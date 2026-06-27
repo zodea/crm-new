@@ -1,0 +1,30 @@
+{
+  "name": "crm-new",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.114",
+    "@pinia/nuxt": "^0.11.3",
+    "@tauri-apps/api": "^2.5.0",
+    "@unocss/nuxt": "^66.7.3",
+    "@vueuse/core": "^14.3.0",
+    "@vueuse/nuxt": "^14.3.0",
+    "nuxt": "^4.4.8",
+    "unocss": "^66.7.3",
+    "vue": "^3.5.38",
+    "vue-router": "^5.1.0",
+    "vxe-table": "^4.19.20",
+    "xe-utils": "^4.0.10"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0"
+  }
+}

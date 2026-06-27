@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2563c7"/>
+    </marker>
+    <marker id="arrowGray" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#7b8794"/>
+    </marker>
+    <style>
+      .page { fill: #f6f8fb; }
+      .board { fill: #fff; stroke: #e2e8f0; stroke-width: 1.5; }
+      .title { font: 700 30px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #171717; }
+      .subtitle { font: 400 18px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #687385; }
+      .zone { fill: #fff; stroke: #d5dde8; stroke-width: 1.5; }
+      .zoneTitle { font: 700 17px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #334155; }
+      .moduleName { font: 700 22px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #fff; }
+      .moduleNameSmall { font: 700 20px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #fff; }
+      .section { font: 700 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #2563c7; }
+      .code { font: 400 15px Consolas, "Microsoft YaHei", monospace; fill: #111827; }
+      .codeRed { font: 700 15px Consolas, "Microsoft YaHei", monospace; fill: #e11d48; }
+      .codeGreen { font: 400 15px Consolas, "Microsoft YaHei", monospace; fill: #15803d; }
+      .hint { font: 400 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #8a93a3; }
+      .small { font: 400 14px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #64748b; }
+      .seam { font: 700 14px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #2563c7; }
+      .orangeText { font: 700 15px "Microsoft YaHei", "PingFang SC", Arial, sans-serif; fill: #f97316; }
+      .card { fill: #fff; stroke: #cfd8e3; stroke-width: 1.6; }
+      .blueHead { fill: #2f66b3; }
+      .midHead { fill: #1769c2; }
+      .orangeHead { fill: #ea580c; }
+      .greenHead { fill: #287a32; }
+      .tealHead { fill: #04786c; }
+      .purpleHead { fill: #7e22ce; }
+      .grayHead { fill: #7b7b7b; }
+      .amberHead { fill: #f97316; }
+      .divider { stroke: #e5e7eb; stroke-width: 1; }
+      .arrowBlue { stroke: #2563c7; stroke-width: 3; fill: none; marker-end: url(#arrowBlue); }
+      .arrowGray { stroke: #7b8794; stroke-width: 2.4; fill: none; marker-end: url(#arrowGray); }
+      .dashBlue { stroke: #2563c7; stroke-width: 2.4; stroke-dasharray: 8 6; fill: none; marker-end: url(#arrowBlue); }
+      .pill { fill: #eef5ff; stroke: #b8cdf4; stroke-width: 1.2; }
+    </style>
+  </defs>
+
+  <rect class="page" width="1600" height="900"/>
+  <rect class="board" x="20" y="20" width="1560" height="860" rx="16" filter="url(#softShadow)"/>
+
+  <text class="title" x="800" y="60" text-anchor="middle">分供方模块 — 数据 / 模块架构</text>
+  <text class="subtitle" x="800" y="90" text-anchor="middle">SQLite 持久化 · Pinia 缓存 · TypeScript 类型 · Supplier 与 ProjectSupplier 分层</text>
+
+  <rect class="zone" x="46" y="112" width="470" height="716" rx="18"/>
+  <text class="zoneTitle" x="70" y="145">ZONE A · 基础库</text>
+  <rect class="pill" x="302" y="126" width="184" height="28" rx="14"/>
+  <text class="seam" x="394" y="145" text-anchor="middle">/base/supplier</text>
+
+  <rect class="card" x="76" y="170" width="410" height="312" rx="13"/>
+  <path class="blueHead" d="M76 183 Q76 170 89 170 H473 Q486 170 486 183 V222 H76 Z"/>
+  <text class="moduleName" x="281" y="204" text-anchor="middle">Supplier（分供方）</text>
+  <text class="codeRed" x="101" y="248">id: string</text>
+  <text class="hint" x="330" y="248">PK</text>
+  <line class="divider" x1="101" y1="262" x2="461" y2="262"/>
+  <text class="section" x="101" y="291">— 基础信息 —</text>
+  <text class="code" x="101" y="320">name: string</text><text class="hint" x="330" y="320">公司全称 · 必填</text>
+  <text class="code" x="101" y="347">aliases: string[]</text><text class="hint" x="330" y="347">简称 / 别名</text>
+  <text class="code" x="101" y="374">taxNo / legalRep / address</text>
+  <line class="divider" x1="101" y1="393" x2="461" y2="393"/>
+  <text class="section" x="101" y="421">— 开票 / 银行 —</text>
+  <text class="code" x="101" y="449">bank: string</text><text class="hint" x="330" y="449">开户行</text>
+  <text class="code" x="101" y="476">bankAccount: string</text><text class="hint" x="330" y="476">银行账号</text>
+
+  <path class="arrowBlue" d="M281 482 L281 528"/>
+  <text class="seam" x="302" y="513">1:N</text>
+
+  <rect class="card" x="76" y="530" width="410" height="188" rx="13"/>
+  <path class="purpleHead" d="M76 543 Q76 530 89 530 H473 Q486 530 486 543 V582 H76 Z"/>
+  <text class="moduleName" x="281" y="564" text-anchor="middle">SupplierCredential（证照附件）</text>
+  <text class="codeRed" x="101" y="608">id: string</text><text class="hint" x="330" y="608">PK</text>
+  <text class="codeGreen" x="101" y="635">supplierId: string</text><text class="hint" x="330" y="635">→ Supplier.id</text>
+  <text class="code" x="101" y="662">category: CredentialCategory</text>
+  <text class="code" x="101" y="689">fileName / filePath / ocrResult</text>
+
+  <rect class="card" x="76" y="742" width="410" height="62" rx="13"/>
+  <path class="grayHead" d="M76 755 Q76 742 89 742 H473 Q486 742 486 755 V782 H76 Z"/>
+  <text class="moduleName" x="281" y="765" text-anchor="middle" font-size="18">CredentialCategory（证照类别）</text>
+  <text class="small" x="101" y="796">营业执照 / 法人身份证 / 银行开户许可证 / 其他</text>
+
+  <rect class="zone" x="556" y="112" width="500" height="716" rx="18"/>
+  <text class="zoneTitle" x="580" y="145">ZONE B · 项目关联</text>
+  <rect class="pill" x="842" y="126" width="184" height="28" rx="14"/>
+  <text class="seam" x="934" y="145" text-anchor="middle">project detail tabs</text>
+
+  <rect class="card" x="586" y="170" width="440" height="333" rx="13"/>
+  <path class="midHead" d="M586 183 Q586 170 599 170 H1013 Q1026 170 1026 183 V222 H586 Z"/>
+  <text class="moduleName" x="806" y="204" text-anchor="middle">ProjectSupplier（项目×分供方）</text>
+  <text class="codeRed" x="611" y="248">id: string</text><text class="hint" x="850" y="248">PK</text>
+  <text class="codeGreen" x="611" y="275">projectId: string</text><text class="hint" x="850" y="275">→ Project.id</text>
+  <text class="codeGreen" x="611" y="302">supplierId: string</text><text class="hint" x="850" y="302">→ Supplier.id</text>
+  <line class="divider" x1="611" y1="319" x2="1001" y2="319"/>
+  <text class="section" x="611" y="348">— 状态机 —</text>
+  <text class="code" x="611" y="375">status: ProjectSupplierStatus</text>
+  <text class="code" x="611" y="402">reviewerId: string | null</text><text class="hint" x="850" y="402">当前审核人</text>
+  <line class="divider" x1="611" y1="420" x2="1001" y2="420"/>
+  <text class="section" x="611" y="449">— 关联子表 —</text>
+  <text class="code" x="611" y="476">contracts: Contract[]</text><text class="hint" x="870" y="476">合同</text>
+  <text class="code" x="611" y="503">claims / invoices / payments</text><text class="hint" x="870" y="503">请款 / 收票 / 付款</text>
+
+  <rect class="card" x="586" y="530" width="440" height="116" rx="13"/>
+  <path class="grayHead" d="M586 543 Q586 530 599 530 H1013 Q1026 530 1026 543 V582 H586 Z"/>
+  <text class="moduleName" x="806" y="564" text-anchor="middle">ProjectSupplierStatus（状态枚举）</text>
+  <text class="code" x="611" y="608">'collecting' / 'contracted' / 'claiming'</text>
+  <text class="code" x="611" y="635">'paid' / 'settled'</text>
+
+  <rect class="card" x="586" y="673" width="215" height="131" rx="13"/>
+  <path class="tealHead" d="M586 686 Q586 673 599 673 H788 Q801 673 801 686 V723 H586 Z"/>
+  <text class="moduleName" x="694" y="704" text-anchor="middle">FileRef</text>
+  <text class="codeRed" x="611" y="749">id: string</text>
+  <text class="code" x="611" y="776">fileName / filePath</text>
+
+  <rect class="card" x="821" y="673" width="205" height="131" rx="13"/>
+  <path class="amberHead" d="M821 686 Q821 673 834 673 H1013 Q1026 673 1026 686 V723 H821 Z"/>
+  <text class="moduleName" x="924" y="704" text-anchor="middle">Computed</text>
+  <text class="orangeText" x="846" y="749">claimedTotal = Σ approved</text>
+  <text class="orangeText" x="846" y="776">balance = contract - paid</text>
+
+  <path class="arrowBlue" d="M486 326 L586 326"/>
+  <text class="seam" x="535" y="313" text-anchor="middle">1:N</text>
+
+  <rect class="zone" x="1096" y="112" width="458" height="716" rx="18"/>
+  <text class="zoneTitle" x="1120" y="145">ZONE C · 独立业务入口</text>
+  <rect class="pill" x="1320" y="126" width="204" height="28" rx="14"/>
+  <text class="seam" x="1422" y="145" text-anchor="middle">Interface: 业务子记录</text>
+
+  <rect class="card" x="1130" y="170" width="390" height="128" rx="13"/>
+  <path class="orangeHead" d="M1130 183 Q1130 170 1143 170 H1507 Q1520 170 1520 183 V222 H1130 Z"/>
+  <text class="moduleName" x="1325" y="204" text-anchor="middle">Contract / Claim（合同 / 请款）</text>
+  <text class="codeRed" x="1155" y="248">id: string</text><text class="hint" x="1365" y="248">projectSupplierId</text>
+  <text class="code" x="1155" y="275">amount / date / status / files</text>
+
+  <rect class="card" x="1130" y="326" width="390" height="128" rx="13"/>
+  <path class="greenHead" d="M1130 339 Q1130 326 1143 326 H1507 Q1520 326 1520 339 V378 H1130 Z"/>
+  <text class="moduleNameSmall" x="1325" y="360" text-anchor="middle">InvoiceRef / Payment（收票 / 付款）</text>
+  <text class="codeRed" x="1155" y="404">id: string</text><text class="hint" x="1365" y="404">projectSupplierId</text>
+  <text class="code" x="1155" y="431">invoiceAmount / paidAmount / method</text>
+
+  <rect class="card" x="1130" y="482" width="390" height="128" rx="13"/>
+  <path class="grayHead" d="M1130 495 Q1130 482 1143 482 H1507 Q1520 482 1520 495 V534 H1130 Z"/>
+  <text class="moduleName" x="1325" y="516" text-anchor="middle">Settlement（结算）</text>
+  <text class="code" x="1155" y="560">date / finalAmount / pdfFile</text>
+  <text class="orangeText" x="1155" y="587">终态 → 数据锁定只读</text>
+
+  <rect class="card" x="1130" y="646" width="390" height="158" rx="13"/>
+  <path class="blueHead" d="M1130 659 Q1130 646 1143 646 H1507 Q1520 646 1520 659 V698 H1130 Z"/>
+  <text class="moduleName" x="1325" y="680" text-anchor="middle">Route / Store 落点</text>
+  <text class="code" x="1155" y="724">/base/supplier → Supplier</text>
+  <text class="code" x="1155" y="751">/material/contract → Contract</text>
+  <text class="code" x="1155" y="778">/finance/payment / ticket → Claim/Payment/Invoice</text>
+
+  <path class="arrowGray" d="M1026 445 C1068 410 1080 244 1130 244"/>
+  <path class="arrowGray" d="M1026 466 C1074 466 1084 390 1130 390"/>
+  <path class="arrowGray" d="M1026 488 C1074 512 1084 546 1130 546"/>
+  <path class="dashBlue" d="M1026 503 C1072 575 1085 705 1130 724"/>
+
+  <rect class="pill" x="46" y="844" width="1508" height="28" rx="14"/>
+  <text class="small" x="800" y="863" text-anchor="middle">架构原则：Supplier 是跨项目共享主数据；ProjectSupplier 是项目维度 Module；合同、请款、收票、付款、结算通过 projectSupplierId 关联，具体操作进入各自页面。</text>
+</svg>

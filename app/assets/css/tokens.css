@@ -1,0 +1,101 @@
+/* 设计系统令牌 — 瑞航CRM
+   色值来源: DESIGN-SYSTEM.md v5 (2026-06-27)
+   双层风格: 侧边栏毛玻璃 + 内容区扁平 */
+
+:root {
+  /* ── 基底色 ── */
+  --bg: #f8f9fb;
+  --panel: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #f3f4f6;
+  --surface-sink: #e9edf4;
+
+  /* ── 描边 ── */
+  --line: #e3e6ea;
+  --line-strong: #c9ced6;
+
+  /* ── 文字 ── */
+  --ink: #1f2329;
+  --ink-soft: #5b6470;
+  --ink-faint: #8b93a1;
+
+  /* ── 品牌色 (v5) ── */
+  --brand: #3976C6;
+  --brand-deep: #2A5996;
+  --brand-soft: rgb(213 230 248);
+
+  /* ── 状态色 (v5) ── */
+  --ok: #169D72;
+  --ok-soft: rgb(207 246 231);
+  --ok-ink: #097251;
+
+  --warn: #D38A20;
+  --warn-soft: rgb(255 239 191);
+  --warn-ink: #8B590C;
+
+  --danger: #E04E5C;
+  --danger-soft: rgb(253 219 224);
+  --danger-ink: #9D313E;
+
+  /* ── 字体 ── */
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* ── 形状 ── */
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 999px;
+
+  /* ── 侧边栏专用 ── */
+  --sidebar-blur: blur(12px);
+  --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+
+  /* ── 弹窗浮层 ── */
+  --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
+
+  /* ── 布局 ── */
+  --sidebar-w: 248px;
+  --sidebar-w-collapsed: 68px;
+  --header-h: 64px;
+  --content-max: 1480px;
+
+  /* ── 动效 ── */
+  --ease-snappy: cubic-bezier(0.2, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 160ms;
+  --dur-dialog: 220ms;
+}
+
+/* ── 全局重置 ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 等宽数字 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 减弱动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
