@@ -1,0 +1,71 @@
+/* vxe-table CRM 风格主题覆写
+   参考: DESIGN-SYSTEM.md §4.13, CRM-PATTERNS.md §1 */
+
+:root {
+  --vxe-font-size-default: 13px;
+  --vxe-font-family: var(--font-sans);
+  --vxe-font-color: var(--ink);
+  --vxe-table-border-color: var(--line);
+  --vxe-table-header-background-color: var(--surface-2);
+  --vxe-table-header-font-color: var(--ink-soft);
+  --vxe-table-header-font-weight: 600;
+  --vxe-table-body-background-color: var(--panel);
+  --vxe-table-row-hover-background-color: var(--surface-3);
+  --vxe-table-row-current-background-color: var(--brand-soft);
+  --vxe-table-border-radius: 0;
+  --vxe-pager-background-color: var(--panel);
+}
+
+/* 无圆角 */
+.vxe-table,
+.vxe-table--render-wrapper {
+  border-radius: 0 !important;
+}
+
+/* 完整网格线 */
+.vxe-table .vxe-header--column,
+.vxe-table .vxe-body--column {
+  border-right: 1px solid var(--line);
+}
+
+/* 表头紧凑 */
+.vxe-table .vxe-header--column {
+  font-size: 11px;
+  padding: 6px 8px;
+}
+
+/* 行紧凑 */
+.vxe-table .vxe-body--column {
+  padding: 7px 8px;
+  font-size: 13px;
+}
+
+/* 金额列等宽 */
+.vxe-table .col--money,
+.vxe-table .col--amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* 链接 */
+.vxe-table .cell--link {
+  color: var(--brand);
+  cursor: pointer;
+}
+.vxe-table .cell--link:hover {
+  text-decoration: underline;
+}
+
+/* 状态纯文字（列表页不用 chip） */
+.vxe-table .cell--status-ok { color: var(--ok); font-weight: 600; }
+.vxe-table .cell--status-warn { color: var(--warn); font-weight: 600; }
+.vxe-table .cell--status-danger { color: var(--danger); font-weight: 600; }
+
+/* 底部汇总栏 */
+.vxe-table .vxe-table--footer {
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  font-weight: 600;
+  font-size: 12px;
+}
