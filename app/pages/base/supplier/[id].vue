@@ -3,6 +3,7 @@ import type { Supplier } from '~/stores/supplier'
 
 const route = useRoute()
 const store = useSupplierStore()
+const psStore = useProjectSupplierStore()
 const toast = useToast()
 
 const supplierId = computed(() => route.params.id as string)
@@ -47,7 +48,14 @@ const CRED_COLOR: Record<string, string> = {
   rejected: 'chip-danger',
 }
 
-onMounted(() => store.load())
+const supplierProjects = computed(() =>
+  psStore.bySupplier(supplierId.value),
+)
+
+onMounted(async () => {
+  await store.load()
+  await psStore.load()
+})
 </script>
 
 <template>
@@ -113,8 +121,45 @@ onMounted(() => store.load())
       <SupplierCredentialTab :supplier-id="supplier.id" />
     </div>
 
+    <div v-else-if="activeTab === 'projects'">
+      <div class="border border-line">
+        <vxe-table
+          :data="supplierProjects"
+          border
+          show-overflow
+          height="auto"
+          :row-config="{ isHover: true }"
+        >
+          <vxe-column type="seq" title="#" width="52" />
+          <vxe-column field="projectName" title="项目名称" min-width="180">
+            <template #default="{ row }">
+              <NuxtLink :to="`/project/${row.projectId}/supplier/${row.supplierId}`" class="cell--link">
+                {{ row.projectName || '—' }}
+              </NuxtLink>
+            </template>
+          </vxe-column>
+          <vxe-column field="status" title="合作状态" width="100">
+            <template #default="{ row }">
+              <span :class="{
+                'cell--status-warn': row.status === 'collecting',
+                'text-brand font-600': row.status === 'contracted' || row.status === 'claiming',
+                'cell--status-ok': row.status === 'paid' || row.status === 'settled',
+              }">
+                {{ { collecting: '资料收集', contracted: '已签合同', claiming: '请款中', paid: '已付款', settled: '已结算' }[row.status] || row.status }}
+              </span>
+            </template>
+          </vxe-column>
+          <vxe-column field="createdAt" title="关联时间" width="160">
+            <template #default="{ row }">
+              {{ row.createdAt?.slice(0, 19).replace('T', ' ') || '—' }}
+            </template>
+          </vxe-column>
+        </vxe-table>
+      </div>
+    </div>
+
     <div v-else class="border border-line bg-panel p-8 text-center text-ink-faint text-13px">
-      {{ tabs.find(t => t.key === activeTab)?.label }} — 待实现
+      {{ tabs.find(t => t.key === activeTab)?.label }} — 待实现（需对应业务模块数据）
     </div>
 
     <!-- 编辑弹窗复用列表页的表单结构 -->
