@@ -143,6 +143,9 @@ onMounted(() => store.load())
       </div>
     </div>
 
+    <!-- 阶段时间线 -->
+    <ProjectTimeline />
+
     <!-- Tab 栏 -->
     <div class="flex border-b border-line mb-4 overflow-x-auto">
       <button
