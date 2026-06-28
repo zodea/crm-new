@@ -163,8 +163,8 @@ onMounted(() => store.load())
     <div v-if="activeTab === 'detail'">
       <ProjectDetailTab :project="project" />
     </div>
-    <div v-else class="border border-line bg-panel p-8 text-center text-ink-faint text-13px">
-      {{ tabs.find(t => t.key === activeTab)?.label }} — 待实现（子表数据需要对应模块先完成）
+    <div v-else>
+      <ProjectSubTables :tab="activeTab" :project-id="projectId" />
     </div>
   </div>
 
