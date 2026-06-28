@@ -17,5 +17,6 @@ provide('sidebarCollapsed', sidebarCollapsed)
         </div>
       </main>
     </div>
+    <ToastHost />
   </div>
 </template>
