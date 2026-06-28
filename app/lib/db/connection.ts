@@ -1,4 +1,5 @@
-import { ALL_SCHEMA, SCHEMA_VERSION } from './schema'
+import { ALL_SCHEMA } from './schema'
+import { seedIfEmpty } from './seed'
 
 interface DbDriver {
   execute(sql: string, params?: unknown[]): Promise<void>
@@ -71,6 +72,8 @@ export async function getDb(): Promise<DbDriver> {
   for (const stmt of stmts) {
     await db.execute(`${stmt};`)
   }
+
+  await seedIfEmpty()
 
   return db
 }
