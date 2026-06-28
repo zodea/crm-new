@@ -8,6 +8,93 @@ const activeTab = ref<'docs' | 'review' | 'ledger'>('docs')
 const searchText = ref('')
 const selectedId = ref<string | null>(null)
 
+// 新增弹窗
+const showAddDialog = ref(false)
+const addForm = reactive({
+  invoiceType: '增值税专用发票',
+  invoiceNumber: '',
+  invoiceDate: '',
+  buyer: '广州市瑞航建筑工程有限公司',
+  seller: '',
+  amount: 0,
+  taxAmount: 0,
+  totalAmount: 0,
+  taxRate: '13%',
+  remark: '',
+  projectName: '',
+  source: 'excel' as const,
+})
+
+function resetAddForm() {
+  addForm.invoiceType = '增值税专用发票'
+  addForm.invoiceNumber = ''
+  addForm.invoiceDate = ''
+  addForm.buyer = '广州市瑞航建筑工程有限公司'
+  addForm.seller = ''
+  addForm.amount = 0
+  addForm.taxAmount = 0
+  addForm.totalAmount = 0
+  addForm.taxRate = '13%'
+  addForm.remark = ''
+  addForm.projectName = ''
+}
+
+async function handleAdd() {
+  if (!addForm.invoiceNumber && !addForm.seller) {
+    toast.warning('请至少填写发票号码或供应商')
+    return
+  }
+  await store.add({
+    ...addForm,
+    ocrStatus: 'done',
+    reviewStatus: 'reviewed',
+    accountStatus: 'confirmed',
+    confirmedAt: new Date().toISOString(),
+  })
+  toast.success('发票已添加')
+  showAddDialog.value = false
+  resetAddForm()
+}
+
+// 删除确认
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref<string | null>(null)
+const deleteTargetName = ref('')
+
+function askDelete(inv: Invoice) {
+  deleteTargetId.value = inv.id
+  deleteTargetName.value = inv.invoiceNumber || inv.fileName || inv.id
+  showDeleteConfirm.value = true
+}
+
+async function confirmDelete() {
+  if (!deleteTargetId.value) return
+  await store.remove(deleteTargetId.value)
+  toast.success('已删除')
+  showDeleteConfirm.value = false
+  deleteTargetId.value = null
+  if (selectedId.value === deleteTargetId.value) selectedId.value = null
+}
+
+// 编辑弹窗（台账用）
+const showEditDialog = ref(false)
+const editForm = reactive<Partial<Invoice>>({})
+const editId = ref('')
+
+function openEdit(inv: Invoice) {
+  editId.value = inv.id
+  Object.assign(editForm, { ...inv })
+  showEditDialog.value = true
+}
+
+async function handleEdit() {
+  if (!editId.value) return
+  await store.update(editId.value, editForm)
+  toast.success('已更新')
+  showEditDialog.value = false
+}
+
+// 统计
 const tabCounts = computed(() => ({
   docs: store.documents.length,
   review: store.pendingReview.length,
@@ -78,9 +165,9 @@ function selectForReview(inv: Invoice) {
   activeTab.value = 'review'
 }
 
-function confirmSelected() {
+async function confirmSelected() {
   if (!selectedId.value) return
-  store.confirmInvoice(selectedId.value)
+  await store.confirmInvoice(selectedId.value)
   toast.success('已确认并入账')
   selectedId.value = null
 }
@@ -114,6 +201,9 @@ onMounted(() => store.load())
         发票台账 {{ tabCounts.ledger }}
       </button>
       <div class="flex-1" />
+      <button class="btn-secondary mr-2" @click="showAddDialog = true">
+        <span class="i-lucide-plus text-13px mr-1" /> 手动录入
+      </button>
       <button class="btn-primary mr-1" disabled>
         <span class="i-lucide-scan-text text-13px mr-1" /> 批量识别
       </button>
@@ -178,9 +268,16 @@ onMounted(() => store.load())
               <span class="text-ink-soft">{{ row.invoiceType || '—' }}</span>
             </template>
           </vxe-column>
-          <vxe-column field="fileSize" title="大小" width="90">
+          <vxe-column field="seller" title="供应商" min-width="160">
             <template #default="{ row }">
-              <span class="text-ink-soft">{{ row.fileSize || '—' }}</span>
+              <span class="text-ink-soft">{{ row.seller || '—' }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="totalAmount" title="价税合计" width="120">
+            <template #default="{ row }">
+              <span class="font-mono font-700 block text-right">
+                {{ row.totalAmount ? fmtMoney(row.totalAmount) : '—' }}
+              </span>
             </template>
           </vxe-column>
           <vxe-column title="状态" width="110">
@@ -198,7 +295,7 @@ onMounted(() => store.load())
                 >
                   <span class="i-lucide-file-search text-14px" />
                 </button>
-                <button class="icon-btn-danger" title="删除">
+                <button class="icon-btn-danger" title="删除" @click="askDelete(row)">
                   <span class="i-lucide-trash-2 text-14px" />
                 </button>
               </div>
@@ -334,12 +431,12 @@ onMounted(() => store.load())
             </template>
           </vxe-column>
           <vxe-column title="操作" width="90" fixed="right">
-            <template #default>
+            <template #default="{ row }">
               <div class="flex items-center gap-1">
-                <button class="icon-btn" title="编辑">
+                <button class="icon-btn" title="编辑" @click="openEdit(row)">
                   <span class="i-lucide-square-pen text-14px" />
                 </button>
-                <button class="icon-btn-danger" title="删除">
+                <button class="icon-btn-danger" title="删除" @click="askDelete(row)">
                   <span class="i-lucide-trash-2 text-14px" />
                 </button>
               </div>
@@ -356,5 +453,150 @@ onMounted(() => store.load())
         <span class="font-mono font-700 text-ink ml-1">¥{{ fmtMoney(ledgerTax) }}</span>
       </div>
     </div>
+
+    <!-- ═══ 删除确认弹窗 ═══ -->
+    <ConfirmDialog
+      :open="showDeleteConfirm"
+      title="删除发票"
+      :message="`确认删除发票「${deleteTargetName}」？此操作不可撤回。`"
+      confirm-label="删除"
+      :danger="true"
+      @confirm="confirmDelete"
+      @cancel="showDeleteConfirm = false"
+    />
+
+    <!-- ═══ 新增发票弹窗 ═══ -->
+    <FormDialog
+      :open="showAddDialog"
+      title="手动录入发票"
+      save-label="添加"
+      width="min(640px, 95vw)"
+      @save="handleAdd"
+      @cancel="showAddDialog = false"
+    >
+      <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div>
+          <label class="field-label">票据类型</label>
+          <select v-model="addForm.invoiceType" class="field-input w-full">
+            <option value="增值税专用发票">增值税专用发票</option>
+            <option value="增值税普通发票">增值税普通发票</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">发票号码</label>
+          <input v-model="addForm.invoiceNumber" class="field-input w-full font-mono" placeholder="发票号码">
+        </div>
+        <div>
+          <label class="field-label">开票日期</label>
+          <input v-model="addForm.invoiceDate" type="date" class="field-input w-full font-mono">
+        </div>
+        <div>
+          <label class="field-label">税率</label>
+          <select v-model="addForm.taxRate" class="field-input w-full">
+            <option value="13%">13%</option>
+            <option value="9%">9%</option>
+            <option value="6%">6%</option>
+            <option value="3%">3%</option>
+            <option value="1%">1%</option>
+            <option value="0%">0%</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">购买方</label>
+          <input v-model="addForm.buyer" class="field-input w-full">
+        </div>
+        <div>
+          <label class="field-label">供应商（销方）</label>
+          <input v-model="addForm.seller" class="field-input w-full" placeholder="供应商名称">
+        </div>
+        <div>
+          <label class="field-label">不含税金额</label>
+          <input v-model.number="addForm.amount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">税额</label>
+          <input v-model.number="addForm.taxAmount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">价税合计</label>
+          <input v-model.number="addForm.totalAmount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">对应项目</label>
+          <input v-model="addForm.projectName" class="field-input w-full" placeholder="项目名称">
+        </div>
+        <div class="col-span-2">
+          <label class="field-label">票面备注</label>
+          <input v-model="addForm.remark" class="field-input w-full" placeholder="备注信息">
+        </div>
+      </div>
+    </FormDialog>
+
+    <!-- ═══ 编辑发票弹窗 ═══ -->
+    <FormDialog
+      :open="showEditDialog"
+      title="编辑发票"
+      save-label="保存"
+      width="min(640px, 95vw)"
+      @save="handleEdit"
+      @cancel="showEditDialog = false"
+    >
+      <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div>
+          <label class="field-label">票据类型</label>
+          <select v-model="editForm.invoiceType" class="field-input w-full">
+            <option value="增值税专用发票">增值税专用发票</option>
+            <option value="增值税普通发票">增值税普通发票</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">发票号码</label>
+          <input v-model="editForm.invoiceNumber" class="field-input w-full font-mono">
+        </div>
+        <div>
+          <label class="field-label">开票日期</label>
+          <input v-model="editForm.invoiceDate" type="date" class="field-input w-full font-mono">
+        </div>
+        <div>
+          <label class="field-label">税率</label>
+          <select v-model="editForm.taxRate" class="field-input w-full">
+            <option value="13%">13%</option>
+            <option value="9%">9%</option>
+            <option value="6%">6%</option>
+            <option value="3%">3%</option>
+            <option value="1%">1%</option>
+            <option value="0%">0%</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">购买方</label>
+          <input v-model="editForm.buyer" class="field-input w-full">
+        </div>
+        <div>
+          <label class="field-label">供应商（销方）</label>
+          <input v-model="editForm.seller" class="field-input w-full">
+        </div>
+        <div>
+          <label class="field-label">不含税金额</label>
+          <input v-model.number="editForm.amount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">税额</label>
+          <input v-model.number="editForm.taxAmount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">价税合计</label>
+          <input v-model.number="editForm.totalAmount" type="number" class="field-input w-full font-mono" step="0.01">
+        </div>
+        <div>
+          <label class="field-label">对应项目</label>
+          <input v-model="editForm.projectName" class="field-input w-full">
+        </div>
+        <div class="col-span-2">
+          <label class="field-label">票面备注</label>
+          <input v-model="editForm.remark" class="field-input w-full">
+        </div>
+      </div>
+    </FormDialog>
   </div>
 </template>
