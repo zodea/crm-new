@@ -1,6 +1,8 @@
 <script setup lang="ts">
 const route = useRoute()
 
+const showNotifications = ref(false)
+
 const pageTitle = computed(() => {
   const path = route.path
   if (path === '/') return '首页'
@@ -32,13 +34,19 @@ const pageTitle = computed(() => {
     <div class="flex-1" />
 
     <!-- 通知 -->
-    <button class="icon-btn mr-2" title="通知">
+    <button class="icon-btn mr-2 relative" title="通知" @click="showNotifications = true">
       <span class="i-lucide-bell-ring text-15px" />
+      <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-danger rounded-full" />
     </button>
 
     <!-- 设置 -->
     <button class="icon-btn" title="设置">
       <span class="i-lucide-settings text-15px" />
     </button>
+
+    <NotificationDrawer
+      :open="showNotifications"
+      @close="showNotifications = false"
+    />
   </header>
 </template>
