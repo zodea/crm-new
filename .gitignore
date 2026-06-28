@@ -23,4 +23,7 @@ logs
 .env.*
 !.env.example
 
+# Dev seed 真实数据（脱敏版 *.json 提交，真实版 *.local.json 不提交）
+app/lib/db/seed/*.local.json
+
 设计系统配色更新/

@@ -9,6 +9,12 @@ export default defineNuxtConfig({
     '@vueuse/nuxt',
   ],
 
+  components: {
+    dirs: [
+      { path: '~/components', pathPrefix: false },
+    ],
+  },
+
   css: [
     '@/assets/css/tokens.css',
   ],

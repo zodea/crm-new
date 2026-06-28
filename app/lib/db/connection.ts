@@ -14,7 +14,8 @@ function isTauri(): boolean {
 }
 
 async function createTauriDriver(): Promise<DbDriver> {
-  const { default: Database } = await import('@tauri-apps/plugin-sql')
+  const mod = '@tauri-apps/' + 'plugin-sql'
+  const { default: Database } = await import(/* @vite-ignore */ mod)
   const conn = await Database.load('sqlite:crm.db')
   return {
     async execute(sql, params = []) {
@@ -31,11 +32,13 @@ async function createTauriDriver(): Promise<DbDriver> {
 
 async function createSqlJsDriver(): Promise<DbDriver> {
   const initSqlJs = (await import('sql.js')).default
-  const SQL = await initSqlJs()
+  const wasmResp = await fetch('/sql-wasm.wasm')
+  const wasmBinary = await wasmResp.arrayBuffer()
+  const SQL = await initSqlJs({ wasmBinary })
   const conn = new SQL.Database()
   return {
-    async execute(sql) {
-      conn.run(sql)
+    async execute(sql, params = []) {
+      conn.run(sql, params as any[])
     },
     async select<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       const stmt = conn.prepare(sql)

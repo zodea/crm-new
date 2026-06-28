@@ -2,6 +2,8 @@
 const route = useRoute()
 
 const showNotifications = ref(false)
+const showDevTools = ref(false)
+const isDev = import.meta.dev
 
 const pageTitle = computed(() => {
   const path = route.path
@@ -33,6 +35,11 @@ const pageTitle = computed(() => {
 
     <div class="flex-1" />
 
+    <!-- 开发工具 (dev only) -->
+    <button v-if="isDev" class="icon-btn mr-2" title="开发工具" @click="showDevTools = true">
+      <span class="i-lucide-wrench text-15px text-warn" />
+    </button>
+
     <!-- 通知 -->
     <button class="icon-btn mr-2 relative" title="通知" @click="showNotifications = true">
       <span class="i-lucide-bell-ring text-15px" />
@@ -47,6 +54,12 @@ const pageTitle = computed(() => {
     <NotificationDrawer
       :open="showNotifications"
       @close="showNotifications = false"
+    />
+
+    <DevToolsPanel
+      v-if="isDev"
+      :open="showDevTools"
+      @close="showDevTools = false"
     />
   </header>
 </template>

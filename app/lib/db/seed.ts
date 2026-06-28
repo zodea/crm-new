@@ -1,10 +1,69 @@
 import { execute, select } from './connection'
 import { generateId } from '~/lib/util/id'
 
-export async function seedIfEmpty() {
-  const [{ cnt }] = await select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
-  if (cnt > 0) return
+type SeedRow = Record<string, unknown>
 
+const localFiles = import.meta.glob<{ default: SeedRow[] }>('./seed/*.local.json', { eager: true })
+const baseFiles = import.meta.glob<{ default: SeedRow[] }>('./seed/*.json', { eager: true })
+
+function loadSeedJson(table: string): SeedRow[] | null {
+  const localKey = `./seed/${table}.local.json`
+  if (localFiles[localKey]) return localFiles[localKey].default
+
+  const baseKey = `./seed/${table}.json`
+  if (baseFiles[baseKey]) return baseFiles[baseKey].default
+
+  return null
+}
+
+function columnPlaceholders(row: SeedRow): { cols: string[], vals: unknown[] } {
+  const cols = Object.keys(row)
+  const vals = cols.map(c => row[c])
+  return { cols, vals }
+}
+
+async function seedFromJson(table: string, rows: SeedRow[]) {
+  for (const row of rows) {
+    const { cols, vals } = columnPlaceholders(row)
+    const placeholders = cols.map(() => '?').join(', ')
+    const colNames = cols.map(c => `"${c}"`).join(', ')
+    await execute(`INSERT OR IGNORE INTO "${table}" (${colNames}) VALUES (${placeholders})`, vals)
+  }
+}
+
+export async function seedIfEmpty() {
+  const jsonTables = [
+    'projects', 'suppliers', 'crews', 'workers',
+    'supplier_credentials', 'project_suppliers', 'phase_tasks',
+    'construction_contracts', 'owner_change_orders', 'expenditure_contracts',
+    'invoice_applications', 'receipt_registrations', 'current_receipts',
+    'current_payments', 'payment_records', 'invoices',
+    'settlements', 'supplement_agreements', 'contract_line_items',
+    'ticket_registrations', 'payment_applications', 'file_refs',
+  ]
+
+  let anySeeded = false
+
+  for (const table of jsonTables) {
+    const [{ cnt }] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
+    if (cnt > 0) continue
+
+    const json = loadSeedJson(table)
+    if (json && json.length > 0) {
+      await seedFromJson(table, json)
+      anySeeded = true
+    }
+  }
+
+  if (!anySeeded) {
+    const [{ cnt }] = await select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
+    if (cnt === 0) {
+      await seedHardcoded()
+    }
+  }
+}
+
+async function seedHardcoded() {
   const projIds = await seedProjects()
   const supIds = await seedSuppliers()
   await seedProjectSuppliers(projIds, supIds)

@@ -84,6 +84,39 @@ CREATE TABLE IF NOT EXISTS suppliers (
   updated_at          TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS invoices (
+  id              TEXT PRIMARY KEY,
+  file_name       TEXT DEFAULT '',
+  file_path       TEXT DEFAULT '',
+  file_size       TEXT DEFAULT '',
+  page_count      INTEGER DEFAULT 0,
+  invoice_type    TEXT DEFAULT '',
+  invoice_number  TEXT DEFAULT '',
+  invoice_date    TEXT DEFAULT '',
+  buyer           TEXT DEFAULT '',
+  buyer_tax_no    TEXT DEFAULT '',
+  seller          TEXT DEFAULT '',
+  seller_tax_no   TEXT DEFAULT '',
+  amount          REAL DEFAULT 0,
+  tax_amount      REAL DEFAULT 0,
+  total_amount    REAL DEFAULT 0,
+  tax_rate        TEXT DEFAULT '',
+  remark          TEXT DEFAULT '',
+  project_id      TEXT,
+  project_name    TEXT DEFAULT '',
+  supplier_id     TEXT,
+  ocr_status      TEXT DEFAULT 'pending',
+  review_status   TEXT DEFAULT 'unreviewed',
+  account_status  TEXT DEFAULT 'none',
+  dup_status      TEXT DEFAULT 'normal',
+  source          TEXT DEFAULT 'scan',
+  print_rotation  INTEGER DEFAULT 0,
+  ocr_confidence  REAL,
+  confirmed_at    TEXT,
+  created_at      TEXT DEFAULT (datetime('now')),
+  updated_at      TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS crews (
   id             TEXT PRIMARY KEY,
   name           TEXT NOT NULL,
@@ -382,6 +415,9 @@ CREATE INDEX IF NOT EXISTS idx_current_receipts_proj ON current_receipts(project
 CREATE INDEX IF NOT EXISTS idx_current_payments_proj ON current_payments(project_id);
 CREATE INDEX IF NOT EXISTS idx_payment_records_proj ON payment_records(project_id);
 CREATE INDEX IF NOT EXISTS idx_workers_crew ON workers(crew_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_project ON invoices(project_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_supplier ON invoices(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_ocr_status ON invoices(ocr_status);
 `
 
 export const ALL_SCHEMA = [
