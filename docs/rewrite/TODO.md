@@ -28,14 +28,14 @@
 |---|---|---|---|
 | 分供方列表 | `/base/supplier` | `base-supplier.md` | ✅ 已确认 |
 | 分供方详情（6Tab） | `/base/supplier/:id` | `base-supplier.md` | ✅ 已确认 |
-| 班组管理 | `/base/crew` | `base-crew.md` | ⬜ 待设计 |
-| 工人信息 | `/base/worker` | `base-worker.md` | ⬜ 待设计 |
+| 班组管理（列表+详情+项目配置） | `/base/crew` · `/base/crew/:id` | `base-crew.md` | ✅ 已确认 |
+| 工人信息（列表+详情4Tab+亲属） | `/base/worker` · `/base/worker/:id` | `base-worker.md` | ✅ 已确认 |
 
 ### 1.4 资金管理
 
 | 页面 | 路由 | 设计文档 | 状态 |
 |---|---|---|---|
-| 发票识别（四阶段） | `/finance/invoice` | `finance-invoice.md` | ✅ 已确认 |
+| 发票识别（三阶段重构） | `/finance/invoice` | `finance-invoice.md` | ✅ 已确认（重写） |
 | 开票因子计算器 | `/finance/invoice/factor` | `finance-invoice.md` | ✅ 已确认 |
 | 开票申请 | `/finance/billing` | `finance-billing.md` | ⬜ 待设计 |
 | 收款登记 | `/finance/receipt` | `finance-receipt.md` | ⬜ 待设计 |
@@ -80,9 +80,9 @@
 
 | 指标 | 数量 |
 |---|---|
-| ✅ 已确认 | 10 |
+| ✅ 已确认 | 12 |
 | 🟡 有效果图待写文档 | 3 |
-| ⬜ 待设计 | 22 |
+| ⬜ 待设计 | 20 |
 | **合计** | **35** |
 
 ---
@@ -139,8 +139,11 @@
 
 | 实体 | 表名 | PK | 关键字段 | 外键 | 设计文档 | 状态 |
 |---|---|---|---|---|---|---|
-| Crew | `crews` | `id` | name, type, leader, projectConfigs[] | — | `base-crew.md` | ⬜ |
-| Worker | `workers` | `id` | name, idCard, phone, certificates[], entryDate | → `crews.id` | `base-worker.md` | ⬜ |
+| Crew | `crews` | `id` | name, trade, contactName, contactPhone | — | `base-crew.md` | ✅ |
+| CrewWorker | `crew_workers` | `id` | payMode, dailyWage, rentOverride, mgmtOverride, ratioOverride | → `crews.id` + `workers.id` | `base-crew.md` | ✅ |
+| CrewProjectConfig | `crew_project_config` | `id` | defaultPayRatio, rentSubsidyEnabled/Price, mgmtFeeEnabled/Price | → `crews.id` + `projects.id` | `base-crew.md` | ✅ |
+| CrewProjectItem | `crew_project_items` | `id` | itemName, unit, unitPrice, inRentSubsidy, inMgmtFee | → `crew_project_config.id` | `base-crew.md` | ✅ |
+| Worker | `workers` | `id` | name, idCard, phone, familyGroupId, certs[], safetyEducation | — | `base-worker.md` | ✅ |
 | QuantityRecord | `quantity_records` | `id` | building, floor, room, workType, area, month, unitPrice | → `projects.id` + `crews.id` + `workers.id` | `subcontract-quantity.md` | ⬜ |
 | PayrollRecord | `payroll_records` | `id` | month, grossAmount, deductions, netAmount, status | → `projects.id` + `crews.id` + `workers.id` | `subcontract-payroll.md` | ⬜ |
 
@@ -148,9 +151,9 @@
 
 | 指标 | 数量 |
 |---|---|
-| ✅ 实体已定义 | 7 (Project, Supplier, SupplierCredential, FileRef, ProjectSupplier, Settlement, PhaseTask) |
-| ⬜ 实体待定义 | 21 |
-| **合计** | **28** |
+| ✅ 实体已定义 | 12 (Project, Supplier, SupplierCredential, FileRef, ProjectSupplier, Settlement, PhaseTask, Crew, CrewWorker, CrewProjectConfig, CrewProjectItem, Worker) |
+| ⬜ 实体待定义 | 20 |
+| **合计** | **32** |
 
 ---
 
@@ -283,6 +286,9 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 | 项目信息 | `pages/project-info.md` | 项目列表+详情(9Tab)+25子表 |
 | 分供方主数据 | `pages/base-supplier.md` | 列表+详情(6Tab)+证照OCR |
 | 项目×分供方 | `pages/project-supplier.md` | 工作台(6Tab)+状态机+结算 |
+| 班组管理 | `pages/base-crew.md` | 列表+详情(全宽)+项目选择器+工人配置+扣罚只读 |
+| 工人信息 | `pages/base-worker.md` | 列表+详情(4Tab+亲属右栏)+familyGroupId+证书 |
+| 发票识别（重写） | `pages/finance-invoice.md` | 三阶段(文档管理/校对排版/台账)+Excel导入+多维导出 |
 
 ---
 
@@ -299,7 +305,7 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 | **P3** | 分包合同 | `subcontract-contract.md` | — | 分包管理核心 |
 | **P3** | 工程量管理 | `subcontract-quantity.md` | QuantityRecord | 与首页甘特图共享数据源 |
 | **P3** | 工资核算 | `subcontract-payroll.md` | PayrollRecord | 已有旧版页面可参考 |
-| **P4** | 班组 / 工人 | `base-crew.md` / `base-worker.md` | Crew, Worker | 已有旧版页面可参考 |
+| ~~P4~~ | ~~班组 / 工人~~ | ~~`base-crew.md` / `base-worker.md`~~ | ~~Crew, Worker~~ | ✅ 已完成 |
 | **P4** | 罚扣/结算/验收/保修等 | 各自独立文档 | — | 按需逐步设计 |
 | **P4** | 费用报销 / 支付记录 | `finance-reimbursement.md` / `finance-records.md` | — | 按需设计 |
 | **P4** | 考勤管理 | `subcontract-attendance.md` | — | 按需设计 |

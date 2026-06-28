@@ -113,8 +113,13 @@
 
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
-| Crew | `crews` | `id` | `base-crew.md`（待设计） |
-| Worker | `workers` | `id` | `base-worker.md`（待设计） |
+| Crew | `crews` | `id` | `base-crew.md` |
+| CrewWorker | `crew_workers` | `id` | `base-crew.md` |
+| CrewProjectConfig | `crew_project_config` | `id` | `base-crew.md` |
+| CrewProjectItem | `crew_project_items` | `id` | `base-crew.md` |
+| Worker | `workers` | `id` | `base-worker.md` |
+| WorkerCert | `worker_certs` | `id` | `base-worker.md` |
+| PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
 | QuantityRecord | `quantity_records` | `id` | `subcontract-quantity.md`（待设计） |
 | PayrollRecord | `payroll_records` | `id` | `subcontract-payroll.md`（待设计） |
 
@@ -159,7 +164,23 @@
 | `current_payments` | `projectId` | `projects.id` | N:1 | 往来付款 → 项目 |
 | `payment_records` | `projectId` | `projects.id` | N:1 | 支付记录 → 项目 |
 
-### 3.4 文件引用（多态关联）
+### 3.4 分包及人工关联
+
+| 表 | 外键字段 | 引用 | 关系 | 说明 |
+|---|---|---|---|---|
+| `crew_workers` | `crewId` | `crews.id` | N:1 | 工人 → 班组 |
+| `crew_workers` | `workerId` | `workers.id` | N:1 | 工人 → 班组 |
+| `crew_project_config` | `crewId` | `crews.id` | N:1 | 班组项目配置 → 班组 |
+| `crew_project_config` | `projectId` | `projects.id` | N:1 | 班组项目配置 → 项目 |
+| `crew_project_items` | `configId` | `crew_project_config.id` | N:1 | 分项单价 → 班组项目配置 |
+| `worker_certs` | `workerId` | `workers.id` | N:1 | 工人证书 → 工人 |
+| `penalty_records` | `projectId` | `projects.id` | N:1 | 扣罚 → 项目 |
+| `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
+| `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
+| `quantity_records` | `projectId` + `crewId` + `workerId` | — | N:1 | 工程量 |
+| `payroll_records` | `projectId` + `crewId` + `workerId` | — | N:1 | 工资 |
+
+### 3.5 文件引用（多态关联）
 
 `file_refs` 使用 `ownerType` + `ownerId` 多态关联到多种实体：
 
@@ -172,6 +193,9 @@
 | `expenditure_contract` | ExpenditureContract | 合同扫描件 |
 | `payment_application` | PaymentApplication | 付款附件 |
 | `ticket_registration` | TicketRegistration | 发票扫描件 |
+| `worker` | Worker | 工人证件照片/信息文件 |
+| `worker_cert` | WorkerCert | 证书扫描件（身份证/特种作业证等） |
+| `penalty_record` | PenaltyRecord | 罚款照片/整改前后对比照/联系单扫描件 |
 
 ```ts
 interface FileRef {
