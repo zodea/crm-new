@@ -337,10 +337,63 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 
 ---
 
-## § 8 维护规则
+## § 8 撤回机制（待实现）
+
+> 所有新增/编辑/删除操作需支持撤回。V1 先用软删除 + 操作日志，后续可扩展为后台管理回退面板。
+
+### 8.1 软删除
+
+所有业务表增加 `deleted_at TEXT DEFAULT NULL` 字段。删除操作不执行 `DELETE`，而是 `UPDATE SET deleted_at = datetime('now')`。
+
+查询默认过滤已删除记录：`WHERE deleted_at IS NULL`。
+
+恢复操作：`UPDATE SET deleted_at = NULL WHERE id = ?`。
+
+```sql
+-- 所有业务表统一追加（后续迁移脚本）
+ALTER TABLE projects ADD COLUMN deleted_at TEXT DEFAULT NULL;
+ALTER TABLE suppliers ADD COLUMN deleted_at TEXT DEFAULT NULL;
+-- ... 其他表同理
+```
+
+### 8.2 操作日志表
+
+```sql
+CREATE TABLE IF NOT EXISTS operation_logs (
+  id          TEXT PRIMARY KEY,
+  table_name  TEXT NOT NULL,        -- 操作的表名
+  record_id   TEXT NOT NULL,        -- 操作的记录 id
+  action      TEXT NOT NULL,        -- 'create' | 'update' | 'delete' | 'restore'
+  before_data TEXT,                 -- 操作前数据快照 (JSON)
+  after_data  TEXT,                 -- 操作后数据快照 (JSON)
+  operator    TEXT DEFAULT '',      -- 操作人
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_logs_record ON operation_logs(table_name, record_id);
+CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at);
+```
+
+### 8.3 撤回规则
+
+1. **删除撤回**：从操作日志中恢复 `before_data`，或直接清除 `deleted_at`
+2. **编辑撤回**：从操作日志中恢复 `before_data` 的字段值
+3. **新增撤回**：标记软删除
+4. **撤回时效**：V1 不限制，V2 可按天数限制（如 30 天内可撤回）
+5. **级联撤回**：删除父记录时子记录一并软删除，撤回时一并恢复
+
+### 8.4 实施计划
+
+- **V1**：在 Pinia store 的 CRUD 方法中集成 `operation_logs` 写入和 `deleted_at` 过滤，提供 `undo()` 方法
+- **V2**：后台管理面板展示操作日志，支持按时间/表/操作类型筛选和批量回退
+
+---
+
+## § 9 维护规则
 
 1. 新增实体时必须同步更新本文件的 § 2 实体清单和 § 3 外键索引
 2. 各模块设计文档只定义业务字段，实体间关系统一在本文件管理
+3. 所有业务表的删除操作使用软删除（§ 8.1），并记录操作日志（§ 8.2）
 3. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
 4. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
 5. 计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询
