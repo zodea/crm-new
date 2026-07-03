@@ -1,0 +1,69 @@
+// AppData — 跨页共享业务数据 store（反馈轮 9 第二层：双页/多页联动地基）
+// 与 ScheduleData(排程)/InvoiceShared(发票域) 同模式：隐藏预载注册 window.APP，subscribe/notify 订阅刷新。
+// 首批集合：projects / suppliers —— 列表页与详情页共用同一份数据，任一处编辑另一处实时可见。
+// 约定：页面不再各自 useState(data.xxx.slice()) 持有副本；读 APP.rows()，改走 APP.update/add/softDel。
+(function () {
+  if (window.APP) { window.AppDataScreen = window.AppDataScreen || function () { return null; }; return; }
+
+  const listeners = new Set();
+  const notify = () => listeners.forEach((f) => { try { f(); } catch (e) {} });
+  const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
+
+  // —— 项目扩展字段（红圈式列表列 + 详情基础信息；原 ProjectScreen 内 EXT 上移到此，两页共用）——
+  const EXT = {
+    p1: { income: 17200000, budget: 26800000, planEnd: "2026-12-30", execManager: "刘志强", builder: "黄伟明" },
+    p2: { income: 6800000, budget: 14200000, planEnd: "2027-03-15", execManager: "梁国栋", builder: "宋子豪" },
+    p3: { income: 30500000, budget: 29800000, planEnd: "2026-08-30", actualEnd: "", execManager: "陈志明", builder: "冯家俊" },
+    p4: { income: 4200000, budget: 12600000, planEnd: "—", execManager: "赵德柱", builder: "—" },
+    p5: { income: 8600000, budget: 15800000, planEnd: "2026-11-30", execManager: "周维", builder: "吴大龙" },
+    p6: { income: 3100000, budget: 9800000, planEnd: "2027-01-20", execManager: "郑海峰", builder: "许志安" },
+    p7: { income: 21800000, budget: 20600000, planEnd: "2025-12-31", actualEnd: "2025-12-18", execManager: "何先进", builder: "郭天佑" },
+    p8: { income: 2400000, budget: 11200000, planEnd: "2027-04-30", execManager: "刘乐喜", builder: "邓建华" },
+    p9: { income: 18600000, budget: 18200000, planEnd: "2026-06-30", actualEnd: "", execManager: "张建军", builder: "叶国强" },
+    p10: { income: 9800000, budget: 9200000, planEnd: "2024-12-31", actualEnd: "2024-12-20", execManager: "王志文", builder: "钟伟雄" },
+    p11: { income: 1200000, budget: 8600000, planEnd: "2027-06-30", execManager: "陈家豪", builder: "罗永康" },
+    p12: { income: 860000, budget: 2400000, planEnd: "长期", execManager: "李建国", builder: "多班组" },
+  };
+  const statusToStage = { "在建": "施工中", "收尾": "完工及竣备", "停工": "停工", "完工": "保修" };
+  const mergeProject = (p) => ({
+    ...p, ...(EXT[p.id] || {}),
+    stage: p.stage || statusToStage[p.status] || "施工中",
+    contractName: p.contractName || (p.name + (p.id === "p12" ? "维修框架协议" : "施工总承包合同")),
+  });
+
+  // —— 分供方扩展（原 SupplierScreen meta 口径：资料状态/项目数/累计额）——
+  const SUP_EXT = [
+    { cred: "complete", projectCount: 3, contractTotal: 1860000, paidTotal: 1420000, category: "材料供应商", contact: "李大板", phone: "13802801234" },
+    { cred: "complete", projectCount: 2, contractTotal: 960000, paidTotal: 960000, category: "材料供应商", contact: "陈花城", phone: "13905201567" },
+    { cred: "incomplete", projectCount: 2, contractTotal: 2350000, paidTotal: 1800000, category: "材料供应商", contact: "赵汇丰", phone: "13712345678" },
+    { cred: "complete", projectCount: 1, contractTotal: 430000, paidTotal: 380000, category: "材料供应商", contact: "钱穗建", phone: "13633334444" },
+    { cred: "reviewing", projectCount: 1, contractTotal: 680000, paidTotal: 260000, category: "劳务分包商", contact: "孙鸿运", phone: "13588887777" },
+  ];
+
+  const state = { projects: [], suppliers: [] };
+  const init = () => {
+    const d = window.KIT_DATA;
+    if (!d) return false;
+    state.projects = (d.projects || []).map(mergeProject);
+    state.suppliers = (d.suppliers || []).map((s, i) => ({ ...s, ...(SUP_EXT[i] || SUP_EXT[0]) }));
+    return true;
+  };
+  if (!init()) { const t = setInterval(() => { if (init()) { clearInterval(t); notify(); } }, 50); }
+
+  const rows = (coll) => (state[coll] || []).filter((x) => !x.discarded);
+  const all = (coll) => state[coll] || [];
+  const get = (coll, id) => (state[coll] || []).find((x) => x.id === id);
+  const update = (coll, id, patch) => { state[coll] = state[coll].map((x) => (x.id === id ? { ...x, ...patch } : x)); notify(); };
+  const add = (coll, row) => { state[coll] = [coll === "projects" ? mergeProject(row) : row, ...state[coll]]; notify(); };
+  const softDel = (coll, id) => update(coll, id, { discarded: true });
+  const restore = (coll, id) => update(coll, id, { discarded: false });
+
+  // React 订阅 hook：任何页面 const A = window.APP; A.use(); 后读 A.rows('projects')
+  const use = () => {
+    const [, force] = React.useReducer((x) => x + 1, 0);
+    React.useEffect(() => subscribe(force), []);
+  };
+
+  window.APP = { subscribe, notify, rows, all, get, update, add, softDel, restore, use };
+  window.AppDataScreen = function () { return null; };
+})();

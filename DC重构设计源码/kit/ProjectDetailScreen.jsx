@@ -522,8 +522,14 @@
 
   function ProjectDetailScreen({ data, params, navigate }) {
     const id = (params && params.id) || "p1";
-    const proj = data.projects.find((p) => p.id === id) || data.projects[0];
-    const m = META[proj.id] || META.p1;
+    // 反馈轮9 第二层：项目主数据走 window.APP 共享 store（与项目列表同源，编辑互通实时联动）
+    const A = window.APP;
+    if (A) A.use();
+    const proj = (A && A.get("projects", id)) || data.projects.find((p) => p.id === id) || data.projects[0];
+    // 经营/票税等聚合仍按 id mock（META）；与 store 重叠的基础字段以 store 为准
+    const m = { ...(META[proj.id] || META.p1) };
+    ["contractName", "operationType", "region", "riskLevel", "overview"].forEach((k) => { if (proj[k] != null && proj[k] !== "") m[k] = proj[k]; });
+    if (proj.planEnd != null && proj.planEnd !== "") m.plannedEnd = proj.planEnd;
     const [tab, setTab] = React.useState("info");
 
     const TABS = [
@@ -572,7 +578,15 @@
                   { key: "riskLevel", label: "项目风险级别", type: "select", options: ["低", "中", "高"], value: m.riskLevel },
                   { key: "overview", label: "工程概况", type: "textarea", value: m.overview, full: true },
                 ],
-                onSave: () => UI().toast("已保存项目信息", "ok"),
+                // 反馈轮9：写回共享 store → 项目列表页实时联动（同名字段映射 planEnd/stage）
+                onSave: (v) => {
+                  if (!v.name) { UI().toast("项目名称不能为空", "danger"); return; }
+                  const patch = { name: v.name, contractName: v.contractName, developer: v.developer, developer2: v.developer2 || "—",
+                    operationType: v.operationType, stage: v.status, region: v.region, manager: v.manager,
+                    address: v.address, startDate: v.startDate, planEnd: v.plannedEnd, riskLevel: v.riskLevel, overview: v.overview };
+                  if (window.APP) window.APP.update("projects", proj.id, patch);
+                  UI().toast("已保存项目信息（项目列表已同步）", "ok");
+                },
               })}>编辑</Button>
             </div>
           </div>

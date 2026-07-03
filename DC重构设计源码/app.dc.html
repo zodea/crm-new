@@ -78,6 +78,9 @@
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="KitAtomsScreen" from="./kit/KitAtoms.jsx" hint-size="0,0"></x-import>
       </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="AppDataScreen" from="./kit/AppData.jsx" hint-size="0,0"></x-import>
+      </sc-if>
       <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
         <x-import component-from-global-scope="AppHomeScreen" from="./kit/HomeScreenNew.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>

@@ -7,24 +7,8 @@
   const KT = () => window.KitTable;
 
   const stageTone = { "项目立项": "neutral", "施工准备": "neutral", "施工中": "brand", "停工": "danger", "完工及竣备": "warn", "交付": "ok", "保修": "ok", "项目完结": "ok" };
-  const statusToStage = { "在建": "施工中", "收尾": "完工及竣备", "停工": "停工", "完工": "保修" };
-
-  // 红圈式扩展字段（累计收入/预算/计划竣工/执行经理/合同名/施工员），按 id mock，与详情页 META 同源口径
-  const EXT = {
-    p1: { income: 17200000, budget: 26800000, planEnd: "2026-12-30", execManager: "刘志强", builder: "黄伟明" },
-    p2: { income: 6800000, budget: 14200000, planEnd: "2027-03-15", execManager: "梁国栋", builder: "宋子豪" },
-    p3: { income: 30500000, budget: 29800000, planEnd: "2026-08-30", actualEnd: "", execManager: "陈志明", builder: "冯家俊" },
-    p4: { income: 4200000, budget: 12600000, planEnd: "—", execManager: "赵德柱", builder: "—" },
-    p5: { income: 8600000, budget: 15800000, planEnd: "2026-11-30", execManager: "周维", builder: "吴大龙" },
-    p6: { income: 3100000, budget: 9800000, planEnd: "2027-01-20", execManager: "郑海峰", builder: "许志安" },
-    p7: { income: 21800000, budget: 20600000, planEnd: "2025-12-31", actualEnd: "2025-12-18", execManager: "何先进", builder: "郭天佑" },
-    p8: { income: 2400000, budget: 11200000, planEnd: "2027-04-30", execManager: "刘乐喜", builder: "邓建华" },
-    p9: { income: 18600000, budget: 18200000, planEnd: "2026-06-30", actualEnd: "", execManager: "张建军", builder: "叶国强" },
-    p10: { income: 9800000, budget: 9200000, planEnd: "2024-12-31", actualEnd: "2024-12-20", execManager: "王志文", builder: "钟伟雄" },
-    p11: { income: 1200000, budget: 8600000, planEnd: "2027-06-30", execManager: "陈家豪", builder: "罗永康" },
-    p12: { income: 860000, budget: 2400000, planEnd: "长期", execManager: "李建国", builder: "多班组" },
-  };
-  const merge = (p) => ({ ...p, ...(EXT[p.id] || {}), stage: p.stage || statusToStage[p.status] || "施工中", contractName: p.contractName || (p.name + (p.id === "p12" ? "维修框架协议" : "施工总承包合同")) });
+  // 数据源：window.APP.projects（AppData.jsx 共享 store，红圈扩展字段已在 store 内合并）——
+  // 反馈轮9 第二层：列表页与项目详情共用同一份数据，任一处编辑另一处实时可见。
 
   const STAGE_OPTS = [
     { key: "all", label: "全部业务流程阶段" }, { key: "项目立项", label: "项目立项" }, { key: "施工准备", label: "施工准备" },
@@ -67,18 +51,19 @@
   function ProjectScreen({ data, navigate }) {
     const [stage, setStage] = React.useState("all");
     const [q, setQ] = React.useState("");
-    const [list, setList] = React.useState(() => data.projects.map(merge));
+    const A = window.APP;
+    if (A) A.use();                                   // 订阅共享 store：详情页编辑 → 本列表实时刷新
     const KitTable = KT();
+    const list = A ? A.rows("projects") : [];
 
-    const addRow = (vals) => setList((l) => [{ id: "p_" + Date.now(), status: "在建", ...vals }, ...l]);
-    const editRow = (id) => (vals) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...vals } : x)));
+    const addRow = (vals) => A.add("projects", { id: "p_" + Date.now(), status: "在建", ...vals });
+    const editRow = (id) => (vals) => A.update("projects", id, vals);
     const delRow = (p) => UI().confirm({
       title: "删除项目", danger: true, confirmText: "删除",
       message: "确定删除「" + p.name + "」？删除为软删除，可在 5 秒内撤回。",
       onConfirm: () => {
-        const idx = list.findIndex((x) => x.id === p.id);
-        setList((l) => l.filter((x) => x.id !== p.id));
-        UI().undoToast("已删除「" + p.name + "」", () => setList((l) => { const n = [...l]; n.splice(Math.min(idx, n.length), 0, p); return n; }));
+        A.softDel("projects", p.id);
+        UI().undoToast("已删除「" + p.name + "」", () => A.restore("projects", p.id));
       },
     });
 
@@ -126,7 +111,7 @@
               title: "导入项目", fileName: "施工项目台账.xlsx", rowCount: 1,
               targetFields: ["项目名称", "业务流程阶段", "项目地址", "计划开工日期", "客户", "项目经理"],
               sourceCols: ["项目名称", "阶段", "地址", "开工日期", "建设单位", "项目经理"],
-              onDone: () => setList((l) => [merge({ id: "p_i1_" + Date.now(), name: "黄埔科学城人才公寓二期", status: "在建", address: "广州市黄埔区科学大道 88 号", startDate: "2026-05-20", developer: "广州开发区建设集团", manager: "郑海峰" }), ...l]),
+              onDone: () => A.add("projects", { id: "p_i1_" + Date.now(), name: "黄埔科学城人才公寓二期", status: "在建", address: "广州市黄埔区科学大道 88 号", startDate: "2026-05-20", developer: "广州开发区建设集团", manager: "郑海峰" }),
             })}>导入 Excel</Button>
             <Button icon="download" onClick={(e) => UI().exportModal({
               title: "导出项目台账", count: rows.length, unit: "个", ext: ".xlsx", anchor: e.currentTarget,
