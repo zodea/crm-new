@@ -16,15 +16,7 @@
     rejected: { tone: "danger", text: "退回" },
   };
 
-  // md 字段 data.js 暂缺 —— 组件内按 id 补 mock（类别/资料状态/只读汇总）
-  const META = {
-    s1: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1860000, paidTotal: 1200000 },
-    s2: { category: "材料供应商", cred: "reviewing", parent: "", projectCount: 1, contractTotal: 720000, paidTotal: 400000 },
-    s3: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1340000, paidTotal: 980000 },
-    s4: { category: "设备供应商", cred: "incomplete", parent: "", projectCount: 1, contractTotal: 230000, paidTotal: 80000 },
-    s5: { category: "劳务分包商", cred: "qualified", parent: "", projectCount: 3, contractTotal: 560000, paidTotal: 560000 },
-  };
-  const meta = (id, i) => META[id] || { category: "其他", cred: "incomplete", parent: "", projectCount: 0, contractTotal: 0, paidTotal: 0 };
+  // 扩展字段 mock 已上移 AppData.jsx（window.APP.suppliers），列表/详情共用同一份数据（反馈轮9 第二层）
 
   const CAT_OPTS = [
     { key: "all", label: "全部类别" }, { key: "材料供应商", label: "材料供应商" },
@@ -59,21 +51,19 @@
     const [cat, setCat] = React.useState("all");
     const [cred, setCred] = React.useState("all");
     const [q, setQ] = React.useState("");
-    // 列表转 state：新增/编辑/删除实时生效（刷新恢复初始 mock）
-    const [list, setList] = React.useState(() => data.suppliers.map((s, i) => ({ ...s, ...meta(s.id, i) })));
+    // 数据源：window.APP.suppliers 共享 store（与分供方详情同源，编辑互通实时联动）
+    const A = window.APP;
+    if (A) A.use();
+    const list = A ? A.rows("suppliers") : [];
 
-    const addRow = (vals) => setList((l) => [
-      { id: "s_" + Date.now(), aliases: [], ...vals, cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 },
-      ...l,
-    ]);
-    const editRow = (id) => (vals) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...vals } : x)));
+    const addRow = (vals) => A.add("suppliers", { id: "s_" + Date.now(), aliases: [], ...vals, cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 });
+    const editRow = (id) => (vals) => A.update("suppliers", id, vals);
     const delRow = (s) => UI().confirm({
       title: "删除分供方", danger: true, confirmText: "删除",
       message: "确定删除「" + s.name + "」？删除为软删除，可在 5 秒内撤回。",
       onConfirm: () => {
-        const idx = list.findIndex((x) => x.id === s.id);
-        setList((l) => l.filter((x) => x.id !== s.id));
-        UI().undoToast("已删除「" + s.name + "」", () => setList((l) => { const n = [...l]; n.splice(Math.min(idx, n.length), 0, s); return n; }));
+        A.softDel("suppliers", s.id);
+        UI().undoToast("已删除「" + s.name + "」", () => A.restore("suppliers", s.id));
       },
     });
 
@@ -106,12 +96,11 @@
               title: "导入分供方", fileName: "分供方台账.xlsx", rowCount: 3,
               targetFields: ["公司名称", "类别", "税号", "简称", "联系人", "电话"],
               sourceCols: ["公司名称", "类别", "税号", "联系人", "电话", "备注"],
-              onDone: () => setList((l) => [
-                { id: "s_i1_" + Date.now(), name: "广州恒益建材有限公司", category: "材料供应商", taxNo: "91440101MA5AXK21XX", aliases: ["恒益"], contact: "刘恒", phone: "13800001111", cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 },
-                { id: "s_i2_" + Date.now(), name: "佛山市南海区隆达劳务队", category: "劳务分包商", taxNo: "92440605MA53TT8XXX", aliases: ["隆达"], contact: "赵隆", phone: "13800002222", cred: "incomplete", projectCount: 0, contractTotal: 0, paidTotal: 0 },
-                { id: "s_i3_" + Date.now(), name: "东莞市威腾机械租赁部", category: "设备供应商", taxNo: "92441900MA4W99KXXX", aliases: ["威腾"], contact: "陈威", phone: "13800003333", cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 },
-                ...l,
-              ]),
+              onDone: () => {
+                A.add("suppliers", { id: "s_i1_" + Date.now(), name: "广州恒益建材有限公司", category: "材料供应商", taxNo: "91440101MA5AXK21XX", aliases: ["恒益"], contact: "刘恒", phone: "13800001111", cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 });
+                A.add("suppliers", { id: "s_i2_" + Date.now(), name: "佛山市南海区隆达劳务队", category: "劳务分包商", taxNo: "92440605MA53TT8XXX", aliases: ["隆达"], contact: "赵隆", phone: "13800002222", cred: "incomplete", projectCount: 0, contractTotal: 0, paidTotal: 0 });
+                A.add("suppliers", { id: "s_i3_" + Date.now(), name: "东莞市威腾机械租赁部", category: "设备供应商", taxNo: "92441900MA4W99KXXX", aliases: ["威腾"], contact: "陈威", phone: "13800003333", cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 });
+              },
             })}>导入</Button>
             <Button variant="primary" icon="plus" onClick={() => supForm(null, "新建分供方", addRow)}>新建</Button>
           </div>

@@ -68,18 +68,26 @@
   const CRED_CHIP = { incomplete: { tone: "warn", text: "证照缺失" }, reviewing: { tone: "brand", text: "审核中" }, qualified: { tone: "ok", text: "合格" }, rejected: { tone: "danger", text: "退回" } };
 
   function SupplierDetailScreen({ data, params, navigate }) {
-    const sup = (data.suppliers.find((s) => s.id === (params && params.id)) || data.suppliers[0]);
+    // 反馈轮9 第二层：分供方主数据走 window.APP 共享 store（与列表页同源，编辑互通实时联动）
+    const A = window.APP;
+    if (A) A.use();
+    const sup = (A && A.get("suppliers", params && params.id)) || data.suppliers.find((s) => s.id === (params && params.id)) || data.suppliers[0];
     const [tab, setTab] = React.useState("info");
     const d = DETAIL;
-    const cc = CRED_CHIP[d.credentialStatus];
+    const cc = CRED_CHIP[sup.cred || d.credentialStatus] || CRED_CHIP.incomplete;
 
     const editSupplier = () => UI().formModal({ title: "编辑分供方 · " + sup.name, cols: 2, fields: [
       { key: "name", label: "公司全称", value: sup.name, full: true },
-      { key: "legalRep", label: "法定代表人", value: d.legalRep },
+      { key: "category", label: "类别", type: "select", options: ["材料供应商", "劳务分包商", "设备供应商", "其他"], value: sup.category },
+      { key: "cred", label: "资料状态", type: "select", options: ["incomplete", "reviewing", "qualified", "rejected"], value: sup.cred || "incomplete" },
       { key: "contact", label: "联系人", value: sup.contact },
       { key: "phone", label: "电话", value: sup.phone },
-      { key: "bank", label: "开户行", value: sup.bank },
-    ], onSave: () => UI().toast("已保存", "ok") });
+      { key: "taxNo", label: "税号", value: sup.taxNo, full: true },
+    ], onSave: (v) => {
+      if (!v.name) { UI().toast("公司全称不能为空", "danger"); return; }
+      if (window.APP) window.APP.update("suppliers", sup.id, v);
+      UI().toast("已保存（分供方列表已同步）", "ok");
+    } });
 
     const tabs = [
       { key: "info", label: "详细资料" },

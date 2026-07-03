@@ -31,21 +31,22 @@
     contractName: p.contractName || (p.name + (p.id === "p12" ? "维修框架协议" : "施工总承包合同")),
   });
 
-  // —— 分供方扩展（原 SupplierScreen meta 口径：资料状态/项目数/累计额）——
-  const SUP_EXT = [
-    { cred: "complete", projectCount: 3, contractTotal: 1860000, paidTotal: 1420000, category: "材料供应商", contact: "李大板", phone: "13802801234" },
-    { cred: "complete", projectCount: 2, contractTotal: 960000, paidTotal: 960000, category: "材料供应商", contact: "陈花城", phone: "13905201567" },
-    { cred: "incomplete", projectCount: 2, contractTotal: 2350000, paidTotal: 1800000, category: "材料供应商", contact: "赵汇丰", phone: "13712345678" },
-    { cred: "complete", projectCount: 1, contractTotal: 430000, paidTotal: 380000, category: "材料供应商", contact: "钱穗建", phone: "13633334444" },
-    { cred: "reviewing", projectCount: 1, contractTotal: 680000, paidTotal: 260000, category: "劳务分包商", contact: "孙鸿运", phone: "13588887777" },
-  ];
+  // —— 分供方扩展（口径 = 原 SupplierScreen META，上移到 store 供列表/详情共用）——
+  const SUP_EXT = {
+    s1: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1860000, paidTotal: 1200000 },
+    s2: { category: "材料供应商", cred: "reviewing", parent: "", projectCount: 1, contractTotal: 720000, paidTotal: 400000 },
+    s3: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1340000, paidTotal: 980000 },
+    s4: { category: "设备供应商", cred: "incomplete", parent: "", projectCount: 1, contractTotal: 230000, paidTotal: 80000 },
+    s5: { category: "劳务分包商", cred: "qualified", parent: "", projectCount: 3, contractTotal: 560000, paidTotal: 560000 },
+  };
+  const mergeSupplier = (s) => ({ category: "其他", cred: "incomplete", parent: "", projectCount: 0, contractTotal: 0, paidTotal: 0, ...(SUP_EXT[s.id] || {}), ...s });
 
   const state = { projects: [], suppliers: [] };
   const init = () => {
     const d = window.KIT_DATA;
     if (!d) return false;
     state.projects = (d.projects || []).map(mergeProject);
-    state.suppliers = (d.suppliers || []).map((s, i) => ({ ...s, ...(SUP_EXT[i] || SUP_EXT[0]) }));
+    state.suppliers = (d.suppliers || []).map(mergeSupplier);
     return true;
   };
   if (!init()) { const t = setInterval(() => { if (init()) { clearInterval(t); notify(); } }, 50); }
