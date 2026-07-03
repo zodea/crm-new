@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/fonts.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/colors.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/typography.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/spacing.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/base.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/_ds_bundle.js"></script>
+  <script src="kit/data.js"></script>
+  <style>
+    :root {
+      --brand: #3976C6; --brand-soft: rgb(213 230 248); --brand-deep: #2A5996;
+      --ok: #169D72; --ok-soft: rgb(207 246 231); --ok-ink: #097251;
+      --warn: #D38A20; --warn-soft: rgb(255 239 191); --warn-ink: #8B590C;
+      --danger: #E04E5C; --danger-soft: rgb(253 219 224); --danger-ink: #9D313E;
+    }
+    /* —— 红圈式页签栏 —— */
+    .dc-tabbar { position: sticky; top: 64px; z-index: 19; height: 40px; flex: none;
+      background: var(--surface-2); border-bottom: 1px solid var(--line);
+      display: flex; align-items: stretch; gap: 2px; padding: 0 16px;
+      overflow-x: auto; overflow-y: hidden; }
+    .dc-tabbar::-webkit-scrollbar { height: 0; }
+    .dc-tab { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px;
+      font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+      user-select: none; white-space: nowrap; max-width: 200px; position: relative;
+      border-radius: 6px 6px 0 0; transition: color 0.12s ease, background 0.12s ease; }
+    .dc-tab:hover { color: var(--ink); background: rgba(17, 24, 39, 0.05); }
+    .dc-tab.active { background: var(--panel); color: var(--brand); font-weight: 800;
+      box-shadow: inset 0 -2px 0 var(--brand); }
+    .dc-tab.active:hover { color: var(--brand-deep); }
+    .dc-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dc-tab-x { display: grid; place-items: center; width: 16px; height: 16px; flex: none;
+      border: 0; border-radius: 4px; background: transparent; padding: 0;
+      color: var(--ink-soft); font-size: 13px; line-height: 1; cursor: pointer; }
+    .dc-tab-x:hover { background: var(--danger-soft); color: var(--danger-ink); }
+  </style>
+</helmet>
+
+<div style="display:flex; min-height:100vh; background:var(--bg); color:var(--ink);">
+  {{ sidebar }}
+  <div style="padding-left:{{ sideW }}px; flex:1; display:flex; flex-direction:column; min-height:100vh; transition:padding-left 0.18s ease;">
+    <header style="position:sticky; top:0; z-index:20; height:64px; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 24px; flex:none; gap:12px;">
+      <div>
+        <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
+        <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; min-height:16px;">{{ pageSubtitle }}</div>
+      </div>
+      <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">2026年6月29日 · 周一</div>
+    </header>
+    {{ tabbar }}
+    <main style="flex:1; padding:20px 24px 36px; min-height:0; overflow-y:auto;">
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="KitUIScreen" from="./kit/KitUI.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleDataScreen" from="./kit/ScheduleData.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="WageConfigScreen" from="./kit/WageConfig.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="INVSharedScreen" from="./kit/InvoiceShared.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+        <x-import component-from-global-scope="AppHomeScreen" from="./kit/HomeScreenNew.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjectScreen" from="./kit/ProjectScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isProjectDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjectDetailScreen" from="./kit/ProjectDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="SchedulePlanScreen" from="./kit/SchedulePlanScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isSupplier }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="SupplierScreen" from="./kit/SupplierScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isSupplierDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="SupplierDetailScreen" from="./kit/SupplierDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isCrew }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CrewScreen" from="./kit/CrewScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isCrewDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CrewDetailScreen" from="./kit/CrewDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isWorker }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="WorkerScreen" from="./kit/WorkerScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isWorkerDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="WorkerDetailScreen" from="./kit/WorkerDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isInvoice }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="InvoiceScreen" from="./kit/InvoiceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isInvoiceLedger }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="InvoiceLedgerScreen" from="./kit/InvoiceLedgerScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isInvoiceEdit }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="InvoiceEditScreen" from="./kit/InvoiceEditScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOcrSettings }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OcrSettingsScreen" from="./kit/OcrSettingsScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isBoqImport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="BoqImportScreen" from="./kit/BoqImportScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isBoqList }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="BoqListScreen" from="./kit/BoqListScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isFactor }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CalcScreen" from="./kit/CalcScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isDelivery }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="DeliveryScreen" from="./kit/DeliveryScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuantity }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="AppQuantityScreen" from="./kit/QuantityScreenV2.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isQuantityUnit }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="QuantityUnitScreen" from="./kit/QuantityUnitScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="AppDetailScreen" from="./kit/DetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayroll }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollScreen" from="./kit/PayrollScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayrollDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayrollDetailScreen" from="./kit/PayrollDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isWageSlip }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="WageSlipScreen" from="./kit/WageSlipScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPrice }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PriceScreen" from="./kit/PriceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+    </main>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const PAGE = {
+  home:          { title: "首页",     subtitle: "在建工程总览" },
+  project:       { title: "施工项目",  subtitle: "项目管理" },
+  projectDetail: { title: "项目详情",  subtitle: "经营驾驶舱 · 阶段 · 子表" },
+  schedule:      { title: "施工进度",  subtitle: "WBS 排程 · 计划vs实际 · 依赖 · 调期" },
+  supplier:      { title: "分供方资料库", subtitle: "资料管理 · 对账" },
+  supplierDetail:{ title: "分供方详情", subtitle: "资料 · 证照 · 跨项目汇总" },
+  crew:          { title: "班组管理",  subtitle: "全局核算单元 · 跨项目复用" },
+  crewDetail:    { title: "班组详情",  subtitle: "基本信息 · 工人配置 · 分项单价" },
+  worker:        { title: "工人信息库", subtitle: "人员管理" },
+  workerDetail:  { title: "工人详情", subtitle: "档案 · 证书 · 亲属关联" },
+  invoice:       { title: "发票识别",  subtitle: "识别中心 · 上传 · 校对 · 打印排版" },
+  invoiceLedger: { title: "发票台账",  subtitle: "资金管理 · 列表 / 打印 / 修改" },
+  invoiceEdit:   { title: "发票编辑",  subtitle: "单张校对 · 左原图右字段" },
+  ocrSettings:   { title: "OCR 设置",  subtitle: "识别引擎 · 云端接入 · 参数" },
+  boqImport:     { title: "清单拆表",  subtitle: "上传 → 确认 → 拆表结果" },
+  boqList:       { title: "工程量清单管理", subtitle: "分部 · 工种 · 分项 · 三量" },
+  factor:        { title: "开票因子推算 · 税额计算", subtitle: "因子推断数量 · 价税分离 · 人民币大写" },
+  delivery:      { title: "送货单整理", subtitle: "识别中心 · 上传 · OCR · 分区归档" },
+  quantity:      { title: "工程量管理", subtitle: "楼层 × 户号 × 分项 · 按月着色" },
+  quantityUnit:  { title: "户详情", subtitle: "房间级三量 · 完成勾选 · 验收照片" },
+  detail:        { title: "施工明细",  subtitle: "楼层 × 工种 明细" },
+  payroll:       { title: "工资核算",  subtitle: "班组 × 项目 × 月份" },
+  payrollDetail: { title: "工资明细",  subtitle: "分项工程量 · 计算流程" },
+  wageSlip:      { title: "工资进度款工具", subtitle: "户工程量配置 · 汇总 · 明细 · 考勤 · 空鼓扣罚" },
+  price:         { title: "单价对比",  subtitle: "材料价格分析" },
+};
+
+class Component extends DCLogic {
+  state = {
+    route: "home",
+    params: {},
+    tabs: [{ id: "home", route: "home", params: {}, title: "首页" }],
+    activeId: "home",
+    collapsed: false,
+    groupOpen: { "g-project": true, "g-base": false, "g-ocr": true, "g-finance": true, "g-sub": true, "g-material": false },
+  };
+
+  _tabSeq = 0;
+
+  // 页签去重 key：同 route + 相同关键参数 → 同一页签
+  _tabKey(route, params) {
+    const p = params || {};
+    if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit")
+      return route + ":" + (p.id || "");
+    if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
+    if (route === "crewDetail") return route + ":" + (p.crewId || "");
+    if (route === "payrollDetail") return route + ":" + (p.worker || "") + ":" + (p.crew || "") + ":" + (p.project || "");
+    if (route === "quantityUnit") return route + ":" + (p.building || "") + ":" + (p.floor || "") + ":" + (p.unit || "");
+    return route; // 列表类页面：一个 route 一个页签
+  }
+
+  // 页签标题 = PAGE.title + 对象名后缀（best-effort 从 KIT_DATA 查）
+  _tabTitle(route, params) {
+    const page = PAGE[route] || PAGE.home;
+    const p = params || {};
+    const d = window.KIT_DATA || {};
+    let name = "";
+    try {
+      if (route === "projectDetail") name = ((d.projects || []).find(x => x.id === p.id) || {}).name || "";
+      else if (route === "supplierDetail") {
+        const s = (d.suppliers || []).find(x => x.id === p.id);
+        name = s ? ((s.aliases && s.aliases[0]) || s.name) : "";
+      }
+      else if (route === "workerDetail") name = ((d.workers || []).find(x => x.id === p.id) || {}).name || "";
+      else if (route === "crewDetail") name = ((d.crews || []).find(x => x.id === p.crewId) || {}).name || "";
+      else if (route === "payrollDetail") name = p.worker || "";
+      else if (route === "quantityUnit") name = (p.building ? p.building + "·" : "") + (p.floor || "") + (p.unit || "");
+      else if (route === "invoiceEdit") { const iv = (window.INV && window.INV.get(p.id)); name = iv && iv.number ? iv.number.slice(-8) : ""; }
+      else if (route === "boqImport" || route === "boqList") name = (p.contract || "").slice(0, 10);
+    } catch (e) { name = ""; }
+    return name ? page.title + "·" + name : page.title;
+  }
+
+  navigate = (route, params) => {
+    const p = params || {};
+    const key = this._tabKey(route, p);
+    const title = this._tabTitle(route, p);
+    const tabs = this.state.tabs.slice();
+    const existIdx = tabs.findIndex(t => this._tabKey(t.route, t.params) === key);
+    if (existIdx > -1) {
+      const t = tabs[existIdx];
+      tabs[existIdx] = { ...t, params: p, title };
+      this.setState({ route, params: p, tabs, activeId: t.id });
+      return;
+    }
+    if (tabs.filter(t => t.id !== "home").length >= 10) {   // 上限 10（不含首页）：阻断提示，不自动关（CONTEXT.md 页签导航）
+      const K = window.KitUI || {};
+      try {
+        K.confirm({ title: "页签已达上限（10 个）", message: "请先关闭部分页签，或一键关闭全部后再打开新页面。",
+          okText: "关闭全部页签", confirmText: "关闭全部页签", onConfirm: () => this.closeTabs("all") });
+      } catch (e) { if (K.toast) K.toast("页签已达上限（10 个），请先关闭部分页签", "warn"); }
+      return;
+    }
+    const id = "t" + (++this._tabSeq);
+    tabs.push({ id, route, params: p, title });
+    this.setState({ route, params: p, tabs, activeId: id });
+  };
+
+  activateTab = (id) => {
+    const t = this.state.tabs.find(x => x.id === id);
+    if (t) this.setState({ activeId: id, route: t.route, params: t.params });
+  };
+
+  closeTab = (id) => {
+    const s = this.state;
+    const idx = s.tabs.findIndex(t => t.id === id);
+    if (idx === -1 || s.tabs[idx].id === "home") return; // 首页页签不可关
+    const tabs = s.tabs.slice();
+    tabs.splice(idx, 1);
+    if (s.activeId === id) {                    // 关闭激活页签 → 激活其左侧相邻
+      const next = tabs[Math.max(0, idx - 1)] || tabs[0];
+      this.setState({ tabs, activeId: next.id, route: next.route, params: next.params });
+    } else {
+      this.setState({ tabs });
+    }
+  };
+
+  // 批量关闭：all=关闭全部 / others=关闭其他 / right=关闭右侧（均保留首页）
+  closeTabs = (mode, anchorId) => {
+    const s = this.state;
+    const ai = s.tabs.findIndex(t => t.id === anchorId);
+    const keep = s.tabs.filter((t, i) => {
+      if (t.id === "home") return true;
+      if (mode === "others") return t.id === anchorId;
+      if (mode === "right") return i <= ai;
+      return false;                                        // all
+    });
+    const active = keep.find(t => t.id === (mode === "all" ? "home" : (anchorId || s.activeId))) || keep[0];
+    this.setState({ tabs: keep, tabMenu: null, activeId: active.id, route: active.route, params: active.params });
+  };
+
+  _buildTabbar() {
+    const { tabs, activeId, tabMenu } = this.state;
+    const menuItem = (label, fn, disabled) => React.createElement("button", {
+      key: label, type: "button", disabled: !!disabled,
+      onClick: () => { if (!disabled) fn(); this.setState({ tabMenu: null }); },
+      style: { display: "block", width: "100%", textAlign: "left", border: 0, background: "transparent",
+        padding: "7px 14px", fontSize: 13, cursor: disabled ? "not-allowed" : "pointer",
+        color: disabled ? "var(--ink-faint)" : "var(--ink)", borderRadius: 6 },
+      onMouseEnter: (e) => { if (!disabled) e.currentTarget.style.background = "var(--brand-soft)"; },
+      onMouseLeave: (e) => { e.currentTarget.style.background = "transparent"; }
+    }, label);
+    return React.createElement(React.Fragment, null,
+      React.createElement("div", { className: "dc-tabbar", role: "tablist" },
+        ...tabs.map(t => React.createElement("div", {
+          key: t.id, role: "tab", title: t.title + "（右键更多操作）",
+          className: "dc-tab" + (t.id === activeId ? " active" : ""),
+          onClick: () => this.activateTab(t.id),
+          onContextMenu: (e) => { e.preventDefault(); this.setState({ tabMenu: { x: e.clientX, y: e.clientY, id: t.id } }); }
+        },
+          React.createElement("span", { className: "dc-tab-title" }, t.title),
+          t.id !== "home" ? React.createElement("button", {
+            type: "button", className: "dc-tab-x", title: "关闭页签",
+            onClick: (e) => { e.stopPropagation(); this.closeTab(t.id); }
+          }, "×") : null
+        ))
+      ),
+      tabMenu ? React.createElement("div", { onClick: () => this.setState({ tabMenu: null }),
+        onContextMenu: (e) => { e.preventDefault(); this.setState({ tabMenu: null }); },
+        style: { position: "fixed", inset: 0, zIndex: 80 } },
+        React.createElement("div", { onClick: (e) => e.stopPropagation(),
+          style: { position: "fixed", left: Math.min(tabMenu.x, window.innerWidth - 170), top: tabMenu.y + 4, width: 152,
+            background: "var(--panel)", border: "1px solid var(--line-strong)", borderRadius: 10,
+            boxShadow: "var(--shadow-pop)", padding: 6, zIndex: 81 } },
+          menuItem("关闭当前", () => this.closeTab(tabMenu.id), tabMenu.id === "home"),
+          menuItem("关闭其他", () => this.closeTabs("others", tabMenu.id)),
+          menuItem("关闭右侧", () => this.closeTabs("right", tabMenu.id)),
+          menuItem("关闭全部", () => this.closeTabs("all", tabMenu.id))
+        )
+      ) : null
+    );
+  }
+
+  _isActive(key) {
+    const r = this.state.route;
+    if (key === "payroll") return r === "payroll" || r === "payrollDetail";
+    if (key === "quantity") return r === "quantity" || r === "detail" || r === "quantityUnit";
+    if (key === "crew") return r === "crew" || r === "crewDetail";
+    if (key === "supplier") return r === "supplier" || r === "supplierDetail";
+    if (key === "worker") return r === "worker" || r === "workerDetail";
+    if (key === "project") return r === "project" || r === "projectDetail";
+    if (key === "invoice") return r === "invoice";
+    if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
+    if (key === "boqList") return r === "boqList" || r === "boqImport";
+    return r === key;
+  }
+
+  _buildSidebar() {
+    const { collapsed, groupOpen } = this.state;
+    const DS = window.DesignSystem_e3d871;
+    if (!DS) return null;
+    const { NavItem, Icon } = DS;
+    const navigate = this.navigate;
+    const isActive = k => this._isActive(k);
+    const W = collapsed ? 68 : 248;
+
+    const NAV = [
+      { type: "item", key: "home", mark: "首", label: "首页", hint: "总览" },
+      { type: "group", key: "g-project", label: "项目信息", icon: "building", items: [
+        { key: "project", mark: "项", label: "项目列表", hint: "工期进度" },
+        { key: "schedule", mark: "进", label: "施工进度", hint: "排程 · 甘特" },
+      ]},
+      { type: "group", key: "g-base", label: "基础信息", icon: "database", items: [
+        { key: "supplier", mark: "方", label: "分供方", hint: "资料管理" },
+        { key: "crew", mark: "组", label: "班组管理", hint: "单价·配置" },
+        { key: "worker", mark: "工", label: "工人信息", hint: "人员证书" },
+      ]},
+      { type: "group", key: "g-ocr", label: "识别中心", icon: "scan-line", items: [
+        { key: "invoice", mark: "票", label: "发票识别", hint: "上传·校对·排版" },
+        { key: "delivery", mark: "送", label: "送货单识别", hint: "OCR 整理识别" },
+        { key: "boqImport", mark: "拆", label: "清单拆表", hint: "合同清单→表格" },
+        { key: "ocrSettings", mark: "设", label: "OCR 设置", hint: "引擎·参数" },
+      ]},
+      { type: "group", key: "g-finance", label: "资金管理", icon: "wallet", items: [
+        { key: "invoiceLedger", mark: "账", label: "发票台账", hint: "列表·打印·修改" },
+        { key: "factor", mark: "因", label: "开票·税额工具", hint: "推算数量" },
+      ]},
+      { type: "disabled", key: "contract", mark: "合", label: "主合同管理" },
+      { type: "group", key: "g-sub", label: "分包及人工", icon: "hard-hat", items: [
+        { key: "quantity", mark: "量", label: "工程量管理", hint: "矩阵可视化" },
+        { key: "boqList", mark: "单", label: "工程量清单", hint: "分项·三量" },
+        { key: "payroll", mark: "资", label: "工资核算", hint: "核算发放" },
+        { key: "wageSlip", mark: "款", label: "工资进度款", hint: "铺贴核算工具" },
+      ]},
+      { type: "group", key: "g-material", label: "乙供材管理", icon: "package", items: [
+        { key: "price", mark: "价", label: "单价对比", hint: "材料价格分析" },
+      ]},
+    ];
+
+    const toggleGroup = key => this.setState(s => ({ groupOpen: { ...s.groupOpen, [key]: !s.groupOpen[key] } }));
+
+    const miniBtn = n => React.createElement("button", {
+      key: n.key, onClick: () => navigate(n.key), title: n.label,
+      style: { display: "grid", placeItems: "center", width: 40, height: 40, margin: "2px auto",
+        border: "1px solid", borderRadius: "var(--radius-btn)", cursor: "pointer",
+        fontSize: 15, fontWeight: 800,
+        background: isActive(n.key) ? "var(--brand-soft)" : "var(--surface-2)",
+        borderColor: isActive(n.key) ? "rgba(57,118,198,0.25)" : "var(--line)",
+        color: isActive(n.key) ? "var(--brand)" : "var(--ink-soft)" }
+    }, n.mark);
+
+    const navItems = NAV.map(n => {
+      if (n.type === "item") {
+        return collapsed ? miniBtn(n) : React.createElement(NavItem, {
+          key: n.key, mark: n.mark, label: n.label, hint: n.hint,
+          active: isActive(n.key), onClick: () => navigate(n.key)
+        });
+      }
+      if (n.type === "disabled") {
+        if (collapsed) return React.createElement("button", { key: n.key, title: "暂未开放",
+          style: { display: "grid", placeItems: "center", width: 40, height: 40, margin: "2px auto",
+            border: "1px solid var(--line)", borderRadius: 8, cursor: "not-allowed", opacity: 0.38,
+            background: "var(--surface-2)", fontSize: 15, fontWeight: 800, color: "var(--ink-soft)" } }, n.mark);
+        return React.createElement("div", { key: n.key, title: "暂未开放",
+          style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+            borderRadius: "var(--radius-btn)", opacity: 0.38, cursor: "not-allowed", userSelect: "none" } },
+          React.createElement("span", { style: { display: "grid", placeItems: "center", width: 28, height: 28,
+            borderRadius: 8, background: "var(--surface-3)", border: "1px solid var(--line)",
+            fontWeight: 800, fontSize: 14, color: "var(--ink-soft)", flex: "none" } }, n.mark),
+          React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--ink-soft)" } }, n.label),
+          React.createElement("span", { style: { fontSize: 11, background: "var(--surface-2)", border: "1px solid var(--line)",
+            borderRadius: 4, padding: "1px 6px", marginLeft: "auto" } }, "待设计")
+        );
+      }
+      if (n.type === "group") {
+        const isOpen = groupOpen[n.key];
+        if (collapsed) return React.createElement(React.Fragment, { key: n.key },
+          React.createElement("div", { style: { height: 1, background: "var(--line)", margin: "8px 6px" } }),
+          ...n.items.map(it => miniBtn(it))
+        );
+        return React.createElement("div", { key: n.key },
+          React.createElement("button", { type: "button", onClick: () => toggleGroup(n.key),
+            style: { display: "flex", alignItems: "center", gap: 8, width: "100%", border: 0,
+              background: "transparent", borderRadius: "var(--radius-btn)", padding: "8px 10px",
+              marginTop: 4, cursor: "pointer", color: "var(--ink-soft)" } },
+            React.createElement(Icon, { name: n.icon, size: 15 }),
+            React.createElement("span", { style: { fontSize: 12, fontWeight: 800, letterSpacing: "0.05em", flex: 1, textAlign: "left" } }, n.label),
+            React.createElement(Icon, { name: isOpen ? "chevron-down" : "chevron-right", size: 14 })
+          ),
+          isOpen && React.createElement("div", {
+            style: { display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, marginLeft: 8, borderLeft: "1px solid var(--line)" } },
+            ...n.items.map(it => React.createElement(NavItem, {
+              key: it.key, mark: it.mark, label: it.label, hint: it.hint,
+              active: isActive(it.key), onClick: () => navigate(it.key)
+            }))
+          )
+        );
+      }
+      return null;
+    });
+
+    return React.createElement("aside", {
+      style: { position: "fixed", insetBlock: 0, left: 0, zIndex: 30, width: W,
+        background: "var(--panel)", borderRight: "1px solid var(--line)",
+        display: "flex", flexDirection: "column",
+        padding: collapsed ? "16px 8px" : "16px 12px",
+        transition: "width 0.18s ease", overflowX: "hidden", overflowY: "auto" }
+    },
+      React.createElement("div", {
+        style: { display: "flex", alignItems: "center", gap: 10,
+          padding: collapsed ? "0 0 16px" : "0 8px 20px",
+          justifyContent: collapsed ? "center" : "flex-start", flex: "none" }
+      },
+        React.createElement("span", { style: { display: "grid", placeItems: "center", width: 36, height: 36,
+          borderRadius: 8, background: "var(--brand)", color: "#fff", fontWeight: 800, fontSize: 16, flex: "none" } }, "瑞"),
+        !collapsed && React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+          React.createElement("div", { style: { fontSize: 16, fontWeight: 800, lineHeight: 1.2 } }, "瑞航 CRM"),
+          React.createElement("div", { style: { fontSize: 11, color: "var(--ink-soft)", marginTop: 2 } }, "工程财务管理")
+        )
+      ),
+      React.createElement("nav", {
+        style: { flex: 1, display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", overflowX: "hidden" }
+      }, ...navItems),
+      React.createElement("div", { style: { flex: "none", paddingTop: 12, marginTop: 12, borderTop: "1px solid var(--line)" } },
+        React.createElement("button", { type: "button", onClick: () => this.setState(s => ({ collapsed: !s.collapsed })),
+          style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
+            border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)",
+            padding: 8, cursor: "pointer", color: "var(--ink-soft)", fontSize: 12, fontWeight: 700 } },
+          React.createElement(Icon, { name: collapsed ? "panel-left-open" : "panel-left-close", size: 16 }),
+          !collapsed && React.createElement("span", null, "收起侧栏")
+        ),
+        !collapsed && React.createElement("div", { style: { paddingTop: 12, fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.7 } },
+          React.createElement("div", null, "本地工具 · 数据不上传"),
+          React.createElement("div", null, "v2.0 · 工程量 / 工资模块")
+        )
+      )
+    );
+  }
+
+  componentDidMount() {
+    // 暴露给页面组件：关闭当前页签（发票编辑保存/删除后回台账）
+    window.DC = { navigate: this.navigate, closeActiveTab: () => this.closeTab(this.state.activeId) };
+    if (!window.DesignSystem_e3d871) {
+      const t = setInterval(() => { if (window.DesignSystem_e3d871) { clearInterval(t); this.forceUpdate(); } }, 50);
+    }
+    if (!window.KIT_DATA) {
+      const t = setInterval(() => { if (window.KIT_DATA) { clearInterval(t); this.forceUpdate(); } }, 50);
+    }
+  }
+
+  renderVals() {
+    const { route, params, collapsed } = this.state;
+    const page = PAGE[route] || PAGE.home;
+    return {
+      sidebar:         this._buildSidebar(),
+      tabbar:          this._buildTabbar(),
+      sideW:           collapsed ? 68 : 248,
+      pageTitle:       page.title,
+      pageSubtitle:    page.subtitle,
+      isHome:          route === "home",
+      isProject:       route === "project",
+      isProjectDetail: route === "projectDetail",
+      isSchedule:      route === "schedule",
+      isSupplier:      route === "supplier",
+      isSupplierDetail:route === "supplierDetail",
+      isCrew:          route === "crew",
+      isCrewDetail:    route === "crewDetail",
+      isWorker:        route === "worker",
+      isWorkerDetail:  route === "workerDetail",
+      isInvoice:       route === "invoice",
+      isInvoiceLedger: route === "invoiceLedger",
+      isInvoiceEdit:   route === "invoiceEdit",
+      isOcrSettings:   route === "ocrSettings",
+      isBoqImport:     route === "boqImport",
+      isBoqList:       route === "boqList",
+      isFactor:        route === "factor",
+      isDelivery:      route === "delivery",
+      isQuantity:      route === "quantity",
+      isQuantityUnit:  route === "quantityUnit",
+      isDetail:        route === "detail",
+      isPayroll:       route === "payroll",
+      isPayrollDetail: route === "payrollDetail",
+      isWageSlip:      route === "wageSlip",
+      isPrice:         route === "price",
+      kitData:         window.KIT_DATA || null,
+      navigate:        this.navigate,
+      params,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

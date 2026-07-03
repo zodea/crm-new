@@ -1,0 +1,39 @@
+/* 排版令牌 — 扫描件助手
+   高密度、可扫读。正文 14px，label 11–12px font-600，标题 font-800。
+   金融数据（发票号/税号/日期/金额）用等宽 + tabular-nums。 */
+:root {
+  /* —— 字族 —— */
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
+    -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New",
+    monospace;
+
+  /* —— 字号阶 —— */
+  --text-2xs: 11px;   /* 导航副提示 / 序号 chip */
+  --text-xs: 12px;    /* label / 次级元信息 */
+  --text-sm: 13px;    /* 紧凑正文 / 表格 */
+  --text-base: 14px;  /* 正文基准 */
+  --text-lg: 17px;    /* 模块标题 / 侧栏品牌 */
+  --text-xl: 20px;    /* 空态标题 */
+  --text-2xl: 24px;   /* 统计卡数字 */
+
+  /* —— 字重 —— */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600; /* label / 按钮 */
+  --weight-bold: 700;     /* 小标题 / 数字强调 */
+  --weight-heavy: 800;    /* 标题 / 导航名 */
+
+  /* —— 行高 —— */
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;  /* 正文 */
+  --leading-loose: 1.8;
+
+  /* —— 字距（label 用小字距营造"label-caps"感，中文不受 uppercase 影响） —— */
+  --tracking-wide: 0.02em;
+
+  /* —— 语义别名 —— */
+  --text-body: var(--text-base);
+  --text-label: var(--text-xs);
+}

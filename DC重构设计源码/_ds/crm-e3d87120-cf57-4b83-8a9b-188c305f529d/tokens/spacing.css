@@ -1,0 +1,42 @@
+/* 形状·间距·阴影令牌 — 扫描件助手
+   容器更圆（卡片 12）、控件更挺（按钮/输入 8）。两级阴影：L1 卡片浮起 / L2 弹层柔和扩散。
+   间距紧凑但不拥挤：panel 内 12–16，元素间 8–12。 */
+:root {
+  /* —— 圆角 —— */
+  --radius-card: 12px;  /* 面板 / 卡片 */
+  --radius-btn: 8px;    /* 按钮 / 输入框 */
+  --radius-pill: 999px; /* chip / 圆形按钮 */
+  --radius: 10px;       /* 通用（原应用 --radius） */
+
+  /* —— 间距阶（4 基准） —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* —— 布局尺度 —— */
+  --sidebar-w: 248px;   /* 桌面固定侧边栏 */
+  --header-h: 64px;     /* 顶栏 */
+  --content-max: 1480px;/* 主内容最大宽 */
+
+  /* —— 阴影 —— */
+  --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
+  --shadow: var(--shadow-card); /* 原应用 --shadow */
+
+  /* —— 选中态内描边（侧栏导航签名） —— */
+  --ring-selected: inset 3px 0 0 var(--brand);
+
+  /* —— 动效 —— */
+  --ease-snappy: cubic-bezier(0.2, 0, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 160ms; /* @kind other */
+  --dur-dialog: 220ms; /* @kind other */
+
+  /* —— 断点（参考值） —— */
+  --bp-tablet: 1024px;  /* ≥ 桌面三栏；< 平板顶部横排 */
+  --bp-mobile: 768px;   /* < 手机底部 tab bar */
+}

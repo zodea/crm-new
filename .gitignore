@@ -27,3 +27,16 @@ logs
 app/lib/db/seed/*.local.json
 
 设计系统配色更新/
+工资发放格式/
+
+# 红圈系统参照资料（含真实业务截图，不上传）
+红圈系统/
+
+# 真实项目资料（含真实项目名/进度/工资数据，不上传）
+docs/*.pdf
+docs/现实合同/
+docs/rewrite/工资发放格式/
+DC重构设计源码/screenshots/
+
+# Claude Code 本地配置
+.claude/settings.local.json

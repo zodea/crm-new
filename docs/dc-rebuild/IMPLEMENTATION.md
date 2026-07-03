@@ -55,7 +55,8 @@ _ds/.../tokens/*.css               ← 颜色/间距/阴影 token
 ```
 - 组件签名：列表 `({ data, navigate })`；详情 `({ data, params, navigate })`。
 - 风格严格按 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
-- **统一原子目前是各文件内联复制**（SegTab/SelectFilter/InfoGrid/SectionHeader/Metric/SubTable/TH/TD）。后续可抽成共享 `kit/KitUI.jsx` 用一个隐藏 x-import 预加载注册 `window.KitUI`，再 DRY 掉重复——目前为降耦合先内联。`SelectFilter` 已在 Project/Supplier/Crew/Worker 四个列表页各自内联一份。
+- **展示原子目前是各文件内联复制**（SegTab/SelectFilter/InfoGrid/SectionHeader/Metric/SubTable/TH/TD），为降耦合先内联；`SelectFilter` 已在 Project/Supplier/Crew/Worker 四个列表页各自内联一份。
+- **交互原语已全局化**：`kit/KitUI.jsx`（隐藏 x-import 预加载注册 `window.KitUI`）提供 toast/confirm/modal/formModal/undoToast/folderPicker/exportModal/importModal/ripple。交互一律先用/先扩 KitUI，规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md) §三。
 
 ### Step 3 — 接入路由（仅新增路由时改 `app.dc.html`）
 在 scratchpad 的 `app.dc.html` 改 4 处：
@@ -116,5 +117,5 @@ write_files(projectId, planId, files:[{ path:"kit/Xxx.jsx", localPath:"Xxx.jsx" 
 
 ## 五、已知遗留 / 注意
 1. **KitToolbar 兼容垫片已移除**：`ProjectScreen` 第 5 站重写后不再引用 `window.KitToolbar/KitTH/KitTD`，已从 `SupplierScreen.jsx` 删除该注册块，全项目无残留。
-2. **弹窗多为占位**：各 md 的新增/编辑弹窗、导出配置、导入映射等基本未实现，作为深化项。
+2. ~~弹窗多为占位~~ **已完成（反馈轮 3）**：新增/编辑弹窗、导出配置、导入映射、打印确认、送货单系列弹窗均已是真实交互，做法与规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md)。项目详情 6 个占位 Tab 与项目×分供方工作台仍为占位。
 3. **DESIGN-SYSTEM.md 未同步**：其扁平 CRM 条款与现风格冲突，暂不改（用户要求），以 [STYLE-GUIDE.md](./STYLE-GUIDE.md) 为准。

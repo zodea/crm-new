@@ -1,0 +1,6 @@
+/* 字体 — 扫描件助手
+   原应用使用系统中文字体（Microsoft YaHei / PingFang SC），不内置 webfont。
+   为保证在任意浏览器中一致渲染，设计系统以 Noto Sans SC 作为跨平台等价替身，
+   再回退到原应用的系统字体栈。财务数据用等宽栈（tabular-nums）。
+   ——若需绝对还原原生外观，请在装有微软雅黑/苹方的环境查看，或替换此处字体。 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800;900&display=swap");

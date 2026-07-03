@@ -1,0 +1,41 @@
+/* 颜色令牌 — 扫描件助手
+   唯一来源：原应用 src/styles.css :root + uno.config.ts theme.colors。
+   策略：轻机构灰画布 + 白纸面板 + 轻盈品牌蓝；状态用红/橙/绿交通灯，每色三档（实色/浅底/深字）。
+   不使用渐变、玻璃态、深色模式、装饰色带。 */
+:root {
+  /* —— 表面层次 —— */
+  --bg: #f8f9fb;            /* L0 画布：轻机构灰 */
+  --panel: #ffffff;         /* L1 卡片：白纸 */
+  --surface-2: #f1f5f9;    /* 表头 / 卡片次级底 */
+  --surface-3: #f3f4f6;    /* 占位 / 行 hover 底 */
+  --surface-sink: #e9edf4; /* 预览区凹底 */
+
+  /* —— 描边 —— */
+  --line: #e3e6ea;         /* 默认描边 */
+  --line-strong: #c9ced6;  /* 强描边：按钮 / 输入框 */
+
+  /* —— 文字（墨） —— */
+  --ink: #1f2329;          /* 主文字 */
+  --ink-soft: #5b6470;     /* 次级文字 */
+  --ink-faint: #8b93a1;    /* 弱文字 / 占位 */
+
+  /* —— 品牌（唯一非状态色） —— */
+  --brand: #60a5fa;        /* 主交互色：轻盈蓝 */
+  --brand-soft: #cde3fe;   /* 浅底：浅色按钮 / 标签背景（v3 加深，≈ Tailwind 150） */
+  --brand-deep: #2563eb;   /* 深色字 / 图标，用于浅底上的文字 */
+
+  /* —— 状态·成功（绿） —— */
+  --ok: #16a34a;
+  --ok-soft: #b1f5d0;
+  --ok-ink: #166534;
+
+  /* —— 状态·警告（橙） —— */
+  --warn: #d97706;
+  --warn-soft: #feeda9;
+  --warn-ink: #92400e;
+
+  /* —— 状态·危险（红） —— */
+  --danger: #dc2626;
+  --danger-soft: #fed6d6;
+  --danger-ink: #991b1b;
+}

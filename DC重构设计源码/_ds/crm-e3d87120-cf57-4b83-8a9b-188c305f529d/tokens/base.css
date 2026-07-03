@@ -1,0 +1,55 @@
+/* 基础重置 — 扫描件助手
+   贴合原应用 src/styles.css：极简重置 + 细滚动条 + 正文默认。 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* 等宽数字：财务字段统一 tabular-nums */
+.tnum,
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 细滚动条：透明轨道，仅悬停显出淡淡滑块 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: rgba(100, 110, 125, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(100, 110, 125, 0.3);
+}
