@@ -525,7 +525,12 @@
     // 反馈轮9 第二层：项目主数据走 window.APP 共享 store（与项目列表同源，编辑互通实时联动）
     const A = window.APP;
     if (A) A.use();
+    // 反馈轮9 第三层（多页数据交互）：订阅发票 store —— 发票识别归档 → 本页票据信息/票税管理实时联动
+    const [, forceInv] = React.useReducer((x) => x + 1, 0);
+    React.useEffect(() => (window.INV ? window.INV.subscribe(forceInv) : undefined), []);
     const proj = (A && A.get("projects", id)) || data.projects.find((p) => p.id === id) || data.projects[0];
+    const invRows = window.INV ? window.INV.live().filter((iv) => iv.account === "posted" && iv.project === proj.name) : null;
+    const invAgg = invRows ? { amt: invRows.reduce((s, iv) => s + Number(iv.total || 0), 0), tax: invRows.reduce((s, iv) => s + Number(iv.tax || 0), 0) } : null;
     // 经营/票税等聚合仍按 id mock（META）；与 store 重叠的基础字段以 store 为准
     const m = { ...(META[proj.id] || META.p1) };
     ["contractName", "operationType", "region", "riskLevel", "overview"].forEach((k) => { if (proj[k] != null && proj[k] !== "") m[k] = proj[k]; });
@@ -627,17 +632,25 @@
               </MetricGrid>
             </Panel>
 
-            {/* 票据信息（固定 6列×1行） */}
+            {/* 票据信息（固定 6列×1行；进项两格与发票台账实时联动 —— 反馈轮9 第三层） */}
             <Panel padding={16}>
-              <SectionHeader extra={<span style={{ fontSize: 11, color: "var(--ink-faint)" }}>自动计算 · 来自票税管理</span>}>票据信息</SectionHeader>
-              <MetricGrid cols={6}>
-                <Metric label="销项票额" value={yuan(m.tax.outAmt)} formula="Σ 开票申请.开票金额" />
-                <Metric label="销项税额" value={yuan(m.tax.outTax)} formula="Σ 开票申请.税额" />
-                <Metric label="进项票额" value={yuan(m.tax.inAmt)} formula="Σ 收票登记.开票金额" />
-                <Metric label="进项税额" value={yuan(m.tax.inTax)} formula="Σ 收票登记.税额" />
-                <Metric label="增值税" value={yuan(m.tax.vat)} formula="销项税额 − 进项税额" tone="brand" />
-                <Metric label="税负率" value={m.tax.rate.toFixed(2) + "%"} formula="增值税 / 销项票额" tone="brand" />
-              </MetricGrid>
+              <SectionHeader extra={<span style={{ fontSize: 11, color: "var(--ink-faint)" }}>{invRows ? "进项与发票台账实时联动（" + invRows.length + " 张归档票）" : "自动计算 · 来自票税管理"}</span>}>票据信息</SectionHeader>
+              {(() => {
+                const inAmt = invAgg ? invAgg.amt : m.tax.inAmt;
+                const inTax = invAgg ? invAgg.tax : m.tax.inTax;
+                const vat = Math.max(0, m.tax.outTax - inTax);
+                const rate = m.tax.outAmt ? (vat / m.tax.outAmt * 100) : 0;
+                return (
+                  <MetricGrid cols={6}>
+                    <Metric label="销项票额" value={yuan(m.tax.outAmt)} formula="Σ 开票申请.开票金额" />
+                    <Metric label="销项税额" value={yuan(m.tax.outTax)} formula="Σ 开票申请.税额" />
+                    <Metric label="进项票额" value={yuan(inAmt)} formula="Σ 发票台账(该项目归档票).价税合计 · 实时联动" tone={invAgg ? "brand" : undefined} />
+                    <Metric label="进项税额" value={yuan(inTax)} formula="Σ 发票台账(该项目归档票).税额 · 实时联动" tone={invAgg ? "brand" : undefined} />
+                    <Metric label="增值税" value={yuan(vat)} formula="销项税额 − 进项税额" tone="brand" />
+                    <Metric label="税负率" value={rate.toFixed(2) + "%"} formula="增值税 / 销项票额" tone="brand" />
+                  </MetricGrid>
+                );
+              })()}
             </Panel>
 
             {/* 阶段时间线（胶囊步进器 + 时间带；key 保证切项目重置内部状态） */}
@@ -649,7 +662,7 @@
                 <SegTab tabs={TABS} active={tab} onChange={setTab} />
               </div>
               <div style={{ padding: 16, background: "var(--bg)" }}>
-                <TabContent tab={tab} proj={proj} m={m} data={data} navigate={navigate} />
+                <TabContent tab={tab} proj={proj} m={m} data={data} navigate={navigate} invRows={invRows} />
               </div>
             </Panel>
           </div>
@@ -663,7 +676,7 @@
     );
   }
 
-  function TabContent({ tab, proj, m, data, navigate }) {
+  function TabContent({ tab, proj, m, data, navigate, invRows }) {
     if (tab === "info") {
       const base = [
         ["项目名称", proj.name], ["项目合同名称", m.contractName], ["客户(甲方)", proj.developer], ["客户2", m.developer2],
@@ -800,7 +813,7 @@
             { key: "type", label: "发票类型", render: (v) => <StatusChip tone="brand">{v}</StatusChip> },
             { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
             { key: "supplier", label: "供应商" },
-          ]} rows={(data.invoices || []).filter((iv) => iv.number).slice(0, 4).map((iv) => ({ no: iv.number.slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: iv.type.includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额", value: m.tax.inAmt }} />
+          ]} rows={(invRows || []).map((iv) => ({ no: (iv.number || "").slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: (iv.type || "").includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额（实时联动发票台账）", value: (invRows || []).reduce((s, iv) => s + Number(iv.total || 0), 0) }} />
         </div>
       );
     }
