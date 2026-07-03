@@ -158,26 +158,8 @@
     );
   }
 
-  function SegTab({ tabs, active, onChange }) {
-    return (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 2, borderBottom: "1px solid var(--line)" }}>
-        {tabs.map((t) => {
-          const on = active === t.key;
-          return (
-            <button key={t.key} onClick={() => onChange(t.key)} style={{
-              border: 0, background: "transparent", cursor: "pointer", padding: "9px 14px", marginBottom: -1,
-              fontSize: 13, fontWeight: on ? 700 : 500, color: on ? "var(--brand-deep)" : "var(--ink-soft)",
-              borderBottom: on ? "2px solid var(--brand)" : "2px solid transparent", whiteSpace: "nowrap",
-              display: "inline-flex", alignItems: "center", gap: 6,
-            }}>
-              {t.label}
-              {t.count != null && <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", padding: "1px 6px", borderRadius: 999, background: on ? "var(--brand-soft)" : "var(--surface-3)", color: on ? "var(--brand-deep)" : "var(--ink-soft)" }}>{t.count}</span>}
-            </button>
-          );
-        })}
-      </div>
-    );
-  }
+  // SegTab 内联副本已删 → 统一用 window.KitAtoms.SegTab（反馈轮9 通用组件）
+  const SegTab = (props) => { const KA = window.KitAtoms; return KA ? <KA.SegTab {...props} /> : null; };
 
   // 通用子表（反馈轮8：委托 KitTable，表格三件套——≥5 行高度 / 容器内横滚 / 分页；金额两位小数）
   function SubTable({ title, count, columns, rows, sum, minRows }) {

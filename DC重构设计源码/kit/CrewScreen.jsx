@@ -12,26 +12,8 @@
     { key: "钢筋工", label: "钢筋工" }, { key: "水暖工", label: "水暖工" }, { key: "防水工", label: "防水工" },
   ];
 
-  function SelectFilter({ label, options, value, onChange, minWidth = 132 }) {
-    return (
-      <label style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", flex: "none" }}>{label}</span>
-        <span style={{ position: "relative", display: "inline-flex" }}>
-          <select value={value} onChange={(e) => onChange(e.target.value)} style={{
-            appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
-            border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", background: "#fff",
-            color: "var(--ink)", fontSize: 13, fontWeight: 600, padding: "7px 30px 7px 12px", cursor: "pointer",
-            minWidth, transition: "border-color var(--dur-fast)",
-          }}>
-            {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-          </select>
-          <span style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
-            <Icon name="chevron-down" size={14} color="var(--ink-faint)" />
-          </span>
-        </span>
-      </label>
-    );
-  }
+  // SelectFilter 内联副本已删 → 统一用 window.KitAtoms.SelectFilter（反馈轮9 通用组件）
+  const SelectFilter = (props) => { const KA = window.KitAtoms; return KA ? <KA.SelectFilter {...props} /> : null; };
 
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, exportModal: () => {}, undoToast: () => {} };
   const crewForm = (c, title, onSave) => UI().formModal({
@@ -84,10 +66,7 @@
           </div>
           <SelectFilter label="工种" options={TRADE_OPTS} value={trade} onChange={setTrade} />
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}><Icon name="search" size={14} color="var(--ink-faint)" /></span>
-              <input placeholder="搜索班组名、负责人…" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 210, border: "1px solid var(--line-strong)", borderRadius: 999, padding: "8px 14px 8px 32px", fontSize: 13, background: "#fff" }} />
-            </div>
+            {window.KitAtoms && <window.KitAtoms.SearchInput placeholder="搜索班组名、负责人…" value={q} onChange={setQ} />}
             <IconButton icon="refresh-cw" title="刷新" onClick={() => { setTrade("all"); setQ(""); UI().toast("已刷新"); }} />
             <IconButton icon="columns-3" title="列设置" onClick={() => UI().toast("列设置（演示）")} />
             <Button icon="download" onClick={(e) => UI().exportModal({

@@ -19,22 +19,8 @@
     return narrow;
   };
 
-  function SegTab({ tabs, active, onChange }) {
-    return (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 2, borderBottom: "1px solid var(--line)" }}>
-        {tabs.map((t) => {
-          const on = active === t.key;
-          return (
-            <button key={t.key} onClick={() => onChange(t.key)} style={{
-              border: 0, background: "transparent", cursor: "pointer", padding: "9px 16px", marginBottom: -1,
-              fontSize: 13, fontWeight: on ? 700 : 500, color: on ? "var(--brand-deep)" : "var(--ink-soft)",
-              borderBottom: on ? "2px solid var(--brand)" : "2px solid transparent", whiteSpace: "nowrap",
-            }}>{t.label}</button>
-          );
-        })}
-      </div>
-    );
-  }
+  // SegTab 内联副本已删 → 统一用 window.KitAtoms.SegTab（反馈轮9 通用组件）
+  const SegTab = (props) => { const KA = window.KitAtoms; return KA ? <KA.SegTab {...props} /> : null; };
 
   function Breadcrumb({ items }) {
     return (

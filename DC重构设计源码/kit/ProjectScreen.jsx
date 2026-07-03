@@ -32,25 +32,8 @@
     { key: "交付", label: "交付" }, { key: "保修", label: "保修" }, { key: "项目完结", label: "项目完结" },
   ];
 
-  function SelectFilter({ label, options, value, onChange, minWidth = 150 }) {
-    return (
-      <label style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", flex: "none" }}>{label}</span>
-        <span style={{ position: "relative", display: "inline-flex" }}>
-          <select value={value} onChange={(e) => onChange(e.target.value)} style={{
-            appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
-            border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", background: "#fff",
-            color: "var(--ink)", fontSize: 13, fontWeight: 600, padding: "7px 30px 7px 12px", cursor: "pointer", minWidth,
-          }}>
-            {options.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-          </select>
-          <span style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
-            <Icon name="chevron-down" size={14} color="var(--ink-faint)" />
-          </span>
-        </span>
-      </label>
-    );
-  }
+  // SelectFilter 内联副本已删 → 统一用 window.KitAtoms.SelectFilter（反馈轮9 通用组件）
+  const SelectFilter = (props) => { const KA = window.KitAtoms; return KA ? <KA.SelectFilter minWidth={150} {...props} /> : null; };
 
   // 完整编辑表单：红圈「详细资料 · 基础信息」分组字段
   const projForm = (p, title, onSave) => UI().formModal({
@@ -137,10 +120,7 @@
           </div>
           <SelectFilter label="阶段" options={STAGE_OPTS} value={stage} onChange={setStage} />
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}><Icon name="search" size={14} color="var(--ink-faint)" /></span>
-              <input placeholder="搜索项目、客户、经理…" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 210, border: "1px solid var(--line-strong)", borderRadius: 999, padding: "8px 14px 8px 32px", fontSize: 13, background: "#fff" }} />
-            </div>
+            {window.KitAtoms && <window.KitAtoms.SearchInput placeholder="搜索项目、客户、经理…" value={q} onChange={setQ} />}
             <IconButton icon="refresh-cw" title="刷新" onClick={() => { setStage("all"); setQ(""); UI().toast("已刷新"); }} />
             <Button icon="upload" onClick={() => UI().importModal({
               title: "导入项目", fileName: "施工项目台账.xlsx", rowCount: 1,
