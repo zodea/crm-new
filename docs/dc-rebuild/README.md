@@ -172,6 +172,16 @@
 - ✅ **已随反馈轮 8 一并推送**（2026-07-04，DesignSync 全量 47 文件：app.dc.html + support.js + kit/** + _ds/**），线上设计稿 = 本地快照已验证状态。
 - ⏭️ 送货单双区/文件树等 D 节内容 → 并入下一实施批。
 
+### 反馈轮 9（2026-07-04：分层联动 —— 通用组件先行，单页→双页→多页）
+> 思路：按联动关联性一层层完善，先最少界面复杂度、后多界面数据交互；通用组件先生成后统一使用；每层一个 commit。
+
+- **第〇层 · 通用组件**：新增 `kit/KitAtoms.jsx`（window.KitAtoms：SelectFilter / SegTab / SearchInput / SectionHeader / Metric / MetricGrid / TreeNav），与 KitUI（交互）/ KitTable（表格）并列成三块全局底座。六页删除内联副本改委托（SelectFilter×4、SegTab×2、搜索框×4）；SupplierDetail/WorkerDetail 的逐项签名 SegTab 形态不同暂留。
+- **第一层 · 单页接入**：四列表页（项目/分供方/班组/工人）筛选与搜索统一走 KitAtoms。
+- **第二层 · 双页联动**：新增 `kit/AppData.jsx`（window.APP：projects/suppliers 订阅式共享 store，subscribe/rows/get/update/add/softDel/restore/use；红圈扩展字段上移 store）。**项目列表↔项目详情**、**分供方列表↔详情** 同源：任一处编辑另一处实时可见，软删除撤回走 store。
+- **第三层 · 多页数据交互**：项目详情订阅 window.INV——「票据信息」进项票额/进项税额 = Σ该项目归档发票（实时，角标显示张数，增值税/税负率随之重算）；「票税管理→收票登记」行 = 发票台账该项目归档票。**发票识别页归档一张票 → 发票台账 → 项目详情三处联动**。
+- 验证：每层本地实测（store 改名双向可见 / 归档新票详情角标+行+合计实时变化），console 零报错；每层独立 commit（4 个）。
+- 全局数据底座分工：KIT_DATA（静态 mock 源）→ APP（主数据：项目/分供方）→ INV（发票域）→ SCHEDULE（排程域）→ WAGE（工资域）；跨页一律订阅 store，禁止再各页 useState 私有副本。
+
 ### 反馈轮 8（2026-07-04：全站界面整改 —— 九大块）
 见 [FEEDBACK-8.md](./FEEDBACK-8.md)：表格三件套铁律（≥10 行高度/容器内横滚/分页）、金额两位小数铁律、红圈对齐；首页减法、项目列表/编辑/详情红圈化、施工进度新建分组子页面、分供方表格修复、税额工具压缩、工程量矩阵优化+量差总表（#37）、清单编辑、工资核算/进度款对齐真实格式。**每完成一屏在该文件标「暂定界面」。**
 

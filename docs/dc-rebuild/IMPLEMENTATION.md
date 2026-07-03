@@ -57,6 +57,8 @@ _ds/.../tokens/*.css               ← 颜色/间距/阴影 token
 - 风格严格按 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
 - **展示原子目前是各文件内联复制**（SegTab/SelectFilter/InfoGrid/SectionHeader/Metric/SubTable/TH/TD），为降耦合先内联；`SelectFilter` 已在 Project/Supplier/Crew/Worker 四个列表页各自内联一份。
 - **交互原语已全局化**：`kit/KitUI.jsx`（隐藏 x-import 预加载注册 `window.KitUI`）提供 toast/confirm/modal/formModal/undoToast/folderPicker/exportModal/importModal/ripple。交互一律先用/先扩 KitUI，规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md) §三。
+- **展示原子已全局化（反馈轮 9，替代"各文件内联复制"旧约定）**：`kit/KitAtoms.jsx` → `window.KitAtoms`（SelectFilter/SegTab/SearchInput/SectionHeader/Metric/MetricGrid/TreeNav）；表格一律 `kit/KitTable.jsx` → `window.KitTable`（≥10 行/容器内横滚/分页/金额两位小数）。**新页面禁止再内联复制这些原子。**
+- **跨页共享数据 store（反馈轮 9）**：主数据走 `kit/AppData.jsx` → `window.APP`（projects/suppliers，subscribe/rows/get/update/add/softDel/restore/use）；发票域 `window.INV`、排程域 `window.SCHEDULE`、工资域 `window.WAGE`。**列表/详情/聚合页禁止各自 useState 持有数据副本**，一律订阅 store，编辑写回 store 实现跨页联动。
 
 ### Step 3 — 接入路由（仅新增路由时改 `app.dc.html`）
 在 scratchpad 的 `app.dc.html` 改 4 处：
