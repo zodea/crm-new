@@ -18,10 +18,10 @@
   const TH = { padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", background: "var(--surface-2)", textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid var(--line)" };
   const TD = { padding: "7px 10px", fontSize: 12, borderBottom: "1px solid var(--line)" };
   const numTD = { ...TD, textAlign: "right", fontFamily: "var(--font-mono)" };
-  function Inp({ value, onChange, type, align, w }) {
+  function Inp({ value, onChange, type, align, w, bold }) {
     const [f, setF] = React.useState(false);
     return React.createElement("input", { type: type || "text", value: value == null ? "" : value, onChange, onFocus: () => setF(true), onBlur: () => setF(false),
-      style: { width: w || "100%", boxSizing: "border-box", border: 0, borderBottom: f ? "1.5px solid var(--brand)" : "1px solid transparent", background: f ? "var(--brand-soft)" : "transparent", padding: "5px 6px", fontSize: 12, fontFamily: type === "number" ? "var(--font-mono)" : "inherit", textAlign: align || "left", outline: "none", borderRadius: 3, color: "var(--ink)" } });
+      style: { width: w || "100%", boxSizing: "border-box", border: 0, borderBottom: f ? "1.5px solid var(--brand)" : "1px solid transparent", background: f ? "var(--brand-soft)" : "transparent", padding: "5px 6px", fontSize: 12, fontWeight: bold ? 800 : 400, fontFamily: type === "number" ? "var(--font-mono)" : "inherit", textAlign: align || "left", outline: "none", borderRadius: 3, color: bold ? "var(--brand)" : "var(--ink)" } });
   }
 
   function WageSlipScreen({ data, params, navigate }) {
@@ -33,7 +33,7 @@
     const WA = window.WAGE;
     const [building, setBuilding] = React.useState(WA.BUILDINGS[0]);
     const [tradeKey, setTradeKey] = React.useState("mason");
-    const [settings, setSettings] = React.useState({ progress: 95, roundTo: 100, prevPaid: 0, rentEnabled: true, mgrEnabled: true, period: "2025年11月" });
+    const [settings, setSettings] = React.useState({ progress: 95, roundTo: 100, prevPaid: 0, payTotal: "", rentEnabled: true, mgrEnabled: true, period: "2025年11月" });
     const [manual, setManual] = React.useState({});
     const [pay, setPay] = React.useState({}); // 班组整包分配：who -> {gross,borrow,days}
     const [hollow, setHollow] = React.useState({});
@@ -64,6 +64,16 @@
       s.progressDue = Math.round(s.due * (settings.progress / 100) * 100) / 100;
       s.payable = Math.floor((s.progressDue - s.prev) / Math.max(1, settings.roundTo)) * Math.max(1, settings.roundTo);
     });
+    // 反馈轮8（九）：进度比例只是参考——「本期支付总额」直接给总数时按各人(进度应发−已发)权重分摊；「实发」可逐人直改（优先级最高）
+    {
+      const arr = Object.values(map);
+      const payTotalN = parseFloat(settings.payTotal);
+      if (!isNaN(payTotalN) && payTotalN > 0) {
+        const baseSum = arr.reduce((s2, r) => s2 + Math.max(0, r.progressDue - r.prev), 0) || 1;
+        arr.forEach((s2) => { s2.payable = Math.floor((Math.max(0, s2.progressDue - s2.prev) / baseSum * payTotalN) / Math.max(1, settings.roundTo)) * Math.max(1, settings.roundTo); });
+      }
+      arr.forEach((s2) => { const mo = manual[s2.who] || {}; if (mo.payOverride !== undefined && mo.payOverride !== "") s2.payable = +mo.payOverride || 0; });
+    }
     const summary = Object.values(map).sort((a, b) => (b.payable) - (a.payable));
     const totalPay = summary.reduce((s, r) => s + Math.max(0, r.payable), 0);
     const isCrewMode = T.mode === "crew";
@@ -94,7 +104,17 @@
               <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>工程量只读 · 来自「工程量管理」配置 · 本次实发合计 <b style={{ color: "var(--brand-deep)", fontFamily: "var(--font-mono)" }}>¥{money(totalPay)}</b></div></div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               <Button icon="edit-3" onClick={() => navigate("quantity")}>去工程量管理改指派</Button>
-              <Button variant="primary" icon="download" onClick={() => UI().toast("正在导出「" + T.name + "·" + building + "」进度款…")}>导出</Button>
+              <Button variant="primary" icon="download" onClick={(e) => UI().exportModal({
+                title: "导出进度款四表", subtitle: T.name + "班组 · " + building + " · " + settings.period + " · 与真实模板同构",
+                count: 4, unit: "张表", ext: ".xls", anchor: e.currentTarget,
+                structureOptions: ["按月份/楼栋（真实归档结构）", "按班组", "不分层"],
+                nameOptions: [
+                  { label: "项目-栋-工种-月份（负责人）", sample: "亚运城C1-2栋岩板10月进度款（何先进）" },
+                  { label: "进度款审批表", sample: settings.period + "进度款审批表" },
+                  { label: "工程量进度清单", sample: building + "工程量进度清单" },
+                  { label: "工人工资表+考勤", sample: T.name + "工工资表" },
+                ],
+              })}>导出</Button>
             </div>
           </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
@@ -106,9 +126,10 @@
               {Object.keys(WA.TRADES).map((tk) => { const on = tradeKey === tk; return <button key={tk} onClick={() => setTradeKey(tk)} style={{ border: "1px solid", borderColor: on ? "var(--brand)" : "var(--line)", background: on ? "var(--brand-soft)" : "#fff", color: on ? "var(--brand-deep)" : "var(--ink-soft)", borderRadius: 999, padding: "5px 14px", fontSize: 13, fontWeight: on ? 700 : 500, cursor: "pointer" }}>{WA.TRADES[tk].name}<StatusChip tone={WA.TRADES[tk].mode === "worker" ? "brand" : "neutral"}>{WA.TRADES[tk].mode === "worker" ? "个人计件" : "班组整包"}</StatusChip></button>; })}
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-              {[["progress", "进度%"], ["roundTo", "取整"], ["prevPaid", "累计已申领"]].map(([k, label]) => (
+              {[["progress", "进度%（参考）"], ["roundTo", "取整"], ["prevPaid", "累计已申领"]].map(([k, label]) => (
                 <label key={k} style={{ fontSize: 12, color: "var(--ink-soft)", display: "inline-flex", alignItems: "center", gap: 5 }}>{label}<input type="number" value={settings[k]} onChange={(e) => setS(k, +e.target.value)} style={{ width: 70, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "5px 7px", fontSize: 12, textAlign: "right" }} /></label>
               ))}
+              <label title="直接给总数：填入后按各人（进度应发−已发）权重分摊，比例仅作参考" style={{ fontSize: 12, color: "var(--brand-deep)", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 5 }}>本期支付总额<input value={settings.payTotal} placeholder="自动" onChange={(e) => setS("payTotal", e.target.value)} style={{ width: 92, border: "1.5px solid var(--brand)", background: "var(--brand-soft)", borderRadius: 6, padding: "5px 7px", fontSize: 12, textAlign: "right", fontFamily: "var(--font-mono)" }} /></label>
               <label style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}><input type="checkbox" checked={settings.rentEnabled} onChange={(e) => setS("rentEnabled", e.target.checked)} />房补</label>
               {T.mode === "worker" && <label style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, cursor: "pointer" }}><input type="checkbox" checked={settings.mgrEnabled} onChange={(e) => setS("mgrEnabled", e.target.checked)} />管理费({mgrName})</label>}
             </div>
@@ -177,7 +198,7 @@
                         <td style={{ ...numTD, fontWeight: 700 }}>{money(r.due)}</td>
                         <td style={numTD}>{money(r.progressDue)}</td>
                         <td style={{ ...TD, width: 84 }}><Inp type="number" value={m.prev || 0} onChange={(e) => setMan(r.who, "prev", +e.target.value)} align="right" /></td>
-                        <td style={{ ...numTD, fontWeight: 800, color: "var(--brand)" }}>{money(r.payable)}</td>
+                        <td style={{ ...TD, width: 100 }} title="实发可直改（清空恢复自动计算）"><Inp type="number" value={m.payOverride !== undefined && m.payOverride !== "" ? m.payOverride : r.payable} onChange={(e) => setMan(r.who, "payOverride", e.target.value)} align="right" bold /></td>
                         <td style={{ ...TD, width: 110 }}><Inp value={m.remark || ""} onChange={(e) => setMan(r.who, "remark", e.target.value)} /></td>
                       </tr>
                     ); })}

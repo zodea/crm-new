@@ -98,56 +98,41 @@
     const num = { ...TD, textAlign: "right", fontFamily: "var(--font-mono)" };
     const fmt = v => v.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    // 反馈轮8：税额计算压缩为顶部横排一行——输入（金额+税率自由输入）与四格结果同排，点格即复制；税率快选 pill 删除
+    const cell = (label, raw, display) => (
+      <div key={label} onClick={() => { try { navigator.clipboard.writeText(String(raw)); } catch (e) {} (window.KitUI || { toast: () => {} }).toast("已复制" + label); }}
+        title="点击复制" style={{ flex: 1, minWidth: 0, padding: "6px 14px", borderLeft: "1px solid var(--line)", cursor: "copy" }}>
+        <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{label}</div>
+        <div style={{ marginTop: 2, fontSize: label === "大写" ? 12.5 : 15, fontWeight: 700, fontFamily: label === "大写" ? "inherit" : "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink)" }}>{display}</div>
+      </div>
+    );
+
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "330px 1fr", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+        {/* 税额计算——单行横排 */}
+        <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, flex: "none" }}>税额计算</span>
+            <input style={{ ...inp, width: 150, fontSize: 15, fontWeight: 700 }} value={target}
+              onChange={e => setTarget(e.target.value)} placeholder="含税金额" />
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-soft)", flex: "none" }}>税率%</span>
+              <input style={{ ...inp, width: 56, textAlign: "center" }} value={taxRate} onChange={e => setTaxRate(e.target.value)} placeholder="13" />
+            </label>
+          </div>
+          {t > 0
+            ? [cell("价税合计", t.toFixed(2), "¥" + fmt(t)),
+               cell("不含税金额", exTax.toFixed(2), "¥" + fmt(exTax)),
+               cell("税额", taxAmt.toFixed(2), "¥" + fmt(taxAmt)),
+               cell("大写", moneyToChinese(t), moneyToChinese(t))]
+            : <div style={{ flex: 1, padding: "6px 14px", borderLeft: "1px solid var(--line)", fontSize: 12, color: "var(--ink-faint)" }}>输入含税金额后，此排显示 价税合计 / 不含税 / 税额 / 大写，点击任一格即复制</div>}
+        </Panel>
+
+        <div style={{ display: "grid", gridTemplateColumns: "330px 1fr", gap: 16, alignItems: "start" }}>
 
         {/* ── 左列 ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-          {/* 税额计算 */}
-          <Panel padding={16} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)", marginBottom: -6 }}>税额计算</div>
-
-            <div>
-              <div style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: 5 }}>目标含税金额（元）</div>
-              <input style={{ ...inp, fontSize: 17, fontWeight: 700, padding: "11px 12px" }} value={target}
-                onChange={e => setTarget(e.target.value)} placeholder="如 128640.00" />
-            </div>
-
-            <div>
-              <div style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: 5 }}>税率 (%)</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input style={{ ...inp, width: 80 }} value={taxRate} onChange={e => setTaxRate(e.target.value)} />
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {["13", "9", "6", "3", "1"].map(v => (
-                    <button key={v} onClick={() => setTaxRate(v)} style={{ border: "1px solid", borderColor: taxRate === v ? "var(--brand)" : "var(--line)", background: taxRate === v ? "var(--brand-soft)" : "#fff", color: taxRate === v ? "var(--brand-deep)" : "var(--ink-soft)", borderRadius: 999, padding: "6px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-mono)" }}>{v}%</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 结果——点击复制 */}
-            {t > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 0, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
-                {[
-                  ["价税合计", t, t.toFixed(2)],
-                  ["不含税金额", exTax, exTax.toFixed(2)],
-                  ["税额", taxAmt, taxAmt.toFixed(2)],
-                ].map(([label, val, raw]) => (
-                  <div key={label} style={{ padding: "8px 0", borderBottom: "1px solid var(--line)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{label}</span>
-                      <CopyValue value={raw} display={"¥" + fmt(val)} mono large color="var(--ink)" />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                      <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>大写</span>
-                      <CopyValue value={moneyToChinese(val)} display={moneyToChinese(val)} color="var(--ink-soft)" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
 
           {/* 因子列表 */}
           <Panel padding={0} style={{ overflow: "hidden" }}>
@@ -229,6 +214,7 @@
             </div>
           )}
         </Panel>
+        </div>
       </div>
     );
   }

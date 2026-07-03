@@ -143,7 +143,8 @@
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
           {formula && <span title={formula} style={{ cursor: "help", display: "inline-flex" }}><Icon name="info" size={11} color="var(--ink-faint)" /></span>}
         </div>
-        <div style={{ marginTop: 5, fontSize: big ? 19 : 15, fontWeight: big ? 800 : 700, fontFamily: "var(--font-mono)", color, lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis" }}>{value}</div>
+        {/* 反馈轮8：金额两位小数完整展示，禁止省略号缩略（CRM 看数第一） */}
+        <div title={typeof value === "string" ? value : undefined} style={{ marginTop: 5, fontSize: big ? 17.5 : 13.5, fontWeight: big ? 800 : 700, fontFamily: "var(--font-mono)", color, lineHeight: 1.25, whiteSpace: "nowrap", letterSpacing: "-0.015em" }}>{value}</div>
       </div>
     );
   }
@@ -178,57 +179,24 @@
     );
   }
 
-  // 通用子表
-  function SubTable({ title, count, columns, rows, sum }) {
-    return (
-      <Panel padding={0} style={{ overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>{title} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({count != null ? count : rows.length})</span></span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <IconButton icon="search" title="搜索" onClick={() => UI().toast("搜索 " + title + "（演示）")} />
-            <IconButton icon="download" title="导出" onClick={() => UI().toast("正在导出 " + title + "…")} />
-            <Button size="sm" variant="primary" icon="plus" onClick={() => UI().formModal({ title: "新增 " + title, fields: [{ key: "name", label: title + "名称", full: true }, { key: "amount", label: "金额", placeholder: "选填" }], onSave: () => UI().toast("已新增", "ok") })}>新增</Button>
-          </div>
+  // 通用子表（反馈轮8：委托 KitTable，表格三件套——≥5 行高度 / 容器内横滚 / 分页；金额两位小数）
+  function SubTable({ title, count, columns, rows, sum, minRows }) {
+    const toolbar = (
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{title} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({count != null ? count : rows.length})</span></span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <IconButton icon="search" title="搜索" onClick={() => UI().toast("搜索 " + title + "（演示）")} />
+          <IconButton icon="download" title="导出" onClick={() => UI().toast("正在导出 " + title + "…")} />
+          <Button size="sm" variant="primary" icon="plus" onClick={() => UI().formModal({ title: "新增 " + title, fields: [{ key: "name", label: title + "名称", full: true }, { key: "amount", label: "金额", placeholder: "选填" }], onSave: () => UI().toast("已新增", "ok") })}>新增</Button>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                <th style={TH}>#</th>
-                {columns.map((c) => <th key={c.key} style={{ ...TH, textAlign: c.align || "left" }}>{c.label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={columns.length + 1} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)", padding: "28px 0" }}>暂无数据</td></tr>
-              )}
-              {rows.map((r, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid var(--line)", transition: "background var(--dur-fast)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <td style={{ ...TD, color: "var(--ink-soft)" }}>{i + 1}</td>
-                  {columns.map((c) => {
-                    const v = r[c.key];
-                    if (c.render) return <td key={c.key} style={{ ...TD, textAlign: c.align || "left" }}>{c.render(v, r)}</td>;
-                    return <td key={c.key} style={{ ...TD, textAlign: c.align || "left", fontFamily: c.mono ? "var(--font-mono)" : "inherit", color: c.color || (c.mono ? "var(--ink)" : "inherit") }}>{c.money ? yuan(v) : (v == null || v === "" ? "—" : v)}</td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-            {sum && (
-              <tfoot>
-                <tr style={{ background: "var(--surface-2)", borderTop: "1px solid var(--line)" }}>
-                  <td colSpan={columns.length + 1} style={{ padding: "11px 16px", fontSize: 13 }}>
-                    <span style={{ color: "var(--ink-soft)" }}>{sum.label}：</span>
-                    <b style={{ fontFamily: "var(--font-mono)", color: "var(--brand)" }}>{yuan(sum.value)}</b>
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </Panel>
+      </div>
     );
+    if (window.KitTable) {
+      return <window.KitTable toolbar={toolbar} columns={columns.map((c) => ({ width: 120, ...c }))} rows={rows}
+        pageSize={10} minRows={minRows != null ? minRows : 5} sum={sum} tableMinWidth={Math.max(640, columns.length * 130)}
+        footerLeft={"共 " + rows.length + " 条"} empty="暂无数据" />;
+    }
+    return <Panel padding={16} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>;
   }
 
   // —— 进度 · 成本 驾驶舱卡（#30 原样保留）：迷你甘特（分组级，数据同首页）+ 人材机四科目 目标/实际/偏差 ——
@@ -407,78 +375,67 @@
     const curIdx = eff.findIndex((_, i) => stateOf(i) === "current");
     const [openPhase, setOpenPhase] = React.useState(curIdx >= 0 ? curIdx : 1);
 
-    // 胶囊节点位置：按阶段起始日期定位 + 最小间距防重叠（保持日期顺序，不均分）
-    const MIN = 11.5;
-    const pos = eff.map((d) => clampN(X(d.s), 5, 95));
-    for (let i = 1; i < pos.length; i++) pos[i] = Math.max(pos[i], pos[i - 1] + MIN);
-    pos[pos.length - 1] = Math.min(pos[pos.length - 1], 95);
-    for (let i = pos.length - 2; i >= 0; i--) pos[i] = Math.min(pos[i], pos[i + 1] - MIN);
-    pos[0] = Math.max(pos[0], 5);
-    for (let i = 1; i < pos.length; i++) pos[i] = Math.max(pos[i], pos[i - 1] + MIN);
-
-    // 节点旁编辑图标 → formModal 改阶段起止；施工中（有排程）只读提示
-    const editPhase = (i) => {
-      if (i === 2 && sp) { UI().toast("「施工中」起止取自施工进度计划，请在施工进度页调整"); return; }
-      const d = dates[i];
-      UI().formModal({
-        title: "编辑「" + PHASES[i].name + "」阶段起止",
-        cols: 2,
-        fields: [
-          { key: "s", label: "开始日期", type: "date", value: d.s },
-          { key: "e", label: "结束日期", type: "date", value: d.e },
-        ],
-        onSave: (v) => {
-          if (!v.s || !v.e || days(v.s, v.e) < 0) { UI().toast("结束日期不能早于开始日期", "warn"); return; }
-          setDates((prev) => prev.map((x, k) => (k === i ? { s: v.s, e: v.e } : x)));
-          UI().toast("「" + PHASES[i].name + "」阶段日期已更新", "ok");
-        },
-      });
-    };
+    // 反馈轮8：散落的小编辑图标废弃 → 模块级「编辑阶段」大修改项（一个弹窗改全部六阶段起止）
+    const editAllPhases = () => UI().formModal({
+      title: "编辑阶段起止 · 全部六阶段", cols: 2, width: 640,
+      subtitle: sp ? "「施工中」起止取自施工进度计划，此处修改不生效（去施工进度页调整）" : null,
+      fields: PHASES.flatMap((ph, i) => [
+        { key: "s" + i, label: ph.name + " · 开始", type: "date", value: eff[i].s },
+        { key: "e" + i, label: ph.name + " · 结束", type: "date", value: eff[i].e },
+      ]),
+      onSave: (v) => {
+        for (let i = 0; i < PHASES.length; i++) {
+          if (v["s" + i] && v["e" + i] && days(v["s" + i], v["e" + i]) < 0) { UI().toast("「" + PHASES[i].name + "」结束日期不能早于开始日期", "danger"); return; }
+        }
+        setDates((prev) => prev.map((x, i) => (i === 2 && sp ? x : { s: v["s" + i] || x.s, e: v["e" + i] || x.e })));
+        UI().toast("阶段起止已更新", "ok");
+      },
+    });
 
     return (
       <Panel padding={16}>
-        <SectionHeader extra={<span style={{ fontSize: 11, color: "var(--ink-faint)" }}>节点按阶段起始日期定位 · 点节点展开任务</span>}>阶段时间线 · 任务文件</SectionHeader>
+        <SectionHeader extra={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>点阶段卡展开任务</span>
+            <Button size="sm" icon="square-pen" onClick={editAllPhases}>编辑阶段</Button>
+          </span>
+        }>阶段时间线 · 任务文件</SectionHeader>
+
+        {/* 反馈轮8：等宽六卡（每阶段有足够位置），日期比例只保留在下方时间带 */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8, marginBottom: 12 }}>
+          {PHASES.map((ph, i) => {
+            const st = stateOf(i);
+            const isOpen = openPhase === i;
+            const done = doneOf(i), totalT = ph.tasks.length;
+            const C = st === "current"
+              ? { bd: "var(--brand)", bg: "var(--brand-soft)", ink: "var(--brand-deep)", icon: "loader" }
+              : st === "done"
+                ? { bd: "var(--ok)", bg: "var(--ok-soft)", ink: "var(--ok-ink)", icon: "check" }
+                : { bd: "var(--line-strong)", bg: "var(--panel)", ink: "var(--ink-faint)", icon: "clock" };
+            return (
+              <button key={i} onClick={() => setOpenPhase(isOpen ? -1 : i)} style={{
+                border: "1.5px solid " + C.bd, background: C.bg, borderRadius: 10, padding: "10px 10px 8px",
+                cursor: "pointer", textAlign: "left", minWidth: 0,
+                boxShadow: isOpen ? "0 0 0 3px var(--brand-soft)" : "none", transition: "box-shadow var(--dur-fast)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Icon name={C.icon} size={13} color={C.ink} />
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ph.name}</span>
+                </div>
+                <div style={{ marginTop: 6, fontSize: 15, fontWeight: 800, fontFamily: "var(--font-mono)", color: C.ink }}>{totalT ? done + "/" + totalT : "动态"}<span style={{ fontSize: 10, fontWeight: 600, marginLeft: 4, color: "var(--ink-faint)" }}>任务</span></div>
+                <div style={{ marginTop: 4, fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{dot(eff[i].s.slice(2))} → {dot(eff[i].e.slice(2))}</div>
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{ position: "relative", margin: "2px 6px 0" }}>
           {/* 「今天」小标 */}
           <div style={{ position: "relative", height: 18 }}>
             <span style={{ position: "absolute", left: todayX + "%", transform: "translateX(-50%)", fontSize: 9.5, fontWeight: 800, color: "var(--danger)", background: "var(--danger-soft)", borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>今天 {dot(today.slice(5))}</span>
           </div>
-          {/* today 红线：贯穿胶囊层 + 时间带 */}
+          {/* today 红线：贯穿时间带 */}
           <div style={{ position: "absolute", left: todayX + "%", top: 18, bottom: 19, width: 2, transform: "translateX(-50%)", background: "var(--danger)", opacity: 0.75, zIndex: 1 }} />
-
-          {/* 上层：胶囊节点（已过=绿描边✓ / 当前=蓝实心 / 未来=灰描边+时钟）+ 任务分数 */}
-          <div style={{ position: "relative", height: 62, zIndex: 2 }}>
-            {PHASES.map((ph, i) => {
-              const st = stateOf(i);
-              const isOpen = openPhase === i;
-              const done = doneOf(i), totalT = ph.tasks.length;
-              const pill = st === "current"
-                ? { background: "var(--brand)", border: "1.5px solid var(--brand)", color: "#fff" }
-                : st === "done"
-                  ? { background: "var(--ok-soft)", border: "1.5px solid var(--ok)", color: "var(--ok-ink)" }
-                  : { background: "var(--panel)", border: "1.5px solid var(--line-strong)", color: "var(--ink-faint)" };
-              return (
-                <div key={i} style={{ position: "absolute", left: pos[i] + "%", transform: "translateX(-50%)", top: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <button onClick={() => setOpenPhase(isOpen ? -1 : i)} title={ph.name + "：" + dot(eff[i].s) + " → " + dot(eff[i].e)} style={{
-                      ...pill, display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 999, padding: "4px 10px",
-                      fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-                      boxShadow: isOpen ? "0 0 0 3px var(--brand-soft)" : "none", transition: "box-shadow var(--dur-fast)",
-                    }}>
-                      {st === "done" ? <Icon name="check" size={11} color="var(--ok-ink)" /> : st === "current" ? <span style={{ width: 6, height: 6, borderRadius: 999, background: "#fff", flex: "none" }} /> : <Icon name="clock" size={11} color="var(--ink-faint)" />}
-                      {ph.name}
-                    </button>
-                    <button onClick={() => editPhase(i)} title={i === 2 && sp ? "起止取自施工进度计划（只读）" : "编辑阶段起止"} style={{ border: 0, background: "transparent", cursor: "pointer", padding: 2, display: "inline-flex" }}>
-                      <Icon name={i === 2 && sp ? "link-2" : "square-pen"} size={11} color="var(--ink-faint)" />
-                    </button>
-                  </div>
-                  <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", fontWeight: 700, color: st === "current" ? "var(--brand)" : st === "done" ? "var(--ok-ink)" : "var(--ink-faint)" }}>{totalT ? done + "/" + totalT : "动态"}</span>
-                  <span style={{ fontSize: 9, fontFamily: "var(--font-mono)", color: "var(--ink-faint)" }}>{dot(eff[i].s.slice(2))}</span>
-                </div>
-              );
-            })}
-          </div>
 
           {/* 下层：14px 时间带 */}
           <div style={{ position: "relative", height: 14, borderRadius: 7, background: "var(--surface-3)", overflow: "hidden", marginTop: 4 }}>
@@ -613,7 +570,28 @@
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8, flex: "none" }}>
               <Button icon="download" onClick={() => UI().toast("正在导出项目台账…")}>导出</Button>
-              <Button variant="primary" icon="square-pen" onClick={() => UI().formModal({ title: "编辑项目 · " + proj.name, cols: 2, fields: [{ key: "name", label: "项目名称", value: proj.name, full: true }, { key: "manager", label: "项目经理", value: proj.manager }, { key: "operationType", label: "经营类型", type: "select", options: ["自营", "联营"], value: m.operationType }, { key: "contractor", label: "承包单位", value: m.contractor, full: true }], onSave: () => UI().toast("已保存", "ok") })}>编辑</Button>
+              {/* 反馈轮8：模块级大编辑 —— 红圈「详细资料·基础信息」完整字段（前台展示+编辑弹窗，后台接权限后迁后台） */}
+              <Button variant="primary" icon="square-pen" onClick={() => UI().formModal({
+                title: "编辑项目 · " + proj.name, cols: 2, width: 640,
+                fields: [
+                  { key: "name", label: "项目名称", value: proj.name, full: true },
+                  { key: "contractName", label: "项目合同名称", value: m.contractName, full: true },
+                  { key: "developer", label: "客户（甲方）", value: proj.developer },
+                  { key: "developer2", label: "客户2（选填）", value: m.developer2 === "—" ? "" : m.developer2 },
+                  { key: "operationType", label: "经营类型", type: "select", options: ["自营", "联营", "挂靠"], value: m.operationType },
+                  { key: "status", label: "业务流程阶段", type: "select", options: ["项目立项", "施工准备", "施工中", "完工及竣备", "交付", "保修", "项目完结"], value: proj.status === "在建" ? "施工中" : proj.status },
+                  { key: "region", label: "工程地域", value: m.region },
+                  { key: "manager", label: "项目经理", value: proj.manager },
+                  { key: "contractor", label: "承包单位", value: m.contractor, full: true },
+                  { key: "address", label: "工程详细地址", value: proj.address, full: true },
+                  { key: "startDate", label: "计划开工日期", value: proj.startDate },
+                  { key: "plannedEnd", label: "计划竣工日期", value: m.plannedEnd },
+                  { key: "plannedDuration", label: "计划工期（天）", value: m.plannedDuration || "" },
+                  { key: "riskLevel", label: "项目风险级别", type: "select", options: ["低", "中", "高"], value: m.riskLevel },
+                  { key: "overview", label: "工程概况", type: "textarea", value: m.overview, full: true },
+                ],
+                onSave: () => UI().toast("已保存项目信息", "ok"),
+              })}>编辑</Button>
             </div>
           </div>
           {/* 元数据行（语义固定 5 列） */}

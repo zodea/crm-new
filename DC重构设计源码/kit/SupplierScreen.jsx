@@ -139,62 +139,32 @@
           </div>
         </Panel>
 
-        {/* 表格卡 */}
-        <Panel padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", minWidth: 1120, borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                  <th style={TH}>#</th>
-                  <th style={TH}>分供方名称</th>
-                  <th style={TH}>类别</th>
-                  <th style={TH}>税号</th>
-                  <th style={TH}>简称</th>
-                  <th style={TH}>联系人 / 电话</th>
-                  <th style={TH}>资料状态</th>
-                  <th style={{ ...TH, textAlign: "right" }}>项目数</th>
-                  <th style={{ ...TH, textAlign: "right" }}>累计合同额</th>
-                  <th style={{ ...TH, textAlign: "right" }}>累计已付</th>
-                  <th style={{ ...TH, textAlign: "right" }}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((s, i) => {
-                  const c = CRED[s.cred] || CRED.incomplete;
-                  return (
-                    <tr key={s.id} style={{ borderBottom: "1px solid var(--line)", transition: "background var(--dur-fast)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                      <td style={{ ...TD, color: "var(--ink-soft)" }}>{i + 1}</td>
-                      <td style={TD}>
-                        <button onClick={() => navigate("supplierDetail", { id: s.id })} style={{ border: 0, background: "transparent", padding: 0, color: "var(--brand)", fontWeight: 700, cursor: "pointer", textAlign: "left" }}>{s.name}</button>
-                      </td>
-                      <td style={{ ...TD, color: "var(--ink-soft)" }}>{s.category}</td>
-                      <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-soft)" }}>{s.taxNo}</td>
-                      <td style={{ ...TD, color: "var(--ink-soft)" }}>{s.aliases.join("、")}</td>
-                      <td style={TD}>{s.contact} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontSize: 12 }}>/ {s.phone}</span></td>
-                      <td style={TD}><StatusChip tone={c.tone}>{c.text}</StatusChip></td>
-                      <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{s.projectCount}</td>
-                      <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(s.contractTotal)}</td>
-                      <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ok-ink)" }}>{money(s.paidTotal)}</td>
-                      <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
-                        <span style={{ display: "inline-flex", gap: 6 }}>
-                          <IconButton icon="file-text" title="详情" onClick={() => navigate("supplierDetail", { id: s.id })} />
-                          <IconButton icon="pencil" title="编辑" onClick={() => supForm(s, "编辑分供方", editRow(s.id))} />
-                          <IconButton icon="upload" title="上传证照" onClick={() => UI().toast("打开证照上传…")} />
-                          <IconButton icon="trash-2" title="删除" onClick={() => delRow(s)} />
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12, color: "var(--ink-soft)" }}>
-            显示 {rows.length} 家，共 {list.length} 家
-          </div>
-        </Panel>
+        {/* 红圈式表格（KitTable：≥10 行 / 容器内横滚不撑破页面 / 分页）——反馈轮 8 */}
+        {window.KitTable
+          ? <window.KitTable
+              rows={rows} checkable pageSize={10} minRows={10}
+              footerLeft={(cks) => cks.length ? ("已选 " + cks.length + " 家") : ("显示 " + rows.length + " 家，共 " + list.length + " 家")}
+              empty="没有符合筛选条件的分供方"
+              columns={[
+                { key: "name", label: "分供方名称", width: 220, maxWidth: 240, render: (v, s) => <button onClick={() => navigate("supplierDetail", { id: s.id })} style={{ border: 0, background: "transparent", padding: 0, color: "var(--brand)", fontWeight: 700, cursor: "pointer", textAlign: "left" }}>{v}</button> },
+                { key: "category", label: "类别", width: 108, filter: true, color: "var(--ink-soft)" },
+                { key: "taxNo", label: "税号", width: 172, mono: true, color: "var(--ink-soft)" },
+                { key: "aliases", label: "简称", width: 100, color: "var(--ink-soft)", render: (v) => (v || []).join("、") || "—" },
+                { key: "contact", label: "联系人 / 电话", width: 168, render: (v, s) => <span>{v} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontSize: 12 }}>/ {s.phone}</span></span> },
+                { key: "cred", label: "资料状态", width: 96, filter: true, render: (v) => { const c = CRED[v] || CRED.incomplete; return <StatusChip tone={c.tone}>{c.text}</StatusChip>; } },
+                { key: "projectCount", label: "项目数", width: 76, align: "right", mono: true },
+                { key: "contractTotal", label: "累计合同额", width: 134, align: "right", money: true },
+                { key: "paidTotal", label: "累计已付", width: 134, align: "right", money: true },
+                { key: "op", label: "操作", width: 138, align: "right", render: (v, s) => (
+                  <span style={{ display: "inline-flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                    <IconButton icon="file-text" title="详情" onClick={() => navigate("supplierDetail", { id: s.id })} />
+                    <IconButton icon="pencil" title="编辑" onClick={() => supForm(s, "编辑分供方", editRow(s.id))} />
+                    <IconButton icon="upload" title="上传证照" onClick={() => UI().toast("打开证照上传…")} />
+                    <IconButton icon="trash-2" title="删除" onClick={() => delRow(s)} />
+                  </span>
+                ) },
+              ]} />
+          : <Panel padding={20} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>}
       </div>
     );
   }

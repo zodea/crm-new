@@ -3,7 +3,10 @@
 // 风格对齐 STYLE-GUIDE：下划线 SegTab（替代 StageTab）+ 疏朗表格 + 统一圆角卡片。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
-  const yuan = n => "¥" + Math.round(n).toLocaleString("zh-CN");
+  // 反馈轮8：金额两位小数（对齐真实工资表口径，禁止取整缩略）
+  const yuan = n => "¥" + Number(n || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // 银行信息（真实工资表「开户行/卡号」列，按姓名联动；未登记显示占位）
+  const BANK = { "虞建华": "农行 6228 4800 8***", "王芳（虞嫂）": "农行 6228 4800 2***", "张建国": "工行 6212 2620 1***", "匡志强": "建行 6217 0028 3***", "赵铁柱": "农行 6228 4811 9***", "孙大勇": "工行 6212 2635 7***", "周伟峰": "建行 6217 0031 2***" };
 
   // 最小宽度两排：窗口 <1360（内容区约 <1100）时卡片网格列数减半，等比缩放、不用 auto-fit 自动换行
   const useNarrow = () => {
@@ -189,7 +192,8 @@
                 <thead><tr>
                   <th style={{ ...TH, textAlign: "left" }}>工人</th>
                   <th style={{ ...TH, textAlign: "left" }}>方式</th>
-                  {["工程金额", "补贴", "提成", "应发总额", "比例", "本期应发", "累计已发", "扣款", "实发金额"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)}
+                  {["工程金额", "房租补贴", "管理提成", "应发总额", "比例(参考)", "本期应发", "累计已发", "借支/扣款", "实发金额"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)}
+                  <th style={{ ...TH, textAlign: "left" }}>开户行 / 卡号</th>
                   <th style={{ ...TH, textAlign: "center" }}>安全教育</th>
                   <th style={{ ...TH, textAlign: "center" }}>操作</th>
                 </tr></thead>
@@ -218,6 +222,7 @@
                           <td style={{ ...num, color: "var(--ink-faint)" }}>—</td>
                         </>}
                         <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{yuan(c.net)}</td>
+                        <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{BANK[r.worker] || "—（未登记）"}</td>
                         <td style={{ ...TD, textAlign: "center" }}>{r.safety ? <Icon name="shield-check" size={16} color="var(--ok)" /> : <StatusChip tone="danger">未完成</StatusChip>}</td>
                         <td style={{ ...TD, textAlign: "center" }}>
                           {r.mode === "piece" && (
@@ -230,6 +235,18 @@
                       </tr>
                     );
                   })}
+                  {/* 合计行（真实工资表固定要素） */}
+                  <tr style={{ background: "var(--surface-2)", borderTop: "1px solid var(--line-strong)" }}>
+                    <td colSpan={2} style={{ ...TD, fontWeight: 800 }}>合计</td>
+                    <td style={{ ...num, fontWeight: 800 }}>{yuan(p.rows.reduce((s, r) => s + (r.mode === "piece" ? r.engineering : 0), 0))}</td>
+                    <td colSpan={3}></td>
+                    <td style={num}></td>
+                    <td style={{ ...num, fontWeight: 800 }}>{yuan(p.rows.reduce((s, r) => s + compute(r).period, 0))}</td>
+                    <td></td>
+                    <td style={{ ...num, fontWeight: 800, color: "var(--danger)" }}>{yuan(p.rows.reduce((s, r) => s + (r.deduct || 0), 0))}</td>
+                    <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{yuan(p.rows.reduce((s, r) => s + compute(r).net, 0))}</td>
+                    <td colSpan={3}></td>
+                  </tr>
                 </tbody>
               </table>
             </div>

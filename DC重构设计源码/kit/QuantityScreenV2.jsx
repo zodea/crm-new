@@ -7,7 +7,7 @@
 //  ② 量差总表：基准量可选（合同/暂估/现场，默认现场），分项×楼栋 汇总差异量与差异金额；未录现场量回退合同量标浅灰
 // 保留：分部矩阵大视图骨架、下钻参数(drill)与上下文条、楼层角标、SettingsModal
 (function () {
-  const { Button, Panel, Icon, StatusChip } = window.DesignSystem_e3d871;
+  const { Button, IconButton, Panel, Icon, StatusChip } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
 
   const TRADES = {
@@ -308,9 +308,9 @@
           </Panel>
         )}
 
-        {/* Row 1 */}
+        {/* 头部（反馈轮8 六1：两行压一行 + 长提示条收进「图例」弹层；六2：设置弹窗废弃 → 工程量清单为配置源） */}
         <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <select onChange={() => UI().toast("已切换项目/班组")} style={{ border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", padding: "7px 10px", fontSize: 13, background: "#fff", cursor: "pointer" }}>
+          <select onChange={() => UI().toast("已切换项目/班组")} style={{ border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", padding: "7px 10px", fontSize: 13, fontWeight: 600, background: "#fff", cursor: "pointer" }}>
             <option>合和新城</option><option>锦绣华庭</option>
           </select>
           <div style={{ display: "flex", gap: 6 }}>
@@ -322,16 +322,7 @@
               }}>{b}</button>
             ))}
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <Button size="sm" icon="table-2" onClick={() => setVariance(true)}>量差总表</Button>
-            <Button size="sm" icon="download" onClick={() => UI().toast("正在导出工程量 Excel…")}>导出</Button>
-            <Button size="sm" variant="primary" icon="settings" onClick={() => setSettings(true)}>设置工程量 / 完工时间</Button>
-          </div>
-        </Panel>
-
-        {/* Row 2 */}
-        <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" }}>分部</span>
+          <span style={{ width: 1, height: 22, background: "var(--line)", margin: "0 2px" }} />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {DIVISIONS.map(d => {
               const on = division === d.key;
@@ -344,19 +335,25 @@
               );
             })}
           </div>
-          <div style={{ marginLeft: "auto" }}>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer", userSelect: "none", color: "var(--ink-soft)" }}>
               <input type="checkbox" checked={hideEmptyFloors} onChange={e => setHideEmptyFloors(e.target.checked)} />
-              隐藏未开工楼层{hiddenCount > 0 ? "（已隐藏 " + hiddenCount + " 层）" : ""}
+              隐藏未开工楼层{hiddenCount > 0 ? "（" + hiddenCount + "）" : ""}
             </label>
+            <IconButton icon="circle-help" title="图例与操作说明" onClick={() => UI().modal({
+              title: "图例与操作说明", width: 460,
+              bodyHTML: '<div style="font-size:13px;line-height:2;color:var(--ink)">' +
+                '<div>· 格子颜色 = 该户各分项<b>完成勾选</b>状态：实色=全完成 / 半透明=部分 / 极浅=未开始</div>' +
+                '<div>· 点击户格进入<b>户详情页</b>：录三量 · 指派 · 完成勾选 · 验收照片</div>' +
+                '<div>· <b>量差总表</b>：合同量 vs 暂估/现场量的差异数量与金额（分项×楼栋）</div>' +
+                '<div>· 分项目录与合同量来自<b>工程量清单</b>（合同附件拆表入库）；各层计划时间由施工进度自动分摊</div>' +
+                "</div>",
+            })} />
+            <Button size="sm" icon="table-2" onClick={() => setVariance(true)}>量差总表</Button>
+            <Button size="sm" icon="download" onClick={() => UI().toast("正在导出工程量 Excel…")}>导出</Button>
+            <Button size="sm" variant="primary" icon="clipboard-list" onClick={() => navigate("boqList", { project: "合和新城", contract: "合和七期户内合同版-清单" })}>工程量清单</Button>
           </div>
         </Panel>
-
-        {/* 配置提示 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--ink-soft)", background: "var(--brand-soft)", border: "1px solid rgba(57,118,198,0.18)", borderRadius: 8, padding: "8px 12px" }}>
-          <Icon name="info" size={14} color="var(--brand)" />
-          <span>格子颜色 = 该户各分项<b>完成勾选</b>状态（实色全完成 / 半透明部分 / 极浅未开始）；点击户格进入<b>户详情页</b>录三量·指派·完成勾选·验收照片；「量差总表」看合同/暂估/现场差异；每层完工月份在右上「设置」中配置。</span>
-        </div>
 
         {/* 矩阵 */}
         <Panel padding={10}>

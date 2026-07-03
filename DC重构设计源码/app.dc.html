@@ -49,7 +49,8 @@
 
 <div style="display:flex; min-height:100vh; background:var(--bg); color:var(--ink);">
   {{ sidebar }}
-  <div style="padding-left:{{ sideW }}px; flex:1; display:flex; flex-direction:column; min-height:100vh; transition:padding-left 0.18s ease;">
+  <!-- min-width:0：flex 项默认 min-width:auto 会让深层表格 min-content 穿透滚动容器撑宽整页（反馈轮8 四：整页横滚根因） -->
+  <div style="padding-left:{{ sideW }}px; flex:1; min-width:0; display:flex; flex-direction:column; min-height:100vh; transition:padding-left 0.18s ease;">
     <header style="position:sticky; top:0; z-index:20; height:64px; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 24px; flex:none; gap:12px;">
       <div>
         <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
@@ -71,6 +72,9 @@
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="INVSharedScreen" from="./kit/InvoiceShared.jsx" hint-size="0,0"></x-import>
       </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="KitTableScreen" from="./kit/KitTable.jsx" hint-size="0,0"></x-import>
+      </sc-if>
       <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
         <x-import component-from-global-scope="AppHomeScreen" from="./kit/HomeScreenNew.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
@@ -82,6 +86,9 @@
       </sc-if>
       <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="SchedulePlanScreen" from="./kit/SchedulePlanScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isScheduleGroupNew }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleGroupNewScreen" from="./kit/ScheduleGroupNewScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
       </sc-if>
       <sc-if value="{{ isSupplier }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="SupplierScreen" from="./kit/SupplierScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
@@ -158,6 +165,7 @@ const PAGE = {
   project:       { title: "施工项目",  subtitle: "项目管理" },
   projectDetail: { title: "项目详情",  subtitle: "经营驾驶舱 · 阶段 · 子表" },
   schedule:      { title: "施工进度",  subtitle: "WBS 排程 · 计划vs实际 · 依赖 · 调期" },
+  scheduleGroupNew: { title: "新建楼栋分组", subtitle: "工序模板逐条可调 · 排程实时预览" },
   supplier:      { title: "分供方资料库", subtitle: "资料管理 · 对账" },
   supplierDetail:{ title: "分供方详情", subtitle: "资料 · 证照 · 跨项目汇总" },
   crew:          { title: "班组管理",  subtitle: "全局核算单元 · 跨项目复用" },
@@ -336,6 +344,7 @@ class Component extends DCLogic {
     if (key === "worker") return r === "worker" || r === "workerDetail";
     if (key === "project") return r === "project" || r === "projectDetail";
     if (key === "invoice") return r === "invoice";
+    if (key === "schedule") return r === "schedule" || r === "scheduleGroupNew";
     if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
     if (key === "boqList") return r === "boqList" || r === "boqImport";
     return r === key;
@@ -507,6 +516,7 @@ class Component extends DCLogic {
       isProject:       route === "project",
       isProjectDetail: route === "projectDetail",
       isSchedule:      route === "schedule",
+      isScheduleGroupNew: route === "scheduleGroupNew",
       isSupplier:      route === "supplier",
       isSupplierDetail:route === "supplierDetail",
       isCrew:          route === "crew",

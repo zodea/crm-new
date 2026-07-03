@@ -1,81 +1,13 @@
-// HomeScreenNew — 首页仪表盘：项目Tab + 统一施工进度甘特（计划vs实际同轴+today线+成本对比）+ 指标卡 + 收支柱状图 + 支出环形图
+// HomeScreenNew — 首页：项目Tab + 统一施工进度甘特（计划vs实际同轴 + today线），界面专项只做进度总览。
 // 反馈轮4：原「开工→完工总进度」里程碑卡 + 「工程量进度」楼层甘特两张割裂卡 → 合并为一张统一甘特。
-// 数据源：kit/ScheduleData.jsx 注册的 window.SCHEDULE（22 道工序标准库 + 楼栋分组 + PDF 计划日期）；
-// 工序点击 → navigate("quantity", {group, trade, item, task, from}) 下钻工程量矩阵（#29 承接）。
+// 反馈轮8：删除底部「项目级成本对比」条（口径不透明、首页用处不大，成本对比归工程量清单看毛利）；
+//          删除指标卡 / 月度收支 / 支出分类模块（在项目详情页查看），首页只留 项目Tab + 甘特 + 图例。
+// 数据源：kit/ScheduleData.jsx 注册的 window.SCHEDULE；工序点击 → navigate("quantity", {...}) 下钻。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
 
-  // 最小宽度两排：窗口 <1360（内容区约 <1100）时指标网格列数减半，等比缩放、不用 auto-fit 自动换行
-  const useNarrow = () => {
-    const [narrow, setNarrow] = React.useState(window.innerWidth < 1360);
-    React.useEffect(() => {
-      const onR = () => setNarrow(window.innerWidth < 1360);
-      window.addEventListener("resize", onR);
-      return () => window.removeEventListener("resize", onR);
-    }, []);
-    return narrow;
-  };
-
   const PROJECTS = ["合和新城", "锦绣华庭", "翠湖花园"];
-
-  const METRICS = {
-    "合和新城": [
-      { label: "合同总额", val: "¥2,860万", sub: "含变更 ¥260万", col: "var(--ink)" },
-      { label: "累计收款", val: "¥1,720万", sub: "回款率 60.2%", col: "var(--ok)" },
-      { label: "累计支出", val: "¥1,341万", sub: "材料+分包+其他", col: "var(--danger)" },
-      { label: "已开票/税额", val: "¥1,580万", sub: "税额 ¥182万", col: "var(--ink)" },
-    ],
-    "锦绣华庭": [
-      { label: "合同总额", val: "¥1,560万", sub: "含变更 ¥160万", col: "var(--ink)" },
-      { label: "累计收款", val: "¥680万", sub: "回款率 43.6%", col: "var(--ok)" },
-      { label: "累计支出", val: "¥524万", sub: "材料+分包+其他", col: "var(--danger)" },
-      { label: "已开票/税额", val: "¥720万", sub: "税额 ¥82.8万", col: "var(--ink)" },
-    ],
-    "翠湖花园": [
-      { label: "合同总额", val: "¥3,120万", sub: "含变更 ¥220万", col: "var(--ink)" },
-      { label: "累计收款", val: "¥3,050万", sub: "回款率 97.8%", col: "var(--ok)" },
-      { label: "累计支出", val: "¥2,780万", sub: "材料+分包+其他", col: "var(--danger)" },
-      { label: "已开票/税额", val: "¥3,080万", sub: "税额 ¥354万", col: "var(--ink)" },
-    ],
-  };
-
-  const ML = ["9月", "10月", "11月", "12月", "1月", "2月", "3月", "4月"];
-  const MONTHLY = {
-    "合和新城": [
-      { l: "9月",  i: 280, e: 180 }, { l: "10月", i: 0,   e: 120 },
-      { l: "11月", i: 320, e: 200 }, { l: "12月", i: 0,   e: 95  },
-      { l: "1月",  i: 420, e: 280 }, { l: "2月",  i: 0,   e: 60  },
-      { l: "3月",  i: 0,   e: 145 }, { l: "4月",  i: 350, e: 220 },
-    ],
-    "锦绣华庭": [
-      { l: "9月",  i: 0,   e: 0   }, { l: "10月", i: 0,   e: 0   },
-      { l: "11月", i: 0,   e: 0   }, { l: "12月", i: 0,   e: 0   },
-      { l: "1月",  i: 200, e: 120 }, { l: "2月",  i: 0,   e: 80  },
-      { l: "3月",  i: 240, e: 160 }, { l: "4月",  i: 0,   e: 96  },
-    ],
-    "翠湖花园": [
-      { l: "9月",  i: 380, e: 310 }, { l: "10月", i: 0,   e: 220 },
-      { l: "11月", i: 460, e: 380 }, { l: "12月", i: 320, e: 280 },
-      { l: "1月",  i: 520, e: 420 }, { l: "2月",  i: 280, e: 230 },
-      { l: "3月",  i: 0,   e: 180 }, { l: "4月",  i: 450, e: 360 },
-    ],
-  };
-
-  const ECATS = {
-    "合和新城": [
-      { l: "材料", p: 51, c: "#3976C6" }, { l: "分包", p: 30, c: "#169D72" },
-      { l: "人工", p: 13, c: "#D38A20" }, { l: "其他", p: 6,  c: "#E04E5C" },
-    ],
-    "锦绣华庭": [
-      { l: "材料", p: 58, c: "#3976C6" }, { l: "分包", p: 25, c: "#169D72" },
-      { l: "人工", p: 12, c: "#D38A20" }, { l: "其他", p: 5,  c: "#E04E5C" },
-    ],
-    "翠湖花园": [
-      { l: "材料", p: 46, c: "#3976C6" }, { l: "分包", p: 35, c: "#169D72" },
-      { l: "人工", p: 14, c: "#D38A20" }, { l: "其他", p: 5,  c: "#E04E5C" },
-    ],
-  };
 
   // ── 统一施工进度甘特 ──────────────────────────────────────
   function ScheduleGantt({ project, navigate }) {
@@ -212,131 +144,22 @@
           })}
         </div>
 
-        {/* 图例 + 项目级成本对比 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "8px 18px", borderBottom: "1px solid var(--line)", fontSize: 11, color: "var(--ink-soft)", flexWrap: "wrap" }}>
+        {/* 图例（成本对比条已删：反馈轮8，成本对比看工程量清单） */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "9px 18px 11px", fontSize: 11, color: "var(--ink-soft)", flexWrap: "wrap" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 18, height: 8, background: "#6366f1", opacity: 0.22, borderRadius: 2, display: "inline-block" }} />计划区间</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 8, background: "#6366f1", borderRadius: 2, display: "inline-block" }} />实际完成</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 2, height: 12, background: "var(--danger)", display: "inline-block" }} />今天</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="link" size={11} style={{ color: "var(--brand)" }} />可下钻工程量</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 8, border: "1.5px dashed var(--danger)", borderRadius: 2, display: "inline-block" }} />应开未开</span>
         </div>
-        <div style={{ display: "flex", alignItems: "stretch", gap: 0, padding: "10px 18px 14px", flexWrap: "wrap" }}>
-          <div style={{ fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", paddingRight: 16, borderRight: "1px solid var(--line)" }}>项目成本<br />目标 vs 实际</div>
-          {p.cost.map(c => {
-            const dev = c.actual - c.expected;
-            const tone = dev > c.expected * 0.03 ? "danger" : dev < -c.expected * 0.03 ? "ok" : "neutral";
-            return (
-              <div key={c.cat} style={{ flex: 1, minWidth: 130, padding: "0 14px", borderRight: "1px solid var(--line)" }}>
-                <div style={{ fontSize: 11, color: "var(--ink-soft)", display: "flex", justifyContent: "space-between" }}>
-                  <span>{c.cat}</span><span>目标 {c.target}万</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 2 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, fontSize: 16 }}>{c.actual}万</span>
-                  <span style={{ transform: "scale(0.9)", transformOrigin: "left center" }}>
-                    <StatusChip tone={tone}>{dev > 0 ? `超 ${dev}万` : dev < 0 ? `省 ${-dev}万` : "持平"}</StatusChip>
-                  </span>
-                </div>
-                <div style={{ position: "relative", height: 5, background: "var(--surface-3)", borderRadius: 99, marginTop: 5 }}>
-                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.min(c.actual / c.target * 100, 100) + "%", background: tone === "danger" ? "var(--danger)" : "var(--brand)", borderRadius: 99 }} />
-                  <div style={{ position: "absolute", left: Math.min(c.expected / c.target * 100, 100) + "%", top: -2, bottom: -2, width: 2, background: "var(--ink)", opacity: 0.5 }} title="按进度应耗" />
-                </div>
-              </div>
-            );
-          })}
-          {(() => {
-            const t = p.cost.reduce((s, c) => s + c.target, 0), a = p.cost.reduce((s, c) => s + c.actual, 0), e = p.cost.reduce((s, c) => s + c.expected, 0);
-            const dev = a - e; const pct = Math.round(dev / e * 1000) / 10;
-            return (
-              <div style={{ flex: "none", paddingLeft: 16, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>合计 {a}万 / 目标 {t}万</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: dev > 0 ? "var(--danger)" : "var(--ok-ink)", fontFamily: "var(--font-mono)" }}>
-                  {dev > 0 ? "+" : ""}{pct}% <span style={{ fontSize: 11, fontWeight: 600 }}>{dev > 0 ? "超支" : "结余"}（按进度）</span>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
       </Panel>
-    );
-  }
-
-  // ── SVG Bar chart ──────────────────────────────────────
-  function BarChart({ monthly }) {
-    const W = 480, H = 160;
-    const PAD = { l: 44, r: 12, t: 10, b: 28 };
-    const iH = H - PAD.t - PAD.b, iW = W - PAD.l - PAD.r;
-    const maxV = Math.max(...monthly.map(d => Math.max(d.i, d.e)), 100);
-    const yS = v => PAD.t + iH - (v / maxV) * iH;
-    const slotW = iW / monthly.length;
-    const bW = slotW * 0.27;
-    const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(maxV * f));
-
-    return (
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H }}>
-        {ticks.map((v, i) => (
-          <g key={i}>
-            <line x1={PAD.l} y1={yS(v)} x2={W - PAD.r} y2={yS(v)} stroke="#e5e7eb" strokeWidth={1} />
-            {v > 0 && <text x={PAD.l - 4} y={yS(v) + 4} textAnchor="end" fontSize={9} fill="#9ca3af">{v}万</text>}
-          </g>
-        ))}
-        {monthly.map((d, i) => {
-          const cx = PAD.l + i * slotW + slotW / 2;
-          const base = PAD.t + iH;
-          const iBar = d.i / maxV * iH, eBar = d.e / maxV * iH;
-          return (
-            <g key={i}>
-              {d.i > 0 && <rect x={cx - bW - 2} y={base - iBar} width={bW} height={iBar} fill="#3976C6" rx={2} />}
-              {d.e > 0 && <rect x={cx + 2} y={base - eBar} width={bW} height={eBar} fill="#E04E5C" rx={2} />}
-              <text x={cx} y={H - 5} textAnchor="middle" fontSize={10} fill="#9ca3af">{d.l}</text>
-            </g>
-          );
-        })}
-        <line x1={PAD.l} y1={PAD.t + iH} x2={W - PAD.r} y2={PAD.t + iH} stroke="#d1d5db" strokeWidth={1} />
-      </svg>
-    );
-  }
-
-  // ── SVG Donut chart ─────────────────────────────────────
-  function DonutChart({ cats }) {
-    const cx = 65, cy = 65, R = 54, ri = 33;
-    let angle = -Math.PI / 2;
-    const paths = cats.map(d => {
-      const da = d.p / 100 * Math.PI * 2;
-      const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle);
-      const x2 = cx + R * Math.cos(angle + da), y2 = cy + R * Math.sin(angle + da);
-      const ix1 = cx + ri * Math.cos(angle + da), iy1 = cy + ri * Math.sin(angle + da);
-      const ix2 = cx + ri * Math.cos(angle), iy2 = cy + ri * Math.sin(angle);
-      const lg = da > Math.PI ? 1 : 0;
-      const path = `M${x1.toFixed(2)} ${y1.toFixed(2)} A${R} ${R} 0 ${lg} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L${ix1.toFixed(2)} ${iy1.toFixed(2)} A${ri} ${ri} 0 ${lg} 0 ${ix2.toFixed(2)} ${iy2.toFixed(2)} Z`;
-      angle += da;
-      return { ...d, path };
-    });
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <svg viewBox="0 0 130 130" style={{ width: "42%", maxWidth: 132, height: "auto", aspectRatio: "1 / 1", flexShrink: 0 }}>
-          {paths.map((p, i) => <path key={i} d={p.path} fill={p.c} />)}
-        </svg>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          {cats.map((c, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: c.c, flexShrink: 0, display: "inline-block" }} />
-              <span style={{ color: "var(--ink-soft)", flex: 1 }}>{c.l}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{c.p}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
     );
   }
 
   // ── Main Component ──────────────────────────────────────
   function HomeScreenNew({ data, navigate }) {
-    const narrow = useNarrow();
     const [tab, setTab] = React.useState(0);
     const project = PROJECTS[tab];
-    const metrics = METRICS[project];
-    const monthly = MONTHLY[project];
-    const expCats = ECATS[project];
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -356,37 +179,8 @@
           </button>
         </div>
 
-        {/* 统一施工进度甘特（计划 vs 实际 + today + 成本对比） */}
+        {/* 统一施工进度甘特（计划 vs 实际 + today）——首页唯一主体（反馈轮8：经营指标/收支/支出分类看项目详情） */}
         <ScheduleGantt project={project} navigate={navigate} />
-
-        {/* Metric cards：4 个指标=语义固定 4 列（窄窗切两排=2 列） */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${narrow ? 2 : 4}, 1fr)`, gap: 12 }}>
-          {metrics.map((m, i) => (
-            <div key={i} style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "16px 20px", boxShadow: "var(--shadow-card)" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-soft)", letterSpacing: "0.02em" }}>{m.label}</div>
-              <div style={{ fontSize: 22, fontFamily: "var(--font-mono)", fontWeight: 700, color: m.col, margin: "6px 0 4px", lineHeight: 1.2 }}>{m.val}</div>
-              <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{m.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Charts row：比例列宽 7:3（替代固定 280px 右栏），SVG 图表 viewBox 自适应 */}
-        <div style={{ display: "grid", gridTemplateColumns: "7fr 3fr", gap: 12 }}>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "16px 20px", boxShadow: "var(--shadow-card)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>月度收支对比</div>
-              <div style={{ display: "flex", gap: 14, fontSize: 11 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "#3976C6", display: "inline-block" }} />收款</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "#E04E5C", display: "inline-block" }} />支出</span>
-              </div>
-            </div>
-            <BarChart monthly={monthly} />
-          </div>
-          <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "16px 20px", boxShadow: "var(--shadow-card)" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>支出分类</div>
-            <DonutChart cats={expCats} />
-          </div>
-        </div>
       </div>
     );
   }

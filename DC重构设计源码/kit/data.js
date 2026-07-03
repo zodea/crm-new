@@ -54,6 +54,14 @@
     { id: "p2", name: "锦绣华庭", status: "在建", address: "广州市番禺区市广路 66 号", startDate: "2026-01-15", developer: "锦绣置业有限公司", manager: "王工" },
     { id: "p3", name: "翠湖花园", status: "收尾", address: "广州市天河区天源路 9 号", startDate: "2024-11-20", developer: "翠湖投资", manager: "李工" },
     { id: "p4", name: "江湾一号", status: "停工", address: "广州市海珠区滨江东路 3 号", startDate: "2025-03-10", developer: "江湾置业", manager: "陈工" },
+    { id: "p5", name: "车陂商业大楼", status: "在建", address: "广州市天河区车陂路 12 号", startDate: "2025-11-08", developer: "天河城建投资", manager: "周维" },
+    { id: "p6", name: "科学城人才公寓", status: "在建", address: "广州市黄埔区科学大道 88 号", startDate: "2026-03-02", developer: "广州开发区建设集团", manager: "郑海峰" },
+    { id: "p7", name: "亚运城C1标段", status: "完工", address: "广州市番禺区亚运大道 1 号", startDate: "2024-06-18", developer: "广州亚运城开发", manager: "何先进" },
+    { id: "p8", name: "利丰北1-4号楼", status: "在建", address: "佛山市南海区利丰北路", startDate: "2026-02-25", developer: "利丰置业", manager: "刘乐喜" },
+    { id: "p9", name: "领秀海5-6号楼", status: "收尾", address: "广州市番禺区领秀海花园", startDate: "2024-09-12", developer: "保利番禺地产", manager: "张工" },
+    { id: "p10", name: "未来印象小区", status: "完工", address: "广州市增城区荔城街道", startDate: "2023-10-06", developer: "未来印象置业", manager: "王工" },
+    { id: "p11", name: "白云机场配套宿舍", status: "在建", address: "广州市花都区机场北路", startDate: "2026-05-11", developer: "白云机场建设", manager: "陈工" },
+    { id: "p12", name: "零星维修框架项目", status: "在建", address: "广州市内多点", startDate: "2026-01-01", developer: "广州市政集团", manager: "李工" },
   ];
 
   const workers = [

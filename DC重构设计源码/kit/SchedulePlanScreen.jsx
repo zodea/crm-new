@@ -126,69 +126,6 @@
     );
   }
 
-  // ── 新建楼栋分组：套 22 道工序模板（可勾选）──
-  function AddGroupModal({ proj, S, onClose }) {
-    const [name, setName] = React.useState("");
-    const [blds, setBlds] = React.useState("");
-    const [start, setStart] = React.useState("2026-07-06");
-    const [sel, setSel] = React.useState(() => S.TEMPLATE.map(() => true));
-    const nSel = sel.filter(Boolean).length;
-    const create = () => {
-      if (!name.trim()) { UI().toast("请填写分组名称", "warn"); return; }
-      if (!nSel) { UI().toast("请至少勾选一道工序", "warn"); return; }
-      const tasks = []; let cur = S.D(start).getTime();
-      S.TEMPLATE.forEach((tpl, i) => {
-        if (!sel[i]) return;
-        const ps = new Date(cur).toISOString().slice(0, 10);
-        const pf = new Date(cur + (tpl.dur - 1) * 86400000).toISOString().slice(0, 10);
-        tasks.push({ id: "t" + i + "-" + Date.now(), ...tpl, ps, pf, actual: 0, hasQty: tpl.item != null });
-        cur += Math.round(tpl.dur * 0.5) * 86400000;   // 流水搭接：后道工序错开半个工期进场
-      });
-      S.state[proj].groups.push({ id: "g" + Date.now(), name: name.trim(), buildings: blds.split(/[、,，\s]+/).filter(Boolean), collapsed: false, tasks });
-      S.notify(); UI().toast("已创建分组「" + name.trim() + "」（" + nSel + " 道工序，流水搭接排程）", "ok"); onClose();
-    };
-    const inp = { border: "1px solid var(--line-strong)", borderRadius: 6, padding: "7px 10px", fontSize: 13, background: "#fff", width: "100%" };
-    return (
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: 24 }}>
-        <div onClick={e => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 12, width: 560, maxHeight: "86vh", overflow: "auto", boxShadow: "var(--shadow-pop)" }}>
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>新建楼栋分组 · {proj}</div>
-            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>套用 22 道精装修工序标准库 · 按参考工期流水搭接自动排程 · 建成后可逐道调期</div>
-          </div>
-          <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <label style={{ fontSize: 12, color: "var(--ink-soft)", fontWeight: 600 }}>分组名称
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="如：户内31栋-36栋" style={{ ...inp, marginTop: 4 }} /></label>
-              <label style={{ fontSize: 12, color: "var(--ink-soft)", fontWeight: 600 }}>开始日期
-                <input type="date" value={start} onChange={e => setStart(e.target.value)} style={{ ...inp, marginTop: 4 }} /></label>
-            </div>
-            <label style={{ fontSize: 12, color: "var(--ink-soft)", fontWeight: 600 }}>包含楼栋（顿号/逗号分隔）
-              <input value={blds} onChange={e => setBlds(e.target.value)} placeholder="如：31栋、33栋、36栋" style={{ ...inp, marginTop: 4 }} /></label>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", fontSize: 12, fontWeight: 600, color: "var(--ink-soft)", marginBottom: 6 }}>
-                工序模板（已选 {nSel}/22）
-                <button onClick={() => setSel(S.TEMPLATE.map(() => nSel < 22))} style={{ marginLeft: "auto", border: 0, background: "transparent", color: "var(--brand)", fontSize: 12, cursor: "pointer", fontWeight: 600 }}>{nSel < 22 ? "全选" : "全不选"}</button>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, maxHeight: 240, overflow: "auto", border: "1px solid var(--line)", borderRadius: 8, padding: 8 }}>
-                {S.TEMPLATE.map((t, i) => (
-                  <label key={i} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, padding: "4px 6px", borderRadius: 6, cursor: "pointer", background: sel[i] ? "var(--brand-soft)" : "transparent" }}>
-                    <input type="checkbox" checked={sel[i]} onChange={() => setSel(s => s.map((v, k) => k === i ? !v : v))} />
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: t.color, flex: "none" }} />
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</span>
-                    <span style={{ color: "var(--ink-faint)", fontFamily: "var(--font-mono)", flex: "none" }}>{t.dur}d</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div style={{ padding: "12px 18px", borderTop: "1px solid var(--line)", display: "flex", justifyContent: "flex-end", gap: 8, position: "sticky", bottom: 0, background: "var(--panel)" }}>
-            <button onClick={onClose} style={{ border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer" }}>取消</button>
-            <button onClick={create} style={{ border: 0, background: "var(--brand)", color: "#fff", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>创建分组</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // ── 主组件 ──
   function SchedulePlanScreen({ data, navigate, params }) {
@@ -277,7 +214,7 @@
           </span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <Button size="sm" icon="flag" onClick={() => UI().toast("已将当前计划保存为基线（V1 写入 schedule_baselines，偏差以基线对比）", "ok")}>设为基线</Button>
-            <Button size="sm" variant="primary" icon="plus" onClick={() => setModal({ kind: "addGroup" })}>新建楼栋分组</Button>
+            <Button size="sm" variant="primary" icon="plus" onClick={() => navigate("scheduleGroupNew", { project: proj })}>新建楼栋分组</Button>
           </div>
         </Panel>
 
@@ -404,7 +341,7 @@
 
         {modal && modal.kind === "task" && <TaskModal proj={proj} g={modal.g} t={modal.t} S={S} navigate={navigate} onClose={() => setModal(null)} />}
         {modal && modal.kind === "addTask" && <AddTaskModal proj={proj} g={modal.g} S={S} onClose={() => setModal(null)} />}
-        {modal && modal.kind === "addGroup" && <AddGroupModal proj={proj} S={S} onClose={() => setModal(null)} />}
+        {/* 反馈轮8：新建楼栋分组改为独立子页面 scheduleGroupNew（原 AddGroupModal 弹窗废弃） */}
       </div>
     );
   }

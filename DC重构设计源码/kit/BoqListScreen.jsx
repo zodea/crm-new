@@ -3,7 +3,7 @@
 // 合同量/合同单价的唯一来源；变更单 / 月度报量为后续深化入口。术语见 CONTEXT.md（三量/合同工程量清单）。
 (function () {
   const { Button, StatusChip, Panel, Icon } = window.DesignSystem_e3d871;
-  const UI = () => window.KitUI || { toast: () => {} };
+  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, modal: () => {}, undoToast: () => {} };
   const money = (v) => "¥" + Number(v || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2 });
   const num = (v) => Number(v || 0).toLocaleString("zh-CN");
 
@@ -26,12 +26,51 @@
     const project = p.project || "合和新城";
     const [sel, setSel] = React.useState("__all"); // 分部 或 分部|工种
     const [base, setBase] = React.useState("con"); // 取数基准量：con/est/site
+    // 反馈轮8（七）：清单行转 state + 编辑模式（行内改单价/暂估量/现场量算式、新增分项、软删除）
+    const [list, setList] = React.useState(() => ROWS.map((r, i) => ({ ...r, id: "bq" + i })));
+    const [editing, setEditing] = React.useState(false);
+    const updRow = (id, patch) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    const delRow = (r) => UI().confirm({
+      title: "删除清单行", danger: true, confirmText: "删除",
+      message: "确定删除「" + r.item + "」？正式流程中调量/删行应走「变更单」留痕；此处为软删除，可 5 秒内撤回。",
+      onConfirm: () => {
+        const idx = list.findIndex((x) => x.id === r.id);
+        setList((l) => l.filter((x) => x.id !== r.id));
+        UI().undoToast("已删除「" + r.item + "」", () => setList((l) => { const n = [...l]; n.splice(Math.min(idx, n.length), 0, r); return n; }));
+      },
+    });
+    const addRow = () => UI().formModal({
+      title: "新增分项（变更）", cols: 2,
+      fields: [
+        { key: "div", label: "分部", type: "select", options: ["楼地面工程", "墙柱面工程", "装饰工程", "安装工程"], value: "楼地面工程" },
+        { key: "trade", label: "工种", type: "select", options: ["泥水", "油漆", "石材", "自流平", "水电"], value: "泥水" },
+        { key: "item", label: "分项名称", full: true },
+        { key: "room", label: "房间（部位）" }, { key: "unit", label: "单位", value: "㎡" },
+        { key: "con", label: "合同量" }, { key: "price", label: "合同单价（不含税）" },
+      ],
+      onSave: (v) => {
+        if (!v.item) { UI().toast("分项名称不能为空", "danger"); return; }
+        setList((l) => [...l, { id: "bq_" + Date.now(), div: v.div, trade: v.trade, item: v.item, room: v.room || "—", unit: v.unit || "㎡", con: Number(v.con) || 0, est: Number(v.con) || 0, site: 0, siteExpr: "", price: Number(v.price) || 0, changed: true }]);
+        UI().toast("已新增分项（标记为变更新增，待甲方确认）", "ok");
+      },
+    });
+    const changeLog = () => UI().modal({
+      title: "变更单", subtitle: contract + " · 新增/调量/调价 + 甲方确认状态", width: 560,
+      bodyHTML:
+        '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+        '<tr style="background:var(--surface-2)"><th style="padding:8px 10px;text-align:left">编号</th><th style="padding:8px 10px;text-align:left">类型</th><th style="padding:8px 10px;text-align:left">内容</th><th style="padding:8px 10px;text-align:left">甲方确认</th></tr>' +
+        '<tr style="border-top:1px solid var(--line)"><td style="padding:8px 10px;font-family:var(--font-mono)">BG-001</td><td style="padding:8px 10px">调价</td><td style="padding:8px 10px">窗台石 220→235/m</td><td style="padding:8px 10px;color:var(--ok-ink)">已确认</td></tr>' +
+        '<tr style="border-top:1px solid var(--line)"><td style="padding:8px 10px;font-family:var(--font-mono)">BG-002</td><td style="padding:8px 10px">新增</td><td style="padding:8px 10px">入户门槛石安装</td><td style="padding:8px 10px;color:var(--warn-ink)">待确认</td></tr>' +
+        (list.filter((r) => r.changed).map((r, i) => '<tr style="border-top:1px solid var(--line)"><td style="padding:8px 10px;font-family:var(--font-mono)">BG-' + String(3 + i).padStart(3, "0") + '</td><td style="padding:8px 10px">新增</td><td style="padding:8px 10px">' + r.item + '</td><td style="padding:8px 10px;color:var(--warn-ink)">待确认</td></tr>').join("")) +
+        "</table>",
+      actions: [{ label: "关闭" }, { label: "新增变更", primary: true, onClick: addRow }],
+    });
 
     // 目录树：分部 → 工种
     const divs = [];
-    ROWS.forEach((r) => { let d = divs.find((x) => x.name === r.div); if (!d) { d = { name: r.div, trades: [] }; divs.push(d); } if (d.trades.indexOf(r.trade) < 0) d.trades.push(r.trade); });
+    list.forEach((r) => { let d = divs.find((x) => x.name === r.div); if (!d) { d = { name: r.div, trades: [] }; divs.push(d); } if (d.trades.indexOf(r.trade) < 0) d.trades.push(r.trade); });
     const match = (r) => sel === "__all" ? true : sel.indexOf("|") > -1 ? (r.div + "|" + r.trade) === sel : r.div === sel;
-    const rows = ROWS.filter(match);
+    const rows = list.filter(match);
     const conTotal = rows.reduce((s, r) => s + r.con * r.price, 0);
     const baseQty = (r) => r[base];
     const baseTotal = rows.reduce((s, r) => s + baseQty(r) * r.price, 0);
@@ -47,9 +86,11 @@
             <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>合同工程量清单 · 归属「{project}」· 合同量与合同单价唯一来源</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button icon="git-compare" onClick={() => UI().toast("变更单管理（后续深化）")}>变更单</Button>
+            <Button icon="git-compare" onClick={changeLog}>变更单</Button>
             <Button icon="file-output" onClick={() => UI().toast("月度报量草稿（后续深化）")}>月度报量</Button>
             <Button icon="upload" onClick={() => navigate("boqImport", { contract, project })}>重新拆表</Button>
+            {editing && <Button icon="plus" onClick={addRow}>新增分项</Button>}
+            <Button variant={editing ? "primary" : undefined} icon={editing ? "check" : "square-pen"} onClick={() => { setEditing(!editing); if (editing) UI().toast("已保存清单修改", "ok"); }}>{editing ? "完成编辑" : "编辑清单"}</Button>
           </div>
         </Panel>
 
@@ -93,22 +134,38 @@
               <table style={{ width: "100%", minWidth: 940, borderCollapse: "collapse" }}>
                 <thead style={{ background: "var(--surface-2)" }}>
                   <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                    {["分项名称", "房间", "单位", "合同量", "暂估量", "现场量", "合同单价", "合价"].map((h, i) => <th key={h} style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: i >= 3 ? "right" : "left", whiteSpace: "nowrap" }}>{h}</th>)}
+                    {["分项名称", "房间", "单位", "合同量", "暂估量", "现场量", "合同单价", "合价"].concat(editing ? ["操作"] : []).map((h, i) => <th key={h} style={{ padding: "11px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: i >= 3 ? "right" : "left", whiteSpace: "nowrap" }}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: "1px solid var(--line)" }} onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                      <td style={{ padding: "10px 14px", fontSize: 13 }}><div style={{ fontWeight: 600 }}>{r.item}</div><div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 2 }}>{r.div} · {r.trade}</div></td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, color: "var(--ink-soft)" }}>{r.room}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5 }}>{r.unit}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "con" ? 700 : 400 }}>{num(r.con)}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", color: "var(--ink-soft)", fontWeight: base === "est" ? 700 : 400 }}>{num(r.est)}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "site" ? 700 : 400 }} title={r.siteExpr}>{r.site ? num(r.site) : <span style={{ color: "var(--ink-faint)" }}>未录</span>}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right" }}>{money(r.price)}</td>
-                      <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700 }}>{money(baseQty(r) * r.price)}</td>
-                    </tr>
-                  ))}
+                  {rows.map((r) => {
+                    const edInp = (val, onCh, w, ph) => <input value={val} placeholder={ph} onChange={(e) => onCh(e.target.value)} style={{ width: w || 76, textAlign: "right", border: "1px solid var(--line-strong)", borderRadius: 6, padding: "4px 7px", fontSize: 12, fontFamily: "var(--font-mono)", background: "#fff" }} />;
+                    return (
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--line)", background: r.changed ? "var(--warn-soft)" : "transparent" }} onMouseEnter={(e) => { if (!r.changed) e.currentTarget.style.background = "var(--surface-3)"; }} onMouseLeave={(e) => { if (!r.changed) e.currentTarget.style.background = "transparent"; }}>
+                        <td style={{ padding: "10px 14px", fontSize: 13 }}><div style={{ fontWeight: 600 }}>{r.item}{r.changed && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--warn-ink)", background: "#fff", border: "1px solid var(--warn)", borderRadius: 999, padding: "1px 6px" }}>变更新增</span>}</div><div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 2 }}>{r.div} · {r.trade}</div></td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, color: "var(--ink-soft)" }}>{r.room}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5 }}>{r.unit}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "con" ? 700 : 400 }} title="合同量以清单/变更单为准，不在此直改">{num(r.con)}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", color: "var(--ink-soft)", fontWeight: base === "est" ? 700 : 400 }}>
+                          {editing ? edInp(r.est, (v) => updRow(r.id, { est: Number(v) || 0 })) : num(r.est)}
+                        </td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "site" ? 700 : 400 }} title={r.siteExpr}>
+                          {editing ? edInp(r.siteExpr || "", (v) => {
+                            // 现场量存算式本身：即时求值（仅 + - × × / 数字），失败保持原值
+                            let val = 0; try { val = Function('"use strict";return (' + v.replace(/×/g, "*").replace(/[^\d+\-*/.() ]/g, "") + ")")() || 0; } catch (e) { val = r.site; }
+                            updRow(r.id, { siteExpr: v, site: Math.round(val * 10) / 10 });
+                          }, 120, "算式 如 5.2×2.4+…") : (r.site ? num(r.site) : <span style={{ color: "var(--ink-faint)" }}>未录</span>)}
+                        </td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right" }}>
+                          {editing ? edInp(r.price, (v) => updRow(r.id, { price: Number(v) || 0 })) : money(r.price)}
+                        </td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700 }}>{money(baseQty(r) * r.price)}</td>
+                        {editing && <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                          <button onClick={() => delRow(r)} title="删除（软删除可撤回）" style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", display: "inline-flex" }}><Icon name="trash-2" size={15} /></button>
+                        </td>}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
