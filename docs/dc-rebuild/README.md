@@ -169,7 +169,7 @@
 - ✅ **蓝本回写**：finance-invoice.md（三 Tab→识别/台账两页）、project-info.md（Tab ③ 附件列）、boq-import.md（§4.5 三步向导）。material-delivery.md（双区）**未回写**（送货单实施排在下一批）。
 - ✅ **建 issues**：#43 识别中心 / #44 合同文件柜+拆表 / #45 发票台账 / #46 OCR 设置（发票识别页 issue 因权限未建，内容在本 README C 节）。
 - ✅ **设计稿实施（合同+发票批）**：`InvoiceShared.jsx`（共享 store+组件）/ `InvoiceScreen.jsx` 重写（单工作台+校对/排版子模式）/ `InvoiceLedgerScreen.jsx`（左树右表三呈现）/ `InvoiceEditScreen.jsx`（编辑页签）/ `OcrSettingsScreen.jsx` / `BoqImportScreen.jsx`（三步向导）/ `BoqListScreen.jsx`（清单管理）/ `ProjectDetailScreen.jsx` Tab③ 附件列 / `app.dc.html`（识别中心菜单组 + 6 新路由 + 页签 key/标题 + window.DC）。esbuild 全过 + 本地 8823 实测全流程（上传→识别→校对→批量通过→台账→编辑页签→拆表向导三步→入库→清单页）console 零报错。
-- ⏸️ **DesignSync 推送被用户中止**（2026-07-03），线上设计稿尚未更新——待反馈轮 8 完成后一并推送。
+- ✅ **已随反馈轮 8 一并推送**（2026-07-04，DesignSync 全量 47 文件：app.dc.html + support.js + kit/** + _ds/**），线上设计稿 = 本地快照已验证状态。
 - ⏭️ 送货单双区/文件树等 D 节内容 → 并入下一实施批。
 
 ### 反馈轮 8（2026-07-04：全站界面整改 —— 九大块）
