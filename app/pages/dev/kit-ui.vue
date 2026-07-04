@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 五原语。
-// 访问 /dev/kit-ui
+// 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
+// 访问 /dev/kit-ui（ripple 暂缓，待补动态图后再加回演示）
 const kit = useKitUI()
 
 const lastResult = ref('（尚无操作）')
@@ -51,19 +51,6 @@ function demoUndoToast() {
     lastResult.value = '记录已恢复到原位置'
   })
 }
-
-function demoRipple(e: MouseEvent) {
-  kit.ripple(e.currentTarget as HTMLElement)
-}
-
-function demoRippleCenter() {
-  kit.ripple()
-}
-
-const reducedMotion = ref(false)
-onMounted(() => {
-  reducedMotion.value = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
-})
 </script>
 
 <template>
@@ -76,11 +63,11 @@ onMounted(() => {
       </div>
       <p class="text-12px text-ink-soft mt-1">
         隐藏路由 <code class="text-11px bg-surface-3 px-1 py-0.5">/dev/kit-ui</code>，
-        逐一触发五原语验证行为，对照设计稿 <code class="text-11px bg-surface-3 px-1 py-0.5">kit/KitUI.jsx</code>。
+        逐一触发原语验证行为，对照设计稿 <code class="text-11px bg-surface-3 px-1 py-0.5">kit/KitUI.jsx</code>。
       </p>
-      <p class="text-12px mt-2" :class="reducedMotion ? 'text-warn-ink' : 'text-ink-faint'">
+      <p class="text-11px text-ink-faint mt-2">
         <span class="i-lucide-info text-12px mr-0.5" />
-        当前 prefers-reduced-motion：<b>{{ reducedMotion ? '开（ripple 退化为静态 ✓）' : '关（播放水波动效）' }}</b>
+        ripple（蓝色水波动效）暂缓，待补动态图后再加回。
       </p>
     </header>
 
@@ -114,16 +101,6 @@ onMounted(() => {
         <h2 class="text-13px font-700 text-ink mb-1">④ undoToast — 软删除 5 秒撤回</h2>
         <p class="text-12px text-ink-soft mb-3">5 秒内点「撤回」执行回调并弹「已撤回」；超时自动消失、不回调。</p>
         <button class="btn-danger" @click="demoUndoToast">软删除（可撤回）</button>
-      </section>
-
-      <!-- ⑤ ripple -->
-      <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">⑤ ripple — 蓝色水波动效</h2>
-        <p class="text-12px text-ink-soft mb-3">以按钮为落点播放水波；reduce 偏好下退化为静态 ✓ 淡入。</p>
-        <div class="flex gap-2">
-          <button class="btn-primary" @click="demoRipple">按钮落点水波</button>
-          <button class="btn-secondary" @click="demoRippleCenter">屏幕中心水波</button>
-        </div>
       </section>
 
       <!-- 结果回读 -->
