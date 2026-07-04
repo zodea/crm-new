@@ -74,6 +74,11 @@ export function useKitUI() {
     error: toast.error,
     warning: toast.warning,
     info: toast.info,
+    // 过程提示（右下重叠道）+ HeroUI 式 promise/loading
+    loading: toast.loading,
+    promise: toast.promise,
+    updateToast: toast.update,
+    dismissToast: toast.dismiss,
     undoToast: toast.undo,
     confirm,
     formModal,
