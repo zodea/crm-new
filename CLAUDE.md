@@ -22,8 +22,8 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
   - **system 道**(右上,展开可读):`success/error/warning/info/undo`——系统消息与「需确认后的结果」类。
   - **process 道**(右下,重叠堆叠省空间、hover 展开):`loading/promise`——上传/识别等界面交互过程提示,不占地方。
   - `promise()`:HeroUI 式加载中转圈 → 自动成功/失败;hover 暂停自动消失(按泳道)。
-- **confirm**:Promise 化确认弹窗(danger 变体)。**formModal**:字段配置驱动 + 必填校验。
-- **ripple**(蓝色水波):暂缓,待补动态图后以 GIF 方式重做(勿再写 CSS 版)。
+- **confirm**:Promise 化确认弹窗,三档变体 simple/batch/cascade(cascade 打实体名 + 预提交挂起),职责边界见 ADR 0003、规格见 `docs/design/kit-ui-component-specs.md`。**formModal**:字段配置驱动 + 必填校验。
+- **ripple**(蓝色水波):**已废弃**,全局水波动效(含导出完成动效)一律不再实现。
 
 **改版工作约定**:每类交互改版前,先搜集一份「多风格真实参考站」菜单(能直接点开看效果)供挑方向,挑定再实装。参考站清单存档见 `docs/design/interaction-style-references.md`。
 
