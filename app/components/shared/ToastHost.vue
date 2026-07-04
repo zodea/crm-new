@@ -33,6 +33,13 @@ const colorMap: Record<string, string> = {
           <span :class="[iconMap[t.type], colorMap[t.type]]" class="text-16px shrink-0 mt-px" />
           <span class="flex-1 text-ink leading-snug">{{ t.message }}</span>
           <button
+            v-if="t.action"
+            class="shrink-0 rounded-full bg-brand-soft px-2.5 py-0.5 text-12px font-700 text-brand-deep cursor-pointer hover:opacity-80 transition-opacity"
+            @click="t.action.onClick()"
+          >
+            {{ t.action.label }}
+          </button>
+          <button
             class="text-ink-faint hover:text-ink shrink-0 cursor-pointer"
             @click="dismiss(t.id)"
           >
