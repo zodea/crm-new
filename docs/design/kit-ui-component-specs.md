@@ -57,3 +57,35 @@ await confirm({
   confirmLabel?, cancelLabel?,
 }) // resolve(true) 执行 / resolve(false) 取消
 ```
+
+---
+
+## 02 · 表单弹窗 `form-modal` ✅ 已定案
+
+**用途**:新增/编辑单条记录的字段录入。低方差原语——各处表单结构基本一致,沿用现有 `KitFormModal`(字段配置驱动 + 必填校验,纯校验在 `app/lib/kit/form-modal.ts`),**不换骨架,只做四处增强**。
+
+**结构锚点**:标题(动词+名词,与主按钮动词一致)→ 字段区(可分组、可滚动)→ 吸底 footer(取消 ghost 左 · 主按钮 `--brand` 右)。
+
+**四处增强**:
+
+| 增强 | 规格 | 参考 |
+|---|---|---|
+| 长表单吸底 | 标题栏 + footer 固定,中间字段区 `overflow-y:auto`;短表单自然高度、不吸底 | shadcn Dialog Sticky Footer |
+| 自动聚焦 | 打开后焦点落在**第一个输入框** | Vercel Geist |
+| 失焦即时校验 | 字段 `blur` 时校验,错误红字贴**该字段下方**(非顶部汇总);提交时再全量校验 | — |
+| 提交三态 | 主按钮 default→loading(spinner + disabled 防重复)→success 关窗;复用 [按钮三态](#06--按钮三态-button-states) 原语 | Vercel Geist |
+
+**未保存内容拦截**:仅当表单**已被改动(dirty)** 时,点遮罩/Esc 关闭要弹一道 `confirm`(`simple` 变体,确认按钮文案「放弃修改」);未动过的表单直接关、不打扰。
+
+**配色 & 令牌**:主按钮 `--brand`(建设性操作,品牌蓝当主角,与 confirm 的 danger 相反);聚焦态品牌蓝描边;校验错误 `--danger` 贴字段下;圆角/留白往 Flowbite 靠一档,别太企业风。
+
+**调用签名**(沿用现有,字段配置驱动):
+
+```ts
+await formModal({
+  title,                          // 动词+名词
+  fields: FieldConfig[],          // 类型/label/必填/校验规则/分组
+  initial?: Record<string, any>,  // 编辑态回填;有值即判 dirty 基线
+  submitLabel?,                   // 与 title 动词一致
+}) // resolve(values) 提交 / resolve(null) 取消
+```
