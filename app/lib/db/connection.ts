@@ -1,4 +1,4 @@
-import { ALL_SCHEMA } from './schema'
+import { runMigrations } from './migrations'
 import { seedIfEmpty } from './seed'
 
 interface DbDriver {
@@ -71,10 +71,7 @@ export async function getDb(): Promise<DbDriver> {
     db = await createSqlJsDriver()
   }
 
-  const stmts = ALL_SCHEMA.split(';').filter(s => s.trim())
-  for (const stmt of stmts) {
-    await db.execute(`${stmt};`)
-  }
+  await runMigrations(db)
 
   await seedIfEmpty()
 

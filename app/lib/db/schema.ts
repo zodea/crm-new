@@ -1,5 +1,4 @@
-export const SCHEMA_VERSION = 1
-
+// schema 版本由 migrations.ts 的迁移数组派生（LATEST_VERSION），此文件只保留基线建表 SQL
 export const BATCH_1_NO_DEPS = `
 -- ═══════ 第 1 批：无外键依赖 ═══════
 
