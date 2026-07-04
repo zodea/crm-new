@@ -184,3 +184,37 @@ openDrawer({
   side?: 'right' | 'bottom', // 默认 right;窄窗自动 bottom
 })
 ```
+
+---
+
+## 06 · 按钮三态 `button-states` ✅ 已定案(公共零件,无 ADR)
+
+**用途**:提交类按钮的状态机,被表单提交 / confirm 确认 / 导入导出「开始」按钮复用。保持克制,不做花哨展示。
+
+**核心机制**(无争议):
+
+- 进 loading **立即 disabled** 防重复提交;**锁死宽度不跳动**。
+- loading 文案:**原文字不变 + 前置 spinner**(如「⟳ 保存」),不换「保存中…」文案(锁宽最稳、免配套文案)。
+
+**状态**:
+
+| 状态 | 表现 | 默认 |
+|---|---|---|
+| default | `--brand`(或调用处指定语义色) | — |
+| loading | 前置 spinner + disabled + 锁宽 | 启用 |
+| success 打勾 | 缩字→打勾 `--ok`→停约 1s 复位 | **默认关** |
+
+**success 打勾按需开**:多数按钮成功后已有别的落点(表单关窗 / 导出/confirm 弹 toast),按钮再打勾是**重复反馈**——故默认只走 default→loading,成功后随容器消失或复位。**仅**「原地保存、不关不跳、无其他反馈」的按钮(如页内「保存设置」)才开 success 打勾。
+
+**行内校验**:配套表单时,错误红字 `--danger` 贴**字段下方**,不在按钮上表达。
+
+**调用签名**:
+
+```ts
+<KitButton
+  :loading="submitting"      // 受控 loading
+  :success="false"           // 可选第三态,默认关
+  variant="brand | danger | ghost"
+  @click="onSubmit"
+/>
+```
