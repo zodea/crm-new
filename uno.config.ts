@@ -56,12 +56,104 @@ export default defineConfig({
         DEFAULT: 'var(--line)',
         strong: 'var(--line-strong)',
       },
+
+      // ── shadcn-vue 语义色（桥接 tokens.css，供 reka-ui/shadcn 组件消费）──
+      // 全走 var(--x) 完整色值约定（非 hsl 三元组），复用现有设计令牌、不重做原子样式。
+      background: 'var(--background)',
+      foreground: 'var(--foreground)',
+      card: { DEFAULT: 'var(--card)', foreground: 'var(--card-foreground)' },
+      popover: { DEFAULT: 'var(--popover)', foreground: 'var(--popover-foreground)' },
+      primary: { DEFAULT: 'var(--primary)', foreground: 'var(--primary-foreground)' },
+      secondary: { DEFAULT: 'var(--secondary)', foreground: 'var(--secondary-foreground)' },
+      muted: { DEFAULT: 'var(--muted)', foreground: 'var(--muted-foreground)' },
+      accent: { DEFAULT: 'var(--accent)', foreground: 'var(--accent-foreground)' },
+      destructive: { DEFAULT: 'var(--destructive)', foreground: 'var(--destructive-foreground)' },
+      border: 'var(--border)',
+      input: 'var(--input)',
+      ring: 'var(--ring)',
     },
+
+    // shadcn 圆角阶梯（lg = --radius，其余派生）；旧的 rounded-[3px]/rounded-full 不受影响
+    borderRadius: {
+      lg: 'var(--radius)',
+      md: 'calc(var(--radius) - 2px)',
+      sm: 'calc(var(--radius) - 4px)',
+      xl: 'calc(var(--radius) + 4px)',
+    },
+
     fontFamily: {
       sans: 'var(--font-sans)',
       mono: 'var(--font-mono)',
     },
   },
+
+  // ── reka-ui / shadcn 进出动画（tailwindcss-animate 的 UnoCSS 原生移植，无 Tailwind 依赖）──
+  // 注册为 rules，data-[state=open]:animate-in 这类变体才能被 UnoCSS 识别生成。
+  // 时长/缓动接项目令牌，keyframes 见下方 preflights。
+  rules: [
+    ['animate-in', {
+      'animation-name': 'enter',
+      'animation-duration': 'var(--dur-dialog, 220ms)',
+      'animation-timing-function': 'var(--ease-snappy)',
+      '--enter-opacity': 'initial',
+      '--enter-scale': 'initial',
+      '--enter-translate-x': 'initial',
+      '--enter-translate-y': 'initial',
+    }],
+    ['animate-out', {
+      'animation-name': 'exit',
+      'animation-duration': 'var(--dur-dialog, 220ms)',
+      'animation-timing-function': 'var(--ease-snappy)',
+      '--exit-opacity': 'initial',
+      '--exit-scale': 'initial',
+      '--exit-translate-x': 'initial',
+      '--exit-translate-y': 'initial',
+    }],
+    ['fade-in-0', { '--enter-opacity': '0' }],
+    ['fade-out-0', { '--exit-opacity': '0' }],
+    ['zoom-in-95', { '--enter-scale': '0.95' }],
+    ['zoom-out-95', { '--exit-scale': '0.95' }],
+    ['slide-in-from-top-2', { '--enter-translate-y': '-0.5rem' }],
+    ['slide-in-from-bottom-2', { '--enter-translate-y': '0.5rem' }],
+    ['slide-in-from-left-2', { '--enter-translate-x': '-0.5rem' }],
+    ['slide-in-from-right-2', { '--enter-translate-x': '0.5rem' }],
+    ['slide-out-to-top-2', { '--exit-translate-y': '-0.5rem' }],
+    ['slide-out-to-bottom-2', { '--exit-translate-y': '0.5rem' }],
+    ['slide-out-to-left-2', { '--exit-translate-x': '-0.5rem' }],
+    ['slide-out-to-right-2', { '--exit-translate-x': '0.5rem' }],
+    ['slide-in-from-left', { '--enter-translate-x': '-100%' }],
+    ['slide-in-from-right', { '--enter-translate-x': '100%' }],
+    ['slide-in-from-top', { '--enter-translate-y': '-100%' }],
+    ['slide-in-from-bottom', { '--enter-translate-y': '100%' }],
+    ['slide-out-to-left', { '--exit-translate-x': '-100%' }],
+    ['slide-out-to-right', { '--exit-translate-x': '100%' }],
+    ['slide-out-to-top', { '--exit-translate-y': '-100%' }],
+    ['slide-out-to-bottom', { '--exit-translate-y': '100%' }],
+  ],
+
+  preflights: [
+    {
+      getCSS: () => `
+@keyframes enter {
+  from {
+    opacity: var(--enter-opacity, 1);
+    transform: translate3d(var(--enter-translate-x, 0), var(--enter-translate-y, 0), 0)
+      scale3d(var(--enter-scale, 1), var(--enter-scale, 1), 1);
+  }
+}
+@keyframes exit {
+  to {
+    opacity: var(--exit-opacity, 1);
+    transform: translate3d(var(--exit-translate-x, 0), var(--exit-translate-y, 0), 0)
+      scale3d(var(--exit-scale, 1), var(--exit-scale, 1), 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .animate-out { animation: none !important; }
+}
+`,
+    },
+  ],
 
   shortcuts: {
     // 侧边栏面板（毛玻璃）
