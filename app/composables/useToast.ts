@@ -44,6 +44,9 @@ function emit(opts: PushOptions): ToastId {
     duration: opts.duration,
     toasterId: toasterOf(lane),
     action: opts.action,
+    // 关闭按钮只给 default 类型（undo）：品牌语义类型(success/error/warning/info/loading)
+    // 已有图标/颜色/自动消失作反馈，不需要额外 ×
+    closeButton: type === 'default',
     // 自动消失/手动关闭都清掉泳道记账，防 laneById 只增不减
     onDismiss: (t: { id: ToastId }) => laneById.delete(t.id),
     onAutoClose: (t: { id: ToastId }) => laneById.delete(t.id),
