@@ -22,7 +22,8 @@ const colorMap: Record<string, string> = {
 
 <template>
   <div
-    class="group flex items-start gap-2.5 w-full rounded-[10px] bg-panel border border-line px-3.5 py-3 shadow-[0_4px_12px_-2px_rgba(16,24,40,0.14),0_2px_6px_-3px_rgba(16,24,40,0.10)]"
+    class="group flex gap-2.5 w-full rounded-[10px] bg-panel border border-line px-3.5 py-3 shadow-[0_4px_12px_-2px_rgba(16,24,40,0.14),0_2px_6px_-3px_rgba(16,24,40,0.10)]"
+    :class="toast.description ? 'items-start' : 'items-center'"
   >
     <!-- 图标 / 加载转圈 -->
     <span v-if="toast.type === 'loading'" class="kit-spinner shrink-0 mt-px" />
