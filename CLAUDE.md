@@ -14,6 +14,21 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 
 单一上下文布局:根目录 `CONTEXT.md` + `docs/adr/`。见 `docs/agents/domain.md`。
 
+### Vue 开发实践(antfu skills)
+
+**本项目 Vue 代码的最佳实践基准 = antfu 系列 Vue 生态 skill。** 写或改任何 `.vue` / composable / store / 相关配置前,先跑对应 skill 核对写法,不凭记忆硬写。存量代码里有不少不合规写法,后续每次改动都按 skill 就地纠正(改到哪纠到哪),不要沿用旧代码的坏范式。**拿不准时以 skill 为准,不要反过来用旧代码去证明写法。**
+
+按本项目技术栈(Nuxt 4 + Vue 3.5 + UnoCSS + VueUse + Pinia + Vitest,pnpm 包管理)对应必须依照的 skill:
+
+- **`vue-best-practices`**——总纲,任何 Vue 任务先加载:一律 Composition API + `<script setup>` + TypeScript,禁止 Options API。
+- **`vue`**——SFC 宏(`defineProps` / `defineEmits` / `defineModel`)、`ref` / `computed` / `watch` 响应式、内置组件(Transition / Teleport / Suspense / KeepAlive)的正确用法。
+- **`vueuse-functions`**——能用 VueUse composable 就别手写(事件监听、防抖节流、`useLocalStorage` 等)。
+- **`nuxt`**——auto-imports、`app/` 目录约定、`useState` / `useFetch`、middleware、混合渲染。
+- **`unocss`**——原子类、shortcuts、preset 用法(配合 ADR 0008 shadcn-vue on UnoCSS)。
+- **`vue-router-best-practices`**——导航守卫、路由参数、路由组件生命周期交互。
+- **`vue-testing-best-practices`** / **`vitest`**——组件测试、mock、覆盖率、测试筛选。
+- **`pnpm`** / **`vite`**——依赖管理(catalog / override / patch)与构建配置。
+
 ## 交互原语设计语言(KitUI)
 
 全局交互原语在 `app/composables/useKitUI.ts` + 单宿主 `app/components/shared/KitUIHost.vue`;dev 验证载体 `/dev/kit-ui`。
