@@ -90,7 +90,7 @@ const categoryColor: Record<string, string> = {
   '银行开户许可证': 'chip-brand',
 }
 
-onMounted(() => loadCredentials())
+watch(() => props.supplierId, loadCredentials, { immediate: true })
 </script>
 
 <template>
