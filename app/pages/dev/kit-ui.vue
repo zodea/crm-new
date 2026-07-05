@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
-// 访问 /dev/kit-ui（ripple 暂缓，待补动态图后再加回演示）
+// 访问 /dev/kit-ui（ripple 已全域废弃，见 ADR 0004，不提供演示）
 const kit = useKitUI()
 
 const lastResult = ref('（尚无操作）')
@@ -147,7 +147,7 @@ async function demoFormModal() {
       </p>
       <p class="text-11px text-ink-faint mt-2">
         <span class="i-lucide-info text-12px mr-0.5" />
-        ripple（蓝色水波动效）暂缓，待补动态图后再加回。
+        ripple（蓝色水波动效）已全域废弃（ADR 0004），不再实现。
       </p>
     </header>
 

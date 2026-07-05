@@ -134,7 +134,7 @@ function dismiss(id: ToastId) {
 
 /** 撤回 toast（软删除限时撤回，system 道；ADR 0003：窗口 10 秒） */
 function undo(message: string, onUndo: () => void, ms = 10000): ToastId {
-  return emit({
+  const id = emit({
     lane: 'system',
     type: 'default',
     message,
@@ -142,11 +142,14 @@ function undo(message: string, onUndo: () => void, ms = 10000): ToastId {
     action: {
       label: '撤回',
       onClick: () => {
+        // vue-sonner 的 action 点击直接删 toast、不回调 onDismiss，需手动清泳道记账
+        laneById.delete(id)
         onUndo()
         success('已撤回')
       },
     },
   })
+  return id
 }
 
 export function useToast() {

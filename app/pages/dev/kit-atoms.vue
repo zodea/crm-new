@@ -72,7 +72,7 @@ const activeNode = ref('p1')
       <!-- ① SelectFilter -->
       <section class="content-panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">① SelectFilter — 紧凑下拉筛选</h2>
-        <p class="text-12px text-ink-soft mb-3">label + 原生 select + 自绘 chevron；即选即筛。</p>
+        <p class="text-12px text-ink-soft mb-3">label + reka-ui Select（样式化下拉 + Portal，6b687e4 迁入）；即选即筛。</p>
         <div class="flex flex-wrap items-center gap-4">
           <SelectFilter v-model="stage" label="阶段" :options="STAGE_OPTS" :min-width="150" />
           <SelectFilter v-model="status" label="状态" :options="STATUS_OPTS" />

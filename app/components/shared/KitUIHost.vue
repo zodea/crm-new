@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // KitUI 全局单宿主：一处挂载，任意页面通过 useKitUI() 触发原语。
 // toast/undoToast 由 <ToastHost/> 渲染；confirm 复用 <ConfirmDialog/>；
-// formModal 走 <KitFormModal/>。（ripple 暂缓，待补动态图后再挂）
+// formModal 走 <KitFormModal/>。（ripple 已全域废弃，见 ADR 0004）
 const {
   confirmState,
   confirmOpts,
