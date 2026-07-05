@@ -80,6 +80,16 @@ function phaseProgress(phase: Phase): string {
   return `${done}/${phase.tasks.length}`
 }
 
+// 预派生每个阶段的状态/进度，避免模板对同一 phase 反复调 phaseStatus/phaseProgress
+const phaseViews = computed(() =>
+  phases.map((phase, idx) => ({
+    phase,
+    idx,
+    status: phaseStatus(phase),
+    progress: phaseProgress(phase),
+  })),
+)
+
 const TASK_STATUS: Record<string, { label: string, cls: string }> = {
   pending: { label: '待上传', cls: 'text-ink-faint' },
   uploaded: { label: '已上传', cls: 'text-brand font-600' },
@@ -91,23 +101,23 @@ const TASK_STATUS: Record<string, { label: string, cls: string }> = {
   <div class="border border-line bg-panel p-4 mb-4">
     <!-- 时间线节点 -->
     <div class="flex items-center gap-1 mb-4 overflow-x-auto">
-      <template v-for="(phase, idx) in phases" :key="idx">
+      <template v-for="pv in phaseViews" :key="pv.idx">
         <button
           class="flex items-center gap-1 px-2.5 py-1.5 rounded-[3px] text-12px font-600 whitespace-nowrap cursor-pointer transition-colors"
           :class="{
-            'bg-ok/10 text-ok': phaseStatus(phase) === 'done',
-            'bg-brand-soft text-brand-deep': phaseStatus(phase) === 'active',
-            'bg-surface-3 text-ink-faint': phaseStatus(phase) === 'pending',
+            'bg-ok/10 text-ok': pv.status === 'done',
+            'bg-brand-soft text-brand-deep': pv.status === 'active',
+            'bg-surface-3 text-ink-faint': pv.status === 'pending',
           }"
-          @click="togglePhase(idx)"
+          @click="togglePhase(pv.idx)"
         >
-          <span v-if="phaseStatus(phase) === 'done'" class="i-lucide-circle-check text-13px" />
-          <span v-else-if="phaseStatus(phase) === 'active'" class="i-lucide-circle-dot text-13px" />
+          <span v-if="pv.status === 'done'" class="i-lucide-circle-check text-13px" />
+          <span v-else-if="pv.status === 'active'" class="i-lucide-circle-dot text-13px" />
           <span v-else class="i-lucide-circle text-13px" />
-          {{ phase.name }}
-          <span v-if="phaseProgress(phase)" class="text-10px opacity-70">({{ phaseProgress(phase) }})</span>
+          {{ pv.phase.name }}
+          <span v-if="pv.progress" class="text-10px opacity-70">({{ pv.progress }})</span>
         </button>
-        <span v-if="idx < phases.length - 1" class="text-line">→</span>
+        <span v-if="pv.idx < phases.length - 1" class="text-line">→</span>
       </template>
     </div>
 

@@ -47,6 +47,13 @@ const CRED_COLOR: Record<string, string> = {
   qualified: 'chip-ok',
   rejected: 'chip-danger',
 }
+const COOP_STATUS_LABEL: Record<string, string> = {
+  collecting: '资料收集',
+  contracted: '已签合同',
+  claiming: '请款中',
+  paid: '已付款',
+  settled: '已结算',
+}
 
 const supplierProjects = computed(() =>
   psStore.bySupplier(supplierId.value),
@@ -145,7 +152,7 @@ onMounted(async () => {
                 'text-brand font-600': row.status === 'contracted' || row.status === 'claiming',
                 'cell--status-ok': row.status === 'paid' || row.status === 'settled',
               }">
-                {{ { collecting: '资料收集', contracted: '已签合同', claiming: '请款中', paid: '已付款', settled: '已结算' }[row.status] || row.status }}
+                {{ COOP_STATUS_LABEL[row.status] || row.status }}
               </span>
             </template>
           </vxe-column>

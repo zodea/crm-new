@@ -101,6 +101,18 @@ const tabCounts = computed(() => ({
   ledger: store.ledger.length,
 }))
 
+const docStats = computed(() => {
+  let pending = 0
+  let done = 0
+  let duplicate = 0
+  for (const d of store.documents) {
+    if (d.ocrStatus === 'pending' || d.ocrStatus === 'processing') pending++
+    if (d.ocrStatus === 'done' && d.dupStatus === 'normal') done++
+    if (d.dupStatus === 'duplicate') duplicate++
+  }
+  return { pending, done, duplicate }
+})
+
 const OCR_STATUS_LABEL: Record<string, string> = {
   pending: '待识别',
   processing: '识别中',
@@ -223,17 +235,17 @@ onMounted(() => store.load())
         <StatCard label="全部文档" :value="store.documents.length" icon="i-lucide-file-text" color="brand" />
         <StatCard
           label="待识别"
-          :value="store.documents.filter(d => d.ocrStatus === 'pending' || d.ocrStatus === 'processing').length"
+          :value="docStats.pending"
           icon="i-lucide-clock" color="warn"
         />
         <StatCard
           label="识别完成"
-          :value="store.documents.filter(d => d.ocrStatus === 'done' && d.dupStatus === 'normal').length"
+          :value="docStats.done"
           icon="i-lucide-circle-check" color="ok"
         />
         <StatCard
           label="重复/排除"
-          :value="store.documents.filter(d => d.dupStatus === 'duplicate').length"
+          :value="docStats.duplicate"
           icon="i-lucide-copy-x" color="danger"
         />
       </div>

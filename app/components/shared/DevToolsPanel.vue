@@ -40,6 +40,7 @@ async function loadTables() {
 
 const hasData = computed(() => tables.value.some(t => t.count > 0))
 const selectedCount = computed(() => tables.value.filter(t => t.selected).length)
+const dataTableCount = computed(() => tables.value.filter(t => t.count > 0).length)
 
 function toggleAll(checked: boolean) {
   for (const t of tables.value) {
@@ -137,8 +138,8 @@ watch(() => props.open, (val) => {
                   <input
                     type="checkbox"
                     class="accent-brand"
-                    :checked="selectedCount === tables.filter(t => t.count > 0).length"
-                    :indeterminate="selectedCount > 0 && selectedCount < tables.filter(t => t.count > 0).length"
+                    :checked="selectedCount === dataTableCount"
+                    :indeterminate="selectedCount > 0 && selectedCount < dataTableCount"
                     @change="toggleAll(($event.target as HTMLInputElement).checked)"
                   >
                   全选有数据的表

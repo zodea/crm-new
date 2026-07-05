@@ -4,7 +4,7 @@ interface ColGroup {
   label: string
 }
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   title: string
   count?: number
   searchPlaceholder?: string
@@ -26,10 +26,6 @@ const emit = defineEmits<{
   export: []
   filter: []
 }>()
-
-const searchText = ref('')
-
-watch(searchText, val => emit('search', val))
 </script>
 
 <template>
@@ -59,9 +55,9 @@ watch(searchText, val => emit('search', val))
 
     <!-- 搜索 -->
     <input
-      v-model="searchText"
       class="field-input w-52"
       :placeholder="searchPlaceholder"
+      @input="emit('search', ($event.target as HTMLInputElement).value)"
     >
 
     <!-- 操作按钮组 -->

@@ -87,15 +87,18 @@ function toggleGroup(label: string) {
   }
 }
 
-function isGroupActive(group: NavGroup): boolean {
-  return group.children.some(c => route.path === c.to || route.path.startsWith(c.to + '/'))
-}
+const activeGroups = computed(() => {
+  const set = new Set<string>()
+  for (const g of navGroups) {
+    if (g.children.some(c => route.path === c.to || route.path.startsWith(c.to + '/')))
+      set.add(g.label)
+  }
+  return set
+})
 
 watchEffect(() => {
-  for (const g of navGroups) {
-    if (isGroupActive(g))
-      expandedGroups.value.add(g.label)
-  }
+  for (const label of activeGroups.value)
+    expandedGroups.value.add(label)
 })
 </script>
 
@@ -126,16 +129,16 @@ watchEffect(() => {
         <!-- 一级菜单 -->
         <button
           class="flex items-center w-full px-2 py-2 rounded-[var(--radius-btn)] text-left transition-colors duration-[var(--dur-fast)]"
-          :class="isGroupActive(group)
+          :class="activeGroups.has(group.label)
             ? 'bg-brand-soft text-brand-deep font-800 shadow-[inset_3px_0_0_var(--brand)] border border-white/50'
             : 'text-ink-soft hover:bg-surface-3'"
-          :style="isGroupActive(group) ? { backdropFilter: 'blur(9px)' } : {}"
+          :style="activeGroups.has(group.label) ? { backdropFilter: 'blur(9px)' } : {}"
           @click="collapsed ? $emit('toggle') : toggleGroup(group.label)"
         >
           <!-- 中文单字方块 -->
           <div
             class="flex items-center justify-center w-7 h-7 rounded-[6px] text-13px font-800 shrink-0"
-            :class="isGroupActive(group)
+            :class="activeGroups.has(group.label)
               ? 'bg-brand text-white'
               : 'bg-surface-2 text-ink-soft'"
           >
