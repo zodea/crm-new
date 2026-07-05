@@ -27,8 +27,8 @@ interface ConfirmState {
   resolve: (ok: boolean) => void
 }
 
-const confirmState = ref<ConfirmState | null>(null)
-const confirmOpts = ref<ConfirmOptions | null>(null) // 关闭动画期间保留视图内容
+const confirmState = shallowRef<ConfirmState | null>(null)
+const confirmOpts = shallowRef<ConfirmOptions | null>(null) // 关闭动画期间保留视图内容
 let confirmSeq = 0
 
 function confirm(opts: ConfirmOptions): Promise<boolean> {
@@ -51,8 +51,8 @@ interface FormModalState {
   resolve: (values: FormValues | null) => void
 }
 
-const formModalState = ref<FormModalState | null>(null)
-const formModalOpts = ref<FormModalOptions | null>(null)
+const formModalState = shallowRef<FormModalState | null>(null)
+const formModalOpts = shallowRef<FormModalOptions | null>(null)
 let formSeq = 0
 
 /** 打开表单弹窗；提交返回字段值对象，取消/关闭返回 null。 */

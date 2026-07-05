@@ -56,7 +56,7 @@ onMounted(() => store.load())
           :key="p.id"
           class="px-3 py-1.5 text-12px font-600 border-r border-line last:border-r-0 cursor-pointer transition-colors"
           :class="store.activePartition === p.id ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-3'"
-          @click="store.activePartition = p.id"
+          @click="store.setActivePartition(p.id)"
         >
           {{ p.name }}
         </button>

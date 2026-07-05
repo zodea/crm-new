@@ -70,8 +70,8 @@ function rowToInvoice(row: Record<string, unknown>): Invoice {
 }
 
 export const useInvoiceStore = defineStore('invoice', () => {
-  const list = ref<Invoice[]>([])
-  const loading = ref(false)
+  const list = shallowRef<Invoice[]>([])
+  const loading = shallowRef(false)
 
   async function load() {
     loading.value = true
@@ -178,5 +178,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
     await load()
   }
 
-  return { list, loading, load, byId, documents, pendingReview, ledger, add, update, updateField, confirmInvoice, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, documents, pendingReview, ledger, add, update, updateField, confirmInvoice, remove }
 })

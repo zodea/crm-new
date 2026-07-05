@@ -32,8 +32,8 @@ function rowToPS(row: Record<string, unknown>): ProjectSupplier {
 }
 
 export const useProjectSupplierStore = defineStore('project-supplier', () => {
-  const list = ref<ProjectSupplier[]>([])
-  const loading = ref(false)
+  const list = shallowRef<ProjectSupplier[]>([])
+  const loading = shallowRef(false)
 
   async function load() {
     loading.value = true
@@ -97,5 +97,5 @@ export const useProjectSupplierStore = defineStore('project-supplier', () => {
     await load()
   }
 
-  return { list, loading, load, byId, byProjectAndSupplier, byProject, bySupplier, add, updateStatus, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, byProjectAndSupplier, byProject, bySupplier, add, updateStatus, remove }
 })

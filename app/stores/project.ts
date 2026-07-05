@@ -82,8 +82,8 @@ function rowToProject(row: Record<string, unknown>): Project {
 }
 
 export const useProjectStore = defineStore('project', () => {
-  const list = ref<Project[]>([])
-  const loading = ref(false)
+  const list = shallowRef<Project[]>([])
+  const loading = shallowRef(false)
 
   async function load() {
     loading.value = true
@@ -148,5 +148,5 @@ export const useProjectStore = defineStore('project', () => {
     await load()
   }
 
-  return { list, loading, load, byId, add, update, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove }
 })

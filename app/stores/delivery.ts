@@ -95,14 +95,18 @@ const MOCK_FILES: DeliveryFile[] = [
 ]
 
 export const useDeliveryStore = defineStore('delivery', () => {
-  const files = ref<DeliveryFile[]>([])
-  const partitions = ref<Partition[]>([])
-  const activePartition = ref('p_all')
-  const loading = ref(false)
+  const files = shallowRef<DeliveryFile[]>([])
+  const partitions = shallowRef<Partition[]>([])
+  const activePartition = shallowRef('p_all')
+  const loading = shallowRef(false)
 
   function load() {
     files.value = [...MOCK_FILES]
     partitions.value = [...MOCK_PARTITIONS]
+  }
+
+  function setActivePartition(id: string) {
+    activePartition.value = id
   }
 
   const filteredFiles = computed(() => {
@@ -131,5 +135,5 @@ export const useDeliveryStore = defineStore('delivery', () => {
     return [...new Set(reasons)]
   }
 
-  return { files, partitions, activePartition, loading, load, filteredFiles, stats, incompleteReasons }
+  return { files: readonly(files), partitions: readonly(partitions), activePartition: readonly(activePartition), loading: readonly(loading), load, setActivePartition, filteredFiles, stats, incompleteReasons }
 })

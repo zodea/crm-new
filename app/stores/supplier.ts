@@ -68,8 +68,8 @@ function rowToSupplier(row: Record<string, unknown>): Supplier {
 }
 
 export const useSupplierStore = defineStore('supplier', () => {
-  const list = ref<Supplier[]>([])
-  const loading = ref(false)
+  const list = shallowRef<Supplier[]>([])
+  const loading = shallowRef(false)
 
   async function load() {
     loading.value = true
@@ -136,5 +136,5 @@ export const useSupplierStore = defineStore('supplier', () => {
     await load()
   }
 
-  return { list, loading, load, byId, add, update, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove }
 })
