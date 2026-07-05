@@ -22,7 +22,7 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 
 - **`vue-best-practices`**——总纲,任何 Vue 任务先加载:一律 Composition API + `<script setup>` + TypeScript,禁止 Options API。
 - **`vue`**——SFC 宏(`defineProps` / `defineEmits` / `defineModel`)、`ref` / `computed` / `watch` 响应式、内置组件(Transition / Teleport / Suspense / KeepAlive)的正确用法。
-- **`vueuse-functions`**——能用 VueUse composable 就别手写(事件监听、防抖节流、`useLocalStorage` 等)。
+- **`vueuse-functions`**——**功能开发前先查 VueUse 有没有现成的,别重复造轮子**(项目已装 `@vueuse/core` + `@vueuse/nuxt` 自动导入);能用 VueUse composable 就别手写:剪贴板 `useClipboard`、定时器 `useTimeoutFn`、事件监听 `useEventListener`、防抖节流、`useLocalStorage` 等。确无现成的再手写。
 - **`nuxt`**——auto-imports、`app/` 目录约定、`useState` / `useFetch`、middleware、混合渲染。
 - **`unocss`**——原子类、shortcuts、preset 用法(配合 ADR 0008 shadcn-vue on UnoCSS)。
 - **`vue-router-best-practices`**——导航守卫、路由参数、路由组件生命周期交互。
