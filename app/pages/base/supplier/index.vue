@@ -86,7 +86,7 @@ onMounted(() => store.load())
         border
         show-overflow
         height="auto"
-        :row-config="{ isHover: true }"
+        :row-config="{ isHover: true, keyField: 'id' }"
         :column-config="{ resizable: true }"
       >
         <vxe-column type="seq" title="#" width="52" fixed="left" />

@@ -135,7 +135,7 @@ onMounted(async () => {
           border
           show-overflow
           height="auto"
-          :row-config="{ isHover: true }"
+          :row-config="{ isHover: true, keyField: 'id' }"
         >
           <vxe-column type="seq" title="#" width="52" />
           <vxe-column field="projectName" title="项目名称" min-width="180">

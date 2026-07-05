@@ -267,7 +267,7 @@ onMounted(() => store.load())
           border
           show-overflow
           height="auto"
-          :row-config="{ isHover: true }"
+          :row-config="{ isHover: true, keyField: 'id' }"
         >
           <vxe-column type="seq" title="#" width="52" />
           <vxe-column field="fileName" title="文件名" min-width="200">
@@ -402,7 +402,7 @@ onMounted(() => store.load())
           border
           show-overflow
           height="auto"
-          :row-config="{ isHover: true }"
+          :row-config="{ isHover: true, keyField: 'id' }"
           :column-config="{ resizable: true }"
         >
           <vxe-column type="seq" title="#" width="52" fixed="left" />
