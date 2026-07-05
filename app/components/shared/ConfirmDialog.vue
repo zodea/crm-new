@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConfirmImpact, ConfirmVariant, HoldState } from '~/lib/kit/confirm'
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import {
   beginHold,
   cancelHold,
@@ -10,7 +10,9 @@ import {
   tickHold,
 } from '~/lib/kit/confirm'
 
-// 三档确认弹窗（ADR 0003 + 规格 §01）：
+// 三档确认弹窗（ADR 0003 + 规格 §01），底座换为 shadcn-vue Dialog（reka-ui）：
+// 焦点陷阱 / Esc / 遮罩关闭 / aria-modal / 焦点返回 / 背景 inert 交给 reka，本组件只管
+// 三档内容 + 打字门控 + 预提交挂起（纯逻辑复用 ~/lib/kit/confirm）。props/emits 对宿主保持不变。
 // simple  高后果轻量操作 → 点确认即 emit('confirm')。
 // batch   批量删除，显示「将删除 N 条」→ 点确认即 emit('confirm')，事后由调用方弹 undoToast。
 // cascade 删有下游关联的父级 → 打记录名激活确认；点确认进 ≥3 秒预提交挂起（期间不写库、
@@ -43,7 +45,6 @@ const hold = ref<HoldState | null>(null) // 非空 = cascade 挂起中
 const remainingMs = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
-const panelRef = ref<HTMLElement | null>(null)
 const cancelBtnRef = ref<HTMLButtonElement | null>(null)
 
 const holding = computed(() => hold.value?.phase === 'pending')
@@ -90,30 +91,16 @@ function onCancel() {
   emit('cancel')
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    onCancel()
-    return
-  }
-  // 轻量焦点锁定：Tab 在弹窗内可聚焦元素间循环
-  if (e.key === 'Tab' && panelRef.value) {
-    const nodes = panelRef.value.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    if (nodes.length === 0) return
-    const first = nodes[0]!
-    const last = nodes[nodes.length - 1]!
-    const active = document.activeElement as HTMLElement | null
-    if (e.shiftKey && active === first) {
-      e.preventDefault()
-      last.focus()
-    }
-    else if (!e.shiftKey && active === last) {
-      e.preventDefault()
-      first.focus()
-    }
-  }
+// reka 请求关闭（Esc / 点遮罩）→ 统一按取消处理（关闭都是安全路径）。
+// 提交路径由宿主改 open=false 收起，不经此回调，故不会误触发 cancel。
+function onOpenChange(value: boolean) {
+  if (!value) onCancel()
+}
+
+// 危险操作焦点默认停在「取消」（安全选项，规格 §01）。
+function onOpenAutoFocus(e: Event) {
+  e.preventDefault()
+  nextTick(() => cancelBtnRef.value?.focus())
 }
 
 watch(() => props.open, (open) => {
@@ -122,8 +109,6 @@ watch(() => props.open, (open) => {
     hold.value = null
     remainingMs.value = 0
     stopTimer()
-    // 打开焦点默认落「取消」（危险操作停在安全选项，规格 §01）
-    nextTick(() => cancelBtnRef.value?.focus())
   }
   else {
     stopTimer()
@@ -134,114 +119,83 @@ onBeforeUnmount(stopTimer)
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition-opacity duration-[var(--dur-dialog)]"
-      leave-active-class="transition-opacity duration-[180ms]"
-      enter-from-class="opacity-0"
-      leave-to-class="opacity-0"
-    >
+  <Dialog :open="open" @update:open="onOpenChange">
+    <DialogContent :show-close="false" @open-auto-focus="onOpenAutoFocus">
+      <DialogTitle>{{ title }}</DialogTitle>
+
+      <DialogDescription class="mt-3 leading-relaxed">
+        {{ message }}
+      </DialogDescription>
+
+      <!-- batch：将删除 N 条 -->
+      <p v-if="variant === 'batch' && count != null" class="text-13px text-ink mt-2">
+        将删除 <b class="text-danger">{{ count }}</b> 条记录。
+      </p>
+
+      <!-- cascade：杀伤清单 -->
       <div
-        v-if="open"
-        class="fixed inset-0 z-[9000] flex items-center justify-center"
-        role="dialog"
-        aria-modal="true"
-        @keydown="onKeydown"
+        v-if="variant === 'cascade' && impact?.length"
+        class="mt-3 rounded-[var(--radius-btn)] bg-danger-soft border border-line px-3 py-2"
       >
-        <!-- 遮罩：品牌色轻遮罩，无毛玻璃（规格 §00） -->
-        <div
-          class="absolute inset-0"
-          style="background: rgba(42, 89, 150, 0.28)"
-          @click="onCancel"
-        />
-        <!-- 内容：面板圆角 --radius-card -->
-        <div
-          ref="panelRef"
-          class="relative bg-panel border border-line shadow-[var(--shadow-pop)] w-[min(440px,92vw)] p-5 rounded-[var(--radius-card)]"
-          style="animation: dialog-enter var(--dur-dialog) var(--ease-snappy)"
-        >
-          <h3 class="text-14px font-800 text-ink mb-3">{{ title }}</h3>
-
-          <p class="text-13px text-ink-soft leading-relaxed">{{ message }}</p>
-
-          <!-- batch：将删除 N 条 -->
-          <p v-if="variant === 'batch' && count != null" class="text-13px text-ink mt-2">
-            将删除 <b class="text-danger">{{ count }}</b> 条记录。
-          </p>
-
-          <!-- cascade：杀伤清单 -->
-          <div
-            v-if="variant === 'cascade' && impact?.length"
-            class="mt-3 rounded-[var(--radius-btn)] bg-danger-soft border border-line px-3 py-2"
-          >
-            <div class="text-12px text-danger-ink font-700 mb-1.5">此操作将影响以下关联数据：</div>
-            <ul class="flex flex-wrap gap-x-4 gap-y-1">
-              <li v-for="it in impact" :key="it.label" class="text-12px text-ink-soft">
-                {{ it.label }} <b class="text-danger-ink">×{{ it.n }}</b>
-              </li>
-            </ul>
-          </div>
-
-          <!-- cascade：type-to-confirm 输入框 -->
-          <div v-if="variant === 'cascade' && requireTyping" class="mt-3">
-            <label class="text-12px text-ink-soft">
-              请输入 <b class="text-ink font-700">{{ requireTyping }}</b> 以确认删除：
-            </label>
-            <input
-              v-model="typed"
-              type="text"
-              class="field-input w-full mt-1.5 rounded-[var(--radius-btn)]"
-              :placeholder="requireTyping"
-              :disabled="holding"
-              autocomplete="off"
-            >
-          </div>
-
-          <!-- footer -->
-          <div class="flex justify-end gap-2 mt-5">
-            <!-- 挂起中：显眼「撤销」（品牌蓝＝安全逃生口） -->
-            <template v-if="holding">
-              <button
-                type="button"
-                class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-700 rounded-[var(--radius-btn)] border border-brand bg-brand text-white cursor-pointer transition-opacity hover:opacity-90"
-                @click="onCancel"
-              >
-                撤销（{{ remainingSec }}s 内可停）
-              </button>
-              <span class="inline-flex items-center gap-1.5 px-3 text-13px text-danger-ink">
-                <span class="i-lucide-loader-circle animate-spin text-14px" />
-                删除中…
-              </span>
-            </template>
-            <!-- 常态 footer：取消 ghost 左 · 确认 danger 右 -->
-            <template v-else>
-              <button
-                ref="cancelBtnRef"
-                type="button"
-                class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-transparent text-ink-soft cursor-pointer transition-colors hover:bg-surface-3 hover:text-ink"
-                @click="onCancel"
-              >
-                {{ cancelLabel }}
-              </button>
-              <button
-                type="button"
-                class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-danger bg-danger text-white cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="variant === 'cascade' && !confirmEnabled"
-                @click="onConfirm"
-              >
-                {{ confirmLabel }}
-              </button>
-            </template>
-          </div>
-        </div>
+        <div class="text-12px text-danger-ink font-700 mb-1.5">此操作将影响以下关联数据：</div>
+        <ul class="flex flex-wrap gap-x-4 gap-y-1">
+          <li v-for="it in impact" :key="it.label" class="text-12px text-ink-soft">
+            {{ it.label }} <b class="text-danger-ink">×{{ it.n }}</b>
+          </li>
+        </ul>
       </div>
-    </Transition>
-  </Teleport>
-</template>
 
-<style scoped>
-@keyframes dialog-enter {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-</style>
+      <!-- cascade：type-to-confirm 输入框 -->
+      <div v-if="variant === 'cascade' && requireTyping" class="mt-3">
+        <label class="text-12px text-ink-soft">
+          请输入 <b class="text-ink font-700">{{ requireTyping }}</b> 以确认删除：
+        </label>
+        <input
+          v-model="typed"
+          type="text"
+          class="field-input w-full mt-1.5 rounded-[var(--radius-btn)]"
+          :placeholder="requireTyping"
+          :disabled="holding"
+          autocomplete="off"
+        >
+      </div>
+
+      <!-- footer -->
+      <div class="flex justify-end gap-2 mt-5">
+        <!-- 挂起中：显眼「撤销」（品牌蓝＝安全逃生口） -->
+        <template v-if="holding">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-700 rounded-[var(--radius-btn)] border border-brand bg-brand text-white cursor-pointer transition-opacity hover:opacity-90"
+            @click="onCancel"
+          >
+            撤销（{{ remainingSec }}s 内可停）
+          </button>
+          <span class="inline-flex items-center gap-1.5 px-3 text-13px text-danger-ink">
+            <span class="i-lucide-loader-circle animate-spin text-14px" />
+            删除中…
+          </span>
+        </template>
+        <!-- 常态 footer：取消 ghost 左 · 确认 danger 右 -->
+        <template v-else>
+          <button
+            ref="cancelBtnRef"
+            type="button"
+            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-transparent text-ink-soft cursor-pointer transition-colors hover:bg-surface-3 hover:text-ink"
+            @click="onCancel"
+          >
+            {{ cancelLabel }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-danger bg-danger text-white cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            :disabled="variant === 'cascade' && !confirmEnabled"
+            @click="onConfirm"
+          >
+            {{ confirmLabel }}
+          </button>
+        </template>
+      </div>
+    </DialogContent>
+  </Dialog>
+</template>

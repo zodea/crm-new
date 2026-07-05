@@ -129,6 +129,10 @@ export default defineConfig({
     ['slide-out-to-right', { '--exit-translate-x': '100%' }],
     ['slide-out-to-top', { '--exit-translate-y': '-100%' }],
     ['slide-out-to-bottom', { '--exit-translate-y': '100%' }],
+    // 居中对话框专用：把 -50%/-48% 的居中位移烘进 enter/exit 偏移，
+    // 避免动画的 transform 覆盖 -translate-x/y-1/2 居中导致跳位（zoom+fade+微升，始终居中）
+    ['dialog-in', { '--enter-opacity': '0', '--enter-scale': '0.96', '--enter-translate-x': '-50%', '--enter-translate-y': '-48%' }],
+    ['dialog-out', { '--exit-opacity': '0', '--exit-scale': '0.96', '--exit-translate-x': '-50%', '--exit-translate-y': '-48%' }],
   ],
 
   preflights: [
