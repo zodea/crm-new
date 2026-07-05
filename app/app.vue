@@ -1,22 +1,19 @@
 <script setup lang="ts">
-const sidebarCollapsed = ref(false)
-provide('sidebarCollapsed', sidebarCollapsed)
+// 应用外框（ADR 0008）：shadcn-vue Sidebar 体系 —— SidebarProvider（状态/快捷键/持久化）
+// > AppSidebar（inset 毛玻璃侧栏）+ SidebarInset（圆角浮岛主内容区，内部滚动）。
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-bg">
-    <AppSidebar
-      :collapsed="sidebarCollapsed"
-      @toggle="sidebarCollapsed = !sidebarCollapsed"
-    />
-    <div class="flex flex-col flex-1 min-w-0">
+  <SidebarProvider>
+    <AppSidebar />
+    <SidebarInset class="h-svh overflow-hidden md:h-[calc(100svh-1rem)]">
       <AppTopbar />
-      <main class="flex-1 overflow-y-auto p-4">
-        <div class="max-w-[var(--content-max)] mx-auto">
+      <div class="flex-1 overflow-y-auto p-4">
+        <div class="mx-auto max-w-[var(--content-max)]">
           <NuxtPage />
         </div>
-      </main>
-    </div>
+      </div>
+    </SidebarInset>
     <KitUIHost />
-  </div>
+  </SidebarProvider>
 </template>

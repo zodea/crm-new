@@ -1,19 +1,31 @@
 <script setup lang="ts">
-defineProps<{
-  collapsed: boolean
-}>()
-
-defineEmits<{
-  toggle: []
-}>()
+// 应用侧边栏 —— 基于 ui/sidebar（shadcn-vue Sidebar 体系，ADR 0008），
+// 组合方式对照官方 dashboard 示例 AppSidebar.vue；保留项目特色：
+// 毛玻璃底（--sidebar-background）+ 中文单字方块（首/项/基/资/合/包/材）+ 分组展开逻辑。
+// 单子项分组（首页/项目）= 直接导航链接；多子项分组 = 点击展开子菜单。
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
+  useSidebar,
+} from '~/components/ui/sidebar'
 
 const route = useRoute()
+const { state, isMobile, setOpen, setOpenMobile } = useSidebar()
 
 interface NavGroup {
   char: string
   label: string
   icon: string
-  children: { label: string; to: string }[]
+  children: { label: string, to: string }[]
 }
 
 const navGroups: NavGroup[] = [
@@ -79,18 +91,20 @@ const navGroups: NavGroup[] = [
 const expandedGroups = ref<Set<string>>(new Set(['首页']))
 
 function toggleGroup(label: string) {
-  if (expandedGroups.value.has(label)) {
+  if (expandedGroups.value.has(label))
     expandedGroups.value.delete(label)
-  }
-  else {
+  else
     expandedGroups.value.add(label)
-  }
+}
+
+function isChildActive(to: string) {
+  return route.path === to || route.path.startsWith(`${to}/`)
 }
 
 const activeGroups = computed(() => {
   const set = new Set<string>()
   for (const g of navGroups) {
-    if (g.children.some(c => route.path === c.to || route.path.startsWith(c.to + '/')))
+    if (g.children.some(c => isChildActive(c.to)))
       set.add(g.label)
   }
   return set
@@ -100,89 +114,103 @@ watchEffect(() => {
   for (const label of activeGroups.value)
     expandedGroups.value.add(label)
 })
+
+/** 多子项分组的表头点击：icon 折叠态先展开侧栏再开组；展开态切换开合。 */
+function onGroupClick(group: NavGroup) {
+  if (state.value === 'collapsed' && !isMobile.value) {
+    setOpen(true)
+    expandedGroups.value.add(group.label)
+    return
+  }
+  toggleGroup(group.label)
+}
+
+/** 移动端点导航链接后收起抽屉。 */
+function onNavigate() {
+  if (isMobile.value)
+    setOpenMobile(false)
+}
 </script>
 
 <template>
-  <aside
-    class="flex flex-col h-screen shrink-0 border-r border-line transition-[width] duration-[var(--dur-base)] ease-[var(--ease-snappy)]"
-    :class="collapsed ? 'w-[var(--sidebar-w-collapsed)]' : 'w-[var(--sidebar-w)]'"
-    :style="{ background: 'rgb(255 255 255 / 82%)', backdropFilter: 'var(--sidebar-blur)' }"
-  >
-    <!-- 品牌 -->
-    <div class="flex items-center h-[var(--header-h)] px-4 shrink-0">
-      <div
-        class="flex items-center justify-center w-8 h-8 rounded-[var(--radius-btn)] bg-brand text-white font-800 text-14px"
-      >
-        瑞
-      </div>
-      <span
-        v-if="!collapsed"
-        class="ml-2.5 text-17px font-500 text-ink whitespace-nowrap"
-      >
-        瑞航CRM
-      </span>
-    </div>
+  <Sidebar variant="inset" collapsible="icon">
+    <!-- 品牌：点击回首页 -->
+    <SidebarHeader>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" as-child tooltip="瑞航CRM · 首页">
+            <NuxtLink to="/" @click="onNavigate">
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-btn)] bg-brand text-14px font-800 text-white"
+                aria-hidden="true"
+              >瑞</span>
+              <span class="text-15px font-600 text-ink">瑞航CRM</span>
+            </NuxtLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarHeader>
 
-    <!-- 导航 -->
-    <nav class="flex-1 overflow-y-auto px-2.5 pb-4">
-      <div v-for="group in navGroups" :key="group.label" class="mb-1">
-        <!-- 一级菜单 -->
-        <button
-          class="flex items-center w-full px-2 py-2 rounded-[var(--radius-btn)] text-left transition-colors duration-[var(--dur-fast)]"
-          :class="activeGroups.has(group.label)
-            ? 'bg-brand-soft text-brand-deep font-800 shadow-[inset_3px_0_0_var(--brand)] border border-white/50'
-            : 'text-ink-soft hover:bg-surface-3'"
-          :style="activeGroups.has(group.label) ? { backdropFilter: 'blur(9px)' } : {}"
-          @click="collapsed ? $emit('toggle') : toggleGroup(group.label)"
-        >
-          <!-- 中文单字方块 -->
-          <div
-            class="flex items-center justify-center w-7 h-7 rounded-[6px] text-13px font-800 shrink-0"
-            :class="activeGroups.has(group.label)
-              ? 'bg-brand text-white'
-              : 'bg-surface-2 text-ink-soft'"
-          >
-            {{ group.char }}
-          </div>
-          <template v-if="!collapsed">
-            <span class="ml-2.5 text-13px whitespace-nowrap">{{ group.label }}</span>
-            <span
-              v-if="group.children.length > 1"
-              class="i-lucide-chevron-down ml-auto text-11px transition-transform duration-[var(--dur-fast)]"
-              :class="expandedGroups.has(group.label) ? 'rotate-180' : ''"
-            />
-          </template>
-        </button>
+    <SidebarContent>
+      <SidebarGroup>
+        <SidebarMenu>
+          <SidebarMenuItem v-for="group in navGroups" :key="group.label">
+            <!-- 单子项分组：直接导航 -->
+            <SidebarMenuButton
+              v-if="group.children.length <= 1"
+              size="lg"
+              as-child
+              :tooltip="group.label"
+              :is-active="activeGroups.has(group.label)"
+              :class="activeGroups.has(group.label) ? 'shadow-[inset_3px_0_0_var(--brand)]' : ''"
+            >
+              <NuxtLink :to="group.children[0]?.to ?? '/'" @click="onNavigate">
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-13px font-800"
+                  :class="activeGroups.has(group.label) ? 'bg-brand text-white' : 'bg-surface-2 text-ink-soft'"
+                  aria-hidden="true"
+                >{{ group.char }}</span>
+                <span>{{ group.label }}</span>
+              </NuxtLink>
+            </SidebarMenuButton>
 
-        <!-- 子菜单 -->
-        <div
-          v-if="!collapsed && expandedGroups.has(group.label) && group.children.length > 1"
-          class="ml-9 mt-0.5"
-        >
-          <NuxtLink
-            v-for="child in group.children"
-            :key="child.to"
-            :to="child.to"
-            class="block px-2.5 py-1.5 text-12px rounded-[4px] transition-colors duration-[var(--dur-fast)]"
-            :class="route.path === child.to || route.path.startsWith(child.to + '/')
-              ? 'text-brand-deep font-600 bg-brand-soft/40'
-              : 'text-ink-soft hover:text-ink hover:bg-surface-3'"
-          >
-            {{ child.label }}
-          </NuxtLink>
-        </div>
-      </div>
-    </nav>
+            <!-- 多子项分组：展开/收起子菜单 -->
+            <template v-else>
+              <SidebarMenuButton
+                size="lg"
+                :tooltip="group.label"
+                :is-active="activeGroups.has(group.label)"
+                :class="activeGroups.has(group.label) ? 'shadow-[inset_3px_0_0_var(--brand)]' : ''"
+                @click="onGroupClick(group)"
+              >
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] text-13px font-800"
+                  :class="activeGroups.has(group.label) ? 'bg-brand text-white' : 'bg-surface-2 text-ink-soft'"
+                  aria-hidden="true"
+                >{{ group.char }}</span>
+                <span>{{ group.label }}</span>
+                <span
+                  class="i-lucide-chevron-down ml-auto h-[13px] w-[13px] shrink-0 text-ink-faint transition-transform duration-[var(--dur-fast)]"
+                  :class="expandedGroups.has(group.label) ? 'rotate-180' : ''"
+                  aria-hidden="true"
+                />
+              </SidebarMenuButton>
 
-    <!-- 收起按钮 -->
-    <button
-      class="flex items-center justify-center h-10 border-t border-line text-ink-faint hover:text-brand transition-colors cursor-pointer"
-      @click="$emit('toggle')"
-    >
-      <span
-        class="text-16px transition-transform duration-[var(--dur-base)]"
-        :class="collapsed ? 'i-lucide-panel-left-open' : 'i-lucide-panel-left-close'"
-      />
-    </button>
-  </aside>
+              <SidebarMenuSub v-if="expandedGroups.has(group.label)">
+                <SidebarMenuSubItem v-for="child in group.children" :key="child.to">
+                  <SidebarMenuSubButton as-child :is-active="isChildActive(child.to)">
+                    <NuxtLink :to="child.to" @click="onNavigate">
+                      <span>{{ child.label }}</span>
+                    </NuxtLink>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              </SidebarMenuSub>
+            </template>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+    </SidebarContent>
+
+    <SidebarRail />
+  </Sidebar>
 </template>
