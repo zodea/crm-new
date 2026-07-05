@@ -102,8 +102,8 @@
   /* shadcn 圆角基准 = 按钮圆角(8px)，md/sm/xl 由 uno.config 派生 */
   --radius: var(--radius-btn);
 
-  /* 浮层遮罩（ADR 0003：品牌色轻遮罩，不上毛玻璃）*/
-  --overlay: rgb(42 89 150 / 28%);
+  /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
+  --overlay: rgb(0 0 0 / 28%);
 
   /* ── shadcn Sidebar 语义令牌（ui/sidebar 组件套消费）──
      背景 = 项目毛玻璃白 82%（配 backdrop-blur 用，保留双层风格特色），
