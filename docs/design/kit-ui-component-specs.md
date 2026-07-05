@@ -1,8 +1,10 @@
 # KitUI 交互原语组件规格（可落地模板）
 
+> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文的**结构锚点、变体/状态、配色令牌、行为规则、调用签名仍然有效**（那是设计语言，与实现无关）。迁移映射见 [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md)。
+
 把每类交互敲定的方向翻译成**照着就能写组件**的规格:结构锚点、变体/状态、配色令牌、行为规则、调用签名。与另外两份分工:方向从 [interaction-style-references.md](./interaction-style-references.md) 挑,为什么这么定见 `docs/adr/`,本文只答「照着怎么写」。
 
-- 技术栈:Nuxt 4 + Vue 3 + UnoCSS,SSR 关闭。统一入口 `app/composables/useKitUI.ts`,单宿主 `app/components/shared/KitUIHost.vue`。
+- 技术栈:Nuxt 4 + Vue 3 + UnoCSS,SSR 关闭;交互底座 shadcn-vue(reka-ui)+vue-sonner。统一入口 `app/composables/useKitUI.ts`,单宿主 `app/components/shared/KitUIHost.vue`。
 - dev 验证载体:`/dev/kit-ui`。令牌见 `app/assets/css/tokens.css`。
 
 ---
