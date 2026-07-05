@@ -29,6 +29,15 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 - **`vue-testing-best-practices`** / **`vitest`**——组件测试、mock、覆盖率、测试筛选。
 - **`pnpm`** / **`vite`**——依赖管理(catalog / override / patch)与构建配置。
 
+**数据流决策阶梯**(够用就停、别越级;先问「这份数据归谁拥有」):
+
+1. **父 → 直接子**:`props` 向下、`emits` 向上(单向默认);子组件是「一个可双向的单值」(表单输入、开关、搜索框)时才用 `defineModel()` / `v-model`。
+2. **同一功能内的深层子树**(父→…→孙,超过约 3 层):别逐层 prop 钻,用 `provide/inject` + `InjectionKey`,mutation 收在 provider、只暴露显式 action。
+3. **跨界面 / 需持久化 / 领域共享数据**(项目、分供方、发票、送货…):**Pinia store**,唯一写路径走 action。
+4. **只共享「行为/逻辑」而非「数据归属」**(剪贴板、定时器、校验、可复用交互):**composable**(带响应式状态)或纯 **util**(无状态)。
+
+判定捷径:数据归某界面/组件树 → 本地(1/2);归业务领域、多界面都要读写 → Pinia(3)。`v-model` 只是阶梯 1「双向单值」的语法糖,**不是**跨界面通信工具——想拿它在两页面间传数据,就是该上 Pinia 的信号。
+
 ## 交互原语设计语言(KitUI)
 
 全局交互原语在 `app/composables/useKitUI.ts` + 单宿主 `app/components/shared/KitUIHost.vue`;dev 验证载体 `/dev/kit-ui`。
