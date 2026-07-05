@@ -45,7 +45,8 @@ const hold = ref<HoldState | null>(null) // 非空 = cascade 挂起中
 const remainingMs = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
-const cancelBtnRef = ref<HTMLButtonElement | null>(null)
+// shadcn Button 组件实例（聚焦取 $el）
+const cancelBtnRef = ref<{ $el?: HTMLButtonElement } | null>(null)
 
 const holding = computed(() => hold.value?.phase === 'pending')
 const confirmEnabled = computed(() => isConfirmEnabled(props.requireTyping, typed.value))
@@ -100,7 +101,7 @@ function onOpenChange(value: boolean) {
 // 危险操作焦点默认停在「取消」（安全选项，规格 §01）。
 function onOpenAutoFocus(e: Event) {
   e.preventDefault()
-  nextTick(() => cancelBtnRef.value?.focus())
+  nextTick(() => cancelBtnRef.value?.$el?.focus())
 }
 
 watch(() => props.open, (open) => {
@@ -160,17 +161,13 @@ onBeforeUnmount(stopTimer)
         >
       </div>
 
-      <!-- footer -->
+      <!-- footer（按钮统一走 shadcn Button 变体：ghost=取消 / destructive=确认 / default=品牌蓝撤销） -->
       <div class="flex justify-end gap-2 mt-5">
         <!-- 挂起中：显眼「撤销」（品牌蓝＝安全逃生口） -->
         <template v-if="holding">
-          <button
-            type="button"
-            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-700 rounded-[var(--radius-btn)] border border-brand bg-brand text-white cursor-pointer transition-opacity hover:opacity-90"
-            @click="onCancel"
-          >
+          <Button @click="onCancel">
             撤销（{{ remainingSec }}s 内可停）
-          </button>
+          </Button>
           <span class="inline-flex items-center gap-1.5 px-3 text-13px text-danger-ink">
             <span class="i-lucide-loader-circle animate-spin text-14px" />
             删除中…
@@ -178,22 +175,16 @@ onBeforeUnmount(stopTimer)
         </template>
         <!-- 常态 footer：取消 ghost 左 · 确认 danger 右 -->
         <template v-else>
-          <button
-            ref="cancelBtnRef"
-            type="button"
-            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-transparent text-ink-soft cursor-pointer transition-colors hover:bg-surface-3 hover:text-ink"
-            @click="onCancel"
-          >
+          <Button ref="cancelBtnRef" variant="ghost" @click="onCancel">
             {{ cancelLabel }}
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center justify-center px-4 py-1.5 text-13px font-600 rounded-[var(--radius-btn)] border border-danger bg-danger text-white cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          </Button>
+          <Button
+            variant="destructive"
             :disabled="variant === 'cascade' && !confirmEnabled"
             @click="onConfirm"
           >
             {{ confirmLabel }}
-          </button>
+          </Button>
         </template>
       </div>
     </DialogContent>

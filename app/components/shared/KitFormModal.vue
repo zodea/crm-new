@@ -136,12 +136,12 @@ function onOpenAutoFocus(e: Event) {
         </div>
       </div>
 
-      <!-- 底部操作栏（固定，吸底） -->
+      <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
       <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
-        <button type="button" class="btn-secondary" @click="emit('cancel')">取消</button>
-        <button type="button" class="btn-primary" @click="handleSave">
+        <Button variant="outline" @click="emit('cancel')">取消</Button>
+        <Button @click="handleSave">
           {{ options.saveText ?? '保存' }}
-        </button>
+        </Button>
       </div>
     </DialogContent>
   </Dialog>

@@ -15,17 +15,11 @@ const {
 <template>
   <ToastHost />
 
+  <!-- ConfirmOptions 字段名与 ConfirmDialog props 同名，整包 v-bind 透传：
+       新增 confirm 选项只需改 ConfirmOptions 类型 + ConfirmDialog，宿主零改动 -->
   <ConfirmDialog
     :open="!!confirmState"
-    :variant="confirmOpts?.variant"
-    :title="confirmOpts?.title"
-    :message="confirmOpts?.message ?? ''"
-    :count="confirmOpts?.count"
-    :impact="confirmOpts?.impact"
-    :require-typing="confirmOpts?.requireTyping"
-    :hold-ms="confirmOpts?.holdMs"
-    :confirm-label="confirmOpts?.confirmLabel"
-    :cancel-label="confirmOpts?.cancelLabel"
+    v-bind="confirmOpts ?? { message: '' }"
     @confirm="resolveConfirm(true)"
     @cancel="resolveConfirm(false)"
   />

@@ -44,6 +44,9 @@ function emit(opts: PushOptions): ToastId {
     duration: opts.duration,
     toasterId: toasterOf(lane),
     action: opts.action,
+    // 自动消失/手动关闭都清掉泳道记账，防 laneById 只增不减
+    onDismiss: (t: { id: ToastId }) => laneById.delete(t.id),
+    onAutoClose: (t: { id: ToastId }) => laneById.delete(t.id),
   }
   let id: ToastId
   switch (type) {
@@ -101,6 +104,9 @@ function update(id: ToastId, patch: { type?: ToastType, message?: string, descri
     description: patch.description,
     duration: patch.duration,
     toasterId: toasterOf(lane),
+    // upsert 会整体替换选项，清账回调必须随每次 update 重新携带
+    onDismiss: (t: { id: ToastId }) => laneById.delete(t.id),
+    onAutoClose: (t: { id: ToastId }) => laneById.delete(t.id),
   }
   const msg = patch.message ?? ''
   switch (type) {
