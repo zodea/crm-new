@@ -19,8 +19,8 @@
 |---|---|---|---|---|
 | `confirm`(simple/batch/cascade) | `ConfirmDialog.vue` | `Dialog`(reka-ui) | ADR 0003：打字门控、预提交挂起 ≥3s、cascade 杀伤清单、batch 计数、10s undoToast | ✅ 焦点陷阱/Esc/遮罩/焦点返回交给 reka，复用 confirm.ts |
 | `formModal` | `KitFormModal.vue` | `Dialog` + 原生控件 | 字段配置驱动、必填校验、改则清红错、错误贴字段下方、长表单吸底 footer、可配宽度 | ✅ 复用 form-modal.ts |
-| `toast` 家族 | `ToastHost.vue`/`ToastCard.vue`/`useToast.ts` | `vue-sonner`（Sonner 风格，本就是既定方向） | 双泳道：system 右上 / process 右下；`promise()` 转圈自动成败；hover 暂停；`undoToast` 10s | ⬜ |
-| `KitUIHost` | 单宿主 | Sonner `<Toaster>` + `<Dialog>` teleport | 全局单挂载点 | ⬜ |
+| `toast` 家族 | `ToastHost.vue`/`useToast.ts` | `vue-sonner` 双 Toaster | 双泳道 = 两个 Toaster（system expand 右上 / process 折叠右下、新消息最上层）；`toasterId` 路由；promise/hover 暂停/action(undo) 全用原生。删掉自研计时器/暂停/堆叠。`ToastCard.vue` 已删。 | ✅ |
+| `KitUIHost` | 单宿主 | 两个 `<Toaster>` + `<Dialog>` | 全局单挂载点（宿主 template 不变，内部 ToastHost 换实现） | ✅ |
 
 > `useKitUI()` 导出的 `toast/success/error/warning/info/loading/promise/updateToast/dismissToast/undoToast/confirm/formModal` **签名逐一保持**，业务页面零改动。
 
@@ -40,9 +40,9 @@
 
 > 注：`app/components/ui/*.vue` 里若有用户并行设计新增的未跟踪副本（Metric/SegTab/SearchInput 等），迁移时就地对齐，勿与其冲突。
 
-## vue-sonner 待装
+## 依赖现状
 
-toast 迁移前需 `pnpm add vue-sonner`（Sonner 的 Vue 版，非 Tailwind 依赖）。
+`reka-ui` + `class-variance-authority` + `clsx` + `vue-sonner` 已装（**无** tailwindcss/tailwind-merge/tailwindcss-animate）。
 
 ## 收尾
 

@@ -1,29 +1,23 @@
-// Sonner 风格 toast 状态层（双泳道）。
-// - system 道（expand）：系统消息 / 需确认后的结果类，展开可读，右上。
-// - process 道（collapse）：上传/识别等过程提示，重叠堆叠省空间、hover 展开，右下。
-// 兼容旧 API：success/error/warning/info/show/undo/dismiss 一律进 system 道。
+// Sonner 风格 toast（双泳道）——底座换为 vue-sonner，本文件仅是「保持既有签名」的薄封装。
+// 计时器 / hover 暂停 / 堆叠 / promise / action 全部交给 vue-sonner 原生实现（少维护）。
+// 双泳道用 vue-sonner 的多 Toaster 路由（toasterId）：
+//   - system 道（右上，展开可读）：系统消息 / 需确认后的结果类。
+//   - process 道（右下，折叠堆叠、hover 展开、新消息最上层）：上传/识别等过程提示。
+// 公共 API（success/error/warning/info/show/loading/promise/undo/update/dismiss）签名不变，
+// 页面与 useKitUI 无感。Toaster 宿主见 components/shared/ToastHost.vue。
+import { toast as sonner } from 'vue-sonner'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading' | 'default'
 export type ToastLane = 'system' | 'process'
 
+export const TOASTER_SYSTEM = 'system'
+export const TOASTER_PROCESS = 'process'
+
+type ToastId = string | number
+
 interface ToastAction {
   label: string
   onClick: () => void
-}
-
-export interface Toast {
-  id: number
-  lane: ToastLane
-  type: ToastType
-  message: string
-  description?: string
-  /** ms；Infinity = 不自动关闭（loading 态） */
-  duration: number
-  action?: ToastAction
-  /** 到期时间戳（0=不自动关闭）；hover 暂停用 */
-  expiresAt: number
-  /** hover 暂停时记录的剩余毫秒（内部） */
-  remaining?: number
 }
 
 interface PushOptions {
@@ -35,149 +29,114 @@ interface PushOptions {
   action?: ToastAction
 }
 
-const toasts = ref<Toast[]>([])
-let nextId = 0
-const timers = new Map<number, ReturnType<typeof setTimeout>>()
-const pausedLanes = new Set<ToastLane>()
+// 记住每条 toast 落在哪个泳道，供 update/dismiss 定向到同一 Toaster
+const laneById = new Map<ToastId, ToastLane>()
 
-function clearTimer(id: number) {
-  const h = timers.get(id)
-  if (h) {
-    clearTimeout(h)
-    timers.delete(id)
-  }
+function toasterOf(lane: ToastLane) {
+  return lane === 'process' ? TOASTER_PROCESS : TOASTER_SYSTEM
 }
 
-function arm(id: number, ms: number) {
-  clearTimer(id)
-  const t = toasts.value.find(x => x.id === id)
-  if (!t) return
-  // 泳道被 hover 暂停时：只记剩余时间，不启动倒计时（含 promise 解析后的续期）
-  if (pausedLanes.has(t.lane)) {
-    t.remaining = ms
-    t.expiresAt = 0
-    return
-  }
-  t.expiresAt = Date.now() + ms
-  timers.set(id, setTimeout(() => dismiss(id), ms))
-}
-
-function dismiss(id: number) {
-  clearTimer(id)
-  const i = toasts.value.findIndex(t => t.id === id)
-  if (i !== -1) toasts.value.splice(i, 1)
-}
-
-function push(opts: PushOptions): number {
-  const id = nextId++
+function emit(opts: PushOptions): ToastId {
+  const lane = opts.lane ?? 'system'
   const type = opts.type ?? 'default'
-  const duration = opts.duration ?? (type === 'loading' ? Infinity : 3500)
-  toasts.value.push({
-    id,
-    lane: opts.lane ?? 'system',
-    type,
-    message: opts.message,
+  const common = {
     description: opts.description,
+    duration: opts.duration,
+    toasterId: toasterOf(lane),
     action: opts.action,
-    duration,
-    expiresAt: 0,
-  })
-  if (Number.isFinite(duration) && duration > 0) arm(id, duration)
+  }
+  let id: ToastId
+  switch (type) {
+    case 'success': id = sonner.success(opts.message, common); break
+    case 'error': id = sonner.error(opts.message, common); break
+    case 'warning': id = sonner.warning(opts.message, common); break
+    case 'info': id = sonner.info(opts.message, common); break
+    case 'loading': id = sonner.loading(opts.message, { ...common, duration: opts.duration ?? Number.POSITIVE_INFINITY }); break
+    default: id = sonner(opts.message, common)
+  }
+  laneById.set(id, lane)
   return id
-}
-
-/** 原地更新一条 toast（promise 态迁移用：loading → success/error） */
-function update(id: number, patch: Partial<Omit<Toast, 'id'>>) {
-  const t = toasts.value.find(x => x.id === id)
-  if (!t) return
-  Object.assign(t, patch)
-  const duration = patch.duration ?? t.duration
-  t.duration = duration
-  if (Number.isFinite(duration) && duration > 0) arm(id, duration)
-  else clearTimer(id)
 }
 
 // —— 语义快捷方式（system 道）——
 function show(message: string, type: ToastType = 'info', duration?: number) {
-  return push({ lane: 'system', type, message, duration })
+  return emit({ lane: 'system', type, message, duration })
 }
-const success = (msg: string, description?: string) => push({ lane: 'system', type: 'success', message: msg, description })
-const error = (msg: string, description?: string) => push({ lane: 'system', type: 'error', message: msg, description })
-const warning = (msg: string, description?: string) => push({ lane: 'system', type: 'warning', message: msg, description })
-const info = (msg: string, description?: string) => push({ lane: 'system', type: 'info', message: msg, description })
+const success = (msg: string, description?: string) => emit({ lane: 'system', type: 'success', message: msg, description })
+const error = (msg: string, description?: string) => emit({ lane: 'system', type: 'error', message: msg, description })
+const warning = (msg: string, description?: string) => emit({ lane: 'system', type: 'warning', message: msg, description })
+const info = (msg: string, description?: string) => emit({ lane: 'system', type: 'info', message: msg, description })
 
-// —— 过程提示（process 道，重叠堆叠）——
+// —— 过程提示（process 道，折叠堆叠）——
 /** 加载态 toast（不自动关闭），返回 id，后续用 update/dismiss 收尾 */
 function loading(message: string, opts?: { lane?: ToastLane, description?: string }) {
-  return push({ lane: opts?.lane ?? 'process', type: 'loading', message, description: opts?.description, duration: Infinity })
+  return emit({ lane: opts?.lane ?? 'process', type: 'loading', message, description: opts?.description })
 }
 
-/** HeroUI 式 promise toast：加载中 → 自动变成功/失败 */
+/** HeroUI 式 promise toast：加载中 → 自动变成功/失败（vue-sonner 原生） */
 function promise<T>(p: Promise<T>, opts: {
   loading: string
   success: string | ((v: T) => string)
   error: string | ((e: unknown) => string)
   lane?: ToastLane
 }): Promise<T> {
-  const id = push({ lane: opts.lane ?? 'process', type: 'loading', message: opts.loading, duration: Infinity })
-  p.then((v) => {
-    update(id, { type: 'success', message: typeof opts.success === 'function' ? opts.success(v) : opts.success, duration: 3500 })
-  }).catch((e) => {
-    update(id, { type: 'error', message: typeof opts.error === 'function' ? opts.error(e) : opts.error, duration: 5000 })
+  sonner.promise(p, {
+    loading: opts.loading,
+    success: (v: T) => (typeof opts.success === 'function' ? opts.success(v) : opts.success),
+    error: (e: unknown) => (typeof opts.error === 'function' ? opts.error(e) : opts.error),
+    toasterId: toasterOf(opts.lane ?? 'process'),
   })
   return p
 }
 
-/** 撤回 toast（软删除限时撤回，system 道，见 CONTEXT.md「撤回」；ADR 0003：窗口 10 秒） */
-function undo(message: string, onUndo: () => void, ms = 10000) {
-  const id = nextId++
-  let settled = false
-  const run = () => {
-    if (settled) return
-    settled = true
-    dismiss(id)
-    onUndo()
-    success('已撤回')
-  }
-  toasts.value.push({
+/**
+ * 原地更新一条 toast（promise 态迁移用：loading → success/error）。
+ * 定向回原泳道对应的 Toaster；无 type 时按 loading 续显。
+ */
+function update(id: ToastId, patch: { type?: ToastType, message?: string, description?: string, duration?: number }) {
+  const lane = laneById.get(id) ?? 'process'
+  const type = patch.type ?? 'loading'
+  const common = {
     id,
-    lane: 'system',
-    type: 'info',
-    message,
-    duration: ms,
-    action: { label: '撤回', onClick: run },
-    expiresAt: 0,
-  })
-  if (ms > 0) arm(id, ms)
-  return id
+    description: patch.description,
+    duration: patch.duration,
+    toasterId: toasterOf(lane),
+  }
+  const msg = patch.message ?? ''
+  switch (type) {
+    case 'success': sonner.success(msg, common); break
+    case 'error': sonner.error(msg, common); break
+    case 'warning': sonner.warning(msg, common); break
+    case 'info': sonner.info(msg, common); break
+    case 'loading': sonner.loading(msg, { ...common, duration: patch.duration ?? Number.POSITIVE_INFINITY }); break
+    default: sonner(msg, common)
+  }
 }
 
-// —— hover 暂停/恢复计时（按泳道）——
-function pauseLane(lane: ToastLane) {
-  pausedLanes.add(lane)
-  const now = Date.now()
-  for (const t of toasts.value) {
-    if (t.lane === lane && t.expiresAt) {
-      clearTimer(t.id)
-      t.remaining = Math.max(0, t.expiresAt - now)
-      t.expiresAt = 0
-    }
-  }
+function dismiss(id: ToastId) {
+  sonner.dismiss(id)
+  laneById.delete(id)
 }
-function resumeLane(lane: ToastLane) {
-  pausedLanes.delete(lane)
-  for (const t of toasts.value) {
-    if (t.lane === lane && t.remaining != null) {
-      const ms = t.remaining
-      t.remaining = undefined
-      arm(t.id, ms)
-    }
-  }
+
+/** 撤回 toast（软删除限时撤回，system 道；ADR 0003：窗口 10 秒） */
+function undo(message: string, onUndo: () => void, ms = 10000): ToastId {
+  return emit({
+    lane: 'system',
+    type: 'default',
+    message,
+    duration: ms,
+    action: {
+      label: '撤回',
+      onClick: () => {
+        onUndo()
+        success('已撤回')
+      },
+    },
+  })
 }
 
 export function useToast() {
   return {
-    toasts: readonly(toasts),
     show,
     success,
     error,
@@ -188,7 +147,5 @@ export function useToast() {
     undo,
     update,
     dismiss,
-    pauseLane,
-    resumeLane,
   }
 }

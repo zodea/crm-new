@@ -1,96 +1,80 @@
 <script setup lang="ts">
-const { toasts, dismiss, pauseLane, resumeLane } = useToast()
-
-// system 道（expand，右上）：newest 在上
-const systemStack = computed(() => toasts.value.filter(t => t.lane === 'system').slice().reverse())
-// process 道（collapse pile，右下）：newest 在前（idx 0）
-const processStack = computed(() => toasts.value.filter(t => t.lane === 'process').slice().reverse())
-
-// —— process pile 堆叠参数（对齐 Sonner）——
-const GAP = 14
-const EST_H = 58 // 过程提示多为单行，用估算高度做展开偏移
-const PEEK = 16 // 折叠态每层露出的高度
-const VISIBLE = 3
-const processHover = ref(false)
-
-function stackStyle(idx: number) {
-  if (processHover.value) {
-    return {
-      transform: `translateY(${-(idx * (EST_H + GAP))}px) scale(1)`,
-      opacity: idx < 8 ? '1' : '0',
-      zIndex: String(200 - idx),
-      transformOrigin: 'bottom center',
-    }
-  }
-  const scale = Math.max(0.82, 1 - idx * 0.05)
-  return {
-    transform: `translateY(${-(idx * PEEK)}px) scale(${scale})`,
-    opacity: idx < VISIBLE ? '1' : '0',
-    zIndex: String(200 - idx),
-    transformOrigin: 'bottom center',
-  }
-}
-
-const pileHeight = computed(() => {
-  const n = processStack.value.length
-  if (n === 0) return '0px'
-  if (processHover.value) return `${n * (EST_H + GAP)}px`
-  return `${EST_H + Math.min(n - 1, VISIBLE - 1) * PEEK}px`
-})
+// 双泳道 toast 宿主 —— vue-sonner 的两个 Toaster（多 Toaster 路由，toasterId 见 useToast.ts）。
+// system 道：右上、expand（展开可读）；process 道：右下、折叠堆叠、hover 展开、新消息最上层。
+// 计时/暂停/堆叠/promise/action 全由 vue-sonner 原生负责。皮肤经下方全局样式桥接项目令牌。
+import { Toaster } from 'vue-sonner'
+import 'vue-sonner/style.css'
 </script>
 
 <template>
-  <!-- system 道：右上，展开可读 -->
-  <Teleport to="body">
-    <div
-      class="fixed top-4 right-4 z-[9999] w-[356px] flex flex-col gap-3"
-      @mouseenter="pauseLane('system')"
-      @mouseleave="resumeLane('system')"
-    >
-      <TransitionGroup
-        move-class="transition-transform duration-[280ms] ease-[var(--ease-snappy)]"
-        enter-active-class="transition-all duration-[240ms] ease-[var(--ease-snappy)]"
-        leave-active-class="transition-all duration-[180ms] ease-[var(--ease-snappy)] absolute w-[356px]"
-        enter-from-class="translate-x-[110%] opacity-0"
-        leave-to-class="translate-x-[110%] opacity-0"
-      >
-        <ToastCard
-          v-for="t in systemStack"
-          :key="t.id"
-          :toast="t"
-          @dismiss="dismiss"
-        />
-      </TransitionGroup>
-    </div>
-  </Teleport>
-
-  <!-- process 道：右下，折叠重叠 + hover 展开 -->
-  <Teleport to="body">
-    <div
-      class="fixed bottom-4 right-4 z-[9998] w-[356px] transition-[height] duration-[300ms] ease-[var(--ease-snappy)]"
-      :style="{ height: pileHeight }"
-      @mouseenter="processHover = true; pauseLane('process')"
-      @mouseleave="processHover = false; resumeLane('process')"
-    >
-      <TransitionGroup
-        enter-active-class="transition-opacity duration-[220ms] ease-[var(--ease-snappy)]"
-        leave-active-class="transition-opacity duration-[180ms] ease-[var(--ease-snappy)]"
-        enter-from-class="opacity-0"
-        leave-to-class="opacity-0"
-      >
-        <div
-          v-for="(t, idx) in processStack"
-          :key="t.id"
-          class="absolute bottom-0 right-0 w-full"
-        >
-          <div
-            class="w-full transition-all duration-[300ms] ease-[var(--ease-snappy)]"
-            :style="stackStyle(idx)"
-          >
-            <ToastCard :toast="t" @dismiss="dismiss" />
-          </div>
-        </div>
-      </TransitionGroup>
-    </div>
-  </Teleport>
+  <!-- system 道：右上，展开可读（系统消息 / 需确认后的结果 / undo） -->
+  <Toaster
+    id="system"
+    position="top-right"
+    :expand="true"
+    :visible-toasts="6"
+    :offset="16"
+    :gap="12"
+  />
+  <!-- process 道：右下，折叠堆叠 + hover 展开（上传/识别等过程提示） -->
+  <Toaster
+    id="process"
+    position="bottom-right"
+    :expand="false"
+    :visible-toasts="3"
+    :offset="16"
+    :gap="12"
+  />
 </template>
+
+<style>
+/* vue-sonner 令牌桥接（sonner 走 body 传送门，用非 scoped 全局样式）。
+   不启 richColors，改为按 data-type 覆盖 --normal-* 三元组，套项目品牌语义色。 */
+[data-sonner-toaster] {
+  --normal-bg: var(--panel);
+  --normal-border: var(--line);
+  --normal-text: var(--ink);
+  --border-radius: var(--radius-card);
+  font-family: var(--font-sans);
+}
+
+[data-sonner-toast] {
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
+}
+
+[data-sonner-toast] [data-title] {
+  font-weight: 600;
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--ink-soft);
+}
+
+[data-sonner-toast][data-type='success'] {
+  --normal-bg: var(--ok-soft);
+  --normal-border: var(--ok);
+  --normal-text: var(--ok-ink);
+}
+[data-sonner-toast][data-type='error'] {
+  --normal-bg: var(--danger-soft);
+  --normal-border: var(--danger);
+  --normal-text: var(--danger-ink);
+}
+[data-sonner-toast][data-type='warning'] {
+  --normal-bg: var(--warn-soft);
+  --normal-border: var(--warn);
+  --normal-text: var(--warn-ink);
+}
+[data-sonner-toast][data-type='info'] {
+  --normal-border: var(--brand);
+}
+
+/* 撤回等 action 按钮：品牌蓝 */
+[data-sonner-toast] [data-button] {
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+}
+</style>
