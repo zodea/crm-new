@@ -11,13 +11,14 @@
 | 令牌桥接 | `tokens.css` shadcn 语义变量 → 现有设计令牌；`uno.config.ts` 注册语义色 + 圆角阶梯 ✅ |
 | 动画 | `uno.config.ts` `rules`+`preflights` 原生移植 animate-in/out/fade/zoom/slide ✅ |
 | 探针 | `app/components/ui/button/`（Button + buttonVariants）✅ |
+| Dialog 组件集 | `app/components/ui/dialog/`（Dialog/Content/Title/Description/Header/Footer，reka-ui 透传 + 令牌皮肤 + dialog-in/out 居中动画）✅ |
 
 ## 交互原语（`useKitUI()` 签名不变，仅换实现）
 
 | KitUI 原语 | 旧实现 | shadcn-vue 对应 | 保留的行为契约 | 状态 |
 |---|---|---|---|---|
-| `confirm`(simple/batch/cascade) | `ConfirmDialog.vue` | `AlertDialog`(reka-ui) | ADR 0003：打字门控、预提交挂起 ≥3s、cascade 杀伤清单、batch 计数、10s undoToast | ⬜ |
-| `formModal` | `KitFormModal.vue` | `Dialog` + `Input`/`Label`/`Select` | 字段配置驱动、必填 + 失焦校验、错误贴字段下方、长表单吸底 footer | ⬜ |
+| `confirm`(simple/batch/cascade) | `ConfirmDialog.vue` | `Dialog`(reka-ui) | ADR 0003：打字门控、预提交挂起 ≥3s、cascade 杀伤清单、batch 计数、10s undoToast | ✅ 焦点陷阱/Esc/遮罩/焦点返回交给 reka，复用 confirm.ts |
+| `formModal` | `KitFormModal.vue` | `Dialog` + 原生控件 | 字段配置驱动、必填校验、改则清红错、错误贴字段下方、长表单吸底 footer、可配宽度 | ✅ 复用 form-modal.ts |
 | `toast` 家族 | `ToastHost.vue`/`ToastCard.vue`/`useToast.ts` | `vue-sonner`（Sonner 风格，本就是既定方向） | 双泳道：system 右上 / process 右下；`promise()` 转圈自动成败；hover 暂停；`undoToast` 10s | ⬜ |
 | `KitUIHost` | 单宿主 | Sonner `<Toaster>` + `<Dialog>` teleport | 全局单挂载点 | ⬜ |
 
