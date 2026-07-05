@@ -104,6 +104,18 @@
 
   /* 浮层遮罩（ADR 0003：品牌色轻遮罩，不上毛玻璃）*/
   --overlay: rgb(42 89 150 / 28%);
+
+  /* ── shadcn Sidebar 语义令牌（ui/sidebar 组件套消费）──
+     背景 = 项目毛玻璃白 82%（配 backdrop-blur 用，保留双层风格特色），
+     active/hover = 品牌浅底 + 深字（沿用旧 AppSidebar 观感）。 */
+  --sidebar-background: rgb(255 255 255 / 82%);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-soft);
+  --sidebar-accent-foreground: var(--brand-deep);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--brand);
 }
 
 /* ── 全局重置 ── */

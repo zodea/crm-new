@@ -1,3 +1,4 @@
+// @unocss-include —— cva 变体类在本 .ts 内，UnoCSS 默认不扫纯 ts，此指令强制纳入提取。
 import { cva, type VariantProps } from 'class-variance-authority'
 
 export { default as Button } from './Button.vue'

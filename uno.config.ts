@@ -6,6 +6,12 @@ import {
 } from 'unocss'
 
 export default defineConfig({
+  // shadcn 组件的 cva 变体字符串在 index.ts 里（官方 registry 结构），
+  // UnoCSS 默认管线不扫纯 .ts —— 显式纳入 ui 目录的 .ts，否则变体类不生成。
+  content: {
+    filesystem: ['app/components/ui/**/*.ts'],
+  },
+
   presets: [
     presetWind3(),
     presetAttributify(),
@@ -71,6 +77,16 @@ export default defineConfig({
       border: 'var(--border)',
       input: 'var(--input)',
       ring: 'var(--ring)',
+      sidebar: {
+        DEFAULT: 'var(--sidebar-background)',
+        foreground: 'var(--sidebar-foreground)',
+        primary: 'var(--sidebar-primary)',
+        'primary-foreground': 'var(--sidebar-primary-foreground)',
+        accent: 'var(--sidebar-accent)',
+        'accent-foreground': 'var(--sidebar-accent-foreground)',
+        border: 'var(--sidebar-border)',
+        ring: 'var(--sidebar-ring)',
+      },
     },
 
     // shadcn 圆角阶梯（lg = --radius，其余派生）；旧的 rounded-[3px]/rounded-full 不受影响
