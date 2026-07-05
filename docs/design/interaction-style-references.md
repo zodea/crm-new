@@ -9,7 +9,9 @@
 
 ---
 
-## Toast —— 已定：Sonner 风格双泳道（已实装）
+## Toast —— 已定：Sonner 风格双泳道（已实装 = vue-sonner，[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）
+
+> 实装底座：**vue-sonner 两个 Toaster**（`toasterId` 路由双泳道），非自研。下面的风格决策据此落地。
 
 - **决策**：走 [Sonner](https://sonner.emilkowal.ski/) 风格。分两条泳道：
   - **system 道**（右上，展开可读）：系统消息 + 需确认后的结果类。

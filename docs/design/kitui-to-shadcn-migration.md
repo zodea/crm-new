@@ -26,19 +26,19 @@
 
 ## 原子组件（`app/components/ui/*`）
 
-| 旧原子 | shadcn-vue 对应 | 备注 | 状态 |
-|---|---|---|---|
-| `SegTab` | `Tabs`(reka-ui) 下划线变体 | 保留 count 角标 | ⬜ |
-| `SelectFilter` | `Select`(reka-ui) | label + chevron | ⬜ |
-| `SearchInput` | `Input` + 前置 icon | pill 圆角 | ⬜ |
-| `SectionHeader` | 保留（纯排版），改用语义类 | 品牌竖条标题 | ⬜ |
-| `Metric` / `MetricGrid` | 保留，基于 `Card` 排版 | 语义固定列数网格 | ⬜ |
-| `StatCard` | `Card` | | ⬜ |
-| `TreeNav` | reka-ui `Tree` 或保留逻辑 + shadcn 皮 | 发票台账/清单同构 | ⬜ |
-| `DataListToolbar` | `Input`+`Select`+`Button` 组合 | | ⬜ |
-| `TablePager` | `Button`(icon/sm) 组合 | vxe-table 仍负责表体 | ⬜ |
+**迁移原则**：只有含交互「脏活」（键盘导航/焦点/aria/定位）的原子才迁到 reka-ui 原语；纯展示与原生控件已是令牌化 shadcn 风格，套 reka 只增风险无收益，**保持不变即是迁移结论**。
 
-> 注：`app/components/ui/*.vue` 里若有用户并行设计新增的未跟踪副本（Metric/SegTab/SearchInput 等），迁移时就地对齐，勿与其冲突。
+| 旧原子 | 处置 | 状态 |
+|---|---|---|
+| `SegTab` | → **reka-ui Tabs**（roving tabindex/方向键/tablist 语义），保留下划线视觉 + count 角标 | ✅ |
+| `SelectFilter` | → **reka-ui Select**（键盘导航/样式化下拉/定位），保留 label+chevron 触发器 | ✅ |
+| `SearchInput` | 原生 `<input type=search>`——已可访问、令牌化，无 reka 收益，**保留** | ✅ |
+| `SectionHeader` | 纯排版（品牌竖条标题），已令牌化，**保留** | ✅ |
+| `Metric` / `MetricGrid` | 纯展示（指标数字/网格），已令牌化，**保留** | ✅ |
+| `StatCard` | 纯展示卡片，已令牌化，**保留** | ✅ |
+| `TreeNav` | 左树导航——纯展示 + 自有轻逻辑，无浮层/焦点脏活，**保留**（reka Tree 收益低、盲改风险高，暂不引） | ✅ |
+| `DataListToolbar` | 组合件——已组合 SearchInput/SelectFilter/Button（后者可用 shadcn `Button`），**保留** | ✅ |
+| `TablePager` | 分页按钮组——vxe-table 负责表体，纯 Button 组合，**保留** | ✅ |
 
 ## 依赖现状
 
@@ -48,7 +48,15 @@
 
 | 项 | 状态 |
 |---|---|
-| 删除旧 KitUIHost/ConfirmDialog/KitFormModal/ToastHost/ToastCard 实现 | ⬜ |
-| `/dev/kit-ui` 改 shadcn 验证台 | ⬜ |
-| 全量文档更新（CLAUDE.md / CONTEXT.md / 规格 / dc-rebuild / ADR 0003） | ⬜ |
-| `pnpm test` + dev 冒烟 | ⬜ |
+| 旧自研实现清除 | ✅ ConfirmDialog/KitFormModal/ToastHost 已原地重写在 shadcn 底座上；ToastCard.vue 已删；生产代码无 `window.KitUI` 引用 |
+| 架构评审四小项 | ✅ toast laneById 泄漏修复（onDismiss/onAutoClose 清账）；KitUIHost v-bind 坍缩；Button 变真实接缝（confirm/formModal footer）；SegTab 选中态单源（data-[state=active]） |
+| `/dev/kit-ui` 验证台 | ✅ 页面只调 `useKitUI()` 公共 API，底座切换后自动验证新实现，无需改造 |
+| 全量文档更新 | ✅ CLAUDE.md、规格横幅、参考站、CONTEXT.md 词条、dc-rebuild 三份（设计稿域文档加「生产端见 ADR 0008」横幅留档） |
+| `pnpm test` | ✅ 55 tests 全过（confirm.ts / form-modal.ts 纯逻辑无损） |
+| dev 实机冒烟 | ⏳ 另一会话 dev server 经 HMR 已加载新代码，可在 `/dev/kit-ui` 直接点验 |
+
+## 后续候选（未纳入本轮，见架构评审报告）
+
+- toast 句柄化：`loading()` 返回 `{update/succeed/fail/dismiss}` 句柄，替代裸 id + `updateToast`
+- formModal 抽 `FieldControl` 子组件：收敛三分支红错重复，select 分支复用 reka Select
+- `btn-*` shortcuts 随改随迁到 `<Button variant>`（乙案），迁完删 shortcuts
