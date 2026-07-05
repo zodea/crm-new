@@ -78,7 +78,7 @@ function labelClass(r: Row): string {
         :style="{ paddingLeft: r.sub ? '24px' : '10px' }"
         @click="active = r.key"
       >
-        <span :class="[r.icon, iconClass(r), r.sub ? 'text-[12px]' : 'text-[14px]']" />
+        <span :class="[r.icon, iconClass(r), r.sub ? 'h-[12px] w-[12px]' : 'h-[14px] w-[14px]']" />
         <span
           class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
           :class="labelClass(r)"

@@ -27,7 +27,7 @@ const model = defineModel<string>()
         <option v-for="o in options" :key="o.key" :value="o.key">{{ o.label }}</option>
       </select>
       <span class="pointer-events-none absolute right-[9px] top-1/2 flex -translate-y-1/2">
-        <span class="i-lucide-chevron-down text-[14px] text-ink-faint" />
+        <span class="i-lucide-chevron-down h-[14px] w-[14px] text-ink-faint" />
       </span>
     </span>
   </label>

@@ -12,7 +12,7 @@ const model = defineModel<string>()
 <template>
   <div class="relative">
     <span class="absolute left-[12px] top-1/2 flex -translate-y-1/2">
-      <span class="i-lucide-search text-[14px] text-ink-faint" />
+      <span class="i-lucide-search h-[14px] w-[14px] text-ink-faint" />
     </span>
     <input
       v-model="model"
