@@ -39,7 +39,7 @@
 | 开票因子计算器 | `/finance/invoice/factor` | `finance-invoice.md` | ✅ 已确认 |
 | 开票申请 | `/finance/billing` | `finance-billing.md` | ⬜ 待设计 |
 | 收款登记 | `/finance/receipt` | `finance-receipt.md` | ⬜ 待设计 |
-| 收票登记（列表+详情） | `/finance/ticket` | `finance-ticket.md` | 🟡 有效果图，待写文档 |
+| 收票登记（查已归档发票） | `/finance/ticket` | — | ⚠️ ADR 0001：并入发票台账（`invoices` 单表），不再单独建表；项目详情「收票登记」Tab = 查已归档 invoices |
 | 付款申请（列表+详情） | `/finance/payment` | `finance-payment.md` | 🟡 有效果图，待写文档 |
 | 费用报销 | `/finance/reimbursement` | `finance-reimbursement.md` | ⬜ 待设计 |
 | 支付记录 | `/finance/records` | `finance-records.md` | ⬜ 待设计 |
@@ -89,6 +89,8 @@
 
 ## § 2 数据实体清单 — 6 大类 28 个实体
 
+> ⚠️ **数据实体与库设计以 `DATABASE.md` 为唯一权威源**。本节及 §3 为早期快照，可能滞后于 DATABASE.md，冲突一律以 DATABASE.md 为准（避免双写漂移）。已知废弃：`ticket_registrations`（→ 合并进 `invoices` 单表，ADR 0001）、`quantity_records`（→ `quantities`）、`payroll_records`（→ 拆为 `wage_statements` / `wage_statement_lines` / `attendance_records` 三表）。
+
 ### 2.1 基础主数据（跨项目共享）
 
 | 实体 | 表名 | PK | 关键字段 | 外键 | 设计文档 | 状态 |
@@ -121,7 +123,7 @@
 | 实体 | 表名 | PK | 关键字段 | 外键 | 设计文档 | 状态 |
 |---|---|---|---|---|---|---|
 | InvoiceApplication | `invoice_applications` | `id` | invoiceType, amount, taxRate, taxAmount, status | → `projects.id` | `finance-billing.md` | ⬜ |
-| TicketRegistration | `ticket_registrations` | `id` | invoiceCode, invoiceNo, amount, taxRate, taxAmount, invoiceType, invoiceDate, status | → `projects.id` + `suppliers.id` | `finance-ticket.md` | ⬜ |
+| ~~TicketRegistration~~ | ~~`ticket_registrations`~~ | — | **已废弃（ADR 0001）**：合并进 `invoices` 单表，收票登记 = 查已归档发票 | — | — | ⛔ |
 | ReceiptRegistration | `receipt_registrations` | `id` | amount, receiptDate, payerName, status | → `projects.id` | `finance-receipt.md` | ⬜ |
 | PaymentApplication | `payment_applications` | `id` | applicationNo, name, amount, approvedAmount, paidAmount, status, paymentStatus | → `projects.id` + `suppliers.id` + `expenditure_contracts.id` | `finance-payment.md` | ⬜ |
 | CurrentReceipt | `current_receipts` | `id` | amount, date, counterparty | → `projects.id` | `finance-receipt.md` | ⬜ |
@@ -144,8 +146,8 @@
 | CrewProjectConfig | `crew_project_config` | `id` | defaultPayRatio, rentSubsidyEnabled/Price, mgmtFeeEnabled/Price | → `crews.id` + `projects.id` | `base-crew.md` | ✅ |
 | CrewProjectItem | `crew_project_items` | `id` | itemName, unit, unitPrice, inRentSubsidy, inMgmtFee | → `crew_project_config.id` | `base-crew.md` | ✅ |
 | Worker | `workers` | `id` | name, idCard, phone, familyGroupId, certs[], safetyEducation | — | `base-worker.md` | ✅ |
-| QuantityRecord | `quantity_records` | `id` | building, floor, room, workType, area, month, unitPrice | → `projects.id` + `crews.id` + `workers.id` | `subcontract-quantity.md` | ⬜ |
-| PayrollRecord | `payroll_records` | `id` | month, grossAmount, deductions, netAmount, status | → `projects.id` + `crews.id` + `workers.id` | `subcontract-payroll.md` | ⬜ |
+| Quantity | `quantities`（~~旧名 quantity_records~~） | `id` | building, floor, room, workType, area, month, unitPrice | → `projects.id` + `crews.id` + `workers.id` | `subcontract-quantity.md` | ⬜ |
+| ~~PayrollRecord~~ → 工资三表 | `wage_statements` / `wage_statement_lines` / `attendance_records`（~~旧 payroll_records~~） | `id` | 字段见 `DATABASE.md` §2.6 | → `projects.id` + `crews.id` + `workers.id` | `subcontract-payroll.md` | ⬜ |
 
 ### 2.7 统计
 
@@ -153,11 +155,13 @@
 |---|---|
 | ✅ 实体已定义 | 12 (Project, Supplier, SupplierCredential, FileRef, ProjectSupplier, Settlement, PhaseTask, Crew, CrewWorker, CrewProjectConfig, CrewProjectItem, Worker) |
 | ⬜ 实体待定义 | 20 |
-| **合计** | **32** |
+| **合计** | **32**（⚠️ 已过时，实体总数以 `DATABASE.md` 为准，含清单/变更/报量/送货单等已远超此数） |
 
 ---
 
 ## § 3 数据库设计 — 外键关联 + 建表顺序
+
+> ⚠️ 以 `DATABASE.md` 为准；下方外键/建表顺序/索引仍含已废弃旧名（`ticket_registrations` / `quantity_records` / `payroll_records`），见 §2 顶部说明。
 
 ### 3.1 外键关联全景（25 条）
 

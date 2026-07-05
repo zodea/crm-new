@@ -123,7 +123,7 @@
 - hover 过渡：`transition: ... var(--dur-fast) var(--ease-snappy)`
 - 卡片/行 hover：边框转 brand 或底色转 surface-3
 - 禁止：路由动画、表格行持续动画、金额滚动、视差
-- 导出完成动效（蓝色水波）见 `DESIGN-SYSTEM.md §7.3`，本轮未实现，后续补
+- ~~导出完成动效（蓝色水波）~~ **已废弃**：全局水波一律不实现，导出完成落点为静态成功 toast（见 ADR 0004）
 
 ---
 

@@ -3,7 +3,7 @@
 > 路由: `/base/worker` · `/base/worker/:id`
 > 页面: `pages/base/worker/index.vue` · `pages/base/worker/[id].vue`
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
-> 原型参考: `设计系统配色更新/kit/WorkerScreen.jsx`
+> 原型参考: `DC重构设计源码/kit/WorkerScreen.jsx`（重构圆角卡片版，见 ADR 0007；旧扁平版 `设计系统配色更新/kit/` 已弃用）
 
 ---
 

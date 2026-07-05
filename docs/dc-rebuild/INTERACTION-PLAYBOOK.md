@@ -42,7 +42,7 @@
 | 1 | **基准**：以哪个版本为准？ | 本地快照「DC重构设计源码」为基准，线上分叉改动全量放弃 |
 | 2 | **范围**：这轮做到哪一层？ | 二级弹窗全部做成真实交互；项目详情占位 Tab、项目×分供方工作台不在本轮 |
 | 3 | **数据行为**：操作怎么生效？ | 内存生效（页面 state 实时更新），刷新恢复初始 mock；删除一律软删除+撤回，字段结构对齐 DATABASE.md |
-| 4 | **深度**：模拟到什么程度？ | 导出=完整模拟全局规范（选文件夹+配置+进度+水波），**不**真实生成文件；导入=映射弹窗+回填示例行 |
+| 4 | **深度**：模拟到什么程度？ | 导出=完整模拟全局规范（选文件夹+配置+进度），**不**真实生成文件；导入=映射弹窗+回填示例行 |
 
 > 问题的形式不限于向用户提问——能从文档/代码里查到答案的自己查；查不到、且答案影响做法的才问用户。
 
@@ -60,9 +60,8 @@
 | `formModal(opts)` | 字段表单弹窗 | `fields[]（text/select/textarea, full, placeholder）/cols/onSave(vals)` |
 | `undoToast(msg, onUndo, ms?)` | **软删除撤回**（默认 5s） | 撤回按钮回调里把记录 splice 回原位置 |
 | `folderPicker(onPick)` | 模拟文件夹选择器 | 选中回调返回路径字符串 |
-| `exportModal(opts)` | **全局导出规范弹窗** | `title/count/unit/ext/anchor/structureOptions[]/nameOptions[{label,sample}]/onDone`；内含 folderPicker + 两级结构 + 命名预览 + 进度条 + 完成 `ripple` |
+| `exportModal(opts)` | **全局导出规范弹窗** | `title/count/unit/ext/anchor/structureOptions[]/nameOptions[{label,sample}]/onDone`；内含 folderPicker + 两级结构 + 命名预览 + 进度条 + 完成静态 toast |
 | `importModal(opts)` | Excel 导入 + 字段映射 | `targetFields[]/sourceCols[]/fileName/rowCount/onDone(count)`；同名列自动匹配 |
-| `ripple(anchor?)` | 蓝色水波动效（§7.3） | anchor 失效自动居中；`prefers-reduced-motion` 退化为对勾 |
 
 ### 3.2 规则
 
@@ -111,7 +110,7 @@ const delRow  = (row) => UI().confirm({
 
 1. **语法检查**：`npx esbuild <改过的>.jsx --loader:.jsx=jsx --outdir=<临时目录>`，全部编译通过。
 2. **本地实测**：起本地静态服务器托管快照目录（node 一个 ~20 行的 http server 即可，注意 `.jsx → text/javascript` 的 MIME），Chrome 打开 `http://localhost:<port>/app.dc.html`：
-   - 每个新交互至少走一遍**完整 happy path**（如导出：选文件夹→配置→进度→水波→toast）；
+   - 每个新交互至少走一遍**完整 happy path**（如导出：选文件夹→配置→进度→toast）；
    - 软删除必须实际点一次**撤回**验证恢复；
    - 全程 console 无报错。
 3. **推送**：DesignSync `finalize_plan`（必须带 `deletes`，无则 `[]`）→ `write_files`（`localPath` 直读快照目录）。全量回滚场景要连 `_ds/**` 一起覆盖。
@@ -120,7 +119,6 @@ const delRow  = (row) => UI().confirm({
 ### 5.1 实测教训（反馈轮 3）
 
 - design **编辑器画布里的点击是「选元素/缩放」不是真交互**；Present 模式的 iframe 对自动化点击也不可靠。→ **交互验证一律以本地静态 server 为准**，线上只查渲染。
-- 弹窗菜单按钮会随菜单关闭从 DOM 移除 → 依赖 anchor 的动效（ripple）必须做失效兜底。
 
 ---
 
@@ -138,9 +136,9 @@ const delRow  = (row) => UI().confirm({
 
 完整记录见 [README.md](./README.md) 「反馈轮 3」。走完 6 步的对应关系：
 
-- Step 1：读了 finance-invoice.md §7（导出规范）、DATABASE.md §8（软删除）、DESIGN-SYSTEM.md §7.3（水波）。
+- Step 1：读了 finance-invoice.md §7（导出规范）、DATABASE.md §8（软删除）。
 - Step 2：4 问全部向用户确认（基准=快照全量回滚 / 范围=二级弹窗 / 数据=内存+可撤回 / 深度=完整模拟）。
-- Step 3：新建 `exportModal/importModal/undoToast/folderPicker/ripple` 五个原语，9 个页面复用。
+- Step 3：新建 `exportModal/importModal/undoToast/folderPicker` 四个原语，9 个页面复用。
 - Step 4：分供方/班组/工人/项目/发票/送货单全部 state 化。
 - Step 5：esbuild 全过 → 本地 server 实测（导出全流程/撤回恢复/上传闭环）→ 推送 36 文件 → 线上渲染确认。
 - Step 6：README 补反馈轮 3；修正 IMPLEMENTATION.md 过时条款；建 CONTEXT.md。

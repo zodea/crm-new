@@ -56,7 +56,7 @@
 - [Mantine · Progress](https://mantine.dev/core/progress/) · 可交互 — 单文件百分比进度条，平滑宽度过渡
 - [PatternFly · Progress stepper](https://www.patternfly.org/components/progress-stepper/design-guidelines/) · 图解为主 — completed/in-progress/failure/warning/pending 五态配色最全
 
-**推荐**：单文件走 Sonner promise toast，多阶段走 MUI Stepper（带打勾），失败态参照 PatternFly。**落到瑞航**：激活步 `--brand`、完成步 `--ok`、失败步 `--danger`；成功收尾正好接[[project-export-animation]]（导出完成动效，待补 GIF）。
+**推荐**：单文件走 Sonner promise toast，多阶段走 MUI Stepper（带打勾），失败态参照 PatternFly。**落到瑞航**：激活步 `--brand`、完成步 `--ok`、失败步 `--danger`；成功收尾=静态 toast 成功、无动效（全局蓝色水波已废弃，见 ADR 0004）。
 
 ### 04 · 导入映射 `import-mapping`
 **要点**：「上传→认列→校验→入库」拆成清晰 stepper；映射步用源列↔系统字段两栏对照 + 智能预匹配（高亮已匹配/未匹配/必填缺失）；一屏可滚动行预览；导入走进度条而非空等。
