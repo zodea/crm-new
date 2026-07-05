@@ -1,7 +1,8 @@
 import type { ConfirmImpact, ConfirmVariant } from '~/lib/kit/confirm'
 import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
 
-// KitUI 原语（Vue 版）——对照设计稿 window.KitUI，改为单宿主 + composable 调用。
+// KitUI 原语（Vue 版）——单宿主 + composable 调用，底座 shadcn-vue（ADR 0008）：
+// confirm/formModal 走 reka-ui Dialog，toast 走 vue-sonner；语义对照 DC 设计稿 window.KitUI。
 // 状态定义在模块级，任意页面 useKitUI() 拿到的都是同一份，由全局 <KitUIHost/> 渲染。
 
 // ── Confirm（Promise 化确认弹窗，三档 simple/batch/cascade，ADR 0003 + 规格 §01）──
@@ -70,10 +71,10 @@ function resolveFormModal(values: FormValues | null) {
   s.resolve(values)
 }
 
-// 注：ripple（蓝色水波动效）暂缓——待补动态图后再实现，先不提供该原语。
+// 注：ripple（蓝色水波动效）已全域废弃（见 ADR 0004），不提供该原语。
 
 /**
- * KitUI 原语统一入口（对照设计稿 window.KitUI）。
+ * KitUI 原语统一入口（语义对照 DC 设计稿 window.KitUI，底座 shadcn-vue，ADR 0008）。
  * toast 家族复用既有单宿主 useToast；confirm/formModal 走本模块状态。
  */
 export function useKitUI() {
