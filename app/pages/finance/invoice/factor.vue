@@ -1,15 +1,8 @@
 <script setup lang="ts">
+import { computeCombinations, type Combination, type Factor } from '~/lib/finance/factor-combination'
 import { moneyToChinese } from '~/lib/util/chinese-amount'
 
 const toast = useToast()
-
-interface Factor {
-  id: number
-  name: string
-  unit: string
-  unitPrice: number
-  upperLimit: number
-}
 
 let nextFactorId = 1
 const targetAmount = ref(128640)
@@ -36,63 +29,20 @@ function removeFactor(id: number) {
   factors.value = factors.value.filter(f => f.id !== id)
 }
 
-interface Combination {
-  items: { factor: Factor, qty: number, subtotal: number }[]
-  total: number
-  diff: number
-}
-
 const combinations = ref<Combination[]>([])
 const calculating = ref(false)
 const calcTime = ref(0)
 
 function calculate() {
   calculating.value = true
-  combinations.value = []
-  const start = performance.now()
-  const target = targetAmount.value
-  const results: Combination[] = []
-  const MAX_RESULTS = 200
-  const TIME_LIMIT = 2000
-
-  function dfs(idx: number, items: Combination['items'], currentTotal: number) {
-    if (performance.now() - start > TIME_LIMIT) return
-    if (results.length >= MAX_RESULTS) return
-
-    if (idx === factors.value.length) {
-      if (currentTotal > 0) {
-        results.push({
-          items: [...items],
-          total: currentTotal,
-          diff: Math.abs(currentTotal - target),
-        })
-      }
-      return
-    }
-
-    const f = factors.value[idx]
-    for (let qty = 0; qty <= f.upperLimit; qty++) {
-      const subtotal = +(qty * f.unitPrice).toFixed(decimalPlaces.value)
-      const newTotal = +(currentTotal + subtotal).toFixed(decimalPlaces.value)
-      if (newTotal > target * 1.01) break
-
-      if (qty > 0) {
-        items.push({ factor: f, qty, subtotal })
-      }
-      dfs(idx + 1, items, newTotal)
-      if (qty > 0) {
-        items.pop()
-      }
-    }
-  }
-
-  dfs(0, [], 0)
-  results.sort((a, b) => a.diff - b.diff)
-  combinations.value = results.slice(0, 50)
-  calcTime.value = Math.round(performance.now() - start)
+  const result = computeCombinations(factors.value, targetAmount.value, {
+    decimalPlaces: decimalPlaces.value,
+  })
+  combinations.value = result.combinations
+  calcTime.value = result.elapsedMs
   calculating.value = false
 
-  if (results.length === 0) {
+  if (result.found === 0) {
     toast.warning('未找到匹配方案，尝试调整因子或上限')
   }
 }
