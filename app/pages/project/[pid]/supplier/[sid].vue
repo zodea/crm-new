@@ -12,6 +12,9 @@ const ps = computed(() => psStore.byProjectAndSupplier(pid.value, sid.value))
 const project = computed(() => projStore.byId(pid.value))
 const supplier = computed(() => supStore.byId(sid.value))
 
+// 页签标题回填为「分供方名」（项目内分供方档案），取代通用「项目分供方」
+useTabTitle(() => supplier.value?.name)
+
 const STATUS_LABEL: Record<string, string> = {
   collecting: '资料收集中',
   contracted: '已签合同',

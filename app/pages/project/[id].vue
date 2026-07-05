@@ -5,6 +5,9 @@ const store = useProjectStore()
 const projectId = computed(() => route.params.id as string)
 const project = computed(() => store.byId(projectId.value))
 
+// 页签标题回填为项目名（如「合和新城」），取代通用「项目详情」
+useTabTitle(() => project.value?.name)
+
 const STATUS_COLOR: Record<string, string> = {
   '筹备中': 'chip-warn',
   '施工中': 'chip-brand',

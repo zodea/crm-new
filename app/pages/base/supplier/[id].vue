@@ -9,6 +9,9 @@ const toast = useToast()
 const supplierId = computed(() => route.params.id as string)
 const supplier = computed(() => store.byId(supplierId.value))
 
+// 页签标题回填为分供方名（如「华东建材」），取代通用「分供方详情」
+useTabTitle(() => supplier.value?.name)
+
 const activeTab = ref('detail')
 const tabs = [
   { key: 'detail', label: '详细资料' },
