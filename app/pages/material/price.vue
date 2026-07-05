@@ -71,16 +71,25 @@ const displayMaterials = computed(() => {
   )
 })
 
-function getPrice(m: MaterialRow, supplier: string): PriceEntry | undefined {
-  return m.prices.find(p => p.supplier === supplier && (!p.excluded || showExcluded.value))
+interface PriceCell {
+  supplier: string
+  entry: PriceEntry | undefined
+  isLowest: boolean
 }
 
-function isLowest(m: MaterialRow, supplier: string): boolean {
-  const entry = getPrice(m, supplier)
-  if (!entry || entry.excluded) return false
-  const validPrices = m.prices.filter(p => !p.excluded).map(p => p.price)
-  return entry.price === Math.min(...validPrices) && validPrices.length > 1
-}
+// 预计算「材料 × 供应商」矩阵，避免模板逐格重复调用 getPrice/isLowest（O(行×列) 重算）
+const rows = computed(() =>
+  displayMaterials.value.map((m) => {
+    const validPrices = m.prices.filter(p => !p.excluded).map(p => p.price)
+    const lowest = validPrices.length > 1 ? Math.min(...validPrices) : null
+    const cells: PriceCell[] = suppliers.value.map((supplier) => {
+      const entry = m.prices.find(p => p.supplier === supplier && (!p.excluded || showExcluded.value))
+      const isLowest = !!entry && !entry.excluded && lowest !== null && entry.price === lowest
+      return { supplier, entry, isLowest }
+    })
+    return { material: m, cells, dimmed: m.prices.every(p => p.excluded) }
+  }),
+)
 
 function fmtMoney(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -116,28 +125,28 @@ function fmtMoney(v: number): string {
         </thead>
         <tbody>
           <tr
-            v-for="m in displayMaterials"
-            :key="m.id"
+            v-for="row in rows"
+            :key="row.material.id"
             class="border-t border-line hover:bg-surface-3"
-            :class="m.prices.every(p => p.excluded) ? 'opacity-50' : ''"
+            :class="row.dimmed ? 'opacity-50' : ''"
           >
             <td class="px-3 py-2 border-r border-line sticky left-0 bg-panel z-10 font-600">
-              {{ m.name }}
+              {{ row.material.name }}
             </td>
-            <td class="px-2 py-2 border-r border-line text-ink-soft">{{ m.unit }}</td>
+            <td class="px-2 py-2 border-r border-line text-ink-soft">{{ row.material.unit }}</td>
             <td
-              v-for="sup in suppliers"
-              :key="sup"
+              v-for="c in row.cells"
+              :key="c.supplier"
               class="px-3 py-2 border-r border-line text-right font-mono"
             >
-              <template v-if="getPrice(m, sup)">
+              <template v-if="c.entry">
                 <span
-                  :class="isLowest(m, sup) ? 'text-ok font-700' : getPrice(m, sup)!.excluded ? 'text-ink-faint line-through' : ''"
+                  :class="c.isLowest ? 'text-ok font-700' : c.entry.excluded ? 'text-ink-faint line-through' : ''"
                 >
-                  {{ fmtMoney(getPrice(m, sup)!.price) }}
+                  {{ fmtMoney(c.entry.price) }}
                 </span>
-                <span v-if="isLowest(m, sup)" class="text-ok ml-1">✓</span>
-                <span v-if="getPrice(m, sup)!.excluded" class="text-10px text-ink-faint ml-1">[剔除]</span>
+                <span v-if="c.isLowest" class="text-ok ml-1">✓</span>
+                <span v-if="c.entry.excluded" class="text-10px text-ink-faint ml-1">[剔除]</span>
               </template>
               <span v-else class="text-ink-faint">—</span>
             </td>
