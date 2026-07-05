@@ -128,8 +128,8 @@ function promise<T>(p: Promise<T>, opts: {
   return p
 }
 
-/** 撤回 toast（软删除限时撤回，system 道，见 CONTEXT.md「撤回」） */
-function undo(message: string, onUndo: () => void, ms = 5000) {
+/** 撤回 toast（软删除限时撤回，system 道，见 CONTEXT.md「撤回」；ADR 0003：窗口 10 秒） */
+function undo(message: string, onUndo: () => void, ms = 10000) {
   const id = nextId++
   let settled = false
   const run = () => {
