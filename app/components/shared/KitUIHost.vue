@@ -17,11 +17,15 @@ const {
 
   <ConfirmDialog
     :open="!!confirmState"
+    :variant="confirmOpts?.variant"
     :title="confirmOpts?.title"
     :message="confirmOpts?.message ?? ''"
+    :count="confirmOpts?.count"
+    :impact="confirmOpts?.impact"
+    :require-typing="confirmOpts?.requireTyping"
+    :hold-ms="confirmOpts?.holdMs"
     :confirm-label="confirmOpts?.confirmLabel"
     :cancel-label="confirmOpts?.cancelLabel"
-    :danger="confirmOpts?.danger"
     @confirm="resolveConfirm(true)"
     @cancel="resolveConfirm(false)"
   />

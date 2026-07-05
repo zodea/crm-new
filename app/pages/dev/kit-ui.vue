@@ -58,24 +58,58 @@ function demoProcessPile() {
 
 // ③ undoToast（system 道）
 function demoUndoToast() {
-  lastResult.value = '已软删除 1 条记录，5 秒内可撤回'
+  lastResult.value = '已软删除 1 条记录，10 秒内可撤回'
   kit.undoToast('已删除「测试项目」', () => {
     lastResult.value = '记录已恢复到原位置'
   })
 }
 
-// ④ confirm
-async function demoConfirm(danger = false) {
+// ④ confirm 三档（ADR 0003）
+// simple：高后果轻量操作（归档后修改）→ 点确认立即关窗交 toast
+async function demoConfirmSimple() {
   const ok = await kit.confirm({
-    title: danger ? '删除分供方' : '确认操作',
-    message: danger
-      ? '确认删除「瑞航建材」？删除后可在 5 秒内撤回。'
-      : '确定提交本次变更吗？',
-    confirmLabel: danger ? '删除' : '确定',
-    danger,
+    variant: 'simple',
+    title: '修改已归档发票',
+    message: '该发票已归档入账，修改会影响项目票据统计。确认继续修改？',
+    confirmLabel: '继续修改',
   })
-  lastResult.value = `confirm 返回：${ok}`
-  if (ok) kit.success(danger ? '已删除' : '已提交')
+  lastResult.value = `simple confirm 返回：${ok}`
+  if (ok) kit.success('已进入编辑')
+}
+
+// batch：批量删除 → 显示「将删除 N 条」，点确认立即关窗，事后弹 10 秒 undoToast
+async function demoConfirmBatch() {
+  const ok = await kit.confirm({
+    variant: 'batch',
+    title: '批量删除发票',
+    message: '删除后可在 10 秒内撤回整批。',
+    count: 12,
+    confirmLabel: '删除',
+  })
+  lastResult.value = `batch confirm 返回：${ok}`
+  if (ok) {
+    kit.undoToast('已删除 12 张发票', () => {
+      lastResult.value = '整批已恢复'
+    })
+  }
+}
+
+// cascade：删有下游关联的父级 → 打名激活 + ≥3 秒预提交挂起 + 无事后 undoToast
+async function demoConfirmCascade() {
+  const ok = await kit.confirm({
+    variant: 'cascade',
+    title: '删除分供方',
+    message: '「华东建材」挂着多份合同与材料、发票记录，删除将一并隐藏其下游数据。',
+    requireTyping: '华东建材',
+    impact: [
+      { label: '合同', n: 3 },
+      { label: '材料', n: 12 },
+      { label: '发票', n: 8 },
+    ],
+    confirmLabel: '删除',
+  })
+  lastResult.value = `cascade confirm 返回：${ok}（true=挂起期满提交 / false=撤销）`
+  if (ok) kit.success('已删除「华东建材」及其下游')
 }
 
 // ⑤ formModal
@@ -142,18 +176,24 @@ async function demoFormModal() {
 
       <!-- ③ undoToast -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">③ undoToast — 软删除 5 秒撤回（expand 道）</h2>
-        <p class="text-12px text-ink-soft mb-3">5 秒内点「撤回」执行回调并弹「已撤回」；超时自动消失、不回调。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">③ undoToast — 软删除 10 秒撤回（expand 道）</h2>
+        <p class="text-12px text-ink-soft mb-3">10 秒内点「撤回」执行回调并弹「已撤回」；超时自动消失、不回调（ADR 0003 撤回时长）。</p>
         <button class="btn-danger" @click="demoUndoToast">软删除（可撤回）</button>
       </section>
 
-      <!-- ④ confirm -->
+      <!-- ④ confirm 三档 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">④ confirm — Promise 化确认弹窗</h2>
-        <p class="text-12px text-ink-soft mb-3">await 拿到 true/false；danger 变体按钮标红。点遮罩/取消 = false。</p>
-        <div class="flex gap-2">
-          <button class="btn-secondary" @click="demoConfirm(false)">普通确认</button>
-          <button class="btn-danger" @click="demoConfirm(true)">危险确认</button>
+        <h2 class="text-13px font-700 text-ink mb-1">④ confirm — 三档确认弹窗（ADR 0003）</h2>
+        <p class="text-12px text-ink-soft mb-3">
+          只服务「不可撤回 / 高杀伤 / 批量」操作。<b>simple</b>=高后果轻量（归档后修改）；
+          <b>batch</b>=批量删除（看清条数 + 事后 10 秒撤回）；
+          <b>cascade</b>=删有下游关联的父级（打记录名激活 + ≥3 秒预提交挂起、期间可撤销、无事后撤回）。
+          取消默认聚焦、Esc/点遮罩=取消。
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-secondary" @click="demoConfirmSimple">simple（归档后修改）</button>
+          <button class="btn-secondary" @click="demoConfirmBatch">batch（批量删除 12 条）</button>
+          <button class="btn-danger" @click="demoConfirmCascade">cascade（删分供方 · 打名+挂起）</button>
         </div>
       </section>
 

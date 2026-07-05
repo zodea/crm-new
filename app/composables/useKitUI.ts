@@ -1,15 +1,25 @@
+import type { ConfirmImpact, ConfirmVariant } from '~/lib/kit/confirm'
 import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
 
 // KitUI 原语（Vue 版）——对照设计稿 window.KitUI，改为单宿主 + composable 调用。
 // 状态定义在模块级，任意页面 useKitUI() 拿到的都是同一份，由全局 <KitUIHost/> 渲染。
 
-// ── Confirm（Promise 化确认弹窗）──
+// ── Confirm（Promise 化确认弹窗，三档 simple/batch/cascade，ADR 0003 + 规格 §01）──
 export interface ConfirmOptions {
+  /** 变体，缺省 simple。simple=高后果轻量 / batch=批量删除 / cascade=删有下游关联的父级 */
+  variant?: ConfirmVariant
   title?: string
   message: string
+  /** batch：显示「将删除 N 条」 */
+  count?: number
+  /** cascade：杀伤清单（只读 count），如 [{label:'合同',n:3}] */
+  impact?: ConfirmImpact[]
+  /** cascade：需精确打入的记录自身名称（打字确认门控） */
+  requireTyping?: string
+  /** cascade：预提交挂起时长（ms），缺省 ≥3000；关联多可传更大 */
+  holdMs?: number
   confirmLabel?: string
   cancelLabel?: string
-  danger?: boolean
 }
 
 interface ConfirmState {
