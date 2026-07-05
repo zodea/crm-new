@@ -93,30 +93,38 @@ function promise<T>(p: Promise<T>, opts: {
 }
 
 /**
- * 原地更新一条 toast（promise 态迁移用：loading → success/error）。
+ * 原地更新一条 toast（进度提示：loading → loading %），或收尾（loading → success/error）。
  * 定向回原泳道对应的 Toaster；无 type 时按 loading 续显。
+ *
+ * ⚠ vue-sonner 的自动关闭定时器用 `remainingTime`，而它只在 onMounted 按当时 duration 设一次、
+ * 之后不随 duration 同步（Toast.vue）。我们的 loading 以 Infinity 创建 → remainingTime 恒为
+ * Infinity，即便 upsert 成有限时长的终态也不会自动关闭。故：
+ *   - loading → loading：原地 upsert（同一 toast，进度平滑变化）；
+ *   - loading → 终态：dismiss 旧的 + 新建终态 toast（全新挂载，定时器按新 duration 正常启动，
+ *     并恢复 hover 暂停）。
  */
 function update(id: ToastId, patch: { type?: ToastType, message?: string, description?: string, duration?: number }) {
   const lane = laneById.get(id) ?? 'process'
   const type = patch.type ?? 'loading'
-  const common = {
-    id,
-    description: patch.description,
-    duration: patch.duration,
-    toasterId: toasterOf(lane),
-    // upsert 会整体替换选项，清账回调必须随每次 update 重新携带
-    onDismiss: (t: { id: ToastId }) => laneById.delete(t.id),
-    onAutoClose: (t: { id: ToastId }) => laneById.delete(t.id),
-  }
   const msg = patch.message ?? ''
-  switch (type) {
-    case 'success': sonner.success(msg, common); break
-    case 'error': sonner.error(msg, common); break
-    case 'warning': sonner.warning(msg, common); break
-    case 'info': sonner.info(msg, common); break
-    case 'loading': sonner.loading(msg, { ...common, duration: patch.duration ?? Number.POSITIVE_INFINITY }); break
-    default: sonner(msg, common)
+
+  // 进度更新：仍是 loading，原地 upsert
+  if (type === 'loading') {
+    sonner.loading(msg, {
+      id,
+      description: patch.description,
+      toasterId: toasterOf(lane),
+      duration: Number.POSITIVE_INFINITY,
+      onDismiss: t => laneById.delete(t.id),
+      onAutoClose: t => laneById.delete(t.id),
+    })
+    return
   }
+
+  // 收尾：换成全新终态 toast，绕开 remainingTime 陈旧导致的「不自动关闭」
+  sonner.dismiss(id)
+  laneById.delete(id)
+  emit({ lane, type, message: msg, description: patch.description, duration: patch.duration })
 }
 
 function dismiss(id: ToastId) {

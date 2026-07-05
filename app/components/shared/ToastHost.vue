@@ -7,7 +7,8 @@ import 'vue-sonner/style.css'
 </script>
 
 <template>
-  <!-- system 道：右上，展开可读（系统消息 / 需确认后的结果 / undo） -->
+  <!-- system 道：右上，展开可读（系统消息 / 需确认后的结果 / undo）
+       close-button：hover 显 × 手动关（loading 态 vue-sonner 自动隐藏 ×，符合预期） -->
   <Toaster
     id="system"
     position="top-right"
@@ -15,6 +16,7 @@ import 'vue-sonner/style.css'
     :visible-toasts="6"
     :offset="16"
     :gap="12"
+    :close-button="true"
   />
   <!-- process 道：右下，折叠堆叠 + hover 展开（上传/识别等过程提示） -->
   <Toaster
@@ -24,6 +26,7 @@ import 'vue-sonner/style.css'
     :visible-toasts="3"
     :offset="16"
     :gap="12"
+    :close-button="true"
   />
 </template>
 
@@ -76,5 +79,16 @@ import 'vue-sonner/style.css'
   color: #fff;
   border-radius: var(--radius-btn);
   font-weight: 600;
+}
+
+/* 关闭按钮：套项目令牌（默认走 sonner 的 --gray*，这里改中性描边） */
+[data-sonner-toast] [data-close-button] {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+[data-sonner-toast] [data-close-button]:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 </style>
