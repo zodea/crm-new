@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 顶栏 —— SiteHeader 风格（对照官方 dashboard 示例）：SidebarTrigger + 分隔线 + 页面标题 + 工具按钮。
 import { SidebarTrigger } from '~/components/ui/sidebar'
+import { routeTitle } from '~/lib/tabs/tab-title'
 
 const route = useRoute()
 
@@ -8,24 +9,8 @@ const showNotifications = ref(false)
 const showDevTools = ref(false)
 const isDev = import.meta.dev
 
-const pageTitle = computed(() => {
-  const path = route.path
-  if (path === '/') return '首页'
-  if (path.startsWith('/project')) return '项目信息'
-  if (path.startsWith('/base/supplier')) return '分供方'
-  if (path.startsWith('/base/crew')) return '班组管理'
-  if (path.startsWith('/base/worker')) return '工人信息'
-  if (path.startsWith('/finance/invoice')) return '发票识别'
-  if (path.startsWith('/finance')) return '资金管理'
-  if (path.startsWith('/contract')) return '主合同管理'
-  if (path.startsWith('/subcontract/quantity')) return '工程量管理'
-  if (path.startsWith('/subcontract/payroll')) return '工资核算'
-  if (path.startsWith('/subcontract')) return '分包及人工'
-  if (path.startsWith('/material/delivery')) return '送货单识别'
-  if (path.startsWith('/material/price')) return '单价对比'
-  if (path.startsWith('/material')) return '乙供材管理'
-  return ''
-})
+// 与页签栏共用同一套路由→标题映射，保持一致。
+const pageTitle = computed(() => routeTitle(route.path))
 </script>
 
 <template>
