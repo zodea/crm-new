@@ -101,9 +101,16 @@ function fmtMoney(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function copyText(text: string) {
-  navigator.clipboard.writeText(text)
-  toast.success('已复制')
+const { copy: copyToClipboard } = useClipboard({ legacy: true })
+
+async function copyText(text: string) {
+  try {
+    await copyToClipboard(text)
+    toast.success('已复制')
+  }
+  catch {
+    toast.error('复制失败')
+  }
 }
 
 const TAX_RATES = [13, 9, 6, 3, 1]
