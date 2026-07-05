@@ -120,7 +120,7 @@ onBeforeUnmount(stopTimer)
 
 <template>
   <Dialog :open="open" @update:open="onOpenChange">
-    <DialogContent :show-close="false" @open-auto-focus="onOpenAutoFocus">
+    <DialogContent :show-close="false" class="w-[min(440px,92vw)] p-5" @open-auto-focus="onOpenAutoFocus">
       <DialogTitle>{{ title }}</DialogTitle>
 
       <DialogDescription class="mt-3 leading-relaxed">
