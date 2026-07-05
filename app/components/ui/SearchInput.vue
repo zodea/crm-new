@@ -11,13 +11,15 @@ const model = defineModel<string>()
 
 <template>
   <div class="relative">
-    <span class="absolute left-[12px] top-1/2 flex -translate-y-1/2">
+    <span aria-hidden="true" class="absolute left-[12px] top-1/2 flex -translate-y-1/2">
       <span class="i-lucide-search h-[14px] w-[14px] text-ink-faint" />
     </span>
     <input
       v-model="model"
+      type="search"
       :placeholder="placeholder"
-      class="border border-line-strong rounded-full bg-white pl-[32px] pr-[14px] py-[8px] text-[13px] outline-none focus:border-brand"
+      :aria-label="placeholder"
+      class="border border-line-strong rounded-full bg-white pl-[32px] pr-[14px] py-[8px] text-[13px] outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_2px_rgba(57,118,198,0.25)]"
       :style="{ width: `${width}px` }"
     >
   </div>

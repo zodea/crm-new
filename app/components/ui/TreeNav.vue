@@ -73,19 +73,20 @@ function labelClass(r: Row): string {
       <button
         v-for="r in rows"
         :key="r.key"
-        class="mb-[2px] flex w-full cursor-pointer items-center gap-[8px] border-0 rounded-[8px] pr-[10px] text-left"
-        :class="[r.on ? 'bg-brand-soft' : 'bg-transparent', r.sub ? 'py-[6px]' : 'py-[8px]']"
+        type="button"
+        class="mb-[2px] flex w-full cursor-pointer items-center gap-[8px] border-0 rounded-[8px] pr-[10px] text-left transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+        :class="[r.on ? 'bg-brand-soft' : 'bg-transparent hover:bg-surface-3', r.sub ? 'py-[6px]' : 'py-[8px]']"
         :style="{ paddingLeft: r.sub ? '24px' : '10px' }"
         @click="active = r.key"
       >
-        <span :class="[r.icon, iconClass(r), r.sub ? 'h-[12px] w-[12px]' : 'h-[14px] w-[14px]']" />
+        <span aria-hidden="true" :class="[r.icon, iconClass(r), r.sub ? 'h-[12px] w-[12px]' : 'h-[14px] w-[14px]']" />
         <span
-          class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
           :class="labelClass(r)"
         >{{ r.label }}</span>
         <span
           v-if="r.count != null"
-          class="rounded-full px-[7px] py-[1px] text-[11px] font-mono"
+          class="rounded-full px-[7px] py-[1px] text-[11px] font-mono tabular-nums"
           :class="r.on ? 'bg-white text-brand' : 'bg-surface-3 text-ink-faint'"
         >{{ r.count }}</span>
       </button>

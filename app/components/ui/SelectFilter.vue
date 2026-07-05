@@ -21,12 +21,13 @@ const model = defineModel<string>()
     <span class="relative inline-flex">
       <select
         v-model="model"
-        class="appearance-none cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-white pl-[12px] pr-[30px] py-[7px] text-[13px] font-600 text-ink outline-none focus:border-brand"
+        :aria-label="label"
+        class="appearance-none cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-white pl-[12px] pr-[30px] py-[7px] text-[13px] font-600 text-ink outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_2px_rgba(57,118,198,0.25)]"
         :style="{ minWidth: `${minWidth}px` }"
       >
         <option v-for="o in options" :key="o.key" :value="o.key">{{ o.label }}</option>
       </select>
-      <span class="pointer-events-none absolute right-[9px] top-1/2 flex -translate-y-1/2">
+      <span aria-hidden="true" class="pointer-events-none absolute right-[9px] top-1/2 flex -translate-y-1/2">
         <span class="i-lucide-chevron-down h-[14px] w-[14px] text-ink-faint" />
       </span>
     </span>

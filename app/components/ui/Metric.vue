@@ -37,13 +37,13 @@ const toneClass = computed(() => {
 <template>
   <div class="min-w-0 bg-panel px-[14px] py-[12px]">
     <div class="flex items-center gap-[4px] text-[11px] font-600 text-ink-faint">
-      <span class="overflow-hidden text-ellipsis whitespace-nowrap">{{ label }}</span>
+      <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ label }}</span>
       <span v-if="formula" :title="formula" class="inline-flex cursor-help">
-        <span class="i-lucide-info h-[11px] w-[11px] text-ink-faint" />
+        <span class="i-lucide-info h-[11px] w-[11px] text-ink-faint" aria-hidden="true" />
       </span>
     </div>
     <div
-      class="mt-[5px] whitespace-nowrap font-mono tracking-[-0.015em] leading-[1.25]"
+      class="mt-[5px] whitespace-nowrap font-mono tabular-nums tracking-[-0.015em] leading-[1.25]"
       :class="[toneClass, big ? 'text-[17.5px] font-800' : 'text-[13.5px] font-700']"
       :title="typeof value === 'string' ? value : undefined"
     >

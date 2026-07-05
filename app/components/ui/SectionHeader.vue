@@ -9,7 +9,7 @@ withDefaults(defineProps<{
 
 <template>
   <div class="flex items-center gap-[10px]" :style="{ marginBottom: `${mb}px` }">
-    <span class="h-[16px] w-[4px] flex-none rounded-[2px] bg-brand" />
+    <span aria-hidden="true" class="h-[16px] w-[4px] flex-none rounded-[2px] bg-brand" />
     <span class="text-[15px] font-800 text-ink"><slot /></span>
     <span v-if="$slots.extra" class="ml-auto"><slot name="extra" /></span>
   </div>
