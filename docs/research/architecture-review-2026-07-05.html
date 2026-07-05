@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>架构深化审查 · 瑞航 CRM · 2026-07-05</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .b-strong { background:#dcfce7; color:#166534; }
+  .b-explore { background:#fef9c3; color:#854d0e; }
+  .b-spec { background:#e0e7ff; color:#3730a3; }
+  .b-info { background:#f1f5f9; color:#475569; }
+  .b-high { background:#fee2e2; color:#991b1b; }
+  .b-med { background:#ffedd5; color:#9a3412; }
+  .b-low { background:#f1f5f9; color:#475569; }
+  .b-done { background:#dcfce7; color:#166534; }
+  .b-confirmed { background:#dbeafe; color:#1e40af; }
+  code { background:#f1f5f9; padding:1px 6px; border-radius:4px; font-size:0.85em; color:#0f172a; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:14px; box-shadow:0 1px 3px rgb(0 0 0 / 0.06); }
+  .field-chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; margin:2px; }
+  .fc-shared { background:#e0f2fe; color:#075985; }
+  .fc-drift { background:#fee2e2; color:#991b1b; font-weight:700; }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+<div class="max-w-5xl mx-auto px-6 py-10">
+
+  <!-- ═══════════ Header ═══════════ -->
+  <header class="mb-8">
+    <div class="flex items-center gap-3 mb-2">
+      <h1 class="text-2xl font-extrabold text-slate-900">架构深化审查 · 瑞航 CRM</h1>
+      <span class="badge b-info">2026-07-05</span>
+    </div>
+    <p class="text-sm text-slate-600 leading-relaxed">
+      范围：<b>批 E 剩余项</b>（肥 page 拆分）+ <b>22 个未 push commit 走查</b>（自研 KitUI → shadcn-vue 迁移系列，ADR 0008）。<br>
+      方法：2 个 Explore 走查 → 6 条关键论断各派反驳者对抗验证（全部 CONFIRMED）→ 1 个新眼睛 commit 补扫 → 已当场修复 1 个回归。
+      测试基线：<b>55/55 全绿</b>。术语按 CONTEXT.md 领域词 + 深/浅/缝/删除测试/局部性/杠杆。
+    </p>
+  </header>
+
+  <!-- ═══════════ 结论速览 ═══════════ -->
+  <section class="grid grid-cols-4 gap-3 mb-10">
+    <div class="card p-4"><div class="text-xs text-slate-500 mb-1">已当场修复</div><div class="text-sm font-bold">vxe-table readonly 回归</div><div class="text-xs text-slate-500 mt-1">commit <code>be393f3</code></div></div>
+    <div class="card p-4"><div class="text-xs text-slate-500 mb-1">最高风险 → 已解决</div><div class="text-sm font-bold">uno.config 桥接缺口</div><div class="text-xs text-slate-500 mt-1">你的 <code>2879be1</code> 修 cva 变体类提取</div></div>
+    <div class="card p-4"><div class="text-xs text-slate-500 mb-1">首推结构候选</div><div class="text-sm font-bold">C1 退役 FormDialog 自研壳</div><div class="text-xs text-slate-500 mt-1">双弹窗栈 → 单一 Dialog 缝</div></div>
+    <div class="card p-4"><div class="text-xs text-slate-500 mb-1">已发现的真缺陷</div><div class="text-sm font-bold">分供方 4 字段编辑不了</div><div class="text-xs text-slate-500 mt-1">表单漂移（C2 顺带修复）</div></div>
+  </section>
+
+  <!-- ═══════════ §A commit 走查 ═══════════ -->
+  <section class="mb-10">
+    <h2 class="text-lg font-extrabold text-slate-900 mb-3">§A 未 push commit 走查（22 个，origin/main..HEAD）</h2>
+    <div class="card p-5 mb-4">
+      <p class="text-sm text-slate-600 mb-3">主题分布：ADR 0008 迁移系列（桥接底座 / confirm / formModal / toast / 原子组件）+ 批 B/C/D/E① 重构 + 文档收尾。每个检查点测试均 55/55（或迁移前 48/48）通过，<b>无行为回归进入提交历史</b>——除下表所列。</p>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-slate-500 border-b"><th class="py-2">严重度</th><th>问题</th><th>位置</th><th>状态</th></tr></thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr><td class="py-2"><span class="badge b-high">HIGH</span></td>
+            <td><b>uno.config 提交态缺 <code>content.filesystem</code></b>：Button 的 cva 语义类（<code>bg-primary</code>/<code>bg-destructive</code>…）只存在于 <code>ui/button/index.ts</code>（纯 .ts），UnoCSS 默认不扫 .ts → 已提交的 22 个 commit 状态下 confirm/formModal 的按钮无底色（删除确认按钮透明）。修复只在<b>工作区未提交</b>的 uno.config.ts:12 里。</td>
+            <td><code>uno.config.ts</code></td>
+            <td><span class="badge b-done">已修</span> 你的 <code>2879be1</code>（tokens/uno 桥接 + cva 变体类提取）</td></tr>
+          <tr><td class="py-2"><span class="badge b-med">MED</span></td>
+            <td><b>批 C readonly 收口回归</b>：vxe-table 默认往行对象写 <code>_X_ROW_KEY</code>，被 readonly 代理拦截，project/supplier 列表每行渲染刷 Vue warn、行标识退化。我的责任。</td>
+            <td>4 个页面 5 张表</td>
+            <td><span class="badge b-done">已修</span> <code>be393f3</code> 补 <code>keyField:'id'</code></td></tr>
+          <tr><td class="py-2"><span class="badge b-low">LOW</span></td>
+            <td><b>toast undo 泄漏残口</b>：<code>21ddec5</code> 修的 laneById 清账挂在 onDismiss/onAutoClose，但 vue-sonner 的 <b>action 点击路径不触发这两个回调</b>——用户点「撤回」后该 id 永久残留 Map（已读源码复核 useToast.ts:144-147 无 delete）。影响小（缓慢累积）。</td>
+            <td><code>useToast.ts:136</code></td>
+            <td><span class="badge b-done">已修</span> <code>cc16ba6</code></td></tr>
+          <tr><td class="py-2"><span class="badge b-low">LOW</span></td>
+            <td><b>ripple「暂缓」旧口径 ×3</b>：与 ADR 0004「全域废弃」打架（文档同步纪律：不留一句和现状打架的话）。<code>dbbeaaa</code> 只改了 useKitUI.ts。</td>
+            <td><code>kit-ui.vue:3,150</code> / <code>KitUIHost.vue:4</code></td>
+            <td><span class="badge b-done">已修</span> <code>cc16ba6</code></td></tr>
+          <tr><td class="py-2"><span class="badge b-low">LOW</span></td>
+            <td><b>kit-atoms 演示文案过时</b>：仍写「label + 原生 select」，但 SelectFilter 已迁 reka-ui Select（<code>6b687e4</code>）。</td>
+            <td><code>kit-atoms.vue:75</code></td>
+            <td><span class="badge b-done">已修</span> <code>cc16ba6</code></td></tr>
+          <tr><td class="py-2"><span class="badge b-low">LOW</span></td>
+            <td><b>DialogHeader / DialogFooter / DialogTrigger 零使用</b>：ConfirmDialog/KitFormModal 标题栏和 footer 均手写 div。若按 shadcn registry 惯例刻意保留，建议注释注明「预留未用」；否则删。</td>
+            <td><code>ui/dialog/</code></td>
+            <td><span class="badge b-done">已注记预留</span> <code>cc16ba6</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card p-4 bg-amber-50 border-amber-200">
+      <p class="text-sm"><b>⚠ ui/sidebar 结论修订</b>：第一轮走查判它「250 行零引用死代码、建议删除」。对抗验证发现它是<b>未跟踪的新文件、从未提交</b>；且你的工作区正把 AppSidebar 接线到它（SidebarProvider/SidebarMenu 体系）。<b>它是进行中的 WIP，不是死代码，不删。</b>与之相关的唯一行动项是上面那条 HIGH：uno.config 桥接先行提交，sidebar WIP 后续独立成 commit。<br><b>更新（当日）</b>：sidebar WIP 已落地为 <code>8c1a1ff</code>（组件套）/ <code>2879be1</code>（桥接+cva 修复）/ <code>ba0fd20</code>（外框重构），HIGH 一并解决。</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ §B 候选卡片 ═══════════ -->
+  <section class="mb-10">
+    <h2 class="text-lg font-extrabold text-slate-900 mb-3">§B 深化候选（按建议执行顺序）</h2>
+
+    <!-- C5 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="font-extrabold text-slate-900">C5 · 迁移收尾小修批次</h3>
+        <span class="badge b-done">✅ 已完成 cc16ba6</span>
+      </div>
+      <p class="text-sm text-slate-600 mb-2"><b>文件</b>：<code>useToast.ts</code>、<code>kit-ui.vue</code>、<code>KitUIHost.vue</code>、<code>kit-atoms.vue</code>、（可选）<code>ui/dialog/</code></p>
+      <p class="text-sm mb-1"><b>问题</b>：§A 表中 4 条 LOW——undo 泄漏残口、ripple 旧口径 ×3、演示文案过时、Dialog 未用件处置。全是迁移红利的最后 5%。</p>
+      <p class="text-sm mb-1"><b>方案</b>：undo 的 action onClick 补 <code>laneById.delete(id)</code>；3 处 ripple 注释/文案改「已废弃（ADR 0004）」墓碑；kit-atoms 文案改述 reka-ui Select；DialogHeader/Footer 按你选择删或注明预留。</p>
+      <p class="text-sm text-slate-600"><b>收益</b>：局部性——迁移系列在 push 前收干净口径，不留和现状打架的话（文档同步纪律）。</p>
+    </div>
+
+    <!-- C1 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="font-extrabold text-slate-900">C1 · 退役 FormDialog 自研壳：业务表单弹窗坐上 Dialog 缝</h3>
+        <span class="badge b-done">✅ 已完成 7920e62</span>
+      </div>
+      <p class="text-sm text-slate-600 mb-2"><b>文件</b>：<code>shared/FormDialog.vue</code>（101 行）→ 基于 <code>ui/dialog/</code> 重实现；5 个调用点不动（invoice ×2、分供方 ×2、项目 ×1）</p>
+      <p class="text-sm mb-2"><b>问题</b>：ADR 0008 承诺「焦点陷阱/Esc/遮罩/滚动锁交给底座」，confirm/formModal 已兑现，但业务大表单弹窗 FormDialog 仍是自研 <code>Teleport+Transition</code>：<b>无 Esc、无焦点陷阱、无滚动锁</b>（已逐点验证），与 Dialog 栈并行成两套 overlay 实现。删除测试：删掉自研壳，这些复杂度<b>消失进 reka-ui</b>，而非转移——典型该删的穿透层。</p>
+      <p class="text-sm mb-2"><b>方案</b>：保持 FormDialog 的接口（<code>open/title/sections/@save/@cancel</code> + 默认插槽）完全不变，内部改为 <code>Dialog + DialogContent</code>（照 KitFormModal 的模式），保留吸顶标题 + 分区锚点滚动 + 吸底 footer 布局。5 个调用点零改动。</p>
+      <p class="text-sm text-slate-600 mb-3"><b>收益</b>：杠杆——5 个业务弹窗免费获得 Esc/焦点返回/aria/滚动锁；局部性——全应用只剩一种 overlay 实现，行为一致（用户在 confirm 里能按 Esc、在表单里不能，这种割裂消失）。C2/C3 的表单缝都将坐在它上面，<b>先做它避免返工</b>。</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-50 rounded-lg p-3">
+          <div class="text-xs font-bold text-slate-500 mb-2">现状（双栈）</div>
+          <pre class="mermaid">graph TD
+    A[invoice ×2 / 分供方 ×2 / 项目 ×1] --> F["FormDialog<br/>自研 Teleport<br/>❌Esc ❌焦点陷阱 ❌滚动锁"]
+    B[confirm / formModal 原语] --> D["Dialog 组件集"] --> R[reka-ui]</pre>
+        </div>
+        <div class="bg-green-50 rounded-lg p-3">
+          <div class="text-xs font-bold text-green-700 mb-2">目标（单缝）</div>
+          <pre class="mermaid">graph TD
+    A[5 个业务调用点<br/>接口不变] --> F["FormDialog<br/>薄布局层"] --> D["Dialog 组件集"] --> R["reka-ui<br/>✅Esc ✅焦点 ✅滚动锁"]
+    B[confirm / formModal] --> D</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- C2 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="font-extrabold text-slate-900">C2 · 分供方表单缝（SupplierFormDialog）</h3>
+        <span class="badge b-strong">Strong · 修真缺陷</span>
+      </div>
+      <p class="text-sm text-slate-600 mb-2"><b>文件</b>：<code>supplier/index.vue</code>（93 行表单）、<code>supplier/[id].vue</code>（79 行表单）、两处状态映射常量</p>
+      <p class="text-sm mb-2"><b>问题</b>：同一份分供方表单在两页各抄一遍，<b>已经漂移出真缺陷</b>——编辑弹窗缺 4 个字段（下图红色），这 4 项创建后<b>永远改不了</b>（经验证：不丢数据，但编辑通道缺失）。凭证状态映射常量两处重复且命名不一致（<code>CRED_STATUS_*</code> vs <code>CRED_*</code>）。2 个调用方 = <b>真缝</b>。</p>
+      <div class="bg-slate-50 rounded-lg p-3 mb-2 text-center">
+        <div class="text-xs font-bold text-slate-500 mb-2">17 个字段的两份手抄本（红 = 编辑弹窗缺失的漂移字段）</div>
+        <span class="field-chip fc-shared">公司全称</span><span class="field-chip fc-shared">类别</span><span class="field-chip fc-shared">税号</span><span class="field-chip fc-shared">法人</span><span class="field-chip fc-shared">注册资金</span><span class="field-chip fc-shared">地址</span><span class="field-chip fc-shared">主营</span><span class="field-chip fc-shared">开户行</span><span class="field-chip fc-shared">账号</span><span class="field-chip fc-shared">开票地址</span><span class="field-chip fc-shared">电话</span><span class="field-chip fc-shared">联系人</span><span class="field-chip fc-shared">联系电话</span><span class="field-chip fc-shared">备注</span>
+        <span class="field-chip fc-drift">业务类型</span><span class="field-chip fc-drift">开票名称</span><span class="field-chip fc-drift">纳税人类型</span><span class="field-chip fc-drift">评价</span>
+      </div>
+      <p class="text-sm mb-1"><b>方案</b>：抽 <code>SupplierFormDialog</code>（坐在 C1 后的 Dialog 栈上），字段/分区/校验单一定义；两页只传 <code>editing</code> 记录 + 保存回调。状态映射抽 <code>lib/supplier/credential.ts</code>，两页共用。</p>
+      <p class="text-sm text-slate-600"><b>收益</b>：局部性——分供方字段变更只改一处；杠杆——编辑弹窗自动补齐 4 个漂移字段（缺陷随重构消失）；字段契约可直接单测。</p>
+    </div>
+
+    <!-- C3 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="font-extrabold text-slate-900">C3 · 发票工作台拆分（InvoiceForm + 三 Tab 容器 + useInvoiceCrud）</h3>
+        <span class="badge b-explore">Worth exploring</span>
+      </div>
+      <p class="text-sm text-slate-600 mb-2"><b>文件</b>：<code>finance/invoice/index.vue</code>（614 行，全项目最大页面）</p>
+      <p class="text-sm mb-2"><b>问题</b>：新增/编辑两弹窗 <b>11 个字段 100% 逐行相同</b>（各 56 行，唯一差异是 4 个 placeholder）——内部效率缝，删除测试立即通过。三 Tab（文档管理 95 行 / 校对排版 68 行 / 发票台账 79 行）+ 三套弹窗状态全在一页，改任何一块都要在 614 行里导航。Tab 容器各只有 1 个调用方（假想缝），价值在<b>局部性</b>而非复用。</p>
+      <p class="text-sm mb-1"><b>方案</b>：先抽 <code>InvoiceForm</code>（一份字段定义 + <code>mode: add/edit</code>），CRUD 编排收进 <code>useInvoiceCrud()</code>；三 Tab 视情况拆 <code>InvoiceDocsTab / InvoiceReviewTab / InvoiceLedgerTab</code>（识别中心 → 归档 → 台账的领域动线正好一一对应）。</p>
+      <p class="text-sm text-slate-600"><b>收益</b>：消 56 行×2 重复；发票字段契约单点化（后续 OCR 字段扩展只改一处）；页面回到「组合面」职责。<b>依赖 C1 先落</b>。</p>
+    </div>
+
+    <!-- C4 -->
+    <div class="card p-5 mb-5">
+      <div class="flex items-center gap-2 mb-2">
+        <h3 class="font-extrabold text-slate-900">C4 · 抽屉 Sheet 缝 + z-index 令牌化</h3>
+        <span class="badge b-spec">Speculative · 后置</span>
+      </div>
+      <p class="text-sm mb-1"><b>问题</b>：NotificationDrawer / DevToolsPanel 仍是手写 Teleport overlay（无 Esc）；z-index 四处硬写（8000/9000/9001/9600）无集中管理。</p>
+      <p class="text-sm text-slate-600"><b>方案与克制理由</b>：等 sidebar WIP 落定后，若 ui/sidebar 的移动抽屉模式可抽 <code>Sheet</code>，两个 drawer 顺势迁移 + <code>--z-*</code> 令牌入 tokens.css。DevToolsPanel 是 dev-only，收益低——1 个业务调用方属假想缝，<b>不急</b>。</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ §C 暂缓项 ═══════════ -->
+  <section class="mb-10">
+    <h2 class="text-lg font-extrabold text-slate-900 mb-3">§C 暂缓项（有意不做，留档防止反复重提）</h2>
+    <div class="card p-5 text-sm space-y-2">
+      <p>• <b>delivery.vue 拆 DeliveryFileCard</b>：识别/编辑/删除三个按钮全是占位交互（0 个处理器），先把交互闭环（送货单识别是识别中心动线的一环），拆分随闭环实现自然发生。1 个调用方，假想缝。</p>
+      <p>• <b>project/[id].vue 经营/票据面板</b>：全部硬编码 0 的占位数据，等子表聚合（发票台账/变更单台账）真实数据流接入时再定缝。</p>
+      <p>• <b>project/index.vue 表单</b>：110 行但字段内聚、无重复、1 个调用方——摩擦低，仅在 C1 落地后顺带受益（获得 Esc 等），不单独拆。</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ §D Top recommendation ═══════════ -->
+  <section>
+    <h2 class="text-lg font-extrabold text-slate-900 mb-3">§D 首推与执行顺序</h2>
+    <div class="card p-5 border-green-300 bg-green-50">
+      <p class="text-sm leading-relaxed">
+        <b>先决动作（你侧）</b>：把 uno.config.ts 的 <code>content.filesystem</code> 桥接单独提交（HIGH），随后 push 22+ 个 commit。<br><br>
+        <b>首推候选：C5 → C1</b>。C5 十分钟把迁移收尾擦干净；C1 是结构首推——它保持接口不变（5 个调用点零改动、回归面最小），却让「双弹窗栈」这个最大的浅层消失，且 C2/C3 的表单缝都要坐在它上面，先做避免返工。随后 <b>C2</b>（真缝 + 顺带修掉 4 字段编辑缺陷）→ <b>C3</b>（消 112 行重复 + 最大页面瘦身）。C4 与 sidebar WIP 合流后再议。<br><br>
+        <b>执行进度（2026-07-05 当日更新）</b>：✅ C5（<code>cc16ba6</code>）✅ C1（<code>7920e62</code>）✅ uno 桥接 HIGH（你的 <code>2879be1</code>）✅ vxe 回归（<code>be393f3</code>）。<b>下一个：C2 分供方表单缝</b>，随后 C3。
+      </p>
+    </div>
+    <p class="text-xs text-slate-400 mt-4">生成：Claude Code /improve-codebase-architecture · 事实经 6 论断对抗验证 + commit 补扫复核 · 留存于 docs/research/</p>
+  </section>
+
+</div>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral' });</script>
+</body>
+</html>
