@@ -62,25 +62,27 @@ const missingRequired = computed(() =>
   REQUIRED.filter(cat => !credentials.value.some(c => c.category === cat)),
 )
 
-const showAdd = ref(false)
-const newCategory = ref('营业执照')
-const newFileName = ref('')
+const { formModal } = useKitUI()
 
 async function addCredential() {
-  if (!newFileName.value.trim()) {
-    toast.warning('请填写文件名')
-    return
-  }
+  const values = await formModal({
+    title: '添加证照',
+    subtitle: '文件上传功能需要 Tauri 环境。当前先记录证照条目，文件稍后上传。',
+    saveText: '添加',
+    fields: [
+      { key: 'category', label: '证照类别', type: 'select', options: CATEGORIES, value: '营业执照', required: true },
+      { key: 'fileName', label: '文件名（上传后自动填充）', placeholder: '如: 营业执照-大板东.pdf', required: true },
+    ],
+  })
+  if (!values) return
   const id = generateId('cred')
   await execute(
     `INSERT INTO supplier_credentials (id, supplier_id, category, file_name, added_at)
      VALUES (?, ?, ?, ?, ?)`,
-    [id, props.supplierId, newCategory.value, newFileName.value, new Date().toISOString()],
+    [id, props.supplierId, values.category, values.fileName, new Date().toISOString()],
   )
   await logCreate(db, 'supplier_credentials', id)
   toast.success('证照已添加（待上传文件）')
-  showAdd.value = false
-  newFileName.value = ''
   await loadCredentials()
 }
 
@@ -116,7 +118,7 @@ watch(() => props.supplierId, loadCredentials, { immediate: true })
       <h4 class="text-13px font-700 text-ink">
         证照清单 · {{ credentials.length }} 份
       </h4>
-      <button class="btn-primary" @click="showAdd = true">
+      <button class="btn-primary" @click="addCredential">
         <span class="i-lucide-plus text-13px mr-1" /> 添加证照
       </button>
     </div>
@@ -177,32 +179,5 @@ watch(() => props.supplierId, loadCredentials, { immediate: true })
         </vxe-column>
       </vxe-table>
     </div>
-
-    <!-- 添加弹窗 -->
-    <ConfirmDialog
-      :open="showAdd"
-      title="添加证照"
-      confirm-label="添加"
-      @confirm="addCredential"
-      @cancel="showAdd = false"
-    >
-      <template #default>
-        <div class="space-y-3">
-          <div>
-            <label class="field-label">证照类别</label>
-            <select v-model="newCategory" class="field-input w-full">
-              <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">文件名（上传后自动填充）</label>
-            <input v-model="newFileName" class="field-input w-full" placeholder="如: 营业执照-大板东.pdf">
-          </div>
-          <p class="text-11px text-ink-faint">
-            文件上传功能需要 Tauri 环境。当前先记录证照条目，文件稍后上传。
-          </p>
-        </div>
-      </template>
-    </ConfirmDialog>
   </div>
 </template>
