@@ -72,8 +72,8 @@ async function confirmDelete() {
   await store.remove(deleteTargetId.value)
   toast.success('已删除')
   showDeleteConfirm.value = false
-  deleteTargetId.value = null
   if (selectedId.value === deleteTargetId.value) selectedId.value = null
+  deleteTargetId.value = null
 }
 
 // 编辑弹窗（台账用）

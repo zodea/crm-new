@@ -29,7 +29,7 @@ export async function execScript(db: MigrationDb, sql: string): Promise<void> {
   }
 }
 
-function assertIdentifier(name: string): void {
+export function assertIdentifier(name: string): void {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
     throw new Error(`[db] 非法标识符: ${name}`)
   }
@@ -57,6 +57,34 @@ export async function addColumnIfMissing(
   return true
 }
 
+/** v2 补列的业务表清单——迁移是历史事实,冻结快照,后续新表在各自迁移里自带 deleted_at */
+const V2_TABLES = [
+  'projects', 'suppliers', 'invoices', 'crews',
+  'supplier_credentials', 'project_suppliers', 'phase_tasks',
+  'construction_contracts', 'owner_change_orders', 'expenditure_contracts',
+  'invoice_applications', 'receipt_registrations', 'current_receipts',
+  'current_payments', 'payment_records', 'workers',
+  'settlements', 'supplement_agreements', 'contract_line_items',
+  'ticket_registrations', 'payment_applications', 'file_refs',
+]
+
+/** 操作日志表(DATABASE.md §8.2) */
+const V2_OPERATION_LOGS = `
+CREATE TABLE IF NOT EXISTS operation_logs (
+  id          TEXT PRIMARY KEY,
+  table_name  TEXT NOT NULL,
+  record_id   TEXT NOT NULL,
+  action      TEXT NOT NULL,
+  before_data TEXT,
+  after_data  TEXT,
+  operator    TEXT DEFAULT '',
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_logs_record ON operation_logs(table_name, record_id);
+CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at);
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -67,6 +95,24 @@ export const migrations: Migration[] = [
     name: 'baseline-full-schema',
     async up(db) {
       await execScript(db, ALL_SCHEMA)
+    },
+  },
+  {
+    version: 2,
+    name: 'soft-delete-operation-logs',
+    async up(db) {
+      for (const t of V2_TABLES) {
+        await addColumnIfMissing(db, t, 'deleted_at', 'TEXT DEFAULT NULL')
+        // 部分索引:已删记录天然稀少,隐藏集 CTE 的基础臂从全表扫描降为 O(已删数)
+        await db.execute(
+          `CREATE INDEX IF NOT EXISTS idx_${t}_deleted ON "${t}"(deleted_at) WHERE deleted_at IS NOT NULL;`,
+        )
+      }
+      // 自引用递归 CTE(hidden_suppliers)按父列查找,补索引
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_suppliers_parent ON suppliers(parent_supplier_id);',
+      )
+      await execScript(db, V2_OPERATION_LOGS)
     },
   },
 ]

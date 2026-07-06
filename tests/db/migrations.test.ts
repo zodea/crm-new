@@ -9,7 +9,7 @@ import {
   runMigrations,
 } from '~/lib/db/migrations'
 import { ALL_SCHEMA } from '~/lib/db/schema'
-import { createMemoryDb, listTables } from '../helpers/memory-db'
+import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 /** 基线 schema 的全部业务表（与 schema.ts 四批建表一一对应） */
 const BASELINE_TABLES = [
@@ -114,50 +114,43 @@ describe('迁移机制：版本化顺序迁移', () => {
   })
 })
 
-describe('迁移机制：存量表 ALTER 补列（为软删除铺路）', () => {
-  /** 模拟 1b 将要写的 v2 迁移：给存量表补 deleted_at */
-  const v2AddDeletedAt: Migration = {
-    version: 2,
-    name: 'add-deleted-at-projects',
+describe('迁移机制：存量表 ALTER 补列', () => {
+  // 版本无关的机制测试：真实 deleted_at 补列已由 v2 落地（见 tests/db/soft-delete.test.ts），
+  // 这里用示例列 + LATEST_VERSION+1 验证 ALTER 升级路径本身
+  const vNextAddSampleCol: Migration = {
+    version: LATEST_VERSION + 1,
+    name: 'add-sample-col-projects',
     async up(db) {
-      await addColumnIfMissing(db, 'projects', 'deleted_at', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'projects', 'sample_col', 'TEXT DEFAULT NULL')
     },
   }
 
   it('升级路径：存量表补列成功，存量行新列值为 NULL', async () => {
     const db = await createMemoryDb()
-    // 先以 v1 基线建库并写入存量数据
+    // 先收敛到当前最新版本并写入存量数据
     await runMigrations(db)
     await db.execute(`INSERT INTO projects (id, name) VALUES (?, ?)`, ['p1', '老项目'])
 
-    // 升级到 v2（ALTER 补列）
-    const result = await runMigrations(db, [...migrations, v2AddDeletedAt])
-    expect(result.from).toBe(1)
-    expect(result.to).toBe(2)
+    // 升级到下一版（ALTER 补列）
+    const result = await runMigrations(db, [...migrations, vNextAddSampleCol])
+    expect(result.from).toBe(LATEST_VERSION)
+    expect(result.to).toBe(LATEST_VERSION + 1)
 
-    const cols = await db.select<{ name: string }>(
-      'SELECT name FROM pragma_table_info(?)',
-      ['projects'],
-    )
-    expect(cols.map(c => c.name)).toContain('deleted_at')
+    expect(await columnNames(db, 'projects')).toContain('sample_col')
 
-    const rows = await db.select<{ name: string, deleted_at: string | null }>(
-      'SELECT name, deleted_at FROM projects',
+    const rows = await db.select<{ name: string, sample_col: string | null }>(
+      'SELECT name, sample_col FROM projects',
     )
-    expect(rows).toEqual([{ name: '老项目', deleted_at: null }])
+    expect(rows).toEqual([{ name: '老项目', sample_col: null }])
     db.close()
   })
 
-  it('冷启动路径：v1+v2 一次跑完，效果与升级路径一致', async () => {
+  it('冷启动路径：基线+补列一次跑完，效果与升级路径一致', async () => {
     const db = await createMemoryDb()
-    const result = await runMigrations(db, [...migrations, v2AddDeletedAt])
+    const result = await runMigrations(db, [...migrations, vNextAddSampleCol])
     expect(result.from).toBe(0)
-    expect(result.to).toBe(2)
-    const cols = await db.select<{ name: string }>(
-      'SELECT name FROM pragma_table_info(?)',
-      ['projects'],
-    )
-    expect(cols.map(c => c.name)).toContain('deleted_at')
+    expect(result.to).toBe(LATEST_VERSION + 1)
+    expect(await columnNames(db, 'projects')).toContain('sample_col')
     db.close()
   })
 
@@ -165,8 +158,8 @@ describe('迁移机制：存量表 ALTER 补列（为软删除铺路）', () => 
     const db = await createMemoryDb()
     await runMigrations(db)
 
-    const first = await addColumnIfMissing(db, 'projects', 'deleted_at', 'TEXT DEFAULT NULL')
-    const second = await addColumnIfMissing(db, 'projects', 'deleted_at', 'TEXT DEFAULT NULL')
+    const first = await addColumnIfMissing(db, 'projects', 'sample_col', 'TEXT DEFAULT NULL')
+    const second = await addColumnIfMissing(db, 'projects', 'sample_col', 'TEXT DEFAULT NULL')
     expect(first).toBe(true)
     expect(second).toBe(false)
     db.close()

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { execute, select } from '~/lib/db/connection'
+import { db } from '~/lib/db/client'
+import { hiddenCtes, logCreate, softDelete, visibleCond } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 
 const props = defineProps<{
@@ -33,7 +35,10 @@ async function loadCredentials() {
   loading.value = true
   try {
     const rows = await select<Record<string, unknown>>(
-      'SELECT * FROM supplier_credentials WHERE supplier_id = ? ORDER BY added_at DESC',
+      `${hiddenCtes('supplier_credentials')}
+       SELECT * FROM supplier_credentials
+       WHERE ${visibleCond('supplier_credentials')} AND supplier_id = ?
+       ORDER BY added_at DESC`,
       [props.supplierId],
     )
     credentials.value = rows.map(r => ({
@@ -72,14 +77,16 @@ async function addCredential() {
      VALUES (?, ?, ?, ?, ?)`,
     [id, props.supplierId, newCategory.value, newFileName.value, new Date().toISOString()],
   )
+  await logCreate(db, 'supplier_credentials', id)
   toast.success('证照已添加（待上传文件）')
   showAdd.value = false
   newFileName.value = ''
   await loadCredentials()
 }
 
+// TODO(数据流阶梯): 本组件直连 db 属存量范式,待证照随分供方域收进 Pinia store
 async function removeCredential(id: string) {
-  await execute('DELETE FROM supplier_credentials WHERE id = ?', [id])
+  await softDelete(db, 'supplier_credentials', id)
   toast.success('已删除')
   await loadCredentials()
 }

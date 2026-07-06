@@ -42,3 +42,9 @@ export async function listTables(db: MigrationDb): Promise<string[]> {
   )
   return rows.map(r => r.name)
 }
+
+/** 某表的全部列名（pragma_table_info） */
+export async function columnNames(db: MigrationDb, table: string): Promise<string[]> {
+  const cols = await db.select<{ name: string }>('SELECT name FROM pragma_table_info(?)', [table])
+  return cols.map(c => c.name)
+}

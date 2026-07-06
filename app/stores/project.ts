@@ -1,5 +1,7 @@
 import { generateId } from '~/lib/util/id'
 import { execute, select } from '~/lib/db/connection'
+import { db } from '~/lib/db/client'
+import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 
 export interface Project {
   id: string
@@ -88,7 +90,9 @@ export const useProjectStore = defineStore('project', () => {
   async function load() {
     loading.value = true
     try {
-      const rows = await select<Record<string, unknown>>('SELECT * FROM projects ORDER BY created_at DESC')
+      const rows = await select<Record<string, unknown>>(
+        selectVisibleSql('projects', 'ORDER BY created_at DESC'),
+      )
       list.value = rows.map(rowToProject)
     }
     finally {
@@ -119,13 +123,15 @@ export const useProjectStore = defineStore('project', () => {
         now, now,
       ],
     )
+    await logCreate(db, 'projects', id)
     await load()
     return id
   }
 
+  /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function update(id: string, data: Partial<Project>) {
     const now = new Date().toISOString()
-    await execute(
+    const logId = await withUpdateLog(db, 'projects', id, () => execute(
       `UPDATE projects SET name=?, contract_name=?, code=?, address=?, region=?, type=?, area=?, contract_amount=?, overview=?, operation_type=?, start_date=?, planned_end=?, actual_end=?, planned_duration=?, status=?, developer=?, developer2=?, supervisor=?, designer=?, contractor=?, manager=?, manager_phone=?, site_leader=?, site_leader_phone=?, risk_level=?, note=?, description=?, updated_at=? WHERE id=?`,
       [
         data.name ?? '', data.contractName ?? '', data.code ?? '', data.address ?? '',
@@ -139,14 +145,12 @@ export const useProjectStore = defineStore('project', () => {
         data.riskLevel ?? '', data.note ?? '', data.description ?? '',
         now, id,
       ],
-    )
+    ))
     await load()
+    return logId
   }
 
-  async function remove(id: string) {
-    await execute('DELETE FROM projects WHERE id = ?', [id])
-    await load()
-  }
+  const { remove, restore, undo } = createSoftDeleteActions(db, 'projects', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove, restore, undo }
 })

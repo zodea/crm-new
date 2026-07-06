@@ -1,5 +1,7 @@
 import { generateId } from '~/lib/util/id'
 import { execute, select } from '~/lib/db/connection'
+import { db } from '~/lib/db/client'
+import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 
 export interface Invoice {
   id: string
@@ -76,7 +78,9 @@ export const useInvoiceStore = defineStore('invoice', () => {
   async function load() {
     loading.value = true
     try {
-      const rows = await select<Record<string, unknown>>('SELECT * FROM invoices ORDER BY created_at DESC')
+      const rows = await select<Record<string, unknown>>(
+        selectVisibleSql('invoices', 'ORDER BY created_at DESC'),
+      )
       list.value = rows.map(rowToInvoice)
     }
     finally {
@@ -127,13 +131,15 @@ export const useInvoiceStore = defineStore('invoice', () => {
         now, now,
       ],
     )
+    await logCreate(db, 'invoices', id)
     await load()
     return id
   }
 
+  /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function update(id: string, data: Partial<Invoice>) {
     const now = new Date().toISOString()
-    await execute(
+    const logId = await withUpdateLog(db, 'invoices', id, () => execute(
       `UPDATE invoices SET file_name=?, file_path=?, file_size=?, page_count=?, invoice_type=?, invoice_number=?, invoice_date=?, buyer=?, buyer_tax_no=?, seller=?, seller_tax_no=?, amount=?, tax_amount=?, total_amount=?, tax_rate=?, remark=?, project_id=?, project_name=?, supplier_id=?, ocr_status=?, review_status=?, account_status=?, dup_status=?, source=?, print_rotation=?, ocr_confidence=?, confirmed_at=?, updated_at=? WHERE id=?`,
       [
         data.fileName ?? '', data.filePath ?? '', data.fileSize ?? '', data.pageCount ?? 0,
@@ -149,8 +155,9 @@ export const useInvoiceStore = defineStore('invoice', () => {
         data.ocrConfidence ?? null, data.confirmedAt ?? null,
         now, id,
       ],
-    )
+    ))
     await load()
+    return logId
   }
 
   async function updateField(id: string, field: keyof Invoice, value: unknown) {
@@ -162,21 +169,17 @@ export const useInvoiceStore = defineStore('invoice', () => {
   }
 
   async function confirmInvoice(id: string) {
-    const inv = byId(id)
-    if (!inv) return
-
     const now = new Date().toISOString()
-    await execute(
+    // withUpdateLog 兼做存在性检查(记录不存在/已删则跳过并返回 null),不再依赖内存 byId
+    const logId = await withUpdateLog(db, 'invoices', id, () => execute(
       `UPDATE invoices SET review_status='reviewed', account_status='confirmed', confirmed_at=?, updated_at=? WHERE id=?`,
       [now, now, id],
-    )
+    ))
     await load()
+    return logId
   }
 
-  async function remove(id: string) {
-    await execute('DELETE FROM invoices WHERE id = ?', [id])
-    await load()
-  }
+  const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, documents, pendingReview, ledger, add, update, updateField, confirmInvoice, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, documents, pendingReview, ledger, add, update, updateField, confirmInvoice, remove, restore, undo }
 })

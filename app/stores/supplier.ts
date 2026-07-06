@@ -1,5 +1,7 @@
 import { generateId } from '~/lib/util/id'
 import { execute, select } from '~/lib/db/connection'
+import { db } from '~/lib/db/client'
+import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 
 export interface Supplier {
   id: string
@@ -74,7 +76,9 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function load() {
     loading.value = true
     try {
-      const rows = await select<Record<string, unknown>>('SELECT * FROM suppliers ORDER BY created_at DESC')
+      const rows = await select<Record<string, unknown>>(
+        selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
+      )
       list.value = rows.map(rowToSupplier)
     }
     finally {
@@ -107,13 +111,15 @@ export const useSupplierStore = defineStore('supplier', () => {
         now, now,
       ],
     )
+    await logCreate(db, 'suppliers', id)
     await load()
     return id
   }
 
+  /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function update(id: string, data: Partial<Supplier>) {
     const now = new Date().toISOString()
-    await execute(
+    const logId = await withUpdateLog(db, 'suppliers', id, () => execute(
       `UPDATE suppliers SET name=?, aliases=?, unique_code=?, tax_no=?, business_type=?, supplier_category=?, rating=?, parent_supplier_id=?, legal_rep=?, registered_capital=?, registered_date=?, address=?, taxpayer_type=?, main_business=?, invoice_name=?, invoice_address=?, bank=?, bank_account=?, phone=?, contact=?, contact_phone=?, note=?, updated_at=? WHERE id=?`,
       [
         data.name ?? '', JSON.stringify(data.aliases ?? []),
@@ -127,14 +133,12 @@ export const useSupplierStore = defineStore('supplier', () => {
         data.contact ?? '', data.contactPhone ?? '',
         data.note ?? '', now, id,
       ],
-    )
+    ))
     await load()
+    return logId
   }
 
-  async function remove(id: string) {
-    await execute('DELETE FROM suppliers WHERE id = ?', [id])
-    await load()
-  }
+  const { remove, restore, undo } = createSoftDeleteActions(db, 'suppliers', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove, restore, undo }
 })

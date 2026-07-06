@@ -1,5 +1,7 @@
 import { generateId } from '~/lib/util/id'
 import { execute, select } from '~/lib/db/connection'
+import { db } from '~/lib/db/client'
+import { createSoftDeleteActions, hiddenCtes, logCreate, restoreRecord, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 
 export type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' | 'settled'
 
@@ -39,10 +41,12 @@ export const useProjectSupplierStore = defineStore('project-supplier', () => {
     loading.value = true
     try {
       const rows = await select<Record<string, unknown>>(`
+        ${hiddenCtes('project_suppliers')}
         SELECT ps.*, p.name as project_name, s.name as supplier_name
         FROM project_suppliers ps
         LEFT JOIN projects p ON ps.project_id = p.id
         LEFT JOIN suppliers s ON ps.supplier_id = s.id
+        WHERE ${visibleCond('project_suppliers', 'ps')}
         ORDER BY ps.created_at DESC
       `)
       list.value = rows.map(rowToPS)
@@ -68,9 +72,29 @@ export const useProjectSupplierStore = defineStore('project-supplier', () => {
     return list.value.filter(ps => ps.supplierId === supplierId)
   }
 
+  /**
+   * 添加挂靠。查重查库而非内存列表:同 (project, supplier) 已有可见行直接复用;
+   * 只有软删行则恢复原行(避免软删+重加+撤回后出现两条重复挂靠)并重置为
+   * collecting(新协作从收集资料开始,不继承上期 settled/paid 状态),都没有才 INSERT。
+   */
   async function add(projectId: string, supplierId: string) {
-    const existing = byProjectAndSupplier(projectId, supplierId)
-    if (existing) return existing.id
+    // 可见行优先于软删行,防止恢复已删老行后与可见行并存
+    const [existing] = await select<{ id: string, deleted_at: string | null }>(
+      `SELECT id, deleted_at FROM project_suppliers WHERE project_id = ? AND supplier_id = ?
+       ORDER BY (deleted_at IS NULL) DESC, created_at LIMIT 1`,
+      [projectId, supplierId],
+    )
+    if (existing) {
+      if (existing.deleted_at != null) {
+        await restoreRecord(db, 'project_suppliers', existing.id)
+        await withUpdateLog(db, 'project_suppliers', existing.id, () => execute(
+          'UPDATE project_suppliers SET status = ?, updated_at = ? WHERE id = ?',
+          ['collecting', new Date().toISOString(), existing.id],
+        ))
+        await load()
+      }
+      return existing.id
+    }
 
     const id = generateId('ps')
     const now = new Date().toISOString()
@@ -79,23 +103,23 @@ export const useProjectSupplierStore = defineStore('project-supplier', () => {
        VALUES (?, ?, ?, 'collecting', ?, ?)`,
       [id, projectId, supplierId, now, now],
     )
+    await logCreate(db, 'project_suppliers', id)
     await load()
     return id
   }
 
+  /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function updateStatus(id: string, status: ProjectSupplierStatus) {
     const now = new Date().toISOString()
-    await execute(
+    const logId = await withUpdateLog(db, 'project_suppliers', id, () => execute(
       'UPDATE project_suppliers SET status = ?, updated_at = ? WHERE id = ?',
       [status, now, id],
-    )
+    ))
     await load()
+    return logId
   }
 
-  async function remove(id: string) {
-    await execute('DELETE FROM project_suppliers WHERE id = ?', [id])
-    await load()
-  }
+  const { remove, restore, undo } = createSoftDeleteActions(db, 'project_suppliers', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, byProjectAndSupplier, byProject, bySupplier, add, updateStatus, remove }
+  return { list: readonly(list), loading: readonly(loading), load, byId, byProjectAndSupplier, byProject, bySupplier, add, updateStatus, remove, restore, undo }
 })
