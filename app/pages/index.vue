@@ -15,6 +15,7 @@ const metrics = computed(() => [
     icon: 'i-lucide-file-signature',
     color: 'brand' as const,
     suffix: '元',
+    money: true,
   },
   {
     label: '累计收款',
@@ -22,6 +23,7 @@ const metrics = computed(() => [
     icon: 'i-lucide-banknote',
     color: 'ok' as const,
     suffix: '元',
+    money: true,
   },
   {
     label: '累计支出',
@@ -29,6 +31,7 @@ const metrics = computed(() => [
     icon: 'i-lucide-receipt',
     color: 'danger' as const,
     suffix: '元',
+    money: true,
   },
   {
     label: '已开票额',
@@ -36,6 +39,7 @@ const metrics = computed(() => [
     icon: 'i-lucide-file-text',
     color: 'brand' as const,
     suffix: '元',
+    money: true,
   },
   {
     label: '材料分供方数',
@@ -43,6 +47,7 @@ const metrics = computed(() => [
     icon: 'i-lucide-building-2',
     color: 'brand' as const,
     suffix: '家',
+    money: false,
   },
 ])
 
@@ -81,6 +86,7 @@ onMounted(async () => {
         :icon="m.icon"
         :color="m.color"
         :suffix="m.suffix"
+        :money="m.money"
       />
     </div>
 
