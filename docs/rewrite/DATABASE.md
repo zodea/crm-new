@@ -714,15 +714,15 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 
 ---
 
-## § 8 撤回机制（待实现）
+## § 8 撤回机制（V1 已落地，#52）
 
-> 所有新增/编辑/删除操作需支持撤回。V1 先用软删除 + 操作日志，后续可扩展为后台管理回退面板。
+> 所有新增/编辑/删除操作需支持撤回。V1 用软删除 + 操作日志（已由 #52 实现），后续可扩展为后台管理回退面板。
 
 ### 8.1 软删除
 
 所有业务表增加 `deleted_at TEXT DEFAULT NULL` 字段。删除操作不执行 `DELETE`，而是 `UPDATE SET deleted_at = datetime('now')`。
 
-查询默认过滤已删除记录：`WHERE deleted_at IS NULL`。
+查询默认过滤已删除记录：`WHERE deleted_at IS NULL`。**注意该条件只查自身**——按 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 级联只标记父级，所有列表查询必须带「祖先未删」过滤（一条记录被隐藏 = 自身被删 OR 任一祖先被删）。读路径指引：单表读一律走 `app/lib/db/soft-delete.ts` 的 `selectVisibleSql(table, tail)`——唯一祝福读路径，整句可见查询，防止调用方漏拼前缀或条件的其中一半；只有 JOIN/聚合查询才用裸 `hiddenCtes(table)` + `visibleCond(table)` 自行组装。任何情况都不要手写 `deleted_at IS NULL` 单条件。
 
 恢复操作：`UPDATE SET deleted_at = NULL WHERE id = ?`。
 
@@ -757,11 +757,11 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 2. **编辑撤回**：从操作日志中恢复 `before_data` 的字段值
 3. **新增撤回**：标记软删除
 4. **撤回时效**：V1 不限制，V2 可按天数限制（如 30 天内可撤回）
-5. **级联撤回**：删除父记录时子记录一并软删除，撤回时一并恢复
+5. **级联撤回**：~~删除父记录时子记录一并软删除，撤回时一并恢复~~ ⚠️ 已过时，见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 第 5 条：级联**只标记父级**，子级靠「祖先是否已删」过滤隐藏（不逐条打标记）；撤回只需恢复父级，下游自动重现；删父级前已被单独删掉的子记录保持删除态、不被误恢复
 
 ### 8.4 实施计划
 
-- **V1**：在 Pinia store 的 CRUD 方法中集成 `operation_logs` 写入和 `deleted_at` 过滤，提供 `undo()` 方法
+- **V1（✅ 已落地，#52）**：全部业务表补 `deleted_at`（迁移 v2，`app/lib/db/migrations.ts`）+ `operation_logs` 表；统一封装在 `app/lib/db/soft-delete.ts`，对外缝级接口四个——`createSoftDeleteActions`（store 软删三连工厂 remove/restore/undo）、`withUpdateLog`（编辑落账三明治）、`logCreate`（新增落账）、`selectVisibleSql`（唯一祝福读路径，§8.1）；中层函数（`softDelete` / `restoreRecord` / `undoOperation` / `hiddenCtes` / `visibleCond`）供封装内部与 JOIN/聚合场景使用，不作为对外接口。4 个 store（project / supplier / invoice / project-supplier）接入并暴露 `remove` / `restore` / `undo`；测试见 `tests/db/soft-delete.test.ts`
 - **V2**：后台管理面板展示操作日志，支持按时间/表/操作类型筛选和批量回退
 
 ---
