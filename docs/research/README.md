@@ -41,7 +41,7 @@
 
 1. ~~本地引擎选型~~ → ✅ **已定**：PaddleOCR-VL-1.6 单模型（你拍板"用 PaddleOCR-VL 解决"）。
 2. ~~云VL CORS 方案~~ → ✅ **已解**：本地自托管走 localhost 无 CORS；云端 aistudio 仅开发期脱敏用。
-3. **送货单工地名 → 新app `project` 的绑定规则**：源项目工地是自由文本，CONTEXT.md 要求送货单必须归项目——怎么映射？（仍待定）
+3. ~~**送货单工地名 → 新app `project` 的绑定规则**~~ → ✅ **已定**（2026-07-06 grill）：`project_aliases` 别名表归一（命中自动绑/未命中人工确认后写回）；自然键全 ID 化（projectId+supplierId+orderNo），工地原文本仅留痕不作键。见 CONTEXT.md「工地」+ DATABASE.md §2.5。
 4. ~~**你的 Mac 机型 / 内存**~~ → ✅ **已解**（2026-07-06）：环境为 **Windows 为主**（Ryzen 5 5600 / 16GB / RTX 4060，已实测），llama.cpp CUDA 跑 0.9B 富余、无需激进量化；Mac 机型待真启用 MLX 加速时再问。
 5. **送货单 PRD 是否发 GitHub Issue**：已成文件；你说只放文档供检查，故未发工单（尝试发被自动拦，符合你意图）。你确认后我再发并打 `ready-for-agent`。
 6. **手写送货单不做全自动**：本地 VL 手写会掉档，需保留人工复核环节——确认接受这个约束。

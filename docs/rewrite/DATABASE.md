@@ -81,6 +81,7 @@ projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→�
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
 invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
 delivery_records ─1:N→ delivery_lines（「入库」写材料明细；单价对比=聚合查询视图，无独立表）
+projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑人工确认、同写法后续自动，CONTEXT.md「工地」）
 ```
 
 ---
@@ -231,15 +232,17 @@ CREATE TABLE monthly_statement_lines (
 |---|---|---|---|
 | DeliveryRecord | `delivery_records` | `id` | `material-delivery.md`（送货单头：处理区/归档库双区字段） |
 | DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（明细行：入库=材料数据，供单价对比/分供方详情读取） |
+| ProjectAlias | `project_aliases` | `id` | CONTEXT.md「工地」（工地名写法变体 → 项目归一，2026-07-06 grill 定） |
 
 > ~~PriceComparison `price_comparisons`~~ **已移除**：单价对比是对 `delivery_lines` 的聚合查询视图（同材料跨分供方/跨时间比价），无独立存储；未来若需收藏对比方案再议。
 
 ```sql
 CREATE TABLE delivery_records (
   id         TEXT PRIMARY KEY,
-  projectId  TEXT NOT NULL,          -- 上传即强制归项目（归属拦截卡在上传，CONTEXT.md「归档」）
+  projectId  TEXT NOT NULL,          -- 上传即强制归项目（归属拦截卡在上传，CONTEXT.md「归档」）；工地名经 project_aliases 归一而来
   supplierId TEXT,                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
-  orderNo TEXT, deliveryDate TEXT,
+  rawSiteText TEXT,                  -- OCR/文件夹推断的工地原文本，仅留痕追溯，不参与任何键（2026-07-06 定）
+  orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
   archived  INTEGER DEFAULT 0,       -- 核对完成即自动归档（核对是归档唯一前置）
@@ -254,6 +257,13 @@ CREATE TABLE delivery_lines (
   materialName TEXT, spec TEXT, unit TEXT,
   qty REAL, unitPrice REAL, amount REAL,
   note TEXT, sortOrder INTEGER
+);
+
+CREATE TABLE project_aliases (
+  id        TEXT PRIMARY KEY,
+  projectId TEXT NOT NULL,           -- → projects.id
+  alias     TEXT NOT NULL,           -- 工地名写法变体（全局唯一，见 §6）；首次人工确认时写入，之后同写法自动绑定
+  createdAt TEXT, deleted_at TEXT
 );
 ```
 
@@ -394,6 +404,7 @@ CREATE TABLE target_cost_items (
 | `attendance_records` | `projectId` / `workerId` | `projects.id` / `workers.id` | N:1 | 考勤（待细化） |
 | `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
 | `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
+| `project_aliases` | `projectId` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |
 
 ### 3.5 文件引用（多态关联）
 
@@ -610,6 +621,9 @@ interface FileRef {
   49. wage_statement_lines        → wage_statements, workers        （第 5 批档位）
   50. attendance_records          → projects, workers               （第 5 批档位）
   51. boq_change_lines            → boq_change_orders, boq_lines    （第 5 批档位）
+
+2026-07-06 增补（送货单工地名归一，随送货单批次建表）
+  52. project_aliases             → projects                        （第 3 批档位）
 ```
 
 ---
@@ -680,6 +694,9 @@ CREATE INDEX idx_msl_statement ON monthly_statement_lines(statementId);
 CREATE INDEX idx_delivery_proj ON delivery_records(projectId);
 CREATE INDEX idx_delivery_sup ON delivery_records(supplierId);
 CREATE INDEX idx_delivery_lines_rec ON delivery_lines(deliveryRecordId);
+-- 去重自然键（2026-07-06 定：全 ID 化，不用工地原文本；supplierId 为 NULL 不参与去重，本就带「缺公司」问题标记）
+CREATE UNIQUE INDEX uq_delivery_natural ON delivery_records(projectId, supplierId, orderNo) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_project_alias ON project_aliases(alias) WHERE deleted_at IS NULL;
 
 -- 工资与考勤
 CREATE INDEX idx_ws_proj ON wage_statements(projectId);

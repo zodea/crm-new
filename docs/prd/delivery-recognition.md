@@ -11,8 +11,8 @@
 
 1. ~~云VL CORS 方案~~ → ✅ **已解**（ADR-0006）：引擎改**本地自托管 PaddleOCR-VL-1.6**，走 localhost 无 CORS；云端 aistudio 仅开发期跑脱敏图。
 2. ~~本地引擎选型~~ → ✅ **已定**（ADR-0006）：**PaddleOCR-VL-1.6 单模型**（一个模型做 OCR+表格+手写+版面），MLX-VLM/llama.cpp 本地部署。源项目 `ocr-vl.js` 的 VL 协议直接复用（端点指向 localhost）；`vl-parse.js` 在 VL 的 Markdown 上抽明细行。
-3. **送货单工地名 → 新app `project` 的绑定规则**（仍待定）：源项目工地是自由文本；CONTEXT.md 要求"送货单必须归项目"。工地名→project 的对齐/映射规则未定，影响入库与归档归属。
-4. **你的 Mac 机型/内存**（新增，轻量）：定 PaddleOCR-VL 本地后端（MLX-VLM 最快 / llama.cpp 兼容广）。0.9B 极轻、门槛低。
+3. ~~**送货单工地名 → 新app `project` 的绑定规则**~~ → ✅ **已定**（2026-07-06 grill，CONTEXT.md「工地」+ DATABASE.md `project_aliases`）：工地名走**项目别名表归一**——命中别名自动绑定；未命中给模糊候选+**强制人工确认**，确认写回别名表（同写法下次自动）。绑定后一律用规范值：去重自然键 = `projectId+supplierId+orderNo` 全 ID 化，**工地原文本仅留痕（rawSiteText）不参与任何键**（用户明确：原文本前缀写法会越积越多，不可作键）。一工地多项目忽略不计，人工可核对、绑错可改。
+4. ~~**你的 Mac 机型/内存**~~ → ✅ **已解**（2026-07-06，ADR-0006 环境更正）：**Windows 为主 + Mac 需可用**，后端首选 **llama.cpp**（Windows CUDA / Mac Metal 同一套 GGUF），主力机 Ryzen 5 5600 / 16GB / RTX 4060 跑 0.9B 富余；MLX-VLM 降为 Mac 可选加速。
 
 ---
 
@@ -99,7 +99,7 @@
 - **分区/整理树落 delivery store**：`app/stores/delivery.ts` 从 mock 换真数据，补 staging(整理树)/partition(分区)/requestOcr/降级 actions；`matchSupplier` 数据源改查 `suppliers` 表（含 alias，若无则补一列或 JSON）。
 - **统一识别接口**：`app/lib/recognize/engine.ts` 封装引擎，对上暴露 `recognize(docType, pages) → { markdownPages, layoutRegions?, engine }`。引擎已定为 **PaddleOCR-VL-1.6 单模型（本地自托管为主，MLX-VLM/llama.cpp）**（ADR-0006）：一个模型出 OCR+表格+手写+版面 Markdown，送货单明细行由 `vl-parse.js` 在 Markdown 上抽取；本地走 localhost 无 CORS，云端 aistudio 仅开发期脱敏用。
 - **OCR 设置页 + 拦截门**：`app/stores/ocr-settings.ts`（token 留 localStorage 不进库/不进代码/不进 git）+ 蓝本形态设置页 + KitUI confirm 拦截门（记住 ack）。
-- **归属**：送货单必须归 `project`；工地名→project 绑定规则**待定**（前置决策3）。
+- **归属**：送货单必须归 `project`；工地名→project 绑定 = **别名表归一**（前置决策3 已定：`project_aliases` 命中自动绑、未命中模糊候选+人工确认后写回；自然键全 ID 化，原文本仅留痕）。
 - **UX 增补**（对齐 UX 基准，均为蓝本上做加法）：常驻六阶段步骤指示器；`BoundingBoxOverlay` 组件（点明细行↔高亮原图，依赖引擎返回坐标，缺坐标降级不高亮不报错）；明细行类 Excel 逐格编辑 + Magic Grid 原图拖线兜底；逐行置信色阶（黄/绿/红/灰统一色卡贯穿列表点/原图框/输入框/明细行底色）；业务勾稽（数量×单价=金额不平标红）；公司来源徽章 + 冲突二选一。
 - **不搬**：`@paddleocr/api-sdk`（未用）、isTauri/tauriInvoke 桌面分支、vite proxy/中间件、recognized-io 双通道、app-settings localStorage 实现、reka-ui、Precision Ledger 重壳（侧边栏+多阶段状态机+独立编辑路由，"变差"病灶）。详见移植方案 §10。
 - **依赖底座**：纯逻辑层可先做；识别 UI 组件（FileCard/FieldsTable/DeliveryTree）依赖 KitTable/KitAtoms/页签/软删——**UI 层必须等核心底座就位**（CONTEXT.md 顺序：KitUI原语→核心底座→识别域）。
