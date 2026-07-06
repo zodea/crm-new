@@ -54,6 +54,11 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 
 **改版工作约定**:每类交互改版前,先搜集一份「多风格真实参考站」菜单(能直接点开看效果)供挑方向,挑定再实装。参考站清单存档见 `docs/design/interaction-style-references.md`。
 
+## 开工纪律
+
+- **新工序开工前先查 issue tracker**:`gh issue list --state open` 搜关键词;已有 open issue 就按其已定稿规格直接做(那是沟通过的设计),**不重新发问、不重新设计**;规格与现状冲突时评论到该 issue 下再动手。**已关闭的 issue 不作数**(新工作需新 issue)。
+- **状态当场核实**:本仓库常有多会话/agent 并行,issue 状态用 `gh issue view` 看当下,不信文档快照与记忆。
+
 ## 提交纪律
 
 - **每完成一个独立工作单元立即提交**:一个 issue、一轮反馈的一层、一份文档定稿,做完即 commit,不要攒到会话结束;结束前检查 `git status`,不留未提交的完成品。
