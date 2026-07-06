@@ -1,6 +1,6 @@
 # OCR 引擎：PaddleOCR-VL 单模型，本地自托管为主、云端 aistudio 仅开发期
 
-> 状态：草案（2026-07-05 定，2026-07-05 依"用 PaddleOCR-VL 解决"修订为单模型方案；2026-07-06 重新拍板：运行环境更正为 Windows 为主 + Mac 需可用，后端首选改 llama.cpp）
+> 状态：**已采纳**（2026-07-05 草案；2026-07-06 用户逐条重新拍板确认——运行环境更正为 Windows 为主 + Mac 需可用、后端首选改 llama.cpp、手写不做全自动保留人工复核）
 > 详细论证见 `docs/research/ocr-recognition-strategy.md`；工程移植见 `docs/research/invoice-recognition-app-port-plan.md`。
 > 本版**取代**初版的"三层多引擎（PP-OCRv6 + 本地文本LLM + 独立视觉LLM）"方案——收敛为单一 PaddleOCR-VL。
 
