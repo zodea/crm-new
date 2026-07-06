@@ -71,6 +71,18 @@ projects ─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N�
     └─1:N→ target_costs ─1:N→ target_cost_items（costCategory: 人工/材料/机械/其他）
 ```
 
+### 1.2 清单与变更线（2026-07-04 grill 新增）
+
+```
+construction_contracts ─1:N→ boq_files ─1:N→ boq_lines（统一清单行模型，合同量+合同单价唯一来源）
+projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，CONTEXT.md「变更单」）
+              ├─1:N→ boq_change_lines ─N:1→ boq_lines（调量/调价指向原行；变更新增行反向挂 changeOrderId）
+              └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
+projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
+invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
+delivery_records ─1:N→ delivery_lines（「入库」写材料明细；单价对比=聚合查询视图，无独立表）
+```
+
 ---
 
 ## § 2 全部实体清单
@@ -99,28 +111,151 @@ projects ─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N�
 |---|---|---|---|
 | ConstructionContract | `construction_contracts` | `id` | `contract-construction.md` |
 | SupplementAgreement | `supplement_agreements` | `id` | `contract-construction.md` |
-| OwnerChangeOrder | `owner_change_orders` | `id` | `contract-construction.md` |
+| OwnerChangeOrder | `owner_change_orders` | `id` | `contract-construction.md`（金额台账=自动行（来源变更单）+手录纯金额签证，ADR-0002） |
 | ExpenditureContract | `expenditure_contracts` | `id` | `contract-base.md` + 类型文档 |
 | ContractLineItem | `contract_line_items` | `id` | `material-contract.md` |
+| BoqFile | `boq_files` | `id` | `boq-import.md`（清单文件：挂施工合同一对多，未拆表/已拆表） |
+| BoqLine | `boq_lines` | `id` | `boq-import.md` §二（统一清单行模型+来源追溯键） |
+| BoqChangeOrder | `boq_change_orders` | `id` | CONTEXT.md「变更单」「指令单」（四档状态） |
+| BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
+| MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
+| MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
+
+```sql
+CREATE TABLE boq_files (
+  id          TEXT PRIMARY KEY,
+  contractId  TEXT NOT NULL,          -- → construction_contracts.id（一份合同可挂多份清单文件）
+  fileName    TEXT, filePath TEXT,
+  formatClass TEXT,                   -- 'A'..'E'（boq-import.md §一 五类格式）
+  parseStatus TEXT DEFAULT 'pending', -- 'pending' 未拆表 | 'parsed' 已拆表·N 行
+  lineCount   INTEGER DEFAULT 0,
+  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE boq_lines (
+  id          TEXT PRIMARY KEY,
+  boqFileId   TEXT NOT NULL,          -- → boq_files.id
+  projectId   TEXT NOT NULL,          -- 冗余 → projects.id（高频按项目查）
+  -- 必有（boq-import.md §二）
+  itemName    TEXT NOT NULL,          -- 分项名称
+  unit TEXT, qty REAL,                -- 单套量为准（×套数=总量）
+  unitPrice   REAL,                   -- 合同单价（不含税）
+  amount      REAL,                   -- 合价
+  traceKey    TEXT,                   -- 来源追溯键（文件·sheet·行）
+  -- 常有可空
+  building TEXT, unitType TEXT, multiplier REAL,  -- 楼栋/户型/套数(倍数)
+  room TEXT, section TEXT, floorZone TEXT,        -- 房间(部位)/分部·章节/楼层层区
+  spec TEXT,                                       -- 特征描述
+  -- 可选
+  taxRate REAL, ownerSupplied INTEGER DEFAULT 0,   -- 税率/甲供标记（计量计工资不计材成本）
+  changeOrderId TEXT,                 -- 非空=变更新增行 → boq_change_orders.id
+  sortOrder INTEGER, createdAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE boq_change_orders (
+  id          TEXT PRIMARY KEY,
+  projectId   TEXT NOT NULL,          -- → projects.id
+  contractId  TEXT,                   -- → construction_contracts.id
+  code TEXT, name TEXT,               -- 编号/名称（单项目可达 200 份，靠编号+状态筛选检索）
+  changeType  TEXT,                   -- 主类型：'新增' | '调量' | '调价'（行级可混合）
+  status      TEXT DEFAULT 'draft',   -- 'draft' 草稿 | 'submitted' 已上报 | 'rejected' 已打回 | 'approved' 已签证
+  statusNote  TEXT,                   -- 各档详细说明（打回原因等，CONTEXT.md「变更单」）
+  directiveNo   TEXT,                 -- 甲方下发指令单编号
+  directiveType TEXT,                 -- 甲方指令单性质：'下发' | '变更' | '补充'
+  totalAmount REAL,                   -- Σ变更行合价（冗余）
+  approvedAt  TEXT,                   -- 签证完成日：该刻自动生成变洽签台账行（ADR-0002）
+  ledgerId    TEXT,                   -- → owner_change_orders.id（1:1 追溯；台账自动行不可直改金额）
+  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+-- 附件（我方指令单/甲方指令单/报价/算量/施工照片）走 file_refs 分类挂载，见 §3.5
+
+CREATE TABLE boq_change_lines (
+  id            TEXT PRIMARY KEY,
+  changeOrderId TEXT NOT NULL,        -- → boq_change_orders.id
+  boqLineId     TEXT,                 -- → boq_lines.id（调量/调价指向原行；新增为 NULL）
+  itemName TEXT, unit TEXT,
+  deltaQty REAL,                      -- 调量差值（新增行=全量）
+  newUnitPrice REAL,                  -- 调价后单价（NULL=价不变）
+  amount REAL,                        -- 该行变更合价
+  note TEXT, sortOrder INTEGER
+);
+
+CREATE TABLE monthly_statements (
+  id        TEXT PRIMARY KEY,
+  projectId TEXT NOT NULL,            -- → projects.id
+  month     TEXT NOT NULL,            -- yyyy-mm
+  status    TEXT DEFAULT 'draft',     -- 'draft' 自动汇总草稿 | 'adjusted' 已手调 | 'exported' 已导出
+  totalAmount REAL,
+  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE monthly_statement_lines (
+  id          TEXT PRIMARY KEY,
+  statementId TEXT NOT NULL,          -- → monthly_statements.id
+  itemName TEXT, unit TEXT,
+  autoQty     REAL,                   -- 自动汇总：当月完成勾选+现场量
+  adjustedQty REAL,                   -- 手工调整（NULL=未调，取 autoQty）
+  unitPrice   REAL,                   -- 合同单价
+  amount REAL, note TEXT, sortOrder INTEGER
+);
+```
 
 ### 2.4 资金管理类
 
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
-| InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（待设计） |
-| TicketRegistration | `ticket_registrations` | `id` | `finance-ticket.md`（待设计） |
+| Invoice | `invoices` | `id` | `finance-invoice.md`（识别+台账**单表**，ADR-0001；归属：项目 或 个人开支） |
+| InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（待设计；销项=开票申请） |
 | ReceiptRegistration | `receipt_registrations` | `id` | `finance-receipt.md`（待设计） |
 | PaymentApplication | `payment_applications` | `id` | `finance-payment.md`（待设计） |
 | CurrentReceipt | `current_receipts` | `id` | `finance-receipt.md`（待设计） |
 | CurrentPayment | `current_payments` | `id` | `finance-payment.md`（待设计） |
 | PaymentRecord | `payment_records` | `id` | `finance-records.md`（待设计） |
 
+> ~~TicketRegistration `ticket_registrations`~~ **已废弃**（ADR-0001）：红圈式收票登记合并进 `invoices` 单表，项目详情「收票登记」Tab = 查已归档 invoices。
+
+```sql
+-- invoices 关键字段（全量以 app/lib/db/schema.ts 为基础，以下为台账/归属增量，代码待迁移对齐）
+--   owner_kind     TEXT  'project' | 'personal'（个人开支）——归档那刻强制选定，无归属禁止归档/导入
+--   project_id     TEXT  owner_kind='project' 时必填 → projects.id
+--   supplier_id    TEXT  销方对应分供方（可选）→ suppliers.id
+--   contract_id    TEXT  合同收票（可选，红圈式，本期不做交互）→ expenditure_contracts.id
+--   account_status TEXT  'none' | 'archived'（归档=进台账；核对完成是归档唯一前置；归档后仍可改但弹二次确认）
+--   print_count    INTEGER 累计打印次数
+--   deleted_at     TEXT  软删除（§8）
+```
+
 ### 2.5 物资管理类
 
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
-| DeliveryRecord | `delivery_records` | `id` | `material-delivery.md`（待设计） |
-| PriceComparison | `price_comparisons` | `id` | `material-price.md`（待设计） |
+| DeliveryRecord | `delivery_records` | `id` | `material-delivery.md`（送货单头：处理区/归档库双区字段） |
+| DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（明细行：入库=材料数据，供单价对比/分供方详情读取） |
+
+> ~~PriceComparison `price_comparisons`~~ **已移除**：单价对比是对 `delivery_lines` 的聚合查询视图（同材料跨分供方/跨时间比价），无独立存储；未来若需收藏对比方案再议。
+
+```sql
+CREATE TABLE delivery_records (
+  id         TEXT PRIMARY KEY,
+  projectId  TEXT NOT NULL,          -- 上传即强制归项目（归属拦截卡在上传，CONTEXT.md「归档」）
+  supplierId TEXT,                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
+  orderNo TEXT, deliveryDate TEXT,
+  fileName TEXT, filePath TEXT,
+  ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
+  archived  INTEGER DEFAULT 0,       -- 核对完成即自动归档（核对是归档唯一前置）
+  stored    INTEGER DEFAULT 0,       -- 已入库（写材料数据，与归档并行的两条路）
+  reviewFlag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
+  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE delivery_lines (
+  id               TEXT PRIMARY KEY,
+  deliveryRecordId TEXT NOT NULL,    -- → delivery_records.id
+  materialName TEXT, spec TEXT, unit TEXT,
+  qty REAL, unitPrice REAL, amount REAL,
+  note TEXT, sortOrder INTEGER
+);
+```
 
 ### 2.6 分包及人工类
 
@@ -133,9 +268,13 @@ projects ─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N�
 | Worker | `workers` | `id` | `base-worker.md` |
 | WorkerCert | `worker_certs` | `id` | `base-worker.md` |
 | PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
-| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：项目×班组，名称/单位） |
-| Quantity | `quantities` | `id` | `subcontract-quantity.md`（工程量：分项×房间×工人，contractQty/fieldQty/provisionalQty/**completedMonth**） |
-| PayrollRecord | `payroll_records` | `id` | `subcontract-payroll.md`（待细化） |
+| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径，谁做记在 `quantities.crewId/workerId`，班组单价走 `crew_project_items`） |
+| Quantity | `quantities` | `id` | `subcontract-quantity.md`（工程量：分项×房间×工人，contractQty/fieldQty/provisionalQty/**completedMonth**；contractQty 由 `boq_lines` 按空间展开写入，已签证变更触发重算） |
+| WageStatement | `wage_statements` | `id` | `subcontract-payroll.md` + 设计稿 WageSlipScreen（月度进度款单：项目×班组×月；「本期支付总额」直给按权重分摊；**字段细化随工资域批次 PRD**） |
+| WageStatementLine | `wage_statement_lines` | `id` | 同上（工人行快照：应发/实发可直改/开户行/卡号） |
+| AttendanceRecord | `attendance_records` | `id` | 考勤（工人×日期×工时，**待细化**） |
+
+> ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资三表（禁用旧名）。工资单是**快照**（生成时计算应发 + 人工改实发），不是纯计算视图——反馈轮 8 定稿「实发逐人可直改」。
 
 ### 2.7 施工进度类（工期 × 工程量主线）
 
@@ -152,6 +291,7 @@ projects ─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N�
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 
 > 进度实际完成率复用 `quantities.completedMonth`，不新增录入口；工序 `hasQty=1` 自动取工程量、`=0` 手动填。详见 `schedule-progress.md` §五、§六。
+> `schedule_tasks` 预留 `baselineStart/baselineFinish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 
 ### 2.8 目标成本类（成本控制基线）
 
@@ -207,15 +347,23 @@ CREATE TABLE target_cost_items (
 | `expenditure_contracts` | `projectId` | `projects.id` | N:1 | 支出合同 → 项目 |
 | `expenditure_contracts` | `supplierId` | `suppliers.id` | N:1 | 支出合同 → 分供方 |
 | `contract_line_items` | `contractId` | `expenditure_contracts.id` | N:1 | 合同明细行 → 支出合同 |
+| `boq_files` | `contractId` | `construction_contracts.id` | N:1 | 清单文件 → 施工合同（一对多） |
+| `boq_lines` | `boqFileId` / `projectId` | `boq_files.id` / `projects.id` | N:1 | 清单行（projectId 冗余） |
+| `boq_lines` | `changeOrderId` | `boq_change_orders.id` | N:1 | 变更新增行来源（可选） |
+| `boq_change_orders` | `projectId` / `contractId` | `projects.id` / `construction_contracts.id` | N:1 | 变更单 |
+| `boq_change_orders` | `ledgerId` | `owner_change_orders.id` | 1:1 | 已签证自动生成的台账行（ADR-0002，软删除级联） |
+| `boq_change_lines` | `changeOrderId` / `boqLineId` | `boq_change_orders.id` / `boq_lines.id` | N:1 | 变更行（新增行 boqLineId 为 NULL） |
+| `monthly_statements` | `projectId` | `projects.id` | N:1 | 月度报量单 |
+| `monthly_statement_lines` | `statementId` | `monthly_statements.id` | N:1 | 报量行 |
 
 ### 3.3 资金管理关联
 
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
 | `invoice_applications` | `projectId` | `projects.id` | N:1 | 开票申请 → 项目 |
-| `ticket_registrations` | `projectId` | `projects.id` | N:1 | 收票 → 项目 |
-| `ticket_registrations` | `supplierId` | `suppliers.id` | N:1 | 收票 → 分供方 |
-| `ticket_registrations` | `contractId` | `expenditure_contracts.id` | N:1 | 收票 → 合同（可选） |
+| `invoices` | `projectId` | `projects.id` | N:1 | 发票归档归属（owner_kind='project' 时必填；'personal'=个人开支不挂项目） |
+| `invoices` | `supplierId` | `suppliers.id` | N:1 | 销方对应分供方（可选） |
+| `invoices` | `contractId` | `expenditure_contracts.id` | N:1 | 合同收票（可选，本期不做交互） |
 | `receipt_registrations` | `projectId` | `projects.id` | N:1 | 收款 → 项目 |
 | `payment_applications` | `projectId` | `projects.id` | N:1 | 付款申请 → 项目 |
 | `payment_applications` | `supplierId` | `suppliers.id` | N:1 | 付款申请 → 分供方 |
@@ -237,11 +385,15 @@ CREATE TABLE target_cost_items (
 | `penalty_records` | `projectId` | `projects.id` | N:1 | 扣罚 → 项目 |
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
-| `items` | `projectId` / `crewId` | `projects.id` / `crews.id` | N:1 | 分项定义 |
+| `items` | `projectId` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
 | `quantities` | `itemId` | `items.id` | N:1 | 工程量 → 分项 |
 | `quantities` | `roomId` / `unitId` | `rooms.id` / `units.id` | N:1 | 工程量 → 房间（unitId 冗余，便于户级聚合） |
 | `quantities` | `crewId` / `workerId` | `crews.id` / `workers.id` | N:1 | 施工班组/工人 |
-| `payroll_records` | `projectId` + `crewId` + `workerId` | — | N:1 | 工资（待细化） |
+| `wage_statements` | `projectId` / `crewId` | `projects.id` / `crews.id` | N:1 | 月度进度款单 |
+| `wage_statement_lines` | `statementId` / `workerId` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
+| `attendance_records` | `projectId` / `workerId` | `projects.id` / `workers.id` | N:1 | 考勤（待细化） |
+| `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
+| `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
 
 ### 3.5 文件引用（多态关联）
 
@@ -253,9 +405,14 @@ CREATE TABLE target_cost_items (
 | `supplier_credential` | SupplierCredential | 证照文件 |
 | `project_supplier` | ProjectSupplier | 项目×分供方文件 |
 | `settlement` | Settlement | 结算确认书 PDF |
+| `construction_contract` | ConstructionContract | 施工合同文书扫描件（Tab③ 文件柜 chip 在线预览） |
+| `supplement_agreement` | SupplementAgreement | 补充协议文书 |
+| `boq_change_order` | BoqChangeOrder | 变更单附件，category 细分**各有放置区**：我方指令单（可多版）/ 甲方指令单 / 报价 / 算量 / 施工照片 |
 | `expenditure_contract` | ExpenditureContract | 合同扫描件 |
 | `payment_application` | PaymentApplication | 付款附件 |
-| `ticket_registration` | TicketRegistration | 发票扫描件 |
+| `invoice` | Invoice | 发票原图（原 `ticket_registration` 已随 ADR-0001 废弃） |
+| `delivery_record` | DeliveryRecord | 送货单扫描件 |
+| `quantity` | Quantity | 验收照片（挂「户×分项」，工序卡点判据，CONTEXT.md「验收照片」） |
 | `worker` | Worker | 工人证件照片/信息文件 |
 | `worker_cert` | WorkerCert | 证书扫描件（身份证/特种作业证等） |
 | `penalty_record` | PenaltyRecord | 罚款照片/整改前后对比照/联系单扫描件 |
@@ -309,7 +466,7 @@ interface FileRef {
 |---|---|
 | 主合同金额 | `SELECT SUM(amount) FROM construction_contracts WHERE projectId = ?` |
 | 增补合同额 | `SELECT SUM(amount) FROM supplement_agreements WHERE contractId IN (SELECT id FROM construction_contracts WHERE projectId = ?)` |
-| 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?` |
+| 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?`（台账=变更单自动行+手录纯金额签证，ADR-0002） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
 | 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
 | 付款金额 | `SELECT SUM(actualPayment) FROM payment_applications WHERE projectId = ?` |
@@ -323,8 +480,8 @@ interface FileRef {
 |---|---|
 | 销项票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |
 | 销项税额 | `SELECT SUM(taxAmount) FROM invoice_applications WHERE projectId = ?` |
-| 进项票额 | `SELECT SUM(amount) FROM ticket_registrations WHERE projectId = ?` |
-| 进项税额 | `SELECT SUM(taxAmount) FROM ticket_registrations WHERE projectId = ?` |
+| 进项票额 | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND account_status = 'archived'`（ADR-0001，反馈轮 9 已在设计稿联动验证） |
+| 进项税额 | `SELECT SUM(tax_amount) FROM invoices WHERE project_id = ? AND account_status = 'archived'` |
 | 增值税 | 销项税额 − 进项税额 |
 | 税负率 | 增值税 / 销项票额 |
 
@@ -345,7 +502,7 @@ interface FileRef {
 | contractTotal | `SELECT SUM(taxIncTotal) FROM expenditure_contracts WHERE projectId = ? AND supplierId = ?` |
 | claimedTotal | `SELECT SUM(amount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND approvalStatus = 'approved'` |
 | paidTotal | `SELECT SUM(actualPayment) FROM payment_applications WHERE projectId = ? AND supplierId = ?` |
-| invoiceTotal | `SELECT SUM(amount) FROM ticket_registrations WHERE projectId = ? AND supplierId = ?` |
+| invoiceTotal | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND supplier_id = ? AND account_status = 'archived'` |
 | balance | contractTotal − paidTotal |
 
 ### 4.5 首页 Dashboard 指标（homepage-dashboard.md）
@@ -370,6 +527,17 @@ interface FileRef {
 | 项目目标成本（按科目） | `SELECT costCategory, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.targetCostId=t.id WHERE t.projectId=? AND t.isBaseline=1 GROUP BY costCategory` |
 | 项目实际成本（按科目） | 按 §2.8 costCategory 约定归集：人工=劳务/分包付款+工资；材料=材料合同付款+送货单；机械=设备租赁付款；其他=报销+其他支出 |
 | 成本偏差率 | `(实际 − 目标) / 目标`（科目级与合计级） |
+
+### 4.7 清单量差与产值（subcontract-quantity.md · CONTEXT.md「三量」「变更单」「月度报量」）
+
+| 字段 | 计算 |
+|---|---|
+| 合同量（含变更） | `boq_lines` 原始行 + **已签证**变更行增量（`boq_change_orders.status='approved'` 的 `boq_change_lines.deltaQty`）；可另开参考口径含已上报 |
+| 量差（分项×楼栋） | 基准量 − 合同量，基准量可勾选 = 合同 / 暂估 / 现场（`quantities` 三字段，项目级设置） |
+| 量差金额 | 量差 × 合同单价（`boq_lines.unitPrice`，调价变更取已签证新单价） |
+| 产值 | Σ完成量 × 合同单价，含已签证变更（CONTEXT.md「单价双轨」：合同单价轨） |
+| 分项毛利 | (合同单价 − 班组分项单价) × 量（现场量未核定用暂估量预估） |
+| 月度报量草稿行 | 当月 `quantities.completedMonth = 月` 的完成量 + 现场量 × 合同单价 → `monthly_statement_lines.autoQty` |
 
 ---
 
@@ -410,7 +578,7 @@ interface FileRef {
   25. settlements                 → project_suppliers
   26. supplement_agreements       → construction_contracts
   27. contract_line_items         → expenditure_contracts
-  28. ticket_registrations        → projects, suppliers, expenditure_contracts
+  28. invoices                    → projects, suppliers, expenditure_contracts（原 ticket_registrations 已废弃，ADR-0001）
   29. payment_applications        → projects, suppliers, expenditure_contracts
   30. floors                      → buildings
   31. schedule_group_buildings    → schedule_groups, buildings
@@ -422,7 +590,7 @@ interface FileRef {
   35. units                       → floors
   36. task_dependencies           → schedule_tasks
   37. task_item_map               → schedule_tasks
-  38. payroll_records             → projects, crews, workers（待细化）
+  38. wage_statements             → projects, crews（原 payroll_records 细化拆分）
 
 第 5 批（依赖第 4 批）
   39. rooms                       → units
@@ -430,6 +598,18 @@ interface FileRef {
 
 第 6 批（多态关联，无严格外键约束）
   41. file_refs                   → ownerType + ownerId（应用层保证一致性）
+
+2026-07-04 增补（清单/变更/报量/送货单/工资，随各自批次建表）
+  42. monthly_statements          → projects                       （第 2 批档位）
+  43. boq_files                   → construction_contracts          （第 3 批档位）
+  44. boq_change_orders           → projects, construction_contracts, owner_change_orders（第 3 批档位）
+  45. delivery_records            → projects, suppliers             （第 3 批档位）
+  46. monthly_statement_lines     → monthly_statements              （第 3 批档位）
+  47. boq_lines                   → boq_files, projects, boq_change_orders（第 4 批档位）
+  48. delivery_lines              → delivery_records                （第 4 批档位）
+  49. wage_statement_lines        → wage_statements, workers        （第 5 批档位）
+  50. attendance_records          → projects, workers               （第 5 批档位）
+  51. boq_change_lines            → boq_change_orders, boq_lines    （第 5 批档位）
 ```
 
 ---
@@ -444,8 +624,9 @@ CREATE INDEX idx_expenditure_contracts_proj ON expenditure_contracts(projectId);
 CREATE INDEX idx_expenditure_contracts_sup ON expenditure_contracts(supplierId);
 CREATE INDEX idx_payment_applications_proj ON payment_applications(projectId);
 CREATE INDEX idx_payment_applications_sup ON payment_applications(supplierId);
-CREATE INDEX idx_ticket_registrations_proj ON ticket_registrations(projectId);
-CREATE INDEX idx_ticket_registrations_sup ON ticket_registrations(supplierId);
+CREATE INDEX idx_invoices_project ON invoices(project_id);
+CREATE INDEX idx_invoices_supplier ON invoices(supplier_id);
+CREATE INDEX idx_invoices_account ON invoices(account_status);
 
 -- 证照查询
 CREATE INDEX idx_supplier_credentials_sup ON supplier_credentials(supplierId);
@@ -482,6 +663,28 @@ CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
 -- 目标成本
 CREATE INDEX idx_target_costs_proj ON target_costs(projectId);
 CREATE INDEX idx_tci_target ON target_cost_items(targetCostId);
+
+-- 清单与变更
+CREATE INDEX idx_boq_files_contract ON boq_files(contractId);
+CREATE INDEX idx_boq_lines_file ON boq_lines(boqFileId);
+CREATE INDEX idx_boq_lines_proj ON boq_lines(projectId);
+CREATE INDEX idx_boq_co_proj ON boq_change_orders(projectId);
+CREATE INDEX idx_boq_co_status ON boq_change_orders(status);   -- 200 份量级按状态筛选
+CREATE INDEX idx_boq_cl_order ON boq_change_lines(changeOrderId);
+
+-- 月度报量
+CREATE INDEX idx_ms_proj_month ON monthly_statements(projectId, month);
+CREATE INDEX idx_msl_statement ON monthly_statement_lines(statementId);
+
+-- 送货单
+CREATE INDEX idx_delivery_proj ON delivery_records(projectId);
+CREATE INDEX idx_delivery_sup ON delivery_records(supplierId);
+CREATE INDEX idx_delivery_lines_rec ON delivery_lines(deliveryRecordId);
+
+-- 工资与考勤
+CREATE INDEX idx_ws_proj ON wage_statements(projectId);
+CREATE INDEX idx_wsl_statement ON wage_statement_lines(statementId);
+CREATE INDEX idx_att_worker ON attendance_records(workerId);
 
 -- 银行行号（idx_bank_codes_name / idx_bank_codes_brand_city 见 base-worker.md §五）
 ```
@@ -573,3 +776,4 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 6. 计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询（§ 4）
 7. 新增支出类实体必须定义 **costCategory 归集口径**（人工/材料/机械/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量表名以 `subcontract-quantity.md` 的 `items` + `quantities` 为准，禁用旧名 `quantity_records`
+9. **禁用旧名**（2026-07-04 grill 定稿）：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表 `wage_statements`/`wage_statement_lines`/`attendance_records`）、`price_comparisons`（→ `delivery_lines` 聚合查询视图，无表）

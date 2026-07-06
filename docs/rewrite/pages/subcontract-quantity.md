@@ -33,8 +33,10 @@ id TEXT PRIMARY KEY, unitId TEXT, name TEXT, sortOrder INTEGER
 ## 二、分项 + 工程量数据
 
 ```sql
--- items（分项定义）
-id TEXT PRIMARY KEY, projectId TEXT, crewId TEXT
+-- items（分项定义：项目×分部/工种，不挂班组——分项是合同计量口径（BoQ 拆表产生），
+-- 谁做记在 quantities.crewId/workerId，班组单价走 crew_project_items（2026-07-04 grill 修订）
+id TEXT PRIMARY KEY, projectId TEXT
+section TEXT, trade TEXT   -- 分部（如 装饰装修）/ 工种（如 泥水）
 name TEXT, unit TEXT, sortOrder INTEGER
 
 -- quantities（工程量记录）
