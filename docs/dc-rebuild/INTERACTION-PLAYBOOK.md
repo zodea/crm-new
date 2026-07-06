@@ -25,7 +25,7 @@
 | 页面结构 / 字段 / Tab / 弹窗定义 | `docs/rewrite/pages/<page>.md`（内容蓝本，结构也要对齐） |
 | 视觉样式（卡片/按钮/表格/状态色） | [STYLE-GUIDE.md](./STYLE-GUIDE.md)（**覆盖** DESIGN-SYSTEM.md 的旧扁平条款） |
 | 删除 / 编辑 / 撤回行为 | `docs/rewrite/DATABASE.md` §8（软删除 + 操作日志 + 撤回规则） |
-| 导出交互 | `docs/rewrite/pages/finance-invoice.md` §7（**全局通用**：文件夹选择器 + 结构/命名配置）+ `docs/rewrite/DESIGN-SYSTEM.md` §7.3（完成水波动效） |
+| 导出交互 | `docs/rewrite/pages/finance-invoice.md` §7（**全局通用**：文件夹选择器 + 结构/命名配置）+ `docs/rewrite/DESIGN-SYSTEM.md` §7.3 |
 | 页面接入 / 路由 / DS 组件 | [IMPLEMENTATION.md](./IMPLEMENTATION.md) |
 | 术语 | 根目录 `CONTEXT.md` |
 
@@ -49,6 +49,8 @@
 ---
 
 ## 三、Step 3 —— 原语优先（KitUI）
+
+> ⚠ **本节描述 DC 设计稿侧（`window.KitUI`）。生产端（Nuxt/Vue）底座已换 shadcn-vue（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：reka-ui Dialog + vue-sonner，统一入口 `useKitUI()`（原语语义与本节一致）。「原语优先、禁止一次性轮子」的规则不变。
 
 ### 3.1 现有全局原语（`kit/KitUI.jsx`，纯 DOM，经隐藏 x-import 预加载注册 `window.KitUI`）
 
