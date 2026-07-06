@@ -1,15 +1,15 @@
 # OCR 引擎：PaddleOCR-VL 单模型，本地自托管为主、云端 aistudio 仅开发期
 
-> 状态：草案（2026-07-05 定，2026-07-05 依"用 PaddleOCR-VL 解决"修订为单模型方案，待用户最终确认）
+> 状态：草案（2026-07-05 定，2026-07-05 依"用 PaddleOCR-VL 解决"修订为单模型方案；2026-07-06 重新拍板：运行环境更正为 Windows 为主 + Mac 需可用，后端首选改 llama.cpp）
 > 详细论证见 `docs/research/ocr-recognition-strategy.md`；工程移植见 `docs/research/invoice-recognition-app-port-plan.md`。
 > 本版**取代**初版的"三层多引擎（PP-OCRv6 + 本地文本LLM + 独立视觉LLM）"方案——收敛为单一 PaddleOCR-VL。
 
-用户是工程财务管理员，处理真实发票/送货单（含税号/金额/公司名），三诉求叠加：**成本敏感**、**隐私敏感**（数据不愿外传）、**要打磨质量**；环境 macOS Apple Silicon。已有一套跑通的实现（`invoice-recognition-app`），其 `ocr-vl.js` 已集成 aistudio 的 PaddleOCR-VL 云端异步 job API（模型名 `PaddleOCR-VL-1.6`）。初版曾设计"本地 PP-OCRv6 + Ollama 文本 LLM + 独立本地视觉 LLM"的三层多引擎方案，但多模型在一台 Mac 上争内存、需切换/加载卸载调度（keep_alive、OLLAMA_MAX_LOADED_MODELS），复杂且易互相干扰。
+用户是工程财务管理员，处理真实发票/送货单（含税号/金额/公司名），三诉求叠加：**成本敏感**、**隐私敏感**（数据不愿外传）、**要打磨质量**；环境 **Windows 为主**（主力机 Ryzen 5 5600 / 16GB / RTX 4060，2026-07-06 实测确认），**Mac 需可用**（初版调研误设 macOS 为唯一环境，已更正）。已有一套跑通的实现（`invoice-recognition-app`），其 `ocr-vl.js` 已集成 aistudio 的 PaddleOCR-VL 云端异步 job API（模型名 `PaddleOCR-VL-1.6`）。初版曾设计"本地 PP-OCRv6 + Ollama 文本 LLM + 独立本地视觉 LLM"的三层多引擎方案，但多模型在一台 Mac 上争内存、需切换/加载卸载调度（keep_alive、OLLAMA_MAX_LOADED_MODELS），复杂且易互相干扰。
 
 **决策**：OCR 识别用**单一 PaddleOCR-VL（0.9B 多模态模型）**做引擎，一个模型完成 OCR + 表格 + 公式 + 手写 + 版面结构，图 → 结构化 Markdown + 版面区域；再由**规则正则**（现成 `vl-parse.js`/`invoice-parse.js`）在 Markdown 上抽出发票/送货单字段。
 
 - **模型版本**：默认 **PaddleOCR-VL-1.6**（最新，0.9B，含发票/边框表与手写强化；与源项目 `ocr-vl.js` 已用的版本一致）；1.5 为已验证稳定回退。全系同为 0.9B，无尺寸取舍。
-- **部署（主）= 本地自托管**：Apple Silicon 上用 **MLX-VLM**（<14B 最快，比 llama.cpp 快 20–87%）为首选后端，`llama.cpp` 为兼容最广的回退（可纯 CPU、无 CUDA 依赖）；Apache-2.0、数据 100% 不出机器、可离线、零泄漏。0.9B 极轻，硬件门槛远低于 7B 级模型。
+- **部署（主）= 本地自托管，首选 `llama.cpp`**（2026-07-06 定：Windows 为主 + Mac 需可用，取跨平台通吃的后端）：Windows 走 CUDA 构建（RTX 4060 8GB 跑 0.9B 富余），Mac 走 Metal 构建，同一套 GGUF 模型文件、同一个本地 server 协议，前端零分支。**MLX-VLM 降为 Mac 专属可选加速**（<14B 比 llama.cpp 快 20–87%，仅当 Mac 侧成为常用环境再启用）。Apache-2.0、数据 100% 不出机器、可离线、零泄漏。0.9B 极轻，硬件门槛远低于 7B 级模型。
 - **部署（仅开发期）= 云端 aistudio**：`aistudio.baidu.com/paddleocr` 登录后免费不限次、API/MCP；**仅用脱敏/样例图跑通交互，禁止喂真实发票**（数据到百度云 + 浏览器 CORS）。`ocr-vl.js` 只需把 base 在本地端点与云端间切换。
 - **结构化**：规则正则（A）为主（VL 的干净 Markdown/表格让正则更稳）；本地文本 LLM（Ollama qwen2.5）降为**可选的极个别怪版式兜底**，默认不启用、不常驻。
 - **统一识别接口** `recognize(docType, pages) → { markdownPages, layoutRegions?, engine }`，引擎（本地 VL / 云端 VL）可切换，调用方不感知。
@@ -28,7 +28,7 @@
 - **架构大幅简化**：从三层多引擎收敛为"一个 0.9B VL 模型 + 规则正则"，**"多模型互相干扰"问题消失**，无需 Ollama 内存调度/模型切换。
 - **隐私满足**：本地自托管数据不出机器、可离线、零泄漏；财务数据默认全本地。
 - **质量满足**：PaddleOCR-VL 文档解析 > GPT-4o（OmniDocBench，1.5 达 94.5%），印刷发票 + 手写送货单一个模型覆盖。
-- **硬件门槛低**：0.9B 极轻（远小于 7B），Apple Silicon（M4 已官方验证）舒适跑；MLX-VLM 后端最快。**待确认用户机型**（M 几 / 内存），以定 MLX vs llama.cpp 及是否需量化。
+- **硬件门槛低**：0.9B 极轻（远小于 7B）。主力 Windows 机已确认（Ryzen 5 5600 / 16GB / **RTX 4060 8GB**）：CUDA 跑 0.9B 显存富余，**无需激进量化**（Q8 或 FP16 均可）。Mac 机型待有需要时再确认（届时才涉及 MLX 加速与量化档位）。
 - **移植受益**：源项目 `ocr-vl.js`（VL 异步 job 协议）+ `vl-parse.js`（Markdown→字段）直接复用；本地端点只需把 base 指向 MLX/llama.cpp 本地 server，删掉云端 Tauri/vite 代理分支。
 - **开发提速**：可先用云端 aistudio（登录免费、一键）跑通交互（脱敏图），再切本地自托管交付真实数据。
 - **待验证**：本地 PaddleOCR-VL 对中文潦草手写送货单的实际质量需抽样实测（手写仍是全行业分水岭，保留人工复核）；VL 版面区域到"发票字段级"高亮的粒度需实测（块级可行，字段级看 layout 细度）。
