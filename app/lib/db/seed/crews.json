@@ -1,0 +1,56 @@
+[
+  {
+    "id": "crew_demo_001",
+    "name": "泥水A班",
+    "trade": "泥水工",
+    "contact_name": "虞师傅",
+    "contact_phone": "13700110001",
+    "note": "墙地砖主力班组",
+    "created_at": "2026-06-01T00:02:06.000Z"
+  },
+  {
+    "id": "crew_demo_002",
+    "name": "泥水B班",
+    "trade": "泥水工",
+    "contact_name": "张师傅",
+    "contact_phone": "13700110002",
+    "note": "",
+    "created_at": "2026-06-01T00:02:05.000Z"
+  },
+  {
+    "id": "crew_demo_003",
+    "name": "木工一班",
+    "trade": "木工",
+    "contact_name": "孙师傅",
+    "contact_phone": "13700110003",
+    "note": "模板·吊顶",
+    "created_at": "2026-06-01T00:02:04.000Z"
+  },
+  {
+    "id": "crew_demo_004",
+    "name": "钢筋班",
+    "trade": "钢筋工",
+    "contact_name": "赵师傅",
+    "contact_phone": "13700110004",
+    "note": "",
+    "created_at": "2026-06-01T00:02:03.000Z"
+  },
+  {
+    "id": "crew_demo_005",
+    "name": "防水班",
+    "trade": "防水工",
+    "contact_name": "刘师傅",
+    "contact_phone": "13700110005",
+    "note": "屋面·卫生间",
+    "created_at": "2026-06-01T00:02:02.000Z"
+  },
+  {
+    "id": "crew_demo_006",
+    "name": "水电班",
+    "trade": "水暖工",
+    "contact_name": "周师傅",
+    "contact_phone": "13700110006",
+    "note": "",
+    "created_at": "2026-06-01T00:02:01.000Z"
+  }
+]
