@@ -80,6 +80,7 @@ export function computeCombinations(
     }
 
     const f = factors[idx]
+    if (!f) return
     for (let qty = 0; qty <= f.upperLimit; qty++) {
       const subtotal = round(qty * f.unitPrice)
       const newTotal = round(currentTotal + subtotal)

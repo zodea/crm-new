@@ -10,8 +10,8 @@ export async function getAllTableNames(): Promise<string[]> {
 }
 
 export async function getTableRowCount(table: string): Promise<number> {
-  const [{ cnt }] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
-  return cnt
+  const [row] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
+  return row?.cnt ?? 0
 }
 
 export async function exportTableToJson(table: string): Promise<Record<string, unknown>[]> {

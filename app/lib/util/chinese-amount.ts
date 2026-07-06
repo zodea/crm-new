@@ -1,6 +1,6 @@
-const DIGITS = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖']
-const UNITS = ['', '拾', '佰', '仟']
-const BIG_UNITS = ['', '万', '亿', '兆']
+const DIGITS = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'] as const
+const UNITS = ['', '拾', '佰', '仟'] as const
+const BIG_UNITS = ['', '万', '亿', '兆'] as const
 
 export function moneyToChinese(amount: number): string {
   if (amount === 0) return '零元整'
@@ -54,15 +54,13 @@ function integerToChinese(n: number): string {
   }
 
   let result = ''
-  for (let gi = 0; gi < groups.length; gi++) {
-    const group = groups[gi]
+  for (const [gi, group] of groups.entries()) {
     const bigUnit = BIG_UNITS[groups.length - 1 - gi] || ''
     let groupStr = ''
     let hasNonZero = false
 
-    for (let i = 0; i < group.length; i++) {
-      const d = group[i]
-      const unit = UNITS[group.length - 1 - i]
+    for (const [i, d] of group.entries()) {
+      const unit = UNITS[group.length - 1 - i] ?? ''
       if (d === 0) {
         if (hasNonZero && i < group.length - 1 && group[i + 1] !== 0) {
           groupStr += '零'

@@ -71,14 +71,14 @@ function handlePaste(e: ClipboardEvent) {
   e.preventDefault()
   const lines = text.trim().split('\n')
   for (const line of lines) {
-    const parts = line.split('\t')
-    if (parts.length >= 3) {
+    const [name, unit, price, limit] = line.split('\t')
+    if (name != null && unit != null && price != null) {
       factors.value.push({
         id: nextFactorId++,
-        name: parts[0].trim(),
-        unit: parts[1].trim(),
-        unitPrice: Number.parseFloat(parts[2]) || 0,
-        upperLimit: parts[3] ? (Number.parseInt(parts[3]) || 10) : 10,
+        name: name.trim(),
+        unit: unit.trim(),
+        unitPrice: Number.parseFloat(price) || 0,
+        upperLimit: limit ? (Number.parseInt(limit) || 10) : 10,
       })
     }
   }

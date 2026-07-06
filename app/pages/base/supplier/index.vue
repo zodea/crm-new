@@ -25,7 +25,7 @@ const CRED_STATUS_LABEL: Record<string, string> = {
 
 const filtered = computed(() => {
   const q = searchText.value.trim().toLowerCase()
-  if (!q) return store.list
+  if (!q) return [...store.list]
   return store.list.filter(s =>
     s.name.toLowerCase().includes(q)
     || s.contact.toLowerCase().includes(q)

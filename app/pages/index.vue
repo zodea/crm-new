@@ -48,8 +48,9 @@ const metrics = computed(() => [
 
 onMounted(async () => {
   await projStore.load()
-  if (projects.value.length > 0 && !selectedProjectId.value) {
-    selectedProjectId.value = projects.value[0].id
+  const first = projects.value[0]
+  if (first && !selectedProjectId.value) {
+    selectedProjectId.value = first.id
   }
 })
 </script>

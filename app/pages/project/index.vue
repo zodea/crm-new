@@ -20,7 +20,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const filtered = computed(() => {
   const q = searchText.value.trim().toLowerCase()
-  if (!q) return store.list
+  if (!q) return [...store.list]
   return store.list.filter(p =>
     p.name.toLowerCase().includes(q)
     || p.address.toLowerCase().includes(q)

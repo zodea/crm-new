@@ -38,10 +38,11 @@ export function exportToXlsx<T extends Record<string, unknown>>(
     }
   })
 
-  if (data.length > 0) {
+  const firstRow = data[0]
+  if (firstRow) {
     const numericCols = columns
       .map((c, i) => ({ col: i, key: c.key }))
-      .filter(({ key }) => typeof data[0][key] === 'number')
+      .filter(({ key }) => typeof firstRow[key] === 'number')
 
     for (const { col } of numericCols) {
       const colLetter = XLSX.utils.encode_col(col)
@@ -79,7 +80,9 @@ export function importFromXlsx<T extends Record<string, unknown>>(
     const process = (buffer: ArrayBuffer) => {
       try {
         const wb = XLSX.read(buffer, { type: 'array' })
-        const ws = wb.Sheets[wb.SheetNames[0]]
+        const firstSheetName = wb.SheetNames[0]
+        const ws = firstSheetName ? wb.Sheets[firstSheetName] : undefined
+        if (!ws) throw new Error('Excel 文件中没有工作表')
         const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
 
         const headerMap = new Map<string, keyof T>()

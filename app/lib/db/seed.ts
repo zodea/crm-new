@@ -45,8 +45,8 @@ export async function seedIfEmpty() {
   let anySeeded = false
 
   for (const table of jsonTables) {
-    const [{ cnt }] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
-    if (cnt > 0) continue
+    const [row] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
+    if ((row?.cnt ?? 0) > 0) continue
 
     const json = loadSeedJson(table)
     if (json && json.length > 0) {
@@ -56,8 +56,8 @@ export async function seedIfEmpty() {
   }
 
   if (!anySeeded) {
-    const [{ cnt }] = await select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
-    if (cnt === 0) {
+    const [row] = await select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
+    if ((row?.cnt ?? 0) === 0) {
       await seedHardcoded()
     }
   }
