@@ -11,7 +11,7 @@ import {
 import { computed } from 'vue'
 import { cn } from '~/lib/utils'
 
-// shadcn-vue DialogContent：portal + 遮罩（品牌色轻遮罩 --overlay，不上毛玻璃）+ 居中面板。
+// shadcn-vue DialogContent：portal + 遮罩（中性黑轻遮罩 --overlay = rgb(0 0 0/28%)，不上毛玻璃）+ 居中面板。
 // 进出动画走 uno.config 的 dialog-in/out（zoom+fade+微升，始终居中）。
 // 基类刻意不含 宽度/内边距/布局——那些由各调用方经 class 自带（无 tailwind-merge，
 // 避免同名工具类对冲靠 CSS 顺序定胜负）。style/role 等经 $attrs 透传到内容元素。
