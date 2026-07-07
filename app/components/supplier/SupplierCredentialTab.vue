@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { execute, select } from '~/lib/db/connection'
 import { db } from '~/lib/db/client'
-import { hiddenCtes, logCreate, softDelete, visibleCond } from '~/lib/db/soft-delete'
+import { logCreate, selectVisibleSql, softDelete } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 
 const props = defineProps<{
   supplierId: string
 }>()
 
-const toast = useToast()
+const { formModal, success, error } = useKitUI()
 
 interface Credential {
   id: string
@@ -35,10 +35,7 @@ async function loadCredentials() {
   loading.value = true
   try {
     const rows = await select<Record<string, unknown>>(
-      `${hiddenCtes('supplier_credentials')}
-       SELECT * FROM supplier_credentials
-       WHERE ${visibleCond('supplier_credentials')} AND supplier_id = ?
-       ORDER BY added_at DESC`,
+      selectVisibleSql('supplier_credentials', 'AND supplier_id = ? ORDER BY added_at DESC'),
       [props.supplierId],
     )
     credentials.value = rows.map(r => ({
@@ -62,8 +59,6 @@ const missingRequired = computed(() =>
   REQUIRED.filter(cat => !credentials.value.some(c => c.category === cat)),
 )
 
-const { formModal } = useKitUI()
-
 async function addCredential() {
   const values = await formModal({
     title: '添加证照',
@@ -76,20 +71,27 @@ async function addCredential() {
   })
   if (!values) return
   const id = generateId('cred')
-  await execute(
-    `INSERT INTO supplier_credentials (id, supplier_id, category, file_name, added_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, props.supplierId, values.category, values.fileName, new Date().toISOString()],
-  )
-  await logCreate(db, 'supplier_credentials', id)
-  toast.success('证照已添加（待上传文件）')
+  // 弹窗在 resolve 时已关闭,写库失败必须显式报错,否则用户会误以为已保存
+  try {
+    await execute(
+      `INSERT INTO supplier_credentials (id, supplier_id, category, file_name, added_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, props.supplierId, values.category, values.fileName, new Date().toISOString()],
+    )
+    await logCreate(db, 'supplier_credentials', id)
+  }
+  catch {
+    error('证照添加失败，未写入数据库，请重试')
+    return
+  }
+  success('证照已添加（待上传文件）')
   await loadCredentials()
 }
 
 // TODO(数据流阶梯): 本组件直连 db 属存量范式,待证照随分供方域收进 Pinia store
 async function removeCredential(id: string) {
   await softDelete(db, 'supplier_credentials', id)
-  toast.success('已删除')
+  success('已删除')
   await loadCredentials()
 }
 
