@@ -3,6 +3,8 @@
 > 路由: `/subcontract/quantity` · `/subcontract/quantity/:pid/:cid`
 > 页面: `pages/subcontract/quantity/index.vue` · `pages/subcontract/quantity/[pid]/[cid].vue`
 > 来源: DESIGN-project-worker §8 + §10
+>
+> ⚠️ **模型已按 [ADR 0010](../../adr/0010-quantity-matrix-and-construction-record-model.md) 大改（2026-07-08）**：工程量矩阵改为**户型模板活链接**（量在户型层共享）+ **完成勾选四合一**（指派+完成+月份+落量）+ 施工记录派生视图；表结构 `house_type_templates` / `house_type_template_items` / `unit_assignments` 取代原 `quantities`。**本文下方仍是旧的「分项×房间×工人」模型，待工程量域批次 PRD 整体重写**——冲突处一律以 ADR 0010 + CONTEXT.md 为准。
 
 ---
 
