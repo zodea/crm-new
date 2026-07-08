@@ -56,8 +56,8 @@ _ds/.../tokens/*.css               ← 颜色/间距/阴影 token
 - 组件签名：列表 `({ data, navigate })`；详情 `({ data, params, navigate })`。
 - 风格严格按 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
 - **展示原子目前是各文件内联复制**（SegTab/SelectFilter/InfoGrid/SectionHeader/Metric/SubTable/TH/TD），为降耦合先内联；`SelectFilter` 已在 Project/Supplier/Crew/Worker 四个列表页各自内联一份。
-- **交互原语已全局化**：`kit/KitUI.jsx`（隐藏 x-import 预加载注册 `window.KitUI`）提供 toast/confirm/modal/formModal/undoToast/folderPicker/exportModal/importModal（ripple 蓝色水波已废弃，不再提供）。交互一律先用/先扩 KitUI，规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md) §三。
-  > ⚠ **本条仅描述 DC 设计稿侧。生产端（Nuxt/Vue）已按 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md) 换 shadcn-vue 底座**：confirm/formModal 基于 reka-ui Dialog、toast 基于 vue-sonner 双 Toaster（样式栈 UnoCSS，零 Tailwind 引擎）；统一入口仍是 `useKitUI()`（签名不变）。设计稿的 `window.KitUI` 仅作视觉/行为基准留档。
+- **交互原语已全局化**：`kit/KitUI.jsx`（隐藏 x-import 预加载注册 `window.KitUI`）提供 toast/confirm/modal/formModal/undoToast/folderPicker；导出/导入原语已退役为独立页签（见 [ADR 0004](../adr/0004-export-interaction-model.md) / [ADR 0005](../adr/0005-import-mapping-model.md)）。交互一律先用/先扩，规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md) §三。
+  > ⚠ 本条为 DC 设计稿侧；生产端底座 = shadcn-vue（统一入口 `useKitUI()`，签名不变），见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)。
 - **展示原子已全局化（反馈轮 9，替代"各文件内联复制"旧约定）**：`kit/KitAtoms.jsx` → `window.KitAtoms`（SelectFilter/SegTab/SearchInput/SectionHeader/Metric/MetricGrid/TreeNav）；表格一律 `kit/KitTable.jsx` → `window.KitTable`（≥10 行/容器内横滚/分页/金额两位小数）。**新页面禁止再内联复制这些原子。**
 - **跨页共享数据 store（反馈轮 9）**：主数据走 `kit/AppData.jsx` → `window.APP`（projects/suppliers，subscribe/rows/get/update/add/softDel/restore/use）；发票域 `window.INV`、排程域 `window.SCHEDULE`、工资域 `window.WAGE`。**列表/详情/聚合页禁止各自 useState 持有数据副本**，一律订阅 store，编辑写回 store 实现跨页联动。
 
@@ -121,4 +121,4 @@ write_files(projectId, planId, files:[{ path:"kit/Xxx.jsx", localPath:"Xxx.jsx" 
 ## 五、已知遗留 / 注意
 1. **KitToolbar 兼容垫片已移除**：`ProjectScreen` 第 5 站重写后不再引用 `window.KitToolbar/KitTH/KitTD`，已从 `SupplierScreen.jsx` 删除该注册块，全项目无残留。
 2. ~~弹窗多为占位~~ **已完成（反馈轮 3）**：新增/编辑弹窗、导出配置、导入映射、打印确认、送货单系列弹窗均已是真实交互，做法与规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md)。项目详情 6 个占位 Tab 与项目×分供方工作台仍为占位。
-3. **DESIGN-SYSTEM.md 未同步**：其扁平 CRM 条款与现风格冲突，暂不改（用户要求），以 [STYLE-GUIDE.md](./STYLE-GUIDE.md) 为准。
+3. **视觉基准 = [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)**（圆角卡片 + 阴影）；DESIGN-SYSTEM.md 扁平旧条款已作废，dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
