@@ -378,6 +378,8 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ### 4.13 vxe-table 主题覆写要点
 
+> 表格底座 = `KitTable` 深封装 vxe-table（三件套阈值 + 金额格式 + 选型理由见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)）；本节仅列 vxe 主题的令牌覆写规格。
+
 - 表头背景: `var(--surface-2)`
 - 行 hover: `var(--surface-3)`
 - 描边: `var(--line)`
