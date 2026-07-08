@@ -774,7 +774,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 2. **编辑撤回**：从操作日志中恢复 `before_data` 的字段值
 3. **新增撤回**：标记软删除
 4. **撤回时效**：V1 不限制，V2 可按天数限制（如 30 天内可撤回）
-5. **级联撤回**：~~删除父记录时子记录一并软删除，撤回时一并恢复~~ ⚠️ 已过时，见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 第 5 条：级联**只标记父级**，子级靠「祖先是否已删」过滤隐藏（不逐条打标记）；撤回只需恢复父级，下游自动重现；删父级前已被单独删掉的子记录保持删除态、不被误恢复
+5. **级联撤回**：见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 第 5 条——级联只标父级、撤回只恢复父级、下游按「祖先是否已删」自动重现（读取过滤本体见 §8.1）。
 
 ### 8.4 实施计划
 
