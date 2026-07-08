@@ -5,7 +5,7 @@
 
 ## 背景
 
-本项目的数据网格底座是 vxe-table（4.x），但它的选型理由此前只散落在 `docs/rewrite/_archived/05-table-solution.md`（2026-06-26 定稿、已归档、无 ADR 编号），且 `STYLE-GUIDE.md`「表格三件套」规范只讲行为契约、不指名库。结果是：一个既成且合理的选型没有可被发现的权威留痕——2026-07-07 就出现了「都用了 shadcn-vue 组件库，怎么 KitTable 还在用 vxe-table，是不是自造 UI」的质疑（详查见 `docs/research/shadcn-table-vs-vxe-table-2026-07-07.md`）。
+本项目的数据网格底座是 vxe-table（4.x），但它的选型理由此前只散落在 `docs/rewrite/_archived/05-table-solution.md`（2026-06-26 定稿、已归档、无 ADR 编号），且 `STYLE-GUIDE.md`「表格三件套」规范只讲行为契约、不指名库。结果是：一个既成且合理的选型没有可被发现的权威留痕——2026-07-07 就出现了「都用了 shadcn-vue 组件库，怎么 KitTable 还在用 vxe-table，是不是自造 UI」的质疑。
 
 这个质疑基于一个误解：以为 [ADR 0008](0008-adopt-shadcn-vue-on-unocss.md) 采纳 shadcn-vue 就该把表格也统一过去。但 ADR 0008 的范围严格限定在**交互原语**（confirm / formModal / toast）+ 两个交互型原子（SegTab / SelectFilter），全文从未把数据网格纳入或排除——唯一涉及表格处是迁移映射表顺带确认「表体由 vxe-table 负责」。**交互原语与数据网格是两个正交的问题域**，需要各自的权威源。本 ADR 补上数据网格这条。
 
