@@ -3,6 +3,8 @@
 > 对象：claude.ai/design 项目「瑞航CRM-NEW」的 `app.dc.html` 单页设计稿
 > 目标：以 `docs/rewrite/pages/*.md` 为内容蓝本，把各页面按统一的「疏朗仪表盘」风格重构，消除「各页各做一套」的割裂感
 > 开始：2026-06-30 · 本目录为实施记录
+>
+> ⛔ **本目录（`docs/dc-rebuild/`）整体是 `window.KitUI`（`.jsx`）设计稿的历史留档**——记录 DC 单页设计稿的重构过程与交互方法论。**生产端（Nuxt/Vue）以 ADR 为权威**：底座 shadcn-vue [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、确认删除 [0003](../adr/0003-confirm-dialog-deletion-model.md)、导出 [0004](../adr/0004-export-interaction-model.md)、导入 [0005](../adr/0005-import-mapping-model.md)、视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、表格 [0009](../adr/0009-vxe-table-as-datagrid-engine.md)。设计稿与 ADR 冲突处一律以 ADR 为准；下文 window.KitUI / 扁平 / 水波 等描述均为设计稿侧留痕。
 
 ---
 
@@ -15,7 +17,7 @@
 ### 1.2 风格基准（已与用户确认）
 **以首页 `HomeScreenNew` + 工程量 `QuantityScreenV2` 为唯一视觉基准**，所有页面向其看齐。
 
-> ⚠️ 注意：`docs/rewrite/DESIGN-SYSTEM.md` §1.2 / §3.2 / §4.1 写的是「内容区扁平、无圆角、无阴影」的旧 CRM 规范，**已与实际实现和用户要求脱节**。实际 `_ds_bundle.js` 里的 `Panel`/`StatCard` 组件早已是圆角 12px + 阴影。本轮以「首页/工程量」为准，`DESIGN-SYSTEM.md` 冲突条款暂不更新（用户要求），但**不要再照旧 DESIGN-SYSTEM 的扁平规范做**。详见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
+> ⚠️ 视觉风格基准 = 圆角卡片 + 阴影，以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准（DESIGN-SYSTEM.md 的扁平旧条款已作废）；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
 
 ### 1.3 内容蓝本
 每个页面的 Tab 结构、字段、列表列、筛选、详情页设计，**严格按 `docs/rewrite/pages/*.md` 实现**（不只是套皮，结构也要对齐 md）。
@@ -74,7 +76,7 @@
 `ProjectScreen` 重写后不再引用 `window.KitToolbar/KitTH/KitTD`，已从 `SupplierScreen.jsx` 末尾删除该注册块。全项目无残留引用。
 
 ### 反馈轮 2（分部/工种·配置·工资·请款单·全量按钮）
-- `kit/KitUI.jsx`（新增）：全局轻交互工具（纯 DOM，跨所有屏复用）—— `KitUI.toast/confirm/modal/formModal`，经隐藏 x-import 预加载；全项目占位按钮（导出/导入/新增/编辑/删除/刷新/上传/查看/列设置/识别…）均已接通交互。（⚠ 生产端底座已换 shadcn-vue，见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)；本条为设计稿侧记录）
+- `kit/KitUI.jsx`（新增）：全局轻交互工具（纯 DOM，跨所有屏复用）—— `KitUI.toast/confirm/modal/formModal`，经隐藏 x-import 预加载；全项目占位按钮（导出/导入/新增/编辑/删除/刷新/上传/查看/列设置/识别…）均已接通交互。
 - `QuantityScreenV2.jsx` 再改：**分部 → 工种 → 分项** 三级（格子按工种分块，不再只到泥水分项）；hover/弹窗展示各工种工人+工程量；弹窗「先量后钱」（金额折叠）、去掉跨楼层入口；格子改**瓷砖留白圆角**观感；**完工月份做成可编辑 state**（「设置工程量/完工时间」弹窗逐层配置，实时驱动矩阵着色/工种/隐藏），并标注首页进度据此生成。
 - `PayrollScreen.jsx`：接 `params` 可从工资明细**逐级回退到班组**层级；发放比例节点**可点选查看历史月份**当期发放；加「请款单格式」入口。`PayrollDetailScreen.jsx`：面包屑逐级可回退（工资核算/项目/班组/工人）。
 - `kit/WageSlipScreen.jsx`（新增）：**网页版工资请款单**，还原 `docs/rewrite/工资发放格式` 真实 Excel 四表（① 进度款审批表 ② 工程量进度清单 ③ 工人工资表 ④ 考勤表），数据按车陂商业大楼·周维铺贴班组 2025.4 样例；侧边栏「分包及人工」加入口 + `wageSlip` 路由。
@@ -84,7 +86,7 @@
 - `KitUI.jsx` 新增三个全局原语（全模块复用）：
   - `exportModal`：全局导出规范弹窗 = 保存位置（模拟文件夹选择器 `folderPicker`）+ 文件夹结构两级下拉 + 命名规则两段组合与实时预览 + 进度条 + 完成后静态成功 toast（蓝色水波动效已废弃，见 ADR 0004）。
   - `importModal`：Excel 导入 = 选文件（模拟）→ 源列→系统字段映射表（同名自动匹配）→ 导入 N 行回调。
-  - `undoToast`：软删除撤回 toast（DATABASE §8），5 秒内可一键撤回。
+  - `undoToast`：软删除撤回 toast（DATABASE §8），10 秒内可一键撤回。
 - 四个列表页（分供方/班组/工人/项目）：列表转组件 state；新增/编辑 formModal 提交**实时更新列表**（必填校验）；删除 = confirm → 软删除 + 撤回；搜索框接通；导出/导入接 exportModal/importModal（导入回填示例行）。刷新恢复初始 mock。
 - 发票页：发票列表提升为 InvoiceScreen state。上传（拖拽/选文件/选文件夹）→ 生成 2 张 mock 发票入「校对与排版」；校对页新增**保存校对**；归档入账真实移入台账；废弃 = 软删除可撤回；打印 = **打印确认弹窗**（张数/页数/金额合计）→ 累计打印次数；台账导出菜单三项接真实弹窗（打印 PDF / 导出原件 / 导出 Excel，未勾选默认全部）；台账导入 = 字段映射弹窗 → 新增 2 条 excel 来源行；编辑/删除真实生效。
 - 送货单页：文件列表转 state。**整理树弹窗**（工地→分供方→文件，实数据构建）；**问题汇总弹窗**（实文件清单 + 一键全部标记已复核）；识别全部/单文件识别真实更新 OCR 状态；**入库**（已识别未入库计数 + stored 标记防重复）；导出归档接 exportModal；分区 chip 点击可**移动分区**；新增分区真实加入标签栏；「只看未完善」真实筛选切换。
