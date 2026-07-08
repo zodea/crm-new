@@ -278,8 +278,11 @@ CREATE TABLE project_aliases (
 | Worker | `workers` | `id` | `base-worker.md` |
 | WorkerCert | `worker_certs` | `id` | `base-worker.md` |
 | PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
-| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径，谁做记在 `quantities.crewId/workerId`，班组单价走 `crew_project_items`） |
-| Quantity | `quantities` | `id` | `subcontract-quantity.md`（工程量：分项×房间×工人，contractQty/fieldQty/provisionalQty/**completedMonth**；contractQty 由 `boq_lines` 按空间展开写入，已签证变更触发重算） |
+| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，班组单价走 `crew_project_items`） |
+| HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
+| HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（房间×工种×分项，清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
+| UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户级指派+完成四合一（户×工种→班组/人×月份×完成，草稿态+验收照片软卡） |
+| ~~Quantity~~ | ~~`quantities`~~ | — | ⚠️ **已按 [ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md) 重构**：原「分项×房间×工人」合一表拆为 `house_type_template_items`（量）+ `unit_assignments`（完成/施工人/月份）；`units` +`houseTypeTemplateId`、`projects` +`matrixArchivedAt`。本文下方对 `quantities` 的引用（§66 关系图 / §303·§461·§534 进度聚合 / §399-401 外键 / §547·§551 口径 / §663-666 索引）待工程量域批次 PRD 随实现改名同步，完整 schema 以 ADR 0010 为权威 |
 | WageStatement | `wage_statements` | `id` | `subcontract-payroll.md` + 设计稿 WageSlipScreen（月度进度款单：项目×班组×月；「本期支付总额」直给按权重分摊；**字段细化随工资域批次 PRD**） |
 | WageStatementLine | `wage_statement_lines` | `id` | 同上（工人行快照：应发/实发可直改/开户行/卡号） |
 | AttendanceRecord | `attendance_records` | `id` | 考勤（工人×日期×工时，**待细化**） |
@@ -605,7 +608,7 @@ interface FileRef {
 
 第 5 批（依赖第 4 批）
   39. rooms                       → units
-  40. quantities                  → items, rooms, units, crews, workers
+  40. quantities  ⚠️ 按 ADR 0010 拆为 house_type_templates / house_type_template_items / unit_assignments（随工程量域批次 PRD 建表）
 
 第 6 批（多态关联，无严格外键约束）
   41. file_refs                   → ownerType + ownerId（应用层保证一致性）
@@ -792,5 +795,5 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 5. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
 6. 计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询（§ 4）
 7. 新增支出类实体必须定义 **costCategory 归集口径**（人工/材料/机械/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
-8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量表名以 `subcontract-quantity.md` 的 `items` + `quantities` 为准，禁用旧名 `quantity_records`
+8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵表名/结构以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准（`house_type_templates` / `house_type_template_items` / `unit_assignments`，取代原 `quantities`），禁用旧名 `quantity_records`
 9. **禁用旧名**（2026-07-04 grill 定稿）：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表 `wage_statements`/`wage_statement_lines`/`attendance_records`）、`price_comparisons`（→ `delivery_lines` 聚合查询视图，无表）
