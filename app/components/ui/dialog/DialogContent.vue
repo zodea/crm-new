@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import type { DialogContentEmits, DialogContentProps, PointerDownOutsideEvent } from 'reka-ui'
 import {
   DialogClose,
   DialogContent,
-  type DialogContentEmits,
-  type DialogContentProps,
+
   DialogOverlay,
   DialogPortal,
+  injectDialogRootContext,
+
   useForwardPropsEmits,
 } from 'reka-ui'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { cn } from '~/lib/utils'
 
 // shadcn-vue DialogContent：portal + 遮罩（中性黑轻遮罩 --overlay = rgb(0 0 0/28%)，不上毛玻璃）+ 居中面板。
@@ -26,6 +28,24 @@ const delegatedProps = computed(() => {
   return rest
 })
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+
+// #86 双击误取消防护：弹窗打开后 GRACE_MS 内忽略 pointer-down-outside。
+// 竞态成因：第一击开窗 → 遮罩在微任务 flush 后挂载接管指针 → 第二击命中遮罩被
+// reka usePointerDownOutside 判为「点外部」→ dismiss。reka 仅 setTimeout(0) 延迟注册监听，
+// 挡不住 ≥50ms 的双击。这里按打开时间戳设 300ms 宽限窗口，窗口内 preventDefault 抑制 dismiss；
+// 窗口外点遮罩仍正常关闭（#79 语义不变），Esc 不受影响（走 escapeKeyDown，非本回调）。
+const GRACE_MS = 300
+const rootContext = injectDialogRootContext()
+const openedAt = ref(0)
+watch(() => rootContext.open.value, (isOpen) => {
+  if (isOpen)
+    openedAt.value = performance.now()
+}, { immediate: true })
+
+function onPointerDownOutside(e: PointerDownOutsideEvent) {
+  if (performance.now() - openedAt.value < GRACE_MS)
+    e.preventDefault()
+}
 </script>
 
 <template>
@@ -39,6 +59,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         'fixed left-1/2 top-1/2 z-[9001] -translate-x-1/2 -translate-y-1/2 border border-line bg-panel shadow-[var(--shadow-pop)] rounded-[var(--radius-card)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:dialog-in data-[state=closed]:dialog-out',
         props.class,
       )"
+      @pointer-down-outside="onPointerDownOutside"
     >
       <slot />
       <DialogClose
