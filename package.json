@@ -9,32 +9,42 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "tauri": "tauri",
+    "typecheck": "nuxt typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky"
   },
   "dependencies": {
-    "@iconify-json/lucide": "^1.2.114",
+    "@iconify-json/lucide": "^1.2.116",
     "@pinia/nuxt": "^0.11.3",
-    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-sql": "^2.4.0",
-    "@unocss/nuxt": "^66.7.3",
+    "@unocss/nuxt": "^66.7.5",
     "@vueuse/core": "^14.3.0",
     "@vueuse/nuxt": "^14.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "nuxt": "^4.4.8",
     "reka-ui": "^2.10.1",
-    "unocss": "^66.7.3",
-    "vue": "^3.5.38",
+    "sql.js": "^1.14.1",
+    "unocss": "^66.7.5",
+    "vue": "^3.5.39",
     "vue-router": "^5.1.0",
     "vue-sonner": "^2.0.9",
-    "vxe-table": "^4.19.20",
-    "xe-utils": "^4.0.10",
-    "sql.js": "^1.14.1",
+    "vxe-table": "^4.19.25",
+    "xe-utils": "^4.0.11",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.5.0",
-    "vitest": "^4.0.0"
+    "@antfu/eslint-config": "^9.1.0",
+    "@nuxt/eslint": "^1.16.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "eslint": "^10.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.7"
   }
 }
