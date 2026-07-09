@@ -90,6 +90,9 @@
       <sc-if value="{{ isProjectDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="ProjectDetailScreen" from="./kit/ProjectDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
+      <sc-if value="{{ isProjectSupplier }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjectSupplierScreen" from="./kit/ProjectSupplierScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
       <sc-if value="{{ isSchedule }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="SchedulePlanScreen" from="./kit/SchedulePlanScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
       </sc-if>
@@ -170,6 +173,7 @@ const PAGE = {
   home:          { title: "首页",     subtitle: "在建工程总览" },
   project:       { title: "施工项目",  subtitle: "项目管理" },
   projectDetail: { title: "项目详情",  subtitle: "经营驾驶舱 · 阶段 · 子表" },
+  projectSupplier: { title: "项目·分供方工作台", subtitle: "合作关系 · 合同/请款/收票/付款 · 结算" },
   schedule:      { title: "施工进度",  subtitle: "WBS 排程 · 计划vs实际 · 依赖 · 调期" },
   scheduleGroupNew: { title: "新建楼栋分组", subtitle: "工序模板逐条可调 · 排程实时预览" },
   supplier:      { title: "分供方资料库", subtitle: "资料管理 · 对账" },
@@ -212,6 +216,7 @@ class Component extends DCLogic {
     const p = params || {};
     if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit")
       return route + ":" + (p.id || "");
+    if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
     if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
     if (route === "crewDetail") return route + ":" + (p.crewId || "");
     if (route === "payrollDetail") return route + ":" + (p.worker || "") + ":" + (p.crew || "") + ":" + (p.project || "");
@@ -238,6 +243,7 @@ class Component extends DCLogic {
       else if (route === "invoiceEdit") { const iv = (window.INV && window.INV.get(p.id)); name = iv && iv.number ? iv.number.slice(-8) : ""; }
       else if (route === "boqImport" || route === "boqList") name = (p.contract || "").slice(0, 10);
     } catch (e) { name = ""; }
+    if (route === "projectSupplier") return (p.project || "项目") + "×" + (p.supplier || "分供方");
     return name ? page.title + "·" + name : page.title;
   }
 
@@ -345,7 +351,7 @@ class Component extends DCLogic {
     if (key === "crew") return r === "crew" || r === "crewDetail";
     if (key === "supplier") return r === "supplier" || r === "supplierDetail";
     if (key === "worker") return r === "worker" || r === "workerDetail";
-    if (key === "project") return r === "project" || r === "projectDetail";
+    if (key === "project") return r === "project" || r === "projectDetail" || r === "projectSupplier";
     if (key === "invoice") return r === "invoice";
     if (key === "schedule") return r === "schedule" || r === "scheduleGroupNew";
     if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
@@ -518,6 +524,7 @@ class Component extends DCLogic {
       isHome:          route === "home",
       isProject:       route === "project",
       isProjectDetail: route === "projectDetail",
+      isProjectSupplier: route === "projectSupplier",
       isSchedule:      route === "schedule",
       isScheduleGroupNew: route === "scheduleGroupNew",
       isSupplier:      route === "supplier",

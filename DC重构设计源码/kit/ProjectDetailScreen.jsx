@@ -838,7 +838,7 @@
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <SubTable title="支出合同" columns={[
             { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
-            { key: "supplier", label: "乙方（分供方）" },
+            { key: "supplier", label: "乙方（分供方）", render: (v) => <button onClick={() => navigate("projectSupplier", { pid: proj.id, sid: v, project: proj.name, supplier: v })} style={{ border: 0, background: "transparent", color: "var(--brand)", fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }} title="打开 项目×分供方 工作台">{v}</button> },
             { key: "type", label: "合同类型" },
             { key: "amount", label: "含税合价", align: "right", money: true },
             { key: "settled", label: "累计结算金额", align: "right", money: true },

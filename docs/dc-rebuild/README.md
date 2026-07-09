@@ -212,6 +212,18 @@
 - 页签上限同步：`app.dc.html` 壳 10+confirm → **15+toast**（CONTEXT.md 页签导航 · 反馈轮10 · #82）。
 - 验证：esbuild 通过；本地 8823 + Chrome 实测（③4表/④3表/⑥5表/⑨6表逐一核对、新增按列生成 5 字段表单并落行、删除确认+撤回恢复、串味修复后计数正确），console 零报错。已 DesignSync 推送（app.dc.html + kit/ProjectDetailScreen.jsx）。
 
+### 设计稿完善 P2（2026-07-09：项目×分供方工作台）
+
+> 蓝本 `project-supplier.md`。定位：某项目下某分供方的合作关系枢纽——本页只做「聚合展示 + 跳转源模块 + 结算确认」。
+
+- 新建 `kit/ProjectSupplierScreen.jsx` + `app.dc.html` `projectSupplier` 路由（PAGE/renderVals/x-import/_tabKey=pid+sid/_tabTitle 特判「项目×分供方」/侧栏归入项目组高亮）。
+- **顶部摘要**：项目 × 分供方 + 状态 chip + 5 段状态机步进器（collecting→contracted→claiming→paid→settled）+ 6 指标（合同额/已批请款/收票额/税额/已付/应付余额）。
+- **6 Tab**：合作概览（信息卡+最近动态）/ 合同 / 请款 / 收票 / 付款（后四者只读列表，[+新建]与行点击跳转源模块携 项目+分供方 筛选）/ **结算**。
+- **结算 = 本页唯一写操作**：填结算金额 + 上传结算确认书 PDF（必填校验）→ [确认结算] 二次确认弹窗 → 状态置「已结算」并**锁定只读**，展示尾款差额。
+- **入口**：项目详情「支出合同管理」子表分供方名做成蓝链 → 进本页（`navigate("projectSupplier", {pid,sid,project,supplier})`）。
+- 右侧文件栏按来源分组（合同/请款/收票/付款）；审批时间线/评论/动态标注 V2。
+- 验证：esbuild 通过；本地 8823 + Chrome 实测（工作台渲染、结算上传→二次确认→已结算锁定只读+尾款差额、入口蓝链开出对应工作台且页签按 pid+sid 去重、标题「合和新城×陈家泥水班组」正确），console 零报错。已 DesignSync 推送（app.dc.html + kit/ProjectSupplierScreen.jsx + kit/ProjectDetailScreen.jsx）。
+
 ### 反馈轮 8（2026-07-04：全站界面整改 —— 九大块）
 见 [FEEDBACK-8.md](./FEEDBACK-8.md)：表格三件套铁律（见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)）、金额两位小数铁律、红圈对齐；首页减法、项目列表/编辑/详情红圈化、施工进度新建分组子页面、分供方表格修复、税额工具压缩、工程量矩阵优化+量差总表（#37）、清单编辑、工资核算/进度款对齐真实格式。**每完成一屏在该文件标「暂定界面」。**
 
@@ -219,7 +231,7 @@
 
 ## 四、尚未做的（待深化）
 - ~~**项目详情子表**：其余 6 个 Tab 为占位卡~~ ✅ **已完成（P1 · 2026-07-09）**：10 Tab 全部按 project-info.md §五出真实子表并接通 CRUD 闭环（新增/编辑/删除+软删撤回/搜索/导出+合计实时重算），共享 `SubTable` 升级承载。阶段任务「上传」已可翻转状态，「查看」仍为占位 toast。
-- **项目×分供方工作台**（project-supplier.md，路由 `/project/:pid/supplier/:sid`）尚未建独立页，目前从项目详情「支出合同管理」Tab 占位入口预留。
+- ~~**项目×分供方工作台** 尚未建独立页~~ ✅ **已完成（P2 · 2026-07-09）**：`ProjectSupplierScreen` + `projectSupplier` 路由，入口＝项目详情「支出合同管理」子表分供方名蓝链。
 - 各页面 md 中的**二级弹窗**普遍只占位：发票导出原件配置 / Excel 导入字段映射 / 打印确认；新增编辑弹窗；送货单整理树 / 问题汇总 / 入库 / 导出弹窗。
 - **数据 mock 在组件内**（项目经营数据/票据/阶段/各子表样例按 id mock）。后续若要更真实，统一补进 `kit/data.js`。
 - `docs/rewrite/DESIGN-SYSTEM.md` 与新风格冲突的条款未同步更新（用户暂不要求）。
