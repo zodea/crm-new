@@ -1,7 +1,7 @@
-import { generateId } from '~/lib/util/id'
-import { execute, select } from '~/lib/db/connection'
 import { db } from '~/lib/db/client'
+import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import { generateId } from '~/lib/util/id'
 
 export interface Supplier {
   id: string
@@ -34,38 +34,84 @@ export interface Supplier {
   updatedAt: string
 }
 
+/** 可写数据列（排除主键与时间戳：id 由 generateId 生成，created_at/updated_at 由写路径注入 now）。 */
+type SupplierData = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>
+
+/** 单列登记项：数据库列名 + 写绑定（字段值 → SQL 占位符实参）+ 读映射（DB 行 → 字段值，按列类型 K 精确定型）。 */
+interface SupplierColumn<K extends keyof SupplierData> {
+  col: string
+  toBind: (d: Partial<Supplier>) => unknown
+  fromRow: (row: Record<string, unknown>) => SupplierData[K]
+}
+
+/** aliases 以 JSON 文本存储；解析失败（脏数据）回退空数组，不抛。 */
+function parseAliases(row: Record<string, unknown>): string[] {
+  try {
+    return JSON.parse((row.aliases as string) || '[]')
+  }
+  catch {
+    return []
+  }
+}
+
+/**
+ * 列登记表（唯一权威源）：INSERT / UPDATE / rowToSupplier 全部从这里派生列名、占位符、绑定与读映射，
+ * 消除「interface / rowToSupplier / add INSERT / update SET 四处并行维护」造成的列漂移
+ * （本次修复的 credential_status / approval_status 只写进 INSERT 却漏出 UPDATE，即此类 bug）。
+ * 映射类型 `{ [K in keyof SupplierData]: … }` 强制键 = 字段名：漏登记某字段直接 typecheck 失败，
+ * 新增字段时编译期强制在此补齐，四处自动跟上。
+ */
+const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
+  name: { col: 'name', toBind: d => d.name ?? '', fromRow: r => r.name as string },
+  aliases: { col: 'aliases', toBind: d => JSON.stringify(d.aliases ?? []), fromRow: parseAliases },
+  uniqueCode: { col: 'unique_code', toBind: d => d.uniqueCode ?? '', fromRow: r => (r.unique_code ?? '') as string },
+  taxNo: { col: 'tax_no', toBind: d => d.taxNo ?? '', fromRow: r => (r.tax_no ?? '') as string },
+  businessType: { col: 'business_type', toBind: d => d.businessType ?? '', fromRow: r => (r.business_type ?? '') as string },
+  supplierCategory: { col: 'supplier_category', toBind: d => d.supplierCategory ?? '', fromRow: r => (r.supplier_category ?? '') as string },
+  rating: { col: 'rating', toBind: d => d.rating ?? '', fromRow: r => (r.rating ?? '') as string },
+  parentSupplierId: { col: 'parent_supplier_id', toBind: d => d.parentSupplierId ?? null, fromRow: r => (r.parent_supplier_id ?? null) as string | null },
+  legalRep: { col: 'legal_rep', toBind: d => d.legalRep ?? '', fromRow: r => (r.legal_rep ?? '') as string },
+  registeredCapital: { col: 'registered_capital', toBind: d => d.registeredCapital ?? null, fromRow: r => r.registered_capital as number | null },
+  registeredDate: { col: 'registered_date', toBind: d => d.registeredDate ?? '', fromRow: r => (r.registered_date ?? '') as string },
+  address: { col: 'address', toBind: d => d.address ?? '', fromRow: r => (r.address ?? '') as string },
+  taxpayerType: { col: 'taxpayer_type', toBind: d => d.taxpayerType ?? '', fromRow: r => (r.taxpayer_type ?? '') as string },
+  mainBusiness: { col: 'main_business', toBind: d => d.mainBusiness ?? '', fromRow: r => (r.main_business ?? '') as string },
+  invoiceName: { col: 'invoice_name', toBind: d => d.invoiceName ?? '', fromRow: r => (r.invoice_name ?? '') as string },
+  invoiceAddress: { col: 'invoice_address', toBind: d => d.invoiceAddress ?? '', fromRow: r => (r.invoice_address ?? '') as string },
+  bank: { col: 'bank', toBind: d => d.bank ?? '', fromRow: r => (r.bank ?? '') as string },
+  bankAccount: { col: 'bank_account', toBind: d => d.bankAccount ?? '', fromRow: r => (r.bank_account ?? '') as string },
+  phone: { col: 'phone', toBind: d => d.phone ?? '', fromRow: r => (r.phone ?? '') as string },
+  contact: { col: 'contact', toBind: d => d.contact ?? '', fromRow: r => (r.contact ?? '') as string },
+  contactPhone: { col: 'contact_phone', toBind: d => d.contactPhone ?? '', fromRow: r => (r.contact_phone ?? '') as string },
+  credentialStatus: { col: 'credential_status', toBind: d => d.credentialStatus ?? 'incomplete', fromRow: r => (r.credential_status ?? 'incomplete') as string },
+  approvalStatus: { col: 'approval_status', toBind: d => d.approvalStatus ?? 'draft', fromRow: r => (r.approval_status ?? 'draft') as string },
+  source: { col: 'source', toBind: d => d.source ?? 'manual', fromRow: r => (r.source ?? 'manual') as string },
+  note: { col: 'note', toBind: d => d.note ?? '', fromRow: r => (r.note ?? '') as string },
+}
+
+/** 登记键序（单次求值）：列名清单与绑定值清单都按同一序派生，保证 SQL 占位符与实参一一对齐。 */
+const SUPPLIER_COLUMN_KEYS = Object.keys(SUPPLIER_COLUMNS) as (keyof SupplierData)[]
+const SUPPLIER_COLS = SUPPLIER_COLUMN_KEYS.map(k => SUPPLIER_COLUMNS[k].col)
+
+/** 写路径共用 SQL（add 的 INSERT、update 的 SET 均由登记表派生，杜绝列漂移）。 */
+const INSERT_SQL = `INSERT INTO suppliers (id, ${SUPPLIER_COLS.join(', ')}, created_at, updated_at)
+       VALUES (?, ${SUPPLIER_COLS.map(() => '?').join(', ')}, ?, ?)`
+const UPDATE_SQL = `UPDATE suppliers SET ${SUPPLIER_COLS.map(c => `${c}=?`).join(', ')}, updated_at=? WHERE id=?`
+
+/** 写路径唯一绑定源：按登记键序产出各列 SQL 实参（aliases → JSON、parent_supplier_id / registered_capital 允许 null 等特殊取值都收在登记表里）。 */
+function supplierToBindings(data: Partial<Supplier>): unknown[] {
+  return SUPPLIER_COLUMN_KEYS.map(k => SUPPLIER_COLUMNS[k].toBind(data))
+}
+
 function rowToSupplier(row: Record<string, unknown>): Supplier {
-  let aliases: string[] = []
-  try { aliases = JSON.parse((row.aliases as string) || '[]') } catch {}
+  const data: Record<string, unknown> = {}
+  for (const k of SUPPLIER_COLUMN_KEYS)
+    data[k] = SUPPLIER_COLUMNS[k].fromRow(row)
   return {
     id: row.id as string,
-    name: row.name as string,
-    aliases,
-    uniqueCode: (row.unique_code ?? '') as string,
-    taxNo: (row.tax_no ?? '') as string,
-    businessType: (row.business_type ?? '') as string,
-    supplierCategory: (row.supplier_category ?? '') as string,
-    rating: (row.rating ?? '') as string,
-    parentSupplierId: (row.parent_supplier_id ?? null) as string | null,
-    legalRep: (row.legal_rep ?? '') as string,
-    registeredCapital: row.registered_capital as number | null,
-    registeredDate: (row.registered_date ?? '') as string,
-    address: (row.address ?? '') as string,
-    taxpayerType: (row.taxpayer_type ?? '') as string,
-    mainBusiness: (row.main_business ?? '') as string,
-    invoiceName: (row.invoice_name ?? '') as string,
-    invoiceAddress: (row.invoice_address ?? '') as string,
-    bank: (row.bank ?? '') as string,
-    bankAccount: (row.bank_account ?? '') as string,
-    phone: (row.phone ?? '') as string,
-    contact: (row.contact ?? '') as string,
-    contactPhone: (row.contact_phone ?? '') as string,
-    credentialStatus: (row.credential_status ?? 'incomplete') as string,
-    approvalStatus: (row.approval_status ?? 'draft') as string,
-    source: (row.source ?? 'manual') as string,
-    note: (row.note ?? '') as string,
     createdAt: (row.created_at ?? '') as string,
     updatedAt: (row.updated_at ?? '') as string,
+    ...(data as SupplierData),
   }
 }
 
@@ -93,24 +139,7 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function add(data: Partial<Supplier>) {
     const id = generateId('sup')
     const now = new Date().toISOString()
-    await execute(
-      `INSERT INTO suppliers (id, name, aliases, unique_code, tax_no, business_type, supplier_category, rating, parent_supplier_id, legal_rep, registered_capital, registered_date, address, taxpayer_type, main_business, invoice_name, invoice_address, bank, bank_account, phone, contact, contact_phone, credential_status, approval_status, source, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id, data.name ?? '', JSON.stringify(data.aliases ?? []),
-        data.uniqueCode ?? '', data.taxNo ?? '',
-        data.businessType ?? '', data.supplierCategory ?? '', data.rating ?? '',
-        data.parentSupplierId ?? null,
-        data.legalRep ?? '', data.registeredCapital ?? null, data.registeredDate ?? '',
-        data.address ?? '', data.taxpayerType ?? '', data.mainBusiness ?? '',
-        data.invoiceName ?? '', data.invoiceAddress ?? '',
-        data.bank ?? '', data.bankAccount ?? '', data.phone ?? '',
-        data.contact ?? '', data.contactPhone ?? '',
-        data.credentialStatus ?? 'incomplete', data.approvalStatus ?? 'draft',
-        data.source ?? 'manual', data.note ?? '',
-        now, now,
-      ],
-    )
+    await execute(INSERT_SQL, [id, ...supplierToBindings(data), now, now])
     await logCreate(db, 'suppliers', id)
     await load()
     return id
@@ -120,19 +149,8 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function update(id: string, data: Partial<Supplier>) {
     const now = new Date().toISOString()
     const logId = await withUpdateLog(db, 'suppliers', id, () => execute(
-      `UPDATE suppliers SET name=?, aliases=?, unique_code=?, tax_no=?, business_type=?, supplier_category=?, rating=?, parent_supplier_id=?, legal_rep=?, registered_capital=?, registered_date=?, address=?, taxpayer_type=?, main_business=?, invoice_name=?, invoice_address=?, bank=?, bank_account=?, phone=?, contact=?, contact_phone=?, note=?, updated_at=? WHERE id=?`,
-      [
-        data.name ?? '', JSON.stringify(data.aliases ?? []),
-        data.uniqueCode ?? '', data.taxNo ?? '',
-        data.businessType ?? '', data.supplierCategory ?? '', data.rating ?? '',
-        data.parentSupplierId ?? null,
-        data.legalRep ?? '', data.registeredCapital ?? null, data.registeredDate ?? '',
-        data.address ?? '', data.taxpayerType ?? '', data.mainBusiness ?? '',
-        data.invoiceName ?? '', data.invoiceAddress ?? '',
-        data.bank ?? '', data.bankAccount ?? '', data.phone ?? '',
-        data.contact ?? '', data.contactPhone ?? '',
-        data.note ?? '', now, id,
-      ],
+      UPDATE_SQL,
+      [...supplierToBindings(data), now, id],
     ))
     await load()
     return logId
