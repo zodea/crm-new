@@ -161,22 +161,62 @@
   // SegTab 内联副本已删 → 统一用 window.KitAtoms.SegTab（反馈轮9 通用组件）
   const SegTab = (props) => { const KA = window.KitAtoms; return KA ? <KA.SegTab {...props} /> : null; };
 
-  // 通用子表（反馈轮8：委托 KitTable，表格三件套——≥5 行高度 / 容器内横滚 / 分页；金额两位小数）
-  function SubTable({ title, count, columns, rows, sum, minRows }) {
+  // 通用子表（反馈轮8 委托 KitTable；本轮升级为自带 CRUD 闭环：新增/编辑 formModal 由列自动生成 +
+  //   删除软删撤回 + 搜索过滤 + 合计随 state 实时重算 + 导出接 exportModal 原语，落实「交互必须闭环」）
+  // props: title, columns[{key,label,width,align,mono,money,color,render,noForm,full}], rows(初始), sum{label,key?,value?},
+  //        minRows, live(true=store 驱动只读、不 state 化), noAdd, exportOpts, addTitle
+  function SubTable({ title, columns, rows, sum, minRows, live, noAdd, exportOpts, addTitle }) {
+    const seed = () => (rows || []).map((r, i) => (r.__id ? r : { ...r, __id: "r" + i + "_" + Math.random().toString(36).slice(2, 7) }));
+    const [data, setData] = React.useState(seed);
+    const [q, setQ] = React.useState("");
+    // live 表直接透传外部 rows（如发票台账联动）；可编辑表 mount 时 seed 一次，之后自身 state 主导（刷新恢复 mock，playbook 规则5）
+    const src = live ? (rows || []) : data;
+    const ql = q.trim().toLowerCase();
+    const shown = ql ? src.filter((r) => columns.some((c) => String(r[c.key] == null ? "" : r[c.key]).toLowerCase().includes(ql))) : src;
+
+    const formCols = columns.filter((c) => !c.noForm && c.key && c.key !== "_ops");
+    const moneyKeys = new Set(columns.filter((c) => c.money).map((c) => c.key));
+    const coerce = (v) => { const o = { ...v }; moneyKeys.forEach((k) => { if (o[k] != null && o[k] !== "") o[k] = Number(String(o[k]).replace(/[^\d.\-]/g, "")) || 0; }); return o; };
+    const buildFields = (row) => formCols.map((c, i) => ({ key: c.key, label: c.label, value: row ? row[c.key] : "", full: c.full || (formCols.length % 2 === 1 && i === formCols.length - 1) }));
+
+    const addRow = () => UI().formModal({ title: addTitle || "新增 " + title, cols: 2, width: 560, fields: buildFields(null),
+      onSave: (v) => { setData((l) => [{ __id: "r_" + Date.now(), ...coerce(v) }, ...l]); UI().toast("已新增 1 行", "ok"); } });
+    const editRow = (row) => UI().formModal({ title: "编辑 · " + title, cols: 2, width: 560, fields: buildFields(row),
+      onSave: (v) => { setData((l) => l.map((x) => (x.__id === row.__id ? { ...x, ...coerce(v) } : x))); UI().toast("已保存", "ok"); } });
+    const delRow = (row) => UI().confirm({ title: "删除该行？", danger: true, confirmText: "删除",
+      message: "确定删除「" + title + "」的这一行？删除为软删除，可在 5 秒内撤回。",
+      onConfirm: () => {
+        const idx = data.findIndex((x) => x.__id === row.__id);
+        setData((l) => l.filter((x) => x.__id !== row.__id));
+        UI().undoToast("已删除「" + title + "」1 行", () => setData((l) => { const n = l.slice(); n.splice(Math.min(idx, n.length), 0, row); return n; }));
+      } });
+
+    const cols = live ? columns : columns.concat([{ key: "_ops", label: "操作", width: 92, align: "center", noForm: true, render: (v, r) => (
+      <span style={{ display: "inline-flex", gap: 4 }}>
+        <IconButton icon="square-pen" title="编辑" onClick={() => editRow(r)} />
+        <IconButton icon="trash-2" title="删除" onClick={() => delRow(r)} />
+      </span>
+    ) }]);
+    const sumValue = sum ? (sum.key != null ? shown.reduce((s, r) => s + (Number(r[sum.key]) || 0), 0) : sum.value) : undefined;
+
     const toolbar = (
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 14, fontWeight: 700 }}>{title} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({count != null ? count : rows.length})</span></span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <IconButton icon="search" title="搜索" onClick={() => UI().toast("搜索 " + title + "（演示）")} />
-          <IconButton icon="download" title="导出" onClick={() => UI().toast("正在导出 " + title + "…")} />
-          <Button size="sm" variant="primary" icon="plus" onClick={() => UI().formModal({ title: "新增 " + title, fields: [{ key: "name", label: title + "名称", full: true }, { key: "amount", label: "金额", placeholder: "选填" }], onSave: () => UI().toast("已新增", "ok") })}>新增</Button>
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{title} <span style={{ color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({src.length})</span></span>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ position: "relative" }}>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={"搜索" + title} style={{ width: 148, border: "1px solid var(--line-strong)", borderRadius: 8, padding: "6px 10px 6px 28px", fontSize: 12.5, background: "#fff", outline: "none" }} />
+            <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "inline-flex" }}><Icon name="search" size={13} color="var(--ink-faint)" /></span>
+          </div>
+          <IconButton icon="download" title="导出" onClick={() => (UI().exportModal ? UI().exportModal(Object.assign({ title: "导出 " + title, count: shown.length, unit: "行", ext: "xlsx" }, exportOpts || {})) : UI().toast("正在导出 " + title + "…"))} />
+          {!live && !noAdd && <Button size="sm" variant="primary" icon="plus" onClick={addRow}>新增</Button>}
         </div>
       </div>
     );
+
     if (window.KitTable) {
-      return <window.KitTable toolbar={toolbar} columns={columns.map((c) => ({ width: 120, ...c }))} rows={rows}
-        pageSize={10} minRows={minRows != null ? minRows : 5} sum={sum} tableMinWidth={Math.max(640, columns.length * 130)}
-        footerLeft={"共 " + rows.length + " 条"} empty="暂无数据" />;
+      return <window.KitTable toolbar={toolbar} columns={cols.map((c) => ({ width: 120, ...c }))} rows={shown}
+        pageSize={10} minRows={minRows != null ? minRows : 5} sum={sum ? { label: sum.label, value: sumValue } : undefined}
+        tableMinWidth={Math.max(640, cols.length * 130)} footerLeft={"共 " + shown.length + " 条"} empty="暂无数据" />;
     }
     return <Panel padding={16} style={{ color: "var(--ink-soft)" }}>表格组件加载中…</Panel>;
   }
@@ -662,7 +702,8 @@
                 <SegTab tabs={TABS} active={tab} onChange={setTab} />
               </div>
               <div style={{ padding: 16, background: "var(--bg)" }}>
-                <TabContent tab={tab} proj={proj} m={m} data={data} navigate={navigate} invRows={invRows} />
+                {/* key={tab}：所有子表同为 SubTable 组件，切 Tab 时须整棵重挂载，否则 React 按位置复用实例导致内部 CRUD state 跨 Tab 串味 */}
+                <TabContent key={tab} tab={tab} proj={proj} m={m} data={data} navigate={navigate} invRows={invRows} />
               </div>
             </Panel>
           </div>
@@ -705,19 +746,20 @@
 
     if (tab === "budget") {
       const rows = [
-        { subject: "人工", item: "墙地砖铺贴人工", qty: "24,600 ㎡", price: 62, amount: 1525200 },
-        { subject: "材料", item: "瓷砖及辅材采购", qty: "26,800 ㎡", price: 118, amount: 3162400 },
-        { subject: "材料", item: "防水涂料", qty: "8,400 ㎡", price: 36, amount: 302400 },
-        { subject: "机械", item: "垂直运输机械台班", qty: "220 台班", price: 1450, amount: 319000 },
+        { name: "主体结构目标成本", incTotal: 12800000, signed: 11200000, actual: 6400000, applied: 5800000 },
+        { name: "装饰装修目标成本", incTotal: 9600000, signed: 8100000, actual: 4200000, applied: 3600000 },
+        { name: "安装工程目标成本", incTotal: 3200000, signed: 2900000, actual: 1350000, applied: 1100000 },
+        { name: "措施及其他费用", incTotal: 1800000, signed: 1500000, actual: 720000, applied: 600000 },
       ];
       return (
-        <SubTable title="目标成本清单" columns={[
-          { key: "subject", label: "科目", render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
-          { key: "item", label: "分项", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
-          { key: "qty", label: "预算量", align: "right", mono: true },
-          { key: "price", label: "单价", align: "right", money: true },
-          { key: "amount", label: "金额", align: "right", money: true },
-        ]} rows={rows} sum={{ label: "预算金额合计", value: rows.reduce((s, r) => s + r.amount, 0) }} />
+        <SubTable title="目标成本" columns={[
+          { key: "name", label: "目标成本名称", width: 170, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+          { key: "project", label: "项目名称", render: () => <span style={{ color: "var(--brand)" }}>{proj.name}</span>, noForm: true },
+          { key: "incTotal", label: "含税合价", align: "right", money: true },
+          { key: "signed", label: "已签合同金额", align: "right", money: true },
+          { key: "actual", label: "实际发生金额", align: "right", money: true },
+          { key: "applied", label: "已申请付金额", align: "right", money: true },
+        ]} rows={rows} sum={{ label: "含税合价总计", key: "incTotal" }} />
       );
     }
 
@@ -769,10 +811,19 @@
             { key: "status", label: "合同状态", render: (v) => <StatusChip tone="ok">{v}</StatusChip> },
             { key: "signDate", label: "签约日期", mono: true, color: "var(--ink-soft)" },
             { key: "signed", label: "含税已签金额", align: "right", money: true },
-            { key: "attach", label: "附件", render: attachCell },
-          ]} rows={rows} sum={{ label: "含税合同金额总计", value: m.biz.main }} />
-          <SubTable title="补充协议" columns={[{ key: "name", label: "协议名称" }, { key: "amount", label: "金额", align: "right", money: true }, { key: "signDate", label: "签约日期", mono: true }, { key: "attach", label: "附件", render: (v, r) => r.doc ? chip({ icon: "file-text", label: "PDF · " + r.doc.pages + " 页", onClick: () => previewDoc(r.doc) }) : chip({ icon: "upload", label: "上传文书", onClick: () => UI().toast("上传补充协议（演示）") }) }]} rows={m.biz.supplement ? [{ name: "材料涨价补充协议", amount: m.biz.supplement, signDate: "2026-03-10", doc: { name: "补充协议.pdf", pages: 4 } }] : []} />
-          <SubTable title="甲方变洽签" columns={[{ key: "no", label: "变更编号", mono: true }, { key: "name", label: "合同名称" }, { key: "inc", label: "含税审定金额", align: "right", money: true }, { key: "exc", label: "无税审定金额", align: "right", money: true }, { key: "date", label: "审定日期", mono: true }]} rows={m.biz.ownerChange ? [{ no: "BQ-001", name: m.contractName, inc: m.biz.ownerChange, exc: Math.round(m.biz.ownerChange / 1.09), date: "2026-04-02" }] : []} />
+            { key: "attach", label: "附件", width: 220, noForm: true, render: attachCell },
+          ]} rows={rows} sum={{ label: "含税合同金额总计", key: "amount" }} />
+          <SubTable title="补充协议" columns={[{ key: "name", label: "协议名称" }, { key: "amount", label: "金额", align: "right", money: true }, { key: "signDate", label: "签约日期", mono: true }, { key: "attach", label: "附件", noForm: true, render: (v, r) => r.doc ? chip({ icon: "file-text", label: "PDF · " + r.doc.pages + " 页", onClick: () => previewDoc(r.doc) }) : chip({ icon: "upload", label: "上传文书", onClick: () => UI().toast("上传补充协议（演示）") }) }]} rows={m.biz.supplement ? [{ name: "材料涨价补充协议", amount: m.biz.supplement, signDate: "2026-03-10", doc: { name: "补充协议.pdf", pages: 4 } }] : []} />
+          <SubTable title="甲方变洽签" columns={[{ key: "no", label: "变更编号", mono: true }, { key: "name", label: "合同名称" }, { key: "inc", label: "含税审定金额", align: "right", money: true }, { key: "exc", label: "无税审定金额", align: "right", money: true }, { key: "applied", label: "无税申报金额", align: "right", money: true }, { key: "date", label: "审定日期", mono: true }]} rows={m.biz.ownerChange ? [{ no: "BQ-001", name: m.contractName, inc: m.biz.ownerChange, exc: Math.round(m.biz.ownerChange / 1.09), applied: Math.round(m.biz.ownerChange / 1.09), date: "2026-04-02" }] : []} sum={{ label: "含税审定金额合计", key: "inc" }} />
+          <SubTable title="进度结算" columns={[
+            { key: "no", label: "结算编号", mono: true },
+            { key: "period", label: "期数" },
+            { key: "amount", label: "结算金额", align: "right", money: true },
+            { key: "date", label: "结算日期", mono: true, color: "var(--ink-soft)" },
+          ]} rows={[
+            { no: "JS-2026-03", period: "第 3 期", amount: Math.round(m.biz.main * 0.26), date: "2026-06-15" },
+            { no: "JS-2026-02", period: "第 2 期", amount: Math.round(m.biz.main * 0.22), date: "2026-04-20" },
+          ]} sum={{ label: "累计结算金额", key: "amount" }} />
         </div>
       );
     }
@@ -784,14 +835,38 @@
         { name: "铝扣板供应及安装合同", supplier: "佛山华铝装饰", type: "专业分包", amount: 920000, settled: 0, status: "已签订" },
       ];
       return (
-        <SubTable title="支出合同" columns={[
-          { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
-          { key: "supplier", label: "分供方" },
-          { key: "type", label: "合同类型" },
-          { key: "amount", label: "含税合同额", align: "right", money: true },
-          { key: "settled", label: "已结算金额", align: "right", money: true },
-          { key: "status", label: "状态", render: (v) => <StatusChip tone={v === "履约中" ? "brand" : v === "已签订" ? "neutral" : "ok"}>{v}</StatusChip> },
-        ]} rows={rows} sum={{ label: "含税合同额总计", value: rows.reduce((s, r) => s + r.amount, 0) }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <SubTable title="支出合同" columns={[
+            { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "supplier", label: "乙方（分供方）" },
+            { key: "type", label: "合同类型" },
+            { key: "amount", label: "含税合价", align: "right", money: true },
+            { key: "settled", label: "累计结算金额", align: "right", money: true },
+            { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "履约中" ? "brand" : v === "已签订" ? "neutral" : "ok"}>{v}</StatusChip> },
+          ]} rows={rows} sum={{ label: "含税合价总计", key: "amount" }} />
+          <SubTable title="分包变洽签" columns={[
+            { key: "no", label: "变更编号", mono: true },
+            { key: "type", label: "变更类型" },
+            { key: "supplier", label: "乙方" },
+            { key: "contract", label: "合同名称" },
+            { key: "amount", label: "审批金额", align: "right", money: true },
+            { key: "area", label: "变更面积", align: "right", mono: true },
+            { key: "audited", label: "实际审定价", align: "right", money: true },
+          ]} rows={[
+            { no: "FBQ-001", type: "增项", supplier: "陈家泥水班组", contract: "泥水班组劳务分包合同", amount: 186000, area: "320 ㎡", audited: 178000 },
+            { no: "FBQ-002", type: "签证", supplier: "广东宏宇陶瓷", contract: "瓷砖采购合同", amount: 92000, area: "—", audited: 88000 },
+          ]} sum={{ label: "审批金额合计", key: "amount" }} />
+          <SubTable title="支出结算" columns={[
+            { key: "name", label: "结算名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "contract", label: "合同名称" },
+            { key: "date", label: "结算日期", mono: true, color: "var(--ink-soft)" },
+            { key: "type", label: "结算类型" },
+            { key: "amount", label: "结算金额", align: "right", money: true },
+          ]} rows={[
+            { name: "泥水班组 6 月进度结算", contract: "泥水班组劳务分包合同", date: "2026-06-25", type: "进度结算", amount: 1240000 },
+            { name: "瓷砖采购 5 月结算", contract: "瓷砖采购合同", date: "2026-05-28", type: "到货结算", amount: 2150000 },
+          ]} sum={{ label: "结算金额合计", key: "amount" }} />
+        </div>
       );
     }
 
@@ -804,7 +879,7 @@
             { key: "tax", label: "税额", align: "right", money: true },
             { key: "status", label: "审核状态", render: (v) => <StatusChip tone="ok">{v}</StatusChip> },
             { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
-          ]} rows={[{ name: "6月进度开票申请", amount: m.tax.outAmt, tax: m.tax.outTax, status: "已审核", date: "2026-06-10" }]} sum={{ label: "合计金额", value: m.tax.outAmt }} />
+          ]} rows={[{ name: "6月进度开票申请", amount: m.tax.outAmt, tax: m.tax.outTax, status: "已审核", date: "2026-06-10" }]} sum={{ label: "合计金额", key: "amount" }} />
           <SubTable title="收票登记" columns={[
             { key: "no", label: "发票号码", mono: true, color: "var(--ink-soft)" },
             { key: "contract", label: "合同名称" },
@@ -813,7 +888,7 @@
             { key: "type", label: "发票类型", render: (v) => <StatusChip tone="brand">{v}</StatusChip> },
             { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
             { key: "supplier", label: "供应商" },
-          ]} rows={(invRows || []).map((iv) => ({ no: (iv.number || "").slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: (iv.type || "").includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额（实时联动发票台账）", value: (invRows || []).reduce((s, iv) => s + Number(iv.total || 0), 0) }} />
+          ]} rows={(invRows || []).map((iv) => ({ no: (iv.number || "").slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: (iv.type || "").includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额（实时联动发票台账）", key: "amount" }} live />
         </div>
       );
     }
@@ -826,12 +901,34 @@
             { key: "amount", label: "收款金额", align: "right", money: true, color: "var(--ok-ink)" },
             { key: "method", label: "支付方式" }, { key: "payer", label: "支付单位" },
             { key: "cum", label: "累计应收", align: "right", money: true },
-          ]} rows={m.biz.receipt ? [{ no: "SK-2026-001", date: "2026-05-30", amount: m.biz.receipt, method: "银行转账", payer: proj.developer, cum: m.biz.receipt }] : []} sum={{ label: "项目收款合计", value: m.biz.receipt }} />
+          ]} rows={m.biz.receipt ? [{ no: "SK-2026-001", date: "2026-05-30", amount: m.biz.receipt, method: "银行转账", payer: proj.developer, cum: m.biz.receipt }] : []} sum={{ label: "项目收款合计", key: "amount" }} />
           <SubTable title="付款申请" columns={[
             { key: "no", label: "付款编号", mono: true }, { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已付款" ? "ok" : "warn"}>{v}</StatusChip> },
             { key: "applicant", label: "申请人" }, { key: "amount", label: "申请金额", align: "right", money: true },
             { key: "paid", label: "已付金额", align: "right", money: true }, { key: "actual", label: "实际支付", align: "right", money: true, color: "var(--danger-ink)" },
-          ]} rows={m.biz.payment ? [{ no: "FK-2026-001", status: "已付款", applicant: proj.manager, amount: m.biz.payment, paid: m.biz.payment, actual: m.biz.payment }] : [{ no: "FK-2026-001", status: "待审批", applicant: proj.manager, amount: 200000, paid: 0, actual: 0 }]} sum={{ label: "付款金额合计", value: m.biz.payment }} />
+          ]} rows={m.biz.payment ? [{ no: "FK-2026-001", status: "已付款", applicant: proj.manager, amount: m.biz.payment, paid: m.biz.payment, actual: m.biz.payment }] : [{ no: "FK-2026-001", status: "待审批", applicant: proj.manager, amount: 200000, paid: 0, actual: 0 }]} sum={{ label: "实际支付合计", key: "actual" }} />
+          <SubTable title="我方项目扣减" columns={[
+            { key: "no", label: "扣减编号", mono: true },
+            { key: "reason", label: "扣减事由", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "amount", label: "扣减金额", align: "right", money: true, color: "var(--danger-ink)" },
+            { key: "status", label: "审核状态", render: (v) => <StatusChip tone={v === "已审核" ? "ok" : "warn"}>{v}</StatusChip> },
+          ]} rows={[{ no: "KJ-001", reason: "甲供材料抵扣", amount: 320000, status: "已审核" }]} sum={{ label: "扣减金额合计", key: "amount" }} />
+          <SubTable title="先行付款申请" columns={[
+            { key: "no", label: "编号", mono: true },
+            { key: "payee", label: "收款方" },
+            { key: "amount", label: "金额", align: "right", money: true },
+            { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已付款" ? "ok" : "warn"}>{v}</StatusChip> },
+          ]} rows={[{ no: "XF-001", payee: "陈家泥水班组", amount: 150000, status: "审批中" }]} sum={{ label: "先行付款合计", key: "amount" }} />
+          <SubTable title="费用报销" columns={[
+            { key: "no", label: "申请编号", mono: true },
+            { key: "item", label: "报销事由" },
+            { key: "amount", label: "报销金额", align: "right", money: true, color: "var(--danger-ink)" },
+            { key: "applicant", label: "报销人" },
+            { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已报销" ? "ok" : "warn"}>{v}</StatusChip> },
+          ]} rows={[
+            { no: "BX-2026-06", item: "现场办公及差旅", amount: 8600, applicant: proj.manager, status: "已报销" },
+            { no: "BX-2026-05", item: "样板房布置", amount: 12400, applicant: "李资料", status: "审批中" },
+          ]} sum={{ label: "报销金额合计", key: "amount" }} />
         </div>
       );
     }
@@ -851,7 +948,7 @@
             { key: "date", label: "收款日期", mono: true, color: "var(--ink-soft)" },
             { key: "amount", label: "收款金额", align: "right", money: true, color: "var(--ok-ink)" },
             { key: "payer", label: "付款人" },
-          ]} rows={rIn} sum={{ label: "往来收款合计", value: rIn.reduce((s, r) => s + r.amount, 0) }} />
+          ]} rows={rIn} sum={{ label: "往来收款合计", key: "amount" }} />
           <SubTable title="往来付款" columns={[
             { key: "no", label: "往来付款编号", mono: true },
             { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已付款" ? "ok" : "warn"}>{v}</StatusChip> },
@@ -859,86 +956,122 @@
             { key: "payee", label: "收款单位" },
             { key: "amount", label: "金额", align: "right", money: true, color: "var(--danger-ink)" },
             { key: "method", label: "付款方式" },
-          ]} rows={rOut} sum={{ label: "往来付款合计", value: rOut.reduce((s, r) => s + r.amount, 0) }} />
+          ]} rows={rOut} sum={{ label: "往来付款合计", key: "amount" }} />
         </div>
       );
     }
 
     if (tab === "pay") {
       const rows = [
-        { no: "ZF-2026-0601", payee: "陈家泥水班组", amount: 380000, method: "银行转账", date: "2026-06-05", by: "财务-刘会计" },
-        { no: "ZF-2026-0518", payee: "广东宏宇陶瓷", amount: 652000, method: "银行承兑", date: "2026-05-18", by: "财务-刘会计" },
-        { no: "ZF-2026-0430", payee: "佛山华铝装饰", amount: 120000, method: "银行转账", date: "2026-04-30", by: "财务-张出纳" },
+        { no: "ZF-2026-0601", date: "2026-06-05", amount: 380000, method: "银行转账", payee: "陈家泥水班组", account: "陈志强", bank: "工商银行广州白云支行", bankNo: "6222 **** 3841" },
+        { no: "ZF-2026-0518", date: "2026-05-18", amount: 652000, method: "银行承兑", payee: "广东宏宇陶瓷", account: "广东宏宇陶瓷有限公司", bank: "建设银行佛山分行", bankNo: "4400 **** 9027" },
+        { no: "ZF-2026-0430", date: "2026-04-30", amount: 120000, method: "银行转账", payee: "佛山华铝装饰", account: "佛山华铝装饰工程", bank: "农业银行佛山禅城支行", bankNo: "6228 **** 1156" },
       ];
       return (
         <SubTable title="支付记录" columns={[
-          { key: "no", label: "付款单号", mono: true },
-          { key: "payee", label: "收款方" },
-          { key: "amount", label: "金额", align: "right", money: true, color: "var(--danger-ink)" },
-          { key: "method", label: "支付方式" },
+          { key: "no", label: "支付编号", mono: true },
           { key: "date", label: "支付日期", mono: true, color: "var(--ink-soft)" },
-          { key: "by", label: "经手人" },
-        ]} rows={rows} sum={{ label: "支付金额合计", value: rows.reduce((s, r) => s + r.amount, 0) }} />
+          { key: "amount", label: "支付金额", align: "right", money: true, color: "var(--danger-ink)" },
+          { key: "method", label: "支付方式" },
+          { key: "account", label: "收款账户", render: (v) => <span style={{ fontWeight: 600 }}>{v}</span> },
+          { key: "bank", label: "开户行" },
+          { key: "bankNo", label: "银行账号", mono: true, color: "var(--ink-soft)" },
+        ]} rows={rows} sum={{ label: "支付金额合计", key: "amount" }} />
       );
     }
 
     if (tab === "material") {
-      const arrive = [
-        { no: "DH-0612", material: "瓷砖 800×800", spec: "灰色亮面", qty: "3,200 箱", supplier: "广东宏宇陶瓷", date: "2026-06-12" },
-        { no: "DH-0605", material: "防水涂料", spec: "JS-Ⅱ型 20kg", qty: "460 桶", supplier: "德高建材", date: "2026-06-05" },
-        { no: "DH-0528", material: "铝扣板 300×300", spec: "白色哑光", qty: "1,150 ㎡", supplier: "佛山华铝装饰", date: "2026-05-28" },
-      ];
-      const usage = [
-        { no: "LY-0615", material: "瓷砖 800×800", qty: "420 箱", crew: "陈家泥水班组", usage: "10栋 3-5层 地砖铺贴", date: "2026-06-15" },
-        { no: "LY-0608", material: "防水涂料", qty: "86 桶", crew: "陈家泥水班组", usage: "12栋 卫生间防水", date: "2026-06-08" },
-      ];
+      const st = (v) => <StatusChip tone={v === "已审批" || v === "已生效" ? "ok" : v === "已驳回" ? "danger" : "warn"}>{v}</StatusChip>;
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SubTable title="乙供材到货" columns={[
-            { key: "no", label: "单据编号", mono: true },
-            { key: "material", label: "材料名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
-            { key: "spec", label: "规格" },
-            { key: "qty", label: "到货数量", align: "right", mono: true },
+          <SubTable title="物资设计计划" columns={[
+            { key: "no", label: "单据编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "status", label: "审批状态", render: st },
+            { key: "date", label: "计划日期", mono: true, color: "var(--ink-soft)" },
+            { key: "owner", label: "负责人" },
+            { key: "createdAt", label: "创建时间", mono: true, color: "var(--ink-soft)" },
+          ]} rows={[
+            { no: "WZSJ-2026-03", status: "已审批", date: "2026-03-15", owner: "预算员-赵工", createdAt: "2026-03-10 09:20" },
+            { no: "WZSJ-2026-01", status: "已审批", date: "2026-01-08", owner: "预算员-赵工", createdAt: "2026-01-05 14:02" },
+          ]} />
+          <SubTable title="物资需用计划" columns={[
+            { key: "no", label: "单据编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "status", label: "审批状态", render: st },
+            { key: "date", label: "计划日期", mono: true, color: "var(--ink-soft)" },
+            { key: "due", label: "要求到期日期", mono: true, color: "var(--ink-soft)" },
+            { key: "createdAt", label: "创建时间", mono: true, color: "var(--ink-soft)" },
+          ]} rows={[
+            { no: "WZXY-2026-06", status: "审批中", date: "2026-06-01", due: "2026-06-20", createdAt: "2026-05-28 11:30" },
+            { no: "WZXY-2026-05", status: "已审批", date: "2026-05-02", due: "2026-05-18", createdAt: "2026-04-29 16:10" },
+          ]} />
+          <SubTable title="入库单" columns={[
+            { key: "no", label: "单据编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "type", label: "类型" },
             { key: "supplier", label: "分供方" },
-            { key: "date", label: "到货日期", mono: true, color: "var(--ink-soft)" },
-          ]} rows={arrive} />
-          <SubTable title="材料领用" columns={[
-            { key: "no", label: "领用单号", mono: true },
-            { key: "material", label: "材料名称" },
-            { key: "qty", label: "领用数量", align: "right", mono: true },
-            { key: "crew", label: "领用班组" },
-            { key: "usage", label: "用途" },
-            { key: "date", label: "领用日期", mono: true, color: "var(--ink-soft)" },
-          ]} rows={usage} />
+            { key: "date", label: "入库日期", mono: true, color: "var(--ink-soft)" },
+            { key: "warehouse", label: "入库仓库" },
+            { key: "contract", label: "材料采购合同" },
+          ]} rows={[
+            { no: "RK-0612", type: "采购入库", supplier: "广东宏宇陶瓷", date: "2026-06-12", warehouse: "现场主仓", contract: "瓷砖采购合同" },
+            { no: "RK-0605", type: "采购入库", supplier: "德高建材", date: "2026-06-05", warehouse: "现场主仓", contract: "防水材料采购合同" },
+          ]} />
+          <SubTable title="直入直出" columns={[
+            { key: "no", label: "单据编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "type", label: "类型" },
+            { key: "supplier", label: "分供方" },
+            { key: "date", label: "日期", mono: true, color: "var(--ink-soft)" },
+            { key: "warehouse", label: "仓库" },
+            { key: "contract", label: "合同名称" },
+          ]} rows={[
+            { no: "ZRZC-0528", type: "直入直出", supplier: "佛山华铝装饰", date: "2026-05-28", warehouse: "现场主仓", contract: "铝扣板供应及安装合同" },
+          ]} />
+          <SubTable title="出库单" columns={[
+            { key: "no", label: "单据编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "type", label: "类型" },
+            { key: "date", label: "出库日期", mono: true, color: "var(--ink-soft)" },
+            { key: "warehouse", label: "仓库" },
+            { key: "picker", label: "领料人" },
+            { key: "contract", label: "材料采购合同" },
+          ]} rows={[
+            { no: "CK-0615", type: "领料出库", date: "2026-06-15", warehouse: "现场主仓", picker: "陈家泥水班组", contract: "瓷砖采购合同" },
+            { no: "CK-0608", type: "领料出库", date: "2026-06-08", warehouse: "现场主仓", picker: "陈家泥水班组", contract: "防水材料采购合同" },
+          ]} />
+          <SubTable title="库存盘点" columns={[
+            { key: "no", label: "盘点编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "warehouse", label: "仓库名称" },
+            { key: "date", label: "盘点日期", mono: true, color: "var(--ink-soft)" },
+            { key: "person", label: "盘点人" },
+            { key: "status", label: "生效状态", render: st },
+          ]} rows={[
+            { no: "PD-2026-06", warehouse: "现场主仓", date: "2026-06-30", person: "仓管-孙工", status: "已生效" },
+          ]} />
         </div>
       );
     }
 
     if (tab === "accept") {
-      const checks = [
-        { no: "YS-001", scope: "防水隐蔽工程（10栋）", date: "2026-06-10", parties: "建设/监理/施工", result: "合格" },
-        { no: "YS-002", scope: "水电预埋隐蔽工程（12栋）", date: "2026-06-20", parties: "建设/监理/施工", result: "限期整改" },
-      ];
-      const repairs = [
-        { no: "BX-001", item: "3栋2单元 卫生间渗水", date: "2026-06-18", status: "处理中", by: "王维修" },
-        { no: "BX-002", item: "样板房 墙面空鼓修复", date: "2026-05-30", status: "已完成", by: "陈家泥水班组" },
-      ];
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <SubTable title="验收记录" columns={[
-            { key: "no", label: "验收编号", mono: true },
-            { key: "scope", label: "验收范围", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
-            { key: "date", label: "验收日期", mono: true, color: "var(--ink-soft)" },
-            { key: "parties", label: "参与方" },
-            { key: "result", label: "结论", render: (v) => <StatusChip tone={v === "合格" ? "ok" : "warn"}>{v}</StatusChip> },
-          ]} rows={checks} />
-          <SubTable title="保修事项" columns={[
-            { key: "no", label: "编号", mono: true },
-            { key: "item", label: "保修事项" },
-            { key: "date", label: "报修日期", mono: true, color: "var(--ink-soft)" },
-            { key: "status", label: "状态", render: (v) => <StatusChip tone={v === "已完成" ? "ok" : "warn"}>{v}</StatusChip> },
-            { key: "by", label: "处理人" },
-          ]} rows={repairs} />
+          <SubTable title="竣工验收" columns={[
+            { key: "no", label: "验收编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "project", label: "项目名称", render: () => proj.name, noForm: true },
+            { key: "developer", label: "甲方", render: () => proj.developer, noForm: true },
+            { key: "contract", label: "合同名称" },
+            { key: "status", label: "验收状态", render: (v) => <StatusChip tone={v === "已验收" ? "ok" : "warn"}>{v}</StatusChip> },
+            { key: "estimate", label: "合同估价", align: "right", money: true },
+          ]} rows={[
+            { no: "JGYS-001", contract: m.contractName, status: "验收中", estimate: m.biz.main },
+          ]} />
+          <SubTable title="保修到期确认单" columns={[
+            { key: "no", label: "编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "project", label: "项目名称", render: () => proj.name, noForm: true },
+            { key: "developer", label: "甲方", render: () => proj.developer, noForm: true },
+            { key: "contract", label: "合同名称" },
+            { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已确认" ? "ok" : "warn"}>{v}</StatusChip> },
+            { key: "owner", label: "保修负责人" },
+          ]} rows={[
+            { no: "BXQR-001", contract: m.contractName, status: "待确认", owner: "项目部-王维修" },
+          ]} />
         </div>
       );
     }

@@ -253,12 +253,9 @@ class Component extends DCLogic {
       this.setState({ route, params: p, tabs, activeId: t.id });
       return;
     }
-    if (tabs.filter(t => t.id !== "home").length >= 10) {   // 上限 10（不含首页）：阻断提示，不自动关（CONTEXT.md 页签导航）
+    if (tabs.filter(t => t.id !== "home").length >= 15) {   // 上限 15（不含首页）：只弹临时 toast、保持原页签，不做「弹窗+一键全关」（CONTEXT.md 页签导航 · 反馈轮10 · #82）
       const K = window.KitUI || {};
-      try {
-        K.confirm({ title: "页签已达上限（10 个）", message: "请先关闭部分页签，或一键关闭全部后再打开新页面。",
-          okText: "关闭全部页签", confirmText: "关闭全部页签", onConfirm: () => this.closeTabs("all") });
-      } catch (e) { if (K.toast) K.toast("页签已达上限（10 个），请先关闭部分页签", "warn"); }
+      if (K.toast) K.toast("页签已达上限（15 个），请先关闭部分页签再打开新页面", "warn");
       return;
     }
     const id = "t" + (++this._tabSeq);
