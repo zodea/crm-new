@@ -81,8 +81,10 @@
           props.sum && rows.length > 0 && React.createElement("tfoot", null,
             React.createElement("tr", { style: { background: "var(--surface-2)", borderTop: "1px solid var(--line)" } },
               React.createElement("td", { colSpan: columns.length + 1 + (props.checkable ? 1 : 0), style: { padding: "11px 16px", fontSize: 13 } },
-                React.createElement("span", { style: { color: "var(--ink-soft)" } }, props.sum.label + "："),
-                React.createElement("b", { style: { fontFamily: "var(--font-mono)" } }, typeof props.sum.value === "number" ? yuan2(props.sum.value) : props.sum.value))))
+                // sum 支持数组（批A 红圈式多段汇总行：变更后金额总和 / 累计收票总和 / 累计支付总和 …）
+                ...(Array.isArray(props.sum) ? props.sum : [props.sum]).map((s, i) => React.createElement("span", { key: i, style: { marginRight: 22, whiteSpace: "nowrap" } },
+                  React.createElement("span", { style: { color: "var(--ink-soft)" } }, s.label + "："),
+                  React.createElement("b", { style: { fontFamily: "var(--font-mono)" } }, typeof s.value === "number" ? yuan2(s.value) : s.value))))))
         )
       ),
       React.createElement("div", { style: { marginTop: "auto", padding: "10px 16px", borderTop: "1px solid var(--line)", background: "var(--surface-2)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, fontSize: 12.5, color: "var(--ink-soft)" } },

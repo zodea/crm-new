@@ -305,7 +305,7 @@
         {/* ── 左侧页内导航（红圈式）：分部 → 工种 → 分项，状态点 + 照片角标，点击锚点定位 ── */}
         <div style={{ width: 200, flex: "none", position: "sticky", top: 12 }}>
           <Panel padding={10} style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: "calc(100vh - 150px)", overflowY: "auto" }}>
-            <Button size="sm" variant="secondary" icon="arrow-left" onClick={() => navigate("quantity")}>返回工程量矩阵</Button>
+            <Button size="sm" variant="secondary" icon="arrow-left" onClick={() => window.DC.closeActiveTab()}>返回工程量矩阵</Button>
             {DIV_ORDER.map(dv => (
               <div key={dv} style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: "var(--ink-faint)", letterSpacing: 1, padding: "0 6px 3px" }}>{dv}</div>

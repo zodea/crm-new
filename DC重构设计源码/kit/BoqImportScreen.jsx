@@ -58,7 +58,7 @@
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Panel padding={16} style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <Button icon="arrow-left" onClick={() => navigate("projectDetail", { id: "p1" })}>返回合同</Button>
+          <Button icon="arrow-left" onClick={() => window.DC.closeActiveTab()}>返回合同</Button>
           <div style={{ flex: "0 0 auto" }}>
             <div style={{ fontSize: 15, fontWeight: 800 }}>清单拆表 · {contract}</div>
             <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>合同工程量清单 → 拆分成表格 · 归属项目「{project}」</div>

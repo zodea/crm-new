@@ -590,7 +590,7 @@
         {/* 顶部摘要（横跨全宽） */}
         <Panel padding={0} style={{ overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <button onClick={() => navigate("project")} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)", padding: "7px 12px", fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", cursor: "pointer", flex: "none" }}>
+            <button onClick={() => window.DC.closeActiveTab()} title="关闭页签（左邻页签自动激活）" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)", padding: "7px 12px", fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", cursor: "pointer", flex: "none" }}>
               <Icon name="arrow-left" size={15} />返回列表
             </button>
             <span style={{ width: 44, height: 44, borderRadius: 10, background: "var(--brand-soft)", color: "var(--brand)", fontWeight: 800, fontSize: 20, display: "grid", placeItems: "center", flex: "none" }}>{proj.name.slice(0, 1)}</span>
@@ -798,17 +798,17 @@
           )}
         </div>
       );
-      const rows = [{ name: m.contractName, amount: m.biz.main, status: "已生效", signDate: proj.startDate, category: "施工总包", signed: m.biz.main,
-        doc: { name: "施工合同正本.pdf", pages: 32 },
-        boqs: proj.id === "p1"
-          ? [{ name: "合和七期户内合同版-清单.xlsx", parsed: true, rows: 1286 }, { name: "公区清单.xlsx", parsed: false }]
-          : [{ name: proj.name + "-工程量清单.xlsx", parsed: false }] }];
+      // 批A 同源化：施工合同行从共享 store 读（与「主合同管理·施工合同」列表同一份数据），Tab=按项目过滤视图
+      const KA = window.KitAtoms || {};
+      const conRows = window.APP ? window.APP.rows("contracts").filter((c) => c.kind === "施工" && c.projectId === proj.id) : [];
+      const rows = conRows.map((c) => ({ ...c, category: "施工总包", signed: c.amount,
+        boqs: c.boqs || [{ name: proj.name + "-工程量清单.xlsx", parsed: false }] }));
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <SubTable title="施工合同" columns={[
-            { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "name", label: "合同名称", render: (v, r) => KA.EntityLink ? <KA.EntityLink type="contract" id={r.id} label={v} /> : <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
             { key: "amount", label: "含税合同金额", align: "right", money: true },
-            { key: "status", label: "合同状态", render: (v) => <StatusChip tone="ok">{v}</StatusChip> },
+            { key: "status", label: "合同状态", render: (v) => <StatusChip tone={v === "履约中" ? "brand" : v === "已签订" ? "neutral" : v === "已结算" ? "warn" : "ok"}>{v}</StatusChip> },
             { key: "signDate", label: "签约日期", mono: true, color: "var(--ink-soft)" },
             { key: "signed", label: "含税已签金额", align: "right", money: true },
             { key: "attach", label: "附件", width: 220, noForm: true, render: attachCell },
@@ -829,20 +829,20 @@
     }
 
     if (tab === "expContract") {
-      const rows = [
-        { name: "泥水班组劳务分包合同", supplier: "陈家泥水班组", type: "劳务分包", amount: 2860000, settled: 1240000, status: "履约中" },
-        { name: "瓷砖采购合同", supplier: "广东宏宇陶瓷", type: "材料采购", amount: 3580000, settled: 2150000, status: "履约中" },
-        { name: "铝扣板供应及安装合同", supplier: "佛山华铝装饰", type: "专业分包", amount: 920000, settled: 0, status: "已签订" },
-      ];
+      // 批A 同源化：支出合同 = 共享 store 里本项目的 分包+材采 合同（与两张合同列表同源），Tab=过滤视图
+      const KA = window.KitAtoms || {};
+      const rows = (window.APP ? window.APP.rows("contracts").filter((c) => (c.kind === "分包" || c.kind === "材采") && c.projectId === proj.id) : [])
+        .map((c) => { const s = window.APP.get("suppliers", c.supplierId);
+          return { id: c.id, name: c.name, supplier: s ? s.name : "—", type: c.kind === "材采" ? "材料采购" : (c.subKind || "劳务") + "分包", amount: c.amount, settled: c.settled, status: c.status }; });
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <SubTable title="支出合同" columns={[
-            { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+            { key: "name", label: "合同名称", render: (v, r) => KA.EntityLink ? <KA.EntityLink type="contract" id={r.id} label={v} /> : <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
             { key: "supplier", label: "乙方（分供方）", render: (v) => <button onClick={() => navigate("projectSupplier", { pid: proj.id, sid: v, project: proj.name, supplier: v })} style={{ border: 0, background: "transparent", color: "var(--brand)", fontWeight: 600, cursor: "pointer", padding: 0, textAlign: "left" }} title="打开 项目×分供方 工作台">{v}</button> },
             { key: "type", label: "合同类型" },
             { key: "amount", label: "含税合价", align: "right", money: true },
             { key: "settled", label: "累计结算金额", align: "right", money: true },
-            { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "履约中" ? "brand" : v === "已签订" ? "neutral" : "ok"}>{v}</StatusChip> },
+            { key: "status", label: "合同状态", render: (v) => <StatusChip tone={v === "履约中" ? "brand" : v === "已签订" ? "neutral" : v === "已结算" ? "warn" : "ok"}>{v}</StatusChip> },
           ]} rows={rows} sum={{ label: "含税合价总计", key: "amount" }} />
           <SubTable title="分包变洽签" columns={[
             { key: "no", label: "变更编号", mono: true },

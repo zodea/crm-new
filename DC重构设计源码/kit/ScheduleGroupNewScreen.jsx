@@ -84,7 +84,7 @@
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* 头部 */}
         <Panel padding={14} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <Button icon="arrow-left" onClick={() => navigate("schedule", { project: proj })}>返回施工进度</Button>
+          <Button icon="arrow-left" onClick={() => window.DC.closeActiveTab()}>返回施工进度</Button>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800 }}>新建楼栋分组 · {proj}</div>
             <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>22 道精装修工序标准库逐条可调 · 排程实时预览 · 创建后仍可在施工进度页改期</div>

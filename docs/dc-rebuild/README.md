@@ -224,6 +224,23 @@
 - 右侧文件栏按来源分组（合同/请款/收票/付款）；审批时间线/评论/动态标注 V2。
 - 验证：esbuild 通过；本地 8823 + Chrome 实测（工作台渲染、结算上传→二次确认→已结算锁定只读+尾款差额、入口蓝链开出对应工作台且页签按 pid+sid 去重、标题「合和新城×陈家泥水班组」正确），console 零报错。已 DesignSync 推送（app.dc.html + kit/ProjectSupplierScreen.jsx + kit/ProjectDetailScreen.jsx）。
 
+### IA 重构 批A（2026-07-11：底座四件 + 新侧栏 10 组 + 合同主线）
+
+> 交接 [HANDOFF.md](../../HANDOFF.md) + [01-批A](../handoffs/01-批A-底座与合同主线.md)。IA 向红圈看齐第一批（地基批）。
+
+- **底座四件**（后续批 B–E 全部白嫖）：
+  - `EntityLink(type,id,label?)` 进 `kit/KitAtoms.jsx`：全站实体蓝链，type→route 映射**只此一处**（project/supplier/contract/crew/worker/invoice）。
+  - `kit/EntityListScreen.jsx` 列表工厂：一份 meta → 整页红圈式列表（四级金额链列 + 底部多段业务汇总行 + 业务态默认视图 SegTab + 可选左侧分类 TreeNav + 搜索/下拉筛选/⚙列显隐 + 导入 importModal(ADR 0005)/导出 Excel 列·范围选择 + 新增/编辑 formModal 按列自动生成（form.toLabel/toValue 支持 id↔名称 select）+ 软删 undoToast）。**CRUD 唯一写路径 = window.APP**。
+  - `kit/DetailShell.jsx` 详情外壳：返回=关页签 + 状态 chip + 四级对账 MetricGrid + SegTab 关联单据壳 + 右侧文书预览/附件栏；**审批流不挂**（grilling 决议③）。
+  - `kit/ContractDetailScreen.jsx` 通用合同详情：kind∈{施工,分包,材采} 显隐口径（施工=开票/收款，支出侧=收票/支付）、变洽签 Tab 仅施工/分包、施工详情带清单拆表 chips → boqImport/boqList。
+- **轻实体仓**：`kit/data.js` 新增 `contracts[]` 31 份（施工12/分包9/材采10，稳定 id sg/fb/cg×××，p1–p4 施工金额与项目详情驾驶舱 m.biz 同源对齐）+ 分包/材采乙方 s6–s10；`kit/AppData.jsx` contracts 入 store，分供方 合同总额/累计支付/项目数改为**从 contracts 派生**（数字不再打架）。
+- **三张合同列表**（Workflow 三代理并行生成）：`ConContractScreen`（主合同管理）/`SubContractScreen`（分包及人工，劳务/专业左分类）/`MatContractScreen`（乙供材管理，红圈三段汇总）。
+- **新侧栏 10 组**（`app.dc.html` NAV 重排，导航 Artifact 锁定版）：识别中心组退役（发票识别→资金、送货单识别→乙供材、清单拆表→主合同、OCR 设置→设置）；批 B/C/D/E 未实装项以「待建」灰显占位（23 项）。`_isActive` 合同详情按 kind 点亮来源列表。
+- **项目详情 Tab③/④ 同源化**：施工合同/支出合同子表改读 `window.APP.rows("contracts")` 按项目过滤（Tab=过滤视图），合同名 EntityLink 真跳合同详情。
+- **返回=关页签 9 处**：projectDetail/projectSupplier/supplierDetail/crewDetail/workerDetail/quantityUnit/scheduleGroupNew/payrollDetail/boqImport 全改 `window.DC.closeActiveTab()`（左邻自动激活=父级）。
+- `KitTable` sum 支持数组（红圈式多段汇总行）。
+- 验证：esbuild 全过；本地 8823 实测（列表默认业务态视图/汇总行/蓝链跳详情/返回关页签/左分类过滤/新建 名称↔id 映射落库/软删撤回/导出列·范围弹窗/导入字段映射/Tab③④ 同源），console 零报错。已 DesignSync 推送。
+
 ### 反馈轮 8（2026-07-04：全站界面整改 —— 九大块）
 见 [FEEDBACK-8.md](./FEEDBACK-8.md)：表格三件套铁律（见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)）、金额两位小数铁律、红圈对齐；首页减法、项目列表/编辑/详情红圈化、施工进度新建分组子页面、分供方表格修复、税额工具压缩、工程量矩阵优化+量差总表（#37）、清单编辑、工资核算/进度款对齐真实格式。**每完成一屏在该文件标「暂定界面」。**
 

@@ -1,6 +1,6 @@
 // AppData — 跨页共享业务数据 store（反馈轮 9 第二层：双页/多页联动地基）
 // 与 ScheduleData(排程)/InvoiceShared(发票域) 同模式：隐藏预载注册 window.APP，subscribe/notify 订阅刷新。
-// 首批集合：projects / suppliers —— 列表页与详情页共用同一份数据，任一处编辑另一处实时可见。
+// 集合：projects / suppliers / contracts（批A）—— 列表页/详情页/项目详情Tab 共用同一份数据，任一处编辑另一处实时可见。
 // 约定：页面不再各自 useState(data.xxx.slice()) 持有副本；读 APP.rows()，改走 APP.update/add/softDel。
 (function () {
   if (window.APP) { window.AppDataScreen = window.AppDataScreen || function () { return null; }; return; }
@@ -33,20 +33,37 @@
 
   // —— 分供方扩展（口径 = 原 SupplierScreen META，上移到 store 供列表/详情共用）——
   const SUP_EXT = {
-    s1: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1860000, paidTotal: 1200000 },
-    s2: { category: "材料供应商", cred: "reviewing", parent: "", projectCount: 1, contractTotal: 720000, paidTotal: 400000 },
-    s3: { category: "材料供应商", cred: "qualified", parent: "", projectCount: 2, contractTotal: 1340000, paidTotal: 980000 },
-    s4: { category: "设备供应商", cred: "incomplete", parent: "", projectCount: 1, contractTotal: 230000, paidTotal: 80000 },
-    s5: { category: "劳务分包商", cred: "qualified", parent: "", projectCount: 3, contractTotal: 560000, paidTotal: 560000 },
+    s1: { category: "材料供应商", cred: "qualified", parent: "" },
+    s2: { category: "材料供应商", cred: "reviewing", parent: "" },
+    s3: { category: "材料供应商", cred: "qualified", parent: "" },
+    s4: { category: "设备供应商", cred: "incomplete", parent: "" },
+    s5: { category: "劳务分包商", cred: "qualified", parent: "" },
+    // 批A 新增乙方（合同主线蓝链落点）
+    s6: { category: "劳务分包商", cred: "qualified", parent: "" },
+    s7: { category: "材料供应商", cred: "qualified", parent: "" },
+    s8: { category: "专业分包商", cred: "qualified", parent: "" },
+    s9: { category: "专业分包商", cred: "reviewing", parent: "" },
+    s10: { category: "专业分包商", cred: "qualified", parent: "" },
   };
-  const mergeSupplier = (s) => ({ category: "其他", cred: "incomplete", parent: "", projectCount: 0, contractTotal: 0, paidTotal: 0, ...(SUP_EXT[s.id] || {}), ...s });
+  // 合同总额/累计支付/项目数一律从 contracts 派生（批A 同源化：分供方页数字不再与合同列表打架）
+  const supAgg = (sid, contracts) => {
+    const list = (contracts || []).filter((c) => c.supplierId === sid);
+    if (!list.length) return { projectCount: 0, contractTotal: 0, paidTotal: 0 };
+    return {
+      projectCount: new Set(list.map((c) => c.projectId)).size,
+      contractTotal: list.reduce((s, c) => s + (Number(c.amount) || 0), 0),
+      paidTotal: list.reduce((s, c) => s + (Number(c.paid) || 0), 0),
+    };
+  };
+  const mergeSupplier = (s, contracts) => ({ category: "其他", cred: "incomplete", parent: "", ...supAgg(s.id, contracts), ...(SUP_EXT[s.id] || {}), ...s });
 
-  const state = { projects: [], suppliers: [] };
+  const state = { projects: [], suppliers: [], contracts: [] };
   const init = () => {
     const d = window.KIT_DATA;
     if (!d) return false;
     state.projects = (d.projects || []).map(mergeProject);
-    state.suppliers = (d.suppliers || []).map(mergeSupplier);
+    state.contracts = (d.contracts || []).slice();
+    state.suppliers = (d.suppliers || []).map((s) => mergeSupplier(s, d.contracts));
     return true;
   };
   if (!init()) { const t = setInterval(() => { if (init()) { clearInterval(t); notify(); } }, 50); }
@@ -55,7 +72,7 @@
   const all = (coll) => state[coll] || [];
   const get = (coll, id) => (state[coll] || []).find((x) => x.id === id);
   const update = (coll, id, patch) => { state[coll] = state[coll].map((x) => (x.id === id ? { ...x, ...patch } : x)); notify(); };
-  const add = (coll, row) => { state[coll] = [coll === "projects" ? mergeProject(row) : row, ...state[coll]]; notify(); };
+  const add = (coll, row) => { state[coll] = [coll === "projects" ? mergeProject(row) : coll === "suppliers" ? mergeSupplier(row, state.contracts) : row, ...state[coll]]; notify(); };
   const softDel = (coll, id) => update(coll, id, { discarded: true });
   const restore = (coll, id) => update(coll, id, { discarded: false });
 

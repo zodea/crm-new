@@ -33,7 +33,7 @@
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* 面包屑（逐级可回退）*/}
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-soft)", flexWrap: "wrap" }}>
-          <button onClick={() => navigate("payroll", {})} style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--brand)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <button onClick={() => window.DC.closeActiveTab()} title="关闭页签（左邻页签自动激活）" style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--brand)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
             <Icon name="chevron-left" size={14} />工资核算
           </button>
           <span style={{ opacity: 0.4 }}>/</span>

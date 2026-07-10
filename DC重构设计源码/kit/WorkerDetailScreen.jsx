@@ -270,7 +270,7 @@
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Panel padding={0} style={{ overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 18px", borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
-            <button onClick={() => navigate("worker")} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line-strong)", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 13, color: "var(--ink-soft)", cursor: "pointer" }}>
+            <button onClick={() => window.DC.closeActiveTab()} title="关闭页签（左邻页签自动激活）" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line-strong)", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 13, color: "var(--ink-soft)", cursor: "pointer" }}>
               <Icon name="arrow-left" size={15} />工人信息
             </button>
             <span style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--brand-soft)", color: "var(--brand)", fontWeight: 800, fontSize: 17, display: "grid", placeItems: "center" }}>{w.name.slice(0, 1)}</span>

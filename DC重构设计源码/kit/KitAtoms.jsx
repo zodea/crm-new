@@ -5,6 +5,7 @@
 //   SearchInput   pill 搜索框            SectionHeader 品牌竖条区块标题（§3.2）
 //   Metric/MetricGrid 指标格+语义固定列数网格（两位小数由调用方保证）
 //   TreeNav       左树导航（发票台账/清单页同构）
+//   EntityLink    实体蓝链（批A：type→route 映射唯一处，全站实体名跳转一律走它）
 // 约定：新页面一律从 window.KitAtoms 取用；旧页面逐步替换内联副本，勿再复制。
 (function () {
   if (window.KitAtoms) { window.KitAtomsScreen = window.KitAtomsScreen || function () { return null; }; return; }
@@ -82,6 +83,32 @@
       ...React.Children.map(children, (c) => h("div", { style: { background: "var(--panel)", minWidth: 0 } }, c)));
   }
 
+  // —— 实体蓝链（批A 底座件①）：全站实体名一律蓝色可点，type→route 映射只写这一处 ——
+  // 用法：<EntityLink type="contract" id="fb01" /> 或 <EntityLink type="supplier" id="s6" label="陈家班" />
+  // label 缺省时按 type 从共享 store / KIT_DATA best-effort 解析；无 id 或查无实体 → 退化为纯文本（不做死链）。
+  const ENTITY_ROUTES = {
+    project:  { route: "projectDetail",  params: (id) => ({ id }),     name: (id) => ((window.APP && window.APP.get("projects", id)) || {}).name },
+    supplier: { route: "supplierDetail", params: (id) => ({ id }),     name: (id) => { const s = window.APP && window.APP.get("suppliers", id); return s ? ((s.aliases && s.aliases[0]) || s.name) : null; } },
+    contract: { route: "contractDetail", params: (id) => ({ id }),     name: (id) => ((window.APP && window.APP.get("contracts", id)) || {}).name },
+    crew:     { route: "crewDetail",     params: (id) => ({ crewId: id }), name: (id) => (((window.KIT_DATA || {}).crews || []).find((c) => c.id === id) || {}).name },
+    worker:   { route: "workerDetail",   params: (id) => ({ id }),     name: (id) => (((window.KIT_DATA || {}).workers || []).find((w) => w.id === id) || {}).name },
+    invoice:  { route: "invoiceEdit",    params: (id) => ({ id }),     name: (id) => { const iv = window.INV && window.INV.get(id); return iv && iv.number ? "票 " + iv.number.slice(-8) : null; } },
+  };
+  function EntityLink({ type, id, label, bold = true, title }) {
+    const conf = ENTITY_ROUTES[type];
+    const text = label != null ? label : (conf && id != null ? conf.name(id) : null);
+    if (text == null || text === "") return h("span", { style: { color: "var(--ink-faint)" } }, "—");
+    if (!conf || id == null) return h("span", null, text);
+    return h("button", {
+      type: "button", title: title || ("打开 " + text),
+      onClick: (e) => { e.stopPropagation(); if (window.DC) window.DC.navigate(conf.route, conf.params(id)); },
+      onMouseEnter: (e) => { e.currentTarget.style.textDecoration = "underline"; },
+      onMouseLeave: (e) => { e.currentTarget.style.textDecoration = "none"; },
+      style: { border: 0, background: "transparent", padding: 0, cursor: "pointer", textAlign: "left",
+        color: "var(--brand)", fontWeight: bold ? 600 : 500, fontSize: "inherit", fontFamily: "inherit" },
+    }, text);
+  }
+
   // —— 左树导航（items: [{key,label,icon,count,tone,children?:[{...}]}]；active/onChange）——
   function TreeNav({ title, items, active, onChange }) {
     const { Icon, Panel } = DS();
@@ -101,6 +128,6 @@
           t.children && h("div", { style: { paddingLeft: 14 } }, ...t.children.map((c) => btn(c, true)))))));
   }
 
-  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav };
+  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink };
   window.KitAtomsScreen = function () { return null; };
 })();

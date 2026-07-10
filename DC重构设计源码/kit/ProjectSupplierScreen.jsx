@@ -154,7 +154,7 @@
         {/* 顶部摘要 */}
         <Panel padding={0} style={{ overflow: "hidden" }}>
           <div style={{ padding: "16px 18px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            <button onClick={() => navigate("projectDetail", { id: pid })} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)", padding: "7px 12px", fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", cursor: "pointer", flex: "none" }}>
+            <button onClick={() => window.DC.closeActiveTab()} title="关闭页签（左邻页签自动激活）" style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)", padding: "7px 12px", fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", cursor: "pointer", flex: "none" }}>
               <Icon name="arrow-left" size={15} />返回项目
             </button>
             <div style={{ minWidth: 0, flex: 1 }}>
