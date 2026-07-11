@@ -7,7 +7,16 @@ export default defineNuxtConfig({
     '@unocss/nuxt',
     '@pinia/nuxt',
     '@vueuse/nuxt',
+    '@nuxt/eslint',
   ],
+
+  eslint: {
+    // 交给外部 eslint.config.mjs 的 antfu 配置组合，@nuxt/eslint 只提供
+    // auto-import globals / Nuxt 专属规则，避免与 antfu 的 stylistic 规则冲突。
+    config: {
+      standalone: false,
+    },
+  },
 
   components: {
     dirs: [

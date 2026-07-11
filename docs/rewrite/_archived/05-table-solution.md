@@ -6,6 +6,8 @@ date: 2026-06-26
 
 # 决策 05：表格方案 — 保留 vxe-table
 
+> ⛔ 已归档：表格方案权威源现为 [ADR 0009](../../adr/0009-vxe-table-as-datagrid-engine.md)（vxe-table 唯一底座 + KitTable 深封装，取代本条）。下文仅存 2026-06-26 原始留档。
+
 ## 结论
 
 继续使用 vxe-table 作为全局表格方案。

@@ -1,19 +1,28 @@
 <script setup lang="ts">
+import type { StatusTone } from '~/lib/project/status'
+import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+
 const route = useRoute()
 const store = useProjectStore()
 
 const projectId = computed(() => route.params.id as string)
 const project = computed(() => store.byId(projectId.value))
 
+const showEdit = ref(false) // 顶部「编辑」入口（与列表页共用 ProjectFormDialog，共享 store 实时联动）
+
 // 页签标题回填为项目名（如「合和新城」），取代通用「项目详情」
 useTabTitle(() => project.value?.name)
 
-const STATUS_COLOR: Record<string, string> = {
-  '筹备中': 'chip-warn',
-  '施工中': 'chip-brand',
-  '停工': 'chip bg-surface-3 text-ink-faint',
-  '已竣工': 'chip-ok',
-  '已结算': 'chip-ok',
+// 语义色调 → 详情页 chip class（色调映射见 ~/lib/project/status，与列表页共用同一状态源）
+const TONE_CHIP: Record<StatusTone, string> = {
+  warn: 'chip-warn',
+  brand: 'chip-brand',
+  muted: 'chip bg-surface-3 text-ink-faint',
+  ok: 'chip-ok',
+}
+function statusChip(status: string): string {
+  const tone = PROJECT_STATUS_TONE[status]
+  return tone ? TONE_CHIP[tone] : 'chip-brand'
 }
 
 const activeTab = ref('detail')
@@ -33,7 +42,8 @@ const tabs = [
 // 经营数据面板（V1 用 0 占位，后续从子表实时聚合）
 const operationData = computed(() => {
   const p = project.value
-  if (!p) return []
+  if (!p)
+    return []
   return [
     { label: '主合同金额(元)', value: 0, color: '' },
     { label: '增补合同额(元)', value: 0, color: '' },
@@ -73,36 +83,48 @@ onMounted(() => store.load())
         <NuxtLink to="/project" class="icon-btn" title="返回列表">
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
-        <h2 class="text-17px font-800 text-ink">{{ project.name }}</h2>
+        <h2 class="text-17px font-800 text-ink">
+          {{ project.name }}
+        </h2>
         <span class="text-13px text-ink-faint">项目信息</span>
-        <span :class="['chip', STATUS_COLOR[project.status] || 'chip-brand']">
+        <span class="chip" :class="[statusChip(project.status)]">
           {{ project.status }}
         </span>
         <div class="flex-1" />
-        <button class="btn-secondary">
+        <button class="btn-secondary" @click="showEdit = true">
           <span class="i-lucide-square-pen text-13px mr-1" /> 编辑
         </button>
       </div>
       <!-- 元数据摘要行 -->
       <div class="info-row text-12px">
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">业务流程阶段</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            业务流程阶段
+          </div>
           <div>{{ project.status }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">经营类型</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            经营类型
+          </div>
           <div>{{ project.operationType || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">项目经理</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            项目经理
+          </div>
           <div>{{ project.manager || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">客户(甲方)</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            客户(甲方)
+          </div>
           <div>{{ project.developer || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">承包单位</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            承包单位
+          </div>
           <div>{{ project.contractor || '—' }}</div>
         </div>
       </div>
@@ -110,7 +132,9 @@ onMounted(() => store.load())
 
     <!-- 项目经营数据 -->
     <div class="border border-line bg-panel mb-3 px-4 py-3">
-      <h4 class="text-11px font-600 text-ink-faint mb-2 tracking-wide">项目经营数据（自动计算）</h4>
+      <h4 class="text-11px font-600 text-ink-faint mb-2 tracking-wide">
+        项目经营数据（自动计算）
+      </h4>
       <div class="grid grid-cols-6 gap-px bg-line">
         <div
           v-for="(d, i) in operationData"
@@ -131,14 +155,18 @@ onMounted(() => store.load())
 
     <!-- 票据信息 -->
     <div class="border border-line bg-panel mb-3 px-4 py-3">
-      <h4 class="text-11px font-600 text-ink-faint mb-2 tracking-wide">票据信息（自动计算）</h4>
+      <h4 class="text-11px font-600 text-ink-faint mb-2 tracking-wide">
+        票据信息（自动计算）
+      </h4>
       <div class="grid grid-cols-6 gap-px bg-line">
         <div
           v-for="(d, i) in invoiceData"
           :key="i"
           class="bg-panel px-3 py-2"
         >
-          <div class="text-9px text-ink-faint mb-1">{{ d.label }}</div>
+          <div class="text-9px text-ink-faint mb-1">
+            {{ d.label }}
+          </div>
           <div class="font-mono text-16px tabular-nums">
             {{ d.isFmt ? d.value : fmtMoney(d.value as number) }}
           </div>
@@ -169,6 +197,9 @@ onMounted(() => store.load())
     <div v-else>
       <ProjectSubTables :tab="activeTab" :project-id="projectId" />
     </div>
+
+    <!-- 顶部「编辑」入口：与列表页共用同一表单组件，保存经共享 store 双页实时联动（#61） -->
+    <ProjectFormDialog v-model:open="showEdit" :project="project" />
   </div>
 
   <div v-else class="py-12 text-center text-ink-faint">

@@ -11,7 +11,7 @@
 
 1. **交互必须闭环**：点了有真实反馈、数据真实变化、可撤回可恢复。占位 toast 只是过渡态，不是交付态。
 2. **规范查文档，不凭感觉**：每类交互在项目文档里都有出处（见 Step 1 的定位表）。
-3. **先全局后局部**：能沉淀为全局原语的交互（弹窗/toast/导出/导入/撤回）先进 `kit/KitUI.jsx`，再被页面调用；禁止在单个页面里造一次性轮子。
+3. **先全局后局部**：能沉淀为全局原语的交互（确认弹窗/toast/表单弹窗/撤回）先走统一入口复用，禁止在单个页面里造一次性轮子。（导出/导入是独立页签流程、非弹窗原语，见 [ADR 0004](../adr/0004-export-interaction-model.md) / [ADR 0005](../adr/0005-import-mapping-model.md)。）
 4. **改坏了先回滚**：出现「改动效果不如意」时，第一步是回到最后已知良好状态（本地快照），再在其上做增量，不在坏版本上修修补补。
 
 ---
@@ -23,13 +23,13 @@
 | 改动涉及 | 查这里 |
 |---|---|
 | 页面结构 / 字段 / Tab / 弹窗定义 | `docs/rewrite/pages/<page>.md`（内容蓝本，结构也要对齐） |
-| 视觉样式（卡片/按钮/表格/状态色） | [STYLE-GUIDE.md](./STYLE-GUIDE.md)（**覆盖** DESIGN-SYSTEM.md 的旧扁平条款） |
+| 视觉样式（卡片/按钮/表格/状态色） | 视觉基准 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md) |
 | 删除 / 编辑 / 撤回行为 | `docs/rewrite/DATABASE.md` §8（软删除 + 操作日志 + 撤回规则） |
-| 导出交互 | `docs/rewrite/pages/finance-invoice.md` §7（**全局通用**：文件夹选择器 + 结构/命名配置）+ `docs/rewrite/DESIGN-SYSTEM.md` §7.3 |
+| 导出交互 | [ADR 0004](../adr/0004-export-interaction-model.md) + [kit-ui-component-specs §export-progress](../design/kit-ui-component-specs.md) |
 | 页面接入 / 路由 / DS 组件 | [IMPLEMENTATION.md](./IMPLEMENTATION.md) |
 | 术语 | 根目录 `CONTEXT.md` |
 
-**冲突时的优先级**：用户当面确认 > STYLE-GUIDE.md > 页面 md 蓝本 > DESIGN-SYSTEM.md 旧条款。
+**冲突时的优先级**：用户当面确认 > 相关 ADR（视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、交互 0003/0004/0005/0008、表格 0009）> STYLE-GUIDE.md（dc 细化）> 页面 md 蓝本。
 
 ---
 
@@ -50,20 +50,22 @@
 
 ## 三、Step 3 —— 原语优先（KitUI）
 
-> ⚠ **本节描述 DC 设计稿侧（`window.KitUI`）。生产端（Nuxt/Vue）底座已换 shadcn-vue（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：reka-ui Dialog + vue-sonner，统一入口 `useKitUI()`（原语语义与本节一致）。「原语优先、禁止一次性轮子」的规则不变。
+> ⚠ 本节描述 DC 设计稿侧 `window.KitUI`；生产端底座 = shadcn-vue，见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)（统一入口 `useKitUI()`，「原语优先、禁止一次性轮子」规则不变）。
 
 ### 3.1 现有全局原语（`kit/KitUI.jsx`，纯 DOM，经隐藏 x-import 预加载注册 `window.KitUI`）
 
-| 原语 | 用途 | 关键参数 |
+> ⚠️ 下表为设计稿快照侧旧原语签名（历史留痕），末列给出生产端现行对应；冲突以所引 ADR 为准。
+
+| 原语（设计稿快照） | 用途 | 生产端对应（现行，以此为准） |
 |---|---|---|
-| `toast(msg, tone)` | 轻反馈 | tone: `"ok"` / `"danger"` / 默认 |
-| `confirm(opts)` | 二次确认 | `title/message/danger/confirmText/onConfirm` |
-| `modal(opts)` | 自定义内容弹窗 | `bodyHTML/actions[]`；返回 `{close, body}` 可挂事件 |
-| `formModal(opts)` | 字段表单弹窗 | `fields[]（text/select/textarea, full, placeholder）/cols/onSave(vals)` |
-| `undoToast(msg, onUndo, ms?)` | **软删除撤回**（默认 5s） | 撤回按钮回调里把记录 splice 回原位置 |
-| `folderPicker(onPick)` | 模拟文件夹选择器 | 选中回调返回路径字符串 |
-| `exportModal(opts)` | **全局导出规范弹窗** | `title/count/unit/ext/anchor/structureOptions[]/nameOptions[{label,sample}]/onDone`；内含 folderPicker + 两级结构 + 命名预览 + 进度条 + 完成静态 toast |
-| `importModal(opts)` | Excel 导入 + 字段映射 | `targetFields[]/sourceCols[]/fileName/rowCount/onDone(count)`；同名列自动匹配 |
+| `toast(msg, tone)` | 轻反馈 | vue-sonner 双泳道 toast，见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md) |
+| `confirm(opts)` | 二次确认 | 三档确认弹窗（所有删除先确认），见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) |
+| `modal(opts)` | 自定义内容弹窗 | reka-ui Dialog，见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md) |
+| `formModal(opts)` | 字段表单弹窗 | reka-ui Dialog + 字段配置驱动，见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)（`app/lib/kit/form-modal.ts`）|
+| `undoToast(msg, onUndo, ms?)` | **软删除撤回** | 撤回时长以 CONTEXT.md「撤回」为准；机制见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) |
+| `folderPicker(onPick)` | 模拟文件夹选择器 | 导出走系统文件夹选择器，见 [ADR 0004](../adr/0004-export-interaction-model.md) |
+| `exportModal(opts)` | 旧「全局导出规范弹窗」 | 已退役为独立页签，见 [ADR 0004](../adr/0004-export-interaction-model.md) |
+| `importModal(opts)` | 旧「Excel 导入 + 字段映射弹窗」 | 已退役为独立页签三步 stepper，见 [ADR 0005](../adr/0005-import-mapping-model.md) |
 
 ### 3.2 规则
 
@@ -86,7 +88,7 @@ const addRow  = (vals) => setList((l) => [{ id: "x_" + Date.now(), ...默认值,
 const editRow = (id) => (vals) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...vals } : x)));
 const delRow  = (row) => UI().confirm({
   title: "删除…", danger: true, confirmText: "删除",
-  message: "确定删除「…」？删除为软删除，可在 5 秒内撤回。",
+  message: "确定删除「…」？删除为软删除，可在 N 秒内撤回。", // N=撤回时长，以 CONTEXT.md「撤回」为准
   onConfirm: () => {
     const idx = list.findIndex((x) => x.id === row.id);
     setList((l) => l.filter((x) => x.id !== row.id));
@@ -140,7 +142,7 @@ const delRow  = (row) => UI().confirm({
 
 - Step 1：读了 finance-invoice.md §7（导出规范）、DATABASE.md §8（软删除）。
 - Step 2：4 问全部向用户确认（基准=快照全量回滚 / 范围=二级弹窗 / 数据=内存+可撤回 / 深度=完整模拟）。
-- Step 3：新建 `exportModal/importModal/undoToast/folderPicker` 四个原语，9 个页面复用。
+- Step 3：新建 `exportModal/importModal/undoToast/folderPicker` 四个原语，9 个页面复用。（exportModal/importModal 后退役为独立页签，见 ADR 0004/0005。）
 - Step 4：分供方/班组/工人/项目/发票/送货单全部 state 化。
 - Step 5：esbuild 全过 → 本地 server 实测（导出全流程/撤回恢复/上传闭环）→ 推送 36 文件 → 线上渲染确认。
 - Step 6：README 补反馈轮 3；修正 IMPLEMENTATION.md 过时条款；建 CONTEXT.md。

@@ -38,7 +38,7 @@
 - [Radix Themes · Alert Dialog](https://www.radix-ui.com/themes/docs/components/alert-dialog) · 可交互 — 评估「品牌蓝主色 + 红确认」配色关系
 - [Mantine · Modals manager](https://mantine.dev/x/modals/) · 可交互 — 命令式调用 + 堆叠/递进确认
 
-**推荐**：骨架用 shadcn/DesignRevision 克制结构，高危项叠 type-to-confirm + Async spinner。**落到瑞航**：确认按钮绑 `--danger`、取消用 ghost 灰，品牌蓝不当主角；不用毛玻璃，`rgba(42,89,150,.28)` 轻遮罩即可。
+**推荐**：骨架用 shadcn/DesignRevision 克制结构，高危项叠 type-to-confirm + Async spinner。**落到瑞航**：确认按钮绑 `--danger`、取消用 ghost 灰，品牌蓝不当主角；不用毛玻璃，`rgba(0,0,0,.28)` 轻遮罩即可。
 
 ### 02 · 表单弹窗 `form-modal`
 **要点**：标题「动词+名词」；字段分组、失焦即时校验、错误贴字段下方；主按钮放右下 footer、动词与标题一致；打开聚焦第一个输入框；有未保存内容要拦。
@@ -78,7 +78,7 @@
 - [Mantine · Drawer](https://mantine.dev/core/drawer/) · 可交互 — 四向 + 毛玻璃开关实拖对比 + 多层叠开
 - [HeroUI · Drawer](https://heroui.com/docs/react/components/drawer) · 可交互 — 毛玻璃背板（仅作展示性灵感）
 
-**推荐**：结构与代码抄 shadcn-vue Sheet（就是本项目技术栈），动效缓动抄 Vaul。**落到瑞航**：桌面端「编辑项目/看工程量详情」走右侧 Drawer（宽 420-520px），三段式，背板 `rgba(42,89,150,.28)` 轻遮罩、**别上毛玻璃**（Tauri 性价比低）；窄窗退化为底部 Sheet + 拖拽把手。
+**推荐**：结构与代码抄 shadcn-vue Sheet（就是本项目技术栈），动效缓动抄 Vaul。**落到瑞航**：桌面端「编辑项目/看工程量详情」走右侧 Drawer（宽 420-520px），三段式，背板 `rgba(0,0,0,.28)` 轻遮罩、**别上毛玻璃**（Tauri 性价比低）；窄窗退化为底部 Sheet + 拖拽把手。
 
 ### 06 · 按钮三态 `button-states`
 **要点**：同一颗按钮原地走完 default→loading（转圈+禁用防重复提交）→success（打勾），**锁死宽度不跳动**，成功停约 1s 再复位；行内校验把错误贴字段下方。

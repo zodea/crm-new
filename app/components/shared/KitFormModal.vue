@@ -23,8 +23,10 @@ const bodyRef = ref<HTMLElement | null>(null)
 const fields = computed(() => props.options?.fields ?? [])
 const cols = computed(() => props.options?.cols ?? 1)
 
-// 每次打开都用字段初始值重置草稿与校验态
-watch(() => props.open, (isOpen) => {
+// 每次打开都用字段初始值重置草稿与校验态。
+// #86 同时监听 options：背靠背二次调用（open 保持 true、仅 options 换新）也要按新字段重置，
+// 否则草稿会残留上一次表单的值。常态输入时 options 引用不变，不会误触发重置。
+watch([() => props.open, () => props.options], ([isOpen]) => {
   if (isOpen && props.options) {
     values.value = initValues(props.options.fields)
     missing.value = new Set()
@@ -51,7 +53,8 @@ function clearMissing(key: string) {
 
 // reka 请求关闭（Esc / 点遮罩）→ 取消
 function onOpenChange(value: boolean) {
-  if (!value) emit('cancel')
+  if (!value)
+    emit('cancel')
 }
 
 // 打开后焦点落在第一个字段控件（规格：自动聚焦第一个输入框）
@@ -106,8 +109,12 @@ function onOpenAutoFocus(e: Event) {
               :class="{ 'border-danger! shadow-[0_0_0_2px_rgba(224,78,92,0.15)]!': missing.has(f.key) }"
               @change="clearMissing(f.key)"
             >
-              <option value="" disabled>请选择</option>
-              <option v-for="o in f.options" :key="o" :value="o">{{ o }}</option>
+              <option value="" disabled>
+                请选择
+              </option>
+              <option v-for="o in f.options" :key="o" :value="o">
+                {{ o }}
+              </option>
             </select>
 
             <textarea
@@ -138,7 +145,9 @@ function onOpenAutoFocus(e: Event) {
 
       <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
       <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
-        <Button variant="outline" @click="emit('cancel')">取消</Button>
+        <Button variant="outline" @click="emit('cancel')">
+          取消
+        </Button>
         <Button @click="handleSave">
           {{ options.saveText ?? '保存' }}
         </Button>

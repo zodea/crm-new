@@ -1,5 +1,6 @@
 import type { ConfirmImpact, ConfirmVariant } from '~/lib/kit/confirm'
 import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
+import { shallowRef } from 'vue'
 
 // KitUI 原语（Vue 版）——单宿主 + composable 调用，底座 shadcn-vue（ADR 0008）：
 // confirm/formModal 走 reka-ui Dialog，toast 走 vue-sonner；语义对照 DC 设计稿 window.KitUI。
@@ -32,7 +33,14 @@ const confirmState = shallowRef<ConfirmState | null>(null)
 const confirmOpts = shallowRef<ConfirmOptions | null>(null) // 关闭动画期间保留视图内容
 let confirmSeq = 0
 
-function confirm(opts: ConfirmOptions): Promise<boolean> {
+// 具名导出：业务页面统一走 useKitUI()，此处导出供单宿主/测试直接驱动原语。
+export function confirm(opts: ConfirmOptions): Promise<boolean> {
+  // #86 并发二次调用：旧 confirm 未落定就被覆写会让其 await 卡死；先以 false 落定旧 promise。
+  const prev = confirmState.value
+  if (prev) {
+    confirmState.value = null
+    prev.resolve(false)
+  }
   confirmOpts.value = opts
   return new Promise<boolean>((resolve) => {
     confirmState.value = { id: confirmSeq++, resolve }
@@ -41,7 +49,8 @@ function confirm(opts: ConfirmOptions): Promise<boolean> {
 
 function resolveConfirm(ok: boolean) {
   const s = confirmState.value
-  if (!s) return
+  if (!s)
+    return
   confirmState.value = null
   s.resolve(ok)
 }
@@ -57,7 +66,13 @@ const formModalOpts = shallowRef<FormModalOptions | null>(null)
 let formSeq = 0
 
 /** 打开表单弹窗；提交返回字段值对象，取消/关闭返回 null。 */
-function formModal(opts: FormModalOptions): Promise<FormValues | null> {
+export function formModal(opts: FormModalOptions): Promise<FormValues | null> {
+  // #86 并发二次调用：旧 formModal 未落定就被覆写会让其 await 卡死；先以 null 落定旧 promise。
+  const prev = formModalState.value
+  if (prev) {
+    formModalState.value = null
+    prev.resolve(null)
+  }
   formModalOpts.value = opts
   return new Promise<FormValues | null>((resolve) => {
     formModalState.value = { id: formSeq++, resolve }
@@ -66,7 +81,8 @@ function formModal(opts: FormModalOptions): Promise<FormValues | null> {
 
 function resolveFormModal(values: FormValues | null) {
   const s = formModalState.value
-  if (!s) return
+  if (!s)
+    return
   formModalState.value = null
   s.resolve(values)
 }

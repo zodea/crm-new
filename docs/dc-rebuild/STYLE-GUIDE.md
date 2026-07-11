@@ -1,7 +1,7 @@
 # 统一视觉规范（DC 重构）
 
 > 基准来源：`kit/HomeScreenNew.jsx`（首页）+ `kit/QuantityScreenV2.jsx`（工程量）——用户亲自调过、认可的「疏朗仪表盘」风格。
-> 所有重构页面以本规范为准；与 `docs/rewrite/DESIGN-SYSTEM.md` 旧扁平条款冲突时，**以本文件为准**。
+> 所有重构页面以本规范为准；视觉风格基准（圆角 vs 扁平）以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准，DESIGN-SYSTEM.md 扁平旧条款已作废。
 
 ---
 
@@ -12,22 +12,10 @@
 ---
 
 ## 二、Design Token（沿用，勿新增颜色）
-| 用途 | token | 值 |
-|---|---|---|
-| 品牌蓝 | `--brand` / `--brand-deep` / `--brand-soft` | `#3976C6` / `#2A5996` / 浅蓝 |
-| 卡片圆角 | `--radius-card` | 12px |
-| 按钮/输入圆角 | `--radius-btn` | 8px |
-| pill | `--radius-pill` | 999px |
-| 卡片阴影 | `--shadow-card` | 轻阴影（L1）|
-| 浮层阴影 | `--shadow-pop` | 弹窗/下拉（L2）|
-| 面板底 | `--panel` | #fff |
-| 画布底 | `--bg` | 浅灰 |
-| 表头/次级底 | `--surface-2` | |
-| hover 底 | `--surface-3` | |
-| 描边 | `--line` / `--line-strong` | 默认 / 输入按钮 |
-| 文字 | `--ink` / `--ink-soft` / `--ink-faint` | 主 / 次 / 弱 |
-| 状态 | `--ok` / `--warn` / `--danger`（+ `-soft` 底 / `-ink` 深字）| |
-| 等宽数字 | `--font-mono` | 金额/编号/日期 tabular-nums |
+
+> Token **数值**以 [DESIGN-SYSTEM.md](../rewrite/DESIGN-SYSTEM.md) §2/§3 为准（值源 tokens.css），圆角/阴影另见 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)；本文只约定**用法**、不复列数值。
+>
+> 常用令牌：品牌 `--brand`/`--brand-deep`/`--brand-soft`、圆角 `--radius-card`/`--radius-btn`/`--radius-pill`、阴影 `--shadow-card`(卡·L1)/`--shadow-pop`(浮层·L2)、底 `--panel`/`--bg`/`--surface-2`/`--surface-3`、描边 `--line`/`--line-strong`、文字 `--ink`/`--ink-soft`/`--ink-faint`、状态 `--ok`/`--warn`/`--danger`(+`-soft` 底/`-ink` 深字)、等宽数字 `--font-mono`(金额/编号/日期 tabular-nums)。
 
 ---
 
@@ -74,6 +62,8 @@
 > pill（选中 `--brand-soft` 底 + `--brand` 边）现在**只用于「可点击汇总卡」「单/双值开关」之类的状态切换**（如工人页在场/退场卡、分区标签栏），不再用于多分类筛选。
 
 ### 3.7 表格
+> 表格三件套阈值 + 引擎（KitTable 深封装 vxe-table）见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)；本节只列 dc-rebuild 侧视觉细化（颜色/间距/对齐）。
+
 - 容器：`Panel padding={0}`，`overflowX:auto`
 - 表头：`background: var(--surface-2)`，12/700/ink-soft，下边框 1px line
 - 行：分隔 1px `--line`；hover `--surface-3`（JS onMouseEnter/Leave 切 background）
