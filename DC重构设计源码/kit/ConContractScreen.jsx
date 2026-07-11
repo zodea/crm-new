@@ -30,8 +30,11 @@
         { key: "amount", label: "含税合同金额", width: 130, money: true, align: "right" },
         { key: "changed", label: "变更后合同金额", width: 130, money: true, align: "right" },
         { key: "settled", label: "累计结算", width: 130, money: true, align: "right" },
-        { key: "invoiced", label: "累计开票", width: 130, money: true, align: "right" },
-        { key: "paid", label: "累计收款", width: 130, money: true, align: "right" },
+        // 金额穿透（批B 铁律④）：开票/收款聚合数字可点 → 对应单据列表带「本合同」预筛
+        { key: "invoiced", label: "累计开票", width: 130, align: "right",
+          render: (v, r) => <KA.MoneyLink value={v} title="查看本合同的开票申请" onClick={() => window.DC.navigate("invApply", { contract: r.id })} /> },
+        { key: "paid", label: "累计收款", width: 130, align: "right",
+          render: (v, r) => <KA.MoneyLink value={v} title="查看本合同的收款登记" onClick={() => window.DC.navigate("receipt", { contract: r.id })} /> },
         { key: "balance", label: "按结算应收余额", width: 130, noForm: true, form: false, align: "right",
           render: (v, r) => {
             const b = Math.round(((r.settled || 0) - (r.paid || 0)) * 100) / 100;

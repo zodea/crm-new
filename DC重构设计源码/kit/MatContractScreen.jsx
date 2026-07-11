@@ -31,7 +31,9 @@
         { key: "changed", label: "变更后合同金额", money: true, align: "right" },
         { key: "settled", label: "累计结算", money: true, align: "right" },
         { key: "invoiced", label: "累计收票", money: true, align: "right" },
-        { key: "paid", label: "累计支付", money: true, align: "right" },
+        // 金额穿透（批B 铁律④）：支付聚合数字可点 → 付款申请列表带「本合同」预筛
+        { key: "paid", label: "累计支付", align: "right",
+          render: (v, r) => <KA.MoneyLink value={v} title="查看本合同的付款申请" onClick={() => window.DC.navigate("payApply", { contract: r.id })} /> },
         { key: "balance", label: "按结算应付余额", noForm: true, form: false, align: "right",
           render: (v, r) => {
             const b = Math.round(((r.settled || 0) - (r.paid || 0)) * 100) / 100;

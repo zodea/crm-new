@@ -57,12 +57,15 @@
   };
   const mergeSupplier = (s, contracts) => ({ category: "其他", cred: "incomplete", parent: "", ...supAgg(s.id, contracts), ...(SUP_EXT[s.id] || {}), ...s });
 
-  const state = { projects: [], suppliers: [], contracts: [] };
+  // 批B 资金域集合直通入仓（无 merge 扩展，CRUD 走通用 rows/add/update/softDel）
+  const PLAIN_COLLS = ["contracts", "payApplies", "receipts", "invApplies", "currents", "payRecords", "reimburses"];
+  const state = { projects: [], suppliers: [] };
+  PLAIN_COLLS.forEach((k) => { state[k] = []; });
   const init = () => {
     const d = window.KIT_DATA;
     if (!d) return false;
     state.projects = (d.projects || []).map(mergeProject);
-    state.contracts = (d.contracts || []).slice();
+    PLAIN_COLLS.forEach((k) => { state[k] = (d[k] || []).slice(); });
     state.suppliers = (d.suppliers || []).map((s) => mergeSupplier(s, d.contracts));
     return true;
   };

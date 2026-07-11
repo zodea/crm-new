@@ -7,6 +7,21 @@
   const I = () => window.INV;
   const backToLedger = (navigate) => { const dc = window.DC; if (dc && dc.closeActiveTab) dc.closeActiveTab(); if (navigate) navigate("invoiceLedger"); };
 
+  // —— 名称→蓝链（批B 全站蓝链）：发票行存的是名称字符串不是 id，按名称反查共享 store（项目按 name 全等；分供方按 name 全等或 aliases 含）。
+  // 只用于展示态文本（头部卖方等），FieldGrid 可编辑 input 不动；查不到实体 → 保持原文本，绝不做死链。
+  const findIdByName = (coll, name) => {
+    const A = window.APP;
+    if (!name || !A) return null;
+    const hit = A.rows(coll).find((x) => x.name === name || (coll === "suppliers" && (x.aliases || []).indexOf(name) >= 0));
+    return hit ? hit.id : null;
+  };
+  const NameLink = ({ type, coll, name, fallback = null }) => {
+    const KA = window.KitAtoms || {};
+    const id = findIdByName(coll, name);
+    if (!KA.EntityLink || !id) return fallback != null ? fallback : (name || null);
+    return <KA.EntityLink type={type} id={id} label={name} />;
+  };
+
   function InvoiceEditScreen({ params, navigate }) {
     if (!I()) return <Panel style={{ padding: 40, textAlign: "center", color: "var(--ink-soft)" }}>加载中…</Panel>;
     const INV = I();
@@ -41,7 +56,7 @@
           <Button icon="arrow-left" onClick={() => backToLedger(navigate)}>返回台账</Button>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 800, fontFamily: "var(--font-mono)" }}>{inv.number}</span>
-            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{inv.seller}</span>
+            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}><NameLink type="supplier" coll="suppliers" name={inv.seller} /></span>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <StatusChip tone={st.tone}>{st.text}</StatusChip>

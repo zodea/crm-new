@@ -6,6 +6,21 @@
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), exportModal: () => {}, importModal: () => {} };
   const I = () => window.INV;
 
+  // —— 名称→蓝链（批B 全站蓝链）：发票行存的是名称字符串不是 id，按名称反查共享 store（项目按 name 全等；分供方按 name 全等或 aliases 含）。
+  // 查不到实体 / KitAtoms 未就绪 → 返回 fallback（保持原文本），绝不做死链。
+  const findIdByName = (coll, name) => {
+    const A = window.APP;
+    if (!name || !A) return null;
+    const hit = A.rows(coll).find((x) => x.name === name || (coll === "suppliers" && (x.aliases || []).indexOf(name) >= 0));
+    return hit ? hit.id : null;
+  };
+  const NameLink = ({ type, coll, name, fallback = null }) => {
+    const KA = window.KitAtoms || {};
+    const id = findIdByName(coll, name);
+    if (!KA.EntityLink || !id) return fallback != null ? fallback : (name || null);
+    return <KA.EntityLink type={type} id={id} label={name} />;
+  };
+
   const TH = { padding: "12px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: "left", whiteSpace: "nowrap" };
   const TD = { padding: "12px 14px", fontSize: 13, verticalAlign: "middle" };
   const INV_STRUCT = ["按归属", "按供应商", "按票据类型", "按开票月份"];
@@ -143,11 +158,15 @@
                           <td style={{ ...TD, textAlign: "center" }}><input type="checkbox" disabled={excel} checked={!!checked[inv.id]} onChange={() => setChecked((c) => ({ ...c, [inv.id]: !c[inv.id] }))} style={{ cursor: excel ? "not-allowed" : "pointer", opacity: excel ? 0.4 : 1 }} /></td>
                           <td style={TD}><button onClick={() => openEdit(inv)} style={{ border: 0, background: "transparent", padding: 0, color: "var(--brand)", fontWeight: 700, fontFamily: "var(--font-mono)", cursor: "pointer" }}>{inv.number.slice(-8)}</button></td>
                           <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{inv.date}</td>
-                          <td style={{ ...TD, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.seller}</td>
+                          <td style={{ ...TD, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><NameLink type="supplier" coll="suppliers" name={inv.seller} /></td>
                           <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700 }}>{INV.money(inv.total)}</td>
                           <td style={{ ...TD, color: "var(--ink-soft)" }}>{(inv.type || "").replace("增值税", "").replace("发票", "")}</td>
                           <td style={TD}><StatusChip tone={src.tone}>{src.text}</StatusChip></td>
-                          <td style={TD}>{inv.project ? <span style={{ color: inv.project === INV.OWN ? "var(--brand-deep)" : "var(--ink-soft)" }}>{inv.project}</span> : <StatusChip tone="warn">未归</StatusChip>}</td>
+                          <td style={TD}>{inv.project
+                            ? (inv.project === INV.OWN
+                              ? <span style={{ color: "var(--brand-deep)" }}>{inv.project}</span>
+                              : <NameLink type="project" coll="projects" name={inv.project} fallback={<span style={{ color: "var(--ink-soft)" }}>{inv.project}</span>} />)
+                            : <StatusChip tone="warn">未归</StatusChip>}</td>
                           <td style={TD}>{printed > 0 ? <StatusChip tone="ok">{printed} 次</StatusChip> : <StatusChip tone="warn">未打印</StatusChip>}</td>
                           <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
                             <span style={{ display: "inline-flex", gap: 6 }}>
@@ -177,9 +196,9 @@
                           <button onClick={() => openEdit(inv)} style={{ border: 0, background: "transparent", padding: 0, color: "var(--brand)", fontWeight: 800, fontFamily: "var(--font-mono)", fontSize: 14, cursor: "pointer" }}>{inv.number.slice(-8)}</button>
                           <span style={{ fontSize: 15, fontWeight: 800, fontFamily: "var(--font-mono)" }}>{INV.money(inv.total)}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inv.seller}</div>
+                        <div style={{ fontSize: 12, color: "var(--ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><NameLink type="supplier" coll="suppliers" name={inv.seller} /></div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                          {inv.project ? <StatusChip tone={inv.project === INV.OWN ? "brand" : "neutral"}>{inv.project}</StatusChip> : <StatusChip tone="warn">未归项目</StatusChip>}
+                          {inv.project ? <StatusChip tone={inv.project === INV.OWN ? "brand" : "neutral"}>{inv.project === INV.OWN ? inv.project : <NameLink type="project" coll="projects" name={inv.project} />}</StatusChip> : <StatusChip tone="warn">未归项目</StatusChip>}
                           <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-faint)" }}>{inv.date}</span>
                         </div>
                         <div style={{ display: "flex", gap: 6, marginTop: 2 }}>

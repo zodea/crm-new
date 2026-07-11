@@ -6,6 +6,7 @@
 //   Metric/MetricGrid 指标格+语义固定列数网格（两位小数由调用方保证）
 //   TreeNav       左树导航（发票台账/清单页同构）
 //   EntityLink    实体蓝链（批A：type→route 映射唯一处，全站实体名跳转一律走它）
+//   MoneyLink     金额穿透链（批B 铁律④：聚合金额可点 → 单据列表带预筛参数）
 // 约定：新页面一律从 window.KitAtoms 取用；旧页面逐步替换内联副本，勿再复制。
 (function () {
   if (window.KitAtoms) { window.KitAtomsScreen = window.KitAtomsScreen || function () { return null; }; return; }
@@ -109,6 +110,21 @@
     }, text);
   }
 
+  // —— 金额穿透链（批B 铁律④）：列表里的聚合金额可点 → 跳对应单据列表并带预筛参数 ——
+  // 值为 0/空 或未给 onClick 时退化为普通等宽金额文本（不做死链）。
+  function MoneyLink({ value, onClick, title }) {
+    const txt = value == null || value === "" ? "—" : "¥" + Number(value).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (!onClick || !Number(value)) return h("span", { style: { fontFamily: "var(--font-mono)", fontWeight: 600 } }, txt);
+    return h("button", {
+      type: "button", title: title || "查看对应单据",
+      onClick: (e) => { e.stopPropagation(); onClick(); },
+      onMouseEnter: (e) => { e.currentTarget.style.textDecoration = "underline"; },
+      onMouseLeave: (e) => { e.currentTarget.style.textDecoration = "none"; },
+      style: { border: 0, background: "transparent", padding: 0, cursor: "pointer",
+        fontFamily: "var(--font-mono)", fontWeight: 600, fontSize: "inherit", color: "var(--brand)" },
+    }, txt);
+  }
+
   // —— 左树导航（items: [{key,label,icon,count,tone,children?:[{...}]}]；active/onChange）——
   function TreeNav({ title, items, active, onChange }) {
     const { Icon, Panel } = DS();
@@ -128,6 +144,6 @@
           t.children && h("div", { style: { paddingLeft: 14 } }, ...t.children.map((c) => btn(c, true)))))));
   }
 
-  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink };
+  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink, MoneyLink };
   window.KitAtomsScreen = function () { return null; };
 })();

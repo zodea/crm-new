@@ -13,6 +13,18 @@
   const yuan = (v) => (v == null ? "—" : "¥" + fmt(v));
   const statusTone = { "在建": "brand", "施工中": "brand", "收尾": "warn", "停工": "danger", "完工": "ok", "已竣工": "ok", "已结算": "ok" };
 
+  // —— 批B 蓝链 helper：存量子表行存的是「名称字符串」而非 id → 按名称反查共享 store 取 id 再蓝链 ——
+  // 项目按 name 全等 / 分供方按 name 或 aliases 含 / 合同按 name 全等；查到 → EntityLink，查不到 → 保持原文本（不做死链）。
+  const NAME_COLL = { project: "projects", supplier: "suppliers", contract: "contracts" };
+  const nameLink = (type, name) => {
+    if (name == null || name === "" || name === "—") return name;
+    const KA = window.KitAtoms, A = window.APP;
+    if (!KA || !KA.EntityLink || !A) return name;
+    const hit = (A.rows(NAME_COLL[type]) || []).find((x) =>
+      type === "supplier" ? (x.name === name || (x.aliases || []).includes(name)) : x.name === name);
+    return hit ? <KA.EntityLink type={type} id={hit.id} label={name} /> : name;
+  };
+
   // —— 日期工具（本地格式化，避免 toISOString 时区偏移）——
   const D = (s) => new Date(s + "T00:00:00");
   const days = (a, b) => Math.round((D(b) - D(a)) / 86400000);
@@ -871,6 +883,7 @@
     }
 
     if (tab === "tax") {
+      const KA = window.KitAtoms || {};
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <SubTable title="开票申请" columns={[
@@ -881,14 +894,15 @@
             { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
           ]} rows={[{ name: "6月进度开票申请", amount: m.tax.outAmt, tax: m.tax.outTax, status: "已审核", date: "2026-06-10" }]} sum={{ label: "合计金额", key: "amount" }} />
           <SubTable title="收票登记" columns={[
-            { key: "no", label: "发票号码", mono: true, color: "var(--ink-soft)" },
-            { key: "contract", label: "合同名称" },
+            // 批B 蓝链：发票号码 → 发票编辑页（仅真实台账行有 iv.id；mock 行无 id 保持纯文本）
+            { key: "no", label: "发票号码", mono: true, color: "var(--ink-soft)", render: (v, r) => (r.id && KA.EntityLink ? <KA.EntityLink type="invoice" id={r.id} label={v} /> : v) },
+            { key: "contract", label: "合同名称", render: (v) => nameLink("contract", v) },
             { key: "amount", label: "发票金额", align: "right", money: true },
             { key: "tax", label: "税额", align: "right", money: true },
             { key: "type", label: "发票类型", render: (v) => <StatusChip tone="brand">{v}</StatusChip> },
             { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
             { key: "supplier", label: "供应商" },
-          ]} rows={(invRows || []).map((iv) => ({ no: (iv.number || "").slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: (iv.type || "").includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额（实时联动发票台账）", key: "amount" }} live />
+          ]} rows={(invRows || []).map((iv) => ({ id: iv.id, no: (iv.number || "").slice(-8), contract: iv.remark || "材料采购", amount: Number(iv.total) || 0, tax: Number(iv.tax) || 0, type: (iv.type || "").includes("专") ? "专票" : "普票", date: iv.date, supplier: iv.seller }))} sum={{ label: "合计金额（实时联动发票台账）", key: "amount" }} live />
         </div>
       );
     }
@@ -1010,7 +1024,7 @@
             { key: "supplier", label: "分供方" },
             { key: "date", label: "入库日期", mono: true, color: "var(--ink-soft)" },
             { key: "warehouse", label: "入库仓库" },
-            { key: "contract", label: "材料采购合同" },
+            { key: "contract", label: "材料采购合同", render: (v) => nameLink("contract", v) },
           ]} rows={[
             { no: "RK-0612", type: "采购入库", supplier: "广东宏宇陶瓷", date: "2026-06-12", warehouse: "现场主仓", contract: "瓷砖采购合同" },
             { no: "RK-0605", type: "采购入库", supplier: "德高建材", date: "2026-06-05", warehouse: "现场主仓", contract: "防水材料采购合同" },
@@ -1021,7 +1035,7 @@
             { key: "supplier", label: "分供方" },
             { key: "date", label: "日期", mono: true, color: "var(--ink-soft)" },
             { key: "warehouse", label: "仓库" },
-            { key: "contract", label: "合同名称" },
+            { key: "contract", label: "合同名称", render: (v) => nameLink("contract", v) },
           ]} rows={[
             { no: "ZRZC-0528", type: "直入直出", supplier: "佛山华铝装饰", date: "2026-05-28", warehouse: "现场主仓", contract: "铝扣板供应及安装合同" },
           ]} />
@@ -1031,7 +1045,7 @@
             { key: "date", label: "出库日期", mono: true, color: "var(--ink-soft)" },
             { key: "warehouse", label: "仓库" },
             { key: "picker", label: "领料人" },
-            { key: "contract", label: "材料采购合同" },
+            { key: "contract", label: "材料采购合同", render: (v) => nameLink("contract", v) },
           ]} rows={[
             { no: "CK-0615", type: "领料出库", date: "2026-06-15", warehouse: "现场主仓", picker: "陈家泥水班组", contract: "瓷砖采购合同" },
             { no: "CK-0608", type: "领料出库", date: "2026-06-08", warehouse: "现场主仓", picker: "陈家泥水班组", contract: "防水材料采购合同" },
@@ -1056,7 +1070,7 @@
             { key: "no", label: "验收编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
             { key: "project", label: "项目名称", render: () => proj.name, noForm: true },
             { key: "developer", label: "甲方", render: () => proj.developer, noForm: true },
-            { key: "contract", label: "合同名称" },
+            { key: "contract", label: "合同名称", render: (v) => nameLink("contract", v) },
             { key: "status", label: "验收状态", render: (v) => <StatusChip tone={v === "已验收" ? "ok" : "warn"}>{v}</StatusChip> },
             { key: "estimate", label: "合同估价", align: "right", money: true },
           ]} rows={[
@@ -1066,7 +1080,7 @@
             { key: "no", label: "编号", mono: true, render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
             { key: "project", label: "项目名称", render: () => proj.name, noForm: true },
             { key: "developer", label: "甲方", render: () => proj.developer, noForm: true },
-            { key: "contract", label: "合同名称" },
+            { key: "contract", label: "合同名称", render: (v) => nameLink("contract", v) },
             { key: "status", label: "审批状态", render: (v) => <StatusChip tone={v === "已确认" ? "ok" : "warn"}>{v}</StatusChip> },
             { key: "owner", label: "保修负责人" },
           ]} rows={[

@@ -6,6 +6,23 @@
   const { Button, IconButton, StatusChip, Panel, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {} };
   const KA = () => window.KitAtoms || {};
+
+  // —— 批B 蓝链反查 helper：存量行数据存的是名称/单号字符串而非 id，按名称反查共享 store 拿 id ——
+  // 项目按 name 全等；分供方按 name 全等或 aliases 含；合同按 name 全等；发票按 number 全等（window.INV）。
+  const findId = {
+    project: (v) => { const A = window.APP; const hit = A && v ? A.rows("projects").find((x) => x.name === v) : null; return hit ? hit.id : null; },
+    supplier: (v) => { const A = window.APP; const hit = A && v ? A.rows("suppliers").find((x) => x.name === v || (x.aliases || []).includes(v)) : null; return hit ? hit.id : null; },
+    contract: (v) => { const A = window.APP; const hit = A && v ? A.rows("contracts").find((x) => x.name === v) : null; return hit ? hit.id : null; },
+    invoice: (v) => { const I = window.INV; const hit = I && v ? I.live().find((x) => x.number === v) : null; return hit ? hit.id : null; },
+  };
+  // 查到 id → EntityLink 蓝链；查不到 → 返回 fallback（保持原文本，不做死链）
+  const linkOr = (type, text, fallback) => {
+    const EntityLink = KA().EntityLink;
+    const id = findId[type] ? findId[type](text) : null;
+    if (!EntityLink || !id) return fallback !== undefined ? fallback : (text == null ? "—" : text);
+    return <EntityLink type={type} id={id} label={text} />;
+  };
+
   const fmt = (v) => (v == null ? "—" : Number(v).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   const yuan = (v) => (v == null ? "—" : "¥" + fmt(v));
   const wan = (v) => (v == null ? "—" : "¥" + (v / 10000).toFixed(1) + "万");
@@ -97,6 +114,9 @@
     const supplierName = p.supplier || "大板东建材";
     const pid = p.pid || "p1";
     const sid = p.sid || supplierName;
+    // 顶部蓝链 id 解析：params 的 pid/sid 可能缺省或存的是名称——先按 id 直查，查不到按名称反查；都查不到保持原文本
+    const projectId = window.APP && window.APP.get("projects", p.pid) ? p.pid : findId.project(projectName);
+    const supplierId = window.APP && window.APP.get("suppliers", sid) ? sid : (findId.supplier(sid) || findId.supplier(supplierName));
 
     const M = React.useMemo(() => mockFor(supplierName), [supplierName]);
     const { contracts, claims, invoices, payments, files } = M;
@@ -147,7 +167,7 @@
       { key: "settle", label: "结算" },
     ];
 
-    const SegTab = KA().SegTab, SectionHeader = KA().SectionHeader, Metric = KA().Metric, MetricGrid = KA().MetricGrid;
+    const SegTab = KA().SegTab, SectionHeader = KA().SectionHeader, Metric = KA().Metric, MetricGrid = KA().MetricGrid, EntityLink = KA().EntityLink;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -159,9 +179,9 @@
             </button>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 17, fontWeight: 800 }}>{projectName}</span>
+                <span style={{ fontSize: 17, fontWeight: 800 }}>{EntityLink && projectId ? <EntityLink type="project" id={projectId} label={projectName} /> : projectName}</span>
                 <span style={{ color: "var(--ink-faint)", fontSize: 15 }}>×</span>
-                <span style={{ fontSize: 17, fontWeight: 800, color: "var(--brand)" }}>{supplierName}</span>
+                <span style={{ fontSize: 17, fontWeight: 800, color: "var(--brand)" }}>{EntityLink && supplierId ? <EntityLink type="supplier" id={supplierId} label={supplierName} /> : supplierName}</span>
                 <StatusChip tone={STATUS[status].tone}>{STATUS[status].label}</StatusChip>
                 {locked && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--ink-faint)" }}><Icon name="lock" size={12} />已锁定只读</span>}
               </div>
@@ -223,7 +243,7 @@
                   <ListTab title="采购合同" moduleName="采购合同" onJump={jump("采购合同")} rows={contracts}
                     columns={[
                       { key: "no", label: "合同号", mono: true },
-                      { key: "name", label: "合同名称", render: (v) => <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span> },
+                      { key: "name", label: "合同名称", render: (v) => linkOr("contract", v, <span style={{ color: "var(--brand)", fontWeight: 600 }}>{v}</span>) },
                       { key: "amount", label: "合同金额", align: "right", money: true },
                       { key: "changed", label: "变更后金额", align: "right", money: true },
                       { key: "attachN", label: "附件", align: "center", render: (v) => <span style={{ fontFamily: "var(--font-mono)" }}>{v} 份</span> },
@@ -246,7 +266,7 @@
                 {tab === "invoice" && (
                   <ListTab title="收票登记" moduleName="收票登记" onJump={jump("收票登记")} rows={invoices}
                     columns={[
-                      { key: "no", label: "发票号码", mono: true, color: "var(--ink-soft)" },
+                      { key: "no", label: "发票号码", mono: true, color: "var(--ink-soft)", render: (v) => linkOr("invoice", v, v) },
                       { key: "date", label: "开票日期", mono: true, color: "var(--ink-soft)" },
                       { key: "amount", label: "含税金额", align: "right", money: true },
                       { key: "tax", label: "税额", align: "right", money: true },

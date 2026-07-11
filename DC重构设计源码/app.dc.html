@@ -135,6 +135,27 @@
       <sc-if value="{{ isContractDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="ContractDetailScreen" from="./kit/ContractDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
+      <sc-if value="{{ isPayApply }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayApplyScreen" from="./kit/PayApplyScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayManage }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayManageScreen" from="./kit/PayManageScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isReceipt }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ReceiptScreen" from="./kit/ReceiptScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isInvApply }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="InvApplyScreen" from="./kit/InvApplyScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isCurrent }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CurrentScreen" from="./kit/CurrentScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isPayRecord }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="PayRecordScreen" from="./kit/PayRecordScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isReimburse }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ReimburseScreen" from="./kit/ReimburseScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
       <sc-if value="{{ isInvoice }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="InvoiceScreen" from="./kit/InvoiceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
       </sc-if>
@@ -206,6 +227,13 @@ const PAGE = {
   contractDetail:{ title: "合同详情",  subtitle: "四级对账 · 关联单据 · 文书" },
   invoice:       { title: "发票识别",  subtitle: "资金管理 · 上传 · 校对 · 打印排版" },
   invoiceLedger: { title: "发票台账",  subtitle: "资金管理 · 列表 / 打印 / 修改" },
+  payApply:      { title: "付款申请",  subtitle: "资金管理 · 8 类业务 · 申请/批复/实付" },
+  payManage:     { title: "付款管理",  subtitle: "待支付工作台 · 批复 vs 执行" },
+  receipt:       { title: "收款登记",  subtitle: "甲方回款 · 关联施工合同" },
+  invApply:      { title: "开票申请",  subtitle: "收入侧起点 · 审核后开票" },
+  current:       { title: "往来收付",  subtitle: "非合同类往来 · 收付并列" },
+  payRecord:     { title: "支付记录",  subtitle: "实付流水终点 · 账户明细" },
+  reimburse:     { title: "费用报销",  subtitle: "个人报销 · 项目/公司开支" },
   invoiceEdit:   { title: "发票编辑",  subtitle: "单张校对 · 左原图右字段" },
   ocrSettings:   { title: "OCR 设置",  subtitle: "识别引擎 · 云端接入 · 参数" },
   boqImport:     { title: "清单拆表",  subtitle: "上传 → 确认 → 拆表结果" },
@@ -451,13 +479,17 @@ class Component extends DCLogic {
       { type: "group", key: "g-finance", label: "资金管理", icon: "wallet", items: [
         { key: "invoiceLedger", mark: "账", label: "发票台账", hint: "收票·打印·修改" },
         { key: "invoice", mark: "票", label: "发票识别", hint: "上传·校对·排版" },
-        { key: "payApply", mark: "付", label: "付款申请", hint: "8 类业务", disabled: true },
-        { key: "payManage", mark: "管", label: "付款管理", hint: "待支付工作台", disabled: true },
-        { key: "receipt", mark: "收", label: "收款登记", hint: "关联合同·开票", disabled: true },
-        { key: "invApply", mark: "开", label: "开票申请", hint: "收入侧起点", disabled: true },
-        { key: "current", mark: "往", label: "往来收付", hint: "非合同类", disabled: true },
-        { key: "payRecord", mark: "流", label: "支付记录", hint: "实付流水", disabled: true },
-        { key: "reimburse", mark: "销", label: "费用报销", hint: "个人报销", disabled: true },
+        { key: "payApply", mark: "付", label: "付款申请", hint: "8 类业务" },
+        // 付款管理带待处理角标（红圈式）：已批复未付清的申请数，从共享 store 现算
+        { key: "payManage", mark: "管", label: "付款管理", hint: (() => {
+          try { const n = window.APP ? window.APP.rows("payApplies").filter(r => r.status !== "审批中" && (r.approvedAmount || 0) > (r.paidAmount || 0)).length : 0;
+            return n > 0 ? "待支付 " + n + " 笔" : "待支付工作台"; } catch (e) { return "待支付工作台"; }
+        })() },
+        { key: "receipt", mark: "收", label: "收款登记", hint: "关联合同·开票" },
+        { key: "invApply", mark: "开", label: "开票申请", hint: "收入侧起点" },
+        { key: "current", mark: "往", label: "往来收付", hint: "非合同类" },
+        { key: "payRecord", mark: "流", label: "支付记录", hint: "实付流水" },
+        { key: "reimburse", mark: "销", label: "费用报销", hint: "个人报销" },
         { key: "factor", mark: "因", label: "开票·税额工具", hint: "推算数量" },
       ]},
       { type: "group", key: "g-other", label: "项目其他合同", icon: "file-stack", items: [
@@ -625,6 +657,13 @@ class Component extends DCLogic {
       isSubContract:   route === "subContract",
       isMatContract:   route === "matContract",
       isContractDetail:route === "contractDetail",
+      isPayApply:      route === "payApply",
+      isPayManage:     route === "payManage",
+      isReceipt:       route === "receipt",
+      isInvApply:      route === "invApply",
+      isCurrent:       route === "current",
+      isPayRecord:     route === "payRecord",
+      isReimburse:     route === "reimburse",
       isInvoice:       route === "invoice",
       isInvoiceLedger: route === "invoiceLedger",
       isInvoiceEdit:   route === "invoiceEdit",

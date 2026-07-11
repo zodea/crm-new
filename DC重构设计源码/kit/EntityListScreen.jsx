@@ -20,7 +20,7 @@
   const DS = () => window.DesignSystem_e3d87 || window.DesignSystem_e3d871 || {};
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, modal: () => {}, undoToast: () => {}, importModal: () => {} };
 
-  function EntityListScreen({ meta }) {
+  function EntityListScreen({ meta, params }) {
     const { Button, IconButton, Icon } = window.DesignSystem_e3d871 || {};
     const KA = window.KitAtoms || {};
     const A = window.APP;
@@ -34,8 +34,16 @@
     const [filterVals, setFilterVals] = React.useState({});
     const [hidden, setHidden] = React.useState({});   // ⚙ 列显隐：{colKey:true}=隐藏
 
-    // —— 数据管道：store → 基础过滤 → 左侧分类 → 业务态视图 → 下拉筛选 → 搜索 ——
-    const baseRows = A.rows(meta.coll).filter((r) => (meta.filter ? meta.filter(r) : true));
+    // —— 带参预筛（批B 金额穿透铁律④）：meta.fromParams(params)→{label,filter}，可一键摘除 ——
+    // 同 route 复用页签时 params 会变，按 params 指纹重置摘除态与预筛计算
+    const paramFp = JSON.stringify(params || {});
+    const [paramOffAt, setParamOffAt] = React.useState(null);      // 记录被摘除时的指纹
+    const paramPre = React.useMemo(() => (meta.fromParams && params ? meta.fromParams(params) : null), [paramFp]);  // eslint-disable-line
+    const paramActive = paramPre && paramOffAt !== paramFp;
+
+    // —— 数据管道：store → 基础过滤 → 带参预筛 → 左侧分类 → 业务态视图 → 下拉筛选 → 搜索 ——
+    const baseRows0 = A.rows(meta.coll).filter((r) => (meta.filter ? meta.filter(r) : true));
+    const baseRows = paramActive ? baseRows0.filter(paramPre.filter) : baseRows0;
     const navItem = meta.leftNav && meta.leftNav.items.find((it) => it.key === navKey);
     const navRows = navItem && navItem.filter ? baseRows.filter(navItem.filter) : baseRows;
     const viewDef = views.find((v) => v.key === view);
@@ -69,11 +77,16 @@
       type: c.form && c.form.type, options: c.form && c.form.options, placeholder: c.form && c.form.placeholder,
       full: (c.form && c.form.full) || (formCols.length % 2 === 1 && i === formCols.length - 1),
     }));
-    const addRow = () => UI().formModal({ title: "新建 " + meta.title, cols: 2, width: 620, fields: buildFields(null),
+    // meta.addFlow({ A, UI, buildFields, coerce, saveNew })：整表新建流自定义（如 付款申请「先选业务类型再出表单」）
+    const saveNew = (patch) => {
+      const row = { id: meta.entity + "-" + Date.now().toString(36), ...(meta.newDefaults ? meta.newDefaults() : {}), ...patch };
+      A.add(meta.coll, row); UI().toast("已新建 1 条「" + meta.title + "」", "ok");
+    };
+    const addRow = () => (meta.addFlow ? meta.addFlow({ A, UI: UI(), buildFields, coerce, saveNew }) : UI().formModal({ title: "新建 " + meta.title, cols: 2, width: 620, fields: buildFields(null),
       onSave: (v) => {
         const row = { id: meta.entity + "-" + Date.now().toString(36), ...(meta.newDefaults ? meta.newDefaults() : {}), ...coerce(v) };
         A.add(meta.coll, row); UI().toast("已新建 1 条「" + meta.title + "」", "ok");
-      } });
+      } }));
     const editRow = (row) => UI().formModal({ title: "编辑 · " + (row.name || meta.title), cols: 2, width: 620, fields: buildFields(row),
       onSave: (v) => { A.update(meta.coll, row.id, coerce(v)); UI().toast("已保存", "ok"); } });
     const delRow = (row) => UI().confirm({ title: "删除该" + meta.title + "？", danger: true, confirmText: "删除",
@@ -152,12 +165,23 @@
       ),
     }]);
 
+    // 穿透进入时切到「全部」视图（预筛已圈定范围，业务态默认视图会再砍一刀反而看不全）
+    React.useEffect(() => { if (paramPre && views.some((v) => v.key === "all")) setView("all"); }, [paramFp]);  // eslint-disable-line
+
     const toolbar = (
       <div style={{ borderBottom: "1px solid var(--line)" }}>
         <div style={{ padding: "12px 16px 10px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 14, fontWeight: 800 }}>{meta.title}
             <span style={{ marginLeft: 6, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>({shown.length})</span>
           </span>
+          {paramActive && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--brand-soft)", color: "var(--brand-deep)",
+              border: "1px solid rgba(57,118,198,0.25)", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 600 }}>
+              {paramPre.label}
+              <button type="button" title="移除该筛选" onClick={() => setParamOffAt(paramFp)}
+                style={{ border: 0, background: "transparent", cursor: "pointer", color: "inherit", padding: 0, fontSize: 13, lineHeight: 1 }}>×</button>
+            </span>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <KA.SearchInput value={q} onChange={setQ} placeholder={"搜索" + meta.title} width={190} />
             {(meta.filters || []).map((f) => (
