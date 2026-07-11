@@ -121,6 +121,29 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
+| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序 |
+
+```sql
+-- 合同域轻实体仓（#90 批A，migrations v3 contracts-light-entity）
+CREATE TABLE contracts (
+  id          TEXT PRIMARY KEY,
+  no          TEXT DEFAULT '',
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT '施工',   -- '施工' | '分包' | '材采'
+  sub_kind    TEXT DEFAULT '',                -- '劳务' | '专业'，仅 kind='分包'
+  project_id  TEXT NOT NULL,                  -- → projects.id
+  supplier_id TEXT,                           -- → suppliers.id；施工合同（乙方=我方）为 NULL
+  amount      REAL DEFAULT 0,                 -- 含税合同金额
+  changed     REAL DEFAULT 0,                 -- 变更后合同金额
+  settled     REAL DEFAULT 0,                 -- 累计结算
+  invoiced    REAL DEFAULT 0,                 -- 累计收票（施工=累计开票）
+  paid        REAL DEFAULT 0,                 -- 累计支付（施工=累计收款）
+  sign_date   TEXT DEFAULT '',
+  status      TEXT DEFAULT '履约中',          -- '履约中' | '已签订' | '已结算' | '已结清'
+  note        TEXT DEFAULT '',
+  created_at  TEXT, updated_at TEXT, deleted_at TEXT
+);
+```
 
 ```sql
 CREATE TABLE boq_files (

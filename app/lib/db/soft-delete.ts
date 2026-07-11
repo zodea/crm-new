@@ -1,8 +1,8 @@
 // 软删除 + 操作日志(#52)——纯函数,node 可测,驱动注入(与 migrations.ts 同模式)。
 // 权威口径:DATABASE.md §8(软删除/操作日志/撤回)+ ADR 0003(级联只标父级、查询按「祖先未删」过滤)。
 import type { MigrationDb } from './migrations'
-import { assertIdentifier } from './migrations'
 import { generateId } from '~/lib/util/id'
+import { assertIdentifier } from './migrations'
 
 export type SoftDb = MigrationDb
 
@@ -37,6 +37,11 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   construction_contracts: [{ column: 'project_id', table: 'projects' }],
   owner_change_orders: [{ column: 'project_id', table: 'projects' }],
   expenditure_contracts: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'supplier_id', table: 'suppliers' },
+  ],
+  // 合同域轻实体仓(#90 批A,v3 迁移):施工/分包/材采单表 kind 区分;施工合同 supplier_id 为 NULL
+  contracts: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
   ],
@@ -85,12 +90,15 @@ function cteTables(table: string): string[] {
   const ordered: string[] = []
   const visited = new Set<string>()
   function visit(t: string, isRoot: boolean): void {
-    if (visited.has(t)) return
+    if (visited.has(t))
+      return
     visited.add(t)
     for (const ref of PARENT_REFS[t]!) {
-      if (ref.table !== t) visit(ref.table, false)
+      if (ref.table !== t)
+        visit(ref.table, false)
     }
-    if (!isRoot || isSelfRef(t)) ordered.push(t)
+    if (!isRoot || isSelfRef(t))
+      ordered.push(t)
   }
   visit(table, true)
   return ordered
@@ -103,7 +111,8 @@ function cteTables(table: string): string[] {
  */
 export function hiddenCtes(table: string): string {
   const tables = cteTables(table)
-  if (!tables.length) return ''
+  if (!tables.length)
+    return ''
   // DFS 后序保证父表 CTE 先定义;跨表成环不支持(自引用除外),成环时 SQL prepare 期报 no such table
   const defs = tables.map((t) => {
     const arms = [`SELECT id FROM "${t}" WHERE deleted_at IS NOT NULL`]
@@ -172,7 +181,10 @@ export async function logOperation(db: SoftDb, input: OperationLogInput): Promis
     `INSERT INTO operation_logs (id, table_name, record_id, action, before_data, after_data, operator, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id, input.table, input.recordId, input.action,
+      id,
+      input.table,
+      input.recordId,
+      input.action,
       input.before ? JSON.stringify(input.before) : null,
       input.after ? JSON.stringify(input.after) : null,
       input.operator ?? '',
@@ -188,7 +200,8 @@ export async function logOperation(db: SoftDb, input: OperationLogInput): Promis
  */
 export async function logCreate(db: SoftDb, table: string, id: string, operator = ''): Promise<string | null> {
   const after = await fetchRowById(db, table, id)
-  if (!after) return null
+  if (!after)
+    return null
   return logOperation(db, { table, recordId: id, action: 'create', after, operator })
 }
 
@@ -204,7 +217,8 @@ export async function withUpdateLog(
   operator = '',
 ): Promise<string | null> {
   const before = await fetchRowById(db, table, id)
-  if (!before || before.deleted_at != null) return null
+  if (!before || before.deleted_at != null)
+    return null
   await mutate()
   const after = await fetchRowById(db, table, id)
   return logOperation(db, { table, recordId: id, action: 'update', before, after, operator })
@@ -222,7 +236,8 @@ export async function softDelete(
   operator = '',
 ): Promise<string | null> {
   const before = await fetchRowById(db, table, id)
-  if (!before || before.deleted_at != null) return null
+  if (!before || before.deleted_at != null)
+    return null
   await db.execute(`UPDATE "${table}" SET deleted_at = ? WHERE id = ?`, [new Date().toISOString(), id])
   return logOperation(db, { table, recordId: id, action: 'delete', before, operator })
 }
@@ -239,7 +254,8 @@ export async function restoreRecord(
   operator = '',
 ): Promise<string | null> {
   const row = await fetchRowById(db, table, id)
-  if (!row || row.deleted_at == null) return null
+  if (!row || row.deleted_at == null)
+    return null
   await db.execute(`UPDATE "${table}" SET deleted_at = NULL WHERE id = ?`, [id])
   // 本次只改了一列,快照本地合成,省一次回查
   const after = { ...row, deleted_at: null }
@@ -265,7 +281,8 @@ export async function undoOperation(db: SoftDb, logId: string, operator = ''): P
     'SELECT * FROM operation_logs WHERE id = ?',
     [logId],
   )
-  if (!log) return false
+  if (!log)
+    return false
   const { table_name: table, record_id: id } = log
   switch (log.action) {
     case 'delete':
@@ -274,15 +291,18 @@ export async function undoOperation(db: SoftDb, logId: string, operator = ''): P
     case 'restore':
       return (await softDelete(db, table, id, operator)) != null
     case 'update': {
-      if (!log.before_data) return false
+      if (!log.before_data)
+        return false
       const current = await fetchRowById(db, table, id)
-      if (!current) return false
+      if (!current)
+        return false
       // 坏日志(损坏 JSON / 非法列名 / 快照含已被后续迁移移除的列)一律优雅拒绝,不抛穿到 UI
       try {
         const before = JSON.parse(log.before_data) as Record<string, unknown>
         // 生死状态只走 delete/restore 通道:回写编辑不得复活/再删记录,故排除 deleted_at
         const cols = Object.keys(before).filter(c => c !== 'id' && c !== 'deleted_at')
-        if (!cols.length) return false
+        if (!cols.length)
+          return false
         cols.forEach(assertIdentifier)
         await db.execute(
           `UPDATE "${table}" SET ${cols.map(c => `"${c}" = ?`).join(', ')} WHERE id = ?`,
@@ -302,10 +322,10 @@ export async function undoOperation(db: SoftDb, logId: string, operator = ''): P
 
 export interface SoftDeleteActions {
   /** 软删除(ADR 0003 只标父级);返回操作日志 id 作单条删除的撤回句柄。级联交互(打名+预提交挂起)见 ADR 0003/#76,不走此撤回 */
-  remove(id: string): Promise<string | null>
-  restore(id: string): Promise<string | null>
+  remove: (id: string) => Promise<string | null>
+  restore: (id: string) => Promise<string | null>
   /** 按操作日志 id 撤回(删除→恢复、新增→软删、编辑→回写) */
-  undo(logId: string): Promise<boolean>
+  undo: (logId: string) => Promise<boolean>
 }
 
 /**
@@ -331,7 +351,8 @@ export function createSoftDeleteActions(
     },
     async undo(logId: string) {
       const ok = await undoOperation(db, logId)
-      if (ok) await reload()
+      if (ok)
+        await reload()
       return ok
     },
   }

@@ -66,13 +66,16 @@ const navGroups: NavGroup[] = [
     char: '合',
     label: '主合同管理',
     icon: 'i-lucide-file-signature',
-    children: [],
+    children: [
+      { label: '施工合同', to: '/contract/construction' },
+    ],
   },
   {
     char: '包',
     label: '分包及人工',
     icon: 'i-lucide-users',
     children: [
+      { label: '分包合同', to: '/contract/subcontract' },
       { label: '工程量管理', to: '/subcontract/quantity' },
       { label: '工资核算', to: '/subcontract/payroll' },
     ],
@@ -82,6 +85,7 @@ const navGroups: NavGroup[] = [
     label: '乙供材管理',
     icon: 'i-lucide-truck',
     children: [
+      { label: '材料采购合同', to: '/contract/material' },
       { label: '送货单识别', to: '/material/delivery' },
       { label: '单价对比', to: '/material/price' },
     ],

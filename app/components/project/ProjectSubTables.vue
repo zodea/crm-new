@@ -1,4 +1,9 @@
 <script setup lang="ts">
+// Tab③ 施工合同 / Tab④ 支出合同 两张子表已接合同域真数据（contracts store，#90）：
+// 合同名蓝链 → /contract/[id]、乙方蓝链 → /base/supplier/[id]，与三列表/合同详情互跳。
+// 其余子表仍为空壳（各域 pass-1 逐步接入）。
+import { yuan } from '~/lib/util/money'
+
 const props = defineProps<{
   tab: string
   projectId: string
@@ -6,6 +11,8 @@ const props = defineProps<{
 
 interface SubTable {
   title: string
+  /** 接合同域真数据的子表：con=施工合同（kind=施工），exp=支出合同（kind=分包/材采） */
+  contracts?: 'con' | 'exp'
   columns: { field: string, title: string, width?: string, minWidth?: string }[]
 }
 
@@ -25,12 +32,8 @@ const TAB_TABLES: Record<string, SubTable[]> = {
   construction: [
     {
       title: '施工合同',
-      columns: [
-        { field: 'name', title: '合同名称', minWidth: '200px' },
-        { field: 'amount', title: '含税合同金额', width: '130px' },
-        { field: 'status', title: '合同状态', width: '90px' },
-        { field: 'signDate', title: '签约日期', width: '100px' },
-      ],
+      contracts: 'con',
+      columns: [],
     },
     {
       title: '补充协议',
@@ -53,13 +56,8 @@ const TAB_TABLES: Record<string, SubTable[]> = {
   expenditure: [
     {
       title: '支出合同',
-      columns: [
-        { field: 'name', title: '合同名称', minWidth: '200px' },
-        { field: 'approvalStatus', title: '审批状态', width: '90px' },
-        { field: 'taxIncTotal', title: '含税合价', width: '120px' },
-        { field: 'contractor', title: '乙方', minWidth: '150px' },
-        { field: 'effectiveDate', title: '生效日期', width: '100px' },
-      ],
+      contracts: 'exp',
+      columns: [],
     },
   ],
   tax: [
@@ -171,19 +169,100 @@ const TAB_TABLES: Record<string, SubTable[]> = {
 }
 
 const subTables = computed(() => TAB_TABLES[props.tab] || [])
+
+// ── 合同域真数据（③施工/④支出）：contracts store 按 kind + projectId 切片 ──
+const contractStore = useContractStore()
+const supplierStore = useSupplierStore()
+
+const conRows = computed(() =>
+  contractStore.byKind('施工').filter(c => c.projectId === props.projectId),
+)
+const expRows = computed(() =>
+  [...contractStore.byKind('分包'), ...contractStore.byKind('材采')]
+    .filter(c => c.projectId === props.projectId),
+)
+
+function rowsFor(key: 'con' | 'exp') {
+  return key === 'con' ? conRows.value : expRows.value
+}
+
+function supplierName(id: string | null): string {
+  return id ? supplierStore.byId(id)?.name ?? '—' : '—'
+}
+
+// vxe formatter：稳定引用（内联新函数/新对象会反复触发 vxe 列注册）
+const moneyFmt = ({ cellValue }: { cellValue: unknown }) => yuan(cellValue as number)
+
+onMounted(() => {
+  contractStore.load()
+  supplierStore.load()
+})
 </script>
 
 <template>
   <div class="space-y-4">
     <div v-for="st in subTables" :key="st.title">
       <div class="flex items-center justify-between mb-2">
-        <h4 class="text-13px font-700 text-ink">{{ st.title }}(0)</h4>
+        <h4 class="text-13px font-700 text-ink">
+          {{ st.title }}({{ st.contracts ? rowsFor(st.contracts).length : 0 }})
+        </h4>
         <button class="btn-primary text-12px" disabled>
           <span class="i-lucide-plus text-12px mr-0.5" /> 新建
         </button>
       </div>
       <div class="border border-line">
+        <!-- 合同域子表（③施工/④支出）：真数据 + 合同名/乙方蓝链 -->
         <vxe-table
+          v-if="st.contracts"
+          :data="rowsFor(st.contracts)"
+          :loading="contractStore.loading"
+          border
+          show-overflow="title"
+          height="auto"
+          :row-config="{ isHover: true, keyField: 'id' }"
+        >
+          <vxe-column type="seq" title="#" width="52" />
+          <vxe-column field="name" title="合同名称" min-width="200">
+            <template #default="{ row }">
+              <NuxtLink :to="`/contract/${row.id}`" class="cell--link">
+                {{ row.name }}
+              </NuxtLink>
+            </template>
+          </vxe-column>
+          <vxe-column field="no" title="合同编号" width="170" />
+          <vxe-column v-if="st.contracts === 'exp'" field="kind" title="类别" width="80">
+            <template #default="{ row }">
+              {{ row.kind === '分包' ? `分包${row.subKind ? ` · ${row.subKind}` : ''}` : '材采' }}
+            </template>
+          </vxe-column>
+          <vxe-column
+            v-if="st.contracts === 'exp'"
+            field="supplierId"
+            title="乙方（分供方）"
+            min-width="170"
+          >
+            <template #default="{ row }">
+              <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
+                {{ supplierName(row.supplierId) }}
+              </NuxtLink>
+              <span v-else>—</span>
+            </template>
+          </vxe-column>
+          <vxe-column
+            field="amount"
+            :title="st.contracts === 'exp' ? '含税合价' : '含税合同金额'"
+            width="130"
+            align="right"
+            class-name="col--money"
+            :formatter="moneyFmt"
+          />
+          <vxe-column field="status" title="合同状态" width="90" />
+          <vxe-column field="signDate" title="签约日期" width="100" />
+        </vxe-table>
+
+        <!-- 其余子表：空壳占位 -->
+        <vxe-table
+          v-else
           :data="[]"
           border
           show-overflow

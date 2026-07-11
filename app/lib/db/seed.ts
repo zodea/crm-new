@@ -1,5 +1,5 @@
-import { execute, select } from './connection'
 import { generateId } from '~/lib/util/id'
+import { execute, select } from './connection'
 
 type SeedRow = Record<string, unknown>
 
@@ -8,10 +8,12 @@ const baseFiles = import.meta.glob<{ default: SeedRow[] }>('./seed/*.json', { ea
 
 function loadSeedJson(table: string): SeedRow[] | null {
   const localKey = `./seed/${table}.local.json`
-  if (localFiles[localKey]) return localFiles[localKey].default
+  if (localFiles[localKey])
+    return localFiles[localKey].default
 
   const baseKey = `./seed/${table}.json`
-  if (baseFiles[baseKey]) return baseFiles[baseKey].default
+  if (baseFiles[baseKey])
+    return baseFiles[baseKey].default
 
   return null
 }
@@ -33,20 +35,37 @@ async function seedFromJson(table: string, rows: SeedRow[]) {
 
 export async function seedIfEmpty() {
   const jsonTables = [
-    'projects', 'suppliers', 'crews', 'workers',
-    'supplier_credentials', 'project_suppliers', 'phase_tasks',
-    'construction_contracts', 'owner_change_orders', 'expenditure_contracts',
-    'invoice_applications', 'receipt_registrations', 'current_receipts',
-    'current_payments', 'payment_records', 'invoices',
-    'settlements', 'supplement_agreements', 'contract_line_items',
-    'ticket_registrations', 'payment_applications', 'file_refs',
+    'projects',
+    'suppliers',
+    'crews',
+    'workers',
+    'supplier_credentials',
+    'project_suppliers',
+    'phase_tasks',
+    'construction_contracts',
+    'owner_change_orders',
+    'expenditure_contracts',
+    'invoice_applications',
+    'receipt_registrations',
+    'current_receipts',
+    'current_payments',
+    'payment_records',
+    'invoices',
+    'settlements',
+    'supplement_agreements',
+    'contract_line_items',
+    'ticket_registrations',
+    'payment_applications',
+    'file_refs',
+    'contracts',
   ]
 
   let anySeeded = false
 
   for (const table of jsonTables) {
     const [row] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
-    if ((row?.cnt ?? 0) > 0) continue
+    if ((row?.cnt ?? 0) > 0)
+      continue
 
     const json = loadSeedJson(table)
     if (json && json.length > 0) {

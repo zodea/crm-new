@@ -1,15 +1,16 @@
+import type { TestDb } from '../helpers/memory-db'
 // #53 seed 演示数据完整性:设计稿 mock 转出的 JSON 与 schema/软删底座/金额铁律对齐。
 // 用 fs 直读 JSON + 内存库实插(复刻 seed.ts 的 INSERT OR IGNORE 语义),不依赖浏览器端 seed.ts。
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
-import { columnNames, createMemoryDb, type TestDb } from '../helpers/memory-db'
+import { columnNames, createMemoryDb } from '../helpers/memory-db'
 
 type SeedRow = Record<string, unknown>
 
 /** 与 app/lib/db/seed.ts 的 jsonTables 灌入顺序一致(父表先行) */
-const SEED_TABLES = ['projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices'] as const
+const SEED_TABLES = ['projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts'] as const
 
 function loadSeed(table: string): SeedRow[] {
   const url = new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url)
@@ -63,12 +64,21 @@ describe('seed 数据:结构与 schema 对齐', () => {
       expect(supIds).toContain(ps.supplier_id)
     }
     for (const inv of loadSeed('invoices')) {
-      if (inv.project_id != null) expect(projIds).toContain(inv.project_id)
-      if (inv.supplier_id != null) expect(supIds).toContain(inv.supplier_id)
+      if (inv.project_id != null)
+        expect(projIds).toContain(inv.project_id)
+      if (inv.supplier_id != null)
+        expect(supIds).toContain(inv.supplier_id)
     }
     for (const w of loadSeed('workers')) {
-      if (w.crew_id != null) expect(crewIds).toContain(w.crew_id)
-      if (w.linked_worker_id != null) expect(workerIds).toContain(w.linked_worker_id)
+      if (w.crew_id != null)
+        expect(crewIds).toContain(w.crew_id)
+      if (w.linked_worker_id != null)
+        expect(workerIds).toContain(w.linked_worker_id)
+    }
+    for (const c of loadSeed('contracts')) {
+      expect(projIds).toContain(c.project_id)
+      if (c.supplier_id != null)
+        expect(supIds).toContain(c.supplier_id)
     }
   })
 
@@ -87,20 +97,27 @@ describe('seed 数据:结构与 schema 对齐', () => {
       }
       expect(round2(amount + tax), `发票 ${inv.id} 价税不平`).toBe(total)
     }
+    for (const c of loadSeed('contracts')) {
+      for (const k of ['amount', 'changed', 'settled', 'invoiced', 'paid'] as const) {
+        const v = c[k] as number
+        expect(v, `合同 ${c.id} ${k} 超两位小数`).toBe(round2(v))
+      }
+    }
   })
 })
 
 describe('seed 数据:灌入行为', () => {
-  it('空库灌入:项目 12 条,分供方 5 条、发票 8 条(含各识别/归档状态)与设计稿 mock 一致', async () => {
+  it('空库灌入:项目 12 条,分供方 10 条(#90 批A 含乙方 s6–s10)、发票 8 条、合同 31 份与设计稿 mock 一致', async () => {
     const db = await seededDb()
     const count = async (t: string) =>
       (await db.select<{ n: number }>(`SELECT COUNT(*) AS n FROM "${t}"`))[0]!.n
     expect(await count('projects')).toBe(12)
-    expect(await count('suppliers')).toBe(5)
+    expect(await count('suppliers')).toBe(10)
     expect(await count('invoices')).toBe(8)
     expect(await count('crews')).toBe(6)
     expect(await count('workers')).toBe(8)
     expect(await count('project_suppliers')).toBe(5)
+    expect(await count('contracts')).toBe(31)
 
     // 识别/归档状态谱系齐备
     const states = await db.select<{ ocr_status: string, account_status: string, dup_status: string }>(

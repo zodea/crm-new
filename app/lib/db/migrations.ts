@@ -2,14 +2,14 @@ import { ALL_SCHEMA } from './schema'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
 export interface MigrationDb {
-  execute(sql: string, params?: unknown[]): Promise<void>
-  select<T>(sql: string, params?: unknown[]): Promise<T[]>
+  execute: (sql: string, params?: unknown[]) => Promise<void>
+  select: <T>(sql: string, params?: unknown[]) => Promise<T[]>
 }
 
 export interface Migration {
   version: number
   name: string
-  up(db: MigrationDb): Promise<void>
+  up: (db: MigrationDb) => Promise<void>
 }
 
 export interface MigrateResult {
@@ -30,7 +30,7 @@ export async function execScript(db: MigrationDb, sql: string): Promise<void> {
 }
 
 export function assertIdentifier(name: string): void {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+  if (!/^[A-Z_]\w*$/i.test(name)) {
     throw new Error(`[db] 非法标识符: ${name}`)
   }
 }
@@ -52,20 +52,36 @@ export async function addColumnIfMissing(
     'SELECT name FROM pragma_table_info(?)',
     [table],
   )
-  if (cols.some(c => c.name === column)) return false
+  if (cols.some(c => c.name === column))
+    return false
   await db.execute(`ALTER TABLE "${table}" ADD COLUMN "${column}" ${ddl};`)
   return true
 }
 
 /** v2 补列的业务表清单——迁移是历史事实,冻结快照,后续新表在各自迁移里自带 deleted_at */
 const V2_TABLES = [
-  'projects', 'suppliers', 'invoices', 'crews',
-  'supplier_credentials', 'project_suppliers', 'phase_tasks',
-  'construction_contracts', 'owner_change_orders', 'expenditure_contracts',
-  'invoice_applications', 'receipt_registrations', 'current_receipts',
-  'current_payments', 'payment_records', 'workers',
-  'settlements', 'supplement_agreements', 'contract_line_items',
-  'ticket_registrations', 'payment_applications', 'file_refs',
+  'projects',
+  'suppliers',
+  'invoices',
+  'crews',
+  'supplier_credentials',
+  'project_suppliers',
+  'phase_tasks',
+  'construction_contracts',
+  'owner_change_orders',
+  'expenditure_contracts',
+  'invoice_applications',
+  'receipt_registrations',
+  'current_receipts',
+  'current_payments',
+  'payment_records',
+  'workers',
+  'settlements',
+  'supplement_agreements',
+  'contract_line_items',
+  'ticket_registrations',
+  'payment_applications',
+  'file_refs',
 ]
 
 /** 操作日志表(DATABASE.md §8.2) */
@@ -83,6 +99,35 @@ CREATE TABLE IF NOT EXISTS operation_logs (
 
 CREATE INDEX IF NOT EXISTS idx_operation_logs_record ON operation_logs(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at);
+`
+
+/** v3 合同域轻实体仓(issue #90 批A):三类合同单表 kind 区分,自带 deleted_at(v2 之后的新表各自迁移带列) */
+const V3_CONTRACTS = `
+CREATE TABLE IF NOT EXISTS contracts (
+  id          TEXT PRIMARY KEY,
+  no          TEXT DEFAULT '',
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT '施工',
+  sub_kind    TEXT DEFAULT '',
+  project_id  TEXT NOT NULL REFERENCES projects(id),
+  supplier_id TEXT REFERENCES suppliers(id),
+  amount      REAL DEFAULT 0,
+  changed     REAL DEFAULT 0,
+  settled     REAL DEFAULT 0,
+  invoiced    REAL DEFAULT 0,
+  paid        REAL DEFAULT 0,
+  sign_date   TEXT DEFAULT '',
+  status      TEXT DEFAULT '履约中',
+  note        TEXT DEFAULT '',
+  created_at  TEXT DEFAULT (datetime('now')),
+  updated_at  TEXT DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_contracts_proj ON contracts(project_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_sup ON contracts(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_kind ON contracts(kind);
+CREATE INDEX IF NOT EXISTS idx_contracts_deleted ON contracts(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
 /**
@@ -113,6 +158,13 @@ export const migrations: Migration[] = [
         'CREATE INDEX IF NOT EXISTS idx_suppliers_parent ON suppliers(parent_supplier_id);',
       )
       await execScript(db, V2_OPERATION_LOGS)
+    },
+  },
+  {
+    version: 3,
+    name: 'contracts-light-entity',
+    async up(db) {
+      await execScript(db, V3_CONTRACTS)
     },
   },
 ]
@@ -159,8 +211,5 @@ export async function runMigrations(
   }
 
   const to = applied.length ? await getCurrentVersion(db) : from
-  if (applied.length) {
-    console.info(`[db] schema 迁移 v${from} → v${to}: ${applied.join(', ')}`)
-  }
   return { from, to, applied }
 }

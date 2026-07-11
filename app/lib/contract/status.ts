@@ -1,0 +1,49 @@
+// 合同域枚举与语义色调——单一权威源（三列表 SegTab 视图 / 表单下拉 / 状态 chip 共用）。
+// 蓝本：DC重构设计源码/kit/{ConContract,SubContract,MatContract,ContractDetail}Screen.jsx（issue #90 批A）。
+// 与 ~/lib/project/status.ts 同构：只共享「枚举集」与「语义色调」，具体 class 由各页按色调映射。
+
+import type { StatusTone } from '~/lib/project/status'
+
+/** 合同类别（kind）：施工=收入侧（甲方=项目 developer），分包/材采=支出侧（乙方=分供方） */
+export const CONTRACT_KINDS = ['施工', '分包', '材采'] as const
+
+export type ContractKind = (typeof CONTRACT_KINDS)[number]
+
+/** 分包合同子类（subKind，仅 kind=分包） */
+export const CONTRACT_SUB_KINDS = ['劳务', '专业'] as const
+
+/** 合同业务态（顺序即 SegTab 视图/下拉展示顺序，默认视图=履约中） */
+export const CONTRACT_STATUSES = ['履约中', '已签订', '已结算', '已结清'] as const
+
+export type ContractStatus = (typeof CONTRACT_STATUSES)[number]
+
+/** 状态 → 语义色调（设计稿 STATUS_TONE：履约中 brand / 已签订 neutral / 已结算 warn / 已结清 ok） */
+export const CONTRACT_STATUS_TONE: Record<string, StatusTone> = {
+  履约中: 'brand',
+  已签订: 'muted',
+  已结算: 'warn',
+  已结清: 'ok',
+}
+
+/** 收入/支出侧口径文案：施工=开票/收款/应收，支出侧（分包/材采）=收票/支付/应付 */
+export function kindLabels(kind: ContractKind) {
+  const isCon = kind === '施工'
+  return {
+    invoiced: isCon ? '累计开票' : '累计收票',
+    paid: isCon ? '累计收款' : '累计支付',
+    balance: isCon ? '按结算应收余额' : '按结算应付余额',
+    party: isCon ? '甲方（客户）' : '乙方（分供方）',
+  }
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/** 派生列「按结算应收/应付余额」= 累计结算 − 累计收款/支付（正数标红，不入表单不入库） */
+export function contractBalance(c: { settled: number | null, paid: number | null }): number {
+  return round2((c.settled ?? 0) - (c.paid ?? 0))
+}
+
+/** 底部汇总段：对可见行集求和（round2 防浮点尾差）。泛型不加 Record 约束——interface 无隐式 index signature，约束了反而拒收 Contract[]。 */
+export function sumField<T>(rows: readonly T[], field: keyof T): number {
+  return round2(rows.reduce((s, r) => s + (Number(r[field]) || 0), 0))
+}
