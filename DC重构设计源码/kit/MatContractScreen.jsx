@@ -4,7 +4,7 @@
 (function () {
   if (window.MatContractScreen) return;
 
-  function MatContractScreen() {
+  function MatContractScreen({ params }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -61,11 +61,17 @@
         { label: "累计收票金额总和", value: rows.reduce((s, r) => s + (r.invoiced || 0), 0) },
         { label: "累计支付金额总和", value: rows.reduce((s, r) => s + (r.paid || 0), 0) },
       ],
+      // 批C：支持项目/分供方带参预筛（穿透与反向视图共用）
+      fromParams: (p) => {
+        if (p && p.project) { const pr = projects.find((x) => x.id === p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; }
+        if (p && p.supplier) { const s = suppliers.find((x) => x.id === p.supplier); return { label: "分供方：" + (s ? s.name : p.supplier), filter: (r) => r.supplierId === p.supplier }; }
+        return null;
+      },
       onRowOpen: (r) => window.DC && window.DC.navigate("contractDetail", { id: r.id }),
       newDefaults: () => ({ kind: "材采", settled: 0, invoiced: 0, paid: 0, doc: { name: "材料采购合同.pdf", pages: 8 } }),
       tableMinWidth: 1640,
     };
-    return <ELS meta={meta} />;
+    return <ELS meta={meta} params={params} />;
   }
 
   window.MatContractScreen = MatContractScreen;

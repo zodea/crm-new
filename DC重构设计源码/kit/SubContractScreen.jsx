@@ -4,7 +4,7 @@
 (function () {
   if (window.SubContractScreen) return;
 
-  function SubContractScreen() {
+  function SubContractScreen({ params }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -76,11 +76,17 @@
         { label: "累计收票", value: rows.reduce((s, r) => s + (Number(r.invoiced) || 0), 0) },
         { label: "累计支付", value: rows.reduce((s, r) => s + (Number(r.paid) || 0), 0) },
       ],
+      // 批C 穿透落点：目标成本「已签合同金额」→ 本列表带「本项目」预筛
+      fromParams: (p) => {
+        if (p && p.project) { const pr = A.get("projects", p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; }
+        if (p && p.supplier) { const s = A.get("suppliers", p.supplier); return { label: "分供方：" + (s ? s.name : p.supplier), filter: (r) => r.supplierId === p.supplier }; }
+        return null;
+      },
       onRowOpen: (r) => window.DC && window.DC.navigate("contractDetail", { id: r.id }),
       newDefaults: () => ({ kind: "分包", subKind: "劳务", settled: 0, invoiced: 0, paid: 0, doc: { name: "分包合同.pdf", pages: 14 } }),
       tableMinWidth: 1760,
     };
-    return <ELS meta={meta} />;
+    return <ELS meta={meta} params={params} />;
   }
 
   window.SubContractScreen = SubContractScreen;

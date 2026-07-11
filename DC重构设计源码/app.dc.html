@@ -18,6 +18,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/_ds_bundle.js"></script>
   <script src="kit/data.js"></script>
+  <!-- 双轨数据：data.local.js(gitignored,车陂真实数据)存在则覆写 KIT_DATA 的 p5 切片；线上/仓库无此文件,静默回落假数据 -->
+  <script src="kit/data.local.js" onerror="console.info('[KIT] data.local.js 不存在，使用虚构兜底数据')"></script>
   <style>
     :root {
       --brand: #3976C6; --brand-soft: rgb(213 230 248); --brand-deep: #2A5996;
@@ -123,14 +125,44 @@
       <sc-if value="{{ isWorkerDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="WorkerDetailScreen" from="./kit/WorkerDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
+      <sc-if value="{{ isTargetCost }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="TargetCostListScreen" from="./kit/TargetCostListScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isTargetCostDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="TargetCostDetailScreen" from="./kit/TargetCostDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOwnerChange }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OwnerChangeScreen" from="./kit/OwnerChangeScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOwnerReport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OwnerReportScreen" from="./kit/OwnerReportScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isAcceptance }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="AcceptanceScreen" from="./kit/AcceptanceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isFinalSettle }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="FinalSettleScreen" from="./kit/FinalSettleScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOwnerPenalty }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OwnerPenaltyScreen" from="./kit/OwnerPenaltyScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isSubChange }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="SubChangeScreen" from="./kit/SubChangeScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isSubSettle }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="SubSettleScreen" from="./kit/SubSettleScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isProjPenalty }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjPenaltyScreen" from="./kit/ProjPenaltyScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
       <sc-if value="{{ isConContract }}" hint-placeholder-val="{{ false }}">
-        <x-import component-from-global-scope="ConContractScreen" from="./kit/ConContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+        <x-import component-from-global-scope="ConContractScreen" from="./kit/ConContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
       <sc-if value="{{ isSubContract }}" hint-placeholder-val="{{ false }}">
-        <x-import component-from-global-scope="SubContractScreen" from="./kit/SubContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+        <x-import component-from-global-scope="SubContractScreen" from="./kit/SubContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
       <sc-if value="{{ isMatContract }}" hint-placeholder-val="{{ false }}">
-        <x-import component-from-global-scope="MatContractScreen" from="./kit/MatContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
+        <x-import component-from-global-scope="MatContractScreen" from="./kit/MatContractScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
       <sc-if value="{{ isContractDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="ContractDetailScreen" from="./kit/ContractDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
@@ -221,6 +253,16 @@ const PAGE = {
   crewDetail:    { title: "班组详情",  subtitle: "基本信息 · 工人配置 · 分项单价" },
   worker:        { title: "工人信息库", subtitle: "人员管理" },
   workerDetail:  { title: "工人详情", subtitle: "档案 · 证书 · 亲属关联" },
+  targetCost:    { title: "目标成本",  subtitle: "项目信息 · 预算基准 · 四级金额链源头" },
+  targetCostDetail: { title: "目标成本详情", subtitle: "多级清单树表 · 预算/已签/实际/支付" },
+  ownerChange:   { title: "甲方变洽签", subtitle: "主合同管理 · 变更/签证/洽商 · 四档" },
+  ownerReport:   { title: "甲方报量",  subtitle: "主合同管理 · 月度申报产值 · 审定" },
+  acceptance:    { title: "竣工验收·保修", subtitle: "主合同管理 · 阶段流转触发" },
+  finalSettle:   { title: "最终结算",  subtitle: "主合同管理 · 与甲方最终结算" },
+  ownerPenalty:  { title: "甲方罚扣单", subtitle: "主合同管理 · 甲方对我方罚扣" },
+  subChange:     { title: "分包变洽签", subtitle: "分包及人工 · 增项/签证/洽商" },
+  subSettle:     { title: "分包结算",  subtitle: "分包及人工 · 结算台账 · 付款依据" },
+  projPenalty:   { title: "项目罚扣",  subtitle: "分包及人工 · 罚款扣款 · 结算抵扣" },
   conContract:   { title: "施工合同",  subtitle: "主合同管理 · 收入合同 · 四级对账" },
   subContract:   { title: "分包合同",  subtitle: "分包及人工 · 劳务 / 专业分包" },
   matContract:   { title: "材料采购合同", subtitle: "乙供材管理 · 采购合同台账" },
@@ -266,7 +308,7 @@ class Component extends DCLogic {
   // 页签去重 key：同 route + 相同关键参数 → 同一页签
   _tabKey(route, params) {
     const p = params || {};
-    if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail")
+    if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail" || route === "targetCostDetail")
       return route + ":" + (p.id || "");
     if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
     if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
@@ -294,6 +336,10 @@ class Component extends DCLogic {
       else if (route === "contractDetail") {
         const c = (window.APP && window.APP.get("contracts", p.id)) || ((d.contracts || []).find(x => x.id === p.id));
         name = c ? c.name.slice(0, 12) : "";
+      }
+      else if (route === "targetCostDetail") {
+        const t = (window.APP && window.APP.get("targetCosts", p.id)) || ((d.targetCosts || []).find(x => x.id === p.id));
+        name = t ? t.name.slice(0, 12) : "";
       }
       else if (route === "quantityUnit") name = (p.building ? p.building + "·" : "") + (p.floor || "") + (p.unit || "");
       else if (route === "invoiceEdit") { const iv = (window.INV && window.INV.get(p.id)); name = iv && iv.number ? iv.number.slice(-8) : ""; }
@@ -438,22 +484,22 @@ class Component extends DCLogic {
       { type: "group", key: "g-project", label: "项目信息", icon: "building", items: [
         { key: "project", mark: "项", label: "项目列表", hint: "工期进度" },
         { key: "schedule", mark: "进", label: "施工进度", hint: "排程 · 甘特" },
-        { key: "targetCost", mark: "标", label: "目标成本", hint: "预算基准", disabled: true },
+        { key: "targetCost", mark: "标", label: "目标成本", hint: "预算基准" },
       ]},
       { type: "group", key: "g-main", label: "主合同管理", icon: "file-signature", items: [
         { key: "conContract", mark: "合", label: "施工合同", hint: "收入合同" },
-        { key: "ownerChange", mark: "洽", label: "甲方变洽签", hint: "变更·签证", disabled: true },
-        { key: "ownerReport", mark: "报", label: "甲方报量", hint: "月度报量", disabled: true },
-        { key: "acceptance", mark: "验", label: "竣工验收·保修", hint: "阶段流转", disabled: true },
-        { key: "finalSettle", mark: "终", label: "最终结算", hint: "与甲方结算", disabled: true },
-        { key: "ownerPenalty", mark: "罚", label: "甲方罚扣单", hint: "对我方罚扣", disabled: true },
+        { key: "ownerChange", mark: "洽", label: "甲方变洽签", hint: "变更·签证" },
+        { key: "ownerReport", mark: "报", label: "甲方报量", hint: "月度报量" },
+        { key: "acceptance", mark: "验", label: "竣工验收·保修", hint: "阶段流转" },
+        { key: "finalSettle", mark: "终", label: "最终结算", hint: "与甲方结算" },
+        { key: "ownerPenalty", mark: "罚", label: "甲方罚扣单", hint: "对我方罚扣" },
         { key: "boqImport", mark: "拆", label: "清单拆表", hint: "合同清单→表格" },
       ]},
       { type: "group", key: "g-sub", label: "分包及人工", icon: "hard-hat", items: [
         { key: "subContract", mark: "分", label: "分包合同", hint: "劳务·专业" },
-        { key: "subChange", mark: "洽", label: "分包变洽签", hint: "增项·签证", disabled: true },
-        { key: "subSettle", mark: "结", label: "分包结算", hint: "结算台账", disabled: true },
-        { key: "projPenalty", mark: "扣", label: "项目罚扣", hint: "罚款·抵扣", disabled: true },
+        { key: "subChange", mark: "洽", label: "分包变洽签", hint: "增项·签证" },
+        { key: "subSettle", mark: "结", label: "分包结算", hint: "结算台账" },
+        { key: "projPenalty", mark: "扣", label: "项目罚扣", hint: "罚款·抵扣" },
         { key: "quantity", mark: "量", label: "工程量管理", hint: "矩阵可视化" },
         { key: "boqList", mark: "单", label: "工程量清单", hint: "分项·三量" },
         { key: "payroll", mark: "资", label: "工资核算", hint: "核算发放" },
@@ -653,6 +699,16 @@ class Component extends DCLogic {
       isCrewDetail:    route === "crewDetail",
       isWorker:        route === "worker",
       isWorkerDetail:  route === "workerDetail",
+      isTargetCost:    route === "targetCost",
+      isTargetCostDetail: route === "targetCostDetail",
+      isOwnerChange:   route === "ownerChange",
+      isOwnerReport:   route === "ownerReport",
+      isAcceptance:    route === "acceptance",
+      isFinalSettle:   route === "finalSettle",
+      isOwnerPenalty:  route === "ownerPenalty",
+      isSubChange:     route === "subChange",
+      isSubSettle:     route === "subSettle",
+      isProjPenalty:   route === "projPenalty",
       isConContract:   route === "conContract",
       isSubContract:   route === "subContract",
       isMatContract:   route === "matContract",

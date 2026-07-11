@@ -57,8 +57,9 @@
   };
   const mergeSupplier = (s, contracts) => ({ category: "其他", cred: "incomplete", parent: "", ...supAgg(s.id, contracts), ...(SUP_EXT[s.id] || {}), ...s });
 
-  // 批B 资金域集合直通入仓（无 merge 扩展，CRUD 走通用 rows/add/update/softDel）
-  const PLAIN_COLLS = ["contracts", "payApplies", "receipts", "invApplies", "currents", "payRecords", "reimburses"];
+  // 批B 资金域 + 批C 目标成本/主合同生命周期/分包单据 集合直通入仓（无 merge 扩展，CRUD 走通用 rows/add/update/softDel）
+  const PLAIN_COLLS = ["contracts", "payApplies", "receipts", "invApplies", "currents", "payRecords", "reimburses",
+    "targetCosts", "ownerChanges", "ownerReports", "acceptances", "finalSettles", "ownerPenalties", "subChanges", "subSettles", "projPenalties"];
   const state = { projects: [], suppliers: [] };
   PLAIN_COLLS.forEach((k) => { state[k] = []; });
   const init = () => {

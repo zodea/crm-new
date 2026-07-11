@@ -412,6 +412,129 @@
     { id: "bx06", no: "BX-2026-0606", applicant: "陈志明", projectId: "p3", category: "零星材料", amount: 980, date: "2026-07-08", status: "审批中", note: "收尾补料" },
   ];
 
+  // ——— 批C 轻实体仓：目标成本 + 主合同生命周期 + 分包单据（稳定 id 够蓝链，金额 mock）———
+  // 目标成本（预算——四级金额链源头）：每项目 1 份；树表明细在 targetCostTrees[costId]
+  const targetCosts = [
+    { id: "tc1", name: "合和新城目标成本", projectId: "p1", incomeAmount: 32388422, plannedProfit: 4988422, signedAmount: 8945000, incTotal: 27400000, excTotal: 25137615, tax: 2262385 },
+    { id: "tc2", name: "锦绣华庭目标成本", projectId: "p2", incomeAmount: 18600000, plannedProfit: 2400000, signedAmount: 4780000, incTotal: 16200000, excTotal: 14862385, tax: 1337615 },
+    { id: "tc3", name: "翠湖花园目标成本", projectId: "p3", incomeAmount: 9800000, plannedProfit: 1000000, signedAmount: 515000, incTotal: 8800000, excTotal: 8073394, tax: 726606 },
+    { id: "tc5", name: "车陂商业大楼目标成本", projectId: "p5", incomeAmount: 15800000, plannedProfit: 1900000, signedAmount: 837181, incTotal: 13900000, excTotal: 12752294, tax: 1147706 },
+  ];
+  // 目标成本树（多级清单：分部→子项→叶子；叶子才有 单价；q/p/a=预算 量/单价/合价，sq/sa=合同已签 量/合价，
+  // ra=实际成本，pa=实际支付；非叶子行金额=children 聚合，由页面现算，勿在此存总）
+  const tcLeaf = (no, name, unit, q, p, sq, ra, pa) => ({ no, name, unit, q, p, a: Math.round(q * p), sq, sa: Math.round(sq * p), ra, pa, leaf: true });
+  const targetCostTrees = {
+    tc1: [
+      { no: "1", name: "主体结构工程", children: [
+        { no: "1.1", name: "钢筋工程", children: [
+          tcLeaf("1.1.1", "HRB400 螺纹钢 Φ12 制安", "吨", 320, 4350, 290, 1264000, 865000),
+          tcLeaf("1.1.2", "HRB400 螺纹钢 Φ25 制安", "吨", 180, 4280, 150, 520000, 380000),
+        ] },
+        { no: "1.2", name: "混凝土工程", children: [
+          tcLeaf("1.2.1", "C30 商品混凝土浇筑", "m³", 2600, 520, 1900, 980000, 980000),
+          tcLeaf("1.2.2", "C35 商品混凝土浇筑", "m³", 800, 545, 420, 226000, 208000),
+        ] },
+        { no: "1.3", name: "模板工程", children: [
+          tcLeaf("1.3.1", "组合钢模板安拆", "㎡", 18000, 62, 12800, 760000, 700000),
+        ] },
+      ] },
+      { no: "2", name: "装饰装修工程", children: [
+        { no: "2.1", name: "墙地砖工程", children: [
+          tcLeaf("2.1.1", "墙砖铺贴（含瓷砖）", "㎡", 26000, 128, 17800, 2150000, 1980000),
+          tcLeaf("2.1.2", "地砖铺贴（含瓷砖）", "㎡", 21000, 112, 14200, 1460000, 1320000),
+        ] },
+        { no: "2.2", name: "涂饰与吊顶", children: [
+          tcLeaf("2.2.1", "内墙乳胶漆", "㎡", 30000, 28, 0, 0, 0),
+          tcLeaf("2.2.2", "铝扣板吊顶", "㎡", 5200, 96, 5200, 0, 0),
+        ] },
+      ] },
+      { no: "3", name: "安装工程", children: [
+        { no: "3.1", name: "给排水", children: [tcLeaf("3.1.1", "PPR/PVC 管道安装", "m", 26000, 36, 0, 0, 0)] },
+        { no: "3.2", name: "电气", children: [tcLeaf("3.2.1", "电线电缆敷设", "m", 68000, 18, 40000, 400000, 400000)] },
+      ] },
+      { no: "4", name: "措施及其他", children: [
+        tcLeaf("4.1", "脚手架搭设", "㎡", 22000, 34, 22000, 266692, 266692),
+        tcLeaf("4.2", "垃圾清运", "车", 300, 380, 0, 86000, 0),
+      ] },
+    ],
+  };
+  // 甲方变洽签（变更单四档：草稿/已上报/已打回/已签证；已签证才进变更后合同额）
+  const ownerChanges = [
+    { id: "oc1", no: "BQ-2026-001", name: "锦绣华庭材料涨价签证", projectId: "p2", contractId: "sg02", type: "签证", incAmount: 320000, excAmount: 293578, appliedAmount: 293578, date: "2026-03-10", status: "已签证" },
+    { id: "oc2", no: "BQ-2026-002", name: "翠湖花园园建变更", projectId: "p3", contractId: "sg03", type: "变更", incAmount: 120000, excAmount: 110092, appliedAmount: 110092, date: "2026-04-02", status: "已签证" },
+    { id: "oc3", no: "BQ-2026-003", name: "亚运城C1户型调整洽商", projectId: "p7", contractId: "sg07", type: "洽商", incAmount: 1200000, excAmount: 1100917, appliedAmount: 1100917, date: "2025-02-18", status: "已签证" },
+    { id: "oc4", no: "BQ-2026-004", name: "领秀海外立面变更", projectId: "p9", contractId: "sg09", type: "变更", incAmount: 400000, excAmount: 366972, appliedAmount: 366972, date: "2025-06-20", status: "已签证" },
+    { id: "oc5", no: "BQ-2026-005", name: "未来印象公区增项", projectId: "p10", contractId: "sg10", type: "变更", incAmount: 600000, excAmount: 550459, appliedAmount: 550459, date: "2024-05-12", status: "已签证" },
+    { id: "oc6", no: "BQ-2026-006", name: "合和新城景观桥签证", projectId: "p1", contractId: "sg01", type: "签证", incAmount: 860000, excAmount: 788991, appliedAmount: 0, date: "2026-07-02", status: "已上报" },
+    { id: "oc7", no: "BQ-2026-007", name: "车陂大楼幕墙洽商", projectId: "p5", contractId: "sg05", type: "洽商", incAmount: 420000, excAmount: 385321, appliedAmount: 0, date: "2026-07-06", status: "草稿" },
+    { id: "oc8", no: "BQ-2026-008", name: "科学城地下室变更", projectId: "p6", contractId: "sg06", type: "变更", incAmount: 260000, excAmount: 238532, appliedAmount: 238532, date: "2026-06-18", status: "已打回" },
+  ];
+  // 甲方报量（月度报量：申报产值→甲方审定；累计收入来源）
+  const ownerReports = [
+    { id: "or1", no: "BL-2026-06-01", projectId: "p1", contractId: "sg01", period: "2026-06", reportedAmount: 3200000, auditedAmount: 3050000, date: "2026-06-28", status: "已审定" },
+    { id: "or2", no: "BL-2026-05-01", projectId: "p1", contractId: "sg01", period: "2026-05", reportedAmount: 2900000, auditedAmount: 2900000, date: "2026-05-28", status: "已审定" },
+    { id: "or3", no: "BL-2026-06-02", projectId: "p2", contractId: "sg02", period: "2026-06", reportedAmount: 1500000, auditedAmount: 1420000, date: "2026-06-30", status: "已审定" },
+    { id: "or4", no: "BL-2026-06-03", projectId: "p5", contractId: "sg05", period: "2026-06", reportedAmount: 1800000, auditedAmount: 0, date: "2026-07-02", status: "已申报" },
+    { id: "or5", no: "BL-2026-06-04", projectId: "p6", contractId: "sg06", period: "2026-06", reportedAmount: 900000, auditedAmount: 860000, date: "2026-06-29", status: "已审定" },
+    { id: "or6", no: "BL-2026-07-01", projectId: "p1", contractId: "sg01", period: "2026-07", reportedAmount: 2600000, auditedAmount: 0, date: "2026-07-09", status: "已申报" },
+    { id: "or7", no: "BL-2026-06-05", projectId: "p8", contractId: "sg08", period: "2026-06", reportedAmount: 760000, auditedAmount: 760000, date: "2026-06-27", status: "已审定" },
+    { id: "or8", no: "BL-2026-06-06", projectId: "p11", contractId: "sg11", period: "2026-06", reportedAmount: 420000, auditedAmount: 400000, date: "2026-06-30", status: "已审定" },
+  ];
+  // 竣工验收 · 保修到期确认单（阶段流转触发器）
+  const acceptances = [
+    { id: "ac1", no: "JGYS-2025-001", type: "竣工验收", name: "亚运城C1标段竣工验收", projectId: "p7", contractId: "sg07", date: "2025-12-18", status: "已验收", estimate: 21800000 },
+    { id: "ac2", no: "JGYS-2024-002", type: "竣工验收", name: "未来印象小区竣工验收", projectId: "p10", contractId: "sg10", date: "2024-12-20", status: "已验收", estimate: 9800000 },
+    { id: "ac3", no: "BXQR-2026-001", type: "保修到期确认", name: "未来印象小区保修到期确认", projectId: "p10", contractId: "sg10", date: "2026-12-20", status: "保修中", estimate: 196000 },
+    { id: "ac4", no: "JGYS-2026-003", type: "竣工验收", name: "领秀海5-6号楼竣工验收", projectId: "p9", contractId: "sg09", date: "2026-06-30", status: "验收中", estimate: 18600000 },
+    { id: "ac5", no: "BXQR-2026-002", type: "保修到期确认", name: "亚运城C1保修到期确认", projectId: "p7", contractId: "sg07", date: "2027-12-18", status: "保修中", estimate: 436000 },
+    { id: "ac6", no: "JGYS-2026-004", type: "竣工验收", name: "翠湖花园竣工预验收", projectId: "p3", contractId: "sg03", date: "2026-08-15", status: "验收中", estimate: 9920000 },
+  ];
+  // 最终结算（与甲方）
+  const finalSettles = [
+    { id: "fs1", no: "ZJS-2026-001", name: "亚运城C1标段最终结算", projectId: "p7", contractId: "sg07", amount: 21800000, date: "2026-03-20", status: "已审定" },
+    { id: "fs2", no: "ZJS-2025-002", name: "未来印象小区最终结算", projectId: "p10", contractId: "sg10", amount: 9800000, date: "2025-04-15", status: "已审定" },
+    { id: "fs3", no: "ZJS-2026-003", name: "领秀海5-6号楼最终结算", projectId: "p9", contractId: "sg09", amount: 18600000, date: "2026-07-01", status: "已报审" },
+    { id: "fs4", no: "ZJS-2026-004", name: "翠湖花园最终结算(编制)", projectId: "p3", contractId: "sg03", amount: 9920000, date: "", status: "编制中" },
+  ];
+  // 甲方罚扣单（甲方对我方罚扣，冲减收入）
+  const ownerPenalties = [
+    { id: "op1", no: "FK-2026-001", reason: "工期延误罚款", projectId: "p4", contractId: "sg04", amount: 120000, date: "2026-05-20", status: "已确认" },
+    { id: "op2", no: "FK-2026-002", reason: "安全文明施工扣款", projectId: "p1", contractId: "sg01", amount: 36000, date: "2026-06-12", status: "已确认" },
+    { id: "op3", no: "FK-2026-003", reason: "成品保护不到位扣款", projectId: "p2", contractId: "sg02", amount: 18000, date: "2026-06-25", status: "申诉中" },
+    { id: "op4", no: "FK-2026-004", reason: "验收整改逾期罚款", projectId: "p9", contractId: "sg09", amount: 52000, date: "2026-07-03", status: "申诉中" },
+    { id: "op5", no: "FK-2025-005", reason: "噪音投诉处罚转嫁", projectId: "p7", contractId: "sg07", amount: 8000, date: "2025-10-11", status: "已确认" },
+  ];
+  // 分包变洽签（对分供方；四档同甲方）
+  const subChanges = [
+    { id: "sc1", no: "FBQ-2026-001", type: "增项", projectId: "p1", contractId: "fb01", supplierId: "s6", amount: 186000, area: "320 ㎡", audited: 178000, date: "2026-04-06", status: "已签证" },
+    { id: "sc2", no: "FBQ-2026-002", type: "签证", projectId: "p1", contractId: "cg01", supplierId: "s7", amount: 92000, area: "—", audited: 88000, date: "2026-05-15", status: "已签证" },
+    { id: "sc3", no: "FBQ-2026-003", type: "洽商", projectId: "p2", contractId: "fb05", supplierId: "s10", amount: 64000, area: "—", audited: 0, date: "2026-07-01", status: "已上报" },
+    { id: "sc4", no: "FBQ-2026-004", type: "增项", projectId: "p1", contractId: "fb02", supplierId: "s8", amount: 45000, area: "600 ㎡", audited: 0, date: "2026-07-05", status: "草稿" },
+    { id: "sc5", no: "FBQ-2026-005", type: "签证", projectId: "p6", contractId: "fb08", supplierId: "s6", amount: 28000, area: "150 ㎡", audited: 0, date: "2026-06-30", status: "已打回" },
+    { id: "sc6", no: "FBQ-2025-006", type: "增项", projectId: "p9", contractId: "fb09", supplierId: "s6", amount: 36000, area: "220 ㎡", audited: 36000, date: "2025-08-12", status: "已签证" },
+  ];
+  // 分包结算（结算单关联分包/材采合同；付款申请引用它）
+  const subSettles = [
+    { id: "ss1", no: "FBJS-2026-001", name: "泥水班组 6 月进度结算", projectId: "p1", contractId: "fb01", supplierId: "s6", type: "进度结算", amount: 1240000, date: "2026-06-25", status: "已确认" },
+    { id: "ss2", no: "FBJS-2026-002", name: "瓷砖采购 5 月结算", projectId: "p1", contractId: "cg01", supplierId: "s7", type: "到货结算", amount: 2150000, date: "2026-05-28", status: "已确认" },
+    { id: "ss3", no: "FBJS-2026-003", name: "屋面防水最终结算", projectId: "p1", contractId: "fb03", supplierId: "s5", type: "最终结算", amount: 560000, date: "2026-02-10", status: "已确认" },
+    { id: "ss4", no: "FBJS-2026-004", name: "机电安装 6 月进度结算", projectId: "p2", contractId: "fb05", supplierId: "s10", type: "进度结算", amount: 640000, date: "2026-06-28", status: "已确认" },
+    { id: "ss5", no: "FBJS-2026-005", name: "钢筋采购结算", projectId: "p1", contractId: "cg02", supplierId: "s1", type: "到货结算", amount: 1264000, date: "2026-05-12", status: "已确认" },
+    { id: "ss6", no: "FBJS-2026-006", name: "脚手架进度结算", projectId: "p5", contractId: "fb06", supplierId: "s9", type: "进度结算", amount: 266692, date: "2026-06-15", status: "已确认" },
+    { id: "ss7", no: "FBJS-2026-007", name: "泥水班组 7 月进度结算(待确认)", projectId: "p1", contractId: "fb01", supplierId: "s6", type: "进度结算", amount: 380000, date: "2026-07-08", status: "待确认" },
+    { id: "ss8", no: "FBJS-2026-008", name: "领秀海泥水最终结算", projectId: "p9", contractId: "fb09", supplierId: "s6", type: "最终结算", amount: 890000, date: "2025-09-30", status: "已确认" },
+  ];
+  // 项目罚扣（对分供方罚款/扣款，结算时抵扣；连工资「空鼓扣罚」口径）
+  const projPenalties = [
+    { id: "pp1", no: "XMFK-2026-001", reason: "空鼓扣罚 · 3 处", projectId: "p1", contractId: "fb01", supplierId: "s6", amount: 600, date: "2026-04-18", status: "已抵扣" },
+    { id: "pp2", no: "XMFK-2026-002", reason: "未收尾扣款", projectId: "p1", contractId: "fb01", supplierId: "s6", amount: 600, date: "2026-04-30", status: "已抵扣" },
+    { id: "pp3", no: "XMFK-2026-003", reason: "材料破损索赔", projectId: "p1", contractId: "cg01", supplierId: "s7", amount: 12000, date: "2026-05-22", status: "已抵扣" },
+    { id: "pp4", no: "XMFK-2026-004", reason: "安全违规罚款", projectId: "p2", contractId: "fb05", supplierId: "s10", amount: 5000, date: "2026-06-20", status: "待抵扣" },
+    { id: "pp5", no: "XMFK-2026-005", reason: "工期滞后罚款", projectId: "p6", contractId: "fb08", supplierId: "s6", amount: 8000, date: "2026-07-02", status: "待抵扣" },
+    { id: "pp6", no: "XMFK-2026-006", reason: "成品保护赔偿", projectId: "p5", contractId: "fb06", supplierId: "s9", amount: 3200, date: "2026-06-08", status: "已抵扣" },
+    { id: "pp7", no: "XMFK-2026-007", reason: "空鼓扣罚 · 2 处", projectId: "p9", contractId: "fb09", supplierId: "s6", amount: 400, date: "2025-09-10", status: "已抵扣" },
+  ];
+
   const factorDefaults = [
     { id: "f1", name: "HRB400 螺纹钢 Φ12", unit: "吨", price: 3980 },
     { id: "f2", name: "C30 商品混凝土", unit: "m³", price: 462 },
@@ -420,5 +543,6 @@
   ];
 
   window.KIT_DATA = { invoices, suppliers, projects, workers, priceSuppliers, priceRows, deliveryFiles, crews, crewConfig, matrix, payroll, projectCrews, factorDefaults, contracts,
-    payApplies, receipts, invApplies, currents, payRecords, reimburses };
+    payApplies, receipts, invApplies, currents, payRecords, reimburses,
+    targetCosts, targetCostTrees, ownerChanges, ownerReports, acceptances, finalSettles, ownerPenalties, subChanges, subSettles, projPenalties };
 })();

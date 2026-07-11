@@ -4,7 +4,7 @@
 (function () {
   if (window.ConContractScreen) return;
 
-  function ConContractScreen() {
+  function ConContractScreen({ params }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -65,11 +65,16 @@
         { label: "累计开票总和", value: Math.round(rows.reduce((s, r) => s + (r.invoiced || 0), 0) * 100) / 100 },
         { label: "累计收款总和", value: Math.round(rows.reduce((s, r) => s + (r.paid || 0), 0) * 100) / 100 },
       ],
+      // 批C：支持项目带参预筛（穿透与反向视图共用）
+      fromParams: (p) => {
+        if (p && p.project) { const pr = projects.find((x) => x.id === p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; }
+        return null;
+      },
       onRowOpen: (r) => window.DC && window.DC.navigate("contractDetail", { id: r.id }),
       newDefaults: () => ({ kind: "施工", supplierId: null, settled: 0, invoiced: 0, paid: 0, doc: { name: "施工合同正本.pdf", pages: 20 } }),
       tableMinWidth: 1680,
     };
-    return <ELS meta={meta} />;
+    return <ELS meta={meta} params={params} />;
   }
 
   window.ConContractScreen = ConContractScreen;
