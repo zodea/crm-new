@@ -634,6 +634,44 @@
     { id: "jzz03", no: "ZR-2026-003", projectId: "p5", material: "甲供石材干挂件", qty: 800, unit: "套", party: "天河城建投资", useFor: "幕墙直装", date: "2026-06-25" },
   ];
 
+  // ——— 批E 轻实体仓：客户（红圈09 甲方档案）+ 项目其他合同（红圈11）（稳定 id 够蓝链，金额 mock）———
+  // 客户 = 项目 developer 文本的实体化（name 与 projects.developer 严格同名，供项目详情「客户(甲方)」蓝链 + 反向聚合）
+  const customers = [
+    { id: "cu1", name: "合和地产集团", contact: "郑建业", phone: "13902200001", address: "广州市天河区珠江新城", taxNo: "91440101MA5AA00001", note: "长期合作·总承包甲方" },
+    { id: "cu2", name: "锦绣置业有限公司", contact: "李锦华", phone: "13902200002", address: "广州市番禺区市桥街道", taxNo: "91440113MA5AA00002", note: "" },
+    { id: "cu3", name: "翠湖投资", contact: "黄翠湖", phone: "13902200003", address: "广州市天河区天源路", taxNo: "91440106MA5AA00003", note: "" },
+    { id: "cu4", name: "江湾置业", contact: "陈江湾", phone: "13902200004", address: "广州市海珠区滨江东路", taxNo: "91440105MA5AA00004", note: "项目停工中" },
+    { id: "cu5", name: "天河城建投资", contact: "周天河", phone: "13902200005", address: "广州市天河区车陂路", taxNo: "91440106MA5AA00005", note: "" },
+    { id: "cu6", name: "广州开发区建设集团", contact: "郑开元", phone: "13902200006", address: "广州市黄埔区科学大道", taxNo: "91440112MA5AA00006", note: "国企甲方" },
+    { id: "cu7", name: "广州亚运城开发", contact: "何亚运", phone: "13902200007", address: "广州市番禺区亚运大道", taxNo: "91440113MA5AA00007", note: "已竣工结算" },
+    { id: "cu8", name: "利丰置业", contact: "刘利丰", phone: "13902200008", address: "佛山市南海区利丰北路", taxNo: "91440605MA5AA00008", note: "" },
+    { id: "cu9", name: "保利番禺地产", contact: "叶保利", phone: "13902200009", address: "广州市番禺区领秀海", taxNo: "91440113MA5AA00009", note: "" },
+    { id: "cu10", name: "未来印象置业", contact: "王印象", phone: "13902200010", address: "广州市增城区荔城街道", taxNo: "91440118MA5AA00010", note: "已竣工·保修中" },
+    { id: "cu11", name: "白云机场建设", contact: "陈云飞", phone: "13902200011", address: "广州市花都区机场北路", taxNo: "91440114MA5AA00011", note: "" },
+    { id: "cu12", name: "广州市政集团", contact: "李政通", phone: "13902200012", address: "广州市越秀区", taxNo: "91440104MA5AA00012", note: "零星维修框架甲方" },
+  ];
+  // 公司支出合同（红圈11 · 公司层面、不挂项目：房租/软件/其他；连费用报销）
+  const companyExps = [
+    { id: "qy1", no: "GS-2026-001", name: "公司办公室租赁合同", category: "房租", counterparty: "广州天河甲级写字楼", amount: 816000, signDate: "2026-01-01", period: "2026-01~2026-12", status: "履约中" },
+    { id: "qy2", no: "GS-2026-002", name: "用友财务软件年费", category: "软件", counterparty: "用友网络科技", amount: 48000, signDate: "2026-01-15", period: "年费", status: "履约中" },
+    { id: "qy3", no: "GS-2026-003", name: "广联达造价软件", category: "软件", counterparty: "广联达科技", amount: 36000, signDate: "2026-02-01", period: "年费", status: "履约中" },
+    { id: "qy4", no: "GS-2025-004", name: "公司社保代理服务", category: "其他", counterparty: "广州人力资源服务", amount: 120000, signDate: "2025-06-01", period: "年费", status: "已结清" },
+    { id: "qy5", no: "GS-2026-005", name: "项目部临时办公板房租赁", category: "房租", counterparty: "华丰活动板房", amount: 96000, signDate: "2026-03-01", period: "2026-03~2027-02", status: "履约中" },
+  ];
+  // 其他支出合同（红圈11 · 项目上非分包/材料的杂项支出，如机械租赁/检测服务）
+  const otherExps = [
+    { id: "qt1", no: "QT-2026-001", name: "合和新城塔吊租赁合同", projectId: "p1", category: "机械租赁", counterparty: "广州建机租赁", amount: 480000, signDate: "2025-10-01", status: "履约中" },
+    { id: "qt2", no: "QT-2026-002", name: "锦绣华庭施工电梯租赁", projectId: "p2", category: "机械租赁", counterparty: "恒升机械", amount: 216000, signDate: "2026-02-10", status: "履约中" },
+    { id: "qt3", no: "QT-2026-003", name: "车陂大楼安全监测服务", projectId: "p5", category: "检测服务", counterparty: "华测检测", amount: 68000, signDate: "2026-03-15", status: "履约中" },
+    { id: "qt4", no: "QT-2026-004", name: "科学城项目临时用电增容", projectId: "p6", category: "其他", counterparty: "南方电网服务", amount: 42000, signDate: "2026-04-01", status: "已结清" },
+  ];
+  // 其他支出结算（其他支出合同的结算单）
+  const otherSettles = [
+    { id: "qs1", no: "QTJS-2026-001", name: "塔吊租赁 6 月结算", projectId: "p1", contractId: "qt1", amount: 240000, date: "2026-06-30", status: "已确认" },
+    { id: "qs2", no: "QTJS-2026-002", name: "施工电梯租赁结算", projectId: "p2", contractId: "qt2", amount: 108000, date: "2026-06-28", status: "已确认" },
+    { id: "qs3", no: "QTJS-2026-003", name: "安全监测服务结算", projectId: "p5", contractId: "qt3", amount: 34000, date: "2026-07-05", status: "待确认" },
+  ];
+
   const factorDefaults = [
     { id: "f1", name: "HRB400 螺纹钢 Φ12", unit: "吨", price: 3980 },
     { id: "f2", name: "C30 商品混凝土", unit: "m³", price: 462 },
@@ -645,5 +683,5 @@
     payApplies, receipts, invApplies, currents, payRecords, reimburses,
     targetCosts, targetCostTrees, ownerChanges, ownerReports, acceptances, finalSettles, ownerPenalties, subChanges, subSettles, projPenalties,
     matRequisitions, matArrivals, matUses, matSettles, stockChecks, omTotals, omRequisitions, omArrivals, omUses, omDirects,
-    deliveryArchives };
+    deliveryArchives, customers, companyExps, otherExps, otherSettles };
 })();

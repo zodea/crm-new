@@ -273,6 +273,19 @@
 - **蓝本回写**：`docs/rewrite/pages/material-delivery.md` 顶部加双区（处理区/归档库）横幅 + 归档规则/改错通道/模糊纠错，指向 CONTEXT「归档」+ 反馈轮7 D 节（此前一直欠回写，本批补齐）。
 - 验证：esbuild 13 文件全过；本地 8823 DOM eval 实测（11 路由全渲染、材料到货默认「已入库」6/7 + 蓝链 + 金额 + 双筛选、下料单默认「未完全到货」+ 剩余未到计算 + 字符串汇总、甲供材总控剩余可用计算、归档库树 项目→分供方 签约升序排序 + 未区分兜底 + 数量角标、未区分节点模糊纠错「建议归并到大板东/宏宇陶瓷」、store softDel/restore 7→6→7），console 零报错。已 DesignSync 推送。
 
+### IA 重构 批E（2026-07-12：项目其他合同 + 客户 + 分供方反向Tab + 全站走查 · IA 重构收官）
+
+> 交接 [05-批E](../handoffs/05-批E-其他合同与收尾.md)。列表白嫖批A `EntityListScreen`；客户详情套批A `DetailShell`；分供方详情反向 Tab 就地改真。**批 A–E 五批 IA 重构（向红圈看齐）至此收官。**
+
+- **轻实体仓**：`kit/data.js` 新增 customers（12 家甲方，name 与 projects.developer 严格同名，供项目详情蓝链 + 反向聚合）+ companyExps（公司支出合同5·房租/软件）+ otherExps（其他支出合同4·机械租赁/检测）+ otherSettles（其他支出结算3）；`kit/AppData.jsx` PLAIN_COLLS 扩到批E 4 集合。
+- **5 张新屏**（Workflow 五代理并行生成，统一接线后逐屏验证）：公司支出合同（公司层面·无项目列·类别筛选）/ 其他支出合同（挂项目·蓝链·穿透 fromParams）/ 其他支出结算（关联其他支出合同）/ **客户列表**（客户名 `EntityLink customer` + 合作项目数计算列 + 反向聚合汇总）/ **客户详情** `CustomerDetailScreen`（套 DetailShell：四级对账 metrics 合作项目/施工合同额/累计收款/应收余额 + 3 反向 Tab 合作项目/施工合同/收款登记，按 developer===name 聚合）。
+- **EntityLink 加 `customer` 类型**（`kit/KitAtoms.jsx` ENTITY_ROUTES 唯一处 → route `customerDetail`）；`kit/ProjectDetailScreen.jsx` `nameLink` 加 customer→customers 映射，摘要「客户(甲方)」两处升级为蓝链 → 客户详情。
+- **分供方详情反向 Tab 改真**（`kit/SupplierDetailScreen.jsx`，红圈铁律③）：删硬编码 mock 常量（PROJECTS/CONTRACTS/PAYMENTS/TICKETS），改按 `supplierId` 从 window.APP store 真实过滤聚合——合作项目(合同归组)/支出合同(分包+材采,合同名/项目名蓝链)/**支出结算**(subSettles+matSettles)/付款管理(payApplies+payRecords)/收票登记(按 seller 名/别名匹配 invoices)，Tab 带真实计数，跨项目汇总卡真实派生。
+- **新侧栏解禁 5 项**：`app.dc.html` 项目其他合同组 3 项 + 基础信息组「客户」去 disabled；加 companyExp/otherExp/otherSettle/customer/customerDetail 的 PAGE/renderVals/sc-if；customerDetail 进 `_tabKey`(route+id)/`_tabTitle`(反查客户名)/`_isActive`(与客户列表同亮)。
+- **全站走查**（Workflow 4 维静态审查 → 对抗验证过滤）：接线完整性(16 新 route × PAGE/renderVals/sc-if/sidebar 四件)、蓝链无死链与 EntityLink 映射、列表 meta 铁律 + data.js id 引用一致性、反向Tab/文档同步。确认项已修。
+- **文档**：`docs/rewrite/pages/material-delivery.md` 批D 已回写双区；CONTEXT.md 客户/甲供材/其他支出合同 词条**待补**（未随本批改动——CONTEXT.md 会话开始已被他人改，避免混提；后续单独补 glossary）。
+- 验证：esbuild 全过；本地 8823 DOM eval 实测（5 新屏渲染/默认业务态视图/客户名蓝链→客户详情→返回关页签闭环、客户详情 4 metrics + 3 反向 Tab、分供方 s6 反向 Tab 支出合同 4 份按 supplierId 过滤 + 跨项目汇总 ¥6,670,000、公司支出合同无项目列、其他支出结算关联合同名），console 零报错。已 DesignSync 推送。
+
 ### 反馈轮 8（2026-07-04：全站界面整改 —— 九大块）
 见 [FEEDBACK-8.md](./FEEDBACK-8.md)：表格三件套铁律（见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)）、金额两位小数铁律、红圈对齐；首页减法、项目列表/编辑/详情红圈化、施工进度新建分组子页面、分供方表格修复、税额工具压缩、工程量矩阵优化+量差总表（#37）、清单编辑、工资核算/进度款对齐真实格式。**每完成一屏在该文件标「暂定界面」。**
 

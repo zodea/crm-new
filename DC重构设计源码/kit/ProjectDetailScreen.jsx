@@ -15,7 +15,7 @@
 
   // —— 批B 蓝链 helper：存量子表行存的是「名称字符串」而非 id → 按名称反查共享 store 取 id 再蓝链 ——
   // 项目按 name 全等 / 分供方按 name 或 aliases 含 / 合同按 name 全等；查到 → EntityLink，查不到 → 保持原文本（不做死链）。
-  const NAME_COLL = { project: "projects", supplier: "suppliers", contract: "contracts" };
+  const NAME_COLL = { project: "projects", supplier: "suppliers", contract: "contracts", customer: "customers" };
   const nameLink = (type, name) => {
     if (name == null || name === "" || name === "—") return name;
     const KA = window.KitAtoms, A = window.APP;
@@ -651,7 +651,7 @@
           <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 1, background: "var(--line)", borderTop: "1px solid var(--line)" }}>
             {[
               ["业务流程阶段", proj.status], ["经营类型", m.operationType], ["项目经理", proj.manager],
-              ["客户(甲方)", proj.developer], ["承包单位", m.contractor],
+              ["客户(甲方)", nameLink("customer", proj.developer)], ["承包单位", m.contractor],
             ].map(([k, v]) => (
               <div key={k} style={{ background: "var(--panel)", padding: "10px 16px", minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{k}</div>
@@ -732,7 +732,7 @@
   function TabContent({ tab, proj, m, data, navigate, invRows }) {
     if (tab === "info") {
       const base = [
-        ["项目名称", proj.name], ["项目合同名称", m.contractName], ["客户(甲方)", proj.developer], ["客户2", m.developer2],
+        ["项目名称", proj.name], ["项目合同名称", m.contractName], ["客户(甲方)", nameLink("customer", proj.developer)], ["客户2", m.developer2],
         ["工程地域", m.region], ["工程详细地址", proj.address], ["经营类型", m.operationType], ["计划开工日期", proj.startDate],
         ["计划竣工日期", m.plannedEnd], ["计划工期(天)", m.plannedDuration], ["项目风险级别", m.riskLevel], ["审批状态", m.approvalStatus],
         ["业务流程阶段", proj.status], ["工程概况", m.overview],

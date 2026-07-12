@@ -94,6 +94,7 @@
     crew:     { route: "crewDetail",     params: (id) => ({ crewId: id }), name: (id) => (((window.KIT_DATA || {}).crews || []).find((c) => c.id === id) || {}).name },
     worker:   { route: "workerDetail",   params: (id) => ({ id }),     name: (id) => (((window.KIT_DATA || {}).workers || []).find((w) => w.id === id) || {}).name },
     invoice:  { route: "invoiceEdit",    params: (id) => ({ id }),     name: (id) => { const iv = window.INV && window.INV.get(id); return iv && iv.number ? "票 " + iv.number.slice(-8) : null; } },
+    customer: { route: "customerDetail", params: (id) => ({ id }),     name: (id) => ((window.APP && window.APP.get("customers", id)) || {}).name },
   };
   function EntityLink({ type, id, label, bold = true, title }) {
     const conf = ENTITY_ROUTES[type];

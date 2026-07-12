@@ -197,6 +197,21 @@
       <sc-if value="{{ isDeliveryArchive }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="DeliveryArchiveScreen" from="./kit/DeliveryArchiveScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
+      <sc-if value="{{ isCompanyExp }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CompanyExpScreen" from="./kit/CompanyExpScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOtherExp }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OtherExpScreen" from="./kit/OtherExpScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isOtherSettle }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OtherSettleScreen" from="./kit/OtherSettleScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isCustomer }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CustomerScreen" from="./kit/CustomerScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isCustomerDetail }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="CustomerDetailScreen" from="./kit/CustomerDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
       <sc-if value="{{ isContractDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="ContractDetailScreen" from="./kit/ContractDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
@@ -310,6 +325,11 @@ const PAGE = {
   omUse:         { title: "甲供材领用",  subtitle: "甲供材管理 · 出库" },
   omDirect:      { title: "甲供材直入直出", subtitle: "甲供材管理 · 不入库直用" },
   deliveryArchive:{ title: "送货单归档库", subtitle: "乙供材管理 · 项目→分供方 · 改归属" },
+  companyExp:    { title: "公司支出合同", subtitle: "项目其他合同 · 房租/软件 · 连费用报销" },
+  otherExp:      { title: "其他支出合同", subtitle: "项目其他合同 · 机械租赁/检测等杂项" },
+  otherSettle:   { title: "其他支出结算", subtitle: "项目其他合同 · 结算台账" },
+  customer:      { title: "客户",        subtitle: "基础信息 · 甲方单位档案 · 反向聚合" },
+  customerDetail:{ title: "客户详情",    subtitle: "项目/施工合同/收款 反向 Tab" },
   contractDetail:{ title: "合同详情",  subtitle: "四级对账 · 关联单据 · 文书" },
   invoice:       { title: "发票识别",  subtitle: "资金管理 · 上传 · 校对 · 打印排版" },
   invoiceLedger: { title: "发票台账",  subtitle: "资金管理 · 列表 / 打印 / 修改" },
@@ -344,7 +364,7 @@ class Component extends DCLogic {
     collapsed: false,
     // 批A 新侧栏 10 组（导航 Artifact 锁定版）：识别中心组退役，默认展开已实装的主线组
     groupOpen: { "g-project": true, "g-main": true, "g-sub": true, "g-material": true, "g-owner-material": true,
-      "g-finance": true, "g-other": false, "g-base": false, "g-settings": false },
+      "g-finance": true, "g-other": true, "g-base": true, "g-settings": false },
   };
 
   _tabSeq = 0;
@@ -352,7 +372,7 @@ class Component extends DCLogic {
   // 页签去重 key：同 route + 相同关键参数 → 同一页签
   _tabKey(route, params) {
     const p = params || {};
-    if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail" || route === "targetCostDetail")
+    if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail" || route === "targetCostDetail" || route === "customerDetail")
       return route + ":" + (p.id || "");
     if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
     if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
@@ -384,6 +404,10 @@ class Component extends DCLogic {
       else if (route === "targetCostDetail") {
         const t = (window.APP && window.APP.get("targetCosts", p.id)) || ((d.targetCosts || []).find(x => x.id === p.id));
         name = t ? t.name.slice(0, 12) : "";
+      }
+      else if (route === "customerDetail") {
+        const c = (window.APP && window.APP.get("customers", p.id)) || ((d.customers || []).find(x => x.id === p.id));
+        name = c ? c.name.slice(0, 12) : "";
       }
       else if (route === "quantityUnit") name = (p.building ? p.building + "·" : "") + (p.floor || "") + (p.unit || "");
       else if (route === "invoiceEdit") { const iv = (window.INV && window.INV.get(p.id)); name = iv && iv.number ? iv.number.slice(-8) : ""; }
@@ -502,6 +526,7 @@ class Component extends DCLogic {
     if (key === "schedule") return r === "schedule" || r === "scheduleGroupNew";
     if (key === "invoiceLedger") return r === "invoiceLedger" || r === "invoiceEdit";
     if (key === "boqList") return r === "boqList";           // 批A：清单拆表独立入主合同管理组，不再挂工程量清单下
+    if (key === "customer") return r === "customer" || r === "customerDetail";  // 批E：客户列表/详情同亮
     if (key === "conContract" || key === "subContract" || key === "matContract") {
       if (r === key) return true;
       if (r !== "contractDetail") return false;              // 合同详情按 kind 点亮来源列表
@@ -584,13 +609,13 @@ class Component extends DCLogic {
         { key: "factor", mark: "因", label: "开票·税额工具", hint: "推算数量" },
       ]},
       { type: "group", key: "g-other", label: "项目其他合同", icon: "file-stack", items: [
-        { key: "companyExp", mark: "司", label: "公司支出合同", hint: "房租·软件", disabled: true },
-        { key: "otherExp", mark: "杂", label: "其他支出合同", hint: "", disabled: true },
-        { key: "otherSettle", mark: "结", label: "其他支出结算", hint: "", disabled: true },
+        { key: "companyExp", mark: "司", label: "公司支出合同", hint: "房租·软件" },
+        { key: "otherExp", mark: "杂", label: "其他支出合同", hint: "项目杂项支出" },
+        { key: "otherSettle", mark: "结", label: "其他支出结算", hint: "结算台账" },
       ]},
       { type: "group", key: "g-base", label: "基础信息", icon: "database", items: [
         { key: "supplier", mark: "方", label: "分供方", hint: "资料管理" },
-        { key: "customer", mark: "客", label: "客户", hint: "甲方档案", disabled: true },
+        { key: "customer", mark: "客", label: "客户", hint: "甲方档案" },
         { key: "crew", mark: "组", label: "班组管理", hint: "单价·配置" },
         { key: "worker", mark: "工", label: "工人信息", hint: "人员证书" },
       ]},
@@ -768,6 +793,11 @@ class Component extends DCLogic {
       isOmUse:         route === "omUse",
       isOmDirect:      route === "omDirect",
       isDeliveryArchive: route === "deliveryArchive",
+      isCompanyExp:    route === "companyExp",
+      isOtherExp:      route === "otherExp",
+      isOtherSettle:   route === "otherSettle",
+      isCustomer:      route === "customer",
+      isCustomerDetail: route === "customerDetail",
       isContractDetail:route === "contractDetail",
       isPayApply:      route === "payApply",
       isPayManage:     route === "payManage",

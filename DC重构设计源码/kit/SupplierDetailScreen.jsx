@@ -48,23 +48,6 @@
     { category: "签约代表身份证", required: false, file: "", verified: null },
     { category: "完税证明", required: false, file: "完税证明_2025.pdf", verified: "2026-05-12" },
   ];
-  const PROJECTS = [
-    { project: "合和新城", status: "在建", contract: 1280000, paid: 820000, settle: "进行中" },
-    { project: "锦绣华庭", status: "在建", contract: 580000, paid: 380000, settle: "进行中" },
-  ];
-  const CONTRACTS = [
-    { no: "HT-2025-014", type: "材料采购", amount: 1280000, date: "2025-09-10", project: "合和新城" },
-    { no: "HT-2026-003", type: "材料采购", amount: 580000, date: "2026-01-20", project: "锦绣华庭" },
-  ];
-  const PAYMENTS = [
-    { no: "FK-2026-051", type: "请款", amount: 320000, date: "2026-05-18", status: "已审批" },
-    { no: "LS-2026-088", type: "付款流水", amount: 320000, date: "2026-05-20", status: "已付" },
-  ];
-  const TICKETS = [
-    { number: "...58760", amount: 128640, tax: 14798.23, date: "2026-06-15", project: "合和新城" },
-    { number: "...58744", amount: 86000, tax: 9893.81, date: "2026-06-12", project: "锦绣华庭" },
-  ];
-
   const CRED_CHIP = { incomplete: { tone: "warn", text: "证照缺失" }, reviewing: { tone: "brand", text: "审核中" }, qualified: { tone: "ok", text: "合格" }, rejected: { tone: "danger", text: "退回" } };
 
   function SupplierDetailScreen({ data, params, navigate }) {
@@ -72,8 +55,23 @@
     const A = window.APP;
     if (A) A.use();
     const sup = (A && A.get("suppliers", params && params.id)) || data.suppliers.find((s) => s.id === (params && params.id)) || data.suppliers[0];
+    const KA = window.KitAtoms || {};
     const [tab, setTab] = React.useState("info");
     const d = DETAIL;
+
+    // 反向 Tab（红圈铁律③）：该分供方名下所有单据按 supplierId 从共享 store 真实过滤聚合（不再硬编码 mock）
+    const supContracts = A ? A.rows("contracts").filter((c) => c.supplierId === sup.id) : [];
+    const supPayApplies = A ? A.rows("payApplies").filter((p) => p.supplierId === sup.id) : [];
+    const supPayRecords = A ? A.rows("payRecords").filter((r) => r.supplierId === sup.id) : [];
+    const supSettles = A ? A.rows("subSettles").filter((s) => s.supplierId === sup.id).concat(A.rows("matSettles").filter((s) => s.supplierId === sup.id)) : [];
+    // 收票登记 = 我方收到该分供方开来的发票（按 seller 名/别名模糊匹配 data.invoices）
+    const supInvoices = (data.invoices || []).filter((iv) => iv.seller && (iv.seller === sup.name || (sup.aliases || []).some((a) => iv.seller.includes(a))));
+    // 合作项目：由该分供方合同按 projectId 归组，合同额/已付合计
+    const projAgg = {};
+    supContracts.forEach((c) => { const g = (projAgg[c.projectId] = projAgg[c.projectId] || { contract: 0, paid: 0 }); g.contract += Number(c.amount) || 0; g.paid += Number(c.paid) || 0; });
+    const supProjects = Object.keys(projAgg).map((pid) => ({ pid, contract: projAgg[pid].contract, paid: projAgg[pid].paid, name: (A.get("projects", pid) || {}).name || pid, status: (A.get("projects", pid) || {}).status || "—" }));
+    const payRows = supPayApplies.map((p) => ({ no: p.no, type: "付款申请", amount: p.applyAmount, date: p.applyDate, status: p.status }))
+      .concat(supPayRecords.map((r) => ({ no: r.no, type: "支付记录", amount: r.amount, date: r.date, status: "已付款" })));
     const cc = CRED_CHIP[sup.cred || d.credentialStatus] || CRED_CHIP.incomplete;
 
     const editSupplier = () => UI().formModal({ title: "编辑分供方 · " + sup.name, cols: 2, fields: [
@@ -92,14 +90,15 @@
     const tabs = [
       { key: "info", label: "详细资料" },
       { key: "cred", label: "证照附件" },
-      { key: "proj", label: "合作项目" },
-      { key: "contract", label: "合同汇总" },
-      { key: "pay", label: "请款 / 付款汇总" },
-      { key: "ticket", label: "收票汇总" },
+      { key: "proj", label: "合作项目 (" + supProjects.length + ")" },
+      { key: "contract", label: "支出合同 (" + supContracts.length + ")" },
+      { key: "settle", label: "支出结算 (" + supSettles.length + ")" },
+      { key: "pay", label: "付款管理 (" + payRows.length + ")" },
+      { key: "ticket", label: "收票登记 (" + supInvoices.length + ")" },
     ];
 
-    const sumContract = PROJECTS.reduce((s, p) => s + p.contract, 0);
-    const sumPaid = PROJECTS.reduce((s, p) => s + p.paid, 0);
+    const sumContract = supContracts.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    const sumPaid = supContracts.reduce((s, c) => s + (Number(c.paid) || 0), 0);
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -175,55 +174,74 @@
             )}
 
             {tab === "proj" && (
-              <SummaryTable head={["项目", "状态", "合同额", "已付", "应付", "结算状态"]} note="按项目维度 · 点击跳转 ProjectSupplier 详情">
-                {PROJECTS.map((p, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid var(--line)", cursor: "pointer" }} onClick={() => navigate("project")}>
-                    <td style={{ ...TD, color: "var(--brand)", fontWeight: 600 }}>{p.project}</td>
+              <SummaryTable head={["项目", "状态", "合同额", "已付", "应付余额"]} note={"按 supplierId 反向聚合 · 该分供方参与 " + supProjects.length + " 个项目 · 项目名可跳详情"}>
+                {supProjects.length === 0 && <tr><td colSpan={5} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)" }}>暂无合作项目</td></tr>}
+                {supProjects.map((p, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={TD}>{KA.EntityLink ? <KA.EntityLink type="project" id={p.pid} /> : p.name}</td>
                     <td style={TD}><StatusChip tone="brand">{p.status}</StatusChip></td>
                     <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(p.contract)}</td>
                     <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ok-ink)" }}>{money(p.paid)}</td>
-                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--danger-ink)" }}>{money(p.contract - p.paid)}</td>
-                    <td style={TD}><StatusChip tone="warn">{p.settle}</StatusChip></td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: (p.contract - p.paid) > 0 ? "var(--danger-ink)" : "var(--ink)" }}>{money(p.contract - p.paid)}</td>
                   </tr>
                 ))}
               </SummaryTable>
             )}
 
             {tab === "contract" && (
-              <SummaryTable head={["合同编号", "类型", "金额", "签订日期", "项目"]} note="跨项目只读 · 点击跳转采购合同详情">
-                {CONTRACTS.map((c, i) => (
+              <SummaryTable head={["合同名称", "类型", "含税金额", "累计支付", "签订日期", "项目"]} note="该分供方名下支出合同（分包 / 材采）· 合同名/项目名可跳详情">
+                {supContracts.length === 0 && <tr><td colSpan={6} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)" }}>暂无支出合同</td></tr>}
+                {supContracts.map((c, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
-                    <td style={{ ...TD, color: "var(--brand)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{c.no}</td>
-                    <td style={TD}>{c.type}</td>
+                    <td style={TD}>{KA.EntityLink ? <KA.EntityLink type="contract" id={c.id} /> : c.name}</td>
+                    <td style={TD}>{c.kind}</td>
                     <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(c.amount)}</td>
-                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{c.date}</td>
-                    <td style={{ ...TD, color: "var(--ink-soft)" }}>{c.project}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ok-ink)" }}>{money(c.paid)}</td>
+                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{c.signDate}</td>
+                    <td style={TD}>{KA.EntityLink ? <KA.EntityLink type="project" id={c.projectId} /> : c.projectId}</td>
+                  </tr>
+                ))}
+              </SummaryTable>
+            )}
+
+            {tab === "settle" && (
+              <SummaryTable head={["结算单号", "结算名称", "金额", "日期", "状态"]} note="该分供方名下 分包结算 / 材料采购结算 汇总">
+                {supSettles.length === 0 && <tr><td colSpan={5} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)" }}>暂无结算单</td></tr>}
+                {supSettles.map((s, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
+                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{s.no}</td>
+                    <td style={{ ...TD, fontWeight: 600 }}>{s.name}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(s.amount)}</td>
+                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{s.date}</td>
+                    <td style={TD}><StatusChip tone={s.status === "已确认" ? "ok" : "warn"}>{s.status}</StatusChip></td>
                   </tr>
                 ))}
               </SummaryTable>
             )}
 
             {tab === "pay" && (
-              <SummaryTable head={["单据编号", "类型", "金额", "日期", "状态"]} note="跨项目只读 · 点击跳转付款申请详情">
-                {PAYMENTS.map((p, i) => (
+              <SummaryTable head={["单据编号", "类型", "金额", "日期", "状态"]} note="该分供方名下 付款申请 + 支付记录（付款管理反向视图）">
+                {payRows.length === 0 && <tr><td colSpan={5} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)" }}>暂无付款单据</td></tr>}
+                {payRows.map((p, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
-                    <td style={{ ...TD, color: "var(--brand)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{p.no}</td>
+                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)", fontWeight: 600 }}>{p.no}</td>
                     <td style={TD}>{p.type}</td>
                     <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(p.amount)}</td>
                     <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{p.date}</td>
-                    <td style={TD}><StatusChip tone={p.status === "已付" ? "ok" : "brand"}>{p.status}</StatusChip></td>
+                    <td style={TD}><StatusChip tone={p.status === "已付款" ? "ok" : p.status === "审批中" ? "brand" : "warn"}>{p.status}</StatusChip></td>
                   </tr>
                 ))}
               </SummaryTable>
             )}
 
             {tab === "ticket" && (
-              <SummaryTable head={["发票号", "金额", "税额", "开票日期", "项目"]} note="跨项目只读 · 点击跳转收票登记详情">
-                {TICKETS.map((t, i) => (
+              <SummaryTable head={["发票号", "金额", "税额", "开票日期", "项目"]} note="收票登记 = 我方收到该分供方开来的发票（按 seller 名/别名匹配）">
+                {supInvoices.length === 0 && <tr><td colSpan={5} style={{ ...TD, textAlign: "center", color: "var(--ink-faint)" }}>暂无收票记录</td></tr>}
+                {supInvoices.map((t, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
-                    <td style={{ ...TD, color: "var(--brand)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{t.number}</td>
-                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(t.amount)}</td>
-                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{money(t.tax)}</td>
+                    <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)", fontWeight: 600 }}>…{String(t.number || "").slice(-8)}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)" }}>{money(Number(String(t.total).replace(/[^\d.]/g, "")) || 0)}</td>
+                    <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{money(Number(String(t.tax).replace(/[^\d.]/g, "")) || 0)}</td>
                     <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{t.date}</td>
                     <td style={{ ...TD, color: "var(--ink-soft)" }}>{t.project}</td>
                   </tr>
@@ -235,7 +253,7 @@
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <Panel padding={16}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>跨项目汇总</div>
-              {[["合作项目数", PROJECTS.length + " 个"], ["合同总额", money(sumContract)], ["累计已付", money(sumPaid)], ["应付余额", money(sumContract - sumPaid)]].map((r, i) => (
+              {[["合作项目数", supProjects.length + " 个"], ["合同总额", money(sumContract)], ["累计已付", money(sumPaid)], ["应付余额", money(sumContract - sumPaid)]].map((r, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: i ? "1px solid var(--line)" : "none" }}>
                   <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{r[0]}</span>
                   <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-mono)", color: i === 3 ? "var(--danger-ink)" : "var(--ink)" }}>{r[1]}</span>
