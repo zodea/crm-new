@@ -2,11 +2,50 @@
 import type { Invoice } from '~/stores/invoice'
 
 const store = useInvoiceStore()
-const toast = useToast()
+const projectStore = useProjectStore()
+const { success, warning, formModal } = useKitUI()
 
 const activeTab = ref<'docs' | 'review' | 'ledger'>('docs')
 const searchText = ref('')
 const selectedId = ref<string | null>(null)
+const ledgerOwnerFilter = ref<'all' | 'project' | 'personal' | 'unassigned'>('all')
+
+// 归属：项目 / 个人开支 单选中文文案 ↔ ownerKind 的映射（formModal select 只支持字符串 label=value）
+const OWNER_KIND_LABEL = { project: '归属项目', personal: '个人开支' } as const
+const OWNER_KIND_OPTIONS = Object.values(OWNER_KIND_LABEL)
+function labelToOwnerKind(label: string): 'project' | 'personal' {
+  return label === OWNER_KIND_LABEL.personal ? 'personal' : 'project'
+}
+/** 手动录入表单专用的第三态：不属于业务归属枚举，代表"这次先不归档"，故不放进 OWNER_KIND_LABEL。 */
+const NO_ATTRIBUTION_LABEL = '暂不归属'
+
+/** 按项目名称查具体项目（归档写入用规范名，而非发票原始 OCR/自由文本，避免 project_id/project_name 各指不同项目）。 */
+function findProjectByName(name: string) {
+  return projectStore.list.find(p => p.name === name)
+}
+
+/** 归档：弹出归属选择表单，校验交给 store.archiveInvoice（缺归属/项目归属未选具体项目均拒绝）。 */
+async function archiveInvoiceFlow(inv: Invoice) {
+  const values = await formModal({
+    title: '归档发票',
+    subtitle: '归档需指定归属（项目 / 个人开支），归档后计入台账统计（DATABASE.md §4.2）。',
+    fields: [
+      { key: 'ownerKindLabel', label: '归属', type: 'select', options: [...OWNER_KIND_OPTIONS], value: OWNER_KIND_LABEL.project, required: true },
+      { key: 'projectName', label: '对应项目（归属项目时必选）', type: 'select', options: projectStore.list.map(p => p.name), value: inv.projectName || '' },
+    ],
+    saveText: '归档',
+  })
+  if (!values)
+    return
+  const ownerKind = labelToOwnerKind(String(values.ownerKindLabel))
+  const project = ownerKind === 'project' ? findProjectByName(String(values.projectName)) : undefined
+  const result = await store.archiveInvoice(inv.id, ownerKind, project?.id ?? null, project?.name)
+  if (!result.ok) {
+    warning(result.reason ?? '归档失败')
+    return
+  }
+  success('已归档，计入台账')
+}
 
 // 新增弹窗
 const showAddDialog = ref(false)
@@ -23,6 +62,7 @@ const addForm = reactive({
   remark: '',
   projectName: '',
   source: 'excel' as const,
+  ownerKindLabel: NO_ATTRIBUTION_LABEL,
 })
 
 function resetAddForm() {
@@ -37,21 +77,34 @@ function resetAddForm() {
   addForm.taxRate = '13%'
   addForm.remark = ''
   addForm.projectName = ''
+  addForm.ownerKindLabel = NO_ATTRIBUTION_LABEL
 }
 
 async function handleAdd() {
   if (!addForm.invoiceNumber && !addForm.seller) {
-    toast.warning('请至少填写发票号码或供应商')
+    warning('请至少填写发票号码或供应商')
     return
   }
-  await store.add({
-    ...addForm,
+  // 手动录入内容已确定，直接落「已确认」态；选了归属则立即归档，否则留到台账页按需归档。
+  const { ownerKindLabel, ...invoiceData } = addForm
+  const id = await store.add({
+    ...invoiceData,
     ocrStatus: 'done',
     reviewStatus: 'reviewed',
-    accountStatus: 'confirmed',
     confirmedAt: new Date().toISOString(),
   })
-  toast.success('发票已添加')
+  if (ownerKindLabel === NO_ATTRIBUTION_LABEL) {
+    success('发票已添加，待归档后计入台账')
+  }
+  else {
+    const ownerKind = labelToOwnerKind(ownerKindLabel)
+    const project = ownerKind === 'project' ? findProjectByName(addForm.projectName) : undefined
+    const result = await store.archiveInvoice(id, ownerKind, project?.id ?? null, project?.name)
+    if (result.ok)
+      success('发票已添加并归档，计入台账')
+    else
+      warning(`发票已添加，但归档失败：${result.reason}`)
+  }
   showAddDialog.value = false
   resetAddForm()
 }
@@ -68,11 +121,13 @@ function askDelete(inv: Invoice) {
 }
 
 async function confirmDelete() {
-  if (!deleteTargetId.value) return
+  if (!deleteTargetId.value)
+    return
   await store.remove(deleteTargetId.value)
-  toast.success('已删除')
+  success('已删除')
   showDeleteConfirm.value = false
-  if (selectedId.value === deleteTargetId.value) selectedId.value = null
+  if (selectedId.value === deleteTargetId.value)
+    selectedId.value = null
   deleteTargetId.value = null
 }
 
@@ -88,17 +143,34 @@ function openEdit(inv: Invoice) {
 }
 
 async function handleEdit() {
-  if (!editId.value) return
+  if (!editId.value)
+    return
   await store.update(editId.value, editForm)
-  toast.success('已更新')
+  success('已更新')
   showEditDialog.value = false
 }
+
+// 台账三分组（issue #57 验收③：项目 / 个人开支 / 未归，未归=已确认待归档）
+const OWNER_FILTER_OPTIONS = [
+  { key: 'all', label: '全部' },
+  { key: 'project', label: '项目' },
+  { key: 'personal', label: '个人开支' },
+  { key: 'unassigned', label: '待归档' },
+] as const
+
+const ledgerRowsByOwner = computed(() => ({
+  all: [...store.ledgerGroups.project, ...store.ledgerGroups.personal, ...store.ledgerGroups.unassigned],
+  project: store.ledgerGroups.project,
+  personal: store.ledgerGroups.personal,
+  unassigned: store.ledgerGroups.unassigned,
+}))
 
 // 统计
 const tabCounts = computed(() => ({
   docs: store.documents.length,
   review: store.pendingReview.length,
-  ledger: store.ledger.length,
+  // 与台账 Tab 三分组共用同一份 ledgerRowsByOwner.all，避免两处各写一套公式算同一个数漂移
+  ledger: ledgerRowsByOwner.value.all.length,
 }))
 
 const docStats = computed(() => {
@@ -106,9 +178,12 @@ const docStats = computed(() => {
   let done = 0
   let duplicate = 0
   for (const d of store.documents) {
-    if (d.ocrStatus === 'pending' || d.ocrStatus === 'processing') pending++
-    if (d.ocrStatus === 'done' && d.dupStatus === 'normal') done++
-    if (d.dupStatus === 'duplicate') duplicate++
+    if (d.ocrStatus === 'pending' || d.ocrStatus === 'processing')
+      pending++
+    if (d.ocrStatus === 'done' && d.dupStatus === 'normal')
+      done++
+    if (d.dupStatus === 'duplicate')
+      duplicate++
   }
   return { pending, done, duplicate }
 })
@@ -127,11 +202,13 @@ const OCR_STATUS_CLASS: Record<string, string> = {
 }
 
 function statusLabel(inv: Invoice): string {
-  if (inv.dupStatus === 'duplicate') return '重复已排除'
+  if (inv.dupStatus === 'duplicate')
+    return '重复已排除'
   return OCR_STATUS_LABEL[inv.ocrStatus] || inv.ocrStatus
 }
 function statusClass(inv: Invoice): string {
-  if (inv.dupStatus === 'duplicate') return 'cell--status-danger'
+  if (inv.dupStatus === 'duplicate')
+    return 'cell--status-danger'
   return OCR_STATUS_CLASS[inv.ocrStatus] || ''
 }
 
@@ -150,7 +227,7 @@ const docsFiltered = computed(() => {
 
 const ledgerFiltered = computed(() => {
   const q = searchText.value.trim().toLowerCase()
-  let items = store.ledger
+  let items = ledgerRowsByOwner.value[ledgerOwnerFilter.value]
   if (q) {
     items = items.filter(inv =>
       inv.invoiceNumber.toLowerCase().includes(q)
@@ -161,11 +238,15 @@ const ledgerFiltered = computed(() => {
   return items
 })
 
+// 底部合计只统计已归档（accountStatus==='archived'）——精确对齐 DATABASE.md §4.2 口径。
+// 台账列表本身按 issue #57 验收③展示「项目/个人开支/待归档」三分组，含未归档行，
+// 但合计栏不应把「待归档」的金额混进「已归档」的统计口径，避免用户误读成 §4.2 台账总额。
+const ledgerArchived = computed(() => ledgerFiltered.value.filter(inv => inv.accountStatus === 'archived'))
 const ledgerTotal = computed(() =>
-  store.ledger.reduce((s, inv) => s + inv.totalAmount, 0),
+  ledgerArchived.value.reduce((s, inv) => s + inv.totalAmount, 0),
 )
 const ledgerTax = computed(() =>
-  store.ledger.reduce((s, inv) => s + inv.taxAmount, 0),
+  ledgerArchived.value.reduce((s, inv) => s + inv.taxAmount, 0),
 )
 
 function fmtMoney(v: number): string {
@@ -178,13 +259,25 @@ function selectForReview(inv: Invoice) {
 }
 
 async function confirmSelected() {
-  if (!selectedId.value) return
+  if (!selectedId.value)
+    return
   await store.confirmInvoice(selectedId.value)
-  toast.success('已确认并入账')
-  selectedId.value = null
+  success('已确认，可在台账页归档')
 }
 
-onMounted(() => store.load())
+async function archiveSelected() {
+  if (!selectedId.value)
+    return
+  const inv = store.byId(selectedId.value)
+  if (!inv)
+    return
+  await archiveInvoiceFlow(inv)
+}
+
+onMounted(() => {
+  store.load()
+  projectStore.load()
+})
 </script>
 
 <template>
@@ -226,8 +319,12 @@ onMounted(() => store.load())
       <!-- 上传区 -->
       <div class="upload-zone mb-4 py-8 cursor-pointer">
         <span class="i-lucide-upload text-24px mb-2 block mx-auto text-brand" />
-        <p class="text-13px font-600">拖拽 PDF / 图片 / 文件夹到此处上传</p>
-        <p class="text-11px text-ink-faint mt-1">上传后自动进入识别队列（需要真实文件时请上传）</p>
+        <p class="text-13px font-600">
+          拖拽 PDF / 图片 / 文件夹到此处上传
+        </p>
+        <p class="text-11px text-ink-faint mt-1">
+          上传后自动进入识别队列（需要真实文件时请上传）
+        </p>
       </div>
 
       <!-- 统计卡片 -->
@@ -339,7 +436,9 @@ onMounted(() => store.load())
               <div class="text-12px font-700 truncate">
                 {{ inv.invoiceNumber ? `…${inv.invoiceNumber.slice(-8)}` : '—' }}
               </div>
-              <div class="text-11px text-ink-soft truncate">{{ inv.seller || inv.buyer || '—' }}</div>
+              <div class="text-11px text-ink-soft truncate">
+                {{ inv.seller || inv.buyer || '—' }}
+              </div>
             </div>
             <span class="chip-warn text-10px">待校对</span>
           </div>
@@ -377,6 +476,7 @@ onMounted(() => store.load())
             <InvoiceReviewForm
               :invoice="store.byId(selectedId)!"
               @confirm="confirmSelected"
+              @archive="archiveSelected"
             />
           </div>
           <div v-else class="p-4 text-center text-ink-faint text-12px">
@@ -390,10 +490,20 @@ onMounted(() => store.load())
     <div v-else-if="activeTab === 'ledger'">
       <DataListToolbar
         title="发票台账"
-        :count="store.ledger.length"
-        @search="v => searchText = v"
+        :count="ledgerFiltered.length"
         :show-create="false"
+        @search="v => searchText = v"
       />
+
+      <!-- 归属筛选（issue #57 验收③：项目 / 个人开支 / 待归档 分组计数） -->
+      <div class="flex items-center gap-2 pb-2.5 px-1">
+        <SelectFilter
+          v-model="ledgerOwnerFilter"
+          label="归属"
+          :options="OWNER_FILTER_OPTIONS.map(o => ({ key: o.key, label: `${o.label} ${ledgerRowsByOwner[o.key].length}` }))"
+          placeholder="全部"
+        />
+      </div>
 
       <div class="border border-line">
         <vxe-table
@@ -435,6 +545,13 @@ onMounted(() => store.load())
             </template>
           </vxe-column>
           <vxe-column field="projectName" title="对应项目" min-width="120" />
+          <vxe-column title="归属" width="90">
+            <template #default="{ row }">
+              <span v-if="row.ownerKind === 'project'" class="chip-brand">项目</span>
+              <span v-else-if="row.ownerKind === 'personal'" class="chip bg-surface-3 text-ink-soft">个人开支</span>
+              <span v-else class="chip-warn">待归档</span>
+            </template>
+          </vxe-column>
           <vxe-column field="source" title="来源" width="70">
             <template #default="{ row }">
               <span :class="row.source === 'scan' ? 'chip-brand' : 'chip bg-surface-3 text-ink-soft'">
@@ -442,9 +559,16 @@ onMounted(() => store.load())
               </span>
             </template>
           </vxe-column>
-          <vxe-column title="操作" width="90" fixed="right">
+          <vxe-column title="操作" width="120" fixed="right">
             <template #default="{ row }">
               <div class="flex items-center gap-1">
+                <button
+                  v-if="row.accountStatus === 'none'"
+                  class="icon-btn" title="归档"
+                  @click="archiveInvoiceFlow(row)"
+                >
+                  <span class="i-lucide-archive text-14px" />
+                </button>
                 <button class="icon-btn" title="编辑" @click="openEdit(row)">
                   <span class="i-lucide-square-pen text-14px" />
                 </button>
@@ -457,11 +581,11 @@ onMounted(() => store.load())
         </vxe-table>
       </div>
 
-      <!-- 底部汇总 -->
+      <!-- 底部汇总（仅统计已归档，对齐 §4.2 口径；当前筛选含待归档行时不计入这两个数字） -->
       <div class="flex items-center px-3 py-2 border border-t-0 border-line bg-panel text-12px">
-        <span class="text-ink-soft">合计金额: </span>
+        <span class="text-ink-soft">已归档合计: </span>
         <span class="font-mono font-700 text-ink ml-1 mr-4">¥{{ fmtMoney(ledgerTotal) }}</span>
-        <span class="text-ink-soft">税额合计: </span>
+        <span class="text-ink-soft">已归档税额: </span>
         <span class="font-mono font-700 text-ink ml-1">¥{{ fmtMoney(ledgerTax) }}</span>
       </div>
     </div>
@@ -490,8 +614,12 @@ onMounted(() => store.load())
         <div>
           <label class="field-label">票据类型</label>
           <select v-model="addForm.invoiceType" class="field-input w-full">
-            <option value="增值税专用发票">增值税专用发票</option>
-            <option value="增值税普通发票">增值税普通发票</option>
+            <option value="增值税专用发票">
+              增值税专用发票
+            </option>
+            <option value="增值税普通发票">
+              增值税普通发票
+            </option>
           </select>
         </div>
         <div>
@@ -505,12 +633,24 @@ onMounted(() => store.load())
         <div>
           <label class="field-label">税率</label>
           <select v-model="addForm.taxRate" class="field-input w-full">
-            <option value="13%">13%</option>
-            <option value="9%">9%</option>
-            <option value="6%">6%</option>
-            <option value="3%">3%</option>
-            <option value="1%">1%</option>
-            <option value="0%">0%</option>
+            <option value="13%">
+              13%
+            </option>
+            <option value="9%">
+              9%
+            </option>
+            <option value="6%">
+              6%
+            </option>
+            <option value="3%">
+              3%
+            </option>
+            <option value="1%">
+              1%
+            </option>
+            <option value="0%">
+              0%
+            </option>
           </select>
         </div>
         <div>
@@ -535,7 +675,24 @@ onMounted(() => store.load())
         </div>
         <div>
           <label class="field-label">对应项目</label>
-          <input v-model="addForm.projectName" class="field-input w-full" placeholder="项目名称">
+          <input v-model="addForm.projectName" class="field-input w-full" placeholder="项目名称" list="invoice-project-names">
+          <datalist id="invoice-project-names">
+            <option v-for="p in projectStore.list" :key="p.id" :value="p.name" />
+          </datalist>
+        </div>
+        <div>
+          <label class="field-label">发票归属</label>
+          <select v-model="addForm.ownerKindLabel" class="field-input w-full">
+            <option value="暂不归属">
+              暂不归属（先录入，台账页再归档）
+            </option>
+            <option :value="OWNER_KIND_LABEL.project">
+              {{ OWNER_KIND_LABEL.project }}
+            </option>
+            <option :value="OWNER_KIND_LABEL.personal">
+              {{ OWNER_KIND_LABEL.personal }}
+            </option>
+          </select>
         </div>
         <div class="col-span-2">
           <label class="field-label">票面备注</label>
@@ -557,8 +714,12 @@ onMounted(() => store.load())
         <div>
           <label class="field-label">票据类型</label>
           <select v-model="editForm.invoiceType" class="field-input w-full">
-            <option value="增值税专用发票">增值税专用发票</option>
-            <option value="增值税普通发票">增值税普通发票</option>
+            <option value="增值税专用发票">
+              增值税专用发票
+            </option>
+            <option value="增值税普通发票">
+              增值税普通发票
+            </option>
           </select>
         </div>
         <div>
@@ -572,12 +733,24 @@ onMounted(() => store.load())
         <div>
           <label class="field-label">税率</label>
           <select v-model="editForm.taxRate" class="field-input w-full">
-            <option value="13%">13%</option>
-            <option value="9%">9%</option>
-            <option value="6%">6%</option>
-            <option value="3%">3%</option>
-            <option value="1%">1%</option>
-            <option value="0%">0%</option>
+            <option value="13%">
+              13%
+            </option>
+            <option value="9%">
+              9%
+            </option>
+            <option value="6%">
+              6%
+            </option>
+            <option value="3%">
+              3%
+            </option>
+            <option value="1%">
+              1%
+            </option>
+            <option value="0%">
+              0%
+            </option>
           </select>
         </div>
         <div>

@@ -7,6 +7,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   confirm: []
+  archive: []
 }>()
 
 const store = useInvoiceStore()
@@ -59,8 +60,12 @@ function update(field: keyof Invoice, value: unknown) {
           class="field-input w-full"
           @change="update('invoiceType', ($event.target as HTMLSelectElement).value)"
         >
-          <option value="增值税专用发票">增值税专用发票</option>
-          <option value="增值税普通发票">增值税普通发票</option>
+          <option value="增值税专用发票">
+            增值税专用发票
+          </option>
+          <option value="增值税普通发票">
+            增值税普通发票
+          </option>
         </select>
       </div>
       <div>
@@ -117,6 +122,12 @@ function update(field: keyof Invoice, value: unknown) {
       OCR 置信度: {{ (invoice.ocrConfidence * 100).toFixed(1) }}%
     </div>
 
+    <!-- 归属/归档状态提示 -->
+    <div v-if="invoice.accountStatus === 'archived'" class="text-11px text-ok-ink flex items-center gap-1">
+      <span class="i-lucide-circle-check text-12px" />
+      已归档{{ invoice.ownerKind === 'personal' ? '（个人开支）' : invoice.ownerKind === 'project' ? '（项目）' : '' }}，已计入台账
+    </div>
+
     <!-- 操作按钮 -->
     <div class="flex items-center justify-between pt-3 border-t border-line">
       <button class="btn-danger text-12px">
@@ -126,8 +137,19 @@ function update(field: keyof Invoice, value: unknown) {
         <button class="btn-secondary text-12px" disabled>
           <span class="i-lucide-refresh-cw text-12px mr-1" /> 重新识别
         </button>
-        <button class="btn-primary text-12px" @click="emit('confirm')">
-          <span class="i-lucide-file-check text-12px mr-1" /> 确认并入账
+        <button
+          v-if="invoice.reviewStatus === 'unreviewed'"
+          class="btn-primary text-12px"
+          @click="emit('confirm')"
+        >
+          <span class="i-lucide-file-check text-12px mr-1" /> 确认
+        </button>
+        <button
+          v-else-if="invoice.accountStatus === 'none'"
+          class="btn-primary text-12px"
+          @click="emit('archive')"
+        >
+          <span class="i-lucide-archive text-12px mr-1" /> 归档
         </button>
       </div>
     </div>
