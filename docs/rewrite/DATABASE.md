@@ -239,13 +239,16 @@ CREATE TABLE monthly_statement_lines (
 > ~~TicketRegistration `ticket_registrations`~~ **已废弃**（ADR-0001）：红圈式收票登记合并进 `invoices` 单表，项目详情「收票登记」Tab = 查已归档 invoices。
 
 ```sql
--- invoices 关键字段（全量以 app/lib/db/schema.ts 为基础，以下为台账/归属增量，代码待迁移对齐）
+-- invoices 关键字段（全量以 app/lib/db/schema.ts 为基础，以下为台账/归属增量，
+-- 迁移 v4「invoices-owner-kind-archive」已落地对齐，issue #57）
 --   owner_kind     TEXT  'project' | 'personal'（个人开支）——归档那刻强制选定，无归属禁止归档/导入
 --   project_id     TEXT  owner_kind='project' 时必填 → projects.id
 --   supplier_id    TEXT  销方对应分供方（可选）→ suppliers.id
 --   contract_id    TEXT  合同收票（可选，红圈式，本期不做交互）→ expenditure_contracts.id
---   account_status TEXT  'none' | 'archived'（归档=进台账；核对完成是归档唯一前置；归档后仍可改但弹二次确认）
+--   account_status TEXT  'none' | 'archived'（归档=进台账；核对完成是归档唯一前置；归档后仍可改但弹二次确认；
+--                        「确认」= review_status 独立字段 unreviewed→reviewed，不占用 account_status）
 --   print_count    INTEGER 累计打印次数
+--   archived_at    TEXT  归档时间（与 confirmed_at 对称，两者是独立阶段）
 --   deleted_at     TEXT  软删除（§8）
 ```
 

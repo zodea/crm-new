@@ -7,6 +7,18 @@
 
 ---
 
+## ⚠️ issue #57 数据层落地（2026-07-12，覆盖下文 account_status/确认归档流程条款）
+
+发票域数据层（owner_kind 归属 + 归档校验 + §4.2 聚合，权威口径见 `docs/rewrite/DATABASE.md` §2.4 +
+`app/stores/invoice.ts`）已实现，与下文历史蓝本存在两处冲突，本节只标注、不逐处重写正文：
+
+- **`accountStatus` 两态,非三态**：现为 `'none' | 'archived'`（无 `'confirmed'` 中间值）。下文出现的
+  `accountStatus:'confirmed'`/`accountStatus=confirmed OR source='excel'` 等表述均已过时。
+- **「核对」与「归档」是两个独立动作,非一步到位**：核对完成只改 `reviewStatus`（内容确认，可再调整），
+  不再自动置 `account_status`；归档需用户额外指定归属（项目/个人开支）并触发，是独立的终态动作，
+  也是进 §4.2 台账聚合口径的唯一途径。下文「归档入账」「校对完成即自动归档/入账」等表述均已过时，
+  实际按钮文案见 `app/components/invoice/InvoiceReviewForm.vue`（确认 / 归档为互斥的两个按钮）。
+
 ## ⚠️ 反馈轮 7 架构调整（2026-07-03 grill 定稿，覆盖下文冲突条款）
 
 本页由「一页三 Tab」**拆成两个独立页面**，归属「识别是动作、台账是资产」原则（CONTEXT.md「识别中心」）：
