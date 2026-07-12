@@ -1,6 +1,12 @@
 <script setup lang="ts">
+import type { ConfidenceTier } from '~/lib/invoice/recognize'
 import type { Invoice } from '~/stores/invoice'
+import { confidenceTier } from '~/lib/invoice/recognize'
+import { formatMoney } from '~/lib/util/money'
 
+// 字段校对表单（#60 反馈轮 7 定稿）：两列紧凑网格，置信度 = 输入框边框色 + 角标百分比
+// （角标/确认按钮放 label 行右侧，不占整行）；绿字段不放确认按钮、仅黄/红出现「✓确认」；
+// 黄/红字段被人工修正（编辑值）或点确认后置信度置满变绿。货物明细默认折叠。
 const props = defineProps<{
   invoice: Invoice
 }>()
@@ -8,149 +14,274 @@ const props = defineProps<{
 const emit = defineEmits<{
   confirm: []
   archive: []
+  discard: []
+  rerecognize: []
 }>()
 
 const store = useInvoiceStore()
+const projectStore = useProjectStore()
+const { warning } = useKitUI()
 
-function update(field: keyof Invoice, value: unknown) {
-  store.updateField(props.invoice.id, field, value)
+interface FieldDef {
+  key: keyof Invoice & string
+  label: string
+  type?: 'text' | 'date' | 'number' | 'select'
+  mono?: boolean
+  full?: boolean
+  options?: string[]
+  /** 对应项目走 datalist（combobox 取项目主数据） */
+  projectList?: boolean
 }
+
+// 网格序 = 蓝本 §5.5：单据编号|开票日期 / 购买方|购买方税号 / 供应商|供应商税号 /
+// 票据类型|价税合计 / 税额|税率 / 对应项目(full) / 票面备注(full)
+const FIELDS: FieldDef[] = [
+  { key: 'invoiceNumber', label: '单据编号', mono: true },
+  { key: 'invoiceDate', label: '开票日期', type: 'date', mono: true },
+  { key: 'buyer', label: '购买方' },
+  { key: 'buyerTaxNo', label: '购买方税号', mono: true },
+  { key: 'seller', label: '供应商' },
+  { key: 'sellerTaxNo', label: '供应商税号', mono: true },
+  { key: 'invoiceType', label: '票据类型', type: 'select', options: ['增值税专用发票', '增值税普通发票'] },
+  { key: 'totalAmount', label: '价税合计', type: 'number', mono: true },
+  { key: 'taxAmount', label: '税额', type: 'number', mono: true },
+  { key: 'taxRate', label: '税率', mono: true },
+  { key: 'projectName', label: '对应项目', full: true, projectList: true },
+  { key: 'remark', label: '票面备注', full: true },
+]
+
+/** 每字段档位一次求值（computed 缓存）：模板里角标 v-if/角标色/按钮 v-if/按钮色共 5 处引用同一档位。 */
+const tiers = computed(() => {
+  const map: Record<string, ConfidenceTier | null> = {}
+  for (const f of FIELDS)
+    map[f.key] = confidenceTier(props.invoice.fieldConfidence[f.key])
+  return map
+})
+
+const TIER_INPUT: Record<ConfidenceTier, string> = {
+  ok: '',
+  warn: 'border-warn!',
+  danger: 'border-danger!',
+}
+const TIER_BADGE: Record<ConfidenceTier, string> = {
+  ok: 'text-ok-ink',
+  warn: 'text-warn-ink',
+  danger: 'text-danger-ink',
+}
+
+function inputClass(f: FieldDef): string {
+  const t = tiers.value[f.key]
+  return t ? TIER_INPUT[t] : ''
+}
+
+/**
+ * 修正字段：域规则（修正即变绿、金额铁律 amount=total−tax 派生、round2 舍入）收敛在
+ * store.correctField 串行写队列里；组件只做输入解析——数字字段清空/非法时 input type=number
+ * 会把 value 报成 ''，Number('')=0 会把价税合计清成 0 还伪装成人工确认过的绿字段，
+ * 这类输入不落库：提示并恢复显示。
+ */
+async function onFieldChange(f: FieldDef, e: Event) {
+  const el = e.target as HTMLInputElement | HTMLSelectElement
+  const raw = el.value
+  if (f.type === 'number') {
+    const n = Number(raw)
+    if (raw === '' || Number.isNaN(n)) {
+      warning(`「${f.label}」需要有效金额，已恢复原值`)
+      el.value = String(props.invoice[f.key] ?? '')
+      return
+    }
+    await store.correctField(props.invoice.id, f.key, n)
+    return
+  }
+  await store.correctField(props.invoice.id, f.key, raw)
+}
+
+/** ✓确认：不改值，仅人工判定该字段无误 → store 置满置信度变绿。 */
+async function confirmField(key: string) {
+  await store.confirmField(props.invoice.id, key)
+}
+
+/** 已归档票在工作台只读：重识别会覆写金额破坏 §4.2 台账口径,废弃会移走已计入台账的票。 */
+const isArchived = computed(() => props.invoice.accountStatus === 'archived')
+/** 重复票排除在确认/归档之外(与文档页「重复已排除」同口径),只留 废弃/重新识别 两条出路。 */
+const isDuplicate = computed(() => props.invoice.dupStatus === 'duplicate')
+
+// 货物明细默认折叠
+const showItems = ref(false)
 </script>
 
 <template>
   <div class="space-y-3">
     <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-      <div>
-        <label class="field-label">单据编号</label>
-        <input
-          :value="invoice.invoiceNumber"
-          class="field-input w-full font-mono"
-          @change="update('invoiceNumber', ($event.target as HTMLInputElement).value)"
-        >
-      </div>
-      <div>
-        <label class="field-label">开票日期</label>
-        <input
-          :value="invoice.invoiceDate"
-          type="date"
-          class="field-input w-full font-mono"
-          @change="update('invoiceDate', ($event.target as HTMLInputElement).value)"
-        >
-      </div>
-      <div>
-        <label class="field-label">购买方</label>
-        <input
-          :value="invoice.buyer"
-          class="field-input w-full"
-          @change="update('buyer', ($event.target as HTMLInputElement).value)"
-        >
-      </div>
-      <div>
-        <label class="field-label">供应商</label>
-        <input
-          :value="invoice.seller"
-          class="field-input w-full"
-          @change="update('seller', ($event.target as HTMLInputElement).value)"
-        >
-      </div>
-      <div>
-        <label class="field-label">票据类型</label>
+      <div v-for="f in FIELDS" :key="f.key" :class="f.full ? 'col-span-2' : ''">
+        <label class="field-label flex items-center gap-1">
+          <span>{{ f.label }}</span>
+          <span class="flex-1" />
+          <span
+            v-if="tiers[f.key]"
+            class="text-9px font-mono leading-none"
+            :class="TIER_BADGE[tiers[f.key]!]"
+          >{{ Math.round((invoice.fieldConfidence[f.key] ?? 0) * 100) }}%</span>
+          <button
+            v-if="tiers[f.key] === 'warn' || tiers[f.key] === 'danger'"
+            type="button"
+            class="inline-flex items-center gap-0.5 text-9px leading-none px-1 py-0.5 rounded-[3px] border transition-colors"
+            :class="tiers[f.key] === 'warn'
+              ? 'border-warn text-warn-ink hover:bg-warn-soft'
+              : 'border-danger text-danger-ink hover:bg-danger-soft'"
+            :title="`人工确认「${f.label}」识别无误`"
+            @click="confirmField(f.key)"
+          >
+            <span class="i-lucide-check text-9px" />确认
+          </button>
+        </label>
+
         <select
-          :value="invoice.invoiceType"
+          v-if="f.type === 'select'"
+          :value="String(invoice[f.key] ?? '')"
           class="field-input w-full"
-          @change="update('invoiceType', ($event.target as HTMLSelectElement).value)"
+          :class="inputClass(f)"
+          @change="onFieldChange(f, $event)"
         >
-          <option value="增值税专用发票">
-            增值税专用发票
-          </option>
-          <option value="增值税普通发票">
-            增值税普通发票
+          <option v-for="o in f.options" :key="o" :value="o">
+            {{ o }}
           </option>
         </select>
-      </div>
-      <div>
-        <label class="field-label">价税合计</label>
         <input
-          :value="invoice.totalAmount"
-          type="number"
-          class="field-input w-full font-mono"
-          @change="update('totalAmount', Number(($event.target as HTMLInputElement).value))"
+          v-else
+          :value="String(invoice[f.key] ?? '')"
+          :type="f.type ?? 'text'"
+          :list="f.projectList ? 'review-project-names' : undefined"
+          class="field-input w-full"
+          :class="[inputClass(f), f.mono ? 'font-mono' : '']"
+          :step="f.type === 'number' ? '0.01' : undefined"
+          @change="onFieldChange(f, $event)"
         >
       </div>
+      <datalist id="review-project-names">
+        <option v-for="p in projectStore.list" :key="p.id" :value="p.name" />
+      </datalist>
     </div>
 
-    <div>
-      <label class="field-label">对应项目</label>
-      <input
-        :value="invoice.projectName"
-        class="field-input w-full"
-        @change="update('projectName', ($event.target as HTMLInputElement).value)"
+    <!-- 货物明细（默认折叠，展开后独立滚动，不影响右栏整体滚动） -->
+    <div class="border-t border-line pt-2">
+      <button
+        type="button"
+        class="w-full flex items-center gap-1.5 text-12px font-700 text-ink-soft hover:text-ink transition-colors"
+        @click="showItems = !showItems"
       >
-    </div>
-
-    <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-      <div>
-        <label class="field-label">税额</label>
-        <input
-          :value="invoice.taxAmount"
-          type="number"
-          class="field-input w-full font-mono"
-          @change="update('taxAmount', Number(($event.target as HTMLInputElement).value))"
-        >
+        <span :class="showItems ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="text-12px" />
+        货物明细 · {{ invoice.items.length }} 行
+      </button>
+      <div v-if="showItems" class="mt-2 max-h-40 overflow-y-auto overflow-x-auto border border-line">
+        <table class="w-full text-11px">
+          <thead class="sticky top-0 bg-surface-2">
+            <tr class="text-left text-ink-faint">
+              <th class="px-2 py-1 font-600">
+                货物名称
+              </th>
+              <th class="px-2 py-1 font-600">
+                规格
+              </th>
+              <th class="px-2 py-1 font-600">
+                单位
+              </th>
+              <th class="px-2 py-1 font-600 text-right">
+                数量
+              </th>
+              <th class="px-2 py-1 font-600 text-right">
+                单价
+              </th>
+              <th class="px-2 py-1 font-600 text-right">
+                金额
+              </th>
+              <th class="px-2 py-1 font-600">
+                税率
+              </th>
+              <th class="px-2 py-1 font-600 text-right">
+                税额
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, i) in invoice.items" :key="i" class="border-t border-line">
+              <td class="px-2 py-1">
+                {{ item.name }}
+              </td>
+              <td class="px-2 py-1">
+                {{ item.spec }}
+              </td>
+              <td class="px-2 py-1">
+                {{ item.unit }}
+              </td>
+              <td class="px-2 py-1 font-mono text-right">
+                {{ item.quantity }}
+              </td>
+              <td class="px-2 py-1 font-mono text-right">
+                {{ formatMoney(item.unitPrice) }}
+              </td>
+              <td class="px-2 py-1 font-mono text-right">
+                {{ formatMoney(item.amount) }}
+              </td>
+              <td class="px-2 py-1 font-mono">
+                {{ item.taxRate }}
+              </td>
+              <td class="px-2 py-1 font-mono text-right">
+                {{ formatMoney(item.taxAmount) }}
+              </td>
+            </tr>
+            <tr v-if="!invoice.items.length">
+              <td colspan="8" class="px-2 py-2 text-center text-ink-faint">
+                无明细行
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <div>
-        <label class="field-label">税率</label>
-        <input
-          :value="invoice.taxRate"
-          class="field-input w-full font-mono"
-          @change="update('taxRate', ($event.target as HTMLInputElement).value)"
-        >
-      </div>
     </div>
 
-    <div>
-      <label class="field-label">票面备注</label>
-      <input
-        :value="invoice.remark"
-        class="field-input w-full"
-        @change="update('remark', ($event.target as HTMLInputElement).value)"
-      >
-    </div>
-
-    <!-- OCR 置信度 -->
+    <!-- OCR 置信度（整票汇总） -->
     <div v-if="invoice.ocrConfidence != null" class="text-11px text-ink-faint">
-      OCR 置信度: {{ (invoice.ocrConfidence * 100).toFixed(1) }}%
+      OCR 置信度: {{ (invoice.ocrConfidence * 100).toFixed(1) }}%（仅作参考，判决权在人）
     </div>
 
-    <!-- 归属/归档状态提示 -->
-    <div v-if="invoice.accountStatus === 'archived'" class="text-11px text-ok-ink flex items-center gap-1">
+    <!-- 归属/归档状态提示：已归档票在工作台只读（不给废弃/重识别/确认入口） -->
+    <div v-if="isArchived" class="text-11px text-ok-ink flex items-center gap-1">
       <span class="i-lucide-circle-check text-12px" />
-      已归档{{ invoice.ownerKind === 'personal' ? '（个人开支）' : invoice.ownerKind === 'project' ? '（项目）' : '' }}，已计入台账
+      已归档{{ invoice.ownerKind === 'personal' ? '（个人开支）' : invoice.ownerKind === 'project' ? '（项目）' : '' }}，已计入台账（如需调整请到台账页操作）
     </div>
 
-    <!-- 操作按钮 -->
-    <div class="flex items-center justify-between pt-3 border-t border-line">
-      <button class="btn-danger text-12px">
+    <!-- 重复票提示：排除在确认/归档路径之外，与文档页「重复已排除」同口径 -->
+    <div v-if="isDuplicate && !isArchived" class="text-11px text-danger-ink flex items-center gap-1">
+      <span class="i-lucide-copy-x text-12px" />
+      重复票已排除，不可确认/归档——可废弃，或重新识别后按新发票号重判
+    </div>
+
+    <!-- 操作条：[废弃]←危险靠左 …… [重新识别][确认/归档]；已归档票整条隐藏 -->
+    <div v-if="!isArchived" class="flex items-center justify-between pt-3 border-t border-line">
+      <button class="btn-danger text-12px" @click="emit('discard')">
         <span class="i-lucide-trash-2 text-12px mr-1" /> 废弃
       </button>
       <div class="flex gap-2">
-        <button class="btn-secondary text-12px" disabled>
+        <button class="btn-secondary text-12px" @click="emit('rerecognize')">
           <span class="i-lucide-refresh-cw text-12px mr-1" /> 重新识别
         </button>
-        <button
-          v-if="invoice.reviewStatus === 'unreviewed'"
-          class="btn-primary text-12px"
-          @click="emit('confirm')"
-        >
-          <span class="i-lucide-file-check text-12px mr-1" /> 确认
-        </button>
-        <button
-          v-else-if="invoice.accountStatus === 'none'"
-          class="btn-primary text-12px"
-          @click="emit('archive')"
-        >
-          <span class="i-lucide-archive text-12px mr-1" /> 归档
-        </button>
+        <template v-if="!isDuplicate">
+          <button
+            v-if="invoice.reviewStatus === 'unreviewed'"
+            class="btn-primary text-12px"
+            @click="emit('confirm')"
+          >
+            <span class="i-lucide-file-check text-12px mr-1" /> 确认
+          </button>
+          <button
+            v-else-if="invoice.accountStatus === 'none'"
+            class="btn-primary text-12px"
+            @click="emit('archive')"
+          >
+            <span class="i-lucide-archive text-12px mr-1" /> 归档
+          </button>
+        </template>
       </div>
     </div>
   </div>

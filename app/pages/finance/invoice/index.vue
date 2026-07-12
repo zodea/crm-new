@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
+import { isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
+import { invoiceDocStatus } from '~/lib/invoice/status'
+import { formatMoney, yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
-const { success, warning, formModal } = useKitUI()
+const { success, warning, info, undoToast, formModal, promise } = useKitUI()
 
 const activeTab = ref<'docs' | 'review' | 'ledger'>('docs')
 const searchText = ref('')
@@ -24,7 +28,7 @@ function findProjectByName(name: string) {
   return projectStore.list.find(p => p.name === name)
 }
 
-/** 归档：弹出归属选择表单，校验交给 store.archiveInvoice（缺归属/项目归属未选具体项目均拒绝）。 */
+/** 归档：弹出归属选择表单，校验交给 store.archiveInvoice（缺归属/项目归属未选具体项目均拒绝）。@returns 是否归档成功 */
 async function archiveInvoiceFlow(inv: Invoice) {
   const values = await formModal({
     title: '归档发票',
@@ -36,15 +40,16 @@ async function archiveInvoiceFlow(inv: Invoice) {
     saveText: '归档',
   })
   if (!values)
-    return
+    return false
   const ownerKind = labelToOwnerKind(String(values.ownerKindLabel))
   const project = ownerKind === 'project' ? findProjectByName(String(values.projectName)) : undefined
   const result = await store.archiveInvoice(inv.id, ownerKind, project?.id ?? null, project?.name)
   if (!result.ok) {
     warning(result.reason ?? '归档失败')
-    return
+    return false
   }
   success('已归档，计入台账')
+  return true
 }
 
 // 新增弹窗
@@ -173,43 +178,49 @@ const tabCounts = computed(() => ({
   ledger: ledgerRowsByOwner.value.all.length,
 }))
 
+// 状态判定统一走 invoiceDocStatus(单一权威派生,与工作台左栏同优先级),本页只做文案/样式映射
+function docStatus(inv: Invoice): InvoiceDocStatus {
+  return invoiceDocStatus(inv, store.recognitionProgress[inv.id] != null)
+}
+
 const docStats = computed(() => {
   let pending = 0
   let done = 0
   let duplicate = 0
   for (const d of store.documents) {
-    if (d.ocrStatus === 'pending' || d.ocrStatus === 'processing')
+    const st = docStatus(d)
+    if (st === 'pending' || st === 'failed' || st === 'recognizing')
       pending++
-    if (d.ocrStatus === 'done' && d.dupStatus === 'normal')
+    if (st === 'unreviewed' || st === 'reviewed')
       done++
-    if (d.dupStatus === 'duplicate')
+    if (st === 'duplicate')
       duplicate++
   }
   return { pending, done, duplicate }
 })
 
-const OCR_STATUS_LABEL: Record<string, string> = {
+const DOC_STATUS_LABEL: Record<InvoiceDocStatus, string> = {
+  recognizing: '识别中',
   pending: '待识别',
-  processing: '识别中',
-  done: '识别完成',
   failed: '识别失败',
+  duplicate: '重复已排除',
+  unreviewed: '识别完成',
+  reviewed: '识别完成',
 }
-const OCR_STATUS_CLASS: Record<string, string> = {
+const DOC_STATUS_CLASS: Record<InvoiceDocStatus, string> = {
+  recognizing: 'text-brand font-600',
   pending: 'cell--status-warn',
-  processing: 'text-brand font-600',
-  done: 'cell--status-ok',
   failed: 'cell--status-danger',
+  duplicate: 'cell--status-danger',
+  unreviewed: 'cell--status-ok',
+  reviewed: 'cell--status-ok',
 }
 
 function statusLabel(inv: Invoice): string {
-  if (inv.dupStatus === 'duplicate')
-    return '重复已排除'
-  return OCR_STATUS_LABEL[inv.ocrStatus] || inv.ocrStatus
+  return DOC_STATUS_LABEL[docStatus(inv)]
 }
 function statusClass(inv: Invoice): string {
-  if (inv.dupStatus === 'duplicate')
-    return 'cell--status-danger'
-  return OCR_STATUS_CLASS[inv.ocrStatus] || ''
+  return DOC_STATUS_CLASS[docStatus(inv)]
 }
 
 const docsFiltered = computed(() => {
@@ -249,20 +260,25 @@ const ledgerTax = computed(() =>
   ledgerArchived.value.reduce((s, inv) => s + inv.taxAmount, 0),
 )
 
-function fmtMoney(v: number): string {
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function selectForReview(inv: Invoice) {
   selectedId.value = inv.id
   activeTab.value = 'review'
 }
 
+/** 右栏当前选中票（单点求值：模板 5 处引用不再各自 O(n) byId 扫描 + `!` 断言）。 */
+const selectedInvoice = computed(() =>
+  selectedId.value ? store.byId(selectedId.value) : undefined,
+)
+
 async function confirmSelected() {
   if (!selectedId.value)
     return
-  await store.confirmInvoice(selectedId.value)
-  success('已确认，可在台账页归档')
+  const result = await store.confirmInvoice(selectedId.value)
+  if (!result.ok) {
+    warning(result.reason ?? '确认失败')
+    return
+  }
+  success('已确认，可归档或在台账页归档')
 }
 
 async function archiveSelected() {
@@ -271,8 +287,132 @@ async function archiveSelected() {
   const inv = store.byId(selectedId.value)
   if (!inv)
     return
-  await archiveInvoiceFlow(inv)
+  const ok = await archiveInvoiceFlow(inv)
+  // 归档成功即离开工作台：清掉选中，不给已归档票留下残留的操作入口
+  if (ok)
+    selectedId.value = null
 }
+
+// ── #60 上传双入口（按钮 useFileDialog + 全页拖拽 useDropZone）→ 桩识别队列 ──
+
+const pageRef = useTemplateRef<HTMLElement>('pageRef')
+
+// reset: true = 每次打开自动清空已选文件，允许重复选择同一文件
+const { open: openFilePicker, onChange: onFilesPicked } = useFileDialog({
+  multiple: true,
+  accept: RECOGNIZABLE_FILE_ACCEPT,
+  reset: true,
+})
+onFilesPicked(files => handleUpload(files))
+
+/** 识别过程走 process 道 promise toast（AGENTS.md 双泳道：上传/识别等过程提示），失败张数如实提示。 */
+async function runRecognition(run: Promise<{ done: number, failed: number }>, label: string) {
+  const r = await promise(run, {
+    loading: `${label}…`,
+    success: ({ done }) => `已识别 ${done} 张`,
+    error: () => '识别过程出错',
+  })
+  if (r.failed > 0)
+    warning(`${r.failed} 张未完成识别（已归档/识别中/引擎失败），可稍后重试`)
+}
+
+async function handleUpload(files: File[] | FileList | null) {
+  const picked = Array.from(files ?? []).filter(f => isRecognizableFile(f.name))
+  if (!picked.length) {
+    warning('请选择 PDF / 图片文件')
+    return
+  }
+  activeTab.value = 'review'
+  // 先建行并立刻选中第一张（识别进度就地可见）；识别完成后不再回头改选中，
+  // 避免用户批量期间点开别的票校对时被抢走上下文
+  const ids = await store.uploadInvoices(picked.map(f => ({ name: f.name, size: f.size })))
+  selectedId.value = ids[0]!
+  await runRecognition(store.recognizeMany(ids), `识别 ${ids.length} 张上传发票`)
+}
+
+// 全页拖拽（VueUse useDropZone；isOverDropZone 驱动虚线遮罩）
+const { isOverDropZone } = useDropZone(pageRef, {
+  onDrop: files => handleUpload(files),
+})
+
+// ── 识别队列状态 ──
+
+const recognizing = computed(() => Object.keys(store.recognitionProgress).length > 0)
+// 与 store.recognizeAllPending 共用同一待识别池（唯一谓词源），按钮计数与实际处理集不漂移
+const pendingCount = computed(() => store.pendingRecognition.length)
+
+async function handleBatchRecognize() {
+  const ids = store.pendingRecognition.map(inv => inv.id)
+  if (!ids.length) {
+    info('没有待识别的发票')
+    return
+  }
+  await runRecognition(store.recognizeMany(ids), `批量识别 ${ids.length} 张`)
+}
+
+async function handleRerecognize() {
+  if (!selectedId.value)
+    return
+  const ok = await promise(store.startRecognition(selectedId.value), {
+    loading: '重新识别中…',
+    success: '识别完成，请校对',
+    error: () => '识别失败',
+  })
+  if (!ok)
+    warning('无法重新识别：该票已归档或正在识别中')
+}
+
+// 废弃 = 软删除 + 10 秒 undoToast 撤回（#60 验收④）；已归档票不可废弃（已计入台账，删除走台账页确认弹窗）
+async function handleDiscard() {
+  if (!selectedId.value)
+    return
+  const inv = store.byId(selectedId.value)
+  if (!inv)
+    return
+  if (inv.accountStatus === 'archived') {
+    warning('已归档发票不可在工作台废弃，请到台账页删除')
+    return
+  }
+  const logId = await store.remove(inv.id)
+  if (!logId) {
+    warning('废弃失败：发票不存在或已删除')
+    return
+  }
+  selectedId.value = null
+  undoToast(`已废弃「${inv.invoiceNumber || inv.fileName || inv.id}」`, () => store.undo(logId))
+}
+
+// 工作台左栏（单行化收窄）：全部未归档扫描件——含待识别/识别中/待校对/已校对/重复，
+// 上传直落此列表原地显示「识别中 N%」；已归档的票流出工作台（进台账）。
+// 状态判定统一走 invoiceDocStatus，此处只映射工作台文案/chip 样式，每行每轮只求值一次。
+const WORKSPACE_STATUS_CLS: Record<InvoiceDocStatus, string> = {
+  recognizing: 'text-brand font-600',
+  pending: 'chip-warn',
+  failed: 'chip-danger',
+  duplicate: 'chip-danger',
+  unreviewed: 'chip-warn',
+  reviewed: 'chip-ok',
+}
+const WORKSPACE_STATUS_LABEL: Record<Exclude<InvoiceDocStatus, 'recognizing'>, string> = {
+  pending: '待识别',
+  failed: '识别失败',
+  duplicate: '重复',
+  unreviewed: '待校对',
+  reviewed: '已校对',
+}
+const workspaceRows = computed(() =>
+  store.documents
+    .filter(inv => inv.accountStatus === 'none')
+    .map((inv) => {
+      const progress = store.recognitionProgress[inv.id]
+      const status = invoiceDocStatus(inv, progress != null)
+      return {
+        inv,
+        label: status === 'recognizing' ? `识别中 ${progress}%` : WORKSPACE_STATUS_LABEL[status],
+        cls: WORKSPACE_STATUS_CLS[status],
+      }
+    }),
+)
 
 onMounted(() => {
   store.load()
@@ -281,7 +421,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div ref="pageRef" class="relative">
+    <!-- 全页拖拽虚线遮罩（#60：拖入即上传进识别队列；「+ 上传发票」走 useFileDialog 无需宿主元素） -->
+    <div
+      v-if="isOverDropZone"
+      class="absolute inset-0 z-50 flex items-center justify-center border-2 border-dashed border-brand bg-brand-soft/40 pointer-events-none"
+    >
+      <div class="text-center">
+        <span class="i-lucide-file-down text-32px text-brand block mx-auto mb-2" />
+        <p class="text-14px font-700 text-brand-deep">
+          松开上传发票，自动进入识别队列
+        </p>
+      </div>
+    </div>
+
     <!-- Tab 栏 -->
     <div class="flex items-center border-b border-line mb-4">
       <button
@@ -309,21 +462,27 @@ onMounted(() => {
       <button class="btn-secondary mr-2" @click="showAddDialog = true">
         <span class="i-lucide-plus text-13px mr-1" /> 手动录入
       </button>
-      <button class="btn-primary mr-1" disabled>
-        <span class="i-lucide-scan-text text-13px mr-1" /> 批量识别
+      <button
+        class="btn-primary mr-1"
+        :disabled="recognizing || pendingCount === 0"
+        :title="pendingCount === 0 ? '没有待识别的发票' : `识别 ${pendingCount} 张待识别发票`"
+        @click="handleBatchRecognize"
+      >
+        <span class="text-13px mr-1" :class="recognizing ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-scan-text'" />
+        批量识别{{ pendingCount > 0 ? ` ${pendingCount}` : '' }}
       </button>
     </div>
 
     <!-- ═══ Tab 1: 文档管理 ═══ -->
     <div v-if="activeTab === 'docs'">
-      <!-- 上传区 -->
-      <div class="upload-zone mb-4 py-8 cursor-pointer">
+      <!-- 上传区（点击选文件；全页任意位置也可直接拖入） -->
+      <div class="upload-zone mb-4 py-8 cursor-pointer" @click="openFilePicker()">
         <span class="i-lucide-upload text-24px mb-2 block mx-auto text-brand" />
         <p class="text-13px font-600">
-          拖拽 PDF / 图片 / 文件夹到此处上传
+          点击选择 或 拖拽 PDF / 图片到此处上传
         </p>
         <p class="text-11px text-ink-faint mt-1">
-          上传后自动进入识别队列（需要真实文件时请上传）
+          上传后自动进入识别队列
         </p>
       </div>
 
@@ -385,7 +544,7 @@ onMounted(() => {
           <vxe-column field="totalAmount" title="价税合计" width="120">
             <template #default="{ row }">
               <span class="font-mono font-700 block text-right">
-                {{ row.totalAmount ? fmtMoney(row.totalAmount) : '—' }}
+                {{ row.totalAmount ? formatMoney(row.totalAmount) : '—' }}
               </span>
             </template>
           </vxe-column>
@@ -414,51 +573,51 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ═══ Tab 2: 校对与排版 ═══ -->
+    <!-- ═══ Tab 2: 校对与排版（#60 字段校对模式：左列表 18% 单行化 / 中原图 40% / 右字段表 42%） ═══ -->
     <div v-else-if="activeTab === 'review'">
       <div class="flex gap-3" style="height: calc(100vh - 240px); min-height: 560px">
-        <!-- 左栏 — 发票列表 -->
-        <div class="w-72 shrink-0 border border-line bg-panel overflow-y-auto">
-          <div class="px-3 py-2 border-b border-line text-12px text-ink-soft">
-            本批次 {{ store.pendingReview.length }} 张 · 待校对
+        <!-- 左栏 — 发票列表（单行化收窄；上传直落此列表原地显示「识别中 N%」） -->
+        <div class="basis-[18%] min-w-44 shrink-0 border border-line bg-panel overflow-y-auto">
+          <div class="px-2.5 py-2 border-b border-line flex items-center gap-1.5">
+            <button class="btn-primary text-11px px-2 py-1 flex-1" @click="openFilePicker()">
+              <span class="i-lucide-plus text-11px mr-0.5" /> 上传发票
+            </button>
+          </div>
+          <div class="px-2.5 py-1.5 border-b border-line text-11px text-ink-soft">
+            本批次 {{ workspaceRows.length }} 张 · 待校对 {{ store.pendingReview.length }}
           </div>
           <div
-            v-for="inv in store.pendingReview"
+            v-for="{ inv, label, cls } in workspaceRows"
             :key="inv.id"
-            class="flex items-center gap-2.5 px-3 py-2 border-b border-line cursor-pointer transition-colors"
+            class="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-line cursor-pointer transition-colors"
             :class="selectedId === inv.id ? 'bg-brand-soft' : 'hover:bg-surface-3'"
             @click="selectedId = inv.id"
           >
-            <div class="w-7 h-9 bg-surface-2 rounded-[2px] flex items-center justify-center text-10px font-800 text-ink-faint shrink-0">
-              票
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="text-12px font-700 truncate">
-                {{ inv.invoiceNumber ? `…${inv.invoiceNumber.slice(-8)}` : '—' }}
-              </div>
-              <div class="text-11px text-ink-soft truncate">
-                {{ inv.seller || inv.buyer || '—' }}
-              </div>
-            </div>
-            <span class="chip-warn text-10px">待校对</span>
+            <span class="text-11px font-700 truncate flex-1 min-w-0" :title="inv.fileName || inv.invoiceNumber">
+              {{ inv.invoiceNumber ? `…${inv.invoiceNumber.slice(-8)}` : (inv.fileName || '—') }}
+            </span>
+            <span class="text-10px shrink-0" :class="cls">
+              {{ label }}
+            </span>
           </div>
-          <div v-if="!store.pendingReview.length" class="p-4 text-center text-ink-faint text-12px">
-            没有待校对的发票
+          <div v-if="!workspaceRows.length" class="p-4 text-center text-ink-faint text-12px">
+            上传发票开始识别
           </div>
         </div>
 
-        <!-- 中栏 — A4 打印排版预览 -->
-        <div class="flex-1 border border-line bg-surface-sink overflow-y-auto p-4">
+        <!-- 中栏 — 原图（放大） -->
+        <div class="basis-[40%] min-w-0 border border-line bg-surface-sink overflow-y-auto p-4">
           <div class="text-12px text-ink-soft mb-3">
-            打印排版 · 单击选中 · 右键旋转
+            发票原图
           </div>
-          <div class="bg-panel border border-line mx-auto p-4" style="aspect-ratio: 1/1.4142; max-width: 480px">
-            <div v-if="selectedId" class="h-full flex items-center justify-center">
+          <div class="bg-panel border border-line mx-auto p-4" style="aspect-ratio: 1/1.4142; max-width: 560px">
+            <div v-if="selectedInvoice" class="h-full flex items-center justify-center">
               <div class="text-center">
-                <div class="w-20 h-28 bg-surface-2 rounded-[3px] mx-auto mb-2 flex items-center justify-center border-2 border-brand">
-                  <span class="text-24px font-800 text-ink-faint">票</span>
+                <div class="w-28 h-40 bg-surface-2 rounded-[3px] mx-auto mb-2 flex items-center justify-center border-2 border-brand">
+                  <span class="text-32px font-800 text-ink-faint">票</span>
                 </div>
-                <span class="text-11px text-ink-soft">{{ store.byId(selectedId)?.invoiceNumber?.slice(-8) || '—' }}</span>
+                <span class="text-11px text-ink-soft block">{{ selectedInvoice.fileName || '—' }}</span>
+                <span class="text-11px text-ink-faint font-mono">{{ selectedInvoice.invoiceNumber?.slice(-8) || '' }}</span>
               </div>
             </div>
             <div v-else class="h-full flex items-center justify-center text-ink-faint text-13px">
@@ -467,18 +626,30 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 右栏 — 识别结果校对 -->
-        <div class="w-80 shrink-0 border border-line bg-panel overflow-y-auto">
+        <!-- 右栏 — 识别结果校对（字段表） -->
+        <div class="basis-[42%] min-w-0 border border-line bg-panel overflow-y-auto">
           <div class="px-3 py-2 border-b border-line text-12px font-700 text-ink">
             识别结果提取
           </div>
-          <div v-if="selectedId && store.byId(selectedId)" class="p-3">
-            <InvoiceReviewForm
-              :invoice="store.byId(selectedId)!"
-              @confirm="confirmSelected"
-              @archive="archiveSelected"
-            />
-          </div>
+          <!-- 进度优先于表单：重新识别时(ocrStatus 仍是 done)也要显示识别中而非旧字段 -->
+          <template v-if="selectedInvoice">
+            <div v-if="store.recognitionProgress[selectedInvoice.id] != null" class="p-6 text-center text-12px">
+              <span class="i-lucide-loader-circle animate-spin text-20px text-brand block mx-auto mb-2" />
+              <span class="text-brand font-600">识别中 {{ store.recognitionProgress[selectedInvoice.id] }}%</span>
+            </div>
+            <div v-else-if="selectedInvoice.ocrStatus === 'done'" class="p-3">
+              <InvoiceReviewForm
+                :invoice="selectedInvoice"
+                @confirm="confirmSelected"
+                @archive="archiveSelected"
+                @discard="handleDiscard"
+                @rerecognize="handleRerecognize"
+              />
+            </div>
+            <div v-else class="p-6 text-center text-12px">
+              <span class="text-ink-faint">待识别——点击顶部「批量识别」开始</span>
+            </div>
+          </template>
           <div v-else class="p-4 text-center text-ink-faint text-12px">
             选择一张发票开始校对
           </div>
@@ -531,12 +702,12 @@ onMounted(() => {
           <vxe-column field="invoiceType" title="票据类型" width="130" />
           <vxe-column field="totalAmount" title="价税合计" width="120">
             <template #default="{ row }">
-              <span class="font-mono font-800 block text-right">{{ fmtMoney(row.totalAmount) }}</span>
+              <span class="font-mono font-800 block text-right">{{ formatMoney(row.totalAmount) }}</span>
             </template>
           </vxe-column>
           <vxe-column field="taxAmount" title="税额" width="100">
             <template #default="{ row }">
-              <span class="font-mono block text-right">{{ fmtMoney(row.taxAmount) }}</span>
+              <span class="font-mono block text-right">{{ formatMoney(row.taxAmount) }}</span>
             </template>
           </vxe-column>
           <vxe-column field="taxRate" title="税率" width="60">
@@ -584,9 +755,9 @@ onMounted(() => {
       <!-- 底部汇总（仅统计已归档，对齐 §4.2 口径；当前筛选含待归档行时不计入这两个数字） -->
       <div class="flex items-center px-3 py-2 border border-t-0 border-line bg-panel text-12px">
         <span class="text-ink-soft">已归档合计: </span>
-        <span class="font-mono font-700 text-ink ml-1 mr-4">¥{{ fmtMoney(ledgerTotal) }}</span>
+        <span class="font-mono font-700 text-ink ml-1 mr-4">{{ yuan(ledgerTotal) }}</span>
         <span class="text-ink-soft">已归档税额: </span>
-        <span class="font-mono font-700 text-ink ml-1">¥{{ fmtMoney(ledgerTax) }}</span>
+        <span class="font-mono font-700 text-ink ml-1">{{ yuan(ledgerTax) }}</span>
       </div>
     </div>
 
