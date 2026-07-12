@@ -7,3 +7,12 @@ export function toNum(v: unknown): number | null {
   const n = Number(v)
   return Number.isNaN(n) ? null : n
 }
+
+/**
+ * 金额两位小数舍入——「amount + tax = total 两位小数铁律」的统一舍入实现。
+ * 此前 recognize.ts / contract/status.ts / 校对表单各内联一份 Math.round(n*100)/100,
+ * 舍入口径一旦某处单改必与铁律漂移,统一收敛到这里。
+ */
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}

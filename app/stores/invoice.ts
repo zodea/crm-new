@@ -1,9 +1,14 @@
 import type { ArchiveCheckResult } from '~/lib/invoice/archive'
+import type { InvoiceItem } from '~/lib/invoice/recognize'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
-import { checkArchiveOwnership, checkReviewed } from '~/lib/invoice/archive'
+import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
+import { recognizeInvoice } from '~/lib/invoice/recognize'
+import { formatFileSize } from '~/lib/util/file'
 import { generateId } from '~/lib/util/id'
+import { parseJsonColumn } from '~/lib/util/json'
+import { round2 } from '~/lib/util/number'
 
 export interface Invoice {
   id: string
@@ -42,6 +47,10 @@ export interface Invoice {
   contractId: string | null
   printCount: number
   archivedAt: string | null
+  /** 货物明细行（OCR 提取，#60；JSON 列存取） */
+  items: InvoiceItem[]
+  /** 逐字段置信度 {字段名: 0~1}（#60 字段校对模式的边框色/角标/✓确认依据；人工录入的票为空对象） */
+  fieldConfidence: Record<string, number>
   createdAt: string
   updatedAt: string
 }
@@ -94,6 +103,8 @@ const INVOICE_COLUMNS: { [K in keyof InvoiceWritable]: InvoiceColumn<K> } = {
   contractId: { col: 'contract_id', toBind: d => d.contractId ?? null, fromRow: r => (r.contract_id ?? null) as string | null },
   printCount: { col: 'print_count', toBind: d => d.printCount ?? 0, fromRow: r => (r.print_count ?? 0) as number },
   archivedAt: { col: 'archived_at', toBind: d => d.archivedAt ?? null, fromRow: r => r.archived_at as string | null },
+  items: { col: 'items', toBind: d => JSON.stringify(d.items ?? []), fromRow: r => parseJsonColumn<InvoiceItem[]>(r.items, []) },
+  fieldConfidence: { col: 'field_confidence', toBind: d => JSON.stringify(d.fieldConfidence ?? {}), fromRow: r => parseJsonColumn<Record<string, number>>(r.field_confidence, {}) },
 }
 
 /** 登记键序（单次求值）：列名清单与绑定值清单都按同一序派生，保证 SQL 占位符与实参一一对齐。 */
@@ -127,6 +138,8 @@ export type ArchiveResult = ArchiveCheckResult
 export const useInvoiceStore = defineStore('invoice', () => {
   const list = shallowRef<Invoice[]>([])
   const loading = shallowRef(false)
+  /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
+  const recognitionProgress = ref<Record<string, number>>({})
 
   async function load() {
     loading.value = true
@@ -192,13 +205,147 @@ export const useInvoiceStore = defineStore('invoice', () => {
     return logId
   }
 
-  async function updateField(id: string, field: keyof Invoice, value: unknown) {
-    const inv = byId(id)
-    if (!inv)
-      return
+  // ── 字段级写路径（校对表单）──
+  // 全行覆写 + 事件时刻快照会互相回滚（编辑后同一手势点另一字段的✓，后落地者以旧快照胜出）：
+  // 改为「串行写队列 + 出队时刻取最新行」——合并发生在队列执行时，前一笔写的 load() 已完成，
+  // 快照必然新鲜；Tauri sqlite 真异步驱动下同样成立。
+  let writeChain: Promise<unknown> = Promise.resolve()
+  function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+    const p = writeChain.then(fn)
+    writeChain = p.then(() => undefined, () => undefined)
+    return p
+  }
 
-    const updated = { ...inv, [field]: value }
-    await update(id, updated)
+  /**
+   * 人工修正字段（域规则收敛在 store action，而非各编辑面自带）：
+   * - 修正即人工判定 → 该字段置信度置满变绿；
+   * - 金额铁律：改价税合计/税额时派生 amount = total − tax（round2 统一舍入，数字值一律
+   *   两位小数入库——input 的 step=0.01 只是 UI 提示挡不住三位小数）。
+   */
+  async function correctField(id: string, field: keyof Invoice & string, value: string | number) {
+    return enqueueWrite(async () => {
+      const inv = byId(id)
+      if (!inv)
+        return null
+      const next = { [field]: typeof value === 'number' ? round2(value) : value } as Partial<Invoice>
+      if (field === 'totalAmount' || field === 'taxAmount') {
+        const total = field === 'totalAmount' ? (next.totalAmount as number) : inv.totalAmount
+        const tax = field === 'taxAmount' ? (next.taxAmount as number) : inv.taxAmount
+        next.amount = round2(total - tax)
+      }
+      const conf = inv.fieldConfidence[field]
+      if (conf != null && conf < 1)
+        next.fieldConfidence = { ...inv.fieldConfidence, [field]: 1 }
+      return update(id, { ...inv, ...next })
+    })
+  }
+
+  /** ✓确认：不改值，仅人工判定该字段识别无误 → 置信度置满变绿。 */
+  async function confirmField(id: string, field: string) {
+    return enqueueWrite(async () => {
+      const inv = byId(id)
+      if (!inv)
+        return null
+      return update(id, { ...inv, fieldConfidence: { ...inv.fieldConfidence, [field]: 1 } })
+    })
+  }
+
+  /**
+   * 桩识别（#60）：「识别中」是纯会话态，只存在于 recognitionProgress（左栏「识别中 N%」的数据源），
+   * 不往内存 list 打 processing 补丁——补丁会被全行写路径持久化进 DB 成死状态、也会被任何 load()
+   * 静默回退，两类都真实发生过（#60 审查 c7/c10）。识别完成一次性把全套字段 + 逐字段置信度写库
+   * （走 update() 落操作日志，识别结果可审计/可撤回）。
+   * 守卫：已归档票拒绝（重识别会覆写金额并把 reviewStatus 拉回 unreviewed，产生 archived+unreviewed
+   * 非法组合且 §4.2 台账合计静默变动）；同 id 在飞拒绝（双击重识别会进度回跳 + 写双份操作日志）。
+   * 重复检测：读 DB 已提交事实而非完成时刻的内存快照，发票号撞车 → dup_status='duplicate'。
+   * 重新识别同样走此函数——覆写字段并把 review_status 拉回 unreviewed（内容变了需重新校对）。
+   * @returns 是否成功完成识别（false = 被守卫拒绝或引擎失败；失败不落库，行保持 pending 可重跑）
+   */
+  async function startRecognition(id: string) {
+    const inv = byId(id)
+    if (!inv || inv.accountStatus === 'archived' || recognitionProgress.value[id] != null)
+      return false
+    recognitionProgress.value[id] = 0
+    try {
+      const r = await recognizeInvoice({ fileName: inv.fileName || inv.id }, {
+        onProgress: (percent) => {
+          recognitionProgress.value[id] = percent
+        },
+      })
+      const current = byId(id)
+      if (!current)
+        return false
+      const dupRows = await select<{ id: string }>(
+        `SELECT id FROM invoices WHERE invoice_number = ? AND id <> ? AND deleted_at IS NULL LIMIT 1`,
+        [r.invoiceNumber, id],
+      )
+      const logId = await update(id, {
+        ...current,
+        ...r,
+        ocrStatus: 'done',
+        reviewStatus: 'unreviewed',
+        dupStatus: dupRows.length ? 'duplicate' : 'normal',
+      })
+      return logId != null
+    }
+    catch {
+      // 桩不会抛；真引擎失败时不落库（行保持 pending 可重跑），由 recognizeMany 汇总失败张数供 UI 提示
+      return false
+    }
+    finally {
+      delete recognitionProgress.value[id]
+    }
+  }
+
+  /**
+   * 上传建行（#60 两种入口共用）：逐张 INSERT（pending 态）后一次性 load()（此前复用 add() 每张
+   * 全表重载一次）。识别由调用方接着调 recognizeMany 驱动——页面先选中第一张再启动识别，
+   * 避免旧实现「整批识别 await 完才选中」夺走用户批量期间的手动选择。
+   */
+  async function uploadInvoices(files: { name: string, size: number }[]) {
+    const ids: string[] = []
+    for (const f of files) {
+      const id = generateId('inv')
+      const now = new Date().toISOString()
+      await execute(INSERT_SQL, [id, ...invoiceToBindings({
+        fileName: f.name,
+        fileSize: formatFileSize(f.size),
+        pageCount: 1,
+        source: 'scan',
+        ocrStatus: 'pending',
+      }), now, now])
+      await logCreate(db, 'invoices', id)
+      ids.push(id)
+    }
+    await load()
+    return ids
+  }
+
+  /** 批量识别驱动：串行走完给定 id 集（进度逐张出现在左栏），返回成败张数供 UI 如实提示。 */
+  async function recognizeMany(ids: string[]) {
+    let done = 0
+    for (const id of ids) {
+      if (await startRecognition(id))
+        done++
+    }
+    return { done, failed: ids.length - done }
+  }
+
+  /**
+   * 待识别池（唯一谓词源：批量识别按钮计数与实际处理集共用，防两处漂移）：
+   * pending 与 failed（真引擎可能写入的失败态）都可（重）跑；识别中的排除。
+   */
+  const pendingRecognition = computed(() =>
+    list.value.filter(inv =>
+      (inv.ocrStatus === 'pending' || inv.ocrStatus === 'failed')
+      && inv.source === 'scan'
+      && recognitionProgress.value[inv.id] == null,
+    ),
+  )
+
+  /** 批量识别：把当前待识别池依次走完桩识别，返回成败张数。 */
+  async function recognizeAllPending() {
+    return recognizeMany(pendingRecognition.value.map(inv => inv.id))
   }
 
   /**
@@ -206,7 +353,13 @@ export const useInvoiceStore = defineStore('invoice', () => {
    * account_status 只有 none|archived 两态，无 confirmed 中间值）——「确认」与「归档」是两个独立
    * 阶段：前者表示内容校对完毕，后者表示进台账终态，靠 reviewStatus/accountStatus 两个字段分别表达。
    */
-  async function confirmInvoice(id: string) {
+  async function confirmInvoice(id: string): Promise<ArchiveResult> {
+    // 重复票排除在确认路径之外(#60):文档页标「重复已排除」,写路径必须同口径拒绝,
+    // 否则重复票被确认→归档后同号票双份计入 §4.2 台账合计
+    const inv = byId(id)
+    const dupCheck = checkNotDuplicate(inv?.dupStatus)
+    if (!dupCheck.ok)
+      return dupCheck
     const now = new Date().toISOString()
     // withUpdateLog 兼做存在性检查(记录不存在/已删则跳过并返回 null),不再依赖内存 byId
     const logId = await withUpdateLog(db, 'invoices', id, () => execute(
@@ -214,7 +367,9 @@ export const useInvoiceStore = defineStore('invoice', () => {
       [now, now, id],
     ))
     await load()
-    return logId
+    if (!logId)
+      return { ok: false, reason: '发票不存在或已删除' }
+    return { ok: true }
   }
 
   /**
@@ -230,6 +385,10 @@ export const useInvoiceStore = defineStore('invoice', () => {
     const inv = byId(id)
     if (!inv)
       return { ok: false, reason: '发票不存在或已删除' }
+
+    const dupCheck = checkNotDuplicate(inv.dupStatus)
+    if (!dupCheck.ok)
+      return dupCheck
 
     const reviewedCheck = checkReviewed(inv.reviewStatus)
     if (!reviewedCheck.ok)
@@ -252,5 +411,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, documents, pendingReview, ledger, ledgerGroups, add, update, updateField, confirmInvoice, archiveInvoice, remove, restore, undo }
+  return { list: readonly(list), loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, remove, restore, undo }
 })

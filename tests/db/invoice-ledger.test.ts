@@ -3,7 +3,7 @@
 // account_status='archived'）+ ADR-0001 归属铁律（无归属禁止归档）。
 import { describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
-import { checkArchiveOwnership, checkReviewed } from '~/lib/invoice/archive'
+import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
 import { createMemoryDb } from '../helpers/memory-db'
 
 describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」)', () => {
@@ -15,6 +15,19 @@ describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.
 
   it('reviewStatus=reviewed 放行', () => {
     expect(checkReviewed('reviewed')).toEqual({ ok: true })
+  })
+})
+
+describe('checkNotDuplicate:重复票排除在确认/归档路径之外(#60 review 修复 c2)', () => {
+  it('dupStatus=duplicate 拒绝(「重复已排除」口径,防同号票双份计入 §4.2 合计)', () => {
+    const r = checkNotDuplicate('duplicate')
+    expect(r.ok).toBe(false)
+    expect(r.reason).toBeTruthy()
+  })
+
+  it('normal / 未知值 放行(只有明确标了重复才拦)', () => {
+    expect(checkNotDuplicate('normal')).toEqual({ ok: true })
+    expect(checkNotDuplicate(undefined)).toEqual({ ok: true })
   })
 })
 

@@ -184,6 +184,17 @@ export const migrations: Migration[] = [
       await db.execute(`UPDATE invoices SET account_status = 'none' WHERE account_status = 'confirmed'`)
     },
   },
+  {
+    // 发票识别工作台(#60):货物明细行(OCR 提取,JSON 数组,对齐 suppliers.aliases 的 JSON 文本先例)
+    // + 逐字段置信度(JSON 对象 {字段名:0~1},字段校对模式的边框色/角标/✓确认 依据;
+    // 全局 ocr_confidence 保留作汇总展示,两者口径不同不合并)。
+    version: 5,
+    name: 'invoices-items-field-confidence',
+    async up(db) {
+      await addColumnIfMissing(db, 'invoices', 'items', `TEXT DEFAULT '[]'`)
+      await addColumnIfMissing(db, 'invoices', 'field_confidence', `TEXT DEFAULT '{}'`)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

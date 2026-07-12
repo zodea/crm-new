@@ -249,6 +249,9 @@ CREATE TABLE monthly_statement_lines (
 --                        「确认」= review_status 独立字段 unreviewed→reviewed，不占用 account_status）
 --   print_count    INTEGER 累计打印次数
 --   archived_at    TEXT  归档时间（与 confirmed_at 对称，两者是独立阶段）
+--   items            TEXT  货物明细行 JSON 数组（OCR 提取，#60，迁移 v5；对齐 suppliers.aliases JSON 文本先例）
+--   field_confidence TEXT  逐字段置信度 JSON 对象 {字段名:0~1}（#60 字段校对边框色/角标/✓确认依据，迁移 v5；
+--                          与全局 ocr_confidence 口径不同不合并；分档阈值见 app/lib/invoice/recognize.ts）
 --   deleted_at     TEXT  软删除（§8）
 ```
 

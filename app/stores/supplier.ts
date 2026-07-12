@@ -3,6 +3,7 @@ import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
+import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
 
 // 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名；对称 stores/project.ts）。
@@ -58,16 +59,6 @@ interface SupplierColumn<K extends keyof SupplierData> {
   fromRow: (row: Record<string, unknown>) => SupplierData[K]
 }
 
-/** aliases 以 JSON 文本存储；解析失败（脏数据）回退空数组，不抛。 */
-function parseAliases(row: Record<string, unknown>): string[] {
-  try {
-    return JSON.parse((row.aliases as string) || '[]')
-  }
-  catch {
-    return []
-  }
-}
-
 /**
  * 列登记表（唯一权威源）：INSERT / UPDATE / rowToSupplier 全部从这里派生列名、占位符、绑定与读映射，
  * 消除「interface / rowToSupplier / add INSERT / update SET 四处并行维护」造成的列漂移
@@ -77,7 +68,7 @@ function parseAliases(row: Record<string, unknown>): string[] {
  */
 const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   name: { col: 'name', toBind: d => d.name ?? '', fromRow: r => r.name as string },
-  aliases: { col: 'aliases', toBind: d => JSON.stringify(d.aliases ?? []), fromRow: parseAliases },
+  aliases: { col: 'aliases', toBind: d => JSON.stringify(d.aliases ?? []), fromRow: r => parseJsonColumn<string[]>(r.aliases, []) },
   uniqueCode: { col: 'unique_code', toBind: d => d.uniqueCode ?? '', fromRow: r => (r.unique_code ?? '') as string },
   taxNo: { col: 'tax_no', toBind: d => d.taxNo ?? '', fromRow: r => (r.tax_no ?? '') as string },
   businessType: { col: 'business_type', toBind: d => d.businessType ?? '', fromRow: r => (r.business_type ?? '') as string },

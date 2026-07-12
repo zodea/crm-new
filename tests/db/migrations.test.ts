@@ -210,6 +210,29 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     expect(row.review_status).toBe('reviewed')
     db.close()
   })
+
+  it('v5：invoices 增列 items/field_confidence，冷启动与 v4 存量升级两条路径均齐、缺省值合法 JSON', async () => {
+    // 冷启动
+    const cold = await createMemoryDb()
+    await runMigrations(cold)
+    const coldCols = await columnNames(cold, 'invoices')
+    expect(coldCols).toContain('items')
+    expect(coldCols).toContain('field_confidence')
+    cold.close()
+
+    // v4 存量升级：先到 v4 插一行，再升到最新，存量行两列取 JSON 缺省
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(m => m.version <= 4))
+    await db.execute(`INSERT INTO invoices (id) VALUES ('inv_v4')`)
+    await runMigrations(db)
+    const [row] = await db.select<{ items: string | null, field_confidence: string | null }>(
+      `SELECT items, field_confidence FROM invoices WHERE id = 'inv_v4'`,
+    )
+    // ALTER ADD COLUMN 的 DEFAULT 对存量行按 SQLite 语义生效；无论取到缺省串还是 NULL，读路径都必须能安全解析
+    expect(JSON.parse(row.items || '[]')).toEqual([])
+    expect(JSON.parse(row.field_confidence || '{}')).toEqual({})
+    db.close()
+  })
 })
 
 describe('vitest 基建：sql.js 内存库可跑业务断言', () => {

@@ -15,6 +15,17 @@ export function checkReviewed(reviewStatus: unknown): ArchiveCheckResult {
   return { ok: true }
 }
 
+/**
+ * 重复票排除(#60):dup_status='duplicate' 的票在文档页标「重复已排除」,确认/归档写路径
+ * 必须同口径拒绝——否则同号票双份计入 §4.2 台账合计。要重新入流需先「重新识别」洗掉重复标记
+ * (识别完成会按当下库内发票号重算 dup_status)或废弃。
+ */
+export function checkNotDuplicate(dupStatus: unknown): ArchiveCheckResult {
+  if (dupStatus === 'duplicate')
+    return { ok: false, reason: '重复发票已排除，不可确认/归档' }
+  return { ok: true }
+}
+
 export function checkArchiveOwnership(ownerKind: unknown, projectId: unknown): ArchiveCheckResult {
   if (ownerKind !== 'project' && ownerKind !== 'personal')
     return { ok: false, reason: '缺少归属（项目/个人开支），无法归档' }
