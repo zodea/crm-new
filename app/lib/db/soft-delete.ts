@@ -320,6 +320,46 @@ export async function undoOperation(db: SoftDb, logId: string, operator = ''): P
   }
 }
 
+export interface DownstreamCount {
+  table: string
+  n: number
+}
+
+/** parentTable 的直接子表清单(以任意列指向 parentTable 的表,含自引用,如 suppliers→suppliers)。 */
+function childTablesOf(parentTable: string): { table: string, column: string }[] {
+  const result: { table: string, column: string }[] = []
+  for (const [table, refs] of Object.entries(PARENT_REFS)) {
+    for (const ref of refs) {
+      if (ref.table === parentTable)
+        result.push({ table, column: ref.column })
+    }
+  }
+  return result
+}
+
+/**
+ * 通用下游杀伤统计(ADR 0003 cascade 确认清单):从权威登记 PARENT_REFS 反推「以任意列指向
+ * parentTable」的子表(含自引用——hiddenCtes/visibleCond 对自引用表走真实递归级联,此层不代为
+ * 假设"自引用=无杀伤"),对每张子表按软删层可见性口径(hiddenCtes+visibleCond)在「应用可见集」中
+ * 并行计数——不把已因兄弟祖先被删而隐藏的记录计入,与列表页口径一致。只含 n>0 的项,空数组=无下游
+ * (驱动 UI 走 simple 而非 cascade 确认)。
+ * 各 store 按自身展示需要把 {table,n} 映射为 { label, n }(ConfirmImpact),标签映射与「本域是否要
+ * 展示某张子表」的业务判断(如分供方域排除 suppliers 自引用——该域无母子挂靠,见 stores/supplier.ts)
+ * 都不进此层,只在调用方按域定制,避免把单一领域的事实认定焊死进domain-agnostic 的共享层。
+ */
+export async function downstreamImpact(db: SoftDb, parentTable: string, id: string): Promise<DownstreamCount[]> {
+  assertBusinessTable(parentTable)
+  const children = childTablesOf(parentTable)
+  const counts = await Promise.all(children.map(async ({ table, column }) => {
+    const [row] = await db.select<{ n: number }>(
+      `${hiddenCtes(table)} SELECT COUNT(*) AS n FROM "${table}" WHERE ${visibleCond(table)} AND "${table}"."${column}" = ?`,
+      [id],
+    )
+    return { table, n: row?.n ?? 0 }
+  }))
+  return counts.filter(c => c.n > 0)
+}
+
 export interface SoftDeleteActions {
   /** 软删除(ADR 0003 只标父级);返回操作日志 id 作单条删除的撤回句柄。级联交互(打名+预提交挂起)见 ADR 0003/#76,不走此撤回 */
   remove: (id: string) => Promise<string | null>

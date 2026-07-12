@@ -1,14 +1,9 @@
 import type { ConfirmImpact } from '~/lib/kit/confirm'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
-import { createSoftDeleteActions, hiddenCtes, logCreate, PARENT_REFS, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
-
-// 项目直接子表（以 project_id 指向 projects）——从软删层权威登记 PARENT_REFS 反推，
-// 不另立硬编码清单（会漂移、漏项）。给 projects 加子表时只需更新 PARENT_REFS，此处自动跟上。
-const PROJECT_CHILD_TABLES = Object.entries(PARENT_REFS)
-  .filter(([, refs]) => refs.some(r => r.table === 'projects' && r.column === 'project_id'))
-  .map(([table]) => table)
+import { toNum } from '~/lib/util/number'
 
 // 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名）。
 const TABLE_LABELS: Record<string, string> = {
@@ -16,6 +11,7 @@ const TABLE_LABELS: Record<string, string> = {
   project_suppliers: '分供方关系',
   expenditure_contracts: '支出合同',
   construction_contracts: '施工合同',
+  contracts: '合同',
   payment_applications: '请款单',
   owner_change_orders: '变更单',
   invoice_applications: '开票申请',
@@ -24,14 +20,6 @@ const TABLE_LABELS: Record<string, string> = {
   current_payments: '往来付款',
   payment_records: '付款记录',
   phase_tasks: '阶段任务',
-}
-
-/** 数值字段归一：空串 / NaN / nullish → null（避免 v-model.number 清空后把 '' 写进数值列）。 */
-function toNum(v: unknown): number | null {
-  if (v === '' || v == null)
-    return null
-  const n = Number(v)
-  return Number.isNaN(n) ? null : n
 }
 
 export interface Project {
@@ -201,20 +189,11 @@ export const useProjectStore = defineStore('project', () => {
 
   /**
    * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
-   * 复用软删层可见性口径（hiddenCtes + visibleCond）：只计当前实际可见的记录，与列表页一致，
-   * 不把「已因兄弟祖先被删而隐藏」的记录误计入。各子表并行查询。只含 n>0 的项，空数组=无下游。
+   * 计数逻辑已上移为软删层通用能力（#89），本店只负责把表名映射为中文展示标签。
    */
   async function downstreamImpact(id: string): Promise<ConfirmImpact[]> {
-    const counts = await Promise.all(PROJECT_CHILD_TABLES.map(async (table) => {
-      const [row] = await select<{ n: number }>(
-        `${hiddenCtes(table)} SELECT COUNT(*) AS n FROM "${table}" WHERE ${visibleCond(table)} AND "${table}".project_id = ?`,
-        [id],
-      )
-      return { table, n: row?.n ?? 0 }
-    }))
-    return counts
-      .filter(c => c.n > 0)
-      .map(c => ({ label: TABLE_LABELS[c.table] ?? c.table, n: c.n }))
+    const counts = await downstreamImpactCounts(db, 'projects', id)
+    return counts.map(c => ({ label: TABLE_LABELS[c.table] ?? c.table, n: c.n }))
   }
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'projects', load)

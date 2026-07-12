@@ -6,6 +6,7 @@ import {
   BUSINESS_TABLES,
   createSoftDeleteActions,
   DEPRECATED_TABLES,
+  downstreamImpact,
   fetchRowById,
   hiddenCtes,
   logCreate,
@@ -124,7 +125,8 @@ describe('软删除:删除不再执行 DELETE,restore 恢复', () => {
 
     // 物理行仍在,只是打了标记
     const [row] = await db.select<{ id: string, deleted_at: string | null }>(
-      'SELECT id, deleted_at FROM projects WHERE id = ?', ['p1'],
+      'SELECT id, deleted_at FROM projects WHERE id = ?',
+      ['p1'],
     )
     expect(row.id).toBe('p1')
     expect(row.deleted_at).not.toBeNull()
@@ -155,7 +157,8 @@ describe('软删除:删除不再执行 DELETE,restore 恢复', () => {
     expect(logId).toBeTruthy()
 
     const [row] = await db.select<{ deleted_at: string | null }>(
-      'SELECT deleted_at FROM projects WHERE id = ?', ['p1'],
+      'SELECT deleted_at FROM projects WHERE id = ?',
+      ['p1'],
     )
     expect(row.deleted_at).toBeNull()
 
@@ -281,7 +284,7 @@ describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
     db.close()
   })
 
-  it('NULL 父引用不误伤:未挂项目的发票不受任何项目删除影响', async () => {
+  it('nULL 父引用不误伤:未挂项目的发票不受任何项目删除影响', async () => {
     const db = await dbWithProject()
     await db.execute(`INSERT INTO invoices (id, project_id, invoice_number) VALUES ('inv1', NULL, 'FP001')`)
     await softDelete(db, 'projects', 'p1')
@@ -310,13 +313,18 @@ describe('操作日志:create/update 也落账', () => {
   it('logOperation 写 create/update 日志,快照 JSON 可回读', async () => {
     const db = await dbWithProject()
     await logOperation(db, {
-      table: 'projects', recordId: 'p1', action: 'create',
+      table: 'projects',
+      recordId: 'p1',
+      action: 'create',
       after: await fetchRowById(db, 'projects', 'p1'),
     })
     await db.execute(`UPDATE projects SET name = ? WHERE id = ?`, ['改名后', 'p1'])
     await logOperation(db, {
-      table: 'projects', recordId: 'p1', action: 'update',
-      before: { name: '合和新城' }, after: { name: '改名后' },
+      table: 'projects',
+      recordId: 'p1',
+      action: 'update',
+      before: { name: '合和新城' },
+      after: { name: '改名后' },
     })
 
     const logs = await logsFor(db, 'projects', 'p1')
@@ -353,13 +361,17 @@ describe('写路径包装:logCreate / withUpdateLog', () => {
 
     // 不存在的 id:mutate 不执行、无日志
     let ran = false
-    expect(await withUpdateLog(db, 'projects', '不存在', async () => { ran = true })).toBeNull()
+    expect(await withUpdateLog(db, 'projects', '不存在', async () => {
+      ran = true
+    })).toBeNull()
     expect(ran).toBe(false)
     expect(await logsFor(db, 'projects', '不存在')).toHaveLength(0)
 
     // 已软删的记录同样拒绝编辑
     await softDelete(db, 'projects', 'p1')
-    expect(await withUpdateLog(db, 'projects', 'p1', async () => { ran = true })).toBeNull()
+    expect(await withUpdateLog(db, 'projects', 'p1', async () => {
+      ran = true
+    })).toBeNull()
     expect(ran).toBe(false)
     db.close()
   })
@@ -380,7 +392,9 @@ describe('撤回:undoOperation 按日志反做(DATABASE.md §8.3)', () => {
   it('撤回新增 = 软删除', async () => {
     const db = await dbWithProject()
     const logId = await logOperation(db, {
-      table: 'projects', recordId: 'p1', action: 'create',
+      table: 'projects',
+      recordId: 'p1',
+      action: 'create',
       after: await fetchRowById(db, 'projects', 'p1'),
     })
     expect(await undoOperation(db, logId)).toBe(true)
@@ -393,8 +407,11 @@ describe('撤回:undoOperation 按日志反做(DATABASE.md §8.3)', () => {
     const before = await fetchRowById(db, 'projects', 'p1')
     await db.execute(`UPDATE projects SET name = ?, status = ? WHERE id = ?`, ['改名后', '施工中', 'p1'])
     const logId = await logOperation(db, {
-      table: 'projects', recordId: 'p1', action: 'update',
-      before, after: await fetchRowById(db, 'projects', 'p1'),
+      table: 'projects',
+      recordId: 'p1',
+      action: 'update',
+      before,
+      after: await fetchRowById(db, 'projects', 'p1'),
     })
 
     expect(await undoOperation(db, logId)).toBe(true)
@@ -458,7 +475,9 @@ describe('createSoftDeleteActions:store 软删三连工厂', () => {
   it('remove/restore 后重载;undo 仅成功时重载', async () => {
     const db = await dbWithProject()
     let reloads = 0
-    const actions = createSoftDeleteActions(db, 'projects', async () => { reloads++ })
+    const actions = createSoftDeleteActions(db, 'projects', async () => {
+      reloads++
+    })
 
     const logId = await actions.remove('p1')
     expect(logId).toBeTruthy()
@@ -481,6 +500,69 @@ describe('createSoftDeleteActions:store 软删三连工厂', () => {
   it('未登记的表直接拒绝(含 ADR-0001 废弃表)', async () => {
     const db = await dbWithProject()
     expect(() => createSoftDeleteActions(db, 'ticket_registrations', async () => {})).toThrow('未登记')
+    db.close()
+  })
+})
+
+describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts 内联上移)', () => {
+  it('suppliers 建父 + 若干可见子,按可见集计数,只含 n>0 的项', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '华东建材')`)
+    await db.execute(`INSERT INTO invoices (id, supplier_id, invoice_number) VALUES ('inv1', 's1', 'FP001'), ('inv2', 's1', 'FP002')`)
+    await db.execute(`INSERT INTO supplier_credentials (id, supplier_id, category) VALUES ('c1', 's1', '营业执照')`)
+
+    const impact = await downstreamImpact(db, 'suppliers', 's1')
+    expect(impact).toEqual(expect.arrayContaining([
+      { table: 'invoices', n: 2 },
+      { table: 'supplier_credentials', n: 1 },
+    ]))
+    // 无数据的子表(project_suppliers/expenditure_contracts/contracts/payment_applications)不出现
+    expect(impact.map(i => i.table).sort()).toEqual(['invoices', 'supplier_credentials'])
+    db.close()
+  })
+
+  it('兄弟祖先隐藏:发票的另一父(项目)被删 → 不计入分供方的杀伤清单(可见集口径)', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '华东建材')`)
+    await db.execute(`INSERT INTO invoices (id, project_id, supplier_id, invoice_number) VALUES ('inv1', 'p1', 's1', 'FP001')`)
+
+    expect(await downstreamImpact(db, 'suppliers', 's1')).toEqual([{ table: 'invoices', n: 1 }])
+    await softDelete(db, 'projects', 'p1')
+    // 发票因项目祖先被删而隐藏,分供方杀伤清单不应再计入它
+    expect(await downstreamImpact(db, 'suppliers', 's1')).toEqual([])
+    db.close()
+  })
+
+  it('无下游数据返回空数组(驱动 UI 走 simple 删除)', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '孤家寡人')`)
+    expect(await downstreamImpact(db, 'suppliers', 's1')).toEqual([])
+    db.close()
+  })
+
+  it('自引用不被通用层特殊排除:suppliers 自身(parent_supplier_id)有真实下游时如实计入', async () => {
+    // 通用层保持"域无关":是否展示自引用杀伤是调用方（业务域）的判断，不在共享 downstreamImpact 里硬编码。
+    // 分供方域"无母子挂靠、不展示自引用"的过滤见 stores/supplier.ts 的 downstreamImpact 包装。
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await db.execute(`INSERT INTO suppliers (id, name, parent_supplier_id) VALUES ('s1', '总公司', NULL), ('s2', '分公司', 's1'), ('s3', '孙公司', 's2')`)
+    const impact = await downstreamImpact(db, 'suppliers', 's1')
+    // 直接子表计数(一跳):仅'分公司'(parent_supplier_id='s1'),不含递归孙辈
+    expect(impact).toContainEqual({ table: 'suppliers', n: 1 })
+    db.close()
+  })
+
+  it('parentTable=projects 回归:与域①现有行为一致(保证回退复用不破坏项目域)', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '华东建材')`)
+    await db.execute(`INSERT INTO project_suppliers (id, project_id, supplier_id) VALUES ('ps1', 'p1', 's1')`)
+    await db.execute(`INSERT INTO invoices (id, project_id, invoice_number) VALUES ('inv1', 'p1', 'FP001')`)
+
+    const impact = await downstreamImpact(db, 'projects', 'p1')
+    expect(impact.map(i => i.table).sort()).toEqual(['invoices', 'project_suppliers'])
+    expect(await downstreamImpact(db, 'projects', '不存在')).toEqual([])
     db.close()
   })
 })
