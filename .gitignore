@@ -38,5 +38,9 @@ docs/现实合同/
 docs/rewrite/工资发放格式/
 DC重构设计源码/screenshots/
 
+# DC 数据蓝本（含红圈真实业务数据，不上传；下轮实装为 kit/data.local.js 双轨）
+DC重构设计源码/数据蓝本/
+DC重构设计源码/kit/data.local.js
+
 # Claude Code 本地配置
 .claude/settings.local.json

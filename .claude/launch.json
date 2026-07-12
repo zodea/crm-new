@@ -4,8 +4,14 @@
     {
       "name": "nuxt-dev",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["nuxi", "dev", "--port", "3000"],
-      "port": 3000
+      "runtimeArgs": ["nuxi", "dev"],
+      "autoPort": true
+    },
+    {
+      "name": "nuxt-dev-3001",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["nuxi", "dev", "--port", "3001"],
+      "port": 3001
     },
     {
       "name": "dc-design",
