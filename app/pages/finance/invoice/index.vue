@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
+import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
 import { formatMoney, yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
-const { success, warning, info, undoToast, formModal, promise } = useKitUI()
+const { success, warning, info, undoToast, formModal, confirm, promise } = useKitUI()
 
 const activeTab = ref<'docs' | 'review' | 'ledger'>('docs')
 const searchText = ref('')
@@ -281,16 +282,34 @@ async function confirmSelected() {
   success('已确认，可归档或在台账页归档')
 }
 
+/**
+ * 工作台单票归档(#63)：归属已在校对表单内联收集（对应项目/个人开支，缺归属时按钮禁用到不了这里），
+ * 直接按解析结果归档，不再弹归属选择框（台账页的归档仍走 archiveInvoiceFlow 弹窗）。
+ */
 async function archiveSelected() {
   if (!selectedId.value)
     return
   const inv = store.byId(selectedId.value)
   if (!inv)
     return
-  const ok = await archiveInvoiceFlow(inv)
+  const attribution = resolveAttribution(inv, findProjectByName)
+  if (!attribution) {
+    warning('缺归属：填写对应项目或选个人开支后方可归档')
+    return
+  }
+  const result = await store.archiveInvoice(
+    inv.id,
+    attribution.ownerKind,
+    attribution.ownerKind === 'project' ? attribution.projectId : null,
+    attribution.ownerKind === 'project' ? attribution.projectName : undefined,
+  )
+  if (!result.ok) {
+    warning(result.reason ?? '归档失败')
+    return
+  }
+  success('已归档，计入台账')
   // 归档成功即离开工作台：清掉选中，不给已归档票留下残留的操作入口
-  if (ok)
-    selectedId.value = null
+  selectedId.value = null
 }
 
 // ── #60 上传双入口（按钮 useFileDialog + 全页拖拽 useDropZone）→ 桩识别队列 ──
@@ -362,6 +381,38 @@ async function handleRerecognize() {
     warning('无法重新识别：该票已归档或正在识别中')
 }
 
+// ── 批量通过(#63)：全绿票(建议通过池)一次放行——有归属的确认+归档,缺归属的排除并列清单 ──
+
+const batchPassing = ref(false)
+
+async function handleBatchPass() {
+  if (batchPassing.value || !store.suggestPass.length)
+    return
+  batchPassing.value = true
+  try {
+    const r = await promise(store.batchPass(), {
+      loading: `批量通过 ${store.suggestPass.length} 张…`,
+      success: ({ archived }) => `已通过并归档 ${archived} 张`,
+      error: () => '批量通过出错',
+    })
+    if (r.excluded.length) {
+      await confirm({
+        title: `已排除 ${r.excluded.length} 张（缺归属）`,
+        message: `${r.excluded.map(e => `·「${e.label}」— ${e.reason}`).join('\n')}\n\n补齐对应项目或选个人开支后可再次批量通过。`,
+        confirmLabel: '知道了',
+        cancelLabel: '关闭',
+      })
+    }
+    // 选中票若在本轮被归档,清掉选中(已归档票不留工作台操作入口)
+    const sel = selectedId.value ? store.byId(selectedId.value) : undefined
+    if (sel?.accountStatus === 'archived')
+      selectedId.value = null
+  }
+  finally {
+    batchPassing.value = false
+  }
+}
+
 // 废弃 = 软删除 + 10 秒 undoToast 撤回（#60 验收④）；已归档票不可废弃（已计入台账，删除走台账页确认弹窗）
 async function handleDiscard() {
   if (!selectedId.value)
@@ -406,6 +457,9 @@ const workspaceRows = computed(() =>
     .map((inv) => {
       const progress = store.recognitionProgress[inv.id]
       const status = invoiceDocStatus(inv, progress != null)
+      // #63:全绿待校对票标「建议通过」(只标记不自动归档,人工点批量通过放行)
+      if (status === 'unreviewed' && isAllGreen(inv.fieldConfidence))
+        return { inv, label: '建议通过', cls: 'chip-ok' }
       return {
         inv,
         label: status === 'recognizing' ? `识别中 ${progress}%` : WORKSPACE_STATUS_LABEL[status],
@@ -463,13 +517,22 @@ onMounted(() => {
         <span class="i-lucide-plus text-13px mr-1" /> 手动录入
       </button>
       <button
-        class="btn-primary mr-1"
+        class="btn-primary mr-2"
         :disabled="recognizing || pendingCount === 0"
         :title="pendingCount === 0 ? '没有待识别的发票' : `识别 ${pendingCount} 张待识别发票`"
         @click="handleBatchRecognize"
       >
         <span class="text-13px mr-1" :class="recognizing ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-scan-text'" />
         批量识别{{ pendingCount > 0 ? ` ${pendingCount}` : '' }}
+      </button>
+      <button
+        class="btn-primary mr-1"
+        :disabled="batchPassing || store.suggestPass.length === 0"
+        :title="store.suggestPass.length === 0 ? '没有全绿(建议通过)的发票' : `放行 ${store.suggestPass.length} 张建议通过发票(有归属的确认+归档,缺归属的排除并列出)`"
+        @click="handleBatchPass"
+      >
+        <span class="text-13px mr-1" :class="batchPassing ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-check-check'" />
+        批量通过{{ store.suggestPass.length > 0 ? ` ${store.suggestPass.length}` : '' }}
       </button>
     </div>
 

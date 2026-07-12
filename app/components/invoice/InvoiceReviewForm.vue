@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConfidenceTier } from '~/lib/invoice/recognize'
 import type { Invoice } from '~/stores/invoice'
+import { resolveAttribution } from '~/lib/invoice/batch-pass'
 import { confidenceTier } from '~/lib/invoice/recognize'
 import { formatMoney } from '~/lib/util/money'
 
@@ -69,7 +70,25 @@ const TIER_BADGE: Record<ConfidenceTier, string> = {
   danger: 'text-danger-ink',
 }
 
+/**
+ * 归属解析(#63 归档强制归属):项目须命中项目主数据规范名 / 个人开支直通;
+ * null = 对应项目字段标红 + 「归档入账」按钮禁用的判定依据。
+ */
+const attribution = computed(() =>
+  resolveAttribution(props.invoice, name => projectStore.list.find(p => p.name === name)),
+)
+const isPersonal = computed(() => props.invoice.ownerKind === 'personal')
+
+function setOwnerKind(kind: 'project' | 'personal') {
+  if (props.invoice.ownerKind === kind)
+    return
+  store.correctField(props.invoice.id, 'ownerKind', kind)
+}
+
 function inputClass(f: FieldDef): string {
+  // 缺归属时对应项目标红(#63):归档强制归属的就地提示(选了个人开支则不标)
+  if (f.key === 'projectName' && !isPersonal.value && !attribution.value)
+    return 'border-danger!'
   const t = tiers.value[f.key]
   return t ? TIER_INPUT[t] : ''
 }
@@ -257,7 +276,31 @@ const showItems = ref(false)
       重复票已排除，不可确认/归档——可废弃，或重新识别后按新发票号重判
     </div>
 
-    <!-- 操作条：[废弃]←危险靠左 …… [重新识别][确认/归档]；已归档票整条隐藏 -->
+    <!-- 归属(#63 归档强制归属)：项目(对应项目须命中主数据) 或 个人开支 两类出口 -->
+    <div v-if="!isArchived && !isDuplicate" class="flex items-center gap-1.5 text-11px">
+      <span class="text-ink-soft shrink-0">归属</span>
+      <button
+        type="button"
+        class="chip cursor-pointer transition-colors"
+        :class="!isPersonal ? 'chip-brand' : 'bg-surface-3 text-ink-soft'"
+        @click="setOwnerKind('project')"
+      >
+        项目
+      </button>
+      <button
+        type="button"
+        class="chip cursor-pointer transition-colors"
+        :class="isPersonal ? 'chip-brand' : 'bg-surface-3 text-ink-soft'"
+        @click="setOwnerKind('personal')"
+      >
+        个人开支
+      </button>
+      <span v-if="!attribution" class="text-danger-ink truncate">
+        未归属：填写对应项目（须为已有项目）或选个人开支
+      </span>
+    </div>
+
+    <!-- 操作条：[废弃]←危险靠左 …… [重新识别][确认/归档入账]；已归档票整条隐藏 -->
     <div v-if="!isArchived" class="flex items-center justify-between pt-3 border-t border-line">
       <button class="btn-danger text-12px" @click="emit('discard')">
         <span class="i-lucide-trash-2 text-12px mr-1" /> 废弃
@@ -277,9 +320,11 @@ const showItems = ref(false)
           <button
             v-else-if="invoice.accountStatus === 'none'"
             class="btn-primary text-12px"
+            :disabled="!attribution"
+            :title="attribution ? '归档并计入台账' : '缺归属：填写对应项目或选个人开支后方可归档'"
             @click="emit('archive')"
           >
-            <span class="i-lucide-archive text-12px mr-1" /> 归档
+            <span class="i-lucide-archive text-12px mr-1" /> 归档入账
           </button>
         </template>
       </div>

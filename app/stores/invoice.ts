@@ -4,6 +4,7 @@ import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
+import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
 import { formatFileSize } from '~/lib/util/file'
 import { generateId } from '~/lib/util/id'
@@ -409,7 +410,45 @@ export const useInvoiceStore = defineStore('invoice', () => {
     return { ok: true }
   }
 
+  /** 「建议通过」池(#63):工作台内全绿扫描件——只标记不自动归档,是「批量通过」的放行范围。 */
+  const suggestPass = computed(() => selectBatchCandidates(list.value))
+
+  /**
+   * 批量通过(#63):对建议通过池分拣——有归属(项目命中主数据 / 个人开支)的票依次
+   * 确认(未校对的补确认)+ 归档,缺归属的排除并返回清单(UI 原样列出)。
+   * 全绿只是入围条件,判决权在人:本动作只由用户点「批量通过」触发,绝不自动执行。
+   */
+  async function batchPass() {
+    const projectStore = useProjectStore()
+    const { pass, excluded } = partitionBatchPass(
+      suggestPass.value,
+      name => projectStore.list.find(p => p.name === name),
+    )
+    let archived = 0
+    const rejected = excluded.map(e => ({ id: e.inv.id, label: e.inv.invoiceNumber || e.inv.fileName || e.inv.id, reason: e.reason }))
+    for (const { inv, attribution } of pass) {
+      if (inv.reviewStatus === 'unreviewed') {
+        const confirmed = await confirmInvoice(inv.id)
+        if (!confirmed.ok) {
+          rejected.push({ id: inv.id, label: inv.invoiceNumber || inv.fileName || inv.id, reason: confirmed.reason ?? '确认失败' })
+          continue
+        }
+      }
+      const result = await archiveInvoice(
+        inv.id,
+        attribution.ownerKind,
+        attribution.ownerKind === 'project' ? attribution.projectId : null,
+        attribution.ownerKind === 'project' ? attribution.projectName : undefined,
+      )
+      if (result.ok)
+        archived++
+      else
+        rejected.push({ id: inv.id, label: inv.invoiceNumber || inv.fileName || inv.id, reason: result.reason ?? '归档失败' })
+    }
+    return { archived, excluded: rejected }
+  }
+
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, remove, restore, undo }
+  return { list: readonly(list), loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
 })

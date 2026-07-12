@@ -63,7 +63,8 @@ function stopTimer() {
 function startTimer() {
   stopTimer()
   timer = setInterval(() => {
-    if (!hold.value) return
+    if (!hold.value)
+      return
     hold.value = tickHold(hold.value, Date.now())
     remainingMs.value = holdRemaining(hold.value, Date.now())
     if (hold.value.phase === 'committed') {
@@ -75,7 +76,8 @@ function startTimer() {
 
 function onConfirm() {
   if (props.variant === 'cascade') {
-    if (!confirmEnabled.value || holding.value) return
+    if (!confirmEnabled.value || holding.value)
+      return
     hold.value = beginHold(createHold(props.holdMs), Date.now())
     remainingMs.value = hold.value.holdMs
     startTimer()
@@ -87,7 +89,8 @@ function onConfirm() {
 
 // 撤销挂起 / Esc / 遮罩点击 / 取消：一律中止并回传 cancel（不提交）。
 function onCancel() {
-  if (hold.value) hold.value = cancelHold(hold.value)
+  if (hold.value)
+    hold.value = cancelHold(hold.value)
   stopTimer()
   emit('cancel')
 }
@@ -95,7 +98,8 @@ function onCancel() {
 // reka 请求关闭（Esc / 点遮罩）→ 统一按取消处理（关闭都是安全路径）。
 // 提交路径由宿主改 open=false 收起，不经此回调，故不会误触发 cancel。
 function onOpenChange(value: boolean) {
-  if (!value) onCancel()
+  if (!value)
+    onCancel()
 }
 
 // 危险操作焦点默认停在「取消」（安全选项，规格 §01）。
@@ -124,7 +128,8 @@ onBeforeUnmount(stopTimer)
     <DialogContent :show-close="false" class="w-[min(440px,92vw)] p-5" @open-auto-focus="onOpenAutoFocus">
       <DialogTitle>{{ title }}</DialogTitle>
 
-      <DialogDescription class="mt-3 leading-relaxed">
+      <!-- whitespace-pre-line:message 支持 \n 多行(批量通过排除清单等列表型消息),单行消息渲染不变 -->
+      <DialogDescription class="mt-3 leading-relaxed whitespace-pre-line">
         {{ message }}
       </DialogDescription>
 
@@ -138,7 +143,9 @@ onBeforeUnmount(stopTimer)
         v-if="variant === 'cascade' && impact?.length"
         class="mt-3 rounded-[var(--radius-btn)] bg-danger-soft border border-line px-3 py-2"
       >
-        <div class="text-12px text-danger-ink font-700 mb-1.5">此操作将影响以下关联数据：</div>
+        <div class="text-12px text-danger-ink font-700 mb-1.5">
+          此操作将影响以下关联数据：
+        </div>
         <ul class="flex flex-wrap gap-x-4 gap-y-1">
           <li v-for="it in impact" :key="it.label" class="text-12px text-ink-soft">
             {{ it.label }} <b class="text-danger-ink">×{{ it.n }}</b>
