@@ -1,70 +1,101 @@
 <script setup lang="ts">
+import type { StatusTone } from '~/lib/supplier/status'
 import type { Supplier } from '~/stores/supplier'
+import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 
 const store = useSupplierStore()
-const toast = useToast()
+const { confirm, undoToast, success, error } = useKitUI()
 
 const searchText = ref('')
-const showForm = ref(false)
-const editing = ref<Partial<Supplier>>({})
-const isEditing = ref(false)
+const categoryFilter = ref('all') // 'all' = 全部（reka Select 不接受空串值，用哨兵）
+const statusFilter = ref('all')
 
-const CATEGORY_OPTIONS = ['材料供应商', '劳务分包商', '设备供应商', '其他']
-const CRED_STATUS_COLOR: Record<string, string> = {
-  incomplete: 'cell--status-warn',
-  reviewing: 'text-brand font-600',
-  qualified: 'cell--status-ok',
-  rejected: 'cell--status-danger',
+const showForm = ref(false)
+const editingRow = ref<Supplier | null>(null) // null = 新增
+
+const CATEGORY_FILTER_OPTIONS = [
+  { key: 'all', label: '全部类别' },
+  ...SUPPLIER_CATEGORIES.map(c => ({ key: c, label: c })),
+]
+const STATUS_FILTER_OPTIONS = [
+  { key: 'all', label: '全部状态' },
+  ...CREDENTIAL_STATUSES.map(s => ({ key: s, label: CREDENTIAL_STATUS_LABEL[s] ?? s })),
+]
+// 语义色调 → 列表页 class（色调映射见 ~/lib/supplier/status，新增状态在那登记即可）
+const TONE_CELL: Record<StatusTone, string> = {
+  warn: 'cell--status-warn',
+  brand: 'text-brand font-600',
+  ok: 'cell--status-ok',
+  danger: 'cell--status-danger',
 }
-const CRED_STATUS_LABEL: Record<string, string> = {
-  incomplete: '资料缺失',
-  reviewing: '审核中',
-  qualified: '合格',
-  rejected: '退回',
+function statusClass(status: string): string {
+  const tone = CREDENTIAL_STATUS_TONE[status]
+  return tone ? TONE_CELL[tone] : ''
 }
 
 const filtered = computed(() => {
   const q = searchText.value.trim().toLowerCase()
-  if (!q) return [...store.list]
-  return store.list.filter(s =>
-    s.name.toLowerCase().includes(q)
-    || s.contact.toLowerCase().includes(q)
-    || s.taxNo.toLowerCase().includes(q)
-    || s.supplierCategory.toLowerCase().includes(q),
-  )
+  const cat = categoryFilter.value
+  const st = statusFilter.value
+  return store.list.filter((s) => {
+    if (cat !== 'all' && s.supplierCategory !== cat)
+      return false
+    if (st !== 'all' && s.credentialStatus !== st)
+      return false
+    if (!q)
+      return true
+    return s.name.toLowerCase().includes(q)
+      || s.contact.toLowerCase().includes(q)
+      || s.taxNo.toLowerCase().includes(q)
+      || s.supplierCategory.toLowerCase().includes(q)
+  })
 })
 
 function openCreate() {
-  editing.value = { supplierCategory: '材料供应商' }
-  isEditing.value = false
+  editingRow.value = null
   showForm.value = true
 }
 
 function openEdit(row: Supplier) {
-  editing.value = { ...row }
-  isEditing.value = true
+  editingRow.value = row
   showForm.value = true
 }
 
-async function handleSave() {
-  if (!editing.value.name?.trim()) {
-    toast.warning('请填写公司全称')
+// 删除按 ADR 0003 分两档（一律先 confirm）：
+// - 无下游 → simple confirm → 软删 + 10 秒 undoToast 撤回；
+// - 有下游 → cascade confirm（打分供方名 + ≥3 秒预提交挂起）→ 软删；级联已是高摩擦，刻意不再另给 undoToast。
+async function handleDelete(row: Supplier) {
+  const impact = await store.downstreamImpact(row.id)
+  const cascade = impact.length > 0
+  const ok = await confirm(cascade
+    ? {
+        variant: 'cascade',
+        title: '删除分供方',
+        message: `“${row.name}”挂有下游数据，删除后其下游数据一并隐藏。`,
+        requireTyping: row.name,
+        impact,
+        confirmLabel: '删除',
+      }
+    : {
+        variant: 'simple',
+        title: '删除分供方',
+        message: `确认删除分供方「${row.name}」？删除后可在 10 秒内撤回。`,
+        confirmLabel: '删除',
+      })
+  if (!ok)
+    return
+
+  const logId = await store.remove(row.id)
+  if (!logId) {
+    error('删除失败：分供方不存在或已删除')
     return
   }
-  if (isEditing.value && editing.value.id) {
-    await store.update(editing.value.id, editing.value)
-    toast.success('分供方已更新')
+  if (cascade) {
+    success(`已删除「${row.name}」及其下游数据`)
   }
   else {
-    await store.add(editing.value)
-    toast.success('分供方已创建')
+    undoToast(`已删除「${row.name}」`, () => store.undo(logId))
   }
-  showForm.value = false
-}
-
-async function handleDelete(row: Supplier) {
-  await store.remove(row.id)
-  toast.success('已删除')
 }
 
 onMounted(() => store.load())
@@ -79,13 +110,29 @@ onMounted(() => store.load())
       @create="openCreate"
     />
 
+    <!-- 类别 / 资料状态筛选 -->
+    <div class="flex items-center gap-2 pb-2.5 px-1">
+      <SelectFilter
+        v-model="categoryFilter"
+        label="类别"
+        :options="CATEGORY_FILTER_OPTIONS"
+        placeholder="全部类别"
+      />
+      <SelectFilter
+        v-model="statusFilter"
+        label="资料状态"
+        :options="STATUS_FILTER_OPTIONS"
+        placeholder="全部状态"
+      />
+    </div>
+
     <div class="border border-line">
       <vxe-table
         :data="filtered"
         :loading="store.loading"
         border
-        show-overflow
-        height="auto"
+        show-overflow="title"
+        max-height="640"
         :row-config="{ isHover: true, keyField: 'id' }"
         :column-config="{ resizable: true }"
       >
@@ -109,8 +156,8 @@ onMounted(() => store.load())
         <vxe-column field="contactPhone" title="联系方式" width="120" />
         <vxe-column field="credentialStatus" title="资料状态" width="90">
           <template #default="{ row }">
-            <span :class="CRED_STATUS_COLOR[row.credentialStatus] || ''">
-              {{ CRED_STATUS_LABEL[row.credentialStatus] || row.credentialStatus }}
+            <span :class="statusClass(row.credentialStatus)">
+              {{ CREDENTIAL_STATUS_LABEL[row.credentialStatus] || row.credentialStatus }}
             </span>
           </template>
         </vxe-column>
@@ -132,110 +179,7 @@ onMounted(() => store.load())
       </vxe-table>
     </div>
 
-    <!-- 新增/编辑弹窗 -->
-    <FormDialog
-      :open="showForm"
-      :title="isEditing ? '编辑分供方' : '新增分供方'"
-      :sections="[
-        { key: 'basic', label: '基础信息' },
-        { key: 'invoice', label: '开票/银行' },
-        { key: 'contact', label: '联系/其他' },
-      ]"
-      @save="handleSave"
-      @cancel="showForm = false"
-    >
-      <section id="form-section-basic" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">基础信息</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div class="col-span-2">
-            <label class="field-label">公司全称 *</label>
-            <input v-model="editing.name" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">分供方类别</label>
-            <select v-model="editing.supplierCategory" class="field-input w-full">
-              <option v-for="c in CATEGORY_OPTIONS" :key="c" :value="c">{{ c }}</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">统一社会信用代码/税号</label>
-            <input v-model="editing.taxNo" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">法定代表人</label>
-            <input v-model="editing.legalRep" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">注册资金 (万元)</label>
-            <input v-model.number="editing.registeredCapital" type="number" class="field-input w-full">
-          </div>
-          <div class="col-span-2">
-            <label class="field-label">注册地址</label>
-            <input v-model="editing.address" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">主营业务</label>
-            <input v-model="editing.mainBusiness" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">业务类型</label>
-            <input v-model="editing.businessType" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <section id="form-section-invoice" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">开票/银行</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div>
-            <label class="field-label">开票名称</label>
-            <input v-model="editing.invoiceName" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">纳税人类型</label>
-            <input v-model="editing.taxpayerType" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">开户行</label>
-            <input v-model="editing.bank" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">银行账号</label>
-            <input v-model="editing.bankAccount" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">开票地址</label>
-            <input v-model="editing.invoiceAddress" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">电话</label>
-            <input v-model="editing.phone" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <section id="form-section-contact" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">联系/其他</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div>
-            <label class="field-label">主要联系人 (签约代表)</label>
-            <input v-model="editing.contact" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">联系方式</label>
-            <input v-model="editing.contactPhone" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">评价等级</label>
-            <input v-model="editing.rating" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <div>
-        <label class="field-label">备注</label>
-        <textarea v-model="editing.note" class="field-input w-full" rows="3" />
-      </div>
-    </FormDialog>
+    <!-- 新增/编辑表单（列表页与详情页共用同一组件） -->
+    <SupplierFormDialog v-model:open="showForm" :supplier="editingRow" />
   </div>
 </template>

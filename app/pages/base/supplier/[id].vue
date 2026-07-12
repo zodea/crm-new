@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { Supplier } from '~/stores/supplier'
+import type { StatusTone } from '~/lib/supplier/status'
+import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE } from '~/lib/supplier/status'
 
 const route = useRoute()
 const store = useSupplierStore()
 const psStore = useProjectSupplierStore()
-const toast = useToast()
 
 const supplierId = computed(() => route.params.id as string)
 const supplier = computed(() => store.byId(supplierId.value))
@@ -22,34 +22,21 @@ const tabs = [
   { key: 'tickets', label: '收票汇总' },
 ]
 
+// 顶部「编辑」与列表页共用同一份 SupplierFormDialog（v-model:open + supplier 驱动，保存逻辑收在组件内）。
 const showEdit = ref(false)
-const editing = ref<Partial<Supplier>>({})
 
-function openEdit() {
-  if (!supplier.value) return
-  editing.value = { ...supplier.value }
-  showEdit.value = true
+// 语义色调 → 详情页 chip class（色调映射见 ~/lib/supplier/status，恰好与 chip-<tone> 类名一一对应）
+const CHIP_TONE_CLASS: Record<StatusTone, string> = {
+  warn: 'chip-warn',
+  brand: 'chip-brand',
+  ok: 'chip-ok',
+  danger: 'chip-danger',
 }
-
-async function handleSave() {
-  if (!editing.value.id) return
-  await store.update(editing.value.id, editing.value)
-  toast.success('分供方信息已更新')
-  showEdit.value = false
+function credentialChipClass(status: string): string {
+  const tone = CREDENTIAL_STATUS_TONE[status]
+  return tone ? CHIP_TONE_CLASS[tone] : ''
 }
 
-const CRED_LABEL: Record<string, string> = {
-  incomplete: '资料缺失',
-  reviewing: '审核中',
-  qualified: '合格',
-  rejected: '退回',
-}
-const CRED_COLOR: Record<string, string> = {
-  incomplete: 'chip-warn',
-  reviewing: 'chip-brand',
-  qualified: 'chip-ok',
-  rejected: 'chip-danger',
-}
 const COOP_STATUS_LABEL: Record<string, string> = {
   collecting: '资料收集',
   contracted: '已签合同',
@@ -76,35 +63,49 @@ onMounted(async () => {
         <NuxtLink to="/base/supplier" class="icon-btn" title="返回列表">
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
-        <h2 class="text-17px font-800 text-ink">{{ supplier.name }}</h2>
-        <span :class="['chip', CRED_COLOR[supplier.credentialStatus]]">
-          {{ CRED_LABEL[supplier.credentialStatus] || supplier.credentialStatus }}
+        <h2 class="text-17px font-800 text-ink">
+          {{ supplier.name }}
+        </h2>
+        <span class="chip" :class="[credentialChipClass(supplier.credentialStatus)]">
+          {{ CREDENTIAL_STATUS_LABEL[supplier.credentialStatus] || supplier.credentialStatus }}
         </span>
         <div class="flex-1" />
-        <button class="btn-secondary" @click="openEdit">
+        <button class="btn-secondary" @click="showEdit = true">
           <span class="i-lucide-square-pen text-13px mr-1" /> 编辑
         </button>
       </div>
       <div class="info-row text-12px">
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">类别</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            类别
+          </div>
           <div>{{ supplier.supplierCategory || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">评价</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            评价
+          </div>
           <div>{{ supplier.rating || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">联系人</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            联系人
+          </div>
           <div>{{ supplier.contact || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">电话</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            电话
+          </div>
           <div>{{ supplier.contactPhone || '—' }}</div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">税号</div>
-          <div class="font-mono text-11px">{{ supplier.taxNo || '—' }}</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            税号
+          </div>
+          <div class="font-mono text-11px">
+            {{ supplier.taxNo || '—' }}
+          </div>
         </div>
       </div>
     </div>
@@ -150,11 +151,13 @@ onMounted(async () => {
           </vxe-column>
           <vxe-column field="status" title="合作状态" width="100">
             <template #default="{ row }">
-              <span :class="{
-                'cell--status-warn': row.status === 'collecting',
-                'text-brand font-600': row.status === 'contracted' || row.status === 'claiming',
-                'cell--status-ok': row.status === 'paid' || row.status === 'settled',
-              }">
+              <span
+                :class="{
+                  'cell--status-warn': row.status === 'collecting',
+                  'text-brand font-600': row.status === 'contracted' || row.status === 'claiming',
+                  'cell--status-ok': row.status === 'paid' || row.status === 'settled',
+                }"
+              >
                 {{ COOP_STATUS_LABEL[row.status] || row.status }}
               </span>
             </template>
@@ -172,98 +175,8 @@ onMounted(async () => {
       {{ tabs.find(t => t.key === activeTab)?.label }} — 待实现（需对应业务模块数据）
     </div>
 
-    <!-- 编辑弹窗复用列表页的表单结构 -->
-    <FormDialog
-      :open="showEdit"
-      title="编辑分供方"
-      :sections="[
-        { key: 'basic', label: '基础信息' },
-        { key: 'invoice', label: '开票/银行' },
-        { key: 'contact', label: '联系/其他' },
-      ]"
-      @save="handleSave"
-      @cancel="showEdit = false"
-    >
-      <section id="form-section-basic" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">基础信息</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div class="col-span-2">
-            <label class="field-label">公司全称 *</label>
-            <input v-model="editing.name" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">分供方类别</label>
-            <select v-model="editing.supplierCategory" class="field-input w-full">
-              <option value="材料供应商">材料供应商</option>
-              <option value="劳务分包商">劳务分包商</option>
-              <option value="设备供应商">设备供应商</option>
-              <option value="其他">其他</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label">税号</label>
-            <input v-model="editing.taxNo" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">法定代表人</label>
-            <input v-model="editing.legalRep" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">注册资金 (万元)</label>
-            <input v-model.number="editing.registeredCapital" type="number" class="field-input w-full">
-          </div>
-          <div class="col-span-2">
-            <label class="field-label">注册地址</label>
-            <input v-model="editing.address" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">主营业务</label>
-            <input v-model="editing.mainBusiness" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <section id="form-section-invoice" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">开票/银行</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div>
-            <label class="field-label">开户行</label>
-            <input v-model="editing.bank" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">银行账号</label>
-            <input v-model="editing.bankAccount" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">开票地址</label>
-            <input v-model="editing.invoiceAddress" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">电话</label>
-            <input v-model="editing.phone" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <section id="form-section-contact" class="mb-6">
-        <h4 class="text-13px font-800 text-brand-deep mb-3">联系/其他</h4>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-          <div>
-            <label class="field-label">主要联系人</label>
-            <input v-model="editing.contact" class="field-input w-full">
-          </div>
-          <div>
-            <label class="field-label">联系方式</label>
-            <input v-model="editing.contactPhone" class="field-input w-full">
-          </div>
-        </div>
-      </section>
-
-      <div>
-        <label class="field-label">备注</label>
-        <textarea v-model="editing.note" class="field-input w-full" rows="3" />
-      </div>
-    </FormDialog>
+    <!-- 编辑弹窗与列表页共用同一 SupplierFormDialog -->
+    <SupplierFormDialog v-model:open="showEdit" :supplier="supplier" />
   </div>
 
   <div v-else class="py-12 text-center text-ink-faint">
