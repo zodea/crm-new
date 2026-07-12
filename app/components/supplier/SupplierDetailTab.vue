@@ -17,7 +17,8 @@ const basicFields: FieldDef[] = [
   { label: '分供方类别', key: 'supplierCategory' },
   { label: '业务类型', key: 'businessType' },
   { label: '评价等级', key: 'rating' },
-  { label: '统一社会信用代码', key: 'taxNo', mono: true },
+  { label: '统一社会信用代码', key: 'uniqueCode', mono: true },
+  { label: '税号', key: 'taxNo', mono: true },
   { label: '法定代表人', key: 'legalRep' },
   { label: '注册资金', key: 'registeredCapital' },
   { label: '注册日期', key: 'registeredDate' },
@@ -43,9 +44,12 @@ const contactFields: FieldDef[] = [
 
 function display(supplier: Supplier, key: keyof Supplier): string {
   const val = supplier[key]
-  if (val == null || val === '') return '—'
-  if (typeof val === 'number') return val.toLocaleString()
-  if (Array.isArray(val)) return val.join('、') || '—'
+  if (val == null || val === '')
+    return '—'
+  if (typeof val === 'number')
+    return val.toLocaleString()
+  if (Array.isArray(val))
+    return val.join('、') || '—'
   return String(val)
 }
 </script>
