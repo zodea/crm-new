@@ -167,6 +167,23 @@ export const migrations: Migration[] = [
       await execScript(db, V3_CONTRACTS)
     },
   },
+  {
+    // 发票归属铁律(ADR-0001/#57):owner_kind 非空才允许归档(account_status='archived')。
+    // contract_id 仅预留(#57 范围不做外键关联);print_count 供后续打印功能(#64)累计;
+    // archived_at 与既有 confirmed_at 对称,记录归档动作的独立时间点(确认≠归档,两者是不同阶段)。
+    // account_status 同轮从三态(含旧值 'confirmed')收窄为两态('none'|'archived',见 stores/invoice.ts)——
+    // 存量库(Tauri 持久化 sqlite 文件,非纯内存)可能已有 'confirmed' 行,回填为 'none'（对应新语义
+    // "已确认待归档"，与新代码的 reviewStatus='reviewed' 组合一致，不会丢数据/凭空从台账消失）。
+    version: 4,
+    name: 'invoices-owner-kind-archive',
+    async up(db) {
+      await addColumnIfMissing(db, 'invoices', 'owner_kind', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'invoices', 'contract_id', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'invoices', 'print_count', 'INTEGER DEFAULT 0')
+      await addColumnIfMissing(db, 'invoices', 'archived_at', 'TEXT DEFAULT NULL')
+      await db.execute(`UPDATE invoices SET account_status = 'none' WHERE account_status = 'confirmed'`)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

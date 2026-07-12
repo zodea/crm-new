@@ -119,13 +119,30 @@ describe('seed 数据:灌入行为', () => {
     expect(await count('project_suppliers')).toBe(5)
     expect(await count('contracts')).toBe(31)
 
-    // 识别/归档状态谱系齐备
-    const states = await db.select<{ ocr_status: string, account_status: string, dup_status: string }>(
-      'SELECT ocr_status, account_status, dup_status FROM invoices',
+    // 识别/归档状态谱系齐备：account_status 两态 none(未归档)/archived(已归档，DATABASE.md §2.4 权威定义，
+    // 无 confirmed 中间值——「确认」由 review_status 独立承载，见 #57)
+    const states = await db.select<{ ocr_status: string, review_status: string, account_status: string, dup_status: string }>(
+      'SELECT ocr_status, review_status, account_status, dup_status FROM invoices',
     )
     expect(new Set(states.map(s => s.ocr_status))).toEqual(new Set(['done', 'pending']))
-    expect(new Set(states.map(s => s.account_status))).toEqual(new Set(['confirmed', 'none']))
+    expect(new Set(states.map(s => s.account_status))).toEqual(new Set(['none', 'archived']))
+    // 谱系含"已校对未归档"过渡态样例(reviewed + none)，否则台账「待归档」分组无法演示
+    expect(states.some(s => s.review_status === 'reviewed' && s.account_status === 'none')).toBe(true)
     expect(states.some(s => s.dup_status === 'duplicate')).toBe(true)
+    db.close()
+  })
+
+  it('§4.2 台账口径：已归档发票的归属字段齐备(owner_kind 非空, project 归属带 project_id)', async () => {
+    const db = await seededDb()
+    const archived = await db.select<{ owner_kind: string | null, project_id: string | null }>(
+      `SELECT owner_kind, project_id FROM invoices WHERE account_status = 'archived'`,
+    )
+    expect(archived.length, 'seed 里应至少有一条已归档发票,否则 §4.2 聚合口径无法演示').toBeGreaterThan(0)
+    for (const row of archived) {
+      expect(row.owner_kind, '已归档发票不应缺归属').not.toBeNull()
+      if (row.owner_kind === 'project')
+        expect(row.project_id, 'owner_kind=project 的已归档发票必须挂具体项目').not.toBeNull()
+    }
     db.close()
   })
 

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   addColumnIfMissing,
   execScript,
-  getCurrentVersion,
   LATEST_VERSION,
   migrations,
   runMigrations,
@@ -13,13 +12,28 @@ import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 /** 基线 schema 的全部业务表（与 schema.ts 四批建表一一对应） */
 const BASELINE_TABLES = [
-  'projects', 'suppliers', 'invoices', 'crews',
-  'supplier_credentials', 'project_suppliers', 'phase_tasks',
-  'construction_contracts', 'owner_change_orders', 'expenditure_contracts',
-  'invoice_applications', 'receipt_registrations', 'current_receipts',
-  'current_payments', 'payment_records', 'workers',
-  'settlements', 'supplement_agreements', 'contract_line_items',
-  'ticket_registrations', 'payment_applications', 'file_refs',
+  'projects',
+  'suppliers',
+  'invoices',
+  'crews',
+  'supplier_credentials',
+  'project_suppliers',
+  'phase_tasks',
+  'construction_contracts',
+  'owner_change_orders',
+  'expenditure_contracts',
+  'invoice_applications',
+  'receipt_registrations',
+  'current_receipts',
+  'current_payments',
+  'payment_records',
+  'workers',
+  'settlements',
+  'supplement_agreements',
+  'contract_line_items',
+  'ticket_registrations',
+  'payment_applications',
+  'file_refs',
 ]
 
 describe('迁移机制：版本化顺序迁移', () => {
@@ -171,6 +185,29 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     await expect(
       addColumnIfMissing(db, 'projects; DROP TABLE projects', 'x', 'TEXT'),
     ).rejects.toThrow('非法标识符')
+    db.close()
+  })
+
+  it('v4 升级路径：存量库遗留的 account_status=\'confirmed\' 回填为 \'none\'，不从台账口径凭空消失', async () => {
+    // 只跑到 v3，模拟本 PR 落地前已跑过旧版 confirmInvoice()（写 account_status='confirmed'）的存量库
+    // （该 app 走 Tauri 持久化 sqlite 文件，非纯内存，升级前的历史值必须被迁移正确处理）
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(m => m.version <= 3))
+    await db.execute(
+      `INSERT INTO invoices (id, review_status, account_status) VALUES ('inv_legacy', 'reviewed', 'confirmed')`,
+    )
+
+    const result = await runMigrations(db)
+    expect(result.from).toBe(3)
+    expect(result.to).toBe(LATEST_VERSION)
+
+    const [row] = await db.select<{ account_status: string, review_status: string }>(
+      `SELECT account_status, review_status FROM invoices WHERE id = 'inv_legacy'`,
+    )
+    // 回填为 'none'（两态口径的合法值），review_status 不受影响——落回「已确认待归档」过渡态，
+    // 而不是既不匹配 'archived' 也不匹配 'none' 从所有台账筛选视图里静默消失
+    expect(row.account_status).toBe('none')
+    expect(row.review_status).toBe('reviewed')
     db.close()
   })
 })
