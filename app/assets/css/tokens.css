@@ -50,6 +50,12 @@
   --sidebar-blur: blur(12px);
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
 
+  /* ── 选中内描边（导航项 active，对齐设计稿 spacing.css）── */
+  --ring-selected: inset 3px 0 0 var(--brand);
+
+  /* ── 字距 ── */
+  --tracking-wide: 0.02em;
+
   /* ── 弹窗浮层 ── */
   --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
 

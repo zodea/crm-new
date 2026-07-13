@@ -63,37 +63,44 @@ function act(fn: () => void) {
     router.push(tabsStore.activeFullPath)
 }
 
-useEventListener('click', () => { if (menu.value.open) closeMenu() })
-useEventListener('scroll', () => { if (menu.value.open) closeMenu() }, true)
-onKeyStroke('Escape', () => { if (menu.value.open) closeMenu() })
+useEventListener('click', () => {
+  if (menu.value.open)
+    closeMenu()
+})
+useEventListener('scroll', () => {
+  if (menu.value.open)
+    closeMenu()
+}, true)
+onKeyStroke('Escape', () => {
+  if (menu.value.open)
+    closeMenu()
+})
 </script>
 
 <template>
-  <div class="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface-2 px-2">
+  <!-- 红圈式页签栏（对齐设计稿 .dc-tabbar）：40px 高、页签贴底、active=白底+品牌色底线 -->
+  <div class="tabbar-scroll flex h-[40px] shrink-0 items-stretch gap-[2px] overflow-x-auto overflow-y-hidden border-b border-line bg-surface-2 px-[16px]">
     <button
       v-for="tab in tabsStore.tabs"
       :key="tab.key"
       type="button"
-      class="group/tab inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border px-2.5 text-12px transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+      class="inline-flex max-w-[200px] shrink-0 cursor-pointer select-none items-center gap-[6px] whitespace-nowrap rounded-t-[6px] px-[12px] text-13px transition-colors duration-[var(--dur-fast)] focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
       :class="tab.key === tabsStore.activeKey
-        ? 'border-line bg-panel font-600 text-brand-deep shadow-[var(--sidebar-shadow)]'
-        : 'border-transparent text-ink-soft hover:bg-surface-3 hover:text-ink'"
+        ? 'bg-panel font-800 text-brand shadow-[inset_0_-2px_0_var(--brand)] hover:text-brand-deep'
+        : 'font-600 text-ink-soft hover:bg-[rgba(17,24,39,0.05)] hover:text-ink'"
       @click="goTab(tab.fullPath, tab.key)"
       @click.middle.prevent="tab.closable && closeAndFollow(tab.key)"
       @contextmenu.prevent="openMenu($event, tab.key)"
     >
-      <span
-        v-if="tab.key === HOME_KEY"
-        class="i-lucide-home h-[13px] w-[13px] shrink-0"
-        aria-hidden="true"
-      />
-      <span class="max-w-[160px] truncate">{{ tab.title }}</span>
+      <span class="truncate">{{ tab.title }}</span>
       <span
         v-if="tab.closable"
-        class="i-lucide-x h-[13px] w-[13px] shrink-0 rounded-[3px] text-ink-faint opacity-60 hover:bg-surface-sink hover:text-danger hover:opacity-100"
-        aria-hidden="true"
+        class="grid h-[16px] w-[16px] shrink-0 cursor-pointer place-items-center rounded-[4px] text-ink-soft hover:bg-danger-soft hover:text-danger-ink"
+        title="关闭页签"
         @click.stop="closeAndFollow(tab.key)"
-      />
+      >
+        <span class="i-lucide-x h-[13px] w-[13px]" aria-hidden="true" />
+      </span>
     </button>
   </div>
 
@@ -141,3 +148,13 @@ onKeyStroke('Escape', () => { if (menu.value.open) closeMenu() })
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* 对齐设计稿 .dc-tabbar：横向可滚但不显示滚动条 */
+.tabbar-scroll {
+  scrollbar-width: none;
+}
+.tabbar-scroll::-webkit-scrollbar {
+  height: 0;
+}
+</style>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// 顶栏 —— SiteHeader 风格（对照官方 dashboard 示例）：SidebarTrigger + 分隔线 + 页面标题 + 工具按钮。
+// 顶栏 —— 对齐 DC 设计稿 app.dc.html header：两行标题（18px/800 title + 12px 副标）+
+// 右侧日期；保留 Nuxt 侧特性：SidebarTrigger、通知、设置、DevTools（dev only）。
 import { SidebarTrigger } from '~/components/ui/sidebar'
-import { routeTitle } from '~/lib/tabs/tab-title'
+import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
 
 const route = useRoute()
 
@@ -11,29 +12,42 @@ const isDev = import.meta.dev
 
 // 与页签栏共用同一套路由→标题映射，保持一致。
 const pageTitle = computed(() => routeTitle(route.path))
+const pageSubtitle = computed(() => routeSubtitle(route.path))
+
+// 顶栏日期（对齐设计稿「2026年6月29日 · 周一」；进入应用时定格，无需实时刷新）
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const
+const now = new Date()
+const today = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 · ${WEEKDAYS[now.getDay()]}`
 </script>
 
 <template>
   <header
-    class="flex h-[var(--header-h)] shrink-0 items-center gap-2 border-b border-line px-4"
+    class="flex h-[var(--header-h)] shrink-0 items-center gap-3 border-b border-line bg-[rgba(255,255,255,0.96)] px-6 backdrop-blur-[8px]"
   >
     <SidebarTrigger class="-ml-1" />
     <div class="mx-1 h-4 w-px bg-line" aria-hidden="true" />
-    <h1 class="text-17px font-500 text-ink">
-      {{ pageTitle }}
-    </h1>
+    <div class="min-w-0">
+      <h1 class="truncate text-18px font-800 leading-tight text-ink">
+        {{ pageTitle }}
+      </h1>
+      <div class="mt-0.5 min-h-4 truncate text-12px text-ink-soft">
+        {{ pageSubtitle }}
+      </div>
+    </div>
 
     <div class="flex-1" />
 
+    <span class="hidden text-12px text-ink-soft md:block">{{ today }}</span>
+
     <!-- 开发工具 (dev only) -->
-    <button v-if="isDev" class="icon-btn mr-2" title="开发工具" @click="showDevTools = true">
+    <button v-if="isDev" class="icon-btn ml-2" title="开发工具" @click="showDevTools = true">
       <span class="i-lucide-wrench text-15px text-warn" aria-hidden="true" />
     </button>
 
     <!-- 通知 -->
-    <button class="icon-btn mr-2 relative" title="通知" @click="showNotifications = true">
+    <button class="icon-btn relative" title="通知" @click="showNotifications = true">
       <span class="i-lucide-bell-ring text-15px" aria-hidden="true" />
-      <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-danger rounded-full" />
+      <span class="absolute h-2 w-2 rounded-full bg-danger -right-0.5 -top-0.5" />
     </button>
 
     <!-- 设置 -->
