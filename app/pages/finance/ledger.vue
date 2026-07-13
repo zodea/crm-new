@@ -168,39 +168,48 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-3">
+  <div class="flex flex-col gap-3.5">
     <!-- 工具栏：搜索 + 视图切换 -->
-    <div class="content-panel flex flex-wrap items-center gap-2.5 rounded-[var(--radius-card)] p-3">
-      <input
-        v-model="searchText"
-        class="field-input w-56"
-        placeholder="搜索编号 / 供应商 / 归属…"
-      >
-      <div class="flex-1" />
-      <div class="inline-flex overflow-hidden border border-line-strong rounded-[8px]">
-        <button
-          v-for="v in (['table', 'card'] as const)"
-          :key="v"
-          type="button"
-          class="inline-flex items-center gap-1 border-0 px-2.5 py-1.5 text-12px"
-          :class="view === v ? 'bg-brand-soft font-800 text-brand-deep' : 'bg-panel font-600 text-ink-soft hover:bg-surface-3'"
-          @click="view = v"
-        >
-          <span :class="v === 'table' ? 'i-lucide-table' : 'i-lucide-layout-grid'" class="h-[13px] w-[13px]" aria-hidden="true" />
-          {{ v === 'table' ? '表格' : '卡片' }}
-        </button>
+    <section class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
+      <div class="mr-1 flex flex-none items-baseline gap-2">
+        <h2 class="text-14px font-800 text-ink">
+          发票台账
+        </h2>
+        <span class="text-12px text-ink-soft">
+          共 <b class="font-mono text-ink">{{ allRows.length }}</b> 张
+          <template v-if="rows.length !== allRows.length">· 当前 {{ rows.length }} 张</template>
+        </span>
       </div>
-    </div>
+
+      <div class="ml-auto flex flex-wrap items-center gap-2.5">
+        <SearchInput v-model="searchText" placeholder="搜索编号、供应商、归属…" :width="230" />
+        <div class="inline-flex overflow-hidden border border-line-strong rounded-[8px] bg-panel">
+          <button
+            v-for="v in (['table', 'card'] as const)"
+            :key="v"
+            type="button"
+            class="inline-flex min-h-8 items-center gap-1 border-0 px-2.5 py-1.5 text-12px transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+            :class="view === v ? 'bg-brand-soft font-800 text-brand-deep' : 'bg-panel font-600 text-ink-soft hover:bg-surface-3'"
+            :aria-pressed="view === v"
+            @click="view = v"
+          >
+            <span :class="v === 'table' ? 'i-lucide-table' : 'i-lucide-layout-grid'" class="h-[13px] w-[13px]" aria-hidden="true" />
+            {{ v === 'table' ? '表格' : '卡片' }}
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- 左树右表 -->
-    <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
-      <TreeNav v-model="node" title="按归属" :items="treeItems" />
+    <div class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-[220px_minmax(0,1fr)]">
+      <TreeNav v-model="node" class="shadow-[var(--shadow-card)]" title="按归属" :items="treeItems" />
 
       <div class="min-w-0 flex flex-col">
         <!-- 表格视图 -->
         <KitTable
           v-if="view === 'table'"
           ref="tableEl"
+          class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
           :columns="columns"
           :data="rows"
           :loading="store.loading"
@@ -251,12 +260,12 @@ onMounted(() => {
         </KitTable>
 
         <!-- 卡片视图（发票预览大图，快速删除） -->
-        <div v-else class="border border-line rounded-[var(--radius-card)] bg-panel p-3.5">
+        <div v-else class="border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
           <div class="grid grid-cols-1 gap-3 lg:grid-cols-3 sm:grid-cols-2">
             <div
               v-for="inv in rows"
               :key="inv.id"
-              class="flex flex-col overflow-hidden border border-line rounded-[12px] bg-panel"
+              class="flex flex-col overflow-hidden border border-line rounded-[12px] bg-panel shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] hover:border-line-strong hover:-translate-y-0.5"
             >
               <div
                 class="grid cursor-pointer place-items-center border-b border-line bg-surface-2 p-2.5"
@@ -303,7 +312,7 @@ onMounted(() => {
         </div>
 
         <!-- 底部：勾选才浮出合计（无常驻汇总） -->
-        <div class="flex flex-wrap items-center justify-between gap-2.5 border border-t-0 border-line rounded-b-[var(--radius-card)] bg-surface-2 px-4 py-2.5 text-13px text-ink-soft">
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-2.5 border border-line rounded-[var(--radius-card)] bg-surface-2 px-4 py-2.5 text-13px text-ink-soft shadow-[var(--shadow-card)]">
           <span v-if="checkedRows.length > 0" class="rounded-full bg-brand-soft px-2.5 py-0.5 text-brand-deep">
             已选 <b class="font-mono">{{ checkedRows.length }}</b> 张 · 合计 <b class="font-mono">{{ yuan(checkedTotal) }}</b>
           </span>
