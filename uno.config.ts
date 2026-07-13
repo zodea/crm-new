@@ -227,7 +227,7 @@ export default defineConfig({
 
     // 表单网格
     'form-grid': 'grid grid-cols-3 border border-line bg-panel',
-    'form-cell': 'px-2.5 py-2 border-b border-r border-surface-3 flex flex-col gap-0.5 nth-child-3n:border-r-0',
+    'form-cell': 'px-2.5 py-2 border-b border-r border-surface-3 flex flex-col gap-0.5 [&:nth-child(3n)]:border-r-0',
 
     // 分页
     'pager-btn': 'inline-flex items-center justify-center w-7 h-7 border border-line rounded-[var(--radius-sm)] bg-panel text-12px text-ink-soft cursor-pointer hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45',
