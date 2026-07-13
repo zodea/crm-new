@@ -1,175 +1,227 @@
 <script setup lang="ts">
-// 应用侧边栏 —— 底座沿用 shadcn-vue Sidebar（状态机/快捷键/移动端 Sheet/Rail，ADR 0008），
-// 导航内容层对齐 DC 设计稿批A 锁定版（app.dc.html _buildSidebar）：
-// 10 组 IA（首页独立项 + 9 分组）+ NavItem 品牌签名（单字方块+名称+副提示）+
-// 分组头（icon+组名+chevron）+ 子项左竖线缩进 + 折叠态单字方块列 + 底部收起按钮/注脚。
-// 未实装页面 = 「待建」占位（#87 后续域 / #91 批C-E 落地后回填 nav-tree 的 to）。
-import type { NavLeaf } from '~/lib/nav/nav-tree'
+import type { NavGroup, NavLeaf } from '~/lib/nav/nav-tree'
+import { useLocalStorage } from '@vueuse/core'
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
-  SidebarRail,
   useSidebar,
 } from '~/components/ui/sidebar'
-import { activeNavKey, DEFAULT_OPEN_GROUPS, NAV_TREE } from '~/lib/nav/nav-tree'
+import { activeNavKey, DEFAULT_OPEN_GROUPS, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
 
 const route = useRoute()
 const contractStore = useContractStore()
-const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar()
+const { state, isMobile, setOpen, setOpenMobile } = useSidebar()
 
-/** 桌面 icon 折叠态（移动端 Sheet 内始终展开渲染） */
-const isIconCollapsed = computed(() => state.value === 'collapsed' && !isMobile.value)
+const isPinned = useLocalStorage('ruihang-sidebar-pinned', true, { initOnMounted: true })
+const openGroupKeys = useLocalStorage<string[]>('ruihang-sidebar-groups', DEFAULT_OPEN_GROUPS, {
+  initOnMounted: true,
+})
+const searchQuery = shallowRef('')
+const isHovering = shallowRef(false)
+const forcePeek = shallowRef(false)
+const searchFocusToken = shallowRef(0)
 
-/** 合同详情页（/contract/[id]）按 kind 点亮来源列表 */
 const contractDetailKind = computed(() => {
-  const m = route.path.match(/^\/contract\/([^/]+)$/)
-  if (!m || ['construction', 'material', 'subcontract'].includes(m[1]!))
+  const match = route.path.match(/^\/contract\/([^/]+)$/)
+  if (!match || ['construction', 'material', 'subcontract'].includes(match[1]!))
     return null
-  return contractStore.byId(m[1]!)?.kind ?? null
+  return contractStore.byId(match[1]!)?.kind ?? null
 })
 
 const activeKey = computed(() => activeNavKey(route.path, contractDetailKind.value))
+const peekOpen = computed(() => !isMobile.value && !isPinned.value && (isHovering.value || forcePeek.value))
+const isVisuallyCollapsed = computed(() => state.value === 'collapsed' && !peekOpen.value && !isMobile.value)
+const visibleTree = computed(() => filterNavTree(NAV_TREE, searchQuery.value))
 
-const openGroups = ref(new Set<string>(DEFAULT_OPEN_GROUPS))
+watch(
+  isPinned,
+  (pinned) => {
+    setOpen(pinned)
+    if (pinned)
+      forcePeek.value = false
+  },
+  { immediate: true },
+)
+
+watch(
+  activeKey,
+  (key) => {
+    if (!key)
+      return
+    const group = NAV_TREE.find((node): node is NavGroup =>
+      node.type === 'group' && node.items.some(item => item.key === key),
+    )
+    if (group && !openGroupKeys.value.includes(group.key))
+      openGroupKeys.value = [...openGroupKeys.value, group.key]
+  },
+  { immediate: true },
+)
+
+function togglePinned() {
+  isPinned.value = !isPinned.value
+}
 
 function toggleGroup(key: string) {
-  if (openGroups.value.has(key))
-    openGroups.value.delete(key)
-  else
-    openGroups.value.add(key)
+  openGroupKeys.value = openGroupKeys.value.includes(key)
+    ? openGroupKeys.value.filter(current => current !== key)
+    : [...openGroupKeys.value, key]
 }
 
-// 当前路由所在分组自动展开（如直达设置组页面时）
-watchEffect(() => {
-  const key = activeKey.value
-  if (!key)
-    return
-  for (const node of NAV_TREE) {
-    if (node.type === 'group' && node.items.some(it => it.key === key))
-      openGroups.value.add(node.key)
-  }
-})
-
-function isStub(it: NavLeaf): boolean {
-  return !it.to
+function isGroupOpen(key: string): boolean {
+  return searchQuery.value.length > 0 || openGroupKeys.value.includes(key)
 }
 
-/** 移动端点导航链接后收起抽屉。 */
+function isStub(item: NavLeaf): item is NavLeaf & { to?: undefined } {
+  return !item.to
+}
+
+function openSearch() {
+  forcePeek.value = true
+  searchFocusToken.value += 1
+}
+
+function openGroupFromRail(key: string) {
+  if (!openGroupKeys.value.includes(key))
+    openGroupKeys.value = [...openGroupKeys.value, key]
+  forcePeek.value = true
+}
+
 function onNavigate() {
+  searchQuery.value = ''
+  forcePeek.value = false
   if (isMobile.value)
     setOpenMobile(false)
 }
 </script>
 
 <template>
-  <Sidebar collapsible="icon">
-    <!-- 品牌区：36px「瑞」方块 + 名称 + 副标（折叠态只留方块） -->
-    <SidebarHeader class="flex-row items-center gap-[10px] px-[12px] pb-[20px] pt-[16px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-[4px]">
-      <NuxtLink to="/" class="flex min-w-0 flex-1 items-center gap-[10px] group-data-[collapsible=icon]:flex-none" @click="onNavigate">
-        <span
-          class="grid h-[36px] w-[36px] flex-none place-items-center rounded-[8px] bg-brand text-16px font-800 text-white"
-          aria-hidden="true"
-        >瑞</span>
-        <span v-if="!isIconCollapsed" class="min-w-0 flex-1">
-          <span class="block text-16px font-800 leading-tight text-ink">瑞航 CRM</span>
-          <span class="mt-0.5 block text-11px text-ink-soft">工程财务管理</span>
-        </span>
-      </NuxtLink>
+  <Sidebar
+    collapsible="icon"
+    :peek-open="peekOpen"
+    @mouseenter="isHovering = true"
+    @mouseleave="isHovering = false"
+  >
+    <SidebarHeader class="shrink-0 gap-2 px-2 pb-2 pt-2">
+      <div class="flex h-10 items-center gap-2">
+        <button
+          v-if="isVisuallyCollapsed"
+          type="button"
+          class="mx-auto grid h-10 w-10 place-items-center border-0 rounded-[var(--radius-btn)] bg-transparent text-[var(--shell-sidebar-text)] hover:bg-[var(--shell-sidebar-hover)]"
+          title="展开侧栏"
+          aria-label="临时展开侧栏"
+          @click="forcePeek = true"
+        >
+          <span class="i-lucide-chart-no-axes-combined h-[18px] w-[18px]" aria-hidden="true" />
+        </button>
+
+        <template v-else>
+          <NuxtLink
+            to="/"
+            class="flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-btn)] px-2 py-1 text-[var(--shell-sidebar-text)] no-underline hover:bg-[var(--shell-sidebar-hover)]"
+            title="返回首页"
+            @click="onNavigate"
+          >
+            <span class="i-lucide-chart-no-axes-combined h-[18px] w-[18px] flex-none text-[var(--shell-sidebar-active-text)]" aria-hidden="true" />
+            <span class="truncate text-14px font-700 tracking-wide">瑞航 CRM</span>
+          </NuxtLink>
+          <button
+            v-if="!isMobile"
+            type="button"
+            class="grid h-8 w-8 flex-none place-items-center border-0 rounded-[var(--radius-btn)] bg-transparent text-[var(--shell-sidebar-muted)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
+            :title="isPinned ? '取消固定侧栏' : '固定侧栏'"
+            :aria-label="isPinned ? '取消固定侧栏' : '固定侧栏'"
+            :aria-pressed="isPinned"
+            @click="togglePinned"
+          >
+            <span :class="isPinned ? 'i-lucide-pin-off' : 'i-lucide-pin'" class="h-4 w-4" aria-hidden="true" />
+          </button>
+        </template>
+      </div>
+
+      <AppSidebarSearch
+        v-model="searchQuery"
+        :collapsed="isVisuallyCollapsed"
+        :focus-token="searchFocusToken"
+        @expand="openSearch"
+      />
     </SidebarHeader>
 
-    <SidebarContent>
-      <nav class="min-h-0 flex flex-1 flex-col gap-[2px] overflow-x-hidden overflow-y-auto px-[12px] pb-[8px] group-data-[collapsible=icon]:px-[6px]">
-        <template v-for="node in NAV_TREE" :key="node.key">
-          <!-- 折叠态：拍平成单字方块列，分组前加横线 -->
-          <template v-if="isIconCollapsed">
-            <div v-if="node.type === 'group'" class="mx-[6px] my-[8px] h-px bg-line" />
-            <template v-for="it in (node.type === 'group' ? node.items : [node])" :key="it.key">
-              <NuxtLink
-                v-if="!isStub(it)"
-                :to="it.to!"
-                :title="it.label"
-                class="mx-auto my-[2px] grid h-[40px] w-[40px] place-items-center border rounded-[var(--radius-btn)] text-15px font-800"
-                :class="activeKey === it.key
-                  ? 'bg-brand-soft border-[rgba(57,118,198,0.25)] text-brand'
-                  : 'bg-surface-2 border-line text-ink-soft hover:bg-surface-3'"
-              >
-                {{ it.mark }}
-              </NuxtLink>
-              <div
-                v-else
-                :title="`${it.label}（后续批次）`"
-                class="mx-auto my-[2px] grid h-[40px] w-[40px] cursor-not-allowed place-items-center border border-line rounded-[var(--radius-btn)] bg-surface-2 text-15px font-800 text-ink-soft opacity-38"
-                aria-disabled="true"
-              >
-                {{ it.mark }}
-              </div>
+    <SidebarContent class="min-h-0 px-2 pb-2">
+      <nav class="shell-sidebar-scroll min-h-0 flex flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto">
+        <template v-for="node in visibleTree" :key="node.key">
+          <template v-if="isVisuallyCollapsed">
+            <template v-if="node.type === 'item'">
+              <AppSidebarNavItem
+                v-if="node.to"
+                :item="node as NavLeaf & { to: string }"
+                :active="activeKey === node.key"
+                collapsed
+                @navigate="onNavigate"
+              />
+              <AppSidebarStubItem v-else :item="node" collapsed />
             </template>
+            <button
+              v-else
+              type="button"
+              class="mx-auto grid h-10 w-10 place-items-center border-0 rounded-[var(--radius-btn)] bg-transparent text-[var(--shell-sidebar-muted)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
+              :title="node.label"
+              :aria-label="`展开${node.label}`"
+              @click="openGroupFromRail(node.key)"
+            >
+              <span class="h-4 w-4" :class="node.icon" aria-hidden="true" />
+            </button>
           </template>
 
-          <!-- 展开态 -->
           <template v-else>
-            <AppSidebarNavItem
-              v-if="node.type === 'item'"
-              :mark="node.mark" :label="node.label" :hint="node.hint" :to="node.to!"
-              :active="activeKey === node.key"
-              @navigate="onNavigate"
-            />
+            <template v-if="node.type === 'item'">
+              <AppSidebarNavItem
+                v-if="node.to"
+                :item="node as NavLeaf & { to: string }"
+                :active="activeKey === node.key"
+                @navigate="onNavigate"
+              />
+              <AppSidebarStubItem v-else :item="node" />
+            </template>
+
             <div v-else>
-              <!-- 分组头：icon + 组名 + chevron -->
               <button
                 type="button"
-                class="mt-[4px] flex w-full items-center gap-[8px] rounded-[var(--radius-btn)] px-[10px] py-[8px] text-ink-soft hover:bg-surface-3"
+                class="mt-1 flex h-8 w-full items-center gap-2 border-0 rounded-[var(--radius-btn)] bg-transparent px-3 text-[var(--shell-sidebar-muted)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
+                :aria-expanded="isGroupOpen(node.key)"
                 @click="toggleGroup(node.key)"
               >
-                <span class="h-[15px] w-[15px] flex-none" :class="node.icon" aria-hidden="true" />
-                <span class="flex-1 text-left text-12px font-800 tracking-[var(--tracking-wide)]">{{ node.label }}</span>
+                <span class="h-4 w-4 flex-none" :class="node.icon" aria-hidden="true" />
+                <span class="min-w-0 flex-1 truncate text-left text-12px font-600">{{ node.label }}</span>
                 <span
-                  class="h-[14px] w-[14px] flex-none"
-                  :class="openGroups.has(node.key) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                  class="h-3.5 w-3.5 flex-none"
+                  :class="isGroupOpen(node.key) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                   aria-hidden="true"
                 />
               </button>
-              <!-- 子项：左竖线缩进 -->
-              <div v-show="openGroups.has(node.key)" class="ml-[8px] flex flex-col gap-[2px] border-l border-line pl-[8px]">
-                <template v-for="it in node.items" :key="it.key">
+
+              <div v-show="isGroupOpen(node.key)" class="flex flex-col gap-0.5">
+                <template v-for="item in node.items" :key="item.key">
                   <AppSidebarNavItem
-                    v-if="!isStub(it)"
-                    :mark="it.mark" :label="it.label" :hint="it.hint" :to="it.to!"
-                    :active="activeKey === it.key"
+                    v-if="!isStub(item)"
+                    :item="item as NavLeaf & { to: string }"
+                    :active="activeKey === item.key"
                     @navigate="onNavigate"
                   />
-                  <AppSidebarStubItem v-else :mark="it.mark" :label="it.label" />
+                  <AppSidebarStubItem v-else :item="item" />
                 </template>
               </div>
             </div>
           </template>
         </template>
+
+        <div
+          v-if="!visibleTree.length && !isVisuallyCollapsed"
+          class="mx-2 mt-4 rounded-[var(--radius-btn)] border border-dashed border-[var(--shell-sidebar-border)] px-3 py-5 text-center text-12px text-[var(--shell-sidebar-muted)]"
+        >
+          没有匹配的菜单
+        </div>
       </nav>
     </SidebarContent>
-
-    <!-- 底部：收起侧栏按钮 + 注脚 -->
-    <SidebarFooter class="border-t border-line px-[12px] pb-[12px] pt-[12px] group-data-[collapsible=icon]:px-[6px]">
-      <button
-        type="button"
-        class="flex w-full items-center justify-center gap-[8px] border border-line rounded-[var(--radius-btn)] bg-surface-2 p-[8px] text-12px font-700 text-ink-soft hover:bg-surface-3"
-        :title="isIconCollapsed ? '展开侧栏' : '收起侧栏'"
-        @click="toggleSidebar()"
-      >
-        <span
-          class="h-[16px] w-[16px] flex-none"
-          :class="isIconCollapsed ? 'i-lucide-panel-left-open' : 'i-lucide-panel-left-close'"
-          aria-hidden="true"
-        />
-        <span v-if="!isIconCollapsed">收起侧栏</span>
-      </button>
-      <div v-if="!isIconCollapsed" class="px-[4px] pt-[4px] text-11px leading-relaxed text-ink-soft">
-        <div>本地部署 · 数据不上传</div>
-        <div>瑞航 CRM · 工程财务管理</div>
-      </div>
-    </SidebarFooter>
-
-    <SidebarRail />
   </Sidebar>
 </template>

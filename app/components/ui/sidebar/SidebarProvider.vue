@@ -1,16 +1,13 @@
 <script setup lang="ts">
-// 移植自官方 registry new-york/ui/sidebar/SidebarProvider.vue（逐行对照）。
-// 差异：wrapper 背景用项目 --bg（inset 浮岛衬底），不用 has-[[data-variant=inset]]:bg-sidebar
-// （我们的 sidebar 背景是半透明毛玻璃，不适合作整页衬底）。
+// 移植自官方 registry new-york/ui/sidebar/SidebarProvider.vue。
+// 差异：断点、宽度和状态持久化由 ADR 0011 的应用外壳规格接管。
 import type { HTMLAttributes, Ref } from 'vue'
-import { defaultDocument, useEventListener, useMediaQuery, useVModel } from '@vueuse/core'
+import { useEventListener, useMediaQuery, useVModel } from '@vueuse/core'
 import { TooltipProvider } from 'reka-ui'
 import { computed, ref } from 'vue'
 import { cn } from '~/lib/utils'
 import {
   provideSidebarContext,
-  SIDEBAR_COOKIE_MAX_AGE,
-  SIDEBAR_COOKIE_NAME,
   SIDEBAR_KEYBOARD_SHORTCUT,
   SIDEBAR_WIDTH,
   SIDEBAR_WIDTH_ICON,
@@ -21,7 +18,7 @@ const props = withDefaults(defineProps<{
   open?: boolean
   class?: HTMLAttributes['class']
 }>(), {
-  defaultOpen: !defaultDocument?.cookie.includes(`${SIDEBAR_COOKIE_NAME}=false`),
+  defaultOpen: true,
   open: undefined,
 })
 
@@ -29,7 +26,7 @@ const emits = defineEmits<{
   'update:open': [open: boolean]
 }>()
 
-const isMobile = useMediaQuery('(max-width: 768px)')
+const isMobile = useMediaQuery('(max-width: 1023px)')
 const openMobile = ref(false)
 
 const open = useVModel(props, 'open', emits, {
@@ -39,8 +36,6 @@ const open = useVModel(props, 'open', emits, {
 
 function setOpen(value: boolean) {
   open.value = value
-  // cookie 持久化展开态（与官方一致）
-  document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
 }
 
 function setOpenMobile(value: boolean) {

@@ -1,6 +1,5 @@
-/* 设计系统令牌 — 瑞航CRM
-   色值来源: DESIGN-SYSTEM.md v5 (2026-06-27)
-   双层风格: 侧边栏毛玻璃 + 内容区扁平 */
+/* 设计系统令牌 — 瑞航 CRM
+   内容区遵循 ADR 0007，应用外壳遵循 ADR 0011。 */
 
 :root {
   /* ── 基底色 ── */
@@ -46,7 +45,7 @@
   --radius-btn: 8px;
   --radius-pill: 999px;
 
-  /* ── 侧边栏专用 ── */
+  /* ── 外层应用框架 ── */
   --sidebar-blur: blur(12px);
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
@@ -63,8 +62,31 @@
   /* ── 布局 ── */
   --sidebar-w: 248px;
   --sidebar-w-collapsed: 68px;
-  --header-h: 64px;
+  --header-h: 54px;
+  --tabbar-h: 36px;
   --content-max: 1480px;
+
+  /* 命名层级，组件中不写裸 z-index。 */
+  --z-shell-sidebar: 40;
+  --z-shell-overlay: 9500;
+  --z-shell-drawer: 9501;
+  --z-shell-popover: 9700;
+
+  /* 默认外壳 = 深蓝侧栏；先于 shadcn 变量桥接声明，避免 var() 在根级失效。 */
+  --shell-sidebar-bg: #162238;
+  --shell-sidebar-text: #f4f7fb;
+  --shell-sidebar-muted: #a9b6c8;
+  --shell-sidebar-hover: rgb(255 255 255 / 8%);
+  --shell-sidebar-active: rgb(57 118 198 / 24%);
+  --shell-sidebar-active-text: #8fc4ff;
+  --shell-sidebar-border: rgb(255 255 255 / 10%);
+  --shell-sidebar-input: rgb(0 0 0 / 16%);
+  --shell-header-bg: rgb(255 255 255 / 97%);
+  --shell-header-text: var(--ink);
+  --shell-header-muted: var(--ink-soft);
+  --shell-header-hover: var(--brand-soft);
+  --shell-header-border: var(--line);
+  --shell-workspace-bg: var(--bg);
 
   /* ── 动效 ── */
   --ease-snappy: cubic-bezier(0.2, 0, 0.2, 1);
@@ -112,17 +134,122 @@
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
   --overlay: rgb(0 0 0 / 28%);
 
-  /* ── shadcn Sidebar 语义令牌（ui/sidebar 组件套消费）──
-     背景 = 项目毛玻璃白 82%（配 backdrop-blur 用，保留双层风格特色），
-     active/hover = 品牌浅底 + 深字（沿用旧 AppSidebar 观感）。 */
-  --sidebar-background: rgb(255 255 255 / 82%);
-  --sidebar-foreground: var(--ink);
+  /* shadcn Sidebar 映射到独立外壳令牌。 */
+  --sidebar-background: var(--shell-sidebar-bg);
+  --sidebar-foreground: var(--shell-sidebar-text);
   --sidebar-primary: var(--brand);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--brand-soft);
-  --sidebar-accent-foreground: var(--brand-deep);
-  --sidebar-border: var(--line);
+  --sidebar-accent: var(--shell-sidebar-active);
+  --sidebar-accent-foreground: var(--shell-sidebar-active-text);
+  --sidebar-border: var(--shell-sidebar-border);
   --sidebar-ring: var(--brand);
+}
+
+/* 外壳主题只改变导航和顶栏，不改业务色、卡片和状态色。 */
+[data-shell-theme="dark"] {
+  --shell-sidebar-bg: #162238;
+  --shell-sidebar-text: #f4f7fb;
+  --shell-sidebar-muted: #a9b6c8;
+  --shell-sidebar-hover: rgb(255 255 255 / 8%);
+  --shell-sidebar-active: rgb(57 118 198 / 24%);
+  --shell-sidebar-active-text: #8fc4ff;
+  --shell-sidebar-border: rgb(255 255 255 / 10%);
+  --shell-sidebar-input: rgb(0 0 0 / 16%);
+  --shell-header-bg: rgb(255 255 255 / 97%);
+  --shell-header-text: var(--ink);
+  --shell-header-muted: var(--ink-soft);
+  --shell-header-hover: var(--brand-soft);
+  --shell-header-border: var(--line);
+  --shell-workspace-bg: var(--bg);
+  --sidebar-background: var(--shell-sidebar-bg);
+  --sidebar-foreground: var(--shell-sidebar-text);
+  --sidebar-accent: var(--shell-sidebar-active);
+  --sidebar-accent-foreground: var(--shell-sidebar-active-text);
+  --sidebar-border: var(--shell-sidebar-border);
+}
+
+[data-shell-theme="light"] {
+  --shell-sidebar-bg: #ffffff;
+  --shell-sidebar-text: var(--ink);
+  --shell-sidebar-muted: var(--ink-soft);
+  --shell-sidebar-hover: var(--surface-3);
+  --shell-sidebar-active: var(--brand-soft);
+  --shell-sidebar-active-text: var(--brand-deep);
+  --shell-sidebar-border: var(--line);
+  --shell-sidebar-input: var(--surface-2);
+  --shell-header-bg: rgb(255 255 255 / 97%);
+  --shell-header-text: var(--ink);
+  --shell-header-muted: var(--ink-soft);
+  --shell-header-hover: var(--brand-soft);
+  --shell-header-border: var(--line);
+  --shell-workspace-bg: var(--bg);
+  --sidebar-background: var(--shell-sidebar-bg);
+  --sidebar-foreground: var(--shell-sidebar-text);
+  --sidebar-accent: var(--shell-sidebar-active);
+  --sidebar-accent-foreground: var(--shell-sidebar-active-text);
+  --sidebar-border: var(--shell-sidebar-border);
+}
+
+.shell-layer-sidebar {
+  z-index: var(--z-shell-sidebar);
+}
+
+.shell-layer-overlay {
+  z-index: var(--z-shell-overlay);
+}
+
+.shell-layer-drawer {
+  z-index: var(--z-shell-drawer);
+}
+
+.shell-layer-popover {
+  z-index: var(--z-shell-popover);
+}
+
+.shell-icon-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-btn);
+  color: var(--shell-header-muted);
+  background: transparent;
+  cursor: pointer;
+  transition-property: color, background-color;
+  transition-duration: var(--dur-fast);
+}
+
+.shell-icon-button:hover,
+.shell-icon-button[aria-pressed="true"] {
+  color: var(--brand);
+  background: var(--shell-header-hover);
+}
+
+.shell-icon-button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.shell-sidebar-scroll {
+  scrollbar-color: var(--shell-sidebar-border) transparent;
+  scrollbar-width: thin;
+}
+
+.shell-sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.shell-sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-pill);
+  background: var(--shell-sidebar-border);
+}
+
+[data-peek-open="true"] {
+  border-right: 1px solid var(--shell-sidebar-border);
+  box-shadow: var(--shadow-pop);
 }
 
 /* ── 全局重置 ── */

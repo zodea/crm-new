@@ -3,8 +3,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import { createContext } from 'reka-ui'
 
-export const SIDEBAR_COOKIE_NAME = 'sidebar_state'
-export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 export const SIDEBAR_WIDTH = 'var(--sidebar-w)'
 export const SIDEBAR_WIDTH_MOBILE = 'var(--sidebar-w)'
 export const SIDEBAR_WIDTH_ICON = 'var(--sidebar-w-collapsed)'

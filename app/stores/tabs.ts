@@ -1,16 +1,21 @@
 // 页签导航 store（Pinia）——纯状态机 tab-machine 的响应式外壳 + 副作用边界。
 // 唯一写路径走 action；超限由 open() 返回 blocked，交调用方弹临时 toast（CONTEXT.md）。
+import { defineStore } from 'pinia'
+import { computed, shallowRef } from 'vue'
 import {
   closeAll,
   closeOthers,
   closeRight,
   closeTab,
+  deriveKey,
   initialTabsState,
   openTab,
 } from '~/lib/tabs/tab-machine'
 
 export const useTabsStore = defineStore('tabs', () => {
   const state = shallowRef(initialTabsState())
+  const cacheVersions = shallowRef<Record<string, number>>({})
+  const invalidatedKeys = shallowRef<string[]>([])
 
   const tabs = computed(() => state.value.tabs)
   const activeKey = computed(() => state.value.activeKey)
@@ -31,20 +36,49 @@ export const useTabsStore = defineStore('tabs', () => {
       state.value = { ...state.value, activeKey: key }
   }
 
+  function invalidate(keys: string[]) {
+    if (!keys.length)
+      return
+
+    const next = { ...cacheVersions.value }
+    for (const key of keys)
+      next[key] = (next[key] ?? 0) + 1
+    cacheVersions.value = next
+    invalidatedKeys.value = keys
+  }
+
+  function applyClose(transform: () => ReturnType<typeof closeTab>) {
+    const before = state.value.tabs.map(tab => tab.key)
+    const next = transform()
+    state.value = next
+    const retained = new Set(next.tabs.map(tab => tab.key))
+    invalidate(before.filter(key => !retained.has(key)))
+  }
+
   function close(key: string) {
-    state.value = closeTab(state.value, key)
+    applyClose(() => closeTab(state.value, key))
   }
 
   function closeOther(key: string) {
-    state.value = closeOthers(state.value, key)
+    applyClose(() => closeOthers(state.value, key))
   }
 
   function closeToRight(key: string) {
-    state.value = closeRight(state.value, key)
+    applyClose(() => closeRight(state.value, key))
   }
 
   function closeEvery() {
-    state.value = closeAll()
+    applyClose(() => closeAll())
+  }
+
+  /** 让当前页签使用新组件 key；旧 keep-alive 条目不再可达，并由 LRU 回收。 */
+  function refreshActive() {
+    invalidate([activeKey.value])
+  }
+
+  function pageCacheKey(fullPath: string): string {
+    const key = deriveKey(fullPath)
+    return `${key}::${cacheVersions.value[key] ?? 0}`
   }
 
   /** 覆盖某页签标题（页面拿到记录名后调用，如「合和新城」）。 */
@@ -60,12 +94,15 @@ export const useTabsStore = defineStore('tabs', () => {
     tabs,
     activeKey,
     activeFullPath,
+    invalidatedKeys,
     open,
     activate,
     close,
     closeOther,
     closeToRight,
     closeEvery,
+    refreshActive,
+    pageCacheKey,
     setTitle,
   }
 })

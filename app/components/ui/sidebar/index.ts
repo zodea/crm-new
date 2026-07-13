@@ -12,6 +12,8 @@ export interface SidebarProps {
   side?: 'left' | 'right'
   variant?: 'sidebar' | 'floating' | 'inset'
   collapsible?: 'offcanvas' | 'icon' | 'none'
+  /** icon 折叠态保持内容占位 68px，但面板临时覆盖展开到 248px。 */
+  peekOpen?: boolean
   class?: HTMLAttributes['class']
 }
 

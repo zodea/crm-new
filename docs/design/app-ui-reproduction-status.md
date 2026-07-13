@@ -2,6 +2,8 @@
 
 > 视觉与交互呈现参考：`设计系统配色更新/kit/`。业务行为以 GitHub Issues 与现有真实 store 为准；设计令牌与交互底座继续遵循现有 ADR，不在本文复制。
 
+> 应用外壳（侧栏、顶栏、页签、通知抽屉）已按 GitHub Issue #82 重做，权威决策见 [ADR 0011](../adr/0011-redesign-application-shell.md)。
+
 ## 已完成（第一批）
 
 | 入口 | 状态 | 本轮范围 |

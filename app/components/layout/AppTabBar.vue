@@ -1,9 +1,6 @@
 <script setup lang="ts">
-// 页签栏（CONTEXT.md「页签导航」）——浏览器式多页签。
-// 「监听」核心：watch 路由 → store.open（开/复用）；超限阻断则弹临时 toast 并弹回原页签。
-// 交互：点页签导航、中键关闭、右键四关菜单（均保留首页）。
 import { onKeyStroke, useEventListener } from '@vueuse/core'
-import { HOME_KEY } from '~/lib/tabs/tab-machine'
+import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
 
 const route = useRoute()
@@ -11,13 +8,15 @@ const router = useRouter()
 const tabsStore = useTabsStore()
 const kit = useKitUI()
 
-// ── 路由监听：进入任意路由即开/复用页签；超限则 toast + 弹回 ──
+const tabListEl = useTemplateRef<HTMLElement>('tabListEl')
+const tabEls = useTemplateRef<HTMLElement[]>('tabEl')
+
 watch(
   () => route.fullPath,
   (fullPath) => {
     const blocked = tabsStore.open({ fullPath, title: routeTitle(route.path) || '未命名' })
     if (blocked) {
-      kit.warning(`页签已达上限 ${15} 个`, '请先关闭部分页签再打开新的')
+      kit.warning(`页签已达上限 ${MAX_TABS} 个`, '请先关闭不需要的页签')
       if (tabsStore.activeFullPath !== fullPath)
         router.replace(tabsStore.activeFullPath)
     }
@@ -25,10 +24,21 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => tabsStore.activeKey,
+  async (key) => {
+    await nextTick()
+    tabEls.value?.find(element => element.dataset.tabKey === key)?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    })
+  },
+  { flush: 'post' },
+)
+
 function goTab(fullPath: string, key: string) {
-  if (key === tabsStore.activeKey)
-    return
-  router.push(fullPath)
+  if (key !== tabsStore.activeKey)
+    router.push(fullPath)
 }
 
 function closeAndFollow(key: string) {
@@ -37,84 +47,116 @@ function closeAndFollow(key: string) {
     router.push(tabsStore.activeFullPath)
 }
 
-// ── 右键菜单 ──
-const menu = ref<{ open: boolean, x: number, y: number, key: string }>({ open: false, x: 0, y: 0, key: '' })
-
-function openMenu(e: MouseEvent, key: string) {
-  menu.value = { open: true, x: e.clientX, y: e.clientY, key }
+function refreshCurrent() {
+  tabsStore.refreshActive()
 }
+
+useEventListener(tabListEl, 'wheel', (event) => {
+  const element = tabListEl.value
+  if (!element || element.scrollWidth <= element.clientWidth)
+    return
+  event.preventDefault()
+  element.scrollLeft += event.deltaY || event.deltaX
+}, { passive: false })
+
+const menu = shallowRef({ open: false, x: 0, y: 0, key: '' })
+
+function openMenu(event: MouseEvent, key: string) {
+  menu.value = {
+    open: true,
+    x: Math.min(event.clientX, window.innerWidth - 148),
+    y: Math.min(event.clientY, window.innerHeight - 166),
+    key,
+  }
+}
+
 function closeMenu() {
-  menu.value.open = false
+  menu.value = { ...menu.value, open: false }
 }
 
-const menuTab = computed(() => tabsStore.tabs.find(t => t.key === menu.value.key))
-const menuIdx = computed(() => tabsStore.tabs.findIndex(t => t.key === menu.value.key))
-const hasRight = computed(() =>
-  tabsStore.tabs.slice(menuIdx.value + 1).some(t => t.key !== HOME_KEY),
-)
-const hasOthers = computed(() =>
-  tabsStore.tabs.some(t => t.key !== HOME_KEY && t.key !== menu.value.key),
-)
+const menuTab = computed(() => tabsStore.tabs.find(tab => tab.key === menu.value.key))
+const menuIndex = computed(() => tabsStore.tabs.findIndex(tab => tab.key === menu.value.key))
+const hasRight = computed(() => tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.key !== HOME_KEY))
+const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.key !== HOME_KEY && tab.key !== menu.value.key))
 
-function act(fn: () => void) {
-  fn()
+function act(action: () => void) {
+  action()
   closeMenu()
   if (tabsStore.activeFullPath !== route.fullPath)
     router.push(tabsStore.activeFullPath)
 }
 
-useEventListener('click', () => {
-  if (menu.value.open)
-    closeMenu()
-})
-useEventListener('scroll', () => {
-  if (menu.value.open)
-    closeMenu()
-}, true)
-onKeyStroke('Escape', () => {
-  if (menu.value.open)
-    closeMenu()
-})
+useEventListener('click', closeMenu)
+useEventListener('scroll', closeMenu, true)
+onKeyStroke('Escape', closeMenu)
 </script>
 
 <template>
-  <!-- 红圈式页签栏（对齐设计稿 .dc-tabbar）：40px 高、页签贴底、active=白底+品牌色底线 -->
-  <div class="tabbar-scroll flex h-[40px] shrink-0 items-stretch gap-[2px] overflow-x-auto overflow-y-hidden border-b border-line bg-surface-2 px-[16px]">
-    <button
-      v-for="tab in tabsStore.tabs"
-      :key="tab.key"
-      type="button"
-      class="inline-flex max-w-[200px] shrink-0 cursor-pointer select-none items-center gap-[6px] whitespace-nowrap rounded-t-[6px] px-[12px] text-13px transition-colors duration-[var(--dur-fast)] focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
-      :class="tab.key === tabsStore.activeKey
-        ? 'bg-panel font-800 text-brand shadow-[inset_0_-2px_0_var(--brand)] hover:text-brand-deep'
-        : 'font-600 text-ink-soft hover:bg-[rgba(17,24,39,0.05)] hover:text-ink'"
-      @click="goTab(tab.fullPath, tab.key)"
-      @click.middle.prevent="tab.closable && closeAndFollow(tab.key)"
-      @contextmenu.prevent="openMenu($event, tab.key)"
+  <div class="flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2">
+    <div
+      ref="tabListEl"
+      class="tabbar-scroll min-w-0 flex flex-1 items-stretch gap-px overflow-x-auto overflow-y-hidden px-2"
+      role="tablist"
+      aria-label="已打开页面"
     >
-      <span class="truncate">{{ tab.title }}</span>
-      <span
-        v-if="tab.closable"
-        class="grid h-[16px] w-[16px] shrink-0 cursor-pointer place-items-center rounded-[4px] text-ink-soft hover:bg-danger-soft hover:text-danger-ink"
-        title="关闭页签"
-        @click.stop="closeAndFollow(tab.key)"
+      <div
+        v-for="tab in tabsStore.tabs"
+        :key="tab.key"
+        ref="tabEl"
+        :data-tab-key="tab.key"
+        role="tab"
+        :aria-selected="tab.key === tabsStore.activeKey"
+        :tabindex="tab.key === tabsStore.activeKey ? 0 : -1"
+        class="group/tab inline-flex max-w-[200px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-12px outline-none transition-colors duration-[var(--dur-fast)] focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+        :class="tab.key === tabsStore.activeKey
+          ? 'border-brand bg-brand-soft font-700 text-brand-deep'
+          : 'font-500 text-ink-soft hover:bg-[rgba(17,24,39,0.05)] hover:text-ink'"
+        @click="goTab(tab.fullPath, tab.key)"
+        @keydown.enter.prevent="goTab(tab.fullPath, tab.key)"
+        @keydown.space.prevent="goTab(tab.fullPath, tab.key)"
+        @contextmenu.prevent="openMenu($event, tab.key)"
       >
-        <span class="i-lucide-x h-[13px] w-[13px]" aria-hidden="true" />
+        <span class="truncate">{{ tab.title }}</span>
+        <button
+          v-if="tab.closable"
+          type="button"
+          class="grid h-5 w-5 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent text-ink-faint opacity-70 hover:bg-danger-soft hover:text-danger group-hover/tab:opacity-100"
+          title="关闭页签"
+          :aria-label="`关闭 ${tab.title}`"
+          @click.stop="closeAndFollow(tab.key)"
+        >
+          <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div class="flex shrink-0 items-center gap-1 border-l border-line bg-surface-2 px-2">
+      <span class="px-1 text-10px text-ink-faint" title="当前页签数量">
+        <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span> 个页签
       </span>
-    </button>
+      <button
+        type="button"
+        class="grid h-7 w-7 place-items-center border-0 rounded-[var(--radius-btn)] bg-transparent text-ink-soft hover:bg-brand-soft hover:text-brand"
+        title="刷新当前页"
+        aria-label="刷新当前页"
+        @click="refreshCurrent"
+      >
+        <span class="i-lucide-refresh-cw h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </div>
   </div>
 
-  <!-- 右键菜单 -->
   <Teleport to="body">
     <div
       v-if="menu.open"
-      class="fixed z-[9700] min-w-[128px] rounded-[8px] border border-line bg-panel py-1 shadow-[var(--shadow-pop)]"
+      class="shell-layer-popover fixed min-w-[136px] border border-line rounded-[var(--radius-btn)] bg-panel py-1 shadow-[var(--shadow-pop)]"
       :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
+      role="menu"
       @click.stop
     >
       <button
         type="button"
-        class="flex w-full items-center px-3 py-1.5 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!menuTab?.closable"
         @click="act(() => tabsStore.close(menu.key))"
       >
@@ -122,7 +164,7 @@ onKeyStroke('Escape', () => {
       </button>
       <button
         type="button"
-        class="flex w-full items-center px-3 py-1.5 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeOther(menu.key))"
       >
@@ -130,7 +172,7 @@ onKeyStroke('Escape', () => {
       </button>
       <button
         type="button"
-        class="flex w-full items-center px-3 py-1.5 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasRight"
         @click="act(() => tabsStore.closeToRight(menu.key))"
       >
@@ -139,7 +181,7 @@ onKeyStroke('Escape', () => {
       <div class="my-1 h-px bg-line" />
       <button
         type="button"
-        class="flex w-full items-center px-3 py-1.5 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeEvery())"
       >
@@ -150,11 +192,12 @@ onKeyStroke('Escape', () => {
 </template>
 
 <style scoped>
-/* 对齐设计稿 .dc-tabbar：横向可滚但不显示滚动条 */
 .tabbar-scroll {
   scrollbar-width: none;
 }
+
 .tabbar-scroll::-webkit-scrollbar {
+  width: 0;
   height: 0;
 }
 </style>
