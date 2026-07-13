@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useTimeoutFn } from '@vueuse/core'
+
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
 // 访问 /dev/kit-ui（ripple 已全域废弃，见 ADR 0004，不提供演示）
 const kit = useKitUI()
@@ -151,6 +153,36 @@ async function demoDirectExport() {
     lastResult.value = `直接保存失败：${error instanceof Error ? error.message : String(error)}`
   }
 }
+
+// ⑦ KitButton 三态（#75）
+const demoSubmitLoading = shallowRef(false)
+const demoSubmitCount = shallowRef(0)
+const demoSaveLoading = shallowRef(false)
+const demoSaveSuccess = shallowRef(false)
+
+const { start: finishDemoSubmit } = useTimeoutFn(() => {
+  demoSubmitLoading.value = false
+}, 900, { immediate: false })
+
+const { start: finishDemoSave } = useTimeoutFn(() => {
+  demoSaveLoading.value = false
+  demoSaveSuccess.value = true
+}, 650, { immediate: false })
+
+function demoKitButtonLoading() {
+  if (demoSubmitLoading.value)
+    return
+  demoSubmitCount.value += 1
+  demoSubmitLoading.value = true
+  finishDemoSubmit()
+}
+
+function demoKitButtonSuccess() {
+  if (demoSaveLoading.value || demoSaveSuccess.value)
+    return
+  demoSaveLoading.value = true
+  finishDemoSave()
+}
 </script>
 
 <template>
@@ -270,6 +302,35 @@ async function demoDirectExport() {
         <button class="btn-primary" @click="demoDirectExport">
           直接保存演示文件
         </button>
+      </section>
+
+      <!-- ⑦ KitButton 三态 -->
+      <section class="content-panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑦ KitButton — 提交按钮三态（#75）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          loading 立即禁用并锁定宽度，保留原文字 + 前置 spinner；success 打勾仅供无其他结果反馈的原地保存显式启用。
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <KitButton :loading="demoSubmitLoading" @click="demoKitButtonLoading">
+            模拟提交
+          </KitButton>
+          <KitButton
+            v-model:success="demoSaveSuccess"
+            :loading="demoSaveLoading"
+            variant="ghost"
+            @click="demoKitButtonSuccess"
+          >
+            原地保存
+          </KitButton>
+          <KitButton variant="danger">
+            危险操作
+          </KitButton>
+        </div>
+        <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
+          提交调用次数：{{ demoSubmitCount }}
+        </p>
       </section>
 
       <!-- 结果回读 -->
