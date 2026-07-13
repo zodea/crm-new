@@ -73,11 +73,11 @@ export function normalizeKitColumn(col: KitTableColumn): NormalizedKitColumn {
  * 注意:选项只来自传入的 rows——受控分页下传当前页切片会得到不完整选项,
  * 应对全量数据调用本函数并经列配置 filterable 显式传入。
  */
-export function deriveFilterOptions(rows: Record<string, unknown>[], field: string): KitFilterOption[] {
+export function deriveFilterOptions<T extends object>(rows: readonly T[], field: string): KitFilterOption[] {
   const seen = new Set<unknown>()
   const out: KitFilterOption[] = []
   for (const row of rows) {
-    const v = row[field]
+    const v = (row as Record<string, unknown>)[field]
     if (v == null || v === '' || Number.isNaN(v) || seen.has(v))
       continue
     seen.add(v)
