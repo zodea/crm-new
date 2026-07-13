@@ -290,14 +290,7 @@ onMounted(() => {
           </template>
         </KitTable>
 
-        <!-- 底部多段汇总行（当前筛选后的全量口径） -->
-        <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border border-line rounded-[var(--radius-card)] bg-panel px-3 py-2.5 shadow-[var(--shadow-card)]">
-          <span class="text-12px text-ink-faint">共 {{ filtered.length }} 份</span>
-          <span v-for="seg in summary" :key="seg.label" class="text-12px text-ink-soft">
-            {{ seg.label }}
-            <span class="ml-1 font-mono font-700 tabular-nums text-ink">{{ yuan(seg.value) }}</span>
-          </span>
-        </div>
+        <ContractListSummary :total="filtered.length" :items="summary" />
       </div>
     </div>
   </div>

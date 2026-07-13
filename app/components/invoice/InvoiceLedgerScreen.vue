@@ -169,36 +169,12 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col gap-3.5">
-    <!-- 工具栏：搜索 + 视图切换 -->
-    <section class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
-      <div class="mr-1 flex flex-none items-baseline gap-2">
-        <h2 class="text-14px font-800 text-ink">
-          发票台账
-        </h2>
-        <span class="text-12px text-ink-soft">
-          共 <b class="font-mono text-ink">{{ allRows.length }}</b> 张
-          <template v-if="rows.length !== allRows.length">· 当前 {{ rows.length }} 张</template>
-        </span>
-      </div>
-
-      <div class="ml-auto flex flex-wrap items-center gap-2.5">
-        <SearchInput v-model="searchText" placeholder="搜索编号、供应商、归属…" :width="230" />
-        <div class="inline-flex overflow-hidden border border-line-strong rounded-[8px] bg-panel">
-          <button
-            v-for="v in (['table', 'card'] as const)"
-            :key="v"
-            type="button"
-            class="inline-flex min-h-8 items-center gap-1 border-0 px-2.5 py-1.5 text-12px transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
-            :class="view === v ? 'bg-brand-soft font-800 text-brand-deep' : 'bg-panel font-600 text-ink-soft hover:bg-surface-3'"
-            :aria-pressed="view === v"
-            @click="view = v"
-          >
-            <span :class="v === 'table' ? 'i-lucide-table' : 'i-lucide-layout-grid'" class="h-[13px] w-[13px]" aria-hidden="true" />
-            {{ v === 'table' ? '表格' : '卡片' }}
-          </button>
-        </div>
-      </div>
-    </section>
+    <InvoiceLedgerToolbar
+      v-model:search="searchText"
+      v-model:view="view"
+      :total="allRows.length"
+      :visible="rows.length"
+    />
 
     <!-- 左树右表 -->
     <div class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-[220px_minmax(0,1fr)]">
