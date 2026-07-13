@@ -39,8 +39,18 @@ const today = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}�
 
     <span class="hidden text-12px text-ink-soft md:block">{{ today }}</span>
 
+    <NuxtLink
+      v-if="isDev"
+      to="/dev/kit-ui"
+      class="icon-btn ml-2"
+      title="组件预览"
+      aria-label="打开组件预览"
+    >
+      <span class="i-lucide-blocks text-15px text-brand" aria-hidden="true" />
+    </NuxtLink>
+
     <!-- 开发工具 (dev only) -->
-    <button v-if="isDev" class="icon-btn ml-2" title="开发工具" @click="showDevTools = true">
+    <button v-if="isDev" class="icon-btn" title="开发工具" @click="showDevTools = true">
       <span class="i-lucide-wrench text-15px text-warn" aria-hidden="true" />
     </button>
 

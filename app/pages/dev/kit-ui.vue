@@ -74,7 +74,8 @@ async function demoConfirmSimple() {
     confirmLabel: '继续修改',
   })
   lastResult.value = `simple confirm 返回：${ok}`
-  if (ok) kit.success('已进入编辑')
+  if (ok)
+    kit.success('已进入编辑')
 }
 
 // batch：批量删除 → 显示「将删除 N 条」，点确认立即关窗，事后弹 10 秒 undoToast
@@ -109,7 +110,8 @@ async function demoConfirmCascade() {
     confirmLabel: '删除',
   })
   lastResult.value = `cascade confirm 返回：${ok}（true=挂起期满提交 / false=撤销）`
-  if (ok) kit.success('已删除「华东建材」及其下游')
+  if (ok)
+    kit.success('已删除「华东建材」及其下游')
 }
 
 // ⑤ formModal
@@ -129,16 +131,20 @@ async function demoFormModal() {
   lastResult.value = values
     ? `formModal 提交：${JSON.stringify(values)}`
     : 'formModal 已取消（返回 null）'
-  if (values) kit.success('分供方已创建')
+  if (values)
+    kit.success('分供方已创建')
 }
 </script>
 
 <template>
   <div class="max-w-3xl mx-auto py-4">
+    <DevPreviewNav />
     <header class="mb-5">
       <div class="flex items-center gap-2">
         <span class="i-lucide-flask-conical text-16px text-brand" />
-        <h1 class="text-16px font-800 text-ink">KitUI 原语演示</h1>
+        <h1 class="text-16px font-800 text-ink">
+          KitUI 原语演示
+        </h1>
         <span class="chip text-9px bg-warn-soft text-warn-ink">DEV ONLY</span>
       </div>
       <p class="text-12px text-ink-soft mt-1">
@@ -154,36 +160,56 @@ async function demoFormModal() {
     <div class="space-y-3">
       <!-- ① 系统/结果提示 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">① 系统/结果提示 — expand 道（右上，展开可读）</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ① 系统/结果提示 — expand 道（右上，展开可读）
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           系统消息、确认后的结果类走这里：右上角展开堆叠、语义色图标、hover 暂停自动消失。
         </p>
-        <button class="btn-primary" @click="demoSemantic">连发 4 条（成功/提示/警告/错误）</button>
+        <button class="btn-primary" @click="demoSemantic">
+          连发 4 条（成功/提示/警告/错误）
+        </button>
       </section>
 
       <!-- ② 过程提示 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">② 过程提示 — collapse 道（右下，重叠省空间）</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ② 过程提示 — collapse 道（右下，重叠省空间）
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           上传/识别等界面交互反馈走这里：右下角重叠堆叠不占地方，<b>鼠标悬停自动展开</b>。含 HeroUI 式 promise/loading（转圈 → 自动变成功/失败）。
         </p>
         <div class="flex flex-wrap gap-2">
-          <button class="btn-secondary" @click="demoUploadPromise">上传发票（promise）</button>
-          <button class="btn-secondary" @click="demoRecognize">识别送货单（loading→进度→成功）</button>
-          <button class="btn-primary" @click="demoProcessPile">连发 5 条（看重叠 + 悬停展开）</button>
+          <button class="btn-secondary" @click="demoUploadPromise">
+            上传发票（promise）
+          </button>
+          <button class="btn-secondary" @click="demoRecognize">
+            识别送货单（loading→进度→成功）
+          </button>
+          <button class="btn-primary" @click="demoProcessPile">
+            连发 5 条（看重叠 + 悬停展开）
+          </button>
         </div>
       </section>
 
       <!-- ③ undoToast -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">③ undoToast — 软删除 10 秒撤回（expand 道）</h2>
-        <p class="text-12px text-ink-soft mb-3">10 秒内点「撤回」执行回调并弹「已撤回」；超时自动消失、不回调（ADR 0003 撤回时长）。</p>
-        <button class="btn-danger" @click="demoUndoToast">软删除（可撤回）</button>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ③ undoToast — 软删除 10 秒撤回（expand 道）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          10 秒内点「撤回」执行回调并弹「已撤回」；超时自动消失、不回调（ADR 0003 撤回时长）。
+        </p>
+        <button class="btn-danger" @click="demoUndoToast">
+          软删除（可撤回）
+        </button>
       </section>
 
       <!-- ④ confirm 三档 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">④ confirm — 三档确认弹窗（ADR 0003）</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ④ confirm — 三档确认弹窗（ADR 0003）
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           只服务「不可撤回 / 高杀伤 / 批量」操作。<b>simple</b>=高后果轻量（归档后修改）；
           <b>batch</b>=批量删除（看清条数 + 事后 10 秒撤回）；
@@ -191,23 +217,39 @@ async function demoFormModal() {
           取消默认聚焦、Esc/点遮罩=取消。
         </p>
         <div class="flex flex-wrap gap-2">
-          <button class="btn-secondary" @click="demoConfirmSimple">simple（归档后修改）</button>
-          <button class="btn-secondary" @click="demoConfirmBatch">batch（批量删除 12 条）</button>
-          <button class="btn-danger" @click="demoConfirmCascade">cascade（删分供方 · 打名+挂起）</button>
+          <button class="btn-secondary" @click="demoConfirmSimple">
+            simple（归档后修改）
+          </button>
+          <button class="btn-secondary" @click="demoConfirmBatch">
+            batch（批量删除 12 条）
+          </button>
+          <button class="btn-danger" @click="demoConfirmCascade">
+            cascade（删分供方 · 打名+挂起）
+          </button>
         </div>
       </section>
 
       <!-- ⑤ formModal -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">⑤ formModal — 字段配置驱动 + 必填校验</h2>
-        <p class="text-12px text-ink-soft mb-3">fields 配置渲染控件；缺必填项标红拦截提交；提交返回值对象，取消返回 null。</p>
-        <button class="btn-primary" @click="demoFormModal">打开表单弹窗</button>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑤ formModal — 字段配置驱动 + 必填校验
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          fields 配置渲染控件；缺必填项标红拦截提交；提交返回值对象，取消返回 null。
+        </p>
+        <button class="btn-primary" @click="demoFormModal">
+          打开表单弹窗
+        </button>
       </section>
 
       <!-- 结果回读 -->
       <section class="content-panel p-4 bg-surface-2">
-        <h2 class="text-12px font-700 text-ink-soft mb-1">最近一次返回值</h2>
-        <p class="text-12px font-mono text-ink break-all">{{ lastResult }}</p>
+        <h2 class="text-12px font-700 text-ink-soft mb-1">
+          最近一次返回值
+        </h2>
+        <p class="text-12px font-mono text-ink break-all">
+          {{ lastResult }}
+        </p>
       </section>
     </div>
   </div>

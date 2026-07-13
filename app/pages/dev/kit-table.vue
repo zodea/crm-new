@@ -124,10 +124,13 @@ const fewColumns: KitTableColumn[] = [
 
 <template>
   <div class="mx-auto max-w-5xl py-4">
+    <DevPreviewNav />
     <header class="mb-5">
       <div class="flex items-center gap-2">
         <span class="i-lucide-table-2 text-16px text-brand" />
-        <h1 class="text-16px font-800 text-ink">KitTable 表格三件套演示</h1>
+        <h1 class="text-16px font-800 text-ink">
+          KitTable 表格三件套演示
+        </h1>
         <span class="chip text-9px bg-warn-soft text-warn-ink">DEV ONLY</span>
       </div>
       <p class="text-12px text-ink-soft mt-1">
@@ -139,7 +142,9 @@ const fewColumns: KitTableColumn[] = [
     <div class="space-y-3">
       <!-- ① 宽表全家桶 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">① 16 列宽表 —— 容器内横滚 + 受控分页 + 列头筛选(remote)+ 金额列 + 插槽</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ① 16 列宽表 —— 容器内横滚 + 受控分页 + 列头筛选(remote)+ 金额列 + 插槽
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           57 条 × 16 列(约 1.9 倍容器宽):横向滚动只发生在表格容器内,页面主体不出横滚条;
           seq/项目名称左固定、操作列右固定;状态/经营类型/地域列头可筛(选项来自<b>全量数据</b>,筛后回第 1 页);
@@ -177,14 +182,20 @@ const fewColumns: KitTableColumn[] = [
 
       <!-- ② 少行兜底 + 本地筛选 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">② 3 行数据 —— minRows 高度兜底(≥10 行)+ 本地筛选(filterable: true)</h2>
-        <p class="text-12px text-ink-soft mb-3">数据不足时表体高度不塌陷;状态列头筛选在组件内本地过滤,选项自动从数据推导。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ② 3 行数据 —— minRows 高度兜底(≥10 行)+ 本地筛选(filterable: true)
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          数据不足时表体高度不塌陷;状态列头筛选在组件内本地过滤,选项自动从数据推导。
+        </p>
         <KitTable :columns="fewColumns" :data="fewRows" />
       </section>
 
       <!-- ③ 空数据 -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">③ 空数据 —— empty 占位</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ③ 空数据 —— empty 占位
+        </h2>
         <KitTable :columns="fewColumns" :data="[]" :min-rows="6" empty="暂无项目,点击右上角「新增」创建" />
       </section>
     </div>

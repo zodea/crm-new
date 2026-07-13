@@ -56,10 +56,13 @@ const activeNode = ref('p1')
 
 <template>
   <div class="mx-auto max-w-4xl py-4">
+    <DevPreviewNav />
     <header class="mb-5">
       <div class="flex items-center gap-2">
         <span class="i-lucide-blocks text-16px text-brand" />
-        <h1 class="text-16px font-800 text-ink">KitAtoms 原子库演示</h1>
+        <h1 class="text-16px font-800 text-ink">
+          KitAtoms 原子库演示
+        </h1>
         <span class="chip text-9px bg-warn-soft text-warn-ink">DEV ONLY</span>
       </div>
       <p class="text-12px text-ink-soft mt-1">
@@ -71,27 +74,43 @@ const activeNode = ref('p1')
     <div class="space-y-3">
       <!-- ① SelectFilter -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">① SelectFilter — 紧凑下拉筛选</h2>
-        <p class="text-12px text-ink-soft mb-3">label + reka-ui Select（样式化下拉 + Portal，6b687e4 迁入）；即选即筛。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ① SelectFilter — 紧凑下拉筛选
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          label + reka-ui Select（样式化下拉 + Portal，6b687e4 迁入）；即选即筛。
+        </p>
         <div class="flex flex-wrap items-center gap-4">
           <SelectFilter v-model="stage" label="阶段" :options="STAGE_OPTS" :min-width="150" />
           <SelectFilter v-model="status" label="状态" :options="STATUS_OPTS" />
         </div>
-        <p class="text-11px text-ink-faint font-mono mt-3">stage = {{ stage }} · status = {{ status }}</p>
+        <p class="text-11px text-ink-faint font-mono mt-3">
+          stage = {{ stage }} · status = {{ status }}
+        </p>
       </section>
 
       <!-- ② SegTab -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">② SegTab — 下划线分段切换（带数量角标）</h2>
-        <p class="text-12px text-ink-soft mb-3">选中态：品牌下划线 + 加粗 + 角标高亮；count 走等宽字体。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ② SegTab — 下划线分段切换（带数量角标）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          选中态：品牌下划线 + 加粗 + 角标高亮；count 走等宽字体。
+        </p>
         <SegTab v-model="ledgerTab" :tabs="LEDGER_TABS" />
-        <p class="text-11px text-ink-faint font-mono mt-3">activeTab = {{ ledgerTab }}</p>
+        <p class="text-11px text-ink-faint font-mono mt-3">
+          activeTab = {{ ledgerTab }}
+        </p>
       </section>
 
       <!-- ③ SearchInput -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">③ SearchInput — pill 搜索框（即输即筛）</h2>
-        <p class="text-12px text-ink-soft mb-3">左置放大镜，圆角胶囊；下方列表随输入实时收窄。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ③ SearchInput — pill 搜索框（即输即筛）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          左置放大镜，圆角胶囊；下方列表随输入实时收窄。
+        </p>
         <SearchInput v-model="keyword" placeholder="搜索分供方名…" :width="240" />
         <div class="flex flex-wrap gap-1.5 mt-3">
           <span v-for="s in filteredSuppliers" :key="s" class="chip bg-surface-3 text-ink-soft">{{ s }}</span>
@@ -101,8 +120,12 @@ const activeNode = ref('p1')
 
       <!-- ④ SectionHeader -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">④ SectionHeader — 品牌竖条区块标题</h2>
-        <p class="text-12px text-ink-soft mb-3">4×16 品牌竖条 + 标题；右侧 extra 插槽放操作/说明。</p>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ④ SectionHeader — 品牌竖条区块标题
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          4×16 品牌竖条 + 标题；右侧 extra 插槽放操作/说明。
+        </p>
         <SectionHeader>项目经营数据</SectionHeader>
         <SectionHeader :mb="0">
           票据信息
@@ -114,11 +137,15 @@ const activeNode = ref('p1')
 
       <!-- ⑤ Metric + MetricGrid -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">⑤ Metric / MetricGrid — 指标格网格（金额 ¥#,##0.00 完整展示）</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑤ Metric / MetricGrid — 指标格网格（金额 ¥#,##0.00 完整展示）
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           语义固定列数、1px 分隔线；money 开关将数字按 <b>¥#,##0.00</b> 千分位两位小数完整展示（去省略号）；tone 语义色 + ⓘ 公式 + big 大号。
         </p>
-        <SectionHeader :mb="8">经营数据（5 列）</SectionHeader>
+        <SectionHeader :mb="8">
+          经营数据（5 列）
+        </SectionHeader>
         <MetricGrid :cols="5">
           <Metric label="主合同金额" :value="8600000" money formula="Σ 施工合同.含税合同金额" />
           <Metric label="增补合同额" :value="1234567.89" money formula="Σ 补充协议.金额" />
@@ -127,7 +154,9 @@ const activeNode = ref('p1')
           <Metric label="项目可用资金余额" :value="-158900.5" money tone="danger" big formula="收款 + 往来收款 − 付款 − 管理费" />
         </MetricGrid>
 
-        <SectionHeader :mb="8" class="mt-4">票据信息（6 列，含百分比）</SectionHeader>
+        <SectionHeader :mb="8" class="mt-4">
+          票据信息（6 列，含百分比）
+        </SectionHeader>
         <MetricGrid :cols="6">
           <Metric label="销项票额" :value="7200000" money />
           <Metric label="销项税额" :value="633628.32" money />
@@ -140,7 +169,9 @@ const activeNode = ref('p1')
 
       <!-- ⑥ TreeNav -->
       <section class="content-panel p-4">
-        <h2 class="text-13px font-700 text-ink mb-1">⑥ TreeNav — 左树导航（数量角标 + 选中态）</h2>
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑥ TreeNav — 左树导航（数量角标 + 选中态）
+        </h2>
         <p class="text-12px text-ink-soft mb-3">
           节点带数量角标；父节点「全部发票」未显式给数，<b>按子节点聚合 = 32</b>；未归项目 warn 色、个人开支 brand 色；选中态高亮。
         </p>
@@ -149,8 +180,12 @@ const activeNode = ref('p1')
             <TreeNav v-model="activeNode" title="发票台账" :items="ledgerTree" />
           </div>
           <div class="flex-1 content-panel bg-surface-2 p-4 rounded-[var(--radius-card)]">
-            <p class="text-12px text-ink-soft">当前选中节点</p>
-            <p class="text-15px font-800 text-brand-deep font-mono mt-1">{{ activeNode }}</p>
+            <p class="text-12px text-ink-soft">
+              当前选中节点
+            </p>
+            <p class="text-15px font-800 text-brand-deep font-mono mt-1">
+              {{ activeNode }}
+            </p>
           </div>
         </div>
       </section>
