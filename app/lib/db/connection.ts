@@ -1,21 +1,18 @@
+import { isTauri } from '@tauri-apps/api/core'
+
 import { runMigrations } from './migrations'
 import { seedIfEmpty } from './seed'
 
 interface DbDriver {
-  execute(sql: string, params?: unknown[]): Promise<void>
-  select<T>(sql: string, params?: unknown[]): Promise<T[]>
-  close(): Promise<void>
+  execute: (sql: string, params?: unknown[]) => Promise<void>
+  select: <T>(sql: string, params?: unknown[]) => Promise<T[]>
+  close: () => Promise<void>
 }
 
 let db: DbDriver | null = null
 
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window
-}
-
 async function createTauriDriver(): Promise<DbDriver> {
-  const mod = '@tauri-apps/' + 'plugin-sql'
-  const { default: Database } = await import(/* @vite-ignore */ mod)
+  const { default: Database } = await import('@tauri-apps/plugin-sql')
   const conn = await Database.load('sqlite:crm.db')
   return {
     async execute(sql, params = []) {
@@ -42,7 +39,9 @@ async function createSqlJsDriver(): Promise<DbDriver> {
     },
     async select<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       const stmt = conn.prepare(sql)
-      if (params.length) stmt.bind(params as any[])
+      if (params.length)
+        stmt.bind(params as any[])
+
       const rows: T[] = []
       while (stmt.step()) {
         rows.push(stmt.getAsObject() as T)
@@ -57,19 +56,13 @@ async function createSqlJsDriver(): Promise<DbDriver> {
 }
 
 export async function getDb(): Promise<DbDriver> {
-  if (db) return db
+  if (db)
+    return db
 
-  try {
-    if (isTauri()) {
-      db = await createTauriDriver()
-    }
-    else {
-      db = await createSqlJsDriver()
-    }
-  }
-  catch {
-    db = await createSqlJsDriver()
-  }
+  // 桌面端必须使用持久化 SQLite；原生驱动失败时显式报错，不能静默退回内存库。
+  db = isTauri()
+    ? await createTauriDriver()
+    : await createSqlJsDriver()
 
   await runMigrations(db)
 
