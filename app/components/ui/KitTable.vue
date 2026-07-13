@@ -16,6 +16,7 @@ const {
   rowKey = 'id',
   empty = '暂无数据',
   remoteFilter = false,
+  checkMethod,
 } = defineProps<{
   columns: KitTableColumn[]
   data: T[]
@@ -29,11 +30,15 @@ const {
   empty?: string
   /** true = 列头筛选不在本地过滤,只 emit filter-change,由调用方对全量数据过滤(配受控分页)。 */
   remoteFilter?: boolean
+  /** checkbox 列的行级可勾判定(如 excel 来源票无扫描件不可勾);缺省全部可勾。 */
+  checkMethod?: (row: T) => boolean
 }>()
 
 const emit = defineEmits<{
-  'page-change': [payload: { page: number, pageSize: number }]
-  'filter-change': [payload: { field: string, values: unknown[], filters: { field: string, values: unknown[] }[] }]
+  pageChange: [payload: { page: number, pageSize: number }]
+  filterChange: [payload: { field: string, values: unknown[], filters: { field: string, values: unknown[] }[] }]
+  /** 勾选变化(含表头全选),携带当前全部选中行。 */
+  checkboxChange: [rows: T[]]
 }>()
 
 defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown>>()
@@ -102,17 +107,37 @@ interface VxeFilterChangeParams {
 }
 
 function onFilterChange(params: VxeFilterChangeParams) {
-  emit('filter-change', {
+  emit('filterChange', {
     field: (params.field ?? params.property)!,
     values: params.values,
     filters: params.filterList.map(f => ({ field: (f.field ?? f.property)!, values: f.values })),
   })
 }
+
+// ── checkbox 列（#69 勾选浮出合计）──
+const tableRef = useTemplateRef<{ getCheckboxRecords: () => T[], clearCheckboxRow: () => void }>('tableRef')
+
+const checkboxConfig = computed(() =>
+  checkMethod ? { checkMethod: ({ row }: { row: T }) => checkMethod(row) } : {},
+)
+
+function onCheckboxChange() {
+  emit('checkboxChange', tableRef.value?.getCheckboxRecords() ?? [])
+}
+
+/** 清空勾选(如切换左树节点时由调用方触发),同步 emit 空选集。 */
+function clearCheckbox() {
+  tableRef.value?.clearCheckboxRow()
+  emit('checkboxChange', [])
+}
+
+defineExpose({ clearCheckbox })
 </script>
 
 <template>
   <div class="border border-line bg-panel min-w-0">
     <vxe-table
+      ref="tableRef"
       :data="data"
       :loading="loading"
       :min-height="minHeight"
@@ -122,12 +147,23 @@ function onFilterChange(params: VxeFilterChangeParams) {
       :column-config="{ resizable: true }"
       :filter-config="{ remote: remoteFilter }"
       :seq-config="seqConfig"
+      :checkbox-config="checkboxConfig"
       @filter-change="onFilterChange"
+      @checkbox-change="onCheckboxChange"
+      @checkbox-all="onCheckboxChange"
     >
       <template v-for="({ col, vxeProps, slot }, i) in normalized" :key="col.field ?? `${col.type}:${i}`">
         <vxe-column
           v-if="col.type === 'seq'"
           type="seq"
+          :title="col.title"
+          :width="col.width"
+          :align="col.align"
+          :fixed="col.fixed"
+        />
+        <vxe-column
+          v-else-if="col.type === 'checkbox'"
+          type="checkbox"
           :title="col.title"
           :width="col.width"
           :align="col.align"
@@ -147,8 +183,8 @@ function onFilterChange(params: VxeFilterChangeParams) {
       :page="page.page"
       :page-size="page.pageSize"
       :page-size-options="pageSizeOptions"
-      @update:page="p => emit('page-change', { page: p, pageSize: page!.pageSize })"
-      @update:page-size="s => emit('page-change', { page: 1, pageSize: s })"
+      @update:page="p => emit('pageChange', { page: p, pageSize: page!.pageSize })"
+      @update:page-size="s => emit('pageChange', { page: 1, pageSize: s })"
     />
   </div>
 </template>

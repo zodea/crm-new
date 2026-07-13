@@ -4,20 +4,19 @@ import type { Invoice } from '~/stores/invoice'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
-import { formatMoney, yuan } from '~/lib/util/money'
+import { formatMoney } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
-const { success, warning, info, undoToast, formModal, confirm, promise } = useKitUI()
+const { success, warning, info, undoToast, confirm, promise } = useKitUI()
 
-const activeTab = ref<'docs' | 'review' | 'ledger'>('docs')
+// 台账已拆独立页 /finance/ledger（#69）：本页收敛为识别工作台两 Tab（文档管理 / 校对与排版）
+const activeTab = ref<'docs' | 'review'>('docs')
 const searchText = ref('')
 const selectedId = ref<string | null>(null)
-const ledgerOwnerFilter = ref<'all' | 'project' | 'personal' | 'unassigned'>('all')
 
-// 归属：项目 / 个人开支 单选中文文案 ↔ ownerKind 的映射（formModal select 只支持字符串 label=value）
+// 归属：项目 / 个人开支 单选中文文案 ↔ ownerKind 的映射（手动录入表单 select 用）
 const OWNER_KIND_LABEL = { project: '归属项目', personal: '个人开支' } as const
-const OWNER_KIND_OPTIONS = Object.values(OWNER_KIND_LABEL)
 function labelToOwnerKind(label: string): 'project' | 'personal' {
   return label === OWNER_KIND_LABEL.personal ? 'personal' : 'project'
 }
@@ -29,29 +28,7 @@ function findProjectByName(name: string) {
   return projectStore.list.find(p => p.name === name)
 }
 
-/** 归档：弹出归属选择表单，校验交给 store.archiveInvoice（缺归属/项目归属未选具体项目均拒绝）。@returns 是否归档成功 */
-async function archiveInvoiceFlow(inv: Invoice) {
-  const values = await formModal({
-    title: '归档发票',
-    subtitle: '归档需指定归属（项目 / 个人开支），归档后计入台账统计（DATABASE.md §4.2）。',
-    fields: [
-      { key: 'ownerKindLabel', label: '归属', type: 'select', options: [...OWNER_KIND_OPTIONS], value: OWNER_KIND_LABEL.project, required: true },
-      { key: 'projectName', label: '对应项目（归属项目时必选）', type: 'select', options: projectStore.list.map(p => p.name), value: inv.projectName || '' },
-    ],
-    saveText: '归档',
-  })
-  if (!values)
-    return false
-  const ownerKind = labelToOwnerKind(String(values.ownerKindLabel))
-  const project = ownerKind === 'project' ? findProjectByName(String(values.projectName)) : undefined
-  const result = await store.archiveInvoice(inv.id, ownerKind, project?.id ?? null, project?.name)
-  if (!result.ok) {
-    warning(result.reason ?? '归档失败')
-    return false
-  }
-  success('已归档，计入台账')
-  return true
-}
+// 归档弹窗流程已随台账迁至 /finance/ledger（#69）；工作台归档走 archiveSelected（自动解析归属）
 
 // 新增弹窗
 const showAddDialog = ref(false)
@@ -137,46 +114,10 @@ async function confirmDelete() {
   deleteTargetId.value = null
 }
 
-// 编辑弹窗（台账用）
-const showEditDialog = ref(false)
-const editForm = reactive<Partial<Invoice>>({})
-const editId = ref('')
-
-function openEdit(inv: Invoice) {
-  editId.value = inv.id
-  Object.assign(editForm, { ...inv })
-  showEditDialog.value = true
-}
-
-async function handleEdit() {
-  if (!editId.value)
-    return
-  await store.update(editId.value, editForm)
-  success('已更新')
-  showEditDialog.value = false
-}
-
-// 台账三分组（issue #57 验收③：项目 / 个人开支 / 未归，未归=已确认待归档）
-const OWNER_FILTER_OPTIONS = [
-  { key: 'all', label: '全部' },
-  { key: 'project', label: '项目' },
-  { key: 'personal', label: '个人开支' },
-  { key: 'unassigned', label: '待归档' },
-] as const
-
-const ledgerRowsByOwner = computed(() => ({
-  all: [...store.ledgerGroups.project, ...store.ledgerGroups.personal, ...store.ledgerGroups.unassigned],
-  project: store.ledgerGroups.project,
-  personal: store.ledgerGroups.personal,
-  unassigned: store.ledgerGroups.unassigned,
-}))
-
 // 统计
 const tabCounts = computed(() => ({
   docs: store.documents.length,
   review: store.pendingReview.length,
-  // 与台账 Tab 三分组共用同一份 ledgerRowsByOwner.all，避免两处各写一套公式算同一个数漂移
-  ledger: ledgerRowsByOwner.value.all.length,
 }))
 
 // 状态判定统一走 invoiceDocStatus(单一权威派生,与工作台左栏同优先级),本页只做文案/样式映射
@@ -236,30 +177,6 @@ const docsFiltered = computed(() => {
   }
   return items
 })
-
-const ledgerFiltered = computed(() => {
-  const q = searchText.value.trim().toLowerCase()
-  let items = ledgerRowsByOwner.value[ledgerOwnerFilter.value]
-  if (q) {
-    items = items.filter(inv =>
-      inv.invoiceNumber.toLowerCase().includes(q)
-      || inv.seller.toLowerCase().includes(q)
-      || inv.buyer.toLowerCase().includes(q),
-    )
-  }
-  return items
-})
-
-// 底部合计只统计已归档（accountStatus==='archived'）——精确对齐 DATABASE.md §4.2 口径。
-// 台账列表本身按 issue #57 验收③展示「项目/个人开支/待归档」三分组，含未归档行，
-// 但合计栏不应把「待归档」的金额混进「已归档」的统计口径，避免用户误读成 §4.2 台账总额。
-const ledgerArchived = computed(() => ledgerFiltered.value.filter(inv => inv.accountStatus === 'archived'))
-const ledgerTotal = computed(() =>
-  ledgerArchived.value.reduce((s, inv) => s + inv.totalAmount, 0),
-)
-const ledgerTax = computed(() =>
-  ledgerArchived.value.reduce((s, inv) => s + inv.taxAmount, 0),
-)
 
 function selectForReview(inv: Invoice) {
   selectedId.value = inv.id
@@ -505,13 +422,11 @@ onMounted(() => {
       >
         校对与排版 {{ tabCounts.review }}
       </button>
-      <button
-        class="content-tab"
-        :class="activeTab === 'ledger' ? 'content-tab-active' : ''"
-        @click="activeTab = 'ledger'"
-      >
-        发票台账 {{ tabCounts.ledger }}
-      </button>
+      <!-- 台账已拆独立页（#69）：这里只留跳转入口 -->
+      <NuxtLink to="/finance/ledger" class="content-tab inline-flex items-center gap-1">
+        发票台账
+        <span class="i-lucide-arrow-up-right h-[12px] w-[12px]" aria-hidden="true" />
+      </NuxtLink>
       <div class="flex-1" />
       <button class="btn-secondary mr-2" @click="showAddDialog = true">
         <span class="i-lucide-plus text-13px mr-1" /> 手动录入
@@ -720,110 +635,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ═══ Tab 3: 发票台账 ═══ -->
-    <div v-else-if="activeTab === 'ledger'">
-      <DataListToolbar
-        title="发票台账"
-        :count="ledgerFiltered.length"
-        :show-create="false"
-        @search="v => searchText = v"
-      />
-
-      <!-- 归属筛选（issue #57 验收③：项目 / 个人开支 / 待归档 分组计数） -->
-      <div class="flex items-center gap-2 pb-2.5 px-1">
-        <SelectFilter
-          v-model="ledgerOwnerFilter"
-          label="归属"
-          :options="OWNER_FILTER_OPTIONS.map(o => ({ key: o.key, label: `${o.label} ${ledgerRowsByOwner[o.key].length}` }))"
-          placeholder="全部"
-        />
-      </div>
-
-      <div class="border border-line">
-        <vxe-table
-          :data="ledgerFiltered"
-          :loading="store.loading"
-          border
-          show-overflow
-          height="auto"
-          :row-config="{ isHover: true, keyField: 'id' }"
-          :column-config="{ resizable: true }"
-        >
-          <vxe-column type="seq" title="#" width="52" fixed="left" />
-          <vxe-column field="invoiceNumber" title="单据编号" width="160">
-            <template #default="{ row }">
-              <span class="font-mono font-700">{{ row.invoiceNumber || '—' }}</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="invoiceDate" title="开票日期" width="100">
-            <template #default="{ row }">
-              <span class="font-mono">{{ row.invoiceDate }}</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="buyer" title="购买方" min-width="160" />
-          <vxe-column field="seller" title="供应商" min-width="180" />
-          <vxe-column field="invoiceType" title="票据类型" width="130" />
-          <vxe-column field="totalAmount" title="价税合计" width="120">
-            <template #default="{ row }">
-              <span class="font-mono font-800 block text-right">{{ formatMoney(row.totalAmount) }}</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="taxAmount" title="税额" width="100">
-            <template #default="{ row }">
-              <span class="font-mono block text-right">{{ formatMoney(row.taxAmount) }}</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="taxRate" title="税率" width="60">
-            <template #default="{ row }">
-              <span class="font-mono">{{ row.taxRate }}</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="projectName" title="对应项目" min-width="120" />
-          <vxe-column title="归属" width="90">
-            <template #default="{ row }">
-              <span v-if="row.ownerKind === 'project'" class="chip-brand">项目</span>
-              <span v-else-if="row.ownerKind === 'personal'" class="chip bg-surface-3 text-ink-soft">个人开支</span>
-              <span v-else class="chip-warn">待归档</span>
-            </template>
-          </vxe-column>
-          <vxe-column field="source" title="来源" width="70">
-            <template #default="{ row }">
-              <span :class="row.source === 'scan' ? 'chip-brand' : 'chip bg-surface-3 text-ink-soft'">
-                {{ row.source === 'scan' ? '扫描' : '导入' }}
-              </span>
-            </template>
-          </vxe-column>
-          <vxe-column title="操作" width="120" fixed="right">
-            <template #default="{ row }">
-              <div class="flex items-center gap-1">
-                <button
-                  v-if="row.accountStatus === 'none'"
-                  class="icon-btn" title="归档"
-                  @click="archiveInvoiceFlow(row)"
-                >
-                  <span class="i-lucide-archive text-14px" />
-                </button>
-                <button class="icon-btn" title="编辑" @click="openEdit(row)">
-                  <span class="i-lucide-square-pen text-14px" />
-                </button>
-                <button class="icon-btn-danger" title="删除" @click="askDelete(row)">
-                  <span class="i-lucide-trash-2 text-14px" />
-                </button>
-              </div>
-            </template>
-          </vxe-column>
-        </vxe-table>
-      </div>
-
-      <!-- 底部汇总（仅统计已归档，对齐 §4.2 口径；当前筛选含待归档行时不计入这两个数字） -->
-      <div class="flex items-center px-3 py-2 border border-t-0 border-line bg-panel text-12px">
-        <span class="text-ink-soft">已归档合计: </span>
-        <span class="font-mono font-700 text-ink ml-1 mr-4">{{ yuan(ledgerTotal) }}</span>
-        <span class="text-ink-soft">已归档税额: </span>
-        <span class="font-mono font-700 text-ink ml-1">{{ yuan(ledgerTax) }}</span>
-      </div>
-    </div>
-
     <!-- ═══ 删除确认弹窗 ═══ -->
     <ConfirmDialog
       :open="showDeleteConfirm"
@@ -931,89 +742,6 @@ onMounted(() => {
         <div class="col-span-2">
           <label class="field-label">票面备注</label>
           <input v-model="addForm.remark" class="field-input w-full" placeholder="备注信息">
-        </div>
-      </div>
-    </FormDialog>
-
-    <!-- ═══ 编辑发票弹窗 ═══ -->
-    <FormDialog
-      :open="showEditDialog"
-      title="编辑发票"
-      save-label="保存"
-      width="min(640px, 95vw)"
-      @save="handleEdit"
-      @cancel="showEditDialog = false"
-    >
-      <div class="grid grid-cols-2 gap-x-4 gap-y-3">
-        <div>
-          <label class="field-label">票据类型</label>
-          <select v-model="editForm.invoiceType" class="field-input w-full">
-            <option value="增值税专用发票">
-              增值税专用发票
-            </option>
-            <option value="增值税普通发票">
-              增值税普通发票
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label">发票号码</label>
-          <input v-model="editForm.invoiceNumber" class="field-input w-full font-mono">
-        </div>
-        <div>
-          <label class="field-label">开票日期</label>
-          <input v-model="editForm.invoiceDate" type="date" class="field-input w-full font-mono">
-        </div>
-        <div>
-          <label class="field-label">税率</label>
-          <select v-model="editForm.taxRate" class="field-input w-full">
-            <option value="13%">
-              13%
-            </option>
-            <option value="9%">
-              9%
-            </option>
-            <option value="6%">
-              6%
-            </option>
-            <option value="3%">
-              3%
-            </option>
-            <option value="1%">
-              1%
-            </option>
-            <option value="0%">
-              0%
-            </option>
-          </select>
-        </div>
-        <div>
-          <label class="field-label">购买方</label>
-          <input v-model="editForm.buyer" class="field-input w-full">
-        </div>
-        <div>
-          <label class="field-label">供应商（销方）</label>
-          <input v-model="editForm.seller" class="field-input w-full">
-        </div>
-        <div>
-          <label class="field-label">不含税金额</label>
-          <input v-model.number="editForm.amount" type="number" class="field-input w-full font-mono" step="0.01">
-        </div>
-        <div>
-          <label class="field-label">税额</label>
-          <input v-model.number="editForm.taxAmount" type="number" class="field-input w-full font-mono" step="0.01">
-        </div>
-        <div>
-          <label class="field-label">价税合计</label>
-          <input v-model.number="editForm.totalAmount" type="number" class="field-input w-full font-mono" step="0.01">
-        </div>
-        <div>
-          <label class="field-label">对应项目</label>
-          <input v-model="editForm.projectName" class="field-input w-full">
-        </div>
-        <div class="col-span-2">
-          <label class="field-label">票面备注</label>
-          <input v-model="editForm.remark" class="field-input w-full">
         </div>
       </div>
     </FormDialog>

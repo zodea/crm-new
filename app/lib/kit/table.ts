@@ -4,7 +4,7 @@
 
 import { yuan } from '~/lib/util/money'
 
-export type KitColumnType = 'seq' | 'text' | 'money' | 'date' | 'action'
+export type KitColumnType = 'seq' | 'checkbox' | 'text' | 'money' | 'date' | 'action'
 
 export interface KitFilterOption {
   label: string
@@ -44,7 +44,7 @@ export function normalizeKitColumn(col: KitTableColumn): NormalizedKitColumn {
   const out: NormalizedKitColumn = {
     ...col,
     type,
-    align: col.align ?? (type === 'money' ? 'right' : type === 'seq' ? 'center' : 'left'),
+    align: col.align ?? (type === 'money' ? 'right' : type === 'seq' || type === 'checkbox' ? 'center' : 'left'),
     filterable: col.filterable ?? false,
   }
   if (type === 'money')
@@ -52,6 +52,8 @@ export function normalizeKitColumn(col: KitTableColumn): NormalizedKitColumn {
   if (col.width == null && col.minWidth == null) {
     if (type === 'seq')
       out.width = 52
+    else if (type === 'checkbox')
+      out.width = 40
     else if (type === 'date')
       out.width = 110
     else if (type === 'action')

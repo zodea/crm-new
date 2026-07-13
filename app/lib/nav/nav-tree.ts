@@ -69,7 +69,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'omDirect', mark: '直', label: '直入直出', hint: '不入库直用' },
   ] },
   { type: 'group', key: 'g-finance', label: '资金管理', icon: 'i-lucide-wallet', items: [
-    { key: 'invoiceLedger', mark: '账', label: '发票台账', hint: '收票·打印·修改' },
+    { key: 'invoiceLedger', mark: '账', label: '发票台账', hint: '收票·打印·修改', to: '/finance/ledger' },
     { key: 'invoice', mark: '票', label: '发票识别', hint: '上传·校对·排版', to: '/finance/invoice' },
     { key: 'payApply', mark: '付', label: '付款申请', hint: '8 类业务' },
     { key: 'payManage', mark: '管', label: '付款管理', hint: '待支付工作台' },
@@ -118,8 +118,13 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'worker'
   if (path.startsWith('/finance/invoice/factor'))
     return 'factor'
+  // 发票编辑页签从台账进入，点亮台账（对齐设计稿 invoiceLedger/invoiceEdit 同亮）
+  if (/^\/finance\/invoice\/[^/]+/.test(path))
+    return 'invoiceLedger'
   if (path.startsWith('/finance/invoice'))
     return 'invoice'
+  if (path.startsWith('/finance/ledger'))
+    return 'invoiceLedger'
   if (path.startsWith('/contract/construction'))
     return 'conContract'
   if (path.startsWith('/contract/subcontract'))

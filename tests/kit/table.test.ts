@@ -37,6 +37,12 @@ describe('列配置归一化:normalizeKitColumn', () => {
     expect(col.width).toBe(110)
   })
 
+  it('checkbox 列默认 40 宽居中(#69 勾选浮出合计)', () => {
+    const col = normalizeKitColumn({ title: '', type: 'checkbox' })
+    expect(col.width).toBe(40)
+    expect(col.align).toBe('center')
+  })
+
   it('filterable 支持显式选项数组透传(受控分页下选项来自全量数据)', () => {
     const opts = [{ label: '施工中', value: '施工中' }]
     expect(normalizeKitColumn({ field: 'status', title: '状态', filterable: opts }).filterable).toEqual(opts)
@@ -90,7 +96,7 @@ describe('列头筛选选项推导:deriveFilterOptions', () => {
     expect(deriveFilterOptions([{ status: null }, { status: undefined }, { status: '' }], 'status')).toEqual([])
   })
 
-  it('NaN 不产出选项(NaN === NaN 恒 false,选项永远筛不出行)', () => {
+  it('naN 不产出选项(NaN === NaN 恒 false,选项永远筛不出行)', () => {
     expect(deriveFilterOptions([{ n: Number.NaN }, { n: 1 }], 'n')).toEqual([
       { label: '1', value: 1 },
     ])

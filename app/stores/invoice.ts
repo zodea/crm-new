@@ -196,6 +196,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
   }
 
   /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
+  /** 全列覆写：data 必须是「最新行 + 改动」的合并结果（`{ ...byId(id), ...patch }`），缺列会被写回默认值。 */
   async function update(id: string, data: Partial<Invoice>) {
     const now = new Date().toISOString()
     const logId = await withUpdateLog(db, 'invoices', id, () => execute(
