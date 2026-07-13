@@ -28,6 +28,6 @@ const emit = defineEmits<{ navigate: [] }>()
       :class="item.icon"
       aria-hidden="true"
     />
-    <span v-if="!collapsed" class="min-w-0 flex-1 truncate text-13px font-600">{{ item.label }}</span>
+    <span v-if="!collapsed" class="min-w-0 flex-1 truncate text-14px font-600">{{ item.label }}</span>
   </NuxtLink>
 </template>

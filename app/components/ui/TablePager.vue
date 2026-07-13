@@ -30,7 +30,7 @@ const visiblePages = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-center justify-end gap-1.5 py-2 px-1 border-t border-line text-12px">
+  <div class="flex items-center justify-end gap-1.5 border-t border-line px-2 py-2 text-13px">
     <span class="text-ink-faint mr-2">共 {{ total }} 条</span>
     <button
       class="pager-btn"
@@ -58,10 +58,12 @@ const visiblePages = computed(() => {
     <select
       v-if="pageSizeOptions?.length"
       :value="size"
-      class="ml-1.5 h-7 border border-line-strong rounded-6px bg-panel px-1.5 text-12px text-ink-soft cursor-pointer"
+      class="ml-1.5 h-7 border border-line-strong rounded-[var(--radius-sm)] bg-panel px-2 text-13px text-ink-soft cursor-pointer outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
       @change="emit('update:pageSize', Number(($event.target as HTMLSelectElement).value))"
     >
-      <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }} 条/页</option>
+      <option v-for="n in pageSizeOptions" :key="n" :value="n">
+        {{ n }} 条/页
+      </option>
     </select>
   </div>
 </template>

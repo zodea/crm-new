@@ -1,10 +1,6 @@
 <script setup lang="ts">
-import type { DeliveryFile } from '~/stores/delivery'
-
 const store = useDeliveryStore()
-const toast = useToast()
 
-const showFilter = ref(false)
 const filterIncomplete = ref(false)
 
 const OCR_STATUS: Record<string, { label: string, cls: string }> = {
@@ -24,7 +20,8 @@ const displayFiles = computed(() => {
 
 function fmtMoney(v: string | number): string {
   const n = typeof v === 'string' ? Number.parseFloat(v) : v
-  if (Number.isNaN(n)) return String(v)
+  if (Number.isNaN(n))
+    return String(v)
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -36,8 +33,12 @@ onMounted(() => store.load())
     <!-- 上传区 -->
     <div class="upload-zone mb-4 py-8 cursor-pointer">
       <span class="i-lucide-upload text-24px mb-2 block mx-auto text-brand" />
-      <p class="text-13px font-600">拖拽 PDF / 图片 / 文件夹到此处上传</p>
-      <p class="text-11px text-ink-faint mt-1">支持 PDF、PNG、JPG、BMP、WebP、GIF、TIFF</p>
+      <p class="text-13px font-600">
+        拖拽 PDF / 图片 / 文件夹到此处上传
+      </p>
+      <p class="text-11px text-ink-faint mt-1">
+        支持 PDF、PNG、JPG、BMP、WebP、GIF、TIFF
+      </p>
     </div>
 
     <!-- 统计卡片 -->
@@ -50,11 +51,11 @@ onMounted(() => store.load())
 
     <!-- 分区栏 + 筛选 -->
     <div class="flex items-center gap-2 mb-3">
-      <div class="flex border border-line rounded-[3px] overflow-hidden bg-panel">
+      <div class="flex overflow-hidden border border-line rounded-[var(--radius-btn)] bg-panel">
         <button
           v-for="p in store.partitions"
           :key="p.id"
-          class="px-3 py-1.5 text-12px font-600 border-r border-line last:border-r-0 cursor-pointer transition-colors"
+          class="cursor-pointer border-r border-line px-3 py-1.5 text-13px font-600 transition-colors last:border-r-0"
           :class="store.activePartition === p.id ? 'bg-brand text-white' : 'text-ink-soft hover:bg-surface-3'"
           @click="store.setActivePartition(p.id)"
         >
@@ -76,11 +77,11 @@ onMounted(() => store.load())
       <div
         v-for="f in displayFiles"
         :key="f.id"
-        class="border border-line bg-panel"
+        class="overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]"
       >
         <div class="flex gap-4 p-3">
           <!-- 左：缩略图占位 -->
-          <div class="w-24 h-32 bg-surface-2 rounded-[3px] flex items-center justify-center shrink-0">
+          <div class="h-32 w-24 flex shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-surface-2">
             <span class="text-28px font-800 text-ink-faint">
               {{ f.kind === 'pdf' ? '📄' : '🖼' }}
             </span>
@@ -90,7 +91,7 @@ onMounted(() => store.load())
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1.5">
               <span class="text-13px font-700 truncate">{{ f.name }}</span>
-              <span :class="['chip text-10px', OCR_STATUS[f.ocrStatus]?.cls || '']">
+              <span class="chip text-10px" :class="OCR_STATUS[f.ocrStatus]?.cls || ''">
                 {{ OCR_STATUS[f.ocrStatus]?.label || f.ocrStatus }}
               </span>
               <span v-if="f.docType" class="chip bg-surface-3 text-ink-soft text-10px">
@@ -126,20 +127,40 @@ onMounted(() => store.load())
                   <table class="w-full text-12px">
                     <thead>
                       <tr class="bg-surface-2">
-                        <th class="text-left px-2 py-1 font-600 text-ink-soft border-r border-line">材料名称</th>
-                        <th class="text-left px-2 py-1 font-600 text-ink-soft border-r border-line w-14">单位</th>
-                        <th class="text-right px-2 py-1 font-600 text-ink-soft border-r border-line w-16">数量</th>
-                        <th class="text-right px-2 py-1 font-600 text-ink-soft border-r border-line w-16">单价</th>
-                        <th class="text-right px-2 py-1 font-600 text-ink-soft w-20">金额</th>
+                        <th class="text-left px-2 py-1 font-600 text-ink-soft border-r border-line">
+                          材料名称
+                        </th>
+                        <th class="text-left px-2 py-1 font-600 text-ink-soft border-r border-line w-14">
+                          单位
+                        </th>
+                        <th class="text-right px-2 py-1 font-600 text-ink-soft border-r border-line w-16">
+                          数量
+                        </th>
+                        <th class="text-right px-2 py-1 font-600 text-ink-soft border-r border-line w-16">
+                          单价
+                        </th>
+                        <th class="text-right px-2 py-1 font-600 text-ink-soft w-20">
+                          金额
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="(item, idx) in doc.items" :key="idx" class="border-t border-line">
-                        <td class="px-2 py-1 border-r border-line">{{ item.name }}</td>
-                        <td class="px-2 py-1 border-r border-line">{{ item.unit }}</td>
-                        <td class="px-2 py-1 border-r border-line text-right font-mono">{{ item.quantity }}</td>
-                        <td class="px-2 py-1 border-r border-line text-right font-mono">{{ item.unitPrice }}</td>
-                        <td class="px-2 py-1 text-right font-mono font-700">{{ fmtMoney(item.total) }}</td>
+                        <td class="px-2 py-1 border-r border-line">
+                          {{ item.name }}
+                        </td>
+                        <td class="px-2 py-1 border-r border-line">
+                          {{ item.unit }}
+                        </td>
+                        <td class="px-2 py-1 border-r border-line text-right font-mono">
+                          {{ item.quantity }}
+                        </td>
+                        <td class="px-2 py-1 border-r border-line text-right font-mono">
+                          {{ item.unitPrice }}
+                        </td>
+                        <td class="px-2 py-1 text-right font-mono font-700">
+                          {{ fmtMoney(item.total) }}
+                        </td>
                       </tr>
                     </tbody>
                   </table>

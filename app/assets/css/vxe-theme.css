@@ -2,9 +2,13 @@
    参考: DESIGN-SYSTEM.md §4.13, CRM-PATTERNS.md §1 */
 
 :root {
-  --vxe-font-size-default: 13px;
+  --vxe-font-size-default: 14px;
   --vxe-font-family: var(--font-sans);
   --vxe-font-color: var(--ink);
+  --vxe-ui-font-family: var(--font-sans);
+  --vxe-ui-font-size-default: 14px;
+  --vxe-ui-table-row-height-default: 40px;
+  --vxe-ui-table-cell-padding-default: 6px;
   --vxe-table-border-color: var(--line);
   --vxe-table-header-background-color: var(--surface-2);
   --vxe-table-header-font-color: var(--ink-soft);
@@ -12,14 +16,15 @@
   --vxe-table-body-background-color: var(--panel);
   --vxe-table-row-hover-background-color: var(--surface-3);
   --vxe-table-row-current-background-color: var(--brand-soft);
-  --vxe-table-border-radius: 0;
+  --vxe-table-border-radius: var(--radius-card);
+  --vxe-ui-table-border-radius: var(--radius-card);
   --vxe-pager-background-color: var(--panel);
 }
 
-/* 无圆角 */
+/* 数据网格与承载卡片共用圆角，内部滚动内容不越界。 */
 .vxe-table,
 .vxe-table--render-wrapper {
-  border-radius: 0 !important;
+  border-radius: var(--radius-card) !important;
 }
 
 /* 完整网格线 */
@@ -28,16 +33,22 @@
   border-right: 1px solid var(--line);
 }
 
-/* 表头紧凑 */
+/* 表头和数据行统一 40px，字号放大但不再叠加单元格外层留白。 */
 .vxe-table .vxe-header--column {
-  font-size: 11px;
-  padding: 6px 8px;
+  height: 40px;
+  padding: 0 !important;
+  font-size: 13px;
 }
 
-/* 行紧凑 */
 .vxe-table .vxe-body--column {
-  padding: 7px 8px;
-  font-size: 13px;
+  height: 40px;
+  padding: 0 !important;
+  font-size: 14px;
+}
+
+.vxe-table .vxe-cell {
+  padding-right: 6px;
+  padding-left: 6px;
 }
 
 /* 金额列等宽 */
@@ -67,5 +78,5 @@
   border-top: 1px solid var(--line);
   background: var(--panel);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
 }

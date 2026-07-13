@@ -30,10 +30,10 @@ const colorClass: Record<string, string> = {
 </script>
 
 <template>
-  <div class="border border-line bg-panel px-4 py-3">
+  <div class="border border-line rounded-[var(--radius-card)] bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
     <div class="flex items-center gap-2 mb-1.5">
       <span v-if="icon" :class="icon" class="text-16px text-ink-faint" aria-hidden="true" />
-      <span class="text-11px font-600 text-ink-faint">{{ label }}</span>
+      <span class="text-12px font-600 text-ink-faint">{{ label }}</span>
     </div>
     <div class="font-mono text-20px font-500 tabular-nums" :class="color ? colorClass[color] : 'text-ink'">
       {{ display }}

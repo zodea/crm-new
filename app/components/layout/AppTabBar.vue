@@ -145,7 +145,7 @@ onKeyStroke('Escape', () => closeMenu(true))
   <div class="flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2">
     <nav
       ref="tabListEl"
-      class="tabbar-scroll min-w-0 flex flex-1 items-stretch gap-px overflow-x-auto overflow-y-hidden px-2"
+      class="tabbar-scroll min-w-0 flex flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-1"
       aria-label="已打开页面"
     >
       <div
@@ -153,10 +153,10 @@ onKeyStroke('Escape', () => closeMenu(true))
         :key="tab.key"
         ref="tabEl"
         :data-tab-key="tab.key"
-        class="group/tab inline-flex max-w-[200px] shrink-0 select-none items-center whitespace-nowrap border-b-2 border-transparent text-12px transition-colors duration-[var(--dur-fast)]"
+        class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center whitespace-nowrap border border-transparent text-14px transition-[color,background-color,border-color] duration-[var(--dur-fast)]"
         :class="tab.key === tabsStore.activeKey
-          ? 'border-brand bg-brand-soft font-700 text-brand-deep'
-          : 'font-500 text-ink-soft hover:bg-[rgba(17,24,39,0.05)] hover:text-ink'"
+          ? 'browser-tab--active z-[1] font-700 text-ink'
+          : 'font-500 text-ink-soft hover:border-line hover:bg-surface-3 hover:text-ink'"
         @contextmenu.prevent="openMenu($event, tab.key)"
       >
         <button
@@ -173,7 +173,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         <button
           v-if="tab.closable"
           type="button"
-          class="mr-2 grid h-5 w-5 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent text-ink-faint opacity-70 outline-none hover:bg-danger-soft hover:text-danger focus-visible:[box-shadow:0_0_0_2px_var(--brand)] group-hover/tab:opacity-100"
+          class="mr-2 grid h-5 w-5 shrink-0 place-items-center border-0 rounded-sm bg-transparent text-ink-faint opacity-70 outline-none hover:bg-danger-soft hover:text-danger focus-visible:[box-shadow:0_0_0_2px_var(--brand)] group-hover/tab:opacity-100"
           title="关闭页签"
           :aria-label="`关闭 ${tab.title}`"
           @click.stop="closeAndFollow(tab.key)"
@@ -184,7 +184,7 @@ onKeyStroke('Escape', () => closeMenu(true))
     </nav>
 
     <div class="flex shrink-0 items-center gap-1 border-l border-line bg-surface-2 px-2">
-      <span class="px-1 text-10px text-ink-faint" title="当前页签数量">
+      <span class="px-1 text-12px text-ink-faint" title="当前页签数量">
         <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span> 个页签
       </span>
       <button
@@ -213,7 +213,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         type="button"
         role="menuitem"
         tabindex="-1"
-        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="tab-menu-item"
         :disabled="!menuTab?.closable"
         @click="act(() => tabsStore.close(menu.key))"
       >
@@ -223,7 +223,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         type="button"
         role="menuitem"
         tabindex="-1"
-        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="tab-menu-item"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeOther(menu.key))"
       >
@@ -233,7 +233,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         type="button"
         role="menuitem"
         tabindex="-1"
-        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="tab-menu-item"
         :disabled="!hasRight"
         @click="act(() => tabsStore.closeToRight(menu.key))"
       >
@@ -244,7 +244,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         type="button"
         role="menuitem"
         tabindex="-1"
-        class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
+        class="tab-menu-item"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeEvery())"
       >
@@ -262,5 +262,68 @@ onKeyStroke('Escape', () => closeMenu(true))
 .tabbar-scroll::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.browser-tab {
+  height: calc(var(--tabbar-h) - 4px);
+  border-radius: var(--radius-btn) var(--radius-btn) 0 0;
+}
+
+.browser-tab--active {
+  margin-bottom: -1px;
+  border-color: var(--line);
+  border-bottom-color: var(--shell-workspace-bg);
+  background: var(--shell-workspace-bg);
+  box-shadow: inset 0 2px 0 var(--brand);
+}
+
+/* Chrome 式连体肩线：激活页签底部自然过渡到工作区，而不是独立胶囊。 */
+.browser-tab--active::before,
+.browser-tab--active::after {
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  content: '';
+  pointer-events: none;
+}
+
+.browser-tab--active::before {
+  left: -10px;
+  border-bottom-right-radius: var(--radius-btn);
+  box-shadow: 5px 5px 0 4px var(--shell-workspace-bg);
+}
+
+.browser-tab--active::after {
+  right: -10px;
+  border-bottom-left-radius: var(--radius-btn);
+  box-shadow: -5px 5px 0 4px var(--shell-workspace-bg);
+}
+
+.tab-menu-item {
+  display: flex;
+  width: calc(100% - 8px);
+  height: 32px;
+  align-items: center;
+  margin-inline: 4px;
+  padding-inline: 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  background: transparent;
+  font-size: 14px;
+}
+
+.tab-menu-item:hover {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+
+.tab-menu-item:disabled {
+  opacity: 0.4;
+}
+
+.tab-menu-item:disabled:hover {
+  background: transparent;
 }
 </style>

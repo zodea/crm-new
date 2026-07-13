@@ -78,23 +78,23 @@ export default defineConfig({
       input: 'var(--input)',
       ring: 'var(--ring)',
       sidebar: {
-        DEFAULT: 'var(--sidebar-background)',
-        foreground: 'var(--sidebar-foreground)',
-        primary: 'var(--sidebar-primary)',
+        'DEFAULT': 'var(--sidebar-background)',
+        'foreground': 'var(--sidebar-foreground)',
+        'primary': 'var(--sidebar-primary)',
         'primary-foreground': 'var(--sidebar-primary-foreground)',
-        accent: 'var(--sidebar-accent)',
+        'accent': 'var(--sidebar-accent)',
         'accent-foreground': 'var(--sidebar-accent-foreground)',
-        border: 'var(--sidebar-border)',
-        ring: 'var(--sidebar-ring)',
+        'border': 'var(--sidebar-border)',
+        'ring': 'var(--sidebar-ring)',
       },
     },
 
-    // shadcn 圆角阶梯（lg = --radius，其余派生）；旧的 rounded-[3px]/rounded-full 不受影响
+    // 统一形状阶梯：交互控件 10px、卡片/弹窗 12px、小控件 8px。
     borderRadius: {
-      lg: 'var(--radius)',
-      md: 'calc(var(--radius) - 2px)',
-      sm: 'calc(var(--radius) - 4px)',
-      xl: 'calc(var(--radius) + 4px)',
+      lg: 'var(--radius-card)',
+      md: 'var(--radius-btn)',
+      sm: 'var(--radius-sm)',
+      xl: 'calc(var(--radius-card) + 2px)',
     },
 
     fontFamily: {
@@ -183,14 +183,14 @@ export default defineConfig({
     'content-panel': 'border border-line bg-panel',
 
     // 按钮
-    'btn': 'inline-flex items-center justify-center border border-line rounded-[3px] px-2.5 py-1.5 text-13px font-600 cursor-pointer transition-colors duration-[var(--dur-fast)]',
+    'btn': 'inline-flex items-center justify-center border border-line rounded-[var(--radius-btn)] px-2.5 py-1.5 text-14px font-600 cursor-pointer transition-colors duration-[var(--dur-fast)]',
     'btn-primary': 'btn border-brand bg-brand text-white hover:opacity-90',
     'btn-secondary': 'btn bg-panel text-ink-soft hover:border-brand hover:text-brand',
     'btn-danger': 'btn border-danger text-danger hover:bg-danger-soft',
     'btn-ghost': 'btn border-transparent bg-transparent text-ink-soft hover:bg-surface-3 hover:text-brand',
 
     // 图标按钮（工具栏）
-    'icon-btn': 'inline-flex items-center justify-center w-7 h-7 rounded-[3px] border border-line bg-panel text-ink-soft cursor-pointer hover:border-brand hover:text-brand transition-colors duration-[var(--dur-fast)]',
+    'icon-btn': 'inline-flex items-center justify-center w-7 h-7 rounded-[var(--radius-btn)] border border-line bg-panel text-ink-soft cursor-pointer hover:border-brand hover:text-brand transition-colors duration-[var(--dur-fast)]',
     'icon-btn-primary': 'icon-btn bg-brand text-white border-brand',
     'icon-btn-danger': 'icon-btn hover:border-danger hover:text-danger',
 
@@ -207,18 +207,18 @@ export default defineConfig({
     'status-danger': 'text-danger font-600',
 
     // 输入框
-    'field-input': 'border border-line rounded-[3px] px-2 py-1.5 bg-panel text-13px outline-none focus:border-brand focus:shadow-[0_0_0_2px_rgba(57,118,198,0.15)]',
+    'field-input': 'border border-line rounded-[var(--radius-btn)] px-2.5 py-1.5 bg-panel text-14px outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]',
 
     // 标签
-    'field-label': 'text-11px font-600 text-ink-soft mb-1',
+    'field-label': 'text-12px font-600 text-ink-soft mb-1',
 
     // 列组切换（CRM 风格）
-    'col-group': 'flex border border-line rounded-[3px] overflow-hidden bg-panel',
-    'col-group-item': 'px-3 py-1 text-11px font-600 text-ink-soft cursor-pointer border-r border-line last:border-r-0',
+    'col-group': 'flex border border-line rounded-[var(--radius-btn)] overflow-hidden bg-panel',
+    'col-group-item': 'px-3 py-1 text-12px font-600 text-ink-soft cursor-pointer border-r border-line last:border-r-0',
     'col-group-active': 'bg-brand text-white',
 
     // 内容区 Tab
-    'content-tab': 'px-3.5 py-2 text-12px text-ink-soft cursor-pointer border-b-2 border-transparent -mb-px hover:text-brand',
+    'content-tab': 'px-3.5 py-2 text-13px text-ink-soft cursor-pointer border-b-2 border-transparent -mb-px hover:text-brand',
     'content-tab-active': 'text-brand-deep border-b-brand font-600',
 
     // 信息摘要行
@@ -230,7 +230,7 @@ export default defineConfig({
     'form-cell': 'px-2.5 py-2 border-b border-r border-surface-3 flex flex-col gap-0.5 nth-child-3n:border-r-0',
 
     // 分页
-    'pager-btn': 'inline-flex items-center justify-center w-6 h-6 border border-line rounded-[3px] bg-panel text-11px text-ink-soft cursor-pointer hover:border-brand hover:text-brand',
+    'pager-btn': 'inline-flex items-center justify-center w-7 h-7 border border-line rounded-[var(--radius-sm)] bg-panel text-12px text-ink-soft cursor-pointer hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45',
     'pager-active': 'bg-brand text-white border-brand',
   },
 })

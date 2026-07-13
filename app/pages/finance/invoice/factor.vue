@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computeCombinations, type Combination, type Factor } from '~/lib/finance/factor-combination'
+import type { Combination, Factor } from '~/lib/finance/factor-combination'
+import { computeCombinations } from '~/lib/finance/factor-combination'
 import { moneyToChinese } from '~/lib/util/chinese-amount'
 
 const toast = useToast()
@@ -67,7 +68,8 @@ const TAX_RATES = [13, 9, 6, 3, 1]
 
 function handlePaste(e: ClipboardEvent) {
   const text = e.clipboardData?.getData('text')
-  if (!text || !text.includes('\t')) return
+  if (!text || !text.includes('\t'))
+    return
   e.preventDefault()
   const lines = text.trim().split('\n')
   for (const line of lines) {
@@ -92,7 +94,9 @@ function handlePaste(e: ClipboardEvent) {
     <div class="grid grid-cols-2 gap-3 mb-4">
       <!-- 输入面板 -->
       <div class="border border-line bg-panel p-4">
-        <h4 class="text-13px font-700 text-ink mb-3">目标金额</h4>
+        <h4 class="text-13px font-700 text-ink mb-3">
+          目标金额
+        </h4>
         <div class="mb-3">
           <label class="field-label">目标含税金额 (元)</label>
           <input v-model.number="targetAmount" type="number" class="field-input w-full font-mono text-17px">
@@ -104,7 +108,7 @@ function handlePaste(e: ClipboardEvent) {
               <button
                 v-for="r in TAX_RATES"
                 :key="r"
-                class="px-2.5 py-1 text-12px font-600 rounded-[3px] border cursor-pointer transition-colors"
+                class="px-2.5 py-1 text-13px font-600 rounded-[var(--radius-btn)] border cursor-pointer transition-colors"
                 :class="taxRate === r ? 'bg-brand text-white border-brand' : 'border-line text-ink-soft hover:border-brand'"
                 @click="taxRate = r"
               >
@@ -121,25 +125,39 @@ function handlePaste(e: ClipboardEvent) {
 
       <!-- 金额卡片 -->
       <div class="border border-line bg-panel p-4">
-        <h4 class="text-13px font-700 text-ink mb-3">计算结果</h4>
+        <h4 class="text-13px font-700 text-ink mb-3">
+          计算结果
+        </h4>
         <div class="grid grid-cols-3 gap-3">
           <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">价税合计</div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">¥{{ fmtMoney(targetAmount) }}</div>
+            <div class="text-11px text-ink-faint mb-1">
+              价税合计
+            </div>
+            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
+              ¥{{ fmtMoney(targetAmount) }}
+            </div>
             <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(targetAmount))">
               {{ moneyToChinese(targetAmount) }} · 复制
             </button>
           </div>
           <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">不含税金额</div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">¥{{ fmtMoney(taxExcAmount) }}</div>
+            <div class="text-11px text-ink-faint mb-1">
+              不含税金额
+            </div>
+            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
+              ¥{{ fmtMoney(taxExcAmount) }}
+            </div>
             <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(taxExcAmount))">
               {{ moneyToChinese(taxExcAmount) }} · 复制
             </button>
           </div>
           <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">税额</div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">¥{{ fmtMoney(taxAmount) }}</div>
+            <div class="text-11px text-ink-faint mb-1">
+              税额
+            </div>
+            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
+              ¥{{ fmtMoney(taxAmount) }}
+            </div>
             <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(taxAmount))">
               {{ moneyToChinese(taxAmount) }} · 复制
             </button>
@@ -153,7 +171,9 @@ function handlePaste(e: ClipboardEvent) {
       <!-- 因子表 -->
       <div class="border border-line bg-panel p-4">
         <div class="flex items-center justify-between mb-3">
-          <h4 class="text-13px font-700 text-ink">开票因子</h4>
+          <h4 class="text-13px font-700 text-ink">
+            开票因子
+          </h4>
           <div class="flex gap-1.5">
             <button class="btn-secondary text-12px" @click="addFactor">
               <span class="i-lucide-plus text-12px mr-0.5" /> 新增
@@ -164,10 +184,18 @@ function handlePaste(e: ClipboardEvent) {
           <table class="w-full text-12px">
             <thead>
               <tr class="bg-surface-2">
-                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line">名称</th>
-                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line w-16">单位</th>
-                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-20">含税单价</th>
-                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-14">上限</th>
+                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line">
+                  名称
+                </th>
+                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line w-16">
+                  单位
+                </th>
+                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-20">
+                  含税单价
+                </th>
+                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-14">
+                  上限
+                </th>
                 <th class="px-2 py-1.5 w-8" />
               </tr>
             </thead>
@@ -194,7 +222,9 @@ function handlePaste(e: ClipboardEvent) {
             </tbody>
           </table>
         </div>
-        <p class="text-10px text-ink-faint mt-2">支持 Ctrl+V 粘贴 Tab 分隔数据（名称\t单位\t单价[\t上限]）</p>
+        <p class="text-10px text-ink-faint mt-2">
+          支持 Ctrl+V 粘贴 Tab 分隔数据（名称\t单位\t单价[\t上限]）
+        </p>
       </div>
 
       <!-- 组合方案 -->

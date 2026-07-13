@@ -55,7 +55,7 @@
 ### 3.6 筛选 —— 下拉框 `SelectFilter`（多分类首选，用户要求）
 列表页的**多分类/多状态筛选**统一用紧凑下拉框，**并入工具栏**，不再单独占一行 pill：
 - `SelectFilter` 原子：`label`（12/700/ink-soft）+ 原生 `<select>`（`appearance:none`）+ 自绘 `chevron-down`
-- select：1px `--line-strong` 边 + `--radius-btn` 圆角 + 13/600，padding `7px 30px 7px 12px`
+- select：1px `--line-strong` 边 + `--radius-btn` 圆角 + 14/600，控件高 32px
 - 放在工具栏标题之后、搜索/操作之前；多个并排，`gap:14`
 - 理由：pill 平铺把所有分类列出来显得臃肿，下拉框收敛为一个控件即可
 
@@ -65,9 +65,9 @@
 > 表格三件套阈值 + 引擎（KitTable 深封装 vxe-table）见 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md)；本节只列 dc-rebuild 侧视觉细化（颜色/间距/对齐）。
 
 - 容器：`Panel padding={0}`，`overflowX:auto`
-- 表头：`background: var(--surface-2)`，12/700/ink-soft，下边框 1px line
+- 表头：`background: var(--surface-2)`，13/700/ink-soft，高 40px，下边框 1px line
 - 行：分隔 1px `--line`；hover `--surface-3`（JS onMouseEnter/Leave 切 background）
-- 单元格：`padding: 13~16px`（疏朗）；金额/操作列右对齐
+- 数据行：14px，高 40px；单元格水平 padding 6px，金额/操作列右对齐
 - 首列序号 ink-soft；名称列做蓝色链接（→ 详情）
 - 操作列：右对齐，一排 `IconButton`（详情/编辑/删除…）
 - 底部汇总条：`padding 12~16`，`--surface-2` 底，左统计 + 右分页

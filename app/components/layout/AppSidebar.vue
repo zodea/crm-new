@@ -195,7 +195,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
                 @click="toggleGroup(node.key)"
               >
                 <span class="h-4 w-4 flex-none" :class="node.icon" aria-hidden="true" />
-                <span class="min-w-0 flex-1 truncate text-left text-12px font-600">{{ node.label }}</span>
+                <span class="min-w-0 flex-1 truncate text-left text-13px font-600">{{ node.label }}</span>
                 <span
                   class="h-3.5 w-3.5 flex-none"
                   :class="isGroupOpen(node.key) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
@@ -220,7 +220,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
 
         <div
           v-if="!visibleTree.length && !isVisuallyCollapsed"
-          class="mx-2 mt-4 rounded-[var(--radius-btn)] border border-dashed border-[var(--shell-sidebar-border)] px-3 py-5 text-center text-12px text-[var(--shell-sidebar-muted)]"
+          class="mx-2 mt-4 rounded-[var(--radius-btn)] border border-dashed border-[var(--shell-sidebar-border)] px-3 py-5 text-center text-13px text-[var(--shell-sidebar-muted)]"
         >
           没有匹配的菜单
         </div>

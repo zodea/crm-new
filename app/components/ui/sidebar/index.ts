@@ -2,7 +2,7 @@
 // shadcn-vue Sidebar（ADR 0008）—— 移植自官方 registry new-york/ui/sidebar/index.ts。
 // 语法适配（Tailwind → UnoCSS presetWind3）：
 //  - text-sidebar-foreground/70 → text-ink-faint（透明度修饰对 var() 色不生效，项目已知坑）
-//  - 菜单字号 text-sm → text-13px（对齐项目侧边栏既定字号）
+//  - 菜单字号固定 14px，保证高频导航在 15px 正文基准下仍清晰。
 // 其余 class 照抄（bg-sidebar-accent 等语义色见 tokens.css --sidebar-* 桥接）。
 import type { VariantProps } from 'class-variance-authority'
 import type { HTMLAttributes } from 'vue'
@@ -44,7 +44,7 @@ export { default as SidebarTrigger } from './SidebarTrigger.vue'
 export { useSidebar } from './utils'
 
 export const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-13px outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-700 data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0',
+  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-14px outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-700 data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -53,9 +53,9 @@ export const sidebarMenuButtonVariants = cva(
           'bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
       },
       size: {
-        default: 'h-8 text-13px',
-        sm: 'h-7 text-12px',
-        lg: 'h-12 text-13px group-data-[collapsible=icon]:p-0',
+        default: 'h-8 text-14px',
+        sm: 'h-7 text-13px',
+        lg: 'h-12 text-14px group-data-[collapsible=icon]:p-0',
       },
     },
     defaultVariants: {

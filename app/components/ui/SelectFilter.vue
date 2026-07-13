@@ -36,7 +36,7 @@ const model = defineModel<string>()
     <SelectRoot v-model="model">
       <SelectTrigger
         :aria-label="label"
-        class="inline-flex items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-white pl-[12px] pr-[9px] py-[7px] text-[13px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_2px_rgba(57,118,198,0.25)]"
+        class="inline-flex h-8 items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[12px] pr-[9px] text-[14px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
         :style="{ minWidth: `${minWidth}px` }"
       >
         <SelectValue :placeholder="placeholder" />
@@ -56,7 +56,7 @@ const model = defineModel<string>()
               v-for="o in options"
               :key="o.key"
               :value="o.key"
-              class="relative flex cursor-pointer select-none items-center rounded-[6px] py-[6px] pl-[26px] pr-[10px] text-[13px] text-ink outline-none data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand-deep data-[state=checked]:font-700"
+              class="relative flex cursor-pointer select-none items-center rounded-[var(--radius-sm)] py-[6px] pl-[26px] pr-[10px] text-[14px] text-ink outline-none data-[highlighted]:bg-brand-soft data-[highlighted]:text-brand-deep data-[state=checked]:font-700"
             >
               <SelectItemIndicator class="absolute left-[7px] inline-flex items-center">
                 <span class="i-lucide-check h-[13px] w-[13px] text-brand" />

@@ -9,6 +9,17 @@
 
 ---
 
+## 应用路由页签与控件形状 —— 已定：Chrome 连接页签 + 10px 控件圆角
+
+- **决策（2026-07-13，Issue #82）**：路由页签采用 Chrome 式连接造型。激活页签顶部圆弧、底部与工作区连成一体，两侧以内凹肩线自然过渡；保留 36px 页签栏与既有关闭、右键菜单、滚动和缓存行为。
+- **控件形状**：按钮/输入/选择器统一 10px，小型图标与分页控件 8px，卡片 12px，chip 保持 pill；不再使用 3px 的硬方角。
+- 参考站：
+  - [Google Chrome · 管理标签页](https://support.google.com/chrome/answer/2391819?hl=zh-Hans&co=GENIE.Platform%3DDesktop) — 连接内容区的激活标签与弧形肩线。
+  - [Firefox · 标签页概览菜单](https://support.mozilla.org/zh-CN/kb/%E6%A0%87%E7%AD%BE%E9%A1%B5%E6%A6%82%E8%A7%88%E8%8F%9C%E5%8D%95) — 作为浮动标签的未采用对照。
+  - [Fluent 2 · Shape](https://fluent2.microsoft.design/shapes) — 8/10/12px 形状层级的设计参考。
+
+---
+
 ## Toast —— 已定：Sonner 风格双泳道（已实装 = vue-sonner，[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）
 
 > 实装底座：**vue-sonner 两个 Toaster**（`toasterId` 路由双泳道），非自研。下面的风格决策据此落地。

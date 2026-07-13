@@ -61,21 +61,27 @@ const phases: Phase[] = [
 const expandedPhases = ref<Set<number>>(new Set([1]))
 
 function togglePhase(idx: number) {
-  if (expandedPhases.value.has(idx)) expandedPhases.value.delete(idx)
-  else expandedPhases.value.add(idx)
+  if (expandedPhases.value.has(idx))
+    expandedPhases.value.delete(idx)
+  else
+    expandedPhases.value.add(idx)
 }
 
 function phaseStatus(phase: Phase): 'done' | 'active' | 'pending' {
-  if (phase.tasks.length === 0) return 'pending'
+  if (phase.tasks.length === 0)
+    return 'pending'
   const allDone = phase.tasks.every(t => t.status === 'confirmed' || t.status === 'uploaded')
-  if (allDone) return 'done'
+  if (allDone)
+    return 'done'
   const hasAny = phase.tasks.some(t => t.status === 'confirmed' || t.status === 'uploaded')
-  if (hasAny) return 'active'
+  if (hasAny)
+    return 'active'
   return 'pending'
 }
 
 function phaseProgress(phase: Phase): string {
-  if (phase.tasks.length === 0) return ''
+  if (phase.tasks.length === 0)
+    return ''
   const done = phase.tasks.filter(t => t.status !== 'pending').length
   return `${done}/${phase.tasks.length}`
 }
@@ -103,7 +109,7 @@ const TASK_STATUS: Record<string, { label: string, cls: string }> = {
     <div class="flex items-center gap-1 mb-4 overflow-x-auto">
       <template v-for="pv in phaseViews" :key="pv.idx">
         <button
-          class="flex items-center gap-1 px-2.5 py-1.5 rounded-[3px] text-12px font-600 whitespace-nowrap cursor-pointer transition-colors"
+          class="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-btn)] text-13px font-600 whitespace-nowrap cursor-pointer transition-colors"
           :class="{
             'bg-ok/10 text-ok': pv.status === 'done',
             'bg-brand-soft text-brand-deep': pv.status === 'active',
@@ -124,7 +130,9 @@ const TASK_STATUS: Record<string, { label: string, cls: string }> = {
     <!-- 展开的阶段任务 -->
     <template v-for="(phase, idx) in phases" :key="`tasks-${idx}`">
       <div v-if="expandedPhases.has(idx) && phase.tasks.length > 0" class="mb-3">
-        <h4 class="text-12px font-700 text-ink mb-2">▾ {{ phase.name }}阶段</h4>
+        <h4 class="text-12px font-700 text-ink mb-2">
+          ▾ {{ phase.name }}阶段
+        </h4>
         <div class="space-y-1.5">
           <div
             v-for="(task, ti) in phase.tasks"

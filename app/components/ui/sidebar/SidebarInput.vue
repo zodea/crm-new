@@ -16,7 +16,7 @@ const model = defineModel<string>()
     v-model="model"
     data-sidebar="input"
     :class="cn(
-      'h-8 w-full rounded-md border border-input bg-background px-2 text-13px outline-none shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+      'h-8 w-full rounded-md border border-input bg-background px-2 text-14px outline-none shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
       props.class,
     )"
   >

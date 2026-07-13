@@ -32,13 +32,13 @@
 
 | 令牌 | 色值 | 用途 |
 |---|---|---|
-| `--bg` | `#f8f9fb` | 画布底色（轻机构灰） |
+| `--bg` | `#f4f7fb` | 画布底色（冷蓝灰） |
 | `--panel` | `#ffffff` | 面板/卡片（白纸） |
-| `--surface-2` | `#f1f5f9` | 表头 / 卡片次级底 |
-| `--surface-3` | `#f3f4f6` | 占位 / 行 hover 底 |
-| `--surface-sink` | `#e9edf4` | 预览区凹底 |
-| `--line` | `#e3e6ea` | 默认描边 |
-| `--line-strong` | `#c9ced6` | 强描边：按钮 / 输入框 |
+| `--surface-2` | `#edf2f7` | 表头 / 卡片次级底 |
+| `--surface-3` | `#e7edf4` | 占位 / 行 hover 底 |
+| `--surface-sink` | `#dfe7f0` | 预览区凹底 |
+| `--line` | `#d7e0ea` | 默认描边 |
+| `--line-strong` | `#b8c5d4` | 强描边：按钮 / 输入框 |
 
 > 侧边栏专用：`--sidebar-panel: rgb(255 255 255 / 82%)`（半透明白+blur），仅侧边栏使用。
 
@@ -48,7 +48,7 @@
 |---|---|---|
 | `--brand` | `#3976C6` | 主品牌蓝 |
 | `--brand-deep` | `#2A5996` | 深蓝（选中文字/强调） |
-| `--brand-soft` | `rgb(213 230 248)` | 选中行底/筛选激活态/浅底按钮 |
+| `--brand-soft` | `#e6f0fb` | 选中行底/筛选激活态/浅底按钮 |
 
 ### 2.3 状态色 (v5) — 三档：实色 / 浅底 / 深字
 
@@ -62,9 +62,9 @@
 
 | 令牌 | 色值 | 用途 |
 |---|---|---|
-| `--ink` | `#1f2329` | 主文字 |
-| `--ink-soft` | `#5b6470` | 次级文字 |
-| `--ink-faint` | `#8b93a1` | 弱文字/占位符 |
+| `--ink` | `#182436` | 主文字 |
+| `--ink-soft` | `#4e5d70` | 次级文字 |
+| `--ink-faint` | `#607187` | 弱文字/占位符 |
 
 ### 2.5 暗色模式
 
@@ -79,7 +79,8 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | 令牌 | 值 | 用途 |
 |---|---|---|
 | `--radius-card` | `12px` | 侧边栏面板/导航项 |
-| `--radius-btn` | `8px` | 侧边栏按钮/方块 |
+| `--radius-btn` | `10px` | 按钮/输入/导航项 |
+| `--radius-sm` | `8px` | 小图标按钮/分页控件 |
 | `--sidebar-blur` | `blur(12px)` | 侧边栏毛玻璃 |
 | `--sidebar-shadow` | `0 1px 3px rgba(16,24,40,0.08)` | 侧边栏卡片 |
 
@@ -89,7 +90,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 | 规则 | 说明 |
 |---|---|
-| 圆角 | 卡片 `--radius-card` 12px；按钮/输入 `--radius-btn` 8px；chip `--radius-pill` 999px |
+| 圆角 | 卡片 `--radius-card` 12px；按钮/输入 `--radius-btn` 10px；小控件 `--radius-sm` 8px；chip `--radius-pill` 999px |
 | 阴影 | 卡片用轻投影阴影 `--shadow-card`（与 1px 边框叠加分层）；~~原「不使用阴影」已废弃~~ |
 | 毛玻璃 | **不使用** `backdrop-filter` |
 | 边框 | 统一 `1px solid var(--line)`，表格内部用 `var(--line)` |
@@ -135,7 +136,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .btn-primary {
   border: 1px solid var(--brand);
-  border-radius: 3px;
+  border-radius: var(--radius-btn);
   padding: 5px 10px;
   background: var(--brand);
   color: white;
@@ -147,7 +148,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .btn-secondary {
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--radius-btn);
   padding: 5px 10px;
   background: var(--panel);
   color: var(--ink-soft);
@@ -163,7 +164,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 .icon-btn {
   width: 28px;
   height: 28px;
-  border-radius: 3px;
+  border-radius: var(--radius-btn);
   border: 1px solid var(--line);
   background: var(--panel);
   display: inline-flex;
@@ -188,15 +189,15 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .field-input {
   border: 1px solid var(--line);
-  border-radius: 3px;
-  padding: 5px 8px;
+  border-radius: var(--radius-btn);
+  padding: 6px 10px;
   background: var(--panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 .field-input:focus {
   border-color: var(--brand);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(57, 118, 198, 0.15);
+  box-shadow: 0 0 0 3px var(--brand-ring);
 }
 ```
 
@@ -204,7 +205,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ```css
 .field-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-soft);
   margin-bottom: 4px;
@@ -245,13 +246,13 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 .col-group {
   display: flex;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--radius-btn);
   overflow: hidden;
   background: var(--panel);
 }
 .col-group-item {
   padding: 4px 12px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-soft);
   cursor: pointer;
@@ -266,7 +267,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .content-tab {
   padding: 7px 14px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-soft);
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -355,7 +356,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .upload-zone {
   border: 1px dashed var(--line-strong);
-  border-radius: 3px;
+  border-radius: var(--radius-card);
   background: var(--surface-3);
   color: var(--brand-deep);
   padding: 20px;
@@ -386,6 +387,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 - 描边: `var(--line)`
 - 列竖线: `1px solid var(--line)`（完整网格线，参照 CRM）
 - 字体: 继承全局，金额列 `font-mono`
+- 密度: 表头/数据行均 40px；表头 13px，正文 14px；单元格水平 padding 6px
 - 操作列: 纯图标按钮 `.icon-btn`
 - 状态列: 纯文字颜色（列表页不用 chip）
 - 列头筛选: 漏斗图标，点击弹下拉多选
@@ -394,15 +396,15 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ```css
 .pager-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: var(--panel);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-soft);
   cursor: pointer;
 }
@@ -420,16 +422,16 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | 模块名/项目名 | 17px | 500 | var(--font-sans) |
 | 卡片区块标题 | 13-14px | 700-800 | var(--font-sans) |
 | 正文 | 14px | 400 | var(--font-sans) |
-| 紧凑正文/表格 | 12-13px | 400 | var(--font-sans) |
+| 紧凑正文/表格 | 13-14px | 400 | var(--font-sans) |
 | 标签 | 11-12px | 600 | var(--font-sans) |
 | 统计卡数字 | 20-24px | 500 | var(--font-mono) |
 | 金额/编号 | 11-14px | 500-700 | var(--font-mono) |
-| 导航副提示 | 11px | 400 | var(--font-sans) |
+| 导航副提示 | 12-13px | 400 | var(--font-sans) |
 | 极小提示 | 9-10px | 400 | var(--font-sans) |
 
 ```css
 :root {
-  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-sans: "Microsoft YaHei UI", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 ```
@@ -554,4 +556,4 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | `--shadow-card` | 内容区移除 | 仅侧边栏/弹窗保留（⚠️ ADR 0007 已恢复内容区卡片阴影，此行为 v5 迁移期旧记录） |
 | `--blur` / `--blur-sm` | 内容区移除 | 仅侧边栏保留 |
 | `--radius-card: 13px` | `--radius-card: 12px` | 对齐 Claude Design |
-| `--radius-btn: 7px` | `--radius-btn: 8px` / 内容区 `3px` | 对齐 |
+| `--radius-btn: 7px` | `--radius-btn: 10px`（小控件 `--radius-sm: 8px`） | 2026-07-13 可读性与形状优化 |

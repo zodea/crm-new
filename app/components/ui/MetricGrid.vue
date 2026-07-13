@@ -9,7 +9,7 @@ withDefaults(defineProps<{
 
 <template>
   <div
-    class="grid gap-[1px] overflow-hidden border border-line rounded-[10px] bg-line"
+    class="grid gap-[1px] overflow-hidden border border-line rounded-[var(--radius-card)] bg-line shadow-[var(--shadow-card)]"
     :style="{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }"
   >
     <slot />

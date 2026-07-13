@@ -47,14 +47,14 @@ watch(
       ref="inputEl"
       v-model="query"
       type="search"
-      class="min-w-0 flex-1 border-0 bg-transparent text-12px text-[var(--shell-sidebar-text)] outline-none placeholder:text-[var(--shell-sidebar-muted)]"
+      class="min-w-0 flex-1 border-0 bg-transparent text-13px text-[var(--shell-sidebar-text)] outline-none placeholder:text-[var(--shell-sidebar-muted)]"
       placeholder="搜索菜单"
       autocomplete="off"
     >
     <button
       v-if="query"
       type="button"
-      class="grid h-6 w-6 flex-none place-items-center border-0 rounded bg-transparent text-[var(--shell-sidebar-muted)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
+      class="grid h-6 w-6 flex-none place-items-center border-0 rounded-[var(--radius-sm)] bg-transparent text-[var(--shell-sidebar-muted)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
       title="清空搜索"
       aria-label="清空搜索"
       @click.prevent="query = ''"

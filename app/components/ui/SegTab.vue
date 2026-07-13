@@ -25,12 +25,12 @@ const active = defineModel<string>()
         v-for="t in tabs"
         :key="t.key"
         :value="t.key"
-        class="group -mb-px inline-flex cursor-pointer items-center gap-[6px] whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-[14px] py-[9px] text-[13px] font-500 text-ink-soft transition-colors hover:text-brand data-[state=active]:border-brand data-[state=active]:font-700 data-[state=active]:text-brand-deep focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+        class="group -mb-px inline-flex cursor-pointer items-center gap-[6px] whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-[14px] py-[9px] text-[14px] font-500 text-ink-soft transition-colors hover:text-brand data-[state=active]:border-brand data-[state=active]:font-700 data-[state=active]:text-brand-deep focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
       >
         {{ t.label }}
         <span
           v-if="t.count != null"
-          class="rounded-full bg-surface-3 px-[6px] py-[1px] text-[11px] text-ink-soft font-mono tabular-nums group-data-[state=active]:bg-brand-soft group-data-[state=active]:text-brand-deep"
+          class="rounded-full bg-surface-3 px-[6px] py-[1px] text-[12px] text-ink-soft font-mono tabular-nums group-data-[state=active]:bg-brand-soft group-data-[state=active]:text-brand-deep"
         >{{ t.count }}</span>
       </TabsTrigger>
     </TabsList>

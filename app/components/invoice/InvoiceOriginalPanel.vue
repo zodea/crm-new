@@ -21,7 +21,7 @@ defineProps<{
       />
       <div v-else-if="invoice" class="h-full flex items-center justify-center">
         <div class="text-center">
-          <div class="w-28 h-40 bg-surface-2 rounded-[3px] mx-auto mb-2 flex items-center justify-center border-2 border-brand">
+          <div class="w-28 h-40 bg-surface-2 rounded-[var(--radius-card)] mx-auto mb-2 flex items-center justify-center border-2 border-brand">
             <span class="text-32px font-800 text-ink-faint">票</span>
           </div>
           <span class="text-11px text-ink-soft block">{{ invoice.fileName || '—' }}</span>

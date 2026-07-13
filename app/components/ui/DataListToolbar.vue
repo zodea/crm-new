@@ -31,7 +31,7 @@ const emit = defineEmits<{
 <template>
   <div class="flex items-center gap-2 py-2.5 px-1">
     <!-- 标题 + 计数 -->
-    <h2 class="text-14px font-800 text-ink whitespace-nowrap">
+    <h2 class="text-15px font-800 text-ink whitespace-nowrap">
       {{ title }}
       <span v-if="count != null" class="text-ink-faint font-400 ml-1">
         · 共 {{ count }} 条

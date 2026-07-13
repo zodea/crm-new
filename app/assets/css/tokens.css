@@ -3,25 +3,26 @@
 
 :root {
   /* ── 基底色 ── */
-  --bg: #f8f9fb;
+  --bg: #f4f7fb;
   --panel: #ffffff;
-  --surface-2: #f1f5f9;
-  --surface-3: #f3f4f6;
-  --surface-sink: #e9edf4;
+  --surface-2: #edf2f7;
+  --surface-3: #e7edf4;
+  --surface-sink: #dfe7f0;
 
   /* ── 描边 ── */
-  --line: #e3e6ea;
-  --line-strong: #c9ced6;
+  --line: #d7e0ea;
+  --line-strong: #b8c5d4;
 
   /* ── 文字 ── */
-  --ink: #1f2329;
-  --ink-soft: #5b6470;
-  --ink-faint: #8b93a1;
+  --ink: #182436;
+  --ink-soft: #4e5d70;
+  --ink-faint: #607187;
 
   /* ── 品牌色 (v5) ── */
   --brand: #3976C6;
   --brand-deep: #2A5996;
-  --brand-soft: rgb(213 230 248);
+  --brand-soft: #e6f0fb;
+  --brand-ring: rgb(57 118 198 / 22%);
 
   /* ── 状态色 (v5) ── */
   --ok: #169D72;
@@ -37,12 +38,13 @@
   --danger-ink: #9D313E;
 
   /* ── 字体 ── */
-  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-sans: "Microsoft YaHei UI", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* ── 形状 ── */
   --radius-card: 12px;
-  --radius-btn: 8px;
+  --radius-btn: 10px;
+  --radius-sm: 8px;
   --radius-pill: 999px;
 
   /* ── 外层应用框架 ── */
@@ -128,7 +130,7 @@
   --input: var(--line);
   --ring: var(--brand);
 
-  /* shadcn 圆角基准 = 按钮圆角(8px)，md/sm/xl 由 uno.config 派生 */
+  /* shadcn 圆角基准 = 按钮圆角(10px)，具体阶梯由 uno.config 派生 */
   --radius: var(--radius-btn);
 
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
@@ -262,8 +264,8 @@
 
 html {
   font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;

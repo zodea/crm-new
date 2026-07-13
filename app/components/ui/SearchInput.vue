@@ -19,7 +19,7 @@ const model = defineModel<string>()
       type="search"
       :placeholder="placeholder"
       :aria-label="placeholder"
-      class="border border-line-strong rounded-full bg-white pl-[32px] pr-[14px] py-[8px] text-[13px] outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_2px_rgba(57,118,198,0.25)]"
+      class="h-8 border border-line-strong rounded-full bg-panel pl-[32px] pr-[14px] text-[14px] text-ink outline-none placeholder:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
       :style="{ width: `${width}px` }"
     >
   </div>

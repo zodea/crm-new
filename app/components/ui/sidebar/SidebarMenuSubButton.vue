@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 移植自官方 registry new-york/ui/sidebar/SidebarMenuSubButton.vue。
-// 差异：text-sm/text-xs → text-12px/text-11px（对齐项目子菜单既定字号）。
+// 差异：子菜单使用 13px/12px，低于一级导航但不牺牲可读性。
 import type { PrimitiveProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import { Primitive } from 'reka-ui'
@@ -26,8 +26,8 @@ const props = withDefaults(defineProps<PrimitiveProps & {
     :class="cn(
       'flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground',
       'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-600',
-      size === 'sm' && 'text-11px',
-      size === 'md' && 'text-12px',
+      size === 'sm' && 'text-12px',
+      size === 'md' && 'text-13px',
       'group-data-[collapsible=icon]:hidden',
       props.class,
     )"

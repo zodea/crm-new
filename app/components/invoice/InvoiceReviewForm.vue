@@ -138,20 +138,20 @@ const showItems = ref(false)
           <span class="flex-1" />
           <span
             v-if="tiers[f.key]"
-            class="text-9px font-mono leading-none"
+            class="text-11px font-mono leading-none"
             :class="TIER_BADGE[tiers[f.key]!]"
           >{{ Math.round((invoice.fieldConfidence[f.key] ?? 0) * 100) }}%</span>
           <button
             v-if="tiers[f.key] === 'warn' || tiers[f.key] === 'danger'"
             type="button"
-            class="inline-flex items-center gap-0.5 text-9px leading-none px-1 py-0.5 rounded-[3px] border transition-colors"
+            class="inline-flex items-center gap-0.5 rounded-[var(--radius-sm)] border px-1.5 py-0.5 text-11px leading-none transition-colors"
             :class="tiers[f.key] === 'warn'
               ? 'border-warn text-warn-ink hover:bg-warn-soft'
               : 'border-danger text-danger-ink hover:bg-danger-soft'"
             :title="`人工确认「${f.label}」识别无误`"
             @click="confirmField(f.key)"
           >
-            <span class="i-lucide-check text-9px" />确认
+            <span class="i-lucide-check text-11px" />确认
           </button>
         </label>
 
