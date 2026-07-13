@@ -62,14 +62,14 @@
 **推荐**：Mantine/shadcn 克制骨架（白面板、footer 右下主按钮、长表单吸底），主按钮与聚焦态换品牌蓝。**落到瑞航**：白面板、圆角 8-12px、主按钮 `--brand`、校验红提示 `--danger` 贴字段下方；别整体太企业风，圆角/留白可往 Flowbite 靠一档。
 
 ### 03 · 导出进度 `export-progress`
-**要点**：开始有反馈（进度条/spinner 立刻出现）、过程有推进感（别停 0%）、完成有明确落点（打勾 + 成功色 +「导出到 X」）；多阶段用步骤条，单文件用进度条，失败原地转 error。
+**要点**：架构与降级策略以 [ADR 0004](../adr/0004-export-interaction-model.md) 为唯一权威。直接保存写盘时立即显示 process loading，成功后 dismiss；最终只显示 system 成功 toast「已导出到 X 文件夹」，不重复 process success。需要目录分类的多阶段导出用页签内步骤条，失败在原载体转 error。
 
-- [Sonner · Toast(promise 段)](https://sonner.emilkowal.ski/toast) · 可交互 — loading→自动打勾，与已定 toast 同源，单文件直接照抄
+- [Sonner · Toast(promise 段)](https://sonner.emilkowal.ski/toast) · 可交互 — 直接保存只借鉴 loading 载体；成功时 dismiss，不能照抄 promise 的终态 success
 - [Material UI · Stepper](https://mui.com/material-ui/react-stepper/) · 可交互 — 多阶段：读数据→生成→写盘→完成，走过的步打勾
-- [Mantine · Progress](https://mantine.dev/core/progress/) · 可交互 — 单文件百分比进度条，平滑宽度过渡
+- [Mantine · Progress](https://mantine.dev/core/progress/) · 可交互 — 配置导出有可测进度时的平滑宽度过渡
 - [PatternFly · Progress stepper](https://www.patternfly.org/components/progress-stepper/design-guidelines/) · 图解为主 — completed/in-progress/failure/warning/pending 五态配色最全
 
-**推荐**：单文件走 Sonner promise toast，多阶段走 MUI Stepper（带打勾），失败态参照 PatternFly。**落到瑞航**：激活步 `--brand`、完成步 `--ok`、失败步 `--danger`；成功收尾=静态 toast 成功、无动效（全局蓝色水波已废弃，见 ADR 0004）。
+**推荐**：直接保存走 Sonner loading toast，多阶段走 MUI Stepper（带打勾），失败态参照 PatternFly。**落到瑞航**：激活步 `--brand`、完成步 `--ok`、失败步 `--danger`；成功收尾只有静态 system toast、无动效（全局蓝色水波已废弃，见 ADR 0004）。
 
 ### 04 · 导入映射 `import-mapping`
 **要点**：「上传→认列→校验→入库」拆成清晰 stepper；映射步用源列↔系统字段两栏对照 + 智能预匹配（高亮已匹配/未匹配/必填缺失）；一屏可滚动行预览；导入走进度条而非空等。

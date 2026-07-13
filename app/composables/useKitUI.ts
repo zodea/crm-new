@@ -95,6 +95,7 @@ function resolveFormModal(values: FormValues | null) {
  */
 export function useKitUI() {
   const toast = useToast()
+  const exportFile = useExportFile()
   return {
     toast: toast.show,
     success: toast.success,
@@ -109,6 +110,7 @@ export function useKitUI() {
     undoToast: toast.undo,
     confirm,
     formModal,
+    exportFile,
   }
 }
 

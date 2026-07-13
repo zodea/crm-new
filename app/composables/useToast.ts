@@ -53,12 +53,23 @@ function emit(opts: PushOptions): ToastId {
   }
   let id: ToastId
   switch (type) {
-    case 'success': id = sonner.success(opts.message, common); break
-    case 'error': id = sonner.error(opts.message, common); break
-    case 'warning': id = sonner.warning(opts.message, common); break
-    case 'info': id = sonner.info(opts.message, common); break
-    case 'loading': id = sonner.loading(opts.message, { ...common, duration: opts.duration ?? Number.POSITIVE_INFINITY }); break
-    default: id = sonner(opts.message, common)
+    case 'success':
+      id = sonner.success(opts.message, common)
+      break
+    case 'error':
+      id = sonner.error(opts.message, common)
+      break
+    case 'warning':
+      id = sonner.warning(opts.message, common)
+      break
+    case 'info':
+      id = sonner.info(opts.message, common)
+      break
+    case 'loading':
+      id = sonner.loading(opts.message, { ...common, duration: opts.duration ?? Number.POSITIVE_INFINITY })
+      break
+    default:
+      id = sonner(opts.message, common)
   }
   laneById.set(id, lane)
   return id
@@ -77,6 +88,10 @@ const info = (msg: string, description?: string) => emit({ lane: 'system', type:
 /** 加载态 toast（不自动关闭），返回 id，后续用 update/dismiss 收尾 */
 function loading(message: string, opts?: { lane?: ToastLane, description?: string }) {
   return emit({ lane: opts?.lane ?? 'process', type: 'loading', message, description: opts?.description })
+}
+
+function processError(message: string, description?: string) {
+  return emit({ lane: 'process', type: 'error', message, description })
 }
 
 /** HeroUI 式 promise toast：加载中 → 自动变成功/失败（vue-sonner 原生） */
@@ -163,6 +178,7 @@ export function useToast() {
     warning,
     info,
     loading,
+    processError,
     promise,
     undo,
     update,

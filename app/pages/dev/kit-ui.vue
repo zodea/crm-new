@@ -3,7 +3,7 @@
 // 访问 /dev/kit-ui（ripple 已全域废弃，见 ADR 0004，不提供演示）
 const kit = useKitUI()
 
-const lastResult = ref('（尚无操作）')
+const lastResult = shallowRef('（尚无操作）')
 
 // ① 系统/结果提示（expand 道，右上）
 function demoSemantic() {
@@ -134,6 +134,23 @@ async function demoFormModal() {
   if (values)
     kit.success('分供方已创建')
 }
+
+// ⑥ 单文件直接保存（ADR 0004）
+async function demoDirectExport() {
+  try {
+    const result = await kit.exportFile({
+      data: `瑞航 CRM 导出演示\n生成时间：${new Date().toLocaleString('zh-CN')}\n`,
+      defaultName: '瑞航CRM-导出演示.txt',
+      mimeType: 'text/plain;charset=utf-8',
+    })
+    lastResult.value = result.status === 'cancelled'
+      ? '直接保存已取消（未写入文件）'
+      : `直接保存完成：${result.displayPath}`
+  }
+  catch (error) {
+    lastResult.value = `直接保存失败：${error instanceof Error ? error.message : String(error)}`
+  }
+}
 </script>
 
 <template>
@@ -239,6 +256,19 @@ async function demoFormModal() {
         </p>
         <button class="btn-primary" @click="demoFormModal">
           打开表单弹窗
+        </button>
+      </section>
+
+      <!-- ⑥ 单文件直接保存 -->
+      <section class="content-panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑥ exportFile — 单文件直接保存（ADR 0004）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          桌面端打开系统目录选择器并真实写盘；支持目录访问 API 的浏览器写入所选文件夹，其他浏览器降级到浏览器下载文件夹。取消时静默结束。
+        </p>
+        <button class="btn-primary" @click="demoDirectExport">
+          直接保存演示文件
         </button>
       </section>
 
