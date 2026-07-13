@@ -1,0 +1,325 @@
+<script setup lang="ts">
+// 发票台账（#69）：左树（按归属，只带张数角标）+ 右表 KitTable / 卡片视图切换 +
+// 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
+// 口径：台账 = 已归档（DATABASE.md §4.2）；「待归档」= 已校对未归档过渡态（#57，
+// 替代设计稿旧模型的「未归项目」——两态模型下归档必有归属，见 issue #69 评论）。
+import type { KitTableColumn } from '~/lib/kit/table'
+import type { TreeNode } from '~/lib/kit/tree-nav'
+import type { Invoice } from '~/stores/invoice'
+import { yuan } from '~/lib/util/money'
+
+const store = useInvoiceStore()
+const projectStore = useProjectStore()
+const router = useRouter()
+const { confirm, error, formModal, success, undoToast, warning } = useKitUI()
+
+// ── 左树：全部 / 项目一级 / 个人开支 / 待归档 ──
+const node = shallowRef('__all')
+const searchText = shallowRef('')
+const view = shallowRef<'table' | 'card'>('table')
+
+const groups = computed(() => store.ledgerGroups)
+
+const projectNames = computed(() => {
+  const names: string[] = []
+  for (const inv of groups.value.project) {
+    if (inv.projectName && !names.includes(inv.projectName))
+      names.push(inv.projectName)
+  }
+  return names
+})
+
+const allRows = computed(() =>
+  [...groups.value.project, ...groups.value.personal, ...groups.value.unassigned],
+)
+
+const treeItems = computed<TreeNode[]>(() => [
+  { key: '__all', label: '全部', icon: 'i-lucide-layers', count: allRows.value.length },
+  ...projectNames.value.map(n => ({
+    key: `p:${n}`,
+    label: n,
+    icon: 'i-lucide-folder',
+    count: groups.value.project.filter(inv => inv.projectName === n).length,
+  })),
+  { key: '__own', label: '个人开支', icon: 'i-lucide-user', count: groups.value.personal.length, tone: 'brand' as const },
+  { key: '__pending', label: '待归档', icon: 'i-lucide-alert-triangle', count: groups.value.unassigned.length, tone: 'warn' as const },
+])
+
+const nodeRows = computed(() => {
+  if (node.value === '__own')
+    return groups.value.personal
+  if (node.value === '__pending')
+    return groups.value.unassigned
+  if (node.value.startsWith('p:')) {
+    const name = node.value.slice(2)
+    return groups.value.project.filter(inv => inv.projectName === name)
+  }
+  return allRows.value
+})
+
+const rows = computed(() => {
+  const kw = searchText.value.trim().toLowerCase()
+  if (!kw)
+    return nodeRows.value
+  return nodeRows.value.filter(inv =>
+    [inv.invoiceNumber, inv.seller, inv.buyer, inv.projectName, inv.remark]
+      .some(v => v && v.toLowerCase().includes(kw)),
+  )
+})
+
+// ── 右表（KitTable，ADR 0009）：供应商 / 类型 / 来源列头筛选 ──
+const columns = computed<KitTableColumn[]>(() => [
+  { type: 'checkbox', title: '' },
+  { field: 'invoiceNumber', title: '单据编号', width: 120, slot: 'number' },
+  { field: 'invoiceDate', title: '开票日期', type: 'date', width: 104 },
+  { field: 'seller', title: '供应商', minWidth: 180, filterable: true },
+  { field: 'totalAmount', title: '价税合计', type: 'money', width: 120 },
+  { field: 'invoiceType', title: '类型', width: 110, filterable: true, slot: 'type' },
+  {
+    field: 'source',
+    title: '来源',
+    width: 78,
+    slot: 'source',
+    filterable: [{ label: '扫描', value: 'scan' }, { label: '导入', value: 'excel' }],
+  },
+  { field: 'projectName', title: '归属', minWidth: 130, slot: 'owner' },
+  { field: 'printCount', title: '打印', width: 92, slot: 'print' },
+  { title: '操作', type: 'action', width: 118 },
+])
+
+/** excel 导入票无扫描件：不可勾选（勾选服务于打印/导出原件） */
+function canCheck(row: Invoice) {
+  return row.source !== 'excel'
+}
+
+// ── 勾选浮出合计（#69：平时无常驻汇总）──
+const checkedRows = shallowRef<Invoice[]>([])
+const checkedTotal = computed(() => checkedRows.value.reduce((s, inv) => s + inv.totalAmount, 0))
+
+const tableEl = useTemplateRef<{ clearCheckbox: () => void }>('tableEl')
+
+// 切树节点 / 搜索 / 切视图都会改变行集，勾选集随之失效
+watch([node, searchText, view], () => {
+  tableEl.value?.clearCheckbox()
+  checkedRows.value = []
+})
+
+// ── 行操作 ──
+function tail8(no: string) {
+  return no ? no.slice(-8) : '—'
+}
+
+function openEdit(inv: Invoice) {
+  router.push(`/finance/invoice/${inv.id}`)
+}
+
+async function del(inv: Invoice) {
+  const ok = await confirm({
+    variant: 'simple',
+    title: '删除发票',
+    message: `确认删除发票「${tail8(inv.invoiceNumber)}」？删除后可在 10 秒内撤回。`,
+    confirmLabel: '删除',
+  })
+  if (!ok)
+    return
+  const logId = await store.remove(inv.id)
+  if (!logId) {
+    error('删除失败：发票不存在或已删除')
+    return
+  }
+  checkedRows.value = checkedRows.value.filter(r => r.id !== inv.id)
+  undoToast(`已删除发票「${tail8(inv.invoiceNumber)}」`, () => store.undo(logId))
+}
+
+function typeShort(t: string) {
+  return (t || '').replace('增值税', '').replace('发票', '') || '—'
+}
+
+// ── 归档（「待归档」行入口，自识别工作台迁入 #69）──
+const OWNER_KIND_LABEL = { project: '归属项目', personal: '个人开支' } as const
+
+/** 归档：弹出归属选择表单，校验交给 store.archiveInvoice（缺归属/项目归属未选具体项目均拒绝）。 */
+async function archiveFlow(inv: Invoice) {
+  const values = await formModal({
+    title: '归档发票',
+    subtitle: '归档需指定归属（项目 / 个人开支），归档后计入台账统计（DATABASE.md §4.2）。',
+    fields: [
+      { key: 'ownerKindLabel', label: '归属', type: 'select', options: Object.values(OWNER_KIND_LABEL), value: OWNER_KIND_LABEL.project, required: true },
+      { key: 'projectName', label: '对应项目（归属项目时必选）', type: 'select', options: projectStore.list.map(p => p.name), value: inv.projectName || '' },
+    ],
+    saveText: '归档',
+  })
+  if (!values)
+    return
+  const ownerKind = values.ownerKindLabel === OWNER_KIND_LABEL.personal ? 'personal' : 'project'
+  const project = ownerKind === 'project' ? projectStore.list.find(p => p.name === String(values.projectName)) : undefined
+  const result = await store.archiveInvoice(inv.id, ownerKind, project?.id ?? null, project?.name)
+  if (!result.ok) {
+    warning(result.reason ?? '归档失败')
+    return
+  }
+  success('已归档，计入台账')
+}
+
+onMounted(() => {
+  if (!store.list.length)
+    store.load()
+})
+</script>
+
+<template>
+  <div class="flex flex-col gap-3.5">
+    <!-- 工具栏：搜索 + 视图切换 -->
+    <section class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
+      <div class="mr-1 flex flex-none items-baseline gap-2">
+        <h2 class="text-14px font-800 text-ink">
+          发票台账
+        </h2>
+        <span class="text-12px text-ink-soft">
+          共 <b class="font-mono text-ink">{{ allRows.length }}</b> 张
+          <template v-if="rows.length !== allRows.length">· 当前 {{ rows.length }} 张</template>
+        </span>
+      </div>
+
+      <div class="ml-auto flex flex-wrap items-center gap-2.5">
+        <SearchInput v-model="searchText" placeholder="搜索编号、供应商、归属…" :width="230" />
+        <div class="inline-flex overflow-hidden border border-line-strong rounded-[8px] bg-panel">
+          <button
+            v-for="v in (['table', 'card'] as const)"
+            :key="v"
+            type="button"
+            class="inline-flex min-h-8 items-center gap-1 border-0 px-2.5 py-1.5 text-12px transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+            :class="view === v ? 'bg-brand-soft font-800 text-brand-deep' : 'bg-panel font-600 text-ink-soft hover:bg-surface-3'"
+            :aria-pressed="view === v"
+            @click="view = v"
+          >
+            <span :class="v === 'table' ? 'i-lucide-table' : 'i-lucide-layout-grid'" class="h-[13px] w-[13px]" aria-hidden="true" />
+            {{ v === 'table' ? '表格' : '卡片' }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 左树右表 -->
+    <div class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-[220px_minmax(0,1fr)]">
+      <TreeNav v-model="node" class="shadow-[var(--shadow-card)]" title="按归属" :items="treeItems" />
+
+      <div class="min-w-0 flex flex-col">
+        <!-- 表格视图 -->
+        <KitTable
+          v-if="view === 'table'"
+          ref="tableEl"
+          class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
+          :columns="columns"
+          :data="rows"
+          :loading="store.loading"
+          :check-method="canCheck"
+          empty="该归属下暂无发票。"
+          @checkbox-change="(list: Invoice[]) => checkedRows = list"
+        >
+          <template #number="{ row }">
+            <button
+              type="button"
+              class="border-0 bg-transparent p-0 font-mono text-13px font-700 text-brand cursor-pointer hover:text-brand-deep"
+              title="编辑（开页签）"
+              @click="openEdit(row)"
+            >
+              {{ tail8(row.invoiceNumber) }}
+            </button>
+          </template>
+          <template #type="{ row }">
+            <span class="text-ink-soft">{{ typeShort(row.invoiceType) }}</span>
+          </template>
+          <template #source="{ row }">
+            <span :class="row.source === 'scan' ? 'chip-brand' : 'chip bg-surface-3 text-ink-soft'">
+              {{ row.source === 'scan' ? '扫描' : '导入' }}
+            </span>
+          </template>
+          <template #owner="{ row }">
+            <span v-if="row.ownerKind === 'personal'" class="text-brand-deep">个人开支</span>
+            <span v-else-if="row.projectName">{{ row.projectName }}</span>
+            <span v-else class="chip-warn">待归档</span>
+          </template>
+          <template #print="{ row }">
+            <span v-if="row.printCount > 0" class="chip-ok">{{ row.printCount }} 次</span>
+            <span v-else class="chip-warn">未打印</span>
+          </template>
+          <template #action="{ row }">
+            <div class="flex items-center gap-1">
+              <button v-if="row.accountStatus === 'none'" class="icon-btn" title="归档" @click="archiveFlow(row)">
+                <span class="i-lucide-archive text-14px" aria-hidden="true" />
+              </button>
+              <button class="icon-btn" title="编辑（开页签）" @click="openEdit(row)">
+                <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
+              </button>
+              <button class="icon-btn-danger" title="删除" @click="del(row)">
+                <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
+              </button>
+            </div>
+          </template>
+        </KitTable>
+
+        <!-- 卡片视图（发票预览大图，快速删除） -->
+        <div v-else class="border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
+          <div class="grid grid-cols-1 gap-3 lg:grid-cols-3 sm:grid-cols-2">
+            <div
+              v-for="inv in rows"
+              :key="inv.id"
+              class="flex flex-col overflow-hidden border border-line rounded-[12px] bg-panel shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] hover:border-line-strong hover:-translate-y-0.5"
+            >
+              <div
+                class="grid cursor-pointer place-items-center border-b border-line bg-surface-2 p-2.5"
+                @click="openEdit(inv)"
+              >
+                <div class="w-4/5">
+                  <InvoicePreviewSvg :invoice="inv" />
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5 p-3">
+                <div class="flex items-center justify-between gap-1.5">
+                  <button
+                    type="button"
+                    class="border-0 bg-transparent p-0 font-mono text-14px font-800 text-brand cursor-pointer"
+                    @click="openEdit(inv)"
+                  >
+                    {{ tail8(inv.invoiceNumber) }}
+                  </button>
+                  <span class="font-mono text-15px font-800">{{ yuan(inv.totalAmount) }}</span>
+                </div>
+                <div class="truncate text-12px text-ink-soft">
+                  {{ inv.seller }}
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span v-if="inv.ownerKind === 'personal'" class="chip-brand">个人开支</span>
+                  <span v-else-if="inv.projectName" class="chip bg-surface-3 text-ink-soft">{{ inv.projectName }}</span>
+                  <span v-else class="chip-warn">待归档</span>
+                  <span class="font-mono text-11px text-ink-faint">{{ inv.invoiceDate }}</span>
+                </div>
+                <div class="mt-0.5 flex items-center gap-1.5">
+                  <button class="btn-secondary text-12px" @click="openEdit(inv)">
+                    <span class="i-lucide-square-pen mr-1 text-12px" aria-hidden="true" />编辑
+                  </button>
+                  <button class="icon-btn-danger" title="删除" @click="del(inv)">
+                    <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-if="rows.length === 0" class="col-span-full py-8 text-center text-ink-soft">
+              该归属下暂无发票。
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部：勾选才浮出合计（无常驻汇总） -->
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-2.5 border border-line rounded-[var(--radius-card)] bg-surface-2 px-4 py-2.5 text-13px text-ink-soft shadow-[var(--shadow-card)]">
+          <span v-if="checkedRows.length > 0" class="rounded-full bg-brand-soft px-2.5 py-0.5 text-brand-deep">
+            已选 <b class="font-mono">{{ checkedRows.length }}</b> 张 · 合计 <b class="font-mono">{{ yuan(checkedTotal) }}</b>
+          </span>
+          <span v-else class="text-ink-faint">勾选发票后显示合计</span>
+          <span class="text-12px">共 {{ rows.length }} 条</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

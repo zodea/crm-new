@@ -33,9 +33,10 @@ describe('分供方列表筛选', () => {
     })).toEqual([rows[1]])
   })
 
-  it('关键词覆盖公司名、简称、信用代码、税号、联系人与电话', () => {
+  it('关键词覆盖公司名、简称、信用代码、税号、类别、联系人与电话', () => {
     expect(filterSuppliers(rows, { search: '大板东', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
     expect(filterSuppliers(rows, { search: 'PQR1122', category: 'all', credentialStatus: 'all' })).toEqual([rows[1]])
+    expect(filterSuppliers(rows, { search: '材料供应商', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
     expect(filterSuppliers(rows, { search: '陈志强', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
     expect(filterSuppliers(rows, { search: '9988', category: 'all', credentialStatus: 'all' })).toEqual([rows[1]])
   })

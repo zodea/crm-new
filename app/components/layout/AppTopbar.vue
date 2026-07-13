@@ -6,8 +6,8 @@ import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
 
 const route = useRoute()
 
-const showNotifications = ref(false)
-const showDevTools = ref(false)
+const showNotifications = shallowRef(false)
+const showDevTools = shallowRef(false)
 const isDev = import.meta.dev
 
 // 与页签栏共用同一套路由→标题映射，保持一致。

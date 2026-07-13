@@ -34,6 +34,7 @@ export function filterSuppliers<T extends SupplierListFilterable>(
       supplier.aliases.join(' '),
       supplier.uniqueCode,
       supplier.taxNo,
+      supplier.supplierCategory,
       supplier.contact,
       supplier.contactPhone,
     ].some(value => value.toLocaleLowerCase('zh-CN').includes(query))

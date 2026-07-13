@@ -8,7 +8,6 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { StatusTone } from '~/lib/project/status'
 import type { Contract } from '~/stores/contract'
-import { Button } from '~/components/ui/button'
 import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, kindLabels, sumField } from '~/lib/contract/status'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -216,43 +215,17 @@ onMounted(() => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <section
-      class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]"
-    >
-      <div class="mr-1 flex flex-none items-baseline gap-2">
-        <h2 class="text-14px font-800 text-ink">
-          {{ title }}
-        </h2>
-        <span class="text-12px text-ink-soft">
-          共 <b class="font-mono text-ink">{{ kindRows.length }}</b> 份
-          <template v-if="filtered.length !== kindRows.length">· 当前 {{ filtered.length }} 份</template>
-        </span>
-      </div>
-
-      <SelectFilter
-        v-model="projFilter"
-        label="项目"
-        :options="projOptions"
-        placeholder="全部项目"
-        :min-width="160"
-      />
-
-      <div class="ml-auto flex flex-wrap items-center gap-2.5">
-        <SearchInput v-model="searchText" placeholder="搜索合同名称 / 编号" :width="220" />
-        <Button variant="outline" size="icon" title="刷新" :disabled="store.loading" @click="refresh">
-          <span
-            class="i-lucide-refresh-cw h-3.5 w-3.5"
-            :class="store.loading ? 'animate-spin' : ''"
-            aria-hidden="true"
-          />
-          <span class="sr-only">刷新</span>
-        </Button>
-        <Button @click="openCreate">
-          <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
-          新增{{ title }}
-        </Button>
-      </div>
-    </section>
+    <ContractListToolbar
+      v-model:search="searchText"
+      v-model:project="projFilter"
+      :title="title"
+      :total="kindRows.length"
+      :visible="filtered.length"
+      :loading="store.loading"
+      :project-options="projOptions"
+      @refresh="refresh"
+      @create="openCreate"
+    />
 
     <!-- 业务态视图（默认履约中） -->
     <div class="rounded-[var(--radius-card)] border border-line bg-panel px-3 shadow-[var(--shadow-card)]">
