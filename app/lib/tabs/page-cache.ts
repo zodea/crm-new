@@ -1,5 +1,6 @@
 import type { Component } from 'vue'
 import { defineComponent, h } from 'vue'
+import { deriveKey } from '~/lib/tabs/tab-machine'
 
 const tabPageBase = Symbol('tab-page-base')
 const wrapperRegistry = new WeakMap<object, Map<string, Component>>()
@@ -7,6 +8,13 @@ const tabWrapperRegistries = new Set<Map<string, Component>>()
 
 type TabPageWrapper = Component & {
   [tabPageBase]?: Component
+}
+
+interface TabRouteLike {
+  fullPath: string
+  matched: ReadonlyArray<{
+    components?: Record<string, unknown> | null
+  }>
 }
 
 /** KeepAlive 的 include 只认组件名；为每个页签生成稳定且可匹配的唯一名。 */
@@ -61,5 +69,22 @@ export function pruneTabPageWrappers(validTabKeys: string[]) {
       if (!valid.has(key))
         registry.delete(key)
     }
+  }
+}
+
+/** 同时覆盖 Nuxt 已完成的首次导航与之后的 beforeResolve 导航。 */
+export function wrapTabRouteComponents(route: TabRouteLike) {
+  const tabKey = deriveKey(route.fullPath)
+  for (const record of route.matched) {
+    const components = record.components
+    const component = components?.default
+    if (!component)
+      continue
+
+    // beforeResolve 后通常已解析为 SFC 对象；未解析 loader 必须留给 Vue Router。
+    if (typeof component === 'function' && !('displayName' in component))
+      continue
+
+    components.default = getTabPageWrapper(component as Component, tabKey)
   }
 }

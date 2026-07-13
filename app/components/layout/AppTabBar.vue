@@ -86,6 +86,8 @@ function openKeyboardMenu(event: KeyboardEvent, key: string) {
 }
 
 function closeMenu(restoreFocus = false) {
+  if (!menu.value.open)
+    return
   const key = menu.value.key
   menu.value = { ...menu.value, open: false }
   if (restoreFocus) {

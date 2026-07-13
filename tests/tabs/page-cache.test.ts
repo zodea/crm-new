@@ -5,6 +5,7 @@ import {
   pruneTabPageWrappers,
   tabPageCacheName,
   unwrapTabPageComponent,
+  wrapTabRouteComponents,
 } from '~/lib/tabs/page-cache'
 
 describe('页签页面缓存身份', () => {
@@ -32,5 +33,21 @@ describe('页签页面缓存身份', () => {
     pruneTabPageWrappers([])
 
     expect(getTabPageWrapper(base, '/base/supplier/1')).not.toBe(before)
+  })
+
+  it('插件注册时立即包装已完成的首次路由', () => {
+    const base = defineComponent({ name: 'InitialPage' })
+    const record = { components: { default: base } }
+
+    wrapTabRouteComponents({ fullPath: '/project/initial', matched: [record] })
+
+    expect(record.components.default.name).toBe(tabPageCacheName('/project/initial'))
+    expect(unwrapTabPageComponent(record.components.default)).toBe(base)
+  })
+
+  it('首次首页使用固定 HOME_KEY 对应的缓存名', () => {
+    const record = { components: { default: defineComponent({ name: 'HomePage' }) } }
+    wrapTabRouteComponents({ fullPath: '/', matched: [record] })
+    expect(record.components.default.name).toBe(tabPageCacheName('home'))
   })
 })
