@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { NavGroup, NavLeaf } from '~/lib/nav/nav-tree'
-import { useLocalStorage } from '@vueuse/core'
+import type { NavLeaf } from '~/lib/nav/nav-tree'
+import { onKeyStroke, useLocalStorage } from '@vueuse/core'
 import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
   useSidebar,
 } from '~/components/ui/sidebar'
-import { activeNavKey, DEFAULT_OPEN_GROUPS, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import { activeNavKey, DEFAULT_OPEN_GROUPS, ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
 
 const route = useRoute()
 const contractStore = useContractStore()
@@ -45,15 +45,11 @@ watch(
 )
 
 watch(
-  activeKey,
-  (key) => {
-    if (!key)
-      return
-    const group = NAV_TREE.find((node): node is NavGroup =>
-      node.type === 'group' && node.items.some(item => item.key === key),
-    )
-    if (group && !openGroupKeys.value.includes(group.key))
-      openGroupKeys.value = [...openGroupKeys.value, group.key]
+  [activeKey, openGroupKeys],
+  ([key, openKeys]) => {
+    const next = ensureActiveGroupOpen(openKeys, key)
+    if (next !== openKeys)
+      openGroupKeys.value = next
   },
   { immediate: true },
 )
@@ -87,12 +83,19 @@ function openGroupFromRail(key: string) {
   forcePeek.value = true
 }
 
+function closeTemporaryPanel() {
+  isHovering.value = false
+  forcePeek.value = false
+}
+
 function onNavigate() {
   searchQuery.value = ''
   forcePeek.value = false
   if (isMobile.value)
     setOpenMobile(false)
 }
+
+onKeyStroke('Escape', closeTemporaryPanel)
 </script>
 
 <template>
@@ -100,7 +103,7 @@ function onNavigate() {
     collapsible="icon"
     :peek-open="peekOpen"
     @mouseenter="isHovering = true"
-    @mouseleave="isHovering = false"
+    @mouseleave="closeTemporaryPanel"
   >
     <SidebarHeader class="shrink-0 gap-2 px-2 pb-2 pt-2">
       <div class="flex h-10 items-center gap-2">

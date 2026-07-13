@@ -44,4 +44,16 @@ describe('页签缓存失效', () => {
 
     expect(store.invalidatedKeys).toEqual(['/base/supplier', '/finance/ledger'])
   })
+
+  it('缓存边界完成卸载后可逐批确认失效项', () => {
+    const store = useTabsStore()
+    store.open({ fullPath: '/project', title: '项目列表' })
+    store.refreshActive()
+    store.open({ fullPath: '/base/supplier', title: '分供方' })
+    store.refreshActive()
+
+    expect(store.invalidatedKeys).toEqual(['/project', '/base/supplier'])
+    store.acknowledgeInvalidations(['/project'])
+    expect(store.invalidatedKeys).toEqual(['/base/supplier'])
+  })
 })

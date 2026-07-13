@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import { ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
 
 function leaves() {
   return NAV_TREE.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -24,5 +24,10 @@ describe('侧栏导航树', () => {
 
   it('空关键词返回完整导航树', () => {
     expect(filterNavTree(NAV_TREE, '')).toBe(NAV_TREE)
+  })
+
+  it('本地状态恢复后仍展开当前叶子所属分组', () => {
+    expect(ensureActiveGroupOpen([], 'project')).toEqual(['g-project'])
+    expect(ensureActiveGroupOpen(['g-project'], 'project')).toEqual(['g-project'])
   })
 })

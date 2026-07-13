@@ -1,3 +1,4 @@
+// @unocss-include
 // 侧栏导航树 —— 单一权威源：保留完整业务 IA，呈现层对齐红圈紧凑单行菜单。
 // icon=Lucide 线性图标、hint=搜索与 tooltip 副提示；to 缺省 = 页面尚未实装（侧栏灰显，
 // 对应 #87 roadmap 后续域 / #91 批C-E，实装后回填 to 即上线入口）。
@@ -120,6 +121,18 @@ export function filterNavTree(tree: NavNode[], query: string): NavNode[] {
 export const DEFAULT_OPEN_GROUPS: string[] = NAV_TREE
   .filter((n): n is NavGroup => n.type === 'group' && n.key !== 'g-settings')
   .map(n => n.key)
+
+/** 合并持久化展开状态与当前路由归属，当前分组始终优先展开。 */
+export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | null): string[] {
+  if (!activeKey)
+    return openKeys
+  const group = NAV_TREE.find((node): node is NavGroup =>
+    node.type === 'group' && node.items.some(item => item.key === activeKey),
+  )
+  if (!group || openKeys.includes(group.key))
+    return openKeys
+  return [...openKeys, group.key]
+}
 
 /**
  * 路由 path → 应点亮的导航 key。

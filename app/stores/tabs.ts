@@ -44,7 +44,7 @@ export const useTabsStore = defineStore('tabs', () => {
     for (const key of keys)
       next[key] = (next[key] ?? 0) + 1
     cacheVersions.value = next
-    invalidatedKeys.value = keys
+    invalidatedKeys.value = [...new Set([...invalidatedKeys.value, ...keys])]
   }
 
   function applyClose(transform: () => ReturnType<typeof closeTab>) {
@@ -71,9 +71,14 @@ export const useTabsStore = defineStore('tabs', () => {
     applyClose(() => closeAll())
   }
 
-  /** 让当前页签使用新组件 key；旧 keep-alive 条目不再可达，并由 LRU 回收。 */
+  /** 切换当前页签组件 key；外层 KeepAlive include 会据 invalidatedKeys 定向卸载旧实例。 */
   function refreshActive() {
     invalidate([activeKey.value])
+  }
+
+  function acknowledgeInvalidations(keys: string[]) {
+    const completed = new Set(keys)
+    invalidatedKeys.value = invalidatedKeys.value.filter(key => !completed.has(key))
   }
 
   function pageCacheKey(fullPath: string): string {
@@ -102,6 +107,7 @@ export const useTabsStore = defineStore('tabs', () => {
     closeToRight,
     closeEvery,
     refreshActive,
+    acknowledgeInvalidations,
     pageCacheKey,
     setTitle,
   }

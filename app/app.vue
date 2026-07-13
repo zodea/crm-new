@@ -4,13 +4,30 @@
 // + SidebarInset 主区（动作顶栏 AppTopbar + 路由页签 AppTabBar + keep-alive 页面）。
 // 页签隔离：page-key=fullPath 让每个页签是独立组件实例（表单/内部 state 互不串），
 // 配合 keepalive 缓存；滚动位置按页签 key 手动存取（滚动容器是共享的，keep-alive 不覆盖）。
-import { deriveKey } from '~/lib/tabs/tab-machine'
+import { pruneTabPageWrappers, tabPageCacheName } from '~/lib/tabs/page-cache'
+import { deriveKey, MAX_TABS } from '~/lib/tabs/tab-machine'
 
 const route = useRoute()
 const tabsStore = useTabsStore()
 const { theme } = provideShellTheme()
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
 const scrollPos = new Map<string, number>()
+const keepAliveNames = computed(() => {
+  const invalidated = new Set(tabsStore.invalidatedKeys)
+  return tabsStore.tabs
+    .filter(tab => !invalidated.has(tab.key))
+    .map(tab => tabPageCacheName(tab.key))
+})
+const keepAliveOptions = computed(() => ({
+  include: keepAliveNames.value,
+  max: MAX_TABS + 1,
+}))
+
+useHead(() => ({
+  htmlAttrs: {
+    'data-shell-theme': theme.value,
+  },
+}))
 
 watch(
   () => route.fullPath,
@@ -28,12 +45,19 @@ watch(
 
 watch(
   () => tabsStore.invalidatedKeys,
-  (keys) => {
+  async (keys) => {
+    if (!keys.length)
+      return
     for (const key of keys)
       scrollPos.delete(key)
     if (keys.includes(tabsStore.activeKey) && scrollEl.value)
       scrollEl.value.scrollTop = 0
+    // KeepAlive 的 include watcher 为 flush:post；再等一拍后确认旧实例已被定向 prune。
+    await nextTick()
+    pruneTabPageWrappers(tabsStore.tabs.map(tab => tab.key))
+    tabsStore.acknowledgeInvalidations(keys)
   },
+  { flush: 'post' },
 )
 
 function pageKey(r: { fullPath: string }) {
@@ -42,7 +66,7 @@ function pageKey(r: { fullPath: string }) {
 </script>
 
 <template>
-  <SidebarProvider :data-shell-theme="theme">
+  <SidebarProvider>
     <AppSidebar />
     <SidebarInset class="h-svh overflow-hidden">
       <AppTopbar />
@@ -50,7 +74,7 @@ function pageKey(r: { fullPath: string }) {
       <!-- 主区滚动容器（对齐设计稿 main：20px 24px 36px 全宽） -->
       <div ref="scrollEl" class="min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)] px-4 pb-9 pt-3">
         <div class="mx-auto w-full max-w-[var(--content-max)]">
-          <NuxtPage :page-key="pageKey" :keepalive="{ max: 16 }" />
+          <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
         </div>
       </div>
     </SidebarInset>

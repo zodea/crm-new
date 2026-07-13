@@ -10,6 +10,7 @@ const kit = useKitUI()
 
 const tabListEl = useTemplateRef<HTMLElement>('tabListEl')
 const tabEls = useTemplateRef<HTMLElement[]>('tabEl')
+const menuEl = useTemplateRef<HTMLElement>('menuEl')
 
 watch(
   () => route.fullPath,
@@ -61,17 +62,64 @@ useEventListener(tabListEl, 'wheel', (event) => {
 
 const menu = shallowRef({ open: false, x: 0, y: 0, key: '' })
 
-function openMenu(event: MouseEvent, key: string) {
+async function showMenu(key: string, x: number, y: number) {
   menu.value = {
     open: true,
-    x: Math.min(event.clientX, window.innerWidth - 148),
-    y: Math.min(event.clientY, window.innerHeight - 166),
+    x: Math.min(x, window.innerWidth - 148),
+    y: Math.min(y, window.innerHeight - 166),
     key,
+  }
+  await nextTick()
+  menuEl.value?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+}
+
+function openMenu(event: MouseEvent, key: string) {
+  void showMenu(key, event.clientX, event.clientY)
+}
+
+function openKeyboardMenu(event: KeyboardEvent, key: string) {
+  if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10'))
+    return
+  event.preventDefault()
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  void showMenu(key, rect.left, rect.bottom)
+}
+
+function closeMenu(restoreFocus = false) {
+  const key = menu.value.key
+  menu.value = { ...menu.value, open: false }
+  if (restoreFocus) {
+    nextTick(() => tabEls.value
+      ?.find(element => element.dataset.tabKey === key)
+      ?.querySelector<HTMLButtonElement>('[data-tab-trigger]')
+      ?.focus())
   }
 }
 
-function closeMenu() {
-  menu.value = { ...menu.value, open: false }
+function onMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    closeMenu(true)
+    return
+  }
+  if (event.key === 'Tab') {
+    closeMenu()
+    return
+  }
+
+  const items = [...(menuEl.value?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])]
+  if (!items.length || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key))
+    return
+  event.preventDefault()
+  const current = items.indexOf(document.activeElement as HTMLButtonElement)
+  const index = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? items.length - 1
+      : event.key === 'ArrowDown'
+        ? (current + 1) % items.length
+        : (current - 1 + items.length) % items.length
+  items[index]?.focus()
 }
 
 const menuTab = computed(() => tabsStore.tabs.find(tab => tab.key === menu.value.key))
@@ -86,17 +134,16 @@ function act(action: () => void) {
     router.push(tabsStore.activeFullPath)
 }
 
-useEventListener('click', closeMenu)
-useEventListener('scroll', closeMenu, true)
-onKeyStroke('Escape', closeMenu)
+useEventListener('click', () => closeMenu())
+useEventListener('scroll', () => closeMenu(), true)
+onKeyStroke('Escape', () => closeMenu(true))
 </script>
 
 <template>
   <div class="flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2">
-    <div
+    <nav
       ref="tabListEl"
       class="tabbar-scroll min-w-0 flex flex-1 items-stretch gap-px overflow-x-auto overflow-y-hidden px-2"
-      role="tablist"
       aria-label="已打开页面"
     >
       <div
@@ -104,23 +151,27 @@ onKeyStroke('Escape', closeMenu)
         :key="tab.key"
         ref="tabEl"
         :data-tab-key="tab.key"
-        role="tab"
-        :aria-selected="tab.key === tabsStore.activeKey"
-        :tabindex="tab.key === tabsStore.activeKey ? 0 : -1"
-        class="group/tab inline-flex max-w-[200px] shrink-0 cursor-pointer select-none items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-12px outline-none transition-colors duration-[var(--dur-fast)] focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+        class="group/tab inline-flex max-w-[200px] shrink-0 select-none items-center whitespace-nowrap border-b-2 border-transparent text-12px transition-colors duration-[var(--dur-fast)]"
         :class="tab.key === tabsStore.activeKey
           ? 'border-brand bg-brand-soft font-700 text-brand-deep'
           : 'font-500 text-ink-soft hover:bg-[rgba(17,24,39,0.05)] hover:text-ink'"
-        @click="goTab(tab.fullPath, tab.key)"
-        @keydown.enter.prevent="goTab(tab.fullPath, tab.key)"
-        @keydown.space.prevent="goTab(tab.fullPath, tab.key)"
         @contextmenu.prevent="openMenu($event, tab.key)"
       >
-        <span class="truncate">{{ tab.title }}</span>
+        <button
+          type="button"
+          data-tab-trigger
+          class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent py-0 pl-3 pr-1 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
+          :class="tab.closable ? '' : 'pr-3'"
+          :aria-current="tab.key === tabsStore.activeKey ? 'page' : undefined"
+          @click="goTab(tab.fullPath, tab.key)"
+          @keydown="openKeyboardMenu($event, tab.key)"
+        >
+          <span class="truncate">{{ tab.title }}</span>
+        </button>
         <button
           v-if="tab.closable"
           type="button"
-          class="grid h-5 w-5 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent text-ink-faint opacity-70 hover:bg-danger-soft hover:text-danger group-hover/tab:opacity-100"
+          class="mr-2 grid h-5 w-5 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent text-ink-faint opacity-70 outline-none hover:bg-danger-soft hover:text-danger focus-visible:[box-shadow:0_0_0_2px_var(--brand)] group-hover/tab:opacity-100"
           title="关闭页签"
           :aria-label="`关闭 ${tab.title}`"
           @click.stop="closeAndFollow(tab.key)"
@@ -128,7 +179,7 @@ onKeyStroke('Escape', closeMenu)
           <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
         </button>
       </div>
-    </div>
+    </nav>
 
     <div class="flex shrink-0 items-center gap-1 border-l border-line bg-surface-2 px-2">
       <span class="px-1 text-10px text-ink-faint" title="当前页签数量">
@@ -149,13 +200,17 @@ onKeyStroke('Escape', closeMenu)
   <Teleport to="body">
     <div
       v-if="menu.open"
+      ref="menuEl"
       class="shell-layer-popover fixed min-w-[136px] border border-line rounded-[var(--radius-btn)] bg-panel py-1 shadow-[var(--shadow-pop)]"
       :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
       role="menu"
       @click.stop
+      @keydown="onMenuKeydown"
     >
       <button
         type="button"
+        role="menuitem"
+        tabindex="-1"
         class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!menuTab?.closable"
         @click="act(() => tabsStore.close(menu.key))"
@@ -164,6 +219,8 @@ onKeyStroke('Escape', closeMenu)
       </button>
       <button
         type="button"
+        role="menuitem"
+        tabindex="-1"
         class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeOther(menu.key))"
@@ -172,15 +229,19 @@ onKeyStroke('Escape', closeMenu)
       </button>
       <button
         type="button"
+        role="menuitem"
+        tabindex="-1"
         class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasRight"
         @click="act(() => tabsStore.closeToRight(menu.key))"
       >
         关闭右侧
       </button>
-      <div class="my-1 h-px bg-line" />
+      <div class="my-1 h-px bg-line" role="separator" />
       <button
         type="button"
+        role="menuitem"
+        tabindex="-1"
         class="flex h-8 w-full items-center border-0 bg-transparent px-3 text-12px text-ink-soft hover:bg-surface-3 hover:text-ink disabled:opacity-40 disabled:hover:bg-transparent"
         :disabled="!hasOthers"
         @click="act(() => tabsStore.closeEvery())"
