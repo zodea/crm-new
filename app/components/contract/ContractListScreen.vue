@@ -8,6 +8,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { StatusTone } from '~/lib/project/status'
 import type { Contract } from '~/stores/contract'
+import { Button } from '~/components/ui/button'
 import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, kindLabels, sumField } from '~/lib/contract/status'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -27,12 +28,13 @@ const KIND_TITLE: Record<ContractKind, string> = {
 }
 const title = computed(() => KIND_TITLE[kind])
 const labels = computed(() => kindLabels(kind))
+const kindRows = computed(() => store.byKind(kind))
 
 // ── 筛选状态：搜索 / 项目 / 业务态视图（默认履约中）/ 分包左分类 ──
-const searchText = ref('')
-const projFilter = ref('all') // reka Select 不接受空串值，'all' 哨兵
-const view = ref('履约中') // 默认业务态视图 = 履约中（设计稿 defaultView: 'active'）
-const subCat = ref('all') // 分包左分类：all | 劳务 | 专业
+const searchText = shallowRef('')
+const projFilter = shallowRef('all') // reka Select 不接受空串值，'all' 哨兵
+const view = shallowRef('履约中') // 默认业务态视图 = 履约中（设计稿 defaultView: 'active'）
+const subCat = shallowRef('all') // 分包左分类：all | 劳务 | 专业
 
 const projOptions = computed(() => [
   { key: 'all', label: '全部项目' },
@@ -43,7 +45,7 @@ const projOptions = computed(() => [
 const searched = computed(() => {
   const q = searchText.value.trim().toLowerCase()
   const proj = projFilter.value
-  return store.byKind(kind).filter((c) => {
+  return kindRows.value.filter((c) => {
     if (proj !== 'all' && c.projectId !== proj)
       return false
     if (!q)
@@ -88,8 +90,8 @@ const catItems = computed<TreeNode[]>(() => {
 })
 
 // ── 受控分页（KitTable 三件套，ADR 0009）──
-const page = ref(1)
-const pageSize = ref(10)
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
 const curPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate(filtered.value, curPage.value, pageSize.value))
 
@@ -175,6 +177,14 @@ function supplierName(id: string | null): string {
 function openCreate() {
   openContractForm(kind)
 }
+
+async function refresh() {
+  searchText.value = ''
+  projFilter.value = 'all'
+  view.value = '履约中'
+  subCat.value = 'all'
+  await Promise.all([store.load(), projectStore.load(), supplierStore.load()])
+}
 function openEdit(row: Contract) {
   openContractForm(kind, row)
 }
@@ -205,19 +215,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
-    <DataListToolbar
-      :title="title"
-      :count="filtered.length"
-      search-placeholder="搜索合同名称 / 编号"
-      @search="v => searchText = v"
-      @create="openCreate"
-    />
+  <div class="flex min-w-0 flex-col gap-4">
+    <section
+      class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]"
+    >
+      <div class="mr-1 flex flex-none items-baseline gap-2">
+        <h2 class="text-14px font-800 text-ink">
+          {{ title }}
+        </h2>
+        <span class="text-12px text-ink-soft">
+          共 <b class="font-mono text-ink">{{ kindRows.length }}</b> 份
+          <template v-if="filtered.length !== kindRows.length">· 当前 {{ filtered.length }} 份</template>
+        </span>
+      </div>
 
-    <!-- 业务态视图（默认履约中）+ 项目筛选 -->
-    <div class="flex flex-wrap items-center gap-3 pb-2.5 px-1">
-      <SegTab v-model="view" :tabs="viewTabs" />
-      <div class="flex-1" />
       <SelectFilter
         v-model="projFilter"
         label="项目"
@@ -225,16 +236,38 @@ onMounted(() => {
         placeholder="全部项目"
         :min-width="160"
       />
+
+      <div class="ml-auto flex flex-wrap items-center gap-2.5">
+        <SearchInput v-model="searchText" placeholder="搜索合同名称 / 编号" :width="220" />
+        <Button variant="outline" size="icon" title="刷新" :disabled="store.loading" @click="refresh">
+          <span
+            class="i-lucide-refresh-cw h-3.5 w-3.5"
+            :class="store.loading ? 'animate-spin' : ''"
+            aria-hidden="true"
+          />
+          <span class="sr-only">刷新</span>
+        </Button>
+        <Button @click="openCreate">
+          <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
+          新增{{ title }}
+        </Button>
+      </div>
+    </section>
+
+    <!-- 业务态视图（默认履约中） -->
+    <div class="rounded-[var(--radius-card)] border border-line bg-panel px-3 shadow-[var(--shadow-card)]">
+      <SegTab v-model="view" :tabs="viewTabs" />
     </div>
 
     <div :class="kind === '分包' ? 'flex items-start gap-3' : ''">
       <!-- 分包页：劳务/专业左分类 -->
-      <div v-if="kind === '分包'" class="w-52 shrink-0">
+      <div v-if="kind === '分包'" class="w-52 shrink-0 overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]">
         <TreeNav v-model="subCat" title="分包合同分类" :items="catItems" />
       </div>
 
       <div class="min-w-0 flex-1">
         <KitTable
+          class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
           :columns="columns"
           :data="pageRows"
           :loading="store.loading"
@@ -285,7 +318,7 @@ onMounted(() => {
         </KitTable>
 
         <!-- 底部多段汇总行（当前筛选后的全量口径） -->
-        <div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 border border-line bg-panel px-3 py-2">
+        <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border border-line rounded-[var(--radius-card)] bg-panel px-3 py-2.5 shadow-[var(--shadow-card)]">
           <span class="text-12px text-ink-faint">共 {{ filtered.length }} 份</span>
           <span v-for="seg in summary" :key="seg.label" class="text-12px text-ink-soft">
             {{ seg.label }}
