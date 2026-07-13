@@ -359,132 +359,33 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 顶部：队列上下文 + 真实可用主操作 -->
-    <section class="mb-3.5 flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
-      <div class="mr-1 flex flex-none items-baseline gap-2">
-        <h2 class="text-14px font-800 text-ink">
-          发票识别
-        </h2>
-        <span class="text-12px text-ink-soft">
-          识别队列 <b class="font-mono text-ink">{{ workspaceRows.length }}</b> 张
-        </span>
-      </div>
-
-      <div class="hidden items-center gap-3 text-11px text-ink-soft xl:flex">
-        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-ok" />≥95 可信</span>
-        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-warn" />80–95 待确认</span>
-        <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-danger" />&lt;80 低置信</span>
-      </div>
-
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <NuxtLink to="/finance/ledger" class="btn-secondary inline-flex items-center gap-1">
-          <span class="i-lucide-book-open h-3.5 w-3.5" aria-hidden="true" />
-          发票台账
-        </NuxtLink>
-        <button class="btn-secondary" @click="showAddDialog = true">
-          <span class="i-lucide-plus mr-1 text-13px" aria-hidden="true" />手动录入
-        </button>
-        <button
-          class="btn-secondary"
-          :disabled="recognizing || pendingCount === 0"
-          :title="pendingCount === 0 ? '没有待识别的发票' : `识别 ${pendingCount} 张待识别发票`"
-          @click="handleBatchRecognize"
-        >
-          <span class="mr-1 text-13px" :class="recognizing ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-scan-text'" aria-hidden="true" />
-          批量识别{{ pendingCount > 0 ? ` ${pendingCount}` : '' }}
-        </button>
-        <button
-          class="btn-primary"
-          :disabled="batchPassing || store.suggestPass.length === 0"
-          :title="store.suggestPass.length === 0 ? '没有建议通过的发票' : `放行 ${store.suggestPass.length} 张建议通过发票`"
-          @click="handleBatchPass"
-        >
-          <span class="mr-1 text-13px" :class="batchPassing ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-check-check'" aria-hidden="true" />
-          批量通过{{ store.suggestPass.length > 0 ? ` ${store.suggestPass.length}` : '' }}
-        </button>
-      </div>
-    </section>
+    <InvoiceWorkspaceToolbar
+      :total="workspaceRows.length"
+      :pending-count="pendingCount"
+      :suggested-count="store.suggestPass.length"
+      :recognizing="recognizing"
+      :batch-passing="batchPassing"
+      @add="showAddDialog = true"
+      @recognize="handleBatchRecognize"
+      @pass="handleBatchPass"
+    />
 
     <!-- #60 单一校对工作台：左队列 / 中原图 / 右字段 -->
     <div class="flex gap-3.5" style="height: calc(100vh - 220px); min-height: 560px">
-      <!-- 左栏 — 发票列表（单行化收窄；上传直落此列表原地显示「识别中 N%」） -->
-      <div class="basis-[18%] min-w-48 shrink-0 overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)] flex flex-col">
-        <div class="flex flex-col gap-2 border-b border-line bg-surface-2 p-2.5">
-          <button class="btn-primary w-full justify-center text-12px" @click="openFilePicker()">
-            <span class="i-lucide-upload mr-1 text-12px" aria-hidden="true" />上传发票
-          </button>
-          <select v-model="workspaceFilter" class="field-input w-full text-12px" aria-label="筛选识别队列">
-            <option value="all">
-              全部状态（{{ workspaceRows.length }}）
-            </option>
-            <option value="recognizing">
-              识别中
-            </option>
-            <option value="suggested">
-              建议通过
-            </option>
-            <option value="warning">
-              待确认
-            </option>
-            <option value="danger">
-              含低置信
-            </option>
-          </select>
-          <input v-model="searchText" type="search" class="field-input w-full text-12px" placeholder="搜索票号、文件、公司…">
-        </div>
-        <div class="px-2.5 py-1.5 border-b border-line text-11px text-ink-soft">
-          当前 {{ visibleWorkspaceRows.length }} 张 · 待校对 {{ store.pendingReview.length }}
-        </div>
-        <div class="min-h-0 flex-1 overflow-y-auto">
-          <button
-            v-for="{ inv, label, cls, dotCls } in visibleWorkspaceRows"
-            :key="inv.id"
-            type="button"
-            class="flex w-full items-center gap-2 border-0 border-b border-line px-2.5 py-2.5 text-left transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
-            :class="selectedId === inv.id ? 'bg-brand-soft' : 'bg-panel hover:bg-surface-3'"
-            @click="selectedId = inv.id"
-          >
-            <span class="h-2 w-2 shrink-0 rounded-full" :class="dotCls" aria-hidden="true" />
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-11px font-700" :title="inv.fileName || inv.invoiceNumber">
-                {{ inv.invoiceNumber ? `…${inv.invoiceNumber.slice(-8)}` : (inv.fileName || '—') }}
-              </span>
-              <span class="mt-0.5 block truncate text-10px text-ink-soft">{{ inv.seller || inv.buyer || inv.fileName || '待识别' }}</span>
-            </span>
-            <span class="shrink-0 text-10px" :class="cls">{{ label }}</span>
-          </button>
-          <div v-if="!visibleWorkspaceRows.length" class="p-4 text-center text-ink-faint text-12px">
-            {{ workspaceRows.length ? '当前筛选下暂无发票' : '上传发票开始识别' }}
-          </div>
-        </div>
-      </div>
+      <InvoiceQueuePanel
+        v-model:search="searchText"
+        v-model:filter="workspaceFilter"
+        v-model:selected-id="selectedId"
+        :rows="visibleWorkspaceRows"
+        :total="workspaceRows.length"
+        :pending-review="store.pendingReview.length"
+        @upload="openFilePicker()"
+      />
 
-      <!-- 中栏 — 原图（放大） -->
-      <div class="basis-[40%] min-w-0 overflow-y-auto border border-line rounded-[var(--radius-card)] bg-surface-sink p-4 shadow-[var(--shadow-card)]">
-        <div class="mb-3 text-12px font-700 text-ink-soft">
-          发票原图
-        </div>
-        <div class="mx-auto border border-line rounded-[10px] bg-panel p-4 shadow-[var(--shadow-card)]" style="aspect-ratio: 1/1.4142; max-width: 560px">
-          <object
-            v-if="selectedId && previewUrls.get(selectedId)"
-            :data="previewUrls.get(selectedId)"
-            :aria-label="selectedInvoice?.fileName || '上传发票原图'"
-            class="h-full w-full rounded-[6px] object-contain"
-          />
-          <div v-else-if="selectedInvoice" class="h-full flex items-center justify-center">
-            <div class="text-center">
-              <div class="w-28 h-40 bg-surface-2 rounded-[3px] mx-auto mb-2 flex items-center justify-center border-2 border-brand">
-                <span class="text-32px font-800 text-ink-faint">票</span>
-              </div>
-              <span class="text-11px text-ink-soft block">{{ selectedInvoice.fileName || '—' }}</span>
-              <span class="text-11px text-ink-faint font-mono">{{ selectedInvoice.invoiceNumber?.slice(-8) || '' }}</span>
-            </div>
-          </div>
-          <div v-else class="h-full flex items-center justify-center text-ink-faint text-13px">
-            从左侧列表选择发票
-          </div>
-        </div>
-      </div>
+      <InvoiceOriginalPanel
+        :invoice="selectedInvoice"
+        :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
+      />
 
       <!-- 右栏 — 识别结果校对（字段表） -->
       <div class="basis-[42%] min-w-0 overflow-y-auto border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]">
