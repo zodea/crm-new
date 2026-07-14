@@ -1,5 +1,6 @@
+import type { TreeNode } from '~/lib/kit/tree-nav'
 import { describe, expect, it } from 'vitest'
-import { flattenTree, isNodeActive, resolveNodeCount, type TreeNode } from '~/lib/kit/tree-nav'
+import { flattenTree, isNodeActive, resolveNodeCount } from '~/lib/kit/tree-nav'
 
 const ledgerTree: TreeNode[] = [
   {
