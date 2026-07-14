@@ -117,7 +117,8 @@ test('配置导出：实时预览、二级写盘、逐步完成并自动关闭�
   await page.getByRole('button', { name: '打开多表导出配置' }).click()
   await expect(page).toHaveURL(/\/export\/config\/[^/]+$/)
   await expect(page.getByTitle('当前页签数量')).toContainText('3 个页签')
-  await expect(page.getByRole('navigation', { name: '已打开页面' }).getByRole('button', { name: '导出配置', exact: true })).toBeVisible()
+  // #98：预占页签的动态后缀不再被路由 watcher 的静态标题打回
+  await expect(page.getByRole('navigation', { name: '已打开页面' }).getByRole('button', { name: '导出配置 · 分供方采购合同', exact: true })).toBeVisible()
 
   const preview = page.getByRole('status')
   await expect(preview).toHaveText('滨江壹号/材料采购/华东建材_CG-2026-001.txt')
@@ -141,7 +142,7 @@ test('配置导出：实时预览、二级写盘、逐步完成并自动关闭�
   await expect(processToaster.getByText('已导出到 E2E 配置导出目录 文件夹', { exact: true })).toHaveCount(0)
   await expect(page).toHaveURL(/\/dev\/kit-ui$/)
   await expect(page.getByTitle('当前页签数量')).toContainText('2 个页签')
-  await expect(page.getByRole('navigation', { name: '已打开页面' }).getByRole('button', { name: '导出配置', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('navigation', { name: '已打开页面' }).getByRole('button', { name: '导出配置 · 分供方采购合同', exact: true })).toHaveCount(0)
 
   const state = await page.evaluate(() => (window as ConfigExportTestWindow).__configExportTest)
   expect(state.pickerCalls).toBe(1)
