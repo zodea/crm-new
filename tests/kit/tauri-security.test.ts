@@ -25,8 +25,12 @@ describe('tauri 桌面壳安全边界', () => {
 
     expect(capability.permissions).toEqual([
       'core:path:allow-join',
+      'core:resources:allow-close',
       'dialog:allow-open',
-      'fs:allow-write-file',
+      'fs:allow-exists',
+      'fs:allow-mkdir',
+      'fs:allow-open',
+      'fs:allow-write',
       'sql:default',
       'sql:allow-execute',
     ])

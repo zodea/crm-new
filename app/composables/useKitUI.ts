@@ -95,7 +95,8 @@ function resolveFormModal(values: FormValues | null) {
  */
 export function useKitUI() {
   const toast = useToast()
-  const exportFile = useExportFile()
+  const openExportTab = useExportWorkflowTab()
+  const exportFile = useExportFile(openExportTab)
   return {
     toast: toast.show,
     success: toast.success,
@@ -111,6 +112,7 @@ export function useKitUI() {
     confirm,
     formModal,
     exportFile,
+    openExportTab,
   }
 }
 

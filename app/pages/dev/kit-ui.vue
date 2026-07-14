@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTimeoutFn } from '@vueuse/core'
+import { toErrorMessage } from '~/lib/util/error'
 
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
 // 访问 /dev/kit-ui（ripple 已全域废弃，见 ADR 0004，不提供演示）
@@ -150,7 +151,7 @@ async function demoDirectExport() {
       : `直接保存完成：${result.displayPath}`
   }
   catch (error) {
-    lastResult.value = `直接保存失败：${error instanceof Error ? error.message : String(error)}`
+    lastResult.value = `直接保存失败：${toErrorMessage(error)}`
   }
 }
 
@@ -182,6 +183,61 @@ function demoKitButtonSuccess() {
     return
   demoSaveLoading.value = true
   finishDemoSave()
+}
+
+// ⑧ 需分类的多文件导出（ADR 0004 / #80）
+async function demoConfiguredExport() {
+  try {
+    const result = await kit.exportFile({
+      requiresDirectoryStructure: true,
+      source: {
+        label: '分供方采购合同',
+        fields: [
+          { key: 'projectName', label: '项目名称' },
+          { key: 'contractType', label: '合同类别' },
+          { key: 'supplierName', label: '分供方' },
+          { key: 'contractNo', label: '合同编号' },
+        ],
+        files: [
+          {
+            row: {
+              projectName: '滨江壹号',
+              contractType: '材料采购',
+              supplierName: '华东建材',
+              contractNo: 'CG-2026-001',
+            },
+            data: '滨江壹号｜华东建材｜采购合同 CG-2026-001',
+            mimeType: 'text/plain;charset=utf-8',
+          },
+          {
+            row: {
+              projectName: '滨江壹号',
+              contractType: '设备采购',
+              supplierName: '南方设备',
+              contractNo: 'CG-2026-002',
+            },
+            data: '滨江壹号｜南方设备｜采购合同 CG-2026-002',
+            mimeType: 'text/plain;charset=utf-8',
+          },
+        ],
+      },
+      structure: {
+        levels: [{ field: 'projectName' }, { field: 'contractType' }],
+      },
+      naming: {
+        parts: [{ field: 'supplierName' }, { field: 'contractNo' }],
+        separator: '_',
+        extension: 'txt',
+      },
+    })
+
+    lastResult.value = result.status === 'opened'
+      ? `配置导出页签已打开：${result.id}`
+      : '配置导出被页签上限阻断'
+  }
+  catch (error) {
+    lastResult.value = `配置导出打开失败：${toErrorMessage(error)}`
+  }
 }
 </script>
 
@@ -331,6 +387,19 @@ function demoKitButtonSuccess() {
         <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
           提交调用次数：{{ demoSubmitCount }}
         </p>
+      </section>
+
+      <!-- ⑧ 配置导出页签 -->
+      <section class="content-panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑧ exportFile — 多文件配置导出页签（ADR 0004）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          需按类分目录的导出经同一分流函数打开独立页签，在页签内配置两级目录、命名预览并完成三步写盘。
+        </p>
+        <KitButton @click="demoConfiguredExport">
+          打开多表导出配置
+        </KitButton>
       </section>
 
       <!-- 结果回读 -->

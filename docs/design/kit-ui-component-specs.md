@@ -96,39 +96,45 @@ await formModal({
 
 ## 03 · 导出进度 `export-progress` ✅ 已定案(ADR 0004)
 
-**用途**:全局导出的进度与落点反馈。架构决策与运行环境降级以 [ADR 0004](../adr/0004-export-interaction-model.md) 为唯一权威;本节只定义 KitUI 的调用与呈现契约。按「导出前是否需要配置目录结构」分两条路——不是按文件数,是按**是否需分类**。
+**用途**:全局导出的进度与落点反馈。路径分流、上下文生命周期、安全命名和写盘环境以 [ADR 0004](../adr/0004-export-interaction-model.md) 为唯一权威;本节只定义 KitUI 的调用与呈现契约。
 
 **两条路**:
 
 | 路径 | 触发 | 交互载体 | 进度 | 完成 |
 |---|---|---|---|---|
 | **直接保存** | 无需目录分类 | 目录选择与写盘能力 | 右下 process 道 loading,成功后 dismiss | 唯一 system 成功 toast |
-| **配置导出** | 需要目录分类 | 独立「导出配置」页签 | 页签内进度条 + stepper(读数据→生成→写盘) | 唯一 system 成功 toast + 页签自动关闭 |
+| **配置导出** | 需要目录分类 | 独立「导出配置」页签 | `ProcessStepper`(读数据→生成→写盘) | 唯一 system 成功 toast + 页签自动关闭 |
 
-**配置页签结构**(仅「配置导出」路):两级文件夹结构配置 → 命名规则(带实时预览)→「开始导出」→ 同页转进度区。
+**配置页签结构**:最多两级文件夹配置 → 两段命名字段/分隔符/扩展名 → 完整相对路径实时预览 →「开始导出」→ 同页转进度区。
 
-**stepper 状态配色**(多阶段):激活步 `--brand`、完成步 `--ok`(打勾)、失败步 `--danger`(参照 PatternFly 五态);走过的步打勾。
+**进度契约**:`ProcessStepper` 接收 pending / active / completed / failed 步态。激活步 `--brand`,完成步 `--ok`并打勾,失败步 `--danger`;该展示组件可直接复用于 #81 导入流程。
+
+「开始导出」与「重试失败步骤」均用 `KitButton`。失败保留页签与已完成步,重试从失败步继续;成功弹唯一 system toast 并自动关闭页签。
 
 **直接保存契约**:调用方只提供数据与默认文件名;KitUI 负责目录选择、真实写盘、取消与环境降级。具体能力与边界见 ADR 0004。
 
-**完成落点**:统一 = **唯一 system 道成功 toast**,文案「已导出到 X 文件夹」。直接保存成功时先 dismiss process loading,不再显示 process success;**无任何动效**(全局水波已废弃)。
+**完成落点**:统一 = **唯一 system 道成功 toast**,文案「已导出到 X 文件夹」。直接保存成功时先 dismiss process loading,不再显示 process success;**无任何动效**。
 
-**失败**:process 道 toast 或页签内原地转 `--danger`,写明失败步,可重试;配置页签失败时**不自动关闭**。
-
-**约束**:配置 UI 全局只此一套(在页签内),任意模块传导出上下文复用;配置页签算 [[页签导航]] 15 上限,成功即自动关闭。
+**约束**:配置 UI 全局只此一套。通用路由、transient context 空态、路径安全、同名序号与普通下载 fallback 的失败语义不在本文复制,统一见 ADR 0004。
 
 **调用签名**:
 
 ```ts
-// 直接保存(无需目录分类)
-await exportFile({ data, defaultName })   // 选择落点 → 写入 → 唯一 system 成功 toast
+const { exportFile, openExportTab } = useKitUI()
 
-// 配置导出(需要目录分类)——打开导出配置页签
-openExportTab({
-  source,                         // 导出上下文(哪个模块/哪批数据)
-  structure?: TwoLevelFolderCfg,  // 两级文件夹结构
-  naming?: NamingRuleCfg,         // 命名规则 + 预览
-}) // 页签内配置→开始→进度→toast 成功→自动关页签
+// 直接保存:requiresDirectoryStructure 缺省为 false
+await exportFile({ data, defaultName })
+
+// 配置导出:由同一 exportFile 入口判定并打开通用页签
+await exportFile({
+  requiresDirectoryStructure: true,
+  source,
+  structure,
+  naming,
+})
+
+// 需显式打开配置页签时的等价别名
+await openExportTab({ source, structure, naming })
 ```
 
 ---

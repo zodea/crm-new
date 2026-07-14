@@ -20,7 +20,10 @@ test('KitUI 单文件导出：选择目录、写入文件且只显示一次成�
       configurable: true,
       value: async () => ({
         name: 'E2E 导出目录',
-        async getFileHandle(name: string) {
+        async getFileHandle(name: string, options?: { create?: boolean }) {
+          // 与生产写盘契约一致：create:false 是防覆盖探测，不存在时抛 NotFoundError。
+          if (!options?.create)
+            throw Object.assign(new Error('文件不存在'), { name: 'NotFoundError' })
           const record: ExportWriteRecord = { name, bytes: [], closed: false }
           testWindow.__exportTestWrites.push(record)
           return {
