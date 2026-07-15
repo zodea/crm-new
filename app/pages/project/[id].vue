@@ -72,7 +72,14 @@ function fmtMoney(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-onMounted(() => store.load())
+// 首次加载完成标记：区分「加载中」与「加载完成但项目不存在/已软删」两态，
+// 避免深链直达时在 load 前一闪「不存在」；软删后（列表页删除经共享 store 联动）此页
+// project 变 undefined 且 ready=true，落到不存在态而非永远「加载中」。
+const ready = shallowRef(false)
+onMounted(async () => {
+  await store.load()
+  ready.value = true
+})
 </script>
 
 <template>
@@ -83,13 +90,25 @@ onMounted(() => store.load())
         <NuxtLink to="/project" class="icon-btn" title="返回列表">
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
-        <h2 class="text-17px font-800 text-ink">
-          {{ project.name }}
-        </h2>
-        <span class="text-13px text-ink-faint">项目信息</span>
-        <span class="chip" :class="[statusChip(project.status)]">
-          {{ project.status }}
+        <span
+          class="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-brand-soft text-20px text-brand font-800"
+          aria-hidden="true"
+        >
+          {{ project.name.slice(0, 1) }}
         </span>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2.5">
+            <h2 class="truncate text-17px text-ink font-800">
+              {{ project.name }}
+            </h2>
+            <span class="chip flex-none" :class="[statusChip(project.status)]">
+              {{ project.status }}
+            </span>
+          </div>
+          <div class="mt-0.5 truncate text-12px text-ink-soft">
+            {{ project.contractName || '—' }} · {{ project.region || '—' }}
+          </div>
+        </div>
         <div class="flex-1" />
         <button class="btn-secondary" @click="showEdit = true">
           <span class="i-lucide-square-pen text-13px mr-1" /> 编辑
@@ -202,7 +221,21 @@ onMounted(() => store.load())
     <ProjectFormDialog v-model:open="showEdit" :project="project" />
   </div>
 
-  <div v-else class="py-12 text-center text-ink-faint">
+  <div v-else-if="!ready || store.loading" class="py-12 text-center text-ink-faint">
     加载中...
+  </div>
+
+  <!-- 加载完成但项目不存在或已被软删除：给出明确空态与返回入口，而非永远「加载中」 -->
+  <div v-else class="flex flex-col items-center gap-3 py-16 text-center">
+    <span class="i-lucide-file-x h-8 w-8 text-ink-faint" aria-hidden="true" />
+    <p class="text-14px text-ink font-700">
+      项目不存在或已被删除
+    </p>
+    <p class="text-12px text-ink-faint">
+      该项目可能已在别处被删除，可返回列表查看。
+    </p>
+    <NuxtLink to="/project" class="btn-secondary mt-1">
+      <span class="i-lucide-arrow-left text-13px mr-1" /> 返回项目列表
+    </NuxtLink>
   </div>
 </template>
