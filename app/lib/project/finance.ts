@@ -5,10 +5,15 @@ import type { Project } from '~/stores/project'
 // 落地后只需替换本函数体，列表列与格式化无需改（单一取值口径，避免列表内联占位逻辑漂移）。
 
 export interface ProjectFinanceSummary {
-  /** 累计收入（元）：Σ 收款登记.收款金额——聚合待 #65，当前占位 0。 */
+  /** 累计收入（元）：Σ 收款登记.收款金额。 */
   income: number
-  /** 预算总额（元）：当前用合同金额（万元→元）占位，子表成本聚合待 #65 接入。 */
+  /** 预算总额（元）：成本预算表未建前，采用主合同额。 */
   budget: number
+}
+
+export interface ProjectFinanceAggregate {
+  income: number
+  mainContractAmount: number
 }
 
 /** 合同金额以万元存储（seed 与「合同金额（万元）」列口径），金额列换算为元展示。 */
@@ -16,9 +21,10 @@ const YUAN_PER_WAN = 10000
 
 export function summarizeProjectFinance(
   project: Pick<Project, 'contractAmount'>,
+  aggregate?: ProjectFinanceAggregate,
 ): ProjectFinanceSummary {
   return {
-    income: 0,
-    budget: (project.contractAmount ?? 0) * YUAN_PER_WAN,
+    income: aggregate?.income ?? 0,
+    budget: aggregate?.mainContractAmount ?? (project.contractAmount ?? 0) * YUAN_PER_WAN,
   }
 }
