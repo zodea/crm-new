@@ -32,5 +32,11 @@ test('项目详情票据面板：归档新票后金额、税额与张数实时�
   await expect(invoicePanel.getByText('1 张归档票')).toBeVisible()
   await expect(invoicePanel.getByText('¥40,000.88')).toBeVisible()
   await expect(invoicePanel.getByText('¥5,199.12')).toBeVisible()
+
+  // 票税管理的收票登记与同一台账查询口径一致：归档后无需刷新即可出现该票。
+  await page.getByRole('button', { name: '票税管理', exact: true }).click()
+  const receivedInvoices = page.getByRole('region', { name: '收票登记' })
+  await expect(receivedInvoices.getByText('09442026000058761', { exact: true })).toBeVisible()
+  await expect(receivedInvoices.getByText('¥45,200.00', { exact: true })).toBeVisible()
   expect(pageErrors, '归档联动旅程不应产生客户端运行错误').toEqual([])
 })
