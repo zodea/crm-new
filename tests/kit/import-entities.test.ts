@@ -11,6 +11,18 @@ describe('导入实体注册表', () => {
     expect(entity?.fields).toContainEqual(EXTERNAL_REF_FIELD)
   })
 
+  it('项目实体已登记：项目名称必填、含外部旧ID 对账列', () => {
+    const entity = getImportEntity('project')
+
+    expect(entity?.label).toBe('施工项目')
+    const nameField = entity?.fields.find(f => f.key === 'name')
+    expect(nameField?.required).toBe(true)
+    expect(entity?.fields).toContainEqual(EXTERNAL_REF_FIELD)
+    // 字段 key 与 Project 字段同名，保证映射行可直接入库
+    expect(entity?.fields.map(f => f.key)).toContain('execManager')
+    expect(entity?.fields.map(f => f.key)).toContain('builder')
+  })
+
   it('未登记的实体返回 undefined', () => {
     expect(getImportEntity('unknown-entity')).toBeUndefined()
   })

@@ -7,6 +7,18 @@ export const PROJECT_STATUSES = ['筹备中', '施工中', '停工', '已竣工'
 
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number]
 
+/**
+ * 状态归一：合法枚举值原样保留，空值/未知值（如外部导入带的旧枚举「在建」「完工」）回落
+ * schema 默认「筹备中」——挡住任意文本经导入写进非法阶段（否则列表 chip 落 muted 兜底、
+ * 阶段筛选也筛不出）。这里只做「合法即留、非法回落」，不做同义词映射（阶段枚举定稿归 #66）。
+ */
+export function normalizeProjectStatus(raw: unknown): ProjectStatus {
+  const value = String(raw ?? '')
+  return (PROJECT_STATUSES as readonly string[]).includes(value)
+    ? (value as ProjectStatus)
+    : '筹备中'
+}
+
 /** 状态语义色调（与具体 class 解耦） */
 export type StatusTone = 'warn' | 'brand' | 'muted' | 'ok'
 
