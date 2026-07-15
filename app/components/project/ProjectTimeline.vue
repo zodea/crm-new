@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import type { PhaseCardStatus } from '~/lib/project/phases'
 import type { PhaseTask } from '~/stores/phase-task'
-import { derivePhaseViews } from '~/lib/project/phases'
+import { createDefaultPhaseTasks, derivePhaseViews } from '~/lib/project/phases'
 
 const props = defineProps<{
   projectId: string
 }>()
 
 const store = usePhaseTaskStore()
-const { info, success, error } = useKitUI()
+const { info, undoToast, error } = useKitUI()
 const showEditor = shallowRef(false)
 const openPhase = shallowRef<number | null>(null)
 
-const tasks = computed(() => store.byProject(props.projectId))
+const tasks = computed(() => {
+  const persisted = store.byProject(props.projectId)
+  return persisted.length ? persisted : createDefaultPhaseTasks(props.projectId)
+})
 const phaseViews = computed(() => derivePhaseViews(tasks.value))
 const activePhaseView = computed(() =>
   openPhase.value == null ? undefined : phaseViews.value[openPhase.value],
@@ -49,9 +52,9 @@ function togglePhase(index: number) {
 
 async function saveTasks(next: PhaseTask[]) {
   try {
-    await store.saveProject(props.projectId, next)
+    const logIds = await store.saveProject(props.projectId, next)
     showEditor.value = false
-    success('阶段任务已更新')
+    undoToast('阶段任务已更新', () => store.undoSave(logIds))
   }
   catch {
     error('阶段任务保存失败，请重试')
@@ -62,7 +65,7 @@ function attachmentPlaceholder(action: '上传' | '查看', title: string) {
   info(`${action}「${title}」附件将在文件管理工序接入`)
 }
 
-onMounted(() => store.ensureProject(props.projectId))
+onMounted(() => store.load())
 </script>
 
 <template>

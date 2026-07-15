@@ -1,11 +1,13 @@
 import type { ArchiveCheckResult } from '~/lib/invoice/archive'
 import type { InvoiceItem } from '~/lib/invoice/recognize'
+import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
+import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
 import { formatFileSize } from '~/lib/util/file'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
@@ -138,6 +140,7 @@ export type ArchiveResult = ArchiveCheckResult
 
 export const useInvoiceStore = defineStore('invoice', () => {
   const list = shallowRef<Invoice[]>([])
+  const archivedAggregateRows = shallowRef<ArchivedInvoiceAggregate[]>([])
   const loading = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
@@ -145,10 +148,14 @@ export const useInvoiceStore = defineStore('invoice', () => {
   async function load() {
     loading.value = true
     try {
-      const rows = await select<Record<string, unknown>>(
-        selectVisibleSql('invoices', 'ORDER BY created_at DESC'),
-      )
+      const [rows, aggregates] = await Promise.all([
+        select<Record<string, unknown>>(
+          selectVisibleSql('invoices', 'ORDER BY created_at DESC'),
+        ),
+        loadArchivedInvoiceAggregates(db),
+      ])
       list.value = rows.map(rowToInvoice)
+      archivedAggregateRows.value = aggregates
     }
     finally {
       loading.value = false
@@ -175,6 +182,10 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const ledger = computed(() =>
     list.value.filter(inv => inv.accountStatus === 'archived'),
   )
+
+  const archivedInvoiceSummaries = computed<Record<string, ArchivedInvoiceAggregate>>(() => Object.fromEntries(
+    archivedAggregateRows.value.map(row => [row.projectId, row]),
+  ))
 
   /** 台账三分组（归属铁律，issue #57 验收③）：按 项目 / 个人开支 / 未归 分组计数；「未归」= 已校对(reviewStatus='reviewed')但尚未归档(accountStatus 仍为 'none')的过渡态。 */
   const ledgerGroups = computed(() => {
@@ -451,5 +462,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
 })

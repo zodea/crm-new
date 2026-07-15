@@ -1,6 +1,9 @@
+import type { ProjectDetailAggregate } from '~/lib/project/detail-aggregate'
+import type { ProjectOperationSummary } from '~/lib/project/detail-summary'
+import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
-import { calculateProjectOperationSummary } from '~/lib/project/detail-summary'
+import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 
 export interface ConstructionContractRow {
   id: string
@@ -103,15 +106,23 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const paymentApplications = shallowRef<PaymentApplicationRow[]>([])
   const currentReceipts = shallowRef<CurrentReceiptRow[]>([])
   const currentPayments = shallowRef<CurrentPaymentRow[]>([])
+  const aggregateRows = shallowRef<ProjectDetailAggregate[]>([])
   const loading = shallowRef(false)
   const loaded = shallowRef(false)
+
+  const operationSummaries = computed<Record<string, ProjectOperationSummary>>(() => Object.fromEntries(
+    aggregateRows.value.map(({ projectId, outputAmount: _, outputTax: __, ...summary }) => [projectId, summary]),
+  ))
+  const invoiceOutputSummaries = computed<Record<string, { outputAmount: number, outputTax: number }>>(() => Object.fromEntries(
+    aggregateRows.value.map(row => [row.projectId, { outputAmount: row.outputAmount, outputTax: row.outputTax }]),
+  ))
 
   async function load(force = false) {
     if (loaded.value && !force)
       return
     loading.value = true
     try {
-      const [contracts, supplements, changes, outgoing, receipts, payments, currentIn, currentOut] = await Promise.all([
+      const [contracts, supplements, changes, outgoing, receipts, payments, currentIn, currentOut, aggregates] = await Promise.all([
         select<Record<string, unknown>>(selectVisibleSql('construction_contracts', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('supplement_agreements', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('owner_change_orders', 'ORDER BY created_at DESC')),
@@ -120,6 +131,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         select<Record<string, unknown>>(selectVisibleSql('payment_applications', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('current_receipts', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('current_payments', 'ORDER BY created_at DESC')),
+        loadProjectDetailAggregates(db),
       ])
 
       constructionContracts.value = contracts.map(row => ({
@@ -202,26 +214,12 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         amount: number(row.amount),
         paymentMethod: (row.payment_method ?? '') as string,
       }))
+      aggregateRows.value = aggregates
       loaded.value = true
     }
     finally {
       loading.value = false
     }
-  }
-
-  function operationSummary(projectId: string) {
-    return calculateProjectOperationSummary({
-      projectId,
-      constructionContracts: constructionContracts.value,
-      supplementAgreements: supplementAgreements.value,
-      ownerChangeOrders: ownerChangeOrders.value,
-      receiptRegistrations: receiptRegistrations.value,
-      paymentApplications: paymentApplications.value,
-      currentReceipts: currentReceipts.value,
-      currentPayments: currentPayments.value,
-      // 管理费配置实体尚未建设；按 issue #65 约定显式展示 seed 静态值并标注。
-      managementFee: 0,
-    })
   }
 
   return {
@@ -233,8 +231,9 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     paymentApplications: readonly(paymentApplications),
     currentReceipts: readonly(currentReceipts),
     currentPayments: readonly(currentPayments),
+    operationSummaries,
+    invoiceOutputSummaries,
     loading: readonly(loading),
     load,
-    operationSummary,
   }
 })

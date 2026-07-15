@@ -14,7 +14,7 @@ test('项目六阶段：编辑任务后持久化并实时更新阶段卡进度',
 
   await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '编辑阶段任务 · 全部六阶段' })
-  const taskCard = dialog.locator('[data-phase-task-id="phase_demo_004"]')
+  const taskCard = dialog.locator('[data-phase-task-id="phase_mz0x1_3"]')
   const titleInput = taskCard.locator('input').first()
   await expect(titleInput).toHaveValue('材料定样板')
   await titleInput.fill('材料定样板（已核）')
@@ -27,7 +27,7 @@ test('项目六阶段：编辑任务后持久化并实时更新阶段卡进度',
   // 重新打开编辑器，确认 action 重载后的 DB 值回填，而非只改了组件局部草稿。
   await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()
   await expect(page.getByRole('dialog', { name: '编辑阶段任务 · 全部六阶段' })
-    .locator('[data-phase-task-id="phase_demo_004"] input').first()).toHaveValue('材料定样板（已核）')
+    .locator('[data-phase-task-id="phase_mz0x1_3"] input').first()).toHaveValue('材料定样板（已核）')
 
   expect(pageErrors, '阶段编辑旅程不应产生客户端运行错误').toEqual([])
 })
