@@ -1,0 +1,17 @@
+[
+  { "id": "phase_demo_001", "project_id": "proj_demo_001", "phase_index": 0, "task_index": 0, "title": "项目立项审批表", "description": "立项文件归档", "responsible": "经营部", "status": "confirmed", "created_at": "2026-01-05T09:00:00.000Z" },
+  { "id": "phase_demo_002", "project_id": "proj_demo_001", "phase_index": 1, "task_index": 0, "title": "施工组织设计方案", "description": "资料员扫描上传并存档", "responsible": "资料员", "status": "uploaded", "created_at": "2026-02-11T09:00:00.000Z" },
+  { "id": "phase_demo_003", "project_id": "proj_demo_001", "phase_index": 1, "task_index": 1, "title": "开工报告及开工令", "description": "资料员扫描上传并存档", "responsible": "资料员", "status": "uploaded", "created_at": "2026-02-11T09:01:00.000Z" },
+  { "id": "phase_demo_004", "project_id": "proj_demo_001", "phase_index": 1, "task_index": 2, "title": "材料定样板", "description": "资料员照片上传，封样件存档", "responsible": "资料员", "status": "pending", "created_at": "2026-02-11T09:02:00.000Z" },
+  { "id": "phase_demo_005", "project_id": "proj_demo_001", "phase_index": 1, "task_index": 3, "title": "图纸会审记录", "description": "设计师扫描上传并原件存档", "responsible": "设计师", "status": "pending", "created_at": "2026-02-11T09:03:00.000Z" },
+  { "id": "phase_demo_006", "project_id": "proj_demo_001", "phase_index": 1, "task_index": 4, "title": "施工蓝图", "description": "设计师勾选不上传但原蓝图存档", "responsible": "设计师", "status": "pending", "created_at": "2026-02-11T09:04:00.000Z" },
+  { "id": "phase_demo_007", "project_id": "proj_demo_001", "phase_index": 2, "task_index": 0, "title": "排版图签确白图", "description": "现场签认后上传", "responsible": "项目经理", "status": "pending", "created_at": "2026-05-01T09:00:00.000Z" },
+  { "id": "phase_demo_008", "project_id": "proj_demo_001", "phase_index": 2, "task_index": 1, "title": "隐蔽验收记录", "description": "监理签认后存档", "responsible": "质检员", "status": "pending", "created_at": "2026-05-01T09:01:00.000Z" },
+  { "id": "phase_demo_009", "project_id": "proj_demo_001", "phase_index": 2, "task_index": 2, "title": "送检报告验收记录", "description": "检测单位出具", "responsible": "质检员", "status": "pending", "created_at": "2026-05-01T09:02:00.000Z" },
+  { "id": "phase_demo_010", "project_id": "proj_demo_001", "phase_index": 3, "task_index": 0, "title": "竣工验收报告/移交", "description": "五方验收并移交", "responsible": "项目经理", "status": "pending", "created_at": "2026-11-01T09:00:00.000Z" },
+  { "id": "phase_demo_011", "project_id": "proj_demo_001", "phase_index": 4, "task_index": 0, "title": "工期一览表", "description": "归档", "responsible": "资料员", "status": "pending", "created_at": "2026-12-01T09:00:00.000Z" },
+  { "id": "phase_demo_012", "project_id": "proj_demo_001", "phase_index": 4, "task_index": 1, "title": "工期延期说明工联单", "description": "如有延期", "responsible": "项目经理", "status": "pending", "created_at": "2026-12-01T09:01:00.000Z" },
+  { "id": "phase_demo_013", "project_id": "proj_demo_001", "phase_index": 4, "task_index": 2, "title": "范围界面确认文件", "description": "甲乙双方确认", "responsible": "经营部", "status": "pending", "created_at": "2026-12-01T09:02:00.000Z" },
+  { "id": "phase_demo_014", "project_id": "proj_demo_001", "phase_index": 4, "task_index": 3, "title": "无甩项确认工联单", "description": "现场确认", "responsible": "项目经理", "status": "pending", "created_at": "2026-12-01T09:03:00.000Z" },
+  { "id": "phase_demo_015", "project_id": "proj_demo_001", "phase_index": 4, "task_index": 4, "title": "结算封板图", "description": "结算用图归档", "responsible": "预算员", "status": "pending", "created_at": "2026-12-01T09:04:00.000Z" }
+]

@@ -1,161 +1,160 @@
 <script setup lang="ts">
-interface PhaseTask {
-  title: string
-  description: string
-  responsible: string
-  status: 'pending' | 'uploaded' | 'confirmed'
-}
+import type { PhaseCardStatus } from '~/lib/project/phases'
+import type { PhaseTask } from '~/stores/phase-task'
+import { derivePhaseViews } from '~/lib/project/phases'
 
-interface Phase {
-  name: string
-  tasks: PhaseTask[]
-}
+const props = defineProps<{
+  projectId: string
+}>()
 
-const phases: Phase[] = [
-  {
-    name: '项目立项',
-    tasks: [
-      { title: '项目立项审批文件', description: '项目经理提交并存档', responsible: '项目经理', status: 'confirmed' },
-    ],
-  },
-  {
-    name: '施工准备',
-    tasks: [
-      { title: '施工组织设计方案', description: '资料员扫描上传并存档', responsible: '资料员', status: 'uploaded' },
-      { title: '开工报告及开工令', description: '资料员扫描上传并存档', responsible: '资料员', status: 'uploaded' },
-      { title: '材料定样板', description: '资料员照片上传，封样件存档', responsible: '资料员', status: 'pending' },
-      { title: '图纸会审记录', description: '设计师扫描上传并原件存档', responsible: '设计师', status: 'pending' },
-      { title: '施工蓝图', description: '设计师勾选不上传但原蓝图存档', responsible: '设计师', status: 'pending' },
-    ],
-  },
-  {
-    name: '施工中',
-    tasks: [
-      { title: '排版图签确白图', description: '设计师上传', responsible: '设计师', status: 'pending' },
-      { title: '隐蔽验收记录', description: '资料员扫描上传', responsible: '资料员', status: 'pending' },
-      { title: '送检报告验收记录', description: '资料员扫描上传', responsible: '资料员', status: 'pending' },
-    ],
-  },
-  {
-    name: '完工及验收',
-    tasks: [
-      { title: '竣工验收报告/移交', description: '项目经理提交', responsible: '项目经理', status: 'pending' },
-    ],
-  },
-  {
-    name: '交付',
-    tasks: [
-      { title: '工期一览表', description: '资料员编制', responsible: '资料员', status: 'pending' },
-      { title: '工期延期说明工联单', description: '项目经理起草', responsible: '项目经理', status: 'pending' },
-      { title: '范围界面确认文件', description: '甲方签章', responsible: '项目经理', status: 'pending' },
-      { title: '无甩项确认工联单', description: '甲方签章', responsible: '项目经理', status: 'pending' },
-      { title: '结算封板图', description: '设计师出图', responsible: '设计师', status: 'pending' },
-    ],
-  },
-  {
-    name: '保修',
-    tasks: [],
-  },
-]
+const store = usePhaseTaskStore()
+const { info, success, error } = useKitUI()
+const showEditor = shallowRef(false)
+const openPhase = shallowRef<number | null>(null)
 
-const expandedPhases = ref<Set<number>>(new Set([1]))
-
-function togglePhase(idx: number) {
-  if (expandedPhases.value.has(idx))
-    expandedPhases.value.delete(idx)
-  else
-    expandedPhases.value.add(idx)
-}
-
-function phaseStatus(phase: Phase): 'done' | 'active' | 'pending' {
-  if (phase.tasks.length === 0)
-    return 'pending'
-  const allDone = phase.tasks.every(t => t.status === 'confirmed' || t.status === 'uploaded')
-  if (allDone)
-    return 'done'
-  const hasAny = phase.tasks.some(t => t.status === 'confirmed' || t.status === 'uploaded')
-  if (hasAny)
-    return 'active'
-  return 'pending'
-}
-
-function phaseProgress(phase: Phase): string {
-  if (phase.tasks.length === 0)
-    return ''
-  const done = phase.tasks.filter(t => t.status !== 'pending').length
-  return `${done}/${phase.tasks.length}`
-}
-
-// 预派生每个阶段的状态/进度，避免模板对同一 phase 反复调 phaseStatus/phaseProgress
-const phaseViews = computed(() =>
-  phases.map((phase, idx) => ({
-    phase,
-    idx,
-    status: phaseStatus(phase),
-    progress: phaseProgress(phase),
-  })),
+const tasks = computed(() => store.byProject(props.projectId))
+const phaseViews = computed(() => derivePhaseViews(tasks.value))
+const activePhaseView = computed(() =>
+  openPhase.value == null ? undefined : phaseViews.value[openPhase.value],
 )
 
-const TASK_STATUS: Record<string, { label: string, cls: string }> = {
-  pending: { label: '待上传', cls: 'text-ink-faint' },
-  uploaded: { label: '已上传', cls: 'text-brand font-600' },
-  confirmed: { label: '已确认', cls: 'text-ok font-600' },
+const STATUS_VIEW: Record<PhaseCardStatus, { icon: string, card: string, text: string }> = {
+  done: {
+    icon: 'i-lucide-circle-check',
+    card: 'border-ok bg-ok-soft',
+    text: 'text-ok-ink',
+  },
+  active: {
+    icon: 'i-lucide-loader-circle',
+    card: 'border-brand bg-brand-soft',
+    text: 'text-brand-deep',
+  },
+  pending: {
+    icon: 'i-lucide-clock-3',
+    card: 'border-line-strong bg-panel',
+    text: 'text-ink-faint',
+  },
 }
+
+watch(phaseViews, (views) => {
+  if (openPhase.value != null)
+    return
+  const active = views.find(view => view.status === 'active')
+  openPhase.value = active?.index ?? 0
+}, { immediate: true })
+
+function togglePhase(index: number) {
+  openPhase.value = openPhase.value === index ? null : index
+}
+
+async function saveTasks(next: PhaseTask[]) {
+  try {
+    await store.saveProject(props.projectId, next)
+    showEditor.value = false
+    success('阶段任务已更新')
+  }
+  catch {
+    error('阶段任务保存失败，请重试')
+  }
+}
+
+function attachmentPlaceholder(action: '上传' | '查看', title: string) {
+  info(`${action}「${title}」附件将在文件管理工序接入`)
+}
+
+onMounted(() => store.ensureProject(props.projectId))
 </script>
 
 <template>
-  <div class="border border-line bg-panel p-4 mb-4">
-    <!-- 时间线节点 -->
-    <div class="flex items-center gap-1 mb-4 overflow-x-auto">
-      <template v-for="pv in phaseViews" :key="pv.idx">
-        <button
-          class="flex items-center gap-1 px-2.5 py-1.5 rounded-[var(--radius-btn)] text-13px font-600 whitespace-nowrap cursor-pointer transition-colors"
-          :class="{
-            'bg-ok/10 text-ok': pv.status === 'done',
-            'bg-brand-soft text-brand-deep': pv.status === 'active',
-            'bg-surface-3 text-ink-faint': pv.status === 'pending',
-          }"
-          @click="togglePhase(pv.idx)"
-        >
-          <span v-if="pv.status === 'done'" class="i-lucide-circle-check text-13px" />
-          <span v-else-if="pv.status === 'active'" class="i-lucide-circle-dot text-13px" />
-          <span v-else class="i-lucide-circle text-13px" />
-          {{ pv.phase.name }}
-          <span v-if="pv.progress" class="text-10px opacity-70">({{ pv.progress }})</span>
-        </button>
-        <span v-if="pv.idx < phases.length - 1" class="text-line">→</span>
+  <section class="mb-4" aria-labelledby="project-phase-title">
+    <SectionHeader>
+      <span id="project-phase-title">阶段时间线 · 任务文件</span>
+      <template #extra>
+        <div class="flex items-center gap-2.5">
+          <span class="text-11px text-ink-faint">点阶段卡展开任务</span>
+          <button class="btn-secondary text-12px" @click="showEditor = true">
+            <span class="i-lucide-square-pen mr-1 text-12px" aria-hidden="true" />编辑阶段
+          </button>
+        </div>
       </template>
+    </SectionHeader>
+
+    <div class="overflow-x-auto pb-1">
+      <div class="grid min-w-[780px] grid-cols-6 gap-2">
+        <button
+          v-for="view in phaseViews"
+          :key="view.name"
+          class="min-w-0 rounded-[var(--radius-btn)] border-2 px-3 py-2.5 text-left transition-shadow"
+          :class="[
+            STATUS_VIEW[view.status].card,
+            openPhase === view.index ? 'shadow-[0_0_0_3px_var(--brand-ring)]' : '',
+          ]"
+          @click="togglePhase(view.index)"
+        >
+          <div class="flex min-w-0 items-center gap-1.5" :class="STATUS_VIEW[view.status].text">
+            <span :class="STATUS_VIEW[view.status].icon" class="h-3.5 w-3.5 flex-none" aria-hidden="true" />
+            <span class="truncate text-12px font-800">{{ view.name }}</span>
+          </div>
+          <div class="mt-2 font-mono text-17px font-800" :class="STATUS_VIEW[view.status].text">
+            {{ view.total ? `${view.done}/${view.total}` : '动态' }}
+            <span class="ml-1 text-10px font-600 text-ink-faint">任务</span>
+          </div>
+        </button>
+      </div>
     </div>
 
-    <!-- 展开的阶段任务 -->
-    <template v-for="(phase, idx) in phases" :key="`tasks-${idx}`">
-      <div v-if="expandedPhases.has(idx) && phase.tasks.length > 0" class="mb-3">
-        <h4 class="text-12px font-700 text-ink mb-2">
-          ▾ {{ phase.name }}阶段
-        </h4>
-        <div class="space-y-1.5">
+    <div v-if="activePhaseView" class="mt-3 border-t border-line pt-3">
+      <template v-if="activePhaseView">
+        <div class="mb-2 flex items-center gap-2">
+          <h4 class="text-13px font-700 text-ink">
+            {{ activePhaseView.name }} · 阶段任务
+          </h4>
+          <span v-if="activePhaseView.total" class="ml-auto text-11px font-mono text-ink-faint">
+            已完成 {{ activePhaseView.done }}/{{ activePhaseView.total }}
+          </span>
+        </div>
+
+        <div v-if="activePhaseView.tasks.length" class="space-y-1.5">
           <div
-            v-for="(task, ti) in phase.tasks"
-            :key="ti"
-            class="flex items-center gap-3 px-3 py-2 border border-line"
+            v-for="(task, index) in activePhaseView.tasks"
+            :key="task.id"
+            class="flex items-center gap-3 rounded-[var(--radius-sm)] border border-line px-3 py-2"
+            :class="task.status === 'pending' ? 'bg-surface-2' : 'bg-ok-soft'"
           >
-            <span class="text-11px text-ink-faint font-mono w-5">{{ ti + 1 }}.</span>
-            <div class="flex-1 min-w-0">
-              <span class="text-12px font-600">{{ task.title }}</span>
-              <span class="text-11px text-ink-faint ml-2">{{ task.description }}</span>
-            </div>
-            <span class="text-11px" :class="TASK_STATUS[task.status]?.cls || ''">
-              {{ TASK_STATUS[task.status]?.label || task.status }}
+            <span
+              class="grid h-6 w-6 flex-none place-items-center rounded-[var(--radius-sm)] text-11px font-700"
+              :class="task.status === 'pending' ? 'bg-surface-3 text-ink-soft' : 'bg-ok text-white'"
+            >
+              {{ task.status === 'pending' ? index + 1 : '✓' }}
             </span>
-            <button class="icon-btn" title="上传">
-              <span class="i-lucide-upload text-13px" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-12px font-700 text-ink">
+                {{ task.title }}
+              </div>
+              <div class="truncate text-11px text-ink-soft">
+                {{ task.description || '—' }}
+              </div>
+            </div>
+            <span class="chip bg-panel text-ink-soft">{{ task.responsible || '待指定' }}</span>
+            <button class="btn-secondary text-11px" @click="attachmentPlaceholder('上传', task.title)">
+              <span class="i-lucide-upload mr-1 text-11px" aria-hidden="true" />上传
             </button>
-            <button class="icon-btn" title="查看">
-              <span class="i-lucide-eye text-13px" />
+            <button class="btn-secondary text-11px" @click="attachmentPlaceholder('查看', task.title)">
+              <span class="i-lucide-eye mr-1 text-11px" aria-hidden="true" />查看
             </button>
           </div>
         </div>
-      </div>
-    </template>
-  </div>
+        <div v-else class="rounded-[var(--radius-btn)] border border-dashed border-line-strong bg-surface-2 px-4 py-6 text-center text-12px text-ink-faint">
+          该阶段任务动态生成，暂无固定任务。
+        </div>
+      </template>
+    </div>
+
+    <ProjectPhaseEditor
+      v-model:open="showEditor"
+      :project-id="projectId"
+      :tasks="tasks"
+      @save="saveTasks"
+    />
+  </section>
 </template>

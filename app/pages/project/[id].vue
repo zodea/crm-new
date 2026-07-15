@@ -119,7 +119,7 @@ onMounted(async () => {
     <ProjectMetrics :project-id="projectId" />
 
     <!-- 阶段时间线 -->
-    <ProjectTimeline />
+    <ProjectTimeline :project-id="projectId" />
 
     <!-- Tab 栏 -->
     <div class="flex border-b border-line mb-4 overflow-x-auto">

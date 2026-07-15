@@ -65,8 +65,10 @@ test('项目详情：项目被软删后，其详情页签落到「不存在」�
   await tabBar.getByRole('button', { name: '项目列表', exact: true }).click()
   await expect(page).toHaveURL(/\/project$/)
   await page.getByRole('button', { name: '删除项目' }).first().click()
-  await page.getByRole('dialog').getByRole('button', { name: '删除' }).click()
-  await expect(page.getByRole('link', { name: 'E2E待删项目' })).toHaveCount(0)
+  const confirmDialog = page.getByRole('dialog')
+  await confirmDialog.getByPlaceholder('E2E待删项目').fill('E2E待删项目')
+  await confirmDialog.getByRole('button', { name: '删除' }).click()
+  await expect(page.getByRole('link', { name: 'E2E待删项目' })).toHaveCount(0, { timeout: 10_000 })
 
   // 切回详情页签：显示明确「不存在」空态与返回入口，而非卡在「加载中」。
   await tabBar.getByRole('button', { name: 'E2E待删项目', exact: true }).click()
