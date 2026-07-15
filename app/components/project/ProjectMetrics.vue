@@ -18,16 +18,14 @@ const operation = computed(() => detailStore.operationSummaries[props.projectId]
   managementFee: 0,
   availableBalance: 0,
 })
-const invoice = computed(() => {
-  const output = detailStore.invoiceOutputSummaries[props.projectId] ?? { outputAmount: 0, outputTax: 0 }
-  const input = invoiceStore.archivedInvoiceSummaries[props.projectId] ?? { inputAmount: 0, inputTax: 0, archivedCount: 0 }
-  const vat = output.outputTax - input.inputTax
-  return {
-    ...output,
-    ...input,
-    vat,
-    taxBurdenRate: output.outputAmount === 0 ? 0 : vat / output.outputAmount,
-  }
+const invoice = computed(() => detailStore.invoiceSummaries[props.projectId] ?? {
+  outputAmount: 0,
+  outputTax: 0,
+  inputAmount: 0,
+  inputTax: 0,
+  vat: 0,
+  taxBurdenRate: 0,
+  archivedCount: 0,
 })
 
 const taxBurdenRate = computed(() => new Intl.NumberFormat('zh-CN', {
