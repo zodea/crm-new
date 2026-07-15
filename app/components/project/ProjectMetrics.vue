@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { calculateProjectInvoiceSummary } from '~/lib/project/detail-summary'
-
 const props = defineProps<{
   projectId: string
 }>()
@@ -8,17 +6,29 @@ const props = defineProps<{
 const detailStore = useProjectDetailStore()
 const invoiceStore = useInvoiceStore()
 
-const operation = computed(() => detailStore.operationSummary(props.projectId))
-const invoice = computed(() => calculateProjectInvoiceSummary({
-  projectId: props.projectId,
-  invoiceApplications: detailStore.invoiceApplications,
-  invoices: invoiceStore.list.map(row => ({
-    projectId: row.projectId ?? '',
-    amount: row.amount,
-    taxAmount: row.taxAmount,
-    accountStatus: row.accountStatus,
-  })),
-}))
+const operation = computed(() => detailStore.operationSummaries[props.projectId] ?? {
+  mainContractAmount: 0,
+  supplementAmount: 0,
+  ownerChangeAmount: 0,
+  changedContractAmount: 0,
+  projectReceipt: 0,
+  paymentAmount: 0,
+  currentReceipt: 0,
+  currentPayment: 0,
+  managementFee: 0,
+  availableBalance: 0,
+})
+const invoice = computed(() => {
+  const output = detailStore.invoiceOutputSummaries[props.projectId] ?? { outputAmount: 0, outputTax: 0 }
+  const input = invoiceStore.archivedInvoiceSummaries[props.projectId] ?? { inputAmount: 0, inputTax: 0, archivedCount: 0 }
+  const vat = output.outputTax - input.inputTax
+  return {
+    ...output,
+    ...input,
+    vat,
+    taxBurdenRate: output.outputAmount === 0 ? 0 : vat / output.outputAmount,
+  }
+})
 
 const taxBurdenRate = computed(() => new Intl.NumberFormat('zh-CN', {
   style: 'percent',

@@ -49,13 +49,15 @@ const pageRows = computed(() => paginate(filtered.value, currentPage.value, page
 // 金额列（累计收入/预算总额）不是 Project 存储字段（口径见 lib/project/finance，#65 聚合），
 // 表格数据行按页切片后就地补上，Project 类型保持纯净。
 const tableRows = computed(() => pageRows.value.map((project) => {
-  const summary = detailStore.operationSummary(project.id)
+  const summary = detailStore.operationSummaries[project.id]
   return {
     ...project,
-    ...summarizeProjectFinance(project, {
-      income: summary.projectReceipt,
-      mainContractAmount: summary.mainContractAmount,
-    }),
+    ...summarizeProjectFinance(project, summary
+      ? {
+          income: summary.projectReceipt,
+          mainContractAmount: summary.mainContractAmount,
+        }
+      : undefined),
   }
 }))
 

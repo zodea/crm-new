@@ -2,6 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
+import { createDefaultPhaseTasks } from '~/lib/project/phases'
 import { usePhaseTaskStore } from '~/stores/phase-task'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -20,16 +21,18 @@ beforeEach(async () => {
 })
 
 describe('phase task store:阶段任务唯一写路径', () => {
-  it('ensureProject:无任务项目按六阶段默认清单落 phase_tasks', async () => {
+  it('load:浏览无任务项目只读，不因打开详情自动写库', async () => {
     const store = usePhaseTaskStore()
-    await store.ensureProject('p1')
-    expect(store.byProject('p1')).toHaveLength(15)
-    expect(store.byProject('p1').filter(task => task.phaseIndex === 1)).toHaveLength(5)
+    await store.load()
+    expect(store.byProject('p1')).toHaveLength(0)
+    const [{ n }] = await mem.select<{ n: number }>('SELECT COUNT(*) AS n FROM operation_logs')
+    expect(n).toBe(0)
   })
 
-  it('saveProject:编辑、新增与移除一次保存持久化，移除走软删除', async () => {
+  it('saveProject:编辑、新增与移除持久化，并可按整次保存撤回', async () => {
     const store = usePhaseTaskStore()
-    await store.ensureProject('p1')
+    await store.load()
+    await store.saveProject('p1', createDefaultPhaseTasks('p1'))
     const initial = store.byProject('p1')
     const removed = initial[1]!
     const next = initial
@@ -48,7 +51,7 @@ describe('phase task store:阶段任务唯一写路径', () => {
       status: 'pending',
     })
 
-    await store.saveProject('p1', next)
+    const logIds = await store.saveProject('p1', next)
     expect(store.byProject('p1')).toHaveLength(15)
     expect(store.byProject('p1')[0]!.title).toBe('已修改立项资料')
     expect(store.byProject('p1').some(task => task.title === '保修回访记录')).toBe(true)
@@ -58,5 +61,11 @@ describe('phase task store:阶段任务唯一写路径', () => {
       [removed.id],
     )
     expect(deleted?.deleted_at).toBeTruthy()
+
+    await store.undoSave(logIds)
+    expect(store.byProject('p1')).toHaveLength(15)
+    expect(store.byProject('p1')[0]!.title).toBe('项目立项审批表')
+    expect(store.byProject('p1').some(task => task.id === removed.id)).toBe(true)
+    expect(store.byProject('p1').some(task => task.title === '保修回访记录')).toBe(false)
   })
 })

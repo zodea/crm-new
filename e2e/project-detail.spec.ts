@@ -66,7 +66,8 @@ test('项目详情：项目被软删后，其详情页签落到「不存在」�
   await expect(page).toHaveURL(/\/project$/)
   await page.getByRole('button', { name: '删除项目' }).first().click()
   const confirmDialog = page.getByRole('dialog')
-  await confirmDialog.getByPlaceholder('E2E待删项目').fill('E2E待删项目')
+  // 仅浏览详情不会自动插入 phase_tasks，因此新项目仍是无下游的 simple 删除确认。
+  await expect(confirmDialog.getByPlaceholder('E2E待删项目')).toHaveCount(0)
   await confirmDialog.getByRole('button', { name: '删除' }).click()
   await expect(page.getByRole('link', { name: 'E2E待删项目' })).toHaveCount(0, { timeout: 10_000 })
 
