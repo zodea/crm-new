@@ -212,6 +212,9 @@ export default defineConfig({
     // 标签
     'field-label': 'text-12px font-600 text-ink-soft mb-1',
 
+    // 表单分组标题（大表单左侧分区锚点对应的分组抬头）
+    'field-group-title': 'text-13px font-800 text-brand-deep mb-3',
+
     // 列组切换（CRM 风格）
     'col-group': 'flex border border-line rounded-[var(--radius-btn)] overflow-hidden bg-panel',
     'col-group-item': 'px-3 py-1 text-12px font-600 text-ink-soft cursor-pointer border-r border-line last:border-r-0',
