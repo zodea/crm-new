@@ -57,3 +57,36 @@ describe('页签缓存失效', () => {
     expect(store.invalidatedKeys).toEqual(['/base/supplier'])
   })
 })
+
+describe('动态标题保持（#98）', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('切走→切回（KeepAlive 缓存组件不重建）：setTitle 回填的记录名不被路由 watcher 的静态标题打回', () => {
+    const store = useTabsStore()
+    // 打开详情页：AppTabBar 路由 watcher 用静态路由标题建签
+    store.open({ fullPath: '/project/1', title: '项目详情' })
+    // 页面 useTabTitle 回填记录名
+    store.setTitle('/project/1', '合和新城')
+    // 切走：KeepAlive 缓存详情页组件
+    store.open({ fullPath: '/base/supplier', title: '分供方' })
+    // 切回：路由 watcher 再次 open 静态标题；组件不重建、无人再 setTitle
+    store.open({ fullPath: '/project/1', title: '项目详情' })
+
+    expect(store.activeKey).toBe('/project/1')
+    expect(store.tabs.find(t => t.key === '/project/1')!.title).toBe('合和新城')
+  })
+
+  it('预占页签：先建签再回填后缀，导航确认后的复用 open 不打回静态名', () => {
+    const store = useTabsStore()
+    // useExportWorkflowTab 在导航前预占页签
+    store.open({ fullPath: '/export/config/exp1', title: '导出配置' })
+    // 页面 setup 的 immediate setTitle 先于路由 watcher 执行
+    store.setTitle('/export/config/exp1', '导出配置 · 分供方采购合同')
+    // 导航确认后 AppTabBar 路由 watcher 复用 open
+    store.open({ fullPath: '/export/config/exp1', title: '导出配置' })
+
+    expect(store.tabs.find(t => t.key === '/export/config/exp1')!.title).toBe('导出配置 · 分供方采购合同')
+  })
+})

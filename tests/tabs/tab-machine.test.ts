@@ -1,3 +1,4 @@
+import type { TabsState } from '~/lib/tabs/tab-machine'
 import { describe, expect, it } from 'vitest'
 import {
   closeAll,
@@ -9,7 +10,6 @@ import {
   initialTabsState,
   MAX_TABS,
   openTab,
-  type TabsState,
 } from '~/lib/tabs/tab-machine'
 
 /** 便捷：连续开 N 个不同页签。 */
@@ -46,15 +46,17 @@ describe('openTab：打开/复用/超限', () => {
     expect(state.tabs[1]).toMatchObject({ title: '分供方', closable: true })
   })
 
-  it('同路由同参数复用（不新增），并刷新 title', () => {
-    let s = openTab(initialTabsState(), { fullPath: '/project/1', title: '项目 1' }).state
+  it('同路由同参数复用（不新增），保留已有 title 不被覆盖（#98）', () => {
+    let s = openTab(initialTabsState(), { fullPath: '/project/1', title: '项目详情' }).state
+    // 页面回填动态标题（等价 store.setTitle）
+    s = { ...s, tabs: s.tabs.map(t => (t.key === '/project/1' ? { ...t, title: '合和新城' } : t)) }
     s = openTab(s, { fullPath: '/base/supplier', title: '分供方' }).state
     const before = s.tabs.length
-    const r = openTab(s, { fullPath: '/project/1', title: '合和新城' }) // 同 key，新 title
+    const r = openTab(s, { fullPath: '/project/1', title: '项目详情' }) // 切回，调用方仍传静态标题
     expect(r.blocked).toBe(false)
     expect(r.state.tabs).toHaveLength(before) // 未新增
     expect(r.state.activeKey).toBe('/project/1')
-    expect(r.state.tabs.find(t => t.key === '/project/1')!.title).toBe('合和新城')
+    expect(r.state.tabs.find(t => t.key === '/project/1')!.title).toBe('合和新城') // 动态标题保留
   })
 
   it('不同 query 视为不同页签', () => {

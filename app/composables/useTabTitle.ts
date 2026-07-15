@@ -13,15 +13,19 @@ import { deriveKey } from '~/lib/tabs/tab-machine'
 export function useTabTitle(title: MaybeRefOrGetter<string | null | undefined>) {
   const route = useRoute()
   const tabsStore = useTabsStore()
+  // setup 时一次性捕获所属页签 key：页面实例与页签一一对应（app.vue page-key=fullPath）。
+  // 不能在 watch 回调里重取 route.fullPath——KeepAlive 停用期间 watcher 照常触发（如别处
+  // 改了本页记录名），彼时 route 已指向当前激活页签，会把别人的标题误改成本页记录名（#99）。
+  const key = deriveKey(route.fullPath)
 
   watch(
     [
       () => toValue(title),
-      () => tabsStore.tabs.some(t => t.key === deriveKey(route.fullPath)),
+      () => tabsStore.tabs.some(t => t.key === key),
     ],
     ([t, tabExists]) => {
       if (t && tabExists)
-        tabsStore.setTitle(deriveKey(route.fullPath), t)
+        tabsStore.setTitle(key, t)
     },
     { immediate: true },
   )
