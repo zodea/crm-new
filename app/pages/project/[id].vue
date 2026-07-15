@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StatusTone } from '~/lib/project/status'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+import { PROJECT_DETAIL_TABS } from '~/lib/project/subtables'
 
 const route = useRoute()
 const store = useProjectStore()
@@ -26,18 +27,7 @@ function statusChip(status: string): string {
 }
 
 const activeTab = ref('detail')
-const tabs = [
-  { key: 'detail', label: '详细资料' },
-  { key: 'budget', label: '成本预算' },
-  { key: 'construction', label: '施工合同管理' },
-  { key: 'expenditure', label: '支出合同管理' },
-  { key: 'tax', label: '票税管理' },
-  { key: 'fund', label: '资金管理' },
-  { key: 'current', label: '往来款' },
-  { key: 'payment', label: '支付明细' },
-  { key: 'material', label: '物资管理' },
-  { key: 'acceptance', label: '竣工验收及保修' },
-]
+const tabs = PROJECT_DETAIL_TABS
 
 // 首次加载完成标记：区分「加载中」与「加载完成但项目不存在/已软删」两态，
 // 避免深链直达时在 load 前一闪「不存在」；软删后（列表页删除经共享 store 联动）此页
