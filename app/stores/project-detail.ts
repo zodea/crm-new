@@ -1,9 +1,10 @@
 import type { ProjectDetailAggregate } from '~/lib/project/detail-aggregate'
-import type { ProjectOperationSummary } from '~/lib/project/detail-summary'
+import type { ProjectInvoiceSummary, ProjectOperationSummary } from '~/lib/project/detail-summary'
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
+import { useInvoiceStore } from '~/stores/invoice'
 
 export interface ConstructionContractRow {
   id: string
@@ -98,6 +99,7 @@ function number(value: unknown): number {
 }
 
 export const useProjectDetailStore = defineStore('project-detail', () => {
+  const invoiceStore = useInvoiceStore()
   const constructionContracts = shallowRef<ConstructionContractRow[]>([])
   const supplementAgreements = shallowRef<SupplementAgreementRow[]>([])
   const ownerChangeOrders = shallowRef<OwnerChangeOrderRow[]>([])
@@ -116,6 +118,23 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const invoiceOutputSummaries = computed<Record<string, { outputAmount: number, outputTax: number }>>(() => Object.fromEntries(
     aggregateRows.value.map(row => [row.projectId, { outputAmount: row.outputAmount, outputTax: row.outputTax }]),
   ))
+  const invoiceSummaries = computed<Record<string, ProjectInvoiceSummary>>(() => {
+    const projectIds = new Set([
+      ...Object.keys(invoiceOutputSummaries.value),
+      ...Object.keys(invoiceStore.archivedInvoiceSummaries),
+    ])
+    return Object.fromEntries([...projectIds].map((projectId) => {
+      const output = invoiceOutputSummaries.value[projectId] ?? { outputAmount: 0, outputTax: 0 }
+      const input = invoiceStore.archivedInvoiceSummaries[projectId] ?? { inputAmount: 0, inputTax: 0, archivedCount: 0 }
+      const vat = output.outputTax - input.inputTax
+      return [projectId, {
+        ...output,
+        ...input,
+        vat,
+        taxBurdenRate: output.outputAmount === 0 ? 0 : vat / output.outputAmount,
+      }]
+    }))
+  })
 
   async function load(force = false) {
     if (loaded.value && !force)
@@ -233,6 +252,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     currentPayments: readonly(currentPayments),
     operationSummaries,
     invoiceOutputSummaries,
+    invoiceSummaries,
     loading: readonly(loading),
     load,
   }

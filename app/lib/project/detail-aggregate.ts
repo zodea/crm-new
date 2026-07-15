@@ -1,6 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import type { ProjectOperationSummary } from '~/lib/project/detail-summary'
-import { hiddenCtes, visibleCond } from '~/lib/db/soft-delete'
+import { hiddenCtes, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 
 export interface ProjectDetailAggregate extends ProjectOperationSummary {
   projectId: string
@@ -20,38 +20,55 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-/**
- * DATABASE §4.1/§4.2：明细求和交给 SQLite，应用层只派生公式字段。
- * 每个子查询都排除软删行；补充协议同时要求其施工合同仍可见。
- */
-export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDetailAggregate[]> {
-  const rows = await db.select<Record<string, unknown>>(`
-    SELECT
-      p.id AS project_id,
-      COALESCE((SELECT SUM(c.amount) FROM construction_contracts c WHERE c.project_id=p.id AND c.deleted_at IS NULL), 0) AS main_contract_amount,
-      COALESCE((SELECT SUM(s.amount) FROM supplement_agreements s JOIN construction_contracts c ON c.id=s.contract_id WHERE c.project_id=p.id AND c.deleted_at IS NULL AND s.deleted_at IS NULL), 0) AS supplement_amount,
-      COALESCE((SELECT SUM(o.tax_inc_amount) FROM owner_change_orders o WHERE o.project_id=p.id AND o.deleted_at IS NULL), 0) AS owner_change_amount,
-      COALESCE((SELECT SUM(r.amount) FROM receipt_registrations r WHERE r.project_id=p.id AND r.deleted_at IS NULL), 0) AS project_receipt,
-      COALESCE((SELECT SUM(a.actual_payment) FROM payment_applications a WHERE a.project_id=p.id AND a.deleted_at IS NULL), 0) AS payment_amount,
-      COALESCE((SELECT SUM(r.amount) FROM current_receipts r WHERE r.project_id=p.id AND r.deleted_at IS NULL), 0) AS current_receipt,
-      COALESCE((SELECT SUM(pmt.amount) FROM current_payments pmt WHERE pmt.project_id=p.id AND pmt.deleted_at IS NULL), 0) AS current_payment,
-      COALESCE((SELECT SUM(i.amount) FROM invoice_applications i WHERE i.project_id=p.id AND i.deleted_at IS NULL), 0) AS output_amount,
-      COALESCE((SELECT SUM(i.tax_amount) FROM invoice_applications i WHERE i.project_id=p.id AND i.deleted_at IS NULL), 0) AS output_tax
-    FROM projects p
-    WHERE p.deleted_at IS NULL
-  `)
+interface ProjectSumRow {
+  project_id: string
+  total: number
+}
 
-  return rows.map((row) => {
-    const mainContractAmount = number(row.main_contract_amount)
-    const supplementAmount = number(row.supplement_amount)
-    const ownerChangeAmount = number(row.owner_change_amount)
-    const projectReceipt = number(row.project_receipt)
-    const paymentAmount = number(row.payment_amount)
-    const currentReceipt = number(row.current_receipt)
-    const currentPayment = number(row.current_payment)
+async function loadProjectSums(db: SoftDb, table: string, valueColumn: string): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtes(table)}
+    SELECT r.project_id, COALESCE(SUM(r."${valueColumn}"), 0) AS total
+    FROM "${table}" r
+    WHERE ${visibleCond(table, 'r')}
+    GROUP BY r.project_id
+  `)
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
+/** DATABASE §4.1/§4.2：明细求和交给 SQLite，且所有表统一走祖先软删过滤。 */
+export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDetailAggregate[]> {
+  const [projects, mainContracts, supplements, changes, receipts, payments, currentIn, currentOut, outputAmounts, outputTaxes] = await Promise.all([
+    db.select<{ id: string }>(selectVisibleSql('projects', 'ORDER BY id')),
+    loadProjectSums(db, 'construction_contracts', 'amount'),
+    db.select<ProjectSumRow>(`
+      ${hiddenCtes('supplement_agreements')}
+      SELECT c.project_id, COALESCE(SUM(s.amount), 0) AS total
+      FROM supplement_agreements s
+      JOIN construction_contracts c ON c.id=s.contract_id
+      WHERE ${visibleCond('supplement_agreements', 's')}
+      GROUP BY c.project_id
+    `).then(rows => new Map(rows.map(row => [row.project_id, number(row.total)]))),
+    loadProjectSums(db, 'owner_change_orders', 'tax_inc_amount'),
+    loadProjectSums(db, 'receipt_registrations', 'amount'),
+    loadProjectSums(db, 'payment_applications', 'actual_payment'),
+    loadProjectSums(db, 'current_receipts', 'amount'),
+    loadProjectSums(db, 'current_payments', 'amount'),
+    loadProjectSums(db, 'invoice_applications', 'amount'),
+    loadProjectSums(db, 'invoice_applications', 'tax_amount'),
+  ])
+
+  return projects.map(({ id: projectId }) => {
+    const mainContractAmount = mainContracts.get(projectId) ?? 0
+    const supplementAmount = supplements.get(projectId) ?? 0
+    const ownerChangeAmount = changes.get(projectId) ?? 0
+    const projectReceipt = receipts.get(projectId) ?? 0
+    const paymentAmount = payments.get(projectId) ?? 0
+    const currentReceipt = currentIn.get(projectId) ?? 0
+    const currentPayment = currentOut.get(projectId) ?? 0
     const managementFee = 0
     return {
-      projectId: row.project_id as string,
+      projectId,
       mainContractAmount,
       supplementAmount,
       ownerChangeAmount,
@@ -62,8 +79,8 @@ export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDe
       currentPayment,
       managementFee,
       availableBalance: projectReceipt + currentReceipt - paymentAmount - currentPayment - managementFee,
-      outputAmount: number(row.output_amount),
-      outputTax: number(row.output_tax),
+      outputAmount: outputAmounts.get(projectId) ?? 0,
+      outputTax: outputTaxes.get(projectId) ?? 0,
     }
   })
 }
