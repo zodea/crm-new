@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS projects (
 
   manager         TEXT DEFAULT '',
   manager_phone   TEXT DEFAULT '',
+  exec_manager    TEXT DEFAULT '',
+  builder         TEXT DEFAULT '',
   site_leader     TEXT DEFAULT '',
   site_leader_phone TEXT DEFAULT '',
 

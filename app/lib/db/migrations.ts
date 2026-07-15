@@ -195,6 +195,16 @@ export const migrations: Migration[] = [
       await addColumnIfMissing(db, 'invoices', 'field_confidence', `TEXT DEFAULT '{}'`)
     },
   },
+  {
+    // 项目红圈化列表/表单(#58/#59):执行经理、施工员两个源字段(设计稿 ProjectScreen.jsx
+    // 列表列 execManager/builder + 编辑表单字段)。存量库补列,新库由 v1 基线自带。
+    version: 6,
+    name: 'projects-exec-manager-builder',
+    async up(db) {
+      await addColumnIfMissing(db, 'projects', 'exec_manager', `TEXT DEFAULT ''`)
+      await addColumnIfMissing(db, 'projects', 'builder', `TEXT DEFAULT ''`)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

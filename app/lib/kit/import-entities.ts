@@ -1,9 +1,14 @@
 import type { ImportTemplateField } from './import-mapping'
+import type { Project } from '~/stores/project'
+import { normalizeProjectStatus } from '~/lib/project/status'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：
 // 实体键即 /import/mapping/:entity 路由参数，静态登记保证刷新后仍可解析。
-// 本片（#81）只带 stub 演示实体；各实体真实模板字段是 #73 的数据任务，后续波次在此登记。
+// demo-supplier 为演示 stub；project 为第一个真实实体（#58 从项目列表页 openImportTab
+// 触发，模板字段取 #73 项目分析，逐行经 store.add 真实入库并落 create 日志）。
+// importRow 内的 useProjectStore 是 Nuxt 自动导入的运行时值：仅浏览器内导入 runner 调用，
+// node 单测不触发（故本文件仍可在纯 node 环境解析——Project 为 type-only import，运行时擦除）。
 
 export interface ImportEntityDef {
   key: string
@@ -25,7 +30,40 @@ const DEMO_SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
 // 用于跑通「失败保留页签 → 从失败行续导」旅程。
 const demoFailedOnce = new Set<string>()
 
+// 项目导入模板字段（#73 项目分析，字段 key = Project 字段名，故映射后的行可直接入库）。
+const PROJECT_FIELDS: readonly ImportTemplateField[] = [
+  { key: 'name', label: '项目名称', required: true, aliases: ['项目', '工程名称'] },
+  { key: 'contractName', label: '项目合同名称', aliases: ['合同名称'] },
+  { key: 'developer', label: '客户', aliases: ['甲方', '建设单位', '客户（甲方）'] },
+  { key: 'operationType', label: '经营类型', aliases: ['经营分类'] },
+  { key: 'status', label: '业务流程阶段', aliases: ['项目状态', '阶段', '状态'] },
+  { key: 'region', label: '工程地域', aliases: ['地域', '所在地区'] },
+  { key: 'address', label: '工程详细地址', aliases: ['项目地址', '地址', '详细地址'] },
+  { key: 'manager', label: '项目经理', aliases: ['负责人'] },
+  { key: 'execManager', label: '执行经理' },
+  { key: 'builder', label: '施工员' },
+  { key: 'startDate', label: '计划开工', aliases: ['开工日期', '计划开工日期'] },
+  { key: 'plannedEnd', label: '计划竣工', aliases: ['竣工日期', '计划竣工日期'] },
+  { key: 'note', label: '备注' },
+  EXTERNAL_REF_FIELD,
+]
+
 export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
+  'project': {
+    key: 'project',
+    label: '施工项目',
+    fields: PROJECT_FIELDS,
+    // 逐行入库：字段 key 与 Project 字段同名，映射后的行即 Partial<Project>；store.add
+    // 内部走 INSERT + logCreate + load，导入完成后新行经共享 store 出现在列表页。
+    // externalRef 等未登记列由 projectToBindings 忽略（只写 PROJECT_COLUMN_KEYS）。
+    // status 经 normalizeProjectStatus 归一：Excel 任意文本不得写进非法阶段值。
+    async importRow(row) {
+      await useProjectStore().add({
+        ...row,
+        status: normalizeProjectStatus(row.status),
+      } as Partial<Project>)
+    },
+  },
   'demo-supplier': {
     key: 'demo-supplier',
     label: '演示·分供方',
