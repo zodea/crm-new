@@ -239,6 +239,19 @@ async function demoConfiguredExport() {
     lastResult.value = `配置导出打开失败：${toErrorMessage(error)}`
   }
 }
+
+// ⑨ 导入映射页签（ADR 0005 / #81）：演示实体的模板见 lib/kit/import-entities.ts
+async function demoImportMapping() {
+  try {
+    const result = await kit.openImportTab({ entity: 'demo-supplier' })
+    lastResult.value = result.status === 'opened'
+      ? `导入映射页签已打开：${result.fullPath}`
+      : '导入映射被页签上限阻断'
+  }
+  catch (error) {
+    lastResult.value = `导入映射打开失败：${toErrorMessage(error)}`
+  }
+}
 </script>
 
 <template>
@@ -399,6 +412,20 @@ async function demoConfiguredExport() {
         </p>
         <KitButton @click="demoConfiguredExport">
           打开多表导出配置
+        </KitButton>
+      </section>
+
+      <!-- ⑨ 导入映射页签 -->
+      <section class="content-panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑨ openImportTab — 导入映射页签（ADR 0005）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          实体触发、模板隐含：页签内 上传 → 映射（智能预匹配 + 三色态 + 必填门控）→ 预览/导入（可删行）。
+          演示实体中「外部旧ID」以 FAIL 开头的行同一会话内首次写入失败（重试从失败行续导成功）。
+        </p>
+        <KitButton @click="demoImportMapping">
+          打开导入映射演示
         </KitButton>
       </section>
 

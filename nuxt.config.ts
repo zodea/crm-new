@@ -28,6 +28,14 @@ export default defineNuxtConfig({
     '@/assets/css/tokens.css',
   ],
 
+  vite: {
+    optimizeDeps: {
+      // xlsx 只被导入/导出页签按需加载；预打包避免 dev 首次进入这些
+      // 路由时 Vite 发现新依赖触发整页 reload（会打断 SPA 页签导航）。
+      include: ['xlsx'],
+    },
+  },
+
   app: {
     head: {
       title: '瑞航CRM',

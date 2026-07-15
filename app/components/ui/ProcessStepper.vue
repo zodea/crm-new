@@ -80,12 +80,12 @@ const progressLabel = computed(() => {
   return summary
 })
 
-const progressBarClass = computed(() => {
+const progressTone = computed<'brand' | 'ok' | 'danger'>(() => {
   if (failedStep.value)
-    return 'bg-danger'
+    return 'danger'
   if (props.steps.length > 0 && completedCount.value === props.steps.length)
-    return 'bg-ok'
-  return 'bg-brand'
+    return 'ok'
+  return 'brand'
 })
 </script>
 
@@ -98,21 +98,12 @@ const progressBarClass = computed(() => {
           {{ progressPercent }}%
         </span>
       </div>
-      <div
-        role="progressbar"
-        class="h-1.5 overflow-hidden rounded-full bg-surface-3"
-        aria-label="处理进度"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        :aria-valuenow="progressPercent"
-        :aria-valuetext="progressLabel"
-      >
-        <div
-          class="h-full rounded-full transition-[width,background-color] duration-[var(--dur-fast)] motion-reduce:transition-none"
-          :class="progressBarClass"
-          :style="{ width: `${progressPercent}%` }"
-        />
-      </div>
+      <ProgressBar
+        :percent="progressPercent"
+        :tone="progressTone"
+        label="处理进度"
+        :valuetext="progressLabel"
+      />
     </div>
 
     <ol class="flex items-start" aria-label="处理步骤">

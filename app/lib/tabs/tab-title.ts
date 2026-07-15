@@ -8,6 +8,11 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
     title: '导出配置',
     subtitle: '目录结构 · 命名规则 · 导出进度',
   },
+  {
+    test: p => /^\/import\/mapping\/[^/]+\/?$/.test(p),
+    title: '导入映射',
+    subtitle: '上传 · 映射 · 预览导入',
+  },
   { test: p => p === '/', title: '首页', subtitle: '在建工程总览' },
   { test: p => /^\/project\/[^/]+\/supplier\/import/.test(p), title: '分供方导入', subtitle: '批量建立合作关系' },
   { test: p => /^\/project\/[^/]+\/supplier\/[^/]+/.test(p), title: '项目分供方', subtitle: '合作关系 · 合同/请款/收票/付款 · 结算' },

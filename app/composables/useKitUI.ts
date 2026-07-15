@@ -97,6 +97,7 @@ export function useKitUI() {
   const toast = useToast()
   const openExportTab = useExportWorkflowTab()
   const exportFile = useExportFile(openExportTab)
+  const openImportTab = useImportMappingTab()
   return {
     toast: toast.show,
     success: toast.success,
@@ -113,6 +114,7 @@ export function useKitUI() {
     formModal,
     exportFile,
     openExportTab,
+    openImportTab,
   }
 }
 
