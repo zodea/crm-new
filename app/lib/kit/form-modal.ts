@@ -55,8 +55,10 @@ export function findMissingRequired(fields: FieldDef[], values: FormValues): str
     .filter(f => f.required)
     .filter((f) => {
       const v = values[f.key]
-      if (v == null) return true
-      if (typeof v === 'string') return v.trim() === ''
+      if (v == null)
+        return true
+      if (typeof v === 'string')
+        return v.trim() === ''
       return Number.isNaN(v)
     })
     .map(f => f.key)

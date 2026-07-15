@@ -27,7 +27,8 @@ export function matchesConfirmName(input: string, target: string): boolean {
  * 有打字要求（cascade）则需名称精确匹配。
  */
 export function isConfirmEnabled(requireTyping: string | null | undefined, input: string): boolean {
-  if (!requireTyping) return true
+  if (!requireTyping)
+    return true
   return matchesConfirmName(input, requireTyping)
 }
 
@@ -60,25 +61,30 @@ export function createHold(holdMs?: number): HoldState {
 
 /** idle → pending：记录起始时刻。非 idle 幂等返回原态。 */
 export function beginHold(state: HoldState, now: number): HoldState {
-  if (state.phase !== 'idle') return state
+  if (state.phase !== 'idle')
+    return state
   return { ...state, phase: 'pending', startedAt: now }
 }
 
 /** pending → cancelled（撤销，彻底中止，不提交）。非 pending 幂等。 */
 export function cancelHold(state: HoldState): HoldState {
-  if (state.phase !== 'pending') return state
+  if (state.phase !== 'pending')
+    return state
   return { ...state, phase: 'cancelled' }
 }
 
 /** 到时推进：pending 且 now-startedAt ≥ holdMs → committed，否则原样返回。 */
 export function tickHold(state: HoldState, now: number): HoldState {
-  if (state.phase !== 'pending' || state.startedAt == null) return state
-  if (now - state.startedAt >= state.holdMs) return { ...state, phase: 'committed' }
+  if (state.phase !== 'pending' || state.startedAt == null)
+    return state
+  if (now - state.startedAt >= state.holdMs)
+    return { ...state, phase: 'committed' }
   return state
 }
 
 /** 剩余毫秒（用于倒计时显示）；非 pending 返回 0。 */
 export function holdRemaining(state: HoldState, now: number): number {
-  if (state.phase !== 'pending' || state.startedAt == null) return 0
+  if (state.phase !== 'pending' || state.startedAt == null)
+    return 0
   return Math.max(0, state.holdMs - (now - state.startedAt))
 }
