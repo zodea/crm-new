@@ -1,280 +1,99 @@
 <script setup lang="ts">
-import type { Combination, Factor } from '~/lib/finance/factor-combination'
-import { computeCombinations } from '~/lib/finance/factor-combination'
-import { moneyToChinese } from '~/lib/util/chinese-amount'
-
-const toast = useToast()
-
-let nextFactorId = 1
-const targetAmount = ref(128640)
-const taxRate = ref(13)
-const decimalPlaces = ref(2)
-const factors = ref<Factor[]>([
-  { id: nextFactorId++, name: 'HRB400 螺纹钢 Φ12', unit: '吨', unitPrice: 3800, upperLimit: 50 },
-  { id: nextFactorId++, name: 'C30 商品混凝土', unit: 'm³', unitPrice: 420, upperLimit: 100 },
-])
-
-const taxExcAmount = computed(() => {
-  const rate = taxRate.value / 100
-  return +(targetAmount.value / (1 + rate)).toFixed(decimalPlaces.value)
-})
-const taxAmount = computed(() => {
-  return +(targetAmount.value - taxExcAmount.value).toFixed(decimalPlaces.value)
-})
-
-function addFactor() {
-  factors.value.push({ id: nextFactorId++, name: '', unit: '', unitPrice: 0, upperLimit: 10 })
-}
-
-function removeFactor(id: number) {
-  factors.value = factors.value.filter(f => f.id !== id)
-}
-
-const combinations = ref<Combination[]>([])
-const calculating = ref(false)
-const calcTime = ref(0)
-
-function calculate() {
-  calculating.value = true
-  const result = computeCombinations(factors.value, targetAmount.value, {
-    decimalPlaces: decimalPlaces.value,
-  })
-  combinations.value = result.combinations
-  calcTime.value = result.elapsedMs
-  calculating.value = false
-
-  if (result.found === 0) {
-    toast.warning('未找到匹配方案，尝试调整因子或上限')
-  }
-}
-
-function fmtMoney(v: number): string {
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-const { copy: copyToClipboard } = useClipboard({ legacy: true })
-
-async function copyText(text: string) {
-  try {
-    await copyToClipboard(text)
-    toast.success('已复制')
-  }
-  catch {
-    toast.error('复制失败')
-  }
-}
-
-const TAX_RATES = [13, 9, 6, 3, 1]
-
-function handlePaste(e: ClipboardEvent) {
-  const text = e.clipboardData?.getData('text')
-  if (!text || !text.includes('\t'))
-    return
-  e.preventDefault()
-  const lines = text.trim().split('\n')
-  for (const line of lines) {
-    const [name, unit, price, limit] = line.split('\t')
-    if (name != null && unit != null && price != null) {
-      factors.value.push({
-        id: nextFactorId++,
-        name: name.trim(),
-        unit: unit.trim(),
-        unitPrice: Number.parseFloat(price) || 0,
-        upperLimit: limit ? (Number.parseInt(limit) || 10) : 10,
-      })
-    }
-  }
-  toast.success(`已导入 ${lines.length} 个因子`)
-}
+const {
+  calculating,
+  cancelCalculation,
+  calculate,
+  copyText,
+  excludeFactor,
+  includeFactor,
+  runningElapsedMs,
+  showCalculationMask,
+  solverResult,
+  state,
+  summary,
+} = useFactorSolver()
 </script>
 
 <template>
-  <div @paste="handlePaste">
-    <!-- Row 1: 输入面板 + 金额卡片 -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      <!-- 输入面板 -->
-      <div class="border border-line bg-panel p-4">
-        <h4 class="text-13px font-700 text-ink mb-3">
-          目标金额
-        </h4>
-        <div class="mb-3">
-          <label class="field-label">目标含税金额 (元)</label>
-          <input v-model.number="targetAmount" type="number" class="field-input w-full font-mono text-17px">
-        </div>
-        <div class="flex gap-3 mb-3">
-          <div class="flex-1">
-            <label class="field-label">税率</label>
-            <div class="flex gap-1">
-              <button
-                v-for="r in TAX_RATES"
-                :key="r"
-                class="px-2.5 py-1 text-13px font-600 rounded-[var(--radius-btn)] border cursor-pointer transition-colors"
-                :class="taxRate === r ? 'bg-brand text-white border-brand' : 'border-line text-ink-soft hover:border-brand'"
-                @click="taxRate = r"
-              >
-                {{ r }}%
-              </button>
-            </div>
-          </div>
-          <div>
-            <label class="field-label">小数位</label>
-            <input v-model.number="decimalPlaces" type="number" min="0" max="4" class="field-input w-16">
-          </div>
-        </div>
-      </div>
-
-      <!-- 金额卡片 -->
-      <div class="border border-line bg-panel p-4">
-        <h4 class="text-13px font-700 text-ink mb-3">
-          计算结果
-        </h4>
-        <div class="grid grid-cols-3 gap-3">
-          <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">
-              价税合计
-            </div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
-              ¥{{ fmtMoney(targetAmount) }}
-            </div>
-            <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(targetAmount))">
-              {{ moneyToChinese(targetAmount) }} · 复制
-            </button>
-          </div>
-          <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">
-              不含税金额
-            </div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
-              ¥{{ fmtMoney(taxExcAmount) }}
-            </div>
-            <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(taxExcAmount))">
-              {{ moneyToChinese(taxExcAmount) }} · 复制
-            </button>
-          </div>
-          <div class="text-center">
-            <div class="text-11px text-ink-faint mb-1">
-              税额
-            </div>
-            <div class="font-mono text-17px font-700 text-ink tabular-nums mb-1">
-              ¥{{ fmtMoney(taxAmount) }}
-            </div>
-            <button class="text-10px text-brand cursor-pointer hover:underline" @click="copyText(moneyToChinese(taxAmount))">
-              {{ moneyToChinese(taxAmount) }} · 复制
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Row 2: 因子表 + 组合方案 -->
-    <div class="grid grid-cols-2 gap-3">
-      <!-- 因子表 -->
-      <div class="border border-line bg-panel p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-13px font-700 text-ink">
-            开票因子
-          </h4>
-          <div class="flex gap-1.5">
-            <button class="btn-secondary text-12px" @click="addFactor">
-              <span class="i-lucide-plus text-12px mr-0.5" /> 新增
-            </button>
-          </div>
-        </div>
-        <div class="border border-line">
-          <table class="w-full text-12px">
-            <thead>
-              <tr class="bg-surface-2">
-                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line">
-                  名称
-                </th>
-                <th class="text-left px-2 py-1.5 font-600 text-ink-soft border-r border-line w-16">
-                  单位
-                </th>
-                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-20">
-                  含税单价
-                </th>
-                <th class="text-right px-2 py-1.5 font-600 text-ink-soft border-r border-line w-14">
-                  上限
-                </th>
-                <th class="px-2 py-1.5 w-8" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="f in factors" :key="f.id" class="border-t border-line">
-                <td class="px-1 py-1 border-r border-line">
-                  <input v-model="f.name" class="field-input w-full !py-0.5 !px-1 text-12px">
-                </td>
-                <td class="px-1 py-1 border-r border-line">
-                  <input v-model="f.unit" class="field-input w-full !py-0.5 !px-1 text-12px">
-                </td>
-                <td class="px-1 py-1 border-r border-line">
-                  <input v-model.number="f.unitPrice" type="number" class="field-input w-full !py-0.5 !px-1 text-12px text-right font-mono">
-                </td>
-                <td class="px-1 py-1 border-r border-line">
-                  <input v-model.number="f.upperLimit" type="number" class="field-input w-full !py-0.5 !px-1 text-12px text-right">
-                </td>
-                <td class="px-1 py-1 text-center">
-                  <button class="text-ink-faint hover:text-danger cursor-pointer" @click="removeFactor(f.id)">
-                    <span class="i-lucide-trash-2 text-13px" />
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="text-10px text-ink-faint mt-2">
-          支持 Ctrl+V 粘贴 Tab 分隔数据（名称\t单位\t单价[\t上限]）
+  <div data-testid="factor-workbench" class="relative overflow-hidden rounded-[var(--radius-card)] border border-line shadow-[var(--shadow-card)]" style="background-color: var(--panel)">
+    <header class="grid items-end gap-3 border-b border-line px-4 py-4 md:grid-cols-2 xl:grid-cols-[minmax(250px,1fr)_minmax(220px,0.85fr)_150px_160px]" style="background-color: var(--panel)">
+      <div class="self-center">
+        <h1 class="text-16px font-800 text-ink">
+          精确加法组合
+        </h1>
+        <p class="mt-1 max-w-[42ch] text-11px leading-4 text-ink-faint">
+          金额按分精确计算，仅返回恰好等于目标值的组合
         </p>
       </div>
+      <div>
+        <label for="factor-target" class="field-label block">目标值</label>
+        <input
+          id="factor-target"
+          v-model.number="state.target"
+          type="number"
+          min="0"
+          step="any"
+          class="field-input w-full font-mono text-16px font-700 tabular-nums"
+          placeholder="请输入目标值"
+        >
+      </div>
+      <div>
+        <label for="factor-max-results" class="field-label block">返回解数量</label>
+        <input
+          id="factor-max-results"
+          v-model.number="state.maxResults"
+          type="number"
+          min="1"
+          max="5000"
+          class="field-input w-full font-mono"
+          placeholder="默认 100"
+        >
+      </div>
+      <button
+        type="button"
+        class="btn-primary h-[34px] w-full whitespace-nowrap text-13px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+        :disabled="calculating || state.factors.length === 0"
+        data-testid="factor-calculate"
+        @click="calculate"
+      >
+        <span :class="calculating ? 'i-lucide-hourglass' : 'i-lucide-calculator'" class="mr-1.5 text-14px" />
+        {{ calculating ? '计算中' : '开始计算' }}
+      </button>
+    </header>
 
-      <!-- 组合方案 -->
-      <div class="border border-line bg-panel p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h4 class="text-13px font-700 text-ink">
-            组合方案
-            <span v-if="combinations.length" class="text-ink-faint font-400 ml-1">
-              · {{ combinations.length }} 种 · {{ calcTime }}ms
-            </span>
-          </h4>
-          <button
-            class="btn-primary text-12px"
-            :disabled="calculating || factors.length === 0"
-            @click="calculate"
-          >
-            <span class="i-lucide-calculator text-12px mr-1" /> 计算组合
+    <div class="grid xl:grid-cols-[390px_minmax(560px,1fr)]" style="background-color: var(--panel)">
+      <FactorSolverConfig :factors="state.factors" @update:factors="state.factors = $event" />
+      <FactorSolverResults
+        v-model:include-factor="includeFactor"
+        v-model:exclude-factor="excludeFactor"
+        :result="solverResult"
+        :summary="summary"
+        @copy="copyText"
+      />
+    </div>
+
+    <FactorTaxCalculator @copy="copyText" />
+
+    <Transition enter-active-class="animate-in fade-in-0" leave-active-class="animate-out fade-out-0">
+      <div
+        v-if="showCalculationMask"
+        class="fixed inset-0 z-50 grid place-items-center bg-[rgb(255_255_255/88%)] backdrop-blur-[2px]"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="w-64 rounded-[var(--radius-card)] border border-line bg-panel p-6 text-center shadow-[var(--shadow-dialog)]">
+          <span class="i-lucide-hourglass text-28px text-brand" />
+          <div class="mt-2 text-14px font-700 text-ink">
+            计算中…
+          </div>
+          <div class="mt-1 font-mono text-12px text-ink-faint">
+            {{ runningElapsedMs }} ms
+          </div>
+          <button type="button" class="btn-secondary mt-4 px-6 active:translate-y-px" @click="cancelCalculation">
+            取消
           </button>
         </div>
-
-        <div v-if="combinations.length" class="space-y-2 max-h-[400px] overflow-y-auto">
-          <div
-            v-for="(combo, idx) in combinations"
-            :key="idx"
-            class="border border-line p-2.5"
-            :class="combo.diff === 0 ? 'border-ok bg-ok-soft/20' : ''"
-          >
-            <div class="flex items-center justify-between mb-1.5">
-              <span class="text-11px font-600" :class="combo.diff === 0 ? 'text-ok' : 'text-ink-soft'">
-                方案 {{ idx + 1 }}
-              </span>
-              <span class="font-mono text-12px">
-                ¥{{ fmtMoney(combo.total) }}
-                <span v-if="combo.diff > 0" class="text-warn ml-1">差 {{ fmtMoney(combo.diff) }}</span>
-                <span v-else class="text-ok ml-1">精确匹配</span>
-              </span>
-            </div>
-            <div class="text-11px space-y-0.5">
-              <div v-for="item in combo.items" :key="item.factor.id" class="flex justify-between">
-                <span>{{ item.factor.name }} × {{ item.qty }}{{ item.factor.unit }}</span>
-                <span class="font-mono">¥{{ fmtMoney(item.subtotal) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="py-8 text-center text-ink-faint text-13px">
-          添加因子后点击「计算组合」
-        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
