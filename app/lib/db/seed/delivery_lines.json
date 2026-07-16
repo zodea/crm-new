@@ -1,0 +1,46 @@
+[
+  {
+    "id": "dline_mdv001_0",
+    "delivery_record_id": "del_mdv001_0",
+    "material_name": "HRB400 螺纹钢",
+    "spec": "Φ12",
+    "unit": "吨",
+    "qty": 2.5,
+    "unit_price": 3800,
+    "amount": 9500,
+    "sort_order": 0
+  },
+  {
+    "id": "dline_mdv001_1",
+    "delivery_record_id": "del_mdv001_0",
+    "material_name": "HRB400 螺纹钢",
+    "spec": "Φ16",
+    "unit": "吨",
+    "qty": 1.8,
+    "unit_price": 3850,
+    "amount": 6930,
+    "sort_order": 1
+  },
+  {
+    "id": "dline_mdv001_2",
+    "delivery_record_id": "del_mdv001_1",
+    "material_name": "普通硅酸盐水泥",
+    "spec": "P.O 42.5",
+    "unit": "吨",
+    "qty": 20,
+    "unit_price": 425,
+    "amount": 8500,
+    "sort_order": 0
+  },
+  {
+    "id": "dline_mdv001_3",
+    "delivery_record_id": "del_mdv001_2",
+    "material_name": "中砂",
+    "spec": "水洗砂",
+    "unit": "方",
+    "qty": 12,
+    "unit_price": 88,
+    "amount": 1056,
+    "sort_order": 0
+  }
+]

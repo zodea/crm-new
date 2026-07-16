@@ -10,7 +10,7 @@ import { columnNames, createMemoryDb } from '../helpers/memory-db'
 type SeedRow = Record<string, unknown>
 
 /** 与 app/lib/db/seed.ts 的 jsonTables 灌入顺序一致(父表先行) */
-const SEED_TABLES = ['projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts'] as const
+const SEED_TABLES = ['projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts', 'delivery_records', 'delivery_lines'] as const
 
 function loadSeed(table: string): SeedRow[] {
   const url = new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url)
@@ -80,6 +80,14 @@ describe('seed 数据:结构与 schema 对齐', () => {
       if (c.supplier_id != null)
         expect(supIds).toContain(c.supplier_id)
     }
+    const deliveryIds = new Set(loadSeed('delivery_records').map(r => r.id))
+    for (const record of loadSeed('delivery_records')) {
+      expect(projIds).toContain(record.project_id)
+      if (record.supplier_id != null)
+        expect(supIds).toContain(record.supplier_id)
+    }
+    for (const line of loadSeed('delivery_lines'))
+      expect(deliveryIds).toContain(line.delivery_record_id)
   })
 
   it('金额铁律:两位小数;发票 不含税+税额=价税合计', () => {
@@ -103,6 +111,11 @@ describe('seed 数据:结构与 schema 对齐', () => {
         expect(v, `合同 ${c.id} ${k} 超两位小数`).toBe(round2(v))
       }
     }
+    for (const line of loadSeed('delivery_lines')) {
+      const qty = line.qty as number
+      const price = line.unit_price as number
+      expect(line.amount, `送货单明细 ${line.id} 金额不平`).toBe(round2(qty * price))
+    }
   })
 })
 
@@ -118,6 +131,8 @@ describe('seed 数据:灌入行为', () => {
     expect(await count('workers')).toBe(8)
     expect(await count('project_suppliers')).toBe(5)
     expect(await count('contracts')).toBe(31)
+    expect(await count('delivery_records')).toBe(3)
+    expect(await count('delivery_lines')).toBe(4)
 
     // 识别/归档状态谱系齐备：account_status 两态 none(未归档)/archived(已归档，DATABASE.md §2.4 权威定义，
     // 无 confirmed 中间值——「确认」由 review_status 独立承载，见 #57)

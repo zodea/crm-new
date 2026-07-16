@@ -58,6 +58,8 @@ export async function seedIfEmpty() {
     'payment_applications',
     'file_refs',
     'contracts',
+    'delivery_records',
+    'delivery_lines',
   ]
 
   let anySeeded = false

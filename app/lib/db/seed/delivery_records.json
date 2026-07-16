@@ -1,0 +1,48 @@
+[
+  {
+    "id": "del_mdv001_0",
+    "project_id": "proj_demo_001",
+    "supplier_id": "sup_demo_001",
+    "raw_site_text": "合和新城",
+    "order_no": "SH-2026-0712-001",
+    "delivery_date": "2026-07-12",
+    "file_name": "大板东建材-送货单-0712.pdf",
+    "ocr_status": "reviewed",
+    "archived": 1,
+    "stored": 0,
+    "note": "首车钢筋",
+    "created_at": "2026-07-12T09:20:00.000Z",
+    "updated_at": "2026-07-12T09:20:00.000Z"
+  },
+  {
+    "id": "del_mdv001_1",
+    "project_id": "proj_demo_005",
+    "supplier_id": "sup_demo_003",
+    "raw_site_text": "车陂商业大楼",
+    "order_no": "SH-2026-0713-006",
+    "delivery_date": "2026-07-13",
+    "file_name": "汇丰水泥-0713.pdf",
+    "ocr_status": "reviewed",
+    "archived": 1,
+    "stored": 0,
+    "note": "地下室批次",
+    "created_at": "2026-07-13T14:10:00.000Z",
+    "updated_at": "2026-07-13T14:10:00.000Z"
+  },
+  {
+    "id": "del_mdv001_2",
+    "project_id": "proj_demo_001",
+    "supplier_id": null,
+    "raw_site_text": "合和新城3号楼",
+    "order_no": "SH-2026-0714-002",
+    "delivery_date": "2026-07-14",
+    "file_name": "现场送货单-0714.jpg",
+    "ocr_status": "reviewed",
+    "archived": 1,
+    "stored": 0,
+    "review_flag": "待补分供方",
+    "note": "分供方待确认",
+    "created_at": "2026-07-14T16:30:00.000Z",
+    "updated_at": "2026-07-14T16:30:00.000Z"
+  }
+]
