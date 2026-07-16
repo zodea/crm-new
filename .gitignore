@@ -41,6 +41,8 @@ app/lib/db/seed/*.local.json
 docs/*.pdf
 docs/现实合同/
 docs/rewrite/工资发放格式/
+docs/rewrite/2026年一季度垫资清单/
+docs/rewrite/合和新城送货单/
 DC重构设计源码/screenshots/
 
 # DC 数据蓝本（含红圈真实业务数据，不上传；下轮实装为 kit/data.local.js 双轨）
