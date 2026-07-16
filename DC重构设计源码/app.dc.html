@@ -15,18 +15,13 @@
   <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/spacing.css">
   <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/base.css">
   <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css">
+  <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css">
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/_ds_bundle.js"></script>
   <script src="kit/data.js"></script>
   <!-- 双轨数据：data.local.js(gitignored,车陂真实数据)存在则覆写 KIT_DATA 的 p5 切片；线上/仓库无此文件,静默回落假数据 -->
   <script src="kit/data.local.js" onerror="console.info('[KIT] data.local.js 不存在，使用虚构兜底数据')"></script>
   <style>
-    :root {
-      --brand: #3976C6; --brand-soft: rgb(213 230 248); --brand-deep: #2A5996;
-      --ok: #169D72; --ok-soft: rgb(207 246 231); --ok-ink: #097251;
-      --warn: #D38A20; --warn-soft: rgb(255 239 191); --warn-ink: #8B590C;
-      --danger: #E04E5C; --danger-soft: rgb(253 219 224); --danger-ink: #9D313E;
-    }
     /* —— 红圈式页签栏 —— */
     .dc-tabbar { position: sticky; top: 64px; z-index: 19; height: 40px; flex: none;
       background: var(--surface-2); border-bottom: 1px solid var(--line);
