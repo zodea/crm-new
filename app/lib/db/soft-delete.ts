@@ -45,6 +45,11 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
   ],
+  delivery_records: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'supplier_id', table: 'suppliers' },
+  ],
+  delivery_lines: [{ column: 'delivery_record_id', table: 'delivery_records' }],
   invoice_applications: [{ column: 'project_id', table: 'projects' }],
   receipt_registrations: [{ column: 'project_id', table: 'projects' }],
   current_receipts: [{ column: 'project_id', table: 'projects' }],
@@ -300,7 +305,7 @@ export async function undoOperation(db: SoftDb, logId: string, operator = ''): P
       try {
         const before = JSON.parse(log.before_data) as Record<string, unknown>
         // 生死状态只走 delete/restore 通道:回写编辑不得复活/再删记录,故排除 deleted_at
-        const cols = Object.keys(before).filter(c => c !== 'id' && c !== 'deleted_at')
+        const cols = Object.keys(before).filter(c => c !== 'id' && c !== 'deleted_at' && !c.startsWith('__'))
         if (!cols.length)
           return false
         cols.forEach(assertIdentifier)

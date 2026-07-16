@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import { activeNavKey, ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
 
 function leaves() {
   return NAV_TREE.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -29,5 +29,12 @@ describe('侧栏导航树', () => {
   it('本地状态恢复后仍展开当前叶子所属分组', () => {
     expect(ensureActiveGroupOpen([], 'project')).toEqual(['g-project'])
     expect(ensureActiveGroupOpen(['g-project'], 'project')).toEqual(['g-project'])
+  })
+
+  it('送货单归档库入口可导航，列表与详情都点亮归档库', () => {
+    expect(leaves().find(item => item.key === 'deliveryArchive')?.to).toBe('/material/delivery/archive')
+    expect(activeNavKey('/material/delivery/archive')).toBe('deliveryArchive')
+    expect(activeNavKey('/material/delivery/archive/del_1')).toBe('deliveryArchive')
+    expect(activeNavKey('/material/delivery')).toBe('delivery')
   })
 })

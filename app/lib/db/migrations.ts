@@ -130,6 +130,53 @@ CREATE INDEX IF NOT EXISTS idx_contracts_kind ON contracts(kind);
 CREATE INDEX IF NOT EXISTS idx_contracts_deleted ON contracts(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+/** v7 送货单 pass-1(#101)：归档库头表 + 材料明细，OCR/导出仍由 #42/#23 深化。 */
+const V7_DELIVERY_RECORDS = `
+CREATE TABLE IF NOT EXISTS delivery_records (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL REFERENCES projects(id),
+  supplier_id   TEXT REFERENCES suppliers(id),
+  raw_site_text TEXT DEFAULT '',
+  order_no      TEXT DEFAULT '',
+  delivery_date TEXT DEFAULT '',
+  file_name     TEXT DEFAULT '',
+  file_path     TEXT DEFAULT '',
+  ocr_status    TEXT DEFAULT 'pending',
+  archived      INTEGER DEFAULT 0,
+  stored        INTEGER DEFAULT 0,
+  review_flag   TEXT DEFAULT '',
+  note          TEXT DEFAULT '',
+  created_at    TEXT DEFAULT (datetime('now')),
+  updated_at    TEXT DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS delivery_lines (
+  id                 TEXT PRIMARY KEY,
+  delivery_record_id TEXT NOT NULL REFERENCES delivery_records(id),
+  material_name      TEXT NOT NULL DEFAULT '',
+  spec               TEXT DEFAULT '',
+  unit               TEXT DEFAULT '',
+  qty                REAL DEFAULT 0,
+  unit_price         REAL DEFAULT 0,
+  amount             REAL DEFAULT 0,
+  note               TEXT DEFAULT '',
+  sort_order         INTEGER DEFAULT 0,
+  created_at         TEXT DEFAULT (datetime('now')),
+  updated_at         TEXT DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_delivery_proj ON delivery_records(project_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_sup ON delivery_records(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_lines_rec ON delivery_lines(delivery_record_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_records_deleted ON delivery_records(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_delivery_lines_deleted ON delivery_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_delivery_natural
+  ON delivery_records(project_id, supplier_id, order_no)
+  WHERE deleted_at IS NULL AND supplier_id IS NOT NULL;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -203,6 +250,13 @@ export const migrations: Migration[] = [
     async up(db) {
       await addColumnIfMissing(db, 'projects', 'exec_manager', `TEXT DEFAULT ''`)
       await addColumnIfMissing(db, 'projects', 'builder', `TEXT DEFAULT ''`)
+    },
+  },
+  {
+    version: 7,
+    name: 'delivery-records-pass-1',
+    async up(db) {
+      await execScript(db, V7_DELIVERY_RECORDS)
     },
   },
 ]
