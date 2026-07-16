@@ -46,9 +46,16 @@ test.describe('精确因子组合工作台', () => {
     await expect(page.getByText('528,442.48', { exact: true })).toBeVisible()
     await expect(page.getByText(/伍拾贰万捌仟肆佰肆拾贰元肆角捌分/)).toBeVisible()
 
-    await page.locator('#factor-tax-rate').fill('-100')
+    const taxRateInput = page.locator('#factor-tax-rate')
+    await taxRateInput.fill('0')
+    await expect(taxRateInput).toHaveValue('1')
+    await taxRateInput.fill('14')
+    await expect(taxRateInput).toHaveValue('13')
+    await taxRateInput.fill('1.5')
+    await expect(taxRateInput).toHaveValue('13')
+    await taxRateInput.fill('')
     await page.getByRole('button', { name: '计算税额和不含税金额' }).click()
-    await expect(page.getByRole('alert')).toHaveText('请输入有效的含税金额和税率')
+    await expect(page.getByRole('alert')).toHaveText('税率请输入 1-13 的正整数')
 
     await page.locator('#factor-target').fill('12.34')
     await page.getByLabel('因子 1 的数值').fill('3.21')
