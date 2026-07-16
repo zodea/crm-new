@@ -2,9 +2,9 @@
 
 > 本文是设计稿的色值·字体·组件·图标·动效清单。**视觉风格基准（圆角卡片 vs 扁平）以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准**——§1.2 / §3.2 / §4.1 正文已就地更新为「圆角卡片 + 阴影」，其中标注的「扁平、无圆角、无阴影」旧条款仅存历史。  
 > ⛔ 本文关于“中文单字方块 + 毛玻璃侧栏”的应用外壳规格已废弃，现行权威源见 [ADR 0011](../adr/0011-redesign-application-shell.md)。下文相关内容仅作历史留档。
-> 色值来源: `docs/设计系统配色更新/app-new.html` color update v5 (2026-06-26)  
+> 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。`app.dc.html` 与 `app-new.html` 都直接加载它；不得在效果稿或应用侧复制色值。
 > 内容区交互模式: `CRM-PATTERNS.md`  
-> 最后更新: 2026-07-08
+> 最后更新: 2026-07-16
 
 ---
 
@@ -32,13 +32,13 @@
 
 | 令牌 | 色值 | 用途 |
 |---|---|---|
-| `--bg` | `#f4f7fb` | 画布底色（冷蓝灰） |
+| `--bg` | `#f8f9fb` | 画布底色（轻机构灰） |
 | `--panel` | `#ffffff` | 面板/卡片（白纸） |
-| `--surface-2` | `#edf2f7` | 表头 / 卡片次级底 |
-| `--surface-3` | `#e7edf4` | 占位 / 行 hover 底 |
-| `--surface-sink` | `#dfe7f0` | 预览区凹底 |
-| `--line` | `#d7e0ea` | 默认描边 |
-| `--line-strong` | `#b8c5d4` | 强描边：按钮 / 输入框 |
+| `--surface-2` | `#f1f5f9` | 表头 / 卡片次级底 |
+| `--surface-3` | `#f3f4f6` | 占位 / 行 hover 底 |
+| `--surface-sink` | `#e9edf4` | 预览区凹底 |
+| `--line` | `#e3e6ea` | 默认描边 |
+| `--line-strong` | `#c9ced6` | 强描边：按钮 / 输入框 |
 
 > 侧边栏专用：`--sidebar-panel: rgb(255 255 255 / 82%)`（半透明白+blur），仅侧边栏使用。
 
@@ -48,7 +48,7 @@
 |---|---|---|
 | `--brand` | `#3976C6` | 主品牌蓝 |
 | `--brand-deep` | `#2A5996` | 深蓝（选中文字/强调） |
-| `--brand-soft` | `#e6f0fb` | 选中行底/筛选激活态/浅底按钮 |
+| `--brand-soft` | `rgb(213 230 248)` | 选中行底/筛选激活态/浅底按钮 |
 
 ### 2.3 状态色 (v5) — 三档：实色 / 浅底 / 深字
 
@@ -62,9 +62,9 @@
 
 | 令牌 | 色值 | 用途 |
 |---|---|---|
-| `--ink` | `#182436` | 主文字 |
-| `--ink-soft` | `#4e5d70` | 次级文字 |
-| `--ink-faint` | `#607187` | 弱文字/占位符 |
+| `--ink` | `#1f2329` | 主文字 |
+| `--ink-soft` | `#5b6470` | 次级文字 |
+| `--ink-faint` | `#8b93a1` | 弱文字/占位符 |
 
 ### 2.5 暗色模式
 
@@ -79,7 +79,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | 令牌 | 值 | 用途 |
 |---|---|---|
 | `--radius-card` | `12px` | 侧边栏面板/导航项 |
-| `--radius-btn` | `10px` | 按钮/输入/导航项 |
+| `--radius-btn` | `8px` | 按钮/输入/导航项 |
 | `--radius-sm` | `8px` | 小图标按钮/分页控件 |
 | `--sidebar-blur` | `blur(12px)` | 侧边栏毛玻璃 |
 | `--sidebar-shadow` | `0 1px 3px rgba(16,24,40,0.08)` | 侧边栏卡片 |
@@ -90,7 +90,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 | 规则 | 说明 |
 |---|---|
-| 圆角 | 卡片 `--radius-card` 12px；按钮/输入 `--radius-btn` 10px；小控件 `--radius-sm` 8px；chip `--radius-pill` 999px |
+| 圆角 | 卡片 `--radius-card` 12px；按钮/输入 `--radius-btn` 8px；小控件 `--radius-sm` 8px；chip `--radius-pill` 999px |
 | 阴影 | 卡片用轻投影阴影 `--shadow-card`（与 1px 边框叠加分层）；~~原「不使用阴影」已废弃~~ |
 | 毛玻璃 | **不使用** `backdrop-filter` |
 | 边框 | 统一 `1px solid var(--line)`，表格内部用 `var(--line)` |
@@ -556,4 +556,4 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | `--shadow-card` | 内容区移除 | 仅侧边栏/弹窗保留（⚠️ ADR 0007 已恢复内容区卡片阴影，此行为 v5 迁移期旧记录） |
 | `--blur` / `--blur-sm` | 内容区移除 | 仅侧边栏保留 |
 | `--radius-card: 13px` | `--radius-card: 12px` | 对齐 Claude Design |
-| `--radius-btn: 7px` | `--radius-btn: 10px`（小控件 `--radius-sm: 8px`） | 2026-07-13 可读性与形状优化 |
+| `--radius-btn: 7px` | `--radius-btn: 8px`（小控件 `--radius-sm: 8px`） | 与效果稿共用令牌，2026-07-16 |
