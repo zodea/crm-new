@@ -45,11 +45,11 @@ function totalQuantity(items: FactorSolutionItem[]): string {
 </script>
 
 <template>
-  <section class="min-w-0" style="background-color: var(--panel)">
-    <div class="border-b border-line p-4">
+  <section class="flex min-w-0 flex-col xl:min-h-0" style="background-color: var(--panel)">
+    <div class="shrink-0 border-b border-line p-4">
       <div class="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h2 class="text-15px font-800 text-ink">
+          <h2 class="text-14px font-800 text-ink">
             精确组合结果
           </h2>
           <p class="mt-1 text-11px text-ink-faint">
@@ -92,7 +92,11 @@ function totalQuantity(items: FactorSolutionItem[]): string {
       </div>
     </div>
 
-    <div v-if="result?.solutions.length" class="max-h-[620px] overflow-auto">
+    <div
+      v-if="result?.solutions.length"
+      data-testid="factor-results-scroll"
+      class="max-h-[520px] overflow-auto overscroll-contain xl:min-h-0 xl:flex-1 xl:max-h-none"
+    >
       <table class="w-full min-w-[620px] border-collapse text-14px">
         <thead class="sticky top-0 z-1 bg-surface-2">
           <tr class="border-b border-line text-left text-13px text-ink-soft">
@@ -151,7 +155,7 @@ function totalQuantity(items: FactorSolutionItem[]): string {
       </table>
     </div>
 
-    <div v-else class="grid min-h-72 place-items-center p-8 text-center">
+    <div v-else class="grid min-h-64 flex-1 place-items-center p-8 text-center">
       <div>
         <span class="i-lucide-sigma text-32px text-ink-faint" />
         <p class="mt-2 text-13px font-600 text-ink-soft">

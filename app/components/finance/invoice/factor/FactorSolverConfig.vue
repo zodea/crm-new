@@ -43,7 +43,7 @@ function updateDecimal(id: number, event: Event) {
 </script>
 
 <template>
-  <section class="min-w-0 p-4 xl:border-r xl:border-line" style="background-color: var(--panel)">
+  <section class="min-w-0 p-4 xl:min-h-0 xl:overflow-y-auto xl:border-r xl:border-line xl:overscroll-contain" style="background-color: var(--panel)">
     <div class="mb-3 flex items-start justify-between gap-3">
       <div>
         <h2 class="text-13px font-800 text-ink">
@@ -59,7 +59,7 @@ function updateDecimal(id: number, event: Event) {
     </div>
 
     <div class="overflow-hidden rounded-[var(--radius-btn)] border border-line">
-      <div class="grid grid-cols-[minmax(0,1fr)_124px_62px_34px] items-center gap-1 bg-surface-2 px-2.5 py-2 text-10px font-700 text-ink-faint">
+      <div class="grid grid-cols-[minmax(86px,1fr)_106px_46px_28px] items-center gap-1.5 bg-surface-2 px-2.5 py-2 text-10px font-700 text-ink-faint">
         <span>因子值</span>
         <span class="text-right">最大次数/数量</span>
         <span class="text-center">小数</span>
@@ -68,7 +68,7 @@ function updateDecimal(id: number, event: Event) {
       <div
         v-for="factor in props.factors"
         :key="factor.id"
-        class="grid grid-cols-[minmax(0,1fr)_124px_62px_34px] items-center gap-1.5 border-t border-line px-2.5 py-2"
+        class="grid grid-cols-[minmax(86px,1fr)_106px_46px_28px] items-center gap-1.5 border-t border-line px-2.5 py-2"
       >
         <input
           :value="factor.value ?? ''"

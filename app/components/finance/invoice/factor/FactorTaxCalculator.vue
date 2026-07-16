@@ -52,9 +52,9 @@ function copyMoney(fen: number) {
 </script>
 
 <template>
-  <section class="border-t border-line p-4" style="background-color: var(--surface-2)">
-    <div class="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[190px_minmax(220px,1fr)_104px_190px]">
-      <div class="self-center">
+  <section class="border-t border-line" style="background-color: var(--surface-2)">
+    <div class="grid xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div class="self-center px-4 py-3">
         <div class="flex items-center gap-2">
           <span class="i-lucide-receipt-text text-15px text-brand" />
           <h2 class="text-13px font-800 text-ink">
@@ -65,67 +65,70 @@ function copyMoney(fen: number) {
           金额按分计算，结果自动勾稽
         </p>
       </div>
-      <div>
-        <label for="factor-tax-total" class="field-label block">含税合同金额</label>
-        <input
-          id="factor-tax-total"
-          v-model.number="total"
-          type="number"
-          min="0"
-          step="0.01"
-          class="field-input w-full font-mono"
-          placeholder="597140.00"
-        >
+      <div class="grid items-end gap-3 border-t border-line px-4 py-3 md:grid-cols-[minmax(220px,1fr)_104px_190px] xl:border-l xl:border-t-0">
+        <div>
+          <label for="factor-tax-total" class="field-label block">含税合同金额</label>
+          <input
+            id="factor-tax-total"
+            v-model.number="total"
+            type="number"
+            min="0"
+            step="0.01"
+            class="field-input w-full font-mono"
+            placeholder="597140.00"
+          >
+        </div>
+        <div>
+          <label for="factor-tax-rate" class="field-label block">税率（%）</label>
+          <input
+            id="factor-tax-rate"
+            v-model.number="rate"
+            type="number"
+            min="0"
+            step="0.01"
+            class="field-input w-full font-mono"
+            placeholder="13"
+          >
+        </div>
+        <button type="button" class="btn-primary h-[34px] w-full whitespace-nowrap active:translate-y-px" @click="calculateTax">
+          计算税额和不含税金额
+        </button>
       </div>
-      <div>
-        <label for="factor-tax-rate" class="field-label block">税率（%）</label>
-        <input
-          id="factor-tax-rate"
-          v-model.number="rate"
-          type="number"
-          min="0"
-          step="0.01"
-          class="field-input w-full font-mono"
-          placeholder="13"
-        >
-      </div>
-      <button type="button" class="btn-primary h-[34px] w-full whitespace-nowrap active:translate-y-px" @click="calculateTax">
-        计算税额和不含税金额
-      </button>
     </div>
 
-    <p v-if="error" class="mt-3 text-12px text-danger" role="alert">
+    <p v-if="error" class="border-t border-line px-4 py-2 text-12px text-danger" role="alert">
       {{ error }}
     </p>
 
-    <div v-if="result" class="mt-3 grid gap-x-5 gap-y-2 border-t border-line pt-3 text-12px md:grid-cols-2 xl:grid-cols-3">
-      <div class="min-w-0">
-        <span class="text-ink-faint">不含税金额：</span>
-        <button class="border-0 bg-transparent p-0 font-mono font-700 text-brand hover:underline" @click="copyMoney(result.noTaxFen)">
+    <div v-if="result" data-testid="tax-result-grid" class="grid border-t border-line text-12px md:grid-cols-3">
+      <div data-testid="tax-result-item" class="min-w-0 px-4 py-3 md:border-r md:border-line">
+        <span class="block text-11px font-600 text-ink-faint">不含税金额</span>
+        <button type="button" class="mt-1 block max-w-full border-0 bg-transparent p-0 text-left font-mono text-14px font-700 tabular-nums text-brand hover:underline" @click="copyMoney(result.noTaxFen)">
           {{ formatMoneyFromFen(result.noTaxFen) }}
         </button>
-        <span class="text-ink-faint"> 元 ｜ </span>
-        <button class="border-0 bg-transparent p-0 text-brand hover:underline" @click="emit('copy', chineseFromFen(result.noTaxFen))">
+        <button type="button" data-testid="tax-uppercase" class="mt-1 block w-full border-0 bg-transparent p-0 text-left leading-5 text-ink-soft [overflow-wrap:anywhere] hover:text-brand hover:underline" @click="emit('copy', chineseFromFen(result.noTaxFen))">
           {{ chineseFromFen(result.noTaxFen) }}
         </button>
       </div>
-      <div class="min-w-0">
-        <span class="text-ink-faint">税额：</span>
-        <button class="border-0 bg-transparent p-0 font-mono font-700 text-brand hover:underline" @click="copyMoney(result.taxFen)">
+      <div data-testid="tax-result-item" class="min-w-0 border-t border-line px-4 py-3 md:border-r md:border-t-0">
+        <span class="block text-11px font-600 text-ink-faint">税额</span>
+        <button type="button" class="mt-1 block max-w-full border-0 bg-transparent p-0 text-left font-mono text-14px font-700 tabular-nums text-brand hover:underline" @click="copyMoney(result.taxFen)">
           {{ formatMoneyFromFen(result.taxFen) }}
         </button>
-        <span class="text-ink-faint"> 元 ｜ </span>
-        <button class="border-0 bg-transparent p-0 text-brand hover:underline" @click="emit('copy', chineseFromFen(result.taxFen))">
+        <button type="button" data-testid="tax-uppercase" class="mt-1 block w-full border-0 bg-transparent p-0 text-left leading-5 text-ink-soft [overflow-wrap:anywhere] hover:text-brand hover:underline" @click="emit('copy', chineseFromFen(result.taxFen))">
           {{ chineseFromFen(result.taxFen) }}
         </button>
       </div>
-      <div class="min-w-0">
-        <span class="text-ink-faint">含税金额大写：</span>
-        <button class="border-0 bg-transparent p-0 text-brand hover:underline" @click="emit('copy', chineseFromFen(result.totalFen))">
+      <div data-testid="tax-result-item" class="min-w-0 border-t border-line px-4 py-3 md:border-t-0">
+        <span class="block text-11px font-600 text-ink-faint">含税金额</span>
+        <button type="button" class="mt-1 block max-w-full border-0 bg-transparent p-0 text-left font-mono text-14px font-700 tabular-nums text-brand hover:underline" @click="copyMoney(result.totalFen)">
+          {{ formatMoneyFromFen(result.totalFen) }}
+        </button>
+        <button type="button" data-testid="tax-uppercase" class="mt-1 block w-full border-0 bg-transparent p-0 text-left leading-5 text-ink-soft [overflow-wrap:anywhere] hover:text-brand hover:underline" @click="emit('copy', chineseFromFen(result.totalFen))">
           {{ chineseFromFen(result.totalFen) }}
         </button>
       </div>
-      <div class="font-mono text-10px text-ink-faint md:col-span-2 xl:col-span-3">
+      <div class="border-t border-line px-4 py-2 font-mono text-10px text-ink-faint md:col-span-3">
         校验：{{ formatMoneyFromFen(result.noTaxFen) }} + {{ formatMoneyFromFen(result.taxFen) }} = {{ formatMoneyFromFen(result.totalFen) }}
       </div>
     </div>
