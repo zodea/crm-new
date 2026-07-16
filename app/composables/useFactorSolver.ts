@@ -154,8 +154,6 @@ export function useFactorSolver() {
     }
 
     stopCurrentWorker()
-    solverResult.value = null
-    statusMessage.value = ''
     calculating.value = true
     showCalculationMask.value = false
     runStartedAt.value = performance.now()

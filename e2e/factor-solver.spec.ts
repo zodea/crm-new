@@ -35,6 +35,54 @@ test.describe('精确因子组合工作台', () => {
     await expect(page.getByText('2.5×0.5(=1.25)', { exact: true }).first()).toBeVisible()
   })
 
+  test('短计算不会清空旧结果或闪烁可见 loading', async ({ page }) => {
+    const calculateButton = page.getByTestId('factor-calculate')
+    const resultRows = page.locator('[data-testid="factor-workbench"] tbody tr')
+
+    await calculateButton.click()
+    await expect(resultRows).toHaveCount(3)
+
+    await page.evaluate(() => {
+      const workbench = document.querySelector<HTMLElement>('[data-testid="factor-workbench"]')
+      if (!workbench)
+        throw new Error('factor workbench not found')
+
+      const snapshots: Array<{ rows: number, buttonText: string, hasMask: boolean }> = []
+      const collect = () => {
+        snapshots.push({
+          rows: workbench.querySelectorAll('tbody tr').length,
+          buttonText: workbench.querySelector<HTMLElement>('[data-testid="factor-calculate"]')?.textContent?.trim() ?? '',
+          hasMask: Boolean(workbench.querySelector('[role="status"]')),
+        })
+      }
+      const observer = new MutationObserver(collect)
+      observer.observe(workbench, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true,
+      })
+      collect()
+      Reflect.set(window, '__factorFlickerProbe', { observer, snapshots })
+    })
+
+    await calculateButton.click()
+    await page.waitForTimeout(250)
+
+    const snapshots = await page.evaluate(() => {
+      const probe = Reflect.get(window, '__factorFlickerProbe') as {
+        observer: MutationObserver
+        snapshots: Array<{ rows: number, buttonText: string, hasMask: boolean }>
+      }
+      probe.observer.disconnect()
+      return probe.snapshots
+    })
+
+    expect(snapshots.some(snapshot => snapshot.rows === 0)).toBe(false)
+    expect(snapshots.some(snapshot => snapshot.buttonText === '计算中')).toBe(false)
+    expect(snapshots.some(snapshot => snapshot.hasMask)).toBe(false)
+  })
+
   test('税额计算准确且配置刷新后仍然保留', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))

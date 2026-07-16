@@ -61,8 +61,8 @@ const {
           data-testid="factor-calculate"
           @click="calculate"
         >
-          <span :class="calculating ? 'i-lucide-hourglass' : 'i-lucide-calculator'" class="mr-1.5 text-14px" />
-          {{ calculating ? '计算中' : '开始计算' }}
+          <span :class="showCalculationMask ? 'i-lucide-hourglass' : 'i-lucide-calculator'" class="mr-1.5 text-14px" />
+          {{ showCalculationMask ? '计算中' : '开始计算' }}
         </button>
       </div>
     </header>
