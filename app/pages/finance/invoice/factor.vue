@@ -15,9 +15,13 @@ const {
 </script>
 
 <template>
-  <div data-testid="factor-workbench" class="relative overflow-hidden rounded-[var(--radius-card)] border border-line shadow-[var(--shadow-card)]" style="background-color: var(--panel)">
-    <header class="grid items-end gap-3 border-b border-line px-4 py-4 md:grid-cols-2 xl:grid-cols-[minmax(250px,1fr)_minmax(220px,0.85fr)_150px_160px]" style="background-color: var(--panel)">
-      <div class="self-center">
+  <div
+    data-testid="factor-workbench"
+    class="relative overflow-hidden rounded-[var(--radius-card)] border border-line shadow-[var(--shadow-card)] xl:grid xl:h-[calc(100dvh-118px)] xl:grid-rows-[auto_minmax(0,1fr)_auto]"
+    style="background-color: var(--panel)"
+  >
+    <header class="grid border-b border-line xl:grid-cols-[360px_minmax(0,1fr)]" style="background-color: var(--panel)">
+      <div class="self-center px-4 py-4">
         <h1 class="text-16px font-800 text-ink">
           精确加法组合
         </h1>
@@ -25,43 +29,45 @@ const {
           金额按分精确计算，仅返回恰好等于目标值的组合
         </p>
       </div>
-      <div>
-        <label for="factor-target" class="field-label block">目标值</label>
-        <input
-          id="factor-target"
-          v-model.number="state.target"
-          type="number"
-          min="0"
-          step="any"
-          class="field-input w-full font-mono text-16px font-700 tabular-nums"
-          placeholder="请输入目标值"
+      <div class="grid items-end gap-3 border-t border-line px-4 py-4 md:grid-cols-[minmax(220px,1fr)_140px_160px] xl:border-l xl:border-t-0">
+        <div>
+          <label for="factor-target" class="field-label block">目标值</label>
+          <input
+            id="factor-target"
+            v-model.number="state.target"
+            type="number"
+            min="0"
+            step="any"
+            class="field-input w-full font-mono text-16px font-700 tabular-nums"
+            placeholder="请输入目标值"
+          >
+        </div>
+        <div>
+          <label for="factor-max-results" class="field-label block">返回解数量</label>
+          <input
+            id="factor-max-results"
+            v-model.number="state.maxResults"
+            type="number"
+            min="1"
+            max="5000"
+            class="field-input w-full font-mono"
+            placeholder="默认 100"
+          >
+        </div>
+        <button
+          type="button"
+          class="btn-primary h-[34px] w-full whitespace-nowrap text-13px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="calculating || state.factors.length === 0"
+          data-testid="factor-calculate"
+          @click="calculate"
         >
+          <span :class="calculating ? 'i-lucide-hourglass' : 'i-lucide-calculator'" class="mr-1.5 text-14px" />
+          {{ calculating ? '计算中' : '开始计算' }}
+        </button>
       </div>
-      <div>
-        <label for="factor-max-results" class="field-label block">返回解数量</label>
-        <input
-          id="factor-max-results"
-          v-model.number="state.maxResults"
-          type="number"
-          min="1"
-          max="5000"
-          class="field-input w-full font-mono"
-          placeholder="默认 100"
-        >
-      </div>
-      <button
-        type="button"
-        class="btn-primary h-[34px] w-full whitespace-nowrap text-13px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
-        :disabled="calculating || state.factors.length === 0"
-        data-testid="factor-calculate"
-        @click="calculate"
-      >
-        <span :class="calculating ? 'i-lucide-hourglass' : 'i-lucide-calculator'" class="mr-1.5 text-14px" />
-        {{ calculating ? '计算中' : '开始计算' }}
-      </button>
     </header>
 
-    <div class="grid xl:grid-cols-[390px_minmax(560px,1fr)]" style="background-color: var(--panel)">
+    <div class="grid min-h-0 xl:grid-cols-[360px_minmax(0,1fr)] xl:overflow-hidden" style="background-color: var(--panel)">
       <FactorSolverConfig :factors="state.factors" @update:factors="state.factors = $event" />
       <FactorSolverResults
         v-model:include-factor="includeFactor"
