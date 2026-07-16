@@ -20,8 +20,13 @@ const error = shallowRef('')
 function calculateTax() {
   const totalFen = total.value == null ? null : yuanToFen(total.value)
   const taxRate = Number(rate.value)
-  if (totalFen == null || !Number.isFinite(taxRate) || totalFen < 0 || taxRate < 0) {
-    error.value = '请输入有效的含税金额和税率'
+  if (totalFen == null || totalFen < 0) {
+    error.value = '请输入有效的含税金额'
+    result.value = null
+    return
+  }
+  if (!Number.isInteger(taxRate) || taxRate < 1 || taxRate > 13) {
+    error.value = '税率请输入 1-13 的正整数'
     result.value = null
     return
   }
@@ -33,6 +38,24 @@ function calculateTax() {
     taxFen: totalFen - noTaxFen,
   }
   error.value = ''
+}
+
+function updateTaxRate(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  if (input.value === '') {
+    rate.value = null
+    return
+  }
+
+  const nextRate = input.valueAsNumber
+  if (!Number.isInteger(nextRate)) {
+    input.value = rate.value == null ? '' : String(rate.value)
+    return
+  }
+
+  const constrainedRate = Math.min(13, Math.max(1, nextRate))
+  rate.value = constrainedRate
+  input.value = String(constrainedRate)
 }
 
 function formatMoneyFromFen(fen: number): string {
@@ -82,12 +105,15 @@ function copyMoney(fen: number) {
           <label for="factor-tax-rate" class="field-label block">税率（%）</label>
           <input
             id="factor-tax-rate"
-            v-model.number="rate"
+            :value="rate ?? ''"
             type="number"
-            min="0"
-            step="0.01"
+            min="1"
+            max="13"
+            step="1"
+            inputmode="numeric"
             class="field-input w-full font-mono"
             placeholder="13"
+            @input="updateTaxRate"
           >
         </div>
         <button type="button" class="btn-primary h-[34px] w-full whitespace-nowrap active:translate-y-px" @click="calculateTax">
