@@ -12,6 +12,18 @@ let mem: TestDb
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work(mem)
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (error) {
+      await mem.execute('ROLLBACK')
+      throw error
+    }
+  },
 }))
 
 const DELIVERY_MARKDOWN = `

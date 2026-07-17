@@ -7,13 +7,37 @@ import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 let mem: TestDb
+let failTransactionSql: RegExp | null = null
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work({
+        ...mem,
+        async execute(sql, params) {
+          if (failTransactionSql?.test(sql))
+            throw new Error('injected transaction failure')
+          return mem.execute(sql, params)
+        },
+        async select<T>(sql: string, params?: unknown[]) {
+          return mem.select<T>(sql, params)
+        },
+      })
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (error) {
+      await mem.execute('ROLLBACK')
+      throw error
+    }
+  },
 }))
 
 beforeEach(async () => {
+  failTransactionSql = null
   mem = await createMemoryDb()
   await runMigrations(mem)
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城')`)
@@ -349,6 +373,39 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
     })
     expect(source?.bytes).toEqual(replacementBytes)
     expect(store.byId(id)?.fileName).toBe('替换.jpg')
+  })
+
+  it('补传原件中途失败时，附件元数据、正文和单头文件名整体回滚', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: null,
+      orderNo: 'SH-SOURCE-ROLLBACK',
+      deliveryDate: '2026-07-17',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    failTransactionSql = /UPDATE delivery_records/
+    await expect(store.saveSourceFile(
+      id,
+      new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], '补传.png', { type: 'image/png' }),
+    )).rejects.toThrow('injected transaction failure')
+
+    const [attachmentCounts] = await mem.select<{ refs: number, payloads: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM file_refs
+          WHERE owner_type = 'delivery_record' AND owner_id = ? AND category = 'source') AS refs,
+         (SELECT COUNT(*) FROM file_payloads) AS payloads`,
+      [id],
+    )
+    const [record] = await mem.select<{ file_name: string }>(
+      'SELECT file_name FROM delivery_records WHERE id = ?',
+      [id],
+    )
+    expect(attachmentCounts).toEqual({ refs: 0, payloads: 0 })
+    expect(record?.file_name).toBe('')
+    expect(store.byId(id)).toMatchObject({ fileName: '', hasSourceFile: false })
   })
 
   it('删除会隐藏送货单及其明细，撤回后完整恢复', async () => {

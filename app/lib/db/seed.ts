@@ -1,5 +1,5 @@
+import type { MigrationDb } from './migrations'
 import { generateId } from '~/lib/util/id'
-import { execute, select } from './connection'
 
 type SeedRow = Record<string, unknown>
 
@@ -24,16 +24,16 @@ function columnPlaceholders(row: SeedRow): { cols: string[], vals: unknown[] } {
   return { cols, vals }
 }
 
-async function seedFromJson(table: string, rows: SeedRow[]) {
+async function seedFromJson(db: MigrationDb, table: string, rows: SeedRow[]) {
   for (const row of rows) {
     const { cols, vals } = columnPlaceholders(row)
     const placeholders = cols.map(() => '?').join(', ')
     const colNames = cols.map(c => `"${c}"`).join(', ')
-    await execute(`INSERT OR IGNORE INTO "${table}" (${colNames}) VALUES (${placeholders})`, vals)
+    await db.execute(`INSERT OR IGNORE INTO "${table}" (${colNames}) VALUES (${placeholders})`, vals)
   }
 }
 
-export async function seedIfEmpty() {
+export async function seedIfEmpty(db: MigrationDb) {
   const jsonTables = [
     'projects',
     'suppliers',
@@ -65,32 +65,32 @@ export async function seedIfEmpty() {
   let anySeeded = false
 
   for (const table of jsonTables) {
-    const [row] = await select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
+    const [row] = await db.select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
     if ((row?.cnt ?? 0) > 0)
       continue
 
     const json = loadSeedJson(table)
     if (json && json.length > 0) {
-      await seedFromJson(table, json)
+      await seedFromJson(db, table, json)
       anySeeded = true
     }
   }
 
   if (!anySeeded) {
-    const [row] = await select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
+    const [row] = await db.select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
     if ((row?.cnt ?? 0) === 0) {
-      await seedHardcoded()
+      await seedHardcoded(db)
     }
   }
 }
 
-async function seedHardcoded() {
-  const projIds = await seedProjects()
-  const supIds = await seedSuppliers()
-  await seedProjectSuppliers(projIds, supIds)
+async function seedHardcoded(db: MigrationDb) {
+  const projIds = await seedProjects(db)
+  const supIds = await seedSuppliers(db)
+  await seedProjectSuppliers(db, projIds, supIds)
 }
 
-async function seedProjects() {
+async function seedProjects(db: MigrationDb) {
   const projects = [
     {
       name: '合和新城·3号楼',
@@ -146,7 +146,7 @@ async function seedProjects() {
     const id = generateId('proj')
     ids.push(id)
     const now = new Date().toISOString()
-    await execute(
+    await db.execute(
       `INSERT INTO projects (id, name, code, address, region, operation_type, start_date, planned_end, status, developer, contractor, manager, manager_phone, site_leader, site_leader_phone, contract_amount, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, p.name, p.code, p.address, p.region, p.operationType, p.startDate, p.plannedEnd, p.status, p.developer, p.contractor, p.manager, p.managerPhone, p.siteLeader ?? '', p.siteLeaderPhone ?? '', p.contractAmount, now, now],
@@ -155,7 +155,7 @@ async function seedProjects() {
   return ids
 }
 
-async function seedSuppliers() {
+async function seedSuppliers(db: MigrationDb) {
   const suppliers = [
     {
       name: '广州市大板东建材有限公司',
@@ -226,7 +226,7 @@ async function seedSuppliers() {
     const id = generateId('sup')
     ids.push(id)
     const now = new Date().toISOString()
-    await execute(
+    await db.execute(
       `INSERT INTO suppliers (id, name, aliases, tax_no, supplier_category, legal_rep, address, main_business, bank, bank_account, contact, contact_phone, credential_status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, s.name, JSON.stringify(s.aliases), s.taxNo, s.supplierCategory, s.legalRep ?? '', s.address, s.mainBusiness, s.bank ?? '', s.bankAccount ?? '', s.contact, s.contactPhone, s.credentialStatus, now, now],
@@ -235,7 +235,7 @@ async function seedSuppliers() {
   return ids
 }
 
-async function seedProjectSuppliers(projIds: string[], supIds: string[]) {
+async function seedProjectSuppliers(db: MigrationDb, projIds: string[], supIds: string[]) {
   const relations = [
     { projIdx: 0, supIdx: 0, status: 'contracted' },
     { projIdx: 0, supIdx: 1, status: 'claiming' },
@@ -248,7 +248,7 @@ async function seedProjectSuppliers(projIds: string[], supIds: string[]) {
   for (const r of relations) {
     const id = generateId('ps')
     const now = new Date().toISOString()
-    await execute(
+    await db.execute(
       `INSERT INTO project_suppliers (id, project_id, supplier_id, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [id, projIds[r.projIdx], supIds[r.supIdx], r.status, now, now],
