@@ -44,6 +44,7 @@ const TAX_ID_RE = /(?<![0-9A-Z])([0-9A-Z](?:[ \t]*[0-9A-Z]){14,19})(?![0-9A-Z])/
 const MONEY_WITH_SYMBOL_RE = /[¥￥][ \t]*([+-]?\d(?:[0-9,， \t]*\d)?[ \t]*\.[ \t]*\d[ \t]*\d)/g
 const KNOWN_TAX_RATES = new Set(['0', '1', '1.5', '2', '3', '4', '5', '6', '9', '10', '11', '13', '16', '17'])
 const INVOICE_ITEM_UNIT_RE = /^(?:[个件套张块片条支根包袋盒瓶桶卷台把米吨次项]|公斤)$/
+const MONEY_RECONCILIATION_TOLERANCE = 0.02
 
 type InvoiceItemColumn = 'name' | 'spec' | 'unit' | 'quantity' | 'unitPrice' | 'amount' | 'taxRate' | 'taxAmount'
 
@@ -227,6 +228,7 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
   let amount: number | null = null
   let taxAmount: number | null = null
   let independentAmount = false
+  let moneySourceConflict = false
 
   const pairs = text
     .split('\n')
@@ -234,7 +236,7 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
     .filter((values): values is [number, number, ...number[]] => values.length >= 2)
   const matchingPair = totalAmount == null
     ? pairs[0]
-    : pairs.find(values => Math.abs(values[0] + values[1] - totalAmount!) <= 0.02) || pairs[0]
+    : pairs.find(values => Math.abs(values[0] + values[1] - totalAmount!) <= MONEY_RECONCILIATION_TOLERANCE) || pairs[0]
   if (matchingPair) {
     amount = matchingPair[0]
     taxAmount = matchingPair[1]
@@ -244,6 +246,9 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
   if (items.length) {
     const itemAmount = round2(items.reduce((sum, item) => sum + item.amount, 0))
     const itemTax = round2(items.reduce((sum, item) => sum + item.taxAmount, 0))
+    moneySourceConflict = matchingPair != null
+      && (Math.abs(matchingPair[0] - itemAmount) > MONEY_RECONCILIATION_TOLERANCE
+        || Math.abs(matchingPair[1] - itemTax) > MONEY_RECONCILIATION_TOLERANCE)
     if (itemAmount > 0) {
       amount = itemAmount
       independentAmount = true
@@ -261,10 +266,11 @@ function extractMoneyFields(text: string, items: ParsedInvoiceItem[]): Pick<Pars
     taxAmount = round2(totalAmount - amount)
 
   const balanced = independentAmount
+    && !moneySourceConflict
     && amount != null
     && taxAmount != null
     && totalAmount != null
-    && Math.abs(round2(amount + taxAmount) - totalAmount) <= 0.02
+    && Math.abs(round2(amount + taxAmount) - totalAmount) <= MONEY_RECONCILIATION_TOLERANCE
   return { amount, taxAmount, totalAmount, balanced }
 }
 
