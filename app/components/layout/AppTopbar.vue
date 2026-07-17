@@ -1,35 +1,57 @@
 <script setup lang="ts">
+import { useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { SidebarTrigger, useSidebar } from '~/components/ui/sidebar'
+import { routeSubtitle, routeTitle } from '~/lib/tabs/tab-title'
 
+const route = useRoute()
 const notificationStore = useNotificationStore()
 const { unreadCount } = storeToRefs(notificationStore)
-const { theme, toggleTheme } = useShellTheme()
 const { isMobile } = useSidebar()
 
 const showNotifications = shallowRef(false)
 const showDevTools = shallowRef(false)
 const isDev = import.meta.dev
+const now = useNow({ interval: 60_000 })
+
+const pageTitle = computed(() => routeTitle(route.path) || '瑞航 CRM')
+const pageSubtitle = computed(() => routeSubtitle(route.path))
+const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'Asia/Shanghai',
+})
+const weekdayFormatter = new Intl.DateTimeFormat('zh-CN', {
+  weekday: 'long',
+  timeZone: 'Asia/Shanghai',
+})
+const dateLabel = computed(() => {
+  const weekday = weekdayFormatter.format(now.value).replace('星期', '周')
+  return `${dateFormatter.format(now.value)} · ${weekday}`
+})
 </script>
 
 <template>
   <header
-    class="flex h-[var(--header-h)] shrink-0 items-center border-b border-[var(--shell-header-border)] bg-[var(--shell-header-bg)] px-4 text-[var(--shell-header-text)] backdrop-blur-[8px]"
+    data-shell-topbar
+    class="sticky top-0 z-[var(--z-shell-header)] flex h-[var(--header-h)] shrink-0 items-center gap-[12px] border-b border-[var(--shell-header-border)] bg-[var(--shell-header-bg)] px-[24px] text-[var(--shell-header-text)] backdrop-blur-[8px]"
   >
     <SidebarTrigger class="lg:hidden" />
-    <div class="flex-1" />
+    <div class="min-w-0 flex-1">
+      <h1 class="truncate text-18px font-800 leading-[1.2]">
+        {{ pageTitle }}
+      </h1>
+      <p class="mt-[2px] min-h-[16px] truncate text-12px leading-[1.35] text-[var(--shell-header-muted)]">
+        {{ pageSubtitle }}
+      </p>
+    </div>
+
+    <time class="hidden flex-none text-12px text-[var(--shell-header-muted)] md:block" :datetime="now.toISOString()">
+      {{ dateLabel }}
+    </time>
 
     <div class="flex items-center gap-1" aria-label="应用工具栏">
-      <button
-        type="button"
-        class="shell-icon-button"
-        :title="theme === 'dark' ? '切换为浅色侧栏' : '切换为深色侧栏'"
-        :aria-label="theme === 'dark' ? '切换为浅色侧栏' : '切换为深色侧栏'"
-        @click="toggleTheme"
-      >
-        <span :class="theme === 'dark' ? 'i-lucide-sun' : 'i-lucide-moon'" class="h-4 w-4" aria-hidden="true" />
-      </button>
-
       <button
         type="button"
         class="shell-icon-button relative"
