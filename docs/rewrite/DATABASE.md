@@ -99,6 +99,8 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | FilePayload | `file_payloads` | `fileRefId` | 共用（附件正文，仅按需读取） |
 | BankCode | `bank_codes` | `id` | `base-worker.md` §五（银行行号字典，内置 seed，无外键） |
 
+`suppliers.external_ref TEXT DEFAULT ''` 保存 ADR 0005 的「外部旧ID / 匹配标识」，作为旧系统迁移对账、二次导入修正与去重键；非空且未软删的记录必须唯一（迁移 v11）。
+
 ### 2.2 项目关联实体
 
 | 实体 | 表名 | PK | 设计文档 |

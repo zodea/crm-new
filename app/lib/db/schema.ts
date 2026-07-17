@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS suppliers (
   id                  TEXT PRIMARY KEY,
   name                TEXT NOT NULL,
+  external_ref        TEXT DEFAULT '',
   aliases             TEXT DEFAULT '[]',
   unique_code         TEXT DEFAULT '',
   tax_no              TEXT DEFAULT '',
