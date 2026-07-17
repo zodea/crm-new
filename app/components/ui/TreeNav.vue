@@ -59,7 +59,7 @@ function iconClass(r: Row): string {
 function labelClass(r: Row): string {
   const weight = r.on ? 'font-800' : r.sub ? 'font-500' : 'font-600'
   const color = r.tone === 'warn' && !r.on ? 'text-warn-ink' : r.on ? 'text-brand-deep' : 'text-ink'
-  const size = r.sub ? 'text-[13px]' : 'text-[14px]'
+  const size = r.sub ? 'text-[12.5px]' : 'text-[13px]'
   return `${weight} ${color} ${size}`
 }
 </script>
@@ -89,7 +89,7 @@ function labelClass(r: Row): string {
         >{{ r.label }}</span>
         <span
           v-if="r.count != null"
-          class="rounded-full px-[7px] py-[1px] text-[12px] font-mono tabular-nums"
+          class="rounded-full px-[7px] py-[1px] text-[11px] font-mono tabular-nums"
           :class="r.on ? 'bg-white text-brand' : 'bg-surface-3 text-ink-faint'"
         >{{ r.count }}</span>
       </button>

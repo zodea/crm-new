@@ -379,7 +379,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 | 正文 | 14px | 400 | var(--font-sans) |
 | 紧凑正文/表格 | 13-14px | 400 | var(--font-sans) |
 | 标签 | 11-12px | 600 | var(--font-sans) |
-| 统计卡数字 | 20-24px | 500 | var(--font-mono) |
+| 统计卡数字 | 24px（#110/A2，设计稿实测；line-height 1.1） | 800 | var(--font-mono) |
 | 金额/编号 | 11-14px | 500-700 | var(--font-mono) |
 | 导航副提示 | 12-13px | 400 | var(--font-sans) |
 | 极小提示 | 9-10px | 400 | var(--font-sans) |
