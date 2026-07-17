@@ -4,10 +4,11 @@ import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
 import { computed, readonly, ref, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
-import { execute, select } from '~/lib/db/connection'
+import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
+import { normalizePrintRotation } from '~/lib/invoice/print-layout'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
 import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
 import { formatFileSize } from '~/lib/util/file'
@@ -499,7 +500,58 @@ export const useInvoiceStore = defineStore('invoice', () => {
     return { archived, excluded: rejected }
   }
 
+  /**
+   * 系统打印对话框关闭后、用户明确确认“已打印”才调用：批量累加次数并保存本次排版角度。
+   * 单事务保证一批票要么全部落账，要么全部不动；直接 SQL `print_count + 1` 避免旧快照覆写计数。
+   */
+  async function recordPrinted(ids: readonly string[], rotations: Readonly<Record<string, number>>) {
+    const printableIds = [...new Set(ids)]
+    if (!printableIds.length)
+      return 0
+
+    const now = new Date().toISOString()
+    let committedRows: { id: string, printCount: number, printRotation: number }[] = []
+    await withTransaction(async (tx) => {
+      const placeholders = printableIds.map(() => '?').join(', ')
+      const rows = await tx.select<{ id: string, printCount: number, printRotation: number }>(
+        `SELECT id, print_count AS printCount, print_rotation AS printRotation
+         FROM invoices
+         WHERE deleted_at IS NULL AND id IN (${placeholders})`,
+        printableIds,
+      )
+      if (rows.length !== printableIds.length)
+        throw new Error('PRINT_RECORD_SET_CHANGED')
+
+      const currentRotations = new Map(rows.map(row => [row.id, row.printRotation]))
+      for (const id of printableIds) {
+        const logId = await withUpdateLog(tx, 'invoices', id, () => tx.execute(
+          `UPDATE invoices
+           SET print_count = print_count + 1, print_rotation = ?, updated_at = ?
+           WHERE id = ?`,
+          [normalizePrintRotation(rotations[id] ?? currentRotations.get(id) ?? 0), now, id],
+        ))
+        if (!logId)
+          throw new Error('PRINT_RECORD_SET_CHANGED')
+      }
+      committedRows = rows
+    })
+
+    const committedById = new Map(committedRows.map(row => [row.id, row]))
+    list.value = list.value.map((invoice) => {
+      const committed = committedById.get(invoice.id)
+      if (!committed)
+        return invoice
+      return {
+        ...invoice,
+        printCount: committed.printCount + 1,
+        printRotation: normalizePrintRotation(rotations[invoice.id] ?? committed.printRotation),
+        updatedAt: now,
+      }
+    })
+    return printableIds.length
+  }
+
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), recognitionError, load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), recognitionError, load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, recordPrinted, remove, restore, undo }
 })
