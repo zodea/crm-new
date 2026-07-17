@@ -3,6 +3,7 @@ import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import { isAllGreen, resolveAttribution } from '~/lib/invoice/batch-pass'
 import { confidenceTier, isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { invoiceDocStatus } from '~/lib/invoice/status'
+import { yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
@@ -12,6 +13,11 @@ const { success, warning, info, undoToast, confirm, promise } = useKitUI()
 const searchText = shallowRef('')
 const workspaceFilter = shallowRef<'all' | 'recognizing' | 'suggested' | 'warning' | 'danger'>('all')
 const selectedId = shallowRef<string | null>(null)
+const workspaceMode = shallowRef<'review' | 'print'>('review')
+const workspaceModes = [
+  { key: 'review', label: '字段校对' },
+  { key: 'print', label: '打印排版' },
+]
 
 /** 按项目名称查具体项目（归档写入用规范名，而非发票原始 OCR/自由文本，避免 project_id/project_name 各指不同项目）。 */
 function findProjectByName(name: string) {
@@ -264,6 +270,34 @@ const visibleWorkspaceRows = computed(() => {
   })
 })
 
+const printableInvoices = computed(() => visibleWorkspaceRows.value.map(row => row.inv))
+
+async function handlePrint(payload: {
+  ids: string[]
+  rotations: Record<string, number>
+  pageCount: number
+  totalAmount: number
+}) {
+  await nextTick()
+  window.print()
+  const printed = await confirm({
+    title: '确认打印结果',
+    message: `系统打印窗口已关闭。是否已完成打印？\n\n${payload.ids.length} 张发票 · ${payload.pageCount} 页 A4 · 金额合计 ${yuan(payload.totalAmount)}`,
+    confirmLabel: '已打印',
+    cancelLabel: '取消',
+  })
+  if (!printed)
+    return
+
+  try {
+    const updated = await store.recordPrinted(payload.ids, payload.rotations)
+    success(`已记录 ${updated} 张发票的打印次数`)
+  }
+  catch {
+    warning('打印记录未保存：所选发票已发生变化，请刷新后重试')
+  }
+}
+
 watch(visibleWorkspaceRows, (rows) => {
   if (!rows.some(({ inv }) => inv.id === selectedId.value))
     selectedId.value = rows[0]?.inv.id ?? null
@@ -306,8 +340,12 @@ onMounted(() => {
       @pass="handleBatchPass"
     />
 
+    <div class="panel mb-3 px-3">
+      <SegTab v-model="workspaceMode" :tabs="workspaceModes" />
+    </div>
+
     <!-- #60 单一校对工作台：左队列 / 中原图 / 右字段 -->
-    <div class="flex gap-3.5" style="height: calc(100vh - 220px); min-height: 560px">
+    <div class="flex gap-3.5" style="height: calc(100vh - 260px); min-height: 540px">
       <InvoiceQueuePanel
         v-model:search="searchText"
         v-model:filter="workspaceFilter"
@@ -319,8 +357,15 @@ onMounted(() => {
       />
 
       <InvoiceOriginalPanel
+        v-if="workspaceMode === 'review'"
         :invoice="selectedInvoice"
         :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
+      />
+      <InvoicePrintLayout
+        v-else
+        v-model:selected-id="selectedId"
+        :invoices="printableInvoices"
+        @print="handlePrint"
       />
 
       <!-- 右栏 — 识别结果校对（字段表） -->

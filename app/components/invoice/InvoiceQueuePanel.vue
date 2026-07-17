@@ -58,6 +58,7 @@ const selectedId = defineModel<string | null>('selectedId', { required: true })
         v-for="{ inv, label, cls, dotCls } in rows"
         :key="inv.id"
         type="button"
+        :aria-label="`选择发票 ${inv.invoiceNumber || inv.fileName}`"
         class="flex w-full items-center gap-2 border-0 border-b border-line px-2.5 py-2.5 text-left transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
         :class="selectedId === inv.id ? 'bg-brand-soft' : 'bg-panel hover:bg-surface-3'"
         @click="selectedId = inv.id"
