@@ -41,5 +41,7 @@ describe('tauri 桌面壳安全边界', () => {
 
     expect(config.app.security.csp).toContain('default-src \'self\'')
     expect(config.app.security.devCsp).toContain('default-src \'self\'')
+    expect(config.app.security.csp).toContain('frame-src \'self\' blob:')
+    expect(config.app.security.devCsp).toContain('frame-src \'self\' blob:')
   })
 })
