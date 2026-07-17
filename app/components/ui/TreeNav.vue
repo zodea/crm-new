@@ -65,7 +65,7 @@ function labelClass(r: Row): string {
 </script>
 
 <template>
-  <div class="content-panel overflow-hidden rounded-[var(--radius-card)]">
+  <div class="panel overflow-hidden">
     <div
       v-if="title"
       class="border-b border-line bg-surface-2 px-[12px] py-[10px] text-[13px] font-700 text-ink-soft"

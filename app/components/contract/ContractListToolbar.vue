@@ -24,7 +24,7 @@ const project = defineModel<string>('project', { required: true })
 </script>
 
 <template>
-  <section class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
+  <section class="panel flex flex-wrap items-center gap-3 p-3.5">
     <div class="mr-1 flex flex-none items-baseline gap-2">
       <h2 class="text-14px font-800 text-ink">
         {{ title }}

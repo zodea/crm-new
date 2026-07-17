@@ -121,15 +121,17 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 }
 ```
 
-**内容区面板**
+**内容区面板（L1 卡片，#110 B1 已统一为 `panel` shortcut，旧名 `content-panel` 已删除）**
 ```css
-.content-panel {
+.panel {
   border: 1px solid var(--line);
   border-radius: var(--radius-card); /* 12px，ADR 0007：圆角卡片 */
   background: var(--panel);
   box-shadow: var(--shadow-card);    /* 卡片阴影，ADR 0007；无毛玻璃 */
 }
+/* 可点卡片叠加 .panel-hover：hover 边转 --brand + 阴影升级 --shadow-pop */
 ```
+配方权威源见 DESIGN-TASTE §4.1（默认内边距 16、表格卡 0 + overflow:hidden、卡内不嵌套圆角阴影）。
 
 ### 4.2 按钮：五变体层级（#109 落地，只指向不复制）
 

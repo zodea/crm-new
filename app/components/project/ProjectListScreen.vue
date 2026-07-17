@@ -247,7 +247,6 @@ onMounted(() => Promise.all([store.load(), detailStore.load()]))
     />
 
     <KitTable
-      class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
       :columns="columns"
       :data="tableRows"
       :loading="store.loading"

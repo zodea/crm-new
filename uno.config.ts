@@ -179,8 +179,11 @@ export default defineConfig({
     // 侧边栏面板（毛玻璃）
     'sidebar-panel': 'border border-line rounded-[var(--radius-card)] bg-[rgb(255_255_255/82%)] backdrop-blur-[12px] shadow-[var(--sidebar-shadow)]',
 
-    // 内容区面板（扁平）
-    'content-panel': 'border border-line bg-panel',
+    // L1 卡片底座（DESIGN-TASTE §4.1 / ADR 0007，#110 B1）：一切内容容器的唯一配方，
+    // 内边距由调用处按 12–16 自持（表格卡 0 + overflow-hidden）；卡内不再嵌套圆角阴影。
+    // 可点卡片叠加 panel-hover（hover 边转 brand + 阴影升级）。
+    'panel': 'border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]',
+    'panel-hover': 'transition-[border-color,box-shadow] duration-[var(--dur-fast)] hover:border-brand hover:shadow-[var(--shadow-pop)]',
 
     // 按钮：五变体层级语言（权威源 DESIGN-TASTE §4.2，#109）。
     // 缺省 = btn-secondary 安静按钮；实心蓝只属于 btn-accent（每屏 ≤1 枚核心 CTA）；

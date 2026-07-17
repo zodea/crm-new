@@ -19,7 +19,7 @@ function rotate(delta: number) {
 </script>
 
 <template>
-  <section class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel shadow-[var(--shadow-card)]">
+  <section class="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
     <div class="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface-2 px-3">
       <div class="min-w-0">
         <div class="truncate text-11px font-700 text-ink" :title="file?.name">

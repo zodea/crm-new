@@ -63,7 +63,7 @@ onMounted(refresh)
 
 <template>
   <div v-if="record" class="flex min-w-0 flex-col gap-4">
-    <div class="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
+    <div class="panel flex items-center gap-3 px-4 py-3">
       <NuxtLink to="/material/delivery/archive" class="icon-btn" title="返回归档库">
         <span class="i-lucide-arrow-left text-14px" />
       </NuxtLink>
@@ -92,7 +92,7 @@ onMounted(refresh)
       <Metric label="入库状态" :value="record.stored ? '已入库' : '未入库'" formula="入库供单价对比，留第二趟" />
     </MetricGrid>
 
-    <div class="rounded-[var(--radius-card)] border border-line bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
+    <div class="panel px-4 py-3">
       <SectionHeader title="单据信息" />
       <div class="mt-2 grid grid-cols-2 gap-x-8">
         <div class="detail-row">

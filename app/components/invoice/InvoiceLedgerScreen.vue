@@ -178,14 +178,13 @@ onMounted(() => {
 
     <!-- 左树右表 -->
     <div class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-[220px_minmax(0,1fr)]">
-      <TreeNav v-model="node" class="shadow-[var(--shadow-card)]" title="按归属" :items="treeItems" />
+      <TreeNav v-model="node" title="按归属" :items="treeItems" />
 
       <div class="min-w-0 flex flex-col">
         <!-- 表格视图 -->
         <KitTable
           v-if="view === 'table'"
           ref="tableEl"
-          class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
           :columns="columns"
           :data="rows"
           :loading="store.loading"
@@ -236,7 +235,7 @@ onMounted(() => {
         </KitTable>
 
         <!-- 卡片视图（发票预览大图，快速删除） -->
-        <div v-else class="border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]">
+        <div v-else class="panel p-3.5">
           <div class="grid grid-cols-1 gap-3 lg:grid-cols-3 sm:grid-cols-2">
             <div
               v-for="inv in rows"
