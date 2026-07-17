@@ -34,6 +34,7 @@ const BASELINE_TABLES = [
   'ticket_registrations',
   'payment_applications',
   'file_refs',
+  'file_payloads',
 ]
 
 describe('迁移机制：版本化顺序迁移', () => {
@@ -252,6 +253,46 @@ describe('迁移机制：存量表 ALTER 补列', () => {
       `SELECT amount_source FROM delivery_lines WHERE id = 'line-v8'`,
     )
     expect(row.amount_source).toBe('manual')
+    db.close()
+  })
+
+  it('v10：送货单原件元数据与正文分表，source 附件对每条归档唯一', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(m => m.version <= 9))
+    await db.execute(`
+      INSERT INTO file_refs
+        (id, owner_type, owner_id, file_name, category)
+      VALUES ('file-legacy', 'delivery_record', 'del-legacy', '旧附件.pdf', 'other')
+    `)
+
+    const result = await runMigrations(db)
+
+    expect(result.from).toBe(9)
+    expect(result.to).toBe(LATEST_VERSION)
+    expect(await columnNames(db, 'file_refs')).toContain('mime_type')
+    expect(await columnNames(db, 'file_refs')).not.toContain('content_base64')
+    expect(await listTables(db)).toContain('file_payloads')
+    expect(await columnNames(db, 'file_payloads')).toEqual(expect.arrayContaining([
+      'file_ref_id',
+      'encoding',
+      'content',
+    ]))
+
+    const [legacy] = await db.select<{ mime_type: string | null }>(
+      `SELECT mime_type FROM file_refs WHERE id = 'file-legacy'`,
+    )
+    expect(legacy.mime_type ?? '').toBe('')
+
+    await db.execute(`
+      INSERT INTO file_refs
+        (id, owner_type, owner_id, file_name, category)
+      VALUES ('file-source-1', 'delivery_record', 'del-legacy', '原件一.pdf', 'source')
+    `)
+    await expect(db.execute(`
+      INSERT INTO file_refs
+        (id, owner_type, owner_id, file_name, category)
+      VALUES ('file-source-2', 'delivery_record', 'del-legacy', '原件二.pdf', 'source')
+    `)).rejects.toThrow()
     db.close()
   })
 })
