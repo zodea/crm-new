@@ -78,6 +78,26 @@ describe('parseDeliveryMarkdown', () => {
     expect(result.docs[0]?.items[0]?.name).not.toBe('1')
   })
 
+  it('产品编号不会抢占后续产品名称列', () => {
+    const result = parseDeliveryMarkdown([`
+      # 示例建材有限公司送货单
+      <table>
+        <tr><td>产品编号</td><td>产品名称</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>SKU-001</td><td>干拌砌筑砂浆</td><td>吨</td><td>2.5</td><td>320</td><td>800</td></tr>
+      </table>
+    `])
+
+    expect(result.docs[0]?.items).toEqual([
+      expect.objectContaining({
+        name: '干拌砌筑砂浆',
+        unit: '吨',
+        quantity: 2.5,
+        unitPrice: 320,
+        total: 800,
+      }),
+    ])
+  })
+
   it('不把 name-only 的无数值行跨列拼入上一条材料规格', () => {
     const result = parseDeliveryMarkdown([`
       # 示例建材有限公司送货单
