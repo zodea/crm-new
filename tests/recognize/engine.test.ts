@@ -34,6 +34,7 @@ describe('recognizeDocument', () => {
     const result = await recognizeDocument(file, {
       fetch: fetchMock,
       onProgress: value => progress.push(value),
+      useDocOrientationClassify: false,
     })
 
     expect(result).toEqual(OCR_RESULT)
@@ -46,6 +47,7 @@ describe('recognizeDocument', () => {
     expect(uploaded).toBe(file)
     expect(uploaded.name).toBe('电子发票.png')
     expect(uploaded.size).toBe(4)
+    expect((init?.body as FormData).get('useDocOrientationClassify')).toBe('false')
   })
 
   it('保留服务端稳定错误码、可重试标记和用户可读信息', async () => {

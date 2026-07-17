@@ -51,6 +51,7 @@ export interface OcrRecognitionResult {
 export interface RecognizeDocumentOptions {
   fetch?: typeof globalThis.fetch
   onProgress?: (percent: number) => void
+  useDocOrientationClassify?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,6 +136,8 @@ export async function recognizeDocument(
   const fetchImpl = options.fetch ?? globalThis.fetch
   const form = new FormData()
   form.append('file', file)
+  if (options.useDocOrientationClassify != null)
+    form.append('useDocOrientationClassify', String(options.useDocOrientationClassify))
   options.onProgress?.(5)
 
   let response: Response

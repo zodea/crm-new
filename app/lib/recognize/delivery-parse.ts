@@ -44,7 +44,7 @@ interface ParsedItems {
 }
 
 const COMPANY_HINT_RE = /有限责任公司|股份有限公司|有限公司|分公司|经营部|商行|商贸|贸易|建材|电缆|照明|装饰|设备|供应链|厂|店/
-const BUYER_FIELD_RE = /^(?:客户|需方|购方|收货单位|收货人|送货地址|送货地点|收货地址|收货地点|项目名称|项目|工地|地址|电话|联系电话|联系人|开户|账号|税号|统一社会信用代码|经手|经办|制单|司机|审核|审批|签收|签字|承运|备注|日期)/
+const BUYER_FIELD_RE = /^(?:客户|需方|购方|收货单位|送货单位|收货人|送货地址|送货地点|收货地址|收货地点|项目名称|项目|工地|地址|电话|联系电话|联系人|开户|账号|税号|统一社会信用代码|经手|经办|制单|司机|审核|审批|签收|签字|承运|备注|日期)/
 const DOC_TYPE_TAIL_RE = /(?:送货单|销货清单|销售清单|出货单|送货清单|发货单|销售单|对账单|清单|送货)$/
 const AGGREGATE_ROW_RE = /合\s*计|总\s*计|本页合计|总金额|应收|实收|大写/
 const NOISE_ITEM_RE = /^(?:备注|说明|大写|送货方式|注意|白色联|红色联|黄色联|绿色联|蓝色联|存根)$/
@@ -205,7 +205,9 @@ function mapHeader(cells: string[]): ColumnMap | null {
   const columns: ColumnMap = {}
   for (const [index, rawCell] of cells.entries()) {
     const cell = rawCell.replace(/\s/g, '')
-    if (/备注|说明/.test(cell))
+    if (/名称及规格/.test(cell))
+      columns.name ??= index
+    else if (/备注|说明/.test(cell))
       columns.note ??= index
     else if (/规格|型号/.test(cell))
       columns.spec ??= index
@@ -217,7 +219,7 @@ function mapHeader(cells: string[]): ColumnMap | null {
       columns.total ??= index
     else if (/单位/.test(cell))
       columns.unit ??= index
-    else if (/商品名称|材料名称|产品名称|货品名称|品名|货名|材料|项目/.test(cell))
+    else if (/商品名称|材料名称|产品名称|货品名称|名称及规格|品名|货名|材料|项目/.test(cell))
       columns.name ??= index
   }
   return columns.name != null && Object.keys(columns).length >= 3 ? columns : null
@@ -287,8 +289,8 @@ function tableItems(table: DeliveryTable): ParsedItems {
     const name = String(cells[header.name] ?? '').trim()
     if (!name
       || /^[-—\s]*$/.test(name)
-      || /^\d+(?:\.\d+)?$/.test(name)
       || /品名|名称|材料|产品/.test(name)
+      || BUYER_FIELD_RE.test(name)
       || NOISE_ITEM_RE.test(name)) {
       continue
     }
@@ -305,8 +307,12 @@ function tableItems(table: DeliveryTable): ParsedItems {
       previous.spec = [previous.spec, spec || name].filter(Boolean).join(' ')
       continue
     }
+    if (quantity == null && unitPrice == null && total == null)
+      continue
     if (total == null && quantity != null && unitPrice != null)
       total = round2(quantity * unitPrice)
+    if (/^\d+(?:\.\d+)?$/.test(name) || (unit && !UNIT_RE.test(unit)) || total == null)
+      note = [note, 'OCR 低置信字段（待复核）'].filter(Boolean).join('；')
     if (quantity != null && unitPrice != null && total != null && Math.abs(round2(quantity * unitPrice) - total) > 1)
       note = [note, '金额与数量×单价不符（待复核）'].filter(Boolean).join('；')
 
@@ -350,7 +356,9 @@ function documentFromTable(
     return null
   const summary = reviewSummary(parsed.items, parsed.statedTotal)
   return {
-    supplier: findSupplier(headerLines) || fileSupplier,
+    supplier: findSupplier(headerLines)
+      || findSupplier(table.rows.flatMap(row => row.flatMap(textLines)))
+      || fileSupplier,
     date: findDate(headerLines) || findDate(fileLines),
     orderNo: findOrderNo(headerLines),
     siteText: findSiteText(headerLines) || findSiteText(fileLines),

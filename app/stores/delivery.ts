@@ -1,8 +1,9 @@
 import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import { defineStore } from 'pinia'
-import { computed, readonly, ref, shallowRef } from 'vue'
+import { computed, reactive, readonly, shallowRef } from 'vue'
 import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
 import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
+import { prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
@@ -46,6 +47,7 @@ export interface DeliveryFile {
   rawText: string
   engine: string
   model: string
+  preprocessed: boolean
 }
 
 export interface DeliveryReviewInput {
@@ -87,7 +89,7 @@ function fileKind(fileName: string): DeliveryFile['kind'] {
 
 export const useDeliveryStore = defineStore('delivery', () => {
   const files = shallowRef<DeliveryFile[]>([])
-  const recognitionProgress = ref<Record<string, number>>({})
+  const recognitionProgress = reactive<Record<string, number>>({})
   const sourceFiles = new Map<string, File>()
 
   function byId(id: string): DeliveryFile | undefined {
@@ -117,6 +119,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         rawText: '',
         engine: '',
         model: '',
+        preprocessed: false,
       })
     }
     files.value = [...files.value, ...next]
@@ -137,11 +140,13 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }
 
     replaceFile(id, { ocrStatus: 'processing', ocrError: '' })
-    recognitionProgress.value[id] = 0
+    recognitionProgress[id] = 0
     try {
-      const result = await recognizeDocument(source, {
+      const prepared = await prepareDeliveryOcrImage(source)
+      const result = await recognizeDocument(prepared.file, {
+        useDocOrientationClassify: prepared.useDocOrientationClassify,
         onProgress: (progress) => {
-          recognitionProgress.value[id] = progress
+          recognitionProgress[id] = progress
         },
       })
       const parsed = parseDeliveryMarkdown(result.markdownPages)
@@ -173,6 +178,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         rawText: parsed.rawText,
         engine: result.engine,
         model: result.model,
+        preprocessed: prepared.transformed,
       })
       return true
     }
@@ -184,7 +190,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
       return false
     }
     finally {
-      delete recognitionProgress.value[id]
+      delete recognitionProgress[id]
     }
   }
 
@@ -201,7 +207,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     if (!byId(id))
       return false
     sourceFiles.delete(id)
-    delete recognitionProgress.value[id]
+    delete recognitionProgress[id]
     files.value = files.value.filter(file => file.id !== id)
     return true
   }

@@ -107,6 +107,39 @@ describe('paddleOcrCloudClient', () => {
     )
   })
 
+  it('允许已在本地扶正的图片关闭上游方向分类，避免二次误旋转', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { jobId: 'upright_job' } }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: { state: 'done', resultUrl: { jsonUrl: 'https://result.example/upright.jsonl' } },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: {
+          dataInfo: { width: 1000, height: 600 },
+          layoutParsingResults: [{ markdown: { text: '# 送货单' }, prunedResult: {} }],
+        },
+      })))
+    const client = new PaddleOcrCloudClient({
+      accessToken: 'test',
+      fetch: fetchMock,
+      sleep: async () => {},
+    })
+
+    await client.recognize({
+      fileName: '已扶正.png',
+      contentType: 'image/png',
+      data: new Uint8Array([1]),
+      useDocOrientationClassify: false,
+    })
+
+    const form = fetchMock.mock.calls[0]?.[1]?.body as FormData
+    expect(JSON.parse(String(form.get('optionalPayload')))).toMatchObject({
+      useDocOrientationClassify: false,
+      useDocUnwarping: true,
+    })
+  })
+
   it.each([
     [401, 'authentication', false],
     [403, 'authentication', false],

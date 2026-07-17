@@ -37,6 +37,22 @@ function inferredContentType(fileName: string, multipartType?: string): string {
   return CONTENT_TYPE_BY_EXTENSION[extension] || 'application/octet-stream'
 }
 
+function optionalBoolean(parts: Awaited<ReturnType<typeof readMultipartFormData>>, name: string): boolean | undefined {
+  const part = parts?.find(candidate => candidate.name === name)
+  if (!part)
+    return undefined
+  const value = part.data.toString('utf8').trim().toLowerCase()
+  if (value === 'true')
+    return true
+  if (value === 'false')
+    return false
+  throw createError({
+    statusCode: 400,
+    statusMessage: `Invalid ${name}`,
+    data: { code: 'invalid-request', message: `${name} 必须是 true 或 false` },
+  })
+}
+
 export default defineEventHandler(async (event) => {
   const parts = await readMultipartFormData(event)
   const file = parts?.find(part => part.name === 'file' && part.filename)
@@ -75,6 +91,7 @@ export default defineEventHandler(async (event) => {
       fileName: file.filename,
       contentType: inferredContentType(file.filename, file.type),
       data: file.data,
+      useDocOrientationClassify: optionalBoolean(parts, 'useDocOrientationClassify'),
     })
   }
   catch (error) {
