@@ -110,4 +110,30 @@ describe('parseDeliveryMarkdown', () => {
       expect.objectContaining({ name: '搬运费', unit: '次', quantity: 1, unitPrice: 20, total: 20 }),
     ])
   })
+
+  it('兼容“名称及规格”表头，并保留手写低置信行供人工改正', () => {
+    const result = parseDeliveryMarkdown([`
+      # 送货单 NO 7667928
+      日期：2026年6月21日
+      <table>
+        <tr><td>货号 NO</td><td>名称及规格 Description</td><td>单位 Unit</td><td>数量 Quantity</td><td>单价 Unit Price</td><td>金额 Amount</td><td>备注</td></tr>
+        <tr><td></td><td>7</td><td>12</td><td>150</td><td></td><td>10m</td><td></td></tr>
+        <tr><td>合计 TOTAL</td><td>佰拾</td><td>万壹仟陆佰</td><td>拾</td><td>元 0.00</td><td>分</td><td>广州示例建材有限公司</td></tr>
+        <tr><td>收货单位及经手人</td><td>送货单位及经手人</td></tr>
+      </table>
+    `])
+    const doc = result.docs[0]!
+
+    expect(result.supplier).toBe('广州示例建材有限公司')
+    expect(doc.items).toEqual([
+      expect.objectContaining({
+        name: '7',
+        unit: '12',
+        quantity: 150,
+        unitPrice: null,
+        total: null,
+        note: expect.stringContaining('低置信'),
+      }),
+    ])
+  })
 })

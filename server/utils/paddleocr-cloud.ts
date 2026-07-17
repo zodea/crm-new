@@ -60,6 +60,7 @@ export interface PaddleOcrCloudInput {
   contentType: string
   data: Uint8Array
   pageRanges?: string
+  useDocOrientationClassify?: boolean
   onProgress?: (percent: number) => void
 }
 
@@ -292,7 +293,11 @@ export class PaddleOcrCloudClient {
   private async submit(input: PaddleOcrCloudInput): Promise<string> {
     const form = new FormData()
     form.append('model', PADDLE_OCR_MODEL)
-    form.append('optionalPayload', JSON.stringify(OFFICIAL_OPTIONS))
+    form.append('optionalPayload', JSON.stringify({
+      ...OFFICIAL_OPTIONS,
+      useDocOrientationClassify: input.useDocOrientationClassify
+        ?? OFFICIAL_OPTIONS.useDocOrientationClassify,
+    }))
     if (input.pageRanges)
       form.append('pageRanges', input.pageRanges)
     const fileBytes = new Uint8Array(input.data.byteLength)
