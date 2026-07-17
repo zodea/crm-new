@@ -434,6 +434,39 @@ describe('parseDeliveryMarkdown', () => {
     })
   })
 
+  it('字段式收据清除票头标识、拆分项目末尾金额并保留备注', () => {
+    const result = parseDeliveryMarkdown([`
+      # G7 示例装卸搬运有限公司收款收据
+      NO 0003323
+      2026年5月2日
+      <table>
+        <tr><td>客户名称</td><td colspan="5"></td></tr>
+        <tr><td>服务项目</td><td colspan="5">叉车费 615</td></tr>
+        <tr><td>工作时间</td><td></td><td>装卸车数</td><td></td><td>搬卸台数</td><td></td></tr>
+        <tr><td colspan="6">人名币（大写）万仟陆佰壹拾伍元 ￥：615</td></tr>
+        <tr><td colspan="6">备注：卸砖 41 板</td></tr>
+      </table>
+    `])
+
+    expect(result.docs[0]).toMatchObject({
+      supplier: '示例装卸搬运有限公司',
+      orderNo: '0003323',
+      date: '2026-05-02',
+      statedTotal: 615,
+      calculatedTotal: 615,
+      balanced: true,
+    })
+    expect(result.docs[0]?.items).toEqual([{
+      name: '叉车费',
+      spec: '',
+      unit: '',
+      quantity: null,
+      unitPrice: null,
+      total: 615,
+      note: '卸砖 41 板',
+    }])
+  })
+
   it('组合名称规格表中带有效单位但数值缺失的材料保持独立待核行', () => {
     const result = parseDeliveryMarkdown([`
       # 示例材料有限公司送货单
