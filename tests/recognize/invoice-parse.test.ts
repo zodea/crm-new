@@ -85,6 +85,30 @@ describe('parseInvoiceText', () => {
     })
   })
 
+  it('票面合计与逐行明细冲突时保留冲突并降低金额置信度', () => {
+    const result = parseInvoiceText(`
+      # 电子发票（普通发票）
+      <table>
+        <tr><td>项目名称</td><td>规格型号</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td><td>税率</td><td>税额</td></tr>
+        <tr><td>*示例材料*材料甲</td><td>A</td><td>件</td><td>2</td><td>50.00</td><td>100.00</td><td>9%</td><td>9.00</td></tr>
+        <tr><td>*示例材料*材料乙</td><td>B</td><td>件</td><td>1</td><td>50.00</td><td>50.00</td><td>9%</td><td>4.50</td></tr>
+        <tr><td>合 计</td><td></td><td></td><td></td><td></td><td>¥150.00</td><td></td><td>¥13.00</td></tr>
+        <tr><td>价税合计（小写）</td><td colspan="7">¥163.50</td></tr>
+      </table>
+    `)
+    const confidence = buildInvoiceFieldConfidence(result)
+
+    expect(result).toMatchObject({
+      amount: 150,
+      taxAmount: 13.5,
+      totalAmount: 163.5,
+      balanced: false,
+    })
+    expect(confidence.amount).toBeLessThan(0.85)
+    expect(confidence.taxAmount).toBeLessThan(0.85)
+    expect(confidence.totalAmount).toBeLessThan(0.85)
+  })
+
   it('兼容字符间被 OCR 插入空格的票号、日期和金额', () => {
     const result = parseInvoiceText(`
       电 子 发 票（普 通 发 票）
