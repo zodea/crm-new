@@ -324,7 +324,7 @@ onMounted(() => {
       />
 
       <!-- 右栏 — 识别结果校对（字段表） -->
-      <div class="basis-[42%] min-w-0 overflow-y-auto border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]">
+      <div class="panel basis-[42%] min-w-0 overflow-y-auto">
         <div class="border-b border-line bg-surface-2 px-3 py-2.5 text-12px font-700 text-ink">
           识别结果提取
         </div>

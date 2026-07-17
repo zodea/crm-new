@@ -135,7 +135,7 @@ defineExpose({ clearCheckbox })
 </script>
 
 <template>
-  <div class="min-w-0 overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]">
+  <div class="panel min-w-0 overflow-hidden">
     <vxe-table
       ref="tableRef"
       :data="data"

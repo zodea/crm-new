@@ -278,7 +278,7 @@ async function demoImportMapping() {
 
     <div class="space-y-3">
       <!-- ① 系统/结果提示 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ① 系统/结果提示 — expand 道（右上，展开可读）
         </h2>
@@ -291,7 +291,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ② 过程提示 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ② 过程提示 — collapse 道（右下，重叠省空间）
         </h2>
@@ -312,7 +312,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ③ undoToast -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ③ undoToast — 软删除 10 秒撤回（expand 道）
         </h2>
@@ -325,7 +325,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ④ confirm 三档 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ④ confirm — 三档确认弹窗（ADR 0003）
         </h2>
@@ -349,7 +349,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑤ formModal -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑤ formModal — 字段配置驱动 + 必填校验
         </h2>
@@ -362,7 +362,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑥ 单文件直接保存 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑥ exportFile — 单文件直接保存（ADR 0004）
         </h2>
@@ -375,7 +375,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑦ KitButton 三态 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑦ KitButton — 提交按钮三态（#75）
         </h2>
@@ -404,7 +404,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑧ 配置导出页签 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑧ exportFile — 多文件配置导出页签（ADR 0004）
         </h2>
@@ -417,7 +417,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑨ 导入映射页签 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑨ openImportTab — 导入映射页签（ADR 0005）
         </h2>
@@ -431,7 +431,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑩ 按钮五变体 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑩ 按钮五变体 — 层级语言（DESIGN-TASTE §4.2 / #109）
         </h2>
@@ -474,7 +474,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- 结果回读 -->
-      <section class="content-panel p-4 bg-surface-2">
+      <section class="panel p-4 bg-surface-2">
         <h2 class="text-12px font-700 text-ink-soft mb-1">
           最近一次返回值
         </h2>

@@ -165,7 +165,7 @@ onMounted(refresh)
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <div class="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
+    <div class="panel flex items-center gap-3 px-4 py-3">
       <div>
         <div class="text-16px font-800 text-ink">
           送货单归档库
@@ -185,7 +185,7 @@ onMounted(refresh)
     </div>
 
     <div class="flex items-start gap-3">
-      <div class="w-64 shrink-0 overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]">
+      <div class="w-64 shrink-0">
         <TreeNav v-model="selectedNode" title="归档库 · 项目 → 分供方" :items="treeItems" />
       </div>
 
