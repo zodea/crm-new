@@ -142,10 +142,13 @@ onKeyStroke('Escape', () => closeMenu(true))
 </script>
 
 <template>
-  <div class="flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2">
+  <div
+    data-shell-tabbar
+    class="sticky top-[var(--header-h)] z-[var(--z-shell-tabbar)] flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2"
+  >
     <nav
       ref="tabListEl"
-      class="tabbar-scroll min-w-0 flex flex-1 items-end gap-1 overflow-x-auto overflow-y-hidden px-2 pt-1"
+      class="tabbar-scroll min-w-0 flex flex-1 items-stretch gap-[2px] overflow-x-auto overflow-y-hidden px-[16px]"
       aria-label="已打开页面"
     >
       <div
@@ -153,17 +156,18 @@ onKeyStroke('Escape', () => closeMenu(true))
         :key="tab.key"
         ref="tabEl"
         :data-tab-key="tab.key"
-        class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center whitespace-nowrap border border-transparent text-14px transition-[color,background-color,border-color] duration-[var(--dur-fast)]"
+        data-shell-tab
+        :data-active="tab.key === tabsStore.activeKey"
+        class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center gap-[6px] whitespace-nowrap px-[12px] text-13px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
         :class="tab.key === tabsStore.activeKey
-          ? 'browser-tab--active z-[1] font-700 text-ink'
-          : 'font-500 text-ink-soft hover:border-line hover:bg-surface-3 hover:text-ink'"
+          ? 'browser-tab--active font-800 text-brand'
+          : 'font-600 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
         @contextmenu.prevent="openMenu($event, tab.key)"
       >
         <button
           type="button"
           data-tab-trigger
-          class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent py-0 pl-3 pr-1 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
-          :class="tab.closable ? '' : 'pr-3'"
+          class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent p-0 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
           :aria-current="tab.key === tabsStore.activeKey ? 'page' : undefined"
           @click="goTab(tab.fullPath, tab.key)"
           @keydown="openKeyboardMenu($event, tab.key)"
@@ -173,12 +177,12 @@ onKeyStroke('Escape', () => closeMenu(true))
         <button
           v-if="tab.closable"
           type="button"
-          class="mr-2 grid h-5 w-5 shrink-0 place-items-center border-0 rounded-sm bg-transparent text-ink-faint opacity-70 outline-none hover:bg-danger-soft hover:text-danger focus-visible:[box-shadow:0_0_0_2px_var(--brand)] group-hover/tab:opacity-100"
+          class="grid h-4 w-4 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent p-0 text-13px leading-none text-ink-soft outline-none hover:bg-danger-soft hover:text-danger-ink focus-visible:[box-shadow:0_0_0_2px_var(--brand)]"
           title="关闭页签"
           :aria-label="`关闭 ${tab.title}`"
           @click.stop="closeAndFollow(tab.key)"
         >
-          <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
+          <span class="i-lucide-x h-[12px] w-[12px]" aria-hidden="true" />
         </button>
       </div>
     </nav>
@@ -265,39 +269,14 @@ onKeyStroke('Escape', () => closeMenu(true))
 }
 
 .browser-tab {
-  height: calc(var(--tabbar-h) - 4px);
-  border-radius: var(--radius-btn) var(--radius-btn) 0 0;
+  height: var(--tabbar-h);
+  border-radius: 6px 6px 0 0;
 }
 
 .browser-tab--active {
-  margin-bottom: -1px;
-  border-color: var(--line);
-  border-bottom-color: var(--shell-workspace-bg);
-  background: var(--shell-workspace-bg);
-  box-shadow: inset 0 2px 0 var(--brand);
-}
-
-/* Chrome 式连体肩线：激活页签底部自然过渡到工作区，而不是独立胶囊。 */
-.browser-tab--active::before,
-.browser-tab--active::after {
-  position: absolute;
-  bottom: 0;
-  width: 10px;
-  height: 10px;
-  content: '';
-  pointer-events: none;
-}
-
-.browser-tab--active::before {
-  left: -10px;
-  border-bottom-right-radius: var(--radius-btn);
-  box-shadow: 5px 5px 0 4px var(--shell-workspace-bg);
-}
-
-.browser-tab--active::after {
-  right: -10px;
-  border-bottom-left-radius: var(--radius-btn);
-  box-shadow: -5px 5px 0 4px var(--shell-workspace-bg);
+  color: var(--brand);
+  background: var(--panel);
+  box-shadow: inset 0 -2px 0 var(--brand);
 }
 
 .tab-menu-item {

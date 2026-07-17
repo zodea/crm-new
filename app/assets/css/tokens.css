@@ -1,11 +1,10 @@
 @import "../../../DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css";
 
 /* 设计系统令牌 — 瑞航 CRM
-   内容区遵循 ADR 0007，应用外壳遵循 ADR 0011。 */
+   内容区遵循 ADR 0007，应用外壳遵循 ADR 0013。 */
 
 :root {
   /* ── 外层应用框架 ── */
-  --sidebar-blur: blur(12px);
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
 
@@ -21,26 +20,27 @@
   /* ── 布局 ── */
   --sidebar-w: 248px;
   --sidebar-w-collapsed: 68px;
-  --header-h: 54px;
-  --tabbar-h: 36px;
-  --content-max: 1480px;
+  --header-h: 64px;
+  --tabbar-h: 40px;
 
   /* 命名层级，组件中不写裸 z-index。 */
+  --z-shell-tabbar: 19;
+  --z-shell-header: 20;
   --z-shell-sidebar: 40;
   --z-shell-overlay: 9500;
   --z-shell-drawer: 9501;
   --z-shell-popover: 9700;
 
-  /* 默认外壳 = 深蓝侧栏；先于 shadcn 变量桥接声明，避免 var() 在根级失效。 */
-  --shell-sidebar-bg: #162238;
-  --shell-sidebar-text: #f4f7fb;
-  --shell-sidebar-muted: #a9b6c8;
-  --shell-sidebar-hover: rgb(255 255 255 / 8%);
-  --shell-sidebar-active: rgb(57 118 198 / 24%);
-  --shell-sidebar-active-text: #8fc4ff;
-  --shell-sidebar-border: rgb(255 255 255 / 10%);
-  --shell-sidebar-input: rgb(0 0 0 / 16%);
-  --shell-header-bg: rgb(255 255 255 / 97%);
+  /* ADR 0013：外壳固定为设计稿浅色值；变量名保留，避免组件大范围改名。 */
+  --shell-sidebar-bg: var(--panel);
+  --shell-sidebar-text: var(--ink);
+  --shell-sidebar-muted: var(--ink-soft);
+  --shell-sidebar-hover: var(--surface-3);
+  --shell-sidebar-active: var(--brand-soft);
+  --shell-sidebar-active-text: var(--brand);
+  --shell-sidebar-border: var(--line);
+  --shell-sidebar-input: var(--surface-2);
+  --shell-header-bg: rgb(255 255 255 / 96%);
   --shell-header-text: var(--ink);
   --shell-header-muted: var(--ink-soft);
   --shell-header-hover: var(--brand-soft);
@@ -87,7 +87,7 @@
   --input: var(--line);
   --ring: var(--brand);
 
-  /* shadcn 圆角基准 = 按钮圆角(10px)，具体阶梯由 uno.config 派生 */
+  /* shadcn 圆角基准 = 按钮圆角(8px)，具体阶梯由 uno.config 派生 */
   --radius: var(--radius-btn);
 
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
@@ -108,51 +108,6 @@
   --sidebar-accent-foreground: var(--shell-sidebar-active-text);
   --sidebar-border: var(--shell-sidebar-border);
   --sidebar-ring: var(--brand);
-}
-
-/* 外壳主题只改变导航和顶栏，不改业务色、卡片和状态色。 */
-[data-shell-theme="dark"] {
-  --shell-sidebar-bg: #162238;
-  --shell-sidebar-text: #f4f7fb;
-  --shell-sidebar-muted: #a9b6c8;
-  --shell-sidebar-hover: rgb(255 255 255 / 8%);
-  --shell-sidebar-active: rgb(57 118 198 / 24%);
-  --shell-sidebar-active-text: #8fc4ff;
-  --shell-sidebar-border: rgb(255 255 255 / 10%);
-  --shell-sidebar-input: rgb(0 0 0 / 16%);
-  --shell-header-bg: rgb(255 255 255 / 97%);
-  --shell-header-text: var(--ink);
-  --shell-header-muted: var(--ink-soft);
-  --shell-header-hover: var(--brand-soft);
-  --shell-header-border: var(--line);
-  --shell-workspace-bg: var(--bg);
-  --sidebar-background: var(--shell-sidebar-bg);
-  --sidebar-foreground: var(--shell-sidebar-text);
-  --sidebar-accent: var(--shell-sidebar-active);
-  --sidebar-accent-foreground: var(--shell-sidebar-active-text);
-  --sidebar-border: var(--shell-sidebar-border);
-}
-
-[data-shell-theme="light"] {
-  --shell-sidebar-bg: #ffffff;
-  --shell-sidebar-text: var(--ink);
-  --shell-sidebar-muted: var(--ink-soft);
-  --shell-sidebar-hover: var(--surface-3);
-  --shell-sidebar-active: var(--brand-soft);
-  --shell-sidebar-active-text: var(--brand-deep);
-  --shell-sidebar-border: var(--line);
-  --shell-sidebar-input: var(--surface-2);
-  --shell-header-bg: rgb(255 255 255 / 97%);
-  --shell-header-text: var(--ink);
-  --shell-header-muted: var(--ink-soft);
-  --shell-header-hover: var(--brand-soft);
-  --shell-header-border: var(--line);
-  --shell-workspace-bg: var(--bg);
-  --sidebar-background: var(--shell-sidebar-bg);
-  --sidebar-foreground: var(--shell-sidebar-text);
-  --sidebar-accent: var(--shell-sidebar-active);
-  --sidebar-accent-foreground: var(--shell-sidebar-active-text);
-  --sidebar-border: var(--shell-sidebar-border);
 }
 
 .shell-layer-sidebar {
