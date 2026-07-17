@@ -261,6 +261,8 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 ### 8.2 已确证待收敛——本轮实测代码逐条点名
 
+> **完整版清单已移交 [#109 审计评论](https://github.com/zodea/crm-new/issues/109#issuecomment-4998491581)**（2026-07-17 放开限制后的全站审计：13px 阶漂移、数字层级错乱、Panel 底座缺失、content-panel 扁平残留、EntityLink/MoneyLink 穿透件缺失、列表页 chip 违例、表格汇总条/skeleton/空态、实心蓝泛滥量化、SegTab 双轨等九组）。本节以下仅保留首轮发现，后续以 #109 为准。
+
 **① 按钮层级语言相反（最大出入，建议最先修）**
 
 | 处 | 现状 | 基准（§4.2） |
