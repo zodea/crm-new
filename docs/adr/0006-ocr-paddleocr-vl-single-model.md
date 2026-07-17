@@ -12,7 +12,7 @@
 - **部署（主）= 本地自托管，首选 `llama.cpp`**（2026-07-06 定：Windows 为主 + Mac 需可用，取跨平台通吃的后端）：Windows 走 CUDA 构建（RTX 4060 8GB 跑 0.9B 富余），Mac 走 Metal 构建，同一套 GGUF 模型文件、同一个本地 server 协议，前端零分支。**MLX-VLM 降为 Mac 专属可选加速**（<14B 比 llama.cpp 快 20–87%，仅当 Mac 侧成为常用环境再启用）。Apache-2.0、数据 100% 不出机器、可离线、零泄漏。0.9B 极轻，硬件门槛远低于 7B 级模型。
 - **部署（显式启用的评估/联网模式）= PaddleOCR 官方 API**：2026-07-16 起先接官方异步 job API（`PaddleOCR-VL-1.6`），用于真实样本质量评估和本地运行时就绪前的识别。真实票据会上传至百度服务，必须由用户明确启用并自行配置 Access Token；不做静默上传或自动回退。浏览器只调用同源 Nitro 代理，Token 仅由服务端环境变量读取。当前该模式用于浏览器 dev 验收；Tauri 静态包没有 Nitro，若后续把云端定为桌面生产能力，需另立工作项实现 Tauri 后端代理或受控远端代理。
 - **结构化**：规则正则（A）为主（VL 的干净 Markdown/表格让正则更稳）；本地文本 LLM（Ollama qwen2.5）降为**可选的极个别怪版式兜底**，默认不启用、不常驻。
-- **统一识别接口** `recognize(docType, pages) → { markdownPages, layoutRegions?, engine }`，引擎（本地 VL / 云端 VL）可切换，调用方不感知。
+- **统一识别接口** `recognizeDocument(file) → { markdownPages, pages[{ layoutRegions }], engine, model, jobId }`；发票/送货单分别在本地纯解析器中把 Markdown 转成领域字段，引擎（本地 VL / 云端 VL）切换不渗透到页面和 store。
 - **坐标/高亮**：PaddleOCR-VL 输出版面区域（layout regions），支撑"点字段↔高亮原图"（块级）；参考实现 `CHEN010325/paddleocr-local` 已展示原图对齐可视化。
 
 **考虑过的替代**：
@@ -33,3 +33,10 @@
 - **开发与质量评估提速**：可先用官方 API 跑通真实识别和建立样本准确率基线，再切本地自托管；两端继续遵守统一识别接口。
 - **待验证**：本地 PaddleOCR-VL 对中文潦草手写送货单的实际质量需抽样实测（手写仍是全行业分水岭，保留人工复核）；VL 版面区域到"发票字段级"高亮的粒度需实测（块级可行，字段级看 layout 细度）。
 - **凭证安全**：云端 Access Token 只存在本机 `.env` / 服务端私有 runtime config，不进入浏览器、localStorage、数据库、日志、代码或 Git；状态接口只返回“是否已配置”。本地自托管无此凭证问题。
+
+## 2026-07-17 实施与样本核对
+
+- 官方 API、同源 Nitro 代理、浏览器 `File` 上传边界、稳定错误码和发票/送货单两个规则解析器均已接通；Access Token 已按服务端私有变量方式配置，本节不记录任何凭证值。
+- 真实电子发票样本：票号、日期、购销方及税号、金额/税额/价税合计和 2 条明细均可抽取，票号/销方/总额与季度台账真值一致。
+- 真实旋转送货单样本：自动校正后抽出供应商、日期、普通“单号”和 10 条材料明细；解析器能区分“本页金额 3842.20”与多页“累计总计 11815.20”，本页明细求和与票面金额一致。
+- `andyhuo520/ppocrv6-studio` 采用的是本地传统 PP-OCRv6 ONNX（Tiny/Small/Medium）工作台，不是 PaddleOCR-VL 1.6 官方云 API。其透视/旋转裁剪、检测框和几何表格重建可作为后续本地引擎及调试界面参考；`model_variant`、`det_thresh`、`box_thresh`、`unclip` 等配置不得伪装成云端 VL 参数发送。

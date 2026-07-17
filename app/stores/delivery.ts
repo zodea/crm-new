@@ -1,139 +1,293 @@
+import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
+import { defineStore } from 'pinia'
+import { computed, readonly, ref, shallowRef } from 'vue'
+import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
+import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
+import { generateId } from '~/lib/util/id'
+import { round2 } from '~/lib/util/number'
+import { useDeliveryRecordStore } from '~/stores/delivery-record'
+
+export type DeliveryOcrStatus = 'pending' | 'processing' | 'done' | 'failed'
+
 export interface DeliveryItem {
+  id: string
   name: string
+  spec: string
   unit: string
-  quantity: string
-  unitPrice: string
-  total: string
+  qty: number
+  unitPrice: number
+  amount: number
+  note: string
 }
 
 export interface DeliveryDoc {
   id: string
-  date: string | null
-  dateText: string
+  supplierText: string
+  deliveryDate: string
   orderNo: string
+  siteText: string
+  docType: '送货单' | '销售单' | '出货单' | '收据' | ''
   items: DeliveryItem[]
+  statedTotal: number | null
+  calculatedTotal: number
+  balanced: boolean
+  note: string
 }
 
 export interface DeliveryFile {
   id: string
   name: string
   kind: 'pdf' | 'image'
-  partitionId: string
-  company: string
-  companySource: '' | 'folder' | 'ocr' | 'manual'
-  companyConflict: boolean
+  size: number
+  supplierText: string
   docs: DeliveryDoc[]
-  ocrStatus: 'idle' | 'running' | 'done' | 'error'
+  ocrStatus: DeliveryOcrStatus
   ocrError: string
-  project: string
-  docType: '送货单' | '收据' | ''
+  rawText: string
+  engine: string
+  model: string
+}
+
+export interface DeliveryReviewInput {
+  projectId: string
+  supplierId: string | null
+  orderNo: string
+  deliveryDate: string
+  siteText: string
+  docType: DeliveryDoc['docType']
   note: string
+  items: DeliveryItem[]
 }
 
-export interface Partition {
-  id: string
-  name: string
+function editableNumber(value: number | null, fallback = 0): number {
+  return value == null || !Number.isFinite(value) ? fallback : value
 }
 
-const MOCK_PARTITIONS: Partition[] = [
-  { id: 'p_all', name: '全部' },
-  { id: 'p_1', name: '合和新城' },
-  { id: 'p_2', name: '车骏商业大楼' },
-]
+function itemFromParsed(item: ParsedDeliveryItem): DeliveryItem {
+  const qty = editableNumber(item.quantity, item.total != null ? 1 : 0)
+  const unitPrice = editableNumber(
+    item.unitPrice,
+    item.total != null && qty !== 0 ? round2(item.total / qty) : 0,
+  )
+  return {
+    id: generateId('ditem'),
+    name: item.name,
+    spec: item.spec,
+    unit: item.unit,
+    qty,
+    unitPrice,
+    amount: editableNumber(item.total, round2(qty * unitPrice)),
+    note: item.note,
+  }
+}
 
-const MOCK_FILES: DeliveryFile[] = [
-  {
-    id: 'df_1', name: '大板东建材-送货单-0615.pdf', kind: 'pdf',
-    partitionId: 'p_1', company: '广州市大板东建材有限公司',
-    companySource: 'folder', companyConflict: false,
-    docs: [{
-      id: 'dd_1', date: '2026-06-15', dateText: '2026年6月15日', orderNo: 'SH-2026-0615-001',
-      items: [
-        { name: 'HRB400 螺纹钢 Φ12', unit: '吨', quantity: '25.5', unitPrice: '3800', total: '96900' },
-        { name: 'HRB400 螺纹钢 Φ16', unit: '吨', quantity: '18.2', unitPrice: '3850', total: '70070' },
-      ],
-    }],
-    ocrStatus: 'done', ocrError: '', project: '合和新城·3号楼', docType: '送货单', note: '',
-  },
-  {
-    id: 'df_2', name: '大板东建材-送货单-0618.pdf', kind: 'pdf',
-    partitionId: 'p_1', company: '广州市大板东建材有限公司',
-    companySource: 'ocr', companyConflict: false,
-    docs: [{
-      id: 'dd_2', date: '2026-06-18', dateText: '2026年6月18日', orderNo: 'SH-2026-0618-003',
-      items: [
-        { name: 'C30 商品混凝土', unit: 'm³', quantity: '45', unitPrice: '420', total: '18900' },
-      ],
-    }],
-    ocrStatus: 'done', ocrError: '', project: '合和新城·3号楼', docType: '送货单', note: '',
-  },
-  {
-    id: 'df_3', name: '鸿运五金-收据-0620.jpg', kind: 'image',
-    partitionId: 'p_2', company: '佛山市南海区鸿运五金建材经营部',
-    companySource: 'folder', companyConflict: false,
-    docs: [{
-      id: 'dd_3', date: '2026-06-20', dateText: '6月20日', orderNo: '',
-      items: [
-        { name: '水管 PPR Φ25', unit: '米', quantity: '200', unitPrice: '12', total: '2400' },
-        { name: '电线 BV 2.5mm²', unit: '米', quantity: '500', unitPrice: '3.5', total: '1750' },
-      ],
-    }],
-    ocrStatus: 'done', ocrError: '', project: '车骏商业大楼', docType: '收据', note: '',
-  },
-  {
-    id: 'df_4', name: '顺利圆铝业-0622.pdf', kind: 'pdf',
-    partitionId: 'p_2', company: '', companySource: '',
-    companyConflict: false, docs: [],
-    ocrStatus: 'idle', ocrError: '', project: '车骏商业大楼', docType: '', note: '',
-  },
-  {
-    id: 'df_5', name: '不清晰扫描件.jpg', kind: 'image',
-    partitionId: 'p_1', company: '广州市大板东建材有限公司',
-    companySource: 'folder', companyConflict: true, docs: [],
-    ocrStatus: 'error', ocrError: '图片模糊无法识别', project: '合和新城·3号楼', docType: '', note: '',
-  },
-]
+function fileKind(fileName: string): DeliveryFile['kind'] {
+  return /\.pdf$/i.test(fileName) ? 'pdf' : 'image'
+}
 
 export const useDeliveryStore = defineStore('delivery', () => {
   const files = shallowRef<DeliveryFile[]>([])
-  const partitions = shallowRef<Partition[]>([])
-  const activePartition = shallowRef('p_all')
-  const loading = shallowRef(false)
+  const recognitionProgress = ref<Record<string, number>>({})
+  const sourceFiles = new Map<string, File>()
 
-  function load() {
-    files.value = [...MOCK_FILES]
-    partitions.value = [...MOCK_PARTITIONS]
+  function byId(id: string): DeliveryFile | undefined {
+    return files.value.find(file => file.id === id)
   }
 
-  function setActivePartition(id: string) {
-    activePartition.value = id
+  function replaceFile(id: string, patch: Partial<DeliveryFile>) {
+    files.value = files.value.map(file => file.id === id ? { ...file, ...patch } : file)
   }
 
-  const filteredFiles = computed(() => {
-    if (activePartition.value === 'p_all') return files.value
-    return files.value.filter(f => f.partitionId === activePartition.value)
-  })
+  function uploadFiles(uploadedFiles: File[]): string[] {
+    const ids: string[] = []
+    const next: DeliveryFile[] = []
+    for (const file of uploadedFiles) {
+      const id = generateId('dfile')
+      sourceFiles.set(id, file)
+      ids.push(id)
+      next.push({
+        id,
+        name: file.name,
+        kind: fileKind(file.name),
+        size: file.size,
+        supplierText: '',
+        docs: [],
+        ocrStatus: 'pending',
+        ocrError: '',
+        rawText: '',
+        engine: '',
+        model: '',
+      })
+    }
+    files.value = [...files.value, ...next]
+    return ids
+  }
 
+  async function recognizeFile(id: string): Promise<boolean> {
+    const current = byId(id)
+    if (!current || current.ocrStatus === 'processing')
+      return false
+    const source = sourceFiles.get(id)
+    if (!source) {
+      replaceFile(id, {
+        ocrStatus: 'failed',
+        ocrError: '原文件已不在当前会话，请重新上传',
+      })
+      return false
+    }
+
+    replaceFile(id, { ocrStatus: 'processing', ocrError: '' })
+    recognitionProgress.value[id] = 0
+    try {
+      const result = await recognizeDocument(source, {
+        onProgress: (progress) => {
+          recognitionProgress.value[id] = progress
+        },
+      })
+      const parsed = parseDeliveryMarkdown(result.markdownPages)
+      const usable = parsed.docs.some(doc => doc.items.length
+        || doc.orderNo
+        || doc.date
+        || doc.supplier)
+      if (!usable)
+        throw new OcrRecognitionError('invalid-result', '未从文件中识别出可用的送货单字段')
+
+      const docs: DeliveryDoc[] = parsed.docs.map(doc => ({
+        id: generateId('ddoc'),
+        supplierText: doc.supplier || parsed.supplier,
+        deliveryDate: doc.date,
+        orderNo: doc.orderNo,
+        siteText: doc.siteText,
+        docType: doc.docType,
+        items: doc.items.map(itemFromParsed),
+        statedTotal: doc.statedTotal,
+        calculatedTotal: doc.calculatedTotal,
+        balanced: doc.balanced,
+        note: doc.note,
+      }))
+      replaceFile(id, {
+        supplierText: parsed.supplier,
+        docs,
+        ocrStatus: 'done',
+        ocrError: '',
+        rawText: parsed.rawText,
+        engine: result.engine,
+        model: result.model,
+      })
+      return true
+    }
+    catch (error) {
+      replaceFile(id, {
+        ocrStatus: 'failed',
+        ocrError: error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试',
+      })
+      return false
+    }
+    finally {
+      delete recognitionProgress.value[id]
+    }
+  }
+
+  async function recognizeMany(ids: string[]): Promise<{ done: number, failed: number }> {
+    let done = 0
+    for (const id of ids) {
+      if (await recognizeFile(id))
+        done += 1
+    }
+    return { done, failed: ids.length - done }
+  }
+
+  function removeFile(id: string): boolean {
+    if (!byId(id))
+      return false
+    sourceFiles.delete(id)
+    delete recognitionProgress.value[id]
+    files.value = files.value.filter(file => file.id !== id)
+    return true
+  }
+
+  async function archiveDocument(fileId: string, documentId: string, input: DeliveryReviewInput): Promise<string> {
+    const file = byId(fileId)
+    const document = file?.docs.find(doc => doc.id === documentId)
+    if (!file || !document)
+      throw new Error('待核对送货单不存在')
+    if (!input.projectId)
+      throw new Error('核对完成前必须选择项目')
+
+    const items = input.items
+      .map(item => ({ ...item, name: item.name.trim() }))
+      .filter(item => item.name)
+    if (!items.length)
+      throw new Error('至少保留一条材料明细')
+
+    const recordStore = useDeliveryRecordStore()
+    const recordId = await recordStore.add({
+      projectId: input.projectId,
+      supplierId: input.supplierId,
+      orderNo: input.orderNo,
+      deliveryDate: input.deliveryDate,
+      rawSiteText: input.siteText,
+      fileName: file.name,
+      note: input.note,
+      lines: items.map(item => ({
+        materialName: item.name,
+        spec: item.spec,
+        unit: item.unit,
+        qty: Number(item.qty) || 0,
+        unitPrice: Number(item.unitPrice) || 0,
+        note: item.note,
+      })),
+    })
+
+    const remainingDocs = file.docs.filter(doc => doc.id !== documentId)
+    if (remainingDocs.length)
+      replaceFile(fileId, { docs: remainingDocs })
+    else
+      removeFile(fileId)
+    return recordId
+  }
+
+  const pendingFiles = computed(() => files.value.filter(file => file.ocrStatus === 'pending' || file.ocrStatus === 'failed'))
   const stats = computed(() => ({
     total: files.value.length,
-    idle: files.value.filter(f => f.ocrStatus === 'idle').length,
-    done: files.value.filter(f => f.ocrStatus === 'done').length,
-    error: files.value.filter(f => f.ocrStatus === 'error').length,
+    pending: files.value.filter(file => file.ocrStatus === 'pending').length,
+    processing: files.value.filter(file => file.ocrStatus === 'processing').length,
+    done: files.value.filter(file => file.ocrStatus === 'done').length,
+    failed: files.value.filter(file => file.ocrStatus === 'failed').length,
   }))
 
-  function incompleteReasons(f: DeliveryFile): string[] {
+  function incompleteReasons(file: DeliveryFile): string[] {
     const reasons: string[] = []
-    if (f.ocrStatus === 'error') reasons.push('识别失败')
-    if (!f.company) reasons.push('缺公司名')
-    if (f.companyConflict) reasons.push('公司名冲突')
-    if (f.docs.length === 0) reasons.push('无明细')
-    for (const doc of f.docs) {
-      if (!doc.date) reasons.push('缺日期')
-      if (!doc.orderNo && f.docType === '送货单') reasons.push('缺单号')
-      if (doc.items.length === 0) reasons.push('0明细行')
+    if (file.ocrStatus === 'failed')
+      reasons.push('识别失败')
+    if (file.ocrStatus === 'done' && !file.supplierText)
+      reasons.push('缺分供方')
+    if (file.ocrStatus === 'done' && !file.docs.length)
+      reasons.push('无可核对单据')
+    for (const doc of file.docs) {
+      if (!doc.deliveryDate)
+        reasons.push('缺日期')
+      if (!doc.orderNo && doc.docType !== '收据')
+        reasons.push('缺单号')
+      if (!doc.items.length)
+        reasons.push('0 明细行')
+      if (doc.note)
+        reasons.push('金额待复核')
     }
     return [...new Set(reasons)]
   }
 
-  return { files: readonly(files), partitions: readonly(partitions), activePartition: readonly(activePartition), loading: readonly(loading), load, setActivePartition, filteredFiles, stats, incompleteReasons }
+  return {
+    files: readonly(files),
+    recognitionProgress: readonly(recognitionProgress),
+    pendingFiles,
+    stats,
+    byId,
+    uploadFiles,
+    recognizeFile,
+    recognizeMany,
+    removeFile,
+    archiveDocument,
+    incompleteReasons,
+  }
 })
