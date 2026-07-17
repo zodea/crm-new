@@ -203,4 +203,26 @@ describe('parseDeliveryMarkdown', () => {
       }),
     ])
   })
+
+  it('按“品名及规格”组合表头对齐材料列，并保留仅有金额的待核行', () => {
+    const result = parseDeliveryMarkdown([`
+      # 示例送货单
+      <table>
+        <tr><td>序号</td><td>品名及规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>1</td><td>钢筋甲 600长</td><td>条</td><td>12</td><td>8</td><td>96</td></tr>
+        <tr><td>2</td><td>钢筋甲 250长</td><td>条</td><td>5</td><td>4</td><td>20</td></tr>
+        <tr><td>3</td><td>植筋胶</td><td>支</td><td>3</td><td>17</td><td>51</td></tr>
+        <tr><td>4</td><td>特殊费用（待核）</td><td></td><td></td><td></td><td>9</td></tr>
+        <tr><td>合计</td><td></td><td></td><td></td><td></td><td>176</td></tr>
+      </table>
+    `])
+
+    expect(result.docs[0]?.items).toEqual([
+      expect.objectContaining({ name: '钢筋甲 600长', unit: '条', quantity: 12, unitPrice: 8, total: 96 }),
+      expect.objectContaining({ name: '钢筋甲 250长', unit: '条', quantity: 5, unitPrice: 4, total: 20 }),
+      expect.objectContaining({ name: '植筋胶', unit: '支', quantity: 3, unitPrice: 17, total: 51 }),
+      expect.objectContaining({ name: '特殊费用（待核）', unit: '', quantity: null, unitPrice: null, total: 9 }),
+    ])
+    expect(result.docs[0]).toMatchObject({ statedTotal: 176, calculatedTotal: 176 })
+  })
 })
