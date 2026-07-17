@@ -226,6 +226,9 @@ export const useDeliveryStore = defineStore('delivery', () => {
       .filter(item => item.name)
     if (!items.length)
       throw new Error('至少保留一条材料明细')
+    const sourceFile = sourceFiles.get(fileId)
+    if (!sourceFile)
+      throw new Error('原文件已不在当前会话，请重新上传')
 
     const recordStore = useDeliveryRecordStore()
     const recordId = await recordStore.add({
@@ -246,7 +249,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         amountSource: item.amountSource,
         note: item.note,
       })),
-    })
+    }, sourceFile)
 
     const remainingDocs = file.docs.filter(doc => doc.id !== documentId)
     if (remainingDocs.length)

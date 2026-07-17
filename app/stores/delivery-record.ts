@@ -49,6 +49,7 @@ export interface DeliveryRecord {
   note: string
   createdAt: string
   updatedAt: string
+  hasSourceFile: boolean
   lines: readonly DeliveryLine[]
   totalAmount: number
 }
@@ -63,6 +64,20 @@ export interface DeliveryRecordInput {
   fileName?: string
   filePath?: string
   lines: DeliveryLineDraft[]
+}
+
+export interface DeliveryRecordSourceFile {
+  fileName: string
+  mimeType: string
+  fileSize: number
+  bytes: Uint8Array
+}
+
+interface PreparedSourceFile {
+  fileName: string
+  mimeType: string
+  fileSize: number
+  content: string
 }
 
 interface DeliveryOperationLog {
@@ -127,6 +142,45 @@ function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+function fileMimeType(file: File): string {
+  const declared = file.type.trim()
+  if (declared)
+    return declared
+  if (/\.pdf$/i.test(file.name))
+    return 'application/pdf'
+  if (/\.png$/i.test(file.name))
+    return 'image/png'
+  if (/\.jpe?g$/i.test(file.name))
+    return 'image/jpeg'
+  return 'application/octet-stream'
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunkSize = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += chunkSize)
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  return btoa(binary)
+}
+
+function base64ToBytes(content: string): Uint8Array {
+  const binary = atob(content)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1)
+    bytes[index] = binary.charCodeAt(index)
+  return bytes
+}
+
+async function prepareSourceFile(file: File): Promise<PreparedSourceFile> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  return {
+    fileName: file.name,
+    mimeType: fileMimeType(file),
+    fileSize: bytes.byteLength,
+    content: bytesToBase64(bytes),
+  }
+}
+
 function amountOf(qty: number | null, unitPrice: number | null): number | null {
   if (qty == null || unitPrice == null)
     return null
@@ -187,7 +241,11 @@ function rowToLine(row: Record<string, unknown>): DeliveryLine {
   }
 }
 
-function rowToRecord(row: Record<string, unknown>, lines: DeliveryLine[]): DeliveryRecord {
+function rowToRecord(
+  row: Record<string, unknown>,
+  lines: DeliveryLine[],
+  hasSourceFile: boolean,
+): DeliveryRecord {
   return {
     id: row.id as string,
     projectId: row.project_id as string,
@@ -204,6 +262,7 @@ function rowToRecord(row: Record<string, unknown>, lines: DeliveryLine[]): Deliv
     note: (row.note ?? '') as string,
     createdAt: (row.created_at ?? '') as string,
     updatedAt: (row.updated_at ?? '') as string,
+    hasSourceFile,
     lines,
     totalAmount: roundMoney(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
   }
@@ -236,6 +295,49 @@ async function insertLines(recordId: string, lines: NormalizedDeliveryLineDraft[
   }
 }
 
+async function persistSourceFile(
+  recordId: string,
+  source: PreparedSourceFile,
+  now: string,
+): Promise<void> {
+  const [existing] = await select<{ id: string }>(
+    `SELECT id FROM file_refs
+     WHERE owner_type = 'delivery_record'
+       AND owner_id = ?
+       AND category = 'source'
+       AND deleted_at IS NULL
+     LIMIT 1`,
+    [recordId],
+  )
+  const fileRefId = existing?.id ?? generateId('file')
+
+  if (existing) {
+    await execute(
+      `UPDATE file_refs
+       SET file_name = ?, file_path = '', file_size = ?, mime_type = ?, uploaded_at = ?
+       WHERE id = ?`,
+      [source.fileName, source.fileSize, source.mimeType, now, fileRefId],
+    )
+  }
+  else {
+    await execute(
+      `INSERT INTO file_refs
+        (id, owner_type, owner_id, file_name, file_path, file_size, category, uploader, uploaded_at, mime_type)
+       VALUES (?, 'delivery_record', ?, ?, '', ?, 'source', '', ?, ?)`,
+      [fileRefId, recordId, source.fileName, source.fileSize, now, source.mimeType],
+    )
+  }
+
+  await execute(
+    `INSERT INTO file_payloads (file_ref_id, encoding, content)
+     VALUES (?, 'base64', ?)
+     ON CONFLICT(file_ref_id) DO UPDATE SET
+       encoding = excluded.encoding,
+       content = excluded.content`,
+    [fileRefId, source.content],
+  )
+}
+
 export const useDeliveryRecordStore = defineStore('delivery-record', () => {
   const list = shallowRef<DeliveryRecord[]>([])
   const loading = shallowRef(false)
@@ -243,9 +345,17 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
   async function load() {
     loading.value = true
     try {
-      const [recordRows, lineRows] = await Promise.all([
+      const [recordRows, lineRows, sourceRows] = await Promise.all([
         select<Record<string, unknown>>(selectVisibleSql('delivery_records', 'AND archived = 1 ORDER BY delivery_date DESC, created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('delivery_lines', 'ORDER BY sort_order, created_at')),
+        select<{ owner_id: string }>(
+          `SELECT source.owner_id
+           FROM file_refs AS source
+           INNER JOIN file_payloads AS payload ON payload.file_ref_id = source.id
+           WHERE source.owner_type = 'delivery_record'
+             AND source.category = 'source'
+             AND source.deleted_at IS NULL`,
+        ),
       ])
       const linesByRecord = new Map<string, DeliveryLine[]>()
       for (const row of lineRows) {
@@ -254,7 +364,12 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
         lines.push(line)
         linesByRecord.set(line.deliveryRecordId, lines)
       }
-      list.value = recordRows.map(row => rowToRecord(row, linesByRecord.get(row.id as string) ?? []))
+      const sourceRecordIds = new Set(sourceRows.map(row => row.owner_id))
+      list.value = recordRows.map(row => rowToRecord(
+        row,
+        linesByRecord.get(row.id as string) ?? [],
+        sourceRecordIds.has(row.id as string),
+      ))
     }
     finally {
       loading.value = false
@@ -265,8 +380,10 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     return list.value.find(record => record.id === id)
   }
 
-  async function add(input: DeliveryRecordInput): Promise<string> {
+  async function add(input: DeliveryRecordInput, sourceFile?: File): Promise<string> {
     const lines = validateInput(input)
+    // File 读取与编码可能失败，必须在开启 SQLite 事务前完成。
+    const source = sourceFile ? await prepareSourceFile(sourceFile) : null
     const id = generateId('del')
     const now = new Date().toISOString()
     await db.execute('BEGIN')
@@ -283,7 +400,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.rawSiteText?.trim() ?? '',
           input.orderNo.trim(),
           input.deliveryDate,
-          input.fileName?.trim() ?? '',
+          input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
           input.note.trim(),
           now,
@@ -292,6 +409,8 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
       )
       await logCreate(db, 'delivery_records', id)
       await insertLines(id, lines, now)
+      if (source)
+        await persistSourceFile(id, source, now)
       await db.execute('COMMIT')
     }
     catch (error) {
@@ -309,16 +428,13 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     try {
       const logId = await withUpdateLog(db, 'delivery_records', id, () => execute(
         `UPDATE delivery_records
-         SET project_id=?, supplier_id=?, raw_site_text=?, order_no=?, delivery_date=?, file_name=?, file_path=?, note=?, updated_at=?
+         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, note=?, updated_at=?
          WHERE id=?`,
         [
           input.projectId,
           input.supplierId || null,
-          input.rawSiteText?.trim() ?? '',
           input.orderNo.trim(),
           input.deliveryDate,
-          input.fileName?.trim() ?? '',
-          input.filePath?.trim() ?? '',
           input.note.trim(),
           now,
           id,
@@ -349,6 +465,72 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
       await db.execute('ROLLBACK')
       throw error
     }
+  }
+
+  async function loadSourceFile(id: string): Promise<DeliveryRecordSourceFile | null> {
+    const [row] = await select<{
+      file_name: string | null
+      file_size: number | null
+      mime_type: string | null
+      encoding: string
+      content: string
+    }>(
+      `SELECT
+         source.file_name,
+         source.file_size,
+         source.mime_type,
+         payload.encoding,
+         payload.content
+       FROM file_refs AS source
+       INNER JOIN file_payloads AS payload ON payload.file_ref_id = source.id
+       WHERE source.owner_type = 'delivery_record'
+         AND source.owner_id = ?
+         AND source.category = 'source'
+         AND source.deleted_at IS NULL
+       LIMIT 1`,
+      [id],
+    )
+    if (!row)
+      return null
+    if (row.encoding !== 'base64')
+      throw new Error(`不支持的送货单原件编码：${row.encoding}`)
+    const bytes = base64ToBytes(row.content)
+    return {
+      fileName: row.file_name ?? '',
+      mimeType: row.mime_type ?? '',
+      fileSize: Number(row.file_size ?? bytes.byteLength),
+      bytes,
+    }
+  }
+
+  async function saveSourceFile(id: string, file: File): Promise<void> {
+    // File 读取与编码可能失败，必须在开启 SQLite 事务前完成。
+    const source = await prepareSourceFile(file)
+    const now = new Date().toISOString()
+    await db.execute('BEGIN')
+    try {
+      const [record] = await select<{ id: string }>(
+        `SELECT id FROM delivery_records
+         WHERE id = ? AND archived = 1 AND deleted_at IS NULL`,
+        [id],
+      )
+      if (!record)
+        throw new Error('送货单归档记录不存在')
+
+      await persistSourceFile(id, source, now)
+      await execute(
+        `UPDATE delivery_records
+         SET file_name = ?, file_path = '', updated_at = ?
+         WHERE id = ?`,
+        [source.fileName, now, id],
+      )
+      await db.execute('COMMIT')
+    }
+    catch (error) {
+      await db.execute('ROLLBACK')
+      throw error
+    }
+    await load()
   }
 
   const softActions = createSoftDeleteActions(db, 'delivery_records', load)
@@ -404,6 +586,8 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     byId,
     add,
     update,
+    loadSourceFile,
+    saveSourceFile,
     remove: softActions.remove,
     restore: softActions.restore,
     undo,

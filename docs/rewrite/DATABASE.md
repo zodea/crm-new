@@ -96,6 +96,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | Supplier | `suppliers` | `id` | `base-supplier.md` |
 | SupplierCredential | `supplier_credentials` | `id` | `base-supplier.md` |
 | FileRef | `file_refs` | `id` | 共用 |
+| FilePayload | `file_payloads` | `fileRefId` | 共用（附件正文，仅按需读取） |
 | BankCode | `bank_codes` | `id` | `base-worker.md` §五（银行行号字典，内置 seed，无外键） |
 
 ### 2.2 项目关联实体
@@ -459,7 +460,7 @@ CREATE TABLE target_cost_items (
 | `expenditure_contract` | ExpenditureContract | 合同扫描件 |
 | `payment_application` | PaymentApplication | 付款附件 |
 | `invoice` | Invoice | 发票原图（原 `ticket_registration` 已随 ADR-0001 废弃） |
-| `delivery_record` | DeliveryRecord | 送货单扫描件 |
+| `delivery_record` | DeliveryRecord | 送货单扫描件（`category=source`，每张归档记录一份当前原件） |
 | `quantity` | Quantity | 验收照片（挂「户×分项」，工序卡点判据，CONTEXT.md「验收照片」） |
 | `worker` | Worker | 工人证件照片/信息文件 |
 | `worker_cert` | WorkerCert | 证书扫描件（身份证/特种作业证等） |
@@ -471,13 +472,27 @@ interface FileRef {
   ownerType: string               // 多态类型标识
   ownerId: string                 // 关联实体的 id
   fileName: string
-  filePath: string                // Tauri 本地路径
+  filePath: string                // 可选：Tauri 本地相对路径
   fileSize: number
+  mimeType: string                // 原件 MIME，用于图片/PDF 预览
   category: string                // 文件分类（合同/送货单/发票/证照/其他）
   uploader: string                // 上传人
   uploadedAt: string
 }
+
+interface FilePayload {
+  fileRefId: string               // 1:1 引用 file_refs.id
+  encoding: 'base64'              // pass-1 本地 SQLite 编码
+  content: string                 // 文件正文，不进入通用附件列表与操作日志
+}
 ```
+
+#### 送货单原件持久化约束
+
+- 新归档送货单的结构化单头、明细行和 `file_refs(category=source)` 在同一归档动作中写入本地 SQLite；原件不上传云端。
+- `file_refs` 保持轻量元数据，文件正文单独存于 `file_payloads`。归档列表不查询、不 JOIN 正文；仅详情页和编辑页按 `ownerId` 单份懒加载。
+- 业务字段编辑不得清空或覆盖原件引用；补传/替换原件走独立 action，不把文件正文复制进 `operation_logs`。
+- 早期归档或手工建立的记录若没有原件字节，界面显示“历史记录未保存原件”并提供补传，不从 OCR 文本伪造扫描件。
 
 ### 3.6 施工进度关联
 
@@ -661,6 +676,9 @@ interface FileRef {
 
 2026-07-06 增补（送货单工地名归一，随送货单批次建表）
   52. project_aliases             → projects                        （第 3 批档位）
+
+2026-07-17 增补（送货单归档原件本地持久化）
+  53. file_payloads               → file_refs                       （1:1 正文，仅按需读取）
 ```
 
 ---
@@ -683,7 +701,10 @@ CREATE INDEX idx_invoices_account ON invoices(account_status);
 CREATE INDEX idx_supplier_credentials_sup ON supplier_credentials(supplierId);
 
 -- 文件多态查询
-CREATE INDEX idx_file_refs_owner ON file_refs(ownerType, ownerId);
+CREATE INDEX idx_file_refs_owner ON file_refs(owner_type, owner_id);
+CREATE UNIQUE INDEX uq_file_refs_delivery_source
+  ON file_refs(owner_type, owner_id, category)
+  WHERE deleted_at IS NULL AND owner_type = 'delivery_record' AND category = 'source';
 
 -- 合同子表
 CREATE INDEX idx_supplement_agreements_contract ON supplement_agreements(contractId);
