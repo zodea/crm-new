@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DeliveryLineDraft, DeliveryRecord } from '~/stores/delivery-record'
+import { calculatedDeliveryAmount } from '~/lib/delivery/review'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
@@ -16,8 +17,10 @@ const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const { confirm, success, warning, error } = useKitUI()
 
-interface EditableLine extends DeliveryLineDraft {
+interface EditableLine extends Omit<DeliveryLineDraft, 'amount'> {
   key: number
+  amount: number
+  amountSource: 'calculated' | 'manual'
 }
 
 let lineKey = 0
@@ -35,13 +38,17 @@ const title = computed(() => props.record ? `编辑送货单 · ${props.record.o
 
 function newLine(source: Partial<DeliveryLineDraft> = {}): EditableLine {
   lineKey += 1
+  const qty = Number(source.qty ?? 0)
+  const unitPrice = Number(source.unitPrice ?? 0)
   return {
     key: lineKey,
     materialName: source.materialName ?? '',
     spec: source.spec ?? '',
     unit: source.unit ?? '',
-    qty: Number(source.qty ?? 0),
-    unitPrice: Number(source.unitPrice ?? 0),
+    qty,
+    unitPrice,
+    amount: Number(source.amount ?? calculatedDeliveryAmount({ qty, unitPrice })),
+    amountSource: source.amount == null ? 'calculated' : 'manual',
     note: source.note ?? '',
   }
 }
@@ -69,7 +76,23 @@ watch(() => open.value, (isOpen) => {
 })
 
 function lineAmount(line: EditableLine): number {
-  return Math.round((Number(line.qty || 0) * Number(line.unitPrice || 0) + Number.EPSILON) * 100) / 100
+  return Number(line.amount || 0)
+}
+
+function numberValue(event: Event): number {
+  const value = Number((event.target as HTMLInputElement).value)
+  return Number.isFinite(value) ? value : 0
+}
+
+function updateLineFactor(line: EditableLine, field: 'qty' | 'unitPrice', event: Event) {
+  line[field] = numberValue(event)
+  if (line.amountSource === 'calculated')
+    line.amount = calculatedDeliveryAmount(line)
+}
+
+function updateLineAmount(line: EditableLine, event: Event) {
+  line.amount = numberValue(event)
+  line.amountSource = 'manual'
 }
 
 const totalAmount = computed(() => form.lines.reduce((sum, line) => sum + lineAmount(line), 0))
@@ -117,7 +140,7 @@ async function save() {
       orderNo: form.orderNo,
       deliveryDate: form.deliveryDate,
       note: form.note,
-      lines: form.lines.map(({ key: _key, ...line }) => line),
+      lines: form.lines.map(({ key: _key, amountSource: _amountSource, ...line }) => line),
     }
     const id = props.record?.id ?? await store.add(input)
     if (props.record) {
@@ -192,7 +215,7 @@ async function save() {
 
       <section>
         <div class="mb-3 flex items-center gap-3">
-          <SectionHeader title="材料明细" subtitle="金额自动按 数量 × 单价 计算" />
+          <SectionHeader title="材料明细" subtitle="默认按数量×单价补金额；手改金额后不再覆盖" />
           <div class="flex-1" />
           <button type="button" class="btn-secondary" @click="addLine">
             <span class="i-lucide-plus mr-1 text-13px" /> 添加一行
@@ -244,13 +267,13 @@ async function save() {
                   <input v-model="line.unit" class="field-input w-full" placeholder="单位">
                 </td>
                 <td class="px-1 py-1">
-                  <input v-model.number="line.qty" type="number" step="0.001" class="field-input w-full text-right font-mono">
+                  <input :value="line.qty" type="number" step="0.001" class="field-input w-full text-right font-mono" @input="updateLineFactor(line, 'qty', $event)">
                 </td>
                 <td class="px-1 py-1">
-                  <input v-model.number="line.unitPrice" type="number" step="0.01" class="field-input w-full text-right font-mono">
+                  <input :value="line.unitPrice" type="number" step="0.01" class="field-input w-full text-right font-mono" @input="updateLineFactor(line, 'unitPrice', $event)">
                 </td>
-                <td class="px-2 py-2 text-right font-mono font-700">
-                  {{ yuan(lineAmount(line)) }}
+                <td class="px-1 py-1">
+                  <input :value="line.amount" type="number" step="0.01" class="field-input w-full text-right font-mono font-700" title="人工修改后不会被数量/单价覆盖" @input="updateLineAmount(line, $event)">
                 </td>
                 <td class="px-2 py-2 text-center">
                   <button type="button" class="icon-btn-danger" title="删除明细" @click="removeLine(index)">

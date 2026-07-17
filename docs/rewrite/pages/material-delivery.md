@@ -9,14 +9,16 @@
 > - **归档库 = 送货单归档库**（乙供材管理 · route `deliveryArchive`，设计稿 `kit/DeliveryArchiveScreen.jsx`）：核对完成后自动归档件的**左树右列表**。左树两级 **项目 → 分供方**（分供方按其合同**签订日期升序**），每项目下设 ⚠**「未区分分供方」**兜底节点；**所有节点带文件数量角标（只数量不金额）**；点树节点出该节点文件列表。
 > - **归档规则**：核对完成即自动归档，**核对是归档唯一前置**；未指定项目**禁止导入**（批量/单个同拦截）。
 > - **归档不是终态**：文件可**拖拽改归属**、节点可**手动新建**（从分供方库选）+ 归档时自动建缺失节点；任何改归属/字段一律弹**二次确认**（识别难免出错，留改错通道）。
-> - **分供方名模糊纠错**：识别/文件夹推断的公司名在分供方库模糊匹配 → 给建议 + 一键替换归并（识别阶段与归档后编辑通用）。
-> - 下文阶段三"文件列表 + 分区"里的"单页平铺态"归档呈现**已废除**，归属拦截时机= **卡在上传**（先分区归组、后识别）；见 CONTEXT「归档」「工地」。
+> - **分供方名模糊纠错**：识别/文件夹推断的公司名在分供方库模糊匹配 → 只给建议，必须人工采用后才绑定；确认的 OCR 写法记入分供方别名。
+> - 下文阶段一至三的“文件夹整理树 / 分区 / 上传时归属拦截”是**未落地历史目标**，不是当前运行行为。当前先上传识别，在核对归档前强制选择项目；若恢复“上传时拦截”，须作为独立工作项同时调整交互和会话模型，不能只改文案。
 
-> ✅ **当前实现快照（2026-07-17）**：浏览器处理区已打通 PDF/PNG/JPG/JPEG 上传 → 同源服务端代理 → PaddleOCR-VL 1.6 → HTML/Markdown 表格解析 → 左原图/右字段与材料行校对 → 核对完成自动写入归档库。支持一文件多张单、供应商别名/模糊建议、工地原文预选项目、金额行级及本页合计勾稽；项目仍是归档硬前置，分供方可落“未区分分供方”。原始 `File` 仅保留在当前识别会话，Token 仅在服务端 `.env`。文件夹整理树、批量改归属和导出归档仍属后续工作，不得把下文历史蓝图误写成已完成。
+> ✅ **当前实现快照（2026-07-17）**：处理区已打通 PDF/PNG/JPG/JPEG 上传 → 图片本地裁边扶正 → 统一 OCR 接口 → HTML/Markdown 表格解析 → 队列/原图/字段与材料行三栏核对 → 自动归档。支持一文件多张单、分供方精确别名自动匹配、模糊候选人工采用、工地原文记忆为项目别名、金额独立手改与行级/票面合计勾稽；项目是归档硬前置，分供方可落“未区分分供方”。OCR 模型、隐私边界、Token 与预处理策略只以 [ADR-0006](../../adr/0006-ocr-paddleocr-vl-single-model.md) 为准。文件夹整理树、批量改归属、跨刷新队列和导出归档仍属后续工作。
 
 ---
 
-## 一、交互流程（六阶段）
+## 一、交互流程（历史六阶段目标）
+
+> ⛔ 本节阶段一至三保留作文件夹整理后续设计输入；当前页面没有文件夹整理树或分区栏。现行可验收闭环以文首“当前实现快照”和下方阶段四至六的已落地说明为准。
 
 ### 阶段一 · 上传入口
 
@@ -58,10 +60,10 @@ FileCard × N:
 
 ```
 触发: "识别全部" 或 单张识别
-  └─ 当前评估模式 → PaddleOCR-VL 1.6 官方 API
-      ├─ useDocOrientationClassify + useDocUnwarping 自动方向/形变校正
-      ├─ 输出结构化 Markdown + HTML 表格 + layout regions
-      └─ 失败显式报错并允许会话内重试；不静默切换其他引擎
+  └─ 调用统一 recognizeDocument(file) 接口
+      ├─ 图片可先生成裁边扶正派生件；PDF 保持原文件
+      ├─ 输出 Markdown / HTML 表格 / layout regions
+      └─ 失败显式报错并允许会话内重试
 
 结果写入:
   ├─ 公司名（检测冲突：文件夹名 vs OCR）
@@ -97,59 +99,7 @@ ProblemDialog:
 
 ## 二、数据模型
 
-> ⚠️ 下列是早期完整蓝图，不是当前运行时副本。持久化模型唯一权威见 `docs/rewrite/DATABASE.md` §2.5；当前处理区会话类型见 `app/stores/delivery.ts`，不要再复制第三份字段定义。
-
-```ts
-interface DeliveryFile {
-  id: string
-  name: string
-  blob: File
-  kind: 'pdf' | 'image'
-  partitionId: string
-  pages: PageImage[]
-  rendering: boolean
-  renderError: string
-  company: string
-  companySource: '' | 'folder' | 'ocr' | 'manual'
-  companyOcr: string
-  companyConflict: boolean
-  specialGroup: string
-  origin: string
-  merge: boolean
-  docs: DeliveryDoc[]
-  ocrText: string
-  ocrStatus: 'idle' | 'running' | 'done' | 'error'
-  ocrError: string
-  ocrPartial: string
-  ocrEngine?: string
-  itemCandidates: any[]
-  project: string
-  docType: '送货单' | '收据' | ''
-  note: string
-}
-
-interface DeliveryDoc {
-  id: string
-  date: string | null
-  dateText: string
-  orderNo: string
-  items: DeliveryItem[]
-  note?: string
-}
-
-interface DeliveryItem {
-  name: string
-  unit: string
-  quantity: string
-  unitPrice: string
-  total: string
-}
-
-interface Partition {
-  id: string
-  name: string
-}
-```
+本页不复制字段定义：持久化模型唯一权威见 [DATABASE.md §2.5](../DATABASE.md)，处理区会话类型见 `app/stores/delivery.ts`。金额口径同样以 DATABASE 为准：`delivery_lines.amount` 是复核后独立金额，数量×单价只做勾稽。
 
 ---
 
@@ -159,10 +109,14 @@ interface Partition {
 
 | 组件 | 职责 |
 |------|------|
-| `DeliveryRecognitionScreen` | 上传/拖拽、识别队列、主数据建议、核对归档编排 |
+| `DeliveryRecognitionScreen` | 页面布局与子组件装配 |
+| `DeliveryWorkbenchHeader` | 上传、批量识别与队列统计 |
 | `DeliveryQueuePanel` | 会话文件队列、状态/进度、单张重试与移除 |
 | `DeliveryOriginalPanel` | PDF/图片原件预览，图片人工旋转辅助核对 |
-| `DeliveryReviewPanel` | 多张单切换、单头/材料行编辑、金额复核与归档入口 |
+| `DeliveryReviewPanel` | 多张单切换、复核进度与归档入口 |
+| `DeliveryDocumentFields` | 只读接收草稿，发出单头/项目/分供方字段变更事件 |
+| `DeliveryItemsEditor` | 只读接收材料行，发出逐格编辑事件并显示金额不平 |
+| `useDeliveryRecognitionWorkspace` | 页面本地状态、识别、主数据建议、别名记忆与归档编排 |
 
 以下为尚未全部落地的历史目标组件：
 

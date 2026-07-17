@@ -22,6 +22,7 @@ export interface ParentRef {
  */
 export const PARENT_REFS: Record<string, ParentRef[]> = {
   projects: [],
+  project_aliases: [{ column: 'project_id', table: 'projects' }],
   suppliers: [{ column: 'parent_supplier_id', table: 'suppliers' }],
   invoices: [
     { column: 'project_id', table: 'projects' },

@@ -100,6 +100,29 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
     ])
   })
 
+  it('人工复核金额独立持久化，不在保存时被数量×单价覆盖', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-MANUAL-AMOUNT',
+      deliveryDate: '2026-07-17',
+      note: '特殊计价',
+      lines: [{
+        materialName: '特殊材料',
+        spec: '',
+        unit: '项',
+        qty: 2,
+        unitPrice: 100,
+        amount: 175,
+        note: '人工确认金额',
+      }],
+    })
+
+    expect(store.byId(id)?.lines[0]?.amount).toBe(175)
+    expect(store.byId(id)?.totalAmount).toBe(175)
+  })
+
   it('编辑会整体替换明细，随后列表与详情读取同一份结果', async () => {
     const store = useDeliveryRecordStore()
     const id = await store.add({

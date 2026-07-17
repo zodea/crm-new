@@ -1,3 +1,4 @@
+import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef } from 'vue'
@@ -18,6 +19,7 @@ export interface DeliveryItem {
   qty: number
   unitPrice: number
   amount: number
+  amountSource: DeliveryAmountSource
   note: string
 }
 
@@ -79,6 +81,7 @@ function itemFromParsed(item: ParsedDeliveryItem): DeliveryItem {
     qty,
     unitPrice,
     amount: editableNumber(item.total, round2(qty * unitPrice)),
+    amountSource: item.total == null ? 'calculated' : 'ocr',
     note: item.note,
   }
 }
@@ -241,6 +244,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         unit: item.unit,
         qty: Number(item.qty) || 0,
         unitPrice: Number(item.unitPrice) || 0,
+        amount: Number(item.amount) || 0,
         note: item.note,
       })),
     })
