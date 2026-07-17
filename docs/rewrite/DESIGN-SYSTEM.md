@@ -4,6 +4,7 @@
 > ⛔ 本文关于“中文单字方块 + 毛玻璃侧栏”的应用外壳规格已废弃，现行权威源见 [ADR 0011](../adr/0011-redesign-application-shell.md)。下文相关内容仅作历史留档。
 > 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。`app.dc.html` 与 `app-new.html` 都直接加载它；不得在效果稿或应用侧复制色值。
 > 内容区交互模式: `CRM-PATTERNS.md`  
+> 品味层（为什么好看/禁止什么/重构方向，基准=线上 Claude Design）: [docs/design/DESIGN-TASTE.md](../design/DESIGN-TASTE.md)；其 §8.2 指出本文 §4.2 按钮层级与设计稿的冲突，修订前以该文为品味基准。  
 > 最后更新: 2026-07-16
 
 ---
