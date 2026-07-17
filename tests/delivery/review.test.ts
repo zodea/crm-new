@@ -36,4 +36,22 @@ describe('送货单人工复核金额', () => {
       balanced: false,
     })
   })
+
+  it('缺失数量或单价时保持空值，不把金额行误判为 0×0 不平', () => {
+    const amountOnly = {
+      id: 'amount-only',
+      qty: null,
+      unitPrice: null,
+      amount: 386,
+      amountSource: 'ocr' as const,
+    }
+
+    expect(summarizeDeliveryAmounts([amountOnly], 386)).toEqual({
+      total: 386,
+      mismatchedLineIds: [],
+      statedBalanced: true,
+      balanced: true,
+    })
+    expect(editDeliveryAmountLine(amountOnly, 'qty', Number.NaN)).toMatchObject({ qty: null, amount: 386 })
+  })
 })

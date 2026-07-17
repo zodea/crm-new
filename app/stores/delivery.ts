@@ -16,9 +16,9 @@ export interface DeliveryItem {
   name: string
   spec: string
   unit: string
-  qty: number
-  unitPrice: number
-  amount: number
+  qty: number | null
+  unitPrice: number | null
+  amount: number | null
   amountSource: DeliveryAmountSource
   note: string
 }
@@ -63,13 +63,14 @@ export interface DeliveryReviewInput {
   items: DeliveryItem[]
 }
 
-function editableNumber(value: number | null, fallback = 0): number {
-  return value == null || !Number.isFinite(value) ? fallback : value
+function editableNumber(value: number | null): number | null {
+  return value == null || !Number.isFinite(value) ? null : value
 }
 
 function itemFromParsed(item: ParsedDeliveryItem): DeliveryItem {
   const qty = editableNumber(item.quantity)
   const unitPrice = editableNumber(item.unitPrice)
+  const calculatedAmount = qty != null && unitPrice != null ? round2(qty * unitPrice) : null
   return {
     id: generateId('ditem'),
     name: item.name,
@@ -77,7 +78,7 @@ function itemFromParsed(item: ParsedDeliveryItem): DeliveryItem {
     unit: item.unit,
     qty,
     unitPrice,
-    amount: editableNumber(item.total, round2(qty * unitPrice)),
+    amount: editableNumber(item.total) ?? calculatedAmount,
     amountSource: item.total == null ? 'calculated' : 'ocr',
     note: item.note,
   }
@@ -239,9 +240,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
         materialName: item.name,
         spec: item.spec,
         unit: item.unit,
-        qty: Number(item.qty) || 0,
-        unitPrice: Number(item.unitPrice) || 0,
-        amount: Number(item.amount) || 0,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        amount: item.amount,
+        amountSource: item.amountSource,
         note: item.note,
       })),
     })

@@ -1,3 +1,4 @@
+import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
@@ -17,16 +18,18 @@ export interface DeliveryLineDraft {
   materialName: string
   spec: string
   unit: string
-  qty: number
-  unitPrice: number
-  amount?: number
+  qty: number | null
+  unitPrice: number | null
+  amount?: number | null
+  amountSource?: DeliveryAmountSource
   note: string
 }
 
-export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount'> {
+export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amountSource'> {
   id: string
   deliveryRecordId: string
-  amount: number
+  amount: number | null
+  amountSource: DeliveryAmountSource
   sortOrder: number
 }
 
@@ -113,25 +116,49 @@ function toNumber(value: unknown): number {
   return Number.isFinite(number) ? number : 0
 }
 
-function amountOf(qty: number, unitPrice: number): number {
-  return Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100
+function toNullableNumber(value: unknown): number | null {
+  if (value == null || value === '')
+    return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
 }
 
-interface NormalizedDeliveryLineDraft extends Omit<DeliveryLineDraft, 'amount'> {
-  amount: number
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function amountOf(qty: number | null, unitPrice: number | null): number | null {
+  if (qty == null || unitPrice == null)
+    return null
+  return roundMoney(qty * unitPrice)
+}
+
+interface NormalizedDeliveryLineDraft extends Omit<DeliveryLineDraft, 'amount' | 'amountSource'> {
+  amount: number | null
+  amountSource: DeliveryAmountSource
+}
+
+function amountSourceOf(value: unknown, fallback: DeliveryAmountSource): DeliveryAmountSource {
+  return value === 'calculated' || value === 'ocr' || value === 'manual' ? value : fallback
 }
 
 function normalizeLines(lines: DeliveryLineDraft[]): NormalizedDeliveryLineDraft[] {
   return lines
-    .map(line => ({
-      materialName: line.materialName.trim(),
-      spec: line.spec.trim(),
-      unit: line.unit.trim(),
-      qty: toNumber(line.qty),
-      unitPrice: toNumber(line.unitPrice),
-      amount: line.amount == null ? amountOf(toNumber(line.qty), toNumber(line.unitPrice)) : toNumber(line.amount),
-      note: line.note.trim(),
-    }))
+    .map((line) => {
+      const qty = toNullableNumber(line.qty)
+      const unitPrice = toNullableNumber(line.unitPrice)
+      const hasExplicitAmount = line.amount !== undefined
+      return {
+        materialName: line.materialName.trim(),
+        spec: line.spec.trim(),
+        unit: line.unit.trim(),
+        qty,
+        unitPrice,
+        amount: hasExplicitAmount ? toNullableNumber(line.amount) : amountOf(qty, unitPrice),
+        amountSource: amountSourceOf(line.amountSource, hasExplicitAmount ? 'manual' : 'calculated'),
+        note: line.note.trim(),
+      }
+    })
     .filter(line => line.materialName.length > 0)
 }
 
@@ -151,9 +178,10 @@ function rowToLine(row: Record<string, unknown>): DeliveryLine {
     materialName: (row.material_name ?? '') as string,
     spec: (row.spec ?? '') as string,
     unit: (row.unit ?? '') as string,
-    qty: toNumber(row.qty),
-    unitPrice: toNumber(row.unit_price),
-    amount: toNumber(row.amount),
+    qty: toNullableNumber(row.qty),
+    unitPrice: toNullableNumber(row.unit_price),
+    amount: toNullableNumber(row.amount),
+    amountSource: amountSourceOf(row.amount_source, 'manual'),
     note: (row.note ?? '') as string,
     sortOrder: toNumber(row.sort_order),
   }
@@ -177,7 +205,7 @@ function rowToRecord(row: Record<string, unknown>, lines: DeliveryLine[]): Deliv
     createdAt: (row.created_at ?? '') as string,
     updatedAt: (row.updated_at ?? '') as string,
     lines,
-    totalAmount: amountOf(1, lines.reduce((sum, line) => sum + line.amount, 0)),
+    totalAmount: roundMoney(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
   }
 }
 
@@ -186,8 +214,8 @@ async function insertLines(recordId: string, lines: NormalizedDeliveryLineDraft[
     const id = generateId('dline')
     await execute(
       `INSERT INTO delivery_lines
-        (id, delivery_record_id, material_name, spec, unit, qty, unit_price, amount, note, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, delivery_record_id, material_name, spec, unit, qty, unit_price, amount, amount_source, note, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         recordId,
@@ -197,6 +225,7 @@ async function insertLines(recordId: string, lines: NormalizedDeliveryLineDraft[
         line.qty,
         line.unitPrice,
         line.amount,
+        line.amountSource,
         line.note,
         index,
         now,
