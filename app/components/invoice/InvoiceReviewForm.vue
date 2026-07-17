@@ -125,6 +125,10 @@ const isArchived = computed(() => props.invoice.accountStatus === 'archived')
 /** 重复票排除在确认/归档之外(与文档页「重复已排除」同口径),只留 废弃/重新识别 两条出路。 */
 const isDuplicate = computed(() => props.invoice.dupStatus === 'duplicate')
 
+function fieldInputId(field: FieldDef) {
+  return `invoice-review-${props.invoice.id}-${field.key}`
+}
+
 // 货物明细默认折叠
 const showItems = shallowRef(false)
 </script>
@@ -133,7 +137,7 @@ const showItems = shallowRef(false)
   <div class="space-y-3">
     <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
       <div v-for="f in FIELDS" :key="f.key" :class="f.full ? 'col-span-2' : ''">
-        <label class="field-label flex items-center gap-1">
+        <label :for="fieldInputId(f)" class="field-label flex items-center gap-1">
           <span>{{ f.label }}</span>
           <span class="flex-1" />
           <span
@@ -157,6 +161,8 @@ const showItems = shallowRef(false)
 
         <select
           v-if="f.type === 'select'"
+          :id="fieldInputId(f)"
+          :aria-label="f.label"
           :value="String(invoice[f.key] ?? '')"
           class="field-input w-full"
           :class="inputClass(f)"
@@ -168,6 +174,8 @@ const showItems = shallowRef(false)
         </select>
         <input
           v-else
+          :id="fieldInputId(f)"
+          :aria-label="f.label"
           :value="String(invoice[f.key] ?? '')"
           :type="f.type ?? 'text'"
           :list="f.projectList ? 'review-project-names' : undefined"
