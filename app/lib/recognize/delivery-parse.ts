@@ -205,7 +205,7 @@ function mapHeader(cells: string[]): ColumnMap | null {
   const columns: ColumnMap = {}
   for (const [index, rawCell] of cells.entries()) {
     const cell = rawCell.replace(/\s/g, '')
-    if (/名称及规格/.test(cell))
+    if (/(?:名称|品名)及规格/.test(cell))
       columns.name ??= index
     else if (/备注|说明/.test(cell))
       columns.note ??= index
