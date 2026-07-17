@@ -219,7 +219,7 @@ function mapHeader(cells: string[]): ColumnMap | null {
       columns.total ??= index
     else if (/单位/.test(cell))
       columns.unit ??= index
-    else if (/商品名称|材料名称|产品名称|货品名称|名称及规格|品名|货名|材料|项目/.test(cell))
+    else if (/商品名称|材料名称|产品名称|货品名称|名称及规格|品名|货名|材料|产品|项目/.test(cell))
       columns.name ??= index
   }
   return columns.name != null && Object.keys(columns).length >= 3 ? columns : null

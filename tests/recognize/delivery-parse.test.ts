@@ -54,6 +54,30 @@ describe('parseDeliveryMarkdown', () => {
     ])
   })
 
+  it('兼容 Paddle HTML 的裸“产品”表头，不把编号当作材料名称', () => {
+    const result = parseDeliveryMarkdown([`
+      # 示例建材有限公司送货单
+      <table>
+        <tr><td>编号</td><td>产品</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>1</td><td>干拌砌筑砂浆</td><td>吨</td><td>2.5</td><td>320</td><td>800</td></tr>
+      </table>
+    `])
+
+    expect(result.docs).toHaveLength(1)
+    expect(result.docs[0]?.items).toEqual([
+      {
+        name: '干拌砌筑砂浆',
+        spec: '',
+        unit: '吨',
+        quantity: 2.5,
+        unitPrice: 320,
+        total: 800,
+        note: '',
+      },
+    ])
+    expect(result.docs[0]?.items[0]?.name).not.toBe('1')
+  })
+
   it('客户/地址不会覆盖供应商，合计与明细不符时明确标待复核', () => {
     const result = parseDeliveryMarkdown([ROTATED_DELIVERY_MARKDOWN
       .replace('822.00', '900.00')
