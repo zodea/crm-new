@@ -14,6 +14,7 @@ export interface SupplierMatch {
 export interface ProjectMatchCandidate {
   id: string
   name: string
+  aliases?: readonly string[]
 }
 
 const DOCUMENT_TAIL_RE = /(?:送货单|销货清单|销售清单|出货单|送货清单|发货单|销售单|对账单|清单|送货)$/
@@ -110,7 +111,9 @@ export function matchProjectText(
   if (!source)
     return null
   const matches = projects
-    .filter(project => source.includes(normalize(project.name)))
-    .sort((left, right) => normalize(right.name).length - normalize(left.name).length)
-  return matches[0] ?? null
+    .flatMap(project => [project.name, ...(project.aliases ?? [])]
+      .map(variant => ({ project, variant: normalize(variant) }))
+      .filter(entry => entry.variant && source.includes(entry.variant)))
+    .sort((left, right) => right.variant.length - left.variant.length)
+  return matches[0]?.project ?? null
 }

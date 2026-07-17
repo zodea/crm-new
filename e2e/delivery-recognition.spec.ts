@@ -1,6 +1,11 @@
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+)
+
 const MARKDOWN = `
 # 广州市大板东建材有限公司销售单
 客户名称：广州市瑞航建筑工程有限公司
@@ -86,6 +91,16 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   expect(uploadedDerivedImage).toBe(true)
   expect(disabledSecondOrientationPass).toBe(true)
 
+  const itemRow = reviewPanel.locator('tbody tr').first()
+  const [qtyInput, amountInput] = [itemRow.locator('input[type="number"]').nth(0), itemRow.locator('input[type="number"]').nth(2)]
+  await amountInput.fill('600')
+  await expect(page.getByText('1 行金额不平', { exact: true }).first()).toBeVisible()
+  await qtyInput.fill('5')
+  await expect(amountInput).toHaveValue('600')
+  await qtyInput.fill('4')
+  await amountInput.fill('622')
+  await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
+
   await page.getByRole('button', { name: '核对完成并归档', exact: true }).click()
   await expect(page.getByText('已完成核对并进入归档库', { exact: true })).toBeVisible()
   await expect(page.getByText('上传 PDF 或图片开始识别', { exact: true })).toBeVisible()
@@ -95,4 +110,34 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   await expect(page.getByText('SH-E2E-20260717', { exact: true })).toBeVisible()
   await expect(page.getByText('普通硅酸盐水泥', { exact: false }).first()).toBeVisible()
   expect(pageErrors).toEqual([])
+})
+
+test('模糊分供方只给建议，不会在人工采用前直接绑定', async ({ page }) => {
+  const fuzzyMarkdown = MARKDOWN.replace('广州市大板东建材有限公司', '广州市大板东建材有限公可')
+  await page.route('**/api/ocr/recognize', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      engine: 'paddleocr-official-api',
+      model: 'PaddleOCR-VL-1.6',
+      jobId: 'job_delivery_fuzzy',
+      pages: [{ pageIndex: 0, markdown: fuzzyMarkdown, prunedResult: {}, layoutRegions: [] }],
+      markdownPages: [fuzzyMarkdown],
+      dataInfo: { numPages: 1 },
+    }),
+  }))
+
+  await page.goto('/material/delivery')
+  const chooserPromise = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: '上传送货单', exact: true }).click()
+  const chooser = await chooserPromise
+  await chooser.setFiles({ name: '合和新城-模糊分供方.png', mimeType: 'image/png', buffer: PNG_1PX })
+
+  const reviewPanel = page.locator('section').filter({
+    has: page.getByText('识别结果校对', { exact: true }),
+  })
+  await expect(reviewPanel.locator('select').nth(1)).toHaveValue('')
+  await expect(page.getByRole('button', { name: '采用并记为别名', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '采用并记为别名', exact: true }).click()
+  await expect(reviewPanel.locator('select').nth(1)).toHaveValue('sup_demo_001')
 })

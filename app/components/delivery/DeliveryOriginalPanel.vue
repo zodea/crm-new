@@ -26,7 +26,7 @@ function rotate(delta: number) {
           {{ file?.name || '原始单据' }}
         </div>
         <div v-if="file?.model" class="text-9px text-ink-faint">
-          {{ file.model }} · 自动方向校正/文档矫正
+          {{ file.model }} · {{ file.preprocessed ? '本地裁边扶正后识别' : '云端方向校正/文档矫正' }}
         </div>
       </div>
       <div class="flex-1" />

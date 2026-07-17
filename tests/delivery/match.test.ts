@@ -45,4 +45,10 @@ describe('matchProjectText', () => {
       name: '合和新城更衣室装修工程',
     })
   })
+
+  it('已人工确认的工地别名可在后续文件中直接命中项目', () => {
+    expect(matchProjectText(['收货地点：和新项目北门'], [
+      { id: 'p1', name: '合和新城更衣室装修工程', aliases: ['和新项目北门'] },
+    ])).toMatchObject({ id: 'p1' })
+  })
 })
