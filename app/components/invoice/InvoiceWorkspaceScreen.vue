@@ -82,14 +82,18 @@ const { open: openFilePicker, onChange: onFilesPicked } = useFileDialog({
 onFilesPicked(files => handleUpload(files))
 
 /** 识别过程走 process 道 promise toast（AGENTS.md 双泳道：上传/识别等过程提示），失败张数如实提示。 */
-async function runRecognition(run: Promise<{ done: number, failed: number }>, label: string) {
+async function runRecognition(run: Promise<{ done: number, failed: number }>, label: string, ids: string[]) {
   const r = await promise(run, {
     loading: `${label}…`,
     success: ({ done }) => `已识别 ${done} 张`,
     error: () => '识别过程出错',
   })
-  if (r.failed > 0)
-    warning(`${r.failed} 张未完成识别（已归档/识别中/引擎失败），可稍后重试`)
+  if (r.failed > 0) {
+    const firstError = ids.map(id => store.recognitionError(id)).find(Boolean)
+    warning(firstError
+      ? `${r.failed} 张未完成识别：${firstError}`
+      : `${r.failed} 张未完成识别（已归档或正在识别），可稍后重试`)
+  }
 }
 
 async function handleUpload(files: File[] | FileList | null) {
@@ -100,14 +104,14 @@ async function handleUpload(files: File[] | FileList | null) {
   }
   // 先建行并立刻选中第一张（识别进度就地可见）；识别完成后不再回头改选中，
   // 避免用户批量期间点开别的票校对时被抢走上下文
-  const ids = await store.uploadInvoices(picked.map(f => ({ name: f.name, size: f.size })))
+  const ids = await store.uploadInvoices(picked)
   ids.forEach((id, index) => {
     const file = picked[index]
     if (file)
       previewUrls.set(id, URL.createObjectURL(file))
   })
   selectedId.value = ids[0]!
-  await runRecognition(store.recognizeMany(ids), `识别 ${ids.length} 张上传发票`)
+  await runRecognition(store.recognizeMany(ids), `识别 ${ids.length} 张上传发票`, ids)
 }
 
 // 全页拖拽（VueUse useDropZone；isOverDropZone 驱动虚线遮罩）
@@ -127,7 +131,7 @@ async function handleBatchRecognize() {
     info('没有待识别的发票')
     return
   }
-  await runRecognition(store.recognizeMany(ids), `批量识别 ${ids.length} 张`)
+  await runRecognition(store.recognizeMany(ids), `批量识别 ${ids.length} 张`, ids)
 }
 
 async function handleRerecognize() {
@@ -135,11 +139,11 @@ async function handleRerecognize() {
     return
   const ok = await promise(store.startRecognition(selectedId.value), {
     loading: '重新识别中…',
-    success: '识别完成，请校对',
+    success: result => result ? '识别完成，请校对' : '识别未完成',
     error: () => '识别失败',
   })
   if (!ok)
-    warning('无法重新识别：该票已归档或正在识别中')
+    warning(store.recognitionError(selectedId.value) || '无法重新识别：该票已归档或正在识别中')
 }
 
 // ── 批量通过(#63)：全绿票(建议通过池)一次放行——有归属的确认+归档,缺归属的排除并列清单 ──
@@ -338,6 +342,15 @@ onMounted(() => {
               @discard="handleDiscard"
               @rerecognize="handleRerecognize"
             />
+          </div>
+          <div v-else-if="selectedInvoice.ocrStatus === 'failed'" class="p-6 text-center text-12px">
+            <span class="i-lucide-circle-alert text-20px text-danger block mx-auto mb-2" />
+            <p class="mb-3 text-danger">
+              {{ store.recognitionError(selectedInvoice.id) || '识别失败，请检查服务后重试' }}
+            </p>
+            <button type="button" class="btn-secondary" @click="handleRerecognize">
+              重新识别
+            </button>
           </div>
           <div v-else class="p-6 text-center text-12px">
             <span class="text-ink-faint">待识别——点击顶部「批量识别」开始</span>

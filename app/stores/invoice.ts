@@ -1,6 +1,8 @@
 import type { ArchiveCheckResult } from '~/lib/invoice/archive'
 import type { InvoiceItem } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
+import { defineStore } from 'pinia'
+import { computed, readonly, ref, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
@@ -12,6 +14,7 @@ import { formatFileSize } from '~/lib/util/file'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { round2 } from '~/lib/util/number'
+import { useProjectStore } from '~/stores/project'
 
 export interface Invoice {
   id: string
@@ -144,6 +147,28 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const loading = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
+  /** 原文件仅保留在当前应用会话，不写入 SQLite，也不进入 Vue 响应式代理。 */
+  const recognitionFiles = new Map<string, File>()
+  const recognitionErrors = ref<Record<string, string>>({})
+
+  function recognitionError(id: string): string {
+    return recognitionErrors.value[id] ?? ''
+  }
+
+  function clearRecognitionError(id: string) {
+    delete recognitionErrors.value[id]
+  }
+
+  async function markRecognitionFailed(inv: Invoice) {
+    if (inv.ocrStatus !== 'pending' && inv.ocrStatus !== 'failed')
+      return
+    try {
+      await update(inv.id, { ...inv, ocrStatus: 'failed' })
+    }
+    catch {
+      // 原始识别错误优先展示；数据库写失败不覆盖它。
+    }
+  }
 
   async function load() {
     loading.value = true
@@ -264,7 +289,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
   }
 
   /**
-   * 桩识别（#60）：「识别中」是纯会话态，只存在于 recognitionProgress（左栏「识别中 N%」的数据源），
+   * 在线识别（#60/#108）：「识别中」是纯会话态，只存在于 recognitionProgress（左栏「识别中 N%」的数据源），
    * 不往内存 list 打 processing 补丁——补丁会被全行写路径持久化进 DB 成死状态、也会被任何 load()
    * 静默回退，两类都真实发生过（#60 审查 c7/c10）。识别完成一次性把全套字段 + 逐字段置信度写库
    * （走 update() 落操作日志，识别结果可审计/可撤回）。
@@ -272,15 +297,22 @@ export const useInvoiceStore = defineStore('invoice', () => {
    * 非法组合且 §4.2 台账合计静默变动）；同 id 在飞拒绝（双击重识别会进度回跳 + 写双份操作日志）。
    * 重复检测：读 DB 已提交事实而非完成时刻的内存快照，发票号撞车 → dup_status='duplicate'。
    * 重新识别同样走此函数——覆写字段并把 review_status 拉回 unreviewed（内容变了需重新校对）。
-   * @returns 是否成功完成识别（false = 被守卫拒绝或引擎失败；失败不落库，行保持 pending 可重跑）
+   * @returns 是否成功完成识别（false = 被守卫拒绝、缺少原文件或引擎失败）
    */
   async function startRecognition(id: string) {
     const inv = byId(id)
     if (!inv || inv.accountStatus === 'archived' || recognitionProgress.value[id] != null)
       return false
+    const file = recognitionFiles.get(id)
+    if (!file) {
+      recognitionErrors.value[id] = '原文件仅保留在上传会话中，请废弃此条后重新上传文件再识别'
+      await markRecognitionFailed(inv)
+      return false
+    }
+    clearRecognitionError(id)
     recognitionProgress.value[id] = 0
     try {
-      const r = await recognizeInvoice({ fileName: inv.fileName || inv.id }, {
+      const r = await recognizeInvoice({ file }, {
         onProgress: (percent) => {
           recognitionProgress.value[id] = percent
         },
@@ -299,10 +331,15 @@ export const useInvoiceStore = defineStore('invoice', () => {
         reviewStatus: 'unreviewed',
         dupStatus: dupRows.length ? 'duplicate' : 'normal',
       })
+      if (logId)
+        clearRecognitionError(id)
       return logId != null
     }
-    catch {
-      // 桩不会抛；真引擎失败时不落库（行保持 pending 可重跑），由 recognizeMany 汇总失败张数供 UI 提示
+    catch (error) {
+      recognitionErrors.value[id] = error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试'
+      const current = byId(id)
+      if (current)
+        await markRecognitionFailed(current)
       return false
     }
     finally {
@@ -315,7 +352,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
    * 全表重载一次）。识别由调用方接着调 recognizeMany 驱动——页面先选中第一张再启动识别，
    * 避免旧实现「整批识别 await 完才选中」夺走用户批量期间的手动选择。
    */
-  async function uploadInvoices(files: { name: string, size: number }[]) {
+  async function uploadInvoices(files: File[]) {
     const ids: string[] = []
     for (const f of files) {
       const id = generateId('inv')
@@ -328,6 +365,8 @@ export const useInvoiceStore = defineStore('invoice', () => {
         ocrStatus: 'pending',
       }), now, now])
       await logCreate(db, 'invoices', id)
+      recognitionFiles.set(id, f)
+      clearRecognitionError(id)
       ids.push(id)
     }
     await load()
@@ -356,7 +395,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
     ),
   )
 
-  /** 批量识别：把当前待识别池依次走完桩识别，返回成败张数。 */
+  /** 批量识别：把当前待识别池依次走完在线识别，返回成败张数。 */
   async function recognizeAllPending() {
     return recognizeMany(pendingRecognition.value.map(inv => inv.id))
   }
@@ -462,5 +501,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), recognitionError, load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, remove, restore, undo }
 })
