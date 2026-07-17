@@ -108,6 +108,7 @@ const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
   { field: 'orderNo', title: '送货单号', minWidth: 160, fixed: 'left', slot: 'orderNo' },
   { field: 'deliveryDate', title: '送货日期', type: 'date', width: 112 },
+  { field: 'hasSourceFile', title: '原件', width: 96, align: 'center', slot: 'source' },
   { field: 'projectId', title: '所属项目', minWidth: 150, slot: 'project' },
   { field: 'supplierId', title: '分供方', minWidth: 200, slot: 'supplier' },
   { field: 'materials', title: '材料明细', minWidth: 220, slot: 'materials' },
@@ -218,6 +219,10 @@ onMounted(refresh)
             <span :title="row.lines.map(line => `${line.materialName} ${line.spec}`).join('、')">
               {{ materialSummary(row) }}
             </span>
+          </template>
+          <template #source="{ row }">
+            <span v-if="row.hasSourceFile" class="chip-ok">可核对</span>
+            <span v-else class="chip-danger">缺原件</span>
           </template>
           <template #action="{ row }">
             <div class="flex items-center gap-1">
