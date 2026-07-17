@@ -285,10 +285,11 @@ CREATE TABLE delivery_lines (
   deliveryRecordId TEXT NOT NULL,    -- → delivery_records.id
   materialName TEXT, spec TEXT, unit TEXT,
   qty REAL, unitPrice REAL, amount REAL,
+  amountSource TEXT DEFAULT 'manual', -- calculated | ocr | manual
   note TEXT, sortOrder INTEGER
 );
 
-> `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；一旦人工修改金额，后续数量/单价编辑与保存都不得覆盖它。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
+> `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
 
 CREATE TABLE project_aliases (
   id        TEXT PRIMARY KEY,

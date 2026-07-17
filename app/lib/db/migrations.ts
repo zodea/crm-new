@@ -281,6 +281,15 @@ export const migrations: Migration[] = [
       await execScript(db, V8_PROJECT_ALIASES)
     },
   },
+  {
+    // 送货明细金额来源：自动计算行重开后继续联动；OCR/人工金额保持独立值。
+    // 存量行无法可靠反推来源，统一按 manual 冻结，避免升级后静默覆盖已复核金额。
+    version: 9,
+    name: 'delivery-lines-amount-source',
+    async up(db) {
+      await addColumnIfMissing(db, 'delivery_lines', 'amount_source', `TEXT NOT NULL DEFAULT 'manual'`)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

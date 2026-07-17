@@ -23,8 +23,11 @@ function textValue(event: Event): string {
 }
 
 function numberValue(event: Event): number {
-  const value = Number((event.target as HTMLInputElement).value)
-  return Number.isFinite(value) ? value : 0
+  const rawValue = (event.target as HTMLInputElement).value.trim()
+  if (!rawValue)
+    return Number.NaN
+  const value = Number(rawValue)
+  return Number.isFinite(value) ? value : Number.NaN
 }
 
 function isMismatch(id: string): boolean {
@@ -97,14 +100,14 @@ function isMismatch(id: string): boolean {
               <input :value="item.unit" class="field-input w-full px-1.5 py-1 text-10px" placeholder="单位" @input="emit('patch', index, { unit: textValue($event) })">
             </td>
             <td class="p-0.5">
-              <input :value="item.qty" type="number" step="0.001" class="field-input w-full px-1.5 py-1 text-right font-mono text-10px" @input="emit('editAmount', index, 'qty', numberValue($event))">
+              <input :value="item.qty ?? ''" type="number" step="0.001" class="field-input w-full px-1.5 py-1 text-right font-mono text-10px" @input="emit('editAmount', index, 'qty', numberValue($event))">
             </td>
             <td class="p-0.5">
-              <input :value="item.unitPrice" type="number" step="0.01" class="field-input w-full px-1.5 py-1 text-right font-mono text-10px" @input="emit('editAmount', index, 'unitPrice', numberValue($event))">
+              <input :value="item.unitPrice ?? ''" type="number" step="0.01" class="field-input w-full px-1.5 py-1 text-right font-mono text-10px" @input="emit('editAmount', index, 'unitPrice', numberValue($event))">
             </td>
             <td class="p-0.5">
               <input
-                :value="item.amount"
+                :value="item.amount ?? ''"
                 type="number"
                 step="0.01"
                 class="field-input w-full px-1.5 py-1 text-right font-mono text-10px"

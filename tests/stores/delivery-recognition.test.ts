@@ -115,7 +115,7 @@ describe('delivery store 真实识别与归档管线', () => {
     expect(store.byId(id!)?.ocrStatus).toBe('done')
   })
 
-  it('仅有 OCR 金额时不伪造数量和单价，并让金额勾稽保留异常', async () => {
+  it('仅有 OCR 金额时不伪造数量和单价，也不误报 0×0 金额不平', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(AMOUNT_ONLY_LINE_MARKDOWN)))
     const store = useDeliveryStore()
     const [id] = store.uploadFiles([new File(['x'], '脱敏送货单.pdf')])
@@ -126,16 +126,16 @@ describe('delivery store 真实识别与归档管线', () => {
 
     expect(item).toMatchObject({
       name: '耐候密封胶',
-      qty: 0,
-      unitPrice: 0,
+      qty: null,
+      unitPrice: null,
       amount: 386,
       amountSource: 'ocr',
     })
     expect(summarizeDeliveryAmounts(doc!.items, doc!.statedTotal)).toMatchObject({
       total: 386,
-      mismatchedLineIds: [item!.id],
+      mismatchedLineIds: [],
       statedBalanced: true,
-      balanced: false,
+      balanced: true,
     })
   })
 
@@ -186,7 +186,7 @@ describe('delivery store 真实识别与归档管线', () => {
       file_name: '待归档.pdf',
     })
     expect(lines).toHaveLength(1)
-    expect(lines[0]).toMatchObject({ material_name: '普通硅酸盐水泥', amount: 622 })
+    expect(lines[0]).toMatchObject({ material_name: '普通硅酸盐水泥', amount: 622, amount_source: 'ocr' })
     expect(store.byId(fileId!)).toBeUndefined()
   })
 })

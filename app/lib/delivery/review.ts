@@ -4,9 +4,9 @@ export type DeliveryAmountSource = 'calculated' | 'ocr' | 'manual'
 
 export interface DeliveryAmountLine {
   id: string
-  qty: number
-  unitPrice: number
-  amount: number
+  qty: number | null
+  unitPrice: number | null
+  amount: number | null
   amountSource: DeliveryAmountSource
 }
 
@@ -17,8 +17,10 @@ export interface DeliveryAmountSummary {
   balanced: boolean
 }
 
-export function calculatedDeliveryAmount(line: Pick<DeliveryAmountLine, 'qty' | 'unitPrice'>): number {
-  return round2(Number(line.qty || 0) * Number(line.unitPrice || 0))
+export function calculatedDeliveryAmount(line: Pick<DeliveryAmountLine, 'qty' | 'unitPrice'>): number | null {
+  if (line.qty == null || line.unitPrice == null)
+    return null
+  return round2(line.qty * line.unitPrice)
 }
 
 export function editDeliveryAmountLine<T extends DeliveryAmountLine>(
@@ -26,11 +28,11 @@ export function editDeliveryAmountLine<T extends DeliveryAmountLine>(
   field: 'qty' | 'unitPrice' | 'amount',
   value: number,
 ): T {
-  const numeric = Number.isFinite(Number(value)) ? Number(value) : 0
+  const numeric = Number.isFinite(value) ? value : null
   if (field === 'amount') {
     return {
       ...line,
-      amount: round2(numeric),
+      amount: numeric == null ? null : round2(numeric),
       amountSource: 'manual',
     }
   }
@@ -44,9 +46,14 @@ export function summarizeDeliveryAmounts(
   lines: readonly DeliveryAmountLine[],
   statedTotal: number | null,
 ): DeliveryAmountSummary {
-  const total = round2(lines.reduce((sum, line) => sum + Number(line.amount || 0), 0))
+  const total = round2(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0))
   const mismatchedLineIds = lines
-    .filter(line => Math.abs(calculatedDeliveryAmount(line) - Number(line.amount || 0)) > 0.01)
+    .filter((line) => {
+      if (line.amount == null)
+        return true
+      const calculated = calculatedDeliveryAmount(line)
+      return calculated != null && Math.abs(calculated - line.amount) > 0.01
+    })
     .map(line => line.id)
   const statedBalanced = statedTotal == null
     ? null
