@@ -4,8 +4,8 @@
 > ⛔ 本文关于“中文单字方块 + 毛玻璃侧栏”的应用外壳规格已废弃，现行权威源见 [ADR 0011](../adr/0011-redesign-application-shell.md)。下文相关内容仅作历史留档。
 > 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。`app.dc.html` 与 `app-new.html` 都直接加载它；不得在效果稿或应用侧复制色值。
 > 内容区交互模式: `CRM-PATTERNS.md`  
-> 品味层（为什么好看/禁止什么/重构方向，基准=线上 Claude Design）: [docs/design/DESIGN-TASTE.md](../design/DESIGN-TASTE.md)；其 §8.2 指出本文 §4.2 按钮层级与设计稿的冲突，修订前以该文为品味基准。  
-> 最后更新: 2026-07-16
+> 品味层（为什么好看/禁止什么/重构方向，基准=线上 Claude Design）: [docs/design/DESIGN-TASTE.md](../design/DESIGN-TASTE.md)；本文 §4.2 按钮层级已按其五变体配方修订（#109），配方冲突时仍以该文为品味基准。  
+> 最后更新: 2026-07-17
 
 ---
 
@@ -131,59 +131,11 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 }
 ```
 
-### 4.2 按钮
+### 4.2 按钮：五变体层级（#109 落地，只指向不复制）
 
-**主按钮**
-```css
-.btn-primary {
-  border: 1px solid var(--brand);
-  border-radius: var(--radius-btn);
-  padding: 5px 10px;
-  background: var(--brand);
-  color: white;
-  font-weight: 600;
-}
-```
+配方唯一权威源 = [DESIGN-TASTE §4.2](../design/DESIGN-TASTE.md)（五变体表、尺寸阶、交互态），本节不抄副本。层级语言一句话：**缺省 = secondary 安静按钮，实心蓝只属于 accent 且每屏 ≤1 枚，danger 静默红**（ADR 0003）。
 
-**次级按钮**
-```css
-.btn-secondary {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-btn);
-  padding: 5px 10px;
-  background: var(--panel);
-  color: var(--ink-soft);
-}
-.btn-secondary:hover {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-```
-
-**图标按钮（工具栏）**
-```css
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-btn);
-  border: 1px solid var(--line);
-  background: var(--panel);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-soft);
-}
-.icon-btn:hover { border-color: var(--brand); color: var(--brand); }
-.icon-btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
-```
-
-**危险按钮**
-```css
-.btn-danger {
-  border: 1px solid var(--danger);
-  color: var(--danger);
-}
-```
+实现落点：五变体外观唯一源 = `uno.config.ts` 的 `btn-look-*` shortcuts（hover 色值令牌见 `tokens.css --btn-hover-*`）；shadcn `Button` cva 变体表（`app/components/ui/button/index.ts`）直接引用同名 look 类，`btn-*` shortcuts 供裸 class 调用；图标按钮实心蓝档 = `icon-btn-accent`，同受「每屏一枚章」约束。
 
 ### 4.3 输入框
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTimeoutFn } from '@vueuse/core'
+import { Button } from '~/components/ui/button'
 import { toErrorMessage } from '~/lib/util/error'
 
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
@@ -284,7 +285,7 @@ async function demoImportMapping() {
         <p class="text-12px text-ink-soft mb-3">
           系统消息、确认后的结果类走这里：右上角展开堆叠、语义色图标、hover 暂停自动消失。
         </p>
-        <button class="btn-primary" @click="demoSemantic">
+        <button class="btn-secondary" @click="demoSemantic">
           连发 4 条（成功/提示/警告/错误）
         </button>
       </section>
@@ -304,7 +305,7 @@ async function demoImportMapping() {
           <button class="btn-secondary" @click="demoRecognize">
             识别送货单（loading→进度→成功）
           </button>
-          <button class="btn-primary" @click="demoProcessPile">
+          <button class="btn-secondary" @click="demoProcessPile">
             连发 5 条（看重叠 + 悬停展开）
           </button>
         </div>
@@ -355,7 +356,7 @@ async function demoImportMapping() {
         <p class="text-12px text-ink-soft mb-3">
           fields 配置渲染控件；缺必填项标红拦截提交；提交返回值对象，取消返回 null。
         </p>
-        <button class="btn-primary" @click="demoFormModal">
+        <button class="btn-secondary" @click="demoFormModal">
           打开表单弹窗
         </button>
       </section>
@@ -368,7 +369,7 @@ async function demoImportMapping() {
         <p class="text-12px text-ink-soft mb-3">
           桌面端打开系统目录选择器并真实写盘；支持目录访问 API 的浏览器写入所选文件夹，其他浏览器降级到浏览器下载文件夹。取消时静默结束。
         </p>
-        <button class="btn-primary" @click="demoDirectExport">
+        <button class="btn-secondary" @click="demoDirectExport">
           直接保存演示文件
         </button>
       </section>
@@ -427,6 +428,49 @@ async function demoImportMapping() {
         <KitButton @click="demoImportMapping">
           打开导入映射演示
         </KitButton>
+      </section>
+
+      <!-- ⑩ 按钮五变体 -->
+      <section class="content-panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑩ 按钮五变体 — 层级语言（DESIGN-TASTE §4.2 / #109）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          缺省 = secondary 安静按钮；实心蓝只属于 <b>accent</b>（业务屏每屏 ≤1 枚章，本演示页除外）；
+          danger 静默红（破坏性防护在确认弹窗，ADR 0003）；hover 平面变色、active 按压 scale(0.97)。
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button>secondary（缺省）</Button>
+          <Button variant="primary">
+            primary
+          </Button>
+          <Button variant="accent">
+            accent（每屏一枚章）
+          </Button>
+          <Button variant="ghost">
+            ghost
+          </Button>
+          <Button variant="destructive">
+            danger（静默红）
+          </Button>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="primary">
+            sm 12px
+          </Button>
+          <Button variant="primary">
+            md 13px（缺省）
+          </Button>
+          <Button size="lg" variant="primary">
+            lg 14px
+          </Button>
+          <Button disabled>
+            disabled
+          </Button>
+        </div>
+        <p class="mt-2 text-11px text-ink-faint">
+          uno shortcut 版同配方：btn-secondary / btn-primary / btn-accent / btn-ghost / btn-danger。
+        </p>
       </section>
 
       <!-- 结果回读 -->

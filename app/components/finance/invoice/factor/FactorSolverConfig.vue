@@ -53,7 +53,7 @@ function updateDecimal(id: number, event: Event) {
           小数数量仅生成单价乘数量恰为整分的组合
         </p>
       </div>
-      <button type="button" class="btn-secondary shrink-0 text-12px active:translate-y-px" @click="addFactor">
+      <button type="button" class="btn-secondary shrink-0" @click="addFactor">
         <span class="i-lucide-plus mr-1 text-12px" />添加因子
       </button>
     </div>
@@ -96,7 +96,7 @@ function updateDecimal(id: number, event: Event) {
         </label>
         <button
           type="button"
-          class="icon-btn-danger h-7 w-7 border-transparent bg-transparent active:translate-y-px"
+          class="icon-btn-danger h-7 w-7 border-transparent bg-transparent active:scale-97"
           :aria-label="`删除因子 ${factor.id}`"
           @click="removeFactor(factor.id)"
         >

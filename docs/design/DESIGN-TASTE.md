@@ -263,7 +263,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 > **完整版清单已移交 [#109 审计评论](https://github.com/zodea/crm-new/issues/109#issuecomment-4998491581)**（2026-07-17 放开限制后的全站审计：13px 阶漂移、数字层级错乱、Panel 底座缺失、content-panel 扁平残留、EntityLink/MoneyLink 穿透件缺失、列表页 chip 违例、表格汇总条/skeleton/空态、实心蓝泛滥量化、SegTab 双轨等九组）。本节以下仅保留首轮发现，后续以 #109 为准。
 
-**① 按钮层级语言相反（最大出入，建议最先修）**
+**① 按钮层级语言相反（最大出入，建议最先修）** ✅ **已落地（#109，2026-07-17）**：五变体齐备、缺省 secondary、实心蓝仅 accent、全站逐屏清点完成；下表现状列仅存历史。
 
 | 处 | 现状 | 基准（§4.2） |
 |---|---|---|
@@ -273,11 +273,11 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 | 同上 | 按钮 14px、无 active 按压态 | md 13px；active `scale(0.97)` |
 | [DESIGN-SYSTEM.md §4.2](../rewrite/DESIGN-SYSTEM.md) | 既有文档就把 `.btn-primary` 写成实心蓝——**出入的文档根源** | 按本文 §4.2 修订该节（后续轮次） |
 
-> 重构方向：给 Button/KitButton 补全五变体映射、把缺省降为安静按钮、实心蓝改名 accent 并全站清点「每屏一枚」。**本轮不动代码**，此条转 issue 后实施。
+> 重构方向：给 Button/KitButton 补全五变体映射、把缺省降为安静按钮、实心蓝改名 accent 并全站清点「每屏一枚」。已随 #109 实施，DESIGN-SYSTEM.md §4.2 同轮修订。
 
 **② 正文基准文档冲突**：ADR 0007 写「正文基准 15px」，而权威令牌（typography.css `--text-base:14px`、tokens.css `html{font-size:14px}`）与设计稿实测均为 14px。建议以 14px 为准、ADR 0007 该句加勘误注（后续轮次处理）。
 
-**③ danger 按钮**：本地 `destructive` = 实心红底白字；设计稿 danger = 白底红字静默红（§4.2）。破坏性操作靠确认弹窗兜底（ADR 0003），按钮本身不必嘶吼。
+**③ danger 按钮** ✅ **已落地（#109）**：`destructive`/`btn-danger` 已改静默红（白底红字，§4.2 配方）。破坏性操作靠确认弹窗兜底（ADR 0003），按钮本身不必嘶吼。
 
 ### 8.3 页面对齐状态——只指向不复制
 

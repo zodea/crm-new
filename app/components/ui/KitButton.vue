@@ -4,7 +4,7 @@ import type { KitButtonVariant } from '~/lib/kit/button'
 import { unrefElement, useTimeoutFn } from '@vueuse/core'
 import { computed, onMounted, shallowRef, useAttrs, useTemplateRef, watch } from 'vue'
 import { Button } from '~/components/ui/button'
-import { resolveKitButtonState } from '~/lib/kit/button'
+import { resolveKitButtonState, resolveKitButtonVariant } from '~/lib/kit/button'
 
 interface Props {
   disabled?: boolean
@@ -17,7 +17,7 @@ defineOptions({ inheritAttrs: false })
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   loading: false,
-  variant: 'brand',
+  variant: 'secondary',
 })
 
 const success = defineModel<boolean>('success', { default: false })
@@ -31,11 +31,7 @@ const state = computed(() => resolveKitButtonState({
   success: success.value,
 }))
 
-const buttonVariant = computed(() => ({
-  brand: 'default',
-  danger: 'destructive',
-  ghost: 'ghost',
-} as const)[props.variant])
+const buttonVariant = computed(() => resolveKitButtonVariant(props.variant))
 
 const buttonStyle = computed<CSSProperties | undefined>(() => lockedWidth.value == null
   ? undefined
@@ -43,8 +39,10 @@ const buttonStyle = computed<CSSProperties | undefined>(() => lockedWidth.value 
 
 function lockCurrentWidth() {
   const element = unrefElement(buttonRef)
+  // 布局宽度而非 getBoundingClientRect：点击触发 loading 时按钮可能正处于
+  // active scale(0.97) 按压态，rect 是变换后的值，会把宽度锁小约 3%
   if (element)
-    lockedWidth.value = element.getBoundingClientRect().width
+    lockedWidth.value = Number.parseFloat(getComputedStyle(element).width)
 }
 
 watch(

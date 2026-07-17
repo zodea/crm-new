@@ -27,7 +27,8 @@ const activeSection = shallowRef(props.sections?.[0]?.key ?? '')
 
 // 每次打开回到第一个分区（sections 后变也随之生效）
 watch(() => props.open, (isOpen) => {
-  if (isOpen) activeSection.value = props.sections?.[0]?.key ?? ''
+  if (isOpen)
+    activeSection.value = props.sections?.[0]?.key ?? ''
 })
 
 function scrollTo(key: string) {
@@ -38,7 +39,8 @@ function scrollTo(key: string) {
 
 // reka 请求关闭（Esc / 点遮罩）→ 取消
 function onOpenChange(value: boolean) {
-  if (!value) emit('cancel')
+  if (!value)
+    emit('cancel')
 }
 </script>
 
@@ -86,9 +88,13 @@ function onOpenChange(value: boolean) {
 
       <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
       <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
-        <Button variant="outline" @click="emit('cancel')">取消</Button>
+        <Button variant="outline" @click="emit('cancel')">
+          取消
+        </Button>
         <slot name="actions" />
-        <Button @click="emit('save')">{{ saveLabel }}</Button>
+        <Button variant="accent" @click="emit('save')">
+          {{ saveLabel }}
+        </Button>
       </div>
     </DialogContent>
   </Dialog>

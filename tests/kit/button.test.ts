@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveKitButtonState } from '~/lib/kit/button'
+import { resolveKitButtonState, resolveKitButtonVariant } from '~/lib/kit/button'
 
 describe('kitButton 状态', () => {
   it('默认态可点击且不锁定宽度', () => {
@@ -44,5 +44,19 @@ describe('kitButton 状态', () => {
 
   it('loading 与 success 短暂重叠时以进行中为准', () => {
     expect(resolveKitButtonState({ loading: true, success: true }).phase).toBe('loading')
+  })
+})
+
+describe('kitButton 变体映射（DESIGN-TASTE §4.2 五变体，#109）', () => {
+  it('缺省为 secondary 安静按钮，不再是实心蓝', () => {
+    expect(resolveKitButtonVariant()).toBe('secondary')
+  })
+
+  it('五档各自映射到底层 Button 变体', () => {
+    expect(resolveKitButtonVariant('secondary')).toBe('secondary')
+    expect(resolveKitButtonVariant('primary')).toBe('primary')
+    expect(resolveKitButtonVariant('accent')).toBe('accent')
+    expect(resolveKitButtonVariant('ghost')).toBe('ghost')
+    expect(resolveKitButtonVariant('danger')).toBe('destructive')
   })
 })

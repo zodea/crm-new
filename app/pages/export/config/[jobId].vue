@@ -118,6 +118,7 @@ onUnmounted(() => {
               取消
             </Button>
             <KitButton
+              variant="accent"
               :disabled="source.files.length === 0 || settings.naming.parts.length === 0"
               :loading="running"
               @click="startExport"

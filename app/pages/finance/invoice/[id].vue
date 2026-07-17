@@ -365,7 +365,7 @@ onMounted(() => {
 
         <!-- 动作：删除 ｜ 重新识别 + 保存 -->
         <div class="mt-1 flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
-          <button class="btn-secondary text-danger hover:border-danger!" @click="del">
+          <button class="btn-danger" @click="del">
             <span class="i-lucide-trash-2 mr-1 text-13px" aria-hidden="true" />删除
           </button>
           <div class="flex items-center gap-2">
@@ -373,7 +373,7 @@ onMounted(() => {
               <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />
               {{ invoice.ocrStatus === 'processing' ? '识别中…' : '重新识别' }}
             </button>
-            <button class="btn-primary" @click="save">
+            <button class="btn-accent" @click="save">
               <span class="i-lucide-save mr-1 text-13px" aria-hidden="true" />保存
             </button>
           </div>
