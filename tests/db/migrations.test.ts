@@ -295,6 +295,28 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     `)).rejects.toThrow()
     db.close()
   })
+
+  it('v11：分供方外部旧 ID 持久化并对可见记录去重', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(m => m.version <= 10))
+    await db.execute(`INSERT INTO suppliers (id, name) VALUES ('sup-legacy', '存量分供方')`)
+
+    const result = await runMigrations(db)
+
+    expect(result.from).toBe(10)
+    expect(result.to).toBe(LATEST_VERSION)
+    expect(await columnNames(db, 'suppliers')).toContain('external_ref')
+    const [legacy] = await db.select<{ external_ref: string | null }>(
+      `SELECT external_ref FROM suppliers WHERE id = 'sup-legacy'`,
+    )
+    expect(legacy.external_ref ?? '').toBe('')
+
+    await db.execute(`INSERT INTO suppliers (id, name, external_ref) VALUES ('sup-a', '甲', 'OLD-001')`)
+    await expect(db.execute(
+      `INSERT INTO suppliers (id, name, external_ref) VALUES ('sup-b', '乙', 'OLD-001')`,
+    )).rejects.toThrow()
+    db.close()
+  })
 })
 
 describe('vitest 基建：sql.js 内存库可跑业务断言', () => {

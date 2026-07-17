@@ -4,11 +4,13 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { StatusTone } from '~/lib/supplier/status'
 import type { Supplier } from '~/stores/supplier'
 import { clampPage, paginate } from '~/lib/kit/table'
+import { createSupplierCategoryExport, createSupplierLedgerExport } from '~/lib/supplier/export'
 import { filterSuppliers } from '~/lib/supplier/list'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { toErrorMessage } from '~/lib/util/error'
 
 const store = useSupplierStore()
-const { confirm, undoToast, success, error } = useKitUI()
+const { confirm, undoToast, success, error, exportFile, openImportTab } = useKitUI()
 
 const searchText = shallowRef('')
 const categoryFilter = shallowRef('all')
@@ -88,6 +90,43 @@ async function refresh() {
   await store.load()
 }
 
+// 导出路一：当前筛选结果合成一个分供方台账，直接选择目录保存。
+async function exportLedger() {
+  if (!filtered.value.length) {
+    error('当前没有可导出的分供方')
+    return
+  }
+  try {
+    await exportFile(createSupplierLedgerExport(filtered.value))
+  }
+  catch (err) {
+    error(`导出失败：${toErrorMessage(err)}`)
+  }
+}
+
+// 导出路二：类别/资料状态两级目录，每家分供方一个文件，进入 ADR 0004 配置页签。
+async function exportByCategory() {
+  if (!filtered.value.length) {
+    error('当前没有可导出的分供方')
+    return
+  }
+  try {
+    await exportFile(createSupplierCategoryExport(filtered.value))
+  }
+  catch (err) {
+    error(`分类导出失败：${toErrorMessage(err)}`)
+  }
+}
+
+async function openImport() {
+  try {
+    await openImportTab({ entity: 'supplier' })
+  }
+  catch (err) {
+    error(`导入打开失败：${toErrorMessage(err)}`)
+  }
+}
+
 async function handleDelete(supplier: DeepReadonly<Supplier>) {
   const impact = await store.downstreamImpact(supplier.id)
   const cascade = impact.length > 0
@@ -137,6 +176,9 @@ onMounted(() => store.load())
       :status-options="statusOptions"
       @refresh="refresh"
       @create="openCreate"
+      @import="openImport"
+      @export-ledger="exportLedger"
+      @export-by-category="exportByCategory"
     />
 
     <KitTable

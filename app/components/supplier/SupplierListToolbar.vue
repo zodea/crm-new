@@ -17,6 +17,9 @@ defineProps<{
 const emit = defineEmits<{
   create: []
   refresh: []
+  import: []
+  exportLedger: []
+  exportByCategory: []
 }>()
 
 const search = defineModel<string>('search', { required: true })
@@ -50,6 +53,18 @@ const credentialStatus = defineModel<string>('credentialStatus', { required: tru
           aria-hidden="true"
         />
         <span class="sr-only">刷新</span>
+      </Button>
+      <Button variant="outline" title="导入分供方（映射页签）" @click="emit('import')">
+        <span class="i-lucide-upload h-3.5 w-3.5" aria-hidden="true" />
+        导入
+      </Button>
+      <Button variant="outline" title="导出分供方台账（单文件直接保存）" @click="emit('exportLedger')">
+        <span class="i-lucide-download h-3.5 w-3.5" aria-hidden="true" />
+        导出台账
+      </Button>
+      <Button variant="outline" title="按类别/资料状态分类导出（配置页签）" @click="emit('exportByCategory')">
+        <span class="i-lucide-folder-tree h-3.5 w-3.5" aria-hidden="true" />
+        分类导出
       </Button>
       <Button variant="accent" @click="emit('create')">
         <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
