@@ -36,7 +36,7 @@ const model = defineModel<string>()
     <SelectRoot v-model="model">
       <SelectTrigger
         :aria-label="label"
-        class="inline-flex h-8 items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[12px] pr-[9px] text-[14px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
+        class="inline-flex h-8 items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[12px] pr-[9px] text-[13px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
         :style="{ minWidth: `${minWidth}px` }"
       >
         <SelectValue :placeholder="placeholder" />

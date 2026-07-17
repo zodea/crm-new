@@ -44,7 +44,7 @@ const toneClass = computed(() => {
     </div>
     <div
       class="mt-[5px] whitespace-nowrap font-mono tabular-nums tracking-[-0.015em] leading-[1.25]"
-      :class="[toneClass, big ? 'text-[19px] font-800' : 'text-[15px] font-700']"
+      :class="[toneClass, big ? 'text-[17.5px] font-800' : 'text-[13.5px] font-700']"
       :title="typeof value === 'string' ? value : undefined"
     >
       {{ display }}

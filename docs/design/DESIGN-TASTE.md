@@ -275,7 +275,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 > 重构方向：给 Button/KitButton 补全五变体映射、把缺省降为安静按钮、实心蓝改名 accent 并全站清点「每屏一枚」。已随 #109 实施，DESIGN-SYSTEM.md §4.2 同轮修订。
 
-**② 正文基准文档冲突**：ADR 0007 写「正文基准 15px」，而权威令牌（typography.css `--text-base:14px`、tokens.css `html{font-size:14px}`）与设计稿实测均为 14px。建议以 14px 为准、ADR 0007 该句加勘误注（后续轮次处理）。
+**② 正文基准文档冲突** ✅ **已处理（#110 阶段③）**：以 14px 为准，ADR 0007 该句已加勘误注；13px 控件阶（SegTab/SelectFilter/SearchInput/TreeNav）与数字字阶（StatCard 24/800、Metric 17.5/13.5）同轮回收。
 
 **③ danger 按钮** ✅ **已落地（#109）**：`destructive`/`btn-danger` 已改静默红（白底红字，§4.2 配方）。破坏性操作靠确认弹窗兜底（ADR 0003），按钮本身不必嘶吼。
 
