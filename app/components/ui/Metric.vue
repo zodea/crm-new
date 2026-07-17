@@ -35,7 +35,7 @@ const toneClass = computed(() => {
 </script>
 
 <template>
-  <div class="min-w-0 bg-panel px-[14px] py-[12px]">
+  <div role="group" :aria-label="label" class="min-w-0 bg-panel px-[14px] py-[12px]">
     <div class="flex items-center gap-[4px] text-[12px] font-600 text-ink-faint">
       <span class="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{ label }}</span>
       <span v-if="formula" :title="formula" class="inline-flex cursor-help">
