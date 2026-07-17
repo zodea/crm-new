@@ -68,11 +68,8 @@ function editableNumber(value: number | null, fallback = 0): number {
 }
 
 function itemFromParsed(item: ParsedDeliveryItem): DeliveryItem {
-  const qty = editableNumber(item.quantity, item.total != null ? 1 : 0)
-  const unitPrice = editableNumber(
-    item.unitPrice,
-    item.total != null && qty !== 0 ? round2(item.total / qty) : 0,
-  )
+  const qty = editableNumber(item.quantity)
+  const unitPrice = editableNumber(item.unitPrice)
   return {
     id: generateId('ditem'),
     name: item.name,
