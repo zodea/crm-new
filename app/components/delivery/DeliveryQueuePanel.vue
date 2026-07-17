@@ -40,7 +40,7 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
         </div>
       </div>
       <div class="flex-1" />
-      <button type="button" class="btn-primary px-2.5 py-1.5 text-11px" @click="emit('upload')">
+      <button type="button" class="btn-secondary px-[11px] py-[5px] text-12px" @click="emit('upload')">
         <span class="i-lucide-plus mr-1" />上传
       </button>
     </div>

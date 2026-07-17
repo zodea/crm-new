@@ -116,7 +116,7 @@ function copyMoney(fen: number) {
             @input="updateTaxRate"
           >
         </div>
-        <button type="button" class="btn-primary h-[34px] w-full whitespace-nowrap active:translate-y-px" @click="calculateTax">
+        <button type="button" class="btn-primary h-[34px] w-full" @click="calculateTax">
           计算税额和不含税金额
         </button>
       </div>

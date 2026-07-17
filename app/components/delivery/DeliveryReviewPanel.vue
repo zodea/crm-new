@@ -68,7 +68,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
         已核对 {{ reviewProgress.passed }}/{{ reviewProgress.total }}
       </span>
       <div class="flex-1" />
-      <NuxtLink to="/material/delivery/archive" class="btn-secondary px-2.5 py-1.5 text-10px">
+      <NuxtLink to="/material/delivery/archive" class="btn-secondary px-[11px] py-[5px] text-12px">
         <span class="i-lucide-archive mr-1" />归档库
       </NuxtLink>
     </div>
@@ -128,7 +128,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
         </button>
         <div class="flex-1" />
         <span class="text-9px text-ink-faint">项目必选；提醒项会在归档前再次确认</span>
-        <button type="button" class="btn-primary" :disabled="saving" @click="emit('archive')">
+        <button type="button" class="btn-accent" :disabled="saving" @click="emit('archive')">
           <span :class="saving ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-circle-check'" class="mr-1 text-12px" />
           {{ saving ? '归档中…' : '核对完成并归档' }}
         </button>
@@ -151,7 +151,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
     <div v-else-if="file" class="flex flex-1 flex-col items-center justify-center text-11px text-ink-faint">
       <span class="i-lucide-scan-text mb-2 text-24px" />
       等待识别
-      <button type="button" class="btn-primary mt-3" @click="emit('recognize')">
+      <button type="button" class="btn-accent mt-3" @click="emit('recognize')">
         开始识别
       </button>
     </div>

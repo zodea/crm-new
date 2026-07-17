@@ -185,7 +185,7 @@ onUnmounted(() => {
             <Button variant="outline" @click="backToUpload">
               重新上传
             </Button>
-            <KitButton :disabled="missingRequired.length > 0" @click="goPreview">
+            <KitButton variant="primary" :disabled="missingRequired.length > 0" @click="goPreview">
               下一步
             </KitButton>
           </div>
@@ -255,6 +255,7 @@ onUnmounted(() => {
               上一步
             </Button>
             <KitButton
+              variant="accent"
               :disabled="!keptEntries.length"
               :loading="phase === 'running'"
               @click="startImport"

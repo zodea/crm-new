@@ -93,6 +93,12 @@
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
   --overlay: rgb(0 0 0 / 28%);
 
+  /* 按钮五变体 hover 值（DESIGN-TASTE §4.2 实测自设计稿，#109）——
+     唯一定义处，uno.config 的 btn-look-* 引用；换品牌/危险色时同步调整这三条 */
+  --btn-hover-quiet: #eceef1;
+  --btn-hover-primary: #dbeafe;
+  --btn-hover-danger: rgb(220 38 38 / 5%);
+
   /* shadcn Sidebar 映射到独立外壳令牌。 */
   --sidebar-background: var(--shell-sidebar-bg);
   --sidebar-foreground: var(--shell-sidebar-text);

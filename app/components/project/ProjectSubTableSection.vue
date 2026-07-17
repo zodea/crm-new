@@ -39,7 +39,7 @@ function changePage(next: { page: number, pageSize: number }) {
         </h4>
         <span class="text-11px text-ink-faint">共 {{ rows.length }} 条</span>
       </div>
-      <button class="btn-primary text-12px" disabled title="将在对应业务波次开放">
+      <button class="btn-secondary" disabled title="将在对应业务波次开放">
         <span class="i-lucide-plus mr-0.5 text-12px" aria-hidden="true" /> 新建
       </button>
     </div>

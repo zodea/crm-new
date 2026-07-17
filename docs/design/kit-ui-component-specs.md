@@ -210,7 +210,7 @@ openDrawer({
 
 | 状态 | 表现 | 默认 |
 |---|---|---|
-| default | `--brand`(或调用处指定语义色) | — |
+| default | 按变体配方渲染(缺省 secondary 安静按钮,见 DESIGN-TASTE §4.2 / #109) | — |
 | loading | 前置 spinner + disabled + 锁宽 | 启用 |
 | success 打勾 | 缩字→打勾 `--ok`→停约 1s 复位 | **默认关** |
 
@@ -224,7 +224,7 @@ openDrawer({
 <KitButton
   :loading="submitting"      // 受控 loading
   :success="false"           // 可选第三态,默认关
-  variant="brand | danger | ghost"
+  variant="secondary | primary | accent | ghost | danger"  // 五变体层级,缺省 secondary(#109,DESIGN-TASTE §4.2)
   @click="onSubmit"
 />
 ```

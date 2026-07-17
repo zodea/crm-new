@@ -179,7 +179,7 @@ onMounted(refresh)
       <button class="btn-secondary" :disabled="store.loading" @click="refresh">
         <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
       </button>
-      <button class="btn-primary" @click="openCreate">
+      <button class="btn-accent" @click="openCreate">
         <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
       </button>
     </div>

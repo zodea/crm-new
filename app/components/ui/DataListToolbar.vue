@@ -75,7 +75,7 @@ const emit = defineEmits<{
     </button>
     <button
       v-if="showCreate"
-      class="icon-btn-primary"
+      class="icon-btn-accent"
       :title="createLabel"
       @click="emit('create')"
     >

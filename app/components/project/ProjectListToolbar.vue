@@ -72,7 +72,7 @@ const status = defineModel<string>('status', { required: true })
         <span class="i-lucide-folder-tree h-3.5 w-3.5" aria-hidden="true" />
         分类导出
       </Button>
-      <Button @click="emit('create')">
+      <Button variant="accent" @click="emit('create')">
         <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
         新增项目
       </Button>

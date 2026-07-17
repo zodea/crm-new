@@ -182,16 +182,28 @@ export default defineConfig({
     // 内容区面板（扁平）
     'content-panel': 'border border-line bg-panel',
 
-    // 按钮
-    'btn': 'inline-flex items-center justify-center border border-line rounded-[var(--radius-btn)] px-2.5 py-1.5 text-14px font-600 cursor-pointer transition-colors duration-[var(--dur-fast)]',
-    'btn-primary': 'btn border-brand bg-brand text-white hover:opacity-90',
-    'btn-secondary': 'btn bg-panel text-ink-soft hover:border-brand hover:text-brand',
-    'btn-danger': 'btn border-danger text-danger hover:bg-danger-soft',
-    'btn-ghost': 'btn border-transparent bg-transparent text-ink-soft hover:bg-surface-3 hover:text-brand',
+    // 按钮：五变体层级语言（权威源 DESIGN-TASTE §4.2，#109）。
+    // 缺省 = btn-secondary 安静按钮；实心蓝只属于 btn-accent（每屏 ≤1 枚核心 CTA）；
+    // btn-danger = 静默红（破坏性防护在确认弹窗，ADR 0003）；hover 平面变色、active scale(0.97)。
+    // btn-look-* 是五变体外观的唯一定义处：shadcn Button 的 cva 变体表（ui/button/index.ts）
+    // 直接引用同名类，几何/交互基座由各轨自持；hover 色值见 tokens.css --btn-hover-*。
+    // 过渡只列颜色/透明度/位移——不用裸 transition，避免 focus 环的 box-shadow 被拖进过渡逐帧重绘。
+    // 不加 disabled:pointer-events-none：禁用按钮要保留 title 提示（如「缺归属…」）的悬停可达性。
+    'btn-look-secondary': 'border-line-strong bg-panel text-ink hover:bg-[var(--btn-hover-quiet)] hover:border-ink-soft',
+    'btn-look-primary': 'border-brand bg-brand-soft text-brand-deep hover:bg-[var(--btn-hover-primary)]',
+    'btn-look-accent': 'border-brand bg-brand text-white hover:opacity-90',
+    'btn-look-ghost': 'border-transparent bg-transparent text-ink-soft hover:bg-brand-soft hover:text-brand',
+    'btn-look-danger': 'border-line-strong bg-panel text-danger hover:border-danger hover:bg-[var(--btn-hover-danger)]',
+    'btn': 'inline-flex items-center justify-center whitespace-nowrap border rounded-[var(--radius-btn)] px-[12px] py-[7px] text-13px font-600 cursor-pointer transition-[color,background-color,border-color,opacity,transform] duration-[var(--dur-fast)] active:scale-97 disabled:opacity-50',
+    'btn-secondary': 'btn btn-look-secondary',
+    'btn-primary': 'btn btn-look-primary',
+    'btn-accent': 'btn btn-look-accent',
+    'btn-ghost': 'btn btn-look-ghost',
+    'btn-danger': 'btn btn-look-danger',
 
     // 图标按钮（工具栏）
     'icon-btn': 'inline-flex items-center justify-center w-7 h-7 rounded-[var(--radius-btn)] border border-line bg-panel text-ink-soft cursor-pointer hover:border-brand hover:text-brand transition-colors duration-[var(--dur-fast)]',
-    'icon-btn-primary': 'icon-btn bg-brand text-white border-brand',
+    'icon-btn-accent': 'icon-btn bg-brand text-white border-brand',
     'icon-btn-danger': 'icon-btn hover:border-danger hover:text-danger',
 
     // Chip

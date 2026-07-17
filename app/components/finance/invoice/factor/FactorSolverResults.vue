@@ -126,7 +126,7 @@ function totalQuantity(items: FactorSolutionItem[]): string {
             <td class="h-10 px-1.5 py-0">
               <button
                 type="button"
-                class="border-0 bg-transparent p-0 text-left font-mono font-700 text-brand hover:underline active:translate-y-px"
+                class="border-0 bg-transparent p-0 text-left font-mono font-700 text-brand hover:underline active:scale-97"
                 title="复制整条表达式"
                 @click="emit('copy', expression(solution))"
               >
@@ -139,7 +139,7 @@ function totalQuantity(items: FactorSolutionItem[]): string {
                   v-for="item in solution"
                   :key="`${item.factorId}-${item.quantity}`"
                   type="button"
-                  class="border-0 bg-transparent p-0 font-mono text-ink-soft hover:text-brand hover:underline active:translate-y-px"
+                  class="border-0 bg-transparent p-0 font-mono text-ink-soft hover:text-brand hover:underline active:scale-97"
                   title="复制该使用项"
                   @click="emit('copy', formatPart(item))"
                 >
