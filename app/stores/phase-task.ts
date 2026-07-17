@@ -1,8 +1,8 @@
+import type { SoftDb } from '~/lib/db/soft-delete'
 import type { PhaseTaskData, PhaseTaskStatus } from '~/lib/project/phases'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
-import { db } from '~/lib/db/client'
-import { execute, select } from '~/lib/db/connection'
+import { select, withTransaction } from '~/lib/db/connection'
 import { logCreate, selectVisibleSql, softDelete, undoOperation, withUpdateLog } from '~/lib/db/soft-delete'
 import { normalizePhaseTasks } from '~/lib/project/phases'
 import { generateId } from '~/lib/util/id'
@@ -43,9 +43,9 @@ export const usePhaseTaskStore = defineStore('phase-task', () => {
     return list.value.filter(task => task.projectId === projectId)
   }
 
-  async function insertTask(task: PhaseTaskData): Promise<string | null> {
+  async function insertTask(tx: SoftDb, task: PhaseTaskData): Promise<string | null> {
     const id = task.id || generateId('phase')
-    await execute(
+    await tx.execute(
       `INSERT INTO phase_tasks (id, project_id, phase_index, task_index, title, description, responsible, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -60,7 +60,7 @@ export const usePhaseTaskStore = defineStore('phase-task', () => {
         new Date().toISOString(),
       ],
     )
-    return logCreate(db, 'phase_tasks', id)
+    return logCreate(tx, 'phase_tasks', id)
   }
 
   async function saveProject(projectId: string, draft: readonly PhaseTaskData[]) {
@@ -70,18 +70,17 @@ export const usePhaseTaskStore = defineStore('phase-task', () => {
     const keptIds = new Set(normalized.map(task => task.id).filter(Boolean))
     const logIds: string[] = []
 
-    await db.execute('BEGIN')
-    try {
+    await withTransaction(async (tx) => {
       for (const task of current) {
         if (!keptIds.has(task.id)) {
-          const logId = await softDelete(db, 'phase_tasks', task.id)
+          const logId = await softDelete(tx, 'phase_tasks', task.id)
           if (logId)
             logIds.push(logId)
         }
       }
       for (const task of normalized) {
         if (task.id && currentIds.has(task.id)) {
-          const logId = await withUpdateLog(db, 'phase_tasks', task.id, () => execute(
+          const logId = await withUpdateLog(tx, 'phase_tasks', task.id, () => tx.execute(
             `UPDATE phase_tasks
              SET phase_index=?, task_index=?, title=?, description=?, responsible=?, status=?
              WHERE id=?`,
@@ -91,32 +90,21 @@ export const usePhaseTaskStore = defineStore('phase-task', () => {
             logIds.push(logId)
         }
         else {
-          const logId = await insertTask(task)
+          const logId = await insertTask(tx, task)
           if (logId)
             logIds.push(logId)
         }
       }
-      await db.execute('COMMIT')
-    }
-    catch (error) {
-      await db.execute('ROLLBACK')
-      throw error
-    }
+    })
     await load()
     return logIds
   }
 
   async function undoSave(logIds: readonly string[]) {
-    await db.execute('BEGIN')
-    try {
+    await withTransaction(async (tx) => {
       for (const logId of [...logIds].reverse())
-        await undoOperation(db, logId)
-      await db.execute('COMMIT')
-    }
-    catch (error) {
-      await db.execute('ROLLBACK')
-      throw error
-    }
+        await undoOperation(tx, logId)
+    })
     await load()
   }
 
