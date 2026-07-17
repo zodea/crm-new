@@ -6,6 +6,7 @@
 // 公共 API（success/error/warning/info/show/loading/promise/undo/update/dismiss）签名不变，
 // 页面与 useKitUI 无感。Toaster 宿主见 components/shared/ToastHost.vue。
 import { toast as sonner } from 'vue-sonner'
+import { toErrorMessage } from '~/lib/util/error'
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading' | 'default'
 export type ToastLane = 'system' | 'process'
@@ -17,7 +18,7 @@ type ToastId = string | number
 
 interface ToastAction {
   label: string
-  onClick: () => void
+  onClick: () => void | Promise<void>
 }
 
 interface PushOptions {
@@ -151,7 +152,7 @@ function dismiss(id: ToastId) {
 }
 
 /** 撤回 toast（软删除限时撤回，system 道；ADR 0003：窗口 10 秒） */
-function undo(message: string, onUndo: () => void, ms = 10000): ToastId {
+function undo(message: string, onUndo: () => boolean | void | Promise<boolean | void>, ms = 10000): ToastId {
   const id = emit({
     lane: 'system',
     type: 'default',
@@ -159,11 +160,20 @@ function undo(message: string, onUndo: () => void, ms = 10000): ToastId {
     duration: ms,
     action: {
       label: '撤回',
-      onClick: () => {
+      onClick: async () => {
         // vue-sonner 的 action 点击直接删 toast、不回调 onDismiss，需手动清泳道记账
         laneById.delete(id)
-        onUndo()
-        success('已撤回')
+        try {
+          const restored = await onUndo()
+          if (restored === false) {
+            error('撤回失败：记录已变化或不存在')
+            return
+          }
+          success('已撤回')
+        }
+        catch (err) {
+          error(`撤回失败：${toErrorMessage(err)}`)
+        }
       },
     },
   })
