@@ -302,9 +302,9 @@ function tableItems(table: DeliveryTable): ParsedItems {
     let total = header.total == null ? null : parseNumber(cells[header.total])
     let note = header.note == null ? '' : String(cells[header.note] ?? '').trim()
 
-    if (!unit && quantity == null && unitPrice == null && total == null && items.length) {
+    if (spec && !unit && quantity == null && unitPrice == null && total == null && items.length) {
       const previous = items.at(-1)!
-      previous.spec = [previous.spec, spec || name].filter(Boolean).join(' ')
+      previous.spec = [previous.spec, spec].filter(Boolean).join(' ')
       continue
     }
     if (quantity == null && unitPrice == null && total == null)

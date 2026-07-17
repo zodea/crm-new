@@ -78,6 +78,29 @@ describe('parseDeliveryMarkdown', () => {
     expect(result.docs[0]?.items[0]?.name).not.toBe('1')
   })
 
+  it('不把 name-only 的无数值行跨列拼入上一条材料规格', () => {
+    const result = parseDeliveryMarkdown([`
+      # 示例建材有限公司送货单
+      <table>
+        <tr><td>编号</td><td>产品</td><td>规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>1</td><td>干拌抹灰砂浆</td><td>M10</td><td>吨</td><td>2</td><td>300</td><td>600</td></tr>
+        <tr><td></td><td>页面边缘识别文字</td><td></td><td></td><td></td><td></td><td></td></tr>
+      </table>
+    `])
+
+    expect(result.docs[0]?.items).toEqual([
+      {
+        name: '干拌抹灰砂浆',
+        spec: 'M10',
+        unit: '吨',
+        quantity: 2,
+        unitPrice: 300,
+        total: 600,
+        note: '',
+      },
+    ])
+  })
+
   it('客户/地址不会覆盖供应商，合计与明细不符时明确标待复核', () => {
     const result = parseDeliveryMarkdown([ROTATED_DELIVERY_MARKDOWN
       .replace('822.00', '900.00')
