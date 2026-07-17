@@ -68,6 +68,7 @@ interface ParsedDeliveryDocumentPart extends ParsedDeliveryDocument {
 const COMPANY_HINT_RE = /有限责任公司|股份有限公司|有限公司|分公司|经营部|商行|商贸|贸易|建材|电缆|照明|装饰|设备|供应链|厂|店/
 const BUYER_FIELD_RE = /^(?:客户(?:名称)?|需方|购方|收货单位|送货单位|收货人|送货人|送货地址|送货地点|收货地址|收货地点|项目名称|项目|工地|地址|电话|联系电话|联系人|开户|账号|税号|统一社会信用代码|经手人?|经办人?|制单人?|销售员|付款人|收款人|司机|审核|审批|签收|签字|承运|备注|日期)(?:\s*[（(][^）)]*[）)])?\s*(?:[:：]|$)/
 const DOC_TYPE_TAIL_RE = /(?:送货单|销货清单|销售清单|出货单|送货清单|发货单|销售单|对账单|工作记录单|收款收据|收据|清单|送货)$/
+const SUPPLIER_LOGO_PREFIX_RE = /^G[Z7]\s+(?=[\u3400-\u9FFF])/
 const AGGREGATE_ROW_RE = /合\s*计|总\s*计|小计|^计[:：]|本页(?:金额|合计|小计)|分页(?:金额|合计|小计)|页金额|累计(?:金额|合计|总计|总金额)|总金额|应收|实收|大写/
 const NOISE_ITEM_RE = /^(?:备注|说明|大写|送货方式|注意|白色联|红色联|黄色联|绿色联|蓝色联|存根)$/
 const UNIT_RE = /^(?:[个件套张块片条支根包袋盒箱瓶桶罐卷捆扎台把只双副米方吨斤车次项mt㎡]|厘米|cm|平方|平方米|m2|立方|m3|公斤|kg)$/i
@@ -171,6 +172,7 @@ function findOrderNo(lines: string[]): string {
 
 function cleanSupplier(value: string): string {
   return stripInline(value)
+    .replace(SUPPLIER_LOGO_PREFIX_RE, '')
     .replace(/\s+/g, '')
     .replace(/^(?:供货单位|供方|销售方|供应商|公司名称|名称)[:：]?/, '')
     .replace(DOC_TYPE_TAIL_RE, '')
@@ -179,10 +181,11 @@ function cleanSupplier(value: string): string {
 
 function findSupplier(lines: string[]): string {
   for (const raw of lines) {
-    const compact = stripInline(raw).replace(/\s+/g, '')
+    const normalized = stripInline(raw)
+    const compact = normalized.replace(/\s+/g, '')
     if (!compact || BUYER_FIELD_RE.test(compact) || !COMPANY_HINT_RE.test(compact))
       continue
-    const supplier = cleanSupplier(compact)
+    const supplier = cleanSupplier(normalized)
     if (supplier.length >= 3 && supplier.length <= 60)
       return supplier
   }
@@ -357,8 +360,8 @@ function valueAfterFieldLabel(rows: string[][], label: RegExp): string {
 }
 
 function fieldFormItems(table: DeliveryTable): ParsedItems | null {
-  const name = valueAfterFieldLabel(table.rows, /^(?:服务项目|服务内容)$/)
-  if (!name)
+  const rawName = valueAfterFieldLabel(table.rows, /^(?:服务项目|服务内容)$/)
+  if (!rawName)
     return null
   const amountMatch = table.rawText.match(
     /人[民名]币[（(]?大写[）)]?[^¥￥]{0,80}[¥￥][\s:：]*([\d,]+(?:\.\d+)?)/,
@@ -366,6 +369,13 @@ function fieldFormItems(table: DeliveryTable): ParsedItems | null {
   const amount = amountMatch?.[1] ? parseNumber(amountMatch[1]) : null
   if (amount == null)
     return null
+  const trailingAmount = rawName.match(/^(.*\S)(?:\s+[¥￥]?|[¥￥])([\d,]+(?:\.\d+)?)\s*$/)
+  const name = trailingAmount?.[1] && parseNumber(trailingAmount[2]) === amount
+    ? trailingAmount[1].trim()
+    : rawName
+  const note = valueAfterFieldLabel(table.rows, /^备注(?:内容)?(?=\s*[:：]|$)/)
+    || table.rawText.match(/(?:备注(?:内容)?|说明) *[:：](.{1,80})$/)?.[1]?.trim()
+    || ''
   const aggregateTotals = { pageTotal: null, cumulativeTotal: null, genericTotal: amount, subtotalTotal: null }
   return {
     items: [{
@@ -375,7 +385,7 @@ function fieldFormItems(table: DeliveryTable): ParsedItems | null {
       quantity: null,
       unitPrice: null,
       total: amount,
-      note: '',
+      note,
     }],
     statedTotal: amount,
     aggregateTotals,
