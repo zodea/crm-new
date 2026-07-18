@@ -228,3 +228,22 @@ openDrawer({
   @click="onSubmit"
 />
 ```
+
+## 07 · 穿透件 `entity-link` / `money-link` ✅ 已定案(2026-07-17 四问定稿,无 ADR)
+
+> 基准:`DC重构设计源码/kit/KitAtoms.jsx` EntityLink(批A 底座件①)+ MoneyLink(批B 铁律④);领域语言见 CONTEXT.md「穿透」词条。
+
+**EntityLink(实体蓝链)**:
+- type→route 映射**唯一处**(组件内 ENTITY_ROUTES 一张表,别处不复制);只登记已实装详情页(project/supplier/contract/invoice…),**未实装类型查无路由自动退化纯文本**——实装后回填映射即全站上线。
+- label 缺省时按 type 从对应 store best-effort 解析(分供方取别名优先);解析为空 → 灰「—」。
+- 视觉:`--brand`/600、hover 下划线、`font-size: inherit`;点击 stopPropagation(不触发行点击)。
+
+**MoneyLink(金额穿透)**:
+- `¥#,##0.00` mono/600 完整两位小数;**跳转目标由调用点传入**(目标列表路由 + 预筛 query),不建集中金额映射表——金额语义(合同额/请款/收票/已付…)归业务屏。
+- 值 0/空/未给目标 → 退化普通 mono 文本。**不做死链**(与 EntityLink 同一铁律)。
+
+**页签交互(对 CONTEXT.md 页签词条的补充边界)**:
+- **穿透预筛不进页签身份**:跳转激活目标列表页的既有页签并应用新预筛;预筛参数不参与「同路由同参数复用」判定。
+- 目标列表页需支持从 query 初始化筛选(样板两屏先补:发票台账、项目列表)。
+
+**落地节奏**:样板先行——发票台账 + 项目列表两屏接入并浏览器验收(穿透观感 + 预筛口径 + 页签复用)后,再全站铺开;样板屏顺手带状态色纯文字化与汇总条(左统计右分页)。
