@@ -3,14 +3,18 @@
 // 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
 // 口径：台账 = 已归档（DATABASE.md §4.2）；「待归档」= 已校对未归档过渡态（#57，
 // 替代设计稿旧模型的「未归项目」——两态模型下归档必有归属，见 issue #69 评论）。
+import type { ProjectGroupKey } from '~/lib/invoice/ledger-nodes'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { Invoice } from '~/stores/invoice'
+import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
 import { yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
 const projectStore = useProjectStore()
+const supplierStore = useSupplierStore()
 const router = useRouter()
+const route = useRoute()
 const { confirm, error, formModal, success, undoToast, warning } = useKitUI()
 
 // ── 左树：全部 / 项目一级 / 个人开支 / 待归档 ──
@@ -26,22 +30,20 @@ interface ProjectLedgerGroup {
   count: number
 }
 
-type ProjectGroupKey = `id:${string}` | `name:${string}`
-type ProjectTreeNodeKey = `p:${ProjectGroupKey}`
-
 function projectGroupKey(inv: Invoice): ProjectGroupKey {
   return inv.projectId ? `id:${inv.projectId}` : `name:${inv.projectName}`
 }
 
-function projectTreeNodeKey(key: ProjectGroupKey): ProjectTreeNodeKey {
-  return `p:${key}`
-}
-
-function projectGroupKeyFromNode(key: string): ProjectGroupKey | null {
-  if (!key.startsWith('p:'))
-    return null
-  return key.slice(2) as ProjectGroupKey
-}
+// query 预筛（specs §07）：?project=<id> 直达对应项目节点；预筛不进页签身份，
+// 页签复用后同一实例收到新 query，靠 watch 应用。
+watch(
+  () => ledgerNodeFromQuery(route.query),
+  (target) => {
+    if (target)
+      node.value = target
+  },
+  { immediate: true },
+)
 
 const projectGroups = computed<ProjectLedgerGroup[]>(() => {
   const result = new Map<string, ProjectLedgerGroup>()
@@ -107,7 +109,7 @@ const columns = computed<KitTableColumn[]>(() => [
   { type: 'checkbox', title: '' },
   { field: 'invoiceNumber', title: '单据编号', width: 120, slot: 'number' },
   { field: 'invoiceDate', title: '开票日期', type: 'date', width: 104 },
-  { field: 'seller', title: '供应商', minWidth: 180, filterable: true },
+  { field: 'seller', title: '供应商', minWidth: 180, filterable: true, slot: 'seller' },
   { field: 'totalAmount', title: '价税合计', type: 'money', width: 120 },
   { field: 'invoiceType', title: '类型', width: 110, filterable: true, slot: 'type' },
   {
@@ -170,6 +172,18 @@ function typeShort(t: string) {
   return (t || '').replace('增值税', '').replace('发票', '') || '—'
 }
 
+// 销方公司名 → 在册分供方 id（含别名，照设计稿 findIdByName）；
+// 非在册销方查无 id → EntityLink 自动退化纯文本
+const supplierIdByName = computed(() => {
+  const map = new Map<string, string>()
+  for (const s of supplierStore.list) {
+    map.set(s.name, s.id)
+    for (const alias of s.aliases)
+      map.set(alias, s.id)
+  }
+  return map
+})
+
 // ── 归档（「待归档」行入口，自识别工作台迁入 #69）──
 const OWNER_KIND_LABEL = { project: '归属项目', personal: '个人开支' } as const
 
@@ -201,6 +215,8 @@ onMounted(() => {
     store.load()
   if (!projectStore.list.length)
     projectStore.load()
+  if (!supplierStore.list.length)
+    supplierStore.load()
 })
 </script>
 
@@ -247,9 +263,12 @@ onMounted(() => {
               {{ row.source === 'scan' ? '扫描' : '导入' }}
             </span>
           </template>
+          <template #seller="{ row }">
+            <EntityLink :id="supplierIdByName.get(row.seller)" type="supplier" :label="row.seller" />
+          </template>
           <template #owner="{ row }">
             <span v-if="row.ownerKind === 'personal'" class="text-brand-deep">个人开支</span>
-            <span v-else-if="row.projectName">{{ row.projectName }}</span>
+            <EntityLink v-else-if="row.projectName" :id="row.projectId" type="project" :label="row.projectName" />
             <span v-else class="chip-warn">待归档</span>
           </template>
           <template #print="{ row }">
