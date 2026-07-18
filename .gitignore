@@ -45,6 +45,9 @@ docs/rewrite/2026年一季度垫资清单/
 docs/rewrite/合和新城送货单/
 DC重构设计源码/screenshots/
 
+# 本地参考文件数据（含真实公司证照、合同、发票、结算及送货资料，不上传）
+/参考文件数据/
+
 # DC 数据蓝本（含红圈真实业务数据，不上传；下轮实装为 kit/data.local.js 双轨）
 DC重构设计源码/数据蓝本/
 DC重构设计源码/kit/data.local.js
