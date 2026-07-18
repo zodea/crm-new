@@ -31,10 +31,15 @@ const visiblePages = computed(() => {
 
 <template>
   <!-- 汇总条基准（STYLE-GUIDE §3.7 / #110 阶段⑤ E1）：surface-2 底、左统计 + 右分页 -->
-  <div class="flex items-center justify-between gap-1.5 border-t border-line bg-surface-2 px-3 py-2.5 text-13px">
+  <nav
+    aria-label="表格分页"
+    class="table-pager flex items-center justify-between gap-1.5 border-t border-line bg-surface-2 px-3 py-2.5 text-13px"
+  >
     <span class="text-ink-soft">共 {{ total }} 条</span>
-    <div class="flex items-center gap-1.5">
+    <div class="table-pager__actions ml-auto min-w-0 flex flex-wrap items-center justify-end gap-1.5">
       <button
+        type="button"
+        aria-label="上一页"
         class="pager-btn"
         :disabled="page <= 1"
         @click="emit('update:page', page - 1)"
@@ -44,13 +49,19 @@ const visiblePages = computed(() => {
       <button
         v-for="p in visiblePages"
         :key="p"
-        class="pager-btn"
+        type="button"
+        :aria-label="`第 ${p} 页`"
+        :aria-current="p === page ? 'page' : undefined"
+        data-pager-page
+        class="pager-page pager-btn"
         :class="p === page ? 'pager-active' : ''"
         @click="emit('update:page', p)"
       >
         {{ p }}
       </button>
       <button
+        type="button"
+        aria-label="下一页"
         class="pager-btn"
         :disabled="page >= totalPages"
         @click="emit('update:page', page + 1)"
@@ -59,8 +70,9 @@ const visiblePages = computed(() => {
       </button>
       <select
         v-if="pageSizeOptions?.length"
+        aria-label="每页条数"
         :value="size"
-        class="ml-1.5 h-7 border border-line-strong rounded-[var(--radius-sm)] bg-panel px-2 text-13px text-ink-soft cursor-pointer outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
+        class="table-pager__page-size ml-1.5 h-7 border border-line-strong rounded-[var(--radius-sm)] bg-panel px-2 text-13px text-ink-soft cursor-pointer outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
         @change="emit('update:pageSize', Number(($event.target as HTMLSelectElement).value))"
       >
         <option v-for="n in pageSizeOptions" :key="n" :value="n">
@@ -68,5 +80,22 @@ const visiblePages = computed(() => {
         </option>
       </select>
     </div>
-  </div>
+  </nav>
 </template>
+
+<style scoped>
+.table-pager {
+  container-type: inline-size;
+  flex-wrap: wrap;
+}
+
+@container (max-width: 32rem) {
+  .pager-page:not(.pager-active) {
+    display: none;
+  }
+
+  .table-pager__page-size {
+    margin-left: 0;
+  }
+}
+</style>

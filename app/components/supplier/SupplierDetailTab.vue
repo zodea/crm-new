@@ -66,7 +66,7 @@ function display(supplier: Supplier, key: keyof Supplier): string {
         v-for="f in basicFields"
         :key="f.key"
         class="form-cell"
-        :style="f.span ? { gridColumn: `span ${f.span}` } : {}"
+        :data-form-span="f.span || undefined"
       >
         <span class="text-9px text-ink-faint">{{ f.label }}</span>
         <span class="text-12px" :class="f.mono ? 'font-mono' : ''">

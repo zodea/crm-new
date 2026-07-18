@@ -8,6 +8,12 @@ import { toErrorMessage } from '~/lib/util/error'
 const kit = useKitUI()
 
 const lastResult = shallowRef('（尚无操作）')
+const rowDialogOpen = ref(false)
+const ROW_DIALOG_SECTIONS = [
+  { key: 'base', label: '分项信息' },
+  { key: 'pricing', label: '计价信息' },
+  { key: 'remark', label: '补充说明' },
+]
 
 // ① 系统/结果提示（expand 道，右上）
 function demoSemantic() {
@@ -359,6 +365,68 @@ async function demoImportMapping() {
         <button class="btn-secondary" @click="demoFormModal">
           打开表单弹窗
         </button>
+      </section>
+
+      <!-- ⑤-b FormDialog：ADR 0014 仅保留给行级小对象/兜底 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑤-b FormDialog — 行级小对象响应式兜底
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          仅演示清单分项等行级小对象；业务实体新增/编辑按 ADR 0014 使用整页表单。
+        </p>
+        <button class="btn-secondary" @click="rowDialogOpen = true">
+          打开行级对象弹窗
+        </button>
+        <FormDialog
+          :open="rowDialogOpen"
+          title="编辑清单分项"
+          :sections="ROW_DIALOG_SECTIONS"
+          @cancel="rowDialogOpen = false"
+          @save="rowDialogOpen = false"
+        >
+          <section id="form-section-base" class="mb-6">
+            <h3 class="field-group-title">
+              分项信息
+            </h3>
+            <div class="form-dialog-demo-grid grid grid-cols-2 gap-3">
+              <label>
+                <span class="field-label">分项名称</span>
+                <input class="field-input w-full" value="轻钢龙骨隔墙">
+              </label>
+              <label>
+                <span class="field-label">单位</span>
+                <input class="field-input w-full" value="㎡">
+              </label>
+            </div>
+          </section>
+          <section id="form-section-pricing" class="mb-6">
+            <h3 class="field-group-title">
+              计价信息
+            </h3>
+            <div class="form-dialog-demo-grid grid grid-cols-2 gap-3">
+              <label>
+                <span class="field-label">数量</span>
+                <input class="field-input w-full" type="number" value="120">
+              </label>
+              <label>
+                <span class="field-label">含税单价</span>
+                <input class="field-input w-full" type="number" value="86">
+              </label>
+            </div>
+          </section>
+          <section id="form-section-remark">
+            <h3 class="field-group-title">
+              补充说明
+            </h3>
+            <div class="form-dialog-demo-grid grid grid-cols-2 gap-3">
+              <label class="col-span-2">
+                <span class="field-label">备注</span>
+                <textarea class="field-input min-h-18 w-full">样板层复核后施工</textarea>
+              </label>
+            </div>
+          </section>
+        </FormDialog>
       </section>
 
       <!-- ⑥ 单文件直接保存 -->

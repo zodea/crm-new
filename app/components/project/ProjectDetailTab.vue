@@ -6,8 +6,10 @@ defineProps<{
 }>()
 
 function display(val: unknown): string {
-  if (val == null || val === '') return '—'
-  if (typeof val === 'number') return val.toLocaleString()
+  if (val == null || val === '')
+    return '—'
+  if (typeof val === 'number')
+    return val.toLocaleString()
   return String(val)
 }
 </script>
@@ -19,7 +21,7 @@ function display(val: unknown): string {
       基础信息
     </h4>
     <div class="form-grid mb-5">
-      <div class="form-cell" style="grid-column: span 2">
+      <div class="form-cell" data-form-span="2">
         <span class="text-9px text-ink-faint">项目名称</span>
         <span class="text-12px">{{ project.name }}</span>
       </div>
@@ -39,7 +41,7 @@ function display(val: unknown): string {
         <span class="text-9px text-ink-faint">经营类型</span>
         <span class="text-12px">{{ display(project.operationType) }}</span>
       </div>
-      <div class="form-cell" style="grid-column: span 3">
+      <div class="form-cell" data-form-span="3">
         <span class="text-9px text-ink-faint">工程详细地址</span>
         <span class="text-12px">{{ display(project.address) }}</span>
       </div>

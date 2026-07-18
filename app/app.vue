@@ -68,7 +68,7 @@ function pageKey(r: { fullPath: string }) {
       <div
         ref="scrollEl"
         data-shell-workspace
-        class="min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)] px-[24px] pb-[36px] pt-[20px]"
+        class="shell-workspace min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)]"
       >
         <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
       </div>
@@ -76,3 +76,9 @@ function pageKey(r: { fullPath: string }) {
     <KitUIHost />
   </SidebarProvider>
 </template>
+
+<style scoped>
+.shell-workspace {
+  padding: clamp(var(--space-3, 12px), 2vw, var(--space-5, 20px)) clamp(var(--space-3, 12px), 2vw, var(--space-6, 24px)) clamp(var(--space-5, 20px), 3vw, 36px);
+}
+</style>
