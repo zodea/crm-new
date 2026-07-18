@@ -10,7 +10,7 @@
 | 2 | 颜色、间距、圆角等令牌 | `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css` |
 | 3 | 自适应、响应式和视觉冲突规则 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) |
 | 4 | 当前功能是否要做、做到什么程度 | [GitHub Issues](https://github.com/zodea/crm-new/issues) 中当下状态的 Issue；关闭 Issue 不作为新工作的规格 |
-| 5 | 页面字段、Tab、业务边界 | [`docs/rewrite/pages/`](../rewrite/pages/) |
+| 5 | 页面字段、Tab、业务边界 | [`docs/rewrite/pages/`](../rewrite/pages/)；⚠️ 新增/编辑**表单字段**暂以设计稿 `kit/forms/*.jsx` 为准（[ADR 0014](../adr/0014-full-page-entity-forms.md) 整页化扩容，蓝本回写见 [#116](https://github.com/zodea/crm-new/issues/116)） |
 | 6 | 数据实体、关系和迁移 | [DATABASE.md](../rewrite/DATABASE.md) |
 | 7 | 领域术语 | [CONTEXT.md](../../CONTEXT.md) |
 | 8 | 组件和交互原语 | 本目录除本入口外的专题文档 + 对应 ADR |

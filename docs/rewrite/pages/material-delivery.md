@@ -1,5 +1,7 @@
 # 送货单识别 — 上传·整理·识别·导出
 
+> ⚠️ **表单字段以设计稿为准（2026-07-18 起）**：新增/编辑表单已按 [ADR 0014 整页表单](../../adr/0014-full-page-entity-forms.md) 大幅扩容，本文字段表未含该轮新字段；现行规格见 `DC重构设计源码/kit/forms/*.jsx`（域文件头注释列出注册路由），回写随 [#116](https://github.com/zodea/crm-new/issues/116) 进行。
+
 > 路由: `/material/delivery`
 > 页面: `pages/material/delivery/index.vue` → `components/delivery/DeliveryRecognitionScreen.vue`
 > 来源: 现有 DeliveryView + delivery store 代码分析；2026-07-17 已接入真实 OCR 闭环
