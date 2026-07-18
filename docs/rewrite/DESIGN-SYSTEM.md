@@ -200,6 +200,8 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ### 4.6 列组切换（CRM 风格）
 
+> ⛔ **已废弃（#110 阶段⑥）**：`col-group` 系 shortcuts 已随唯一用点 `DataListToolbar`（零引用死组件）一并删除；列切换如再需要走 SegTab/SelectFilter。下方配方仅存历史。
+
 ```css
 .col-group {
   display: flex;
@@ -221,6 +223,8 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```
 
 ### 4.7 内容区 Tab（下划线式）
+
+> ⛔ **已废弃（#110 阶段⑥ 双轨收敛）**：`content-tab` shortcuts 已删除，下划线 tab 统一走 `SegTab`（reka-ui Tabs 底座，13px 阶，配方见 DESIGN-TASTE §4.6）。下方配方仅存历史。
 
 ```css
 .content-tab {

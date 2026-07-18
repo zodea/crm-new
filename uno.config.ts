@@ -227,15 +227,6 @@ export default defineConfig({
     // 表单分组标题（大表单左侧分区锚点对应的分组抬头）
     'field-group-title': 'text-13px font-800 text-brand-deep mb-3',
 
-    // 列组切换（CRM 风格）
-    'col-group': 'flex border border-line rounded-[var(--radius-btn)] overflow-hidden bg-panel',
-    'col-group-item': 'px-3 py-1 text-12px font-600 text-ink-soft cursor-pointer border-r border-line last:border-r-0',
-    'col-group-active': 'bg-brand text-white',
-
-    // 内容区 Tab
-    'content-tab': 'px-3.5 py-2 text-13px text-ink-soft cursor-pointer border-b-2 border-transparent -mb-px hover:text-brand',
-    'content-tab-active': 'text-brand-deep border-b-brand font-600',
-
     // 信息摘要行
     'info-row': 'flex border border-line',
     'info-cell': 'flex-1 px-3 py-2 border-r border-line last:border-r-0',
