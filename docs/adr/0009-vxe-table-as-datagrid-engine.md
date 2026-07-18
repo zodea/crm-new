@@ -1,11 +1,11 @@
 # 数据网格引擎选型：vxe-table 作为唯一底座，KitTable 深封装其上，不自研表格
 
 > 状态：已采纳（2026-07-07）
-> 影响：`app/components/ui/KitTable.vue`、`app/lib/kit/table.ts`、`app/plugins/vxe-table.ts`、`app/assets/css/vxe-theme.css`、现存 6 处裸用 vxe-table 的页面（后续统一收口到 KitTable）；`docs/rewrite/_archived/05-table-solution.md`（历史留档，本 ADR 取代其为权威源）。
+> 影响：`app/components/ui/KitTable.vue`、`app/lib/kit/table.ts`、`app/plugins/vxe-table.ts`、`app/assets/css/vxe-theme.css`、现存 6 处裸用 vxe-table 的页面（后续统一收口到 KitTable）。本 ADR 已接管并取代早期表格选型说明。
 
 ## 背景
 
-本项目的数据网格底座是 vxe-table（4.x），但它的选型理由此前只散落在 `docs/rewrite/_archived/05-table-solution.md`（2026-06-26 定稿、已归档、无 ADR 编号），且 `STYLE-GUIDE.md`「表格三件套」规范只讲行为契约、不指名库。结果是：一个既成且合理的选型没有可被发现的权威留痕——2026-07-07 就出现了「都用了 shadcn-vue 组件库，怎么 KitTable 还在用 vxe-table，是不是自造 UI」的质疑。
+本项目的数据网格底座是 vxe-table（4.x），但选型理由此前只散落在一份无 ADR 编号的早期方案中，且 `STYLE-GUIDE.md`「表格三件套」规范只讲行为契约、不指名库。结果是：一个既成且合理的选型没有可被发现的权威留痕——2026-07-07 就出现了「都用了 shadcn-vue 组件库，怎么 KitTable 还在用 vxe-table，是不是自造 UI」的质疑。
 
 这个质疑基于一个误解：以为 [ADR 0008](0008-adopt-shadcn-vue-on-unocss.md) 采纳 shadcn-vue 就该把表格也统一过去。但 ADR 0008 的范围严格限定在**交互原语**（confirm / formModal / toast）+ 两个交互型原子（SegTab / SelectFilter），全文从未把数据网格纳入或排除——唯一涉及表格处是迁移映射表顺带确认「表体由 vxe-table 负责」。**交互原语与数据网格是两个正交的问题域**，需要各自的权威源。本 ADR 补上数据网格这条。
 
@@ -28,7 +28,7 @@
 
 ## 后果
 
-- **表格选型此后以本 ADR 为权威源**，`_archived/05-table-solution.md` 降为历史留档。任何「要不要换表格库」的新诉求，先核对本 ADR，不重新发起选型讨论（AGENTS.md 开工纪律）。
+- **表格选型此后只以本 ADR 为权威源**。早期方案已从工作树删除，需要时从 Git 历史查看。任何「要不要换表格库」的新诉求，先核对本 ADR，不重新发起选型讨论（AGENTS.md 开工纪律）。
 - **shadcn-vue 与 vxe-table 视觉对齐是「换皮」不是「换引擎」**：通过 `app/assets/css/vxe-theme.css` 用 CSS 变量把 vxe 默认主题桥接到设计令牌，与 KitTable 之外的 shadcn 组件视觉一致；对齐终点是设计稿令牌与 [ADR 0013](0013-align-all-ui-to-online-design.md) 基准，不是 vxe/shadcn 默认样式。这是持续项，不是迁移。
 - **边界**：若未来出现「几行静态数据、无需固定列/虚拟滚动/复杂表头」的轻表格,可评估直接用语义化 `<table>`（更轻），不必套 KitTable/vxe——但当前所有场景都在「重型数据网格」这一侧，暂不引入第二套表格方案以免认知负担。
 - vxe-table 的已知实现坑（如 `vxe-column` 的 `v-bind` 每次渲染产出新对象会触发列重注册死循环、需 `row-config.keyField='id'`）沉在 `KitTable` 实现内，不外泄给调用方。

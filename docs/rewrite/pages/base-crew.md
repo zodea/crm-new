@@ -3,7 +3,7 @@
 > 路由: `/base/crew` · `/base/crew/:id`
 > 页面: `pages/base/crew/index.vue` · `pages/base/crew/[id].vue`
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
-> 原型参考: `DC重构设计源码/kit/CrewScreen.jsx` · `CrewDetailScreen.jsx`（重构圆角卡片版，见 ADR 0007；旧扁平版 `设计系统配色更新/kit/` 已弃用）
+> 原型参考: `DC重构设计源码/kit/CrewScreen.jsx` · `CrewDetailScreen.jsx`（圆角卡片版，见 ADR 0007；旧扁平稿已删除）
 
 ---
 
