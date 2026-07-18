@@ -2,7 +2,7 @@
 
 > 本文是设计稿的色值·字体·组件·图标·动效清单。**视觉风格基准（圆角卡片 vs 扁平）以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准**——§1.2 / §3.2 / §4.1 正文已就地更新为「圆角卡片 + 阴影」，其中标注的「扁平、无圆角、无阴影」旧条款仅存历史。  
 > ⚠️ 应用外壳规格（2026-07-17 改基准）：**毛玻璃侧栏仍废弃**；「中文单字方块 + 白底浅色侧栏」按 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) **回归为现行规格**（64px 白顶栏 + 40px 红圈式页签同源），外壳行为条款见 [ADR 0011](../adr/0011-redesign-application-shell.md)。下文毛玻璃相关内容仅作历史留档。
-> 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。`app.dc.html` 与 `app-new.html` 都直接加载它；不得在效果稿或应用侧复制色值。**全站布局/排版/颜色唯一基准 = `app.dc.html`（ADR 0013）**，`app-new.html` 仅历史对照。
+> 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。当前唯一界面入口 `app.dc.html` 直接加载它；不得在效果稿或应用侧复制色值。**全站布局/排版/颜色唯一基准 = `app.dc.html`（ADR 0013）**；旧对照页已删除，历史从 Git 查看。
 > 内容区交互模式: `CRM-PATTERNS.md`  
 > 品味层（为什么好看/禁止什么/重构方向，基准=线上 Claude Design）: [docs/design/DESIGN-TASTE.md](../design/DESIGN-TASTE.md)；本文 §4.2 按钮层级已按其五变体配方修订（#109），配方冲突时仍以该文为品味基准。  
 > 最后更新: 2026-07-17
