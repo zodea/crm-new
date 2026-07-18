@@ -23,13 +23,13 @@
 | 改动涉及 | 查这里 |
 |---|---|
 | 页面结构 / 字段 / Tab / 弹窗定义 | `docs/rewrite/pages/<page>.md`（内容蓝本，结构也要对齐） |
-| 视觉样式（卡片/按钮/表格/状态色） | 视觉基准 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md) |
+| 视觉样式（卡片/按钮/表格/状态色） | 视觉基准 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) + 全站布局/排版/颜色 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md) |
 | 删除 / 编辑 / 撤回行为 | `docs/rewrite/DATABASE.md` §8（软删除 + 操作日志 + 撤回规则） |
 | 导出交互 | [ADR 0004](../adr/0004-export-interaction-model.md) + [kit-ui-component-specs §export-progress](../design/kit-ui-component-specs.md) |
 | 页面接入 / 路由 / DS 组件 | [IMPLEMENTATION.md](./IMPLEMENTATION.md) |
 | 术语 | 根目录 `CONTEXT.md` |
 
-**冲突时的优先级**：用户当面确认 > 相关 ADR（视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、交互 0003/0004/0005/0008、表格 0009）> STYLE-GUIDE.md（dc 细化）> 页面 md 蓝本。
+**冲突时的优先级**：用户当面确认 > 相关 ADR（视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、布局/排版/颜色基准 [0013](../adr/0013-align-all-ui-to-online-design.md)、交互 0003/0004/0005/0008、表格 0009）> STYLE-GUIDE.md（dc 细化）> 页面 md 蓝本。
 
 ---
 

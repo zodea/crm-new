@@ -1,7 +1,7 @@
 # 统一视觉规范（DC 重构）
 
-> 基准来源：`kit/HomeScreenNew.jsx`（首页）+ `kit/QuantityScreenV2.jsx`（工程量）——用户亲自调过、认可的「疏朗仪表盘」风格。
-> 所有重构页面以本规范为准；视觉风格基准（圆角 vs 扁平）以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准，DESIGN-SYSTEM.md 扁平旧条款已作废。
+> 基准来源：`kit/HomeScreenNew.jsx`（首页）+ `kit/QuantityScreenV2.jsx`（工程量）——用户亲自调过、认可的「疏朗仪表盘」风格。2026-07-17 起基准扩为整份设计稿 `app.dc.html` + `kit/*.jsx` + `_ds` 令牌（含应用外壳），见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)。
+> 所有重构页面以本规范为准；视觉风格基准（圆角 vs 扁平）以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准、全站布局/排版/颜色以 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 为准，DESIGN-SYSTEM.md 扁平旧条款已作废。
 
 ---
 

@@ -42,7 +42,7 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 
 统一入口仍是 `app/composables/useKitUI.ts` + 单宿主 `app/components/shared/KitUIHost.vue`;dev 验证载体 `/dev/kit-ui`。**`useKitUI()` 的调用签名不变,页面无感。**
 
-> **底座已换成 shadcn-vue(见 [ADR 0008](docs/adr/0008-adopt-shadcn-vue-on-unocss.md))**:退役自研实现,confirm/formModal 基于 **reka-ui Dialog**、toast 基于 **vue-sonner**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等「脏活」交给底座。**样式栈仍是 UnoCSS(零 Tailwind 引擎)**:装 `reka-ui`+`cva`+`clsx`+`vue-sonner`,**不引** `tailwindcss`/`tailwind-merge`/`tailwindcss-animate`;shadcn 语义令牌桥接到现有设计令牌(tokens.css),动画用 UnoCSS `rules`/`preflights` 原生实现。下面的**设计语义(双泳道/三档 confirm)仍然有效**,只是实现底座变了。
+> **底座已换成 shadcn-vue(见 [ADR 0008](docs/adr/0008-adopt-shadcn-vue-on-unocss.md))**:退役自研实现,confirm/formModal 基于 **reka-ui Dialog**、toast 基于 **vue-sonner**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等「脏活」交给底座。**样式栈仍是 UnoCSS(零 Tailwind 引擎)**:装 `reka-ui`+`cva`+`clsx`+`vue-sonner`,**不引** `tailwindcss`/`tailwind-merge`/`tailwindcss-animate`;shadcn 语义令牌桥接到现有设计令牌(tokens.css),动画用 UnoCSS `rules`/`preflights` 原生实现。下面的**设计语义(双泳道/三档 confirm)仍然有效**,只是实现底座变了。**框架组件替换原则(ADR 0013)**:shadcn-vue/reka-ui/vxe-table 等库组件的默认观感与线上设计稿冲突时,一律以设计稿为准定制或替换,不允许以框架默认样式为由偏离设计稿(交互底座与可达性仍按 ADR 0008/0009)。
 
 - **toast(Sonner 风格双泳道 = vue-sonner 两个 Toaster)**:
   - **system 道**(右上,`:expand` 展开可读):`success/error/warning/info/undo`——系统消息与「需确认后的结果」类。
@@ -72,4 +72,4 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 - **单一权威源,二次文档只指向不复制**:**数据模型** → `docs/rewrite/DATABASE.md`;**架构决策** → `docs/adr/`;**领域术语(词条)** → `CONTEXT.md`。其他文档(页面蓝本 / TODO / dc-rebuild / research 等)用到这些内容时**只引用、不抄副本**——副本必与权威源漂移(TODO.md §2/§3 的实体表就是教训,已改为指向 DATABASE.md)。
 - **决策变更,同一轮就更新/标注旧文档**:每定一条 ADR 或改一个决策,顺手把描述旧行为的旧文档在**同一次改动**里更新;暂时不重写就打「⛔ 已废弃 / ⚠️ 已过时,见 ADR xxxx」横幅 + 指向新权威源,原文保留作历史留档。宁可当场加一行墓碑,也不留一句和现状打架的话。
 
-**已知权威源锚点**:发票单表 ADR 0001、变更单台账 ADR 0002、确认弹窗 ADR 0003、导出 ADR 0004、导入 ADR 0005、OCR ADR 0006、视觉风格(圆角卡片) ADR 0007、交互底座 shadcn-vue(reka-ui/vue-sonner on UnoCSS) ADR 0008;水波 ripple 全域废弃(见 ADR 0004)。
+**已知权威源锚点**:发票单表 ADR 0001、变更单台账 ADR 0002、确认弹窗 ADR 0003、导出 ADR 0004、导入 ADR 0005、OCR ADR 0006、视觉风格(圆角卡片) ADR 0007、交互底座 shadcn-vue(reka-ui/vue-sonner on UnoCSS) ADR 0008、**全站布局/排版/颜色基准=线上设计稿 app.dc.html(含应用外壳,框架组件观感冲突以设计稿为准) ADR 0013**(取代 ADR 0011 视觉条款,其行为条款仍有效);水波 ripple 全域废弃(见 ADR 0004)。

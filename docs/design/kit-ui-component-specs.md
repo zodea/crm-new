@@ -14,7 +14,7 @@
 | 项 | 规格 |
 |---|---|
 | 遮罩 | `rgba(0,0,0,.28)`(中性轻遮罩,2026-07-05 由品牌蓝改中性黑),**不上毛玻璃**(Tauri 性价比低) |
-| 圆角 | 弹窗/卡片 `--radius-card`(12px),按钮/输入 `--radius-btn`(10px),小控件 `--radius-sm`(8px) |
+| 圆角 | 弹窗/卡片 `--radius-card`(12px),按钮/输入 `--radius-btn`(8px,勘误:旧文写 10px,镜像 content-v5.css 实值 8px),小控件 `--radius-sm`(8px) |
 | 浮层阴影 | `--shadow-pop` |
 | 进出动效 | `--dur-dialog`(220ms)+ `--ease-snappy`;进场 `opacity 0→1 + translateY(12→0)` |
 | 退路 | Esc 关闭、遮罩点击关闭、焦点锁定在浮层内 |
