@@ -110,12 +110,17 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | `invoice_address` | 分供方确认使用的开票资料地址 | 选填；可从注册地址一次性复制，但保存后独立维护、不永久联动 |
 | `phone` | 公司电话/开票资料电话 | 选填；与联系人手机 `contact_phone` 分开，不影响资料齐全度 |
 | `taxpayer_type` | 纳税人类型 | 选填，默认“未核验”；经官方查询或人工资料确认后填写，“未查到”不得自动推导为“小规模纳税人” |
+| `credential_status` | 资料齐全度与人工核验结论 | `incomplete` 缺失/过期；`reviewing` 齐全待核验；`qualified` 人工合格；`rejected` 人工退回 |
+
+Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''`：人工通过记录时间和可选备注，人工退回时备注必填；操作人字段待账号体系落地后补充。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。
 
 广东省内分供方可从应用打开[广东省电子税务局一般纳税人资格查询](https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx)辅助核验。应用只负责复制税号、打开官网及记录人工确认结果；验证码由用户在官网完成，不爬取页面、不绕过验证码，也不把该页面当作稳定 API。
 
 `supplier_credential_requirements` 用于持久化“分供方 × 证照类别”的要求，而 `supplier_credentials` 只保存实际已收到的文件。目标字段至少包含 `supplier_id`、`category`、`requirement`（`not_applicable | optional | required`）、`reason`、`updated_at`，并对 `(supplier_id, category)` 唯一。默认规则：营业执照、法人身份证、银行账户资料为 `required`；资质证书、品牌授权书/证明为 `not_applicable`；其余资料为 `optional`。只有被明确改为 `required` 的条件资料，缺失或过期时才影响资料齐全度。
 
 “银行账户资料”是统一业务类别，兼容“银行开户许可证 / 开户许可证 / 基本存款账户信息 / 基本存款账户信息表”等历史名称；“品牌授权书 / 品牌授权证明”同样按一个类别读取，迁移不得造成附件丢失或误报缺失。
+
+已人工合格后，如必需资料的文件、分类、有效期、要求状态或相关 OCR 确认值发生变化，原核验结论必须失效并按规则重算；只修改可选资料不撤销合格。
 
 ### 2.2 项目关联实体
 
@@ -804,6 +809,7 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 3. 旧 `Supplier.attachments[]` 内嵌数组 → 拆为 `supplier_credentials` 多行
 4. 旧 `Supplier.purchases[]` / `payments[]` → 保留在 `suppliers` 表的 JSON 字段中（兼容），新数据走独立表
 5. 区域树/工程量/施工进度/目标成本等新表**无 localStorage 旧数据来源**，不参与迁移（首启建空表 + seed；工序标准库 22 道随 seed 内置）
+6. 旧 `credential_status` 按新必需资料和有效期重新计算：缺失/过期 → `incomplete`；齐全 → `reviewing`。没有人工核验时间/备注凭证的旧自动 `qualified` 不得迁为人工合格，也应进入 `reviewing`；旧 `rejected` 仅在有明确退回凭证时保留，否则同样重算。迁移不得伪造 `credential_reviewed_at` 或核验备注。
 
 ---
 
