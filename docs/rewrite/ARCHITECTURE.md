@@ -120,7 +120,7 @@ pages/
 
 components/
 ├── layout/     # AppSidebar, AppTopbar, MobileTabBar, StickyToolbar
-├── ui/         # shadcn-vue + DataListToolbar, SearchInput, StatCard, StatusChip, FilterPill, StageTab, Panel, IconButton, TableActions
+├── ui/         # shadcn-vue + SearchInput, StatCard, StatusChip, FilterPill, SegTab, EntityLink, MoneyLink, IconButton, TableActions（DataListToolbar 已删 #110 阶段⑥）
 ├── home/       # ProjectDashboard
 ├── invoice/    # InvoiceUpload, InvoicePreview, InvoiceRow, FieldsTable, InvoicePrintPanel, InvoiceLedgerPanel, InvoiceLedgerViewer, ExportPanel
 ├── delivery/   # DeliveryTree, PartitionBar, UploadZone, FileCard, SaveToStorePanel

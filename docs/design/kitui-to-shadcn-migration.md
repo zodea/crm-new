@@ -37,7 +37,7 @@
 | `Metric` / `MetricGrid` | 纯展示（指标数字/网格），已令牌化，**保留** | ✅ |
 | `StatCard` | 纯展示卡片，已令牌化，**保留** | ✅ |
 | `TreeNav` | 左树导航——纯展示 + 自有轻逻辑，无浮层/焦点脏活，**保留**（reka Tree 收益低、盲改风险高，暂不引） | ✅ |
-| `DataListToolbar` | 组合件——已组合 SearchInput/SelectFilter/Button（后者可用 shadcn `Button`），**保留** | ✅ |
+| `DataListToolbar` | ~~组合件——保留~~ ⛔ 零引用死组件已删除（#110 阶段⑥，各列表页用 Panel 化工具栏组件） | 已删 |
 | `TablePager` | 分页按钮组——vxe-table 负责表体，纯 Button 组合，**保留** | ✅ |
 
 ## 依赖现状
