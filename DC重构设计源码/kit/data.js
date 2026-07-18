@@ -685,3 +685,112 @@
     matRequisitions, matArrivals, matUses, matSettles, stockChecks, omTotals, omRequisitions, omArrivals, omUses, omDirects,
     deliveryArchives, customers, companyExps, otherExps, otherSettles };
 })();
+
+// —— 2026-07-18 表单补全轮：整页表单新字段精选回填（grill 决议 #7）——
+// 每个重点实体挑 1~2 行代表性假数据补齐新字段，编辑演示不见大片空白；
+// 量级/写法风格对标真实数据蓝本（金额到分、粤系公司名/人名），值全部虚构。其余行留空属正常。
+(function () {
+  const d = window.KIT_DATA;
+  if (!d) return;
+  const patch = (arr, id, p) => { const r = (arr || []).find((x) => x.id === id); if (r) Object.assign(r, p); };
+
+  // 施工合同 sg01：条款/质保/开票方/履约联系人
+  patch(d.contracts, "sg01", {
+    client: "cu1", content: "合和新城住宅项目室内外装饰装修总承包", isSupplement: "否", invoiceType: "增值税专用发票",
+    contact: "刘志强", contactPhone: "13802734561", taxRate: "9%",
+    terms: "按建设工程施工合同示范文本（GF-2017-0201）签订，专用条款优先。",
+    termPay: "按月度报量审定产值的 80% 支付进度款，竣工结算后付至 97%，余 3% 作质保金。",
+    termTime: "总工期 610 日历天，2026-05-01 开工，工期顺延须经监理与甲方书面确认。",
+    warrantyRate: 3, warrantyAmount: 971652.68, warrantyDays: 730,
+    invoiceName: "广州市瑞航建筑工程有限公司", invoiceTaxNo: "91440101MA5AJ2K87L",
+    invoiceBank: "中国建设银行广州体育东路支行", invoiceAccount: "44050143260100002317",
+  });
+  // 分包合同 fb01：劳务条款
+  patch(d.contracts, "fb01", {
+    content: "泥水工程劳务分包（砌筑/抹灰/铺贴）", isSupplement: "否", invoiceType: "增值税专用发票",
+    contact: "陈锦洪", contactPhone: "13711052388", taxRate: "9%",
+    termPay: "按完成工程量月度计量，次月 25 日前支付 85%，结算后付清。",
+    warrantyRate: 5, warrantyDays: 365,
+  });
+  // 材采合同 cg01：采购明细行 + 开票方（销方）
+  patch(d.contracts, "cg01", {
+    content: "全抛釉瓷砖及配套供货", isSupplement: "否", invoiceType: "增值税专用发票",
+    contact: "黄启文", contactPhone: "13924078815", taxRate: "13%",
+    termBrand: "东鹏/马可波罗一级品，色号以封样为准，每批附出厂检验报告。",
+    termTime: "下单后 15 日内分批到场，急件 72 小时内补货。",
+    warrantyRate: 2, warrantyDays: 365,
+    invoiceName: "广州市大板东建材有限公司", invoiceTaxNo: "91440101MA9W3XB22F",
+    invoiceBank: "中国工商银行广州黄石支行", invoiceAccount: "3602814409100387256",
+    lines: [
+      { name: "全抛釉瓷砖", spec: "800×800", brand: "东鹏", unit: "块", qty: 12600, price: 42.8, amount: 539280, planDate: "2026-06-20", note: "首批样板层" },
+      { name: "阳角线", spec: "2440mm", brand: "配套", unit: "根", qty: 1800, price: 9.5, amount: 17100, planDate: "2026-06-20", note: "" },
+      { name: "瓷砖胶", spec: "20kg/包", brand: "德高", unit: "包", qty: 4200, price: 33.6, amount: 141120, planDate: "2026-07-05", note: "分两批" },
+    ],
+  });
+  // 付款申请 fk02：付款内容 + 关联结算/发票行
+  patch(d.payApplies, "fk02", {
+    payContent: "泥水班组 6 月砌筑抹灰进度款，对应 10-12 栋完成工程量。",
+    settleLinks: [{ sNo: "FBJS-2026-006", sName: "泥水班组 6 月过程结算", sAmt: 386500, sLink: 328525, sNote: "按 85% 支付" }],
+    invoiceLinks: [{ iNo: "04403276911", iDate: "2026-07-02", iAmt: 328525, iLink: 328525 }],
+  });
+  // 收款登记 sk01：经办/期次/流水
+  patch(d.receipts, "sk01", { handler: "周维", periodLabel: "2026 年 5 月进度款", bankRef: "20260528100443172", status: "已登记", payerAccount: "8873" });
+  // 开票申请 kp01：名称/购方/开票内容
+  patch(d.invApplies, "kp01", { name: "合和新城 5 月进度款开票", invoiceType: "增值税专用发票", buyer: "合和地产集团", buyerTaxNo: "91440101MA5CFH991Q", content: "建筑服务*工程款" });
+  // 分供方 s1（材料）/ s5（劳务）：工商/开票/评价档案
+  patch(d.suppliers, "s1", {
+    businessType: "公司分供方", uniqueCode: "MA9W3XB2", legalRep: "潘大板", registeredCapital: 500,
+    registeredDate: "2015-03-18", address: "广州市白云区石井大道 128 号", taxpayerType: "一般纳税人", rating: "A",
+    mainBusiness: "建筑陶瓷、石材、辅材批发零售", contactTitle: "销售经理",
+    invoiceName: "广州市大板东建材有限公司", invoiceAddr: "广州市白云区石井大道 128 号 020-86342217",
+  });
+  patch(d.suppliers, "s5", {
+    businessType: "公司分供方", legalRep: "陈锦洪", registeredCapital: 100, registeredDate: "2018-09-02",
+    address: "佛山市南海区大沥镇联安路 33 号", taxpayerType: "小规模纳税人", rating: "B",
+    mainBusiness: "建筑劳务分包（砌筑、抹灰、地面铺贴）", contactTitle: "班组负责人",
+  });
+  // 甲方变洽签 oc1：指令单 + 变更行
+  patch(d.ownerChanges, "oc1", {
+    directiveNo: "JXHT-ZL-2026-013", directiveType: "下发",
+    reason: "甲方设计变更：公区墙面由乳胶漆改为仿石材铝板，含基层调整。",
+    lines: [
+      { name: "公区墙面仿石材铝板", unit: "㎡", qtyDiff: 860, price: 385, amount: 331100, note: "含龙骨基层" },
+      { name: "原乳胶漆墙面取消", unit: "㎡", qtyDiff: -860, price: 48, amount: -41280, note: "扣减" },
+    ],
+  });
+  // 材料到货 dh01：到货明细 + 质检
+  patch(d.matArrivals, "dh01", {
+    quality: "合格",
+    lines: [
+      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", qty: 4200, price: 42.8, amount: 179760, note: "10 栋首批" },
+      { material: "瓷砖胶", spec: "20kg/包", unit: "包", qty: 1400, price: 33.6, amount: 47040, note: "" },
+    ],
+  });
+  // 库存盘点 pd01：盘点明细（盈亏聚合示范）
+  patch(d.stockChecks, "pd01", {
+    lines: [
+      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", bookQty: 2600, realQty: 2588, diffQty: -12, diffAmount: -513.6 },
+      { material: "瓷砖胶", spec: "20kg/包", unit: "包", bookQty: 640, realQty: 640, diffQty: 0, diffAmount: 0 },
+      { material: "阳角线", spec: "2440mm", unit: "根", bookQty: 950, realQty: 962, diffQty: 12, diffAmount: 114 },
+    ],
+  });
+  // 工人 w1：银行/紧急联系人/技能档案
+  patch(d.workers, "w1", {
+    gender: "男", hometown: "广东梅州", skillLevel: "高级", dailyWage: 420,
+    bankName: "中国建设银行广州天河支行", bankAccount: "6217003810051234987", bankCode: "105581000418",
+    emergencyContact: "王芳", emergencyPhone: "13600418867",
+  });
+  // 客户 cu1：工商开票档案
+  patch(d.customers, "cu1", {
+    aliases: ["合和"], legalRep: "何宗盛",
+    invoiceName: "合和地产集团有限公司", bank: "招商银行广州分行营业部", bankAccount: "120903618810602",
+  });
+  // 班组 c1：计薪参数
+  patch(d.crews, "c1", { payRatio: 95, rentSubsidy: "开启", rentPrice: 3.0, mgmtFee: "开启", mgmtPrice: 1.5 });
+  // 项目 p1：地域/概况/参建单位
+  patch(d.projects, "p1", {
+    region: "广州·白云", code: "RJ-2026-001", area: 86500, riskLevel: "低",
+    overview: "22 栋高层住宅室内精装 + 公区装饰，建筑面积约 8.65 万㎡，精装交付标准。",
+    managerPhone: "13802734561", supervisor: "广州建雅工程监理有限公司", designer: "华南装饰设计研究院", siteLeader: "黄伟明", siteLeaderPhone: "13710294452",
+  });
+})();
