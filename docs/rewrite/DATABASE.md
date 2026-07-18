@@ -145,7 +145,7 @@ Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
-| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序 |
+| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序。⚠️ 设计稿整页表单（ADR 0014，`kit/forms/*.jsx`）含超出本 schema 的探索字段（合同条款/质保金/开票方/明细行、收款承兑汇票、分供方工商档案等），是否入库以 [#116](https://github.com/zodea/crm-new/issues/116) 字段定稿评审为准 |
 
 ```sql
 -- 合同域轻实体仓（#90 批A，migrations v3 contracts-light-entity）
