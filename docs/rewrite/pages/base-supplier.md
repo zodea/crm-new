@@ -77,7 +77,7 @@ interface Supplier {
 
   // 状态（两个独立维度）
   credentialStatus: 'incomplete' | 'reviewing' | 'qualified' | 'rejected'
-    // 证照维度: 必需证照是否齐全
+    // 资料维度: 必需资料齐全度 + 人工核验结论
   approvalStatus: 'draft' | 'submitted' | 'approved' | 'rejected'
     // 入库维度: 分供方整体是否通过审批
     // V1: 默认 'draft'，无流转操作入口，预留字段
@@ -158,7 +158,7 @@ interface SupplierReadonlySummary {
 | 详细地址 | `address` | 长文本省略 |
 | 主要联系人 | `contact` | |
 | 联系方式 | `contactPhone` | |
-| 资料状态 | `credentialStatus` | chip: 缺失/审核中/合格/退回 |
+| 资料状态 | `credentialStatus` | chip: 缺失/齐全待核验/合格/退回 |
 | 合作项目数 | computed | 只读计算 |
 | 累计合同额 | computed | 只读计算 |
 | 累计已付 | computed | 只读计算 |
@@ -169,7 +169,7 @@ interface SupplierReadonlySummary {
 | 筛选项 | 说明 |
 |---|---|
 | 分供方类别 | 材料供应商、劳务分包商、设备供应商、其他 |
-| 资料状态 | 缺失、审核中、合格、退回 |
+| 资料状态 | 缺失、齐全待核验、合格、退回 |
 | 合作项目 | 只看某项目关联过的分供方 |
 | 欠款状态 | 应付余额 > 0 |
 | 证照缺失 | 必需证照不完整 |
@@ -187,7 +187,7 @@ interface SupplierReadonlySummary {
 | 联系/其他 | 主要联系人、联系方式、评价等级、上级供应商、来源、备注 |
 | 证照附件 | 上传、预览、删除、OCR 识别、自动分类、手动调整类别 |
 
-V1 说明：`approvalStatus` 默认 `draft`，表单中不显示审批操作入口。`credentialStatus` 根据证照齐全程度自动计算。
+V1 说明：`approvalStatus` 默认 `draft`，表单中不显示整体入库审批入口。`credentialStatus` 中 `incomplete/reviewing` 由资料规则自动计算，`qualified/rejected` 只能由人工核验动作产生。
 
 ### 地址、电话与纳税人类型口径
 
@@ -270,13 +270,16 @@ Tab 3 和 Tab 4/5/6 的视角不同：Tab 3 按项目维度，Tab 4/5/6 按单�
 
 ### credentialStatus 流转
 
-> ⚠️ Issue #13 尚待用户确认：资料齐全后应直接自动 `qualified`，还是进入人工核验后才 `qualified`。确认前保留下表作为存量行为记录，不据此关闭 Issue；当前推荐“缺失 → 齐全待核验 → 人工合格 / 人工退回”。
+> ✅ Issue #13 已确认：资料齐全不等于合格，必须经过人工核验。内部值 `reviewing` 的界面文案统一显示“齐全待核验”。
 
 | 动作 | 结果 |
 |---|---|
-| 上传证照 | 自动检查：必需证照齐全 → `qualified`，否则 → `incomplete` |
-| 删除证照 | 重新检查，可能退回 `incomplete` |
-| 退回补充（V2 审核人操作） | `rejected`，必须填写退回原因 |
+| 上传/删除文件，或修改类别、有效期、条件要求 | 自动重算：必需资料缺失或过期 → `incomplete`；全部满足 → `reviewing` |
+| 人工核验通过 | 仅 `reviewing` 可执行；→ `qualified`，记录核验时间和备注 |
+| 人工退回 | → `rejected`，退回原因必填 |
+| 修正退回问题 | 按资料规则重新计算为 `incomplete` 或 `reviewing`，不得自动恢复 `qualified` |
+
+已人工合格后，如必需资料的文件、分类、有效期、要求状态或相关 OCR 确认值发生变化，原核验结论失效并重新计算；只修改不参与齐全度的可选资料，不应无故撤销合格。
 
 ---
 
@@ -302,7 +305,7 @@ Tab 3 和 Tab 4/5/6 的视角不同：Tab 3 按项目维度，Tab 4/5/6 按单�
 3. 证照 OCR 冲突不覆盖人工字段
 4. 详情页汇总数字必须能追溯源单据（带筛选条件跳转）
 5. 同一个 Supplier 可关联多个项目，主数据只维护一份
-6. `approvalStatus` V1 预留不启用，`credentialStatus` 根据证照自动计算
+6. `approvalStatus` V1 预留不启用；资料缺失/齐全状态自动计算，但 `qualified/rejected` 必须由人工核验产生并可追溯
 7. 文件管理区 V1 启用（上传/下载/目录结构），审批/评论/跟进人/动态 V1 留空
 8. 开票资料地址和公司电话允许留空，不影响资料齐全度；注册地址与开票资料地址独立保存
 9. 资质证书、品牌授权书默认不适用，只有明确标记“需提供”后才参与缺失/过期判断
