@@ -95,11 +95,27 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | Project | `projects` | `id` | `project-info.md` |
 | Supplier | `suppliers` | `id` | `base-supplier.md` |
 | SupplierCredential | `supplier_credentials` | `id` | `base-supplier.md` |
+| SupplierCredentialRequirement | `supplier_credential_requirements` | `id` | `base-supplier.md`（#13 目标模型，待迁移落地） |
 | FileRef | `file_refs` | `id` | 共用 |
 | FilePayload | `file_payloads` | `fileRefId` | 共用（附件正文，仅按需读取） |
 | BankCode | `bank_codes` | `id` | `base-worker.md` §五（银行行号字典，内置 seed，无外键） |
 
 `suppliers.external_ref TEXT DEFAULT ''` 保存 ADR 0005 的「外部旧ID / 匹配标识」，作为旧系统迁移对账、二次导入修正与去重键；非空且未软删的记录必须唯一（迁移 v11）。
+
+#### Supplier 字段语义（Issue #13）
+
+| 字段 | 权威语义 | 必填/状态规则 |
+|---|---|---|
+| `address` | 营业执照登记的住所/注册地址 | 工商信息；不得与经营地址或开票地址混用 |
+| `invoice_address` | 分供方确认使用的开票资料地址 | 选填；可从注册地址一次性复制，但保存后独立维护、不永久联动 |
+| `phone` | 公司电话/开票资料电话 | 选填；与联系人手机 `contact_phone` 分开，不影响资料齐全度 |
+| `taxpayer_type` | 纳税人类型 | 选填，默认“未核验”；经官方查询或人工资料确认后填写，“未查到”不得自动推导为“小规模纳税人” |
+
+广东省内分供方可从应用打开[广东省电子税务局一般纳税人资格查询](https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx)辅助核验。应用只负责复制税号、打开官网及记录人工确认结果；验证码由用户在官网完成，不爬取页面、不绕过验证码，也不把该页面当作稳定 API。
+
+`supplier_credential_requirements` 用于持久化“分供方 × 证照类别”的要求，而 `supplier_credentials` 只保存实际已收到的文件。目标字段至少包含 `supplier_id`、`category`、`requirement`（`not_applicable | optional | required`）、`reason`、`updated_at`，并对 `(supplier_id, category)` 唯一。默认规则：营业执照、法人身份证、银行账户资料为 `required`；资质证书、品牌授权书/证明为 `not_applicable`；其余资料为 `optional`。只有被明确改为 `required` 的条件资料，缺失或过期时才影响资料齐全度。
+
+“银行账户资料”是统一业务类别，兼容“银行开户许可证 / 开户许可证 / 基本存款账户信息 / 基本存款账户信息表”等历史名称；“品牌授权书 / 品牌授权证明”同样按一个类别读取，迁移不得造成附件丢失或误报缺失。
 
 ### 2.2 项目关联实体
 
