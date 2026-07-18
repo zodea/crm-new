@@ -143,7 +143,7 @@ onMounted(async () => {
           <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
             <span class="w-0.5 h-3.5 bg-brand rounded-full" /> 项目信息
           </h4>
-          <div class="form-grid !grid-cols-2">
+          <div class="form-grid">
             <div class="form-cell">
               <span class="text-9px text-ink-faint">项目名称</span>
               <NuxtLink :to="`/project/${pid}`" class="text-12px text-brand hover:underline">
@@ -168,7 +168,7 @@ onMounted(async () => {
           <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
             <span class="w-0.5 h-3.5 bg-brand rounded-full" /> 分供方信息
           </h4>
-          <div class="form-grid !grid-cols-2">
+          <div class="form-grid">
             <div class="form-cell">
               <span class="text-9px text-ink-faint">公司名称</span>
               <NuxtLink :to="`/base/supplier/${sid}`" class="text-12px text-brand hover:underline">
