@@ -23,7 +23,7 @@
     return h;
   }
   function toast(msg, tone) {
-    var bg = tone === "danger" ? "var(--danger)" : tone === "ok" ? "var(--ok)" : "var(--ink)";
+    var bg = tone === "danger" ? "var(--danger)" : tone === "ok" ? "var(--ok)" : tone === "warn" ? "var(--warn, #B45309)" : "var(--ink)";
     var t = el("div", {
       background: bg, color: "#fff", padding: "9px 18px", borderRadius: "999px",
       fontSize: "13px", fontWeight: "600", boxShadow: "var(--shadow-pop)",
@@ -64,7 +64,7 @@
   // —— Confirm ——
   function confirm(opts) {
     opts = opts || {};
-    var close = function () { ov.remove(); };
+    var close = function () { ov.remove(); if (opts.onCancel) { var f = opts.onCancel; opts.onCancel = null; f(); } };
     var ov = overlay(close);
     var box = panel(opts.width || 380);
     header(box, opts.title || "确认操作", null, close);
@@ -73,7 +73,7 @@
     var cancel = btn(opts.cancelText || "取消");
     var ok = btn(opts.confirmText || "确定", opts.danger ? "danger" : "primary");
     cancel.addEventListener("click", close);
-    ok.addEventListener("click", function () { close(); if (opts.onConfirm) opts.onConfirm(); });
+    ok.addEventListener("click", function () { opts.onCancel = null; ov.remove(); if (opts.onConfirm) opts.onConfirm(); });
     foot.appendChild(cancel); foot.appendChild(ok);
     box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
   }
@@ -97,47 +97,485 @@
     return { close: close, body: body };
   }
 
-  // —— FormModal（字段表单 → onSave(values) ）——
+  // —— buildFormBody：表单字段渲染核心（弹窗 formModal 与整页 KitFormPage 共用，grill 决议 2026-07-18 #3）——
+  // 红圈对标（差距清单 2026-07-11 §1）字段契约 f：
+  //     { section:"分组标题" }                      分组：grid 布局=整行小标题分隔；cards 布局=开一张新圆角卡片（锚点）
+  //     { key,label,value,type,options,placeholder,full,
+  //       required:true,                            必填：label 星号 + 保存全量校验（红框 + 字段下红字 + warning toast 双通道）
+  //       hint:"说明",                               字段下方灰色说明文字
+  //       suffix:"元",                               输入框尾单位
+  //       type:"readonly",                          只读带出（灰底）；配 compute(vals) 任意字段变更实时重算（级联带出）
+  //       type:"lookup",                            检索下拉：输入过滤 + 命中高亮 + ✕清空；options 可为 fn(vals)（级联过滤）
+  //       dependsOn:{key,label},                    依赖字段未填：聚焦弹 warning toast「该字段依赖…」不开浮层
+  //       type:"file", max:15,                      附件位 mock：虚线框「拖拽或点击上传（0/15）」，点击模拟添加，值=文件名数组
+  //       type:"grid", columns:[{key,label,width,type:'text'|'number'|'select'|'readonly',options,derive(row)}],
+  //         rows:[...], summaryKeys:["amount"], minRows:2 }
+  //                                                 明细网格：添加/复制/删除 + EXCEL 粘贴(TSV) + 全屏编辑 + 派生列 + Σ汇总；保存返回行数组
+  //   opts：{ fields, cols, layout:"grid"|"cards", onDirty() }
+  //   返回 { node, getVals, getAllVals, validate, recompute, anchors:[{title,el}], focusFirst() }
+  function buildFormBody(opts) {
+    opts = opts || {};
+    var ctrls = [];          // {f, get(), input, wrap, err} 按字段序
+    var anchors = [];        // cards 布局的分区锚点（整页表单左侧导航用）
+    var markDirty = function () { if (opts.onDirty) opts.onDirty(); };
+    var getVals = function () {
+      var vals = {};
+      // readonly 带出字段默认不回写（显示值可能带千分位/「—」，写回会污染存储；要回写显式 saveValue:true）
+      ctrls.forEach(function (c) { if (c.f.key && (c.f.type !== "readonly" || c.f.saveValue)) vals[c.f.key] = c.get(); });
+      return vals;
+    };
+    var getAllVals = function () {   // 级联/带出计算用：包含 readonly 当前显示值
+      var vals = {};
+      ctrls.forEach(function (c) { if (c.f.key) vals[c.f.key] = c.get(); });
+      return vals;
+    };
+    // 任意字段变更 → 重算 readonly compute 带出字段
+    var recompute = function () {
+      var vals = getAllVals();
+      ctrls.forEach(function (c) {
+        if (c.f.type === "readonly" && typeof c.f.compute === "function") {
+          var v = c.f.compute(vals);
+          c.input.textContent = v == null || v === "" ? "—" : String(v);
+        }
+      });
+    };
+    var inputStyle = { width: "100%", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", padding: "8px 11px", fontSize: "13px", background: "#fff", boxSizing: "border-box", fontFamily: "inherit" };
+
+    // —— 检索下拉（KitLookup 设计稿版：过滤 + 高亮 + ✕ + 依赖拦截）——
+    function buildLookup(f) {
+      var wrap = el("div", { position: "relative" });
+      var input = el("input", inputStyle);
+      input.type = "text";
+      input.placeholder = f.placeholder || "输入关键词检索";
+      input.value = f.value != null ? f.value : "";
+      input.style.paddingRight = "26px";
+      var clearBtn = el("button", { position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)", border: "0", background: "transparent", cursor: "pointer", color: "var(--ink-faint)", fontSize: "14px", lineHeight: "1", padding: "2px", display: input.value ? "block" : "none" }, "✕");
+      var drop = el("div", { position: "absolute", left: "0", right: "0", top: "calc(100% + 4px)", zIndex: "30", background: "var(--panel)", border: "1px solid var(--line-strong)", borderRadius: "8px", boxShadow: "var(--shadow-pop)", maxHeight: "196px", overflowY: "auto", display: "none" });
+      var getOptions = function () { return (typeof f.options === "function" ? f.options(getAllVals()) : f.options) || []; };
+      var depBlocked = function () {
+        if (!f.dependsOn) return false;
+        var v = getAllVals()[f.dependsOn.key];
+        if (v) return false;
+        toast("该字段依赖「" + (f.dependsOn.label || f.dependsOn.key) + "」的值，请补全后操作", "warn");
+        return true;
+      };
+      var render = function (kw) {
+        drop.innerHTML = "";
+        var list = getOptions().filter(function (o) { return !kw || String(o).toLowerCase().indexOf(kw.toLowerCase()) > -1; }).slice(0, 40);
+        if (!list.length) { drop.appendChild(el("div", { padding: "10px 12px", fontSize: "12px", color: "var(--ink-faint)" }, "无匹配项")); return; }
+        list.forEach(function (o) {
+          var label = String(o);
+          var html = kw ? label.replace(new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), function (m) { return '<b style="color:var(--brand);font-weight:800;">' + m + "</b>"; }) : label;
+          var item = el("div", { padding: "8px 12px", fontSize: "13px", cursor: "pointer" }, html);
+          item.addEventListener("mouseenter", function () { item.style.background = "var(--brand-soft)"; });
+          item.addEventListener("mouseleave", function () { item.style.background = "transparent"; });
+          item.addEventListener("mousedown", function (e) { e.preventDefault(); input.value = label; clearBtn.style.display = "block"; drop.style.display = "none"; markDirty(); recompute(); });
+          drop.appendChild(item);
+        });
+      };
+      input.addEventListener("focus", function () { if (depBlocked()) { input.blur(); return; } render(""); drop.style.display = "block"; });
+      input.addEventListener("input", function () { render(input.value); drop.style.display = "block"; clearBtn.style.display = input.value ? "block" : "none"; markDirty(); recompute(); });
+      input.addEventListener("blur", function () { setTimeout(function () { drop.style.display = "none"; }, 120); });
+      clearBtn.addEventListener("mousedown", function (e) { e.preventDefault(); input.value = ""; clearBtn.style.display = "none"; markDirty(); recompute(); });
+      wrap.appendChild(input); wrap.appendChild(clearBtn); wrap.appendChild(drop);
+      return { node: wrap, input: input, get: function () { return input.value; } };
+    }
+
+    // —— 明细网格（KitEditGrid 设计稿版：添加/复制/删除 + 行内编辑 + 派生列 + Σ汇总）——
+    function buildGrid(f) {
+      var cols = f.columns || [];
+      var rows = (f.value && Array.isArray(f.value) ? f.value : f.rows || []).map(function (r) { return Object.assign({}, r); });
+      var minRows = f.minRows != null ? f.minRows : 2;
+      while (rows.length < minRows) rows.push({});
+      var wrap = el("div", { border: "1px solid var(--line)", borderRadius: "10px", overflow: "hidden" });
+      var bar = el("div", { display: "flex", alignItems: "center", gap: "6px", padding: "6px 10px", background: "var(--surface-2)", borderBottom: "1px solid var(--line)" });
+      var mkTool = function (label, fn) {
+        var b = el("button", { border: "1px solid var(--line)", background: "var(--panel)", borderRadius: "6px", padding: "3px 10px", fontSize: "12px", fontWeight: "600", cursor: "pointer", color: "var(--ink-soft)" }, label);
+        b.type = "button"; b.addEventListener("click", fn); return b;
+      };
+      var selIdx = { v: -1 };
+      bar.appendChild(el("span", { fontSize: "12px", fontWeight: "700", color: "var(--ink-soft)", marginRight: "auto" }, f.gridLabel || "明细行"));
+      bar.appendChild(mkTool("＋ 添加行", function () { rows.push({}); renderBody(); markDirty(); }));
+      bar.appendChild(mkTool("⧉ 复制选中", function () { if (selIdx.v < 0) return toast("先点选一行再复制", "warn"); rows.splice(selIdx.v + 1, 0, Object.assign({}, rows[selIdx.v])); renderBody(); markDirty(); }));
+      bar.appendChild(mkTool("🗑 删除选中", function () { if (selIdx.v < 0) return toast("先点选一行再删除", "warn"); rows.splice(selIdx.v, 1); selIdx.v = -1; renderBody(); markDirty(); }));
+      // EXCEL 粘贴：从 Excel 复制区域直接粘进来（TSV 按可编辑列顺序解析批量插行）——红圈「切换EXCEL模式」对标
+      bar.appendChild(mkTool("⎘ EXCEL 粘贴", function () {
+        var editCols = cols.filter(function (c) { return !c.derive && c.type !== "readonly"; });
+        var m = modal({ title: "EXCEL 粘贴导入 · " + (f.gridLabel || "明细行"),
+          subtitle: "在 Excel 中复制数据区域，粘贴到下方文本框；列顺序：" + editCols.map(function (c) { return c.label; }).join(" | "),
+          width: 560, bodyHTML: "",
+          actions: [{ label: "取消" }, { label: "解析并插入", primary: true, onClick: function () {
+            var lines = ta.value.split(/\r?\n/).filter(function (l) { return l.trim() !== ""; });
+            if (!lines.length) return toast("未粘贴任何内容", "warn");
+            lines.forEach(function (line) {
+              var cells = line.split("\t");
+              var row = {};
+              editCols.forEach(function (c, i) {
+                if (cells[i] == null || cells[i] === "") return;
+                row[c.key] = c.type === "number" ? (Number(String(cells[i]).replace(/[^\d.\-]/g, "")) || "") : cells[i].trim();
+              });
+              rows.push(row);
+            });
+            renderBody(); markDirty();
+            toast("已插入 " + lines.length + " 行", "ok");
+          } }] });
+        if (!m || !m.body) return;
+        var ta = el("textarea", { width: "100%", minHeight: "160px", border: "1px solid var(--line-strong)", borderRadius: "8px", padding: "10px", fontSize: "12.5px", fontFamily: "var(--font-mono)", boxSizing: "border-box", resize: "vertical" });
+        ta.placeholder = "粘贴示例（制表符分隔，每行一条）：\n墙面砖 800×800\t800×800\t㎡\t120\t45.5";
+        m.body.appendChild(ta);
+        setTimeout(function () { ta.focus(); }, 50);
+      }));
+      // 全屏编辑：网格节点整体搬进全屏浮层，改完原位放回（DOM 复用，编辑状态不丢）
+      bar.appendChild(mkTool("⛶ 全屏编辑", function () {
+        var ph = el("div");
+        wrap.parentNode.insertBefore(ph, wrap);
+        var fov = el("div", { position: "fixed", inset: "0", zIndex: String(Z + 120), background: "var(--bg, #F3F4F6)", padding: "20px 24px", display: "flex", flexDirection: "column", gap: "12px" });
+        var bar2 = el("div", { display: "flex", alignItems: "center", gap: "12px" });
+        bar2.appendChild(el("div", { fontSize: "15px", fontWeight: "800" }, (f.gridLabel || "明细行") + " · 全屏编辑"));
+        bar2.appendChild(el("div", { fontSize: "12px", color: "var(--ink-soft)" }, "大批量录入模式，完成后返回表单"));
+        var closeB = btn("完成，返回表单", "primary");
+        closeB.style.marginLeft = "auto";
+        bar2.appendChild(closeB);
+        var host2 = el("div", { flex: "1", overflow: "auto" });
+        host2.appendChild(wrap);
+        fov.appendChild(bar2); fov.appendChild(host2);
+        document.body.appendChild(fov);
+        closeB.addEventListener("click", function () { ph.parentNode.replaceChild(wrap, ph); fov.remove(); });
+      }));
+      if (f.gridImport) bar.appendChild(mkTool("⤓ 导入明细", function () { (window.KitUI || {}).importModal && window.KitUI.importModal({ title: "导入" + (f.gridLabel || "明细行"), targetFields: cols.map(function (c) { return c.label; }), sourceCols: cols.map(function (c) { return c.label; }), fileName: "明细导入.xlsx", rowCount: 18, onDone: function (n) { toast("已导入 " + n + " 行明细（演示）", "ok"); } }); }));
+      wrap.appendChild(bar);
+      var scroller = el("div", { overflowX: "auto" });
+      var tbl = el("table", { width: "100%", borderCollapse: "collapse", fontSize: "12.5px", minWidth: Math.max(420, cols.reduce(function (s, c) { return s + (c.width || 90); }, 30)) + "px" });
+      var thead = el("thead");
+      var hr = el("tr");
+      hr.appendChild(el("th", { width: "26px", background: "var(--surface-2)", borderBottom: "1px solid var(--line)" }, ""));
+      cols.forEach(function (c) {
+        var th = el("th", { padding: "6px 8px", textAlign: c.type === "number" || c.derive ? "right" : "left", fontWeight: "700", color: "var(--ink-soft)", background: "var(--surface-2)", borderBottom: "1px solid var(--line)", whiteSpace: "nowrap" }, c.label + (c.required ? ' <span style="color:var(--danger)">*</span>' : ""));
+        if (c.width) th.style.width = c.width + "px";
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr); tbl.appendChild(thead);
+      var tbody = el("tbody");
+      tbl.appendChild(tbody);
+      var tfoot = el("tfoot");
+      tbl.appendChild(tfoot);
+      var cellInput = function (row, c) {
+        var iv;
+        if (c.derive || c.type === "readonly") {
+          iv = el("div", { padding: "5px 4px", textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }, "");
+          iv.setAttribute("data-derive", "1");
+          return iv;
+        }
+        if (c.type === "select") {
+          iv = el("select", { width: "100%", border: "1px solid transparent", background: "transparent", padding: "5px 2px", fontSize: "12.5px", borderRadius: "6px" });
+          var blank = el("option", null, ""); blank.value = ""; iv.appendChild(blank);
+          (c.options || []).forEach(function (o) { var op = el("option", null, o); op.value = o; if (o === row[c.key]) op.selected = true; iv.appendChild(op); });
+        } else {
+          iv = el("input", { width: "100%", border: "1px solid transparent", background: "transparent", padding: "5px 4px", fontSize: "12.5px", borderRadius: "6px", boxSizing: "border-box", textAlign: c.type === "number" ? "right" : "left", fontFamily: c.type === "number" ? "var(--font-mono)" : "inherit" });
+          iv.type = c.type === "number" ? "number" : "text";
+          iv.value = row[c.key] != null ? row[c.key] : "";
+          if (c.placeholder) iv.placeholder = c.placeholder;
+        }
+        iv.addEventListener("focus", function () { iv.style.borderColor = "var(--brand)"; iv.style.background = "#fff"; });
+        iv.addEventListener("blur", function () { iv.style.borderColor = "transparent"; iv.style.background = "transparent"; });
+        iv.addEventListener(c.type === "select" ? "change" : "input", function () {
+          row[c.key] = c.type === "number" ? (iv.value === "" ? "" : Number(iv.value)) : iv.value;
+          markDirty(); refreshRowDerive(); refreshSum();
+        });
+        return iv;
+      };
+      var refreshRowDerive = function () {
+        Array.prototype.forEach.call(tbody.children, function (tr, ri) {
+          cols.forEach(function (c, ci) {
+            if (!c.derive) return;
+            var cell = tr.children[ci + 1].firstChild;
+            var v = c.derive(rows[ri]);
+            rows[ri][c.key] = v;
+            cell.textContent = v == null || v === "" || isNaN(v) ? "—" : Number(v).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+          });
+        });
+      };
+      var refreshSum = function () {
+        tfoot.innerHTML = "";
+        if (!f.summaryKeys || !f.summaryKeys.length) return;
+        var tr = el("tr");
+        tr.appendChild(el("td", { background: "var(--surface-2)", borderTop: "1px solid var(--line)" }, ""));
+        cols.forEach(function (c, ci) {
+          var td = el("td", { padding: "6px 8px", textAlign: "right", fontWeight: "800", fontFamily: "var(--font-mono)", background: "var(--surface-2)", borderTop: "1px solid var(--line)" });
+          if (f.summaryKeys.indexOf(c.key) > -1) {
+            var s = rows.reduce(function (acc, r) { return acc + (Number(r[c.key]) || 0); }, 0);
+            td.innerHTML = '<span style="color:var(--ink-faint);font-weight:600;margin-right:4px;">Σ</span>' + s.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+          } else if (ci === 0) { td.textContent = "合计"; td.style.textAlign = "left"; td.style.fontFamily = "inherit"; }
+          tr.appendChild(td);
+        });
+        tfoot.appendChild(tr);
+      };
+      var renderBody = function () {
+        tbody.innerHTML = "";
+        rows.forEach(function (row, ri) {
+          var tr = el("tr");
+          tr.style.borderBottom = "1px solid var(--line)";
+          var sel = el("td", { textAlign: "center", cursor: "pointer", color: "var(--ink-faint)", fontSize: "11px", background: selIdx.v === ri ? "var(--brand-soft)" : "transparent" }, String(ri + 1));
+          sel.addEventListener("click", function () { selIdx.v = selIdx.v === ri ? -1 : ri; renderBody(); });
+          tr.appendChild(sel);
+          cols.forEach(function (c) {
+            var td = el("td", { padding: "1px 4px", background: selIdx.v === ri ? "var(--brand-soft)" : "transparent" });
+            td.appendChild(cellInput(row, c));
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        refreshRowDerive(); refreshSum();
+      };
+      renderBody();
+      scroller.appendChild(tbl); wrap.appendChild(scroller);
+      return { node: wrap, input: tbl, get: function () {
+        return rows.filter(function (r) { return cols.some(function (c) { return r[c.key] !== "" && r[c.key] != null && !(c.derive); }); });
+      } };
+    }
+
+    // —— 附件位（红圈式「拖拽或单击后粘贴 (0/15)」mock：点击模拟添加，值=文件名数组）——
+    function buildFile(f) {
+      var max = f.max || 9;
+      var files = Array.isArray(f.value) ? f.value.slice() : [];
+      var wrap = el("div");
+      var box = el("div", { border: "1.5px dashed var(--line-strong)", borderRadius: "10px", padding: "12px 14px", textAlign: "center", cursor: "pointer", background: "var(--surface-2)", transition: "border-color .12s" });
+      var label = el("div", { fontSize: "12px", color: "var(--ink-soft)" });
+      var chips = el("div", { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: files.length ? "8px" : "0" });
+      var paint = function () {
+        label.innerHTML = "⇪ 拖拽文件到此处，或点击上传（" + files.length + "/" + max + "）";
+        chips.innerHTML = "";
+        chips.style.marginTop = files.length ? "8px" : "0";
+        files.forEach(function (name, i) {
+          var chip = el("span", { display: "inline-flex", alignItems: "center", gap: "5px", background: "var(--brand-soft)", color: "var(--brand-deep, var(--brand))", borderRadius: "6px", padding: "2px 8px", fontSize: "11.5px", fontWeight: "600" }, "📄 " + name);
+          var x = el("button", { border: "0", background: "transparent", cursor: "pointer", color: "inherit", padding: "0", fontSize: "12px", lineHeight: "1" }, "✕");
+          x.addEventListener("click", function (e) { e.stopPropagation(); files.splice(i, 1); paint(); markDirty(); });
+          chip.appendChild(x);
+          chips.appendChild(chip);
+        });
+      };
+      paint();
+      box.appendChild(label);
+      box.addEventListener("mouseenter", function () { box.style.borderColor = "var(--brand)"; });
+      box.addEventListener("mouseleave", function () { box.style.borderColor = "var(--line-strong)"; });
+      box.addEventListener("click", function () {
+        if (files.length >= max) return toast("附件已达上限（" + max + " 个）", "warn");
+        files.push((f.label || "附件") + "-" + (files.length + 1) + ".pdf");
+        paint(); markDirty();
+        toast("演示环境：已模拟添加 1 个附件（正式版接文件选择器）");
+      });
+      wrap.appendChild(box); wrap.appendChild(chips);
+      return { node: wrap, input: box, get: function () { return files; } };
+    }
+
+    // —— 布局：grid（弹窗，默认）｜cards（整页表单：每个 section 一张圆角卡片 + 锚点）——
+    var cardsMode = opts.layout === "cards";
+    var mkGrid = function () { return el("div", { display: "grid", gridTemplateColumns: opts.cols === 2 ? "1fr 1fr" : "1fr", gap: "12px", alignContent: "start" }); };
+    var root, grid;
+    if (cardsMode) { root = el("div"); grid = null; } else { root = grid = mkGrid(); }
+    var openCard = function (title) {
+      var card = el("div", { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "14px", padding: "16px 18px", marginBottom: "14px" });
+      if (title) card.appendChild(el("div", { fontSize: "13.5px", fontWeight: "800", marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid var(--line)" }, title));
+      grid = mkGrid();
+      card.appendChild(grid);
+      root.appendChild(card);
+      if (title) anchors.push({ title: title, el: card });
+    };
+
+    (opts.fields || []).forEach(function (f) {
+      if (f.section) {
+        if (cardsMode) { openCard(f.section); return; }
+        var sec = el("div", { gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: "10px", marginTop: ctrls.length ? "8px" : "0" });
+        sec.appendChild(el("div", { fontSize: "12px", fontWeight: "800", color: "var(--brand-deep, var(--brand))", letterSpacing: "0.04em", whiteSpace: "nowrap" }, f.section));
+        sec.appendChild(el("div", { flex: "1", height: "1px", background: "var(--line)" }, ""));
+        grid.appendChild(sec);
+        return;
+      }
+      if (cardsMode && !grid) openCard(null);
+      var wrap = el("div", (f.full || f.type === "grid" || f.type === "textarea") ? { gridColumn: "1 / -1" } : null);
+      var lab = el("div", { fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", marginBottom: "5px" });
+      lab.innerHTML = f.label + (f.required ? ' <span style="color:var(--danger)">*</span>' : "");
+      wrap.appendChild(lab);
+      var ctrl;
+      if (f.type === "lookup") {
+        ctrl = buildLookup(f);
+        wrap.appendChild(ctrl.node);
+      } else if (f.type === "grid") {
+        ctrl = buildGrid(f);
+        wrap.appendChild(ctrl.node);
+      } else if (f.type === "file") {
+        ctrl = buildFile(f);
+        wrap.appendChild(ctrl.node);
+      } else if (f.type === "readonly") {
+        var ro = el("div", { width: "100%", border: "1px dashed var(--line)", borderRadius: "var(--radius-btn)", padding: "8px 11px", fontSize: "13px", background: "var(--surface-2)", color: "var(--ink-soft)", boxSizing: "border-box", minHeight: "35px" }, f.value == null || f.value === "" ? "—" : String(f.value));
+        ctrl = { input: ro, get: function () { return ro.textContent === "—" ? "" : ro.textContent; } };
+        wrap.appendChild(ro);
+      } else if (f.type === "select") {
+        var input = el("select", inputStyle);
+        var optList = (typeof f.options === "function" ? f.options({}) : f.options) || [];
+        optList.forEach(function (o) { var op = el("option", null, o); op.value = o; if (o === f.value) op.selected = true; input.appendChild(op); });
+        input.addEventListener("change", function () { markDirty(); recompute(); });
+        ctrl = { input: input, get: function () { return input.value; } };
+        wrap.appendChild(input);
+      } else if (f.type === "textarea") {
+        var ta = el("textarea", Object.assign({}, inputStyle, { minHeight: "64px", resize: "vertical" }));
+        ta.value = f.value || "";
+        if (f.placeholder) ta.placeholder = f.placeholder;
+        ta.addEventListener("input", function () { markDirty(); recompute(); });
+        ctrl = { input: ta, get: function () { return ta.value; } };
+        wrap.appendChild(ta);
+      } else {
+        var inp = el("input", inputStyle);
+        inp.type = f.type || "text";
+        inp.value = f.value != null ? f.value : "";
+        if (f.placeholder) inp.placeholder = f.placeholder;
+        inp.addEventListener("input", function () { markDirty(); recompute(); });
+        if (f.suffix) {
+          var sWrap = el("div", { position: "relative" });
+          inp.style.paddingRight = "34px";
+          sWrap.appendChild(inp);
+          sWrap.appendChild(el("span", { position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", fontSize: "12px", color: "var(--ink-faint)", pointerEvents: "none" }, f.suffix));
+          ctrl = { input: inp, get: function () { return inp.value; } };
+          wrap.appendChild(sWrap);
+        } else {
+          ctrl = { input: inp, get: function () { return inp.value; } };
+          wrap.appendChild(inp);
+        }
+      }
+      if (f.hint) wrap.appendChild(el("div", { fontSize: "11.5px", color: "var(--ink-faint)", marginTop: "4px", lineHeight: "1.5" }, f.hint));
+      var err = el("div", { fontSize: "11.5px", color: "var(--danger)", marginTop: "4px", display: "none" }, "");
+      wrap.appendChild(err);
+      ctrl.f = f; ctrl.wrap = wrap; ctrl.err = err;
+      ctrls.push(ctrl);
+      grid.appendChild(wrap);
+    });
+    recompute();
+
+    // —— 校验（必填双通道：红框 + 字段下红字 + system warning toast）——
+    var validate = function () {
+      var bad = [];
+      ctrls.forEach(function (c) {
+        var isEmpty = c.f.required && (c.get() === "" || c.get() == null || (Array.isArray(c.get()) && !c.get().length));
+        if (c.input && c.input.style) c.input.style.borderColor = isEmpty ? "var(--danger)" : "var(--line-strong)";
+        c.err.style.display = isEmpty ? "block" : "none";
+        c.err.textContent = isEmpty ? c.f.label + "：为必填项" : "";
+        if (isEmpty) bad.push(c);
+      });
+      if (bad.length) {
+        toast(bad[0].f.label + "：为必填项" + (bad.length > 1 ? "（等 " + bad.length + " 处）" : ""), "warn");
+        bad[0].input.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      return !bad.length;
+    };
+
+    return { node: root, getVals: getVals, getAllVals: getAllVals, validate: validate, recompute: recompute, anchors: anchors,
+      focusFirst: function () {
+        var first = ctrls.find(function (c) { return c.f.type !== "readonly" && c.f.type !== "grid" && c.f.type !== "file" && c.input && c.input.focus; });
+        if (first) setTimeout(function () { try { first.input.focus(); } catch (e) {} }, 50);
+      } };
+  }
+
+  // —— FormModal（字段表单弹窗 → onSave(values, action)）——
+  // opts：{ title, subtitle, width, cols, fields, saveText, onSave(vals, action),
+  //         actions:["draft","saveNew","saveSubmit"] 保存动作组（红圈五件套按需裁剪，默认 取消/保存） }
+  // 字段契约见上方 buildFormBody。行为：首字段自动聚焦；dirty 后点遮罩/Esc 弹「放弃修改」确认；
+  // 长表单 header/footer 吸底、字段区独立滚动；「保存草稿」未改动前置灰（红圈按钮三态）、跳过必填校验。
   function formModal(opts) {
     opts = opts || {};
-    var close = function () { ov.remove(); };
-    var ov = overlay(close);
+    var dirty = false;
+    var closed = false;
+    var asking = false;
+    var draftBtn = null;
+    var close = function () { if (closed) return; closed = true; document.removeEventListener("keydown", onKey); ov.remove(); };
+    var tryClose = function () {
+      if (!dirty) return close();
+      if (asking) return;
+      asking = true;
+      confirm({ title: "放弃修改？", message: "表单内容尚未保存，关闭后本次填写将丢失。", confirmText: "放弃修改", danger: true,
+        onConfirm: close, onCancel: function () { asking = false; } });
+    };
+    var onKey = function (e) { if (e.key === "Escape") { e.stopPropagation(); tryClose(); } };
+    var ov = overlay(tryClose);
     var box = panel(opts.width || 480);
-    header(box, opts.title || "编辑", opts.subtitle, close);
-    var body = el("div", { padding: "18px 20px", display: "grid", gridTemplateColumns: opts.cols === 2 ? "1fr 1fr" : "1fr", gap: "12px" });
-    (opts.fields || []).forEach(function (f) {
-      var wrap = el("div", f.full ? { gridColumn: "1 / -1" } : null);
-      wrap.appendChild(el("div", { fontSize: "12px", fontWeight: "600", color: "var(--ink-soft)", marginBottom: "5px" }, f.label));
-      var input;
-      if (f.type === "select") {
-        input = el("select", null);
-        (f.options || []).forEach(function (o) { var op = el("option", null, o); op.value = o; if (o === f.value) op.selected = true; input.appendChild(op); });
-      } else if (f.type === "textarea") {
-        input = el("textarea", { minHeight: "64px", resize: "vertical" });
-        input.value = f.value || "";
-      } else {
-        input = el("input", null);
-        input.type = f.type || "text";
-        input.value = f.value != null ? f.value : "";
-        if (f.placeholder) input.placeholder = f.placeholder;
-      }
-      Object.assign(input.style, { width: "100%", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", padding: "8px 11px", fontSize: "13px", background: "#fff", boxSizing: "border-box" });
-      input.setAttribute("data-key", f.key);
-      wrap.appendChild(input);
-      body.appendChild(wrap);
-    });
-    box.appendChild(body);
-    var foot = el("div", { padding: "0 20px 18px", display: "flex", justifyContent: "flex-end", gap: "8px" });
+    Object.assign(box.style, { overflow: "hidden", display: "flex", flexDirection: "column" });
+    header(box, opts.title || "编辑", opts.subtitle, tryClose);
+    var fb = buildFormBody({ fields: opts.fields, cols: opts.cols, onDirty: function () {
+      dirty = true;
+      if (draftBtn) { draftBtn.disabled = false; draftBtn.style.opacity = "1"; draftBtn.style.cursor = "pointer"; }
+    } });
+    var bodyWrap = el("div", { padding: "18px 20px", overflowY: "auto", flex: "1 1 auto" });
+    bodyWrap.appendChild(fb.node);
+    box.appendChild(bodyWrap);
+    var foot = el("div", { padding: "12px 20px 16px", display: "flex", justifyContent: "flex-end", gap: "8px", borderTop: "1px solid var(--line)", flex: "none", background: "var(--panel)" });
     var cancel = btn("取消");
-    var save = btn(opts.saveText || "保存", "primary");
-    cancel.addEventListener("click", close);
-    save.addEventListener("click", function () {
-      var vals = {};
-      body.querySelectorAll("[data-key]").forEach(function (i) { vals[i.getAttribute("data-key")] = i.value; });
-      close(); if (opts.onSave) opts.onSave(vals);
+    cancel.addEventListener("click", tryClose);
+    foot.appendChild(cancel);
+    var ACTION_LABEL = { draft: "保存草稿", saveNew: "保存并新建", saveSubmit: "保存并提交" };
+    (opts.actions || []).forEach(function (a) {
+      if (!ACTION_LABEL[a]) return;
+      var b = btn(ACTION_LABEL[a]);
+      if (a === "draft") { draftBtn = b; b.disabled = true; b.style.opacity = "0.45"; b.style.cursor = "not-allowed"; }   // 红圈：空表单草稿置灰
+      b.addEventListener("click", function () {
+        if (a === "draft" && !dirty) return;
+        if (a !== "draft" && !fb.validate()) return;   // 草稿允许不完整（红圈：草稿可后补）
+        var vals = fb.getVals();
+        close(); if (opts.onSave) opts.onSave(vals, a);
+      });
+      foot.appendChild(b);
     });
-    foot.appendChild(cancel); foot.appendChild(save);
-    box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
+    var save = btn(opts.saveText || "保存", "primary");
+    save.addEventListener("click", function () {
+      if (!fb.validate()) return;
+      var vals = fb.getVals();
+      close(); if (opts.onSave) opts.onSave(vals, "save");
+    });
+    foot.appendChild(save);
+    box.appendChild(foot);
+    ov.appendChild(box); document.body.appendChild(ov);
+    document.addEventListener("keydown", onKey);
+    fb.focusFirst();
+  }
+
+  // —— typeSelect（新建三段式第一段：业务类型单选弹窗 → Promise<value|null>）——
+  // 红圈范本：新建付款申请 8 类型。opts:{ title, options:[{value,label,hint}], defaultValue }
+  function typeSelect(opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      var picked = { v: opts.defaultValue || (opts.options && opts.options[0] && opts.options[0].value) };
+      var done = function (v) { ov.remove(); resolve(v); };
+      var ov = overlay(function () { done(null); });
+      var box = panel(opts.width || 460);
+      header(box, opts.title || "选择业务类型", opts.subtitle || "先选类型，再填写对应表单", function () { done(null); });
+      var body = el("div", { padding: "14px 16px", display: "flex", flexDirection: "column", gap: "6px", maxHeight: "52vh", overflowY: "auto" });
+      var items = [];
+      (opts.options || []).forEach(function (o) {
+        var it = el("div", { display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: "1px solid var(--line)", borderRadius: "10px", cursor: "pointer" });
+        var dot = el("span", { width: "14px", height: "14px", borderRadius: "50%", border: "2px solid var(--line-strong)", flex: "none", boxSizing: "border-box" });
+        var tx = el("div", null);
+        tx.appendChild(el("div", { fontSize: "13px", fontWeight: "700" }, o.label));
+        if (o.hint) tx.appendChild(el("div", { fontSize: "11.5px", color: "var(--ink-faint)", marginTop: "2px" }, o.hint));
+        it.appendChild(dot); it.appendChild(tx);
+        var paint = function () {
+          var on = picked.v === o.value;
+          it.style.borderColor = on ? "var(--brand)" : "var(--line)";
+          it.style.background = on ? "var(--brand-soft)" : "transparent";
+          dot.style.borderColor = on ? "var(--brand)" : "var(--line-strong)";
+          dot.style.background = on ? "radial-gradient(circle, var(--brand) 45%, transparent 50%)" : "transparent";
+        };
+        it.addEventListener("click", function () { picked.v = o.value; items.forEach(function (p) { p(); }); });
+        it.addEventListener("dblclick", function () { done(o.value); });
+        items.push(paint); paint();
+        body.appendChild(it);
+      });
+      box.appendChild(body);
+      var foot = el("div", { padding: "12px 20px 16px", display: "flex", justifyContent: "flex-end", gap: "8px", borderTop: "1px solid var(--line)" });
+      var cancel = btn("取消");
+      cancel.addEventListener("click", function () { done(null); });
+      var ok = btn("确定", "primary");
+      ok.addEventListener("click", function () { done(picked.v); });
+      foot.appendChild(cancel); foot.appendChild(ok);
+      box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
+    });
   }
 
   // —— 水波粼粼动效（DESIGN-SYSTEM §7.3：导出完成反馈）——
@@ -405,6 +843,6 @@
     box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
   }
 
-  window.KitUI = { toast: toast, confirm: confirm, modal: modal, formModal: formModal, ripple: ripple, undoToast: undoToast, folderPicker: folderPicker, exportModal: exportModal, importModal: importModal };
+  window.KitUI = { toast: toast, confirm: confirm, modal: modal, formModal: formModal, buildFormBody: buildFormBody, typeSelect: typeSelect, ripple: ripple, undoToast: undoToast, folderPicker: folderPicker, exportModal: exportModal, importModal: importModal };
   window.KitUIScreen = function () { return null; };
 })();

@@ -7,8 +7,15 @@
 //   entity   实体 key（新增行 id 前缀/导出文件名）        coll     window.APP 集合名（CRUD 唯一写路径）
 //   title    列表标题                                    filter(row)   本列表基础过滤（如 kind==="施工"）
 //   columns  KitTable 列 + 表单提示：{ key,label,width,align,mono,money,color,render(v,row),
-//            form:{type:"select"|"textarea"|"date"|"number",options,placeholder,
+//            form:{type:"select"|"textarea"|"date"|"number"|"lookup"|"readonly"|"grid",options,placeholder,
+//                  section:"分组标题",required,hint,suffix,dependsOn,compute,columns,rows,summaryKeys,
 //                  toLabel(存储值)→表单显示,toValue(表单值)→存储值}|false, noForm }   // toX 用于 id↔名称 select
+//   formOnly [{key,label,money,form:{...}}] 仅表单字段（新增/编辑弹窗出现，不占表格列）——
+//            红圈对标：表单字段数 ≫ 列表列数，完整单据字段全走这里（差距清单 2026-07-11 §1）
+//   formWidth/formCols/formSubtitle/formActions 表单弹窗配置（actions=["draft","saveNew","saveSubmit"] 保存动作组）
+//   formRoute  整页表单路由（grill 决议 2026-07-18：设则新建/编辑跳 kit/forms/* 注册的整页表单页签，弹窗仅兜底）
+//   typeSelect {title,options:[{value,label,hint}],defaultValue} 新建三段式第一段（类型 → params.type 带进表单）
+//   statusKey  状态字段名 → 自动补「草稿」视图 chip + 草稿行点击直进表单续填（草稿三入口，决议 8c）
 //   views    [{key,label,filter(row)}] 业务态视图        defaultView  默认视图 key（红圈：默认业务态）
 //   filters  [{key,label,options:[{key,label}],match(row,val)}] 下拉筛选（key"all"=不过滤）
 //   searchKeys 搜索命中字段                              leftNav  {title,items:[{key,label,filter(row)}]} 左侧分类
@@ -20,14 +27,21 @@
   const DS = () => window.DesignSystem_e3d87 || window.DesignSystem_e3d871 || {};
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, modal: () => {}, undoToast: () => {}, importModal: () => {} };
 
-  function EntityListScreen({ meta, params }) {
+  function EntityListScreen({ meta, params, navigate }) {
     const { Button, IconButton, Icon } = window.DesignSystem_e3d871 || {};
     const KA = window.KitAtoms || {};
     const A = window.APP;
     if (!A || !window.KitTable || !KA.SegTab) return null;
     A.use();
+    // 整页表单路由（grill 决议 2026-07-18 #3）：meta.formRoute 存在时新建/编辑跳整页表单页签；
+    // meta.typeSelect 存在时新建先弹类型选择（三段式第一段）。navigate 优先取 prop，兜底 window.DC。
+    const nav = navigate || (window.DC && window.DC.navigate);
 
-    const views = meta.views || [];
+    // meta.statusKey：状态字段名 → 自动补「草稿」视图 chip（0 条也显示，草稿三入口②，决议 8c）
+    const views = (meta.views || []).concat(
+      meta.statusKey && !(meta.views || []).some((v) => v.key === "__draft")
+        ? [{ key: "__draft", label: "草稿", filter: (r) => r[meta.statusKey] === "草稿" }] : []
+    );
     const [view, setView] = React.useState(meta.defaultView || (views[0] && views[0].key));
     const [navKey, setNavKey] = React.useState(meta.leftNav ? meta.leftNav.items[0].key : null);
     const [q, setQ] = React.useState("");
@@ -58,37 +72,72 @@
       : filtered;
 
     // —— CRUD（唯一写路径 = window.APP）——
-    const formCols = meta.columns.filter((c) => c.form !== false && !c.noForm && c.key);
-    const moneyKeys = new Set(meta.columns.filter((c) => c.money).map((c) => c.key));
+    // 表单字段 = 表格列(带 form) + meta.formOnly（仅表单字段，不占表格列，shape 同 columns：{key,label,money,form:{...}}）。
+    // c.form 全量透传给 KitUI.formModal（新能力契约见其头注释）：section 分组标题 / required 必填 / hint 说明 /
+    //   suffix 单位 / type:"lookup" 检索下拉(options 可为 fn(vals) 级联) / dependsOn 依赖拦截 /
+    //   type:"readonly"+compute(vals) 带出区块 / type:"grid"+columns/rows/summaryKeys 明细网格。
+    // meta.formWidth / formCols / formSubtitle / formActions(["draft","saveNew","saveSubmit"]) 透传弹窗配置。
+    const formDefs = meta.columns.filter((c) => c.form !== false && !c.noForm && c.key).concat(meta.formOnly || []);
+    const moneyKeys = new Set(formDefs.filter((c) => c.money).map((c) => c.key));
     // 空值不覆盖 newDefaults；money 转数值；form.toValue 支持「表单显示名 → 存储 id」（如 项目/乙方 select）
     const coerce = (v) => {
       const o = {};
       Object.keys(v).forEach((k) => {
         if (v[k] === "" || v[k] == null) return;
-        const col = formCols.find((c) => c.key === k);
+        const col = formDefs.find((c) => c.key === k);
         o[k] = col && col.form && col.form.toValue ? col.form.toValue(v[k]) : v[k];
-        if (moneyKeys.has(k)) o[k] = Number(String(o[k]).replace(/[^\d.\-]/g, "")) || 0;
+        if (moneyKeys.has(k) && !Array.isArray(o[k])) o[k] = Number(String(o[k]).replace(/[^\d.\-]/g, "")) || 0;
       });
       return o;
     };
-    const buildFields = (row) => formCols.map((c, i) => ({
-      key: c.key, label: c.label,
-      value: row ? (c.form && c.form.toLabel ? c.form.toLabel(row[c.key]) : row[c.key]) : "",
-      type: c.form && c.form.type, options: c.form && c.form.options, placeholder: c.form && c.form.placeholder,
-      full: (c.form && c.form.full) || (formCols.length % 2 === 1 && i === formCols.length - 1),
-    }));
-    // meta.addFlow({ A, UI, buildFields, coerce, saveNew })：整表新建流自定义（如 付款申请「先选业务类型再出表单」）
-    const saveNew = (patch) => {
-      const row = { id: meta.entity + "-" + Date.now().toString(36), ...(meta.newDefaults ? meta.newDefaults() : {}), ...patch };
-      A.add(meta.coll, row); UI().toast("已新建 1 条「" + meta.title + "」", "ok");
+    const buildFields = (row) => {
+      const out = [];
+      formDefs.forEach((c, i) => {
+        const f = c.form || {};
+        if (f.section) out.push({ section: f.section });
+        const fld = Object.assign({}, f, {
+          section: undefined,
+          key: c.key, label: c.label,
+          value: row ? (f.toLabel ? f.toLabel(row[c.key], row) : row[c.key]) : (f.value !== undefined ? f.value : ""),
+          full: f.full || f.type === "grid" || f.type === "textarea" || (formDefs.length % 2 === 1 && i === formDefs.length - 1),
+        });
+        out.push(fld);
+      });
+      return out;
     };
-    const addRow = () => (meta.addFlow ? meta.addFlow({ A, UI: UI(), buildFields, coerce, saveNew }) : UI().formModal({ title: "新建 " + meta.title, cols: 2, width: 620, fields: buildFields(null),
-      onSave: (v) => {
-        const row = { id: meta.entity + "-" + Date.now().toString(36), ...(meta.newDefaults ? meta.newDefaults() : {}), ...coerce(v) };
-        A.add(meta.coll, row); UI().toast("已新建 1 条「" + meta.title + "」", "ok");
-      } }));
-    const editRow = (row) => UI().formModal({ title: "编辑 · " + (row.name || meta.title), cols: 2, width: 620, fields: buildFields(row),
-      onSave: (v) => { A.update(meta.coll, row.id, coerce(v)); UI().toast("已保存", "ok"); } });
+    // meta.addFlow({ A, UI, buildFields, coerce, saveNew })：整表新建流自定义（如 付款申请「先选业务类型再出表单」）
+    const saveNew = (patch, action) => {
+      const row = { id: meta.entity + "-" + Date.now().toString(36), ...(meta.newDefaults ? meta.newDefaults() : {}), ...patch };
+      A.add(meta.coll, row);
+      UI().toast(action === "draft" ? "已保存草稿「" + meta.title + "」（可稍后补全提交）"
+        : action === "saveSubmit" ? "已保存并提交 1 条「" + meta.title + "」"
+        : "已新建 1 条「" + meta.title + "」", "ok");
+    };
+    const formOpts = (row) => ({
+      title: row ? "编辑 · " + (row.name || row.no || meta.title) : "新建 " + meta.title,
+      subtitle: meta.formSubtitle, cols: meta.formCols || 2, width: meta.formWidth || 620,
+      actions: meta.formActions, fields: buildFields(row),
+    });
+    const addRow = () => {
+      if (meta.formRoute && nav) {
+        if (meta.typeSelect) {   // 新建三段式第一段：业务类型选择 → 带 type 进整页表单
+          UI().typeSelect(meta.typeSelect).then((v) => { if (v != null) nav(meta.formRoute, { type: v }); });
+          return;
+        }
+        nav(meta.formRoute, {});
+        return;
+      }
+      return meta.addFlow ? meta.addFlow({ A, UI: UI(), buildFields, coerce, saveNew }) : UI().formModal({ ...formOpts(null),
+        onSave: (v, action) => {
+          saveNew(coerce(v), action);
+          if (action === "saveNew") setTimeout(addRow, 120);   // 保存并新建：落库后原样再开一张空表单
+        } });
+    };
+    const editRow = (row) => {
+      if (meta.formRoute && nav) return nav(meta.formRoute, { id: row.id });
+      return UI().formModal({ ...formOpts(row),
+        onSave: (v) => { A.update(meta.coll, row.id, coerce(v)); UI().toast("已保存", "ok"); } });
+    };
     const delRow = (row) => UI().confirm({ title: "删除该" + meta.title + "？", danger: true, confirmText: "删除",
       message: "确定删除「" + (row.name || row.no || "该行") + "」？删除为软删除，可在 5 秒内撤回。",
       onConfirm: () => { A.softDel(meta.coll, row.id); UI().undoToast("已删除「" + (row.name || meta.title) + "」", () => A.restore(meta.coll, row.id)); } });
@@ -209,7 +258,11 @@
         pageSize={meta.pageSize || 10} minRows={10}
         sum={meta.summary ? meta.summary(shown) : undefined}
         tableMinWidth={meta.tableMinWidth != null ? meta.tableMinWidth : Math.max(720, cols.length * 128)}
-        onRowClick={meta.onRowOpen ? (r) => meta.onRowOpen(r) : undefined}
+        onRowClick={(meta.onRowOpen || (meta.statusKey && meta.formRoute)) ? (r) => {
+          // 草稿行整行点击直接进整页表单续填（草稿三入口③，决议 8c）；普通行走原 onRowOpen
+          if (meta.statusKey && meta.formRoute && nav && r[meta.statusKey] === "草稿") return nav(meta.formRoute, { id: r.id });
+          if (meta.onRowOpen) meta.onRowOpen(r);
+        } : undefined}
         footerLeft={"共 " + shown.length + " 条"} empty="暂无数据" />
     );
 
