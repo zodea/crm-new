@@ -81,11 +81,21 @@
       const host = hostRef.current;
       if (!host) return undefined;
       const cached = window.KIT_FORM_CACHE[cacheKey];
-      const fields = cached
-        ? spec.fields.map((f) => (f.key && cached[f.key] !== undefined
+      // 新建：newDefaults 合并进初始字段值（select 默认项/自动单号可见可改；不合并则浏览器 select 自动选第一项——曾致「保存」落成草稿态）
+      const nd = !spec.row && spec.newDefaults ? spec.newDefaults() : null;
+      let fields = nd
+        ? spec.fields.map((f) => {
+          if (!f.key || f.type === "grid" || f.type === "file" || nd[f.key] === undefined) return f;
+          if (f.value !== "" && f.value != null) return f;
+          const v = f.toLabel ? f.toLabel(nd[f.key]) : nd[f.key];
+          return (v === "" || v == null || typeof v === "object") ? f : Object.assign({}, f, { value: v });
+        })
+        : spec.fields;
+      fields = cached
+        ? fields.map((f) => (f.key && cached[f.key] !== undefined
           ? Object.assign({}, f, { value: cached[f.key], rows: Array.isArray(cached[f.key]) ? cached[f.key] : f.rows })
           : f))
-        : spec.fields;
+        : fields;
       const fb = UI.buildFormBody({ fields, cols: spec.cols || 2, layout: "cards", onDirty: () => {
         dirtyRef.current = true;
         setDirty(true);

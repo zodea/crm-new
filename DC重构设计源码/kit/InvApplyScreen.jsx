@@ -1,10 +1,11 @@
 // InvApplyScreen — 开票申请列表（收入侧起点：我方给甲方开票）：EntityListScreen meta 一份生成整页。
 // 口径：amount=开票金额(含税)、tax=税额、rate 存字符串("9%")；与 contracts.invoiced(施工=累计开票) 大体对齐。
 // fromParams：params.contract → 按 contractId 预筛（施工合同「累计开票」金额穿透落点）。
+// 2026-07-18 表单补全轮：新增/编辑改整页表单（kit/forms/FinanceForms.jsx invApplyForm），对标红圈+grill决议
 (function () {
   if (window.InvApplyScreen) return;
 
-  function InvApplyScreen({ params }) {
+  function InvApplyScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -18,6 +19,8 @@
       entity: "invApply",
       title: "开票申请",
       coll: "invApplies",
+      formRoute: "invApplyForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "申请编号", width: 150, mono: true },
         { key: "projectId", label: "项目名称", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -61,7 +64,7 @@
       newDefaults: () => ({ status: "审批中", rate: "9%" }),
       tableMinWidth: 1220,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.InvApplyScreen = InvApplyScreen;

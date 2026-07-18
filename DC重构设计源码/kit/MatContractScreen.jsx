@@ -4,7 +4,7 @@
 (function () {
   if (window.MatContractScreen) return;
 
-  function MatContractScreen({ params }) {
+  function MatContractScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -19,6 +19,8 @@
 
     const meta = {
       entity: "matContract", coll: "contracts", title: "材料采购合同",
+      formRoute: "matContractForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       filter: (r) => r.kind === "材采",
       columns: [
         { key: "name", label: "合同名称", width: 230, render: (v, r) => <KA.EntityLink type="contract" id={r.id} label={v} /> },
@@ -71,7 +73,7 @@
       newDefaults: () => ({ kind: "材采", settled: 0, invoiced: 0, paid: 0, doc: { name: "材料采购合同.pdf", pages: 8 } }),
       tableMinWidth: 1640,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.MatContractScreen = MatContractScreen;

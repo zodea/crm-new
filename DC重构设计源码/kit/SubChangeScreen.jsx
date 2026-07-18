@@ -4,7 +4,7 @@
 (function () {
   if (window.SubChangeScreen) return;
 
-  function SubChangeScreen({ params }) {
+  function SubChangeScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -20,6 +20,8 @@
       entity: "subChange",
       title: "分包变洽签",
       coll: "subChanges",
+      formRoute: "subChangeForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "变更编号", width: 140, mono: true },
         { key: "type", label: "类型", width: 84, form: { type: "select", options: ["增项", "签证", "洽商"] } },
@@ -75,7 +77,7 @@
       newDefaults: () => ({ status: "草稿", type: "增项", audited: 0 }),
       tableMinWidth: 1620,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.SubChangeScreen = SubChangeScreen;

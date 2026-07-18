@@ -161,11 +161,8 @@
     const family = m.family ? data.workers.filter((x) => wmeta(x.id).family === m.family) : [];
     const hasFamily = family.length > 1;
 
-    const editWorker = () => UI().formModal({ title: "编辑工人 · " + w.name, cols: 2, fields: [
-      { key: "name", label: "姓名", value: w.name }, { key: "trade", label: "工种", type: "select", options: ["泥水工", "钢筋工", "木工", "水电工", "防水工", "普工"], value: m.trade },
-      { key: "team", label: "所属班组", value: w.team }, { key: "phone", label: "联系电话", value: w.phone },
-      { key: "idCard", label: "身份证号", value: w.idCard, full: true },
-    ], onSave: () => UI().toast("已保存", "ok") });
+    // 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/BaseForms.jsx workerForm，5 分区含银行/紧急联系人/证书附件）
+    const editWorker = () => navigate("workerForm", { id: w.id });
 
     const certs = [
       { category: "身份证", subType: "", file: "身份证.jpg", expiry: null, added: "2024-08-15" },

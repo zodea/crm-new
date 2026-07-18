@@ -3,7 +3,7 @@
 (function () {
   if (window.CustomerScreen) return;
 
-  function CustomerScreen({ params }) {
+  function CustomerScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -14,6 +14,7 @@
 
     const meta = {
       entity: "customer", coll: "customers", title: "客户",
+      formRoute: "customerForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "name", label: "客户名称", width: 220, render: (v, r) => <KA.EntityLink type="customer" id={r.id} label={v} /> },
         { key: "contact", label: "联系人", width: 110 },
@@ -36,7 +37,7 @@
       onRowOpen: (r) => window.DC && window.DC.navigate("customerDetail", { id: r.id }),
       tableMinWidth: 1280,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.CustomerScreen = CustomerScreen;

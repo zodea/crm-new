@@ -2,7 +2,7 @@
 (function () {
   if (window.OmRequisitionScreen) return;
 
-  function OmRequisitionScreen({ params }) {
+  function OmRequisitionScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -15,6 +15,8 @@
 
     const meta = {
       entity: "omRequisition", coll: "omRequisitions", title: "甲供材下料单",
+      formRoute: "omRequisitionForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "下料单编号", width: 150, mono: true },
         { key: "projectId", label: "项目", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -42,7 +44,7 @@
       newDefaults: () => ({ status: "待下单" }),
       tableMinWidth: 1120,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OmRequisitionScreen = OmRequisitionScreen;

@@ -4,7 +4,7 @@
 (function () {
   if (window.PayManageScreen) return;
 
-  function PayManageScreen({ params }) {
+  function PayManageScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -20,6 +20,7 @@
       entity: "payManage",
       title: "付款管理",
       coll: "payApplies",
+      editFormRoute: "payApplyForm",   // 编辑跳整页付款申请表单；新建仍被 addFlow 拦截去「付款申请」
       filter: (r) => r.status !== "审批中",
       columns: [
         { key: "no", label: "编号", width: 150, mono: true },
@@ -71,7 +72,7 @@
       addFlow: ({ UI }) => UI.toast("请到「付款申请」新建；本页只核对与执行支付", "warn"),
       tableMinWidth: 1500,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.PayManageScreen = PayManageScreen;

@@ -74,18 +74,8 @@
       .concat(supPayRecords.map((r) => ({ no: r.no, type: "支付记录", amount: r.amount, date: r.date, status: "已付款" })));
     const cc = CRED_CHIP[sup.cred || d.credentialStatus] || CRED_CHIP.incomplete;
 
-    const editSupplier = () => UI().formModal({ title: "编辑分供方 · " + sup.name, cols: 2, fields: [
-      { key: "name", label: "公司全称", value: sup.name, full: true },
-      { key: "category", label: "类别", type: "select", options: ["材料供应商", "劳务分包商", "设备供应商", "其他"], value: sup.category },
-      { key: "cred", label: "资料状态", type: "select", options: ["incomplete", "reviewing", "qualified", "rejected"], value: sup.cred || "incomplete" },
-      { key: "contact", label: "联系人", value: sup.contact },
-      { key: "phone", label: "电话", value: sup.phone },
-      { key: "taxNo", label: "税号", value: sup.taxNo, full: true },
-    ], onSave: (v) => {
-      if (!v.name) { UI().toast("公司全称不能为空", "danger"); return; }
-      if (window.APP) window.APP.update("suppliers", sup.id, v);
-      UI().toast("已保存（分供方列表已同步）", "ok");
-    } });
+    // 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/BaseForms.jsx supplierForm，红圈 5 分区 30 字段 + 7 附件位）
+    const editSupplier = () => navigate("supplierForm", { id: sup.id });
 
     const tabs = [
       { key: "info", label: "详细资料" },

@@ -4,7 +4,7 @@
 (function () {
   if (window.SubContractScreen) return;
 
-  function SubContractScreen({ params }) {
+  function SubContractScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -21,6 +21,8 @@
       entity: "subContract",
       title: "分包合同",
       coll: "contracts",
+      formRoute: "subContractForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       filter: (r) => r.kind === "分包",
       columns: [
         { key: "name", label: "合同名称", width: 230, render: (v, r) => <KA.EntityLink type="contract" id={r.id} label={v} /> },
@@ -86,7 +88,7 @@
       newDefaults: () => ({ kind: "分包", subKind: "劳务", settled: 0, invoiced: 0, paid: 0, doc: { name: "分包合同.pdf", pages: 14 } }),
       tableMinWidth: 1760,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.SubContractScreen = SubContractScreen;

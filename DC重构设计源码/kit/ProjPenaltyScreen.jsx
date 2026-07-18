@@ -4,7 +4,7 @@
 (function () {
   if (window.ProjPenaltyScreen) return;
 
-  function ProjPenaltyScreen({ params }) {
+  function ProjPenaltyScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -21,6 +21,8 @@
       entity: "projPenalty",
       title: "项目罚扣",
       coll: "projPenalties",
+      formRoute: "projPenaltyForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "罚扣编号", width: 140, mono: true },
         { key: "reason", label: "罚扣事由", width: 220 },
@@ -72,7 +74,7 @@
       newDefaults: () => ({ status: "待抵扣" }),
       tableMinWidth: 1440,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.ProjPenaltyScreen = ProjPenaltyScreen;

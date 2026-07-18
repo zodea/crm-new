@@ -47,43 +47,24 @@
   }
 
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, exportModal: () => {}, importModal: () => {}, undoToast: () => {} };
-  const workerForm = (w, title, onSave) => UI().formModal({
-    title, cols: 2,
-    fields: [
-      { key: "name", label: "姓名", value: w ? w.name : "" },
-      { key: "trade", label: "工种", type: "select", options: ["泥水工", "钢筋工", "木工", "水电工", "防水工", "普工"], value: w ? w.trade : "泥水工" },
-      { key: "team", label: "所属班组", value: w ? w.team : "" },
-      { key: "phone", label: "联系电话", value: w ? w.phone : "" },
-      { key: "idCard", label: "身份证号", value: w ? w.idCard : "", full: true },
-      { key: "entryDate", label: "进场日期", value: w ? w.entryDate : "", placeholder: "2026-07-02" },
-    ],
-    onSave: (vals) => {
-      if (!vals.name) { UI().toast("姓名不能为空", "danger"); return; }
-      onSave(vals);
-      UI().toast(w ? "已保存修改" : "已添加工人", "ok");
-    },
-  });
+  // 2026-07-18 表单补全轮：新建/编辑改整页表单（kit/forms/BaseForms.jsx workerForm 路由），数据切共享仓 APP.workers
 
   function WorkerScreen({ data, navigate }) {
     const [card, setCard] = React.useState("all"); // all/on/off/cert
     const [trade, setTrade] = React.useState("all");
     const [safe, setSafe] = React.useState("all");
     const [q, setQ] = React.useState("");
-    // 列表转 state：新增/编辑/删除实时生效（刷新恢复初始 mock）
-    const [list, setList] = React.useState(() => data.workers.map((w) => ({ ...w, ...wmeta(w.id) })));
+    // 数据源：window.APP.workers 共享仓 + WORKER_META 补 mock 字段（行值优先，meta 兜底）
+    const A = window.APP;
+    if (A) A.use();
+    const list = (A ? A.rows("workers") : data.workers).map((w) => ({ ...wmeta(w.id), ...w }));
 
-    const addRow = (vals) => setList((l) => [
-      { id: "w_" + Date.now(), onSite: true, project: "—", exitDate: "", safety: false, family: null, certExp: 0, idCard: "", ...vals },
-      ...l,
-    ]);
-    const editRow = (id) => (vals) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...vals } : x)));
     const delRow = (w) => UI().confirm({
       title: "删除工人", danger: true, confirmText: "删除",
       message: "确定删除「" + w.name + "」？删除为软删除，可在 5 秒内撤回。",
       onConfirm: () => {
-        const idx = list.findIndex((x) => x.id === w.id);
-        setList((l) => l.filter((x) => x.id !== w.id));
-        UI().undoToast("已删除「" + w.name + "」", () => setList((l) => { const n = [...l]; n.splice(Math.min(idx, n.length), 0, w); return n; }));
+        A.softDel("workers", w.id);
+        UI().undoToast("已删除「" + w.name + "」", () => A.restore("workers", w.id));
       },
     });
 
@@ -134,7 +115,7 @@
               structureOptions: ["按工种", "按班组", "按在场状态", "不分层"],
               nameOptions: [{ label: "姓名", sample: "杨永强" }, { label: "工种", sample: "泥水工" }, { label: "导出日期", sample: "2026-07-02" }],
             })}>导出</Button>
-            <Button variant="primary" icon="user-plus" onClick={() => workerForm(null, "添加工人", addRow)}>添加工人</Button>
+            <Button variant="primary" icon="user-plus" onClick={() => navigate("workerForm", {})}>添加工人</Button>
           </div>
         </Panel>
 
@@ -175,7 +156,7 @@
                     <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
                       <span style={{ display: "inline-flex", gap: 6 }}>
                         <IconButton icon="file-text" title="详情" onClick={() => navigate("workerDetail", { id: w.id })} />
-                        <IconButton icon="square-pen" title="编辑" onClick={() => workerForm(w, "编辑工人 · " + w.name, editRow(w.id))} />
+                        <IconButton icon="square-pen" title="编辑" onClick={() => navigate("workerForm", { id: w.id })} />
                         <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => delRow(w)} />
                       </span>
                     </td>

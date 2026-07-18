@@ -3,7 +3,7 @@
 (function () {
   if (window.OmTotalScreen) return;
 
-  function OmTotalScreen({ params }) {
+  function OmTotalScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -15,6 +15,7 @@
 
     const meta = {
       entity: "omTotal", coll: "omTotals", title: "甲供材总控量",
+      formRoute: "omTotalForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "no", label: "总控编号", width: 140, mono: true },
         { key: "projectId", label: "项目", width: 140, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -39,7 +40,7 @@
       newDefaults: () => ({ arrivedQty: 0, usedQty: 0 }),
       tableMinWidth: 1260,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OmTotalScreen = OmTotalScreen;

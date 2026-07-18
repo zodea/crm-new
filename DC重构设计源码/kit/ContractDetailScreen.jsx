@@ -42,13 +42,11 @@
       { key: "pay", label: isCon ? "收款记录" : "付款记录", count: split(c.paid, () => 0).length },
     ].filter(Boolean);
 
-    const editContract = () => UI().formModal({ title: "编辑 · " + c.name, cols: 2, width: 620, fields: [
-      { key: "name", label: "合同名称", value: c.name, full: true },
-      { key: "amount", label: "含税合同金额", value: c.amount },
-      { key: "changed", label: "变更后合同金额", value: c.changed },
-      { key: "signDate", label: "签约日期", value: c.signDate, type: "date" },
-      { key: "status", label: "合同状态", value: c.status, type: "select", options: ["履约中", "已签订", "已结算", "已结清"] },
-    ], onSave: (v) => { A.update("contracts", c.id, { ...v, amount: Number(v.amount) || c.amount, changed: Number(v.changed) || c.changed }); UI().toast("已保存", "ok"); } });
+    // 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/ContractForms.jsx，按 kind 分流三条表单路由，红圈 5 分区全字段）
+    const editContract = () => {
+      const route = { "施工": "conContractForm", "分包": "subContractForm", "材采": "matContractForm" }[c.kind] || "conContractForm";
+      navigate(route, { id: c.id });
+    };
 
     // —— Tab 内容 ——
     const infoRow = (label, val) => (

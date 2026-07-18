@@ -134,7 +134,8 @@
         } });
     };
     const editRow = (row) => {
-      if (meta.formRoute && nav) return nav(meta.formRoute, { id: row.id });
+      // editFormRoute：仅编辑走整页表单（新建仍走 addFlow 拦截，如 付款管理 编辑跳 payApplyForm）
+      if ((meta.formRoute || meta.editFormRoute) && nav) return nav(meta.formRoute || meta.editFormRoute, { id: row.id });
       return UI().formModal({ ...formOpts(row),
         onSave: (v) => { A.update(meta.coll, row.id, coerce(v)); UI().toast("已保存", "ok"); } });
     };
