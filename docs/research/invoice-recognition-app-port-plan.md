@@ -4,6 +4,7 @@
 > 分析日期：2026-07-05
 > 目标：把已跑通的发票+送货单识别能力（OCR 集成 + 正则结构化 + 送货单四件套）优化后移植进 新app（Nuxt4+Pinia+SQLite+KitUI），对齐识别中心蓝本（反馈轮7）与 ADR-0001。
 > 本文由多 agent 拆读源码生成，供后续实装参照。**只覆盖发票和送货单相关部分。**
+> ⚠️ 本文出现的固定栏宽、固定比例与桌面布局只作历史迁移参考；UI 实装统一遵循 [ADR 0013 响应式与自适应契约](../adr/0013-align-all-ui-to-online-design.md)。
 
 > ⚠**引擎决策已更新（2026-07-05）**：本文 §1/§7/§9 关于"PP-OCRv6 vs `@paddlejs-models/ocr`"的讨论**已被 [ADR-0006](../adr/0006-ocr-paddleocr-vl-single-model.md) 取代**——引擎统一定为 **PaddleOCR-VL-1.6 单模型（本地自托管为主）**。影响：`ocr-vl.js`（VL 云端协议）成为**核心复用**（本地自托管只需把端点指向 localhost MLX/llama.cpp server）；`ocr.js`（`@paddlejs-models/ocr` 旧本地引擎）改为 **leave-behind**；§7 前置决策 1（CORS）、2（引擎选型）**已解**。本文其余部分（正则库、送货单四件套、纯函数移植、新旧UI取舍）**全部仍然有效**。
 

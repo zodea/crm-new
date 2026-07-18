@@ -5,7 +5,7 @@
 > 内容区视觉令牌唯一权威源: `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。当前唯一界面入口 `app.dc.html` 直接加载它；不得在效果稿或应用侧复制色值。**全站布局/排版/颜色唯一基准 = `app.dc.html`（ADR 0013）**；旧对照页已删除，历史从 Git 查看。
 > 内容区交互模式: `CRM-PATTERNS.md`  
 > 品味层（为什么好看/禁止什么/重构方向，基准=线上 Claude Design）: [docs/design/DESIGN-TASTE.md](../design/DESIGN-TASTE.md)；本文 §4.2 按钮层级已按其五变体配方修订（#109），配方冲突时仍以该文为品味基准。  
-> 最后更新: 2026-07-17
+> 最后更新: 2026-07-18（响应式契约同步 ADR 0013）
 
 ---
 
@@ -247,15 +247,17 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ```css
 .info-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 1px;
   border: 1px solid var(--line);
+  background: var(--line);
 }
 .info-cell {
-  flex: 1;
   padding: 8px 12px;
-  border-right: 1px solid var(--line);
+  min-width: 0;
+  background: var(--panel);
 }
-.info-cell:last-child { border-right: none; }
 .info-cell .label { font-size: 9px; color: var(--ink-faint); margin-bottom: 3px; }
 .info-cell .value { font-size: 12px; }
 ```
@@ -265,19 +267,19 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface-3);
 }
 .form-cell {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--surface-3);
-  border-right: 1px solid var(--surface-3);
+  min-width: 0;
+  background: var(--panel);
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.form-cell:nth-child(3n) { border-right: none; }
 .form-cell .fl { font-size: 9px; color: var(--ink-faint); }
 .form-cell .fv { font-size: 12px; }
 ```
@@ -487,13 +489,14 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ## § 8 响应式
 
-| 断点 | 侧边栏 | 内容区 | 表格 |
-|---|---|---|---|
-| ≥1024px 桌面 | 固定左侧 248px | max-w-[1480px] mx-auto | 正常 |
-| 768-1024px 平板 | ~~收起 68px(图标模式)~~ ⚠️ 现行：<1024px 侧栏转 reka-ui Sheet（ADR 0011 行为条款） | 满宽 | 横向滚动 |
-| <768px 手机 | ~~底部 tab bar h-16~~ ⚠️ 旧方案已废弃，现行同上（Sheet） | 满宽 | 横向滚动，固定首尾列 |
+全站唯一强制口径见 [ADR 0013「响应式与自适应契约」](../adr/0013-align-all-ui-to-online-design.md)。本节只记录组件层实现提示：
 
-弹窗宽度: `min(880px, 95vw)`。长公司名/文件名: `truncate` + `title`。
+- 248/68px 是桌面侧栏组件令牌，不是固定页面画布；<1024px 侧栏转 reka-ui Sheet（ADR 0011 行为条款）。
+- 内容区流式占满可用空间，`max-width:1480px` 只作上限；gutter 在紧凑视口缩小。卡片/摘要/表单按容器最小可读宽度在 1/2/N 列间重排。
+- 表格、矩阵、甘特等密集数据区允许自身横向滚动并可保留语义固定列；页面本身不得横滚。固定首尾列只有在不会遮住可读内容时启用。
+- 弹窗宽度使用 `min(880px, calc(100dvw - 2 * var(--space-3)))`；左锚点在空间不足时隐藏或转顶部选择器。抽屉同理使用目标宽度与 `100dvw` 的较小值。
+- 长公司名/文件名可 `truncate` + `title`；金额与关键编号必须完整可读。全高工作台用 `dvh/svh + min-height:0`，禁止 `100vh - 常量 + 大 min-height` 锁死。
+- 最低验证宽度为 390 / 768 / 1024 / 1280–1440px，并检查 200% 浏览器缩放。
 
 ---
 
