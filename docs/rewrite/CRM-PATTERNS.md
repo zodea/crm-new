@@ -1,7 +1,7 @@
 # 红圈CRM 内容区设计模式参考
 
 > 从红圈CRM截图中提取的交互模式与布局规则。  
-> **适用范围**：仅内容区（右侧主体）。⛔ 原“中文方块 + 毛玻璃”侧栏约束已废弃，应用外壳见 [ADR 0011](../adr/0011-redesign-application-shell.md)。
+> **适用范围**：仅内容区（右侧主体）。外壳视觉见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)（中文方块白底侧栏回归、毛玻璃侧栏仍废弃），外壳行为见 [ADR 0011](../adr/0011-redesign-application-shell.md)。
 > 色值/组件样式: → `DESIGN-SYSTEM.md`（本文件只管布局模式，不定义色值）  
 > CRM 截图: `docs/红圈系统/`
 >
@@ -334,7 +334,7 @@
 |---|---|
 | 圆角 | ~~内容区无圆角~~ → **卡片 `--radius-card` 12px**（ADR 0007）；按钮/输入 10px，小控件 8px。详见 `DESIGN-SYSTEM.md § 3.2` |
 | 阴影 | ~~内容区不使用阴影~~ → **卡片用 `--shadow-card` 阴影**（ADR 0007），与 1px 边框叠加分层 |
-| 毛玻璃 | 内容区**不使用** `backdrop-filter`，仅侧边栏保留 |
+| 毛玻璃 | 内容区**不使用** `backdrop-filter`；侧栏毛玻璃已废弃，外壳仅顶栏 blur(8px)（ADR 0013） |
 | 边框 | 统一 `1px solid var(--line)` (`#d7e0ea`)，表格内部同 |
 | 背景 | 页面 `var(--bg)` (`#f4f7fb`)，面板 `var(--panel)` (`#fff`)，表头 `var(--surface-2)` (`#edf2f7`) |
 | 字体 | 正文基准 15px，表格/控件 14px，label 12px，标题 14-15px 加粗。详见 `DESIGN-SYSTEM.md § 5` |
@@ -350,7 +350,7 @@
 ## § 8 与现有APP的融合策略
 
 **不变的部分:**
-- 应用外壳以 [ADR 0011](../adr/0011-redesign-application-shell.md) 为准（旧“中文方块 + 毛玻璃侧栏”已废弃）
+- 应用外壳：视觉以 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 为准（中文方块白底侧栏回归、毛玻璃仍废弃），行为以 [ADR 0011](../adr/0011-redesign-application-shell.md) 为准
 - 品牌锚点 `#3976C6` 与三类状态色保持不变；中性色与文字对比以 `DESIGN-SYSTEM.md` 当前令牌为准
 - 组件样式详见 `DESIGN-SYSTEM.md § 4`
 
@@ -359,4 +359,4 @@
 - 详情页: 信息摘要行 + Section网格 + 右侧审批/评论/文件
 - 表单页: 左侧分区导航 + 2列表单 + 底部操作栏
 - 弹窗: 可编辑表格 + 底部取消确定
-- 通用: 内容区~~扁平（无圆角/无阴影）~~ → **圆角卡片 + 阴影**（ADR 0007），保留网格线/紧凑行高；外壳见 ADR 0011
+- 通用: 内容区~~扁平（无圆角/无阴影）~~ → **圆角卡片 + 阴影**（ADR 0007），保留网格线/紧凑行高；外壳视觉见 ADR 0013、行为见 ADR 0011

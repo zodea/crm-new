@@ -22,7 +22,7 @@
 4. **进出动画（tailwindcss-animate 的 UnoCSS 原生移植）**：在 `uno.config.ts` 用 `rules` 注册 `animate-in/animate-out/fade-*/zoom-*/slide-*`，`keyframes` 放 `preflights`；时长/缓动接 `--dur-dialog`/`--ease-snappy`。注册为 rules（而非静态 CSS）是为了让 `data-[state=open]:animate-in` 这类变体能被 UnoCSS 识别生成。
 5. **`cn()` 用 clsx 单跑，不用 tailwind-merge**：样式覆盖走 cva 变体属性，而非 class 字符串对冲——避免运行时字符串魔法，冲突在 variant 层解决。
 6. **组件源码纳入仓库**（shadcn「你拥有源码」模式），落在 `app/components/ui/<name>/`；`useKitUI()` 保留为**薄封装**，`confirm/formModal/toast/promise/undoToast` 调用签名不变，业务页面无感迁移。
-7. **保留既定视觉**：v5 品牌/状态色、圆角卡片风（ADR 0007）、confirm 三档模型与撤回时长（ADR 0003）不变——把已定的原子态效果接进 shadcn，不重起炉灶。
+7. **保留既定视觉**：v5 品牌/状态色、圆角卡片风（ADR 0007）、confirm 三档模型与撤回时长（ADR 0003）不变——把已定的原子态效果接进 shadcn，不重起炉灶。shadcn/reka-ui **默认观感与设计稿冲突时，一律以设计稿为准定制或替换**（[ADR 0013](0013-align-all-ui-to-online-design.md) 框架组件替换原则）。
 
 ## 考虑过的替代
 

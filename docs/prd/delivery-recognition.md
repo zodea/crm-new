@@ -93,7 +93,7 @@
 
 ## Implementation Decisions
 
-- **独立页面**：送货单识别与发票识别**分开**（不共用工作台，只共用底层原语：上传区/统一识别接口/左图右X 布局/置信度着色/BoundingBoxOverlay/明细网格）。路由沿用 `/material/delivery`，侧边栏归入**识别中心**菜单组（与发票识别/清单拆表/OCR设置并列，见 CONTEXT.md「识别中心」）。
+- **独立页面**：送货单识别与发票识别**分开**（不共用工作台，只共用底层原语：上传区/统一识别接口/左图右X 布局/置信度着色/BoundingBoxOverlay/明细网格）。路由沿用 `/material/delivery`，~~侧边栏归入**识别中心**菜单组~~（⛔ 识别中心组已退役 2026-07-09：送货单识别归**乙供材管理**组，现行导航结构以设计稿 NAV 锁定版为准——ADR 0013 / CONTEXT.md「识别中心」词条）。
 - **纯逻辑层移植**（`app/lib/recognize/`，lift-as-is/with-adapt，JS→TS + 单测同搬）：`delivery-parse.ts`(源 parse.js)、`vl-parse.ts`、`delivery-tree.ts`、`supplier-match.ts`(源 supplier-db.js 的匹配/归一化纯函数)、`recognized-store.ts`(classifyUpsert/recordsEqual/docToRecord)、`price-compare.ts`。详见移植方案 §2/§8。
 - **新表 `delivery_records`**：`site TEXT + company TEXT + order_no TEXT`（三者唯一索引），`date`、`note`、`items JSON`（或子表 `delivery_record_items`）；`classifyUpsert` 的 inserted/identical/conflicts 改成 SQL upsert；缺公司/单号 → heldBack 不入库。**这是「入库」落点**，导出归档是另一条路。
 - **分区/整理树落 delivery store**：`app/stores/delivery.ts` 从 mock 换真数据，补 staging(整理树)/partition(分区)/requestOcr/降级 actions；`matchSupplier` 数据源改查 `suppliers` 表（含 alias，若无则补一列或 JSON）。

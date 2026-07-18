@@ -2,7 +2,7 @@
 
 > 视觉与交互呈现参考：`DC重构设计源码/app.dc.html`。内容区视觉令牌唯一权威源为 `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`；业务行为以 GitHub Issues 与现有真实 store 为准，设计令牌与交互底座继续遵循现有 ADR，不在本文复制。
 
-> 应用外壳（侧栏、顶栏、页签、通知抽屉）已按 GitHub Issue #82 重做，权威决策见 [ADR 0011](../adr/0011-redesign-application-shell.md)。
+> ⚠️ 应用外壳视觉已改基准（2026-07-17）：#82/ADR 0011 的深蓝外壳视觉验收口径作废，**外壳布局/排版/颜色以 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)（线上设计稿 app.dc.html）为准**；页签状态机/通知抽屉等行为仍归 [ADR 0011](../adr/0011-redesign-application-shell.md)。
 
 ## 已完成（第一批）
 
