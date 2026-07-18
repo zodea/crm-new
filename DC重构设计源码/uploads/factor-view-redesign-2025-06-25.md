@@ -1,5 +1,6 @@
 # InvoiceFactorView 重构设计
 
+> ⛔ **历史布局草案**：本文的“两行两列、定高”等尺寸描述不得作为当前 app/Nuxt 的固定画布依据；现行实现必须遵循仓库根目录 `docs/adr/0013-align-all-ui-to-online-design.md` 的响应式与自适应契约。
 > 日期：2025-06-25
 > 修改文件：`src/views/InvoiceFactorView.vue`
 > 对应 design.md 章节：§ 4（开票因子计算子页）

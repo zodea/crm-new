@@ -1,8 +1,9 @@
 # 设计系统 — 颜色·字体·组件·图标·动效
 
 > ⛔ 本文中的色值表为历史留档，不再作为实现依据。内容区视觉令牌唯一权威源为 `../_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`；运行时与 `app.dc.html` / `app-new.html` 均直接加载该文件。
+> ⚠️ 本文固定比例、固定列数与旧移动端外壳均为历史记录；现行响应式契约以仓库根目录 `docs/adr/0013-align-all-ui-to-online-design.md` 为准。
 
-> 本文是设计稿输出的唯一视觉基准。  
+> 本文是早期设计稿输出的历史清单；当前视觉与布局权威源为 `app.dc.html` + 仓库根目录 ADR 0013。
 > 色值来源: `docs/设计系统配色更新/app-new.html` color update v5 (2026-06-26)  
 > 内容区交互模式: `CRM-PATTERNS.md`  
 > 最后更新: 2026-06-27
@@ -283,15 +284,17 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ```css
 .info-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 1px;
   border: 1px solid var(--line);
+  background: var(--line);
 }
 .info-cell {
-  flex: 1;
   padding: 8px 12px;
-  border-right: 1px solid var(--line);
+  min-width: 0;
+  background: var(--panel);
 }
-.info-cell:last-child { border-right: none; }
 .info-cell .label { font-size: 9px; color: var(--ink-faint); margin-bottom: 3px; }
 .info-cell .value { font-size: 12px; }
 ```
@@ -301,19 +304,19 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 ```css
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface-3);
 }
 .form-cell {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--surface-3);
-  border-right: 1px solid var(--surface-3);
+  min-width: 0;
+  background: var(--panel);
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.form-cell:nth-child(3n) { border-right: none; }
 .form-cell .fl { font-size: 9px; color: var(--ink-faint); }
 .form-cell .fv { font-size: 12px; }
 ```
@@ -542,11 +545,7 @@ V1 不做暗色模式。预留 CSS 变量结构，V2 按需扩展。
 
 ## § 8 响应式
 
-| 断点 | 侧边栏 | 内容区 | 表格 |
-|---|---|---|---|
-| ≥1024px 桌面 | 固定左侧 248px | max-w-[1480px] mx-auto | 正常 |
-| 768-1024px 平板 | 收起 68px(图标模式) | 满宽 | 横向滚动 |
-| <768px 手机 | 底部 tab bar h-16 | 满宽 | 横向滚动，固定首尾列 |
+> ⛔ 旧“三档固定画布/底部 tab bar”方案已废弃。当前 app 与 Nuxt 使用流式内容容器；248/68px 仅是桌面侧栏组件令牌，<1024px 侧栏转 Sheet。业务卡片、字段与工具条按容器最小可读宽度降列/换行；表格、矩阵、甘特只在自身容器横滚。最低在 390 / 768 / 1024 / 1440px 验证，页面本身不得横滚。
 
 弹窗宽度: `min(880px, 95vw)`。长公司名/文件名: `truncate` + `title`。
 
