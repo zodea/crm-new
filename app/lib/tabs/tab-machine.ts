@@ -29,11 +29,16 @@ export function initialTabsState(): TabsState {
   return { tabs: [makeHomeTab()], activeKey: HOME_KEY }
 }
 
-/** 由 fullPath 推 key：首页归一到 HOME_KEY，其余用 fullPath 本身（同路由同参数复用）。 */
+/**
+ * 由 fullPath 推 key：首页归一到 HOME_KEY，其余取路径（剥离 query——
+ * 穿透预筛不进页签身份，同路径复用页签并刷新 fullPath 即「应用新预筛」，
+ * 见 CONTEXT.md「页签导航」词条 / kit-ui-component-specs §07）。
+ */
 export function deriveKey(fullPath: string): string {
-  if (fullPath === '/' || fullPath === '')
+  const path = fullPath.split('?')[0] ?? ''
+  if (path === '/' || path === '')
     return HOME_KEY
-  return fullPath
+  return path
 }
 
 export interface OpenResult {

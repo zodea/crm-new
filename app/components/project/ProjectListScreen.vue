@@ -28,11 +28,12 @@ const statusOptions = [
   ...PROJECT_STATUSES.map(status => ({ key: status, label: status })),
 ]
 
-const toneChip: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  muted: 'chip bg-surface-3 text-ink-soft',
-  ok: 'chip-ok',
+// 列表页状态一律纯文字色，chip 只进详情页/表单（DESIGN-TASTE §2.3/§4.5，#110 阶段⑤）
+const toneText: Record<StatusTone, string> = {
+  warn: 'cell--status-warn',
+  brand: 'font-600 text-brand-deep',
+  muted: 'font-600 text-ink-soft',
+  ok: 'cell--status-ok',
 }
 
 const filtered = computed(() => filterProjectColumns(
@@ -84,7 +85,7 @@ watch([searchText, statusFilter], () => {
 
 function statusClass(status: string): string {
   const tone = PROJECT_STATUS_TONE[status]
-  return tone ? toneChip[tone] : 'chip bg-surface-3 text-ink-soft'
+  return tone ? toneText[tone] : 'font-600 text-ink-soft'
 }
 
 function openCreate() {
@@ -257,9 +258,7 @@ onMounted(() => Promise.all([store.load(), detailStore.load()]))
       @filter-change="handleColumnFilter"
     >
       <template #name="{ row }">
-        <NuxtLink :to="`/project/${row.id}`" class="cell--link">
-          {{ row.name }}
-        </NuxtLink>
+        <EntityLink :id="row.id" type="project" :label="row.name" />
       </template>
 
       <template #status="{ row }">
@@ -267,7 +266,8 @@ onMounted(() => Promise.all([store.load(), detailStore.load()]))
       </template>
 
       <template #developer="{ row }">
-        <span class="font-600 text-brand-deep">{{ row.developer || '—' }}</span>
+        <!-- 客户详情未实装 → EntityLink 自动退化纯文本，实装后回填映射即全站上线（specs §07） -->
+        <EntityLink type="customer" :label="row.developer" />
       </template>
 
       <template #action="{ row }">

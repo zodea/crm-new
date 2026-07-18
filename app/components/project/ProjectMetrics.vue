@@ -72,7 +72,13 @@ onMounted(() => Promise.all([
     <MetricGrid :cols="6">
       <Metric label="销项票额" :value="invoice.outputAmount" money formula="Σ 开票申请.开票金额" />
       <Metric label="销项税额" :value="invoice.outputTax" money formula="Σ 开票申请.税额" />
-      <Metric label="进项票额" :value="invoice.inputAmount" money formula="Σ 本项目已归档发票.金额" />
+      <Metric
+        label="进项票额"
+        :value="invoice.inputAmount"
+        money
+        formula="Σ 本项目已归档发票.金额"
+        :to="{ path: '/finance/ledger', query: { project: projectId } }"
+      />
       <Metric label="进项税额" :value="invoice.inputTax" money formula="Σ 本项目已归档发票.税额" />
       <Metric label="增值税" :value="invoice.vat" money formula="销项税额 − 进项税额" />
       <Metric label="税负率" :value="taxBurdenRate" formula="增值税 ÷ 销项票额" />
