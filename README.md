@@ -1,75 +1,24 @@
-# Nuxt Minimal Starter
+# 瑞航 CRM
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Nuxt 4 + Vue 3.5 + SQLite/Tauri 的工程项目管理应用。
 
-## Setup
+## 唯一设计入口
 
-Make sure to install dependencies:
+设计、页面蓝本、数据模型及权威源优先级统一从 [`docs/design/README.md`](docs/design/README.md) 进入。不要从旧 HTML、历史反馈稿或截图开始查规格。
+
+## 本地开发
 
 ```bash
-# npm
-npm install
-
-# pnpm
 pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
 pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
-
-Build the application for production:
+常用校验：
 
 ```bash
-# npm
-npm run build
-
-# pnpm
+pnpm typecheck
+pnpm test
 pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
 ```
 
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+协作约定见 [`AGENTS.md`](AGENTS.md)。本地真实业务参考资料位于被 Git 忽略的目录，不得提交到仓库、测试夹具或 CI。
