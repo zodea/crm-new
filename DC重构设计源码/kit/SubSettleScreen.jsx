@@ -4,7 +4,7 @@
 (function () {
   if (window.SubSettleScreen) return;
 
-  function SubSettleScreen({ params }) {
+  function SubSettleScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -22,6 +22,8 @@
       entity: "subSettle",
       title: "分包结算",
       coll: "subSettles",
+      formRoute: "subSettleForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "结算编号", width: 140, mono: true },
         { key: "name", label: "结算名称", width: 240, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
@@ -73,7 +75,7 @@
       newDefaults: () => ({ status: "待确认", type: "进度结算" }),
       tableMinWidth: 1660,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.SubSettleScreen = SubSettleScreen;

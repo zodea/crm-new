@@ -19,34 +19,7 @@
   // SelectFilter 内联副本已删 → 统一用 window.KitAtoms.SelectFilter（反馈轮9 通用组件）
   const SelectFilter = (props) => { const KA = window.KitAtoms; return KA ? <KA.SelectFilter minWidth={150} {...props} /> : null; };
 
-  // 完整编辑表单：红圈「详细资料 · 基础信息」分组字段
-  const projForm = (p, title, onSave) => UI().formModal({
-    title, cols: 2, width: 640,
-    fields: [
-      { key: "name", label: "项目名称", value: p ? p.name : "", full: true },
-      { key: "contractName", label: "项目合同名称", value: p ? p.contractName : "", full: true },
-      { key: "developer", label: "客户（甲方）", value: p ? p.developer : "" },
-      { key: "developer2", label: "客户2（选填）", value: p ? p.developer2 || "" : "" },
-      { key: "operationType", label: "经营类型", type: "select", options: ["自营", "联营", "挂靠"], value: p ? p.operationType || "自营" : "自营" },
-      { key: "stage", label: "业务流程阶段", type: "select", options: STAGE_OPTS.slice(1).map((o) => o.label), value: p ? p.stage : "施工中" },
-      { key: "region", label: "工程地域", value: p ? p.region || "" : "", placeholder: "广州·白云" },
-      { key: "manager", label: "项目经理", value: p ? p.manager : "" },
-      { key: "execManager", label: "执行经理", value: p ? p.execManager : "" },
-      { key: "builder", label: "施工员", value: p ? p.builder : "" },
-      { key: "address", label: "工程详细地址", value: p ? p.address : "", full: true },
-      { key: "startDate", label: "计划开工日期", value: p ? p.startDate : "", placeholder: "2026-07-04" },
-      { key: "planEnd", label: "计划竣工日期", value: p ? p.planEnd : "", placeholder: "2027-06-30" },
-      { key: "planDays", label: "计划工期（天）", value: p ? p.planDays || "" : "", placeholder: "360" },
-      { key: "riskLevel", label: "项目风险级别", type: "select", options: ["低", "中", "高"], value: p ? p.riskLevel || "低" : "低" },
-      { key: "overview", label: "工程概况", type: "textarea", value: p ? p.overview || "" : "", full: true, placeholder: "楼栋数 / 层数 / 建筑面积 / 装修标准…" },
-      { key: "note", label: "备注", type: "textarea", value: p ? p.note || "" : "", full: true },
-    ],
-    onSave: (vals) => {
-      if (!vals.name) { UI().toast("项目名称不能为空", "danger"); return; }
-      onSave(vals);
-      UI().toast(p ? "已保存修改" : "已新增项目", "ok");
-    },
-  });
+  // 2026-07-18 表单补全轮：新建/编辑改整页表单（kit/forms/BaseForms.jsx projectForm 路由），原弹窗 projForm 退役
 
   function ProjectScreen({ data, navigate }) {
     const [stage, setStage] = React.useState("all");
@@ -56,8 +29,6 @@
     const KitTable = KT();
     const list = A ? A.rows("projects") : [];
 
-    const addRow = (vals) => A.add("projects", { id: "p_" + Date.now(), status: "在建", ...vals });
-    const editRow = (id) => (vals) => A.update("projects", id, vals);
     const delRow = (p) => UI().confirm({
       title: "删除项目", danger: true, confirmText: "删除",
       message: "确定删除「" + p.name + "」？删除为软删除，可在 5 秒内撤回。",
@@ -89,7 +60,7 @@
       { key: "op", label: "操作", width: 116, align: "right", render: (v, p) => (
         <span style={{ display: "inline-flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
           <IconButton icon="file-text" title="详情" onClick={() => navigate("projectDetail", { id: p.id })} />
-          <IconButton icon="square-pen" title="编辑" onClick={() => projForm(p, "编辑项目 · " + p.name, editRow(p.id))} />
+          <IconButton icon="square-pen" title="编辑" onClick={() => navigate("projectForm", { id: p.id })} />
           <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => delRow(p)} />
         </span>
       ) },
@@ -118,7 +89,7 @@
               structureOptions: ["按业务流程阶段", "按客户", "不分层"],
               nameOptions: [{ label: "项目名称", sample: "车陂商业大楼" }, { label: "阶段", sample: "施工中" }, { label: "导出日期", sample: "2026-07-04" }],
             })}>导出 Excel</Button>
-            <Button variant="primary" icon="plus" onClick={() => projForm(null, "新增项目", addRow)}>新增</Button>
+            <Button variant="primary" icon="plus" onClick={() => navigate("projectForm", {})}>新增</Button>
           </div>
         </Panel>
 

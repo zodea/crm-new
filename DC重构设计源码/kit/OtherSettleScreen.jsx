@@ -4,7 +4,7 @@
 (function () {
   if (window.OtherSettleScreen) return;
 
-  function OtherSettleScreen({ params }) {
+  function OtherSettleScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -19,6 +19,8 @@
 
     const meta = {
       entity: "otherSettle", coll: "otherSettles", title: "其他支出结算",
+      formRoute: "otherSettleForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "结算单号", width: 160, mono: true },
         { key: "name", label: "结算名称", width: 210, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
@@ -53,7 +55,7 @@
       newDefaults: () => ({ status: "待确认", amount: 0 }),
       tableMinWidth: 1380,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OtherSettleScreen = OtherSettleScreen;

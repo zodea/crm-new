@@ -3,7 +3,7 @@
 (function () {
   if (window.CompanyExpScreen) return;
 
-  function CompanyExpScreen({ params }) {
+  function CompanyExpScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -14,6 +14,8 @@
 
     const meta = {
       entity: "companyExp", coll: "companyExps", title: "公司支出合同",
+      formRoute: "companyExpForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "合同编号", width: 150, mono: true },
         { key: "name", label: "合同名称", width: 220, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
@@ -49,7 +51,7 @@
       newDefaults: () => ({ status: "履约中", amount: 0 }),
       tableMinWidth: 1160,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.CompanyExpScreen = CompanyExpScreen;

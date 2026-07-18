@@ -1,10 +1,11 @@
 // OwnerChangeScreen — 甲方变洽签台账（收入侧：变更/签证/洽商，四档 草稿→已上报→已打回/已签证）：EntityListScreen meta 一份生成整页。
 // 口径：已签证才进变更后合同额；合同 select 只列施工合同（甲方变洽签只挂收入侧主合同）；defaultView=已签证（台账态）。
 // fromParams 承接穿透：params.contract → contractId 预筛（label 带合同名）；否则 params.project → projectId 预筛。
+// 2026-07-18 表单补全轮：新增/编辑改整页表单（kit/forms/OwnerDocForms.jsx），对标红圈+grill决议
 (function () {
   if (window.OwnerChangeScreen) return;
 
-  function OwnerChangeScreen({ params }) {
+  function OwnerChangeScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -72,9 +73,11 @@
         return null;
       },
       newDefaults: () => ({ status: "草稿", type: "变更", appliedAmount: 0 }),
+      formRoute: "ownerChangeForm",   // 整页表单（kit/forms/OwnerDocForms.jsx，grill 决议 2026-07-18）
+      statusKey: "status",
       tableMinWidth: 1620,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OwnerChangeScreen = OwnerChangeScreen;

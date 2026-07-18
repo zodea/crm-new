@@ -3,7 +3,7 @@
 (function () {
   if (window.MatUseScreen) return;
 
-  function MatUseScreen({ params }) {
+  function MatUseScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -14,6 +14,7 @@
 
     const meta = {
       entity: "matUse", coll: "matUses", title: "材料领用",
+      formRoute: "matUseForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "no", label: "领用单号", width: 150, mono: true },
         { key: "projectId", label: "项目", width: 140, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -41,7 +42,7 @@
       newDefaults: () => ({ warehouse: "中心仓" }),
       tableMinWidth: 1360,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.MatUseScreen = MatUseScreen;

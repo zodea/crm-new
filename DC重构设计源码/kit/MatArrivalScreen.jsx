@@ -3,7 +3,7 @@
 (function () {
   if (window.MatArrivalScreen) return;
 
-  function MatArrivalScreen({ params }) {
+  function MatArrivalScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -20,6 +20,8 @@
 
     const meta = {
       entity: "matArrival", coll: "matArrivals", title: "材料到货",
+      formRoute: "matArrivalForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "到货单号", width: 150, mono: true },
         { key: "projectId", label: "项目", width: 130, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -62,7 +64,7 @@
       newDefaults: () => ({ status: "待入库", amount: 0, warehouse: "中心仓" }),
       tableMinWidth: 1720,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.MatArrivalScreen = MatArrivalScreen;

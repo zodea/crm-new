@@ -61,7 +61,8 @@
   const PLAIN_COLLS = ["contracts", "payApplies", "receipts", "invApplies", "currents", "payRecords", "reimburses",
     "targetCosts", "ownerChanges", "ownerReports", "acceptances", "finalSettles", "ownerPenalties", "subChanges", "subSettles", "projPenalties",
     "matRequisitions", "matArrivals", "matUses", "matSettles", "stockChecks", "omTotals", "omRequisitions", "omArrivals", "omUses", "omDirects",
-    "customers", "companyExps", "otherExps", "otherSettles"];
+    "customers", "companyExps", "otherExps", "otherSettles",
+    "crews", "workers", "deliveryArchives"];   // 2026-07-18 表单补全轮：班组/工人/送货归档入仓（整页表单 kit/forms/* 唯一写路径）
   const state = { projects: [], suppliers: [] };
   PLAIN_COLLS.forEach((k) => { state[k] = []; });
   const init = () => {

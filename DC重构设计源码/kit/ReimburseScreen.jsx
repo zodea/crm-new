@@ -4,7 +4,7 @@
 (function () {
   if (window.ReimburseScreen) return;
 
-  function ReimburseScreen({ params }) {
+  function ReimburseScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -17,6 +17,8 @@
       entity: "reimburse",
       title: "费用报销",
       coll: "reimburses",
+      formRoute: "reimburseForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "报销单号", width: 140, mono: true },
         { key: "applicant", label: "报销人", width: 100 },
@@ -59,7 +61,7 @@
       newDefaults: () => ({ status: "审批中" }),
       tableMinWidth: 1240,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.ReimburseScreen = ReimburseScreen;

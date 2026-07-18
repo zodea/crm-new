@@ -3,7 +3,7 @@
 (function () {
   if (window.OmDirectScreen) return;
 
-  function OmDirectScreen({ params }) {
+  function OmDirectScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -14,6 +14,7 @@
 
     const meta = {
       entity: "omDirect", coll: "omDirects", title: "甲供材直入直出",
+      formRoute: "omDirectForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "no", label: "单据编号", width: 150, mono: true },
         { key: "projectId", label: "项目", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -35,7 +36,7 @@
       fromParams: (p) => { if (p && p.project) { const pr = A.get("projects", p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; } return null; },
       tableMinWidth: 1160,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OmDirectScreen = OmDirectScreen;

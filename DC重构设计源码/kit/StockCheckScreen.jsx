@@ -3,7 +3,7 @@
 (function () {
   if (window.StockCheckScreen) return;
 
-  function StockCheckScreen({ params }) {
+  function StockCheckScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -13,6 +13,8 @@
 
     const meta = {
       entity: "stockCheck", coll: "stockChecks", title: "库存盘点",
+      formRoute: "stockCheckForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "盘点编号", width: 170, mono: true },
         { key: "warehouse", label: "仓库", width: 160, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span>, form: { type: "select", options: ["中心仓", "合和新城现场仓"] } },
@@ -41,7 +43,7 @@
       newDefaults: () => ({ status: "草稿", itemCount: 0, diffAmount: 0, warehouse: "中心仓" }),
       tableMinWidth: 1080,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.StockCheckScreen = StockCheckScreen;

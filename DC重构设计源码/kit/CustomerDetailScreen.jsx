@@ -30,16 +30,8 @@
     const receiptSum = receipts.reduce((s, r) => s + (r.amount || 0), 0);
     const due = Math.round((contractSum - receiptSum) * 100) / 100;
 
-    const editCustomer = () => window.KitUI.formModal({
-      title: "编辑客户 · " + cust.name, cols: 2, fields: [
-        { key: "name", label: "客户名称", value: cust.name, full: true },
-        { key: "contact", label: "联系人", value: cust.contact },
-        { key: "phone", label: "电话", value: cust.phone },
-        { key: "address", label: "注册地址", value: cust.address, full: true },
-        { key: "taxNo", label: "统一社会信用代码", value: cust.taxNo, full: true },
-        { key: "note", label: "备注", value: cust.note, full: true },
-      ], onSave: (v) => { A.update("customers", cust.id, v); window.KitUI.toast("已保存", "ok"); },
-    });
+    // 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/BaseForms.jsx customerForm）
+    const editCustomer = () => navigate("customerForm", { id: cust.id });
 
     // —— Tab 表格：合作项目 / 施工合同 / 收款登记 ——
     const projCols = [

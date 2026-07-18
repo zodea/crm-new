@@ -3,7 +3,7 @@
 (function () {
   if (window.AcceptanceScreen) return;
 
-  function AcceptanceScreen({ params }) {
+  function AcceptanceScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -18,6 +18,8 @@
       entity: "acceptance",
       title: "竣工验收·保修",
       coll: "acceptances",
+      formRoute: "acceptanceForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "单据编号", width: 140, mono: true },
         { key: "type", label: "类型", width: 110,
@@ -65,7 +67,7 @@
       newDefaults: () => ({ type: "竣工验收", status: "验收中" }),
       tableMinWidth: 1460,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.AcceptanceScreen = AcceptanceScreen;
