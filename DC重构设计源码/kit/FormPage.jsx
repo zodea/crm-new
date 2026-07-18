@@ -18,6 +18,19 @@
   window.KIT_FORM_PAGES = window.KIT_FORM_PAGES || {};
   window.KIT_FORM_CACHE = window.KIT_FORM_CACHE || {};   // 页签缓存：cacheKey -> getAllVals() 快照
 
+  // —— 响应式样式（ADR 0013 契约②③：inline style 做不了容器查询，注入一次 class 规则）——
+  // 窄容器锚点导航隐藏（分区卡片标题即导航替身，grill 2026-07-18 定）；吸底动作条允许换行。
+  if (!document.getElementById("kit-formpage-css")) {
+    const st = document.createElement("style");
+    st.id = "kit-formpage-css";
+    st.textContent = [
+      ".kfp-root { container-type: inline-size; }",
+      ".kfp-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 16px; align-items: start; }",
+      "@container (max-width: 900px) { .kfp-layout { display: block; } .kfp-anchors { display: none; } }",
+    ].join("\n");
+    document.head.appendChild(st);
+  }
+
   // —— 规格辅助（与 EntityListScreen buildFields/coerce 同语义，defs = [{key,label,money,form:{...}}]）——
   const buildFields = (defs, row) => {
     const out = [];
@@ -176,9 +189,9 @@
 
     const showNav = anchors.length >= 3;
     return (
-      <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+      <div className="kfp-root" style={{ maxWidth: 1080, margin: "0 auto" }}>
         {/* 面包屑 + 标题 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <button type="button" onClick={doCancel}
             style={{ border: "1px solid var(--line)", background: "var(--surface-2)", borderRadius: "var(--radius-btn)", padding: "5px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", color: "var(--ink-soft)" }}>
             ← 返回列表
@@ -189,10 +202,10 @@
           )}
           {spec.headerNote && <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>{spec.headerNote}</span>}
         </div>
-        {/* 锚点导航 + 分区卡片 */}
-        <div style={showNav ? { display: "grid", gridTemplateColumns: "180px minmax(0,1fr)", gap: 16, alignItems: "start" } : undefined}>
+        {/* 锚点导航 + 分区卡片（.kfp-layout 容器查询：窄容器降为单栏、锚点隐藏，ADR 0013） */}
+        <div className={showNav ? "kfp-layout" : undefined}>
           {showNav && (
-            <nav style={{ position: "sticky", top: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: 8 }}>
+            <nav className="kfp-anchors" style={{ position: "sticky", top: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: 8 }}>
               {anchors.map((a, i) => (
                 <button key={a.title} type="button"
                   onClick={() => { a.el.scrollIntoView({ behavior: "smooth", block: "start" }); setActiveAnchor(i); }}
@@ -209,14 +222,14 @@
           <div ref={hostRef} />
         </div>
         {/* 吸底动作条（红圈五件套 + 保存后关闭勾选） */}
-        <div style={{ position: "sticky", bottom: 0, zIndex: 15, display: "flex", alignItems: "center", gap: 8,
+        <div style={{ position: "sticky", bottom: 0, zIndex: 15, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
           background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "10px 14px",
           marginTop: 4, boxShadow: "0 -4px 16px rgba(16,24,40,0.06)" }}>
           <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--ink-soft)", cursor: "pointer", userSelect: "none" }}>
             <input type="checkbox" checked={closeAfter} onChange={(e) => setCloseAfter(e.target.checked)} />
             【保存】后关闭
           </label>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
             <button type="button" style={btnStyle()} onClick={doCancel}>取消</button>
             <button type="button" disabled={!dirty} style={btnStyle(dirty ? "" : "disabled")} onClick={() => doSave("draft")}>保存草稿</button>
             <button type="button" style={btnStyle()} onClick={() => doSave("saveNew")}>保存并新建</button>

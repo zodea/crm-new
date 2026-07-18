@@ -369,12 +369,13 @@
     }
 
     // —— 布局：grid（弹窗，默认）｜cards（整页表单：每个 section 一张圆角卡片 + 锚点）——
+    // 两列 = repeat(auto-fit, minmax(280px,1fr))：容器不足最小可读宽度自动降单列（ADR 0013 响应式契约②③，勿写死 1fr 1fr）
     var cardsMode = opts.layout === "cards";
-    var mkGrid = function () { return el("div", { display: "grid", gridTemplateColumns: opts.cols === 2 ? "1fr 1fr" : "1fr", gap: "12px", alignContent: "start" }); };
+    var mkGrid = function () { return el("div", { display: "grid", gridTemplateColumns: opts.cols === 2 ? "repeat(auto-fit, minmax(280px, 1fr))" : "1fr", gap: "12px", alignContent: "start" }); };
     var root, grid;
     if (cardsMode) { root = el("div"); grid = null; } else { root = grid = mkGrid(); }
     var openCard = function (title) {
-      var card = el("div", { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "14px", padding: "16px 18px", marginBottom: "14px" });
+      var card = el("div", { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card, 14px)", padding: "16px 18px", marginBottom: "14px" });
       if (title) card.appendChild(el("div", { fontSize: "13.5px", fontWeight: "800", marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid var(--line)" }, title));
       grid = mkGrid();
       card.appendChild(grid);
