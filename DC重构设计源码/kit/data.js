@@ -991,3 +991,21 @@
     if (!hh.some((c) => c.crew === "杂工班")) hh.splice(2, 0, { crew: "杂工班", trade: "杂工(时工)", workers: 2, net: 0, hasData: true });
   }
 })();
+
+// —— 2026-07-19 反馈轮：PAYSLIP 写回接口（核对表编辑）+ 班组指派粒度 ——
+(function () {
+  const P = window.PAYSLIP;
+  const d = window.KIT_DATA;
+  if (!P || !d) return;
+  // 核对表写回：fn(worker, crew) 就地改 units/byMonth 字段，改完通知共享仓订阅者（瀑布卡/工资总表联动重算）
+  P.update = (crewKey, workerName, fn) => {
+    const crew = P.data[crewKey];
+    const w = crew && crew.workers.find((x) => x.name === workerName);
+    if (!w) return false;
+    fn(w, crew);
+    if (window.APP && window.APP.notify) window.APP.notify();
+    return true;
+  };
+  // 指派粒度（户详情复选树用）：个人=可下钻到成员逐人勾选；班组=只能整组指派。泥水按个人分发（grill 定稿）。
+  (d.crews || []).forEach((c) => { if (c.assignLevel == null) c.assignLevel = /泥水/.test(c.trade || c.name) ? "个人" : "班组"; });
+})();

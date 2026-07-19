@@ -107,8 +107,8 @@
             const clickable = !!S;
             const hollowCnt = S && S.payType === "piece" ? S.rows.reduce((s, x) => s + x.c.hollowSum, 0) : 0;
             return (
-              <button key={i} onClick={() => { if (clickable) setSelCrew(c.crew); }}
-                style={{ display: "block", width: "100%", breakInside: "avoid", marginBottom: 16,
+              <div key={i} role="button" tabIndex={0} onClick={() => { if (clickable) setSelCrew(c.crew); }}
+                style={{ display: "block", width: "100%", boxSizing: "border-box", breakInside: "avoid", marginBottom: 16,
                   border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "14px 16px",
                   background: "var(--panel)", cursor: clickable ? "pointer" : "not-allowed", textAlign: "left",
                   opacity: clickable ? 1 : 0.62, boxShadow: clickable ? "var(--shadow-card)" : "none", transition: "border-color var(--dur-fast)" }}
@@ -146,7 +146,25 @@
                   </div>
                   {S.borrow > 0 && <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 5 }}>另有借支 ¥{num0(S.borrow)}，于工资表实发时扣回</div>}
                 </>)}
-              </button>
+                {/* 按人速览：泥水等按个人分发的班组，点名字直达该工人进度款核对表（grill 2026-07-19） */}
+                {S && (
+                  <div style={{ marginTop: 9, paddingTop: 8, borderTop: "1px dashed var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
+                    {S.rows.map(({ w, c: wc }) => (
+                      <div key={w.name} role="button" tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); navigate("payrollDetail", { worker: w.name, crew: c.crew, project: selProject, month: S.month }); }}
+                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", borderRadius: 6, cursor: "pointer" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "var(--brand-soft)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--brand)" }}>{w.name}</span>
+                        {w.flags.includes("暂不支付") && <span style={{ fontSize: 10, color: "var(--danger-ink)", background: "var(--danger-soft)", borderRadius: 4, padding: "0 4px" }}>暂不支付</span>}
+                        {w.flags.includes("单独计价") && <span style={{ fontSize: 10, color: "var(--ink-soft)", background: "var(--surface-3)", borderRadius: 4, padding: "0 4px" }}>单独</span>}
+                        {!c.trade.includes("时工") && wc.hollowSum > 0 && <span style={{ fontSize: 10, color: "var(--warn-ink)", background: "var(--warn-soft)", borderRadius: 4, padding: "0 4px" }}>空鼓{wc.hollowSum}</span>}
+                        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600 }}>{num0(S.payType === "time" ? wc.net : wc.rounded)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

@@ -6,30 +6,32 @@
 //  · 页尾全户合计卡：合同量金额 / 现场量金额 / 毛利合计
 // 业务逻辑照搬原 QuantityScreenV2 UnitModal：勾完成需上一道工序已传验收照片；量到房间、完成勾到户（CONTEXT.md）
 // 编辑经 window.QTY_UNIT_STATE 写穿（key=栋|层|户|工种:分项），返回矩阵页保持一致；刷新恢复初始 mock。
+// 2026-07-19 反馈轮：指派复选树(班组分组可下钻)/验收照片按分项可配/房间行默认收起/左导航 sticky 修复
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
 
-  // —— 与 QuantityScreenV2 对齐的 mock 基础数据（新增 cprice=班组分项单价，毛利=单价双轨差×现场量）——
+  // —— 与 QuantityScreenV2 对齐的 mock 基础数据（新增 cprice=班组分项单价，毛利=单价双轨差×现场量；photo:false=该分项无需验收照片）——
   const TRADES = {
     plumb: { key: "plumb", name: "水电工", div: "机电安装", color: "#10b981", crew: "水电班",
-      items: [{ n: "给排水管", u: "m", price: 18, cprice: 13, base: 42 }, { n: "强弱电管", u: "m", price: 12, cprice: 8.5, base: 36 }] },
+      items: [{ n: "给排水管", u: "m", price: 18, cprice: 13, base: 42 }, { n: "强弱电管", u: "m", price: 12, cprice: 8.5, base: 36, photo: false }] },
     water: { key: "water", name: "防水工", div: "防水工程", color: "#06b6d4", crew: "防水班",
       items: [{ n: "卫生间防水", u: "㎡", price: 25, cprice: 17, base: 8 }, { n: "厨房防水", u: "㎡", price: 25, cprice: 17, base: 5 }] },
     mason: { key: "mason", name: "泥水工", div: "装饰装修", color: "#6366f1", crew: "泥水A班",
       items: [{ n: "墙砖铺贴", u: "㎡", price: 38, cprice: 26, base: 28 }, { n: "地砖铺贴", u: "㎡", price: 32, cprice: 22, base: 18 }] },
     carp: { key: "carp", name: "木工", div: "装饰装修", color: "#f59e0b", crew: "木工一班",
-      items: [{ n: "吊顶", u: "㎡", price: 45, cprice: 32, base: 16 }, { n: "门套", u: "樘", price: 120, cprice: 85, base: 4 }] },
+      items: [{ n: "吊顶", u: "㎡", price: 45, cprice: 32, base: 16 }, { n: "门套", u: "樘", price: 120, cprice: 85, base: 4, photo: false }] },
   };
   const TRADE_ORDER = ["plumb", "water", "mason", "carp"];
   const DIV_ORDER = ["机电安装", "防水工程", "装饰装修"];
+  // 默认指派与名册统一为 KIT_DATA.workers 真名（2026-07-19 反馈轮，与工资核算 PAYSLIP 名册一致）
   const WORKER = {
-    plumb: { "01户": ["周师傅"], "02户": ["周师傅"], "03户": ["阿杰"], "04户": ["阿杰"] },
-    water: { "01户": ["郑师傅"], "02户": ["郑师傅"], "03户": ["郑师傅"], "04户": ["郑师傅"] },
-    mason: { "01户": ["虞师傅"], "02户": ["匡师傅"], "03户": ["李师傅"], "04户": ["李师傅"] },
-    carp: { "01户": ["孙师傅"], "02户": ["孙师傅"], "03户": ["阿强"], "04户": ["阿强"] },
+    plumb: { "01户": ["周伟峰"], "02户": ["周伟峰"], "03户": ["周伟峰"], "04户": ["水电班"] },
+    water: { "01户": ["郑明"], "02户": ["郑明"], "03户": ["防水班"], "04户": ["防水班"] },
+    mason: { "01户": ["虞建华"], "02户": ["匡志强"], "03户": ["张建国"], "04户": ["王芳（虞嫂）"] },
+    carp: { "01户": ["孙大勇"], "02户": ["孙大勇"], "03户": ["木工一班"], "04户": ["木工一班"] },
   };
-  const ASSIGNEES = ["周师傅", "阿杰", "郑师傅", "虞师傅", "匡师傅", "李师傅", "孙师傅", "阿强"];
+  const ASSIGNEES = ["虞建华", "匡志强", "张建国", "王芳（虞嫂）", "孙大勇", "周伟峰", "郑明"];
   const CREWS = ["泥水A班", "水电班", "木工一班"];
   const ASSIGN_OPTS = [...ASSIGNEES.map(w => ({ v: w, l: w })), ...CREWS.map(c => ({ v: c, l: c + "（班组）" }))];
 
@@ -240,8 +242,8 @@
       slot.qs[k] = { ...(slot.qs[k] || {}), est: v };
     };
 
-    // —— 指派（户级默认，房间级为可选细化）——
-    const getAsg = (tk, idx) => asg[keyOf(tk, idx)] || { who: (WORKER[tk][unit] || [""])[0] || "", byRoom: false, rooms: {} };
+    // —— 指派（户级默认，房间级为可选细化；who/rooms[r] 值模型 = string[] 多选，旧 string 值读取处经 toWhoList 兼容）——
+    const getAsg = (tk, idx) => asg[keyOf(tk, idx)] || { who: (WORKER[tk][unit] || []).slice(), byRoom: false, rooms: {} };
     const patchAsg = (tk, idx, patch) => {
       const k = keyOf(tk, idx);
       const next = { ...asg, [k]: { ...getAsg(tk, idx), ...patch } };
@@ -261,7 +263,8 @@
       if (pos > 0) {
         const prev = CHAIN[pos - 1];
         const pk = keyOf(prev.tk, prev.idx);
-        if (doneMap[pk] && !(photoMap[pk] > 0)) { UI().toast("上一道工序『" + prev.n + "』未上传验收照片", "warn"); return; }
+        const prevNeedPhoto = TRADES[prev.tk].items[prev.idx].photo !== false;
+        if (prevNeedPhoto && doneMap[pk] && !(photoMap[pk] > 0)) { UI().toast("上一道工序『" + prev.n + "』未上传验收照片", "warn"); return; }
       }
       const v = { done: true, date: TODAY() };
       setDoneMap(m => ({ ...m, [k]: v })); slot.dm[k] = v;
@@ -302,9 +305,9 @@
     return (
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
 
-        {/* ── 左侧页内导航（红圈式）：分部 → 工种 → 分项，状态点 + 照片角标，点击锚点定位 ── */}
-        <div style={{ width: 200, flex: "none", position: "sticky", top: 12 }}>
-          <Panel padding={10} style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: "calc(100vh - 150px)", overflowY: "auto" }}>
+        {/* ── 左侧页内导航（红圈式）：分部 → 工种 → 分项，状态点 + 照片角标，点击锚点定位；滚动在 document 层，top 需让过 104px 吸顶头部 ── */}
+        <div style={{ width: 200, flex: "none", position: "sticky", top: 116 }}>
+          <Panel padding={10} style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: "calc(100vh - 132px)", overflowY: "auto" }}>
             <Button size="sm" variant="secondary" icon="arrow-left" onClick={() => window.DC.closeActiveTab()}>返回工程量矩阵</Button>
             {DIV_ORDER.map(dv => (
               <div key={dv} style={{ marginTop: 8 }}>
@@ -327,7 +330,7 @@
                         }}>
                           <span style={{ width: 7, height: 7, borderRadius: "50%", background: navColor(x), flex: "none" }} />
                           <span style={{ fontSize: 12, color: on ? "var(--brand-deep)" : "var(--ink)", fontWeight: on ? 700 : 500, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.n}</span>
-                          {x.photos > 0 && (
+                          {it.photo !== false && x.photos > 0 && (
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--ink-soft)", background: "var(--surface-3)", borderRadius: 999, padding: "1px 6px", flex: "none" }}>
                               <Icon name="image" size={9} />{x.photos}
                             </span>
@@ -416,12 +419,91 @@
     );
   }
 
+  // —— 指派值模型 = string[]（多选：人名/班组名混排）；兼容旧 string 写穿值统一经此转换 ——
+  const toWhoList = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+
+  // —— AssignPicker：按班组分组的复选框树浮层（户级/房间级指派共用）——
+  //  · 组头复选框 = 整组指派（值=班组名）；assignLevel==="个人" 的班组组头下缩进列出成员复选框（可下钻）
+  //  · 勾组头清掉该班组已勾成员；勾任一成员取消该班组组头；assignLevel==="班组" 只有组头不展开
+  //  · 存量班组行无 assignLevel 字段时兜底：泥水类默认「个人」（与 crewForm「指派粒度」hint 口径一致）
+  function AssignPicker({ value, onChange, style }) {
+    const [open, setOpen] = React.useState(false);
+    const list = toWhoList(value);
+    React.useEffect(() => {
+      if (!open) return;
+      const close = () => setOpen(false);
+      document.addEventListener("mousedown", close);
+      return () => document.removeEventListener("mousedown", close);
+    }, [open]);
+    const crews = (window.APP ? window.APP.rows("crews") : window.KIT_DATA.crews) || [];
+    const workers = (window.KIT_DATA && window.KIT_DATA.workers) || [];
+    const crewNames = crews.map(c => c.name);
+    const levelOf = (crew) => crew.assignLevel || (String(crew.trade || "").indexOf("泥水") >= 0 ? "个人" : "班组");
+    const membersOf = (crew) => workers.filter(w => w.team === crew.name).map(w => w.name);
+    const toggleCrew = (crew) => {
+      const members = membersOf(crew);
+      onChange(list.includes(crew.name)
+        ? list.filter(v => v !== crew.name)
+        : [...list.filter(v => !members.includes(v)), crew.name]);
+    };
+    const toggleMember = (crew, name) => {
+      onChange(list.includes(name)
+        ? list.filter(v => v !== name)
+        : [...list.filter(v => v !== crew.name), name]);
+    };
+    const summary = list.map(v => crewNames.includes(v) ? v + "（班组）" : v).join("、");
+    const rowLbl = { display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer", userSelect: "none", padding: "3px 4px", borderRadius: 4 };
+    return (
+      <span style={{ position: "relative", display: "inline-block", ...(style || {}) }} onMouseDown={e => e.stopPropagation()}>
+        <button onClick={() => setOpen(o => !o)} title={summary || "未指派"} style={{
+          border: "1px solid var(--line-strong)", borderRadius: 6, padding: "5px 8px", fontSize: 12,
+          background: "#fff", cursor: "pointer", width: "100%", textAlign: "left",
+          color: list.length ? "var(--ink)" : "var(--ink-faint)",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{summary || "未指派"}</button>
+        {open && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 40, minWidth: 210, maxHeight: 280, overflowY: "auto",
+            background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 8, boxShadow: "var(--shadow-pop)", padding: 8,
+          }}>
+            {crews.map(crew => {
+              const canDrill = levelOf(crew) === "个人";
+              const members = canDrill ? membersOf(crew) : [];
+              return (
+                <div key={crew.id || crew.name} style={{ marginBottom: 2 }}>
+                  <label style={{ ...rowLbl, fontWeight: 700 }}>
+                    <input type="checkbox" checked={list.includes(crew.name)} onChange={() => toggleCrew(crew)} />
+                    <span style={{ flex: 1, minWidth: 0 }}>{crew.name}</span>
+                    {canDrill
+                      ? <span style={{ fontSize: 10, fontWeight: 700, color: "var(--brand-deep)", background: "var(--brand-soft)", borderRadius: 999, padding: "1px 6px", flex: "none" }}>可下钻</span>
+                      : <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ink-soft)", background: "var(--surface-3)", borderRadius: 999, padding: "1px 6px", flex: "none" }}>整包</span>}
+                  </label>
+                  {members.map(name => (
+                    <label key={name} style={{ ...rowLbl, paddingLeft: 26 }}>
+                      <input type="checkbox" checked={list.includes(name)} onChange={() => toggleMember(crew, name)} />
+                      <span>{name}</span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </span>
+    );
+  }
+
   // —— 单个分项区块：户级指派 + 房间行表格 + 小计行 + 完成勾选/验收照片 ——
   function ItemSection({ x, S }) {
     const [expanded, setExpanded] = React.useState(false);
-    const { c, ci, mask, rooms, cSub, sSub, fb, hasSite, done, date, photos, price, cprice, profit } = x;
+    const { c, ci, it, mask, rooms, cSub, sSub, fb, hasSite, done, date, photos, price, cprice, profit } = x;
     const a = S.getAsg(c.tk, c.idx);
     const est = S.estOf(c.tk, c.idx);
+    const needPhoto = it.photo !== false;
+    // 房间行默认收起：已按房间配置的默认展开；点「房间级详细配置」强制展开
+    const [showRooms, setShowRooms] = React.useState(a.byRoom === true);
+    const toggleExpanded = () => { if (!expanded) setShowRooms(true); setExpanded(e => !e); };
+    const linkBtn = { border: 0, background: "transparent", color: "var(--brand-deep)", fontSize: 12, fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0 };
     const inp = { border: "1px solid var(--line-strong)", borderRadius: 6, padding: "5px 8px", fontSize: 12, background: "#fff", width: "100%" };
     const sel = { border: "1px solid var(--line-strong)", borderRadius: 6, padding: "5px 8px", fontSize: 12, background: "#fff", cursor: "pointer", width: "100%" };
     const lbl = { fontSize: 11, fontWeight: 700, color: "var(--ink-soft)" };
@@ -460,12 +542,9 @@
                     style={{ border: 0, background: "transparent", color: "var(--ink-faint)", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>恢复户级指派</button>
                 </React.Fragment>
               ) : (
-                <select value={a.who} onChange={e => S.patchAsg(c.tk, c.idx, { who: e.target.value })} style={{ ...sel, width: 160 }}>
-                  <option value="">未指派</option>
-                  {ASSIGN_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-                </select>
+                <AssignPicker value={a.who} onChange={list => S.patchAsg(c.tk, c.idx, { who: list })} style={{ width: 200 }} />
               )}
-              <button onClick={() => setExpanded(e => !e)}
+              <button onClick={toggleExpanded}
                 style={{ border: "1px solid var(--line-strong)", background: "#fff", color: "var(--brand-deep)", borderRadius: 6, padding: "4px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 {expanded ? "收起房间配置" : "房间级详细配置"}
               </button>
@@ -476,7 +555,16 @@
               </span>
             </div>
 
-            {/* 房间行表格：合同量 | 现场计算式（实时求值） | 现场量（+ 展开时房间指派列） */}
+            {/* 房间行明细：默认收起为小计摘要行（已按房间配置默认展开）；展开 = 合同量 | 现场计算式（实时求值） | 现场量（+ 房间指派列） */}
+            {!showRooms ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" }}>合同量小计 <span style={{ fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{fq(cSub)}{c.u}</span></span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" }}>现场量小计 <span style={{ fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{fq(sSub)}{c.u}{fb ? "*" : ""}</span></span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: profit >= 0 ? "var(--ok-ink)" : "var(--danger)" }}>毛利 {fM(profit)}</span>
+                <button onClick={() => setShowRooms(true)} style={{ ...linkBtn, marginLeft: "auto" }}>展开房间明细（{mask.length} 间）</button>
+              </div>
+            ) : (
+            <React.Fragment>
             <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "hidden" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
                 <colgroup>
@@ -530,12 +618,10 @@
                         </td>
                         {expanded && (
                           <td style={td}>
-                            <select value={(a.rooms && a.rooms[r]) || a.who || ""}
-                              onChange={e => S.patchAsg(c.tk, c.idx, { byRoom: true, rooms: { ...(a.rooms || {}), [r]: e.target.value } })}
-                              style={sel}>
-                              <option value="">未指派</option>
-                              {ASSIGN_OPTS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-                            </select>
+                            <AssignPicker
+                              value={(a.rooms && a.rooms[r] != null && a.rooms[r] !== "") ? a.rooms[r] : a.who}
+                              onChange={list => S.patchAsg(c.tk, c.idx, { byRoom: true, rooms: { ...(a.rooms || {}), [r]: list } })}
+                              style={{ width: "100%" }} />
                           </td>
                         )}
                       </tr>
@@ -557,6 +643,9 @@
               </table>
             </div>
             {fb && <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: -6 }}>* 未录现场量（或算式无效）的房间按合同量回退计入小计</div>}
+            {!expanded && <button onClick={() => setShowRooms(false)} style={{ ...linkBtn, alignSelf: "flex-start", marginTop: -4 }}>收起房间明细</button>}
+            </React.Fragment>
+            )}
 
             {/* 完成勾选（户级） + 验收照片 + 工序链卡点提示 */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingTop: 8, borderTop: "1px dashed var(--line)" }}>
@@ -570,22 +659,28 @@
               )}
               <span style={{ width: 1, height: 18, background: "var(--line)", margin: "0 2px" }} />
               <span style={lbl}>验收照片</span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                {Array.from({ length: photos }).map((_, i) => (
-                  <span key={i} title={"验收照片 " + (i + 1)} style={{ width: 34, height: 34, borderRadius: 6, background: "var(--surface-3)", border: "1px solid var(--line)", display: "inline-grid", placeItems: "center" }}>
-                    <Icon name="image" size={14} color="var(--ink-faint)" />
+              {!needPhoto ? (
+                <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>本分项无需验收照片</span>
+              ) : (
+                <React.Fragment>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    {Array.from({ length: photos }).map((_, i) => (
+                      <span key={i} title={"验收照片 " + (i + 1)} style={{ width: 34, height: 34, borderRadius: 6, background: "var(--surface-3)", border: "1px solid var(--line)", display: "inline-grid", placeItems: "center" }}>
+                        <Icon name="image" size={14} color="var(--ink-faint)" />
+                      </span>
+                    ))}
+                    <button onClick={() => S.addPhoto(c.tk, c.idx)} title="上传验收照片"
+                      style={{ width: 34, height: 34, borderRadius: 6, border: "1.5px dashed var(--line-strong)", background: "transparent", cursor: "pointer", display: "inline-grid", placeItems: "center", color: "var(--ink-soft)" }}>
+                      <Icon name="plus" size={14} />
+                    </button>
                   </span>
-                ))}
-                <button onClick={() => S.addPhoto(c.tk, c.idx)} title="上传验收照片"
-                  style={{ width: 34, height: 34, borderRadius: 6, border: "1.5px dashed var(--line-strong)", background: "transparent", cursor: "pointer", display: "inline-grid", placeItems: "center", color: "var(--ink-soft)" }}>
-                  <Icon name="plus" size={14} />
-                </button>
-              </span>
-              <span style={{ fontSize: 11, color: photos > 0 ? "var(--ink-soft)" : "var(--ink-faint)" }}>{photos > 0 ? "已传 " + photos + " 张" : "未传"}</span>
-              {done && photos === 0 && (
-                <span style={{ fontSize: 11, color: "var(--warn-ink)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <Icon name="alert-triangle" size={12} color="var(--warn-ink)" />未传验收照片，下一道工序无法勾选完成
-                </span>
+                  <span style={{ fontSize: 11, color: photos > 0 ? "var(--ink-soft)" : "var(--ink-faint)" }}>{photos > 0 ? "已传 " + photos + " 张" : "未传"}</span>
+                  {done && photos === 0 && (
+                    <span style={{ fontSize: 11, color: "var(--warn-ink)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <Icon name="alert-triangle" size={12} color="var(--warn-ink)" />未传验收照片，下一道工序无法勾选完成
+                    </span>
+                  )}
+                </React.Fragment>
               )}
             </div>
           </div>
