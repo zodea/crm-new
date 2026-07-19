@@ -270,9 +270,12 @@
     if (!meta.leftNav) return table;
     return (
       <div style={{ display: "grid", gridTemplateColumns: "216px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-        <KA.TreeNav title={meta.leftNav.title} active={navKey} onChange={setNavKey}
-          items={meta.leftNav.items.map((it) => ({ key: it.key, label: it.label, icon: it.icon,
-            count: (it.filter ? baseRows.filter(it.filter) : baseRows).length }))} />
+        {/* 左树 sticky：应用滚动在 document 层，116 = 吸顶 header(64)+页签栏(40)+呼吸位（2026-07-19 反馈轮） */}
+        <div style={{ position: "sticky", top: 116, alignSelf: "start", maxHeight: "calc(100vh - 132px)", overflowY: "auto" }}>
+          <KA.TreeNav title={meta.leftNav.title} active={navKey} onChange={setNavKey}
+            items={meta.leftNav.items.map((it) => ({ key: it.key, label: it.label, icon: it.icon,
+              count: (it.filter ? baseRows.filter(it.filter) : baseRows).length }))} />
+        </div>
         {table}
       </div>
     );

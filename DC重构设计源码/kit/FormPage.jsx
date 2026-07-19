@@ -122,7 +122,7 @@
       else { dirtyRef.current = false; setDirty(false); }
       doneRef.current = false;
       fb.focusFirst();
-      // 滚动联动锚点高亮（main 是滚动容器）
+      // 滚动联动锚点高亮：应用实际滚动在 document 层（main 不产生滚动），window+main 双挂兜底
       const scroller = host.closest("main");
       const onScroll = () => {
         const tops = fb.anchors.map((a) => a.el.getBoundingClientRect().top);
@@ -130,8 +130,10 @@
         tops.forEach((t, i) => { if (t < 180) idx = i; });
         setActiveAnchor(idx);
       };
+      window.addEventListener("scroll", onScroll, { passive: true });
       if (scroller) scroller.addEventListener("scroll", onScroll, { passive: true });
       return () => {
+        window.removeEventListener("scroll", onScroll);
         if (scroller) scroller.removeEventListener("scroll", onScroll);
         if (dirtyRef.current && !doneRef.current && fbRef.current) {
           window.KIT_FORM_CACHE[cacheKey] = fbRef.current.getAllVals();   // 切页签保值
@@ -205,7 +207,7 @@
         {/* 锚点导航 + 分区卡片（.kfp-layout 容器查询：窄容器降为单栏、锚点隐藏，ADR 0013） */}
         <div className={showNav ? "kfp-layout" : undefined}>
           {showNav && (
-            <nav className="kfp-anchors" style={{ position: "sticky", top: 8, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: 8 }}>
+            <nav className="kfp-anchors" style={{ position: "sticky", top: 116, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: 8 }}>
               {anchors.map((a, i) => (
                 <button key={a.title} type="button"
                   onClick={() => { a.el.scrollIntoView({ behavior: "smooth", block: "start" }); setActiveAnchor(i); }}
