@@ -43,11 +43,11 @@ function patchDocType(event: Event) {
 </script>
 
 <template>
-  <section>
+  <section class="delivery-document-fields">
     <div class="mb-2 flex items-center gap-2">
       <span class="text-11px font-800 text-ink">单据信息</span>
     </div>
-    <div class="grid grid-cols-2 gap-2.5">
+    <div class="delivery-document-fields__grid grid gap-2.5">
       <div>
         <label class="field-label">所属项目 <span class="text-danger">*</span></label>
         <select :value="draft.projectId" class="field-input w-full" :class="!draft.projectId ? 'border-danger' : ''" @change="patchProject">
@@ -123,10 +123,24 @@ function patchDocType(event: Event) {
         <label class="field-label">工地原文</label>
         <input :value="draft.siteText" class="field-input w-full" placeholder="人工选定项目后将记忆此写法" @input="patchText('siteText', $event)">
       </div>
-      <div class="col-span-2">
+      <div class="delivery-document-fields__full">
         <label class="field-label">复核备注</label>
         <input :value="draft.note" class="field-input w-full" placeholder="金额差异、手写内容或人工说明" @input="patchText('note', $event)">
       </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+.delivery-document-fields {
+  container-type: inline-size;
+}
+
+.delivery-document-fields__grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+}
+
+.delivery-document-fields__full {
+  grid-column: 1 / -1;
+}
+</style>

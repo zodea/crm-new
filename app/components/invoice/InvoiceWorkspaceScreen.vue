@@ -14,10 +14,16 @@ const searchText = shallowRef('')
 const workspaceFilter = shallowRef<'all' | 'recognizing' | 'suggested' | 'warning' | 'danger'>('all')
 const selectedId = shallowRef<string | null>(null)
 const workspaceMode = shallowRef<'review' | 'print'>('review')
+const activePane = shallowRef<'queue' | 'source' | 'review'>('queue')
 const workspaceModes = [
   { key: 'review', label: '字段校对' },
   { key: 'print', label: '打印排版' },
 ]
+const paneLabels = computed(() => ({
+  queue: '队列',
+  source: workspaceMode.value === 'print' ? '排版' : '原件',
+  review: '校对',
+}))
 
 /** 按项目名称查具体项目（归档写入用规范名，而非发票原始 OCR/自由文本，避免 project_id/project_name 各指不同项目）。 */
 function findProjectByName(name: string) {
@@ -344,68 +350,76 @@ onMounted(() => {
       <SegTab v-model="workspaceMode" :tabs="workspaceModes" />
     </div>
 
-    <!-- #60 单一校对工作台：左队列 / 中原图 / 右字段 -->
-    <div class="flex gap-3.5" style="height: calc(100vh - 260px); min-height: 540px">
-      <InvoiceQueuePanel
-        v-model:search="searchText"
-        v-model:filter="workspaceFilter"
-        v-model:selected-id="selectedId"
-        :rows="visibleWorkspaceRows"
-        :total="workspaceRows.length"
-        :pending-review="store.pendingReview.length"
-        @upload="openFilePicker()"
-      />
+    <!-- #60 单一校对工作台：宽屏三栏；窄容器分段但保留三个面板实例与编辑状态。 -->
+    <AdaptiveWorkbench
+      v-model="activePane"
+      :labels="paneLabels"
+    >
+      <template #queue>
+        <InvoiceQueuePanel
+          v-model:search="searchText"
+          v-model:filter="workspaceFilter"
+          v-model:selected-id="selectedId"
+          :rows="visibleWorkspaceRows"
+          :total="workspaceRows.length"
+          :pending-review="store.pendingReview.length"
+          @upload="openFilePicker()"
+        />
+      </template>
 
-      <InvoiceOriginalPanel
-        v-if="workspaceMode === 'review'"
-        :invoice="selectedInvoice"
-        :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
-      />
-      <InvoicePrintLayout
-        v-else
-        v-model:selected-id="selectedId"
-        :invoices="printableInvoices"
-        @print="handlePrint"
-      />
+      <template #source>
+        <InvoiceOriginalPanel
+          v-if="workspaceMode === 'review'"
+          :invoice="selectedInvoice"
+          :preview-url="selectedId ? previewUrls.get(selectedId) : undefined"
+        />
+        <InvoicePrintLayout
+          v-else
+          v-model:selected-id="selectedId"
+          :invoices="printableInvoices"
+          @print="handlePrint"
+        />
+      </template>
 
-      <!-- 右栏 — 识别结果校对（字段表） -->
-      <div class="panel basis-[42%] min-w-0 overflow-y-auto">
-        <div class="border-b border-line bg-surface-2 px-3 py-2.5 text-12px font-700 text-ink">
-          识别结果提取
+      <template #review>
+        <div class="panel h-full min-w-0 w-full overflow-y-auto">
+          <div class="border-b border-line bg-surface-2 px-3 py-2.5 text-12px font-700 text-ink">
+            识别结果提取
+          </div>
+          <!-- 进度优先于表单：重新识别时(ocrStatus 仍是 done)也要显示识别中而非旧字段 -->
+          <template v-if="selectedInvoice">
+            <div v-if="store.recognitionProgress[selectedInvoice.id] != null" class="p-6 text-center text-12px">
+              <span class="i-lucide-loader-circle animate-spin text-20px text-brand block mx-auto mb-2" />
+              <span class="text-brand font-600">识别中 {{ store.recognitionProgress[selectedInvoice.id] }}%</span>
+            </div>
+            <div v-else-if="selectedInvoice.ocrStatus === 'done'" class="p-3">
+              <InvoiceReviewForm
+                :invoice="selectedInvoice"
+                @confirm="confirmSelected"
+                @archive="archiveSelected"
+                @discard="handleDiscard"
+                @rerecognize="handleRerecognize"
+              />
+            </div>
+            <div v-else-if="selectedInvoice.ocrStatus === 'failed'" class="p-6 text-center text-12px">
+              <span class="i-lucide-circle-alert text-20px text-danger block mx-auto mb-2" />
+              <p class="mb-3 text-danger">
+                {{ store.recognitionError(selectedInvoice.id) || '识别失败，请检查服务后重试' }}
+              </p>
+              <button type="button" class="btn-secondary" @click="handleRerecognize">
+                重新识别
+              </button>
+            </div>
+            <div v-else class="p-6 text-center text-12px">
+              <span class="text-ink-faint">待识别——点击顶部「批量识别」开始</span>
+            </div>
+          </template>
+          <div v-else class="p-4 text-center text-ink-faint text-12px">
+            选择一张发票开始校对
+          </div>
         </div>
-        <!-- 进度优先于表单：重新识别时(ocrStatus 仍是 done)也要显示识别中而非旧字段 -->
-        <template v-if="selectedInvoice">
-          <div v-if="store.recognitionProgress[selectedInvoice.id] != null" class="p-6 text-center text-12px">
-            <span class="i-lucide-loader-circle animate-spin text-20px text-brand block mx-auto mb-2" />
-            <span class="text-brand font-600">识别中 {{ store.recognitionProgress[selectedInvoice.id] }}%</span>
-          </div>
-          <div v-else-if="selectedInvoice.ocrStatus === 'done'" class="p-3">
-            <InvoiceReviewForm
-              :invoice="selectedInvoice"
-              @confirm="confirmSelected"
-              @archive="archiveSelected"
-              @discard="handleDiscard"
-              @rerecognize="handleRerecognize"
-            />
-          </div>
-          <div v-else-if="selectedInvoice.ocrStatus === 'failed'" class="p-6 text-center text-12px">
-            <span class="i-lucide-circle-alert text-20px text-danger block mx-auto mb-2" />
-            <p class="mb-3 text-danger">
-              {{ store.recognitionError(selectedInvoice.id) || '识别失败，请检查服务后重试' }}
-            </p>
-            <button type="button" class="btn-secondary" @click="handleRerecognize">
-              重新识别
-            </button>
-          </div>
-          <div v-else class="p-6 text-center text-12px">
-            <span class="text-ink-faint">待识别——点击顶部「批量识别」开始</span>
-          </div>
-        </template>
-        <div v-else class="p-4 text-center text-ink-faint text-12px">
-          选择一张发票开始校对
-        </div>
-      </div>
-    </div>
+      </template>
+    </AdaptiveWorkbench>
 
     <InvoiceManualEntryDialog v-model:open="showAddDialog" />
   </div>

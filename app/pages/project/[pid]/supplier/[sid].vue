@@ -77,11 +77,11 @@ onMounted(async () => {
   <div v-if="ps && project && supplier">
     <!-- 顶部摘要 -->
     <div class="border border-line bg-panel mb-3 px-4 py-3">
-      <div class="flex items-center gap-3 mb-2">
+      <div class="flex flex-wrap items-start gap-3 mb-2">
         <NuxtLink :to="`/project/${pid}`" class="icon-btn" title="返回项目">
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
-        <h2 class="text-14px font-800 text-ink">
+        <h2 class="min-w-0 flex-1 break-words text-14px font-800 text-ink">
           项目: <span class="text-brand">{{ project.name }}</span>
           × 分供方: <span class="text-brand">{{ supplier.name }}</span>
         </h2>
@@ -138,7 +138,7 @@ onMounted(async () => {
 
     <!-- Tab 内容 -->
     <div v-if="activeTab === 'overview'" class="border border-line bg-panel p-4">
-      <div class="grid grid-cols-2 gap-4">
+      <div class="project-supplier-overview grid gap-4">
         <div>
           <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
             <span class="w-0.5 h-3.5 bg-brand rounded-full" /> 项目信息
@@ -194,7 +194,7 @@ onMounted(async () => {
 
     <!-- 合同/请款/收票/付款 Tab — 带 [+新建] 跳转 -->
     <div v-else-if="['contract', 'claim', 'ticket', 'payment'].includes(activeTab)" class="border border-line bg-panel p-4">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h4 class="text-13px font-700 text-ink">
           {{ tabs.find(t => t.key === activeTab)?.label }} · 0 条
         </h4>
@@ -246,3 +246,9 @@ onMounted(async () => {
     加载中...
   </div>
 </template>
+
+<style scoped>
+.project-supplier-overview {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+}
+</style>

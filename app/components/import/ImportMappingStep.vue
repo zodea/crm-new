@@ -53,10 +53,10 @@ function onSelect(fieldKey: string, event: Event) {
 </script>
 
 <template>
-  <section aria-label="源列映射到模板字段">
+  <section class="import-mapping" aria-label="源列映射到模板字段">
     <div class="border border-line rounded-[var(--radius-card)] bg-panel">
       <div
-        class="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-2 text-11px text-ink-faint font-700 tracking-wide uppercase"
+        class="import-mapping__header grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-2 text-11px text-ink-faint font-700 tracking-wide uppercase"
         aria-hidden="true"
       >
         <span>系统模板字段</span>
@@ -69,18 +69,18 @@ function onSelect(fieldKey: string, event: Event) {
         <li
           v-for="field in fields"
           :key="field.key"
-          class="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-2.5 last:border-b-0"
+          class="import-mapping__row grid grid-cols-[1fr_1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-2.5 last:border-b-0"
           :data-field="field.key"
           :data-status="status[field.key]"
         >
-          <span class="min-w-0 truncate text-13px text-ink">
+          <span class="import-mapping__field min-w-0 truncate text-13px text-ink">
             {{ field.label }}
             <span v-if="field.required" class="text-danger" aria-label="必填">*</span>
           </span>
 
           <select
             :value="mapping[field.key]?.column ?? ''"
-            class="field-input w-full"
+            class="import-mapping__select field-input w-full"
             :aria-label="`${field.label}的源列`"
             @change="onSelect(field.key, $event)"
           >
@@ -93,7 +93,7 @@ function onSelect(fieldKey: string, event: Event) {
           </select>
 
           <span
-            class="rounded-full px-2 py-0.5 text-11px font-600"
+            class="import-mapping__status rounded-full px-2 py-0.5 text-11px font-600"
             :class="STATUS_PRESENTATION[status[field.key] ?? 'unmapped'].chip"
           >
             {{ STATUS_PRESENTATION[status[field.key] ?? 'unmapped'].label }}
@@ -102,13 +102,13 @@ function onSelect(fieldKey: string, event: Event) {
           <button
             v-if="status[field.key] === 'pending'"
             type="button"
-            class="border border-warn/50 rounded-[var(--radius-btn)] bg-transparent px-2 py-1 text-11px text-warn-ink font-600 hover:bg-warn-soft"
+            class="import-mapping__confirm border border-warn/50 rounded-[var(--radius-btn)] bg-transparent px-2 py-1 text-11px text-warn-ink font-600 hover:bg-warn-soft"
             :aria-label="`确认${field.label}的匹配`"
             @click="emit('confirm', field.key)"
           >
             确认
           </button>
-          <span v-else />
+          <span v-else class="import-mapping__action-placeholder" />
         </li>
       </ul>
     </div>
@@ -127,3 +127,45 @@ function onSelect(fieldKey: string, event: Event) {
     </p>
   </section>
 </template>
+
+<style scoped>
+.import-mapping {
+  container-type: inline-size;
+}
+
+@container (max-width: 36rem) {
+  .import-mapping__header {
+    display: none;
+  }
+
+  .import-mapping__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .import-mapping__field {
+    grid-column: 1;
+  }
+
+  .import-mapping__status {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .import-mapping__select {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .import-mapping__confirm {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .import-mapping__action-placeholder {
+    display: none;
+  }
+}
+</style>

@@ -1,5 +1,14 @@
 <script setup lang="ts">
+type WorkbenchPane = 'queue' | 'source' | 'review'
+
 const pageRef = useTemplateRef<HTMLElement>('pageRef')
+const activePane = shallowRef<WorkbenchPane>('queue')
+const paneLabels: Readonly<Record<WorkbenchPane, string>> = {
+  queue: '队列',
+  source: '原件',
+  review: '校对',
+}
+
 const {
   store,
   projectStore,
@@ -51,20 +60,26 @@ const {
       @recognize-all="recognizeAll"
     />
 
-    <div class="flex min-h-155 gap-3" style="height: calc(100vh - 330px)">
-      <DeliveryQueuePanel
-        :files="store.files"
-        :selected-id="selectedFileId"
-        :progress="store.recognitionProgress"
-        @select="selectFile"
-        @upload="openFilePicker()"
-        @recognize="recognizeOne"
-        @remove="removeFile"
-      />
-      <div class="min-w-0 basis-[38%]">
+    <AdaptiveWorkbench
+      v-model="activePane"
+      :labels="paneLabels"
+      wide-columns="17rem minmax(0,38%) minmax(0,1fr)"
+    >
+      <template #queue>
+        <DeliveryQueuePanel
+          :files="store.files"
+          :selected-id="selectedFileId"
+          :progress="store.recognitionProgress"
+          @select="selectFile"
+          @upload="openFilePicker()"
+          @recognize="recognizeOne"
+          @remove="removeFile"
+        />
+      </template>
+      <template #source>
         <DeliveryOriginalPanel :file="selectedFile" :preview-url="previewUrl" />
-      </div>
-      <div class="min-w-0 flex-1">
+      </template>
+      <template #review>
         <DeliveryReviewPanel
           :draft="reviewDraft"
           :file="selectedFile"
@@ -86,7 +101,7 @@ const {
           @apply-supplier-suggestion="applySupplierSuggestion"
           @archive="archiveSelected"
         />
-      </div>
-    </div>
+      </template>
+    </AdaptiveWorkbench>
   </div>
 </template>

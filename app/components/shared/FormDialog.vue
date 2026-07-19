@@ -137,16 +137,18 @@ function onOpenChange(value: boolean) {
     padding: var(--space-4, 16px);
   }
 
+  .form-dialog__actions {
+    padding-inline: var(--space-4, 16px);
+  }
+}
+
+@container (max-width: 39rem) {
   .form-dialog__content .grid-cols-2 {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .form-dialog__content .col-span-2 {
     grid-column: span 1 / span 1 !important;
-  }
-
-  .form-dialog__actions {
-    padding-inline: var(--space-4, 16px);
   }
 }
 </style>

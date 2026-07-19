@@ -54,7 +54,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
 </script>
 
 <template>
-  <section class="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+  <section class="delivery-review-panel panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
     <div class="flex min-h-11 shrink-0 items-center gap-2 border-b border-line bg-surface-2 px-3 py-2">
       <div>
         <div class="text-11px font-800 text-ink">
@@ -74,7 +74,7 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
     </div>
 
     <template v-if="file && document && draft">
-      <div v-if="documents.length > 1" class="flex shrink-0 gap-1 overflow-x-auto border-b border-line px-3 py-2">
+      <div v-if="documents.length > 1" class="flex flex-wrap shrink-0 gap-1 border-b border-line px-3 py-2">
         <button
           v-for="(doc, index) in documents"
           :key="doc.id"
@@ -122,12 +122,12 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
         />
       </div>
 
-      <div class="flex shrink-0 items-center gap-2 border-t border-line bg-surface-2 px-3 py-2.5">
+      <div class="delivery-review-panel__footer flex flex-wrap shrink-0 items-center gap-2 border-t border-line bg-surface-2 px-3 py-2.5">
         <button type="button" class="btn-secondary" :disabled="saving" @click="emit('recognize')">
           <span class="i-lucide-refresh-cw mr-1 text-12px" />重新识别
         </button>
         <div class="flex-1" />
-        <span class="text-9px text-ink-faint">项目必选；提醒项会在归档前再次确认</span>
+        <span class="delivery-review-panel__hint text-9px text-ink-faint">项目必选；提醒项会在归档前再次确认</span>
         <button type="button" class="btn-accent" :disabled="saving" @click="emit('archive')">
           <span :class="saving ? 'i-lucide-loader-circle animate-spin' : 'i-lucide-circle-check'" class="mr-1 text-12px" />
           {{ saving ? '归档中…' : '核对完成并归档' }}
@@ -161,3 +161,16 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
     </div>
   </section>
 </template>
+
+<style scoped>
+.delivery-review-panel {
+  container-type: inline-size;
+}
+
+@container (max-width: 33.999rem) {
+  .delivery-review-panel__hint {
+    order: 3;
+    width: 100%;
+  }
+}
+</style>
