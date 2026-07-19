@@ -1,9 +1,10 @@
 // WageConfig — 工程量/工资 共享配置源（window.WAGE），工程量管理写、工资工具读
 // 模型：楼栋 → 楼层 → 户型 → 分项 → 房间；工程量固定(房间加总)；房间级指派 工人/班组；单价；完成层数(按完工楼层)
 // 通过隐藏 x-import 预加载；localStorage 持久化。导出 no-op 组件 WageConfigScreen 供挂载。
+// 2026-07-19 反馈轮：可指派人名与工资核算 PAYSLIP 名册统一（LKEY 升 v2 废旧档）
 (function () {
   if (window.WAGE) { window.WageConfigScreen = window.WageConfigScreen || function () { return null; }; return; }
-  const LKEY = "wage.config.v1";
+  const LKEY = "wage.config.v2";
 
   const BUILDINGS = ["1栋", "2栋"];
   const UNITS = ["01户", "02户", "03户", "04户"]; // 户型
@@ -35,7 +36,7 @@
   }
 
   // 可指派对象
-  const WORKERS = ["虞师傅", "匡师傅", "李师傅", "张师傅", "何嫂", "文师傅", "孙师傅", "周师傅", "郑师傅"];
+  const WORKERS = ["虞建华", "匡志强", "孙大勇", "张建国", "王芳（虞嫂）", "赵铁柱", "周伟峰", "郑春明", "刘水生"];
   const CREWS = ["泥水A班", "木工一班", "水电班", "防水班"];
 
   // —— 默认指派：key = 栋|户型|分项|房间 → {mode:"worker"|"crew", who} ——
@@ -50,7 +51,7 @@
             if (t.mode === "crew") { a[key] = { mode: "crew", who: t.crew }; return; }
             // 泥水个人：每户每分项默认一个工人；示例：01户地砖 阳台 由另一人做（异人拆行）
             let who = WORKERS[(ui + (item === "地砖" ? 3 : 0)) % 6];
-            if (u === "01户" && item === "地砖" && room === "阳台") who = "何嫂";
+            if (u === "01户" && item === "地砖" && room === "阳台") who = "王芳（虞嫂）";
             a[key] = { mode: "worker", who };
           });
         });
@@ -59,7 +60,7 @@
     return a;
   }
 
-  let data = { assign: seedAssign(), price: { ...PRICE }, done: JSON.parse(JSON.stringify(DONE)), managerExcluded: ["文师傅"], managerName: "虞师傅", managerRate: 2.5, rentRate: 1.3 };
+  let data = { assign: seedAssign(), price: { ...PRICE }, done: JSON.parse(JSON.stringify(DONE)), managerExcluded: ["赵铁柱"], managerName: "虞建华", managerRate: 2.5, rentRate: 1.3 };
   try { const s = JSON.parse(localStorage.getItem(LKEY) || "null"); if (s) data = { ...data, ...s, assign: { ...seedAssign(), ...(s.assign || {}) } }; } catch (e) {}
 
   function save() { localStorage.setItem(LKEY, JSON.stringify(data)); }
