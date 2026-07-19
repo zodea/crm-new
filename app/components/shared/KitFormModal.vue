@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { findMissingRequired, initValues } from '~/lib/kit/form-modal'
 
 // 字段配置驱动的表单弹窗，底座换为 shadcn-vue Dialog（reka-ui）：
@@ -18,7 +18,7 @@ const emit = defineEmits<{
 
 const values = ref<FormValues>({})
 const missing = ref<Set<string>>(new Set())
-const bodyRef = ref<HTMLElement | null>(null)
+const bodyRef = useTemplateRef<HTMLElement>('bodyRef')
 
 const fields = computed(() => props.options?.fields ?? [])
 const cols = computed(() => props.options?.cols ?? 1)
@@ -71,13 +71,13 @@ function onOpenAutoFocus(e: Event) {
     <DialogContent
       v-if="options"
       :show-close="false"
-      class="max-h-[86vh] flex flex-col p-0"
-      :style="{ width: `min(${options.width ?? 480}px, 94vw)` }"
+      class="kit-form-modal flex flex-col p-0"
+      :style="{ width: `min(${options.width ?? 480}px, calc(100dvw - var(--space-6, 24px)))` }"
       @open-auto-focus="onOpenAutoFocus"
     >
       <!-- 标题栏（固定） -->
       <div class="flex items-start justify-between px-5 py-3.5 border-b border-line shrink-0">
-        <div>
+        <div class="min-w-0">
           <DialogTitle>{{ options.title ?? '编辑' }}</DialogTitle>
           <DialogDescription v-if="options.subtitle" class="text-12px mt-0.5">
             {{ options.subtitle }}
@@ -90,7 +90,7 @@ function onOpenAutoFocus(e: Event) {
 
       <!-- 字段区（可滚动） -->
       <div ref="bodyRef" class="flex-1 overflow-y-auto p-5">
-        <div class="grid gap-3.5" :class="cols === 2 ? 'grid-cols-2' : 'grid-cols-1'">
+        <div class="kit-form-modal__fields grid gap-3.5" :data-cols="cols">
           <div
             v-for="f in fields"
             :key="f.key"
@@ -144,7 +144,7 @@ function onOpenAutoFocus(e: Event) {
       </div>
 
       <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
-      <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
+      <div class="kit-form-modal__actions flex flex-wrap items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
         <Button variant="outline" @click="emit('cancel')">
           取消
         </Button>
@@ -155,3 +155,24 @@ function onOpenAutoFocus(e: Event) {
     </DialogContent>
   </Dialog>
 </template>
+
+<style>
+.kit-form-modal {
+  container-type: inline-size;
+  max-height: min(86dvh, calc(100svh - var(--space-6, 24px)));
+}
+
+.kit-form-modal__fields[data-cols='2'] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+}
+
+@container (max-width: 30rem) {
+  .kit-form-modal__fields .col-span-full {
+    grid-column: 1;
+  }
+
+  .kit-form-modal__actions {
+    padding-inline: var(--space-4, 16px);
+  }
+}
+</style>

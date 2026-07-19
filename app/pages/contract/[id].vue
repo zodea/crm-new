@@ -74,7 +74,7 @@ const metrics = computed(() => {
 })
 
 // ── 关联单据 Tab（壳占位：变洽签仅施工/分包，材采无） ──
-const activeTab = ref('info')
+const activeTab = shallowRef('info')
 const tabs = computed(() => {
   const c = contract.value
   if (!c)
@@ -140,21 +140,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="contract">
+  <div v-if="contract" class="contract-detail-screen">
     <!-- 顶栏 -->
     <div class="border border-line bg-panel mb-3 px-4 py-3">
-      <div class="flex items-center gap-3">
+      <div class="flex flex-wrap items-center gap-3">
         <NuxtLink :to="backTo" class="icon-btn" title="返回列表">
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
-        <h2 class="text-17px font-800 text-ink">
+        <h2 class="min-w-0 flex-[1_1_20rem] break-words text-17px font-800 text-ink">
           {{ contract.name }}
         </h2>
         <span class="text-13px text-ink-faint font-mono">{{ contract.no }}</span>
         <span class="text-13px text-ink-faint">{{ kindLabel }}</span>
         <span class="chip" :class="statusChip">{{ contract.status }}</span>
-        <div class="flex-1" />
-        <button class="btn-secondary" @click="openEdit">
+        <button class="btn-secondary ml-auto" @click="openEdit">
           <span class="i-lucide-square-pen text-13px mr-1" /> 编辑
         </button>
       </div>
@@ -182,7 +181,7 @@ onMounted(() => {
 
     <!-- 基本信息 -->
     <div v-if="activeTab === 'info'" class="border border-line bg-panel px-4 py-3">
-      <div class="grid grid-cols-2 gap-x-7">
+      <div class="contract-detail-grid grid gap-x-7">
         <div class="detail-row">
           <span class="detail-label">合同编号</span>
           <span class="detail-value font-mono">{{ contract.no || '—' }}</span>
@@ -220,7 +219,7 @@ onMounted(() => {
           <span class="detail-label">合同状态</span>
           <span class="detail-value"><span class="chip" :class="statusChip">{{ contract.status }}</span></span>
         </div>
-        <div class="detail-row col-span-2">
+        <div class="detail-row contract-detail-grid__full">
           <span class="detail-label">备注</span>
           <span class="detail-value">{{ contract.note || '—' }}</span>
         </div>
@@ -270,6 +269,15 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.contract-detail-screen {
+  container-type: inline-size;
+}
+.contract-detail-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.contract-detail-grid__full {
+  grid-column: 1 / -1;
+}
 .detail-row {
   display: flex;
   gap: 10px;

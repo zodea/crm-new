@@ -29,7 +29,7 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
 </script>
 
 <template>
-  <aside class="panel h-full min-h-0 w-68 shrink-0 overflow-hidden">
+  <aside class="panel h-full min-h-0 w-full flex flex-col overflow-hidden">
     <div class="flex items-center gap-2 border-b border-line bg-surface-2 px-3 py-2.5">
       <div>
         <div class="text-12px font-800 text-ink">
@@ -45,13 +45,14 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
       </button>
     </div>
 
-    <div class="h-[calc(100%-54px)] overflow-y-auto p-2">
+    <div class="min-h-0 flex-1 overflow-y-auto p-2">
       <div
         v-for="file in files"
         :key="file.id"
         class="mb-2 w-full rounded-[var(--radius-btn)] border p-2.5 text-left transition-colors last:mb-0"
         :class="selectedId === file.id ? 'border-brand bg-brand-soft/45' : 'border-line bg-panel hover:bg-surface-2'"
         role="button"
+        :aria-pressed="selectedId === file.id"
         tabindex="0"
         @click="emit('select', file.id)"
         @keydown.enter="emit('select', file.id)"

@@ -134,9 +134,13 @@ const showItems = ref(false)
 </script>
 
 <template>
-  <div class="space-y-3">
-    <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-      <div v-for="f in FIELDS" :key="f.key" :class="f.full ? 'col-span-2' : ''">
+  <div class="invoice-review-form space-y-3">
+    <div class="invoice-review-form__fields grid gap-x-3 gap-y-2.5">
+      <div
+        v-for="f in FIELDS"
+        :key="f.key"
+        :class="f.full ? 'invoice-review-form__field--full' : ''"
+      >
         <label :for="fieldInputId(f)" class="field-label flex items-center gap-1">
           <span>{{ f.label }}</span>
           <span class="flex-1" />
@@ -309,11 +313,11 @@ const showItems = ref(false)
     </div>
 
     <!-- 操作条：[废弃]←危险靠左 …… [重新识别][确认/归档入账]；已归档票整条隐藏 -->
-    <div v-if="!isArchived" class="flex items-center justify-between pt-3 border-t border-line">
+    <div v-if="!isArchived" class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-line">
       <button class="btn-danger" @click="emit('discard')">
         <span class="i-lucide-trash-2 text-12px mr-1" /> 废弃
       </button>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button class="btn-secondary" @click="emit('rerecognize')">
           <span class="i-lucide-refresh-cw text-12px mr-1" /> 重新识别
         </button>
@@ -339,3 +343,17 @@ const showItems = ref(false)
     </div>
   </div>
 </template>
+
+<style scoped>
+.invoice-review-form {
+  container-type: inline-size;
+}
+
+.invoice-review-form__fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+}
+
+.invoice-review-form__field--full {
+  grid-column: 1 / -1;
+}
+</style>

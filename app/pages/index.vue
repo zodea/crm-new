@@ -1,12 +1,9 @@
 <script setup lang="ts">
 const projStore = useProjectStore()
 
-const selectedProjectId = ref<string | ''>('')
+const selectedProjectId = shallowRef<string | ''>('')
 
 const projects = computed(() => projStore.list)
-const selectedProject = computed(() =>
-  selectedProjectId.value ? projStore.byId(selectedProjectId.value) : null,
-)
 
 const metrics = computed(() => [
   {
@@ -63,13 +60,17 @@ onMounted(async () => {
 <template>
   <div>
     <!-- 项目选择器 -->
-    <div class="flex items-center gap-3 mb-4">
-      <h2 class="text-17px font-800 text-ink">在建工程总览</h2>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <h2 class="text-17px font-800 text-ink">
+        在建工程总览
+      </h2>
       <select
         v-model="selectedProjectId"
-        class="field-input w-64"
+        class="field-input w-64 max-w-full"
       >
-        <option value="">全部项目</option>
+        <option value="">
+          全部项目
+        </option>
         <option v-for="p in projects" :key="p.id" :value="p.id">
           {{ p.name }}
         </option>
@@ -77,7 +78,7 @@ onMounted(async () => {
     </div>
 
     <!-- 指标卡片 -->
-    <div class="grid grid-cols-5 gap-3 mb-6">
+    <div class="dashboard-metrics grid gap-3 mb-6">
       <StatCard
         v-for="m in metrics"
         :key="m.label"
@@ -91,7 +92,7 @@ onMounted(async () => {
     </div>
 
     <!-- 图表区 -->
-    <div class="grid grid-cols-2 gap-3">
+    <div class="dashboard-charts grid gap-3">
       <!-- 月度支出柱状图 55% -->
       <div class="border border-line bg-panel p-4" style="grid-column: span 1">
         <h4 class="text-13px font-700 text-ink mb-3 flex items-center gap-1.5">
@@ -138,3 +139,13 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.dashboard-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+
+.dashboard-charts {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+}
+</style>

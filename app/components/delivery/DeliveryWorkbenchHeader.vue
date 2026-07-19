@@ -14,8 +14,8 @@ const emit = defineEmits<{
 
 <template>
   <div class="flex flex-col gap-3">
-    <div class="panel flex items-center gap-3 px-4 py-3">
-      <div>
+    <div class="panel flex flex-wrap items-center gap-3 px-4 py-3">
+      <div class="min-w-0 flex-[1_1_22rem]">
         <div class="text-16px font-800 text-ink">
           送货单识别工作台
         </div>
@@ -23,7 +23,6 @@ const emit = defineEmits<{
           PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 人工核对后自动归档
         </div>
       </div>
-      <div class="flex-1" />
       <button type="button" class="btn-secondary" :disabled="!pendingCount" @click="emit('recognizeAll')">
         <span class="i-lucide-scan-text mr-1 text-12px" />识别全部（{{ pendingCount }}）
       </button>
@@ -44,7 +43,7 @@ const emit = defineEmits<{
       </span>
     </button>
 
-    <div class="grid grid-cols-4 gap-3">
+    <div class="delivery-workbench-stats grid gap-3">
       <StatCard label="队列文件" :value="stats.total" icon="i-lucide-files" color="brand" />
       <StatCard label="待识别" :value="stats.pending + stats.processing" icon="i-lucide-clock" color="warn" />
       <StatCard label="待核对" :value="stats.done" icon="i-lucide-file-check" color="ok" />
@@ -52,3 +51,9 @@ const emit = defineEmits<{
     </div>
   </div>
 </template>
+
+<style scoped>
+.delivery-workbench-stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+</style>

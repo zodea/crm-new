@@ -67,12 +67,12 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div v-if="record" class="flex min-w-0 flex-col gap-4">
-    <div class="panel flex items-center gap-3 px-4 py-3">
+  <div v-if="record" class="delivery-record-detail flex min-w-0 flex-col gap-4">
+    <div class="panel flex flex-wrap items-center gap-3 px-4 py-3">
       <NuxtLink to="/material/delivery/archive" class="icon-btn" title="返回归档库">
         <span class="i-lucide-arrow-left text-14px" />
       </NuxtLink>
-      <div>
+      <div class="min-w-0 flex-1">
         <div class="text-17px font-800 text-ink">
           {{ record.orderNo || '未编号送货单' }}
         </div>
@@ -81,13 +81,14 @@ onMounted(refresh)
         </div>
       </div>
       <span class="chip-ok">已归档</span>
-      <div class="flex-1" />
-      <button class="btn-secondary" @click="showForm = true">
-        <span class="i-lucide-square-pen mr-1 text-13px" /> 编辑
-      </button>
-      <button class="btn-danger" @click="handleDelete">
-        <span class="i-lucide-trash-2 mr-1 text-13px" /> 删除
-      </button>
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <button class="btn-secondary" @click="showForm = true">
+          <span class="i-lucide-square-pen mr-1 text-13px" /> 编辑
+        </button>
+        <button class="btn-danger" @click="handleDelete">
+          <span class="i-lucide-trash-2 mr-1 text-13px" /> 删除
+        </button>
+      </div>
     </div>
 
     <MetricGrid :cols="4">
@@ -97,18 +98,18 @@ onMounted(refresh)
       <Metric label="入库状态" :value="record.stored ? '已入库' : '未入库'" formula="入库供单价对比，留第二趟" />
     </MetricGrid>
 
-    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(360px,42%)_minmax(0,1fr)]">
+    <div class="delivery-record-layout grid min-w-0 items-start gap-4">
       <DeliveryRecordSourcePanel
         :key="sourcePanelVersion"
         :record-id="record.id"
-        min-height="min(680px, calc(100vh - 220px))"
-        class="self-start xl:sticky xl:top-4"
+        min-height="clamp(22rem, 60dvh, 42.5rem)"
+        class="delivery-record-source self-start"
       />
 
       <div class="flex min-w-0 flex-col gap-4">
         <div class="panel px-4 py-3">
           <SectionHeader title="单据信息" subtitle="右侧结构化数据应与左侧原件逐项核对" />
-          <div class="mt-2 grid grid-cols-2 gap-x-8">
+          <div class="delivery-record-info mt-2 grid gap-x-8">
             <div class="detail-row">
               <span class="detail-label">所属项目</span><NuxtLink :to="`/project/${record.projectId}`" class="cell--link">
                 {{ project?.name ?? record.projectId }}
@@ -125,7 +126,7 @@ onMounted(refresh)
             <div class="detail-row">
               <span class="detail-label">送货日期</span><span class="font-mono">{{ record.deliveryDate || '—' }}</span>
             </div>
-            <div class="detail-row col-span-2">
+            <div class="detail-row delivery-record-info__full">
               <span class="detail-label">备注</span><span>{{ record.note || '—' }}</span>
             </div>
           </div>
@@ -157,6 +158,33 @@ onMounted(refresh)
 </template>
 
 <style scoped>
+.delivery-record-detail {
+  container-type: inline-size;
+}
+
+.delivery-record-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.delivery-record-info {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+
+.delivery-record-info__full {
+  grid-column: 1 / -1;
+}
+
+@container (min-width: 64rem) {
+  .delivery-record-layout {
+    grid-template-columns: minmax(22.5rem, 42%) minmax(0, 1fr);
+  }
+
+  .delivery-record-source {
+    position: sticky;
+    top: var(--space-4, 16px);
+  }
+}
+
 .detail-row {
   display: flex;
   min-width: 0;
