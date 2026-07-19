@@ -1,7 +1,9 @@
-// WageSlipScreen — 工资进度款工具 = 进度款「调参模拟」面（只读工程量，从 window.WAGE 按 户型×分项×施工人 聚合）
-// 三面分工（2026-07-19 反馈轮）：本工具只管调参模拟——进度比例/取整/本期支付总额权重分摊/实发逐人直改/空鼓扣罚，多工种统一模板；
-//   台账与正式单据在「工资核算」（班组瀑布卡 → 工资总表 → 个人核对表 + A4 打印，数据源 window.PAYSLIP）；工程量修改去「工程量管理」。
-// 人名与工资核算 PAYSLIP 名册统一；点击人名 → 该工人进度款核对表（payrollDetail）。
+// WageSlipScreen — 工资进度款工具 = 挂在同一套数上的「调参器」（#117 D1：数字只有一套）
+//   工程量只读，从 window.WAGE 按 户型×分项×施工人 聚合——与工资核算请款簿/核对表/A4 同数；
+//   台账与正式单据在「工资核算」（班组瀑布卡 → 请款簿总表 → 核对两步流 + A4 格式族）；工程量修改去「工程量管理」。
+// D5：空鼓页签由手填改为从户记录聚合只读（扣款启动在请款簿内）；
+// 「进度%参考/本期支付总额权重分摊」等调参项去留待 grill 定稿（#117 未决⑥），暂保持现状。
+// 人名与名册统一；点击人名 → 该人所在请款簿（payrollDetail）。
 // 清单：同分项同人合并一行、异人拆行（房间备注）；两种归属：个人计件(管理费可按人配) / 班组整包(班组内分配)。
 // 叠加：房租补贴、工资表(银行信息联动)、考勤(按出勤预填)、空鼓扣罚。
 (function () {
@@ -38,8 +40,7 @@
     const [settings, setSettings] = React.useState({ progress: 95, roundTo: 100, prevPaid: 0, payTotal: "", rentEnabled: true, mgrEnabled: true, period: "2025年11月" });
     const [manual, setManual] = React.useState({});
     const [pay, setPay] = React.useState({}); // 班组整包分配：who -> {gross,borrow,days}
-    const [hollow, setHollow] = React.useState({});
-    const [hollowRate, setHollowRate] = React.useState(5);
+    const [hollowRate, setHollowRate] = React.useState(30);   // 单处扣款（建档默认 30 元/处，可调参）
     const [att, setAtt] = React.useState({});
     const [tab, setTab] = React.useState("list");
 
@@ -61,7 +62,8 @@
       const m = manual[s.who] || {};
       s.rent = settings.rentEnabled ? Math.round(s.rentQty * rentRate * 100) / 100 : 0;
       s.adjust = +m.adjust || 0; s.prev = +m.prev || 0; s.remark = m.remark || "";
-      s.hollow = +hollow[s.who] || 0; s.hollowAmt = s.hollow * (+hollowRate || 0);
+      s.hollow = WA.hollowAgg ? WA.hollowAgg([s.who]).unfixed : 0;   // D5：从户记录聚合（仍未整改处数），不再手填
+      s.hollowAmt = s.hollow * (+hollowRate || 0);
       s.due = Math.round((s.eng + s.rent + s.mgr + s.adjust - s.hollowAmt) * 100) / 100;
       s.progressDue = Math.round(s.due * (settings.progress / 100) * 100) / 100;
       s.payable = Math.floor((s.progressDue - s.prev) / Math.max(1, settings.roundTo)) * Math.max(1, settings.roundTo);
@@ -83,15 +85,15 @@
     const setS = (k, v) => setSettings((p) => ({ ...p, [k]: v }));
     const setMan = (who, k, v) => setManual((p) => ({ ...p, [who]: { ...(p[who] || {}), [k]: v } }));
 
-    // —— 人名统一 PAYSLIP 名册：点击人名 → 该工人进度款核对表（payrollDetail）——
+    // —— 人名统一名册：点击人名 → 该人所在请款簿（负责人簿优先，其次组员所在簿）——
     const goWorker = (name) => {
-      const crew = T.crew;
-      const key = "合和新城|" + crew;
       const P = window.PAYSLIP;
-      if (P && P.data[key] && P.data[key].workers.some((w) => w.name === name)) {
-        window.DC.navigate("payrollDetail", { worker: name, crew, project: "合和新城", month: (P.data[key].schedule.find((s) => s.current) || {}).m });
+      const book = P && (P.books.find((b) => b.project === "合和新城" && b.leader === name && b.family !== "MGR")
+        || P.books.find((b) => b.project === "合和新城" && b.members.indexOf(name) >= 0 && b.family !== "MGR"));
+      if (book) {
+        window.DC.navigate("payrollDetail", { book: book.id, crew: book.crew, project: book.project, month: P.curMonth(book) });
       } else {
-        UI().toast("该工人本月暂无进度款单（演示数据）");
+        UI().toast("该工人暂无请款簿（演示数据）");
       }
     };
     const workerLink = (name) => (
@@ -283,28 +285,35 @@
               </div>
             )}
 
-            {/* ⑤ 空鼓扣罚（泥水）*/}
+            {/* ⑤ 空鼓（泥水）— D5：从户记录聚合只读（不再手填）；扣款启动在请款簿内（⑥） */}
             {tab === "hollow" && T.name === "泥水" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", background: "var(--warn-soft)", border: "1px solid var(--warn)", borderRadius: 8, padding: "10px 14px" }}>
                   <Icon name="triangle-alert" size={16} color="var(--warn-ink)" />
-                  <span style={{ fontSize: 13, color: "var(--warn-ink)", fontWeight: 600 }}>空鼓待整改罚单 · 扣款实时进入工资汇总的「空鼓扣」列</span>
-                  <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--warn-ink)", display: "inline-flex", alignItems: "center", gap: 6 }}>单处扣款<input type="number" value={hollowRate} onChange={(e) => setHollowRate(+e.target.value || 0)} style={{ width: 64, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" }} /></label>
+                  <span style={{ fontSize: 13, color: "var(--warn-ink)", fontWeight: 600 }}>空鼓记录在对应户/楼层（现场维度，只读聚合）· 进度月仅列示，扣款在请款簿内手动启动</span>
+                  <label style={{ marginLeft: "auto", fontSize: 12, color: "var(--warn-ink)", display: "inline-flex", alignItems: "center", gap: 6 }}>单处扣款（调参）<input type="number" value={hollowRate} onChange={(e) => setHollowRate(+e.target.value || 0)} style={{ width: 64, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "4px 6px", fontSize: 12, textAlign: "right" }} /></label>
+                  <Button size="sm" icon="edit-3" onClick={() => navigate("quantity")}>去户记录登记/销记</Button>
                 </div>
                 <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: 8 }}>
-                  <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520 }}>
-                    <thead><tr>{["工人", "空鼓处数", "单处", "扣款", "状态"].map((h, i) => <th key={h} style={{ ...TH, textAlign: i >= 1 && i <= 3 ? "right" : "left" }}>{h}</th>)}</tr></thead>
+                  <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 680 }}>
+                    <thead><tr>{["位置（栋/楼层/户）", "分项", "工人", "处数", "已整改(销记不扣)", "未整改", "预估扣款", "状态"].map((h, i) => <th key={h} style={{ ...TH, textAlign: i >= 3 && i <= 6 ? "right" : "left" }}>{h}</th>)}</tr></thead>
                     <tbody>
-                      {summary.filter((s) => s.mode === "worker").map((s) => { const c = +hollow[s.who] || 0; return (
-                        <tr key={s.who}><td style={{ ...TD, fontWeight: 700 }}>{s.who}</td>
-                          <td style={{ ...TD, width: 100 }}><Inp type="number" value={c} onChange={(e) => setHollow((p) => ({ ...p, [s.who]: +e.target.value || 0 }))} align="right" /></td>
-                          <td style={{ ...numTD, color: "var(--ink-soft)" }}>{money(hollowRate)}</td>
-                          <td style={{ ...numTD, color: c ? "var(--danger)" : "var(--ink-faint)", fontWeight: 700 }}>{c ? "−" + money(c * hollowRate) : "—"}</td>
-                          <td style={TD}>{c ? <StatusChip tone="warn">待整改</StatusChip> : <StatusChip tone="ok">已整改</StatusChip>}</td></tr>
+                      {(WA.hollowAll ? WA.hollowAll() : []).map((h, i) => { const un = h.spots - h.fixed; return (
+                        <tr key={i}>
+                          <td style={{ ...TD, fontWeight: 600 }}>{h.b}{h.f}楼 {h.u}</td>
+                          <td style={TD}>{h.item}</td>
+                          <td style={{ ...TD, color: "var(--brand)", fontWeight: 700 }}>{workerLink(h.who)}</td>
+                          <td style={numTD}>{h.spots}</td>
+                          <td style={{ ...numTD, color: "var(--ok-ink)" }}>{h.fixed || "—"}</td>
+                          <td style={{ ...numTD, fontWeight: 700, color: un ? "var(--warn-ink)" : "var(--ink-faint)" }}>{un || "—"}</td>
+                          <td style={{ ...numTD, color: un ? "var(--danger)" : "var(--ink-faint)", fontWeight: 700 }}>{un ? "−" + money(un * hollowRate) : "—"}</td>
+                          <td style={TD}>{un ? <StatusChip tone="warn">待整改</StatusChip> : <StatusChip tone="ok">已销记</StatusChip>}</td>
+                        </tr>
                       ); })}
                     </tbody>
                   </table>
                 </div>
+                <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>明细文字（如「2栋6楼2处」）与扣款行由请款簿自动生成；「暂扣→返还」机制已废除（#117 ⑥）。</div>
               </div>
             )}
           </div>
