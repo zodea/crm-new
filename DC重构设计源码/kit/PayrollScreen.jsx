@@ -99,7 +99,7 @@
           {data.projects.map(p => {
             const crews = data.projectCrews[p.name] || [];
             const sums = crews.map(c => P.crewSummary(p.name, c.crew)).filter(Boolean);
-            const request = sums.reduce((s, x) => s + (x.timeLike ? x.total : x.rounded), 0);
+            const request = sums.reduce((s, x) => s + (x.due || 0), 0);   // 仅未发放单据（已发放=历史快照，不计待付）
             const bookCnt = P.booksOf(p.name).length;
             return (
               <button key={p.id} onClick={() => { setSelProject(p.name); setSelCrew(null); }}
@@ -166,16 +166,16 @@
                 )}
                 {S && S.timeLike && (<>
                   <FlowRow first label="本月直付合计（时工）" value={S.total} strong />
-                  <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 6 }}>无比例、无取整，按实发全额支付</div>
+                  <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 6 }}>{S.due > 0 ? "无比例、无取整，按实发全额支付" : "本月已直付结清"}</div>
                 </>)}
                 {S && !S.timeLike && (<>
                   <FlowRow first label="工程量总额（含补贴）" value={S.total} />
                   <FlowRow label="× 支付比例（各簿单据级）" value={S.payable} />
                   <FlowRow label="− 累计已领（实际发放值）" value={S.paid} tone="ok" />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7,
-                    background: S.rounded > 0 ? "var(--danger-soft)" : "var(--ok-soft)", borderRadius: 8, padding: "7px 10px" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: S.rounded > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>本期应发（取整合计）</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, fontWeight: 800, color: S.rounded > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{num0(S.rounded)}</span>
+                    background: S.due > 0 ? "var(--danger-soft)" : "var(--ok-soft)", borderRadius: 8, padding: "7px 10px" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: S.due > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{S.due > 0 ? "本期应发（取整合计）" : "本期已结清"}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, fontWeight: 800, color: S.due > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{num0(S.due)}</span>
                   </div>
                 </>)}
                 {/* D2：人数状态（替代按人速览；人名明细在点进去的请款簿总表里看） */}
@@ -212,21 +212,29 @@
     // 批量核对 / 批量发放（D6：班组层面批量操作）
     const draftRows = rows.filter(x => x.doc && x.doc.status === "草稿");
     const checkedRows = rows.filter(x => x.doc && x.doc.status === "已核对" && !x.doc.deferred);
+    // 可发放 = 已核对且全员三级安全教育已录入（按钮计数与实际发放口径一致）
+    const releasableRows = checkedRows.filter(x => !(x.doc.wageRows || []).some(r => !r.safety));
     const batchCheck = () => UI().confirm({
       title: "批量核对 " + month + " 请款单？",
       message: "将把 " + draftRows.length + " 本草稿请款簿标记为「已核对」并记录核对指纹；此后上游工程量/单价再变动会提示「有变动、需重核」。",
       confirmText: "全部核对",
       onConfirm: () => { draftRows.forEach(x => P.check(x.book.id, month)); UI().toast("已核对 " + draftRows.length + " 本请款簿", "success"); },
     });
-    const batchRelease = () => UI().confirm({
-      title: "批量登记发放？",
-      message: "将按「取整应发」默认金额登记 " + checkedRows.length + " 本已核对请款簿的实际发放并整体固化（只读快照）；同时在付款管理域逐簿生成支出记录（类别=工人工资）。",
-      confirmText: "登记发放",
-      onConfirm: () => {
-        checkedRows.forEach(x => P.release(x.book.id, month));
-        UI().toast("已发放并固化 " + checkedRows.length + " 本 · 已在付款管理生成 " + checkedRows.length + " 条支出记录", "success");
-      },
-    });
+    const batchRelease = () => {
+      // 口径校验：三级安全教育未录入 → 该簿不可发放（按钮计数已按 releasableRows）
+      const blocked = checkedRows.filter(x => (x.doc.wageRows || []).some(r => !r.safety));
+      if (!releasableRows.length) { UI().toast("待发簿存在「三级安全教育未录入」，禁止发放", "danger"); return; }
+      UI().confirm({
+        title: "批量登记发放？",
+        message: "将按「取整应发」默认金额登记 " + releasableRows.length + " 本已核对请款簿的实际发放并整体固化（只读快照）；同时在付款管理域逐簿生成支出记录（类别=工人工资）。"
+          + (blocked.length ? "另有 " + blocked.map(x => x.book.leader + "簿").join("、") + " 因三级安全教育未录入被跳过。" : ""),
+        confirmText: "登记发放",
+        onConfirm: () => {
+          releasableRows.forEach(x => P.release(x.book.id, month));
+          UI().toast("已发放并固化 " + releasableRows.length + " 本 · 已在付款管理生成 " + releasableRows.length + " 条支出记录" + (blocked.length ? "（跳过 " + blocked.length + " 本）" : ""), "success");
+        },
+      });
+    };
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -271,7 +279,7 @@
             <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>一个负责人一本请款簿 · 数字由工程量管理聚合生成（单一数据链）</span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               {!timeLike && <Button size="sm" icon="circle-check" disabled={!draftRows.length} onClick={batchCheck}>批量核对（{draftRows.length}）</Button>}
-              <Button size="sm" variant="primary" icon="banknote" disabled={!checkedRows.length} onClick={batchRelease}>批量发放（{checkedRows.length}）</Button>
+              <Button size="sm" variant="primary" icon="banknote" disabled={!releasableRows.length} onClick={batchRelease}>批量发放（{releasableRows.length}）</Button>
               <Button size="sm" icon="sliders-horizontal" onClick={() => navigate("wageSlip", { crew: selCrew, project: selProject, month })}>进度款工具</Button>
               <Button size="sm" icon="download" onClick={() => UI().toast("正在导出 Excel（请款簿 × " + rows.length + " 本，含清单/工资表/考勤表）…")}>导出 Excel</Button>
             </span>

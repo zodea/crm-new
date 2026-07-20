@@ -813,7 +813,7 @@
 (function () {
   const r2 = (n) => Math.round(n * 100) / 100;
   const floorN = (n, unit) => { const u = Math.max(1, unit || 100); return Math.max(0, Math.floor(n / u) * u); };
-  const attArr = (n) => { const a = []; for (let i = 0; i < 31; i++) a.push(i % 7 === 6 ? "" : (a.filter(Boolean).length < n ? "√" : "")); return a; };
+  const attArr = (n) => { const a = []; let c = 0; for (let i = 0; i < 31; i++) { const on = i % 7 !== 6 && c < n; if (on) c++; a.push(on ? "√" : ""); } return a; };
 
   // —— 名册登记表（D8-10，挂班组·工人域 #73）：性别/籍贯/身份证/劳动合同/入退场日期/证件照/银行卡照 ——
   // 进/退场日期 → 瀑布卡「在班 X 人 · 离职 Y 人」（D2）；退场且有未整改空鼓 → 提示启动扣款（⑥-3）。
@@ -894,7 +894,7 @@
           floorsSnap: { "1栋": FL(1, 8), "2栋": FL(1, 3) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "张建国": 25, "孙大勇": 24 } },
         "2026-05": { status: "已发放", ratio: 80, seqNo: 33, actualPaid: 31900, alloc: { "张建国": 20000, "孙大勇": 11900 },
           floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: { "孙大勇": 500 }, attN: { "张建国": 27, "孙大勇": 26 } },
-        "2026-06": { status: "已核对", ratio: 85, checkedFp: "__stale__", borrow: { "孙大勇": 1000 }, attN: { "张建国": 26, "孙大勇": 27 } },
+        "2026-06": { status: "已核对", ratio: 85, checkedFp: "__stale__", borrow: { "张建国": 1000 }, attN: { "张建国": 26, "孙大勇": 27 } },
         "结算": { kind: "settle", status: "未到", ratio: 95 },
         "尾款": { kind: "final", status: "未到", ratio: 100 },
       } },
@@ -1031,7 +1031,7 @@
     return null;
   };
   const monthLabel = (mKey, mo) => {
-    if (mo && mo.kind === "settle") return "结算 " + (mo.ratio || 95) + "%";
+    if (mo && mo.kind === "settle") return "结算 " + (mo.ratio != null ? mo.ratio : 95) + "%";
     if (mo && mo.kind === "final") return "尾款 100%";
     return mKey;
   };
@@ -1085,14 +1085,19 @@
     W.BUILDINGS.forEach((b) => {
       const doneList = mo.floorsSnap ? (mo.floorsSnap[b] || []) : W.doneFloors(b);
       const doneN = doneList.length;
+      // 单次扫描按分项分桶（payrollRows 一栋只跑一遍）
+      // 排除口径：管理人自己 + 免管理费名单 + 「公司代管」单独簿的全部成员（D7 成因①：代管无管理费）
+      const excluded = new Set([book.leader].concat(cfg.managerExcluded || []));
+      books.filter((x) => x.project === book.project && x.crew === book.crew && x.config.mgr && x.config.mgr.mode === "公司代管")
+        .forEach((x) => x.members.forEach((m) => excluded.add(m)));
+      const qtyByItem = {};
+      W.payrollRows(book.tradeKey, b).forEach((r) => {
+        if (r.item !== "墙砖" && r.item !== "地砖") return;
+        if (excluded.has(r.who)) return;
+        qtyByItem[r.item] = (qtyByItem[r.item] || 0) + r.perUnitQty * doneN;
+      });
       ["墙砖", "地砖"].forEach((base) => {
-        let qty = 0;
-        W.payrollRows(book.tradeKey, b).forEach((r) => {
-          if (r.item !== base) return;
-          if (r.who === book.leader || (cfg.managerExcluded || []).indexOf(r.who) >= 0) return;
-          qty += r.perUnitQty * doneN;
-        });
-        qty = r2(qty);
+        const qty = r2(qtyByItem[base] || 0);
         if (!qty) return;
         lines.push({ item: b + base + "汇总", baseItem: "管理费", unit: W.UNIT_M[base] || "㎡", perUnit: null,
           floors: doneN, floorNote: W.compressFloors(doneList), qty, price: rate, amount: r2(qty * rate) });
@@ -1156,17 +1161,19 @@
       doc.fp = JSON.stringify(doc.logs.map((l) => [l.d, l.who, l.units]));
     } else {
       // A / MGR / B：清单 + 请款链（D8-1 行序：合计 → ×比例 → −逐月已领(每月单列) → 本次进度请款合计 → 空鼓扣款行 → 取整）
-      doc.lines = book.family === "MGR" ? linesMgr(book, mo) : book.family === "B" ? linesB(book, mo) : linesA(book, mo);
+      // 已发放且有行级快照（运行期 release 落盘）→ 直接用冻结行；否则由 floorsSnap/priceSnap 派生（种子历史月）
+      doc.lines = mo.linesSnap || (book.family === "MGR" ? linesMgr(book, mo) : book.family === "B" ? linesB(book, mo) : linesA(book, mo));
       if (!doc.lines) return null;   // WAGE 未就绪
       const dataLines = doc.lines.filter((l) => !l.group);
-      doc.subsidies = (book.config.subsidies || []).map((s) => {
+      doc.subsidies = mo.subsSnap || (book.config.subsidies || []).map((s) => {
         const qty = r2(dataLines.filter((l) => s.items.indexOf(l.baseItem) >= 0).reduce((x, l) => x + l.qty, 0));
         return { name: s.name, qty, price: s.price, amount: r2(qty * s.price) };
       });
       doc.linesAmt = r2(dataLines.reduce((s, l) => s + l.amount, 0));
       doc.subsidyAmt = r2(doc.subsidies.reduce((s, x) => s + x.amount, 0));
       doc.total = r2(doc.linesAmt + doc.subsidyAmt);
-      doc.payable = r2(doc.total * (mo.ratio || 100) / 100);
+      // 比例可为 0（单据级参数），不能用 || 兜底——0% 就是 0%
+      doc.payable = r2(doc.total * (mo.ratio != null ? mo.ratio : 100) / 100);
       // 逐月已领：往月「实际发放值」之和（D6），每月单列行（D8-1）；B 族进度月为增量直报（简化链），结算/尾款走累计链
       const useCum = book.family !== "B" || mo.kind === "settle" || mo.kind === "final";
       doc.prevPaid = [];
@@ -1193,14 +1200,17 @@
       doc.alloc = mo.alloc || (doc.rounded > 0 ? { [book.leader]: doc.rounded } : {});
       doc.fp = JSON.stringify([dataLines.map((l) => [l.item, l.qty, l.price]), doc.subsidyAmt, mo.ratio]);
     }
-    // 工资表/考勤表行（D7 负责人+组员多行；实发 = 分配额 − 借支）
+    // 工资表/考勤表行（D7 负责人+组员多行）：
+    // C1/C2 应发=毛额（日薪×出勤+加班 / 工数×大工价）、实发=毛额−借支（取自 rows.net，避免双扣）；
+    // 计件族 应发=组内分配额、实发=分配−借支。
     doc.wageRows = book.members.map((name) => {
-      const amount = book.family === "C1" || book.family === "C2"
-        ? (doc.rows.find((r) => r.name === name) || {}).net || 0
+      const timeRow = (book.family === "C1" || book.family === "C2") ? (doc.rows.find((r) => r.name === name) || null) : null;
+      const amount = timeRow
+        ? (timeRow.gross != null ? r2(timeRow.gross + (timeRow.otAmt || 0)) : (timeRow.amount || 0))
         : (doc.alloc || {})[name] || 0;
       const borrow = (mo.borrow || {})[name] || 0;
       const r = rosterRow(name);
-      return { name, amount, borrow, net: r2(amount - (book.family === "C1" || book.family === "C2" ? 0 : borrow)),
+      return { name, amount, borrow, net: timeRow ? (timeRow.net || 0) : r2(amount - borrow),
         attN: (mo.attN || {})[name] || 0, bank: r ? r.bank : null, safety: r ? r.safety : true,
         att: attArr((mo.attN || {})[name] || 0) };
     });
@@ -1223,10 +1233,13 @@
     const timeLike = rows.every((x) => x.book.family === "C1" || x.book.family === "C2");
     const sum = (f) => r2(rows.reduce((s, x) => s + (f(x.doc) || 0), 0));
     const ro = rosterOf(crew);
-    if (timeLike) return { timeLike: true, rows, total: sum((d) => d.total), roster: ro };
+    // due = 本期应发（仅未发放单据；已发放月是历史快照，不再是「待付」）
+    if (timeLike) return { timeLike: true, rows, total: sum((d) => d.total), roster: ro,
+      due: sum((d) => (d.status === "已发放" ? 0 : d.total)) };
     return { timeLike: false, rows, roster: ro,
       total: sum((d) => d.total), payable: sum((d) => d.payable), paid: sum((d) => d.paidSum),
       request: sum((d) => d.request), rounded: sum((d) => d.rounded),
+      due: sum((d) => (d.status === "已发放" ? 0 : d.rounded)),
       statusCount: rows.reduce((acc, x) => { acc[x.doc.status] = (acc[x.doc.status] || 0) + 1; return acc; }, {}) };
   };
 
@@ -1240,7 +1253,7 @@
     setBorrow: (id, mKey, name, v) => { const b = bookById(id); if (!b) return; const mo = b.months[mKey]; mo.borrow = mo.borrow || {}; mo.borrow[name] = +v || 0; notify(); },
     setAlloc: (id, mKey, alloc) => { const b = bookById(id); if (!b) return; b.months[mKey].alloc = alloc; notify(); },
     // 核对（D6-2）：留当前指纹；上游再变动 → dirty
-    check: (id, mKey) => { const b = bookById(id); if (!b) return; const d = calc(id, mKey); b.months[mKey].status = "已核对"; b.months[mKey].checkedFp = d ? d.fp : "__ok__"; notify(); },
+    check: (id, mKey) => { const b = bookById(id); if (!b) return; const d = calc(id, mKey); b.months[mKey].status = "已核对"; b.months[mKey].checkedFp = d ? d.fp : null; notify(); },
     backToDraft: (id, mKey) => { const b = bookById(id); if (!b) return; const mo = b.months[mKey]; if (mo.status === "已核对") { mo.status = "草稿"; delete mo.checkedFp; notify(); } },
     // 暂不支付（D6）：不执行发放动作，应发滚存到后月（不再取整记 0）
     defer: (id, mKey, on) => { const b = bookById(id); if (!b) return; b.months[mKey].deferred = !!on; notify(); },
@@ -1251,10 +1264,12 @@
       const mo = b.months[mKey];
       const d = calc(id, mKey);
       mo.status = "已发放";
-      mo.actualPaid = +actual || (d ? (d.rounded != null ? d.rounded : d.total) : 0);
+      // 实际发放金额以实际为准——0 也是合法登记值，不能用 || 兜回默认
+      const av = actual == null || actual === "" ? NaN : +actual;
+      mo.actualPaid = Number.isFinite(av) ? av : (d ? (d.rounded != null ? d.rounded : d.total) : 0);
       if (alloc) mo.alloc = alloc; else if (!mo.alloc) mo.alloc = { [b.leader]: mo.actualPaid };
       if (!mo.seqNo && b.family !== "C1") mo.seqNo = nextSeq(b.project);
-      // D3 快照固化：冻结当月工程量与单价
+      // D3 快照固化：冻结当月工程量/单价 + 完整清单行（防后续改指派/改量穿透历史月）
       if ((b.family === "A" || b.family === "MGR") && window.WAGE && !mo.floorsSnap) {
         const W = window.WAGE;
         mo.floorsSnap = {}; W.BUILDINGS.forEach((bb) => { mo.floorsSnap[bb] = (W.doneFloors(bb) || []).slice(); });
@@ -1262,6 +1277,7 @@
         if (b.family === "MGR") { mo.priceSnap["管理费"] = (b.config.priceAdj || {})["管理费"] != null ? b.config.priceAdj["管理费"] : (W.config.managerRate || 2.5); }
         else { (W.TRADES[b.tradeKey].items || []).forEach((it) => { mo.priceSnap[it] = (b.config.priceAdj || {})[it] != null ? b.config.priceAdj[it] : W.price(it); }); }
       }
+      if (d && d.lines) { mo.linesSnap = d.lines.map((l) => ({ ...l })); mo.subsSnap = (d.subsidies || []).map((s) => ({ ...s })); }
       delete mo._sealed;
       notify();
       return mo;

@@ -341,7 +341,7 @@ CREATE TABLE project_aliases (
 | HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（房间×工种×分项，清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
 | UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户级指派+完成四合一（户×工种→班组/人×月份×完成，草稿态+验收照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | ⚠️ **已按 [ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md) 重构**：原「分项×房间×工人」合一表拆为 `house_type_template_items`（量）+ `unit_assignments`（完成/施工人/月份）；`units` +`houseTypeTemplateId`、`projects` +`matrixArchivedAt`。本文下方对 `quantities` 的引用（§66 关系图 / §303·§461·§534 进度聚合 / §399-401 外键 / §547·§551 口径 / §663-666 索引）待工程量域批次 PRD 随实现改名同步，完整 schema 以 ADR 0010 为权威 |
-| WageStatement | `wage_statements` | `id` | `subcontract-payroll.md` + 设计稿 WageSlipScreen（月度进度款单：项目×班组×月；「本期支付总额」直给按权重分摊；**字段细化随工资域批次 PRD**） |
+| WageStatement | `wage_statements` | `id` | ⚠️ 口径已随 [#117](https://github.com/zodea/crm-new/issues/117) 进度款域重构更新（2026-07-20）：单据主体=**负责人请款簿**（请款主体×月），三态生命周期（草稿/已核对/已发放固化实际金额）、单据级比例、格式族 A/B/C1/C2、全项目递增请款序号；「本期支付总额权重分摊」待 #117 未决⑥。**字段细化随工资域批次 PRD**，以 #117 定稿为权威 |
 | WageStatementLine | `wage_statement_lines` | `id` | 同上（工人行快照：应发/实发可直改/开户行/卡号） |
 | AttendanceRecord | `attendance_records` | `id` | 考勤（工人×日期×工时，**待细化**） |
 
