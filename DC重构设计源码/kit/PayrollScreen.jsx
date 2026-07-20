@@ -3,6 +3,8 @@
 //   D2：去掉按人速览，卡片底部显示「在班 X 人 · 离职 Y 人」（数据来自名册登记表进/退场日期）；
 // · 第三层 = 请款簿总表（D7 单据主体=负责人）：一行一本请款簿（负责人+组员），三态状态列（D6），
 //   班组层面批量核对/批量发放；月份轴含 结算95%/尾款100% 档并显示各月实际用过的比例（⑦）；
+// · ⑧ 工具页退役：「本期支付总额权重分摊」并入批量发放弹窗——输入本期资金总额 → 按各簿（应领−已领）
+//   权重生成建议实际金额（按各簿取整规则下取整）→ 逐行可改 → 批量登记发放并固化；
 // · 打开请款簿 → PayrollDetailScreen（核对两步流 + A4 格式族）。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
@@ -220,20 +222,77 @@
       confirmText: "全部核对",
       onConfirm: () => { draftRows.forEach(x => P.check(x.book.id, month)); UI().toast("已核对 " + draftRows.length + " 本请款簿", "success"); },
     });
+    // ⑧ 批量发放弹窗：默认=各簿取整应发；输入「本期支付总额」→ 按（应领−已领）权重分摊建议值；逐行可改，以实际为准
     const batchRelease = () => {
-      // 口径校验：三级安全教育未录入 → 该簿不可发放（按钮计数已按 releasableRows）
       const blocked = checkedRows.filter(x => (x.doc.wageRows || []).some(r => !r.safety));
       if (!releasableRows.length) { UI().toast("待发簿存在「三级安全教育未录入」，禁止发放", "danger"); return; }
-      UI().confirm({
-        title: "批量登记发放？",
-        message: "将按「取整应发」默认金额登记 " + releasableRows.length + " 本已核对请款簿的实际发放并整体固化（只读快照）；同时在付款管理域逐簿生成支出记录（类别=工人工资）。"
-          + (blocked.length ? "另有 " + blocked.map(x => x.book.leader + "簿").join("、") + " 因三级安全教育未录入被跳过。" : ""),
-        confirmText: "登记发放",
-        onConfirm: () => {
-          releasableRows.forEach(x => P.release(x.book.id, month));
-          UI().toast("已发放并固化 " + releasableRows.length + " 本 · 已在付款管理生成 " + releasableRows.length + " 条支出记录" + (blocked.length ? "（跳过 " + blocked.length + " 本）" : ""), "success");
-        },
+      const num2 = n => Number(n || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const rowsHtml = releasableRows.map(x => {
+        const d = x.doc;
+        const def = d.rounded != null ? d.rounded : d.total;
+        return '<tr style="border-bottom:1px solid var(--line)">' +
+          '<td style="padding:7px 10px;font-size:12.5px;white-space:nowrap"><b style="color:var(--brand)">' + x.book.leader + '簿</b>' +
+          '<span style="font-size:10.5px;color:var(--ink-faint);margin-left:6px">' + x.book.scopeLabel + '</span></td>' +
+          '<td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--font-mono);color:var(--ink-soft)">' + num2(d.request) + '</td>' +
+          '<td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--font-mono)">' + num2(def) + '</td>' +
+          '<td style="padding:5px 10px;text-align:right"><input data-bid="' + x.book.id + '" type="number" value="' + def + '" ' +
+          'style="width:110px;border:1.5px solid var(--brand);border-radius:6px;padding:5px 8px;font-size:12.5px;text-align:right;font-family:var(--font-mono)"></td></tr>';
+      }).join("");
+      const ret = UI().modal({
+        title: "批量发放 · " + P.monthLabel(month, axisBook.months[month]),
+        subtitle: "默认=取整应发，逐行可改，以实际最终发放金额为准（D6）；输入本期资金总额可按权重分摊（原进度款工具能力，定稿⑧）",
+        width: 640,
+        bodyHTML:
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<div style="display:flex;align-items:center;gap:8px;background:var(--brand-soft);border-radius:8px;padding:9px 12px">' +
+          '<span style="font-size:12.5px;font-weight:700;color:var(--brand-deep)">本期支付总额</span>' +
+          '<input id="kit-batch-total" type="number" placeholder="选填" style="width:130px;border:1.5px solid var(--brand);border-radius:6px;padding:6px 9px;font-size:12.5px;text-align:right;font-family:var(--font-mono)">' +
+          '<button id="kit-batch-share" style="border:0;background:var(--brand);color:#fff;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">按权重分摊</button>' +
+          '<span style="font-size:10.5px;color:var(--brand-deep);opacity:.8">权重 = 各簿（应领 − 已领），建议值按各簿取整规则下取整</span></div>' +
+          '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
+          ['请款簿', '本次请款', '取整应发', '实际发放金额'].map((h, i) => '<th style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);text-align:' + (i ? "right" : "left") + '">' + h + '</th>').join("") +
+          '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+          '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 10px">' +
+          '<span style="color:var(--ink-soft)">' + (blocked.length ? "跳过（安全教育未录入）：" + blocked.map(x => x.book.leader + "簿").join("、") : "") + '</span>' +
+          '<span>Σ 实际发放 <b id="kit-batch-sum" style="font-family:var(--font-mono)">0.00</b><span id="kit-batch-diff" style="margin-left:8px;font-size:11px;color:var(--ink-faint)"></span></span></div>' +
+          '<div style="display:flex;justify-content:flex-end"><button id="kit-batch-ok" style="border:0;background:var(--brand);color:#fff;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:800;cursor:pointer">登记发放 ' + releasableRows.length + ' 本并固化</button></div>' +
+          '</div>',
+        actions: [{ label: "取消" }],
       });
+      const body = ret.body;
+      const inputs = () => Array.from(body.querySelectorAll("input[data-bid]"));
+      const refreshSum = () => {
+        const s = inputs().reduce((a, el) => a + (+el.value || 0), 0);
+        body.querySelector("#kit-batch-sum").textContent = num2(s);
+        const tv = parseFloat(body.querySelector("#kit-batch-total").value);
+        body.querySelector("#kit-batch-diff").textContent = Number.isFinite(tv) && tv > 0 ? "（与总额差 " + num2(tv - s) + "）" : "";
+      };
+      inputs().forEach(el => el.addEventListener("input", refreshSum));
+      body.querySelector("#kit-batch-total").addEventListener("input", refreshSum);
+      body.querySelector("#kit-batch-share").addEventListener("click", () => {
+        const tv = parseFloat(body.querySelector("#kit-batch-total").value);
+        if (!Number.isFinite(tv) || tv <= 0) { UI().toast("先填入本期支付总额，再按权重分摊", "warning"); return; }
+        const base = releasableRows.map(x => Math.max(0, (x.doc.payable || 0) - (x.doc.paidSum || 0)));
+        const baseSum = base.reduce((a, b2) => a + b2, 0) || 1;
+        releasableRows.forEach((x, i) => {
+          const u = Math.max(1, x.book.config.round || 100);
+          // 先四舍五入到分再按取整规则下取整，避免浮点（如 30000×1.0 → 29999.997 → 少一档）
+          const share = Math.round(tv * base[i] / baseSum * 100) / 100;
+          const v = Math.max(0, Math.floor(share / u) * u);
+          const el = body.querySelector('input[data-bid="' + x.book.id + '"]');
+          if (el) el.value = v;
+        });
+        refreshSum();
+      });
+      body.querySelector("#kit-batch-ok").addEventListener("click", () => {
+        releasableRows.forEach(x => {
+          const el = body.querySelector('input[data-bid="' + x.book.id + '"]');
+          P.release(x.book.id, month, el ? el.value : null);
+        });
+        ret.close();
+        UI().toast("已发放并固化 " + releasableRows.length + " 本 · 已在付款管理生成 " + releasableRows.length + " 条支出记录（类别=工人工资）" + (blocked.length ? "（跳过 " + blocked.length + " 本）" : ""), "success");
+      });
+      refreshSum();
     };
 
     return (
@@ -280,7 +339,6 @@
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               {!timeLike && <Button size="sm" icon="circle-check" disabled={!draftRows.length} onClick={batchCheck}>批量核对（{draftRows.length}）</Button>}
               <Button size="sm" variant="primary" icon="banknote" disabled={!releasableRows.length} onClick={batchRelease}>批量发放（{releasableRows.length}）</Button>
-              <Button size="sm" icon="sliders-horizontal" onClick={() => navigate("wageSlip", { crew: selCrew, project: selProject, month })}>进度款工具</Button>
               <Button size="sm" icon="download" onClick={() => UI().toast("正在导出 Excel（请款簿 × " + rows.length + " 本，含清单/工资表/考勤表）…")}>导出 Excel</Button>
             </span>
           </div>
