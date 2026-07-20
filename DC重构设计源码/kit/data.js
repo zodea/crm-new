@@ -1294,6 +1294,39 @@
     // D4 单价修改路径（弹窗双模式）：统一改=改分项基准单价（所有做该项的人、当月起）；单独改=本簿单列调价
     priceUniform: (baseItem, v) => { if (window.WAGE) window.WAGE.setPrice(baseItem, +v || 0); notify(); },
     priceSolo: (id, baseItem, v) => { const b = bookById(id); if (!b) return; b.config.priceAdj = b.config.priceAdj || {}; if (v == null || v === "") delete b.config.priceAdj[baseItem]; else b.config.priceAdj[baseItem] = +v || 0; notify(); },
+    // ④ 建档：新建请款主体（格式族挂建档级）→ 生成首月草稿（计件族月份轴自动补 结算95%/尾款100% 档）
+    createBook: (o) => {
+      const nid = "B" + (books.reduce((mx, b) => Math.max(mx, +(String(b.id).replace(/^B/, "")) || 0), 0) + 1);
+      const isTime = o.family === "C1" || o.family === "C2";
+      const fm = o.firstMonth || "2026-06";
+      const book = {
+        id: nid, project: o.project, crew: o.crew, trade: o.trade || o.crew, tradeKey: o.tradeKey,
+        family: o.family, leader: o.leader, members: o.members && o.members.length ? o.members : [o.leader],
+        scopeLabel: o.scopeLabel || o.trade || o.crew,
+        config: o.config || {},
+        monthSeq: isTime ? [fm] : [fm, "结算", "尾款"],
+        months: { [fm]: Object.assign({ status: "草稿", borrow: {}, attN: {} },
+          isTime ? {} : { ratio: (o.config && o.config.ratioFirst) != null ? o.config.ratioFirst : 75 },
+          o.family === "C1" ? { days: {}, otHours: {} } : {},
+          o.family === "C2" ? { logs: [] } : {}) },
+      };
+      if (!isTime) {
+        book.months["结算"] = { kind: "settle", status: "未到", ratio: 95 };
+        book.months["尾款"] = { kind: "final", status: "未到", ratio: 100 };
+      }
+      if (o.family === "B") book.contractLines = o.contractLines || [];
+      books.push(book);
+      // 班组不在 projectCrews 时补挂（瀑布卡可见）
+      const dd = window.KIT_DATA;
+      if (dd && dd.projectCrews) {
+        dd.projectCrews[o.project] = dd.projectCrews[o.project] || [];
+        if (!dd.projectCrews[o.project].some((c) => c.crew === o.crew)) {
+          dd.projectCrews[o.project].push({ crew: o.crew, trade: o.trade || o.crew, workers: book.members.length, net: 0, hasData: true });
+        }
+      }
+      notify();
+      return book;
+    },
   };
 
   // —— projectCrews 增补：合和新城挂杂工班/木工有数据；未来印象小区挂 B/C2 两组（按月一册归档演示）——
