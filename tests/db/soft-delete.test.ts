@@ -47,6 +47,25 @@ async function dbWithProject(id = 'p1', name = '合和新城') {
   return db
 }
 
+/** #103 工程量域最小关系图：项目→楼栋→楼层→户→责任/完成，模板→房间→三量。 */
+async function dbWithQuantityGraph() {
+  const db = await dbWithProject()
+  await db.execute(`INSERT INTO crews (id, name, trade) VALUES ('crew1', '泥工一班', '泥工')`)
+  await db.execute(`INSERT INTO workers (id, crew_id, name, trade) VALUES ('worker1', 'crew1', '张师傅', '泥工')`)
+  await db.execute(`INSERT INTO items (id, project_id, code, name, trade) VALUES ('item1', 'p1', 'IT-01', '墙砖', '泥工')`)
+  await db.execute(`INSERT INTO buildings (id, project_id, code, name) VALUES ('building1', 'p1', 'B1', '1号楼')`)
+  await db.execute(`INSERT INTO floors (id, building_id, code, name) VALUES ('floor1', 'building1', 'F1', '一层')`)
+  await db.execute(`INSERT INTO house_type_templates (id, project_id, code, name) VALUES ('template1', 'p1', 'A', 'A户型')`)
+  await db.execute(`INSERT INTO rooms (id, template_id, code, name) VALUES ('room1', 'template1', 'living', '客厅')`)
+  await db.execute(`INSERT INTO units (id, floor_id, house_type_template_id, code, name) VALUES ('unit1', 'floor1', 'template1', '101', '101室')`)
+  await db.execute(`INSERT INTO house_type_template_items (id, room_id, item_id, contract_qty) VALUES ('template-item1', 'room1', 'item1', 10)`)
+  await db.execute(`INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES ('stage1', 'p1', 'ST-01', '墙砖粘贴', '泥工')`)
+  await db.execute(`INSERT INTO unit_assignments (id, unit_id, trade, worker_id) VALUES ('assignment1', 'unit1', '泥工', 'worker1')`)
+  await db.execute(`INSERT INTO unit_stage_completions (id, unit_id, stage_id, assignment_id, status, completed_at) VALUES ('completion1', 'unit1', 'stage1', 'assignment1', 'completed', '2026-07-01')`)
+  await db.execute(`INSERT INTO unit_assignment_scopes (id, assignment_id, room_id, item_id) VALUES ('scope1', 'assignment1', 'room1', 'item1')`)
+  return db
+}
+
 describe('v2 迁移:全业务表 deleted_at + operation_logs', () => {
   it('冷启动:全部业务表含 deleted_at 列,并建有软删部分索引', async () => {
     const db = await createMemoryDb()
@@ -267,6 +286,92 @@ describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
 
     await restoreRecord(db, 'projects', 'p1')
     expect(await selectVisible(db, 'settlements')).toHaveLength(1)
+    db.close()
+  })
+
+  it('#103 深链祖先过滤:删项目隐藏楼栋→楼层→户→责任/完成,且只标项目自身', async () => {
+    const db = await dbWithQuantityGraph()
+
+    await softDelete(db, 'projects', 'p1')
+
+    const descendants = [
+      ['buildings', 'building1'],
+      ['floors', 'floor1'],
+      ['units', 'unit1'],
+      ['unit_assignments', 'assignment1'],
+      ['unit_stage_completions', 'completion1'],
+    ] as const
+    for (const [table, id] of descendants) {
+      expect(await selectVisible(db, table), `${table} 应随项目祖先隐藏`).toHaveLength(0)
+      const [physical] = await db.select<{ deleted_at: string | null }>(
+        `SELECT deleted_at FROM "${table}" WHERE id = ?`,
+        [id],
+      )
+      expect(physical.deleted_at, `${table} 不应被逐条软删`).toBeNull()
+      expect(await logsFor(db, table, id), `${table} 不应生成级联删除日志`).toHaveLength(0)
+    }
+    expect((await logsFor(db, 'projects', 'p1')).map(log => log.action)).toEqual(['delete'])
+    db.close()
+  })
+
+  it('#103 模板祖先过滤:删户型模板隐藏模板房间、挂靠户与模板三量', async () => {
+    const db = await dbWithQuantityGraph()
+
+    await softDelete(db, 'house_type_templates', 'template1')
+
+    expect(await selectVisible(db, 'rooms')).toHaveLength(0)
+    expect(await selectVisible(db, 'units')).toHaveLength(0)
+    expect(await selectVisible(db, 'house_type_template_items')).toHaveLength(0)
+    db.close()
+  })
+
+  it('#103 完成时责任留史:旧责任软删后完成仍可见,历史 JOIN 可读物理责任与人员', async () => {
+    const db = await dbWithQuantityGraph()
+
+    await softDelete(db, 'unit_assignments', 'assignment1')
+
+    expect(await selectVisible(db, 'unit_assignments')).toHaveLength(0)
+    expect(await selectVisible(db, 'unit_stage_completions')).toHaveLength(1)
+
+    const rows = await db.select<{
+      completion_id: string
+      assignment_id: string
+      assignment_deleted_at: string | null
+      crew_name: string
+      worker_name: string
+    }>(`
+      ${hiddenCtes('unit_stage_completions')}
+      SELECT
+        usc.id AS completion_id,
+        ua.id AS assignment_id,
+        ua.deleted_at AS assignment_deleted_at,
+        c.name AS crew_name,
+        w.name AS worker_name
+      FROM unit_stage_completions usc
+      LEFT JOIN unit_assignments ua ON ua.id = usc.assignment_id
+      LEFT JOIN workers w ON w.id = ua.worker_id
+      LEFT JOIN crews c ON c.id = COALESCE(ua.crew_id, w.crew_id)
+      WHERE ${visibleCond('unit_stage_completions', 'usc')}
+    `)
+    expect(rows).toEqual([{
+      completion_id: 'completion1',
+      assignment_id: 'assignment1',
+      assignment_deleted_at: expect.any(String),
+      crew_name: '泥工一班',
+      worker_name: '张师傅',
+    }])
+    db.close()
+  })
+
+  it('#103 借用模板只留审计来源:删除来源模板不隐藏快照复制件', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO house_type_templates (id, project_id, code, name) VALUES ('template-source', 'p1', 'A', 'A户型')`)
+    await db.execute(`INSERT INTO house_type_templates (id, project_id, code, name, copied_from_template_id) VALUES ('template-copy', 'p1', 'B', 'B户型', 'template-source')`)
+
+    await softDelete(db, 'house_type_templates', 'template-source')
+
+    const visible = await selectVisible(db, 'house_type_templates', 'ORDER BY id')
+    expect(visible.map(row => row.id)).toEqual(['template-copy'])
     db.close()
   })
 
@@ -539,6 +644,15 @@ describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts �
     await runMigrations(db)
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '孤家寡人')`)
     expect(await downstreamImpact(db, 'suppliers', 's1')).toEqual([])
+    db.close()
+  })
+
+  it('#103 责任删除杀伤面只含下钻范围,不把历史完成事实当子级', async () => {
+    const db = await dbWithQuantityGraph()
+
+    expect(await downstreamImpact(db, 'unit_assignments', 'assignment1')).toEqual([
+      { table: 'unit_assignment_scopes', n: 1 },
+    ])
     db.close()
   })
 

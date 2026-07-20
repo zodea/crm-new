@@ -29,6 +29,39 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'supplier_id', table: 'suppliers' },
   ],
   crews: [],
+  items: [{ column: 'project_id', table: 'projects' }],
+  buildings: [{ column: 'project_id', table: 'projects' }],
+  floors: [{ column: 'building_id', table: 'buildings' }],
+  house_type_templates: [{ column: 'project_id', table: 'projects' }],
+  rooms: [{ column: 'template_id', table: 'house_type_templates' }],
+  units: [
+    { column: 'floor_id', table: 'floors' },
+    { column: 'house_type_template_id', table: 'house_type_templates' },
+  ],
+  house_type_template_items: [
+    { column: 'room_id', table: 'rooms' },
+    { column: 'item_id', table: 'items' },
+  ],
+  construction_stages: [{ column: 'project_id', table: 'projects' }],
+  construction_stage_items: [
+    { column: 'stage_id', table: 'construction_stages' },
+    { column: 'item_id', table: 'items' },
+  ],
+  unit_assignments: [
+    { column: 'unit_id', table: 'units' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  unit_assignment_scopes: [
+    { column: 'assignment_id', table: 'unit_assignments' },
+    { column: 'room_id', table: 'rooms' },
+    { column: 'item_id', table: 'items' },
+  ],
+  // assignment_id 仅为完成时责任审计引用；责任软删不得吞掉历史完成事实。
+  unit_stage_completions: [
+    { column: 'unit_id', table: 'units' },
+    { column: 'stage_id', table: 'construction_stages' },
+  ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [
     { column: 'project_id', table: 'projects' },
