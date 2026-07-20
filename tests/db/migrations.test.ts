@@ -1,4 +1,4 @@
-import type { Migration } from '~/lib/db/migrations'
+import type { Migration, MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
 import {
   addColumnIfMissing,
@@ -36,6 +36,135 @@ const BASELINE_TABLES = [
   'file_refs',
   'file_payloads',
 ]
+
+const QUANTITY_TABLES = [
+  'items',
+  'buildings',
+  'floors',
+  'house_type_templates',
+  'rooms',
+  'units',
+  'house_type_template_items',
+  'construction_stages',
+  'construction_stage_items',
+  'unit_assignments',
+  'unit_stage_completions',
+  'unit_assignment_scopes',
+]
+
+const QUANTITY_MIGRATION_VERSION = 12
+
+const QUANTITY_QUERY_INDEXES = [
+  'idx_buildings_project',
+  'idx_floors_building',
+  'idx_units_floor',
+  'idx_units_template',
+  'idx_rooms_template',
+  'idx_items_project',
+  'idx_ht_project',
+  'idx_hti_room',
+  'idx_hti_item',
+  'idx_stages_project',
+  'idx_stage_items_stage',
+  'idx_unit_assignments_unit',
+  'idx_unit_assignments_crew',
+  'idx_unit_assignments_worker',
+  'idx_unit_assignments_trade',
+  'idx_uas_assignment',
+  'idx_usc_stage_date',
+  'idx_usc_unit',
+  'idx_usc_assignment',
+  ...QUANTITY_TABLES.map(table => `idx_${table}_deleted`),
+]
+
+const QUANTITY_ACTIVE_UNIQUE_INDEXES = [
+  'uq_building_code',
+  'uq_floor_code',
+  'uq_unit_code',
+  'uq_room_code',
+  'uq_room_whole_unit',
+  'uq_item_code',
+  'uq_ht_code',
+  'uq_hti_room_item',
+  'uq_stage_code',
+  'uq_stage_item',
+  'uq_unit_assignment_trade',
+  'uq_uas_scope',
+  'uq_usc_unit_stage',
+]
+
+const QUANTITY_REQUIRED_COLUMNS: Record<string, string[]> = {
+  items: ['id', 'project_id', 'code', 'name', 'section', 'trade', 'unit', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  buildings: ['id', 'project_id', 'code', 'name', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  floors: ['id', 'building_id', 'code', 'name', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  house_type_templates: ['id', 'project_id', 'code', 'name', 'copied_from_template_id', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  rooms: ['id', 'template_id', 'code', 'name', 'kind', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  units: ['id', 'floor_id', 'house_type_template_id', 'code', 'name', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  house_type_template_items: ['id', 'room_id', 'item_id', 'recognized_contract_qty', 'contract_qty', 'provisional_qty', 'field_formula', 'field_qty', 'note', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  construction_stages: ['id', 'project_id', 'code', 'name', 'trade', 'completion_mode', 'sort_order', 'created_at', 'updated_at', 'deleted_at'],
+  construction_stage_items: ['id', 'stage_id', 'item_id', 'created_at', 'updated_at', 'deleted_at'],
+  unit_assignments: ['id', 'unit_id', 'trade', 'crew_id', 'worker_id', 'note', 'created_at', 'updated_at', 'deleted_at'],
+  unit_stage_completions: ['id', 'unit_id', 'stage_id', 'assignment_id', 'status', 'completed_at', 'note', 'created_at', 'updated_at', 'deleted_at'],
+  unit_assignment_scopes: ['id', 'assignment_id', 'room_id', 'item_id', 'created_at', 'updated_at', 'deleted_at'],
+}
+
+interface ForeignKeyDescription {
+  source_column: string
+  target_table: string
+  target_column: string
+}
+
+const QUANTITY_FOREIGN_KEYS: Record<string, ForeignKeyDescription[]> = {
+  items: [{ source_column: 'project_id', target_table: 'projects', target_column: 'id' }],
+  buildings: [{ source_column: 'project_id', target_table: 'projects', target_column: 'id' }],
+  floors: [{ source_column: 'building_id', target_table: 'buildings', target_column: 'id' }],
+  house_type_templates: [
+    { source_column: 'project_id', target_table: 'projects', target_column: 'id' },
+    { source_column: 'copied_from_template_id', target_table: 'house_type_templates', target_column: 'id' },
+  ],
+  rooms: [{ source_column: 'template_id', target_table: 'house_type_templates', target_column: 'id' }],
+  units: [
+    { source_column: 'floor_id', target_table: 'floors', target_column: 'id' },
+    { source_column: 'house_type_template_id', target_table: 'house_type_templates', target_column: 'id' },
+  ],
+  house_type_template_items: [
+    { source_column: 'room_id', target_table: 'rooms', target_column: 'id' },
+    { source_column: 'item_id', target_table: 'items', target_column: 'id' },
+  ],
+  construction_stages: [{ source_column: 'project_id', target_table: 'projects', target_column: 'id' }],
+  construction_stage_items: [
+    { source_column: 'stage_id', target_table: 'construction_stages', target_column: 'id' },
+    { source_column: 'item_id', target_table: 'items', target_column: 'id' },
+  ],
+  unit_assignments: [
+    { source_column: 'unit_id', target_table: 'units', target_column: 'id' },
+    { source_column: 'crew_id', target_table: 'crews', target_column: 'id' },
+    { source_column: 'worker_id', target_table: 'workers', target_column: 'id' },
+  ],
+  unit_stage_completions: [
+    { source_column: 'unit_id', target_table: 'units', target_column: 'id' },
+    { source_column: 'stage_id', target_table: 'construction_stages', target_column: 'id' },
+    { source_column: 'assignment_id', target_table: 'unit_assignments', target_column: 'id' },
+  ],
+  unit_assignment_scopes: [
+    { source_column: 'assignment_id', target_table: 'unit_assignments', target_column: 'id' },
+    { source_column: 'room_id', target_table: 'rooms', target_column: 'id' },
+    { source_column: 'item_id', target_table: 'items', target_column: 'id' },
+  ],
+}
+
+async function seedQuantityFixture(db: MigrationDb): Promise<void> {
+  await db.execute(`INSERT INTO projects (id, name, region) VALUES ('project-q', '存量项目', '华东')`)
+  await db.execute(`INSERT INTO crews (id, name, trade) VALUES ('crew-q', '墙地砖班组', '瓦工')`)
+  await db.execute(`INSERT INTO workers (id, crew_id, name, trade) VALUES ('worker-q', 'crew-q', '王工', '瓦工')`)
+  await db.execute(`INSERT INTO items (id, project_id, code, name, trade) VALUES ('item-q', 'project-q', 'ITEM-01', '墙砖铺贴', '瓦工')`)
+  await db.execute(`INSERT INTO buildings (id, project_id, code, name) VALUES ('building-q', 'project-q', 'B-01', '1#楼')`)
+  await db.execute(`INSERT INTO floors (id, building_id, code, name) VALUES ('floor-q', 'building-q', 'F-01', '1层')`)
+  await db.execute(`INSERT INTO house_type_templates (id, project_id, code, name) VALUES ('template-q', 'project-q', 'HT-A', 'A户型')`)
+  await db.execute(`INSERT INTO rooms (id, template_id, code, name) VALUES ('room-q', 'template-q', 'ROOM-01', '次卧')`)
+  await db.execute(`INSERT INTO units (id, floor_id, house_type_template_id, code, name) VALUES ('unit-q', 'floor-q', 'template-q', 'U-101', '101')`)
+  await db.execute(`INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES ('stage-q', 'project-q', 'STAGE-01', '墙砖铺贴', '瓦工')`)
+}
 
 describe('迁移机制：版本化顺序迁移', () => {
   it('冷启动：空库收敛到最新版本，全量表建齐', async () => {
@@ -315,6 +444,315 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     await expect(db.execute(
       `INSERT INTO suppliers (id, name, external_ref) VALUES ('sup-b', '乙', 'OLD-001')`,
     )).rejects.toThrow()
+    db.close()
+  })
+
+  it('v12：冷启动建立工程量域表，并为项目增加独立矩阵归档时间', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+
+    expect(await listTables(db)).toEqual(expect.arrayContaining(QUANTITY_TABLES))
+    expect(await columnNames(db, 'projects')).toContain('matrix_archived_at')
+    db.close()
+  })
+
+  it('v12：工程量查询链与每张新业务表都有目标索引', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+
+    const indexes = await db.select<{ name: string }>(
+      `SELECT name FROM sqlite_master WHERE type = 'index'`,
+    )
+    expect(indexes.map(index => index.name)).toEqual(expect.arrayContaining(QUANTITY_QUERY_INDEXES))
+    db.close()
+  })
+
+  it('v12：工程量自然键只约束未软删记录', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+
+    const indexes = await db.select<{ name: string, sql: string }>(
+      `SELECT name, sql FROM sqlite_master WHERE type = 'index' AND name LIKE 'uq_%'`,
+    )
+    const quantityIndexes = indexes.filter(index => QUANTITY_ACTIVE_UNIQUE_INDEXES.includes(index.name))
+    expect(quantityIndexes.map(index => index.name)).toEqual(expect.arrayContaining(QUANTITY_ACTIVE_UNIQUE_INDEXES))
+    expect(quantityIndexes).toHaveLength(QUANTITY_ACTIVE_UNIQUE_INDEXES.length)
+    expect(quantityIndexes.every(index => /WHERE deleted_at IS NULL/i.test(index.sql))).toBe(true)
+    expect(quantityIndexes.find(index => index.name === 'uq_room_whole_unit')?.sql)
+      .toMatch(/kind\s*=\s*'whole_unit'/i)
+    db.close()
+  })
+})
+
+describe('v12 工程量底座：升级与约束行为', () => {
+  it('v11 升级保留项目、区域、班组和工人，新建工程量树为空', async () => {
+    const db = await createMemoryDb()
+    const previousMigrations = migrations.filter(migration => migration.version < QUANTITY_MIGRATION_VERSION)
+    const quantityMigrations = migrations.filter(migration => migration.version <= QUANTITY_MIGRATION_VERSION)
+    await runMigrations(db, previousMigrations)
+    await db.execute(`INSERT INTO projects (id, name, region) VALUES ('project-v11', '存量项目', '华南')`)
+    await db.execute(`INSERT INTO crews (id, name, trade) VALUES ('crew-v11', '存量班组', '油漆工')`)
+    await db.execute(`INSERT INTO workers (id, crew_id, name, trade) VALUES ('worker-v11', 'crew-v11', '存量工人', '油漆工')`)
+
+    const result = await runMigrations(db, quantityMigrations)
+
+    expect(result.from).toBe(QUANTITY_MIGRATION_VERSION - 1)
+    expect(result.to).toBe(QUANTITY_MIGRATION_VERSION)
+    expect(result.applied).toHaveLength(1)
+    expect(await db.select('SELECT id, name, region FROM projects WHERE id = ?', ['project-v11']))
+      .toEqual([{ id: 'project-v11', name: '存量项目', region: '华南' }])
+    expect(await db.select('SELECT id, name, trade FROM crews WHERE id = ?', ['crew-v11']))
+      .toEqual([{ id: 'crew-v11', name: '存量班组', trade: '油漆工' }])
+    expect(await db.select('SELECT id, crew_id, name, trade FROM workers WHERE id = ?', ['worker-v11']))
+      .toEqual([{ id: 'worker-v11', crew_id: 'crew-v11', name: '存量工人', trade: '油漆工' }])
+
+    for (const table of QUANTITY_TABLES) {
+      const [row] = await db.select<{ total: number }>(`SELECT COUNT(*) AS total FROM "${table}"`)
+      expect(row.total, `${table} 应为空表`).toBe(0)
+    }
+    db.close()
+  })
+
+  it('新建工程量表使用规格中的 snake_case 物理列', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+
+    for (const [table, requiredColumns] of Object.entries(QUANTITY_REQUIRED_COLUMNS)) {
+      const columns = await columnNames(db, table)
+      expect(columns, `${table} 缺少规格列`).toEqual(expect.arrayContaining(requiredColumns))
+      expect(columns.every(column => /^[a-z][a-z0-9_]*$/.test(column)), `${table} 存在非 snake_case 列`).toBe(true)
+    }
+    expect(await columnNames(db, 'projects')).toContain('matrix_archived_at')
+    expect(await columnNames(db, 'projects')).not.toContain('matrixArchivedAt')
+    db.close()
+  })
+
+  it('pragma 列出完整外键，显式开启外键后拒绝孤儿写入', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+
+    for (const [table, expectedForeignKeys] of Object.entries(QUANTITY_FOREIGN_KEYS)) {
+      const actualForeignKeys = await db.select<ForeignKeyDescription>(`
+        SELECT "from" AS source_column, "table" AS target_table, "to" AS target_column
+        FROM pragma_foreign_key_list(?)
+      `, [table])
+      expect(actualForeignKeys, `${table} 外键数量不符`).toHaveLength(expectedForeignKeys.length)
+      expect(actualForeignKeys, `${table} 外键目标不符`).toEqual(expect.arrayContaining(expectedForeignKeys))
+    }
+
+    await db.execute('PRAGMA foreign_keys = ON')
+    const [foreignKeysPragma] = await db.select<{ foreign_keys: number }>('PRAGMA foreign_keys')
+    expect(foreignKeysPragma.foreign_keys).toBe(1)
+    await expect(db.execute(`
+      INSERT INTO buildings (id, project_id, code, name)
+      VALUES ('building-orphan', 'missing-project', 'B-X', '孤儿楼栋')
+    `)).rejects.toThrow(/FOREIGN KEY constraint failed/i)
+    db.close()
+  })
+
+  it('未软删的户工种责任不可重复，软删后可复用同一自然键', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await seedQuantityFixture(db)
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, crew_id)
+      VALUES ('assignment-old', 'unit-q', '瓦工', 'crew-q')
+    `)
+
+    await expect(db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, worker_id)
+      VALUES ('assignment-conflict', 'unit-q', '瓦工', 'worker-q')
+    `)).rejects.toThrow(/UNIQUE constraint failed/i)
+
+    await db.execute(`UPDATE unit_assignments SET deleted_at = '2026-07-20 12:00:00' WHERE id = 'assignment-old'`)
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, worker_id)
+      VALUES ('assignment-new', 'unit-q', '瓦工', 'worker-q')
+    `)
+    expect(await db.select(`
+      SELECT id, worker_id
+      FROM unit_assignments
+      WHERE unit_id = 'unit-q' AND trade = '瓦工' AND deleted_at IS NULL
+    `)).toEqual([{ id: 'assignment-new', worker_id: 'worker-q' }])
+    db.close()
+  })
+
+  it('户工种责任强制班组与个人 XOR', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await seedQuantityFixture(db)
+
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, crew_id)
+      VALUES ('assignment-crew', 'unit-q', '班组责任', 'crew-q')
+    `)
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, worker_id)
+      VALUES ('assignment-worker', 'unit-q', '个人责任', 'worker-q')
+    `)
+    await expect(db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade)
+      VALUES ('assignment-neither', 'unit-q', '无责任')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+    await expect(db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, crew_id, worker_id)
+      VALUES ('assignment-both', 'unit-q', '双责任', 'crew-q', 'worker-q')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+
+    expect(await db.select<{ id: string }>('SELECT id FROM unit_assignments ORDER BY id'))
+      .toEqual([{ id: 'assignment-crew' }, { id: 'assignment-worker' }])
+    db.close()
+  })
+
+  it('阶段完成事实必须同时带完成时间和当时责任', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await seedQuantityFixture(db)
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, crew_id)
+      VALUES ('assignment-completion', 'unit-q', '瓦工', 'crew-q')
+    `)
+
+    await expect(db.execute(`
+      INSERT INTO unit_stage_completions (id, unit_id, stage_id, status)
+      VALUES ('completion-empty', 'unit-q', 'stage-q', 'completed')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+    await expect(db.execute(`
+      INSERT INTO unit_stage_completions (id, unit_id, stage_id, status, completed_at)
+      VALUES ('completion-no-assignment', 'unit-q', 'stage-q', 'completed', '2026-07-20 12:00:00')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+    await expect(db.execute(`
+      INSERT INTO unit_stage_completions (id, unit_id, stage_id, assignment_id, status)
+      VALUES ('completion-no-time', 'unit-q', 'stage-q', 'assignment-completion', 'completed')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+    await expect(db.execute(`
+      INSERT INTO unit_stage_completions (id, unit_id, stage_id, status)
+      VALUES ('completion-invalid-status', 'unit-q', 'stage-q', 'cancelled')
+    `)).rejects.toThrow(/CHECK constraint failed/i)
+
+    await db.execute(`
+      INSERT INTO unit_stage_completions
+        (id, unit_id, stage_id, assignment_id, status, completed_at)
+      VALUES
+        ('completion-valid', 'unit-q', 'stage-q', 'assignment-completion', 'completed', '2026-07-20 12:00:00')
+    `)
+    await db.execute(`
+      INSERT INTO construction_stages (id, project_id, code, name, trade)
+      VALUES ('stage-draft', 'project-q', 'STAGE-02', '墙砖草稿', '瓦工')
+    `)
+    await db.execute(`
+      INSERT INTO unit_stage_completions (id, unit_id, stage_id, status)
+      VALUES ('completion-draft', 'unit-q', 'stage-draft', 'draft')
+    `)
+
+    expect(await db.select(`
+      SELECT id, status, assignment_id, completed_at
+      FROM unit_stage_completions
+      ORDER BY id
+    `)).toEqual([
+      { id: 'completion-draft', status: 'draft', assignment_id: null, completed_at: null },
+      {
+        id: 'completion-valid',
+        status: 'completed',
+        assignment_id: 'assignment-completion',
+        completed_at: '2026-07-20 12:00:00',
+      },
+    ])
+    db.close()
+  })
+
+  it('v12 up 半途失败后可重跑，且保留已建表中的数据', async () => {
+    const db = await createMemoryDb()
+    const previousMigrations = migrations.filter(migration => migration.version < QUANTITY_MIGRATION_VERSION)
+    const quantityMigrations = migrations.filter(migration => migration.version <= QUANTITY_MIGRATION_VERSION)
+    await runMigrations(db, previousMigrations)
+    await db.execute(`INSERT INTO projects (id, name) VALUES ('project-retry', '重跑项目')`)
+
+    let injectedFailure = false
+    const interruptedDb: MigrationDb = {
+      async execute(sql, params = []) {
+        if (!injectedFailure && /CREATE TABLE IF NOT EXISTS floors\b/i.test(sql)) {
+          injectedFailure = true
+          throw new Error('测试注入：v12 执行中断')
+        }
+        await db.execute(sql, params)
+      },
+      select(sql, params = []) {
+        return db.select(sql, params)
+      },
+    }
+
+    await expect(runMigrations(interruptedDb, quantityMigrations)).rejects.toThrow('测试注入：v12 执行中断')
+    expect(injectedFailure).toBe(true)
+    expect(await listTables(db)).toContain('items')
+    expect(await listTables(db)).not.toContain('floors')
+    await db.execute(`
+      INSERT INTO items (id, project_id, code, name, trade)
+      VALUES ('item-before-retry', 'project-retry', 'ITEM-R', '中断前数据', '瓦工')
+    `)
+
+    const resumed = await runMigrations(db, quantityMigrations)
+
+    expect(resumed.from).toBe(QUANTITY_MIGRATION_VERSION - 1)
+    expect(resumed.to).toBe(QUANTITY_MIGRATION_VERSION)
+    expect(resumed.applied).toHaveLength(1)
+    expect(await db.select(`
+      SELECT id, project_id, code, name, trade
+      FROM items
+      WHERE id = 'item-before-retry'
+    `)).toEqual([{
+      id: 'item-before-retry',
+      project_id: 'project-retry',
+      code: 'ITEM-R',
+      name: '中断前数据',
+      trade: '瓦工',
+    }])
+    const [versionRecord] = await db.select<{ total: number }>(
+      'SELECT COUNT(*) AS total FROM schema_migrations WHERE version = ?',
+      [QUANTITY_MIGRATION_VERSION],
+    )
+    expect(versionRecord.total).toBe(1)
+    db.close()
+  })
+
+  it('模板房间改名后三量明细与个人范围仍按稳定 ID 指向同一房间', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await seedQuantityFixture(db)
+    await db.execute(`
+      INSERT INTO house_type_template_items (id, room_id, item_id, contract_qty)
+      VALUES ('template-item-q', 'room-q', 'item-q', 12.5)
+    `)
+    await db.execute(`
+      INSERT INTO unit_assignments (id, unit_id, trade, worker_id)
+      VALUES ('assignment-room-q', 'unit-q', '瓦工', 'worker-q')
+    `)
+    await db.execute(`
+      INSERT INTO unit_assignment_scopes (id, assignment_id, room_id, item_id)
+      VALUES ('scope-room-q', 'assignment-room-q', 'room-q', 'item-q')
+    `)
+
+    await db.execute(`UPDATE rooms SET name = '主卧' WHERE id = 'room-q'`)
+
+    const links = await db.select(`
+      SELECT
+        template_item.room_id AS template_room_id,
+        assignment_scope.room_id AS scope_room_id,
+        room.name AS room_name
+      FROM house_type_template_items AS template_item
+      JOIN unit_assignment_scopes AS assignment_scope
+        ON assignment_scope.room_id = template_item.room_id
+        AND assignment_scope.item_id = template_item.item_id
+      JOIN rooms AS room ON room.id = template_item.room_id
+      WHERE template_item.id = 'template-item-q'
+        AND assignment_scope.id = 'scope-room-q'
+    `)
+    expect(links).toEqual([{
+      template_room_id: 'room-q',
+      scope_room_id: 'room-q',
+      room_name: '主卧',
+    }])
+    expect(await db.select(`SELECT id FROM rooms WHERE name = '次卧'`)).toEqual([])
     db.close()
   })
 })
