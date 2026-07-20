@@ -7,6 +7,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   configure: [cell: QuantityMatrixCell]
+  complete: [cell: QuantityMatrixCell]
 }>()
 
 const selectedCellId = shallowRef('')
@@ -39,6 +40,7 @@ function completedLabel(completedAt: string | null): string {
     <QuantityMatrix
       :matrix="matrix"
       @configure="emit('configure', $event)"
+      @complete="emit('complete', $event)"
       @detail="inspectDetail"
     />
 

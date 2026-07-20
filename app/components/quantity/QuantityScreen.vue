@@ -22,6 +22,9 @@ const templateDialogOpen = shallowRef(false)
 const assignmentDialogOpen = shallowRef(false)
 const assignmentInitialUnitId = shallowRef('')
 const assignmentInitialTrade = shallowRef(ALL_QUANTITY_FILTER)
+const completionDialogOpen = shallowRef(false)
+const completionUnitId = shallowRef('')
+const completionInitialStageId = shallowRef('')
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -114,6 +117,12 @@ function configureCell(cell: QuantityMatrixCell): void {
     ? trade.value
     : cell.summary?.stageTrade ?? cell.assignments[0]?.trade ?? ALL_QUANTITY_FILTER
   openAssignments(cell.unitId, preferredTrade)
+}
+
+function completeCell(cell: QuantityMatrixCell): void {
+  completionUnitId.value = cell.unitId
+  completionInitialStageId.value = cell.summary?.stageId ?? ''
+  completionDialogOpen.value = true
 }
 
 onMounted(initialize)
@@ -217,6 +226,7 @@ onMounted(initialize)
       v-else-if="snapshot"
       :matrix="matrix"
       @configure="configureCell"
+      @complete="completeCell"
     />
 
     <QuantityTemplateDialog
@@ -232,6 +242,14 @@ onMounted(initialize)
       :initial-building-id="buildingId"
       :initial-trade="assignmentInitialTrade"
       :initial-unit-id="assignmentInitialUnitId"
+    />
+
+    <QuantityCompletionDialog
+      v-if="projectId && completionUnitId"
+      v-model:open="completionDialogOpen"
+      :project-id="projectId"
+      :unit-id="completionUnitId"
+      :initial-stage-id="completionInitialStageId"
     />
   </div>
 </template>
