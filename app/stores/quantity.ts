@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { withTransaction } from '~/lib/db/connection'
+import { withUpdateLog } from '~/lib/db/soft-delete'
 import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
 import { persistQuantityBatchCompletion } from '~/lib/quantity/batch-completion'
 import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from '~/lib/quantity/completion'
@@ -158,14 +159,14 @@ export const useQuantityStore = defineStore('quantity', () => {
     }
   }
 
-  async function deleteTemplate(templateId: string) {
+  async function deleteTemplate(templateId: string, options: { allowArchivedEdit?: boolean } = {}) {
     const projectId = templateWorkspace.value?.projectId ?? ''
     if (!projectId)
       throw new Error('请先加载户型模板')
     templateSaving.value = true
     templateError.value = ''
     try {
-      const logId = await withTransaction(tx => deleteQuantityTemplate(tx, projectId, templateId))
+      const logId = await withTransaction(tx => deleteQuantityTemplate(tx, projectId, templateId, options))
       try {
         await loadTemplates(projectId)
       }
@@ -285,6 +286,50 @@ export const useQuantityStore = defineStore('quantity', () => {
     }
   }
 
+  // 归档独立 action：matrix_archived_at 刻意不在 project store 的列登记表里，
+  // 普通项目全字段更新不触碰它；归档/解除都单独落 projects update 日志（蓝本§六）。
+  async function setMatrixArchived(projectId: string, archived: boolean) {
+    if (!projectId)
+      throw new Error('请选择项目')
+    beginRequest()
+    try {
+      const logId = await withTransaction(async (tx) => {
+        const [row] = await tx.select<{ matrix_archived_at: string | null }>(
+          'SELECT matrix_archived_at FROM projects WHERE id = ? AND deleted_at IS NULL',
+          [projectId],
+        )
+        if (!row)
+          throw new Error('工程量项目不存在或已删除')
+        if ((row.matrix_archived_at != null) === archived)
+          return null
+        return withUpdateLog(tx, 'projects', projectId, async () => {
+          await tx.execute(
+            'UPDATE projects SET matrix_archived_at = ? WHERE id = ?',
+            [archived ? new Date().toISOString() : null, projectId],
+          )
+        })
+      })
+      if (logId)
+        await loadProject(projectId)
+      return logId
+    }
+    catch (cause) {
+      error.value = `${archived ? '归档' : '解除归档'}失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      endRequest()
+    }
+  }
+
+  async function archiveMatrix(projectId: string) {
+    return setMatrixArchived(projectId, true)
+  }
+
+  async function unarchiveMatrix(projectId: string) {
+    return setMatrixArchived(projectId, false)
+  }
+
   async function saveBatchCompletion(draft: QuantityBatchCompletionDraft) {
     completionSaving.value = true
     completionError.value = ''
@@ -363,5 +408,7 @@ export const useQuantityStore = defineStore('quantity', () => {
     loadCompletion,
     saveCompletion,
     saveBatchCompletion,
+    archiveMatrix,
+    unarchiveMatrix,
   }
 })

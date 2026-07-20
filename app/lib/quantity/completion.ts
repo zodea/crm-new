@@ -100,6 +100,8 @@ export interface QuantityCompletionDraft {
   expectedAssignmentId: string | null
   photos: QuantityCompletionPhotoDraft[]
   allowArchivedEdit?: boolean
+  /** 历史迁移导入专用：跳过缺照片软卡（ADR 0010 §24 交互软卡不适用于旧数据回填）；UI 不暴露。 */
+  allowMissingPhotos?: boolean
 }
 
 export interface QuantityCompletionWriteResult {
@@ -488,7 +490,7 @@ export async function persistQuantityStageCompletion(
       throw new Error('请填写完成日期')
     if (!assignmentId)
       throw new Error('该户当前工种还没有责任人，请先在责任配置中指派')
-    if (!draft.photos.length && !stage.photos.length)
+    if (!draft.photos.length && !stage.photos.length && !draft.allowMissingPhotos)
       throw new Error('缺少验收照片：请补拍上传，或保存到草稿')
   }
 

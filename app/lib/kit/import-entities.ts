@@ -1,8 +1,27 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Project } from '~/stores/project'
 import { normalizeProjectStatus } from '~/lib/project/status'
+import {
+  QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
+  QUANTITY_COMPLETION_IMPORT_FIELDS,
+  QUANTITY_LEGACY_PRECHECK_FIELDS,
+  QUANTITY_TEMPLATE_IMPORT_FIELDS,
+} from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
+
+// 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
+// connection 依赖 Tauri 运行时，因此在 importRow 内动态加载，保持本文件纯 node 可解析。
+async function runQuantityImport(
+  row: Record<string, unknown>,
+  handler: 'importQuantityTemplateRow' | 'importQuantityAssignmentRow' | 'importQuantityCompletionRow',
+): Promise<void> {
+  const [{ withTransaction }, quantityImport] = await Promise.all([
+    import('~/lib/db/connection'),
+    import('~/lib/quantity/import'),
+  ])
+  await withTransaction(tx => quantityImport[handler](tx, row))
+}
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：
 // 实体键即 /import/mapping/:entity 路由参数，静态登记保证刷新后仍可解析。
@@ -110,6 +129,37 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
         demoFailedOnce.add(externalRef)
         throw new Error(`演示写入失败：${externalRef}`)
       }
+    },
+  },
+  'quantity-template': {
+    key: 'quantity-template',
+    label: '工程量·户型模板量',
+    fields: QUANTITY_TEMPLATE_IMPORT_FIELDS,
+    importRow: row => runQuantityImport(row, 'importQuantityTemplateRow'),
+  },
+  'quantity-assignment': {
+    key: 'quantity-assignment',
+    label: '工程量·责任配置',
+    fields: QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
+    importRow: row => runQuantityImport(row, 'importQuantityAssignmentRow'),
+  },
+  'quantity-completion': {
+    key: 'quantity-completion',
+    label: '工程量·阶段完成',
+    fields: QUANTITY_COMPLETION_IMPORT_FIELDS,
+    importRow: row => runQuantityImport(row, 'importQuantityCompletionRow'),
+  },
+  'quantity-legacy-precheck': {
+    key: 'quantity-legacy-precheck',
+    label: '工程量·旧合一行迁移预检（不写入）',
+    fields: QUANTITY_LEGACY_PRECHECK_FIELDS,
+    // 预检只读校验：行成功 = 可迁移，行失败原因即预检报告；绝不写库。
+    async importRow(row) {
+      const [{ withTransaction }, { precheckQuantityLegacyRow }] = await Promise.all([
+        import('~/lib/db/connection'),
+        import('~/lib/quantity/import'),
+      ])
+      await withTransaction(tx => precheckQuantityLegacyRow(tx, row))
     },
   },
 }
