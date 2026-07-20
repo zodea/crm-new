@@ -1,4 +1,5 @@
 import type { QuantityAssignmentBatchDraft, QuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
+import type { QuantityCompletionDraft, QuantityCompletionWorkspace } from '~/lib/quantity/completion'
 import type { QuantityCatalogProject, QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { QuantityTemplateDraft, QuantityTemplateWorkspace } from '~/lib/quantity/template'
 import { defineStore } from 'pinia'
@@ -6,6 +7,7 @@ import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { withTransaction } from '~/lib/db/connection'
 import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
+import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from '~/lib/quantity/completion'
 import { loadQuantityCatalog, loadQuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import {
   deleteQuantityTemplate,
@@ -29,12 +31,18 @@ export const useQuantityStore = defineStore('quantity', () => {
   const assignmentLoading = shallowRef(false)
   const assignmentSaving = shallowRef(false)
   const assignmentError = shallowRef('')
+  const completionWorkspace = shallowRef<QuantityCompletionWorkspace | null>(null)
+  const completionLoading = shallowRef(false)
+  const completionSaving = shallowRef(false)
+  const completionError = shallowRef('')
   let pending = 0
   let latestProjectRequest = 0
   let pendingTemplateRequests = 0
   let latestTemplateRequest = 0
   let pendingAssignmentRequests = 0
   let latestAssignmentRequest = 0
+  let pendingCompletionRequests = 0
+  let latestCompletionRequest = 0
 
   function beginRequest() {
     pending += 1
@@ -211,6 +219,58 @@ export const useQuantityStore = defineStore('quantity', () => {
     }
   }
 
+  async function loadCompletion(projectId: string, unitId: string) {
+    const request = ++latestCompletionRequest
+    pendingCompletionRequests += 1
+    completionLoading.value = true
+    completionError.value = ''
+    if (completionWorkspace.value?.projectId !== projectId || completionWorkspace.value?.unit.id !== unitId)
+      completionWorkspace.value = null
+    try {
+      const result = projectId && unitId
+        ? await loadQuantityCompletionWorkspace(db, projectId, unitId)
+        : null
+      if (request === latestCompletionRequest)
+        completionWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestCompletionRequest) {
+        completionWorkspace.value = null
+        completionError.value = `完成登记加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      pendingCompletionRequests = Math.max(0, pendingCompletionRequests - 1)
+      completionLoading.value = pendingCompletionRequests > 0
+    }
+  }
+
+  async function saveCompletion(draft: QuantityCompletionDraft) {
+    completionSaving.value = true
+    completionError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityStageCompletion(tx, draft))
+      try {
+        await loadCompletion(draft.projectId, draft.unitId)
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        completionError.value = `完成登记已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      completionError.value = `完成登记保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      completionSaving.value = false
+    }
+  }
+
   async function saveAssignments(draft: QuantityAssignmentBatchDraft) {
     assignmentSaving.value = true
     assignmentError.value = ''
@@ -249,6 +309,10 @@ export const useQuantityStore = defineStore('quantity', () => {
     assignmentLoading: readonly(assignmentLoading),
     assignmentSaving: readonly(assignmentSaving),
     assignmentError: readonly(assignmentError),
+    completionWorkspace: readonly(completionWorkspace),
+    completionLoading: readonly(completionLoading),
+    completionSaving: readonly(completionSaving),
+    completionError: readonly(completionError),
     loadCatalog,
     loadProject,
     loadTemplates,
@@ -257,5 +321,7 @@ export const useQuantityStore = defineStore('quantity', () => {
     undoTemplateSave,
     loadAssignments,
     saveAssignments,
+    loadCompletion,
+    saveCompletion,
   }
 })
