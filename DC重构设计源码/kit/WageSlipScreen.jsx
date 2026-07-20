@@ -44,6 +44,10 @@
     const [att, setAtt] = React.useState({});
     const [tab, setTab] = React.useState("list");
 
+    // 工具目前只承载合和新城的工程量配置（window.WAGE 演示数据）；从其他项目进入给出提示，避免误读
+    const fromProject = (params && params.project) || "合和新城";
+    const otherProject = fromProject !== "合和新城";
+
     const T = WA.TRADES[tradeKey];
     const cfg = WA.config;
     const rentRate = cfg.rentRate, mgrName = cfg.managerName, mgrRate = cfg.managerRate;
@@ -119,6 +123,12 @@
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {otherProject && (
+          <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--warn-soft)", borderColor: "var(--warn)" }}>
+            <Icon name="triangle-alert" size={14} color="var(--warn-ink)" />
+            <span style={{ fontSize: 12.5, color: "var(--warn-ink)" }}>「{fromProject}」暂无工程量配置演示数据——以下为合和新城示例（调参器挂在同一套数上，仅作演示）。</span>
+          </Panel>
+        )}
         <Panel padding={16}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => navigate("payroll", {})} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line-strong)", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 13, color: "var(--ink-soft)", cursor: "pointer" }}><Icon name="arrow-left" size={15} />工资核算</button>
@@ -251,7 +261,7 @@
                           <td style={{ ...TD, width: 90 }}><Inp type="number" value={p.gross} onChange={(e) => setPayF(w, "gross", +e.target.value)} align="right" /></td>
                           <td style={{ ...TD, width: 80 }}><Inp type="number" value={p.borrow} onChange={(e) => setPayF(w, "borrow", +e.target.value)} align="right" /></td>
                           <td style={{ ...numTD, fontWeight: 800, color: "var(--brand)" }}>{money(net)}</td>
-                          <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-soft)" }}>{BANK[w] || "—（未登记）"}</td>
+                          <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-soft)" }}>{(() => { const b = window.PAYSLIP && window.PAYSLIP.bankOf && window.PAYSLIP.bankOf(w); return b ? b.branch + " " + b.account : (BANK[w] || "—（未登记）"); })()}</td>
                         </tr>
                       ); })}
                       <tr style={{ background: "var(--surface-2)" }}>

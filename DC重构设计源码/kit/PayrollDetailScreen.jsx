@@ -70,10 +70,10 @@
     const W = window.WAGE;
     const A = window.APP;
     if (A && A.use) A.use();   // 订阅共享通知：工程量/单价/状态变动 → 实时联动
-    const [tick, setTick] = React.useState(0);
+    const [, forceReady] = React.useState(0);   // 仅用于 WAGE/PAYSLIP 就绪后触发重渲染
     React.useEffect(() => {
       if (P && W) return;
-      const t = setInterval(() => { if (window.PAYSLIP && window.WAGE) { clearInterval(t); setTick(v => v + 1); } }, 60);
+      const t = setInterval(() => { if (window.PAYSLIP && window.WAGE) { clearInterval(t); forceReady(v => v + 1); } }, 60);
       return () => clearInterval(t);
     }, []);
 
@@ -96,7 +96,13 @@
     const paramFp = (params.book || params.worker || "") + "|" + (params.month || "") + "|" + (params.step || "");
     React.useEffect(() => { if (book) { setMonth((params.month && book.months[params.month]) ? params.month : defMonth); setStep(params.step === "a4" ? "a4" : "check"); } }, [paramFp, !!book]);   // eslint-disable-line
     if (!window.PAYSLIP || !window.WAGE) return <Panel padding={40} style={{ textAlign: "center", color: "var(--ink-soft)" }}>数据链加载中…</Panel>;
-    if (!book) return <div style={{ padding: 40, color: "var(--ink-soft)" }}>未找到请款簿（{params.book || params.worker || "?"}）。</div>;
+    if (!book) return (
+      <Panel padding={40} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <Icon name="file-question" size={28} color="var(--ink-faint)" />
+        <div style={{ fontSize: 13.5, color: "var(--ink-soft)" }}>未找到请款簿（{params.book || params.worker || "?"}）——旧入口的花名（如「虞师傅」）未挂请款簿，请从工资核算按名册真名进入。</div>
+        <Button icon="arrow-left" onClick={() => navigate("payroll", params.project ? { project: params.project } : {})}>返回工资核算</Button>
+      </Panel>
+    );
     if (!month) return <div style={{ padding: 40, color: "var(--ink-soft)" }}>请款簿加载中…</div>;
     const doc = P.calc(book.id, month);
     if (!doc) return <div style={{ padding: 40, color: "var(--ink-soft)" }}>「{book.leader}簿」在 {month} 无单据。</div>;
@@ -164,7 +170,11 @@
       confirmText: doc.dirty ? "重新核对" : "核对完成",
       onConfirm: () => { P.check(book.id, month); UI().toast("已核对 · " + doc.name, "success"); },
     });
-    const doRelease = () => UI().formModal({
+    const doRelease = () => {
+      // 口径校验（延续旧域护栏）：三级安全教育未录入 → 禁止发放
+      const unsafe = (doc.wageRows || []).filter(r => !r.safety).map(r => r.name);
+      if (unsafe.length) { UI().toast("三级安全教育未录入：" + unsafe.join("、") + " —— 禁止发放（先在名册/工人域补录）", "danger"); return; }
+      UI().formModal({
       title: "登记发放 · " + doc.label,
       subtitle: "默认=取整应发，可改——以实际最终发放金额为准（D6）；保存后整体快照固化、只读",
       width: 520,
@@ -175,10 +185,11 @@
       ],
       onSave: (vals) => {
         const alloc = {}; book.members.forEach(m => { alloc[m] = +vals["alloc__" + m] || 0; });
-        P.release(book.id, month, +vals.actual || 0, alloc);
-        UI().toast("已发放并固化（只读快照） · 付款管理已生成支出记录：工人工资 · " + book.leader + "簿 · " + doc.label + " · ¥" + num0(+vals.actual), "success");
+        P.release(book.id, month, vals.actual, alloc);
+        UI().toast("已发放并固化（只读快照） · 付款管理已生成支出记录：工人工资 · " + book.leader + "簿 · " + doc.label + " · ¥" + num0(+vals.actual || 0), "success");
       },
-    });
+      });
+    };
     const doDefer = () => UI().confirm({
       title: doc.deferred ? "恢复支付？" : "暂不支付？",
       message: doc.deferred ? "恢复后可正常登记发放。" : "「暂不支付」= 本月不执行发放动作，应发滚存到后月（不再取整记 0）。",
@@ -334,7 +345,7 @@
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", fontSize: 12.5 }}>
             <span>合计（含补贴） <b style={{ fontFamily: "var(--font-mono)" }}>{num0(doc.total)}</b></span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>× 支付比例
-              {draft || (checked && !sealed)
+              {draft || checked
                 ? numInput(doc.ratio, v => P.setRatio(book.id, month, v), 62)
                 : <b style={{ fontFamily: "var(--font-mono)" }}>{doc.ratio}</b>}%
               <span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>单据级参数 · 默认沿用上月</span>
@@ -367,7 +378,7 @@
                   <span style={{ fontSize: 11.5, color: "var(--danger-ink)" }}>借支</span>
                   {sealed ? <b style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>{num0(borrow)}</b>
                     : numInput(borrow, v => P.setBorrow(book.id, month, m, v), 76)}
-                  <span style={{ fontSize: 11.5 }}>实发 <b style={{ fontFamily: "var(--font-mono)", color: "var(--brand)" }}>{num0(alloc - borrow)}</b></span>
+                  <span style={{ fontSize: 11.5 }}>实发 <b style={{ fontFamily: "var(--font-mono)", color: alloc - borrow < 0 ? "var(--danger)" : "var(--brand)" }}>{num0(alloc - borrow)}</b>{alloc - borrow < 0 && <span style={{ fontSize: 10, color: "var(--danger-ink)", marginLeft: 4 }}>借支超分配，请调整</span>}</span>
                 </div>
               );
             })}
@@ -465,7 +476,8 @@
 
     // ================= 步骤 ②：A4 单据（格式族） =================
     const chainRow = (no, label, val, opts) => {
-      const lead = (opts && opts.lead) || 6, tail = (opts && opts.tail) || 1;
+      const lead = opts && opts.lead != null ? opts.lead : 6;
+      const tail = opts && opts.tail != null ? opts.tail : 1;   // tail 可为 0（B 族 7 列表无备注尾列）
       return (
         <tr key={"ch" + label + no}>
           <td style={TDc}>{no || ""}</td>
@@ -478,7 +490,9 @@
     const wm = doc.deferred ? "暂 不 支 付" : null;
     const seqLine = (
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#555", margin: "2px 0 6px" }}>
-        <span>单据编号：{doc.seqNo ? "第 " + doc.seqNo + " 号（全项目递增）" : "发放时定号（下一号 " + P.nextSeq(book.project) + "）"}</span>
+        <span>单据编号：{doc.seqNo ? "第 " + doc.seqNo + " 号（全项目递增）"
+          : book.family === "C1" ? "—（月薪时工表不入请款序号）"
+          : sealed ? "—" : "发放时定号（下一号 " + P.nextSeq(book.project) + "）"}</span>
         <span>{doc.name}</span>
       </div>
     );
@@ -575,13 +589,13 @@
       const dataCnt = doc.lines.filter(l => !l.group).length;
       cn = dataCnt;
       const chain = [];
-      chain.push(chainRow(++cn, "合计", doc.total, { bold: true, lead: 5, tail: 1 }));
-      chain.push(chainRow(++cn, "本次请款总合计" + doc.ratio + "%", doc.payable, { lead: 5, tail: 1 }));
-      doc.prevPaid.forEach(pp => chain.push(chainRow(++cn, pp.label, pp.amount, { lead: 5, tail: 1 })));
-      if (doc.prevPaid.length) chain.push(chainRow(++cn, "累计已申领", doc.paidSum, { lead: 5, tail: 1 }));
-      chain.push(chainRow(++cn, "本次请款合计", doc.request, { lead: 5, tail: 1 }));
-      chain.push(chainRow(++cn, "本次请款合计（取整）", doc.rounded, { bold: true, lead: 5, tail: 1 }));
-      if (doc.actualPaid != null) chain.push(chainRow("", "实际发放金额（以实际为准）", doc.actualPaid, { bold: true, color: "#166534", lead: 5, tail: 1 }));
+      chain.push(chainRow(++cn, "合计", doc.total, { bold: true, lead: 5, tail: 0 }));
+      chain.push(chainRow(++cn, "本次请款总合计" + doc.ratio + "%", doc.payable, { lead: 5, tail: 0 }));
+      doc.prevPaid.forEach(pp => chain.push(chainRow(++cn, pp.label, pp.amount, { lead: 5, tail: 0 })));
+      if (doc.prevPaid.length) chain.push(chainRow(++cn, "累计已申领", doc.paidSum, { lead: 5, tail: 0 }));
+      chain.push(chainRow(++cn, "本次请款合计", doc.request, { lead: 5, tail: 0 }));
+      chain.push(chainRow(++cn, "本次请款合计（取整）", doc.rounded, { bold: true, lead: 5, tail: 0 }));
+      if (doc.actualPaid != null) chain.push(chainRow("", "实际发放金额（以实际为准）", doc.actualPaid, { bold: true, color: "#166534", lead: 5, tail: 0 }));
       return (
         <A4 watermark={wm} orient={orient.list} onFlip={() => flip("list")} label="第 1 页 · 工程量申报清单（BOQ 直报）">
           <div style={{ textAlign: "center", fontSize: 15, fontWeight: 800 }}>{book.trade}班组{doc.kind === "month" ? M + "月" : doc.label}工程量申报清单（{book.leader}）</div>
@@ -839,6 +853,7 @@
           {book.soloNote && <StatusChip tone="neutral">单独出单</StatusChip>}
           {doc.deferred && <StatusChip tone="danger">暂不支付 · 滚存</StatusChip>}
           {sealed && <StatusChip tone="ok">已固化 · 只读</StatusChip>}
+          {!sealed && (doc.wageRows || []).some(r => !r.safety) && <StatusChip tone="danger">三级安全教育未录入 · 禁止发放</StatusChip>}
         </div>
 
         {(book.soloNote || book.autoNote) && (
