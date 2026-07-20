@@ -38,9 +38,9 @@
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
 │                                                                             │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│  │ExpenditureContr. │  │InvoiceApplication│  │TicketRegistration│         │
-│  │  支出合同          │  │  开票申请          │  │  收票登记         │         │
-│  │  projectId → Proj │  │  projectId → Proj │  │  projectId → Proj│         │
+│  │ExpenditureContr. │  │InvoiceApplication│  │Invoice           │         │
+│  │  支出合同          │  │  开票申请          │  │  发票单表         │         │
+│  │  projectId → Proj │  │  projectId → Proj │  │  owner_kind归属  │         │
 │  │  supplierId → Sup │  │                    │  │  supplierId → Sup│         │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
 │                                                                             │
@@ -62,12 +62,16 @@
 ### 1.1 施工进度线（工期 × 工程量，2026-07 新增）
 
 ```
-projects ─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N→ units ─1:N→ rooms
-    │            (schedule_group_buildings)                                     │
-    ├─1:N→ schedule_tasks（WBS: project→group→task, parentId 自关联）           │
-    │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）                    │
-    │        └─ 1:N → task_item_map ─(itemName)→ items ─1:N→ quantities ────────┘
-    │                  实际完成率 = 分组内该分项已完成(completedMonth非空)房间 / 总房间
+projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1─ units
+    │                  ▲                              ▲
+    │                  │ stageId                      │ unitId
+    ├─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N→ units ─1:N→ rooms
+    │            (schedule_group_buildings)
+    ├─1:N→ schedule_tasks（WBS: project→group→task, parentId 自关联，引用 stageId）
+    │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）
+    │        └─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
+    │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
+    ├─1:N→ unit_assignments（户 × 工种责任；完成不存这里）
     └─1:N→ target_costs ─1:N→ target_cost_items（costCategory: 人工/材料/机械/其他）
 ```
 
@@ -145,7 +149,7 @@ Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
-| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序。⚠️ 设计稿整页表单（ADR 0014，`kit/forms/*.jsx`）含超出本 schema 的探索字段（合同条款/质保金/开票方/明细行、收款承兑汇票、分供方工商档案等），是否入库以 [#116](https://github.com/zodea/crm-new/issues/116) 字段定稿评审为准 |
+| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序。⚠️ [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认设计稿整页表单中的用户可编辑业务字段默认持久化；合同条款/质保金/开票方/明细行等具体列与迁移仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 回写，本警示在该评审完成前保留 |
 
 ```sql
 -- 合同域轻实体仓（#90 批A，migrations v3 contracts-light-entity）
@@ -255,7 +259,10 @@ CREATE TABLE monthly_statement_lines (
 | Invoice | `invoices` | `id` | `finance-invoice.md`（识别+台账**单表**，ADR-0001；归属：项目 或 个人开支） |
 | InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（待设计；销项=开票申请） |
 | ReceiptRegistration | `receipt_registrations` | `id` | `finance-receipt.md`（待设计） |
-| PaymentApplication | `payment_applications` | `id` | `finance-payment.md`（待设计） |
+| ExpenditureSettlement | `expenditure_settlements` | `id` | 支出合同过程/完工结算统一源单；与 `project_suppliers` 终态关闭用的 `settlements` 不同 |
+| PaymentApplication | `payment_applications` | `id` | `finance-payment.md`（8 类型；ADR 0015） |
+| PaymentApplicationSettlementAllocation | `payment_application_settlement_allocations` | `id` | 付款申请—真实结算分摊（ADR 0015） |
+| PaymentApplicationInvoiceAllocation | `payment_application_invoice_allocations` | `id` | 付款申请—真实发票分摊（ADR 0015） |
 | CurrentReceipt | `current_receipts` | `id` | `finance-receipt.md`（待设计） |
 | CurrentPayment | `current_payments` | `id` | `finance-payment.md`（待设计） |
 | PaymentRecord | `payment_records` | `id` | `finance-records.md`（待设计） |
@@ -278,6 +285,74 @@ CREATE TABLE monthly_statement_lines (
 --                          与全局 ocr_confidence 口径不同不合并；分档阈值见 app/lib/invoice/recognize.ts）
 --   deleted_at     TEXT  软删除（§8）
 ```
+
+```sql
+-- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。
+-- project_suppliers 的 1:1 `settlements` 只表示合作关系终态关闭，不得作为付款勾稽源单。
+CREATE TABLE expenditure_settlements (
+  id             TEXT PRIMARY KEY,
+  no             TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  bizType        TEXT NOT NULL,       -- '人工' | '材料' | '分包' | '其他'
+  projectId      TEXT NOT NULL,       -- → projects.id
+  supplierId     TEXT NOT NULL,       -- → suppliers.id
+  contractId     TEXT NOT NULL,       -- → contracts.id；仅支出侧 kind（分包/材采等）
+  settlementType TEXT,                -- 过程结算/完工结算/零星用工等
+  totalAmount    REAL NOT NULL,       -- 含税结算金额；付款勾稽展示与额度口径
+  amount         REAL,                -- 不含税结算金额
+  taxAmount      REAL,
+  taxRate        REAL,
+  settlementDate TEXT NOT NULL,
+  status         TEXT DEFAULT '草稿',
+  note           TEXT,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+-- 付款申请头：可编辑标量落实体列；attachFiles 走 file_refs，不存 JSON。
+-- `_biz` / `_c1`..`_c4` / `isPrepay` 等 readonly+compute 展示字段不存。
+CREATE TABLE payment_applications (
+  id             TEXT PRIMARY KEY,
+  no             TEXT NOT NULL,
+  name           TEXT NOT NULL,
+  bizType        TEXT NOT NULL,       -- 有合同-人工/材料/分包、无合同-零星采购、预付款、管理费、项目费用、公司付款
+  projectId      TEXT,                -- 公司付款可空 → projects.id
+  supplierId     TEXT,                -- → suppliers.id；类型提交规则决定是否必填
+  contractId     TEXT,                -- 有合同/预付款可选或必填 → contracts.id；保存真实 lookup ID
+  costName       TEXT,
+  applyAmount    REAL,
+  applyDate      TEXT,
+  applicant      TEXT,
+  invoiceState   TEXT,                -- '先票后款' | '先款后票' | '无需发票'
+  payContent     TEXT,
+  prepayDeduct   REAL,
+  prepayNote     TEXT,
+  approvedAmount REAL,
+  paidAmount     REAL,
+  status         TEXT DEFAULT '草稿',
+  note           TEXT,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE payment_application_settlement_allocations (
+  id                   TEXT PRIMARY KEY,
+  paymentApplicationId TEXT NOT NULL, -- → payment_applications.id
+  settlementId         TEXT NOT NULL, -- → expenditure_settlements.id；单号/名称/含税结算金额均从源单读取
+  allocatedAmount      REAL NOT NULL,
+  note                 TEXT,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE payment_application_invoice_allocations (
+  id                   TEXT PRIMARY KEY,
+  paymentApplicationId TEXT NOT NULL, -- → payment_applications.id
+  invoiceId            TEXT NOT NULL, -- → invoices.id；票号/日期/含税金额均从源票读取
+  allocatedAmount      REAL NOT NULL,
+  note                 TEXT,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+```
+
+付款申请头与两类分摊行必须由同一个 store action 在事务内保存。草稿允许金额不平并显示差额；提交规则、`先款后票`待回票金额与单票全局额度见 `finance-payment.md` 和 ADR 0015。
 
 ### 2.5 物资管理类
 
@@ -339,13 +414,92 @@ CREATE TABLE project_aliases (
 | Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，班组单价走 `crew_project_items`） |
 | HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
 | HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（房间×工种×分项，清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
-| UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户级指派+完成四合一（户×工种→班组/人×月份×完成，草稿态+验收照片软卡） |
-| ~~Quantity~~ | ~~`quantities`~~ | — | ⚠️ **已按 [ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md) 重构**：原「分项×房间×工人」合一表拆为 `house_type_template_items`（量）+ `unit_assignments`（完成/施工人/月份）；`units` +`houseTypeTemplateId`、`projects` +`matrixArchivedAt`。本文下方对 `quantities` 的引用（§66 关系图 / §303·§461·§534 进度聚合 / §399-401 外键 / §547·§551 口径 / §663-666 索引）待工程量域批次 PRD 随实现改名同步，完整 schema 以 ADR 0010 为权威 |
+| ConstructionStage | `construction_stages` | `id` | **ADR 0010**：项目工序阶段目录，给 #103 完成事实与 #114 排程共享稳定 ID |
+| ConstructionStageItem | `construction_stage_items` | `id` | 工序阶段 ↔ 计量分项映射，圈定应做户与下钻范围 |
+| UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户 × 工种责任（只表达谁负责，不存完成） |
+| UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选房间 × 分项下钻范围 |
+| UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
+| ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
 | WageStatement | `wage_statements` | `id` | ⚠️ 口径已随 [#117](https://github.com/zodea/crm-new/issues/117) 进度款域重构更新（2026-07-20）：单据主体=**负责人请款簿**（请款主体×月），三态生命周期（草稿/已核对/已发放固化实际金额）、单据级比例、格式族 A/B/C1/C2、全项目递增请款序号；「本期支付总额权重分摊」待 #117 未决⑥。**字段细化随工资域批次 PRD**，以 #117 定稿为权威 |
 | WageStatementLine | `wage_statement_lines` | `id` | 同上（工人行快照：应发/实发可直改/开户行/卡号） |
 | AttendanceRecord | `attendance_records` | `id` | 考勤（工人×日期×工时，**待细化**） |
 
 > ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资三表（禁用旧名）。工资单是**快照**（生成时计算应发 + 人工改实发），不是纯计算视图——反馈轮 8 定稿「实发逐人可直改」。
+
+```sql
+CREATE TABLE construction_stages (
+  id             TEXT PRIMARY KEY,
+  projectId      TEXT NOT NULL,       -- → projects.id
+  code           TEXT NOT NULL,       -- 项目内稳定编码；排程任务引用，不用名称关联
+  name           TEXT NOT NULL,       -- 墙砖粘贴/地砖铺贴/一遍腻子/二遍腻子…
+  trade          TEXT NOT NULL,       -- 工种；用于匹配户 × 工种责任
+  completionMode TEXT DEFAULT 'unit', -- 'unit'=户级阶段事实 | 'manual'=排程手填
+  sortOrder      INTEGER DEFAULT 0,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE construction_stage_items (
+  id      TEXT PRIMARY KEY,
+  stageId TEXT NOT NULL,              -- → construction_stages.id
+  itemId  TEXT NOT NULL,              -- → items.id；用于应做户、量值和下钻，不代表共享完成率
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE house_type_templates (
+  id        TEXT PRIMARY KEY,
+  projectId TEXT NOT NULL,            -- → projects.id
+  code      TEXT NOT NULL,            -- A/B/C…
+  name      TEXT,
+  copiedFromTemplateId TEXT,          -- 一次性借用来源，仅留痕，不建立活链接
+  sortOrder INTEGER DEFAULT 0,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE house_type_template_items (
+  id         TEXT PRIMARY KEY,
+  templateId TEXT NOT NULL,           -- → house_type_templates.id
+  roomName   TEXT,
+  trade      TEXT NOT NULL,
+  itemId     TEXT NOT NULL,           -- → items.id
+  recognizedContractQty REAL,         -- 清单识别原值
+  contractQty           REAL,         -- 当前合同量，可手改
+  provisionalQty        REAL,
+  fieldFormula          TEXT,
+  fieldQty              REAL,
+  note TEXT, sortOrder INTEGER DEFAULT 0,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE unit_assignments (
+  id       TEXT PRIMARY KEY,
+  unitId   TEXT NOT NULL,              -- → units.id
+  trade    TEXT NOT NULL,
+  crewId   TEXT,                       -- → crews.id；与 workerId 至少一个非空
+  workerId TEXT,                       -- → workers.id
+  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE unit_assignment_scopes (
+  id           TEXT PRIMARY KEY,
+  assignmentId TEXT NOT NULL,          -- → unit_assignments.id
+  roomId       TEXT NOT NULL,          -- → rooms.id
+  itemId       TEXT NOT NULL,          -- → items.id
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+
+CREATE TABLE unit_stage_completions (
+  id           TEXT PRIMARY KEY,
+  unitId       TEXT NOT NULL,           -- → units.id
+  stageId      TEXT NOT NULL,           -- → construction_stages.id
+  assignmentId TEXT,                    -- → unit_assignments.id；完成时的执行责任
+  status       TEXT DEFAULT 'draft',    -- 'draft' | 'completed'
+  completedAt  TEXT,                    -- 完成日期；月份从日期派生
+  note         TEXT,
+  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+);
+-- units 增加 houseTypeTemplateId → house_type_templates.id；projects 增加 matrixArchivedAt。
+-- 验收照片走 file_refs(ownerType='unit_stage_completion', ownerId=完成事实 id)。
+```
 
 ### 2.7 施工进度类（工期 × 工程量主线）
 
@@ -361,7 +515,7 @@ CREATE TABLE project_aliases (
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 
-> 进度实际完成率复用 `quantities.completedMonth`，不新增录入口；工序 `hasQty=1` 自动取工程量、`=0` 手动填。详见 `schedule-progress.md` §五、§六。
+> `schedule_tasks.stageId` 引用 `construction_stages.id`。工序 `hasQty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manualProgress`；墙砖/地砖、一遍/二遍腻子使用不同 stageId。
 > `schedule_tasks` 预留 `baselineStart/baselineFinish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 
 ### 2.8 目标成本类（成本控制基线）
@@ -438,10 +592,14 @@ CREATE TABLE target_cost_items (
 | `receipt_registrations` | `projectId` | `projects.id` | N:1 | 收款 → 项目 |
 | `payment_applications` | `projectId` | `projects.id` | N:1 | 付款申请 → 项目 |
 | `payment_applications` | `supplierId` | `suppliers.id` | N:1 | 付款申请 → 分供方 |
-| `payment_applications` | `contractId` | `expenditure_contracts.id` | N:1 | 付款申请 → 合同（可选） |
+| `payment_applications` | `contractId` | `contracts.id` | N:1 | 付款申请 → 合同域轻实体仓中的支出侧合同（可选） |
+| `expenditure_settlements` | `projectId` / `supplierId` / `contractId` | `projects.id` / `suppliers.id` / `contracts.id` | N:1 | 支出合同结算统一源单；区别于合作关系终态 `settlements` |
+| `payment_application_settlement_allocations` | `paymentApplicationId` / `settlementId` | `payment_applications.id` / `expenditure_settlements.id` | N:1 | 付款申请—真实支出结算分摊；源单字段不复制 |
+| `payment_application_invoice_allocations` | `paymentApplicationId` / `invoiceId` | `payment_applications.id` / `invoices.id` | N:1 | 付款申请—真实发票分摊；跨申请累计不得超票额 |
 | `current_receipts` | `projectId` | `projects.id` | N:1 | 往来收款 → 项目 |
 | `current_payments` | `projectId` | `projects.id` | N:1 | 往来付款 → 项目 |
 | `payment_records` | `projectId` | `projects.id` | N:1 | 支付记录 → 项目 |
+| `payment_records` | `paymentApplicationId` | `payment_applications.id` | N:1 | 支付记录 → 付款申请（零星支付可空） |
 
 ### 3.4 分包及人工关联
 
@@ -457,9 +615,13 @@ CREATE TABLE target_cost_items (
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
 | `items` | `projectId` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
-| `quantities` | `itemId` | `items.id` | N:1 | 工程量 → 分项 |
-| `quantities` | `roomId` / `unitId` | `rooms.id` / `units.id` | N:1 | 工程量 → 房间（unitId 冗余，便于户级聚合） |
-| `quantities` | `crewId` / `workerId` | `crews.id` / `workers.id` | N:1 | 施工班组/工人 |
+| `house_type_templates` | `projectId` | `projects.id` | N:1 | 项目户型模板 |
+| `house_type_template_items` | `templateId` / `itemId` | `house_type_templates.id` / `items.id` | N:1 | 户型层三量明细 |
+| `construction_stages` | `projectId` | `projects.id` | N:1 | 项目工序阶段目录 |
+| `construction_stage_items` | `stageId` / `itemId` | `construction_stages.id` / `items.id` | N:1 | 阶段 ↔ 计量分项 |
+| `unit_assignments` | `unitId` / `crewId` / `workerId` | `units.id` / `crews.id` / `workers.id` | N:1 | 户 × 工种责任，不存完成 |
+| `unit_assignment_scopes` | `assignmentId` / `roomId` / `itemId` | `unit_assignments.id` / `rooms.id` / `items.id` | N:1 | 个人指派房间 × 分项下钻 |
+| `unit_stage_completions` | `unitId` / `stageId` / `assignmentId` | `units.id` / `construction_stages.id` / `unit_assignments.id` | N:1 | 户 × 工序阶段完成事实 |
 | `wage_statements` | `projectId` / `crewId` | `projects.id` / `crews.id` | N:1 | 月度进度款单 |
 | `wage_statement_lines` | `statementId` / `workerId` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
 | `attendance_records` | `projectId` / `workerId` | `projects.id` / `workers.id` | N:1 | 考勤（待细化） |
@@ -477,6 +639,7 @@ CREATE TABLE target_cost_items (
 | `supplier_credential` | SupplierCredential | 证照文件 |
 | `project_supplier` | ProjectSupplier | 项目×分供方文件 |
 | `settlement` | Settlement | 结算确认书 PDF |
+| `expenditure_settlement` | ExpenditureSettlement | 支出过程/完工结算单及对账附件 |
 | `construction_contract` | ConstructionContract | 施工合同文书扫描件（Tab③ 文件柜 chip 在线预览） |
 | `supplement_agreement` | SupplementAgreement | 补充协议文书 |
 | `boq_change_order` | BoqChangeOrder | 变更单附件，category 细分**各有放置区**：我方指令单（可多版）/ 甲方指令单 / 报价 / 算量 / 施工照片 |
@@ -484,7 +647,7 @@ CREATE TABLE target_cost_items (
 | `payment_application` | PaymentApplication | 付款附件 |
 | `invoice` | Invoice | 发票原图（原 `ticket_registration` 已随 ADR-0001 废弃） |
 | `delivery_record` | DeliveryRecord | 送货单扫描件（`category=source`，每张归档记录一份当前原件） |
-| `quantity` | Quantity | 验收照片（挂「户×分项」，工序卡点判据，CONTEXT.md「验收照片」） |
+| `unit_stage_completion` | UnitStageCompletion | 验收照片（挂“户 × 工序阶段”；缺照片只允许取消/存草稿） |
 | `worker` | Worker | 工人证件照片/信息文件 |
 | `worker_cert` | WorkerCert | 证书扫描件（身份证/特种作业证等） |
 | `penalty_record` | PenaltyRecord | 罚款照片/整改前后对比照/联系单扫描件 |
@@ -530,10 +693,11 @@ interface FilePayload {
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
 | `schedule_tasks` | `groupId` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组（summary 行为 NULL） |
 | `schedule_tasks` | `parentId` | `schedule_tasks.id` | N:1 | WBS 自关联（项目→分组→工序） |
+| `schedule_tasks` | `stageId` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；hasQty=1 必填 |
 | `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
 | `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |
 
-> 工序实际进度不建外键存值，运行时按 `task_item_map.itemName` + `schedule_group_buildings` 聚合 `quantities.completedMonth` 算完成率（见 `schedule-progress.md` §五）。
+> 工序实际进度不另存值：运行时按 `schedule_tasks.stageId` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
 
 ### 3.7 目标成本关联
 
@@ -555,7 +719,7 @@ interface FilePayload {
 | 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?`（台账=变更单自动行+手录纯金额签证，ADR-0002） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
 | 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 付款金额 | `SELECT SUM(actualPayment) FROM payment_applications WHERE projectId = ?` |
+| 付款金额 | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND deleted_at IS NULL` |
 | 往来收款 | `SELECT SUM(amount) FROM current_receipts WHERE projectId = ?` |
 | 往来付款 | `SELECT SUM(amount) FROM current_payments WHERE projectId = ?` |
 | 项目可用资金余额 | 项目收款 + 往来收款 − 付款金额 − 往来付款 − 管理费 |
@@ -571,6 +735,16 @@ interface FilePayload {
 | 增值税 | 销项税额 − 进项税额 |
 | 税负率 | 增值税 / 销项票额 |
 
+### 4.2.1 付款申请勾稽（finance-payment.md · ADR 0015）
+
+| 字段 | 计算 |
+|---|---|
+| 关联结算金额 | `SUM(payment_application_settlement_allocations.allocatedAmount)`，只计未软删行 |
+| 结算差额 | `payment_applications.applyAmount − 关联结算金额`；有合同三类提交时必须为 0 |
+| 关联发票金额 | `SUM(payment_application_invoice_allocations.allocatedAmount)`，只计未软删行 |
+| 待回票金额 | `max(payment_applications.applyAmount − 关联发票金额, 0)`；仅 `invoiceState='先款后票'` 展示 |
+| 单票剩余可关联金额 | `invoices.total_amount − SUM(该 invoiceId 跨全部付款申请的有效 allocatedAmount)`；写入后不得小于 0 |
+
 ### 4.3 分供方汇总（base-supplier.md）
 
 | 字段 | SQL 计算 |
@@ -578,7 +752,7 @@ interface FilePayload {
 | 合作项目数 | `SELECT COUNT(*) FROM project_suppliers WHERE supplierId = ?` |
 | 合同数 | `SELECT COUNT(*) FROM expenditure_contracts WHERE supplierId = ?` |
 | 合同总额 | `SELECT SUM(taxIncTotal) FROM expenditure_contracts WHERE supplierId = ?` |
-| 累计已付 | `SELECT SUM(actualPayment) FROM payment_applications WHERE supplierId = ?` |
+| 累计已付 | `SELECT SUM(paidAmount) FROM payment_applications WHERE supplierId = ? AND deleted_at IS NULL` |
 | 应付余额 | 合同总额 − 累计已付 |
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
@@ -587,7 +761,7 @@ interface FilePayload {
 |---|---|
 | contractTotal | `SELECT SUM(taxIncTotal) FROM expenditure_contracts WHERE projectId = ? AND supplierId = ?` |
 | claimedTotal | `SELECT SUM(amount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND approvalStatus = 'approved'` |
-| paidTotal | `SELECT SUM(actualPayment) FROM payment_applications WHERE projectId = ? AND supplierId = ?` |
+| paidTotal | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND deleted_at IS NULL` |
 | invoiceTotal | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND supplier_id = ? AND account_status = 'archived'` |
 | balance | contractTotal − paidTotal |
 
@@ -599,7 +773,7 @@ interface FilePayload {
 |---|---|
 | 合同总额 | `SELECT SUM(amount) FROM construction_contracts WHERE projectId = ?` + 变更 |
 | 累计收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 累计支出 | `SELECT SUM(actualPayment) FROM payment_applications WHERE projectId = ?` |
+| 累计支出 | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND deleted_at IS NULL` |
 | 已开票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |
 | 材料分供方数 | `SELECT COUNT(DISTINCT supplierId) FROM project_suppliers ps JOIN suppliers s ON ps.supplierId = s.id WHERE ps.projectId = ? AND s.supplierCategory = '材料供应商'` |
 | 采购合同数 | `SELECT COUNT(*) FROM expenditure_contracts WHERE projectId = ? AND contractType = '材料采购'` |
@@ -608,7 +782,7 @@ interface FilePayload {
 
 | 字段 | 计算 |
 |---|---|
-| 工序实际完成率（hasQty=1） | 分组内该分项 已完成房间/总房间：`quantities.completedMonth IS NOT NULL` 计数 ÷ 总数，范围 = `task_item_map.itemName` × `schedule_group_buildings` 圈定的楼栋 |
+| 工序实际完成率（hasQty=1） | 分组内该 `stageId` 已完成户数 ÷ 应做户数；分子查 `unit_stage_completions.status='completed'`，分母由 `construction_stage_items` / `task_item_map` 与户型模板适用范围圈定 |
 | 工序实际完成率（hasQty=0） | `schedule_tasks.manualProgress` |
 | 工序计划应完成率 | `clamp((today − plannedStart) / (plannedFinish − plannedStart), 0, 1)` |
 | 提前/延后天数 | `(实际完成率 − 计划应完成率) × durationDays`（分组/项目行按子工序工期加权） |
@@ -621,89 +795,54 @@ interface FilePayload {
 | 字段 | 计算 |
 |---|---|
 | 合同量（含变更） | `boq_lines` 原始行 + **已签证**变更行增量（`boq_change_orders.status='approved'` 的 `boq_change_lines.deltaQty`）；可另开参考口径含已上报 |
-| 量差（分项×楼栋） | 基准量 − 合同量，基准量可勾选 = 合同 / 暂估 / 现场（`quantities` 三字段，项目级设置） |
+| 量差（分项×楼栋） | 基准量 − 合同量，基准量可勾选 = 合同 / 暂估 / 现场（`house_type_template_items` 三量，按挂靠户展开到楼栋） |
 | 量差金额 | 量差 × 合同单价（`boq_lines.unitPrice`，调价变更取已签证新单价） |
 | 产值 | Σ完成量 × 合同单价，含已签证变更（CONTEXT.md「单价双轨」：合同单价轨） |
 | 分项毛利 | (合同单价 − 班组分项单价) × 量（现场量未核定用暂估量预估） |
-| 月度报量草稿行 | 当月 `quantities.completedMonth = 月` 的完成量 + 现场量 × 合同单价 → `monthly_statement_lines.autoQty` |
+| 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completedAt`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.autoQty`；同一分项映射多阶段不得重复计量 |
 
 ---
 
 ## § 5 SQLite 建表顺序
 
-按外键依赖排序，先建被引用的表：
+按外键依赖排序，先建被引用的表；同批次内仍按下列先后执行：
 
 ```
 第 1 批（无外键依赖）
-  1. projects
-  2. suppliers
-  3. bank_codes                   （内置行号字典 seed）
-  4. crews
-  5. workers
+  projects, suppliers, bank_codes, crews, workers
 
-第 2 批（依赖第 1 批）
-  6. supplier_credentials         → suppliers
-  7. project_suppliers            → projects, suppliers
-  8. phase_tasks                  → projects
-  9. construction_contracts       → projects
-  10. owner_change_orders         → projects
-  11. expenditure_contracts       → projects, suppliers
-  12. invoice_applications        → projects
-  13. receipt_registrations       → projects
-  14. current_receipts            → projects
-  15. current_payments            → projects
-  16. payment_records             → projects
-  17. buildings                   → projects
-  18. schedule_groups             → projects
-  19. target_costs                → projects
-  20. items                       → projects, crews
-  21. crew_workers                → crews, workers
-  22. crew_project_config         → crews, projects
-  23. worker_certs                → workers
-  24. penalty_records             → projects, crews, workers
+第 2 批（只依赖第 1 批）
+  supplier_credentials, project_suppliers, phase_tasks
+  construction_contracts, owner_change_orders, expenditure_contracts, contracts
+  invoice_applications, receipt_registrations, current_receipts, current_payments
+  buildings, schedule_groups, target_costs, items
+  crew_workers, crew_project_config, worker_certs, penalty_records
+  construction_stages, house_type_templates, monthly_statements
 
 第 3 批（依赖第 2 批）
-  25. settlements                 → project_suppliers
-  26. supplement_agreements       → construction_contracts
-  27. contract_line_items         → expenditure_contracts
-  28. invoices                    → projects, suppliers, expenditure_contracts（原 ticket_registrations 已废弃，ADR-0001）
-  29. payment_applications        → projects, suppliers, expenditure_contracts
-  30. floors                      → buildings
-  31. schedule_group_buildings    → schedule_groups, buildings
-  32. schedule_tasks              → projects, schedule_groups（parentId 自关联）
-  33. target_cost_items           → target_costs
-  34. crew_project_items          → crew_project_config
+  settlements, supplement_agreements, contract_line_items, expenditure_settlements
+  invoices, payment_applications
+  floors, schedule_group_buildings, schedule_tasks, target_cost_items
+  crew_project_items, construction_stage_items, house_type_template_items
+  boq_files, boq_change_orders, delivery_records, project_aliases
 
 第 4 批（依赖第 3 批）
-  35. units                       → floors
-  36. task_dependencies           → schedule_tasks
-  37. task_item_map               → schedule_tasks
-  38. wage_statements             → projects, crews（原 payroll_records 细化拆分）
+  units, task_dependencies, task_item_map
+  payment_application_settlement_allocations
+  payment_application_invoice_allocations
+  payment_records
+  monthly_statement_lines, boq_lines, delivery_lines, wage_statements
 
 第 5 批（依赖第 4 批）
-  39. rooms                       → units
-  40. quantities  ⚠️ 按 ADR 0010 拆为 house_type_templates / house_type_template_items / unit_assignments（随工程量域批次 PRD 建表）
+  rooms, unit_assignments, unit_stage_completions
+  wage_statement_lines, attendance_records, boq_change_lines
 
-第 6 批（多态关联，无严格外键约束）
-  41. file_refs                   → ownerType + ownerId（应用层保证一致性）
+第 6 批（依赖 rooms / unit_assignments）
+  unit_assignment_scopes
 
-2026-07-04 增补（清单/变更/报量/送货单/工资，随各自批次建表）
-  42. monthly_statements          → projects                       （第 2 批档位）
-  43. boq_files                   → construction_contracts          （第 3 批档位）
-  44. boq_change_orders           → projects, construction_contracts, owner_change_orders（第 3 批档位）
-  45. delivery_records            → projects, suppliers             （第 3 批档位）
-  46. monthly_statement_lines     → monthly_statements              （第 3 批档位）
-  47. boq_lines                   → boq_files, projects, boq_change_orders（第 4 批档位）
-  48. delivery_lines              → delivery_records                （第 4 批档位）
-  49. wage_statement_lines        → wage_statements, workers        （第 5 批档位）
-  50. attendance_records          → projects, workers               （第 5 批档位）
-  51. boq_change_lines            → boq_change_orders, boq_lines    （第 5 批档位）
-
-2026-07-06 增补（送货单工地名归一，随送货单批次建表）
-  52. project_aliases             → projects                        （第 3 批档位）
-
-2026-07-17 增补（送货单归档原件本地持久化）
-  53. file_payloads               → file_refs                       （1:1 正文，仅按需读取）
+第 7 批（多态关联）
+  file_refs → ownerType + ownerId（应用层保证一致性）
+  file_payloads → file_refs（1:1 正文，仅按需读取）
 ```
 
 ---
@@ -718,6 +857,15 @@ CREATE INDEX idx_expenditure_contracts_proj ON expenditure_contracts(projectId);
 CREATE INDEX idx_expenditure_contracts_sup ON expenditure_contracts(supplierId);
 CREATE INDEX idx_payment_applications_proj ON payment_applications(projectId);
 CREATE INDEX idx_payment_applications_sup ON payment_applications(supplierId);
+CREATE INDEX idx_expenditure_settlements_proj ON expenditure_settlements(projectId);
+CREATE INDEX idx_expenditure_settlements_sup ON expenditure_settlements(supplierId);
+CREATE INDEX idx_expenditure_settlements_contract ON expenditure_settlements(contractId);
+CREATE INDEX idx_pasa_application ON payment_application_settlement_allocations(paymentApplicationId);
+CREATE INDEX idx_pasa_settlement ON payment_application_settlement_allocations(settlementId);
+CREATE INDEX idx_paia_application ON payment_application_invoice_allocations(paymentApplicationId);
+CREATE INDEX idx_paia_invoice ON payment_application_invoice_allocations(invoiceId);
+CREATE UNIQUE INDEX uq_pasa_source ON payment_application_settlement_allocations(paymentApplicationId, settlementId) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_paia_source ON payment_application_invoice_allocations(paymentApplicationId, invoiceId) WHERE deleted_at IS NULL;
 CREATE INDEX idx_invoices_project ON invoices(project_id);
 CREATE INDEX idx_invoices_supplier ON invoices(supplier_id);
 CREATE INDEX idx_invoices_account ON invoices(account_status);
@@ -743,16 +891,28 @@ CREATE INDEX idx_floors_building ON floors(buildingId);
 CREATE INDEX idx_units_floor ON units(floorId);
 CREATE INDEX idx_rooms_unit ON rooms(unitId);
 CREATE INDEX idx_items_project ON items(projectId);
-CREATE INDEX idx_quantities_item ON quantities(itemId);
-CREATE INDEX idx_quantities_room ON quantities(roomId);
-CREATE INDEX idx_quantities_worker ON quantities(workerId);
-CREATE INDEX idx_quantities_month ON quantities(completedMonth);
+CREATE INDEX idx_ht_project ON house_type_templates(projectId);
+CREATE UNIQUE INDEX uq_ht_code ON house_type_templates(projectId, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_hti_template ON house_type_template_items(templateId);
+CREATE INDEX idx_hti_item ON house_type_template_items(itemId);
+CREATE INDEX idx_stages_project ON construction_stages(projectId);
+CREATE UNIQUE INDEX uq_stage_code ON construction_stages(projectId, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_stage_items_stage ON construction_stage_items(stageId);
+CREATE UNIQUE INDEX uq_stage_item ON construction_stage_items(stageId, itemId) WHERE deleted_at IS NULL;
+CREATE INDEX idx_unit_assignments_unit ON unit_assignments(unitId);
+CREATE UNIQUE INDEX uq_unit_assignment_trade ON unit_assignments(unitId, trade) WHERE deleted_at IS NULL;
+CREATE INDEX idx_uas_assignment ON unit_assignment_scopes(assignmentId);
+CREATE UNIQUE INDEX uq_uas_scope ON unit_assignment_scopes(assignmentId, roomId, itemId) WHERE deleted_at IS NULL;
+CREATE INDEX idx_usc_stage_date ON unit_stage_completions(stageId, completedAt);
+CREATE INDEX idx_usc_unit ON unit_stage_completions(unitId);
+CREATE UNIQUE INDEX uq_usc_unit_stage ON unit_stage_completions(unitId, stageId) WHERE deleted_at IS NULL;
 
 -- 施工进度
 CREATE INDEX idx_schedule_groups_proj ON schedule_groups(projectId);
 CREATE INDEX idx_sgb_group ON schedule_group_buildings(groupId);
 CREATE INDEX idx_schedule_tasks_proj ON schedule_tasks(projectId);
 CREATE INDEX idx_schedule_tasks_group ON schedule_tasks(groupId);
+CREATE INDEX idx_schedule_tasks_stage ON schedule_tasks(stageId);
 CREATE INDEX idx_task_deps_pred ON task_dependencies(predId);
 CREATE INDEX idx_task_deps_succ ON task_dependencies(succId);
 CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
@@ -874,7 +1034,8 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 3. 所有业务表的删除操作使用软删除（§ 8.1），并记录操作日志（§ 8.2）
 4. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
 5. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
-6. 纯派生计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询（§ 4）；人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
+6. 遵守 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)：用户可编辑业务字段默认持久化（标量列 / lookup 外键 / grid 子表 / file_refs）；`readonly + compute`、`_` 展示字段和纯聚合不存。人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
 7. 新增支出类实体必须定义 **costCategory 归集口径**（人工/材料/机械/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
-8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵表名/结构以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准（`house_type_templates` / `house_type_template_items` / `unit_assignments`，取代原 `quantities`），禁用旧名 `quantity_records`
-9. **禁用旧名**（2026-07-04 grill 定稿）：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表 `wage_statements`/`wage_statement_lines`/`attendance_records`）、`price_comparisons`（→ `delivery_lines` 聚合查询视图，无表）
+8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准：量=`house_type_template_items`、责任=`unit_assignments`、完成=`unit_stage_completions`，稳定阶段=`construction_stages`
+9. 付款申请头与结算/发票分摊必须由同一 action 事务写入；源单展示字段不得复制，提交勾稽与发票全局额度检查遵守 ADR 0015
+10. **禁用旧名**：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表）、`price_comparisons`（→ `delivery_lines` 聚合视图）、`quantities` / `quantity_records`（→ ADR 0010 分层表）

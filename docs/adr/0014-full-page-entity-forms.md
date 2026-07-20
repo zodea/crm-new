@@ -65,5 +65,5 @@
 
 - **弹窗从「表单主形态」退位**：`KitUI.formModal` 保留为行级对象与兜底（`buildFormBody` grid 布局）；差距清单 §1-6「大单据改整页」全域兑现且范围扩大到全部实体。
 - **Vue 侧原语 issue 基准变化**（#74/#79/#92-96）：Wave2 原语（KitLookup/KitEditGrid/typeSelect/KitFormFooter）继续有效，但组合目标从「弹窗四增强」改为整页表单壳；已在对应 issue 评论。
-- 表单字段唯一现行来源 = `kit/forms/*.jsx`，页面蓝本与 DATABASE.md 的回写/入库评审由 [#116](https://github.com/zodea/crm-new/issues/116) 跟踪（相关文档已打横幅）。
+- 表单字段唯一现行来源 = `kit/forms/*.jsx`；用户可编辑业务字段默认持久化及付款申请勾稽以 [ADR 0015](0015-form-persistence-and-payment-reconciliation.md) 为准。页面蓝本与 DATABASE.md 的逐实体列/迁移回写继续由 [#116](https://github.com/zodea/crm-new/issues/116) 跟踪，未完成页面保留警示横幅。
 - 后续若某实体确需退回弹窗（高频轻量录入），按「够用就停」原则个案评审，不整体回退。
