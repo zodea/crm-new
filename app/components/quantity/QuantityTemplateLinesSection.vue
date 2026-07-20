@@ -1,0 +1,218 @@
+<script setup lang="ts">
+import type {
+  QuantityTemplateLineDraft,
+  QuantityTemplateNewItemDraft,
+  QuantityTemplateRoomDraft,
+} from '~/lib/quantity/template'
+import { evaluateQuantityFormula } from '~/lib/quantity/formula'
+
+interface ItemOption {
+  key: string
+  label: string
+}
+
+type NewItemField = 'code' | 'name' | 'trade' | 'unit'
+type LineUpdate
+  = | { key: string, field: 'roomKey' | 'itemId' | 'fieldFormula' | 'note', value: string }
+    | { key: string, field: 'contractQty' | 'provisionalQty', value: number | null }
+
+const props = defineProps<{
+  rooms: readonly QuantityTemplateRoomDraft[]
+  newItems: readonly QuantityTemplateNewItemDraft[]
+  lines: readonly QuantityTemplateLineDraft[]
+  itemOptions: readonly ItemOption[]
+}>()
+
+const emit = defineEmits<{
+  addManualItem: []
+  addLine: []
+  removeNewItem: [item: QuantityTemplateNewItemDraft]
+  removeLine: [line: QuantityTemplateLineDraft]
+  updateNewItem: [payload: { key: string, field: NewItemField, value: string }]
+  updateLine: [payload: LineUpdate]
+}>()
+
+const formulaResults = computed(() => new Map(
+  props.lines.map(line => [line.key, evaluateQuantityFormula(line.fieldFormula)]),
+))
+
+function inputValue(event: Event): string {
+  return (event.target as HTMLInputElement).value
+}
+
+function selectValue(event: Event): string {
+  return (event.target as HTMLSelectElement).value
+}
+
+function numberInput(event: Event): number | null {
+  const raw = inputValue(event).trim()
+  if (!raw)
+    return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+function formulaResult(line: QuantityTemplateLineDraft) {
+  return formulaResults.value.get(line.key) ?? evaluateQuantityFormula(line.fieldFormula)
+}
+
+function formulaError(line: QuantityTemplateLineDraft): string {
+  const result = formulaResult(line)
+  return result.ok ? '' : result.error
+}
+
+function formulaValue(line: QuantityTemplateLineDraft): number | null {
+  const result = formulaResult(line)
+  return result.ok ? result.value : null
+}
+
+function roomLabel(roomKey: string): string {
+  return props.rooms.find(room => room.key === roomKey)?.name ?? '未知房间'
+}
+
+function itemLabel(itemId: string): string {
+  return props.itemOptions.find(item => item.key === itemId)?.label ?? '未知分项'
+}
+</script>
+
+<template>
+  <section id="form-section-items" class="mt-6 scroll-mt-4 border-t border-line pt-5">
+    <div class="mb-2 flex flex-wrap items-center gap-2">
+      <div>
+        <h3 class="text-13px font-800 text-ink">
+          房间 × 分项 × 三量
+        </h3>
+        <p class="mt-0.5 text-11px text-ink-soft">
+          识别原值只读；现场量由算式实时计算，非法算式会阻止整份保存。
+        </p>
+      </div>
+      <button type="button" class="btn-secondary ml-auto" @click="emit('addManualItem')">
+        <span class="i-lucide-list-plus mr-1" aria-hidden="true" />新增手工分项
+      </button>
+      <button type="button" class="btn-secondary" :disabled="!props.itemOptions.length" @click="emit('addLine')">
+        <span class="i-lucide-plus mr-1" aria-hidden="true" />添加明细
+      </button>
+    </div>
+
+    <div v-if="props.newItems.length" class="mb-3 rounded-[var(--radius-btn)] border border-brand/25 bg-brand-soft/25 p-3">
+      <div class="mb-2 text-11px font-800 text-ink">
+        随模板一起建立的手工分项
+      </div>
+      <div v-for="item in props.newItems" :key="item.key" class="mb-2 grid grid-cols-[1fr_1.4fr_1fr_0.7fr_auto] gap-2 last:mb-0">
+        <input :value="item.code" class="field-input min-w-0" aria-label="新分项编码" placeholder="编码" @input="emit('updateNewItem', { key: item.key, field: 'code', value: inputValue($event) })">
+        <input :value="item.name" class="field-input min-w-0" aria-label="新分项名称" placeholder="分项名称" @input="emit('updateNewItem', { key: item.key, field: 'name', value: inputValue($event) })">
+        <input :value="item.trade" class="field-input min-w-0" aria-label="新分项工种" placeholder="工种" @input="emit('updateNewItem', { key: item.key, field: 'trade', value: inputValue($event) })">
+        <input :value="item.unit" class="field-input min-w-0" aria-label="新分项单位" placeholder="单位" @input="emit('updateNewItem', { key: item.key, field: 'unit', value: inputValue($event) })">
+        <button type="button" class="icon-btn-danger" aria-label="删除新分项" @click="emit('removeNewItem', item)">
+          <span class="i-lucide-x" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-[var(--radius-btn)] border border-line">
+      <table class="min-w-[1080px] w-full text-10px">
+        <thead class="bg-surface-2 text-ink-soft">
+          <tr>
+            <th class="min-w-28 px-2 py-2 text-left">
+              房间
+            </th>
+            <th class="min-w-44 px-2 py-2 text-left">
+              分项
+            </th>
+            <th class="w-24 px-2 py-2 text-right">
+              识别原值
+            </th>
+            <th class="w-24 px-2 py-2 text-right">
+              当前合同量
+            </th>
+            <th class="w-24 px-2 py-2 text-right">
+              暂估量
+            </th>
+            <th class="min-w-48 px-2 py-2 text-left">
+              现场复核算式
+            </th>
+            <th class="w-24 px-2 py-2 text-right">
+              现场量
+            </th>
+            <th class="min-w-32 px-2 py-2 text-left">
+              备注
+            </th>
+            <th class="w-10 px-1 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="line in props.lines" :key="line.key" class="border-t border-line align-top">
+            <td class="p-1">
+              <select
+                :value="line.roomKey"
+                class="field-input w-full"
+                :aria-label="`房间 ${roomLabel(line.roomKey)}`"
+                :disabled="Boolean(line.id || line.sourceLineId)"
+                @change="emit('updateLine', { key: line.key, field: 'roomKey', value: selectValue($event) })"
+              >
+                <option v-for="room in props.rooms" :key="room.key" :value="room.key">
+                  {{ room.name }}
+                </option>
+              </select>
+            </td>
+            <td class="p-1">
+              <select
+                :value="line.itemId"
+                class="field-input w-full"
+                :aria-label="`分项 ${itemLabel(line.itemId)}`"
+                :disabled="Boolean(line.id || line.sourceLineId)"
+                @change="emit('updateLine', { key: line.key, field: 'itemId', value: selectValue($event) })"
+              >
+                <option v-for="item in props.itemOptions" :key="item.key" :value="item.key">
+                  {{ item.label }}
+                </option>
+              </select>
+            </td>
+            <td class="p-1 text-right font-mono">
+              <span v-if="line.recognizedContractQty != null" class="inline-block px-2 py-2 text-ink-soft">{{ line.recognizedContractQty }}</span>
+              <span v-else class="inline-block px-2 py-2 text-ink-faint">手工</span>
+            </td>
+            <td class="p-1">
+              <input :value="line.contractQty ?? ''" type="number" min="0" step="0.001" class="field-input w-full text-right font-mono" aria-label="当前合同量" @input="emit('updateLine', { key: line.key, field: 'contractQty', value: numberInput($event) })">
+            </td>
+            <td class="p-1">
+              <input :value="line.provisionalQty ?? ''" type="number" min="0" step="0.001" class="field-input w-full text-right font-mono" aria-label="暂估量" @input="emit('updateLine', { key: line.key, field: 'provisionalQty', value: numberInput($event) })">
+            </td>
+            <td class="p-1">
+              <input
+                :value="line.fieldFormula"
+                class="field-input w-full font-mono"
+                :class="formulaResult(line).ok ? '' : 'border-danger text-danger'"
+                aria-label="现场复核算式"
+                placeholder="如 客厅（3.2×4）"
+                @input="emit('updateLine', { key: line.key, field: 'fieldFormula', value: inputValue($event) })"
+              >
+              <div v-if="formulaError(line)" class="mt-1 px-1 text-9px text-danger" role="alert">
+                {{ formulaError(line) }}
+              </div>
+            </td>
+            <td class="p-1 text-right font-mono">
+              <span v-if="formulaValue(line) != null" class="inline-block px-2 py-2 font-800 text-brand-deep">
+                {{ formulaValue(line) }}
+              </span>
+              <span v-else class="inline-block px-2 py-2 text-ink-faint">—</span>
+            </td>
+            <td class="p-1">
+              <input :value="line.note" class="field-input w-full" aria-label="模板明细备注" placeholder="备注" @input="emit('updateLine', { key: line.key, field: 'note', value: inputValue($event) })">
+            </td>
+            <td class="px-1 py-1 text-center">
+              <button type="button" class="icon-btn-danger h-7 w-7" aria-label="删除三量明细" @click="emit('removeLine', line)">
+                <span class="i-lucide-x" aria-hidden="true" />
+              </button>
+            </td>
+          </tr>
+          <tr v-if="!props.lines.length">
+            <td colspan="9" class="px-4 py-8 text-center text-ink-faint">
+              暂无三量明细；可选择已有分项，或在无 BOQ 时新增手工分项。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</template>

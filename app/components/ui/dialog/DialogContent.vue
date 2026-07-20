@@ -43,7 +43,9 @@ watch(() => rootContext.open.value, (isOpen) => {
 }, { immediate: true })
 
 function onPointerDownOutside(e: PointerDownOutsideEvent) {
-  if (performance.now() - openedAt.value < GRACE_MS)
+  const target = e.detail.originalEvent.target
+  const isToastInteraction = target instanceof Element && target.closest('[data-sonner-toaster]') != null
+  if (isToastInteraction || performance.now() - openedAt.value < GRACE_MS)
     e.preventDefault()
 }
 </script>

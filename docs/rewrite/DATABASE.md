@@ -601,7 +601,7 @@ BEGIN
 END;
 ```
 
-每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID，`house_type_template_items.room_id` 不允许为空。
+每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID；`rooms.code` 是模板内唯一、创建后不可修改的机器码，界面可修改的是 `rooms.name` 显示名。`house_type_template_items.room_id` 不允许为空。
 
 责任人或个人范围任一变化，都采用“软删旧 `unit_assignments`（旧 scope 随父级保留并隐藏）+ 新建 assignment/scopes”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任、范围及责任人，仍须先保证完成事实本身及其户、阶段可见。历史只冻结责任/范围身份，房间显示名与三量仍从当前活链接模板读取；已发放工资才按 #117 固化金额快照。
 
@@ -1156,6 +1156,8 @@ CREATE TABLE IF NOT EXISTS operation_logs (
 CREATE INDEX IF NOT EXISTS idx_operation_logs_record ON operation_logs(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at);
 ```
+
+新写入的 `delete` 日志同时保存 `before_data` 与含精确 `deleted_at` 的 `after_data`，供需要并发保护的严格撤回做操作后快照比对；历史 `delete` 日志的 `after_data` 允许为空，兼容路径按 `before_data` 与当前删除态判断。
 
 ### 8.3 撤回规则
 

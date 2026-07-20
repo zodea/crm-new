@@ -18,6 +18,7 @@ const viewMode = shallowRef<QuantityMatrixViewMode>('trade')
 const trade = shallowRef(ALL_QUANTITY_FILTER)
 const assigneeKey = shallowRef(ALL_QUANTITY_FILTER)
 const initialized = shallowRef(false)
+const templateDialogOpen = shallowRef(false)
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -120,6 +121,7 @@ onMounted(initialize)
       :loading="store.loading"
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
+      @manage-templates="templateDialogOpen = true"
       @refresh="retry"
     />
 
@@ -195,6 +197,12 @@ onMounted(initialize)
     </section>
 
     <QuantityWorkspace v-else-if="snapshot" :matrix="matrix" />
+
+    <QuantityTemplateDialog
+      v-if="projectId"
+      v-model:open="templateDialogOpen"
+      :project-id="projectId"
+    />
   </div>
 </template>
 
