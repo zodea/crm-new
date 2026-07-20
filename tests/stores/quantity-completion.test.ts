@@ -5,6 +5,7 @@ import { runMigrations } from '~/lib/db/migrations'
 import { softDelete } from '~/lib/db/soft-delete'
 import {
   loadQuantityCompletionWorkspace,
+  loadQuantityPhotoDataUrl,
   persistQuantityStageCompletion,
 } from '~/lib/quantity/completion'
 import { useQuantityStore } from '~/stores/quantity'
@@ -270,6 +271,16 @@ describe('quantity stage completion：单户×单阶段唯一写路径', () => {
       { stage_id: 's-putty-2', status: 'completed', completed_at: '2026-07-12' },
       { stage_id: 's-wall', status: 'completed', completed_at: '2026-07-19' },
     ])
+  })
+
+  it('照片正文按可见 file_ref 惰性读取为 data URL，软删照片拒绝提供正文', async () => {
+    const result = await persistQuantityStageCompletion(mem, await draftFor('s-wall'))
+    const photoId = result.photoIds[0]!
+
+    await expect(loadQuantityPhotoDataUrl(mem, photoId)).resolves.toBe('data:image/jpeg;base64,AQID')
+
+    await softDelete(mem, 'file_refs', photoId)
+    await expect(loadQuantityPhotoDataUrl(mem, photoId)).rejects.toThrow('不存在或已删除')
   })
 
   it('照片只随可见完成事实读取，责任软删不吞历史，完成事实隐藏后照片不可见', async () => {

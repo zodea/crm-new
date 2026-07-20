@@ -88,7 +88,7 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
     expect(updated).toMatchObject({ contract_qty: 32, total: 1 })
   })
 
-  it('责任导入按名称匹配班组并允许替换旧责任，历史软删保留', async () => {
+  it('责任导入按名称匹配班组；替换现有责任必须行内显式声明，历史软删保留', async () => {
     await importQuantityAssignmentRow(mem, {
       projectCode: 'P1',
       buildingCode: '1',
@@ -97,6 +97,16 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
       trade: '泥水工',
       crewName: '泥水一班',
     })
+    // 未声明替换：不同责任静默覆盖被拒（ADR 0010 冲突保护）。
+    await expect(importQuantityAssignmentRow(mem, {
+      projectCode: 'P1',
+      buildingCode: '1',
+      floorCode: '1',
+      unitCode: '01',
+      trade: '泥水工',
+      crewName: '泥水二班',
+    })).rejects.toThrow('允许替换现有责任')
+
     await importQuantityAssignmentRow(mem, {
       projectCode: 'P1',
       buildingCode: '1',
@@ -104,6 +114,7 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
       unitCode: '01',
       trade: '泥水工',
       crewName: '泥水二班',
+      replaceExisting: '是',
     })
 
     expect(await mem.select(
