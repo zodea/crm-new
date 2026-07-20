@@ -227,6 +227,7 @@ onMounted(initialize)
     <template v-else-if="snapshot">
       <QuantityProgressCards :progress="store.stageProgress" />
       <QuantityWorkspace
+        :project-id="projectId"
         :matrix="matrix"
         @configure="configureCell"
         @complete="completeCell"

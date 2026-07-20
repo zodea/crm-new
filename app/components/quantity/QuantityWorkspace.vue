@@ -2,6 +2,7 @@
 import type { QuantityMatrixCell, QuantityMatrixView } from '~/lib/quantity/matrix'
 
 const props = defineProps<{
+  projectId: string
   matrix: QuantityMatrixView
 }>()
 
@@ -55,6 +56,13 @@ function completedLabel(completedAt: string | null): string {
           {{ selectedCell.floorName }} · {{ selectedCell.unitName }} · 阶段时间线
         </h3>
         <span class="text-11px text-ink-faint">总览按月份取最近阶段，此处保留完整记录</span>
+        <NuxtLink
+          :to="`/subcontract/quantity/${projectId}/${selectedCell.unitId}`"
+          class="ml-auto text-12px text-brand-deep font-700 hover:underline"
+        >
+          打开户施工详情
+          <span class="i-lucide-arrow-right align-[-2px]" aria-hidden="true" />
+        </NuxtLink>
       </div>
       <ol v-if="selectedCell.timeline.length" class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <li

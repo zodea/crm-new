@@ -34,6 +34,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/contract/material'), title: '材料采购合同', subtitle: '乙供材管理 · 采购合同台账' },
   { test: p => /^\/contract\/[^/]+/.test(p), title: '合同详情', subtitle: '四级对账 · 关联单据 · 文书' },
   { test: p => p.startsWith('/contract'), title: '主合同管理' },
+  { test: p => /^\/subcontract\/quantity\/[^/]+\/[^/]+/.test(p), title: '户施工详情', subtitle: '工种 → 工序阶段 → 完成日期 · 三量与验收照片' },
   { test: p => p.startsWith('/subcontract/quantity'), title: '工程量管理', subtitle: '户型模板 · 责任指派 · 阶段完成' },
   { test: p => p.startsWith('/subcontract/payroll'), title: '工资核算', subtitle: '班组 × 项目 × 月份' },
   { test: p => p.startsWith('/subcontract/attendance'), title: '考勤', subtitle: '班组出勤记录' },
