@@ -482,6 +482,38 @@ describe('迁移机制：存量表 ALTER 补列', () => {
       .toMatch(/kind\s*=\s*'whole_unit'/i)
     db.close()
   })
+
+  it('v12：每个户型模板始终拥有唯一且不可单删的整户范围', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await db.execute(`INSERT INTO projects (id, name) VALUES ('project-whole', '整户范围项目')`)
+
+    await db.execute(`
+      INSERT INTO house_type_templates (id, project_id, code, name)
+      VALUES ('template-whole', 'project-whole', 'A', 'A户型')
+    `)
+
+    expect(await db.select(`
+      SELECT id, template_id, code, name, kind
+      FROM rooms
+      WHERE template_id = 'template-whole' AND kind = 'whole_unit' AND deleted_at IS NULL
+    `)).toEqual([{
+      id: 'template-whole:whole_unit',
+      template_id: 'template-whole',
+      code: '__whole_unit__',
+      name: '整户范围',
+      kind: 'whole_unit',
+    }])
+    await expect(db.execute(`
+      UPDATE rooms SET deleted_at = '2026-07-20 12:00:00'
+      WHERE id = 'template-whole:whole_unit'
+    `)).rejects.toThrow(/whole_unit room cannot be deleted/i)
+    await expect(db.execute(`
+      INSERT INTO rooms (id, template_id, code, name, kind)
+      VALUES ('whole-duplicate', 'template-whole', 'WHOLE-2', '另一整户', 'whole_unit')
+    `)).rejects.toThrow(/UNIQUE constraint failed/i)
+    db.close()
+  })
 })
 
 describe('v12 工程量底座：升级与约束行为', () => {

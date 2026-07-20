@@ -420,6 +420,26 @@ CREATE INDEX IF NOT EXISTS idx_unit_stage_completions_deleted ON unit_stage_comp
 CREATE INDEX IF NOT EXISTS idx_unit_assignment_scopes_deleted ON unit_assignment_scopes(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+// trigger body 含内部分号，不能交给 execScript 的简单拆句器，须作为完整语句执行。
+const V12_CREATE_WHOLE_UNIT_ROOM = `
+CREATE TRIGGER IF NOT EXISTS trg_house_type_templates_whole_unit
+AFTER INSERT ON house_type_templates
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  INSERT INTO rooms (id, template_id, code, name, kind, sort_order)
+  VALUES (NEW.id || ':whole_unit', NEW.id, '__whole_unit__', '整户范围', 'whole_unit', -1);
+END;
+`
+
+const V12_PROTECT_WHOLE_UNIT_ROOM = `
+CREATE TRIGGER IF NOT EXISTS trg_rooms_keep_whole_unit
+BEFORE UPDATE OF deleted_at ON rooms
+WHEN OLD.kind = 'whole_unit' AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'whole_unit room cannot be deleted');
+END;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -545,6 +565,8 @@ export const migrations: Migration[] = [
     async up(db) {
       await addColumnIfMissing(db, 'projects', 'matrix_archived_at', 'TEXT DEFAULT NULL')
       await execScript(db, V12_QUANTITY_FOUNDATION)
+      await db.execute(V12_CREATE_WHOLE_UNIT_ROOM)
+      await db.execute(V12_PROTECT_WHOLE_UNIT_ROOM)
     },
   },
 ]
