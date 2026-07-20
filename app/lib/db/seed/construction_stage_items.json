@@ -1,0 +1,42 @@
+[
+  {
+    "id": "qty_csi_plumb",
+    "stage_id": "qty_stage_plumb_rough",
+    "item_id": "qty_item_plumb_pipe"
+  },
+  {
+    "id": "qty_csi_wp_1_wall",
+    "stage_id": "qty_stage_waterproof_1",
+    "item_id": "qty_item_waterproof_wall"
+  },
+  {
+    "id": "qty_csi_wp_1_floor",
+    "stage_id": "qty_stage_waterproof_1",
+    "item_id": "qty_item_waterproof_floor"
+  },
+  {
+    "id": "qty_csi_wp_2_wall",
+    "stage_id": "qty_stage_waterproof_2",
+    "item_id": "qty_item_waterproof_wall"
+  },
+  {
+    "id": "qty_csi_wp_2_floor",
+    "stage_id": "qty_stage_waterproof_2",
+    "item_id": "qty_item_waterproof_floor"
+  },
+  {
+    "id": "qty_csi_masonry_wall",
+    "stage_id": "qty_stage_masonry_wall",
+    "item_id": "qty_item_masonry_wall"
+  },
+  {
+    "id": "qty_csi_masonry_floor",
+    "stage_id": "qty_stage_masonry_floor",
+    "item_id": "qty_item_masonry_floor"
+  },
+  {
+    "id": "qty_csi_ceiling",
+    "stage_id": "qty_stage_ceiling",
+    "item_id": "qty_item_ceiling"
+  }
+]

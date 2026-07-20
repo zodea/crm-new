@@ -1,0 +1,98 @@
+[
+  {
+    "id": "qty_done_1_01_01_plumb",
+    "unit_id": "qty_u_1_01_01",
+    "stage_id": "qty_stage_plumb_rough",
+    "assignment_id": "qty_asg_1_01_01_plumb",
+    "status": "completed",
+    "completed_at": "2026-04-05T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_01_01_wp1",
+    "unit_id": "qty_u_1_01_01",
+    "stage_id": "qty_stage_waterproof_1",
+    "assignment_id": "qty_asg_1_01_01_waterproof",
+    "status": "completed",
+    "completed_at": "2026-04-10T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_01_01_wp2",
+    "unit_id": "qty_u_1_01_01",
+    "stage_id": "qty_stage_waterproof_2",
+    "assignment_id": "qty_asg_1_01_01_waterproof",
+    "status": "completed",
+    "completed_at": "2026-05-02T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_01_01_wall",
+    "unit_id": "qty_u_1_01_01",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_1_01_01_masonry",
+    "status": "completed",
+    "completed_at": "2026-05-18T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_01_01_floor",
+    "unit_id": "qty_u_1_01_01",
+    "stage_id": "qty_stage_masonry_floor",
+    "assignment_id": "qty_asg_1_01_01_masonry",
+    "status": "completed",
+    "completed_at": "2026-06-03T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_01_02_wall",
+    "unit_id": "qty_u_1_01_02",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_1_01_02_masonry",
+    "status": "completed",
+    "completed_at": "2026-06-12T09:00:00.000Z"
+  },
+  {
+    "id": "qty_draft_1_02_02_wp1",
+    "unit_id": "qty_u_1_02_02",
+    "stage_id": "qty_stage_waterproof_1",
+    "assignment_id": "qty_asg_1_02_02_waterproof",
+    "status": "draft",
+    "note": "待补验收照片"
+  },
+  {
+    "id": "qty_done_1_02_01_wall",
+    "unit_id": "qty_u_1_02_01",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_1_02_01_masonry",
+    "status": "completed",
+    "completed_at": "2026-05-22T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_1_02_02_wall",
+    "unit_id": "qty_u_1_02_02",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_1_02_02_masonry",
+    "status": "completed",
+    "completed_at": "2026-06-15T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_2_02_01_wall",
+    "unit_id": "qty_u_2_02_01",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_2_02_01_masonry",
+    "status": "completed",
+    "completed_at": "2026-06-18T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_2_02_02_wall",
+    "unit_id": "qty_u_2_02_02",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_2_02_02_masonry",
+    "status": "completed",
+    "completed_at": "2026-05-28T09:00:00.000Z"
+  },
+  {
+    "id": "qty_done_2_01_01_wall",
+    "unit_id": "qty_u_2_01_01",
+    "stage_id": "qty_stage_masonry_wall",
+    "assignment_id": "qty_asg_2_01_01_masonry",
+    "status": "completed",
+    "completed_at": "2026-06-20T09:00:00.000Z"
+  }
+]

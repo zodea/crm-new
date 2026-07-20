@@ -1,0 +1,62 @@
+[
+  {
+    "id": "qty_item_plumb_pipe",
+    "project_id": "proj_demo_001",
+    "code": "MEP-PIPE",
+    "name": "给排水管安装",
+    "section": "机电安装",
+    "trade": "水暖工",
+    "unit": "m",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_item_waterproof_wall",
+    "project_id": "proj_demo_001",
+    "code": "WP-WALL",
+    "name": "卫生间墙面防水",
+    "section": "防水工程",
+    "trade": "防水工",
+    "unit": "㎡",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_item_waterproof_floor",
+    "project_id": "proj_demo_001",
+    "code": "WP-FLOOR",
+    "name": "卫生间地面防水",
+    "section": "防水工程",
+    "trade": "防水工",
+    "unit": "㎡",
+    "sort_order": 21
+  },
+  {
+    "id": "qty_item_masonry_wall",
+    "project_id": "proj_demo_001",
+    "code": "DEC-WALL-TILE",
+    "name": "墙砖铺贴",
+    "section": "装饰装修",
+    "trade": "泥水工",
+    "unit": "㎡",
+    "sort_order": 30
+  },
+  {
+    "id": "qty_item_masonry_floor",
+    "project_id": "proj_demo_001",
+    "code": "DEC-FLOOR-TILE",
+    "name": "地砖铺贴",
+    "section": "装饰装修",
+    "trade": "泥水工",
+    "unit": "㎡",
+    "sort_order": 31
+  },
+  {
+    "id": "qty_item_ceiling",
+    "project_id": "proj_demo_001",
+    "code": "DEC-CEILING",
+    "name": "轻钢龙骨吊顶",
+    "section": "装饰装修",
+    "trade": "木工",
+    "unit": "㎡",
+    "sort_order": 40
+  }
+]

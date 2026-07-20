@@ -1,0 +1,66 @@
+[
+  {
+    "id": "qty_u_1_02_01",
+    "floor_id": "qty_floor_1_02",
+    "house_type_template_id": "qty_tpl_a",
+    "code": "01",
+    "name": "201户",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_u_1_02_02",
+    "floor_id": "qty_floor_1_02",
+    "house_type_template_id": "qty_tpl_b",
+    "code": "02",
+    "name": "202户",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_u_1_01_01",
+    "floor_id": "qty_floor_1_01",
+    "house_type_template_id": "qty_tpl_a",
+    "code": "01",
+    "name": "101户",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_u_1_01_02",
+    "floor_id": "qty_floor_1_01",
+    "house_type_template_id": "qty_tpl_b",
+    "code": "02",
+    "name": "102户",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_u_2_02_01",
+    "floor_id": "qty_floor_2_02",
+    "house_type_template_id": "qty_tpl_b",
+    "code": "01",
+    "name": "201户",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_u_2_02_02",
+    "floor_id": "qty_floor_2_02",
+    "house_type_template_id": "qty_tpl_a",
+    "code": "02",
+    "name": "202户",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_u_2_01_01",
+    "floor_id": "qty_floor_2_01",
+    "house_type_template_id": "qty_tpl_b",
+    "code": "01",
+    "name": "101户",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_u_2_01_02",
+    "floor_id": "qty_floor_2_01",
+    "house_type_template_id": "qty_tpl_a",
+    "code": "02",
+    "name": "102户",
+    "sort_order": 20
+  }
+]

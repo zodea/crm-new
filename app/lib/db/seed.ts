@@ -33,6 +33,81 @@ async function seedFromJson(db: MigrationDb, table: string, rows: SeedRow[]) {
   }
 }
 
+export const QUANTITY_SEED_TABLES = [
+  'items',
+  'buildings',
+  'floors',
+  'house_type_templates',
+  'rooms',
+  'units',
+  'house_type_template_items',
+  'construction_stages',
+  'construction_stage_items',
+  'unit_assignments',
+  'unit_assignment_scopes',
+  'unit_stage_completions',
+] as const
+
+function loadBaseSeedJson(table: string): SeedRow[] {
+  const key = `./seed/${table}.json`
+  const rows = baseFiles[key]?.default
+  if (!rows?.length)
+    throw new Error(`[seed] 工程量演示数据缺失或为空: ${table}.json`)
+  return rows
+}
+
+async function seedStrictById(db: MigrationDb, table: string, rows: SeedRow[]) {
+  for (const row of rows) {
+    const { cols, vals } = columnPlaceholders(row)
+    const placeholders = cols.map(() => '?').join(', ')
+    const colNames = cols.map(c => `"${c}"`).join(', ')
+    await db.execute(
+      `INSERT INTO "${table}" (${colNames}) VALUES (${placeholders}) ON CONFLICT(id) DO NOTHING`,
+      vals,
+    )
+  }
+}
+
+/**
+ * v12 工程量演示图是一个紧密关联的整体：不能沿用“表非空就整表跳过”，因为插入
+ * 户型时 trigger 会先创建 whole_unit 房间。确定性 ID 允许中断后整组重放；旧用户库
+ * 不一定包含演示项目/班组祖先，缺任一哨兵时安全跳过，不向真实数据硬塞 demo。
+ */
+export async function seedQuantityDemo(db: MigrationDb) {
+  const [project] = await db.select<{ id: string }>(
+    `SELECT id FROM projects WHERE id = 'proj_demo_001' AND deleted_at IS NULL`,
+  )
+  const crews = await db.select<{ id: string }>(
+    `SELECT id FROM crews
+     WHERE id IN ('crew_demo_001', 'crew_demo_002', 'crew_demo_005', 'crew_demo_006')
+       AND deleted_at IS NULL`,
+  )
+  const [worker] = await db.select<{ id: string }>(
+    `SELECT id FROM workers WHERE id = 'wkr_demo_003' AND deleted_at IS NULL`,
+  )
+  if (!project || crews.length !== 4 || !worker)
+    return
+
+  // 完整 seed 的尾哨兵物理存在后不再重放，避免用户后续编辑 demo 自然键时每次启动
+  // 都被确定性 seed 干扰；事务失败不会留下该哨兵，预置的半成品仍可收敛。
+  const [seeded] = await db.select<{ id: string }>(
+    `SELECT id FROM unit_stage_completions WHERE id = 'qty_done_2_01_01_wall'`,
+  )
+  if (seeded)
+    return
+
+  await db.execute('BEGIN')
+  try {
+    for (const table of QUANTITY_SEED_TABLES)
+      await seedStrictById(db, table, loadBaseSeedJson(table))
+    await db.execute('COMMIT')
+  }
+  catch (error) {
+    await db.execute('ROLLBACK')
+    throw error
+  }
+}
+
 export async function seedIfEmpty(db: MigrationDb) {
   const jsonTables = [
     'projects',
@@ -82,6 +157,8 @@ export async function seedIfEmpty(db: MigrationDb) {
       await seedHardcoded(db)
     }
   }
+
+  await seedQuantityDemo(db)
 }
 
 async function seedHardcoded(db: MigrationDb) {
