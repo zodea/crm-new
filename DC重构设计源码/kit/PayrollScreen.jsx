@@ -76,6 +76,230 @@
     return <StatusChip tone={tone}>{label}</StatusChip>;
   };
 
+  // —— ④ 建档弹窗：新建请款主体（格式族挂建档级；族联动配置逐项开关、金额自设；合同可空仅 B 必填）——
+  function CreateBookModal({ project, crew, onClose }) {
+    const P = window.PAYSLIP, W = window.WAGE;
+    const rosterList = (P.roster[crew] && P.roster[crew].length ? P.roster[crew]
+      : Object.keys(P.roster).reduce((a, k) => a.concat(P.roster[k]), []));   // 班组名册为空时从全名册选
+    const defTradeKey = Object.keys(W.TRADES).find(k => W.TRADES[k].crew === crew) || "mason";
+    const [fam, setFam] = React.useState("A");
+    const [leader, setLeader] = React.useState((rosterList.find(r => !r.exit) || rosterList[0] || {}).name || "");
+    const [members, setMembers] = React.useState(() => new Set(leader ? [leader] : []));
+    const [tradeKey, setTradeKey] = React.useState(defTradeKey);
+    const [contract, setContract] = React.useState("");
+    const [firstMonth, setFirstMonth] = React.useState("2026-06");
+    const [cfg, setCfg] = React.useState({ ratioFirst: 75, round: 100, rentOn: true, rentPrice: 1.30, hollowOn: true, hollowPrice: 30,
+      mgrMode: "班组管理", mgrPerson: "", mgrRate: 2.5, daily: {}, bigPrice: 350,
+      footNote: "1、当日用工由证明人 2 天内确认，逾期未确认视为无效；2、虚报用工经查实按双倍扣回；3、半工按 0.5 工计。" });
+    React.useEffect(() => { setMembers(prev => { const s = new Set(prev); if (leader) s.add(leader); return s; }); }, [leader]);
+    const setC = (k, v) => setCfg(p => ({ ...p, [k]: v }));
+    const toggleMember = (name) => setMembers(prev => { const s = new Set(prev); if (name === leader) return s; if (s.has(name)) s.delete(name); else s.add(name); return s; });
+    const famDefs = [
+      { key: "A", name: "A · 户型派生", src: "行由工程量管理「户型模板×勾房」自动聚合，行名=栋+户型+分项", chips: ["补贴", "空鼓", "逐月已领", "管理费单"], ref: "亚运城泥水铺贴同款" },
+      { key: "B", name: "B · 清单直报", src: "从签订合同清单抽取行（固定单价、长项目特征），逐月填申报量", chips: ["简化链", "分组小标题", "一口价行"], ref: "未来印暖通同款" },
+      { key: "C1", name: "C1 · 月薪时工", src: "日薪 × 出勤 + 加班 − 借支，100% 直付", chips: ["加班时薪=日薪÷8"], ref: "未来印杂工同款" },
+      { key: "C2", name: "C2 · 零星签工", src: "按日签工（壹/半工），两天内确认制", chips: ["签工确认制"], ref: "未来印泥水时工同款" },
+    ];
+    const lbl = { fontSize: 11, color: "var(--ink-faint)", marginBottom: 4 };
+    const secT = { fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", margin: "0 0 8px" };
+    const sub = { border: "1px dashed var(--line-strong)", borderRadius: 10, background: "var(--bg)", padding: "10px 13px" };
+    const amt = (v, on, w) => <input type="number" value={v} onChange={e => on(+e.target.value || 0)}
+      style={{ width: w || 72, border: "1.5px solid var(--brand)", borderRadius: 6, padding: "4px 8px", fontSize: 12.5, textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--brand-deep)" }} />;
+    const doCreate = () => {
+      if (!leader) { UI().toast("请选择负责人", "warning"); return; }
+      if (fam === "B" && !contract.trim()) { UI().toast("B 族（清单直报）必须关联合同——清单行从合同抽取（定稿⑦b）", "warning"); return; }
+      const mem = [leader].concat([...members].filter(m => m !== leader));
+      const T = W.TRADES[tradeKey] || {};
+      const baseTrade = crew.replace(/(安装)?班$/, "") || crew;
+      let config, scopeLabel, trade;
+      if (fam === "A") {
+        trade = T.name || baseTrade;
+        scopeLabel = (T.items || []).join("、") || trade;
+        config = { ratioFirst: cfg.ratioFirst, round: cfg.round, contract: contract.trim() || null,
+          subsidies: cfg.rentOn ? [{ name: "合计工程量房租", price: cfg.rentPrice, items: ["墙砖", "地砖"] }] : [],
+          hollowPrice: cfg.hollowOn ? cfg.hollowPrice : 0, hollowTiming: "结算时扣（可手动提前启动）",
+          mgr: cfg.mgrMode === "班组管理" ? { mode: "班组管理", person: cfg.mgrPerson || leader, rate: cfg.mgrRate } : { mode: "公司代管" }, priceAdj: {} };
+      } else if (fam === "B") {
+        trade = baseTrade; scopeLabel = baseTrade + "直报";
+        config = { ratioFirst: cfg.ratioFirst, round: cfg.round, contract: contract.trim(), subsidies: [], priceAdj: {}, allowManual: true };
+      } else if (fam === "C1") {
+        trade = baseTrade; scopeLabel = "时工";
+        const daily = {}; mem.forEach(m => { daily[m] = cfg.daily[m] != null ? cfg.daily[m] : 300; });
+        config = { contract: contract.trim() || null, daily, otRate: {} };
+      } else {
+        trade = baseTrade + "(零星)"; scopeLabel = "零星用工";
+        config = { contract: contract.trim() || null, bigPrice: cfg.bigPrice, footNote: cfg.footNote };
+      }
+      const nb = P.createBook({ project, crew, trade, tradeKey: fam === "A" ? tradeKey : undefined, family: fam,
+        leader, members: mem, scopeLabel, firstMonth: firstMonth.trim() || "2026-06", config });
+      UI().toast("已建档「" + leader + "簿 · " + fam + " 族」，生成 " + nb.monthSeq[0] + " 草稿" + (fam === "B" ? "（去核对页用合同清单抽取器带入行）" : ""), "success");
+      onClose(nb);
+    };
+    return (
+      <div onClick={() => onClose(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: 20 }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: 880, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto", background: "var(--panel)", borderRadius: 14, boxShadow: "var(--shadow-pop)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "15px 20px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>新建请款主体</div>
+              <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>{project} · {crew} · 建档后按月生成请款单据（格式族挂建档级，定稿④-①）</div>
+            </div>
+            <button onClick={() => onClose(null)} style={{ marginLeft: "auto", width: 26, height: 26, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--ink-faint)", cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ padding: "14px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+            <div>
+              <div style={secT}>基本信息</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.9fr 1.5fr", gap: 10 }}>
+                <div><div style={lbl}>项目</div><div style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 700 }}>{project}</div></div>
+                <div><div style={lbl}>负责人（名册选择）</div>
+                  <select value={leader} onChange={e => setLeader(e.target.value)} style={{ width: "100%", border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 8px", fontSize: 12.5, fontWeight: 700, background: "#fff" }}>
+                    {rosterList.map(r => <option key={r.name} value={r.name}>{r.name}{r.exit ? "（已离职）" : ""}</option>)}
+                  </select></div>
+                <div><div style={lbl}>班组 / 工种</div><div style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 700 }}>{crew}</div></div>
+                <div><div style={lbl}>关联合同（可空，仅 B 族必填 · 定稿⑦b）</div>
+                  <input value={contract} onChange={e => setContract(e.target.value)} placeholder={fam === "B" ? "必填：如 FB-2025-012 暖通劳务分包合同" : "选填——不是每个工人都签合同"}
+                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid " + (fam === "B" && !contract.trim() ? "var(--warn)" : "var(--line-strong)"), borderRadius: 8, padding: "7px 10px", fontSize: 12.5 }} /></div>
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>格式族（决定整本单据的形态与取数）</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                {famDefs.map(f => {
+                  const on = fam === f.key;
+                  return (
+                    <div key={f.key} onClick={() => setFam(f.key)} role="button"
+                      style={{ position: "relative", border: "1px solid " + (on ? "var(--brand)" : "var(--line)"), boxShadow: on ? "inset 0 0 0 1px var(--brand)" : "none",
+                        borderRadius: 10, padding: "11px 11px 9px", background: on ? "var(--brand-soft)" : "#fff", cursor: "pointer" }}>
+                      {on && <span style={{ position: "absolute", top: 8, right: 8, width: 16, height: 16, borderRadius: 999, background: "var(--brand-deep)", color: "#fff", display: "grid", placeItems: "center", fontSize: 10 }}>✓</span>}
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{f.name}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--ink-soft)", margin: "4px 0 7px", lineHeight: 1.5, minHeight: 31 }}>{f.src}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{f.chips.map(c => <StatusChip key={c} tone={on ? "brand" : "neutral"}>{c}</StatusChip>)}</div>
+                      <div style={{ fontSize: 9.5, color: "var(--ink-faint)", marginTop: 6 }}>{f.ref}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>{fam} 族联动配置<span style={{ fontWeight: 400, color: "var(--ink-faint)", marginLeft: 8, fontSize: 11 }}>各项可开关；蓝框金额自行设定；未开启项不出现在单据上</span></div>
+              {fam === "A" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>取数范围（工种 → 分项）</div>
+                    <select value={tradeKey} onChange={e => setTradeKey(e.target.value)} style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "6px 8px", fontSize: 12.5, background: "#fff", marginBottom: 6 }}>
+                      {Object.keys(W.TRADES).map(k => <option key={k} value={k}>{W.TRADES[k].name}（{W.TRADES[k].items.join("、")}）</option>)}
+                    </select>
+                    <div style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>量=户型模板×勾房；只聚合指派给本主体成员的行；楼栋随勾房自动</div>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>补贴设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="checkbox" checked={cfg.rentOn} onChange={e => setC("rentOn", e.target.checked)} />
+                      <b>房租补贴</b>{amt(cfg.rentPrice, v => setC("rentPrice", v), 64)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/㎡ · 基数=墙/地砖申报量</span>
+                    </label>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>空鼓设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="checkbox" checked={cfg.hollowOn} onChange={e => setC("hollowOn", e.target.checked)} />
+                      <b>空鼓扣款</b><span>单处</span>{amt(cfg.hollowPrice, v => setC("hollowPrice", v), 60)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/处 · 单据上「开始扣款」手动启动</span>
+                    </label>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>管理设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="radio" name="kit-mgr" checked={cfg.mgrMode === "班组管理"} onChange={() => setC("mgrMode", "班组管理")} />
+                      <b>有班组管理</b>
+                      <select value={cfg.mgrPerson || leader} onChange={e => setC("mgrPerson", e.target.value)} style={{ border: "1px solid var(--line-strong)", borderRadius: 6, padding: "3px 6px", fontSize: 12, background: "#fff" }}>
+                        {rosterList.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+                      </select>
+                      {amt(cfg.mgrRate, v => setC("mgrRate", v), 56)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/㎡ · 自动派生管理费单</span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="radio" name="kit-mgr" checked={cfg.mgrMode === "公司代管"} onChange={() => setC("mgrMode", "公司代管")} />
+                      <b>公司代管</b><span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>代管工序无管理费，不生成管理费单（单独出单成因①）</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+              {fam === "B" && (
+                <div style={sub}>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.8 }}>
+                    清单行从上方「关联合同」的清单里抽取（<b>必填</b>）：分组小标题随合同带入、单价合同价锁定（改价走调价弹窗）、
+                    长项目特征折叠显示/A4 展开、一口价「项」行只填总价。<span style={{ color: "var(--ink-faint)" }}>建档后在核对页点「合同清单抽取器」带入行，逐月只填申报量。</span>
+                  </div>
+                </div>
+              )}
+              {fam === "C1" && (
+                <div style={sub}>
+                  <div style={{ ...lbl, fontWeight: 700 }}>组员计薪（日薪逐人自设；加班时薪默认 = 日薪 ÷ 8，可在核对页按人另设）</div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    {[leader].concat([...members].filter(m => m !== leader)).map(m => (
+                      <span key={m} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                        <b>{m}</b>{amt(cfg.daily[m] != null ? cfg.daily[m] : 300, v => setC("daily", { ...cfg.daily, [m]: v }), 68)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/天</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {fam === "C2" && (
+                <div style={sub}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, marginBottom: 8 }}>
+                    <b>大工单价</b>{amt(cfg.bigPrice, v => setC("bigPrice", v), 68)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/工 · 半工按 0.5 工计</span>
+                  </div>
+                  <div style={{ ...lbl, fontWeight: 700 }}>确认规则脚注（印在单据、可编辑）</div>
+                  <textarea value={cfg.footNote} onChange={e => setC("footNote", e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid var(--line-strong)", borderRadius: 6, padding: "7px 10px", fontSize: 12, minHeight: 48, lineHeight: 1.6 }} />
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginTop: 8, fontSize: 12.5 }}>
+                {(fam === "A" || fam === "B") && (<>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>首月比例{amt(cfg.ratioFirst, v => setC("ratioFirst", v), 56)}%<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>之后默认沿用上月（⑦）</span></span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>取整规则：下取整到{amt(cfg.round, v => setC("round", v), 60)}元</span>
+                </>)}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>首月
+                  <input value={firstMonth} onChange={e => setFirstMonth(e.target.value)} style={{ width: 84, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "4px 8px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "center" }} />
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>组员（工资表 / 考勤表按此多行渲染；在班/离职来自名册进退场）</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {rosterList.map(r => {
+                  const on = members.has(r.name);
+                  const isLeader = r.name === leader;
+                  return (
+                    <label key={r.name} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid " + (on ? "var(--brand)" : "var(--line)"), borderRadius: 8, padding: "7px 12px", fontSize: 12.5, cursor: isLeader ? "default" : "pointer", background: on ? "#fff" : "var(--surface-2)", opacity: r.exit && !on ? 0.6 : 1 }}>
+                      <input type="checkbox" checked={on} disabled={isLeader} onChange={() => toggleMember(r.name)} />
+                      <b>{r.name}</b>
+                      {isLeader && <StatusChip tone="brand">负责人</StatusChip>}
+                      {r.exit ? <StatusChip tone="danger">离职 · {r.exit.slice(5)}</StatusChip> : <StatusChip tone="ok">在班</StatusChip>}
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>{r.bank ? r.bank.branch.slice(0, 4) + " ····" + r.bank.account.replace(/\s/g, "").slice(-4) : ""}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--brand-soft)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "var(--brand-deep)" }}>
+              同人可多本：计件 + 时工并存、组员离职拆账，都是再开一本独立请款账，互不影响（定稿 D7）。
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 20px", borderTop: "1px solid var(--line)", position: "sticky", bottom: 0, background: "var(--panel)" }}>
+            <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>建档后：按月生成草稿 → 人工核对 → 发放固化（D6）</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <Button onClick={() => onClose(null)}>取消</Button>
+              <Button variant="primary" icon="plus" onClick={doCreate}>建档并生成首月草稿</Button>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function PayrollScreen({ data, navigate, params }) {
     const narrow = useNarrow();
     const ready = useReady();
@@ -84,6 +308,7 @@
     const [selProject, setSelProject] = React.useState((params && params.project) || null);
     const [selCrew, setSelCrew] = React.useState((params && params.crew) || null);
     const [selMonth, setSelMonth] = React.useState((params && params.month) || null);
+    const [showCreate, setShowCreate] = React.useState(false);   // ④ 建档弹窗
     const P = window.PAYSLIP;
 
     if (!ready) return <Panel padding={40} style={{ textAlign: "center", color: "var(--ink-soft)" }}>数据链加载中…</Panel>;
@@ -143,10 +368,10 @@
               return r && r.exit && x.doc.hollow && x.doc.hollow.unfixed > 0 && !x.doc.deduct;
             }).length;
             return (
-              <div key={i} role="button" tabIndex={0} onClick={() => { if (clickable) setSelCrew(c.crew); }}
+              <div key={i} role="button" tabIndex={0} onClick={() => setSelCrew(c.crew)}
                 style={{ display: "block", width: "100%", boxSizing: "border-box", breakInside: "avoid", marginBottom: 16,
                   border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "14px 16px",
-                  background: "var(--panel)", cursor: clickable ? "pointer" : "not-allowed", textAlign: "left",
+                  background: "var(--panel)", cursor: "pointer", textAlign: "left",
                   opacity: clickable ? 1 : 0.62, boxShadow: clickable ? "var(--shadow-card)" : "none", transition: "border-color var(--dur-fast)" }}
                 onMouseEnter={e => clickable && (e.currentTarget.style.borderColor = "var(--brand)")}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--line)")}>
@@ -164,7 +389,7 @@
                   </span>
                 </div>
                 {!S && (
-                  <div style={{ fontSize: 12, color: "var(--ink-faint)", padding: "6px 0 2px" }}>暂无请款簿 · 建档后由工程量聚合自动生成单据行</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-faint)", padding: "6px 0 2px" }}>暂无请款簿 · 点击进入建档（新建请款主体）</div>
                 )}
                 {S && S.timeLike && (<>
                   <FlowRow first label="本月直付合计（时工）" value={S.total} strong />
@@ -196,7 +421,18 @@
 
     // ── Level 2: 请款簿总表（D7 负责人制 + D6 三态 + ⑦ 月份轴）──
     const crewBooks = P.booksOf(selProject, selCrew);
-    if (!crewBooks.length) return <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); } }, { label: selProject, onClick: back }, { label: selCrew + "（无请款簿）" }]} />;
+    if (!crewBooks.length) return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); } }, { label: selProject, onClick: back }, { label: selCrew }]} />
+        <Panel padding={40} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
+          <Icon name="book-plus" size={28} color="var(--ink-faint)" />
+          <div style={{ fontSize: 14, fontWeight: 800 }}>{selCrew} 还没有请款簿</div>
+          <div style={{ fontSize: 12.5, color: "var(--ink-soft)", maxWidth: 480, lineHeight: 1.8 }}>建档选定格式族（A 户型派生 / B 清单直报 / C1 月薪时工 / C2 零星签工）后，按月生成请款单据；A 族清单行由工程量管理聚合自动生成。</div>
+          <Button variant="primary" icon="plus" onClick={() => setShowCreate(true)}>新建请款主体</Button>
+        </Panel>
+        {showCreate && <CreateBookModal project={selProject} crew={selCrew} onClose={() => setShowCreate(false)} />}
+      </div>
+    );
     const axisBook = crewBooks.reduce((a, b) => (b.monthSeq.length > a.monthSeq.length ? b : a), crewBooks[0]);
     const axis = axisBook.monthSeq;
     const defMonth = P.curMonth(axisBook);
@@ -337,6 +573,7 @@
             <span style={{ fontSize: 13.5, fontWeight: 800 }}>请款簿总表 · {P.monthLabel(month, axisBook.months[month])}</span>
             <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>一个负责人一本请款簿 · 数字由工程量管理聚合生成（单一数据链）</span>
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <Button size="sm" icon="plus" onClick={() => setShowCreate(true)}>新建请款主体</Button>
               {!timeLike && <Button size="sm" icon="circle-check" disabled={!draftRows.length} onClick={batchCheck}>批量核对（{draftRows.length}）</Button>}
               <Button size="sm" variant="primary" icon="banknote" disabled={!releasableRows.length} onClick={batchRelease}>批量发放（{releasableRows.length}）</Button>
               <Button size="sm" icon="download" onClick={() => UI().toast("正在导出 Excel（请款簿 × " + rows.length + " 本，含清单/工资表/考勤表）…")}>导出 Excel</Button>
@@ -431,6 +668,8 @@
             </div>
           </Panel>
         </div>
+
+        {showCreate && <CreateBookModal project={selProject} crew={selCrew} onClose={(nb) => { setShowCreate(false); if (nb) setSelMonth(nb.monthSeq[0]); }} />}
       </div>
     );
   }
