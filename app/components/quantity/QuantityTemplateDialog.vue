@@ -279,6 +279,16 @@ function updateLine(payload: LineUpdate) {
   }
 }
 
+// 矩阵归档后的模板写入需要显式二次授权（蓝本§六）。
+async function confirmArchivedEdit(action: string): Promise<boolean> {
+  return confirm({
+    variant: 'simple',
+    title: '修改已归档矩阵',
+    message: `当前工程量矩阵已归档。继续${action}会保留操作日志，确认继续？`,
+    confirmLabel: '确认修改',
+  })
+}
+
 async function save() {
   if (!draft.value || store.templateSaving || store.templateLoading || initializing.value)
     return
@@ -288,7 +298,17 @@ async function save() {
   }
   try {
     const operationProjectId = draft.value.projectId
-    const result = await store.saveTemplate(draft.value)
+    let result: Awaited<ReturnType<typeof store.saveTemplate>>
+    try {
+      result = await store.saveTemplate(draft.value)
+    }
+    catch (cause) {
+      if (!toErrorMessage(cause).includes('已归档'))
+        throw cause
+      if (!await confirmArchivedEdit('保存户型模板'))
+        return
+      result = await store.saveTemplate({ ...draft.value, allowArchivedEdit: true })
+    }
     selectedTemplateId.value = result.templateId
     if (workspace.value) {
       remember(editableQuantityTemplateDraft(workspace.value, result.templateId))
@@ -342,7 +362,17 @@ async function removeTemplate() {
     return
   try {
     const operationProjectId = template.projectId
-    const logId = await store.deleteTemplate(template.id)
+    let logId: string
+    try {
+      logId = await store.deleteTemplate(template.id)
+    }
+    catch (cause) {
+      if (!toErrorMessage(cause).includes('已归档'))
+        throw cause
+      if (!await confirmArchivedEdit('删除户型模板'))
+        return
+      logId = await store.deleteTemplate(template.id, { allowArchivedEdit: true })
+    }
     if (workspace.value) {
       const next = workspace.value.templates[0]
       selectDraft(next?.id ?? '')
