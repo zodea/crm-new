@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
+import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import {
   ALL_QUANTITY_FILTER,
@@ -19,6 +19,9 @@ const trade = shallowRef(ALL_QUANTITY_FILTER)
 const assigneeKey = shallowRef(ALL_QUANTITY_FILTER)
 const initialized = shallowRef(false)
 const templateDialogOpen = shallowRef(false)
+const assignmentDialogOpen = shallowRef(false)
+const assignmentInitialUnitId = shallowRef('')
+const assignmentInitialTrade = shallowRef(ALL_QUANTITY_FILTER)
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -100,6 +103,19 @@ async function retry() {
     await loadSelectedProject(false)
 }
 
+function openAssignments(unitId = '', preferredTrade = trade.value) {
+  assignmentInitialUnitId.value = unitId
+  assignmentInitialTrade.value = preferredTrade
+  assignmentDialogOpen.value = true
+}
+
+function configureCell(cell: QuantityMatrixCell): void {
+  const preferredTrade = trade.value !== ALL_QUANTITY_FILTER
+    ? trade.value
+    : cell.summary?.stageTrade ?? cell.assignments[0]?.trade ?? ALL_QUANTITY_FILTER
+  openAssignments(cell.unitId, preferredTrade)
+}
+
 onMounted(initialize)
 </script>
 
@@ -122,6 +138,7 @@ onMounted(initialize)
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
       @manage-templates="templateDialogOpen = true"
+      @manage-assignments="openAssignments()"
       @refresh="retry"
     />
 
@@ -196,12 +213,25 @@ onMounted(initialize)
       </p>
     </section>
 
-    <QuantityWorkspace v-else-if="snapshot" :matrix="matrix" />
+    <QuantityWorkspace
+      v-else-if="snapshot"
+      :matrix="matrix"
+      @configure="configureCell"
+    />
 
     <QuantityTemplateDialog
       v-if="projectId"
       v-model:open="templateDialogOpen"
       :project-id="projectId"
+    />
+
+    <QuantityAssignmentDialog
+      v-if="projectId"
+      v-model:open="assignmentDialogOpen"
+      :project-id="projectId"
+      :initial-building-id="buildingId"
+      :initial-trade="assignmentInitialTrade"
+      :initial-unit-id="assignmentInitialUnitId"
     />
   </div>
 </template>

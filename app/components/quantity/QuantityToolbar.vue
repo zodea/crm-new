@@ -17,6 +17,7 @@ withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
+  manageAssignments: []
   manageTemplates: []
   refresh: []
 }>()
@@ -76,6 +77,10 @@ const viewTabs = [
         <span class="text-12px text-ink-soft" aria-live="polite">
           有责任或进度 <b class="font-mono text-ink">{{ activeUnits }}</b> / {{ totalUnits }} 户
         </span>
+        <button type="button" class="btn-primary" @click="emit('manageAssignments')">
+          <span class="i-lucide-users-round mr-1 text-13px" aria-hidden="true" />
+          责任配置
+        </button>
         <button type="button" class="btn-secondary" @click="emit('manageTemplates')">
           <span class="i-lucide-layout-template mr-1 text-13px" aria-hidden="true" />
           户型模板

@@ -1,9 +1,11 @@
+import type { QuantityAssignmentBatchDraft, QuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
 import type { QuantityCatalogProject, QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { QuantityTemplateDraft, QuantityTemplateWorkspace } from '~/lib/quantity/template'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { withTransaction } from '~/lib/db/connection'
+import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
 import { loadQuantityCatalog, loadQuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import {
   deleteQuantityTemplate,
@@ -23,10 +25,16 @@ export const useQuantityStore = defineStore('quantity', () => {
   const templateLoading = shallowRef(false)
   const templateSaving = shallowRef(false)
   const templateError = shallowRef('')
+  const assignmentWorkspace = shallowRef<QuantityAssignmentWorkspace | null>(null)
+  const assignmentLoading = shallowRef(false)
+  const assignmentSaving = shallowRef(false)
+  const assignmentError = shallowRef('')
   let pending = 0
   let latestProjectRequest = 0
   let pendingTemplateRequests = 0
   let latestTemplateRequest = 0
+  let pendingAssignmentRequests = 0
+  let latestAssignmentRequest = 0
 
   function beginRequest() {
     pending += 1
@@ -176,6 +184,58 @@ export const useQuantityStore = defineStore('quantity', () => {
     }
   }
 
+  async function loadAssignments(projectId: string) {
+    const request = ++latestAssignmentRequest
+    pendingAssignmentRequests += 1
+    assignmentLoading.value = true
+    assignmentError.value = ''
+    if (assignmentWorkspace.value?.projectId !== projectId)
+      assignmentWorkspace.value = null
+    try {
+      const result = projectId
+        ? await loadQuantityAssignmentWorkspace(db, projectId)
+        : null
+      if (request === latestAssignmentRequest)
+        assignmentWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestAssignmentRequest) {
+        assignmentWorkspace.value = null
+        assignmentError.value = `责任配置加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      pendingAssignmentRequests = Math.max(0, pendingAssignmentRequests - 1)
+      assignmentLoading.value = pendingAssignmentRequests > 0
+    }
+  }
+
+  async function saveAssignments(draft: QuantityAssignmentBatchDraft) {
+    assignmentSaving.value = true
+    assignmentError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityAssignments(tx, draft))
+      try {
+        await loadAssignments(draft.projectId)
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        assignmentError.value = `责任配置已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      assignmentError.value = `责任配置保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      assignmentSaving.value = false
+    }
+  }
+
   return {
     catalog: readonly(catalog),
     snapshot: readonly(snapshot),
@@ -185,11 +245,17 @@ export const useQuantityStore = defineStore('quantity', () => {
     templateLoading: readonly(templateLoading),
     templateSaving: readonly(templateSaving),
     templateError: readonly(templateError),
+    assignmentWorkspace: readonly(assignmentWorkspace),
+    assignmentLoading: readonly(assignmentLoading),
+    assignmentSaving: readonly(assignmentSaving),
+    assignmentError: readonly(assignmentError),
     loadCatalog,
     loadProject,
     loadTemplates,
     saveTemplate,
     deleteTemplate,
     undoTemplateSave,
+    loadAssignments,
+    saveAssignments,
   }
 })
