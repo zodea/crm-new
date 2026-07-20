@@ -441,8 +441,8 @@ CREATE TABLE items (
   trade      TEXT NOT NULL,
   unit       TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
 );
 
@@ -452,8 +452,8 @@ CREATE TABLE buildings (
   code       TEXT NOT NULL,
   name       TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
 );
 
@@ -463,8 +463,8 @@ CREATE TABLE floors (
   code        TEXT NOT NULL,
   name        TEXT NOT NULL,
   sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at  TEXT
 );
 
@@ -475,8 +475,8 @@ CREATE TABLE house_type_templates (
   name                    TEXT,
   copied_from_template_id TEXT REFERENCES house_type_templates(id),
   sort_order              INTEGER NOT NULL DEFAULT 0,
-  created_at              TEXT NOT NULL,
-  updated_at              TEXT NOT NULL,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at              TEXT
 );
 
@@ -487,8 +487,8 @@ CREATE TABLE rooms (
   name        TEXT NOT NULL,
   kind        TEXT NOT NULL DEFAULT 'room' CHECK (kind IN ('room', 'whole_unit')),
   sort_order  INTEGER NOT NULL DEFAULT 0,
-  created_at  TEXT NOT NULL,
-  updated_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at  TEXT
 );
 
@@ -499,8 +499,8 @@ CREATE TABLE units (
   code                   TEXT NOT NULL,
   name                   TEXT,
   sort_order             INTEGER NOT NULL DEFAULT 0,
-  created_at             TEXT NOT NULL,
-  updated_at             TEXT NOT NULL,
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at             TEXT
 );
 
@@ -515,8 +515,8 @@ CREATE TABLE house_type_template_items (
   field_qty               REAL,
   note                    TEXT,
   sort_order              INTEGER NOT NULL DEFAULT 0,
-  created_at              TEXT NOT NULL,
-  updated_at              TEXT NOT NULL,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at              TEXT
 );
 
@@ -528,8 +528,8 @@ CREATE TABLE construction_stages (
   trade           TEXT NOT NULL,
   completion_mode TEXT NOT NULL DEFAULT 'unit' CHECK (completion_mode IN ('unit', 'manual')),
   sort_order      INTEGER NOT NULL DEFAULT 0,
-  created_at      TEXT NOT NULL,
-  updated_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at      TEXT
 );
 
@@ -537,8 +537,8 @@ CREATE TABLE construction_stage_items (
   id         TEXT PRIMARY KEY,
   stage_id   TEXT NOT NULL REFERENCES construction_stages(id),
   item_id    TEXT NOT NULL REFERENCES items(id),
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
 );
 
@@ -549,8 +549,8 @@ CREATE TABLE unit_assignments (
   crew_id    TEXT REFERENCES crews(id),
   worker_id  TEXT REFERENCES workers(id),
   note       TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT,
   CHECK (
     (crew_id IS NOT NULL AND worker_id IS NULL)
@@ -563,8 +563,8 @@ CREATE TABLE unit_assignment_scopes (
   assignment_id TEXT NOT NULL REFERENCES unit_assignments(id),
   room_id       TEXT NOT NULL REFERENCES rooms(id),
   item_id       TEXT NOT NULL REFERENCES items(id),
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT
 );
 
@@ -576,8 +576,8 @@ CREATE TABLE unit_stage_completions (
   status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'completed')),
   completed_at  TEXT,
   note          TEXT,
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at    TEXT,
   CHECK (status = 'draft' OR (completed_at IS NOT NULL AND assignment_id IS NOT NULL))
 );
@@ -588,7 +588,17 @@ ALTER TABLE projects ADD COLUMN matrix_archived_at TEXT;
 
 每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID，`house_type_template_items.room_id` 不允许为空。
 
-责任替换采用“软删旧 `unit_assignments` + 新建新行”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任，仍须先保证完成事实本身及其户、阶段可见。
+责任人或个人范围任一变化，都采用“软删旧 `unit_assignments`（旧 scope 随父级保留并隐藏）+ 新建 assignment/scopes”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任、范围及责任人，仍须先保证完成事实本身及其户、阶段可见。历史只冻结责任/范围身份，房间显示名与三量仍从当前活链接模板读取；已发放工资才按 #117 固化金额快照。
+
+下列同域约束不能只靠单列外键表达，必须由同一个 quantity store transaction 在写入前校验：
+
+- 户经楼层、楼栋归属的项目必须与其户型模板项目相同；详情路由的 `pid` 也必须等于该项目。
+- 模板明细的模板房间与分项必须属于同一项目。
+- 阶段与阶段分项必须属于同一项目，且工种匹配。
+- 个人范围的模板房间必须属于该户挂靠模板，分项必须匹配指派工种且存在有效模板明细。
+- 阶段完成的户、阶段必须属于同一项目；完成责任必须属于同一户且工种与阶段匹配。
+
+可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
 ### 2.7 施工进度类（工期 × 工程量主线）
 
@@ -1002,6 +1012,9 @@ CREATE UNIQUE INDEX uq_stage_code ON construction_stages(project_id, code) WHERE
 CREATE INDEX idx_stage_items_stage ON construction_stage_items(stage_id);
 CREATE UNIQUE INDEX uq_stage_item ON construction_stage_items(stage_id, item_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_unit_assignments_unit ON unit_assignments(unit_id);
+CREATE INDEX idx_unit_assignments_crew ON unit_assignments(crew_id);
+CREATE INDEX idx_unit_assignments_worker ON unit_assignments(worker_id);
+CREATE INDEX idx_unit_assignments_trade ON unit_assignments(trade);
 CREATE UNIQUE INDEX uq_unit_assignment_trade ON unit_assignments(unit_id, trade) WHERE deleted_at IS NULL;
 CREATE INDEX idx_uas_assignment ON unit_assignment_scopes(assignment_id);
 CREATE UNIQUE INDEX uq_uas_scope ON unit_assignment_scopes(assignment_id, room_id, item_id) WHERE deleted_at IS NULL;
@@ -1009,6 +1022,20 @@ CREATE INDEX idx_usc_stage_date ON unit_stage_completions(stage_id, completed_at
 CREATE INDEX idx_usc_unit ON unit_stage_completions(unit_id);
 CREATE INDEX idx_usc_assignment ON unit_stage_completions(assignment_id);
 CREATE UNIQUE INDEX uq_usc_unit_stage ON unit_stage_completions(unit_id, stage_id) WHERE deleted_at IS NULL;
+
+-- 软删隐藏集基础臂
+CREATE INDEX idx_items_deleted ON items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_buildings_deleted ON buildings(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_floors_deleted ON floors(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_house_type_templates_deleted ON house_type_templates(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_rooms_deleted ON rooms(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_units_deleted ON units(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_house_type_template_items_deleted ON house_type_template_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_construction_stages_deleted ON construction_stages(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_construction_stage_items_deleted ON construction_stage_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_assignments_deleted ON unit_assignments(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_assignment_scopes_deleted ON unit_assignment_scopes(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_stage_completions_deleted ON unit_stage_completions(deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- 施工进度
 CREATE INDEX idx_schedule_groups_proj ON schedule_groups(projectId);
