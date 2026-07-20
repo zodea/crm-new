@@ -584,9 +584,24 @@ CREATE TABLE unit_stage_completions (
 
 ALTER TABLE projects ADD COLUMN matrix_archived_at TEXT;
 -- 验收照片走 file_refs(owner_type='unit_stage_completion', owner_id=完成事实 id)。
+
+CREATE TRIGGER trg_house_type_templates_whole_unit
+AFTER INSERT ON house_type_templates
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  INSERT INTO rooms (id, template_id, code, name, kind, sort_order)
+  VALUES (NEW.id || ':whole_unit', NEW.id, '__whole_unit__', '整户范围', 'whole_unit', -1);
+END;
+
+CREATE TRIGGER trg_rooms_keep_whole_unit
+BEFORE UPDATE OF deleted_at ON rooms
+WHEN OLD.kind = 'whole_unit' AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'whole_unit room cannot be deleted');
+END;
 ```
 
-每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID，`house_type_template_items.room_id` 不允许为空。
+每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID，`house_type_template_items.room_id` 不允许为空。
 
 责任人或个人范围任一变化，都采用“软删旧 `unit_assignments`（旧 scope 随父级保留并隐藏）+ 新建 assignment/scopes”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任、范围及责任人，仍须先保证完成事实本身及其户、阶段可见。历史只冻结责任/范围身份，房间显示名与三量仍从当前活链接模板读取；已发放工资才按 #117 固化金额快照。
 
