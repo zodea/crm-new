@@ -40,7 +40,7 @@
 | 开票申请 | `/finance/billing` | `finance-billing.md` | ⬜ 待设计 |
 | 收款登记 | `/finance/receipt` | `finance-receipt.md` | ⬜ 待设计 |
 | 收票登记（查已归档发票） | `/finance/ticket` | — | ⚠️ ADR 0001：并入发票台账（`invoices` 单表），不再单独建表；项目详情「收票登记」Tab = 查已归档 invoices |
-| 付款申请（列表+详情） | `/finance/payment` | `finance-payment.md` | 🟡 有效果图，待写文档 |
+| 付款申请（列表+详情） | `/finance/payment` | `finance-payment.md` | ✅ 8 类型字段与结算/发票勾稽已定稿，待 Vue/SQLite 实装 |
 | 费用报销 | `/finance/reimbursement` | `finance-reimbursement.md` | ⬜ 待设计 |
 | 支付记录 | `/finance/records` | `finance-records.md` | ⬜ 待设计 |
 
@@ -89,7 +89,7 @@
 
 ## § 2 数据实体清单 — 6 大类 28 个实体
 
-> ⚠️ **数据实体与库设计以 `DATABASE.md` 为唯一权威源**。本节及 §3 为早期快照，可能滞后于 DATABASE.md，冲突一律以 DATABASE.md 为准（避免双写漂移）。已知废弃：`ticket_registrations`（→ 合并进 `invoices` 单表，ADR 0001）、`quantity_records`（→ `quantities`）、`payroll_records`（→ 拆为 `wage_statements` / `wage_statement_lines` / `attendance_records` 三表）。
+> ⛔ **本节及 §3 是早期快照，不再维护字段副本**。数据实体、外键与表名只以 `DATABASE.md` 为权威；已知废弃：`ticket_registrations`（ADR 0001）、`quantities` / `quantity_records`（ADR 0010 分层表）、`payroll_records`（工资三表）。
 
 ### 2.1 基础主数据（跨项目共享）
 
@@ -125,7 +125,7 @@
 | InvoiceApplication | `invoice_applications` | `id` | invoiceType, amount, taxRate, taxAmount, status | → `projects.id` | `finance-billing.md` | ⬜ |
 | ~~TicketRegistration~~ | ~~`ticket_registrations`~~ | — | **已废弃（ADR 0001）**：合并进 `invoices` 单表，收票登记 = 查已归档发票 | — | — | ⛔ |
 | ReceiptRegistration | `receipt_registrations` | `id` | amount, receiptDate, payerName, status | → `projects.id` | `finance-receipt.md` | ⬜ |
-| PaymentApplication | `payment_applications` | `id` | applicationNo, name, amount, approvedAmount, paidAmount, status, paymentStatus | → `projects.id` + `suppliers.id` + `expenditure_contracts.id` | `finance-payment.md` | ⬜ |
+| PaymentApplication | `payment_applications` + 两类真实分摊子表 | `id` | 以 DATABASE §2.4 与 ADR 0015 为准 | 以 DATABASE §3.3 为准 | `finance-payment.md` | ⬜ |
 | CurrentReceipt | `current_receipts` | `id` | amount, date, counterparty | → `projects.id` | `finance-receipt.md` | ⬜ |
 | CurrentPayment | `current_payments` | `id` | amount, date, counterparty | → `projects.id` | `finance-payment.md` | ⬜ |
 | PaymentRecord | `payment_records` | `id` | amount, date, method, voucherNo | → `projects.id` | `finance-records.md` | ⬜ |
@@ -146,7 +146,7 @@
 | CrewProjectConfig | `crew_project_config` | `id` | defaultPayRatio, rentSubsidyEnabled/Price, mgmtFeeEnabled/Price | → `crews.id` + `projects.id` | `base-crew.md` | ✅ |
 | CrewProjectItem | `crew_project_items` | `id` | itemName, unit, unitPrice, inRentSubsidy, inMgmtFee | → `crew_project_config.id` | `base-crew.md` | ✅ |
 | Worker | `workers` | `id` | name, idCard, phone, familyGroupId, certs[], safetyEducation | — | `base-worker.md` | ✅ |
-| Quantity | `quantities`（~~旧名 quantity_records~~） | `id` | building, floor, room, workType, area, month, unitPrice | → `projects.id` + `crews.id` + `workers.id` | `subcontract-quantity.md` | ⬜ |
+| ~~Quantity~~ | ~~`quantities` / `quantity_records`~~ | — | **已废弃（ADR 0010）**：量、户 × 工种责任、户 × 工序阶段完成分层，表名只看 DATABASE §2.6 | — | `subcontract-quantity.md` | ⛔ |
 | ~~PayrollRecord~~ → 工资三表 | `wage_statements` / `wage_statement_lines` / `attendance_records`（~~旧 payroll_records~~） | `id` | 字段见 `DATABASE.md` §2.6 | → `projects.id` + `crews.id` + `workers.id` | `subcontract-payroll.md` | ⬜ |
 
 ### 2.7 统计
@@ -302,7 +302,7 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 |---|---|---|---|---|
 | **P1** | 采购合同 | `material-contract.md` | ExpenditureContract, ContractLineItem | 已有效果图（列表+详情+新建），需写正式文档 |
 | **P1** | 收票登记 | `finance-ticket.md` | TicketRegistration | 已有效果图，需写正式文档 |
-| **P1** | 付款申请 | `finance-payment.md` | PaymentApplication, PaymentRecord | 已有效果图，需写正式文档 |
+| **P1** | 付款申请 | `finance-payment.md` | PaymentApplication, 两类分摊子表, PaymentRecord | 蓝本已定稿，待 Vue/SQLite 实装 |
 | **P2** | 施工合同 | `contract-construction.md` | ConstructionContract, SupplementAgreement, OwnerChangeOrder | 主合同管理核心 |
 | **P2** | 开票申请 | `finance-billing.md` | InvoiceApplication | 资金管理 |
 | **P2** | 收款登记 | `finance-receipt.md` | ReceiptRegistration, CurrentReceipt | 资金管理 |
