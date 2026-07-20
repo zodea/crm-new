@@ -1,0 +1,50 @@
+[
+  {
+    "id": "qty_room_a_living",
+    "template_id": "qty_tpl_a",
+    "code": "living",
+    "name": "客餐厅",
+    "kind": "room",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_room_a_kitchen",
+    "template_id": "qty_tpl_a",
+    "code": "kitchen",
+    "name": "厨房",
+    "kind": "room",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_room_a_bath",
+    "template_id": "qty_tpl_a",
+    "code": "bath",
+    "name": "卫生间",
+    "kind": "room",
+    "sort_order": 30
+  },
+  {
+    "id": "qty_room_b_living",
+    "template_id": "qty_tpl_b",
+    "code": "living",
+    "name": "客餐厅",
+    "kind": "room",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_room_b_bedroom",
+    "template_id": "qty_tpl_b",
+    "code": "bedroom",
+    "name": "主卧",
+    "kind": "room",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_room_b_bath",
+    "template_id": "qty_tpl_b",
+    "code": "bath",
+    "name": "卫生间",
+    "kind": "room",
+    "sort_order": 30
+  }
+]

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "qty_asg_1_02_01_masonry",
+    "unit_id": "qty_u_1_02_01",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_001",
+    "note": "低区泥水A班"
+  },
+  {
+    "id": "qty_asg_1_02_01_waterproof",
+    "unit_id": "qty_u_1_02_01",
+    "trade": "防水工",
+    "crew_id": "crew_demo_005"
+  },
+  {
+    "id": "qty_asg_1_02_01_plumb",
+    "unit_id": "qty_u_1_02_01",
+    "trade": "水暖工",
+    "crew_id": "crew_demo_006"
+  },
+  {
+    "id": "qty_asg_1_02_02_masonry",
+    "unit_id": "qty_u_1_02_02",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_002",
+    "note": "低区泥水B班"
+  },
+  {
+    "id": "qty_asg_1_02_02_waterproof",
+    "unit_id": "qty_u_1_02_02",
+    "trade": "防水工",
+    "crew_id": "crew_demo_005"
+  },
+  {
+    "id": "qty_asg_1_01_01_masonry",
+    "unit_id": "qty_u_1_01_01",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_001"
+  },
+  {
+    "id": "qty_asg_1_01_01_waterproof",
+    "unit_id": "qty_u_1_01_01",
+    "trade": "防水工",
+    "crew_id": "crew_demo_005"
+  },
+  {
+    "id": "qty_asg_1_01_01_plumb",
+    "unit_id": "qty_u_1_01_01",
+    "trade": "水暖工",
+    "crew_id": "crew_demo_006"
+  },
+  {
+    "id": "qty_asg_1_01_02_masonry",
+    "unit_id": "qty_u_1_01_02",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_002"
+  },
+  {
+    "id": "qty_asg_2_02_01_masonry",
+    "unit_id": "qty_u_2_02_01",
+    "trade": "泥水工",
+    "worker_id": "wkr_demo_003",
+    "note": "个人计件，细化到客餐厅墙砖"
+  },
+  {
+    "id": "qty_asg_2_02_02_masonry",
+    "unit_id": "qty_u_2_02_02",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_001"
+  },
+  {
+    "id": "qty_asg_2_01_01_masonry",
+    "unit_id": "qty_u_2_01_01",
+    "trade": "泥水工",
+    "crew_id": "crew_demo_002"
+  },
+  {
+    "id": "qty_asg_2_01_02_waterproof",
+    "unit_id": "qty_u_2_01_02",
+    "trade": "防水工",
+    "crew_id": "crew_demo_005"
+  }
+]

@@ -1,0 +1,94 @@
+[
+  {
+    "id": "qty_hti_a_pipe",
+    "room_id": "qty_tpl_a:whole_unit",
+    "item_id": "qty_item_plumb_pipe",
+    "recognized_contract_qty": 42,
+    "contract_qty": 42,
+    "provisional_qty": 44,
+    "field_formula": "12.5×2+17",
+    "field_qty": 42,
+    "sort_order": 10
+  },
+  {
+    "id": "qty_hti_a_wp_wall",
+    "room_id": "qty_room_a_bath",
+    "item_id": "qty_item_waterproof_wall",
+    "recognized_contract_qty": 18,
+    "contract_qty": 18,
+    "provisional_qty": 19,
+    "sort_order": 20
+  },
+  {
+    "id": "qty_hti_a_wp_floor",
+    "room_id": "qty_room_a_bath",
+    "item_id": "qty_item_waterproof_floor",
+    "recognized_contract_qty": 6,
+    "contract_qty": 6,
+    "provisional_qty": 6.5,
+    "sort_order": 21
+  },
+  {
+    "id": "qty_hti_a_wall",
+    "room_id": "qty_room_a_kitchen",
+    "item_id": "qty_item_masonry_wall",
+    "recognized_contract_qty": 26,
+    "contract_qty": 27.5,
+    "provisional_qty": 28,
+    "sort_order": 30
+  },
+  {
+    "id": "qty_hti_a_floor",
+    "room_id": "qty_room_a_living",
+    "item_id": "qty_item_masonry_floor",
+    "recognized_contract_qty": 31,
+    "contract_qty": 31,
+    "provisional_qty": 32,
+    "sort_order": 31
+  },
+  {
+    "id": "qty_hti_b_pipe",
+    "room_id": "qty_tpl_b:whole_unit",
+    "item_id": "qty_item_plumb_pipe",
+    "recognized_contract_qty": 48,
+    "contract_qty": 48,
+    "provisional_qty": 50,
+    "sort_order": 10
+  },
+  {
+    "id": "qty_hti_b_wp_wall",
+    "room_id": "qty_room_b_bath",
+    "item_id": "qty_item_waterproof_wall",
+    "recognized_contract_qty": 21,
+    "contract_qty": 21,
+    "provisional_qty": 22,
+    "sort_order": 20
+  },
+  {
+    "id": "qty_hti_b_wp_floor",
+    "room_id": "qty_room_b_bath",
+    "item_id": "qty_item_waterproof_floor",
+    "recognized_contract_qty": 7,
+    "contract_qty": 7,
+    "provisional_qty": 7.5,
+    "sort_order": 21
+  },
+  {
+    "id": "qty_hti_b_wall",
+    "room_id": "qty_room_b_living",
+    "item_id": "qty_item_masonry_wall",
+    "recognized_contract_qty": 30,
+    "contract_qty": 30,
+    "provisional_qty": 31,
+    "sort_order": 30
+  },
+  {
+    "id": "qty_hti_b_floor",
+    "room_id": "qty_room_b_bedroom",
+    "item_id": "qty_item_masonry_floor",
+    "recognized_contract_qty": 24,
+    "contract_qty": 24,
+    "provisional_qty": 24.5,
+    "sort_order": 31
+  }
+]

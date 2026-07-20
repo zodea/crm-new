@@ -1,0 +1,16 @@
+[
+  {
+    "id": "qty_bld_1",
+    "project_id": "proj_demo_001",
+    "code": "1",
+    "name": "1栋",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_bld_2",
+    "project_id": "proj_demo_001",
+    "code": "2",
+    "name": "2栋",
+    "sort_order": 20
+  }
+]

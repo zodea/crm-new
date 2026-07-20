@@ -1,0 +1,30 @@
+[
+  {
+    "id": "qty_floor_1_02",
+    "building_id": "qty_bld_1",
+    "code": "02",
+    "name": "2层",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_floor_1_01",
+    "building_id": "qty_bld_1",
+    "code": "01",
+    "name": "1层",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_floor_2_02",
+    "building_id": "qty_bld_2",
+    "code": "02",
+    "name": "2层",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_floor_2_01",
+    "building_id": "qty_bld_2",
+    "code": "01",
+    "name": "1层",
+    "sort_order": 20
+  }
+]
