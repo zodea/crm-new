@@ -1070,7 +1070,7 @@
     const names = book.workAs || book.members;
     return W.subjectRows(book.tradeKey, names, mo.floorsSnap || null).map((r) => {
       const price = priceOf(book, mo, r.item, r.price);
-      return { item: r.b + r.unit + r.item, baseItem: r.item, unit: r.unitM, perUnit: r.perUnitQty,
+      return { b: r.b, item: r.b + r.unit + r.item, baseItem: r.item, unit: r.unitM, perUnit: r.perUnitQty,
         floors: r.floors, floorNote: r.floorNote, rooms: r.roomNote, who: r.who, qty: r.qty,
         price, amount: r2(r.qty * price),
         adj: !(mo.priceSnap && mo.priceSnap[r.item] != null) && book.config.priceAdj && book.config.priceAdj[r.item] != null };
