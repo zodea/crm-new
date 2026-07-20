@@ -1,7 +1,7 @@
 # 工程量矩阵与施工记录模型：户型模板活链接 + 指派/阶段完成分层 + 施工记录派生
 
 > 状态：已采纳（2026-07-08；2026-07-19 补充“指派与阶段完成拆分”；2026-07-20 补充模板房间稳定身份）
-> 影响：`DATABASE.md`（`house_type_templates` / `house_type_template_items` / `construction_stages` / `unit_assignments` / `unit_stage_completions`）、`docs/rewrite/pages/subcontract-quantity.md`、`docs/rewrite/pages/schedule-progress.md`、`CONTEXT.md`、[#73](https://github.com/zodea/crm-new/issues/73) §8，以及工程量矩阵/工资/进度相关实现。
+> 影响：`DATABASE.md`（`house_type_templates` / `rooms` / `house_type_template_items` / `construction_stages` / `unit_assignments` / `unit_assignment_scopes` / `unit_stage_completions`）、`docs/rewrite/pages/subcontract-quantity.md`、`docs/rewrite/pages/schedule-progress.md`、`CONTEXT.md`、[#73](https://github.com/zodea/crm-new/issues/73) §8，以及工程量矩阵/工资/进度相关实现。
 
 ## 背景
 
@@ -22,9 +22,9 @@
 4. **清单量双通道 + 留痕**：有合同清单时从 `boq_lines` 按户型读入，无清单时手工填写。任意量可人工修正；清单量修正必须保留识别原值与当前值。
 5. **阶段完成是唯一进度事实**：现场在“人/班组视角”选择户和具体工序阶段，写入该阶段的状态、完成日期和执行指派。界面可以提供“整个工种批量完成”，但该动作必须展开为该工种下每个阶段各一条 `unit_stage_completions` 事实，不能写工种级完成布尔值。阶段进度 = 该阶段已完成户数 ÷ 该阶段应做户数。
 6. **验收照片是阶段级软卡点**：照片挂 `unit_stage_completion`。提交阶段完成但缺照片时只允许“取消 / 保存到草稿”，不得丢输入；也不得以“上一阶段无照片”为由硬锁下一阶段。工序前后置只产生提示和排程偏差，不改写完成事实。
-7. **指派粒度自适应且替换留史**：户内按工种派给班组（到户 × 工种即止）或个人（可下钻模板房间 × 分项，满足个人计件）。责任替换必须软删旧指派后新建指派，不能原地改写；完成事实保留“完成当时执行责任”的审计引用。批量指派从人/班组视角进入楼层 × 房号表格；冲突户不可静默覆盖，整层无可选户时隐藏。
+7. **指派粒度自适应且替换留史**：户内按工种派给班组（到户 × 工种即止）或个人（可下钻模板房间 × 分项，满足个人计件）。责任人或个人范围任一变化，都必须软删旧指派（旧范围随父级保留并隐藏）后新建指派与范围，不能原地改写；完成事实保留“完成当时执行责任与范围身份”的审计引用。批量指派从人/班组视角进入楼层 × 房号表格；冲突户不可静默覆盖，整层无可选户时隐藏。
 8. **两视角矩阵 + 极简总览**：工种矩阵与班组矩阵共享同一指派和阶段完成事实。月份颜色来自各阶段完成日期；总览每格只标“是否有人施工”，阶段明细在详情或展开区查看，避免把同工种多阶段压成一个完成率。
-9. **施工记录 = 派生详情视图，不独立导入**：户/块详情页展示“工种 × 工序阶段 × 完成日期 × 做了什么”，数据由 `house_type_template_items`（量）+ `unit_assignments`（责任）+ `unit_stage_completions`（完成事实）拼出，不落第二张施工记录表、无独立导入模板。户详情路由以项目 ID + 户 ID 定位，参数命名为 `:pid/:uid`；不得让含义不明的 `cid` 承担领域身份。工程量矩阵导入走 [ADR 0005](0005-import-mapping-model.md)，导出走 [ADR 0004](0004-export-interaction-model.md)，归档后改动走二次确认。
+9. **施工记录 = 派生详情视图，不独立导入**：户/块详情页展示“工种 × 工序阶段 × 完成日期 × 做了什么”，数据由 `house_type_template_items`（量）+ `unit_assignments`（责任）+ `unit_stage_completions`（完成事实）拼出，不落第二张施工记录表、无独立导入模板。户详情路由以项目 ID + 户 ID 定位，参数命名为 `:pid/:uid`，加载时必须验证该户经楼层、楼栋归属 `pid`；不得让含义不明的 `cid` 承担领域身份。工程量矩阵导入走 [ADR 0005](0005-import-mapping-model.md)，导出走 [ADR 0004](0004-export-interaction-model.md)，归档后改动走二次确认。
 
 ## 考虑过的替代
 
@@ -39,7 +39,8 @@
 
 - **[#73](https://github.com/zodea/crm-new/issues/73) §8 定案不变**：施工记录不设独立导入模板；历史“谁做多少量”随工资历史迁，在建与已完成项目都录入矩阵，已完成项目归档锁定。
 - **`quantities` 重构**：拆成 `house_type_template_items`（量）+ `unit_assignments`（户 × 工种责任）+ `unit_stage_completions`（户 × 工序阶段事实）；`construction_stages` 提供 #103 与 #114 共享的稳定阶段标识。
-- **责任审计不参与可见性祖先**：`unit_stage_completions.assignment_id` 只记录完成时的执行责任。责任替换后，历史施工记录可按物理 ID 读取已软删指派；完成事实是否可见仍只受户与阶段等业务祖先约束，不能因旧指派软删而被吞掉。
+- **责任审计不参与可见性祖先**：`unit_stage_completions.assignment_id` 只记录完成时的执行责任。责任替换后，历史施工记录可按物理 ID 读取已软删指派及范围；完成事实是否可见仍只受户与阶段等业务祖先约束，不能因旧指派软删而被吞掉。`copied_from_template_id` 同样只是一次性复制来源留痕，不是复制件的可见性祖先。
+- **施工记录只冻结责任身份**：已完成行按完成时指派与范围显示执行责任，但模板房间显示名与三量仍走活链接读取当前模板值；只有已发放工资按 #117 固化金额快照，不在 #103 复制名称或数量快照。
 - **依赖顺序**：#103 先落阶段目录、指派与完成事实；#114 的 `schedule_tasks.stage_id` 再消费阶段完成率；#7 只消费 #114 的共享排程 store，不建首页副本。
 - **派生 vs 快照**：施工记录、工序进度与月度报量是实时派生查询；工资进度清单发放前是派生预览，发放后按 #117 的月度固化规则保存快照，之后矩阵改动不追溯历史发放。
 - 表格三件套仍走 [ADR 0009](0009-vxe-table-as-datagrid-engine.md) KitTable；矩阵本体是可点击网格，与 KitTable 正交。
