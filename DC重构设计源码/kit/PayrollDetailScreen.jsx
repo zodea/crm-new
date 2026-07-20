@@ -93,6 +93,7 @@
     const [step, setStep] = React.useState(params.step === "a4" ? "a4" : "check");
     const [orient, setOrient] = React.useState({ list: "port", wage: "land", att: "land", roster: "land", log: "port" });
     const [featOpen, setFeatOpen] = React.useState({});
+    const [selB, setSelB] = React.useState(null);   // ⑨ 楼层可视化：点清单行 → 高亮该行楼栋
     const paramFp = (params.book || params.worker || "") + "|" + (params.month || "") + "|" + (params.step || "");
     React.useEffect(() => { if (book) { setMonth((params.month && book.months[params.month]) ? params.month : defMonth); setStep(params.step === "a4" ? "a4" : "check"); } }, [paramFp, !!book]);   // eslint-disable-line
     if (!window.PAYSLIP || !window.WAGE) return <Panel padding={40} style={{ textAlign: "center", color: "var(--ink-soft)" }}>数据链加载中…</Panel>;
@@ -156,7 +157,7 @@
           {l.adj && <span title="本簿单独调价" style={{ fontSize: 9.5, color: "var(--warn-ink)", background: "var(--warn-soft)", borderRadius: 3, padding: "0 3px" }}>调</span>}
           {l.locked && <Icon name="lock" size={10} color="var(--ink-faint)" />}
           {clickable
-            ? <button onClick={() => priceModal(l.baseItem, l.price)} title="点击修改单价（统一改/单独改）"
+            ? <button onClick={(e) => { e.stopPropagation(); priceModal(l.baseItem, l.price); }} title="点击修改单价（统一改/单独改）"
                 style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--brand)", fontFamily: "var(--font-mono)", fontSize: "inherit", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: 3, padding: 0 }}>{num0(l.price)}</button>
             : <span>{num0(l.price)}</span>}
         </span>
@@ -214,6 +215,73 @@
           fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", background: sealed || future ? "var(--surface-2)" : "#fff" }} />
     );
 
+    // —— ⑨ 工人楼层可视化（A 族特性）：只显示本簿施工过的楼栋；往月/本月/未涉及色标 + 空鼓未整改点；点清单行联动 ——
+    const floorPanel = book.family === "A" && (() => {
+      const dataLines = (doc.lines || []).filter(l => !l.group && l.b);
+      const bs = [...new Set(dataLines.map(l => l.b))];
+      if (!bs.length) return null;
+      // 当月楼层：固化月用快照（D3），草稿/已核对用勾房实时；「往月已完成」基线 = 上一个已发放月的快照
+      const curF = {}; bs.forEach(b2 => { curF[b2] = mo.floorsSnap ? (mo.floorsSnap[b2] || []) : W.doneFloors(b2); });
+      let prevSnap = null;
+      for (const k of book.monthSeq) { if (k === month) break; const pm = book.months[k]; if (pm.status === "已发放" && pm.floorsSnap) prevSnap = pm.floorsSnap; }
+      const holMap = {};
+      (doc.hollow ? doc.hollow.list : []).forEach(h => {
+        const un = h.spots - h.fixed; if (un <= 0) return;
+        holMap[h.b] = holMap[h.b] || {};
+        (holMap[h.b][h.f] = holMap[h.b][h.f] || []).push(h);
+      });
+      const sq = (bg, round) => ({ display: "inline-block", width: 11, height: 11, borderRadius: round ? 999 : 3, background: bg, verticalAlign: -1, marginRight: 4 });
+      return (
+        <Panel padding={0} style={{ overflow: "hidden" }}>
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 800 }}>楼层核对 · {book.leader}簿</span>
+            <StatusChip tone="brand">只显示本簿施工的楼栋（勾房记录）</StatusChip>
+            <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>点下方清单行 → 高亮该行楼栋；点带橙点格子看空鼓明细</span>
+            {selB && <button onClick={() => setSelB(null)} style={{ marginLeft: "auto", border: 0, background: "transparent", color: "var(--brand)", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>清除高亮（当前 {selB}）</button>}
+          </div>
+          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8, overflowX: "auto" }}>
+            {bs.map(b2 => {
+              const cur = curF[b2] || [];
+              const prev = (prevSnap && prevSnap[b2]) || [];
+              const dim = selB && selB !== b2;
+              return (
+                <div key={b2} style={{ display: "flex", alignItems: "center", gap: 8, opacity: dim ? 0.35 : 1, transition: "opacity var(--dur-fast)" }}>
+                  <span style={{ flex: "none", width: 42, fontSize: 12.5, fontWeight: 800, color: selB === b2 ? "var(--brand-deep)" : "var(--ink)" }}>{b2}</span>
+                  <div style={{ display: "flex", gap: 3, flexWrap: "nowrap" }}>
+                    {W.FLOORS.map(f => {
+                      const inCur = cur.indexOf(f) >= 0;
+                      const inPrev = prev.indexOf(f) >= 0;
+                      const st = inCur ? (inPrev ? "prev" : "cur") : "none";
+                      const hol = (holMap[b2] || {})[f];
+                      const un = hol ? hol.reduce((s, h) => s + h.spots - h.fixed, 0) : 0;
+                      const tip = b2 + f + "楼 · " + (st === "cur" ? "本月新增（计入当月申报）" : st === "prev" ? "往月已完成" : "未涉及") + (un ? " · 空鼓未整改 " + un + " 处" : "");
+                      return (
+                        <span key={f} title={tip}
+                          onClick={() => { if (un) UI().toast(b2 + f + "楼空鼓：" + hol.map(h => h.u + h.item + " " + (h.spots - h.fixed) + "处（" + h.who + "）").join("、"), "warning"); }}
+                          style={{ position: "relative", width: 19, height: 19, borderRadius: 4, flex: "none", display: "grid", placeItems: "center",
+                            fontSize: 9, fontFamily: "var(--font-mono)", cursor: un ? "pointer" : "default", fontWeight: st === "none" ? 400 : 800,
+                            background: st === "cur" ? "var(--brand)" : st === "prev" ? "var(--ok-soft)" : "var(--surface-3)",
+                            color: st === "cur" ? "#fff" : st === "prev" ? "var(--ok-ink)" : "var(--ink-faint)" }}>
+                          {f}
+                          {un > 0 && <span style={{ position: "absolute", top: -2, right: -2, width: 7, height: 7, borderRadius: 999, background: "var(--warn)", border: "1.5px solid #fff" }}></span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11, color: "var(--ink-soft)", paddingTop: 4 }}>
+              <span><span style={sq("var(--ok-soft)")}></span>往月已完成</span>
+              <span><span style={sq("var(--brand)")}></span>本月新增（计入当月申报）</span>
+              <span><span style={sq("var(--surface-3)")}></span>未涉及</span>
+              <span><span style={sq("var(--warn)", true)}></span>空鼓未整改层（点格子看明细）</span>
+            </div>
+          </div>
+        </Panel>
+      );
+    })();
+
     // —— 清单核对（A/MGR/B 共用，列随族微调）——
     const isB = book.family === "B";
     const isMgr = book.family === "MGR";
@@ -259,7 +327,9 @@
                   <td colSpan={isB ? 6 : 8} style={{ ...cTD, fontWeight: 800, color: "var(--ink-soft)" }}>{l.group}（分组小标题 · 随合同带入）</td>
                 </tr>
               ) : (
-                <tr key={i} style={{ background: l.extra ? "var(--danger-soft)" : "transparent" }}>
+                <tr key={i} onClick={() => { if (book.family === "A" && l.b) setSelB(selB === l.b ? null : l.b); }}
+                  style={{ background: l.extra ? "var(--danger-soft)" : (book.family === "A" && l.b && selB === l.b ? "var(--brand-soft)" : "transparent"),
+                    cursor: book.family === "A" && l.b ? "pointer" : "default" }}>
                   <td style={{ ...cTD, textAlign: "center", color: "var(--ink-faint)" }}>{doc.lines.slice(0, i + 1).filter(x => !x.group).length}</td>
                   <td style={cTD}>
                     <span style={{ fontWeight: 600 }}>{l.item}</span>
@@ -913,7 +983,10 @@
 
         {future && <Panel padding={30} style={{ textAlign: "center", color: "var(--ink-faint)", fontSize: 13 }}>「{doc.label}」档未到：结算档默认 95%（可改，留 5% 尾款），尾款档固定 100% 收口。</Panel>}
 
-        {step === "check" && !future && (checkList || checkC1 || checkC2)}
+        {step === "check" && !future && (<>
+          {floorPanel}
+          {checkList || checkC1 || checkC2}
+        </>)}
 
         {step === "a4" && !future && (
           <div id="payslip-print-root" style={{ overflowX: "auto", padding: "4px 0 20px" }}>
