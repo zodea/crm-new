@@ -25,6 +25,7 @@ const assignmentInitialTrade = shallowRef(ALL_QUANTITY_FILTER)
 const completionDialogOpen = shallowRef(false)
 const completionUnitId = shallowRef('')
 const completionInitialStageId = shallowRef('')
+const batchCompletionDialogOpen = shallowRef(false)
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -146,6 +147,7 @@ onMounted(initialize)
       :loading="store.loading"
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
+      @batch-complete="batchCompletionDialogOpen = true"
       @manage-templates="templateDialogOpen = true"
       @manage-assignments="openAssignments()"
       @refresh="retry"
@@ -222,12 +224,14 @@ onMounted(initialize)
       </p>
     </section>
 
-    <QuantityWorkspace
-      v-else-if="snapshot"
-      :matrix="matrix"
-      @configure="configureCell"
-      @complete="completeCell"
-    />
+    <template v-else-if="snapshot">
+      <QuantityProgressCards :progress="store.stageProgress" />
+      <QuantityWorkspace
+        :matrix="matrix"
+        @configure="configureCell"
+        @complete="completeCell"
+      />
+    </template>
 
     <QuantityTemplateDialog
       v-if="projectId"
@@ -250,6 +254,14 @@ onMounted(initialize)
       :project-id="projectId"
       :unit-id="completionUnitId"
       :initial-stage-id="completionInitialStageId"
+    />
+
+    <QuantityBatchCompletionDialog
+      v-if="projectId"
+      v-model:open="batchCompletionDialogOpen"
+      :project-id="projectId"
+      :initial-building-id="buildingId"
+      :initial-trade="trade"
     />
   </div>
 </template>

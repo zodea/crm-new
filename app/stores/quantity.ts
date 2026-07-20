@@ -1,5 +1,7 @@
 import type { QuantityAssignmentBatchDraft, QuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
+import type { QuantityBatchCompletionDraft } from '~/lib/quantity/batch-completion'
 import type { QuantityCompletionDraft, QuantityCompletionWorkspace } from '~/lib/quantity/completion'
+import type { QuantityStageProgress } from '~/lib/quantity/derived'
 import type { QuantityCatalogProject, QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { QuantityTemplateDraft, QuantityTemplateWorkspace } from '~/lib/quantity/template'
 import { defineStore } from 'pinia'
@@ -7,7 +9,9 @@ import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { withTransaction } from '~/lib/db/connection'
 import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
+import { persistQuantityBatchCompletion } from '~/lib/quantity/batch-completion'
 import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from '~/lib/quantity/completion'
+import { loadQuantityStageProgress } from '~/lib/quantity/derived'
 import { loadQuantityCatalog, loadQuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import {
   deleteQuantityTemplate,
@@ -21,6 +25,7 @@ import { toErrorMessage } from '~/lib/util/error'
 export const useQuantityStore = defineStore('quantity', () => {
   const catalog = shallowRef<QuantityCatalogProject[]>([])
   const snapshot = shallowRef<QuantityProjectSnapshot | null>(null)
+  const stageProgress = shallowRef<QuantityStageProgress[]>([])
   const loading = shallowRef(false)
   const error = shallowRef('')
   const templateWorkspace = shallowRef<QuantityTemplateWorkspace | null>(null)
@@ -73,19 +78,28 @@ export const useQuantityStore = defineStore('quantity', () => {
     const request = ++latestProjectRequest
     if (!projectId) {
       snapshot.value = null
+      stageProgress.value = []
       return
     }
-    if (snapshot.value?.projectId !== projectId)
+    if (snapshot.value?.projectId !== projectId) {
       snapshot.value = null
+      stageProgress.value = []
+    }
     beginRequest()
     try {
-      const result = await loadQuantityProjectSnapshot(db, projectId)
-      if (request === latestProjectRequest)
+      const [result, progress] = await Promise.all([
+        loadQuantityProjectSnapshot(db, projectId),
+        loadQuantityStageProgress(db, projectId),
+      ])
+      if (request === latestProjectRequest) {
         snapshot.value = result
+        stageProgress.value = progress
+      }
     }
     catch (cause) {
       if (request === latestProjectRequest) {
         snapshot.value = null
+        stageProgress.value = []
         error.value = `工程量矩阵加载失败：${toErrorMessage(cause)}`
       }
     }
@@ -271,6 +285,30 @@ export const useQuantityStore = defineStore('quantity', () => {
     }
   }
 
+  async function saveBatchCompletion(draft: QuantityBatchCompletionDraft) {
+    completionSaving.value = true
+    completionError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityBatchCompletion(tx, draft))
+      try {
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        completionError.value = `批量完成已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      completionError.value = `批量完成保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      completionSaving.value = false
+    }
+  }
+
   async function saveAssignments(draft: QuantityAssignmentBatchDraft) {
     assignmentSaving.value = true
     assignmentError.value = ''
@@ -299,6 +337,7 @@ export const useQuantityStore = defineStore('quantity', () => {
   return {
     catalog: readonly(catalog),
     snapshot: readonly(snapshot),
+    stageProgress: readonly(stageProgress),
     loading: readonly(loading),
     error: readonly(error),
     templateWorkspace: readonly(templateWorkspace),
@@ -323,5 +362,6 @@ export const useQuantityStore = defineStore('quantity', () => {
     saveAssignments,
     loadCompletion,
     saveCompletion,
+    saveBatchCompletion,
   }
 })
