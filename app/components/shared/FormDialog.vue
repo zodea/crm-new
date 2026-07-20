@@ -13,9 +13,11 @@ const props = withDefaults(defineProps<{
   sections?: Section[]
   saveLabel?: string
   width?: string
+  busy?: boolean
 }>(), {
   saveLabel: '保存',
   width: 'min(880px, calc(100dvw - var(--space-6, 24px)))',
+  busy: false,
 })
 
 const emit = defineEmits<{
@@ -39,7 +41,7 @@ function scrollTo(key: string) {
 
 // reka 请求关闭（Esc / 点遮罩）→ 取消
 function onOpenChange(value: boolean) {
-  if (!value)
+  if (!value && !props.busy)
     emit('cancel')
 }
 </script>
@@ -50,11 +52,12 @@ function onOpenChange(value: boolean) {
       :show-close="false"
       class="form-dialog flex flex-col p-0"
       :style="{ width }"
+      :aria-busy="busy"
     >
       <!-- 标题栏（固定） -->
       <div class="flex items-center justify-between px-5 py-3.5 border-b border-line shrink-0">
         <DialogTitle>{{ title }}</DialogTitle>
-        <button type="button" class="icon-btn" aria-label="关闭" @click="emit('cancel')">
+        <button type="button" class="icon-btn" aria-label="关闭" :disabled="busy" @click="emit('cancel')">
           <span class="i-lucide-x text-14px" />
         </button>
       </div>
@@ -101,11 +104,11 @@ function onOpenChange(value: boolean) {
 
       <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
       <div class="form-dialog__actions flex flex-wrap items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
-        <Button variant="outline" @click="emit('cancel')">
+        <Button variant="outline" :disabled="busy" @click="emit('cancel')">
           取消
         </Button>
         <slot name="actions" />
-        <Button variant="accent" @click="emit('save')">
+        <Button variant="accent" :disabled="busy" @click="emit('save')">
           {{ saveLabel }}
         </Button>
       </div>

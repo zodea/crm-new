@@ -17,6 +17,7 @@ import {
   selectVisibleSql,
   softDelete,
   undoOperation,
+  undoOperationIfUnchanged,
   visibleCond,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
@@ -155,8 +156,11 @@ describe('软删除:删除不再执行 DELETE,restore 恢复', () => {
     expect(logs[0].action).toBe('delete')
     expect(logs[0].operator).toBe('张三')
     const before = JSON.parse(logs[0].before_data!)
+    const after = JSON.parse(logs[0].after_data!)
     expect(before.name).toBe('合和新城')
     expect(before.deleted_at).toBeNull()
+    expect(after.name).toBe('合和新城')
+    expect(after.deleted_at).toBe(row.deleted_at)
     db.close()
   })
 
@@ -572,6 +576,47 @@ describe('撤回:undoOperation 按日志反做(DATABASE.md §8.3)', () => {
       ['bad2', 'projects', 'p1', 'update', '{"ghost_column": 1}'],
     )
     expect(await undoOperation(db, 'bad2')).toBe(false)
+    db.close()
+  })
+})
+
+describe('严格撤回：仅反做仍处于日志操作后状态的记录', () => {
+  it('当前行未再变化时正常撤回', async () => {
+    const db = await dbWithProject()
+    const logId = await withUpdateLog(db, 'projects', 'p1', async () => {
+      await db.execute(`UPDATE projects SET name = ? WHERE id = ?`, ['改名后', 'p1'])
+    })
+
+    expect(await undoOperationIfUnchanged(db, logId!)).toBe(true)
+    expect((await fetchRowById(db, 'projects', 'p1'))?.name).toBe('合和新城')
+    db.close()
+  })
+
+  it('后续编辑存在时拒绝旧 update/create 日志，不覆盖新值', async () => {
+    const db = await dbWithProject()
+    const updateLogId = await withUpdateLog(db, 'projects', 'p1', async () => {
+      await db.execute(`UPDATE projects SET name = ? WHERE id = ?`, ['第一次修改', 'p1'])
+    })
+    await db.execute(`UPDATE projects SET name = ? WHERE id = ?`, ['后续修改', 'p1'])
+
+    expect(await undoOperationIfUnchanged(db, updateLogId!)).toBe(false)
+    expect((await fetchRowById(db, 'projects', 'p1'))?.name).toBe('后续修改')
+
+    const createLogId = await logCreate(db, 'projects', 'p1')
+    await db.execute(`UPDATE projects SET status = ? WHERE id = ?`, ['施工中', 'p1'])
+    expect(await undoOperationIfUnchanged(db, createLogId!)).toBe(false)
+    expect((await fetchRowById(db, 'projects', 'p1'))?.deleted_at).toBeNull()
+    db.close()
+  })
+
+  it('delete 使用操作后快照，后续恢复再删除时拒绝旧日志', async () => {
+    const db = await dbWithProject()
+    const firstDeleteLogId = await softDelete(db, 'projects', 'p1')
+    await restoreRecord(db, 'projects', 'p1')
+    await softDelete(db, 'projects', 'p1')
+
+    expect(await undoOperationIfUnchanged(db, firstDeleteLogId!)).toBe(false)
+    expect((await fetchRowById(db, 'projects', 'p1'))?.deleted_at).not.toBeNull()
     db.close()
   })
 })

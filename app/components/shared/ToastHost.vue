@@ -7,25 +7,28 @@ import 'vue-sonner/style.css'
 </script>
 
 <template>
-  <!-- system 道：右上，展开可读（系统消息 / 需确认后的结果 / undo）
-       close-button：Toaster 级不强制显示，仅 default 类型（undo）按 toast 级 closeButton 单独开启 -->
-  <Toaster
-    id="system"
-    position="top-right"
-    :expand="true"
-    :visible-toasts="6"
-    :offset="16"
-    :gap="12"
-  />
-  <!-- process 道：右下，折叠堆叠 + hover 展开（上传/识别等过程提示） -->
-  <Toaster
-    id="process"
-    position="bottom-right"
-    :expand="false"
-    :visible-toasts="3"
-    :offset="16"
-    :gap="12"
-  />
+  <!-- 脱离应用壳 stacking context，确保 Dialog 打开时 toast action 仍在遮罩上方可操作。 -->
+  <Teleport to="body">
+    <!-- system 道：右上，展开可读（系统消息 / 需确认后的结果 / undo）
+         close-button：Toaster 级不强制显示，仅 default 类型（undo）按 toast 级 closeButton 单独开启 -->
+    <Toaster
+      id="system"
+      position="top-right"
+      :expand="true"
+      :visible-toasts="6"
+      :offset="16"
+      :gap="12"
+    />
+    <!-- process 道：右下，折叠堆叠 + hover 展开（上传/识别等过程提示） -->
+    <Toaster
+      id="process"
+      position="bottom-right"
+      :expand="false"
+      :visible-toasts="3"
+      :offset="16"
+      :gap="12"
+    />
+  </Teleport>
 </template>
 
 <style>
@@ -42,6 +45,8 @@ import 'vue-sonner/style.css'
 [data-sonner-toast] {
   box-shadow: var(--shadow-pop);
   font-size: 13px;
+  /* reka modal 会把 body 设为 pointer-events:none；toast 叶节点需显式恢复命中。 */
+  pointer-events: auto;
 }
 
 [data-sonner-toast] [data-title] {

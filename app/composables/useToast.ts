@@ -152,7 +152,11 @@ function dismiss(id: ToastId) {
 }
 
 /** 撤回 toast（软删除限时撤回，system 道；ADR 0003：窗口 10 秒） */
-function undo(message: string, onUndo: () => boolean | void | Promise<boolean | void>, ms = 10000): ToastId {
+function undo(
+  message: string,
+  onUndo: () => 'cancelled' | boolean | void | Promise<'cancelled' | boolean | void>,
+  ms = 10000,
+): ToastId {
   const id = emit({
     lane: 'system',
     type: 'default',
@@ -165,6 +169,10 @@ function undo(message: string, onUndo: () => boolean | void | Promise<boolean | 
         laneById.delete(id)
         try {
           const restored = await onUndo()
+          if (restored === 'cancelled') {
+            info('已取消撤回，当前内容保持不变')
+            return
+          }
           if (restored === false) {
             error('撤回失败：记录已变化或不存在')
             return
