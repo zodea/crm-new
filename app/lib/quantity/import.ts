@@ -36,6 +36,7 @@ export const QUANTITY_ASSIGNMENT_IMPORT_FIELDS: readonly ImportTemplateField[] =
   { key: 'trade', label: '工种', required: true, aliases: ['工种名称'] },
   { key: 'crewName', label: '班组名称', aliases: ['班组'] },
   { key: 'workerName', label: '工人姓名', aliases: ['工人', '个人'] },
+  { key: 'replaceExisting', label: '允许替换现有责任', aliases: ['允许替换', '替换'] },
   { key: 'note', label: '备注', aliases: ['说明'] },
 ]
 
@@ -260,6 +261,14 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
   const current = workspace.assignments.find(assignment => (
     assignment.unitId === unitId && assignment.trade === trade
   ))
+
+  // 替换保护对齐 ADR 0010：既有不同责任不静默覆盖，必须行内显式声明「允许替换」。
+  const replaceExisting = ['是', 'y', 'yes', 'true', '1'].includes(str(row, 'replaceExisting').toLowerCase())
+  const isSameAssignee = current
+    && current.assigneeKind === assignee.kind
+    && current.assigneeId === assignee.id
+  if (current && !isSameAssignee && !replaceExisting)
+    throw new Error(`该户「${trade}」已有责任「${current.assigneeName}」；如需替换请在「允许替换现有责任」列填「是」`)
 
   await persistQuantityAssignments(db, {
     projectId,
