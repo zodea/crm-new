@@ -18,6 +18,18 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "serve", "-l", "8823", "DC重构设计源码"],
       "port": 8823
+    },
+    {
+      "name": "dc-design-b",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "8824", "DC重构设计源码"],
+      "port": 8824
+    },
+    {
+      "name": "dc-design-nc",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "DC重构设计源码", "-p", "8825", "-c-1"],
+      "port": 8825
     }
   ]
 }
