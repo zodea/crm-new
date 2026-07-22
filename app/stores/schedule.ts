@@ -1,5 +1,5 @@
 import type { ScheduleOverlapMode, ScheduleTemplatePlanInput } from '~/lib/schedule/planning'
-import type { ScheduleCatalogProject, ScheduleProjectView } from '~/lib/schedule/read-model'
+import type { ScheduleBuildingOption, ScheduleCatalogProject, ScheduleProjectView } from '~/lib/schedule/read-model'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { execute, select, withTransaction } from '~/lib/db/connection'
@@ -16,7 +16,7 @@ import {
   dependencyConflicts,
   planTemplateTasks,
 } from '~/lib/schedule/planning'
-import { loadScheduleCatalog, loadScheduleProject } from '~/lib/schedule/read-model'
+import { loadScheduleBuildings, loadScheduleCatalog, loadScheduleProject } from '~/lib/schedule/read-model'
 import { SCHEDULE_TEMPLATE_BY_KEY } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
@@ -53,6 +53,7 @@ interface IdCodeRow { id: string, code: string }
 
 export const useScheduleStore = defineStore('schedule', () => {
   const catalog = shallowRef<ScheduleCatalogProject[]>([])
+  const buildings = shallowRef<ScheduleBuildingOption[]>([])
   const snapshot = shallowRef<ScheduleProjectView | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -63,6 +64,10 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function loadCatalog() {
     catalog.value = await loadScheduleCatalog(db)
+  }
+
+  async function loadBuildings(projectId: string) {
+    buildings.value = projectId ? await loadScheduleBuildings(db, projectId) : []
   }
 
   async function loadProject(projectId: string, today = toLocalDateInputValue()) {
@@ -268,6 +273,50 @@ export const useScheduleStore = defineStore('schedule', () => {
     }
   }
 
+  async function updateDependency(
+    successorId: string,
+    predecessorId: string,
+    lagDays: number,
+    today = activeToday,
+  ) {
+    const tasks = snapshot.value?.groups.flatMap(group => group.tasks) ?? []
+    const successor = tasks.find(task => task.id === successorId)
+    const predecessor = tasks.find(task => task.id === predecessorId)
+    if (!successor || !predecessor || successor.groupId !== predecessor.groupId)
+      throw new Error('前置工序与后续工序必须属于同一楼栋分组')
+    if (successor.id === predecessor.id)
+      throw new Error('工序不能依赖自身')
+
+    const normalizedLag = Math.trunc(lagDays)
+    const current = snapshot.value?.dependencies.find(dependency => dependency.succId === successorId)
+    saving.value = true
+    try {
+      let logId: string | null
+      if (current) {
+        logId = await withUpdateLog(db, 'task_dependencies', current.id, () => execute(
+          `UPDATE task_dependencies
+           SET pred_id = ?, dependency_type = 'FS', lag_days = ?, updated_at = datetime('now')
+           WHERE id = ?`,
+          [predecessorId, normalizedLag, current.id],
+        ))
+      }
+      else {
+        const dependencyId = generateId('schedule_dependency')
+        await execute(
+          `INSERT INTO task_dependencies (id, pred_id, succ_id, dependency_type, lag_days)
+           VALUES (?, ?, ?, 'FS', ?)`,
+          [dependencyId, predecessorId, successorId, normalizedLag],
+        )
+        logId = await logCreate(db, 'task_dependencies', dependencyId)
+      }
+      await loadProject(successor.projectId, today)
+      return logId
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
   async function setBaseline(projectId: string, today = activeToday) {
     const tasks = snapshot.value?.id === projectId
       ? snapshot.value.groups.flatMap(group => group.tasks)
@@ -382,14 +431,17 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   return {
     catalog: readonly(catalog),
+    buildings: readonly(buildings),
     snapshot: readonly(snapshot),
     loading: readonly(loading),
     saving: readonly(saving),
     error: readonly(error),
     loadCatalog,
+    loadBuildings,
     loadProject,
     createGroup,
     updateTask,
+    updateDependency,
     setBaseline,
     addTask,
     removeTask,

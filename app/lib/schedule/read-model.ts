@@ -12,6 +12,13 @@ export interface ScheduleCatalogProject {
   groupCount: number
 }
 
+export interface ScheduleBuildingOption {
+  id: string
+  projectId: string
+  code: string
+  name: string
+}
+
 export interface ScheduleTaskView {
   id: string
   projectId: string
@@ -29,8 +36,8 @@ export interface ScheduleTaskView {
   manualProgress: number | null
   stageId: string | null
   sortOrder: number
-  itemIds: string[]
-  itemNames: string[]
+  itemIds: readonly string[]
+  itemNames: readonly string[]
   applicableUnits: number | null
   completedUnits: number | null
   actualProgress: number
@@ -45,9 +52,9 @@ export interface ScheduleGroupView {
   projectId: string
   name: string
   sortOrder: number
-  buildingIds: string[]
-  buildingNames: string[]
-  tasks: ScheduleTaskView[]
+  buildingIds: readonly string[]
+  buildingNames: readonly string[]
+  tasks: readonly ScheduleTaskView[]
   plannedStart: string | null
   plannedFinish: string | null
   actualProgress: number
@@ -59,8 +66,8 @@ export interface ScheduleProjectView {
   id: string
   name: string
   code: string
-  groups: ScheduleGroupView[]
-  dependencies: ScheduleDependencyInput[]
+  groups: readonly ScheduleGroupView[]
+  dependencies: readonly ScheduleDependencyInput[]
   plannedStart: string | null
   plannedFinish: string | null
   actualProgress: number
@@ -69,6 +76,7 @@ export interface ScheduleProjectView {
 }
 
 interface ProjectRow { id: string, name: string, code: string | null, status: string | null }
+interface BuildingRow { id: string, project_id: string, code: string, name: string }
 interface GroupRow { id: string, project_id: string, name: string, sort_order: number }
 interface GroupBuildingRow { group_id: string, building_id: string, building_name: string }
 interface TaskRow {
@@ -136,6 +144,19 @@ export async function loadScheduleCatalog(db: SoftDb): Promise<ScheduleCatalogPr
     code: row.code ?? '',
     status: row.status ?? '',
     groupCount: countByProject.get(row.id) ?? 0,
+  }))
+}
+
+export async function loadScheduleBuildings(db: SoftDb, projectId: string): Promise<ScheduleBuildingOption[]> {
+  const rows = await db.select<BuildingRow>(
+    selectVisibleSql('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'),
+    [projectId],
+  )
+  return rows.map(row => ({
+    id: row.id,
+    projectId: row.project_id,
+    code: row.code,
+    name: row.name,
   }))
 }
 

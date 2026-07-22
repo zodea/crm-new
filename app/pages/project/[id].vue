@@ -111,6 +111,9 @@ onMounted(async () => {
     <!-- 阶段时间线 -->
     <ProjectTimeline :project-id="projectId" />
 
+    <!-- #114 施工进度与 /schedule 共用同一 Pinia / SQLite 数据源 -->
+    <ProjectScheduleCard :project-id="projectId" />
+
     <!-- Tab 栏（SegTab 统一底座，content-tab 双轨已收敛 #110 阶段⑥） -->
     <SegTab v-model="activeTab" :tabs="[...tabs]" class="mb-4" />
 
