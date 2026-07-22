@@ -87,6 +87,22 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
     await expect(page.getByRole('grid', { name: '工程量楼层房号矩阵' })).toHaveCount(0)
   })
 
+  test('整工种批量完成展开到户×阶段并按缺照片规则回显草稿', async ({ page }) => {
+    await page.goto('/subcontract/quantity')
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('button', { name: '批量完成', exact: true }).click()
+    const dialog = page.getByRole('dialog').filter({ hasText: '整工种批量完成' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('checkbox', { name: '选择2层201户' }).first().check()
+    await dialog.getByRole('button', { name: '展开阶段', exact: true }).click()
+    await expect(dialog.getByText(/将提交 \d+ 项/)).toBeVisible()
+
+    await dialog.getByRole('button', { name: '提交批量登记', exact: true }).click()
+    await expect(dialog.getByRole('status')).toContainText('提交结果（按阶段回显）')
+    await expect(dialog.getByRole('status')).toContainText('存草稿 · 缺验收照片')
+  })
+
   test('390px 页面不横滚且只有矩阵局部横滚', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/subcontract/quantity')

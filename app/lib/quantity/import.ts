@@ -269,6 +269,13 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
     && current.assigneeId === assignee.id
   if (current && !isSameAssignee && !replaceExisting)
     throw new Error(`该户「${trade}」已有责任「${current.assigneeName}」；如需替换请在「允许替换现有责任」列填「是」`)
+  if (current?.hasInvalidScopes && !replaceExisting)
+    throw new Error(`该户「${trade}」既有责任范围已失效；如需修复请在「允许替换现有责任」列填「是」`)
+
+  // 导入目标没有范围列；重复导入同一责任人时必须保留既有个人范围，不能静默扩成整户责任。
+  const scopes = isSameAssignee
+    ? current.scopes.map(scope => ({ unitId, roomId: scope.roomId, itemId: scope.itemId }))
+    : []
 
   await persistQuantityAssignments(db, {
     projectId,
@@ -281,9 +288,9 @@ export async function importQuantityAssignmentRow(db: SoftDb, row: Record<string
       assignmentId: current?.id ?? null,
       fingerprint: current?.fingerprint ?? null,
     }],
-    scopes: [],
+    scopes,
     note: str(row, 'note') || undefined,
-    allowReplacement: true,
+    allowReplacement: Boolean(isSameAssignee) || replaceExisting,
     allowArchivedEdit: false,
   })
 }

@@ -2,7 +2,7 @@
 // 施工记录不落独立表；页面、工资预览、排程（#114/#117）都消费这里，不各自重算口径。
 import type { QuantityCompletionStatus } from './read-model'
 import type { SoftDb } from '~/lib/db/soft-delete'
-import { hiddenCtes, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import { hiddenCtes, hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 
 export interface QuantityStageProgress {
   stageId: string
@@ -118,16 +118,17 @@ export async function loadQuantityStageProgress(db: SoftDb, projectId: string): 
   )
 
   const applicability = await db.select<ApplicabilityRow>(
-    `${hiddenCtes('units')}
+    `${hiddenCtesFor('construction_stage_items', 'house_type_template_items', 'units')}
      SELECT csi.stage_id, COUNT(DISTINCT u.id) AS n
      FROM construction_stage_items csi
      JOIN construction_stages s ON s.id = csi.stage_id
-     JOIN house_type_template_items hti ON hti.item_id = csi.item_id AND hti.deleted_at IS NULL
-     JOIN rooms r ON r.id = hti.room_id AND r.deleted_at IS NULL
+     JOIN house_type_template_items hti ON hti.item_id = csi.item_id
+     JOIN rooms r ON r.id = hti.room_id
      JOIN units u ON u.house_type_template_id = r.template_id
      JOIN floors f ON f.id = u.floor_id
      JOIN buildings b ON b.id = f.building_id
-     WHERE csi.deleted_at IS NULL
+     WHERE ${visibleCond('construction_stage_items', 'csi')}
+       AND ${visibleCond('house_type_template_items', 'hti')}
        AND s.project_id = ?
        AND ${visibleCond('units', 'u')}
        AND b.project_id = ?
@@ -278,9 +279,9 @@ export async function loadQuantityConstructionRecords(
 }
 
 export async function loadQuantityMonthlyOutput(db: SoftDb, projectId: string): Promise<QuantityMonthlyOutput[]> {
-  // 月度只聚合 completed（草稿不是完成事实）；量走活链接（该户当前模板明细），与页面口径一致。
+  // 月度只聚合 completed；量走活链接，且每个分项只在显式报量阶段计一次。
   const rows = await db.select<MonthlyRow>(
-    `${hiddenCtes('unit_stage_completions')}
+    `${hiddenCtesFor('unit_stage_completions', 'construction_stage_items', 'house_type_template_items')}
      SELECT substr(usc.completed_at, 1, 7) AS month,
             usc.stage_id,
             s.name AS stage_name,
@@ -296,16 +297,18 @@ export async function loadQuantityMonthlyOutput(db: SoftDb, projectId: string): 
      JOIN buildings b ON b.id = f.building_id
      JOIN house_type_templates ht ON ht.id = u.house_type_template_id
      JOIN construction_stages s ON s.id = usc.stage_id
-     LEFT JOIN (
+     JOIN (
        SELECT r.template_id,
               csi.stage_id,
               SUM(COALESCE(hti.contract_qty, 0)) AS contract_qty,
               SUM(COALESCE(hti.provisional_qty, 0)) AS provisional_qty,
               SUM(COALESCE(hti.field_qty, 0)) AS field_qty
        FROM construction_stage_items csi
-       JOIN house_type_template_items hti ON hti.item_id = csi.item_id AND hti.deleted_at IS NULL
-       JOIN rooms r ON r.id = hti.room_id AND r.deleted_at IS NULL
-       WHERE csi.deleted_at IS NULL
+       JOIN house_type_template_items hti ON hti.item_id = csi.item_id
+       JOIN rooms r ON r.id = hti.room_id
+       WHERE ${visibleCond('construction_stage_items', 'csi')}
+         AND ${visibleCond('house_type_template_items', 'hti')}
+         AND csi.is_reporting_stage = 1
        GROUP BY r.template_id, csi.stage_id
      ) qty ON qty.template_id = u.house_type_template_id AND qty.stage_id = usc.stage_id
      WHERE ${visibleCond('unit_stage_completions', 'usc')}
