@@ -17,6 +17,8 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: 'WBS 排程与实际进度' })).toBeVisible()
     await expect(page.getByText('户内1栋-2栋', { exact: true })).toBeVisible()
+    await expect(page.getByText('2026-05-06', { exact: true }).first()).toBeVisible()
+    await expect(page.locator('.dependency-path').first()).toBeVisible()
 
     await page.getByRole('button', { name: '放线及新建墙体', exact: true }).click()
     const manualDialog = page.getByRole('dialog', { name: /工序详情 · 放线及新建墙体/ })
@@ -36,6 +38,10 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await quantityDialog.getByRole('button', { name: '查看工程量', exact: true }).click()
     await expect(page).toHaveURL(/\/subcontract\/quantity\?.*from=schedule/)
     await expect(page.getByText('来自施工排程 · 户内1栋-2栋')).toBeVisible()
+    await expect(page.getByText('户内1栋-2栋', { exact: true }).last()).toBeVisible()
+    await expect(page.getByText('1栋 · 2层', { exact: true })).toBeVisible()
+    await expect(page.getByText('2栋 · 2层', { exact: true })).toBeVisible()
+    await expect(page.getByText(/映射分项：.*墙面防水.*地面防水/)).toBeVisible()
     await page.getByRole('link', { name: '返回该工序', exact: true }).click()
     await expect(page).toHaveURL(/\/schedule\?.*task=schedule_task_demo_03/)
     await expect(page.getByRole('dialog', { name: /工序详情 · 卫生间回填及防水/ })).toBeVisible()
@@ -76,6 +82,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible()
+    await expect(page.getByText('FS 前置', { exact: true })).toBeVisible()
     await expect(page.locator('.process-row').filter({ has: page.locator('input[type="checkbox"]') })).toHaveCount(22)
     await expect(page.getByRole('button', { name: '生成排程', exact: true })).toBeVisible()
   })

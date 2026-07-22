@@ -310,7 +310,11 @@ export const useScheduleStore = defineStore('schedule', () => {
         logId = await logCreate(db, 'task_dependencies', dependencyId)
       }
       await loadProject(successor.projectId, today)
-      return logId
+      const allTasks = snapshot.value?.groups.flatMap(group => group.tasks) ?? []
+      return {
+        logId,
+        conflicts: dependencyConflicts(allTasks, snapshot.value?.dependencies ?? []),
+      }
     }
     finally {
       saving.value = false

@@ -64,3 +64,10 @@ onMounted(load)
     </div>
   </section>
 </template>
+
+<style scoped>
+strong, .text-right {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+</style>

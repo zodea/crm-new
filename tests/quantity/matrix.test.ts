@@ -147,6 +147,36 @@ describe('工程量矩阵纯投影', () => {
     expect(workerCell.assignments[0]?.assigneeName).toBe('张建国')
   })
 
+  it('排程下钻可按稳定阶段精确筛选，并覆盖楼栋分组的多栋范围', () => {
+    const grouped: QuantityProjectSnapshot = {
+      ...snapshot,
+      buildings: [
+        ...snapshot.buildings,
+        { id: 'b2', projectId: 'p1', code: '2', name: '2栋', sortOrder: 1 },
+      ],
+      floors: [
+        ...snapshot.floors,
+        { id: 'f3', buildingId: 'b2', code: '1', name: '1层', sortOrder: 0 },
+      ],
+      units: [
+        ...snapshot.units,
+        { id: 'u301', floorId: 'f3', templateId: 't1', code: '01', name: '101户', sortOrder: 0 },
+      ],
+    }
+    const view = buildQuantityMatrix(grouped, {
+      buildingId: 'b1',
+      buildingIds: ['b1', 'b2'],
+      month: ALL_QUANTITY_FILTER,
+      viewMode: 'trade',
+      trade: '泥水工',
+      assigneeKey: ALL_QUANTITY_FILTER,
+      stageId: 's-wall',
+    })
+
+    expect(view.rows.map(row => row.label)).toEqual(['1栋 · 2层', '2栋 · 1层', '1栋 · 1层'])
+    expect(view.rows[0]!.cells[0]!.timeline.map(item => item.stageId)).toEqual(['s-wall'])
+  })
+
   it('派生月份、工种和班组选项且顺序稳定', () => {
     expect(quantityMonthOptions(snapshot).map(option => option.key)).toEqual(['all', '2026-06', '2026-05'])
     expect(quantityTradeOptions(snapshot).map(option => option.key)).toEqual(['all', '泥水工', '防水工'])

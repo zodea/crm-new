@@ -15,6 +15,7 @@ const selectedProjectId = shallowRef('')
 const initialized = shallowRef(false)
 const selectedTask = shallowRef<ScheduleTaskView | null>(null)
 const taskDialogOpen = shallowRef(false)
+const highlightedGroupId = computed(() => String(route.query.group ?? ''))
 
 const selectedGroupName = computed(() => {
   if (!selectedTask.value)
@@ -47,6 +48,7 @@ async function initialize() {
   if (selectedProjectId.value)
     await store.loadProject(selectedProjectId.value, today)
   initialized.value = true
+  restoreTaskFromRoute(route.query.task)
 }
 
 watch(selectedProjectId, async (next, previous) => {
@@ -56,7 +58,7 @@ watch(selectedProjectId, async (next, previous) => {
   await store.loadProject(next, today)
 })
 
-watch(() => route.query.task, (taskId) => {
+function restoreTaskFromRoute(taskId: unknown) {
   if (!taskId || !store.snapshot)
     return
   const task = store.snapshot.groups.flatMap(group => group.tasks).find(candidate => candidate.id === taskId)
@@ -64,7 +66,9 @@ watch(() => route.query.task, (taskId) => {
     selectedTask.value = task
     taskDialogOpen.value = true
   }
-})
+}
+
+watch(() => route.query.task, restoreTaskFromRoute)
 
 function openTask(task: ScheduleTaskView) {
   selectedTask.value = task
@@ -100,12 +104,14 @@ async function saveTask(payload: {
   try {
     const taskId = selectedTask.value.id
     const result = await store.updateTask(taskId, payload.task, today)
-    if (payload.dependency)
-      await store.updateDependency(taskId, payload.dependency.predecessorId, payload.dependency.lagDays, today)
+    const dependencyResult = payload.dependency
+      ? await store.updateDependency(taskId, payload.dependency.predecessorId, payload.dependency.lagDays, today)
+      : null
     taskDialogOpen.value = false
     success('工序计划已更新')
-    if (result.conflicts.length)
-      warning(`存在 ${result.conflicts.length} 条前后置日期冲突，请检查 FS 关系`)
+    const conflicts = dependencyResult?.conflicts ?? result.conflicts
+    if (conflicts.length)
+      warning(`存在 ${conflicts.length} 条前后置日期冲突，请检查 FS 关系`)
   }
   catch (cause) {
     error(toErrorMessage(cause))
@@ -173,11 +179,15 @@ function drillQuantity() {
       project: task.projectId,
       group: task.groupId,
       building: group?.buildingIds[0] ?? undefined,
+      buildings: group?.buildingIds.join(',') || undefined,
       task: task.id,
       groupName: group?.name ?? undefined,
       taskName: task.name,
       stage: task.stageId ?? undefined,
       item: task.itemIds[0] ?? undefined,
+      itemName: task.itemNames.join('、') || undefined,
+      planStart: task.plannedStart,
+      planFinish: task.plannedFinish,
       from: 'schedule',
     },
   })
@@ -233,8 +243,13 @@ onMounted(initialize)
       </div>
     </section>
 
-    <section v-if="(!initialized || store.loading) && !store.snapshot" class="panel grid min-h-64 place-items-center text-12px text-ink-soft" role="status">
-      <span><span class="i-lucide-loader-circle mr-2 animate-spin text-brand" />正在读取施工排程…</span>
+    <section v-if="(!initialized || store.loading) && !store.snapshot" class="panel grid min-h-64 gap-3 p-4" role="status" aria-label="正在读取施工排程">
+      <span class="sr-only">正在读取施工排程…</span>
+      <div class="h-7 w-56 animate-pulse rounded bg-surface-3" />
+      <div class="grid grid-cols-4 gap-2">
+        <div v-for="index in 4" :key="index" class="h-14 animate-pulse rounded-lg bg-surface-2" />
+      </div>
+      <div class="h-36 animate-pulse rounded-lg bg-surface-2" />
     </section>
     <section v-else-if="store.error" class="panel grid min-h-64 place-items-center p-5 text-center text-12px text-danger" role="alert">
       {{ store.error }}
@@ -262,6 +277,7 @@ onMounted(initialize)
       v-else-if="store.snapshot"
       :snapshot="store.snapshot"
       :today="today"
+      :highlighted-group-id="highlightedGroupId"
       @select-task="openTask"
       @add-task="addTask"
     />
@@ -284,6 +300,7 @@ onMounted(initialize)
 .schedule-screen { container-type: inline-size; overflow: hidden; }
 .summary-cell { display: flex; min-width: 0; flex-direction: column; gap: 2px; border-radius: 8px; background: var(--surface-2); padding: 8px 10px; color: var(--ink-faint); }
 .summary-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 12px; }
+.summary-cell strong { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 @container (max-width: 48rem) { .schedule-screen .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container (max-width: 26rem) { .schedule-screen .grid-cols-4 { grid-template-columns: minmax(0, 1fr); } }
 </style>

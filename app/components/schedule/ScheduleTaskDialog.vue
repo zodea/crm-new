@@ -155,3 +155,10 @@ function save() {
     </template>
   </FormDialog>
 </template>
+
+<style scoped>
+input[type='date'], input[type='number'], input[type='range'], .font-700.text-brand {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+</style>

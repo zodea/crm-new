@@ -16,10 +16,12 @@ export interface QuantityOption {
 
 export interface QuantityMatrixFilters {
   buildingId: string
+  buildingIds?: readonly string[]
   month: string
   viewMode: QuantityMatrixViewMode
   trade: string
   assigneeKey: string
+  stageId?: string
 }
 
 export interface QuantityMatrixColumn {
@@ -96,14 +98,17 @@ function matchingAssignments(assignments: readonly QuantityAssignment[], filters
 }
 
 function matchingCompletions(completions: readonly QuantityCompletion[], filters: QuantityMatrixFilters): QuantityCompletion[] {
+  const scoped = filters.stageId
+    ? completions.filter(completion => completion.stageId === filters.stageId)
+    : [...completions]
   if (filters.viewMode === 'trade') {
     if (filters.trade === ALL_QUANTITY_FILTER)
-      return [...completions]
-    return completions.filter(completion => completion.stageTrade === filters.trade)
+      return scoped
+    return scoped.filter(completion => completion.stageTrade === filters.trade)
   }
   if (filters.assigneeKey === ALL_QUANTITY_FILTER)
-    return [...completions]
-  return completions.filter(completion => (
+    return scoped
+  return scoped.filter(completion => (
     completion.assigneeKind != null
     && `${completion.assigneeKind}:${completion.assigneeId}` === filters.assigneeKey
   ))
@@ -202,8 +207,9 @@ export function buildQuantityMatrix(
   snapshot: QuantityProjectSnapshot,
   filters: QuantityMatrixFilters,
 ): QuantityMatrixView {
+  const scopedBuildingIds = new Set(filters.buildingIds?.length ? filters.buildingIds : [filters.buildingId])
   const floors = snapshot.floors
-    .filter(floor => floor.buildingId === filters.buildingId)
+    .filter(floor => scopedBuildingIds.has(floor.buildingId))
     .sort((left, right) => left.sortOrder - right.sortOrder || right.code.localeCompare(left.code) || left.id.localeCompare(right.id))
   const floorIds = new Set(floors.map(floor => floor.id))
   const units = snapshot.units
@@ -278,7 +284,12 @@ export function buildQuantityMatrix(
         ariaLabel: cellAriaLabel(floor.name, unit.name, assignments, summary, draftCount),
       }
     })
-    return { id: floor.id, label: floor.name, cells }
+    const buildingName = snapshot.buildings.find(building => building.id === floor.buildingId)?.name ?? ''
+    return {
+      id: floor.id,
+      label: scopedBuildingIds.size > 1 ? `${buildingName} · ${floor.name}` : floor.name,
+      cells,
+    }
   })
 
   return {
