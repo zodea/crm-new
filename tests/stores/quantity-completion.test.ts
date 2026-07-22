@@ -166,6 +166,24 @@ describe('quantity stage completion：单户×单阶段唯一写路径', () => {
     ])
   })
 
+  it('单户工作区的 planWindow 消费其楼栋所在排程分组计划区间', async () => {
+    await mem.execute(`INSERT INTO schedule_groups (id, project_id, name)
+      VALUES ('g-plan', 'p1', '户内1栋')`)
+    await mem.execute(`INSERT INTO schedule_group_buildings (id, group_id, building_id)
+      VALUES ('gb-plan', 'g-plan', 'b1')`)
+    await mem.execute(`INSERT INTO schedule_tasks
+      (id, project_id, group_id, name, duration_days, planned_start, planned_finish, has_qty, manual_progress, sort_order) VALUES
+      ('task-plan-1', 'p1', 'g-plan', '放线', 10, '2026-07-01', '2026-07-10', 0, 0.5, 10),
+      ('task-plan-2', 'p1', 'g-plan', '保洁', 8, '2026-08-01', '2026-08-08', 0, 0, 20)`)
+
+    const workspace = await loadQuantityCompletionWorkspace(mem, 'p1', 'u1')
+
+    expect(workspace.planWindow).toEqual({
+      plannedStartAt: '2026-07-01',
+      plannedEndAt: '2026-08-08',
+    })
+  })
+
   it('模板没有可见量明细的阶段不进入单户登记且不可写入', async () => {
     const workspace = await loadQuantityCompletionWorkspace(mem, 'p1', 'u1')
     expect(workspace.stages.some(stage => stage.id === 's-ceiling')).toBe(false)
