@@ -65,7 +65,7 @@ function save() {
       <div class="rounded-lg bg-surface-2 px-3 py-2 text-12px text-ink-soft">
         <span class="font-700 text-ink">{{ groupName }}</span>
         <span class="mx-2 text-line-strong">/</span>
-        {{ task.trade }} · {{ task.durationDays }} 天
+        {{ task.trade }} · <span class="numeric">{{ task.durationDays }}</span> 天
       </div>
 
       <div class="grid grid-cols-2 gap-3">
@@ -102,7 +102,7 @@ function save() {
       <section class="rounded-lg border border-line p-3">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <div class="text-12px font-800 text-ink">
+            <div class="numeric text-12px font-800 text-ink">
               实际进度 {{ Math.round(task.actualProgress * 100) }}%
             </div>
             <div class="mt-0.5 text-11px text-ink-faint">
@@ -133,7 +133,7 @@ function save() {
           <div class="text-ink-faint">
             计量范围
           </div>
-          <div class="mt-1 font-700 text-ink">
+          <div class="numeric mt-1 font-700 text-ink">
             {{ task.itemNames.join('、') || '阶段全部分项' }}
           </div>
         </div>
@@ -158,6 +158,11 @@ function save() {
 
 <style scoped>
 input[type='date'], input[type='number'], input[type='range'], .font-700.text-brand {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.numeric {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
