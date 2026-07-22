@@ -52,6 +52,12 @@ Issue 记在 GitHub Issues(zodea/crm-new),通过 `gh` CLI 读写。见 `docs/age
 - **原子组件**(`app/components/ui/*`):交互型迁到 reka-ui(SegTab→Tabs、SelectFilter→Select);展示型/原生控件(Metric/SectionHeader/SearchInput 等)已令牌化,保持不变。迁移映射见 `docs/design/kitui-to-shadcn-migration.md`。
 - **ripple**(蓝色水波):**已废弃**,全局水波动效(含导出完成动效)一律不再实现。
 
+**通用组件沉淀与渐进扩展**（ADR 0013）:
+
+- 界面按 `app.dc.html` 整改时，先检查 `app/components/ui/*` 与 `app/components/shared/*`。按钮、弹窗壳、表格尺度/单元格、状态标签、工具栏等稳定且跨领域复用的视觉/交互能力，必须沉淀到现有通用组件或补充明确的通用原语；禁止只在业务页面堆一次性 CSS。WBS、甘特、领域表单等仅服务特定业务语义的部分保留为领域组件，不为“通用”而强行抽象。
+- 采用**改到哪、迁到哪**的渐进策略：当前任务涉及的界面立即改用新通用能力并按设计稿验收；未触及界面不在本轮无差别重刷。通用组件 API 优先向后兼容，后续界面整改时直接复用，使标准自然扩展到全站；只有 issue 明确要求全站切换时才一次性改变全局默认观感。
+- 每次页面整改同时验证两层：通用原语在 `/dev/kit-ui` 或对应组件测试中成立，业务页面在设计稿参考视口及 390/768/1024/1280-1440px 响应式矩阵中成立。不得以“已经用了通用组件”替代逐屏视觉对照。
+
 **改版工作约定**:每类交互改版前,先搜集一份「多风格真实参考站」菜单(能直接点开看效果)供挑方向,挑定再实装。参考站清单存档见 `docs/design/interaction-style-references.md`。
 
 ## 开工纪律
