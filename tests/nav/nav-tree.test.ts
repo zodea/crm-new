@@ -37,4 +37,10 @@ describe('侧栏导航树', () => {
     expect(activeNavKey('/material/delivery/archive/del_1')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery')).toBe('delivery')
   })
+
+  it('施工进度入口与新建子路由都点亮排程导航', () => {
+    expect(leaves().find(item => item.key === 'schedule')?.to).toBe('/schedule')
+    expect(activeNavKey('/schedule')).toBe('schedule')
+    expect(activeNavKey('/schedule/new')).toBe('schedule')
+  })
 })
