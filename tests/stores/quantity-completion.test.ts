@@ -52,6 +52,7 @@ beforeEach(async () => {
     ('i-putty', 'p1', 'putty', '墙面腻子', '油工', '㎡', 10),
     ('i-wall', 'p1', 'wall', '墙砖', '泥水工', '㎡', 20),
     ('i-floor', 'p1', 'floor', '地砖', '泥水工', '㎡', 21),
+    ('i-ceiling', 'p1', 'ceiling', '吊顶', '泥水工', '㎡', 22),
     ('i-other', 'p2', 'other', '外项目分项', '泥水工', '㎡', 10)`)
   await mem.execute(`INSERT INTO house_type_template_items
     (id, room_id, item_id, recognized_contract_qty, contract_qty, provisional_qty, field_formula, field_qty, sort_order) VALUES
@@ -69,6 +70,7 @@ beforeEach(async () => {
     ('s-putty-2', 'p1', 'putty-2', '二遍腻子', '油工', 'unit', 11),
     ('s-wall', 'p1', 'wall', '墙砖铺贴', '泥水工', 'unit', 20),
     ('s-floor', 'p1', 'floor', '地砖铺贴', '泥水工', 'unit', 21),
+    ('s-ceiling', 'p1', 'ceiling', '吊顶施工', '泥水工', 'unit', 22),
     ('s-manual', 'p1', 'manual', '人工进度', '其他', 'manual', 30),
     ('s-other', 'p2', 'other', '外项目阶段', '泥水工', 'unit', 10)`)
   await mem.execute(`INSERT INTO construction_stage_items (id, stage_id, item_id) VALUES
@@ -76,6 +78,7 @@ beforeEach(async () => {
     ('map-putty-2', 's-putty-2', 'i-putty'),
     ('map-wall', 's-wall', 'i-wall'),
     ('map-floor', 's-floor', 'i-floor'),
+    ('map-ceiling', 's-ceiling', 'i-ceiling'),
     ('map-other', 's-other', 'i-other')`)
   await mem.execute(`INSERT INTO crews (id, name, trade) VALUES
     ('crew-paint', '油工一班', '油工'),
@@ -161,6 +164,25 @@ describe('quantity stage completion：单户×单阶段唯一写路径', () => {
     expect(workspace.stages.find(stage => stage.id === 's-putty-2')?.warnings).toEqual([
       expect.objectContaining({ code: 'prior-photo-missing', stageId: 's-putty-1' }),
     ])
+  })
+
+  it('模板没有可见量明细的阶段不进入单户登记且不可写入', async () => {
+    const workspace = await loadQuantityCompletionWorkspace(mem, 'p1', 'u1')
+    expect(workspace.stages.some(stage => stage.id === 's-ceiling')).toBe(false)
+
+    await expect(persistQuantityStageCompletion(mem, {
+      projectId: 'p1',
+      unitId: 'u1',
+      stageId: 's-ceiling',
+      status: 'completed',
+      completedAt: '2026-07-20',
+      note: '不应写入',
+      expectedCompletionId: null,
+      expectedCompletionFingerprint: null,
+      expectedAssignmentId: 'a-masonry',
+      photos: [photo('吊顶.jpg')],
+      allowArchivedEdit: false,
+    })).rejects.toThrow('不属于当前项目或不支持按户完成')
   })
 
   it('有照片时原子写完成事实、附件正文和逐记录日志，并刷新矩阵', async () => {
@@ -273,6 +295,40 @@ describe('quantity stage completion：单户×单阶段唯一写路径', () => {
     ])
   })
 
+  it('责任替换后修正已完成事实仍冻结完成时责任', async () => {
+    const result = await persistQuantityStageCompletion(mem, await draftFor('s-wall'))
+    await softDelete(mem, 'unit_assignments', 'a-masonry')
+    await mem.execute(`INSERT INTO crews (id, name, trade) VALUES ('crew-masonry-new', '泥水二班', '泥水工')`)
+    await mem.execute(`INSERT INTO unit_assignments
+      (id, unit_id, trade, crew_id, note) VALUES
+      ('a-masonry-new', 'u1', '泥水工', 'crew-masonry-new', '现责任')`)
+
+    const workspace = await loadQuantityCompletionWorkspace(mem, 'p1', 'u1')
+    const stage = workspace.stages.find(candidate => candidate.id === 's-wall')!
+    await persistQuantityStageCompletion(mem, {
+      projectId: 'p1',
+      unitId: 'u1',
+      stageId: 's-wall',
+      status: 'completed',
+      completedAt: '2026-07-21',
+      note: '只修正日期和备注',
+      expectedCompletionId: stage.completion?.id ?? null,
+      expectedCompletionFingerprint: stage.completion?.fingerprint ?? null,
+      expectedAssignmentId: stage.currentAssignment?.id ?? null,
+      photos: [],
+      allowArchivedEdit: false,
+    })
+
+    expect(await mem.select(
+      `SELECT assignment_id, completed_at, note FROM unit_stage_completions WHERE id = ?`,
+      [result.completionId],
+    )).toEqual([{
+      assignment_id: 'a-masonry',
+      completed_at: '2026-07-21',
+      note: '只修正日期和备注',
+    }])
+  })
+
   it('照片正文按可见 file_ref 惰性读取为 data URL，软删照片拒绝提供正文', async () => {
     const result = await persistQuantityStageCompletion(mem, await draftFor('s-wall'))
     const photoId = result.photoIds[0]!
@@ -300,6 +356,15 @@ describe('quantity stage completion：单户×单阶段唯一写路径', () => {
       completion: null,
       photos: [],
     })
+    await expect(loadQuantityPhotoDataUrl(mem, result.photoIds[0]!)).rejects.toThrow('不存在或已删除')
+  })
+
+  it('完成事实的业务祖先隐藏后照片正文不可读取', async () => {
+    const result = await persistQuantityStageCompletion(mem, await draftFor('s-wall'))
+
+    await softDelete(mem, 'units', 'u1')
+
+    await expect(loadQuantityPhotoDataUrl(mem, result.photoIds[0]!)).rejects.toThrow('不存在或已删除')
   })
 
   it('expected completion/assignment 防并发覆盖，归档修改必须显式授权且跨项目阶段拒绝', async () => {

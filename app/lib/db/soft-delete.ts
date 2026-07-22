@@ -151,8 +151,17 @@ function cteTables(table: string): string[] {
  * 无祖先依赖时返回空串。用法:
  *   `${hiddenCtes(t)} SELECT * FROM t WHERE ${visibleCond(t)}`
  */
-export function hiddenCtes(table: string): string {
-  const tables = cteTables(table)
+export function hiddenCtesFor(...roots: string[]): string {
+  const tables: string[] = []
+  const seen = new Set<string>()
+  for (const root of roots) {
+    for (const table of cteTables(root)) {
+      if (seen.has(table))
+        continue
+      seen.add(table)
+      tables.push(table)
+    }
+  }
   if (!tables.length)
     return ''
   // DFS 后序保证父表 CTE 先定义;跨表成环不支持(自引用除外),成环时 SQL prepare 期报 no such table
@@ -164,6 +173,10 @@ export function hiddenCtes(table: string): string {
     return `hidden_${t}(id) AS (\n  ${arms.join('\n  UNION\n  ')}\n)`
   })
   return `WITH RECURSIVE ${defs.join(',\n')}`
+}
+
+export function hiddenCtes(table: string): string {
+  return hiddenCtesFor(table)
 }
 
 /**

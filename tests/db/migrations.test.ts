@@ -789,6 +789,38 @@ describe('v12 工程量底座：升级与约束行为', () => {
   })
 })
 
+describe('v13 工程量报量阶段映射：单一计量入口', () => {
+  it('升级时为每个分项选择最终阶段，并禁止多个活跃报量阶段', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= QUANTITY_MIGRATION_VERSION))
+    await db.execute(`INSERT INTO projects (id, name) VALUES ('project-reporting', '报量项目')`)
+    await db.execute(`INSERT INTO items
+      (id, project_id, code, name, trade) VALUES
+      ('item-reporting', 'project-reporting', 'ITEM-R', '防水', '防水工')`)
+    await db.execute(`INSERT INTO construction_stages
+      (id, project_id, code, name, trade, sort_order) VALUES
+      ('stage-reporting-1', 'project-reporting', 'WP-01', '防水一遍', '防水工', 10),
+      ('stage-reporting-2', 'project-reporting', 'WP-02', '防水二遍', '防水工', 20)`)
+    await db.execute(`INSERT INTO construction_stage_items
+      (id, stage_id, item_id) VALUES
+      ('mapping-reporting-1', 'stage-reporting-1', 'item-reporting'),
+      ('mapping-reporting-2', 'stage-reporting-2', 'item-reporting')`)
+
+    const result = await runMigrations(db)
+
+    expect(result.to).toBe(13)
+    expect(await columnNames(db, 'construction_stage_items')).toContain('is_reporting_stage')
+    expect(await db.select(`SELECT id, is_reporting_stage
+      FROM construction_stage_items ORDER BY id`)).toEqual([
+      { id: 'mapping-reporting-1', is_reporting_stage: 0 },
+      { id: 'mapping-reporting-2', is_reporting_stage: 1 },
+    ])
+    await expect(db.execute(`UPDATE construction_stage_items
+      SET is_reporting_stage = 1 WHERE id = 'mapping-reporting-1'`)).rejects.toThrow(/UNIQUE constraint failed/i)
+    db.close()
+  })
+})
+
 describe('vitest 基建：sql.js 内存库可跑业务断言', () => {
   it('示例：全量 schema 上插入并查回一条项目记录', async () => {
     const db = await createMemoryDb()

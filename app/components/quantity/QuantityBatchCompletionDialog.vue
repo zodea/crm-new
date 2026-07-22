@@ -9,6 +9,7 @@ import { db } from '~/lib/db/client'
 import { loadQuantityBatchCompletionPlan } from '~/lib/quantity/batch-completion'
 import { ALL_QUANTITY_FILTER } from '~/lib/quantity/matrix'
 import { toErrorMessage } from '~/lib/util/error'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -76,10 +77,6 @@ const dirty = computed(() => (
   open.value && (selectedUnitIds.value.length > 0 || planItems.value != null) && result.value == null
 ))
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 async function initialize(sequence: number, projectId: string) {
   try {
     await store.loadAssignments(projectId)
@@ -110,7 +107,7 @@ function requestInitialize(isOpen: boolean, projectId: string) {
   excludedKeys.value = []
   result.value = null
   note.value = ''
-  completedAt.value = today()
+  completedAt.value = toLocalDateInputValue()
   if (!isOpen || !projectId) {
     initializing.value = false
     return

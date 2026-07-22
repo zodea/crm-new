@@ -569,6 +569,44 @@ export const migrations: Migration[] = [
       await db.execute(V12_PROTECT_WHOLE_UNIT_ROOM)
     },
   },
+  {
+    version: 13,
+    name: 'quantity-reporting-stage-mapping',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'construction_stage_items',
+        'is_reporting_stage',
+        'INTEGER NOT NULL DEFAULT 0 CHECK (is_reporting_stage IN (0, 1))',
+      )
+      // 存量库没有显式映射：一次性选择排序最末的活跃阶段作为兼容默认，之后由字段明确维护。
+      await db.execute('UPDATE construction_stage_items SET is_reporting_stage = 0')
+      await db.execute(`
+        UPDATE construction_stage_items AS target
+        SET is_reporting_stage = 1
+        WHERE target.deleted_at IS NULL
+          AND target.id = (
+            SELECT candidate.id
+            FROM construction_stage_items candidate
+            JOIN construction_stages stage ON stage.id = candidate.stage_id
+            JOIN items item ON item.id = candidate.item_id
+            JOIN projects project ON project.id = item.project_id
+            WHERE candidate.item_id = target.item_id
+              AND candidate.deleted_at IS NULL
+              AND stage.deleted_at IS NULL
+              AND item.deleted_at IS NULL
+              AND project.deleted_at IS NULL
+            ORDER BY stage.sort_order DESC, stage.code DESC, candidate.id DESC
+            LIMIT 1
+          )
+      `)
+      await db.execute(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_stage_item_reporting
+        ON construction_stage_items(item_id)
+        WHERE deleted_at IS NULL AND is_reporting_stage = 1
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

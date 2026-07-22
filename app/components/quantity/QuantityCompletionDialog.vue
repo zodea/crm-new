@@ -9,6 +9,7 @@ import { useBase64, useEventListener, useFileDialog } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import { toErrorMessage } from '~/lib/util/error'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -59,10 +60,6 @@ const selectedStage = computed(() => (
   workspace.value?.stages.find(stage => stage.id === selectedStageId.value) ?? null
 ))
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function draftSignature(): string {
   return JSON.stringify({
     stageId: selectedStageId.value,
@@ -77,7 +74,7 @@ const dirty = computed(() => baseline.value !== '' && draftSignature() !== basel
 
 function hydrateStage(stage: QuantityCompletionStageView | null) {
   status.value = stage?.completion?.status ?? 'completed'
-  completedAt.value = stage?.completion?.completedAt?.slice(0, 10) ?? today()
+  completedAt.value = stage?.completion?.completedAt?.slice(0, 10) ?? toLocalDateInputValue()
   note.value = stage?.completion?.note ?? ''
   newPhotos.value = []
   baseline.value = draftSignature()

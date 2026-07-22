@@ -1,6 +1,8 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
+import { softDelete } from '~/lib/db/soft-delete'
+import { loadQuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
 import {
   importQuantityAssignmentRow,
   importQuantityCompletionRow,
@@ -125,7 +127,77 @@ describe('quantity import：三类目标逐行复用唯一写路径', () => {
     )).toEqual([{ n: 1 }])
   })
 
+  it('重复导入同一名个人责任时保留既有房间分项范围', async () => {
+    await mem.execute(`INSERT INTO workers (id, crew_id, name, trade) VALUES
+      ('worker-a', 'crew-a', '张师傅', '泥水工')`)
+    await mem.execute(`INSERT INTO house_type_template_items
+      (id, room_id, item_id, contract_qty) VALUES
+      ('line-wall', 't1:whole_unit', 'i-wall', 20)`)
+    await mem.execute(`INSERT INTO unit_assignments
+      (id, unit_id, trade, worker_id, note) VALUES
+      ('assignment-worker', 'u1', '泥水工', 'worker-a', '保留范围')`)
+    await mem.execute(`INSERT INTO unit_assignment_scopes
+      (id, assignment_id, room_id, item_id) VALUES
+      ('scope-wall', 'assignment-worker', 't1:whole_unit', 'i-wall')`)
+
+    await importQuantityAssignmentRow(mem, {
+      projectCode: 'P1',
+      buildingCode: '1',
+      floorCode: '1',
+      unitCode: '01',
+      trade: '泥水工',
+      workerName: '张师傅',
+    })
+
+    const workspace = await loadQuantityAssignmentWorkspace(mem, 'p1')
+    expect(workspace.assignments).toEqual([
+      expect.objectContaining({
+        id: 'assignment-worker',
+        assigneeId: 'worker-a',
+        scopes: [expect.objectContaining({ roomId: 't1:whole_unit', itemId: 'i-wall' })],
+      }),
+    ])
+  })
+
+  it('既有个人范围失效时必须显式替换，确认后清理失效范围', async () => {
+    await mem.execute(`INSERT INTO workers (id, crew_id, name, trade) VALUES
+      ('worker-invalid', 'crew-a', '李师傅', '泥水工')`)
+    await mem.execute(`INSERT INTO house_type_template_items
+      (id, room_id, item_id, contract_qty) VALUES
+      ('line-invalid', 't1:whole_unit', 'i-wall', 20)`)
+    await mem.execute(`INSERT INTO unit_assignments
+      (id, unit_id, trade, worker_id) VALUES
+      ('assignment-invalid', 'u1', '泥水工', 'worker-invalid')`)
+    await mem.execute(`INSERT INTO unit_assignment_scopes
+      (id, assignment_id, room_id, item_id) VALUES
+      ('scope-invalid', 'assignment-invalid', 't1:whole_unit', 'i-wall')`)
+    await softDelete(mem, 'house_type_template_items', 'line-invalid')
+
+    const row = {
+      projectCode: 'P1',
+      buildingCode: '1',
+      floorCode: '1',
+      unitCode: '01',
+      trade: '泥水工',
+      workerName: '李师傅',
+    }
+    await expect(importQuantityAssignmentRow(mem, row)).rejects.toThrow('既有责任范围已失效')
+
+    await importQuantityAssignmentRow(mem, { ...row, replaceExisting: '是' })
+    const workspace = await loadQuantityAssignmentWorkspace(mem, 'p1')
+    expect(workspace.assignments).toEqual([
+      expect.objectContaining({
+        assigneeId: 'worker-invalid',
+        scopes: [],
+        hasInvalidScopes: false,
+      }),
+    ])
+  })
+
   it('阶段完成导入走历史迁移通道：无照片仍可 completed 并写执行责任审计', async () => {
+    await mem.execute(`INSERT INTO house_type_template_items
+      (id, room_id, item_id, contract_qty) VALUES
+      ('line-wall-completion', 't1:whole_unit', 'i-wall', 20)`)
     await importQuantityAssignmentRow(mem, {
       projectCode: 'P1',
       buildingCode: '1',
