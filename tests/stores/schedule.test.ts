@@ -64,7 +64,8 @@ describe('schedule store：排程唯一 action 写路径', () => {
     const automaticTask = store.snapshot!.groups[0]!.tasks.find(task => task.hasQty)!
 
     const dependencyLog = await store.updateDependency(automaticTask.id, manualTask.id, 3, '2026-07-01')
-    expect(dependencyLog).toBeTruthy()
+    expect(dependencyLog.logId).toBeTruthy()
+    expect(dependencyLog.conflicts).not.toHaveLength(0)
     const [dependency] = await mem.select<{ dependency_type: string, lag_days: number }>(
       `SELECT dependency_type, lag_days FROM task_dependencies WHERE succ_id = ? AND deleted_at IS NULL`,
       [automaticTask.id],

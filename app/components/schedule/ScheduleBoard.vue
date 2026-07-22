@@ -10,6 +10,7 @@ type BoardRow
 const props = defineProps<{
   snapshot: ScheduleProjectView
   today: string
+  highlightedGroupId?: string
 }>()
 
 const emit = defineEmits<{
@@ -83,6 +84,28 @@ const monthTicks = computed(() => {
   return ticks
 })
 
+const dependencyPaths = computed(() => {
+  const taskById = new Map(props.snapshot.groups.flatMap(group => group.tasks).map(task => [task.id, task]))
+  const rowIndexById = new Map(rows.value.map((row, index) => [row.id, index]))
+  return props.snapshot.dependencies.flatMap((dependency) => {
+    const predecessor = taskById.get(dependency.predId)
+    const successor = taskById.get(dependency.succId)
+    const predecessorIndex = rowIndexById.get(dependency.predId)
+    const successorIndex = rowIndexById.get(dependency.succId)
+    if (!predecessor || !successor || predecessorIndex == null || successorIndex == null)
+      return []
+    const fromX = position(predecessor.plannedFinish)
+    const toX = position(successor.plannedStart)
+    const elbowX = Math.max(fromX + 1.2, (fromX + toX) / 2)
+    const fromY = predecessorIndex * 36 + 18
+    const toY = successorIndex * 36 + 18
+    return [{
+      id: dependency.id,
+      d: `M ${fromX} ${fromY} H ${elbowX} V ${toY} H ${toX}`,
+    }]
+  })
+})
+
 function position(value: string): number {
   return Math.max(0, Math.min(100, calendarDays(axisStart.value, value) / axisDays.value * 100))
 }
@@ -146,7 +169,7 @@ function dependencyLabel(taskId: string): string {
     <div data-testid="schedule-scroll" class="schedule-scroll" tabindex="0" aria-label="施工进度排程表，可横向滚动">
       <div class="schedule-grid">
         <div class="wbs-cell wbs-head">
-          <span>WBS / 工序</span><span>工期</span><span>计划</span><span>实际</span><span>状态</span>
+          <span>WBS / 工序</span><span>工期</span><span>计划开始</span><span>计划完成</span><span>实际</span><span>偏差</span>
         </div>
         <div class="timeline-cell timeline-head">
           <span
@@ -158,8 +181,34 @@ function dependencyLabel(taskId: string): string {
           <span class="today-line" :style="{ left: `${position(today)}%` }" />
         </div>
 
+        <svg
+          v-if="dependencyPaths.length"
+          class="dependency-overlay"
+          :viewBox="`0 0 100 ${rows.length * 36}`"
+          :style="{ height: `${rows.length * 36}px` }"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <marker id="schedule-dependency-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+              <path d="M0,0 L5,2.5 L0,5 Z" fill="var(--ink-faint)" />
+            </marker>
+          </defs>
+          <path
+            v-for="dependency in dependencyPaths"
+            :key="dependency.id"
+            :d="dependency.d"
+            class="dependency-path"
+            marker-end="url(#schedule-dependency-arrow)"
+          />
+        </svg>
+
         <template v-for="row in rows" :key="row.id">
-          <div class="wbs-cell schedule-row" :data-kind="row.kind">
+          <div
+            class="wbs-cell schedule-row"
+            :data-kind="row.kind"
+            :data-highlighted="row.kind === 'group' && row.id === highlightedGroupId ? 'true' : undefined"
+          >
             <div class="min-w-0 flex items-center gap-1.5" :class="row.kind === 'task' && 'pl-8'">
               <button
                 v-if="row.kind === 'group'"
@@ -192,7 +241,8 @@ function dependencyLabel(taskId: string): string {
               </button>
             </div>
             <span>{{ row.start && row.finish ? calendarDays(row.start, row.finish) + 1 : '—' }}天</span>
-            <span>{{ percent(row.planned) }}</span>
+            <span>{{ row.start ?? '—' }}</span>
+            <span>{{ row.finish ?? '—' }}</span>
             <span>{{ percent(row.actual) }}</span>
             <span :class="row.deviation < 0 ? 'text-danger' : row.deviation > 0 ? 'text-ok' : 'text-ink-soft'">
               {{ deviationLabel(row.deviation) }}
@@ -233,21 +283,25 @@ function dependencyLabel(taskId: string): string {
 .schedule-board { container-type: inline-size; }
 .schedule-scroll { max-width: 100%; overflow-x: auto; outline: none; }
 .schedule-scroll:focus-visible { box-shadow: inset 0 0 0 2px var(--brand-ring); }
-.schedule-grid { display: grid; grid-template-columns: 480px minmax(600px, 1fr); min-width: 1080px; }
-.wbs-cell { display: grid; grid-template-columns: minmax(190px, 2fr) 48px 52px 52px 76px; align-items: center; gap: 6px; border-right: 1px solid var(--line); padding-inline: 10px; }
+.schedule-grid { position: relative; display: grid; grid-template-columns: 590px minmax(600px, 1fr); min-width: 1190px; }
+.wbs-cell { display: grid; grid-template-columns: minmax(190px, 2fr) 46px 78px 78px 48px 72px; align-items: center; gap: 6px; border-right: 1px solid var(--line); padding-inline: 10px; }
+.wbs-cell > span:not(:first-child), .month-tick, .dependency-label { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .timeline-cell { position: relative; min-width: 0; overflow: hidden; }
 .wbs-head, .timeline-head { position: sticky; top: 0; z-index: 4; height: 34px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); font-size: 10px; font-weight: 700; }
 .schedule-row { height: 36px; border-bottom: 1px solid var(--line); font-size: 11px; }
 .schedule-row[data-kind='project'] { background: color-mix(in srgb, var(--brand-soft) 45%, var(--panel)); font-weight: 800; }
 .schedule-row[data-kind='group'] { background: var(--surface-2); font-weight: 700; }
+.schedule-row[data-highlighted='true'] { background: var(--brand-soft); box-shadow: inset 3px 0 0 var(--brand); }
 .month-tick { position: absolute; top: 9px; transform: translateX(4px); white-space: nowrap; }
 .grid-line, .today-line { position: absolute; inset-block: 0; width: 1px; background: var(--line); pointer-events: none; }
 .today-line { z-index: 3; width: 2px; background: var(--danger); opacity: .65; }
-.plan-bar { position: absolute; top: 9px; height: 18px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, black); border-radius: 4px; background: color-mix(in srgb, var(--bar-color) 18%, var(--panel)); cursor: pointer; }
+.plan-bar { position: absolute; top: 9px; height: 18px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, var(--ink)); border-radius: 4px; background: color-mix(in srgb, var(--bar-color) 18%, var(--panel)); cursor: pointer; }
 .plan-bar.is-rollup { top: 11px; height: 14px; border-radius: 2px; cursor: default; }
 .actual-fill { position: absolute; inset-block: 0; left: 0; max-width: 100%; background: var(--bar-color); opacity: .82; }
 .baseline-mark { position: absolute; inset: 2px; border: 1px dashed var(--ink); opacity: .55; }
 .dependency-label { position: absolute; right: 5px; top: 10px; max-width: 44%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-faint); font-size: 9px; }
+.dependency-overlay { position: absolute; z-index: 3; top: 34px; left: 590px; width: calc(100% - 590px); overflow: visible; pointer-events: none; }
+.dependency-path { fill: none; stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
 .view-button { border-radius: calc(var(--radius-btn) - 2px); padding: 4px 10px; color: var(--ink-soft); font-size: 11px; }
 .view-button.is-active { background: var(--panel); color: var(--brand-deep); box-shadow: var(--shadow-card); font-weight: 700; }
 
@@ -256,9 +310,11 @@ function dependencyLabel(taskId: string): string {
 }
 
 @container (max-width: 52rem) {
-  .schedule-board[data-view='wbs'] .schedule-grid { grid-template-columns: minmax(430px, 1fr); min-width: 430px; }
+  .schedule-board[data-view='wbs'] .schedule-grid { grid-template-columns: minmax(560px, 1fr); min-width: 560px; }
   .schedule-board[data-view='wbs'] .timeline-cell { display: none; }
+  .schedule-board[data-view='wbs'] .dependency-overlay { display: none; }
   .schedule-board[data-view='gantt'] .schedule-grid { grid-template-columns: minmax(660px, 1fr); min-width: 660px; }
   .schedule-board[data-view='gantt'] .wbs-cell { display: none; }
+  .schedule-board[data-view='gantt'] .dependency-overlay { left: 0; width: 100%; }
 }
 </style>

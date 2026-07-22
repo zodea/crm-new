@@ -45,8 +45,12 @@ const scheduleContext = computed(() => route.query.from === 'schedule'
       stageId: String(route.query.stage ?? ''),
       itemId: String(route.query.item ?? ''),
       buildingId: String(route.query.building ?? ''),
+      buildingIds: String(route.query.buildings ?? '').split(',').filter(Boolean),
       groupName: String(route.query.groupName ?? '楼栋分组'),
       taskName: String(route.query.taskName ?? '排程工序'),
+      itemName: String(route.query.itemName ?? ''),
+      planStart: String(route.query.planStart ?? ''),
+      planFinish: String(route.query.planFinish ?? ''),
     }
   : null)
 
@@ -80,10 +84,12 @@ const matrix = computed(() => {
   }
   return buildQuantityMatrix(snapshot.value, {
     buildingId: buildingId.value,
+    buildingIds: scheduleContext.value?.buildingIds,
     month: month.value,
     viewMode: viewMode.value,
     trade: trade.value,
     assigneeKey: assigneeKey.value,
+    stageId: scheduleContext.value?.stageId || undefined,
   })
 })
 
@@ -95,7 +101,10 @@ function normalizeFilters(next: QuantityProjectSnapshot, reset = false, restoreS
     buildingId.value = next.buildings[0]?.id ?? ''
 
   const months = quantityMonthOptions(next)
-  if (reset || !months.some(option => option.key === month.value))
+  const requestedMonth = restoreScheduleContext ? scheduleContext.value?.planStart.slice(0, 7) : ''
+  if (requestedMonth && months.some(option => option.key === requestedMonth))
+    month.value = requestedMonth
+  else if (reset || !months.some(option => option.key === month.value))
     month.value = ALL_QUANTITY_FILTER
 
   const trades = quantityTradeOptions(next)
@@ -280,6 +289,7 @@ onMounted(initialize)
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
       :matrix-archived-at="snapshot?.matrixArchivedAt ?? null"
+      :schedule-scope-label="scheduleContext?.groupName ?? ''"
       @batch-complete="batchCompletionDialogOpen = true"
       @import-data="importData"
       @export-ledger="exportLedger"
@@ -299,7 +309,9 @@ onMounted(initialize)
           来自施工排程 · {{ scheduleContext.groupName }}
         </div>
         <div class="truncate text-11px text-ink-soft">
-          正在核对「{{ scheduleContext.taskName }}」的工程量完成事实{{ scheduleContext.itemId ? ` · 分项 ${scheduleContext.itemId}` : '' }}
+          正在核对「{{ scheduleContext.taskName }}」的工程量完成事实
+          <span v-if="scheduleContext.itemName" class="ml-1 rounded bg-panel px-1.5 py-0.5 font-700 text-brand-deep">映射分项：{{ scheduleContext.itemName }}</span>
+          <span v-if="scheduleContext.planStart" class="ml-1 font-mono">计划 {{ scheduleContext.planStart }} — {{ scheduleContext.planFinish }}</span>
         </div>
       </div>
       <NuxtLink :to="scheduleReturnTo" class="btn-primary">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleOverlapMode } from '~/lib/schedule/planning'
-import { planTemplateTasks } from '~/lib/schedule/planning'
+import { calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
 import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -40,6 +40,17 @@ const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMod
 const planByKey = computed(() => new Map(plannedRows.value.map(row => [row.key, row])))
 const enabledCount = computed(() => tasks.value.filter(task => task.enabled).length)
 const finishDate = computed(() => plannedRows.value.map(row => row.plannedFinish).sort().at(-1) ?? '—')
+
+function predecessorLabel(templateKey: string): string {
+  const index = plannedRows.value.findIndex(row => row.key === templateKey)
+  if (index <= 0)
+    return '—'
+  const predecessor = plannedRows.value[index - 1]!
+  const successor = plannedRows.value[index]!
+  const predecessorName = templateByKey.get(predecessor.key)?.name ?? '前置工序'
+  const lag = calendarDays(predecessor.plannedFinish, successor.plannedStart)
+  return `${predecessorName} · FS${lag ? `${lag > 0 ? '+' : ''}${lag}天` : ''}`
+}
 
 async function loadBuildings(reset = true) {
   await store.loadBuildings(projectId.value)
@@ -209,7 +220,7 @@ onMounted(async () => {
         <div class="process-scroll overflow-x-auto">
           <div class="process-table min-w-760px">
             <div class="process-row process-head">
-              <span>启用</span><span>工序</span><span>工种</span><span>工期(天)</span><span>锚点开始</span><span>计划日期</span>
+              <span>启用</span><span>工序</span><span>工种</span><span>工期(天)</span><span>锚点开始</span><span>FS 前置</span><span>计划日期</span>
             </div>
             <div v-for="task in tasks" :key="task.templateKey" class="process-row">
               <input v-model="task.enabled" type="checkbox" class="accent-[var(--brand)]" :aria-label="`启用${templateByKey.get(task.templateKey)?.name}`">
@@ -217,6 +228,9 @@ onMounted(async () => {
               <span>{{ templateByKey.get(task.templateKey)?.trade }}</span>
               <input v-model.number="task.durationDays" type="number" min="1" max="365" class="field-input w-20" :disabled="!task.enabled">
               <input v-model="task.anchorStart" type="date" class="field-input w-34" :disabled="!task.enabled">
+              <span class="truncate" :title="predecessorLabel(task.templateKey)">
+                {{ task.enabled ? predecessorLabel(task.templateKey) : '—' }}
+              </span>
               <span>{{ planByKey.get(task.templateKey)?.plannedStart ?? '—' }}<br><small>{{ planByKey.get(task.templateKey)?.plannedFinish ?? '—' }}</small></span>
             </div>
           </div>
@@ -229,7 +243,8 @@ onMounted(async () => {
 <style scoped>
 .schedule-new { container-type: inline-size; overflow: hidden; }
 .new-layout { display: grid; grid-template-columns: minmax(240px, 26%) minmax(0, 1fr); }
-.process-row { display: grid; grid-template-columns: 42px minmax(220px, 1.4fr) 82px 90px 150px 126px; align-items: center; min-height: 42px; gap: 8px; border-bottom: 1px solid var(--line); padding: 6px 12px; color: var(--ink-soft); font-size: 11px; }
+.process-row { display: grid; grid-template-columns: 42px minmax(210px, 1.4fr) 76px 86px 142px minmax(150px, 1fr) 126px; align-items: center; min-height: 42px; gap: 8px; border-bottom: 1px solid var(--line); padding: 6px 12px; color: var(--ink-soft); font-size: 11px; }
+.process-row > :nth-child(n+4) { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .process-head { min-height: 34px; background: var(--surface-2); color: var(--ink-faint); font-size: 10px; font-weight: 700; }
 @container (max-width: 48rem) { .new-layout { grid-template-columns: minmax(0, 1fr); } }
 </style>
