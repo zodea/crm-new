@@ -46,5 +46,47 @@
     "stage_id": "qty_stage_ceiling",
     "item_id": "qty_item_ceiling",
     "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_leveling",
+    "stage_id": "qty_stage_leveling",
+    "item_id": "qty_item_leveling",
+    "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_gypsum_line",
+    "stage_id": "qty_stage_gypsum_line",
+    "item_id": "qty_item_gypsum_line",
+    "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_putty_1",
+    "stage_id": "qty_stage_putty_1",
+    "item_id": "qty_item_putty",
+    "is_reporting_stage": 0
+  },
+  {
+    "id": "qty_csi_putty_2",
+    "stage_id": "qty_stage_putty_2",
+    "item_id": "qty_item_putty",
+    "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_wood_floor",
+    "stage_id": "qty_stage_wood_floor",
+    "item_id": "qty_item_wood_floor",
+    "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_latex_paint",
+    "stage_id": "qty_stage_latex_paint",
+    "item_id": "qty_item_latex_paint",
+    "is_reporting_stage": 1
+  },
+  {
+    "id": "qty_csi_aluminum_ceiling",
+    "stage_id": "qty_stage_aluminum_ceiling",
+    "item_id": "qty_item_aluminum_ceiling",
+    "is_reporting_stage": 1
   }
 ]

@@ -46,5 +46,61 @@
     "name": "吊顶封板",
     "trade": "木工",
     "sort_order": 40
+  },
+  {
+    "id": "qty_stage_leveling",
+    "project_id": "proj_demo_001",
+    "code": "LEVELING",
+    "name": "水泥沙找平",
+    "trade": "泥水工",
+    "sort_order": 50
+  },
+  {
+    "id": "qty_stage_gypsum_line",
+    "project_id": "proj_demo_001",
+    "code": "GYPSUM-LINE",
+    "name": "石膏线安装",
+    "trade": "油漆工",
+    "sort_order": 60
+  },
+  {
+    "id": "qty_stage_putty_1",
+    "project_id": "proj_demo_001",
+    "code": "PUTTY-01",
+    "name": "一遍腻子",
+    "trade": "油漆工",
+    "sort_order": 70
+  },
+  {
+    "id": "qty_stage_putty_2",
+    "project_id": "proj_demo_001",
+    "code": "PUTTY-02",
+    "name": "二遍腻子",
+    "trade": "油漆工",
+    "sort_order": 71
+  },
+  {
+    "id": "qty_stage_wood_floor",
+    "project_id": "proj_demo_001",
+    "code": "WOOD-FLOOR",
+    "name": "木地板安装",
+    "trade": "木工",
+    "sort_order": 80
+  },
+  {
+    "id": "qty_stage_latex_paint",
+    "project_id": "proj_demo_001",
+    "code": "LATEX-PAINT",
+    "name": "乳胶漆",
+    "trade": "油漆工",
+    "sort_order": 90
+  },
+  {
+    "id": "qty_stage_aluminum_ceiling",
+    "project_id": "proj_demo_001",
+    "code": "ALUMINUM-CEILING",
+    "name": "铝扣板安装",
+    "trade": "干挂工",
+    "sort_order": 100
   }
 ]

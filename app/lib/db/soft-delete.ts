@@ -62,6 +62,25 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'unit_id', table: 'units' },
     { column: 'stage_id', table: 'construction_stages' },
   ],
+  schedule_groups: [{ column: 'project_id', table: 'projects' }],
+  schedule_group_buildings: [
+    { column: 'group_id', table: 'schedule_groups' },
+    { column: 'building_id', table: 'buildings' },
+  ],
+  schedule_tasks: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'group_id', table: 'schedule_groups' },
+    { column: 'parent_id', table: 'schedule_tasks' },
+    { column: 'stage_id', table: 'construction_stages' },
+  ],
+  task_dependencies: [
+    { column: 'pred_id', table: 'schedule_tasks' },
+    { column: 'succ_id', table: 'schedule_tasks' },
+  ],
+  task_item_map: [
+    { column: 'task_id', table: 'schedule_tasks' },
+    { column: 'item_id', table: 'items' },
+  ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [
     { column: 'project_id', table: 'projects' },
@@ -167,7 +186,12 @@ export function hiddenCtesFor(...roots: string[]): string {
   // DFS 后序保证父表 CTE 先定义;跨表成环不支持(自引用除外),成环时 SQL prepare 期报 no such table
   const defs = tables.map((t) => {
     const arms = [`SELECT id FROM "${t}" WHERE deleted_at IS NOT NULL`]
-    for (const ref of PARENT_REFS[t]!) {
+    // SQLite 要求递归项位于全部非递归项之后。schedule_tasks 同时拥有项目/分组/阶段
+    // 父级与 parent_id 自引用，不能沿用登记顺序直接拼接，否则会报 circular reference。
+    const refs = [...PARENT_REFS[t]!].sort((left, right) => (
+      Number(left.table === t) - Number(right.table === t)
+    ))
+    for (const ref of refs) {
       arms.push(`SELECT c.id FROM "${t}" c JOIN hidden_${ref.table} h ON c."${ref.column}" = h.id`)
     }
     return `hidden_${t}(id) AS (\n  ${arms.join('\n  UNION\n  ')}\n)`

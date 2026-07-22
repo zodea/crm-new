@@ -1,4 +1,5 @@
 import type { MigrationDb } from './migrations'
+import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { generateId } from '~/lib/util/id'
 
 type SeedRow = Record<string, unknown>
@@ -108,6 +109,166 @@ export async function seedQuantityDemo(db: MigrationDb) {
   }
 }
 
+const DEMO_SCHEDULE_PROJECT_ID = 'proj_demo_001'
+const DEMO_SCHEDULE_GROUP_ID = 'schedule_group_demo_001'
+
+const DEMO_SCHEDULE_WINDOWS = [
+  ['2026-05-06', '2026-06-04'],
+  ['2026-05-08', '2026-06-06'],
+  ['2026-05-12', '2026-06-10'],
+  ['2026-06-07', '2026-07-06'],
+  ['2026-06-11', '2026-06-28'],
+  ['2026-06-11', '2026-07-10'],
+  ['2026-07-07', '2026-07-24'],
+  ['2026-07-04', '2026-07-21'],
+  ['2026-06-13', '2026-08-01'],
+  ['2026-07-23', '2026-08-21'],
+  ['2026-06-21', '2026-07-10'],
+  ['2026-07-11', '2026-07-30'],
+  ['2026-07-31', '2026-08-17'],
+  ['2026-08-13', '2026-09-06'],
+  ['2026-07-31', '2026-08-29'],
+  ['2026-08-02', '2026-08-21'],
+  ['2026-08-18', '2026-09-06'],
+  ['2026-08-23', '2026-09-16'],
+  ['2026-09-27', '2026-10-06'],
+  ['2026-07-31', '2026-08-19'],
+  ['2026-09-17', '2026-10-06'],
+  ['2026-10-16', '2026-10-23'],
+] as const
+
+const DEMO_MANUAL_PROGRESS: Record<string, number> = {
+  'setting-out': 1,
+  'plumbing': 1,
+  'wiring': 0.8,
+  'air-conditioning': 1,
+}
+
+function calendarDayDifference(from: string, to: string): number {
+  const fromTime = Date.parse(`${from}T00:00:00Z`)
+  const toTime = Date.parse(`${to}T00:00:00Z`)
+  return Math.round((toTime - fromTime) / 86_400_000)
+}
+
+/**
+ * #114 演示排程是确定性 seed：只在完整的 #103 演示图存在时写入，不污染真实旧库。
+ * stage/item 均按稳定 code 解析，排程 seed 不复制工程量身份。
+ */
+export async function seedScheduleDemo(db: MigrationDb) {
+  const [project] = await db.select<{ id: string }>(
+    `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+    [DEMO_SCHEDULE_PROJECT_ID],
+  )
+  if (!project)
+    return
+
+  const [seeded] = await db.select<{ id: string }>(
+    `SELECT id FROM schedule_tasks WHERE id = 'schedule_task_demo_22'`,
+  )
+  if (seeded)
+    return
+
+  const buildings = await db.select<{ id: string }>(
+    `SELECT id FROM buildings
+     WHERE project_id = ? AND deleted_at IS NULL
+     ORDER BY sort_order, code, id`,
+    [DEMO_SCHEDULE_PROJECT_ID],
+  )
+  const stages = await db.select<{ id: string, code: string }>(
+    `SELECT id, code FROM construction_stages
+     WHERE project_id = ? AND deleted_at IS NULL`,
+    [DEMO_SCHEDULE_PROJECT_ID],
+  )
+  const items = await db.select<{ id: string, code: string }>(
+    `SELECT id, code FROM items
+     WHERE project_id = ? AND deleted_at IS NULL`,
+    [DEMO_SCHEDULE_PROJECT_ID],
+  )
+  const stageByCode = new Map(stages.map(stage => [stage.code, stage.id]))
+  const itemByCode = new Map(items.map(item => [item.code, item.id]))
+  const missingStage = SCHEDULE_TASK_TEMPLATES.find(
+    template => template.stageCode && !stageByCode.has(template.stageCode),
+  )
+  const missingItem = SCHEDULE_TASK_TEMPLATES
+    .flatMap(template => template.itemCodes)
+    .find(code => !itemByCode.has(code))
+  if (!buildings.length || missingStage || missingItem)
+    return
+
+  await db.execute('BEGIN')
+  try {
+    await db.execute(
+      `INSERT INTO schedule_groups (id, project_id, name, sort_order)
+       VALUES (?, ?, ?, 10) ON CONFLICT(id) DO NOTHING`,
+      [DEMO_SCHEDULE_GROUP_ID, DEMO_SCHEDULE_PROJECT_ID, '户内1栋-2栋'],
+    )
+    for (const [index, building] of buildings.entries()) {
+      await db.execute(
+        `INSERT INTO schedule_group_buildings (id, group_id, building_id, sort_order)
+         VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+        [`schedule_group_building_demo_${index + 1}`, DEMO_SCHEDULE_GROUP_ID, building.id, (index + 1) * 10],
+      )
+    }
+
+    for (const [index, template] of SCHEDULE_TASK_TEMPLATES.entries()) {
+      const id = `schedule_task_demo_${String(index + 1).padStart(2, '0')}`
+      const [plannedStart, plannedFinish] = DEMO_SCHEDULE_WINDOWS[index]!
+      const stageId = template.stageCode ? stageByCode.get(template.stageCode)! : null
+      await db.execute(
+        `INSERT INTO schedule_tasks
+          (id, project_id, group_id, name, trade, color, duration_days,
+           planned_start, planned_finish, has_qty, manual_progress, stage_id, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+        [
+          id,
+          DEMO_SCHEDULE_PROJECT_ID,
+          DEMO_SCHEDULE_GROUP_ID,
+          template.name,
+          template.trade,
+          template.color,
+          template.durationDays,
+          plannedStart,
+          plannedFinish,
+          stageId ? 1 : 0,
+          stageId ? null : (DEMO_MANUAL_PROGRESS[template.key] ?? 0),
+          stageId,
+          (index + 1) * 10,
+        ],
+      )
+
+      for (const [mapIndex, itemCode] of template.itemCodes.entries()) {
+        await db.execute(
+          `INSERT INTO task_item_map (id, task_id, item_id)
+           VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+          [`schedule_task_item_demo_${index + 1}_${mapIndex + 1}`, id, itemByCode.get(itemCode)!],
+        )
+      }
+
+      if (index > 0) {
+        const predId = `schedule_task_demo_${String(index).padStart(2, '0')}`
+        const previousFinish = DEMO_SCHEDULE_WINDOWS[index - 1]![1]
+        await db.execute(
+          `INSERT INTO task_dependencies
+            (id, pred_id, succ_id, dependency_type, lag_days)
+           VALUES (?, ?, ?, 'FS', ?) ON CONFLICT(id) DO NOTHING`,
+          [
+            `schedule_dependency_demo_${String(index).padStart(2, '0')}`,
+            predId,
+            id,
+            calendarDayDifference(previousFinish, plannedStart),
+          ],
+        )
+      }
+    }
+    await db.execute('COMMIT')
+  }
+  catch (error) {
+    await db.execute('ROLLBACK')
+    throw error
+  }
+}
+
 export async function seedIfEmpty(db: MigrationDb) {
   const jsonTables = [
     'projects',
@@ -159,6 +320,7 @@ export async function seedIfEmpty(db: MigrationDb) {
   }
 
   await seedQuantityDemo(db)
+  await seedScheduleDemo(db)
 }
 
 async function seedHardcoded(db: MigrationDb) {

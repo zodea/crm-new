@@ -58,5 +58,65 @@
     "trade": "木工",
     "unit": "㎡",
     "sort_order": 40
+  },
+  {
+    "id": "qty_item_leveling",
+    "project_id": "proj_demo_001",
+    "code": "DEC-LEVELING",
+    "name": "水泥砂浆找平",
+    "section": "装饰装修",
+    "trade": "泥水工",
+    "unit": "㎡",
+    "sort_order": 50
+  },
+  {
+    "id": "qty_item_gypsum_line",
+    "project_id": "proj_demo_001",
+    "code": "DEC-GYPSUM-LINE",
+    "name": "石膏线",
+    "section": "装饰装修",
+    "trade": "油漆工",
+    "unit": "m",
+    "sort_order": 60
+  },
+  {
+    "id": "qty_item_putty",
+    "project_id": "proj_demo_001",
+    "code": "DEC-PUTTY",
+    "name": "腻子",
+    "section": "装饰装修",
+    "trade": "油漆工",
+    "unit": "㎡",
+    "sort_order": 70
+  },
+  {
+    "id": "qty_item_wood_floor",
+    "project_id": "proj_demo_001",
+    "code": "DEC-WOOD-FLOOR",
+    "name": "木地板",
+    "section": "装饰装修",
+    "trade": "木工",
+    "unit": "㎡",
+    "sort_order": 80
+  },
+  {
+    "id": "qty_item_latex_paint",
+    "project_id": "proj_demo_001",
+    "code": "DEC-LATEX-PAINT",
+    "name": "乳胶漆",
+    "section": "装饰装修",
+    "trade": "油漆工",
+    "unit": "㎡",
+    "sort_order": 90
+  },
+  {
+    "id": "qty_item_aluminum_ceiling",
+    "project_id": "proj_demo_001",
+    "code": "DEC-ALUMINUM-CEILING",
+    "name": "铝扣板",
+    "section": "装饰装修",
+    "trade": "干挂工",
+    "unit": "㎡",
+    "sort_order": 100
   }
 ]

@@ -440,6 +440,123 @@ BEGIN
 END;
 `
 
+/** v14 施工进度排程底座(#114)：楼栋分组、WBS 工序、依赖与分项映射。 */
+const V14_SCHEDULE_FOUNDATION = `
+CREATE TABLE IF NOT EXISTS schedule_groups (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS schedule_group_buildings (
+  id          TEXT PRIMARY KEY,
+  group_id    TEXT NOT NULL REFERENCES schedule_groups(id),
+  building_id TEXT NOT NULL REFERENCES buildings(id),
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS schedule_tasks (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id),
+  group_id        TEXT REFERENCES schedule_groups(id),
+  parent_id       TEXT REFERENCES schedule_tasks(id),
+  name            TEXT NOT NULL,
+  trade           TEXT NOT NULL DEFAULT '',
+  color           TEXT NOT NULL DEFAULT '#64748b',
+  duration_days   INTEGER NOT NULL DEFAULT 1 CHECK (duration_days > 0),
+  planned_start   TEXT NOT NULL,
+  planned_finish  TEXT NOT NULL,
+  baseline_start  TEXT,
+  baseline_finish TEXT,
+  has_qty         INTEGER NOT NULL DEFAULT 0 CHECK (has_qty IN (0, 1)),
+  manual_progress REAL,
+  stage_id        TEXT REFERENCES construction_stages(id),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at      TEXT DEFAULT NULL,
+  CHECK (planned_finish >= planned_start),
+  CHECK (
+    (baseline_start IS NULL AND baseline_finish IS NULL)
+    OR (
+      baseline_start IS NOT NULL
+      AND baseline_finish IS NOT NULL
+      AND baseline_finish >= baseline_start
+    )
+  ),
+  CHECK (
+    (has_qty = 1 AND stage_id IS NOT NULL AND manual_progress IS NULL)
+    OR (
+      has_qty = 0
+      AND stage_id IS NULL
+      AND manual_progress IS NOT NULL
+      AND manual_progress >= 0
+      AND manual_progress <= 1
+    )
+  )
+);
+
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id              TEXT PRIMARY KEY,
+  pred_id         TEXT NOT NULL REFERENCES schedule_tasks(id),
+  succ_id         TEXT NOT NULL REFERENCES schedule_tasks(id),
+  dependency_type TEXT NOT NULL DEFAULT 'FS' CHECK (dependency_type IN ('FS', 'SS', 'FF', 'SF')),
+  lag_days        INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at      TEXT DEFAULT NULL,
+  CHECK (pred_id <> succ_id)
+);
+
+CREATE TABLE IF NOT EXISTS task_item_map (
+  id         TEXT PRIMARY KEY,
+  task_id    TEXT NOT NULL REFERENCES schedule_tasks(id),
+  item_id    TEXT NOT NULL REFERENCES items(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_groups_project ON schedule_groups(project_id);
+CREATE INDEX IF NOT EXISTS idx_sgb_group ON schedule_group_buildings(group_id);
+CREATE INDEX IF NOT EXISTS idx_sgb_building ON schedule_group_buildings(building_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_tasks_project ON schedule_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_tasks_group ON schedule_tasks(group_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_tasks_parent ON schedule_tasks(parent_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_tasks_stage ON schedule_tasks(stage_id);
+CREATE INDEX IF NOT EXISTS idx_task_deps_pred ON task_dependencies(pred_id);
+CREATE INDEX IF NOT EXISTS idx_task_deps_succ ON task_dependencies(succ_id);
+CREATE INDEX IF NOT EXISTS idx_task_item_map_task ON task_item_map(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_item_map_item ON task_item_map(item_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_group_name
+  ON schedule_groups(project_id, name) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_group_building
+  ON schedule_group_buildings(group_id, building_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_task_dependency
+  ON task_dependencies(pred_id, succ_id, dependency_type) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_task_item_map
+  ON task_item_map(task_id, item_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_schedule_groups_deleted
+  ON schedule_groups(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_schedule_group_buildings_deleted
+  ON schedule_group_buildings(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_schedule_tasks_deleted
+  ON schedule_tasks(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_deleted
+  ON task_dependencies(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_item_map_deleted
+  ON task_item_map(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -605,6 +722,13 @@ export const migrations: Migration[] = [
         ON construction_stage_items(item_id)
         WHERE deleted_at IS NULL AND is_reporting_stage = 1
       `)
+    },
+  },
+  {
+    version: 14,
+    name: 'schedule-foundation',
+    async up(db) {
+      await execScript(db, V14_SCHEDULE_FOUNDATION)
     },
   },
 ]
