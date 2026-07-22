@@ -1,6 +1,6 @@
 import type { QuantityAssigneeKind, QuantityCompletionStatus } from './read-model'
 import type { SoftDb } from '~/lib/db/soft-delete'
-import { hiddenCtes, logCreate, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import { hiddenCtes, hiddenCtesFor, logCreate, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 
 export interface QuantityCompletionUnit {
@@ -137,6 +137,11 @@ interface StageRow {
   sort_order: number
 }
 
+interface PlanWindowRow {
+  planned_start: string | null
+  planned_finish: string | null
+}
+
 interface AssignmentRow {
   id: string
   trade: string
@@ -242,6 +247,27 @@ export async function loadQuantityCompletionWorkspace(
   )
   if (!unit)
     throw new Error('户不存在、已删除或不属于当前项目')
+
+  const [planWindowRow] = await db.select<PlanWindowRow>(
+    `${hiddenCtesFor('schedule_group_buildings', 'schedule_tasks')}
+     SELECT MIN(st.planned_start) AS planned_start,
+            MAX(st.planned_finish) AS planned_finish
+     FROM schedule_group_buildings sgb
+     JOIN schedule_groups sg ON sg.id = sgb.group_id
+     JOIN schedule_tasks st ON st.group_id = sg.id
+     WHERE ${visibleCond('schedule_group_buildings', 'sgb')}
+       AND ${visibleCond('schedule_tasks', 'st')}
+       AND sgb.building_id = ?
+       AND sg.project_id = ?
+       AND st.project_id = ?`,
+    [unit.building_id, projectId, projectId],
+  )
+  const planWindow = planWindowRow?.planned_start && planWindowRow.planned_finish
+    ? {
+        plannedStartAt: planWindowRow.planned_start,
+        plannedEndAt: planWindowRow.planned_finish,
+      }
+    : null
 
   const stageRows = await db.select<StageRow>(
     selectVisibleSql('construction_stages', `AND project_id = ? AND completion_mode = 'unit' ORDER BY sort_order, code, id`),
@@ -452,7 +478,7 @@ export async function loadQuantityCompletionWorkspace(
       buildingName: unit.building_name,
       templateId: unit.template_id,
     },
-    planWindow: null,
+    planWindow,
     stages,
   }
 }
