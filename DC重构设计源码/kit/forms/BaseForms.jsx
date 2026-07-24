@@ -3,6 +3,7 @@
 //           workerForm 工人 / projectForm 项目 / targetCostForm 目标成本
 // 用法：window.KitFormUtil.registerForm(route, {title, subtitle, listRoute}, (params)=>spec)，
 //       spec 契约见 kit/FormPage.jsx 头注释；defs 复用 KitFormUtil.buildFields/coerce。
+// 2026-07-19 反馈轮：crewForm「计薪与提成」新增指派粒度 assignLevel（班组整包/可下钻到个人，存储="班组"|"个人"，工程量指派复选树读取）
 (function () {
   if (window.BaseFormsPreload) return;
   window.BaseFormsPreload = function () { return null; };
@@ -93,7 +94,7 @@
       };
     });
 
-    // ============ 班组 crewForm（3 分区 10 字段：计薪与提成参数为班组级默认，项目级可在详情覆盖） ============
+    // ============ 班组 crewForm（3 分区 11 字段：计薪与提成参数为班组级默认，项目级可在详情覆盖） ============
     KF.registerForm("crewForm", { title: "班组", subtitle: "全局实体 · 跨项目复用 · 计薪参数班组级默认", listRoute: "crew" }, (params) => {
       const row = params.id ? A.get("crews", params.id) : null;
       const defs = [
@@ -106,6 +107,10 @@
         { key: "rentPrice", label: "房租补贴单价", form: { type: "number", suffix: "元每㎡" } },
         { key: "mgmtFee", label: "管理提成", form: { type: "select", options: ["开启", "关闭"] } },
         { key: "mgmtPrice", label: "提成单价", form: { type: "number", suffix: "元每㎡" } },
+        { key: "assignLevel", label: "指派粒度", form: { type: "select", options: ["班组整包", "可下钻到个人"],
+          toLabel: (v) => v === "个人" ? "可下钻到个人" : (v === "班组" ? "班组整包" : (v || "")),
+          toValue: (s) => s === "可下钻到个人" ? "个人" : "班组",
+          hint: "决定工程量指派能否勾选到组内工人；泥水类默认可下钻" } },
         { key: "note", label: "备注", form: { section: "备注", type: "textarea" } },
         { key: "agreementFiles", label: "合作协议", form: { type: "file", max: 9 } },
       ];
@@ -113,7 +118,7 @@
         coll: "crews", entity: "crew", listRoute: "crew", title: "班组", row,
         fields: KF.buildFields(defs, row),
         coerce: (vals) => KF.coerce(defs, vals),
-        newDefaults: () => ({ trade: "泥水工", payRatio: 95, rentSubsidy: "关闭", mgmtFee: "关闭", workerCount: 0, projectCount: 0 }),
+        newDefaults: () => ({ trade: "泥水工", payRatio: 95, rentSubsidy: "关闭", mgmtFee: "关闭", assignLevel: "班组", workerCount: 0, projectCount: 0 }),
       };
     });
 

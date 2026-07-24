@@ -1,5 +1,7 @@
-// WageSlipScreen — 工资进度款工具（只读工程量，从 window.WAGE 按 户型×分项×施工人 聚合）
-// 工程量/单价/谁做的 全部来自「工程量管理」配置源(WAGE)，此处不可改工程量。
+// WageSlipScreen — 工资进度款工具 = 进度款「调参模拟」面（只读工程量，从 window.WAGE 按 户型×分项×施工人 聚合）
+// 三面分工（2026-07-19 反馈轮）：本工具只管调参模拟——进度比例/取整/本期支付总额权重分摊/实发逐人直改/空鼓扣罚，多工种统一模板；
+//   台账与正式单据在「工资核算」（班组瀑布卡 → 工资总表 → 个人核对表 + A4 打印，数据源 window.PAYSLIP）；工程量修改去「工程量管理」。
+// 人名与工资核算 PAYSLIP 名册统一；点击人名 → 该工人进度款核对表（payrollDetail）。
 // 清单：同分项同人合并一行、异人拆行（房间备注）；两种归属：个人计件(管理费可按人配) / 班组整包(班组内分配)。
 // 叠加：房租补贴、工资表(银行信息联动)、考勤(按出勤预填)、空鼓扣罚。
 (function () {
@@ -9,11 +11,11 @@
   const fmt = (v) => { const n = +v; return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0; };
 
   const BANK = {
-    "虞师傅": "农行 石楼支行 6212****4918", "匡师傅": "工行 天河支行 6222****8890", "李师傅": "建行 番禺支行 6217****5567",
-    "张师傅": "农行 海珠支行 6228****7712", "何嫂": "招行 广州分行 6225****9931", "文师傅": "农行 石楼支行 6212****4408",
-    "孙师傅": "农行 广州分行 6228****1055", "周师傅": "工行 天河支行 6222****3341", "郑师傅": "建行 天河支行 6217****2033",
+    "虞建华": "农行 石楼支行 6212****4918", "匡志强": "工行 天河支行 6222****8890", "孙大勇": "建行 番禺支行 6217****5567",
+    "张建国": "农行 海珠支行 6228****7712", "王芳（虞嫂）": "招行 广州分行 6225****9931", "赵铁柱": "农行 石楼支行 6212****4408",
+    "周伟峰": "农行 广州分行 6228****1055", "刘水生": "工行 天河支行 6222****3341", "郑春明": "建行 天河支行 6217****2033",
   };
-  const CREW_MEMBERS = { "泥水A班": ["虞师傅", "匡师傅", "李师傅", "张师傅"], "木工一班": ["孙师傅", "阿强"], "水电班": ["周师傅", "阿杰"], "防水班": ["郑师傅", "老吴"] };
+  const CREW_MEMBERS = { "泥水A班": ["虞建华", "匡志强", "孙大勇", "张建国", "王芳（虞嫂）"], "木工一班": ["周伟峰", "郑春明"], "水电班": ["刘水生", "阿杰"], "防水班": ["郑春明", "老吴"] };
 
   const TH = { padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", background: "var(--surface-2)", textAlign: "left", whiteSpace: "nowrap", borderBottom: "1px solid var(--line)" };
   const TD = { padding: "7px 10px", fontSize: 12, borderBottom: "1px solid var(--line)" };
@@ -81,6 +83,24 @@
     const setS = (k, v) => setSettings((p) => ({ ...p, [k]: v }));
     const setMan = (who, k, v) => setManual((p) => ({ ...p, [who]: { ...(p[who] || {}), [k]: v } }));
 
+    // —— 人名统一 PAYSLIP 名册：点击人名 → 该工人进度款核对表（payrollDetail）——
+    const goWorker = (name) => {
+      const crew = T.crew;
+      const key = "合和新城|" + crew;
+      const P = window.PAYSLIP;
+      if (P && P.data[key] && P.data[key].workers.some((w) => w.name === name)) {
+        window.DC.navigate("payrollDetail", { worker: name, crew, project: "合和新城", month: (P.data[key].schedule.find((s) => s.current) || {}).m });
+      } else {
+        UI().toast("该工人本月暂无进度款单（演示数据）");
+      }
+    };
+    const workerLink = (name) => (
+      <button type="button" title={"打开 " + name + " 的进度款核对表"} onClick={() => goWorker(name)}
+        onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+        style={{ border: 0, background: "transparent", padding: 0, cursor: "pointer", textAlign: "left", color: "var(--brand)", fontWeight: 700, fontSize: "inherit", fontFamily: "inherit" }}>{name}</button>
+    );
+
     // 工资表工人：个人计件=各施工人；班组整包=班组成员
     const wageWorkers = isCrewMode
       ? Array.from(new Set(summary.flatMap((s) => CREW_MEMBERS[s.who] || [s.who])))
@@ -101,7 +121,7 @@
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
             <button onClick={() => navigate("payroll", {})} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "1px solid var(--line-strong)", background: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 13, color: "var(--ink-soft)", cursor: "pointer" }}><Icon name="arrow-left" size={15} />工资核算</button>
             <div><div style={{ fontSize: 15, fontWeight: 800 }}>工资进度款工具</div>
-              <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>工程量只读 · 来自「工程量管理」配置 · 本次实发合计 <b style={{ color: "var(--brand-deep)", fontFamily: "var(--font-mono)" }}>¥{money(totalPay)}</b></div></div>
+              <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>工程量只读 · 来自「工程量管理」配置 · 本次实发合计 <b style={{ color: "var(--brand-deep)", fontFamily: "var(--font-mono)" }}>¥{money(totalPay)}</b> · 人名可点击 → 进度款核对表</div></div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               <Button icon="edit-3" onClick={() => navigate("quantity")}>去工程量管理改指派</Button>
               <Button variant="primary" icon="download" onClick={(e) => UI().exportModal({
@@ -188,7 +208,7 @@
                   <tbody>
                     {summary.map((r) => { const m = manual[r.who] || {}; return (
                       <tr key={r.who}>
-                        <td style={{ ...TD, fontWeight: 700 }}>{r.who}{r.who === mgrName && T.mode === "worker" && <StatusChip tone="brand">班组长</StatusChip>}{r.mode === "crew" && <StatusChip tone="neutral">班组</StatusChip>}</td>
+                        <td style={{ ...TD, fontWeight: 700 }}>{r.mode === "crew" ? r.who : workerLink(r.who)}{r.who === mgrName && T.mode === "worker" && <StatusChip tone="brand">班组长</StatusChip>}{r.mode === "crew" && <StatusChip tone="neutral">班组</StatusChip>}</td>
                         <td style={numTD}>{money(r.eng)}</td>
                         <td style={numTD}>{money(r.rent)}</td>
                         <td style={numTD}>{r.mgr ? money(r.mgr) : "—"}</td>
@@ -224,7 +244,7 @@
                       {wageWorkers.map((w, i) => { const p = getPay(w); const net = (+p.gross || 0) - (+p.borrow || 0); return (
                         <tr key={w}>
                           <td style={{ ...TD, color: "var(--ink-soft)" }}>{i + 1}</td>
-                          <td style={{ ...TD, fontWeight: 700 }}>{w}</td>
+                          <td style={{ ...TD, fontWeight: 700 }}>{workerLink(w)}</td>
                           <td style={{ ...TD, width: 60 }}><Inp type="number" value={p.days} onChange={(e) => setPayF(w, "days", +e.target.value)} align="right" /></td>
                           <td style={{ ...TD, width: 90 }}><Inp type="number" value={p.gross} onChange={(e) => setPayF(w, "gross", +e.target.value)} align="right" /></td>
                           <td style={{ ...TD, width: 80 }}><Inp type="number" value={p.borrow} onChange={(e) => setPayF(w, "borrow", +e.target.value)} align="right" /></td>
