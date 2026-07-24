@@ -11,8 +11,8 @@ const props = withDefaults(defineProps<{
   loading: false,
 })
 
-const page = ref(1)
-const pageSize = ref(10)
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
 const pageState = computed(() => ({
   page: page.value,
   pageSize: pageSize.value,

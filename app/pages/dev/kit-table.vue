@@ -87,9 +87,9 @@ const wideColumns: KitTableColumn[] = [
 ]
 
 // —— 全量数据管线(remote 筛选 + 受控分页):筛选 → 钳页码 → 切片 ——
-const activeFilters = ref<Record<string, unknown[]>>({})
-const page = ref(1)
-const pageSize = ref(10)
+const activeFilters = shallowRef<Record<string, unknown[]>>({})
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
 
 const filtered = computed(() => ALL_ROWS.filter(row =>
   Object.entries(activeFilters.value).every(([field, values]) =>

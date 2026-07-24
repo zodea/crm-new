@@ -63,7 +63,7 @@ function snapshot(inv: Invoice): FormShape {
 }
 
 const form = ref<FormShape>(invoice.value ? snapshot(invoice.value) : {})
-const ownerKind = ref<Invoice['ownerKind']>(invoice.value?.ownerKind ?? null)
+const ownerKind = shallowRef<Invoice['ownerKind']>(invoice.value?.ownerKind ?? null)
 
 function resetForm() {
   if (invoice.value) {
@@ -97,7 +97,7 @@ const docChip = computed(() => {
     return null
   return DOC_CHIP[invoiceDocStatus(inv, store.recognitionProgress[inv.id] != null)]
 })
-const showItems = ref(false)
+const showItems = shallowRef(false)
 
 // ── 关页签回台账（设计稿行为：删/存后回台账）──
 function closeTabToLedger() {

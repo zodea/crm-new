@@ -126,7 +126,7 @@ const isArchived = computed(() => props.invoice.accountStatus === 'archived')
 const isDuplicate = computed(() => props.invoice.dupStatus === 'duplicate')
 
 // 货物明细默认折叠
-const showItems = ref(false)
+const showItems = shallowRef(false)
 </script>
 
 <template>

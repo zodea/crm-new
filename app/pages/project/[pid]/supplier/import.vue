@@ -7,7 +7,7 @@ const psStore = useProjectSupplierStore()
 const toast = useToast()
 
 const project = computed(() => projStore.byId(pid.value))
-const step = ref(1)
+const step = shallowRef(1)
 
 const selectedSupplierIds = ref<Set<string>>(new Set())
 

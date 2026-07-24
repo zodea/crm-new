@@ -10,14 +10,14 @@ const STAGE_OPTS = [
   { key: 'settle', label: '结算中' },
   { key: 'done', label: '已完工' },
 ]
-const stage = ref('all')
+const stage = shallowRef('all')
 
 const STATUS_OPTS = [
   { key: 'all', label: '全部状态' },
   { key: 'normal', label: '合作中' },
   { key: 'paused', label: '已暂停' },
 ]
-const status = ref('normal')
+const status = shallowRef('normal')
 
 // ② SegTab
 const LEDGER_TABS = [
@@ -26,11 +26,11 @@ const LEDGER_TABS = [
   { key: 'archived', label: '已归档', count: 29 },
   { key: 'void', label: '已废弃', count: 0 },
 ]
-const ledgerTab = ref('all')
+const ledgerTab = shallowRef('all')
 
 // ③ SearchInput（即输即筛 demo）
 const SUPPLIERS = ['华东建材', '广州瑞航建材', '锦泰劳务', '恒基水电', '南方钢构', '德胜五金']
-const keyword = ref('')
+const keyword = shallowRef('')
 const filteredSuppliers = computed(() => {
   const q = keyword.value.trim()
   return q ? SUPPLIERS.filter(s => s.includes(q)) : SUPPLIERS
@@ -51,7 +51,7 @@ const ledgerTree: TreeNode[] = [
     ],
   },
 ]
-const activeNode = ref('p1')
+const activeNode = shallowRef('p1')
 </script>
 
 <template>

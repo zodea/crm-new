@@ -38,7 +38,7 @@ const STATUS_DEFAULT_TAB: Record<string, string> = {
   settled: 'settlement',
 }
 
-const activeTab = ref('overview')
+const activeTab = shallowRef('overview')
 const tabs = [
   { key: 'overview', label: '合作概览' },
   { key: 'contract', label: '合同' },
@@ -53,8 +53,8 @@ watch(ps, (v) => {
     activeTab.value = STATUS_DEFAULT_TAB[v.status] || 'overview'
 }, { immediate: true })
 
-const showSettlement = ref(false)
-const settlementAmount = ref(0)
+const showSettlement = shallowRef(false)
+const settlementAmount = shallowRef(0)
 
 async function confirmSettlement() {
   if (!ps.value)

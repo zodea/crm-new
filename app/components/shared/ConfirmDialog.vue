@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConfirmImpact, ConfirmVariant, HoldState } from '~/lib/kit/confirm'
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from 'vue'
 import {
   beginHold,
   cancelHold,
@@ -40,9 +40,9 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const typed = ref('')
-const hold = ref<HoldState | null>(null) // 非空 = cascade 挂起中
-const remainingMs = ref(0)
+const typed = shallowRef('')
+const hold = shallowRef<HoldState | null>(null) // 非空 = cascade 挂起中
+const remainingMs = shallowRef(0)
 const typingInputId = useId()
 let timer: ReturnType<typeof setInterval> | null = null
 
