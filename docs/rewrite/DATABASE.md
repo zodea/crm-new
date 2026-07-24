@@ -632,6 +632,7 @@ END;
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 
+> `ScheduleGroup.contractId` 为必填逻辑外键，指向且只指向一份 `ConstructionContract`；`projectId` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，禁止跨合同混组。当前 `contracts` 轻实体与 `construction_contracts` 旧 IA 尚待 #115/#116 收口，新增迁移前必须统一到合同域 canonical ID，不能同时保存两套合同引用。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 
@@ -807,6 +808,7 @@ interface FilePayload {
 | `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
 | `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
 | `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
+| `schedule_groups` | `contractId` | `ConstructionContract` canonical ID | N:1 | 楼栋分组 → 唯一施工合同；必填、项目必须一致、禁止跨合同混组；物理目标待 #115/#116 合同实体收口后统一 |
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
 | `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |

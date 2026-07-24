@@ -43,6 +43,18 @@
 
 ## 其余交互（待挑方向）
 
+### 00 · 项目切换器 `project-switcher` —— 已定：统一触发器 + 可搜索 SelectPanel
+
+**要点**：同一个入口必须覆盖 1、3、12 到更多项目，不能按数量在「横向按钮 / 下拉框」之间切换皮肤；当前项目持续可见，项目多时支持搜索、最近使用和键盘选择。完整调研与模式对比见 [头部项目切换器公开产品模式调研](../research/project-switcher-patterns.md)。
+
+- [GitHub · Repository switcher](https://github.blog/changelog/2026-06-18-repository-switcher-generally-available-in-global-navigation/) + [Primer SelectPanel](https://primer.style/product/components/select-panel/) — 当前上下文触发器打开可搜索选择面板；最贴合“当前项目”语义。
+- [GitLab · Search or go to](https://docs.gitlab.com/tutorials/left_sidebar/) — 搜索优先、常访问项目优先；适合作为信息组织参考。
+- [Jira · 切换项目与看板](https://support.atlassian.com/jira-software-cloud/docs/switch-between-projects-and-boards/) — Recent/Starred 降低长列表噪音。
+- [Vercel · Team switcher](https://vercel.com/kb/guide/how-do-i-select-a-team-on-vercel) — 单一 scope 触发器；两级 scope 当前不采用。
+- [Linear · Workspaces](https://linear.app/docs/workspaces) — 左上当前 workspace 入口与快捷键思路。
+
+**决策（2026-07-22 用户确认）**：统一采用 GitHub 型「当前项目触发器 + 可搜索 SelectPanel」，吸收 Jira/GitLab 的“最近使用”分组。桌面为锚定弹层，窄屏仅把同一内容容器全屏化；搜索、分组、选中状态和键盘逻辑完全同源。明确不保留“三个以内按钮平铺”、不做项目按钮横向滚动、不按数量切换样式。落地规格见 [KitUI 组件规格 §08](./kit-ui-component-specs.md#08--项目切换器-project-switcher--已定案2026-07-22)。
+
 ### 01 · 确认弹窗 `confirm-dialog`
 **要点**：破坏性操作要让人「停顿」—— 遮罩 + 焦点锁定 + Esc/取消有退路；取消走中性、确认走 danger 红并写明「不可撤销」；高危场景加 type-to-confirm（打字确认）。
 
