@@ -1,0 +1,376 @@
+import { defineStore } from 'pinia'
+import { readonly, shallowRef } from 'vue'
+import { db } from '~/lib/db/client'
+import { execute, select } from '~/lib/db/connection'
+import {
+  createSoftDeleteActions,
+  logCreate,
+  restoreRecord,
+  selectVisibleSql,
+  softDelete,
+  undoOperation,
+  withUpdateLog,
+} from '~/lib/db/soft-delete'
+import { generateId } from '~/lib/util/id'
+
+export interface DeliveryLineDraft {
+  materialName: string
+  spec: string
+  unit: string
+  qty: number
+  unitPrice: number
+  note: string
+}
+
+export interface DeliveryLine extends DeliveryLineDraft {
+  id: string
+  deliveryRecordId: string
+  amount: number
+  sortOrder: number
+}
+
+export interface DeliveryRecord {
+  id: string
+  projectId: string
+  supplierId: string | null
+  rawSiteText: string
+  orderNo: string
+  deliveryDate: string
+  fileName: string
+  filePath: string
+  ocrStatus: string
+  archived: boolean
+  stored: boolean
+  reviewFlag: string
+  note: string
+  createdAt: string
+  updatedAt: string
+  lines: readonly DeliveryLine[]
+  totalAmount: number
+}
+
+export interface DeliveryRecordInput {
+  projectId: string
+  supplierId: string | null
+  orderNo: string
+  deliveryDate: string
+  note: string
+  rawSiteText?: string
+  fileName?: string
+  filePath?: string
+  lines: DeliveryLineDraft[]
+}
+
+interface DeliveryOperationLog {
+  table_name: string
+  record_id: string
+  action: string
+  before_data: string | null
+}
+
+const DELIVERY_LINE_IDS_META = '__delivery_line_ids'
+
+function withDeliveryLineIds(data: string | null, lineIds: string[]): string {
+  const value = data ? JSON.parse(data) as unknown : {}
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('送货单操作日志快照格式错误')
+  return JSON.stringify({ ...value, [DELIVERY_LINE_IDS_META]: lineIds })
+}
+
+function deliveryLineIdsFrom(data: string | null): string[] | null {
+  if (!data)
+    return null
+  try {
+    const value = JSON.parse(data) as Record<string, unknown>
+    const lineIds = value[DELIVERY_LINE_IDS_META]
+    return Array.isArray(lineIds) && lineIds.every(id => typeof id === 'string') ? lineIds : null
+  }
+  catch {
+    return null
+  }
+}
+
+async function attachDeliveryLineIds(logId: string, beforeIds: string[], afterIds: string[]): Promise<void> {
+  const [log] = await select<{ before_data: string | null, after_data: string | null }>(
+    'SELECT before_data, after_data FROM operation_logs WHERE id = ?',
+    [logId],
+  )
+  if (!log)
+    throw new Error('送货单编辑日志不存在')
+  await execute(
+    'UPDATE operation_logs SET before_data = ?, after_data = ? WHERE id = ?',
+    [
+      withDeliveryLineIds(log.before_data, beforeIds),
+      withDeliveryLineIds(log.after_data, afterIds),
+      logId,
+    ],
+  )
+}
+
+function toNumber(value: unknown): number {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : 0
+}
+
+function amountOf(qty: number, unitPrice: number): number {
+  return Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100
+}
+
+function normalizeLines(lines: DeliveryLineDraft[]): DeliveryLineDraft[] {
+  return lines
+    .map(line => ({
+      materialName: line.materialName.trim(),
+      spec: line.spec.trim(),
+      unit: line.unit.trim(),
+      qty: toNumber(line.qty),
+      unitPrice: toNumber(line.unitPrice),
+      note: line.note.trim(),
+    }))
+    .filter(line => line.materialName.length > 0)
+}
+
+function validateInput(input: DeliveryRecordInput): DeliveryLineDraft[] {
+  if (!input.projectId)
+    throw new Error('送货单必须选择项目')
+  const lines = normalizeLines(input.lines)
+  if (!lines.length)
+    throw new Error('至少添加一条材料明细')
+  return lines
+}
+
+function rowToLine(row: Record<string, unknown>): DeliveryLine {
+  return {
+    id: row.id as string,
+    deliveryRecordId: row.delivery_record_id as string,
+    materialName: (row.material_name ?? '') as string,
+    spec: (row.spec ?? '') as string,
+    unit: (row.unit ?? '') as string,
+    qty: toNumber(row.qty),
+    unitPrice: toNumber(row.unit_price),
+    amount: toNumber(row.amount),
+    note: (row.note ?? '') as string,
+    sortOrder: toNumber(row.sort_order),
+  }
+}
+
+function rowToRecord(row: Record<string, unknown>, lines: DeliveryLine[]): DeliveryRecord {
+  return {
+    id: row.id as string,
+    projectId: row.project_id as string,
+    supplierId: (row.supplier_id ?? null) as string | null,
+    rawSiteText: (row.raw_site_text ?? '') as string,
+    orderNo: (row.order_no ?? '') as string,
+    deliveryDate: (row.delivery_date ?? '') as string,
+    fileName: (row.file_name ?? '') as string,
+    filePath: (row.file_path ?? '') as string,
+    ocrStatus: (row.ocr_status ?? 'reviewed') as string,
+    archived: Boolean(row.archived),
+    stored: Boolean(row.stored),
+    reviewFlag: (row.review_flag ?? '') as string,
+    note: (row.note ?? '') as string,
+    createdAt: (row.created_at ?? '') as string,
+    updatedAt: (row.updated_at ?? '') as string,
+    lines,
+    totalAmount: amountOf(1, lines.reduce((sum, line) => sum + line.amount, 0)),
+  }
+}
+
+async function insertLines(recordId: string, lines: DeliveryLineDraft[], now: string): Promise<void> {
+  for (const [index, line] of lines.entries()) {
+    const id = generateId('dline')
+    await execute(
+      `INSERT INTO delivery_lines
+        (id, delivery_record_id, material_name, spec, unit, qty, unit_price, amount, note, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        recordId,
+        line.materialName,
+        line.spec,
+        line.unit,
+        line.qty,
+        line.unitPrice,
+        amountOf(line.qty, line.unitPrice),
+        line.note,
+        index,
+        now,
+        now,
+      ],
+    )
+    await logCreate(db, 'delivery_lines', id)
+  }
+}
+
+export const useDeliveryRecordStore = defineStore('delivery-record', () => {
+  const list = shallowRef<DeliveryRecord[]>([])
+  const loading = shallowRef(false)
+
+  async function load() {
+    loading.value = true
+    try {
+      const [recordRows, lineRows] = await Promise.all([
+        select<Record<string, unknown>>(selectVisibleSql('delivery_records', 'AND archived = 1 ORDER BY delivery_date DESC, created_at DESC')),
+        select<Record<string, unknown>>(selectVisibleSql('delivery_lines', 'ORDER BY sort_order, created_at')),
+      ])
+      const linesByRecord = new Map<string, DeliveryLine[]>()
+      for (const row of lineRows) {
+        const line = rowToLine(row)
+        const lines = linesByRecord.get(line.deliveryRecordId) ?? []
+        lines.push(line)
+        linesByRecord.set(line.deliveryRecordId, lines)
+      }
+      list.value = recordRows.map(row => rowToRecord(row, linesByRecord.get(row.id as string) ?? []))
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  function byId(id: string) {
+    return list.value.find(record => record.id === id)
+  }
+
+  async function add(input: DeliveryRecordInput): Promise<string> {
+    const lines = validateInput(input)
+    const id = generateId('del')
+    const now = new Date().toISOString()
+    await db.execute('BEGIN')
+    try {
+      await execute(
+        `INSERT INTO delivery_records
+          (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
+           ocr_status, archived, stored, review_flag, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 0, '', ?, ?, ?)`,
+        [
+          id,
+          input.projectId,
+          input.supplierId || null,
+          input.rawSiteText?.trim() ?? '',
+          input.orderNo.trim(),
+          input.deliveryDate,
+          input.fileName?.trim() ?? '',
+          input.filePath?.trim() ?? '',
+          input.note.trim(),
+          now,
+          now,
+        ],
+      )
+      await logCreate(db, 'delivery_records', id)
+      await insertLines(id, lines, now)
+      await db.execute('COMMIT')
+    }
+    catch (error) {
+      await db.execute('ROLLBACK')
+      throw error
+    }
+    await load()
+    return id
+  }
+
+  async function update(id: string, input: DeliveryRecordInput): Promise<string | null> {
+    const lines = validateInput(input)
+    const now = new Date().toISOString()
+    await db.execute('BEGIN')
+    try {
+      const logId = await withUpdateLog(db, 'delivery_records', id, () => execute(
+        `UPDATE delivery_records
+         SET project_id=?, supplier_id=?, raw_site_text=?, order_no=?, delivery_date=?, file_name=?, file_path=?, note=?, updated_at=?
+         WHERE id=?`,
+        [
+          input.projectId,
+          input.supplierId || null,
+          input.rawSiteText?.trim() ?? '',
+          input.orderNo.trim(),
+          input.deliveryDate,
+          input.fileName?.trim() ?? '',
+          input.filePath?.trim() ?? '',
+          input.note.trim(),
+          now,
+          id,
+        ],
+      ))
+      if (!logId) {
+        await db.execute('ROLLBACK')
+        await load()
+        return null
+      }
+      const oldLines = await select<{ id: string }>(
+        `${selectVisibleSql('delivery_lines')} AND delivery_record_id = ?`,
+        [id],
+      )
+      for (const line of oldLines)
+        await softDelete(db, 'delivery_lines', line.id)
+      await insertLines(id, lines, now)
+      const newLines = await select<{ id: string }>(
+        `${selectVisibleSql('delivery_lines')} AND delivery_record_id = ?`,
+        [id],
+      )
+      await attachDeliveryLineIds(logId, oldLines.map(line => line.id), newLines.map(line => line.id))
+      await db.execute('COMMIT')
+      await load()
+      return logId
+    }
+    catch (error) {
+      await db.execute('ROLLBACK')
+      throw error
+    }
+  }
+
+  const softActions = createSoftDeleteActions(db, 'delivery_records', load)
+
+  async function undo(logId: string): Promise<boolean> {
+    const [log] = await select<DeliveryOperationLog>(
+      'SELECT table_name, record_id, action, before_data FROM operation_logs WHERE id = ?',
+      [logId],
+    )
+    const beforeLineIds = log?.table_name === 'delivery_records' && log.action === 'update'
+      ? deliveryLineIdsFrom(log.before_data)
+      : null
+    if (!log || beforeLineIds == null)
+      return softActions.undo(logId)
+
+    await db.execute('BEGIN')
+    try {
+      const undone = await undoOperation(db, logId)
+      if (!undone) {
+        await db.execute('ROLLBACK')
+        return false
+      }
+
+      const lines = await select<{ id: string, deleted_at: string | null }>(
+        'SELECT id, deleted_at FROM delivery_lines WHERE delivery_record_id = ?',
+        [log.record_id],
+      )
+      const existingIds = new Set(lines.map(line => line.id))
+      if (beforeLineIds.some(id => !existingIds.has(id)))
+        throw new Error('送货单编辑撤回缺少原明细行')
+
+      const beforeIds = new Set(beforeLineIds)
+      for (const line of lines) {
+        if (beforeIds.has(line.id) && line.deleted_at != null)
+          await restoreRecord(db, 'delivery_lines', line.id)
+        else if (!beforeIds.has(line.id) && line.deleted_at == null)
+          await softDelete(db, 'delivery_lines', line.id)
+      }
+      await db.execute('COMMIT')
+    }
+    catch (error) {
+      await db.execute('ROLLBACK')
+      throw error
+    }
+    await load()
+    return true
+  }
+
+  return {
+    list: readonly(list),
+    loading: readonly(loading),
+    load,
+    byId,
+    add,
+    update,
+    remove: softActions.remove,
+    restore: softActions.restore,
+    undo,
+  }
+})

@@ -59,7 +59,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'matSettle', icon: 'i-lucide-calculator', label: '材料采购结算', hint: '对账结算' },
     { key: 'stockCheck', icon: 'i-lucide-clipboard-check', label: '库存盘点', hint: '盘点生效' },
     { key: 'delivery', icon: 'i-lucide-scan-line', label: '送货单识别', hint: 'OCR 处理区', to: '/material/delivery' },
-    { key: 'deliveryArchive', icon: 'i-lucide-archive', label: '送货单归档库', hint: '项目→分供方' },
+    { key: 'deliveryArchive', icon: 'i-lucide-archive', label: '送货单归档库', hint: '项目→分供方', to: '/material/delivery/archive' },
     { key: 'price', icon: 'i-lucide-chart-no-axes-combined', label: '单价对比', hint: '材料价格分析', to: '/material/price' },
   ] },
   { type: 'group', key: 'g-owner-material', label: '甲供材管理', icon: 'i-lucide-boxes', items: [
@@ -179,6 +179,8 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
   // 考勤从工资页进入，归属工资核算入口
   if (path.startsWith('/subcontract/payroll') || path.startsWith('/subcontract/attendance'))
     return 'payroll'
+  if (path.startsWith('/material/delivery/archive'))
+    return 'deliveryArchive'
   if (path.startsWith('/material/delivery'))
     return 'delivery'
   if (path.startsWith('/material/price'))
