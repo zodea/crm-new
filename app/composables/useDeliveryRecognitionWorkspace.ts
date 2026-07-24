@@ -24,7 +24,7 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
 
   const selectedFileId = shallowRef<string | null>(null)
   const selectedDocumentId = shallowRef<string | null>(null)
-  const reviewDraft = ref<DeliveryReviewInput | null>(null)
+  const reviewDraft = shallowRef<DeliveryReviewInput | null>(null)
   const saving = shallowRef(false)
   const previewFiles = shallowReactive(new Map<string, File>())
 
