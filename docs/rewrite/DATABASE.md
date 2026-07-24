@@ -591,7 +591,9 @@ interface FilePayload {
 | invoiceTotal | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND supplier_id = ? AND account_status = 'archived'` |
 | balance | contractTotal − paidTotal |
 
-### 4.5 首页 Dashboard 指标（homepage-dashboard.md）
+### 4.5 可复用经营聚合（旧首页 Dashboard 指标）
+
+> 2026-07-18：当前首页已裁定以统一施工进度甘特为准，本节只保留可复用的数据聚合口径，不代表首页必须展示指标卡或固定网格；旧 UI 蓝本见 `homepage-dashboard.md` 废弃横幅。
 
 | 字段 | SQL 计算 |
 |---|---|

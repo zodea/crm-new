@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <section class="basis-[40%] min-w-0 overflow-y-auto border border-line rounded-[var(--radius-card)] bg-surface-sink p-4 shadow-[var(--shadow-card)]">
+  <section class="h-full min-w-0 w-full overflow-y-auto border border-line rounded-[var(--radius-card)] bg-surface-sink p-4 shadow-[var(--shadow-card)]">
     <div class="mb-3 text-12px font-700 text-ink-soft">
       发票原图
     </div>

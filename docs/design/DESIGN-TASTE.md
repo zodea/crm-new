@@ -158,7 +158,7 @@
 
 - **StatCard**：Panel 内 label（12/700/`--ink-soft`）+ 大数字（24/800，行高 1.1，tone 上色）。`clickable` 时升级为可跳卡（hover 蓝框浮起）。
 - **Metric**：label（11/600/`--ink-faint` + ⓘ公式 tooltip）+ mono 数字（big 17.5/800，普通 13.5/700，`letter-spacing:-0.015em`）。两位小数完整展示，禁省略号。
-- **MetricGrid**：`grid-template-columns: repeat(N, 1fr)` 语义固定列数，`gap:1px` + `--line` 底色透出细分隔线，外框 1px + 圆角 10 + `overflow:hidden`。**禁 auto-fit**。
+- **MetricGrid**：宽屏的 `cols` 只表示**最多列数/语义分组提示**，不是所有宽度锁列。重复指标优先 `repeat(auto-fit, minmax(min(100%, var(--metric-min)), 1fr))`，或用容器查询在 1/2/N 列间降级；`gap:1px` + `--line` 底色透出细分隔线，外框 1px + 圆角 10 + `overflow:hidden`。金额必须完整可读，不能靠压缩列宽或省略号维持列数。
 
 ### 4.5 StatusChip
 
@@ -196,15 +196,15 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 ## 5. 布局原则
 
-**页面模板全站同构**（详见 [STYLE-GUIDE §四](../dc-rebuild/STYLE-GUIDE.md)，此处只记品味要点）：
+**页面模板全站同构**（强制响应式契约见 [ADR 0013「响应式与自适应契约」](../adr/0013-align-all-ui-to-online-design.md)，此处只记品味要点）：
 
 - **列表页**：工具栏卡（标题 + 计数 → SelectFilter 组 → 搜索 → 按钮组，一行收齐）→ 可选汇总卡行 → 表格卡。按钮组从左到右由弱到强，accent 永远最右。
 - **详情页**：顶部摘要卡（返回 + 头像方块 + 标题行 + 摘要格行）→ SegTab / SectionHeader 分区。SectionHeader = 4×16px 品牌竖条 + 15/800 标题——品牌蓝作「章」的又一处。
-- **网格铁律**：语义固定列数（4 指标 = `repeat(4,1fr)`），列宽只用 `fr`/百分比，整体随窗口等比缩放；**禁 `repeat(auto-fit/auto-fill, minmax())`**、禁 `calc()` 百分比 hack、固定 px 侧栏改比例列或 `clamp()`。
+- **流式网格优先**：重复卡片按最小可读宽度自适应，可使用 `auto-fit` / `auto-fill` + `minmax()`；语义栏位可显式给宽屏列数或比例，但必须用容器/视口断点提供降列、堆叠、Tab 或 Sheet 退化。比例列是宽屏构图，不是固定画布。
 - **禁整页横滚**：宽内容（大表格/矩阵/甘特）在自身容器内 `overflow-x:auto`。SegTab 用 wrap 不用横滚。
-- **SVG 图表**：`viewBox` + 百分比宽，随容器等比缩放，不写固定 px 宽。
-- 内容区 `max-width: 1480px` 居中；面板间 `gap 16`；面板内 padding 12–16（仪表盘卡 16–20）。
-- 断点：<1100px 内容区网格列数减半（预设两排，非连续换行）；<1024px 侧栏转 Sheet（ADR 0011）；<768px 单列 + 表格横滚固定首尾列。
+- **SVG 图表**：`viewBox` + 百分比宽随容器缩放；需要重绘时观察**容器**而非只监听窗口，不写死画布宽高。
+- 内容区 `max-width: 1480px` 只是宽度上限；水平 gutter 从窄屏到宽屏流式收敛。面板间 gap 16、面板内 padding 12–16 是令牌目标，可在紧凑视口按令牌阶梯缩小。
+- **退化基线**：<1024px 侧栏转 Sheet（ADR 0011）；业务区根据容器可用宽度自动降列，<768px 以单列/分段呈现为默认。断点是保护最小可读宽度的触发点，不是固定“两排模板”。
 
 ---
 
@@ -234,7 +234,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 - 界面文案/图标混用 emoji；图标只用 Lucide（`i-lucide-*`）单色线性。
 
 **布局**
-- `repeat(auto-fit/auto-fill, minmax())`；`calc()` 百分比 hack；整页横向滚动条；SegTab 横滚。
+- 固定页面画布、固定业务区长宽、任何宽度永不变化的列模板；没有最小可读宽度保护、会造成剧烈跳动的 `auto-fit/auto-fill` 滥用；`calc()` 百分比 hack；整页横向滚动条；SegTab 横滚。
 - 为凑对称硬摆「3 等分卡片行」——列数由内容语义决定。
 - 文字/元素重叠、绝对定位堆内容。
 

@@ -1,7 +1,7 @@
 # 设计进度总览 — 界面·数据结构·文档状态
 
 > 每完成一个模块的设计文档，将状态从「待设计」改为「已确认」。  
-> 最后更新: 2026-06-27
+> 最后更新: 2026-07-18（首页旧蓝本与响应式口径勘误）
 
 ---
 
@@ -11,7 +11,7 @@
 
 | 页面 | 路由 | 设计文档 | 状态 |
 |---|---|---|---|
-| Dashboard | `/` | `homepage-dashboard.md` | ✅ 已确认 |
+| Dashboard | `/` | `homepage-dashboard.md` / `schedule-progress.md §7.1` | ⚠️ 旧五指标四图表蓝本已废弃，按当前 app 甘特由 #7 重写 |
 
 ### 1.2 项目信息
 
@@ -269,10 +269,10 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 |---|---|---|
 | SupplierReadonlySummary | 分供方详情页跨项目汇总 | JOIN projects + project_suppliers + expenditure_contracts + payment_applications + ticket_registrations |
 | ProjectSupplier.ComputedSummary | 项目×分供方合作概览 | JOIN expenditure_contracts + payment_applications + ticket_registrations + payment_records |
-| Dashboard.MetricCards | 首页5个指标卡片 | JOIN construction_contracts + receipt_registrations + payment_applications + invoice_applications |
-| Dashboard.MonthlyExpense | 首页月度支出柱状图 | GROUP BY month FROM payment_records |
-| Dashboard.ExpensePie | 首页支出构成饼图 | GROUP BY category FROM payment_records |
-| Dashboard.InvoiceTax | 首页票据与税额 | SUM FROM invoice_applications + ticket_registrations |
+| Dashboard.MetricCards | ⛔ 旧首页5个指标卡片（不再属于当前首页验收） | 历史数据设想，若复用需另开功能入口 |
+| Dashboard.MonthlyExpense | ⛔ 旧首页月度支出柱状图 | 历史数据设想，若复用需另开功能入口 |
+| Dashboard.ExpensePie | ⛔ 旧首页支出构成饼图 | 历史数据设想，若复用需另开功能入口 |
+| Dashboard.InvoiceTax | ⛔ 旧首页票据与税额 | 历史数据设想，若复用需另开功能入口 |
 | Dashboard.ConstructionGantt | 首页施工进度甘特图 | GROUP BY building+floor+workType FROM quantity_records |
 | Project.OperationData | 项目详情经营数据面板 | 同 Dashboard 但单项目 |
 
@@ -286,7 +286,7 @@ CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 | 架构规范 | `ARCHITECTURE.md` | 技术栈·导航·目录·OCR |
 | 数据库设计 | `DATABASE.md` | ER图·外键·建表顺序·计算字段·迁移 |
 | CRM交互参考 | `CRM-PATTERNS.md` | 红圈CRM内容区布局模式（列表/详情/表单/弹窗） |
-| 首页Dashboard | `pages/homepage-dashboard.md` | 项目下拉+通知铃铛+5指标+4图表 |
+| 首页Dashboard | `pages/homepage-dashboard.md` + `pages/schedule-progress.md §7.1` | ⚠️ 当前 app 统一施工进度甘特；旧 5 指标 + 4 图表说明已废弃，#7 待重写 |
 | 项目信息 | `pages/project-info.md` | 项目列表+详情(9Tab)+25子表 |
 | 分供方主数据 | `pages/base-supplier.md` | 列表+详情(6Tab)+证照OCR |
 | 项目×分供方 | `pages/project-supplier.md` | 工作台(6Tab)+状态机+结算 |

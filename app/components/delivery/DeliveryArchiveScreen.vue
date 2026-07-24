@@ -165,9 +165,9 @@ onMounted(refresh)
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-4">
-    <div class="panel flex items-center gap-3 px-4 py-3">
-      <div>
+  <div class="delivery-archive-screen flex min-w-0 flex-col gap-4">
+    <div class="delivery-archive__toolbar panel flex items-center gap-3 px-4 py-3">
+      <div class="min-w-0">
         <div class="text-16px font-800 text-ink">
           送货单归档库
         </div>
@@ -175,23 +175,32 @@ onMounted(refresh)
           手工录入 · 项目 → 分供方 · 详情与材料明细
         </div>
       </div>
-      <div class="flex-1" />
-      <SearchInput v-model="search" class="w-72" placeholder="搜索单号、项目、分供方、材料" />
-      <button class="btn-secondary" :disabled="store.loading" @click="refresh">
-        <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
-      </button>
-      <button class="btn-accent" @click="openCreate">
-        <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
-      </button>
+      <div class="delivery-archive__actions ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
+        <SearchInput
+          v-model="search"
+          class="delivery-archive__search w-72 max-w-full"
+          placeholder="搜索单号、项目、分供方、材料"
+          :width="288"
+        />
+        <button class="btn-secondary" :disabled="store.loading" @click="refresh">
+          <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
+        </button>
+        <button class="btn-accent" @click="openCreate">
+          <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
+        </button>
+      </div>
     </div>
 
-    <div class="flex items-start gap-3">
-      <div class="w-64 shrink-0">
+    <div class="delivery-archive__layout flex items-start gap-3">
+      <ArchiveScopePicker v-model="selectedNode" class="delivery-archive__mobile-scope" :items="treeItems" />
+
+      <div class="delivery-archive__desktop-tree w-64 shrink-0">
         <TreeNav v-model="selectedNode" title="归档库 · 项目 → 分供方" :items="treeItems" />
       </div>
 
       <div class="min-w-0 flex-1">
         <KitTable
+          data-testid="delivery-archive-table"
           :columns="columns"
           :data="pageRows"
           :loading="store.loading"
@@ -239,7 +248,7 @@ onMounted(refresh)
           </template>
         </KitTable>
 
-        <div class="mt-2 flex items-center justify-end gap-6 rounded-[var(--radius-card)] bg-surface-2 px-4 py-2 text-12px text-ink-soft">
+        <div class="mt-2 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 rounded-[var(--radius-card)] bg-surface-2 px-4 py-2 text-12px text-ink-soft">
           <span>当前筛选：<b class="font-mono text-ink">{{ filtered.length }}</b> 份</span>
           <span>金额合计：<b class="font-mono text-ink">{{ yuan(totalAmount) }}</b></span>
         </div>
@@ -249,3 +258,62 @@ onMounted(refresh)
     <DeliveryRecordFormDialog v-model:open="showForm" :record="editingRecord" />
   </div>
 </template>
+
+<style scoped>
+.delivery-archive-screen {
+  container-type: inline-size;
+}
+
+.delivery-archive__mobile-scope {
+  display: none;
+}
+
+@container (max-width: 59.999rem) {
+  .delivery-archive__layout {
+    display: block;
+  }
+
+  .delivery-archive__desktop-tree {
+    display: none;
+  }
+
+  .delivery-archive__mobile-scope {
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@container (max-width: 47.999rem) {
+  .delivery-archive__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .delivery-archive__actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .delivery-archive__search {
+    min-width: min(100%, 16rem);
+    flex: 1 1 16rem;
+  }
+
+  .delivery-archive__search :deep(input) {
+    width: 100% !important;
+    max-width: 100%;
+  }
+}
+
+@container (max-width: 31rem) {
+  .delivery-archive__search {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .delivery-archive__actions > :deep(button) {
+    flex: 1 1 auto;
+  }
+}
+</style>

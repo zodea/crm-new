@@ -158,7 +158,7 @@ useEventListener(() => document, 'click', () => {
 </script>
 
 <template>
-  <section class="panel basis-[40%] min-w-0 overflow-hidden flex flex-col" aria-label="发票打印排版">
+  <section class="panel h-full min-w-0 w-full overflow-hidden flex flex-col" aria-label="发票打印排版">
     <div class="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-3 py-2.5">
       <strong class="mr-auto text-12px text-ink">打印排版</strong>
       <button type="button" class="btn-secondary px-2.5 py-1.5" :disabled="!zoomInvoice" @click="showZoom = true">

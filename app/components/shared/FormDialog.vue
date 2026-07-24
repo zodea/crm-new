@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<{
   width?: string
 }>(), {
   saveLabel: '保存',
-  width: 'min(880px, 95vw)',
+  width: 'min(880px, calc(100dvw - var(--space-6, 24px)))',
 })
 
 const emit = defineEmits<{
@@ -48,7 +48,7 @@ function onOpenChange(value: boolean) {
   <Dialog :open="open" @update:open="onOpenChange">
     <DialogContent
       :show-close="false"
-      class="max-h-[85vh] flex flex-col p-0"
+      class="form-dialog flex flex-col p-0"
       :style="{ width }"
     >
       <!-- 标题栏（固定） -->
@@ -60,11 +60,11 @@ function onOpenChange(value: boolean) {
       </div>
 
       <!-- 主体 -->
-      <div class="flex flex-1 min-h-0">
+      <div class="form-dialog__body flex flex-1 min-h-0">
         <!-- 左侧分区导航 -->
         <nav
           v-if="sections?.length"
-          class="w-36 border-r border-line py-3 overflow-y-auto shrink-0"
+          class="form-dialog__nav w-36 border-r border-line py-3 overflow-y-auto shrink-0"
         >
           <button
             v-for="s in sections"
@@ -81,13 +81,26 @@ function onOpenChange(value: boolean) {
         </nav>
 
         <!-- 表单内容 -->
-        <div class="flex-1 overflow-y-auto p-5">
+        <div class="form-dialog__content min-w-0 flex-1 overflow-y-auto p-5">
+          <label v-if="sections?.length" class="form-dialog__section-select mb-4">
+            <span class="field-label">表单分区</span>
+            <select
+              v-model="activeSection"
+              aria-label="表单分区"
+              class="field-input w-full"
+              @change="scrollTo(activeSection)"
+            >
+              <option v-for="s in sections" :key="s.key" :value="s.key">
+                {{ s.label }}
+              </option>
+            </select>
+          </label>
           <slot />
         </div>
       </div>
 
       <!-- 底部操作栏（固定，吸底；按钮走 shadcn Button 变体） -->
-      <div class="flex items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
+      <div class="form-dialog__actions flex flex-wrap items-center justify-end gap-2 px-5 py-3 border-t border-line shrink-0">
         <Button variant="outline" @click="emit('cancel')">
           取消
         </Button>
@@ -99,3 +112,43 @@ function onOpenChange(value: boolean) {
     </DialogContent>
   </Dialog>
 </template>
+
+<style>
+.form-dialog {
+  container-type: inline-size;
+  max-width: calc(100dvw - var(--space-6, 24px));
+  max-height: min(85dvh, calc(100svh - var(--space-6, 24px)));
+}
+
+.form-dialog__section-select {
+  display: none;
+}
+
+@container (max-width: 40rem) {
+  .form-dialog__nav {
+    display: none;
+  }
+
+  .form-dialog__section-select {
+    display: block;
+  }
+
+  .form-dialog__content {
+    padding: var(--space-4, 16px);
+  }
+
+  .form-dialog__actions {
+    padding-inline: var(--space-4, 16px);
+  }
+}
+
+@container (max-width: 39rem) {
+  .form-dialog__content .grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .form-dialog__content .col-span-2 {
+    grid-column: span 1 / span 1 !important;
+  }
+}
+</style>

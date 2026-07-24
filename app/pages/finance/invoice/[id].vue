@@ -215,23 +215,23 @@ onMounted(() => {
     </NuxtLink>
   </div>
 
-  <div v-else class="flex flex-col gap-3">
+  <div v-else class="invoice-edit-screen flex flex-col gap-3">
     <!-- 顶条：返回 + 号码/卖方 + 状态 -->
     <div class="panel flex flex-wrap items-center gap-3 p-3">
       <button class="btn-secondary" @click="closeTabToLedger">
         <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />返回台账
       </button>
-      <div class="flex items-baseline gap-2">
+      <div class="min-w-0 flex flex-wrap items-baseline gap-2">
         <span class="font-mono text-15px font-800">{{ invoice.invoiceNumber || '—' }}</span>
         <span class="text-12px text-ink-soft">{{ invoice.seller }}</span>
       </div>
-      <div class="ml-auto flex items-center gap-2">
+      <div class="ml-auto flex flex-wrap items-center gap-2">
         <span v-if="docChip" :class="docChip.cls">{{ docChip.label }}</span>
         <span v-if="isArchived" class="chip-ok">已在台账</span>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+    <div class="invoice-edit-layout grid items-start gap-3">
       <!-- 左：原图 -->
       <div class="panel min-h-[420px] flex flex-col overflow-hidden">
         <div class="border-b border-line bg-surface-2 px-3 py-2 text-12px font-700 text-ink-soft">
@@ -245,13 +245,13 @@ onMounted(() => {
       </div>
 
       <!-- 右：字段（本地缓冲）+ 明细 + 动作 -->
-      <div class="panel flex flex-col gap-3 p-4">
+      <div class="invoice-edit-form panel flex min-w-0 flex-col gap-3 p-4">
         <h2 class="text-15px font-800">
           发票字段
         </h2>
 
         <!-- 归属（与校对表单一致：项目 / 个人开支） -->
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span class="text-12px font-600 text-ink-soft">归属</span>
           <div class="inline-flex overflow-hidden border border-line rounded-[6px]">
             <button
@@ -268,8 +268,8 @@ onMounted(() => {
           <span v-if="!ownerKind" class="chip-warn">未归属</span>
         </div>
 
-        <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-          <div v-for="d in FIELDS" :key="d.key" :class="d.full ? 'col-span-2' : ''">
+        <div class="invoice-edit-fields grid gap-x-3 gap-y-2.5">
+          <div v-for="d in FIELDS" :key="d.key" :class="{ 'invoice-edit-fields__full': d.full }">
             <label class="field-label">{{ d.label }}</label>
             <select
               v-if="d.type === 'select'"
@@ -312,52 +312,58 @@ onMounted(() => {
             <span :class="showItems ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="h-[13px] w-[13px]" aria-hidden="true" />
             货物明细（{{ invoice.items.length }} 行）
           </button>
-          <table v-if="showItems && invoice.items.length" class="mt-2 w-full border-collapse text-12px">
-            <thead>
-              <tr class="bg-surface-2 text-left text-ink-soft">
-                <th class="border-b border-line px-2 py-1.5 font-600">
-                  名称
-                </th>
-                <th class="border-b border-line px-2 py-1.5 font-600">
-                  规格
-                </th>
-                <th class="border-b border-line px-2 py-1.5 font-600">
-                  单位
-                </th>
-                <th class="border-b border-line px-2 py-1.5 text-right font-600">
-                  数量
-                </th>
-                <th class="border-b border-line px-2 py-1.5 text-right font-600">
-                  单价
-                </th>
-                <th class="border-b border-line px-2 py-1.5 text-right font-600">
-                  金额
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(it, i) in invoice.items" :key="i" class="border-b border-line">
-                <td class="px-2 py-1.5">
-                  {{ it.name }}
-                </td>
-                <td class="px-2 py-1.5 text-ink-soft">
-                  {{ it.spec || '—' }}
-                </td>
-                <td class="px-2 py-1.5 text-ink-soft">
-                  {{ it.unit || '—' }}
-                </td>
-                <td class="px-2 py-1.5 text-right font-mono">
-                  {{ it.quantity }}
-                </td>
-                <td class="px-2 py-1.5 text-right font-mono">
-                  {{ it.unitPrice }}
-                </td>
-                <td class="px-2 py-1.5 text-right font-mono">
-                  {{ it.amount }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div
+            v-if="showItems && invoice.items.length"
+            class="mt-2 overflow-x-auto"
+            data-testid="invoice-edit-items-scroll"
+          >
+            <table class="min-w-[620px] w-full border-collapse text-12px">
+              <thead>
+                <tr class="bg-surface-2 text-left text-ink-soft">
+                  <th class="border-b border-line px-2 py-1.5 font-600">
+                    名称
+                  </th>
+                  <th class="border-b border-line px-2 py-1.5 font-600">
+                    规格
+                  </th>
+                  <th class="border-b border-line px-2 py-1.5 font-600">
+                    单位
+                  </th>
+                  <th class="border-b border-line px-2 py-1.5 text-right font-600">
+                    数量
+                  </th>
+                  <th class="border-b border-line px-2 py-1.5 text-right font-600">
+                    单价
+                  </th>
+                  <th class="border-b border-line px-2 py-1.5 text-right font-600">
+                    金额
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(it, i) in invoice.items" :key="i" class="border-b border-line">
+                  <td class="px-2 py-1.5">
+                    {{ it.name }}
+                  </td>
+                  <td class="px-2 py-1.5 text-ink-soft">
+                    {{ it.spec || '—' }}
+                  </td>
+                  <td class="px-2 py-1.5 text-ink-soft">
+                    {{ it.unit || '—' }}
+                  </td>
+                  <td class="px-2 py-1.5 text-right font-mono">
+                    {{ it.quantity }}
+                  </td>
+                  <td class="px-2 py-1.5 text-right font-mono">
+                    {{ it.unitPrice }}
+                  </td>
+                  <td class="px-2 py-1.5 text-right font-mono">
+                    {{ it.amount }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div v-else-if="showItems" class="mt-2 text-12px text-ink-faint">
             无明细行。
           </div>
@@ -368,7 +374,7 @@ onMounted(() => {
           <button class="btn-danger" @click="del">
             <span class="i-lucide-trash-2 mr-1 text-13px" aria-hidden="true" />删除
           </button>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center justify-end gap-2">
             <button class="btn-secondary" :disabled="invoice.ocrStatus === 'processing'" @click="rerecognize">
               <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />
               {{ invoice.ocrStatus === 'processing' ? '识别中…' : '重新识别' }}
@@ -382,3 +388,28 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.invoice-edit-screen,
+.invoice-edit-form {
+  container-type: inline-size;
+}
+
+.invoice-edit-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.invoice-edit-fields {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17.5rem), 1fr));
+}
+
+.invoice-edit-fields__full {
+  grid-column: 1 / -1;
+}
+
+@container (min-width: 64rem) {
+  .invoice-edit-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

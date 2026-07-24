@@ -171,6 +171,21 @@ export default defineConfig({
 @media (prefers-reduced-motion: reduce) {
   .animate-in, .animate-out { animation: none !important; }
 }
+.form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  container-type: inline-size;
+}
+.form-grid > [data-form-span="2"] { grid-column: span 2; }
+.form-grid > [data-form-span="3"] { grid-column: span 3; }
+.info-row {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.75rem), 1fr));
+}
+@container (max-width: 45rem) {
+  .form-grid > [data-form-span="3"] { grid-column: 1 / -1; }
+}
+@container (max-width: 30rem) {
+  .form-grid > [data-form-span] { grid-column: 1 / -1; }
+}
 `,
     },
   ],
@@ -228,12 +243,12 @@ export default defineConfig({
     'field-group-title': 'text-13px font-800 text-brand-deep mb-3',
 
     // 信息摘要行
-    'info-row': 'flex border border-line',
-    'info-cell': 'flex-1 px-3 py-2 border-r border-line last:border-r-0',
+    'info-row': 'grid gap-[1px] border border-line bg-line',
+    'info-cell': 'min-w-0 bg-panel px-3 py-2',
 
     // 表单网格
-    'form-grid': 'grid grid-cols-3 border border-line bg-panel',
-    'form-cell': 'px-2.5 py-2 border-b border-r border-surface-3 flex flex-col gap-0.5 [&:nth-child(3n)]:border-r-0',
+    'form-grid': 'grid gap-[1px] border border-line bg-surface-3',
+    'form-cell': 'min-w-0 bg-panel px-2.5 py-2 flex flex-col gap-0.5',
 
     // 分页
     'pager-btn': 'inline-flex items-center justify-center w-7 h-7 border border-line rounded-[var(--radius-sm)] bg-panel text-12px text-ink-soft cursor-pointer hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45',
