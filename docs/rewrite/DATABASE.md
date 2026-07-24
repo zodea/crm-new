@@ -418,7 +418,7 @@ CREATE TABLE project_aliases (
 | HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
 | HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（稳定模板房间×分项，工种从分项读取；清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
 | ConstructionStage | `construction_stages` | `id` | **ADR 0010**：项目工序阶段目录，给 #103 完成事实与 #114 排程共享稳定 ID |
-| ConstructionStageItem | `construction_stage_items` | `id` | 工序阶段 ↔ 计量分项映射，圈定应做户与下钻范围 |
+| ConstructionStageItem | `construction_stage_items` | `id` | 工序阶段 ↔ 计量分项映射，圈定应做户与下钻范围；`is_reporting_stage=1` 是该分项唯一月度报量阶段 |
 | UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户 × 工种责任（只表达谁负责，不存完成） |
 | UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选模板房间 × 分项下钻范围；户身份由所属指派提供 |
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
@@ -534,12 +534,13 @@ CREATE TABLE construction_stages (
 );
 
 CREATE TABLE construction_stage_items (
-  id         TEXT PRIMARY KEY,
-  stage_id   TEXT NOT NULL REFERENCES construction_stages(id),
-  item_id    TEXT NOT NULL REFERENCES items(id),
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  deleted_at TEXT
+  id                 TEXT PRIMARY KEY,
+  stage_id           TEXT NOT NULL REFERENCES construction_stages(id),
+  item_id            TEXT NOT NULL REFERENCES items(id),
+  is_reporting_stage INTEGER NOT NULL DEFAULT 0 CHECK (is_reporting_stage IN (0, 1)),
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT
 );
 
 CREATE TABLE unit_assignments (
@@ -602,6 +603,8 @@ END;
 ```
 
 每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID；`rooms.code` 是模板内唯一、创建后不可修改的机器码，界面可修改的是 `rooms.name` 显示名。`house_type_template_items.room_id` 不允许为空。
+
+同一分项可以映射多个施工阶段以分别计算进度，但月度报量只能选择其中一个活跃映射：`construction_stage_items.is_reporting_stage=1`。v13 对存量按阶段排序最末项作一次性兼容回填，并用活跃部分唯一索引保证每个 `item_id` 最多一个报量阶段；月度派生只读取该映射，避免同量重复计取。
 
 责任人或个人范围任一变化，都采用“软删旧 `unit_assignments`（旧 scope 随父级保留并隐藏）+ 新建 assignment/scopes”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任、范围及责任人，仍须先保证完成事实本身及其户、阶段可见。历史只冻结责任/范围身份，房间显示名与三量仍从当前活链接模板读取；已发放工资才按 #117 固化金额快照。
 
@@ -1026,6 +1029,7 @@ CREATE INDEX idx_stages_project ON construction_stages(project_id);
 CREATE UNIQUE INDEX uq_stage_code ON construction_stages(project_id, code) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stage_items_stage ON construction_stage_items(stage_id);
 CREATE UNIQUE INDEX uq_stage_item ON construction_stage_items(stage_id, item_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_stage_item_reporting ON construction_stage_items(item_id) WHERE deleted_at IS NULL AND is_reporting_stage = 1;
 CREATE INDEX idx_unit_assignments_unit ON unit_assignments(unit_id);
 CREATE INDEX idx_unit_assignments_crew ON unit_assignments(crew_id);
 CREATE INDEX idx_unit_assignments_worker ON unit_assignments(worker_id);

@@ -46,10 +46,11 @@ beforeEach(async () => {
     ('s-floor', 'p1', 'floor', '地砖铺贴', '泥水工', 'unit', 21),
     ('s-putty', 'p1', 'putty', '一遍腻子', '油工', 'unit', 10),
     ('s-manual', 'p1', 'manual', '人工进度', '其他', 'manual', 90)`)
-  await mem.execute(`INSERT INTO construction_stage_items (id, stage_id, item_id) VALUES
-    ('map-wall', 's-wall', 'i-wall'),
-    ('map-floor', 's-floor', 'i-floor'),
-    ('map-putty', 's-putty', 'i-putty')`)
+  await mem.execute(`INSERT INTO construction_stage_items
+    (id, stage_id, item_id, is_reporting_stage) VALUES
+    ('map-wall', 's-wall', 'i-wall', 1),
+    ('map-floor', 's-floor', 'i-floor', 1),
+    ('map-putty', 's-putty', 'i-putty', 1)`)
   await mem.execute(`INSERT INTO crews (id, name, trade) VALUES
     ('crew-masonry', '泥水一班', '泥水工'),
     ('crew-paint', '油工一班', '油工')`)
@@ -99,6 +100,22 @@ describe('quantity derived：统一派生读 seam', () => {
       applicableUnits: 2,
       completedUnits: 1,
     })
+  })
+
+  it('分项软删后从进度分母和月度量中隐藏，但不吞历史完成事实', async () => {
+    await softDelete(mem, 'items', 'i-floor')
+
+    const progress = await loadQuantityStageProgress(mem, 'p1')
+    expect(progress.find(stage => stage.stageId === 's-floor')).toMatchObject({
+      applicableUnits: 0,
+      completedUnits: 1,
+    })
+
+    const monthly = await loadQuantityMonthlyOutput(mem, 'p1')
+    expect(monthly.some(row => row.stageId === 's-floor')).toBe(false)
+
+    const records = await loadQuantityConstructionRecords(mem, 'p1')
+    expect(records.some(record => record.completionId === 'c4')).toBe(true)
   })
 
   it('施工记录：工种→阶段→日期排序，执行责任按审计保留，照片随可见完成事实计数', async () => {
@@ -152,5 +169,33 @@ describe('quantity derived：统一派生读 seam', () => {
       contractQty: 21,
     })
     expect(monthly.some(row => row.stageId === 's-floor' && row.month === '2026-06')).toBe(false)
+  })
+
+  it('月度完成量只在显式报量阶段计一次，多阶段共用分项不重复带量', async () => {
+    await mem.execute(`INSERT INTO construction_stages
+      (id, project_id, code, name, trade, completion_mode, sort_order) VALUES
+      ('s-putty-final', 'p1', 'putty-final', '二遍腻子', '油工', 'unit', 11)`)
+    await mem.execute(`UPDATE construction_stage_items
+      SET is_reporting_stage = 0 WHERE id = 'map-putty'`)
+    await mem.execute(`INSERT INTO construction_stage_items
+      (id, stage_id, item_id, is_reporting_stage) VALUES
+      ('map-putty-final', 's-putty-final', 'i-putty', 1)`)
+    await mem.execute(`INSERT INTO unit_stage_completions
+      (id, unit_id, stage_id, assignment_id, status, completed_at) VALUES
+      ('c6', 'u1', 's-putty-final', 'a-u1-p', 'completed', '2026-06-25')`)
+
+    const monthly = await loadQuantityMonthlyOutput(mem, 'p1')
+    const putty = monthly.filter(row => row.trade === '油工')
+
+    expect(putty).toEqual([
+      expect.objectContaining({
+        month: '2026-06',
+        stageId: 's-putty-final',
+        completedUnits: 1,
+        contractQty: 40,
+        provisionalQty: 41,
+        fieldQty: 42,
+      }),
+    ])
   })
 })

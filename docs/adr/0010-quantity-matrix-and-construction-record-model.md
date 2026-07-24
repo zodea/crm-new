@@ -1,6 +1,6 @@
 # 工程量矩阵与施工记录模型：户型模板活链接 + 指派/阶段完成分层 + 施工记录派生
 
-> 状态：已采纳（2026-07-08；2026-07-19 补充“指派与阶段完成拆分”；2026-07-20 补充模板房间稳定身份）
+> 状态：已采纳（2026-07-08；2026-07-19 补充“指派与阶段完成拆分”；2026-07-20 补充模板房间稳定身份；2026-07-22 补充报量阶段映射）
 > 影响：`DATABASE.md`（`house_type_templates` / `rooms` / `house_type_template_items` / `construction_stages` / `unit_assignments` / `unit_assignment_scopes` / `unit_stage_completions`）、`docs/rewrite/pages/subcontract-quantity.md`、`docs/rewrite/pages/schedule-progress.md`、`CONTEXT.md`、[#73](https://github.com/zodea/crm-new/issues/73) §8，以及工程量矩阵/工资/进度相关实现。
 
 ## 背景
@@ -43,4 +43,5 @@
 - **施工记录只冻结责任身份**：已完成行按完成时指派与范围显示执行责任，但模板房间显示名与三量仍走活链接读取当前模板值；只有已发放工资按 #117 固化金额快照，不在 #103 复制名称或数量快照。
 - **依赖顺序**：#103 先落阶段目录、指派与完成事实；#114 的 `schedule_tasks.stage_id` 再消费阶段完成率；#7 只消费 #114 的共享排程 store，不建首页副本。
 - **派生 vs 快照**：施工记录、工序进度与月度报量是实时派生查询；工资进度清单发放前是派生预览，发放后按 #117 的月度固化规则保存快照，之后矩阵改动不追溯历史发放。
+- **报量阶段唯一映射**：同一计量分项可参与多个施工阶段进度，但只允许一个活跃 `construction_stage_items.is_reporting_stage=1` 映射进入月度量；存量升级以排序最末阶段作一次性兼容默认，后续调整必须显式改映射，避免一遍/二遍等阶段重复带量。
 - 表格三件套仍走 [ADR 0009](0009-vxe-table-as-datagrid-engine.md) KitTable；矩阵本体是可点击网格，与 KitTable 正交。

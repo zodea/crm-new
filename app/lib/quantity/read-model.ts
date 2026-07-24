@@ -74,6 +74,7 @@ export interface QuantityCompletion {
 
 export interface QuantityProjectSnapshot {
   projectId: string
+  matrixArchivedAt: string | null
   buildings: readonly QuantityBuilding[]
   floors: readonly QuantityFloor[]
   units: readonly QuantityUnit[]
@@ -270,6 +271,11 @@ export async function loadQuantityCatalog(db: SoftDb): Promise<QuantityCatalogPr
 }
 
 export async function loadQuantityProjectSnapshot(db: SoftDb, projectId: string): Promise<QuantityProjectSnapshot> {
+  const [project] = await db.select<{ matrix_archived_at: string | null }>(
+    selectVisibleSql('projects', 'AND id = ?'),
+    [projectId],
+  )
+
   const buildings = await db.select<BuildingRow>(
     selectVisibleSql('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'),
     [projectId],
@@ -361,6 +367,7 @@ export async function loadQuantityProjectSnapshot(db: SoftDb, projectId: string)
 
   return {
     projectId,
+    matrixArchivedAt: project?.matrix_archived_at ?? null,
     buildings: buildings.map(mapBuilding),
     floors: floors.map(mapFloor),
     units: units.map(mapUnit),

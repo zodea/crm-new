@@ -10,16 +10,22 @@ withDefaults(defineProps<{
   loading?: boolean
   activeUnits?: number
   totalUnits?: number
+  matrixArchivedAt?: string | null
 }>(), {
   loading: false,
   activeUnits: 0,
   totalUnits: 0,
+  matrixArchivedAt: null,
 })
 
 const emit = defineEmits<{
   batchComplete: []
+  exportLedger: []
+  exportByCategory: []
+  importData: []
   manageAssignments: []
   manageTemplates: []
+  toggleArchive: []
   refresh: []
 }>()
 
@@ -75,6 +81,9 @@ const viewTabs = [
       />
 
       <div class="quantity-toolbar__right ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
+        <span v-if="matrixArchivedAt" class="status-warn">
+          已归档 {{ matrixArchivedAt.slice(0, 10) }}
+        </span>
         <span class="text-12px text-ink-soft" aria-live="polite">
           有责任或进度 <b class="font-mono text-ink">{{ activeUnits }}</b> / {{ totalUnits }} 户
         </span>
@@ -89,6 +98,22 @@ const viewTabs = [
         <button type="button" class="btn-secondary" @click="emit('manageTemplates')">
           <span class="i-lucide-layout-template mr-1 text-13px" aria-hidden="true" />
           户型模板
+        </button>
+        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('importData')">
+          <span class="i-lucide-file-up mr-1 text-13px" aria-hidden="true" />
+          导入
+        </button>
+        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('exportLedger')">
+          <span class="i-lucide-file-down mr-1 text-13px" aria-hidden="true" />
+          导出台账
+        </button>
+        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('exportByCategory')">
+          <span class="i-lucide-folder-tree mr-1 text-13px" aria-hidden="true" />
+          分类导出
+        </button>
+        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('toggleArchive')">
+          <span :class="matrixArchivedAt ? 'i-lucide-archive-restore' : 'i-lucide-archive'" class="mr-1 text-13px" aria-hidden="true" />
+          {{ matrixArchivedAt ? '解除归档' : '归档矩阵' }}
         </button>
         <button type="button" class="btn-secondary" :disabled="loading" @click="emit('refresh')">
           <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />

@@ -107,6 +107,8 @@ export interface QuantityTemplateDraft {
   rooms: QuantityTemplateRoomDraft[]
   newItems: QuantityTemplateNewItemDraft[]
   lines: QuantityTemplateLineDraft[]
+  /** 矩阵归档后仍要保存时的显式二次授权（蓝本§六）。 */
+  allowArchivedEdit?: boolean
 }
 
 interface ItemRow {
@@ -522,13 +524,16 @@ export async function persistQuantityTemplate(
   db: SoftDb,
   draft: QuantityTemplateDraft,
 ): Promise<{ templateId: string, logIds: string[] }> {
-  const normalized = normalizeDraft(draft)
-  const [project] = await db.select<{ id: string }>(
+  const [project] = await db.select<{ id: string, matrix_archived_at: string | null }>(
     `${selectVisibleSql('projects')} AND id = ?`,
     [draft.projectId],
   )
   if (!project)
     throw new Error('当前项目不存在或已删除')
+  // 归档门先于输入校验：矩阵已归档时无论草稿内容如何都不接受写入。
+  if (project.matrix_archived_at && !draft.allowArchivedEdit)
+    throw new Error('工程量矩阵已归档，请二次确认后再修改户型模板')
+  const normalized = normalizeDraft(draft)
 
   const existingItems = await db.select<ItemRow>(
     selectVisibleSql('items', 'AND project_id = ?'),
@@ -897,7 +902,16 @@ export async function deleteQuantityTemplate(
   db: SoftDb,
   projectId: string,
   templateId: string,
+  options: { allowArchivedEdit?: boolean } = {},
 ): Promise<string> {
+  const [project] = await db.select<{ id: string, matrix_archived_at: string | null }>(
+    `${selectVisibleSql('projects')} AND id = ?`,
+    [projectId],
+  )
+  if (!project)
+    throw new Error('当前项目不存在或已删除')
+  if (project.matrix_archived_at && !options.allowArchivedEdit)
+    throw new Error('工程量矩阵已归档，请二次确认后再删除户型模板')
   const [template] = await db.select<TemplateRow>(
     `${selectVisibleSql('house_type_templates')} AND id = ? AND project_id = ?`,
     [templateId, projectId],

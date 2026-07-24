@@ -100,6 +100,8 @@ export interface QuantityCompletionDraft {
   expectedAssignmentId: string | null
   photos: QuantityCompletionPhotoDraft[]
   allowArchivedEdit?: boolean
+  /** 历史迁移导入专用：跳过缺照片软卡（ADR 0010 §24 交互软卡不适用于旧数据回填）；UI 不暴露。 */
+  allowMissingPhotos?: boolean
 }
 
 export interface QuantityCompletionWriteResult {
@@ -400,21 +402,26 @@ export async function loadQuantityCompletionWorkspace(
     })
   }
 
-  const stages: QuantityCompletionStageView[] = stageRows.map((row) => {
+  const stages: QuantityCompletionStageView[] = []
+  for (const row of stageRows) {
     const completion = completionByStage.get(row.id) ?? null
-    return {
+    const quantities = quantitiesByStage.get(row.id) ?? []
+    // 新登记只暴露该户型确有可见量明细的阶段；既有历史事实即使模板后来调整仍保留只读/修正入口。
+    if (!quantities.length && !completion)
+      continue
+    stages.push({
       id: row.id,
       code: row.code,
       name: row.name,
       trade: row.trade,
       sortOrder: Number(row.sort_order) || 0,
       currentAssignment: assignmentByTrade.get(row.trade) ?? null,
-      quantities: quantitiesByStage.get(row.id) ?? [],
+      quantities,
       completion,
       photos: completion ? photosByCompletion.get(completion.id) ?? [] : [],
       warnings: [],
-    }
-  })
+    })
+  }
 
   // 风险软提示（蓝本§四）：同工种紧邻的上一阶段未完成 / 已完成但缺可见照片，
   // 只提示不硬锁——写入路径不消费 warnings。
@@ -450,6 +457,31 @@ export async function loadQuantityCompletionWorkspace(
   }
 }
 
+/**
+ * 惰性读取验收照片正文（file_payloads 独立存放，列表只带元数据）。
+ * 仍按可见口径校验 file_ref 与所属完成事实：任一方或业务祖先隐藏后都不提供正文。
+ */
+export async function loadQuantityPhotoDataUrl(db: SoftDb, photoId: string): Promise<string> {
+  const [row] = await db.select<{ mime_type: string, encoding: string, content: string }>(
+    `${hiddenCtes('unit_stage_completions')}
+     SELECT fr.mime_type, fp.encoding, fp.content
+     FROM file_refs fr
+     JOIN file_payloads fp ON fp.file_ref_id = fr.id
+     JOIN unit_stage_completions usc ON usc.id = fr.owner_id
+     WHERE fr.id = ?
+       AND fr.owner_type = 'unit_stage_completion'
+       AND fr.category = 'acceptance_photo'
+       AND fr.deleted_at IS NULL
+       AND ${visibleCond('unit_stage_completions', 'usc')}`,
+    [photoId],
+  )
+  if (!row)
+    throw new Error('验收照片不存在或已删除')
+  if (row.encoding !== 'base64')
+    throw new Error('验收照片编码不受支持')
+  return `data:${row.mime_type || 'image/jpeg'};base64,${row.content}`
+}
+
 export async function persistQuantityStageCompletion(
   db: SoftDb,
   draft: QuantityCompletionDraft,
@@ -482,13 +514,17 @@ export async function persistQuantityStageCompletion(
 
   const note = draft.note.trim()
   const completedAt = draft.completedAt?.trim() || null
-  const assignmentId = stage.currentAssignment?.id ?? null
+  // 已完成事实冻结完成时责任；责任替换后的日期/备注修正不得把审计引用改成当前责任。
+  // 草稿首次转完成时才绑定提交当下的 active assignment。
+  const assignmentId = current?.status === 'completed'
+    ? current.assignmentId
+    : stage.currentAssignment?.id ?? null
   if (draft.status === 'completed') {
     if (!completedAt)
       throw new Error('请填写完成日期')
     if (!assignmentId)
       throw new Error('该户当前工种还没有责任人，请先在责任配置中指派')
-    if (!draft.photos.length && !stage.photos.length)
+    if (!draft.photos.length && !stage.photos.length && !draft.allowMissingPhotos)
       throw new Error('缺少验收照片：请补拍上传，或保存到草稿')
   }
 

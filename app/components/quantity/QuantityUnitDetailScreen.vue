@@ -1,15 +1,35 @@
 <script setup lang="ts">
 import type { QuantityCompletionQuantityLine, QuantityCompletionStageView } from '~/lib/quantity/completion'
 
+import { db } from '~/lib/db/client'
+import { loadQuantityPhotoDataUrl } from '~/lib/quantity/completion'
+import { formatQuantityValue } from '~/lib/quantity/format'
+import { toErrorMessage } from '~/lib/util/error'
+
 const props = defineProps<{
   projectId: string
   unitId: string
 }>()
 
 const store = useQuantityStore()
+const { error: toastError } = useKitUI()
 
 const completionDialogOpen = shallowRef(false)
 const completionInitialStageId = shallowRef('')
+const previewPhoto = shallowRef<{ fileName: string, dataUrl: string } | null>(null)
+
+// 验收照片正文惰性读取（蓝本§五「展示…验收照片」）：点击 chip 才拉 payload。
+async function openPhotoPreview(photo: { id: string, fileName: string }) {
+  try {
+    previewPhoto.value = {
+      fileName: photo.fileName,
+      dataUrl: await loadQuantityPhotoDataUrl(db, photo.id),
+    }
+  }
+  catch (cause) {
+    toastError(`验收照片加载失败：${toErrorMessage(cause)}`)
+  }
+}
 
 const workspace = computed(() => (
   store.completionWorkspace?.projectId === props.projectId
@@ -62,11 +82,9 @@ const unitTotals = computed(() => {
   return sumLines(lines)
 })
 
-function quantityLabel(value: number | null): string {
-  if (value == null)
-    return '—'
-  return String(Math.round(value * 100) / 100)
-}
+const stageTotals = computed(() => new Map(
+  (workspace.value?.stages ?? []).map(stage => [stage.id, sumLines(stage.quantities)]),
+))
 
 function statusChip(stage: QuantityCompletionStageView): { label: string, cls: string } {
   if (stage.completion?.status === 'completed')
@@ -247,13 +265,13 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
                     {{ line.unit || '—' }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(line.contractQty) }}
+                    {{ formatQuantityValue(line.contractQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(line.provisionalQty) }}
+                    {{ formatQuantityValue(line.provisionalQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(line.fieldQty) }}
+                    {{ formatQuantityValue(line.fieldQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink-faint">
                     待单价数据
@@ -264,13 +282,13 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
                     分项小计
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(sumLines(stage.quantities).contractQty) }}
+                    {{ formatQuantityValue(stageTotals.get(stage.id)!.contractQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(sumLines(stage.quantities).provisionalQty) }}
+                    {{ formatQuantityValue(stageTotals.get(stage.id)!.provisionalQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ quantityLabel(sumLines(stage.quantities).fieldQty) }}
+                    {{ formatQuantityValue(stageTotals.get(stage.id)!.fieldQty) }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink-faint">
                     —
@@ -281,13 +299,16 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
           </div>
 
           <ul v-if="stage.photos.length" class="mt-2 flex flex-wrap gap-1.5">
-            <li
-              v-for="photo in stage.photos"
-              :key="photo.id"
-              class="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-11px text-ink-soft"
-            >
-              <span class="i-lucide-image flex-none" aria-hidden="true" />
-              <span class="max-w-40 truncate">{{ photo.fileName }}</span>
+            <li v-for="photo in stage.photos" :key="photo.id">
+              <button
+                type="button"
+                class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-surface-2 px-2.5 py-1 text-11px text-ink-soft outline-none hover:bg-brand-soft/50 focus-visible:[box-shadow:0_0_0_2px_var(--brand-ring)]"
+                :aria-label="`预览照片 ${photo.fileName}`"
+                @click="openPhotoPreview(photo)"
+              >
+                <span class="i-lucide-image flex-none" aria-hidden="true" />
+                <span class="max-w-40 truncate">{{ photo.fileName }}</span>
+              </button>
             </li>
           </ul>
         </article>
@@ -296,9 +317,9 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
       <section class="panel min-w-0 px-4 py-3" aria-label="全户合计">
         <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 text-12px">
           <span class="text-13px font-800 text-ink">全户合计</span>
-          <span class="text-ink-soft">合同量 <b class="text-ink font-mono">{{ quantityLabel(unitTotals.contractQty) }}</b></span>
-          <span class="text-ink-soft">暂定量 <b class="text-ink font-mono">{{ quantityLabel(unitTotals.provisionalQty) }}</b></span>
-          <span class="text-ink-soft">现场量 <b class="text-ink font-mono">{{ quantityLabel(unitTotals.fieldQty) }}</b></span>
+          <span class="text-ink-soft">合同量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.contractQty) }}</b></span>
+          <span class="text-ink-soft">暂定量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.provisionalQty) }}</b></span>
+          <span class="text-ink-soft">现场量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.fieldQty) }}</b></span>
           <span class="text-ink-faint">毛利参考待 BOQ 合同单价与班组分项单价落地后接入</span>
         </div>
       </section>
@@ -311,6 +332,20 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
       :unit-id="unitId"
       :initial-stage-id="completionInitialStageId"
     />
+
+    <Dialog :open="previewPhoto != null" @update:open="(value: boolean) => { if (!value) previewPhoto = null }">
+      <DialogContent class="max-w-[min(880px,calc(100dvw-32px))] p-4">
+        <DialogTitle class="truncate pr-8 text-13px">
+          {{ previewPhoto?.fileName }}
+        </DialogTitle>
+        <img
+          v-if="previewPhoto"
+          :src="previewPhoto.dataUrl"
+          :alt="`验收照片 ${previewPhoto.fileName}`"
+          class="mt-2 max-h-[70dvh] max-w-full rounded-[var(--radius-btn)] object-contain"
+        >
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

@@ -5,9 +5,11 @@ import type {
   QuantityCompletionWorkspace,
 } from '~/lib/quantity/completion'
 import type { QuantityCompletionStatus } from '~/lib/quantity/read-model'
-import { useEventListener, useFileDialog } from '@vueuse/core'
+import { useBase64, useEventListener, useFileDialog } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import { formatQuantityValue } from '~/lib/quantity/format'
 import { toErrorMessage } from '~/lib/util/error'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -58,10 +60,6 @@ const selectedStage = computed(() => (
   workspace.value?.stages.find(stage => stage.id === selectedStageId.value) ?? null
 ))
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
 function draftSignature(): string {
   return JSON.stringify({
     stageId: selectedStageId.value,
@@ -76,7 +74,7 @@ const dirty = computed(() => baseline.value !== '' && draftSignature() !== basel
 
 function hydrateStage(stage: QuantityCompletionStageView | null) {
   status.value = stage?.completion?.status ?? 'completed'
-  completedAt.value = stage?.completion?.completedAt?.slice(0, 10) ?? today()
+  completedAt.value = stage?.completion?.completedAt?.slice(0, 10) ?? toLocalDateInputValue()
   note.value = stage?.completion?.note ?? ''
   newPhotos.value = []
   baseline.value = draftSignature()
@@ -150,28 +148,17 @@ const { open: openPhotoPicker, onChange: onPhotoPicked, reset: resetPhotoPicker 
   multiple: true,
 })
 
-function readAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = String(reader.result ?? '')
-      resolve(result.slice(result.indexOf(',') + 1))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('读取照片失败'))
-    reader.readAsDataURL(file)
-  })
-}
-
 onPhotoPicked(async (files) => {
   if (!files?.length)
     return
   try {
     for (const file of Array.from(files)) {
+      const dataUrl = await useBase64(file).promise.value
       newPhotos.value.push({
         fileName: file.name,
         mimeType: file.type || 'image/jpeg',
         fileSize: file.size,
-        contentBase64: await readAsBase64(file),
+        contentBase64: dataUrl.slice(dataUrl.indexOf(',') + 1),
       })
     }
   }
@@ -199,10 +186,6 @@ function warningLabel(item: QuantityCompletionWarning): string {
   return item.code === 'prior-photo-missing'
     ? `上一阶段「${item.stageName}」已完成但缺验收照片`
     : `上一阶段「${item.stageName}」尚未完成`
-}
-
-function quantityLabel(value: number | null): string {
-  return value == null ? '—' : String(value)
 }
 
 async function confirmArchivedEdit(): Promise<boolean> {
@@ -492,17 +475,17 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
                       {{ line.unit || '—' }}
                     </td>
                     <td class="px-3 py-2 text-right text-ink font-mono">
-                      {{ quantityLabel(line.contractQty) }}
+                      {{ formatQuantityValue(line.contractQty) }}
                       <span
                         v-if="line.recognizedContractQty != null && line.recognizedContractQty !== line.contractQty"
                         class="block text-10px text-ink-faint"
                       >识别 {{ line.recognizedContractQty }}</span>
                     </td>
                     <td class="px-3 py-2 text-right text-ink font-mono">
-                      {{ quantityLabel(line.provisionalQty) }}
+                      {{ formatQuantityValue(line.provisionalQty) }}
                     </td>
                     <td class="px-3 py-2 text-right text-ink font-mono">
-                      {{ quantityLabel(line.fieldQty) }}
+                      {{ formatQuantityValue(line.fieldQty) }}
                     </td>
                   </tr>
                 </tbody>

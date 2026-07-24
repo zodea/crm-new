@@ -65,6 +65,33 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     expect(scrollableTables).toBeGreaterThan(0)
   })
 
+  test('缺照片软卡取消时保留输入，确认后按原日期和备注保存草稿', async ({ page }) => {
+    await page.goto('/subcontract/quantity')
+    await page.waitForLoadState('networkidle')
+    const cells = page.getByTestId('quantity-matrix-cell')
+    await cells.nth(2).focus()
+    await cells.nth(2).press('Enter')
+    await page.getByRole('button', { name: '详情 101户' }).click()
+    await page.getByRole('link', { name: /打开户施工详情/ }).click()
+
+    await page.getByRole('region', { name: '泥水工施工记录' }).getByRole('button', { name: '登记' }).first().click()
+    const dialog = page.getByRole('dialog').filter({ hasText: '阶段完成登记' })
+    const note = dialog.getByRole('textbox', { name: '备注' })
+    await note.fill('缺照片软卡保留输入')
+    await expect(dialog.getByLabel('完成日期')).not.toHaveValue('')
+
+    await dialog.getByRole('button', { name: '登记完成', exact: true }).click()
+    const softGate = page.getByRole('dialog').filter({ hasText: '缺少验收照片' })
+    await expect(softGate).toBeVisible()
+    await softGate.getByRole('button', { name: '取消', exact: true }).click()
+    await expect(note).toHaveValue('缺照片软卡保留输入')
+
+    await dialog.getByRole('button', { name: '登记完成', exact: true }).click()
+    await softGate.getByRole('button', { name: '保存到草稿', exact: true }).click()
+    await expect(page.getByText(/已保存.*草稿/)).toBeVisible()
+    await expect(note).toHaveValue('缺照片软卡保留输入')
+  })
+
   test('直接访问不存在的户显示错误态', async ({ page }) => {
     await page.goto('/subcontract/quantity/proj_demo_001/not-a-unit')
     await page.waitForLoadState('networkidle')

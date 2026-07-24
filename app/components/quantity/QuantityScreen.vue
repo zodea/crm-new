@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
+import { db } from '~/lib/db/client'
+import {
+  loadQuantityConstructionRecords,
+  loadQuantityMonthlyOutput,
+  loadQuantityStageProgress,
+} from '~/lib/quantity/derived'
+import { createQuantityCategoryExport, createQuantityLedgerExport } from '~/lib/quantity/export'
 import {
   ALL_QUANTITY_FILTER,
   buildQuantityMatrix,
@@ -8,8 +15,10 @@ import {
   quantityMonthOptions,
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
+import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
+const { confirm, error: toastError, exportFile, formModal, openImportTab, success, warning } = useKitUI()
 
 const projectId = shallowRef('')
 const buildingId = shallowRef('')
@@ -126,6 +135,100 @@ function completeCell(cell: QuantityMatrixCell): void {
   completionDialogOpen.value = true
 }
 
+// 导入走 ADR 0005 映射页签：三类目标 + 旧合一行迁移预检（蓝本§六）。
+const IMPORT_TARGETS = [
+  { label: '户型模板量', entity: 'quantity-template' },
+  { label: '责任配置', entity: 'quantity-assignment' },
+  { label: '阶段完成', entity: 'quantity-completion' },
+  { label: '旧合一行迁移预检（不写入）', entity: 'quantity-legacy-precheck' },
+] as const
+
+async function importData() {
+  const values = await formModal({
+    title: '工程量导入',
+    subtitle: '选择导入目标后进入映射页签；旧合一行只做迁移预检，不会写入。',
+    saveText: '进入映射',
+    fields: [{
+      key: 'target',
+      label: '导入目标',
+      type: 'select',
+      options: IMPORT_TARGETS.map(target => target.label),
+      value: IMPORT_TARGETS[0].label,
+      required: true,
+    }],
+  })
+  if (!values)
+    return
+  const target = IMPORT_TARGETS.find(candidate => candidate.label === values.target)
+  if (target)
+    openImportTab({ entity: target.entity })
+}
+
+// 导出读统一派生查询（derived.ts），与页面/工资预览同口径（蓝本§六）。
+async function exportLedger() {
+  if (!projectId.value)
+    return
+  try {
+    const [records, progress, monthly] = await Promise.all([
+      loadQuantityConstructionRecords(db, projectId.value),
+      loadQuantityStageProgress(db, projectId.value),
+      loadQuantityMonthlyOutput(db, projectId.value),
+    ])
+    if (!records.length && !progress.length) {
+      warning('当前项目还没有可导出的工程量数据')
+      return
+    }
+    const projectName = store.catalog.find(project => project.id === projectId.value)?.name ?? ''
+    await exportFile(createQuantityLedgerExport({ projectName, records, progress, monthly }))
+  }
+  catch (cause) {
+    toastError(`工程量导出失败：${toErrorMessage(cause)}`)
+  }
+}
+
+async function exportByCategory() {
+  if (!projectId.value)
+    return
+  try {
+    const records = await loadQuantityConstructionRecords(db, projectId.value)
+    if (!records.length) {
+      warning('当前项目还没有施工记录可分类导出')
+      return
+    }
+    await exportFile(createQuantityCategoryExport(records))
+  }
+  catch (cause) {
+    toastError(`工程量导出失败：${toErrorMessage(cause)}`)
+  }
+}
+
+// 归档锁定/解除都要二次确认并落 projects 操作日志（蓝本§六）。
+async function toggleArchive() {
+  if (!projectId.value || !snapshot.value)
+    return
+  const archived = Boolean(snapshot.value.matrixArchivedAt)
+  const approved = await confirm({
+    variant: 'simple',
+    title: archived ? '解除矩阵归档' : '归档工程量矩阵',
+    message: archived
+      ? '解除归档后，模板、责任与完成事实恢复正常编辑。'
+      : '归档后修改户型模板、责任指派或完成事实都需要二次确认，操作日志全程保留。确认归档当前项目矩阵？',
+    confirmLabel: archived ? '解除归档' : '确认归档',
+  })
+  if (!approved)
+    return
+  try {
+    const logId = archived
+      ? await store.unarchiveMatrix(projectId.value)
+      : await store.archiveMatrix(projectId.value)
+    if (logId)
+      success(archived ? '已解除矩阵归档' : '矩阵已归档锁定')
+  }
+  catch {
+    toastError(store.error || '归档操作失败')
+  }
+}
+
 onMounted(initialize)
 </script>
 
@@ -147,7 +250,12 @@ onMounted(initialize)
       :loading="store.loading"
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
+      :matrix-archived-at="snapshot?.matrixArchivedAt ?? null"
       @batch-complete="batchCompletionDialogOpen = true"
+      @import-data="importData"
+      @export-ledger="exportLedger"
+      @export-by-category="exportByCategory"
+      @toggle-archive="toggleArchive"
       @manage-templates="templateDialogOpen = true"
       @manage-assignments="openAssignments()"
       @refresh="retry"
