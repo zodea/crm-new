@@ -313,6 +313,19 @@ export const migrations: Migration[] = [
       await execScript(db, V10_DELIVERY_SOURCE_FILES)
     },
   },
+  {
+    // ADR 0005：外部旧 ID 是迁移对账/二次修正/去重键；空值不参与唯一约束。
+    version: 11,
+    name: 'suppliers-external-reference',
+    async up(db) {
+      await addColumnIfMissing(db, 'suppliers', 'external_ref', `TEXT DEFAULT ''`)
+      await db.execute(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_suppliers_external_ref
+        ON suppliers(external_ref)
+        WHERE external_ref <> '' AND deleted_at IS NULL;
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

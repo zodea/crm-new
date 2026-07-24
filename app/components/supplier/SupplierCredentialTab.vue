@@ -1,185 +1,194 @@
 <script setup lang="ts">
-import { execute, select } from '~/lib/db/connection'
-import { db } from '~/lib/db/client'
-import { logCreate, selectVisibleSql, softDelete } from '~/lib/db/soft-delete'
-import { generateId } from '~/lib/util/id'
+import type { KitTableColumn } from '~/lib/kit/table'
+import type { SupplierCredentialCategory } from '~/lib/supplier/detail'
+import type { SupplierCredential, SupplierDetailSnapshot } from '~/stores/supplier-detail'
+import {
+  REQUIRED_SUPPLIER_CREDENTIALS,
+  SUPPLIER_CREDENTIAL_CATEGORIES,
+} from '~/lib/supplier/detail'
+import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
   supplierId: string
+  snapshot: SupplierDetailSnapshot
 }>()
 
-const { formModal, success, error } = useKitUI()
+const detailStore = useSupplierDetailStore()
+const { confirm, formModal, undoToast, success, warning, error } = useKitUI()
 
-interface Credential {
-  id: string
-  supplierId: string
-  category: string
-  fileName: string
-  filePath: string
-  ocrResult: Record<string, unknown>
-  ocrConfidence: number | null
-  verifiedAt: string | null
-  addedAt: string
-}
-
-const CATEGORIES = [
-  '营业执照', '法人身份证', '银行开户许可证', '签约代表身份证',
-  '品牌授权证明', '合同模板', '完税证明', '过往业绩合同', '施工照片', '其他',
+const columns: KitTableColumn[] = [
+  { title: '#', type: 'seq', fixed: 'left' },
+  { field: 'category', title: '证照类别', width: 150, slot: 'category' },
+  { field: 'required', title: '要求', width: 80, slot: 'required' },
+  { field: 'fileName', title: '文件', minWidth: 210, slot: 'fileName' },
+  { field: 'ocrConfidence', title: 'OCR 置信度', width: 115, slot: 'confidence' },
+  { field: 'verifiedAt', title: '审核状态', width: 110, slot: 'verified' },
+  { field: 'addedAt', title: '添加时间', width: 165, slot: 'addedAt' },
+  { title: '操作', type: 'action', width: 132, fixed: 'right' },
 ]
-const REQUIRED = ['营业执照', '法人身份证', '银行开户许可证']
 
-const credentials = ref<Credential[]>([])
-const loading = ref(false)
+const credentials = computed(() => [...props.snapshot.credentials])
+const missingRequired = computed(() =>
+  REQUIRED_SUPPLIER_CREDENTIALS.filter(category =>
+    !credentials.value.some(credential => credential.category === category),
+  ),
+)
 
-async function loadCredentials() {
-  loading.value = true
-  try {
-    const rows = await select<Record<string, unknown>>(
-      selectVisibleSql('supplier_credentials', 'AND supplier_id = ? ORDER BY added_at DESC'),
-      [props.supplierId],
-    )
-    credentials.value = rows.map(r => ({
-      id: r.id as string,
-      supplierId: r.supplier_id as string,
-      category: r.category as string,
-      fileName: (r.file_name ?? '') as string,
-      filePath: (r.file_path ?? '') as string,
-      ocrResult: JSON.parse((r.ocr_result as string) || '{}'),
-      ocrConfidence: r.ocr_confidence as number | null,
-      verifiedAt: r.verified_at as string | null,
-      addedAt: (r.added_at ?? '') as string,
-    }))
-  }
-  finally {
-    loading.value = false
-  }
+function isRequired(category: string): boolean {
+  return REQUIRED_SUPPLIER_CREDENTIALS.includes(category as SupplierCredentialCategory)
 }
 
-const missingRequired = computed(() =>
-  REQUIRED.filter(cat => !credentials.value.some(c => c.category === cat)),
-)
+function formatDateTime(value: string | null): string {
+  return value?.slice(0, 19).replace('T', ' ') || '—'
+}
+
+function showMutationError(prefix: string, err: unknown) {
+  const message = toErrorMessage(err)
+  error(message.startsWith('数据已保存') ? message : `${prefix}：${message}`)
+}
 
 async function addCredential() {
   const values = await formModal({
     title: '添加证照',
-    subtitle: '文件上传功能需要 Tauri 环境。当前先记录证照条目，文件稍后上传。',
+    subtitle: '浏览器模式保存证照分类与文件名；Tauri 文件路径将在桌面端接管。',
     saveText: '添加',
     fields: [
-      { key: 'category', label: '证照类别', type: 'select', options: CATEGORIES, value: '营业执照', required: true },
-      { key: 'fileName', label: '文件名（上传后自动填充）', placeholder: '如: 营业执照-大板东.pdf', required: true },
+      { key: 'category', label: '证照类别', type: 'select', options: [...SUPPLIER_CREDENTIAL_CATEGORIES], value: '营业执照', required: true },
+      { key: 'fileName', label: '文件名', placeholder: '如：营业执照-大板东.pdf', required: true },
     ],
   })
-  if (!values) return
-  const id = generateId('cred')
-  // 弹窗在 resolve 时已关闭,写库失败必须显式报错,否则用户会误以为已保存
-  try {
-    await execute(
-      `INSERT INTO supplier_credentials (id, supplier_id, category, file_name, added_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [id, props.supplierId, values.category, values.fileName, new Date().toISOString()],
-    )
-    await logCreate(db, 'supplier_credentials', id)
-  }
-  catch {
-    error('证照添加失败，未写入数据库，请重试')
+  if (!values)
+    return
+
+  const category = values.category as SupplierCredentialCategory
+  const fileName = String(values.fileName ?? '').trim()
+  if (!SUPPLIER_CREDENTIAL_CATEGORIES.includes(category) || !fileName) {
+    warning('请选择证照类别并填写文件名')
     return
   }
-  success('证照已添加（待上传文件）')
-  await loadCredentials()
+
+  try {
+    await detailStore.addCredential({ supplierId: props.supplierId, category, fileName })
+    success('证照已添加，资料状态已重新计算')
+  }
+  catch (err) {
+    showMutationError('证照添加失败', err)
+  }
 }
 
-// TODO(数据流阶梯): 本组件直连 db 属存量范式,待证照随分供方域收进 Pinia store
-async function removeCredential(id: string) {
-  await softDelete(db, 'supplier_credentials', id)
-  success('已删除')
-  await loadCredentials()
+async function removeCredential(credential: SupplierCredential) {
+  const supplierId = credential.supplierId
+  const confirmed = await confirm({
+    variant: 'simple',
+    title: '删除证照',
+    message: `确认删除「${credential.fileName || credential.category}」？删除后可在 10 秒内撤回。`,
+    confirmLabel: '删除',
+  })
+  if (!confirmed)
+    return
+
+  try {
+    const logId = await detailStore.removeCredential(credential.id, supplierId)
+    if (!logId) {
+      error('删除失败：证照不存在或已删除')
+      return
+    }
+    undoToast(
+      `已删除证照「${credential.fileName || credential.category}」`,
+      () => detailStore.undoCredential(logId, supplierId),
+    )
+  }
+  catch (err) {
+    showMutationError('证照删除失败', err)
+  }
 }
 
-const categoryColor: Record<string, string> = {
-  '营业执照': 'chip-brand',
-  '法人身份证': 'chip-brand',
-  '银行开户许可证': 'chip-brand',
+function previewCredential(credential: SupplierCredential) {
+  warning(credential.filePath
+    ? `正在打开 ${credential.fileName}`
+    : '浏览器模式仅保存文件元数据，桌面端接入后可预览原文件')
 }
-
-watch(() => props.supplierId, loadCredentials, { immediate: true })
 </script>
 
 <template>
-  <div>
-    <!-- 缺失提示 -->
+  <div class="flex min-w-0 flex-col gap-3">
     <div
       v-if="missingRequired.length"
-      class="flex items-center gap-2 px-3 py-2 mb-4 border border-line bg-warn-soft/30 text-12px text-warn-ink"
+      class="panel flex items-center gap-2 border-warn/30 bg-warn-soft/30 px-3 py-2 text-12px text-warn-ink"
+      role="status"
     >
-      <span class="i-lucide-triangle-alert text-14px" />
-      缺失必需证照: {{ missingRequired.join('、') }}
+      <span class="i-lucide-triangle-alert text-14px" aria-hidden="true" />
+      缺失必需证照：{{ missingRequired.join('、') }}
     </div>
 
-    <!-- 工具栏 -->
-    <div class="flex items-center justify-between mb-3">
-      <h4 class="text-13px font-700 text-ink">
-        证照清单 · {{ credentials.length }} 份
-      </h4>
-      <button class="btn-primary" @click="addCredential">
-        <span class="i-lucide-plus text-13px mr-1" /> 添加证照
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="mr-auto">
+        <h3 class="text-13px font-700 text-ink">
+          证照清单 · {{ credentials.length }} 份
+        </h3>
+        <p class="mt-0.5 text-11px text-ink-faint">
+          营业执照、法人身份证、银行开户许可证齐全后自动标记为合格
+        </p>
+      </div>
+      <button type="button" class="btn-secondary" @click="warning('桌面端文件打包能力接入后开放批量下载')">
+        <span class="i-lucide-download mr-1" aria-hidden="true" />批量下载
+      </button>
+      <button type="button" class="btn-primary" @click="addCredential">
+        <span class="i-lucide-plus mr-1" aria-hidden="true" />添加证照
       </button>
     </div>
 
-    <!-- 证照表格 -->
-    <div class="border border-line">
-      <vxe-table
-        :data="credentials"
-        :loading="loading"
-        border
-        show-overflow
-        height="auto"
-        :row-config="{ isHover: true }"
-      >
-        <vxe-column type="seq" title="#" width="52" />
-        <vxe-column field="category" title="类别" width="140">
-          <template #default="{ row }">
-            <span :class="['chip', categoryColor[row.category] || 'chip-brand']">
-              {{ row.category }}
-            </span>
-          </template>
-        </vxe-column>
-        <vxe-column field="fileName" title="文件名" min-width="200">
-          <template #default="{ row }">
-            <span v-if="row.filePath" class="cell--link">{{ row.fileName }}</span>
-            <span v-else class="text-ink-faint">{{ row.fileName || '待上传' }}</span>
-          </template>
-        </vxe-column>
-        <vxe-column field="ocrConfidence" title="识别置信度" width="110">
-          <template #default="{ row }">
-            <span v-if="row.ocrConfidence != null" class="font-mono text-12px">
-              {{ (row.ocrConfidence * 100).toFixed(1) }}%
-            </span>
-            <span v-else class="text-ink-faint">—</span>
-          </template>
-        </vxe-column>
-        <vxe-column field="verifiedAt" title="审核时间" width="160">
-          <template #default="{ row }">
-            {{ row.verifiedAt?.slice(0, 19).replace('T', ' ') || '—' }}
-          </template>
-        </vxe-column>
-        <vxe-column field="addedAt" title="添加时间" width="160">
-          <template #default="{ row }">
-            {{ row.addedAt?.slice(0, 19).replace('T', ' ') || '—' }}
-          </template>
-        </vxe-column>
-        <vxe-column title="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <div class="flex items-center gap-1">
-              <button class="icon-btn" title="上传文件">
-                <span class="i-lucide-upload text-14px" />
-              </button>
-              <button class="icon-btn-danger" title="删除" @click="removeCredential(row.id)">
-                <span class="i-lucide-trash-2 text-14px" />
-              </button>
-            </div>
-          </template>
-        </vxe-column>
-      </vxe-table>
-    </div>
+    <KitTable
+      :columns="columns"
+      :data="credentials"
+      :loading="detailStore.isLoading(supplierId)"
+      empty="尚未添加证照"
+    >
+      <template #category="{ row }">
+        <span class="chip chip-brand">{{ row.category }}</span>
+      </template>
+
+      <template #required="{ row }">
+        <span v-if="isRequired(row.category)" class="chip chip-warn">必需</span>
+        <span v-else class="text-ink-faint">可选</span>
+      </template>
+
+      <template #fileName="{ row }">
+        <button type="button" class="cell--link" @click="previewCredential(row)">
+          {{ row.fileName || '待上传' }}
+        </button>
+      </template>
+
+      <template #confidence="{ row }">
+        <span v-if="row.ocrConfidence != null" class="font-mono">
+          {{ (row.ocrConfidence * 100).toFixed(1) }}%
+        </span>
+        <span v-else class="text-ink-faint">—</span>
+      </template>
+
+      <template #verified="{ row }">
+        <span :class="row.verifiedAt ? 'chip chip-ok' : 'chip chip-warn'">
+          {{ row.verifiedAt ? '已审核' : '待审核' }}
+        </span>
+      </template>
+
+      <template #addedAt="{ row }">
+        <span class="font-mono text-11px text-ink-soft">{{ formatDateTime(row.addedAt) }}</span>
+      </template>
+
+      <template #action="{ row }">
+        <div class="flex justify-end gap-1">
+          <button type="button" class="icon-btn" :aria-label="`重新识别证照 ${row.fileName}`" title="OCR 重新识别" @click="warning('OCR 证照识别将在识别服务接入后开放')">
+            <span class="i-lucide-scan-text" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn" :aria-label="`预览证照 ${row.fileName}`" title="预览" @click="previewCredential(row)">
+            <span class="i-lucide-eye" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn-danger" :aria-label="`删除证照 ${row.fileName}`" title="删除" @click="removeCredential(row)">
+            <span class="i-lucide-trash-2" aria-hidden="true" />
+          </button>
+        </div>
+      </template>
+    </KitTable>
   </div>
 </template>

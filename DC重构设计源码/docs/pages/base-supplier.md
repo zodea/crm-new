@@ -1,5 +1,7 @@
 # 基础信息/分供方 — 主数据 + 证照 + 跨项目汇总
 
+> ⚠️ 本文件保留设计阶段页面说明；当前分供方字段语义与数据模型以 `docs/rewrite/pages/base-supplier.md`、`docs/rewrite/DATABASE.md` 及 GitHub Issue #13 为准。不要沿用本文件中与其冲突的旧字段名、必填规则或状态流转。
+
 > 路由: `/base/supplier` · `/base/supplier/:id`  
 > 页面: `pages/base/supplier/index.vue` · `pages/base/supplier/[id].vue`  
 > 参考: CRM 截图 `docs/红圈系统/合同页/`、`docs/红圈系统/付款申请/`、`docs/红圈系统/收票登记/`  

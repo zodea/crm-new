@@ -1,7 +1,10 @@
 import type { ConfirmImpact } from '~/lib/kit/confirm'
+import { defineStore } from 'pinia'
+import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
@@ -21,6 +24,8 @@ const TABLE_LABELS: Record<string, string> = {
 export interface Supplier {
   id: string
   name: string
+  /** 源系统主键/匹配标识（ADR 0005），用于迁移对账、重导修正与去重。 */
+  externalRef: string
   aliases: string[]
   uniqueCode: string
   taxNo: string
@@ -68,6 +73,7 @@ interface SupplierColumn<K extends keyof SupplierData> {
  */
 const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   name: { col: 'name', toBind: d => d.name ?? '', fromRow: r => r.name as string },
+  externalRef: { col: 'external_ref', toBind: d => d.externalRef ?? '', fromRow: r => (r.external_ref ?? '') as string },
   aliases: { col: 'aliases', toBind: d => JSON.stringify(d.aliases ?? []), fromRow: r => parseJsonColumn<string[]>(r.aliases, []) },
   uniqueCode: { col: 'unique_code', toBind: d => d.uniqueCode ?? '', fromRow: r => (r.unique_code ?? '') as string },
   taxNo: { col: 'tax_no', toBind: d => d.taxNo ?? '', fromRow: r => (r.tax_no ?? '') as string },
@@ -150,6 +156,24 @@ export const useSupplierStore = defineStore('supplier', () => {
     return id
   }
 
+  /** ADR 0005 导入唯一写路径：有外部旧 ID 时更新既有记录，否则新增。 */
+  async function upsertImported(data: Partial<Supplier>) {
+    const externalRef = data.externalRef?.trim() ?? ''
+    if (!externalRef)
+      return add(withSupplierImportCreateDefaults(data))
+
+    const [row] = await select<Record<string, unknown>>(
+      selectVisibleSql('suppliers', 'AND external_ref = ? LIMIT 1'),
+      [externalRef],
+    )
+    if (!row)
+      return add(withSupplierImportCreateDefaults({ ...data, externalRef }))
+
+    const existing = rowToSupplier(row)
+    await update(existing.id, { ...existing, ...data, externalRef })
+    return existing.id
+  }
+
   /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   async function update(id: string, data: Partial<Supplier>) {
     const now = new Date().toISOString()
@@ -175,5 +199,5 @@ export const useSupplierStore = defineStore('supplier', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'suppliers', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove, restore, undo, downstreamImpact }
+  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, upsertImported, remove, restore, undo, downstreamImpact }
 })

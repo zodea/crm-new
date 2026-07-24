@@ -1,6 +1,7 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Project } from '~/stores/project'
 import { normalizeProjectStatus } from '~/lib/project/status'
+import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 导入实体注册表（ADR 0005「实体触发、模板隐含」）：
@@ -48,6 +49,32 @@ const PROJECT_FIELDS: readonly ImportTemplateField[] = [
   EXTERNAL_REF_FIELD,
 ]
 
+const SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
+  { key: 'name', label: '公司全称', required: true, aliases: ['分供方名称', '供应商名称', '名称'] },
+  { key: 'supplierCategory', label: '分供方类别', aliases: ['类别', '合作类别'] },
+  { key: 'credentialStatus', label: '资料状态', aliases: ['资质状态'] },
+  { key: 'aliases', label: '简称/别名', aliases: ['简称', '别名'] },
+  { key: 'uniqueCode', label: '统一社会信用代码', aliases: ['信用代码'] },
+  { key: 'taxNo', label: '税号', aliases: ['纳税人识别号'] },
+  { key: 'legalRep', label: '法定代表人', aliases: ['法人'] },
+  { key: 'registeredCapital', label: '注册资金（万元）', aliases: ['注册资金', '注册资本'] },
+  { key: 'registeredDate', label: '注册日期', aliases: ['成立日期'] },
+  { key: 'address', label: '注册地址', aliases: ['地址'] },
+  { key: 'mainBusiness', label: '主营业务' },
+  { key: 'businessType', label: '业务类型' },
+  { key: 'invoiceName', label: '开票名称' },
+  { key: 'taxpayerType', label: '纳税人类型' },
+  { key: 'bank', label: '开户行' },
+  { key: 'bankAccount', label: '银行账号' },
+  { key: 'invoiceAddress', label: '开票地址' },
+  { key: 'phone', label: '电话' },
+  { key: 'contact', label: '主要联系人', aliases: ['联系人'] },
+  { key: 'contactPhone', label: '联系方式', aliases: ['联系电话', '手机号'] },
+  { key: 'rating', label: '评价等级' },
+  { key: 'note', label: '备注' },
+  EXTERNAL_REF_FIELD,
+]
+
 export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
   'project': {
     key: 'project',
@@ -62,6 +89,14 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
         ...row,
         status: normalizeProjectStatus(row.status),
       } as Partial<Project>)
+    },
+  },
+  'supplier': {
+    key: 'supplier',
+    label: '分供方',
+    fields: SUPPLIER_FIELDS,
+    async importRow(row) {
+      await useSupplierStore().upsertImported(normalizeSupplierImportRow(row))
     },
   },
   'demo-supplier': {

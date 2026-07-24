@@ -23,6 +23,20 @@ describe('导入实体注册表', () => {
     expect(entity?.fields.map(f => f.key)).toContain('builder')
   })
 
+  it('分供方实体已登记：公司全称必填，字段覆盖类别、资料状态与别名', () => {
+    const entity = getImportEntity('supplier')
+
+    expect(entity?.label).toBe('分供方')
+    expect(entity?.fields.find(field => field.key === 'name')?.required).toBe(true)
+    expect(entity?.fields.map(field => field.key)).toEqual(expect.arrayContaining([
+      'supplierCategory',
+      'credentialStatus',
+      'aliases',
+      'registeredCapital',
+    ]))
+    expect(entity?.fields).toContainEqual(EXTERNAL_REF_FIELD)
+  })
+
   it('未登记的实体返回 undefined', () => {
     expect(getImportEntity('unknown-entity')).toBeUndefined()
   })
