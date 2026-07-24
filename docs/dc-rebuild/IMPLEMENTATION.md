@@ -121,4 +121,4 @@ write_files(projectId, planId, files:[{ path:"kit/Xxx.jsx", localPath:"Xxx.jsx" 
 ## 五、已知遗留 / 注意
 1. **KitToolbar 兼容垫片已移除**：`ProjectScreen` 第 5 站重写后不再引用 `window.KitToolbar/KitTH/KitTD`，已从 `SupplierScreen.jsx` 删除该注册块，全项目无残留。
 2. ~~弹窗多为占位~~ **已完成（反馈轮 3）**：新增/编辑弹窗、导出配置、导入映射、打印确认、送货单系列弹窗均已是真实交互，做法与规则见 [INTERACTION-PLAYBOOK.md](./INTERACTION-PLAYBOOK.md)。项目详情 6 个占位 Tab 与项目×分供方工作台仍为占位。
-3. **视觉基准 = [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)**（圆角卡片 + 阴影）；DESIGN-SYSTEM.md 扁平旧条款已作废，dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
+3. **视觉基准 = [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)**（圆角卡片 + 阴影）+ **[ADR 0013](../adr/0013-align-all-ui-to-online-design.md)**（全站布局/排版/颜色 = 设计稿 `app.dc.html`，含外壳）；DESIGN-SYSTEM.md 扁平旧条款已作废，dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。

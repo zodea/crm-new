@@ -17,7 +17,7 @@ const {
 <template>
   <div
     data-testid="factor-workbench"
-    class="relative overflow-hidden rounded-[var(--radius-card)] border border-line shadow-[var(--shadow-card)] xl:grid xl:h-[calc(100dvh-118px)] xl:grid-rows-[auto_minmax(0,1fr)_auto]"
+    class="relative overflow-hidden rounded-[var(--radius-card)] border border-line shadow-[var(--shadow-card)] xl:grid xl:h-full xl:grid-rows-[auto_minmax(0,1fr)_auto]"
     style="background-color: var(--panel)"
   >
     <header class="grid border-b border-line xl:grid-cols-[360px_minmax(0,1fr)]" style="background-color: var(--panel)">

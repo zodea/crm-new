@@ -89,7 +89,7 @@ export default defineConfig({
       },
     },
 
-    // 统一形状阶梯：交互控件 10px、卡片/弹窗 12px、小控件 8px。
+    // 统一形状阶梯：交互控件 8px、卡片/弹窗 12px、小控件 8px。
     borderRadius: {
       lg: 'var(--radius-card)',
       md: 'var(--radius-btn)',
@@ -176,9 +176,6 @@ export default defineConfig({
   ],
 
   shortcuts: {
-    // 侧边栏面板（毛玻璃）
-    'sidebar-panel': 'border border-line rounded-[var(--radius-card)] bg-[rgb(255_255_255/82%)] backdrop-blur-[12px] shadow-[var(--sidebar-shadow)]',
-
     // L1 卡片底座（DESIGN-TASTE §4.1 / ADR 0007，#110 B1）：一切内容容器的唯一配方，
     // 内边距由调用处按 12–16 自持（表格卡 0 + overflow-hidden）；卡内不再嵌套圆角阴影。
     // 可点卡片叠加 panel-hover（hover 边转 brand + 阴影升级）。

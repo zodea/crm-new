@@ -4,7 +4,7 @@
 > 目标：以 `docs/rewrite/pages/*.md` 为内容蓝本，把各页面按统一的「疏朗仪表盘」风格重构，消除「各页各做一套」的割裂感
 > 开始：2026-06-30 · 本目录为实施记录
 >
-> ⛔ **本目录（`docs/dc-rebuild/`）整体是 `window.KitUI`（`.jsx`）设计稿的历史留档**——记录 DC 单页设计稿的重构过程与交互方法论。**生产端（Nuxt/Vue）以 ADR 为权威**：底座 shadcn-vue [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、确认删除 [0003](../adr/0003-confirm-dialog-deletion-model.md)、导出 [0004](../adr/0004-export-interaction-model.md)、导入 [0005](../adr/0005-import-mapping-model.md)、视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、表格 [0009](../adr/0009-vxe-table-as-datagrid-engine.md)。设计稿与 ADR 冲突处一律以 ADR 为准；下文 window.KitUI / 扁平 / 水波 等描述均为设计稿侧留痕。
+> ⛔ **本目录（`docs/dc-rebuild/`）整体是 `window.KitUI`（`.jsx`）设计稿的历史留档**——记录 DC 单页设计稿的重构过程与交互方法论。**生产端（Nuxt/Vue）以 ADR 为权威**：底座 shadcn-vue [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、确认删除 [0003](../adr/0003-confirm-dialog-deletion-model.md)、导出 [0004](../adr/0004-export-interaction-model.md)、导入 [0005](../adr/0005-import-mapping-model.md)、视觉 [0007](../adr/0007-unified-visual-style-rounded-cards.md)、表格 [0009](../adr/0009-vxe-table-as-datagrid-engine.md)、**全站布局/排版/颜色基准 [0013](../adr/0013-align-all-ui-to-online-design.md)（设计稿 `app.dc.html` 即视觉唯一基准，含外壳）**。行为/数据与 ADR 冲突处以 ADR 为准，**视觉与布局以设计稿镜像为准（ADR 0013）**；下文 window.KitUI / 扁平 / 水波 等描述均为设计稿侧留痕。
 
 ---
 
@@ -15,9 +15,9 @@
 - 更关键：**各页面风格不统一**——首页/工程量是用户亲自调过的「圆角卡片 + 阴影 + 充足留白」现代仪表盘风，而发票/分供方/工人等列表页还是「密集表格台账 + 横条工具栏」的旧 CRM 风，两种风格并存 = 割裂。
 
 ### 1.2 风格基准（已与用户确认）
-**以首页 `HomeScreenNew` + 工程量 `QuantityScreenV2` 为唯一视觉基准**，所有页面向其看齐。
+**以首页 `HomeScreenNew` + 工程量 `QuantityScreenV2` 为唯一视觉基准**，所有页面向其看齐。（2026-07-17 起基准扩为整份设计稿 `app.dc.html` + `kit/*.jsx` + `_ds` 令牌，含应用外壳——见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)。）
 
-> ⚠️ 视觉风格基准 = 圆角卡片 + 阴影，以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准（DESIGN-SYSTEM.md 的扁平旧条款已作废）；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
+> ⚠️ 视觉风格基准 = 圆角卡片 + 阴影，以 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md) 为准（DESIGN-SYSTEM.md 的扁平旧条款已作废）；全站布局/排版/颜色唯一基准 = 设计稿 `app.dc.html`（[ADR 0013](../adr/0013-align-all-ui-to-online-design.md)）；dc-rebuild 组件级细化见 [STYLE-GUIDE.md](./STYLE-GUIDE.md)。
 
 ### 1.3 内容蓝本
 每个页面的 Tab 结构、字段、列表列、筛选、详情页设计，**严格按 `docs/rewrite/pages/*.md` 实现**（不只是套皮，结构也要对齐 md）。

@@ -29,6 +29,6 @@
 ## 后果
 
 - **表格选型此后以本 ADR 为权威源**，`_archived/05-table-solution.md` 降为历史留档。任何「要不要换表格库」的新诉求，先核对本 ADR，不重新发起选型讨论（AGENTS.md 开工纪律）。
-- **shadcn-vue 与 vxe-table 视觉对齐是「换皮」不是「换引擎」**：通过 `app/assets/css/vxe-theme.css` 用 CSS 变量把 vxe 默认主题桥接到设计令牌，与 KitTable 之外的 shadcn 组件视觉一致。这是持续项，不是迁移。
+- **shadcn-vue 与 vxe-table 视觉对齐是「换皮」不是「换引擎」**：通过 `app/assets/css/vxe-theme.css` 用 CSS 变量把 vxe 默认主题桥接到设计令牌，与 KitTable 之外的 shadcn 组件视觉一致；对齐终点是设计稿令牌与 [ADR 0013](0013-align-all-ui-to-online-design.md) 基准，不是 vxe/shadcn 默认样式。这是持续项，不是迁移。
 - **边界**：若未来出现「几行静态数据、无需固定列/虚拟滚动/复杂表头」的轻表格,可评估直接用语义化 `<table>`（更轻），不必套 KitTable/vxe——但当前所有场景都在「重型数据网格」这一侧，暂不引入第二套表格方案以免认知负担。
 - vxe-table 的已知实现坑（如 `vxe-column` 的 `v-bind` 每次渲染产出新对象会触发列重注册死循环、需 `row-config.keyField='id'`）沉在 `KitTable` 实现内，不外泄给调用方。

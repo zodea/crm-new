@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 应用外框（ADR 0008 交互底座 + ADR 0011 外壳规格）：shadcn-vue Sidebar 体系 ——
+// 应用外框（ADR 0008 交互底座 + ADR 0013 外壳规格）：shadcn-vue Sidebar 体系 ——
 // SidebarProvider（响应式状态）> AppSidebar（可固定/悬浮的完整导航树）
 // + SidebarInset 主区（动作顶栏 AppTopbar + 路由页签 AppTabBar + keep-alive 页面）。
 // 页签隔离：page-key=fullPath 让每个页签是独立组件实例（表单/内部 state 互不串），
@@ -9,7 +9,6 @@ import { deriveKey, MAX_TABS } from '~/lib/tabs/tab-machine'
 
 const route = useRoute()
 const tabsStore = useTabsStore()
-const { theme } = provideShellTheme()
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
 const scrollPos = new Map<string, number>()
 const keepAliveNames = computed(() => {
@@ -21,12 +20,6 @@ const keepAliveNames = computed(() => {
 const keepAliveOptions = computed(() => ({
   include: keepAliveNames.value,
   max: MAX_TABS + 1,
-}))
-
-useHead(() => ({
-  htmlAttrs: {
-    'data-shell-theme': theme.value,
-  },
 }))
 
 watch(
@@ -72,10 +65,12 @@ function pageKey(r: { fullPath: string }) {
       <AppTopbar />
       <AppTabBar />
       <!-- 主区滚动容器（对齐设计稿 main：20px 24px 36px 全宽） -->
-      <div ref="scrollEl" class="min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)] px-4 pb-9 pt-3">
-        <div class="mx-auto w-full max-w-[var(--content-max)]">
-          <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
-        </div>
+      <div
+        ref="scrollEl"
+        data-shell-workspace
+        class="min-h-0 flex-1 overflow-y-auto bg-[var(--shell-workspace-bg)] px-[24px] pb-[36px] pt-[20px]"
+      >
+        <NuxtPage :page-key="pageKey" :keepalive="keepAliveOptions" />
       </div>
     </SidebarInset>
     <KitUIHost />

@@ -67,6 +67,7 @@ export function useFactorSolver() {
   const runningElapsedMs = shallowRef(0)
   const runStartedAt = shallowRef(0)
   const activeWorker = shallowRef<Worker | null>(null)
+  let jobSequence = 0
 
   const { copy: copyToClipboard } = useClipboard({ legacy: true })
   const { start: startMaskDelay, stop: stopMaskDelay } = useTimeoutFn(
@@ -130,12 +131,24 @@ export function useFactorSolver() {
     activeWorker.value = null
   }
 
+  // 空闲复用：热 worker 免去每次冷启动（dev 下含 Vite worker chunk 编译），
+  // 第二次起的求解往返远低于 150ms mask 阈值，显著压低短计算闪 loading 的概率。
+  // terminate 收敛三处：在途任务被新计算抢占、取消计算、组件卸载；出错的 worker 状态不明也杀掉。
+  function ensureWorker(): Worker {
+    if (!activeWorker.value) {
+      activeWorker.value = new Worker(
+        new URL('../workers/factor-combination.worker.ts', import.meta.url),
+        { type: 'module' },
+      )
+    }
+    return activeWorker.value
+  }
+
   function finishCalculation() {
     calculating.value = false
     showCalculationMask.value = false
     stopMaskDelay()
     stopElapsedTimer()
-    stopCurrentWorker()
   }
 
   function calculate() {
@@ -153,7 +166,10 @@ export function useFactorSolver() {
       return
     }
 
-    stopCurrentWorker()
+    // 在途的同步求解无法中断，只能杀掉重建；空闲 worker 直接复用。
+    if (calculating.value)
+      stopCurrentWorker()
+    const jobId = ++jobSequence
     calculating.value = true
     showCalculationMask.value = false
     runStartedAt.value = performance.now()
@@ -161,20 +177,22 @@ export function useFactorSolver() {
     startMaskDelay()
     startElapsedTimer()
 
-    const worker = new Worker(
-      new URL('../workers/factor-combination.worker.ts', import.meta.url),
-      { type: 'module' },
-    )
-    activeWorker.value = worker
+    const worker = ensureWorker()
 
     worker.onmessage = (event: MessageEvent<FactorSolverResult>) => {
+      // 迟到消息（已被抢占/取消的旧 job）不得写入新一轮结果。
+      if (jobId !== jobSequence)
+        return
       solverResult.value = event.data
       statusMessage.value = ''
       finishCalculation()
     }
     worker.onerror = () => {
+      if (jobId !== jobSequence)
+        return
       statusMessage.value = '计算出错，请调整因子后重试'
       finishCalculation()
+      stopCurrentWorker()
     }
 
     const maxResults = Math.min(
@@ -195,6 +213,8 @@ export function useFactorSolver() {
   }
 
   function cancelCalculation() {
+    jobSequence += 1
+    stopCurrentWorker()
     finishCalculation()
     statusMessage.value = '已取消计算'
   }

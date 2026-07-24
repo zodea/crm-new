@@ -5,7 +5,7 @@
 >
 > **与既有权威源的关系**（本文是「品味层」，不推翻任何权威源）：
 > - 色值/形状令牌唯一权威源 = `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。本文 hex 为快照，冲突以该文件为准。
-> - 内容区风格 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)、应用外壳 [ADR 0011](../adr/0011-redesign-application-shell.md)、交互底座 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、表格 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md) 继续有效。
+> - 内容区风格 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)、交互底座 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、表格 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md) 继续有效；**全站布局/排版/颜色（含应用外壳）基准 = [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)**，[ADR 0011](../adr/0011-redesign-application-shell.md) 仅存外壳行为条款。
 > - 与 [DESIGN-SYSTEM.md](../rewrite/DESIGN-SYSTEM.md)（既有 design 文档）的分工：那是逐组件规格清单；本文回答「为什么线上版本好看、哪些做法绝对不许、本地要往哪重构」。两文冲突处见 §8.2（已发现的冲突本文已点名）。
 >
 > **本轮只出文档，不改代码。** 后续任何页面实装/重构，以本文 §4–§7 为对照检查表。
@@ -86,7 +86,7 @@
 ### 2.5 遮罩与外壳
 
 - 浮层遮罩 = 中性黑 `rgb(0 0 0 / 28%)`（ADR 0003：不上毛玻璃、不用品牌蓝遮罩）。
-- 应用外壳（深蓝侧栏 `#162238` 等 `--shell-*` 令牌）由 ADR 0011 独立管辖，只影响导航与顶栏，**永不渗入业务内容区**。
+- 应用外壳按 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 回归设计稿白底浅色（~~深蓝侧栏 `#162238`~~ 作废；`--shell-*` 令牌名保留、重映射浅色值），与内容区共用同一套设计令牌。
 
 ---
 
@@ -166,7 +166,7 @@ pill（圆角 999px）浅底深字：`padding 4px 10px`、12px/600、非交互�
 
 ### 4.6 SegTab（业务内容分段 tab，下划线式）
 
-容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项 `padding 9px 14px`、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab（应用外壳路由页签除外，归 ADR 0011）。
+容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项 `padding 9px 14px`、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab（应用外壳路由页签除外，视觉归 ADR 0013 的 40px 红圈式页签栏，行为归 ADR 0011）。
 
 ### 4.7 SelectFilter / SearchInput（工具栏两件套）
 
@@ -229,7 +229,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 **视觉**
 - 纯黑 `#000000`（黑 = `--ink #1f2329`）；暖灰混入冷蓝灰阶；第二 accent 色。
-- 霓虹外发光、紫蓝渐变、渐变大标题、毛玻璃进内容区（`backdrop-filter` 仅 ADR 0011 外壳许可范围）。
+- 霓虹外发光、紫蓝渐变、渐变大标题、毛玻璃进内容区（`backdrop-filter` 仅限外壳顶栏 blur(8px)，ADR 0013 设计稿规格；侧栏毛玻璃仍废弃）。
 - 实心状态色大色块底；一屏多枚实心蓝按钮；卡片套卡片。
 - 界面文案/图标混用 emoji；图标只用 Lucide（`i-lucide-*`）单色线性。
 
@@ -256,7 +256,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 | 面 | 设计稿（线上） | 本地（权威） | 结论 |
 |---|---|---|---|
-| 应用外壳 | 自带旧外壳（浅色侧栏/自建页签） | 深蓝侧栏 `#162238` + 54px 顶栏 + 36px Chrome 式页签（ADR 0011，issue #82 验收口径） | **本地为准**。重构对照设计稿时跳过外壳，只对内容区 |
+| 应用外壳 | 白底浅色侧栏 248px（单字方块+分组）+ 64px 白顶栏 + 40px 红圈式页签 | ~~深蓝侧栏 `#162238` + 54px 顶栏 + 36px Chrome 式页签~~（ADR 0011 视觉条款已废，见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)） | **设计稿为准**（2026-07-17 用户指令）。外壳纳入逐屏对照范围；ADR 0011 仅存行为条款 |
 | 交互底座 | 手写 React 弹窗/toast | reka-ui Dialog + vue-sonner（ADR 0008） | **本地为准**，视觉语义仍按本文 |
 
 ### 8.2 已确证待收敛——本轮实测代码逐条点名
