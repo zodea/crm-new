@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { findMissingRequired, initValues } from '~/lib/kit/form-modal'
 
 // 字段配置驱动的表单弹窗，底座换为 shadcn-vue Dialog（reka-ui）：
@@ -19,9 +19,18 @@ const emit = defineEmits<{
 const values = ref<FormValues>({})
 const missing = ref<Set<string>>(new Set())
 const bodyRef = ref<HTMLElement | null>(null)
+const fieldIdPrefix = useId()
 
 const fields = computed(() => props.options?.fields ?? [])
 const cols = computed(() => props.options?.cols ?? 1)
+
+function fieldId(key: string) {
+  return `${fieldIdPrefix}-${key}`
+}
+
+function errorId(key: string) {
+  return `${fieldId(key)}-error`
+}
 
 // 每次打开都用字段初始值重置草稿与校验态。
 // #86 同时监听 options：背靠背二次调用（open 保持 true、仅 options 换新）也要按新字段重置，
@@ -79,8 +88,8 @@ function onOpenAutoFocus(e: Event) {
       <div class="flex items-start justify-between px-5 py-3.5 border-b border-line shrink-0">
         <div>
           <DialogTitle>{{ options.title ?? '编辑' }}</DialogTitle>
-          <DialogDescription v-if="options.subtitle" class="text-12px mt-0.5">
-            {{ options.subtitle }}
+          <DialogDescription :class="options.subtitle ? 'text-12px mt-0.5' : 'sr-only'">
+            {{ options.subtitle ?? '填写表单后保存。' }}
           </DialogDescription>
         </div>
         <button type="button" class="icon-btn" aria-label="关闭" @click="emit('cancel')">
@@ -97,14 +106,17 @@ function onOpenAutoFocus(e: Event) {
             :class="{ 'col-span-full': f.full }"
             class="flex flex-col"
           >
-            <label class="field-label flex items-center gap-0.5">
+            <label :for="fieldId(f.key)" class="field-label flex items-center gap-0.5">
               {{ f.label }}
               <span v-if="f.required" class="text-danger">*</span>
             </label>
 
             <select
               v-if="f.type === 'select'"
+              :id="fieldId(f.key)"
               v-model="values[f.key]"
+              :aria-describedby="missing.has(f.key) ? errorId(f.key) : undefined"
+              :aria-invalid="missing.has(f.key)"
               class="field-input w-full"
               :class="{ 'border-danger! shadow-[0_0_0_2px_rgba(224,78,92,0.15)]!': missing.has(f.key) }"
               @change="clearMissing(f.key)"
@@ -119,7 +131,10 @@ function onOpenAutoFocus(e: Event) {
 
             <textarea
               v-else-if="f.type === 'textarea'"
+              :id="fieldId(f.key)"
               v-model="values[f.key]"
+              :aria-describedby="missing.has(f.key) ? errorId(f.key) : undefined"
+              :aria-invalid="missing.has(f.key)"
               class="field-input w-full min-h-16 resize-y"
               :class="{ 'border-danger! shadow-[0_0_0_2px_rgba(224,78,92,0.15)]!': missing.has(f.key) }"
               :placeholder="f.placeholder"
@@ -128,7 +143,10 @@ function onOpenAutoFocus(e: Event) {
 
             <input
               v-else
+              :id="fieldId(f.key)"
               v-model="values[f.key]"
+              :aria-describedby="missing.has(f.key) ? errorId(f.key) : undefined"
+              :aria-invalid="missing.has(f.key)"
               :type="f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'"
               class="field-input w-full"
               :class="{ 'border-danger! shadow-[0_0_0_2px_rgba(224,78,92,0.15)]!': missing.has(f.key) }"
@@ -136,7 +154,11 @@ function onOpenAutoFocus(e: Event) {
               @input="clearMissing(f.key)"
             >
 
-            <span v-if="missing.has(f.key)" class="text-11px text-danger mt-1">
+            <span
+              v-if="missing.has(f.key)"
+              :id="errorId(f.key)"
+              class="text-11px text-danger mt-1"
+            >
               此项为必填
             </span>
           </div>

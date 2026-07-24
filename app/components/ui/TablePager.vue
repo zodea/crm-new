@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { pageCount } from '~/lib/kit/table'
 
 const props = defineProps<{
@@ -33,7 +34,9 @@ const visiblePages = computed(() => {
   <div class="flex items-center justify-end gap-1.5 border-t border-line px-2 py-2 text-13px">
     <span class="text-ink-faint mr-2">共 {{ total }} 条</span>
     <button
+      type="button"
       class="pager-btn"
+      aria-label="上一页"
       :disabled="page <= 1"
       @click="emit('update:page', page - 1)"
     >
@@ -42,14 +45,19 @@ const visiblePages = computed(() => {
     <button
       v-for="p in visiblePages"
       :key="p"
+      type="button"
       class="pager-btn"
       :class="p === page ? 'pager-active' : ''"
+      :aria-current="p === page ? 'page' : undefined"
+      :aria-label="`第 ${p} 页`"
       @click="emit('update:page', p)"
     >
       {{ p }}
     </button>
     <button
+      type="button"
       class="pager-btn"
+      aria-label="下一页"
       :disabled="page >= totalPages"
       @click="emit('update:page', page + 1)"
     >
@@ -58,6 +66,7 @@ const visiblePages = computed(() => {
     <select
       v-if="pageSizeOptions?.length"
       :value="size"
+      aria-label="每页条数"
       class="ml-1.5 h-7 border border-line-strong rounded-[var(--radius-sm)] bg-panel px-2 text-13px text-ink-soft cursor-pointer outline-none focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
       @change="emit('update:pageSize', Number(($event.target as HTMLSelectElement).value))"
     >
