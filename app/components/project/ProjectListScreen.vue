@@ -12,6 +12,7 @@ import { PROJECT_STATUS_TONE, PROJECT_STATUSES } from '~/lib/project/status'
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useProjectStore()
+const detailStore = useProjectDetailStore()
 const { confirm, undoToast, success, error, exportFile, openImportTab } = useKitUI()
 
 const searchText = shallowRef('')
@@ -47,7 +48,18 @@ const pageRows = computed(() => paginate(filtered.value, currentPage.value, page
 
 // 金额列（累计收入/预算总额）不是 Project 存储字段（口径见 lib/project/finance，#65 聚合），
 // 表格数据行按页切片后就地补上，Project 类型保持纯净。
-const tableRows = computed(() => pageRows.value.map(p => ({ ...p, ...summarizeProjectFinance(p) })))
+const tableRows = computed(() => pageRows.value.map((project) => {
+  const summary = detailStore.operationSummaries[project.id]
+  return {
+    ...project,
+    ...summarizeProjectFinance(project, summary
+      ? {
+          income: summary.projectReceipt,
+          mainContractAmount: summary.mainContractAmount,
+        }
+      : undefined),
+  }
+}))
 
 // 设计稿 ProjectScreen.jsx 红圈 13 列（顺序即列序）；金额列走 money 两位小数（元）。
 const columns = computed<KitTableColumn[]>(() => [
@@ -215,7 +227,7 @@ async function handleDelete(project: Project) {
     undoToast(`已删除「${project.name}」`, () => store.undo(logId))
 }
 
-onMounted(() => store.load())
+onMounted(() => Promise.all([store.load(), detailStore.load()]))
 </script>
 
 <template>

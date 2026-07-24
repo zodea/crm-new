@@ -1,0 +1,16 @@
+[
+  {
+    "id": "cc_mz0x1_0",
+    "project_id": "proj_demo_001",
+    "name": "合和新城施工总承包合同",
+    "contract_no": "RJ-HHXC-SG-2025001",
+    "amount": 32388422,
+    "status": "履约中",
+    "sign_date": "2025-09-01",
+    "category": "施工总包",
+    "signed_amount": 32388422,
+    "tax_rate": 9,
+    "created_at": "2026-06-20T00:00:31.000Z",
+    "updated_at": "2026-06-20T00:00:31.000Z"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "oco_mz0x1_0",
+    "project_id": "proj_demo_001",
+    "change_no": "BQ-2026-001",
+    "contract_name": "合和新城施工总承包合同",
+    "tax_inc_amount": 120000,
+    "tax_exc_amount": 110091.74,
+    "applied_amount": 110091.74,
+    "approval_date": "2026-04-02",
+    "created_at": "2026-04-02T09:00:00.000Z"
+  }
+]

@@ -1,289 +1,172 @@
 <script setup lang="ts">
-// Tab③ 施工合同 / Tab④ 支出合同 两张子表已接合同域真数据（contracts store，#90）：
-// 合同名蓝链 → /contract/[id]、乙方蓝链 → /base/supplier/[id]，与三列表/合同详情互跳。
-// 其余子表仍为空壳（各域 pass-1 逐步接入）。
-import { yuan } from '~/lib/util/money'
+import type { KitTableColumn } from '~/lib/kit/table'
+import { PROJECT_DETAIL_TABS, projectArchivedInvoices } from '~/lib/project/subtables'
 
 const props = defineProps<{
   tab: string
   projectId: string
 }>()
 
-interface SubTable {
-  title: string
-  /** 接合同域真数据的子表：con=施工合同（kind=施工），exp=支出合同（kind=分包/材采） */
-  contracts?: 'con' | 'exp'
-  columns: { field: string, title: string, width?: string, minWidth?: string }[]
-}
+const detailStore = useProjectDetailStore()
+const invoiceStore = useInvoiceStore()
 
-const TAB_TABLES: Record<string, SubTable[]> = {
-  budget: [
-    {
-      title: '目标成本',
-      columns: [
-        { field: 'name', title: '目标成本名称', minWidth: '200px' },
-        { field: 'taxIncTotal', title: '含税合价', width: '120px' },
-        { field: 'signedAmount', title: '已签合同金额', width: '120px' },
-        { field: 'actualAmount', title: '实际发生金额', width: '120px' },
-        { field: 'appliedAmount', title: '已申请付金额', width: '120px' },
-      ],
-    },
-  ],
-  construction: [
-    {
-      title: '施工合同',
-      contracts: 'con',
-      columns: [],
-    },
-    {
-      title: '补充协议',
-      columns: [
-        { field: 'name', title: '协议名称', minWidth: '200px' },
-        { field: 'amount', title: '金额', width: '120px' },
-        { field: 'signDate', title: '签约日期', width: '100px' },
-      ],
-    },
-    {
-      title: '甲方变洽签',
-      columns: [
-        { field: 'changeNo', title: '变更编号', width: '120px' },
-        { field: 'contractName', title: '合同名称', minWidth: '160px' },
-        { field: 'taxIncAmount', title: '含税审定金额', width: '130px' },
-        { field: 'approvalDate', title: '审定日期', width: '100px' },
-      ],
-    },
-  ],
-  expenditure: [
-    {
-      title: '支出合同',
-      contracts: 'exp',
-      columns: [],
-    },
-  ],
-  tax: [
-    {
-      title: '开票申请',
-      columns: [
-        { field: 'name', title: '开票申请名称', minWidth: '200px' },
-        { field: 'amount', title: '开票金额', width: '120px' },
-        { field: 'status', title: '审核状态', width: '90px' },
-        { field: 'invoiceDate', title: '开票日期', width: '100px' },
-      ],
-    },
-    {
-      title: '收票登记',
-      columns: [
-        { field: 'invoiceNo', title: '发票号码', width: '160px' },
-        { field: 'amount', title: '发票金额', width: '120px' },
-        { field: 'taxAmount', title: '税额', width: '100px' },
-        { field: 'invoiceType', title: '发票类型', width: '130px' },
-        { field: 'invoiceDate', title: '开票日期', width: '100px' },
-      ],
-    },
-  ],
-  fund: [
-    {
-      title: '收款登记',
-      columns: [
-        { field: 'receiptNo', title: '收款编号', width: '140px' },
-        { field: 'receiptDate', title: '收款日期', width: '100px' },
-        { field: 'amount', title: '收款金额', width: '120px' },
-        { field: 'paymentMethod', title: '支付方式', width: '90px' },
-        { field: 'payerUnit', title: '支付单位', minWidth: '150px' },
-      ],
-    },
-    {
-      title: '付款申请',
-      columns: [
-        { field: 'applicationNo', title: '付款编号', width: '140px' },
-        { field: 'approvalStatus', title: '审批状态', width: '90px' },
-        { field: 'amount', title: '申请金额', width: '120px' },
-        { field: 'paidAmount', title: '已付金额', width: '120px' },
-        { field: 'actualPayment', title: '实际支付', width: '120px' },
-      ],
-    },
-  ],
-  current: [
-    {
-      title: '往来收款',
-      columns: [
-        { field: 'receiptNo', title: '编号', width: '140px' },
-        { field: 'receiptDate', title: '收款日期', width: '100px' },
-        { field: 'amount', title: '收款金额', width: '120px' },
-        { field: 'payer', title: '付款人', minWidth: '150px' },
-      ],
-    },
-    {
-      title: '往来付款',
-      columns: [
-        { field: 'paymentNo', title: '编号', width: '140px' },
-        { field: 'paymentDate', title: '付款日期', width: '100px' },
-        { field: 'amount', title: '金额', width: '120px' },
-        { field: 'payee', title: '收款单位', minWidth: '150px' },
-      ],
-    },
-  ],
-  payment: [
-    {
-      title: '支付记录',
-      columns: [
-        { field: 'paymentNo', title: '支付编号', width: '140px' },
-        { field: 'paymentDate', title: '支付日期', width: '100px' },
-        { field: 'amount', title: '支付金额', width: '120px' },
-        { field: 'paymentMethod', title: '支付方式', width: '90px' },
-        { field: 'payeeAccount', title: '收款账户', minWidth: '150px' },
-      ],
-    },
-  ],
-  material: [
-    {
-      title: '入库单',
-      columns: [
-        { field: 'no', title: '单据编号', width: '140px' },
-        { field: 'type', title: '类型', width: '80px' },
-        { field: 'supplier', title: '分供方', minWidth: '150px' },
-        { field: 'date', title: '入库日期', width: '100px' },
-      ],
-    },
-  ],
-  acceptance: [
-    {
-      title: '竣工验收',
-      columns: [
-        { field: 'no', title: '验收编号', width: '140px' },
-        { field: 'contractName', title: '合同名称', minWidth: '200px' },
-        { field: 'status', title: '验收状态', width: '90px' },
-        { field: 'estimatedAmount', title: '合同估价', width: '120px' },
-      ],
-    },
-    {
-      title: '保修到期确认单',
-      columns: [
-        { field: 'no', title: '编号', width: '140px' },
-        { field: 'contractName', title: '合同名称', minWidth: '200px' },
-        { field: 'approvalStatus', title: '审批状态', width: '90px' },
-        { field: 'responsible', title: '保修负责人', width: '100px' },
-      ],
-    },
-  ],
-}
-
-const subTables = computed(() => TAB_TABLES[props.tab] || [])
-
-// ── 合同域真数据（③施工/④支出）：contracts store 按 kind + projectId 切片 ──
-const contractStore = useContractStore()
-const supplierStore = useSupplierStore()
-
-const conRows = computed(() =>
-  contractStore.byKind('施工').filter(c => c.projectId === props.projectId),
+const constructionContracts = computed(() =>
+  detailStore.constructionContracts.filter(row => row.projectId === props.projectId),
 )
-const expRows = computed(() =>
-  [...contractStore.byKind('分包'), ...contractStore.byKind('材采')]
-    .filter(c => c.projectId === props.projectId),
+const supplementAgreements = computed(() =>
+  detailStore.supplementAgreements.filter(row => row.projectId === props.projectId),
+)
+const ownerChangeOrders = computed(() =>
+  detailStore.ownerChangeOrders.filter(row => row.projectId === props.projectId),
+)
+const invoiceApplications = computed(() =>
+  detailStore.invoiceApplications.filter(row => row.projectId === props.projectId),
+)
+const receivedInvoices = computed(() =>
+  projectArchivedInvoices(invoiceStore.list, props.projectId),
+)
+const receiptRegistrations = computed(() =>
+  detailStore.receiptRegistrations.filter(row => row.projectId === props.projectId),
+)
+const paymentApplications = computed(() =>
+  detailStore.paymentApplications.filter(row => row.projectId === props.projectId),
 )
 
-function rowsFor(key: 'con' | 'exp') {
-  return key === 'con' ? conRows.value : expRows.value
-}
+const placeholder = computed(() =>
+  PROJECT_DETAIL_TABS.find(tab => tab.key === props.tab && tab.kind === 'placeholder'),
+)
 
-function supplierName(id: string | null): string {
-  return id ? supplierStore.byId(id)?.name ?? '—' : '—'
-}
+const constructionColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '合同名称', minWidth: 220 },
+  { field: 'contractNo', title: '合同编号', width: 180 },
+  { field: 'category', title: '合同类别', width: 110 },
+  { field: 'amount', title: '含税合同金额', type: 'money', width: 150 },
+  { field: 'status', title: '合同状态', width: 100 },
+  { field: 'signDate', title: '签约日期', type: 'date' },
+]
+const supplementColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '协议名称', minWidth: 240 },
+  { field: 'amount', title: '协议金额', type: 'money', width: 140 },
+  { field: 'signDate', title: '签约日期', type: 'date' },
+]
+const changeColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'changeNo', title: '变更编号', width: 140 },
+  { field: 'contractName', title: '合同名称', minWidth: 220 },
+  { field: 'taxIncAmount', title: '含税审定金额', type: 'money', width: 150 },
+  { field: 'taxExcAmount', title: '不含税审定金额', type: 'money', width: 160 },
+  { field: 'appliedAmount', title: '已申请金额', type: 'money', width: 140 },
+  { field: 'approvalDate', title: '审定日期', type: 'date' },
+]
+const invoiceApplicationColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '开票申请名称', minWidth: 240 },
+  { field: 'amount', title: '开票金额', type: 'money', width: 140 },
+  { field: 'taxRate', title: '税率(%)', width: 90, align: 'right' },
+  { field: 'taxAmount', title: '税额', type: 'money', width: 130 },
+  { field: 'status', title: '审核状态', width: 100 },
+  { field: 'invoiceDate', title: '开票日期', type: 'date' },
+]
+const receivedInvoiceColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'invoiceNumber', title: '发票号码', minWidth: 170 },
+  { field: 'seller', title: '销方名称', minWidth: 200 },
+  { field: 'totalAmount', title: '价税合计', type: 'money', width: 140 },
+  { field: 'taxAmount', title: '税额', type: 'money', width: 120 },
+  { field: 'invoiceType', title: '发票类型', minWidth: 150 },
+  { field: 'invoiceDate', title: '开票日期', type: 'date' },
+]
+const receiptColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'receiptNo', title: '收款编号', width: 150 },
+  { field: 'receiptDate', title: '收款日期', type: 'date' },
+  { field: 'amount', title: '收款金额', type: 'money', width: 150 },
+  { field: 'paymentMethod', title: '支付方式', width: 110 },
+  { field: 'payerUnit', title: '支付单位', minWidth: 200 },
+  { field: 'cumulativeReceivable', title: '累计应收', type: 'money', width: 150 },
+]
+const paymentColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'applicationNo', title: '付款编号', width: 150 },
+  { field: 'approvalStatus', title: '审批状态', width: 100 },
+  { field: 'applicant', title: '申请人', width: 100 },
+  { field: 'amount', title: '申请金额', type: 'money', width: 140 },
+  { field: 'paidAmount', title: '已付金额', type: 'money', width: 140 },
+  { field: 'actualPayment', title: '实际支付', type: 'money', width: 140 },
+  { field: 'paymentMethod', title: '支付方式', width: 110 },
+]
 
-// vxe formatter：稳定引用（内联新函数/新对象会反复触发 vxe 列注册）
-const moneyFmt = ({ cellValue }: { cellValue: unknown }) => yuan(cellValue as number)
-
-onMounted(() => {
-  contractStore.load()
-  supplierStore.load()
-})
+onMounted(() => Promise.all([
+  detailStore.load(),
+  invoiceStore.load(),
+]))
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div v-for="st in subTables" :key="st.title">
-      <div class="flex items-center justify-between mb-2">
-        <h4 class="text-13px font-700 text-ink">
-          {{ st.title }}({{ st.contracts ? rowsFor(st.contracts).length : 0 }})
-        </h4>
-        <button class="btn-primary text-12px" disabled>
-          <span class="i-lucide-plus text-12px mr-0.5" /> 新建
-        </button>
-      </div>
-      <div class="border border-line">
-        <!-- 合同域子表（③施工/④支出）：真数据 + 合同名/乙方蓝链 -->
-        <vxe-table
-          v-if="st.contracts"
-          :data="rowsFor(st.contracts)"
-          :loading="contractStore.loading"
-          border
-          show-overflow="title"
-          height="auto"
-          :row-config="{ isHover: true, keyField: 'id' }"
-        >
-          <vxe-column type="seq" title="#" width="52" />
-          <vxe-column field="name" title="合同名称" min-width="200">
-            <template #default="{ row }">
-              <NuxtLink :to="`/contract/${row.id}`" class="cell--link">
-                {{ row.name }}
-              </NuxtLink>
-            </template>
-          </vxe-column>
-          <vxe-column field="no" title="合同编号" width="170" />
-          <vxe-column v-if="st.contracts === 'exp'" field="kind" title="类别" width="80">
-            <template #default="{ row }">
-              {{ row.kind === '分包' ? `分包${row.subKind ? ` · ${row.subKind}` : ''}` : '材采' }}
-            </template>
-          </vxe-column>
-          <vxe-column
-            v-if="st.contracts === 'exp'"
-            field="supplierId"
-            title="乙方（分供方）"
-            min-width="170"
-          >
-            <template #default="{ row }">
-              <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
-                {{ supplierName(row.supplierId) }}
-              </NuxtLink>
-              <span v-else>—</span>
-            </template>
-          </vxe-column>
-          <vxe-column
-            field="amount"
-            :title="st.contracts === 'exp' ? '含税合价' : '含税合同金额'"
-            width="130"
-            align="right"
-            class-name="col--money"
-            :formatter="moneyFmt"
-          />
-          <vxe-column field="status" title="合同状态" width="90" />
-          <vxe-column field="signDate" title="签约日期" width="100" />
-        </vxe-table>
+  <div v-if="tab === 'construction'" class="space-y-5">
+    <ProjectSubTableSection
+      title="施工合同"
+      :columns="constructionColumns"
+      :rows="constructionContracts"
+      :loading="detailStore.loading"
+    />
+    <ProjectSubTableSection
+      title="补充协议"
+      :columns="supplementColumns"
+      :rows="supplementAgreements"
+      :loading="detailStore.loading"
+    />
+    <ProjectSubTableSection
+      title="甲方变洽签"
+      :columns="changeColumns"
+      :rows="ownerChangeOrders"
+      :loading="detailStore.loading"
+    />
+  </div>
 
-        <!-- 其余子表：空壳占位 -->
-        <vxe-table
-          v-else
-          :data="[]"
-          border
-          show-overflow
-          height="auto"
-          :row-config="{ isHover: true }"
-        >
-          <vxe-column type="seq" title="#" width="52" />
-          <vxe-column
-            v-for="col in st.columns"
-            :key="col.field"
-            :field="col.field"
-            :title="col.title"
-            :width="col.width"
-            :min-width="col.minWidth"
-          />
-        </vxe-table>
-      </div>
-    </div>
+  <div v-else-if="tab === 'tax'" class="space-y-5">
+    <ProjectSubTableSection
+      title="开票申请"
+      :columns="invoiceApplicationColumns"
+      :rows="invoiceApplications"
+      :loading="detailStore.loading"
+    />
+    <ProjectSubTableSection
+      title="收票登记"
+      :columns="receivedInvoiceColumns"
+      :rows="receivedInvoices"
+      :loading="invoiceStore.loading"
+    />
+  </div>
 
-    <div v-if="!subTables.length" class="border border-line bg-panel p-8 text-center text-ink-faint text-13px">
-      此 Tab 暂无子表定义
-    </div>
+  <div v-else-if="tab === 'fund'" class="space-y-5">
+    <ProjectSubTableSection
+      title="收款登记"
+      :columns="receiptColumns"
+      :rows="receiptRegistrations"
+      :loading="detailStore.loading"
+    />
+    <ProjectSubTableSection
+      title="付款申请"
+      :columns="paymentColumns"
+      :rows="paymentApplications"
+      :loading="detailStore.loading"
+    />
+  </div>
+
+  <div
+    v-else-if="placeholder"
+    class="flex min-h-56 flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-panel px-6 py-12 text-center shadow-[var(--shadow-card)]"
+  >
+    <span class="i-lucide-panels-top-left mb-3 h-8 w-8 text-brand" aria-hidden="true" />
+    <h3 class="text-15px text-ink font-700">
+      {{ placeholder.label }}
+    </h3>
+    <p class="mt-1.5 max-w-120 text-12px leading-5 text-ink-faint">
+      页面框架已预留，该模块将在后续业务波次接入真实数据与操作能力。
+    </p>
+    <span class="chip mt-4 bg-surface-3 text-ink-soft">待建设</span>
   </div>
 </template>

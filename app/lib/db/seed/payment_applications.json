@@ -1,0 +1,18 @@
+[
+  {
+    "id": "pa_mz0x1_0",
+    "project_id": "proj_demo_001",
+    "application_no": "FK-2026-001",
+    "approval_status": "已付款",
+    "applicant": "张工",
+    "amount": 4200000,
+    "approved_amount": 4200000,
+    "paid_amount": 4200000,
+    "payment_method": "银行转账",
+    "actual_payment": 4200000,
+    "payment_status": "已付款",
+    "acceptor": "财务部",
+    "created_at": "2026-06-18T09:00:00.000Z",
+    "updated_at": "2026-06-18T09:00:00.000Z"
+  }
+]
