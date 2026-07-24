@@ -19,10 +19,11 @@ export interface DeliveryLineDraft {
   unit: string
   qty: number
   unitPrice: number
+  amount?: number
   note: string
 }
 
-export interface DeliveryLine extends DeliveryLineDraft {
+export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount'> {
   id: string
   deliveryRecordId: string
   amount: number
@@ -116,7 +117,11 @@ function amountOf(qty: number, unitPrice: number): number {
   return Math.round((qty * unitPrice + Number.EPSILON) * 100) / 100
 }
 
-function normalizeLines(lines: DeliveryLineDraft[]): DeliveryLineDraft[] {
+interface NormalizedDeliveryLineDraft extends Omit<DeliveryLineDraft, 'amount'> {
+  amount: number
+}
+
+function normalizeLines(lines: DeliveryLineDraft[]): NormalizedDeliveryLineDraft[] {
   return lines
     .map(line => ({
       materialName: line.materialName.trim(),
@@ -124,12 +129,13 @@ function normalizeLines(lines: DeliveryLineDraft[]): DeliveryLineDraft[] {
       unit: line.unit.trim(),
       qty: toNumber(line.qty),
       unitPrice: toNumber(line.unitPrice),
+      amount: line.amount == null ? amountOf(toNumber(line.qty), toNumber(line.unitPrice)) : toNumber(line.amount),
       note: line.note.trim(),
     }))
     .filter(line => line.materialName.length > 0)
 }
 
-function validateInput(input: DeliveryRecordInput): DeliveryLineDraft[] {
+function validateInput(input: DeliveryRecordInput): NormalizedDeliveryLineDraft[] {
   if (!input.projectId)
     throw new Error('送货单必须选择项目')
   const lines = normalizeLines(input.lines)
@@ -175,7 +181,7 @@ function rowToRecord(row: Record<string, unknown>, lines: DeliveryLine[]): Deliv
   }
 }
 
-async function insertLines(recordId: string, lines: DeliveryLineDraft[], now: string): Promise<void> {
+async function insertLines(recordId: string, lines: NormalizedDeliveryLineDraft[], now: string): Promise<void> {
   for (const [index, line] of lines.entries()) {
     const id = generateId('dline')
     await execute(
@@ -190,7 +196,7 @@ async function insertLines(recordId: string, lines: DeliveryLineDraft[], now: st
         line.unit,
         line.qty,
         line.unitPrice,
-        amountOf(line.qty, line.unitPrice),
+        line.amount,
         line.note,
         index,
         now,

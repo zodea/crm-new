@@ -177,6 +177,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_delivery_natural
   WHERE deleted_at IS NULL AND supplier_id IS NOT NULL;
 `
 
+/** v8 工地别名：首次人工选定项目时记忆 OCR 工地写法，后续自动预选。 */
+const V8_PROJECT_ALIASES = `
+CREATE TABLE IF NOT EXISTS project_aliases (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  alias      TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_aliases_project ON project_aliases(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_aliases_deleted ON project_aliases(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_project_alias ON project_aliases(alias) WHERE deleted_at IS NULL;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -257,6 +272,13 @@ export const migrations: Migration[] = [
     name: 'delivery-records-pass-1',
     async up(db) {
       await execScript(db, V7_DELIVERY_RECORDS)
+    },
+  },
+  {
+    version: 8,
+    name: 'project-aliases',
+    async up(db) {
+      await execScript(db, V8_PROJECT_ALIASES)
     },
   },
 ]

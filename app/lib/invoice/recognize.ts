@@ -3,7 +3,10 @@
 // 只换此处的实现绑定，不改任何调用方。桩识别按文件名哈希确定性产出 mock 字段：
 // 同一文件名重复识别结果一致（可测、可复现演示，日期也从 seed 派生不读时钟），
 // 金额满足两位小数铁律(amount+tax=total)。
+import type { RecognizeDocumentOptions } from '~/lib/recognize/engine'
 import { promiseTimeout } from '@vueuse/core'
+import { OcrRecognitionError, recognizeDocument } from '~/lib/recognize/engine'
+import { buildInvoiceFieldConfidence, parseInvoiceText } from '~/lib/recognize/invoice-parse'
 import { round2 } from '~/lib/util/number'
 
 export interface InvoiceItem {
@@ -41,6 +44,8 @@ export interface RecognizeOptions {
   onProgress?: (percent: number) => void
   /** 进度节拍间隔 ms；0 = 不等待（测试用），缺省 ~120ms 模拟真识别耗时 */
   stepMs?: number
+  /** 测试/宿主注入的网络边界；业务调用保持缺省，统一走同源 OCR 代理。 */
+  fetch?: RecognizeDocumentOptions['fetch']
 }
 
 // ── 置信度分档（OCR 设置页的"置信度分档阈值"默认值；置信度仅作参考，判决权在人）──
@@ -196,5 +201,54 @@ export async function stubRecognizeInvoice(
   }
 }
 
-/** 当前识别引擎绑定（桩）。接真引擎时只改这一行的实现来源，调用方无感（#60 约定）。 */
-export const recognizeInvoice = stubRecognizeInvoice
+/**
+ * 真实发票识别：上传原始文件到同源代理，由 PaddleOCR-VL 产出版面 Markdown，再进入本地可测试解析器。
+ * 项目提示仍保持原始文本，不在识别层强绑项目主数据；字段确认和归档继续由领域 store 负责。
+ */
+export async function recognizeInvoice(
+  input: { file: File },
+  options: RecognizeOptions = {},
+): Promise<RecognizedInvoiceFields> {
+  const cloud = await recognizeDocument(input.file, {
+    fetch: options.fetch,
+    onProgress: options.onProgress,
+  })
+  const parsed = parseInvoiceText(cloud.markdownPages.join('\n\n'))
+  const hasUsableInvoiceData = Boolean(
+    parsed.invoiceNumber
+    || parsed.buyer
+    || parsed.seller
+    || parsed.totalAmount != null
+    || parsed.items.length,
+  )
+  if (!hasUsableInvoiceData) {
+    throw new OcrRecognitionError(
+      'invalid-result',
+      '未从文件中识别出可用的发票字段',
+    )
+  }
+
+  const fieldConfidence = buildInvoiceFieldConfidence(parsed)
+  const confidenceValues = Object.values(fieldConfidence)
+  const ocrConfidence = confidenceValues.length
+    ? round2(confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length)
+    : 0
+
+  return {
+    invoiceType: parsed.invoiceType,
+    invoiceNumber: parsed.invoiceNumber,
+    invoiceDate: parsed.invoiceDate,
+    buyer: parsed.buyer,
+    buyerTaxNo: parsed.buyerTaxNo,
+    seller: parsed.seller,
+    sellerTaxNo: parsed.sellerTaxNo,
+    amount: parsed.amount ?? 0,
+    taxAmount: parsed.taxAmount ?? 0,
+    totalAmount: parsed.totalAmount ?? 0,
+    taxRate: parsed.taxRate,
+    remark: parsed.remark,
+    items: parsed.items,
+    fieldConfidence,
+    ocrConfidence,
+  }
+}

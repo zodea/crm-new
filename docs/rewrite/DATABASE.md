@@ -268,7 +268,7 @@ CREATE TABLE monthly_statement_lines (
 ```sql
 CREATE TABLE delivery_records (
   id         TEXT PRIMARY KEY,
-  projectId  TEXT NOT NULL,          -- 上传即强制归项目（归属拦截卡在上传，CONTEXT.md「归档」）；工地名经 project_aliases 归一而来
+  projectId  TEXT NOT NULL,          -- 核对归档前强制归项目；上传时归属拦截仍是后续交互目标；工地名经 project_aliases 归一而来
   supplierId TEXT,                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
   rawSiteText TEXT,                  -- OCR/文件夹推断的工地原文本，仅留痕追溯，不参与任何键（2026-07-06 定）
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
@@ -288,6 +288,8 @@ CREATE TABLE delivery_lines (
   note TEXT, sortOrder INTEGER
 );
 
+> `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；一旦人工修改金额，后续数量/单价编辑与保存都不得覆盖它。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
+
 CREATE TABLE project_aliases (
   id        TEXT PRIMARY KEY,
   projectId TEXT NOT NULL,           -- → projects.id
@@ -295,6 +297,8 @@ CREATE TABLE project_aliases (
   createdAt TEXT, deleted_at TEXT
 );
 ```
+
+> `project_aliases` 已由迁移 v8 落地：人工选定项目并完成核对时记忆 `rawSiteText`，同一归一化写法后续自动预选；若该写法已属于其他项目则拒绝静默改绑。
 
 ### 2.6 分包及人工类
 
@@ -822,7 +826,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 3. 所有业务表的删除操作使用软删除（§ 8.1），并记录操作日志（§ 8.2）
 4. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
 5. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
-6. 计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询（§ 4）
+6. 纯派生计算字段不存储，Pinia store 中提供 computed getter，底层走 SQL 聚合查询（§ 4）；人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
 7. 新增支出类实体必须定义 **costCategory 归集口径**（人工/材料/机械/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵表名/结构以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准（`house_type_templates` / `house_type_template_items` / `unit_assignments`，取代原 `quantities`），禁用旧名 `quantity_records`
 9. **禁用旧名**（2026-07-04 grill 定稿）：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表 `wage_statements`/`wage_statement_lines`/`attendance_records`）、`price_comparisons`（→ `delivery_lines` 聚合查询视图，无表）

@@ -1,20 +1,24 @@
 # 送货单识别 — 上传·整理·识别·导出
 
 > 路由: `/material/delivery`
-> 页面: `pages/material/delivery.vue`
-> 来源: 现有 DeliveryView + delivery store 代码分析
+> 页面: `pages/material/delivery/index.vue` → `components/delivery/DeliveryRecognitionScreen.vue`
+> 来源: 现有 DeliveryView + delivery store 代码分析；2026-07-17 已接入真实 OCR 闭环
 
 > ⚠️ **IA 重构（批D · 2026-07-11）双区拆分已定案**——本页描述的"单页平铺"形态已被拆成两个页面，权威见 CONTEXT.md「归档」词条 + `docs/dc-rebuild/README.md` 反馈轮7 D 节 + `docs/handoffs/04-批D`：
 > - **处理区 = 送货单识别**（乙供材管理 · route `delivery`，本页下文的上传/整理树/识别/核对流程）：只放**待识别 / 识别中 / 待核对**；核对完成即离开处理区。
 > - **归档库 = 送货单归档库**（乙供材管理 · route `deliveryArchive`，设计稿 `kit/DeliveryArchiveScreen.jsx`）：核对完成后自动归档件的**左树右列表**。左树两级 **项目 → 分供方**（分供方按其合同**签订日期升序**），每项目下设 ⚠**「未区分分供方」**兜底节点；**所有节点带文件数量角标（只数量不金额）**；点树节点出该节点文件列表。
 > - **归档规则**：核对完成即自动归档，**核对是归档唯一前置**；未指定项目**禁止导入**（批量/单个同拦截）。
 > - **归档不是终态**：文件可**拖拽改归属**、节点可**手动新建**（从分供方库选）+ 归档时自动建缺失节点；任何改归属/字段一律弹**二次确认**（识别难免出错，留改错通道）。
-> - **分供方名模糊纠错**：识别/文件夹推断的公司名在分供方库模糊匹配 → 给建议 + 一键替换归并（识别阶段与归档后编辑通用）。
-> - 下文阶段三"文件列表 + 分区"里的"单页平铺态"归档呈现**已废除**，归属拦截时机= **卡在上传**（先分区归组、后识别）；见 CONTEXT「归档」「工地」。
+> - **分供方名模糊纠错**：识别/文件夹推断的公司名在分供方库模糊匹配 → 只给建议，必须人工采用后才绑定；确认的 OCR 写法记入分供方别名。
+> - 下文阶段一至三的“文件夹整理树 / 分区 / 上传时归属拦截”是**未落地历史目标**，不是当前运行行为。当前先上传识别，在核对归档前强制选择项目；若恢复“上传时拦截”，须作为独立工作项同时调整交互和会话模型，不能只改文案。
+
+> ✅ **当前实现快照（2026-07-17）**：处理区已打通 PDF/PNG/JPG/JPEG 上传 → 图片本地裁边扶正 → 统一 OCR 接口 → HTML/Markdown 表格解析 → 队列/原图/字段与材料行三栏核对 → 自动归档。支持一文件多张单、分供方精确别名自动匹配、模糊候选人工采用、工地原文记忆为项目别名、金额独立手改与行级/票面合计勾稽；项目是归档硬前置，分供方可落“未区分分供方”。OCR 模型、隐私边界、Token 与预处理策略只以 [ADR-0006](../../adr/0006-ocr-paddleocr-vl-single-model.md) 为准。文件夹整理树、批量改归属、跨刷新队列和导出归档仍属后续工作。
 
 ---
 
-## 一、交互流程（六阶段）
+## 一、交互流程（历史六阶段目标）
+
+> ⛔ 本节阶段一至三保留作文件夹整理后续设计输入；当前页面没有文件夹整理树或分区栏。现行可验收闭环以文首“当前实现快照”和下方阶段四至六的已落地说明为准。
 
 ### 阶段一 · 上传入口
 
@@ -56,10 +60,10 @@ FileCard × N:
 
 ```
 触发: "识别全部" 或 单张识别
-  ├─ VL 已配置? → PaddleOCR-VL 云端 (_runOcrVl)
-  │   失败则 fallback 本地
-  └─ 未配置 → 本地 OCR (_runOcrLocal)
-      识别失败尝试旋转 90°/270°
+  └─ 调用统一 recognizeDocument(file) 接口
+      ├─ 图片可先生成裁边扶正派生件；PDF 保持原文件
+      ├─ 输出 Markdown / HTML 表格 / layout regions
+      └─ 失败显式报错并允许会话内重试
 
 结果写入:
   ├─ 公司名（检测冲突：文件夹名 vs OCR）
@@ -81,74 +85,40 @@ ProblemDialog:
   缺公司 / 缺日期 / 缺单号 / 0明细行 / 待复核
 ```
 
-### 阶段六 · 输出（两条并行路径）
+### 阶段六 · 核对完成与输出
 
-| 路径 | 组件 | 功能 |
-|------|------|------|
-| A · 入库 | SaveToStorePanel | 写入 recognizedStore（键=工地+公司+单号），供分供方详情/单价对比读取 |
-| B · 导出 | ExportPanel | 每分区一个子文件夹，同公司可合并PDF，生成「送货单整理汇总.xlsx」 |
+> ⛔ 下方旧版“入库/导出两条并行路径”已废弃。当前权威口径是：**核对完成即自动归档，核对是归档唯一前置**。
 
-两条路径互不替代，可以只做一个也可以都做。
+| 路径 | 当前行为 |
+|------|------|
+| 核对完成 | 强制选择项目；把单头与材料明细写入 `delivery_records` / `delivery_lines`，立即离开处理区并进入归档库 |
+| 分供方未命中 | 允许归到项目下“未区分分供方”，保留 OCR 供应商原文供后续纠正 |
+| 导出 | 独立后续能力，不阻塞核对归档，也不由 OCR 完成动作隐式触发 |
 
 ---
 
 ## 二、数据模型
 
-```ts
-interface DeliveryFile {
-  id: string
-  name: string
-  blob: File
-  kind: 'pdf' | 'image'
-  partitionId: string
-  pages: PageImage[]
-  rendering: boolean
-  renderError: string
-  company: string
-  companySource: '' | 'folder' | 'ocr' | 'manual'
-  companyOcr: string
-  companyConflict: boolean
-  specialGroup: string
-  origin: string
-  merge: boolean
-  docs: DeliveryDoc[]
-  ocrText: string
-  ocrStatus: 'idle' | 'running' | 'done' | 'error'
-  ocrError: string
-  ocrPartial: string
-  ocrEngine?: string
-  itemCandidates: any[]
-  project: string
-  docType: '送货单' | '收据' | ''
-  note: string
-}
-
-interface DeliveryDoc {
-  id: string
-  date: string | null
-  dateText: string
-  orderNo: string
-  items: DeliveryItem[]
-  note?: string
-}
-
-interface DeliveryItem {
-  name: string
-  unit: string
-  quantity: string
-  unitPrice: string
-  total: string
-}
-
-interface Partition {
-  id: string
-  name: string
-}
-```
+本页不复制字段定义：持久化模型唯一权威见 [DATABASE.md §2.5](../DATABASE.md)，处理区会话类型见 `app/stores/delivery.ts`。金额口径同样以 DATABASE 为准：`delivery_lines.amount` 是复核后独立金额，数量×单价只做勾稽。
 
 ---
 
 ## 三、组件清单
+
+当前已落地：
+
+| 组件 | 职责 |
+|------|------|
+| `DeliveryRecognitionScreen` | 页面布局与子组件装配 |
+| `DeliveryWorkbenchHeader` | 上传、批量识别与队列统计 |
+| `DeliveryQueuePanel` | 会话文件队列、状态/进度、单张重试与移除 |
+| `DeliveryOriginalPanel` | PDF/图片原件预览，图片人工旋转辅助核对 |
+| `DeliveryReviewPanel` | 多张单切换、复核进度与归档入口 |
+| `DeliveryDocumentFields` | 只读接收草稿，发出单头/项目/分供方字段变更事件 |
+| `DeliveryItemsEditor` | 只读接收材料行，发出逐格编辑事件并显示金额不平 |
+| `useDeliveryRecognitionWorkspace` | 页面本地状态、识别、主数据建议、别名记忆与归档编排 |
+
+以下为尚未全部落地的历史目标组件：
 
 | 组件 | 职责 |
 |------|------|

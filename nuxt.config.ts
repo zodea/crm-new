@@ -3,6 +3,14 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: true },
 
+  runtimeConfig: {
+    // PaddleOCR 官方 API 凭证仅存在 Nitro 服务端；禁止放入 public 或前端持久化。
+    paddleOcrAccessToken: '',
+    paddleOcrBaseUrl: 'https://paddleocr.aistudio-app.com',
+    paddleOcrRequestTimeoutMs: 120_000,
+    paddleOcrPollTimeoutMs: 600_000,
+  },
+
   modules: [
     '@unocss/nuxt',
     '@pinia/nuxt',

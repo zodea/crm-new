@@ -41,6 +41,8 @@ app/lib/db/seed/*.local.json
 docs/*.pdf
 docs/现实合同/
 docs/rewrite/工资发放格式/
+docs/rewrite/2026年一季度垫资清单/
+docs/rewrite/合和新城送货单/
 DC重构设计源码/screenshots/
 
 # 本地参考文件数据（含真实公司证照、合同、发票、结算及送货资料，不上传）
