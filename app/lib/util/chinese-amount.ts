@@ -3,85 +3,78 @@ const UNITS = ['', '拾', '佰', '仟'] as const
 const BIG_UNITS = ['', '万', '亿', '兆'] as const
 
 export function moneyToChinese(amount: number): string {
-  if (amount === 0) return '零元整'
-  if (amount < 0) return `负${moneyToChinese(-amount)}`
+  if (amount === 0)
+    return '零元整'
+  if (amount < 0)
+    return `负${moneyToChinese(-amount)}`
 
-  const fen = Math.round(amount * 100)
-  const intPart = Math.floor(fen / 100)
-  const jiao = Math.floor((fen % 100) / 10)
-  const fenDigit = fen % 10
+  const totalFen = Math.round(amount * 100)
+  const integer = Math.floor(totalFen / 100)
+  const jiao = Math.floor((totalFen % 100) / 10)
+  const fen = totalFen % 10
+  let result = `${integer > 0 ? integerToChinese(integer) : DIGITS[0]}元`
+
+  if (jiao === 0 && fen === 0)
+    return `${result}整`
+
+  if (jiao > 0)
+    result += `${DIGITS[jiao]}角`
+  else if (integer > 0 && fen > 0)
+    result += DIGITS[0]
+
+  if (fen > 0)
+    result += `${DIGITS[fen]}分`
+
+  return result
+}
+
+function integerToChinese(value: number): string {
+  const groups: number[] = []
+  let remaining = Math.floor(value)
+  while (remaining > 0) {
+    groups.push(remaining % 10_000)
+    remaining = Math.floor(remaining / 10_000)
+  }
 
   let result = ''
+  let skippedGroup = false
+  for (let index = groups.length - 1; index >= 0; index--) {
+    const group = groups[index] ?? 0
+    if (group === 0) {
+      if (result)
+        skippedGroup = true
+      continue
+    }
 
-  if (intPart > 0) {
-    result = integerToChinese(intPart) + '元'
-  }
+    if (result && (skippedGroup || group < 1_000) && !result.endsWith(DIGITS[0]))
+      result += DIGITS[0]
 
-  if (jiao === 0 && fenDigit === 0) {
-    result += '整'
-  }
-  else {
-    if (intPart > 0 && jiao === 0) {
-      result += '零'
-    }
-    if (jiao > 0) {
-      result += DIGITS[jiao] + '角'
-    }
-    if (fenDigit > 0) {
-      if (jiao === 0 && intPart === 0) {
-        result += DIGITS[fenDigit] + '分'
-      }
-      else {
-        if (jiao === 0 && intPart > 0) {
-          // 零已在上面添加
-        }
-        result += DIGITS[fenDigit] + '分'
-      }
-    }
+    result += sectionToChinese(group) + (BIG_UNITS[index] ?? '')
+    skippedGroup = false
   }
 
   return result
 }
 
-function integerToChinese(n: number): string {
-  if (n === 0) return DIGITS[0]
-
-  const s = String(n)
-  const groups: number[][] = []
-  for (let i = s.length; i > 0; i -= 4) {
-    const start = Math.max(0, i - 4)
-    groups.unshift(s.slice(start, i).split('').map(Number))
-  }
-
+function sectionToChinese(section: number): string {
   let result = ''
-  for (const [gi, group] of groups.entries()) {
-    const bigUnit = BIG_UNITS[groups.length - 1 - gi] || ''
-    let groupStr = ''
-    let hasNonZero = false
+  let zeroPending = false
 
-    for (const [i, d] of group.entries()) {
-      const unit = UNITS[group.length - 1 - i] ?? ''
-      if (d === 0) {
-        if (hasNonZero && i < group.length - 1 && group[i + 1] !== 0) {
-          groupStr += '零'
-        }
-      }
-      else {
-        groupStr += DIGITS[d] + unit
-        hasNonZero = true
-      }
+  for (let unitIndex = 3; unitIndex >= 0; unitIndex--) {
+    const power = 10 ** unitIndex
+    const digit = Math.floor(section / power) % 10
+    if (digit === 0) {
+      if (result)
+        zeroPending = true
+      continue
     }
 
-    if (hasNonZero) {
-      if (gi > 0 && group.length < 4 && result.length > 0 && !result.endsWith('零')) {
-        result += '零'
-      }
-      result += groupStr + bigUnit
+    if (zeroPending) {
+      result += DIGITS[0]
+      zeroPending = false
     }
-    else if (result.length > 0 && !result.endsWith('零') && gi < groups.length - 1) {
-      result += '零'
-    }
+    result += `${DIGITS[digit]}${UNITS[unitIndex] ?? ''}`
   }
 
-  return result.replace(/零+$/, '')
+  return result
 }
