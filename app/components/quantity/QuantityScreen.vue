@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
+import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import {
   ALL_QUANTITY_FILTER,
@@ -19,6 +19,13 @@ const trade = shallowRef(ALL_QUANTITY_FILTER)
 const assigneeKey = shallowRef(ALL_QUANTITY_FILTER)
 const initialized = shallowRef(false)
 const templateDialogOpen = shallowRef(false)
+const assignmentDialogOpen = shallowRef(false)
+const assignmentInitialUnitId = shallowRef('')
+const assignmentInitialTrade = shallowRef(ALL_QUANTITY_FILTER)
+const completionDialogOpen = shallowRef(false)
+const completionUnitId = shallowRef('')
+const completionInitialStageId = shallowRef('')
+const batchCompletionDialogOpen = shallowRef(false)
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -100,6 +107,25 @@ async function retry() {
     await loadSelectedProject(false)
 }
 
+function openAssignments(unitId = '', preferredTrade = trade.value) {
+  assignmentInitialUnitId.value = unitId
+  assignmentInitialTrade.value = preferredTrade
+  assignmentDialogOpen.value = true
+}
+
+function configureCell(cell: QuantityMatrixCell): void {
+  const preferredTrade = trade.value !== ALL_QUANTITY_FILTER
+    ? trade.value
+    : cell.summary?.stageTrade ?? cell.assignments[0]?.trade ?? ALL_QUANTITY_FILTER
+  openAssignments(cell.unitId, preferredTrade)
+}
+
+function completeCell(cell: QuantityMatrixCell): void {
+  completionUnitId.value = cell.unitId
+  completionInitialStageId.value = cell.summary?.stageId ?? ''
+  completionDialogOpen.value = true
+}
+
 onMounted(initialize)
 </script>
 
@@ -121,7 +147,9 @@ onMounted(initialize)
       :loading="store.loading"
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
+      @batch-complete="batchCompletionDialogOpen = true"
       @manage-templates="templateDialogOpen = true"
+      @manage-assignments="openAssignments()"
       @refresh="retry"
     />
 
@@ -196,12 +224,45 @@ onMounted(initialize)
       </p>
     </section>
 
-    <QuantityWorkspace v-else-if="snapshot" :matrix="matrix" />
+    <template v-else-if="snapshot">
+      <QuantityProgressCards :progress="store.stageProgress" />
+      <QuantityWorkspace
+        :project-id="projectId"
+        :matrix="matrix"
+        @configure="configureCell"
+        @complete="completeCell"
+      />
+    </template>
 
     <QuantityTemplateDialog
       v-if="projectId"
       v-model:open="templateDialogOpen"
       :project-id="projectId"
+    />
+
+    <QuantityAssignmentDialog
+      v-if="projectId"
+      v-model:open="assignmentDialogOpen"
+      :project-id="projectId"
+      :initial-building-id="buildingId"
+      :initial-trade="assignmentInitialTrade"
+      :initial-unit-id="assignmentInitialUnitId"
+    />
+
+    <QuantityCompletionDialog
+      v-if="projectId && completionUnitId"
+      v-model:open="completionDialogOpen"
+      :project-id="projectId"
+      :unit-id="completionUnitId"
+      :initial-stage-id="completionInitialStageId"
+    />
+
+    <QuantityBatchCompletionDialog
+      v-if="projectId"
+      v-model:open="batchCompletionDialogOpen"
+      :project-id="projectId"
+      :initial-building-id="buildingId"
+      :initial-trade="trade"
     />
   </div>
 </template>

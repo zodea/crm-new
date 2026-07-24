@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   configure: [cell: QuantityMatrixCell]
+  complete: [cell: QuantityMatrixCell]
   detail: [cell: QuantityMatrixCell]
 }>()
 
@@ -33,7 +34,7 @@ function cellButton(cellId: string): HTMLButtonElement | null {
   return [...buttons].find(button => button.dataset.quantityCellId === cellId) ?? null
 }
 
-function actionButton(cellId: string, action: 'configure' | 'detail'): HTMLButtonElement | null {
+function actionButton(cellId: string, action: 'configure' | 'complete' | 'detail'): HTMLButtonElement | null {
   const buttons = gridRef.value?.querySelectorAll<HTMLButtonElement>('[data-quantity-action]') ?? []
   return [...buttons].find(button => button.dataset.quantityCellId === cellId && button.dataset.quantityAction === action) ?? null
 }
@@ -217,10 +218,21 @@ function assigneeLabel(cell: QuantityMatrixCell): string {
                   </button>
                   <button
                     type="button"
+                    :aria-label="`登记 ${cell.unitName}`"
+                    data-quantity-action="complete"
+                    :data-quantity-cell-id="cell.id"
+                    class="rounded-[var(--radius-btn)] border border-white bg-white px-3 py-1.5 text-12px font-700 text-ink outline-none hover:bg-brand-soft focus-visible:[box-shadow:0_0_0_3px_var(--brand-ring)]"
+                    @click="emit('complete', cell)"
+                    @keydown.esc.stop.prevent="closeActions(cell.id, true)"
+                  >
+                    登记
+                  </button>
+                  <button
+                    type="button"
                     :aria-label="`详情 ${cell.unitName}`"
                     data-quantity-action="detail"
                     :data-quantity-cell-id="cell.id"
-                    class="rounded-[var(--radius-btn)] border border-white bg-white px-3 py-1.5 text-12px font-700 text-ink outline-none hover:bg-brand-soft focus-visible:[box-shadow:0_0_0_3px_var(--brand-ring)]"
+                    class="rounded-[var(--radius-btn)] border border-white/45 bg-white/12 px-3 py-1.5 text-12px font-700 text-white outline-none hover:bg-white/22 focus-visible:[box-shadow:0_0_0_3px_var(--brand-ring)]"
                     @click="emit('detail', cell)"
                     @keydown.esc.stop.prevent="closeActions(cell.id, true)"
                   >

@@ -2,13 +2,16 @@
 import type { QuantityMatrixCell, QuantityMatrixView } from '~/lib/quantity/matrix'
 
 const props = defineProps<{
+  projectId: string
   matrix: QuantityMatrixView
 }>()
 
-type InspectorMode = 'configure' | 'detail'
+const emit = defineEmits<{
+  configure: [cell: QuantityMatrixCell]
+  complete: [cell: QuantityMatrixCell]
+}>()
 
 const selectedCellId = shallowRef('')
-const inspectorMode = shallowRef<InspectorMode>('detail')
 
 const selectedCell = computed(() => {
   for (const row of props.matrix.rows) {
@@ -24,9 +27,8 @@ watch(() => props.matrix.positions.map(position => position.id).join('|'), () =>
     selectedCellId.value = ''
 })
 
-function inspect(cell: QuantityMatrixCell, mode: InspectorMode) {
+function inspectDetail(cell: QuantityMatrixCell) {
   selectedCellId.value = cell.id
-  inspectorMode.value = mode
 }
 
 function completedLabel(completedAt: string | null): string {
@@ -38,34 +40,13 @@ function completedLabel(completedAt: string | null): string {
   <div class="flex min-w-0 flex-col gap-3">
     <QuantityMatrix
       :matrix="matrix"
-      @configure="inspect($event, 'configure')"
-      @detail="inspect($event, 'detail')"
+      @configure="emit('configure', $event)"
+      @complete="emit('complete', $event)"
+      @detail="inspectDetail"
     />
 
     <section
-      v-if="selectedCell && inspectorMode === 'configure'"
-      class="panel px-4 py-3"
-      role="region"
-      :aria-label="`${selectedCell.unitName}责任配置摘要`"
-    >
-      <div class="flex flex-wrap items-baseline gap-2">
-        <h3 class="text-14px font-800 text-ink">
-          {{ selectedCell.floorName }} · {{ selectedCell.unitName }} · 当前责任
-        </h3>
-        <span class="text-11px text-ink-faint">只读摘要</span>
-      </div>
-      <div v-if="selectedCell.assignments.length" class="mt-2 flex flex-wrap gap-2">
-        <span v-for="assignment in selectedCell.assignments" :key="assignment.id" class="chip-brand">
-          {{ assignment.trade }} · {{ assignment.assigneeName }}
-        </span>
-      </div>
-      <p v-else class="mt-2 text-12px text-ink-soft">
-        当前筛选范围内尚未指派。
-      </p>
-    </section>
-
-    <section
-      v-else-if="selectedCell"
+      v-if="selectedCell"
       class="panel px-4 py-3"
       role="region"
       :aria-label="`${selectedCell.unitName}阶段时间线`"
@@ -75,6 +56,13 @@ function completedLabel(completedAt: string | null): string {
           {{ selectedCell.floorName }} · {{ selectedCell.unitName }} · 阶段时间线
         </h3>
         <span class="text-11px text-ink-faint">总览按月份取最近阶段，此处保留完整记录</span>
+        <NuxtLink
+          :to="`/subcontract/quantity/${projectId}/${selectedCell.unitId}`"
+          class="ml-auto text-12px text-brand-deep font-700 hover:underline"
+        >
+          打开户施工详情
+          <span class="i-lucide-arrow-right align-[-2px]" aria-hidden="true" />
+        </NuxtLink>
       </div>
       <ol v-if="selectedCell.timeline.length" class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <li
