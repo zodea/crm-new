@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConfirmImpact, ConfirmVariant, HoldState } from '~/lib/kit/confirm'
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import {
   beginHold,
   cancelHold,
@@ -43,6 +43,7 @@ const emit = defineEmits<{
 const typed = ref('')
 const hold = ref<HoldState | null>(null) // 非空 = cascade 挂起中
 const remainingMs = ref(0)
+const typingInputId = useId()
 let timer: ReturnType<typeof setInterval> | null = null
 
 // shadcn Button 组件实例（聚焦取 $el）
@@ -155,10 +156,11 @@ onBeforeUnmount(stopTimer)
 
       <!-- cascade：type-to-confirm 输入框 -->
       <div v-if="variant === 'cascade' && requireTyping" class="mt-3">
-        <label class="text-12px text-ink-soft">
+        <label :for="typingInputId" class="text-12px text-ink-soft">
           请输入 <b class="text-ink font-700">{{ requireTyping }}</b> 以确认删除：
         </label>
         <input
+          :id="typingInputId"
           v-model="typed"
           type="text"
           class="field-input w-full mt-1.5 rounded-[var(--radius-btn)]"

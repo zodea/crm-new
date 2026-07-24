@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test'
 test.describe('KitButton 三态原语', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/dev/kit-ui')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('button', { name: '模拟提交', exact: true })).toBeVisible({
+      timeout: 20_000,
+    })
   })
 
   test('loading 立即禁用、保留原文并锁定宽度', async ({ page }) => {
