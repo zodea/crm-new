@@ -54,4 +54,15 @@ describe('undo toast', () => {
     expect(sonner.error).toHaveBeenCalledWith('撤回失败：数据库不可用', expect.any(Object))
     expect(sonner.success).not.toHaveBeenCalled()
   })
+
+  it('用户取消撤回时只提示内容保持不变', async () => {
+    useToast().undo('已更新记录', async () => 'cancelled')
+    const options = sonner.mock.calls[0]![1] as { action: { onClick: () => Promise<void> } }
+
+    await options.action.onClick()
+
+    expect(sonner.info).toHaveBeenCalledWith('已取消撤回，当前内容保持不变', expect.any(Object))
+    expect(sonner.success).not.toHaveBeenCalled()
+    expect(sonner.error).not.toHaveBeenCalled()
+  })
 })

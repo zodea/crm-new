@@ -29,6 +29,39 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'supplier_id', table: 'suppliers' },
   ],
   crews: [],
+  items: [{ column: 'project_id', table: 'projects' }],
+  buildings: [{ column: 'project_id', table: 'projects' }],
+  floors: [{ column: 'building_id', table: 'buildings' }],
+  house_type_templates: [{ column: 'project_id', table: 'projects' }],
+  rooms: [{ column: 'template_id', table: 'house_type_templates' }],
+  units: [
+    { column: 'floor_id', table: 'floors' },
+    { column: 'house_type_template_id', table: 'house_type_templates' },
+  ],
+  house_type_template_items: [
+    { column: 'room_id', table: 'rooms' },
+    { column: 'item_id', table: 'items' },
+  ],
+  construction_stages: [{ column: 'project_id', table: 'projects' }],
+  construction_stage_items: [
+    { column: 'stage_id', table: 'construction_stages' },
+    { column: 'item_id', table: 'items' },
+  ],
+  unit_assignments: [
+    { column: 'unit_id', table: 'units' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  unit_assignment_scopes: [
+    { column: 'assignment_id', table: 'unit_assignments' },
+    { column: 'room_id', table: 'rooms' },
+    { column: 'item_id', table: 'items' },
+  ],
+  // assignment_id 仅为完成时责任审计引用；责任软删不得吞掉历史完成事实。
+  unit_stage_completions: [
+    { column: 'unit_id', table: 'units' },
+    { column: 'stage_id', table: 'construction_stages' },
+  ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [
     { column: 'project_id', table: 'projects' },
@@ -178,7 +211,7 @@ export interface OperationLogInput {
   action: OperationAction
   /** 操作前快照(create 无) */
   before?: Record<string, unknown> | null
-  /** 操作后快照(delete 无) */
+  /** 操作后快照；旧版 delete 日志可能为空 */
   after?: Record<string, unknown> | null
   operator?: string
 }
@@ -247,8 +280,10 @@ export async function softDelete(
   const before = await fetchRowById(db, table, id)
   if (!before || before.deleted_at != null)
     return null
-  await db.execute(`UPDATE "${table}" SET deleted_at = ? WHERE id = ?`, [new Date().toISOString(), id])
-  return logOperation(db, { table, recordId: id, action: 'delete', before, operator })
+  const deletedAt = new Date().toISOString()
+  await db.execute(`UPDATE "${table}" SET deleted_at = ? WHERE id = ?`, [deletedAt, id])
+  const after = { ...before, deleted_at: deletedAt }
+  return logOperation(db, { table, recordId: id, action: 'delete', before, after, operator })
 }
 
 /**
@@ -272,12 +307,74 @@ export async function restoreRecord(
 }
 
 interface OperationLogRow {
+  sequence: number
   id: string
   table_name: string
   record_id: string
   action: OperationAction
   before_data: string | null
   after_data: string | null
+}
+
+function snapshotMatches(
+  current: Record<string, unknown>,
+  expected: Record<string, unknown>,
+  ignoredKeys: readonly string[] = [],
+): boolean {
+  const ignored = new Set(ignoredKeys)
+  const currentKeys = Object.keys(current).filter(key => !ignored.has(key) && !key.startsWith('__')).sort()
+  const expectedKeys = Object.keys(expected).filter(key => !ignored.has(key) && !key.startsWith('__')).sort()
+  if (currentKeys.length !== expectedKeys.length || currentKeys.some((key, index) => key !== expectedKeys[index]))
+    return false
+  return expectedKeys.every(key => JSON.stringify(current[key]) === JSON.stringify(expected[key]))
+}
+
+/**
+ * 严格撤回：仅当物理行仍等于该日志的“操作后”快照时才反做。
+ *
+ * 这是需要 CAS 语义的批量撤回专用入口；旧的 undoOperation 保持跨域兼容语义。
+ * 历史 delete 日志可能没有 after_data，因此兼容为“当前仍已删除，且其余列等于 before”。
+ */
+export async function undoOperationIfUnchanged(db: SoftDb, logId: string, operator = ''): Promise<boolean> {
+  const [log] = await db.select<OperationLogRow>(
+    'SELECT rowid AS sequence, * FROM operation_logs WHERE id = ?',
+    [logId],
+  )
+  if (!log)
+    return false
+
+  try {
+    // 防 ABA：即使字段值/毫秒时间戳绕回原样，只要此后落过同记录日志，旧句柄即失效。
+    const [newer] = await db.select<{ present: number }>(
+      `SELECT 1 AS present
+       FROM operation_logs
+       WHERE table_name = ? AND record_id = ? AND rowid > ?
+       LIMIT 1`,
+      [log.table_name, log.record_id, log.sequence],
+    )
+    if (newer)
+      return false
+    const current = await fetchRowById(db, log.table_name, log.record_id)
+    if (!current)
+      return false
+    if (log.after_data) {
+      const after = JSON.parse(log.after_data) as Record<string, unknown>
+      if (!snapshotMatches(current, after))
+        return false
+    }
+    else {
+      if (log.action !== 'delete' || !log.before_data || current.deleted_at == null)
+        return false
+      const before = JSON.parse(log.before_data) as Record<string, unknown>
+      if (!snapshotMatches(current, before, ['deleted_at']))
+        return false
+    }
+  }
+  catch {
+    return false
+  }
+
+  return undoOperation(db, logId, operator)
 }
 
 /**

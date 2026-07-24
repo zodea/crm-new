@@ -207,6 +207,239 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_file_refs_delivery_source
     AND category = 'source';
 `
 
+/** v12 工程量矩阵底座(#103)：稳定模板房间 + 户工种责任 + 户阶段完成。 */
+const V12_QUANTITY_FOUNDATION = `
+CREATE TABLE IF NOT EXISTS items (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  code       TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  section    TEXT,
+  trade      TEXT NOT NULL,
+  unit       TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS buildings (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  code       TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS house_type_templates (
+  id                      TEXT PRIMARY KEY,
+  project_id              TEXT NOT NULL REFERENCES projects(id),
+  code                    TEXT NOT NULL,
+  name                    TEXT,
+  copied_from_template_id TEXT REFERENCES house_type_templates(id),
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at              TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS construction_stages (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id),
+  code            TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  trade           TEXT NOT NULL,
+  completion_mode TEXT NOT NULL DEFAULT 'unit' CHECK (completion_mode IN ('unit', 'manual')),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at      TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS floors (
+  id          TEXT PRIMARY KEY,
+  building_id TEXT NOT NULL REFERENCES buildings(id),
+  code        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS rooms (
+  id          TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL REFERENCES house_type_templates(id),
+  code        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'room' CHECK (kind IN ('room', 'whole_unit')),
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS units (
+  id                     TEXT PRIMARY KEY,
+  floor_id               TEXT NOT NULL REFERENCES floors(id),
+  house_type_template_id TEXT NOT NULL REFERENCES house_type_templates(id),
+  code                   TEXT NOT NULL,
+  name                   TEXT,
+  sort_order             INTEGER NOT NULL DEFAULT 0,
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS house_type_template_items (
+  id                      TEXT PRIMARY KEY,
+  room_id                 TEXT NOT NULL REFERENCES rooms(id),
+  item_id                 TEXT NOT NULL REFERENCES items(id),
+  recognized_contract_qty REAL,
+  contract_qty            REAL,
+  provisional_qty         REAL,
+  field_formula           TEXT,
+  field_qty               REAL,
+  note                    TEXT,
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at              TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS construction_stage_items (
+  id         TEXT PRIMARY KEY,
+  stage_id   TEXT NOT NULL REFERENCES construction_stages(id),
+  item_id    TEXT NOT NULL REFERENCES items(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS unit_assignments (
+  id         TEXT PRIMARY KEY,
+  unit_id    TEXT NOT NULL REFERENCES units(id),
+  trade      TEXT NOT NULL,
+  crew_id    TEXT REFERENCES crews(id),
+  worker_id  TEXT REFERENCES workers(id),
+  note       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL,
+  CHECK (
+    (crew_id IS NOT NULL AND worker_id IS NULL)
+    OR (crew_id IS NULL AND worker_id IS NOT NULL)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS unit_stage_completions (
+  id            TEXT PRIMARY KEY,
+  unit_id       TEXT NOT NULL REFERENCES units(id),
+  stage_id      TEXT NOT NULL REFERENCES construction_stages(id),
+  assignment_id TEXT REFERENCES unit_assignments(id),
+  status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'completed')),
+  completed_at  TEXT,
+  note          TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL,
+  CHECK (status = 'draft' OR (completed_at IS NOT NULL AND assignment_id IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS unit_assignment_scopes (
+  id            TEXT PRIMARY KEY,
+  assignment_id TEXT NOT NULL REFERENCES unit_assignments(id),
+  room_id       TEXT NOT NULL REFERENCES rooms(id),
+  item_id       TEXT NOT NULL REFERENCES items(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_buildings_project ON buildings(project_id);
+CREATE INDEX IF NOT EXISTS idx_floors_building ON floors(building_id);
+CREATE INDEX IF NOT EXISTS idx_units_floor ON units(floor_id);
+CREATE INDEX IF NOT EXISTS idx_units_template ON units(house_type_template_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_template ON rooms(template_id);
+CREATE INDEX IF NOT EXISTS idx_items_project ON items(project_id);
+CREATE INDEX IF NOT EXISTS idx_ht_project ON house_type_templates(project_id);
+CREATE INDEX IF NOT EXISTS idx_hti_room ON house_type_template_items(room_id);
+CREATE INDEX IF NOT EXISTS idx_hti_item ON house_type_template_items(item_id);
+CREATE INDEX IF NOT EXISTS idx_stages_project ON construction_stages(project_id);
+CREATE INDEX IF NOT EXISTS idx_stage_items_stage ON construction_stage_items(stage_id);
+CREATE INDEX IF NOT EXISTS idx_unit_assignments_unit ON unit_assignments(unit_id);
+CREATE INDEX IF NOT EXISTS idx_unit_assignments_crew ON unit_assignments(crew_id);
+CREATE INDEX IF NOT EXISTS idx_unit_assignments_worker ON unit_assignments(worker_id);
+CREATE INDEX IF NOT EXISTS idx_unit_assignments_trade ON unit_assignments(trade);
+CREATE INDEX IF NOT EXISTS idx_uas_assignment ON unit_assignment_scopes(assignment_id);
+CREATE INDEX IF NOT EXISTS idx_usc_stage_date ON unit_stage_completions(stage_id, completed_at);
+CREATE INDEX IF NOT EXISTS idx_usc_unit ON unit_stage_completions(unit_id);
+CREATE INDEX IF NOT EXISTS idx_usc_assignment ON unit_stage_completions(assignment_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_building_code
+  ON buildings(project_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_floor_code
+  ON floors(building_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_unit_code
+  ON units(floor_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_room_code
+  ON rooms(template_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_room_whole_unit
+  ON rooms(template_id) WHERE deleted_at IS NULL AND kind = 'whole_unit';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_item_code
+  ON items(project_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ht_code
+  ON house_type_templates(project_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_hti_room_item
+  ON house_type_template_items(room_id, item_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stage_code
+  ON construction_stages(project_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_stage_item
+  ON construction_stage_items(stage_id, item_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_unit_assignment_trade
+  ON unit_assignments(unit_id, trade) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_uas_scope
+  ON unit_assignment_scopes(assignment_id, room_id, item_id) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_usc_unit_stage
+  ON unit_stage_completions(unit_id, stage_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_items_deleted ON items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_buildings_deleted ON buildings(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_floors_deleted ON floors(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_house_type_templates_deleted ON house_type_templates(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_rooms_deleted ON rooms(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_units_deleted ON units(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_house_type_template_items_deleted ON house_type_template_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_construction_stages_deleted ON construction_stages(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_construction_stage_items_deleted ON construction_stage_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_unit_assignments_deleted ON unit_assignments(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_unit_stage_completions_deleted ON unit_stage_completions(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_unit_assignment_scopes_deleted ON unit_assignment_scopes(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+// trigger body 含内部分号，不能交给 execScript 的简单拆句器，须作为完整语句执行。
+const V12_CREATE_WHOLE_UNIT_ROOM = `
+CREATE TRIGGER IF NOT EXISTS trg_house_type_templates_whole_unit
+AFTER INSERT ON house_type_templates
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  INSERT INTO rooms (id, template_id, code, name, kind, sort_order)
+  VALUES (NEW.id || ':whole_unit', NEW.id, '__whole_unit__', '整户范围', 'whole_unit', -1);
+END;
+`
+
+const V12_PROTECT_WHOLE_UNIT_ROOM = `
+CREATE TRIGGER IF NOT EXISTS trg_rooms_keep_whole_unit
+BEFORE UPDATE OF deleted_at ON rooms
+WHEN OLD.kind = 'whole_unit' AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'whole_unit room cannot be deleted');
+END;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -324,6 +557,16 @@ export const migrations: Migration[] = [
         ON suppliers(external_ref)
         WHERE external_ref <> '' AND deleted_at IS NULL;
       `)
+    },
+  },
+  {
+    version: 12,
+    name: 'quantity-matrix-foundation',
+    async up(db) {
+      await addColumnIfMissing(db, 'projects', 'matrix_archived_at', 'TEXT DEFAULT NULL')
+      await execScript(db, V12_QUANTITY_FOUNDATION)
+      await db.execute(V12_CREATE_WHOLE_UNIT_ROOM)
+      await db.execute(V12_PROTECT_WHOLE_UNIT_ROOM)
     },
   },
 ]

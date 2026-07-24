@@ -1,0 +1,16 @@
+[
+  {
+    "id": "qty_tpl_a",
+    "project_id": "proj_demo_001",
+    "code": "A",
+    "name": "A户型",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_tpl_b",
+    "project_id": "proj_demo_001",
+    "code": "B",
+    "name": "B户型",
+    "sort_order": 20
+  }
+]

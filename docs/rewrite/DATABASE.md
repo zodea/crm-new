@@ -64,10 +64,13 @@
 ```
 projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1─ units
     │                  ▲                              ▲
-    │                  │ stageId                      │ unitId
-    ├─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N→ units ─1:N→ rooms
+    │                  │ stage_id                     │ unit_id
+    ├─1:N→ schedule_groups ═N:M═ buildings ─1:N→ floors ─1:N→ units
     │            (schedule_group_buildings)
-    ├─1:N→ schedule_tasks（WBS: project→group→task, parentId 自关联，引用 stageId）
+    ├─1:N→ house_type_templates ─1:N→ rooms（稳定模板房间）
+    │                  ▲                    └─1:N→ house_type_template_items
+    │                  └────────N:1──────── units（户通过模板活链接读取房间）
+    ├─1:N→ schedule_tasks（WBS: project→group→task, parent_id 自关联，引用 stage_id）
     │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）
     │        └─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
     │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
@@ -413,11 +416,11 @@ CREATE TABLE project_aliases (
 | PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
 | Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，班组单价走 `crew_project_items`） |
 | HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
-| HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（房间×工种×分项，清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
+| HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（稳定模板房间×分项，工种从分项读取；清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
 | ConstructionStage | `construction_stages` | `id` | **ADR 0010**：项目工序阶段目录，给 #103 完成事实与 #114 排程共享稳定 ID |
 | ConstructionStageItem | `construction_stage_items` | `id` | 工序阶段 ↔ 计量分项映射，圈定应做户与下钻范围 |
 | UnitAssignment | `unit_assignments` | `id` | **ADR 0010**：户 × 工种责任（只表达谁负责，不存完成） |
-| UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选房间 × 分项下钻范围 |
+| UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选模板房间 × 分项下钻范围；户身份由所属指派提供 |
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
 | WageStatement | `wage_statements` | `id` | ⚠️ 口径已随 [#117](https://github.com/zodea/crm-new/issues/117) 进度款域重构更新（2026-07-20）：单据主体=**负责人请款簿**（请款主体×月），三态生命周期（草稿/已核对/已发放固化实际金额）、单据级比例、格式族 A/B/C1/C2、全项目递增请款序号；「本期支付总额权重分摊」待 #117 未决⑥。**字段细化随工资域批次 PRD**，以 #117 定稿为权威 |
@@ -426,80 +429,191 @@ CREATE TABLE project_aliases (
 
 > ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资三表（禁用旧名）。工资单是**快照**（生成时计算应发 + 人工改实发），不是纯计算视图——反馈轮 8 定稿「实发逐人可直改」。
 
+以下是 #103 的目标物理模型；列名统一为 snake_case。模板房间直接落 `rooms`，但它属于户型模板而非某一户；某户的房间实例由 `(unit_id, room_id)` 组合指认，不建立逐户房间副本。
+
 ```sql
-CREATE TABLE construction_stages (
-  id             TEXT PRIMARY KEY,
-  projectId      TEXT NOT NULL,       -- → projects.id
-  code           TEXT NOT NULL,       -- 项目内稳定编码；排程任务引用，不用名称关联
-  name           TEXT NOT NULL,       -- 墙砖粘贴/地砖铺贴/一遍腻子/二遍腻子…
-  trade          TEXT NOT NULL,       -- 工种；用于匹配户 × 工种责任
-  completionMode TEXT DEFAULT 'unit', -- 'unit'=户级阶段事实 | 'manual'=排程手填
-  sortOrder      INTEGER DEFAULT 0,
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+CREATE TABLE items (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  code       TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  section    TEXT,
+  trade      TEXT NOT NULL,
+  unit       TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT
 );
 
-CREATE TABLE construction_stage_items (
-  id      TEXT PRIMARY KEY,
-  stageId TEXT NOT NULL,              -- → construction_stages.id
-  itemId  TEXT NOT NULL,              -- → items.id；用于应做户、量值和下钻，不代表共享完成率
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+CREATE TABLE buildings (
+  id         TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id),
+  code       TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT
+);
+
+CREATE TABLE floors (
+  id          TEXT PRIMARY KEY,
+  building_id TEXT NOT NULL REFERENCES buildings(id),
+  code        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT
 );
 
 CREATE TABLE house_type_templates (
-  id        TEXT PRIMARY KEY,
-  projectId TEXT NOT NULL,            -- → projects.id
-  code      TEXT NOT NULL,            -- A/B/C…
-  name      TEXT,
-  copiedFromTemplateId TEXT,          -- 一次性借用来源，仅留痕，不建立活链接
-  sortOrder INTEGER DEFAULT 0,
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  id                      TEXT PRIMARY KEY,
+  project_id              TEXT NOT NULL REFERENCES projects(id),
+  code                    TEXT NOT NULL,
+  name                    TEXT,
+  copied_from_template_id TEXT REFERENCES house_type_templates(id),
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at              TEXT
+);
+
+CREATE TABLE rooms (
+  id          TEXT PRIMARY KEY,
+  template_id TEXT NOT NULL REFERENCES house_type_templates(id),
+  code        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'room' CHECK (kind IN ('room', 'whole_unit')),
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT
+);
+
+CREATE TABLE units (
+  id                     TEXT PRIMARY KEY,
+  floor_id               TEXT NOT NULL REFERENCES floors(id),
+  house_type_template_id TEXT NOT NULL REFERENCES house_type_templates(id),
+  code                   TEXT NOT NULL,
+  name                   TEXT,
+  sort_order             INTEGER NOT NULL DEFAULT 0,
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT
 );
 
 CREATE TABLE house_type_template_items (
+  id                      TEXT PRIMARY KEY,
+  room_id                 TEXT NOT NULL REFERENCES rooms(id),
+  item_id                 TEXT NOT NULL REFERENCES items(id),
+  recognized_contract_qty REAL,
+  contract_qty            REAL,
+  provisional_qty         REAL,
+  field_formula           TEXT,
+  field_qty               REAL,
+  note                    TEXT,
+  sort_order              INTEGER NOT NULL DEFAULT 0,
+  created_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at              TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at              TEXT
+);
+
+CREATE TABLE construction_stages (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id),
+  code            TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  trade           TEXT NOT NULL,
+  completion_mode TEXT NOT NULL DEFAULT 'unit' CHECK (completion_mode IN ('unit', 'manual')),
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at      TEXT
+);
+
+CREATE TABLE construction_stage_items (
   id         TEXT PRIMARY KEY,
-  templateId TEXT NOT NULL,           -- → house_type_templates.id
-  roomName   TEXT,
-  trade      TEXT NOT NULL,
-  itemId     TEXT NOT NULL,           -- → items.id
-  recognizedContractQty REAL,         -- 清单识别原值
-  contractQty           REAL,         -- 当前合同量，可手改
-  provisionalQty        REAL,
-  fieldFormula          TEXT,
-  fieldQty              REAL,
-  note TEXT, sortOrder INTEGER DEFAULT 0,
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  stage_id   TEXT NOT NULL REFERENCES construction_stages(id),
+  item_id    TEXT NOT NULL REFERENCES items(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT
 );
 
 CREATE TABLE unit_assignments (
-  id       TEXT PRIMARY KEY,
-  unitId   TEXT NOT NULL,              -- → units.id
-  trade    TEXT NOT NULL,
-  crewId   TEXT,                       -- → crews.id；与 workerId 至少一个非空
-  workerId TEXT,                       -- → workers.id
-  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  id         TEXT PRIMARY KEY,
+  unit_id    TEXT NOT NULL REFERENCES units(id),
+  trade      TEXT NOT NULL,
+  crew_id    TEXT REFERENCES crews(id),
+  worker_id  TEXT REFERENCES workers(id),
+  note       TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,
+  CHECK (
+    (crew_id IS NOT NULL AND worker_id IS NULL)
+    OR (crew_id IS NULL AND worker_id IS NOT NULL)
+  )
 );
 
 CREATE TABLE unit_assignment_scopes (
-  id           TEXT PRIMARY KEY,
-  assignmentId TEXT NOT NULL,          -- → unit_assignments.id
-  roomId       TEXT NOT NULL,          -- → rooms.id
-  itemId       TEXT NOT NULL,          -- → items.id
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  id            TEXT PRIMARY KEY,
+  assignment_id TEXT NOT NULL REFERENCES unit_assignments(id),
+  room_id       TEXT NOT NULL REFERENCES rooms(id),
+  item_id       TEXT NOT NULL REFERENCES items(id),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT
 );
 
 CREATE TABLE unit_stage_completions (
-  id           TEXT PRIMARY KEY,
-  unitId       TEXT NOT NULL,           -- → units.id
-  stageId      TEXT NOT NULL,           -- → construction_stages.id
-  assignmentId TEXT,                    -- → unit_assignments.id；完成时的执行责任
-  status       TEXT DEFAULT 'draft',    -- 'draft' | 'completed'
-  completedAt  TEXT,                    -- 完成日期；月份从日期派生
-  note         TEXT,
-  createdAt TEXT, updatedAt TEXT, deleted_at TEXT
+  id            TEXT PRIMARY KEY,
+  unit_id       TEXT NOT NULL REFERENCES units(id),
+  stage_id      TEXT NOT NULL REFERENCES construction_stages(id),
+  assignment_id TEXT REFERENCES unit_assignments(id),
+  status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'completed')),
+  completed_at  TEXT,
+  note          TEXT,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT,
+  CHECK (status = 'draft' OR (completed_at IS NOT NULL AND assignment_id IS NOT NULL))
 );
--- units 增加 houseTypeTemplateId → house_type_templates.id；projects 增加 matrixArchivedAt。
--- 验收照片走 file_refs(ownerType='unit_stage_completion', ownerId=完成事实 id)。
+
+ALTER TABLE projects ADD COLUMN matrix_archived_at TEXT;
+-- 验收照片走 file_refs(owner_type='unit_stage_completion', owner_id=完成事实 id)。
+
+CREATE TRIGGER trg_house_type_templates_whole_unit
+AFTER INSERT ON house_type_templates
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  INSERT INTO rooms (id, template_id, code, name, kind, sort_order)
+  VALUES (NEW.id || ':whole_unit', NEW.id, '__whole_unit__', '整户范围', 'whole_unit', -1);
+END;
+
+CREATE TRIGGER trg_rooms_keep_whole_unit
+BEFORE UPDATE OF deleted_at ON rooms
+WHEN OLD.kind = 'whole_unit' AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'whole_unit room cannot be deleted');
+END;
 ```
+
+每个户型模板必须有且仅有一个 `kind='whole_unit'` 的稳定“整户范围”节点，承接合同清单中没有天然房间粒度的整户/分部项；v12 在模板插入时自动创建该系统节点，并禁止单独软删，模板整体软删仍由祖先可见性隐藏。普通模板房间使用 `kind='room'`。两类节点都使用稳定 ID；`rooms.code` 是模板内唯一、创建后不可修改的机器码，界面可修改的是 `rooms.name` 显示名。`house_type_template_items.room_id` 不允许为空。
+
+责任人或个人范围任一变化，都采用“软删旧 `unit_assignments`（旧 scope 随父级保留并隐藏）+ 新建 assignment/scopes”，不得原地改写。`unit_stage_completions.assignment_id` 只保存完成时的执行责任审计引用，不是完成事实的可见性父级；历史施工记录可按该物理 ID 读取已软删责任、范围及责任人，仍须先保证完成事实本身及其户、阶段可见。历史只冻结责任/范围身份，房间显示名与三量仍从当前活链接模板读取；已发放工资才按 #117 固化金额快照。
+
+下列同域约束不能只靠单列外键表达，必须由同一个 quantity store transaction 在写入前校验：
+
+- 户经楼层、楼栋归属的项目必须与其户型模板项目相同；详情路由的 `pid` 也必须等于该项目。
+- 模板明细的模板房间与分项必须属于同一项目。
+- 阶段与阶段分项必须属于同一项目，且工种匹配。
+- 个人范围的模板房间必须属于该户挂靠模板，分项必须匹配指派工种且存在有效模板明细。
+- 阶段完成的户、阶段必须属于同一项目；完成责任必须属于同一户且工种与阶段匹配。
+
+可见性父链刻意排除两项审计引用：`house_type_templates.copied_from_template_id` 只是一次性复制来源，删除来源不隐藏复制件；`unit_stage_completions.assignment_id` 只是完成时责任，软删旧责任不隐藏完成事实。
 
 ### 2.7 施工进度类（工期 × 工程量主线）
 
@@ -508,15 +622,15 @@ CREATE TABLE unit_stage_completions (
 | Building | `buildings` | `id` | `subcontract-quantity.md`（区域树·楼栋） |
 | Floor | `floors` | `id` | `subcontract-quantity.md`（楼层） |
 | Unit | `units` | `id` | `subcontract-quantity.md`（户） |
-| Room | `rooms` | `id` | `subcontract-quantity.md`（房间） |
+| Room | `rooms` | `id` | `subcontract-quantity.md`（户型模板内的稳定范围节点：普通房间或整户范围；不按户物化） |
 | ScheduleGroup | `schedule_groups` | `id` | `schedule-progress.md`（楼栋分组） |
 | ScheduleGroupBuilding | `schedule_group_buildings` | `id` | `schedule-progress.md`（分组×楼栋） |
 | ScheduleTask | `schedule_tasks` | `id` | `schedule-progress.md`（工序/WBS） |
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 
-> `schedule_tasks.stageId` 引用 `construction_stages.id`。工序 `hasQty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manualProgress`；墙砖/地砖、一遍/二遍腻子使用不同 stageId。
-> `schedule_tasks` 预留 `baselineStart/baselineFinish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
+> `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
+> `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 
 ### 2.8 目标成本类（成本控制基线）
 
@@ -614,14 +728,15 @@ CREATE TABLE target_cost_items (
 | `penalty_records` | `projectId` | `projects.id` | N:1 | 扣罚 → 项目 |
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
-| `items` | `projectId` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
-| `house_type_templates` | `projectId` | `projects.id` | N:1 | 项目户型模板 |
-| `house_type_template_items` | `templateId` / `itemId` | `house_type_templates.id` / `items.id` | N:1 | 户型层三量明细 |
-| `construction_stages` | `projectId` | `projects.id` | N:1 | 项目工序阶段目录 |
-| `construction_stage_items` | `stageId` / `itemId` | `construction_stages.id` / `items.id` | N:1 | 阶段 ↔ 计量分项 |
-| `unit_assignments` | `unitId` / `crewId` / `workerId` | `units.id` / `crews.id` / `workers.id` | N:1 | 户 × 工种责任，不存完成 |
-| `unit_assignment_scopes` | `assignmentId` / `roomId` / `itemId` | `unit_assignments.id` / `rooms.id` / `items.id` | N:1 | 个人指派房间 × 分项下钻 |
-| `unit_stage_completions` | `unitId` / `stageId` / `assignmentId` | `units.id` / `construction_stages.id` / `unit_assignments.id` | N:1 | 户 × 工序阶段完成事实 |
+| `items` | `project_id` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
+| `house_type_templates` | `project_id` | `projects.id` | N:1 | 项目户型模板 |
+| `rooms` | `template_id` | `house_type_templates.id` | N:1 | 稳定模板房间；显示名可改，不按户复制 |
+| `house_type_template_items` | `room_id` / `item_id` | `rooms.id` / `items.id` | N:1 | 户型层三量明细；模板由房间归属唯一确定 |
+| `construction_stages` | `project_id` | `projects.id` | N:1 | 项目工序阶段目录 |
+| `construction_stage_items` | `stage_id` / `item_id` | `construction_stages.id` / `items.id` | N:1 | 阶段 ↔ 计量分项 |
+| `unit_assignments` | `unit_id` / `crew_id` / `worker_id` | `units.id` / `crews.id` / `workers.id` | N:1 | 户 × 工种责任，不存完成；班组/个人二选一 |
+| `unit_assignment_scopes` | `assignment_id` / `room_id` / `item_id` | `unit_assignments.id` / `rooms.id` / `items.id` | N:1 | 个人指派模板房间 × 分项下钻；户由 assignment 唯一确定 |
+| `unit_stage_completions` | `unit_id` / `stage_id` / `assignment_id` | `units.id` / `construction_stages.id` / `unit_assignments.id` | N:1 | 户 × 工序阶段完成事实；assignment 只作完成时责任审计引用 |
 | `wage_statements` | `projectId` / `crewId` | `projects.id` / `crews.id` | N:1 | 月度进度款单 |
 | `wage_statement_lines` | `statementId` / `workerId` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
 | `attendance_records` | `projectId` / `workerId` | `projects.id` / `workers.id` | N:1 | 考勤（待细化） |
@@ -684,20 +799,23 @@ interface FilePayload {
 
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
-| `floors` | `buildingId` | `buildings.id` | N:1 | 楼层 → 楼栋 |
-| `units` | `floorId` | `floors.id` | N:1 | 户 → 楼层 |
-| `rooms` | `unitId` | `units.id` | N:1 | 房间 → 户 |
+| `buildings` | `project_id` | `projects.id` | N:1 | 楼栋 → 项目 |
+| `floors` | `building_id` | `buildings.id` | N:1 | 楼层 → 楼栋 |
+| `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
+| `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
 | `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
 | `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
 | `schedule_tasks` | `groupId` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组（summary 行为 NULL） |
 | `schedule_tasks` | `parentId` | `schedule_tasks.id` | N:1 | WBS 自关联（项目→分组→工序） |
-| `schedule_tasks` | `stageId` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；hasQty=1 必填 |
+| `schedule_tasks` | `stage_id` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；`has_qty=1` 必填 |
 | `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
 | `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |
 
-> 工序实际进度不另存值：运行时按 `schedule_tasks.stageId` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
+> 工序实际进度不另存值：运行时按 `schedule_tasks.stage_id` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
+
+> 可见性特例：`unit_stage_completions.assignment_id` 不登记为完成事实的祖先关系。普通责任列表过滤已软删指派；历史施工记录则在完成事实、户和阶段均可见的前提下，按物理 ID 直连旧指派及其班组/工人记录，避免责任替换吞掉历史完成。
 
 ### 3.7 目标成本关联
 
@@ -782,8 +900,8 @@ interface FilePayload {
 
 | 字段 | 计算 |
 |---|---|
-| 工序实际完成率（hasQty=1） | 分组内该 `stageId` 已完成户数 ÷ 应做户数；分子查 `unit_stage_completions.status='completed'`，分母由 `construction_stage_items` / `task_item_map` 与户型模板适用范围圈定 |
-| 工序实际完成率（hasQty=0） | `schedule_tasks.manualProgress` |
+| 工序实际完成率（`has_qty=1`） | 分组内该 `stage_id` 已完成户数 ÷ 应做户数；分子查 `unit_stage_completions.status='completed'`，分母由 `construction_stage_items` / `task_item_map` 与户型模板适用范围圈定 |
+| 工序实际完成率（`has_qty=0`） | `schedule_tasks.manual_progress` |
 | 工序计划应完成率 | `clamp((today − plannedStart) / (plannedFinish − plannedStart), 0, 1)` |
 | 提前/延后天数 | `(实际完成率 − 计划应完成率) × durationDays`（分组/项目行按子工序工期加权） |
 | 项目目标成本（按科目） | `SELECT costCategory, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.targetCostId=t.id WHERE t.projectId=? AND t.isBaseline=1 GROUP BY costCategory` |
@@ -799,7 +917,7 @@ interface FilePayload {
 | 量差金额 | 量差 × 合同单价（`boq_lines.unitPrice`，调价变更取已签证新单价） |
 | 产值 | Σ完成量 × 合同单价，含已签证变更（CONTEXT.md「单价双轨」：合同单价轨） |
 | 分项毛利 | (合同单价 − 班组分项单价) × 量（现场量未核定用暂估量预估） |
-| 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completedAt`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.autoQty`；同一分项映射多阶段不得重复计量 |
+| 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completed_at`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.autoQty`；同一分项映射多阶段不得重复计量 |
 
 ---
 
@@ -822,22 +940,22 @@ interface FilePayload {
 第 3 批（依赖第 2 批）
   settlements, supplement_agreements, contract_line_items, expenditure_settlements
   invoices, payment_applications
-  floors, schedule_group_buildings, schedule_tasks, target_cost_items
-  crew_project_items, construction_stage_items, house_type_template_items
+  floors, rooms, schedule_group_buildings, schedule_tasks, target_cost_items
+  crew_project_items, construction_stage_items
   boq_files, boq_change_orders, delivery_records, project_aliases
 
 第 4 批（依赖第 3 批）
-  units, task_dependencies, task_item_map
+  units, house_type_template_items, task_dependencies, task_item_map
   payment_application_settlement_allocations
   payment_application_invoice_allocations
   payment_records
   monthly_statement_lines, boq_lines, delivery_lines, wage_statements
 
 第 5 批（依赖第 4 批）
-  rooms, unit_assignments, unit_stage_completions
+  unit_assignments, unit_stage_completions
   wage_statement_lines, attendance_records, boq_change_lines
 
-第 6 批（依赖 rooms / unit_assignments）
+第 6 批（依赖模板 rooms / unit_assignments）
   unit_assignment_scopes
 
 第 7 批（多态关联）
@@ -887,25 +1005,52 @@ CREATE INDEX idx_contract_line_items_contract ON contract_line_items(contractId)
 CREATE INDEX idx_phase_tasks_proj ON phase_tasks(projectId);
 
 -- 区域树与工程量
-CREATE INDEX idx_floors_building ON floors(buildingId);
-CREATE INDEX idx_units_floor ON units(floorId);
-CREATE INDEX idx_rooms_unit ON rooms(unitId);
-CREATE INDEX idx_items_project ON items(projectId);
-CREATE INDEX idx_ht_project ON house_type_templates(projectId);
-CREATE UNIQUE INDEX uq_ht_code ON house_type_templates(projectId, code) WHERE deleted_at IS NULL;
-CREATE INDEX idx_hti_template ON house_type_template_items(templateId);
-CREATE INDEX idx_hti_item ON house_type_template_items(itemId);
-CREATE INDEX idx_stages_project ON construction_stages(projectId);
-CREATE UNIQUE INDEX uq_stage_code ON construction_stages(projectId, code) WHERE deleted_at IS NULL;
-CREATE INDEX idx_stage_items_stage ON construction_stage_items(stageId);
-CREATE UNIQUE INDEX uq_stage_item ON construction_stage_items(stageId, itemId) WHERE deleted_at IS NULL;
-CREATE INDEX idx_unit_assignments_unit ON unit_assignments(unitId);
-CREATE UNIQUE INDEX uq_unit_assignment_trade ON unit_assignments(unitId, trade) WHERE deleted_at IS NULL;
-CREATE INDEX idx_uas_assignment ON unit_assignment_scopes(assignmentId);
-CREATE UNIQUE INDEX uq_uas_scope ON unit_assignment_scopes(assignmentId, roomId, itemId) WHERE deleted_at IS NULL;
-CREATE INDEX idx_usc_stage_date ON unit_stage_completions(stageId, completedAt);
-CREATE INDEX idx_usc_unit ON unit_stage_completions(unitId);
-CREATE UNIQUE INDEX uq_usc_unit_stage ON unit_stage_completions(unitId, stageId) WHERE deleted_at IS NULL;
+CREATE INDEX idx_buildings_project ON buildings(project_id);
+CREATE UNIQUE INDEX uq_building_code ON buildings(project_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_floors_building ON floors(building_id);
+CREATE UNIQUE INDEX uq_floor_code ON floors(building_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_units_floor ON units(floor_id);
+CREATE INDEX idx_units_template ON units(house_type_template_id);
+CREATE UNIQUE INDEX uq_unit_code ON units(floor_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_rooms_template ON rooms(template_id);
+CREATE UNIQUE INDEX uq_room_code ON rooms(template_id, code) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_room_whole_unit ON rooms(template_id) WHERE deleted_at IS NULL AND kind = 'whole_unit';
+CREATE INDEX idx_items_project ON items(project_id);
+CREATE UNIQUE INDEX uq_item_code ON items(project_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_ht_project ON house_type_templates(project_id);
+CREATE UNIQUE INDEX uq_ht_code ON house_type_templates(project_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_hti_room ON house_type_template_items(room_id);
+CREATE INDEX idx_hti_item ON house_type_template_items(item_id);
+CREATE UNIQUE INDEX uq_hti_room_item ON house_type_template_items(room_id, item_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_stages_project ON construction_stages(project_id);
+CREATE UNIQUE INDEX uq_stage_code ON construction_stages(project_id, code) WHERE deleted_at IS NULL;
+CREATE INDEX idx_stage_items_stage ON construction_stage_items(stage_id);
+CREATE UNIQUE INDEX uq_stage_item ON construction_stage_items(stage_id, item_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_unit_assignments_unit ON unit_assignments(unit_id);
+CREATE INDEX idx_unit_assignments_crew ON unit_assignments(crew_id);
+CREATE INDEX idx_unit_assignments_worker ON unit_assignments(worker_id);
+CREATE INDEX idx_unit_assignments_trade ON unit_assignments(trade);
+CREATE UNIQUE INDEX uq_unit_assignment_trade ON unit_assignments(unit_id, trade) WHERE deleted_at IS NULL;
+CREATE INDEX idx_uas_assignment ON unit_assignment_scopes(assignment_id);
+CREATE UNIQUE INDEX uq_uas_scope ON unit_assignment_scopes(assignment_id, room_id, item_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_usc_stage_date ON unit_stage_completions(stage_id, completed_at);
+CREATE INDEX idx_usc_unit ON unit_stage_completions(unit_id);
+CREATE INDEX idx_usc_assignment ON unit_stage_completions(assignment_id);
+CREATE UNIQUE INDEX uq_usc_unit_stage ON unit_stage_completions(unit_id, stage_id) WHERE deleted_at IS NULL;
+
+-- 软删隐藏集基础臂
+CREATE INDEX idx_items_deleted ON items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_buildings_deleted ON buildings(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_floors_deleted ON floors(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_house_type_templates_deleted ON house_type_templates(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_rooms_deleted ON rooms(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_units_deleted ON units(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_house_type_template_items_deleted ON house_type_template_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_construction_stages_deleted ON construction_stages(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_construction_stage_items_deleted ON construction_stage_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_assignments_deleted ON unit_assignments(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_assignment_scopes_deleted ON unit_assignment_scopes(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX idx_unit_stage_completions_deleted ON unit_stage_completions(deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- 施工进度
 CREATE INDEX idx_schedule_groups_proj ON schedule_groups(projectId);
@@ -1011,6 +1156,8 @@ CREATE TABLE IF NOT EXISTS operation_logs (
 CREATE INDEX IF NOT EXISTS idx_operation_logs_record ON operation_logs(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at);
 ```
+
+新写入的 `delete` 日志同时保存 `before_data` 与含精确 `deleted_at` 的 `after_data`，供需要并发保护的严格撤回做操作后快照比对；历史 `delete` 日志的 `after_data` 允许为空，兼容路径按 `before_data` 与当前删除态判断。
 
 ### 8.3 撤回规则
 

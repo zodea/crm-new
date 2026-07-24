@@ -1,0 +1,50 @@
+[
+  {
+    "id": "qty_stage_plumb_rough",
+    "project_id": "proj_demo_001",
+    "code": "PLUMB-ROUGH",
+    "name": "给排水预埋",
+    "trade": "水暖工",
+    "sort_order": 10
+  },
+  {
+    "id": "qty_stage_waterproof_1",
+    "project_id": "proj_demo_001",
+    "code": "WP-01",
+    "name": "防水一遍",
+    "trade": "防水工",
+    "sort_order": 20
+  },
+  {
+    "id": "qty_stage_waterproof_2",
+    "project_id": "proj_demo_001",
+    "code": "WP-02",
+    "name": "防水二遍",
+    "trade": "防水工",
+    "sort_order": 21
+  },
+  {
+    "id": "qty_stage_masonry_wall",
+    "project_id": "proj_demo_001",
+    "code": "MASON-WALL",
+    "name": "墙砖铺贴",
+    "trade": "泥水工",
+    "sort_order": 30
+  },
+  {
+    "id": "qty_stage_masonry_floor",
+    "project_id": "proj_demo_001",
+    "code": "MASON-FLOOR",
+    "name": "地砖铺贴",
+    "trade": "泥水工",
+    "sort_order": 31
+  },
+  {
+    "id": "qty_stage_ceiling",
+    "project_id": "proj_demo_001",
+    "code": "CEILING",
+    "name": "吊顶封板",
+    "trade": "木工",
+    "sort_order": 40
+  }
+]

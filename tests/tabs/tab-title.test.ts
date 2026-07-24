@@ -20,3 +20,10 @@ describe('导入映射页签文案', () => {
     expect(routeSubtitle('/import/mapping/demo-supplier')).toBe('上传 · 映射 · 预览导入')
   })
 })
+
+describe('工程量矩阵页签文案', () => {
+  it('标题与副标题使用责任、阶段分离后的领域语言', () => {
+    expect(routeTitle('/subcontract/quantity')).toBe('工程量管理')
+    expect(routeSubtitle('/subcontract/quantity')).toBe('户型模板 · 责任指派 · 阶段完成')
+  })
+})
