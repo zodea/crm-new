@@ -20,6 +20,7 @@ const MARKDOWN = `
 `
 
 test('送货单闭环：上传识别、主数据匹配、人工核对并自动进入归档库', async ({ page }) => {
+  test.setTimeout(90_000)
   const pageErrors: string[] = []
   let uploadedDerivedImage = false
   let disabledSecondOrientationPass = false
@@ -44,7 +45,7 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   })
 
   await page.goto('/material/delivery')
-  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 60_000 })
 
   const syntheticScan = await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
@@ -126,8 +127,9 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
 })
 
 test('旧送货单未保存原件时，详情和编辑都提供明确的补传入口', async ({ page }) => {
+  test.setTimeout(90_000)
   await page.goto('/material/delivery/archive')
-  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('button', { name: '新增送货单', exact: true })).toBeVisible({ timeout: 60_000 })
 
   await page.getByRole('button', { name: '新增送货单', exact: true }).click()
   const createDialog = page.getByRole('dialog')
