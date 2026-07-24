@@ -18,7 +18,7 @@ const { success, warning, error } = useKitUI()
 const isEditing = computed(() => !!props.supplier?.id)
 const draft = ref<Partial<Supplier>>({})
 // aliases（简称/别名）在 store 内是字符串数组，表单用逗号分隔文本框录入，保存时再解析回数组。
-const aliasesText = ref('')
+const aliasesText = shallowRef('')
 
 // 打开时按来源初始化草稿：编辑回填现值、新增给默认状态。
 // 同时监听 supplier：详情/列表切换编辑对象（open 保持 true）也按新行重填。
