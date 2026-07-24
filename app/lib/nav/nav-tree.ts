@@ -31,7 +31,7 @@ export const NAV_TREE: NavNode[] = [
   { type: 'item', key: 'home', mark: '首', icon: 'i-lucide-house', label: '首页', hint: '总览', to: '/' },
   { type: 'group', key: 'g-project', label: '项目信息', icon: 'i-lucide-building', items: [
     { key: 'project', mark: '项', icon: 'i-lucide-folder-kanban', label: '项目列表', hint: '工期进度', to: '/project' },
-    { key: 'schedule', mark: '进', icon: 'i-lucide-calendar-clock', label: '施工进度', hint: '排程 · 甘特' },
+    { key: 'schedule', mark: '进', icon: 'i-lucide-calendar-clock', label: '施工进度', hint: '排程 · 甘特', to: '/schedule' },
     { key: 'targetCost', mark: '标', icon: 'i-lucide-target', label: '目标成本', hint: '预算基准' },
   ] },
   { type: 'group', key: 'g-main', label: '主合同管理', icon: 'i-lucide-file-pen', items: [
@@ -143,6 +143,8 @@ export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | nu
 export function activeNavKey(path: string, contractKindOfDetail?: string | null): string | null {
   if (path === '/')
     return 'home'
+  if (path.startsWith('/schedule'))
+    return 'schedule'
   if (path.startsWith('/project'))
     return 'project'
   if (path.startsWith('/base/supplier'))

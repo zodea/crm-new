@@ -15,6 +15,14 @@ export interface QuantityStageProgress {
   draftUnits: number
   /** 已完成 ÷ 应做；应做为 0 时为 0。 */
   completionRate: number
+  firstCompletedAt: string | null
+  lastCompletedAt: string | null
+}
+
+export interface QuantityStageProgressScope {
+  stageIds?: readonly string[]
+  buildingIds?: readonly string[]
+  itemIds?: readonly string[]
 }
 
 export interface QuantityConstructionRecord {
@@ -71,6 +79,8 @@ interface StatusCountRow {
   stage_id: string
   status: QuantityCompletionStatus
   n: number
+  first_completed_at: string | null
+  last_completed_at: string | null
 }
 
 interface RecordRow {
@@ -111,10 +121,23 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-export async function loadQuantityStageProgress(db: SoftDb, projectId: string): Promise<QuantityStageProgress[]> {
+function inClause(values: readonly string[] | undefined): string {
+  return values?.length ? `(${values.map(() => '?').join(', ')})` : ''
+}
+
+export async function loadQuantityStageProgress(
+  db: SoftDb,
+  projectId: string,
+  scope: QuantityStageProgressScope = {},
+): Promise<QuantityStageProgress[]> {
+  const stageClause = inClause(scope.stageIds)
+  const buildingClause = inClause(scope.buildingIds)
+  const itemClause = inClause(scope.itemIds)
   const stages = await db.select<StageRow>(
-    selectVisibleSql('construction_stages', `AND project_id = ? AND completion_mode = 'unit' ORDER BY sort_order, code, id`),
-    [projectId],
+    selectVisibleSql('construction_stages', `AND project_id = ? AND completion_mode = 'unit'
+      ${stageClause ? `AND id IN ${stageClause}` : ''}
+      ORDER BY sort_order, code, id`),
+    [projectId, ...(scope.stageIds ?? [])],
   )
 
   const applicability = await db.select<ApplicabilityRow>(
@@ -132,32 +155,69 @@ export async function loadQuantityStageProgress(db: SoftDb, projectId: string): 
        AND s.project_id = ?
        AND ${visibleCond('units', 'u')}
        AND b.project_id = ?
+       ${stageClause ? `AND csi.stage_id IN ${stageClause}` : ''}
+       ${buildingClause ? `AND b.id IN ${buildingClause}` : ''}
+       ${itemClause ? `AND csi.item_id IN ${itemClause}` : ''}
      GROUP BY csi.stage_id`,
-    [projectId, projectId],
+    [
+      projectId,
+      projectId,
+      ...(scope.stageIds ?? []),
+      ...(scope.buildingIds ?? []),
+      ...(scope.itemIds ?? []),
+    ],
   )
   const applicableByStage = new Map(applicability.map(row => [row.stage_id, numberValue(row.n)]))
 
   // 完成事实以事实为准：模板后删分项不隐藏历史完成，应做口径只影响分母。
   const statusCounts = await db.select<StatusCountRow>(
     `${hiddenCtes('unit_stage_completions')}
-     SELECT usc.stage_id, usc.status, COUNT(*) AS n
+     SELECT usc.stage_id,
+            usc.status,
+            COUNT(*) AS n,
+            MIN(CASE WHEN usc.status = 'completed' THEN usc.completed_at END) AS first_completed_at,
+            MAX(CASE WHEN usc.status = 'completed' THEN usc.completed_at END) AS last_completed_at
      FROM unit_stage_completions usc
      JOIN construction_stages s ON s.id = usc.stage_id
+     JOIN units u ON u.id = usc.unit_id
+     JOIN floors f ON f.id = u.floor_id
+     JOIN buildings b ON b.id = f.building_id
      WHERE ${visibleCond('unit_stage_completions', 'usc')}
        AND s.project_id = ?
+       ${stageClause ? `AND usc.stage_id IN ${stageClause}` : ''}
+       ${buildingClause ? `AND b.id IN ${buildingClause}` : ''}
      GROUP BY usc.stage_id, usc.status`,
-    [projectId],
+    [projectId, ...(scope.stageIds ?? []), ...(scope.buildingIds ?? [])],
   )
-  const countByStage = new Map<string, { completed: number, draft: number }>()
+  const countByStage = new Map<string, {
+    completed: number
+    draft: number
+    firstCompletedAt: string | null
+    lastCompletedAt: string | null
+  }>()
   for (const row of statusCounts) {
-    const bucket = countByStage.get(row.stage_id) ?? { completed: 0, draft: 0 }
+    const bucket = countByStage.get(row.stage_id) ?? {
+      completed: 0,
+      draft: 0,
+      firstCompletedAt: null,
+      lastCompletedAt: null,
+    }
     bucket[row.status] += numberValue(row.n)
+    if (row.status === 'completed') {
+      bucket.firstCompletedAt = row.first_completed_at
+      bucket.lastCompletedAt = row.last_completed_at
+    }
     countByStage.set(row.stage_id, bucket)
   }
 
   return stages.map((stage) => {
     const applicableUnits = applicableByStage.get(stage.id) ?? 0
-    const counts = countByStage.get(stage.id) ?? { completed: 0, draft: 0 }
+    const counts = countByStage.get(stage.id) ?? {
+      completed: 0,
+      draft: 0,
+      firstCompletedAt: null,
+      lastCompletedAt: null,
+    }
     return {
       stageId: stage.id,
       stageName: stage.name,
@@ -167,6 +227,8 @@ export async function loadQuantityStageProgress(db: SoftDb, projectId: string): 
       completedUnits: counts.completed,
       draftUnits: counts.draft,
       completionRate: applicableUnits ? counts.completed / applicableUnits : 0,
+      firstCompletedAt: counts.firstCompletedAt,
+      lastCompletedAt: counts.lastCompletedAt,
     }
   })
 }

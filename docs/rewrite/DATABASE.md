@@ -70,7 +70,7 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
     ├─1:N→ house_type_templates ─1:N→ rooms（稳定模板房间）
     │                  ▲                    └─1:N→ house_type_template_items
     │                  └────────N:1──────── units（户通过模板活链接读取房间）
-    ├─1:N→ schedule_tasks（WBS: project→group→task, parent_id 自关联，引用 stage_id）
+    ├─1:N→ schedule_tasks（工序任务；project→group→task 由 project_id/group_id 表达，引用 stage_id）
     │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）
     │        └─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
     │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
@@ -810,8 +810,8 @@ interface FilePayload {
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
 | `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
-| `schedule_tasks` | `groupId` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组（summary 行为 NULL） |
-| `schedule_tasks` | `parentId` | `schedule_tasks.id` | N:1 | WBS 自关联（项目→分组→工序） |
+| `schedule_tasks` | `groupId` | `schedule_groups.id` | N:1 | 工序 → 楼栋分组；项目/分组 summary 直接由对应实体及其子工序派生，不复制为任务行 |
+| `schedule_tasks` | `parentId` | `schedule_tasks.id` | N:1 | 可选的工序任务 → 子任务扩展；当前项目→分组→工序三层由实体外键表达，普通工序为 NULL |
 | `schedule_tasks` | `stage_id` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；`has_qty=1` 必填 |
 | `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
 | `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |

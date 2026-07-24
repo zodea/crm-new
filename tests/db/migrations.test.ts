@@ -808,7 +808,7 @@ describe('v13 工程量报量阶段映射：单一计量入口', () => {
 
     const result = await runMigrations(db)
 
-    expect(result.to).toBe(13)
+    expect(result.to).toBe(LATEST_VERSION)
     expect(await columnNames(db, 'construction_stage_items')).toContain('is_reporting_stage')
     expect(await db.select(`SELECT id, is_reporting_stage
       FROM construction_stage_items ORDER BY id`)).toEqual([

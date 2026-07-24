@@ -90,5 +90,101 @@
     "contract_qty": 24,
     "provisional_qty": 24.5,
     "sort_order": 31
+  },
+  {
+    "id": "qty_hti_a_leveling",
+    "room_id": "qty_tpl_a:whole_unit",
+    "item_id": "qty_item_leveling",
+    "contract_qty": 86,
+    "provisional_qty": 88,
+    "sort_order": 50
+  },
+  {
+    "id": "qty_hti_b_leveling",
+    "room_id": "qty_tpl_b:whole_unit",
+    "item_id": "qty_item_leveling",
+    "contract_qty": 92,
+    "provisional_qty": 94,
+    "sort_order": 50
+  },
+  {
+    "id": "qty_hti_a_gypsum_line",
+    "room_id": "qty_room_a_living",
+    "item_id": "qty_item_gypsum_line",
+    "contract_qty": 28,
+    "provisional_qty": 29,
+    "sort_order": 60
+  },
+  {
+    "id": "qty_hti_b_gypsum_line",
+    "room_id": "qty_room_b_living",
+    "item_id": "qty_item_gypsum_line",
+    "contract_qty": 31,
+    "provisional_qty": 32,
+    "sort_order": 60
+  },
+  {
+    "id": "qty_hti_a_putty",
+    "room_id": "qty_tpl_a:whole_unit",
+    "item_id": "qty_item_putty",
+    "contract_qty": 238,
+    "provisional_qty": 242,
+    "sort_order": 70
+  },
+  {
+    "id": "qty_hti_b_putty",
+    "room_id": "qty_tpl_b:whole_unit",
+    "item_id": "qty_item_putty",
+    "contract_qty": 252,
+    "provisional_qty": 258,
+    "sort_order": 70
+  },
+  {
+    "id": "qty_hti_a_wood_floor",
+    "room_id": "qty_tpl_a:whole_unit",
+    "item_id": "qty_item_wood_floor",
+    "contract_qty": 42,
+    "provisional_qty": 43,
+    "sort_order": 80
+  },
+  {
+    "id": "qty_hti_b_wood_floor",
+    "room_id": "qty_room_b_bedroom",
+    "item_id": "qty_item_wood_floor",
+    "contract_qty": 38,
+    "provisional_qty": 39,
+    "sort_order": 80
+  },
+  {
+    "id": "qty_hti_a_latex_paint",
+    "room_id": "qty_tpl_a:whole_unit",
+    "item_id": "qty_item_latex_paint",
+    "contract_qty": 238,
+    "provisional_qty": 242,
+    "sort_order": 90
+  },
+  {
+    "id": "qty_hti_b_latex_paint",
+    "room_id": "qty_tpl_b:whole_unit",
+    "item_id": "qty_item_latex_paint",
+    "contract_qty": 252,
+    "provisional_qty": 258,
+    "sort_order": 90
+  },
+  {
+    "id": "qty_hti_a_aluminum_ceiling",
+    "room_id": "qty_room_a_bath",
+    "item_id": "qty_item_aluminum_ceiling",
+    "contract_qty": 6,
+    "provisional_qty": 6.5,
+    "sort_order": 100
+  },
+  {
+    "id": "qty_hti_b_aluminum_ceiling",
+    "room_id": "qty_room_b_bath",
+    "item_id": "qty_item_aluminum_ceiling",
+    "contract_qty": 7,
+    "provisional_qty": 7.5,
+    "sort_order": 100
   }
 ]

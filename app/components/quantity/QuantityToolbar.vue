@@ -11,11 +11,13 @@ withDefaults(defineProps<{
   activeUnits?: number
   totalUnits?: number
   matrixArchivedAt?: string | null
+  scheduleScopeLabel?: string
 }>(), {
   loading: false,
   activeUnits: 0,
   totalUnits: 0,
   matrixArchivedAt: null,
+  scheduleScopeLabel: '',
 })
 
 const emit = defineEmits<{
@@ -52,12 +54,16 @@ const viewTabs = [
         :min-width="176"
       />
       <SelectFilter
-        v-if="buildingOptions.length"
+        v-if="buildingOptions.length && !scheduleScopeLabel"
         v-model="buildingId"
         label="楼栋"
         :options="buildingOptions"
         :min-width="108"
       />
+      <div v-if="scheduleScopeLabel" class="grid gap-1 text-12px">
+        <span class="font-700 text-ink-soft">排程范围</span>
+        <span class="field-input min-w-36 bg-brand-soft text-brand-deep">{{ scheduleScopeLabel }}</span>
+      </div>
       <SelectFilter
         v-if="monthOptions.length"
         v-model="month"

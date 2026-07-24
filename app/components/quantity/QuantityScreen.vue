@@ -18,6 +18,7 @@ import {
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
+const route = useRoute()
 const { confirm, error: toastError, exportFile, formModal, openImportTab, success, warning } = useKitUI()
 
 const projectId = shallowRef('')
@@ -35,6 +36,27 @@ const completionDialogOpen = shallowRef(false)
 const completionUnitId = shallowRef('')
 const completionInitialStageId = shallowRef('')
 const batchCompletionDialogOpen = shallowRef(false)
+
+const scheduleContext = computed(() => route.query.from === 'schedule'
+  ? {
+      projectId: String(route.query.project ?? ''),
+      groupId: String(route.query.group ?? ''),
+      taskId: String(route.query.task ?? ''),
+      stageId: String(route.query.stage ?? ''),
+      itemId: String(route.query.item ?? ''),
+      buildingId: String(route.query.building ?? ''),
+      buildingIds: String(route.query.buildings ?? '').split(',').filter(Boolean),
+      groupName: String(route.query.groupName ?? '楼栋分组'),
+      taskName: String(route.query.taskName ?? '排程工序'),
+      itemName: String(route.query.itemName ?? ''),
+      planStart: String(route.query.planStart ?? ''),
+      planFinish: String(route.query.planFinish ?? ''),
+    }
+  : null)
+
+const scheduleReturnTo = computed(() => scheduleContext.value
+  ? { path: '/schedule', query: { project: scheduleContext.value.projectId, group: scheduleContext.value.groupId, task: scheduleContext.value.taskId } }
+  : '/schedule')
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -62,23 +84,36 @@ const matrix = computed(() => {
   }
   return buildQuantityMatrix(snapshot.value, {
     buildingId: buildingId.value,
+    buildingIds: scheduleContext.value?.buildingIds,
     month: month.value,
     viewMode: viewMode.value,
     trade: trade.value,
     assigneeKey: assigneeKey.value,
+    stageId: scheduleContext.value?.stageId || undefined,
   })
 })
 
-function normalizeFilters(next: QuantityProjectSnapshot, reset = false) {
-  if (reset || !next.buildings.some(building => building.id === buildingId.value))
+function normalizeFilters(next: QuantityProjectSnapshot, reset = false, restoreScheduleContext = false) {
+  const requestedBuildingId = restoreScheduleContext ? scheduleContext.value?.buildingId : ''
+  if (requestedBuildingId && next.buildings.some(building => building.id === requestedBuildingId))
+    buildingId.value = requestedBuildingId
+  else if (reset || !next.buildings.some(building => building.id === buildingId.value))
     buildingId.value = next.buildings[0]?.id ?? ''
 
   const months = quantityMonthOptions(next)
-  if (reset || !months.some(option => option.key === month.value))
+  const requestedMonth = restoreScheduleContext ? scheduleContext.value?.planStart.slice(0, 7) : ''
+  if (requestedMonth && months.some(option => option.key === requestedMonth))
+    month.value = requestedMonth
+  else if (reset || !months.some(option => option.key === month.value))
     month.value = ALL_QUANTITY_FILTER
 
   const trades = quantityTradeOptions(next)
-  if (reset || !trades.some(option => option.key === trade.value))
+  const requestedStage = restoreScheduleContext
+    ? next.stages.find(stage => stage.id === scheduleContext.value?.stageId)
+    : null
+  if (requestedStage && trades.some(option => option.key === requestedStage.trade))
+    trade.value = requestedStage.trade
+  else if (reset || !trades.some(option => option.key === trade.value))
     trade.value = ALL_QUANTITY_FILTER
 
   const assignees = quantityAssigneeOptions(next)
@@ -86,20 +121,23 @@ function normalizeFilters(next: QuantityProjectSnapshot, reset = false) {
     assigneeKey.value = ALL_QUANTITY_FILTER
 }
 
-async function loadSelectedProject(reset = false) {
+async function loadSelectedProject(reset = false, restoreScheduleContext = false) {
   const requestedProject = projectId.value
   await store.loadProject(requestedProject)
   if (store.snapshot?.projectId === requestedProject)
-    normalizeFilters(store.snapshot, reset)
+    normalizeFilters(store.snapshot, reset, restoreScheduleContext)
 }
 
 async function initialize() {
   initialized.value = false
   await store.loadCatalog()
-  const preferred = store.catalog.find(project => project.hasQuantityData) ?? store.catalog[0]
+  const requestedProjectId = scheduleContext.value?.projectId ?? String(route.query.project ?? '')
+  const preferred = store.catalog.find(project => project.id === requestedProjectId)
+    ?? store.catalog.find(project => project.hasQuantityData)
+    ?? store.catalog[0]
   projectId.value = preferred?.id ?? ''
   if (projectId.value)
-    await loadSelectedProject(true)
+    await loadSelectedProject(true, Boolean(scheduleContext.value))
   initialized.value = true
 }
 
@@ -251,6 +289,7 @@ onMounted(initialize)
       :active-units="matrix.activeUnits"
       :total-units="matrix.totalUnits"
       :matrix-archived-at="snapshot?.matrixArchivedAt ?? null"
+      :schedule-scope-label="scheduleContext?.groupName ?? ''"
       @batch-complete="batchCompletionDialogOpen = true"
       @import-data="importData"
       @export-ledger="exportLedger"
@@ -260,6 +299,25 @@ onMounted(initialize)
       @manage-assignments="openAssignments()"
       @refresh="retry"
     />
+
+    <section v-if="scheduleContext" class="panel flex flex-wrap items-center gap-3 border-brand/30 bg-brand-soft/35 px-4 py-3">
+      <span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-brand-soft text-brand">
+        <span class="i-lucide-corner-down-right" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="text-12px font-800 text-ink">
+          来自施工排程 · {{ scheduleContext.groupName }}
+        </div>
+        <div class="truncate text-11px text-ink-soft">
+          正在核对「{{ scheduleContext.taskName }}」的工程量完成事实
+          <span v-if="scheduleContext.itemName" class="ml-1 rounded bg-panel px-1.5 py-0.5 font-700 text-brand-deep">映射分项：{{ scheduleContext.itemName }}</span>
+          <span v-if="scheduleContext.planStart" class="ml-1 font-mono">计划 {{ scheduleContext.planStart }} — {{ scheduleContext.planFinish }}</span>
+        </div>
+      </div>
+      <NuxtLink :to="scheduleReturnTo" class="btn-primary">
+        <span class="i-lucide-arrow-left mr-1" /> 返回该工序
+      </NuxtLink>
+    </section>
 
     <section
       v-if="(!initialized || store.loading) && !snapshot"
