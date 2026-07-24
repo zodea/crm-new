@@ -75,7 +75,7 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
     │        └─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
     │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
     ├─1:N→ unit_assignments（户 × 工种责任；完成不存这里）
-    └─1:N→ target_costs ─1:N→ target_cost_items（costCategory: 人工/材料/机械/其他）
+    └─1:N→ target_costs ─1:N→ target_cost_items（costCategory: 专业分包/合同劳务/材料/机械/工人工资/费用报销/其他）
 ```
 
 ### 1.2 清单与变更线（2026-07-04 grill 新增）
@@ -153,6 +153,7 @@ Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_
 | MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
 | Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序。⚠️ [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认设计稿整页表单中的用户可编辑业务字段默认持久化；合同条款/质保金/开票方/明细行等具体列与迁移仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 回写，本警示在该评审完成前保留 |
+| ContractSupplement | `contract_supplements` | `id` | 支出合同/合同轻实体补充协议；区别于只挂施工合同的 `supplement_agreements`，见 §10.1 |
 
 ```sql
 -- 合同域轻实体仓（#90 批A，migrations v3 contracts-light-entity）
@@ -160,8 +161,11 @@ CREATE TABLE contracts (
   id          TEXT PRIMARY KEY,
   no          TEXT DEFAULT '',
   name        TEXT NOT NULL,
-  kind        TEXT NOT NULL DEFAULT '施工',   -- '施工' | '分包' | '材采'
+  kind        TEXT NOT NULL DEFAULT '施工',   -- '施工' | '分包' | '材采' | '其他支出'
   sub_kind    TEXT DEFAULT '',                -- '劳务' | '专业'，仅 kind='分包'
+  cost_category TEXT DEFAULT '',              -- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
+  legacy_type TEXT DEFAULT '',                -- 迁移源原始细类
+  classification_state TEXT DEFAULT 'classified', -- 'classified' | 'unclassified' | 'no_contract'
   project_id  TEXT NOT NULL,                  -- → projects.id
   supplier_id TEXT,                           -- → suppliers.id；施工合同（乙方=我方）为 NULL
   amount      REAL DEFAULT 0,                 -- 含税合同金额
@@ -169,6 +173,9 @@ CREATE TABLE contracts (
   settled     REAL DEFAULT 0,                 -- 累计结算
   invoiced    REAL DEFAULT 0,                 -- 累计收票（施工=累计开票）
   paid        REAL DEFAULT 0,                 -- 累计支付（施工=累计收款）
+  signer_name TEXT DEFAULT '',                -- 签约人
+  contact_phone TEXT DEFAULT '',              -- 合同联系人电话，按文本保存
+  tax_rate    REAL,                           -- 合同税率；不据此推算发票金额
   sign_date   TEXT DEFAULT '',
   status      TEXT DEFAULT '履约中',          -- '履约中' | '已签订' | '已结算' | '已结清'
   note        TEXT DEFAULT '',
@@ -263,12 +270,14 @@ CREATE TABLE monthly_statement_lines (
 | InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（待设计；销项=开票申请） |
 | ReceiptRegistration | `receipt_registrations` | `id` | `finance-receipt.md`（待设计） |
 | ExpenditureSettlement | `expenditure_settlements` | `id` | 支出合同过程/完工结算统一源单；与 `project_suppliers` 终态关闭用的 `settlements` 不同 |
-| PaymentApplication | `payment_applications` | `id` | `finance-payment.md`（8 类型；ADR 0015） |
+| PaymentApplication | `payment_applications` | `id` | `finance-payment.md`（10 类型；ADR 0015） |
 | PaymentApplicationSettlementAllocation | `payment_application_settlement_allocations` | `id` | 付款申请—真实结算分摊（ADR 0015） |
 | PaymentApplicationInvoiceAllocation | `payment_application_invoice_allocations` | `id` | 付款申请—真实发票分摊（ADR 0015） |
 | CurrentReceipt | `current_receipts` | `id` | `finance-receipt.md`（待设计） |
 | CurrentPayment | `current_payments` | `id` | `finance-payment.md`（待设计） |
 | PaymentRecord | `payment_records` | `id` | `finance-records.md`（待设计） |
+| PaymentRecordApplicationAllocation | `payment_record_application_allocations` | `id` | 支付记录—付款申请多对多分摊（ADR 0015、§10.2） |
+| ExpenseReimbursement | `expense_reimbursements` | `id` | 已确认费用报销进入动态成本（§10.3） |
 
 > ~~TicketRegistration `ticket_registrations`~~ **已废弃**（ADR-0001）：红圈式收票登记合并进 `invoices` 单表，项目详情「收票登记」Tab = 查已归档 invoices。
 
@@ -296,7 +305,7 @@ CREATE TABLE expenditure_settlements (
   id             TEXT PRIMARY KEY,
   no             TEXT NOT NULL,
   name           TEXT NOT NULL,
-  bizType        TEXT NOT NULL,       -- '人工' | '材料' | '分包' | '其他'
+  bizType        TEXT NOT NULL,       -- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
   projectId      TEXT NOT NULL,       -- → projects.id
   supplierId     TEXT NOT NULL,       -- → suppliers.id
   contractId     TEXT NOT NULL,       -- → contracts.id；仅支出侧 kind（分包/材采等）
@@ -317,7 +326,7 @@ CREATE TABLE payment_applications (
   id             TEXT PRIMARY KEY,
   no             TEXT NOT NULL,
   name           TEXT NOT NULL,
-  bizType        TEXT NOT NULL,       -- 有合同-人工/材料/分包、无合同-零星采购、预付款、管理费、项目费用、公司付款
+  bizType        TEXT NOT NULL,       -- 有合同-合同劳务/材料/专业分包/机械/其他、无合同-零星采购、预付款、管理费、项目费用、公司付款
   projectId      TEXT,                -- 公司付款可空 → projects.id
   supplierId     TEXT,                -- → suppliers.id；类型提交规则决定是否必填
   contractId     TEXT,                -- 有合同/预付款可选或必填 → contracts.id；保存真实 lookup ID
@@ -330,7 +339,8 @@ CREATE TABLE payment_applications (
   prepayDeduct   REAL,
   prepayNote     TEXT,
   approvedAmount REAL,
-  paidAmount     REAL,
+  paidAmount     REAL,                -- 兼容旧列，只读；新值由已确认支付记录分摊派生（§10.2）
+  external_ref   TEXT DEFAULT '',      -- 外部业务键；导入时用于幂等和来源关联
   status         TEXT DEFAULT '草稿',
   note           TEXT,
   createdAt TEXT, updatedAt TEXT, deleted_at TEXT
@@ -641,7 +651,7 @@ END;
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | TargetCost | `target_costs` | `id` | `schedule-progress.md` §六（项目目标成本，isBaseline 版本化） |
-| TargetCostItem | `target_cost_items` | `id` | `schedule-progress.md` §六（科目行：人工/材料/机械/其他，可细到分项） |
+| TargetCostItem | `target_cost_items` | `id` | `schedule-progress.md` §六（科目行：专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，可细到分项） |
 
 ```sql
 CREATE TABLE target_costs (
@@ -656,7 +666,7 @@ CREATE TABLE target_costs (
 CREATE TABLE target_cost_items (
   id           TEXT PRIMARY KEY,
   targetCostId TEXT NOT NULL,       -- → target_costs.id
-  costCategory TEXT NOT NULL,       -- '人工' | '材料' | '机械' | '其他'
+  costCategory TEXT NOT NULL,       -- '专业分包' | '合同劳务' | '材料' | '机械' | '工人工资' | '费用报销' | '其他'
   itemName     TEXT,                -- 可选：细到分项（墙砖/地砖…），NULL=科目级
   unit TEXT, qty REAL, unitPrice REAL,
   amount       REAL NOT NULL,
@@ -664,7 +674,15 @@ CREATE TABLE target_cost_items (
 );
 ```
 
-> **costCategory 全局归集约定**：所有支出类单据可归集到 人工/材料/机械/其他 四科目——`expenditure_contracts.contractType` 映射（劳务/专业分包→人工；材料采购→材料；**设备租赁→机械**；其他→其他），`payroll_records`→人工，`delivery_records`→材料，费用报销→其他。实际成本按此口径聚合与目标对比（§4.6）。红圈参照：目标成本 + 目标成本清单明细（树形清单，DC 简化为 科目+可选分项 两级）。
+> **costCategory 全局归集约定（2026-07-23 修订）**：合同成本按专业分包、合同劳务、材料、机械、其他五类；直接工人工资和费用报销分别作为独立成本来源。**合同劳务与工人工资不得合并为“人工”**。动态成本以已确认支出结算、已发放工资和已确认费用报销归集；付款申请、支付记录和送货单分别代表审批、现金流和收货事实，不与结算重复计入成本。红圈参照：目标成本 + 目标成本清单明细。
+
+### 2.9 导入与对账审计类
+
+| 实体 | 表名 | PK | 说明 |
+|---|---|---|---|
+| ImportBatch | `import_batches` | `id` | 一次源文件实体迁移批次 |
+| ImportSourceRef | `import_source_refs` | `id` | 系统实体到源文件/工作表/行的追溯 |
+| ReconciliationIssue | `reconciliation_issues` | `id` | Excel 与系统聚合差异及项目/Excel/映射/缺源归因 |
 
 ---
 
@@ -698,6 +716,8 @@ CREATE TABLE target_cost_items (
 | `boq_change_lines` | `changeOrderId` / `boqLineId` | `boq_change_orders.id` / `boq_lines.id` | N:1 | 变更行（新增行 boqLineId 为 NULL） |
 | `monthly_statements` | `projectId` | `projects.id` | N:1 | 月度报量单 |
 | `monthly_statement_lines` | `statementId` | `monthly_statements.id` | N:1 | 报量行 |
+| `contracts` | `project_id` / `supplier_id` | `projects.id` / `suppliers.id` | N:1 | 合同轻实体仓 |
+| `contract_supplements` | `contract_id` | `contracts.id` | N:1 | 支出合同/轻实体补充协议 |
 
 ### 3.3 资金管理关联
 
@@ -717,7 +737,9 @@ CREATE TABLE target_cost_items (
 | `current_receipts` | `projectId` | `projects.id` | N:1 | 往来收款 → 项目 |
 | `current_payments` | `projectId` | `projects.id` | N:1 | 往来付款 → 项目 |
 | `payment_records` | `projectId` | `projects.id` | N:1 | 支付记录 → 项目 |
-| `payment_records` | `paymentApplicationId` | `payment_applications.id` | N:1 | 支付记录 → 付款申请（零星支付可空） |
+| `payment_records` | `supplier_id` | `suppliers.id` | N:1 | 支付记录 → 收款分供方（可空） |
+| `payment_record_application_allocations` | `payment_record_id` / `payment_application_id` | `payment_records.id` / `payment_applications.id` | N:1 | 支付记录—付款申请多对多分摊；旧单外键退出写路径 |
+| `expense_reimbursements` | `project_id` | `projects.id` | N:1 | 费用报销 → 项目 |
 
 ### 3.4 分包及人工关联
 
@@ -748,6 +770,14 @@ CREATE TABLE target_cost_items (
 | `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
 | `project_aliases` | `projectId` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |
 
+### 3.4.1 导入与对账审计关联
+
+| 表 | 外键字段 | 引用 | 关系 | 说明 |
+|---|---|---|---|---|
+| `import_batches` | `project_id` | `projects.id` | N:1 | 项目迁移批次（通用主数据导入可空） |
+| `import_source_refs` | `import_batch_id` | `import_batches.id` | N:1 | 逐实体来源追溯 |
+| `reconciliation_issues` | `import_batch_id` / `project_id` | `import_batches.id` / `projects.id` | N:1 | 迁移差异与归因 |
+
 ### 3.5 文件引用（多态关联）
 
 `file_refs` 使用 `ownerType` + `ownerId` 多态关联到多种实体：
@@ -760,6 +790,9 @@ CREATE TABLE target_cost_items (
 | `settlement` | Settlement | 结算确认书 PDF |
 | `expenditure_settlement` | ExpenditureSettlement | 支出过程/完工结算单及对账附件 |
 | `construction_contract` | ConstructionContract | 施工合同文书扫描件（Tab③ 文件柜 chip 在线预览） |
+| `contract_supplement` | ContractSupplement | 支出合同补充协议附件 |
+| `payment_record` | PaymentRecord | 银行回单原图/PDF；OCR 与人工确认同一支付事实 |
+| `expense_reimbursement` | ExpenseReimbursement | 报销票据和审批附件 |
 | `supplement_agreement` | SupplementAgreement | 补充协议文书 |
 | `boq_change_order` | BoqChangeOrder | 变更单附件，category 细分**各有放置区**：我方指令单（可多版）/ 甲方指令单 / 报价 / 算量 / 施工照片 |
 | `expenditure_contract` | ExpenditureContract | 合同扫描件 |
@@ -842,10 +875,14 @@ interface FilePayload {
 | 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?`（台账=变更单自动行+手录纯金额签证，ADR-0002） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
 | 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 付款金额 | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND deleted_at IS NULL` |
+| 合同付款 | `SUM(payment_record_application_allocations.allocated_amount)`，连接已确认 `payment_records`、付款申请和支出合同后按项目过滤 |
+| 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='issued'`（界面“已发放”） |
+| 动态成本 | 五类已确认 `expenditure_settlements.totalAmount` + 已发放工资 + 已确认费用报销（§10.4） |
 | 往来收款 | `SELECT SUM(amount) FROM current_receipts WHERE projectId = ?` |
 | 往来付款 | `SELECT SUM(amount) FROM current_payments WHERE projectId = ?` |
-| 项目可用资金余额 | 项目收款 + 往来收款 − 付款金额 − 往来付款 − 管理费 |
+| 收支差额 | 全部已确认资金流入 − 全部已确认资金流出（§10.6） |
+| 工程款余缺 | 项目合同收款 − 合同付款 |
+| 项目可用资金余额 | 项目收款 + 往来收款 − 合同付款 − 工资支付 − 往来付款 − 其他已确认流出 |
 
 ### 4.2 票据信息面板（project-info.md）
 
@@ -863,28 +900,30 @@ interface FilePayload {
 | 字段 | 计算 |
 |---|---|
 | 关联结算金额 | `SUM(payment_application_settlement_allocations.allocatedAmount)`，只计未软删行 |
-| 结算差额 | `payment_applications.applyAmount − 关联结算金额`；有合同三类提交时必须为 0 |
+| 结算差额 | `payment_applications.applyAmount − 关联结算金额`；有合同五类提交时必须为 0 |
 | 关联发票金额 | `SUM(payment_application_invoice_allocations.allocatedAmount)`，只计未软删行 |
 | 待回票金额 | `max(payment_applications.applyAmount − 关联发票金额, 0)`；仅 `invoiceState='先款后票'` 展示 |
 | 单票剩余可关联金额 | `invoices.total_amount − SUM(该 invoiceId 跨全部付款申请的有效 allocatedAmount)`；写入后不得小于 0 |
+| 已付金额 | `SUM(payment_record_application_allocations.allocated_amount)`，只连接 `payment_records.review_status='confirmed'` |
+| 支付分摊差额 | `payment_records.amount − SUM(该支付记录有效 allocated_amount)`；确认支付时必须为 0 |
 
 ### 4.3 分供方汇总（base-supplier.md）
 
 | 字段 | SQL 计算 |
 |---|---|
 | 合作项目数 | `SELECT COUNT(*) FROM project_suppliers WHERE supplierId = ?` |
-| 合同数 | `SELECT COUNT(*) FROM expenditure_contracts WHERE supplierId = ?` |
-| 合同总额 | `SELECT SUM(taxIncTotal) FROM expenditure_contracts WHERE supplierId = ?` |
-| 累计已付 | `SELECT SUM(paidAmount) FROM payment_applications WHERE supplierId = ? AND deleted_at IS NULL` |
+| 合同数 | `SELECT COUNT(*) FROM contracts WHERE supplier_id = ? AND kind <> '施工'` |
+| 合同总额 | `Σ contracts.amount + Σ有效 contract_supplements.amount`，按 `supplier_id` 过滤 |
+| 累计已付 | 按分供方连接已确认 `payment_records` 与 `payment_record_application_allocations` 求和 |
 | 应付余额 | 合同总额 − 累计已付 |
 
 ### 4.4 ProjectSupplier 汇总（project-supplier.md）
 
 | 字段 | SQL 计算 |
 |---|---|
-| contractTotal | `SELECT SUM(taxIncTotal) FROM expenditure_contracts WHERE projectId = ? AND supplierId = ?` |
+| contractTotal | `Σ contracts.amount + Σ有效 contract_supplements.amount`，按 `project_id + supplier_id` 过滤 |
 | claimedTotal | `SELECT SUM(amount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND approvalStatus = 'approved'` |
-| paidTotal | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND supplierId = ? AND deleted_at IS NULL` |
+| paidTotal | 按 `project_id + supplier_id` 连接已确认支付记录分摊求和 |
 | invoiceTotal | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND supplier_id = ? AND account_status = 'archived'` |
 | balance | contractTotal − paidTotal |
 
@@ -896,7 +935,7 @@ interface FilePayload {
 |---|---|
 | 合同总额 | `SELECT SUM(amount) FROM construction_contracts WHERE projectId = ?` + 变更 |
 | 累计收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 累计支出 | `SELECT SUM(paidAmount) FROM payment_applications WHERE projectId = ? AND deleted_at IS NULL` |
+| 累计支出 | 已确认支付记录 + 已确认工资发放 + 已确认往来/保证金/备用金等其他资金流出；禁止读取付款申请头手写已付值 |
 | 已开票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |
 | 材料分供方数 | `SELECT COUNT(DISTINCT supplierId) FROM project_suppliers ps JOIN suppliers s ON ps.supplierId = s.id WHERE ps.projectId = ? AND s.supplierCategory = '材料供应商'` |
 | 采购合同数 | `SELECT COUNT(*) FROM expenditure_contracts WHERE projectId = ? AND contractType = '材料采购'` |
@@ -910,7 +949,7 @@ interface FilePayload {
 | 工序计划应完成率 | `clamp((today − plannedStart) / (plannedFinish − plannedStart), 0, 1)` |
 | 提前/延后天数 | `(实际完成率 − 计划应完成率) × durationDays`（分组/项目行按子工序工期加权） |
 | 项目目标成本（按科目） | `SELECT costCategory, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.targetCostId=t.id WHERE t.projectId=? AND t.isBaseline=1 GROUP BY costCategory` |
-| 项目实际成本（按科目） | 按 §2.8 costCategory 约定归集：人工=劳务/分包付款+工资；材料=材料合同付款+送货单；机械=设备租赁付款；其他=报销+其他支出 |
+| 项目实际成本（按科目） | 专业分包/合同劳务/材料/机械/其他=对应已确认支出结算；工人工资=已发放工资快照；费用报销=已确认报销。付款和送货单不重复计入成本 |
 | 成本偏差率 | `(实际 − 目标) / 目标`（科目级与合计级） |
 
 ### 4.7 清单量差与产值（subcontract-quantity.md · CONTEXT.md「三量」「变更单」「月度报量」）
@@ -938,13 +977,15 @@ interface FilePayload {
   supplier_credentials, project_suppliers, phase_tasks
   construction_contracts, owner_change_orders, expenditure_contracts, contracts
   invoice_applications, receipt_registrations, current_receipts, current_payments
+  expense_reimbursements, import_batches
   buildings, schedule_groups, target_costs, items
   crew_workers, crew_project_config, worker_certs, penalty_records
   construction_stages, house_type_templates, monthly_statements
 
 第 3 批（依赖第 2 批）
-  settlements, supplement_agreements, contract_line_items, expenditure_settlements
+  settlements, supplement_agreements, contract_supplements, contract_line_items, expenditure_settlements
   invoices, payment_applications
+  import_source_refs, reconciliation_issues
   floors, rooms, schedule_group_buildings, schedule_tasks, target_cost_items
   crew_project_items, construction_stage_items
   boq_files, boq_change_orders, delivery_records, project_aliases
@@ -958,6 +999,7 @@ interface FilePayload {
 
 第 5 批（依赖第 4 批）
   unit_assignments, unit_stage_completions
+  payment_record_application_allocations
   wage_statement_lines, attendance_records, boq_change_lines
 
 第 6 批（依赖模板 rooms / unit_assignments）
@@ -980,6 +1022,7 @@ CREATE INDEX idx_expenditure_contracts_proj ON expenditure_contracts(projectId);
 CREATE INDEX idx_expenditure_contracts_sup ON expenditure_contracts(supplierId);
 CREATE INDEX idx_payment_applications_proj ON payment_applications(projectId);
 CREATE INDEX idx_payment_applications_sup ON payment_applications(supplierId);
+CREATE INDEX idx_contract_supplements_contract ON contract_supplements(contract_id);
 CREATE INDEX idx_expenditure_settlements_proj ON expenditure_settlements(projectId);
 CREATE INDEX idx_expenditure_settlements_sup ON expenditure_settlements(supplierId);
 CREATE INDEX idx_expenditure_settlements_contract ON expenditure_settlements(contractId);
@@ -987,6 +1030,14 @@ CREATE INDEX idx_pasa_application ON payment_application_settlement_allocations(
 CREATE INDEX idx_pasa_settlement ON payment_application_settlement_allocations(settlementId);
 CREATE INDEX idx_paia_application ON payment_application_invoice_allocations(paymentApplicationId);
 CREATE INDEX idx_paia_invoice ON payment_application_invoice_allocations(invoiceId);
+CREATE INDEX idx_payment_records_project ON payment_records(project_id);
+CREATE INDEX idx_payment_records_supplier ON payment_records(supplier_id);
+CREATE INDEX idx_praa_record ON payment_record_application_allocations(payment_record_id);
+CREATE INDEX idx_praa_application ON payment_record_application_allocations(payment_application_id);
+CREATE INDEX idx_expense_reimbursements_project ON expense_reimbursements(project_id, status);
+CREATE INDEX idx_import_batches_project ON import_batches(project_id);
+CREATE INDEX idx_import_source_refs_batch ON import_source_refs(import_batch_id);
+CREATE INDEX idx_reconciliation_issues_batch ON reconciliation_issues(import_batch_id, status);
 CREATE UNIQUE INDEX uq_pasa_source ON payment_application_settlement_allocations(paymentApplicationId, settlementId) WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX uq_paia_source ON payment_application_invoice_allocations(paymentApplicationId, invoiceId) WHERE deleted_at IS NULL;
 CREATE INDEX idx_invoices_project ON invoices(project_id);
@@ -1188,7 +1239,278 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 4. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
 5. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
 6. 遵守 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)：用户可编辑业务字段默认持久化（标量列 / lookup 外键 / grid 子表 / file_refs）；`readonly + compute`、`_` 展示字段和纯聚合不存。人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
-7. 新增支出类实体必须定义 **costCategory 归集口径**（人工/材料/机械/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
+7. 新增支出类实体必须定义 **costCategory 归集口径**（专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准：量=`house_type_template_items`、责任=`unit_assignments`、完成=`unit_stage_completions`，稳定阶段=`construction_stages`
 9. 付款申请头与结算/发票分摊必须由同一 action 事务写入；源单展示字段不得复制，提交勾稽与发票全局额度检查遵守 ADR 0015
 10. **禁用旧名**：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表）、`price_comparisons`（→ `delivery_lines` 聚合视图）、`quantities` / `quantity_records`（→ ADR 0010 分层表）
+
+---
+
+## § 10 通用项目经营汇总增补（2026-07-23）
+
+> 来源：车陂商业大楼项目迁移分析。该项目只是首个验收样本，以下模型是通用规则。与前文冲突时，本节及 ADR 0015 的较新决策优先。
+
+### 10.1 支出合同分类与补充协议
+
+`contracts.kind/sub_kind` 继续承担界面分组，新增稳定经营维度和迁移留痕：
+
+```sql
+ALTER TABLE contracts ADD COLUMN cost_category TEXT DEFAULT '';
+-- '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
+
+ALTER TABLE contracts ADD COLUMN legacy_type TEXT DEFAULT '';
+ALTER TABLE contracts ADD COLUMN classification_state TEXT DEFAULT 'classified';
+-- 'classified' | 'unclassified' | 'no_contract'
+ALTER TABLE contracts ADD COLUMN signer_name TEXT DEFAULT '';
+ALTER TABLE contracts ADD COLUMN contact_phone TEXT DEFAULT '';
+ALTER TABLE contracts ADD COLUMN tax_rate REAL;
+```
+
+`kind` 目标值扩展为 `'施工' | '分包' | '材采' | '其他支出'`。映射：
+
+- 专业分包：`kind='分包', sub_kind='专业'`
+- 合同劳务：`kind='分包', sub_kind='劳务'`
+- 材料：`kind='材采'`
+- 机械、其他：`kind='其他支出'`
+
+支出合同补充协议不得继续复用只挂 `construction_contracts` 的旧 `supplement_agreements`：
+
+```sql
+CREATE TABLE contract_supplements (
+  id             TEXT PRIMARY KEY,
+  contract_id    TEXT NOT NULL REFERENCES contracts(id),
+  no             TEXT DEFAULT '',
+  name           TEXT NOT NULL,
+  amount         REAL NOT NULL DEFAULT 0,
+  sign_date      TEXT DEFAULT '',
+  status         TEXT NOT NULL DEFAULT '有效',
+  external_ref   TEXT DEFAULT '',
+  note           TEXT DEFAULT '',
+  created_at     TEXT,
+  updated_at     TEXT,
+  deleted_at     TEXT
+);
+
+CREATE INDEX idx_contract_supplements_contract
+  ON contract_supplements(contract_id, deleted_at);
+```
+
+支出合同经营金额=`contracts.amount + Σ有效 contract_supplements.amount`。`contracts.changed/settled/invoiced/paid` 的存量静态值只能用于迁移对账；新读路径分别从补充协议、结算、发票和支付分摊聚合。
+
+### 10.2 支付记录及付款申请分摊
+
+普通合同付款的权威金额只保存于 `payment_records.amount`。目标表补齐识别、审核和银行流水字段：
+
+```sql
+-- 现有表按 SQLite 重建表迁移补齐；此处列出目标增量
+ALTER TABLE payment_records ADD COLUMN supplier_id TEXT REFERENCES suppliers(id);
+ALTER TABLE payment_records ADD COLUMN payee_name TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN purpose TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN source_kind TEXT DEFAULT 'manual';
+-- 'image_ocr' | 'manual' | 'excel_import'
+ALTER TABLE payment_records ADD COLUMN review_status TEXT DEFAULT 'draft';
+-- 'draft' | 'needs_review' | 'confirmed'
+ALTER TABLE payment_records ADD COLUMN bank_serial TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN ocr_payload TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN field_confidence TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN confirmed_by TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN confirmed_at TEXT;
+ALTER TABLE payment_records ADD COLUMN external_ref TEXT DEFAULT '';
+ALTER TABLE payment_records ADD COLUMN updated_at TEXT;
+ALTER TABLE payment_records ADD COLUMN deleted_at TEXT;
+ALTER TABLE payment_applications ADD COLUMN external_ref TEXT DEFAULT '';
+```
+
+旧 `payment_records.payment_application_id` 退出写入路径，改用分摊表：
+
+```sql
+CREATE TABLE payment_record_application_allocations (
+  id                     TEXT PRIMARY KEY,
+  payment_record_id      TEXT NOT NULL REFERENCES payment_records(id),
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
+  note                   TEXT DEFAULT '',
+  created_at             TEXT,
+  updated_at             TEXT,
+  deleted_at             TEXT
+);
+
+CREATE UNIQUE INDEX uq_payment_record_application_allocation
+  ON payment_record_application_allocations(payment_record_id, payment_application_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX idx_praa_record
+  ON payment_record_application_allocations(payment_record_id, deleted_at);
+CREATE INDEX idx_praa_application
+  ON payment_record_application_allocations(payment_application_id, deleted_at);
+```
+
+确认支付记录的事务约束：
+
+1. 金额、日期、收款方和凭证均已人工核对；
+2. `Σ该支付有效分摊.allocated_amount = payment_records.amount`；
+3. 同一 `bank_serial` 在有效记录中不得重复；
+4. OCR 置信度不替代人工确认；
+5. 未确认支付不进入已付、合同付款或现金流汇总。
+
+付款申请派生字段：
+
+```text
+paid_amount =
+  Σ payment_record_application_allocations.allocated_amount
+  WHERE payment_record.review_status = 'confirmed'
+
+actual_payment = paid_amount
+unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
+```
+
+`payment_applications.paid_amount/actual_payment` 旧列在兼容期只读；迁移完成后移除。分摊金额写入、支付确认、撤回及操作日志必须在同一事务内。
+
+### 10.3 工人工资与费用报销
+
+工人工资按 #117 的负责人请款簿管理。工资单通过“确认发放”动作进入“已发放”状态时，同时确认成本和已支付事实，不生成逐工人支付记录或合同付款申请：
+
+```text
+工资动态成本 = Σ wage_statements.actual_amount
+WHERE status = 'issued'
+
+工资资金流出 = 同一集合
+```
+
+工资金额必须保存发放时快照；工程量或人员资料后改不追溯历史发放。
+
+费用报销需要独立事实表：
+
+```sql
+CREATE TABLE expense_reimbursements (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL REFERENCES projects(id),
+  no             TEXT DEFAULT '',
+  applicant      TEXT DEFAULT '',
+  expense_date   TEXT,
+  amount         REAL NOT NULL CHECK (amount >= 0),
+  status         TEXT NOT NULL DEFAULT 'draft',
+  -- 'draft' | 'submitted' | 'confirmed' | 'rejected'
+  note           TEXT DEFAULT '',
+  external_ref   TEXT DEFAULT '',
+  created_at     TEXT,
+  updated_at     TEXT,
+  deleted_at     TEXT
+);
+
+CREATE INDEX idx_expense_reimbursements_project
+  ON expense_reimbursements(project_id, status, deleted_at);
+```
+
+只有 `status='confirmed'` 的报销进入动态成本。当前睿璟资料未提供完整报销金额，迁移状态是 `pending`，不是 0。
+
+### 10.4 动态成本与合同付款
+
+```text
+动态成本 =
+  Σ已确认支出结算.total_amount（按合同 cost_category 五类）
+  + Σ已发放工资.actual_amount
+  + Σ已确认费用报销.amount
+
+动态效益 = 客户已确认收入 - 动态成本
+动态效益率 = 动态效益 / 客户已确认收入
+```
+
+客户确认收入尚未取得时，动态效益和动态效益率返回 `pending`，不得用施工合同额、项目收款或支出金额代替；客户确认收入为 0 时，动态效益率不做除法并按完整性契约返回状态。
+
+合同付款只统计：
+
+```text
+Σ已确认 payment_record 分摊
+WHERE payment_application.contract_id IS NOT NULL
+GROUP BY contract.cost_category
+```
+
+禁止：
+
+- 用合同金额补空结算；
+- 用付款申请金额或支付记录金额补动态成本；
+- 用送货单金额与材料结算重复计成本；
+- 根据付款用途文本推断合同分类。
+
+### 10.5 经营汇总完整性
+
+经营汇总 API 的每个指标返回：
+
+```ts
+interface OperatingMetric {
+  value: number | null
+  status: 'complete' | 'partial' | 'pending' | 'not_applicable' | 'undefined'
+  missingSources: string[]
+  asOf: string
+  drilldown: { entity: string, filter: Record<string, string> } | null
+}
+```
+
+含义：
+
+- `complete`：所需来源均已纳入；
+- `partial`：已有部分金额，但至少一个组成来源缺失；
+- `pending`：应有来源尚未取得，不返回伪造 0；
+- `not_applicable`：本期明确不统计，例如库存；
+- `undefined`：业务公式尚未定义，例如资金效能。
+
+### 10.6 资金计算
+
+```text
+总流入 =
+  已确认项目收款 + 其他收款 + 往来收款
+  + 保证金退回 + 备用金退回
+
+总流出 =
+  已确认支付记录 + 已确认工资发放 + 往来付款
+  + 保证金缴纳 + 备用金申请
+
+收支差额 = 总流入 - 总流出
+工程款余缺 = 项目合同收款 - 合同类支付记录
+```
+
+首个样本的迁移前显示值只在[睿璟验收清单](../migration/ruijing-acceptance.md)维护。系统按实体重新派生；差异进入对账，不反写静态值。
+
+### 10.7 导入追溯与差异表
+
+```sql
+CREATE TABLE import_batches (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT REFERENCES projects(id),
+  source_file    TEXT NOT NULL,
+  source_hash    TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'draft',
+  created_at     TEXT,
+  completed_at   TEXT
+);
+
+CREATE TABLE import_source_refs (
+  id              TEXT PRIMARY KEY,
+  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
+  entity_type     TEXT NOT NULL,
+  entity_id       TEXT NOT NULL,
+  source_sheet    TEXT NOT NULL,
+  source_row      INTEGER NOT NULL,
+  source_key      TEXT DEFAULT '',
+  raw_snapshot    TEXT DEFAULT ''      -- JSON 对象；保留未进入业务表的源列及原始文本
+);
+
+CREATE TABLE reconciliation_issues (
+  id              TEXT PRIMARY KEY,
+  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
+  project_id      TEXT NOT NULL REFERENCES projects(id),
+  metric_key      TEXT NOT NULL,
+  source_ref      TEXT DEFAULT '',
+  excel_value     REAL,
+  system_value    REAL,
+  difference      REAL,
+  attribution     TEXT NOT NULL,
+  -- 'project' | 'excel' | 'mapping' | 'missing_source'
+  status          TEXT NOT NULL DEFAULT 'open',
+  resolution      TEXT DEFAULT '',
+  created_at      TEXT,
+  resolved_at     TEXT
+);
+```
+
+导入有效行以业务字段判断，不以 Excel `usedRange`、序号或公式存在判断。所有金额在应用边界统一 `round2`；在全库迁移为整数分之前，禁止直接比较浮点绝对相等。
