@@ -12,6 +12,12 @@ export default withNuxt(
     formatters: false,
     // DC 设计稿源码(claude.ai/design 单页设计稿)= x-import 全局 React、刻意精简写法的历史留档,
     // 非 Nuxt 应用代码,整体不走应用 ESLint(见 docs/dc-rebuild)。
-    ignores: ['DC重构设计源码/**', '设计系统配色更新/**'],
+    ignores: [
+      'DC重构设计源码/**',
+      '设计系统配色更新/**',
+      '参考文件数据/**',
+      'src-tauri/gen/**',
+      'src-tauri/target/**',
+    ],
   }),
 )
