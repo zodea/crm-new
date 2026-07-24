@@ -10,14 +10,14 @@ const STAGE_OPTS = [
   { key: 'settle', label: '结算中' },
   { key: 'done', label: '已完工' },
 ]
-const stage = ref('all')
+const stage = shallowRef('all')
 
 const STATUS_OPTS = [
   { key: 'all', label: '全部状态' },
   { key: 'normal', label: '合作中' },
   { key: 'paused', label: '已暂停' },
 ]
-const status = ref('normal')
+const status = shallowRef('normal')
 
 // ② SegTab
 const LEDGER_TABS = [
@@ -26,11 +26,11 @@ const LEDGER_TABS = [
   { key: 'archived', label: '已归档', count: 29 },
   { key: 'void', label: '已废弃', count: 0 },
 ]
-const ledgerTab = ref('all')
+const ledgerTab = shallowRef('all')
 
 // ③ SearchInput（即输即筛 demo）
 const SUPPLIERS = ['华东建材', '广州瑞航建材', '锦泰劳务', '恒基水电', '南方钢构', '德胜五金']
-const keyword = ref('')
+const keyword = shallowRef('')
 const filteredSuppliers = computed(() => {
   const q = keyword.value.trim()
   return q ? SUPPLIERS.filter(s => s.includes(q)) : SUPPLIERS
@@ -51,7 +51,7 @@ const ledgerTree: TreeNode[] = [
     ],
   },
 ]
-const activeNode = ref('p1')
+const activeNode = shallowRef('p1')
 </script>
 
 <template>
@@ -73,7 +73,7 @@ const activeNode = ref('p1')
 
     <div class="space-y-3">
       <!-- ① SelectFilter -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ① SelectFilter — 紧凑下拉筛选
         </h2>
@@ -90,7 +90,7 @@ const activeNode = ref('p1')
       </section>
 
       <!-- ② SegTab -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ② SegTab — 下划线分段切换（带数量角标）
         </h2>
@@ -104,7 +104,7 @@ const activeNode = ref('p1')
       </section>
 
       <!-- ③ SearchInput -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ③ SearchInput — pill 搜索框（即输即筛）
         </h2>
@@ -119,7 +119,7 @@ const activeNode = ref('p1')
       </section>
 
       <!-- ④ SectionHeader -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ④ SectionHeader — 品牌竖条区块标题
         </h2>
@@ -136,7 +136,7 @@ const activeNode = ref('p1')
       </section>
 
       <!-- ⑤ Metric + MetricGrid -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑤ Metric / MetricGrid — 指标格网格（金额 ¥#,##0.00 完整展示）
         </h2>
@@ -168,7 +168,7 @@ const activeNode = ref('p1')
       </section>
 
       <!-- ⑥ TreeNav -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑥ TreeNav — 左树导航（数量角标 + 选中态）
         </h2>
@@ -179,7 +179,7 @@ const activeNode = ref('p1')
           <div class="w-60 flex-none">
             <TreeNav v-model="activeNode" title="发票台账" :items="ledgerTree" />
           </div>
-          <div class="flex-1 content-panel bg-surface-2 p-4 rounded-[var(--radius-card)]">
+          <div class="flex-1 panel bg-surface-2 p-4">
             <p class="text-12px text-ink-soft">
               当前选中节点
             </p>

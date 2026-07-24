@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useTimeoutFn } from '@vueuse/core'
+import { Button } from '~/components/ui/button'
 import { toErrorMessage } from '~/lib/util/error'
 
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
@@ -277,20 +278,20 @@ async function demoImportMapping() {
 
     <div class="space-y-3">
       <!-- ① 系统/结果提示 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ① 系统/结果提示 — expand 道（右上，展开可读）
         </h2>
         <p class="text-12px text-ink-soft mb-3">
           系统消息、确认后的结果类走这里：右上角展开堆叠、语义色图标、hover 暂停自动消失。
         </p>
-        <button class="btn-primary" @click="demoSemantic">
+        <button class="btn-secondary" @click="demoSemantic">
           连发 4 条（成功/提示/警告/错误）
         </button>
       </section>
 
       <!-- ② 过程提示 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ② 过程提示 — collapse 道（右下，重叠省空间）
         </h2>
@@ -304,14 +305,14 @@ async function demoImportMapping() {
           <button class="btn-secondary" @click="demoRecognize">
             识别送货单（loading→进度→成功）
           </button>
-          <button class="btn-primary" @click="demoProcessPile">
+          <button class="btn-secondary" @click="demoProcessPile">
             连发 5 条（看重叠 + 悬停展开）
           </button>
         </div>
       </section>
 
       <!-- ③ undoToast -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ③ undoToast — 软删除 10 秒撤回（expand 道）
         </h2>
@@ -324,7 +325,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ④ confirm 三档 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ④ confirm — 三档确认弹窗（ADR 0003）
         </h2>
@@ -348,33 +349,33 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑤ formModal -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑤ formModal — 字段配置驱动 + 必填校验
         </h2>
         <p class="text-12px text-ink-soft mb-3">
           fields 配置渲染控件；缺必填项标红拦截提交；提交返回值对象，取消返回 null。
         </p>
-        <button class="btn-primary" @click="demoFormModal">
+        <button class="btn-secondary" @click="demoFormModal">
           打开表单弹窗
         </button>
       </section>
 
       <!-- ⑥ 单文件直接保存 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑥ exportFile — 单文件直接保存（ADR 0004）
         </h2>
         <p class="text-12px text-ink-soft mb-3">
           桌面端打开系统目录选择器并真实写盘；支持目录访问 API 的浏览器写入所选文件夹，其他浏览器降级到浏览器下载文件夹。取消时静默结束。
         </p>
-        <button class="btn-primary" @click="demoDirectExport">
+        <button class="btn-secondary" @click="demoDirectExport">
           直接保存演示文件
         </button>
       </section>
 
       <!-- ⑦ KitButton 三态 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑦ KitButton — 提交按钮三态（#75）
         </h2>
@@ -403,7 +404,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑧ 配置导出页签 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑧ exportFile — 多文件配置导出页签（ADR 0004）
         </h2>
@@ -416,7 +417,7 @@ async function demoImportMapping() {
       </section>
 
       <!-- ⑨ 导入映射页签 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ⑨ openImportTab — 导入映射页签（ADR 0005）
         </h2>
@@ -429,8 +430,51 @@ async function demoImportMapping() {
         </KitButton>
       </section>
 
+      <!-- ⑩ 按钮五变体 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          ⑩ 按钮五变体 — 层级语言（DESIGN-TASTE §4.2 / #109）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          缺省 = secondary 安静按钮；实心蓝只属于 <b>accent</b>（业务屏每屏 ≤1 枚章，本演示页除外）；
+          danger 静默红（破坏性防护在确认弹窗，ADR 0003）；hover 平面变色、active 按压 scale(0.97)。
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <Button>secondary（缺省）</Button>
+          <Button variant="primary">
+            primary
+          </Button>
+          <Button variant="accent">
+            accent（每屏一枚章）
+          </Button>
+          <Button variant="ghost">
+            ghost
+          </Button>
+          <Button variant="destructive">
+            danger（静默红）
+          </Button>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="primary">
+            sm 12px
+          </Button>
+          <Button variant="primary">
+            md 13px（缺省）
+          </Button>
+          <Button size="lg" variant="primary">
+            lg 14px
+          </Button>
+          <Button disabled>
+            disabled
+          </Button>
+        </div>
+        <p class="mt-2 text-11px text-ink-faint">
+          uno shortcut 版同配方：btn-secondary / btn-primary / btn-accent / btn-ghost / btn-danger。
+        </p>
+      </section>
+
       <!-- 结果回读 -->
-      <section class="content-panel p-4 bg-surface-2">
+      <section class="panel p-4 bg-surface-2">
         <h2 class="text-12px font-700 text-ink-soft mb-1">
           最近一次返回值
         </h2>

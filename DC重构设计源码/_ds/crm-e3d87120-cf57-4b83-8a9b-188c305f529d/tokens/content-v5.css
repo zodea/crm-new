@@ -1,0 +1,46 @@
+/*
+ * 瑞航 CRM 内容区视觉令牌（v5）
+ *
+ * 唯一权威源：Nuxt 应用与设计稿均直接加载本文件。应用外壳的尺寸、
+ * 侧栏和页签令牌不在这里定义，避免把设计稿的旧外壳带回运行时。
+ */
+:root {
+  /* ── 基底色：保留效果稿的轻机构灰层次 ── */
+  --bg: #f8f9fb;
+  --panel: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #f3f4f6;
+  --surface-sink: #e9edf4;
+
+  /* ── 描边与文字 ── */
+  --line: #e3e6ea;
+  --line-strong: #c9ced6;
+  --ink: #1f2329;
+  --ink-soft: #5b6470;
+  --ink-faint: #8b93a1;
+
+  /* ── 品牌色（v5）── */
+  --brand: #3976C6;
+  --brand-deep: #2A5996;
+  --brand-soft: rgb(213 230 248);
+  --brand-ring: rgb(57 118 198 / 22%);
+
+  /* ── 状态色（v5）── */
+  --ok: #169D72;
+  --ok-soft: rgb(207 246 231);
+  --ok-ink: #097251;
+  --warn: #D38A20;
+  --warn-soft: rgb(255 239 191);
+  --warn-ink: #8B590C;
+  --danger: #E04E5C;
+  --danger-soft: rgb(253 219 224);
+  --danger-ink: #9D313E;
+
+  /* ── 字体与形状：与效果稿一致 ── */
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+}

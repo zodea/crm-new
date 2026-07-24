@@ -1,52 +1,9 @@
+@import "../../../DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css";
+
 /* 设计系统令牌 — 瑞航 CRM
    内容区遵循 ADR 0007，应用外壳遵循 ADR 0011。 */
 
 :root {
-  /* ── 基底色 ── */
-  --bg: #f4f7fb;
-  --panel: #ffffff;
-  --surface-2: #edf2f7;
-  --surface-3: #e7edf4;
-  --surface-sink: #dfe7f0;
-
-  /* ── 描边 ── */
-  --line: #d7e0ea;
-  --line-strong: #b8c5d4;
-
-  /* ── 文字 ── */
-  --ink: #182436;
-  --ink-soft: #4e5d70;
-  --ink-faint: #607187;
-
-  /* ── 品牌色 (v5) ── */
-  --brand: #3976C6;
-  --brand-deep: #2A5996;
-  --brand-soft: #e6f0fb;
-  --brand-ring: rgb(57 118 198 / 22%);
-
-  /* ── 状态色 (v5) ── */
-  --ok: #169D72;
-  --ok-soft: rgb(207 246 231);
-  --ok-ink: #097251;
-
-  --warn: #D38A20;
-  --warn-soft: rgb(255 239 191);
-  --warn-ink: #8B590C;
-
-  --danger: #E04E5C;
-  --danger-soft: rgb(253 219 224);
-  --danger-ink: #9D313E;
-
-  /* ── 字体 ── */
-  --font-sans: "Microsoft YaHei UI", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-
-  /* ── 形状 ── */
-  --radius-card: 12px;
-  --radius-btn: 10px;
-  --radius-sm: 8px;
-  --radius-pill: 999px;
-
   /* ── 外层应用框架 ── */
   --sidebar-blur: blur(12px);
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
@@ -135,6 +92,12 @@
 
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
   --overlay: rgb(0 0 0 / 28%);
+
+  /* 按钮五变体 hover 值（DESIGN-TASTE §4.2 实测自设计稿，#109）——
+     唯一定义处，uno.config 的 btn-look-* 引用；换品牌/危险色时同步调整这三条 */
+  --btn-hover-quiet: #eceef1;
+  --btn-hover-primary: #dbeafe;
+  --btn-hover-danger: rgb(220 38 38 / 5%);
 
   /* shadcn Sidebar 映射到独立外壳令牌。 */
   --sidebar-background: var(--shell-sidebar-bg);
@@ -264,8 +227,8 @@
 
 html {
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--ink);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;

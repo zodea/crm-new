@@ -13,7 +13,9 @@ const props = withDefaults(defineProps<{
   suffix?: string
   /** value 为数字金额时置 true，按 #,##0.00 两位小数展示。 */
   money?: boolean
-}>(), { money: false })
+  /** 可点汇总卡（点击切筛选，如工人页/台账页签）：hover 蓝框浮起，渲染为 button。 */
+  clickable?: boolean
+}>(), { money: false, clickable: false })
 
 const display = computed(() =>
   props.money && typeof props.value === 'number'
@@ -30,14 +32,19 @@ const colorClass: Record<string, string> = {
 </script>
 
 <template>
-  <div class="border border-line rounded-[var(--radius-card)] bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
+  <component
+    :is="clickable ? 'button' : 'div'"
+    :type="clickable ? 'button' : undefined"
+    class="panel px-4 py-3"
+    :class="clickable ? 'panel-hover w-full cursor-pointer text-left font-sans focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:2px]' : undefined"
+  >
     <div class="flex items-center gap-2 mb-1.5">
       <span v-if="icon" :class="icon" class="text-16px text-ink-faint" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink-faint">{{ label }}</span>
+      <span class="text-12px font-700 text-ink-soft">{{ label }}</span>
     </div>
-    <div class="font-mono text-20px font-500 tabular-nums" :class="color ? colorClass[color] : 'text-ink'">
+    <div class="font-mono text-24px font-800 leading-[1.1] tabular-nums" :class="color ? colorClass[color] : 'text-ink'">
       {{ display }}
       <span v-if="suffix" class="text-12px font-400 text-ink-faint ml-0.5">{{ suffix }}</span>
     </div>
-  </div>
+  </component>
 </template>

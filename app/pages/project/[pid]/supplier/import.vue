@@ -7,7 +7,7 @@ const psStore = useProjectSupplierStore()
 const toast = useToast()
 
 const project = computed(() => projStore.byId(pid.value))
-const step = ref(1)
+const step = shallowRef(1)
 
 const selectedSupplierIds = ref<Set<string>>(new Set())
 
@@ -16,7 +16,8 @@ const availableSuppliers = computed(() =>
 )
 
 function toggleSupplier(id: string) {
-  if (selectedSupplierIds.value.has(id)) selectedSupplierIds.value.delete(id)
+  if (selectedSupplierIds.value.has(id))
+    selectedSupplierIds.value.delete(id)
   else selectedSupplierIds.value.add(id)
 }
 
@@ -106,16 +107,22 @@ onMounted(async () => {
         </div>
       </div>
       <div class="flex justify-end gap-2">
-        <button class="btn-secondary" @click="step = 1">上一步</button>
-        <button class="btn-primary" @click="doImport">确认关联</button>
+        <button class="btn-secondary" @click="step = 1">
+          上一步
+        </button>
+        <button class="btn-accent" @click="doImport">
+          确认关联
+        </button>
       </div>
     </div>
 
     <!-- Step 3: 完成 -->
     <div v-else class="border border-line bg-panel p-8 text-center">
       <span class="i-lucide-circle-check text-32px text-ok mb-2 block mx-auto" />
-      <p class="text-14px font-700 text-ok mb-2">导入完成</p>
-      <NuxtLink :to="`/project/${pid}`" class="btn-primary">
+      <p class="text-14px font-700 text-ok mb-2">
+        导入完成
+      </p>
+      <NuxtLink :to="`/project/${pid}`" class="btn-secondary">
         返回项目详情
       </NuxtLink>
     </div>

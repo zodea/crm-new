@@ -56,7 +56,7 @@ const {
         </div>
         <button
           type="button"
-          class="btn-primary h-[34px] w-full whitespace-nowrap text-13px active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          class="btn-accent h-[34px] w-full"
           :disabled="calculating || state.factors.length === 0"
           data-testid="factor-calculate"
           @click="calculate"
@@ -95,7 +95,7 @@ const {
           <div class="mt-1 font-mono text-12px text-ink-faint">
             {{ runningElapsedMs }} ms
           </div>
-          <button type="button" class="btn-secondary mt-4 px-6 active:translate-y-px" @click="cancelCalculation">
+          <button type="button" class="btn-secondary mt-4 px-6" @click="cancelCalculation">
             取消
           </button>
         </div>

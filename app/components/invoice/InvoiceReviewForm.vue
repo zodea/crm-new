@@ -126,7 +126,7 @@ const isArchived = computed(() => props.invoice.accountStatus === 'archived')
 const isDuplicate = computed(() => props.invoice.dupStatus === 'duplicate')
 
 // 货物明细默认折叠
-const showItems = ref(false)
+const showItems = shallowRef(false)
 </script>
 
 <template>
@@ -302,24 +302,24 @@ const showItems = ref(false)
 
     <!-- 操作条：[废弃]←危险靠左 …… [重新识别][确认/归档入账]；已归档票整条隐藏 -->
     <div v-if="!isArchived" class="flex items-center justify-between pt-3 border-t border-line">
-      <button class="btn-danger text-12px" @click="emit('discard')">
+      <button class="btn-danger" @click="emit('discard')">
         <span class="i-lucide-trash-2 text-12px mr-1" /> 废弃
       </button>
       <div class="flex gap-2">
-        <button class="btn-secondary text-12px" @click="emit('rerecognize')">
+        <button class="btn-secondary" @click="emit('rerecognize')">
           <span class="i-lucide-refresh-cw text-12px mr-1" /> 重新识别
         </button>
         <template v-if="!isDuplicate">
           <button
             v-if="invoice.reviewStatus === 'unreviewed'"
-            class="btn-primary text-12px"
+            class="btn-accent"
             @click="emit('confirm')"
           >
             <span class="i-lucide-file-check text-12px mr-1" /> 确认
           </button>
           <button
             v-else-if="invoice.accountStatus === 'none'"
-            class="btn-primary text-12px"
+            class="btn-accent"
             :disabled="!attribution"
             :title="attribution ? '归档并计入台账' : '缺归属：填写对应项目或选个人开支后方可归档'"
             @click="emit('archive')"

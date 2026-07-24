@@ -38,7 +38,7 @@ const STATUS_DEFAULT_TAB: Record<string, string> = {
   settled: 'settlement',
 }
 
-const activeTab = ref('overview')
+const activeTab = shallowRef('overview')
 const tabs = [
   { key: 'overview', label: '合作概览' },
   { key: 'contract', label: '合同' },
@@ -49,14 +49,16 @@ const tabs = [
 ]
 
 watch(ps, (v) => {
-  if (v) activeTab.value = STATUS_DEFAULT_TAB[v.status] || 'overview'
+  if (v)
+    activeTab.value = STATUS_DEFAULT_TAB[v.status] || 'overview'
 }, { immediate: true })
 
-const showSettlement = ref(false)
-const settlementAmount = ref(0)
+const showSettlement = shallowRef(false)
+const settlementAmount = shallowRef(0)
 
 async function confirmSettlement() {
-  if (!ps.value) return
+  if (!ps.value)
+    return
   if (settlementAmount.value <= 0) {
     toast.warning('请填写结算金额')
     return
@@ -83,30 +85,50 @@ onMounted(async () => {
           项目: <span class="text-brand">{{ project.name }}</span>
           × 分供方: <span class="text-brand">{{ supplier.name }}</span>
         </h2>
-        <span :class="['chip', STATUS_COLOR[ps.status]]">
+        <span class="chip" :class="[STATUS_COLOR[ps.status]]">
           {{ STATUS_LABEL[ps.status] || ps.status }}
         </span>
       </div>
       <div class="info-row text-12px">
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">合同额</div>
-          <div class="font-mono tabular-nums">¥0.00</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            合同额
+          </div>
+          <div class="font-mono tabular-nums">
+            ¥0.00
+          </div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">请款</div>
-          <div class="font-mono tabular-nums">¥0.00</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            请款
+          </div>
+          <div class="font-mono tabular-nums">
+            ¥0.00
+          </div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">收票</div>
-          <div class="font-mono tabular-nums">¥0.00</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            收票
+          </div>
+          <div class="font-mono tabular-nums">
+            ¥0.00
+          </div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">已付</div>
-          <div class="font-mono tabular-nums">¥0.00</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            已付
+          </div>
+          <div class="font-mono tabular-nums">
+            ¥0.00
+          </div>
         </div>
         <div class="info-cell">
-          <div class="text-9px text-ink-faint mb-0.5">应付余额</div>
-          <div class="font-mono tabular-nums text-danger font-700">¥0.00</div>
+          <div class="text-9px text-ink-faint mb-0.5">
+            应付余额
+          </div>
+          <div class="font-mono tabular-nums text-danger font-700">
+            ¥0.00
+          </div>
         </div>
       </div>
     </div>
@@ -134,7 +156,9 @@ onMounted(async () => {
           <div class="form-grid !grid-cols-2">
             <div class="form-cell">
               <span class="text-9px text-ink-faint">项目名称</span>
-              <NuxtLink :to="`/project/${pid}`" class="text-12px text-brand hover:underline">{{ project.name }}</NuxtLink>
+              <NuxtLink :to="`/project/${pid}`" class="text-12px text-brand hover:underline">
+                {{ project.name }}
+              </NuxtLink>
             </div>
             <div class="form-cell">
               <span class="text-9px text-ink-faint">状态</span>
@@ -157,7 +181,9 @@ onMounted(async () => {
           <div class="form-grid !grid-cols-2">
             <div class="form-cell">
               <span class="text-9px text-ink-faint">公司名称</span>
-              <NuxtLink :to="`/base/supplier/${sid}`" class="text-12px text-brand hover:underline">{{ supplier.name }}</NuxtLink>
+              <NuxtLink :to="`/base/supplier/${sid}`" class="text-12px text-brand hover:underline">
+                {{ supplier.name }}
+              </NuxtLink>
             </div>
             <div class="form-cell">
               <span class="text-9px text-ink-faint">类别</span>
@@ -182,7 +208,7 @@ onMounted(async () => {
         <h4 class="text-13px font-700 text-ink">
           {{ tabs.find(t => t.key === activeTab)?.label }} · 0 条
         </h4>
-        <button class="btn-primary" disabled>
+        <button class="btn-secondary" disabled>
           <span class="i-lucide-plus text-13px mr-1" />
           新建（跳转到对应模块）
         </button>
@@ -196,14 +222,18 @@ onMounted(async () => {
     <div v-else-if="activeTab === 'settlement'" class="border border-line bg-panel p-4">
       <div v-if="ps.status === 'settled'" class="text-center py-8">
         <span class="i-lucide-circle-check text-32px text-ok mb-2 block mx-auto" />
-        <p class="text-14px font-700 text-ok mb-1">已结算</p>
-        <p class="text-12px text-ink-faint">数据已锁定为只读</p>
+        <p class="text-14px font-700 text-ok mb-1">
+          已结算
+        </p>
+        <p class="text-12px text-ink-faint">
+          数据已锁定为只读
+        </p>
       </div>
       <div v-else>
         <p class="text-13px text-ink-soft mb-4">
           确认结算后，该项目×分供方的所有数据将锁定为只读。请确保所有合同、请款、收票、付款数据已完善。
         </p>
-        <button class="btn-primary" @click="showSettlement = true">
+        <button class="btn-accent" @click="showSettlement = true">
           <span class="i-lucide-file-check text-13px mr-1" />
           确认结算
         </button>

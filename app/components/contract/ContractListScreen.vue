@@ -228,19 +228,18 @@ onMounted(() => {
     />
 
     <!-- 业务态视图（默认履约中） -->
-    <div class="rounded-[var(--radius-card)] border border-line bg-panel px-3 shadow-[var(--shadow-card)]">
+    <div class="panel px-3">
       <SegTab v-model="view" :tabs="viewTabs" />
     </div>
 
     <div :class="kind === '分包' ? 'flex items-start gap-3' : ''">
       <!-- 分包页：劳务/专业左分类 -->
-      <div v-if="kind === '分包'" class="w-52 shrink-0 overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]">
+      <div v-if="kind === '分包'" class="w-52 shrink-0">
         <TreeNav v-model="subCat" title="分包合同分类" :items="catItems" />
       </div>
 
       <div class="min-w-0 flex-1">
         <KitTable
-          class="overflow-hidden rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
           :columns="columns"
           :data="pageRows"
           :loading="store.loading"

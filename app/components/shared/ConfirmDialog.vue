@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ConfirmImpact, ConfirmVariant, HoldState } from '~/lib/kit/confirm'
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, useId, watch } from 'vue'
 import {
   beginHold,
   cancelHold,
@@ -40,9 +40,9 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const typed = ref('')
-const hold = ref<HoldState | null>(null) // 非空 = cascade 挂起中
-const remainingMs = ref(0)
+const typed = shallowRef('')
+const hold = shallowRef<HoldState | null>(null) // 非空 = cascade 挂起中
+const remainingMs = shallowRef(0)
 const typingInputId = useId()
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -170,11 +170,11 @@ onBeforeUnmount(stopTimer)
         >
       </div>
 
-      <!-- footer（按钮统一走 shadcn Button 变体：ghost=取消 / destructive=确认 / default=品牌蓝撤销） -->
+      <!-- footer（按钮统一走 shadcn Button 变体：ghost=取消 / destructive=静默红确认 / accent=品牌蓝撤销） -->
       <div class="flex justify-end gap-2 mt-5">
-        <!-- 挂起中：显眼「撤销」（品牌蓝＝安全逃生口） -->
+        <!-- 挂起中：显眼「撤销」（品牌蓝＝安全逃生口，是弹窗此态唯一的章） -->
         <template v-if="holding">
-          <Button @click="onCancel">
+          <Button variant="accent" @click="onCancel">
             撤销（{{ remainingSec }}s 内可停）
           </Button>
           <span class="inline-flex items-center gap-1.5 px-3 text-13px text-danger-ink">

@@ -170,7 +170,7 @@ function onOpenAutoFocus(e: Event) {
         <Button variant="outline" @click="emit('cancel')">
           取消
         </Button>
-        <Button @click="handleSave">
+        <Button variant="accent" @click="handleSave">
           {{ options.saveText ?? '保存' }}
         </Button>
       </div>

@@ -63,7 +63,7 @@ function snapshot(inv: Invoice): FormShape {
 }
 
 const form = ref<FormShape>(invoice.value ? snapshot(invoice.value) : {})
-const ownerKind = ref<Invoice['ownerKind']>(invoice.value?.ownerKind ?? null)
+const ownerKind = shallowRef<Invoice['ownerKind']>(invoice.value?.ownerKind ?? null)
 
 function resetForm() {
   if (invoice.value) {
@@ -97,7 +97,7 @@ const docChip = computed(() => {
     return null
   return DOC_CHIP[invoiceDocStatus(inv, store.recognitionProgress[inv.id] != null)]
 })
-const showItems = ref(false)
+const showItems = shallowRef(false)
 
 // ── 关页签回台账（设计稿行为：删/存后回台账）──
 function closeTabToLedger() {
@@ -207,7 +207,7 @@ onMounted(() => {
 
 <template>
   <!-- 空态：不存在或已删除 -->
-  <div v-if="!invoice" class="content-panel flex flex-col items-center gap-3 rounded-[var(--radius-card)] py-10 text-ink-soft">
+  <div v-if="!invoice" class="panel flex flex-col items-center gap-3 py-10 text-ink-soft">
     <span class="i-lucide-file-x h-8 w-8 text-ink-faint" aria-hidden="true" />
     <div>该发票不存在或已删除。</div>
     <NuxtLink to="/finance/ledger" class="btn-secondary">
@@ -217,7 +217,7 @@ onMounted(() => {
 
   <div v-else class="flex flex-col gap-3">
     <!-- 顶条：返回 + 号码/卖方 + 状态 -->
-    <div class="content-panel flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] p-3">
+    <div class="panel flex flex-wrap items-center gap-3 p-3">
       <button class="btn-secondary" @click="closeTabToLedger">
         <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />返回台账
       </button>
@@ -233,7 +233,7 @@ onMounted(() => {
 
     <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
       <!-- 左：原图 -->
-      <div class="content-panel min-h-[420px] flex flex-col overflow-hidden rounded-[var(--radius-card)]">
+      <div class="panel min-h-[420px] flex flex-col overflow-hidden">
         <div class="border-b border-line bg-surface-2 px-3 py-2 text-12px font-700 text-ink-soft">
           发票原件 · {{ invoice.fileName || '无扫描件' }}
         </div>
@@ -245,7 +245,7 @@ onMounted(() => {
       </div>
 
       <!-- 右：字段（本地缓冲）+ 明细 + 动作 -->
-      <div class="content-panel flex flex-col gap-3 rounded-[var(--radius-card)] p-4">
+      <div class="panel flex flex-col gap-3 p-4">
         <h2 class="text-15px font-800">
           发票字段
         </h2>
@@ -365,7 +365,7 @@ onMounted(() => {
 
         <!-- 动作：删除 ｜ 重新识别 + 保存 -->
         <div class="mt-1 flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-3">
-          <button class="btn-secondary text-danger hover:border-danger!" @click="del">
+          <button class="btn-danger" @click="del">
             <span class="i-lucide-trash-2 mr-1 text-13px" aria-hidden="true" />删除
           </button>
           <div class="flex items-center gap-2">
@@ -373,7 +373,7 @@ onMounted(() => {
               <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />
               {{ invoice.ocrStatus === 'processing' ? '识别中…' : '重新识别' }}
             </button>
-            <button class="btn-primary" @click="save">
+            <button class="btn-accent" @click="save">
               <span class="i-lucide-save mr-1 text-13px" aria-hidden="true" />保存
             </button>
           </div>

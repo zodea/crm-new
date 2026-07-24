@@ -87,9 +87,9 @@ const wideColumns: KitTableColumn[] = [
 ]
 
 // —— 全量数据管线(remote 筛选 + 受控分页):筛选 → 钳页码 → 切片 ——
-const activeFilters = ref<Record<string, unknown[]>>({})
-const page = ref(1)
-const pageSize = ref(10)
+const activeFilters = shallowRef<Record<string, unknown[]>>({})
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
 
 const filtered = computed(() => ALL_ROWS.filter(row =>
   Object.entries(activeFilters.value).every(([field, values]) =>
@@ -141,7 +141,7 @@ const fewColumns: KitTableColumn[] = [
 
     <div class="space-y-3">
       <!-- ① 宽表全家桶 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ① 16 列宽表 —— 容器内横滚 + 受控分页 + 列头筛选(remote)+ 金额列 + 插槽
         </h2>
@@ -181,7 +181,7 @@ const fewColumns: KitTableColumn[] = [
       </section>
 
       <!-- ② 少行兜底 + 本地筛选 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ② 3 行数据 —— minRows 高度兜底(≥10 行)+ 本地筛选(filterable: true)
         </h2>
@@ -192,7 +192,7 @@ const fewColumns: KitTableColumn[] = [
       </section>
 
       <!-- ③ 空数据 -->
-      <section class="content-panel p-4">
+      <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
           ③ 空数据 —— empty 占位
         </h2>

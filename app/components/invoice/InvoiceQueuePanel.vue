@@ -26,9 +26,9 @@ const selectedId = defineModel<string | null>('selectedId', { required: true })
 </script>
 
 <template>
-  <aside class="basis-[18%] min-w-48 shrink-0 overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)] flex flex-col">
+  <aside class="panel basis-[18%] min-w-48 shrink-0 overflow-hidden flex flex-col">
     <div class="flex flex-col gap-2 border-b border-line bg-surface-2 p-2.5">
-      <button class="btn-primary w-full justify-center text-12px" @click="emit('upload')">
+      <button class="btn-primary w-full" @click="emit('upload')">
         <span class="i-lucide-upload mr-1 text-12px" aria-hidden="true" />上传发票
       </button>
       <select v-model="filter" class="field-input w-full text-12px" aria-label="筛选识别队列">

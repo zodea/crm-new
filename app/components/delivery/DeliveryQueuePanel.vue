@@ -29,7 +29,7 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
 </script>
 
 <template>
-  <aside class="h-full min-h-0 w-68 shrink-0 overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel shadow-[var(--shadow-card)]">
+  <aside class="panel h-full min-h-0 w-68 shrink-0 overflow-hidden">
     <div class="flex items-center gap-2 border-b border-line bg-surface-2 px-3 py-2.5">
       <div>
         <div class="text-12px font-800 text-ink">
@@ -40,7 +40,7 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
         </div>
       </div>
       <div class="flex-1" />
-      <button type="button" class="btn-primary px-2.5 py-1.5 text-11px" @click="emit('upload')">
+      <button type="button" class="btn-secondary px-[11px] py-[5px] text-12px" @click="emit('upload')">
         <span class="i-lucide-plus mr-1" />上传
       </button>
     </div>

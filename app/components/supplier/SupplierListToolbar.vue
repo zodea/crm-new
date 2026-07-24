@@ -26,7 +26,7 @@ const credentialStatus = defineModel<string>('credentialStatus', { required: tru
 
 <template>
   <section
-    class="flex flex-wrap items-center gap-3 border border-line rounded-[var(--radius-card)] bg-panel p-3.5 shadow-[var(--shadow-card)]"
+    class="panel flex flex-wrap items-center gap-3 p-3.5"
   >
     <div class="mr-1 flex flex-none items-baseline gap-2">
       <h2 class="text-14px font-800 text-ink">
@@ -51,7 +51,7 @@ const credentialStatus = defineModel<string>('credentialStatus', { required: tru
         />
         <span class="sr-only">刷新</span>
       </Button>
-      <Button @click="emit('create')">
+      <Button variant="accent" @click="emit('create')">
         <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
         新增分供方
       </Button>

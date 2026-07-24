@@ -14,7 +14,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="flex flex-col gap-3">
-    <div class="flex items-center gap-3 rounded-[var(--radius-card)] border border-line bg-panel px-4 py-3 shadow-[var(--shadow-card)]">
+    <div class="panel flex items-center gap-3 px-4 py-3">
       <div>
         <div class="text-16px font-800 text-ink">
           送货单识别工作台

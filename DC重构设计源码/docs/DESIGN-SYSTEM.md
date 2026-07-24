@@ -1,5 +1,7 @@
 # 设计系统 — 颜色·字体·组件·图标·动效
 
+> ⛔ 本文中的色值表为历史留档，不再作为实现依据。内容区视觉令牌唯一权威源为 `../_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`；运行时与 `app.dc.html` / `app-new.html` 均直接加载该文件。
+
 > 本文是设计稿输出的唯一视觉基准。  
 > 色值来源: `docs/设计系统配色更新/app-new.html` color update v5 (2026-06-26)  
 > 内容区交互模式: `CRM-PATTERNS.md`  
