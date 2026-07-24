@@ -3,6 +3,7 @@
 // 基准：DC重构设计源码/kit/KitAtoms.jsx Metric。
 // 金额：设计源码约定「两位小数由调用方保证」；本组件额外提供 money 便捷开关，
 // value 为数字时按 ¥#,##0.00 完整展示（#50 AC②）。
+import type { RouteLocationRaw } from 'vue-router'
 import { computed } from 'vue'
 import { formatMoney } from '~/lib/util/money'
 
@@ -16,7 +17,9 @@ const props = withDefaults(defineProps<{
   big?: boolean
   /** value 为数字金额时，按 ¥#,##0.00 完整展示。 */
   money?: boolean
-}>(), { money: false })
+  /** 金额穿透目标（specs §07）：给定即渲染 MoneyLink，0/空自动退化。 */
+  to?: RouteLocationRaw | null
+}>(), { money: false, to: null })
 
 const display = computed(() =>
   props.money && typeof props.value === 'number'
@@ -47,7 +50,10 @@ const toneClass = computed(() => {
       :class="[toneClass, big ? 'text-[17.5px] font-800' : 'text-[13.5px] font-700']"
       :title="typeof value === 'string' ? value : undefined"
     >
-      {{ display }}
+      <MoneyLink v-if="to != null && money && typeof value === 'number'" :value="value" :to="to" />
+      <template v-else>
+        {{ display }}
+      </template>
     </div>
   </div>
 </template>

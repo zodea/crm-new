@@ -30,11 +30,28 @@ describe('初始态', () => {
 })
 
 describe('deriveKey', () => {
-  it('首页归一 HOME_KEY，其余用 fullPath', () => {
+  it('首页归一 HOME_KEY，其余用路径', () => {
     expect(deriveKey('/')).toBe(HOME_KEY)
     expect(deriveKey('')).toBe(HOME_KEY)
     expect(deriveKey('/base/supplier')).toBe('/base/supplier')
-    expect(deriveKey('/project/1?tab=info')).toBe('/project/1?tab=info')
+  })
+
+  it('穿透预筛不进页签身份：query 不参与键判定（CONTEXT.md 页签词条 / specs §07）', () => {
+    expect(deriveKey('/project/1?tab=info')).toBe('/project/1')
+    expect(deriveKey('/finance/ledger?project=p1')).toBe('/finance/ledger')
+    expect(deriveKey('/?from=x')).toBe(HOME_KEY)
+  })
+})
+
+describe('openTab：穿透预筛复用', () => {
+  it('同路径不同 query 复用页签并刷新 fullPath（复用 + 应用新预筛）', () => {
+    const s = openTab(initialTabsState(), { fullPath: '/finance/ledger', title: '发票台账' }).state
+    const before = s.tabs.length
+    const r = openTab(s, { fullPath: '/finance/ledger?project=p1', title: '发票台账' })
+    expect(r.blocked).toBe(false)
+    expect(r.state.tabs).toHaveLength(before)
+    expect(r.state.activeKey).toBe('/finance/ledger')
+    expect(r.state.tabs.find(t => t.key === '/finance/ledger')!.fullPath).toBe('/finance/ledger?project=p1')
   })
 })
 
@@ -59,10 +76,11 @@ describe('openTab：打开/复用/超限', () => {
     expect(r.state.tabs.find(t => t.key === '/project/1')!.title).toBe('合和新城') // 动态标题保留
   })
 
-  it('不同 query 视为不同页签', () => {
+  it('不同 query 复用同一页签（旧规则「不同 query 不同页签」已被穿透预筛规则取代）', () => {
     let s = openTab(initialTabsState(), { fullPath: '/project/1?tab=a', title: 'A' }).state
     s = openTab(s, { fullPath: '/project/1?tab=b', title: 'B' }).state
-    expect(s.tabs.filter(t => t.key !== HOME_KEY)).toHaveLength(2)
+    expect(s.tabs.filter(t => t.key !== HOME_KEY)).toHaveLength(1)
+    expect(s.tabs.find(t => t.key === '/project/1')!.fullPath).toBe('/project/1?tab=b')
   })
 
   it('达上限 15（不含首页）后阻断：不新增、不改激活、blocked=true', () => {
