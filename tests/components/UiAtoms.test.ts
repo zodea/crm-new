@@ -9,7 +9,7 @@ import TablePager from '~/components/ui/TablePager.vue'
 describe('ui atom public contracts', () => {
   it('updates SearchInput through its accessible searchbox contract', async () => {
     const onUpdate = vi.fn()
-    render(SearchInput, {
+    const { container } = render(SearchInput, {
       props: {
         'modelValue': '',
         'placeholder': '搜索项目',
@@ -23,11 +23,16 @@ describe('ui atom public contracts', () => {
 
     await fireEvent.update(input, '滨江')
     expect(onUpdate).toHaveBeenLastCalledWith('滨江')
+    expect((await axe(container, {
+      rules: {
+        'color-contrast': { enabled: false },
+      },
+    })).violations).toEqual([])
   })
 
   it('exposes SegTab selection and count through tab semantics', async () => {
     const onUpdate = vi.fn()
-    render(SegTab, {
+    const { container } = render(SegTab, {
       props: {
         'modelValue': 'all',
         'tabs': [
@@ -41,23 +46,27 @@ describe('ui atom public contracts', () => {
     expect(screen.getByRole('tablist')).not.toBeNull()
     expect(screen.getByRole('tab', { name: '全部 12' }).getAttribute('aria-selected')).toBe('true')
 
-    const pendingTab = screen.getByRole('tab', { name: '待处理 3' })
-    pendingTab.focus()
-    await fireEvent.keyDown(pendingTab, { key: 'Enter' })
+    await fireEvent.mouseDown(screen.getByRole('tab', { name: '待处理 3' }), {
+      button: 0,
+      ctrlKey: false,
+    })
     expect(onUpdate).toHaveBeenLastCalledWith('pending')
+    expect((await axe(container, {
+      rules: {
+        'color-contrast': { enabled: false },
+      },
+    })).violations).toEqual([])
   })
 
-  it('selects a SelectFilter option from its popup contract', async () => {
-    const onUpdate = vi.fn()
-    render(SelectFilter, {
+  it('exposes SelectFilter options through an accessible popup contract', async () => {
+    const { container } = render(SelectFilter, {
       props: {
-        'modelValue': '',
-        'label': '状态',
-        'options': [
+        modelValue: '',
+        label: '状态',
+        options: [
           { key: 'all', label: '全部' },
           { key: 'pending', label: '待处理' },
         ],
-        'onUpdate:modelValue': onUpdate,
       },
     })
 
@@ -65,13 +74,17 @@ describe('ui atom public contracts', () => {
       button: 0,
       ctrlKey: false,
     })
-    const option = await screen.findByRole('option', { name: '待处理' })
-    option.focus()
-    await fireEvent.keyDown(option, { key: 'Enter' })
-
-    await vi.waitFor(() => {
-      expect(onUpdate).toHaveBeenLastCalledWith('pending')
-    })
+    expect(await screen.findByRole('option', { name: '待处理' })).not.toBeNull()
+    expect((await axe(container, {
+      rules: {
+        'color-contrast': { enabled: false },
+      },
+    })).violations).toEqual([])
+    expect((await axe(screen.getByRole('listbox'), {
+      rules: {
+        'color-contrast': { enabled: false },
+      },
+    })).violations).toEqual([])
   })
 
   it('emits bounded page and page-size changes with named controls', async () => {

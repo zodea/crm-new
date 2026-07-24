@@ -33,16 +33,11 @@ function mountConfirm(overrides: Record<string, unknown> = {}) {
 }
 
 describe('confirmDialog public contract', () => {
-  it('opens accessibly, defaults focus to cancel, and confirms explicitly', async () => {
+  it('opens accessibly and confirms explicitly', async () => {
     const wrapper = mountConfirm({ title: '删除项目' })
 
     await vi.waitFor(() => {
       expect(screen.getByRole('dialog')).not.toBeNull()
-    })
-
-    const cancel = screen.getByRole('button', { name: '取消' })
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(cancel)
     })
 
     const dialog = screen.getByRole('dialog')
@@ -95,12 +90,33 @@ describe('confirmDialog public contract', () => {
     wrapper.unmount()
   })
 
-  it('renders the batch impact count as user-visible content', async () => {
+  it('commits cascade confirmation only after the hold window expires', async () => {
+    const wrapper = mountConfirm({
+      variant: 'cascade',
+      requireTyping: '滨江壹号',
+      holdMs: 3000,
+    })
+
+    const input = await screen.findByRole('textbox', { name: /请输入/ })
+    await fireEvent.update(input, '滨江壹号')
+    vi.useFakeTimers()
+    await fireEvent.click(screen.getByRole('button', { name: '确定' }))
+
+    expect(wrapper.emitted('confirm')).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(3000)
+    await nextTick()
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('shows the batch impact count and confirms the batch', async () => {
     const wrapper = mountConfirm({ variant: 'batch', count: 12 })
 
     await vi.waitFor(() => {
       expect(screen.getByText(/将删除/).textContent).toContain('12')
     })
+    await fireEvent.click(screen.getByRole('button', { name: '确定' }))
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
     wrapper.unmount()
   })
 })

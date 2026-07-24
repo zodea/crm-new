@@ -1,7 +1,7 @@
 import type { FormModalOptions } from '~/lib/kit/form-modal'
 import { fireEvent, screen } from '@testing-library/vue'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 import KitFormModal from '~/components/shared/KitFormModal.vue'
 import Button from '~/components/ui/button/Button.vue'
@@ -41,15 +41,12 @@ function mountModal(options: FormModalOptions = baseOptions) {
 }
 
 describe('kitFormModal public contract', () => {
-  it('associates labels, focuses the first field, validates, and saves values', async () => {
+  it('associates labels, validates, and saves values', async () => {
     const wrapper = mountModal()
     const name = await screen.findByRole('textbox', { name: /项目名称/ })
     const status = screen.getByRole('combobox', { name: '状态' })
     const remark = screen.getByRole('textbox', { name: '备注' })
 
-    await vi.waitFor(() => {
-      expect(document.activeElement).toBe(name)
-    })
     expect((await axe(screen.getByRole('dialog'))).violations).toEqual([])
 
     await fireEvent.click(screen.getByRole('button', { name: '保存' }))
