@@ -292,9 +292,6 @@
       <sc-if value="{{ isPayrollDetail }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="PayrollDetailScreen" from="./kit/PayrollDetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
-      <sc-if value="{{ isWageSlip }}" hint-placeholder-val="{{ false }}">
-        <x-import component-from-global-scope="WageSlipScreen" from="./kit/WageSlipScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
-      </sc-if>
       <sc-if value="{{ isPrice }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="PriceScreen" from="./kit/PriceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
       </sc-if>
@@ -366,9 +363,8 @@ const PAGE = {
   quantity:      { title: "工程量管理", subtitle: "楼层 × 户号 × 分项 · 按月着色" },
   quantityUnit:  { title: "户详情", subtitle: "房间级三量 · 完成勾选 · 验收照片" },
   detail:        { title: "施工明细",  subtitle: "楼层 × 工种 明细" },
-  payroll:       { title: "工资核算",  subtitle: "班组 × 项目 × 月份" },
-  payrollDetail: { title: "工资明细",  subtitle: "分项工程量 · 计算流程" },
-  wageSlip:      { title: "工资进度款工具", subtitle: "户工程量配置 · 汇总 · 明细 · 考勤 · 空鼓扣罚" },
+  payroll:       { title: "工资核算",  subtitle: "项目 → 班组瀑布 → 请款簿总表（负责人制）" },
+  payrollDetail: { title: "请款簿",  subtitle: "核对两步流 · A4 单据（格式族 A/B/C1/C2）" },
   price:         { title: "单价对比",  subtitle: "材料价格分析" },
 };
 
@@ -396,7 +392,7 @@ class Component extends DCLogic {
     if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
     if (route === "boqImport" || route === "boqList") return route + ":" + (p.contract || "");
     if (route === "crewDetail") return route + ":" + (p.crewId || "");
-    if (route === "payrollDetail") return route + ":" + (p.worker || "") + ":" + (p.crew || "") + ":" + (p.project || "");
+    if (route === "payrollDetail") return route + ":" + (p.book || p.worker || "") + ":" + (p.crew || "") + ":" + (p.project || "");
     if (route === "quantityUnit") return route + ":" + (p.building || "") + ":" + (p.floor || "") + ":" + (p.unit || "");
     return route; // 列表类页面：一个 route 一个页签
   }
@@ -419,7 +415,10 @@ class Component extends DCLogic {
       }
       else if (route === "workerDetail") name = ((d.workers || []).find(x => x.id === p.id) || {}).name || "";
       else if (route === "crewDetail") name = ((d.crews || []).find(x => x.id === p.crewId) || {}).name || "";
-      else if (route === "payrollDetail") name = p.worker || "";
+      else if (route === "payrollDetail") {
+        const bk = p.book && window.PAYSLIP && window.PAYSLIP.bookById && window.PAYSLIP.bookById(p.book);
+        name = bk ? bk.leader + "簿" : (p.worker || "");
+      }
       else if (route === "contractDetail") {
         const c = (window.APP && window.APP.get("contracts", p.id)) || ((d.contracts || []).find(x => x.id === p.id));
         name = c ? c.name.slice(0, 12) : "";
@@ -598,7 +597,6 @@ class Component extends DCLogic {
         { key: "quantity", mark: "量", label: "工程量管理", hint: "矩阵可视化" },
         { key: "boqList", mark: "单", label: "工程量清单", hint: "分项·三量" },
         { key: "payroll", mark: "资", label: "工资核算", hint: "核算发放" },
-        { key: "wageSlip", mark: "款", label: "工资进度款", hint: "铺贴核算工具" },
       ]},
       { type: "group", key: "g-material", label: "乙供材管理", icon: "package", items: [
         { key: "matContract", mark: "采", label: "材料采购合同", hint: "采购台账" },
@@ -849,7 +847,6 @@ class Component extends DCLogic {
       isDetail:        route === "detail",
       isPayroll:       route === "payroll",
       isPayrollDetail: route === "payrollDetail",
-      isWageSlip:      route === "wageSlip",
       isPrice:         route === "price",
       kitData:         window.KIT_DATA || null,
       navigate:        this.navigate,

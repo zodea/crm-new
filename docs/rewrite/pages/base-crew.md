@@ -1,6 +1,6 @@
 # 基础信息/班组管理 — 列表 + 详情 + 项目配置
 
-> ⚠️ **表单字段以设计稿为准（2026-07-18 起）**：新增/编辑表单已按 [ADR 0014 整页表单](../../adr/0014-full-page-entity-forms.md) 大幅扩容，本文字段表未含该轮新字段；现行规格见 `DC重构设计源码/kit/forms/*.jsx`（域文件头注释列出注册路由），回写随 [#116](https://github.com/zodea/crm-new/issues/116) 进行。
+> ⚠️ **字段回写未完，横幅保留**：新增/编辑表单以 [ADR 0014](../../adr/0014-full-page-entity-forms.md) 与 `DC重构设计源码/kit/forms/*.jsx` 为现行字段来源；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认用户可编辑业务字段默认持久化，但本文字段表和 DATABASE 具体列仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 评审。
 
 > 路由: `/base/crew` · `/base/crew/:id`
 > 页面: `pages/base/crew/index.vue` · `pages/base/crew/[id].vue`

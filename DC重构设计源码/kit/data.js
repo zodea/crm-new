@@ -795,217 +795,556 @@
   });
 })();
 
-// —— 2026-07-19 工资单据化轮：PAYSLIP 数据集（1:1 对应真实工资发放格式 Excel，grill 定稿）——
-// 结构：payslips["项目|班组"] = { payType: "piece"计件按比例 | "time"时工100%直付, schedule 发放比例递增,
-//   workers[].units 户×分项(每户工程量), byMonth[月] = { floors 累计完成层数[对应units], hollow 空鼓点数[],
-//   hollowNote 空鼓明细文字, hold 空鼓暂扣, borrow 借支, att 出勤(31天) } }
-// 派生口径（与真实单一致，window.PAYSLIP.calc 唯一勾稽）：申报量=每户量×层数；金额=申报×单价；房租=Σ申报×1.30；
-//   合计→×比例→−逐月已领(往月取整递归)→−空鼓暂扣→−借支→本次请款→取整(下取整到百)。特殊 flags: 暂不支付/单独计价。
+// —— 2026-07-20 进度款域重构（#117 grill 定稿）：请款主体（负责人簿）数据层 PAYSLIP v2 ——
+// D1 单一数据链：A 族清单行从工程量管理（window.WAGE）聚合派生（同人合并、异人拆行，行名=栋+户型+分项），
+//   工具面/台账面/核对表/A4 同一套数；核对表手工调整只起核对作用，不构成第二本账。
+// D3/D6 生命周期三态：草稿(活算) → 已核对(留指纹，上游变动→「有变动、需重核」) → 已发放(登记实际金额→快照固化只读)；
+//   「累计已领」= 往月实际发放值之和（废除运行时递归重算）；「暂不支付」= 不执行发放、应发滚存（不再取整记 0）。
+// D7 单据主体 = 负责人：一本请款簿 = 负责人 + 组员多行工资表/考勤表；取整请款额组内分配（默认全给负责人，可改）；
+//   「单独计价」= 该人自己当负责人开一本（公司代管无管理费，或组员离职拆簿）。
+// D8/D9 格式族：A 户型派生 / B BOQ 直报（行从关联合同清单抽取，简化链、结算尾款走累计链）/
+//   C1 月薪时工（加班时薪默认=日薪÷8）/ C2 零星签工（大工价×工数，半工=0.5，确认规则可编辑脚注）；
+//   管理费单 = 管理人自己的进度款单（栋×分项汇总量×费率，支持负单价代付行），自动生成。
+// ⑥ 空鼓：进度月只列示（从户记录聚合，WAGE.hollowAgg），「开始扣款」手动启动 → 按仍未整改处数×单处金额
+//   生成扣款行（挂在本次进度请款合计之后、取整之前）；已整改销记不扣；「暂扣→返还」机制废除。
+// ⑦ 支付比例：单据级参数（默认沿用上月，首月建档给），废除预排递增 schedule；月份轴含 结算95%（可改）/尾款100% 档。
+// ⑤ 审批表 = 工资表（签字确认并按手印列 + 四签名栏即审批载体），A4 不加审批表页；
+//   ⑤b 发放固化时在付款管理域生成支出记录（类别=工人工资，设计稿以 toast 呈现）。
 (function () {
-  const att = (n) => { const a = []; for (let i = 0; i < 31; i++) a.push(i % 7 === 6 ? "" : (a.filter(Boolean).length < n ? "√" : "")); return a; };
-  const payslips = {
-    "合和新城|泥水A班": {
-      payType: "piece", trade: "泥水", rentPrice: 1.30,
-      schedule: [{ m: "2026-04", r: 75 }, { m: "2026-05", r: 85 }, { m: "2026-06", r: 95, current: true }],
-      workers: [
-        { name: "虞建华", safety: true, flags: [],
-          bank: { holder: "虞建华", phone: "13873962451", account: "6228 4800 8125 6829 011", branch: "农业银行韶关浈江支行" },
-          units: [
-            { item: "2栋01户墙砖", unit: "㎡", perUnit: 40.77, price: 36.00 },
-            { item: "2栋04户墙砖", unit: "㎡", perUnit: 26.43, price: 36.00 },
-            { item: "2栋06户墙砖", unit: "㎡", perUnit: 43.96, price: 36.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [3, 2, 2], notes: ["4,7,10楼", "7,10楼", "4,7楼"], hollow: [0, 0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(24) },
-            "2026-05": { floors: [5, 4, 3], notes: ["4,7,10,12,19楼", "7,10,12,19楼", "4,7,12楼"], hollow: [3, 0, 0], hollowNote: "12楼3处，其余暂未排查", hold: 0, borrow: 0, att: att(26) },
-            "2026-06": { floors: [7, 6, 5], notes: ["4,7,10,12,19,28,37楼", "7,10,12,19,28,37楼", "4,7,12,19,28楼"], hollow: [22, 10, 0], hollowNote: "37楼19处，19楼8处，12楼5处，其余暂未排查", hold: 3200, borrow: 0, att: att(25) },
-          } },
-        { name: "张建国", safety: true, flags: [],
-          bank: { holder: "张建国", phone: "13612078834", account: "6212 2620 1003 5417 902", branch: "工商银行广州黄埔支行" },
-          units: [
-            { item: "2栋02户墙砖", unit: "㎡", perUnit: 40.77, price: 36.00 },
-            { item: "2栋03户墙砖", unit: "㎡", perUnit: 43.96, price: 36.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [3, 3], notes: ["5,8,11楼", "5,8,11楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(25) },
-            "2026-05": { floors: [6, 5], notes: ["5,8,11,14,20,29楼", "5,8,11,14,20楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 500, att: att(27) },
-            "2026-06": { floors: [8, 7], notes: ["5,8,11,14,20,29,33,38楼", "5,8,11,14,20,29,33楼"], hollow: [0, 4], hollowNote: "33楼4处", hold: 0, borrow: 0, att: att(26) },
-          } },
-        { name: "匡志强", safety: false, flags: ["单独计价"],
-          bank: { holder: "匡志强", phone: "13725690417", account: "6217 0028 3910 2264 780", branch: "建设银行广州车陂支行" },
-          units: [
-            { item: "1栋淋浴板安装", unit: "块", perUnit: 12, price: 45.00 },
-            { item: "1栋窗台铺贴", unit: "m", perUnit: 8.6, price: 28.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [2, 2], notes: ["3,6楼", "3,6楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(20) },
-            "2026-05": { floors: [4, 3], notes: ["3,6,9,15楼", "3,6,9楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(22) },
-            "2026-06": { floors: [6, 5], notes: ["3,6,9,15,21,27楼", "3,6,9,15,21楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 800, att: att(23) },
-          } },
-        { name: "赵铁柱", safety: true, flags: ["暂不支付"],
-          bank: { holder: "赵铁柱", phone: "13924471182", account: "6228 4811 9077 3390 552", branch: "农业银行清远清城支行" },
-          units: [
-            { item: "3栋01户地砖", unit: "㎡", perUnit: 32.40, price: 32.00 },
-            { item: "3栋02户地砖", unit: "㎡", perUnit: 28.15, price: 32.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [2, 2], notes: ["6,9楼", "6,9楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(23) },
-            "2026-05": { floors: [4, 4], notes: ["6,9,13,18楼", "6,9,13,18楼"], hollow: [6, 3], hollowNote: "13楼6处，18楼3处", hold: 1200, borrow: 0, att: att(25) },
-            "2026-06": { floors: [5, 5], notes: ["6,9,13,18,25楼", "6,9,13,18,25楼"], hollow: [6, 3], hollowNote: "13楼6处，18楼3处（未整改）", hold: 1200, borrow: 0, att: att(21) },
-          } },
-        { name: "孙大勇", safety: true, flags: [],
-          bank: { holder: "孙大勇", phone: "13560104428", account: "6212 2635 7008 1145 337", branch: "工商银行佛山南海支行" },
-          units: [
-            { item: "1栋05户墙砖", unit: "㎡", perUnit: 26.43, price: 36.00 },
-            { item: "1栋06户墙砖", unit: "㎡", perUnit: 43.96, price: 36.00 },
-            { item: "1栋05户地砖", unit: "㎡", perUnit: 24.80, price: 32.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [2, 2, 1], notes: ["8,16楼", "8,16楼", "8楼"], hollow: [0, 0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(24) },
-            "2026-05": { floors: [4, 4, 3], notes: ["8,16,22,30楼", "8,16,22,30楼", "8,16,22楼"], hollow: [0, 0, 0], hollowNote: "", hold: 0, borrow: 1000, att: att(26) },
-            "2026-06": { floors: [6, 6, 5], notes: ["8,16,22,30,35,39楼", "8,16,22,30,35,39楼", "8,16,22,30,35楼"], hollow: [5, 0, 0], hollowNote: "35楼5处", hold: 0, borrow: 0, att: att(27) },
-          } },
-        { name: "王芳（虞嫂）", safety: true, flags: [],
-          bank: { holder: "王芳", phone: "13873962455", account: "6228 4800 2311 7845 023", branch: "农业银行韶关浈江支行" },
-          units: [
-            { item: "2栋05户墙砖", unit: "㎡", perUnit: 26.43, price: 36.00 },
-          ],
-          byMonth: {
-            "2026-04": { floors: [2], notes: ["4,26楼"], hollow: [0], hollowNote: "", hold: 0, borrow: 0, att: att(22) },
-            "2026-05": { floors: [4], notes: ["4,26,31,36楼"], hollow: [0], hollowNote: "", hold: 0, borrow: 0, att: att(24) },
-            "2026-06": { floors: [6], notes: ["4,26,31,36,38,40楼"], hollow: [2], hollowNote: "38楼2处", hold: 0, borrow: 0, att: att(25) },
-          } },
-      ],
-    },
-    "合和新城|木工一班": {
-      payType: "piece", trade: "木工", rentPrice: 1.30,
-      schedule: [{ m: "2026-05", r: 85 }, { m: "2026-06", r: 85, current: true }],
-      workers: [
-        { name: "周伟峰", safety: true, flags: [],
-          bank: { holder: "周伟峰", phone: "13802276645", account: "6217 0031 2088 4419 206", branch: "建设银行广州天河支行" },
-          units: [
-            { item: "1栋天花吊顶", unit: "㎡", perUnit: 38.5, price: 42.00 },
-            { item: "1栋石膏线安装", unit: "m", perUnit: 26.0, price: 8.50 },
-          ],
-          byMonth: {
-            "2026-05": { floors: [3, 2], notes: ["5,9,14楼", "5,9楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(25) },
-            "2026-06": { floors: [6, 5], notes: ["5,9,14,18,23,28楼", "5,9,14,18,23楼"], hollow: [0, 0], hollowNote: "", hold: 0, borrow: 0, att: att(26) },
-          } },
-        { name: "郑春明", safety: true, flags: [],
-          bank: { holder: "郑春明", phone: "13710388290", account: "6222 0210 0118 6634 951", branch: "交通银行广州东圃支行" },
-          units: [
-            { item: "2栋天花吊顶", unit: "㎡", perUnit: 38.5, price: 42.00 },
-          ],
-          byMonth: {
-            "2026-05": { floors: [2], notes: ["7,12楼"], hollow: [0], hollowNote: "", hold: 0, borrow: 600, att: att(23) },
-            "2026-06": { floors: [5], notes: ["7,12,17,24,30楼"], hollow: [0], hollowNote: "", hold: 0, borrow: 0, att: att(25) },
-          } },
-      ],
-    },
-    "合和新城|杂工班": {
-      payType: "time", trade: "杂工",
-      schedule: [{ m: "2026-05", r: 100 }, { m: "2026-06", r: 100, current: true }],
-      workers: [
-        { name: "杨红彬", safety: true, flags: [],
-          bank: { holder: "杨红彬", phone: "13539917790", account: "6228 4528 7807 8625 871", branch: "农业银行四川广安罗渡镇支行" },
-          byMonth: {
-            "2026-05": { daily: 400, days: 24, overtime: 0, borrow: 0, att: att(24) },
-            "2026-06": { daily: 400, days: 23, overtime: 200, borrow: 0, att: att(23) },
-          } },
-        { name: "蔡燕琼", safety: true, flags: [],
-          bank: { holder: "蔡燕琼", phone: "18161160100", account: "6210 9867 3700 0050 967", branch: "邮政银行四川广安罗渡镇支行" },
-          byMonth: {
-            "2026-05": { daily: 300, days: 24, overtime: 0, borrow: 0, att: att(24) },
-            "2026-06": { daily: 300, days: 23, overtime: 150, borrow: 0, att: att(23) },
-          } },
-      ],
-    },
-  };
-
-  // —— 派生器（唯一勾稽口径，屏幕共用 window.PAYSLIP.calc）——
   const r2 = (n) => Math.round(n * 100) / 100;
-  const floor100 = (n) => Math.max(0, Math.floor(n / 100) * 100);
-  // 计件：某工人某月的完整单据数值（逐月已领 = 往月取整递归求值，保证台账勾稽一致）
-  const calcPiece = (crew, w, month) => {
-    const mi = crew.schedule.findIndex((s) => s.m === month);
-    const mo = w.byMonth[month];
-    if (!mo || mi < 0) return null;
-    const lines = w.units.map((u, i) => ({
-      item: u.item, unit: u.unit, perUnit: u.perUnit, floors: mo.floors[i], note: mo.notes[i],
-      qty: r2(u.perUnit * mo.floors[i]), price: u.price, amount: r2(u.perUnit * mo.floors[i] * u.price), hollow: mo.hollow[i] || 0,
+  const floorN = (n, unit) => { const u = Math.max(1, unit || 100); return Math.max(0, Math.floor(n / u) * u); };
+  const attArr = (n) => { const a = []; let c = 0; for (let i = 0; i < 31; i++) { const on = i % 7 !== 6 && c < n; if (on) c++; a.push(on ? "√" : ""); } return a; };
+
+  // —— 名册登记表（D8-10，挂班组·工人域 #73）：性别/籍贯/身份证/劳动合同/入退场日期/证件照/银行卡照 ——
+  // 进/退场日期 → 瀑布卡「在班 X 人 · 离职 Y 人」（D2）；退场且有未整改空鼓 → 提示启动扣款（⑥-3）。
+  const roster = {
+    "泥水A班": [
+      { name: "虞建华", gender: "男", origin: "浙江绍兴", idNo: "330682198503117890", contract: "已签 2024-08-15", entry: "2024-08-15", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "虞建华", phone: "13873962451", account: "6228 4800 8125 6829 011", branch: "农业银行韶关浈江支行" } },
+      { name: "王芳（虞嫂）", gender: "女", origin: "浙江绍兴", idNo: "330682198706128901", contract: "已签 2024-08-15", entry: "2024-08-15", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "王芳", phone: "13873962455", account: "6228 4800 2311 7845 023", branch: "农业银行韶关浈江支行" } },
+      { name: "张建国", gender: "男", origin: "江西吉安", idNo: "362426198712146789", contract: "已签 2024-09-01", entry: "2024-09-01", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "张建国", phone: "13612078834", account: "6212 2620 1003 5417 902", branch: "工商银行广州黄埔支行" } },
+      { name: "孙大勇", gender: "男", origin: "四川南充", idNo: "511325198807122345", contract: "已签 2025-01-12", entry: "2025-01-12", exit: null, safety: true, photo: true, bankPhoto: false,
+        bank: { holder: "孙大勇", phone: "13560104428", account: "6212 2635 7008 1145 337", branch: "工商银行佛山南海支行" } },
+      { name: "匡志强", gender: "男", origin: "湖南衡阳", idNo: "430481198905264567", contract: "已签 2024-09-10", entry: "2024-09-10", exit: null, safety: false, photo: true, bankPhoto: true,
+        bank: { holder: "匡志强", phone: "13725690417", account: "6217 0028 3910 2264 780", branch: "建设银行广州车陂支行" } },
+      { name: "赵铁柱", gender: "男", origin: "广东清远", idNo: "440181199003051234", contract: "已签 2025-03-20", entry: "2025-03-20", exit: "2026-06-10", safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "赵铁柱", phone: "13924471182", account: "6228 4811 9077 3390 552", branch: "农业银行清远清城支行" } },
+    ],
+    "木工一班": [
+      { name: "周伟峰", gender: "男", origin: "安徽宿州", idNo: "342221199211053456", contract: "已签 2025-01-20", entry: "2025-01-20", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "周伟峰", phone: "13802276645", account: "6217 0031 2088 4419 206", branch: "建设银行广州天河支行" } },
+      { name: "郑春明", gender: "男", origin: "广西玉林", idNo: "452123199001025678", contract: "已签 2025-02-01", entry: "2025-02-01", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "郑春明", phone: "13710388290", account: "6222 0210 0118 6634 951", branch: "交通银行广州东圃支行" } },
+    ],
+    "杂工班": [
+      { name: "杨红彬", gender: "男", origin: "四川广安", idNo: "511623198209150013", contract: "已签 2026-04-18", entry: "2026-04-18", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "杨红彬", phone: "13539917790", account: "6228 4528 7807 8625 871", branch: "农业银行四川广安罗渡镇支行" } },
+      { name: "蔡燕琼", gender: "女", origin: "四川广安", idNo: "511623198512220020", contract: "已签 2026-04-18", entry: "2026-04-18", exit: null, safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "蔡燕琼", phone: "18161160100", account: "6210 9867 3700 0050 967", branch: "邮政银行四川广安罗渡镇支行" } },
+    ],
+    "暖通安装班": [
+      { name: "陈国强", gender: "男", origin: "湖北孝感", idNo: "420921197808124512", contract: "已签 2025-10-12", entry: "2025-10-12", exit: "2026-01-20", safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "陈国强", phone: "13688904471", account: "6212 2601 1198 3345 208", branch: "工商银行广州东圃支行" } },
+      { name: "黄伟荣", gender: "男", origin: "广东茂名", idNo: "440923199105083317", contract: "已签 2025-10-12", entry: "2025-10-12", exit: "2026-01-20", safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "黄伟荣", phone: "13570221809", account: "6217 0033 4901 5568 114", branch: "建设银行广州珠村支行" } },
+    ],
+    "泥水时工组": [
+      { name: "周维", gender: "男", origin: "湖南邵阳", idNo: "430522198010264428", contract: "未签（零星）", entry: "2025-11-20", exit: "2026-01-15", safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "周维", phone: "13725500981", account: "6212 2609 0233 7712 001", branch: "工商银行广州车陂支行" } },
+      { name: "黄伟荣", gender: "男", origin: "广东茂名", idNo: "440923199105083317", contract: "未签（零星）", entry: "2025-11-20", exit: "2026-01-15", safety: true, photo: true, bankPhoto: true,
+        bank: { holder: "黄伟荣", phone: "13570221809", account: "6217 0033 4901 5568 114", branch: "建设银行广州珠村支行" } },
+    ],
+  };
+
+  // —— 请款簿（一个负责人一本；family: A 户型派生 / B BOQ直报 / C1 月薪时工 / C2 零星签工 / MGR 管理费单）——
+  // 月份键：YYYY-MM 或 "结算"/"尾款"；月份数据字段：
+  //   status 草稿|已核对|已发放|未到；ratio 单据级比例（⑦）；seqNo 全项目递增请款序号（D8-8）；
+  //   actualPaid 实际发放金额（D6 以实际为准）；alloc 组内分配（D7）；borrow 按人借支；attN 按人出勤天数；
+  //   floorsSnap/priceSnap 发放固化的当月工程量/单价快照（D3）；deduct 空鼓扣款（⑥ 手动启动后生成）；
+  //   deferred 暂不支付（滚存）；checkedFp 核对指纹（"__ok__"=演示种子不比对，"__stale__"=演示已过期）。
+  const FL = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+  const books = [
+    { id: "B1", project: "合和新城", crew: "泥水A班", trade: "泥水", tradeKey: "mason", family: "A",
+      leader: "虞建华", members: ["虞建华", "王芳（虞嫂）"], scopeLabel: "墙砖、地砖",
+      config: { ratioFirst: 75, round: 100, contract: null,
+        subsidies: [{ name: "合计工程量房租", price: 1.30, items: ["墙砖", "地砖"] }],
+        hollowPrice: 30, hollowTiming: "结算时扣（可手动提前启动）",
+        mgr: { mode: "班组管理", person: "虞建华", rate: 2.5 }, priceAdj: {} },
+      monthSeq: ["2026-04", "2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-04": { status: "已发放", ratio: 75, seqNo: 29, actualPaid: 24700, alloc: { "虞建华": 16400, "王芳（虞嫂）": 8300 },
+          floorsSnap: { "1栋": FL(1, 8), "2栋": FL(1, 3) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "虞建华": 24, "王芳（虞嫂）": 22 } },
+        "2026-05": { status: "已发放", ratio: 80, seqNo: 32, actualPaid: 30600, alloc: { "虞建华": 20600, "王芳（虞嫂）": 10000 },
+          floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "虞建华": 26, "王芳（虞嫂）": 24 } },
+        "2026-06": { status: "草稿", ratio: 80, borrow: { "虞建华": 0, "王芳（虞嫂）": 0 }, attN: { "虞建华": 25, "王芳（虞嫂）": 23 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B2", project: "合和新城", crew: "泥水A班", trade: "泥水", tradeKey: "mason", family: "A",
+      leader: "张建国", members: ["张建国", "孙大勇"], scopeLabel: "墙砖、地砖",
+      config: { ratioFirst: 75, round: 100, contract: null,
+        subsidies: [{ name: "合计工程量房租", price: 1.30, items: ["墙砖", "地砖"] }],
+        hollowPrice: 30, hollowTiming: "结算时扣（可手动提前启动）",
+        mgr: { mode: "班组管理", person: "虞建华", rate: 2.5 }, priceAdj: {} },
+      monthSeq: ["2026-04", "2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-04": { status: "已发放", ratio: 75, seqNo: 30, actualPaid: 26400, alloc: { "张建国": 26400 },
+          floorsSnap: { "1栋": FL(1, 8), "2栋": FL(1, 3) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "张建国": 25, "孙大勇": 24 } },
+        "2026-05": { status: "已发放", ratio: 80, seqNo: 33, actualPaid: 31900, alloc: { "张建国": 20000, "孙大勇": 11900 },
+          floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: { "孙大勇": 500 }, attN: { "张建国": 27, "孙大勇": 26 } },
+        "2026-06": { status: "已核对", ratio: 85, checkedFp: "__stale__", borrow: { "张建国": 1000 }, attN: { "张建国": 26, "孙大勇": 27 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B3", project: "合和新城", crew: "泥水A班", trade: "泥水", tradeKey: "mason", family: "A",
+      leader: "匡志强", members: ["匡志强"], scopeLabel: "02户墙砖（单独）",
+      soloNote: "单独出单：该工序无班组管理、由我方代管（D7 成因①），故无管理费、独立一本。",
+      config: { ratioFirst: 75, round: 100, contract: null,
+        subsidies: [{ name: "合计工程量房租", price: 1.30, items: ["墙砖", "地砖"] }],
+        hollowPrice: 30, hollowTiming: "结算时扣（可手动提前启动）",
+        mgr: { mode: "公司代管" }, priceAdj: {} },
+      monthSeq: ["2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-05": { status: "已发放", ratio: 80, seqNo: 34, actualPaid: 14000, alloc: { "匡志强": 14000 },
+          floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "匡志强": 22 } },
+        "2026-06": { status: "草稿", ratio: 80, borrow: { "匡志强": 800 }, attN: { "匡志强": 23 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B4", project: "合和新城", crew: "泥水A班", trade: "泥水", tradeKey: "mason", family: "A",
+      leader: "赵铁柱", members: ["赵铁柱"], scopeLabel: "03户地砖",
+      config: { ratioFirst: 75, round: 100, contract: null,
+        subsidies: [{ name: "合计工程量房租", price: 1.30, items: ["墙砖", "地砖"] }],
+        hollowPrice: 30, hollowTiming: "结算时扣（离职必扣，可手动启动）",
+        mgr: { mode: "班组管理", person: "虞建华", rate: 2.5 }, priceAdj: {} },
+      monthSeq: ["2026-04", "2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-04": { status: "已发放", ratio: 75, seqNo: 28, actualPaid: 12000, alloc: { "赵铁柱": 12000 },
+          floorsSnap: { "1栋": FL(1, 8), "2栋": FL(1, 3) }, priceSnap: { "墙砖": 36, "地砖": 32 }, borrow: {}, attN: { "赵铁柱": 23 } },
+        "2026-05": { status: "已核对", ratio: 80, checkedFp: "__ok__", deferred: true, borrow: {}, attN: { "赵铁柱": 25 } },
+        "2026-06": { status: "草稿", ratio: 80, borrow: {}, attN: { "赵铁柱": 6 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B5", project: "合和新城", crew: "泥水A班", trade: "泥水", tradeKey: "mason", family: "MGR", auto: true,
+      leader: "虞建华", members: ["虞建华"], scopeLabel: "管理费",
+      autoNote: "管理费单自动生成（D8-4）：行 = 栋×分项汇总量 × 2.5 元；支持负单价代付行。",
+      config: { ratioFirst: 75, round: 100, contract: null, subsidies: [], priceAdj: {},
+        extraRows: [{ item: "1栋淋浴板未收尾代付（负价代扣）", unit: "套", qty: 30, price: -20 }] },
+      monthSeq: ["2026-04", "2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-04": { status: "已发放", ratio: 75, seqNo: 31, actualPaid: 4600, alloc: { "虞建华": 4600 },
+          floorsSnap: { "1栋": FL(1, 8), "2栋": FL(1, 3) }, priceSnap: { "管理费": 2.5 }, borrow: {}, attN: { "虞建华": 24 } },
+        "2026-05": { status: "已发放", ratio: 80, seqNo: 35, actualPaid: 1800, alloc: { "虞建华": 1800 },
+          floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "管理费": 2.5 }, borrow: {}, attN: { "虞建华": 26 } },
+        "2026-06": { status: "草稿", ratio: 80, borrow: {}, attN: { "虞建华": 25 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B6", project: "合和新城", crew: "木工一班", trade: "木工", tradeKey: "carp", family: "A",
+      leader: "周伟峰", members: ["周伟峰", "郑春明"], workAs: ["木工一班"], scopeLabel: "吊顶",
+      config: { ratioFirst: 85, round: 100, contract: null, subsidies: [], hollowPrice: 0,
+        mgr: { mode: "公司代管" }, priceAdj: {} },
+      monthSeq: ["2026-05", "2026-06", "结算", "尾款"],
+      months: {
+        "2026-05": { status: "已发放", ratio: 85, seqNo: 36, actualPaid: 22000, alloc: { "周伟峰": 12000, "郑春明": 10000 },
+          floorsSnap: { "1栋": [1, 2, 3, 4, 5, 6, 7, 8, 9, 11], "2栋": FL(1, 4) }, priceSnap: { "吊顶": 45 }, borrow: { "郑春明": 600 }, attN: { "周伟峰": 25, "郑春明": 23 } },
+        "2026-06": { status: "草稿", ratio: 85, borrow: {}, attN: { "周伟峰": 26, "郑春明": 25 } },
+        "结算": { kind: "settle", status: "未到", ratio: 95 },
+        "尾款": { kind: "final", status: "未到", ratio: 100 },
+      } },
+    { id: "B7", project: "合和新城", crew: "杂工班", trade: "杂工", family: "C1",
+      leader: "杨红彬", members: ["杨红彬", "蔡燕琼"], scopeLabel: "杂工",
+      config: { contract: null, daily: { "杨红彬": 400, "蔡燕琼": 300 }, otRate: {} },   // 加班时薪默认=日薪÷8（400→50 实证），可按人另设
+      monthSeq: ["2026-05", "2026-06"],
+      months: {
+        "2026-05": { status: "已发放", actualPaid: 16800, days: { "杨红彬": 24, "蔡燕琼": 24 }, otHours: {}, borrow: {}, attN: { "杨红彬": 24, "蔡燕琼": 24 } },
+        "2026-06": { status: "草稿", days: { "杨红彬": 23, "蔡燕琼": 23 }, otHours: { "杨红彬": 4, "蔡燕琼": 4 }, borrow: { "蔡燕琼": 300 }, attN: { "杨红彬": 23, "蔡燕琼": 23 } },
+      } },
+    { id: "B8", project: "未来印象小区", crew: "暖通安装班", trade: "暖通", family: "B",
+      leader: "陈国强", members: ["陈国强", "黄伟荣"], scopeLabel: "暖通安装",
+      config: { ratioFirst: 80, round: 100, contract: "FB-2025-012 暖通劳务分包合同", subsidies: [], priceAdj: {}, allowManual: true },
+      // ④-② B 族清单行来源=与工人签订的合同清单：分组小标题随合同带入、单价锁定（改价走 D4 调价弹窗）、
+      // 长项目特征折叠显示/A4 展开、一口价「项」行只填总价。
+      contractLines: [
+        { group: "拆除部分" },
+        { name: "风机盘管拆除", feature: "拆除原有风机盘管及冷凝水管、保温棉，含制冷剂回收、管口封堵、成品保护及建筑垃圾清运至指定地点", unit: "台", price: 85 },
+        { name: "镀锌风管拆除", feature: "原镀锌风管及角钢支架整体拆除，含高空作业防护、材料分类下运、场内转驳", unit: "㎡", price: 22 },
+        { group: "安装部分" },
+        { name: "风机盘管安装", feature: "卧式暗装风机盘管吊装就位、减震吊架制作安装、软接与冷凝水管坡度调校，配合土建预留洞修补", unit: "台", price: 260 },
+        { name: "镀锌风管制作安装", feature: "共板法兰风管制作安装，含法兰、垫料、支吊架制作安装及漏光试验配合", unit: "㎡", price: 48 },
+        { name: "部分铺贴（管井周边地面修复）", feature: "管井封堵后周边地面水泥砂浆找平修复，与原地面顺平", unit: "㎡", price: 28 },
+        { name: "通风系统调试", feature: "系统风量平衡调试、单机试运转及运行记录，含调试报告编制", unit: "项", price: 8000, lump: true },
+      ],
+      monthSeq: ["2025-11", "2025-12", "结算", "尾款"],
+      months: {
+        "2025-11": { status: "已发放", ratio: 80, seqNo: 11, actualPaid: 20800, alloc: { "陈国强": 13000, "黄伟荣": 7800 },
+          qtys: [null, 46, 380, null, 20, 180, 0, 0], borrow: {}, attN: { "陈国强": 26, "黄伟荣": 25 } },
+        "2025-12": { status: "已发放", ratio: 80, seqNo: 12, actualPaid: 21600, alloc: { "陈国强": 13600, "黄伟荣": 8000 },
+          qtys: [null, 0, 0, null, 26, 240, 26, 1], borrow: {}, attN: { "陈国强": 27, "黄伟荣": 26 } },
+        "结算": { kind: "settle", status: "已发放", ratio: 95, seqNo: 15, actualPaid: 8000, alloc: { "陈国强": 8000 },
+          qtys: [null, 46, 380, null, 46, 420, 26, 1], borrow: {}, attN: { "陈国强": 12, "黄伟荣": 10 } },
+        "尾款": { kind: "final", status: "已发放", ratio: 100, seqNo: 18, actualPaid: 2700, alloc: { "陈国强": 2700 },
+          qtys: [null, 46, 380, null, 46, 420, 26, 1], borrow: {}, attN: { "陈国强": 0, "黄伟荣": 0 } },
+      } },
+    { id: "B9", project: "未来印象小区", crew: "泥水时工组", trade: "泥水(时工)", family: "C2",
+      leader: "周维", members: ["周维", "黄伟荣"], scopeLabel: "零星用工",
+      config: { contract: null, bigPrice: 350,
+        footNote: "1、当日用工由证明人 2 天内确认，逾期未确认视为无效；2、虚报用工经查实按双倍扣回；3、半工按 0.5 工计。" },
+      monthSeq: ["2025-12"],
+      months: {
+        "2025-12": { status: "已发放", seqNo: 14, actualPaid: 4725, alloc: { "周维": 2975, "黄伟荣": 1750 }, borrow: {}, attN: { "周维": 9, "黄伟荣": 5 },
+          logs: [
+            { d: "12-02", content: "地下室积水清理、材料转运", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-03" },
+            { d: "12-03", content: "地下室积水清理（续）", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-04" },
+            { d: "12-05", content: "外墙脚手架拆除配合", span: "8:00–12:00", who: "周维", units: 0.5, witness: "王工", confirm: "12-06" },
+            { d: "12-05", content: "外墙脚手架拆除配合", span: "8:00–18:00", who: "黄伟荣", units: 1, witness: "王工", confirm: "12-06" },
+            { d: "12-08", content: "样板间成品保护拆除、清运", span: "8:00–18:00", who: "周维", units: 1, witness: "郑工", confirm: "12-09" },
+            { d: "12-08", content: "样板间成品保护拆除、清运", span: "8:00–18:00", who: "黄伟荣", units: 1, witness: "郑工", confirm: "12-09" },
+            { d: "12-11", content: "地库排水沟修补", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-12" },
+            { d: "12-15", content: "首层大堂地面保护、搬运", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-16" },
+            { d: "12-18", content: "屋面杂物清理", span: "8:00–18:00", who: "周维", units: 1, witness: "郑工", confirm: "12-19" },
+            { d: "12-18", content: "屋面杂物清理", span: "8:00–18:00", who: "黄伟荣", units: 1, witness: "郑工", confirm: "12-19" },
+            { d: "12-22", content: "临边防护整改", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-23" },
+            { d: "12-26", content: "竣工清洁配合", span: "8:00–18:00", who: "周维", units: 1, witness: "王工", confirm: "12-27" },
+            { d: "12-26", content: "竣工清洁配合", span: "8:00–18:00", who: "黄伟荣", units: 1, witness: "王工", confirm: "12-27" },
+            { d: "12-28", content: "移交前场地清理", span: "8:00–12:00", who: "黄伟荣", units: 1, witness: "郑工", confirm: "12-29" },
+          ] },
+      } },
+  ];
+
+  // —— 工具 ——
+  const bookById = (id) => books.find((b) => b.id === id) || null;
+  const booksOf = (project, crew) => books.filter((b) => b.project === project && (!crew || b.crew === crew));
+  const rosterOf = (crew) => {
+    const list = roster[crew] || [];
+    return { list, active: list.filter((r) => !r.exit).length, exited: list.filter((r) => r.exit).length };
+  };
+  const bankOf = (name) => {
+    for (const k in roster) { const hit = roster[k].find((r) => r.name === name); if (hit) return hit.bank; }
+    return null;
+  };
+  const rosterRow = (name) => {
+    for (const k in roster) { const hit = roster[k].find((r) => r.name === name); if (hit) return hit; }
+    return null;
+  };
+  const monthLabel = (mKey, mo) => {
+    if (mo && mo.kind === "settle") return "结算 " + (mo.ratio != null ? mo.ratio : 95) + "%";
+    if (mo && mo.kind === "final") return "尾款 100%";
+    return mKey;
+  };
+  const nextSeq = (project) => {
+    let mx = 0;
+    books.filter((b) => b.project === project).forEach((b) => Object.keys(b.months).forEach((k) => {
+      const s = b.months[k].seqNo; if (s && s > mx) mx = s;
     }));
-    const rentQty = r2(lines.reduce((s, l) => s + l.qty, 0));
-    const rentAmt = r2(rentQty * (crew.rentPrice || 0));
-    const total = r2(lines.reduce((s, l) => s + l.amount, 0) + rentAmt);
-    const ratio = crew.schedule[mi].r;
-    const payable = r2(total * ratio / 100);
-    const prevPaid = crew.schedule.slice(0, mi).map((s) => ({ month: s.m, amount: (calcPiece(crew, w, s.m) || { rounded: 0 }).rounded }));
-    const paidSum = r2(prevPaid.reduce((s, x) => s + x.amount, 0));
-    // 与真实单口径一致：清单请款链只扣「空鼓暂扣」；借支在工资表层扣（实发 = 取整应发 − 借支）
-    const request = r2(payable - paidSum - (mo.hold || 0));
-    const rounded = w.flags.includes("暂不支付") ? 0 : floor100(request);
-    const net = r2(rounded - (mo.borrow || 0));
-    return { lines, rentQty, rentAmt, total, ratio, payable, prevPaid, paidSum,
-      hold: mo.hold || 0, borrow: mo.borrow || 0, hollowNote: mo.hollowNote, request, rounded, net, att: mo.att,
-      hollowSum: lines.reduce((s, l) => s + l.hollow, 0) };
+    return mx + 1;
   };
-  // 时工：日薪 × 出勤 + 加班 − 借支（100% 直付，无比例无台账）
-  const calcTime = (crew, w, month) => {
-    const mo = w.byMonth[month];
-    if (!mo) return null;
-    const gross = r2(mo.daily * mo.days);
-    return { daily: mo.daily, days: mo.days, overtime: mo.overtime || 0, borrow: mo.borrow || 0,
-      gross, net: r2(gross + (mo.overtime || 0) - (mo.borrow || 0)), att: mo.att };
+  const docName = (book, mKey) => {
+    const mo = book.months[mKey] || {};
+    const tail = "（" + book.leader + "）";
+    if (mo.kind === "settle") return book.project + "-" + book.scopeLabel + "结算款95%" + tail;
+    if (mo.kind === "final") return book.project + "-" + book.scopeLabel + "尾款结清100%" + tail;
+    const p = mKey.split("-");
+    const base = book.project + "-" + book.scopeLabel + p[0] + "年" + parseInt(p[1]) + "月";
+    return base + (book.family === "MGR" ? "管理费单" : book.family === "C1" ? "工资表" : book.family === "C2" ? "零星用工表" : "进度款") + tail;
   };
-  const calc = (crewKey, workerName, month) => {
-    const crew = payslips[crewKey];
-    if (!crew) return null;
-    const w = crew.workers.find((x) => x.name === workerName);
-    if (!w) return null;
-    return crew.payType === "time" ? calcTime(crew, w, month) : calcPiece(crew, w, month);
+  const curMonth = (book) => {
+    const seq = book.monthSeq;
+    for (const k of seq) { const st = book.months[k].status; if (st === "草稿" || st === "已核对") return k; }
+    for (let i = seq.length - 1; i >= 0; i--) if (book.months[seq[i]].status === "已发放") return seq[i];
+    return seq[0];
   };
-  // 班组月度汇总（瀑布卡/工资总表用）
-  const crewSummary = (crewKey, month) => {
-    const crew = payslips[crewKey];
-    if (!crew) return null;
-    const m = month || (crew.schedule.find((s) => s.current) || crew.schedule[crew.schedule.length - 1]).m;
-    if (crew.payType === "time") {
-      const rows = crew.workers.map((w) => ({ w, c: calcTime(crew, w, m) })).filter((x) => x.c);
-      return { payType: "time", month: m, total: r2(rows.reduce((s, x) => s + x.c.net, 0)), rows };
+
+  // —— 行派生 ——
+  const priceOf = (book, mo, baseItem, livePrice) => {
+    if (mo.priceSnap && mo.priceSnap[baseItem] != null) return mo.priceSnap[baseItem];
+    if (book.config.priceAdj && book.config.priceAdj[baseItem] != null) return book.config.priceAdj[baseItem];
+    return livePrice;
+  };
+  // A 族：行从工程量管理聚合派生（D1）；历史月用 floorsSnap（D3 快照）
+  const linesA = (book, mo) => {
+    const W = window.WAGE; if (!W) return null;
+    const names = book.workAs || book.members;
+    return W.subjectRows(book.tradeKey, names, mo.floorsSnap || null).map((r) => {
+      const price = priceOf(book, mo, r.item, r.price);
+      return { b: r.b, item: r.b + r.unit + r.item, baseItem: r.item, unit: r.unitM, perUnit: r.perUnitQty,
+        floors: r.floors, floorNote: r.floorNote, rooms: r.roomNote, who: r.who, qty: r.qty,
+        price, amount: r2(r.qty * price),
+        adj: !(mo.priceSnap && mo.priceSnap[r.item] != null) && book.config.priceAdj && book.config.priceAdj[r.item] != null };
+    });
+  };
+  // 管理费单：栋 × 分项汇总量 × 费率（排除管理人自己与免管理费名单）+ 负价代付行（D8-4）
+  const linesMgr = (book, mo) => {
+    const W = window.WAGE; if (!W) return null;
+    const cfg = W.config;
+    const rate = priceOf(book, mo, "管理费", cfg.managerRate || 2.5);
+    const lines = [];
+    W.BUILDINGS.forEach((b) => {
+      const doneList = mo.floorsSnap ? (mo.floorsSnap[b] || []) : W.doneFloors(b);
+      const doneN = doneList.length;
+      // 单次扫描按分项分桶（payrollRows 一栋只跑一遍）
+      // 排除口径：管理人自己 + 免管理费名单 + 「公司代管」单独簿的全部成员（D7 成因①：代管无管理费）
+      const excluded = new Set([book.leader].concat(cfg.managerExcluded || []));
+      books.filter((x) => x.project === book.project && x.crew === book.crew && x.config.mgr && x.config.mgr.mode === "公司代管")
+        .forEach((x) => x.members.forEach((m) => excluded.add(m)));
+      const qtyByItem = {};
+      W.payrollRows(book.tradeKey, b).forEach((r) => {
+        if (r.item !== "墙砖" && r.item !== "地砖") return;
+        if (excluded.has(r.who)) return;
+        qtyByItem[r.item] = (qtyByItem[r.item] || 0) + r.perUnitQty * doneN;
+      });
+      ["墙砖", "地砖"].forEach((base) => {
+        const qty = r2(qtyByItem[base] || 0);
+        if (!qty) return;
+        lines.push({ item: b + base + "汇总", baseItem: "管理费", unit: W.UNIT_M[base] || "㎡", perUnit: null,
+          floors: doneN, floorNote: W.compressFloors(doneList), qty, price: rate, amount: r2(qty * rate) });
+      });
+    });
+    (book.config.extraRows || []).forEach((x) => lines.push({ item: x.item, baseItem: null, unit: x.unit,
+      perUnit: null, floors: null, floorNote: "", qty: x.qty, price: x.price, amount: r2(x.qty * x.price), extra: true }));
+    return lines;
+  };
+  // B 族：行从关联合同清单抽取（④-②，单价锁定），group 行透传为小标题（D8-5）；lump=一口价「项」行
+  const linesB = (book, mo) => {
+    const out = [];
+    (book.contractLines || []).forEach((l, i) => {
+      if (l.group) { out.push({ group: l.group }); return; }
+      const qty = (mo.qtys && mo.qtys[i] != null) ? mo.qtys[i] : 0;
+      const price = l.lump ? l.price : priceOf(book, mo, l.name, l.price);
+      out.push({ item: l.name, baseItem: l.name, feature: l.feature, unit: l.unit, qty,
+        price, lump: !!l.lump, amount: r2(qty * price), locked: true, idx: i });
+    });
+    (mo.extraLines || []).forEach((x) => out.push({ item: x.name, unit: x.unit, qty: x.qty, price: x.price,
+      amount: r2(x.qty * x.price), manual: true }));
+    return out;
+  };
+
+  // —— 单据派生（唯一勾稽口径）——
+  const calc = (bookId, mKey) => {
+    const book = bookById(bookId); if (!book) return null;
+    const mo = book.months[mKey]; if (!mo) return null;
+    if (mo._sealed) return mo._sealed;
+
+    const doc = { book, mKey, mo, status: mo.status, kind: mo.kind || "month", ratio: mo.ratio,
+      seqNo: mo.seqNo || null, name: docName(book, mKey), deferred: !!mo.deferred,
+      label: monthLabel(mKey, mo) };
+
+    if (book.family === "C1") {
+      doc.rows = book.members.map((name) => {
+        const daily = (book.config.daily || {})[name] || 0;
+        const days = (mo.days || {})[name] || 0;
+        const otRate = (book.config.otRate && book.config.otRate[name] != null) ? book.config.otRate[name] : r2(daily / 8);
+        const otHours = (mo.otHours || {})[name] || 0;
+        const otAmt = r2(otHours * otRate);
+        const borrow = (mo.borrow || {})[name] || 0;
+        const gross = r2(daily * days);
+        return { name, daily, days, otRate, otHours, otAmt, borrow, gross, net: r2(gross + otAmt - borrow),
+          attN: (mo.attN || {})[name] != null ? mo.attN[name] : days, bank: bankOf(name) };
+      });
+      doc.total = r2(doc.rows.reduce((s, x) => s + x.net, 0));
+      doc.actualPaid = mo.actualPaid != null ? mo.actualPaid : null;
+      doc.fp = JSON.stringify(doc.rows.map((x) => [x.daily, x.days, x.otHours, x.borrow]));
+    } else if (book.family === "C2") {
+      doc.logs = mo.logs || [];
+      doc.rows = book.members.map((name) => {
+        const units = r2(doc.logs.filter((l) => l.who === name).reduce((s, l) => s + l.units, 0));
+        const borrow = (mo.borrow || {})[name] || 0;
+        return { name, units, price: book.config.bigPrice, amount: r2(units * book.config.bigPrice), borrow,
+          net: r2(units * book.config.bigPrice - borrow), attN: (mo.attN || {})[name] || 0, bank: bankOf(name) };
+      });
+      doc.total = r2(doc.rows.reduce((s, x) => s + x.net, 0));
+      doc.footNote = mo.footNote || book.config.footNote || "";
+      doc.actualPaid = mo.actualPaid != null ? mo.actualPaid : null;
+      doc.fp = JSON.stringify(doc.logs.map((l) => [l.d, l.who, l.units]));
+    } else {
+      // A / MGR / B：清单 + 请款链（D8-1 行序：合计 → ×比例 → −逐月已领(每月单列) → 本次进度请款合计 → 空鼓扣款行 → 取整）
+      // 已发放且有行级快照（运行期 release 落盘）→ 直接用冻结行；否则由 floorsSnap/priceSnap 派生（种子历史月）
+      doc.lines = mo.linesSnap || (book.family === "MGR" ? linesMgr(book, mo) : book.family === "B" ? linesB(book, mo) : linesA(book, mo));
+      if (!doc.lines) return null;   // WAGE 未就绪
+      const dataLines = doc.lines.filter((l) => !l.group);
+      doc.subsidies = mo.subsSnap || (book.config.subsidies || []).map((s) => {
+        const qty = r2(dataLines.filter((l) => s.items.indexOf(l.baseItem) >= 0).reduce((x, l) => x + l.qty, 0));
+        return { name: s.name, qty, price: s.price, amount: r2(qty * s.price) };
+      });
+      doc.linesAmt = r2(dataLines.reduce((s, l) => s + l.amount, 0));
+      doc.subsidyAmt = r2(doc.subsidies.reduce((s, x) => s + x.amount, 0));
+      doc.total = r2(doc.linesAmt + doc.subsidyAmt);
+      // 比例可为 0（单据级参数），不能用 || 兜底——0% 就是 0%
+      doc.payable = r2(doc.total * (mo.ratio != null ? mo.ratio : 100) / 100);
+      // 逐月已领：往月「实际发放值」之和（D6），每月单列行（D8-1）；B 族进度月为增量直报（简化链），结算/尾款走累计链
+      const useCum = book.family !== "B" || mo.kind === "settle" || mo.kind === "final";
+      doc.prevPaid = [];
+      if (useCum) {
+        for (const k of book.monthSeq) {
+          if (k === mKey) break;
+          const pm = book.months[k];
+          if (pm.status === "已发放" && pm.actualPaid != null) {
+            const lb = pm.kind === "settle" ? "结算款已申领" : pm.kind === "final" ? "尾款已申领"
+              : (() => { const p = k.split("-"); return p[0] + "年" + parseInt(p[1]) + "月份已申领进度款"; })();
+            doc.prevPaid.push({ key: k, label: lb, amount: pm.actualPaid });
+          }
+        }
+      }
+      doc.paidSum = r2(doc.prevPaid.reduce((s, x) => s + x.amount, 0));
+      doc.request = r2(doc.payable - doc.paidSum);
+      // 空鼓（⑥）：A 族泥水簿列示（从户记录聚合，进度月不扣）；deduct 启动后生成扣款行（请款合计后、取整前）
+      doc.hollow = (book.family === "A" && book.tradeKey === "mason" && window.WAGE)
+        ? window.WAGE.hollowAgg(book.members) : null;
+      doc.deduct = mo.deduct ? { spots: mo.deduct.spots, price: mo.deduct.price,
+        amount: r2(-(mo.deduct.spots * mo.deduct.price)), at: mo.deduct.at } : null;
+      doc.rounded = floorN(doc.request + (doc.deduct ? doc.deduct.amount : 0), book.config.round);
+      doc.actualPaid = mo.actualPaid != null ? mo.actualPaid : null;
+      doc.alloc = mo.alloc || (doc.rounded > 0 ? { [book.leader]: doc.rounded } : {});
+      doc.fp = JSON.stringify([dataLines.map((l) => [l.item, l.qty, l.price]), doc.subsidyAmt, mo.ratio]);
     }
-    const rows = crew.workers.map((w) => ({ w, c: calcPiece(crew, w, m) })).filter((x) => x.c);
-    const sum = (f) => r2(rows.reduce((s, x) => s + f(x.c), 0));
-    return { payType: "piece", month: m, ratio: crew.schedule.find((s) => s.m === m).r,
-      total: sum((c) => c.total), payable: sum((c) => c.payable), paid: sum((c) => c.paidSum),
-      hold: sum((c) => c.hold), borrow: sum((c) => c.borrow), request: sum((c) => c.request),
-      rounded: sum((c) => c.rounded), net: sum((c) => c.net), rows };
+    // 工资表/考勤表行（D7 负责人+组员多行）：
+    // C1/C2 应发=毛额（日薪×出勤+加班 / 工数×大工价）、实发=毛额−借支（取自 rows.net，避免双扣）；
+    // 计件族 应发=组内分配额、实发=分配−借支。
+    doc.wageRows = book.members.map((name) => {
+      const timeRow = (book.family === "C1" || book.family === "C2") ? (doc.rows.find((r) => r.name === name) || null) : null;
+      const amount = timeRow
+        ? (timeRow.gross != null ? r2(timeRow.gross + (timeRow.otAmt || 0)) : (timeRow.amount || 0))
+        : (doc.alloc || {})[name] || 0;
+      const borrow = (mo.borrow || {})[name] || 0;
+      const r = rosterRow(name);
+      return { name, amount, borrow, net: timeRow ? (timeRow.net || 0) : r2(amount - borrow),
+        attN: (mo.attN || {})[name] || 0, bank: r ? r.bank : null, safety: r ? r.safety : true,
+        att: attArr((mo.attN || {})[name] || 0) };
+    });
+    doc.wageTotal = r2(doc.wageRows.reduce((s, x) => s + x.net, 0));
+    // 已核对指纹比对（D6-2：核对后上游数据变动 → 有变动、需重核）
+    doc.dirty = mo.status === "已核对" && mo.checkedFp != null && mo.checkedFp !== "__ok__" && mo.checkedFp !== doc.fp;
+    if (mo.status === "已发放") mo._sealed = doc;   // 快照固化（只读，运行期冻结）
+    return doc;
   };
-  window.PAYSLIP = { data: payslips, calc, crewSummary };
 
-  // projectCrews 增补：合和新城挂 杂工班(时工100%直付)；木工一班改为有数据
+  // —— 班组月度汇总（L0 项目卡 / L1 瀑布卡）——
+  const crewSummary = (project, crew, mKey) => {
+    const bs = booksOf(project, crew);
+    if (!bs.length) return null;
+    const rows = bs.map((b) => {
+      const m = mKey && b.months[mKey] ? mKey : curMonth(b);
+      return { book: b, m, doc: calc(b.id, m) };
+    }).filter((x) => x.doc);
+    if (!rows.length) return null;
+    const timeLike = rows.every((x) => x.book.family === "C1" || x.book.family === "C2");
+    const sum = (f) => r2(rows.reduce((s, x) => s + (f(x.doc) || 0), 0));
+    const ro = rosterOf(crew);
+    // due = 本期应发（仅未发放单据；已发放月是历史快照，不再是「待付」）
+    if (timeLike) return { timeLike: true, rows, total: sum((d) => d.total), roster: ro,
+      due: sum((d) => (d.status === "已发放" ? 0 : d.total)) };
+    return { timeLike: false, rows, roster: ro,
+      total: sum((d) => d.total), payable: sum((d) => d.payable), paid: sum((d) => d.paidSum),
+      request: sum((d) => d.request), rounded: sum((d) => d.rounded),
+      due: sum((d) => (d.status === "已发放" ? 0 : d.rounded)),
+      statusCount: rows.reduce((acc, x) => { acc[x.doc.status] = (acc[x.doc.status] || 0) + 1; return acc; }, {}) };
+  };
+
+  const notify = () => { if (window.APP && window.APP.notify) window.APP.notify(); };
+
+  window.PAYSLIP = {
+    books, roster, bookById, booksOf, rosterOf, bankOf, rosterRow,
+    calc, curMonth, crewSummary, docName, nextSeq, monthLabel,
+    update: (id, fn) => { const b = bookById(id); if (!b) return false; fn(b); notify(); return true; },
+    setRatio: (id, mKey, v) => { const b = bookById(id); if (!b) return; b.months[mKey].ratio = Math.max(0, Math.min(100, +v || 0)); notify(); },
+    setBorrow: (id, mKey, name, v) => { const b = bookById(id); if (!b) return; const mo = b.months[mKey]; mo.borrow = mo.borrow || {}; mo.borrow[name] = +v || 0; notify(); },
+    setAlloc: (id, mKey, alloc) => { const b = bookById(id); if (!b) return; b.months[mKey].alloc = alloc; notify(); },
+    // 核对（D6-2）：留当前指纹；上游再变动 → dirty
+    check: (id, mKey) => { const b = bookById(id); if (!b) return; const d = calc(id, mKey); b.months[mKey].status = "已核对"; b.months[mKey].checkedFp = d ? d.fp : null; notify(); },
+    backToDraft: (id, mKey) => { const b = bookById(id); if (!b) return; const mo = b.months[mKey]; if (mo.status === "已核对") { mo.status = "草稿"; delete mo.checkedFp; notify(); } },
+    // 暂不支付（D6）：不执行发放动作，应发滚存到后月（不再取整记 0）
+    defer: (id, mKey, on) => { const b = bookById(id); if (!b) return; b.months[mKey].deferred = !!on; notify(); },
+    // 发放登记（D6-3）：登记实际最终发放金额（默认=取整应发，可改，以实际为准）→ 整体快照固化只读；
+    // ⑤b：同时在付款管理域生成支出记录（设计稿以 toast 呈现，由屏幕层触发）。
+    release: (id, mKey, actual, alloc) => {
+      const b = bookById(id); if (!b) return null;
+      const mo = b.months[mKey];
+      const d = calc(id, mKey);
+      mo.status = "已发放";
+      // 实际发放金额以实际为准——0 也是合法登记值，不能用 || 兜回默认
+      const av = actual == null || actual === "" ? NaN : +actual;
+      mo.actualPaid = Number.isFinite(av) ? av : (d ? (d.rounded != null ? d.rounded : d.total) : 0);
+      if (alloc) mo.alloc = alloc; else if (!mo.alloc) mo.alloc = { [b.leader]: mo.actualPaid };
+      if (!mo.seqNo && b.family !== "C1") mo.seqNo = nextSeq(b.project);
+      // D3 快照固化：冻结当月工程量/单价 + 完整清单行（防后续改指派/改量穿透历史月）
+      if ((b.family === "A" || b.family === "MGR") && window.WAGE && !mo.floorsSnap) {
+        const W = window.WAGE;
+        mo.floorsSnap = {}; W.BUILDINGS.forEach((bb) => { mo.floorsSnap[bb] = (W.doneFloors(bb) || []).slice(); });
+        mo.priceSnap = {};
+        if (b.family === "MGR") { mo.priceSnap["管理费"] = (b.config.priceAdj || {})["管理费"] != null ? b.config.priceAdj["管理费"] : (W.config.managerRate || 2.5); }
+        else { (W.TRADES[b.tradeKey].items || []).forEach((it) => { mo.priceSnap[it] = (b.config.priceAdj || {})[it] != null ? b.config.priceAdj[it] : W.price(it); }); }
+      }
+      if (d && d.lines) { mo.linesSnap = d.lines.map((l) => ({ ...l })); mo.subsSnap = (d.subsidies || []).map((s) => ({ ...s })); }
+      delete mo._sealed;
+      notify();
+      return mo;
+    },
+    // ⑥ 空鼓扣款手动启动：按当时仍未整改处数 × 单处金额生成扣款行
+    startDeduct: (id, mKey) => {
+      const b = bookById(id); if (!b || !window.WAGE) return null;
+      const agg = window.WAGE.hollowAgg(b.members);
+      b.months[mKey].deduct = { spots: agg.unfixed, price: b.config.hollowPrice || 30, at: "手动启动" };
+      notify();
+      return b.months[mKey].deduct;
+    },
+    cancelDeduct: (id, mKey) => { const b = bookById(id); if (!b) return; delete b.months[mKey].deduct; notify(); },
+    // D4 单价修改路径（弹窗双模式）：统一改=改分项基准单价（所有做该项的人、当月起）；单独改=本簿单列调价
+    priceUniform: (baseItem, v) => { if (window.WAGE) window.WAGE.setPrice(baseItem, +v || 0); notify(); },
+    priceSolo: (id, baseItem, v) => { const b = bookById(id); if (!b) return; b.config.priceAdj = b.config.priceAdj || {}; if (v == null || v === "") delete b.config.priceAdj[baseItem]; else b.config.priceAdj[baseItem] = +v || 0; notify(); },
+    // ④ 建档：新建请款主体（格式族挂建档级）→ 生成首月草稿（计件族月份轴自动补 结算95%/尾款100% 档）
+    createBook: (o) => {
+      const nid = "B" + (books.reduce((mx, b) => Math.max(mx, +(String(b.id).replace(/^B/, "")) || 0), 0) + 1);
+      const isTime = o.family === "C1" || o.family === "C2";
+      const fm = o.firstMonth || "2026-06";
+      const book = {
+        id: nid, project: o.project, crew: o.crew, trade: o.trade || o.crew, tradeKey: o.tradeKey,
+        family: o.family, leader: o.leader, members: o.members && o.members.length ? o.members : [o.leader],
+        scopeLabel: o.scopeLabel || o.trade || o.crew,
+        config: o.config || {},
+        monthSeq: isTime ? [fm] : [fm, "结算", "尾款"],
+        months: { [fm]: Object.assign({ status: "草稿", borrow: {}, attN: {} },
+          isTime ? {} : { ratio: (o.config && o.config.ratioFirst) != null ? o.config.ratioFirst : 75 },
+          o.family === "C1" ? { days: {}, otHours: {} } : {},
+          o.family === "C2" ? { logs: [] } : {}) },
+      };
+      if (!isTime) {
+        book.months["结算"] = { kind: "settle", status: "未到", ratio: 95 };
+        book.months["尾款"] = { kind: "final", status: "未到", ratio: 100 };
+      }
+      if (o.family === "B") book.contractLines = o.contractLines || [];
+      books.push(book);
+      // 班组不在 projectCrews 时补挂（瀑布卡可见）
+      const dd = window.KIT_DATA;
+      if (dd && dd.projectCrews) {
+        dd.projectCrews[o.project] = dd.projectCrews[o.project] || [];
+        if (!dd.projectCrews[o.project].some((c) => c.crew === o.crew)) {
+          dd.projectCrews[o.project].push({ crew: o.crew, trade: o.trade || o.crew, workers: book.members.length, net: 0, hasData: true });
+        }
+      }
+      notify();
+      return book;
+    },
+  };
+
+  // —— projectCrews 增补：合和新城挂杂工班/木工有数据；未来印象小区挂 B/C2 两组（按月一册归档演示）——
   const d = window.KIT_DATA;
-  if (d && d.projectCrews && d.projectCrews["合和新城"]) {
-    const hh = d.projectCrews["合和新城"];
-    const mu = hh.find((c) => c.crew === "木工一班");
-    if (mu) { mu.hasData = true; mu.net = 0; }
-    if (!hh.some((c) => c.crew === "杂工班")) hh.splice(2, 0, { crew: "杂工班", trade: "杂工(时工)", workers: 2, net: 0, hasData: true });
+  if (d && d.projectCrews) {
+    if (d.projectCrews["合和新城"]) {
+      const hh = d.projectCrews["合和新城"];
+      const mu = hh.find((c) => c.crew === "木工一班");
+      if (mu) { mu.hasData = true; mu.net = 0; }
+      if (!hh.some((c) => c.crew === "杂工班")) hh.splice(2, 0, { crew: "杂工班", trade: "杂工(时工)", workers: 2, net: 0, hasData: true });
+    }
+    if (!d.projectCrews["未来印象小区"]) {
+      d.projectCrews["未来印象小区"] = [
+        { crew: "暖通安装班", trade: "暖通(BOQ直报)", workers: 2, net: 0, hasData: true },
+        { crew: "泥水时工组", trade: "泥水(零星签工)", workers: 2, net: 0, hasData: true },
+      ];
+    }
   }
-})();
-
-// —— 2026-07-19 反馈轮：PAYSLIP 写回接口（核对表编辑）+ 班组指派粒度 ——
-(function () {
-  const P = window.PAYSLIP;
-  const d = window.KIT_DATA;
-  if (!P || !d) return;
-  // 核对表写回：fn(worker, crew) 就地改 units/byMonth 字段，改完通知共享仓订阅者（瀑布卡/工资总表联动重算）
-  P.update = (crewKey, workerName, fn) => {
-    const crew = P.data[crewKey];
-    const w = crew && crew.workers.find((x) => x.name === workerName);
-    if (!w) return false;
-    fn(w, crew);
-    if (window.APP && window.APP.notify) window.APP.notify();
-    return true;
-  };
   // 指派粒度（户详情复选树用）：个人=可下钻到成员逐人勾选；班组=只能整组指派。泥水按个人分发（grill 定稿）。
-  (d.crews || []).forEach((c) => { if (c.assignLevel == null) c.assignLevel = /泥水/.test(c.trade || c.name) ? "个人" : "班组"; });
+  ((d && d.crews) || []).forEach((c) => { if (c.assignLevel == null) c.assignLevel = /泥水/.test(c.trade || c.name) ? "个人" : "班组"; });
 })();

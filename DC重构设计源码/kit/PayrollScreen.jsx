@@ -1,11 +1,14 @@
-// PayrollScreen — 工资核算三层钻取：项目 → 班组(瀑布卡) → 工资总表（单据口径）
-// 2026-07-19 工资单据化轮（grill 定稿）：数据源切 window.PAYSLIP（1:1 对应真实工资发放格式 Excel）：
-//   · 第二层班组卡 = 资金瀑布：工程量总额 → ×支付比例 → −累计已付 → −空鼓暂扣/借支 → 剩余待付清；
-//     100% 直付班组(时工)只显工程量总额一行；瀑布流布局(CSS columns)，卡片高度随内容错落。
-//   · 第三层工资总表 = 单据列口径：合计(含房租)/比例/应领/累计已领/暂扣/借支/本次请款/取整/特殊情况；
-//     「明细」进 A4 进度款单（PayrollDetailScreen，每 sheet 独立一页可打印）。
+// PayrollScreen — 工资核算三层钻取：项目 → 班组(瀑布卡) → 请款簿总表（负责人制，#117 进度款域重构）
+// · 第二层班组卡 = 资金瀑布（工程量总额 → ×比例 → −累计已领(实际) → 本期应发合计）；
+//   D2：去掉按人速览，卡片底部显示「在班 X 人 · 离职 Y 人」（数据来自名册登记表进/退场日期）；
+// · 第三层 = 请款簿总表（D7 单据主体=负责人）：一行一本请款簿（负责人+组员），三态状态列（D6），
+//   班组层面批量核对/批量发放；月份轴含 结算95%/尾款100% 档并显示各月实际用过的比例（⑦）；
+// · ⑧ 工具页退役：「本期支付总额权重分摊」并入批量发放弹窗——输入本期资金总额 → 按各簿（应领−已领）
+//   权重生成建议实际金额（按各簿取整规则下取整）→ 逐行可改 → 批量登记发放并固化；
+// · 打开请款簿 → PayrollDetailScreen（核对两步流 + A4 格式族）。
 (function () {
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
+  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm() };
   const yuan = n => "¥" + Number(n || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const num0 = n => Number(n || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -19,8 +22,16 @@
     }, []);
     return narrow;
   };
-
-  const SegTab = (props) => { const KA = window.KitAtoms; return KA ? <KA.SegTab {...props} /> : null; };
+  // WAGE/PAYSLIP 就绪轮询（x-import 预加载时序保护）
+  const useReady = () => {
+    const [ready, setReady] = React.useState(!!(window.WAGE && window.PAYSLIP));
+    React.useEffect(() => {
+      if (ready) return;
+      const t = setInterval(() => { if (window.WAGE && window.PAYSLIP) { clearInterval(t); setReady(true); } }, 60);
+      return () => clearInterval(t);
+    }, []);
+    return ready;
+  };
 
   function Breadcrumb({ items }) {
     return (
@@ -49,28 +60,274 @@
     </div>
   );
 
+  // 三态状态 chip（D6）
+  const StatusTri = ({ doc }) => {
+    if (!doc) return <StatusChip tone="neutral">—</StatusChip>;
+    if (doc.status === "已发放") return <StatusChip tone="ok">已发放 · 已固化</StatusChip>;
+    if (doc.status === "已核对") return doc.dirty
+      ? <StatusChip tone="warn">有变动 · 需重核</StatusChip>
+      : <StatusChip tone="brand">已核对</StatusChip>;
+    if (doc.status === "未到") return <StatusChip tone="neutral">未到</StatusChip>;
+    return <StatusChip tone="neutral">草稿</StatusChip>;
+  };
+  const FamilyChip = ({ book }) => {
+    const map = { A: ["A · 户型派生", "brand"], B: ["B · BOQ直报", "neutral"], C1: ["C1 · 月薪时工", "neutral"], C2: ["C2 · 零星签工", "neutral"], MGR: ["管理费单 · 自动", "warn"] };
+    const [label, tone] = map[book.family] || [book.family, "neutral"];
+    return <StatusChip tone={tone}>{label}</StatusChip>;
+  };
+
+  // —— ④ 建档弹窗：新建请款主体（格式族挂建档级；族联动配置逐项开关、金额自设；合同可空仅 B 必填）——
+  function CreateBookModal({ project, crew, onClose }) {
+    const P = window.PAYSLIP, W = window.WAGE;
+    const rosterList = (P.roster[crew] && P.roster[crew].length ? P.roster[crew]
+      : Object.keys(P.roster).reduce((a, k) => a.concat(P.roster[k]), []));   // 班组名册为空时从全名册选
+    const defTradeKey = Object.keys(W.TRADES).find(k => W.TRADES[k].crew === crew) || "mason";
+    const [fam, setFam] = React.useState("A");
+    const [leader, setLeader] = React.useState((rosterList.find(r => !r.exit) || rosterList[0] || {}).name || "");
+    const [members, setMembers] = React.useState(() => new Set(leader ? [leader] : []));
+    const [tradeKey, setTradeKey] = React.useState(defTradeKey);
+    const [contract, setContract] = React.useState("");
+    const [firstMonth, setFirstMonth] = React.useState("2026-06");
+    const [cfg, setCfg] = React.useState({ ratioFirst: 75, round: 100, rentOn: true, rentPrice: 1.30, hollowOn: true, hollowPrice: 30,
+      mgrMode: "班组管理", mgrPerson: "", mgrRate: 2.5, daily: {}, bigPrice: 350,
+      footNote: "1、当日用工由证明人 2 天内确认，逾期未确认视为无效；2、虚报用工经查实按双倍扣回；3、半工按 0.5 工计。" });
+    React.useEffect(() => { setMembers(prev => { const s = new Set(prev); if (leader) s.add(leader); return s; }); }, [leader]);
+    const setC = (k, v) => setCfg(p => ({ ...p, [k]: v }));
+    const toggleMember = (name) => setMembers(prev => { const s = new Set(prev); if (name === leader) return s; if (s.has(name)) s.delete(name); else s.add(name); return s; });
+    const famDefs = [
+      { key: "A", name: "A · 户型派生", src: "行由工程量管理「户型模板×勾房」自动聚合，行名=栋+户型+分项", chips: ["补贴", "空鼓", "逐月已领", "管理费单"], ref: "亚运城泥水铺贴同款" },
+      { key: "B", name: "B · 清单直报", src: "从签订合同清单抽取行（固定单价、长项目特征），逐月填申报量", chips: ["简化链", "分组小标题", "一口价行"], ref: "未来印暖通同款" },
+      { key: "C1", name: "C1 · 月薪时工", src: "日薪 × 出勤 + 加班 − 借支，100% 直付", chips: ["加班时薪=日薪÷8"], ref: "未来印杂工同款" },
+      { key: "C2", name: "C2 · 零星签工", src: "按日签工（壹/半工），两天内确认制", chips: ["签工确认制"], ref: "未来印泥水时工同款" },
+    ];
+    const lbl = { fontSize: 11, color: "var(--ink-faint)", marginBottom: 4 };
+    const secT = { fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", margin: "0 0 8px" };
+    const sub = { border: "1px dashed var(--line-strong)", borderRadius: 10, background: "var(--bg)", padding: "10px 13px" };
+    const amt = (v, on, w) => <input type="number" value={v} onChange={e => on(+e.target.value || 0)}
+      style={{ width: w || 72, border: "1.5px solid var(--brand)", borderRadius: 6, padding: "4px 8px", fontSize: 12.5, textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--brand-deep)" }} />;
+    const doCreate = () => {
+      if (!leader) { UI().toast("请选择负责人", "warning"); return; }
+      if (fam === "B" && !contract.trim()) { UI().toast("B 族（清单直报）必须关联合同——清单行从合同抽取（定稿⑦b）", "warning"); return; }
+      const mem = [leader].concat([...members].filter(m => m !== leader));
+      const T = W.TRADES[tradeKey] || {};
+      const baseTrade = crew.replace(/(安装)?班$/, "") || crew;
+      let config, scopeLabel, trade;
+      if (fam === "A") {
+        trade = T.name || baseTrade;
+        scopeLabel = (T.items || []).join("、") || trade;
+        config = { ratioFirst: cfg.ratioFirst, round: cfg.round, contract: contract.trim() || null,
+          subsidies: cfg.rentOn ? [{ name: "合计工程量房租", price: cfg.rentPrice, items: ["墙砖", "地砖"] }] : [],
+          hollowPrice: cfg.hollowOn ? cfg.hollowPrice : 0, hollowTiming: "结算时扣（可手动提前启动）",
+          mgr: cfg.mgrMode === "班组管理" ? { mode: "班组管理", person: cfg.mgrPerson || leader, rate: cfg.mgrRate } : { mode: "公司代管" }, priceAdj: {} };
+      } else if (fam === "B") {
+        trade = baseTrade; scopeLabel = baseTrade + "直报";
+        config = { ratioFirst: cfg.ratioFirst, round: cfg.round, contract: contract.trim(), subsidies: [], priceAdj: {}, allowManual: true };
+      } else if (fam === "C1") {
+        trade = baseTrade; scopeLabel = "时工";
+        const daily = {}; mem.forEach(m => { daily[m] = cfg.daily[m] != null ? cfg.daily[m] : 300; });
+        config = { contract: contract.trim() || null, daily, otRate: {} };
+      } else {
+        trade = baseTrade + "(零星)"; scopeLabel = "零星用工";
+        config = { contract: contract.trim() || null, bigPrice: cfg.bigPrice, footNote: cfg.footNote };
+      }
+      const nb = P.createBook({ project, crew, trade, tradeKey: fam === "A" ? tradeKey : undefined, family: fam,
+        leader, members: mem, scopeLabel, firstMonth: firstMonth.trim() || "2026-06", config });
+      UI().toast("已建档「" + leader + "簿 · " + fam + " 族」，生成 " + nb.monthSeq[0] + " 草稿" + (fam === "B" ? "（去核对页用合同清单抽取器带入行）" : ""), "success");
+      onClose(nb);
+    };
+    return (
+      <div onClick={() => onClose(null)} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: 20 }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: 880, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto", background: "var(--panel)", borderRadius: 14, boxShadow: "var(--shadow-pop)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "15px 20px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--panel)", zIndex: 1 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>新建请款主体</div>
+              <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>{project} · {crew} · 建档后按月生成请款单据（格式族挂建档级，定稿④-①）</div>
+            </div>
+            <button onClick={() => onClose(null)} style={{ marginLeft: "auto", width: 26, height: 26, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--ink-faint)", cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ padding: "14px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+            <div>
+              <div style={secT}>基本信息</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.1fr 0.9fr 1.5fr", gap: 10 }}>
+                <div><div style={lbl}>项目</div><div style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 700 }}>{project}</div></div>
+                <div><div style={lbl}>负责人（名册选择）</div>
+                  <select value={leader} onChange={e => setLeader(e.target.value)} style={{ width: "100%", border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 8px", fontSize: 12.5, fontWeight: 700, background: "#fff" }}>
+                    {rosterList.map(r => <option key={r.name} value={r.name}>{r.name}{r.exit ? "（已离职）" : ""}</option>)}
+                  </select></div>
+                <div><div style={lbl}>班组 / 工种</div><div style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "7px 10px", fontSize: 12.5, fontWeight: 700 }}>{crew}</div></div>
+                <div><div style={lbl}>关联合同（可空，仅 B 族必填 · 定稿⑦b）</div>
+                  <input value={contract} onChange={e => setContract(e.target.value)} placeholder={fam === "B" ? "必填：如 FB-2025-012 暖通劳务分包合同" : "选填——不是每个工人都签合同"}
+                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid " + (fam === "B" && !contract.trim() ? "var(--warn)" : "var(--line-strong)"), borderRadius: 8, padding: "7px 10px", fontSize: 12.5 }} /></div>
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>格式族（决定整本单据的形态与取数）</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                {famDefs.map(f => {
+                  const on = fam === f.key;
+                  return (
+                    <div key={f.key} onClick={() => setFam(f.key)} role="button"
+                      style={{ position: "relative", border: "1px solid " + (on ? "var(--brand)" : "var(--line)"), boxShadow: on ? "inset 0 0 0 1px var(--brand)" : "none",
+                        borderRadius: 10, padding: "11px 11px 9px", background: on ? "var(--brand-soft)" : "#fff", cursor: "pointer" }}>
+                      {on && <span style={{ position: "absolute", top: 8, right: 8, width: 16, height: 16, borderRadius: 999, background: "var(--brand-deep)", color: "#fff", display: "grid", placeItems: "center", fontSize: 10 }}>✓</span>}
+                      <div style={{ fontSize: 13, fontWeight: 800 }}>{f.name}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--ink-soft)", margin: "4px 0 7px", lineHeight: 1.5, minHeight: 31 }}>{f.src}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{f.chips.map(c => <StatusChip key={c} tone={on ? "brand" : "neutral"}>{c}</StatusChip>)}</div>
+                      <div style={{ fontSize: 9.5, color: "var(--ink-faint)", marginTop: 6 }}>{f.ref}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>{fam} 族联动配置<span style={{ fontWeight: 400, color: "var(--ink-faint)", marginLeft: 8, fontSize: 11 }}>各项可开关；蓝框金额自行设定；未开启项不出现在单据上</span></div>
+              {fam === "A" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>取数范围（工种 → 分项）</div>
+                    <select value={tradeKey} onChange={e => setTradeKey(e.target.value)} style={{ border: "1px solid var(--line-strong)", borderRadius: 8, padding: "6px 8px", fontSize: 12.5, background: "#fff", marginBottom: 6 }}>
+                      {Object.keys(W.TRADES).map(k => <option key={k} value={k}>{W.TRADES[k].name}（{W.TRADES[k].items.join("、")}）</option>)}
+                    </select>
+                    <div style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>量=户型模板×勾房；只聚合指派给本主体成员的行；楼栋随勾房自动</div>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>补贴设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="checkbox" checked={cfg.rentOn} onChange={e => setC("rentOn", e.target.checked)} />
+                      <b>房租补贴</b>{amt(cfg.rentPrice, v => setC("rentPrice", v), 64)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/㎡ · 基数=墙/地砖申报量</span>
+                    </label>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>空鼓设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="checkbox" checked={cfg.hollowOn} onChange={e => setC("hollowOn", e.target.checked)} />
+                      <b>空鼓扣款</b><span>单处</span>{amt(cfg.hollowPrice, v => setC("hollowPrice", v), 60)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/处 · 单据上「开始扣款」手动启动</span>
+                    </label>
+                  </div>
+                  <div style={sub}>
+                    <div style={{ ...lbl, fontWeight: 700 }}>管理设定</div>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="radio" name="kit-mgr" checked={cfg.mgrMode === "班组管理"} onChange={() => setC("mgrMode", "班组管理")} />
+                      <b>有班组管理</b>
+                      <select value={cfg.mgrPerson || leader} onChange={e => setC("mgrPerson", e.target.value)} style={{ border: "1px solid var(--line-strong)", borderRadius: 6, padding: "3px 6px", fontSize: 12, background: "#fff" }}>
+                        {rosterList.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
+                      </select>
+                      {amt(cfg.mgrRate, v => setC("mgrRate", v), 56)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/㎡ · 自动派生管理费单</span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, padding: "2px 0" }}>
+                      <input type="radio" name="kit-mgr" checked={cfg.mgrMode === "公司代管"} onChange={() => setC("mgrMode", "公司代管")} />
+                      <b>公司代管</b><span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>代管工序无管理费，不生成管理费单（单独出单成因①）</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+              {fam === "B" && (
+                <div style={sub}>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.8 }}>
+                    清单行从上方「关联合同」的清单里抽取（<b>必填</b>）：分组小标题随合同带入、单价合同价锁定（改价走调价弹窗）、
+                    长项目特征折叠显示/A4 展开、一口价「项」行只填总价。<span style={{ color: "var(--ink-faint)" }}>建档后在核对页点「合同清单抽取器」带入行，逐月只填申报量。</span>
+                  </div>
+                </div>
+              )}
+              {fam === "C1" && (
+                <div style={sub}>
+                  <div style={{ ...lbl, fontWeight: 700 }}>组员计薪（日薪逐人自设；加班时薪默认 = 日薪 ÷ 8，可在核对页按人另设）</div>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    {[leader].concat([...members].filter(m => m !== leader)).map(m => (
+                      <span key={m} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+                        <b>{m}</b>{amt(cfg.daily[m] != null ? cfg.daily[m] : 300, v => setC("daily", { ...cfg.daily, [m]: v }), 68)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/天</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {fam === "C2" && (
+                <div style={sub}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, marginBottom: 8 }}>
+                    <b>大工单价</b>{amt(cfg.bigPrice, v => setC("bigPrice", v), 68)}<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>元/工 · 半工按 0.5 工计</span>
+                  </div>
+                  <div style={{ ...lbl, fontWeight: 700 }}>确认规则脚注（印在单据、可编辑）</div>
+                  <textarea value={cfg.footNote} onChange={e => setC("footNote", e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid var(--line-strong)", borderRadius: 6, padding: "7px 10px", fontSize: 12, minHeight: 48, lineHeight: 1.6 }} />
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginTop: 8, fontSize: 12.5 }}>
+                {(fam === "A" || fam === "B") && (<>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>首月比例{amt(cfg.ratioFirst, v => setC("ratioFirst", v), 56)}%<span style={{ fontSize: 10.5, color: "var(--ink-faint)" }}>之后默认沿用上月（⑦）</span></span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>取整规则：下取整到{amt(cfg.round, v => setC("round", v), 60)}元</span>
+                </>)}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>首月
+                  <input value={firstMonth} onChange={e => setFirstMonth(e.target.value)} style={{ width: 84, border: "1px solid var(--line-strong)", borderRadius: 6, padding: "4px 8px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "center" }} />
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div style={secT}>组员（工资表 / 考勤表按此多行渲染；在班/离职来自名册进退场）</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {rosterList.map(r => {
+                  const on = members.has(r.name);
+                  const isLeader = r.name === leader;
+                  return (
+                    <label key={r.name} style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid " + (on ? "var(--brand)" : "var(--line)"), borderRadius: 8, padding: "7px 12px", fontSize: 12.5, cursor: isLeader ? "default" : "pointer", background: on ? "#fff" : "var(--surface-2)", opacity: r.exit && !on ? 0.6 : 1 }}>
+                      <input type="checkbox" checked={on} disabled={isLeader} onChange={() => toggleMember(r.name)} />
+                      <b>{r.name}</b>
+                      {isLeader && <StatusChip tone="brand">负责人</StatusChip>}
+                      {r.exit ? <StatusChip tone="danger">离职 · {r.exit.slice(5)}</StatusChip> : <StatusChip tone="ok">在班</StatusChip>}
+                      <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>{r.bank ? r.bank.branch.slice(0, 4) + " ····" + r.bank.account.replace(/\s/g, "").slice(-4) : ""}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--brand-soft)", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "var(--brand-deep)" }}>
+              同人可多本：计件 + 时工并存、组员离职拆账，都是再开一本独立请款账，互不影响（定稿 D7）。
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 20px", borderTop: "1px solid var(--line)", position: "sticky", bottom: 0, background: "var(--panel)" }}>
+            <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>建档后：按月生成草稿 → 人工核对 → 发放固化（D6）</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <Button onClick={() => onClose(null)}>取消</Button>
+              <Button variant="primary" icon="plus" onClick={doCreate}>建档并生成首月草稿</Button>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function PayrollScreen({ data, navigate, params }) {
     const narrow = useNarrow();
+    const ready = useReady();
+    const A = window.APP;
+    if (A && A.use) A.use();   // 订阅共享仓：请款簿状态/工程量变动 → 全层联动
     const [selProject, setSelProject] = React.useState((params && params.project) || null);
     const [selCrew, setSelCrew] = React.useState((params && params.crew) || null);
-    const [tab, setTab] = React.useState("table");
-    const [viewIdx, setViewIdx] = React.useState(null);   // null=当前月（进班组后按其 schedule 解析）
+    const [selMonth, setSelMonth] = React.useState((params && params.month) || null);
+    const [showCreate, setShowCreate] = React.useState(false);   // ④ 建档弹窗
     const P = window.PAYSLIP;
 
-    const back = () => { if (selCrew) { setSelCrew(null); setViewIdx(null); } else setSelProject(null); };
+    if (!ready) return <Panel padding={40} style={{ textAlign: "center", color: "var(--ink-soft)" }}>数据链加载中…</Panel>;
 
-    // ── Level 0: 项目卡片（不动）──
+    const back = () => { if (selCrew) { setSelCrew(null); setSelMonth(null); } else setSelProject(null); };
+
+    // ── Level 0: 项目卡片 ──
     if (!selProject) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Panel padding={14} style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon name="info" size={15} color="var(--brand)" />
-          <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>选择项目 → 班组资金瀑布 → 工资总表 → A4 进度款单（可打印）</span>
+          <span style={{ fontSize: 13, color: "var(--ink-soft)" }}>选择项目 → 班组资金瀑布 → 请款簿总表（负责人制）→ 核对两步流与 A4 单据（格式族 A/B/C1/C2）</span>
         </Panel>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${narrow ? 2 : 4}, 1fr)`, gap: 16 }}>
           {data.projects.map(p => {
             const crews = data.projectCrews[p.name] || [];
-            const sums = crews.map(c => P && P.crewSummary(p.name + "|" + c.crew)).filter(Boolean);
-            const request = sums.reduce((s, x) => s + (x.payType === "time" ? x.total : x.request), 0);
+            const sums = crews.map(c => P.crewSummary(p.name, c.crew)).filter(Boolean);
+            const request = sums.reduce((s, x) => s + (x.due || 0), 0);   // 仅未发放单据（已发放=历史快照，不计待付）
+            const bookCnt = P.booksOf(p.name).length;
             return (
               <button key={p.id} onClick={() => { setSelProject(p.name); setSelCrew(null); }}
                 style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: 0, background: "var(--panel)", cursor: "pointer", textAlign: "left", boxShadow: "var(--shadow-card)", transition: "border-color var(--dur-fast)" }}
@@ -84,8 +341,8 @@
                   <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 4 }}>{p.address}</div>
                 </div>
                 <div style={{ padding: "10px 18px 14px", borderTop: "1px solid var(--line)", display: "flex", gap: 20 }}>
-                  <div><div style={{ fontSize: 11, color: "var(--ink-faint)" }}>参与班组</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "var(--font-mono)" }}>{crews.length}</div></div>
-                  <div><div style={{ fontSize: 11, color: "var(--ink-faint)" }}>本期待付</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "var(--font-mono)", color: sums.length ? "var(--brand)" : "var(--ink-faint)" }}>{sums.length ? yuan(request) : "—"}</div></div>
+                  <div><div style={{ fontSize: 11, color: "var(--ink-faint)" }}>请款簿</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "var(--font-mono)" }}>{bookCnt || "—"}</div></div>
+                  <div><div style={{ fontSize: 11, color: "var(--ink-faint)" }}>本期应发</div><div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, fontFamily: "var(--font-mono)", color: sums.length ? "var(--brand)" : "var(--ink-faint)" }}>{sums.length ? yuan(request) : "—"}</div></div>
                 </div>
               </button>
             );
@@ -94,7 +351,7 @@
       </div>
     );
 
-    // ── Level 1: 班组瀑布卡（工程量总额 → 比例 → 已付 → 扣罚 → 剩余；100% 直付简版）──
+    // ── Level 1: 班组瀑布卡（D2 人数状态版）──
     const crews = data.projectCrews[selProject] || [];
     if (!selCrew) return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -102,15 +359,19 @@
         {/* 瀑布流布局：CSS columns，卡片高度随内容错落（grill 定稿：不做方方正正统一格子） */}
         <div style={{ columnCount: narrow ? 2 : 3, columnGap: 16 }}>
           {crews.map((c, i) => {
-            const key = selProject + "|" + c.crew;
-            const S = P && P.crewSummary(key);
+            const S = P.crewSummary(selProject, c.crew);
             const clickable = !!S;
-            const hollowCnt = S && S.payType === "piece" ? S.rows.reduce((s, x) => s + x.c.hollowSum, 0) : 0;
+            const ro = S ? S.roster : P.rosterOf(c.crew);
+            const dirtyCnt = S && !S.timeLike ? S.rows.filter(x => x.doc.dirty).length : 0;
+            const exitHollow = !S || S.timeLike ? 0 : S.rows.filter(x => {
+              const r = P.rosterRow(x.book.leader);
+              return r && r.exit && x.doc.hollow && x.doc.hollow.unfixed > 0 && !x.doc.deduct;
+            }).length;
             return (
-              <div key={i} role="button" tabIndex={0} onClick={() => { if (clickable) setSelCrew(c.crew); }}
+              <div key={i} role="button" tabIndex={0} onClick={() => setSelCrew(c.crew)}
                 style={{ display: "block", width: "100%", boxSizing: "border-box", breakInside: "avoid", marginBottom: 16,
                   border: "1px solid var(--line)", borderRadius: "var(--radius-card)", padding: "14px 16px",
-                  background: "var(--panel)", cursor: clickable ? "pointer" : "not-allowed", textAlign: "left",
+                  background: "var(--panel)", cursor: "pointer", textAlign: "left",
                   opacity: clickable ? 1 : 0.62, boxShadow: clickable ? "var(--shadow-card)" : "none", transition: "border-color var(--dur-fast)" }}
                 onMouseEnter={e => clickable && (e.currentTarget.style.borderColor = "var(--brand)")}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--line)")}>
@@ -118,52 +379,39 @@
                   <span style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-soft)", color: "var(--brand)", fontWeight: 800, display: "grid", placeItems: "center", flex: "none" }}>{c.crew.slice(0, 1)}</span>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 14.5, fontWeight: 800 }}>{c.crew}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>{c.trade} · {c.workers}人{S && S.payType === "piece" ? " · " + S.month : ""}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>{c.trade}{S ? " · " + S.rows.length + " 本请款簿" : ""}</div>
                   </div>
                   <span style={{ marginLeft: "auto", flex: "none" }}>
                     {!S ? <StatusChip tone="neutral">未生成</StatusChip>
-                      : S.payType === "time" ? <StatusChip tone="ok">100% 直付</StatusChip>
-                      : S.hold > 0 ? <StatusChip tone="warn">空鼓暂扣</StatusChip>
-                      : <StatusChip tone="brand">{S.ratio}%</StatusChip>}
+                      : S.timeLike ? <StatusChip tone="ok">100% 直付</StatusChip>
+                      : dirtyCnt > 0 ? <StatusChip tone="warn">需重核 {dirtyCnt}</StatusChip>
+                      : <StatusChip tone="brand">{(S.statusCount["草稿"] || 0) + " 草稿 · " + (S.statusCount["已发放"] || 0) + " 已发放"}</StatusChip>}
                   </span>
                 </div>
                 {!S && (
-                  <div style={{ fontSize: 12, color: "var(--ink-faint)", padding: "6px 0 2px" }}>暂无数据 · 本月工资表未生成</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-faint)", padding: "6px 0 2px" }}>暂无请款簿 · 点击进入建档（新建请款主体）</div>
                 )}
-                {S && S.payType === "time" && (<>
-                  <FlowRow first label="工程量总额（工天）" value={S.total} strong />
-                  <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 6 }}>无比例、无扣罚，按实发全额支付</div>
+                {S && S.timeLike && (<>
+                  <FlowRow first label="本月直付合计（时工）" value={S.total} strong />
+                  <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 6 }}>{S.due > 0 ? "无比例、无取整，按实发全额支付" : "本月已直付结清"}</div>
                 </>)}
-                {S && S.payType === "piece" && (<>
-                  <FlowRow first label="工程量总额（含房租）" value={S.total} />
-                  <FlowRow label={"× 支付比例 " + S.ratio + "%"} value={S.payable} />
-                  <FlowRow label="− 累计已付" value={S.paid} tone="ok" />
-                  {S.hold > 0 && <FlowRow label={"− 空鼓暂扣（" + hollowCnt + "处）"} value={S.hold} tone="warn" />}
+                {S && !S.timeLike && (<>
+                  <FlowRow first label="工程量总额（含补贴）" value={S.total} />
+                  <FlowRow label="× 支付比例（各簿单据级）" value={S.payable} />
+                  <FlowRow label="− 累计已领（实际发放值）" value={S.paid} tone="ok" />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 7,
-                    background: S.request > 0 ? "var(--danger-soft)" : "var(--ok-soft)", borderRadius: 8, padding: "7px 10px" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: S.request > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>剩余待付清</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, fontWeight: 800, color: S.request > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{num0(S.request)}</span>
+                    background: S.due > 0 ? "var(--danger-soft)" : "var(--ok-soft)", borderRadius: 8, padding: "7px 10px" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 700, color: S.due > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{S.due > 0 ? "本期应发（取整合计）" : "本期已结清"}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, fontWeight: 800, color: S.due > 0 ? "var(--danger-ink)" : "var(--ok-ink)" }}>{num0(S.due)}</span>
                   </div>
-                  {S.borrow > 0 && <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 5 }}>另有借支 ¥{num0(S.borrow)}，于工资表实发时扣回</div>}
                 </>)}
-                {/* 按人速览：泥水等按个人分发的班组，点名字直达该工人进度款核对表（grill 2026-07-19） */}
-                {S && (
-                  <div style={{ marginTop: 9, paddingTop: 8, borderTop: "1px dashed var(--line)", display: "flex", flexDirection: "column", gap: 3 }}>
-                    {S.rows.map(({ w, c: wc }) => (
-                      <div key={w.name} role="button" tabIndex={0}
-                        onClick={(e) => { e.stopPropagation(); navigate("payrollDetail", { worker: w.name, crew: c.crew, project: selProject, month: S.month }); }}
-                        style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px", borderRadius: 6, cursor: "pointer" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "var(--brand-soft)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--brand)" }}>{w.name}</span>
-                        {w.flags.includes("暂不支付") && <span style={{ fontSize: 10, color: "var(--danger-ink)", background: "var(--danger-soft)", borderRadius: 4, padding: "0 4px" }}>暂不支付</span>}
-                        {w.flags.includes("单独计价") && <span style={{ fontSize: 10, color: "var(--ink-soft)", background: "var(--surface-3)", borderRadius: 4, padding: "0 4px" }}>单独</span>}
-                        {!c.trade.includes("时工") && wc.hollowSum > 0 && <span style={{ fontSize: 10, color: "var(--warn-ink)", background: "var(--warn-soft)", borderRadius: 4, padding: "0 4px" }}>空鼓{wc.hollowSum}</span>}
-                        <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600 }}>{num0(S.payType === "time" ? wc.net : wc.rounded)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* D2：人数状态（替代按人速览；人名明细在点进去的请款簿总表里看） */}
+                <div style={{ marginTop: 9, paddingTop: 8, borderTop: "1px dashed var(--line)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Icon name="users" size={13} color="var(--ink-soft)" />
+                  <span style={{ fontSize: 12, color: "var(--ink)", fontWeight: 700 }}>在班 {ro.active} 人</span>
+                  <span style={{ fontSize: 12, color: ro.exited ? "var(--warn-ink)" : "var(--ink-faint)", fontWeight: ro.exited ? 700 : 500 }}>离职 {ro.exited} 人</span>
+                  {exitHollow > 0 && <span style={{ fontSize: 10.5, color: "var(--danger-ink)", background: "var(--danger-soft)", borderRadius: 4, padding: "1px 6px" }}>离职未整改空鼓 · 待启动扣款</span>}
+                </div>
               </div>
             );
           })}
@@ -171,189 +419,265 @@
       </div>
     );
 
-    // ── Level 2: 工资总表（单据口径，数据源 = PAYSLIP）──
-    const crewKey = selProject + "|" + selCrew;
-    const crewData = P && P.data[crewKey];
-    if (!crewData) return <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); } }, { label: selProject, onClick: back }, { label: selCrew + "（无数据）" }]} />;
-    const sched = crewData.schedule;
-    const curIdx = Math.max(0, sched.findIndex(s => s.current));
-    const idx = viewIdx == null ? curIdx : viewIdx;
-    const selMonth = sched[idx].m;
-    const isTime = crewData.payType === "time";
-    const S = P.crewSummary(crewKey, selMonth);
+    // ── Level 2: 请款簿总表（D7 负责人制 + D6 三态 + ⑦ 月份轴）──
+    const crewBooks = P.booksOf(selProject, selCrew);
+    if (!crewBooks.length) return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); } }, { label: selProject, onClick: back }, { label: selCrew }]} />
+        <Panel padding={40} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
+          <Icon name="book-plus" size={28} color="var(--ink-faint)" />
+          <div style={{ fontSize: 14, fontWeight: 800 }}>{selCrew} 还没有请款簿</div>
+          <div style={{ fontSize: 12.5, color: "var(--ink-soft)", maxWidth: 480, lineHeight: 1.8 }}>建档选定格式族（A 户型派生 / B 清单直报 / C1 月薪时工 / C2 零星签工）后，按月生成请款单据；A 族清单行由工程量管理聚合自动生成。</div>
+          <Button variant="primary" icon="plus" onClick={() => setShowCreate(true)}>新建请款主体</Button>
+        </Panel>
+        {showCreate && <CreateBookModal project={selProject} crew={selCrew} onClose={() => setShowCreate(false)} />}
+      </div>
+    );
+    const axisBook = crewBooks.reduce((a, b) => (b.monthSeq.length > a.monthSeq.length ? b : a), crewBooks[0]);
+    const axis = axisBook.monthSeq;
+    const defMonth = P.curMonth(axisBook);
+    const month = selMonth && axis.indexOf(selMonth) >= 0 ? selMonth : defMonth;
+    const timeLike = crewBooks.every(b => b.family === "C1" || b.family === "C2");
+    const rows = crewBooks.map(b => ({ book: b, doc: b.months[month] ? P.calc(b.id, month) : null }));
+    const ro = P.rosterOf(selCrew);
 
     const TH = { padding: "12px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", background: "var(--surface-2)", position: "sticky", top: 0, whiteSpace: "nowrap" };
     const TD = { padding: "12px 14px", fontSize: 13 };
     const num = { ...TD, textAlign: "right", fontFamily: "var(--font-mono)" };
-    const flagChips = (w, c) => {
-      const chips = [];
-      if (w.flags.includes("暂不支付")) chips.push(<StatusChip key="z" tone="danger">暂不支付</StatusChip>);
-      if (w.flags.includes("单独计价")) chips.push(<StatusChip key="d" tone="neutral">单独计价</StatusChip>);
-      if (!isTime && c.hollowSum > 0) chips.push(<StatusChip key="k" tone="warn">空鼓{c.hollowSum}处</StatusChip>);
-      return chips.length ? <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>{chips}</span> : <span style={{ color: "var(--ink-faint)" }}>—</span>;
+    const sum = (f) => rows.reduce((s, x) => s + (x.doc ? (f(x.doc) || 0) : 0), 0);
+
+    const openBook = (b) => navigate("payrollDetail", { book: b.id, project: selProject, crew: selCrew, month });
+    // 批量核对 / 批量发放（D6：班组层面批量操作）
+    const draftRows = rows.filter(x => x.doc && x.doc.status === "草稿");
+    const checkedRows = rows.filter(x => x.doc && x.doc.status === "已核对" && !x.doc.deferred);
+    // 可发放 = 已核对且全员三级安全教育已录入（按钮计数与实际发放口径一致）
+    const releasableRows = checkedRows.filter(x => !(x.doc.wageRows || []).some(r => !r.safety));
+    const batchCheck = () => UI().confirm({
+      title: "批量核对 " + month + " 请款单？",
+      message: "将把 " + draftRows.length + " 本草稿请款簿标记为「已核对」并记录核对指纹；此后上游工程量/单价再变动会提示「有变动、需重核」。",
+      confirmText: "全部核对",
+      onConfirm: () => { draftRows.forEach(x => P.check(x.book.id, month)); UI().toast("已核对 " + draftRows.length + " 本请款簿", "success"); },
+    });
+    // ⑧ 批量发放弹窗：默认=各簿取整应发；输入「本期支付总额」→ 按（应领−已领）权重分摊建议值；逐行可改，以实际为准
+    const batchRelease = () => {
+      const blocked = checkedRows.filter(x => (x.doc.wageRows || []).some(r => !r.safety));
+      if (!releasableRows.length) { UI().toast("待发簿存在「三级安全教育未录入」，禁止发放", "danger"); return; }
+      const num2 = n => Number(n || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const rowsHtml = releasableRows.map(x => {
+        const d = x.doc;
+        const def = d.rounded != null ? d.rounded : d.total;
+        return '<tr style="border-bottom:1px solid var(--line)">' +
+          '<td style="padding:7px 10px;font-size:12.5px;white-space:nowrap"><b style="color:var(--brand)">' + x.book.leader + '簿</b>' +
+          '<span style="font-size:10.5px;color:var(--ink-faint);margin-left:6px">' + x.book.scopeLabel + '</span></td>' +
+          '<td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--font-mono);color:var(--ink-soft)">' + num2(d.request) + '</td>' +
+          '<td style="padding:7px 10px;font-size:12px;text-align:right;font-family:var(--font-mono)">' + num2(def) + '</td>' +
+          '<td style="padding:5px 10px;text-align:right"><input data-bid="' + x.book.id + '" type="number" value="' + def + '" ' +
+          'style="width:110px;border:1.5px solid var(--brand);border-radius:6px;padding:5px 8px;font-size:12.5px;text-align:right;font-family:var(--font-mono)"></td></tr>';
+      }).join("");
+      const ret = UI().modal({
+        title: "批量发放 · " + P.monthLabel(month, axisBook.months[month]),
+        subtitle: "默认=取整应发，逐行可改，以实际最终发放金额为准（D6）；输入本期资金总额可按权重分摊（原进度款工具能力，定稿⑧）",
+        width: 640,
+        bodyHTML:
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<div style="display:flex;align-items:center;gap:8px;background:var(--brand-soft);border-radius:8px;padding:9px 12px">' +
+          '<span style="font-size:12.5px;font-weight:700;color:var(--brand-deep)">本期支付总额</span>' +
+          '<input id="kit-batch-total" type="number" placeholder="选填" style="width:130px;border:1.5px solid var(--brand);border-radius:6px;padding:6px 9px;font-size:12.5px;text-align:right;font-family:var(--font-mono)">' +
+          '<button id="kit-batch-share" style="border:0;background:var(--brand);color:#fff;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">按权重分摊</button>' +
+          '<span style="font-size:10.5px;color:var(--brand-deep);opacity:.8">权重 = 各簿（应领 − 已领），建议值按各簿取整规则下取整</span></div>' +
+          '<table style="width:100%;border-collapse:collapse"><thead><tr>' +
+          ['请款簿', '本次请款', '取整应发', '实际发放金额'].map((h, i) => '<th style="padding:7px 10px;font-size:11px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);text-align:' + (i ? "right" : "left") + '">' + h + '</th>').join("") +
+          '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+          '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:2px 10px">' +
+          '<span style="color:var(--ink-soft)">' + (blocked.length ? "跳过（安全教育未录入）：" + blocked.map(x => x.book.leader + "簿").join("、") : "") + '</span>' +
+          '<span>Σ 实际发放 <b id="kit-batch-sum" style="font-family:var(--font-mono)">0.00</b><span id="kit-batch-diff" style="margin-left:8px;font-size:11px;color:var(--ink-faint)"></span></span></div>' +
+          '<div style="display:flex;justify-content:flex-end"><button id="kit-batch-ok" style="border:0;background:var(--brand);color:#fff;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:800;cursor:pointer">登记发放 ' + releasableRows.length + ' 本并固化</button></div>' +
+          '</div>',
+        actions: [{ label: "取消" }],
+      });
+      const body = ret.body;
+      const inputs = () => Array.from(body.querySelectorAll("input[data-bid]"));
+      const refreshSum = () => {
+        const s = inputs().reduce((a, el) => a + (+el.value || 0), 0);
+        body.querySelector("#kit-batch-sum").textContent = num2(s);
+        const tv = parseFloat(body.querySelector("#kit-batch-total").value);
+        body.querySelector("#kit-batch-diff").textContent = Number.isFinite(tv) && tv > 0 ? "（与总额差 " + num2(tv - s) + "）" : "";
+      };
+      inputs().forEach(el => el.addEventListener("input", refreshSum));
+      body.querySelector("#kit-batch-total").addEventListener("input", refreshSum);
+      body.querySelector("#kit-batch-share").addEventListener("click", () => {
+        const tv = parseFloat(body.querySelector("#kit-batch-total").value);
+        if (!Number.isFinite(tv) || tv <= 0) { UI().toast("先填入本期支付总额，再按权重分摊", "warning"); return; }
+        const base = releasableRows.map(x => Math.max(0, (x.doc.payable || 0) - (x.doc.paidSum || 0)));
+        const baseSum = base.reduce((a, b2) => a + b2, 0) || 1;
+        releasableRows.forEach((x, i) => {
+          const u = Math.max(1, x.book.config.round || 100);
+          // 先四舍五入到分再按取整规则下取整，避免浮点（如 30000×1.0 → 29999.997 → 少一档）
+          const share = Math.round(tv * base[i] / baseSum * 100) / 100;
+          const v = Math.max(0, Math.floor(share / u) * u);
+          const el = body.querySelector('input[data-bid="' + x.book.id + '"]');
+          if (el) el.value = v;
+        });
+        refreshSum();
+      });
+      body.querySelector("#kit-batch-ok").addEventListener("click", () => {
+        releasableRows.forEach(x => {
+          const el = body.querySelector('input[data-bid="' + x.book.id + '"]');
+          P.release(x.book.id, month, el ? el.value : null);
+        });
+        ret.close();
+        UI().toast("已发放并固化 " + releasableRows.length + " 本 · 已在付款管理生成 " + releasableRows.length + " 条支出记录（类别=工人工资）" + (blocked.length ? "（跳过 " + blocked.length + " 本）" : ""), "success");
+      });
+      refreshSum();
     };
-    const detailBtn = (w) => (
-      <button onClick={() => navigate("payrollDetail", { worker: w.name, crew: selCrew, project: selProject, month: selMonth })}
-        style={{ border: "1px solid var(--brand)", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer", background: "var(--brand-soft)", color: "var(--brand-deep)", fontWeight: 600, whiteSpace: "nowrap" }}>
-        A4 单
-      </button>
-    );
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); setViewIdx(null); } }, { label: selProject, onClick: back }, { label: selCrew }]} />
+        <Breadcrumb items={[{ label: "工资核算", onClick: () => { setSelProject(null); setSelCrew(null); setSelMonth(null); } }, { label: selProject, onClick: back }, { label: selCrew }]} />
 
-        {/* 发放比例 · 点选月份查看当期单据（时工无比例，仅月份切换） */}
+        {/* ⑦ 月份轴：单据级比例（默认沿用上月），无预排计划；含 结算95%（可改）/ 尾款100% 档；显示各月实际用过的比例 */}
         <Panel padding={16}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)" }}>{isTime ? "月份 · 时工按月 100% 直付" : "发放比例 · 随完工进度递增"}</span>
-            <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>点击月份查看当期工资单</span>
-            <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-soft)" }}>当前查看：<b style={{ color: "var(--brand-deep)", fontFamily: "var(--font-mono)" }}>{selMonth}{isTime ? "" : " · " + sched[idx].r + "%"}</b>{idx === curIdx ? "（最新）" : "（历史）"}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)" }}>{timeLike ? "月份 · 时工按月 100% 直付" : "月份轴 · 比例为单据级参数（管理员按现场实际拍，默认沿用上月）"}</span>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-soft)" }}>当前查看：<b style={{ color: "var(--brand-deep)", fontFamily: "var(--font-mono)" }}>{P.monthLabel(month, axisBook.months[month])}</b>{month === defMonth ? "（本期）" : ""}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-            {sched.map((s, i) => {
-              const on = i === idx;
-              const past = i < idx;
+            {axis.map((mk, i) => {
+              const mo = axisBook.months[mk];
+              const on = mk === month;
+              const done = mo.status === "已发放";
+              const future = mo.status === "未到";
+              const ratios = [...new Set(crewBooks.filter(b => b.months[mk]).map(b => b.months[mk].ratio).filter(v => v != null))];
+              const rLabel = timeLike ? "100" : (ratios.length === 1 ? ratios[0] : ratios.join("/"));
               return (
-                <React.Fragment key={s.m}>
-                  <button onClick={() => setViewIdx(i)} style={{ textAlign: "center", flex: "none", border: 0, background: "transparent", cursor: "pointer", padding: 0 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 999, display: "grid", placeItems: "center", margin: "0 auto", fontSize: 13, fontWeight: 800, fontFamily: "var(--font-mono)", border: "2px solid", borderColor: on ? "var(--brand)" : past ? "var(--ok)" : "var(--line-strong)", background: on ? "var(--brand)" : past ? "var(--ok-soft)" : "#fff", color: on ? "#fff" : past ? "var(--ok-ink)" : "var(--ink-soft)", transition: "all var(--dur-fast)" }}>{s.r}%</div>
-                    <div style={{ fontSize: 11, marginTop: 4, color: on ? "var(--brand)" : "var(--ink-soft)", fontWeight: on ? 800 : 600 }}>{s.m}{s.current ? " ·本月" : ""}</div>
+                <React.Fragment key={mk}>
+                  <button onClick={() => setSelMonth(mk)} style={{ textAlign: "center", flex: "none", border: 0, background: "transparent", cursor: "pointer", padding: 0 }}>
+                    <div style={{ minWidth: 48, height: 48, borderRadius: 999, display: "grid", placeItems: "center", margin: "0 auto", padding: "0 6px", fontSize: 12, fontWeight: 800, fontFamily: "var(--font-mono)", border: "2px solid",
+                      borderColor: on ? "var(--brand)" : done ? "var(--ok)" : "var(--line-strong)",
+                      background: on ? "var(--brand)" : done ? "var(--ok-soft)" : "#fff",
+                      color: on ? "#fff" : done ? "var(--ok-ink)" : future ? "var(--ink-faint)" : "var(--ink-soft)" }}>{rLabel}%</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: on ? "var(--brand)" : future ? "var(--ink-faint)" : "var(--ink-soft)", fontWeight: on ? 800 : 600 }}>
+                      {mo.kind === "settle" ? "结算" : mo.kind === "final" ? "尾款" : mk}{mk === defMonth ? " ·本期" : ""}
+                    </div>
                   </button>
-                  {i < sched.length - 1 && <div style={{ flex: 1, height: 2, background: i < idx ? "var(--ok)" : "var(--line)", marginBottom: 18 }}></div>}
+                  {i < axis.length - 1 && <div style={{ flex: 1, height: 2, background: done ? "var(--ok)" : "var(--line)", marginBottom: 18 }}></div>}
                 </React.Fragment>
               );
             })}
           </div>
         </Panel>
 
-        {/* Tab + 操作 */}
+        {/* 请款簿总表 */}
         <Panel padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", padding: "0 8px", borderBottom: "1px solid var(--line)" }}>
-            <div style={{ flex: 1 }}>
-              <SegTab tabs={[{ key: "table", label: "工资总表" }, { key: "matrix", label: "工程量矩阵" }]} active={tab} onChange={setTab} />
-            </div>
-            <div style={{ display: "flex", gap: 8, padding: "8px 8px 8px 0" }}>
-              <Button size="sm" icon="file-text" onClick={() => navigate("wageSlip", { crew: selCrew, project: selProject, month: selMonth })}>请款单格式</Button>
-              <Button size="sm" icon="download" onClick={() => (window.KitUI || { toast: () => {} }).toast("正在导出 Excel（进度清单/工资表/考勤表 各一 sheet × " + S.rows.length + " 人）…")}>导出 Excel</Button>
-            </div>
+          <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", borderBottom: "1px solid var(--line)", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 800 }}>请款簿总表 · {P.monthLabel(month, axisBook.months[month])}</span>
+            <span style={{ fontSize: 11.5, color: "var(--ink-faint)" }}>一个负责人一本请款簿 · 数字由工程量管理聚合生成（单一数据链）</span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <Button size="sm" icon="plus" onClick={() => setShowCreate(true)}>新建请款主体</Button>
+              {!timeLike && <Button size="sm" icon="circle-check" disabled={!draftRows.length} onClick={batchCheck}>批量核对（{draftRows.length}）</Button>}
+              <Button size="sm" variant="primary" icon="banknote" disabled={!releasableRows.length} onClick={batchRelease}>批量发放（{releasableRows.length}）</Button>
+              <Button size="sm" icon="download" onClick={() => UI().toast("正在导出 Excel（请款簿 × " + rows.length + " 本，含清单/工资表/考勤表）…")}>导出 Excel</Button>
+            </span>
           </div>
 
-          {tab === "table" && !isTime && (
-            <div style={{ overflow: "auto", maxHeight: 480 }}>
-              <table style={{ width: "100%", minWidth: 1220, borderCollapse: "collapse" }}>
-                <thead><tr>
-                  <th style={{ ...TH, textAlign: "left" }}>工人</th>
-                  {["工程量金额(含房租)", "比例", "应领金额", "累计已领", "空鼓暂扣", "本次请款", "取整(应发)", "借支", "实发"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)}
-                  <th style={{ ...TH, textAlign: "left" }}>开户行 / 卡号</th>
-                  <th style={{ ...TH, textAlign: "center" }}>安全教育</th>
-                  <th style={{ ...TH, textAlign: "left" }}>特殊情况</th>
-                  <th style={{ ...TH, textAlign: "center" }}>操作</th>
-                </tr></thead>
-                <tbody>
-                  {S.rows.map(({ w, c }) => (
-                    <tr key={w.name} style={{ borderBottom: "1px solid var(--line)", transition: "background var(--dur-fast)" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "var(--surface-3)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ ...TD, fontWeight: 700, color: "var(--brand)", whiteSpace: "nowrap" }}>{w.name}</td>
-                      <td style={num}>{num0(c.total)}</td>
-                      <td style={num}>{c.ratio}%</td>
-                      <td style={num}>{num0(c.payable)}</td>
-                      <td style={{ ...num, color: "var(--ink-soft)" }}>{num0(c.paidSum)}</td>
-                      <td style={{ ...num, color: c.hold ? "var(--warn-ink)" : "var(--ink-faint)" }}>{c.hold ? "−" + num0(c.hold) : "—"}</td>
-                      <td style={{ ...num, fontWeight: 700 }}>{num0(c.request)}</td>
-                      <td style={num}>{w.flags.includes("暂不支付") ? "0.00" : num0(c.rounded)}</td>
-                      <td style={{ ...num, color: c.borrow ? "var(--danger)" : "var(--ink-faint)" }}>{c.borrow ? "−" + num0(c.borrow) : "—"}</td>
-                      <td style={{ ...num, fontWeight: 800, color: w.flags.includes("暂不支付") ? "var(--danger)" : "var(--brand)" }}>{num0(c.net)}</td>
-                      <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{w.bank.branch}<br />{w.bank.account}</td>
-                      <td style={{ ...TD, textAlign: "center" }}>{w.safety ? <Icon name="shield-check" size={16} color="var(--ok)" /> : <StatusChip tone="danger">未完成</StatusChip>}</td>
-                      <td style={TD}>{flagChips(w, c)}</td>
-                      <td style={{ ...TD, textAlign: "center" }}>{detailBtn(w)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: "var(--surface-2)", borderTop: "1px solid var(--line-strong)" }}>
-                    <td style={{ ...TD, fontWeight: 800 }}>合计</td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.total)}</td>
-                    <td></td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.payable)}</td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.paid)}</td>
-                    <td style={{ ...num, fontWeight: 800, color: "var(--warn-ink)" }}>{S.hold ? "−" + num0(S.hold) : "—"}</td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.request)}</td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.rounded)}</td>
-                    <td style={{ ...num, fontWeight: 800, color: "var(--danger)" }}>{S.borrow ? "−" + num0(S.borrow) : "—"}</td>
-                    <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{num0(S.net)}</td>
-                    <td colSpan={4}></td>
+          <div style={{ overflow: "auto", maxHeight: 520 }}>
+            <table style={{ width: "100%", minWidth: timeLike ? 900 : 1280, borderCollapse: "collapse" }}>
+              <thead><tr>
+                <th style={{ ...TH, textAlign: "left" }}>请款簿（负责人 + 组员）</th>
+                <th style={{ ...TH, textAlign: "left" }}>格式族</th>
+                <th style={{ ...TH, textAlign: "left" }}>状态</th>
+                {timeLike
+                  ? ["人数", "本月合计", "实际发放"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)
+                  : ["合计(含补贴)", "比例", "应领", "累计已领(实际)", "本次请款", "取整应发", "实际发放"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)}
+                <th style={{ ...TH, textAlign: "center" }}>操作</th>
+              </tr></thead>
+              <tbody>
+                {rows.map(({ book: b, doc }) => (
+                  <tr key={b.id} style={{ borderBottom: "1px solid var(--line)", transition: "background var(--dur-fast)", cursor: doc ? "pointer" : "default" }}
+                    onClick={() => doc && openBook(b)}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--surface-3)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 800, color: "var(--brand)" }}>{b.leader}</span>
+                        {doc && doc.seqNo && <span style={{ fontSize: 10.5, color: "var(--ink-soft)", background: "var(--surface-3)", borderRadius: 4, padding: "1px 6px", fontFamily: "var(--font-mono)" }}>第 {doc.seqNo} 号</span>}
+                        {b.soloNote && <StatusChip tone="neutral">单独出单</StatusChip>}
+                        {(() => { const r = P.rosterRow(b.leader); return r && r.exit ? <StatusChip tone="warn">已离职 {r.exit.slice(5)}</StatusChip> : null; })()}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--ink-soft)", marginTop: 3 }}>
+                        {b.scopeLabel} · 组员：{b.members.filter(m => m !== b.leader).join("、") || "—"}
+                      </div>
+                    </td>
+                    <td style={TD}><FamilyChip book={b} /></td>
+                    <td style={{ ...TD, whiteSpace: "nowrap" }}>
+                      <StatusTri doc={doc} />
+                      {doc && doc.deferred && <div style={{ marginTop: 3 }}><StatusChip tone="danger">暂不支付 · 滚存</StatusChip></div>}
+                    </td>
+                    {timeLike ? (<>
+                      <td style={num}>{b.members.length}</td>
+                      <td style={{ ...num, fontWeight: 700 }}>{doc ? num0(doc.total) : "—"}</td>
+                      <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{doc && doc.actualPaid != null ? num0(doc.actualPaid) : "—"}</td>
+                    </>) : (<>
+                      <td style={num}>{doc ? num0(doc.total) : "—"}</td>
+                      <td style={num}>{doc ? doc.ratio + "%" : "—"}</td>
+                      <td style={num}>{doc ? num0(doc.payable) : "—"}</td>
+                      <td style={{ ...num, color: "var(--ink-soft)" }}>{doc ? num0(doc.paidSum) : "—"}</td>
+                      <td style={num}>{doc ? num0(doc.request) : "—"}</td>
+                      <td style={{ ...num, fontWeight: 700 }}>{doc ? num0(doc.rounded) : "—"}</td>
+                      <td style={{ ...num, fontWeight: 800, color: doc && doc.actualPaid != null ? "var(--brand)" : "var(--ink-faint)" }}>{doc && doc.actualPaid != null ? num0(doc.actualPaid) : "—"}</td>
+                    </>)}
+                    <td style={{ ...TD, textAlign: "center", whiteSpace: "nowrap" }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => doc && openBook(b)} disabled={!doc}
+                        style={{ border: "1px solid var(--brand)", borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: doc ? "pointer" : "not-allowed", background: "var(--brand-soft)", color: "var(--brand-deep)", fontWeight: 600, opacity: doc ? 1 : 0.5 }}>
+                        打开请款簿
+                      </button>
+                    </td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {tab === "table" && isTime && (
-            <div style={{ overflow: "auto", maxHeight: 480 }}>
-              <table style={{ width: "100%", minWidth: 980, borderCollapse: "collapse" }}>
-                <thead><tr>
-                  <th style={{ ...TH, textAlign: "left" }}>工人</th>
-                  {["日/月薪资", "出勤天数", "应发工资", "加班工资", "借支", "实发工资"].map(h => <th key={h} style={{ ...TH, textAlign: "right" }}>{h}</th>)}
-                  <th style={{ ...TH, textAlign: "left" }}>开户行 / 卡号</th>
-                  <th style={{ ...TH, textAlign: "center" }}>安全教育</th>
-                  <th style={{ ...TH, textAlign: "left" }}>特殊情况</th>
-                  <th style={{ ...TH, textAlign: "center" }}>操作</th>
-                </tr></thead>
-                <tbody>
-                  {S.rows.map(({ w, c }) => (
-                    <tr key={w.name} style={{ borderBottom: "1px solid var(--line)" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "var(--surface-3)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ ...TD, fontWeight: 700, color: "var(--brand)" }}>{w.name}</td>
-                      <td style={num}>{num0(c.daily)}</td>
-                      <td style={num}>{c.days}</td>
-                      <td style={num}>{num0(c.gross)}</td>
-                      <td style={num}>{c.overtime ? num0(c.overtime) : "—"}</td>
-                      <td style={{ ...num, color: c.borrow ? "var(--danger)" : "var(--ink-faint)" }}>{c.borrow ? "−" + num0(c.borrow) : "—"}</td>
-                      <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{num0(c.net)}</td>
-                      <td style={{ ...TD, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{w.bank.branch}<br />{w.bank.account}</td>
-                      <td style={{ ...TD, textAlign: "center" }}>{w.safety ? <Icon name="shield-check" size={16} color="var(--ok)" /> : <StatusChip tone="danger">未完成</StatusChip>}</td>
-                      <td style={TD}>{flagChips(w, c)}</td>
-                      <td style={{ ...TD, textAlign: "center" }}>{detailBtn(w)}</td>
-                    </tr>
-                  ))}
+                ))}
+                {!timeLike && (
                   <tr style={{ background: "var(--surface-2)", borderTop: "1px solid var(--line-strong)" }}>
-                    <td style={{ ...TD, fontWeight: 800 }}>合计</td>
+                    <td style={{ ...TD, fontWeight: 800 }}>合计（{rows.filter(x => x.doc).length} 本）</td>
                     <td colSpan={2}></td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.rows.reduce((s, x) => s + x.c.gross, 0))}</td>
-                    <td style={{ ...num, fontWeight: 800 }}>{num0(S.rows.reduce((s, x) => s + x.c.overtime, 0))}</td>
-                    <td style={{ ...num, fontWeight: 800, color: "var(--danger)" }}>{num0(S.rows.reduce((s, x) => s + x.c.borrow, 0))}</td>
-                    <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{num0(S.total)}</td>
-                    <td colSpan={4}></td>
+                    <td style={{ ...num, fontWeight: 800 }}>{num0(sum(d => d.total))}</td>
+                    <td></td>
+                    <td style={{ ...num, fontWeight: 800 }}>{num0(sum(d => d.payable))}</td>
+                    <td style={{ ...num, fontWeight: 800 }}>{num0(sum(d => d.paidSum))}</td>
+                    <td style={{ ...num, fontWeight: 800 }}>{num0(sum(d => d.request))}</td>
+                    <td style={{ ...num, fontWeight: 800 }}>{num0(sum(d => d.rounded))}</td>
+                    <td style={{ ...num, fontWeight: 800, color: "var(--brand)" }}>{num0(sum(d => d.actualPaid))}</td>
+                    <td></td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {tab === "matrix" && (
-            <div style={{ fontSize: 13, color: "var(--ink-soft)", textAlign: "center", padding: 40 }}>
-              <Icon name="grid-2x2" size={32} color="var(--ink-faint)" />
-              <div style={{ marginTop: 12, fontWeight: 700, color: "var(--ink)" }}>工程量矩阵视图</div>
-              <div style={{ marginTop: 6, fontSize: 12 }}>可在「工程量管理」主菜单查看完整矩阵，或点击矩阵格子跳转至此工资明细。</div>
-              <button onClick={() => navigate("quantity")} style={{ marginTop: 14, border: "1px solid var(--brand)", borderRadius: 8, padding: "9px 20px", fontSize: 13, cursor: "pointer", background: "var(--brand-soft)", color: "var(--brand-deep)", fontWeight: 700 }}>
-                前往工程量矩阵 →
-              </button>
-            </div>
-          )}
-        </Panel>
-
-        {/* 合理性校验提示 */}
-        <Panel padding={14} style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "var(--warn-soft)", borderColor: "var(--warn)" }}>
-          <Icon name="triangle-alert" size={16} color="var(--warn-ink)" />
-          <div style={{ fontSize: 12, color: "var(--warn-ink)", lineHeight: 1.7 }}>
-            <b>合理性校验：</b>三级安全教育未录入 → 禁止发放 / 标红；「暂不支付」工人取整金额记 0，恢复支付后按台账补发；空鼓暂扣在整改核验后随下期返还或转扣。
+                )}
+              </tbody>
+            </table>
           </div>
         </Panel>
+
+        {/* 人数状态 + 校验提示（D6/⑥ 口径） */}
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <Panel padding={14} style={{ flex: "1 1 260px", display: "flex", alignItems: "center", gap: 10 }}>
+            <Icon name="users" size={16} color="var(--brand)" />
+            <span style={{ fontSize: 12.5 }}>名册：<b>在班 {ro.active} 人</b> · <b style={{ color: ro.exited ? "var(--warn-ink)" : "inherit" }}>离职 {ro.exited} 人</b></span>
+            <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>名册登记表在请款簿 A4 组内（D8-10）</span>
+          </Panel>
+          <Panel padding={14} style={{ flex: "3 1 420px", display: "flex", alignItems: "flex-start", gap: 10, background: "var(--warn-soft)", borderColor: "var(--warn)" }}>
+            <Icon name="triangle-alert" size={16} color="var(--warn-ink)" />
+            <div style={{ fontSize: 12, color: "var(--warn-ink)", lineHeight: 1.7 }}>
+              <b>口径提示：</b>三级安全教育未录入 → 禁止发放；「暂不支付」= 不执行发放动作，应发滚存到后月；
+              空鼓进度月只列示不扣款，离职或人工点「开始扣款」后按仍未整改处数 × 单处金额生成扣款行；已发放月份为固化快照，改量改价不追溯。
+            </div>
+          </Panel>
+        </div>
+
+        {showCreate && <CreateBookModal project={selProject} crew={selCrew} onClose={(nb) => { setShowCreate(false); if (nb) setSelMonth(nb.monthSeq[0]); }} />}
       </div>
     );
   }
 
-  window.PayrollScreen = PayrollScreen;
+  // _ds_bundle.js 内打包有旧版同名全局，且 helmet/x-import 脚本执行顺序不保证——
+  // 注册后短时间内周期性重断言，确保 kit 新版最终胜出（bundle 后执行也会被覆盖回来）。
+  const __reg = () => { window.PayrollScreen = PayrollScreen; };
+  __reg();
+  const __regT = setInterval(__reg, 120);
+  setTimeout(() => clearInterval(__regT), 3000);
 })();

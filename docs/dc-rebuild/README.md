@@ -34,7 +34,7 @@
 | ③ | 工人 | base-worker.md | 列表（可点汇总卡）+ 详情（条件亲属右栏 + 证书三档着色）| ✅ 完成 |
 | ④ | 班组 | base-crew.md | 列表 + 详情全宽 3 Section（工人配置/项目配置/扣罚只读）| ✅ 完成 |
 | ⑤ | 项目信息 | project-info.md · project-supplier.md | 列表（状态下拉筛选）+ 详情驾驶舱：摘要 / 经营数据 / 票据信息 / 6阶段时间线 / 10 Tab 子表（重点 4 Tab 出真实子表，其余占位）| ✅ 完成（框架）|
-| ⑥ | 工资核算 + 明细 | subcontract-payroll.md | 三层钻取 + 比例阶梯 + 计件/计时总表（StageTab→SegTab）+ 明细瀑布 | ✅ 完成 |
+| ⑥ | 工资核算 + 明细 | subcontract-payroll.md | 三层钻取 + 比例阶梯 + 计件/计时总表（StageTab→SegTab）+ 明细瀑布 ⚠ 2026-07-20 已被 #117 重构：负责人请款簿 + 三态固化 + 格式族 A/B/C1/C2（比例阶梯废除） | ✅ 完成（已迭代） |
 | ⑦ | 工程量 | subcontract-quantity.md | 户级矩阵重做：每户一格(分项对半)+hover全工种+点击弹"该户"弹窗+隐藏未开工楼层+楼层列固定 | ✅ 完成（户级重做）|
 | ⑧ | 开票·税额工具 | finance-invoice.md §9 | CalcScreen：因子推算 + 价税分离 + 大写复制（风格打磨）| ✅ 完成 |
 | ⑨ | 送货单 | material-delivery.md | DeliveryScreen：已接入侧边栏(乙供材管理) + `delivery` 路由，修未定义 token | ✅ 完成 |
@@ -80,7 +80,7 @@
 - `kit/KitUI.jsx`（新增）：全局轻交互工具（纯 DOM，跨所有屏复用）—— `KitUI.toast/confirm/modal/formModal`，经隐藏 x-import 预加载；全项目占位按钮（导出/导入/新增/编辑/删除/刷新/上传/查看/列设置/识别…）均已接通交互。
 - `QuantityScreenV2.jsx` 再改：**分部 → 工种 → 分项** 三级（格子按工种分块，不再只到泥水分项）；hover/弹窗展示各工种工人+工程量；弹窗「先量后钱」（金额折叠）、去掉跨楼层入口；格子改**瓷砖留白圆角**观感；**完工月份做成可编辑 state**（「设置工程量/完工时间」弹窗逐层配置，实时驱动矩阵着色/工种/隐藏），并标注首页进度据此生成。
 - `PayrollScreen.jsx`：接 `params` 可从工资明细**逐级回退到班组**层级；发放比例节点**可点选查看历史月份**当期发放；加「请款单格式」入口。`PayrollDetailScreen.jsx`：面包屑逐级可回退（工资核算/项目/班组/工人）。
-- `kit/WageSlipScreen.jsx`（新增）：**网页版工资请款单**，还原 `docs/rewrite/工资发放格式` 真实 Excel 四表（① 进度款审批表 ② 工程量进度清单 ③ 工人工资表 ④ 考勤表），数据按车陂商业大楼·周维铺贴班组 2025.4 样例；侧边栏「分包及人工」加入口 + `wageSlip` 路由。
+- `kit/WageSlipScreen.jsx`（新增）：**网页版工资请款单**，还原 `docs/rewrite/工资发放格式` 真实 Excel 四表（① 进度款审批表 ② 工程量进度清单 ③ 工人工资表 ④ 考勤表），数据按车陂商业大楼·周维铺贴班组 2025.4 样例；侧边栏「分包及人工」加入口 + `wageSlip` 路由。⚠ 2026-07-20 #117 后已降级为「同一套数上的调参器」，四表/A4 单据职责迁至 PayrollDetailScreen（请款簿两步流 + 格式族）。
 
 ### 反馈轮 3（2026-07-02：回滚 claude-design 改动 + 二级弹窗全量补全）
 - **背景**：快照后 claude-design 工具在线上重写了 `HomeScreenNew/QuantityScreenV2/DetailScreen/app.dc.html`，界面效果与交互不符合预期。经用户确认**全量回滚**到本地快照「DC重构设计源码」，并在快照基础上把二级弹窗补成真实交互后重新推送（DesignSync 36 文件全量覆盖，含 `_ds/**`）。
