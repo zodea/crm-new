@@ -170,7 +170,8 @@
             </button>
             <span style={{ width: 44, height: 44, borderRadius: 10, background: "var(--brand-soft)", color: "var(--brand)", fontWeight: 800, fontSize: 18, display: "grid", placeItems: "center" }}>{crew.name.slice(0, 1)}</span>
             <div style={{ fontSize: 18, fontWeight: 800 }}>{crew.name}</div>
-            <div style={{ marginLeft: "auto" }}><Button variant="primary" icon="square-pen" onClick={() => UI().formModal({ title: "编辑班组 · " + crew.name, cols: 2, fields: [{ key: "name", label: "班组名称", value: crew.name }, { key: "trade", label: "工种", value: crew.trade }, { key: "contact", label: "负责人", value: crew.contact }, { key: "phone", label: "联系电话", value: crew.phone }], onSave: () => UI().toast("已保存", "ok") })}>编辑</Button></div>
+            {/* 2026-07-18 表单补全轮：编辑改整页表单（kit/forms/BaseForms.jsx crewForm，含计薪与提成参数） */}
+            <div style={{ marginLeft: "auto" }}><Button variant="primary" icon="square-pen" onClick={() => navigate("crewForm", { id: crew.id })}>编辑</Button></div>
           </div>
           <div style={{ display: "flex" }}>
             <SummaryCell label="工种类型" value={crew.trade} />

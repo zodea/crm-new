@@ -84,6 +84,28 @@
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="DetailShellPreload" from="./kit/DetailShell.jsx" hint-size="0,0"></x-import>
       </sc-if>
+      <!-- 整页表单底座 + 分域表单规格注册（grill 决议 2026-07-18：全实体新建/编辑走整页表单路由） -->
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="KitFormPagePreload" from="./kit/FormPage.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="FinanceFormsPreload" from="./kit/forms/FinanceForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ContractFormsPreload" from="./kit/forms/ContractForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="OwnerDocFormsPreload" from="./kit/forms/OwnerDocForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="MaterialFormsPreload" from="./kit/forms/MaterialForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="BaseFormsPreload" from="./kit/forms/BaseForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
+      <sc-if value="{{ isEntityForm }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="EntityFormScreen" from="./kit/FormPage.jsx" route="{{ routeName }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
+      </sc-if>
       <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
         <x-import component-from-global-scope="AppHomeScreen" from="./kit/HomeScreenNew.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
@@ -367,6 +389,8 @@ class Component extends DCLogic {
   // 页签去重 key：同 route + 相同关键参数 → 同一页签
   _tabKey(route, params) {
     const p = params || {};
+    // 整页表单路由（kit/forms/* 注册）：新建共用一个页签，编辑按对象 id 去重
+    if (window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[route]) return route + ":" + (p.id || "new");
     if (route === "projectDetail" || route === "supplierDetail" || route === "workerDetail" || route === "invoiceEdit" || route === "contractDetail" || route === "targetCostDetail" || route === "customerDetail")
       return route + ":" + (p.id || "");
     if (route === "projectSupplier") return route + ":" + (p.pid || "") + ":" + (p.sid || "");
@@ -379,8 +403,12 @@ class Component extends DCLogic {
 
   // 页签标题 = PAGE.title + 对象名后缀（best-effort 从 KIT_DATA 查）
   _tabTitle(route, params) {
-    const page = PAGE[route] || PAGE.home;
     const p = params || {};
+    // 整页表单路由：页签题「新建·xxx」/「编辑·xxx」
+    if (window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[route]) {
+      return (p.id ? "编辑·" : "新建·") + window.KIT_FORM_PAGES[route].title;
+    }
+    const page = PAGE[route] || PAGE.home;
     const d = window.KIT_DATA || {};
     let name = "";
     try {
@@ -510,7 +538,10 @@ class Component extends DCLogic {
   }
 
   _isActive(key) {
-    const r = this.state.route;
+    let r = this.state.route;
+    // 整页表单路由点亮其来源列表的侧栏项
+    const fp = window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[r];
+    if (fp && fp.listRoute) r = fp.listRoute;
     if (key === "payroll") return r === "payroll" || r === "payrollDetail";
     if (key === "quantity") return r === "quantity" || r === "detail" || r === "quantityUnit";
     if (key === "crew") return r === "crew" || r === "crewDetail";
@@ -745,8 +776,12 @@ class Component extends DCLogic {
 
   renderVals() {
     const { route, params, collapsed } = this.state;
-    const page = PAGE[route] || PAGE.home;
+    // 整页表单路由的头部标题从 KIT_FORM_PAGES 注册表取（kit/forms/* 按域注册）
+    const formPage = window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[route];
+    const page = PAGE[route] || (formPage ? { title: (params && params.id ? "编辑 · " : "新建 ") + formPage.title, subtitle: formPage.subtitle || "" } : PAGE.home);
     return {
+      isEntityForm:    !!formPage,
+      routeName:       route,
       sidebar:         this._buildSidebar(),
       tabbar:          this._buildTabbar(),
       sideW:           collapsed ? 68 : 248,

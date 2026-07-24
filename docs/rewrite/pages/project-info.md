@@ -1,5 +1,7 @@
 # 项目信息 — 项目列表 + 项目详情
 
+> ⚠️ **表单字段以设计稿为准（2026-07-18 起）**：新增/编辑表单已按 [ADR 0014 整页表单](../../adr/0014-full-page-entity-forms.md) 大幅扩容，本文字段表未含该轮新字段；现行规格见 `DC重构设计源码/kit/forms/*.jsx`（域文件头注释列出注册路由），回写随 [#116](https://github.com/zodea/crm-new/issues/116) 进行。
+
 > 路由: `/project` · `/project/:id`  
 > 页面: `pages/project/index.vue` · `pages/project/[id].vue`  
 > 参考: `docs/红圈系统/项目详情页/` 25张红圈CRM截图  

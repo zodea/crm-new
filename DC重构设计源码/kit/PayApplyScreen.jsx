@@ -1,12 +1,13 @@
 // PayApplyScreen — 付款申请列表（资金域，支出侧）：EntityListScreen meta 一份生成整页，接收 params 供金额穿透预筛。
 // 口径：默认视图=待追回发票（invoiceState 驱动，红圈）；实际支付金额>0 时蓝色可点穿透支付记录（payRecord?payApply=行id），0 显示 ¥0.00 普通色但仍可表单编辑。
-// 新建流：先选 8 业务类型再出表单（mock 级显隐：公司付款不含项目；管理费/项目费用/公司付款不含收款单位；仅 有合同-* 与 预付款 含关联合同）。
+// 新建流（2026-07-18 表单补全轮）：typeSelect 8 业务类型 → 整页表单 payApplyForm（kit/forms/FinanceForms.jsx，
+// 按类型显隐 合同情况带出/预付款/关联结算网格 分区），原宫格 addFlow 弹窗已退役。
 (function () {
   if (window.PayApplyScreen) return;
 
   const BIZ_TYPES = ["有合同-人工", "有合同-材料", "有合同-分包", "无合同-零星采购", "预付款", "管理费", "项目费用", "公司付款"];
 
-  function PayApplyScreen({ params }) {
+  function PayApplyScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -25,6 +26,24 @@
       entity: "payApply",
       title: "付款申请",
       coll: "payApplies",
+      formRoute: "payApplyForm",   // 整页表单（kit/forms/FinanceForms.jsx，grill 决议 2026-07-18）
+      statusKey: "status",
+      // 新建三段式第一段：8 业务类型（typeSelect → params.type 带进整页表单，红圈范本）
+      typeSelect: {
+        title: "新建付款申请 · 选择业务类型",
+        subtitle: "业务类型决定表单字段与后续流转",
+        defaultValue: "有合同-人工",
+        options: [
+          { value: "有合同-人工", label: "有合同（人分包）付款申请", hint: "劳务分包进度款，关联结算额度" },
+          { value: "有合同-材料", label: "有合同（材料）付款申请", hint: "材采合同到货结算付款" },
+          { value: "有合同-分包", label: "有合同（专业分包）付款申请", hint: "专业分包进度/结算款" },
+          { value: "无合同-零星采购", label: "无合同（人材料分包）付款申请", hint: "零星采购、无合同支出" },
+          { value: "预付款", label: "有合同预付款申请", hint: "合同预付款，后续按比例扣回" },
+          { value: "管理费", label: "项目（管理费）付款申请", hint: "项目管理费支出" },
+          { value: "项目费用", label: "项目（项目费用）付款申请", hint: "项目杂项费用" },
+          { value: "公司付款", label: "公司付款申请", hint: "不挂项目的公司层面支出" },
+        ],
+      },
       columns: [
         { key: "no", label: "付款申请编号", width: 150, mono: true, form: { placeholder: "FKSQ-2026-xxxx" } },
         { key: "name", label: "付款申请名称", width: 210 },
@@ -100,56 +119,10 @@
         }
         return null;
       },
-      // 新建流：先选业务类型（8 宫格）→ 再按类型出字段表单（mock 级显隐）
-      addFlow: ({ UI, coerce, saveNew }) => {
-        const toId = (rows, name) => { const r0 = rows.find((x) => x.name === name); return r0 ? r0.id : name; };
-        const openForm = (t) => {
-          const hasContract = t.indexOf("有合同") === 0 || t === "预付款";
-          const noProject = t === "公司付款";
-          const noSupplier = t === "管理费" || t === "项目费用" || t === "公司付款";
-          const fields = [
-            { key: "no", label: "付款申请编号", placeholder: "FKSQ-2026-xxxx" },
-            { key: "name", label: "付款申请名称" },
-          ];
-          if (!noProject) fields.push({ key: "projectId", label: "项目名称", type: "select", options: projects.map((p) => p.name) });
-          if (!noSupplier) fields.push({ key: "supplierId", label: "收款单位", type: "select", options: suppliers.map((s) => s.name) });
-          if (hasContract) fields.push({ key: "contractId", label: "关联合同", type: "select", options: contracts.map((c) => c.name) });
-          fields.push(
-            { key: "applyAmount", label: "申请金额", placeholder: "0.00" },
-            { key: "costName", label: "成本预算", placeholder: "如 材料费/瓷砖" },
-            { key: "applicant", label: "申请人" },
-            { key: "applyDate", label: "申请日期", type: "date" },
-          );
-          UI.formModal({ title: "新建付款申请 · " + t, cols: 2, width: 620, fields,
-            onSave: (v) => {
-              const o = coerce(v);   // 空值剔除 + money 数值化 + 列 toValue(名→id)
-              if (v.projectId) o.projectId = toId(projects, v.projectId);
-              if (v.supplierId) o.supplierId = toId(suppliers, v.supplierId);
-              if (v.contractId) o.contractId = toId(contracts, v.contractId);
-              o.applyAmount = Number(String(v.applyAmount == null ? "" : v.applyAmount).replace(/[^\d.\-]/g, "")) || 0;   // coerce 只认列 money 键，手动兜底更稳
-              saveNew({ ...o, bizType: t, status: "审批中", invoiceState: "待追回", approvedAmount: 0, paidAmount: 0 });
-            } });
-        };
-        const m = UI.modal({ title: "新建付款申请 · 选择业务类型", subtitle: "业务类型决定表单字段与后续流转", bodyHTML: "", actions: [{ label: "取消" }] });
-        if (!m || !m.body) return;
-        const grid = document.createElement("div");
-        Object.assign(grid.style, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" });
-        BIZ_TYPES.forEach((t) => {
-          const b = document.createElement("button");
-          b.type = "button"; b.textContent = t;
-          Object.assign(b.style, { border: "1px solid var(--line-strong)", background: "var(--surface-2)", borderRadius: "10px",
-            padding: "12px 10px", fontSize: "13px", fontWeight: "600", color: "var(--ink)", cursor: "pointer", textAlign: "center" });
-          b.addEventListener("mouseenter", () => { b.style.borderColor = "var(--brand)"; b.style.color = "var(--brand-deep)"; b.style.background = "var(--brand-soft)"; });
-          b.addEventListener("mouseleave", () => { b.style.borderColor = "var(--line-strong)"; b.style.color = "var(--ink)"; b.style.background = "var(--surface-2)"; });
-          b.addEventListener("click", () => { m.close(); openForm(t); });
-          grid.appendChild(b);
-        });
-        m.body.appendChild(grid);
-      },
       newDefaults: () => ({ status: "审批中", invoiceState: "待追回", approvedAmount: 0, paidAmount: 0 }),
       tableMinWidth: 2000,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.PayApplyScreen = PayApplyScreen;

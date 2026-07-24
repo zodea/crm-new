@@ -3,7 +3,7 @@
 (function () {
   if (window.MatSettleScreen) return;
 
-  function MatSettleScreen({ params }) {
+  function MatSettleScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -20,6 +20,8 @@
 
     const meta = {
       entity: "matSettle", coll: "matSettles", title: "材料采购结算",
+      formRoute: "matSettleForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "结算单号", width: 160, mono: true },
         { key: "name", label: "结算名称", width: 210, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
@@ -57,7 +59,7 @@
       newDefaults: () => ({ status: "待确认", amount: 0 }),
       tableMinWidth: 1420,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.MatSettleScreen = MatSettleScreen;

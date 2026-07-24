@@ -2,7 +2,7 @@
 (function () {
   if (window.OmArrivalScreen) return;
 
-  function OmArrivalScreen({ params }) {
+  function OmArrivalScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -15,6 +15,8 @@
 
     const meta = {
       entity: "omArrival", coll: "omArrivals", title: "甲供材到货",
+      formRoute: "omArrivalForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "到货单号", width: 150, mono: true },
         { key: "projectId", label: "项目", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
@@ -43,7 +45,7 @@
       newDefaults: () => ({ status: "待入库", warehouse: "中心仓" }),
       tableMinWidth: 1220,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OmArrivalScreen = OmArrivalScreen;

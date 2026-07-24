@@ -4,7 +4,7 @@
 (function () {
   if (window.CurrentScreen) return;
 
-  function CurrentScreen({ params }) {
+  function CurrentScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -17,6 +17,7 @@
       entity: "current",
       title: "往来收付",
       coll: "currents",
+      formRoute: "currentForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "no", label: "单据编号", width: 150, mono: true },
         { key: "direction", label: "方向", width: 72,
@@ -61,7 +62,7 @@
       newDefaults: () => ({ direction: "收", method: "银行转账" }),
       tableMinWidth: 1320,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.CurrentScreen = CurrentScreen;

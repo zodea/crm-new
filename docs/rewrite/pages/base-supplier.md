@@ -1,5 +1,7 @@
 # 基础信息/分供方 — 主数据 + 证照 + 跨项目汇总
 
+> ⚠️ **表单字段以设计稿为准（2026-07-18 起）**：新增/编辑表单已按 [ADR 0014 整页表单](../../adr/0014-full-page-entity-forms.md) 大幅扩容，本文字段表未含该轮新字段；现行规格见 `DC重构设计源码/kit/forms/*.jsx`（域文件头注释列出注册路由），回写随 [#116](https://github.com/zodea/crm-new/issues/116) 进行。
+
 > 路由: `/base/supplier` · `/base/supplier/:id`  
 > 页面: `pages/base/supplier/index.vue` · `pages/base/supplier/[id].vue`  
 > 参考: CRM 截图 `docs/红圈系统/合同页/`、`docs/红圈系统/付款申请/`、`docs/红圈系统/收票登记/`  

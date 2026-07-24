@@ -4,7 +4,7 @@
 (function () {
   if (window.PayRecordScreen) return;
 
-  function PayRecordScreen({ params }) {
+  function PayRecordScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -17,6 +17,7 @@
       entity: "payRecord",
       title: "支付记录",
       coll: "payRecords",
+      formRoute: "payRecordForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "no", label: "支付编号", width: 140, mono: true },
         { key: "date", label: "支付日期", width: 110, mono: true, form: { type: "date" } },
@@ -74,7 +75,7 @@
       newDefaults: () => ({ method: "银行转账" }),
       tableMinWidth: 1700,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.PayRecordScreen = PayRecordScreen;

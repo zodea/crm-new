@@ -4,7 +4,7 @@
 (function () {
   if (window.OwnerPenaltyScreen) return;
 
-  function OwnerPenaltyScreen({ params }) {
+  function OwnerPenaltyScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -19,6 +19,8 @@
       entity: "ownerPenalty",
       title: "甲方罚扣单",
       coll: "ownerPenalties",
+      formRoute: "ownerPenaltyForm",   // 整页表单（grill 决议 2026-07-18）
+      statusKey: "status",
       columns: [
         { key: "no", label: "罚扣编号", width: 140, mono: true },
         { key: "reason", label: "罚扣事由", width: 240 },
@@ -64,7 +66,7 @@
       newDefaults: () => ({ status: "申诉中" }),
       tableMinWidth: 1280,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OwnerPenaltyScreen = OwnerPenaltyScreen;

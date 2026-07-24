@@ -31,7 +31,6 @@ logs
 # Dev seed 真实数据（脱敏版 *.json 提交，真实版 *.local.json 不提交）
 app/lib/db/seed/*.local.json
 
-设计系统配色更新/
 工资发放格式/
 
 # 红圈系统参照资料（含真实业务截图，不上传）

@@ -4,7 +4,7 @@
 (function () {
   if (window.ReceiptScreen) return;
 
-  function ReceiptScreen({ params }) {
+  function ReceiptScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -52,9 +52,11 @@
         return { label: "合同：" + (c ? c.name : p.contract), filter: (r) => r.contractId === p.contract };
       },
       newDefaults: () => ({ method: "银行转账" }),
+      formRoute: "receiptForm",   // 整页表单（kit/forms/FinanceForms.jsx，grill 决议 2026-07-18）
+      statusKey: "status",
       tableMinWidth: 1180,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.ReceiptScreen = ReceiptScreen;

@@ -1,6 +1,7 @@
 // SupplierScreen — 基础信息/分供方·列表页（按 base-supplier.md §三 重构）
 // 跨项目共享主数据：工具栏（含下拉筛选）+ 表格（名称蓝链→详情、资料状态 chip、只读汇总列）。
 // 风格：统一疏朗版式。筛选由 pill 行改为紧凑下拉框（SelectFilter），并入工具栏去臃肿。
+// 2026-07-18 表单补全轮：新建/编辑改整页表单（kit/forms/BaseForms.jsx），对标红圈+grill决议
 (function () {
   const { Button, IconButton, StatusChip, Panel, Icon } = window.DesignSystem_e3d871;
 
@@ -20,7 +21,9 @@
 
   const CAT_OPTS = [
     { key: "all", label: "全部类别" }, { key: "材料供应商", label: "材料供应商" },
-    { key: "劳务分包商", label: "劳务分包商" }, { key: "设备供应商", label: "设备供应商" }, { key: "其他", label: "其他" },
+    { key: "劳务分包商", label: "劳务分包商" }, { key: "专业分包商", label: "专业分包商" },
+    { key: "设备供应商", label: "设备供应商" }, { key: "检测供应商", label: "检测供应商" },
+    { key: "个人", label: "个人" }, { key: "其他", label: "其他" },
   ];
   const CRED_OPTS = [
     { key: "all", label: "全部状态" }, { key: "incomplete", label: "证照缺失" },
@@ -30,22 +33,17 @@
   // SelectFilter 内联副本已删 → 统一用 window.KitAtoms.SelectFilter（反馈轮9 通用组件）
   const SelectFilter = (props) => { const KA = window.KitAtoms; return KA ? <KA.SelectFilter {...props} /> : null; };
 
-  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, exportModal: () => {}, importModal: () => {}, undoToast: () => {} };
-  const supForm = (s, title, onSave) => UI().formModal({
-    title, cols: 2,
-    fields: [
-      { key: "name", label: "公司名称", value: s ? s.name : "", full: true },
-      { key: "category", label: "类别", type: "select", options: ["材料供应商", "劳务分包商", "设备供应商", "其他"], value: s ? s.category : "材料供应商" },
-      { key: "taxNo", label: "税号", value: s ? s.taxNo : "" },
-      { key: "contact", label: "联系人", value: s ? s.contact : "" },
-      { key: "phone", label: "电话", value: s ? s.phone : "" },
-    ],
-    onSave: (vals) => {
-      if (!vals.name) { UI().toast("公司名称不能为空", "danger"); return; }
-      onSave(vals);
-      UI().toast(s ? "已保存修改" : "已新建分供方", "ok");
-    },
-  });
+  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, typeSelect: () => Promise.resolve(null), exportModal: () => {}, importModal: () => {}, undoToast: () => {} };
+  // 新建三段式第一段：分供方七类类别选择 → 带 type 进整页表单（kit/forms/BaseForms.jsx supplierForm）
+  const SUP_TYPES = [
+    { value: "材料供应商", label: "材料供应商", hint: "钢材、瓷砖、水泥等材料采购" },
+    { value: "劳务分包商", label: "劳务分包商", hint: "泥水、油漆等劳务班组分包" },
+    { value: "专业分包商", label: "专业分包商", hint: "防水、幕墙等专业工程分包" },
+    { value: "设备供应商", label: "设备供应商", hint: "机械设备租赁与采购" },
+    { value: "检测供应商", label: "检测供应商", hint: "检测、试验与鉴定服务" },
+    { value: "个人", label: "个人", hint: "个人供应商或零星用工" },
+    { value: "其他", label: "其他", hint: "其他类型分供方" },
+  ];
 
   function SupplierScreen({ data, navigate }) {
     const [cat, setCat] = React.useState("all");
@@ -56,8 +54,6 @@
     if (A) A.use();
     const list = A ? A.rows("suppliers") : [];
 
-    const addRow = (vals) => A.add("suppliers", { id: "s_" + Date.now(), aliases: [], ...vals, cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 });
-    const editRow = (id) => (vals) => A.update("suppliers", id, vals);
     const delRow = (s) => UI().confirm({
       title: "删除分供方", danger: true, confirmText: "删除",
       message: "确定删除「" + s.name + "」？删除为软删除，可在 5 秒内撤回。",
@@ -102,7 +98,9 @@
                 A.add("suppliers", { id: "s_i3_" + Date.now(), name: "东莞市威腾机械租赁部", category: "设备供应商", taxNo: "92441900MA4W99KXXX", aliases: ["威腾"], contact: "陈威", phone: "13800003333", cred: "reviewing", projectCount: 0, contractTotal: 0, paidTotal: 0 });
               },
             })}>导入</Button>
-            <Button variant="primary" icon="plus" onClick={() => supForm(null, "新建分供方", addRow)}>新建</Button>
+            <Button variant="primary" icon="plus" onClick={() => UI().typeSelect({
+              title: "新建分供方 · 选择类别", options: SUP_TYPES, defaultValue: "材料供应商",
+            }).then((v) => { if (v != null) navigate("supplierForm", { type: v }); })}>新建</Button>
           </div>
         </Panel>
 
@@ -125,7 +123,7 @@
                 { key: "op", label: "操作", width: 138, align: "right", render: (v, s) => (
                   <span style={{ display: "inline-flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
                     <IconButton icon="file-text" title="详情" onClick={() => navigate("supplierDetail", { id: s.id })} />
-                    <IconButton icon="pencil" title="编辑" onClick={() => supForm(s, "编辑分供方", editRow(s.id))} />
+                    <IconButton icon="pencil" title="编辑" onClick={() => navigate("supplierForm", { id: s.id })} />
                     <IconButton icon="upload" title="上传证照" onClick={() => UI().toast("打开证照上传…")} />
                     <IconButton icon="trash-2" title="删除" onClick={() => delRow(s)} />
                   </span>

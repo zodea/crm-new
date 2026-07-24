@@ -16,37 +16,22 @@
   const SelectFilter = (props) => { const KA = window.KitAtoms; return KA ? <KA.SelectFilter {...props} /> : null; };
 
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, exportModal: () => {}, undoToast: () => {} };
-  const crewForm = (c, title, onSave) => UI().formModal({
-    title, cols: 2,
-    fields: [
-      { key: "name", label: "班组名称", value: c ? c.name : "" },
-      { key: "trade", label: "工种", type: "select", options: ["泥水工", "木工", "钢筋工", "水暖工", "防水工"], value: c ? c.trade : "泥水工" },
-      { key: "contact", label: "负责人", value: c ? c.contact : "" },
-      { key: "phone", label: "联系电话", value: c ? c.phone : "" },
-      { key: "note", label: "备注", value: c ? c.note : "", full: true },
-    ],
-    onSave: (vals) => {
-      if (!vals.name) { UI().toast("班组名称不能为空", "danger"); return; }
-      onSave(vals);
-      UI().toast(c ? "已保存修改" : "已新建班组", "ok");
-    },
-  });
+  // 2026-07-18 表单补全轮：新建/编辑改整页表单（kit/forms/BaseForms.jsx crewForm 路由），数据切共享仓 APP.crews
 
   function CrewScreen({ data, navigate }) {
     const [trade, setTrade] = React.useState("all");
     const [q, setQ] = React.useState("");
-    // 列表转 state：新增/编辑/删除实时生效（刷新恢复初始 mock）
-    const [list, setList] = React.useState(() => data.crews.slice());
+    // 数据源：window.APP.crews 共享仓（整页表单写入实时联动；兜底 data.crews）
+    const A = window.APP;
+    if (A) A.use();
+    const list = A ? A.rows("crews") : data.crews;
 
-    const addRow = (vals) => setList((l) => [{ id: "c_" + Date.now(), workerCount: 0, projectCount: 0, ...vals }, ...l]);
-    const editRow = (id) => (vals) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...vals } : x)));
     const delRow = (c) => UI().confirm({
       title: "删除班组", danger: true, confirmText: "删除",
       message: "确定删除「" + c.name + "」？删除为软删除，可在 5 秒内撤回。",
       onConfirm: () => {
-        const idx = list.findIndex((x) => x.id === c.id);
-        setList((l) => l.filter((x) => x.id !== c.id));
-        UI().undoToast("已删除「" + c.name + "」", () => setList((l) => { const n = [...l]; n.splice(Math.min(idx, n.length), 0, c); return n; }));
+        A.softDel("crews", c.id);
+        UI().undoToast("已删除「" + c.name + "」", () => A.restore("crews", c.id));
       },
     });
 
@@ -74,7 +59,7 @@
               structureOptions: ["按工种", "不分层"],
               nameOptions: [{ label: "班组名称", sample: "周维铺贴班组" }, { label: "工种", sample: "泥水工" }, { label: "导出日期", sample: "2026-07-02" }],
             })}>导出</Button>
-            <Button variant="primary" icon="plus" onClick={() => crewForm(null, "新建班组", addRow)}>新建班组</Button>
+            <Button variant="primary" icon="plus" onClick={() => navigate("crewForm", {})}>新建班组</Button>
           </div>
         </Panel>
 
@@ -110,7 +95,7 @@
                     <td style={{ ...TD, textAlign: "right", whiteSpace: "nowrap" }}>
                       <span style={{ display: "inline-flex", gap: 6 }}>
                         <IconButton icon="file-text" title="详情" onClick={() => navigate("crewDetail", { crewId: c.id })} />
-                        <IconButton icon="square-pen" title="编辑" onClick={() => crewForm(c, "编辑班组 · " + c.name, editRow(c.id))} />
+                        <IconButton icon="square-pen" title="编辑" onClick={() => navigate("crewForm", { id: c.id })} />
                         <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => delRow(c)} />
                       </span>
                     </td>

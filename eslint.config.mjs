@@ -10,7 +10,7 @@ export default withNuxt(
     typescript: true,
     // 不启用 formatters(会内部引入 Prettier 处理 css/md);本项目不引 Prettier。
     formatters: false,
-    // DC 设计稿源码(claude.ai/design 单页设计稿)= x-import 全局 React、刻意精简写法的历史留档,
+    // DC 设计稿源码(claude.ai/design 单页设计稿)= x-import 全局 React、刻意精简写法,
     // 非 Nuxt 应用代码,整体不走应用 ESLint(见 docs/dc-rebuild)。
     ignores: [
       'DC重构设计源码/**',

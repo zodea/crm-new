@@ -615,36 +615,8 @@
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8, flex: "none" }}>
               <Button icon="download" onClick={() => UI().toast("正在导出项目台账…")}>导出</Button>
-              {/* 反馈轮8：模块级大编辑 —— 红圈「详细资料·基础信息」完整字段（前台展示+编辑弹窗，后台接权限后迁后台） */}
-              <Button variant="primary" icon="square-pen" onClick={() => UI().formModal({
-                title: "编辑项目 · " + proj.name, cols: 2, width: 640,
-                fields: [
-                  { key: "name", label: "项目名称", value: proj.name, full: true },
-                  { key: "contractName", label: "项目合同名称", value: m.contractName, full: true },
-                  { key: "developer", label: "客户（甲方）", value: proj.developer },
-                  { key: "developer2", label: "客户2（选填）", value: m.developer2 === "—" ? "" : m.developer2 },
-                  { key: "operationType", label: "经营类型", type: "select", options: ["自营", "联营", "挂靠"], value: m.operationType },
-                  { key: "status", label: "业务流程阶段", type: "select", options: ["项目立项", "施工准备", "施工中", "完工及竣备", "交付", "保修", "项目完结"], value: proj.status === "在建" ? "施工中" : proj.status },
-                  { key: "region", label: "工程地域", value: m.region },
-                  { key: "manager", label: "项目经理", value: proj.manager },
-                  { key: "contractor", label: "承包单位", value: m.contractor, full: true },
-                  { key: "address", label: "工程详细地址", value: proj.address, full: true },
-                  { key: "startDate", label: "计划开工日期", value: proj.startDate },
-                  { key: "plannedEnd", label: "计划竣工日期", value: m.plannedEnd },
-                  { key: "plannedDuration", label: "计划工期（天）", value: m.plannedDuration || "" },
-                  { key: "riskLevel", label: "项目风险级别", type: "select", options: ["低", "中", "高"], value: m.riskLevel },
-                  { key: "overview", label: "工程概况", type: "textarea", value: m.overview, full: true },
-                ],
-                // 反馈轮9：写回共享 store → 项目列表页实时联动（同名字段映射 planEnd/stage）
-                onSave: (v) => {
-                  if (!v.name) { UI().toast("项目名称不能为空", "danger"); return; }
-                  const patch = { name: v.name, contractName: v.contractName, developer: v.developer, developer2: v.developer2 || "—",
-                    operationType: v.operationType, stage: v.status, region: v.region, manager: v.manager,
-                    address: v.address, startDate: v.startDate, planEnd: v.plannedEnd, riskLevel: v.riskLevel, overview: v.overview };
-                  if (window.APP) window.APP.update("projects", proj.id, patch);
-                  UI().toast("已保存项目信息（项目列表已同步）", "ok");
-                },
-              })}>编辑</Button>
+              {/* 2026-07-18 表单补全轮：模块级大编辑改整页表单（kit/forms/BaseForms.jsx projectForm，5 分区含参建单位/立项附件） */}
+              <Button variant="primary" icon="square-pen" onClick={() => navigate("projectForm", { id: proj.id })}>编辑</Button>
             </div>
           </div>
           {/* 元数据行（语义固定 5 列） */}

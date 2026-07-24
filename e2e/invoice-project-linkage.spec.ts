@@ -82,7 +82,7 @@ async function expectProjectInvoiceState(
   await expect(metric(panel, '增值税')).toContainText(expected.vat)
   await expect(metric(panel, '税负率')).toContainText(expected.taxBurden)
 
-  await page.getByRole('button', { name: '票税管理', exact: true }).click()
+  await page.getByRole('tab', { name: '票税管理', exact: true }).click()
   const receivedInvoices = page.getByRole('region', { name: '收票登记' })
   if (expected.containsJourneyInvoice) {
     await expect(receivedInvoices.getByText(INVOICE_NUMBER, { exact: true })).toBeVisible()

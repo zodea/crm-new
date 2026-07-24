@@ -133,18 +133,8 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Tab 栏 -->
-    <div class="flex border-b border-line mb-4">
-      <button
-        v-for="t in tabs"
-        :key="t.key"
-        class="content-tab"
-        :class="activeTab === t.key ? 'content-tab-active' : ''"
-        @click="activeTab = t.key"
-      >
-        {{ t.label }}
-      </button>
-    </div>
+    <!-- Tab 栏（SegTab 统一底座，content-tab 双轨已收敛 #110 阶段⑥） -->
+    <SegTab v-model="activeTab" :tabs="tabs" class="mb-4" />
 
     <!-- Tab 内容 -->
     <div v-if="activeTab === 'overview'" class="border border-line bg-panel p-4">

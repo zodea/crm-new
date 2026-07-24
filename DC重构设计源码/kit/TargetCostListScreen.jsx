@@ -4,7 +4,7 @@
 (function () {
   if (window.TargetCostListScreen) return;
 
-  function TargetCostListScreen({ params }) {
+  function TargetCostListScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -17,6 +17,7 @@
       entity: "targetCost",
       title: "目标成本",
       coll: "targetCosts",
+      formRoute: "targetCostForm",   // 整页表单（grill 决议 2026-07-18）
       columns: [
         { key: "name", label: "目标成本名称", width: 230,
           render: (v, r) => (
@@ -67,7 +68,7 @@
       newDefaults: () => ({ incomeAmount: 0, plannedProfit: 0, signedAmount: 0, incTotal: 0, excTotal: 0, tax: 0 }),
       tableMinWidth: 1560,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.TargetCostListScreen = TargetCostListScreen;

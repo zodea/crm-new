@@ -14,7 +14,8 @@
     if (!A || !KA.EntityLink) return null;
     A.use();
 
-    const [files, setFiles] = React.useState(() => (data.deliveryArchives || []).slice());
+    // 2026-07-18 表单补全轮：归档行切共享仓 APP.deliveryArchives（整页表单 deliveryArchiveForm 编辑实时联动）
+    const files = A.rows("deliveryArchives");
     const [sel, setSel] = React.useState("p1");
     const [dropHot, setDropHot] = React.useState(null);   // 拖拽悬停高亮节点
     const [extraNodes, setExtraNodes] = React.useState([]); // 手动新建的空分供方节点 [{projectId,supplierId}]
@@ -70,7 +71,7 @@
         title: "改归属确认", confirmText: "确认改归属",
         message: "将「" + f.name + "」改归属到\n项目：" + projName(pid) + "\n分供方：" + toSup + "\n\n归档库为可改错通道，此修改会即时生效。",
         onConfirm: () => {
-          setFiles((l) => l.map((x) => (x.id === fileId ? { ...x, projectId: pid, supplierId: sid === UN ? null : sid } : x)));
+          A.update("deliveryArchives", fileId, { projectId: pid, supplierId: sid === UN ? null : sid });
           UI().toast("已改归属到「" + projName(pid) + " · " + toSup + "」", "ok");
           setSel(pid + (sid == null ? "" : "__" + sid));
         },
@@ -189,7 +190,7 @@
                       <div style={{ paddingLeft: 19, marginTop: 4 }}>
                         <button onClick={() => UI().confirm({ title: "分供方模糊匹配", confirmText: "替换归并",
                           message: "OCR 识别名「" + f.ocrCompany + "」\n模糊匹配到分供方库：" + sug.name + "\n\n替换后该文件归入此分供方节点。",
-                          onConfirm: () => { setFiles((l) => l.map((x) => (x.id === f.id ? { ...x, supplierId: sug.id } : x))); UI().toast("已归并到「" + sug.name + "」", "ok"); } })}
+                          onConfirm: () => { A.update("deliveryArchives", f.id, { supplierId: sug.id }); UI().toast("已归并到「" + sug.name + "」", "ok"); } })}
                           style={{ border: "1px solid var(--brand)", background: "var(--brand-soft)", color: "var(--brand-deep)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <Icon name="wand-sparkles" size={11} color="var(--brand)" />建议归并到「{(sug.aliases && sug.aliases[0]) || sug.name}」
                         </button>
@@ -201,6 +202,8 @@
                   <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.material}</span>
                   <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 700, textAlign: "right" }}>¥{Number(f.amount || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   <span style={{ display: "inline-flex", gap: 4, justifyContent: "center" }}>
+                    {/* 2026-07-18 表单补全轮：归档行整页编辑（单号/日期/材料/金额此前无编辑入口） */}
+                    <IconButton icon="square-pen" title="编辑归档信息" onClick={() => (window.DC && window.DC.navigate ? window.DC.navigate("deliveryArchiveForm", { id: f.id }) : null)} />
                     <IconButton icon="folder-input" title="改归属" onClick={() => editAttr(f)} />
                     <IconButton icon="zoom-in" title="预览原件" onClick={() => UI().modal && UI().modal({ title: f.name, subtitle: f.ocrCompany, width: 520, bodyHTML: '<div style="height:280px;display:grid;place-items:center;background:var(--surface-2);border-radius:8px;color:var(--brand);font-size:40px;font-weight:800;opacity:.5">单</div>' })} />
                   </span>

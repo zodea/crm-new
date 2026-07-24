@@ -1,9 +1,11 @@
 # 基础信息/工人信息 — 列表 + 详情（含亲属关联）
 
+> ⚠️ **表单字段以设计稿为准（2026-07-18 起）**：新增/编辑表单已按 [ADR 0014 整页表单](../../adr/0014-full-page-entity-forms.md) 大幅扩容，本文字段表未含该轮新字段；现行规格见 `DC重构设计源码/kit/forms/*.jsx`（域文件头注释列出注册路由），回写随 [#116](https://github.com/zodea/crm-new/issues/116) 进行。
+
 > 路由: `/base/worker` · `/base/worker/:id`
 > 页面: `pages/base/worker/index.vue` · `pages/base/worker/[id].vue`
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
-> 原型参考: `DC重构设计源码/kit/WorkerScreen.jsx`（重构圆角卡片版，见 ADR 0007；旧扁平版 `设计系统配色更新/kit/` 已弃用）
+> 原型参考: `DC重构设计源码/kit/WorkerScreen.jsx`（圆角卡片版，见 ADR 0007；旧扁平稿已删除）
 
 ---
 

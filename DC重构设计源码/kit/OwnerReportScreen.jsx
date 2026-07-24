@@ -1,10 +1,11 @@
 // OwnerReportScreen — 甲方报量列表（收入侧：月度申报产值→甲方审定，累计收入来源）：EntityListScreen meta 一份生成整页。
 // 合同 select 只列施工合同（报量只挂收入侧主合同）；审减额=派生列(reportedAmount-auditedAmount，仅已审定行)不进表单；
 // fromParams 承接穿透：params.contract→按合同预筛，否则 params.project→按项目预筛。默认视图=已申报（待审工作队列）。
+// 2026-07-18 表单补全轮：新增/编辑改整页表单（kit/forms/OwnerDocForms.jsx），对标红圈+grill决议
 (function () {
   if (window.OwnerReportScreen) return;
 
-  function OwnerReportScreen({ params }) {
+  function OwnerReportScreen({ params, navigate }) {
     const KA = window.KitAtoms || {};
     const ELS = window.EntityListScreen;
     const A = window.APP;
@@ -13,7 +14,7 @@
 
     const projects = A.rows("projects");
     const contracts = A.rows("contracts").filter((c) => c.kind === "施工");
-    const STATUS_TONE = { "已申报": "brand", "已审定": "ok" };
+    const STATUS_TONE = { "草稿": "neutral", "已申报": "brand", "已审定": "ok" };
     const fmt = (n) => "¥" + Number(n).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const meta = {
@@ -42,7 +43,7 @@
         { key: "date", label: "申报日期", width: 108, mono: true, form: { type: "date" } },
         { key: "status", label: "状态", width: 92,
           render: (v) => (StatusChip ? <StatusChip tone={STATUS_TONE[v] || "neutral"}>{v}</StatusChip> : v),
-          form: { type: "select", options: ["已申报", "已审定"] } },
+          form: { type: "select", options: ["草稿", "已申报", "已审定"] } },
       ],
       views: [
         { key: "all", label: "全部" },
@@ -72,9 +73,11 @@
         return null;
       },
       newDefaults: () => ({ status: "已申报", auditedAmount: 0 }),
+      formRoute: "ownerReportForm",   // 整页表单（kit/forms/OwnerDocForms.jsx，grill 决议 2026-07-18）
+      statusKey: "status",
       tableMinWidth: 1380,
     };
-    return <ELS meta={meta} params={params} />;
+    return <ELS meta={meta} params={params} navigate={navigate} />;
   }
 
   window.OwnerReportScreen = OwnerReportScreen;
