@@ -14,6 +14,7 @@ const project = computed(() => record.value ? projectStore.byId(record.value.pro
 const supplier = computed(() => record.value?.supplierId ? supplierStore.byId(record.value.supplierId) : undefined)
 const showForm = shallowRef(false)
 const loaded = shallowRef(false)
+const sourcePanelVersion = shallowRef(0)
 
 useTabTitle(() => record.value?.orderNo ? `送货单 ${record.value.orderNo}` : record.value ? '未编号送货单' : undefined)
 
@@ -58,6 +59,10 @@ async function refresh() {
   }
 }
 
+function refreshSourcePanel() {
+  sourcePanelVersion.value += 1
+}
+
 onMounted(refresh)
 </script>
 
@@ -92,37 +97,52 @@ onMounted(refresh)
       <Metric label="入库状态" :value="record.stored ? '已入库' : '未入库'" formula="入库供单价对比，留第二趟" />
     </MetricGrid>
 
-    <div class="panel px-4 py-3">
-      <SectionHeader title="单据信息" />
-      <div class="mt-2 grid grid-cols-2 gap-x-8">
-        <div class="detail-row">
-          <span class="detail-label">所属项目</span><NuxtLink :to="`/project/${record.projectId}`" class="cell--link">
-            {{ project?.name ?? record.projectId }}
-          </NuxtLink>
+    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(360px,42%)_minmax(0,1fr)]">
+      <DeliveryRecordSourcePanel
+        :key="sourcePanelVersion"
+        :record-id="record.id"
+        min-height="min(680px, calc(100vh - 220px))"
+        class="self-start xl:sticky xl:top-4"
+      />
+
+      <div class="flex min-w-0 flex-col gap-4">
+        <div class="panel px-4 py-3">
+          <SectionHeader title="单据信息" subtitle="右侧结构化数据应与左侧原件逐项核对" />
+          <div class="mt-2 grid grid-cols-2 gap-x-8">
+            <div class="detail-row">
+              <span class="detail-label">所属项目</span><NuxtLink :to="`/project/${record.projectId}`" class="cell--link">
+                {{ project?.name ?? record.projectId }}
+              </NuxtLink>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">分供方</span><NuxtLink v-if="record.supplierId" :to="`/base/supplier/${record.supplierId}`" class="cell--link">
+                {{ supplier?.name ?? record.supplierId }}
+              </NuxtLink><span v-else class="text-warn-ink">未区分分供方</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">送货单号</span><span class="font-mono">{{ record.orderNo || '—' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">送货日期</span><span class="font-mono">{{ record.deliveryDate || '—' }}</span>
+            </div>
+            <div class="detail-row col-span-2">
+              <span class="detail-label">备注</span><span>{{ record.note || '—' }}</span>
+            </div>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">分供方</span><NuxtLink v-if="record.supplierId" :to="`/base/supplier/${record.supplierId}`" class="cell--link">
-            {{ supplier?.name ?? record.supplierId }}
-          </NuxtLink><span v-else class="text-warn-ink">未区分分供方</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">送货单号</span><span class="font-mono">{{ record.orderNo || '—' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">送货日期</span><span class="font-mono">{{ record.deliveryDate || '—' }}</span>
-        </div>
-        <div class="detail-row col-span-2">
-          <span class="detail-label">备注</span><span>{{ record.note || '—' }}</span>
+
+        <div>
+          <SectionHeader title="材料明细" :subtitle="`共 ${record.lines.length} 项 · ${yuan(record.totalAmount)}`" />
+          <KitTable class="mt-2" :columns="columns" :data="[...record.lines]" :min-rows="5" empty="暂无材料明细" />
         </div>
       </div>
     </div>
 
-    <div>
-      <SectionHeader title="材料明细" :subtitle="`共 ${record.lines.length} 项 · ${yuan(record.totalAmount)}`" />
-      <KitTable class="mt-2" :columns="columns" :data="[...record.lines]" :min-rows="5" empty="暂无材料明细" />
-    </div>
-
-    <DeliveryRecordFormDialog v-model:open="showForm" :record="record" />
+    <DeliveryRecordFormDialog
+      v-model:open="showForm"
+      :record="record"
+      @source-file-saved="refreshSourcePanel"
+    />
   </div>
 
   <div v-else-if="store.loading || !loaded" class="py-12 text-center text-ink-faint">

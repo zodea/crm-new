@@ -1,19 +1,15 @@
-import { isTauri } from '@tauri-apps/api/core'
+import type { DbDriver, TransactionDb } from './coordinator'
 
+import { invoke, isTauri } from '@tauri-apps/api/core'
+import { createDbCoordinator } from './coordinator'
 import { runMigrations } from './migrations'
 import { seedIfEmpty } from './seed'
 
-interface DbDriver {
-  execute: (sql: string, params?: unknown[]) => Promise<void>
-  select: <T>(sql: string, params?: unknown[]) => Promise<T[]>
-  close: () => Promise<void>
-}
-
-let db: DbDriver | null = null
-
 async function createTauriDriver(): Promise<DbDriver> {
   const { default: Database } = await import('@tauri-apps/plugin-sql')
-  const conn = await Database.load('sqlite:crm.db')
+  const databaseUrl = 'sqlite:crm.db'
+  await invoke('prepare_app_database')
+  const conn = Database.get(databaseUrl)
   return {
     async execute(sql, params = []) {
       await conn.execute(sql, params as any[])
@@ -22,7 +18,7 @@ async function createTauriDriver(): Promise<DbDriver> {
       return conn.select(sql, params as any[])
     },
     async close() {
-      await conn.close()
+      await conn.close(databaseUrl)
     },
   }
 }
@@ -55,28 +51,42 @@ async function createSqlJsDriver(): Promise<DbDriver> {
   }
 }
 
-export async function getDb(): Promise<DbDriver> {
-  if (db)
-    return db
-
+async function initializeDb(): Promise<DbDriver> {
   // 桌面端必须使用持久化 SQLite；原生驱动失败时显式报错，不能静默退回内存库。
-  db = isTauri()
+  const db = isTauri()
     ? await createTauriDriver()
     : await createSqlJsDriver()
 
-  await runMigrations(db)
+  try {
+    await runMigrations(db)
+    await seedIfEmpty(db)
+    return db
+  }
+  catch (error) {
+    try {
+      await db.close()
+    }
+    catch {
+      // 初始化错误才是主因，关闭失败不覆盖它。
+    }
+    throw error
+  }
+}
 
-  await seedIfEmpty()
+const coordinator = createDbCoordinator(initializeDb)
 
-  return db
+export async function getDb(): Promise<DbDriver> {
+  return coordinator.getDb()
 }
 
 export async function execute(sql: string, params?: unknown[]): Promise<void> {
-  const conn = await getDb()
-  return conn.execute(sql, params)
+  return coordinator.execute(sql, params)
 }
 
 export async function select<T>(sql: string, params?: unknown[]): Promise<T[]> {
-  const conn = await getDb()
-  return conn.select<T>(sql, params)
+  return coordinator.select<T>(sql, params)
+}
+
+export async function withTransaction<T>(work: (tx: TransactionDb) => Promise<T>): Promise<T> {
+  return coordinator.withTransaction(work)
 }

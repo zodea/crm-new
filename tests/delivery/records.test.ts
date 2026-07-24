@@ -7,13 +7,37 @@ import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 let mem: TestDb
+let failTransactionSql: RegExp | null = null
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work({
+        ...mem,
+        async execute(sql, params) {
+          if (failTransactionSql?.test(sql))
+            throw new Error('injected transaction failure')
+          return mem.execute(sql, params)
+        },
+        async select<T>(sql: string, params?: unknown[]) {
+          return mem.select<T>(sql, params)
+        },
+      })
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (error) {
+      await mem.execute('ROLLBACK')
+      throw error
+    }
+  },
 }))
 
 beforeEach(async () => {
+  failTransactionSql = null
   mem = await createMemoryDb()
   await runMigrations(mem)
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城')`)
@@ -239,6 +263,149 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
     expect(store.byId(id)).toMatchObject({ orderNo: 'SH-002', supplierId: null, totalAmount: 800 })
     expect(store.byId(id)?.lines).toHaveLength(1)
     expect(store.byId(id)?.lines[0]?.materialName).toBe('砂')
+  })
+
+  it('归档原件按需读取，普通编辑不会清空原件或 OCR 元数据', async () => {
+    const store = useDeliveryRecordStore()
+    const sourceBytes = new Uint8Array([0x00, 0x80, 0xFF, 0x12])
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-SOURCE-001',
+      deliveryDate: '2026-07-17',
+      rawSiteText: '合和新城项目部',
+      fileName: '原送货单.pdf',
+      filePath: 'legacy-cache-path',
+      note: '',
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 1, unitPrice: 400, note: '' }],
+    }, new File([sourceBytes], '原送货单.pdf', { type: 'application/pdf' }))
+
+    expect(store.byId(id)?.hasSourceFile).toBe(true)
+    expect((await store.loadSourceFile(id))?.bytes).toEqual(sourceBytes)
+
+    await store.update(id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-SOURCE-001-A',
+      deliveryDate: '2026-07-18',
+      note: '复核后编辑',
+      lines: [{ materialName: '水泥', spec: 'P.O 42.5', unit: '吨', qty: 2, unitPrice: 410, note: '' }],
+    })
+
+    const [record] = await mem.select<{ raw_site_text: string, file_name: string, file_path: string }>(
+      'SELECT raw_site_text, file_name, file_path FROM delivery_records WHERE id = ?',
+      [id],
+    )
+    expect(record).toEqual({
+      raw_site_text: '合和新城项目部',
+      file_name: '原送货单.pdf',
+      file_path: 'legacy-cache-path',
+    })
+    expect((await store.loadSourceFile(id))?.bytes).toEqual(sourceBytes)
+
+    const attachmentLogs = await mem.select<{ table_name: string }>(
+      `SELECT table_name FROM operation_logs
+       WHERE table_name IN ('file_refs', 'file_payloads')`,
+    )
+    expect(attachmentLogs).toEqual([])
+  })
+
+  it('旧归档没有原件时返回 null，并在列表轻量标记为缺原件', async () => {
+    await mem.execute(
+      `INSERT INTO delivery_records
+        (id, project_id, order_no, archived, ocr_status)
+       VALUES ('del-legacy-no-source', 'p1', 'LEGACY-NO-SOURCE', 1, 'reviewed')`,
+    )
+    // 模拟曾写入轻量附件元数据、但正文已缺失的存量异常；不能误报为可预览原件。
+    await mem.execute(
+      `INSERT INTO file_refs
+        (id, owner_type, owner_id, file_name, category, mime_type)
+       VALUES (
+         'file-legacy-metadata-only',
+         'delivery_record',
+         'del-legacy-no-source',
+         '已丢失原件.pdf',
+         'source',
+         'application/pdf'
+       )`,
+    )
+    const store = useDeliveryRecordStore()
+    await store.load()
+
+    expect(store.byId('del-legacy-no-source')?.hasSourceFile).toBe(false)
+    await expect(store.loadSourceFile('del-legacy-no-source')).resolves.toBeNull()
+  })
+
+  it('旧归档可补传并原位替换原件，始终只保留一个 source 附件', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: null,
+      orderNo: 'SH-SOURCE-REPLACE',
+      deliveryDate: '2026-07-17',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    await store.saveSourceFile(id, new File([
+      new Uint8Array([0x00, 0x80, 0xFF]),
+    ], '补传.png', { type: 'image/png' }))
+    expect(store.byId(id)?.hasSourceFile).toBe(true)
+
+    const replacementBytes = new Uint8Array([0xFF, 0x00, 0x80, 0x34])
+    await store.saveSourceFile(
+      id,
+      new File([replacementBytes], '替换.jpg', { type: 'image/jpeg' }),
+    )
+
+    const refs = await mem.select<{ file_name: string, mime_type: string }>(
+      `SELECT file_name, mime_type FROM file_refs
+       WHERE owner_type = 'delivery_record' AND owner_id = ?
+         AND category = 'source' AND deleted_at IS NULL`,
+      [id],
+    )
+    expect(refs).toEqual([{ file_name: '替换.jpg', mime_type: 'image/jpeg' }])
+    const source = await store.loadSourceFile(id)
+    expect(source).toMatchObject({
+      fileName: '替换.jpg',
+      mimeType: 'image/jpeg',
+      fileSize: replacementBytes.byteLength,
+    })
+    expect(source?.bytes).toEqual(replacementBytes)
+    expect(store.byId(id)?.fileName).toBe('替换.jpg')
+  })
+
+  it('补传原件中途失败时，附件元数据、正文和单头文件名整体回滚', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: null,
+      orderNo: 'SH-SOURCE-ROLLBACK',
+      deliveryDate: '2026-07-17',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    failTransactionSql = /UPDATE delivery_records/
+    await expect(store.saveSourceFile(
+      id,
+      new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], '补传.png', { type: 'image/png' }),
+    )).rejects.toThrow('injected transaction failure')
+
+    const [attachmentCounts] = await mem.select<{ refs: number, payloads: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM file_refs
+          WHERE owner_type = 'delivery_record' AND owner_id = ? AND category = 'source') AS refs,
+         (SELECT COUNT(*) FROM file_payloads) AS payloads`,
+      [id],
+    )
+    const [record] = await mem.select<{ file_name: string }>(
+      'SELECT file_name FROM delivery_records WHERE id = ?',
+      [id],
+    )
+    expect(attachmentCounts).toEqual({ refs: 0, payloads: 0 })
+    expect(record?.file_name).toBe('')
+    expect(store.byId(id)).toMatchObject({ fileName: '', hasSourceFile: false })
   })
 
   it('删除会隐藏送货单及其明细，撤回后完整恢复', async () => {

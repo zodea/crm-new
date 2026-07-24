@@ -77,6 +77,9 @@ export const BUSINESS_TABLES = Object.keys(PARENT_REFS)
 /** 物理存在(v1 基线遗留)但已废弃的表,禁止业务读写:ticket_registrations → invoices 单表(ADR-0001) */
 export const DEPRECATED_TABLES = ['ticket_registrations']
 
+/** 不参与通用软删除与操作日志的基础设施表；file_payloads 避免正文进入通用快照。 */
+export const INFRA_TABLES = ['schema_migrations', 'operation_logs', 'file_payloads']
+
 function assertBusinessTable(table: string): void {
   if (!(table in PARENT_REFS)) {
     throw new Error(`[db] 未登记的业务表: ${table}`)

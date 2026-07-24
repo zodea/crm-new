@@ -9,6 +9,7 @@ import {
   downstreamImpact,
   fetchRowById,
   hiddenCtes,
+  INFRA_TABLES,
   logCreate,
   logOperation,
   PARENT_REFS,
@@ -98,10 +99,9 @@ describe('父引用图与 schema 漂移校验', () => {
     await runMigrations(db)
 
     const tables = await listTables(db)
-    const infra = ['schema_migrations', 'operation_logs']
     // schema 里每张表都必须有归属:业务表(登记进 PARENT_REFS)/ 废弃表 / 基建表
     for (const t of tables) {
-      const known = BUSINESS_TABLES.includes(t) || DEPRECATED_TABLES.includes(t) || infra.includes(t)
+      const known = BUSINESS_TABLES.includes(t) || DEPRECATED_TABLES.includes(t) || INFRA_TABLES.includes(t)
       expect(known, `表 ${t} 未在 PARENT_REFS/DEPRECATED_TABLES 登记归属`).toBe(true)
     }
     // 登记的业务表必须物理存在;每条父引用的外键列真实存在、父表已登记

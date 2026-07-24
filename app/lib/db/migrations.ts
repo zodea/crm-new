@@ -192,6 +192,21 @@ CREATE INDEX IF NOT EXISTS idx_project_aliases_deleted ON project_aliases(delete
 CREATE UNIQUE INDEX IF NOT EXISTS uq_project_alias ON project_aliases(alias) WHERE deleted_at IS NULL;
 `
 
+/** v10 送货单归档原件：file_refs 只保留轻量元数据，正文独立存放并按记录惰性读取。 */
+const V10_DELIVERY_SOURCE_FILES = `
+CREATE TABLE IF NOT EXISTS file_payloads (
+  file_ref_id TEXT PRIMARY KEY REFERENCES file_refs(id),
+  encoding    TEXT NOT NULL DEFAULT 'base64',
+  content     TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_file_refs_delivery_source
+  ON file_refs(owner_type, owner_id, category)
+  WHERE deleted_at IS NULL
+    AND owner_type = 'delivery_record'
+    AND category = 'source';
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -288,6 +303,14 @@ export const migrations: Migration[] = [
     name: 'delivery-lines-amount-source',
     async up(db) {
       await addColumnIfMissing(db, 'delivery_lines', 'amount_source', `TEXT NOT NULL DEFAULT 'manual'`)
+    },
+  },
+  {
+    version: 10,
+    name: 'delivery-source-file-payloads',
+    async up(db) {
+      await addColumnIfMissing(db, 'file_refs', 'mime_type', `TEXT DEFAULT ''`)
+      await execScript(db, V10_DELIVERY_SOURCE_FILES)
     },
   },
 ]

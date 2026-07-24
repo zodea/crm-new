@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { useDeliveryStore } from '~/stores/delivery'
+import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
@@ -11,6 +12,18 @@ let mem: TestDb
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
+    await mem.execute('BEGIN')
+    try {
+      const result = await work(mem)
+      await mem.execute('COMMIT')
+      return result
+    }
+    catch (error) {
+      await mem.execute('ROLLBACK')
+      throw error
+    }
+  },
 }))
 
 const DELIVERY_MARKDOWN = `
@@ -142,7 +155,10 @@ describe('delivery store 真实识别与归档管线', () => {
   it('核对完成必须归项目，并自动写入归档库与材料明细', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()
-    const [fileId] = store.uploadFiles([new File(['x'], '待归档.pdf')])
+    const sourceBytes = new Uint8Array([0x00, 0x80, 0xFF])
+    const [fileId] = store.uploadFiles([
+      new File([sourceBytes], '待归档.pdf', { type: 'application/pdf' }),
+    ])
     await store.recognizeFile(fileId!)
     const doc = store.byId(fileId!)?.docs[0]
     expect(doc).toBeTruthy()
@@ -176,6 +192,15 @@ describe('delivery store 真实识别与归档管线', () => {
       'SELECT * FROM delivery_lines WHERE delivery_record_id = ?',
       [recordId],
     )
+    const sourceFiles = await mem.select<Record<string, unknown>>(
+      `SELECT id, file_name, file_size, mime_type FROM file_refs
+       WHERE owner_type = 'delivery_record' AND owner_id = ? AND category = 'source'`,
+      [recordId],
+    )
+    const sourcePayloads = await mem.select<Record<string, unknown>>(
+      `SELECT encoding, content FROM file_payloads WHERE file_ref_id = ?`,
+      [sourceFiles[0]?.id],
+    )
 
     expect(record).toMatchObject({
       project_id: 'p1',
@@ -187,6 +212,26 @@ describe('delivery store 真实识别与归档管线', () => {
     })
     expect(lines).toHaveLength(1)
     expect(lines[0]).toMatchObject({ material_name: '普通硅酸盐水泥', amount: 622, amount_source: 'ocr' })
+    expect(sourceFiles).toEqual([
+      expect.objectContaining({
+        file_name: '待归档.pdf',
+        file_size: sourceBytes.byteLength,
+        mime_type: 'application/pdf',
+      }),
+    ])
+    expect(sourcePayloads).toEqual([{ encoding: 'base64', content: 'AID/' }])
+
+    setActivePinia(createPinia())
+    const coldStore = useDeliveryRecordStore()
+    await coldStore.load()
+    expect(coldStore.byId(recordId)?.hasSourceFile).toBe(true)
+    const coldSource = await coldStore.loadSourceFile(recordId)
+    expect(coldSource).toMatchObject({
+      fileName: '待归档.pdf',
+      fileSize: sourceBytes.byteLength,
+      mimeType: 'application/pdf',
+    })
+    expect(coldSource?.bytes).toEqual(sourceBytes)
     expect(store.byId(fileId!)).toBeUndefined()
   })
 })

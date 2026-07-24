@@ -20,6 +20,7 @@ const MARKDOWN = `
 `
 
 test('送货单闭环：上传识别、主数据匹配、人工核对并自动进入归档库', async ({ page }) => {
+  test.setTimeout(90_000)
   const pageErrors: string[] = []
   let uploadedDerivedImage = false
   let disabledSecondOrientationPass = false
@@ -44,7 +45,7 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   })
 
   await page.goto('/material/delivery')
-  await page.waitForLoadState('networkidle')
+  await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 60_000 })
 
   const syntheticScan = await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
@@ -109,7 +110,59 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   await expect(page).toHaveURL(/\/material\/delivery\/archive$/)
   await expect(page.getByText('SH-E2E-20260717', { exact: true })).toBeVisible()
   await expect(page.getByText('普通硅酸盐水泥', { exact: false }).first()).toBeVisible()
+  const archivedLink = page.getByRole('link', { name: 'SH-E2E-20260717', exact: true })
+  await expect(page.getByText('可核对', { exact: true }).first()).toBeVisible()
+
+  await archivedLink.click()
+  await expect(page).toHaveURL(/\/material\/delivery\/archive\/[^/]+$/)
+  const detailSourceImage = page.getByTestId('delivery-source-image')
+  await expect(detailSourceImage).toBeVisible()
+  await expect(detailSourceImage).toHaveAttribute('src', /^blob:/)
+
+  await page.getByRole('button', { name: '编辑', exact: true }).click()
+  const editDialog = page.getByRole('dialog')
+  await expect(editDialog.getByTestId('delivery-source-image')).toBeVisible()
+  await expect(editDialog.getByRole('button', { name: '替换原件', exact: true })).toBeVisible()
   expect(pageErrors).toEqual([])
+})
+
+test('旧送货单未保存原件时，详情和编辑都提供明确的补传入口', async ({ page }) => {
+  test.setTimeout(90_000)
+  await page.goto('/material/delivery/archive')
+  await expect(page.getByRole('button', { name: '新增送货单', exact: true })).toBeVisible({ timeout: 60_000 })
+
+  await page.getByRole('button', { name: '新增送货单', exact: true }).click()
+  const createDialog = page.getByRole('dialog')
+  await createDialog.locator('select').nth(0).selectOption('proj_demo_001')
+  await createDialog.locator('input[placeholder="例如 SH-2026-0715-001"]').fill('SH-E2E-NO-SOURCE')
+  await createDialog.locator('input[placeholder="材料名称"]').fill('手工补录材料')
+  await createDialog.getByRole('button', { name: '保存送货单', exact: true }).click()
+  await expect(page.getByText('送货单已新增', { exact: true })).toBeVisible()
+
+  const manualLink = page.getByRole('link', { name: 'SH-E2E-NO-SOURCE', exact: true })
+  await expect(page.getByText('缺原件', { exact: true }).first()).toBeVisible()
+  await manualLink.click()
+
+  const detailPanel = page.getByTestId('delivery-source-panel')
+  await expect(detailPanel.getByText('历史记录未保存原件', { exact: true })).toBeVisible()
+  await expect(detailPanel.getByRole('button', { name: '补传原件', exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '编辑', exact: true }).click()
+  const editPanel = page.getByRole('dialog').getByTestId('delivery-source-panel')
+  await expect(editPanel.getByText('历史记录未保存原件', { exact: true })).toBeVisible()
+  const chooserPromise = page.waitForEvent('filechooser')
+  await editPanel.getByRole('button', { name: '补传原件', exact: true }).click()
+  const chooser = await chooserPromise
+  await chooser.setFiles({ name: '手工补传原件.png', mimeType: 'image/png', buffer: PNG_1PX })
+  await expect(editPanel.getByTestId('delivery-source-image')).toBeVisible()
+
+  await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click()
+  const refreshedDetailImage = page.locator('#__nuxt').getByTestId('delivery-source-image')
+  await expect(refreshedDetailImage).toBeVisible()
+  await expect(refreshedDetailImage).toHaveAttribute('src', /^blob:/)
+
+  await page.getByRole('button', { name: '编辑', exact: true }).click()
+  await expect(page.getByRole('dialog').getByTestId('delivery-source-image')).toBeVisible()
 })
 
 test('模糊分供方只给建议，不会在人工采用前直接绑定', async ({ page }) => {
