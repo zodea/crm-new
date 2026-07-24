@@ -16,6 +16,12 @@ defineProps<{
 const emit = defineEmits<{
   create: []
   refresh: []
+  /** 导出台账（单文件直接保存，ADR 0004） */
+  exportLedger: []
+  /** 分类导出（按客户/阶段分两级目录，配置导出页签，ADR 0004） */
+  exportByCategory: []
+  /** 导入映射页签（ADR 0005） */
+  import: []
 }>()
 
 const search = defineModel<string>('search', { required: true })
@@ -53,6 +59,18 @@ const status = defineModel<string>('status', { required: true })
           aria-hidden="true"
         />
         <span class="sr-only">刷新</span>
+      </Button>
+      <Button variant="outline" title="导入项目（映射页签）" @click="emit('import')">
+        <span class="i-lucide-upload h-3.5 w-3.5" aria-hidden="true" />
+        导入
+      </Button>
+      <Button variant="outline" title="导出项目台账（单文件直接保存）" @click="emit('exportLedger')">
+        <span class="i-lucide-download h-3.5 w-3.5" aria-hidden="true" />
+        导出台账
+      </Button>
+      <Button variant="outline" title="按客户/阶段分类导出（配置页签）" @click="emit('exportByCategory')">
+        <span class="i-lucide-folder-tree h-3.5 w-3.5" aria-hidden="true" />
+        分类导出
       </Button>
       <Button @click="emit('create')">
         <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />

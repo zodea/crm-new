@@ -46,6 +46,8 @@ export interface Project {
   contractor: string
   manager: string
   managerPhone: string
+  execManager: string
+  builder: string
   siteLeader: string
   siteLeaderPhone: string
   riskLevel: string
@@ -107,6 +109,8 @@ const PROJECT_COLUMNS: { [K in keyof ProjectWritable]: ProjectColumn<K> } = {
   contractor: { col: 'contractor', toBind: d => d.contractor ?? '', fromRow: r => (r.contractor ?? '') as string },
   manager: { col: 'manager', toBind: d => d.manager ?? '', fromRow: r => (r.manager ?? '') as string },
   managerPhone: { col: 'manager_phone', toBind: d => d.managerPhone ?? '', fromRow: r => (r.manager_phone ?? '') as string },
+  execManager: { col: 'exec_manager', toBind: d => d.execManager ?? '', fromRow: r => (r.exec_manager ?? '') as string },
+  builder: { col: 'builder', toBind: d => d.builder ?? '', fromRow: r => (r.builder ?? '') as string },
   siteLeader: { col: 'site_leader', toBind: d => d.siteLeader ?? '', fromRow: r => (r.site_leader ?? '') as string },
   siteLeaderPhone: { col: 'site_leader_phone', toBind: d => d.siteLeaderPhone ?? '', fromRow: r => (r.site_leader_phone ?? '') as string },
   riskLevel: { col: 'risk_level', toBind: d => d.riskLevel ?? '', fromRow: r => (r.risk_level ?? '') as string },
