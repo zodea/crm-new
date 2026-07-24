@@ -20,13 +20,48 @@ const view = shallowRef<'table' | 'card'>('table')
 
 const groups = computed(() => store.ledgerGroups)
 
-const projectNames = computed(() => {
-  const names: string[] = []
+interface ProjectLedgerGroup {
+  key: ProjectGroupKey
+  label: string
+  count: number
+}
+
+type ProjectGroupKey = `id:${string}` | `name:${string}`
+type ProjectTreeNodeKey = `p:${ProjectGroupKey}`
+
+function projectGroupKey(inv: Invoice): ProjectGroupKey {
+  return inv.projectId ? `id:${inv.projectId}` : `name:${inv.projectName}`
+}
+
+function projectTreeNodeKey(key: ProjectGroupKey): ProjectTreeNodeKey {
+  return `p:${key}`
+}
+
+function projectGroupKeyFromNode(key: string): ProjectGroupKey | null {
+  if (!key.startsWith('p:'))
+    return null
+  return key.slice(2) as ProjectGroupKey
+}
+
+const projectGroups = computed<ProjectLedgerGroup[]>(() => {
+  const result = new Map<string, ProjectLedgerGroup>()
   for (const inv of groups.value.project) {
-    if (inv.projectName && !names.includes(inv.projectName))
-      names.push(inv.projectName)
+    const key = projectGroupKey(inv)
+    const current = result.get(key)
+    if (current) {
+      current.count++
+      continue
+    }
+    const canonicalProject = inv.projectId
+      ? projectStore.list.find(project => project.id === inv.projectId)
+      : undefined
+    result.set(key, {
+      key,
+      label: canonicalProject?.name || inv.projectName || '未命名项目',
+      count: 1,
+    })
   }
-  return names
+  return [...result.values()]
 })
 
 const allRows = computed(() =>
@@ -35,11 +70,11 @@ const allRows = computed(() =>
 
 const treeItems = computed<TreeNode[]>(() => [
   { key: '__all', label: '全部', icon: 'i-lucide-layers', count: allRows.value.length },
-  ...projectNames.value.map(n => ({
-    key: `p:${n}`,
-    label: n,
+  ...projectGroups.value.map(group => ({
+    key: projectTreeNodeKey(group.key),
+    label: group.label,
     icon: 'i-lucide-folder',
-    count: groups.value.project.filter(inv => inv.projectName === n).length,
+    count: group.count,
   })),
   { key: '__own', label: '个人开支', icon: 'i-lucide-user', count: groups.value.personal.length, tone: 'brand' as const },
   { key: '__pending', label: '待归档', icon: 'i-lucide-alert-triangle', count: groups.value.unassigned.length, tone: 'warn' as const },
@@ -50,9 +85,9 @@ const nodeRows = computed(() => {
     return groups.value.personal
   if (node.value === '__pending')
     return groups.value.unassigned
-  if (node.value.startsWith('p:')) {
-    const name = node.value.slice(2)
-    return groups.value.project.filter(inv => inv.projectName === name)
+  const key = projectGroupKeyFromNode(node.value)
+  if (key) {
+    return groups.value.project.filter(inv => projectGroupKey(inv) === key)
   }
   return allRows.value
 })
@@ -164,6 +199,8 @@ async function archiveFlow(inv: Invoice) {
 onMounted(() => {
   if (!store.list.length)
     store.load()
+  if (!projectStore.list.length)
+    projectStore.load()
 })
 </script>
 
