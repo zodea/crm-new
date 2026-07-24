@@ -233,6 +233,27 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     expect(JSON.parse(row.field_confidence || '{}')).toEqual({})
     db.close()
   })
+
+  it('v9：送货明细持久化金额来源，存量独立金额按人工值冻结', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(m => m.version <= 8))
+    await db.execute(`INSERT INTO projects (id, name) VALUES ('p-v8', '存量项目')`)
+    await db.execute(`INSERT INTO delivery_records (id, project_id) VALUES ('del-v8', 'p-v8')`)
+    await db.execute(`
+      INSERT INTO delivery_lines
+        (id, delivery_record_id, material_name, qty, unit_price, amount)
+      VALUES ('line-v8', 'del-v8', '存量材料', 2, 10, 20)
+    `)
+
+    await runMigrations(db)
+
+    expect(await columnNames(db, 'delivery_lines')).toContain('amount_source')
+    const [row] = await db.select<{ amount_source: string }>(
+      `SELECT amount_source FROM delivery_lines WHERE id = 'line-v8'`,
+    )
+    expect(row.amount_source).toBe('manual')
+    db.close()
+  })
 })
 
 describe('vitest 基建：sql.js 内存库可跑业务断言', () => {

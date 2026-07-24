@@ -2,6 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
+import { editDeliveryAmountLine } from '~/lib/delivery/review'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
@@ -49,6 +50,7 @@ describe('送货单 pass-1：版本化持久化', () => {
       'qty',
       'unit_price',
       'amount',
+      'amount_source',
       'sort_order',
       'deleted_at',
     ]))
@@ -119,8 +121,93 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       }],
     })
 
-    expect(store.byId(id)?.lines[0]?.amount).toBe(175)
+    expect(store.byId(id)?.lines[0]).toMatchObject({ amount: 175, amountSource: 'manual' })
     expect(store.byId(id)?.totalAmount).toBe(175)
+  })
+
+  it('自动金额来源跨保存与重载保留，后续仍可随数量单价联动', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-CALCULATED-SOURCE',
+      deliveryDate: '2026-07-17',
+      note: '',
+      lines: [{ materialName: '自动计价材料', spec: '', unit: '件', qty: 2, unitPrice: 10, note: '' }],
+    })
+
+    expect(store.byId(id)?.lines[0]).toMatchObject({ amount: 20, amountSource: 'calculated' })
+    const [row] = await mem.select<{ amount: number | null, amount_source: string }>(
+      'SELECT amount, amount_source FROM delivery_lines WHERE delivery_record_id = ?',
+      [id],
+    )
+    expect(row).toEqual({ amount: 20, amount_source: 'calculated' })
+
+    await store.load()
+    const reloaded = store.byId(id)?.lines[0]
+    expect(reloaded).toMatchObject({ amount: 20, amountSource: 'calculated' })
+    expect(editDeliveryAmountLine(reloaded!, 'qty', 3)).toMatchObject({ qty: 3, amount: 30 })
+  })
+
+  it('费用行的缺失数量与单价以 NULL 持久化，不伪装成零值', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'FEE-NULL-001',
+      deliveryDate: '2026-07-17',
+      note: '费用凭证',
+      lines: [{
+        materialName: '卸货服务费',
+        spec: '',
+        unit: '',
+        qty: null,
+        unitPrice: null,
+        amount: 615,
+        note: '',
+      }],
+    })
+
+    expect(store.byId(id)?.lines[0]).toMatchObject({
+      qty: null,
+      unitPrice: null,
+      amount: 615,
+    })
+    const [row] = await mem.select<{ qty: number | null, unit_price: number | null, amount: number | null }>(
+      'SELECT qty, unit_price, amount FROM delivery_lines WHERE delivery_record_id = ?',
+      [id],
+    )
+    expect(row).toEqual({ qty: null, unit_price: null, amount: 615 })
+  })
+
+  it('明确清空的金额即使数量和单价存在也保持为 NULL', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: null,
+      orderNo: 'SH-NULL-AMOUNT-001',
+      deliveryDate: '2026-07-17',
+      note: '',
+      lines: [{
+        materialName: '待复核材料',
+        spec: '',
+        unit: '件',
+        qty: 2,
+        unitPrice: 10,
+        amount: null,
+        note: '',
+      }],
+    })
+
+    expect(store.byId(id)?.lines[0]).toMatchObject({ amount: null, amountSource: 'manual' })
+    const [row] = await mem.select<{ amount: number | null }>(
+      'SELECT amount FROM delivery_lines WHERE delivery_record_id = ?',
+      [id],
+    )
+    expect(row?.amount).toBeNull()
+
+    await store.load()
+    expect(store.byId(id)?.lines[0]?.amount).toBeNull()
   })
 
   it('编辑会整体替换明细，随后列表与详情读取同一份结果', async () => {

@@ -2,6 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
+import { summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { useDeliveryStore } from '~/stores/delivery'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -22,6 +23,15 @@ const DELIVERY_MARKDOWN = `
   <tr><td>序号</td><td>商品名称</td><td>规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
   <tr><td>1</td><td>普通硅酸盐水泥</td><td>P.O 42.5</td><td>袋</td><td>4</td><td>155.50</td><td>622.00</td></tr>
   <tr><td></td><td>合计</td><td></td><td></td><td></td><td></td><td>622.00</td></tr>
+</table>
+`
+
+const AMOUNT_ONLY_LINE_MARKDOWN = `
+# 示例送货单
+<table>
+  <tr><td>序号</td><td>商品名称</td><td>规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+  <tr><td>1</td><td>耐候密封胶</td><td>590ml</td><td>支</td><td></td><td></td><td>386.00</td></tr>
+  <tr><td></td><td>合计</td><td></td><td></td><td></td><td></td><td>386.00</td></tr>
 </table>
 `
 
@@ -105,6 +115,30 @@ describe('delivery store 真实识别与归档管线', () => {
     expect(store.byId(id!)?.ocrStatus).toBe('done')
   })
 
+  it('仅有 OCR 金额时不伪造数量和单价，也不误报 0×0 金额不平', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(AMOUNT_ONLY_LINE_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [id] = store.uploadFiles([new File(['x'], '脱敏送货单.pdf')])
+
+    expect(await store.recognizeFile(id!)).toBe(true)
+    const doc = store.byId(id!)?.docs[0]
+    const item = doc?.items[0]
+
+    expect(item).toMatchObject({
+      name: '耐候密封胶',
+      qty: null,
+      unitPrice: null,
+      amount: 386,
+      amountSource: 'ocr',
+    })
+    expect(summarizeDeliveryAmounts(doc!.items, doc!.statedTotal)).toMatchObject({
+      total: 386,
+      mismatchedLineIds: [],
+      statedBalanced: true,
+      balanced: true,
+    })
+  })
+
   it('核对完成必须归项目，并自动写入归档库与材料明细', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()
@@ -152,7 +186,7 @@ describe('delivery store 真实识别与归档管线', () => {
       file_name: '待归档.pdf',
     })
     expect(lines).toHaveLength(1)
-    expect(lines[0]).toMatchObject({ material_name: '普通硅酸盐水泥', amount: 622 })
+    expect(lines[0]).toMatchObject({ material_name: '普通硅酸盐水泥', amount: 622, amount_source: 'ocr' })
     expect(store.byId(fileId!)).toBeUndefined()
   })
 })
