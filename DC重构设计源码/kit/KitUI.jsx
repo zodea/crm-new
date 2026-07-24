@@ -579,37 +579,6 @@
     });
   }
 
-  // —— 水波粼粼动效（DESIGN-SYSTEM §7.3：导出完成反馈）——
-  function ripple(anchorEl) {
-    var r = anchorEl && anchorEl.getBoundingClientRect ? anchorEl.getBoundingClientRect() : null;
-    if (r && !r.width && !r.height) r = null; // anchor 已从文档移除 → 居中兜底
-    var cx = r ? r.left + r.width / 2 : window.innerWidth / 2;
-    var cy = r ? r.top + r.height / 2 : window.innerHeight / 2;
-    var host = el("div", { position: "fixed", inset: "0", zIndex: Z + 200, pointerEvents: "none" });
-    document.body.appendChild(host);
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      var ck = el("div", { position: "absolute", left: cx - 14 + "px", top: cy - 14 + "px", width: "28px", height: "28px", borderRadius: "50%", background: "var(--ok)", color: "#fff", display: "grid", placeItems: "center", fontSize: "16px", fontWeight: "800", opacity: "0", transition: "opacity .3s" }, "✓");
-      host.appendChild(ck);
-      requestAnimationFrame(function () { ck.style.opacity = "1"; });
-      setTimeout(function () { host.remove(); }, 900);
-      return;
-    }
-    // ① 水滴从上方落下（150ms ease-in，scaleY 拉伸）
-    var drop = el("div", { position: "absolute", left: cx - 5 + "px", top: cy - 46 + "px", width: "10px", height: "14px", background: "var(--brand)", borderRadius: "50% 50% 50% 50% / 60% 60% 40% 40%", transform: "scaleY(1.2)", transition: "top .15s ease-in, opacity .1s" });
-    host.appendChild(drop);
-    requestAnimationFrame(function () { drop.style.top = cy - 7 + "px"; });
-    setTimeout(function () { drop.style.opacity = "0"; }, 150);
-    // ② 触达后 3 圈同心水波，间隔 120ms，opacity 0.4→0（600ms）
-    for (var i = 0; i < 3; i++) (function (i) {
-      setTimeout(function () {
-        var w = el("div", { position: "absolute", left: cx - 8 + "px", top: cy - 8 + "px", width: "16px", height: "16px", borderRadius: "50%", border: "2px solid var(--brand)", background: "var(--brand-soft)", opacity: "0.4", transform: "scale(0.5)", transition: "transform .6s ease-out, opacity .6s ease-out" });
-        host.appendChild(w);
-        requestAnimationFrame(function () { w.style.transform = "scale(" + (4 + i * 2.2) + ")"; w.style.opacity = "0"; w.style.background = "transparent"; });
-      }, 150 + i * 120);
-    })(i);
-    setTimeout(function () { host.remove(); }, 1400);
-  }
-
   // —— 撤回 toast（DATABASE §8 软删除：删除后可一键撤回）——
   function undoToast(msg, onUndo, ms) {
     var t = el("div", {
@@ -769,7 +738,6 @@
           progText.textContent = count + " / " + count + " · 完成";
           setTimeout(function () {
             close();
-            ripple(opts.anchor);
             toast("已导出 " + count + " " + unit + " 至 " + pathText.textContent, "ok");
             if (opts.onDone) opts.onDone({ path: pathText.textContent, lv1: lv1.value, lv2: lv2.value, name: n1.value + "+" + n2.value });
           }, 320);
@@ -844,6 +812,6 @@
     box.appendChild(foot); ov.appendChild(box); document.body.appendChild(ov);
   }
 
-  window.KitUI = { toast: toast, confirm: confirm, modal: modal, formModal: formModal, buildFormBody: buildFormBody, typeSelect: typeSelect, ripple: ripple, undoToast: undoToast, folderPicker: folderPicker, exportModal: exportModal, importModal: importModal };
+  window.KitUI = { toast: toast, confirm: confirm, modal: modal, formModal: formModal, buildFormBody: buildFormBody, typeSelect: typeSelect, undoToast: undoToast, folderPicker: folderPicker, exportModal: exportModal, importModal: importModal };
   window.KitUIScreen = function () { return null; };
 })();
