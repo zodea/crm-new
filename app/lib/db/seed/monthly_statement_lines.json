@@ -1,0 +1,17 @@
+[
+  {
+    "id": "monthly_statement_line_demo_001",
+    "statement_id": "monthly_statement_demo_001",
+    "boq_line_id": "boq_line_demo_a_floor",
+    "item_name": "地砖铺贴",
+    "unit": "㎡",
+    "auto_qty": 60,
+    "adjusted_qty": 62,
+    "unit_price": 80,
+    "amount": 4960,
+    "note": "按现场复核量调整",
+    "sort_order": 10,
+    "created_at": "2026-07-01T09:00:00.000Z",
+    "updated_at": "2026-07-01T09:00:00.000Z"
+  }
+]

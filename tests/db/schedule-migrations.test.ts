@@ -17,6 +17,7 @@ const REQUIRED_COLUMNS: Record<(typeof SCHEDULE_TABLES)[number], string[]> = {
   schedule_groups: [
     'id',
     'project_id',
+    'contract_id',
     'name',
     'sort_order',
     'created_at',
@@ -67,6 +68,7 @@ const REQUIRED_COLUMNS: Record<(typeof SCHEDULE_TABLES)[number], string[]> = {
     'id',
     'task_id',
     'item_id',
+    'boq_line_id',
     'created_at',
     'updated_at',
     'deleted_at',
@@ -97,6 +99,7 @@ interface ForeignKeyDescription {
 const EXPECTED_FOREIGN_KEYS: Record<(typeof SCHEDULE_TABLES)[number], ForeignKeyDescription[]> = {
   schedule_groups: [
     { source_column: 'project_id', target_table: 'projects', target_column: 'id' },
+    { source_column: 'contract_id', target_table: 'contracts', target_column: 'id' },
   ],
   schedule_group_buildings: [
     { source_column: 'group_id', target_table: 'schedule_groups', target_column: 'id' },
@@ -115,6 +118,7 @@ const EXPECTED_FOREIGN_KEYS: Record<(typeof SCHEDULE_TABLES)[number], ForeignKey
   task_item_map: [
     { source_column: 'task_id', target_table: 'schedule_tasks', target_column: 'id' },
     { source_column: 'item_id', target_table: 'items', target_column: 'id' },
+    { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
   ],
 }
 
@@ -209,7 +213,10 @@ describe('v14 施工进度排程数据底座', () => {
     await db.execute(`INSERT INTO projects (id, name) VALUES ('project-v13', '存量工程量项目')`)
     await db.execute(`INSERT INTO items (id, project_id, code, name, trade) VALUES ('item-v13', 'project-v13', 'ITEM-13', '存量分项', '泥水工')`)
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(
+      db,
+      migrations.filter(migration => migration.version <= SCHEDULE_MIGRATION_VERSION),
+    )
 
     expect(result.from).toBe(SCHEDULE_MIGRATION_VERSION - 1)
     expect(result.to).toBe(SCHEDULE_MIGRATION_VERSION)
