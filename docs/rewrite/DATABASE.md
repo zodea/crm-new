@@ -1890,7 +1890,7 @@ F3 迁移将旧 `expense_reimbursements.amount > 0` 的记录转换为一条 `ex
 动态成本 =
   Σ已确认支出结算.total_amount（按合同 cost_category 五类）
   + Σ已发放工资.actual_amount
-  + Σ已确认费用报销.amount
+  + Σ费用报销明细.amount（仅头 status='confirmed' 且头/明细均未软删）
 
 动态效益 = 客户已确认收入 - 动态成本
 动态效益率 = 动态效益 / 客户已确认收入
