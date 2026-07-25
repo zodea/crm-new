@@ -1,9 +1,19 @@
 import type { ConfirmImpact } from '~/lib/kit/confirm'
+import type {
+  FormAttachmentChanges,
+  MasterDataSaveAction,
+  SupplierFormDraft,
+} from '~/lib/master-data/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import {
+  listFormAttachments,
+  loadSupplierForm,
+  saveSupplierForm,
+} from '~/lib/master-data/forms'
 import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
@@ -187,6 +197,16 @@ export const useSupplierStore = defineStore('supplier', () => {
     return logId
   }
 
+  async function saveForm(
+    draft: SupplierFormDraft,
+    action: MasterDataSaveAction,
+    attachments?: FormAttachmentChanges,
+  ) {
+    const result = await saveSupplierForm(draft, action, attachments)
+    await load()
+    return result
+  }
+
   /**
    * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
    */
@@ -198,5 +218,20 @@ export const useSupplierStore = defineStore('supplier', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'suppliers', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, upsertImported, remove, restore, undo, downstreamImpact }
+  return {
+    list: readonly(list),
+    loading: readonly(loading),
+    load,
+    byId,
+    add,
+    update,
+    upsertImported,
+    saveForm,
+    loadForm: loadSupplierForm,
+    loadFormAttachments: (id: string) => listFormAttachments('supplier', id),
+    remove,
+    restore,
+    undo,
+    downstreamImpact,
+  }
 })

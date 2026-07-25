@@ -1,9 +1,19 @@
 import type { ConfirmImpact } from '~/lib/kit/confirm'
+import type {
+  FormAttachmentChanges,
+  MasterDataSaveAction,
+  ProjectFormDraft,
+} from '~/lib/master-data/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import {
+  listFormAttachments,
+  loadProjectForm,
+  saveProjectForm,
+} from '~/lib/master-data/forms'
 import { generateId } from '~/lib/util/id'
 import { toNum } from '~/lib/util/number'
 
@@ -212,6 +222,16 @@ export const useProjectStore = defineStore('project', () => {
     return logId
   }
 
+  async function saveForm(
+    draft: ProjectFormDraft,
+    action: MasterDataSaveAction,
+    attachments?: FormAttachmentChanges,
+  ) {
+    const result = await saveProjectForm(draft, action, attachments)
+    await load()
+    return result
+  }
+
   /**
    * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
    * 计数逻辑已上移为软删层通用能力（#89），本店只负责把表名映射为中文展示标签。
@@ -223,5 +243,19 @@ export const useProjectStore = defineStore('project', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'projects', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove, restore, undo, downstreamImpact }
+  return {
+    list: readonly(list),
+    loading: readonly(loading),
+    load,
+    byId,
+    add,
+    update,
+    saveForm,
+    loadForm: loadProjectForm,
+    loadFormAttachments: (id: string) => listFormAttachments('project', id),
+    remove,
+    restore,
+    undo,
+    downstreamImpact,
+  }
 })
