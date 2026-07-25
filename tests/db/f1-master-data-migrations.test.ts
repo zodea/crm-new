@@ -1,7 +1,6 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
 import {
-  LATEST_VERSION,
   migrations,
   runMigrations,
 } from '~/lib/db/migrations'
@@ -9,6 +8,7 @@ import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 const F1_MIGRATION_VERSION = 19
 const F1_LATEST_VERSION = 20
+const F1_MIGRATIONS = migrations.filter(migration => migration.version <= F1_LATEST_VERSION)
 
 const F1_TABLES = [
   'customers',
@@ -154,9 +154,8 @@ async function createCustomerTableForInterruptedUpgrade(db: MigrationDb) {
 describe('v19 F1 基础主数据迁移', () => {
   it('冷启动建立 F1 表、目标列与索引，并移除停止写入的旧列', async () => {
     const db = await createMemoryDb()
-    await runMigrations(db)
+    await runMigrations(db, F1_MIGRATIONS)
 
-    expect(LATEST_VERSION).toBe(F1_LATEST_VERSION)
     const tables = await listTables(db)
     for (const table of F1_TABLES)
       expect(tables).toContain(table)
@@ -225,7 +224,7 @@ describe('v19 F1 基础主数据迁移', () => {
         ('supplier-child', '旧分公司', 'supplier-parent')
     `)
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(db, F1_MIGRATIONS)
 
     expect(result.from).toBe(F1_MIGRATION_VERSION - 1)
     expect(result.to).toBe(F1_LATEST_VERSION)
@@ -305,7 +304,7 @@ describe('v19 F1 基础主数据迁移', () => {
 
   it('客户税号和目标成本基线唯一约束仅作用于未软删记录', async () => {
     const db = await createMemoryDb()
-    await runMigrations(db)
+    await runMigrations(db, F1_MIGRATIONS)
     await db.execute(`
       INSERT INTO projects (id, name) VALUES ('project-cost', '目标成本项目')
     `)
@@ -347,7 +346,7 @@ describe('v19 F1 基础主数据迁移', () => {
 
   it('比例、布尔、责任层级、目标金额和成本类别由数据库约束兜底', async () => {
     const db = await createMemoryDb()
-    await runMigrations(db)
+    await runMigrations(db, F1_MIGRATIONS)
     await db.execute(`INSERT INTO projects (id, name) VALUES ('project-check', '约束项目')`)
 
     await expect(db.execute(`
@@ -415,7 +414,7 @@ describe('v19 F1 基础主数据迁移', () => {
       VALUES ('item-v20', 'target-v20', '材料', '瓷砖', 88.8)
     `)
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(db, F1_MIGRATIONS)
     expect(result).toMatchObject({
       from: F1_MIGRATION_VERSION,
       to: F1_LATEST_VERSION,

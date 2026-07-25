@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { F2FormKind } from '~/lib/contract/forms'
 // 合同三列表共用屏（#90 批A）：kind 一份 meta 生成整页——蓝本 DC 设计稿
 // {ConContract,SubContract,MatContract}Screen.jsx 的 EntityListScreen 范式。
 // 口径差异全部收在 kindLabels（施工=开票/收款/应收，支出侧=收票/支付/应付）；
@@ -8,6 +9,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { StatusTone } from '~/lib/project/status'
 import type { Contract } from '~/stores/contract'
+import { formPath } from '~/lib/contract/page'
 import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES, CONTRACT_SUB_KINDS, contractBalance, kindLabels, sumField } from '~/lib/contract/status'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -18,7 +20,6 @@ const store = useContractStore()
 const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const { confirm, undoToast, error } = useKitUI()
-const { openContractForm } = useContractForm()
 
 const KIND_TITLE: Record<ContractKind, string> = {
   施工: '施工合同',
@@ -174,7 +175,7 @@ function supplierName(id: string | null): string {
 
 // ── CRUD ──
 function openCreate() {
-  openContractForm(kind)
+  void navigateTo(formPath(formKind()))
 }
 
 async function refresh() {
@@ -185,10 +186,19 @@ async function refresh() {
   await Promise.all([store.load(), projectStore.load(), supplierStore.load()])
 }
 function openEdit(row: Contract) {
-  openContractForm(kind, row)
+  void navigateTo(formPath(formKind(), row.id))
 }
 
-// 合同无下游子表（PARENT_REFS 中无表指向 contracts）→ 一律 simple confirm + 10 秒 undoToast（ADR 0003）
+function formKind(): F2FormKind {
+  const values: Record<ContractKind, F2FormKind> = {
+    施工: 'construction',
+    分包: 'subcontract',
+    材采: 'material',
+  }
+  return values[kind]
+}
+
+// 普通删除先由领域 action 检查结算、付款、发票、BOQ 等真实下游，再提供 10 秒撤回。
 async function handleDelete(row: Contract) {
   const ok = await confirm({
     variant: 'simple',
@@ -198,12 +208,17 @@ async function handleDelete(row: Contract) {
   })
   if (!ok)
     return
-  const logId = await store.remove(row.id)
-  if (!logId) {
-    error('删除失败：合同不存在或已删除')
-    return
+  try {
+    const logId = await store.removeForm(formKind(), row.id)
+    if (!logId) {
+      error('删除失败：合同不存在或已删除')
+      return
+    }
+    undoToast(`已删除「${row.name}」`, () => store.undoForm(formKind(), logId))
   }
-  undoToast(`已删除「${row.name}」`, () => store.undo(logId))
+  catch (cause) {
+    error(cause instanceof Error ? cause.message : '删除失败')
+  }
 }
 
 onMounted(() => {

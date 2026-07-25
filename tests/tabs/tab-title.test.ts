@@ -50,3 +50,16 @@ describe('boq 页签文案', () => {
     expect(routeTitle('/contract/boq/import')).toBe('清单拆表')
   })
 })
+
+describe('f2 合同与支出结算页签文案', () => {
+  it.each([
+    ['/contract/construction/form/contract_1', '施工合同'],
+    ['/contract/subcontract/form/contract_2', '分包合同'],
+    ['/contract/material/form/contract_3', '材料采购合同'],
+    ['/contract/company-expense/form/company_1', '公司支出合同'],
+    ['/contract/other-expense/form/contract_4', '其他支出合同'],
+    ['/contract/other-settlement/form/settlement_1', '其他支出结算'],
+  ])('%s 保持对应业务标题', (path, title) => {
+    expect(routeTitle(path)).toBe(title)
+  })
+})

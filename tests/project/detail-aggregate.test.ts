@@ -11,6 +11,7 @@ import { createMemoryDb } from '../helpers/memory-db'
 type SeedRow = Record<string, unknown>
 
 const TABLES = [
+  'customers',
   'projects',
   'suppliers',
   'invoices',

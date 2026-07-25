@@ -31,6 +31,7 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   invoices: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
+    { column: 'contract_id', table: 'contracts' },
   ],
   crews: [],
   items: [{ column: 'project_id', table: 'projects' }],
@@ -112,7 +113,16 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   // 合同域轻实体仓(#90 批A,v3 迁移):施工/分包/材采单表 kind 区分;施工合同 supplier_id 为 NULL
   contracts: [
     { column: 'project_id', table: 'projects' },
+    { column: 'customer_id', table: 'customers' },
     { column: 'supplier_id', table: 'suppliers' },
+  ],
+  contract_supplements: [{ column: 'contract_id', table: 'contracts' }],
+  contract_line_items: [{ column: 'contract_id', table: 'contracts' }],
+  company_expense_contracts: [],
+  expenditure_settlements: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'supplier_id', table: 'suppliers' },
+    { column: 'contract_id', table: 'contracts' },
   ],
   boq_files: [{ column: 'contract_id', table: 'contracts' }],
   boq_change_orders: [
@@ -152,11 +162,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],
   settlements: [{ column: 'project_supplier_id', table: 'project_suppliers' }],
   supplement_agreements: [{ column: 'contract_id', table: 'construction_contracts' }],
-  contract_line_items: [{ column: 'contract_id', table: 'expenditure_contracts' }],
   payment_applications: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
-    { column: 'contract_id', table: 'expenditure_contracts' },
+    { column: 'contract_id', table: 'contracts' },
   ],
   file_refs: [],
 }
@@ -174,6 +183,7 @@ export const INFRA_TABLES = [
   'file_payloads',
   'import_batches',
   'reconciliation_issues',
+  'contract_legacy_mappings',
 ]
 
 function assertBusinessTable(table: string): void {
