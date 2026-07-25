@@ -213,11 +213,13 @@ boq_change_orders(
 
 boq_change_lines(
   id, change_order_id -> boq_change_orders.id, boq_line_id -> boq_lines.id NULL,
-  result_boq_line_id -> boq_lines.id NULL, operation ['add'|'qty'|'price'],
-  item_name, unit, delta_qty, new_unit_price, amount, note, sort_order,
+  result_boq_line_id -> boq_lines.id NULL, item_id -> items.id NULL,
+  operation ['add'|'qty'|'price'], section, trade, item_name, unit, spec,
+  delta_qty, new_unit_price, amount, note, sort_order,
   created_at, updated_at, deleted_at
 )
 -- add 不指向原行；qty/price 必须指向原行。签证后的新增结果通过 result_boq_line_id 追溯。
+-- v16 `boq-change-added-line-metadata` 为已发布 v15 的存量库补齐 item_id/section/trade/spec。
 
 monthly_statements(
   id, project_id -> projects.id, contract_id -> contracts.id, month,
@@ -686,7 +688,7 @@ CREATE TABLE target_cost_items (
 | `boq_lines` | `change_order_id` | `boq_change_orders.id` | N:1 | 已签证变更新增行来源（可选） |
 | `boq_change_orders` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 变更单 |
 | `boq_change_orders` | `ledger_id` | `owner_change_orders.id` | 1:1 | 已签证自动生成的台账行（ADR-0002，软删除级联） |
-| `boq_change_lines` | `change_order_id` / `boq_line_id` / `result_boq_line_id` | `boq_change_orders.id` / `boq_lines.id` | N:1 | 变更行原始目标与签证结果追溯 |
+| `boq_change_lines` | `change_order_id` / `boq_line_id` / `result_boq_line_id` / `item_id` | `boq_change_orders.id` / `boq_lines.id` / `items.id` | N:1 | 变更行原始目标、签证结果与新增标准分项追溯 |
 | `monthly_statements` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 月度报量单 |
 | `monthly_statement_lines` | `statement_id` / `boq_line_id` | `monthly_statements.id` / `boq_lines.id` | N:1 | 报量行 |
 | `house_type_template_items` | `boq_line_id` | `boq_lines.id` | N:1 | 户型分项从已确认 BOQ 行带出工程量；NULL 表示人工兜底 |
@@ -1109,6 +1111,7 @@ CREATE INDEX idx_boq_change_orders_project ON boq_change_orders(project_id);
 CREATE INDEX idx_boq_change_orders_contract ON boq_change_orders(contract_id);
 CREATE INDEX idx_boq_change_orders_status ON boq_change_orders(status); -- 200 份量级按状态筛选
 CREATE INDEX idx_boq_change_lines_order ON boq_change_lines(change_order_id);
+CREATE INDEX idx_boq_change_lines_item ON boq_change_lines(item_id);
 CREATE UNIQUE INDEX uq_boq_line_trace ON boq_lines(boq_file_id, trace_key)
   WHERE deleted_at IS NULL AND boq_file_id IS NOT NULL AND trace_key <> '';
 CREATE UNIQUE INDEX uq_boq_change_order_ledger ON boq_change_orders(ledger_id)
