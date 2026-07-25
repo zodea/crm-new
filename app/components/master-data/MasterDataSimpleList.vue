@@ -3,8 +3,8 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { MasterDataOwnerType } from '~/lib/master-data/forms'
 import { select } from '~/lib/db/connection'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
-import { deleteMasterDataRecord } from '~/lib/master-data/forms'
 import { FORM_META } from '~/lib/master-data/page'
+import { toErrorMessage } from '~/lib/util/error'
 
 type SimpleListKind = Extract<MasterDataOwnerType, 'customer' | 'crew' | 'worker' | 'target_cost'>
 type ListRow = Record<string, unknown> & { id: string, name: string }
@@ -14,10 +14,22 @@ const props = defineProps<{
 }>()
 
 const { confirm, success, warning, error } = useKitUI()
+const customerStore = useCustomerStore()
+const crewStore = useCrewStore()
+const workerStore = useWorkerStore()
+const targetCostStore = useTargetCostStore()
+const stores = {
+  customer: customerStore,
+  crew: crewStore,
+  worker: workerStore,
+  target_cost: targetCostStore,
+}
 const search = shallowRef('')
 const rows = shallowRef<ListRow[]>([])
 const loading = shallowRef(false)
 const meta = computed(() => FORM_META[props.kind])
+const activeStore = computed(() => stores[props.kind])
+const activeRevision = computed(() => activeStore.value.revision)
 
 const columns = computed<KitTableColumn[]>(() => {
   switch (props.kind) {
@@ -85,6 +97,7 @@ async function load() {
         rows.value = result.map(row => ({
           id: row.id as string,
           name: row.name as string,
+          aliases: row.aliases,
           taxNo: row.tax_no,
           contact: row.contact,
           contactPhone: row.contact_phone,
@@ -134,7 +147,7 @@ async function load() {
         const result = await select<Record<string, unknown>>(`
           SELECT target.*, project.name AS project_name
           FROM (${visibleTargets}) AS target
-          JOIN projects AS project ON project.id = target.project_id
+          LEFT JOIN projects AS project ON project.id = target.project_id
           ORDER BY target.created_at DESC
         `)
         rows.value = result.map(row => ({
@@ -156,31 +169,6 @@ async function load() {
 }
 
 async function remove(row: ListRow) {
-  if (props.kind === 'customer') {
-    const [usage] = await select<{ projectCount: number }>(`
-      SELECT COUNT(*) AS projectCount
-      FROM projects
-      WHERE (customer_id = ? OR secondary_customer_id = ?)
-        AND deleted_at IS NULL
-    `, [row.id, row.id])
-    if ((usage?.projectCount ?? 0) > 0) {
-      warning(`无法删除「${row.name}」：仍被 ${usage?.projectCount} 个活跃项目引用`)
-      return
-    }
-  }
-
-  if (props.kind === 'crew') {
-    const [usage] = await select<{ workerCount: number }>(`
-      SELECT COUNT(*) AS workerCount
-      FROM workers
-      WHERE crew_id = ? AND deleted_at IS NULL
-    `, [row.id])
-    if ((usage?.workerCount ?? 0) > 0) {
-      warning(`无法删除「${row.name}」：班组仍有 ${usage?.workerCount} 名在册工人`)
-      return
-    }
-  }
-
   const accepted = await confirm({
     variant: 'simple',
     title: `删除${meta.value.label}`,
@@ -189,16 +177,37 @@ async function remove(row: ListRow) {
   })
   if (!accepted)
     return
-  const logId = await deleteMasterDataRecord(props.kind, row.id)
-  if (!logId) {
-    error('记录不存在或已删除')
-    return
+  try {
+    const logId = await removeThroughStore(row.id)
+    if (!logId) {
+      error('记录不存在或已删除')
+      return
+    }
+    success(`已删除「${row.name}」`)
+    await load()
   }
-  success(`已删除「${row.name}」`)
-  await load()
+  catch (cause) {
+    warning(`无法删除「${row.name}」：${toErrorMessage(cause)}`)
+  }
 }
 
-onMounted(load)
+async function removeThroughStore(id: string) {
+  return activeStore.value.remove(id)
+}
+
+let mounted = false
+watch(activeRevision, () => {
+  if (mounted)
+    void load()
+})
+onMounted(async () => {
+  mounted = true
+  await load()
+})
+onActivated(() => {
+  if (mounted)
+    void load()
+})
 </script>
 
 <template>

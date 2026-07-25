@@ -25,14 +25,14 @@ test('项目导入：从列表触发映射页签，导入后真实新增行并�
     mimeType: 'text/csv',
     buffer: Buffer.from([
       '项目名称,客户,项目经理,业务流程阶段',
-      '导入项目甲,导入客户甲,张三,施工中',
-      '导入项目乙,导入客户乙,李四,在建',
+      '导入项目甲,合和地产,张三,施工中',
+      '导入项目乙,锦绣置业,李四,在建',
     ].join('\n'), 'utf-8'),
   })
 
   const fieldRow = (key: string) => page.locator(`[data-field="${key}"]`)
   await expect(fieldRow('name')).toHaveAttribute('data-status', 'matched')
-  await expect(fieldRow('developer')).toHaveAttribute('data-status', 'matched')
+  await expect(fieldRow('customerName')).toHaveAttribute('data-status', 'matched')
   await expect(fieldRow('manager')).toHaveAttribute('data-status', 'matched')
   await expect(fieldRow('status')).toHaveAttribute('data-status', 'matched')
 

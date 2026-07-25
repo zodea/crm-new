@@ -654,7 +654,7 @@ END;
 ```sql
 CREATE TABLE target_costs (
   id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL,        -- → projects.id
+  project_id          TEXT,                 -- → projects.id；仅 draft 可空，提交时应用层强制必填
   name                TEXT NOT NULL,        -- 版本名（“投标预算”/“开工基线”）
   is_baseline         INTEGER DEFAULT 0,    -- 1=当前对比基线；部分唯一索引保证一项目一条
   contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
@@ -663,6 +663,7 @@ CREATE TABLE target_costs (
   tax_inclusive_total REAL DEFAULT 0 CHECK (tax_inclusive_total >= 0),
   tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
   tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  status TEXT NOT NULL DEFAULT 'draft',     -- draft | submitted
   note TEXT DEFAULT '',
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
@@ -678,6 +679,8 @@ CREATE TABLE target_cost_items (
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
 ```
+
+> 迁移 v20 `target-cost-incomplete-drafts` 将已落过 v19 的存量库安全重建为 `project_id` 草稿可空，并原样保留目标成本头、科目明细、软删除状态和索引；非草稿保存仍必须校验真实项目 ID。
 
 > **costCategory 全局归集约定（2026-07-23 修订）**：合同成本按专业分包、合同劳务、材料、机械、其他五类；直接工人工资和费用报销分别作为独立成本来源。**合同劳务与工人工资不得合并为“人工”**。动态成本以已确认支出结算、已发放工资和已确认费用报销归集；付款申请、支付记录和送货单分别代表审批、现金流和收货事实，不与结算重复计入成本。红圈参照：目标成本 + 目标成本清单明细。
 
@@ -742,6 +745,7 @@ crews += (
   mgmt_fee_price REAL,
   assignment_level TEXT DEFAULT 'crew'
     CHECK (assignment_level IN ('crew', 'worker')),
+  status TEXT DEFAULT 'draft',
   updated_at TEXT, deleted_at TEXT
 )
 
@@ -1605,6 +1609,10 @@ CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
 CREATE INDEX idx_schedule_floor_plans_task ON schedule_task_floor_plans(task_id);
 CREATE INDEX idx_schedule_floor_plans_floor ON schedule_task_floor_plans(floor_id);
 CREATE INDEX idx_schedule_floor_plans_boq ON schedule_task_floor_plans(boq_line_id);
+
+-- 基础主数据
+CREATE UNIQUE INDEX uq_crews_name_active
+  ON crews(name) WHERE deleted_at IS NULL AND name <> '';
 
 -- 目标成本
 CREATE INDEX idx_target_costs_proj ON target_costs(project_id);

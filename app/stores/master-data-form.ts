@@ -28,6 +28,7 @@ export function createMasterDataFormState<T extends { id?: string }>(
   const attachments = shallowRef<FormAttachment[]>([])
   const loading = shallowRef(false)
   const saving = shallowRef(false)
+  const revision = shallowRef(0)
 
   async function load(id: string) {
     loading.value = true
@@ -54,6 +55,7 @@ export function createMasterDataFormState<T extends { id?: string }>(
     try {
       const result = await saveForm(draft, action, changes)
       await load(result.id)
+      revision.value += 1
       return result
     }
     finally {
@@ -67,12 +69,16 @@ export function createMasterDataFormState<T extends { id?: string }>(
       current.value = null
       attachments.value = []
     }
+    if (logId)
+      revision.value += 1
     return logId
   }
 
   async function restore(id: string) {
     const logId = await restoreMasterDataRecord(ownerType, id)
     await load(id)
+    if (logId)
+      revision.value += 1
     return logId
   }
 
@@ -86,6 +92,7 @@ export function createMasterDataFormState<T extends { id?: string }>(
     attachments: readonly(attachments),
     loading: readonly(loading),
     saving: readonly(saving),
+    revision: readonly(revision),
     load,
     save,
     remove,

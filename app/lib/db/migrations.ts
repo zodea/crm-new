@@ -874,7 +874,7 @@ CREATE TABLE IF NOT EXISTS reconciliation_issues (
 
 CREATE TABLE IF NOT EXISTS target_costs (
   id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL REFERENCES projects(id),
+  project_id          TEXT REFERENCES projects(id),
   name                TEXT NOT NULL,
   is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)),
   contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
@@ -913,6 +913,9 @@ const V19_F1_INDEXES = `
 CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_tax_no
   ON customers(tax_no)
   WHERE deleted_at IS NULL AND tax_no <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crews_name_active
+  ON crews(name)
+  WHERE deleted_at IS NULL AND name <> '';
 CREATE INDEX IF NOT EXISTS idx_customers_deleted
   ON customers(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_projects_customer
@@ -935,6 +938,131 @@ CREATE INDEX IF NOT EXISTS idx_target_cost_items_deleted
 CREATE INDEX IF NOT EXISTS idx_reconciliation_issues_batch
   ON reconciliation_issues(import_batch_id, status);
 `
+
+const V20_TARGET_COST_DRAFT_TABLES = `
+DROP INDEX IF EXISTS idx_target_costs_proj;
+DROP INDEX IF EXISTS uq_target_costs_baseline;
+DROP INDEX IF EXISTS idx_target_costs_deleted;
+DROP INDEX IF EXISTS idx_tci_target;
+DROP INDEX IF EXISTS idx_target_cost_items_deleted;
+
+ALTER TABLE target_cost_items RENAME TO target_cost_items_v20_old;
+ALTER TABLE target_costs RENAME TO target_costs_v20_old;
+
+CREATE TABLE target_costs (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT REFERENCES projects(id),
+  name                TEXT NOT NULL,
+  is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)),
+  contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
+  planned_profit      REAL DEFAULT 0 CHECK (planned_profit >= 0),
+  signed_contract_sum REAL DEFAULT 0 CHECK (signed_contract_sum >= 0),
+  tax_inclusive_total REAL DEFAULT 0 CHECK (tax_inclusive_total >= 0),
+  tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
+  tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  status              TEXT NOT NULL DEFAULT 'draft',
+  note                TEXT NOT NULL DEFAULT '',
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at          TEXT DEFAULT NULL
+);
+
+CREATE TABLE target_cost_items (
+  id             TEXT PRIMARY KEY,
+  target_cost_id TEXT NOT NULL REFERENCES target_costs(id),
+  cost_category  TEXT NOT NULL CHECK (
+    cost_category IN ('专业分包', '合同劳务', '材料', '机械', '工人工资', '费用报销', '其他')
+  ),
+  item_name      TEXT,
+  unit           TEXT DEFAULT '',
+  qty            REAL CHECK (qty IS NULL OR qty >= 0),
+  unit_price     REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  amount         REAL NOT NULL CHECK (amount >= 0),
+  note           TEXT NOT NULL DEFAULT '',
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL
+);
+
+INSERT INTO target_costs (
+  id, project_id, name, is_baseline, contract_revenue, planned_profit,
+  signed_contract_sum, tax_inclusive_total, tax_exclusive_total, tax_amount,
+  status, note, created_at, updated_at, deleted_at
+)
+SELECT
+  id, project_id, name, is_baseline, contract_revenue, planned_profit,
+  signed_contract_sum, tax_inclusive_total, tax_exclusive_total, tax_amount,
+  status, note, created_at, updated_at, deleted_at
+FROM target_costs_v20_old;
+
+INSERT INTO target_cost_items (
+  id, target_cost_id, cost_category, item_name, unit, qty, unit_price, amount,
+  note, sort_order, created_at, updated_at, deleted_at
+)
+SELECT
+  id, target_cost_id, cost_category, item_name, unit, qty, unit_price, amount,
+  note, sort_order, created_at, updated_at, deleted_at
+FROM target_cost_items_v20_old;
+
+DROP TABLE target_cost_items_v20_old;
+DROP TABLE target_costs_v20_old;
+`
+
+const V20_TARGET_COST_DRAFT_INDEXES = `
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crews_name_active
+  ON crews(name)
+  WHERE deleted_at IS NULL AND name <> '';
+CREATE INDEX IF NOT EXISTS idx_target_costs_proj
+  ON target_costs(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_target_costs_baseline
+  ON target_costs(project_id)
+  WHERE deleted_at IS NULL AND is_baseline = 1;
+CREATE INDEX IF NOT EXISTS idx_target_costs_deleted
+  ON target_costs(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tci_target
+  ON target_cost_items(target_cost_id);
+CREATE INDEX IF NOT EXISTS idx_target_cost_items_deleted
+  ON target_cost_items(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+async function allowIncompleteTargetCostDrafts(db: MigrationDb): Promise<void> {
+  const [projectColumn] = await db.select<{ notnull: number }>(
+    `SELECT "notnull" FROM pragma_table_info('target_costs') WHERE name = 'project_id'`,
+  )
+  if (!projectColumn?.notnull) {
+    await execScript(db, V20_TARGET_COST_DRAFT_INDEXES)
+    return
+  }
+
+  await db.execute('PRAGMA foreign_keys = OFF')
+  let transactionStarted = false
+  try {
+    await db.execute('BEGIN IMMEDIATE')
+    transactionStarted = true
+    await execScript(db, V20_TARGET_COST_DRAFT_TABLES)
+    const violations = await db.select<{ table: string }>('PRAGMA foreign_key_check')
+    if (violations.length)
+      throw new Error(`[db] v20 目标成本重建后存在 ${violations.length} 条外键异常`)
+    await execScript(db, V20_TARGET_COST_DRAFT_INDEXES)
+    await db.execute('COMMIT')
+    transactionStarted = false
+  }
+  catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.execute('ROLLBACK')
+      }
+      catch {
+        // 保留原始迁移错误；连接后续会由 initializeDb 关闭。
+      }
+    }
+    throw error
+  }
+  finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
 
 const F1_IMPORT_BATCH_ID = 'migration_f1_v19'
 
@@ -1019,10 +1147,13 @@ async function migrateF1ProjectCustomers(db: MigrationDb): Promise<void> {
   if (!legacyFields.length)
     return
 
+  const legacySelect = legacyFields
+    .map(field => `"${field.source}"`)
+    .join(', ')
   const projects = await db.select<Record<string, unknown>>(
-    `SELECT id, developer, developer2 FROM projects`,
+    `SELECT id, ${legacySelect} FROM projects`,
   )
-  let customers = await db.select<F1CustomerCandidate>(
+  const customers = await db.select<F1CustomerCandidate>(
     `SELECT id, name, aliases, deleted_at FROM customers`,
   )
 
@@ -1033,22 +1164,9 @@ async function migrateF1ProjectCustomers(db: MigrationDb): Promise<void> {
       if (!normalized)
         continue
 
-      let matches = customers.filter(customer =>
+      const matches = customers.filter(customer =>
         customer.deleted_at == null && customerSearchNames(customer).includes(normalized),
       )
-      if (matches.length === 0) {
-        const customerId = stableMigrationId('customer_migrated', normalized)
-        await db.execute(`
-          INSERT OR IGNORE INTO customers (id, name, status)
-          VALUES (?, ?, 'draft')
-        `, [customerId, sourceValue])
-        customers = await db.select<F1CustomerCandidate>(
-          `SELECT id, name, aliases, deleted_at FROM customers`,
-        )
-        matches = customers.filter(customer =>
-          customer.deleted_at == null && customerSearchNames(customer).includes(normalized),
-        )
-      }
 
       if (matches.length === 1) {
         await db.execute(
@@ -1445,70 +1563,98 @@ export const migrations: Migration[] = [
     version: 19,
     name: 'f1-master-data',
     async up(db) {
-      await execScript(db, V19_F1_TABLES)
+      await db.execute('BEGIN IMMEDIATE')
+      try {
+        await execScript(db, V19_F1_TABLES)
 
-      await addColumnIfMissing(db, 'suppliers', 'contact_title', `TEXT NOT NULL DEFAULT ''`)
-      await addColumnIfMissing(db, 'suppliers', 'credential_reviewed_at', 'TEXT')
-      await addColumnIfMissing(db, 'suppliers', 'credential_review_note', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'suppliers', 'contact_title', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'suppliers', 'credential_reviewed_at', 'TEXT')
+        await addColumnIfMissing(db, 'suppliers', 'credential_review_note', `TEXT NOT NULL DEFAULT ''`)
 
-      await addColumnIfMissing(
-        db,
-        'crews',
-        'default_pay_ratio',
-        'REAL NOT NULL DEFAULT 0.95 CHECK (default_pay_ratio BETWEEN 0 AND 1)',
-      )
-      await addColumnIfMissing(
-        db,
-        'crews',
-        'rent_subsidy_enabled',
-        'INTEGER NOT NULL DEFAULT 0 CHECK (rent_subsidy_enabled IN (0, 1))',
-      )
-      await addColumnIfMissing(db, 'crews', 'rent_subsidy_price', 'REAL CHECK (rent_subsidy_price IS NULL OR rent_subsidy_price >= 0)')
-      await addColumnIfMissing(
-        db,
-        'crews',
-        'mgmt_fee_enabled',
-        'INTEGER NOT NULL DEFAULT 0 CHECK (mgmt_fee_enabled IN (0, 1))',
-      )
-      await addColumnIfMissing(db, 'crews', 'mgmt_fee_price', 'REAL CHECK (mgmt_fee_price IS NULL OR mgmt_fee_price >= 0)')
-      await addColumnIfMissing(
-        db,
-        'crews',
-        'assignment_level',
-        `TEXT NOT NULL DEFAULT 'crew' CHECK (assignment_level IN ('crew', 'worker'))`,
-      )
-      await addColumnIfMissing(db, 'crews', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
-      await addColumnIfMissing(db, 'crews', 'updated_at', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'default_pay_ratio',
+          'REAL NOT NULL DEFAULT 0.95 CHECK (default_pay_ratio BETWEEN 0 AND 1)',
+        )
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'rent_subsidy_enabled',
+          'INTEGER NOT NULL DEFAULT 0 CHECK (rent_subsidy_enabled IN (0, 1))',
+        )
+        await addColumnIfMissing(db, 'crews', 'rent_subsidy_price', 'REAL CHECK (rent_subsidy_price IS NULL OR rent_subsidy_price >= 0)')
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'mgmt_fee_enabled',
+          'INTEGER NOT NULL DEFAULT 0 CHECK (mgmt_fee_enabled IN (0, 1))',
+        )
+        await addColumnIfMissing(db, 'crews', 'mgmt_fee_price', 'REAL CHECK (mgmt_fee_price IS NULL OR mgmt_fee_price >= 0)')
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'assignment_level',
+          `TEXT NOT NULL DEFAULT 'crew' CHECK (assignment_level IN ('crew', 'worker'))`,
+        )
+        await addColumnIfMissing(db, 'crews', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
+        await addColumnIfMissing(db, 'crews', 'updated_at', `TEXT NOT NULL DEFAULT ''`)
 
-      await addColumnIfMissing(db, 'workers', 'bank_name', `TEXT NOT NULL DEFAULT ''`)
-      await addColumnIfMissing(db, 'workers', 'bank_account', `TEXT NOT NULL DEFAULT ''`)
-      await addColumnIfMissing(db, 'workers', 'bank_code', `TEXT NOT NULL DEFAULT ''`)
-      await addColumnIfMissing(db, 'workers', 'current_project_id', 'TEXT REFERENCES projects(id)')
-      await addColumnIfMissing(db, 'workers', 'family_group_id', 'TEXT')
-      await addColumnIfMissing(db, 'workers', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
+        await addColumnIfMissing(db, 'workers', 'bank_name', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'bank_account', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'bank_code', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'current_project_id', 'TEXT REFERENCES projects(id)')
+        await addColumnIfMissing(db, 'workers', 'family_group_id', 'TEXT')
+        await addColumnIfMissing(db, 'workers', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
 
-      await addColumnIfMissing(db, 'projects', 'customer_id', 'TEXT REFERENCES customers(id)')
-      await addColumnIfMissing(db, 'projects', 'secondary_customer_id', 'TEXT REFERENCES customers(id)')
-      await addColumnIfMissing(db, 'projects', 'developer_supervisor', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'projects', 'customer_id', 'TEXT REFERENCES customers(id)')
+        await addColumnIfMissing(db, 'projects', 'secondary_customer_id', 'TEXT REFERENCES customers(id)')
+        await addColumnIfMissing(db, 'projects', 'developer_supervisor', `TEXT NOT NULL DEFAULT ''`)
 
-      await db.execute(`
-        INSERT OR IGNORE INTO import_batches (
+        await db.execute(`
+        INSERT INTO import_batches (
           id, project_id, source_file, source_hash, status, completed_at
         )
-        VALUES (?, NULL, 'schema:v19', 'f1-master-data', 'completed', datetime('now'))
+        VALUES (?, NULL, 'schema:v19', 'f1-master-data', 'running', NULL)
+        ON CONFLICT(id) DO UPDATE SET
+          status = 'running',
+          completed_at = NULL
       `, [F1_IMPORT_BATCH_ID])
 
-      await migrateF1ProjectCustomers(db)
-      await migrateF1WorkerProjects(db)
-      await recordF1SupplierHierarchy(db)
+        await migrateF1ProjectCustomers(db)
+        await migrateF1WorkerProjects(db)
+        await recordF1SupplierHierarchy(db)
 
-      await db.execute('DROP INDEX IF EXISTS idx_suppliers_parent')
-      await dropColumnIfExists(db, 'suppliers', 'parent_supplier_id')
-      await dropColumnIfExists(db, 'projects', 'developer')
-      await dropColumnIfExists(db, 'projects', 'developer2')
-      await dropColumnIfExists(db, 'workers', 'current_project')
+        await db.execute('DROP INDEX IF EXISTS idx_suppliers_parent')
+        await dropColumnIfExists(db, 'suppliers', 'parent_supplier_id')
+        await dropColumnIfExists(db, 'projects', 'developer')
+        await dropColumnIfExists(db, 'projects', 'developer2')
+        await dropColumnIfExists(db, 'workers', 'current_project')
 
-      await execScript(db, V19_F1_INDEXES)
+        await execScript(db, V19_F1_INDEXES)
+        await db.execute(`
+          UPDATE import_batches
+          SET status = 'completed', completed_at = datetime('now')
+          WHERE id = ?
+        `, [F1_IMPORT_BATCH_ID])
+        await db.execute('COMMIT')
+      }
+      catch (error) {
+        try {
+          await db.execute('ROLLBACK')
+        }
+        catch {
+          // 保留原始迁移错误。
+        }
+        throw error
+      }
+    },
+  },
+  {
+    version: 20,
+    name: 'target-cost-incomplete-drafts',
+    async up(db) {
+      await allowIncompleteTargetCostDrafts(db)
     },
   },
 ]

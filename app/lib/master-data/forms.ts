@@ -261,7 +261,7 @@ async function assertActiveReference(
   if (!id)
     return
   const rows = await tx.select<{ id: string }>(
-    `SELECT id FROM "${table}" WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
+    selectVisibleSql(table, 'AND id = ? LIMIT 1'),
     [id],
   )
   if (!rows[0])
@@ -291,6 +291,18 @@ async function applyAttachmentChanges(
   for (const attachmentId of changes.restoreIds ?? []) {
     await assertAttachmentOwner(tx, ownerType, ownerId, attachmentId)
     await restoreRecord(tx, 'file_refs', attachmentId)
+  }
+  if (ownerType === 'customer') {
+    const [usage] = await tx.select<{ total: number }>(`
+      SELECT COUNT(*) AS total
+      FROM file_refs
+      WHERE owner_type = 'customer'
+        AND owner_id = ?
+        AND deleted_at IS NULL
+    `, [ownerId])
+    const nextTotal = (usage?.total ?? 0) + (changes.add?.length ?? 0)
+    if (nextTotal > 9)
+      throw new Error('客户附件最多 9 个')
   }
   for (const draft of changes.add ?? []) {
     const fileName = text(draft.fileName)
@@ -471,7 +483,22 @@ export async function saveCrewForm(
     mgmt_fee_price: nullableNumber(draft.mgmtFeePrice),
     assignment_level: draft.assignmentLevel ?? 'crew',
     note: rawText(draft.note),
-  }, action, { attachments })
+  }, action, {
+    attachments,
+    beforePersist: async (tx, id) => {
+      const name = text(draft.name)
+      if (!name)
+        return
+      const duplicate = await tx.select<{ id: string }>(`
+        SELECT id
+        FROM crews
+        WHERE name = ? AND id <> ? AND deleted_at IS NULL
+        LIMIT 1
+      `, [name, id])
+      if (duplicate[0])
+        throw new Error('班组名称已存在')
+    },
+  })
 }
 
 export async function saveWorkerForm(
@@ -952,7 +979,43 @@ export async function deleteMasterDataRecord(
   ownerType: MasterDataOwnerType,
   id: string,
 ): Promise<string | null> {
-  return withTransaction(tx => softDelete(tx, MASTER_DATA_TABLES[ownerType], id))
+  return withTransaction(async (tx) => {
+    if (ownerType === 'customer') {
+      const projects = await tx.select<{ id: string }>(
+        selectVisibleSql(
+          'projects',
+          'AND (customer_id = ? OR secondary_customer_id = ?)',
+        ),
+        [id, id],
+      )
+      if (projects.length > 0)
+        throw new Error(`客户仍被 ${projects.length} 个活跃项目引用`)
+
+      const contractColumns = await tx.select<{ name: string }>(
+        `SELECT name FROM pragma_table_info('contracts')`,
+      )
+      if (contractColumns.some(column => column.name === 'customer_id')) {
+        const [contracts] = await tx.select<{ total: number }>(`
+          SELECT COUNT(*) AS total
+          FROM contracts
+          WHERE customer_id = ? AND deleted_at IS NULL
+        `, [id])
+        if ((contracts?.total ?? 0) > 0)
+          throw new Error(`客户仍被 ${contracts!.total} 份活跃施工合同引用`)
+      }
+    }
+
+    if (ownerType === 'crew') {
+      const workers = await tx.select<{ id: string }>(
+        selectVisibleSql('workers', 'AND crew_id = ?'),
+        [id],
+      )
+      if (workers.length > 0)
+        throw new Error(`班组仍有 ${workers.length} 名在册工人`)
+    }
+
+    return softDelete(tx, MASTER_DATA_TABLES[ownerType], id)
+  })
 }
 
 export async function restoreMasterDataRecord(

@@ -130,6 +130,10 @@ describe('f1 整页表单领域 action', () => {
     expect(workerStore.current?.name).toBe('Store 工人')
     expect(projectStore.byId(project.id)?.customerId).toBe(customer.id)
     expect(targetCostStore.current?.projectId).toBe(project.id)
+    expect(customerStore.revision).toBe(1)
+    expect(crewStore.revision).toBe(1)
+    expect(workerStore.revision).toBe(1)
+    expect(targetCostStore.revision).toBe(1)
     expect(worker.id).toBeTruthy()
     expect(targetCost.id).toBeTruthy()
   })
@@ -163,7 +167,7 @@ describe('f1 整页表单领域 action', () => {
       manager: '',
     }, 'draft')
     const targetCost = await saveTargetCostForm({
-      projectId: 'project-ref',
+      projectId: null,
       name: '',
     }, 'draft')
 
@@ -172,7 +176,10 @@ describe('f1 整页表单领域 action', () => {
     expect((await loadCrewForm(crew.id))?.status).toBe('draft')
     expect((await loadWorkerForm(worker.id))?.status).toBe('draft')
     expect((await loadProjectForm(project.id))?.approvalStatus).toBe('draft')
-    expect((await loadTargetCostForm(targetCost.id))?.status).toBe('draft')
+    expect(await loadTargetCostForm(targetCost.id)).toMatchObject({
+      projectId: null,
+      status: 'draft',
+    })
   })
 
   it('提交逐类校验必填、真实关系与非负数，不接受名称假装外键', async () => {
@@ -191,6 +198,12 @@ describe('f1 整页表单领域 action', () => {
       contactName: '班组长',
       contactPhone: '',
     }, 'submit')).rejects.toThrow('联系电话')
+    await expect(saveCrewForm({
+      name: '引用班组',
+      trade: '木工',
+      contactName: '另一班组长',
+      contactPhone: '13800138009',
+    }, 'submit')).rejects.toThrow('班组名称已存在')
     await expect(saveWorkerForm({
       name: '张三',
       phone: '13800138001',
@@ -209,6 +222,24 @@ describe('f1 整页表单领域 action', () => {
       name: '负数目标',
       plannedProfit: -0.01,
     }, 'submit')).rejects.toThrow('计划利润不能为负数')
+
+    await mem.execute(`
+      UPDATE customers
+      SET deleted_at = '2026-07-25T00:00:00.000Z'
+      WHERE id = 'customer-ref'
+    `)
+    await expect(saveWorkerForm({
+      name: '不可见项目工人',
+      phone: '13800138002',
+      bankName: '建设银行',
+      bankAccount: '62270002',
+      trade: '泥水',
+      currentProjectId: 'project-ref',
+    }, 'submit')).rejects.toThrow('当前项目不存在或已删除')
+    await expect(saveTargetCostForm({
+      projectId: 'project-ref',
+      name: '不可见项目目标',
+    }, 'submit')).rejects.toThrow('项目不存在或已删除')
   })
 
   it('六类表单的全部可编辑标量字段按真实 ID 写入并完整回显', async () => {
@@ -562,6 +593,53 @@ describe('f1 整页表单领域 action', () => {
       SELECT id FROM operation_logs
       WHERE table_name IN ('customers', 'file_refs')
     `)).toEqual([])
+  })
+
+  it('客户附件最多保留 9 个，超限时整笔事务回滚', async () => {
+    const customer = await saveCustomerForm({
+      name: '九附件客户',
+      contact: '联系人',
+    }, 'submit', {
+      add: Array.from({ length: 9 }, (_, index) => ({
+        fileName: `附件-${index + 1}.pdf`,
+        filePath: `documents/customer/${index + 1}.pdf`,
+      })),
+    })
+
+    await expect(saveCustomerForm({
+      id: customer.id,
+      name: '九附件客户',
+      contact: '联系人',
+    }, 'save', {
+      add: [{ fileName: '第十个附件.pdf' }],
+    })).rejects.toThrow('客户附件最多 9 个')
+    expect(await listFormAttachments('customer', customer.id)).toHaveLength(9)
+  })
+
+  it('客户与班组删除约束在领域事务内检查项目、合同和在册工人', async () => {
+    await expect(deleteMasterDataRecord('customer', 'customer-ref'))
+      .rejects
+      .toThrow('活跃项目')
+    await mem.execute(`ALTER TABLE contracts ADD COLUMN customer_id TEXT REFERENCES customers(id)`)
+    await mem.execute(`
+      INSERT INTO customers (id, name, contact)
+      VALUES ('customer-contract-ref', '合同客户', '联系人')
+    `)
+    await mem.execute(`
+      INSERT INTO contracts (id, name, kind, project_id, customer_id)
+      VALUES ('contract-customer-ref', '施工合同', '施工', 'project-ref', 'customer-contract-ref')
+    `)
+    await expect(deleteMasterDataRecord('customer', 'customer-contract-ref'))
+      .rejects
+      .toThrow('活跃施工合同')
+
+    await mem.execute(`
+      INSERT INTO workers (id, name, crew_id)
+      VALUES ('worker-crew-ref', '在册工人', 'crew-ref')
+    `)
+    await expect(deleteMasterDataRecord('crew', 'crew-ref'))
+      .rejects
+      .toThrow('在册工人')
   })
 
   it('六类头表共用软删除、恢复与日志边界', async () => {

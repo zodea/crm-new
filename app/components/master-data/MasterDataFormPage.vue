@@ -14,6 +14,7 @@ import type {
   WorkerFormDraft,
 } from '~/lib/master-data/forms'
 import type { FormFooterAction } from '~/lib/master-data/page'
+import { isTauri } from '@tauri-apps/api/core'
 import { onBeforeRouteLeave } from 'vue-router'
 import { select } from '~/lib/db/connection'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
@@ -33,6 +34,7 @@ import {
 } from '~/lib/master-data/page'
 import { PROJECT_STATUSES } from '~/lib/project/status'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
 type PageDraft
@@ -58,26 +60,31 @@ const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
 const targetCostStore = useTargetCostStore()
+const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
 const meta = computed(() => FORM_META[props.kind])
-const routeId = computed(() => {
+const pageFullPath = route.fullPath
+const pageKey = deriveKey(pageFullPath)
+const routeId = (() => {
   const value = route.params.id
   return Array.isArray(value) ? value[0] : value
-})
-const isEditing = computed(() => Boolean(routeId.value))
-const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · ${meta.value.label}`)
+})()
+const isEditing = Boolean(routeId)
+const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
 useTabTitle(title)
 
 const draft = ref<PageDraft>(formDefaults(props.kind) as PageDraft)
 const attachments = shallowRef<FormAttachment[]>([])
 const pendingAttachments = shallowRef<PendingAttachment[]>([])
 const pendingRemoveIds = shallowRef<string[]>([])
+const pendingRestoreIds = shallowRef<string[]>([])
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
+const desktopAttachmentPicker = shallowRef(false)
 let allowLeave = false
 
 const aliasesText = computed({
@@ -92,7 +99,8 @@ const aliasesText = computed({
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value
   || pendingAttachments.value.length > 0
-  || pendingRemoveIds.value.length > 0)
+  || pendingRemoveIds.value.length > 0
+  || pendingRestoreIds.value.length > 0)
 
 const sections = computed(() => meta.value.sections)
 
@@ -102,8 +110,8 @@ async function queryLookup(
   includeAliases = false,
 ): Promise<LookupOption[]> {
   const pattern = `%${keyword.trim()}%`
-  const aliasClause = includeAliases ? 'OR aliases LIKE ?' : ''
-  const params = includeAliases ? [pattern, pattern] : [pattern]
+  const aliasClause = includeAliases ? 'OR aliases LIKE ? OR tax_no LIKE ?' : ''
+  const params = includeAliases ? [pattern, pattern, pattern] : [pattern]
   const rows = await select<{ id: string, name: string }>(
     selectVisibleSql(
       table,
@@ -134,8 +142,9 @@ async function initialize() {
   fieldErrors.value = {}
   pendingAttachments.value = []
   pendingRemoveIds.value = []
+  pendingRestoreIds.value = []
   try {
-    const id = routeId.value
+    const id = routeId
     if (!id) {
       draft.value = formDefaults(props.kind) as PageDraft
       attachments.value = []
@@ -143,7 +152,7 @@ async function initialize() {
     else {
       const [record, files] = await Promise.all([
         loadRecord(id),
-        listFormAttachments(props.kind, id),
+        listFormAttachments(props.kind, id, true),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -197,6 +206,7 @@ function attachmentChanges(): FormAttachmentChanges {
   return {
     add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
     removeIds: pendingRemoveIds.value,
+    restoreIds: pendingRestoreIds.value,
   }
 }
 
@@ -219,18 +229,7 @@ async function saveThroughStore(action: MasterDataSaveAction) {
 
 async function handleFooterAction(action: FormFooterAction) {
   if (action === 'cancel') {
-    if (dirty.value) {
-      const leave = await confirm({
-        variant: 'simple',
-        title: '放弃修改',
-        message: '当前表单还有未保存内容，确认放弃并返回列表？',
-        confirmLabel: '放弃修改',
-      })
-      if (!leave)
-        return
-    }
-    allowLeave = true
-    await navigateTo(meta.value.listPath)
+    await leaveToList()
     return
   }
 
@@ -249,6 +248,7 @@ async function handleFooterAction(action: FormFooterAction) {
     success(saveAction === 'draft' ? '草稿已保存' : '保存成功')
     pendingAttachments.value = []
     pendingRemoveIds.value = []
+    pendingRestoreIds.value = []
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
@@ -257,8 +257,10 @@ async function handleFooterAction(action: FormFooterAction) {
         draft.value = formDefaults(props.kind) as PageDraft
         attachments.value = []
         savedSnapshot.value = JSON.stringify(draft.value)
+        allowLeave = false
       }
       else {
+        tabsStore.close(pageKey)
         await navigateTo(meta.value.newPath)
       }
       return
@@ -266,12 +268,14 @@ async function handleFooterAction(action: FormFooterAction) {
 
     if (closeAfterSave.value) {
       allowLeave = true
+      tabsStore.close(pageKey)
       await navigateTo(meta.value.listPath)
       return
     }
 
-    if (!isEditing.value) {
+    if (!isEditing) {
       allowLeave = true
+      tabsStore.close(pageKey)
       await navigateTo(`${meta.value.newPath}/${result.id}`)
       return
     }
@@ -285,20 +289,59 @@ async function handleFooterAction(action: FormFooterAction) {
   }
 }
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = [...(input.files ?? [])]
+function appendPendingAttachments(files: FormAttachmentDraft[]) {
+  const activeExisting = attachments.value.filter(file =>
+    (!file.deletedAt && !pendingRemoveIds.value.includes(file.id))
+    || pendingRestoreIds.value.includes(file.id),
+  ).length
+  const available = props.kind === 'customer'
+    ? Math.max(0, 9 - activeExisting - pendingAttachments.value.length)
+    : files.length
+  const accepted = files.slice(0, available)
+  if (accepted.length < files.length)
+    warning('客户附件最多 9 个，超出部分未加入')
+
   pendingAttachments.value = [
     ...pendingAttachments.value,
-    ...files.map(file => ({
-      localId: `${file.name}-${file.size}-${file.lastModified}`,
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-      category: meta.value.defaultAttachmentCategory,
+    ...accepted.map((file, index) => ({
+      ...file,
+      localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
+      category: file.category || meta.value.defaultAttachmentCategory,
     })),
   ]
+}
+
+function handleFiles(event: Event) {
+  const input = event.target as HTMLInputElement
+  appendPendingAttachments([...(input.files ?? [])].map(file => ({
+    fileName: file.name,
+    fileSize: file.size,
+    mimeType: file.type,
+  })))
   input.value = ''
+}
+
+async function pickNativeFiles() {
+  try {
+    const [{ open }, { stat }, { basename }] = await Promise.all([
+      import('@tauri-apps/plugin-dialog'),
+      import('@tauri-apps/plugin-fs'),
+      import('@tauri-apps/api/path'),
+    ])
+    const selected = await open({ multiple: true, directory: false })
+    const paths = selected == null
+      ? []
+      : Array.isArray(selected) ? selected : [selected]
+    const files = await Promise.all(paths.map(async filePath => ({
+      fileName: await basename(filePath),
+      filePath,
+      fileSize: (await stat(filePath)).size,
+    })))
+    appendPendingAttachments(files)
+  }
+  catch (cause) {
+    error(`选择附件失败：${toErrorMessage(cause)}`)
+  }
 }
 
 function removePending(localId: string) {
@@ -306,26 +349,57 @@ function removePending(localId: string) {
 }
 
 function toggleExistingAttachment(id: string) {
+  const attachment = attachments.value.find(file => file.id === id)
+  if (attachment?.deletedAt) {
+    pendingRestoreIds.value = pendingRestoreIds.value.includes(id)
+      ? pendingRestoreIds.value.filter(item => item !== id)
+      : [...pendingRestoreIds.value, id]
+    return
+  }
   pendingRemoveIds.value = pendingRemoveIds.value.includes(id)
     ? pendingRemoveIds.value.filter(item => item !== id)
     : [...pendingRemoveIds.value, id]
 }
 
+async function leaveToList() {
+  if (dirty.value) {
+    const leave = await confirm({
+      variant: 'simple',
+      title: '放弃修改',
+      message: '当前表单还有未保存内容，确认放弃并返回列表？',
+      confirmLabel: '放弃修改',
+    })
+    if (!leave)
+      return
+  }
+  allowLeave = true
+  tabsStore.close(pageKey)
+  await navigateTo(meta.value.listPath)
+}
+
 onBeforeRouteLeave(async () => {
   if (allowLeave || !dirty.value)
     return true
-  return confirm({
+
+  // 普通页签切换保留 KeepAlive 草稿；只有当前表单页签已被关闭时才拦截。
+  if (tabsStore.tabs.some(tab => tab.key === pageKey))
+    return true
+
+  const leave = await confirm({
     variant: 'simple',
     title: '放弃修改',
     message: '当前表单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
+  if (!leave)
+    tabsStore.open({ fullPath: pageFullPath, title: title.value })
+  return leave
 })
 
-watch(() => routeId.value, () => {
-  allowLeave = false
+onMounted(() => {
+  desktopAttachmentPicker.value = isTauri()
   void initialize()
-}, { immediate: true })
+})
 </script>
 
 <template>
@@ -348,10 +422,10 @@ watch(() => routeId.value, () => {
     <main class="min-w-0 flex-1">
       <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <NuxtLink :to="meta.listPath" class="mb-1 inline-flex items-center gap-1 text-12px text-brand-deep">
+          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
             <span class="i-lucide-arrow-left" aria-hidden="true" />
             返回{{ meta.listLabel }}
-          </NuxtLink>
+          </button>
           <h1 class="text-20px font-800 text-ink">
             {{ title }}
           </h1>
@@ -946,10 +1020,20 @@ watch(() => routeId.value, () => {
 
         <section id="section-attachments" class="panel scroll-mt-4 p-4">
           <SectionHeader :title="kind === 'worker' ? '证书档案' : '附件'" />
-          <label class="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft">
+          <button
+            v-if="desktopAttachmentPicker"
+            type="button"
+            class="flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
+            @click="pickNativeFiles"
+          >
             <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
             <span class="text-12px font-600 text-ink">点击选择附件</span>
-            <span class="mt-0.5 text-11px text-ink-faint">仅保存文件引用元数据，不把文件数组写进业务头表</span>
+            <span class="mt-0.5 text-11px text-ink-faint">保存可重新打开的本机文件路径，文件引用独立写入 file_refs</span>
+          </button>
+          <label v-else class="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft">
+            <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
+            <span class="text-12px font-600 text-ink">点击选择附件</span>
+            <span class="mt-0.5 text-11px text-ink-faint">浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径</span>
             <input type="file" multiple class="sr-only" @change="handleFiles">
           </label>
 
@@ -958,13 +1042,25 @@ watch(() => routeId.value, () => {
               v-for="file in attachments"
               :key="file.id"
               class="flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2"
-              :class="pendingRemoveIds.includes(file.id) ? 'bg-danger-soft opacity-65' : 'bg-panel'"
+              :class="pendingRemoveIds.includes(file.id)
+                ? 'bg-danger-soft opacity-65'
+                : pendingRestoreIds.includes(file.id)
+                  ? 'border-brand/30 bg-brand-soft'
+                  : file.deletedAt ? 'bg-surface-2 opacity-65' : 'bg-panel'"
             >
               <span class="i-lucide-paperclip text-ink-faint" aria-hidden="true" />
               <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
               <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
-              <button type="button" class="text-11px text-danger" @click="toggleExistingAttachment(file.id)">
-                {{ pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
+              <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
+              <button
+                type="button"
+                class="text-11px"
+                :class="file.deletedAt ? 'text-brand' : 'text-danger'"
+                @click="toggleExistingAttachment(file.id)"
+              >
+                {{ file.deletedAt
+                  ? pendingRestoreIds.includes(file.id) ? '取消恢复' : '恢复'
+                  : pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
               </button>
             </div>
             <div
