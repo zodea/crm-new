@@ -1,7 +1,5 @@
 # 送货单识别 — 上传·整理·识别·导出
 
-> ⚠️ **字段回写未完，横幅保留**：新增/编辑表单以 [ADR 0014](../../adr/0014-full-page-entity-forms.md) 与 `DC重构设计源码/kit/forms/*.jsx` 为现行字段来源；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认用户可编辑业务字段默认持久化，但本文字段表和 DATABASE 具体列仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 评审。
-
 > 路由: `/material/delivery`
 > 页面: `pages/material/delivery/index.vue` → `components/delivery/DeliveryRecognitionScreen.vue`
 > 来源: 现有 DeliveryView + delivery store 代码分析；2026-07-17 已接入真实 OCR 闭环
@@ -99,13 +97,26 @@ ProblemDialog:
 
 ---
 
-## 二、数据模型
+## 二、归档行编辑
+
+`deliveryArchiveForm` 是归档库记录的整页编辑入口，归档不是终态；保存前使用二次确认。
+
+| 分区 | 字段与规则 |
+|---|---|
+| 档案信息 | 文件名、OCR 识别公司只读留痕 |
+| 归属 | 项目*、分供方（可空=未区分分供方），均为真实 lookup |
+| 单据字段 | 送货单号、送货日期、材料摘要、单据金额 |
+| 备注 | 备注 |
+
+改项目/分供方后重新校验去重自然键；材料摘要和单据金额保存人工核对结果，材料行仍是入库与单价对比的明细事实。
+
+## 三、数据模型
 
 本页不复制字段定义：持久化模型唯一权威见 [DATABASE.md §2.5](../DATABASE.md)，处理区会话类型见 `app/stores/delivery.ts`。金额口径同样以 DATABASE 为准：`delivery_lines.amount` 是复核后独立金额，数量×单价只做勾稽。
 
 ---
 
-## 三、组件清单
+## 四、组件清单
 
 当前已落地：
 
@@ -137,7 +148,7 @@ ProblemDialog:
 
 ---
 
-## 四、未完善检测规则
+## 五、未完善检测规则
 
 ```ts
 function fileIncompleteReasons(f: DeliveryFile): string[] {

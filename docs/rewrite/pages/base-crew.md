@@ -1,9 +1,8 @@
 # 基础信息/班组管理 — 列表 + 详情 + 项目配置
 
-> ⚠️ **字段回写未完，横幅保留**：新增/编辑表单以 [ADR 0014](../../adr/0014-full-page-entity-forms.md) 与 `DC重构设计源码/kit/forms/*.jsx` 为现行字段来源；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认用户可编辑业务字段默认持久化，但本文字段表和 DATABASE 具体列仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 评审。
-
 > 路由: `/base/crew` · `/base/crew/:id`
 > 页面: `pages/base/crew/index.vue` · `pages/base/crew/[id].vue`
+> 表单蓝本: `crewForm`（ADR 0014）
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
 > 原型参考: `DC重构设计源码/kit/CrewScreen.jsx` · `CrewDetailScreen.jsx`（圆角卡片版，见 ADR 0007；旧扁平稿已删除）
 
@@ -55,7 +54,9 @@
 
 ---
 
-## 二、数据模型（SQLite）
+## 二、旧建表快照（已废弃）
+
+> ⛔ 本节只保留早期班组详情模型作历史对照，不是 schema 来源。现行表结构、外键和整页表单增量统一见 [`DATABASE.md` §2.6、§2.10](../DATABASE.md)。
 
 ### crews
 
@@ -66,6 +67,12 @@ CREATE TABLE crews (
   trade         TEXT,                   -- 工种类型
   contactName   TEXT,                   -- 班组负责人
   contactPhone  TEXT,
+  defaultPayRatio REAL DEFAULT 0.95,
+  rentSubsidyEnabled INTEGER DEFAULT 0,
+  rentSubsidyPrice REAL,
+  mgmtFeeEnabled INTEGER DEFAULT 0,
+  mgmtFeePrice REAL,
+  assignmentLevel TEXT DEFAULT '班组', -- '班组' | '个人'
   note          TEXT,
   createdAt     TEXT,
   updatedAt     TEXT
@@ -229,12 +236,13 @@ CREATE INDEX idx_penalty_records_worker ON penalty_records(workerId);
 
 ## 四、新增/编辑班组
 
-弹窗表单宽屏最多 2 列，字段最小可读宽度不足时自动单列。
+采用 ADR 0014 整页表单，宽屏最多 2 列，字段最小可读宽度不足时自动单列。
 
 | 分区 | 字段 | 说明 |
 |------|------|------|
-| 基本信息 | 班组名称*、工种类型*、备注 | 名称不可重复 |
-| 负责人 | 负责人姓名、联系电话 | |
+| 基本信息 | 班组名称*、工种*、负责人*、联系电话* | 名称不可重复 |
+| 计薪与提成 | 默认发放比例、房租补贴开关与单价、管理提成开关与单价、指派粒度 | 指派粒度保存“班组/个人”；决定工程量指派是否可下钻组内工人 |
+| 备注 | 备注、合作协议附件 | 附件走 `file_refs` |
 
 保存后跳转至详情页。
 

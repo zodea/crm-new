@@ -1,9 +1,8 @@
 # 基础信息/分供方 — 主数据 + 证照 + 跨项目汇总
 
-> ⚠️ **字段回写未完，横幅保留**：新增/编辑表单以 [ADR 0014](../../adr/0014-full-page-entity-forms.md) 与 `DC重构设计源码/kit/forms/*.jsx` 为现行字段来源；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认用户可编辑业务字段默认持久化，但本文字段表和 DATABASE 具体列仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 评审。分供方字段同时受 #13 领域语义约束。
-
 > 路由: `/base/supplier` · `/base/supplier/:id`  
 > 页面: `pages/base/supplier/index.vue` · `pages/base/supplier/[id].vue`  
+> 表单蓝本: `supplierForm`（ADR 0014）  
 > 参考: CRM 截图 `docs/红圈系统/合同页/`、`docs/红圈系统/付款申请/`、`docs/红圈系统/收票登记/`  
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
 
@@ -40,7 +39,9 @@
 
 ---
 
-## 二、数据模型
+## 二、旧字段快照（已废弃）
+
+> ⛔ 本节只保留早期界面类型作历史对照，不是 schema 来源。现行列、约束、核验状态与迁移批次统一见 [`DATABASE.md` §2.1、§2.10](../DATABASE.md)；新增实现不得从下列 TypeScript 接口反推表结构。
 
 ### Supplier
 
@@ -54,9 +55,8 @@ interface Supplier {
 
   // 分类
   businessType: string            // 业务类型
-  supplierCategory: string        // 分供方类别: 材料供应商/劳务分包商/设备供应商/其他
+  supplierCategory: string        // CONTEXT.md 权威 7 类
   rating: string                  // 评价等级
-  parentSupplierId: string | null // 上级供应商
 
   // 工商信息
   legalRep: string                // 法定代表人
@@ -76,6 +76,7 @@ interface Supplier {
   // 联系人
   contact: string                 // 主要联系人(签约代表)
   contactPhone: string            // 联系方式
+  contactTitle: string            // 职务
 
   // 状态（两个独立维度）
   credentialStatus: 'incomplete' | 'reviewing' | 'qualified' | 'rejected'
@@ -156,7 +157,6 @@ interface SupplierReadonlySummary {
 | 分供方类别 | `supplierCategory` | 可筛选 |
 | 唯一识别码/税号 | `uniqueCode` / `taxNo` | 用于去重 |
 | 供应商简称 | `aliases[0]` | 可为空 |
-| 上级供应商 | `parentSupplierId` | 显示上级名称 |
 | 详细地址 | `address` | 长文本省略 |
 | 主要联系人 | `contact` | |
 | 联系方式 | `contactPhone` | |
@@ -170,7 +170,7 @@ interface SupplierReadonlySummary {
 
 | 筛选项 | 说明 |
 |---|---|
-| 分供方类别 | 材料供应商、劳务分包商、设备供应商、其他 |
+| 分供方类别 | 材料供应商、劳务分包商、专业分包商、设备供应商、检测供应商、个人、其他 |
 | 资料状态 | 缺失、齐全待核验、合格、退回 |
 | 合作项目 | 只看某项目关联过的分供方 |
 | 欠款状态 | 应付余额 > 0 |
@@ -180,16 +180,17 @@ interface SupplierReadonlySummary {
 
 ## 四、新增/编辑
 
-弹窗或抽屉表单，字段按分区组织。
+采用 ADR 0014 整页表单；新建前先选择 CONTEXT.md 权威七类，类型带入表单但仍可在未产生业务引用前修正。
 
 | 分区 | 字段 |
 |---|---|
-| 基础信息 | 公司全称*、简称/别名、分供方类别、业务类型、统一社会信用代码/税号、法人代表、注册资金、注册日期、注册地址、主营业务 |
-| 开票/银行 | 开票名称、纳税人类型（默认未核验）、开户行、银行账号、开票资料地址（选填）、公司电话（选填） |
-| 联系/其他 | 主要联系人、联系方式、评价等级、上级供应商、来源、备注 |
-| 证照附件 | 上传、预览、删除、OCR 识别、自动分类、手动调整类别 |
+| 基础信息 | 公司全称*、简称别名、分供方类别*、经营类型、唯一识别码、统一社会信用代码、法定代表人、注册资金、注册日期、注册地址、纳税人类型、评价等级、主营业务 |
+| 联系人信息 | 主要联系人*、联系人电话、职务、公司电话 |
+| 开票信息 | 开票名称、开户行、银行账号、开票地址及电话 |
+| 证照附件 | 营业执照、法人身份证、银行账户资料、资质证书、过往业绩合同、品牌授权书、完税证明；每类附件可上传、预览、下载和软删除 |
+| 状态与备注 | 资料状态（按资料规则与人工审核动作产生）、备注 |
 
-V1 说明：`approvalStatus` 默认 `draft`，表单中不显示整体入库审批入口。`credentialStatus` 中 `incomplete/reviewing` 由资料规则自动计算，`qualified/rejected` 只能由人工核验动作产生。
+`approvalStatus` 不作为本表单普通字段。`credentialStatus` 中 `incomplete/reviewing` 由资料规则自动计算，`qualified/rejected` 只能由人工核验动作产生；设计稿普通 select 不得绕过 #13 的审核凭证要求。
 
 ### 地址、电话与纳税人类型口径
 
