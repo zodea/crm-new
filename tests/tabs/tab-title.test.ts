@@ -11,6 +11,21 @@ describe('导出配置页签文案', () => {
   })
 })
 
+describe('f1 主数据表单页签文案', () => {
+  it.each([
+    ['/base/supplier/form', '分供方表单'],
+    ['/base/supplier/form/sup_1', '分供方表单'],
+    ['/base/customer/form/customer_1', '客户表单'],
+    ['/base/crew/form/crew_1', '班组表单'],
+    ['/base/worker/form/worker_1', '工人表单'],
+    ['/project/form/project_1', '项目表单'],
+    ['/project/target-cost', '目标成本'],
+    ['/project/target-cost/form/target_1', '目标成本表单'],
+  ])('%s 不落入通用详情规则', (path, title) => {
+    expect(routeTitle(path)).toBe(title)
+  })
+})
+
 describe('导入映射页签文案', () => {
   it('实体路由使用统一页签标题', () => {
     expect(routeTitle('/import/mapping/demo-supplier')).toBe('导入映射')

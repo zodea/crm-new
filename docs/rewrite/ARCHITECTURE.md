@@ -124,8 +124,9 @@ components/
 ├── home/       # ProjectDashboard
 ├── invoice/    # InvoiceUpload, InvoicePreview, InvoiceRow, FieldsTable, InvoicePrintPanel, InvoiceLedgerPanel, InvoiceLedgerViewer, ExportPanel
 ├── delivery/   # DeliveryTree, PartitionBar, UploadZone, FileCard, SaveToStorePanel
-├── supplier/   # SupplierFormDialog, SupplierCredentialPanel, SupplierSummaryTabs, SupplierProjectSummary
-├── project/    # ProjectFormDialog, ProjectCombobox, ProjectInfoCard
+├── master-data/ # MasterDataFormPage, MasterDataSimpleList（F1 六类整页主数据表单）
+├── supplier/   # SupplierCredentialPanel, SupplierSummaryTabs, SupplierProjectSummary
+├── project/    # ProjectCombobox, ProjectInfoCard
 ├── worker/     # WorkerFormDialog
 ├── crew/       # (待展开)
 ├── quantity/   # (矩阵可视化·待展开)

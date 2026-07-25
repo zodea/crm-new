@@ -44,6 +44,13 @@ describe('侧栏导航树', () => {
     expect(activeNavKey('/schedule/new')).toBe('schedule')
   })
 
+  it('f1 客户与目标成本入口已启用并保持子路由点亮', () => {
+    expect(leaves().find(item => item.key === 'customer')?.to).toBe('/base/customer')
+    expect(activeNavKey('/base/customer/form/customer_1')).toBe('customer')
+    expect(leaves().find(item => item.key === 'targetCost')?.to).toBe('/project/target-cost')
+    expect(activeNavKey('/project/target-cost/form/target_1')).toBe('targetCost')
+  })
+
   it('boq 工作区与专用拆表页开放入口并点亮各自导航', () => {
     expect(leaves().find(item => item.key === 'boqList')?.to).toBe('/contract/boq')
     expect(leaves().find(item => item.key === 'boqImport')?.to).toBe('/contract/boq/import')

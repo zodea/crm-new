@@ -32,7 +32,7 @@ export const NAV_TREE: NavNode[] = [
   { type: 'group', key: 'g-project', label: '项目信息', icon: 'i-lucide-building', items: [
     { key: 'project', mark: '项', icon: 'i-lucide-folder-kanban', label: '项目列表', hint: '工期进度', to: '/project' },
     { key: 'schedule', mark: '进', icon: 'i-lucide-calendar-clock', label: '施工进度', hint: '排程 · 甘特', to: '/schedule' },
-    { key: 'targetCost', mark: '标', icon: 'i-lucide-target', label: '目标成本', hint: '预算基准' },
+    { key: 'targetCost', mark: '标', icon: 'i-lucide-target', label: '目标成本', hint: '预算基准', to: '/project/target-cost' },
   ] },
   { type: 'group', key: 'g-main', label: '主合同管理', icon: 'i-lucide-file-pen', items: [
     { key: 'conContract', mark: '合', icon: 'i-lucide-signature', label: '施工合同', hint: '收入合同', to: '/contract/construction' },
@@ -90,7 +90,7 @@ export const NAV_TREE: NavNode[] = [
   ] },
   { type: 'group', key: 'g-base', label: '基础信息', icon: 'i-lucide-database', items: [
     { key: 'supplier', mark: '方', icon: 'i-lucide-factory', label: '分供方', hint: '资料管理', to: '/base/supplier' },
-    { key: 'customer', mark: '客', icon: 'i-lucide-landmark', label: '客户', hint: '甲方档案' },
+    { key: 'customer', mark: '客', icon: 'i-lucide-landmark', label: '客户', hint: '甲方档案', to: '/base/customer' },
     { key: 'crew', mark: '组', icon: 'i-lucide-users-round', label: '班组管理', hint: '单价·配置', to: '/base/crew' },
     { key: 'worker', mark: '工', icon: 'i-lucide-user-round', label: '工人信息', hint: '人员证书', to: '/base/worker' },
   ] },
@@ -145,10 +145,14 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'home'
   if (path.startsWith('/schedule'))
     return 'schedule'
+  if (path.startsWith('/project/target-cost'))
+    return 'targetCost'
   if (path.startsWith('/project'))
     return 'project'
   if (path.startsWith('/base/supplier'))
     return 'supplier'
+  if (path.startsWith('/base/customer'))
+    return 'customer'
   if (path.startsWith('/base/crew'))
     return 'crew'
   if (path.startsWith('/base/worker'))
