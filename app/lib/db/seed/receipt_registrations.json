@@ -2,12 +2,14 @@
   {
     "id": "rr_mz0x1_0",
     "project_id": "proj_demo_001",
-    "receipt_no": "SK-2026-001",
+    "customer_id": "customer_demo_001",
+    "no": "SK-2026-001",
     "receipt_date": "2026-05-30",
     "amount": 25367027,
     "payment_method": "银行转账",
-    "payer_unit": "合和地产集团",
-    "cumulative_receivable": 25367027,
-    "created_at": "2026-05-30T09:00:00.000Z"
+    "payer_account": "合和地产集团",
+    "status": "submitted",
+    "created_at": "2026-05-30T09:00:00.000Z",
+    "updated_at": "2026-05-30T09:00:00.000Z"
   }
 ]

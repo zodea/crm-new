@@ -54,6 +54,19 @@ async function loadConstructionContractSums(db: SoftDb): Promise<Map<string, num
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
 }
 
+async function loadConfirmedPaymentSums(db: SoftDb): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtes('payment_records')}
+    SELECT payment.project_id, COALESCE(SUM(payment.amount), 0) AS total
+    FROM payment_records AS payment
+    WHERE ${visibleCond('payment_records', 'payment')}
+      AND payment.confirmation_status = 'confirmed'
+      AND payment.project_id IS NOT NULL
+    GROUP BY payment.project_id
+  `)
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
 async function loadConstructionSupplementSums(db: SoftDb): Promise<Map<string, number>> {
   const rows = await db.select<ProjectSumRow>(`
     ${hiddenCtesFor('contracts', 'contract_supplements')}
@@ -70,6 +83,21 @@ async function loadConstructionSupplementSums(db: SoftDb): Promise<Map<string, n
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
 }
 
+async function loadCurrentSums(
+  db: SoftDb,
+  direction: 'receipt' | 'payment',
+): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtes('current_transactions')}
+    SELECT current.project_id, COALESCE(SUM(current.amount), 0) AS total
+    FROM current_transactions AS current
+    WHERE ${visibleCond('current_transactions', 'current')}
+      AND current.direction = ?
+    GROUP BY current.project_id
+  `, [direction])
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
 /** DATABASE §4.1/§4.2：明细求和交给 SQLite，且所有表统一走祖先软删过滤。 */
 export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDetailAggregate[]> {
   const [projects, mainContracts, supplements, changes, receipts, payments, currentIn, currentOut, outputAmounts, outputTaxes] = await Promise.all([
@@ -78,9 +106,9 @@ export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDe
     loadConstructionSupplementSums(db),
     loadProjectSums(db, 'owner_change_orders', 'tax_inc_amount'),
     loadProjectSums(db, 'receipt_registrations', 'amount'),
-    loadProjectSums(db, 'payment_applications', 'actual_payment'),
-    loadProjectSums(db, 'current_receipts', 'amount'),
-    loadProjectSums(db, 'current_payments', 'amount'),
+    loadConfirmedPaymentSums(db),
+    loadCurrentSums(db, 'receipt'),
+    loadCurrentSums(db, 'payment'),
     loadProjectSums(db, 'invoice_applications', 'amount'),
     loadProjectSums(db, 'invoice_applications', 'tax_amount'),
   ])

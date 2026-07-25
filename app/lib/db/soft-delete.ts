@@ -146,13 +146,24 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'supplier_id', table: 'suppliers' },
   ],
   delivery_lines: [{ column: 'delivery_record_id', table: 'delivery_records' }],
-  invoice_applications: [{ column: 'project_id', table: 'projects' }],
-  receipt_registrations: [{ column: 'project_id', table: 'projects' }],
-  current_receipts: [{ column: 'project_id', table: 'projects' }],
-  current_payments: [{ column: 'project_id', table: 'projects' }],
+  invoice_applications: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+    { column: 'customer_id', table: 'customers' },
+  ],
+  receipt_registrations: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+    { column: 'customer_id', table: 'customers' },
+  ],
+  current_transactions: [{ column: 'project_id', table: 'projects' }],
   payment_records: [
     { column: 'project_id', table: 'projects' },
-    { column: 'payment_application_id', table: 'payment_applications' },
+    { column: 'supplier_id', table: 'suppliers' },
+  ],
+  expense_reimbursements: [{ column: 'project_id', table: 'projects' }],
+  expense_reimbursement_lines: [
+    { column: 'reimbursement_id', table: 'expense_reimbursements' },
   ],
   workers: [
     { column: 'crew_id', table: 'crews' },
@@ -166,6 +177,18 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
     { column: 'contract_id', table: 'contracts' },
+  ],
+  payment_application_settlement_allocations: [
+    { column: 'payment_application_id', table: 'payment_applications' },
+    { column: 'settlement_id', table: 'expenditure_settlements' },
+  ],
+  payment_application_invoice_allocations: [
+    { column: 'payment_application_id', table: 'payment_applications' },
+    { column: 'invoice_id', table: 'invoices' },
+  ],
+  payment_record_application_allocations: [
+    { column: 'payment_record_id', table: 'payment_records' },
+    { column: 'payment_application_id', table: 'payment_applications' },
   ],
   file_refs: [],
 }

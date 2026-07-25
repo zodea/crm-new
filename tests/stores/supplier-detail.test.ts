@@ -67,8 +67,33 @@ beforeEach(async () => {
   `)
   await mem.execute(`
     INSERT INTO payment_applications
-      (id, project_id, supplier_id, application_no, name, amount, approved_amount, paid_amount, actual_payment, payment_status)
-    VALUES ('pay1', 'p1', 's1', 'PAY-1', '进度请款', 400, 300, 200, 200, '部分付款')
+      (id, project_id, supplier_id, no, name, biz_type, apply_amount,
+       apply_date, applicant, invoice_state, approved_amount, status)
+    VALUES (
+      'pay1', 'p1', 's1', 'PAY-1', '进度请款', '项目费用', 400,
+      '2026-07-01', '张工', '先款后票', 300, 'approved'
+    )
+  `)
+  await mem.execute(`
+    INSERT INTO payment_records (
+      id, no, project_id, supplier_id, payee_name, payment_date, amount,
+      voucher_no, bank_serial_no, confirmation_status
+    )
+    VALUES (
+      'record1', 'ZF-1', 'p1', 's1', '测试分供方', '2026-07-02', 200,
+      'V-1', 'BANK-1', 'needs_review'
+    )
+  `)
+  await mem.execute(`
+    INSERT INTO payment_record_application_allocations (
+      id, payment_record_id, payment_application_id, allocated_amount
+    )
+    VALUES ('record-allocation1', 'record1', 'pay1', 200)
+  `)
+  await mem.execute(`
+    UPDATE payment_records
+    SET confirmation_status = 'confirmed', confirmed_at = '2026-07-02T09:00:00.000Z'
+    WHERE id = 'record1'
   `)
   await mem.execute(`
     INSERT INTO invoices

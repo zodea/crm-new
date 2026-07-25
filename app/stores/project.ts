@@ -28,8 +28,7 @@ const TABLE_LABELS: Record<string, string> = {
   owner_change_orders: '变更单',
   invoice_applications: '开票申请',
   receipt_registrations: '收货登记',
-  current_receipts: '往来收款',
-  current_payments: '往来付款',
+  current_transactions: '往来收付',
   payment_records: '付款记录',
   phase_tasks: '阶段任务',
 }

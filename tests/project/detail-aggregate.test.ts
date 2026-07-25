@@ -21,8 +21,7 @@ const TABLES = [
   'invoice_applications',
   'receipt_registrations',
   'payment_applications',
-  'current_receipts',
-  'current_payments',
+  'current_transactions',
 ] as const
 
 async function insertSeed(db: TestDb, table: string) {
@@ -43,6 +42,33 @@ describe('project detail SQL aggregates', () => {
     await runMigrations(db)
     for (const table of TABLES)
       await insertSeed(db, table)
+    await db.execute(`
+      INSERT INTO payment_records (
+        id, no, project_id, payee_name, payment_date, amount,
+        voucher_no, bank_serial_no, confirmation_status
+      )
+      VALUES (
+        'payment-project-aggregate', 'ZF-AGG', 'proj_demo_001', '项目收款方',
+        '2026-06-20', 4200000, 'V-AGG', 'BANK-AGG', 'needs_review'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO payment_record_application_allocations (
+        id, payment_record_id, payment_application_id, allocated_amount
+      )
+      VALUES (
+        'payment-project-aggregate-allocation',
+        'payment-project-aggregate',
+        'pa_mz0x1_0',
+        4200000
+      )
+    `)
+    await db.execute(`
+      UPDATE payment_records
+      SET confirmation_status = 'confirmed',
+          confirmed_at = '2026-06-20T09:00:00.000Z'
+      WHERE id = 'payment-project-aggregate'
+    `)
 
     const rows = await loadProjectDetailAggregates(db)
     const p1 = rows.find(row => row.projectId === 'proj_demo_001')!

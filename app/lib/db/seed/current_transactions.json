@@ -1,0 +1,27 @@
+[
+  {
+    "id": "cr_mz0x1_0",
+    "project_id": "proj_demo_001",
+    "no": "WL-SK-001",
+    "direction": "receipt",
+    "transaction_date": "2026-04-12",
+    "amount": 6100000,
+    "counterparty": "合和地产集团",
+    "status": "submitted",
+    "created_at": "2026-04-12T09:00:00.000Z",
+    "updated_at": "2026-04-12T09:00:00.000Z"
+  },
+  {
+    "id": "cp_mz0x1_0",
+    "project_id": "proj_demo_001",
+    "no": "WL-FK-001",
+    "direction": "payment",
+    "transaction_date": "2026-04-20",
+    "counterparty": "公司总部",
+    "amount": 5950000,
+    "payment_method": "银行转账",
+    "status": "submitted",
+    "created_at": "2026-04-20T09:00:00.000Z",
+    "updated_at": "2026-04-20T09:00:00.000Z"
+  }
+]
