@@ -31,9 +31,17 @@ beforeEach(async () => {
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '演示项目')`)
   await mem.execute(`INSERT INTO buildings (id, project_id, code, name) VALUES
     ('b1', 'p1', '1', '1栋')`)
+  await mem.execute(`INSERT INTO contracts (id, name, kind, project_id) VALUES
+    ('contract-main', '演示施工合同', '施工', 'p1')`)
   await mem.execute(`INSERT INTO items (id, project_id, code, name, trade) VALUES
     ('i-wp-wall', 'p1', 'WP-WALL', '墙面防水', '防水工'),
     ('i-wp-floor', 'p1', 'WP-FLOOR', '地面防水', '防水工')`)
+  await mem.execute(`INSERT INTO boq_files (id, contract_id, file_name, parse_status, line_count) VALUES
+    ('boq-file', 'contract-main', '演示清单.xlsx', 'parsed', 2)`)
+  await mem.execute(`INSERT INTO boq_lines
+    (id, boq_file_id, project_id, contract_id, item_id, item_name, qty, unit_price, trace_key, sort_order) VALUES
+    ('boq-wall', 'boq-file', 'p1', 'contract-main', 'i-wp-wall', '墙面防水', 20, 50, 'demo·1', 10),
+    ('boq-floor', 'boq-file', 'p1', 'contract-main', 'i-wp-floor', '地面防水', 8, 60, 'demo·2', 20)`)
   await mem.execute(`INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES
     ('s-wp', 'p1', 'WP-02', '防水二遍', '防水工')`)
   await mem.execute(`INSERT INTO construction_stage_items (id, stage_id, item_id) VALUES
@@ -45,10 +53,15 @@ beforeEach(async () => {
 describe('schedule store：排程唯一 action 写路径', () => {
   it('建组、改期/人工进度、设基线、增删工序均真实持久化', async () => {
     const store = useScheduleStore()
+    await store.loadContracts('p1')
+    expect(store.contracts).toEqual([
+      expect.objectContaining({ id: 'contract-main', lineCount: 2 }),
+    ])
     const settingOut = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'setting-out')!
     const waterproof = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'waterproof')!
     const groupId = await store.createGroup({
       projectId: 'p1',
+      contractId: 'contract-main',
       name: '户内1栋',
       buildingIds: ['b1'],
       startDate: '2026-07-01',
@@ -59,9 +72,17 @@ describe('schedule store：排程唯一 action 写路径', () => {
       ],
     }, '2026-07-01')
 
-    expect(store.snapshot?.groups[0]).toMatchObject({ id: groupId, buildingIds: ['b1'] })
+    expect(store.snapshot?.groups[0]).toMatchObject({
+      id: groupId,
+      contractId: 'contract-main',
+      buildingIds: ['b1'],
+    })
     const manualTask = store.snapshot!.groups[0]!.tasks.find(task => !task.hasQty)!
     const automaticTask = store.snapshot!.groups[0]!.tasks.find(task => task.hasQty)!
+    expect(automaticTask.boqLineIds).toEqual(['boq-floor', 'boq-wall'])
+    expect(await mem.select(`
+      SELECT contract_id FROM schedule_groups WHERE id = ?
+    `, [groupId])).toEqual([{ contract_id: 'contract-main' }])
 
     const dependencyLog = await store.updateDependency(automaticTask.id, manualTask.id, 3, '2026-07-01')
     expect(dependencyLog.logId).toBeTruthy()

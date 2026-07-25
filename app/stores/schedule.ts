@@ -1,5 +1,10 @@
 import type { ScheduleOverlapMode, ScheduleTemplatePlanInput } from '~/lib/schedule/planning'
-import type { ScheduleBuildingOption, ScheduleCatalogProject, ScheduleProjectView } from '~/lib/schedule/read-model'
+import type {
+  ScheduleBuildingOption,
+  ScheduleCatalogProject,
+  ScheduleContractOption,
+  ScheduleProjectView,
+} from '~/lib/schedule/read-model'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { execute, select, withTransaction } from '~/lib/db/connection'
@@ -16,7 +21,12 @@ import {
   dependencyConflicts,
   planTemplateTasks,
 } from '~/lib/schedule/planning'
-import { loadScheduleBuildings, loadScheduleCatalog, loadScheduleProject } from '~/lib/schedule/read-model'
+import {
+  loadScheduleBuildings,
+  loadScheduleCatalog,
+  loadScheduleContracts,
+  loadScheduleProject,
+} from '~/lib/schedule/read-model'
 import { SCHEDULE_TEMPLATE_BY_KEY } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
@@ -31,6 +41,7 @@ const db: ScheduleDb = { execute, select }
 
 export interface CreateScheduleGroupDraft {
   projectId: string
+  contractId: string
   name: string
   buildingIds: readonly string[]
   startDate: string
@@ -50,10 +61,38 @@ export interface AddScheduleTaskDraft {
 }
 
 interface IdCodeRow { id: string, code: string }
+interface BoqLineRow { id: string, item_id: string }
+
+async function loadBoqLineByItem(
+  targetDb: ScheduleDb,
+  projectId: string,
+  contractId: string,
+  itemIds: readonly string[],
+): Promise<Map<string, string>> {
+  const uniqueItemIds = [...new Set(itemIds)]
+  if (!contractId || !uniqueItemIds.length)
+    return new Map()
+  const rows = await targetDb.select<BoqLineRow>(
+    selectVisibleSql(
+      'boq_lines',
+      `AND project_id = ? AND contract_id = ?
+       AND item_id IN (${uniqueItemIds.map(() => '?').join(', ')})
+       ORDER BY sort_order, id`,
+    ),
+    [projectId, contractId, ...uniqueItemIds],
+  )
+  const lineByItem = new Map<string, string>()
+  for (const row of rows) {
+    if (!lineByItem.has(row.item_id))
+      lineByItem.set(row.item_id, row.id)
+  }
+  return lineByItem
+}
 
 export const useScheduleStore = defineStore('schedule', () => {
   const catalog = shallowRef<ScheduleCatalogProject[]>([])
   const buildings = shallowRef<ScheduleBuildingOption[]>([])
+  const contracts = shallowRef<ScheduleContractOption[]>([])
   const snapshot = shallowRef<ScheduleProjectView | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -68,6 +107,10 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function loadBuildings(projectId: string) {
     buildings.value = projectId ? await loadScheduleBuildings(db, projectId) : []
+  }
+
+  async function loadContracts(projectId: string) {
+    contracts.value = projectId ? await loadScheduleContracts(db, projectId) : []
   }
 
   async function loadProject(projectId: string, today = toLocalDateInputValue()) {
@@ -100,8 +143,8 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function createGroup(draft: CreateScheduleGroupDraft, today = toLocalDateInputValue()) {
     const name = draft.name.trim()
-    if (!draft.projectId || !name)
-      throw new Error('项目与分组名称必填')
+    if (!draft.projectId || !draft.contractId || !name)
+      throw new Error('项目、施工合同与分组名称必填')
     const buildingIds = [...new Set(draft.buildingIds)]
     if (!buildingIds.length)
       throw new Error('请至少选择一栋楼')
@@ -132,6 +175,13 @@ export const useScheduleStore = defineStore('schedule', () => {
         if (buildings.length !== buildingIds.length)
           throw new Error('楼栋范围包含无效或已删除记录')
 
+        const [contract] = await tx.select<{ id: string }>(
+          selectVisibleSql('contracts', `AND id = ? AND project_id = ? AND kind = '施工'`),
+          [draft.contractId, draft.projectId],
+        )
+        if (!contract)
+          throw new Error('施工合同无效、已删除或不属于当前项目')
+
         const stageCodes = templates.flatMap(({ template }) => template.stageCode ? [template.stageCode] : [])
         const itemCodes = templates.flatMap(({ template }) => template.itemCodes)
         const stages = stageCodes.length
@@ -152,6 +202,12 @@ export const useScheduleStore = defineStore('schedule', () => {
         const missingItem = itemCodes.find(code => !itemByCode.has(code))
         if (missingStage || missingItem)
           throw new Error(`工序模板映射未就绪：${missingStage ?? missingItem}`)
+        const boqLineByItem = await loadBoqLineByItem(
+          tx,
+          draft.projectId,
+          draft.contractId,
+          [...itemByCode.values()],
+        )
 
         const [order] = await tx.select<{ next_order: number }>(
           `SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_order
@@ -159,9 +215,9 @@ export const useScheduleStore = defineStore('schedule', () => {
           [draft.projectId],
         )
         await tx.execute(
-          `INSERT INTO schedule_groups (id, project_id, name, sort_order)
-           VALUES (?, ?, ?, ?)`,
-          [groupId, draft.projectId, name, Number(order?.next_order) || 10],
+          `INSERT INTO schedule_groups (id, project_id, contract_id, name, sort_order)
+           VALUES (?, ?, ?, ?, ?)`,
+          [groupId, draft.projectId, draft.contractId, name, Number(order?.next_order) || 10],
         )
         await logCreate(tx, 'schedule_groups', groupId)
 
@@ -204,9 +260,11 @@ export const useScheduleStore = defineStore('schedule', () => {
 
           for (const itemCode of template.itemCodes) {
             const mapId = generateId('schedule_task_item')
+            const itemId = itemByCode.get(itemCode)!
             await tx.execute(
-              `INSERT INTO task_item_map (id, task_id, item_id) VALUES (?, ?, ?)`,
-              [mapId, taskId, itemByCode.get(itemCode)!],
+              `INSERT INTO task_item_map (id, task_id, item_id, boq_line_id)
+               VALUES (?, ?, ?, ?)`,
+              [mapId, taskId, itemId, boqLineByItem.get(itemId) ?? null],
             )
             await logCreate(tx, 'task_item_map', mapId)
           }
@@ -373,6 +431,12 @@ export const useScheduleStore = defineStore('schedule', () => {
       if (items.length !== template.itemCodes.length)
         throw new Error('工序分项映射未就绪')
       const itemByCode = new Map(items.map(item => [item.code, item.id]))
+      const boqLineByItem = await loadBoqLineByItem(
+        tx,
+        group.projectId,
+        group.contractId,
+        [...itemByCode.values()],
+      )
       const lastTask = [...group.tasks].sort((left, right) => left.sortOrder - right.sortOrder).at(-1)
       const sortOrder = (lastTask?.sortOrder ?? 0) + 10
       await tx.execute(
@@ -399,7 +463,11 @@ export const useScheduleStore = defineStore('schedule', () => {
       await logCreate(tx, 'schedule_tasks', taskId)
       for (const itemCode of template.itemCodes) {
         const mapId = generateId('schedule_task_item')
-        await tx.execute(`INSERT INTO task_item_map (id, task_id, item_id) VALUES (?, ?, ?)`, [mapId, taskId, itemByCode.get(itemCode)!])
+        const itemId = itemByCode.get(itemCode)!
+        await tx.execute(
+          `INSERT INTO task_item_map (id, task_id, item_id, boq_line_id) VALUES (?, ?, ?, ?)`,
+          [mapId, taskId, itemId, boqLineByItem.get(itemId) ?? null],
+        )
         await logCreate(tx, 'task_item_map', mapId)
       }
       if (lastTask) {
@@ -436,12 +504,14 @@ export const useScheduleStore = defineStore('schedule', () => {
   return {
     catalog: readonly(catalog),
     buildings: readonly(buildings),
+    contracts: readonly(contracts),
     snapshot: readonly(snapshot),
     loading: readonly(loading),
     saving: readonly(saving),
     error: readonly(error),
     loadCatalog,
     loadBuildings,
+    loadContracts,
     loadProject,
     createGroup,
     updateTask,

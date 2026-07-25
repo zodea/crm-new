@@ -18,6 +18,7 @@ const store = useScheduleStore()
 const { confirm, error, success } = useKitUI()
 
 const projectId = shallowRef('')
+const contractId = shallowRef('')
 const name = ref('精装修楼栋组')
 const startDate = shallowRef(toLocalDateInputValue())
 const overlapMode = shallowRef<ScheduleOverlapMode>('half')
@@ -52,16 +53,23 @@ function predecessorLabel(templateKey: string): string {
   return `${predecessorName} · FS${lag ? `${lag > 0 ? '+' : ''}${lag}天` : ''}`
 }
 
-async function loadBuildings(reset = true) {
-  await store.loadBuildings(projectId.value)
-  if (reset)
+async function loadRange(reset = true) {
+  await Promise.all([
+    store.loadBuildings(projectId.value),
+    store.loadContracts(projectId.value),
+  ])
+  if (reset) {
     buildingIds.value = store.buildings.map(building => building.id)
+    contractId.value = store.contracts.find(contract => contract.lineCount > 0)?.id
+      ?? store.contracts[0]?.id
+      ?? ''
+  }
 }
 
 watch(projectId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
-  await loadBuildings(true)
+  await loadRange(true)
 })
 
 function toggleBuilding(id: string) {
@@ -75,8 +83,8 @@ function toggleAllTasks(enabled: boolean) {
 }
 
 async function submit() {
-  if (!projectId.value || !name.value.trim()) {
-    error('请选择项目并填写分组名称')
+  if (!projectId.value || !contractId.value || !name.value.trim()) {
+    error('请选择项目、施工合同并填写分组名称')
     return
   }
   if (!buildingIds.value.length || !enabledCount.value) {
@@ -95,6 +103,7 @@ async function submit() {
   try {
     const groupId = await store.createGroup({
       projectId: projectId.value,
+      contractId: contractId.value,
       name: name.value,
       buildingIds: buildingIds.value,
       startDate: startDate.value,
@@ -114,7 +123,7 @@ onMounted(async () => {
   const requested = String(route.query.project ?? '')
   projectId.value = store.catalog.find(project => project.id === requested)?.id ?? store.catalog[0]?.id ?? ''
   if (projectId.value)
-    await loadBuildings(true)
+    await loadRange(true)
   initialized.value = true
 })
 </script>
@@ -154,6 +163,20 @@ onMounted(async () => {
           <label>
             <span class="field-label block">分组名称</span>
             <input v-model="name" class="field-input w-full" maxlength="80">
+          </label>
+          <label>
+            <span class="field-label block">施工合同</span>
+            <select v-model="contractId" class="field-input w-full">
+              <option v-for="contract in store.contracts" :key="contract.id" :value="contract.id">
+                {{ contract.name }}{{ contract.no ? ` · ${contract.no}` : '' }} · {{ contract.lineCount }} 条清单
+              </option>
+            </select>
+            <span v-if="!store.contracts.length" class="mt-1 block text-11px text-danger">
+              当前项目尚未配置施工合同。
+            </span>
+            <span v-else-if="store.contracts.every(contract => !contract.lineCount)" class="mt-1 block text-11px text-warning">
+              合同尚未导入清单；工序会保留分项映射，导入后可继续补齐清单关联。
+            </span>
           </label>
           <label>
             <span class="field-label block">计划开始</span>

@@ -19,6 +19,14 @@ export interface ScheduleBuildingOption {
   name: string
 }
 
+export interface ScheduleContractOption {
+  id: string
+  projectId: string
+  no: string
+  name: string
+  lineCount: number
+}
+
 export interface ScheduleTaskView {
   id: string
   projectId: string
@@ -38,6 +46,7 @@ export interface ScheduleTaskView {
   sortOrder: number
   itemIds: readonly string[]
   itemNames: readonly string[]
+  boqLineIds: readonly string[]
   applicableUnits: number | null
   completedUnits: number | null
   actualProgress: number
@@ -50,6 +59,7 @@ export interface ScheduleTaskView {
 export interface ScheduleGroupView {
   id: string
   projectId: string
+  contractId: string
   name: string
   sortOrder: number
   buildingIds: readonly string[]
@@ -77,7 +87,7 @@ export interface ScheduleProjectView {
 
 interface ProjectRow { id: string, name: string, code: string | null, status: string | null }
 interface BuildingRow { id: string, project_id: string, code: string, name: string }
-interface GroupRow { id: string, project_id: string, name: string, sort_order: number }
+interface GroupRow { id: string, project_id: string, contract_id: string | null, name: string, sort_order: number }
 interface GroupBuildingRow { group_id: string, building_id: string, building_name: string }
 interface TaskRow {
   id: string
@@ -97,7 +107,7 @@ interface TaskRow {
   stage_id: string | null
   sort_order: number
 }
-interface TaskItemRow { task_id: string, item_id: string, item_name: string }
+interface TaskItemRow { task_id: string, item_id: string, boq_line_id: string | null, item_name: string }
 interface DependencyRow {
   id: string
   pred_id: string
@@ -160,6 +170,38 @@ export async function loadScheduleBuildings(db: SoftDb, projectId: string): Prom
   }))
 }
 
+export async function loadScheduleContracts(db: SoftDb, projectId: string): Promise<ScheduleContractOption[]> {
+  const rows = await db.select<{
+    id: string
+    project_id: string
+    no: string
+    name: string
+    line_count: number
+  }>(`
+    SELECT contract.id,
+           contract.project_id,
+           contract.no,
+           contract.name,
+           COUNT(boq_line.id) AS line_count
+    FROM contracts contract
+    LEFT JOIN boq_lines boq_line
+      ON boq_line.contract_id = contract.id
+     AND boq_line.deleted_at IS NULL
+    WHERE contract.deleted_at IS NULL
+      AND contract.project_id = ?
+      AND contract.kind = '施工'
+    GROUP BY contract.id
+    ORDER BY contract.no, contract.name, contract.id
+  `, [projectId])
+  return rows.map(row => ({
+    id: row.id,
+    projectId: row.project_id,
+    no: row.no,
+    name: row.name,
+    lineCount: Number(row.line_count) || 0,
+  }))
+}
+
 export async function loadScheduleProject(
   db: SoftDb,
   projectId: string,
@@ -212,7 +254,7 @@ export async function loadScheduleProject(
   const itemRows = taskIds.length
     ? await db.select<TaskItemRow>(
         `${hiddenCtesFor('task_item_map')}
-         SELECT tim.task_id, tim.item_id, i.name AS item_name
+         SELECT tim.task_id, tim.item_id, tim.boq_line_id, i.name AS item_name
          FROM task_item_map tim
          JOIN items i ON i.id = tim.item_id
          WHERE ${visibleCond('task_item_map', 'tim')}
@@ -279,6 +321,7 @@ export async function loadScheduleProject(
       sortOrder: Number(task.sort_order) || 0,
       itemIds: mappedItems.map(item => item.item_id),
       itemNames: mappedItems.map(item => item.item_name),
+      boqLineIds: mappedItems.flatMap(item => item.boq_line_id ? [item.boq_line_id] : []),
       applicableUnits,
       completedUnits,
       actualProgress,
@@ -301,6 +344,7 @@ export async function loadScheduleProject(
     return {
       id: group.id,
       projectId: group.project_id,
+      contractId: group.contract_id ?? '',
       name: group.name,
       sortOrder: Number(group.sort_order) || 0,
       buildingIds: groupBuildings.map(row => row.building_id),

@@ -83,6 +83,10 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible()
+    const contractSelect = page.locator('label', { hasText: '施工合同' }).locator('select')
+    await expect(contractSelect).toBeVisible()
+    await expect(contractSelect).toHaveValue('con_demo_sg01')
+    await expect(contractSelect.locator('option:checked')).toHaveText(/合和新城施工总承包合同.*10 条清单/)
     await expect(page.getByText('FS 前置', { exact: true })).toBeVisible()
     await expect(page.locator('.process-row').filter({ has: page.locator('input[type="checkbox"]') })).toHaveCount(22)
     await expect(page.getByRole('button', { name: '生成排程', exact: true })).toBeVisible()
