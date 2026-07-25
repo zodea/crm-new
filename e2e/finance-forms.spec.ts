@@ -51,6 +51,11 @@ async function chooseSelect(page: Page, label: string, optionText: string) {
   await page.getByRole('option', { name: optionText, exact: true }).click()
 }
 
+async function enterPaymentApplicationForm(page: Page, bizType = '有合同-材料') {
+  await expect(page.getByRole('heading', { name: '选择付款业务类型' })).toBeVisible()
+  await page.getByRole('button', { name: bizType, exact: true }).click()
+}
+
 test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
   test('六条命名路由均可保存不完整草稿并在小屏回显', async ({ page }) => {
     test.setTimeout(120_000)
@@ -59,11 +64,13 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
     for (const [index, form] of FORM_ROUTES.entries()) {
       const value = `E2E-F3-草稿-${index}-${Date.now()}`
       await page.goto(form.path)
+      if (form.path === '/finance/payment/new')
+        await enterPaymentApplicationForm(page)
       await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
         timeout: 20_000,
       })
       await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button'))
-        .toHaveCount(3)
+        .toHaveCount(5)
 
       await page.locator(form.field).fill(value)
       await page.getByRole('button', { name: '保存草稿' }).click()
@@ -109,13 +116,21 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
     await expect(attachments.getByText('已删除', { exact: true })).toHaveCount(0)
   })
 
+  test('必填校验同时标红字段并给出 system warning', async ({ page }) => {
+    await page.goto('/finance/receipt/new')
+    await page.getByRole('button', { name: '保存并提交' }).click()
+    await expect(page.getByText(/为必填项（共 \d+ 处）/)).toBeVisible()
+    await expect(page.locator('.field-error').first()).toBeVisible()
+    await expect(page.locator('.border-danger\\!').first()).toBeVisible()
+  })
+
   test('公司付款申请不造虚拟项目，支付记录可分摊、确认和撤回', async ({ page }) => {
     test.setTimeout(120_000)
     const suffix = Date.now()
     const applicationName = `E2E公司付款-${suffix}`
     await page.goto('/finance/payment/new')
+    await enterPaymentApplicationForm(page, '公司付款')
     await page.getByTestId('finance-name').fill(applicationName)
-    await chooseSelect(page, '业务类型', '公司付款')
     await page.getByTestId('finance-amount').fill('88')
     await page.getByTestId('finance-date').fill('2026-07-25')
     await page.getByLabel('申请人 *').fill('财务')
@@ -133,9 +148,10 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
     await page.getByTestId('finance-amount').fill('88')
     await page.getByLabel('付款凭证号 *').fill(`V-E2E-${suffix}`)
     await page.getByTestId('payment-bank-serial').fill(`BANK-E2E-${suffix}`)
-    await page.getByTestId('add-payment-allocation').click()
+    await page.getByTestId('add-grid-line').click()
     await chooseLookup(page, '选择付款申请', applicationName, applicationName)
     await page.getByLabel('本次支付分摊金额').fill('88')
+    await page.getByTestId('payment-confirmed-by').fill('E2E 财务')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByTestId('confirm-payment').click()
     await page.getByRole('dialog').getByRole('button', { name: '确认支付' }).click()
@@ -153,6 +169,8 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
       await page.setViewportSize({ width, height: 900 })
       for (const form of FORM_ROUTES) {
         await page.goto(form.path)
+        if (form.path === '/finance/payment/new')
+          await enterPaymentApplicationForm(page)
         await expect(page.getByRole('heading', { name: form.title })).toBeVisible()
         const widths = await page.evaluate(() => ({
           client: document.documentElement.clientWidth,

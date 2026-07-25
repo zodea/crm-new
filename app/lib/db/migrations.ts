@@ -1395,9 +1395,11 @@ CREATE TABLE payment_records_v22_new (
   source               TEXT NOT NULL DEFAULT 'manual'
                        CHECK (source IN ('manual', 'image_ocr', 'excel_import')),
   recognition_status   TEXT NOT NULL DEFAULT 'not_applicable',
+  ocr_payload           TEXT NOT NULL DEFAULT '{}',
   field_confidence     TEXT NOT NULL DEFAULT '{}',
   confirmation_status  TEXT NOT NULL DEFAULT 'draft'
                        CHECK (confirmation_status IN ('draft', 'needs_review', 'confirmed')),
+  confirmed_by         TEXT NOT NULL DEFAULT '',
   confirmed_at         TEXT,
   external_ref         TEXT NOT NULL DEFAULT '',
   note                 TEXT NOT NULL DEFAULT '',
@@ -1412,6 +1414,7 @@ CREATE TABLE payment_records_v22_new (
       AND TRIM(payee_name) <> ''
       AND TRIM(voucher_no) <> ''
       AND TRIM(bank_serial_no) <> ''
+      AND TRIM(confirmed_by) <> ''
       AND confirmed_at IS NOT NULL
     )
   )
@@ -2985,8 +2988,8 @@ async function rebuildPaymentRecordsForF3(db: MigrationDb): Promise<void> {
       id, no, project_id, supplier_id, payee_name, purpose,
       payment_date, amount, payment_method, voucher_no, bank_serial_no,
       payee_account, payee_bank, payee_bank_account, handler, source,
-      recognition_status, field_confidence, confirmation_status,
-      confirmed_at, external_ref, note, created_at, updated_at, deleted_at
+      recognition_status, ocr_payload, field_confidence, confirmation_status,
+      confirmed_by, confirmed_at, external_ref, note, created_at, updated_at, deleted_at
     )
     SELECT
       ${f3Column(available, 'id', `''`)},
@@ -3015,8 +3018,10 @@ async function rebuildPaymentRecordsForF3(db: MigrationDb): Promise<void> {
         ELSE 'manual'
       END,
       COALESCE(${f3Column(available, 'recognition_status', `'not_applicable'`)}, 'not_applicable'),
+      COALESCE(${f3Column(available, 'ocr_payload', `'{}'`)}, '{}'),
       COALESCE(${f3Column(available, 'field_confidence', `'{}'`)}, '{}'),
       'needs_review',
+      '',
       NULL,
       COALESCE(${f3Column(available, 'external_ref', `''`)}, ''),
       COALESCE(${f3Column(available, 'note', `''`)}, ''),
@@ -3037,7 +3042,8 @@ async function snapshotAndRebuildExpenseReimbursementsForF3(
     CREATE TABLE f3_legacy_reimbursement_amounts_v22 (
       reimbursement_id TEXT PRIMARY KEY,
       project_id TEXT,
-      amount REAL NOT NULL DEFAULT 0
+      amount REAL,
+      issue_reason TEXT NOT NULL DEFAULT ''
     )
   `)
 
@@ -3052,17 +3058,29 @@ async function snapshotAndRebuildExpenseReimbursementsForF3(
     return
 
   const available = await f3Columns(db, 'expense_reimbursements')
-  if (available.has('amount')) {
-    await db.execute(`
-      INSERT INTO f3_legacy_reimbursement_amounts_v22 (
-        reimbursement_id, project_id, amount
-      )
-      SELECT id, ${f3Column(available, 'project_id', 'NULL')},
-             MAX(COALESCE(amount, 0), 0)
-      FROM expense_reimbursements AS legacy
-      WHERE COALESCE(amount, 0) > 0
-    `)
-  }
+  const legacyAmount = f3Column(available, 'amount', 'NULL')
+  const legacyApplicant = f3Column(available, 'applicant', `''`)
+  const legacyDate = available.has('reimbursement_date')
+    ? f3Column(available, 'reimbursement_date', `''`)
+    : f3Column(available, 'date', `''`)
+  await db.execute(`
+    INSERT INTO f3_legacy_reimbursement_amounts_v22 (
+      reimbursement_id, project_id, amount, issue_reason
+    )
+    SELECT
+      id,
+      ${f3Column(available, 'project_id', 'NULL')},
+      ${legacyAmount},
+      CASE
+        WHEN ${legacyAmount} IS NULL OR ${legacyAmount} <= 0
+          THEN 'legacy-missing-or-nonpositive-amount'
+        WHEN TRIM(COALESCE(${legacyApplicant}, '')) = ''
+          OR TRIM(COALESCE(${legacyDate}, '')) = ''
+          THEN 'legacy-incomplete-head'
+        ELSE ''
+      END
+    FROM expense_reimbursements AS legacy
+  `)
 
   await db.execute('DROP TABLE IF EXISTS expense_reimbursements_v22_new')
   await execScript(db, V22_EXPENSE_REIMBURSEMENTS_TABLE)
@@ -3101,6 +3119,39 @@ async function snapshotAndRebuildExpenseReimbursementsForF3(
 
 async function migrateF3ChildFacts(db: MigrationDb): Promise<void> {
   await execScript(db, V22_F3_CHILD_TABLES)
+  await db.execute(`
+    INSERT OR IGNORE INTO reconciliation_issues (
+      id, import_batch_id, project_id, entity_type, entity_id, field_name,
+      source_value, metric_key, source_ref, excel_value, system_value,
+      difference, attribution
+    )
+    SELECT
+      'f3_payment_link_' || link.payment_record_id,
+      ?,
+      COALESCE(payment.project_id, application.project_id),
+      'payment_records',
+      link.payment_record_id,
+      'payment_application_id',
+      COALESCE(link.payment_application_id, ''),
+      'payment_records.payment_application_id',
+      'schema:v22:payment_records:' || link.payment_record_id,
+      link.allocated_amount,
+      0,
+      link.allocated_amount,
+      CASE
+        WHEN payment.id IS NULL THEN 'legacy-orphan-payment-record'
+        WHEN application.id IS NULL THEN 'legacy-orphan-payment-application'
+        ELSE 'legacy-nonpositive-payment-allocation'
+      END
+    FROM f3_legacy_payment_links_v22 AS link
+    LEFT JOIN payment_records AS payment
+      ON payment.id = link.payment_record_id
+    LEFT JOIN payment_applications AS application
+      ON application.id = link.payment_application_id
+    WHERE payment.id IS NULL
+       OR application.id IS NULL
+       OR link.allocated_amount <= 0
+  `, [F3_IMPORT_BATCH_ID])
   await db.execute(`
     INSERT OR IGNORE INTO payment_record_application_allocations (
       id, payment_record_id, payment_application_id, allocated_amount, note
@@ -3146,15 +3197,17 @@ async function migrateF3ChildFacts(db: MigrationDb): Promise<void> {
       'expense_reimbursements',
       legacy.reimbursement_id,
       'amount',
-      CAST(legacy.amount AS TEXT),
+      CAST(COALESCE(legacy.amount, 0) AS TEXT),
       'expense_reimbursements.amount',
       'schema:v22:expense_reimbursements:' || legacy.reimbursement_id,
-      legacy.amount,
-      legacy.amount,
+      COALESCE(legacy.amount, 0),
+      CASE WHEN legacy.amount > 0 THEN legacy.amount ELSE 0 END,
       0,
-      'legacy-head-to-line'
+      CASE
+        WHEN legacy.issue_reason <> '' THEN legacy.issue_reason
+        ELSE 'legacy-head-to-line'
+      END
     FROM f3_legacy_reimbursement_amounts_v22 AS legacy
-    WHERE legacy.amount > 0
   `, [F3_IMPORT_BATCH_ID])
   await db.execute('DROP TABLE f3_legacy_payment_links_v22')
   await db.execute('DROP TABLE f3_legacy_reimbursement_amounts_v22')

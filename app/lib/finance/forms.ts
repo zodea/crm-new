@@ -23,7 +23,7 @@ export type F3FormKind
     | 'reimbursement'
     | 'payment_application'
 
-export type F3SaveAction = 'draft' | 'submit' | 'confirm'
+export type F3SaveAction = 'draft' | 'save' | 'submit' | 'confirm'
 export type InvoiceState = '先票后款' | '先款后票' | '无需发票'
 export type CurrentDirection = 'receipt' | 'payment'
 export type PaymentSource = 'manual' | 'image_ocr' | 'excel_import'
@@ -173,8 +173,10 @@ export interface PaymentRecordFormDraft {
   handler?: string
   source?: PaymentSource
   recognitionStatus?: string
+  ocrPayload?: string | Record<string, unknown>
   fieldConfidence?: string | Record<string, number>
   confirmationStatus?: PaymentConfirmationStatus
+  confirmedBy?: string
   confirmedAt?: string | null
   externalRef?: string
   note?: string
@@ -316,8 +318,10 @@ function lifecycleStatus(
 ): string {
   if (action === 'draft')
     return 'draft'
+  if (action === 'submit')
+    return 'submitted'
   const value = text(requested)
-  return value && value !== 'draft' ? value : 'submitted'
+  return value || 'draft'
 }
 
 function generatedNo(prefix: string, requested: unknown, id: string): string {
@@ -338,6 +342,21 @@ function serializedConfidence(
     }
     catch {
       throw new Error('逐字段置信度必须是有效 JSON')
+    }
+  }
+  return JSON.stringify(value ?? {})
+}
+
+function serializedOcrPayload(
+  value: PaymentRecordFormDraft['ocrPayload'],
+): string {
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value)
+      return value
+    }
+    catch {
+      throw new Error('OCR 原始结果必须是合法 JSON')
     }
   }
   return JSON.stringify(value ?? {})
@@ -1012,8 +1031,8 @@ async function validatePaymentRecord(
       apply_amount: number
       approved_amount: number
     }>(tx, 'payment_applications', applicationId, '付款申请')
-    if (draft.projectId && application.project_id && application.project_id !== draft.projectId)
-      throw new Error('付款申请不属于所选项目')
+    if (nullableId(draft.projectId) !== application.project_id)
+      throw new Error('付款申请与支付记录的项目归属不一致')
     if (draft.supplierId && application.supplier_id && application.supplier_id !== draft.supplierId)
       throw new Error('付款申请不属于所选分供方')
     if (action === 'confirm') {
@@ -1048,6 +1067,8 @@ async function validatePaymentRecord(
   }
   if (action === 'confirm' && !moneyEqual(sumMoney(allocations), amount))
     throw new Error('支付分摊合计必须等于支付金额')
+  if (action === 'confirm')
+    requireFields([['确认人', draft.confirmedBy]])
   return amount
 }
 
@@ -1070,7 +1091,9 @@ async function savePaymentRecord(
     ? 'confirmed'
     : action === 'submit'
       ? 'needs_review'
-      : 'draft'
+      : (existing?.confirmation_status as PaymentConfirmationStatus | undefined)
+        ?? draft.confirmationStatus
+        ?? 'draft'
   const source = draft.source ?? 'manual'
   if (!['manual', 'image_ocr', 'excel_import'].includes(source))
     throw new Error('支付来源无效')
@@ -1091,8 +1114,10 @@ async function savePaymentRecord(
     text(draft.handler),
     source,
     text(draft.recognitionStatus) || (source === 'manual' ? 'not_applicable' : 'pending'),
+    serializedOcrPayload(draft.ocrPayload),
     serializedConfidence(draft.fieldConfidence),
     action === 'confirm' ? 'needs_review' : confirmationStatus,
+    '',
     null,
     text(draft.externalRef),
     text(draft.note),
@@ -1105,7 +1130,8 @@ async function savePaymentRecord(
             payment_date = ?, amount = ?, payment_method = ?, voucher_no = ?,
             bank_serial_no = ?, payee_account = ?, payee_bank = ?,
             payee_bank_account = ?, handler = ?, source = ?, recognition_status = ?,
-            field_confidence = ?, confirmation_status = ?, confirmed_at = ?,
+            ocr_payload = ?, field_confidence = ?, confirmation_status = ?,
+            confirmed_by = ?, confirmed_at = ?,
             external_ref = ?, note = ?, updated_at = ?
         WHERE id = ?
       `, [...values, id]))
@@ -1115,12 +1141,12 @@ async function savePaymentRecord(
             id, no, project_id, supplier_id, payee_name, purpose,
             payment_date, amount, payment_method, voucher_no, bank_serial_no,
             payee_account, payee_bank, payee_bank_account, handler, source,
-            recognition_status, field_confidence, confirmation_status,
-            confirmed_at, external_ref, note, created_at, updated_at
+            recognition_status, ocr_payload, field_confidence, confirmation_status,
+            confirmed_by, confirmed_at, external_ref, note, created_at, updated_at
           )
           VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?
           )
         `, [id, ...values.slice(0, -1), now, now])
         return logCreate(tx, 'payment_records', id)
@@ -1151,14 +1177,16 @@ async function savePaymentRecord(
     },
     'payment_application_allocation',
   )
+  let finalLogId = logId
   if (action === 'confirm') {
-    await tx.execute(`
+    finalLogId = await withUpdateLog(tx, 'payment_records', id, () => tx.execute(`
       UPDATE payment_records
-      SET confirmation_status = 'confirmed', confirmed_at = ?, updated_at = ?
+      SET confirmation_status = 'confirmed', confirmed_by = ?,
+          confirmed_at = ?, updated_at = ?
       WHERE id = ?
-    `, [now, now, id])
+    `, [text(draft.confirmedBy), now, now, id]), text(draft.confirmedBy)) ?? logId
   }
-  return { id, logId }
+  return { id, logId: finalLogId }
 }
 
 export async function saveFinanceForm(
@@ -1474,8 +1502,10 @@ async function loadPaymentRecord(
     handler: String(row.handler ?? ''),
     source: String(row.source) as PaymentSource,
     recognitionStatus: String(row.recognition_status ?? ''),
+    ocrPayload: String(row.ocr_payload ?? '{}'),
     fieldConfidence: String(row.field_confidence ?? '{}'),
     confirmationStatus: String(row.confirmation_status) as PaymentConfirmationStatus,
+    confirmedBy: String(row.confirmed_by ?? ''),
     confirmedAt: row.confirmed_at == null ? null : String(row.confirmed_at),
     externalRef: String(row.external_ref ?? ''),
     note: String(row.note ?? ''),
@@ -1529,6 +1559,7 @@ export async function unconfirmPaymentRecord(id: string): Promise<void> {
     await withUpdateLog(tx, 'payment_records', id, () => tx.execute(`
       UPDATE payment_records
       SET confirmation_status = 'needs_review',
+          confirmed_by = '',
           confirmed_at = NULL,
           updated_at = ?
       WHERE id = ?

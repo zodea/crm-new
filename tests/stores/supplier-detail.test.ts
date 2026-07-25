@@ -92,7 +92,8 @@ beforeEach(async () => {
   `)
   await mem.execute(`
     UPDATE payment_records
-    SET confirmation_status = 'confirmed', confirmed_at = '2026-07-02T09:00:00.000Z'
+    SET confirmation_status = 'confirmed', confirmed_by = '测试财务',
+        confirmed_at = '2026-07-02T09:00:00.000Z'
     WHERE id = 'record1'
   `)
   await mem.execute(`

@@ -66,6 +66,7 @@ describe('project detail SQL aggregates', () => {
     await db.execute(`
       UPDATE payment_records
       SET confirmation_status = 'confirmed',
+          confirmed_by = '测试财务',
           confirmed_at = '2026-06-20T09:00:00.000Z'
       WHERE id = 'payment-project-aggregate'
     `)

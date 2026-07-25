@@ -4,8 +4,8 @@ import { defineComponent } from 'vue'
 import FinanceFormFields from '~/components/finance/FinanceFormFields.vue'
 
 const SectionHeader = defineComponent({
-  props: { title: { type: String, required: true } },
-  template: '<h2>{{ title }}</h2>',
+  props: { title: { type: String, default: '' } },
+  template: '<h2><slot />{{ title }}</h2>',
 })
 
 const LookupSelect = defineComponent({
@@ -51,6 +51,21 @@ const KitButton = defineComponent({
   template: '<button v-bind="$attrs" type="button" @click="$emit(\'click\')"><slot /></button>',
 })
 
+const KitTable = defineComponent({
+  props: { data: { type: Array, default: () => [] } },
+  template: `
+    <div>
+      <div v-for="(row, rowIndex) in data" :key="rowIndex">
+        <slot name="source" :row="row" :row-index="rowIndex" />
+        <slot name="date" :row="row" :row-index="rowIndex" />
+        <slot name="amount" :row="row" :row-index="rowIndex" />
+        <slot name="note" :row="row" :row-index="rowIndex" />
+        <slot name="action" :row="row" :row-index="rowIndex" />
+      </div>
+    </div>
+  `,
+})
+
 const fetchLookup = vi.fn(async () => [])
 
 function mountFields(
@@ -76,6 +91,11 @@ function mountFields(
         LookupSelect,
         SectionHeader,
         SelectFilter,
+      },
+      stubs: {
+        KitButton,
+        KitTable,
+        LookupSelect,
       },
     },
   })
@@ -117,9 +137,9 @@ describe('financeFormFields real-ID and detail-grid flow', () => {
         invoiceAllocations: [],
       },
     })
-    expect(wrapper.get('[data-placeholder="选择真实结算单"]').attributes('disabled'))
+    expect(wrapper.get('[data-placeholder="选择结算单"]').attributes('disabled'))
       .toBeUndefined()
-    await wrapper.get('[data-placeholder="选择真实结算单"]').trigger('click')
+    await wrapper.get('[data-placeholder="选择结算单"]').trigger('click')
     expect(wrapper.emitted('patch')?.at(-1)?.[0]).toMatchObject({
       settlementAllocations: [
         expect.objectContaining({ settlementId: 'lookup-real-id' }),
@@ -168,13 +188,24 @@ describe('financeFormFields real-ID and detail-grid flow', () => {
         expect.objectContaining({ expenseItem: '交通费', amount: 18.5 }),
       ],
     })
-    await wrapper.get('[data-testid="add-reimbursement-line"]').trigger('click')
+    await wrapper.get('[data-testid="add-grid-line"]').trigger('click')
     expect(wrapper.emitted('patch')?.at(-1)?.[0]).toMatchObject({
       lines: [
         expect.objectContaining({ expenseItem: '交通费' }),
         expect.objectContaining({ expenseItem: '' }),
       ],
     })
+
+    await wrapper.get('[data-testid="import-grid-tsv"]').trigger('click')
+    await wrapper.get('[data-testid="grid-tsv-input"]').setValue('差旅费\t2026-07-25\t20\t出差')
+    await wrapper.get('[data-testid="confirm-grid-import"]').trigger('click')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toMatchObject({
+      lines: [
+        expect.objectContaining({ expenseItem: '交通费' }),
+        expect.objectContaining({ expenseItem: '差旅费', amount: 20 }),
+      ],
+    })
+    expect(wrapper.get('[data-testid="toggle-grid-fullscreen"]').exists()).toBe(true)
   })
 
   it('shows payment allocation conservation and the mandatory manual-review boundary', async () => {

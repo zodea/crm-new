@@ -199,6 +199,9 @@ describe('f3 六条资金表单领域 action', () => {
       bankSerialNo: 'PAYMENT-BANK-F3',
       source: 'manual',
       recognitionStatus: 'not_applicable',
+      ocrPayload: { bank: '测试银行', confidence: 0.99 },
+      fieldConfidence: { amount: 0.99 },
+      confirmedBy: '财务甲',
       applicationAllocations: [{
         paymentApplicationId: application.id,
         allocatedAmount: 100,
@@ -234,6 +237,9 @@ describe('f3 六条资金表单领域 action', () => {
     })
     expect(await loadFinanceForm('payment_record', payment.id)).toMatchObject({
       confirmationStatus: 'confirmed',
+      confirmedBy: '财务甲',
+      ocrPayload: '{"bank":"测试银行","confidence":0.99}',
+      fieldConfidence: '{"amount":0.99}',
       applicationAllocations: [
         expect.objectContaining({ paymentApplicationId: application.id }),
       ],
@@ -423,10 +429,12 @@ describe('支付事实确认与撤回', () => {
     expect((await getPaymentApplicationSummary(application.id)).paidAmount).toBe(0)
     await expect(store.saveForm('payment_record', {
       ...await loadFinanceForm('payment_record', draftPayment.id),
+      confirmedBy: '财务乙',
     }, 'confirm')).rejects.toThrow('支付分摊合计必须等于支付金额')
 
     const confirmed = await store.saveForm('payment_record', {
       ...await loadFinanceForm('payment_record', draftPayment.id),
+      confirmedBy: '财务乙',
       applicationAllocations: [{
         paymentApplicationId: application.id,
         allocatedAmount: 100,
@@ -434,13 +442,56 @@ describe('支付事实确认与撤回', () => {
     }, 'confirm')
     expect((await getPaymentApplicationSummary(application.id)).paidAmount).toBe(100)
     expect(await getProjectConfirmedPaymentTotal('project-finance')).toBe(0)
+    const [confirmationLog] = await mem.select<{
+      before_data: string
+      after_data: string
+      operator: string
+    }>(`
+      SELECT before_data, after_data, operator
+      FROM operation_logs
+      WHERE table_name = 'payment_records'
+        AND record_id = ?
+        AND action = 'update'
+        AND operator = '财务乙'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [confirmed.id])
+    expect(JSON.parse(confirmationLog!.before_data).confirmation_status).toBe('needs_review')
+    expect(JSON.parse(confirmationLog!.after_data)).toMatchObject({
+      confirmation_status: 'confirmed',
+      confirmed_by: '财务乙',
+    })
+    expect(confirmationLog!.operator).toBe('财务乙')
 
     await unconfirmPaymentRecord(confirmed.id)
     expect((await getPaymentApplicationSummary(application.id)).paidAmount).toBe(0)
     expect(await loadFinanceForm('payment_record', confirmed.id)).toMatchObject({
       confirmationStatus: 'needs_review',
+      confirmedBy: '',
       confirmedAt: null,
     })
+
+    const projectApplication = await store.saveForm('payment_application', {
+      name: '项目付款',
+      bizType: '项目费用',
+      projectId: 'project-finance',
+      applyAmount: 1,
+      applyDate: '2026-07-20',
+      applicant: '项目财务',
+      invoiceState: '无需发票',
+    }, 'submit')
+    await expect(store.saveForm('payment_record', {
+      payeeName: '公司级支付',
+      projectId: null,
+      paymentDate: '2026-07-20',
+      amount: 1,
+      voucherNo: 'V-COMPANY',
+      bankSerialNo: 'BANK-COMPANY',
+      applicationAllocations: [{
+        paymentApplicationId: projectApplication.id,
+        allocatedAmount: 1,
+      }],
+    }, 'submit')).rejects.toThrow('项目归属不一致')
 
     await expect(store.saveForm('payment_record', {
       no: 'ZF-DUP',

@@ -161,7 +161,10 @@ export function f3FormDefaults(kind: F3FormKind): F3FormDraft {
         paymentMethod: '银行转账',
         source: 'manual',
         recognitionStatus: 'not_applicable',
+        ocrPayload: {},
+        fieldConfidence: {},
         confirmationStatus: 'draft',
+        confirmedBy: '',
         applicationAllocations: [],
       } satisfies PaymentRecordFormDraft
   }

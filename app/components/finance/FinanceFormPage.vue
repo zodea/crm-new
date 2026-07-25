@@ -71,11 +71,13 @@ const attachments = shallowRef<FileRefRecord[]>([])
 const pendingAttachments = shallowRef<PendingFileRef[]>([])
 const pendingRemoveIds = shallowRef<string[]>([])
 const pendingRestoreIds = shallowRef<string[]>([])
+const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | 'confirmPayment' | 'unconfirmPayment' | null>(null)
 const closeAfterSave = shallowRef(true)
 const desktopAttachmentPicker = shallowRef(false)
 const savedSnapshot = shallowRef('')
+const paymentTypeSelected = shallowRef(false)
 let allowLeave = false
 
 const dirty = computed(() =>
@@ -87,6 +89,26 @@ const dirty = computed(() =>
 const isConfirmedPayment = computed(() =>
   props.kind === 'payment_record' && draft.value.confirmationStatus === 'confirmed',
 )
+const footerLoadingAction = computed<FormFooterAction | null>(() =>
+  loadingAction.value === 'confirmPayment' || loadingAction.value === 'unconfirmPayment'
+    ? null
+    : loadingAction.value,
+)
+const showPaymentTypeStep = computed(() =>
+  props.kind === 'payment_application' && !isEditing.value && !paymentTypeSelected.value,
+)
+const PAYMENT_BIZ_TYPES = [
+  '有合同-合同劳务',
+  '有合同-材料',
+  '有合同-专业分包',
+  '有合同-机械',
+  '有合同-其他',
+  '无合同-零星采购',
+  '预付款',
+  '管理费',
+  '项目费用',
+  '公司付款',
+]
 
 async function basicLookup(
   table: 'projects' | 'customers' | 'suppliers',
@@ -210,6 +232,9 @@ async function fetchPaymentApplications(keyword: string): Promise<LookupOption[]
     filters.push('application.project_id = ?')
     params.push(draft.value.projectId)
   }
+  else {
+    filters.push('application.project_id IS NULL')
+  }
   if (draft.value.supplierId) {
     filters.push('application.supplier_id = ?')
     params.push(draft.value.supplierId)
@@ -261,6 +286,7 @@ async function initialize() {
     if (!id) {
       draft.value = f3FormDefaults(props.kind) as PageDraft
       attachments.value = []
+      paymentTypeSelected.value = props.kind !== 'payment_application'
     }
     else {
       const [record, files] = await Promise.all([
@@ -278,7 +304,9 @@ async function initialize() {
         ...record,
       } as PageDraft
       attachments.value = files
+      paymentTypeSelected.value = true
     }
+    fieldErrors.value = {}
     await nextTick()
     savedSnapshot.value = JSON.stringify(draft.value)
   }
@@ -311,6 +339,100 @@ function patchDraft(patch: Partial<PageDraft>) {
   }
 }
 
+function selectPaymentType(bizType: string) {
+  patchDraft({
+    bizType,
+    ...(bizType === '公司付款'
+      ? { projectId: null, contractId: null, settlementAllocations: [] }
+      : {}),
+  })
+  paymentTypeSelected.value = true
+}
+
+function clearFieldError(field: string) {
+  if (!fieldErrors.value[field])
+    return
+  const next = { ...fieldErrors.value }
+  delete next[field]
+  fieldErrors.value = next
+}
+
+function validateRequired(action: F3SaveAction): boolean {
+  const errors: Record<string, string> = {}
+  const require = (field: keyof PageDraft, label: string, positive = false) => {
+    const value = draft.value[field]
+    const missing = positive
+      ? !(Number(value) > 0)
+      : typeof value === 'string'
+        ? !value.trim()
+        : value == null
+    if (missing)
+      errors[String(field)] = `${label}为必填项`
+  }
+
+  switch (props.kind) {
+    case 'receipt':
+      require('receiptDate', '收款日期')
+      require('projectId', '项目')
+      require('customerId', '客户')
+      require('amount', '收款金额', true)
+      break
+    case 'invoice_application':
+      require('name', '开票申请名称')
+      require('projectId', '项目')
+      require('customerId', '客户')
+      require('buyerNameSnapshot', '购方名称')
+      require('buyerTaxNoSnapshot', '购方税号')
+      require('applicationDate', '申请日期')
+      require('amount', '申请金额', true)
+      break
+    case 'current':
+      require('direction', '收付方向')
+      require('projectId', '项目')
+      require('counterparty', '往来单位')
+      require('transactionDate', '发生日期')
+      require('amount', '发生金额', true)
+      break
+    case 'reimbursement':
+      require('applicant', '报销人')
+      require('reimbursementDate', '报销日期')
+      if (!(draft.value.lines?.length)
+        || draft.value.lines.some(line => !line.expenseItem?.trim() || !(Number(line.amount) > 0))) {
+        errors.lines = '费用明细项目和金额为必填项'
+      }
+      break
+    case 'payment_application':
+      require('name', '付款申请名称')
+      require('bizType', '业务类型')
+      require('applyAmount', '申请金额', true)
+      require('applyDate', '申请日期')
+      require('applicant', '申请人')
+      require('invoiceState', '回票类型')
+      if (draft.value.bizType !== '公司付款')
+        require('projectId', '项目')
+      if (draft.value.bizType?.startsWith('有合同-') || draft.value.bizType === '预付款') {
+        require('supplierId', '收款单位')
+        require('contractId', '关联合同')
+      }
+      break
+    case 'payment_record':
+      require('payeeName', '收款方名称')
+      require('paymentDate', '支付日期')
+      require('amount', '支付金额', true)
+      require('voucherNo', '付款凭证号')
+      require('bankSerialNo', '银行流水号')
+      if (action === 'confirm')
+        require('confirmedBy', '确认人')
+      break
+  }
+
+  fieldErrors.value = errors
+  const messages = Object.values(errors)
+  if (messages.length)
+    warning(`${messages[0]}（共 ${messages.length} 处）`)
+  return messages.length === 0
+}
+
 function attachmentChanges(): FileRefChanges {
   return {
     add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
@@ -319,8 +441,11 @@ function attachmentChanges(): FileRefChanges {
   }
 }
 
-async function persist(action: F3SaveAction) {
-  loadingAction.value = action === 'confirm' ? 'confirmPayment' : action === 'draft' ? 'draft' : 'saveSubmit'
+async function persist(action: F3SaveAction, footerAction?: FormFooterAction) {
+  if (action !== 'draft' && !validateRequired(action))
+    return
+  loadingAction.value = footerAction
+    ?? (action === 'confirm' ? 'confirmPayment' : action === 'draft' ? 'draft' : 'saveSubmit')
   try {
     const result = await financeStore.saveForm(
       props.kind,
@@ -333,14 +458,29 @@ async function persist(action: F3SaveAction) {
         ? '草稿已保存'
         : action === 'confirm'
           ? '支付已人工确认并计入资金汇总'
-          : props.kind === 'payment_record'
-            ? '已保存，等待人工核对'
-            : '已保存并提交',
+          : action === 'save'
+            ? '保存成功'
+            : props.kind === 'payment_record'
+              ? '已保存，等待人工核对'
+              : '已保存并提交',
     )
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
-    if (closeAfterSave.value && action !== 'draft') {
+    fieldErrors.value = {}
+    if (footerAction === 'saveNew') {
+      allowLeave = true
+      if (routeId.value)
+        await navigateTo(meta.value.newPath, { replace: true })
+      draft.value = f3FormDefaults(props.kind) as PageDraft
+      attachments.value = []
+      paymentTypeSelected.value = props.kind !== 'payment_application'
+      await nextTick()
+      savedSnapshot.value = JSON.stringify(draft.value)
+      allowLeave = false
+      return
+    }
+    if (closeAfterSave.value && (footerAction === 'save' || footerAction === 'saveSubmit')) {
       allowLeave = true
       tabsStore.close(pageKey)
       await navigateTo(meta.value.listPath)
@@ -364,10 +504,17 @@ async function handleFooterAction(action: FormFooterAction) {
     await leaveToList()
     return
   }
-  await persist(action === 'draft' ? 'draft' : 'submit')
+  const saveAction: F3SaveAction = action === 'draft'
+    ? 'draft'
+    : action === 'saveSubmit'
+      ? 'submit'
+      : 'save'
+  await persist(saveAction, action)
 }
 
 async function confirmPayment() {
+  if (!validateRequired('confirm'))
+    return
   const accepted = await confirm({
     variant: 'simple',
     title: '人工确认支付',
@@ -517,7 +664,35 @@ onMounted(() => {
     </aside>
 
     <main class="min-w-0 flex-1">
-      <header class="mb-4 flex flex-wrap items-start gap-3">
+      <section
+        v-if="showPaymentTypeStep"
+        class="panel mx-auto max-w-920px p-5"
+        data-testid="payment-type-step"
+      >
+        <button type="button" class="mb-3 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
+          <span class="i-lucide-arrow-left" aria-hidden="true" />
+          返回付款申请
+        </button>
+        <h1 class="text-20px font-800 text-ink">
+          选择付款业务类型
+        </h1>
+        <p class="mt-2 text-13px text-ink-soft">
+          业务类型决定项目、合同、结算与回票校验规则，进入表单后仍可调整。
+        </p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <button
+            v-for="bizType in PAYMENT_BIZ_TYPES"
+            :key="bizType"
+            type="button"
+            class="rounded-[var(--radius-card)] border border-line bg-panel p-4 text-left text-13px font-700 text-ink transition-colors hover:border-brand hover:bg-brand-soft"
+            @click="selectPaymentType(bizType)"
+          >
+            {{ bizType }}
+          </button>
+        </div>
+      </section>
+
+      <header v-if="!showPaymentTypeStep" class="mb-4 flex flex-wrap items-start gap-3">
         <div>
           <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
             <span class="i-lucide-arrow-left" aria-hidden="true" />
@@ -554,13 +729,14 @@ onMounted(() => {
         </div>
       </header>
 
-      <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
+      <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
         正在载入表单…
       </div>
-      <form v-else class="flex flex-col gap-4" data-testid="finance-form" @submit.prevent>
+      <form v-else-if="!showPaymentTypeStep" class="flex flex-col gap-4" data-testid="finance-form" @submit.prevent>
         <FinanceFormFields
           :kind="kind"
           :draft="draft"
+          :field-errors="fieldErrors"
           :fetch-projects="fetchProjects"
           :fetch-customers="fetchCustomers"
           :fetch-suppliers="fetchSuppliers"
@@ -570,6 +746,7 @@ onMounted(() => {
           :fetch-invoices="fetchInvoices"
           :fetch-payment-applications="fetchPaymentApplications"
           @patch="patchDraft"
+          @clear-error="clearFieldError"
         />
 
         <FileRefAttachmentSection
@@ -590,10 +767,9 @@ onMounted(() => {
 
         <FormFooter
           v-model="closeAfterSave"
-          :actions="['cancel', 'draft', 'saveSubmit']"
           :dirty="dirty"
           close-after-save
-          :loading-action="loadingAction === 'draft' || loadingAction === 'saveSubmit' ? loadingAction : null"
+          :loading-action="footerLoadingAction"
           @action="handleFooterAction"
         />
       </form>

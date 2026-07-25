@@ -77,8 +77,10 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
       'bank_serial_no',
       'source',
       'recognition_status',
+      'ocr_payload',
       'field_confidence',
       'confirmation_status',
+      'confirmed_by',
       'confirmed_at',
     ]))
     expect(await columnNames(db, 'payment_applications')).toEqual(expect.arrayContaining([
@@ -167,6 +169,18 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
         '2026-07-03', 40, '银行转账', 'V-001'
       )
     `)
+    await db.execute('PRAGMA foreign_keys = OFF')
+    await db.execute(`
+      INSERT INTO payment_records (
+        id, project_id, payment_application_id, payment_no, payment_date,
+        amount, payment_method, voucher_no
+      )
+      VALUES (
+        'legacy-orphan-payment', 'project-f3', 'missing-application', 'ZF-ORPHAN',
+        '2026-07-03', 10, '银行转账', 'V-ORPHAN'
+      )
+    `)
+    await db.execute('PRAGMA foreign_keys = ON')
     await db.execute(`
       CREATE TABLE expense_reimbursements (
         id TEXT PRIMARY KEY,
@@ -182,10 +196,19 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
       INSERT INTO expense_reimbursements (
         id, project_id, no, applicant, amount, reimbursement_date, created_at
       )
-      VALUES (
-        'legacy-reimbursement', NULL, 'BX-001', '李工', 123.45,
-        '2026-07-04', '2026-07-04T09:00:00.000Z'
-      )
+      VALUES
+        (
+          'legacy-reimbursement', NULL, 'BX-001', '李工', 123.45,
+          '2026-07-04', '2026-07-04T09:00:00.000Z'
+        ),
+        (
+          'legacy-empty-reimbursement', NULL, 'BX-EMPTY', '', NULL,
+          '', '2026-07-04T10:00:00.000Z'
+        ),
+        (
+          'legacy-incomplete-reimbursement', NULL, 'BX-INCOMPLETE', '', 20,
+          '', '2026-07-04T11:00:00.000Z'
+        )
     `)
 
     const result = await runMigrations(db)
@@ -224,17 +247,48 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
     expect(await db.select(`
       SELECT reimbursement_id, expense_item, amount
       FROM expense_reimbursement_lines
-    `)).toEqual([{
-      reimbursement_id: 'legacy-reimbursement',
-      expense_item: '迁移汇总',
-      amount: 123.45,
-    }])
+    `)).toEqual([
+      {
+        reimbursement_id: 'legacy-reimbursement',
+        expense_item: '迁移汇总',
+        amount: 123.45,
+      },
+      {
+        reimbursement_id: 'legacy-incomplete-reimbursement',
+        expense_item: '迁移汇总',
+        amount: 20,
+      },
+    ])
     expect(await db.select<{ cnt: number }>(`
       SELECT COUNT(*) AS cnt
       FROM reconciliation_issues
       WHERE import_batch_id = 'migration_f3_v22'
         AND entity_id IN ('legacy-application', 'legacy-reimbursement')
     `)).toEqual([{ cnt: 2 }])
+    expect(await db.select(`
+      SELECT entity_id, attribution
+      FROM reconciliation_issues
+      WHERE import_batch_id = 'migration_f3_v22'
+        AND entity_id IN (
+          'legacy-orphan-payment',
+          'legacy-empty-reimbursement',
+          'legacy-incomplete-reimbursement'
+        )
+      ORDER BY entity_id
+    `)).toEqual([
+      {
+        entity_id: 'legacy-empty-reimbursement',
+        attribution: 'legacy-missing-or-nonpositive-amount',
+      },
+      {
+        entity_id: 'legacy-incomplete-reimbursement',
+        attribution: 'legacy-incomplete-head',
+      },
+      {
+        entity_id: 'legacy-orphan-payment',
+        attribution: 'legacy-orphan-payment-application',
+      },
+    ])
     expect(await db.select(`
       SELECT status FROM import_batches WHERE id = 'migration_f3_v22'
     `)).toEqual([{ status: 'completed' }])
