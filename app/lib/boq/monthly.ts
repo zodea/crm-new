@@ -1,6 +1,7 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, logCreate, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
+import { round2 } from '~/lib/util/number'
 import { loadBoqWorkspace } from './read-model'
 
 export interface MonthlyStatementLineView {
@@ -70,10 +71,6 @@ function numberValue(value: unknown): number {
 
 function nullableNumber(value: unknown): number | null {
   return value == null ? null : numberValue(value)
-}
-
-function money(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 function assertMonth(month: string) {
@@ -153,14 +150,14 @@ export async function generateMonthlyStatement(
     return [{
       line,
       autoQty,
-      amount: money(autoQty * line.effectiveUnitPrice),
+      amount: round2(autoQty * line.effectiveUnitPrice),
     }]
   })
   if (!rows.length)
     throw new Error(`${month} 没有可报量的已完成工程量`)
 
   const statementId = generateId('monthly_statement')
-  const totalAmount = money(rows.reduce((total, row) => total + row.amount, 0))
+  const totalAmount = round2(rows.reduce((total, row) => total + row.amount, 0))
   const logIds: string[] = []
   await db.execute(
     `INSERT INTO monthly_statements
@@ -275,7 +272,7 @@ export async function adjustMonthlyStatementLine(
     `UPDATE monthly_statement_lines
      SET adjusted_qty = ?, amount = ?, note = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    [adjustedQty, money(adjustedQty * numberValue(line.unit_price)), note.trim(), statementLineId],
+    [adjustedQty, round2(adjustedQty * numberValue(line.unit_price)), note.trim(), statementLineId],
   ))
   if (lineLogId)
     logIds.push(lineLogId)
@@ -290,7 +287,7 @@ export async function adjustMonthlyStatementLine(
     `UPDATE monthly_statements
      SET status = 'adjusted', total_amount = ?, updated_at = datetime('now')
      WHERE id = ?`,
-    [money(numberValue(total?.amount)), line.statement_id],
+    [round2(numberValue(total?.amount)), line.statement_id],
   ))
   if (statementLogId)
     logIds.push(statementLogId)

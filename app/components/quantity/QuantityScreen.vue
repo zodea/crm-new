@@ -37,6 +37,8 @@ const completionDialogOpen = shallowRef(false)
 const completionUnitId = shallowRef('')
 const completionInitialStageId = shallowRef('')
 const batchCompletionDialogOpen = shallowRef(false)
+const boqLineId = computed(() => String(route.query.boqLine ?? ''))
+const fromBoq = computed(() => Boolean(boqLineId.value))
 
 const scheduleContext = computed(() => parseScheduleDrillContext(route.query))
 const scheduleReturnTo = computed(() => scheduleContext.value
@@ -129,6 +131,8 @@ async function initialize() {
   projectId.value = preferred?.id ?? ''
   if (projectId.value)
     await loadSelectedProject(true, Boolean(scheduleContext.value))
+  if (fromBoq.value)
+    templateDialogOpen.value = true
   initialized.value = true
 }
 
@@ -310,6 +314,23 @@ onMounted(initialize)
       </NuxtLink>
     </section>
 
+    <section v-else-if="fromBoq" class="panel flex flex-wrap items-center gap-3 border-brand/30 bg-brand-soft/35 px-4 py-3">
+      <span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-brand-soft text-brand">
+        <span class="i-lucide-calculator" />
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="text-12px font-800 text-ink">
+          来自合同工程量清单
+        </div>
+        <div class="truncate text-11px text-ink-soft">
+          若该 BOQ 行已唯一命中户型模板，系统会直接定位；可在“三量明细”中维护现场复核算式。
+        </div>
+      </div>
+      <NuxtLink :to="{ path: '/contract/boq', query: { project: projectId } }" class="btn-primary">
+        <span class="i-lucide-arrow-left mr-1" /> 返回合同清单
+      </NuxtLink>
+    </section>
+
     <section
       v-if="(!initialized || store.loading) && !snapshot"
       class="panel flex min-h-64 flex-col items-center justify-center gap-3 px-6 text-center"
@@ -395,6 +416,7 @@ onMounted(initialize)
       v-if="projectId"
       v-model:open="templateDialogOpen"
       :project-id="projectId"
+      :initial-boq-line-id="boqLineId"
     />
 
     <QuantityAssignmentDialog

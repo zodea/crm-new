@@ -42,6 +42,11 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'room_id', table: 'rooms' },
     { column: 'item_id', table: 'items' },
   ],
+  item_unit_prices: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'item_id', table: 'items' },
+    { column: 'boq_file_id', table: 'boq_files' },
+  ],
   construction_stages: [{ column: 'project_id', table: 'projects' }],
   construction_stage_items: [
     { column: 'stage_id', table: 'construction_stages' },
@@ -83,6 +88,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   task_item_map: [
     { column: 'task_id', table: 'schedule_tasks' },
     { column: 'item_id', table: 'items' },
+  ],
+  schedule_task_floor_plans: [
+    { column: 'task_id', table: 'schedule_tasks' },
+    { column: 'floor_id', table: 'floors' },
   ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [

@@ -58,7 +58,9 @@ async function importRows(payload: {
       formatClass: payload.formatClass,
       rows: payload.rows,
     })
-    success(`已导入 ${result.lineCount} 行，${result.linkedTemplateLineCount} 行已回接户型工程量`)
+    success(result.unitPriceCount
+      ? `已导入分项单价库 ${result.unitPriceCount} 行，不计入合同工程量`
+      : `已导入 ${result.lineCount} 行，${result.linkedTemplateLineCount} 行已回接户型工程量`)
     await router.push({
       path: '/contract/boq',
       query: { project: projectId.value, contract: contractId.value },

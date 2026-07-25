@@ -1,13 +1,18 @@
-import type { CreateBoqChangeOrderDraft } from '~/lib/boq/change'
+import type {
+  CreateBoqChangeOrderDraft,
+  ReviseApprovedBoqChangeOrderDraft,
+} from '~/lib/boq/change'
 import type { PersistBoqImportInput } from '~/lib/boq/import'
 import type { BoqLinePatch } from '~/lib/boq/lines'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqCatalogProject, BoqWorkspace } from '~/lib/boq/read-model'
+import type { ExportFileOptions } from '~/lib/kit/export'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
+  reviseApprovedBoqChangeOrder,
   transitionBoqChangeOrder,
 } from '~/lib/boq/change'
 import { persistBoqImport } from '~/lib/boq/import'
@@ -41,6 +46,8 @@ export interface BoqAttachmentDraft {
   fileName: string
   filePath?: string
   fileSize?: number
+  mimeType: string
+  contentBase64: string
   category: BoqAttachmentCategory
 }
 
@@ -187,6 +194,17 @@ export const useBoqStore = defineStore('boq', () => {
     )
   }
 
+  async function reviseApprovedChange(
+    orderId: string,
+    draft: ReviseApprovedBoqChangeOrderDraft,
+    secondConfirmed = false,
+  ) {
+    return save(
+      '已签证变更更正',
+      () => withTransaction(tx => reviseApprovedBoqChangeOrder(tx, orderId, draft, secondConfirmed)),
+    )
+  }
+
   async function removeChange(orderId: string, allowApproved = false) {
     return save('变更单删除', () => withTransaction(async (tx) => {
       const [order] = await tx.select<{ status: string, ledger_id: string | null }>(
@@ -222,11 +240,13 @@ export const useBoqStore = defineStore('boq', () => {
         throw new Error('变更单不存在或已删除')
       if (!draft.fileName.trim())
         throw new Error('附件文件名必填')
+      if (!draft.contentBase64)
+        throw new Error('附件正文为空，请重新选择文件')
       const id = generateId('file')
       await tx.execute(
         `INSERT INTO file_refs
-          (id, owner_type, owner_id, file_name, file_path, file_size, category)
-         VALUES (?, 'boq_change_order', ?, ?, ?, ?, ?)`,
+          (id, owner_type, owner_id, file_name, file_path, file_size, category, mime_type)
+         VALUES (?, 'boq_change_order', ?, ?, ?, ?, ?, ?)`,
         [
           id,
           orderId,
@@ -234,10 +254,45 @@ export const useBoqStore = defineStore('boq', () => {
           draft.filePath?.trim() ?? '',
           draft.fileSize ?? 0,
           draft.category,
+          draft.mimeType || 'application/octet-stream',
         ],
+      )
+      await tx.execute(
+        `INSERT INTO file_payloads (file_ref_id, encoding, content)
+         VALUES (?, 'base64', ?)`,
+        [id, draft.contentBase64],
       )
       return { id, logId: await logCreate(tx, 'file_refs', id) }
     }))
+  }
+
+  async function loadAttachmentFile(attachmentId: string): Promise<ExportFileOptions> {
+    const [attachment] = await select<{
+      file_name: string
+      mime_type: string
+      encoding: string
+      content: string
+    }>(`
+      SELECT file_ref.file_name, file_ref.mime_type, payload.encoding, payload.content
+      FROM file_refs file_ref
+      JOIN file_payloads payload ON payload.file_ref_id = file_ref.id
+      WHERE file_ref.id = ?
+        AND file_ref.owner_type = 'boq_change_order'
+        AND file_ref.deleted_at IS NULL
+    `, [attachmentId])
+    if (!attachment)
+      throw new Error('附件不存在、已删除或正文缺失')
+    if (attachment.encoding !== 'base64')
+      throw new Error(`不支持的附件编码：${attachment.encoding}`)
+    const binary = atob(attachment.content)
+    const data = new Uint8Array(binary.length)
+    for (let index = 0; index < binary.length; index += 1)
+      data[index] = binary.charCodeAt(index)
+    return {
+      data,
+      defaultName: attachment.file_name,
+      mimeType: attachment.mime_type || 'application/octet-stream',
+    }
   }
 
   async function removeAttachment(attachmentId: string) {
@@ -303,8 +358,10 @@ export const useBoqStore = defineStore('boq', () => {
     createChange,
     transitionChange,
     approveChange,
+    reviseApprovedChange,
     removeChange,
     addChangeAttachment,
+    loadAttachmentFile,
     removeAttachment,
     generateMonthly,
     adjustMonthly,

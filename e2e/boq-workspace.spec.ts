@@ -65,12 +65,33 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(page.getByRole('heading', { name: '人工确认列映射' })).toBeVisible()
     await page.getByRole('button', { name: '下一步：结果预览', exact: true }).click()
     await expect(page.getByRole('heading', { name: '拆表结果预览' })).toBeVisible()
-    await expect(page.getByRole('row').filter({ hasText: '给排水管安装' })).toContainText('43')
+    const quantityInput = page.getByLabel('单套量 给排水管安装')
+    await expect(quantityInput).toHaveValue('43')
+    await quantityInput.fill('44')
     await page.getByRole('button', { name: '确认导入 1 行', exact: true }).click()
 
     await expect(page).toHaveURL(/\/contract\/boq\?/)
     await expect(page.getByText('已导入 1 行，1 行已回接户型工程量', { exact: true })).toBeVisible()
-    await expect(page.getByRole('row').filter({ hasText: '新增施工清单.xlsx·户内安装·3' })).toContainText('43')
+    await expect(page.getByRole('row').filter({ hasText: '新增施工清单.xlsx·户内安装·3' })).toContainText('44')
+  })
+
+  test('清单行通过稳定引用进入现场算式与排程楼层计划', async ({ page }) => {
+    await page.goto('/contract/boq')
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('button', { name: /现场算式：墙砖铺贴/ }).first().click()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\?.*boqLine=/)
+    await expect(page.getByText('来自合同工程量清单', { exact: true })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: '户型模板与三量' })).toBeVisible()
+
+    await page.goto('/contract/boq')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('button', { name: /楼层计划：墙砖铺贴/ }).first().click()
+    await expect(page).toHaveURL(/\/schedule\?.*boqLine=/)
+    const dialog = page.getByRole('dialog', { name: /工序详情 · 墙砖粘贴/ })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('分项 × 楼层计划', { exact: true })).toBeVisible()
+    await expect(dialog.getByText(/1栋 · 1层/).first()).toBeVisible()
   })
 
   for (const viewport of [

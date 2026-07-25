@@ -51,27 +51,41 @@ async function initialize() {
   if (selectedProjectId.value)
     await store.loadProject(selectedProjectId.value, today)
   initialized.value = true
-  restoreTaskFromRoute(route.query.task)
+  restoreTaskFromRoute(route.query.task, route.query.boqLine)
 }
 
 watch(selectedProjectId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
-  await router.replace({ query: { ...route.query, project: next, group: undefined, task: undefined } })
+  await router.replace({
+    query: {
+      ...route.query,
+      project: next,
+      group: undefined,
+      task: undefined,
+      boqLine: undefined,
+    },
+  })
   await store.loadProject(next, today)
 })
 
-function restoreTaskFromRoute(taskId: unknown) {
-  if (!taskId || !store.snapshot)
+function restoreTaskFromRoute(taskId: unknown, boqLineId: unknown = route.query.boqLine) {
+  if (!store.snapshot)
     return
-  const task = store.snapshot.groups.flatMap(group => group.tasks).find(candidate => candidate.id === taskId)
+  const tasks = store.snapshot.groups.flatMap(group => group.tasks)
+  const task = taskId
+    ? tasks.find(candidate => candidate.id === taskId)
+    : tasks.find(candidate => candidate.boqLineIds.includes(String(boqLineId ?? '')))
   if (task) {
     selectedTask.value = task
     taskDialogOpen.value = true
   }
 }
 
-watch(() => route.query.task, restoreTaskFromRoute)
+watch(
+  () => [route.query.task, route.query.boqLine] as const,
+  ([taskId, boqLineId]) => restoreTaskFromRoute(taskId, boqLineId),
+)
 
 function openTask(task: ScheduleTaskView) {
   selectedTask.value = task
@@ -101,20 +115,17 @@ async function setBaseline() {
 async function saveTask(payload: {
   task: { plannedStart: string, plannedFinish: string, manualProgress?: number }
   dependency: { predecessorId: string, lagDays: number } | null
+  floorPlans: { id: string, plannedStart: string, plannedFinish: string }[]
 }) {
   if (!selectedTask.value)
     return
   try {
     const taskId = selectedTask.value.id
-    const result = await store.updateTask(taskId, payload.task, today)
-    const dependencyResult = payload.dependency
-      ? await store.updateDependency(taskId, payload.dependency.predecessorId, payload.dependency.lagDays, today)
-      : null
+    const result = await store.saveTaskPlan(taskId, payload, today)
     taskDialogOpen.value = false
     success('工序计划已更新')
-    const conflicts = dependencyResult?.conflicts ?? result.conflicts
-    if (conflicts.length)
-      warning(`存在 ${conflicts.length} 条前后置日期冲突，请检查 FS 关系`)
+    if (result.conflicts.length)
+      warning(`存在 ${result.conflicts.length} 条前后置日期冲突，请检查 FS 关系`)
   }
   catch (cause) {
     error(toErrorMessage(cause))

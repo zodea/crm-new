@@ -40,6 +40,7 @@ export interface QuantityTemplateLine {
   id: string
   roomId: string
   itemId: string
+  readonly boqLineId: string | null
   readonly recognizedContractQty: number | null
   contractQty: number | null
   provisionalQty: number | null
@@ -145,6 +146,7 @@ interface LineRow {
   id: string
   room_id: string
   item_id: string
+  boq_line_id: string | null
   recognized_contract_qty: number | null
   contract_qty: number | null
   provisional_qty: number | null
@@ -311,6 +313,7 @@ function mapLine(row: LineRow): QuantityTemplateLine {
     id: row.id,
     roomId: row.room_id,
     itemId: row.item_id,
+    boqLineId: row.boq_line_id,
     recognizedContractQty: row.recognized_contract_qty,
     contractQty: row.contract_qty,
     provisionalQty: row.provisional_qty,

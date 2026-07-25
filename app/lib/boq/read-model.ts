@@ -1,5 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
+import { round2 } from '~/lib/util/number'
 
 export type BoqChangeStatus = 'draft' | 'submitted' | 'rejected' | 'approved'
 export type BoqChangeOperation = 'add' | 'qty' | 'price'
@@ -65,10 +66,17 @@ export interface BoqLineView {
 export interface BoqCatalogTrade {
   name: string
   lineIds: readonly string[]
+  items: readonly BoqCatalogItem[]
+}
+
+export interface BoqCatalogItem {
+  name: string
+  lineIds: readonly string[]
 }
 
 export interface BoqCatalogSection {
   name: string
+  lineIds: readonly string[]
   trades: readonly BoqCatalogTrade[]
 }
 
@@ -85,7 +93,31 @@ export interface BoqChangeOrderView {
   approvedAt: string | null
   ledgerId: string | null
   attachmentCount: number
+  attachments: readonly BoqAttachmentView[]
+  lines: readonly BoqChangeLineView[]
   createdAt: string
+}
+
+export interface BoqChangeLineView {
+  id: string
+  operation: BoqChangeOperation
+  boqLineId: string | null
+  resultBoqLineId: string | null
+  itemName: string
+  deltaQty: number | null
+  newUnitPrice: number | null
+  amount: number
+  note: string
+}
+
+export interface BoqAttachmentView {
+  id: string
+  orderId: string
+  fileName: string
+  fileSize: number
+  mimeType: string
+  category: string
+  uploadedAt: string
 }
 
 export interface BoqMonthlyStatementSummary {
@@ -199,8 +231,19 @@ interface ChangeOrderRow {
   total_amount: number
   approved_at: string | null
   ledger_id: string | null
-  attachment_count: number
   created_at: string
+}
+interface ChangeDetailRow {
+  id: string
+  change_order_id: string
+  operation: BoqChangeOperation
+  boq_line_id: string | null
+  result_boq_line_id: string | null
+  item_name: string
+  delta_qty: number | null
+  new_unit_price: number | null
+  amount: number
+  note: string
 }
 
 interface MonthlySummaryRow {
@@ -209,6 +252,15 @@ interface MonthlySummaryRow {
   status: 'draft' | 'adjusted' | 'exported'
   total_amount: number
   note: string
+}
+interface AttachmentRow {
+  id: string
+  owner_id: string
+  file_name: string
+  file_size: number
+  mime_type: string
+  category: string
+  uploaded_at: string
 }
 
 function numberValue(value: unknown): number {
@@ -220,28 +272,34 @@ function nullableNumber(value: unknown): number | null {
   return value == null ? null : numberValue(value)
 }
 
-function money(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
-}
-
 function buildCatalog(lines: readonly BoqLineView[]): BoqCatalogSection[] {
-  const sections = new Map<string, Map<string, string[]>>()
+  const sections = new Map<string, Map<string, Map<string, string[]>>>()
   for (const line of lines) {
     const sectionName = line.section || '未分部'
     const tradeName = line.trade || '未分工种'
-    const trades = sections.get(sectionName) ?? new Map<string, string[]>()
-    const lineIds = trades.get(tradeName) ?? []
+    const itemName = line.itemName || '未命名分项'
+    const trades = sections.get(sectionName) ?? new Map<string, Map<string, string[]>>()
+    const items = trades.get(tradeName) ?? new Map<string, string[]>()
+    const lineIds = items.get(itemName) ?? []
     lineIds.push(line.id)
-    trades.set(tradeName, lineIds)
+    items.set(itemName, lineIds)
+    trades.set(tradeName, items)
     sections.set(sectionName, trades)
   }
   return [...sections.entries()]
     .sort(([left], [right]) => left.localeCompare(right, 'zh-CN'))
     .map(([name, trades]) => ({
       name,
+      lineIds: [...trades.values()].flatMap(items => [...items.values()].flat()),
       trades: [...trades.entries()]
         .sort(([left], [right]) => left.localeCompare(right, 'zh-CN'))
-        .map(([trade, lineIds]) => ({ name: trade, lineIds })),
+        .map(([trade, items]) => ({
+          name: trade,
+          lineIds: [...items.values()].flat(),
+          items: [...items.entries()]
+            .sort(([left], [right]) => left.localeCompare(right, 'zh-CN'))
+            .map(([itemName, lineIds]) => ({ name: itemName, lineIds })),
+        })),
     }))
 }
 
@@ -297,7 +355,15 @@ export async function loadBoqWorkspace(
   if (!project || !contract)
     return null
 
-  const [fileRows, lineRows, approvedRows, changeRows, monthlyRows] = await Promise.all([
+  const [
+    fileRows,
+    lineRows,
+    approvedRows,
+    changeRows,
+    changeDetailRows,
+    monthlyRows,
+    attachmentRows,
+  ] = await Promise.all([
     db.select<FileRow>(
       selectVisibleSql('boq_files', 'AND contract_id = ? ORDER BY created_at, id'),
       [contractId],
@@ -338,19 +404,32 @@ export async function loadBoqWorkspace(
              order_row.total_amount,
              order_row.approved_at,
              order_row.ledger_id,
-             order_row.created_at,
-             (
-               SELECT COUNT(*)
-               FROM file_refs attachment
-               WHERE attachment.owner_type = 'boq_change_order'
-                 AND attachment.owner_id = order_row.id
-                 AND attachment.deleted_at IS NULL
-             ) AS attachment_count
+             order_row.created_at
       FROM boq_change_orders order_row
       WHERE order_row.deleted_at IS NULL
         AND order_row.project_id = ?
         AND order_row.contract_id = ?
       ORDER BY order_row.created_at DESC, order_row.id DESC
+    `, [projectId, contractId]),
+    db.select<ChangeDetailRow>(`
+      SELECT change_line.id,
+             change_line.change_order_id,
+             change_line.operation,
+             change_line.boq_line_id,
+             change_line.result_boq_line_id,
+             COALESCE(NULLIF(change_line.item_name, ''), target.item_name, '') AS item_name,
+             change_line.delta_qty,
+             change_line.new_unit_price,
+             change_line.amount,
+             change_line.note
+      FROM boq_change_lines change_line
+      LEFT JOIN boq_lines target ON target.id = change_line.boq_line_id
+      JOIN boq_change_orders order_row ON order_row.id = change_line.change_order_id
+      WHERE change_line.deleted_at IS NULL
+        AND order_row.deleted_at IS NULL
+        AND order_row.project_id = ?
+        AND order_row.contract_id = ?
+      ORDER BY change_line.sort_order, change_line.id
     `, [projectId, contractId]),
     db.select<MonthlySummaryRow>(
       selectVisibleSql(
@@ -359,6 +438,23 @@ export async function loadBoqWorkspace(
       ),
       [projectId, contractId],
     ),
+    db.select<AttachmentRow>(`
+      SELECT attachment.id,
+             attachment.owner_id,
+             attachment.file_name,
+             attachment.file_size,
+             attachment.mime_type,
+             attachment.category,
+             attachment.uploaded_at
+      FROM file_refs attachment
+      JOIN boq_change_orders order_row ON order_row.id = attachment.owner_id
+      WHERE attachment.deleted_at IS NULL
+        AND attachment.owner_type = 'boq_change_order'
+        AND order_row.deleted_at IS NULL
+        AND order_row.project_id = ?
+        AND order_row.contract_id = ?
+      ORDER BY attachment.uploaded_at, attachment.id
+    `, [projectId, contractId]),
   ])
 
   const changesByLine = new Map<string, ApprovedChangeRow[]>()
@@ -374,12 +470,12 @@ export async function loadBoqWorkspace(
   const lines = lineRows.map<BoqLineView>((row) => {
     const baseQty = numberValue(row.qty)
     const baseUnitPrice = numberValue(row.unit_price)
-    const baseAmount = row.amount == null ? money(baseQty * baseUnitPrice) : numberValue(row.amount)
+    const baseAmount = row.amount == null ? round2(baseQty * baseUnitPrice) : numberValue(row.amount)
     let effectiveQty = baseQty
     let effectiveUnitPrice = baseUnitPrice
     let approvedChangeAmount = 0
     for (const change of changesByLine.get(row.id) ?? []) {
-      approvedChangeAmount = money(approvedChangeAmount + numberValue(change.amount))
+      approvedChangeAmount = round2(approvedChangeAmount + numberValue(change.amount))
       if (change.operation === 'qty')
         effectiveQty += numberValue(change.delta_qty)
       else if (change.operation === 'price')
@@ -401,7 +497,7 @@ export async function loadBoqWorkspace(
       baseAmount,
       effectiveQty,
       effectiveUnitPrice,
-      effectiveAmount: money(effectiveQty * effectiveUnitPrice),
+      effectiveAmount: round2(effectiveQty * effectiveUnitPrice),
       approvedChangeAmount,
       traceKey: row.trace_key,
       sourceSheet: row.source_sheet,
@@ -424,13 +520,44 @@ export async function loadBoqWorkspace(
     }
   })
 
-  const approvedChangeAmount = money(changeRows
+  const approvedChangeAmount = round2(changeRows
     .filter(change => change.status === 'approved')
     .reduce((total, change) => total + numberValue(change.total_amount), 0))
-  const baseAmount = money(lines
+  const baseAmount = round2(lines
     .filter(line => line.boqFileId != null)
     .reduce((total, line) => total + line.baseAmount, 0))
-  const effectiveAmount = money(lines.reduce((total, line) => total + line.effectiveAmount, 0))
+  const effectiveAmount = round2(lines.reduce((total, line) => total + line.effectiveAmount, 0))
+  const attachmentsByOrder = new Map<string, BoqAttachmentView[]>()
+  for (const attachment of attachmentRows) {
+    const bucket = attachmentsByOrder.get(attachment.owner_id) ?? []
+    bucket.push({
+      id: attachment.id,
+      orderId: attachment.owner_id,
+      fileName: attachment.file_name,
+      fileSize: numberValue(attachment.file_size),
+      mimeType: attachment.mime_type || 'application/octet-stream',
+      category: attachment.category,
+      uploadedAt: attachment.uploaded_at,
+    })
+    attachmentsByOrder.set(attachment.owner_id, bucket)
+  }
+  const changeLinesByOrder = new Map<string, BoqChangeLineView[]>()
+  for (const line of changeDetailRows) {
+    changeLinesByOrder.set(line.change_order_id, [
+      ...(changeLinesByOrder.get(line.change_order_id) ?? []),
+      {
+        id: line.id,
+        operation: line.operation,
+        boqLineId: line.boq_line_id,
+        resultBoqLineId: line.result_boq_line_id,
+        itemName: line.item_name,
+        deltaQty: nullableNumber(line.delta_qty),
+        newUnitPrice: nullableNumber(line.new_unit_price),
+        amount: numberValue(line.amount),
+        note: line.note,
+      },
+    ])
+  }
 
   return {
     projectId,
@@ -462,7 +589,9 @@ export async function loadBoqWorkspace(
       totalAmount: numberValue(row.total_amount),
       approvedAt: row.approved_at,
       ledgerId: row.ledger_id,
-      attachmentCount: numberValue(row.attachment_count),
+      attachmentCount: attachmentsByOrder.get(row.id)?.length ?? 0,
+      attachments: attachmentsByOrder.get(row.id) ?? [],
+      lines: changeLinesByOrder.get(row.id) ?? [],
       createdAt: row.created_at,
     })),
     monthlyStatements: monthlyRows.map(row => ({

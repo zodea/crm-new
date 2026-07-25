@@ -738,6 +738,68 @@ CREATE INDEX IF NOT EXISTS idx_monthly_statement_lines_deleted
   ON monthly_statement_lines(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+/** v17 #115 排程域分项×楼层计划：BOQ 仅作来源引用，计划与微调归排程所有。 */
+const V17_SCHEDULE_FLOOR_PLANS = `
+CREATE TABLE IF NOT EXISTS schedule_task_floor_plans (
+  id             TEXT PRIMARY KEY,
+  task_id        TEXT NOT NULL REFERENCES schedule_tasks(id),
+  floor_id       TEXT NOT NULL REFERENCES floors(id),
+  boq_line_id    TEXT NOT NULL REFERENCES boq_lines(id),
+  planned_start  TEXT NOT NULL,
+  planned_finish TEXT NOT NULL,
+  is_manual      INTEGER NOT NULL DEFAULT 0 CHECK (is_manual IN (0, 1)),
+  note           TEXT NOT NULL DEFAULT '',
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL,
+  CHECK (planned_finish >= planned_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_schedule_floor_plans_task
+  ON schedule_task_floor_plans(task_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_floor_plans_floor
+  ON schedule_task_floor_plans(floor_id);
+CREATE INDEX IF NOT EXISTS idx_schedule_floor_plans_boq
+  ON schedule_task_floor_plans(boq_line_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_floor_plan_scope
+  ON schedule_task_floor_plans(task_id, floor_id, boq_line_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_schedule_task_floor_plans_deleted
+  ON schedule_task_floor_plans(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+/** v18 #115 E 类零星维修清单进入独立分项单价库，不伪装成合同工程量。 */
+const V18_ITEM_UNIT_PRICES = `
+CREATE TABLE IF NOT EXISTS item_unit_prices (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL REFERENCES projects(id),
+  item_id       TEXT REFERENCES items(id),
+  boq_file_id   TEXT NOT NULL REFERENCES boq_files(id),
+  item_code     TEXT NOT NULL DEFAULT '',
+  item_name     TEXT NOT NULL,
+  unit          TEXT NOT NULL DEFAULT '',
+  unit_price    REAL NOT NULL CHECK (unit_price >= 0),
+  spec          TEXT NOT NULL DEFAULT '',
+  trace_key     TEXT NOT NULL DEFAULT '',
+  source_sheet  TEXT NOT NULL DEFAULT '',
+  source_row    INTEGER,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_unit_prices_project
+  ON item_unit_prices(project_id);
+CREATE INDEX IF NOT EXISTS idx_item_unit_prices_item
+  ON item_unit_prices(item_id);
+CREATE INDEX IF NOT EXISTS idx_item_unit_prices_file
+  ON item_unit_prices(boq_file_id);
+CREATE INDEX IF NOT EXISTS idx_item_unit_prices_deleted
+  ON item_unit_prices(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -1031,6 +1093,20 @@ export const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_boq_change_lines_item
         ON boq_change_lines(item_id);
       `)
+    },
+  },
+  {
+    version: 17,
+    name: 'schedule-floor-plan-allocation',
+    async up(db) {
+      await execScript(db, V17_SCHEDULE_FLOOR_PLANS)
+    },
+  },
+  {
+    version: 18,
+    name: 'item-unit-price-library',
+    async up(db) {
+      await execScript(db, V18_ITEM_UNIT_PRICES)
     },
   },
 ]

@@ -22,6 +22,7 @@ export interface BoqParsedWorkbook {
   formatClass: BoqFormatClass
   formatLabel: string
   sheets: readonly BoqParsedSheet[]
+  ignoredSheets: readonly string[]
 }
 
 export type BoqImportField
@@ -31,6 +32,7 @@ export type BoqImportField
     | 'itemName'
     | 'unit'
     | 'qty'
+    | 'totalQty'
     | 'unitPrice'
     | 'amount'
     | 'building'
@@ -41,6 +43,7 @@ export type BoqImportField
     | 'spec'
     | 'taxRate'
     | 'ownerSupplied'
+    | 'rowType'
 
 export type BoqColumnMapping = Readonly<Partial<Record<BoqImportField, string>>>
 
@@ -51,6 +54,7 @@ export interface BoqImportRow {
   itemName: string
   unit: string
   qty: number
+  totalQty: number | null
   unitPrice: number
   amount: number
   building: string
@@ -78,6 +82,7 @@ export interface PersistBoqImportInput {
 export interface PersistBoqImportResult {
   fileId: string
   lineCount: number
+  unitPriceCount: number
   linkedTemplateLineCount: number
   logIds: readonly string[]
 }
@@ -97,6 +102,7 @@ const FIELD_ALIASES: Record<BoqImportField, readonly string[]> = {
   itemName: ['分项名称', '项目名称', '清单名称', '名称'],
   unit: ['单位', '计量单位'],
   qty: ['工程量', '数量', '合同量', '清单量'],
+  totalQty: ['总工程量', '总量', '合计量'],
   unitPrice: ['不含税单价', '合同单价', '综合单价', '单价'],
   amount: ['合价', '金额', '合同金额'],
   building: ['楼栋', '栋号'],
@@ -107,6 +113,7 @@ const FIELD_ALIASES: Record<BoqImportField, readonly string[]> = {
   spec: ['特征描述', '项目特征', '规格', '做法'],
   taxRate: ['税率'],
   ownerSupplied: ['甲供', '甲供材', '采购方式'],
+  rowType: ['行类型', '数据类型', '记录类型'],
 }
 
 function normalized(value: unknown): string {
@@ -129,12 +136,132 @@ function headerScore(row: readonly unknown[]): number {
   return row.reduce<number>((score, value) => score + Number(KNOWN_HEADERS.has(normalized(value))), 0)
 }
 
-function parseSheet(name: string, worksheet: XLSX.WorkSheet): BoqParsedSheet {
+function fillMergedCells(matrix: unknown[][], worksheet: XLSX.WorkSheet): void {
+  for (const merge of worksheet['!merges'] ?? []) {
+    const value = matrix[merge.s.r]?.[merge.s.c] ?? ''
+    for (let row = merge.s.r; row <= merge.e.r; row += 1) {
+      matrix[row] ??= []
+      for (let column = merge.s.c; column <= merge.e.c; column += 1)
+        matrix[row]![column] = value
+    }
+  }
+}
+
+function forwardFilled(row: readonly unknown[]): string[] {
+  let previous = ''
+  return row.map((value) => {
+    const current = String(value ?? '').trim()
+    if (current)
+      previous = current
+    return current || previous
+  })
+}
+
+function aliasesMatch(value: string, field: BoqImportField): boolean {
+  const header = normalized(value)
+  return FIELD_ALIASES[field].some((alias) => {
+    const candidate = normalized(alias)
+    return header === candidate || header.includes(candidate)
+  })
+}
+
+function matrixHeaderLabel(parts: readonly string[]): string {
+  return [...new Set(parts.filter(Boolean))].join(' / ')
+}
+
+function unitTypeFromHeader(parts: readonly string[]): string {
+  const ignored = new Set(Object.values(FIELD_ALIASES).flat().map(normalized))
+  const candidate = [...parts]
+    .reverse()
+    .find(part => part && !ignored.has(normalized(part)) && !/^(?:数量|工程量|合同量|清单量|套数|倍数)$/.test(part))
+  return candidate?.replace(/户型.*$/, '').replace(/^户型/, '').trim() ?? ''
+}
+
+function tryExpandMatrixRows(
+  matrix: readonly unknown[][],
+  headerIndex: number,
+): { columns: string[], rows: BoqParsedSourceRow[] } | null {
+  for (const depth of [3, 2]) {
+    const headerRows = matrix.slice(headerIndex, headerIndex + depth).map(forwardFilled)
+    if (headerRows.length !== depth)
+      continue
+    const width = Math.max(...headerRows.map(row => row.length), 0)
+    const headerParts = Array.from(
+      { length: width },
+      (_, column) => headerRows.map(row => row[column] ?? '').filter(Boolean),
+    )
+    const qtyColumns = headerParts
+      .map((parts, index) => ({ index, parts }))
+      .filter(column => aliasesMatch(matrixHeaderLabel(column.parts), 'qty'))
+    if (qtyColumns.length < 2)
+      continue
+
+    const columnIndex = (field: BoqImportField) =>
+      headerParts.findIndex(parts => aliasesMatch(matrixHeaderLabel(parts), field))
+    const itemNameIndex = columnIndex('itemName')
+    const unitPriceIndex = columnIndex('unitPrice')
+    if (itemNameIndex < 0 || unitPriceIndex < 0)
+      continue
+    const fixedFields = [
+      'section',
+      'trade',
+      'itemCode',
+      'itemName',
+      'unit',
+      'unitPrice',
+      'totalQty',
+      'building',
+      'room',
+      'floorZone',
+      'spec',
+      'taxRate',
+      'ownerSupplied',
+    ] as const
+    const fixedIndexes = new Map(fixedFields.map(field => [field, columnIndex(field)]))
+    const multiplierColumns = headerParts
+      .map((parts, index) => ({ index, unitType: unitTypeFromHeader(parts) }))
+      .filter(column => aliasesMatch(matrixHeaderLabel(headerParts[column.index] ?? []), 'multiplier'))
+    const rows: BoqParsedSourceRow[] = []
+    for (const [offset, cells] of matrix.slice(headerIndex + depth).entries()) {
+      for (const quantityColumn of qtyColumns) {
+        const quantity = cells[quantityColumn.index]
+        if (String(quantity ?? '').trim() === '')
+          continue
+        const unitType = unitTypeFromHeader(quantityColumn.parts)
+        const multiplierColumn = multiplierColumns.find(column => column.unitType === unitType)
+        const values: Record<string, unknown> = {
+          户型: unitType,
+          工程量: quantity,
+          套数: multiplierColumn ? cells[multiplierColumn.index] ?? '' : '',
+        }
+        for (const field of fixedFields) {
+          const index = fixedIndexes.get(field) ?? -1
+          if (index >= 0)
+            values[FIELD_ALIASES[field][0]!] = cells[index] ?? ''
+        }
+        rows.push({
+          sourceRow: headerIndex + depth + offset + 1,
+          values,
+        })
+      }
+    }
+    if (!rows.length)
+      continue
+    return {
+      columns: uniqueColumns(Object.keys(rows[0]?.values ?? {})),
+      rows: rows.filter(row => Object.values(row.values).some(value => String(value ?? '').trim())),
+    }
+  }
+  return null
+}
+
+function parseSheet(name: string, worksheet: XLSX.WorkSheet): BoqParsedSheet | null {
   const matrix = XLSX.utils.sheet_to_json<unknown[]>(worksheet, {
     header: 1,
     raw: false,
     defval: '',
   })
+  fillMergedCells(matrix, worksheet)
   let headerIndex = -1
   let bestScore = 0
   for (const [index, row] of matrix.slice(0, 20).entries()) {
@@ -145,7 +272,16 @@ function parseSheet(name: string, worksheet: XLSX.WorkSheet): BoqParsedSheet {
     }
   }
   if (headerIndex < 0 || bestScore < 2)
-    throw new Error(`工作表「${name}」前 20 行未识别到清单表头`)
+    return null
+  const expanded = tryExpandMatrixRows(matrix, headerIndex)
+  if (expanded) {
+    return {
+      name,
+      headerRow: headerIndex + 1,
+      columns: expanded.columns,
+      rows: expanded.rows,
+    }
+  }
   const columns = uniqueColumns(matrix[headerIndex] ?? [])
   const rows = matrix
     .slice(headerIndex + 1)
@@ -189,18 +325,22 @@ export function parseBoqWorkbook(buffer: ArrayBuffer, fileName: string): BoqPars
   const workbook = XLSX.read(buffer, { type: 'array', codepage: 65001 })
   if (!workbook.SheetNames.length)
     throw new Error('清单文件没有工作表')
-  const sheets = workbook.SheetNames.map((name) => {
+  const parsedSheets = workbook.SheetNames.map((name) => {
     const worksheet = workbook.Sheets[name]
     if (!worksheet)
       throw new Error(`工作表「${name}」读取失败`)
-    return parseSheet(name, worksheet)
+    return { name, sheet: parseSheet(name, worksheet) }
   })
+  const sheets = parsedSheets.flatMap(result => result.sheet ? [result.sheet] : [])
+  if (!sheets.length)
+    throw new Error('所有工作表前 20 行都未识别到清单表头')
   const formatClass = detectFormat(fileName, workbook, sheets)
   return {
     fileName,
     formatClass,
     formatLabel: FORMAT_LABELS[formatClass],
     sheets,
+    ignoredSheets: parsedSheets.flatMap(result => result.sheet ? [] : [result.name]),
   }
 }
 
@@ -258,40 +398,76 @@ function requiredNumber(value: string, label: string, sourceRow: number): number
 export function buildBoqImportRows(
   sheet: BoqParsedSheet,
   mapping: BoqColumnMapping,
+  formatClass?: BoqFormatClass,
 ): BoqImportRow[] {
-  if (!mapping.itemName || !mapping.qty || !mapping.unitPrice)
+  if (!mapping.itemName || (!mapping.qty && formatClass !== 'E') || !mapping.unitPrice)
     throw new Error('分项名称、工程量、合同单价是导入必填映射')
-  return sheet.rows.flatMap((source) => {
+  const rows: BoqImportRow[] = []
+  let currentSection = ''
+  let currentFloor = ''
+  let currentSpec = ''
+  for (const source of sheet.rows) {
     const itemName = text(source, mapping.itemName)
+    const quantityText = text(source, mapping.qty)
+    const unitPriceText = text(source, mapping.unitPrice)
+    const detectedRowType = text(source, mapping.rowType)
+      || Object.values(source.values).find(value => /^(?:A1章|BQDESC|BQITEM|TOTAL)$/i.test(String(value).trim()))
+    if (formatClass === 'C' && detectedRowType) {
+      if (/^A1章$/i.test(String(detectedRowType))) {
+        currentSection = itemName || currentSection
+        continue
+      }
+      if (/^BQDESC$/i.test(String(detectedRowType))) {
+        currentSpec = itemName || currentSpec
+        continue
+      }
+      if (!/^BQITEM$/i.test(String(detectedRowType)))
+        continue
+    }
+    if (formatClass === 'D' && !quantityText && !unitPriceText && itemName) {
+      if (/^(?:负?\d+层|首层|夹层|屋面层|地下.+层)$/.test(itemName))
+        currentFloor = itemName
+      else
+        currentSection = itemName
+      continue
+    }
     if (!itemName || /^(?:合计|小计|总计|备注)$/.test(itemName))
-      return []
-    const qty = requiredNumber(text(source, mapping.qty), '工程量', source.sourceRow)
-    const unitPrice = requiredNumber(text(source, mapping.unitPrice), '合同单价', source.sourceRow)
+      continue
+    const qty = formatClass === 'E' && !quantityText
+      ? 1
+      : requiredNumber(quantityText, '工程量', source.sourceRow)
+    const unitPrice = requiredNumber(unitPriceText, '合同单价', source.sourceRow)
     if (qty < 0 || unitPrice < 0)
       throw new Error(`第 ${source.sourceRow} 行工程量与合同单价不能为负数`)
     const amount = numberOrNull(text(source, mapping.amount)) ?? qty * unitPrice
     const ownerSupplied = /^(?:是|甲供|甲供材|1|true|yes)$/i.test(text(source, mapping.ownerSupplied))
-    return [{
-      section: text(source, mapping.section),
+    const rawSpec = text(source, mapping.spec) || currentSpec
+    const inferredRoom = formatClass === 'B'
+      ? /于([^，。；\s]+)/.exec(`${itemName} ${rawSpec}`)?.[1] ?? ''
+      : ''
+    rows.push({
+      section: text(source, mapping.section) || currentSection,
       trade: text(source, mapping.trade),
       itemCode: text(source, mapping.itemCode),
       itemName,
       unit: text(source, mapping.unit),
       qty,
+      totalQty: numberOrNull(text(source, mapping.totalQty)),
       unitPrice,
       amount: Math.round((amount + Number.EPSILON) * 100) / 100,
       building: text(source, mapping.building),
       unitType: text(source, mapping.unitType),
       multiplier: numberOrNull(text(source, mapping.multiplier)),
-      room: text(source, mapping.room),
-      floorZone: text(source, mapping.floorZone),
-      spec: text(source, mapping.spec),
+      room: text(source, mapping.room) || inferredRoom,
+      floorZone: text(source, mapping.floorZone) || currentFloor,
+      spec: rawSpec,
       taxRate: numberOrNull(text(source, mapping.taxRate)),
       ownerSupplied,
       sourceSheet: sheet.name,
       sourceRow: source.sourceRow,
-    }]
-  })
+    })
+  }
+  return rows
 }
 
 export async function persistBoqImport(
@@ -341,6 +517,49 @@ export async function persistBoqImport(
   const fileLogId = await logCreate(db, 'boq_files', fileId)
   if (fileLogId)
     logIds.push(fileLogId)
+
+  if (input.formatClass === 'E') {
+    for (const [index, row] of input.rows.entries()) {
+      const priceId = generateId('item_unit_price')
+      const itemId = (
+        itemByCode.get(row.itemCode.trim().toLowerCase())
+        ?? itemByName.get(row.itemName.trim())
+        ?? null
+      )
+      const traceKey = `${input.fileName}·${row.sourceSheet}·${row.sourceRow}`
+      await db.execute(
+        `INSERT INTO item_unit_prices
+          (id, project_id, item_id, boq_file_id, item_code, item_name, unit,
+           unit_price, spec, trace_key, source_sheet, source_row, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          priceId,
+          input.projectId,
+          itemId,
+          fileId,
+          row.itemCode,
+          row.itemName,
+          row.unit,
+          row.unitPrice,
+          row.spec,
+          traceKey,
+          row.sourceSheet,
+          row.sourceRow,
+          (index + 1) * 10,
+        ],
+      )
+      const priceLogId = await logCreate(db, 'item_unit_prices', priceId)
+      if (priceLogId)
+        logIds.push(priceLogId)
+    }
+    return {
+      fileId,
+      lineCount: 0,
+      unitPriceCount: input.rows.length,
+      linkedTemplateLineCount: 0,
+      logIds,
+    }
+  }
 
   let linkedTemplateLineCount = 0
   for (const row of input.rows) {
@@ -393,8 +612,16 @@ export async function persistBoqImport(
       logIds.push(lineLogId)
 
     if (itemId && row.unitType) {
-      const templateLines = await db.select<{ id: string }>(`
-        SELECT hti.id
+      const templateLines = await db.select<{
+        id: string
+        room_code: string
+        room_name: string
+        room_kind: 'room' | 'whole_unit'
+      }>(`
+        SELECT hti.id,
+               room_row.code AS room_code,
+               room_row.name AS room_name,
+               room_row.kind AS room_kind
         FROM house_type_template_items hti
         JOIN rooms room_row ON room_row.id = hti.room_id
         JOIN house_type_templates template ON template.id = room_row.template_id
@@ -405,7 +632,21 @@ export async function persistBoqImport(
           AND template.code = ?
           AND hti.item_id = ?
       `, [input.projectId, row.unitType, itemId])
-      for (const templateLine of templateLines) {
+      const requestedRoom = row.room.trim()
+      const matchedTemplateLines = requestedRoom
+        ? templateLines.filter(templateLine => (
+            templateLine.room_code === requestedRoom
+            || templateLine.room_name === requestedRoom
+            || (
+              templateLine.room_kind === 'whole_unit'
+              && ['整户', '整户范围', '全屋'].includes(requestedRoom)
+            )
+          ))
+        : templateLines
+      // BOQ 是合同量唯一来源；只有“户型 + 标准分项 + 房间（若提供）”唯一命中才回接。
+      // 模糊或多房间命中一律保留 BOQ 行，交给工程量页人工兜底，禁止最后一行静默覆盖。
+      if (matchedTemplateLines.length === 1) {
+        const templateLine = matchedTemplateLines[0]!
         const templateLogId = await withUpdateLog(
           db,
           'house_type_template_items',
@@ -429,6 +670,7 @@ export async function persistBoqImport(
   return {
     fileId,
     lineCount: input.rows.length,
+    unitPriceCount: 0,
     linkedTemplateLineCount,
     logIds,
   }

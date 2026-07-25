@@ -30,6 +30,7 @@ const tasks = ref<TaskDraft[]>(SCHEDULE_TASK_TEMPLATES.map(template => ({
   anchorStart: null,
 })))
 const initialized = shallowRef(false)
+const loadingRange = shallowRef(false)
 
 const templateByKey = new Map(SCHEDULE_TASK_TEMPLATES.map(template => [template.key, template]))
 const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMode.value, tasks.value.map(task => ({
@@ -41,6 +42,24 @@ const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMod
 const planByKey = computed(() => new Map(plannedRows.value.map(row => [row.key, row])))
 const enabledCount = computed(() => tasks.value.filter(task => task.enabled).length)
 const finishDate = computed(() => plannedRows.value.map(row => row.plannedFinish).sort().at(-1) ?? '—')
+const projectOptions = computed(() => store.catalog.map(project => ({
+  key: project.id,
+  label: `${project.name}${project.code ? ` · ${project.code}` : ''}`,
+})))
+const contractOptions = computed(() => store.contracts.map(contract => ({
+  key: contract.id,
+  label: `${contract.name}${contract.no ? ` · ${contract.no}` : ''} · ${contract.lineCount} 条清单`,
+})))
+const coverageSummary = computed(() => ({
+  contract: store.buildingCoverage.filter(building => building.inContract).length,
+  scheduled: store.buildingCoverage.filter(building => building.inContract && building.scheduled).length,
+  available: store.buildingCoverage.filter(building => building.inContract && !building.scheduled).length,
+  outside: store.buildingCoverage.filter(building => !building.inContract).length,
+}))
+const outsideBuildingNames = computed(() => store.buildingCoverage
+  .filter(building => !building.inContract)
+  .map(building => building.name)
+  .join('、'))
 
 function predecessorLabel(templateKey: string): string {
   const index = plannedRows.value.findIndex(row => row.key === templateKey)
@@ -54,15 +73,20 @@ function predecessorLabel(templateKey: string): string {
 }
 
 async function loadRange(reset = true) {
-  await Promise.all([
-    store.loadBuildings(projectId.value),
-    store.loadContracts(projectId.value),
-  ])
-  if (reset) {
-    buildingIds.value = store.buildings.map(building => building.id)
-    contractId.value = store.contracts.find(contract => contract.lineCount > 0)?.id
-      ?? store.contracts[0]?.id
-      ?? ''
+  loadingRange.value = true
+  try {
+    await store.loadContracts(projectId.value)
+    if (reset) {
+      contractId.value = store.contracts.find(contract => contract.lineCount > 0)?.id
+        ?? store.contracts[0]?.id
+        ?? ''
+    }
+    await store.loadBuildings(projectId.value, contractId.value)
+    if (reset)
+      buildingIds.value = store.buildings.map(building => building.id)
+  }
+  finally {
+    loadingRange.value = false
   }
 }
 
@@ -70,6 +94,13 @@ watch(projectId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
   await loadRange(true)
+})
+
+watch(contractId, async (next, previous) => {
+  if (!initialized.value || loadingRange.value || !next || next === previous)
+    return
+  await store.loadBuildings(projectId.value, next)
+  buildingIds.value = store.buildings.map(building => building.id)
 })
 
 function toggleBuilding(id: string) {
@@ -154,30 +185,24 @@ onMounted(async () => {
           排程范围
         </h2>
         <div class="mt-4 grid gap-3">
-          <label>
+          <div>
             <span class="field-label block">项目</span>
-            <select v-model="projectId" class="field-input w-full">
-              <option v-for="project in store.catalog" :key="project.id" :value="project.id">{{ project.name }}{{ project.code ? ` · ${project.code}` : '' }}</option>
-            </select>
-          </label>
+            <SelectFilter v-model="projectId" aria-label="项目" :options="projectOptions" :min-width="210" placeholder="选择项目" />
+          </div>
           <label>
             <span class="field-label block">分组名称</span>
             <input v-model="name" class="field-input w-full" maxlength="80">
           </label>
-          <label>
+          <div>
             <span class="field-label block">施工合同</span>
-            <select v-model="contractId" class="field-input w-full">
-              <option v-for="contract in store.contracts" :key="contract.id" :value="contract.id">
-                {{ contract.name }}{{ contract.no ? ` · ${contract.no}` : '' }} · {{ contract.lineCount }} 条清单
-              </option>
-            </select>
+            <SelectFilter v-model="contractId" aria-label="施工合同" :options="contractOptions" :min-width="210" placeholder="选择施工合同" />
             <span v-if="!store.contracts.length" class="mt-1 block text-11px text-danger">
               当前项目尚未配置施工合同。
             </span>
             <span v-else-if="store.contracts.every(contract => !contract.lineCount)" class="mt-1 block text-11px text-warning">
-              合同尚未导入清单；工序会保留分项映射，导入后可继续补齐清单关联。
+              合同尚未导入清单；请先拆表确认楼栋范围后再建组。
             </span>
-          </label>
+          </div>
           <label>
             <span class="field-label block">计划开始</span>
             <input v-model="startDate" type="date" class="field-input w-full">
@@ -203,6 +228,12 @@ onMounted(async () => {
             <legend class="field-label">
               楼栋范围
             </legend>
+            <div v-if="store.buildingCoverage.length" class="mt-1 flex flex-wrap gap-1.5 text-10px">
+              <span class="chip-brand">合同范围 {{ coverageSummary.contract }}</span>
+              <span class="chip-ok">未纳入 {{ coverageSummary.available }}</span>
+              <span class="chip">已纳入 {{ coverageSummary.scheduled }}</span>
+              <span v-if="coverageSummary.outside" class="chip-warn">超合同范围 {{ coverageSummary.outside }}</span>
+            </div>
             <div v-if="store.buildings.length" class="mt-1 grid max-h-48 gap-1.5 overflow-y-auto pr-1">
               <label v-for="building in store.buildings" :key="building.id" class="flex items-center gap-2 rounded px-1 py-1 text-12px hover:bg-surface-2">
                 <input :checked="buildingIds.includes(building.id)" type="checkbox" class="accent-[var(--brand)]" @change="toggleBuilding(building.id)">
@@ -210,7 +241,10 @@ onMounted(async () => {
               </label>
             </div>
             <p v-else class="mt-1 text-11px text-danger">
-              当前项目尚未配置楼栋。
+              清单未提供可验证的显式楼栋范围，或合同范围已全部纳入排程。
+            </p>
+            <p v-if="outsideBuildingNames" class="mt-1 text-10px text-ink-faint">
+              项目库中不属于本合同：{{ outsideBuildingNames }}
             </p>
           </fieldset>
         </div>
