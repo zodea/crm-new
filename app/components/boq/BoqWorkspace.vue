@@ -1,0 +1,460 @@
+<script setup lang="ts">
+import type { CreateBoqChangeOrderDraft } from '~/lib/boq/change'
+import type { MonthlyStatementView } from '~/lib/boq/monthly'
+import type { BoqChangeOrderView, BoqLineView } from '~/lib/boq/read-model'
+import type { BoqAttachmentDraft } from '~/stores/boq'
+import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
+import { toErrorMessage } from '~/lib/util/error'
+
+type BoqTab = 'lines' | 'changes' | 'monthly'
+
+const route = useRoute()
+const router = useRouter()
+const store = useBoqStore()
+const {
+  confirm,
+  error: toastError,
+  exportFile,
+  formModal,
+  success,
+  undoToast,
+} = useKitUI()
+
+const projectId = shallowRef('')
+const contractId = shallowRef('')
+const activeTab = shallowRef<BoqTab>('lines')
+const treeScope = shallowRef('all')
+const search = shallowRef('')
+const initialized = shallowRef(false)
+
+const projectOptions = computed(() => store.catalog.map(project => ({
+  id: project.id,
+  code: project.code,
+  name: project.name,
+})))
+
+const selectedProject = computed(() => store.catalog.find(project => project.id === projectId.value) ?? null)
+const contractOptions = computed(() => (selectedProject.value?.contracts ?? []).map(contract => ({
+  key: contract.id,
+  label: contract.no ? `${contract.name} · ${contract.no}` : contract.name,
+})))
+
+const tabs = computed(() => [
+  { key: 'lines', label: '合同清单', count: store.workspace?.summary.lineCount ?? 0 },
+  { key: 'changes', label: '变更单', count: store.workspace?.changes.length ?? 0 },
+  { key: 'monthly', label: '月度报量', count: store.workspace?.monthlyStatements.length ?? 0 },
+])
+
+function queryTab(value: unknown): BoqTab {
+  return value === 'changes' || value === 'monthly' ? value : 'lines'
+}
+
+async function replaceQuery() {
+  await router.replace({
+    query: {
+      ...route.query,
+      project: projectId.value || undefined,
+      contract: contractId.value || undefined,
+      tab: activeTab.value === 'lines' ? undefined : activeTab.value,
+    },
+  })
+}
+
+async function initialize() {
+  initialized.value = false
+  try {
+    await store.loadCatalog()
+    activeTab.value = queryTab(route.query.tab)
+    const requestedProject = String(route.query.project ?? '')
+    const preferredProject = store.catalog.find(project => project.id === requestedProject)
+      ?? store.catalog.find(project => project.contracts.some(contract => contract.lineCount > 0))
+      ?? store.catalog[0]
+    projectId.value = preferredProject?.id ?? ''
+    const requestedContract = String(route.query.contract ?? '')
+    const preferredContract = preferredProject?.contracts.find(contract => contract.id === requestedContract)
+      ?? preferredProject?.contracts.find(contract => contract.lineCount > 0)
+      ?? preferredProject?.contracts[0]
+    contractId.value = preferredContract?.id ?? ''
+    if (projectId.value && contractId.value)
+      await store.loadWorkspace(projectId.value, contractId.value)
+    await replaceQuery()
+    if (activeTab.value === 'monthly' && store.workspace?.monthlyStatements[0])
+      await store.loadStatement(store.workspace.monthlyStatements[0].id)
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+  finally {
+    initialized.value = true
+  }
+}
+
+watch(projectId, async (next, previous) => {
+  if (!initialized.value || !next || next === previous)
+    return
+  const project = store.catalog.find(candidate => candidate.id === next)
+  contractId.value = project?.contracts.find(contract => contract.lineCount > 0)?.id
+    ?? project?.contracts[0]?.id
+    ?? ''
+  treeScope.value = 'all'
+  if (contractId.value)
+    await store.loadWorkspace(next, contractId.value)
+  await replaceQuery()
+})
+
+watch(contractId, async (next, previous) => {
+  if (!initialized.value || !next || next === previous)
+    return
+  treeScope.value = 'all'
+  await store.loadWorkspace(projectId.value, next)
+  await replaceQuery()
+})
+
+watch(activeTab, async (next) => {
+  if (!initialized.value)
+    return
+  await replaceQuery()
+  if (next === 'monthly' && !store.monthlyStatement && store.workspace?.monthlyStatements[0])
+    await store.loadStatement(store.workspace.monthlyStatements[0].id)
+})
+
+watch(() => route.query.tab, (value) => {
+  const next = queryTab(value)
+  if (next !== activeTab.value)
+    activeTab.value = next
+})
+
+async function editLine(line: BoqLineView) {
+  const values = await formModal({
+    title: `编辑「${line.itemName}」`,
+    subtitle: '识别原值保持不变；改后的合同量/合同价会标记为人工修正。',
+    cols: 2,
+    width: 680,
+    saveText: '保存修正',
+    fields: [
+      { key: 'section', label: '分部', value: line.section, required: true },
+      { key: 'trade', label: '工种', value: line.trade, required: true },
+      { key: 'itemName', label: '分项名称', value: line.itemName, required: true },
+      { key: 'unit', label: '单位', value: line.unit },
+      { key: 'qty', label: '合同工程量', type: 'number', value: line.baseQty, required: true },
+      { key: 'unitPrice', label: '合同单价', type: 'number', value: line.baseUnitPrice, required: true },
+      { key: 'unitType', label: '户型', value: line.unitType },
+      { key: 'room', label: '房间 / 部位', value: line.room },
+      { key: 'spec', label: '特征描述', type: 'textarea', value: line.spec, full: true },
+    ],
+  })
+  if (!values)
+    return
+  try {
+    await store.updateLine(line.id, {
+      section: String(values.section),
+      trade: String(values.trade),
+      itemName: String(values.itemName),
+      unit: String(values.unit),
+      qty: Number(values.qty),
+      unitPrice: Number(values.unitPrice),
+      unitType: String(values.unitType),
+      room: String(values.room),
+      spec: String(values.spec),
+    })
+    success('清单行已保存')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function removeLine(line: BoqLineView) {
+  const approved = await confirm({
+    variant: 'simple',
+    title: `删除「${line.itemName}」？`,
+    message: '清单行会软删除；工程量模板与排程保留既有事实，但不再把该行作为可用合同来源。',
+    confirmLabel: '删除清单行',
+  })
+  if (!approved)
+    return
+  try {
+    const logId = await store.removeLine(line.id)
+    if (logId)
+      undoToast(`已删除「${line.itemName}」`, () => store.undo([logId]))
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function createChange(draft: CreateBoqChangeOrderDraft) {
+  try {
+    await store.createChange(draft)
+    success('变更单草稿已创建')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function transitionChange(payload: { orderId: string, target: 'submitted' | 'rejected', note: string }) {
+  try {
+    await store.transitionChange(payload.orderId, payload.target, payload.note)
+    success(payload.target === 'submitted' ? '变更单已上报' : '变更单已退回')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function approveChange(payload: { orderId: string, approvedAt: string }) {
+  const order = store.workspace?.changes.find(change => change.id === payload.orderId)
+  if (!order)
+    return
+  const approved = await confirm({
+    variant: 'simple',
+    title: `确认签证「${order.code}」？`,
+    message: '签证会立即改变合同量/合同价，并自动生成锁定的业主变洽签台账行。该状态不可直接退回。',
+    confirmLabel: '确认签证',
+  })
+  if (!approved)
+    return
+  try {
+    await store.approveChange(payload.orderId, payload.approvedAt)
+    success('变更单已签证并写入业主台账')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function removeChange(order: BoqChangeOrderView) {
+  const approved = await confirm(order.status === 'approved'
+    ? {
+        variant: 'cascade',
+        title: `删除已签证变更「${order.code}」？`,
+        message: '该操作会同时软删除自动生成的业主台账行和变更新增 BOQ 行。',
+        impact: [
+          { label: '业主变洽签台账', n: order.ledgerId ? 1 : 0 },
+          { label: '变更明细及新增清单行', n: 1 },
+        ],
+        requireTyping: order.name,
+        confirmLabel: '级联删除',
+      }
+    : {
+        variant: 'simple',
+        title: `删除变更单「${order.code}」？`,
+        message: '变更单及其明细会软删除，可通过撤回恢复。',
+        confirmLabel: '删除变更单',
+      })
+  if (!approved)
+    return
+  try {
+    const logIds = await store.removeChange(order.id, order.status === 'approved')
+    if (logIds.length)
+      undoToast(`已删除变更单「${order.code}」`, () => store.undo(logIds))
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function attachChange(payload: { orderId: string, draft: BoqAttachmentDraft }) {
+  try {
+    await store.addChangeAttachment(payload.orderId, payload.draft)
+    success('变更附件已登记')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function generateMonthly(month: string) {
+  try {
+    await store.generateMonthly(month)
+    success(`${month} 月度报量草稿已生成`)
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function adjustMonthly(payload: { lineId: string, adjustedQty: number, note: string }) {
+  try {
+    await store.adjustMonthly(payload.lineId, payload.adjustedQty, payload.note)
+    success('月度报量手调已保存')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function exportAll() {
+  if (!store.workspace)
+    return
+  try {
+    await exportFile(createBoqWorkbookExport(store.workspace))
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function exportMonthly(statement: MonthlyStatementView) {
+  if (!store.workspace)
+    return
+  try {
+    await exportFile(createMonthlyStatementExport(
+      statement,
+      store.workspace.projectName,
+      store.workspace.contractName,
+    ))
+    await store.markMonthlyExported(statement.id)
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+onMounted(initialize)
+</script>
+
+<template>
+  <div class="boq-workspace min-w-0 space-y-4">
+    <section class="panel p-4">
+      <div class="flex flex-wrap items-start gap-3">
+        <div class="min-w-52 flex-1">
+          <div class="text-11px font-700 tracking-wide text-brand">
+            合同工程量清单
+          </div>
+          <h1 class="mt-0.5 text-20px font-850 text-ink">
+            BOQ · 变更 · 月度报量
+          </h1>
+          <p class="mt-1 text-12px text-ink-soft">
+            合同量与合同价只认已确认清单和已签证变更；工资单价仍由班组责任独立维护。
+          </p>
+        </div>
+        <div class="min-w-52">
+          <span class="field-label block">项目</span>
+          <ProjectSwitcher
+            v-model="projectId"
+            :projects="projectOptions"
+            :loading="!initialized && store.loading"
+            :error="store.error"
+            aria-label="选择清单项目"
+          />
+        </div>
+        <div class="min-w-64">
+          <span class="field-label block">施工合同</span>
+          <SelectFilter v-model="contractId" :options="contractOptions" :min-width="250" placeholder="选择施工合同" />
+        </div>
+        <div class="flex flex-wrap gap-2 self-end">
+          <button type="button" class="btn-secondary" :disabled="!store.workspace" @click="exportAll">
+            <span class="i-lucide-download mr-1" /> 导出台账
+          </button>
+          <NuxtLink
+            :to="{ path: '/contract/boq/import', query: { project: projectId, contract: contractId } }"
+            class="btn-accent"
+          >
+            <span class="i-lucide-file-up mr-1" /> 导入清单
+          </NuxtLink>
+        </div>
+      </div>
+
+      <div v-if="store.workspace" class="boq-summary mt-4 grid grid-cols-4 gap-2">
+        <div class="summary-cell">
+          <span>清单行</span><strong>{{ store.workspace.summary.lineCount }}</strong>
+        </div>
+        <div class="summary-cell">
+          <span>原合同合价</span><strong>¥{{ store.workspace.summary.baseAmount.toLocaleString('zh-CN') }}</strong>
+        </div>
+        <div class="summary-cell">
+          <span>已签证变更</span><strong class="text-brand">¥{{ store.workspace.summary.approvedChangeAmount.toLocaleString('zh-CN') }}</strong>
+        </div>
+        <div class="summary-cell">
+          <span>当前合同合价</span><strong>¥{{ store.workspace.summary.effectiveAmount.toLocaleString('zh-CN') }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel overflow-hidden px-3 pt-1">
+      <SegTab v-model="activeTab" :tabs="tabs" />
+    </section>
+
+    <section v-if="(!initialized || store.loading) && !store.workspace" class="panel grid min-h-80 gap-3 p-4" role="status">
+      <span class="sr-only">正在读取工程量清单…</span>
+      <div class="h-8 w-56 animate-pulse rounded bg-surface-3" />
+      <div class="h-56 animate-pulse rounded-lg bg-surface-2" />
+    </section>
+    <section v-else-if="store.error && !store.workspace" class="panel grid min-h-80 place-items-center p-5 text-center text-12px text-danger" role="alert">
+      {{ store.error }}
+    </section>
+    <section v-else-if="!store.workspace" class="panel grid min-h-80 place-items-center p-6 text-center">
+      <div>
+        <span class="i-lucide-file-spreadsheet text-28px text-ink-faint" />
+        <p class="mt-2 text-14px font-800 text-ink">
+          当前没有可用施工合同
+        </p>
+      </div>
+    </section>
+
+    <section v-else-if="activeTab === 'lines'" class="boq-lines-layout grid min-w-0 grid-cols-[15rem_minmax(0,1fr)] gap-3">
+      <aside class="min-w-0">
+        <BoqCatalogTree
+          v-model="treeScope"
+          :catalog="store.workspace.catalog"
+          :line-count="store.workspace.lines.length"
+        />
+      </aside>
+      <div class="min-w-0">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <SearchInput v-model="search" placeholder="搜索分项、户型、房间或来源…" />
+          <div class="text-11px text-ink-faint">
+            来源追溯键永久保留 · 识别原值与人工修正并列
+          </div>
+        </div>
+        <BoqLinesTable
+          :lines="store.workspace.lines"
+          :scope-key="treeScope"
+          :search="search"
+          :loading="store.saving"
+          @edit="editLine"
+          @remove="removeLine"
+        />
+      </div>
+    </section>
+
+    <BoqChangeWorkspace
+      v-else-if="activeTab === 'changes'"
+      :workspace="store.workspace"
+      :busy="store.saving"
+      @create="createChange"
+      @transition="transitionChange"
+      @approve="approveChange"
+      @remove="removeChange"
+      @attach="attachChange"
+    />
+
+    <BoqMonthlyWorkspace
+      v-else
+      :workspace="store.workspace"
+      :statement="store.monthlyStatement"
+      :busy="store.saving"
+      @select="store.loadStatement"
+      @generate="generateMonthly"
+      @adjust="adjustMonthly"
+      @export="exportMonthly"
+    />
+  </div>
+</template>
+
+<style scoped>
+.boq-workspace { container-type: inline-size; overflow: hidden; }
+.summary-cell { display: flex; min-width: 0; flex-direction: column; gap: 2px; border-radius: 8px; background: var(--surface-2); padding: 8px 10px; color: var(--ink-faint); font-size: 11px; }
+.summary-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+@container (max-width: 58rem) {
+  .boq-lines-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 48rem) {
+  .boq-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 26rem) {
+  .boq-summary { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
