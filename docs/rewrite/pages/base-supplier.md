@@ -2,7 +2,7 @@
 
 > 路由: `/base/supplier` · `/base/supplier/:id`  
 > 页面: `pages/base/supplier/index.vue` · `pages/base/supplier/[id].vue`  
-> 表单蓝本: `supplierForm`（ADR 0014）  
+> 表单蓝本: `supplierForm`（ADR 0014）
 > 参考: CRM 截图 `docs/红圈系统/合同页/`、`docs/红圈系统/付款申请/`、`docs/红圈系统/收票登记/`  
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
 

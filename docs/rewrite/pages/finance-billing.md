@@ -1,6 +1,6 @@
 # 开票申请 — 我方向客户开票
 
-> 表单蓝本：`invApplyForm`  
+> 表单蓝本：`invApplyForm`
 > 持久化权威：`DATABASE.md` 的 `invoice_applications` / `file_refs`
 
 ## 新增/编辑

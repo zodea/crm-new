@@ -1,6 +1,6 @@
 # 合同表单 — 施工/分包/材采/其他支出/公司支出
 
-> 表单蓝本：`conContractForm`、`subContractForm`、`matContractForm`、`otherExpForm`、`companyExpForm`、`otherSettleForm`  
+> 表单蓝本：`conContractForm`、`subContractForm`、`matContractForm`、`otherExpForm`、`companyExpForm`、`otherSettleForm`
 > 持久化权威：`DATABASE.md` 的 `contracts`、`contract_supplements`、`contract_line_items`、`company_expense_contracts`、`expenditure_settlements`
 
 ## 一、三类项目合同

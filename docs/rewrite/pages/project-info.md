@@ -2,7 +2,7 @@
 
 > 路由: `/project` · `/project/:id`  
 > 页面: `pages/project/index.vue` · `pages/project/[id].vue`  
-> 表单蓝本: `projectForm`（ADR 0014）  
+> 表单蓝本: `projectForm`（ADR 0014）
 > 参考: `docs/红圈系统/项目详情页/` 25张红圈CRM截图  
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5  
 > 状态: 已确认布局 · 2026-06-26

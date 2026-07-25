@@ -1,6 +1,6 @@
 # 费用报销 — 报销头 + 费用明细
 
-> 表单蓝本：`reimburseForm`  
+> 表单蓝本：`reimburseForm`
 > 持久化权威：`DATABASE.md` 的 `expense_reimbursements` / `expense_reimbursement_lines`
 
 ## 新增/编辑

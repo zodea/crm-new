@@ -1,6 +1,6 @@
 # 基础信息/客户 — 甲方主数据 + 开票资料
 
-> 表单蓝本：`customerForm`（ADR 0014）  
+> 表单蓝本：`customerForm`（ADR 0014）
 > 持久化权威：`DATABASE.md` 的 `customers` / `file_refs`
 
 ## 定位

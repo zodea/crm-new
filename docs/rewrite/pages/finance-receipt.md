@@ -1,6 +1,6 @@
 # 收款与往来收付 — 实际资金流入/非合同往来
 
-> 表单蓝本：`receiptForm`、`currentForm`  
+> 表单蓝本：`receiptForm`、`currentForm`
 > 持久化权威：`DATABASE.md` 的 `receipt_registrations` / `current_transactions`
 
 ## 一、收款登记

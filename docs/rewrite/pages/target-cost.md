@@ -1,6 +1,6 @@
 # 目标成本 — 项目预算基线
 
-> 表单蓝本：`targetCostForm`（ADR 0014）  
+> 表单蓝本：`targetCostForm`（ADR 0014）
 > 持久化权威：`DATABASE.md` 的 `target_costs` / `target_cost_items`
 
 ## 定位

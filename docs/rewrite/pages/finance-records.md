@@ -1,6 +1,6 @@
 # 支付记录 — 银行实际支付 + 申请分摊
 
-> 表单蓝本：`payRecordForm`，领域规则以 ADR 0015 为准  
+> 表单蓝本：`payRecordForm`，领域规则以 ADR 0015 为准
 > 持久化权威：`DATABASE.md` 的 `payment_records` / `payment_record_application_allocations`
 
 ## 定位

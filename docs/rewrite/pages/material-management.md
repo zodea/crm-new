@@ -1,6 +1,6 @@
 # 物资管理表单 — 乙供材与甲供材
 
-> 表单蓝本：`MaterialForms.jsx` 中除 `deliveryArchiveForm` 外的 10 条路由  
+> 表单蓝本：`MaterialForms.jsx` 中除 `deliveryArchiveForm` 外的 10 条路由
 > 持久化权威：`DATABASE.md` §2.5
 
 ## 一、乙供材
