@@ -10,7 +10,7 @@ import { columnNames, createMemoryDb } from '../helpers/memory-db'
 type SeedRow = Record<string, unknown>
 
 /** 与 app/lib/db/seed.ts 的 jsonTables 灌入顺序一致(父表先行) */
-const SEED_TABLES = ['projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts', 'delivery_records', 'delivery_lines'] as const
+const SEED_TABLES = ['customers', 'projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts', 'delivery_records', 'delivery_lines'] as const
 
 function loadSeed(table: string): SeedRow[] {
   const url = new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url)
@@ -53,12 +53,19 @@ describe('seed 数据:结构与 schema 对齐', () => {
     db.close()
   })
 
-  it('外键引用全部可解析(挂靠/发票/工人→班组/关联工人)', async () => {
+  it('外键引用全部可解析(客户/发票/工人→班组与项目/关联工人)', async () => {
+    const customerIds = new Set(loadSeed('customers').map(r => r.id))
     const projIds = new Set(loadSeed('projects').map(r => r.id))
     const supIds = new Set(loadSeed('suppliers').map(r => r.id))
     const crewIds = new Set(loadSeed('crews').map(r => r.id))
     const workerIds = new Set(loadSeed('workers').map(r => r.id))
 
+    for (const project of loadSeed('projects')) {
+      if (project.customer_id != null)
+        expect(customerIds).toContain(project.customer_id)
+      if (project.secondary_customer_id != null)
+        expect(customerIds).toContain(project.secondary_customer_id)
+    }
     for (const ps of loadSeed('project_suppliers')) {
       expect(projIds).toContain(ps.project_id)
       expect(supIds).toContain(ps.supplier_id)
@@ -72,6 +79,8 @@ describe('seed 数据:结构与 schema 对齐', () => {
     for (const w of loadSeed('workers')) {
       if (w.crew_id != null)
         expect(crewIds).toContain(w.crew_id)
+      if (w.current_project_id != null)
+        expect(projIds).toContain(w.current_project_id)
       if (w.linked_worker_id != null)
         expect(workerIds).toContain(w.linked_worker_id)
     }

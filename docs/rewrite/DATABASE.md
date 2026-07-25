@@ -773,6 +773,8 @@ projects += (
 
 `supplierForm` 的资料类别、条件必需和人工核验状态继续由 Issue #13 规则约束；`credential_status` 不是普通下拉字段。`target_costs` / `target_cost_items` 的完整目标列见 §2.8。
 
+> F1 表结构由迁移 v19 落地。旧客户名、工人当前项目名仅在唯一匹配时转为真实 ID；分供方旧层级及歧义/缺失映射写入 `reconciliation_issues` 后删除停止写入的旧列。迁移对账可能尚无可确认的项目，因此该表的 `project_id` 允许为空，并以实体定位列保存来源。
+
 #### 2.10.3 F2 合同与支出结算
 
 ```sql
@@ -1979,7 +1981,11 @@ CREATE TABLE import_source_refs (
 CREATE TABLE reconciliation_issues (
   id              TEXT PRIMARY KEY,
   import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
-  project_id      TEXT NOT NULL REFERENCES projects(id),
+  project_id      TEXT REFERENCES projects(id), -- 允许为空：实体映射失败时可能尚无合法项目
+  entity_type     TEXT DEFAULT '',
+  entity_id       TEXT DEFAULT '',
+  field_name      TEXT DEFAULT '',
+  source_value    TEXT DEFAULT '',
   metric_key      TEXT NOT NULL,
   source_ref      TEXT DEFAULT '',
   excel_value     REAL,
@@ -1993,5 +1999,7 @@ CREATE TABLE reconciliation_issues (
   resolved_at     TEXT
 );
 ```
+
+`entity_type + entity_id + field_name + source_value` 定位无法进入真实外键的源值；`project_id` 只在已有合法项目归属时填写，不创建“公司”或“待核对”等虚拟项目补空。
 
 导入有效行以业务字段判断，不以 Excel `usedRange`、序号或公式存在判断。所有金额在应用边界统一 `round2`；在全库迁移为整数分之前，禁止直接比较浮点绝对相等。

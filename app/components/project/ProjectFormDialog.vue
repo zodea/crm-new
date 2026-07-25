@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import type { LookupOption } from '~/lib/kit/lookup'
 import type { Project } from '~/stores/project'
+import { select } from '~/lib/db/connection'
+import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { PROJECT_STATUSES } from '~/lib/project/status'
 
 // 项目新增/编辑共享表单（#59 红圈式分组两列表单）。
@@ -22,6 +25,21 @@ const draft = ref<Partial<Project>>({})
 
 const OPERATION_TYPES = ['自营', '联营', '挂靠'] as const
 const RISK_LEVELS = ['低', '中', '高'] as const
+
+async function fetchCustomers(keyword: string): Promise<LookupOption[]> {
+  const pattern = `%${keyword.trim()}%`
+  const rows = await select<{ id: string, name: string }>(
+    selectVisibleSql(
+      'customers',
+      `AND (name LIKE ? OR aliases LIKE ?) ORDER BY name LIMIT 50`,
+    ),
+    [pattern, pattern],
+  )
+  return rows.map(customer => ({
+    id: customer.id,
+    label: customer.name,
+  }))
+}
 
 // 打开时按来源初始化草稿：编辑回填现值（整行展开，未在表单里的列如监理/设计单位随之保留，
 // 不被 store 写路径抹空）、新增给设计稿默认值。同时监听 project：详情/列表切换编辑对象
@@ -85,11 +103,21 @@ async function handleSave() {
         </div>
         <div>
           <label class="field-label">客户（甲方）</label>
-          <input v-model="draft.developer" class="field-input w-full">
+          <LookupSelect
+            v-model="draft.customerId"
+            :fetch="fetchCustomers"
+            recent-key="project-primary-customers"
+            placeholder="检索客户"
+          />
         </div>
         <div>
           <label class="field-label">客户2（选填）</label>
-          <input v-model="draft.developer2" class="field-input w-full">
+          <LookupSelect
+            v-model="draft.secondaryCustomerId"
+            :fetch="fetchCustomers"
+            recent-key="project-secondary-customers"
+            placeholder="检索次客户"
+          />
         </div>
         <div>
           <label class="field-label">经营类型</label>

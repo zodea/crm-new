@@ -10,8 +10,6 @@ import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
 
 // 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名；对称 stores/project.ts）。
-// suppliers 自引用（parent_supplier_id）不在此登记——本店 downstreamImpact 按本域业务判断过滤自引用
-// （领域上分供方无母子挂靠），通用软删层的 downstreamImpact 本身不做这层排除。
 const TABLE_LABELS: Record<string, string> = {
   invoices: '发票',
   supplier_credentials: '证照',
@@ -32,7 +30,6 @@ export interface Supplier {
   businessType: string
   supplierCategory: string
   rating: string
-  parentSupplierId: string | null
   legalRep: string
   registeredCapital: number | null
   registeredDate: string
@@ -46,7 +43,10 @@ export interface Supplier {
   phone: string
   contact: string
   contactPhone: string
+  contactTitle: string
   credentialStatus: string
+  credentialReviewedAt: string | null
+  credentialReviewNote: string
   approvalStatus: string
   source: string
   note: string
@@ -80,7 +80,6 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   businessType: { col: 'business_type', toBind: d => d.businessType ?? '', fromRow: r => (r.business_type ?? '') as string },
   supplierCategory: { col: 'supplier_category', toBind: d => d.supplierCategory ?? '', fromRow: r => (r.supplier_category ?? '') as string },
   rating: { col: 'rating', toBind: d => d.rating ?? '', fromRow: r => (r.rating ?? '') as string },
-  parentSupplierId: { col: 'parent_supplier_id', toBind: d => d.parentSupplierId ?? null, fromRow: r => (r.parent_supplier_id ?? null) as string | null },
   legalRep: { col: 'legal_rep', toBind: d => d.legalRep ?? '', fromRow: r => (r.legal_rep ?? '') as string },
   registeredCapital: { col: 'registered_capital', toBind: d => toNum(d.registeredCapital), fromRow: r => r.registered_capital as number | null },
   registeredDate: { col: 'registered_date', toBind: d => d.registeredDate ?? '', fromRow: r => (r.registered_date ?? '') as string },
@@ -94,7 +93,10 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   phone: { col: 'phone', toBind: d => d.phone ?? '', fromRow: r => (r.phone ?? '') as string },
   contact: { col: 'contact', toBind: d => d.contact ?? '', fromRow: r => (r.contact ?? '') as string },
   contactPhone: { col: 'contact_phone', toBind: d => d.contactPhone ?? '', fromRow: r => (r.contact_phone ?? '') as string },
+  contactTitle: { col: 'contact_title', toBind: d => d.contactTitle ?? '', fromRow: r => (r.contact_title ?? '') as string },
   credentialStatus: { col: 'credential_status', toBind: d => d.credentialStatus ?? 'incomplete', fromRow: r => (r.credential_status ?? 'incomplete') as string },
+  credentialReviewedAt: { col: 'credential_reviewed_at', toBind: d => d.credentialReviewedAt ?? null, fromRow: r => (r.credential_reviewed_at ?? null) as string | null },
+  credentialReviewNote: { col: 'credential_review_note', toBind: d => d.credentialReviewNote ?? '', fromRow: r => (r.credential_review_note ?? '') as string },
   approvalStatus: { col: 'approval_status', toBind: d => d.approvalStatus ?? 'draft', fromRow: r => (r.approval_status ?? 'draft') as string },
   source: { col: 'source', toBind: d => d.source ?? 'manual', fromRow: r => (r.source ?? 'manual') as string },
   note: { col: 'note', toBind: d => d.note ?? '', fromRow: r => (r.note ?? '') as string },
@@ -109,7 +111,7 @@ const INSERT_SQL = `INSERT INTO suppliers (id, ${SUPPLIER_COLS.join(', ')}, crea
        VALUES (?, ${SUPPLIER_COLS.map(() => '?').join(', ')}, ?, ?)`
 const UPDATE_SQL = `UPDATE suppliers SET ${SUPPLIER_COLS.map(c => `${c}=?`).join(', ')}, updated_at=? WHERE id=?`
 
-/** 写路径唯一绑定源：按登记键序产出各列 SQL 实参（aliases → JSON、parent_supplier_id / registered_capital 允许 null 等特殊取值都收在登记表里）。 */
+/** 写路径唯一绑定源：按登记键序产出各列 SQL 实参（aliases → JSON、registered_capital 允许 null 等特殊取值都收在登记表里）。 */
 function supplierToBindings(data: Partial<Supplier>): unknown[] {
   return SUPPLIER_COLUMN_KEYS.map(k => SUPPLIER_COLUMNS[k].toBind(data))
 }
@@ -187,13 +189,10 @@ export const useSupplierStore = defineStore('supplier', () => {
 
   /**
    * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
-   * 分供方自引用（parent_supplier_id）不计入：领域上分供方无母子挂靠（CONTEXT.md「分供方」词条），
-   * 这是本域的业务判断，故在此过滤而非焊死进通用软删层。
    */
   async function downstreamImpact(id: string): Promise<ConfirmImpact[]> {
     const counts = await downstreamImpactCounts(db, 'suppliers', id)
     return counts
-      .filter(c => c.table !== 'suppliers')
       .map(c => ({ label: TABLE_LABELS[c.table] ?? c.table, n: c.n }))
   }
 

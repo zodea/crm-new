@@ -414,6 +414,7 @@ export async function seedScheduleDemo(db: MigrationDb) {
 
 export async function seedIfEmpty(db: MigrationDb) {
   const jsonTables = [
+    'customers',
     'projects',
     'suppliers',
     'crews',
@@ -468,12 +469,31 @@ export async function seedIfEmpty(db: MigrationDb) {
 }
 
 async function seedHardcoded(db: MigrationDb) {
-  const projIds = await seedProjects(db)
+  const customerIds = await seedCustomers(db)
+  const projIds = await seedProjects(db, customerIds)
   const supIds = await seedSuppliers(db)
   await seedProjectSuppliers(db, projIds, supIds)
 }
 
-async function seedProjects(db: MigrationDb) {
+async function seedCustomers(db: MigrationDb) {
+  const names = [
+    '广州合和置业有限公司',
+    '广州车骏实业发展有限公司',
+    '广州市天誉置业有限公司',
+  ]
+  const ids: string[] = []
+  for (const name of names) {
+    const id = generateId('customer')
+    ids.push(id)
+    await db.execute(
+      `INSERT INTO customers (id, name) VALUES (?, ?)`,
+      [id, name],
+    )
+  }
+  return ids
+}
+
+async function seedProjects(db: MigrationDb, customerIds: string[]) {
   const projects = [
     {
       name: '合和新城·3号楼',
@@ -484,7 +504,7 @@ async function seedProjects(db: MigrationDb) {
       startDate: '2025-09-15',
       plannedEnd: '2027-03-15',
       status: '施工中',
-      developer: '广州合和置业有限公司',
+      customerId: customerIds[0],
       contractor: '广州市瑞航建筑工程有限公司',
       manager: '陈志强',
       managerPhone: '13800001001',
@@ -501,7 +521,7 @@ async function seedProjects(db: MigrationDb) {
       startDate: '2025-06-01',
       plannedEnd: '2026-12-31',
       status: '施工中',
-      developer: '广州车骏实业发展有限公司',
+      customerId: customerIds[1],
       contractor: '广州睿瑛装饰工程有限公司',
       manager: '古富联',
       managerPhone: '13800002001',
@@ -516,7 +536,7 @@ async function seedProjects(db: MigrationDb) {
       startDate: '2026-01-10',
       plannedEnd: '2027-06-30',
       status: '筹备中',
-      developer: '广州市天誉置业有限公司',
+      customerId: customerIds[2],
       contractor: '广州市瑞航建筑工程有限公司',
       manager: '陈志强',
       managerPhone: '13800001001',
@@ -530,9 +550,9 @@ async function seedProjects(db: MigrationDb) {
     ids.push(id)
     const now = new Date().toISOString()
     await db.execute(
-      `INSERT INTO projects (id, name, code, address, region, operation_type, start_date, planned_end, status, developer, contractor, manager, manager_phone, site_leader, site_leader_phone, contract_amount, created_at, updated_at)
+      `INSERT INTO projects (id, name, code, address, region, operation_type, start_date, planned_end, status, customer_id, contractor, manager, manager_phone, site_leader, site_leader_phone, contract_amount, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, p.name, p.code, p.address, p.region, p.operationType, p.startDate, p.plannedEnd, p.status, p.developer, p.contractor, p.manager, p.managerPhone, p.siteLeader ?? '', p.siteLeaderPhone ?? '', p.contractAmount, now, now],
+      [id, p.name, p.code, p.address, p.region, p.operationType, p.startDate, p.plannedEnd, p.status, p.customerId, p.contractor, p.manager, p.managerPhone, p.siteLeader ?? '', p.siteLeaderPhone ?? '', p.contractAmount, now, now],
     )
   }
   return ids
