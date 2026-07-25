@@ -55,8 +55,9 @@ interface Supplier {
 
   // 分类
   businessType: string            // 业务类型
-  supplierCategory: string        // CONTEXT.md 权威 7 类
+  supplierCategory: string        // 分供方类别: 材料供应商/劳务分包商/设备供应商/其他
   rating: string                  // 评价等级
+  parentSupplierId: string | null // 上级供应商
 
   // 工商信息
   legalRep: string                // 法定代表人
@@ -76,7 +77,6 @@ interface Supplier {
   // 联系人
   contact: string                 // 主要联系人(签约代表)
   contactPhone: string            // 联系方式
-  contactTitle: string            // 职务
 
   // 状态（两个独立维度）
   credentialStatus: 'incomplete' | 'reviewing' | 'qualified' | 'rejected'

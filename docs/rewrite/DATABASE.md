@@ -155,7 +155,7 @@ Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_
 | MonthlyStatement | `monthly_statements` | `id` | `owner-documents.md` + CONTEXT.md「月度报量」 |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
 | Contract | `contracts` | `id` | **合同域 canonical ID（#90 批A 新 IA，v3；BOQ v15 收口）**：施工/分包/材采/其他支出单表 `kind` 区分。BOQ 文件、清单行、变更单、月度报量和进度分组统一引用这里的施工合同；旧 `construction_contracts` / `expenditure_contracts` 只作迁移兼容，不接受新表单写入 |
-| ContractSupplement | `contract_supplements` | `id` | 支出合同/合同轻实体补充协议；区别于只挂施工合同的 `supplement_agreements`，见 §10.1 |
+| ContractSupplement | `contract_supplements` | `id` | canonical 合同补充协议；施工/支出侧均引用 `contracts.id`，见 §10.1 |
 | CompanyExpenseContract | `company_expense_contracts` | `id` | `contract-forms.md`（公司支出，不挂虚拟项目） |
 | ProjectAcceptance | `project_acceptances` | `id` | `owner-documents.md`（竣工验收/保修） |
 | OwnerFinalSettlement | `owner_final_settlements` | `id` | `owner-documents.md`（甲方最终结算） |
@@ -332,18 +332,18 @@ CREATE TABLE payment_applications (
 
 CREATE TABLE payment_application_settlement_allocations (
   id                     TEXT PRIMARY KEY,
-  payment_application_id TEXT NOT NULL, -- → payment_applications.id
-  settlement_id          TEXT NOT NULL, -- → expenditure_settlements.id；单号/名称/含税结算金额均从源单读取
-  allocated_amount       REAL NOT NULL,
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  settlement_id          TEXT NOT NULL REFERENCES expenditure_settlements(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
   note                   TEXT DEFAULT '',
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
 
 CREATE TABLE payment_application_invoice_allocations (
   id                     TEXT PRIMARY KEY,
-  payment_application_id TEXT NOT NULL, -- → payment_applications.id
-  invoice_id              TEXT NOT NULL, -- → invoices.id；票号/日期/含税金额均从源票读取
-  allocated_amount        REAL NOT NULL,
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  invoice_id              TEXT NOT NULL REFERENCES invoices(id),
+  allocated_amount        REAL NOT NULL CHECK (allocated_amount > 0),
   note                    TEXT DEFAULT '',
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
@@ -882,12 +882,18 @@ payment_records += (
   confirmation_status TEXT DEFAULT 'draft',
   confirmed_at TEXT, updated_at TEXT, deleted_at TEXT
 )
+-- F3 以重建表迁移将既有 project_id 改为可空；公司付款的支付事实不挂虚拟项目。
 
-expense_reimbursements += (
-  reimburser TEXT DEFAULT '', category TEXT DEFAULT '',
+expense_reimbursements(
+  id, project_id TEXT REFERENCES projects(id),
+  no TEXT DEFAULT '', applicant TEXT DEFAULT '', category TEXT DEFAULT '',
   reimbursement_date TEXT DEFAULT '', invoice_count INTEGER DEFAULT 0,
-  reason TEXT DEFAULT '', updated_at TEXT, deleted_at TEXT
+  reason TEXT DEFAULT '', status TEXT DEFAULT 'draft', note TEXT DEFAULT '',
+  external_ref TEXT DEFAULT '',
+  created_at, updated_at, deleted_at
 )
+-- project_id 可空=公司开支；报销总额只从有效 expense_reimbursement_lines 聚合。
+-- 旧 amount 列停止写入并在 F3 重建表时移除。
 
 expense_reimbursement_lines(
   id, reimbursement_id TEXT NOT NULL REFERENCES expense_reimbursements(id),
@@ -996,13 +1002,17 @@ owner_material_directs(
 
 ```sql
 boq_change_orders += (
-  instruction_no TEXT DEFAULT '', instruction_type TEXT DEFAULT '',
+  document_type TEXT DEFAULT 'change_negotiation'
+    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
   application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
   approved_tax_inclusive_amount REAL,
   approved_tax_exclusive_amount REAL,
   applied_tax_exclusive_amount REAL,
-  status_note TEXT DEFAULT '', updated_at TEXT, deleted_at TEXT
+  updated_at TEXT, deleted_at TEXT
 )
+-- document_type 保存表单“变更洽商/现场签证/索赔/材料认价”；
+-- change_type 继续只表示行操作汇总 add/qty/price/mixed，二者不得复用。
+-- 指令编号/类型复用既有 directive_no / directive_type。
 -- 量、价、合价明细继续写 boq_change_lines；已签证金额链规则见 §2.3。
 
 monthly_statements += (
@@ -1104,7 +1114,7 @@ penalty_records += (
 | `schedule_groups` | `contract_id` | `contracts.id` | N:1 | 楼栋分组只属于一份施工合同 |
 | `task_item_map` | `boq_line_id` | `boq_lines.id` | N:1 | 计划分解只引用 BOQ，不复制合同量/合同价 |
 | `contracts` | `project_id` / `customer_id` / `supplier_id` | `projects.id` / `customers.id` / `suppliers.id` | N:1 | canonical 项目合同仓；施工侧引用客户，支出侧引用分供方 |
-| `contract_supplements` | `contract_id` | `contracts.id` | N:1 | 支出合同/轻实体补充协议 |
+| `contract_supplements` | `contract_id` | `contracts.id` | N:1 | canonical 合同补充协议（施工/支出侧共用） |
 | `project_acceptances` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 竣工验收/保修单 |
 | `owner_final_settlements` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 甲方最终结算 |
 | `owner_penalties` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 甲方罚扣 |
@@ -1115,9 +1125,9 @@ penalty_records += (
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
 | `invoice_applications` | `project_id` / `contract_id` / `customer_id` | `projects.id` / `contracts.id` / `customers.id` | N:1 | 开票申请 → 项目/施工合同/购方 |
-| `invoices` | `projectId` | `projects.id` | N:1 | 发票归档归属（owner_kind='project' 时必填；'personal'=个人开支不挂项目） |
-| `invoices` | `supplierId` | `suppliers.id` | N:1 | 销方对应分供方（可选） |
-| `invoices` | `contractId` | `expenditure_contracts.id` | N:1 | 合同收票（可选，本期不做交互） |
+| `invoices` | `project_id` | `projects.id` | N:1 | 发票归档归属（owner_kind='project' 时必填；'personal'=个人开支不挂项目） |
+| `invoices` | `supplier_id` | `suppliers.id` | N:1 | 销方对应分供方（可选） |
+| `invoices` | `contract_id` | `contracts.id` | N:1 | 合同收票（可选）；旧 `expenditure_contracts` ID 在 F2/F3 迁移时映射到 canonical 合同 |
 | `receipt_registrations` | `project_id` / `contract_id` / `customer_id` | `projects.id` / `contracts.id` / `customers.id` | N:1 | 收款 → 项目/施工合同/付款客户 |
 | `payment_applications` | `project_id` | `projects.id` | N:1 | 付款申请 → 项目 |
 | `payment_applications` | `supplier_id` | `suppliers.id` | N:1 | 付款申请 → 分供方 |
@@ -1740,7 +1750,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 
 > 来源：车陂商业大楼项目迁移分析。该项目只是首个验收样本，以下模型是通用规则。与前文冲突时，本节及 ADR 0015 的较新决策优先。
 
-### 10.1 支出合同分类与补充协议
+### 10.1 合同分类与补充协议
 
 `contracts.kind/sub_kind` 继续承担界面分组，新增稳定经营维度和迁移留痕：
 
@@ -1763,7 +1773,7 @@ ALTER TABLE contracts ADD COLUMN tax_rate REAL;
 - 材料：`kind='材采'`
 - 机械、其他：`kind='其他支出'`
 
-支出合同补充协议不得继续复用只挂 `construction_contracts` 的旧 `supplement_agreements`：
+施工和支出合同的新补充协议均不得继续复用只挂 `construction_contracts` 的旧 `supplement_agreements`；统一引用 canonical `contracts`：
 
 ```sql
 CREATE TABLE contract_supplements (
@@ -1771,6 +1781,7 @@ CREATE TABLE contract_supplements (
   contract_id    TEXT NOT NULL REFERENCES contracts(id),
   no             TEXT DEFAULT '',
   name           TEXT NOT NULL,
+  content        TEXT DEFAULT '',
   amount         REAL NOT NULL DEFAULT 0,
   sign_date      TEXT DEFAULT '',
   status         TEXT NOT NULL DEFAULT '有效',
@@ -1785,7 +1796,7 @@ CREATE INDEX idx_contract_supplements_contract
   ON contract_supplements(contract_id, deleted_at);
 ```
 
-支出合同经营金额=`contracts.amount + Σ有效 contract_supplements.amount`。`contracts.changed/settled/invoiced/paid` 的存量静态值只能用于迁移对账；新读路径分别从补充协议、结算、发票和支付分摊聚合。
+合同有效金额=`contracts.amount + Σ有效 contract_supplements.amount`；支出合同经营汇总使用同一口径。`contracts.changed/settled/invoiced/paid` 的存量静态值只能用于迁移对账；新读路径分别从补充协议、变更/结算、发票和支付分摊聚合。
 
 ### 10.2 支付记录及付款申请分摊
 
@@ -1869,30 +1880,9 @@ WHERE status = 'issued'
 
 工资金额必须保存发放时快照；工程量或人员资料后改不追溯历史发放。
 
-费用报销需要独立事实表：
+费用报销的目标头表与明细表见 §2.10.4。`project_id` 可空，空值明确表示公司开支；总额始终由有效 `expense_reimbursement_lines.amount` 聚合，头表不保存第二份可编辑金额。
 
-```sql
-CREATE TABLE expense_reimbursements (
-  id             TEXT PRIMARY KEY,
-  project_id     TEXT NOT NULL REFERENCES projects(id),
-  no             TEXT DEFAULT '',
-  applicant      TEXT DEFAULT '',
-  expense_date   TEXT,
-  amount         REAL NOT NULL CHECK (amount >= 0),
-  status         TEXT NOT NULL DEFAULT 'draft',
-  -- 'draft' | 'submitted' | 'confirmed' | 'rejected'
-  note           TEXT DEFAULT '',
-  external_ref   TEXT DEFAULT '',
-  created_at     TEXT,
-  updated_at     TEXT,
-  deleted_at     TEXT
-);
-
-CREATE INDEX idx_expense_reimbursements_project
-  ON expense_reimbursements(project_id, status, deleted_at);
-```
-
-只有 `status='confirmed'` 的报销进入动态成本。当前睿璟资料未提供完整报销金额，迁移状态是 `pending`，不是 0。
+F3 迁移将旧 `expense_reimbursements.amount > 0` 的记录转换为一条 `expense_item='迁移汇总'` 的明细并记录来源追溯；旧金额为空或资料不完整时写 `reconciliation_issues`，不得补 0。只有 `status='confirmed'` 的报销进入动态成本。
 
 ### 10.4 动态成本与合同付款
 

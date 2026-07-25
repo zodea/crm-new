@@ -67,12 +67,6 @@ CREATE TABLE crews (
   trade         TEXT,                   -- 工种类型
   contactName   TEXT,                   -- 班组负责人
   contactPhone  TEXT,
-  defaultPayRatio REAL DEFAULT 0.95,
-  rentSubsidyEnabled INTEGER DEFAULT 0,
-  rentSubsidyPrice REAL,
-  mgmtFeeEnabled INTEGER DEFAULT 0,
-  mgmtFeePrice REAL,
-  assignmentLevel TEXT DEFAULT '班组', -- '班组' | '个人'
   note          TEXT,
   createdAt     TEXT,
   updatedAt     TEXT
