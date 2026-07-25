@@ -15,6 +15,7 @@ import {
   quantityMonthOptions,
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
+import { buildScheduleReturnLocation, parseScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
@@ -37,26 +38,16 @@ const completionUnitId = shallowRef('')
 const completionInitialStageId = shallowRef('')
 const batchCompletionDialogOpen = shallowRef(false)
 
-const scheduleContext = computed(() => route.query.from === 'schedule'
-  ? {
-      projectId: String(route.query.project ?? ''),
-      groupId: String(route.query.group ?? ''),
-      taskId: String(route.query.task ?? ''),
-      stageId: String(route.query.stage ?? ''),
-      itemId: String(route.query.item ?? ''),
-      buildingId: String(route.query.building ?? ''),
-      buildingIds: String(route.query.buildings ?? '').split(',').filter(Boolean),
-      groupName: String(route.query.groupName ?? '楼栋分组'),
-      taskName: String(route.query.taskName ?? '排程工序'),
-      itemName: String(route.query.itemName ?? ''),
-      planStart: String(route.query.planStart ?? ''),
-      planFinish: String(route.query.planFinish ?? ''),
-    }
-  : null)
-
+const scheduleContext = computed(() => parseScheduleDrillContext(route.query))
 const scheduleReturnTo = computed(() => scheduleContext.value
-  ? { path: '/schedule', query: { project: scheduleContext.value.projectId, group: scheduleContext.value.groupId, task: scheduleContext.value.taskId } }
+  ? buildScheduleReturnLocation(scheduleContext.value)
   : '/schedule')
+const scheduleSourceLabel = computed(() => scheduleContext.value?.source === 'home'
+  ? '来自首页施工进度'
+  : '来自施工排程')
+const scheduleReturnLabel = computed(() => scheduleContext.value?.source === 'home'
+  ? '返回首页该工序'
+  : '返回该工序')
 
 const projectOptions = computed<QuantityOption[]>(() => store.catalog.map(project => ({
   key: project.id,
@@ -306,7 +297,7 @@ onMounted(initialize)
       </span>
       <div class="min-w-0 flex-1">
         <div class="text-12px font-800 text-ink">
-          来自施工排程 · {{ scheduleContext.groupName }}
+          {{ scheduleSourceLabel }} · {{ scheduleContext.groupName }}
         </div>
         <div class="truncate text-11px text-ink-soft">
           正在核对「{{ scheduleContext.taskName }}」的工程量完成事实
@@ -315,7 +306,7 @@ onMounted(initialize)
         </div>
       </div>
       <NuxtLink :to="scheduleReturnTo" class="btn-primary">
-        <span class="i-lucide-arrow-left mr-1" /> 返回该工序
+        <span class="i-lucide-arrow-left mr-1" /> {{ scheduleReturnLabel }}
       </NuxtLink>
     </section>
 
