@@ -40,9 +40,9 @@ const constructionColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
   { field: 'name', title: '合同名称', minWidth: 220 },
   { field: 'contractNo', title: '合同编号', width: 180 },
-  { field: 'category', title: '合同类别', width: 110 },
+  { field: 'category', title: '合同类别', width: 110, filterable: true },
   { field: 'amount', title: '含税合同金额', type: 'money', width: 150 },
-  { field: 'status', title: '合同状态', width: 100 },
+  { field: 'status', title: '合同状态', width: 100, filterable: true },
   { field: 'signDate', title: '签约日期', type: 'date' },
 ]
 const supplementColumns: KitTableColumn[] = [
@@ -66,7 +66,7 @@ const invoiceApplicationColumns: KitTableColumn[] = [
   { field: 'amount', title: '开票金额', type: 'money', width: 140 },
   { field: 'taxRate', title: '税率(%)', width: 90, align: 'right' },
   { field: 'taxAmount', title: '税额', type: 'money', width: 130 },
-  { field: 'status', title: '审核状态', width: 100 },
+  { field: 'status', title: '审核状态', width: 100, filterable: true },
   { field: 'invoiceDate', title: '开票日期', type: 'date' },
 ]
 const receivedInvoiceColumns: KitTableColumn[] = [
@@ -111,18 +111,21 @@ onMounted(() => Promise.all([
       :columns="constructionColumns"
       :rows="constructionContracts"
       :loading="detailStore.loading"
+      :summary-fields="[{ field: 'amount', label: '含税合同金额合计' }]"
     />
     <ProjectSubTableSection
       title="补充协议"
       :columns="supplementColumns"
       :rows="supplementAgreements"
       :loading="detailStore.loading"
+      :summary-fields="[{ field: 'amount', label: '协议金额合计' }]"
     />
     <ProjectSubTableSection
       title="甲方变洽签"
       :columns="changeColumns"
       :rows="ownerChangeOrders"
       :loading="detailStore.loading"
+      :summary-fields="[{ field: 'taxIncAmount', label: '含税审定金额合计' }]"
     />
   </div>
 
@@ -132,12 +135,20 @@ onMounted(() => Promise.all([
       :columns="invoiceApplicationColumns"
       :rows="invoiceApplications"
       :loading="detailStore.loading"
+      :summary-fields="[
+        { field: 'amount', label: '开票金额合计' },
+        { field: 'taxAmount', label: '税额合计' },
+      ]"
     />
     <ProjectSubTableSection
       title="收票登记"
       :columns="receivedInvoiceColumns"
       :rows="receivedInvoices"
       :loading="invoiceStore.loading"
+      :summary-fields="[
+        { field: 'totalAmount', label: '价税合计' },
+        { field: 'taxAmount', label: '税额合计' },
+      ]"
     />
   </div>
 
@@ -147,12 +158,17 @@ onMounted(() => Promise.all([
       :columns="receiptColumns"
       :rows="receiptRegistrations"
       :loading="detailStore.loading"
+      :summary-fields="[{ field: 'amount', label: '收款金额合计' }]"
     />
     <ProjectSubTableSection
       title="付款申请"
       :columns="paymentColumns"
       :rows="paymentApplications"
       :loading="detailStore.loading"
+      :summary-fields="[
+        { field: 'amount', label: '申请金额合计' },
+        { field: 'paidAmount', label: '已付金额合计' },
+      ]"
     />
   </div>
 
