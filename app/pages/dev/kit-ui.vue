@@ -192,6 +192,47 @@ function demoKitButtonSuccess() {
   finishDemoSave()
 }
 
+// W2-1 LookupSelect 检索下拉（#93）
+const demoLookupId = shallowRef<string | null>(null)
+const demoLookupOptions = [
+  { id: 'project-chebei', label: '车陂全流程项目', hint: '广州市天河区' },
+  { id: 'project-yuzhu', label: '鱼珠项目', hint: '广州市黄埔区' },
+  { id: 'project-nansha', label: '南沙产业园', hint: '广州市南沙区' },
+]
+
+async function fetchDemoLookup(keyword: string) {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  const normalized = keyword.trim().toLocaleLowerCase()
+  return normalized
+    ? demoLookupOptions.filter(option =>
+        `${option.label}${option.hint}`.toLocaleLowerCase().includes(normalized),
+      )
+    : demoLookupOptions
+}
+
+function demoLookupCreate() {
+  lastResult.value = 'LookupSelect 抛出 create，由业务页面接管新建流程'
+}
+
+// W2-4 FormFooter 保存动作组（#96）
+type DemoFormAction = 'cancel' | 'draft' | 'saveNew' | 'saveSubmit' | 'save'
+const demoFormDirty = shallowRef(false)
+const demoCloseAfterSave = shallowRef(false)
+const demoFormLoading = shallowRef<DemoFormAction | null>(null)
+
+const { start: finishDemoFormAction } = useTimeoutFn(() => {
+  demoFormLoading.value = null
+}, 800, { immediate: false })
+
+function handleDemoFormAction(action: DemoFormAction) {
+  lastResult.value = `FormFooter action：${action}；保存后关闭：${demoCloseAfterSave.value}`
+  if (action === 'cancel')
+    return
+
+  demoFormLoading.value = action
+  finishDemoFormAction()
+}
+
 // ⑧ 需分类的多文件导出（ADR 0004 / #80）
 async function demoConfiguredExport() {
   try {
@@ -468,6 +509,68 @@ async function demoImportMapping() {
         </div>
         <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
           提交调用次数：{{ demoSubmitCount }}
+        </p>
+      </section>
+
+      <!-- W2-1 LookupSelect 检索下拉 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-1 LookupSelect — 远程检索与最近选择（#93）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          输入“车”可观察 300ms 防抖后的关键词高亮；选中后重开显示最近选择，也可清空或快捷新建。
+        </p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label>
+            <span class="field-label">项目名称</span>
+            <LookupSelect
+              v-model="demoLookupId"
+              :fetch="fetchDemoLookup"
+              recent-key="dev-projects"
+              allow-create
+              placeholder="搜索项目"
+              @create="demoLookupCreate"
+            />
+          </label>
+          <label>
+            <span class="field-label">依赖项目的合同</span>
+            <LookupSelect
+              :fetch="fetchDemoLookup"
+              disabled-reason="该字段依赖“项目名称”的值，请补全后操作"
+              placeholder="搜索合同"
+            />
+          </label>
+        </div>
+        <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
+          当前选中 ID：{{ demoLookupId ?? '未选择' }}
+        </p>
+      </section>
+
+      <!-- W2-4 FormFooter 保存动作组 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-4 FormFooter — 表单保存动作组（#96）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          五动作保持固定顺序；切换 dirty 可观察“保存草稿”置灰，勾选项与页面状态双向同步。
+        </p>
+        <label class="mb-3 inline-flex cursor-pointer items-center gap-1.5 text-12px text-ink-soft">
+          <input
+            v-model="demoFormDirty"
+            type="checkbox"
+            class="h-3.5 w-3.5 accent-[var(--brand)]"
+          >
+          <span>表单有修改（dirty）</span>
+        </label>
+        <FormFooter
+          v-model="demoCloseAfterSave"
+          :dirty="demoFormDirty"
+          close-after-save
+          :loading-action="demoFormLoading"
+          @action="handleDemoFormAction"
+        />
+        <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
+          dirty：{{ demoFormDirty }}；保存后关闭：{{ demoCloseAfterSave }}
         </p>
       </section>
 
