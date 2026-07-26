@@ -1354,30 +1354,31 @@ interface FilePayload {
 
 | 字段 | SQL 计算 |
 |---|---|
-| 主合同金额 | `SELECT SUM(amount) FROM contracts WHERE project_id = ? AND kind = '施工'` |
-| 增补合同额 | `SELECT SUM(s.amount) FROM contract_supplements s JOIN contracts c ON c.id = s.contract_id WHERE c.project_id = ? AND c.kind = '施工' AND s.status NOT IN ('draft', '草稿')` |
-| 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?`（台账=变更单自动行+手录纯金额签证，ADR-0002） |
+| 主合同金额 | `SELECT SUM(amount) FROM contracts WHERE project_id = ? AND kind = '施工' AND status NOT IN ('draft','草稿')`；草稿仍可在详情子表查看，但不进入正式合计 |
+| 增补合同额 | `SELECT SUM(s.amount) FROM contract_supplements s JOIN contracts c ON c.id = s.contract_id WHERE c.project_id = ? AND c.kind = '施工' AND c.status NOT IN ('draft','草稿') AND s.status NOT IN ('draft','草稿')` |
+| 变洽签审定额 | `SELECT SUM(tax_inc_amount) FROM owner_change_orders WHERE project_id = ? AND (source_locked = 1 OR status = 'approved' OR approval_date <> '')`（锁定的 BOQ 自动台账、已签证记录及迁移前有审定日期的历史记录；提交未审定不计） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
-| 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
-| 合同付款 | `SUM(payment_record_application_allocations.allocated_amount)`，连接已确认 `payment_records`、付款申请和支出合同后按项目过滤 |
+| 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
+| 确认支付 | `SELECT SUM(amount) FROM payment_records WHERE project_id = ? AND confirmation_status = 'confirmed'`；是否分摊到付款申请另由 §4.2.1 的勾稽差额表达 |
 | 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='issued'`（界面“已发放”） |
 | 动态成本 | 五类已确认 `expenditure_settlements.totalAmount` + 已发放工资 + 已确认费用报销（§10.4） |
 | 往来收款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'receipt' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
 | 往来付款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'payment' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
 | 收支差额 | 全部已确认资金流入 − 全部已确认资金流出（§10.6） |
-| 工程款余缺 | 项目合同收款 − 合同付款 |
-| 项目可用资金余额 | 项目收款 + 往来收款 − 合同付款 − 工资支付 − 往来付款 − 其他已确认流出 |
+| 工程款余缺 | 项目合同收款 − 确认支付 |
+| 管理费 | 当前未接入权威来源，界面显示 `—`，不得以 `0` 冒充已知事实 |
+| 已知资金余额 | 项目收款 + 往来收款 − 确认支付 − 往来付款；当前明确不含尚未接入的管理费，不能命名为完整“可用资金余额” |
 
 ### 4.2 票据信息面板（project-info.md）
 
 | 字段 | SQL 计算 |
 |---|---|
-| 销项票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |
-| 销项税额 | `SELECT SUM(taxAmount) FROM invoice_applications WHERE projectId = ?` |
+| 销项票额 | `SELECT SUM(amount) FROM invoice_applications WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
+| 销项税额 | `SELECT SUM(tax_amount) FROM invoice_applications WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
 | 进项票额 | `SELECT SUM(amount) FROM invoices WHERE project_id = ? AND account_status = 'archived'`（ADR-0001，反馈轮 9 已在设计稿联动验证） |
 | 进项税额 | `SELECT SUM(tax_amount) FROM invoices WHERE project_id = ? AND account_status = 'archived'` |
 | 增值税 | 销项税额 − 进项税额 |
-| 税负率 | 增值税 / 销项票额 |
+| 税负率 | 增值税 / 销项票额；销项票额为 0 时不可计算，界面显示 `—` 而不是 `0%` |
 
 ### 4.2.1 付款申请勾稽（finance-payment.md · ADR 0015）
 

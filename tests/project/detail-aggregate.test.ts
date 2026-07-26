@@ -117,6 +117,63 @@ describe('project detail SQL aggregates', () => {
       )
     `)
     await db.execute(`
+      INSERT INTO contracts (
+        id, no, name, kind, project_id, customer_id, amount, status
+      )
+      VALUES (
+        'contract-draft', 'SG-DRAFT', '草稿施工合同', '施工',
+        'project-canonical', 'customer-canonical', 900, 'draft'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO contract_supplements (
+        id, contract_id, name, amount, status
+      )
+      VALUES (
+        'supplement-on-draft-contract', 'contract-draft', '草稿合同下的有效协议', 125, '有效'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO contract_supplements (
+        id, contract_id, name, amount, status
+      )
+      VALUES (
+        'supplement-draft', 'contract-canonical', '草稿补充协议', 75, 'draft'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO receipt_registrations (
+        id, project_id, no, amount, status
+      )
+      VALUES (
+        'receipt-draft', 'project-canonical', 'SK-DRAFT', 800, 'draft'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO invoice_applications (
+        id, project_id, no, name, amount, tax_amount, status
+      )
+      VALUES (
+        'invoice-draft', 'project-canonical', 'KP-DRAFT', '草稿开票', 700, 63, 'draft'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO owner_change_orders (
+        id, project_id, change_no, tax_inc_amount, status
+      )
+      VALUES (
+        'change-submitted', 'project-canonical', 'BG-SUBMITTED', 600, 'submitted'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO owner_change_orders (
+        id, project_id, change_no, tax_inc_amount, approval_date, status
+      )
+      VALUES (
+        'change-approved', 'project-canonical', 'BG-APPROVED', 50, '2026-07-27', 'approved'
+      )
+    `)
+    await db.execute(`
       INSERT INTO construction_contracts (
         id, project_id, name, amount
       )
@@ -138,7 +195,49 @@ describe('project detail SQL aggregates', () => {
       projectId: 'project-canonical',
       mainContractAmount: 100,
       supplementAmount: 25,
-      changedContractAmount: 125,
+      ownerChangeAmount: 50,
+      changedContractAmount: 175,
+      projectReceipt: 0,
+      outputAmount: 0,
+      outputTax: 0,
+    })
+
+    await db.execute(`UPDATE contracts SET status = '履约中' WHERE id = 'contract-draft'`)
+    await db.execute(`UPDATE contract_supplements SET status = '有效' WHERE id = 'supplement-draft'`)
+    await db.execute(`UPDATE receipt_registrations SET status = 'submitted' WHERE id = 'receipt-draft'`)
+    await db.execute(`UPDATE invoice_applications SET status = '已审核' WHERE id = 'invoice-draft'`)
+    await db.execute(`UPDATE owner_change_orders SET status = 'approved' WHERE id = 'change-submitted'`)
+
+    const [afterConfirmation] = await loadProjectDetailAggregates(db)
+    expect(afterConfirmation).toMatchObject({
+      projectId: 'project-canonical',
+      mainContractAmount: 1000,
+      supplementAmount: 225,
+      ownerChangeAmount: 650,
+      changedContractAmount: 1875,
+      projectReceipt: 800,
+      outputAmount: 700,
+      outputTax: 63,
+    })
+
+    const deletedAt = '2026-07-27T00:00:00.000Z'
+    await db.execute(`UPDATE contracts SET deleted_at = ? WHERE id = 'contract-draft'`, [deletedAt])
+    await db.execute(`UPDATE contract_supplements SET deleted_at = ? WHERE id = 'supplement-on-draft-contract'`, [deletedAt])
+    await db.execute(`UPDATE contract_supplements SET deleted_at = ? WHERE id = 'supplement-draft'`, [deletedAt])
+    await db.execute(`UPDATE receipt_registrations SET deleted_at = ? WHERE id = 'receipt-draft'`, [deletedAt])
+    await db.execute(`UPDATE invoice_applications SET deleted_at = ? WHERE id = 'invoice-draft'`, [deletedAt])
+    await db.execute(`UPDATE owner_change_orders SET deleted_at = ? WHERE id = 'change-submitted'`, [deletedAt])
+
+    const [afterSoftDelete] = await loadProjectDetailAggregates(db)
+    expect(afterSoftDelete).toMatchObject({
+      projectId: 'project-canonical',
+      mainContractAmount: 100,
+      supplementAmount: 25,
+      ownerChangeAmount: 50,
+      changedContractAmount: 175,
+      projectReceipt: 0,
+      outputAmount: 0,
+      outputTax: 0,
     })
   })
 })

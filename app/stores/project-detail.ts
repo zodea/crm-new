@@ -25,6 +25,11 @@ import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 import { loadProjectExpenditureRelations } from '~/lib/project/expenditure-relations'
 import { loadProjectFinanceFacts } from '~/lib/project/finance-facts'
+import {
+  effectiveAmount,
+  effectiveChildAmount,
+  isFormalOwnerChange,
+} from '~/lib/project/formal-facts'
 import { useInvoiceStore } from '~/stores/invoice'
 
 export interface ConstructionContractRow {
@@ -37,6 +42,8 @@ export interface ConstructionContractRow {
   signDate: string
   category: string
   signedAmount: number
+  effectiveAmount: number
+  sourcePath: string
 }
 
 export interface SupplementAgreementRow {
@@ -46,6 +53,9 @@ export interface SupplementAgreementRow {
   name: string
   amount: number
   signDate: string
+  status: string
+  effectiveAmount: number
+  sourcePath: string
 }
 
 export interface OwnerChangeOrderRow {
@@ -57,6 +67,10 @@ export interface OwnerChangeOrderRow {
   taxExcAmount: number
   appliedAmount: number
   approvalDate: string
+  status: string
+  formalState: string
+  effectiveTaxIncAmount: number
+  sourcePath: string
 }
 
 export interface InvoiceApplicationRow {
@@ -68,6 +82,9 @@ export interface InvoiceApplicationRow {
   taxAmount: number
   status: string
   invoiceDate: string
+  effectiveAmount: number
+  effectiveTaxAmount: number
+  sourcePath: string
 }
 
 export interface ReceiptRegistrationRow {
@@ -79,6 +96,9 @@ export interface ReceiptRegistrationRow {
   paymentMethod: string
   payerUnit: string
   cumulativeReceivable: number
+  status: string
+  effectiveAmount: number
+  sourcePath: string
 }
 
 export interface PaymentApplicationRow {
@@ -92,6 +112,7 @@ export interface PaymentApplicationRow {
   paymentMethod: string
   actualPayment: number
   acceptor: string
+  sourcePath: string
 }
 
 function number(value: unknown): number {
@@ -204,56 +225,110 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         loadProjectAcceptanceLifecycle(db),
       ])
 
-      constructionContracts.value = contracts.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        name: (row.name ?? '') as string,
-        contractNo: (row.no ?? '') as string,
-        amount: number(row.amount),
-        status: (row.status ?? '') as string,
-        signDate: (row.sign_date ?? '') as string,
-        category: (row.kind ?? '') as string,
-        signedAmount: number(row.amount),
-      }))
-      const contractProjects = new Map(constructionContracts.value.map(row => [row.id, row.projectId]))
-      supplementAgreements.value = supplements.map(row => ({
-        id: row.id as string,
-        contractId: row.contract_id as string,
-        projectId: contractProjects.get(row.contract_id as string) ?? '',
-        name: (row.name ?? '') as string,
-        amount: number(row.amount),
-        signDate: (row.sign_date ?? '') as string,
-      }))
-      ownerChangeOrders.value = changes.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        changeNo: (row.change_no ?? '') as string,
-        contractName: (row.contract_name ?? '') as string,
-        taxIncAmount: number(row.tax_inc_amount),
-        taxExcAmount: number(row.tax_exc_amount),
-        appliedAmount: number(row.applied_amount),
-        approvalDate: (row.approval_date ?? '') as string,
-      }))
-      invoiceApplications.value = outgoing.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        name: (row.name ?? '') as string,
-        amount: number(row.amount),
-        taxRate: number(row.tax_rate),
-        taxAmount: number(row.tax_amount),
-        status: (row.status ?? '') as string,
-        invoiceDate: (row.application_date ?? '') as string,
-      }))
-      receiptRegistrations.value = receipts.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        receiptNo: (row.no ?? '') as string,
-        receiptDate: (row.receipt_date ?? '') as string,
-        amount: number(row.amount),
-        paymentMethod: (row.payment_method ?? '') as string,
-        payerUnit: (row.payer_account ?? '') as string,
-        cumulativeReceivable: number(row.amount),
-      }))
+      constructionContracts.value = contracts.map((row) => {
+        const id = row.id as string
+        const status = (row.status ?? '') as string
+        const amount = number(row.amount)
+        return {
+          id,
+          projectId: row.project_id as string,
+          name: (row.name ?? '') as string,
+          contractNo: (row.no ?? '') as string,
+          amount,
+          status,
+          signDate: (row.sign_date ?? '') as string,
+          category: (row.kind ?? '') as string,
+          signedAmount: amount,
+          effectiveAmount: effectiveAmount(amount, status),
+          sourcePath: `/contract/${id}`,
+        }
+      })
+      const constructionContractsById = new Map(
+        constructionContracts.value.map(row => [row.id, row]),
+      )
+      supplementAgreements.value = supplements.map((row) => {
+        const id = row.id as string
+        const contractId = row.contract_id as string
+        const contract = constructionContractsById.get(contractId)
+        const status = (row.status ?? '') as string
+        const amount = number(row.amount)
+        return {
+          id,
+          contractId,
+          projectId: contract?.projectId ?? '',
+          name: (row.name ?? '') as string,
+          amount,
+          signDate: (row.sign_date ?? '') as string,
+          status,
+          effectiveAmount: contract
+            ? effectiveChildAmount(amount, status, contract.status)
+            : 0,
+          sourcePath: `/contract/${contractId}`,
+        }
+      })
+      ownerChangeOrders.value = changes.map((row) => {
+        const id = row.id as string
+        const taxIncAmount = number(row.tax_inc_amount)
+        const approvalDate = (row.approval_date ?? '') as string
+        const status = (row.status ?? '') as string
+        const sourceId = (row.source_id ?? '') as string
+        const formal = isFormalOwnerChange({
+          status,
+          approvalDate,
+          sourceLocked: row.source_locked,
+        })
+        return {
+          id,
+          projectId: row.project_id as string,
+          changeNo: (row.change_no ?? '') as string,
+          contractName: (row.contract_name ?? '') as string,
+          taxIncAmount,
+          taxExcAmount: number(row.tax_exc_amount),
+          appliedAmount: number(row.applied_amount),
+          approvalDate,
+          status,
+          formalState: formal ? '计入审定额' : '未审定不计',
+          effectiveTaxIncAmount: formal ? taxIncAmount : 0,
+          sourcePath: `/owner/change/${sourceId || id}`,
+        }
+      })
+      invoiceApplications.value = outgoing.map((row) => {
+        const id = row.id as string
+        const status = (row.status ?? '') as string
+        const amount = number(row.amount)
+        const taxAmount = number(row.tax_amount)
+        return {
+          id,
+          projectId: row.project_id as string,
+          name: (row.name ?? '') as string,
+          amount,
+          taxRate: number(row.tax_rate),
+          taxAmount,
+          status,
+          invoiceDate: (row.application_date ?? '') as string,
+          effectiveAmount: effectiveAmount(amount, status),
+          effectiveTaxAmount: effectiveAmount(taxAmount, status),
+          sourcePath: `/finance/billing/${id}`,
+        }
+      })
+      receiptRegistrations.value = receipts.map((row) => {
+        const id = row.id as string
+        const status = (row.status ?? '') as string
+        const amount = number(row.amount)
+        return {
+          id,
+          projectId: row.project_id as string,
+          receiptNo: (row.no ?? '') as string,
+          receiptDate: (row.receipt_date ?? '') as string,
+          amount,
+          paymentMethod: (row.payment_method ?? '') as string,
+          payerUnit: (row.payer_account ?? '') as string,
+          cumulativeReceivable: amount,
+          status,
+          effectiveAmount: effectiveAmount(amount, status),
+          sourcePath: `/finance/receipt/${id}`,
+        }
+      })
       paymentApplications.value = payments.map(row => ({
         id: row.id as string,
         projectId: row.project_id as string,
@@ -265,6 +340,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         paymentMethod: '',
         actualPayment: number(row.derived_paid_amount),
         acceptor: (row.approval_note ?? '') as string,
+        sourcePath: `/finance/payment/${row.id as string}`,
       }))
       currentReceipts.value = financeFacts.currentReceipts
       currentPayments.value = financeFacts.currentPayments
