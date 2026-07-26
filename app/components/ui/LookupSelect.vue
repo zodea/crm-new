@@ -350,7 +350,8 @@ watch(
         position="popper"
         align="start"
         :side-offset="5"
-        class="z-[var(--z-shell-popover)] min-w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[var(--radius-btn)] border border-line bg-panel shadow-[var(--shadow-pop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95"
+        data-overlay-owned
+        class="z-[var(--z-overlay-owned)] min-w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[var(--radius-btn)] border border-line bg-panel shadow-[var(--shadow-pop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95"
       >
         <ComboboxViewport class="max-h-72 overflow-y-auto p-1">
           <ComboboxGroup v-if="recentKey && recents.items.value.length > 0">

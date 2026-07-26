@@ -55,12 +55,14 @@ function onPointerDownOutside(e: PointerDownOutsideEvent) {
 <template>
   <DialogPortal>
     <DialogOverlay
-      class="fixed inset-0 z-[9000] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+      data-overlay-backdrop
+      class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
     />
     <DialogContent
       v-bind="{ ...forwarded, ...$attrs }"
+      data-overlay-surface
       :class="cn(
-        'fixed left-1/2 top-1/2 z-[9001] -translate-x-1/2 -translate-y-1/2 border border-line bg-panel shadow-[var(--shadow-pop)] rounded-[var(--radius-card)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:dialog-in data-[state=closed]:dialog-out',
+        'fixed left-1/2 top-1/2 z-[var(--z-overlay-surface)] -translate-x-1/2 -translate-y-1/2 border border-line bg-panel shadow-[var(--shadow-pop)] rounded-[var(--radius-card)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:dialog-in data-[state=closed]:dialog-out',
         props.class,
       )"
       @pointer-down-outside="onPointerDownOutside"

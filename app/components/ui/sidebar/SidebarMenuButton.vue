@@ -43,7 +43,8 @@ const delegatedProps = reactiveOmit(props, 'tooltip')
         side="right"
         align="center"
         :side-offset="6"
-        class="z-[9700] rounded-[6px] border border-line bg-panel px-2.5 py-1.5 text-12px text-ink shadow-[var(--shadow-pop)] data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95"
+        data-overlay-owned
+        class="z-[var(--z-overlay-owned)] rounded-[6px] border border-line bg-panel px-2.5 py-1.5 text-12px text-ink shadow-[var(--shadow-pop)] data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95"
       >
         <template v-if="typeof tooltip === 'string'">
           {{ tooltip }}
