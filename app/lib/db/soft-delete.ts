@@ -141,6 +141,36 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'contract_id', table: 'contracts' },
   ],
   monthly_statement_lines: [{ column: 'statement_id', table: 'monthly_statements' }],
+  project_acceptances: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  owner_final_settlements: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  owner_penalties: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  subcontract_change_orders: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'supplier_id', table: 'suppliers' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  penalty_records: [
+    { column: 'projectId', table: 'projects' },
+    { column: 'crewId', table: 'crews' },
+    { column: 'workerId', table: 'workers' },
+    { column: 'responsibleWorkerId', table: 'workers' },
+    { column: 'repairedByWorkerId', table: 'workers' },
+    { column: 'supplier_id', table: 'suppliers' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  penalty_settlement_deductions: [
+    { column: 'penalty_id', table: 'penalty_records' },
+    { column: 'settlement_id', table: 'expenditure_settlements' },
+  ],
   delivery_records: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },

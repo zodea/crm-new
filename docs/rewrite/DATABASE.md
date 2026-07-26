@@ -1021,6 +1021,19 @@ boq_change_orders += (
 -- 指令编号/类型复用既有 directive_no / directive_type。
 -- 量、价、合价明细继续写 boq_change_lines；已签证金额链规则见 §2.3。
 
+owner_change_orders += (
+  contract_id TEXT REFERENCES contracts(id),
+  name TEXT DEFAULT '',
+  document_type TEXT DEFAULT 'change_negotiation'
+    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
+  directive_no TEXT DEFAULT '', directive_type TEXT DEFAULT '',
+  application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
+  status TEXT DEFAULT 'draft', status_note TEXT DEFAULT '',
+  note TEXT DEFAULT '', updated_at TEXT
+)
+-- 上述扩展只服务“不含量价明细的纯金额签证”直写台账；
+-- 量价变更仍由 boq_change_orders 生成 source_locked=1 的一对一锁定行。
+
 monthly_statements += (
   no TEXT DEFAULT '', period_no TEXT DEFAULT '',
   application_date TEXT DEFAULT '',
@@ -1077,9 +1090,22 @@ penalty_records += (
   deduction_method TEXT DEFAULT '', rectification_note TEXT DEFAULT '',
   updated_at TEXT, deleted_at TEXT
 )
+
+penalty_settlement_deductions(
+  id,
+  penalty_id TEXT REFERENCES penalty_records(id),
+  settlement_id TEXT REFERENCES expenditure_settlements(id),
+  amount REAL CHECK (amount > 0),
+  note TEXT DEFAULT '',
+  created_at TEXT, updated_at TEXT, deleted_at TEXT
+)
+-- (penalty_id, settlement_id) 对活跃关系唯一；累计已抵扣金额从活跃关系行聚合，
+-- 不回写 penalty_records 头表。
 ```
 
 `ownerChangeForm` 复用 BOQ 变更模型；只有不含量价明细的纯金额签证直接写 `owner_change_orders`。`subSettleForm` 复用 `expenditure_settlements`。项目罚扣抵扣结算时由独立 action 写真实结算引用/操作日志，不在罚扣头维护“已扣金额”副本。
+
+> v24 实装核对：v1-v23 物理库并未创建蓝本已声明的 `penalty_records`，因此 F5 迁移按本节与 `pages/base-crew.md` 的既有字段一次性建表，并同时加入 F5 外键和软删除列；不另建项目罚扣头表。
 
 ---
 
@@ -1162,6 +1188,7 @@ penalty_records += (
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
 | `penalty_records` | `supplier_id` / `contract_id` | `suppliers.id` / `contracts.id` | N:1 | 项目罚扣 → 分供方/支出合同（可选） |
+| `penalty_settlement_deductions` | `penalty_id` / `settlement_id` | `penalty_records.id` / `expenditure_settlements.id` | N:1 | 项目罚扣 → 真实支出结算抵扣关系 |
 | `items` | `project_id` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
 | `house_type_templates` | `project_id` | `projects.id` | N:1 | 项目户型模板 |
 | `rooms` | `template_id` | `house_type_templates.id` | N:1 | 稳定模板房间；显示名可改，不按户复制 |
