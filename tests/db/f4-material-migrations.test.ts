@@ -51,7 +51,7 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
     const db = await createMemoryDb()
     await runMigrations(db)
 
-    expect(LATEST_VERSION).toBe(F4_MIGRATION_VERSION)
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(F4_MIGRATION_VERSION)
     const tables = await listTables(db)
     for (const table of [
       'material_requisitions',
@@ -148,7 +148,10 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
       )
     `)
 
-    const result = await runMigrations(db)
+    const f4Migrations = migrations.filter(
+      migration => migration.version <= F4_MIGRATION_VERSION,
+    )
+    const result = await runMigrations(db, f4Migrations)
     expect(result.applied).toEqual(['v23 f4-material-forms-inventory-facts'])
     expect(await db.select(`
       SELECT id, order_no FROM delivery_records WHERE id = 'delivery-before-f4'
@@ -160,7 +163,7 @@ describe('v23 F4 物资表单与库存事实迁移', () => {
       id: 'settlement-before-f4',
       contract_id: 'contract-f4',
     }])
-    expect((await runMigrations(db)).applied).toEqual([])
+    expect((await runMigrations(db, f4Migrations)).applied).toEqual([])
     expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
     db.close()
   })
