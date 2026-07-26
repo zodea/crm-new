@@ -36,12 +36,12 @@ export const NAV_TREE: NavNode[] = [
   ] },
   { type: 'group', key: 'g-main', label: '主合同管理', icon: 'i-lucide-file-pen', items: [
     { key: 'conContract', mark: '合', icon: 'i-lucide-signature', label: '施工合同', hint: '收入合同', to: '/contract/construction' },
-    { key: 'ownerChange', mark: '洽', icon: 'i-lucide-file-diff', label: '甲方变洽签', hint: '变更·签证' },
-    { key: 'ownerReport', mark: '报', icon: 'i-lucide-chart-no-axes-column-increasing', label: '甲方报量', hint: '月度报量' },
+    { key: 'ownerChange', mark: '洽', icon: 'i-lucide-file-diff', label: '甲方变洽签', hint: '变更·签证', to: '/contract/boq?tab=changes' },
+    { key: 'ownerReport', mark: '报', icon: 'i-lucide-chart-no-axes-column-increasing', label: '甲方报量', hint: '月度报量', to: '/contract/boq?tab=monthly' },
     { key: 'acceptance', mark: '验', icon: 'i-lucide-badge-check', label: '竣工验收·保修', hint: '阶段流转' },
     { key: 'finalSettle', mark: '终', icon: 'i-lucide-circle-check-big', label: '最终结算', hint: '与甲方结算' },
     { key: 'ownerPenalty', mark: '罚', icon: 'i-lucide-gavel', label: '甲方罚扣单', hint: '对我方罚扣' },
-    { key: 'boqImport', mark: '拆', icon: 'i-lucide-file-scan', label: '清单拆表', hint: '合同清单→表格' },
+    { key: 'boqImport', mark: '拆', icon: 'i-lucide-file-scan', label: '清单拆表', hint: '合同清单→表格', to: '/contract/boq/import' },
   ] },
   { type: 'group', key: 'g-sub', label: '分包及人工', icon: 'i-lucide-hard-hat', items: [
     { key: 'subContract', mark: '分', icon: 'i-lucide-handshake', label: '分包合同', hint: '劳务·专业', to: '/contract/subcontract' },
@@ -49,7 +49,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'subSettle', mark: '结', icon: 'i-lucide-scale', label: '分包结算', hint: '结算台账' },
     { key: 'projPenalty', mark: '扣', icon: 'i-lucide-circle-minus', label: '项目罚扣', hint: '罚款·抵扣' },
     { key: 'quantity', mark: '量', icon: 'i-lucide-grid-3x3', label: '工程量管理', hint: '矩阵可视化', to: '/subcontract/quantity' },
-    { key: 'boqList', mark: '单', icon: 'i-lucide-list-tree', label: '工程量清单', hint: '分项·三量' },
+    { key: 'boqList', mark: '单', icon: 'i-lucide-list-tree', label: '工程量清单', hint: '分项·三量', to: '/contract/boq' },
     { key: 'payroll', mark: '资', icon: 'i-lucide-wallet-cards', label: '工资核算', hint: '核算发放', to: '/subcontract/payroll' },
     { key: 'wageSlip', mark: '款', icon: 'i-lucide-badge-dollar-sign', label: '工资进度款', hint: '铺贴核算工具' },
   ] },
@@ -168,6 +168,10 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'subContract'
   if (path.startsWith('/contract/material'))
     return 'matContract'
+  if (path.startsWith('/contract/boq/import'))
+    return 'boqImport'
+  if (path.startsWith('/contract/boq'))
+    return 'boqList'
   if (/^\/contract\/[^/]+/.test(path)) {
     // 合同详情：按 kind 点亮来源列表（查不到时不点亮）
     if (contractKindOfDetail === '施工')

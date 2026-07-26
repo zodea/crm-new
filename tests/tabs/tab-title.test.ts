@@ -27,3 +27,11 @@ describe('工程量矩阵页签文案', () => {
     expect(routeSubtitle('/subcontract/quantity')).toBe('户型模板 · 责任指派 · 阶段完成')
   })
 })
+
+describe('boq 页签文案', () => {
+  it('清单工作区与专用拆表页不会落入通用合同详情', () => {
+    expect(routeTitle('/contract/boq')).toBe('工程量清单')
+    expect(routeSubtitle('/contract/boq')).toBe('合同清单 · 变更单 · 月度报量')
+    expect(routeTitle('/contract/boq/import')).toBe('清单拆表')
+  })
+})
