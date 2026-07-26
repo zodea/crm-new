@@ -9,27 +9,36 @@ const FORM_ROUTES = [
   ['/project/target-cost/form', '新建 · 目标成本'],
 ] as const
 
+const FORM_VIEWPORTS = [
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 900 },
+] as const
+
 test.describe('F1 基础主数据整页表单', () => {
-  test('六条命名表单路由共用完整五动作底栏且小屏无横向溢出', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 })
+  for (const viewport of FORM_VIEWPORTS) {
+    test(`六条命名表单路由在 ${viewport.width}px 共用完整五动作底栏且无横向溢出`, async ({ page }) => {
+      await page.setViewportSize(viewport)
 
-    for (const [path, title] of FORM_ROUTES) {
-      await page.goto(path)
-      await expect(page.getByRole('heading', { name: title })).toBeVisible({
-        timeout: 20_000,
-      })
+      for (const [path, title] of FORM_ROUTES) {
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: title })).toBeVisible({
+          timeout: 20_000,
+        })
 
-      const footer = page.getByRole('group', { name: '表单操作' })
-      await expect(footer).toBeVisible()
-      await expect(footer.getByRole('button')).toHaveCount(5)
+        const footer = page.getByRole('group', { name: '表单操作' })
+        await expect(footer).toBeVisible()
+        await expect(footer.getByRole('button')).toHaveCount(5)
 
-      const widths = await page.evaluate(() => ({
-        client: document.documentElement.clientWidth,
-        scroll: document.documentElement.scrollWidth,
-      }))
-      expect(widths.scroll, `${path} 不应横向溢出`).toBeLessThanOrEqual(widths.client)
-    }
-  })
+        const widths = await page.evaluate(() => ({
+          client: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth,
+        }))
+        expect(widths.scroll, `${path} 不应横向溢出`).toBeLessThanOrEqual(widths.client)
+      }
+    })
+  }
 
   test('切换页签保留未保存字段，不弹放弃确认', async ({ page }) => {
     await page.goto('/base/customer/form')

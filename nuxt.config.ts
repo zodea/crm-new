@@ -38,9 +38,25 @@ export default defineNuxtConfig({
 
   vite: {
     optimizeDeps: {
-      // xlsx 只被导入/导出页签按需加载；预打包避免 dev 首次进入这些
-      // 路由时 Vite 发现新依赖触发整页 reload（会打断 SPA 页签导航）。
-      include: ['xlsx'],
+      // 预打包应用壳、交互原语、桌面桥接与按需导入依赖，避免 dev
+      // 首次进入表单/导入路由时 Vite 发现新依赖并触发整页 reload。
+      include: [
+        '@tauri-apps/api/core',
+        '@tauri-apps/api/path',
+        '@tauri-apps/plugin-dialog',
+        '@tauri-apps/plugin-fs',
+        '@tauri-apps/plugin-sql',
+        '@vue/devtools-core',
+        '@vue/devtools-kit',
+        'class-variance-authority',
+        'clsx',
+        'reka-ui',
+        'sql.js',
+        'vue-sonner',
+        'vxe-pc-ui',
+        'vxe-table',
+        'xlsx',
+      ],
     },
   },
 

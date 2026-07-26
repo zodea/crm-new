@@ -1,23 +1,18 @@
 <script setup lang="ts">
-import type { LookupOption } from '~/lib/kit/lookup'
+import type { PendingMasterDataAttachment } from './MasterDataAttachmentSection.vue'
 import type {
-  CrewFormDraft,
-  CustomerFormDraft,
   FormAttachment,
   FormAttachmentChanges,
   FormAttachmentDraft,
   MasterDataOwnerType,
   MasterDataSaveAction,
-  ProjectFormDraft,
-  SupplierFormDraft,
-  TargetCostFormDraft,
-  WorkerFormDraft,
 } from '~/lib/master-data/forms'
-import type { FormFooterAction } from '~/lib/master-data/page'
+import type {
+  FormFooterAction,
+  MasterDataPageDraft,
+} from '~/lib/master-data/page'
 import { isTauri } from '@tauri-apps/api/core'
 import { onBeforeRouteLeave } from 'vue-router'
-import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
 import {
   listFormAttachments,
   loadCrewForm,
@@ -32,22 +27,8 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
-import { PROJECT_STATUSES } from '~/lib/project/status'
-import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
-
-type PageDraft
-  = SupplierFormDraft
-    & CustomerFormDraft
-    & CrewFormDraft
-    & WorkerFormDraft
-    & ProjectFormDraft
-    & TargetCostFormDraft
-
-interface PendingAttachment extends FormAttachmentDraft {
-  localId: string
-}
 
 const props = defineProps<{
   kind: MasterDataOwnerType
@@ -60,6 +41,7 @@ const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
 const targetCostStore = useTargetCostStore()
+const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
@@ -74,9 +56,11 @@ const isEditing = Boolean(routeId)
 const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
 useTabTitle(title)
 
-const draft = ref<PageDraft>(formDefaults(props.kind) as PageDraft)
+const draft = ref<MasterDataPageDraft>(
+  formDefaults(props.kind) as MasterDataPageDraft,
+)
 const attachments = shallowRef<FormAttachment[]>([])
-const pendingAttachments = shallowRef<PendingAttachment[]>([])
+const pendingAttachments = shallowRef<PendingMasterDataAttachment[]>([])
 const pendingRemoveIds = shallowRef<string[]>([])
 const pendingRestoreIds = shallowRef<string[]>([])
 const fieldErrors = shallowRef<Record<string, string>>({})
@@ -87,53 +71,26 @@ const savedSnapshot = shallowRef('')
 const desktopAttachmentPicker = shallowRef(false)
 let allowLeave = false
 
-const aliasesText = computed({
-  get: () => draft.value.aliases?.join('、') ?? '',
-  set: (value: string) => {
-    draft.value.aliases = value
-      .split(/[，,、;；]/)
-      .map(item => item.trim())
-      .filter(Boolean)
-  },
-})
-
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value
   || pendingAttachments.value.length > 0
   || pendingRemoveIds.value.length > 0
   || pendingRestoreIds.value.length > 0)
 
 const sections = computed(() => meta.value.sections)
+const attachmentTitle = computed(() => props.kind === 'worker' ? '证书档案' : '附件')
 
-async function queryLookup(
-  table: 'customers' | 'projects' | 'crews',
-  keyword: string,
-  includeAliases = false,
-): Promise<LookupOption[]> {
-  const pattern = `%${keyword.trim()}%`
-  const aliasClause = includeAliases ? 'OR aliases LIKE ? OR tax_no LIKE ?' : ''
-  const params = includeAliases ? [pattern, pattern, pattern] : [pattern]
-  const rows = await select<{ id: string, name: string }>(
-    selectVisibleSql(
-      table,
-      `AND (name LIKE ? ${aliasClause}) ORDER BY name LIMIT 50`,
-    ),
-    params,
-  )
-  return rows.map(row => ({ id: row.id, label: row.name }))
-}
+const fetchCustomers = readStore.searchCustomers
+const fetchProjects = readStore.searchProjects
+const fetchCrews = readStore.searchCrews
 
-const fetchCustomers = (keyword: string) => queryLookup('customers', keyword, true)
-const fetchProjects = (keyword: string) => queryLookup('projects', keyword)
-const fetchCrews = (keyword: string) => queryLookup('crews', keyword)
-
-async function loadRecord(id: string): Promise<PageDraft | null> {
+async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
   switch (props.kind) {
-    case 'supplier': return await loadSupplierForm(id) as PageDraft | null
-    case 'customer': return await loadCustomerForm(id) as PageDraft | null
-    case 'crew': return await loadCrewForm(id) as PageDraft | null
-    case 'worker': return await loadWorkerForm(id) as PageDraft | null
-    case 'project': return await loadProjectForm(id) as PageDraft | null
-    case 'target_cost': return await loadTargetCostForm(id) as PageDraft | null
+    case 'supplier': return await loadSupplierForm(id) as MasterDataPageDraft | null
+    case 'customer': return await loadCustomerForm(id) as MasterDataPageDraft | null
+    case 'crew': return await loadCrewForm(id) as MasterDataPageDraft | null
+    case 'worker': return await loadWorkerForm(id) as MasterDataPageDraft | null
+    case 'project': return await loadProjectForm(id) as MasterDataPageDraft | null
+    case 'target_cost': return await loadTargetCostForm(id) as MasterDataPageDraft | null
   }
 }
 
@@ -144,15 +101,14 @@ async function initialize() {
   pendingRemoveIds.value = []
   pendingRestoreIds.value = []
   try {
-    const id = routeId
-    if (!id) {
-      draft.value = formDefaults(props.kind) as PageDraft
+    if (!routeId) {
+      draft.value = formDefaults(props.kind) as MasterDataPageDraft
       attachments.value = []
     }
     else {
       const [record, files] = await Promise.all([
-        loadRecord(id),
-        listFormAttachments(props.kind, id, true),
+        loadRecord(routeId),
+        listFormAttachments(props.kind, routeId, true),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -163,7 +119,7 @@ async function initialize() {
       draft.value = {
         ...formDefaults(props.kind),
         ...record,
-      } as PageDraft
+      } as MasterDataPageDraft
       attachments.value = files
     }
     await nextTick()
@@ -177,7 +133,7 @@ async function initialize() {
 function validateRequired(): boolean {
   const errors: Record<string, string> = {}
   for (const [field, label] of formRequiredFields(props.kind)) {
-    const value = draft.value[field as keyof PageDraft]
+    const value = draft.value[field as keyof MasterDataPageDraft]
     if (typeof value === 'string' ? !value.trim() : value == null)
       errors[field] = `${label}为必填项`
   }
@@ -188,13 +144,7 @@ function validateRequired(): boolean {
   return labels.length === 0
 }
 
-function fieldClass(field: keyof PageDraft) {
-  return fieldErrors.value[field]
-    ? 'field-input w-full border-danger! ring-1 ring-danger/20'
-    : 'field-input w-full'
-}
-
-function clearFieldError(field: keyof PageDraft) {
+function clearFieldError(field: keyof MasterDataPageDraft) {
   if (!fieldErrors.value[field])
     return
   const next = { ...fieldErrors.value }
@@ -254,7 +204,7 @@ async function handleFooterAction(action: FormFooterAction) {
     if (action === 'saveNew') {
       allowLeave = true
       if (route.path === meta.value.newPath) {
-        draft.value = formDefaults(props.kind) as PageDraft
+        draft.value = formDefaults(props.kind) as MasterDataPageDraft
         attachments.value = []
         savedSnapshot.value = JSON.stringify(draft.value)
         allowLeave = false
@@ -311,14 +261,12 @@ function appendPendingAttachments(files: FormAttachmentDraft[]) {
   ]
 }
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  appendPendingAttachments([...(input.files ?? [])].map(file => ({
+function handleFiles(files: File[]) {
+  appendPendingAttachments(files.map(file => ({
     fileName: file.name,
     fileSize: file.size,
     mimeType: file.type,
   })))
-  input.value = ''
 }
 
 async function pickNativeFiles() {
@@ -345,7 +293,15 @@ async function pickNativeFiles() {
 }
 
 function removePending(localId: string) {
-  pendingAttachments.value = pendingAttachments.value.filter(file => file.localId !== localId)
+  pendingAttachments.value = pendingAttachments.value.filter(file =>
+    file.localId !== localId,
+  )
+}
+
+function updatePendingCategory(localId: string, category: string) {
+  pendingAttachments.value = pendingAttachments.value.map(file =>
+    file.localId === localId ? { ...file, category } : file,
+  )
 }
 
 function toggleExistingAttachment(id: string) {
@@ -443,640 +399,29 @@ onMounted(() => {
       </div>
 
       <form v-else class="flex flex-col gap-4" @submit.prevent>
-        <!-- 分供方 -->
-        <template v-if="kind === 'supplier'">
-          <section id="section-basic" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="基础信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">公司全称 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">简称/别名</span>
-                <input v-model="aliasesText" class="field-input w-full" placeholder="多个别名用逗号或顿号分隔">
-              </label>
-              <label class="field-block">
-                <span class="field-label">分供方类别 *</span>
-                <select v-model="draft.supplierCategory" :class="fieldClass('supplierCategory')" data-field="supplierCategory" @change="clearFieldError('supplierCategory')">
-                  <option value="">请选择</option>
-                  <option v-for="category in SUPPLIER_CATEGORIES" :key="category" :value="category">{{ category }}</option>
-                </select>
-                <span v-if="fieldErrors.supplierCategory" class="field-error">{{ fieldErrors.supplierCategory }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">经营类型</span>
-                <input v-model="draft.businessType" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">唯一识别码</span>
-                <input v-model="draft.uniqueCode" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">统一社会信用代码</span>
-                <input v-model="draft.taxNo" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">法定代表人</span>
-                <input v-model="draft.legalRep" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">注册资金（万元）</span>
-                <input v-model.number="draft.registeredCapital" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">注册日期</span>
-                <input v-model="draft.registeredDate" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">纳税人类型</span>
-                <select v-model="draft.taxpayerType" class="field-input w-full">
-                  <option value="未核验">未核验</option>
-                  <option value="一般纳税人">一般纳税人</option>
-                  <option value="小规模纳税人">小规模纳税人</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">评价等级</span>
-                <input v-model="draft.rating" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">注册地址</span>
-                <input v-model="draft.address" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">主营业务</span>
-                <textarea v-model="draft.mainBusiness" rows="3" class="field-input w-full" />
-              </label>
-            </div>
-          </section>
+        <MasterDataFormFields
+          v-model="draft"
+          :kind="kind"
+          :field-errors="fieldErrors"
+          :fetch-customers="fetchCustomers"
+          :fetch-projects="fetchProjects"
+          :fetch-crews="fetchCrews"
+          @clear-error="clearFieldError"
+        />
 
-          <section id="section-contact" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="联系人信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">主要联系人 *</span>
-                <input v-model="draft.contact" :class="fieldClass('contact')" data-field="contact" @input="clearFieldError('contact')">
-                <span v-if="fieldErrors.contact" class="field-error">{{ fieldErrors.contact }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">联系人电话</span>
-                <input v-model="draft.contactPhone" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">职务</span>
-                <input v-model="draft.contactTitle" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">公司电话</span>
-                <input v-model="draft.phone" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-
-          <section id="section-invoice" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="开票与银行信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">开票名称</span>
-                <input v-model="draft.invoiceName" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">开户行</span>
-                <input v-model="draft.bank" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">银行账号</span>
-                <input v-model="draft.bankAccount" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">开票地址</span>
-                <input v-model="draft.invoiceAddress" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-        </template>
-
-        <!-- 客户 -->
-        <template v-else-if="kind === 'customer'">
-          <section id="section-basic" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="基础信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">客户名称 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">简称/别名</span>
-                <input v-model="aliasesText" class="field-input w-full" placeholder="多个别名用逗号或顿号分隔">
-              </label>
-              <label class="field-block">
-                <span class="field-label">统一社会信用代码</span>
-                <input v-model="draft.taxNo" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">法定代表人</span>
-                <input v-model="draft.legalRep" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">注册地址</span>
-                <input v-model="draft.registeredAddress" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-          <section id="section-invoice" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="开票与银行" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">开票名称</span>
-                <input v-model="draft.invoiceName" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">开户行</span>
-                <input v-model="draft.bank" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">银行账号</span>
-                <input v-model="draft.bankAccount" class="field-input w-full font-mono">
-              </label>
-            </div>
-          </section>
-          <section id="section-contact" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="联系与备注" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">联系人 *</span>
-                <input v-model="draft.contact" :class="fieldClass('contact')" data-field="contact" @input="clearFieldError('contact')">
-                <span v-if="fieldErrors.contact" class="field-error">{{ fieldErrors.contact }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">联系电话</span>
-                <input v-model="draft.contactPhone" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-        </template>
-
-        <!-- 班组 -->
-        <template v-else-if="kind === 'crew'">
-          <section id="section-basic" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="基本信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">班组名称 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">工种 *</span>
-                <input v-model="draft.trade" :class="fieldClass('trade')" data-field="trade" @input="clearFieldError('trade')">
-                <span v-if="fieldErrors.trade" class="field-error">{{ fieldErrors.trade }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">负责人 *</span>
-                <input v-model="draft.contactName" :class="fieldClass('contactName')" data-field="contactName" @input="clearFieldError('contactName')">
-                <span v-if="fieldErrors.contactName" class="field-error">{{ fieldErrors.contactName }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">联系电话 *</span>
-                <input v-model="draft.contactPhone" :class="fieldClass('contactPhone')" data-field="contactPhone" @input="clearFieldError('contactPhone')">
-                <span v-if="fieldErrors.contactPhone" class="field-error">{{ fieldErrors.contactPhone }}</span>
-              </label>
-            </div>
-          </section>
-          <section id="section-pay" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="计薪与提成" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">默认发放比例</span>
-                <input v-model.number="draft.defaultPayRatio" type="number" min="0" max="1" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">指派粒度</span>
-                <select v-model="draft.assignmentLevel" class="field-input w-full">
-                  <option value="crew">班组</option>
-                  <option value="worker">个人</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">房租补贴</span>
-                <span class="flex items-center gap-2">
-                  <input v-model="draft.rentSubsidyEnabled" type="checkbox" class="accent-brand">
-                  <span class="text-12px text-ink-soft">启用</span>
-                </span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">房租补贴单价</span>
-                <input v-model.number="draft.rentSubsidyPrice" type="number" min="0" step="0.01" :disabled="!draft.rentSubsidyEnabled" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">管理提成</span>
-                <span class="flex items-center gap-2">
-                  <input v-model="draft.mgmtFeeEnabled" type="checkbox" class="accent-brand">
-                  <span class="text-12px text-ink-soft">启用</span>
-                </span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">管理提成单价</span>
-                <input v-model.number="draft.mgmtFeePrice" type="number" min="0" step="0.01" :disabled="!draft.mgmtFeeEnabled" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-        </template>
-
-        <!-- 工人 -->
-        <template v-else-if="kind === 'worker'">
-          <section id="section-personal" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="个人信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">姓名 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">性别</span>
-                <select v-model="draft.gender" class="field-input w-full">
-                  <option value="">未填写</option>
-                  <option value="男">男</option>
-                  <option value="女">女</option>
-                </select>
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">身份证号</span>
-                <input v-model="draft.idCard" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">联系电话 *</span>
-                <input v-model="draft.phone" :class="fieldClass('phone')" data-field="phone" @input="clearFieldError('phone')">
-                <span v-if="fieldErrors.phone" class="field-error">{{ fieldErrors.phone }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">籍贯</span>
-                <input v-model="draft.hometown" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">紧急联系人</span>
-                <input v-model="draft.emergencyContact" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">紧急联系电话</span>
-                <input v-model="draft.emergencyPhone" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-          <section id="section-bank" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="银行信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">开户银行 *</span>
-                <input v-model="draft.bankName" :class="fieldClass('bankName')" data-field="bankName" @input="clearFieldError('bankName')">
-                <span v-if="fieldErrors.bankName" class="field-error">{{ fieldErrors.bankName }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">银行卡号 *</span>
-                <input v-model="draft.bankAccount" :class="fieldClass('bankAccount')" data-field="bankAccount" @input="clearFieldError('bankAccount')">
-                <span v-if="fieldErrors.bankAccount" class="field-error">{{ fieldErrors.bankAccount }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">银行行号</span>
-                <input v-model="draft.bankCode" class="field-input w-full font-mono">
-              </label>
-            </div>
-          </section>
-          <section id="section-work" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="工作信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">工种 *</span>
-                <input v-model="draft.trade" :class="fieldClass('trade')" data-field="trade" @input="clearFieldError('trade')">
-                <span v-if="fieldErrors.trade" class="field-error">{{ fieldErrors.trade }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">技能等级</span>
-                <input v-model="draft.skillLevel" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">参考日工资</span>
-                <input v-model.number="draft.dailyWage" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">所属班组</span>
-                <LookupSelect v-model="draft.crewId" :fetch="fetchCrews" recent-key="worker-crews" placeholder="检索班组" />
-              </label>
-              <label class="field-block">
-                <span class="field-label">亲属组 ID</span>
-                <input v-model="draft.familyGroupId" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-          <section id="section-project" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="项目分配" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">当前项目</span>
-                <LookupSelect v-model="draft.currentProjectId" :fetch="fetchProjects" recent-key="worker-projects" placeholder="检索项目" />
-              </label>
-              <label class="field-block">
-                <span class="field-label">在场状态</span>
-                <select v-model="draft.projectStatus" class="field-input w-full">
-                  <option value="在场">在场</option>
-                  <option value="已退场">已退场</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">进场日期</span>
-                <input v-model="draft.entryDate" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">退场日期</span>
-                <input v-model="draft.exitDate" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="flex items-center gap-2">
-                  <input v-model="draft.safetyEducation" type="checkbox" class="accent-brand">
-                  <span class="field-label mb-0">已完成三级安全教育</span>
-                </span>
-              </label>
-            </div>
-          </section>
-        </template>
-
-        <!-- 项目 -->
-        <template v-else-if="kind === 'project'">
-          <section id="section-basic" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="基本信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">项目名称 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">项目合同名称</span>
-                <input v-model="draft.contractName" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">项目编号</span>
-                <input v-model="draft.code" class="field-input w-full font-mono">
-              </label>
-              <label class="field-block">
-                <span class="field-label">客户（甲方） *</span>
-                <LookupSelect v-model="draft.customerId" :fetch="fetchCustomers" recent-key="project-customers" placeholder="检索客户" @update:model-value="clearFieldError('customerId')" />
-                <span v-if="fieldErrors.customerId" class="field-error">{{ fieldErrors.customerId }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">客户2</span>
-                <LookupSelect v-model="draft.secondaryCustomerId" :fetch="fetchCustomers" recent-key="project-secondary-customers" placeholder="检索次客户" />
-              </label>
-              <label class="field-block">
-                <span class="field-label">工程地域</span>
-                <input v-model="draft.region" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">详细地址</span>
-                <input v-model="draft.address" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">经营类型</span>
-                <select v-model="draft.operationType" class="field-input w-full">
-                  <option value="自营">自营</option>
-                  <option value="联营">联营</option>
-                  <option value="挂靠">挂靠</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">工程类型</span>
-                <input v-model="draft.type" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">建筑面积</span>
-                <input v-model.number="draft.area" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">合同金额</span>
-                <input v-model.number="draft.contractAmount" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block form-span-full">
-                <span class="field-label">工程概况</span>
-                <textarea v-model="draft.overview" rows="3" class="field-input w-full" />
-              </label>
-            </div>
-          </section>
-          <section id="section-schedule" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="工期与阶段" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">业务流程阶段</span>
-                <select v-model="draft.status" class="field-input w-full">
-                  <option v-for="status in PROJECT_STATUSES" :key="status" :value="status">{{ status }}</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">计划开工</span>
-                <input v-model="draft.startDate" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">计划竣工</span>
-                <input v-model="draft.plannedEnd" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">计划工期（天）</span>
-                <input v-model.number="draft.plannedDuration" type="number" min="0" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">实际竣工</span>
-                <input v-model="draft.actualEnd" type="date" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-          <section id="section-team" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="参建单位" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">项目经理 *</span>
-                <input v-model="draft.manager" :class="fieldClass('manager')" data-field="manager" @input="clearFieldError('manager')">
-                <span v-if="fieldErrors.manager" class="field-error">{{ fieldErrors.manager }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">项目经理电话</span>
-                <input v-model="draft.managerPhone" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">执行经理</span>
-                <input v-model="draft.execManager" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">施工员</span>
-                <input v-model="draft.builder" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">承包单位</span>
-                <input v-model="draft.contractor" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">监理单位</span>
-                <input v-model="draft.supervisor" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">设计单位</span>
-                <input v-model="draft.designer" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">甲方代表</span>
-                <input v-model="draft.developerSupervisor" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">现场负责人</span>
-                <input v-model="draft.siteLeader" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">现场负责人电话</span>
-                <input v-model="draft.siteLeaderPhone" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-          <section id="section-risk" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="风控与立项" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">项目风险级别</span>
-                <select v-model="draft.riskLevel" class="field-input w-full">
-                  <option value="低">低</option>
-                  <option value="中">中</option>
-                  <option value="高">高</option>
-                </select>
-              </label>
-              <label class="field-block">
-                <span class="field-label">立项文件时间</span>
-                <input v-model="draft.filingDate" type="date" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">验收日期</span>
-                <input v-model="draft.acceptanceDate" type="date" class="field-input w-full">
-              </label>
-            </div>
-          </section>
-        </template>
-
-        <!-- 目标成本 -->
-        <template v-else-if="kind === 'target_cost'">
-          <section id="section-basic" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="基本信息" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">版本名 *</span>
-                <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="clearFieldError('name')">
-                <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
-              </label>
-              <label class="field-block">
-                <span class="field-label">项目 *</span>
-                <LookupSelect v-model="draft.projectId" :fetch="fetchProjects" recent-key="target-cost-projects" placeholder="检索项目" @update:model-value="clearFieldError('projectId')" />
-                <span v-if="fieldErrors.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
-              </label>
-              <label class="field-block form-span-full">
-                <span class="flex items-center gap-2">
-                  <input v-model="draft.isBaseline" type="checkbox" class="accent-brand">
-                  <span class="field-label mb-0">设为当前对比基线</span>
-                </span>
-              </label>
-            </div>
-          </section>
-          <section id="section-amount" class="panel scroll-mt-4 p-4">
-            <SectionHeader title="金额基准" />
-            <div class="form-grid">
-              <label class="field-block">
-                <span class="field-label">合同收入</span>
-                <input v-model.number="draft.contractRevenue" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">计划利润</span>
-                <input v-model.number="draft.plannedProfit" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">已签合同额</span>
-                <input v-model.number="draft.signedContractSum" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">含税合价</span>
-                <input v-model.number="draft.taxInclusiveTotal" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">无税合价</span>
-                <input v-model.number="draft.taxExclusiveTotal" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-              <label class="field-block">
-                <span class="field-label">税额</span>
-                <input v-model.number="draft.taxAmount" type="number" min="0" step="0.01" class="field-input w-full">
-              </label>
-            </div>
-            <p class="mt-3 text-11px text-ink-faint">
-              含税、无税和税额只作勾稽提示，不自动覆盖人工确认值。
-            </p>
-          </section>
-        </template>
-
-        <section id="section-attachments" class="panel scroll-mt-4 p-4">
-          <SectionHeader :title="kind === 'worker' ? '证书档案' : '附件'" />
-          <button
-            v-if="desktopAttachmentPicker"
-            type="button"
-            class="flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-            @click="pickNativeFiles"
-          >
-            <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-            <span class="text-12px font-600 text-ink">点击选择附件</span>
-            <span class="mt-0.5 text-11px text-ink-faint">保存可重新打开的本机文件路径，文件引用独立写入 file_refs</span>
-          </button>
-          <label v-else class="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft">
-            <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-            <span class="text-12px font-600 text-ink">点击选择附件</span>
-            <span class="mt-0.5 text-11px text-ink-faint">浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径</span>
-            <input type="file" multiple class="sr-only" @change="handleFiles">
-          </label>
-
-          <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
-            <div
-              v-for="file in attachments"
-              :key="file.id"
-              class="flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2"
-              :class="pendingRemoveIds.includes(file.id)
-                ? 'bg-danger-soft opacity-65'
-                : pendingRestoreIds.includes(file.id)
-                  ? 'border-brand/30 bg-brand-soft'
-                  : file.deletedAt ? 'bg-surface-2 opacity-65' : 'bg-panel'"
-            >
-              <span class="i-lucide-paperclip text-ink-faint" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
-              <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
-              <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
-              <button
-                type="button"
-                class="text-11px"
-                :class="file.deletedAt ? 'text-brand' : 'text-danger'"
-                @click="toggleExistingAttachment(file.id)"
-              >
-                {{ file.deletedAt
-                  ? pendingRestoreIds.includes(file.id) ? '取消恢复' : '恢复'
-                  : pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
-              </button>
-            </div>
-            <div
-              v-for="file in pendingAttachments"
-              :key="file.localId"
-              class="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-brand/30 bg-brand-soft px-3 py-2"
-            >
-              <span class="i-lucide-file-plus-2 text-brand" aria-hidden="true" />
-              <span class="min-w-36 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
-              <input v-model="file.category" class="field-input h-7 w-32 text-11px" aria-label="附件分类">
-              <button type="button" class="text-11px text-danger" @click="removePending(file.localId)">
-                移除
-              </button>
-            </div>
-          </div>
-        </section>
+        <MasterDataAttachmentSection
+          :title="attachmentTitle"
+          :desktop-picker="desktopAttachmentPicker"
+          :attachments="attachments"
+          :pending-attachments="pendingAttachments"
+          :pending-remove-ids="pendingRemoveIds"
+          :pending-restore-ids="pendingRestoreIds"
+          @pick-native="pickNativeFiles"
+          @files="handleFiles"
+          @toggle-existing="toggleExistingAttachment"
+          @remove-pending="removePending"
+          @update-pending-category="updatePendingCategory"
+        />
 
         <section id="section-note" class="panel scroll-mt-4 p-4">
           <SectionHeader title="备注" />
@@ -1094,29 +439,3 @@ onMounted(() => {
     </main>
   </div>
 </template>
-
-<style scoped>
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 0.75rem 1rem;
-  margin-top: 0.75rem;
-}
-
-.field-block {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.form-span-full {
-  grid-column: 1 / -1;
-}
-
-.field-error {
-  color: var(--danger);
-  font-size: 11px;
-  line-height: 1.3;
-}
-</style>

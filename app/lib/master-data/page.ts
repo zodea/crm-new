@@ -1,4 +1,20 @@
-import type { MasterDataOwnerType } from './forms'
+import type {
+  CrewFormDraft,
+  CustomerFormDraft,
+  MasterDataOwnerType,
+  ProjectFormDraft,
+  SupplierFormDraft,
+  TargetCostFormDraft,
+  WorkerFormDraft,
+} from './forms'
+
+export type MasterDataPageDraft
+  = SupplierFormDraft
+    & CustomerFormDraft
+    & CrewFormDraft
+    & WorkerFormDraft
+    & ProjectFormDraft
+    & TargetCostFormDraft
 
 export type FormFooterAction = 'cancel' | 'draft' | 'saveNew' | 'saveSubmit' | 'save'
 

@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { MasterDataOwnerType } from '~/lib/master-data/forms'
-import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
+import type {
+  MasterDataListKind,
+  MasterDataListRow,
+} from '~/stores/master-data-read'
 import { FORM_META } from '~/lib/master-data/page'
 import { toErrorMessage } from '~/lib/util/error'
 
-type SimpleListKind = Extract<MasterDataOwnerType, 'customer' | 'crew' | 'worker' | 'target_cost'>
-type ListRow = Record<string, unknown> & { id: string, name: string }
-
 const props = defineProps<{
-  kind: SimpleListKind
+  kind: MasterDataListKind
 }>()
 
 const { confirm, success, warning, error } = useKitUI()
+const readStore = useMasterDataReadStore()
+const { rowsByKind, loadingByKind } = storeToRefs(readStore)
 const customerStore = useCustomerStore()
 const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
@@ -25,8 +25,10 @@ const stores = {
   target_cost: targetCostStore,
 }
 const search = shallowRef('')
-const rows = shallowRef<ListRow[]>([])
-const loading = shallowRef(false)
+const rows = computed<MasterDataListRow[]>(() => [
+  ...rowsByKind.value[props.kind],
+])
+const loading = computed(() => loadingByKind.value[props.kind])
 const meta = computed(() => FORM_META[props.kind])
 const activeStore = computed(() => stores[props.kind])
 const activeRevision = computed(() => activeStore.value.revision)
@@ -87,88 +89,10 @@ const filtered = computed(() => {
 })
 
 async function load() {
-  loading.value = true
-  try {
-    switch (props.kind) {
-      case 'customer': {
-        const result = await select<Record<string, unknown>>(
-          selectVisibleSql('customers', 'ORDER BY created_at DESC'),
-        )
-        rows.value = result.map(row => ({
-          id: row.id as string,
-          name: row.name as string,
-          aliases: row.aliases,
-          taxNo: row.tax_no,
-          contact: row.contact,
-          contactPhone: row.contact_phone,
-          status: row.status,
-        }))
-        break
-      }
-      case 'crew': {
-        const result = await select<Record<string, unknown>>(
-          selectVisibleSql('crews', 'ORDER BY created_at DESC'),
-        )
-        rows.value = result.map(row => ({
-          id: row.id as string,
-          name: row.name as string,
-          trade: row.trade,
-          contactName: row.contact_name,
-          contactPhone: row.contact_phone,
-          status: row.status,
-        }))
-        break
-      }
-      case 'worker': {
-        const visibleWorkers = selectVisibleSql('workers')
-        const result = await select<Record<string, unknown>>(`
-          SELECT
-            worker.*,
-            crew.name AS crew_name,
-            project.name AS project_name
-          FROM (${visibleWorkers}) AS worker
-          LEFT JOIN crews AS crew ON crew.id = worker.crew_id
-          LEFT JOIN projects AS project ON project.id = worker.current_project_id
-          ORDER BY worker.created_at DESC
-        `)
-        rows.value = result.map(row => ({
-          id: row.id as string,
-          name: row.name as string,
-          trade: row.trade,
-          crewName: row.crew_name,
-          projectName: row.project_name,
-          projectStatus: row.project_status,
-          phone: row.phone,
-        }))
-        break
-      }
-      case 'target_cost': {
-        const visibleTargets = selectVisibleSql('target_costs')
-        const result = await select<Record<string, unknown>>(`
-          SELECT target.*, project.name AS project_name
-          FROM (${visibleTargets}) AS target
-          LEFT JOIN projects AS project ON project.id = target.project_id
-          ORDER BY target.created_at DESC
-        `)
-        rows.value = result.map(row => ({
-          id: row.id as string,
-          name: row.name as string,
-          projectName: row.project_name,
-          isBaselineLabel: row.is_baseline === 1 ? '是' : '否',
-          taxInclusiveTotal: row.tax_inclusive_total,
-          signedContractSum: row.signed_contract_sum,
-          status: row.status,
-        }))
-        break
-      }
-    }
-  }
-  finally {
-    loading.value = false
-  }
+  await readStore.load(props.kind)
 }
 
-async function remove(row: ListRow) {
+async function remove(row: MasterDataListRow) {
   const accepted = await confirm({
     variant: 'simple',
     title: `删除${meta.value.label}`,
