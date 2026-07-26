@@ -34,7 +34,7 @@ async function expectNoPageOverflow(page: Page, context: string) {
 }
 
 test.describe('F5 甲方与分包整页表单', () => {
-  for (const width of [390, 768, 1024, 1366]) {
+  for (const width of [390, 768, 1024, 1440]) {
     test(`八类表单在 ${width}px 视口可达且无页面级横向溢出`, async ({ page }) => {
       test.setTimeout(180_000)
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })

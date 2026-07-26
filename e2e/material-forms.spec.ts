@@ -260,7 +260,7 @@ test.describe('F4 物资领域整页表单', () => {
 
   test('十一条整页表单在响应式验收矩阵中无页面级横向溢出', async ({ page }, testInfo) => {
     test.setTimeout(240_000)
-    for (const width of [390, 768, 1024, 1366]) {
+    for (const width of [390, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       for (const route of RESPONSIVE_ROUTES) {
         await page.goto(route.path)

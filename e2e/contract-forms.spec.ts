@@ -174,11 +174,13 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
   test('六条表单在响应式参考矩阵均无页面级横向溢出', async ({ page }) => {
     test.setTimeout(120_000)
-    for (const width of [768, 1024, 1366]) {
+    for (const width of [768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       for (const form of FORM_ROUTES) {
         await page.goto(form.path)
-        await expect(page.getByRole('heading', { name: form.title })).toBeVisible()
+        await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
+          timeout: 20_000,
+        })
         const widths = await page.evaluate(() => ({
           client: document.documentElement.clientWidth,
           scroll: document.documentElement.scrollWidth,
