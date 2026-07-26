@@ -238,6 +238,86 @@ export function ownerDocumentKindFromRoute(
   return entry?.[0] as OwnerDocumentKind | undefined ?? null
 }
 
+export function validateOwnerDocumentForm(
+  kind: OwnerDocumentKind,
+  draft: OwnerDocumentDraft,
+): Record<string, string> {
+  const errors: Record<string, string> = {}
+  const require = (field: string, label: string, positive = false) => {
+    const value = draft[field]
+    const missing = positive
+      ? !(Number(value) > 0)
+      : typeof value === 'string' ? !value.trim() : value == null
+    if (missing)
+      errors[field] = `${label}为必填项`
+  }
+
+  switch (kind) {
+    case 'owner_change':
+      require('name', '变更名称')
+      require('projectId', '项目')
+      require('contractId', '施工合同')
+      require('applicationDate', '申报日期')
+      require('reason', '变更事由')
+      if (!(draft.lines?.length) && !(
+        Number(draft.approvedTaxInclusiveAmount) > 0
+        || Number(draft.approvedTaxExclusiveAmount) > 0
+      )) {
+        errors.lines = '至少填写一条量价变更，或填写纯金额签证金额'
+      }
+      break
+    case 'owner_report':
+      require('projectId', '项目')
+      require('contractId', '施工合同')
+      require('periodNo', '报量期次')
+      require('applicationDate', '申报日期')
+      if (!draft.lines?.length)
+        errors.lines = '至少填写一条报量明细'
+      break
+    case 'acceptance':
+      require('name', '名称')
+      require('projectId', '项目')
+      require('documentDate', '日期')
+      break
+    case 'final_settlement':
+      require('name', '结算名称')
+      require('projectId', '项目')
+      require('settlementAmount', '结算金额', true)
+      require('submissionDate', '报审日期')
+      break
+    case 'owner_penalty':
+      require('projectId', '项目')
+      require('amount', '罚扣金额', true)
+      require('penaltyDate', '罚扣日期')
+      require('reason', '罚扣事由')
+      break
+    case 'sub_change':
+      require('projectId', '项目')
+      require('supplierId', '分供方')
+      require('contractId', '支出合同')
+      require('changeDate', '变更日期')
+      require('approvedAmount', '审批金额', true)
+      require('reason', '变更事由')
+      break
+    case 'sub_settlement':
+      require('name', '结算名称')
+      require('projectId', '项目')
+      require('supplierId', '分供方')
+      require('contractId', '支出合同')
+      require('totalAmount', '结算金额', true)
+      require('settlementDate', '结算日期')
+      break
+    case 'project_penalty':
+      require('projectId', '项目')
+      require('amount', '罚扣金额', true)
+      require('penaltyDate', '罚扣日期')
+      require('reason', '罚扣事由')
+      break
+  }
+
+  return errors
+}
+
 export function ownerDocumentStatusLabel(status: string): string {
   return {
     draft: '草稿',

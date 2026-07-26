@@ -1,20 +1,12 @@
 <script setup lang="ts">
-import type {
-  FileRefChanges,
-  FileRefDraft,
-  FileRefRecord,
-} from '~/lib/forms/file-refs'
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type {
-  AcceptanceLifecycleTarget,
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
   OwnerDocumentKind,
   OwnerDocumentSaveAction,
-  PenaltyDeductionView,
 } from '~/lib/owner-document/forms'
-import { isTauri } from '@tauri-apps/api/core'
 import { useDebounceFn } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
@@ -23,11 +15,10 @@ import {
   ownerDocumentFormPath,
   ownerDocumentLineAmount,
   ownerDocumentStatusLabel,
+  validateOwnerDocumentForm,
 } from '~/lib/owner-document/page'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
-
-type PendingFileRef = FileRefDraft & { localId: string }
 
 const props = defineProps<{
   kind: OwnerDocumentKind
@@ -52,69 +43,57 @@ useTabTitle(title)
 
 const draft = ref<OwnerDocumentDraft>(ownerDocumentDefaults(props.kind))
 const boqLines = shallowRef<OwnerDocumentBoqLine[]>([])
-const attachments = shallowRef<FileRefRecord[]>([])
-const pendingAttachments = shallowRef<PendingFileRef[]>([])
-const pendingRemoveIds = shallowRef<string[]>([])
-const pendingRestoreIds = shallowRef<string[]>([])
+const {
+  attachments,
+  pendingAttachments,
+  pendingRemoveIds,
+  pendingRestoreIds,
+  desktopAttachmentPicker,
+  dirty: attachmentsDirty,
+  reset: resetAttachments,
+  clearPending: clearPendingAttachments,
+  changes: attachmentChanges,
+  handleFiles,
+  pickNativeFiles,
+  toggleExisting: toggleExistingAttachment,
+  removePending,
+  patchPending,
+} = useOwnerDocumentFormAttachments()
 const fieldErrors = shallowRef<Record<string, string>>({})
-const penaltyDeductions = shallowRef<PenaltyDeductionView[]>([])
-const deductionSettlementId = shallowRef<string | null>(null)
-const deductionAmount = shallowRef<number | null>(null)
-const deductionNote = shallowRef('')
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
-const lifecycleLoading = shallowRef(false)
 const closeAfterSave = shallowRef(true)
-const desktopAttachmentPicker = shallowRef(false)
 const savedSnapshot = shallowRef('')
 let allowLeave = false
 
 const status = computed(() => String(draft.value.status ?? 'draft'))
 const editable = computed(() => status.value === 'draft' || status.value === 'rejected')
-const auditMode = computed(() => props.kind === 'owner_report' && status.value === 'reported')
-const canApproveChange = computed(() =>
-  props.kind === 'owner_change' && status.value === 'submitted',
-)
-const canDeductPenalty = computed(() =>
-  props.kind === 'project_penalty'
-  && ['pending', 'repairing', 'repaired_self', 'repaired_other'].includes(status.value)
-  && Number(draft.value.remainingDeductionAmount ?? draft.value.amount ?? 0) > 0,
-)
-const acceptanceAction = computed<{
-  label: string
-  message: string
-  target: AcceptanceLifecycleTarget
-} | null>(() => {
-  if (props.kind !== 'acceptance')
-    return null
-  if (status.value === 'submitted') {
-    return {
-      label: '确认验收',
-      message: '确认验收结论后，单据进入已验收状态。',
-      target: 'accepted',
-    }
-  }
-  if (status.value === 'accepted') {
-    return {
-      label: '进入保修',
-      message: '进入保修后，单据类型切换为保修并开始履约跟踪。',
-      target: 'warranty',
-    }
-  }
-  if (status.value === 'warranty') {
-    return {
-      label: '确认保修到期',
-      message: '确认后将结束本单据的保修生命周期。',
-      target: 'expired',
-    }
-  }
-  return null
+const {
+  loading: lifecycleLoading,
+  penaltyDeductions,
+  deductionSettlementId,
+  deductionAmount,
+  deductionNote,
+  auditMode,
+  canApproveChange,
+  canDeductPenalty,
+  acceptanceAction,
+  refreshDeductions,
+  fetchSettlements,
+  approveChange,
+  moveAcceptance,
+  auditReport,
+  deductPenalty,
+} = useOwnerDocumentLifecycle({
+  kind: () => props.kind,
+  draft,
+  routeId,
+  label: computed(() => meta.value.label),
+  refresh: initialize,
 })
 const dirty = computed(() =>
   JSON.stringify(draft.value) !== savedSnapshot.value
-  || pendingAttachments.value.length > 0
-  || pendingRemoveIds.value.length > 0
-  || pendingRestoreIds.value.length > 0,
+  || attachmentsDirty.value,
 )
 const footerActions = computed<FormFooterAction[]>(() =>
   editable.value
@@ -153,20 +132,6 @@ async function fetchContracts(keyword: string): Promise<LookupOption[]> {
     projectId,
     ownerSide ? 'owner' : 'expenditure',
     supplierId,
-    keyword,
-  )
-}
-
-async function fetchSettlements(keyword: string): Promise<LookupOption[]> {
-  const projectId = typeof draft.value.projectId === 'string'
-    ? draft.value.projectId
-    : ''
-  if (!projectId)
-    return []
-  return store.loadSettlementOptions(
-    projectId,
-    String(draft.value.supplierId ?? ''),
-    String(draft.value.contractId ?? ''),
     keyword,
   )
 }
@@ -270,19 +235,19 @@ const refreshContractSummary = useDebounceFn(async () => {
 async function initialize() {
   loading.value = true
   fieldErrors.value = {}
-  resetPendingAttachments()
+  clearPendingAttachments()
   try {
     const id = routeId.value
     if (!id) {
       draft.value = ownerDocumentDefaults(props.kind)
-      attachments.value = []
-      penaltyDeductions.value = []
+      resetAttachments()
+      await refreshDeductions()
     }
     else {
-      const [record, files, deductions] = await Promise.all([
+      const [record, files] = await Promise.all([
         store.loadOne(props.kind, id),
         store.loadAttachments(props.kind, id, true),
-        props.kind === 'project_penalty' ? store.loadDeductions(id) : Promise.resolve([]),
+        refreshDeductions(id),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -294,8 +259,7 @@ async function initialize() {
         ...ownerDocumentDefaults(props.kind),
         ...record,
       }
-      attachments.value = files
-      penaltyDeductions.value = deductions
+      resetAttachments(files)
     }
     await refreshBoqLines()
     await refreshContractSummary()
@@ -359,96 +323,12 @@ function clearFieldError(field: string) {
 }
 
 function validateSubmit(): boolean {
-  const errors: Record<string, string> = {}
-  const require = (field: string, label: string, positive = false) => {
-    const value = draft.value[field]
-    const missing = positive
-      ? !(Number(value) > 0)
-      : typeof value === 'string' ? !value.trim() : value == null
-    if (missing)
-      errors[field] = `${label}为必填项`
-  }
-  switch (props.kind) {
-    case 'owner_change':
-      require('name', '变更名称')
-      require('projectId', '项目')
-      require('contractId', '施工合同')
-      require('applicationDate', '申报日期')
-      require('reason', '变更事由')
-      if (!(draft.value.lines?.length) && !(
-        Number(draft.value.approvedTaxInclusiveAmount) > 0
-        || Number(draft.value.approvedTaxExclusiveAmount) > 0
-      )) {
-        errors.lines = '至少填写一条量价变更，或填写纯金额签证金额'
-      }
-      break
-    case 'owner_report':
-      require('projectId', '项目')
-      require('contractId', '施工合同')
-      require('periodNo', '报量期次')
-      require('applicationDate', '申报日期')
-      if (!draft.value.lines?.length)
-        errors.lines = '至少填写一条报量明细'
-      break
-    case 'acceptance':
-      require('name', '名称')
-      require('projectId', '项目')
-      require('documentDate', '日期')
-      break
-    case 'final_settlement':
-      require('name', '结算名称')
-      require('projectId', '项目')
-      require('settlementAmount', '结算金额', true)
-      require('submissionDate', '报审日期')
-      break
-    case 'owner_penalty':
-      require('projectId', '项目')
-      require('amount', '罚扣金额', true)
-      require('penaltyDate', '罚扣日期')
-      require('reason', '罚扣事由')
-      break
-    case 'sub_change':
-      require('projectId', '项目')
-      require('supplierId', '分供方')
-      require('contractId', '支出合同')
-      require('changeDate', '变更日期')
-      require('approvedAmount', '审批金额', true)
-      require('reason', '变更事由')
-      break
-    case 'sub_settlement':
-      require('name', '结算名称')
-      require('projectId', '项目')
-      require('supplierId', '分供方')
-      require('contractId', '支出合同')
-      require('totalAmount', '结算金额', true)
-      require('settlementDate', '结算日期')
-      break
-    case 'project_penalty':
-      require('projectId', '项目')
-      require('amount', '罚扣金额', true)
-      require('penaltyDate', '罚扣日期')
-      require('reason', '罚扣事由')
-      break
-  }
+  const errors = validateOwnerDocumentForm(props.kind, draft.value)
   fieldErrors.value = errors
   const messages = Object.values(errors)
   if (messages.length)
     warning(`${messages[0]}（共 ${messages.length} 处）`)
   return messages.length === 0
-}
-
-function attachmentChanges(): FileRefChanges {
-  return {
-    add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
-    removeIds: pendingRemoveIds.value,
-    restoreIds: pendingRestoreIds.value,
-  }
-}
-
-function resetPendingAttachments() {
-  pendingAttachments.value = []
-  pendingRemoveIds.value = []
-  pendingRestoreIds.value = []
 }
 
 async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooterAction) {
@@ -473,7 +353,7 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
       attachmentChanges(),
     )
     success(action === 'submit' ? `${meta.value.postLabel.replace('保存并', '')}成功` : '草稿已保存')
-    resetPendingAttachments()
+    clearPendingAttachments()
     fieldErrors.value = {}
     if (action === 'submit' && closeAfterSave.value) {
       allowLeave = true
@@ -524,211 +404,6 @@ async function handleFooterAction(action: FormFooterAction) {
   await persist(action === 'saveSubmit' ? 'submit' : 'draft', action)
 }
 
-async function approveChange() {
-  const id = routeId.value
-  if (!id)
-    return
-  const accepted = await confirm({
-    variant: 'cascade',
-    title: '确认甲方签证',
-    message: '签证后将生成并锁定收入变更台账，量价事实不可直接回退。',
-    requireTyping: String(draft.value.name ?? draft.value.no ?? meta.value.label),
-    impact: [
-      { label: '锁定收入变更台账', n: 1 },
-      { label: '变更明细', n: draft.value.lines?.length ?? 0 },
-    ],
-    confirmLabel: '确认签证',
-  })
-  if (!accepted)
-    return
-  lifecycleLoading.value = true
-  try {
-    const today = new Date().toISOString().slice(0, 10)
-    await store.approveOwnerChange(id, today)
-    success('甲方签证已生效，收入变更台账已锁定')
-    await initialize()
-  }
-  catch (cause) {
-    error(`签证失败：${toErrorMessage(cause)}`)
-  }
-  finally {
-    lifecycleLoading.value = false
-  }
-}
-
-async function moveAcceptance() {
-  const id = routeId.value
-  const action = acceptanceAction.value
-  if (!id || !action)
-    return
-  const accepted = await confirm({
-    variant: 'simple',
-    title: action.label,
-    message: action.message,
-    confirmLabel: action.label,
-  })
-  if (!accepted)
-    return
-  lifecycleLoading.value = true
-  try {
-    await store.transitionAcceptance(id, action.target)
-    success(`${action.label}成功`)
-    await initialize()
-  }
-  catch (cause) {
-    error(`${action.label}失败：${toErrorMessage(cause)}`)
-  }
-  finally {
-    lifecycleLoading.value = false
-  }
-}
-
-async function auditReport() {
-  const id = routeId.value
-  if (!id)
-    return
-  const lines = (draft.value.lines ?? []).map(line => ({
-    boqLineId: String(line.boqLineId ?? ''),
-    auditedQty: Number(line.auditedQty),
-    auditedAmount: (Number(line.auditedQty) || 0) * (Number(line.unitPrice) || 0),
-  }))
-  if (lines.some(line => !line.boqLineId || !Number.isFinite(line.auditedQty) || line.auditedQty < 0)) {
-    warning('请为每条报量明细填写有效的审定量')
-    return
-  }
-  const auditedAmount = lines.reduce((sum, line) => sum + line.auditedAmount, 0)
-  const accepted = await confirm({
-    variant: 'simple',
-    title: '确认甲方审定',
-    message: `本次审定金额 ¥${auditedAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，确认后锁定审定量。`,
-    confirmLabel: '确认审定',
-  })
-  if (!accepted)
-    return
-  lifecycleLoading.value = true
-  try {
-    await store.auditOwnerReport(id, { auditedAmount, lines })
-    success('甲方报量已审定')
-    await initialize()
-  }
-  catch (cause) {
-    error(`审定失败：${toErrorMessage(cause)}`)
-  }
-  finally {
-    lifecycleLoading.value = false
-  }
-}
-
-async function deductPenalty() {
-  const id = routeId.value
-  if (!id || !deductionSettlementId.value || !(Number(deductionAmount.value) > 0)) {
-    warning('请选择结算单并填写大于 0 的抵扣金额')
-    return
-  }
-  const accepted = await confirm({
-    variant: 'cascade',
-    title: '确认结算抵扣',
-    message: `将在所选分包结算中抵扣 ¥${Number(deductionAmount.value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，并保存独立抵扣关系。`,
-    requireTyping: String(draft.value.no ?? meta.value.label),
-    impact: [
-      { label: '项目罚扣记录', n: 1 },
-      { label: '分包结算抵扣', n: 1 },
-    ],
-    confirmLabel: '执行抵扣',
-  })
-  if (!accepted)
-    return
-  lifecycleLoading.value = true
-  try {
-    await store.deductProjectPenalty(
-      id,
-      deductionSettlementId.value,
-      Number(deductionAmount.value),
-      deductionNote.value,
-    )
-    success('项目罚扣已写入结算抵扣')
-    deductionSettlementId.value = null
-    deductionAmount.value = null
-    deductionNote.value = ''
-    await initialize()
-  }
-  catch (cause) {
-    error(`抵扣失败：${toErrorMessage(cause)}`)
-  }
-  finally {
-    lifecycleLoading.value = false
-  }
-}
-
-function appendPendingAttachments(files: FileRefDraft[]) {
-  const activeCount = attachments.value.filter(file => !file.deletedAt).length
-    - pendingRemoveIds.value.length
-    + pendingRestoreIds.value.length
-  const available = Math.max(9 - activeCount - pendingAttachments.value.length, 0)
-  if (files.length > available)
-    warning(`每张单据最多保留 9 份附件，本次只加入前 ${available} 份`)
-  pendingAttachments.value = [
-    ...pendingAttachments.value,
-    ...files.slice(0, available).map((file, index) => ({
-      ...file,
-      localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
-      category: file.category || '业务附件',
-    })),
-  ]
-}
-
-function handleFiles(files: File[]) {
-  appendPendingAttachments(files.map(file => ({
-    fileName: file.name,
-    fileSize: file.size,
-    mimeType: file.type,
-  })))
-}
-
-async function pickNativeFiles() {
-  try {
-    const [{ open }, { stat }, { basename }] = await Promise.all([
-      import('@tauri-apps/plugin-dialog'),
-      import('@tauri-apps/plugin-fs'),
-      import('@tauri-apps/api/path'),
-    ])
-    const selected = await open({ multiple: true, directory: false })
-    const paths = selected == null ? [] : Array.isArray(selected) ? selected : [selected]
-    const files = await Promise.all(paths.map(async filePath => ({
-      fileName: await basename(filePath),
-      filePath,
-      fileSize: (await stat(filePath)).size,
-    })))
-    appendPendingAttachments(files)
-  }
-  catch (cause) {
-    error(`选择附件失败：${toErrorMessage(cause)}`)
-  }
-}
-
-function toggleExistingAttachment(id: string) {
-  const attachment = attachments.value.find(file => file.id === id)
-  if (attachment?.deletedAt) {
-    pendingRestoreIds.value = pendingRestoreIds.value.includes(id)
-      ? pendingRestoreIds.value.filter(item => item !== id)
-      : [...pendingRestoreIds.value, id]
-    return
-  }
-  pendingRemoveIds.value = pendingRemoveIds.value.includes(id)
-    ? pendingRemoveIds.value.filter(item => item !== id)
-    : [...pendingRemoveIds.value, id]
-}
-
-function removePending(localId: string) {
-  pendingAttachments.value = pendingAttachments.value.filter(file => file.localId !== localId)
-}
-
-function patchPending(localId: string, patch: Partial<PendingFileRef>) {
-  pendingAttachments.value = pendingAttachments.value.map(file =>
-    file.localId === localId ? { ...file, ...patch } : file,
-  )
-}
-
 async function leaveToList() {
   if (dirty.value) {
     const leave = await confirm({
@@ -761,10 +436,7 @@ onBeforeRouteLeave(async () => {
   return leave
 })
 
-onMounted(() => {
-  desktopAttachmentPicker.value = isTauri()
-  void initialize()
-})
+onMounted(() => void initialize())
 </script>
 
 <template>
