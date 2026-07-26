@@ -243,7 +243,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 **文案与数据**
 - AI 味营销词（「赋能」「一站式」「极致」之类）；「点击探索」「下滑查看」等填充引导。
 - 假人名假公司（John Doe/Acme/某某公司）、整数假数（99.99%/50%）——演示数据一律取自真实数据蓝本（`数据蓝本/`，红圈收尾链为空就留空态，**勿造数据**）。
-- 暂缓页不补演示 toast、不伪造成功状态、不以删功能换视觉相似（复刻纪律，见 [app-ui-reproduction-status.md](app-ui-reproduction-status.md)）。
+- 未闭环页面不补演示 toast、不伪造成功状态、不以删功能换视觉相似（状态口径见 [ui-implementation-status.md](ui-implementation-status.md)）。
 - 金额两位小数完整展示，禁省略号截断。
 
 ---
@@ -281,7 +281,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 ### 8.3 页面对齐状态——只指向不复制
 
-已对齐/暂缓清单以 [app-ui-reproduction-status.md](app-ui-reproduction-status.md) 为准。重构优先级建议：**① 按钮语言全站收敛（§8.2①）→ ② 详情/编辑页批次（合同/项目/分供方/发票编辑）→ ③ 暂缓页解锁后对齐（`/`、`/material/*`）**。理由：按钮出入是每屏都可见的「气质出入」，修一次全站受益；页面批次按 issue 节奏走。
+未实现与已搭未闭环清单以 [ui-implementation-status.md](ui-implementation-status.md) 为准；具体重构顺序以对应 GitHub open Issues 的优先级和依赖为准，不在品味文档维护排期快照。
 
 ### 8.4 重构工作方式
 

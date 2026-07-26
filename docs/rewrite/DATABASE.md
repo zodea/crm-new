@@ -375,13 +375,13 @@ CREATE TABLE payment_application_invoice_allocations (
 ```sql
 CREATE TABLE delivery_records (
   id         TEXT PRIMARY KEY,
-  projectId  TEXT NOT NULL,          -- 核对归档前强制归项目；上传时归属拦截仍是后续交互目标；工地名经 project_aliases 归一而来
+  projectId  TEXT NOT NULL,          -- 写入持久化记录前强制归项目；工地名经 project_aliases 归一而来
   supplierId TEXT,                   -- 可空=归档库左树「⚠未区分分供方」兜底节点
   rawSiteText TEXT,                  -- OCR/文件夹推断的工地原文本，仅留痕追溯，不参与任何键（2026-07-06 定）
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
-  archived  INTEGER DEFAULT 0,       -- 核对完成即自动归档（核对是归档唯一前置）
+  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；核对完成不自动置位
   stored    INTEGER DEFAULT 0,       -- 已入库（写材料数据，与归档并行的两条路）
   reviewFlag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
   note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT

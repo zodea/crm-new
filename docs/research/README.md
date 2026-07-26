@@ -1,63 +1,22 @@
-﻿# 识别域（发票 + 送货单）调研与规划总览
+# 调研与历史证据
 
-> 生成日期：2026-07-05（自主生成，待用户检查）
-> 缘起：读 #47 + 现状 → 确定优先做发票/送货单识别 → 你提供 `ppocrv6-studio` 参考 + `zodea/invoice-recognition-app` 现成实现 → 调研 OCR 成本/隐私/竞品 UX → 移植方案 + 策略定案。
+> **本目录全部是非权威源。** 它回答“当时看到了什么、为什么形成某个方向”，不回答“现在必须怎么实现”。当前约束请回到 [`docs/README.md`](../README.md)、ADR、页面蓝本和 GitHub open Issues。
 
-这是一次 grill + 多 Workflow 调研的产物索引。**先看本页的"已定决策"和"待你拍板"两节即可掌握全局**，细节钻进对应文档。
+## 索引
 
----
+| 文档 | 用途 | 现行权威 |
+| --- | --- | --- |
+| [`red-circle-ui-gap-2026-07-11.md`](./red-circle-ui-gap-2026-07-11.md) | 红圈系统结构与交互差距走查，保留来源证据 | ADR 0013–0015、界面状态页、open Issues |
+| [`architecture-review-2026-07-05.html`](./architecture-review-2026-07-05.html) | 早期架构扫描报告 | `docs/rewrite/ARCHITECTURE.md`、ADR |
+| [`invoice-recognition-app-port-plan.md`](./invoice-recognition-app-port-plan.md) | 旧识别应用可迁移能力调查 | ADR 0006、当前 `app/lib/recognize/` |
+| [`ocr-recognition-strategy.md`](./ocr-recognition-strategy.md) | OCR 引擎、隐私与成本论证 | ADR 0006 |
+| [`ocr-ux-benchmark.md`](./ocr-ux-benchmark.md) | OCR 工作台体验参考 | 当前设计稿、#42、#113 |
+| [`project-switcher-patterns.md`](./project-switcher-patterns.md) | 项目切换器参考模式 | 当前设计稿和相关 Issue |
+| [`issue-tracker-audit-2026-07-06.md`](./issue-tracker-audit-2026-07-06.md) | 某一时点的 Issue 审计 | GitHub 当前状态 |
 
-## 📁 产出文档清单
+## 使用规则
 
-| 文档 | 回答什么 |
-|---|---|
-| [invoice-recognition-app-port-plan.md](invoice-recognition-app-port-plan.md) | 你现成实现哪些能搬、搬到哪、怎么适配；完整正则库精华；送货单四件套映射；新旧UI取舍；落地顺序；风险 |
-| [ocr-recognition-strategy.md](ocr-recognition-strategy.md) | **直接回答你四问**：能用哪些/省钱方案/是否必联网/是否泄漏；推荐的完全离线管线 |
-| [ocr-ux-benchmark.md](ocr-ux-benchmark.md) | 业界优秀发票/送货单识别产品的排版布局与功能；针对"简陋/不连贯"的连贯性改法；按 ROI 排序的改进清单 |
-| [../adr/0006-ocr-paddleocr-vl-single-model.md](../adr/0006-ocr-paddleocr-vl-single-model.md) | OCR 架构决策定案（本地免费为主、可完全离线、云端默认关闭） |
-| [../prd/delivery-recognition.md](../prd/delivery-recognition.md) | 《送货单识别》PRD（六阶段 + 入库/归档双路径 + 单价对比 + 用户故事 + 测试 + 落地顺序） |
-
----
-
-## ✅ 本次已定的决策（grill 拍板 + 调研支撑）
-
-1. ~~**总路线三段式**：KitUI 原语改版收口（#75→#77→#78→#79→#80→#81）→ #47 核心底座（#52软删→#53seed→#50/#51 atoms/table→#54/#56页签）→ 识别域。**底座先做，不跳。**~~
-   ⚠ **2026-07-06 已被用户裁定取代**：执行顺序按 wave-1 队列 handoff 既定排程（#51 完成后下一批 #52/#53/#54，见 `d27e554`），**KitUI 改版线不提前插队**，#77/#81 仅作为 #58/#62 的 Blocked-by 依赖在轮到时生效（裁定记录见 #84 关闭评论）。「识别域在底座之后」仍然有效。原文保留作历史留档。
-2. **发票识别 与 送货单识别 分开**（两个独立工作台，只共用底层原语），**送货单单独出 PRD**（已成文，把它从 #47 倒数第二波提前）。
-3. **OCR 用真识别、且要打磨质量**（你的原话：尽快出界面但要好作品）。
-4. **OCR 引擎：PaddleOCR-VL 单模型**（ADR-0006，已从"三层多引擎"收敛）：
-   - **一个 0.9B 多模态模型（PaddleOCR-VL-1.6）全包** OCR+表格+公式+手写+版面 → 结构化 Markdown（质量 > GPT-4o）。
-   - **本地自托管为主**（MLX-VLM 最快 / llama.cpp 兼容广）：离线、零泄漏、Apache-2.0、0.9B 极轻。**云端 aistudio 仅开发期跑脱敏图。**（⚠ 2026-07-06 环境更正：实际 **Windows 为主 + Mac 需可用**，后端首选改 **llama.cpp**、MLX 降为 Mac 可选加速，见 ADR 0006；本页调研时误设 macOS 唯一环境，原文留档）
-   - **结构化用规则正则**（现成 vl-parse/invoice-parse）；本地文本 LLM 降为极个别怪版式的可选兜底。手写保留人工复核。
-   - ✅ **好处**：一个模型没有"多模型互相干扰"、无需 Ollama 内存调度；硬件门槛大降（0.9B 而非 7B）；VL 版面区域支撑"点字段↔高亮原图"。
-5. **默认完全离线、零成本、零泄漏**（你的隐私/成本诉求）；云端一律默认关闭，仅极个别难件逐张确认才上云。
-6. **你四问的结论**：省钱=全本地开源免费零边际成本（只摊 Mac 内存）；是否必联网=**不必**（本地推理拔网可跑）；是否泄漏=**本地零泄漏**（数据不出机器），云端才有留存面、财务数据默认不走云。
-7. **引擎定为 PaddleOCR-VL**：弃用源项目的 `@paddlejs-models/ocr`（旧小模型、无坐标）；也不用初版设想的 PP-OCRv6+Ollama 多引擎——**统一到一个 PaddleOCR-VL-1.6**。源项目 `ocr-vl.js` 已集成此模型的云端协议，本地自托管只需把端点指向 localhost。
-8. **移植策略**：源项目的正则/结构化纯函数 lift-as-is 搬进 `app/lib/recognize/`，持久化改 SQLite；旧版更简洁的 UX 保留、新版"变差"的重壳（侧边栏/多阶段状态机/独立路由）不搬。
-
----
-
-## ⚠ 待你拍板的问题（休息后检查，逐条给了推荐）
-
-1. ~~本地引擎选型~~ → ✅ **已定**：PaddleOCR-VL-1.6 单模型（你拍板"用 PaddleOCR-VL 解决"）。
-2. ~~云VL CORS 方案~~ → ✅ **已解**：本地自托管走 localhost 无 CORS；云端 aistudio 仅开发期脱敏用。
-3. ~~**送货单工地名 → 新app `project` 的绑定规则**~~ → ✅ **已定**（2026-07-06 grill）：`project_aliases` 别名表归一（命中自动绑/未命中人工确认后写回）；自然键全 ID 化（projectId+supplierId+orderNo），工地原文本仅留痕不作键。见 CONTEXT.md「工地」+ DATABASE.md §2.5。
-4. ~~**你的 Mac 机型 / 内存**~~ → ✅ **已解**（2026-07-06）：环境为 **Windows 为主**（Ryzen 5 5600 / 16GB / RTX 4060，已实测），llama.cpp CUDA 跑 0.9B 富余、无需激进量化；Mac 机型待真启用 MLX 加速时再问。
-5. ~~**送货单 PRD 是否发 GitHub Issue**~~ → ✅ **已办**（2026-07-06）：不新建——既有 **#42** 已是承接 issue（其评论明确承接 #21/#22 未完成部分+本 PRD），已评论挂 PRD 定稿 + 前置决策清零，标签 needs-triage → ready-for-agent + P2。
-6. ~~**手写送货单不做全自动**~~ → ✅ **已确认**（2026-07-06 用户拍板）：接受约束——人工校对是主流程环节，手写件必过人眼；VL 手写质量后续抽样实测定置信阈值。
-
----
-
-## ✅ 全部调研已收口
-
-- **OCR 成本研究**：那条多 agent Workflow 卡死了（0 字节输出、未返回），按你"卡顿就直接生成文档"的指示，我用一次快速搜索补齐了云端定价，写进 `ocr-recognition-strategy.md` §5.1。
-- **结论有个反转**：云端视觉大模型其实**很便宜**（每月几百到两千张仅几毛到几块钱，Qwen-VL-Max ≈ $0.0003/张）——所以"是否收费"不是真拦路虎，**真正让你留在本地的理由是隐私（数据出机器），不是钱**。离线优先是隐私驱动。
-
----
-
-## 🔜 建议的下一步（你回来拍板后）
-
-1. 拍板上面 6 个待决项（尤其引擎选型）。
-2. 若确认 PP-OCRv6：把蓝本"本地 PaddleOCR"文案对齐为 PP-OCRv6，`ocr-settings` 引擎项更新。
-3. 按落地顺序**先做纯逻辑层**（`app/lib/recognize/` 搬正则 + 单测，零 UI 零底座依赖，最值钱最低风险）——这一步现在就能开工，不必等底座。
-4. 识别 UI 组件待核心底座（KitAtoms/KitTable/页签/软删）就位后实装。
+- 调研结论被采纳后，应写入 ADR、`CONTEXT.md`、`DATABASE.md` 或页面蓝本；这里保留论证，不复制为第二套规格。
+- 文件顶部必须写清采集日期、样本和“非权威源”。
+- “待拍板”“下一步”“当前状态”等快照文字超过有效期后，不据此排期；以 GitHub 当前 Issue 为准。
+- 真实业务数据、客户名称、原始票据和未脱敏截图不得提交。

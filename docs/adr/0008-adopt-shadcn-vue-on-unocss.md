@@ -1,7 +1,7 @@
 # 采纳 shadcn-vue（reka-ui + UnoCSS 桥接），退役自研 KitUI
 
 > 状态：已采纳（2026-07-05）
-> 影响：`app/composables/useKitUI.ts`、`app/components/shared/KitUIHost.vue` 及其子件、`app/components/ui/*`、`docs/design/kit-ui-component-specs.md`、`docs/design/interaction-style-references.md`、`docs/dc-rebuild/INTERACTION-PLAYBOOK.md`、`CONTEXT.md`「原语（KitUI 原语）」定义、`CLAUDE.md`「交互原语设计语言」段、ADR 0003（confirm 承载技术改述）。
+> 影响：`app/composables/useKitUI.ts`、`app/components/shared/KitUIHost.vue` 及其子件、`app/components/ui/*`、`docs/design/kit-ui-component-specs.md`、`docs/design/interaction-style-references.md`、`CONTEXT.md`「原语（KitUI 原语）」定义、ADR 0003（confirm 承载技术改述）。
 
 ## 背景
 
