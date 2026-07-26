@@ -16,7 +16,6 @@ test('分供方 CRUD：新增编辑、详情双页联动、页签复用与 simpl
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/base/supplier')
-  await page.waitForLoadState('networkidle')
 
   await page.getByRole('button', { name: '新增分供方', exact: true }).click()
   await expect(page).toHaveURL('/base/supplier/form')
@@ -83,7 +82,6 @@ test('分供方 cascade 删除：打名门控、预提交撤销、最终删除�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/base/supplier')
-  await page.waitForLoadState('networkidle')
   await searchSupplier(page, CASCADE_NAME)
 
   const openCascade = async () => {

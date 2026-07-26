@@ -14,7 +14,6 @@ test('项目列表↔详情：详情编辑联动列表、同项目复用页签',
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
 
   const tabBar = page.getByRole('navigation', { name: '已打开页面' })
 
@@ -55,7 +54,6 @@ test('项目详情：项目被软删后，其详情页签落到「不存在」�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
 
   // 建一个无下游的新项目并打开其详情页签。
   await page.getByRole('button', { name: '新增项目' }).click()

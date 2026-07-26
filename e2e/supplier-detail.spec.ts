@@ -8,7 +8,6 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/base/supplier')
-  await page.waitForLoadState('networkidle')
   await page.getByPlaceholder('搜索公司名、税号、简称…').fill(SUPPLIER_NAME)
   await page.getByRole('link', { name: SUPPLIER_NAME, exact: true }).click()
   await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004$/)

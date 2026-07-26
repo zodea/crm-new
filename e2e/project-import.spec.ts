@@ -10,7 +10,6 @@ test('项目导入：从列表触发映射页签，导入后真实新增行并�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
   await expect(page.getByText('共 12 个')).toBeVisible()
 
   // 从项目列表工具栏触发导入（实体触发、模板隐含）。

@@ -16,7 +16,6 @@ test('项目列表：新增 → 软删 → 10 秒内撤回恢复', async ({ page
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
   await expect(page.getByRole('link', { name: '合和新城' })).toBeVisible()
 
   // 新增：整页表单填完提交必填项，lookup 保存真实 customer_id。
