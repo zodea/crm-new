@@ -34,13 +34,9 @@ async function expectNoPageOverflow(page: Page, context: string) {
 }
 
 test.describe('F5 甲方与分包整页表单', () => {
-  test('八类表单在响应式验收矩阵中可达且无页面级横向溢出', async ({ page }) => {
-    test.setTimeout(240_000)
-    await page.goto(ROUTES[0][0])
-    await expect(page.getByRole('heading', { name: ROUTES[0][1] })).toBeVisible({
-      timeout: 60_000,
-    })
-    for (const width of [390, 768, 1024, 1366]) {
+  for (const width of [390, 768, 1024, 1366]) {
+    test(`八类表单在 ${width}px 视口可达且无页面级横向溢出`, async ({ page }) => {
+      test.setTimeout(180_000)
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       for (const [path, title] of ROUTES) {
         await page.goto(path)
@@ -49,8 +45,8 @@ test.describe('F5 甲方与分包整页表单', () => {
         })
         await expectNoPageOverflow(page, `${path} @ ${width}px`)
       }
-    }
-  })
+    })
+  }
 
   test('甲方量价变更复用真实 BOQ，附件随单提交并完成签证锁定', async ({ page }) => {
     test.setTimeout(120_000)
