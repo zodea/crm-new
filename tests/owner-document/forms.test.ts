@@ -170,6 +170,30 @@ describe('f5 甲方/分包单据领域事务', () => {
     await expect(
       store.removeForm('owner_change', saved.id),
     ).rejects.toThrow('已签证变更不可直接删除')
+
+    const pureAmount = await store.saveForm('owner_change', {
+      no: 'BQ-OWNER-PURE-001',
+      name: '纯金额现场签证',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentType: 'site_visa',
+      applicationDate: '2026-07-21',
+      approvedTaxInclusiveAmount: 88,
+      approvedTaxExclusiveAmount: 80,
+      reason: '仅确认金额、不调整量价',
+      lines: [],
+    }, 'submit')
+    await store.approveOwnerChange(pureAmount.id, '2026-07-27')
+    expect(await loadOwnerDocumentForm('owner_change', pureAmount.id)).toMatchObject({
+      status: 'approved',
+      sourceLocked: true,
+      approvedTaxInclusiveAmount: 88,
+      approvedTaxExclusiveAmount: 80,
+      lines: [],
+    })
+    await expect(
+      store.removeForm('owner_change', pureAmount.id),
+    ).rejects.toThrow('已生效纯金额签证不可直接删除')
   })
 
   it('月度报量保留自动完成量、申报量和审定量，不复制第二套完成事实', async () => {

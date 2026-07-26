@@ -930,6 +930,7 @@ async function loadOwnerChange(id: string): Promise<Record<string, unknown> | nu
       reason: ledger.reason,
       status: ledger.status,
       statusNote: ledger.status_note,
+      sourceLocked: numberValue(ledger.source_locked) === 1,
       note: ledger.note,
       totalAmount: numberValue(ledger.tax_inc_amount),
       lines: [],
@@ -1368,6 +1369,15 @@ export async function deleteOwnerDocumentForm(
       if (order?.status === 'approved')
         throw new Error('已签证变更不可直接删除，请在 BOQ 工作区执行级联二次确认')
     }
+    if (kind === 'owner_change' && table === 'owner_change_orders') {
+      const [ledger] = await tx.select<{ status: string }>(
+        `SELECT status FROM owner_change_orders
+         WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (ledger?.status === 'approved')
+        throw new Error('已生效纯金额签证不可直接删除，请新建更正单留痕')
+    }
     return softDelete(tx, table, id)
   })
 }
@@ -1428,9 +1438,30 @@ export async function approveOwnerChange(
       `SELECT id FROM boq_change_orders WHERE id = ? AND deleted_at IS NULL`,
       [id],
     )
-    if (!order)
-      throw new Error('纯金额签证请在台账中确认，量价变更才执行 BOQ 签证')
-    await approveBoqChangeOrder(tx, id, approvedAt)
+    if (order) {
+      await approveBoqChangeOrder(tx, id, approvedAt)
+      return
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(approvedAt))
+      throw new Error('签证日期格式必须为 yyyy-mm-dd')
+    const [ledger] = await tx.select<{ id: string, source_type: string, status: string }>(
+      `SELECT id, source_type, status
+       FROM owner_change_orders
+       WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (!ledger || ledger.source_type !== 'manual')
+      throw new Error('纯金额签证不存在或已删除')
+    if (ledger.status === 'approved')
+      throw new Error('该纯金额签证已生效')
+    if (ledger.status !== 'submitted')
+      throw new Error('只有已上报纯金额签证可以生效')
+    await withUpdateLog(tx, 'owner_change_orders', id, () => tx.execute(`
+      UPDATE owner_change_orders
+      SET approval_date = ?, status = 'approved', status_note = '甲方已签证',
+          source_locked = 1, updated_at = datetime('now')
+      WHERE id = ?
+    `, [approvedAt, id]))
   })
 }
 
