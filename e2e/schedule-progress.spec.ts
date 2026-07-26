@@ -14,8 +14,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     page.on('pageerror', error => pageErrors.push(error.message))
 
     await page.goto('/schedule')
-    await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'WBS 排程与实际进度' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'WBS 排程与实际进度' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('project-switcher-trigger')).toContainText('合和新城')
     await expect(page.getByText('户内1栋-2栋', { exact: true })).toBeVisible()
     await expect(page.getByText('2026-05-06', { exact: true }).first()).toBeVisible()

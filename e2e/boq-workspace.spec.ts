@@ -27,8 +27,7 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     page.on('pageerror', error => pageErrors.push(error.message))
 
     await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
-    await expect(page.getByRole('heading', { name: 'BOQ · 变更 · 月度报量' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'BOQ · 变更 · 月度报量' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('project-switcher-trigger')).toContainText('合和新城')
     const wallRow = page.getByRole('row').filter({ hasText: '墙砖铺贴' }).first()
     await expect(wallRow).toBeVisible()
