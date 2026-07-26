@@ -855,7 +855,7 @@ function settlementMatchesKind(
 ): boolean {
   return kind === 'material_settlement'
     ? bizType === '材料' || bizType === '材采'
-    : bizType === '其他'
+    : bizType === '机械' || bizType === '其他'
 }
 
 export async function saveF2Form(

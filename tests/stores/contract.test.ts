@@ -138,6 +138,7 @@ describe('contract store:唯一写路径 action 闭环', () => {
       },
     ])
     await expect(store.searchSettlementContracts(
+      'other_settlement',
       'p1',
       '其他支出',
     )).resolves.toEqual([
@@ -148,6 +149,7 @@ describe('contract store:唯一写路径 action 闭环', () => {
       },
     ])
     await expect(store.searchSettlementContracts(
+      'other_settlement',
       null,
       '其他支出',
     )).resolves.toEqual([])
