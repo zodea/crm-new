@@ -3,7 +3,7 @@
 > 状态：已采纳（2026-07-18）
 > 来源：用户反馈「设计稿很多新增、修改界面不够齐全，填写的内容很少」+ `/grill-me` 九问定稿（原 `docs/dc-rebuild/2026-07-18-表单补全整页化-grill决议.md`，已按设计入口规则并入本 ADR 后删除，过程见 Git 历史）。
 > 对标依据：[红圈补采差距清单 §1/§2/§6](../dc-rebuild/2026-07-11-红圈补采差距清单.md) + 红圈截图实拍（付款申请/支出合同/收票登记/分供方 表单逐字段提取）。
-> 实装状态：设计稿侧已全量落地并推送线上设计项目（37 条表单路由，`DC重构设计源码/kit/forms/*.jsx`）；**Vue 侧未动**，实装以设计稿为蓝本。字段回写权威文档见 [#116](https://github.com/zodea/crm-new/issues/116)。
+> 实装状态：设计稿侧已全量落地并推送线上设计项目（37 条表单路由，`DC重构设计源码/kit/forms/*.jsx`）；**Vue 侧未动**。页面蓝本已回写至 `docs/rewrite/pages/`，目标列、约束与 F1-F5 迁移批次已定稿在 `docs/rewrite/DATABASE.md §2.10`（Issue #116）。
 
 ## 决策
 
@@ -65,5 +65,5 @@
 
 - **弹窗从「表单主形态」退位**：`KitUI.formModal` 保留为行级对象与兜底（`buildFormBody` grid 布局）；差距清单 §1-6「大单据改整页」全域兑现且范围扩大到全部实体。
 - **Vue 侧原语 issue 基准变化**（#74/#79/#92-96）：Wave2 原语（KitLookup/KitEditGrid/typeSelect/KitFormFooter）继续有效，但组合目标从「弹窗四增强」改为整页表单壳；已在对应 issue 评论。
-- 表单字段唯一现行来源 = `kit/forms/*.jsx`；用户可编辑业务字段默认持久化及付款申请勾稽以 [ADR 0015](0015-form-persistence-and-payment-reconciliation.md) 为准。页面蓝本与 DATABASE.md 的逐实体列/迁移回写继续由 [#116](https://github.com/zodea/crm-new/issues/116) 跟踪，未完成页面保留警示横幅。
+- 设计稿控件与分区以 `kit/forms/*.jsx` 为准；业务字段、边界与验收以 `docs/rewrite/pages/` 为准；列、外键、子表和迁移批次以 `docs/rewrite/DATABASE.md §2.10` 为准。用户可编辑业务字段默认持久化及付款申请勾稽继续遵守 [ADR 0015](0015-form-persistence-and-payment-reconciliation.md)。
 - 后续若某实体确需退回弹窗（高频轻量录入），按「够用就停」原则个案评审，不整体回退。

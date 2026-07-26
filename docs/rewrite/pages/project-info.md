@@ -1,9 +1,8 @@
 # 项目信息 — 项目列表 + 项目详情
 
-> ⚠️ **字段回写未完，横幅保留**：新增/编辑表单以 [ADR 0014](../../adr/0014-full-page-entity-forms.md) 与 `DC重构设计源码/kit/forms/*.jsx` 为现行字段来源；[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认用户可编辑业务字段默认持久化，但本文字段表和 DATABASE 具体列仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 评审。
-
 > 路由: `/project` · `/project/:id`  
 > 页面: `pages/project/index.vue` · `pages/project/[id].vue`  
+> 表单蓝本: `projectForm`（ADR 0014）
 > 参考: `docs/红圈系统/项目详情页/` 25张红圈CRM截图  
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5  
 > 状态: 已确认布局 · 2026-06-26
@@ -42,6 +41,20 @@
 | 建设单位 | developer | min 120px | |
 | 项目经理 | manager | 90px | |
 | 操作 | — | 130px | fixed right: 详情/编辑/删除 |
+
+### 新增/编辑项目
+
+采用 ADR 0014 整页表单。
+
+| 分区 | 字段与规则 |
+|---|---|
+| 基本信息 | 项目名称*、项目合同名称、项目编号、客户(甲方)*、客户2、工程地域、详细地址、经营类型、建筑面积、工程概况 |
+| 工期与阶段 | 业务流程阶段、计划开工、计划竣工、计划工期、实际竣工 |
+| 参建单位 | 项目经理*、项目经理电话、执行经理、承包单位、监理单位、设计单位、现场负责人、现场负责人电话 |
+| 风控与立项 | 项目风险级别、立项文件时间、立项文件附件、效果图附件 |
+| 备注 | 备注 |
+
+客户 lookup 保存真实 `customer_id` / `secondary_customer_id`；不再依赖客户名称同名关联。附件进入 `file_refs`。
 
 ---
 
@@ -281,7 +294,9 @@ interface FileRef {
 
 ---
 
-## 六、数据模型
+## 六、旧字段快照（已废弃）
+
+> ⛔ 本节只保留早期项目详情聚合类型作历史对照，不是 schema 来源。现行项目客户外键、表单字段、合同/资金子实体及迁移批次统一见 [`DATABASE.md` §2.10](../DATABASE.md)；`developer` / `developer2` 名称文本、`TicketRegistration` 和拆分的 `CurrentReceipt` / `CurrentPayment` 均不得用于新写路径。
 
 ### 6.1 Project（扩展）
 

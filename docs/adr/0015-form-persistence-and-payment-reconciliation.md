@@ -18,7 +18,7 @@ ADR 0014 已把 37 个业务对象的新增/编辑表单补到字段级，但旧
 
 ## 后果
 
-- #116 不再等待“字段是否值得入库”的逐项确认；后续 schema 评审只决定列名、类型、约束和迁移批次。未完成逐实体 schema 回写前，旧蓝本警示横幅继续保留。
+- Issue #116 已完成逐实体 schema 评审：37 条表单的列名、类型、约束、真实外键、子表和 F1-F5 迁移批次见 `docs/rewrite/DATABASE.md §2.10`；旧蓝本中的 #116 警示横幅已移除。该定稿不等于迁移、store 或 Vue 页面已实现。
 - 付款申请保存 action 必须在一个事务中写申请头与两类分摊行；提交校验和发票全局额度检查也在该 action 内完成，页面不维护自由文本副本。单票额度以 `invoices.total_amount`（含税金额）为上限，不得误用不含税额 `invoices.amount`。
 - `待回票金额 = max(申请金额 − 有效发票关联金额合计, 0)` 为派生值，不另存列。
 - `payment_records.amount` 是支付金额唯一落点；`payment_applications.paid_amount` / `actual_payment` 退出手工写入路径，读取时按有效 `payment_record_application_allocations` 汇总。迁移前的存量手写值只能用于差异核对，不可覆盖银行流水。
