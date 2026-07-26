@@ -17,8 +17,6 @@ const categoryFilter = shallowRef('all')
 const statusFilter = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
-const showForm = shallowRef(false)
-const editingRow = shallowRef<Supplier | null>(null)
 
 const categoryOptions = [
   { key: 'all', label: '全部类别' },
@@ -69,13 +67,11 @@ function statusClass(status: string): string {
 }
 
 function openCreate() {
-  editingRow.value = null
-  showForm.value = true
+  void navigateTo('/base/supplier/form')
 }
 
 function openEdit(supplier: DeepReadonly<Supplier>) {
-  editingRow.value = { ...supplier, aliases: [...supplier.aliases] } as Supplier
-  showForm.value = true
+  void navigateTo(`/base/supplier/form/${supplier.id}`)
 }
 
 function handlePageChange(payload: { page: number, pageSize: number }) {
@@ -219,7 +215,5 @@ onMounted(() => store.load())
         </div>
       </template>
     </KitTable>
-
-    <SupplierFormDialog v-model:open="showForm" :supplier="editingRow" />
   </div>
 </template>

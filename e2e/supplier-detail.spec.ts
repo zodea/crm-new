@@ -8,7 +8,6 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/base/supplier')
-  await page.waitForLoadState('networkidle')
   await page.getByPlaceholder('搜索公司名、税号、简称…').fill(SUPPLIER_NAME)
   await page.getByRole('link', { name: SUPPLIER_NAME, exact: true }).click()
   await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004$/)
@@ -67,17 +66,19 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   await expect(page.getByRole('button', { name: `预览证照 ${CREDENTIAL_FILE}`, exact: true })).toBeVisible()
 
   await supplierHeader.getByRole('button', { name: '编辑', exact: true }).click()
-  dialog = page.getByRole('dialog', { name: '编辑分供方' })
-  await dialog.getByLabel('主要联系人', { exact: true }).fill('E2E周经理')
-  await dialog.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(page).toHaveURL('/base/supplier/form/sup_demo_004')
+  await page.getByLabel('主要联系人 *', { exact: true }).fill('E2E周经理')
+  await page.getByRole('group', { name: '表单操作' })
+    .getByRole('button', { name: '保存', exact: true })
+    .click()
+  await page.getByRole('link', { name: SUPPLIER_NAME, exact: true }).click()
   await expect(supplierHeader).toContainText('联系人 E2E周经理')
 
   const tabBar = page.getByRole('navigation', { name: '已打开页面' })
   await tabBar.getByRole('button', { name: '分供方', exact: true }).click()
   await page.getByRole('button', { name: '编辑分供方', exact: true }).click()
-  dialog = page.getByRole('dialog', { name: '编辑分供方' })
-  await expect(dialog.getByLabel('主要联系人', { exact: true })).toHaveValue('E2E周经理')
-  await dialog.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page.getByLabel('主要联系人 *', { exact: true })).toHaveValue('E2E周经理')
+  await page.getByRole('button', { name: '返回分供方列表' }).click()
 
   expect(pageErrors, '分供方详情旅程不应产生客户端运行错误').toEqual([])
 })

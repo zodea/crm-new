@@ -654,7 +654,7 @@ END;
 ```sql
 CREATE TABLE target_costs (
   id                  TEXT PRIMARY KEY,
-  project_id          TEXT NOT NULL,        -- → projects.id
+  project_id          TEXT,                 -- → projects.id；仅 draft 可空，提交时应用层强制必填
   name                TEXT NOT NULL,        -- 版本名（“投标预算”/“开工基线”）
   is_baseline         INTEGER DEFAULT 0,    -- 1=当前对比基线；部分唯一索引保证一项目一条
   contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
@@ -663,6 +663,7 @@ CREATE TABLE target_costs (
   tax_inclusive_total REAL DEFAULT 0 CHECK (tax_inclusive_total >= 0),
   tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
   tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  status TEXT NOT NULL DEFAULT 'draft',     -- draft | submitted
   note TEXT DEFAULT '',
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
@@ -678,6 +679,8 @@ CREATE TABLE target_cost_items (
   created_at TEXT, updated_at TEXT, deleted_at TEXT
 );
 ```
+
+> 迁移 v20 `target-cost-incomplete-drafts` 将已落过 v19 的存量库安全重建为 `project_id` 草稿可空，并原样保留目标成本头、科目明细、软删除状态和索引；非草稿保存仍必须校验真实项目 ID。
 
 > **costCategory 全局归集约定（2026-07-23 修订）**：合同成本按专业分包、合同劳务、材料、机械、其他五类；直接工人工资和费用报销分别作为独立成本来源。**合同劳务与工人工资不得合并为“人工”**。动态成本以已确认支出结算、已发放工资和已确认费用报销归集；付款申请、支付记录和送货单分别代表审批、现金流和收货事实，不与结算重复计入成本。红圈参照：目标成本 + 目标成本清单明细。
 
@@ -742,6 +745,7 @@ crews += (
   mgmt_fee_price REAL,
   assignment_level TEXT DEFAULT 'crew'
     CHECK (assignment_level IN ('crew', 'worker')),
+  status TEXT DEFAULT 'draft',
   updated_at TEXT, deleted_at TEXT
 )
 
@@ -772,6 +776,8 @@ projects += (
 ```
 
 `supplierForm` 的资料类别、条件必需和人工核验状态继续由 Issue #13 规则约束；`credential_status` 不是普通下拉字段。`target_costs` / `target_cost_items` 的完整目标列见 §2.8。
+
+> F1 表结构由迁移 v19 落地。旧客户名、工人当前项目名仅在唯一匹配时转为真实 ID；分供方旧层级及歧义/缺失映射写入 `reconciliation_issues` 后删除停止写入的旧列。迁移对账可能尚无可确认的项目，因此该表的 `project_id` 允许为空，并以实体定位列保存来源。
 
 #### 2.10.3 F2 合同与支出结算
 
@@ -1604,6 +1610,10 @@ CREATE INDEX idx_schedule_floor_plans_task ON schedule_task_floor_plans(task_id)
 CREATE INDEX idx_schedule_floor_plans_floor ON schedule_task_floor_plans(floor_id);
 CREATE INDEX idx_schedule_floor_plans_boq ON schedule_task_floor_plans(boq_line_id);
 
+-- 基础主数据
+CREATE UNIQUE INDEX uq_crews_name_active
+  ON crews(name) WHERE deleted_at IS NULL AND name <> '';
+
 -- 目标成本
 CREATE INDEX idx_target_costs_proj ON target_costs(project_id);
 CREATE UNIQUE INDEX uq_target_costs_baseline
@@ -1979,7 +1989,11 @@ CREATE TABLE import_source_refs (
 CREATE TABLE reconciliation_issues (
   id              TEXT PRIMARY KEY,
   import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
-  project_id      TEXT NOT NULL REFERENCES projects(id),
+  project_id      TEXT REFERENCES projects(id), -- 允许为空：实体映射失败时可能尚无合法项目
+  entity_type     TEXT DEFAULT '',
+  entity_id       TEXT DEFAULT '',
+  field_name      TEXT DEFAULT '',
+  source_value    TEXT DEFAULT '',
   metric_key      TEXT NOT NULL,
   source_ref      TEXT DEFAULT '',
   excel_value     REAL,
@@ -1993,5 +2007,7 @@ CREATE TABLE reconciliation_issues (
   resolved_at     TEXT
 );
 ```
+
+`entity_type + entity_id + field_name + source_value` 定位无法进入真实外键的源值；`project_id` 只在已有合法项目归属时填写，不创建“公司”或“待核对”等虚拟项目补空。
 
 导入有效行以业务字段判断，不以 Excel `usedRange`、序号或公式存在判断。所有金额在应用边界统一 `round2`；在全库迁移为整数分之前，禁止直接比较浮点绝对相等。

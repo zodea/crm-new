@@ -3,8 +3,8 @@
 // 「状态键集」与「语义色调」，class 由各页按色调映射，避免多处各抄一份状态清单而漂移（对称 ~/lib/project/status）。
 // 权威口径：CONTEXT.md「分供方」词条（2026-07-09）。
 
-/** 分供方类别清单（权威 6 类，顺序即下拉/筛选展示顺序）。此前表单枚举缺「专业分包商」，导致部分存量数据选不中，本次补齐。 */
-export const SUPPLIER_CATEGORIES = ['材料供应商', '劳务分包商', '专业分包商', '设备供应商', '个人', '其他'] as const
+/** 分供方类别清单（权威 7 类，顺序即下拉/筛选展示顺序）。 */
+export const SUPPLIER_CATEGORIES = ['材料供应商', '劳务分包商', '专业分包商', '设备供应商', '检测供应商', '个人', '其他'] as const
 
 export type SupplierCategory = (typeof SUPPLIER_CATEGORIES)[number]
 

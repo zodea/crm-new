@@ -1,5 +1,6 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Project } from '~/stores/project'
+import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { normalizeProjectStatus } from '~/lib/project/status'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
@@ -8,6 +9,7 @@ import {
   QUANTITY_TEMPLATE_IMPORT_FIELDS,
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
+import { parseJsonColumn } from '~/lib/util/json'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
@@ -50,11 +52,49 @@ const DEMO_SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
 // 用于跑通「失败保留页签 → 从失败行续导」旅程。
 const demoFailedOnce = new Set<string>()
 
-// 项目导入模板字段（#73 项目分析，字段 key = Project 字段名，故映射后的行可直接入库）。
+interface ProjectImportCustomer {
+  id: string
+  name: string
+  aliases: string
+}
+
+function normalizedReference(value: unknown): string {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('zh-CN')
+}
+
+async function resolveProjectCustomerId(
+  reference: unknown,
+  label: string,
+  required = false,
+): Promise<string | null> {
+  const normalized = normalizedReference(reference)
+  if (!normalized) {
+    if (required)
+      throw new Error(`${label}不能为空`)
+    return null
+  }
+
+  const { select } = await import('~/lib/db/connection')
+  const customers = await select<ProjectImportCustomer>(selectVisibleSql('customers'))
+  const matches = customers.filter((customer) => {
+    const aliases = parseJsonColumn<string[]>(customer.aliases, [])
+    return [
+      customer.id,
+      customer.name,
+      ...aliases,
+    ].some(value => normalizedReference(value) === normalized)
+  })
+  if (matches.length !== 1)
+    throw new Error(`${label}“${String(reference).trim()}”未唯一匹配到有效客户`)
+  return matches[0]!.id
+}
+
+// 项目导入客户字段先唯一解析为真实 ID，拒绝继续写已停用的 developer/developer2 文本列。
 const PROJECT_FIELDS: readonly ImportTemplateField[] = [
   { key: 'name', label: '项目名称', required: true, aliases: ['项目', '工程名称'] },
   { key: 'contractName', label: '项目合同名称', aliases: ['合同名称'] },
-  { key: 'developer', label: '客户', aliases: ['甲方', '建设单位', '客户（甲方）'] },
+  { key: 'customerName', label: '客户', required: true, aliases: ['甲方', '建设单位', '客户（甲方）'] },
+  { key: 'secondaryCustomerName', label: '次客户', aliases: ['客户2', '次甲方'] },
   { key: 'operationType', label: '经营类型', aliases: ['经营分类'] },
   { key: 'status', label: '业务流程阶段', aliases: ['项目状态', '阶段', '状态'] },
   { key: 'region', label: '工程地域', aliases: ['地域', '所在地区'] },
@@ -99,13 +139,20 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
     key: 'project',
     label: '施工项目',
     fields: PROJECT_FIELDS,
-    // 逐行入库：字段 key 与 Project 字段同名，映射后的行即 Partial<Project>；store.add
-    // 内部走 INSERT + logCreate + load，导入完成后新行经共享 store 出现在列表页。
+    // 逐行入库：客户名称必须唯一解析为 customerId；缺失或歧义会让该行失败并留在导入重试清单。
+    // store.add 内部走 INSERT + logCreate + load，导入完成后新行经共享 store 出现在列表页。
     // externalRef 等未登记列由 projectToBindings 忽略（只写 PROJECT_COLUMN_KEYS）。
     // status 经 normalizeProjectStatus 归一：Excel 任意文本不得写进非法阶段值。
     async importRow(row) {
+      const {
+        customerName,
+        secondaryCustomerName,
+        ...project
+      } = row
       await useProjectStore().add({
-        ...row,
+        ...project,
+        customerId: await resolveProjectCustomerId(customerName, '客户', true),
+        secondaryCustomerId: await resolveProjectCustomerId(secondaryCustomerName, '次客户'),
         status: normalizeProjectStatus(row.status),
       } as Partial<Project>)
     },

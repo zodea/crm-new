@@ -9,8 +9,6 @@ const store = useProjectStore()
 const projectId = computed(() => route.params.id as string)
 const project = computed(() => store.byId(projectId.value))
 
-const showEdit = ref(false) // 顶部「编辑」入口（与列表页共用 ProjectFormDialog，共享 store 实时联动）
-
 // 页签标题回填为项目名（如「合和新城」），取代通用「项目详情」
 useTabTitle(() => project.value?.name)
 
@@ -67,7 +65,7 @@ onMounted(async () => {
           </div>
         </div>
         <div class="flex-1" />
-        <button class="btn-secondary" @click="showEdit = true">
+        <button class="btn-secondary" @click="navigateTo(`/project/form/${project.id}`)">
           <span class="i-lucide-square-pen text-13px mr-1" /> 编辑
         </button>
       </div>
@@ -124,9 +122,6 @@ onMounted(async () => {
     <div v-else>
       <ProjectSubTables :tab="activeTab" :project-id="projectId" />
     </div>
-
-    <!-- 顶部「编辑」入口：与列表页共用同一表单组件，保存经共享 store 双页实时联动（#61） -->
-    <ProjectFormDialog v-model:open="showEdit" :project="project" />
   </div>
 
   <div v-else-if="!ready || store.loading" class="py-12 text-center text-ink-faint">

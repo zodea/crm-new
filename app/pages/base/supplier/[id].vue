@@ -33,8 +33,6 @@ const tabs = computed(() => [
   { key: 'invoices' as const, label: `收票汇总 (${snapshot.value.invoices.length})` },
 ])
 
-const showEdit = shallowRef(false)
-
 const chipToneClass: Record<StatusTone, string> = {
   warn: 'chip-warn',
   brand: 'chip-brand',
@@ -88,7 +86,7 @@ watch(supplierId, async (id) => {
         <button type="button" class="btn-secondary" @click="warning(`工商查询接口接入后可查询「${supplier.name}」`)">
           <span class="i-lucide-search-check mr-1" aria-hidden="true" />爱企查
         </button>
-        <button type="button" class="btn-primary" @click="showEdit = true">
+        <button type="button" class="btn-primary" @click="navigateTo(`/base/supplier/form/${supplier.id}`)">
           <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
         </button>
       </div>
@@ -165,8 +163,6 @@ watch(supplierId, async (id) => {
         </section>
       </aside>
     </div>
-
-    <SupplierFormDialog v-model:open="showEdit" :supplier="supplier" />
   </div>
 
   <div v-else class="panel py-12 text-center text-12px text-ink-faint">

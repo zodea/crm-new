@@ -58,6 +58,27 @@ export async function addColumnIfMissing(
   return true
 }
 
+async function columnExists(db: MigrationDb, table: string, column: string): Promise<boolean> {
+  const columns = await db.select<{ name: string }>(
+    'SELECT name FROM pragma_table_info(?)',
+    [table],
+  )
+  return columns.some(item => item.name === column)
+}
+
+async function dropColumnIfExists(
+  db: MigrationDb,
+  table: string,
+  column: string,
+): Promise<boolean> {
+  assertIdentifier(table)
+  assertIdentifier(column)
+  if (!await columnExists(db, table, column))
+    return false
+  await db.execute(`ALTER TABLE "${table}" DROP COLUMN "${column}";`)
+  return true
+}
+
 /** v2 补列的业务表清单——迁移是历史事实,冻结快照,后续新表在各自迁移里自带 deleted_at */
 const V2_TABLES = [
   'projects',
@@ -800,6 +821,435 @@ CREATE INDEX IF NOT EXISTS idx_item_unit_prices_deleted
   ON item_unit_prices(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+/** v19 F1 基础主数据(#147)：客户、目标成本和迁移对账底座。 */
+const V19_F1_TABLES = `
+CREATE TABLE IF NOT EXISTS customers (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  aliases            TEXT NOT NULL DEFAULT '[]',
+  tax_no             TEXT NOT NULL DEFAULT '',
+  legal_rep          TEXT NOT NULL DEFAULT '',
+  registered_address TEXT NOT NULL DEFAULT '',
+  invoice_name       TEXT NOT NULL DEFAULT '',
+  bank               TEXT NOT NULL DEFAULT '',
+  bank_account       TEXT NOT NULL DEFAULT '',
+  contact            TEXT NOT NULL DEFAULT '',
+  contact_phone      TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'draft',
+  note               TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS import_batches (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT REFERENCES projects(id),
+  source_file  TEXT NOT NULL,
+  source_hash  TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'draft',
+  created_at   TEXT DEFAULT (datetime('now')),
+  completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reconciliation_issues (
+  id              TEXT PRIMARY KEY,
+  import_batch_id TEXT NOT NULL REFERENCES import_batches(id),
+  project_id      TEXT REFERENCES projects(id),
+  entity_type     TEXT NOT NULL DEFAULT '',
+  entity_id       TEXT NOT NULL DEFAULT '',
+  field_name      TEXT NOT NULL DEFAULT '',
+  source_value    TEXT NOT NULL DEFAULT '',
+  metric_key      TEXT NOT NULL,
+  source_ref      TEXT DEFAULT '',
+  excel_value     REAL,
+  system_value    REAL,
+  difference      REAL,
+  attribution     TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'open',
+  resolution      TEXT DEFAULT '',
+  created_at      TEXT DEFAULT (datetime('now')),
+  resolved_at     TEXT
+);
+
+CREATE TABLE IF NOT EXISTS target_costs (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT REFERENCES projects(id),
+  name                TEXT NOT NULL,
+  is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)),
+  contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
+  planned_profit      REAL DEFAULT 0 CHECK (planned_profit >= 0),
+  signed_contract_sum REAL DEFAULT 0 CHECK (signed_contract_sum >= 0),
+  tax_inclusive_total REAL DEFAULT 0 CHECK (tax_inclusive_total >= 0),
+  tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
+  tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  status              TEXT NOT NULL DEFAULT 'draft',
+  note                TEXT NOT NULL DEFAULT '',
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at          TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS target_cost_items (
+  id             TEXT PRIMARY KEY,
+  target_cost_id TEXT NOT NULL REFERENCES target_costs(id),
+  cost_category  TEXT NOT NULL CHECK (
+    cost_category IN ('专业分包', '合同劳务', '材料', '机械', '工人工资', '费用报销', '其他')
+  ),
+  item_name      TEXT,
+  unit           TEXT DEFAULT '',
+  qty            REAL CHECK (qty IS NULL OR qty >= 0),
+  unit_price     REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  amount         REAL NOT NULL CHECK (amount >= 0),
+  note           TEXT NOT NULL DEFAULT '',
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL
+);
+`
+
+const V19_F1_INDEXES = `
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_tax_no
+  ON customers(tax_no)
+  WHERE deleted_at IS NULL AND tax_no <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crews_name_active
+  ON crews(name)
+  WHERE deleted_at IS NULL AND name <> '';
+CREATE INDEX IF NOT EXISTS idx_customers_deleted
+  ON customers(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_projects_customer
+  ON projects(customer_id);
+CREATE INDEX IF NOT EXISTS idx_projects_secondary_customer
+  ON projects(secondary_customer_id);
+CREATE INDEX IF NOT EXISTS idx_workers_current_project
+  ON workers(current_project_id);
+CREATE INDEX IF NOT EXISTS idx_target_costs_proj
+  ON target_costs(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_target_costs_baseline
+  ON target_costs(project_id)
+  WHERE deleted_at IS NULL AND is_baseline = 1;
+CREATE INDEX IF NOT EXISTS idx_target_costs_deleted
+  ON target_costs(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tci_target
+  ON target_cost_items(target_cost_id);
+CREATE INDEX IF NOT EXISTS idx_target_cost_items_deleted
+  ON target_cost_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_reconciliation_issues_batch
+  ON reconciliation_issues(import_batch_id, status);
+`
+
+const V20_TARGET_COST_DRAFT_TABLES = `
+DROP INDEX IF EXISTS idx_target_costs_proj;
+DROP INDEX IF EXISTS uq_target_costs_baseline;
+DROP INDEX IF EXISTS idx_target_costs_deleted;
+DROP INDEX IF EXISTS idx_tci_target;
+DROP INDEX IF EXISTS idx_target_cost_items_deleted;
+
+ALTER TABLE target_cost_items RENAME TO target_cost_items_v20_old;
+ALTER TABLE target_costs RENAME TO target_costs_v20_old;
+
+CREATE TABLE target_costs (
+  id                  TEXT PRIMARY KEY,
+  project_id          TEXT REFERENCES projects(id),
+  name                TEXT NOT NULL,
+  is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)),
+  contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
+  planned_profit      REAL DEFAULT 0 CHECK (planned_profit >= 0),
+  signed_contract_sum REAL DEFAULT 0 CHECK (signed_contract_sum >= 0),
+  tax_inclusive_total REAL DEFAULT 0 CHECK (tax_inclusive_total >= 0),
+  tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
+  tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
+  status              TEXT NOT NULL DEFAULT 'draft',
+  note                TEXT NOT NULL DEFAULT '',
+  created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at          TEXT DEFAULT NULL
+);
+
+CREATE TABLE target_cost_items (
+  id             TEXT PRIMARY KEY,
+  target_cost_id TEXT NOT NULL REFERENCES target_costs(id),
+  cost_category  TEXT NOT NULL CHECK (
+    cost_category IN ('专业分包', '合同劳务', '材料', '机械', '工人工资', '费用报销', '其他')
+  ),
+  item_name      TEXT,
+  unit           TEXT DEFAULT '',
+  qty            REAL CHECK (qty IS NULL OR qty >= 0),
+  unit_price     REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  amount         REAL NOT NULL CHECK (amount >= 0),
+  note           TEXT NOT NULL DEFAULT '',
+  sort_order     INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL
+);
+
+INSERT INTO target_costs (
+  id, project_id, name, is_baseline, contract_revenue, planned_profit,
+  signed_contract_sum, tax_inclusive_total, tax_exclusive_total, tax_amount,
+  status, note, created_at, updated_at, deleted_at
+)
+SELECT
+  id, project_id, name, is_baseline, contract_revenue, planned_profit,
+  signed_contract_sum, tax_inclusive_total, tax_exclusive_total, tax_amount,
+  status, note, created_at, updated_at, deleted_at
+FROM target_costs_v20_old;
+
+INSERT INTO target_cost_items (
+  id, target_cost_id, cost_category, item_name, unit, qty, unit_price, amount,
+  note, sort_order, created_at, updated_at, deleted_at
+)
+SELECT
+  id, target_cost_id, cost_category, item_name, unit, qty, unit_price, amount,
+  note, sort_order, created_at, updated_at, deleted_at
+FROM target_cost_items_v20_old;
+
+DROP TABLE target_cost_items_v20_old;
+DROP TABLE target_costs_v20_old;
+`
+
+const V20_TARGET_COST_DRAFT_INDEXES = `
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crews_name_active
+  ON crews(name)
+  WHERE deleted_at IS NULL AND name <> '';
+CREATE INDEX IF NOT EXISTS idx_target_costs_proj
+  ON target_costs(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_target_costs_baseline
+  ON target_costs(project_id)
+  WHERE deleted_at IS NULL AND is_baseline = 1;
+CREATE INDEX IF NOT EXISTS idx_target_costs_deleted
+  ON target_costs(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tci_target
+  ON target_cost_items(target_cost_id);
+CREATE INDEX IF NOT EXISTS idx_target_cost_items_deleted
+  ON target_cost_items(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+async function allowIncompleteTargetCostDrafts(db: MigrationDb): Promise<void> {
+  const [projectColumn] = await db.select<{ notnull: number }>(
+    `SELECT "notnull" FROM pragma_table_info('target_costs') WHERE name = 'project_id'`,
+  )
+  if (!projectColumn?.notnull) {
+    await execScript(db, V20_TARGET_COST_DRAFT_INDEXES)
+    return
+  }
+
+  await db.execute('PRAGMA foreign_keys = OFF')
+  let transactionStarted = false
+  try {
+    await db.execute('BEGIN IMMEDIATE')
+    transactionStarted = true
+    await execScript(db, V20_TARGET_COST_DRAFT_TABLES)
+    const violations = await db.select<{ table: string }>('PRAGMA foreign_key_check')
+    if (violations.length)
+      throw new Error(`[db] v20 目标成本重建后存在 ${violations.length} 条外键异常`)
+    await execScript(db, V20_TARGET_COST_DRAFT_INDEXES)
+    await db.execute('COMMIT')
+    transactionStarted = false
+  }
+  catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.execute('ROLLBACK')
+      }
+      catch {
+        // 保留原始迁移错误；连接后续会由 initializeDb 关闭。
+      }
+    }
+    throw error
+  }
+  finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
+
+const F1_IMPORT_BATCH_ID = 'migration_f1_v19'
+
+function normalizeLegacyName(value: unknown): string {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function stableMigrationId(prefix: string, ...parts: string[]): string {
+  let hash = 2166136261
+  for (const char of parts.join('\u001F')) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `${prefix}_${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
+
+interface F1CustomerCandidate {
+  id: string
+  name: string
+  aliases: string
+  deleted_at: string | null
+}
+
+function customerSearchNames(customer: F1CustomerCandidate): string[] {
+  let aliases: unknown = []
+  try {
+    aliases = JSON.parse(customer.aliases || '[]')
+  }
+  catch {
+    aliases = []
+  }
+  return [
+    customer.name,
+    ...(Array.isArray(aliases) ? aliases.filter(alias => typeof alias === 'string') : []),
+  ].map(normalizeLegacyName).filter(Boolean)
+}
+
+async function insertF1ReconciliationIssue(
+  db: MigrationDb,
+  input: {
+    projectId?: string | null
+    entityType: string
+    entityId: string
+    fieldName: string
+    sourceValue: string
+    attribution: 'mapping' | 'missing_source'
+  },
+): Promise<void> {
+  const id = stableMigrationId(
+    'reconciliation_f1',
+    input.entityType,
+    input.entityId,
+    input.fieldName,
+  )
+  await db.execute(`
+    INSERT OR IGNORE INTO reconciliation_issues (
+      id, import_batch_id, project_id, entity_type, entity_id, field_name,
+      source_value, metric_key, source_ref, attribution
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [
+    id,
+    F1_IMPORT_BATCH_ID,
+    input.projectId ?? null,
+    input.entityType,
+    input.entityId,
+    input.fieldName,
+    input.sourceValue,
+    `${input.entityType}.${input.fieldName}`,
+    `schema:v19:${input.entityType}:${input.entityId}`,
+    input.attribution,
+  ])
+}
+
+async function migrateF1ProjectCustomers(db: MigrationDb): Promise<void> {
+  const projectColumns = await db.select<{ name: string }>('SELECT name FROM pragma_table_info(?)', ['projects'])
+  const available = new Set(projectColumns.map(column => column.name))
+  const legacyFields = [
+    { source: 'developer', target: 'customer_id' },
+    { source: 'developer2', target: 'secondary_customer_id' },
+  ].filter(field => available.has(field.source))
+  if (!legacyFields.length)
+    return
+
+  const legacySelect = legacyFields
+    .map(field => `"${field.source}"`)
+    .join(', ')
+  const projects = await db.select<Record<string, unknown>>(
+    `SELECT id, ${legacySelect} FROM projects`,
+  )
+  const customers = await db.select<F1CustomerCandidate>(
+    `SELECT id, name, aliases, deleted_at FROM customers`,
+  )
+
+  for (const project of projects) {
+    for (const field of legacyFields) {
+      const sourceValue = String(project[field.source] ?? '').trim()
+      const normalized = normalizeLegacyName(sourceValue)
+      if (!normalized)
+        continue
+
+      const matches = customers.filter(customer =>
+        customer.deleted_at == null && customerSearchNames(customer).includes(normalized),
+      )
+
+      if (matches.length === 1) {
+        await db.execute(
+          `UPDATE projects SET "${field.target}" = ? WHERE id = ?`,
+          [matches[0]!.id, project.id],
+        )
+      }
+      else {
+        await insertF1ReconciliationIssue(db, {
+          projectId: String(project.id),
+          entityType: 'project',
+          entityId: String(project.id),
+          fieldName: field.target,
+          sourceValue,
+          attribution: matches.length > 1 ? 'mapping' : 'missing_source',
+        })
+      }
+    }
+  }
+}
+
+async function migrateF1WorkerProjects(db: MigrationDb): Promise<void> {
+  if (!await columnExists(db, 'workers', 'current_project'))
+    return
+
+  const projects = await db.select<{
+    id: string
+    name: string
+    deleted_at: string | null
+  }>(`SELECT id, name, deleted_at FROM projects`)
+  const workers = await db.select<{
+    id: string
+    current_project: string
+  }>(`SELECT id, current_project FROM workers`)
+
+  for (const worker of workers) {
+    const sourceValue = String(worker.current_project ?? '').trim()
+    const normalized = normalizeLegacyName(sourceValue)
+    if (!normalized)
+      continue
+    const matches = projects.filter(project =>
+      project.deleted_at == null && normalizeLegacyName(project.name) === normalized,
+    )
+    if (matches.length === 1) {
+      await db.execute(
+        `UPDATE workers SET current_project_id = ? WHERE id = ?`,
+        [matches[0]!.id, worker.id],
+      )
+    }
+    else {
+      await insertF1ReconciliationIssue(db, {
+        entityType: 'worker',
+        entityId: worker.id,
+        fieldName: 'current_project_id',
+        sourceValue,
+        attribution: matches.length > 1 ? 'mapping' : 'missing_source',
+      })
+    }
+  }
+}
+
+async function recordF1SupplierHierarchy(db: MigrationDb): Promise<void> {
+  if (!await columnExists(db, 'suppliers', 'parent_supplier_id'))
+    return
+  const suppliers = await db.select<{
+    id: string
+    parent_supplier_id: string | null
+  }>(`
+    SELECT id, parent_supplier_id
+    FROM suppliers
+    WHERE parent_supplier_id IS NOT NULL AND TRIM(parent_supplier_id) <> ''
+  `)
+  for (const supplier of suppliers) {
+    await insertF1ReconciliationIssue(db, {
+      entityType: 'supplier',
+      entityId: supplier.id,
+      fieldName: 'parent_supplier_id',
+      sourceValue: supplier.parent_supplier_id!,
+      attribution: 'mapping',
+    })
+  }
+}
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -1107,6 +1557,104 @@ export const migrations: Migration[] = [
     name: 'item-unit-price-library',
     async up(db) {
       await execScript(db, V18_ITEM_UNIT_PRICES)
+    },
+  },
+  {
+    version: 19,
+    name: 'f1-master-data',
+    async up(db) {
+      await db.execute('BEGIN IMMEDIATE')
+      try {
+        await execScript(db, V19_F1_TABLES)
+
+        await addColumnIfMissing(db, 'suppliers', 'contact_title', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'suppliers', 'credential_reviewed_at', 'TEXT')
+        await addColumnIfMissing(db, 'suppliers', 'credential_review_note', `TEXT NOT NULL DEFAULT ''`)
+
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'default_pay_ratio',
+          'REAL NOT NULL DEFAULT 0.95 CHECK (default_pay_ratio BETWEEN 0 AND 1)',
+        )
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'rent_subsidy_enabled',
+          'INTEGER NOT NULL DEFAULT 0 CHECK (rent_subsidy_enabled IN (0, 1))',
+        )
+        await addColumnIfMissing(db, 'crews', 'rent_subsidy_price', 'REAL CHECK (rent_subsidy_price IS NULL OR rent_subsidy_price >= 0)')
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'mgmt_fee_enabled',
+          'INTEGER NOT NULL DEFAULT 0 CHECK (mgmt_fee_enabled IN (0, 1))',
+        )
+        await addColumnIfMissing(db, 'crews', 'mgmt_fee_price', 'REAL CHECK (mgmt_fee_price IS NULL OR mgmt_fee_price >= 0)')
+        await addColumnIfMissing(
+          db,
+          'crews',
+          'assignment_level',
+          `TEXT NOT NULL DEFAULT 'crew' CHECK (assignment_level IN ('crew', 'worker'))`,
+        )
+        await addColumnIfMissing(db, 'crews', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
+        await addColumnIfMissing(db, 'crews', 'updated_at', `TEXT NOT NULL DEFAULT ''`)
+
+        await addColumnIfMissing(db, 'workers', 'bank_name', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'bank_account', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'bank_code', `TEXT NOT NULL DEFAULT ''`)
+        await addColumnIfMissing(db, 'workers', 'current_project_id', 'TEXT REFERENCES projects(id)')
+        await addColumnIfMissing(db, 'workers', 'family_group_id', 'TEXT')
+        await addColumnIfMissing(db, 'workers', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
+
+        await addColumnIfMissing(db, 'projects', 'customer_id', 'TEXT REFERENCES customers(id)')
+        await addColumnIfMissing(db, 'projects', 'secondary_customer_id', 'TEXT REFERENCES customers(id)')
+        await addColumnIfMissing(db, 'projects', 'developer_supervisor', `TEXT NOT NULL DEFAULT ''`)
+
+        await db.execute(`
+        INSERT INTO import_batches (
+          id, project_id, source_file, source_hash, status, completed_at
+        )
+        VALUES (?, NULL, 'schema:v19', 'f1-master-data', 'running', NULL)
+        ON CONFLICT(id) DO UPDATE SET
+          status = 'running',
+          completed_at = NULL
+      `, [F1_IMPORT_BATCH_ID])
+
+        await migrateF1ProjectCustomers(db)
+        await migrateF1WorkerProjects(db)
+        await recordF1SupplierHierarchy(db)
+
+        await db.execute('DROP INDEX IF EXISTS idx_suppliers_parent')
+        await dropColumnIfExists(db, 'suppliers', 'parent_supplier_id')
+        await dropColumnIfExists(db, 'projects', 'developer')
+        await dropColumnIfExists(db, 'projects', 'developer2')
+        await dropColumnIfExists(db, 'workers', 'current_project')
+
+        await execScript(db, V19_F1_INDEXES)
+        await db.execute(`
+          UPDATE import_batches
+          SET status = 'completed', completed_at = datetime('now')
+          WHERE id = ?
+        `, [F1_IMPORT_BATCH_ID])
+        await db.execute('COMMIT')
+      }
+      catch (error) {
+        try {
+          await db.execute('ROLLBACK')
+        }
+        catch {
+          // 保留原始迁移错误。
+        }
+        throw error
+      }
+    },
+  },
+  {
+    version: 20,
+    name: 'target-cost-incomplete-drafts',
+    async up(db) {
+      await allowIncompleteTargetCostDrafts(db)
     },
   },
 ]

@@ -1,0 +1,93 @@
+[
+  {
+    "id": "customer_demo_001",
+    "name": "合和地产集团",
+    "aliases": "[\"合和地产\"]",
+    "created_at": "2026-06-01T00:00:01.000Z",
+    "updated_at": "2026-06-01T00:00:01.000Z"
+  },
+  {
+    "id": "customer_demo_002",
+    "name": "锦绣置业有限公司",
+    "aliases": "[\"锦绣置业\"]",
+    "created_at": "2026-06-01T00:00:02.000Z",
+    "updated_at": "2026-06-01T00:00:02.000Z"
+  },
+  {
+    "id": "customer_demo_003",
+    "name": "翠湖投资",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:03.000Z",
+    "updated_at": "2026-06-01T00:00:03.000Z"
+  },
+  {
+    "id": "customer_demo_004",
+    "name": "中海地产广州公司",
+    "aliases": "[\"中海地产\"]",
+    "created_at": "2026-06-01T00:00:04.000Z",
+    "updated_at": "2026-06-01T00:00:04.000Z"
+  },
+  {
+    "id": "customer_demo_005",
+    "name": "江湾置业",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:05.000Z",
+    "updated_at": "2026-06-01T00:00:05.000Z"
+  },
+  {
+    "id": "customer_demo_006",
+    "name": "天河城建投资",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:06.000Z",
+    "updated_at": "2026-06-01T00:00:06.000Z"
+  },
+  {
+    "id": "customer_demo_007",
+    "name": "广州开发区建设集团",
+    "aliases": "[\"开发区建设集团\"]",
+    "created_at": "2026-06-01T00:00:07.000Z",
+    "updated_at": "2026-06-01T00:00:07.000Z"
+  },
+  {
+    "id": "customer_demo_008",
+    "name": "广州亚运城开发",
+    "aliases": "[\"亚运城开发\"]",
+    "created_at": "2026-06-01T00:00:08.000Z",
+    "updated_at": "2026-06-01T00:00:08.000Z"
+  },
+  {
+    "id": "customer_demo_009",
+    "name": "利丰置业",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:09.000Z",
+    "updated_at": "2026-06-01T00:00:09.000Z"
+  },
+  {
+    "id": "customer_demo_010",
+    "name": "保利番禺地产",
+    "aliases": "[\"保利番禺\"]",
+    "created_at": "2026-06-01T00:00:10.000Z",
+    "updated_at": "2026-06-01T00:00:10.000Z"
+  },
+  {
+    "id": "customer_demo_011",
+    "name": "未来印象置业",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:11.000Z",
+    "updated_at": "2026-06-01T00:00:11.000Z"
+  },
+  {
+    "id": "customer_demo_012",
+    "name": "白云机场建设",
+    "aliases": "[]",
+    "created_at": "2026-06-01T00:00:12.000Z",
+    "updated_at": "2026-06-01T00:00:12.000Z"
+  },
+  {
+    "id": "customer_demo_013",
+    "name": "广州市政集团",
+    "aliases": "[\"市政集团\"]",
+    "created_at": "2026-06-01T00:00:13.000Z",
+    "updated_at": "2026-06-01T00:00:13.000Z"
+  }
+]

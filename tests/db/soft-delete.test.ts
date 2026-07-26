@@ -78,7 +78,7 @@ describe('v2 迁移:全业务表 deleted_at + operation_logs', () => {
       expect(await columnNames(db, t), `${t} 缺 deleted_at`).toContain('deleted_at')
       expect(indexes, `${t} 缺软删部分索引`).toContain(`idx_${t}_deleted`)
     }
-    expect(indexes).toContain('idx_suppliers_parent')
+    expect(indexes).not.toContain('idx_suppliers_parent')
     db.close()
   })
 
@@ -379,17 +379,18 @@ describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
     db.close()
   })
 
-  it('自引用祖先过滤:删父分供方,子/孙分供方隐藏且自身不打标记', async () => {
+  it('客户祖先过滤:删除客户后关联项目隐藏，恢复客户后项目重现', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)
-    await db.execute(`INSERT INTO suppliers (id, name, parent_supplier_id) VALUES ('s1', '总公司', NULL), ('s2', '分公司', 's1'), ('s3', '孙公司', 's2'), ('s9', '无关公司', NULL)`)
+    await db.execute(`INSERT INTO customers (id, name) VALUES ('c1', '建设单位'), ('c9', '无关客户')`)
+    await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('p1', '关联项目', 'c1'), ('p9', '无关项目', 'c9')`)
 
-    await softDelete(db, 'suppliers', 's1')
-    const rows = await selectVisible(db, 'suppliers')
-    expect(rows.map(r => r.id)).toEqual(['s9'])
+    await softDelete(db, 'customers', 'c1')
+    const rows = await selectVisible(db, 'projects')
+    expect(rows.map(r => r.id)).toEqual(['p9'])
 
-    await restoreRecord(db, 'suppliers', 's1')
-    expect((await selectVisible(db, 'suppliers'))).toHaveLength(4)
+    await restoreRecord(db, 'customers', 'c1')
+    expect((await selectVisible(db, 'projects'))).toHaveLength(2)
     db.close()
   })
 
@@ -701,15 +702,13 @@ describe('downstreamImpact:通用下游杀伤统计(#89 由 stores/project.ts �
     db.close()
   })
 
-  it('自引用不被通用层特殊排除:suppliers 自身(parent_supplier_id)有真实下游时如实计入', async () => {
-    // 通用层保持"域无关":是否展示自引用杀伤是调用方（业务域）的判断，不在共享 downstreamImpact 里硬编码。
-    // 分供方域"无母子挂靠、不展示自引用"的过滤见 stores/supplier.ts 的 downstreamImpact 包装。
+  it('客户删除影响按真实外键统计关联项目', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)
-    await db.execute(`INSERT INTO suppliers (id, name, parent_supplier_id) VALUES ('s1', '总公司', NULL), ('s2', '分公司', 's1'), ('s3', '孙公司', 's2')`)
-    const impact = await downstreamImpact(db, 'suppliers', 's1')
-    // 直接子表计数(一跳):仅'分公司'(parent_supplier_id='s1'),不含递归孙辈
-    expect(impact).toContainEqual({ table: 'suppliers', n: 1 })
+    await db.execute(`INSERT INTO customers (id, name) VALUES ('c1', '建设单位')`)
+    await db.execute(`INSERT INTO projects (id, name, customer_id) VALUES ('p1', '一期', 'c1'), ('p2', '二期', 'c1')`)
+    const impact = await downstreamImpact(db, 'customers', 'c1')
+    expect(impact).toContainEqual({ table: 'projects', n: 2 })
     db.close()
   })
 

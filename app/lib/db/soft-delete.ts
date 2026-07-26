@@ -21,9 +21,13 @@ export interface ParentRef {
  * file_refs 为多态关联(owner_type/owner_id),静态 SQL 无法表达,查询方须按 owner 过滤。
  */
 export const PARENT_REFS: Record<string, ParentRef[]> = {
-  projects: [],
+  customers: [],
+  projects: [
+    { column: 'customer_id', table: 'customers' },
+    { column: 'secondary_customer_id', table: 'customers' },
+  ],
   project_aliases: [{ column: 'project_id', table: 'projects' }],
-  suppliers: [{ column: 'parent_supplier_id', table: 'suppliers' }],
+  suppliers: [],
   invoices: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
@@ -140,7 +144,12 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'project_id', table: 'projects' },
     { column: 'payment_application_id', table: 'payment_applications' },
   ],
-  workers: [{ column: 'crew_id', table: 'crews' }],
+  workers: [
+    { column: 'crew_id', table: 'crews' },
+    { column: 'current_project_id', table: 'projects' },
+  ],
+  target_costs: [{ column: 'project_id', table: 'projects' }],
+  target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],
   settlements: [{ column: 'project_supplier_id', table: 'project_suppliers' }],
   supplement_agreements: [{ column: 'contract_id', table: 'construction_contracts' }],
   contract_line_items: [{ column: 'contract_id', table: 'expenditure_contracts' }],
@@ -159,7 +168,13 @@ export const BUSINESS_TABLES = Object.keys(PARENT_REFS)
 export const DEPRECATED_TABLES = ['ticket_registrations']
 
 /** 不参与通用软删除与操作日志的基础设施表；file_payloads 避免正文进入通用快照。 */
-export const INFRA_TABLES = ['schema_migrations', 'operation_logs', 'file_payloads']
+export const INFRA_TABLES = [
+  'schema_migrations',
+  'operation_logs',
+  'file_payloads',
+  'import_batches',
+  'reconciliation_issues',
+]
 
 function assertBusinessTable(table: string): void {
   if (!(table in PARENT_REFS)) {

@@ -3,14 +3,17 @@ import { expect, test } from '@playwright/test'
 // 项目详情旅程（#61）：列表↔详情双页联动、同项目复用页签、软删后详情落「不存在」态。
 // 复用现有页签基建与共享 store：seed/projects.json 提供演示数据（proj_demo_001 = 合和新城）。
 
-const NAME_PLACEHOLDER = '如：合和新城·3号楼'
+async function selectCustomer(page: import('@playwright/test').Page, name: string) {
+  const lookup = page.getByRole('combobox', { name: '检索客户' })
+  await lookup.fill(name)
+  await page.getByRole('option', { name: new RegExp(name) }).click()
+}
 
 test('项目列表↔详情：详情编辑联动列表、同项目复用页签', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
 
   const tabBar = page.getByRole('navigation', { name: '已打开页面' })
 
@@ -20,11 +23,14 @@ test('项目列表↔详情：详情编辑联动列表、同项目复用页签',
   await expect(tabBar.getByRole('button', { name: '合和新城', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: '合和新城' })).toBeVisible()
 
-  // 详情顶部编辑 → 改名 → 保存：详情头部即时更新。
+  // 详情顶部编辑 → 进入整页表单改名 → 保存：详情与列表共享 store 即时更新。
   await page.getByRole('button', { name: '编辑', exact: true }).click()
-  const editDialog = page.getByRole('dialog')
-  await editDialog.getByPlaceholder(NAME_PLACEHOLDER).fill('合和新城·改')
-  await editDialog.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL('/project/form/proj_demo_001')
+  await page.getByLabel('项目名称 *').fill('合和新城·改')
+  await page.getByRole('group', { name: '表单操作' })
+    .getByRole('button', { name: '保存', exact: true })
+    .click()
+  await page.getByRole('link', { name: '合和新城·改' }).click()
   await expect(page.getByRole('heading', { name: '合和新城·改' })).toBeVisible()
 
   // 回列表：行名随共享 store 联动更新（反馈轮9 双页联动）。
@@ -48,13 +54,16 @@ test('项目详情：项目被软删后，其详情页签落到「不存在」�
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await page.waitForLoadState('networkidle')
 
   // 建一个无下游的新项目并打开其详情页签。
   await page.getByRole('button', { name: '新增项目' }).click()
-  const formDialog = page.getByRole('dialog')
-  await formDialog.getByPlaceholder(NAME_PLACEHOLDER).fill('E2E待删项目')
-  await formDialog.getByRole('button', { name: '保存' }).click()
+  await expect(page).toHaveURL('/project/form')
+  await page.getByLabel('项目名称 *').fill('E2E待删项目')
+  await selectCustomer(page, '合和地产')
+  await page.getByLabel('项目经理 *').fill('E2E项目经理')
+  await page.getByRole('group', { name: '表单操作' })
+    .getByRole('button', { name: '保存', exact: true })
+    .click()
   await page.getByRole('link', { name: 'E2E待删项目' }).click()
   await expect(page).toHaveURL(/\/project\/proj_/)
   await expect(page.getByRole('heading', { name: 'E2E待删项目' })).toBeVisible()
@@ -64,6 +73,7 @@ test('项目详情：项目被软删后，其详情页签落到「不存在」�
   // 回列表删除该项目（不撤回）。
   await tabBar.getByRole('button', { name: '项目列表', exact: true }).click()
   await expect(page).toHaveURL(/\/project$/)
+  // vxe-table 固定列会把名称列和操作列渲染成两张同步表；新建记录位于首行。
   await page.getByRole('button', { name: '删除项目' }).first().click()
   const confirmDialog = page.getByRole('dialog')
   // 仅浏览详情不会自动插入 phase_tasks，因此新项目仍是无下游的 simple 删除确认。

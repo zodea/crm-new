@@ -1,9 +1,19 @@
 import type { ConfirmImpact } from '~/lib/kit/confirm'
+import type {
+  FormAttachmentChanges,
+  MasterDataSaveAction,
+  ProjectFormDraft,
+} from '~/lib/master-data/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select } from '~/lib/db/connection'
 import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import {
+  listFormAttachments,
+  loadProjectForm,
+  saveProjectForm,
+} from '~/lib/master-data/forms'
 import { generateId } from '~/lib/util/id'
 import { toNum } from '~/lib/util/number'
 
@@ -41,8 +51,13 @@ export interface Project {
   actualEnd: string
   plannedDuration: number | null
   status: string
+  customerId: string | null
+  secondaryCustomerId: string | null
+  /** 关联客户名称，只读带出，不参与写入。 */
   developer: string
+  /** 关联次客户名称，只读带出，不参与写入。 */
   developer2: string
+  developerSupervisor: string
   supervisor: string
   designer: string
   contractor: string
@@ -71,7 +86,10 @@ export interface Project {
  * created_by/updated_by 是审计列——store 写路径当前不管（沿用旧行为，靠 schema 默认值 ''，
  * 仅 rowToProject 读回），故不进写登记表，避免每次编辑把 updated_by 抹空。
  */
-type ProjectWritable = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>
+type ProjectWritable = Omit<
+  Project,
+  'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy' | 'developer' | 'developer2'
+>
 
 /** 单列登记项：数据库列名 + 写绑定（字段值 → SQL 占位符实参）+ 读映射（DB 行 → 字段值，按列类型 K 精确定型）。 */
 interface ProjectColumn<K extends keyof ProjectWritable> {
@@ -104,8 +122,9 @@ const PROJECT_COLUMNS: { [K in keyof ProjectWritable]: ProjectColumn<K> } = {
   actualEnd: { col: 'actual_end', toBind: d => d.actualEnd ?? '', fromRow: r => (r.actual_end ?? '') as string },
   plannedDuration: { col: 'planned_duration', toBind: d => toNum(d.plannedDuration), fromRow: r => r.planned_duration as number | null },
   status: { col: 'status', toBind: d => d.status ?? '筹备中', fromRow: r => (r.status ?? '筹备中') as string },
-  developer: { col: 'developer', toBind: d => d.developer ?? '', fromRow: r => (r.developer ?? '') as string },
-  developer2: { col: 'developer2', toBind: d => d.developer2 ?? '', fromRow: r => (r.developer2 ?? '') as string },
+  customerId: { col: 'customer_id', toBind: d => d.customerId ?? null, fromRow: r => (r.customer_id ?? null) as string | null },
+  secondaryCustomerId: { col: 'secondary_customer_id', toBind: d => d.secondaryCustomerId ?? null, fromRow: r => (r.secondary_customer_id ?? null) as string | null },
+  developerSupervisor: { col: 'developer_supervisor', toBind: d => d.developerSupervisor ?? '', fromRow: r => (r.developer_supervisor ?? '') as string },
   supervisor: { col: 'supervisor', toBind: d => d.supervisor ?? '', fromRow: r => (r.supervisor ?? '') as string },
   designer: { col: 'designer', toBind: d => d.designer ?? '', fromRow: r => (r.designer ?? '') as string },
   contractor: { col: 'contractor', toBind: d => d.contractor ?? '', fromRow: r => (r.contractor ?? '') as string },
@@ -148,6 +167,8 @@ function rowToProject(row: Record<string, unknown>): Project {
     createdAt: (row.created_at ?? '') as string,
     updatedBy: (row.updated_by ?? '') as string,
     updatedAt: (row.updated_at ?? '') as string,
+    developer: (row.developer ?? '') as string,
+    developer2: (row.developer2 ?? '') as string,
     ...(data as ProjectWritable),
   }
 }
@@ -159,8 +180,16 @@ export const useProjectStore = defineStore('project', () => {
   async function load() {
     loading.value = true
     try {
+      const visibleProjects = selectVisibleSql('projects')
       const rows = await select<Record<string, unknown>>(
-        selectVisibleSql('projects', 'ORDER BY created_at DESC'),
+        `SELECT
+           project.*,
+           primary_customer.name AS developer,
+           secondary_customer.name AS developer2
+         FROM (${visibleProjects}) AS project
+         LEFT JOIN customers AS primary_customer ON primary_customer.id = project.customer_id
+         LEFT JOIN customers AS secondary_customer ON secondary_customer.id = project.secondary_customer_id
+         ORDER BY project.created_at DESC`,
       )
       list.value = rows.map(rowToProject)
     }
@@ -193,6 +222,16 @@ export const useProjectStore = defineStore('project', () => {
     return logId
   }
 
+  async function saveForm(
+    draft: ProjectFormDraft,
+    action: MasterDataSaveAction,
+    attachments?: FormAttachmentChanges,
+  ) {
+    const result = await saveProjectForm(draft, action, attachments)
+    await load()
+    return result
+  }
+
   /**
    * 删除前统计各下游子表在「应用可见集」中的未删记录，返回 cascade 杀伤清单（ADR 0003）。
    * 计数逻辑已上移为软删层通用能力（#89），本店只负责把表名映射为中文展示标签。
@@ -204,5 +243,19 @@ export const useProjectStore = defineStore('project', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'projects', load)
 
-  return { list: readonly(list), loading: readonly(loading), load, byId, add, update, remove, restore, undo, downstreamImpact }
+  return {
+    list: readonly(list),
+    loading: readonly(loading),
+    load,
+    byId,
+    add,
+    update,
+    saveForm,
+    loadForm: loadProjectForm,
+    loadFormAttachments: (id: string) => listFormAttachments('project', id),
+    remove,
+    restore,
+    undo,
+    downstreamImpact,
+  }
 })

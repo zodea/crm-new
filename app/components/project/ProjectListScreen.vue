@@ -19,8 +19,6 @@ const searchText = shallowRef('')
 const statusFilter = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
-const showForm = shallowRef(false)
-const editingRow = shallowRef<Project | null>(null)
 const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
 
 const statusOptions = [
@@ -89,13 +87,11 @@ function statusClass(status: string): string {
 }
 
 function openCreate() {
-  editingRow.value = null
-  showForm.value = true
+  void navigateTo('/project/form')
 }
 
 function openEdit(project: Project) {
-  editingRow.value = project
-  showForm.value = true
+  void navigateTo(`/project/form/${project.id}`)
 }
 
 function handlePageChange(payload: { page: number, pageSize: number }) {
@@ -284,7 +280,5 @@ onMounted(() => Promise.all([store.load(), detailStore.load()]))
         </div>
       </template>
     </KitTable>
-
-    <ProjectFormDialog v-model:open="showForm" :project="editingRow" />
   </div>
 </template>

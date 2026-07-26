@@ -18,7 +18,10 @@ describe('导入实体注册表', () => {
     const nameField = entity?.fields.find(f => f.key === 'name')
     expect(nameField?.required).toBe(true)
     expect(entity?.fields).toContainEqual(EXTERNAL_REF_FIELD)
-    // 字段 key 与 Project 字段同名，保证映射行可直接入库
+    // 客户名称先唯一解析为 customerId，不能再写已停用的 developer 文本列。
+    expect(entity?.fields.map(f => f.key)).toContain('customerName')
+    expect(entity?.fields.find(f => f.key === 'customerName')?.required).toBe(true)
+    expect(entity?.fields.map(f => f.key)).not.toContain('developer')
     expect(entity?.fields.map(f => f.key)).toContain('execManager')
     expect(entity?.fields.map(f => f.key)).toContain('builder')
   })
