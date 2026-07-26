@@ -4,6 +4,7 @@ import type { OwnerDocumentKind } from '~/lib/owner-document/forms'
 import type { OwnerDocumentBoqLine } from '~/lib/owner-document/page'
 import { useFullscreen } from '@vueuse/core'
 import { computed, useTemplateRef } from 'vue'
+import { ownerDocumentLineAmount } from '~/lib/owner-document/page'
 
 type GridKind = Extract<OwnerDocumentKind, 'owner_change' | 'owner_report'>
 type GridLine = Record<string, unknown>
@@ -49,7 +50,10 @@ const columns = computed<KitTableColumn[]>(() => props.kind === 'owner_change'
 )
 
 const summary = computed(() => {
-  const amount = props.lines.reduce((sum, line) => sum + lineAmount(line), 0)
+  const amount = props.lines.reduce(
+    (sum, line) => sum + ownerDocumentLineAmount(props.kind, line),
+    0,
+  )
   if (props.kind === 'owner_change')
     return `${props.lines.length} 项变更 · 合计 ¥${amount.toFixed(2)}`
   const audited = props.lines.reduce(
@@ -128,21 +132,6 @@ function copy(index: number) {
 
 function remove(index: number) {
   emit('update', props.lines.filter((_, current) => current !== index))
-}
-
-function lineAmount(line: GridLine): number {
-  if (props.kind === 'owner_report')
-    return (Number(line.reportedQty) || 0) * (Number(line.unitPrice) || 0)
-  const operation = String(line.operation ?? 'qty')
-  const qty = Number(line.qty) || 0
-  const deltaQty = Number(line.deltaQty) || 0
-  const unitPrice = Number(line.unitPrice) || 0
-  const newUnitPrice = Number(line.newUnitPrice) || 0
-  if (operation === 'add')
-    return deltaQty * newUnitPrice
-  if (operation === 'price')
-    return qty * (newUnitPrice - unitPrice)
-  return deltaQty * unitPrice
 }
 </script>
 
@@ -284,8 +273,8 @@ function lineAmount(line: GridLine): number {
           <span class="font-mono font-700">{{ Number(row.unitPrice || 0).toFixed(2) }}</span>
         </template>
         <template #amount="{ row }">
-          <span class="font-mono font-700" :class="{ 'text-danger': lineAmount(row) < 0 }">
-            {{ lineAmount(row).toFixed(2) }}
+          <span class="font-mono font-700" :class="{ 'text-danger': ownerDocumentLineAmount(kind, row) < 0 }">
+            {{ ownerDocumentLineAmount(kind, row).toFixed(2) }}
           </span>
         </template>
         <template #note="{ row, rowIndex }">

@@ -9,7 +9,13 @@ import {
 } from '~/lib/boq/change'
 import { loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { select, withTransaction } from '~/lib/db/connection'
-import { logCreate, restoreRecord, softDelete, withUpdateLog } from '~/lib/db/soft-delete'
+import {
+  logCreate,
+  restoreRecord,
+  selectVisibleSql,
+  softDelete,
+  withUpdateLog,
+} from '~/lib/db/soft-delete'
 import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
@@ -25,6 +31,7 @@ export type OwnerDocumentKind
     | 'project_penalty'
 
 export type OwnerDocumentSaveAction = 'draft' | 'submit'
+export type AcceptanceLifecycleTarget = 'accepted' | 'warranty' | 'expired'
 
 export interface OwnerDocumentDraft {
   [key: string]: unknown
@@ -86,6 +93,18 @@ export interface PenaltyDeductionView {
   createdAt: string
 }
 
+export interface OwnerDocumentContractSummary {
+  contractAmount: number
+  priorSettlementAmount: number
+  receivedAmount: number
+}
+
+export interface OwnerDocumentLookupOption {
+  id: string
+  label: string
+  hint?: string
+}
+
 interface ContractRef {
   id: string
   project_id: string
@@ -93,8 +112,6 @@ interface ContractRef {
   kind: string
   name: string
   amount: number
-  changed: number
-  paid: number
 }
 
 const FILE_OWNER_TYPES: Record<Exclude<OwnerDocumentKind, 'owner_change'>, string> = {
@@ -156,6 +173,25 @@ function documentNo(value: unknown, prefix: string): string {
   return `${prefix}-${date}-${generateId('no').slice(-6).toUpperCase()}`
 }
 
+async function assertEditableDraft(
+  tx: TransactionDb,
+  table: string,
+  id: string,
+  label: string,
+  condition = '',
+): Promise<void> {
+  const [record] = await tx.select<{ status: string }>(
+    `SELECT status
+     FROM "${table}"
+     WHERE id = ? AND deleted_at IS NULL ${condition}`,
+    [id],
+  )
+  if (!record)
+    throw new Error(`${label}不存在或已删除`)
+  if (!['draft', 'rejected'].includes(record.status))
+    throw new Error(`只有草稿或已退回${label}可以编辑`)
+}
+
 async function activeContract(
   tx: TransactionDb,
   projectId: string,
@@ -164,7 +200,7 @@ async function activeContract(
   supplierId?: string | null,
 ): Promise<ContractRef> {
   const [contract] = await tx.select<ContractRef>(`
-    SELECT id, project_id, supplier_id, kind, name, amount, changed, paid
+    SELECT id, project_id, supplier_id, kind, name, amount
     FROM contracts
     WHERE id = ? AND project_id = ? AND deleted_at IS NULL
   `, [contractId, projectId])
@@ -222,12 +258,24 @@ async function saveOwnerChange(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const projectId = required(draft.projectId, '项目')
-  const contractId = required(draft.contractId, '施工合同')
-  const contract = await activeContract(tx, projectId, contractId, 'owner')
+  const projectId = action === 'submit'
+    ? required(draft.projectId, '项目')
+    : text(draft.projectId) || null
+  const contractId = action === 'submit'
+    ? required(draft.contractId, '施工合同')
+    : text(draft.contractId) || null
+  const contract = projectId && contractId
+    ? await activeContract(tx, projectId, contractId, 'owner')
+    : null
+  if (contractId && !projectId)
+    throw new Error('选择施工合同前必须先选择项目')
   const no = documentNo(draft.no, 'BQ')
-  const name = required(draft.name, '变更名称')
+  const name = action === 'submit'
+    ? required(draft.name, '变更名称')
+    : text(draft.name)
   const lines = boqLines(draft)
+  if (lines.length && (!projectId || !contractId))
+    throw new Error('量价变更明细必须关联项目与施工合同')
   const documentType = (text(draft.documentType) || 'change_negotiation') as BoqDocumentType
   const directiveType = text(draft.directiveType) as BoqDirectiveType
   const reason = action === 'submit' ? required(draft.reason, '变更事由') : text(draft.reason)
@@ -241,6 +289,8 @@ async function saveOwnerChange(
     if (boqOrder) {
       if (!lines.length)
         throw new Error('量价变更草稿不能改为纯金额签证，请保留至少一条明细')
+      if (!projectId || !contractId)
+        throw new Error('量价变更明细必须关联项目与施工合同')
       const result = await replaceBoqChangeOrderDraft(tx, id, {
         projectId,
         contractId,
@@ -267,8 +317,6 @@ async function saveOwnerChange(
       return { id, logIds }
     }
 
-    if (lines.length)
-      throw new Error('纯金额签证草稿不能改为量价变更，请新建量价变更单')
     const [ledger] = await tx.select<{ id: string, status: string, source_type: string }>(
       `SELECT id, status, source_type FROM owner_change_orders
        WHERE id = ? AND deleted_at IS NULL`,
@@ -278,6 +326,43 @@ async function saveOwnerChange(
       throw new Error('变更单不存在、已删除或不可编辑')
     if (!['draft', 'rejected'].includes(ledger.status))
       throw new Error('只有草稿或已退回纯金额签证可以编辑')
+    if (lines.length) {
+      if (!projectId || !contractId)
+        throw new Error('量价变更明细必须关联项目与施工合同')
+      const result = await createBoqChangeOrder(tx, {
+        id,
+        projectId,
+        contractId,
+        code: no,
+        name,
+        documentType,
+        directiveNo: text(draft.directiveNo),
+        directiveType,
+        applicationDate: text(draft.applicationDate),
+        reason,
+        approvedTaxInclusiveAmount: nullableNumber(draft.approvedTaxInclusiveAmount),
+        approvedTaxExclusiveAmount: nullableNumber(draft.approvedTaxExclusiveAmount),
+        appliedTaxExclusiveAmount: nullableNumber(draft.appliedTaxExclusiveAmount),
+        note: text(draft.note),
+        lines,
+      })
+      const deleteLogId = await softDelete(tx, 'owner_change_orders', id)
+      await tx.execute(`
+        UPDATE file_refs
+        SET owner_type = 'boq_change_order'
+        WHERE owner_type = 'owner_change_order' AND owner_id = ?
+      `, [id])
+      const logIds = [...result.logIds]
+      if (deleteLogId)
+        logIds.push(deleteLogId)
+      if (action === 'submit') {
+        const statusLogId = await transitionBoqChangeOrder(tx, id, 'submitted', text(draft.statusNote))
+        if (statusLogId)
+          logIds.push(statusLogId)
+      }
+      await applyFileRefChanges(tx, 'boq_change_order', id, attachments)
+      return { id, logIds }
+    }
     const logId = await withUpdateLog(tx, 'owner_change_orders', id, () => tx.execute(`
       UPDATE owner_change_orders
       SET project_id = ?, change_no = ?, contract_name = ?, tax_inc_amount = ?,
@@ -289,7 +374,7 @@ async function saveOwnerChange(
     `, [
       projectId,
       no,
-      contract.name,
+      contract?.name ?? '',
       numberValue(draft.approvedTaxInclusiveAmount),
       numberValue(draft.approvedTaxExclusiveAmount),
       numberValue(draft.appliedTaxExclusiveAmount),
@@ -324,7 +409,7 @@ async function saveOwnerChange(
       id,
       projectId,
       no,
-      contract.name,
+      contract?.name ?? '',
       numberValue(draft.approvedTaxInclusiveAmount),
       numberValue(draft.approvedTaxExclusiveAmount),
       numberValue(draft.appliedTaxExclusiveAmount),
@@ -346,6 +431,8 @@ async function saveOwnerChange(
     return { id, logIds }
   }
 
+  if (!projectId || !contractId)
+    throw new Error('量价变更明细必须关联项目与施工合同')
   const result = await createBoqChangeOrder(tx, {
     projectId,
     contractId,
@@ -377,13 +464,26 @@ async function assertBoqLine(
   boqLineId: string,
   projectId: string,
   contractId: string,
-): Promise<void> {
-  const [line] = await tx.select<{ id: string }>(`
-    SELECT id FROM boq_lines
+): Promise<{
+  id: string
+  item_name: string
+  unit: string
+  unit_price: number
+}> {
+  const [line] = await tx.select<{
+    id: string
+    item_name: string
+    unit: string
+    unit_price: number
+  }>(`
+    SELECT id, item_name, unit,
+           COALESCE(recognized_unit_price, unit_price, 0) AS unit_price
+    FROM boq_lines
     WHERE id = ? AND project_id = ? AND contract_id = ? AND deleted_at IS NULL
   `, [boqLineId, projectId, contractId])
   if (!line)
     throw new Error('报量明细包含无效合同工程量清单行')
+  return line
 }
 
 async function saveOwnerReport(
@@ -392,30 +492,49 @@ async function saveOwnerReport(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const projectId = required(draft.projectId, '项目')
-  const contractId = required(draft.contractId, '施工合同')
-  await activeContract(tx, projectId, contractId, 'owner')
-  const periodNo = required(draft.periodNo, '报量期次')
-  if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(periodNo))
+  const projectId = action === 'submit'
+    ? required(draft.projectId, '项目')
+    : text(draft.projectId) || null
+  const contractId = action === 'submit'
+    ? required(draft.contractId, '施工合同')
+    : text(draft.contractId) || null
+  if (contractId && !projectId)
+    throw new Error('选择施工合同前必须先选择项目')
+  if (projectId && contractId)
+    await activeContract(tx, projectId, contractId, 'owner')
+  const periodNo = action === 'submit'
+    ? required(draft.periodNo, '报量期次')
+    : text(draft.periodNo)
+  if (periodNo && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(periodNo))
     throw new Error('报量期次格式必须为 yyyy-mm')
   const lines = draft.lines ?? []
   if (action === 'submit' && !lines.length)
     throw new Error('报量单至少需要一条明细')
+  if (lines.length && (!projectId || !contractId))
+    throw new Error('报量明细必须关联项目与施工合同')
 
+  const quantities = projectId && contractId && periodNo
+    ? await loadMonthlyQuantities(tx, projectId, contractId, periodNo)
+    : []
+  const autoQtyById = new Map(
+    quantities.map(row => [row.boq_line_id, numberValue(row.auto_qty)]),
+  )
   const normalized = await Promise.all(lines.map(async (line) => {
     const boqLineId = required(line.boqLineId, '合同工程量清单行')
-    await assertBoqLine(tx, boqLineId, projectId, contractId)
-    const autoQty = numberValue(line.autoQty)
+    if (!projectId || !contractId)
+      throw new Error('报量明细必须关联项目与施工合同')
+    const boqLine = await assertBoqLine(tx, boqLineId, projectId, contractId)
+    const autoQty = autoQtyById.get(boqLineId) ?? 0
     const reportedQty = nullableNumber(line.reportedQty) ?? autoQty
     if (autoQty < 0 || reportedQty < 0)
       throw new Error('自动完成量与申报量不能为负数')
-    const unitPrice = numberValue(line.unitPrice)
+    const unitPrice = numberValue(boqLine.unit_price)
     if (unitPrice < 0)
       throw new Error('合同单价不能为负数')
     return {
       boqLineId,
-      itemName: required(line.itemName, '分项名称'),
-      unit: text(line.unit),
+      itemName: boqLine.item_name,
+      unit: boqLine.unit,
       autoQty,
       reportedQty,
       unitPrice,
@@ -528,6 +647,8 @@ async function saveAcceptance(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('project_acceptance')
+  if (draft.id)
+    await assertEditableDraft(tx, 'project_acceptances', id, '验收或保修记录')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   if (action === 'submit') {
@@ -585,6 +706,8 @@ async function saveFinalSettlement(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('owner_final_settlement')
+  if (draft.id)
+    await assertEditableDraft(tx, 'owner_final_settlements', id, '最终结算')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   const amount = numberValue(draft.settlementAmount)
@@ -641,6 +764,8 @@ async function saveOwnerPenalty(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('owner_penalty')
+  if (draft.id)
+    await assertEditableDraft(tx, 'owner_penalties', id, '甲方罚扣单')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   const amount = numberValue(draft.amount)
@@ -697,6 +822,8 @@ async function saveSubChange(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('subcontract_change')
+  if (draft.id)
+    await assertEditableDraft(tx, 'subcontract_change_orders', id, '分包变更单')
   const projectId = text(draft.projectId) || null
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
@@ -758,6 +885,15 @@ async function saveSubSettlement(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('expenditure_settlement')
+  if (draft.id) {
+    await assertEditableDraft(
+      tx,
+      'expenditure_settlements',
+      id,
+      '分包结算',
+      `AND biz_type = '分包'`,
+    )
+  }
   const projectId = text(draft.projectId) || null
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
@@ -818,7 +954,18 @@ async function saveProjectPenalty(
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
   const id = text(draft.id) || generateId('penalty')
-  const projectId = required(draft.projectId, '项目')
+  if (draft.id) {
+    await assertEditableDraft(
+      tx,
+      'penalty_records',
+      id,
+      '项目罚扣',
+      `AND source = 'project'`,
+    )
+  }
+  const projectId = action === 'submit'
+    ? required(draft.projectId, '项目')
+    : text(draft.projectId) || null
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
   const crewId = text(draft.crewId) || null
@@ -828,9 +975,12 @@ async function saveProjectPenalty(
     requiredPositive(amount, '罚扣金额')
     required(draft.penaltyDate, '日期')
   }
-  await assertActiveProject(tx, projectId)
+  if (projectId)
+    await assertActiveProject(tx, projectId)
   await assertActiveCrew(tx, crewId)
-  if (contractId)
+  if (contractId && !projectId)
+    throw new Error('选择支出合同前必须先选择项目')
+  if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'expenditure', supplierId)
   const values = [
     documentNo(draft.no, 'XMFK'),
@@ -1045,6 +1195,150 @@ async function loadSimple(
   return rows[0] ?? null
 }
 
+export async function loadOwnerDocumentContractSummary(
+  contractId: string,
+  excludeSettlementId = '',
+): Promise<OwnerDocumentContractSummary | null> {
+  if (!contractId)
+    return null
+  const [row] = await select<{
+    contract_amount: number
+    prior_settlement_amount: number
+    received_amount: number
+  }>(`
+    SELECT
+      contract.amount + COALESCE((
+        SELECT SUM(supplement.amount)
+        FROM contract_supplements supplement
+        WHERE supplement.contract_id = contract.id
+          AND supplement.deleted_at IS NULL
+          AND supplement.status NOT IN ('draft', '草稿')
+      ), 0) AS contract_amount,
+      COALESCE((
+        SELECT SUM(settlement.total_amount)
+        FROM expenditure_settlements settlement
+        WHERE settlement.contract_id = contract.id
+          AND settlement.biz_type = '分包'
+          AND settlement.deleted_at IS NULL
+          AND (? = '' OR settlement.id <> ?)
+      ), 0) AS prior_settlement_amount,
+      COALESCE((
+        SELECT SUM(receipt.amount)
+        FROM receipt_registrations receipt
+        WHERE receipt.contract_id = contract.id
+          AND receipt.deleted_at IS NULL
+      ), 0) AS received_amount
+    FROM contracts contract
+    WHERE contract.id = ? AND contract.deleted_at IS NULL
+  `, [excludeSettlementId, excludeSettlementId, contractId])
+  return row
+    ? {
+        contractAmount: numberValue(row.contract_amount),
+        priorSettlementAmount: numberValue(row.prior_settlement_amount),
+        receivedAmount: numberValue(row.received_amount),
+      }
+    : null
+}
+
+export async function listOwnerDocumentBasicOptions(
+  kind: 'crew' | 'project' | 'supplier',
+  keyword: string,
+): Promise<OwnerDocumentLookupOption[]> {
+  const table = {
+    crew: 'crews',
+    project: 'projects',
+    supplier: 'suppliers',
+  }[kind]
+  const rows = await select<{ id: string, name: string }>(
+    selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
+    [`%${keyword.trim()}%`],
+  )
+  return rows.map(row => ({ id: row.id, label: row.name }))
+}
+
+export async function listOwnerDocumentContractOptions(
+  projectId: string,
+  side: 'expenditure' | 'owner',
+  supplierId: string,
+  keyword: string,
+): Promise<OwnerDocumentLookupOption[]> {
+  if (!projectId)
+    return []
+  const pattern = `%${keyword.trim()}%`
+  const rows = await select<{
+    id: string
+    no: string
+    name: string
+    supplier_name: string
+  }>(`
+    SELECT contract.id, contract.no, contract.name,
+           COALESCE(supplier.name, '') AS supplier_name
+    FROM contracts contract
+    LEFT JOIN suppliers supplier
+      ON supplier.id = contract.supplier_id AND supplier.deleted_at IS NULL
+    WHERE contract.deleted_at IS NULL
+      AND contract.project_id = ?
+      AND ${side === 'owner' ? 'contract.kind = \'施工\'' : 'contract.kind <> \'施工\''}
+      AND (? = '' OR contract.supplier_id = ?)
+      AND (contract.no LIKE ? OR contract.name LIKE ?)
+    ORDER BY contract.sign_date DESC, contract.created_at DESC
+    LIMIT 50
+  `, [
+    projectId,
+    side === 'owner' ? '' : supplierId,
+    supplierId,
+    pattern,
+    pattern,
+  ])
+  return rows.map(row => ({
+    id: row.id,
+    label: row.name,
+    hint: `${row.no || '未编号'}${row.supplier_name ? ` · ${row.supplier_name}` : ''}`,
+  }))
+}
+
+export async function listOwnerDocumentSettlementOptions(
+  projectId: string,
+  supplierId: string,
+  contractId: string,
+  keyword: string,
+): Promise<OwnerDocumentLookupOption[]> {
+  if (!projectId)
+    return []
+  const pattern = `%${keyword.trim()}%`
+  const rows = await select<{
+    id: string
+    no: string
+    name: string
+    total_amount: number
+  }>(`
+    SELECT id, no, name, total_amount
+    FROM expenditure_settlements
+    WHERE deleted_at IS NULL
+      AND biz_type = '分包'
+      AND status = 'confirmed'
+      AND project_id = ?
+      AND (? = '' OR supplier_id = ?)
+      AND (? = '' OR contract_id = ?)
+      AND (no LIKE ? OR name LIKE ?)
+    ORDER BY settlement_date DESC, created_at DESC
+    LIMIT 50
+  `, [
+    projectId,
+    supplierId,
+    supplierId,
+    contractId,
+    contractId,
+    pattern,
+    pattern,
+  ])
+  return rows.map(row => ({
+    id: row.id,
+    label: row.name || row.no,
+    hint: `${row.no || '未编号'} · ¥${numberValue(row.total_amount).toLocaleString('zh-CN')}`,
+  }))
+}
+
 export async function loadOwnerDocumentForm(
   kind: OwnerDocumentKind,
   id: string,
@@ -1072,18 +1366,12 @@ export async function loadOwnerDocumentForm(
     }
   }
   if (kind === 'final_settlement') {
-    const [row] = await select<Record<string, unknown>>(`
-      SELECT settlement.*, contract.amount AS contract_amount,
-             contract.changed AS contract_changed, contract.paid AS contract_paid
-      FROM owner_final_settlements settlement
-      LEFT JOIN contracts contract
-        ON contract.id = settlement.contract_id AND contract.deleted_at IS NULL
-      WHERE settlement.id = ? AND settlement.deleted_at IS NULL
-    `, [id])
+    const row = await loadSimple('owner_final_settlements', id)
     if (!row)
       return null
     const settlementAmount = numberValue(row.settlement_amount)
-    const receivedAmount = numberValue(row.contract_paid)
+    const summary = await loadOwnerDocumentContractSummary(text(row.contract_id))
+    const receivedAmount = summary?.receivedAmount ?? 0
     return {
       id: row.id,
       no: row.no,
@@ -1096,7 +1384,7 @@ export async function loadOwnerDocumentForm(
       differenceNote: row.difference_note,
       status: row.status,
       note: row.note,
-      changedContractAmount: numberValue(row.contract_changed || row.contract_amount),
+      changedContractAmount: summary?.contractAmount ?? 0,
       receivedAmount,
       settlementReceiptGap: round2(settlementAmount - receivedAmount),
     }
@@ -1465,6 +1753,35 @@ export async function approveOwnerChange(
   })
 }
 
+export async function transitionAcceptance(
+  id: string,
+  target: AcceptanceLifecycleTarget,
+): Promise<void> {
+  const allowed: Record<string, AcceptanceLifecycleTarget> = {
+    submitted: 'accepted',
+    accepted: 'warranty',
+    warranty: 'expired',
+  }
+  await withTransaction(async (tx) => {
+    const [record] = await tx.select<{ status: string }>(
+      `SELECT status
+       FROM project_acceptances
+       WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (!record)
+      throw new Error('验收或保修记录不存在或已删除')
+    if (allowed[record.status] !== target)
+      throw new Error('验收或保修状态已变化，请刷新后重试')
+    await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
+      UPDATE project_acceptances
+      SET type = CASE WHEN ? IN ('warranty', 'expired') THEN 'warranty' ELSE type END,
+          status = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `, [target, target, id]))
+  })
+}
+
 export async function auditOwnerReport(
   id: string,
   draft: OwnerReportAuditDraft,
@@ -1476,13 +1793,22 @@ export async function auditOwnerReport(
     )
     if (!head)
       throw new Error('月度报量单不存在或已删除')
-    if (head.status === 'exported')
-      throw new Error('该月度报量已审定')
-    const rows = await tx.select<{ id: string, boq_line_id: string }>(
-      `SELECT id, boq_line_id FROM monthly_statement_lines
+    if (head.status !== 'adjusted')
+      throw new Error('只有已申报月度报量可以执行审定')
+    const rows = await tx.select<{
+      id: string
+      boq_line_id: string
+      unit_price: number
+    }>(
+      `SELECT id, boq_line_id, unit_price FROM monthly_statement_lines
        WHERE statement_id = ? AND deleted_at IS NULL`,
       [id],
     )
+    if (!rows.length)
+      throw new Error('月度报量没有可审定明细')
+    const submittedBoqIds = new Set(draft.lines.map(line => line.boqLineId))
+    if (submittedBoqIds.size !== rows.length || draft.lines.length !== rows.length)
+      throw new Error('审定必须覆盖当前月度报量的全部明细')
     const rowByBoq = new Map(rows.map(row => [row.boq_line_id, row]))
     let auditedTotal = 0
     for (const line of draft.lines) {
@@ -1491,9 +1817,7 @@ export async function auditOwnerReport(
         throw new Error('审定明细不属于当前月度报量单')
       if (!Number.isFinite(line.auditedQty) || line.auditedQty < 0)
         throw new Error('审定量必须是非负有效数字')
-      const auditedAmount = numberValue(line.auditedAmount)
-      if (auditedAmount < 0)
-        throw new Error('审定金额不能为负数')
+      const auditedAmount = round2(line.auditedQty * numberValue(row.unit_price))
       auditedTotal = round2(auditedTotal + auditedAmount)
       await withUpdateLog(tx, 'monthly_statement_lines', row.id, () => tx.execute(`
         UPDATE monthly_statement_lines
@@ -1501,16 +1825,11 @@ export async function auditOwnerReport(
         WHERE id = ?
       `, [line.auditedQty, auditedAmount, row.id]))
     }
-    const headAmount = Number.isFinite(draft.auditedAmount)
-      ? round2(draft.auditedAmount)
-      : auditedTotal
-    if (headAmount < 0)
-      throw new Error('审定产值不能为负数')
     await withUpdateLog(tx, 'monthly_statements', id, () => tx.execute(`
       UPDATE monthly_statements
       SET audited_amount = ?, status = 'exported', updated_at = datetime('now')
       WHERE id = ?
-    `, [headAmount, id]))
+    `, [auditedTotal, id]))
   })
 }
 
@@ -1539,17 +1858,21 @@ export async function deductProjectPenalty(
     if (penalty.status === 'draft')
       throw new Error('草稿罚扣不能执行结算抵扣')
     const [settlement] = await tx.select<{
+      biz_type: string
       contract_id: string | null
       project_id: string | null
+      status: string
       supplier_id: string | null
       total_amount: number
     }>(`
-      SELECT project_id, supplier_id, contract_id, total_amount
+      SELECT project_id, supplier_id, contract_id, total_amount, biz_type, status
       FROM expenditure_settlements
       WHERE id = ? AND deleted_at IS NULL
     `, [settlementId])
     if (!settlement)
       throw new Error('支出结算不存在或已删除')
+    if (settlement.biz_type !== '分包' || settlement.status !== 'confirmed')
+      throw new Error('项目罚扣只能抵扣已确认分包结算')
     if (settlement.project_id !== penalty.projectId)
       throw new Error('罚扣与支出结算不属于同一项目')
     if (penalty.supplier_id && settlement.supplier_id !== penalty.supplier_id)

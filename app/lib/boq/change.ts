@@ -29,6 +29,7 @@ export interface BoqChangeLineDraft {
 }
 
 export interface CreateBoqChangeOrderDraft {
+  id?: string
   projectId: string
   contractId: string
   code: string
@@ -273,13 +274,13 @@ export async function createBoqChangeOrder(
 ): Promise<CreateBoqChangeOrderResult> {
   const code = draft.code.trim()
   const name = draft.name.trim()
-  if (!draft.projectId || !draft.contractId || !code || !name)
-    throw new Error('项目、施工合同、变更编号与名称必填')
+  if (!draft.projectId || !draft.contractId || !code)
+    throw new Error('项目、施工合同与变更编号必填')
   if (!draft.lines.length)
     throw new Error('变更单至少需要一条明细')
 
   const { normalized, changeType, totalAmount } = await normalizeChangeDraft(db, draft)
-  const orderId = generateId('boq_change')
+  const orderId = draft.id ?? generateId('boq_change')
   const logIds: string[] = []
   await db.execute(
     `INSERT INTO boq_change_orders
@@ -325,8 +326,8 @@ export async function replaceBoqChangeOrderDraft(
     throw new Error('只有草稿或已退回变更单可以编辑')
   const code = draft.code.trim()
   const name = draft.name.trim()
-  if (!draft.projectId || !draft.contractId || !code || !name)
-    throw new Error('项目、施工合同、变更编号与名称必填')
+  if (!draft.projectId || !draft.contractId || !code)
+    throw new Error('项目、施工合同与变更编号必填')
   if (!draft.lines.length)
     throw new Error('量价变更单至少需要一条明细')
 

@@ -1,6 +1,7 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { runMigrations } from '~/lib/db/migrations'
 import {
   listOwnerDocumentAttachments,
@@ -89,6 +90,41 @@ beforeEach(async () => {
       '墙砖铺贴', '㎡', 10, 20, 200, 'owner-line-1', 10
     )
   `)
+  for (const sql of [
+    `INSERT INTO items (id, project_id, code, name, trade)
+     VALUES ('item-owner', 'project-owner', 'ITEM-OWNER', '墙砖铺贴', '瓦工')`,
+    `INSERT INTO buildings (id, project_id, code, name)
+     VALUES ('building-owner', 'project-owner', 'B-OWNER', '1#楼')`,
+    `INSERT INTO floors (id, building_id, code, name)
+     VALUES ('floor-owner', 'building-owner', 'F-OWNER', '1层')`,
+    `INSERT INTO house_type_templates (id, project_id, code, name)
+     VALUES ('template-owner', 'project-owner', 'HT-OWNER', 'A户型')`,
+    `INSERT INTO rooms (id, template_id, code, name)
+     VALUES ('room-owner', 'template-owner', 'ROOM-OWNER', '客厅')`,
+    `INSERT INTO units (id, floor_id, house_type_template_id, code, name)
+     VALUES ('unit-owner', 'floor-owner', 'template-owner', 'U-OWNER', '101')`,
+    `INSERT INTO house_type_template_items (
+       id, room_id, item_id, boq_line_id, field_qty
+     )
+     VALUES ('hti-owner', 'room-owner', 'item-owner', 'boq-line-owner', 3)`,
+    `INSERT INTO construction_stages (id, project_id, code, name, trade)
+     VALUES ('stage-owner', 'project-owner', 'STAGE-OWNER', '墙砖完成', '瓦工')`,
+    `INSERT INTO construction_stage_items (
+       id, stage_id, item_id, is_reporting_stage
+     )
+     VALUES ('stage-item-owner', 'stage-owner', 'item-owner', 1)`,
+    `INSERT INTO unit_assignments (id, unit_id, trade, crew_id)
+     VALUES ('assignment-owner', 'unit-owner', '瓦工', 'crew-owner')`,
+    `INSERT INTO unit_stage_completions (
+       id, unit_id, stage_id, assignment_id, status, completed_at
+     )
+     VALUES (
+       'completion-owner', 'unit-owner', 'stage-owner', 'assignment-owner',
+       'completed', '2026-07-20 12:00:00'
+     )`,
+  ]) {
+    await mem.execute(sql)
+  }
 })
 
 afterEach(() => {
@@ -196,8 +232,14 @@ describe('f5 甲方/分包单据领域事务', () => {
     ).rejects.toThrow('已生效纯金额签证不可直接删除')
   })
 
-  it('月度报量保留自动完成量、申报量和审定量，不复制第二套完成事实', async () => {
+  it('月度报量从阶段完成事实派生自动量，忽略客户端伪造值并保留申报与审定量', async () => {
     const store = useOwnerDocumentStore()
+    expect(await loadMonthlyQuantities(
+      mem,
+      'project-owner',
+      'contract-owner',
+      '2026-07',
+    )).toEqual([{ boq_line_id: 'boq-line-owner', auto_qty: 3 }])
     const saved = await store.saveForm('owner_report', {
       no: 'BL-OWNER-001',
       projectId: 'project-owner',
@@ -209,7 +251,7 @@ describe('f5 甲方/分包单据领域事务', () => {
         boqLineId: 'boq-line-owner',
         itemName: '墙砖铺贴',
         unit: '㎡',
-        autoQty: 3,
+        autoQty: 999,
         reportedQty: 2.5,
         unitPrice: 20,
       }],
@@ -230,6 +272,10 @@ describe('f5 甲方/分包单据领域事务', () => {
         }),
       ],
     })
+    await expect(store.auditOwnerReport(saved.id, {
+      auditedAmount: 0,
+      lines: [],
+    })).rejects.toThrow('全部明细')
     await store.auditOwnerReport(saved.id, {
       auditedAmount: 40,
       lines: [{
@@ -256,6 +302,23 @@ describe('f5 甲方/分包单据领域事务', () => {
 
   it('六类独立单据复用真实合同与支出结算，项目罚扣从抵扣关系派生金额', async () => {
     const store = useOwnerDocumentStore()
+    await mem.execute(`
+      INSERT INTO contract_supplements (
+        id, contract_id, no, name, amount, status
+      )
+      VALUES
+        ('supplement-owner-effective', 'contract-owner', 'BC-001', '有效补充协议', 250, '有效'),
+        ('supplement-owner-draft', 'contract-owner', 'BC-002', '草稿补充协议', 500, '草稿')
+    `)
+    await mem.execute(`
+      INSERT INTO receipt_registrations (
+        id, no, receipt_date, project_id, contract_id, customer_id, amount
+      )
+      VALUES (
+        'receipt-owner', 'SK-001', '2026-07-20', 'project-owner',
+        'contract-owner', 'customer-owner', 320
+      )
+    `)
     const acceptance = await store.saveForm('acceptance', {
       no: 'YS-001',
       type: 'acceptance',
@@ -325,16 +388,42 @@ describe('f5 甲方/分包单据领域事务', () => {
       rectificationNote: '复查合格后抵扣',
     }, 'submit')
 
+    for (const [kind, id] of [
+      ['acceptance', acceptance.id],
+      ['final_settlement', finalSettlement.id],
+      ['owner_penalty', ownerPenalty.id],
+      ['sub_change', subChange.id],
+      ['sub_settlement', subSettlement.id],
+      ['project_penalty', penalty.id],
+    ] as const) {
+      await expect(store.saveForm(kind, { id }, 'draft')).rejects.toThrow('只有草稿')
+    }
+
     expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
       projectId: 'project-owner',
       contractId: 'contract-owner',
       status: 'submitted',
     })
+    await store.transitionAcceptance(acceptance.id, 'accepted')
+    expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
+      type: 'acceptance',
+      status: 'accepted',
+    })
+    await store.transitionAcceptance(acceptance.id, 'warranty')
+    expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
+      type: 'warranty',
+      status: 'warranty',
+    })
+    await store.transitionAcceptance(acceptance.id, 'expired')
+    expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
+      type: 'warranty',
+      status: 'expired',
+    })
     expect(await loadOwnerDocumentForm('final_settlement', finalSettlement.id)).toMatchObject({
       settlementAmount: 1180,
-      changedContractAmount: 1200,
-      receivedAmount: 300,
-      settlementReceiptGap: 880,
+      changedContractAmount: 1250,
+      receivedAmount: 320,
+      settlementReceiptGap: 860,
     })
     expect(await loadOwnerDocumentForm('owner_penalty', ownerPenalty.id)).toMatchObject({
       noticeNo: 'LX-001',
@@ -427,6 +516,69 @@ describe('f5 甲方/分包单据领域事务', () => {
     expect(await listOwnerDocumentForms('acceptance')).toHaveLength(1)
   })
 
+  it('甲方变更、月度报量与项目罚扣草稿允许缺少项目、合同和必填业务字段', async () => {
+    const store = useOwnerDocumentStore()
+    const change = await store.saveForm('owner_change', {
+      note: '待选择项目与合同',
+      lines: [],
+    }, 'draft')
+    const report = await store.saveForm('owner_report', {
+      note: '待选择报量期次',
+      lines: [],
+    }, 'draft')
+    const penalty = await store.saveForm('project_penalty', {
+      note: '待补罚扣信息',
+    }, 'draft')
+
+    expect(await loadOwnerDocumentForm('owner_change', change.id)).toMatchObject({
+      projectId: null,
+      contractId: null,
+      status: 'draft',
+      note: '待选择项目与合同',
+    })
+    expect(await loadOwnerDocumentForm('owner_report', report.id)).toMatchObject({
+      projectId: null,
+      contractId: null,
+      status: 'draft',
+      note: '待选择报量期次',
+    })
+    expect(await loadOwnerDocumentForm('project_penalty', penalty.id)).toMatchObject({
+      projectId: null,
+      status: 'draft',
+      note: '待补罚扣信息',
+    })
+
+    const converted = await store.saveForm('owner_change', {
+      id: change.id,
+      name: '草稿完善为量价变更',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      applicationDate: '2026-07-26',
+      reason: '补齐后提交',
+      lines: [{
+        operation: 'qty',
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        deltaQty: 1,
+      }],
+    }, 'submit')
+    expect(converted.id).toBe(change.id)
+    expect(await loadOwnerDocumentForm('owner_change', change.id)).toMatchObject({
+      name: '草稿完善为量价变更',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      status: 'submitted',
+      lines: [expect.objectContaining({ boqLineId: 'boq-line-owner' })],
+    })
+    expect(await mem.select(`
+      SELECT deleted_at
+      FROM owner_change_orders
+      WHERE id = ?
+    `, [change.id])).toEqual([
+      expect.objectContaining({ deleted_at: expect.any(String) }),
+    ])
+  })
+
   it('甲方变更与月度报量草稿在原单替换明细后提交，不复制业务单据', async () => {
     const store = useOwnerDocumentStore()
     const change = await store.saveForm('owner_change', {
@@ -483,11 +635,15 @@ describe('f5 甲方/分包单据领域事务', () => {
         boqLineId: 'boq-line-owner',
         itemName: '墙砖铺贴',
         unit: '㎡',
-        autoQty: 2,
+        autoQty: 999,
         reportedQty: 2,
         unitPrice: 20,
       }],
     }, 'draft')
+    await expect(store.auditOwnerReport(report.id, {
+      auditedAmount: 0,
+      lines: [],
+    })).rejects.toThrow('只有已申报')
     const reported = await store.saveForm('owner_report', {
       id: report.id,
       no: 'BL-DRAFT-001',
@@ -499,7 +655,7 @@ describe('f5 甲方/分包单据领域事务', () => {
         boqLineId: 'boq-line-owner',
         itemName: '墙砖铺贴',
         unit: '㎡',
-        autoQty: 2,
+        autoQty: 999,
         reportedQty: 1.5,
         unitPrice: 20,
       }],
@@ -509,7 +665,7 @@ describe('f5 甲方/分包单据领域事务', () => {
     expect(await loadOwnerDocumentForm('owner_report', report.id)).toMatchObject({
       status: 'reported',
       reportedAmount: 30,
-      lines: [expect.objectContaining({ reportedQty: 1.5, amount: 30 })],
+      lines: [expect.objectContaining({ autoQty: 0, reportedQty: 1.5, amount: 30 })],
     })
     expect(await mem.select(`
       SELECT COUNT(*) AS count

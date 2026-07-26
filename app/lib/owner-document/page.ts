@@ -237,3 +237,43 @@ export function ownerDocumentKindFromRoute(
   )
   return entry?.[0] as OwnerDocumentKind | undefined ?? null
 }
+
+export function ownerDocumentStatusLabel(status: string): string {
+  return {
+    draft: '草稿',
+    submitted: '已提交',
+    adjusted: '已申报',
+    reported: '已申报',
+    exported: '已审定',
+    audited: '已审定',
+    approved: '已签证',
+    accepted: '已验收',
+    warranty: '保修中',
+    expired: '保修到期',
+    confirmed: '已确认',
+    pending: '待抵扣',
+    repairing: '整改中',
+    repaired_self: '自行整改',
+    repaired_other: '代为整改',
+    deducted: '已抵扣',
+    rejected: '已退回',
+  }[status] ?? status
+}
+
+export function ownerDocumentLineAmount(
+  kind: OwnerDocumentKind,
+  line: Record<string, unknown>,
+): number {
+  if (kind === 'owner_report')
+    return (Number(line.reportedQty) || 0) * (Number(line.unitPrice) || 0)
+  const operation = String(line.operation ?? 'qty')
+  const qty = Number(line.qty) || 0
+  const deltaQty = Number(line.deltaQty) || 0
+  const unitPrice = Number(line.unitPrice) || 0
+  const newUnitPrice = Number(line.newUnitPrice) || 0
+  if (operation === 'add')
+    return deltaQty * newUnitPrice
+  if (operation === 'price')
+    return qty * (newUnitPrice - unitPrice)
+  return deltaQty * unitPrice
+}

@@ -7,6 +7,7 @@ import type {
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type {
+  AcceptanceLifecycleTarget,
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
   OwnerDocumentKind,
@@ -16,18 +17,12 @@ import type {
 import { isTauri } from '@tauri-apps/api/core'
 import { useDebounceFn } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
-import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
-import {
-  listOwnerDocumentAttachments,
-  listOwnerDocumentBoqLines,
-  loadOwnerDocumentForm,
-  loadPenaltyDeductions,
-} from '~/lib/owner-document/forms'
 import {
   OWNER_DOCUMENT_META,
   ownerDocumentDefaults,
   ownerDocumentFormPath,
+  ownerDocumentLineAmount,
+  ownerDocumentStatusLabel,
 } from '~/lib/owner-document/page'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
@@ -85,6 +80,36 @@ const canDeductPenalty = computed(() =>
   && ['pending', 'repairing', 'repaired_self', 'repaired_other'].includes(status.value)
   && Number(draft.value.remainingDeductionAmount ?? draft.value.amount ?? 0) > 0,
 )
+const acceptanceAction = computed<{
+  label: string
+  message: string
+  target: AcceptanceLifecycleTarget
+} | null>(() => {
+  if (props.kind !== 'acceptance')
+    return null
+  if (status.value === 'submitted') {
+    return {
+      label: '确认验收',
+      message: '确认验收结论后，单据进入已验收状态。',
+      target: 'accepted',
+    }
+  }
+  if (status.value === 'accepted') {
+    return {
+      label: '进入保修',
+      message: '进入保修后，单据类型切换为保修并开始履约跟踪。',
+      target: 'warranty',
+    }
+  }
+  if (status.value === 'warranty') {
+    return {
+      label: '确认保修到期',
+      message: '确认后将结束本单据的保修生命周期。',
+      target: 'expired',
+    }
+  }
+  return null
+})
 const dirty = computed(() =>
   JSON.stringify(draft.value) !== savedSnapshot.value
   || pendingAttachments.value.length > 0
@@ -101,111 +126,49 @@ const footerLabels = computed(() => ({
   save: '保存附件',
 }))
 
-function statusLabel(value: string): string {
-  return {
-    draft: '草稿',
-    submitted: '已提交',
-    adjusted: '已申报',
-    reported: '已申报',
-    exported: '已审定',
-    audited: '已审定',
-    approved: '已签证',
-    confirmed: '已确认',
-    pending: '待抵扣',
-    repairing: '整改中',
-    repaired_self: '自行整改',
-    repaired_other: '代为整改',
-    deducted: '已抵扣',
-    rejected: '已退回',
-  }[value] ?? value
-}
-
 async function basicLookup(
-  table: 'projects' | 'suppliers' | 'crews',
+  kind: 'crew' | 'project' | 'supplier',
   keyword: string,
 ): Promise<LookupOption[]> {
-  const pattern = `%${keyword.trim()}%`
-  const rows = await select<{ id: string, name: string }>(
-    selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
-    [pattern],
-  )
-  return rows.map(row => ({ id: row.id, label: row.name }))
+  return store.loadBasicOptions(kind, keyword)
 }
 
-const fetchProjects = (keyword: string) => basicLookup('projects', keyword)
-const fetchSuppliers = (keyword: string) => basicLookup('suppliers', keyword)
-const fetchCrews = (keyword: string) => basicLookup('crews', keyword)
+const fetchProjects = (keyword: string) => basicLookup('project', keyword)
+const fetchSuppliers = (keyword: string) => basicLookup('supplier', keyword)
+const fetchCrews = (keyword: string) => basicLookup('crew', keyword)
 
 async function fetchContracts(keyword: string): Promise<LookupOption[]> {
-  if (!draft.value.projectId)
+  const projectId = typeof draft.value.projectId === 'string'
+    ? draft.value.projectId
+    : ''
+  if (!projectId)
     return []
   const ownerSide = props.kind.startsWith('owner_')
     || props.kind === 'acceptance'
     || props.kind === 'final_settlement'
-  const pattern = `%${keyword.trim()}%`
   const supplierId = typeof draft.value.supplierId === 'string'
     ? draft.value.supplierId
     : ''
-  const rows = await select<{
-    id: string
-    no: string
-    name: string
-    supplier_name: string
-  }>(`
-    SELECT contract.id, contract.no, contract.name,
-           COALESCE(supplier.name, '') AS supplier_name
-    FROM contracts contract
-    LEFT JOIN suppliers supplier
-      ON supplier.id = contract.supplier_id AND supplier.deleted_at IS NULL
-    WHERE contract.deleted_at IS NULL
-      AND contract.project_id = ?
-      AND ${ownerSide ? 'contract.kind = \'施工\'' : 'contract.kind <> \'施工\''}
-      AND (? = '' OR contract.supplier_id = ?)
-      AND (contract.no LIKE ? OR contract.name LIKE ?)
-    ORDER BY contract.sign_date DESC, contract.created_at DESC
-    LIMIT 50
-  `, [draft.value.projectId, ownerSide ? '' : supplierId, supplierId, pattern, pattern])
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name,
-    hint: `${row.no || '未编号'}${row.supplier_name ? ` · ${row.supplier_name}` : ''}`,
-  }))
+  return store.loadContractOptions(
+    projectId,
+    ownerSide ? 'owner' : 'expenditure',
+    supplierId,
+    keyword,
+  )
 }
 
 async function fetchSettlements(keyword: string): Promise<LookupOption[]> {
-  if (!draft.value.projectId)
+  const projectId = typeof draft.value.projectId === 'string'
+    ? draft.value.projectId
+    : ''
+  if (!projectId)
     return []
-  const pattern = `%${keyword.trim()}%`
-  const rows = await select<{
-    id: string
-    no: string
-    name: string
-    total_amount: number
-  }>(`
-    SELECT id, no, name, total_amount
-    FROM expenditure_settlements
-    WHERE deleted_at IS NULL
-      AND biz_type = '分包'
-      AND project_id = ?
-      AND (? = '' OR supplier_id = ?)
-      AND (? = '' OR contract_id = ?)
-      AND (no LIKE ? OR name LIKE ?)
-    ORDER BY settlement_date DESC, created_at DESC
-    LIMIT 50
-  `, [
-    draft.value.projectId,
-    String(draft.value.supplierId ?? ''),
+  return store.loadSettlementOptions(
+    projectId,
     String(draft.value.supplierId ?? ''),
     String(draft.value.contractId ?? ''),
-    String(draft.value.contractId ?? ''),
-    pattern,
-    pattern,
-  ])
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name || row.no,
-    hint: `${row.no || '未编号'} · ¥${Number(row.total_amount).toLocaleString('zh-CN')}`,
-  }))
+    keyword,
+  )
 }
 
 const refreshBoqLines = useDebounceFn(async () => {
@@ -216,7 +179,7 @@ const refreshBoqLines = useDebounceFn(async () => {
     return
   }
   try {
-    boqLines.value = await listOwnerDocumentBoqLines(
+    boqLines.value = await store.loadBoqLines(
       projectId,
       contractId,
       props.kind === 'owner_report' ? String(draft.value.periodNo ?? '') : '',
@@ -275,44 +238,30 @@ const refreshContractSummary = useDebounceFn(async () => {
     return
   }
   if (props.kind === 'final_settlement') {
-    const [contract] = await select<{ amount: number, changed: number, paid: number }>(
-      `SELECT amount, changed, paid FROM contracts
-       WHERE id = ? AND deleted_at IS NULL`,
-      [contractId],
-    )
-    if (!contract)
+    const summary = await store.loadContractSummary(contractId)
+    if (!summary)
       return
-    const changedContractAmount = Number(contract.changed || contract.amount) || 0
-    const receivedAmount = Number(contract.paid) || 0
     const settlementAmount = Number(draft.value.settlementAmount) || 0
     draft.value = {
       ...draft.value,
-      changedContractAmount,
-      receivedAmount,
-      settlementReceiptGap: Math.round((settlementAmount - receivedAmount) * 100) / 100,
+      changedContractAmount: summary.contractAmount,
+      receivedAmount: summary.receivedAmount,
+      settlementReceiptGap: Math.round(
+        (settlementAmount - summary.receivedAmount) * 100,
+      ) / 100,
     }
   }
   if (props.kind === 'sub_settlement') {
-    const [contract] = await select<{ amount: number }>(
-      `SELECT amount FROM contracts WHERE id = ? AND deleted_at IS NULL`,
-      [contractId],
-    )
-    const [settled] = await select<{ amount: number }>(`
-      SELECT COALESCE(SUM(total_amount), 0) AS amount
-      FROM expenditure_settlements
-      WHERE biz_type = '分包'
-        AND contract_id = ?
-        AND deleted_at IS NULL
-        AND (? = '' OR id <> ?)
-    `, [contractId, routeId.value ?? '', routeId.value ?? ''])
-    const contractAmount = Number(contract?.amount) || 0
+    const summary = await store.loadContractSummary(contractId, routeId.value ?? '')
+    if (!summary)
+      return
     const totalAmount = Number(draft.value.totalAmount) || 0
     draft.value = {
       ...draft.value,
-      contractAmount,
-      priorSettlementAmount: Number(settled?.amount) || 0,
-      settlementRatio: contractAmount > 0
-        ? `${(totalAmount / contractAmount * 100).toFixed(2)}%`
+      contractAmount: summary.contractAmount,
+      priorSettlementAmount: summary.priorSettlementAmount,
+      settlementRatio: summary.contractAmount > 0
+        ? `${(totalAmount / summary.contractAmount * 100).toFixed(2)}%`
         : '—',
     }
   }
@@ -331,9 +280,9 @@ async function initialize() {
     }
     else {
       const [record, files, deductions] = await Promise.all([
-        loadOwnerDocumentForm(props.kind, id),
-        listOwnerDocumentAttachments(props.kind, id, true),
-        props.kind === 'project_penalty' ? loadPenaltyDeductions(id) : Promise.resolve([]),
+        store.loadOne(props.kind, id),
+        store.loadAttachments(props.kind, id, true),
+        props.kind === 'project_penalty' ? store.loadDeductions(id) : Promise.resolve([]),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -389,24 +338,12 @@ function patchLines(lines: Array<Record<string, unknown>>) {
   updateDerivedAmounts()
 }
 
-function lineAmount(line: Record<string, unknown>): number {
-  if (props.kind === 'owner_report')
-    return (Number(line.reportedQty) || 0) * (Number(line.unitPrice) || 0)
-  const operation = String(line.operation ?? 'qty')
-  const qty = Number(line.qty) || 0
-  const deltaQty = Number(line.deltaQty) || 0
-  const unitPrice = Number(line.unitPrice) || 0
-  const newUnitPrice = Number(line.newUnitPrice) || 0
-  if (operation === 'add')
-    return deltaQty * newUnitPrice
-  if (operation === 'price')
-    return qty * (newUnitPrice - unitPrice)
-  return deltaQty * unitPrice
-}
-
 function updateDerivedAmounts() {
   const lines = draft.value.lines ?? []
-  const amount = lines.reduce((sum, line) => sum + lineAmount(line), 0)
+  const amount = lines.reduce(
+    (sum, line) => sum + ownerDocumentLineAmount(props.kind, line),
+    0,
+  )
   if (props.kind === 'owner_change')
     draft.value = { ...draft.value, totalAmount: Math.round(amount * 100) / 100 }
   if (props.kind === 'owner_report')
@@ -613,6 +550,33 @@ async function approveChange() {
   }
   catch (cause) {
     error(`签证失败：${toErrorMessage(cause)}`)
+  }
+  finally {
+    lifecycleLoading.value = false
+  }
+}
+
+async function moveAcceptance() {
+  const id = routeId.value
+  const action = acceptanceAction.value
+  if (!id || !action)
+    return
+  const accepted = await confirm({
+    variant: 'simple',
+    title: action.label,
+    message: action.message,
+    confirmLabel: action.label,
+  })
+  if (!accepted)
+    return
+  lifecycleLoading.value = true
+  try {
+    await store.transitionAcceptance(id, action.target)
+    success(`${action.label}成功`)
+    await initialize()
+  }
+  catch (cause) {
+    error(`${action.label}失败：${toErrorMessage(cause)}`)
   }
   finally {
     lifecycleLoading.value = false
@@ -835,7 +799,7 @@ onMounted(() => {
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <span class="chip" :class="editable ? 'chip-brand' : 'chip-ok'">
-            {{ statusLabel(status) }}
+            {{ ownerDocumentStatusLabel(status) }}
           </span>
           <KitButton
             v-if="canApproveChange"
@@ -850,6 +814,13 @@ onMounted(() => {
             @click="auditReport"
           >
             <span class="i-lucide-stamp mr-1" aria-hidden="true" />确认审定
+          </KitButton>
+          <KitButton
+            v-if="acceptanceAction"
+            :loading="lifecycleLoading"
+            @click="moveAcceptance"
+          >
+            <span class="i-lucide-shield-check mr-1" aria-hidden="true" />{{ acceptanceAction.label }}
           </KitButton>
         </div>
       </header>

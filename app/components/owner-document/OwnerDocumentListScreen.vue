@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { OwnerDocumentKind, OwnerDocumentListRecord } from '~/lib/owner-document/forms'
-import { OWNER_DOCUMENT_META, ownerDocumentFormPath } from '~/lib/owner-document/page'
+import {
+  OWNER_DOCUMENT_META,
+  ownerDocumentFormPath,
+  ownerDocumentStatusLabel,
+} from '~/lib/owner-document/page'
 
 const props = defineProps<{
   kind: OwnerDocumentKind
@@ -20,7 +24,7 @@ const filtered = computed(() => {
   if (!keyword)
     return records.value
   return records.value.filter(row =>
-    [row.no, row.name, row.projectName, row.counterpartyName, statusLabel(row.status)]
+    [row.no, row.name, row.projectName, row.counterpartyName, ownerDocumentStatusLabel(row.status)]
       .some(value => value.toLocaleLowerCase('zh-CN').includes(keyword)),
   )
 })
@@ -36,25 +40,6 @@ const columns: KitTableColumn[] = [
   { field: 'status', title: '状态', width: 110, slot: 'status' },
   { title: '操作', type: 'action', width: 104 },
 ]
-
-function statusLabel(status: string): string {
-  return {
-    draft: '草稿',
-    submitted: '已提交',
-    adjusted: '已申报',
-    reported: '已申报',
-    exported: '已审定',
-    audited: '已审定',
-    approved: '已签证',
-    confirmed: '已确认',
-    pending: '待抵扣',
-    repairing: '整改中',
-    repaired_self: '自行整改',
-    repaired_other: '代为整改',
-    deducted: '已抵扣',
-    rejected: '已退回',
-  }[status] ?? status
-}
 
 function isDraftStatus(status: string): boolean {
   return status === 'draft' || status === 'rejected'
@@ -138,7 +123,7 @@ onActivated(() => {
         </template>
         <template #status="{ row }">
           <span class="chip" :class="isDraftStatus(row.status) ? 'chip-brand' : 'chip-ok'">
-            {{ statusLabel(row.status) }}
+            {{ ownerDocumentStatusLabel(row.status) }}
           </span>
         </template>
         <template #action="{ row }">

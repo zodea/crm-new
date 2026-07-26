@@ -100,6 +100,17 @@ describe('v24 F5 甲方/分包单据迁移', () => {
       'rectification_note',
       'deleted_at',
     ]))
+    for (const [table, column] of [
+      ['owner_change_orders', 'project_id'],
+      ['monthly_statements', 'project_id'],
+      ['monthly_statements', 'contract_id'],
+      ['penalty_records', 'projectId'],
+    ] as const) {
+      const columns = await db.select<{ name: string, notnull: number }>(
+        `PRAGMA table_info('${table}')`,
+      )
+      expect(columns.find(item => item.name === column)?.notnull).toBe(0)
+    }
 
     const penaltyForeignKeys = await db.select<{ table: string, from: string }>(
       `PRAGMA foreign_key_list('penalty_records')`,
@@ -227,6 +238,10 @@ describe('v24 F5 甲方/分包单据迁移', () => {
       VALUES (
         'bad-owner-penalty', 'project-f5', -1, '2026-07-26', '错误金额'
       )
+    `)).rejects.toThrow()
+    await expect(db.execute(`
+      INSERT INTO project_acceptances (id, status)
+      VALUES ('bad-acceptance-status', 'unknown')
     `)).rejects.toThrow()
 
     await db.execute(`

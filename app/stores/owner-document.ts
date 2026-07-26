@@ -1,5 +1,6 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type {
+  AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
   OwnerDocumentKind,
   OwnerDocumentSaveAction,
@@ -12,10 +13,18 @@ import {
   auditOwnerReport,
   deductProjectPenalty,
   deleteOwnerDocumentForm,
+  listOwnerDocumentAttachments,
+  listOwnerDocumentBasicOptions,
+  listOwnerDocumentBoqLines,
+  listOwnerDocumentContractOptions,
   listOwnerDocumentForms,
+  listOwnerDocumentSettlementOptions,
+  loadOwnerDocumentContractSummary,
   loadOwnerDocumentForm,
+  loadPenaltyDeductions,
   restoreOwnerDocumentForm,
   saveOwnerDocumentForm,
+  transitionAcceptance,
   updateOwnerDocumentAttachments,
 } from '~/lib/owner-document/forms'
 
@@ -53,6 +62,56 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
+  async function loadAttachments(kind: OwnerDocumentKind, id: string, includeDeleted = false) {
+    return listOwnerDocumentAttachments(kind, id, includeDeleted)
+  }
+
+  async function loadBoqLines(
+    projectId: string,
+    contractId: string,
+    periodNo = '',
+  ) {
+    return listOwnerDocumentBoqLines(projectId, contractId, periodNo)
+  }
+
+  async function loadDeductions(penaltyId: string) {
+    return loadPenaltyDeductions(penaltyId)
+  }
+
+  async function loadContractSummary(contractId: string, excludeSettlementId = '') {
+    return loadOwnerDocumentContractSummary(contractId, excludeSettlementId)
+  }
+
+  async function loadBasicOptions(
+    kind: 'crew' | 'project' | 'supplier',
+    keyword: string,
+  ) {
+    return listOwnerDocumentBasicOptions(kind, keyword)
+  }
+
+  async function loadContractOptions(
+    projectId: string,
+    side: 'expenditure' | 'owner',
+    supplierId: string,
+    keyword: string,
+  ) {
+    return listOwnerDocumentContractOptions(projectId, side, supplierId, keyword)
+  }
+
+  async function loadSettlementOptions(
+    projectId: string,
+    supplierId: string,
+    contractId: string,
+    keyword: string,
+  ) {
+    return listOwnerDocumentSettlementOptions(
+      projectId,
+      supplierId,
+      contractId,
+      keyword,
+    )
+  }
+
   async function saveForm(
     kind: OwnerDocumentKind,
     draft: OwnerDocumentDraft,
@@ -86,6 +145,17 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     try {
       await auditOwnerReport(id, draft)
       return await loadOne('owner_report', id)
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function moveAcceptance(id: string, target: AcceptanceLifecycleTarget) {
+    loading.value = true
+    try {
+      await transitionAcceptance(id, target)
+      return await loadOne('acceptance', id)
     }
     finally {
       loading.value = false
@@ -141,9 +211,17 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading: readonly(loading),
     loadKind,
     loadOne,
+    loadAttachments,
+    loadBoqLines,
+    loadDeductions,
+    loadContractSummary,
+    loadBasicOptions,
+    loadContractOptions,
+    loadSettlementOptions,
     saveForm,
     approveOwnerChange: approveChange,
     auditOwnerReport: auditReport,
+    transitionAcceptance: moveAcceptance,
     deductProjectPenalty: deductPenalty,
     removeForm,
     restoreForm,
