@@ -7,6 +7,11 @@ import { loadBoqWorkspace } from './read-model'
 
 export type BoqChangeType = 'add' | 'qty' | 'price' | 'mixed'
 export type BoqDirectiveType = '' | 'issued' | 'changed' | 'supplemented'
+export type BoqDocumentType
+  = | 'change_negotiation'
+    | 'site_visa'
+    | 'claim'
+    | 'material_price_approval'
 
 export interface BoqChangeLineDraft {
   operation: BoqChangeOperation
@@ -31,6 +36,12 @@ export interface CreateBoqChangeOrderDraft {
   changeType?: BoqChangeType
   directiveNo?: string
   directiveType?: BoqDirectiveType
+  documentType?: BoqDocumentType
+  applicationDate?: string
+  reason?: string
+  approvedTaxInclusiveAmount?: number | null
+  approvedTaxExclusiveAmount?: number | null
+  appliedTaxExclusiveAmount?: number | null
   note?: string
   lines: readonly BoqChangeLineDraft[]
 }
@@ -224,8 +235,10 @@ export async function createBoqChangeOrder(
   await db.execute(
     `INSERT INTO boq_change_orders
       (id, project_id, contract_id, code, name, change_type, status, directive_no,
-       directive_type, total_amount, note)
-     VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+       directive_type, document_type, application_date, reason,
+       approved_tax_inclusive_amount, approved_tax_exclusive_amount,
+       applied_tax_exclusive_amount, total_amount, note)
+     VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       orderId,
       draft.projectId,
@@ -235,6 +248,12 @@ export async function createBoqChangeOrder(
       changeType,
       draft.directiveNo?.trim() ?? '',
       draft.directiveType ?? '',
+      draft.documentType ?? 'change_negotiation',
+      draft.applicationDate?.trim() ?? '',
+      draft.reason?.trim() ?? '',
+      draft.approvedTaxInclusiveAmount ?? null,
+      draft.approvedTaxExclusiveAmount ?? null,
+      draft.appliedTaxExclusiveAmount ?? null,
       totalAmount,
       draft.note?.trim() ?? '',
     ],
@@ -391,22 +410,55 @@ export async function approveBoqChangeOrder(
       logIds.push(lineLogId)
   }
 
+  const [formAmounts] = await db.select<{
+    approved_tax_inclusive_amount: number | null
+    approved_tax_exclusive_amount: number | null
+    applied_tax_exclusive_amount: number | null
+    application_date: string
+    contract_id: string
+    directive_no: string
+    directive_type: string
+    document_type: string
+    name: string
+    note: string
+    reason: string
+  }>(`
+    SELECT approved_tax_inclusive_amount, approved_tax_exclusive_amount,
+           applied_tax_exclusive_amount, application_date, contract_id,
+           directive_no, directive_type, document_type, name, note, reason
+    FROM boq_change_orders
+    WHERE id = ? AND deleted_at IS NULL
+  `, [orderId])
+  const taxInclusiveAmount = formAmounts?.approved_tax_inclusive_amount ?? totalAmount
+  const taxExclusiveAmount = formAmounts?.approved_tax_exclusive_amount ?? totalAmount
+  const appliedAmount = formAmounts?.applied_tax_exclusive_amount ?? totalAmount
   const ledgerId = generateId('owner_change')
   await db.execute(
     `INSERT INTO owner_change_orders
       (id, project_id, change_no, contract_name, tax_inc_amount, tax_exc_amount,
-       applied_amount, approval_date, source_type, source_id, source_locked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'boq_change_order', ?, 1)`,
+       applied_amount, approval_date, source_type, source_id, source_locked,
+       contract_id, name, document_type, directive_no, directive_type,
+       application_date, reason, status, status_note, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'boq_change_order', ?, 1, ?, ?, ?, ?, ?, ?, ?,
+             'approved', '甲方已签证', ?)`,
     [
       ledgerId,
       order.project_id,
       order.code,
       workspace.contractName,
-      totalAmount,
-      totalAmount,
-      totalAmount,
+      taxInclusiveAmount,
+      taxExclusiveAmount,
+      appliedAmount,
       approvedAt,
       orderId,
+      formAmounts?.contract_id ?? order.contract_id,
+      formAmounts?.name ?? order.name,
+      formAmounts?.document_type ?? 'change_negotiation',
+      formAmounts?.directive_no ?? '',
+      formAmounts?.directive_type ?? '',
+      formAmounts?.application_date ?? '',
+      formAmounts?.reason ?? '',
+      formAmounts?.note ?? '',
     ],
   )
   const ledgerLogId = await logCreate(db, 'owner_change_orders', ledgerId)
