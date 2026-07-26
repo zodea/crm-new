@@ -55,9 +55,9 @@ interface Supplier {
 
   // 分类
   businessType: string            // 业务类型
-  supplierCategory: string        // 分供方类别: 材料供应商/劳务分包商/设备供应商/其他
+  supplierCategory: string        // ⛔ 历史 4 类快照；现行 7 类以 CONTEXT.md「分供方」为准
   rating: string                  // 评价等级
-  parentSupplierId: string | null // 上级供应商
+  parentSupplierId: string | null // ⛔ 已废弃：分供方是终端签约对象、无母子挂靠；见 DATABASE.md §2.10.2
 
   // 工商信息
   legalRep: string                // 法定代表人
