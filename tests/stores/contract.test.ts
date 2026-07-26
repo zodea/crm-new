@@ -89,6 +89,70 @@ describe('contract store:唯一写路径 action 闭环', () => {
     expect(store.byKind('材采').map(c => c.name)).toEqual(['C'])
   })
 
+  it('lookup actions return real IDs and keep settlement contracts project-scoped', async () => {
+    const store = useContractStore()
+    await mem.execute(`INSERT INTO customers (id, name) VALUES ('customer-2', '第二客户')`)
+    await mem.execute(`
+      INSERT INTO projects (id, name, customer_id)
+      VALUES ('p2', '第二项目', 'customer-2')
+    `)
+    await mem.execute(`INSERT INTO suppliers (id, name) VALUES ('supplier-2', '第二分供方')`)
+    const construction = await store.saveForm('construction', {
+      name: '演示施工合同',
+      projectId: 'p1',
+      customerId: 'customer-1',
+      content: '施工合同内容',
+      signDate: '2026-07-26',
+    }, 'submit')
+    const otherExpenseP1 = await store.saveForm('other_expense', {
+      name: '演示其他支出合同',
+      projectId: 'p1',
+      supplierId: 'supplier-1',
+      amount: 88,
+      content: '其他支出合同内容',
+      signDate: '2026-07-26',
+    }, 'submit')
+    await store.saveForm('other_expense', {
+      name: '第二项目其他支出合同',
+      projectId: 'p2',
+      supplierId: 'supplier-2',
+      amount: 99,
+      content: '第二项目其他支出合同内容',
+      signDate: '2026-07-26',
+    }, 'submit')
+
+    await expect(store.searchProjects('演示')).resolves.toEqual([
+      { id: 'p1', label: '演示项目' },
+    ])
+    await expect(store.searchCustomers('演示')).resolves.toEqual([
+      { id: 'customer-1', label: '演示客户' },
+    ])
+    await expect(store.searchSuppliers('演示')).resolves.toEqual([
+      { id: 'supplier-1', label: '演示分供方' },
+    ])
+    await expect(store.searchOriginalContracts('construction', '演示施工')).resolves.toEqual([
+      {
+        id: construction.id,
+        label: '演示施工合同',
+        hint: expect.any(String),
+      },
+    ])
+    await expect(store.searchSettlementContracts(
+      'p1',
+      '其他支出',
+    )).resolves.toEqual([
+      {
+        id: otherExpenseP1.id,
+        label: '演示其他支出合同',
+        hint: expect.stringContaining('88.00'),
+      },
+    ])
+    await expect(store.searchSettlementContracts(
+      null,
+      '其他支出',
+    )).resolves.toEqual([])
+  })
+
   it('编辑仍经 canonical action 回写并返回日志 id', async () => {
     const store = useContractStore()
     const created = await store.saveForm('construction', {

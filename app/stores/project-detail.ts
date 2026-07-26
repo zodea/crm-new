@@ -142,8 +142,13 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     loading.value = true
     try {
       const [contracts, supplements, changes, outgoing, receipts, payments, currentIn, currentOut, aggregates] = await Promise.all([
-        select<Record<string, unknown>>(selectVisibleSql('construction_contracts', 'ORDER BY created_at DESC')),
-        select<Record<string, unknown>>(selectVisibleSql('supplement_agreements', 'ORDER BY created_at DESC')),
+        select<Record<string, unknown>>(
+          selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
+          ['施工'],
+        ),
+        select<Record<string, unknown>>(
+          selectVisibleSql('contract_supplements', 'ORDER BY created_at DESC'),
+        ),
         select<Record<string, unknown>>(selectVisibleSql('owner_change_orders', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('invoice_applications', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('receipt_registrations', 'ORDER BY created_at DESC')),
@@ -157,12 +162,12 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         id: row.id as string,
         projectId: row.project_id as string,
         name: (row.name ?? '') as string,
-        contractNo: (row.contract_no ?? '') as string,
+        contractNo: (row.no ?? '') as string,
         amount: number(row.amount),
         status: (row.status ?? '') as string,
         signDate: (row.sign_date ?? '') as string,
-        category: (row.category ?? '') as string,
-        signedAmount: number(row.signed_amount),
+        category: (row.kind ?? '') as string,
+        signedAmount: number(row.amount),
       }))
       const contractProjects = new Map(constructionContracts.value.map(row => [row.id, row.projectId]))
       supplementAgreements.value = supplements.map(row => ({

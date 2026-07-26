@@ -164,16 +164,19 @@ describe('f2 合同与支出结算领域 action', () => {
       name: '办公软件合同',
     }])
     expect(await mem.select(`
-      SELECT id, project_id, supplier_id, contract_id, status
+      SELECT id, biz_type, project_id, supplier_id, contract_id, status
       FROM expenditure_settlements
       WHERE id = ?
     `, [settlement.id])).toEqual([{
       id: settlement.id,
+      biz_type: '机械',
       project_id: 'project-contract',
       supplier_id: 'supplier-contract',
       contract_id: otherExpense.id,
       status: '审批中',
     }])
+    expect(await loadF2Form('other_settlement', settlement.id))
+      .toMatchObject({ id: settlement.id, contractId: otherExpense.id })
   })
 
   it('补充协议只写 contract_supplements，头、附件与操作日志同事务保存', async () => {

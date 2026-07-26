@@ -5,6 +5,7 @@ import type {
   F2SaveAction,
 } from '~/lib/contract/forms'
 import type { ContractKind } from '~/lib/contract/status'
+import type { LookupOption } from '~/lib/kit/lookup'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { deleteF2Form, saveF2Form } from '~/lib/contract/forms'
@@ -77,6 +78,8 @@ export interface ContractAuxRow {
   date: string
   status: string
 }
+
+type ContractLookupTable = 'projects' | 'customers' | 'suppliers'
 
 /** 金额字段归一:空串 / NaN / nullish → 0(四级金额链默认 0,与 schema DEFAULT 0 一致) */
 function toMoney(v: unknown): number {
@@ -203,6 +206,82 @@ export const useContractStore = defineStore('contract', () => {
     return auxLists.value[kind] ?? []
   }
 
+  async function searchLookup(
+    table: ContractLookupTable,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const rows = await select<{ id: string, name: string }>(
+      selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
+      [`%${keyword.trim()}%`],
+    )
+    return rows.map(row => ({ id: row.id, label: row.name }))
+  }
+
+  const searchProjects = (keyword: string) => searchLookup('projects', keyword)
+  const searchCustomers = (keyword: string) => searchLookup('customers', keyword)
+  const searchSuppliers = (keyword: string) => searchLookup('suppliers', keyword)
+
+  async function searchOriginalContracts(
+    kind: F2FormKind,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const contractKind: Partial<Record<F2FormKind, string>> = {
+      construction: '施工',
+      subcontract: '分包',
+      material: '材采',
+      other_expense: '其他支出',
+    }
+    const canonicalKind = contractKind[kind]
+    if (!canonicalKind)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const rows = await select<{
+      id: string
+      name: string
+      no: string
+    }>(selectVisibleSql('contracts', `
+      AND kind = ?
+      AND (name LIKE ? OR no LIKE ?)
+      ORDER BY sign_date DESC, created_at DESC
+      LIMIT 50
+    `), [canonicalKind, pattern, pattern])
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: row.no,
+    }))
+  }
+
+  async function searchSettlementContracts(
+    projectId: string | null,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    if (!projectId)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const rows = await select<{
+      id: string
+      name: string
+      no: string
+      amount: number
+    }>(selectVisibleSql('contracts', `
+      AND kind = '其他支出'
+      AND project_id = ?
+      AND (name LIKE ? OR no LIKE ?)
+      ORDER BY sign_date DESC, created_at DESC
+      LIMIT 50
+    `), [
+      projectId,
+      pattern,
+      pattern,
+    ])
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: `${row.no} · ${Number(row.amount).toFixed(2)}`,
+    }))
+  }
+
   async function loadAux(
     kind: 'other_expense' | 'company_expense' | 'other_settlement',
   ) {
@@ -261,7 +340,7 @@ export const useContractStore = defineStore('contract', () => {
         LEFT JOIN contracts AS contract
           ON contract.id = settlement.contract_id AND contract.deleted_at IS NULL
         WHERE ${visibleCond('expenditure_settlements', 'settlement')}
-          AND settlement.biz_type = '其他支出'
+          AND settlement.biz_type IN ('机械', '其他')
         ORDER BY settlement.created_at DESC
         `)
       }
@@ -310,6 +389,11 @@ export const useContractStore = defineStore('contract', () => {
     byId,
     byKind,
     auxByKind,
+    searchProjects,
+    searchCustomers,
+    searchSuppliers,
+    searchOriginalContracts,
+    searchSettlementContracts,
     saveForm,
     removeForm,
     undoForm,

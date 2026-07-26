@@ -9,10 +9,10 @@ interface PendingContractAttachment extends ContractFormAttachmentDraft {
 }
 
 defineProps<{
-  attachments: ContractFormAttachment[]
-  pendingAttachments: PendingContractAttachment[]
-  pendingRemoveIds: string[]
-  pendingRestoreIds: string[]
+  attachments: ReadonlyArray<Readonly<ContractFormAttachment>>
+  pendingAttachments: ReadonlyArray<Readonly<PendingContractAttachment>>
+  pendingRemoveIds: readonly string[]
+  pendingRestoreIds: readonly string[]
   desktopPicker: boolean
   note: string
 }>()

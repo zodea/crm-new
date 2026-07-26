@@ -2,17 +2,12 @@
 import type {
   CompanyExpenseContractFormDraft,
   ContractAttachmentOwnerType,
-  ContractFormAttachment,
-  ContractFormAttachmentChanges,
-  ContractFormAttachmentDraft,
   ExpenditureSettlementFormDraft,
   F2FormKind,
   F2SaveAction,
   ProjectContractFormDraft,
 } from '~/lib/contract/forms'
-import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
-import { isTauri } from '@tauri-apps/api/core'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
   listContractFormAttachments,
@@ -24,8 +19,6 @@ import {
   f2FormDefaults,
   formPath,
 } from '~/lib/contract/page'
-import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -33,10 +26,6 @@ type PageDraft
   = ProjectContractFormDraft
     & CompanyExpenseContractFormDraft
     & ExpenditureSettlementFormDraft
-
-interface PendingAttachment extends ContractFormAttachmentDraft {
-  localId: string
-}
 
 const props = defineProps<{
   kind: F2FormKind
@@ -46,6 +35,22 @@ const route = useRoute()
 const contractStore = useContractStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
+const {
+  attachments,
+  pendingAttachments,
+  pendingRemoveIds,
+  pendingRestoreIds,
+  desktopAttachmentPicker,
+  dirty: attachmentDirty,
+  reset: resetAttachments,
+  clearPending: clearPendingAttachments,
+  changes: attachmentChanges,
+  handleFiles,
+  pickNativeFiles,
+  removePending,
+  patchPending,
+  toggleExisting: toggleExistingAttachment,
+} = useContractFormAttachments()
 
 const meta = computed(() => F2_FORM_META[props.kind])
 const routeId = computed(() => {
@@ -62,23 +67,16 @@ const title = computed(() =>
 useTabTitle(title)
 
 const draft = ref<PageDraft>(f2FormDefaults(props.kind) as PageDraft)
-const attachments = shallowRef<ContractFormAttachment[]>([])
-const pendingAttachments = shallowRef<PendingAttachment[]>([])
-const pendingRemoveIds = shallowRef<string[]>([])
-const pendingRestoreIds = shallowRef<string[]>([])
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
-const desktopAttachmentPicker = shallowRef(false)
 let allowLeave = false
 
 const dirty = computed(() =>
   JSON.stringify(draft.value) !== savedSnapshot.value
-  || pendingAttachments.value.length > 0
-  || pendingRemoveIds.value.length > 0
-  || pendingRestoreIds.value.length > 0,
+  || attachmentDirty.value,
 )
 
 const sections = computed(() => {
@@ -109,88 +107,30 @@ const selectedContractAmount = computed(() => {
   return contractStore.byId(draft.value.contractId)?.amount ?? null
 })
 
-function kindName(kind: F2FormKind): string {
-  const values: Partial<Record<F2FormKind, string>> = {
-    construction: '施工',
-    subcontract: '分包',
-    material: '材采',
-    other_expense: '其他支出',
-  }
-  return values[kind] ?? ''
+const fetchProjects = contractStore.searchProjects
+const fetchCustomers = contractStore.searchCustomers
+const fetchSuppliers = contractStore.searchSuppliers
+
+function fetchOriginalContracts(keyword: string) {
+  return contractStore.searchOriginalContracts(props.kind, keyword)
 }
 
-async function lookup(
-  table: 'projects' | 'customers' | 'suppliers',
-  keyword: string,
-): Promise<LookupOption[]> {
-  const pattern = `%${keyword.trim()}%`
-  const rows = await select<{ id: string, name: string }>(
-    selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
-    [pattern],
+function fetchOtherExpenseContracts(keyword: string) {
+  return contractStore.searchSettlementContracts(
+    draft.value.projectId ?? null,
+    keyword,
   )
-  return rows.map(row => ({ id: row.id, label: row.name }))
-}
-
-const fetchProjects = (keyword: string) => lookup('projects', keyword)
-const fetchCustomers = (keyword: string) => lookup('customers', keyword)
-const fetchSuppliers = (keyword: string) => lookup('suppliers', keyword)
-
-async function fetchOriginalContracts(keyword: string): Promise<LookupOption[]> {
-  const rows = await select<{
-    id: string
-    name: string
-    no: string
-  }>(selectVisibleSql('contracts', `
-      AND kind = ?
-      AND (name LIKE ? OR no LIKE ?)
-    ORDER BY sign_date DESC, created_at DESC
-    LIMIT 50
-  `), [kindName(props.kind), `%${keyword.trim()}%`, `%${keyword.trim()}%`])
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name,
-    hint: row.no,
-  }))
-}
-
-async function fetchOtherExpenseContracts(keyword: string): Promise<LookupOption[]> {
-  if (!draft.value.projectId)
-    return []
-  const rows = await select<{
-    id: string
-    name: string
-    no: string
-    amount: number
-  }>(selectVisibleSql('contracts', `
-      AND kind = '其他支出'
-      AND project_id = ?
-      AND (name LIKE ? OR no LIKE ?)
-    ORDER BY sign_date DESC, created_at DESC
-    LIMIT 50
-  `), [
-    draft.value.projectId,
-    `%${keyword.trim()}%`,
-    `%${keyword.trim()}%`,
-  ])
-  return rows.map(row => ({
-    id: row.id,
-    label: row.name,
-    hint: `${row.no} · ${Number(row.amount).toFixed(2)}`,
-  }))
 }
 
 async function initialize() {
   loading.value = true
   fieldErrors.value = {}
-  pendingAttachments.value = []
-  pendingRemoveIds.value = []
-  pendingRestoreIds.value = []
+  resetAttachments()
   try {
     await contractStore.load()
     const id = routeId.value
     if (!id) {
       draft.value = f2FormDefaults(props.kind) as PageDraft
-      attachments.value = []
     }
     else {
       const recordPromise = isSupplementRoute.value
@@ -217,7 +157,7 @@ async function initialize() {
         ...f2FormDefaults(props.kind),
         ...record,
       } as PageDraft
-      attachments.value = files
+      resetAttachments(files)
     }
     await nextTick()
     savedSnapshot.value = JSON.stringify(draft.value)
@@ -295,14 +235,6 @@ function validateRequired(): boolean {
   return messages.length === 0
 }
 
-function attachmentChanges(): ContractFormAttachmentChanges {
-  return {
-    add: pendingAttachments.value.map(({ localId: _localId, ...file }) => file),
-    removeIds: pendingRemoveIds.value,
-    restoreIds: pendingRestoreIds.value,
-  }
-}
-
 async function handleFooterAction(action: FormFooterAction) {
   if (action === 'cancel') {
     await leaveToList()
@@ -326,9 +258,7 @@ async function handleFooterAction(action: FormFooterAction) {
       attachmentChanges(),
     )
     success(saveAction === 'draft' ? '草稿已保存' : saveAction === 'submit' ? '已保存并提交' : '保存成功')
-    pendingAttachments.value = []
-    pendingRemoveIds.value = []
-    pendingRestoreIds.value = []
+    clearPendingAttachments()
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
@@ -336,7 +266,7 @@ async function handleFooterAction(action: FormFooterAction) {
       if (routeId.value)
         await navigateTo(meta.value.newPath, { replace: true })
       draft.value = f2FormDefaults(props.kind) as PageDraft
-      attachments.value = []
+      resetAttachments()
       await nextTick()
       savedSnapshot.value = JSON.stringify(draft.value)
       allowLeave = false
@@ -364,74 +294,6 @@ async function handleFooterAction(action: FormFooterAction) {
   finally {
     loadingAction.value = null
   }
-}
-
-function appendPendingAttachments(files: ContractFormAttachmentDraft[]) {
-  pendingAttachments.value = [
-    ...pendingAttachments.value,
-    ...files.map((file, index) => ({
-      ...file,
-      localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
-      category: file.category || '合同附件',
-    })),
-  ]
-}
-
-function handleFiles(files: File[]) {
-  appendPendingAttachments(files.map(file => ({
-    fileName: file.name,
-    fileSize: file.size,
-    mimeType: file.type,
-  })))
-}
-
-async function pickNativeFiles() {
-  try {
-    const [{ open }, { stat }, { basename }] = await Promise.all([
-      import('@tauri-apps/plugin-dialog'),
-      import('@tauri-apps/plugin-fs'),
-      import('@tauri-apps/api/path'),
-    ])
-    const selected = await open({ multiple: true, directory: false })
-    const paths = selected == null
-      ? []
-      : Array.isArray(selected) ? selected : [selected]
-    const files = await Promise.all(paths.map(async filePath => ({
-      fileName: await basename(filePath),
-      filePath,
-      fileSize: (await stat(filePath)).size,
-    })))
-    appendPendingAttachments(files)
-  }
-  catch (cause) {
-    error(`选择附件失败：${toErrorMessage(cause)}`)
-  }
-}
-
-function removePending(localId: string) {
-  pendingAttachments.value = pendingAttachments.value.filter(file => file.localId !== localId)
-}
-
-function patchPending(
-  localId: string,
-  patch: Partial<PendingAttachment>,
-) {
-  pendingAttachments.value = pendingAttachments.value.map(file =>
-    file.localId === localId ? { ...file, ...patch } : file,
-  )
-}
-
-function toggleExistingAttachment(id: string) {
-  const attachment = attachments.value.find(file => file.id === id)
-  if (attachment?.deletedAt) {
-    pendingRestoreIds.value = pendingRestoreIds.value.includes(id)
-      ? pendingRestoreIds.value.filter(item => item !== id)
-      : [...pendingRestoreIds.value, id]
-    return
-  }
-  pendingRemoveIds.value = pendingRemoveIds.value.includes(id)
-    ? pendingRemoveIds.value.filter(item => item !== id)
-    : [...pendingRemoveIds.value, id]
 }
 
 async function leaveToList() {
@@ -466,10 +328,7 @@ onBeforeRouteLeave(async () => {
   return leave
 })
 
-onMounted(() => {
-  desktopAttachmentPicker.value = isTauri()
-  void initialize()
-})
+onMounted(() => void initialize())
 </script>
 
 <template>
