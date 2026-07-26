@@ -1,3 +1,4 @@
+import type { ProjectAcceptanceLifecycleRow } from '~/lib/project/acceptance-lifecycle'
 import type {
   TargetCostCategoryRow,
   TargetCostVersionRow,
@@ -18,6 +19,7 @@ import type {
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import { loadProjectAcceptanceLifecycle } from '~/lib/project/acceptance-lifecycle'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
 import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
@@ -115,6 +117,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const expenditureSettlements = shallowRef<ExpenditureSettlementRow[]>([])
   const paymentRecords = shallowRef<ProjectPaymentRecordRow[]>([])
   const deliveries = shallowRef<ProjectDeliveryArchiveRow[]>([])
+  const acceptances = shallowRef<ProjectAcceptanceLifecycleRow[]>([])
   const aggregateRows = shallowRef<ProjectDetailAggregate[]>([])
   const loading = shallowRef(false)
   const loaded = shallowRef(false)
@@ -160,6 +163,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         expenditureRelations,
         financeFacts,
         deliveryArchive,
+        acceptanceLifecycle,
       ] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
@@ -197,6 +201,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         loadProjectExpenditureRelations(db),
         loadProjectFinanceFacts(db),
         loadProjectDeliveryArchive(db),
+        loadProjectAcceptanceLifecycle(db),
       ])
 
       constructionContracts.value = contracts.map(row => ({
@@ -271,6 +276,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
       expenditureSettlements.value = expenditureRelations.settlements
       paymentRecords.value = financeFacts.paymentRecords
       deliveries.value = deliveryArchive
+      acceptances.value = acceptanceLifecycle
       aggregateRows.value = aggregates
       loaded.value = true
     }
@@ -296,6 +302,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     expenditureSettlements: readonly(expenditureSettlements),
     paymentRecords: readonly(paymentRecords),
     deliveries: readonly(deliveries),
+    acceptances: readonly(acceptances),
     operationSummaries,
     invoiceOutputSummaries,
     invoiceSummaries,

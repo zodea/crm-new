@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('项目详情十页签：已完成页签读取 SQLite，未完成页签显示统一占位卡', async ({ page }) => {
+test('项目详情十页签读取 SQLite 且不再显示待建设占位卡', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
 
@@ -34,11 +34,9 @@ test('项目详情十页签：已完成页签读取 SQLite，未完成页签显�
   await expect(page.getByRole('region', { name: '收款登记' }).getByText('¥25,367,027.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('region', { name: '付款申请' }).getByText('¥4,200,000.00', { exact: true }).first()).toBeVisible()
 
-  for (const tab of ['竣工验收及保修']) {
-    await contentTabs.getByRole('tab', { name: tab, exact: true }).click()
-    await expect(page.getByRole('heading', { name: tab, exact: true })).toBeVisible()
-    await expect(page.getByText('待建设', { exact: true })).toBeVisible()
-  }
+  await contentTabs.getByRole('tab', { name: '竣工验收及保修', exact: true }).click()
+  await expect(page.getByRole('region', { name: '竣工验收与保修', exact: true })).toBeVisible()
+  await expect(page.getByText('待建设', { exact: true })).toHaveCount(0)
 
   expect(pageErrors, '子表页签旅程不应产生客户端运行错误').toEqual([])
 })

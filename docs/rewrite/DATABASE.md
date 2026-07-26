@@ -1066,6 +1066,8 @@ project_acceptances(
 )
 -- 生命周期：draft -> submitted -> accepted -> warranty -> expired；
 -- 进入 warranty 时同一记录 type 切为 warranty，不复制保修单据。
+-- 项目详情原样读取上述状态，不按日期或 type 推导跳级；附件继续使用
+-- file_refs(owner_type='project_acceptance', owner_id=project_acceptances.id)。
 
 owner_final_settlements(
   id, no TEXT DEFAULT '', name TEXT NOT NULL,
