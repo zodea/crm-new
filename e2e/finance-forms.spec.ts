@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const FORM_ROUTES = [
   {
@@ -78,12 +79,7 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
       await expect(page.locator(form.field)).toHaveValue(value)
       await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
 
-      const widths = await page.evaluate(() => ({
-        client: document.documentElement.clientWidth,
-        scroll: document.documentElement.scrollWidth,
-      }))
-      expect(widths.scroll, `${form.path} 不应产生页面级横向溢出`)
-        .toBeLessThanOrEqual(widths.client)
+      await expectNoPageOverflow(page, form.path)
     }
   })
 
@@ -165,19 +161,14 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
 
   test('六条表单在桌面响应式矩阵均无页面级横向溢出', async ({ page }) => {
     test.setTimeout(120_000)
-    for (const width of [768, 1024, 1440]) {
+    for (const width of RESPONSIVE_WIDTHS.slice(1)) {
       await page.setViewportSize({ width, height: 900 })
       for (const form of FORM_ROUTES) {
         await page.goto(form.path)
         if (form.path === '/finance/payment/new')
           await enterPaymentApplicationForm(page)
         await expect(page.getByRole('heading', { name: form.title })).toBeVisible()
-        const widths = await page.evaluate(() => ({
-          client: document.documentElement.clientWidth,
-          scroll: document.documentElement.scrollWidth,
-        }))
-        expect(widths.scroll, `${form.path} @ ${width}px 不应产生页面级横向溢出`)
-          .toBeLessThanOrEqual(widths.client)
+        await expectNoPageOverflow(page, `${form.path} @ ${width}px`)
       }
     }
   })

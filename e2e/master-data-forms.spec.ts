@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const FORM_ROUTES = [
   ['/base/supplier/form', '新建 · 分供方'],
@@ -9,12 +10,10 @@ const FORM_ROUTES = [
   ['/project/target-cost/form', '新建 · 目标成本'],
 ] as const
 
-const FORM_VIEWPORTS = [
-  { width: 390, height: 844 },
-  { width: 768, height: 1024 },
-  { width: 1024, height: 768 },
-  { width: 1440, height: 900 },
-] as const
+const FORM_VIEWPORTS = RESPONSIVE_WIDTHS.map(width => ({
+  width,
+  height: width === 390 ? 844 : width === 768 ? 1024 : width === 1024 ? 768 : 900,
+}))
 
 test.describe('F1 基础主数据整页表单', () => {
   for (const viewport of FORM_VIEWPORTS) {
@@ -31,11 +30,7 @@ test.describe('F1 基础主数据整页表单', () => {
         await expect(footer).toBeVisible()
         await expect(footer.getByRole('button')).toHaveCount(5)
 
-        const widths = await page.evaluate(() => ({
-          client: document.documentElement.clientWidth,
-          scroll: document.documentElement.scrollWidth,
-        }))
-        expect(widths.scroll, `${path} 不应横向溢出`).toBeLessThanOrEqual(widths.client)
+        await expectNoPageOverflow(page, path)
       }
     })
   }

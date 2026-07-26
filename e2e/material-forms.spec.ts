@@ -2,6 +2,7 @@ import type { Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
+import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const MATERIAL_FORM_ROUTES = [
   {
@@ -90,15 +91,6 @@ async function openMaterialCreate(page: Page, listPath: string) {
   await expect(page).toHaveURL(listPath)
   await page.getByTestId('create-material-form').click()
   await expect(page).toHaveURL(`${listPath}/new`)
-}
-
-async function expectNoPageOverflow(page: Page, context: string) {
-  const widths = await page.evaluate(() => ({
-    client: document.documentElement.clientWidth,
-    scroll: document.documentElement.scrollWidth,
-  }))
-  expect(widths.scroll, `${context} 不应产生页面级横向溢出`)
-    .toBeLessThanOrEqual(widths.client)
 }
 
 async function captureVisual(
@@ -260,7 +252,7 @@ test.describe('F4 物资领域整页表单', () => {
 
   test('十一条整页表单在响应式验收矩阵中无页面级横向溢出', async ({ page }, testInfo) => {
     test.setTimeout(240_000)
-    for (const width of [390, 768, 1024, 1440]) {
+    for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
       for (const route of RESPONSIVE_ROUTES) {
         await page.goto(route.path)
