@@ -146,6 +146,45 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'supplier_id', table: 'suppliers' },
   ],
   delivery_lines: [{ column: 'delivery_record_id', table: 'delivery_records' }],
+  material_requisitions: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  material_arrivals: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'supplier_id', table: 'suppliers' },
+    { column: 'contract_id', table: 'contracts' },
+    { column: 'requisition_id', table: 'material_requisitions' },
+  ],
+  material_arrival_lines: [
+    { column: 'arrival_id', table: 'material_arrivals' },
+  ],
+  material_uses: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+  ],
+  stock_checks: [],
+  stock_check_lines: [
+    { column: 'stock_check_id', table: 'stock_checks' },
+  ],
+  owner_material_controls: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'customer_id', table: 'customers' },
+  ],
+  owner_material_requisitions: [
+    { column: 'project_id', table: 'projects' },
+  ],
+  owner_material_arrivals: [
+    { column: 'project_id', table: 'projects' },
+  ],
+  owner_material_uses: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+  ],
+  owner_material_directs: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'customer_id', table: 'customers' },
+  ],
   invoice_applications: [
     { column: 'project_id', table: 'projects' },
     { column: 'contract_id', table: 'contracts' },
