@@ -11,11 +11,11 @@ describe('project detail subtable definitions', () => {
       'detail',
       'budget',
       'construction',
+      'expenditure',
       'tax',
       'fund',
     ])
     expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'placeholder').map(tab => tab.key)).toEqual([
-      'expenditure',
       'current',
       'payment',
       'material',

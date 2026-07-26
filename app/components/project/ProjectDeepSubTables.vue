@@ -14,6 +14,18 @@ const targetCosts = computed(() =>
 const targetCostCategories = computed(() =>
   detailStore.targetCostCategories.filter(row => row.projectId === props.projectId),
 )
+const expenditureContracts = computed(() =>
+  detailStore.expenditureContracts.filter(row => row.projectId === props.projectId),
+)
+const expenditureSupplements = computed(() =>
+  detailStore.expenditureSupplements.filter(row => row.projectId === props.projectId),
+)
+const subcontractChanges = computed(() =>
+  detailStore.subcontractChanges.filter(row => row.projectId === props.projectId),
+)
+const expenditureSettlements = computed(() =>
+  detailStore.expenditureSettlements.filter(row => row.projectId === props.projectId),
+)
 
 const targetCostColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
@@ -34,6 +46,51 @@ const targetCategoryColumns: KitTableColumn[] = [
   { field: 'paidAmount', title: '累计支付', type: 'money', width: 145 },
   { field: 'remainingAmount', title: '目标余量', type: 'money', width: 145 },
   { field: 'source', title: '来源', minWidth: 280, slot: 'source' },
+]
+const expenditureContractColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '合同名称', minWidth: 230, slot: 'link' },
+  { field: 'contractNo', title: '合同编号', width: 180 },
+  { field: 'category', title: '合同类别', width: 110, filterable: true },
+  { field: 'originalCategory', title: '原始细类', width: 110, filterable: true },
+  { field: 'classificationState', title: '分类状态', width: 110, filterable: true },
+  { field: 'status', title: '合同状态', width: 100, filterable: true },
+  { field: 'amount', title: '主合同含税金额', type: 'money', width: 155 },
+  { field: 'supplementAmount', title: '有效补充协议', type: 'money', width: 155 },
+  { field: 'supplier', title: '分供方', minWidth: 180, filterable: true },
+  { field: 'effectiveDate', title: '生效日期', type: 'date' },
+  { field: 'settledAmount', title: '累计正式结算', type: 'money', width: 155 },
+  { field: 'paidAmount', title: '累计确认支付', type: 'money', width: 155 },
+]
+const expenditureSupplementColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '协议名称', minWidth: 220, slot: 'link' },
+  { field: 'agreementNo', title: '协议编号', width: 170 },
+  { field: 'contractName', title: '关联合同', minWidth: 220, filterable: true },
+  { field: 'amount', title: '协议金额', type: 'money', width: 145 },
+  { field: 'signDate', title: '签约日期', type: 'date' },
+  { field: 'status', title: '状态', width: 100, filterable: true },
+]
+const subcontractChangeColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'changeNo', title: '变更编号', width: 160, slot: 'link' },
+  { field: 'changeType', title: '变更类型', width: 120, filterable: true },
+  { field: 'supplier', title: '乙方', minWidth: 170, filterable: true },
+  { field: 'contractName', title: '合同名称', minWidth: 220 },
+  { field: 'approvedAmount', title: '审批金额', type: 'money', width: 145 },
+  { field: 'changedArea', title: '变更面积', width: 120, align: 'right' },
+  { field: 'actualApprovedPrice', title: '实际审定价', type: 'money', width: 145 },
+  { field: 'status', title: '合约审批', width: 110, filterable: true },
+]
+const expenditureSettlementColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'name', title: '结算名称', minWidth: 220, slot: 'link' },
+  { field: 'settlementNo', title: '结算编号', width: 160 },
+  { field: 'contractName', title: '合同名称', minWidth: 220, filterable: true },
+  { field: 'settlementDate', title: '结算日期', type: 'date' },
+  { field: 'settlementType', title: '结算类型', width: 130, filterable: true },
+  { field: 'amount', title: '结算金额', type: 'money', width: 145 },
+  { field: 'status', title: '状态', width: 100, filterable: true },
 ]
 </script>
 
@@ -96,6 +153,69 @@ const targetCategoryColumns: KitTableColumn[] = [
             —
           </span>
         </div>
+      </template>
+    </ProjectSubTableSection>
+  </div>
+
+  <div v-else-if="tab === 'expenditure'" class="space-y-5">
+    <ProjectSubTableSection
+      title="支出合同"
+      :columns="expenditureContractColumns"
+      :rows="expenditureContracts"
+      :loading="detailStore.loading"
+      :summary-fields="[
+        { field: 'amount', label: '主合同合计' },
+        { field: 'supplementAmount', label: '有效补充协议合计' },
+        { field: 'settledAmount', label: '正式结算合计' },
+        { field: 'paidAmount', label: '确认支付合计' },
+      ]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || row.contractNo || '查看合同' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
+
+    <ProjectSubTableSection
+      title="支出合同补充协议"
+      :columns="expenditureSupplementColumns"
+      :rows="expenditureSupplements"
+      :loading="detailStore.loading"
+      :summary-fields="[{ field: 'effectiveAmount', label: '有效协议金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || row.agreementNo || '查看关联合同' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
+
+    <ProjectSubTableSection
+      title="分包变洽签"
+      :columns="subcontractChangeColumns"
+      :rows="subcontractChanges"
+      :loading="detailStore.loading"
+      :summary-fields="[{ field: 'effectiveApprovedAmount', label: '正式审批金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.changeNo || '查看分包变洽签' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
+
+    <ProjectSubTableSection
+      title="支出结算"
+      :columns="expenditureSettlementColumns"
+      :rows="expenditureSettlements"
+      :loading="detailStore.loading"
+      :summary-fields="[{ field: 'effectiveAmount', label: '正式结算金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || row.settlementNo || '查看支出结算' }}
+        </NuxtLink>
       </template>
     </ProjectSubTableSection>
   </div>

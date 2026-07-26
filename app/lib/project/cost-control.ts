@@ -77,7 +77,7 @@ function text(value: unknown): string {
   return value == null ? '' : String(value)
 }
 
-function categoryFromContract(row: Record<string, unknown>): CostCategory {
+export function costCategoryFromContract(row: Record<string, unknown>): CostCategory {
   const canonical = text(row.cost_category)
   if ((COST_CATEGORIES as readonly string[]).includes(canonical))
     return canonical as CostCategory
@@ -263,7 +263,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
     const projectId = text(row.project_id)
     if (!projectId)
       continue
-    const current = getFact(projectId, categoryFromContract(row))
+    const current = getFact(projectId, costCategoryFromContract(row))
     current.signedAmount += number(row.amount) + (supplementsByContract.get(text(row.id)) ?? 0)
     current.contractIds.add(text(row.id))
   }
@@ -272,7 +272,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
     const projectId = text(row.project_id)
     if (!projectId)
       continue
-    const current = getFact(projectId, categoryFromContract(row))
+    const current = getFact(projectId, costCategoryFromContract(row))
     current.settledAmount += number(row.total_amount)
     current.settlementIds.add(text(row.id))
   }
@@ -281,7 +281,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
     const projectId = text(row.project_id)
     if (!projectId)
       continue
-    const current = getFact(projectId, categoryFromContract(row))
+    const current = getFact(projectId, costCategoryFromContract(row))
     current.paidAmount += number(row.allocated_amount)
     current.paymentIds.add(text(row.payment_id))
   }
