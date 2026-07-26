@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import {
   listOwnerDocumentAttachments,
+  listOwnerDocumentForms,
   loadOwnerDocumentForm,
   loadPenaltyDeductions,
 } from '~/lib/owner-document/forms'
@@ -166,6 +167,9 @@ describe('f5 甲方/分包单据领域事务', () => {
         category: 'owner_directive',
       }),
     ])
+    await expect(
+      store.removeForm('owner_change', saved.id),
+    ).rejects.toThrow('已签证变更不可直接删除')
   })
 
   it('月度报量保留自动完成量、申报量和审定量，不复制第二套完成事实', async () => {
@@ -353,5 +357,140 @@ describe('f5 甲方/分包单据领域事务', () => {
       totalAmount: 10,
       settlementDate: '2026-07-26',
     }, 'submit')).rejects.toThrow('分供方')
+  })
+
+  it('草稿可在原单继续编辑，列表和软删除恢复使用同一真实记录', async () => {
+    const store = useOwnerDocumentStore()
+    const created = await store.saveForm('acceptance', {
+      no: 'YS-DRAFT-001',
+      type: 'acceptance',
+      name: '待完善验收',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentDate: '2026-07-26',
+    }, 'draft')
+
+    const updated = await store.saveForm('acceptance', {
+      id: created.id,
+      no: 'YS-DRAFT-001',
+      type: 'warranty',
+      name: '保修移交',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentDate: '2026-07-27',
+      warrantyOwner: '王工',
+    }, 'submit')
+
+    expect(updated.id).toBe(created.id)
+    expect(await loadOwnerDocumentForm('acceptance', created.id)).toMatchObject({
+      type: 'warranty',
+      name: '保修移交',
+      status: 'submitted',
+      warrantyOwner: '王工',
+    })
+    expect(await listOwnerDocumentForms('acceptance')).toEqual([
+      expect.objectContaining({
+        id: created.id,
+        no: 'YS-DRAFT-001',
+        name: '保修移交',
+        status: 'submitted',
+      }),
+    ])
+
+    expect(await store.removeForm('acceptance', created.id)).toEqual(expect.any(String))
+    expect(await listOwnerDocumentForms('acceptance')).toEqual([])
+    expect(await store.restoreForm('acceptance', created.id)).toEqual(expect.any(String))
+    expect(await listOwnerDocumentForms('acceptance')).toHaveLength(1)
+  })
+
+  it('甲方变更与月度报量草稿在原单替换明细后提交，不复制业务单据', async () => {
+    const store = useOwnerDocumentStore()
+    const change = await store.saveForm('owner_change', {
+      no: 'BQ-DRAFT-001',
+      name: '草稿变更',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentType: 'change_negotiation',
+      lines: [{
+        operation: 'qty',
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        unit: '㎡',
+        deltaQty: 1,
+      }],
+    }, 'draft')
+    const changed = await store.saveForm('owner_change', {
+      id: change.id,
+      no: 'BQ-DRAFT-001',
+      name: '草稿变更已完善',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentType: 'site_visa',
+      reason: '现场增量',
+      lines: [{
+        operation: 'qty',
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        unit: '㎡',
+        deltaQty: 3,
+      }],
+    }, 'submit')
+
+    expect(changed.id).toBe(change.id)
+    expect(await loadOwnerDocumentForm('owner_change', change.id)).toMatchObject({
+      name: '草稿变更已完善',
+      documentType: 'site_visa',
+      status: 'submitted',
+      totalAmount: 60,
+      lines: [expect.objectContaining({ deltaQty: 3, amount: 60 })],
+    })
+    expect(await mem.select(`
+      SELECT COUNT(*) AS count
+      FROM boq_change_orders
+      WHERE code = 'BQ-DRAFT-001' AND deleted_at IS NULL
+    `)).toEqual([{ count: 1 }])
+
+    const report = await store.saveForm('owner_report', {
+      no: 'BL-DRAFT-001',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      periodNo: '2026-08',
+      lines: [{
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        unit: '㎡',
+        autoQty: 2,
+        reportedQty: 2,
+        unitPrice: 20,
+      }],
+    }, 'draft')
+    const reported = await store.saveForm('owner_report', {
+      id: report.id,
+      no: 'BL-DRAFT-001',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      periodNo: '2026-08',
+      applicationDate: '2026-08-25',
+      lines: [{
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        unit: '㎡',
+        autoQty: 2,
+        reportedQty: 1.5,
+        unitPrice: 20,
+      }],
+    }, 'submit')
+
+    expect(reported.id).toBe(report.id)
+    expect(await loadOwnerDocumentForm('owner_report', report.id)).toMatchObject({
+      status: 'reported',
+      reportedAmount: 30,
+      lines: [expect.objectContaining({ reportedQty: 1.5, amount: 30 })],
+    })
+    expect(await mem.select(`
+      SELECT COUNT(*) AS count
+      FROM monthly_statements
+      WHERE contract_id = 'contract-owner' AND month = '2026-08' AND deleted_at IS NULL
+    `)).toEqual([{ count: 1 }])
   })
 })

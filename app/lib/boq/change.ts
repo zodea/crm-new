@@ -1,6 +1,6 @@
 import type { BoqChangeOperation, BoqChangeStatus, BoqLineView } from './read-model'
 import type { SoftDb } from '~/lib/db/soft-delete'
-import { logCreate, withUpdateLog } from '~/lib/db/soft-delete'
+import { logCreate, softDelete, withUpdateLog } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
 import { loadBoqWorkspace } from './read-model'
@@ -184,17 +184,10 @@ async function activeOrder(db: SoftDb, orderId: string): Promise<ChangeOrderRow>
   return order
 }
 
-export async function createBoqChangeOrder(
+async function normalizeChangeDraft(
   db: SoftDb,
   draft: CreateBoqChangeOrderDraft,
-): Promise<CreateBoqChangeOrderResult> {
-  const code = draft.code.trim()
-  const name = draft.name.trim()
-  if (!draft.projectId || !draft.contractId || !code || !name)
-    throw new Error('项目、施工合同、变更编号与名称必填')
-  if (!draft.lines.length)
-    throw new Error('变更单至少需要一条明细')
-
+) {
   const workspace = await loadBoqWorkspace(db, draft.projectId, draft.contractId)
   if (!workspace)
     throw new Error('施工合同不存在、已删除或不属于所选项目')
@@ -229,8 +222,64 @@ export async function createBoqChangeOrder(
   const changeType = derivedChangeType(normalized)
   if (draft.changeType && draft.changeType !== changeType)
     throw new Error('变更单主类型与明细操作不一致')
+  const totalAmount = round2(normalized.reduce(
+    (total, line) => total + line.calculation.amount,
+    0,
+  ))
+  return { normalized, changeType, totalAmount }
+}
+
+async function insertChangeLines(
+  db: SoftDb,
+  orderId: string,
+  normalized: Awaited<ReturnType<typeof normalizeChangeDraft>>['normalized'],
+): Promise<string[]> {
+  const logIds: string[] = []
+  for (const [index, line] of normalized.entries()) {
+    const lineId = generateId('boq_change_line')
+    await db.execute(
+      `INSERT INTO boq_change_lines
+        (id, change_order_id, boq_line_id, item_id, operation, section, trade,
+         item_name, unit, spec, delta_qty, new_unit_price, amount, note, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        lineId,
+        orderId,
+        line.target?.id ?? null,
+        line.itemId,
+        line.operation,
+        line.section,
+        line.trade,
+        line.itemName,
+        line.unit,
+        line.spec,
+        line.calculation.deltaQty,
+        line.calculation.newUnitPrice,
+        line.calculation.amount,
+        line.note?.trim() ?? '',
+        (index + 1) * 10,
+      ],
+    )
+    const lineLogId = await logCreate(db, 'boq_change_lines', lineId)
+    if (lineLogId)
+      logIds.push(lineLogId)
+  }
+  return logIds
+}
+
+export async function createBoqChangeOrder(
+  db: SoftDb,
+  draft: CreateBoqChangeOrderDraft,
+): Promise<CreateBoqChangeOrderResult> {
+  const code = draft.code.trim()
+  const name = draft.name.trim()
+  if (!draft.projectId || !draft.contractId || !code || !name)
+    throw new Error('项目、施工合同、变更编号与名称必填')
+  if (!draft.lines.length)
+    throw new Error('变更单至少需要一条明细')
+
+  const { normalized, changeType, totalAmount } = await normalizeChangeDraft(db, draft)
   const orderId = generateId('boq_change')
-  const totalAmount = round2(normalized.reduce((total, line) => total + line.calculation.amount, 0))
   const logIds: string[] = []
   await db.execute(
     `INSERT INTO boq_change_orders
@@ -262,35 +311,69 @@ export async function createBoqChangeOrder(
   if (orderLogId)
     logIds.push(orderLogId)
 
-  for (const [index, line] of normalized.entries()) {
-    const lineId = generateId('boq_change_line')
-    await db.execute(
-      `INSERT INTO boq_change_lines
-        (id, change_order_id, boq_line_id, item_id, operation, section, trade,
-         item_name, unit, spec, delta_qty, new_unit_price, amount, note, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        lineId,
-        orderId,
-        line.target?.id ?? null,
-        line.itemId,
-        line.operation,
-        line.section,
-        line.trade,
-        line.itemName,
-        line.unit,
-        line.spec,
-        line.calculation.deltaQty,
-        line.calculation.newUnitPrice,
-        line.calculation.amount,
-        line.note?.trim() ?? '',
-        (index + 1) * 10,
-      ],
-    )
-    const lineLogId = await logCreate(db, 'boq_change_lines', lineId)
+  logIds.push(...await insertChangeLines(db, orderId, normalized))
+  return { orderId, logIds }
+}
+
+export async function replaceBoqChangeOrderDraft(
+  db: SoftDb,
+  orderId: string,
+  draft: CreateBoqChangeOrderDraft,
+): Promise<CreateBoqChangeOrderResult> {
+  const order = await activeOrder(db, orderId)
+  if (!['draft', 'rejected'].includes(order.status))
+    throw new Error('只有草稿或已退回变更单可以编辑')
+  const code = draft.code.trim()
+  const name = draft.name.trim()
+  if (!draft.projectId || !draft.contractId || !code || !name)
+    throw new Error('项目、施工合同、变更编号与名称必填')
+  if (!draft.lines.length)
+    throw new Error('量价变更单至少需要一条明细')
+
+  const { normalized, changeType, totalAmount } = await normalizeChangeDraft(db, draft)
+  const logIds: string[] = []
+  const orderLogId = await withUpdateLog(db, 'boq_change_orders', orderId, () => db.execute(
+    `UPDATE boq_change_orders
+     SET project_id = ?, contract_id = ?, code = ?, name = ?, change_type = ?,
+         status = 'draft', status_note = '', directive_no = ?, directive_type = ?,
+         document_type = ?, application_date = ?, reason = ?,
+         approved_tax_inclusive_amount = ?, approved_tax_exclusive_amount = ?,
+         applied_tax_exclusive_amount = ?, total_amount = ?, note = ?,
+         updated_at = datetime('now')
+     WHERE id = ?`,
+    [
+      draft.projectId,
+      draft.contractId,
+      code,
+      name,
+      changeType,
+      draft.directiveNo?.trim() ?? '',
+      draft.directiveType ?? '',
+      draft.documentType ?? 'change_negotiation',
+      draft.applicationDate?.trim() ?? '',
+      draft.reason?.trim() ?? '',
+      draft.approvedTaxInclusiveAmount ?? null,
+      draft.approvedTaxExclusiveAmount ?? null,
+      draft.appliedTaxExclusiveAmount ?? null,
+      totalAmount,
+      draft.note?.trim() ?? '',
+      orderId,
+    ],
+  ))
+  if (orderLogId)
+    logIds.push(orderLogId)
+
+  const existingLines = await db.select<{ id: string }>(
+    `SELECT id FROM boq_change_lines
+     WHERE change_order_id = ? AND deleted_at IS NULL`,
+    [orderId],
+  )
+  for (const line of existingLines) {
+    const lineLogId = await softDelete(db, 'boq_change_lines', line.id)
     if (lineLogId)
       logIds.push(lineLogId)
   }
+  logIds.push(...await insertChangeLines(db, orderId, normalized))
   return { orderId, logIds }
 }
 

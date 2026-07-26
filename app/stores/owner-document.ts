@@ -11,13 +11,29 @@ import {
   approveOwnerChange,
   auditOwnerReport,
   deductProjectPenalty,
+  deleteOwnerDocumentForm,
+  listOwnerDocumentForms,
   loadOwnerDocumentForm,
+  restoreOwnerDocumentForm,
   saveOwnerDocumentForm,
+  updateOwnerDocumentAttachments,
 } from '~/lib/owner-document/forms'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const records = shallowRef<Partial<Record<OwnerDocumentKind, Record<string, unknown>[]>>>({})
   const loading = shallowRef(false)
+
+  async function loadKind(kind: OwnerDocumentKind) {
+    loading.value = true
+    try {
+      const rows = await listOwnerDocumentForms(kind)
+      records.value = { ...records.value, [kind]: rows }
+      return rows
+    }
+    finally {
+      loading.value = false
+    }
+  }
 
   async function loadOne(kind: OwnerDocumentKind, id: string) {
     loading.value = true
@@ -92,13 +108,45 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
+  async function removeForm(kind: OwnerDocumentKind, id: string) {
+    const logId = await deleteOwnerDocumentForm(kind, id)
+    if (logId)
+      await loadKind(kind)
+    return logId
+  }
+
+  async function restoreForm(kind: OwnerDocumentKind, id: string) {
+    const logId = await restoreOwnerDocumentForm(kind, id)
+    if (logId)
+      await loadKind(kind)
+    return logId
+  }
+
+  async function saveAttachments(
+    kind: OwnerDocumentKind,
+    id: string,
+    changes: FileRefChanges,
+  ) {
+    loading.value = true
+    try {
+      return await updateOwnerDocumentAttachments(kind, id, changes)
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   return {
     records: readonly(records),
     loading: readonly(loading),
+    loadKind,
     loadOne,
     saveForm,
     approveOwnerChange: approveChange,
     auditOwnerReport: auditReport,
     deductProjectPenalty: deductPenalty,
+    removeForm,
+    restoreForm,
+    saveAttachments,
   }
 })

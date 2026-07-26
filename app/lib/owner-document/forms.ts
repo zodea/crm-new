@@ -1,9 +1,15 @@
 import type { BoqChangeLineDraft, BoqDirectiveType, BoqDocumentType } from '~/lib/boq/change'
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
-import { approveBoqChangeOrder, createBoqChangeOrder, transitionBoqChangeOrder } from '~/lib/boq/change'
+import {
+  approveBoqChangeOrder,
+  createBoqChangeOrder,
+  replaceBoqChangeOrderDraft,
+  transitionBoqChangeOrder,
+} from '~/lib/boq/change'
+import { loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { select, withTransaction } from '~/lib/db/connection'
-import { logCreate, withUpdateLog } from '~/lib/db/soft-delete'
+import { logCreate, restoreRecord, softDelete, withUpdateLog } from '~/lib/db/soft-delete'
 import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
@@ -37,6 +43,27 @@ export interface OwnerDocumentDraft {
 export interface OwnerDocumentSaveResult {
   id: string
   logIds: readonly string[]
+}
+
+export interface OwnerDocumentListRecord {
+  id: string
+  no: string
+  name: string
+  projectId: string | null
+  projectName: string
+  counterpartyName: string
+  amount: number
+  date: string
+  status: string
+}
+
+export interface OwnerDocumentBoqLine {
+  id: string
+  itemName: string
+  unit: string
+  qty: number
+  unitPrice: number
+  autoQty: number
 }
 
 export interface OwnerReportAuditDraft {
@@ -78,6 +105,17 @@ const FILE_OWNER_TYPES: Record<Exclude<OwnerDocumentKind, 'owner_change'>, strin
   sub_change: 'subcontract_change_order',
   sub_settlement: 'expenditure_settlement',
   project_penalty: 'penalty_record',
+}
+
+const TABLE_BY_KIND: Record<OwnerDocumentKind, string> = {
+  owner_change: 'boq_change_orders',
+  owner_report: 'monthly_statements',
+  acceptance: 'project_acceptances',
+  final_settlement: 'owner_final_settlements',
+  owner_penalty: 'owner_penalties',
+  sub_change: 'subcontract_change_orders',
+  sub_settlement: 'expenditure_settlements',
+  project_penalty: 'penalty_records',
 }
 
 function text(value: unknown): string {
@@ -184,8 +222,6 @@ async function saveOwnerChange(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  if (draft.id)
-    throw new Error('现有变更单编辑需走受控更正流程')
   const projectId = required(draft.projectId, '项目')
   const contractId = required(draft.contractId, '施工合同')
   const contract = await activeContract(tx, projectId, contractId, 'owner')
@@ -195,6 +231,83 @@ async function saveOwnerChange(
   const documentType = (text(draft.documentType) || 'change_negotiation') as BoqDocumentType
   const directiveType = text(draft.directiveType) as BoqDirectiveType
   const reason = action === 'submit' ? required(draft.reason, '变更事由') : text(draft.reason)
+
+  if (draft.id) {
+    const id = text(draft.id)
+    const [boqOrder] = await tx.select<{ id: string }>(
+      `SELECT id FROM boq_change_orders WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (boqOrder) {
+      if (!lines.length)
+        throw new Error('量价变更草稿不能改为纯金额签证，请保留至少一条明细')
+      const result = await replaceBoqChangeOrderDraft(tx, id, {
+        projectId,
+        contractId,
+        code: no,
+        name,
+        documentType,
+        directiveNo: text(draft.directiveNo),
+        directiveType,
+        applicationDate: text(draft.applicationDate),
+        reason,
+        approvedTaxInclusiveAmount: nullableNumber(draft.approvedTaxInclusiveAmount),
+        approvedTaxExclusiveAmount: nullableNumber(draft.approvedTaxExclusiveAmount),
+        appliedTaxExclusiveAmount: nullableNumber(draft.appliedTaxExclusiveAmount),
+        note: text(draft.note),
+        lines,
+      })
+      const logIds = [...result.logIds]
+      if (action === 'submit') {
+        const statusLogId = await transitionBoqChangeOrder(tx, id, 'submitted', text(draft.statusNote))
+        if (statusLogId)
+          logIds.push(statusLogId)
+      }
+      await applyFileRefChanges(tx, 'boq_change_order', id, attachments)
+      return { id, logIds }
+    }
+
+    if (lines.length)
+      throw new Error('纯金额签证草稿不能改为量价变更，请新建量价变更单')
+    const [ledger] = await tx.select<{ id: string, status: string, source_type: string }>(
+      `SELECT id, status, source_type FROM owner_change_orders
+       WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (!ledger || ledger.source_type !== 'manual')
+      throw new Error('变更单不存在、已删除或不可编辑')
+    if (!['draft', 'rejected'].includes(ledger.status))
+      throw new Error('只有草稿或已退回纯金额签证可以编辑')
+    const logId = await withUpdateLog(tx, 'owner_change_orders', id, () => tx.execute(`
+      UPDATE owner_change_orders
+      SET project_id = ?, change_no = ?, contract_name = ?, tax_inc_amount = ?,
+          tax_exc_amount = ?, applied_amount = ?, contract_id = ?, name = ?,
+          document_type = ?, directive_no = ?, directive_type = ?,
+          application_date = ?, reason = ?, status = ?, status_note = ?, note = ?,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `, [
+      projectId,
+      no,
+      contract.name,
+      numberValue(draft.approvedTaxInclusiveAmount),
+      numberValue(draft.approvedTaxExclusiveAmount),
+      numberValue(draft.appliedTaxExclusiveAmount),
+      contractId,
+      name,
+      documentType,
+      text(draft.directiveNo),
+      directiveType,
+      text(draft.applicationDate),
+      reason,
+      action === 'submit' ? 'submitted' : 'draft',
+      text(draft.statusNote),
+      text(draft.note),
+      id,
+    ]))
+    await applyFileRefChanges(tx, 'owner_change_order', id, attachments)
+    return { id, logIds: logId ? [logId] : [] }
+  }
 
   if (!lines.length) {
     const id = generateId('owner_change')
@@ -279,8 +392,6 @@ async function saveOwnerReport(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  if (draft.id)
-    throw new Error('现有月度报量请在原单上执行审定或明细调整')
   const projectId = required(draft.projectId, '项目')
   const contractId = required(draft.contractId, '施工合同')
   await activeContract(tx, projectId, contractId, 'owner')
@@ -312,29 +423,72 @@ async function saveOwnerReport(
       note: text(line.note),
     }
   }))
-  const id = generateId('monthly_statement')
+  const id = text(draft.id) || generateId('monthly_statement')
   const reportedAmount = round2(normalized.reduce((sum, line) => sum + line.amount, 0))
   const logIds: string[] = []
-  await tx.execute(`
-    INSERT INTO monthly_statements (
-      id, project_id, contract_id, month, no, period_no, application_date,
-      status, total_amount, reported_amount, audited_amount, note
+  let headLogId: string | null
+  if (draft.id) {
+    const [head] = await tx.select<{ id: string, status: string }>(
+      `SELECT id, status FROM monthly_statements
+       WHERE id = ? AND deleted_at IS NULL`,
+      [id],
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
-  `, [
-    id,
-    projectId,
-    contractId,
-    periodNo,
-    documentNo(draft.no, 'BL'),
-    periodNo,
-    text(draft.applicationDate),
-    action === 'submit' ? 'adjusted' : 'draft',
-    reportedAmount,
-    reportedAmount,
-    text(draft.note),
-  ])
-  const headLogId = await logCreate(tx, 'monthly_statements', id)
+    if (!head)
+      throw new Error('月度报量单不存在或已删除')
+    if (head.status !== 'draft')
+      throw new Error('只有草稿月度报量可以编辑')
+    headLogId = await withUpdateLog(tx, 'monthly_statements', id, () => tx.execute(`
+      UPDATE monthly_statements
+      SET project_id = ?, contract_id = ?, month = ?, no = ?, period_no = ?,
+          application_date = ?, status = ?, total_amount = ?, reported_amount = ?,
+          audited_amount = NULL, note = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `, [
+      projectId,
+      contractId,
+      periodNo,
+      documentNo(draft.no, 'BL'),
+      periodNo,
+      text(draft.applicationDate),
+      action === 'submit' ? 'adjusted' : 'draft',
+      reportedAmount,
+      reportedAmount,
+      text(draft.note),
+      id,
+    ]))
+    const existingLines = await tx.select<{ id: string }>(
+      `SELECT id FROM monthly_statement_lines
+       WHERE statement_id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    for (const line of existingLines) {
+      const lineLogId = await softDelete(tx, 'monthly_statement_lines', line.id)
+      if (lineLogId)
+        logIds.push(lineLogId)
+    }
+  }
+  else {
+    await tx.execute(`
+      INSERT INTO monthly_statements (
+        id, project_id, contract_id, month, no, period_no, application_date,
+        status, total_amount, reported_amount, audited_amount, note
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+    `, [
+      id,
+      projectId,
+      contractId,
+      periodNo,
+      documentNo(draft.no, 'BL'),
+      periodNo,
+      text(draft.applicationDate),
+      action === 'submit' ? 'adjusted' : 'draft',
+      reportedAmount,
+      reportedAmount,
+      text(draft.note),
+    ])
+    headLogId = await logCreate(tx, 'monthly_statements', id)
+  }
   if (headLogId)
     logIds.push(headLogId)
   for (const [index, line] of normalized.entries()) {
@@ -373,7 +527,7 @@ async function saveAcceptance(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('project_acceptance')
+  const id = text(draft.id) || generateId('project_acceptance')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   if (action === 'submit') {
@@ -385,14 +539,7 @@ async function saveAcceptance(
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'owner')
-  await tx.execute(`
-    INSERT INTO project_acceptances (
-      id, no, type, name, project_id, contract_id, document_date,
-      contract_estimate, acceptor, warranty_owner, conclusion, status, note
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'YS'),
     text(draft.type) || 'acceptance',
     text(draft.name),
@@ -405,8 +552,28 @@ async function saveAcceptance(
     text(draft.conclusion),
     action === 'submit' ? 'submitted' : 'draft',
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'project_acceptances', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'project_acceptances', id, () => tx.execute(`
+        UPDATE project_acceptances
+        SET no = ?, type = ?, name = ?, project_id = ?, contract_id = ?,
+            document_date = ?, contract_estimate = ?, acceptor = ?,
+            warranty_owner = ?, conclusion = ?, status = ?, note = ?,
+            updated_at = datetime('now')
+        WHERE id = ? AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO project_acceptances (
+            id, no, type, name, project_id, contract_id, document_date,
+            contract_estimate, acceptor, warranty_owner, conclusion, status, note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'project_acceptances', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('验收或保修记录不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'project_acceptance', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -417,7 +584,7 @@ async function saveFinalSettlement(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('owner_final_settlement')
+  const id = text(draft.id) || generateId('owner_final_settlement')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   const amount = numberValue(draft.settlementAmount)
@@ -431,14 +598,7 @@ async function saveFinalSettlement(
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'owner')
-  await tx.execute(`
-    INSERT INTO owner_final_settlements (
-      id, no, name, project_id, contract_id, settlement_amount,
-      submission_date, basis, difference_note, status, note
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'ZZ'),
     text(draft.name),
     projectId,
@@ -449,8 +609,27 @@ async function saveFinalSettlement(
     text(draft.differenceNote),
     action === 'submit' ? 'submitted' : 'draft',
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'owner_final_settlements', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'owner_final_settlements', id, () => tx.execute(`
+        UPDATE owner_final_settlements
+        SET no = ?, name = ?, project_id = ?, contract_id = ?,
+            settlement_amount = ?, submission_date = ?, basis = ?,
+            difference_note = ?, status = ?, note = ?, updated_at = datetime('now')
+        WHERE id = ? AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO owner_final_settlements (
+            id, no, name, project_id, contract_id, settlement_amount,
+            submission_date, basis, difference_note, status, note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'owner_final_settlements', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('最终结算不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'owner_final_settlement', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -461,7 +640,7 @@ async function saveOwnerPenalty(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('owner_penalty')
+  const id = text(draft.id) || generateId('owner_penalty')
   const projectId = text(draft.projectId) || null
   const contractId = text(draft.contractId) || null
   const amount = numberValue(draft.amount)
@@ -475,14 +654,7 @@ async function saveOwnerPenalty(
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'owner')
-  await tx.execute(`
-    INSERT INTO owner_penalties (
-      id, no, project_id, contract_id, notice_no, amount, penalty_date,
-      reason, appeal_note, status, note
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'JFFK'),
     projectId,
     contractId,
@@ -493,8 +665,27 @@ async function saveOwnerPenalty(
     text(draft.appealNote),
     action === 'submit' ? 'submitted' : 'draft',
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'owner_penalties', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'owner_penalties', id, () => tx.execute(`
+        UPDATE owner_penalties
+        SET no = ?, project_id = ?, contract_id = ?, notice_no = ?, amount = ?,
+            penalty_date = ?, reason = ?, appeal_note = ?, status = ?, note = ?,
+            updated_at = datetime('now')
+        WHERE id = ? AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO owner_penalties (
+            id, no, project_id, contract_id, notice_no, amount, penalty_date,
+            reason, appeal_note, status, note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'owner_penalties', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('甲方罚扣单不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'owner_penalty', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -505,7 +696,7 @@ async function saveSubChange(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('subcontract_change')
+  const id = text(draft.id) || generateId('subcontract_change')
   const projectId = text(draft.projectId) || null
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
@@ -513,6 +704,7 @@ async function saveSubChange(
   if (action === 'submit') {
     required(projectId, '项目')
     required(supplierId, '分供方')
+    required(contractId, '支出合同')
     required(draft.changeDate, '日期')
     requiredPositive(draft.approvedAmount, '审批金额')
   }
@@ -520,14 +712,7 @@ async function saveSubChange(
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'expenditure', supplierId)
-  await tx.execute(`
-    INSERT INTO subcontract_change_orders (
-      id, no, change_type, project_id, supplier_id, contract_id, change_date,
-      approved_amount, changed_area, actual_approved_price, reason, status, note
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'FBBQ'),
     text(draft.changeType),
     projectId,
@@ -540,8 +725,28 @@ async function saveSubChange(
     reason,
     action === 'submit' ? 'submitted' : 'draft',
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'subcontract_change_orders', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'subcontract_change_orders', id, () => tx.execute(`
+        UPDATE subcontract_change_orders
+        SET no = ?, change_type = ?, project_id = ?, supplier_id = ?,
+            contract_id = ?, change_date = ?, approved_amount = ?,
+            changed_area = ?, actual_approved_price = ?, reason = ?,
+            status = ?, note = ?, updated_at = datetime('now')
+        WHERE id = ? AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO subcontract_change_orders (
+            id, no, change_type, project_id, supplier_id, contract_id, change_date,
+            approved_amount, changed_area, actual_approved_price, reason, status, note
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'subcontract_change_orders', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('分包变更单不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'subcontract_change_order', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -552,7 +757,7 @@ async function saveSubSettlement(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('expenditure_settlement')
+  const id = text(draft.id) || generateId('expenditure_settlement')
   const projectId = text(draft.projectId) || null
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
@@ -560,6 +765,7 @@ async function saveSubSettlement(
   if (action === 'submit') {
     required(projectId, '项目')
     required(supplierId, '分供方')
+    required(contractId, '支出合同')
     required(draft.name, '结算名称')
     requiredPositive(amount, '结算金额')
     required(draft.settlementDate, '结算日期')
@@ -568,14 +774,7 @@ async function saveSubSettlement(
     await assertActiveProject(tx, projectId)
   if (contractId && projectId)
     await activeContract(tx, projectId, contractId, 'expenditure', supplierId)
-  await tx.execute(`
-    INSERT INTO expenditure_settlements (
-      id, no, name, biz_type, project_id, supplier_id, contract_id,
-      settlement_type, total_amount, settlement_date, deduction_note, status, note
-    )
-    VALUES (?, ?, ?, '分包', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'FBJS'),
     text(draft.name),
     projectId,
@@ -587,8 +786,27 @@ async function saveSubSettlement(
     text(draft.deductionNote),
     action === 'submit' ? 'confirmed' : 'draft',
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'expenditure_settlements', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'expenditure_settlements', id, () => tx.execute(`
+        UPDATE expenditure_settlements
+        SET no = ?, name = ?, project_id = ?, supplier_id = ?, contract_id = ?,
+            settlement_type = ?, total_amount = ?, settlement_date = ?,
+            deduction_note = ?, status = ?, note = ?, updated_at = datetime('now')
+        WHERE id = ? AND biz_type = '分包' AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO expenditure_settlements (
+            id, no, name, biz_type, project_id, supplier_id, contract_id,
+            settlement_type, total_amount, settlement_date, deduction_note, status, note
+          )
+          VALUES (?, ?, ?, '分包', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'expenditure_settlements', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('分包结算不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'expenditure_settlement', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -599,7 +817,7 @@ async function saveProjectPenalty(
   action: OwnerDocumentSaveAction,
   attachments: FileRefChanges,
 ): Promise<OwnerDocumentSaveResult> {
-  const id = generateId('penalty')
+  const id = text(draft.id) || generateId('penalty')
   const projectId = required(draft.projectId, '项目')
   const supplierId = text(draft.supplierId) || null
   const contractId = text(draft.contractId) || null
@@ -614,15 +832,7 @@ async function saveProjectPenalty(
   await assertActiveCrew(tx, crewId)
   if (contractId)
     await activeContract(tx, projectId, contractId, 'expenditure', supplierId)
-  await tx.execute(`
-    INSERT INTO penalty_records (
-      id, no, projectId, crewId, source, reason, amount, penaltyDate,
-      chargeMethod, deadline, status, supplier_id, contract_id,
-      deduction_method, rectification_note, note
-    )
-    VALUES (?, ?, ?, ?, 'project', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `, [
-    id,
+  const values = [
     documentNo(draft.no, 'XMFK'),
     projectId,
     crewId,
@@ -637,8 +847,29 @@ async function saveProjectPenalty(
     text(draft.deductionMethod),
     text(draft.rectificationNote),
     text(draft.note),
-  ])
-  const logId = await logCreate(tx, 'penalty_records', id)
+  ]
+  const logId = draft.id
+    ? await withUpdateLog(tx, 'penalty_records', id, () => tx.execute(`
+        UPDATE penalty_records
+        SET no = ?, projectId = ?, crewId = ?, reason = ?, amount = ?,
+            penaltyDate = ?, chargeMethod = ?, deadline = ?, status = ?,
+            supplier_id = ?, contract_id = ?, deduction_method = ?,
+            rectification_note = ?, note = ?, updated_at = datetime('now')
+        WHERE id = ? AND source = 'project' AND deleted_at IS NULL
+      `, [...values, id]))
+    : await (async () => {
+        await tx.execute(`
+          INSERT INTO penalty_records (
+            id, no, projectId, crewId, source, reason, amount, penaltyDate,
+            chargeMethod, deadline, status, supplier_id, contract_id,
+            deduction_method, rectification_note, note
+          )
+          VALUES (?, ?, ?, ?, 'project', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [id, ...values])
+        return logCreate(tx, 'penalty_records', id)
+      })()
+  if (draft.id && !logId)
+    throw new Error('项目罚扣不存在、已删除或不可编辑')
   await applyFileRefChanges(tx, 'penalty_record', id, attachments)
   return { id, logIds: logId ? [logId] : [] }
 }
@@ -955,6 +1186,200 @@ export async function loadOwnerDocumentForm(
   }
 }
 
+export async function listOwnerDocumentForms(
+  kind: OwnerDocumentKind,
+): Promise<OwnerDocumentListRecord[]> {
+  if (kind === 'owner_change') {
+    const rows = await select<Record<string, unknown>>(`
+      SELECT change_order.id, change_order.code AS no, change_order.name,
+             change_order.project_id, project.name AS project_name,
+             contract.name AS counterparty_name, change_order.total_amount AS amount,
+             change_order.application_date AS document_date, change_order.status,
+             change_order.created_at
+      FROM boq_change_orders change_order
+      LEFT JOIN projects project ON project.id = change_order.project_id
+      LEFT JOIN contracts contract ON contract.id = change_order.contract_id
+      WHERE change_order.deleted_at IS NULL
+      UNION ALL
+      SELECT ledger.id, ledger.change_no, ledger.name, ledger.project_id,
+             project.name, ledger.contract_name, ledger.tax_inc_amount,
+             ledger.application_date, ledger.status, ledger.created_at
+      FROM owner_change_orders ledger
+      LEFT JOIN projects project ON project.id = ledger.project_id
+      WHERE ledger.source_type = 'manual' AND ledger.deleted_at IS NULL
+      ORDER BY created_at DESC, id DESC
+    `)
+    return rows.map(toListRecord)
+  }
+
+  const queryByKind: Record<Exclude<OwnerDocumentKind, 'owner_change'>, string> = {
+    owner_report: `
+      SELECT statement.id, statement.no, statement.period_no AS name,
+             statement.project_id, project.name AS project_name,
+             contract.name AS counterparty_name,
+             COALESCE(statement.audited_amount, statement.reported_amount, statement.total_amount, 0) AS amount,
+             statement.application_date AS document_date, statement.status,
+             statement.created_at
+      FROM monthly_statements statement
+      LEFT JOIN projects project ON project.id = statement.project_id
+      LEFT JOIN contracts contract ON contract.id = statement.contract_id
+      WHERE statement.deleted_at IS NULL`,
+    acceptance: `
+      SELECT document.id, document.no, document.name, document.project_id,
+             project.name AS project_name, contract.name AS counterparty_name,
+             COALESCE(document.contract_estimate, 0) AS amount,
+             document.document_date, document.status, document.created_at
+      FROM project_acceptances document
+      LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
+      WHERE document.deleted_at IS NULL`,
+    final_settlement: `
+      SELECT document.id, document.no, document.name, document.project_id,
+             project.name AS project_name, contract.name AS counterparty_name,
+             document.settlement_amount AS amount,
+             document.submission_date AS document_date, document.status, document.created_at
+      FROM owner_final_settlements document
+      LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
+      WHERE document.deleted_at IS NULL`,
+    owner_penalty: `
+      SELECT document.id, document.no, document.reason AS name, document.project_id,
+             project.name AS project_name, contract.name AS counterparty_name,
+             document.amount, document.penalty_date AS document_date,
+             document.status, document.created_at
+      FROM owner_penalties document
+      LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
+      WHERE document.deleted_at IS NULL`,
+    sub_change: `
+      SELECT document.id, document.no, document.reason AS name, document.project_id,
+             project.name AS project_name, supplier.name AS counterparty_name,
+             document.approved_amount AS amount, document.change_date AS document_date,
+             document.status, document.created_at
+      FROM subcontract_change_orders document
+      LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
+      WHERE document.deleted_at IS NULL`,
+    sub_settlement: `
+      SELECT document.id, document.no, document.name, document.project_id,
+             project.name AS project_name, supplier.name AS counterparty_name,
+             document.total_amount AS amount, document.settlement_date AS document_date,
+             document.status, document.created_at
+      FROM expenditure_settlements document
+      LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
+      WHERE document.biz_type = '分包' AND document.deleted_at IS NULL`,
+    project_penalty: `
+      SELECT document.id, document.no, document.reason AS name,
+             document.projectId AS project_id, project.name AS project_name,
+             COALESCE(supplier.name, crew.name, '') AS counterparty_name,
+             document.amount, document.penaltyDate AS document_date,
+             document.status, document.createdAt AS created_at
+      FROM penalty_records document
+      LEFT JOIN projects project ON project.id = document.projectId
+      LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
+      LEFT JOIN crews crew ON crew.id = document.crewId
+      WHERE document.source = 'project' AND document.deleted_at IS NULL`,
+  }
+  const rows = await select<Record<string, unknown>>(
+    `SELECT * FROM (${queryByKind[kind]}) AS list_record
+     ORDER BY created_at DESC, id DESC`,
+  )
+  return rows.map(toListRecord)
+}
+
+export async function listOwnerDocumentBoqLines(
+  projectId: string,
+  contractId: string,
+  periodNo = '',
+): Promise<OwnerDocumentBoqLine[]> {
+  if (!projectId || !contractId)
+    return []
+  const rows = await select<{
+    id: string
+    item_name: string
+    unit: string
+    effective_qty: number
+    effective_unit_price: number
+  }>(`
+    SELECT id, item_name, unit,
+           COALESCE(recognized_qty, qty, 0) AS effective_qty,
+           COALESCE(recognized_unit_price, unit_price, 0) AS effective_unit_price
+    FROM boq_lines
+    WHERE project_id = ? AND contract_id = ? AND deleted_at IS NULL
+    ORDER BY sort_order, id
+  `, [projectId, contractId])
+  const quantities = periodNo
+    ? await loadMonthlyQuantities({ select }, projectId, contractId, periodNo)
+    : []
+  const autoQtyById = new Map(
+    quantities.map(row => [row.boq_line_id, numberValue(row.auto_qty)]),
+  )
+  return rows.map(row => ({
+    id: row.id,
+    itemName: row.item_name,
+    unit: row.unit,
+    qty: numberValue(row.effective_qty),
+    unitPrice: numberValue(row.effective_unit_price),
+    autoQty: autoQtyById.get(row.id) ?? 0,
+  }))
+}
+
+function toListRecord(row: Record<string, unknown>): OwnerDocumentListRecord {
+  return {
+    id: text(row.id),
+    no: text(row.no),
+    name: text(row.name),
+    projectId: text(row.project_id) || null,
+    projectName: text(row.project_name),
+    counterpartyName: text(row.counterparty_name),
+    amount: numberValue(row.amount),
+    date: text(row.document_date),
+    status: text(row.status),
+  }
+}
+
+async function ownerChangeStorageTable(id: string): Promise<string> {
+  const [boq] = await select<{ id: string }>(
+    `SELECT id FROM boq_change_orders WHERE id = ?`,
+    [id],
+  )
+  return boq ? 'boq_change_orders' : 'owner_change_orders'
+}
+
+async function storageTable(kind: OwnerDocumentKind, id: string): Promise<string> {
+  return kind === 'owner_change'
+    ? ownerChangeStorageTable(id)
+    : TABLE_BY_KIND[kind]
+}
+
+export async function deleteOwnerDocumentForm(
+  kind: OwnerDocumentKind,
+  id: string,
+): Promise<string | null> {
+  const table = await storageTable(kind, id)
+  return withTransaction(async (tx) => {
+    if (kind === 'owner_change' && table === 'boq_change_orders') {
+      const [order] = await tx.select<{ status: string }>(
+        `SELECT status FROM boq_change_orders
+         WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (order?.status === 'approved')
+        throw new Error('已签证变更不可直接删除，请在 BOQ 工作区执行级联二次确认')
+    }
+    return softDelete(tx, table, id)
+  })
+}
+
+export async function restoreOwnerDocumentForm(
+  kind: OwnerDocumentKind,
+  id: string,
+): Promise<string | null> {
+  const table = await storageTable(kind, id)
+  return withTransaction(tx => restoreRecord(tx, table, id))
+}
+
 async function ownerChangeFileOwner(id: string): Promise<string> {
   const [order] = await select<{ id: string }>(
     `SELECT id FROM boq_change_orders WHERE id = ?`,
@@ -972,6 +1397,26 @@ export async function listOwnerDocumentAttachments(
     ? await ownerChangeFileOwner(id)
     : FILE_OWNER_TYPES[kind]
   return listFileRefs(ownerType, id, includeDeleted)
+}
+
+export async function updateOwnerDocumentAttachments(
+  kind: OwnerDocumentKind,
+  id: string,
+  changes: FileRefChanges,
+): Promise<string[]> {
+  const ownerType = kind === 'owner_change'
+    ? await ownerChangeFileOwner(id)
+    : FILE_OWNER_TYPES[kind]
+  const table = await storageTable(kind, id)
+  return withTransaction(async (tx) => {
+    const [record] = await tx.select<{ id: string }>(
+      `SELECT id FROM "${table}" WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (!record)
+      throw new Error('单据不存在或已删除')
+    return applyFileRefChanges(tx, ownerType, id, changes)
+  })
 }
 
 export async function approveOwnerChange(
