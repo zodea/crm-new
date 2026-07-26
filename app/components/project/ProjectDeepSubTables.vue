@@ -26,6 +26,15 @@ const subcontractChanges = computed(() =>
 const expenditureSettlements = computed(() =>
   detailStore.expenditureSettlements.filter(row => row.projectId === props.projectId),
 )
+const currentReceipts = computed(() =>
+  detailStore.currentReceipts.filter(row => row.projectId === props.projectId),
+)
+const currentPayments = computed(() =>
+  detailStore.currentPayments.filter(row => row.projectId === props.projectId),
+)
+const paymentRecords = computed(() =>
+  detailStore.paymentRecords.filter(row => row.projectId === props.projectId),
+)
 
 const targetCostColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
@@ -91,6 +100,48 @@ const expenditureSettlementColumns: KitTableColumn[] = [
   { field: 'settlementType', title: '结算类型', width: 130, filterable: true },
   { field: 'amount', title: '结算金额', type: 'money', width: 145 },
   { field: 'status', title: '状态', width: 100, filterable: true },
+]
+const currentReceiptColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'documentNo', title: '往来收款编号', width: 170, slot: 'link' },
+  { field: 'transactionDate', title: '收款日期', type: 'date' },
+  { field: 'counterparty', title: '付款方', minWidth: 190, filterable: true },
+  { field: 'purpose', title: '用途', minWidth: 190 },
+  { field: 'amount', title: '收款金额', type: 'money', width: 150 },
+  { field: 'paymentMethod', title: '支付方式', width: 120, filterable: true },
+  { field: 'bankSerialNo', title: '银行流水', width: 170 },
+  { field: 'handler', title: '经办人', width: 110, filterable: true },
+  { field: 'status', title: '状态', width: 100, filterable: true },
+]
+const currentPaymentColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'documentNo', title: '往来付款编号', width: 170, slot: 'link' },
+  { field: 'transactionDate', title: '付款日期', type: 'date' },
+  { field: 'counterparty', title: '收款方', minWidth: 190, filterable: true },
+  { field: 'purpose', title: '用途', minWidth: 190 },
+  { field: 'amount', title: '付款金额', type: 'money', width: 150 },
+  { field: 'paymentMethod', title: '支付方式', width: 120, filterable: true },
+  { field: 'bankSerialNo', title: '银行流水', width: 170 },
+  { field: 'handler', title: '经办人', width: 110, filterable: true },
+  { field: 'status', title: '状态', width: 100, filterable: true },
+]
+const paymentRecordColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'paymentNo', title: '支付编号', width: 160, slot: 'link' },
+  { field: 'paymentDate', title: '支付日期', type: 'date' },
+  { field: 'payee', title: '收款方', minWidth: 190, filterable: true },
+  { field: 'purpose', title: '用途', minWidth: 210 },
+  { field: 'amount', title: '支付金额', type: 'money', width: 150 },
+  { field: 'paymentMethod', title: '支付方式', width: 120, filterable: true },
+  { field: 'voucherNo', title: '凭证号', width: 160 },
+  { field: 'bankSerialNo', title: '银行流水号', width: 170 },
+  { field: 'handler', title: '经办/确认人', width: 120, filterable: true },
+  { field: 'status', title: '确认状态', width: 110, filterable: true },
+  { field: 'source', title: '识别来源', width: 110, filterable: true },
+  { field: 'recognitionStatus', title: '识别状态', width: 110, filterable: true },
+  { field: 'allocationCount', title: '分摊申请数', width: 110, align: 'right' },
+  { field: 'allocatedAmount', title: '已分摊', type: 'money', width: 140 },
+  { field: 'allocationDifference', title: '分摊差额', type: 'money', width: 140 },
 ]
 </script>
 
@@ -219,4 +270,48 @@ const expenditureSettlementColumns: KitTableColumn[] = [
       </template>
     </ProjectSubTableSection>
   </div>
+
+  <div v-else-if="tab === 'current'" class="space-y-5">
+    <ProjectSubTableSection
+      title="往来收款"
+      :columns="currentReceiptColumns"
+      :rows="currentReceipts"
+      :loading="detailStore.loading"
+      :summary-fields="[{ field: 'effectiveAmount', label: '正式往来收款合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.documentNo || '查看往来收款' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
+    <ProjectSubTableSection
+      title="往来付款"
+      :columns="currentPaymentColumns"
+      :rows="currentPayments"
+      :loading="detailStore.loading"
+      :summary-fields="[{ field: 'effectiveAmount', label: '正式往来付款合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.documentNo || '查看往来付款' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
+  </div>
+
+  <ProjectSubTableSection
+    v-else-if="tab === 'payment'"
+    title="支付记录"
+    :columns="paymentRecordColumns"
+    :rows="paymentRecords"
+    :loading="detailStore.loading"
+    :summary-fields="[{ field: 'effectiveAmount', label: '确认支付合计' }]"
+  >
+    <template #link="{ row }">
+      <NuxtLink :to="row.sourcePath" class="cell--link">
+        {{ row.paymentNo || '查看支付记录' }}
+      </NuxtLink>
+    </template>
+  </ProjectSubTableSection>
 </template>

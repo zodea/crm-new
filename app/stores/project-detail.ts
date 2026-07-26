@@ -10,12 +10,17 @@ import type {
   ExpenditureSupplementRow,
   SubcontractChangeRow,
 } from '~/lib/project/expenditure-relations'
+import type {
+  ProjectCurrentTransactionRow,
+  ProjectPaymentRecordRow,
+} from '~/lib/project/finance-facts'
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 import { loadProjectExpenditureRelations } from '~/lib/project/expenditure-relations'
+import { loadProjectFinanceFacts } from '~/lib/project/finance-facts'
 import { useInvoiceStore } from '~/stores/invoice'
 
 export interface ConstructionContractRow {
@@ -85,26 +90,6 @@ export interface PaymentApplicationRow {
   acceptor: string
 }
 
-export interface CurrentReceiptRow {
-  id: string
-  projectId: string
-  receiptNo: string
-  receiptDate: string
-  amount: number
-  payer: string
-}
-
-export interface CurrentPaymentRow {
-  id: string
-  projectId: string
-  paymentNo: string
-  approvalStatus: string
-  paymentDate: string
-  payee: string
-  amount: number
-  paymentMethod: string
-}
-
 function number(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -118,14 +103,15 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const invoiceApplications = shallowRef<InvoiceApplicationRow[]>([])
   const receiptRegistrations = shallowRef<ReceiptRegistrationRow[]>([])
   const paymentApplications = shallowRef<PaymentApplicationRow[]>([])
-  const currentReceipts = shallowRef<CurrentReceiptRow[]>([])
-  const currentPayments = shallowRef<CurrentPaymentRow[]>([])
+  const currentReceipts = shallowRef<ProjectCurrentTransactionRow[]>([])
+  const currentPayments = shallowRef<ProjectCurrentTransactionRow[]>([])
   const targetCosts = shallowRef<TargetCostVersionRow[]>([])
   const targetCostCategories = shallowRef<TargetCostCategoryRow[]>([])
   const expenditureContracts = shallowRef<ExpenditureContractRow[]>([])
   const expenditureSupplements = shallowRef<ExpenditureSupplementRow[]>([])
   const subcontractChanges = shallowRef<SubcontractChangeRow[]>([])
   const expenditureSettlements = shallowRef<ExpenditureSettlementRow[]>([])
+  const paymentRecords = shallowRef<ProjectPaymentRecordRow[]>([])
   const aggregateRows = shallowRef<ProjectDetailAggregate[]>([])
   const loading = shallowRef(false)
   const loaded = shallowRef(false)
@@ -166,10 +152,10 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         outgoing,
         receipts,
         payments,
-        currentRows,
         aggregates,
         costControl,
         expenditureRelations,
+        financeFacts,
       ] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
@@ -202,15 +188,11 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
           WHERE ${visibleCond('payment_applications', 'application')}
           ORDER BY application.created_at DESC
         `),
-        select<Record<string, unknown>>(
-          selectVisibleSql('current_transactions', 'ORDER BY created_at DESC'),
-        ),
         loadProjectDetailAggregates(db),
         loadProjectCostControl(db),
         loadProjectExpenditureRelations(db),
+        loadProjectFinanceFacts(db),
       ])
-      const currentIn = currentRows.filter(row => row.direction === 'receipt')
-      const currentOut = currentRows.filter(row => row.direction === 'payment')
 
       constructionContracts.value = contracts.map(row => ({
         id: row.id as string,
@@ -274,30 +256,15 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         actualPayment: number(row.derived_paid_amount),
         acceptor: (row.approval_note ?? '') as string,
       }))
-      currentReceipts.value = currentIn.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        receiptNo: (row.no ?? '') as string,
-        receiptDate: (row.transaction_date ?? '') as string,
-        amount: number(row.amount),
-        payer: (row.counterparty ?? '') as string,
-      }))
-      currentPayments.value = currentOut.map(row => ({
-        id: row.id as string,
-        projectId: row.project_id as string,
-        paymentNo: (row.no ?? '') as string,
-        approvalStatus: (row.status ?? '') as string,
-        paymentDate: (row.transaction_date ?? '') as string,
-        payee: (row.counterparty ?? '') as string,
-        amount: number(row.amount),
-        paymentMethod: (row.payment_method ?? '') as string,
-      }))
+      currentReceipts.value = financeFacts.currentReceipts
+      currentPayments.value = financeFacts.currentPayments
       targetCosts.value = costControl.versions
       targetCostCategories.value = costControl.categories
       expenditureContracts.value = expenditureRelations.contracts
       expenditureSupplements.value = expenditureRelations.supplements
       subcontractChanges.value = expenditureRelations.changes
       expenditureSettlements.value = expenditureRelations.settlements
+      paymentRecords.value = financeFacts.paymentRecords
       aggregateRows.value = aggregates
       loaded.value = true
     }
@@ -321,6 +288,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     expenditureSupplements: readonly(expenditureSupplements),
     subcontractChanges: readonly(subcontractChanges),
     expenditureSettlements: readonly(expenditureSettlements),
+    paymentRecords: readonly(paymentRecords),
     operationSummaries,
     invoiceOutputSummaries,
     invoiceSummaries,

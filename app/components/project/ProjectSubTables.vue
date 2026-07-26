@@ -173,7 +173,7 @@ onMounted(() => Promise.all([
   </div>
 
   <ProjectDeepSubTables
-    v-else-if="tab === 'budget' || tab === 'expenditure'"
+    v-else-if="['budget', 'expenditure', 'current', 'payment'].includes(tab)"
     :tab="tab"
     :project-id="projectId"
   />

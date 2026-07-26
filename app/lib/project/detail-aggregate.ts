@@ -93,6 +93,7 @@ async function loadCurrentSums(
     FROM current_transactions AS current
     WHERE ${visibleCond('current_transactions', 'current')}
       AND current.direction = ?
+      AND current.status NOT IN ('draft', '草稿')
     GROUP BY current.project_id
   `, [direction])
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
