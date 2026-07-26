@@ -19,6 +19,7 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0013](./0013-align-all-ui-to-online-design.md) | 全站视觉统一到线上设计稿 | 已采纳 |
 | [0014](./0014-full-page-entity-forms.md) | 业务实体使用整页表单 | 已采纳并已落地 |
 | [0015](./0015-form-persistence-and-payment-reconciliation.md) | 表单持久化与付款勾稽 | 已采纳并已落地 |
+| [0016](./0016-overlay-composition-contract.md) | 浮层组合采用单交互平面与模态栈契约 | 已采纳，迁移中 |
 
 ## 写作边界
 
