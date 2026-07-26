@@ -1,0 +1,163 @@
+<script setup lang="ts">
+import type { FinancePageDraft } from '~/lib/finance/page'
+import type { LookupOption } from '~/lib/kit/lookup'
+import { computed } from 'vue'
+import FinanceLineGrid from './FinanceLineGrid.vue'
+
+const props = defineProps<{
+  kind: 'current' | 'reimbursement'
+  draft: FinancePageDraft
+  fieldErrors?: Record<string, string>
+  fetchProjects: (keyword: string) => Promise<LookupOption[]>
+}>()
+
+const emit = defineEmits<{
+  patch: [patch: Partial<FinancePageDraft>]
+  clearError: [field: string]
+}>()
+
+const PAYMENT_METHOD_OPTIONS = ['银行转账', '承兑汇票', '现金', '其他']
+  .map(value => ({ key: value, label: value }))
+const DIRECTION_OPTIONS = [
+  { key: 'receipt', label: '收款' },
+  { key: 'payment', label: '付款' },
+]
+const reimbursementTotal = computed(() =>
+  (props.draft.lines ?? []).reduce((sum, line) => sum + (Number(line.amount) || 0), 0),
+)
+
+function patch(field: keyof FinancePageDraft, value: unknown) {
+  emit('patch', { [field]: value } as Partial<FinancePageDraft>)
+  emit('clearError', String(field))
+}
+
+function updateLines(lines: unknown[]) {
+  emit('patch', { lines } as Partial<FinancePageDraft>)
+  emit('clearError', 'lines')
+}
+
+function inputValue(event: Event): string {
+  return (event.target as HTMLInputElement).value
+}
+
+function inputNumber(event: Event): number {
+  return Number((event.target as HTMLInputElement).value) || 0
+}
+
+function fieldClass(field: string) {
+  return props.fieldErrors?.[field] ? 'border-danger! ring-1 ring-danger/20' : ''
+}
+</script>
+
+<template>
+  <template v-if="kind === 'current'">
+    <section id="section-basic" class="panel scroll-mt-4 p-4">
+      <SectionHeader>基本信息</SectionHeader>
+      <div class="form-fields-grid mt-3">
+        <label class="field-block">
+          <span class="field-label">单据编号</span>
+          <input :value="draft.no" class="field-input w-full font-mono" data-testid="finance-no" @input="patch('no', inputValue($event))">
+        </label>
+        <div class="field-block" :class="fieldClass('direction')">
+          <span class="field-label">收付方向 *</span>
+          <SelectFilter :model-value="draft.direction" :options="DIRECTION_OPTIONS" full-width aria-label="收付方向" @update:model-value="patch('direction', $event)" />
+          <span v-if="fieldErrors?.direction" class="field-error">{{ fieldErrors.direction }}</span>
+        </div>
+        <div class="field-block" :class="fieldClass('projectId')">
+          <span class="field-label">项目 *</span>
+          <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-current-project" placeholder="检索项目" @update:model-value="patch('projectId', $event)" />
+          <span v-if="fieldErrors?.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
+        </div>
+        <label class="field-block">
+          <span class="field-label">往来方 *</span>
+          <input :value="draft.counterparty" class="field-input w-full" :class="[fieldClass('counterparty')]" data-testid="finance-name" @input="patch('counterparty', inputValue($event))">
+          <span v-if="fieldErrors?.counterparty" class="field-error">{{ fieldErrors.counterparty }}</span>
+        </label>
+        <label class="field-block form-span-full">
+          <span class="field-label">款项性质</span>
+          <input :value="draft.purpose" class="field-input w-full" @input="patch('purpose', inputValue($event))">
+        </label>
+      </div>
+    </section>
+    <section id="section-amount" class="panel scroll-mt-4 p-4">
+      <SectionHeader>金额与方式</SectionHeader>
+      <div class="form-fields-grid mt-3">
+        <label class="field-block">
+          <span class="field-label">金额 *</span>
+          <input :value="draft.amount" type="number" min="0" step="0.01" class="field-input w-full font-mono" :class="[fieldClass('amount')]" data-testid="finance-amount" @input="patch('amount', inputNumber($event))">
+          <span v-if="fieldErrors?.amount" class="field-error">{{ fieldErrors.amount }}</span>
+        </label>
+        <div class="field-block">
+          <span class="field-label">收付方式</span>
+          <SelectFilter :model-value="draft.paymentMethod" :options="PAYMENT_METHOD_OPTIONS" full-width aria-label="收付方式" @update:model-value="patch('paymentMethod', $event)" />
+        </div>
+        <label class="field-block">
+          <span class="field-label">日期 *</span>
+          <input :value="draft.transactionDate" type="date" class="field-input w-full" :class="[fieldClass('transactionDate')]" data-testid="finance-date" @input="patch('transactionDate', inputValue($event))">
+          <span v-if="fieldErrors?.transactionDate" class="field-error">{{ fieldErrors.transactionDate }}</span>
+        </label>
+        <label class="field-block">
+          <span class="field-label">银行流水号</span>
+          <input :value="draft.bankSerialNo" class="field-input w-full font-mono" @input="patch('bankSerialNo', inputValue($event))">
+        </label>
+        <label class="field-block">
+          <span class="field-label">经办人</span>
+          <input :value="draft.handler" class="field-input w-full" @input="patch('handler', inputValue($event))">
+        </label>
+      </div>
+    </section>
+  </template>
+
+  <template v-else>
+    <section id="section-basic" class="panel scroll-mt-4 p-4">
+      <SectionHeader>基本信息</SectionHeader>
+      <div class="form-fields-grid mt-3">
+        <label class="field-block">
+          <span class="field-label">报销单号</span>
+          <input :value="draft.no" class="field-input w-full font-mono" data-testid="finance-no" @input="patch('no', inputValue($event))">
+        </label>
+        <label class="field-block">
+          <span class="field-label">报销人 *</span>
+          <input :value="draft.applicant" class="field-input w-full" :class="[fieldClass('applicant')]" data-testid="finance-name" @input="patch('applicant', inputValue($event))">
+          <span v-if="fieldErrors?.applicant" class="field-error">{{ fieldErrors.applicant }}</span>
+        </label>
+        <div class="field-block">
+          <span class="field-label">归属项目（可空=公司开支）</span>
+          <LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" recent-key="finance-reimbursement-project" placeholder="留空表示公司开支" @update:model-value="patch('projectId', $event)" />
+        </div>
+        <label class="field-block">
+          <span class="field-label">费用类别</span>
+          <input :value="draft.category" class="field-input w-full" @input="patch('category', inputValue($event))">
+        </label>
+        <label class="field-block">
+          <span class="field-label">报销日期 *</span>
+          <input :value="draft.reimbursementDate" type="date" class="field-input w-full" :class="[fieldClass('reimbursementDate')]" data-testid="finance-date" @input="patch('reimbursementDate', inputValue($event))">
+          <span v-if="fieldErrors?.reimbursementDate" class="field-error">{{ fieldErrors.reimbursementDate }}</span>
+        </label>
+        <label class="field-block">
+          <span class="field-label">发票张数</span>
+          <input :value="draft.invoiceCount" type="number" min="0" step="1" class="field-input w-full" @input="patch('invoiceCount', inputNumber($event))">
+        </label>
+        <label class="field-block form-span-full">
+          <span class="field-label">报销事由</span>
+          <textarea :value="draft.reason" rows="2" class="field-input w-full" @input="patch('reason', inputValue($event))" />
+        </label>
+      </div>
+    </section>
+    <section id="section-lines" class="panel scroll-mt-4 overflow-hidden" :class="fieldClass('lines')">
+      <div class="border-b border-line px-4 py-3">
+        <SectionHeader>费用明细</SectionHeader>
+      </div>
+      <FinanceLineGrid
+        kind="reimbursement"
+        :lines="draft.lines ?? []"
+        :total-label="`合计 ¥ ${reimbursementTotal.toFixed(2)}`"
+        empty="暂无明细，请新增一行"
+        @update="updateLines"
+      />
+      <p v-if="fieldErrors?.lines" class="field-error px-4 pb-3">
+        {{ fieldErrors.lines }}
+      </p>
+    </section>
+  </template>
+</template>

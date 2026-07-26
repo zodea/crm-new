@@ -1,10 +1,35 @@
 import type {
+  CurrentTransactionFormDraft,
   ExpenseReimbursementFormDraft,
   F3FormDraft,
   F3FormKind,
+  F3SaveAction,
+  InvoiceApplicationFormDraft,
   PaymentApplicationFormDraft,
   PaymentRecordFormDraft,
+  ReceiptFormDraft,
 } from '~/lib/finance/forms'
+
+export type FinancePageDraft
+  = ReceiptFormDraft
+    & InvoiceApplicationFormDraft
+    & CurrentTransactionFormDraft
+    & ExpenseReimbursementFormDraft
+    & PaymentApplicationFormDraft
+    & PaymentRecordFormDraft
+
+export const PAYMENT_BIZ_TYPES = [
+  '有合同-合同劳务',
+  '有合同-材料',
+  '有合同-专业分包',
+  '有合同-机械',
+  '有合同-其他',
+  '无合同-零星采购',
+  '预付款',
+  '管理费',
+  '项目费用',
+  '公司付款',
+]
 
 export interface FinanceFormMeta {
   label: string
@@ -173,4 +198,80 @@ export function f3FormDefaults(kind: F3FormKind): F3FormDraft {
 export function financeFormPath(kind: F3FormKind, id?: string): string {
   const base = F3_FORM_META[kind].listPath
   return id ? `${base}/${id}` : `${base}/new`
+}
+
+export function validateFinanceForm(
+  kind: F3FormKind,
+  draft: FinancePageDraft,
+  action: F3SaveAction,
+): Record<string, string> {
+  const errors: Record<string, string> = {}
+  const require = (field: keyof FinancePageDraft, label: string, positive = false) => {
+    const value = draft[field]
+    const missing = positive
+      ? !(Number(value) > 0)
+      : typeof value === 'string'
+        ? !value.trim()
+        : value == null
+    if (missing)
+      errors[String(field)] = `${label}为必填项`
+  }
+
+  switch (kind) {
+    case 'receipt':
+      require('receiptDate', '收款日期')
+      require('projectId', '项目')
+      require('customerId', '客户')
+      require('amount', '收款金额', true)
+      break
+    case 'invoice_application':
+      require('name', '开票申请名称')
+      require('projectId', '项目')
+      require('customerId', '客户')
+      require('buyerNameSnapshot', '购方名称')
+      require('buyerTaxNoSnapshot', '购方税号')
+      require('applicationDate', '申请日期')
+      require('amount', '申请金额', true)
+      break
+    case 'current':
+      require('direction', '收付方向')
+      require('projectId', '项目')
+      require('counterparty', '往来单位')
+      require('transactionDate', '发生日期')
+      require('amount', '发生金额', true)
+      break
+    case 'reimbursement':
+      require('applicant', '报销人')
+      require('reimbursementDate', '报销日期')
+      if (!(draft.lines?.length)
+        || draft.lines.some(line => !line.expenseItem?.trim() || !(Number(line.amount) > 0))) {
+        errors.lines = '费用明细项目和金额为必填项'
+      }
+      break
+    case 'payment_application':
+      require('name', '付款申请名称')
+      require('bizType', '业务类型')
+      require('applyAmount', '申请金额', true)
+      require('applyDate', '申请日期')
+      require('applicant', '申请人')
+      require('invoiceState', '回票类型')
+      if (draft.bizType !== '公司付款')
+        require('projectId', '项目')
+      if (draft.bizType?.startsWith('有合同-') || draft.bizType === '预付款') {
+        require('supplierId', '收款单位')
+        require('contractId', '关联合同')
+      }
+      break
+    case 'payment_record':
+      require('payeeName', '收款方名称')
+      require('paymentDate', '支付日期')
+      require('amount', '支付金额', true)
+      require('voucherNo', '付款凭证号')
+      require('bankSerialNo', '银行流水号')
+      if (action === 'confirm')
+        require('confirmedBy', '确认人')
+      break
+  }
+
+  return errors
 }

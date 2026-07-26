@@ -1,29 +1,20 @@
 <script setup lang="ts">
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
-import { select } from '~/lib/db/connection'
-import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import type { FinanceListRow } from '~/stores/finance'
 import { F3_FORM_META, financeFormPath } from '~/lib/finance/page'
 import { yuan } from '~/lib/util/money'
-
-interface FinanceListRow {
-  id: string
-  no: string
-  name: string
-  projectName: string
-  partyName: string
-  amount: number
-  date: string
-  status: string
-}
 
 const props = defineProps<{
   kind: F3FormKind
 }>()
 
 const meta = computed(() => F3_FORM_META[props.kind])
-const rows = shallowRef<FinanceListRow[]>([])
-const loading = shallowRef(false)
+const financeStore = useFinanceStore()
+const { listRows, loading } = storeToRefs(financeStore)
+const rows = computed<FinanceListRow[]>(() => [
+  ...(listRows.value[props.kind] ?? []),
+])
 const search = shallowRef('')
 
 const filtered = computed(() => {
@@ -48,138 +39,8 @@ const columns: KitTableColumn[] = [
   { title: '操作', type: 'action', width: 72 },
 ]
 
-function mapRows(source: Array<Record<string, unknown>>): FinanceListRow[] {
-  return source.map(row => ({
-    id: String(row.id),
-    no: String(row.no ?? ''),
-    name: String(row.display_name ?? ''),
-    projectName: String(row.project_name ?? ''),
-    partyName: String(row.party_name ?? ''),
-    amount: Number(row.display_amount) || 0,
-    date: String(row.display_date ?? ''),
-    status: String(row.display_status ?? ''),
-  }))
-}
-
 async function load() {
-  loading.value = true
-  try {
-    let result: Array<Record<string, unknown>>
-    switch (props.kind) {
-      case 'receipt':
-        result = await select(`
-          ${hiddenCtesFor('receipt_registrations')}
-          SELECT receipt.id, receipt.no,
-                 COALESCE(customer.name, receipt.payer_account, '') AS display_name,
-                 COALESCE(project.name, '') AS project_name,
-                 COALESCE(contract.name, '') AS party_name,
-                 receipt.amount AS display_amount,
-                 receipt.receipt_date AS display_date,
-                 receipt.status AS display_status
-          FROM receipt_registrations AS receipt
-          LEFT JOIN projects AS project ON project.id = receipt.project_id
-          LEFT JOIN customers AS customer ON customer.id = receipt.customer_id
-          LEFT JOIN contracts AS contract ON contract.id = receipt.contract_id
-          WHERE ${visibleCond('receipt_registrations', 'receipt')}
-          ORDER BY receipt.created_at DESC
-        `)
-        break
-      case 'invoice_application':
-        result = await select(`
-          ${hiddenCtesFor('invoice_applications')}
-          SELECT application.id, application.no,
-                 application.name AS display_name,
-                 COALESCE(project.name, '') AS project_name,
-                 application.buyer_name_snapshot AS party_name,
-                 application.amount + application.tax_amount AS display_amount,
-                 application.application_date AS display_date,
-                 application.status AS display_status
-          FROM invoice_applications AS application
-          LEFT JOIN projects AS project ON project.id = application.project_id
-          WHERE ${visibleCond('invoice_applications', 'application')}
-          ORDER BY application.created_at DESC
-        `)
-        break
-      case 'current':
-        result = await select(`
-          ${hiddenCtesFor('current_transactions')}
-          SELECT current_row.id, current_row.no,
-                 current_row.counterparty AS display_name,
-                 COALESCE(project.name, '') AS project_name,
-                 CASE current_row.direction WHEN 'receipt' THEN '收款' ELSE '付款' END AS party_name,
-                 current_row.amount AS display_amount,
-                 current_row.transaction_date AS display_date,
-                 current_row.status AS display_status
-          FROM current_transactions AS current_row
-          LEFT JOIN projects AS project ON project.id = current_row.project_id
-          WHERE ${visibleCond('current_transactions', 'current_row')}
-          ORDER BY current_row.created_at DESC
-        `)
-        break
-      case 'reimbursement':
-        result = await select(`
-          ${hiddenCtesFor('expense_reimbursements', 'expense_reimbursement_lines')}
-          SELECT reimbursement.id, reimbursement.no,
-                 reimbursement.applicant AS display_name,
-                 COALESCE(project.name, '公司开支') AS project_name,
-                 reimbursement.category AS party_name,
-                 COALESCE((
-                   SELECT SUM(line.amount)
-                   FROM expense_reimbursement_lines AS line
-                   WHERE line.reimbursement_id = reimbursement.id
-                     AND ${visibleCond('expense_reimbursement_lines', 'line')}
-                 ), 0) AS display_amount,
-                 reimbursement.reimbursement_date AS display_date,
-                 reimbursement.status AS display_status
-          FROM expense_reimbursements AS reimbursement
-          LEFT JOIN projects AS project ON project.id = reimbursement.project_id
-          WHERE ${visibleCond('expense_reimbursements', 'reimbursement')}
-          ORDER BY reimbursement.created_at DESC
-        `)
-        break
-      case 'payment_application':
-        result = await select(`
-          ${hiddenCtesFor('payment_applications')}
-          SELECT application.id, application.no,
-                 application.name AS display_name,
-                 COALESCE(project.name, '公司付款') AS project_name,
-                 COALESCE(supplier.name, application.biz_type) AS party_name,
-                 application.apply_amount AS display_amount,
-                 application.apply_date AS display_date,
-                 application.status AS display_status
-          FROM payment_applications AS application
-          LEFT JOIN projects AS project ON project.id = application.project_id
-          LEFT JOIN suppliers AS supplier ON supplier.id = application.supplier_id
-          WHERE ${visibleCond('payment_applications', 'application')}
-          ORDER BY application.created_at DESC
-        `)
-        break
-      case 'payment_record':
-        result = await select(`
-          ${hiddenCtesFor('payment_records')}
-          SELECT payment.id, payment.no,
-                 payment.payee_name AS display_name,
-                 COALESCE(project.name, '公司付款') AS project_name,
-                 payment.purpose AS party_name,
-                 payment.amount AS display_amount,
-                 payment.payment_date AS display_date,
-                 CASE payment.confirmation_status
-                   WHEN 'confirmed' THEN '已确认'
-                   WHEN 'needs_review' THEN '待核对'
-                   ELSE '草稿'
-                 END AS display_status
-          FROM payment_records AS payment
-          LEFT JOIN projects AS project ON project.id = payment.project_id
-          WHERE ${visibleCond('payment_records', 'payment')}
-          ORDER BY payment.created_at DESC
-        `)
-        break
-    }
-    rows.value = mapRows(result)
-  }
-  finally {
-    loading.value = false
-  }
+  await financeStore.loadList(props.kind)
 }
 
 function openCreate() {

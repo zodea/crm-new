@@ -9,10 +9,10 @@ export interface PendingFileRef extends FileRefDraft {
 }
 
 defineProps<{
-  attachments: FileRefRecord[]
-  pendingAttachments: PendingFileRef[]
-  pendingRemoveIds: string[]
-  pendingRestoreIds: string[]
+  attachments: ReadonlyArray<Readonly<FileRefRecord>>
+  pendingAttachments: ReadonlyArray<Readonly<PendingFileRef>>
+  pendingRemoveIds: readonly string[]
+  pendingRestoreIds: readonly string[]
   desktopPicker: boolean
   title?: string
   note: string

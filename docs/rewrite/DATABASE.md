@@ -1343,7 +1343,7 @@ interface FilePayload {
 | 关联发票金额 | `SUM(payment_application_invoice_allocations.allocatedAmount)`，只计未软删行 |
 | 待回票金额 | `max(payment_applications.applyAmount − 关联发票金额, 0)`；仅 `invoiceState='先款后票'` 展示 |
 | 单票剩余可关联金额 | `invoices.total_amount − SUM(该 invoiceId 跨全部付款申请的有效 allocatedAmount)`；写入后不得小于 0 |
-| 已付金额 | `SUM(payment_record_application_allocations.allocated_amount)`，只连接 `payment_records.review_status='confirmed'` |
+| 已付金额 | `SUM(payment_record_application_allocations.allocated_amount)`，只连接 `payment_records.confirmation_status='confirmed'` |
 | 支付分摊差额 | `payment_records.amount − SUM(该支付记录有效 allocated_amount)`；确认支付时必须为 0 |
 
 ### 4.3 分供方汇总（base-supplier.md）
