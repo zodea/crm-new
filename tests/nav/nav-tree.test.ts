@@ -113,4 +113,23 @@ describe('侧栏导航树', () => {
     }
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
   })
+
+  it('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮', () => {
+    const routes = [
+      ['ownerChange', '/owner/change'],
+      ['ownerReport', '/owner/report'],
+      ['acceptance', '/owner/acceptance'],
+      ['finalSettle', '/owner/final-settlement'],
+      ['ownerPenalty', '/owner/penalty'],
+      ['subChange', '/subcontract/change'],
+      ['subSettle', '/subcontract/settlement'],
+      ['projPenalty', '/project/penalty'],
+    ] as const
+
+    for (const [key, route] of routes) {
+      expect(leaves().find(item => item.key === key)?.to).toBe(route)
+      expect(activeNavKey(`${route}/new`)).toBe(key)
+      expect(activeNavKey(`${route}/f5_1`)).toBe(key)
+    }
+  })
 })

@@ -36,7 +36,7 @@ export interface GenerateMonthlyStatementResult {
   logIds: readonly string[]
 }
 
-interface MonthlyQuantityRow {
+export interface MonthlyQuantityRow {
   boq_line_id: string
   auto_qty: number
 }
@@ -78,8 +78,8 @@ function assertMonth(month: string) {
     throw new Error('报量月份格式必须为 yyyy-mm')
 }
 
-async function loadMonthlyQuantities(
-  db: SoftDb,
+export async function loadMonthlyQuantities(
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId: string,
   month: string,

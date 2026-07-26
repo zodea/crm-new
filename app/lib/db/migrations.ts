@@ -1940,6 +1940,414 @@ CREATE INDEX IF NOT EXISTS idx_owner_material_directs_customer
   ON owner_material_directs(customer_id);
 `
 
+/** v24 #151 F5 甲方/分包单据：复用 BOQ、报量与支出结算，补齐验收/罚扣事实。 */
+const V24_F5_OWNER_SUBCONTRACT_TABLES = `
+CREATE TABLE IF NOT EXISTS project_acceptances (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  type              TEXT NOT NULL DEFAULT 'acceptance'
+                    CHECK (type IN ('acceptance', 'warranty')),
+  name              TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  contract_id       TEXT REFERENCES contracts(id),
+  document_date     TEXT NOT NULL DEFAULT '',
+  contract_estimate REAL CHECK (contract_estimate IS NULL OR contract_estimate >= 0),
+  acceptor          TEXT NOT NULL DEFAULT '',
+  warranty_owner    TEXT NOT NULL DEFAULT '',
+  conclusion        TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft'
+                    CHECK (status IN ('draft', 'submitted', 'accepted', 'warranty', 'expired')),
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_final_settlements (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  name              TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  contract_id       TEXT REFERENCES contracts(id),
+  settlement_amount REAL NOT NULL DEFAULT 0 CHECK (settlement_amount >= 0),
+  submission_date   TEXT NOT NULL DEFAULT '',
+  basis             TEXT NOT NULL DEFAULT '',
+  difference_note   TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_penalties (
+  id           TEXT PRIMARY KEY,
+  no           TEXT NOT NULL DEFAULT '',
+  project_id   TEXT REFERENCES projects(id),
+  contract_id  TEXT REFERENCES contracts(id),
+  notice_no    TEXT NOT NULL DEFAULT '',
+  amount       REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  penalty_date TEXT NOT NULL DEFAULT '',
+  reason       TEXT NOT NULL DEFAULT '',
+  appeal_note  TEXT NOT NULL DEFAULT '',
+  status       TEXT NOT NULL DEFAULT 'draft',
+  note         TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at   TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS subcontract_change_orders (
+  id                    TEXT PRIMARY KEY,
+  no                    TEXT NOT NULL DEFAULT '',
+  change_type           TEXT NOT NULL DEFAULT '',
+  project_id            TEXT REFERENCES projects(id),
+  supplier_id           TEXT REFERENCES suppliers(id),
+  contract_id           TEXT REFERENCES contracts(id),
+  change_date           TEXT NOT NULL DEFAULT '',
+  approved_amount       REAL NOT NULL DEFAULT 0,
+  changed_area          REAL,
+  actual_approved_price REAL,
+  reason                TEXT NOT NULL DEFAULT '',
+  status                TEXT NOT NULL DEFAULT 'draft',
+  note                  TEXT NOT NULL DEFAULT '',
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at            TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS penalty_records (
+  id                     TEXT PRIMARY KEY,
+  no                     TEXT NOT NULL DEFAULT '',
+  projectId              TEXT REFERENCES projects(id),
+  crewId                 TEXT REFERENCES crews(id),
+  workerId               TEXT REFERENCES workers(id),
+  source                 TEXT NOT NULL DEFAULT 'project'
+                         CHECK (source IN ('inspection', 'owner_notice', 'acceptance', 'project')),
+  noticeNo               TEXT NOT NULL DEFAULT '',
+  building               TEXT NOT NULL DEFAULT '',
+  floor                  TEXT NOT NULL DEFAULT '',
+  room                   TEXT NOT NULL DEFAULT '',
+  location               TEXT NOT NULL DEFAULT '',
+  reason                 TEXT NOT NULL DEFAULT '',
+  amount                 REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  penaltyDate            TEXT NOT NULL DEFAULT '',
+  chargeMethod           TEXT NOT NULL DEFAULT '',
+  responsibleWorkerId    TEXT REFERENCES workers(id),
+  responsibleWorkerName  TEXT NOT NULL DEFAULT '',
+  reportedBy             TEXT NOT NULL DEFAULT '',
+  repairedByWorkerId     TEXT REFERENCES workers(id),
+  repairedByWorkerName   TEXT NOT NULL DEFAULT '',
+  deadline               TEXT NOT NULL DEFAULT '',
+  status                 TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (
+                           status IN (
+                             'draft', 'pending', 'repairing', 'repaired_self',
+                             'repaired_other', 'deducted'
+                           )
+                         ),
+  repairedAt             TEXT,
+  deductedAt             TEXT,
+  supplier_id            TEXT REFERENCES suppliers(id),
+  contract_id            TEXT REFERENCES contracts(id),
+  deduction_method       TEXT NOT NULL DEFAULT '',
+  rectification_note     TEXT NOT NULL DEFAULT '',
+  note                   TEXT NOT NULL DEFAULT '',
+  createdAt              TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS penalty_settlement_deductions (
+  id            TEXT PRIMARY KEY,
+  penalty_id    TEXT NOT NULL REFERENCES penalty_records(id),
+  settlement_id TEXT NOT NULL REFERENCES expenditure_settlements(id),
+  amount        REAL NOT NULL CHECK (amount > 0),
+  note          TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+`
+
+const V24_OWNER_CHANGE_ORDERS_TABLE = `
+CREATE TABLE owner_change_orders_v24_new (
+  id                            TEXT PRIMARY KEY,
+  project_id                    TEXT REFERENCES projects(id),
+  change_no                     TEXT NOT NULL DEFAULT '',
+  contract_name                 TEXT NOT NULL DEFAULT '',
+  tax_inc_amount                REAL NOT NULL DEFAULT 0,
+  tax_exc_amount                REAL NOT NULL DEFAULT 0,
+  applied_amount                REAL NOT NULL DEFAULT 0,
+  approval_date                 TEXT NOT NULL DEFAULT '',
+  created_at                    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at                    TEXT DEFAULT NULL,
+  source_type                   TEXT NOT NULL DEFAULT 'manual',
+  source_id                     TEXT,
+  source_locked                 INTEGER NOT NULL DEFAULT 0 CHECK (source_locked IN (0, 1)),
+  contract_id                   TEXT REFERENCES contracts(id),
+  name                          TEXT NOT NULL DEFAULT '',
+  document_type                 TEXT NOT NULL DEFAULT 'change_negotiation'
+                                CHECK (
+                                  document_type IN (
+                                    'change_negotiation', 'site_visa', 'claim', 'material_price_approval'
+                                  )
+                                ),
+  directive_no                  TEXT NOT NULL DEFAULT '',
+  directive_type                TEXT NOT NULL DEFAULT ''
+                                CHECK (directive_type IN ('', 'issued', 'changed', 'supplemented')),
+  application_date              TEXT NOT NULL DEFAULT '',
+  reason                        TEXT NOT NULL DEFAULT '',
+  status                        TEXT NOT NULL DEFAULT 'draft',
+  status_note                   TEXT NOT NULL DEFAULT '',
+  note                          TEXT NOT NULL DEFAULT '',
+  updated_at                    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`
+
+const V24_MONTHLY_STATEMENTS_TABLE = `
+CREATE TABLE monthly_statements_v24_new (
+  id                 TEXT PRIMARY KEY,
+  project_id         TEXT REFERENCES projects(id),
+  contract_id        TEXT REFERENCES contracts(id),
+  month              TEXT NOT NULL DEFAULT ''
+                     CHECK (month = '' OR month GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'),
+  status             TEXT NOT NULL DEFAULT 'draft'
+                     CHECK (status IN ('draft', 'adjusted', 'exported')),
+  total_amount       REAL NOT NULL DEFAULT 0,
+  note               TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL,
+  no                 TEXT NOT NULL DEFAULT '',
+  period_no          TEXT NOT NULL DEFAULT '',
+  application_date   TEXT NOT NULL DEFAULT '',
+  reported_amount    REAL CHECK (reported_amount IS NULL OR reported_amount >= 0),
+  audited_amount     REAL CHECK (audited_amount IS NULL OR audited_amount >= 0)
+);
+`
+
+const V24_F5_OWNER_SUBCONTRACT_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_project_acceptances_project
+  ON project_acceptances(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_acceptances_contract
+  ON project_acceptances(contract_id);
+CREATE INDEX IF NOT EXISTS idx_project_acceptances_deleted
+  ON project_acceptances(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_final_settlements_project
+  ON owner_final_settlements(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_final_settlements_contract
+  ON owner_final_settlements(contract_id);
+CREATE INDEX IF NOT EXISTS idx_owner_final_settlements_deleted
+  ON owner_final_settlements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_penalties_project
+  ON owner_penalties(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_penalties_contract
+  ON owner_penalties(contract_id);
+CREATE INDEX IF NOT EXISTS idx_owner_penalties_deleted
+  ON owner_penalties(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_subcontract_change_project
+  ON subcontract_change_orders(project_id);
+CREATE INDEX IF NOT EXISTS idx_subcontract_change_supplier
+  ON subcontract_change_orders(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_subcontract_change_contract
+  ON subcontract_change_orders(contract_id);
+CREATE INDEX IF NOT EXISTS idx_subcontract_change_orders_deleted
+  ON subcontract_change_orders(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_penalty_records_project
+  ON penalty_records(projectId);
+CREATE INDEX IF NOT EXISTS idx_penalty_records_crew
+  ON penalty_records(crewId);
+CREATE INDEX IF NOT EXISTS idx_penalty_records_worker
+  ON penalty_records(workerId);
+CREATE INDEX IF NOT EXISTS idx_penalty_records_supplier
+  ON penalty_records(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_penalty_records_contract
+  ON penalty_records(contract_id);
+CREATE INDEX IF NOT EXISTS idx_penalty_records_deleted
+  ON penalty_records(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_penalty_deductions_penalty
+  ON penalty_settlement_deductions(penalty_id);
+CREATE INDEX IF NOT EXISTS idx_penalty_deductions_settlement
+  ON penalty_settlement_deductions(settlement_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_penalty_settlement_deduction
+  ON penalty_settlement_deductions(penalty_id, settlement_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_penalty_settlement_deductions_deleted
+  ON penalty_settlement_deductions(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_change_orders_contract
+  ON owner_change_orders(contract_id);
+CREATE INDEX IF NOT EXISTS idx_owner_change_orders_proj
+  ON owner_change_orders(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_change_orders_deleted
+  ON owner_change_orders(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_owner_change_order_boq_source
+  ON owner_change_orders(source_type, source_id)
+  WHERE deleted_at IS NULL
+    AND source_type = 'boq_change_order'
+    AND source_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_monthly_statements_project_month
+  ON monthly_statements(project_id, month);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_monthly_statement_contract_month
+  ON monthly_statements(contract_id, month)
+  WHERE deleted_at IS NULL
+    AND contract_id IS NOT NULL
+    AND month <> '';
+CREATE INDEX IF NOT EXISTS idx_monthly_statements_deleted
+  ON monthly_statements(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+async function rebuildOwnerChangeOrdersForF5(db: MigrationDb): Promise<void> {
+  await db.execute('DROP TABLE IF EXISTS owner_change_orders_v24_new')
+  await execScript(db, V24_OWNER_CHANGE_ORDERS_TABLE)
+  await db.execute(`
+    INSERT INTO owner_change_orders_v24_new (
+      id, project_id, change_no, contract_name, tax_inc_amount, tax_exc_amount,
+      applied_amount, approval_date, created_at, deleted_at, source_type,
+      source_id, source_locked, contract_id, name, document_type, directive_no,
+      directive_type, application_date, reason, status, status_note, note, updated_at
+    )
+    SELECT
+      id, project_id, change_no, contract_name, tax_inc_amount, tax_exc_amount,
+      applied_amount, approval_date, created_at, deleted_at, source_type,
+      source_id, source_locked, contract_id, name, document_type, directive_no,
+      directive_type, application_date, reason, status, status_note, note, updated_at
+    FROM owner_change_orders
+  `)
+  await db.execute('DROP TABLE owner_change_orders')
+  await db.execute('ALTER TABLE owner_change_orders_v24_new RENAME TO owner_change_orders')
+}
+
+async function rebuildMonthlyStatementsForF5(db: MigrationDb): Promise<void> {
+  await db.execute('DROP TABLE IF EXISTS monthly_statements_v24_new')
+  await execScript(db, V24_MONTHLY_STATEMENTS_TABLE)
+  await db.execute(`
+    INSERT INTO monthly_statements_v24_new (
+      id, project_id, contract_id, month, status, total_amount, note,
+      created_at, updated_at, deleted_at, no, period_no, application_date,
+      reported_amount, audited_amount
+    )
+    SELECT
+      id, project_id, contract_id, month, status, total_amount, note,
+      created_at, updated_at, deleted_at, no, period_no, application_date,
+      reported_amount, audited_amount
+    FROM monthly_statements
+  `)
+  await db.execute('DROP TABLE monthly_statements')
+  await db.execute('ALTER TABLE monthly_statements_v24_new RENAME TO monthly_statements')
+}
+
+async function migrateF5OwnerSubcontractDocuments(db: MigrationDb): Promise<void> {
+  await db.execute('PRAGMA foreign_keys = OFF')
+  let transactionStarted = false
+  try {
+    await db.execute('BEGIN IMMEDIATE')
+    transactionStarted = true
+    await addColumnIfMissing(
+      db,
+      'boq_change_orders',
+      'document_type',
+      `TEXT NOT NULL DEFAULT 'change_negotiation'
+       CHECK (
+         document_type IN (
+           'change_negotiation', 'site_visa', 'claim', 'material_price_approval'
+         )
+       )`,
+    )
+    await addColumnIfMissing(db, 'boq_change_orders', 'application_date', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'boq_change_orders', 'reason', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'boq_change_orders', 'approved_tax_inclusive_amount', 'REAL')
+    await addColumnIfMissing(db, 'boq_change_orders', 'approved_tax_exclusive_amount', 'REAL')
+    await addColumnIfMissing(db, 'boq_change_orders', 'applied_tax_exclusive_amount', 'REAL')
+
+    await addColumnIfMissing(db, 'owner_change_orders', 'contract_id', 'TEXT REFERENCES contracts(id)')
+    await addColumnIfMissing(db, 'owner_change_orders', 'name', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(
+      db,
+      'owner_change_orders',
+      'document_type',
+      `TEXT NOT NULL DEFAULT 'change_negotiation'
+       CHECK (
+         document_type IN (
+           'change_negotiation', 'site_visa', 'claim', 'material_price_approval'
+         )
+       )`,
+    )
+    await addColumnIfMissing(db, 'owner_change_orders', 'directive_no', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(
+      db,
+      'owner_change_orders',
+      'directive_type',
+      `TEXT NOT NULL DEFAULT ''
+       CHECK (directive_type IN ('', 'issued', 'changed', 'supplemented'))`,
+    )
+    await addColumnIfMissing(db, 'owner_change_orders', 'application_date', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'owner_change_orders', 'reason', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'owner_change_orders', 'status', `TEXT NOT NULL DEFAULT 'draft'`)
+    await addColumnIfMissing(db, 'owner_change_orders', 'status_note', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'owner_change_orders', 'note', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'owner_change_orders', 'updated_at', `TEXT NOT NULL DEFAULT (datetime('now'))`)
+
+    await addColumnIfMissing(db, 'monthly_statements', 'no', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'monthly_statements', 'period_no', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(db, 'monthly_statements', 'application_date', `TEXT NOT NULL DEFAULT ''`)
+    await addColumnIfMissing(
+      db,
+      'monthly_statements',
+      'reported_amount',
+      'REAL CHECK (reported_amount IS NULL OR reported_amount >= 0)',
+    )
+    await addColumnIfMissing(
+      db,
+      'monthly_statements',
+      'audited_amount',
+      'REAL CHECK (audited_amount IS NULL OR audited_amount >= 0)',
+    )
+    await addColumnIfMissing(
+      db,
+      'monthly_statement_lines',
+      'reported_qty',
+      'REAL CHECK (reported_qty IS NULL OR reported_qty >= 0)',
+    )
+    await addColumnIfMissing(
+      db,
+      'monthly_statement_lines',
+      'audited_qty',
+      'REAL CHECK (audited_qty IS NULL OR audited_qty >= 0)',
+    )
+    await addColumnIfMissing(
+      db,
+      'monthly_statement_lines',
+      'audited_amount',
+      'REAL CHECK (audited_amount IS NULL OR audited_amount >= 0)',
+    )
+
+    await rebuildOwnerChangeOrdersForF5(db)
+    await rebuildMonthlyStatementsForF5(db)
+    await execScript(db, V24_F5_OWNER_SUBCONTRACT_TABLES)
+    await execScript(db, V24_F5_OWNER_SUBCONTRACT_INDEXES)
+    const foreignKeyIssues = await db.select<{ table: string }>('PRAGMA foreign_key_check')
+    if (foreignKeyIssues.length > 0)
+      throw new Error('[db] F5 迁移后存在无效外键')
+    await db.execute('COMMIT')
+    transactionStarted = false
+  }
+  catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.execute('ROLLBACK')
+      }
+      catch {
+        // 保留原始迁移错误。
+      }
+    }
+    throw error
+  }
+  finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
+
 function normalizeLegacyName(value: unknown): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -3969,6 +4377,13 @@ export const migrations: Migration[] = [
         }
         throw error
       }
+    },
+  },
+  {
+    version: 24,
+    name: 'f5-owner-subcontract-documents',
+    async up(db) {
+      await migrateF5OwnerSubcontractDocuments(db)
     },
   },
 ]

@@ -1021,7 +1021,23 @@ boq_change_orders += (
 -- 指令编号/类型复用既有 directive_no / directive_type。
 -- 量、价、合价明细继续写 boq_change_lines；已签证金额链规则见 §2.3。
 
+owner_change_orders += (
+  contract_id TEXT REFERENCES contracts(id),
+  name TEXT DEFAULT '',
+  document_type TEXT DEFAULT 'change_negotiation'
+    CHECK (document_type IN ('change_negotiation', 'site_visa', 'claim', 'material_price_approval')),
+  directive_no TEXT DEFAULT '', directive_type TEXT DEFAULT '',
+  application_date TEXT DEFAULT '', reason TEXT DEFAULT '',
+  status TEXT DEFAULT 'draft', status_note TEXT DEFAULT '',
+  note TEXT DEFAULT '', updated_at TEXT
+)
+-- 上述扩展只服务“不含量价明细的纯金额签证”直写台账；
+-- 量价变更仍由 boq_change_orders 生成 source_locked=1 的一对一锁定行。
+-- v24 同时将 owner_change_orders.project_id 收窄前的 NOT NULL 去除：
+-- 不完整草稿先保存为 manual 草稿，补齐量价明细后原 ID 转入 BOQ 变更实体。
+
 monthly_statements += (
+  project_id TEXT NULL, contract_id TEXT NULL, month TEXT DEFAULT '',
   no TEXT DEFAULT '', period_no TEXT DEFAULT '',
   application_date TEXT DEFAULT '',
   reported_amount REAL, audited_amount REAL,
@@ -1033,6 +1049,8 @@ monthly_statement_lines += (
   updated_at TEXT, deleted_at TEXT
 )
 -- 审定差额为 audited_amount - reported_amount，纯计算不存。
+-- 自动完成量在每次保存时按 project+contract+period 从阶段完成事实重新派生，
+-- 客户端 auto_qty 不进入信任边界；空项目/合同/期次只允许草稿且不落明细。
 
 project_acceptances(
   id, no TEXT DEFAULT '', type TEXT DEFAULT 'acceptance',
@@ -1040,8 +1058,12 @@ project_acceptances(
   contract_id TEXT REFERENCES contracts(id), document_date TEXT DEFAULT '',
   contract_estimate REAL, acceptor TEXT DEFAULT '',
   warranty_owner TEXT DEFAULT '', conclusion TEXT DEFAULT '',
-  status, note, created_at, updated_at, deleted_at
+  status TEXT DEFAULT 'draft'
+    CHECK (status IN ('draft', 'submitted', 'accepted', 'warranty', 'expired')),
+  note, created_at, updated_at, deleted_at
 )
+-- 生命周期：draft -> submitted -> accepted -> warranty -> expired；
+-- 进入 warranty 时同一记录 type 切为 warranty，不复制保修单据。
 
 owner_final_settlements(
   id, no TEXT DEFAULT '', name TEXT NOT NULL,
@@ -1072,14 +1094,32 @@ subcontract_change_orders(
 )
 
 penalty_records += (
+  projectId TEXT NULL, reason TEXT DEFAULT '',
   supplier_id TEXT REFERENCES suppliers(id),
   contract_id TEXT REFERENCES contracts(id),
   deduction_method TEXT DEFAULT '', rectification_note TEXT DEFAULT '',
   updated_at TEXT, deleted_at TEXT
 )
+
+penalty_settlement_deductions(
+  id,
+  penalty_id TEXT REFERENCES penalty_records(id),
+  settlement_id TEXT REFERENCES expenditure_settlements(id),
+  amount REAL CHECK (amount > 0),
+  note TEXT DEFAULT '',
+  created_at TEXT, updated_at TEXT, deleted_at TEXT
+)
+-- (penalty_id, settlement_id) 对活跃关系唯一；累计已抵扣金额从活跃关系行聚合，
+-- 不回写 penalty_records 头表。
 ```
 
 `ownerChangeForm` 复用 BOQ 变更模型；只有不含量价明细的纯金额签证直接写 `owner_change_orders`。`subSettleForm` 复用 `expenditure_settlements`。项目罚扣抵扣结算时由独立 action 写真实结算引用/操作日志，不在罚扣头维护“已扣金额”副本。
+
+最终结算只读口径不读 `contracts.changed/paid`：变更后合同金额取
+`contracts.amount + Σ非草稿 contract_supplements.amount`，累计收款取同合同的活跃
+`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。
+
+> v24 实装核对：v1-v23 物理库并未创建蓝本已声明的 `penalty_records`，因此 F5 迁移按本节与 `pages/base-crew.md` 的既有字段一次性建表，并同时加入 F5 外键和软删除列；不另建项目罚扣头表。
 
 ---
 
@@ -1162,6 +1202,7 @@ penalty_records += (
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
 | `penalty_records` | `supplier_id` / `contract_id` | `suppliers.id` / `contracts.id` | N:1 | 项目罚扣 → 分供方/支出合同（可选） |
+| `penalty_settlement_deductions` | `penalty_id` / `settlement_id` | `penalty_records.id` / `expenditure_settlements.id` | N:1 | 项目罚扣 → 真实支出结算抵扣关系 |
 | `items` | `project_id` | `projects.id` | N:1 | 分项定义（项目×分部/工种，**不挂班组**——合同计量口径） |
 | `house_type_templates` | `project_id` | `projects.id` | N:1 | 项目户型模板 |
 | `rooms` | `template_id` | `house_type_templates.id` | N:1 | 稳定模板房间；显示名可改，不按户复制 |
