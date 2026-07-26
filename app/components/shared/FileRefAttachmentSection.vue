@@ -16,6 +16,7 @@ defineProps<{
   desktopPicker: boolean
   title?: string
   note: string
+  noteReadonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -123,6 +124,7 @@ function inputValue(event: Event): string {
       <textarea
         :value="note"
         rows="4"
+        :disabled="noteReadonly"
         class="field-input w-full"
         placeholder="补充说明"
         @input="emit('updateNote', inputValue($event))"

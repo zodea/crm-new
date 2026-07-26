@@ -1684,6 +1684,262 @@ const F1_IMPORT_BATCH_ID = 'migration_f1_v19'
 
 const F3_IMPORT_BATCH_ID = 'migration_f3_v22'
 
+const V23_F4_MATERIAL_TABLES = `
+CREATE TABLE IF NOT EXISTS material_requisitions (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  contract_id       TEXT REFERENCES contracts(id),
+  applicant         TEXT NOT NULL DEFAULT '',
+  requisition_date  TEXT NOT NULL DEFAULT '',
+  required_date     TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  planned_qty       REAL NOT NULL DEFAULT 0 CHECK (planned_qty >= 0),
+  warehouse         TEXT NOT NULL DEFAULT '',
+  purpose           TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS material_arrivals (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  supplier_id       TEXT REFERENCES suppliers(id),
+  contract_id       TEXT REFERENCES contracts(id),
+  requisition_id    TEXT REFERENCES material_requisitions(id),
+  warehouse         TEXT NOT NULL DEFAULT '',
+  arrival_date      TEXT NOT NULL DEFAULT '',
+  receiver          TEXT NOT NULL DEFAULT '',
+  quality_result    TEXT NOT NULL DEFAULT '',
+  stock_status      TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS material_arrival_lines (
+  id                TEXT PRIMARY KEY,
+  arrival_id        TEXT NOT NULL REFERENCES material_arrivals(id),
+  material_name     TEXT NOT NULL,
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  qty               REAL NOT NULL CHECK (qty > 0),
+  unit_price        REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  note              TEXT NOT NULL DEFAULT '',
+  sort_order        INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS material_uses (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  warehouse         TEXT NOT NULL DEFAULT '',
+  use_date          TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  qty               REAL NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  receiver          TEXT NOT NULL DEFAULT '',
+  crew_id           TEXT REFERENCES crews(id),
+  purpose           TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS stock_checks (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  warehouse         TEXT NOT NULL DEFAULT '',
+  checker           TEXT NOT NULL DEFAULT '',
+  check_date        TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS stock_check_lines (
+  id                TEXT PRIMARY KEY,
+  stock_check_id    TEXT NOT NULL REFERENCES stock_checks(id),
+  material_name     TEXT NOT NULL,
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  book_qty          REAL NOT NULL DEFAULT 0 CHECK (book_qty >= 0),
+  actual_qty        REAL NOT NULL DEFAULT 0 CHECK (actual_qty >= 0),
+  variance_amount   REAL NOT NULL DEFAULT 0,
+  sort_order        INTEGER NOT NULL DEFAULT 0,
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_material_controls (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  customer_id       TEXT REFERENCES customers(id),
+  material_name     TEXT NOT NULL DEFAULT '',
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  control_qty       REAL NOT NULL DEFAULT 0 CHECK (control_qty >= 0),
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_material_requisitions (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  applicant         TEXT NOT NULL DEFAULT '',
+  application_date  TEXT NOT NULL DEFAULT '',
+  required_date     TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  planned_qty       REAL NOT NULL DEFAULT 0 CHECK (planned_qty >= 0),
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_material_arrivals (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  warehouse         TEXT NOT NULL DEFAULT '',
+  arrival_date      TEXT NOT NULL DEFAULT '',
+  receiver          TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  spec              TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  qty               REAL NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  quality_result    TEXT NOT NULL DEFAULT '',
+  stock_status      TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_material_uses (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  use_date          TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  qty               REAL NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  receiver          TEXT NOT NULL DEFAULT '',
+  crew_id           TEXT REFERENCES crews(id),
+  purpose           TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS owner_material_directs (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  customer_id       TEXT REFERENCES customers(id),
+  transaction_date  TEXT NOT NULL DEFAULT '',
+  material_name     TEXT NOT NULL DEFAULT '',
+  unit              TEXT NOT NULL DEFAULT '',
+  qty               REAL NOT NULL DEFAULT 0 CHECK (qty >= 0),
+  purpose           TEXT NOT NULL DEFAULT '',
+  use_location      TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'draft',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT '',
+  updated_at        TEXT NOT NULL DEFAULT '',
+  deleted_at        TEXT DEFAULT NULL
+);
+`
+
+const V23_F4_MATERIAL_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_material_requisitions_deleted
+  ON material_requisitions(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_material_arrivals_deleted
+  ON material_arrivals(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_material_arrival_lines_deleted
+  ON material_arrival_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_material_uses_deleted
+  ON material_uses(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_stock_checks_deleted
+  ON stock_checks(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_stock_check_lines_deleted
+  ON stock_check_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_material_controls_deleted
+  ON owner_material_controls(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_material_requisitions_deleted
+  ON owner_material_requisitions(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_material_arrivals_deleted
+  ON owner_material_arrivals(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_material_uses_deleted
+  ON owner_material_uses(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_owner_material_directs_deleted
+  ON owner_material_directs(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_material_requisitions_project
+  ON material_requisitions(project_id);
+CREATE INDEX IF NOT EXISTS idx_material_requisitions_contract
+  ON material_requisitions(contract_id);
+CREATE INDEX IF NOT EXISTS idx_material_arrivals_project
+  ON material_arrivals(project_id);
+CREATE INDEX IF NOT EXISTS idx_material_arrivals_supplier
+  ON material_arrivals(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_material_arrivals_contract
+  ON material_arrivals(contract_id);
+CREATE INDEX IF NOT EXISTS idx_material_arrivals_requisition
+  ON material_arrivals(requisition_id);
+CREATE INDEX IF NOT EXISTS idx_material_arrival_lines_head
+  ON material_arrival_lines(arrival_id);
+CREATE INDEX IF NOT EXISTS idx_material_uses_project
+  ON material_uses(project_id);
+CREATE INDEX IF NOT EXISTS idx_material_uses_crew
+  ON material_uses(crew_id);
+CREATE INDEX IF NOT EXISTS idx_stock_check_lines_head
+  ON stock_check_lines(stock_check_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_controls_project
+  ON owner_material_controls(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_controls_customer
+  ON owner_material_controls(customer_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_requisitions_project
+  ON owner_material_requisitions(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_arrivals_project
+  ON owner_material_arrivals(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_uses_project
+  ON owner_material_uses(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_uses_crew
+  ON owner_material_uses(crew_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_directs_project
+  ON owner_material_directs(project_id);
+CREATE INDEX IF NOT EXISTS idx_owner_material_directs_customer
+  ON owner_material_directs(customer_id);
+`
+
 function normalizeLegacyName(value: unknown): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
@@ -3692,6 +3948,27 @@ export const migrations: Migration[] = [
     name: 'f3-finance-forms-reconciliation',
     async up(db) {
       await migrateF3FinanceForms(db)
+    },
+  },
+  {
+    version: 23,
+    name: 'f4-material-forms-inventory-facts',
+    async up(db) {
+      await db.execute('BEGIN IMMEDIATE')
+      try {
+        await execScript(db, V23_F4_MATERIAL_TABLES)
+        await execScript(db, V23_F4_MATERIAL_INDEXES)
+        await db.execute('COMMIT')
+      }
+      catch (error) {
+        try {
+          await db.execute('ROLLBACK')
+        }
+        catch {
+          // 保留原始迁移错误。
+        }
+        throw error
+      }
     },
   },
 ]

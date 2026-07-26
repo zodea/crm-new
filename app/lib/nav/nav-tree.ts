@@ -55,21 +55,21 @@ export const NAV_TREE: NavNode[] = [
   ] },
   { type: 'group', key: 'g-material', label: '乙供材管理', icon: 'i-lucide-package', items: [
     { key: 'matContract', mark: '采', icon: 'i-lucide-shopping-cart', label: '材料采购合同', hint: '采购台账', to: '/contract/material' },
-    { key: 'matRequisition', mark: '料', icon: 'i-lucide-clipboard-list', label: '下料单', hint: '要料计划' },
-    { key: 'matArrival', mark: '到', icon: 'i-lucide-package-check', label: '材料到货', hint: '入库' },
-    { key: 'matUse', mark: '领', icon: 'i-lucide-package-open', label: '材料领用', hint: '出库' },
-    { key: 'matSettle', mark: '算', icon: 'i-lucide-calculator', label: '材料采购结算', hint: '对账结算' },
-    { key: 'stockCheck', mark: '盘', icon: 'i-lucide-clipboard-check', label: '库存盘点', hint: '盘点生效' },
+    { key: 'matRequisition', mark: '料', icon: 'i-lucide-clipboard-list', label: '下料单', hint: '要料计划', to: '/material/requisition' },
+    { key: 'matArrival', mark: '到', icon: 'i-lucide-package-check', label: '材料到货', hint: '入库', to: '/material/arrival' },
+    { key: 'matUse', mark: '领', icon: 'i-lucide-package-open', label: '材料领用', hint: '出库', to: '/material/use' },
+    { key: 'matSettle', mark: '算', icon: 'i-lucide-calculator', label: '材料采购结算', hint: '对账结算', to: '/material/settlement' },
+    { key: 'stockCheck', mark: '盘', icon: 'i-lucide-clipboard-check', label: '库存盘点', hint: '盘点生效', to: '/material/stock-check' },
     { key: 'delivery', mark: '送', icon: 'i-lucide-scan-line', label: '送货单识别', hint: 'OCR 处理区', to: '/material/delivery' },
     { key: 'deliveryArchive', mark: '档', icon: 'i-lucide-archive', label: '送货单归档库', hint: '项目→分供方', to: '/material/delivery/archive' },
     { key: 'price', mark: '价', icon: 'i-lucide-chart-no-axes-combined', label: '单价对比', hint: '材料价格分析', to: '/material/price' },
   ] },
   { type: 'group', key: 'g-owner-material', label: '甲供材管理', icon: 'i-lucide-boxes', items: [
-    { key: 'omTotal', mark: '控', icon: 'i-lucide-gauge', label: '甲供材总控量', hint: '总控/到货/领用' },
-    { key: 'omRequisition', mark: '料', icon: 'i-lucide-list-ordered', label: '甲供材下料单', hint: '要料计划' },
-    { key: 'omArrival', mark: '到', icon: 'i-lucide-package-plus', label: '甲供材到货', hint: '入库' },
-    { key: 'omUse', mark: '领', icon: 'i-lucide-package-minus', label: '甲供材领用', hint: '出库' },
-    { key: 'omDirect', mark: '直', icon: 'i-lucide-arrow-left-right', label: '直入直出', hint: '不入库直用' },
+    { key: 'omTotal', mark: '控', icon: 'i-lucide-gauge', label: '甲供材总控量', hint: '总控/到货/领用', to: '/owner-material/control' },
+    { key: 'omRequisition', mark: '料', icon: 'i-lucide-list-ordered', label: '甲供材下料单', hint: '要料计划', to: '/owner-material/requisition' },
+    { key: 'omArrival', mark: '到', icon: 'i-lucide-package-plus', label: '甲供材到货', hint: '入库', to: '/owner-material/arrival' },
+    { key: 'omUse', mark: '领', icon: 'i-lucide-package-minus', label: '甲供材领用', hint: '出库', to: '/owner-material/use' },
+    { key: 'omDirect', mark: '直', icon: 'i-lucide-arrow-left-right', label: '直入直出', hint: '不入库直用', to: '/owner-material/direct' },
   ] },
   { type: 'group', key: 'g-finance', label: '资金管理', icon: 'i-lucide-wallet', items: [
     { key: 'invoiceLedger', mark: '账', icon: 'i-lucide-book-open-check', label: '发票台账', hint: '收票·打印·修改', to: '/finance/ledger' },
@@ -209,11 +209,31 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
   // 考勤从工资页进入，归属工资核算入口
   if (path.startsWith('/subcontract/payroll') || path.startsWith('/subcontract/attendance'))
     return 'payroll'
+  if (path.startsWith('/owner-material/control'))
+    return 'omTotal'
+  if (path.startsWith('/owner-material/requisition'))
+    return 'omRequisition'
+  if (path.startsWith('/owner-material/arrival'))
+    return 'omArrival'
+  if (path.startsWith('/owner-material/use'))
+    return 'omUse'
+  if (path.startsWith('/owner-material/direct'))
+    return 'omDirect'
   if (path.startsWith('/material/delivery/archive'))
     return 'deliveryArchive'
   if (path.startsWith('/material/delivery'))
     return 'delivery'
   if (path.startsWith('/material/price'))
     return 'price'
+  if (path.startsWith('/material/requisition'))
+    return 'matRequisition'
+  if (path.startsWith('/material/arrival'))
+    return 'matArrival'
+  if (path.startsWith('/material/use'))
+    return 'matUse'
+  if (path.startsWith('/material/settlement'))
+    return 'matSettle'
+  if (path.startsWith('/material/stock-check'))
+    return 'stockCheck'
   return null
 }

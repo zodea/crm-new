@@ -95,6 +95,19 @@ export const F2_FORM_META: Record<F2FormKind, ContractFormMeta> = {
       { key: 'attachments', label: '经办与备注' },
     ],
   },
+  material_settlement: {
+    label: '材料采购结算',
+    subtitle: '材料采购合同对账结算 · 复用统一支出结算事实',
+    listLabel: '材料采购结算',
+    listPath: '/material/settlement',
+    newPath: '/material/settlement/form',
+    sections: [
+      { key: 'basic', label: '基本信息' },
+      { key: 'amount', label: '结算金额' },
+      { key: 'contract', label: '合同情况' },
+      { key: 'attachments', label: '对账附件' },
+    ],
+  },
 }
 
 function compactDate(): string {
@@ -157,6 +170,18 @@ export function f2FormDefaults(kind: F2FormKind): F2FormDraft {
         name: '',
         projectId: null,
         contractId: null,
+        totalAmount: 0,
+        settlementDate: '',
+        status: '草稿',
+        note: '',
+      }
+    case 'material_settlement':
+      return {
+        no: generatedNo('CGJS'),
+        name: '',
+        projectId: null,
+        contractId: null,
+        settlementType: '材料采购结算',
         totalAmount: 0,
         settlementDate: '',
         status: '草稿',

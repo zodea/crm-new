@@ -8,6 +8,9 @@ import {
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 const F3_MIGRATION_VERSION = 22
+const f3Migrations = migrations.filter(
+  migration => migration.version <= F3_MIGRATION_VERSION,
+)
 
 async function createPreF3Db() {
   const db = await createMemoryDb()
@@ -38,7 +41,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
     const db = await createMemoryDb()
     await runMigrations(db)
 
-    expect(LATEST_VERSION).toBe(F3_MIGRATION_VERSION)
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(F3_MIGRATION_VERSION)
     const tables = await listTables(db)
     for (const table of [
       'receipt_registrations',
@@ -211,7 +214,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
         )
     `)
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(db, f3Migrations)
     expect(result.applied).toEqual(['v22 f3-finance-forms-reconciliation'])
 
     expect(await db.select(`
@@ -294,7 +297,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
     `)).toEqual([{ status: 'completed' }])
     expect(await db.select('PRAGMA foreign_key_check')).toEqual([])
 
-    expect((await runMigrations(db)).applied).toEqual([])
+    expect((await runMigrations(db, f3Migrations)).applied).toEqual([])
     db.close()
   })
 

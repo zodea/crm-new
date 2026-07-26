@@ -46,6 +46,7 @@ const isExpenseContract = computed(() =>
 const isSupplement = computed(() =>
   isProjectContract.value && Boolean(props.draft.isSupplement),
 )
+const isMaterialSettlement = computed(() => props.kind === 'material_settlement')
 const taxExclusiveAmount = computed(() => {
   const amount = Number(props.draft.amount) || 0
   const rate = Number(props.draft.taxRate) || 0
@@ -524,13 +525,13 @@ function inputChecked(event: Event): boolean {
           <span v-if="fieldErrors.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
         </label>
         <label class="field-block">
-          <span class="field-label">其他支出合同 *</span>
+          <span class="field-label">{{ isMaterialSettlement ? '材料采购合同' : '其他支出合同' }} *</span>
           <LookupSelect
             :model-value="draft.contractId"
             :fetch="fetchOtherExpenseContracts"
-            recent-key="other-settlement-contract"
+            :recent-key="isMaterialSettlement ? 'material-settlement-contract' : 'other-settlement-contract'"
             :disabled-reason="draft.projectId ? undefined : '请先选择项目'"
-            placeholder="检索其他支出合同"
+            :placeholder="isMaterialSettlement ? '检索材料采购合同' : '检索其他支出合同'"
             @update:model-value="patch('contractId', $event)"
           />
           <span v-if="fieldErrors.contractId" class="field-error">{{ fieldErrors.contractId }}</span>

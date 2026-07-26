@@ -6,7 +6,7 @@ import { F2_FORM_META, formPath } from '~/lib/contract/page'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
-  kind: 'other_expense' | 'company_expense' | 'other_settlement'
+  kind: 'other_expense' | 'company_expense' | 'other_settlement' | 'material_settlement'
 }>()
 
 const contractStore = useContractStore()

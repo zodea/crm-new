@@ -12,9 +12,7 @@ const recordId = computed(() => String(route.params.id))
 const record = computed(() => store.byId(recordId.value))
 const project = computed(() => record.value ? projectStore.byId(record.value.projectId) : undefined)
 const supplier = computed(() => record.value?.supplierId ? supplierStore.byId(record.value.supplierId) : undefined)
-const showForm = shallowRef(false)
 const loaded = shallowRef(false)
-const sourcePanelVersion = shallowRef(0)
 
 useTabTitle(() => record.value?.orderNo ? `送货单 ${record.value.orderNo}` : record.value ? '未编号送货单' : undefined)
 
@@ -59,10 +57,6 @@ async function refresh() {
   }
 }
 
-function refreshSourcePanel() {
-  sourcePanelVersion.value += 1
-}
-
 onMounted(refresh)
 </script>
 
@@ -82,9 +76,9 @@ onMounted(refresh)
       </div>
       <span class="chip-ok">已归档</span>
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <button class="btn-secondary" @click="showForm = true">
+        <NuxtLink :to="`/material/delivery/archive/form/${record.id}`" class="btn-secondary">
           <span class="i-lucide-square-pen mr-1 text-13px" /> 编辑
-        </button>
+        </NuxtLink>
         <button class="btn-danger" @click="handleDelete">
           <span class="i-lucide-trash-2 mr-1 text-13px" /> 删除
         </button>
@@ -100,7 +94,6 @@ onMounted(refresh)
 
     <div class="delivery-record-layout grid min-w-0 items-start gap-4">
       <DeliveryRecordSourcePanel
-        :key="sourcePanelVersion"
         :record-id="record.id"
         min-height="clamp(22rem, 60dvh, 42.5rem)"
         class="delivery-record-source self-start"
@@ -138,12 +131,6 @@ onMounted(refresh)
         </div>
       </div>
     </div>
-
-    <DeliveryRecordFormDialog
-      v-model:open="showForm"
-      :record="record"
-      @source-file-saved="refreshSourcePanel"
-    />
   </div>
 
   <div v-else-if="store.loading || !loaded" class="py-12 text-center text-ink-faint">
