@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleGroupView, ScheduleTaskView } from '~/lib/schedule/read-model'
+import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
 import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -35,7 +36,9 @@ const predecessorTasks = computed(() => {
 
 const projectOptions = computed(() => store.catalog.map(project => ({
   id: project.id,
-  label: project.code ? `${project.name} · ${project.code}` : project.name,
+  name: project.name,
+  code: project.code,
+  status: project.status,
 })))
 
 async function initialize() {
@@ -172,25 +175,10 @@ function drillQuantity() {
   if (!task)
     return
   const group = store.snapshot?.groups.find(candidate => candidate.id === task.groupId)
+  if (!group)
+    return
   taskDialogOpen.value = false
-  router.push({
-    path: '/subcontract/quantity',
-    query: {
-      project: task.projectId,
-      group: task.groupId,
-      building: group?.buildingIds[0] ?? undefined,
-      buildings: group?.buildingIds.join(',') || undefined,
-      task: task.id,
-      groupName: group?.name ?? undefined,
-      taskName: task.name,
-      stage: task.stageId ?? undefined,
-      item: task.itemIds[0] ?? undefined,
-      itemName: task.itemNames.join('、') || undefined,
-      planStart: task.plannedStart,
-      planFinish: task.plannedFinish,
-      from: 'schedule',
-    },
-  })
+  router.push(buildQuantityDrillLocation('schedule', group, task))
 }
 
 onMounted(initialize)
@@ -211,12 +199,16 @@ onMounted(initialize)
             计划日期、工程量完成事实与 FS 前后置关系在同一行对齐。
           </p>
         </div>
-        <label class="min-w-52">
+        <div class="min-w-52">
           <span class="field-label block">项目</span>
-          <select v-model="selectedProjectId" class="field-input w-full" aria-label="选择项目">
-            <option v-for="project in projectOptions" :key="project.id" :value="project.id">{{ project.label }}</option>
-          </select>
-        </label>
+          <ProjectSwitcher
+            v-model="selectedProjectId"
+            :projects="projectOptions"
+            :loading="!initialized && store.loading"
+            :error="store.error"
+            aria-label="选择施工进度项目"
+          />
+        </div>
         <div class="flex flex-wrap gap-2 self-end">
           <button type="button" class="btn-secondary" :disabled="!store.snapshot?.groups.length" @click="setBaseline">
             <span class="i-lucide-git-commit-horizontal mr-1" /> 设置基准
