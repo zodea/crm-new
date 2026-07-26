@@ -140,7 +140,7 @@ function remove(index: number) {
     id="section-lines"
     ref="root"
     class="panel scroll-mt-4 overflow-hidden"
-    :class="{ 'fixed inset-3 z-[var(--z-shell-modal)] flex flex-col bg-panel': isFullscreen }"
+    :class="{ 'fixed inset-3 z-[var(--z-page-fullscreen)] flex flex-col bg-panel': isFullscreen }"
   >
     <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
       <div>

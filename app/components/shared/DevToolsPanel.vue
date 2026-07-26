@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getAllTableNames, getTableRowCount, exportAllSeeds } from '~/lib/db/export-seed'
+import { exportAllSeeds, getAllTableNames, getTableRowCount } from '~/lib/db/export-seed'
 
 const props = defineProps<{
   open: boolean
@@ -38,13 +38,13 @@ async function loadTables() {
   }
 }
 
-const hasData = computed(() => tables.value.some(t => t.count > 0))
 const selectedCount = computed(() => tables.value.filter(t => t.selected).length)
 const dataTableCount = computed(() => tables.value.filter(t => t.count > 0).length)
 
 function toggleAll(checked: boolean) {
   for (const t of tables.value) {
-    if (t.count > 0) t.selected = checked
+    if (t.count > 0)
+      t.selected = checked
   }
 }
 
@@ -98,7 +98,7 @@ watch(() => props.open, (val) => {
       enter-from-class="opacity-0"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-[8000]">
+      <div v-if="open" class="fixed inset-0 z-[var(--z-devtools)]">
         <div class="absolute inset-0 bg-black/20" @click="emit('close')" />
         <div
           class="absolute right-0 top-0 h-full w-[420px] bg-panel border-l border-line shadow-[var(--shadow-pop)] flex flex-col"
@@ -108,7 +108,9 @@ watch(() => props.open, (val) => {
           <div class="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
             <div class="flex items-center gap-2">
               <span class="i-lucide-wrench text-14px text-brand" />
-              <h3 class="text-14px font-800 text-ink">开发工具</h3>
+              <h3 class="text-14px font-800 text-ink">
+                开发工具
+              </h3>
               <span class="chip text-9px bg-warn/20 text-warn">DEV ONLY</span>
             </div>
             <button class="icon-btn" @click="emit('close')">

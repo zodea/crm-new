@@ -39,6 +39,8 @@ import 'vue-sonner/style.css'
   --normal-border: var(--line);
   --normal-text: var(--ink);
   --border-radius: var(--radius-card);
+  /* 覆盖 vue-sonner 的裸 999999999，统一进入 ADR 0016 消息平面。 */
+  z-index: var(--z-toast) !important;
   font-family: var(--font-sans);
 }
 

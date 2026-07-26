@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from 'reka-ui'
+import { useModalLayerRegistration } from '~/composables/useOverlayStack'
 import { resolveNodeCount } from '~/lib/kit/tree-nav'
 
 const props = defineProps<{
@@ -18,7 +19,7 @@ const props = defineProps<{
 const selectedKey = defineModel<string>({ required: true })
 const open = shallowRef(false)
 const activeProjectKey = shallowRef<string | null>(null)
-useModalLayerRegistration(open)
+const { layerStyle } = useModalLayerRegistration(open)
 
 const allNode = computed(() => props.items.find(item => item.key === 'all'))
 const projectNodes = computed(() => props.items.filter(item => item.key !== 'all'))
@@ -74,12 +75,14 @@ function select(key: string) {
       <DialogPortal>
         <DialogOverlay
           data-overlay-backdrop
-          class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+          class="overlay-layer-backdrop fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+          :style="layerStyle"
         />
         <DialogContent
           data-testid="archive-scope-sheet"
           data-overlay-surface
-          class="fixed inset-y-0 right-0 z-[var(--z-overlay-surface)] flex h-svh w-[min(360px,calc(100vw-24px))] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+          class="overlay-layer-surface fixed inset-y-0 right-0 flex h-svh w-[min(360px,calc(100vw-24px))] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+          :style="layerStyle"
         >
           <header class="flex h-16 shrink-0 items-center gap-2 border-b border-line px-4">
             <button

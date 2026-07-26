@@ -13,6 +13,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from 'reka-ui'
+import { useModalLayerRegistration, useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 
 interface ProjectOption {
   id: string
@@ -42,7 +43,8 @@ const open = shallowRef(false)
 const panelId = `project-switcher-${useId()}`
 const isCompact = useMediaQuery('(max-width: 768px)', { ssrWidth: 1024 })
 const storedRecentProjectIds = useLocalStorage<string[]>('crm-recent-project-ids', [])
-useModalLayerRegistration(computed(() => isCompact.value && open.value))
+const { layerStyle: modalLayerStyle } = useModalLayerRegistration(computed(() => isCompact.value && open.value))
+const ownedLayerStyle = useOwnedOverlayLayerStyle()
 
 const currentProject = computed(() => props.projects.find(project => project.id === model.value) ?? null)
 const effectiveRecentProjectIds = computed(() => [...new Set([
@@ -110,7 +112,8 @@ function selectProject(projectId: string) {
           :side-offset="6"
           :collision-padding="12"
           data-overlay-owned
-          class="z-[var(--z-overlay-owned)] w-[min(360px,calc(100vw-24px))] overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel text-ink shadow-[var(--shadow-pop)] outline-none"
+          class="overlay-layer-owned w-[min(360px,calc(100vw-24px))] overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel text-ink shadow-[var(--shadow-pop)] outline-none"
+          :style="ownedLayerStyle"
         >
           <ProjectSwitcherPanel
             :projects="projects"
@@ -153,12 +156,14 @@ function selectProject(projectId: string) {
       <DialogPortal>
         <DialogOverlay
           data-overlay-backdrop
-          class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          class="overlay-layer-backdrop fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          :style="modalLayerStyle"
         />
         <DialogContent
           :id="panelId"
           data-overlay-surface
-          class="fixed inset-0 z-[var(--z-overlay-surface)] flex h-svh w-screen flex-col bg-panel text-ink outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          class="overlay-layer-surface fixed inset-0 flex h-svh w-screen flex-col bg-panel text-ink outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          :style="modalLayerStyle"
         >
           <header class="flex min-h-13 flex-none items-center gap-3 border-b border-line px-3">
             <button

@@ -24,8 +24,8 @@ test.describe('Issue #170：Dialog 子浮层与嵌套确认', () => {
     await expect(discard).toBeVisible()
     const parentSurface = page.locator('[role="dialog"]').filter({ hasText: '户 × 工种责任配置' }).first()
 
-    const nestedBackdrop = page.locator('.fixed.inset-0[data-state="open"]').last()
-    await expect(nestedBackdrop).toHaveCSS('z-index', '9000')
+    const nestedBackdrop = page.locator('[data-overlay-backdrop][data-state="open"][style*="--overlay-layer-offset: 10"]')
+    await expect(nestedBackdrop).toHaveCSS('z-index', '9010')
     await expect(parentSurface).toHaveCSS('z-index', '9000')
     const backdropOwnsParentCorner = await nestedBackdrop.evaluate((backdrop, point) => {
       const top = document.elementFromPoint(point.x, point.y)
