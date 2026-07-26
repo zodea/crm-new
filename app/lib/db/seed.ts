@@ -35,6 +35,25 @@ async function seedFromJson(db: MigrationDb, table: string, rows: SeedRow[]) {
   }
 }
 
+function stagePaymentRecords(rows: SeedRow[]): SeedRow[] {
+  return rows.map(row => row.confirmation_status === 'confirmed'
+    ? { ...row, confirmation_status: 'needs_review' }
+    : row)
+}
+
+async function confirmStagedPaymentRecords(db: MigrationDb, rows: SeedRow[]) {
+  for (const row of rows) {
+    if (row.confirmation_status !== 'confirmed')
+      continue
+    await db.execute(
+      `UPDATE payment_records
+       SET confirmation_status = 'confirmed'
+       WHERE id = ? AND confirmation_status = 'needs_review'`,
+      [row.id],
+    )
+  }
+}
+
 export const QUANTITY_SEED_TABLES = [
   'items',
   'buildings',
@@ -448,6 +467,7 @@ export async function seedIfEmpty(db: MigrationDb) {
   ]
 
   let anySeeded = false
+  let stagedPaymentRecords: SeedRow[] = []
 
   for (const table of jsonTables) {
     const [row] = await db.select<{ cnt: number }>(`SELECT COUNT(*) as cnt FROM "${table}"`)
@@ -456,10 +476,17 @@ export async function seedIfEmpty(db: MigrationDb) {
 
     const json = loadSeedJson(table)
     if (json && json.length > 0) {
-      await seedFromJson(db, table, json)
+      if (table === 'payment_records') {
+        stagedPaymentRecords = json
+        await seedFromJson(db, table, stagePaymentRecords(json))
+      }
+      else {
+        await seedFromJson(db, table, json)
+      }
       anySeeded = true
     }
   }
+  await confirmStagedPaymentRecords(db, stagedPaymentRecords)
 
   if (!anySeeded) {
     const [row] = await db.select<{ cnt: number }>('SELECT COUNT(*) as cnt FROM projects')
