@@ -11,7 +11,7 @@ import type {
 import { defineStore } from 'pinia'
 import { shallowRef } from 'vue'
 import { select, withTransaction } from '~/lib/db/connection'
-import { hiddenCtes, logCreate, softDelete, undoOperation, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import { hiddenCtes, hiddenCtesFor, logCreate, softDelete, undoOperation, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import {
   buildSupplierProjectSummaries,
   buildSupplierReadonlySummary,
@@ -95,18 +95,23 @@ function rowToContract(row: Record<string, unknown>): SupplierContractSummary {
 }
 
 function rowToPayment(row: Record<string, unknown>): SupplierPaymentSummary {
+  const paidAmount = Number(row.derived_paid_amount ?? 0)
   return {
     id: row.id as string,
-    applicationNo: (row.application_no ?? '') as string,
+    applicationNo: (row.no ?? '') as string,
     name: (row.name ?? '') as string,
     projectId: (row.project_id ?? '') as string,
     projectName: (row.project_name ?? '') as string,
-    amount: Number(row.amount ?? 0),
+    amount: Number(row.apply_amount ?? 0),
     approvedAmount: Number(row.approved_amount ?? 0),
-    paidAmount: Number(row.paid_amount ?? 0),
-    actualPayment: Number(row.actual_payment ?? 0),
-    approvalStatus: (row.approval_status ?? '') as string,
-    paymentStatus: (row.payment_status ?? '') as string,
+    paidAmount,
+    actualPayment: paidAmount,
+    approvalStatus: (row.status ?? '') as string,
+    paymentStatus: paidAmount <= 0
+      ? '未付款'
+      : paidAmount >= Number(row.apply_amount ?? 0)
+        ? '已付款'
+        : '部分付款',
     createdAt: (row.created_at ?? '') as string,
   }
 }
@@ -170,8 +175,22 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
           ORDER BY c.sign_date DESC, c.created_at DESC
         `, [supplierId]),
       select<Record<string, unknown>>(`
-          ${hiddenCtes('payment_applications')}
-          SELECT pa.*, p.name AS project_name
+          ${hiddenCtesFor(
+            'payment_applications',
+            'payment_record_application_allocations',
+            'payment_records',
+          )}
+          SELECT pa.*, p.name AS project_name,
+                 COALESCE((
+                   SELECT SUM(allocation.allocated_amount)
+                   FROM payment_record_application_allocations AS allocation
+                   JOIN payment_records AS payment
+                     ON payment.id = allocation.payment_record_id
+                   WHERE allocation.payment_application_id = pa.id
+                     AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+                     AND ${visibleCond('payment_records', 'payment')}
+                     AND payment.confirmation_status = 'confirmed'
+                 ), 0) AS derived_paid_amount
           FROM payment_applications pa
           LEFT JOIN projects p ON p.id = pa.project_id
           WHERE ${visibleCond('payment_applications', 'pa')} AND pa.supplier_id = ?

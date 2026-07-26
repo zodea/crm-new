@@ -150,6 +150,7 @@ export const useContractStore = defineStore('contract', () => {
           'invoices',
           'payment_applications',
           'payment_records',
+          'payment_record_application_allocations',
         )}
         SELECT contract.*,
                contract.amount + COALESCE((
@@ -174,13 +175,17 @@ export const useContractStore = defineStore('contract', () => {
                    AND invoice.account_status = 'archived'
                ), 0) AS invoiced,
                COALESCE((
-                 SELECT SUM(payment.amount)
-                 FROM payment_records AS payment
+                 SELECT SUM(allocation.allocated_amount)
+                 FROM payment_record_application_allocations AS allocation
+                 JOIN payment_records AS payment
+                   ON payment.id = allocation.payment_record_id
                  JOIN payment_applications AS application
-                   ON application.id = payment.payment_application_id
+                   ON application.id = allocation.payment_application_id
                  WHERE application.contract_id = contract.id
+                   AND ${visibleCond('payment_record_application_allocations', 'allocation')}
                    AND ${visibleCond('payment_records', 'payment')}
                    AND ${visibleCond('payment_applications', 'application')}
+                   AND payment.confirmation_status = 'confirmed'
                ), 0) AS paid
         FROM contracts AS contract
         WHERE ${visibleCond('contracts', 'contract')}

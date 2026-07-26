@@ -1,7 +1,6 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
 import {
-  LATEST_VERSION,
   migrations,
   runMigrations,
 } from '~/lib/db/migrations'
@@ -36,9 +35,14 @@ async function seedF2References(db: MigrationDb) {
 describe('v21 F2 canonical 合同与支出结算迁移', () => {
   it('冷启动建立 F2 目标表、列、外键和索引', async () => {
     const db = await createMemoryDb()
-    await runMigrations(db)
+    await runMigrations(
+      db,
+      migrations.filter(migration => migration.version <= F2_MIGRATION_VERSION),
+    )
 
-    expect(LATEST_VERSION).toBe(F2_MIGRATION_VERSION)
+    expect(Math.max(...migrations
+      .filter(migration => migration.version <= F2_MIGRATION_VERSION)
+      .map(migration => migration.version))).toBe(F2_MIGRATION_VERSION)
     const tables = await listTables(db)
     for (const table of [
       'contract_legacy_mappings',
@@ -177,7 +181,10 @@ describe('v21 F2 canonical 合同与支出结算迁移', () => {
       VALUES ('legacy-invoice', 'INV-001', 'legacy-material')
     `)
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(
+      db,
+      migrations.filter(migration => migration.version <= F2_MIGRATION_VERSION),
+    )
     expect(result.applied).toEqual(['v21 f2-canonical-contracts-settlements'])
 
     const mappings = await db.select<{

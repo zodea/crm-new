@@ -14,8 +14,16 @@ describe('侧栏导航树', () => {
     const byLabel = filterNavTree(NAV_TREE, '付款申请')
     const payment = byLabel.flatMap(node => node.type === 'group' ? node.items : [node])
     expect(payment).toHaveLength(1)
-    expect(payment[0]).toMatchObject({ key: 'payApply' })
-    expect(payment[0]).not.toHaveProperty('to')
+    expect(payment[0]).toMatchObject({
+      key: 'payApply',
+      to: '/finance/payment',
+    })
+
+    const pendingPayment = filterNavTree(NAV_TREE, '待支付工作台')
+      .flatMap(node => node.type === 'group' ? node.items : [node])
+    expect(pendingPayment).toHaveLength(1)
+    expect(pendingPayment[0]).toMatchObject({ key: 'payManage' })
+    expect(pendingPayment[0]).not.toHaveProperty('to')
 
     const byHint = filterNavTree(NAV_TREE, 'OCR 处理区')
     const delivery = byHint.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -65,5 +73,22 @@ describe('侧栏导航树', () => {
     expect(activeNavKey('/contract/company-expense/form/company_1')).toBe('companyExp')
     expect(activeNavKey('/contract/other-expense/form/contract_1')).toBe('otherExp')
     expect(activeNavKey('/contract/other-settlement/form/settlement_1')).toBe('otherSettle')
+  })
+
+  it('f3 六类资金表单入口已启用，新增和编辑路由保持来源导航点亮', () => {
+    const routes = [
+      ['receipt', '/finance/receipt'],
+      ['invApply', '/finance/billing'],
+      ['current', '/finance/current'],
+      ['payRecord', '/finance/records'],
+      ['reimburse', '/finance/reimbursement'],
+      ['payApply', '/finance/payment'],
+    ] as const
+
+    for (const [key, route] of routes) {
+      expect(leaves().find(item => item.key === key)?.to).toBe(route)
+      expect(activeNavKey(`${route}/new`)).toBe(key)
+      expect(activeNavKey(`${route}/form/f3_1`)).toBe(key)
+    }
   })
 })

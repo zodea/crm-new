@@ -1274,9 +1274,415 @@ CREATE INDEX IF NOT EXISTS idx_payment_applications_deleted
   ON payment_applications(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+const V22_RECEIPT_REGISTRATIONS_TABLE = `
+CREATE TABLE receipt_registrations_v22_new (
+  id                 TEXT PRIMARY KEY,
+  no                 TEXT NOT NULL DEFAULT '',
+  receipt_date       TEXT NOT NULL DEFAULT '',
+  project_id         TEXT REFERENCES projects(id),
+  contract_id        TEXT REFERENCES contracts(id),
+  customer_id        TEXT REFERENCES customers(id),
+  payer_account      TEXT NOT NULL DEFAULT '',
+  amount             REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  payment_method     TEXT NOT NULL DEFAULT '',
+  acceptance_bill_no TEXT NOT NULL DEFAULT '',
+  bill_due_date      TEXT NOT NULL DEFAULT '',
+  period_no          TEXT NOT NULL DEFAULT '',
+  bank_serial_no     TEXT NOT NULL DEFAULT '',
+  handler            TEXT NOT NULL DEFAULT '',
+  review_status      TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'draft',
+  note               TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+`
+
+const V22_INVOICE_APPLICATIONS_TABLE = `
+CREATE TABLE invoice_applications_v22_new (
+  id                     TEXT PRIMARY KEY,
+  no                     TEXT NOT NULL DEFAULT '',
+  name                   TEXT NOT NULL DEFAULT '',
+  project_id             TEXT REFERENCES projects(id),
+  contract_id            TEXT REFERENCES contracts(id),
+  customer_id            TEXT REFERENCES customers(id),
+  buyer_name_snapshot    TEXT NOT NULL DEFAULT '',
+  buyer_tax_no_snapshot  TEXT NOT NULL DEFAULT '',
+  invoice_type           TEXT NOT NULL DEFAULT '',
+  amount                 REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  tax_rate               REAL NOT NULL DEFAULT 0 CHECK (tax_rate >= 0),
+  tax_amount             REAL NOT NULL DEFAULT 0 CHECK (tax_amount >= 0),
+  invoice_content        TEXT NOT NULL DEFAULT '',
+  invoice_remark         TEXT NOT NULL DEFAULT '',
+  applicant              TEXT NOT NULL DEFAULT '',
+  application_date       TEXT NOT NULL DEFAULT '',
+  status                 TEXT NOT NULL DEFAULT 'draft',
+  note                   TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+`
+
+const V22_CURRENT_TRANSACTIONS_TABLE = `
+CREATE TABLE IF NOT EXISTS current_transactions (
+  id                 TEXT PRIMARY KEY,
+  no                 TEXT NOT NULL DEFAULT '',
+  direction          TEXT NOT NULL CHECK (direction IN ('receipt', 'payment')),
+  project_id         TEXT REFERENCES projects(id),
+  counterparty       TEXT NOT NULL DEFAULT '',
+  purpose            TEXT NOT NULL DEFAULT '',
+  amount             REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  payment_method     TEXT NOT NULL DEFAULT '',
+  transaction_date   TEXT NOT NULL DEFAULT '',
+  bank_serial_no     TEXT NOT NULL DEFAULT '',
+  handler            TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'draft',
+  note               TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+`
+
+const V22_PAYMENT_APPLICATIONS_TABLE = `
+CREATE TABLE payment_applications_v22_new (
+  id                 TEXT PRIMARY KEY,
+  no                 TEXT NOT NULL DEFAULT '',
+  name               TEXT NOT NULL DEFAULT '',
+  biz_type           TEXT NOT NULL DEFAULT '',
+  project_id         TEXT REFERENCES projects(id),
+  supplier_id        TEXT REFERENCES suppliers(id),
+  contract_id        TEXT REFERENCES contracts(id),
+  cost_name          TEXT NOT NULL DEFAULT '',
+  apply_amount       REAL NOT NULL DEFAULT 0 CHECK (apply_amount >= 0),
+  apply_date         TEXT NOT NULL DEFAULT '',
+  applicant          TEXT NOT NULL DEFAULT '',
+  invoice_state      TEXT NOT NULL DEFAULT '先款后票'
+                     CHECK (invoice_state IN ('先票后款', '先款后票', '无需发票')),
+  pay_content        TEXT NOT NULL DEFAULT '',
+  prepay_deduct      REAL NOT NULL DEFAULT 0 CHECK (prepay_deduct >= 0),
+  prepay_note        TEXT NOT NULL DEFAULT '',
+  approved_amount    REAL NOT NULL DEFAULT 0 CHECK (approved_amount >= 0),
+  approval_note      TEXT NOT NULL DEFAULT '',
+  status             TEXT NOT NULL DEFAULT 'draft',
+  note               TEXT NOT NULL DEFAULT '',
+  external_ref       TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+`
+
+const V22_PAYMENT_RECORDS_TABLE = `
+CREATE TABLE payment_records_v22_new (
+  id                   TEXT PRIMARY KEY,
+  no                   TEXT NOT NULL DEFAULT '',
+  project_id           TEXT REFERENCES projects(id),
+  supplier_id          TEXT REFERENCES suppliers(id),
+  payee_name           TEXT NOT NULL DEFAULT '',
+  purpose              TEXT NOT NULL DEFAULT '',
+  payment_date         TEXT NOT NULL DEFAULT '',
+  amount               REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  payment_method       TEXT NOT NULL DEFAULT '',
+  voucher_no           TEXT NOT NULL DEFAULT '',
+  bank_serial_no       TEXT NOT NULL DEFAULT '',
+  payee_account        TEXT NOT NULL DEFAULT '',
+  payee_bank           TEXT NOT NULL DEFAULT '',
+  payee_bank_account   TEXT NOT NULL DEFAULT '',
+  handler              TEXT NOT NULL DEFAULT '',
+  source               TEXT NOT NULL DEFAULT 'manual'
+                       CHECK (source IN ('manual', 'image_ocr', 'excel_import')),
+  recognition_status   TEXT NOT NULL DEFAULT 'not_applicable',
+  ocr_payload           TEXT NOT NULL DEFAULT '{}',
+  field_confidence     TEXT NOT NULL DEFAULT '{}',
+  confirmation_status  TEXT NOT NULL DEFAULT 'draft'
+                       CHECK (confirmation_status IN ('draft', 'needs_review', 'confirmed')),
+  confirmed_by         TEXT NOT NULL DEFAULT '',
+  confirmed_at         TEXT,
+  external_ref         TEXT NOT NULL DEFAULT '',
+  note                 TEXT NOT NULL DEFAULT '',
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at           TEXT DEFAULT NULL,
+  CHECK (
+    confirmation_status <> 'confirmed'
+    OR (
+      amount > 0
+      AND TRIM(payment_date) <> ''
+      AND TRIM(payee_name) <> ''
+      AND TRIM(voucher_no) <> ''
+      AND TRIM(bank_serial_no) <> ''
+      AND TRIM(confirmed_by) <> ''
+      AND confirmed_at IS NOT NULL
+    )
+  )
+);
+`
+
+const V22_EXPENSE_REIMBURSEMENTS_TABLE = `
+CREATE TABLE expense_reimbursements_v22_new (
+  id                   TEXT PRIMARY KEY,
+  no                   TEXT NOT NULL DEFAULT '',
+  project_id           TEXT REFERENCES projects(id),
+  applicant            TEXT NOT NULL DEFAULT '',
+  category             TEXT NOT NULL DEFAULT '',
+  reimbursement_date   TEXT NOT NULL DEFAULT '',
+  invoice_count        INTEGER NOT NULL DEFAULT 0 CHECK (invoice_count >= 0),
+  reason               TEXT NOT NULL DEFAULT '',
+  status               TEXT NOT NULL DEFAULT 'draft',
+  note                 TEXT NOT NULL DEFAULT '',
+  external_ref         TEXT NOT NULL DEFAULT '',
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at           TEXT DEFAULT NULL
+);
+`
+
+const V22_F3_CHILD_TABLES = `
+CREATE TABLE IF NOT EXISTS expense_reimbursement_lines (
+  id                   TEXT PRIMARY KEY,
+  reimbursement_id     TEXT NOT NULL REFERENCES expense_reimbursements(id),
+  expense_item         TEXT NOT NULL DEFAULT '',
+  expense_date         TEXT NOT NULL DEFAULT '',
+  amount               REAL NOT NULL CHECK (amount > 0),
+  note                 TEXT NOT NULL DEFAULT '',
+  sort_order           INTEGER NOT NULL DEFAULT 0,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at           TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS payment_application_settlement_allocations (
+  id                     TEXT PRIMARY KEY,
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  settlement_id          TEXT NOT NULL REFERENCES expenditure_settlements(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
+  note                   TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS payment_application_invoice_allocations (
+  id                     TEXT PRIMARY KEY,
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  invoice_id             TEXT NOT NULL REFERENCES invoices(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
+  note                   TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS payment_record_application_allocations (
+  id                     TEXT PRIMARY KEY,
+  payment_record_id      TEXT NOT NULL REFERENCES payment_records(id),
+  payment_application_id TEXT NOT NULL REFERENCES payment_applications(id),
+  allocated_amount       REAL NOT NULL CHECK (allocated_amount > 0),
+  note                   TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+`
+
+const V22_F3_INDEXES_AND_TRIGGERS = `
+CREATE INDEX IF NOT EXISTS idx_receipt_registrations_project
+  ON receipt_registrations(project_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_registrations_contract
+  ON receipt_registrations(contract_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_registrations_customer
+  ON receipt_registrations(customer_id);
+CREATE INDEX IF NOT EXISTS idx_receipt_registrations_deleted
+  ON receipt_registrations(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_receipt_bank_serial
+  ON receipt_registrations(bank_serial_no)
+  WHERE deleted_at IS NULL AND TRIM(bank_serial_no) <> '';
+CREATE INDEX IF NOT EXISTS idx_invoice_applications_project
+  ON invoice_applications(project_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_applications_contract
+  ON invoice_applications(contract_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_applications_deleted
+  ON invoice_applications(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_current_transactions_project
+  ON current_transactions(project_id);
+CREATE INDEX IF NOT EXISTS idx_current_transactions_direction
+  ON current_transactions(direction, transaction_date);
+CREATE INDEX IF NOT EXISTS idx_current_transactions_deleted
+  ON current_transactions(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_current_transaction_bank_serial
+  ON current_transactions(bank_serial_no)
+  WHERE deleted_at IS NULL AND TRIM(bank_serial_no) <> '';
+CREATE INDEX IF NOT EXISTS idx_payment_applications_project
+  ON payment_applications(project_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_supplier
+  ON payment_applications(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_contract
+  ON payment_applications(contract_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_deleted
+  ON payment_applications(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_records_project
+  ON payment_records(project_id);
+CREATE INDEX IF NOT EXISTS idx_payment_records_supplier
+  ON payment_records(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_payment_records_confirmation
+  ON payment_records(confirmation_status, payment_date);
+CREATE INDEX IF NOT EXISTS idx_payment_records_deleted
+  ON payment_records(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_record_bank_serial
+  ON payment_records(bank_serial_no)
+  WHERE deleted_at IS NULL AND TRIM(bank_serial_no) <> '';
+CREATE INDEX IF NOT EXISTS idx_expense_reimbursements_project
+  ON expense_reimbursements(project_id);
+CREATE INDEX IF NOT EXISTS idx_expense_reimbursements_deleted
+  ON expense_reimbursements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_expense_reimbursement_lines_head
+  ON expense_reimbursement_lines(reimbursement_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_expense_reimbursement_lines_deleted
+  ON expense_reimbursement_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_application_settlement
+  ON payment_application_settlement_allocations(payment_application_id, settlement_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_settlement_allocation_source
+  ON payment_application_settlement_allocations(settlement_id);
+CREATE INDEX IF NOT EXISTS idx_payment_application_settlement_allocations_deleted
+  ON payment_application_settlement_allocations(deleted_at)
+  WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_application_invoice
+  ON payment_application_invoice_allocations(payment_application_id, invoice_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_invoice_allocation_source
+  ON payment_application_invoice_allocations(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_payment_application_invoice_allocations_deleted
+  ON payment_application_invoice_allocations(deleted_at)
+  WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_record_application
+  ON payment_record_application_allocations(payment_record_id, payment_application_id)
+  WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_application_payment
+  ON payment_record_application_allocations(payment_application_id);
+CREATE INDEX IF NOT EXISTS idx_payment_record_application_allocations_deleted
+  ON payment_record_application_allocations(deleted_at)
+  WHERE deleted_at IS NOT NULL;
+
+CREATE TRIGGER IF NOT EXISTS trg_invoice_allocation_cap_insert
+BEFORE INSERT ON payment_application_invoice_allocations
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  SELECT CASE
+    WHEN NOT EXISTS (
+      SELECT 1 FROM invoices
+      WHERE id = NEW.invoice_id AND deleted_at IS NULL
+    )
+    THEN RAISE(ABORT, '关联发票不存在或已删除')
+  END;
+  SELECT CASE
+    WHEN (
+      COALESCE((
+        SELECT SUM(allocation.allocated_amount)
+        FROM payment_application_invoice_allocations AS allocation
+        WHERE allocation.invoice_id = NEW.invoice_id
+          AND allocation.deleted_at IS NULL
+      ), 0) + NEW.allocated_amount
+    ) > COALESCE((
+      SELECT invoice.total_amount FROM invoices AS invoice
+      WHERE invoice.id = NEW.invoice_id
+    ), 0) + 0.0001
+    THEN RAISE(ABORT, '发票可关联额度不足')
+  END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_invoice_allocation_cap_update
+BEFORE UPDATE OF invoice_id, allocated_amount, deleted_at
+ON payment_application_invoice_allocations
+WHEN NEW.deleted_at IS NULL
+BEGIN
+  SELECT CASE
+    WHEN NOT EXISTS (
+      SELECT 1 FROM invoices
+      WHERE id = NEW.invoice_id AND deleted_at IS NULL
+    )
+    THEN RAISE(ABORT, '关联发票不存在或已删除')
+  END;
+  SELECT CASE
+    WHEN (
+      COALESCE((
+        SELECT SUM(allocation.allocated_amount)
+        FROM payment_application_invoice_allocations AS allocation
+        WHERE allocation.invoice_id = NEW.invoice_id
+          AND allocation.deleted_at IS NULL
+          AND allocation.id <> OLD.id
+      ), 0) + NEW.allocated_amount
+    ) > COALESCE((
+      SELECT invoice.total_amount FROM invoices AS invoice
+      WHERE invoice.id = NEW.invoice_id
+    ), 0) + 0.0001
+    THEN RAISE(ABORT, '发票可关联额度不足')
+  END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_payment_confirmation_balanced
+BEFORE UPDATE OF confirmation_status ON payment_records
+WHEN NEW.confirmation_status = 'confirmed'
+  AND OLD.confirmation_status <> 'confirmed'
+BEGIN
+  SELECT CASE
+    WHEN ABS(
+      COALESCE((
+        SELECT SUM(allocation.allocated_amount)
+        FROM payment_record_application_allocations AS allocation
+        WHERE allocation.payment_record_id = NEW.id
+          AND allocation.deleted_at IS NULL
+      ), 0) - NEW.amount
+    ) > 0.0001
+    THEN RAISE(ABORT, '支付分摊合计必须等于支付金额')
+  END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_insert
+BEFORE INSERT ON payment_record_application_allocations
+WHEN EXISTS (
+  SELECT 1 FROM payment_records
+  WHERE id = NEW.payment_record_id
+    AND confirmation_status = 'confirmed'
+    AND deleted_at IS NULL
+)
+BEGIN
+  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_update
+BEFORE UPDATE ON payment_record_application_allocations
+WHEN EXISTS (
+  SELECT 1 FROM payment_records
+  WHERE id = NEW.payment_record_id
+    AND confirmation_status = 'confirmed'
+    AND deleted_at IS NULL
+)
+BEGIN
+  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_confirmed_payment_allocation_delete
+BEFORE DELETE ON payment_record_application_allocations
+WHEN EXISTS (
+  SELECT 1 FROM payment_records
+  WHERE id = OLD.payment_record_id
+    AND confirmation_status = 'confirmed'
+    AND deleted_at IS NULL
+)
+BEGIN
+  SELECT RAISE(ABORT, '已确认支付需先撤回再修改分摊');
+END;
+`
+
 const F2_IMPORT_BATCH_ID = 'migration_f2_v21'
 
 const F1_IMPORT_BATCH_ID = 'migration_f1_v19'
+
+const F3_IMPORT_BATCH_ID = 'migration_f3_v22'
 
 function normalizeLegacyName(value: unknown): string {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
@@ -2218,6 +2624,655 @@ async function recordF1SupplierHierarchy(db: MigrationDb): Promise<void> {
   }
 }
 
+async function f3TableExists(db: MigrationDb, table: string): Promise<boolean> {
+  const rows = await db.select<{ name: string }>(
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`,
+    [table],
+  )
+  return rows.length > 0
+}
+
+async function f3Columns(db: MigrationDb, table: string): Promise<Set<string>> {
+  const rows = await db.select<{ name: string }>(
+    `SELECT name FROM pragma_table_info(?)`,
+    [table],
+  )
+  return new Set(rows.map(row => row.name))
+}
+
+function f3Column(
+  available: Set<string>,
+  column: string,
+  fallback: string,
+  alias = 'legacy',
+): string {
+  assertIdentifier(column)
+  assertIdentifier(alias)
+  return available.has(column) ? `${alias}."${column}"` : fallback
+}
+
+async function rebuildReceiptRegistrationsForF3(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'receipt_registrations', 'bank_serial_no'))
+    return
+
+  const available = await f3Columns(db, 'receipt_registrations')
+  const no = available.has('no')
+    ? f3Column(available, 'no', `''`)
+    : f3Column(available, 'receipt_no', `''`)
+  const customer = f3Column(available, 'customer_id', 'NULL')
+  await db.execute('DROP TABLE IF EXISTS receipt_registrations_v22_new')
+  await execScript(db, V22_RECEIPT_REGISTRATIONS_TABLE)
+  await db.execute(`
+    INSERT INTO receipt_registrations_v22_new (
+      id, no, receipt_date, project_id, contract_id, customer_id,
+      payer_account, amount, payment_method, acceptance_bill_no,
+      bill_due_date, period_no, bank_serial_no, handler, review_status,
+      status, note, created_at, updated_at, deleted_at
+    )
+    SELECT
+      ${f3Column(available, 'id', `''`)},
+      COALESCE(${no}, ''),
+      COALESCE(${f3Column(available, 'receipt_date', `''`)}, ''),
+      ${f3Column(available, 'project_id', 'NULL')},
+      NULLIF(${f3Column(available, 'contract_id', 'NULL')}, ''),
+      COALESCE(
+        NULLIF(${customer}, ''),
+        (
+          SELECT project.customer_id
+          FROM projects AS project
+          WHERE project.id = ${f3Column(available, 'project_id', 'NULL')}
+        )
+      ),
+      COALESCE(${f3Column(available, 'payer_account', `''`)}, ''),
+      MAX(COALESCE(${f3Column(available, 'amount', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'payment_method', `''`)}, ''),
+      COALESCE(${f3Column(available, 'acceptance_bill_no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'bill_due_date', `''`)}, ''),
+      COALESCE(${f3Column(available, 'period_no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'bank_serial_no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'handler', `''`)}, ''),
+      COALESCE(${f3Column(available, 'review_status', `''`)}, ''),
+      COALESCE(NULLIF(${f3Column(available, 'status', `''`)}, ''), 'submitted'),
+      COALESCE(${f3Column(available, 'note', `''`)}, ''),
+      COALESCE(${f3Column(available, 'created_at', `datetime('now')`)}, datetime('now')),
+      COALESCE(${f3Column(available, 'updated_at', f3Column(available, 'created_at', `datetime('now')`))}, datetime('now')),
+      ${f3Column(available, 'deleted_at', 'NULL')}
+    FROM receipt_registrations AS legacy
+  `)
+  await db.execute('DROP TABLE receipt_registrations')
+  await db.execute(
+    'ALTER TABLE receipt_registrations_v22_new RENAME TO receipt_registrations',
+  )
+}
+
+async function rebuildInvoiceApplicationsForF3(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'invoice_applications', 'buyer_name_snapshot'))
+    return
+
+  const available = await f3Columns(db, 'invoice_applications')
+  const customer = f3Column(available, 'customer_id', 'NULL')
+  const project = f3Column(available, 'project_id', 'NULL')
+  await db.execute('DROP TABLE IF EXISTS invoice_applications_v22_new')
+  await execScript(db, V22_INVOICE_APPLICATIONS_TABLE)
+  await db.execute(`
+    INSERT INTO invoice_applications_v22_new (
+      id, no, name, project_id, contract_id, customer_id,
+      buyer_name_snapshot, buyer_tax_no_snapshot, invoice_type,
+      amount, tax_rate, tax_amount, invoice_content, invoice_remark,
+      applicant, application_date, status, note, created_at, updated_at,
+      deleted_at
+    )
+    SELECT
+      ${f3Column(available, 'id', `''`)},
+      COALESCE(${f3Column(available, 'no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'name', `''`)}, ''),
+      ${project},
+      NULLIF(${f3Column(available, 'contract_id', 'NULL')}, ''),
+      COALESCE(
+        NULLIF(${customer}, ''),
+        (
+          SELECT project_row.customer_id
+          FROM projects AS project_row
+          WHERE project_row.id = ${project}
+        )
+      ),
+      COALESCE(
+        NULLIF(${f3Column(available, 'buyer_name_snapshot', `''`)}, ''),
+        (
+          SELECT customer_row.name
+          FROM customers AS customer_row
+          WHERE customer_row.id = COALESCE(
+            NULLIF(${customer}, ''),
+            (
+              SELECT project_row.customer_id
+              FROM projects AS project_row
+              WHERE project_row.id = ${project}
+            )
+          )
+        ),
+        ''
+      ),
+      COALESCE(
+        NULLIF(${f3Column(available, 'buyer_tax_no_snapshot', `''`)}, ''),
+        (
+          SELECT customer_row.tax_no
+          FROM customers AS customer_row
+          WHERE customer_row.id = COALESCE(
+            NULLIF(${customer}, ''),
+            (
+              SELECT project_row.customer_id
+              FROM projects AS project_row
+              WHERE project_row.id = ${project}
+            )
+          )
+        ),
+        ''
+      ),
+      COALESCE(${f3Column(available, 'invoice_type', `''`)}, ''),
+      MAX(COALESCE(${f3Column(available, 'amount', '0')}, 0), 0),
+      MAX(COALESCE(${f3Column(available, 'tax_rate', '0')}, 0), 0),
+      MAX(COALESCE(${f3Column(available, 'tax_amount', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'invoice_content', `''`)}, ''),
+      COALESCE(${f3Column(available, 'invoice_remark', `''`)}, ''),
+      COALESCE(${f3Column(available, 'applicant', `''`)}, ''),
+      COALESCE(
+        NULLIF(${f3Column(available, 'application_date', `''`)}, ''),
+        ${f3Column(available, 'invoice_date', `''`)},
+        ''
+      ),
+      COALESCE(NULLIF(${f3Column(available, 'status', `''`)}, ''), 'submitted'),
+      COALESCE(${f3Column(available, 'note', `''`)}, ''),
+      COALESCE(${f3Column(available, 'created_at', `datetime('now')`)}, datetime('now')),
+      COALESCE(${f3Column(available, 'updated_at', f3Column(available, 'created_at', `datetime('now')`))}, datetime('now')),
+      ${f3Column(available, 'deleted_at', 'NULL')}
+    FROM invoice_applications AS legacy
+  `)
+  await db.execute('DROP TABLE invoice_applications')
+  await db.execute(
+    'ALTER TABLE invoice_applications_v22_new RENAME TO invoice_applications',
+  )
+}
+
+async function migrateCurrentTransactionsForF3(db: MigrationDb): Promise<void> {
+  await execScript(db, V22_CURRENT_TRANSACTIONS_TABLE)
+  if (await f3TableExists(db, 'current_receipts')) {
+    await db.execute(`
+      INSERT OR IGNORE INTO current_transactions (
+        id, no, direction, project_id, counterparty, amount,
+        transaction_date, status, created_at, updated_at, deleted_at
+      )
+      SELECT
+        receipt.id,
+        COALESCE(receipt.receipt_no, ''),
+        'receipt',
+        receipt.project_id,
+        COALESCE(receipt.payer, ''),
+        MAX(COALESCE(receipt.amount, 0), 0),
+        COALESCE(receipt.receipt_date, ''),
+        'submitted',
+        COALESCE(receipt.created_at, datetime('now')),
+        COALESCE(receipt.created_at, datetime('now')),
+        receipt.deleted_at
+      FROM current_receipts AS receipt
+    `)
+    await db.execute('DROP TABLE current_receipts')
+  }
+  if (await f3TableExists(db, 'current_payments')) {
+    await db.execute(`
+      INSERT OR IGNORE INTO current_transactions (
+        id, no, direction, project_id, counterparty, amount,
+        payment_method, transaction_date, status,
+        created_at, updated_at, deleted_at
+      )
+      SELECT
+        payment.id,
+        COALESCE(payment.payment_no, ''),
+        'payment',
+        payment.project_id,
+        COALESCE(payment.payee, ''),
+        MAX(COALESCE(payment.amount, 0), 0),
+        COALESCE(payment.payment_method, ''),
+        COALESCE(payment.payment_date, ''),
+        COALESCE(NULLIF(payment.approval_status, ''), 'submitted'),
+        COALESCE(payment.created_at, datetime('now')),
+        COALESCE(payment.created_at, datetime('now')),
+        payment.deleted_at
+      FROM current_payments AS payment
+    `)
+    await db.execute('DROP TABLE current_payments')
+  }
+}
+
+async function snapshotLegacyPaymentFactsForF3(db: MigrationDb): Promise<void> {
+  await db.execute('DROP TABLE IF EXISTS f3_legacy_payment_links_v22')
+  await db.execute(`
+    CREATE TABLE f3_legacy_payment_links_v22 (
+      payment_record_id TEXT PRIMARY KEY,
+      payment_application_id TEXT,
+      allocated_amount REAL NOT NULL DEFAULT 0
+    )
+  `)
+  if (await columnExists(db, 'payment_records', 'payment_application_id')) {
+    await db.execute(`
+      INSERT INTO f3_legacy_payment_links_v22 (
+        payment_record_id, payment_application_id, allocated_amount
+      )
+      SELECT id, NULLIF(payment_application_id, ''), MAX(COALESCE(amount, 0), 0)
+      FROM payment_records
+      WHERE payment_application_id IS NOT NULL
+        AND TRIM(payment_application_id) <> ''
+    `)
+  }
+
+  if (await columnExists(db, 'payment_applications', 'paid_amount')) {
+    await db.execute(`
+      INSERT OR IGNORE INTO reconciliation_issues (
+        id, import_batch_id, project_id, entity_type, entity_id, field_name,
+        source_value, metric_key, source_ref, excel_value, system_value,
+        difference, attribution
+      )
+      SELECT
+        'f3_payment_paid_' || application.id,
+        ?,
+        application.project_id,
+        'payment_applications',
+        application.id,
+        'paid_amount',
+        CAST(application.paid_amount AS TEXT),
+        'payment_applications.paid_amount',
+        'schema:v22:payment_applications:' || application.id,
+        application.paid_amount,
+        COALESCE((
+          SELECT SUM(link.allocated_amount)
+          FROM f3_legacy_payment_links_v22 AS link
+          WHERE link.payment_application_id = application.id
+        ), 0),
+        application.paid_amount - COALESCE((
+          SELECT SUM(link.allocated_amount)
+          FROM f3_legacy_payment_links_v22 AS link
+          WHERE link.payment_application_id = application.id
+        ), 0),
+        'legacy-manual-paid'
+      FROM payment_applications AS application
+      WHERE COALESCE(application.paid_amount, 0) > 0
+    `, [F3_IMPORT_BATCH_ID])
+  }
+}
+
+async function rebuildPaymentApplicationsForF3(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'payment_applications', 'biz_type'))
+    return
+
+  const available = await f3Columns(db, 'payment_applications')
+  const no = available.has('no')
+    ? f3Column(available, 'no', `''`)
+    : f3Column(available, 'application_no', `''`)
+  const applyAmount = available.has('apply_amount')
+    ? f3Column(available, 'apply_amount', '0')
+    : f3Column(available, 'amount', '0')
+  const status = available.has('status')
+    ? f3Column(available, 'status', `'draft'`)
+    : f3Column(available, 'approval_status', `'draft'`)
+  const project = f3Column(available, 'project_id', 'NULL')
+  const contract = f3Column(available, 'contract_id', 'NULL')
+  await db.execute('DROP TABLE IF EXISTS payment_applications_v22_new')
+  await execScript(db, V22_PAYMENT_APPLICATIONS_TABLE)
+  await db.execute(`
+    INSERT INTO payment_applications_v22_new (
+      id, no, name, biz_type, project_id, supplier_id, contract_id,
+      cost_name, apply_amount, apply_date, applicant, invoice_state,
+      pay_content, prepay_deduct, prepay_note, approved_amount,
+      approval_note, status, note, external_ref, created_at, updated_at,
+      deleted_at
+    )
+    SELECT
+      ${f3Column(available, 'id', `''`)},
+      COALESCE(${no}, ''),
+      COALESCE(${f3Column(available, 'name', `''`)}, ''),
+      COALESCE(
+        NULLIF(${f3Column(available, 'biz_type', `''`)}, ''),
+        CASE
+          WHEN ${contract} IS NOT NULL AND TRIM(${contract}) <> '' THEN '有合同-其他'
+          WHEN ${project} IS NULL OR TRIM(${project}) = '' THEN '公司付款'
+          ELSE '项目费用'
+        END
+      ),
+      NULLIF(${project}, ''),
+      NULLIF(${f3Column(available, 'supplier_id', 'NULL')}, ''),
+      NULLIF(${contract}, ''),
+      COALESCE(${f3Column(available, 'cost_name', `''`)}, ''),
+      MAX(COALESCE(${applyAmount}, 0), 0),
+      COALESCE(
+        NULLIF(${f3Column(available, 'apply_date', `''`)}, ''),
+        SUBSTR(${f3Column(available, 'created_at', `''`)}, 1, 10),
+        ''
+      ),
+      COALESCE(${f3Column(available, 'applicant', `''`)}, ''),
+      CASE
+        WHEN ${f3Column(available, 'invoice_state', `'先款后票'`)}
+          IN ('先票后款', '先款后票', '无需发票')
+        THEN ${f3Column(available, 'invoice_state', `'先款后票'`)}
+        ELSE '先款后票'
+      END,
+      COALESCE(${f3Column(available, 'pay_content', `''`)}, ''),
+      MAX(COALESCE(${f3Column(available, 'prepay_deduct', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'prepay_note', `''`)}, ''),
+      MAX(COALESCE(${f3Column(available, 'approved_amount', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'approval_note', `''`)}, ''),
+      COALESCE(NULLIF(${status}, ''), 'draft'),
+      COALESCE(${f3Column(available, 'note', `''`)}, ''),
+      COALESCE(${f3Column(available, 'external_ref', `''`)}, ''),
+      COALESCE(${f3Column(available, 'created_at', `datetime('now')`)}, datetime('now')),
+      COALESCE(${f3Column(available, 'updated_at', f3Column(available, 'created_at', `datetime('now')`))}, datetime('now')),
+      ${f3Column(available, 'deleted_at', 'NULL')}
+    FROM payment_applications AS legacy
+  `)
+  await db.execute('DROP TABLE payment_applications')
+  await db.execute(
+    'ALTER TABLE payment_applications_v22_new RENAME TO payment_applications',
+  )
+}
+
+async function rebuildPaymentRecordsForF3(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'payment_records', 'confirmation_status'))
+    return
+
+  const available = await f3Columns(db, 'payment_records')
+  const no = available.has('no')
+    ? f3Column(available, 'no', `''`)
+    : f3Column(available, 'payment_no', `''`)
+  await db.execute('DROP TABLE IF EXISTS payment_records_v22_new')
+  await execScript(db, V22_PAYMENT_RECORDS_TABLE)
+  await db.execute(`
+    INSERT INTO payment_records_v22_new (
+      id, no, project_id, supplier_id, payee_name, purpose,
+      payment_date, amount, payment_method, voucher_no, bank_serial_no,
+      payee_account, payee_bank, payee_bank_account, handler, source,
+      recognition_status, ocr_payload, field_confidence, confirmation_status,
+      confirmed_by, confirmed_at, external_ref, note, created_at, updated_at, deleted_at
+    )
+    SELECT
+      ${f3Column(available, 'id', `''`)},
+      COALESCE(${no}, ''),
+      NULLIF(${f3Column(available, 'project_id', 'NULL')}, ''),
+      NULLIF(${f3Column(available, 'supplier_id', 'NULL')}, ''),
+      COALESCE(
+        NULLIF(${f3Column(available, 'payee_name', `''`)}, ''),
+        ${f3Column(available, 'payee_account', `''`)},
+        ''
+      ),
+      COALESCE(${f3Column(available, 'purpose', `''`)}, ''),
+      COALESCE(${f3Column(available, 'payment_date', `''`)}, ''),
+      MAX(COALESCE(${f3Column(available, 'amount', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'payment_method', `''`)}, ''),
+      COALESCE(${f3Column(available, 'voucher_no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'bank_serial_no', `''`)}, ''),
+      COALESCE(${f3Column(available, 'payee_account', `''`)}, ''),
+      COALESCE(${f3Column(available, 'payee_bank', `''`)}, ''),
+      COALESCE(${f3Column(available, 'payee_bank_account', `''`)}, ''),
+      COALESCE(${f3Column(available, 'handler', `''`)}, ''),
+      CASE
+        WHEN ${f3Column(available, 'source', `'manual'`)}
+          IN ('manual', 'image_ocr', 'excel_import')
+        THEN ${f3Column(available, 'source', `'manual'`)}
+        ELSE 'manual'
+      END,
+      COALESCE(${f3Column(available, 'recognition_status', `'not_applicable'`)}, 'not_applicable'),
+      COALESCE(${f3Column(available, 'ocr_payload', `'{}'`)}, '{}'),
+      COALESCE(${f3Column(available, 'field_confidence', `'{}'`)}, '{}'),
+      'needs_review',
+      '',
+      NULL,
+      COALESCE(${f3Column(available, 'external_ref', `''`)}, ''),
+      COALESCE(${f3Column(available, 'note', `''`)}, ''),
+      COALESCE(${f3Column(available, 'created_at', `datetime('now')`)}, datetime('now')),
+      COALESCE(${f3Column(available, 'updated_at', f3Column(available, 'created_at', `datetime('now')`))}, datetime('now')),
+      ${f3Column(available, 'deleted_at', 'NULL')}
+    FROM payment_records AS legacy
+  `)
+  await db.execute('DROP TABLE payment_records')
+  await db.execute('ALTER TABLE payment_records_v22_new RENAME TO payment_records')
+}
+
+async function snapshotAndRebuildExpenseReimbursementsForF3(
+  db: MigrationDb,
+): Promise<void> {
+  await db.execute('DROP TABLE IF EXISTS f3_legacy_reimbursement_amounts_v22')
+  await db.execute(`
+    CREATE TABLE f3_legacy_reimbursement_amounts_v22 (
+      reimbursement_id TEXT PRIMARY KEY,
+      project_id TEXT,
+      amount REAL,
+      issue_reason TEXT NOT NULL DEFAULT ''
+    )
+  `)
+
+  if (!await f3TableExists(db, 'expense_reimbursements')) {
+    await execScript(db, V22_EXPENSE_REIMBURSEMENTS_TABLE)
+    await db.execute(
+      'ALTER TABLE expense_reimbursements_v22_new RENAME TO expense_reimbursements',
+    )
+    return
+  }
+  if (await columnExists(db, 'expense_reimbursements', 'category'))
+    return
+
+  const available = await f3Columns(db, 'expense_reimbursements')
+  const legacyAmount = f3Column(available, 'amount', 'NULL')
+  const legacyApplicant = f3Column(available, 'applicant', `''`)
+  const legacyDate = available.has('reimbursement_date')
+    ? f3Column(available, 'reimbursement_date', `''`)
+    : f3Column(available, 'date', `''`)
+  await db.execute(`
+    INSERT INTO f3_legacy_reimbursement_amounts_v22 (
+      reimbursement_id, project_id, amount, issue_reason
+    )
+    SELECT
+      id,
+      ${f3Column(available, 'project_id', 'NULL')},
+      ${legacyAmount},
+      CASE
+        WHEN ${legacyAmount} IS NULL OR ${legacyAmount} <= 0
+          THEN 'legacy-missing-or-nonpositive-amount'
+        WHEN TRIM(COALESCE(${legacyApplicant}, '')) = ''
+          OR TRIM(COALESCE(${legacyDate}, '')) = ''
+          THEN 'legacy-incomplete-head'
+        ELSE ''
+      END
+    FROM expense_reimbursements AS legacy
+  `)
+
+  await db.execute('DROP TABLE IF EXISTS expense_reimbursements_v22_new')
+  await execScript(db, V22_EXPENSE_REIMBURSEMENTS_TABLE)
+  await db.execute(`
+    INSERT INTO expense_reimbursements_v22_new (
+      id, no, project_id, applicant, category, reimbursement_date,
+      invoice_count, reason, status, note, external_ref,
+      created_at, updated_at, deleted_at
+    )
+    SELECT
+      ${f3Column(available, 'id', `''`)},
+      COALESCE(${f3Column(available, 'no', `''`)}, ''),
+      NULLIF(${f3Column(available, 'project_id', 'NULL')}, ''),
+      COALESCE(${f3Column(available, 'applicant', `''`)}, ''),
+      COALESCE(${f3Column(available, 'category', `''`)}, ''),
+      COALESCE(
+        NULLIF(${f3Column(available, 'reimbursement_date', `''`)}, ''),
+        ${f3Column(available, 'date', `''`)},
+        ''
+      ),
+      MAX(COALESCE(${f3Column(available, 'invoice_count', '0')}, 0), 0),
+      COALESCE(${f3Column(available, 'reason', `''`)}, ''),
+      COALESCE(NULLIF(${f3Column(available, 'status', `''`)}, ''), 'submitted'),
+      COALESCE(${f3Column(available, 'note', `''`)}, ''),
+      COALESCE(${f3Column(available, 'external_ref', `''`)}, ''),
+      COALESCE(${f3Column(available, 'created_at', `datetime('now')`)}, datetime('now')),
+      COALESCE(${f3Column(available, 'updated_at', f3Column(available, 'created_at', `datetime('now')`))}, datetime('now')),
+      ${f3Column(available, 'deleted_at', 'NULL')}
+    FROM expense_reimbursements AS legacy
+  `)
+  await db.execute('DROP TABLE expense_reimbursements')
+  await db.execute(
+    'ALTER TABLE expense_reimbursements_v22_new RENAME TO expense_reimbursements',
+  )
+}
+
+async function migrateF3ChildFacts(db: MigrationDb): Promise<void> {
+  await execScript(db, V22_F3_CHILD_TABLES)
+  await db.execute(`
+    INSERT OR IGNORE INTO reconciliation_issues (
+      id, import_batch_id, project_id, entity_type, entity_id, field_name,
+      source_value, metric_key, source_ref, excel_value, system_value,
+      difference, attribution
+    )
+    SELECT
+      'f3_payment_link_' || link.payment_record_id,
+      ?,
+      COALESCE(payment.project_id, application.project_id),
+      'payment_records',
+      link.payment_record_id,
+      'payment_application_id',
+      COALESCE(link.payment_application_id, ''),
+      'payment_records.payment_application_id',
+      'schema:v22:payment_records:' || link.payment_record_id,
+      link.allocated_amount,
+      0,
+      link.allocated_amount,
+      CASE
+        WHEN payment.id IS NULL THEN 'legacy-orphan-payment-record'
+        WHEN application.id IS NULL THEN 'legacy-orphan-payment-application'
+        ELSE 'legacy-nonpositive-payment-allocation'
+      END
+    FROM f3_legacy_payment_links_v22 AS link
+    LEFT JOIN payment_records AS payment
+      ON payment.id = link.payment_record_id
+    LEFT JOIN payment_applications AS application
+      ON application.id = link.payment_application_id
+    WHERE payment.id IS NULL
+       OR application.id IS NULL
+       OR link.allocated_amount <= 0
+  `, [F3_IMPORT_BATCH_ID])
+  await db.execute(`
+    INSERT OR IGNORE INTO payment_record_application_allocations (
+      id, payment_record_id, payment_application_id, allocated_amount, note
+    )
+    SELECT
+      'f3_legacy_payment_allocation_' || link.payment_record_id,
+      link.payment_record_id,
+      link.payment_application_id,
+      link.allocated_amount,
+      'v22 由旧单一付款申请引用迁移'
+    FROM f3_legacy_payment_links_v22 AS link
+    JOIN payment_records AS payment
+      ON payment.id = link.payment_record_id
+    JOIN payment_applications AS application
+      ON application.id = link.payment_application_id
+    WHERE link.allocated_amount > 0
+  `)
+  await db.execute(`
+    INSERT OR IGNORE INTO expense_reimbursement_lines (
+      id, reimbursement_id, expense_item, amount, note
+    )
+    SELECT
+      'f3_legacy_reimbursement_line_' || legacy.reimbursement_id,
+      legacy.reimbursement_id,
+      '迁移汇总',
+      legacy.amount,
+      'v22 由旧报销头金额迁移；后续人工拆分明细'
+    FROM f3_legacy_reimbursement_amounts_v22 AS legacy
+    JOIN expense_reimbursements AS reimbursement
+      ON reimbursement.id = legacy.reimbursement_id
+    WHERE legacy.amount > 0
+  `)
+  await db.execute(`
+    INSERT OR IGNORE INTO reconciliation_issues (
+      id, import_batch_id, project_id, entity_type, entity_id, field_name,
+      source_value, metric_key, source_ref, excel_value, system_value,
+      difference, attribution
+    )
+    SELECT
+      'f3_reimbursement_amount_' || legacy.reimbursement_id,
+      ?,
+      legacy.project_id,
+      'expense_reimbursements',
+      legacy.reimbursement_id,
+      'amount',
+      CAST(COALESCE(legacy.amount, 0) AS TEXT),
+      'expense_reimbursements.amount',
+      'schema:v22:expense_reimbursements:' || legacy.reimbursement_id,
+      COALESCE(legacy.amount, 0),
+      CASE WHEN legacy.amount > 0 THEN legacy.amount ELSE 0 END,
+      0,
+      CASE
+        WHEN legacy.issue_reason <> '' THEN legacy.issue_reason
+        ELSE 'legacy-head-to-line'
+      END
+    FROM f3_legacy_reimbursement_amounts_v22 AS legacy
+  `, [F3_IMPORT_BATCH_ID])
+  await db.execute('DROP TABLE f3_legacy_payment_links_v22')
+  await db.execute('DROP TABLE f3_legacy_reimbursement_amounts_v22')
+}
+
+async function migrateF3FinanceForms(db: MigrationDb): Promise<void> {
+  await db.execute('PRAGMA foreign_keys = OFF')
+  let transactionStarted = false
+  try {
+    await db.execute('BEGIN IMMEDIATE')
+    transactionStarted = true
+    await db.execute(`
+      INSERT INTO import_batches (
+        id, project_id, source_file, source_hash, status, completed_at
+      )
+      VALUES (?, NULL, 'schema:v22', 'f3-finance-forms-reconciliation', 'running', NULL)
+      ON CONFLICT(id) DO UPDATE SET
+        status = 'running',
+        completed_at = NULL
+    `, [F3_IMPORT_BATCH_ID])
+
+    await rebuildReceiptRegistrationsForF3(db)
+    await rebuildInvoiceApplicationsForF3(db)
+    await migrateCurrentTransactionsForF3(db)
+    await snapshotLegacyPaymentFactsForF3(db)
+    await rebuildPaymentApplicationsForF3(db)
+    await rebuildPaymentRecordsForF3(db)
+    await snapshotAndRebuildExpenseReimbursementsForF3(db)
+    await migrateF3ChildFacts(db)
+    const [indexSql, ...triggerSql] = V22_F3_INDEXES_AND_TRIGGERS
+      .split(/\n(?=CREATE TRIGGER)/)
+    await execScript(db, indexSql ?? '')
+    for (const trigger of triggerSql)
+      await db.execute(trigger.trim())
+
+    const foreignKeyIssues = await db.select<{ table: string }>(
+      'PRAGMA foreign_key_check',
+    )
+    if (foreignKeyIssues.length > 0)
+      throw new Error('[db] F3 迁移后存在无效外键')
+
+    await db.execute(`
+      UPDATE import_batches
+      SET status = 'completed', completed_at = datetime('now')
+      WHERE id = ?
+    `, [F3_IMPORT_BATCH_ID])
+    await db.execute('COMMIT')
+    transactionStarted = false
+  }
+  catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.execute('ROLLBACK')
+      }
+      catch {
+        // 保留原始迁移错误。
+      }
+    }
+    throw error
+  }
+  finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
+}
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -2630,6 +3685,13 @@ export const migrations: Migration[] = [
     name: 'f2-canonical-contracts-settlements',
     async up(db) {
       await migrateF2ContractsAndSettlements(db)
+    },
+  },
+  {
+    version: 22,
+    name: 'f3-finance-forms-reconciliation',
+    async up(db) {
+      await migrateF3FinanceForms(db)
     },
   },
 ]

@@ -1,0 +1,460 @@
+<script setup lang="ts">
+import type {
+  F3FormKind,
+  F3SaveAction,
+} from '~/lib/finance/forms'
+import type { FinancePageDraft } from '~/lib/finance/page'
+import type {
+  FormFooterAction,
+} from '~/lib/master-data/page'
+import { onBeforeRouteLeave } from 'vue-router'
+import {
+  listFinanceFormAttachments,
+  loadFinanceForm,
+} from '~/lib/finance/forms'
+import {
+  F3_FORM_META,
+  f3FormDefaults,
+  financeFormPath,
+  PAYMENT_BIZ_TYPES,
+  validateFinanceForm,
+} from '~/lib/finance/page'
+import { deriveKey } from '~/lib/tabs/tab-machine'
+import { toErrorMessage } from '~/lib/util/error'
+
+const props = defineProps<{
+  kind: F3FormKind
+}>()
+
+const route = useRoute()
+const financeStore = useFinanceStore()
+const tabsStore = useTabsStore()
+const { confirm, success, warning, error } = useKitUI()
+const {
+  attachments,
+  pendingAttachments,
+  pendingRemoveIds,
+  pendingRestoreIds,
+  desktopAttachmentPicker,
+  dirty: attachmentDirty,
+  reset: resetAttachments,
+  clearPending: clearPendingAttachments,
+  changes: attachmentChanges,
+  handleFiles,
+  pickNativeFiles,
+  toggleExisting: toggleExistingAttachment,
+  removePending,
+  patchPending,
+} = useFinanceFormAttachments(toRef(props, 'kind'))
+
+const meta = computed(() => F3_FORM_META[props.kind])
+const routeId = computed(() => {
+  const value = route.params.id
+  return Array.isArray(value) ? value[0] : value
+})
+const isEditing = computed(() => Boolean(routeId.value))
+const pageFullPath = route.fullPath
+const pageKey = deriveKey(pageFullPath)
+const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · ${meta.value.label}`)
+useTabTitle(title)
+
+const draft = ref<FinancePageDraft>(f3FormDefaults(props.kind) as FinancePageDraft)
+const fieldErrors = shallowRef<Record<string, string>>({})
+const loading = shallowRef(false)
+const loadingAction = shallowRef<FormFooterAction | 'confirmPayment' | 'unconfirmPayment' | null>(null)
+const closeAfterSave = shallowRef(true)
+const savedSnapshot = shallowRef('')
+const paymentTypeSelected = shallowRef(false)
+let allowLeave = false
+
+const dirty = computed(() =>
+  JSON.stringify(draft.value) !== savedSnapshot.value
+  || attachmentDirty.value,
+)
+const isConfirmedPayment = computed(() =>
+  props.kind === 'payment_record' && draft.value.confirmationStatus === 'confirmed',
+)
+const footerLoadingAction = computed<FormFooterAction | null>(() =>
+  loadingAction.value === 'confirmPayment' || loadingAction.value === 'unconfirmPayment'
+    ? null
+    : loadingAction.value,
+)
+const showPaymentTypeStep = computed(() =>
+  props.kind === 'payment_application' && !isEditing.value && !paymentTypeSelected.value,
+)
+const fetchProjects = financeStore.searchProjects
+const fetchCustomers = financeStore.searchCustomers
+const fetchSuppliers = financeStore.searchSuppliers
+
+function fetchIncomeContracts(keyword: string) {
+  return financeStore.searchContracts(
+    draft.value.projectId ?? null,
+    ['施工'],
+    keyword,
+  )
+}
+
+function fetchExpenseContracts(keyword: string) {
+  return financeStore.searchContracts(
+    draft.value.projectId ?? null,
+    ['分包', '材采', '其他支出'],
+    keyword,
+  )
+}
+
+function fetchSettlements(keyword: string) {
+  return financeStore.searchSettlements(
+    draft.value.projectId ?? null,
+    draft.value.contractId ?? null,
+    keyword,
+  )
+}
+
+function fetchInvoices(keyword: string) {
+  return financeStore.searchInvoices({
+    projectId: draft.value.projectId ?? null,
+    supplierId: draft.value.supplierId ?? null,
+    excludePaymentApplicationId: draft.value.id,
+  }, keyword)
+}
+
+function fetchPaymentApplications(keyword: string) {
+  return financeStore.searchPaymentApplications({
+    projectId: draft.value.projectId ?? null,
+    supplierId: draft.value.supplierId ?? null,
+  }, keyword)
+}
+
+async function initialize() {
+  loading.value = true
+  resetAttachments()
+  try {
+    const id = routeId.value
+    if (!id) {
+      draft.value = f3FormDefaults(props.kind) as FinancePageDraft
+      paymentTypeSelected.value = props.kind !== 'payment_application'
+    }
+    else {
+      const [record, files] = await Promise.all([
+        loadFinanceForm(props.kind, id),
+        listFinanceFormAttachments(props.kind, id, true),
+      ])
+      if (!record) {
+        error(`${meta.value.label}不存在或已删除`)
+        allowLeave = true
+        await navigateTo(meta.value.listPath)
+        return
+      }
+      draft.value = {
+        ...f3FormDefaults(props.kind),
+        ...record,
+      } as FinancePageDraft
+      resetAttachments(files)
+      paymentTypeSelected.value = true
+    }
+    fieldErrors.value = {}
+    await nextTick()
+    savedSnapshot.value = JSON.stringify(draft.value)
+  }
+  catch (cause) {
+    error(`载入失败：${toErrorMessage(cause)}`)
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function patchDraft(patch: Partial<FinancePageDraft>) {
+  draft.value = { ...draft.value, ...patch }
+  if (
+    props.kind === 'invoice_application'
+    && typeof patch.customerId === 'string'
+  ) {
+    void financeStore.loadCustomerSnapshot(patch.customerId).then((customer) => {
+      if (!customer || draft.value.customerId !== patch.customerId)
+        return
+      draft.value = {
+        ...draft.value,
+        buyerNameSnapshot: customer.name,
+        buyerTaxNoSnapshot: customer.taxNo,
+      }
+    })
+  }
+}
+
+function selectPaymentType(bizType: string) {
+  patchDraft({
+    bizType,
+    ...(bizType === '公司付款'
+      ? { projectId: null, contractId: null, settlementAllocations: [] }
+      : {}),
+  })
+  paymentTypeSelected.value = true
+}
+
+function clearFieldError(field: string) {
+  if (!fieldErrors.value[field])
+    return
+  const next = { ...fieldErrors.value }
+  delete next[field]
+  fieldErrors.value = next
+}
+
+function validateRequired(action: F3SaveAction): boolean {
+  const errors = validateFinanceForm(props.kind, draft.value, action)
+  fieldErrors.value = errors
+  const messages = Object.values(errors)
+  if (messages.length)
+    warning(`${messages[0]}（共 ${messages.length} 处）`)
+  return messages.length === 0
+}
+
+async function persist(action: F3SaveAction, footerAction?: FormFooterAction) {
+  if (action !== 'draft' && !validateRequired(action))
+    return
+  loadingAction.value = footerAction
+    ?? (action === 'confirm' ? 'confirmPayment' : action === 'draft' ? 'draft' : 'saveSubmit')
+  try {
+    const result = await financeStore.saveForm(
+      props.kind,
+      draft.value,
+      action,
+      attachmentChanges(),
+    )
+    success(
+      action === 'draft'
+        ? '草稿已保存'
+        : action === 'confirm'
+          ? '支付已人工确认并计入资金汇总'
+          : action === 'save'
+            ? '保存成功'
+            : props.kind === 'payment_record'
+              ? '已保存，等待人工核对'
+              : '已保存并提交',
+    )
+    clearPendingAttachments()
+    fieldErrors.value = {}
+    if (footerAction === 'saveNew') {
+      allowLeave = true
+      if (routeId.value)
+        await navigateTo(meta.value.newPath, { replace: true })
+      draft.value = f3FormDefaults(props.kind) as FinancePageDraft
+      resetAttachments()
+      paymentTypeSelected.value = props.kind !== 'payment_application'
+      await nextTick()
+      savedSnapshot.value = JSON.stringify(draft.value)
+      allowLeave = false
+      return
+    }
+    if (closeAfterSave.value && (footerAction === 'save' || footerAction === 'saveSubmit')) {
+      allowLeave = true
+      tabsStore.close(pageKey)
+      await navigateTo(meta.value.listPath)
+      return
+    }
+    allowLeave = true
+    await navigateTo(financeFormPath(props.kind, result.id), { replace: true })
+    await initialize()
+    allowLeave = false
+  }
+  catch (cause) {
+    error(`保存失败：${toErrorMessage(cause)}`)
+  }
+  finally {
+    loadingAction.value = null
+  }
+}
+
+async function handleFooterAction(action: FormFooterAction) {
+  if (action === 'cancel') {
+    await leaveToList()
+    return
+  }
+  const saveAction: F3SaveAction = action === 'draft'
+    ? 'draft'
+    : action === 'saveSubmit'
+      ? 'submit'
+      : 'save'
+  await persist(saveAction, action)
+}
+
+async function confirmPayment() {
+  if (!validateRequired('confirm'))
+    return
+  const accepted = await confirm({
+    variant: 'simple',
+    title: '人工确认支付',
+    message: '确认金额、日期、收款方、银行流水、回单和付款申请分摊均已人工核对？确认后将进入资金与合同已付汇总。',
+    confirmLabel: '确认支付',
+  })
+  if (accepted)
+    await persist('confirm')
+}
+
+async function unconfirmPayment() {
+  const id = routeId.value
+  if (!id)
+    return
+  const accepted = await confirm({
+    variant: 'simple',
+    title: '撤回支付确认',
+    message: '撤回后该笔支付立即退出项目资金、合同已付和付款申请累计已付。',
+    confirmLabel: '撤回确认',
+  })
+  if (!accepted)
+    return
+  loadingAction.value = 'unconfirmPayment'
+  try {
+    await financeStore.unconfirmPayment(id)
+    success('已撤回支付确认')
+    await initialize()
+  }
+  catch (cause) {
+    error(`撤回失败：${toErrorMessage(cause)}`)
+  }
+  finally {
+    loadingAction.value = null
+  }
+}
+
+async function leaveToList() {
+  if (dirty.value) {
+    const accepted = await confirm({
+      variant: 'simple',
+      title: '放弃修改',
+      message: '当前表单还有未保存内容，确认放弃并返回列表？',
+      confirmLabel: '放弃修改',
+    })
+    if (!accepted)
+      return
+  }
+  allowLeave = true
+  tabsStore.close(pageKey)
+  await navigateTo(meta.value.listPath)
+}
+
+onBeforeRouteLeave(async () => {
+  if (allowLeave || !dirty.value)
+    return true
+  if (tabsStore.tabs.some(tab => tab.key === pageKey))
+    return true
+  const accepted = await confirm({
+    variant: 'simple',
+    title: '放弃修改',
+    message: '当前表单还有未保存内容，确认离开？',
+    confirmLabel: '放弃修改',
+  })
+  return accepted
+})
+
+onMounted(() => void initialize())
+</script>
+
+<template>
+  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
+    <aside
+      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
+      aria-label="表单分区"
+    >
+      <a
+        v-for="section in meta.sections"
+        :key="section.key"
+        :href="`#section-${section.key}`"
+        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
+      >
+        {{ section.label }}
+      </a>
+    </aside>
+
+    <main class="min-w-0 flex-1">
+      <FinancePaymentTypeStep
+        v-if="showPaymentTypeStep"
+        :biz-types="PAYMENT_BIZ_TYPES"
+        @back="leaveToList"
+        @select="selectPaymentType"
+      />
+
+      <header v-if="!showPaymentTypeStep" class="mb-4 flex flex-wrap items-start gap-3">
+        <div>
+          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
+            <span class="i-lucide-arrow-left" aria-hidden="true" />
+            返回{{ meta.label }}
+          </button>
+          <h1 class="text-20px font-800 text-ink">
+            {{ title }}
+          </h1>
+          <p class="mt-1 text-12px text-ink-faint">
+            {{ meta.subtitle }}；草稿允许缺项，提交时由领域 action 校验真实关联。
+          </p>
+        </div>
+        <div v-if="kind === 'payment_record'" class="ml-auto flex items-center gap-2">
+          <span class="chip" :class="isConfirmedPayment ? 'chip-ok' : 'chip-brand'">
+            {{ isConfirmedPayment ? '已人工确认' : draft.confirmationStatus === 'needs_review' ? '待核对' : '草稿' }}
+          </span>
+          <KitButton
+            v-if="isConfirmedPayment"
+            variant="secondary"
+            :loading="loadingAction === 'unconfirmPayment'"
+            data-testid="unconfirm-payment"
+            @click="unconfirmPayment"
+          >
+            撤回确认
+          </KitButton>
+          <KitButton
+            v-else
+            :loading="loadingAction === 'confirmPayment'"
+            data-testid="confirm-payment"
+            @click="confirmPayment"
+          >
+            人工确认支付
+          </KitButton>
+        </div>
+      </header>
+
+      <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
+        正在载入表单…
+      </div>
+      <form v-else-if="!showPaymentTypeStep" class="flex flex-col gap-4" data-testid="finance-form" @submit.prevent>
+        <FinanceFormFields
+          :kind="kind"
+          :draft="draft"
+          :field-errors="fieldErrors"
+          :fetch-projects="fetchProjects"
+          :fetch-customers="fetchCustomers"
+          :fetch-suppliers="fetchSuppliers"
+          :fetch-income-contracts="fetchIncomeContracts"
+          :fetch-expense-contracts="fetchExpenseContracts"
+          :fetch-settlements="fetchSettlements"
+          :fetch-invoices="fetchInvoices"
+          :fetch-payment-applications="fetchPaymentApplications"
+          @patch="patchDraft"
+          @clear-error="clearFieldError"
+        />
+
+        <FileRefAttachmentSection
+          :attachments="attachments"
+          :pending-attachments="pendingAttachments"
+          :pending-remove-ids="pendingRemoveIds"
+          :pending-restore-ids="pendingRestoreIds"
+          :desktop-picker="desktopAttachmentPicker"
+          :title="kind === 'payment_record' ? '付款回单与备注' : '附件与备注'"
+          :note="draft.note ?? ''"
+          @pick-native="pickNativeFiles"
+          @files="handleFiles"
+          @toggle-existing="toggleExistingAttachment"
+          @remove-pending="removePending"
+          @patch-pending="patchPending"
+          @update-note="patchDraft({ note: $event })"
+        />
+
+        <FormFooter
+          v-model="closeAfterSave"
+          :dirty="dirty"
+          close-after-save
+          :loading-action="footerLoadingAction"
+          @action="handleFooterAction"
+        />
+      </form>
+    </main>
+  </div>
+</template>

@@ -1,0 +1,448 @@
+import type {
+  F3FormDraft,
+  F3FormKind,
+  F3SaveAction,
+  FinanceFormRecordMap,
+} from '~/lib/finance/forms'
+import type { FileRefChanges } from '~/lib/forms/file-refs'
+import type { LookupOption } from '~/lib/kit/lookup'
+import { defineStore } from 'pinia'
+import { readonly, shallowRef } from 'vue'
+import { select } from '~/lib/db/connection'
+import {
+  hiddenCtesFor,
+  selectVisibleSql,
+  visibleCond,
+} from '~/lib/db/soft-delete'
+import {
+  loadFinanceForm,
+  saveFinanceForm,
+  unconfirmPaymentRecord,
+} from '~/lib/finance/forms'
+
+type FinanceRecord = FinanceFormRecordMap[F3FormKind]
+
+export interface FinanceListRow {
+  id: string
+  no: string
+  name: string
+  projectName: string
+  partyName: string
+  amount: number
+  date: string
+  status: string
+}
+
+type FinanceLookupTable = 'projects' | 'customers' | 'suppliers'
+
+function mapListRows(source: Array<Record<string, unknown>>): FinanceListRow[] {
+  return source.map(row => ({
+    id: String(row.id),
+    no: String(row.no ?? ''),
+    name: String(row.display_name ?? ''),
+    projectName: String(row.project_name ?? ''),
+    partyName: String(row.party_name ?? ''),
+    amount: Number(row.display_amount) || 0,
+    date: String(row.display_date ?? ''),
+    status: String(row.display_status ?? ''),
+  }))
+}
+
+export const useFinanceStore = defineStore('finance', () => {
+  const records = shallowRef<Partial<Record<F3FormKind, FinanceRecord[]>>>({})
+  const listRows = shallowRef<Partial<Record<F3FormKind, FinanceListRow[]>>>({})
+  const loading = shallowRef(false)
+
+  function byId<K extends F3FormKind>(
+    kind: K,
+    id: string,
+  ): FinanceFormRecordMap[K] | undefined {
+    return records.value[kind]?.find(record => record.id === id) as
+      | FinanceFormRecordMap[K]
+      | undefined
+  }
+
+  async function loadOne<K extends F3FormKind>(
+    kind: K,
+    id: string,
+  ): Promise<FinanceFormRecordMap[K] | null> {
+    loading.value = true
+    try {
+      const record = await loadFinanceForm(kind, id)
+      if (!record)
+        return null
+      const current = records.value[kind] ?? []
+      records.value = {
+        ...records.value,
+        [kind]: [
+          record,
+          ...current.filter(item => item.id !== id),
+        ],
+      }
+      return record
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function saveForm<K extends F3FormKind>(
+    kind: K,
+    draft: F3FormDraft,
+    action: F3SaveAction,
+    attachments: FileRefChanges = {},
+  ) {
+    loading.value = true
+    try {
+      const result = await saveFinanceForm(kind, draft, action, attachments)
+      await loadOne(kind, result.id)
+      return result
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function unconfirmPayment(id: string) {
+    loading.value = true
+    try {
+      await unconfirmPaymentRecord(id)
+      await loadOne('payment_record', id)
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function loadList(kind: F3FormKind) {
+    loading.value = true
+    try {
+      let result: Array<Record<string, unknown>>
+      switch (kind) {
+        case 'receipt':
+          result = await select(`
+            ${hiddenCtesFor('receipt_registrations')}
+            SELECT receipt.id, receipt.no,
+                   COALESCE(customer.name, receipt.payer_account, '') AS display_name,
+                   COALESCE(project.name, '') AS project_name,
+                   COALESCE(contract.name, '') AS party_name,
+                   receipt.amount AS display_amount,
+                   receipt.receipt_date AS display_date,
+                   receipt.status AS display_status
+            FROM receipt_registrations AS receipt
+            LEFT JOIN projects AS project ON project.id = receipt.project_id
+            LEFT JOIN customers AS customer ON customer.id = receipt.customer_id
+            LEFT JOIN contracts AS contract ON contract.id = receipt.contract_id
+            WHERE ${visibleCond('receipt_registrations', 'receipt')}
+            ORDER BY receipt.created_at DESC
+          `)
+          break
+        case 'invoice_application':
+          result = await select(`
+            ${hiddenCtesFor('invoice_applications')}
+            SELECT application.id, application.no,
+                   application.name AS display_name,
+                   COALESCE(project.name, '') AS project_name,
+                   application.buyer_name_snapshot AS party_name,
+                   application.amount + application.tax_amount AS display_amount,
+                   application.application_date AS display_date,
+                   application.status AS display_status
+            FROM invoice_applications AS application
+            LEFT JOIN projects AS project ON project.id = application.project_id
+            WHERE ${visibleCond('invoice_applications', 'application')}
+            ORDER BY application.created_at DESC
+          `)
+          break
+        case 'current':
+          result = await select(`
+            ${hiddenCtesFor('current_transactions')}
+            SELECT current_row.id, current_row.no,
+                   current_row.counterparty AS display_name,
+                   COALESCE(project.name, '') AS project_name,
+                   CASE current_row.direction WHEN 'receipt' THEN '收款' ELSE '付款' END AS party_name,
+                   current_row.amount AS display_amount,
+                   current_row.transaction_date AS display_date,
+                   current_row.status AS display_status
+            FROM current_transactions AS current_row
+            LEFT JOIN projects AS project ON project.id = current_row.project_id
+            WHERE ${visibleCond('current_transactions', 'current_row')}
+            ORDER BY current_row.created_at DESC
+          `)
+          break
+        case 'reimbursement':
+          result = await select(`
+            ${hiddenCtesFor('expense_reimbursements', 'expense_reimbursement_lines')}
+            SELECT reimbursement.id, reimbursement.no,
+                   reimbursement.applicant AS display_name,
+                   COALESCE(project.name, '公司开支') AS project_name,
+                   reimbursement.category AS party_name,
+                   COALESCE((
+                     SELECT SUM(line.amount)
+                     FROM expense_reimbursement_lines AS line
+                     WHERE line.reimbursement_id = reimbursement.id
+                       AND ${visibleCond('expense_reimbursement_lines', 'line')}
+                   ), 0) AS display_amount,
+                   reimbursement.reimbursement_date AS display_date,
+                   reimbursement.status AS display_status
+            FROM expense_reimbursements AS reimbursement
+            LEFT JOIN projects AS project ON project.id = reimbursement.project_id
+            WHERE ${visibleCond('expense_reimbursements', 'reimbursement')}
+            ORDER BY reimbursement.created_at DESC
+          `)
+          break
+        case 'payment_application':
+          result = await select(`
+            ${hiddenCtesFor('payment_applications')}
+            SELECT application.id, application.no,
+                   application.name AS display_name,
+                   COALESCE(project.name, '公司付款') AS project_name,
+                   COALESCE(supplier.name, application.biz_type) AS party_name,
+                   application.apply_amount AS display_amount,
+                   application.apply_date AS display_date,
+                   application.status AS display_status
+            FROM payment_applications AS application
+            LEFT JOIN projects AS project ON project.id = application.project_id
+            LEFT JOIN suppliers AS supplier ON supplier.id = application.supplier_id
+            WHERE ${visibleCond('payment_applications', 'application')}
+            ORDER BY application.created_at DESC
+          `)
+          break
+        case 'payment_record':
+          result = await select(`
+            ${hiddenCtesFor('payment_records')}
+            SELECT payment.id, payment.no,
+                   payment.payee_name AS display_name,
+                   COALESCE(project.name, '公司付款') AS project_name,
+                   payment.purpose AS party_name,
+                   payment.amount AS display_amount,
+                   payment.payment_date AS display_date,
+                   CASE payment.confirmation_status
+                     WHEN 'confirmed' THEN '已确认'
+                     WHEN 'needs_review' THEN '待核对'
+                     ELSE '草稿'
+                   END AS display_status
+            FROM payment_records AS payment
+            LEFT JOIN projects AS project ON project.id = payment.project_id
+            WHERE ${visibleCond('payment_records', 'payment')}
+            ORDER BY payment.created_at DESC
+          `)
+          break
+      }
+      listRows.value = {
+        ...listRows.value,
+        [kind]: mapListRows(result),
+      }
+      return listRows.value[kind] ?? []
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function searchLookup(
+    table: FinanceLookupTable,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const rows = await select<{ id: string, name: string }>(
+      selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
+      [`%${keyword.trim()}%`],
+    )
+    return rows.map(row => ({ id: row.id, label: row.name }))
+  }
+
+  const searchProjects = (keyword: string) => searchLookup('projects', keyword)
+  const searchCustomers = (keyword: string) => searchLookup('customers', keyword)
+  const searchSuppliers = (keyword: string) => searchLookup('suppliers', keyword)
+
+  async function searchContracts(
+    projectId: string | null,
+    kinds: string[],
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    if (!projectId)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const placeholders = kinds.map(() => '?').join(', ')
+    const rows = await select<{
+      id: string
+      no: string
+      name: string
+      amount: number
+    }>(selectVisibleSql('contracts', `
+      AND project_id = ?
+      AND kind IN (${placeholders})
+      AND (no LIKE ? OR name LIKE ?)
+      ORDER BY sign_date DESC, created_at DESC
+      LIMIT 50
+    `), [projectId, ...kinds, pattern, pattern])
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: `${row.no || '未编号'} · ¥${Number(row.amount).toFixed(2)}`,
+    }))
+  }
+
+  async function searchSettlements(
+    projectId: string | null,
+    contractId: string | null,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    if (!projectId || !contractId)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const rows = await select<{
+      id: string
+      no: string
+      name: string
+      total_amount: number
+    }>(selectVisibleSql('expenditure_settlements', `
+      AND project_id = ? AND contract_id = ?
+      AND (no LIKE ? OR name LIKE ?)
+      ORDER BY settlement_date DESC, created_at DESC
+      LIMIT 50
+    `), [projectId, contractId, pattern, pattern])
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: `${row.no || '未编号'} · 含税 ¥${Number(row.total_amount).toFixed(2)}`,
+    }))
+  }
+
+  async function searchInvoices(
+    scope: {
+      projectId: string | null
+      supplierId: string | null
+      excludePaymentApplicationId?: string
+    },
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const pattern = `%${keyword.trim()}%`
+    const params: unknown[] = [pattern]
+    const filters = ['invoice.invoice_number LIKE ?']
+    if (scope.projectId) {
+      filters.push('invoice.project_id = ?')
+      params.push(scope.projectId)
+    }
+    if (scope.supplierId) {
+      filters.push('invoice.supplier_id = ?')
+      params.push(scope.supplierId)
+    }
+    const rows = await select<{
+      id: string
+      invoice_number: string
+      invoice_date: string
+      total_amount: number
+      used_amount: number
+    }>(`
+      ${hiddenCtesFor('invoices', 'payment_application_invoice_allocations')}
+      SELECT invoice.id, invoice.invoice_number, invoice.invoice_date,
+             invoice.total_amount,
+             COALESCE((
+               SELECT SUM(allocation.allocated_amount)
+               FROM payment_application_invoice_allocations AS allocation
+               WHERE allocation.invoice_id = invoice.id
+                 AND ${visibleCond('payment_application_invoice_allocations', 'allocation')}
+                 ${scope.excludePaymentApplicationId ? 'AND allocation.payment_application_id <> ?' : ''}
+             ), 0) AS used_amount
+      FROM invoices AS invoice
+      WHERE ${visibleCond('invoices', 'invoice')}
+        AND ${filters.join(' AND ')}
+      ORDER BY invoice.invoice_date DESC, invoice.created_at DESC
+      LIMIT 50
+    `, scope.excludePaymentApplicationId
+      ? [scope.excludePaymentApplicationId, ...params]
+      : params)
+    return rows.map(row => ({
+      id: row.id,
+      label: row.invoice_number || '未编号发票',
+      hint: `${row.invoice_date || '未填日期'} · 剩余 ¥${Math.max(Number(row.total_amount) - Number(row.used_amount), 0).toFixed(2)}`,
+    }))
+  }
+
+  async function searchPaymentApplications(
+    scope: {
+      projectId: string | null
+      supplierId: string | null
+    },
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const pattern = `%${keyword.trim()}%`
+    const filters = ['(application.no LIKE ? OR application.name LIKE ?)']
+    const params: unknown[] = [pattern, pattern]
+    if (scope.projectId) {
+      filters.push('application.project_id = ?')
+      params.push(scope.projectId)
+    }
+    else {
+      filters.push('application.project_id IS NULL')
+    }
+    if (scope.supplierId) {
+      filters.push('application.supplier_id = ?')
+      params.push(scope.supplierId)
+    }
+    const rows = await select<{
+      id: string
+      no: string
+      name: string
+      apply_amount: number
+      paid_amount: number
+    }>(`
+      ${hiddenCtesFor(
+        'payment_applications',
+        'payment_record_application_allocations',
+        'payment_records',
+      )}
+      SELECT application.id, application.no, application.name,
+             application.apply_amount,
+             COALESCE((
+               SELECT SUM(allocation.allocated_amount)
+               FROM payment_record_application_allocations AS allocation
+               JOIN payment_records AS payment
+                 ON payment.id = allocation.payment_record_id
+               WHERE allocation.payment_application_id = application.id
+                 AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+                 AND ${visibleCond('payment_records', 'payment')}
+                 AND payment.confirmation_status = 'confirmed'
+             ), 0) AS paid_amount
+      FROM payment_applications AS application
+      WHERE ${visibleCond('payment_applications', 'application')}
+        AND ${filters.join(' AND ')}
+      ORDER BY application.apply_date DESC, application.created_at DESC
+      LIMIT 50
+    `, params)
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: `${row.no || '未编号'} · 申请 ¥${Number(row.apply_amount).toFixed(2)} · 已付 ¥${Number(row.paid_amount).toFixed(2)}`,
+    }))
+  }
+
+  async function loadCustomerSnapshot(id: string) {
+    const [customer] = await select<{ name: string, tax_no: string }>(
+      selectVisibleSql('customers', 'AND id = ? LIMIT 1'),
+      [id],
+    )
+    return customer
+      ? { name: customer.name, taxNo: customer.tax_no }
+      : null
+  }
+
+  return {
+    records: readonly(records),
+    listRows: readonly(listRows),
+    loading: readonly(loading),
+    byId,
+    loadOne,
+    loadList,
+    searchProjects,
+    searchCustomers,
+    searchSuppliers,
+    searchContracts,
+    searchSettlements,
+    searchInvoices,
+    searchPaymentApplications,
+    loadCustomerSnapshot,
+    saveForm,
+    unconfirmPayment,
+  }
+})

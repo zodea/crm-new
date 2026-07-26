@@ -1,0 +1,247 @@
+<script setup lang="ts">
+import type {
+  InvoiceAllocationDraft,
+  PaymentApplicationAllocationDraft,
+  ReimbursementLineDraft,
+  SettlementAllocationDraft,
+} from '~/lib/finance/forms'
+import type { LookupOption } from '~/lib/kit/lookup'
+import type { KitTableColumn } from '~/lib/kit/table'
+import { useFullscreen } from '@vueuse/core'
+import { computed, shallowRef } from 'vue'
+import KitButton from '~/components/ui/KitButton.vue'
+import KitTable from '~/components/ui/KitTable.vue'
+import LookupSelect from '~/components/ui/LookupSelect.vue'
+
+type GridKind = 'reimbursement' | 'settlement' | 'invoice' | 'payment'
+type GridLine
+  = Partial<ReimbursementLineDraft>
+    & Partial<SettlementAllocationDraft>
+    & Partial<InvoiceAllocationDraft>
+    & Partial<PaymentApplicationAllocationDraft>
+
+const props = defineProps<{
+  kind: GridKind
+  lines: GridLine[]
+  fetchOptions?: (keyword: string) => Promise<LookupOption[]>
+  disabledReason?: string
+  totalLabel: string
+  empty: string
+}>()
+
+const emit = defineEmits<{
+  update: [lines: GridLine[]]
+}>()
+
+const root = shallowRef<HTMLElement | null>(null)
+const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(root)
+const importing = shallowRef(false)
+const tsv = shallowRef('')
+
+const sourceTitle = computed(() => ({
+  reimbursement: '费用项目',
+  settlement: '结算单',
+  invoice: '发票',
+  payment: '付款申请',
+})[props.kind])
+
+const columns = computed<KitTableColumn[]>(() => [
+  { field: 'source', title: sourceTitle.value, minWidth: 240, slot: 'source' },
+  ...(props.kind === 'reimbursement'
+    ? [{ field: 'date', title: '发生日期', width: 150, slot: 'date' } satisfies KitTableColumn]
+    : []),
+  { field: 'amount', title: '金额', width: 160, align: 'right', slot: 'amount' },
+  { field: 'note', title: '备注', minWidth: 180, slot: 'note' },
+  { type: 'action', title: '操作', width: 92, align: 'center', slot: 'action' },
+])
+
+function sourceId(line: GridLine): string | null | undefined {
+  if (props.kind === 'settlement')
+    return line.settlementId
+  if (props.kind === 'invoice')
+    return line.invoiceId
+  return line.paymentApplicationId
+}
+
+function patch(index: number, value: Partial<GridLine>) {
+  emit('update', props.lines.map((line, current) =>
+    current === index ? { ...line, ...value } : line,
+  ))
+}
+
+function patchSource(index: number, value: string | null) {
+  const key = props.kind === 'settlement'
+    ? 'settlementId'
+    : props.kind === 'invoice'
+      ? 'invoiceId'
+      : 'paymentApplicationId'
+  patch(index, { [key]: value } as Partial<GridLine>)
+}
+
+function emptyLine(): GridLine {
+  if (props.kind === 'reimbursement') {
+    return {
+      expenseItem: '',
+      expenseDate: '',
+      amount: 0,
+      note: '',
+    } as GridLine
+  }
+  const key = props.kind === 'settlement'
+    ? 'settlementId'
+    : props.kind === 'invoice'
+      ? 'invoiceId'
+      : 'paymentApplicationId'
+  return {
+    [key]: null,
+    allocatedAmount: 0,
+    note: '',
+  } as GridLine
+}
+
+function add() {
+  emit('update', [...props.lines, emptyLine()])
+}
+
+function copy(index: number) {
+  const next = [...props.lines]
+  next.splice(index + 1, 0, { ...props.lines[index], id: undefined })
+  emit('update', next)
+}
+
+function remove(index: number) {
+  emit('update', props.lines.filter((_, current) => current !== index))
+}
+
+function inputValue(event: Event): string {
+  return (event.target as HTMLInputElement).value
+}
+
+function inputNumber(event: Event): number {
+  return Number((event.target as HTMLInputElement).value) || 0
+}
+
+function importTsv() {
+  const imported = tsv.value
+    .split(/\r?\n/)
+    .filter(line => line.trim())
+    .map((line) => {
+      const [source = '', dateOrAmount = '', amountOrNote = '', note = ''] = line.split('\t')
+      if (props.kind === 'reimbursement') {
+        return {
+          expenseItem: source.trim(),
+          expenseDate: dateOrAmount.trim(),
+          amount: Number(amountOrNote) || 0,
+          note: note.trim(),
+        } as GridLine
+      }
+      const key = props.kind === 'settlement'
+        ? 'settlementId'
+        : props.kind === 'invoice'
+          ? 'invoiceId'
+          : 'paymentApplicationId'
+      return {
+        [key]: source.trim() || null,
+        allocatedAmount: Number(dateOrAmount) || 0,
+        note: amountOrNote.trim(),
+      } as GridLine
+    })
+  emit('update', [...props.lines, ...imported])
+  tsv.value = ''
+  importing.value = false
+}
+</script>
+
+<template>
+  <section
+    ref="root"
+    class="flex min-h-0 flex-col bg-panel"
+    :class="{ 'h-screen p-4': isFullscreen }"
+    data-testid="finance-line-grid"
+  >
+    <div class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+      <span class="font-mono text-12px font-700 text-brand-deep">{{ totalLabel }}</span>
+      <div class="ml-auto flex flex-wrap gap-2">
+        <KitButton size="sm" variant="secondary" data-testid="import-grid-tsv" @click="importing = !importing">
+          <span class="i-lucide-clipboard-paste mr-1" aria-hidden="true" />粘贴导入
+        </KitButton>
+        <KitButton size="sm" variant="secondary" data-testid="toggle-grid-fullscreen" @click="toggleFullscreen">
+          <span :class="isFullscreen ? 'i-lucide-minimize-2' : 'i-lucide-maximize-2'" class="mr-1" aria-hidden="true" />
+          {{ isFullscreen ? '退出全屏' : '全屏' }}
+        </KitButton>
+        <KitButton size="sm" variant="secondary" data-testid="add-grid-line" @click="add">
+          <span class="i-lucide-plus mr-1" aria-hidden="true" />新增行
+        </KitButton>
+      </div>
+    </div>
+
+    <div v-if="importing" class="grid gap-2 border-b border-line bg-surface-2 p-3">
+      <p class="text-12px text-ink-soft">
+        {{ kind === 'reimbursement' ? '每行：费用项目、发生日期、金额、备注' : `每行：${sourceTitle} ID、金额、备注` }}，字段间用 Tab 分隔。
+      </p>
+      <textarea v-model="tsv" rows="4" class="field-input w-full font-mono" data-testid="grid-tsv-input" />
+      <div class="flex justify-end gap-2">
+        <KitButton size="sm" variant="secondary" @click="importing = false">
+          取消
+        </KitButton>
+        <KitButton size="sm" :disabled="!tsv.trim()" data-testid="confirm-grid-import" @click="importTsv">
+          导入
+        </KitButton>
+      </div>
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-auto">
+      <KitTable :columns="columns" :data="lines" :min-rows="3" :empty="empty">
+        <template #source="{ row, rowIndex }">
+          <input
+            v-if="kind === 'reimbursement'"
+            :value="row.expenseItem"
+            class="field-input w-full"
+            :data-testid="`reimbursement-item-${rowIndex}`"
+            @input="patch(rowIndex, { expenseItem: inputValue($event) })"
+          >
+          <LookupSelect
+            v-else
+            :model-value="sourceId(row)"
+            :fetch="fetchOptions!"
+            :recent-key="`finance-${kind}-${rowIndex}`"
+            :disabled-reason="disabledReason"
+            :placeholder="`选择${sourceTitle}`"
+            @update:model-value="patchSource(rowIndex, $event)"
+          />
+        </template>
+        <template #date="{ row, rowIndex }">
+          <input
+            :value="row.expenseDate"
+            type="date"
+            class="field-input w-full"
+            @input="patch(rowIndex, { expenseDate: inputValue($event) })"
+          >
+        </template>
+        <template #amount="{ row, rowIndex }">
+          <input
+            :value="kind === 'reimbursement' ? row.amount : row.allocatedAmount"
+            type="number"
+            min="0"
+            step="0.01"
+            class="field-input w-full text-right font-mono"
+            :aria-label="kind === 'reimbursement' ? '费用金额' : kind === 'settlement' ? '本次关联结算金额' : kind === 'invoice' ? '本次关联发票金额' : '本次支付分摊金额'"
+            :data-testid="kind === 'reimbursement' ? `reimbursement-amount-${rowIndex}` : undefined"
+            @input="patch(rowIndex, kind === 'reimbursement' ? { amount: inputNumber($event) } : { allocatedAmount: inputNumber($event) })"
+          >
+        </template>
+        <template #note="{ row, rowIndex }">
+          <input :value="row.note" class="field-input w-full" @input="patch(rowIndex, { note: inputValue($event) })">
+        </template>
+        <template #action="{ rowIndex }">
+          <button type="button" class="icon-btn" title="复制" :data-testid="`copy-grid-line-${rowIndex}`" @click="copy(rowIndex)">
+            <span class="i-lucide-copy" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn-danger" title="删除" @click="remove(rowIndex)">
+            <span class="i-lucide-trash-2" aria-hidden="true" />
+          </button>
+        </template>
+      </KitTable>
+    </div>
+  </section>
+</template>

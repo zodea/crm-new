@@ -10,7 +10,7 @@ import {
 import { ALL_SCHEMA } from '~/lib/db/schema'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
-/** 基线 schema 的全部业务表（与 schema.ts 四批建表一一对应） */
+/** 全量迁移后的业务表；v22 已用统一往来表取代两张旧表。 */
 const BASELINE_TABLES = [
   'projects',
   'suppliers',
@@ -24,8 +24,7 @@ const BASELINE_TABLES = [
   'expenditure_contracts',
   'invoice_applications',
   'receipt_registrations',
-  'current_receipts',
-  'current_payments',
+  'current_transactions',
   'payment_records',
   'workers',
   'settlements',
@@ -33,6 +32,11 @@ const BASELINE_TABLES = [
   'contract_line_items',
   'ticket_registrations',
   'payment_applications',
+  'expense_reimbursements',
+  'expense_reimbursement_lines',
+  'payment_application_settlement_allocations',
+  'payment_application_invoice_allocations',
+  'payment_record_application_allocations',
   'file_refs',
   'file_payloads',
 ]

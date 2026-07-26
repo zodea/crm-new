@@ -2,7 +2,7 @@ import type { ProjectDetailAggregate } from '~/lib/project/detail-aggregate'
 import type { ProjectInvoiceSummary, ProjectOperationSummary } from '~/lib/project/detail-summary'
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
+import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 import { useInvoiceStore } from '~/stores/invoice'
 
@@ -141,7 +141,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
       return
     loading.value = true
     try {
-      const [contracts, supplements, changes, outgoing, receipts, payments, currentIn, currentOut, aggregates] = await Promise.all([
+      const [contracts, supplements, changes, outgoing, receipts, payments, currentRows, aggregates] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
           ['施工'],
@@ -152,11 +152,34 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         select<Record<string, unknown>>(selectVisibleSql('owner_change_orders', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('invoice_applications', 'ORDER BY created_at DESC')),
         select<Record<string, unknown>>(selectVisibleSql('receipt_registrations', 'ORDER BY created_at DESC')),
-        select<Record<string, unknown>>(selectVisibleSql('payment_applications', 'ORDER BY created_at DESC')),
-        select<Record<string, unknown>>(selectVisibleSql('current_receipts', 'ORDER BY created_at DESC')),
-        select<Record<string, unknown>>(selectVisibleSql('current_payments', 'ORDER BY created_at DESC')),
+        select<Record<string, unknown>>(`
+          ${hiddenCtesFor(
+            'payment_applications',
+            'payment_record_application_allocations',
+            'payment_records',
+          )}
+          SELECT application.*,
+                 COALESCE((
+                   SELECT SUM(allocation.allocated_amount)
+                   FROM payment_record_application_allocations AS allocation
+                   JOIN payment_records AS payment
+                     ON payment.id = allocation.payment_record_id
+                   WHERE allocation.payment_application_id = application.id
+                     AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+                     AND ${visibleCond('payment_records', 'payment')}
+                     AND payment.confirmation_status = 'confirmed'
+                 ), 0) AS derived_paid_amount
+          FROM payment_applications AS application
+          WHERE ${visibleCond('payment_applications', 'application')}
+          ORDER BY application.created_at DESC
+        `),
+        select<Record<string, unknown>>(
+          selectVisibleSql('current_transactions', 'ORDER BY created_at DESC'),
+        ),
         loadProjectDetailAggregates(db),
       ])
+      const currentIn = currentRows.filter(row => row.direction === 'receipt')
+      const currentOut = currentRows.filter(row => row.direction === 'payment')
 
       constructionContracts.value = contracts.map(row => ({
         id: row.id as string,
@@ -196,45 +219,45 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         taxRate: number(row.tax_rate),
         taxAmount: number(row.tax_amount),
         status: (row.status ?? '') as string,
-        invoiceDate: (row.invoice_date ?? '') as string,
+        invoiceDate: (row.application_date ?? '') as string,
       }))
       receiptRegistrations.value = receipts.map(row => ({
         id: row.id as string,
         projectId: row.project_id as string,
-        receiptNo: (row.receipt_no ?? '') as string,
+        receiptNo: (row.no ?? '') as string,
         receiptDate: (row.receipt_date ?? '') as string,
         amount: number(row.amount),
         paymentMethod: (row.payment_method ?? '') as string,
-        payerUnit: (row.payer_unit ?? '') as string,
-        cumulativeReceivable: number(row.cumulative_receivable),
+        payerUnit: (row.payer_account ?? '') as string,
+        cumulativeReceivable: number(row.amount),
       }))
       paymentApplications.value = payments.map(row => ({
         id: row.id as string,
         projectId: row.project_id as string,
-        applicationNo: (row.application_no ?? '') as string,
-        approvalStatus: (row.approval_status ?? '') as string,
+        applicationNo: (row.no ?? '') as string,
+        approvalStatus: (row.status ?? '') as string,
         applicant: (row.applicant ?? '') as string,
-        amount: number(row.amount),
-        paidAmount: number(row.paid_amount),
-        paymentMethod: (row.payment_method ?? '') as string,
-        actualPayment: number(row.actual_payment),
-        acceptor: (row.acceptor ?? '') as string,
+        amount: number(row.apply_amount),
+        paidAmount: number(row.derived_paid_amount),
+        paymentMethod: '',
+        actualPayment: number(row.derived_paid_amount),
+        acceptor: (row.approval_note ?? '') as string,
       }))
       currentReceipts.value = currentIn.map(row => ({
         id: row.id as string,
         projectId: row.project_id as string,
-        receiptNo: (row.receipt_no ?? '') as string,
-        receiptDate: (row.receipt_date ?? '') as string,
+        receiptNo: (row.no ?? '') as string,
+        receiptDate: (row.transaction_date ?? '') as string,
         amount: number(row.amount),
-        payer: (row.payer ?? '') as string,
+        payer: (row.counterparty ?? '') as string,
       }))
       currentPayments.value = currentOut.map(row => ({
         id: row.id as string,
         projectId: row.project_id as string,
-        paymentNo: (row.payment_no ?? '') as string,
-        approvalStatus: (row.approval_status ?? '') as string,
-        paymentDate: (row.payment_date ?? '') as string,
-        payee: (row.payee ?? '') as string,
+        paymentNo: (row.no ?? '') as string,
+        approvalStatus: (row.status ?? '') as string,
+        paymentDate: (row.transaction_date ?? '') as string,
+        payee: (row.counterparty ?? '') as string,
         amount: number(row.amount),
         paymentMethod: (row.payment_method ?? '') as string,
       }))
