@@ -47,11 +47,15 @@ beforeEach(async () => {
   setActivePinia(createPinia())
   await mem.execute(`
     INSERT INTO customers (id, name, status)
-    VALUES ('customer-material', '材料甲方', 'submitted')
+    VALUES
+      ('customer-material', '材料甲方', 'submitted'),
+      ('customer-other', '其他甲方', 'submitted')
   `)
   await mem.execute(`
     INSERT INTO projects (id, name, customer_id, approval_status)
-    VALUES ('project-material', '材料项目', 'customer-material', 'submitted')
+    VALUES
+      ('project-material', '材料项目', 'customer-material', 'submitted'),
+      ('project-other', '其他项目', 'customer-other', 'submitted')
   `)
   await mem.execute(`
     INSERT INTO suppliers (id, name, approval_status)
@@ -65,10 +69,15 @@ beforeEach(async () => {
     INSERT INTO contracts (
       id, no, name, kind, project_id, supplier_id, amount, changed, status
     )
-    VALUES (
-      'contract-material', 'MAT-F4', '材料采购合同', '材采',
-      'project-material', 'supplier-material', 1000, 1000, '履约中'
-    )
+    VALUES
+      (
+        'contract-material', 'MAT-F4', '材料采购合同', '材采',
+        'project-material', 'supplier-material', 1000, 1000, '履约中'
+      ),
+      (
+        'contract-other', 'MAT-OTHER', '其他项目材料合同', '材采',
+        'project-other', 'supplier-material', 2000, 2000, '履约中'
+      )
   `)
 })
 
@@ -256,6 +265,43 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
     const store = useMaterialStore()
     await expect(store.saveForm('mat_requisition', {
       projectId: 'project-material',
+      contractId: 'contract-other',
+      applicant: '张工',
+      requisitionDate: '2026-07-20',
+      materialName: '砂浆',
+      unit: '吨',
+      plannedQty: 1,
+    }, 'post')).rejects.toThrow('材料采购合同不属于所选项目')
+    const otherRequisition = await store.saveForm('mat_requisition', {
+      projectId: 'project-other',
+      contractId: 'contract-other',
+      applicant: '李工',
+      requisitionDate: '2026-07-20',
+      materialName: '砂浆',
+      unit: '吨',
+      plannedQty: 1,
+    }, 'post')
+    await expect(store.saveForm('mat_arrival', {
+      projectId: 'project-material',
+      supplierId: 'supplier-material',
+      requisitionId: otherRequisition.id,
+      warehouse: '中心仓',
+      arrivalDate: '2026-07-20',
+      lines: [{
+        materialName: '砂浆',
+        unit: '吨',
+        qty: 1,
+      }],
+    }, 'post')).rejects.toThrow('关联下料单不属于所选项目')
+    await expect(store.saveForm('owner_control', {
+      projectId: 'project-material',
+      customerId: 'customer-other',
+      materialName: '洁具',
+      unit: '套',
+      controlQty: 2,
+    }, 'post')).rejects.toThrow('甲供单位不属于所选项目')
+    await expect(store.saveForm('mat_requisition', {
+      projectId: 'project-material',
       contractId: null,
       applicant: '张工',
       requisitionDate: '2026-07-20',
@@ -340,6 +386,43 @@ describe('f4 物资事实、派生库存与甲供材总控', () => {
     expect((await getMaterialStockSummary('中心仓', '腻子', '', '包')).availableQty).toBe(8)
     expect(await store.restoreForm('mat_use', use.id)).toBeTruthy()
     expect((await getMaterialStockSummary('中心仓', '腻子', '', '包')).availableQty).toBe(5)
+  })
+
+  it('表单 lookup 由 material store 统一按项目和有效记录过滤', async () => {
+    const store = useMaterialStore()
+    const requisition = await store.saveForm('mat_requisition', {
+      no: 'XL-LOOKUP',
+      projectId: 'project-material',
+      contractId: 'contract-material',
+      applicant: '张工',
+      requisitionDate: '2026-07-20',
+      materialName: '瓷砖',
+      unit: '㎡',
+      plannedQty: 12,
+    }, 'post')
+
+    await expect(store.searchContracts('project-material', '材料')).resolves.toEqual([
+      {
+        id: 'contract-material',
+        label: '材料采购合同',
+        hint: 'MAT-F4',
+      },
+    ])
+    await expect(store.searchContracts('project-other', '材料')).resolves.toEqual([
+      {
+        id: 'contract-other',
+        label: '其他项目材料合同',
+        hint: 'MAT-OTHER',
+      },
+    ])
+    await expect(store.searchRequisitions('project-material', '瓷砖')).resolves.toEqual([
+      {
+        id: requisition.id,
+        label: 'XL-LOOKUP · 瓷砖',
+        hint: '计划 12 ㎡',
+      },
+    ])
+    await expect(store.searchRequisitions('project-other', '瓷砖')).resolves.toEqual([])
   })
 
   it('附件失败会原子回滚单头、明细和操作日志', async () => {

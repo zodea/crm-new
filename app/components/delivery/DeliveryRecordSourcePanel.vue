@@ -120,6 +120,7 @@ function rotate(delta: number) {
 }
 
 watch(() => props.recordId, loadSourceFile, { immediate: true })
+onActivated(loadSourceFile)
 </script>
 
 <template>

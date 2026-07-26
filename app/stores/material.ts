@@ -1,4 +1,5 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
+import type { LookupOption } from '~/lib/kit/lookup'
 import type {
   MaterialFormDraft,
   MaterialFormKind,
@@ -7,6 +8,8 @@ import type {
 } from '~/lib/material/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
+import { select } from '~/lib/db/connection'
+import { selectVisibleSql } from '~/lib/db/soft-delete'
 import {
   deleteMaterialForm,
   getMaterialStockSummary,
@@ -19,6 +22,7 @@ import {
 } from '~/lib/material/forms'
 
 type MaterialRecord = MaterialFormRecordMap[MaterialFormKind]
+type MaterialLookupTable = 'projects' | 'customers' | 'suppliers' | 'crews'
 
 export const useMaterialStore = defineStore('material', () => {
   const records = shallowRef<Partial<Record<MaterialFormKind, MaterialRecord[]>>>({})
@@ -130,6 +134,73 @@ export const useMaterialStore = defineStore('material', () => {
     }
   }
 
+  async function searchLookup(
+    table: MaterialLookupTable,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    const rows = await select<{ id: string, name: string }>(
+      selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
+      [`%${keyword.trim()}%`],
+    )
+    return rows.map(row => ({ id: row.id, label: row.name }))
+  }
+
+  const searchProjects = (keyword: string) => searchLookup('projects', keyword)
+  const searchCustomers = (keyword: string) => searchLookup('customers', keyword)
+  const searchSuppliers = (keyword: string) => searchLookup('suppliers', keyword)
+  const searchCrews = (keyword: string) => searchLookup('crews', keyword)
+
+  async function searchContracts(
+    projectId: string | null,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    if (!projectId)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const rows = await select<{
+      id: string
+      no: string
+      name: string
+    }>(selectVisibleSql('contracts', `
+      AND kind = '材采'
+      AND project_id = ?
+      AND (no LIKE ? OR name LIKE ?)
+      ORDER BY sign_date DESC, created_at DESC
+      LIMIT 50
+    `), [projectId, pattern, pattern])
+    return rows.map(row => ({
+      id: row.id,
+      label: row.name,
+      hint: row.no || '未编号',
+    }))
+  }
+
+  async function searchRequisitions(
+    projectId: string | null,
+    keyword: string,
+  ): Promise<LookupOption[]> {
+    if (!projectId)
+      return []
+    const pattern = `%${keyword.trim()}%`
+    const rows = await select<{
+      id: string
+      no: string
+      material_name: string
+      planned_qty: number
+      unit: string
+    }>(selectVisibleSql('material_requisitions', `
+      AND project_id = ?
+      AND (no LIKE ? OR material_name LIKE ?)
+      ORDER BY requisition_date DESC, created_at DESC
+      LIMIT 50
+    `), [projectId, pattern, pattern])
+    return rows.map(row => ({
+      id: row.id,
+      label: `${row.no || '未编号'} · ${row.material_name}`,
+      hint: `计划 ${Number(row.planned_qty)} ${row.unit}`,
+    }))
+  }
+
   return {
     records: readonly(records),
     loading: readonly(loading),
@@ -140,6 +211,12 @@ export const useMaterialStore = defineStore('material', () => {
     saveAttachments,
     removeForm,
     restoreForm,
+    searchProjects,
+    searchCustomers,
+    searchSuppliers,
+    searchCrews,
+    searchContracts,
+    searchRequisitions,
     getMaterialStockSummary,
     getOwnerMaterialSummary,
   }

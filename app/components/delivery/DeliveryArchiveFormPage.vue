@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
-import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type { DeliveryLineDraft, DeliveryRecordInput } from '~/stores/delivery-record'
 import { onBeforeRouteLeave } from 'vue-router'
-import { select } from '~/lib/db/connection'
-import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -17,6 +14,7 @@ interface EditableDeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amoun
 
 const route = useRoute()
 const store = useDeliveryRecordStore()
+const materialStore = useMaterialStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
@@ -50,20 +48,8 @@ let allowLeave = false
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value)
 
-async function lookup(
-  table: 'projects' | 'suppliers',
-  keyword: string,
-): Promise<LookupOption[]> {
-  const pattern = `%${keyword.trim()}%`
-  const rows = await select<{ id: string, name: string }>(
-    selectVisibleSql(table, 'AND name LIKE ? ORDER BY name LIMIT 50'),
-    [pattern],
-  )
-  return rows.map(row => ({ id: row.id, label: row.name }))
-}
-
-const fetchProjects = (keyword: string) => lookup('projects', keyword)
-const fetchSuppliers = (keyword: string) => lookup('suppliers', keyword)
+const fetchProjects = materialStore.searchProjects
+const fetchSuppliers = materialStore.searchSuppliers
 
 async function initialize() {
   loading.value = true

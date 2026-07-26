@@ -421,6 +421,27 @@ async function assertMaterialContract(
   }
 }
 
+async function assertProjectCustomer(
+  tx: Pick<TransactionDb, 'select'>,
+  projectId: unknown,
+  customerId: unknown,
+): Promise<void> {
+  const selectedProjectId = nullableId(projectId)
+  const selectedCustomerId = nullableId(customerId)
+  if (!selectedProjectId || !selectedCustomerId)
+    return
+  const project = await assertReference<{
+    customer_id: string | null
+    secondary_customer_id: string | null
+  }>(tx, 'projects', selectedProjectId, '项目')
+  if (
+    project.customer_id !== selectedCustomerId
+    && project.secondary_customer_id !== selectedCustomerId
+  ) {
+    throw new Error('甲供单位不属于所选项目')
+  }
+}
+
 async function persistHead(
   tx: TransactionDb,
   kind: MaterialFormKind,
@@ -895,6 +916,7 @@ async function saveOwnerControl(
 ): Promise<PersistedHead> {
   await assertOptionalReference(tx, 'projects', draft.projectId, '项目')
   await assertOptionalReference(tx, 'customers', draft.customerId, '甲供单位')
+  await assertProjectCustomer(tx, draft.projectId, draft.customerId)
   const controlQty = nonNegativeNumber('总控量', draft.controlQty)
   if (action === 'post') {
     requireFields([
@@ -1046,6 +1068,7 @@ async function saveOwnerDirect(
 ): Promise<PersistedHead> {
   await assertOptionalReference(tx, 'projects', draft.projectId, '项目')
   await assertOptionalReference(tx, 'customers', draft.customerId, '甲供单位')
+  await assertProjectCustomer(tx, draft.projectId, draft.customerId)
   const qty = nonNegativeNumber('直入直出数量', draft.qty)
   if (action === 'post') {
     requireFields([
