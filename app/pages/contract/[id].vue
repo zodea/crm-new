@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { F2FormKind } from '~/lib/contract/forms'
 // 通用合同详情（#90 批A 底座件④）：1 个页面吃施工/分包/材采三类。
 // kind 决定显隐：摘要六指标四级对账口径（施工=开票/收款/应收，支出侧=收票/支付/应付）、
 // 变洽签 Tab 仅施工/分包、基本信息里 甲方(项目 developer)/乙方(分供方蓝链)。
 // 关联单据 Tab 为壳占位（空表，真聚合停第二趟）；无审批流，只留合同状态 chip。
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { StatusTone } from '~/lib/project/status'
+import { formPath } from '~/lib/contract/page'
 import { CONTRACT_STATUS_TONE, contractBalance, kindLabels } from '~/lib/contract/status'
 import { yuan } from '~/lib/util/money'
 
@@ -12,7 +14,6 @@ const route = useRoute()
 const store = useContractStore()
 const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
-const { openContractForm } = useContractForm()
 
 const contractId = computed(() => route.params.id as string)
 const contract = computed(() => store.byId(contractId.value))
@@ -128,8 +129,14 @@ const payColumns = computed<KitTableColumn[]>(() => [
 ])
 
 function openEdit() {
-  if (contract.value)
-    openContractForm(contract.value.kind, contract.value)
+  if (!contract.value)
+    return
+  const kinds: Record<typeof contract.value.kind, F2FormKind> = {
+    施工: 'construction',
+    分包: 'subcontract',
+    材采: 'material',
+  }
+  void navigateTo(formPath(kinds[contract.value.kind], contract.value.id))
 }
 
 onMounted(() => {

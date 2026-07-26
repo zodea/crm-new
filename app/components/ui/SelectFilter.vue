@@ -26,18 +26,20 @@ withDefaults(defineProps<{
   options: Option[]
   minWidth?: number
   placeholder?: string
-}>(), { minWidth: 132, placeholder: '请选择' })
+  fullWidth?: boolean
+}>(), { minWidth: 132, placeholder: '请选择', fullWidth: false })
 
 const model = defineModel<string>()
 </script>
 
 <template>
-  <label class="inline-flex items-center gap-[7px]">
+  <label class="inline-flex items-center gap-[7px]" :class="{ 'w-full': fullWidth }">
     <span v-if="label" class="flex-none text-[12px] font-700 text-ink-soft">{{ label }}</span>
     <SelectRoot v-model="model">
       <SelectTrigger
         :aria-label="ariaLabel || label"
         class="inline-flex h-8 items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[12px] pr-[9px] text-[13px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
+        :class="{ 'w-full': fullWidth }"
         :style="{ minWidth: `${minWidth}px` }"
       >
         <SelectValue :placeholder="placeholder" />

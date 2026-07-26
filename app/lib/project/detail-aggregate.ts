@@ -1,6 +1,11 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import type { ProjectOperationSummary } from '~/lib/project/detail-summary'
-import { hiddenCtes, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import {
+  hiddenCtes,
+  hiddenCtesFor,
+  selectVisibleSql,
+  visibleCond,
+} from '~/lib/db/soft-delete'
 
 export interface ProjectDetailAggregate extends ProjectOperationSummary {
   projectId: string
@@ -36,19 +41,41 @@ async function loadProjectSums(db: SoftDb, table: string, valueColumn: string): 
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
 }
 
+async function loadConstructionContractSums(db: SoftDb): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtes('contracts')}
+    SELECT contract.project_id, COALESCE(SUM(contract.amount), 0) AS total
+    FROM contracts AS contract
+    WHERE ${visibleCond('contracts', 'contract')}
+      AND contract.kind = '施工'
+      AND contract.project_id IS NOT NULL
+    GROUP BY contract.project_id
+  `)
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
+async function loadConstructionSupplementSums(db: SoftDb): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtesFor('contracts', 'contract_supplements')}
+    SELECT contract.project_id, COALESCE(SUM(supplement.amount), 0) AS total
+    FROM contract_supplements AS supplement
+    JOIN contracts AS contract ON contract.id = supplement.contract_id
+    WHERE ${visibleCond('contract_supplements', 'supplement')}
+      AND ${visibleCond('contracts', 'contract')}
+      AND contract.kind = '施工'
+      AND supplement.status NOT IN ('draft', '草稿')
+      AND contract.project_id IS NOT NULL
+    GROUP BY contract.project_id
+  `)
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
 /** DATABASE §4.1/§4.2：明细求和交给 SQLite，且所有表统一走祖先软删过滤。 */
 export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDetailAggregate[]> {
   const [projects, mainContracts, supplements, changes, receipts, payments, currentIn, currentOut, outputAmounts, outputTaxes] = await Promise.all([
     db.select<{ id: string }>(selectVisibleSql('projects', 'ORDER BY id')),
-    loadProjectSums(db, 'construction_contracts', 'amount'),
-    db.select<ProjectSumRow>(`
-      ${hiddenCtes('supplement_agreements')}
-      SELECT c.project_id, COALESCE(SUM(s.amount), 0) AS total
-      FROM supplement_agreements s
-      JOIN construction_contracts c ON c.id=s.contract_id
-      WHERE ${visibleCond('supplement_agreements', 's')}
-      GROUP BY c.project_id
-    `).then(rows => new Map(rows.map(row => [row.project_id, number(row.total)]))),
+    loadConstructionContractSums(db),
+    loadConstructionSupplementSums(db),
     loadProjectSums(db, 'owner_change_orders', 'tax_inc_amount'),
     loadProjectSums(db, 'receipt_registrations', 'amount'),
     loadProjectSums(db, 'payment_applications', 'actual_payment'),

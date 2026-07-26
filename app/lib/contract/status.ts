@@ -12,13 +12,15 @@ export type ContractKind = (typeof CONTRACT_KINDS)[number]
 /** 分包合同子类（subKind，仅 kind=分包） */
 export const CONTRACT_SUB_KINDS = ['劳务', '专业'] as const
 
-/** 合同业务态（顺序即 SegTab 视图/下拉展示顺序，默认视图=履约中） */
-export const CONTRACT_STATUSES = ['履约中', '已签订', '已结算', '已结清'] as const
+/** 合同业务态（顺序即 SegTab 视图/下拉展示顺序，草稿与审批入口固定可见） */
+export const CONTRACT_STATUSES = ['草稿', '审批中', '履约中', '已签订', '已结算', '已结清'] as const
 
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number]
 
 /** 状态 → 语义色调（设计稿 STATUS_TONE：履约中 brand / 已签订 neutral / 已结算 warn / 已结清 ok） */
 export const CONTRACT_STATUS_TONE: Record<string, StatusTone> = {
+  草稿: 'muted',
+  审批中: 'warn',
   履约中: 'brand',
   已签订: 'muted',
   已结算: 'warn',

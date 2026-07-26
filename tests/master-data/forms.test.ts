@@ -620,7 +620,6 @@ describe('f1 整页表单领域 action', () => {
     await expect(deleteMasterDataRecord('customer', 'customer-ref'))
       .rejects
       .toThrow('活跃项目')
-    await mem.execute(`ALTER TABLE contracts ADD COLUMN customer_id TEXT REFERENCES customers(id)`)
     await mem.execute(`
       INSERT INTO customers (id, name, contact)
       VALUES ('customer-contract-ref', '合同客户', '联系人')

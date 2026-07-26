@@ -438,6 +438,7 @@ export async function seedIfEmpty(db: MigrationDb) {
     'payment_applications',
     'file_refs',
     'contracts',
+    'contract_supplements',
     'delivery_records',
     'delivery_lines',
   ]

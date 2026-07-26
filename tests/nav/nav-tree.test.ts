@@ -57,4 +57,13 @@ describe('侧栏导航树', () => {
     expect(activeNavKey('/contract/boq')).toBe('boqList')
     expect(activeNavKey('/contract/boq/import')).toBe('boqImport')
   })
+
+  it('f2 三类新增台账入口已启用，表单子路由保持来源导航点亮', () => {
+    expect(leaves().find(item => item.key === 'companyExp')?.to).toBe('/contract/company-expense')
+    expect(leaves().find(item => item.key === 'otherExp')?.to).toBe('/contract/other-expense')
+    expect(leaves().find(item => item.key === 'otherSettle')?.to).toBe('/contract/other-settlement')
+    expect(activeNavKey('/contract/company-expense/form/company_1')).toBe('companyExp')
+    expect(activeNavKey('/contract/other-expense/form/contract_1')).toBe('otherExp')
+    expect(activeNavKey('/contract/other-settlement/form/settlement_1')).toBe('otherSettle')
+  })
 })

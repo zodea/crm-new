@@ -84,9 +84,9 @@ export const NAV_TREE: NavNode[] = [
     { key: 'factor', mark: '因', icon: 'i-lucide-sigma', label: '开票·税额工具', hint: '推算数量', to: '/finance/invoice/factor' },
   ] },
   { type: 'group', key: 'g-other', label: '项目其他合同', icon: 'i-lucide-file-stack', items: [
-    { key: 'companyExp', mark: '司', icon: 'i-lucide-building-2', label: '公司支出合同', hint: '房租·软件' },
-    { key: 'otherExp', mark: '杂', icon: 'i-lucide-files', label: '其他支出合同', hint: '项目杂项支出' },
-    { key: 'otherSettle', mark: '结', icon: 'i-lucide-scale', label: '其他支出结算', hint: '结算台账' },
+    { key: 'companyExp', mark: '司', icon: 'i-lucide-building-2', label: '公司支出合同', hint: '房租·软件', to: '/contract/company-expense' },
+    { key: 'otherExp', mark: '杂', icon: 'i-lucide-files', label: '其他支出合同', hint: '项目杂项支出', to: '/contract/other-expense' },
+    { key: 'otherSettle', mark: '结', icon: 'i-lucide-scale', label: '其他支出结算', hint: '结算台账', to: '/contract/other-settlement' },
   ] },
   { type: 'group', key: 'g-base', label: '基础信息', icon: 'i-lucide-database', items: [
     { key: 'supplier', mark: '方', icon: 'i-lucide-factory', label: '分供方', hint: '资料管理', to: '/base/supplier' },
@@ -172,6 +172,12 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'subContract'
   if (path.startsWith('/contract/material'))
     return 'matContract'
+  if (path.startsWith('/contract/company-expense'))
+    return 'companyExp'
+  if (path.startsWith('/contract/other-expense'))
+    return 'otherExp'
+  if (path.startsWith('/contract/other-settlement'))
+    return 'otherSettle'
   if (path.startsWith('/contract/boq/import'))
     return 'boqImport'
   if (path.startsWith('/contract/boq'))

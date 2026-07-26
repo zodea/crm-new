@@ -1064,6 +1064,218 @@ async function allowIncompleteTargetCostDrafts(db: MigrationDb): Promise<void> {
   }
 }
 
+/** v21 F2 合同与支出结算(#148)：canonical 头表、补充协议、材采明细及统一结算。 */
+const V21_CONTRACTS_TABLE = `
+CREATE TABLE contracts_v21_new (
+  id                    TEXT PRIMARY KEY,
+  no                    TEXT NOT NULL DEFAULT '',
+  name                  TEXT NOT NULL DEFAULT '',
+  kind                  TEXT NOT NULL DEFAULT '施工'
+                          CHECK (kind IN ('施工', '分包', '材采', '其他支出')),
+  sub_kind              TEXT NOT NULL DEFAULT '',
+  cost_category         TEXT NOT NULL DEFAULT '',
+  legacy_type           TEXT NOT NULL DEFAULT '',
+  classification_state  TEXT NOT NULL DEFAULT 'classified'
+                          CHECK (classification_state IN ('classified', 'unclassified', 'no_contract')),
+  project_id            TEXT REFERENCES projects(id),
+  customer_id           TEXT REFERENCES customers(id),
+  supplier_id           TEXT REFERENCES suppliers(id),
+  amount                REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  changed               REAL NOT NULL DEFAULT 0 CHECK (changed >= 0),
+  settled               REAL NOT NULL DEFAULT 0 CHECK (settled >= 0),
+  invoiced              REAL NOT NULL DEFAULT 0 CHECK (invoiced >= 0),
+  paid                  REAL NOT NULL DEFAULT 0 CHECK (paid >= 0),
+  content               TEXT NOT NULL DEFAULT '',
+  invoice_type          TEXT NOT NULL DEFAULT '',
+  signer_name           TEXT NOT NULL DEFAULT '',
+  contact_name          TEXT NOT NULL DEFAULT '',
+  contact_phone         TEXT NOT NULL DEFAULT '',
+  tax_rate              REAL CHECK (tax_rate IS NULL OR tax_rate >= 0),
+  sign_date             TEXT NOT NULL DEFAULT '',
+  main_terms            TEXT NOT NULL DEFAULT '',
+  payment_terms         TEXT NOT NULL DEFAULT '',
+  brand_quality_terms   TEXT NOT NULL DEFAULT '',
+  schedule_terms        TEXT NOT NULL DEFAULT '',
+  warranty_terms        TEXT NOT NULL DEFAULT '',
+  special_terms         TEXT NOT NULL DEFAULT '',
+  retention_ratio       REAL CHECK (
+                          retention_ratio IS NULL
+                          OR (retention_ratio >= 0 AND retention_ratio <= 1)
+                        ),
+  retention_amount      REAL CHECK (retention_amount IS NULL OR retention_amount >= 0),
+  retention_days        INTEGER CHECK (retention_days IS NULL OR retention_days >= 0),
+  invoice_name          TEXT NOT NULL DEFAULT '',
+  invoice_tax_no        TEXT NOT NULL DEFAULT '',
+  invoice_address_phone TEXT NOT NULL DEFAULT '',
+  invoice_bank          TEXT NOT NULL DEFAULT '',
+  invoice_bank_account  TEXT NOT NULL DEFAULT '',
+  other_expense_kind    TEXT NOT NULL DEFAULT '',
+  service_period        TEXT NOT NULL DEFAULT '',
+  payment_cycle         TEXT NOT NULL DEFAULT '',
+  status                TEXT NOT NULL DEFAULT '草稿',
+  note                  TEXT NOT NULL DEFAULT '',
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at            TEXT DEFAULT NULL
+);
+`
+
+const V21_F2_TABLES = `
+CREATE TABLE IF NOT EXISTS contract_legacy_mappings (
+  id           TEXT PRIMARY KEY,
+  source_table TEXT NOT NULL,
+  legacy_id    TEXT NOT NULL,
+  contract_id  TEXT NOT NULL REFERENCES contracts(id),
+  source_no    TEXT NOT NULL DEFAULT '',
+  source_name  TEXT NOT NULL DEFAULT '',
+  mapped_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (source_table, legacy_id)
+);
+
+CREATE TABLE IF NOT EXISTS contract_supplements (
+  id          TEXT PRIMARY KEY,
+  contract_id TEXT NOT NULL REFERENCES contracts(id),
+  no          TEXT NOT NULL DEFAULT '',
+  name        TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL DEFAULT '',
+  amount      REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  sign_date   TEXT NOT NULL DEFAULT '',
+  status      TEXT NOT NULL DEFAULT '草稿',
+  external_ref TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at  TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS company_expense_contracts (
+  id            TEXT PRIMARY KEY,
+  no            TEXT NOT NULL DEFAULT '',
+  name          TEXT NOT NULL DEFAULT '',
+  category      TEXT NOT NULL DEFAULT '',
+  counterparty  TEXT NOT NULL DEFAULT '',
+  sign_date     TEXT NOT NULL DEFAULT '',
+  service_period TEXT NOT NULL DEFAULT '',
+  amount        REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  payment_cycle TEXT NOT NULL DEFAULT '',
+  main_terms    TEXT NOT NULL DEFAULT '',
+  status        TEXT NOT NULL DEFAULT '草稿',
+  note          TEXT NOT NULL DEFAULT '',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS expenditure_settlements (
+  id                TEXT PRIMARY KEY,
+  no                TEXT NOT NULL DEFAULT '',
+  name              TEXT NOT NULL DEFAULT '',
+  biz_type          TEXT NOT NULL DEFAULT '',
+  project_id        TEXT REFERENCES projects(id),
+  supplier_id       TEXT REFERENCES suppliers(id),
+  contract_id       TEXT REFERENCES contracts(id),
+  settlement_type   TEXT NOT NULL DEFAULT '',
+  total_amount      REAL NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
+  amount            REAL CHECK (amount IS NULL OR amount >= 0),
+  tax_amount        REAL CHECK (tax_amount IS NULL OR tax_amount >= 0),
+  tax_rate          REAL CHECK (tax_rate IS NULL OR tax_rate >= 0),
+  settlement_date   TEXT NOT NULL DEFAULT '',
+  settlement_period TEXT NOT NULL DEFAULT '',
+  deduction_note    TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT '草稿',
+  note              TEXT NOT NULL DEFAULT '',
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at        TEXT DEFAULT NULL
+);
+`
+
+const V21_CONTRACT_LINE_ITEMS_TABLE = `
+CREATE TABLE contract_line_items_v21_new (
+  id                       TEXT PRIMARY KEY,
+  contract_id              TEXT NOT NULL REFERENCES contracts(id),
+  material_name            TEXT NOT NULL DEFAULT '',
+  spec                     TEXT NOT NULL DEFAULT '',
+  brand                    TEXT NOT NULL DEFAULT '',
+  unit                     TEXT NOT NULL DEFAULT '',
+  qty                      REAL CHECK (qty IS NULL OR qty > 0),
+  tax_inclusive_unit_price REAL
+                            CHECK (tax_inclusive_unit_price IS NULL
+                              OR tax_inclusive_unit_price >= 0),
+  planned_arrival_date     TEXT NOT NULL DEFAULT '',
+  note                     TEXT NOT NULL DEFAULT '',
+  sort_order               INTEGER NOT NULL DEFAULT 0,
+  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at               TEXT DEFAULT NULL
+);
+`
+
+const V21_PAYMENT_APPLICATIONS_TABLE = `
+CREATE TABLE payment_applications_v21_new (
+  id                     TEXT PRIMARY KEY,
+  project_id             TEXT REFERENCES projects(id),
+  supplier_id            TEXT REFERENCES suppliers(id),
+  contract_id            TEXT REFERENCES contracts(id),
+  application_no         TEXT NOT NULL DEFAULT '',
+  name                   TEXT NOT NULL DEFAULT '',
+  approval_status        TEXT NOT NULL DEFAULT '',
+  applicant              TEXT NOT NULL DEFAULT '',
+  amount                 REAL NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  approved_amount        REAL NOT NULL DEFAULT 0 CHECK (approved_amount >= 0),
+  paid_amount            REAL NOT NULL DEFAULT 0 CHECK (paid_amount >= 0),
+  payment_method         TEXT NOT NULL DEFAULT '',
+  actual_payment         REAL NOT NULL DEFAULT 0 CHECK (actual_payment >= 0),
+  payment_status         TEXT NOT NULL DEFAULT '',
+  acceptor               TEXT NOT NULL DEFAULT '',
+  note                   TEXT NOT NULL DEFAULT '',
+  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at             TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at             TEXT DEFAULT NULL
+);
+`
+
+const V21_F2_INDEXES = `
+CREATE UNIQUE INDEX IF NOT EXISTS uq_contract_legacy_source
+  ON contract_legacy_mappings(source_table, legacy_id);
+CREATE INDEX IF NOT EXISTS idx_contract_legacy_contract
+  ON contract_legacy_mappings(contract_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_proj ON contracts(project_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_customer ON contracts(customer_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_sup ON contracts(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_kind ON contracts(kind);
+CREATE INDEX IF NOT EXISTS idx_contracts_deleted
+  ON contracts(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_contract_supplements_contract
+  ON contract_supplements(contract_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_contract_supplements_deleted
+  ON contract_supplements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_contract_line_items_contract
+  ON contract_line_items(contract_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_contract_line_items_deleted
+  ON contract_line_items(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_company_expense_contracts_deleted
+  ON company_expense_contracts(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_expenditure_settlements_proj
+  ON expenditure_settlements(project_id);
+CREATE INDEX IF NOT EXISTS idx_expenditure_settlements_sup
+  ON expenditure_settlements(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_expenditure_settlements_contract
+  ON expenditure_settlements(contract_id);
+CREATE INDEX IF NOT EXISTS idx_expenditure_settlements_deleted
+  ON expenditure_settlements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_payment_applications_proj
+  ON payment_applications(project_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_sup
+  ON payment_applications(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_contract
+  ON payment_applications(contract_id);
+CREATE INDEX IF NOT EXISTS idx_payment_applications_deleted
+  ON payment_applications(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
+const F2_IMPORT_BATCH_ID = 'migration_f2_v21'
+
 const F1_IMPORT_BATCH_ID = 'migration_f1_v19'
 
 function normalizeLegacyName(value: unknown): string {
@@ -1077,6 +1289,762 @@ function stableMigrationId(prefix: string, ...parts: string[]): string {
     hash = Math.imul(hash, 16777619)
   }
   return `${prefix}_${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
+
+function quotedColumnOr(
+  available: Set<string>,
+  column: string,
+  fallback: string,
+): string {
+  return available.has(column) ? `"${column}"` : fallback
+}
+
+async function rebuildContractsForF2(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'contracts', 'customer_id'))
+    return
+
+  const columns = await db.select<{ name: string }>(
+    `SELECT name FROM pragma_table_info('contracts')`,
+  )
+  const available = new Set(columns.map(column => column.name))
+  await db.execute('DROP TABLE IF EXISTS contracts_v21_new')
+  await execScript(db, V21_CONTRACTS_TABLE)
+
+  const targets = [
+    'id',
+    'no',
+    'name',
+    'kind',
+    'sub_kind',
+    'cost_category',
+    'legacy_type',
+    'classification_state',
+    'project_id',
+    'customer_id',
+    'supplier_id',
+    'amount',
+    'changed',
+    'settled',
+    'invoiced',
+    'paid',
+    'content',
+    'invoice_type',
+    'signer_name',
+    'contact_name',
+    'contact_phone',
+    'tax_rate',
+    'sign_date',
+    'main_terms',
+    'payment_terms',
+    'brand_quality_terms',
+    'schedule_terms',
+    'warranty_terms',
+    'special_terms',
+    'retention_ratio',
+    'retention_amount',
+    'retention_days',
+    'invoice_name',
+    'invoice_tax_no',
+    'invoice_address_phone',
+    'invoice_bank',
+    'invoice_bank_account',
+    'other_expense_kind',
+    'service_period',
+    'payment_cycle',
+    'status',
+    'note',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ]
+  const expressions: Record<string, string> = {
+    id: quotedColumnOr(available, 'id', `''`),
+    no: `COALESCE(${quotedColumnOr(available, 'no', `''`)}, '')`,
+    name: `COALESCE(${quotedColumnOr(available, 'name', `''`)}, '')`,
+    kind: `CASE
+      WHEN ${quotedColumnOr(available, 'kind', `'施工'`)} IN ('施工', '分包', '材采', '其他支出')
+        THEN ${quotedColumnOr(available, 'kind', `'施工'`)}
+      ELSE '其他支出'
+    END`,
+    sub_kind: `COALESCE(${quotedColumnOr(available, 'sub_kind', `''`)}, '')`,
+    cost_category: `COALESCE(${quotedColumnOr(available, 'cost_category', `''`)}, '')`,
+    legacy_type: `COALESCE(${quotedColumnOr(available, 'legacy_type', `''`)}, '')`,
+    classification_state: `COALESCE(${quotedColumnOr(available, 'classification_state', `'classified'`)}, 'classified')`,
+    project_id: `NULLIF(${quotedColumnOr(available, 'project_id', 'NULL')}, '')`,
+    customer_id: 'NULL',
+    supplier_id: `NULLIF(${quotedColumnOr(available, 'supplier_id', 'NULL')}, '')`,
+    amount: `MAX(COALESCE(${quotedColumnOr(available, 'amount', '0')}, 0), 0)`,
+    changed: `MAX(COALESCE(${quotedColumnOr(available, 'changed', '0')}, 0), 0)`,
+    settled: `MAX(COALESCE(${quotedColumnOr(available, 'settled', '0')}, 0), 0)`,
+    invoiced: `MAX(COALESCE(${quotedColumnOr(available, 'invoiced', '0')}, 0), 0)`,
+    paid: `MAX(COALESCE(${quotedColumnOr(available, 'paid', '0')}, 0), 0)`,
+    content: `COALESCE(${quotedColumnOr(available, 'content', `''`)}, '')`,
+    invoice_type: `COALESCE(${quotedColumnOr(available, 'invoice_type', `''`)}, '')`,
+    signer_name: `COALESCE(${quotedColumnOr(available, 'signer_name', `''`)}, '')`,
+    contact_name: `COALESCE(${quotedColumnOr(available, 'contact_name', `''`)}, '')`,
+    contact_phone: `COALESCE(${quotedColumnOr(available, 'contact_phone', `''`)}, '')`,
+    tax_rate: quotedColumnOr(available, 'tax_rate', 'NULL'),
+    sign_date: `COALESCE(${quotedColumnOr(available, 'sign_date', `''`)}, '')`,
+    main_terms: `COALESCE(${quotedColumnOr(available, 'main_terms', `''`)}, '')`,
+    payment_terms: `COALESCE(${quotedColumnOr(available, 'payment_terms', `''`)}, '')`,
+    brand_quality_terms: `COALESCE(${quotedColumnOr(available, 'brand_quality_terms', `''`)}, '')`,
+    schedule_terms: `COALESCE(${quotedColumnOr(available, 'schedule_terms', `''`)}, '')`,
+    warranty_terms: `COALESCE(${quotedColumnOr(available, 'warranty_terms', `''`)}, '')`,
+    special_terms: `COALESCE(${quotedColumnOr(available, 'special_terms', `''`)}, '')`,
+    retention_ratio: quotedColumnOr(available, 'retention_ratio', 'NULL'),
+    retention_amount: quotedColumnOr(available, 'retention_amount', 'NULL'),
+    retention_days: quotedColumnOr(available, 'retention_days', 'NULL'),
+    invoice_name: `COALESCE(${quotedColumnOr(available, 'invoice_name', `''`)}, '')`,
+    invoice_tax_no: `COALESCE(${quotedColumnOr(available, 'invoice_tax_no', `''`)}, '')`,
+    invoice_address_phone: `COALESCE(${quotedColumnOr(available, 'invoice_address_phone', `''`)}, '')`,
+    invoice_bank: `COALESCE(${quotedColumnOr(available, 'invoice_bank', `''`)}, '')`,
+    invoice_bank_account: `COALESCE(${quotedColumnOr(available, 'invoice_bank_account', `''`)}, '')`,
+    other_expense_kind: `COALESCE(${quotedColumnOr(available, 'other_expense_kind', `''`)}, '')`,
+    service_period: `COALESCE(${quotedColumnOr(available, 'service_period', `''`)}, '')`,
+    payment_cycle: `COALESCE(${quotedColumnOr(available, 'payment_cycle', `''`)}, '')`,
+    status: `COALESCE(${quotedColumnOr(available, 'status', `'draft'`)}, 'draft')`,
+    note: `COALESCE(${quotedColumnOr(available, 'note', `''`)}, '')`,
+    created_at: `COALESCE(${quotedColumnOr(available, 'created_at', `datetime('now')`)}, datetime('now'))`,
+    updated_at: `COALESCE(${quotedColumnOr(available, 'updated_at', `datetime('now')`)}, datetime('now'))`,
+    deleted_at: quotedColumnOr(available, 'deleted_at', 'NULL'),
+  }
+
+  await db.execute(`
+    INSERT INTO contracts_v21_new (${targets.join(', ')})
+    SELECT ${targets.map(column => expressions[column]).join(', ')}
+    FROM contracts
+  `)
+  await db.execute('DROP TABLE contracts')
+  await db.execute('ALTER TABLE contracts_v21_new RENAME TO contracts')
+}
+
+interface LegacyConstructionContractRow {
+  id: string
+  project_id: string
+  name: string
+  contract_no: string
+  amount: number | null
+  status: string | null
+  sign_date: string | null
+  category: string | null
+  tax_rate: number | null
+  created_at: string | null
+  updated_at: string | null
+  deleted_at: string | null
+}
+
+interface LegacyExpenditureContractRow {
+  id: string
+  project_id: string
+  supplier_id: string | null
+  name: string
+  contract_no: string
+  approval_status: string | null
+  tax_inc_total: number | null
+  effective_date: string | null
+  contract_type: string | null
+  tax_rate: number | null
+  payment_method: string | null
+  created_at: string | null
+  updated_at: string | null
+  deleted_at: string | null
+}
+
+interface LegacyContractMapping {
+  sourceTable: 'construction_contracts' | 'expenditure_contracts'
+  legacyId: string
+  contractId: string
+  sourceNo: string
+  sourceName: string
+}
+
+async function upsertLegacyContractMapping(
+  db: MigrationDb,
+  mapping: LegacyContractMapping,
+): Promise<void> {
+  await db.execute(`
+    INSERT INTO contract_legacy_mappings (
+      id, source_table, legacy_id, contract_id, source_no, source_name, mapped_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(source_table, legacy_id) DO UPDATE SET
+      contract_id = excluded.contract_id,
+      source_no = excluded.source_no,
+      source_name = excluded.source_name,
+      mapped_at = excluded.mapped_at
+  `, [
+    stableMigrationId('contract_map', mapping.sourceTable, mapping.legacyId),
+    mapping.sourceTable,
+    mapping.legacyId,
+    mapping.contractId,
+    mapping.sourceNo,
+    mapping.sourceName,
+  ])
+}
+
+async function mappedContractId(
+  db: MigrationDb,
+  sourceTable: LegacyContractMapping['sourceTable'],
+  legacyId: string,
+): Promise<string | null> {
+  const [mapping] = await db.select<{ contract_id: string }>(`
+    SELECT contract_id
+    FROM contract_legacy_mappings
+    WHERE source_table = ? AND legacy_id = ?
+    LIMIT 1
+  `, [sourceTable, legacyId])
+  return mapping?.contract_id ?? null
+}
+
+async function findCanonicalContractMatch(
+  db: MigrationDb,
+  input: {
+    sourceTable: LegacyContractMapping['sourceTable']
+    legacyId: string
+    kind: string
+    projectId: string
+    supplierId?: string | null
+    no: string
+    name: string
+    amount: number
+    signDate: string
+  },
+): Promise<string | null> {
+  const candidates = await db.select<{
+    id: string
+    kind: string
+    project_id: string
+    supplier_id: string | null
+    no: string
+    name: string
+    amount: number
+    sign_date: string
+  }>(`
+    SELECT id, kind, project_id, supplier_id, no, name, amount, sign_date
+    FROM contracts
+    WHERE id = ?
+       OR (
+        kind = ?
+        AND project_id = ?
+        AND COALESCE(supplier_id, '') = COALESCE(?, '')
+        AND (
+          (? <> '' AND no = ?)
+          OR name = ?
+        )
+      )
+    ORDER BY created_at, id
+  `, [
+    input.legacyId,
+    input.kind,
+    input.projectId,
+    input.supplierId ?? null,
+    input.no,
+    input.no,
+    input.name,
+  ])
+
+  const exact = candidates.filter(candidate =>
+    candidate.kind === input.kind
+    && candidate.project_id === input.projectId
+    && (candidate.supplier_id ?? null) === (input.supplierId ?? null)
+    && normalizeLegacyName(candidate.no) === normalizeLegacyName(input.no)
+    && normalizeLegacyName(candidate.name) === normalizeLegacyName(input.name)
+    && Math.abs(Number(candidate.amount) - input.amount) < 0.005
+    && (candidate.sign_date ?? '') === input.signDate,
+  )
+  if (exact.length === 1)
+    return exact[0]!.id
+
+  if (candidates.length) {
+    const issueId = stableMigrationId(
+      'reconciliation_f2_contract',
+      input.sourceTable,
+      input.legacyId,
+    )
+    await db.execute(`
+      INSERT OR IGNORE INTO reconciliation_issues (
+        id, import_batch_id, project_id, entity_type, entity_id, field_name,
+        source_value, metric_key, source_ref, attribution
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'mapping')
+    `, [
+      issueId,
+      F2_IMPORT_BATCH_ID,
+      input.projectId,
+      input.sourceTable,
+      input.legacyId,
+      'contract_id',
+      JSON.stringify({
+        no: input.no,
+        name: input.name,
+        amount: input.amount,
+        signDate: input.signDate,
+        candidateIds: candidates.map(candidate => candidate.id),
+      }),
+      `${input.sourceTable}.contract_id`,
+      `schema:v21:${input.sourceTable}:${input.legacyId}`,
+    ])
+  }
+  return null
+}
+
+async function availableCanonicalId(
+  db: MigrationDb,
+  sourceTable: string,
+  legacyId: string,
+): Promise<string> {
+  const [sameId] = await db.select<{ id: string }>(
+    `SELECT id FROM contracts WHERE id = ? LIMIT 1`,
+    [legacyId],
+  )
+  if (!sameId)
+    return legacyId
+  return stableMigrationId('contract_legacy', sourceTable, legacyId)
+}
+
+function classifyLegacyExpenditureContract(legacyType: string): {
+  kind: '分包' | '材采' | '其他支出'
+  subKind: '' | '劳务' | '专业'
+  costCategory: '专业分包' | '合同劳务' | '材料' | '机械' | '其他'
+  otherExpenseKind: string
+} {
+  if (/劳务/.test(legacyType)) {
+    return {
+      kind: '分包',
+      subKind: '劳务',
+      costCategory: '合同劳务',
+      otherExpenseKind: '',
+    }
+  }
+  if (/专业|分包/.test(legacyType)) {
+    return {
+      kind: '分包',
+      subKind: '专业',
+      costCategory: '专业分包',
+      otherExpenseKind: '',
+    }
+  }
+  if (/材料|采购/.test(legacyType)) {
+    return {
+      kind: '材采',
+      subKind: '',
+      costCategory: '材料',
+      otherExpenseKind: '',
+    }
+  }
+  if (/机械|租赁/.test(legacyType)) {
+    return {
+      kind: '其他支出',
+      subKind: '',
+      costCategory: '机械',
+      otherExpenseKind: '机械租赁',
+    }
+  }
+  return {
+    kind: '其他支出',
+    subKind: '',
+    costCategory: '其他',
+    otherExpenseKind: legacyType,
+  }
+}
+
+async function migrateLegacyConstructionContracts(db: MigrationDb): Promise<void> {
+  const rows = await db.select<LegacyConstructionContractRow>(`
+    SELECT
+      id, project_id, name, contract_no, amount, status, sign_date,
+      category, tax_rate, created_at, updated_at, deleted_at
+    FROM construction_contracts
+    ORDER BY id
+  `)
+  for (const row of rows) {
+    let contractId = await mappedContractId(db, 'construction_contracts', row.id)
+    contractId ??= await findCanonicalContractMatch(db, {
+      sourceTable: 'construction_contracts',
+      legacyId: row.id,
+      kind: '施工',
+      projectId: row.project_id,
+      supplierId: null,
+      no: row.contract_no ?? '',
+      name: row.name,
+      amount: Math.max(row.amount ?? 0, 0),
+      signDate: row.sign_date ?? '',
+    })
+    if (!contractId) {
+      contractId = await availableCanonicalId(db, 'construction_contracts', row.id)
+      await db.execute(`
+        INSERT INTO contracts (
+          id, no, name, kind, project_id, customer_id, amount, changed,
+          legacy_type, tax_rate, sign_date, status, created_at, updated_at, deleted_at
+        )
+        SELECT
+          ?, ?, ?, '施工', ?, project.customer_id, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        FROM projects AS project
+        WHERE project.id = ?
+      `, [
+        contractId,
+        row.contract_no ?? '',
+        row.name,
+        row.project_id,
+        Math.max(row.amount ?? 0, 0),
+        Math.max(row.amount ?? 0, 0),
+        row.category ?? '',
+        row.tax_rate,
+        row.sign_date ?? '',
+        row.status || '履约中',
+        row.created_at ?? new Date().toISOString(),
+        row.updated_at ?? row.created_at ?? new Date().toISOString(),
+        row.deleted_at,
+        row.project_id,
+      ])
+    }
+    else {
+      await db.execute(`
+        UPDATE contracts
+        SET customer_id = COALESCE(
+              customer_id,
+              (SELECT customer_id FROM projects WHERE id = contracts.project_id)
+            ),
+            legacy_type = CASE WHEN legacy_type = '' THEN ? ELSE legacy_type END,
+            tax_rate = COALESCE(tax_rate, ?)
+        WHERE id = ?
+      `, [row.category ?? '', row.tax_rate, contractId])
+    }
+    await upsertLegacyContractMapping(db, {
+      sourceTable: 'construction_contracts',
+      legacyId: row.id,
+      contractId,
+      sourceNo: row.contract_no ?? '',
+      sourceName: row.name,
+    })
+  }
+
+  await db.execute(`
+    UPDATE contracts
+    SET customer_id = (
+      SELECT project.customer_id
+      FROM projects AS project
+      WHERE project.id = contracts.project_id
+    )
+    WHERE kind = '施工'
+      AND customer_id IS NULL
+      AND project_id IS NOT NULL
+  `)
+}
+
+async function migrateLegacyExpenditureContracts(db: MigrationDb): Promise<void> {
+  const rows = await db.select<LegacyExpenditureContractRow>(`
+    SELECT
+      id, project_id, supplier_id, name, contract_no, approval_status,
+      tax_inc_total, effective_date, contract_type, tax_rate, payment_method,
+      created_at, updated_at, deleted_at
+    FROM expenditure_contracts
+    ORDER BY id
+  `)
+  for (const row of rows) {
+    const classification = classifyLegacyExpenditureContract(row.contract_type ?? '')
+    let contractId = await mappedContractId(db, 'expenditure_contracts', row.id)
+    contractId ??= await findCanonicalContractMatch(db, {
+      sourceTable: 'expenditure_contracts',
+      legacyId: row.id,
+      kind: classification.kind,
+      projectId: row.project_id,
+      supplierId: row.supplier_id,
+      no: row.contract_no ?? '',
+      name: row.name,
+      amount: Math.max(row.tax_inc_total ?? 0, 0),
+      signDate: row.effective_date ?? '',
+    })
+    if (!contractId) {
+      contractId = await availableCanonicalId(db, 'expenditure_contracts', row.id)
+      await db.execute(`
+        INSERT INTO contracts (
+          id, no, name, kind, sub_kind, cost_category, legacy_type,
+          project_id, supplier_id, amount, changed, tax_rate, sign_date,
+          payment_terms, other_expense_kind, payment_cycle, status,
+          created_at, updated_at, deleted_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        contractId,
+        row.contract_no ?? '',
+        row.name,
+        classification.kind,
+        classification.subKind,
+        classification.costCategory,
+        row.contract_type ?? '',
+        row.project_id,
+        row.supplier_id,
+        Math.max(row.tax_inc_total ?? 0, 0),
+        Math.max(row.tax_inc_total ?? 0, 0),
+        row.tax_rate,
+        row.effective_date ?? '',
+        row.payment_method ?? '',
+        classification.otherExpenseKind,
+        row.payment_method ?? '',
+        row.approval_status || 'draft',
+        row.created_at ?? new Date().toISOString(),
+        row.updated_at ?? row.created_at ?? new Date().toISOString(),
+        row.deleted_at,
+      ])
+    }
+    else {
+      await db.execute(`
+        UPDATE contracts
+        SET cost_category = CASE WHEN cost_category = '' THEN ? ELSE cost_category END,
+            legacy_type = CASE WHEN legacy_type = '' THEN ? ELSE legacy_type END,
+            tax_rate = COALESCE(tax_rate, ?),
+            payment_cycle = CASE WHEN payment_cycle = '' THEN ? ELSE payment_cycle END
+        WHERE id = ?
+      `, [
+        classification.costCategory,
+        row.contract_type ?? '',
+        row.tax_rate,
+        row.payment_method ?? '',
+        contractId,
+      ])
+    }
+    await upsertLegacyContractMapping(db, {
+      sourceTable: 'expenditure_contracts',
+      legacyId: row.id,
+      contractId,
+      sourceNo: row.contract_no ?? '',
+      sourceName: row.name,
+    })
+  }
+}
+
+async function migrateLegacySupplements(db: MigrationDb): Promise<void> {
+  const rows = await db.select<{
+    id: string
+    contract_id: string
+    name: string
+    amount: number | null
+    sign_date: string | null
+    created_at: string | null
+    deleted_at: string | null
+  }>(`
+    SELECT id, contract_id, name, amount, sign_date, created_at, deleted_at
+    FROM supplement_agreements
+    ORDER BY id
+  `)
+  for (const row of rows) {
+    const contractId = await mappedContractId(db, 'construction_contracts', row.contract_id)
+    if (!contractId)
+      continue
+    await db.execute(`
+      INSERT OR IGNORE INTO contract_supplements (
+        id, contract_id, name, amount, sign_date, status,
+        created_at, updated_at, deleted_at
+      )
+      VALUES (?, ?, ?, ?, ?, '有效', ?, ?, ?)
+    `, [
+      row.id,
+      contractId,
+      row.name,
+      Math.max(row.amount ?? 0, 0),
+      row.sign_date ?? '',
+      row.created_at ?? new Date().toISOString(),
+      row.created_at ?? new Date().toISOString(),
+      row.deleted_at,
+    ])
+  }
+}
+
+async function migrateLegacyContractReferences(db: MigrationDb): Promise<void> {
+  for (const table of [
+    'invoices',
+    'boq_files',
+    'boq_change_orders',
+    'boq_lines',
+    'monthly_statements',
+    'schedule_groups',
+  ]) {
+    if (!await columnExists(db, table, 'contract_id'))
+      continue
+    await db.execute(`
+      UPDATE "${table}"
+      SET contract_id = COALESCE(
+        (
+          SELECT mapping.contract_id
+          FROM contract_legacy_mappings AS mapping
+          WHERE mapping.source_table = 'expenditure_contracts'
+            AND mapping.legacy_id = "${table}".contract_id
+        ),
+        (
+          SELECT mapping.contract_id
+          FROM contract_legacy_mappings AS mapping
+          WHERE mapping.source_table = 'construction_contracts'
+            AND mapping.legacy_id = "${table}".contract_id
+        ),
+        contract_id
+      )
+      WHERE contract_id IS NOT NULL AND TRIM(contract_id) <> ''
+    `)
+  }
+}
+
+async function rebuildContractLineItemsForF2(db: MigrationDb): Promise<void> {
+  if (await columnExists(db, 'contract_line_items', 'material_name'))
+    return
+
+  await db.execute('DROP TABLE IF EXISTS contract_line_items_v21_new')
+  await execScript(db, V21_CONTRACT_LINE_ITEMS_TABLE)
+  await db.execute(`
+    INSERT INTO contract_line_items_v21_new (
+      id, contract_id, material_name, spec, brand, unit, qty,
+      tax_inclusive_unit_price, sort_order, created_at, updated_at, deleted_at
+    )
+    SELECT
+      legacy.id,
+      mapping.contract_id,
+      COALESCE(legacy.item_name, ''),
+      COALESCE(legacy.spec, ''),
+      COALESCE(legacy.brand, ''),
+      COALESCE(legacy.unit, ''),
+      CASE WHEN legacy.quantity > 0 THEN legacy.quantity ELSE NULL END,
+      MAX(COALESCE(legacy.unit_price, 0), 0),
+      COALESCE(legacy.sort_order, 0),
+      COALESCE(legacy.created_at, datetime('now')),
+      COALESCE(legacy.created_at, datetime('now')),
+      legacy.deleted_at
+    FROM contract_line_items AS legacy
+    JOIN contract_legacy_mappings AS mapping
+      ON mapping.source_table = 'expenditure_contracts'
+     AND mapping.legacy_id = legacy.contract_id
+  `)
+  await db.execute('DROP TABLE contract_line_items')
+  await db.execute(
+    'ALTER TABLE contract_line_items_v21_new RENAME TO contract_line_items',
+  )
+}
+
+async function paymentApplicationsReferenceCanonicalContracts(db: MigrationDb): Promise<boolean> {
+  const foreignKeys = await db.select<{ table: string, from: string }>(
+    `PRAGMA foreign_key_list('payment_applications')`,
+  )
+  return foreignKeys.some(key => key.from === 'contract_id' && key.table === 'contracts')
+}
+
+async function rebuildPaymentApplicationsForF2(db: MigrationDb): Promise<void> {
+  if (await paymentApplicationsReferenceCanonicalContracts(db))
+    return
+
+  await db.execute('DROP TABLE IF EXISTS payment_applications_v21_new')
+  await execScript(db, V21_PAYMENT_APPLICATIONS_TABLE)
+  await db.execute(`
+    INSERT INTO payment_applications_v21_new (
+      id, project_id, supplier_id, contract_id, application_no, name,
+      approval_status, applicant, amount, approved_amount, paid_amount,
+      payment_method, actual_payment, payment_status, acceptor, note,
+      created_at, updated_at, deleted_at
+    )
+    SELECT
+      application.id,
+      NULLIF(application.project_id, ''),
+      NULLIF(application.supplier_id, ''),
+      COALESCE(
+        (
+          SELECT mapping.contract_id
+          FROM contract_legacy_mappings AS mapping
+          WHERE mapping.source_table = 'expenditure_contracts'
+            AND mapping.legacy_id = application.contract_id
+        ),
+        (
+          SELECT contract.id
+          FROM contracts AS contract
+          WHERE contract.id = application.contract_id
+        )
+      ),
+      COALESCE(application.application_no, ''),
+      COALESCE(application.name, ''),
+      COALESCE(application.approval_status, ''),
+      COALESCE(application.applicant, ''),
+      MAX(COALESCE(application.amount, 0), 0),
+      MAX(COALESCE(application.approved_amount, 0), 0),
+      MAX(COALESCE(application.paid_amount, 0), 0),
+      COALESCE(application.payment_method, ''),
+      MAX(COALESCE(application.actual_payment, 0), 0),
+      COALESCE(application.payment_status, ''),
+      COALESCE(application.acceptor, ''),
+      COALESCE(application.note, ''),
+      COALESCE(application.created_at, datetime('now')),
+      COALESCE(application.updated_at, datetime('now')),
+      application.deleted_at
+    FROM payment_applications AS application
+  `)
+  await db.execute('DROP TABLE payment_applications')
+  await db.execute(
+    'ALTER TABLE payment_applications_v21_new RENAME TO payment_applications',
+  )
+}
+
+async function migrateF2ContractsAndSettlements(db: MigrationDb): Promise<void> {
+  await db.execute('PRAGMA foreign_keys = OFF')
+  let transactionStarted = false
+  try {
+    await db.execute('BEGIN IMMEDIATE')
+    transactionStarted = true
+    await rebuildContractsForF2(db)
+    await execScript(db, V21_F2_TABLES)
+    await db.execute(`
+      INSERT INTO import_batches (
+        id, project_id, source_file, source_hash, status, completed_at
+      )
+      VALUES (?, NULL, 'schema:v21', 'f2-canonical-contracts-settlements', 'running', NULL)
+      ON CONFLICT(id) DO UPDATE SET
+        status = 'running',
+        completed_at = NULL
+    `, [F2_IMPORT_BATCH_ID])
+
+    await migrateLegacyConstructionContracts(db)
+    await migrateLegacyExpenditureContracts(db)
+    await migrateLegacySupplements(db)
+    await migrateLegacyContractReferences(db)
+    await rebuildContractLineItemsForF2(db)
+    await rebuildPaymentApplicationsForF2(db)
+    for (const table of [
+      'contracts',
+      'contract_supplements',
+      'company_expense_contracts',
+      'expenditure_settlements',
+    ]) {
+      await db.execute(`
+        UPDATE "${table}"
+        SET status = CASE status
+          WHEN 'draft' THEN '草稿'
+          WHEN 'submitted' THEN '审批中'
+          ELSE status
+        END
+      `)
+    }
+    await execScript(db, V21_F2_INDEXES)
+
+    const violations = await db.select<{ table: string }>('PRAGMA foreign_key_check')
+    if (violations.length)
+      throw new Error(`[db] v21 F2 迁移后存在 ${violations.length} 条外键异常`)
+
+    await db.execute(`
+      UPDATE import_batches
+      SET status = 'completed', completed_at = datetime('now')
+      WHERE id = ?
+    `, [F2_IMPORT_BATCH_ID])
+    await db.execute('COMMIT')
+    transactionStarted = false
+  }
+  catch (error) {
+    if (transactionStarted) {
+      try {
+        await db.execute('ROLLBACK')
+      }
+      catch {
+        // 保留原始迁移错误。
+      }
+    }
+    throw error
+  }
+  finally {
+    await db.execute('PRAGMA foreign_keys = ON')
+  }
 }
 
 interface F1CustomerCandidate {
@@ -1655,6 +2623,13 @@ export const migrations: Migration[] = [
     name: 'target-cost-incomplete-drafts',
     async up(db) {
       await allowIncompleteTargetCostDrafts(db)
+    },
+  },
+  {
+    version: 21,
+    name: 'f2-canonical-contracts-settlements',
+    async up(db) {
+      await migrateF2ContractsAndSettlements(db)
     },
   },
 ]

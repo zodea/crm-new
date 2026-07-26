@@ -1309,8 +1309,8 @@ interface FilePayload {
 
 | 字段 | SQL 计算 |
 |---|---|
-| 主合同金额 | `SELECT SUM(amount) FROM construction_contracts WHERE projectId = ?` |
-| 增补合同额 | `SELECT SUM(amount) FROM supplement_agreements WHERE contractId IN (SELECT id FROM construction_contracts WHERE projectId = ?)` |
+| 主合同金额 | `SELECT SUM(amount) FROM contracts WHERE project_id = ? AND kind = '施工'` |
+| 增补合同额 | `SELECT SUM(s.amount) FROM contract_supplements s JOIN contracts c ON c.id = s.contract_id WHERE c.project_id = ? AND c.kind = '施工' AND s.status NOT IN ('draft', '草稿')` |
 | 变洽签审定额 | `SELECT SUM(taxIncAmount) FROM owner_change_orders WHERE projectId = ?`（台账=变更单自动行+手录纯金额签证，ADR-0002） |
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
 | 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
@@ -1372,7 +1372,7 @@ interface FilePayload {
 
 | 字段 | SQL 计算 |
 |---|---|
-| 合同总额 | `SELECT SUM(amount) FROM construction_contracts WHERE projectId = ?` + 变更 |
+| 合同总额 | `SELECT SUM(amount) FROM contracts WHERE project_id = ? AND kind = '施工'` + `contract_supplements` 有效补充协议 + 变更 |
 | 累计收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE projectId = ?` |
 | 累计支出 | 已确认支付记录 + 已确认工资发放 + 已确认往来/保证金/备用金等其他资金流出；禁止读取付款申请头手写已付值 |
 | 已开票额 | `SELECT SUM(amount) FROM invoice_applications WHERE projectId = ?` |

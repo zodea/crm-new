@@ -10,7 +10,7 @@ import { columnNames, createMemoryDb } from '../helpers/memory-db'
 type SeedRow = Record<string, unknown>
 
 /** 与 app/lib/db/seed.ts 的 jsonTables 灌入顺序一致(父表先行) */
-const SEED_TABLES = ['customers', 'projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts', 'delivery_records', 'delivery_lines'] as const
+const SEED_TABLES = ['customers', 'projects', 'suppliers', 'crews', 'workers', 'project_suppliers', 'invoices', 'contracts', 'contract_supplements', 'delivery_records', 'delivery_lines'] as const
 
 function loadSeed(table: string): SeedRow[] {
   const url = new URL(`../../app/lib/db/seed/${table}.json`, import.meta.url)
@@ -59,6 +59,7 @@ describe('seed 数据:结构与 schema 对齐', () => {
     const supIds = new Set(loadSeed('suppliers').map(r => r.id))
     const crewIds = new Set(loadSeed('crews').map(r => r.id))
     const workerIds = new Set(loadSeed('workers').map(r => r.id))
+    const contractIds = new Set(loadSeed('contracts').map(r => r.id))
 
     for (const project of loadSeed('projects')) {
       if (project.customer_id != null)
@@ -89,6 +90,8 @@ describe('seed 数据:结构与 schema 对齐', () => {
       if (c.supplier_id != null)
         expect(supIds).toContain(c.supplier_id)
     }
+    for (const supplement of loadSeed('contract_supplements'))
+      expect(contractIds).toContain(supplement.contract_id)
     const deliveryIds = new Set(loadSeed('delivery_records').map(r => r.id))
     for (const record of loadSeed('delivery_records')) {
       expect(projIds).toContain(record.project_id)
@@ -140,6 +143,7 @@ describe('seed 数据:灌入行为', () => {
     expect(await count('workers')).toBe(8)
     expect(await count('project_suppliers')).toBe(5)
     expect(await count('contracts')).toBe(31)
+    expect(await count('contract_supplements')).toBe(1)
     expect(await count('delivery_records')).toBe(3)
     expect(await count('delivery_lines')).toBe(4)
 
