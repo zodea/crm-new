@@ -1,6 +1,6 @@
 import type { MigrationDb } from '~/lib/db/migrations'
 import { describe, expect, it } from 'vitest'
-import { migrations, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION, migrations, runMigrations } from '~/lib/db/migrations'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 const BOQ_MIGRATION_VERSION = 15
@@ -84,9 +84,13 @@ const REQUIRED_COLUMNS: Record<(typeof BOQ_TABLES)[number], string[]> = {
     'change_order_id',
     'boq_line_id',
     'result_boq_line_id',
+    'item_id',
     'operation',
+    'section',
+    'trade',
     'item_name',
     'unit',
+    'spec',
     'delta_qty',
     'new_unit_price',
     'amount',
@@ -217,6 +221,7 @@ describe('v15 BOQ 清单、变更与月度报量数据底座', () => {
         { source_column: 'change_order_id', target_table: 'boq_change_orders', target_column: 'id' },
         { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
         { source_column: 'result_boq_line_id', target_table: 'boq_lines', target_column: 'id' },
+        { source_column: 'item_id', target_table: 'items', target_column: 'id' },
       ],
       monthly_statements: [
         { source_column: 'project_id', target_table: 'projects', target_column: 'id' },
@@ -304,8 +309,8 @@ describe('v15 BOQ 清单、变更与月度报量数据底座', () => {
     const result = await runMigrations(db)
 
     expect(result.from).toBe(BOQ_MIGRATION_VERSION - 1)
-    expect(result.to).toBe(BOQ_MIGRATION_VERSION)
-    expect(result.applied).toHaveLength(1)
+    expect(result.to).toBe(LATEST_VERSION)
+    expect(result.applied).toHaveLength(LATEST_VERSION - (BOQ_MIGRATION_VERSION - 1))
     expect(await db.select(`
       SELECT id, no, name, kind, project_id, amount
       FROM contracts

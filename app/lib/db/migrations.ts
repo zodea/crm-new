@@ -643,9 +643,13 @@ CREATE TABLE IF NOT EXISTS boq_change_lines (
   change_order_id    TEXT NOT NULL REFERENCES boq_change_orders(id),
   boq_line_id        TEXT REFERENCES boq_lines(id),
   result_boq_line_id TEXT REFERENCES boq_lines(id),
+  item_id            TEXT REFERENCES items(id),
   operation          TEXT NOT NULL CHECK (operation IN ('add', 'qty', 'price')),
+  section            TEXT NOT NULL DEFAULT '',
+  trade              TEXT NOT NULL DEFAULT '',
   item_name          TEXT NOT NULL DEFAULT '',
   unit               TEXT NOT NULL DEFAULT '',
+  spec               TEXT NOT NULL DEFAULT '',
   delta_qty          REAL,
   new_unit_price     REAL,
   amount             REAL NOT NULL DEFAULT 0,
@@ -701,6 +705,7 @@ CREATE INDEX IF NOT EXISTS idx_boq_change_orders_project ON boq_change_orders(pr
 CREATE INDEX IF NOT EXISTS idx_boq_change_orders_contract ON boq_change_orders(contract_id);
 CREATE INDEX IF NOT EXISTS idx_boq_change_orders_status ON boq_change_orders(status);
 CREATE INDEX IF NOT EXISTS idx_boq_change_lines_order ON boq_change_lines(change_order_id);
+CREATE INDEX IF NOT EXISTS idx_boq_change_lines_item ON boq_change_lines(item_id);
 CREATE INDEX IF NOT EXISTS idx_monthly_statements_project_month
   ON monthly_statements(project_id, month);
 CREATE INDEX IF NOT EXISTS idx_monthly_statement_lines_statement
@@ -1010,6 +1015,21 @@ export const migrations: Migration[] = [
           WHERE deleted_at IS NULL
             AND source_type = 'boq_change_order'
             AND source_id IS NOT NULL;
+      `)
+    },
+  },
+  {
+    // v15 已发布后的变更新增行补充：审批物化为 boq_lines 时必须保留标准分项与目录语义。
+    version: 16,
+    name: 'boq-change-added-line-metadata',
+    async up(db) {
+      await addColumnIfMissing(db, 'boq_change_lines', 'item_id', 'TEXT REFERENCES items(id)')
+      await addColumnIfMissing(db, 'boq_change_lines', 'section', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'boq_change_lines', 'trade', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'boq_change_lines', 'spec', `TEXT NOT NULL DEFAULT ''`)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_boq_change_lines_item
+        ON boq_change_lines(item_id);
       `)
     },
   },
