@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const store = usePhaseTaskStore()
-const { info, undoToast, error } = useKitUI()
+const { undoToast, error } = useKitUI()
 const showEditor = shallowRef(false)
 const openPhase = shallowRef<number | null>(null)
 
@@ -59,10 +59,6 @@ async function saveTasks(next: PhaseTask[]) {
   catch {
     error('阶段任务保存失败，请重试')
   }
-}
-
-function attachmentPlaceholder(action: '上传' | '查看', title: string) {
-  info(`${action}「${title}」附件将在文件管理工序接入`)
 }
 
 onMounted(() => store.load())
@@ -121,7 +117,7 @@ onMounted(() => store.load())
           <div
             v-for="(task, index) in activePhaseView.tasks"
             :key="task.id"
-            class="flex items-center gap-3 rounded-[var(--radius-sm)] border border-line px-3 py-2"
+            class="flex flex-wrap items-center gap-3 rounded-[var(--radius-sm)] border border-line px-3 py-2"
             :class="task.status === 'pending' ? 'bg-surface-2' : 'bg-ok-soft'"
           >
             <span
@@ -130,7 +126,7 @@ onMounted(() => store.load())
             >
               {{ task.status === 'pending' ? index + 1 : '✓' }}
             </span>
-            <div class="min-w-0 flex-1">
+            <div class="min-w-48 flex-1">
               <div class="truncate text-12px font-700 text-ink">
                 {{ task.title }}
               </div>
@@ -139,12 +135,7 @@ onMounted(() => store.load())
               </div>
             </div>
             <span class="chip bg-panel text-ink-soft">{{ task.responsible || '待指定' }}</span>
-            <button class="btn-secondary text-11px" @click="attachmentPlaceholder('上传', task.title)">
-              <span class="i-lucide-upload mr-1 text-11px" aria-hidden="true" />上传
-            </button>
-            <button class="btn-secondary text-11px" @click="attachmentPlaceholder('查看', task.title)">
-              <span class="i-lucide-eye mr-1 text-11px" aria-hidden="true" />查看
-            </button>
+            <ProjectTaskFiles :task="task" :project-tasks="tasks" />
           </div>
         </div>
         <div v-else class="rounded-[var(--radius-btn)] border border-dashed border-line-strong bg-surface-2 px-4 py-6 text-center text-12px text-ink-faint">
@@ -152,6 +143,8 @@ onMounted(() => store.load())
         </div>
       </template>
     </div>
+
+    <ProjectFileList :project-id="projectId" :tasks="tasks" />
 
     <ProjectPhaseEditor
       v-model:open="showEditor"

@@ -1,6 +1,7 @@
 import type { DbDriver, TransactionDb } from './coordinator'
 
 import { invoke, isTauri } from '@tauri-apps/api/core'
+import { loadBrowserDatabase, saveBrowserDatabase } from './browser-storage'
 import { createDbCoordinator } from './coordinator'
 import { runMigrations } from './migrations'
 import { seedIfEmpty } from './seed'
@@ -28,7 +29,8 @@ async function createSqlJsDriver(): Promise<DbDriver> {
   const wasmResp = await fetch('/sql-wasm.wasm')
   const wasmBinary = await wasmResp.arrayBuffer()
   const SQL = await initSqlJs({ wasmBinary })
-  const conn = new SQL.Database()
+  const snapshot = await loadBrowserDatabase()
+  const conn = snapshot ? new SQL.Database(snapshot) : new SQL.Database()
   return {
     async execute(sql, params = []) {
       conn.run(sql, params as any[])
@@ -45,6 +47,9 @@ async function createSqlJsDriver(): Promise<DbDriver> {
       stmt.free()
       return rows
     },
+    async persist() {
+      await saveBrowserDatabase(conn.export())
+    },
     async close() {
       conn.close()
     },
@@ -60,6 +65,7 @@ async function initializeDb(): Promise<DbDriver> {
   try {
     await runMigrations(db)
     await seedIfEmpty(db)
+    await db.persist?.()
     return db
   }
   catch (error) {
