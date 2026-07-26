@@ -116,7 +116,10 @@ function fetchOriginalContracts(keyword: string) {
 }
 
 function fetchOtherExpenseContracts(keyword: string) {
+  if (props.kind !== 'other_settlement' && props.kind !== 'material_settlement')
+    return Promise.resolve([])
   return contractStore.searchSettlementContracts(
+    props.kind,
     draft.value.projectId ?? null,
     keyword,
   )
@@ -140,7 +143,7 @@ async function initialize() {
         ? 'contract_supplement'
         : props.kind === 'company_expense'
           ? 'company_expense_contract'
-          : props.kind === 'other_settlement'
+          : props.kind === 'other_settlement' || props.kind === 'material_settlement'
             ? 'expenditure_settlement'
             : 'contract'
       const [record, files] = await Promise.all([
@@ -172,7 +175,7 @@ async function initialize() {
 
 function patchDraft(patch: Partial<PageDraft>) {
   const next = { ...draft.value, ...patch }
-  if ('projectId' in patch && props.kind === 'other_settlement')
+  if ('projectId' in patch && (props.kind === 'other_settlement' || props.kind === 'material_settlement'))
     next.contractId = null
   draft.value = next
 }
@@ -215,10 +218,11 @@ function validateRequired(): boolean {
     )
   }
   else {
+    const contractLabel = props.kind === 'material_settlement' ? '材料采购合同' : '其他支出合同'
     required.push(
       ['name', '结算名称'],
       ['projectId', '项目'],
-      ['contractId', '其他支出合同'],
+      ['contractId', contractLabel],
       ['settlementDate', '结算日期'],
     )
   }

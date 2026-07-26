@@ -133,6 +133,14 @@ describe('f2 合同与支出结算领域 action', () => {
       totalAmount: 120,
       settlementDate: '2026-07-25',
     }, 'submit')
+    const materialSettlement = await store.saveForm('material_settlement', {
+      no: 'MAT-SETTLE-STORE',
+      name: '瓷砖采购结算',
+      projectId: 'project-contract',
+      contractId: material.id,
+      totalAmount: 200,
+      settlementDate: '2026-07-26',
+    }, 'submit')
 
     expect(store.byId(construction.id)).toMatchObject({
       customerId: 'customer-contract',
@@ -177,6 +185,27 @@ describe('f2 合同与支出结算领域 action', () => {
     }])
     expect(await loadF2Form('other_settlement', settlement.id))
       .toMatchObject({ id: settlement.id, contractId: otherExpense.id })
+    expect(await mem.select(`
+      SELECT id, biz_type, project_id, supplier_id, contract_id
+      FROM expenditure_settlements
+      WHERE id = ?
+    `, [materialSettlement.id])).toEqual([{
+      id: materialSettlement.id,
+      biz_type: '材料',
+      project_id: 'project-contract',
+      supplier_id: 'supplier-contract',
+      contract_id: material.id,
+    }])
+    expect(await loadF2Form('material_settlement', materialSettlement.id))
+      .toMatchObject({ id: materialSettlement.id, contractId: material.id })
+    expect(await loadF2Form('other_settlement', materialSettlement.id)).toBeNull()
+    await expect(store.saveForm('other_settlement', {
+      id: materialSettlement.id,
+      name: '错误路由覆盖',
+      projectId: 'project-contract',
+      contractId: otherExpense.id,
+      totalAmount: 1,
+    }, 'save')).rejects.toThrow('错误路由不能修改')
   })
 
   it('补充协议只写 contract_supplements，头、附件与操作日志同事务保存', async () => {

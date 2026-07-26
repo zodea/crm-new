@@ -1442,6 +1442,31 @@ export async function listMaterialFormAttachments(
   return listFileRefs(ownerType, id, includeDeleted)
 }
 
+export function materialFormIsFinal(
+  kind: MaterialFormKind,
+  status: string | null | undefined,
+): boolean {
+  return status === FINAL_STATUS[kind]
+}
+
+export function materialFormSupportsAttachments(kind: MaterialFormKind): boolean {
+  return Boolean(OWNER_TYPE[kind])
+}
+
+export async function updateMaterialFormAttachments(
+  kind: MaterialFormKind,
+  id: string,
+  changes: FileRefChanges,
+): Promise<string[]> {
+  const ownerType = OWNER_TYPE[kind]
+  if (!ownerType)
+    throw new Error('当前表单不支持附件')
+  return withTransaction(async (tx) => {
+    await assertReference(tx, TABLE_BY_KIND[kind], id, '单据')
+    return applyFileRefChanges(tx, ownerType, id, changes)
+  })
+}
+
 export async function deleteMaterialForm(
   kind: MaterialFormKind,
   id: string,

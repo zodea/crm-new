@@ -91,4 +91,26 @@ describe('侧栏导航树', () => {
       expect(activeNavKey(`${route}/form/f3_1`)).toBe(key)
     }
   })
+
+  it('f4 乙供材与甲供材入口全部启用，整页表单保持来源导航点亮', () => {
+    const routes = [
+      ['matRequisition', '/material/requisition'],
+      ['matArrival', '/material/arrival'],
+      ['matUse', '/material/use'],
+      ['matSettle', '/material/settlement'],
+      ['stockCheck', '/material/stock-check'],
+      ['omTotal', '/owner-material/control'],
+      ['omRequisition', '/owner-material/requisition'],
+      ['omArrival', '/owner-material/arrival'],
+      ['omUse', '/owner-material/use'],
+      ['omDirect', '/owner-material/direct'],
+    ] as const
+
+    for (const [key, route] of routes) {
+      expect(leaves().find(item => item.key === key)?.to).toBe(route)
+      expect(activeNavKey(`${route}/new`)).toBe(key)
+      expect(activeNavKey(`${route}/f4_1`)).toBe(key)
+    }
+    expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
+  })
 })

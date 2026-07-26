@@ -258,6 +258,7 @@ export const useContractStore = defineStore('contract', () => {
   }
 
   async function searchSettlementContracts(
+    kind: 'other_settlement' | 'material_settlement',
     projectId: string | null,
     keyword: string,
   ): Promise<LookupOption[]> {
@@ -270,12 +271,13 @@ export const useContractStore = defineStore('contract', () => {
       no: string
       amount: number
     }>(selectVisibleSql('contracts', `
-      AND kind = '其他支出'
+      AND kind = ?
       AND project_id = ?
       AND (name LIKE ? OR no LIKE ?)
       ORDER BY sign_date DESC, created_at DESC
       LIMIT 50
     `), [
+      kind === 'material_settlement' ? '材采' : '其他支出',
       projectId,
       pattern,
       pattern,
@@ -288,7 +290,7 @@ export const useContractStore = defineStore('contract', () => {
   }
 
   async function loadAux(
-    kind: 'other_expense' | 'company_expense' | 'other_settlement',
+    kind: 'other_expense' | 'company_expense' | 'other_settlement' | 'material_settlement',
   ) {
     loading.value = true
     try {
@@ -345,7 +347,9 @@ export const useContractStore = defineStore('contract', () => {
         LEFT JOIN contracts AS contract
           ON contract.id = settlement.contract_id AND contract.deleted_at IS NULL
         WHERE ${visibleCond('expenditure_settlements', 'settlement')}
-          AND settlement.biz_type IN ('机械', '其他')
+          AND settlement.biz_type ${kind === 'material_settlement'
+            ? `IN ('材料', '材采')`
+            : `IN ('机械', '其他')`}
         ORDER BY settlement.created_at DESC
         `)
       }
@@ -369,18 +373,18 @@ export const useContractStore = defineStore('contract', () => {
 
   async function removeForm(kind: F2FormKind, id: string) {
     const logId = await deleteF2Form(kind, id)
-    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'other_expense')
+    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'material_settlement' || kind === 'other_expense')
       await loadAux(kind)
-    if (kind !== 'company_expense' && kind !== 'other_settlement')
+    if (kind !== 'company_expense' && kind !== 'other_settlement' && kind !== 'material_settlement')
       await load()
     return logId
   }
 
   async function undoForm(kind: F2FormKind, logId: string) {
     const restored = await undoOperation(db, logId)
-    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'other_expense')
+    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'material_settlement' || kind === 'other_expense')
       await loadAux(kind)
-    if (kind !== 'company_expense' && kind !== 'other_settlement')
+    if (kind !== 'company_expense' && kind !== 'other_settlement' && kind !== 'material_settlement')
       await load()
     return restored
   }

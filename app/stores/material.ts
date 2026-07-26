@@ -15,6 +15,7 @@ import {
   loadMaterialForm,
   restoreMaterialForm,
   saveMaterialForm,
+  updateMaterialFormAttachments,
 } from '~/lib/material/forms'
 
 type MaterialRecord = MaterialFormRecordMap[MaterialFormKind]
@@ -103,6 +104,20 @@ export const useMaterialStore = defineStore('material', () => {
     }
   }
 
+  async function saveAttachments(
+    kind: MaterialFormKind,
+    id: string,
+    attachments: FileRefChanges,
+  ) {
+    loading.value = true
+    try {
+      return await updateMaterialFormAttachments(kind, id, attachments)
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
   async function restoreForm(kind: MaterialFormKind, id: string) {
     loading.value = true
     try {
@@ -122,6 +137,7 @@ export const useMaterialStore = defineStore('material', () => {
     loadKind,
     loadOne,
     saveForm,
+    saveAttachments,
     removeForm,
     restoreForm,
     getMaterialStockSummary,

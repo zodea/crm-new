@@ -20,6 +20,7 @@ export type F2FormKind
     | 'other_expense'
     | 'company_expense'
     | 'other_settlement'
+    | 'material_settlement'
 
 export type F2SaveAction = 'draft' | 'save' | 'submit'
 
@@ -744,8 +745,9 @@ async function saveCompanyExpenseContract(
   return { id, logId, attachmentIds }
 }
 
-async function saveOtherSettlement(
+async function saveExpenditureSettlement(
   tx: TransactionDb,
+  kind: 'other_settlement' | 'material_settlement',
   draft: ExpenditureSettlementFormDraft,
   action: F2SaveAction,
   attachments: ContractFormAttachmentChanges,
@@ -769,17 +771,19 @@ async function saveOtherSettlement(
     'contracts',
     draft.contractId,
   )
+  const expectedContractKind = kind === 'material_settlement' ? '材采' : '其他支出'
+  const contractLabel = kind === 'material_settlement' ? '材料采购合同' : '其他支出合同'
   if (draft.contractId && !contract)
-    throw new Error('其他支出合同不存在或已删除')
-  if (contract && contract.kind !== '其他支出')
-    throw new Error('所选合同不是其他支出合同')
+    throw new Error(`${contractLabel}不存在或已删除`)
+  if (contract && contract.kind !== expectedContractKind)
+    throw new Error(`所选合同不是${contractLabel}`)
   if (contract && draft.projectId && contract.project_id !== draft.projectId)
-    throw new Error('其他支出合同与所选项目不一致')
+    throw new Error(`${contractLabel}与所选项目不一致`)
   if (action === 'submit') {
     requireFields([
       ['结算名称', draft.name],
       ['项目', draft.projectId],
-      ['其他支出合同', draft.contractId],
+      [contractLabel, draft.contractId],
       ['结算日期', draft.settlementDate],
     ])
   }
@@ -789,7 +793,7 @@ async function saveOtherSettlement(
   const values = [
     rawText(draft.no),
     rawText(draft.name),
-    contract?.cost_category || '其他',
+    contract?.cost_category || (kind === 'material_settlement' ? '材料' : '其他'),
     contract?.project_id ?? nullableText(draft.projectId),
     contract?.supplier_id ?? null,
     contract?.id ?? null,
@@ -806,8 +810,14 @@ async function saveOtherSettlement(
     now,
   ]
   const existing = draft.id
-    ? await activeRow<{ id: string }>(tx, 'expenditure_settlements', draft.id)
+    ? await activeRow<{ id: string, biz_type: string }>(
+        tx,
+        'expenditure_settlements',
+        draft.id,
+      )
     : null
+  if (existing && !settlementMatchesKind(kind, existing.biz_type))
+    throw new Error('错误路由不能修改该结算单')
   const logId = existing
     ? await withUpdateLog(tx, 'expenditure_settlements', id, () => tx.execute(`
         UPDATE expenditure_settlements
@@ -839,6 +849,15 @@ async function saveOtherSettlement(
   return { id, logId, attachmentIds }
 }
 
+function settlementMatchesKind(
+  kind: 'other_settlement' | 'material_settlement',
+  bizType: string,
+): boolean {
+  return kind === 'material_settlement'
+    ? bizType === '材料' || bizType === '材采'
+    : bizType === '其他'
+}
+
 export async function saveF2Form(
   kind: F2FormKind,
   draft: F2FormDraft,
@@ -863,8 +882,9 @@ export async function saveF2Form(
         attachments,
       )
     }
-    return saveOtherSettlement(
+    return saveExpenditureSettlement(
       tx,
+      kind as 'other_settlement' | 'material_settlement',
       draft as ExpenditureSettlementFormDraft,
       action,
       attachments,
@@ -979,6 +999,12 @@ export async function loadF2Form(
   if (!rows[0])
     return null
   const row = rows[0]
+  if (
+    (kind === 'other_settlement' || kind === 'material_settlement')
+    && !settlementMatchesKind(kind, String(row.biz_type ?? ''))
+  ) {
+    return null
+  }
   return {
     id: row.id as string,
     no: (row.no ?? '') as string,

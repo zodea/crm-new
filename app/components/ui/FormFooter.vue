@@ -6,6 +6,7 @@ type FormFooterAction = 'cancel' | 'draft' | 'saveNew' | 'saveSubmit' | 'save'
 
 interface Props {
   actions?: FormFooterAction[]
+  labels?: Partial<Record<FormFooterAction, string>>
   dirty: boolean
   closeAfterSave?: boolean
   loadingAction?: FormFooterAction | null
@@ -13,6 +14,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   actions: () => ['cancel', 'draft', 'saveNew', 'saveSubmit', 'save'],
+  labels: () => ({}),
   closeAfterSave: false,
   loadingAction: null,
 })
@@ -74,7 +76,7 @@ function emitAction(action: FormFooterAction) {
         :disabled="isDisabled(action.name)"
         @click="emitAction(action.name)"
       >
-        {{ action.label }}
+        {{ labels[action.name] ?? action.label }}
       </KitButton>
     </div>
   </footer>

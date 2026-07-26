@@ -55,6 +55,19 @@ describe('formFooter public behavior', () => {
       .toEqual(['取消', '保存并提交', '保存'])
   })
 
+  it('allows a business form to override an action label', () => {
+    render(FormFooter, {
+      props: {
+        actions: ['cancel', 'saveSubmit'],
+        labels: { saveSubmit: '保存并入库' },
+        dirty: true,
+      },
+    })
+
+    expect(screen.getByRole('button', { name: '保存并入库' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '保存并提交' })).toBeNull()
+  })
+
   it('two-way binds the optional close-after-save checkbox', async () => {
     const onUpdate = vi.fn()
     render(FormFooter, {
