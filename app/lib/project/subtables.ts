@@ -18,7 +18,7 @@ export interface ProjectDetailTabDefinition {
 
 export const PROJECT_DETAIL_TABS: readonly ProjectDetailTabDefinition[] = [
   { key: 'detail', label: '详细资料', kind: 'real' },
-  { key: 'budget', label: '成本预算', kind: 'placeholder' },
+  { key: 'budget', label: '成本预算', kind: 'real' },
   { key: 'construction', label: '施工合同管理', kind: 'real' },
   { key: 'expenditure', label: '支出合同管理', kind: 'placeholder' },
   { key: 'tax', label: '票税管理', kind: 'real' },

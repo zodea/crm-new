@@ -5,16 +5,16 @@ import {
 } from '~/lib/project/subtables'
 
 describe('project detail subtable definitions', () => {
-  it('keeps exactly four real tabs and six placeholders', () => {
+  it('keeps the completed budget slice real and the remaining deep tabs explicit', () => {
     expect(PROJECT_DETAIL_TABS).toHaveLength(10)
     expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'real').map(tab => tab.key)).toEqual([
       'detail',
+      'budget',
       'construction',
       'tax',
       'fund',
     ])
     expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'placeholder').map(tab => tab.key)).toEqual([
-      'budget',
       'expenditure',
       'current',
       'payment',

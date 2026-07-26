@@ -1,8 +1,13 @@
+import type {
+  TargetCostCategoryRow,
+  TargetCostVersionRow,
+} from '~/lib/project/cost-control'
 import type { ProjectDetailAggregate } from '~/lib/project/detail-aggregate'
 import type { ProjectInvoiceSummary, ProjectOperationSummary } from '~/lib/project/detail-summary'
 import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import { loadProjectCostControl } from '~/lib/project/cost-control'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 import { useInvoiceStore } from '~/stores/invoice'
 
@@ -108,6 +113,8 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const paymentApplications = shallowRef<PaymentApplicationRow[]>([])
   const currentReceipts = shallowRef<CurrentReceiptRow[]>([])
   const currentPayments = shallowRef<CurrentPaymentRow[]>([])
+  const targetCosts = shallowRef<TargetCostVersionRow[]>([])
+  const targetCostCategories = shallowRef<TargetCostCategoryRow[]>([])
   const aggregateRows = shallowRef<ProjectDetailAggregate[]>([])
   const loading = shallowRef(false)
   const loaded = shallowRef(false)
@@ -141,7 +148,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
       return
     loading.value = true
     try {
-      const [contracts, supplements, changes, outgoing, receipts, payments, currentRows, aggregates] = await Promise.all([
+      const [contracts, supplements, changes, outgoing, receipts, payments, currentRows, aggregates, costControl] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
           ['施工'],
@@ -177,6 +184,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
           selectVisibleSql('current_transactions', 'ORDER BY created_at DESC'),
         ),
         loadProjectDetailAggregates(db),
+        loadProjectCostControl(db),
       ])
       const currentIn = currentRows.filter(row => row.direction === 'receipt')
       const currentOut = currentRows.filter(row => row.direction === 'payment')
@@ -261,6 +269,8 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         amount: number(row.amount),
         paymentMethod: (row.payment_method ?? '') as string,
       }))
+      targetCosts.value = costControl.versions
+      targetCostCategories.value = costControl.categories
       aggregateRows.value = aggregates
       loaded.value = true
     }
@@ -278,6 +288,8 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     paymentApplications: readonly(paymentApplications),
     currentReceipts: readonly(currentReceipts),
     currentPayments: readonly(currentPayments),
+    targetCosts: readonly(targetCosts),
+    targetCostCategories: readonly(targetCostCategories),
     operationSummaries,
     invoiceOutputSummaries,
     invoiceSummaries,
