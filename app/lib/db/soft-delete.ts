@@ -41,6 +41,7 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   house_type_template_items: [
     { column: 'room_id', table: 'rooms' },
     { column: 'item_id', table: 'items' },
+    { column: 'boq_line_id', table: 'boq_lines' },
   ],
   construction_stages: [{ column: 'project_id', table: 'projects' }],
   construction_stage_items: [
@@ -62,7 +63,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'unit_id', table: 'units' },
     { column: 'stage_id', table: 'construction_stages' },
   ],
-  schedule_groups: [{ column: 'project_id', table: 'projects' }],
+  schedule_groups: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
   schedule_group_buildings: [
     { column: 'group_id', table: 'schedule_groups' },
     { column: 'building_id', table: 'buildings' },
@@ -80,6 +84,7 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   task_item_map: [
     { column: 'task_id', table: 'schedule_tasks' },
     { column: 'item_id', table: 'items' },
+    { column: 'boq_line_id', table: 'boq_lines' },
   ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [
@@ -97,6 +102,30 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   contracts: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
+  ],
+  boq_files: [{ column: 'contract_id', table: 'contracts' }],
+  boq_change_orders: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  boq_lines: [
+    { column: 'boq_file_id', table: 'boq_files' },
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+    { column: 'item_id', table: 'items' },
+    { column: 'change_order_id', table: 'boq_change_orders' },
+  ],
+  boq_change_lines: [
+    { column: 'change_order_id', table: 'boq_change_orders' },
+    { column: 'boq_line_id', table: 'boq_lines' },
+  ],
+  monthly_statements: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'contract_id', table: 'contracts' },
+  ],
+  monthly_statement_lines: [
+    { column: 'statement_id', table: 'monthly_statements' },
+    { column: 'boq_line_id', table: 'boq_lines' },
   ],
   delivery_records: [
     { column: 'project_id', table: 'projects' },

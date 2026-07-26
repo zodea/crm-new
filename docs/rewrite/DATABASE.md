@@ -81,9 +81,9 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
 ### 1.2 清单与变更线（2026-07-04 grill 新增）
 
 ```
-construction_contracts ─1:N→ boq_files ─1:N→ boq_lines（统一清单行模型，合同量+合同单价唯一来源）
+contracts(kind='施工') ─1:N→ boq_files ─1:N→ boq_lines（统一清单行模型，合同量+合同单价唯一来源）
 projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→已打回→已签证，CONTEXT.md「变更单」）
-              ├─1:N→ boq_change_lines ─N:1→ boq_lines（调量/调价指向原行；变更新增行反向挂 changeOrderId）
+              ├─1:N→ boq_change_lines ─N:1→ boq_lines（调量/调价指向原行；变更新增行反向挂 change_order_id）
               └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
 invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
@@ -141,18 +141,18 @@ Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_
 
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
-| ConstructionContract | `construction_contracts` | `id` | `contract-construction.md` |
+| ConstructionContract | `construction_contracts` | `id` | `contract-construction.md`（旧 IA 兼容表；v15 起 BOQ/变更/报量新关系统一引用 `contracts.id`） |
 | SupplementAgreement | `supplement_agreements` | `id` | `contract-construction.md` |
 | OwnerChangeOrder | `owner_change_orders` | `id` | `contract-construction.md`（金额台账=自动行（来源变更单）+手录纯金额签证，ADR-0002） |
 | ExpenditureContract | `expenditure_contracts` | `id` | `contract-base.md` + 类型文档 |
 | ContractLineItem | `contract_line_items` | `id` | `material-contract.md` |
-| BoqFile | `boq_files` | `id` | `boq-import.md`（清单文件：挂施工合同一对多，未拆表/已拆表） |
-| BoqLine | `boq_lines` | `id` | `boq-import.md` §二（统一清单行模型+来源追溯键） |
+| BoqFile | `boq_files` | `id` | `boq-import.md`（清单文件：挂 `contracts(kind='施工')` 一对多，未拆表/已拆表） |
+| BoqLine | `boq_lines` | `id` | `boq-import.md` §二（统一清单行模型+来源追溯键；已确认导入行或已签证变更新增行二选一） |
 | BoqChangeOrder | `boq_change_orders` | `id` | CONTEXT.md「变更单」「指令单」（四档状态） |
 | BoqChangeLine | `boq_change_lines` | `id` | 变更单行明细（新增/调量/调价） |
 | MonthlyStatement | `monthly_statements` | `id` | CONTEXT.md「月度报量」（屏待设计，表先行） |
 | MonthlyStatementLine | `monthly_statement_lines` | `id` | 同上（自动汇总+手调字段） |
-| Contract | `contracts` | `id` | **合同域轻实体仓（#90 批A 新 IA，v3 迁移已落地）**：施工/分包/材采单表 `kind` 区分，对齐设计稿 `kit/data.js` contracts[]。四级金额链列（amount/changed/settled/invoiced/paid）为 seed 静态值，真聚合留后续 pass。`construction_contracts` / `expenditure_contracts` 为旧 IA 表（清单拆表/变更单线仍挂其上），迁移合并另起工序。⚠️ [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认设计稿整页表单中的用户可编辑业务字段默认持久化；合同条款/质保金/开票方/明细行等具体列与迁移仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 回写，本警示在该评审完成前保留 |
+| Contract | `contracts` | `id` | **合同域 canonical ID（#90 批A 新 IA，v3；BOQ v15 收口）**：施工/分包/材采单表 `kind` 区分。v15 将 BOQ 文件、清单行、变更单、月度报量和进度分组统一引用这里的施工合同，并兼容合并缺失的旧 `construction_contracts` ID；旧表继续服务尚未迁移的补充协议等 IA。四级金额链列（amount/changed/settled/invoiced/paid）当前为 seed 静态值，真聚合留后续 pass。⚠️ [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md) 已确认设计稿整页表单中的用户可编辑业务字段默认持久化；合同条款/质保金/开票方/明细行等具体列与迁移仍待 [#116](https://github.com/zodea/crm-new/issues/116) 逐实体 schema 回写，本警示在该评审完成前保留 |
 | ContractSupplement | `contract_supplements` | `id` | 支出合同/合同轻实体补充协议；区别于只挂施工合同的 `supplement_agreements`，见 §10.1 |
 
 ```sql
@@ -184,83 +184,56 @@ CREATE TABLE contracts (
 ```
 
 ```sql
-CREATE TABLE boq_files (
-  id          TEXT PRIMARY KEY,
-  contractId  TEXT NOT NULL,          -- → construction_contracts.id（一份合同可挂多份清单文件）
-  fileName    TEXT, filePath TEXT,
-  formatClass TEXT,                   -- 'A'..'E'（boq-import.md §一 五类格式）
-  parseStatus TEXT DEFAULT 'pending', -- 'pending' 未拆表 | 'parsed' 已拆表·N 行
-  lineCount   INTEGER DEFAULT 0,
-  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
-);
+-- v15 `boq-change-monthly-foundation`：下列关系全部使用 snake_case。
+boq_files(
+  id, contract_id -> contracts.id, file_name, file_path, format_class,
+  parse_status ['pending'|'parsed'], line_count, note, created_at, updated_at, deleted_at
+)
 
-CREATE TABLE boq_lines (
-  id          TEXT PRIMARY KEY,
-  boqFileId   TEXT NOT NULL,          -- → boq_files.id
-  projectId   TEXT NOT NULL,          -- 冗余 → projects.id（高频按项目查）
-  -- 必有（boq-import.md §二）
-  itemName    TEXT NOT NULL,          -- 分项名称
-  unit TEXT, qty REAL,                -- 单套量为准（×套数=总量）
-  unitPrice   REAL,                   -- 合同单价（不含税）
-  amount      REAL,                   -- 合价
-  traceKey    TEXT,                   -- 来源追溯键（文件·sheet·行）
-  -- 常有可空
-  building TEXT, unitType TEXT, multiplier REAL,  -- 楼栋/户型/套数(倍数)
-  room TEXT, section TEXT, floorZone TEXT,        -- 房间(部位)/分部·章节/楼层层区
-  spec TEXT,                                       -- 特征描述
-  -- 可选
-  taxRate REAL, ownerSupplied INTEGER DEFAULT 0,   -- 税率/甲供标记（计量计工资不计材成本）
-  changeOrderId TEXT,                 -- 非空=变更新增行 → boq_change_orders.id
-  sortOrder INTEGER, createdAt TEXT, deleted_at TEXT
-);
+boq_lines(
+  id, boq_file_id -> boq_files.id NULL, project_id -> projects.id,
+  contract_id -> contracts.id, item_id -> items.id NULL,
+  section, trade, item_name, unit, qty, unit_price, amount,
+  trace_key, source_sheet, source_row, recognized_qty, recognized_unit_price,
+  building, unit_type, multiplier, room, floor_zone, spec, tax_rate, owner_supplied,
+  change_order_id -> boq_change_orders.id NULL, sort_order, created_at, updated_at, deleted_at
+)
+-- 活跃行必须二选一：导入行有 boq_file_id；变更新增行有 change_order_id。
+-- (boq_file_id, trace_key) 对活跃导入行唯一。
 
-CREATE TABLE boq_change_orders (
-  id          TEXT PRIMARY KEY,
-  projectId   TEXT NOT NULL,          -- → projects.id
-  contractId  TEXT,                   -- → construction_contracts.id
-  code TEXT, name TEXT,               -- 编号/名称（单项目可达 200 份，靠编号+状态筛选检索）
-  changeType  TEXT,                   -- 主类型：'新增' | '调量' | '调价'（行级可混合）
-  status      TEXT DEFAULT 'draft',   -- 'draft' 草稿 | 'submitted' 已上报 | 'rejected' 已打回 | 'approved' 已签证
-  statusNote  TEXT,                   -- 各档详细说明（打回原因等，CONTEXT.md「变更单」）
-  directiveNo   TEXT,                 -- 甲方下发指令单编号
-  directiveType TEXT,                 -- 甲方指令单性质：'下发' | '变更' | '补充'
-  totalAmount REAL,                   -- Σ变更行合价（冗余）
-  approvedAt  TEXT,                   -- 签证完成日：该刻自动生成变洽签台账行（ADR-0002）
-  ledgerId    TEXT,                   -- → owner_change_orders.id（1:1 追溯；台账自动行不可直改金额）
-  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
-);
--- 附件（我方指令单/甲方指令单/报价/算量/施工照片）走 file_refs 分类挂载，见 §3.5
+boq_change_orders(
+  id, project_id -> projects.id, contract_id -> contracts.id, code, name,
+  change_type ['add'|'qty'|'price'|'mixed'],
+  status ['draft'|'submitted'|'rejected'|'approved'], status_note,
+  directive_no, directive_type [''|'issued'|'changed'|'supplemented'],
+  total_amount, approved_at, ledger_id -> owner_change_orders.id,
+  note, created_at, updated_at, deleted_at
+)
+-- approved 必须同时有 approved_at、ledger_id；ledger_id 对活跃变更单唯一。
 
-CREATE TABLE boq_change_lines (
-  id            TEXT PRIMARY KEY,
-  changeOrderId TEXT NOT NULL,        -- → boq_change_orders.id
-  boqLineId     TEXT,                 -- → boq_lines.id（调量/调价指向原行；新增为 NULL）
-  itemName TEXT, unit TEXT,
-  deltaQty REAL,                      -- 调量差值（新增行=全量）
-  newUnitPrice REAL,                  -- 调价后单价（NULL=价不变）
-  amount REAL,                        -- 该行变更合价
-  note TEXT, sortOrder INTEGER
-);
+boq_change_lines(
+  id, change_order_id -> boq_change_orders.id, boq_line_id -> boq_lines.id NULL,
+  result_boq_line_id -> boq_lines.id NULL, operation ['add'|'qty'|'price'],
+  item_name, unit, delta_qty, new_unit_price, amount, note, sort_order,
+  created_at, updated_at, deleted_at
+)
+-- add 不指向原行；qty/price 必须指向原行。签证后的新增结果通过 result_boq_line_id 追溯。
 
-CREATE TABLE monthly_statements (
-  id        TEXT PRIMARY KEY,
-  projectId TEXT NOT NULL,            -- → projects.id
-  month     TEXT NOT NULL,            -- yyyy-mm
-  status    TEXT DEFAULT 'draft',     -- 'draft' 自动汇总草稿 | 'adjusted' 已手调 | 'exported' 已导出
-  totalAmount REAL,
-  note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
-);
+monthly_statements(
+  id, project_id -> projects.id, contract_id -> contracts.id, month,
+  status ['draft'|'adjusted'|'exported'], total_amount, note,
+  created_at, updated_at, deleted_at
+)
+-- (contract_id, month) 对活跃报量单唯一。
 
-CREATE TABLE monthly_statement_lines (
-  id          TEXT PRIMARY KEY,
-  statementId TEXT NOT NULL,          -- → monthly_statements.id
-  itemName TEXT, unit TEXT,
-  autoQty     REAL,                   -- 自动汇总：当月完成勾选+现场量
-  adjustedQty REAL,                   -- 手工调整（NULL=未调，取 autoQty）
-  unitPrice   REAL,                   -- 合同单价
-  amount REAL, note TEXT, sortOrder INTEGER
-);
+monthly_statement_lines(
+  id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,
+  item_name, unit, auto_qty, adjusted_qty, unit_price, amount, note, sort_order,
+  created_at, updated_at, deleted_at
+)
 ```
+
+变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。
 
 ### 2.4 资金管理类
 
@@ -642,7 +615,7 @@ END;
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 
-> `ScheduleGroup.contractId` 为必填逻辑外键，指向且只指向一份 `ConstructionContract`；`projectId` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，禁止跨合同混组。当前 `contracts` 轻实体与 `construction_contracts` 旧 IA 尚待 #115/#116 收口，新增迁移前必须统一到合同域 canonical ID，不能同时保存两套合同引用。
+> `schedule_groups.contract_id` 是 v15 落地的合同域外键，指向且只指向一份 `contracts(kind='施工')`；`project_id` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，禁止跨合同混组。`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 
@@ -708,14 +681,17 @@ CREATE TABLE target_cost_items (
 | `expenditure_contracts` | `projectId` | `projects.id` | N:1 | 支出合同 → 项目 |
 | `expenditure_contracts` | `supplierId` | `suppliers.id` | N:1 | 支出合同 → 分供方 |
 | `contract_line_items` | `contractId` | `expenditure_contracts.id` | N:1 | 合同明细行 → 支出合同 |
-| `boq_files` | `contractId` | `construction_contracts.id` | N:1 | 清单文件 → 施工合同（一对多） |
-| `boq_lines` | `boqFileId` / `projectId` | `boq_files.id` / `projects.id` | N:1 | 清单行（projectId 冗余） |
-| `boq_lines` | `changeOrderId` | `boq_change_orders.id` | N:1 | 变更新增行来源（可选） |
-| `boq_change_orders` | `projectId` / `contractId` | `projects.id` / `construction_contracts.id` | N:1 | 变更单 |
-| `boq_change_orders` | `ledgerId` | `owner_change_orders.id` | 1:1 | 已签证自动生成的台账行（ADR-0002，软删除级联） |
-| `boq_change_lines` | `changeOrderId` / `boqLineId` | `boq_change_orders.id` / `boq_lines.id` | N:1 | 变更行（新增行 boqLineId 为 NULL） |
-| `monthly_statements` | `projectId` | `projects.id` | N:1 | 月度报量单 |
-| `monthly_statement_lines` | `statementId` | `monthly_statements.id` | N:1 | 报量行 |
+| `boq_files` | `contract_id` | `contracts.id` | N:1 | 清单文件 → canonical 施工合同（一对多） |
+| `boq_lines` | `boq_file_id` / `project_id` / `contract_id` / `item_id` | `boq_files.id` / `projects.id` / `contracts.id` / `items.id` | N:1 | 清单行；项目、合同为高频查询冗余，标准分项映射可空 |
+| `boq_lines` | `change_order_id` | `boq_change_orders.id` | N:1 | 已签证变更新增行来源（可选） |
+| `boq_change_orders` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 变更单 |
+| `boq_change_orders` | `ledger_id` | `owner_change_orders.id` | 1:1 | 已签证自动生成的台账行（ADR-0002，软删除级联） |
+| `boq_change_lines` | `change_order_id` / `boq_line_id` / `result_boq_line_id` | `boq_change_orders.id` / `boq_lines.id` | N:1 | 变更行原始目标与签证结果追溯 |
+| `monthly_statements` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 月度报量单 |
+| `monthly_statement_lines` | `statement_id` / `boq_line_id` | `monthly_statements.id` / `boq_lines.id` | N:1 | 报量行 |
+| `house_type_template_items` | `boq_line_id` | `boq_lines.id` | N:1 | 户型分项从已确认 BOQ 行带出工程量；NULL 表示人工兜底 |
+| `schedule_groups` | `contract_id` | `contracts.id` | N:1 | 楼栋分组只属于一份施工合同 |
+| `task_item_map` | `boq_line_id` | `boq_lines.id` | N:1 | 计划分解只引用 BOQ，不复制合同量/合同价 |
 | `contracts` | `project_id` / `supplier_id` | `projects.id` / `suppliers.id` | N:1 | 合同轻实体仓 |
 | `contract_supplements` | `contract_id` | `contracts.id` | N:1 | 支出合同/轻实体补充协议 |
 
@@ -958,10 +934,10 @@ interface FilePayload {
 |---|---|
 | 合同量（含变更） | `boq_lines` 原始行 + **已签证**变更行增量（`boq_change_orders.status='approved'` 的 `boq_change_lines.deltaQty`）；可另开参考口径含已上报 |
 | 量差（分项×楼栋） | 基准量 − 合同量，基准量可勾选 = 合同 / 暂估 / 现场（`house_type_template_items` 三量，按挂靠户展开到楼栋） |
-| 量差金额 | 量差 × 合同单价（`boq_lines.unitPrice`，调价变更取已签证新单价） |
+| 量差金额 | 量差 × 合同单价（`boq_lines.unit_price`，调价变更取已签证新单价） |
 | 产值 | Σ完成量 × 合同单价，含已签证变更（CONTEXT.md「单价双轨」：合同单价轨） |
 | 分项毛利 | (合同单价 − 班组分项单价) × 量（现场量未核定用暂估量预估） |
-| 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completed_at`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.autoQty`；同一分项映射多阶段不得重复计量 |
+| 月度报量草稿行 | 按报量阶段映射筛当月 `unit_stage_completions.completed_at`，连接户型模板现场量 × 合同单价 → `monthly_statement_lines.auto_qty`；同一分项映射多阶段不得重复计量 |
 
 ---
 
@@ -1124,16 +1100,25 @@ CREATE INDEX idx_target_costs_proj ON target_costs(projectId);
 CREATE INDEX idx_tci_target ON target_cost_items(targetCostId);
 
 -- 清单与变更
-CREATE INDEX idx_boq_files_contract ON boq_files(contractId);
-CREATE INDEX idx_boq_lines_file ON boq_lines(boqFileId);
-CREATE INDEX idx_boq_lines_proj ON boq_lines(projectId);
-CREATE INDEX idx_boq_co_proj ON boq_change_orders(projectId);
-CREATE INDEX idx_boq_co_status ON boq_change_orders(status);   -- 200 份量级按状态筛选
-CREATE INDEX idx_boq_cl_order ON boq_change_lines(changeOrderId);
+CREATE INDEX idx_boq_files_contract ON boq_files(contract_id);
+CREATE INDEX idx_boq_lines_file ON boq_lines(boq_file_id);
+CREATE INDEX idx_boq_lines_project ON boq_lines(project_id);
+CREATE INDEX idx_boq_lines_contract ON boq_lines(contract_id);
+CREATE INDEX idx_boq_lines_item ON boq_lines(item_id);
+CREATE INDEX idx_boq_change_orders_project ON boq_change_orders(project_id);
+CREATE INDEX idx_boq_change_orders_contract ON boq_change_orders(contract_id);
+CREATE INDEX idx_boq_change_orders_status ON boq_change_orders(status); -- 200 份量级按状态筛选
+CREATE INDEX idx_boq_change_lines_order ON boq_change_lines(change_order_id);
+CREATE UNIQUE INDEX uq_boq_line_trace ON boq_lines(boq_file_id, trace_key)
+  WHERE deleted_at IS NULL AND boq_file_id IS NOT NULL AND trace_key <> '';
+CREATE UNIQUE INDEX uq_boq_change_order_ledger ON boq_change_orders(ledger_id)
+  WHERE deleted_at IS NULL AND ledger_id IS NOT NULL;
 
 -- 月度报量
-CREATE INDEX idx_ms_proj_month ON monthly_statements(projectId, month);
-CREATE INDEX idx_msl_statement ON monthly_statement_lines(statementId);
+CREATE INDEX idx_monthly_statements_project_month ON monthly_statements(project_id, month);
+CREATE INDEX idx_monthly_statement_lines_statement ON monthly_statement_lines(statement_id);
+CREATE UNIQUE INDEX uq_monthly_statement_contract_month ON monthly_statements(contract_id, month)
+  WHERE deleted_at IS NULL;
 
 -- 送货单
 CREATE INDEX idx_delivery_proj ON delivery_records(projectId);

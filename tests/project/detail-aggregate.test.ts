@@ -48,7 +48,7 @@ describe('project detail SQL aggregates', () => {
     expect(p1).toMatchObject({
       mainContractAmount: 32388422,
       supplementAmount: 320000,
-      ownerChangeAmount: 120000,
+      ownerChangeAmount: 120520,
       projectReceipt: 25367027,
       paymentAmount: 4200000,
       currentReceipt: 6100000,

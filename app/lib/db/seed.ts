@@ -109,6 +109,78 @@ export async function seedQuantityDemo(db: MigrationDb) {
   }
 }
 
+const BOQ_SEED_TABLES = [
+  'boq_files',
+  'boq_lines',
+  'boq_change_orders',
+  'boq_change_lines',
+  'monthly_statements',
+  'monthly_statement_lines',
+] as const
+
+const BOQ_TEMPLATE_LINKS = [
+  ['qty_hti_a_pipe', 'boq_line_demo_a_pipe'],
+  ['qty_hti_a_wp_wall', 'boq_line_demo_a_wp_wall'],
+  ['qty_hti_a_wp_floor', 'boq_line_demo_a_wp_floor'],
+  ['qty_hti_a_wall', 'boq_line_demo_a_wall'],
+  ['qty_hti_a_floor', 'boq_line_demo_a_floor'],
+  ['qty_hti_b_pipe', 'boq_line_demo_b_pipe'],
+  ['qty_hti_b_wp_wall', 'boq_line_demo_b_wp_wall'],
+  ['qty_hti_b_wp_floor', 'boq_line_demo_b_wp_floor'],
+  ['qty_hti_b_wall', 'boq_line_demo_b_wall'],
+  ['qty_hti_b_floor', 'boq_line_demo_b_floor'],
+] as const
+
+/**
+ * #115 演示清单与 #103 工程量事实共享稳定行 ID；缺施工合同或工程量演示图时不污染旧库。
+ */
+export async function seedBoqDemo(db: MigrationDb) {
+  const [contract] = await db.select<{ id: string }>(`
+    SELECT id
+    FROM contracts
+    WHERE id = 'con_demo_sg01'
+      AND project_id = 'proj_demo_001'
+      AND kind = '施工'
+      AND deleted_at IS NULL
+  `)
+  const [quantitySentinel] = await db.select<{ id: string }>(`
+    SELECT id
+    FROM house_type_template_items
+    WHERE id = 'qty_hti_b_floor'
+      AND deleted_at IS NULL
+  `)
+  if (!contract || !quantitySentinel)
+    return
+
+  const [seeded] = await db.select<{ id: string }>(`
+    SELECT id FROM monthly_statement_lines WHERE id = 'monthly_statement_line_demo_001'
+  `)
+  if (seeded)
+    return
+
+  await db.execute('BEGIN')
+  try {
+    const ledgerRows = loadBaseSeedJson('owner_change_orders')
+      .filter(row => row.id === 'boq_ledger_demo_001')
+    await seedStrictById(db, 'owner_change_orders', ledgerRows)
+    for (const table of BOQ_SEED_TABLES)
+      await seedStrictById(db, table, loadBaseSeedJson(table))
+    for (const [templateItemId, boqLineId] of BOQ_TEMPLATE_LINKS) {
+      await db.execute(
+        `UPDATE house_type_template_items
+         SET boq_line_id = ?
+         WHERE id = ? AND deleted_at IS NULL`,
+        [boqLineId, templateItemId],
+      )
+    }
+    await db.execute('COMMIT')
+  }
+  catch (error) {
+    await db.execute('ROLLBACK')
+    throw error
+  }
+}
+
 const DEMO_SCHEDULE_PROJECT_ID = 'proj_demo_001'
 const DEMO_SCHEDULE_GROUP_ID = 'schedule_group_demo_001'
 
@@ -186,21 +258,44 @@ export async function seedScheduleDemo(db: MigrationDb) {
   )
   const stageByCode = new Map(stages.map(stage => [stage.code, stage.id]))
   const itemByCode = new Map(items.map(item => [item.code, item.id]))
+  const [contract] = await db.select<{ id: string }>(`
+    SELECT id
+    FROM contracts
+    WHERE project_id = ?
+      AND kind = '施工'
+      AND deleted_at IS NULL
+    ORDER BY created_at, id
+    LIMIT 1
+  `, [DEMO_SCHEDULE_PROJECT_ID])
+  const boqLines = await db.select<{ id: string, item_id: string }>(`
+    SELECT id, item_id
+    FROM boq_lines
+    WHERE project_id = ?
+      AND contract_id = ?
+      AND item_id IS NOT NULL
+      AND deleted_at IS NULL
+    ORDER BY sort_order, id
+  `, [DEMO_SCHEDULE_PROJECT_ID, contract?.id ?? ''])
+  const boqLineByItem = new Map<string, string>()
+  for (const line of boqLines) {
+    if (!boqLineByItem.has(line.item_id))
+      boqLineByItem.set(line.item_id, line.id)
+  }
   const missingStage = SCHEDULE_TASK_TEMPLATES.find(
     template => template.stageCode && !stageByCode.has(template.stageCode),
   )
   const missingItem = SCHEDULE_TASK_TEMPLATES
     .flatMap(template => template.itemCodes)
     .find(code => !itemByCode.has(code))
-  if (!buildings.length || missingStage || missingItem)
+  if (!buildings.length || !contract || missingStage || missingItem)
     return
 
   await db.execute('BEGIN')
   try {
     await db.execute(
-      `INSERT INTO schedule_groups (id, project_id, name, sort_order)
-       VALUES (?, ?, ?, 10) ON CONFLICT(id) DO NOTHING`,
-      [DEMO_SCHEDULE_GROUP_ID, DEMO_SCHEDULE_PROJECT_ID, '户内1栋-2栋'],
+      `INSERT INTO schedule_groups (id, project_id, contract_id, name, sort_order)
+       VALUES (?, ?, ?, ?, 10) ON CONFLICT(id) DO NOTHING`,
+      [DEMO_SCHEDULE_GROUP_ID, DEMO_SCHEDULE_PROJECT_ID, contract.id, '户内1栋-2栋'],
     )
     for (const [index, building] of buildings.entries()) {
       await db.execute(
@@ -238,10 +333,16 @@ export async function seedScheduleDemo(db: MigrationDb) {
       )
 
       for (const [mapIndex, itemCode] of template.itemCodes.entries()) {
+        const itemId = itemByCode.get(itemCode)!
         await db.execute(
-          `INSERT INTO task_item_map (id, task_id, item_id)
-           VALUES (?, ?, ?) ON CONFLICT(id) DO NOTHING`,
-          [`schedule_task_item_demo_${index + 1}_${mapIndex + 1}`, id, itemByCode.get(itemCode)!],
+          `INSERT INTO task_item_map (id, task_id, item_id, boq_line_id)
+           VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+          [
+            `schedule_task_item_demo_${index + 1}_${mapIndex + 1}`,
+            id,
+            itemId,
+            boqLineByItem.get(itemId) ?? null,
+          ],
         )
       }
 
@@ -320,6 +421,7 @@ export async function seedIfEmpty(db: MigrationDb) {
   }
 
   await seedQuantityDemo(db)
+  await seedBoqDemo(db)
   await seedScheduleDemo(db)
 }
 

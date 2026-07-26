@@ -130,6 +130,7 @@ const QUANTITY_FOREIGN_KEYS: Record<string, ForeignKeyDescription[]> = {
   house_type_template_items: [
     { source_column: 'room_id', target_table: 'rooms', target_column: 'id' },
     { source_column: 'item_id', target_table: 'items', target_column: 'id' },
+    { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
   ],
   construction_stages: [{ source_column: 'project_id', target_table: 'projects', target_column: 'id' }],
   construction_stage_items: [

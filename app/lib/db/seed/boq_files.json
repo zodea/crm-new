@@ -1,0 +1,14 @@
+[
+  {
+    "id": "boq_file_demo_001",
+    "contract_id": "con_demo_sg01",
+    "file_name": "合和新城施工合同清单.xlsx",
+    "file_path": "",
+    "format_class": "B",
+    "parse_status": "parsed",
+    "line_count": 10,
+    "note": "B 类·章节树户内合同型",
+    "created_at": "2026-04-01T09:00:00.000Z",
+    "updated_at": "2026-04-01T09:00:00.000Z"
+  }
+]

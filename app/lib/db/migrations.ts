@@ -557,6 +557,182 @@ CREATE INDEX IF NOT EXISTS idx_task_item_map_deleted
   ON task_item_map(deleted_at) WHERE deleted_at IS NOT NULL;
 `
 
+/** v15 BOQ 深模块(#115)：清单唯一量价源、变更签证与月度报量。 */
+const V15_BOQ_FOUNDATION = `
+CREATE TABLE IF NOT EXISTS boq_change_orders (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL REFERENCES projects(id),
+  contract_id    TEXT NOT NULL REFERENCES contracts(id),
+  code           TEXT NOT NULL DEFAULT '',
+  name           TEXT NOT NULL,
+  change_type    TEXT NOT NULL DEFAULT 'qty'
+                 CHECK (change_type IN ('add', 'qty', 'price', 'mixed')),
+  status         TEXT NOT NULL DEFAULT 'draft'
+                 CHECK (status IN ('draft', 'submitted', 'rejected', 'approved')),
+  status_note    TEXT NOT NULL DEFAULT '',
+  directive_no   TEXT NOT NULL DEFAULT '',
+  directive_type TEXT NOT NULL DEFAULT ''
+                 CHECK (directive_type IN ('', 'issued', 'changed', 'supplemented')),
+  total_amount   REAL NOT NULL DEFAULT 0,
+  approved_at    TEXT,
+  ledger_id      TEXT REFERENCES owner_change_orders(id),
+  note           TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL,
+  CHECK (
+    (status = 'approved' AND approved_at IS NOT NULL AND ledger_id IS NOT NULL)
+    OR status <> 'approved'
+  )
+);
+
+CREATE TABLE IF NOT EXISTS boq_files (
+  id           TEXT PRIMARY KEY,
+  contract_id  TEXT NOT NULL REFERENCES contracts(id),
+  file_name    TEXT NOT NULL,
+  file_path    TEXT NOT NULL DEFAULT '',
+  format_class TEXT NOT NULL DEFAULT '',
+  parse_status TEXT NOT NULL DEFAULT 'pending'
+               CHECK (parse_status IN ('pending', 'parsed')),
+  line_count   INTEGER NOT NULL DEFAULT 0 CHECK (line_count >= 0),
+  note         TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at   TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS boq_lines (
+  id                    TEXT PRIMARY KEY,
+  boq_file_id           TEXT REFERENCES boq_files(id),
+  project_id            TEXT NOT NULL REFERENCES projects(id),
+  contract_id           TEXT NOT NULL REFERENCES contracts(id),
+  item_id               TEXT REFERENCES items(id),
+  section               TEXT NOT NULL DEFAULT '',
+  trade                 TEXT NOT NULL DEFAULT '',
+  item_name             TEXT NOT NULL,
+  unit                  TEXT NOT NULL DEFAULT '',
+  qty                   REAL,
+  unit_price            REAL,
+  amount                REAL,
+  trace_key             TEXT NOT NULL DEFAULT '',
+  source_sheet          TEXT NOT NULL DEFAULT '',
+  source_row            INTEGER,
+  recognized_qty        REAL,
+  recognized_unit_price REAL,
+  building              TEXT NOT NULL DEFAULT '',
+  unit_type             TEXT NOT NULL DEFAULT '',
+  multiplier            REAL,
+  room                  TEXT NOT NULL DEFAULT '',
+  floor_zone            TEXT NOT NULL DEFAULT '',
+  spec                  TEXT NOT NULL DEFAULT '',
+  tax_rate              REAL,
+  owner_supplied        INTEGER NOT NULL DEFAULT 0 CHECK (owner_supplied IN (0, 1)),
+  change_order_id       TEXT REFERENCES boq_change_orders(id),
+  sort_order            INTEGER NOT NULL DEFAULT 0,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at            TEXT DEFAULT NULL,
+  CHECK (
+    (boq_file_id IS NOT NULL AND change_order_id IS NULL)
+    OR (boq_file_id IS NULL AND change_order_id IS NOT NULL)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS boq_change_lines (
+  id                 TEXT PRIMARY KEY,
+  change_order_id    TEXT NOT NULL REFERENCES boq_change_orders(id),
+  boq_line_id        TEXT REFERENCES boq_lines(id),
+  result_boq_line_id TEXT REFERENCES boq_lines(id),
+  operation          TEXT NOT NULL CHECK (operation IN ('add', 'qty', 'price')),
+  item_name          TEXT NOT NULL DEFAULT '',
+  unit               TEXT NOT NULL DEFAULT '',
+  delta_qty          REAL,
+  new_unit_price     REAL,
+  amount             REAL NOT NULL DEFAULT 0,
+  note               TEXT NOT NULL DEFAULT '',
+  sort_order         INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL,
+  CHECK (
+    (operation = 'add' AND boq_line_id IS NULL AND delta_qty IS NOT NULL)
+    OR (operation = 'qty' AND boq_line_id IS NOT NULL AND delta_qty IS NOT NULL)
+    OR (operation = 'price' AND boq_line_id IS NOT NULL AND new_unit_price IS NOT NULL)
+  )
+);
+
+CREATE TABLE IF NOT EXISTS monthly_statements (
+  id           TEXT PRIMARY KEY,
+  project_id   TEXT NOT NULL REFERENCES projects(id),
+  contract_id  TEXT NOT NULL REFERENCES contracts(id),
+  month        TEXT NOT NULL CHECK (month GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]'),
+  status       TEXT NOT NULL DEFAULT 'draft'
+               CHECK (status IN ('draft', 'adjusted', 'exported')),
+  total_amount REAL NOT NULL DEFAULT 0,
+  note         TEXT NOT NULL DEFAULT '',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at   TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS monthly_statement_lines (
+  id            TEXT PRIMARY KEY,
+  statement_id  TEXT NOT NULL REFERENCES monthly_statements(id),
+  boq_line_id   TEXT NOT NULL REFERENCES boq_lines(id),
+  item_name     TEXT NOT NULL,
+  unit          TEXT NOT NULL DEFAULT '',
+  auto_qty      REAL NOT NULL DEFAULT 0,
+  adjusted_qty  REAL,
+  unit_price    REAL NOT NULL DEFAULT 0,
+  amount        REAL NOT NULL DEFAULT 0,
+  note          TEXT NOT NULL DEFAULT '',
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_boq_files_contract ON boq_files(contract_id);
+CREATE INDEX IF NOT EXISTS idx_boq_lines_file ON boq_lines(boq_file_id);
+CREATE INDEX IF NOT EXISTS idx_boq_lines_project ON boq_lines(project_id);
+CREATE INDEX IF NOT EXISTS idx_boq_lines_contract ON boq_lines(contract_id);
+CREATE INDEX IF NOT EXISTS idx_boq_lines_item ON boq_lines(item_id);
+CREATE INDEX IF NOT EXISTS idx_boq_change_orders_project ON boq_change_orders(project_id);
+CREATE INDEX IF NOT EXISTS idx_boq_change_orders_contract ON boq_change_orders(contract_id);
+CREATE INDEX IF NOT EXISTS idx_boq_change_orders_status ON boq_change_orders(status);
+CREATE INDEX IF NOT EXISTS idx_boq_change_lines_order ON boq_change_lines(change_order_id);
+CREATE INDEX IF NOT EXISTS idx_monthly_statements_project_month
+  ON monthly_statements(project_id, month);
+CREATE INDEX IF NOT EXISTS idx_monthly_statement_lines_statement
+  ON monthly_statement_lines(statement_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_boq_line_trace
+  ON boq_lines(boq_file_id, trace_key)
+  WHERE deleted_at IS NULL AND boq_file_id IS NOT NULL AND trace_key <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_boq_change_order_code
+  ON boq_change_orders(project_id, code)
+  WHERE deleted_at IS NULL AND code <> '';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_boq_change_order_ledger
+  ON boq_change_orders(ledger_id)
+  WHERE deleted_at IS NULL AND ledger_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_monthly_statement_contract_month
+  ON monthly_statements(contract_id, month)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_boq_files_deleted
+  ON boq_files(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_boq_lines_deleted
+  ON boq_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_boq_change_orders_deleted
+  ON boq_change_orders(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_boq_change_lines_deleted
+  ON boq_change_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_monthly_statements_deleted
+  ON monthly_statements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_monthly_statement_lines_deleted
+  ON monthly_statement_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+`
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -729,6 +905,112 @@ export const migrations: Migration[] = [
     name: 'schedule-foundation',
     async up(db) {
       await execScript(db, V14_SCHEDULE_FOUNDATION)
+    },
+  },
+  {
+    version: 15,
+    name: 'boq-change-monthly-foundation',
+    async up(db) {
+      // 合同域 canonical ID 已由 contracts store 持有；旧 IA 施工合同仅作为兼容迁移来源。
+      await db.execute(`
+        INSERT INTO contracts
+          (id, no, name, kind, project_id, amount, changed, sign_date, status, created_at, updated_at)
+        SELECT
+          legacy.id,
+          legacy.contract_no,
+          legacy.name,
+          '施工',
+          legacy.project_id,
+          legacy.amount,
+          legacy.amount,
+          legacy.sign_date,
+          legacy.status,
+          legacy.created_at,
+          legacy.updated_at
+        FROM construction_contracts AS legacy
+        WHERE legacy.deleted_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM contracts AS canonical
+            WHERE canonical.deleted_at IS NULL
+              AND canonical.kind = '施工'
+              AND canonical.project_id = legacy.project_id
+              AND (
+                (legacy.contract_no <> '' AND canonical.no = legacy.contract_no)
+                OR canonical.name = legacy.name
+              )
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM contracts AS same_id WHERE same_id.id = legacy.id
+          )
+      `)
+
+      await execScript(db, V15_BOQ_FOUNDATION)
+      await addColumnIfMissing(
+        db,
+        'house_type_template_items',
+        'boq_line_id',
+        'TEXT REFERENCES boq_lines(id)',
+      )
+      await addColumnIfMissing(
+        db,
+        'schedule_groups',
+        'contract_id',
+        'TEXT REFERENCES contracts(id)',
+      )
+      await addColumnIfMissing(
+        db,
+        'task_item_map',
+        'boq_line_id',
+        'TEXT REFERENCES boq_lines(id)',
+      )
+      await addColumnIfMissing(db, 'owner_change_orders', 'source_type', `TEXT NOT NULL DEFAULT 'manual'`)
+      await addColumnIfMissing(db, 'owner_change_orders', 'source_id', 'TEXT')
+      await addColumnIfMissing(
+        db,
+        'owner_change_orders',
+        'source_locked',
+        'INTEGER NOT NULL DEFAULT 0 CHECK (source_locked IN (0, 1))',
+      )
+
+      await db.execute(`
+        UPDATE schedule_groups
+        SET contract_id = (
+          SELECT MIN(contract.id)
+          FROM contracts AS contract
+          WHERE contract.project_id = schedule_groups.project_id
+            AND contract.kind = '施工'
+            AND contract.deleted_at IS NULL
+        )
+        WHERE contract_id IS NULL
+          AND (
+            SELECT COUNT(*)
+            FROM contracts AS contract
+            WHERE contract.project_id = schedule_groups.project_id
+              AND contract.kind = '施工'
+              AND contract.deleted_at IS NULL
+          ) = 1
+      `)
+
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_hti_boq_line
+          ON house_type_template_items(boq_line_id);
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_schedule_groups_contract
+          ON schedule_groups(contract_id);
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_task_item_map_boq_line
+          ON task_item_map(boq_line_id);
+      `)
+      await db.execute(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_owner_change_order_boq_source
+          ON owner_change_orders(source_type, source_id)
+          WHERE deleted_at IS NULL
+            AND source_type = 'boq_change_order'
+            AND source_id IS NOT NULL;
+      `)
     },
   },
 ]

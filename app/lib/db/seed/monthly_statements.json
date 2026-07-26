@@ -1,0 +1,13 @@
+[
+  {
+    "id": "monthly_statement_demo_001",
+    "project_id": "proj_demo_001",
+    "contract_id": "con_demo_sg01",
+    "month": "2026-06",
+    "status": "adjusted",
+    "total_amount": 4960,
+    "note": "现场复核后调整 2㎡",
+    "created_at": "2026-07-01T09:00:00.000Z",
+    "updated_at": "2026-07-01T09:00:00.000Z"
+  }
+]

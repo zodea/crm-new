@@ -1,0 +1,19 @@
+[
+  {
+    "id": "boq_change_demo_001",
+    "project_id": "proj_demo_001",
+    "contract_id": "con_demo_sg01",
+    "code": "BG-2026-001",
+    "name": "厨房墙砖工程量调整",
+    "change_type": "qty",
+    "status": "approved",
+    "status_note": "甲方已签证",
+    "directive_no": "ZL-2026-018",
+    "directive_type": "changed",
+    "total_amount": 520,
+    "approved_at": "2026-04-02",
+    "ledger_id": "boq_ledger_demo_001",
+    "created_at": "2026-03-25T09:00:00.000Z",
+    "updated_at": "2026-04-02T09:00:00.000Z"
+  }
+]
