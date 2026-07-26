@@ -42,6 +42,7 @@ const open = shallowRef(false)
 const panelId = `project-switcher-${useId()}`
 const isCompact = useMediaQuery('(max-width: 768px)', { ssrWidth: 1024 })
 const storedRecentProjectIds = useLocalStorage<string[]>('crm-recent-project-ids', [])
+useModalLayerRegistration(computed(() => isCompact.value && open.value))
 
 const currentProject = computed(() => props.projects.find(project => project.id === model.value) ?? null)
 const effectiveRecentProjectIds = computed(() => [...new Set([
@@ -108,7 +109,8 @@ function selectProject(projectId: string) {
           align="start"
           :side-offset="6"
           :collision-padding="12"
-          class="z-[7000] w-[min(360px,calc(100vw-24px))] overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel text-ink shadow-[var(--shadow-pop)] outline-none"
+          data-overlay-owned
+          class="z-[var(--z-overlay-owned)] w-[min(360px,calc(100vw-24px))] overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel text-ink shadow-[var(--shadow-pop)] outline-none"
         >
           <ProjectSwitcherPanel
             :projects="projects"
@@ -149,10 +151,14 @@ function selectProject(projectId: string) {
         </button>
       </DialogTrigger>
       <DialogPortal>
-        <DialogOverlay class="fixed inset-0 z-[9000] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
+        <DialogOverlay
+          data-overlay-backdrop
+          class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+        />
         <DialogContent
           :id="panelId"
-          class="fixed inset-0 z-[9001] flex h-svh w-screen flex-col bg-panel text-ink outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+          data-overlay-surface
+          class="fixed inset-0 z-[var(--z-overlay-surface)] flex h-svh w-screen flex-col bg-panel text-ink outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
         >
           <header class="flex min-h-13 flex-none items-center gap-3 border-b border-line px-3">
             <button

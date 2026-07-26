@@ -25,6 +25,7 @@ const emit = defineEmits<{
 
 const notificationStore = useNotificationStore()
 const { items, unreadCount } = storeToRefs(notificationStore)
+useModalLayerRegistration(toRef(props, 'open'))
 
 const activeKind = shallowRef<NotificationKind>('todo')
 const query = shallowRef('')
@@ -70,10 +71,12 @@ async function openItem(id: string) {
   <DialogRoot :open="props.open" @update:open="emit('update:open', $event)">
     <DialogPortal>
       <DialogOverlay
-        class="shell-layer-overlay fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        data-overlay-backdrop
+        class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
       />
       <DialogContent
-        class="shell-layer-drawer fixed inset-y-0 right-0 flex h-svh w-[min(390px,100vw)] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+        data-overlay-surface
+        class="fixed inset-y-0 right-0 z-[var(--z-overlay-surface)] flex h-svh w-[min(390px,100vw)] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
       >
         <div class="flex h-[54px] shrink-0 items-center justify-between border-b border-line px-4">
           <div>
