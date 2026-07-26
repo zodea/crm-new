@@ -16,6 +16,7 @@ import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
   projectId: string
+  initialBoqLineId?: string
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -78,7 +79,14 @@ async function initialize(sequence: number, projectId: string) {
     await store.loadTemplates(projectId)
     if (sequence !== initializeSequence || !open.value || props.projectId !== projectId || workspace.value?.projectId !== projectId)
       return
-    const preferred = workspace.value.templates.find(template => template.id === selectedTemplateId.value)
+    const linkedLine = props.initialBoqLineId
+      ? workspace.value.lines.find(line => line.boqLineId === props.initialBoqLineId)
+      : null
+    const linkedRoom = linkedLine
+      ? workspace.value.rooms.find(room => room.id === linkedLine.roomId)
+      : null
+    const preferred = workspace.value.templates.find(template => template.id === linkedRoom?.templateId)
+      ?? workspace.value.templates.find(template => template.id === selectedTemplateId.value)
       ?? workspace.value.templates[0]
     selectDraft(preferred?.id ?? '')
   }
@@ -106,7 +114,7 @@ function requestInitialize(isOpen: boolean, projectId: string) {
 }
 
 watch(
-  [open, () => props.projectId],
+  [open, () => props.projectId, () => props.initialBoqLineId],
   ([isOpen, projectId]) => requestInitialize(isOpen, projectId),
   { immediate: true },
 )

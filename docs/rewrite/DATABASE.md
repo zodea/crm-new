@@ -72,7 +72,8 @@ projects ─1:N→ construction_stages ─1:N→ unit_stage_completions ←N:1�
     │                  └────────N:1──────── units（户通过模板活链接读取房间）
     ├─1:N→ schedule_tasks（工序任务；project→group→task 由 project_id/group_id 表达，引用 stage_id）
     │        ├─ N:M → task_dependencies（FS/SS/FF/SF + lag）
-    │        └─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
+    │        ├─ 1:N → task_item_map ─(itemName)→ items ─→ house_type_template_items
+    │        └─ 1:N → schedule_task_floor_plans ─→ floors / boq_lines
     │                  实际完成率 = 分组内该阶段已完成户数 / 该阶段应做户数
     ├─1:N→ unit_assignments（户 × 工种责任；完成不存这里）
     └─1:N→ target_costs ─1:N→ target_cost_items（costCategory: 专业分包/合同劳务/材料/机械/工人工资/费用报销/其他）
@@ -235,7 +236,7 @@ monthly_statement_lines(
 )
 ```
 
-变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。
+变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。单明细已签证变更允许在明确的二次确认后受控更正，并在同一事务内同步变更明细、变更新增结果行和锁定台账且写操作日志；若同一目标清单行已有后续签证，或原签证含多明细/混合操作，则禁止原地改写，必须新增更正变更单以保持金额链可追溯。
 
 ### 2.4 资金管理类
 
@@ -400,6 +401,7 @@ CREATE TABLE project_aliases (
 | WorkerCert | `worker_certs` | `id` | `base-worker.md` |
 | PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
 | Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，班组单价走 `crew_project_items`） |
+| ItemUnitPrice | `item_unit_prices` | `id` | `boq-import.md`（E 类零星维修分项单价库；不进入合同工程量/合同价轨） |
 | HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
 | HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（稳定模板房间×分项，工种从分项读取；清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
 | ConstructionStage | `construction_stages` | `id` | **ADR 0010**：项目工序阶段目录，给 #103 完成事实与 #114 排程共享稳定 ID |
@@ -616,10 +618,12 @@ END;
 | ScheduleTask | `schedule_tasks` | `id` | `schedule-progress.md`（工序/WBS） |
 | TaskDependency | `task_dependencies` | `id` | `schedule-progress.md`（前后置依赖） |
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
+| ScheduleTaskFloorPlan | `schedule_task_floor_plans` | `id` | `schedule-progress.md`（分项×楼层自动计划及个别微调） |
 
-> `schedule_groups.contract_id` 是 v15 落地的合同域外键，指向且只指向一份 `contracts(kind='施工')`；`project_id` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，禁止跨合同混组。`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
+> `schedule_groups.contract_id` 是 v15 落地的合同域外键，指向且只指向一份 `contracts(kind='施工')`；`project_id` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供；只有清单行的显式楼栋字段才可证明合同覆盖，户型只在已确认楼栋内部筛选适用楼层，空白通用行或同名户型不得反推合同楼栋。禁止跨合同混组。`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
+> `schedule_task_floor_plans` 由排程域拥有，唯一范围为 `task_id + floor_id + boq_line_id`；初建时从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。BOQ 只提供稳定 `boq_line_id`，不保存第二份计划。
 
 ### 2.8 目标成本类（成本控制基线）
 
@@ -686,6 +690,7 @@ CREATE TABLE target_cost_items (
 | `boq_files` | `contract_id` | `contracts.id` | N:1 | 清单文件 → canonical 施工合同（一对多） |
 | `boq_lines` | `boq_file_id` / `project_id` / `contract_id` / `item_id` | `boq_files.id` / `projects.id` / `contracts.id` / `items.id` | N:1 | 清单行；项目、合同为高频查询冗余，标准分项映射可空 |
 | `boq_lines` | `change_order_id` | `boq_change_orders.id` | N:1 | 已签证变更新增行来源（可选） |
+| `item_unit_prices` | `project_id` / `item_id` / `boq_file_id` | `projects.id` / `items.id` / `boq_files.id` | N:1 | E 类单价库行；保存标准分项匹配与来源追溯，不生成 `boq_lines` |
 | `boq_change_orders` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 变更单 |
 | `boq_change_orders` | `ledger_id` | `owner_change_orders.id` | 1:1 | 已签证自动生成的台账行（ADR-0002，软删除级联） |
 | `boq_change_lines` | `change_order_id` / `boq_line_id` / `result_boq_line_id` / `item_id` | `boq_change_orders.id` / `boq_lines.id` / `items.id` | N:1 | 变更行原始目标、签证结果与新增标准分项追溯 |
@@ -819,7 +824,7 @@ interface FilePayload {
 | `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
 | `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
 | `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
-| `schedule_groups` | `contractId` | `ConstructionContract` canonical ID | N:1 | 楼栋分组 → 唯一施工合同；必填、项目必须一致、禁止跨合同混组；物理目标待 #115/#116 合同实体收口后统一 |
+| `schedule_groups` | `contract_id` | `contracts.id`（`kind='施工'`） | N:1 | 楼栋分组 → 唯一施工合同；必填、项目必须一致、禁止跨合同混组；`construction_contracts` 仅作旧 IA 兼容 |
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
 | `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
@@ -828,6 +833,7 @@ interface FilePayload {
 | `schedule_tasks` | `stage_id` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；`has_qty=1` 必填 |
 | `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
 | `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |
+| `schedule_task_floor_plans` | `task_id` / `floor_id` / `boq_line_id` | `schedule_tasks.id` / `floors.id` / `boq_lines.id` | N:1 | 排程域拥有的分项×楼层计划；自动分摊后允许单层微调，BOQ 仅作来源引用 |
 
 > 工序实际进度不另存值：运行时按 `schedule_tasks.stage_id` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
 
@@ -969,7 +975,7 @@ interface FilePayload {
   boq_files, boq_change_orders, delivery_records, project_aliases
 
 第 4 批（依赖第 3 批）
-  units, house_type_template_items, task_dependencies, task_item_map
+  units, house_type_template_items, task_dependencies, task_item_map, item_unit_prices
   payment_application_settlement_allocations
   payment_application_invoice_allocations
   payment_records
@@ -978,7 +984,7 @@ interface FilePayload {
 第 5 批（依赖第 4 批）
   unit_assignments, unit_stage_completions
   payment_record_application_allocations
-  wage_statement_lines, attendance_records, boq_change_lines
+  wage_statement_lines, attendance_records, boq_change_lines, schedule_task_floor_plans
 
 第 6 批（依赖模板 rooms / unit_assignments）
   unit_assignment_scopes
@@ -1096,6 +1102,9 @@ CREATE INDEX idx_schedule_tasks_stage ON schedule_tasks(stageId);
 CREATE INDEX idx_task_deps_pred ON task_dependencies(predId);
 CREATE INDEX idx_task_deps_succ ON task_dependencies(succId);
 CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
+CREATE INDEX idx_schedule_floor_plans_task ON schedule_task_floor_plans(task_id);
+CREATE INDEX idx_schedule_floor_plans_floor ON schedule_task_floor_plans(floor_id);
+CREATE INDEX idx_schedule_floor_plans_boq ON schedule_task_floor_plans(boq_line_id);
 
 -- 目标成本
 CREATE INDEX idx_target_costs_proj ON target_costs(projectId);
@@ -1112,6 +1121,9 @@ CREATE INDEX idx_boq_change_orders_contract ON boq_change_orders(contract_id);
 CREATE INDEX idx_boq_change_orders_status ON boq_change_orders(status); -- 200 份量级按状态筛选
 CREATE INDEX idx_boq_change_lines_order ON boq_change_lines(change_order_id);
 CREATE INDEX idx_boq_change_lines_item ON boq_change_lines(item_id);
+CREATE INDEX idx_item_unit_prices_project ON item_unit_prices(project_id);
+CREATE INDEX idx_item_unit_prices_item ON item_unit_prices(item_id);
+CREATE INDEX idx_item_unit_prices_file ON item_unit_prices(boq_file_id);
 CREATE UNIQUE INDEX uq_boq_line_trace ON boq_lines(boq_file_id, trace_key)
   WHERE deleted_at IS NULL AND boq_file_id IS NOT NULL AND trace_key <> '';
 CREATE UNIQUE INDEX uq_boq_change_order_ledger ON boq_change_orders(ledger_id)

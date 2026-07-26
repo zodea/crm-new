@@ -11,6 +11,7 @@ const SCHEDULE_TABLES = [
   'schedule_tasks',
   'task_dependencies',
   'task_item_map',
+  'schedule_task_floor_plans',
 ] as const
 
 const REQUIRED_COLUMNS: Record<(typeof SCHEDULE_TABLES)[number], string[]> = {
@@ -73,6 +74,20 @@ const REQUIRED_COLUMNS: Record<(typeof SCHEDULE_TABLES)[number], string[]> = {
     'updated_at',
     'deleted_at',
   ],
+  schedule_task_floor_plans: [
+    'id',
+    'task_id',
+    'floor_id',
+    'boq_line_id',
+    'planned_start',
+    'planned_finish',
+    'is_manual',
+    'note',
+    'sort_order',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
 }
 
 const REQUIRED_INDEXES = [
@@ -87,6 +102,9 @@ const REQUIRED_INDEXES = [
   'idx_task_deps_succ',
   'idx_task_item_map_task',
   'idx_task_item_map_item',
+  'idx_schedule_floor_plans_task',
+  'idx_schedule_floor_plans_floor',
+  'idx_schedule_floor_plans_boq',
   ...SCHEDULE_TABLES.map(table => `idx_${table}_deleted`),
 ]
 
@@ -120,6 +138,11 @@ const EXPECTED_FOREIGN_KEYS: Record<(typeof SCHEDULE_TABLES)[number], ForeignKey
     { source_column: 'item_id', target_table: 'items', target_column: 'id' },
     { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
   ],
+  schedule_task_floor_plans: [
+    { source_column: 'task_id', target_table: 'schedule_tasks', target_column: 'id' },
+    { source_column: 'floor_id', target_table: 'floors', target_column: 'id' },
+    { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
+  ],
 }
 
 async function insertScheduleAncestors(db: MigrationDb): Promise<void> {
@@ -130,8 +153,8 @@ async function insertScheduleAncestors(db: MigrationDb): Promise<void> {
   await db.execute(`INSERT INTO schedule_groups (id, project_id, name) VALUES ('group-schedule', 'project-schedule', '户内1栋')`)
 }
 
-describe('v14 施工进度排程数据底座', () => {
-  it('冷启动建立五张排程表、规格列和查询索引', async () => {
+describe('施工进度排程数据底座', () => {
+  it('冷启动建立排程表、规格列和查询索引', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)
 
@@ -146,7 +169,7 @@ describe('v14 施工进度排程数据底座', () => {
     db.close()
   })
 
-  it('五张排程表的外键与领域关系一致', async () => {
+  it('排程表的外键与领域关系一致', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)
 
@@ -201,6 +224,78 @@ describe('v14 施工进度排程数据底座', () => {
     await expect(db.execute(`INSERT INTO task_dependencies
       (id, pred_id, succ_id, dependency_type, lag_days)
       VALUES ('dep-kind', 'task-auto', 'task-manual', 'XX', 0)`))
+      .rejects
+      .toThrow(/CHECK constraint failed/i)
+
+    db.close()
+  })
+
+  it('分项×楼层计划保持唯一范围并拒绝倒排日期', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await insertScheduleAncestors(db)
+    await db.execute(`INSERT INTO floors (id, building_id, code, name)
+      VALUES ('floor-schedule', 'building-schedule', 'F1', '1层')`)
+    await db.execute(`INSERT INTO contracts (id, project_id, kind, name)
+      VALUES ('contract-schedule', 'project-schedule', '施工', '排程合同')`)
+    await db.execute(`INSERT INTO boq_files (id, contract_id, file_name, parse_status)
+      VALUES ('boq-file-schedule', 'contract-schedule', '清单.xlsx', 'parsed')`)
+    await db.execute(`INSERT INTO boq_lines
+      (id, boq_file_id, project_id, contract_id, item_id, item_name, trace_key)
+      VALUES (
+        'boq-line-schedule',
+        'boq-file-schedule',
+        'project-schedule',
+        'contract-schedule',
+        'item-schedule',
+        '墙砖',
+        '清单·1'
+      )`)
+    await db.execute(`INSERT INTO schedule_tasks
+      (id, project_id, group_id, name, planned_start, planned_finish, has_qty, stage_id)
+      VALUES (
+        'task-floor-plan',
+        'project-schedule',
+        'group-schedule',
+        '墙砖铺贴',
+        '2026-07-01',
+        '2026-07-10',
+        1,
+        'stage-schedule'
+      )`)
+    await db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      VALUES (
+        'floor-plan',
+        'task-floor-plan',
+        'floor-schedule',
+        'boq-line-schedule',
+        '2026-07-01',
+        '2026-07-05'
+      )`)
+
+    await expect(db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      VALUES (
+        'floor-plan-duplicate',
+        'task-floor-plan',
+        'floor-schedule',
+        'boq-line-schedule',
+        '2026-07-06',
+        '2026-07-10'
+      )`))
+      .rejects
+      .toThrow(/UNIQUE constraint failed/i)
+    await expect(db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      VALUES (
+        'floor-plan-invalid',
+        'task-floor-plan',
+        'floor-schedule',
+        'boq-line-schedule',
+        '2026-07-10',
+        '2026-07-01'
+      )`))
       .rejects
       .toThrow(/CHECK constraint failed/i)
 

@@ -1,5 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { withUpdateLog } from '~/lib/db/soft-delete'
+import { round2 } from '~/lib/util/number'
 
 export interface BoqLinePatch {
   itemId?: string | null
@@ -44,10 +45,6 @@ function finiteNumber(value: number, label: string): number {
   if (!Number.isFinite(value))
     throw new Error(`${label}必须是有效数字`)
   return value
-}
-
-function money(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 export async function persistBoqLinePatch(
@@ -129,7 +126,7 @@ export async function persistBoqLinePatch(
       next.unit,
       next.qty,
       next.unitPrice,
-      money(next.qty * next.unitPrice),
+      round2(next.qty * next.unitPrice),
       next.building,
       next.unitType,
       next.multiplier,

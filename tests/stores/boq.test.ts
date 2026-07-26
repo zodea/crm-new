@@ -64,4 +64,31 @@ describe('boq store', () => {
       totalAmount: 1512,
     })
   })
+
+  it('persists change attachment bytes and exposes categorized download metadata', async () => {
+    const store = useBoqStore()
+    await store.loadWorkspace('proj_demo_001', 'con_demo_sg01')
+    const saved = await store.addChangeAttachment('boq_change_demo_001', {
+      fileName: '甲方指令.pdf',
+      fileSize: 5,
+      mimeType: 'application/pdf',
+      contentBase64: 'aGVsbG8=',
+      category: 'owner_directive',
+    })
+
+    expect(store.workspace?.changes[0]?.attachments).toEqual([
+      expect.objectContaining({
+        id: saved.id,
+        fileName: '甲方指令.pdf',
+        mimeType: 'application/pdf',
+        category: 'owner_directive',
+      }),
+    ])
+    const download = await store.loadAttachmentFile(saved.id)
+    expect(download).toMatchObject({
+      defaultName: '甲方指令.pdf',
+      mimeType: 'application/pdf',
+    })
+    expect([...new Uint8Array(download.data as Uint8Array)]).toEqual([104, 101, 108, 108, 111])
+  })
 })

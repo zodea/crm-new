@@ -2,6 +2,7 @@ import type { MonthlyStatementView } from './monthly'
 import type { BoqWorkspace } from './read-model'
 import type { ExportFileOptions } from '~/lib/kit/export'
 import * as XLSX from 'xlsx'
+import { BOQ_CHANGE_STATUS_LABEL, BOQ_MONTHLY_STATUS_LABEL } from './presentation'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -28,14 +29,6 @@ export function createBoqWorkbookExport(
   workspace: BoqWorkspace,
   now = new Date(),
 ): ExportFileOptions {
-  const statusLabel: Record<string, string> = {
-    draft: '草稿',
-    submitted: '已上报',
-    rejected: '已打回',
-    approved: '已签证',
-    adjusted: '已手调',
-    exported: '已导出',
-  }
   return {
     data: workbookBuffer([
       {
@@ -62,7 +55,7 @@ export function createBoqWorkbookExport(
           变更编号: change.code,
           变更名称: change.name,
           类型: change.changeType,
-          状态: statusLabel[change.status] ?? change.status,
+          状态: BOQ_CHANGE_STATUS_LABEL[change.status],
           甲方指令单: change.directiveNo,
           变更金额: change.totalAmount,
           签证日期: change.approvedAt ?? '',
@@ -75,7 +68,7 @@ export function createBoqWorkbookExport(
         name: '月度报量',
         rows: workspace.monthlyStatements.map(statement => ({
           月份: statement.month,
-          状态: statusLabel[statement.status] ?? statement.status,
+          状态: BOQ_MONTHLY_STATUS_LABEL[statement.status],
           报量金额: statement.totalAmount,
           备注: statement.note,
         })),

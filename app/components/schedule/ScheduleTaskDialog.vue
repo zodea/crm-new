@@ -13,6 +13,7 @@ const emit = defineEmits<{
   save: [payload: {
     task: { plannedStart: string, plannedFinish: string, manualProgress?: number }
     dependency: { predecessorId: string, lagDays: number } | null
+    floorPlans: { id: string, plannedStart: string, plannedFinish: string }[]
   }]
   remove: []
   drill: []
@@ -24,6 +25,11 @@ const plannedFinish = shallowRef('')
 const manualPercent = shallowRef(0)
 const predecessorId = shallowRef('')
 const lagDays = shallowRef(0)
+const floorPlans = ref<{ id: string, plannedStart: string, plannedFinish: string }[]>([])
+const predecessorOptions = computed(() => props.predecessorTasks.map(task => ({
+  key: task.id,
+  label: task.name,
+})))
 
 watch([open, () => props.task], ([isOpen, task]) => {
   if (!isOpen || !task)
@@ -33,6 +39,11 @@ watch([open, () => props.task], ([isOpen, task]) => {
   manualPercent.value = Math.round((task.manualProgress ?? task.actualProgress) * 100)
   predecessorId.value = props.dependency?.predId ?? props.predecessorTasks.at(-1)?.id ?? ''
   lagDays.value = props.dependency?.lagDays ?? 0
+  floorPlans.value = task.floorPlans.map(plan => ({
+    id: plan.id,
+    plannedStart: plan.plannedStart,
+    plannedFinish: plan.plannedFinish,
+  }))
 }, { immediate: true })
 
 function save() {
@@ -47,6 +58,14 @@ function save() {
     dependency: predecessorId.value
       ? { predecessorId: predecessorId.value, lagDays: lagDays.value }
       : null,
+    floorPlans: floorPlans.value.filter((plan) => {
+      const current = props.task?.floorPlans.find(candidate => candidate.id === plan.id)
+      return current
+        && (
+          current.plannedStart !== plan.plannedStart
+          || current.plannedFinish !== plan.plannedFinish
+        )
+    }),
   })
 }
 </script>
@@ -57,7 +76,7 @@ function save() {
     :title="task ? `工序详情 · ${task.name}` : '工序详情'"
     :busy="busy"
     save-label="保存调整"
-    width="min(680px, calc(100dvw - 24px))"
+    width="min(860px, calc(100dvw - 24px))"
     @save="save"
     @cancel="open = false"
   >
@@ -84,18 +103,58 @@ function save() {
           FS 前后置关系
         </div>
         <div class="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
-          <label>
+          <div>
             <span class="field-label block">前置工序</span>
-            <select v-model="predecessorId" class="field-input w-full">
-              <option v-for="candidate in predecessorTasks" :key="candidate.id" :value="candidate.id">
-                {{ candidate.name }}
-              </option>
-            </select>
-          </label>
+            <SelectFilter
+              v-model="predecessorId"
+              aria-label="前置工序"
+              :options="predecessorOptions"
+              :min-width="260"
+            />
+          </div>
           <label>
             <span class="field-label block">Lag（天）</span>
             <input v-model.number="lagDays" type="number" min="-365" max="365" class="field-input w-full">
           </label>
+        </div>
+      </section>
+
+      <section v-if="task.floorPlans.length" class="rounded-lg border border-line p-3">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div class="text-12px font-800 text-ink">
+              分项 × 楼层计划
+            </div>
+            <p class="mt-0.5 text-11px text-ink-faint">
+              默认按工序窗口逐层分摊；改动某层后，仅该层转为人工微调。
+            </p>
+          </div>
+          <span class="status-info">{{ task.floorPlans.length }} 条</span>
+        </div>
+        <div class="mt-3 grid max-h-64 gap-2 overflow-y-auto pr-1">
+          <div
+            v-for="(plan, index) in floorPlans"
+            :key="plan.id"
+            class="grid gap-2 rounded-lg bg-surface-2 p-2.5 sm:grid-cols-[minmax(150px,1fr)_150px_150px]"
+          >
+            <div class="min-w-0 self-center">
+              <div class="truncate text-12px font-700 text-ink">
+                {{ task.floorPlans[index]?.itemName }}
+              </div>
+              <div class="mt-0.5 text-11px text-ink-faint">
+                {{ task.floorPlans[index]?.buildingName }} · {{ task.floorPlans[index]?.floorName }}
+                <span v-if="task.floorPlans[index]?.isManual" class="ml-1 text-warning">已微调</span>
+              </div>
+            </div>
+            <label>
+              <span class="field-label block">开始</span>
+              <input v-model="plan.plannedStart" type="date" class="field-input w-full" required>
+            </label>
+            <label>
+              <span class="field-label block">完成</span>
+              <input v-model="plan.plannedFinish" type="date" class="field-input w-full" required>
+            </label>
+          </div>
         </div>
       </section>
 

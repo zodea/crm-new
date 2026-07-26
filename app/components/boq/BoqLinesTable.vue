@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import type { BoqLineView } from '~/lib/boq/read-model'
+import type { BoqCatalogSection, BoqLineView } from '~/lib/boq/read-model'
 import type { KitTableColumn } from '~/lib/kit/table'
+import { boqCatalogScopeLineIds } from '~/lib/boq/catalog'
 
 const props = withDefaults(defineProps<{
   lines: readonly BoqLineView[]
+  catalog: readonly BoqCatalogSection[]
   scopeKey?: string
   search?: string
   loading?: boolean
@@ -15,6 +17,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   edit: [line: BoqLineView]
+  formula: [line: BoqLineView]
+  plan: [line: BoqLineView]
   remove: [line: BoqLineView]
 }>()
 
@@ -28,20 +32,15 @@ const columns: KitTableColumn[] = [
   { field: 'effectiveUnitPrice', title: '合同单价', width: 116, align: 'right', slot: 'unitPrice' },
   { field: 'effectiveAmount', title: '合价', type: 'money', width: 128 },
   { field: 'traceKey', title: '来源追溯', minWidth: 210, slot: 'source' },
-  { type: 'action', title: '操作', width: 126 },
+  { type: 'action', title: '操作', width: 264 },
 ]
 
 const filteredLines = computed(() => {
   const keyword = props.search.trim().toLocaleLowerCase('zh-CN')
-  const scope = props.scopeKey
+  const scopeLineIds = boqCatalogScopeLineIds(props.scopeKey, props.catalog)
   return props.lines.filter((line) => {
-    if (scope.startsWith('section:') && line.section !== scope.slice('section:'.length))
+    if (scopeLineIds && !scopeLineIds.has(line.id))
       return false
-    if (scope.startsWith('trade:')) {
-      const [, section, trade] = scope.split(':')
-      if (line.section !== section || line.trade !== trade)
-        return false
-    }
     if (!keyword)
       return true
     return [
@@ -114,6 +113,25 @@ function decimal(value: number): string {
             @click="emit('edit', row)"
           >
             编辑
+          </button>
+          <button
+            type="button"
+            class="btn-ghost px-2 py-1 text-11px"
+            :disabled="!row.itemId"
+            :title="row.itemId ? '前往工程量域维护现场复核算式' : '该行尚未匹配标准分项'"
+            :aria-label="`现场算式：${row.itemName} ${row.unitType} ${row.room}`"
+            @click="emit('formula', row)"
+          >
+            现场算式
+          </button>
+          <button
+            type="button"
+            class="btn-ghost px-2 py-1 text-11px"
+            title="前往排程域查看该分项的楼层计划"
+            :aria-label="`楼层计划：${row.itemName} ${row.unitType} ${row.room}`"
+            @click="emit('plan', row)"
+          >
+            楼层计划
           </button>
           <button
             type="button"

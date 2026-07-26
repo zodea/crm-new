@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
+  reviseApprovedBoqChangeOrder,
   transitionBoqChangeOrder,
 } from '~/lib/boq/change'
 import { loadBoqWorkspace } from '~/lib/boq/read-model'
@@ -112,6 +113,105 @@ describe('boq change order lifecycle', () => {
       unit_price: 75,
       amount: 900,
     })
+  })
+
+  it('revises a single approved quantity change only after confirmation and keeps ledger reconciled', async () => {
+    const created = await createBoqChangeOrder(db, {
+      projectId: 'proj_demo_001',
+      contractId: 'con_demo_sg01',
+      code: 'BG-2026-007',
+      name: '地砖工程量签证',
+      changeType: 'qty',
+      lines: [{
+        operation: 'qty',
+        boqLineId: 'boq_line_demo_a_floor',
+        deltaQty: 2,
+      }],
+    })
+    await transitionBoqChangeOrder(db, created.orderId, 'submitted')
+    const approved = await approveBoqChangeOrder(db, created.orderId, '2026-07-22')
+    const workspace = await loadBoqWorkspace(db, 'proj_demo_001', 'con_demo_sg01')
+    const change = workspace?.changes.find(order => order.id === created.orderId)
+    expect(change?.lines).toHaveLength(1)
+
+    const correction = {
+      name: '地砖工程量签证（更正）',
+      line: {
+        id: change!.lines[0]!.id,
+        deltaQty: 3,
+        note: '甲方复核后更正',
+      },
+    }
+    await expect(reviseApprovedBoqChangeOrder(db, created.orderId, correction, false))
+      .rejects
+      .toThrow('二次确认')
+
+    const result = await reviseApprovedBoqChangeOrder(db, created.orderId, correction, true)
+    expect(result.totalAmount).toBe(240)
+    expect(result.logIds.length).toBeGreaterThanOrEqual(3)
+    const [ledger] = await db.select<{ tax_inc_amount: number }>(
+      'SELECT tax_inc_amount FROM owner_change_orders WHERE id = ?',
+      [approved.ledgerId],
+    )
+    expect(ledger?.tax_inc_amount).toBe(240)
+
+    const corrected = await loadBoqWorkspace(db, 'proj_demo_001', 'con_demo_sg01')
+    expect(corrected?.lines.find(line => line.id === 'boq_line_demo_a_floor')).toMatchObject({
+      effectiveQty: 34,
+      approvedChangeAmount: 240,
+    })
+    expect(corrected?.changes.find(order => order.id === created.orderId)).toMatchObject({
+      name: '地砖工程量签证（更正）',
+      totalAmount: 240,
+      statusNote: '甲方已签证 · 二次确认更正',
+    })
+  })
+
+  it('calculates mixed changes on one line sequentially and keeps ledger total reconcilable', async () => {
+    const created = await createBoqChangeOrder(db, {
+      projectId: 'proj_demo_001',
+      contractId: 'con_demo_sg01',
+      code: 'BG-2026-005',
+      name: '地砖量价同步调整',
+      changeType: 'mixed',
+      lines: [
+        {
+          operation: 'qty',
+          boqLineId: 'boq_line_demo_a_floor',
+          deltaQty: 2,
+        },
+        {
+          operation: 'price',
+          boqLineId: 'boq_line_demo_a_floor',
+          newUnitPrice: 100,
+        },
+      ],
+    })
+    await transitionBoqChangeOrder(db, created.orderId, 'submitted')
+    const approved = await approveBoqChangeOrder(db, created.orderId, '2026-07-22')
+
+    expect(approved.totalAmount).toBe(820)
+    const workspace = await loadBoqWorkspace(db, 'proj_demo_001', 'con_demo_sg01')
+    expect(workspace.lines.find(line => line.id === 'boq_line_demo_a_floor')).toMatchObject({
+      effectiveQty: 33,
+      effectiveUnitPrice: 100,
+      effectiveAmount: 3300,
+      approvedChangeAmount: 820,
+    })
+  })
+
+  it('rejects cumulative quantity reductions below zero within one draft', async () => {
+    await expect(createBoqChangeOrder(db, {
+      projectId: 'proj_demo_001',
+      contractId: 'con_demo_sg01',
+      code: 'BG-2026-006',
+      name: '无效累计减量',
+      changeType: 'qty',
+      lines: [
+        { operation: 'qty', boqLineId: 'boq_line_demo_a_floor', deltaQty: -20 },
+        { operation: 'qty', boqLineId: 'boq_line_demo_a_floor', deltaQty: -20 },
+      ],
+    })).rejects.toThrow('不能为负数')
   })
 
   it('enforces the submitted/rejected resubmission state machine', async () => {

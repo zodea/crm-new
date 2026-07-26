@@ -1,4 +1,5 @@
 import type { MigrationDb } from './migrations'
+import { addCalendarDays } from '~/lib/schedule/planning'
 import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { generateId } from '~/lib/util/id'
 
@@ -234,10 +235,15 @@ export async function seedScheduleDemo(db: MigrationDb) {
   if (!project)
     return
 
-  const [seeded] = await db.select<{ id: string }>(
+  const [seededTask] = await db.select<{ id: string }>(
     `SELECT id FROM schedule_tasks WHERE id = 'schedule_task_demo_22'`,
   )
-  if (seeded)
+  const [seededFloorPlan] = await db.select<{ id: string }>(
+    `SELECT id FROM schedule_task_floor_plans
+     WHERE task_id LIKE 'schedule_task_demo_%'
+     LIMIT 1`,
+  )
+  if (seededTask && seededFloorPlan)
     return
 
   const buildings = await db.select<{ id: string }>(
@@ -249,6 +255,16 @@ export async function seedScheduleDemo(db: MigrationDb) {
   const stages = await db.select<{ id: string, code: string }>(
     `SELECT id, code FROM construction_stages
      WHERE project_id = ? AND deleted_at IS NULL`,
+    [DEMO_SCHEDULE_PROJECT_ID],
+  )
+  const floors = await db.select<{ id: string, building_id: string }>(
+    `SELECT floor_row.id, floor_row.building_id
+     FROM floors floor_row
+     JOIN buildings building ON building.id = floor_row.building_id
+     WHERE building.project_id = ?
+       AND building.deleted_at IS NULL
+       AND floor_row.deleted_at IS NULL
+     ORDER BY building.sort_order, building.code, floor_row.sort_order, floor_row.code, floor_row.id`,
     [DEMO_SCHEDULE_PROJECT_ID],
   )
   const items = await db.select<{ id: string, code: string }>(
@@ -334,6 +350,7 @@ export async function seedScheduleDemo(db: MigrationDb) {
 
       for (const [mapIndex, itemCode] of template.itemCodes.entries()) {
         const itemId = itemByCode.get(itemCode)!
+        const boqLineId = boqLineByItem.get(itemId) ?? null
         await db.execute(
           `INSERT INTO task_item_map (id, task_id, item_id, boq_line_id)
            VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
@@ -341,9 +358,34 @@ export async function seedScheduleDemo(db: MigrationDb) {
             `schedule_task_item_demo_${index + 1}_${mapIndex + 1}`,
             id,
             itemId,
-            boqLineByItem.get(itemId) ?? null,
+            boqLineId,
           ],
         )
+        if (boqLineId) {
+          const durationDays = calendarDayDifference(plannedStart, plannedFinish) + 1
+          for (const [floorIndex, floor] of floors.entries()) {
+            const startOffset = Math.floor(floorIndex * durationDays / floors.length)
+            const finishOffset = Math.max(
+              startOffset,
+              Math.ceil((floorIndex + 1) * durationDays / floors.length) - 1,
+            )
+            await db.execute(
+              `INSERT INTO schedule_task_floor_plans
+                (id, task_id, floor_id, boq_line_id, planned_start, planned_finish, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT DO NOTHING`,
+              [
+                `schedule_floor_plan_demo_${index + 1}_${mapIndex + 1}_${floorIndex + 1}`,
+                id,
+                floor.id,
+                boqLineId,
+                addCalendarDays(plannedStart, startOffset),
+                addCalendarDays(plannedStart, finishOffset),
+                (floorIndex + 1) * 10,
+              ],
+            )
+          }
+        }
       }
 
       if (index > 0) {

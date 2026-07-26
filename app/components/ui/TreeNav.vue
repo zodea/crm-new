@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 左树导航（KitAtoms，发票台账/清单页同构）：两级节点 + 数量角标 + 选中态。
+// 左树导航（KitAtoms，发票台账/清单页同构）：递归层级 + 数量角标 + 选中态。
 // 基准：DC重构设计源码/kit/KitAtoms.jsx TreeNav。
 // 计数走 resolveNodeCount：父节点未显式给 count 时按子节点聚合（台账「全部」口径）。
 import type { TreeNode } from '~/lib/kit/tree-nav'
@@ -19,30 +19,27 @@ interface Row {
   icon: string
   count: number | null
   tone?: 'warn' | 'brand'
-  sub: boolean
+  depth: number
   on: boolean
 }
 
 const rows = computed<Row[]>(() => {
   const out: Row[] = []
-  const push = (node: TreeNode, sub: boolean) => {
+  const push = (node: TreeNode, depth: number) => {
     out.push({
       key: node.key,
       label: node.label,
-      icon: node.icon || (sub ? 'i-lucide-wrench' : 'i-lucide-folder'),
+      icon: node.icon || (depth ? 'i-lucide-wrench' : 'i-lucide-folder'),
       count: resolveNodeCount(node),
       tone: node.tone,
-      sub,
+      depth,
       on: isNodeActive(node.key, active.value),
     })
+    for (const child of node.children ?? [])
+      push(child, depth + 1)
   }
-  for (const it of props.items) {
-    push(it, false)
-    if (it.children) {
-      for (const c of it.children)
-        push(c, true)
-    }
-  }
+  for (const it of props.items)
+    push(it, 0)
   return out
 })
 
@@ -57,9 +54,9 @@ function iconClass(r: Row): string {
 }
 
 function labelClass(r: Row): string {
-  const weight = r.on ? 'font-800' : r.sub ? 'font-500' : 'font-600'
+  const weight = r.on ? 'font-800' : r.depth ? 'font-500' : 'font-600'
   const color = r.tone === 'warn' && !r.on ? 'text-warn-ink' : r.on ? 'text-brand-deep' : 'text-ink'
-  const size = r.sub ? 'text-[12.5px]' : 'text-[13px]'
+  const size = r.depth > 1 ? 'text-[12px]' : r.depth ? 'text-[12.5px]' : 'text-[13px]'
   return `${weight} ${color} ${size}`
 }
 </script>
@@ -78,11 +75,11 @@ function labelClass(r: Row): string {
         :key="r.key"
         type="button"
         class="mb-[2px] flex w-full cursor-pointer items-center gap-[8px] border-0 rounded-[var(--radius-btn)] pr-[10px] text-left transition-colors focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
-        :class="[r.on ? 'bg-brand-soft' : 'bg-transparent hover:bg-surface-3', r.sub ? 'py-[6px]' : 'py-[8px]']"
-        :style="{ paddingLeft: r.sub ? '24px' : '10px' }"
+        :class="[r.on ? 'bg-brand-soft' : 'bg-transparent hover:bg-surface-3', r.depth ? 'py-[6px]' : 'py-[8px]']"
+        :style="{ paddingLeft: `${10 + r.depth * 14}px` }"
         @click="active = r.key"
       >
-        <span aria-hidden="true" :class="[r.icon, iconClass(r), r.sub ? 'h-[12px] w-[12px]' : 'h-[14px] w-[14px]']" />
+        <span aria-hidden="true" :class="[r.icon, iconClass(r), r.depth ? 'h-[12px] w-[12px]' : 'h-[14px] w-[14px]']" />
         <span
           class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
           :class="labelClass(r)"

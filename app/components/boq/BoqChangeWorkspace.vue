@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import type { CreateBoqChangeOrderDraft } from '~/lib/boq/change'
-import type { BoqChangeOrderView, BoqWorkspace } from '~/lib/boq/read-model'
+import type {
+  CreateBoqChangeOrderDraft,
+  ReviseApprovedBoqChangeOrderDraft,
+} from '~/lib/boq/change'
+import type { BoqAttachmentView, BoqChangeOrderView, BoqWorkspace } from '~/lib/boq/read-model'
+import type { FieldDef } from '~/lib/kit/form-modal'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { useFileDialog } from '@vueuse/core'
+import {
+  BOQ_CHANGE_STATUS_LABEL,
+  BOQ_CHANGE_TYPE_LABEL,
+} from '~/lib/boq/presentation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 const props = defineProps<{
@@ -15,12 +23,25 @@ const emit = defineEmits<{
   create: [draft: CreateBoqChangeOrderDraft]
   transition: [payload: { orderId: string, target: 'submitted' | 'rejected', note: string }]
   approve: [payload: { orderId: string, approvedAt: string }]
+  reviseApproved: [payload: { orderId: string, draft: ReviseApprovedBoqChangeOrderDraft }]
   remove: [order: BoqChangeOrderView]
   attach: [payload: { orderId: string, draft: BoqAttachmentDraft }]
+  downloadAttachment: [attachment: BoqAttachmentView]
+  removeAttachment: [attachment: BoqAttachmentView]
 }>()
 
 const { formModal, warning } = useKitUI()
 const attachmentOrderId = shallowRef('')
+const attachmentCategories = [
+  ['我方指令单', 'our_directive'],
+  ['甲方指令单', 'owner_directive'],
+  ['报价', 'quotation'],
+  ['算量', 'quantity_calculation'],
+  ['施工照片', 'construction_photo'],
+] as const
+const attachmentCategoryLabel = Object.fromEntries(
+  attachmentCategories.map(([label, key]) => [key, label]),
+)
 const { onChange, open: openFileDialog } = useFileDialog({
   accept: '.pdf,.xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png',
   multiple: false,
@@ -36,27 +57,13 @@ const columns: KitTableColumn[] = [
   { field: 'totalAmount', title: '变更金额', type: 'money', width: 128 },
   { field: 'approvedAt', title: '签证日期', type: 'date', width: 110 },
   { field: 'attachmentCount', title: '附件', width: 72, align: 'center' },
-  { type: 'action', title: '操作', width: 250 },
+  { type: 'action', title: '操作', width: 292 },
 ]
 
 const lineOptionByLabel = computed(() => new Map(props.workspace.lines.map(line => [
   `${line.itemName} · ${line.unitType || '通用'} · ${line.id.slice(-6)}`,
   line,
 ])))
-
-const operationLabel: Record<string, string> = {
-  add: '新增',
-  qty: '调量',
-  price: '调价',
-  mixed: '混合',
-}
-
-const statusLabel: Record<string, string> = {
-  draft: '草稿',
-  submitted: '已上报',
-  rejected: '已打回',
-  approved: '已签证',
-}
 
 const statusClass: Record<string, string> = {
   draft: 'chip',
@@ -154,9 +161,75 @@ async function approve(order: BoqChangeOrderView) {
     emit('approve', { orderId: order.id, approvedAt: String(values.date) })
 }
 
+async function reviseApproved(order: BoqChangeOrderView) {
+  const line = order.lines[0]
+  if (order.lines.length !== 1 || !line) {
+    warning('多明细或混合签证不能原地改写，请新建一张更正变更单')
+    return
+  }
+  const fields: FieldDef[] = [
+    { key: 'name', label: '变更名称', value: order.name, required: true },
+    { key: 'directiveNo', label: '甲方指令单编号', value: order.directiveNo },
+  ]
+  if (line.operation === 'add' || line.operation === 'qty') {
+    fields.push({
+      key: 'quantity',
+      label: line.operation === 'add' ? '新增工程量' : '调整工程量',
+      type: 'number',
+      value: line.deltaQty,
+      required: true,
+    })
+  }
+  if (line.operation === 'add' || line.operation === 'price') {
+    fields.push({
+      key: 'unitPrice',
+      label: line.operation === 'add' ? '新增合同单价' : '调整后合同单价',
+      type: 'number',
+      value: line.newUnitPrice,
+      required: true,
+    })
+  }
+  fields.push({ key: 'lineNote', label: '明细说明', type: 'textarea', value: line.note, full: true })
+  const values = await formModal({
+    title: `更正已签证变更「${order.code}」`,
+    subtitle: '保存前还需二次确认；原签证、锁定台账与结果清单会在同一事务中同步更正并写操作日志。',
+    cols: 2,
+    width: 680,
+    saveText: '进入二次确认',
+    fields,
+  })
+  if (!values)
+    return
+  emit('reviseApproved', {
+    orderId: order.id,
+    draft: {
+      name: String(values.name),
+      directiveNo: String(values.directiveNo ?? ''),
+      line: {
+        id: line.id,
+        deltaQty: values.quantity === undefined ? undefined : Number(values.quantity),
+        newUnitPrice: values.unitPrice === undefined ? undefined : Number(values.unitPrice),
+        note: String(values.lineNote ?? ''),
+      },
+    },
+  })
+}
+
 function chooseAttachment(orderId: string) {
   attachmentOrderId.value = orderId
   openFileDialog()
+}
+
+function fileContentBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('附件读取失败')), { once: true })
+    reader.addEventListener('load', () => {
+      const result = String(reader.result ?? '')
+      resolve(result.includes(',') ? result.slice(result.indexOf(',') + 1) : result)
+    }, { once: true })
+    reader.readAsDataURL(file)
+  })
 }
 
 onChange(async (files) => {
@@ -164,31 +237,27 @@ onChange(async (files) => {
   const orderId = attachmentOrderId.value
   if (!file || !orderId)
     return
-  const categories = [
-    ['我方指令单', 'our_directive'],
-    ['甲方指令单', 'owner_directive'],
-    ['报价', 'quotation'],
-    ['算量', 'quantity_calculation'],
-    ['施工照片', 'construction_photo'],
-  ] as const
   const values = await formModal({
     title: '登记变更附件',
     fields: [{
       key: 'category',
       label: '附件类别',
       type: 'select',
-      options: categories.map(category => category[0]),
-      value: categories[0][0],
+      options: attachmentCategories.map(category => category[0]),
+      value: attachmentCategories[0][0],
       required: true,
     }],
   })
-  const category = categories.find(candidate => candidate[0] === values?.category)
+  const category = attachmentCategories.find(candidate => candidate[0] === values?.category)
   if (values && category) {
+    const contentBase64 = await fileContentBase64(file)
     emit('attach', {
       orderId,
       draft: {
         fileName: file.name,
         fileSize: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        contentBase64,
         category: category[1],
       },
     })
@@ -220,10 +289,10 @@ onChange(async (files) => {
       empty="当前合同还没有变更单"
     >
       <template #changeType="{ row }">
-        {{ operationLabel[row.changeType] ?? row.changeType }}
+        {{ BOQ_CHANGE_TYPE_LABEL[row.changeType] }}
       </template>
       <template #status="{ row }">
-        <span :class="statusClass[row.status]">{{ statusLabel[row.status] }}</span>
+        <span :class="statusClass[row.status]">{{ BOQ_CHANGE_STATUS_LABEL[row.status] }}</span>
       </template>
       <template #action="{ row }">
         <div class="flex items-center justify-end gap-1">
@@ -244,11 +313,47 @@ onChange(async (files) => {
           <button v-if="row.status === 'submitted'" type="button" class="btn-primary px-2 py-1 text-11px" @click="approve(row)">
             签证
           </button>
+          <button v-if="row.status === 'approved'" type="button" class="btn-ghost px-2 py-1 text-11px" @click="reviseApproved(row)">
+            更正
+          </button>
           <button type="button" class="btn-danger px-2 py-1 text-11px" @click="emit('remove', row)">
             删除
           </button>
         </div>
       </template>
     </KitTable>
+
+    <section v-if="workspace.changes.some(order => order.attachments.length)" class="mt-3 grid gap-2">
+      <div
+        v-for="order in workspace.changes.filter(change => change.attachments.length)"
+        :key="order.id"
+        class="panel flex min-w-0 flex-wrap items-center gap-2 px-3 py-2"
+      >
+        <strong class="mr-1 text-12px text-ink">{{ order.code }}</strong>
+        <div
+          v-for="attachment in order.attachments"
+          :key="attachment.id"
+          class="flex min-w-0 items-center gap-1 rounded-[var(--radius-btn)] bg-surface-2 px-2 py-1"
+        >
+          <span class="chip">{{ attachmentCategoryLabel[attachment.category] ?? attachment.category }}</span>
+          <button
+            type="button"
+            class="max-w-52 truncate text-11px text-brand hover:underline"
+            :title="`下载 ${attachment.fileName}`"
+            @click="emit('downloadAttachment', attachment)"
+          >
+            {{ attachment.fileName }}
+          </button>
+          <button
+            type="button"
+            class="icon-btn h-6 w-6 text-danger"
+            :aria-label="`删除附件 ${attachment.fileName}`"
+            @click="emit('removeAttachment', attachment)"
+          >
+            <span class="i-lucide-x h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

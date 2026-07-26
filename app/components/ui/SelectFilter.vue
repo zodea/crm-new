@@ -22,6 +22,7 @@ interface Option {
 
 withDefaults(defineProps<{
   label?: string
+  ariaLabel?: string
   options: Option[]
   minWidth?: number
   placeholder?: string
@@ -35,7 +36,7 @@ const model = defineModel<string>()
     <span v-if="label" class="flex-none text-[12px] font-700 text-ink-soft">{{ label }}</span>
     <SelectRoot v-model="model">
       <SelectTrigger
-        :aria-label="label"
+        :aria-label="ariaLabel || label"
         class="inline-flex h-8 items-center justify-between gap-2 cursor-pointer border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[12px] pr-[9px] text-[13px] font-600 text-ink outline-none data-[placeholder]:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
         :style="{ minWidth: `${minWidth}px` }"
       >

@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import type { CreateBoqChangeOrderDraft } from '~/lib/boq/change'
+import type {
+  CreateBoqChangeOrderDraft,
+  ReviseApprovedBoqChangeOrderDraft,
+} from '~/lib/boq/change'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
-import type { BoqChangeOrderView, BoqLineView } from '~/lib/boq/read-model'
+import type { BoqAttachmentView, BoqChangeOrderView, BoqLineView } from '~/lib/boq/read-model'
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
 import { toErrorMessage } from '~/lib/util/error'
@@ -183,6 +186,26 @@ async function removeLine(line: BoqLineView) {
   }
 }
 
+async function openFieldFormula(line: BoqLineView) {
+  await router.push({
+    path: '/subcontract/quantity',
+    query: {
+      project: projectId.value,
+      boqLine: line.id,
+    },
+  })
+}
+
+async function openFloorPlan(line: BoqLineView) {
+  await router.push({
+    path: '/schedule',
+    query: {
+      project: projectId.value,
+      boqLine: line.id,
+    },
+  })
+}
+
 async function createChange(draft: CreateBoqChangeOrderDraft) {
   try {
     await store.createChange(draft)
@@ -224,6 +247,33 @@ async function approveChange(payload: { orderId: string, approvedAt: string }) {
   }
 }
 
+async function reviseApprovedChange(payload: { orderId: string, draft: ReviseApprovedBoqChangeOrderDraft }) {
+  const order = store.workspace?.changes.find(change => change.id === payload.orderId)
+  if (!order)
+    return
+  const approved = await confirm({
+    variant: 'cascade',
+    title: `更正已签证变更「${order.code}」？`,
+    message: '该操作会同步重算签证金额、锁定业主台账与变更新增结果，并完整记录修改前后值。',
+    impact: [
+      { label: '已签证变更单', n: 1 },
+      { label: '锁定业主台账', n: order.ledgerId ? 1 : 0 },
+      { label: '变更明细 / 结果清单', n: order.lines.length },
+    ],
+    requireTyping: order.name,
+    confirmLabel: '确认更正',
+  })
+  if (!approved)
+    return
+  try {
+    await store.reviseApprovedChange(payload.orderId, payload.draft, true)
+    success('已签证变更及关联台账已更正')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
 async function removeChange(order: BoqChangeOrderView) {
   const approved = await confirm(order.status === 'approved'
     ? {
@@ -259,6 +309,34 @@ async function attachChange(payload: { orderId: string, draft: BoqAttachmentDraf
   try {
     await store.addChangeAttachment(payload.orderId, payload.draft)
     success('变更附件已登记')
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function downloadAttachment(attachment: BoqAttachmentView) {
+  try {
+    await exportFile(await store.loadAttachmentFile(attachment.id))
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function removeAttachment(attachment: BoqAttachmentView) {
+  const approved = await confirm({
+    variant: 'simple',
+    title: `删除附件「${attachment.fileName}」？`,
+    message: '附件会软删除，可通过消息中的撤回操作恢复。',
+    confirmLabel: '删除附件',
+  })
+  if (!approved)
+    return
+  try {
+    const logId = await store.removeAttachment(attachment.id)
+    if (logId)
+      undoToast(`已删除附件「${attachment.fileName}」`, () => store.undo([logId]))
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
@@ -357,20 +435,12 @@ onMounted(initialize)
         </div>
       </div>
 
-      <div v-if="store.workspace" class="boq-summary mt-4 grid grid-cols-4 gap-2">
-        <div class="summary-cell">
-          <span>清单行</span><strong>{{ store.workspace.summary.lineCount }}</strong>
-        </div>
-        <div class="summary-cell">
-          <span>原合同合价</span><strong>¥{{ store.workspace.summary.baseAmount.toLocaleString('zh-CN') }}</strong>
-        </div>
-        <div class="summary-cell">
-          <span>已签证变更</span><strong class="text-brand">¥{{ store.workspace.summary.approvedChangeAmount.toLocaleString('zh-CN') }}</strong>
-        </div>
-        <div class="summary-cell">
-          <span>当前合同合价</span><strong>¥{{ store.workspace.summary.effectiveAmount.toLocaleString('zh-CN') }}</strong>
-        </div>
-      </div>
+      <MetricGrid v-if="store.workspace" class="mt-4" :cols="4">
+        <Metric label="清单行" :value="store.workspace.summary.lineCount" />
+        <Metric label="原合同合价" :value="store.workspace.summary.baseAmount" money />
+        <Metric label="已签证变更" :value="store.workspace.summary.approvedChangeAmount" tone="brand" money />
+        <Metric label="当前合同合价" :value="store.workspace.summary.effectiveAmount" money />
+      </MetricGrid>
     </section>
 
     <section class="panel overflow-hidden px-3 pt-1">
@@ -396,11 +466,18 @@ onMounted(initialize)
 
     <section v-else-if="activeTab === 'lines'" class="boq-lines-layout grid min-w-0 grid-cols-[15rem_minmax(0,1fr)] gap-3">
       <aside class="min-w-0">
-        <BoqCatalogTree
-          v-model="treeScope"
-          :catalog="store.workspace.catalog"
-          :line-count="store.workspace.lines.length"
-        />
+        <details open class="boq-catalog-filter">
+          <summary class="boq-catalog-summary">
+            <span class="i-lucide-list-tree" />
+            目录筛选
+            <span class="ml-auto text-ink-faint">{{ store.workspace.lines.length }} 行</span>
+          </summary>
+          <BoqCatalogTree
+            v-model="treeScope"
+            :catalog="store.workspace.catalog"
+            :line-count="store.workspace.lines.length"
+          />
+        </details>
       </aside>
       <div class="min-w-0">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -411,10 +488,13 @@ onMounted(initialize)
         </div>
         <BoqLinesTable
           :lines="store.workspace.lines"
+          :catalog="store.workspace.catalog"
           :scope-key="treeScope"
           :search="search"
           :loading="store.saving"
           @edit="editLine"
+          @formula="openFieldFormula"
+          @plan="openFloorPlan"
           @remove="removeLine"
         />
       </div>
@@ -427,8 +507,11 @@ onMounted(initialize)
       @create="createChange"
       @transition="transitionChange"
       @approve="approveChange"
+      @revise-approved="reviseApprovedChange"
       @remove="removeChange"
       @attach="attachChange"
+      @download-attachment="downloadAttachment"
+      @remove-attachment="removeAttachment"
     />
 
     <BoqMonthlyWorkspace
@@ -446,15 +529,11 @@ onMounted(initialize)
 
 <style scoped>
 .boq-workspace { container-type: inline-size; overflow: hidden; }
-.summary-cell { display: flex; min-width: 0; flex-direction: column; gap: 2px; border-radius: 8px; background: var(--surface-2); padding: 8px 10px; color: var(--ink-faint); font-size: 11px; }
-.summary-cell strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.boq-catalog-summary { display: none; }
 @container (max-width: 58rem) {
   .boq-lines-layout { grid-template-columns: minmax(0, 1fr); }
-}
-@container (max-width: 48rem) {
-  .boq-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container (max-width: 26rem) {
-  .boq-summary { grid-template-columns: minmax(0, 1fr); }
+  .boq-catalog-filter { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--panel); }
+  .boq-catalog-summary { display: flex; cursor: pointer; align-items: center; gap: 8px; padding: 10px 12px; color: var(--ink); font-size: 12px; font-weight: 750; }
+  .boq-catalog-filter[open] .boq-catalog-summary { border-bottom: 1px solid var(--line); }
 }
 </style>

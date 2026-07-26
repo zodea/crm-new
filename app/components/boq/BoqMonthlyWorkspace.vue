@@ -2,6 +2,7 @@
 import type { MonthlyStatementLineView, MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqWorkspace } from '~/lib/boq/read-model'
 import type { KitTableColumn } from '~/lib/kit/table'
+import { BOQ_MONTHLY_STATUS_LABEL } from '~/lib/boq/presentation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 defineProps<{
@@ -31,12 +32,6 @@ const columns: KitTableColumn[] = [
   { field: 'note', title: '手调说明', minWidth: 160 },
   { type: 'action', title: '操作', width: 90 },
 ]
-
-const statusLabel: Record<string, string> = {
-  draft: '自动草稿',
-  adjusted: '已手调',
-  exported: '已导出',
-}
 
 async function generate() {
   const values = await formModal({
@@ -103,7 +98,7 @@ async function adjust(line: MonthlyStatementLineView) {
           <div class="flex items-center justify-between gap-2">
             <strong class="text-12px text-ink">{{ item.month }}</strong>
             <span :class="item.status === 'exported' ? 'chip-ok' : item.status === 'adjusted' ? 'chip-warn' : 'chip-brand'">
-              {{ statusLabel[item.status] }}
+              {{ BOQ_MONTHLY_STATUS_LABEL[item.status] }}
             </span>
           </div>
           <div class="mt-1 font-mono text-12px tabular-nums text-ink-soft">
@@ -123,7 +118,7 @@ async function adjust(line: MonthlyStatementLineView) {
             {{ statement.month }} 月度报量
           </h2>
           <p class="text-11px text-ink-soft">
-            {{ statusLabel[statement.status] }} · 共 {{ statement.lines.length }} 个分项
+            {{ BOQ_MONTHLY_STATUS_LABEL[statement.status] }} · 共 {{ statement.lines.length }} 个分项
           </p>
         </div>
         <button type="button" class="btn-primary" @click="emit('export', statement)">
