@@ -398,6 +398,8 @@ CREATE TABLE delivery_lines (
 
 > `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
 
+项目详情的到货视图只查询 `delivery_records.archived=1` 且头/项目/分供方祖先未软删的记录，并聚合未软删 `delivery_lines`。原件正文继续归属 `file_refs(owner_type='delivery_record', owner_id=delivery_records.id, category='source')`；`delivery_records.file_name` 仅作兼容显示，不建立详情附件副本。
+
 CREATE TABLE project_aliases (
   id        TEXT PRIMARY KEY,
   projectId TEXT NOT NULL,           -- → projects.id

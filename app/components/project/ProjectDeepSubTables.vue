@@ -35,6 +35,9 @@ const currentPayments = computed(() =>
 const paymentRecords = computed(() =>
   detailStore.paymentRecords.filter(row => row.projectId === props.projectId),
 )
+const deliveries = computed(() =>
+  detailStore.deliveries.filter(row => row.projectId === props.projectId),
+)
 
 const targetCostColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
@@ -142,6 +145,20 @@ const paymentRecordColumns: KitTableColumn[] = [
   { field: 'allocationCount', title: '分摊申请数', width: 110, align: 'right' },
   { field: 'allocatedAmount', title: '已分摊', type: 'money', width: 140 },
   { field: 'allocationDifference', title: '分摊差额', type: 'money', width: 140 },
+]
+const deliveryColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'orderNo', title: '送货单号', minWidth: 180, slot: 'link' },
+  { field: 'deliveryDate', title: '到货日期', type: 'date' },
+  { field: 'supplier', title: '分供方', minWidth: 180, filterable: true },
+  { field: 'lineCount', title: '有效材料行', width: 110, align: 'right' },
+  { field: 'totalQty', title: '到货数量', width: 120, align: 'right' },
+  { field: 'totalAmount', title: '到货金额', type: 'money', width: 145 },
+  { field: 'fileName', title: '归档原件', minWidth: 210 },
+  { field: 'sourceStatus', title: '原件状态', width: 110, filterable: true },
+  { field: 'ocrStatus', title: '识别状态', width: 110, filterable: true },
+  { field: 'reviewFlag', title: '核对标记', minWidth: 150, filterable: true },
+  { field: 'storedStatus', title: '入库状态', width: 100, filterable: true },
 ]
 </script>
 
@@ -311,6 +328,22 @@ const paymentRecordColumns: KitTableColumn[] = [
     <template #link="{ row }">
       <NuxtLink :to="row.sourcePath" class="cell--link">
         {{ row.paymentNo || '查看支付记录' }}
+      </NuxtLink>
+    </template>
+  </ProjectSubTableSection>
+
+  <ProjectSubTableSection
+    v-else-if="tab === 'material'"
+    title="项目到货归档"
+    :columns="deliveryColumns"
+    :rows="deliveries"
+    :loading="detailStore.loading"
+    :summary-fields="[{ field: 'totalAmount', label: '到货金额合计' }]"
+    empty="当前项目尚无已归档送货单"
+  >
+    <template #link="{ row }">
+      <NuxtLink :to="row.sourcePath" class="cell--link">
+        {{ row.orderNo || '查看到货归档' }}
       </NuxtLink>
     </template>
   </ProjectSubTableSection>
