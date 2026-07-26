@@ -73,10 +73,10 @@ function onOpenChange(value: boolean) {
             v-for="s in sections"
             :key="s.key"
             type="button"
-            class="block w-full text-left px-3.5 py-2 text-12px transition-colors"
+            class="form-dialog__nav-button block w-full text-left px-3.5 py-2 text-12px transition-colors"
             :class="activeSection === s.key
               ? 'text-brand-deep font-600 bg-brand-soft/40'
-              : 'text-ink-soft hover:text-ink hover:bg-surface-3'"
+              : 'bg-transparent text-ink-soft hover:text-ink hover:bg-surface-3'"
             @click="scrollTo(s.key)"
           >
             {{ s.label }}
@@ -125,6 +125,12 @@ function onOpenChange(value: boolean) {
 
 .form-dialog__section-select {
   display: none;
+}
+
+.form-dialog__nav-button {
+  appearance: none;
+  border: 0;
+  font: inherit;
 }
 
 @container (max-width: 40rem) {

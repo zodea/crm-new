@@ -89,7 +89,7 @@ function clearAll() {
       </button>
     </div>
 
-    <fieldset :disabled="disabled" class="grid gap-3">
+    <fieldset :disabled="disabled" class="m-0 min-w-0 grid gap-3 border-0 p-0">
       <section
         v-for="floor in floorGroups"
         :key="floor.id"
@@ -108,7 +108,7 @@ function clearAll() {
           <span class="text-11px text-ink-faint">按房号勾选</span>
         </div>
 
-        <div class="grid gap-px bg-line sm:grid-cols-2 xl:grid-cols-3">
+        <div class="quantity-assignment-unit-grid grid gap-px bg-line">
           <label
             v-for="unit in floor.units"
             :key="unit.id"
@@ -143,3 +143,9 @@ function clearAll() {
     </p>
   </div>
 </template>
+
+<style scoped>
+.quantity-assignment-unit-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+</style>
