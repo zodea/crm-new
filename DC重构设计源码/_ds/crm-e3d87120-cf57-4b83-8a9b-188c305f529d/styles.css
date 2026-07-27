@@ -1,7 +1,6 @@
-/* 扫描件助手 — 设计系统全局样式入口
+/* 瑞航 CRM — 当前设计系统全局样式入口
    仅由 @import 组成；所有 token 与字体经此聚合后交付给消费方。 */
 @import "./tokens/fonts.css";
-@import "./tokens/colors.css";
 @import "./tokens/typography.css";
-@import "./tokens/spacing.css";
 @import "./tokens/base.css";
+@import "./tokens/content-v5.css";

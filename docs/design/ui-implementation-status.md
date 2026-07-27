@@ -33,23 +33,24 @@ Nuxt 路由级实现结果：
 
 | 状态 | 数量 | 占比 |
 | --- | ---: | ---: |
-| 已有对应界面 | 91 | 91.9% |
-| **未实现** | **8** | **8.1%** |
+| 已有对应界面 | 90 | 90.9% |
+| **未实现** | **9** | **9.1%** |
 
 设计稿中存在一个不可达的通用 `detail` 残留，没有任何导航或动作进入，本次不计入 99 个可达界面；历史实现状态也不再混进当前分母。
 
-## 3. 未实现的 8 个界面
+## 3. 未实现的 9 个界面
 
-| 设计界面 | Nuxt 现状 | 判定 |
-| --- | --- | --- |
-| 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 |
-| OCR 设置 | 侧栏项缺少 `to`，无页面路由 | 未实现 |
-| 工资核算 / 工资进度款 | `/subcontract/payroll` 仍为明确的待实现占位，设计稿对应工资工具未落地 | 未实现 |
-| 班组详情 | `/base/crew/[id]` 为待实现占位 | 未实现 |
-| 工人详情 | `/base/worker/[id]` 为待实现占位 | 未实现 |
-| 目标成本详情 | 只有列表/编辑能力，没有设计稿树形详情的对应路由 | 未实现 |
-| 客户详情 | 只有列表/编辑能力，没有名下项目、合同、收款反向聚合详情 | 未实现 |
-| 请款簿详情 | 设计稿有可达二级界面，Nuxt 无对应路由 | 未实现 |
+| 设计界面 | Nuxt 现状 | 判定 | 实施票 |
+| --- | --- | --- | --- |
+| 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
+| OCR 设置 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#204](https://github.com/zodea/crm-new/issues/204) |
+| 工资核算 / 工资进度款 | `/subcontract/payroll` 仍为明确的待实现占位，设计稿对应工资工具未落地 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 考勤工作台 | `/subcontract/attendance` 仍为明确的待实现占位 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 班组详情 | `/base/crew/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
+| 工人详情 | `/base/worker/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
+| 目标成本详情 | 只有列表/编辑能力，没有设计稿树形详情的对应路由 | 未实现 | [#191](https://github.com/zodea/crm-new/issues/191) |
+| 客户详情 | 只有列表/编辑能力，没有名下项目、合同、收款反向聚合详情 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
+| 请款簿详情 | 设计稿有可达二级界面，Nuxt 无对应路由 | 未实现 | [#197](https://github.com/zodea/crm-new/issues/197) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
 
@@ -59,13 +60,17 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 项目×分供方 | 页面/关系基础已存在 | [#15：项目×分供方工作台](https://github.com/zodea/crm-new/issues/15) |
-| 分供方资料 | 主数据表单已落地 | [#13：真实证照、OCR 回填与审核](https://github.com/zodea/crm-new/issues/13) |
-| 送货单识别与归档 | 工作台和归档页面已存在 | [#42：OCR 到核对入库](https://github.com/zodea/crm-new/issues/42)、[#113：设计稿双区闭环修正](https://github.com/zodea/crm-new/issues/113) |
-| 发票台账 | 识别、归档与列表基础已存在 | [#70：打印、导入拒绝、编辑删除入口](https://github.com/zodea/crm-new/issues/70) |
-| 工程量 / 工资 | 工程量矩阵和责任配置已存在 | [#37：量差总表与真实取数](https://github.com/zodea/crm-new/issues/37) |
-| 全站视觉与表格 | 已使用共享原语并完成部分响应式；#112 已关闭 | [#181](https://github.com/zodea/crm-new/issues/181) 与 [#183–#206](https://github.com/zodea/crm-new/issues/183) 的逐屏对标链 |
-| 浮层层次 | Dialog/Sheet/Popover 底座已存在 | [#166：浮层遮挡、滚动锁与容器布局](https://github.com/zodea/crm-new/issues/166) |
+| 施工进度 / 目标成本 | 列表、排程和编辑基础已存在 | [#191](https://github.com/zodea/crm-new/issues/191) |
+| 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
+| 客户 / 班组 / 工人 | 主数据列表与表单已存在，部分详情仍缺失 | [#194](https://github.com/zodea/crm-new/issues/194) |
+| 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
+| 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
+| 工程量 / 工资 / 考勤 | 工程量矩阵和责任配置已存在，工资与考勤仍有占位 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |
+| 收入 / 支出 / 发票 | 票款列表、表单、识别和台账基础已存在 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204) |
+| 导入 / 导出工具 | 配置页和映射工作台已存在 | [#205](https://github.com/zodea/crm-new/issues/205) |
+| 全站视觉与交互 | 已使用共享原语并完成部分响应式；#112 已关闭 | [#181](https://github.com/zodea/crm-new/issues/181)、[#206](https://github.com/zodea/crm-new/issues/206) |
+| 材料价格分析 | 页面基础已存在，参考路径与归属待确认 | [#207](https://github.com/zodea/crm-new/issues/207) |
 
 项目详情已在 [#173–#180](https://github.com/zodea/crm-new/issues/180) 完成只读子表、阶段文件、成本/合同/资金/物资/验收关系、正式事实口径、来源穿透及四档响应式验收，因此不再列入“已搭但未闭环”。这不改变路由总数，只改变闭环状态。
 

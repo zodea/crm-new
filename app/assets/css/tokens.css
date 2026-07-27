@@ -8,19 +8,11 @@
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow-form-footer: none;
 
-  /* ── 选中内描边（导航项 active，对齐设计稿 spacing.css）── */
-  --ring-selected: inset 3px 0 0 var(--brand);
-
   /* ── 字距 ── */
   --tracking-wide: 0.02em;
 
-  /* ── 弹窗浮层 ── */
-  --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
-
-  /* ── 布局 ── */
-  --sidebar-w: 248px;
+  /* ── 应用外壳专属布局；公共尺寸由 content-v5 → spacing.css 提供 ── */
   --sidebar-w-collapsed: 68px;
-  --header-h: 64px;
   --tabbar-h: 40px;
 
   /* 浮层组合契约（ADR 0016）。
@@ -53,11 +45,6 @@
   --shell-header-border: var(--line);
   --shell-workspace-bg: var(--bg);
 
-  /* ── 动效 ── */
-  --ease-snappy: cubic-bezier(0.2, 0, 0.2, 1);
-  --dur-fast: 120ms;
-  --dur-base: 160ms;
-  --dur-dialog: 220ms;
 }
 
 /* ── shadcn-vue 语义令牌 ──
@@ -92,9 +79,6 @@
   --border: var(--line);
   --input: var(--line);
   --ring: var(--brand);
-
-  /* shadcn 圆角基准 = 按钮圆角(4px)，具体阶梯由 uno.config 派生 */
-  --radius: var(--radius-btn);
 
   /* 浮层遮罩（ADR 0003：中性遮罩，不上毛玻璃；品牌蓝改用中性黑，避免遮罩抢戏）*/
   --overlay: rgb(0 0 0 / 28%);
