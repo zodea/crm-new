@@ -6,6 +6,12 @@
 import type { KitFilterOption, KitTableColumn, NormalizedKitColumn } from '~/lib/kit/table'
 import { deriveFilterOptions, formatCell, normalizeKitColumn } from '~/lib/kit/table'
 
+interface KitTableEmptyState {
+  title: string
+  description?: string
+  actionLabel?: string
+}
+
 const {
   columns,
   data,
@@ -27,7 +33,7 @@ const {
   /** 最少展示行数的高度兜底(设计稿铁律 ≥10 行)。 */
   minRows?: number
   rowKey?: string
-  empty?: string
+  empty?: string | KitTableEmptyState
   /** true = 列头筛选不在本地过滤,只 emit filter-change,由调用方对全量数据过滤(配受控分页)。 */
   remoteFilter?: boolean
   /** checkbox 列的行级可勾判定(如 excel 来源票无扫描件不可勾);缺省全部可勾。 */
@@ -39,6 +45,7 @@ const emit = defineEmits<{
   filterChange: [payload: { field: string, values: unknown[], filters: { field: string, values: unknown[] }[] }]
   /** 勾选变化(含表头全选),携带当前全部选中行。 */
   checkboxChange: [rows: T[]]
+  emptyAction: []
 }>()
 
 defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown>>()
@@ -53,6 +60,14 @@ const normalized = computed(() => columns.map((raw) => {
 
 /** 38px 表头 + 38px 数据行，字号增大后仍保持紧凑，兜住 ≥minRows 行展示高度。 */
 const minHeight = computed(() => 38 + minRows * 38)
+const emptyState = computed<KitTableEmptyState>(() =>
+  typeof empty === 'string'
+    ? {
+        title: empty,
+        description: '请调整筛选条件，或检查当前业务范围。',
+      }
+    : empty,
+)
 
 /** 跨页连续序号:seq 列从当前页偏移起算,而不是每页都从 1 开始。 */
 const seqConfig = computed(() =>
@@ -115,7 +130,11 @@ function onFilterChange(params: VxeFilterChangeParams) {
 }
 
 // ── checkbox 列（#69 勾选浮出合计）──
-const tableRef = useTemplateRef<{ getCheckboxRecords: () => T[], clearCheckboxRow: () => void }>('tableRef')
+const tableRef = useTemplateRef<{
+  getCheckboxRecords: () => T[]
+  clearCheckboxRow: () => void
+  clearFilter?: () => Promise<void> | void
+}>('tableRef')
 
 const checkboxConfig = computed(() =>
   checkMethod ? { checkMethod: ({ row }: { row: T }) => checkMethod(row) } : {},
@@ -131,7 +150,11 @@ function clearCheckbox() {
   emit('checkboxChange', [])
 }
 
-defineExpose({ clearCheckbox })
+async function clearFilter() {
+  await tableRef.value?.clearFilter?.()
+}
+
+defineExpose({ clearCheckbox, clearFilter })
 </script>
 
 <template>
@@ -141,7 +164,7 @@ defineExpose({ clearCheckbox })
       :data="data"
       :loading="loading"
       :min-height="minHeight"
-      :empty-text="empty"
+      :empty-text="emptyState.title"
       show-overflow="title"
       :row-config="{ isHover: true, keyField: rowKey }"
       :column-config="{ resizable: true }"
@@ -171,10 +194,25 @@ defineExpose({ clearCheckbox })
       </template>
 
       <template #empty>
-        <div data-ui="kit-table-empty" class="flex flex-col items-center justify-center px-6 py-10 text-center">
+        <div
+          data-ui="kit-table-empty"
+          role="status"
+          :aria-label="emptyState.title"
+          class="flex flex-col items-center justify-center px-6 py-10 text-center"
+        >
           <span aria-hidden="true" class="i-lucide-inbox mb-2 h-7 w-7 text-ink-faint" />
-          <strong class="text-14px font-700 text-ink">{{ empty }}</strong>
-          <span class="mt-1 text-12px text-ink-faint">请调整筛选条件，或检查当前业务范围。</span>
+          <strong class="text-14px font-700 text-ink">{{ emptyState.title }}</strong>
+          <span v-if="emptyState.description" class="mt-1 text-12px text-ink-faint">
+            {{ emptyState.description }}
+          </span>
+          <button
+            v-if="emptyState.actionLabel"
+            type="button"
+            class="btn-primary mt-4"
+            @click="emit('emptyAction')"
+          >
+            {{ emptyState.actionLabel }}
+          </button>
         </div>
       </template>
 
@@ -235,6 +273,12 @@ defineExpose({ clearCheckbox })
 @keyframes kit-table-shimmer {
   to {
     transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kit-table__shimmer::after {
+    animation: none;
   }
 }
 </style>

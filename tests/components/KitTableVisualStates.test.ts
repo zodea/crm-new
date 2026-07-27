@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, useTemplateRef } from 'vue'
 import KitTable from '~/components/ui/KitTable.vue'
@@ -72,5 +72,25 @@ describe('kitTable visual states', () => {
 
     expect(screen.getByText('暂无项目')).not.toBeNull()
     expect(screen.getByText('请调整筛选条件，或检查当前业务范围。')).not.toBeNull()
+  })
+
+  it('supports business guidance and an optional empty primary action', async () => {
+    const view = render(KitTable, {
+      props: {
+        columns: [{ field: 'name', title: '名称' }],
+        data: [],
+        empty: {
+          title: '还没有施工项目',
+          description: '新建第一个项目后，可在这里跟踪阶段与经营数据。',
+          actionLabel: '新增项目',
+        },
+      },
+      global,
+    })
+
+    expect(screen.getByText('还没有施工项目')).not.toBeNull()
+    expect(screen.getByText('新建第一个项目后，可在这里跟踪阶段与经营数据。')).not.toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '新增项目' }))
+    expect(view.emitted().emptyAction).toHaveLength(1)
   })
 })

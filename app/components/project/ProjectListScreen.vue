@@ -20,6 +20,7 @@ const statusFilter = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
+const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
 
 const statusOptions = [
   { key: 'all', label: '全部状态' },
@@ -59,6 +60,26 @@ const tableRows = computed(() => pageRows.value.map((project) => {
       : undefined),
   }
 }))
+
+const hasActiveFilters = computed(() => Boolean(
+  searchText.value.trim()
+  || statusFilter.value !== 'all'
+  || columnFilters.value.some(filter => filter.values.length > 0),
+))
+
+const emptyState = computed(() => {
+  return hasActiveFilters.value
+    ? {
+        title: '没有符合条件的项目',
+        description: '可清除搜索、状态和表头筛选后查看全部项目。',
+        actionLabel: '清除筛选',
+      }
+    : {
+        title: '还没有施工项目',
+        description: '新建第一个项目后，可在这里跟踪阶段与经营数据。',
+        actionLabel: '新增项目',
+      }
+})
 
 // 设计稿 ProjectScreen.jsx 红圈 13 列（顺序即列序）；金额列走 money 两位小数（元）。
 const columns = computed<KitTableColumn[]>(() => [
@@ -105,10 +126,32 @@ function handleColumnFilter(payload: { filters: { field: string, values: unknown
 }
 
 async function refresh() {
+  await clearFilters()
+  await loadProjects()
+}
+
+async function clearFilters() {
   searchText.value = ''
   statusFilter.value = 'all'
   columnFilters.value = []
-  await store.load()
+  page.value = 1
+  await tableRef.value?.clearFilter()
+}
+
+async function handleEmptyAction() {
+  if (hasActiveFilters.value)
+    await clearFilters()
+  else
+    openCreate()
+}
+
+async function loadProjects() {
+  try {
+    await store.load()
+  }
+  catch {
+    // Store exposes the user-facing error; the page renders the shared retry state.
+  }
 }
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -224,7 +267,10 @@ async function handleDelete(project: Project) {
     undoToast(`已删除「${project.name}」`, () => store.undo(logId))
 }
 
-onMounted(() => Promise.all([store.load(), detailStore.load()]))
+onMounted(() => {
+  void loadProjects()
+  void detailStore.load().catch(() => {})
+})
 </script>
 
 <template>
@@ -243,15 +289,28 @@ onMounted(() => Promise.all([store.load(), detailStore.load()]))
       @export-by-category="exportByCategory"
     />
 
+    <StatePanel
+      v-if="store.error"
+      kind="error"
+      title="项目列表加载失败"
+      :description="store.error"
+      action-label="重新加载"
+      compact
+      @action="loadProjects"
+    />
+
     <KitTable
+      v-if="!store.error || store.list.length > 0"
+      ref="tableRef"
       :columns="columns"
       :data="tableRows"
-      :loading="store.loading"
+      :loading="store.loading || !store.loaded"
       :page="{ page: currentPage, pageSize, total: filtered.length }"
       remote-filter
-      empty="没有符合筛选条件的项目"
+      :empty="emptyState"
       @page-change="handlePageChange"
       @filter-change="handleColumnFilter"
+      @empty-action="handleEmptyAction"
     >
       <template #name="{ row }">
         <EntityLink :id="row.id" type="project" :label="row.name" />
