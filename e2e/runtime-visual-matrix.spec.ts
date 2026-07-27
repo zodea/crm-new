@@ -240,7 +240,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test.describe('#184 / #186 运行态视觉基线', () => {
+test.describe('#184 / #186 / #187 运行态视觉基线', () => {
   for (const sample of SAMPLES) {
     for (const width of RESPONSIVE_WIDTHS) {
       test(`${sample.key} @ ${width}px`, async ({ page }) => {

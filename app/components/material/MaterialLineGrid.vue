@@ -40,6 +40,9 @@ const columns = computed<KitTableColumn[]>(() => [
     ] satisfies KitTableColumn[]),
   { type: 'action', title: '操作', width: 92, align: 'center', slot: 'action' },
 ])
+const gridMinWidth = computed(() =>
+  columns.value.reduce((width, column) => width + (column.width ?? column.minWidth ?? 0), 0),
+)
 
 const summary = computed(() => {
   if (props.kind === 'mat_arrival') {
@@ -211,7 +214,7 @@ function importTsv() {
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
-      <KitTable :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
+      <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
         <template #materialName="{ row, rowIndex }">
           <input :value="row.materialName" :disabled="readonly" class="field-input w-full" aria-label="材料名称" @input="patch(rowIndex, { materialName: inputValue($event) })">
         </template>

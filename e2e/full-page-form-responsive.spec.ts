@@ -166,36 +166,78 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
     }
   })
 
-  test('390px 下四类密集明细只在自身容器横向滚动', async ({ context }) => {
+  test('390px 下密集明细只在自身容器单层横向滚动且末列可达', async ({ context }) => {
     const denseForms = [
       {
         path: '/finance/payment/new',
         title: '新建 · 付款申请',
         prepare: preparePaymentForm,
         addLine: async (page: Page) => page.getByTestId('add-grid-line').first().click(),
-        root: (page: Page) => page.getByTestId('finance-line-grid').first(),
+        root: (page: Page) => page.getByTestId('finance-line-grid').first().locator(':scope > .overflow-auto'),
+        lastAction: (page: Page) => page
+          .getByTestId('finance-line-grid')
+          .first()
+          .getByTitle('删除')
+          .last(),
+      },
+      {
+        path: '/finance/reimbursement/new',
+        title: '新建 · 费用报销',
+        addLine: async (page: Page) => page.getByTestId('add-grid-line').click(),
+        root: (page: Page) => page.getByTestId('finance-line-grid').locator(':scope > .overflow-auto'),
+        lastAction: (page: Page) => page
+          .getByTestId('finance-line-grid')
+          .getByTitle('删除')
+          .last(),
       },
       {
         path: '/material/arrival/new',
         title: '新建 · 材料到货',
         addLine: async (page: Page) => page.getByTestId('add-material-line').click(),
-        root: (page: Page) => page.getByTestId('material-line-grid'),
+        root: (page: Page) => page.getByTestId('material-line-grid')
+          .locator(':scope > .overflow-auto'),
+        lastAction: (page: Page) => page
+          .getByTestId('material-line-grid')
+          .getByTitle('删除')
+          .last(),
       },
       {
         path: '/owner/report/new',
         title: '新建 · 甲方报量',
         addLine: async (page: Page) => page.getByTestId('owner-document-add-line').click(),
-        root: (page: Page) => page.locator('#section-lines'),
+        root: (page: Page) => page.locator('#section-lines')
+          .locator(':scope > .overflow-auto'),
+        lastAction: (page: Page) => page
+          .locator('#section-lines')
+          .getByTitle('删除')
+          .last(),
+      },
+      {
+        path: '/owner/change/new',
+        title: '新建 · 甲方变洽签',
+        addLine: async (page: Page) => page.getByTestId('owner-document-add-line').click(),
+        root: (page: Page) => page.locator('#section-lines')
+          .locator(':scope > .overflow-auto'),
+        lastAction: (page: Page) => page
+          .locator('#section-lines')
+          .getByTitle('删除')
+          .last(),
       },
       {
         path: '/contract/material/form',
         title: '新建 · 材料采购合同',
         addLine: async (page: Page) => page.getByTestId('add-contract-line').click(),
-        root: (page: Page) => page.locator('#section-lines'),
+        root: (page: Page) => page.locator('#section-lines')
+          .locator('.overflow-x-auto'),
+        lastAction: (page: Page) => page
+          .locator('#section-lines')
+          .getByTitle('删除明细')
+          .last(),
       },
     ] satisfies Array<FormRoute & {
       addLine: (page: Page) => Promise<void>
       root: (page: Page) => Locator
+      lastAction: (page: Page) => Locator
     }>
 
     for (const form of denseForms) {
@@ -204,7 +246,20 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
         await page.setViewportSize({ width: 390, height: 844 })
         await openRepresentativeForm(page, form)
         await form.addLine(page)
-        await expectLocalHorizontalScroll(form.root(page), `${form.path} 明细`)
+        const scrollRoot = form.root(page)
+        await expectLocalHorizontalScroll(scrollRoot, `${form.path} 明细`)
+        await expect.poll(() => scrollRoot.evaluate(root =>
+          [...root.querySelectorAll<HTMLElement>('*')].filter((element) => {
+            const overflowX = getComputedStyle(element).overflowX
+            return ['auto', 'scroll'].includes(overflowX)
+              && element.scrollWidth > element.clientWidth + 1
+          }).length,
+        )).toBe(0)
+        await scrollRoot.evaluate(root => root.scrollLeft = root.scrollWidth)
+        await expect.poll(() => scrollRoot.evaluate(root => root.scrollLeft)).toBeGreaterThan(0)
+        const lastAction = form.lastAction(page)
+        await lastAction.scrollIntoViewIfNeeded()
+        await expect(lastAction).toBeInViewport()
         await expectNoPageOverflow(page, `${form.path} @ 390px`)
       }
       finally {

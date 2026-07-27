@@ -34,11 +34,14 @@ function fieldClass(field: keyof TargetCostFormDraft) {
         <LookupSelect
           v-model="draft.projectId"
           :fetch="fetchProjects"
+          field="projectId"
+          :invalid="!!fieldErrors.projectId"
+          :description-id="fieldErrors.projectId ? 'target-cost-project-error' : undefined"
           recent-key="target-cost-projects"
           placeholder="检索项目"
           @update:model-value="emit('clearError', 'projectId')"
         />
-        <span v-if="fieldErrors.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
+        <span v-if="fieldErrors.projectId" id="target-cost-project-error" class="field-error">{{ fieldErrors.projectId }}</span>
       </label>
       <label class="field-block form-span-full">
         <span class="flex items-center gap-2">

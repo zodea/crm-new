@@ -48,6 +48,9 @@ const columns = computed<KitTableColumn[]>(() => props.kind === 'owner_change'
       { type: 'action', title: '操作', width: 72, slot: 'action' },
     ],
 )
+const gridMinWidth = computed(() =>
+  columns.value.reduce((width, column) => width + (column.width ?? column.minWidth ?? 0), 0),
+)
 
 const summary = computed(() => {
   const amount = props.lines.reduce(
@@ -165,7 +168,7 @@ function remove(index: number) {
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
-      <KitTable :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
+      <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
         <template #operation="{ row, rowIndex }">
           <select
             :value="row.operation"

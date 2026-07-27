@@ -400,3 +400,57 @@ openDrawer({
   <template #aside />
 </EntityDetailShell>
 ```
+
+---
+
+## 11 · 整页表单壳 `entity-form-shell` ✅ 已定案（2026-07-27）
+
+**用途**：`app/components/ui/EntityFormShell.vue` 统一业务实体整页表单的页面结构：返回、标题/副标题、状态与页面级操作、可选分区导航、加载/错误落点、内容区和吸底动作区。壳只发出 `back/stateAction` 事件并承载插槽，不读取领域 store、不执行校验、不决定保存草稿、保存或提交规则。
+
+**参考、差异与最终处理**：
+
+| 核对项 | 参考结构 | #187 前 app | 最终处理 |
+| --- | --- | --- | --- |
+| 页面头部 | `DC重构设计源码/kit/FormPage.jsx`：返回 + 新建/编辑标题 + 草稿状态/提示 | 各领域 Page 复制相近头部，文案和右侧动作位置不一 | 固定 `title/subtitle/backLabel`，`status/actions` 由领域页注入 |
+| 分区导航 | 三个以上分区时显示左侧锚点，窄容器隐藏 | MasterData/Contract/Finance 等组件重复 aside，按 viewport 判断 | `sections` 统一生成语义化 nav；以 56.25rem 表单容器阈值并排，窄容器由分区卡片标题接替 |
+| 状态 | 参考页有载入与保存反馈 | 代表页只有文字 loading，加载异常只 toast 或无落点 | `ready/loading/error` 映射共享 `StatePanel`；领域页仍判定状态和重试 |
+| 内容与动作 | 字段卡片 + 可选明细网格 + 吸底五动作 | 字段、附件、明细和 `FormFooter` 已存在，但外壳逐页复制 | 默认插槽承载字段/明细；`footer` 插槽承载现有 `FormFooter`，动作语义不进入壳 |
+| 代表迁移 | 新建、编辑回显、校验、草稿、提交、页签缓存、放弃修改 | `MasterDataFormPage` 已有完整领域 action | 迁移 MasterData 代表页；保留 store/action/dirty/KeepAlive，补首次字段聚焦、加载错误和首个错误字段聚焦 |
+
+`EntityFormShell` 不创建第二个 `main` landmark；应用级 `SidebarInset` 仍是唯一主内容地标。底部动作在 DOM 顺序上位于字段内容之后，保持从字段自然 Tab 到取消与主操作。
+
+**响应式与交互契约**：
+
+- 390 / 768 / 1024 / 1440px 与 200% 等效宽度不得产生页面横向滚动。
+- 分区导航按表单自身可用宽度显示；隐藏后各 `section-*` 卡片标题仍是结构导航。导航拦截原生 hash，仅滚动目标分区，不改变 Nuxt 路由与页签 key。
+- 密集明细网格由领域调用点提供唯一的局部 `overflow-x:auto`，表格最小宽度随实际列宽求和，壳不得吞掉或放大为整页滚动。
+- 非就绪态仍保留返回入口；错误状态由 `stateAction` 回到领域加载函数。
+- dirty 拦截只在首次成功水合后生效；页签切换保值、失焦字段内错误、提交 toast 双通道、首错滚入视口并聚焦、草稿跳过必填、保存/提交 loading 均由既有领域层保持。必填 `LookupSelect` 通过 `field` 把同一字段键落到真实 combobox，以 `invalid` 同步视觉与 `aria-invalid`，并用 `descriptionId` 关联字段错误说明。
+- `footer` 插槽不增加包裹层，`FormFooter` 必须作为内容列直接子元素保持 sticky 定位。
+
+**关联原语审计**：
+
+- #79：旧表单弹窗范围已由 ADR 0014 替代；#187 在整页形态采用其吸底动作、首次聚焦、校验双通道、提交三态和 dirty 拦截语义，弹窗仅保留轻量对象兜底。
+- #94 `KitEditGrid`：继续作为跨领域明细网格独立原语；代表 MasterData 表单没有可编辑明细矩阵，本期明确延期，不阻塞表单壳。
+- #95 `typeSelect`：继续作为付款申请等“三段式新建”独立原语；代表 MasterData 表单没有业务类型首段，本期明确延期，不阻塞表单壳。
+
+**调用签名**：
+
+```vue
+<EntityFormShell
+  :title="title"
+  :sections="sections"
+  :state="pageState"
+  @back="leaveToList"
+  @state-action="reload"
+>
+  <template #status />
+  <template #actions />
+
+  <form><!-- 领域字段、附件与明细 --></form>
+
+  <template #footer>
+    <FormFooter @action="handleDomainAction" />
+  </template>
+</EntityFormShell>
+```

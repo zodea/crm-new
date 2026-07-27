@@ -54,6 +54,9 @@ const columns = computed<KitTableColumn[]>(() => [
   { field: 'note', title: '备注', minWidth: 180, slot: 'note' },
   { type: 'action', title: '操作', width: 92, align: 'center', slot: 'action' },
 ])
+const gridMinWidth = computed(() =>
+  columns.value.reduce((width, column) => width + (column.width ?? column.minWidth ?? 0), 0),
+)
 
 function sourceId(line: GridLine): string | null | undefined {
   if (props.kind === 'settlement')
@@ -191,7 +194,7 @@ function importTsv() {
     </div>
 
     <div class="min-h-0 flex-1 overflow-auto">
-      <KitTable :columns="columns" :data="lines" :min-rows="3" :empty="empty">
+      <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" :empty="empty">
         <template #source="{ row, rowIndex }">
           <input
             v-if="kind === 'reimbursement'"

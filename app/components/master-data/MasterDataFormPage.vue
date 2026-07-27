@@ -65,19 +65,39 @@ const pendingRemoveIds = shallowRef<string[]>([])
 const pendingRestoreIds = shallowRef<string[]>([])
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
+const loadError = shallowRef('')
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
+const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
+const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 
-const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value
+const dirty = computed(() => hydrated.value && (
+  JSON.stringify(draft.value) !== savedSnapshot.value
   || pendingAttachments.value.length > 0
   || pendingRemoveIds.value.length > 0
-  || pendingRestoreIds.value.length > 0)
+  || pendingRestoreIds.value.length > 0
+))
 
 const sections = computed(() => meta.value.sections)
 const attachmentTitle = computed(() => props.kind === 'worker' ? '证书档案' : '附件')
+const requiredFields = computed(() =>
+  new Map<string, string>(formRequiredFields(props.kind)),
+)
+const shellState = computed(() => {
+  if (loading.value)
+    return 'loading'
+  if (loadError.value)
+    return 'error'
+  return 'ready'
+})
+const shellStateTitle = computed(() =>
+  loading.value
+    ? `正在载入${meta.value.label}表单`
+    : `${meta.value.label}表单载入失败`,
+)
 
 const fetchCustomers = readStore.searchCustomers
 const fetchProjects = readStore.searchProjects
@@ -95,11 +115,14 @@ async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
 }
 
 async function initialize() {
+  hydrated.value = false
   loading.value = true
+  loadError.value = ''
   fieldErrors.value = {}
   pendingAttachments.value = []
   pendingRemoveIds.value = []
   pendingRestoreIds.value = []
+  let shouldFocus = false
   try {
     if (!routeId) {
       draft.value = formDefaults(props.kind) as MasterDataPageDraft
@@ -124,9 +147,20 @@ async function initialize() {
     }
     await nextTick()
     savedSnapshot.value = JSON.stringify(draft.value)
+    hydrated.value = true
+    shouldFocus = true
+  }
+  catch (cause) {
+    loadError.value = toErrorMessage(cause)
   }
   finally {
     loading.value = false
+    if (shouldFocus) {
+      await nextTick()
+      formElement.value
+        ?.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
+        ?.focus({ preventScroll: true })
+    }
   }
 }
 
@@ -139,9 +173,45 @@ function validateRequired(): boolean {
   }
   fieldErrors.value = errors
   const labels = Object.values(errors)
-  if (labels.length)
+  if (labels.length) {
     warning(`${labels[0]}（共 ${labels.length} 处）`)
+    const firstField = Object.keys(errors)[0]
+    if (firstField)
+      focusField(firstField)
+  }
   return labels.length === 0
+}
+
+function focusField(field: string) {
+  void nextTick(() => {
+    const target = formElement.value
+      ?.querySelector<HTMLElement>(`[data-field="${field}"]`)
+    target?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
+    target?.focus()
+  })
+}
+
+function validateFieldOnBlur(event: FocusEvent) {
+  const target = event.target
+  if (!(target instanceof HTMLElement))
+    return
+  const field = target.dataset.field
+  if (!field)
+    return
+  const label = requiredFields.value.get(field)
+  if (!label)
+    return
+
+  const value = draft.value[field as keyof MasterDataPageDraft]
+  const missing = typeof value === 'string' ? !value.trim() : value == null
+  if (!missing) {
+    clearFieldError(field as keyof MasterDataPageDraft)
+    return
+  }
+  fieldErrors.value = {
+    ...fieldErrors.value,
+    [field]: `${label}为必填项`,
+  }
 }
 
 function clearFieldError(field: keyof MasterDataPageDraft) {
@@ -359,83 +429,71 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      v-if="sections.length >= 3"
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
-    >
-      <a
-        v-for="section in sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
-      >
-        {{ section.label }}
-      </a>
-    </aside>
-
-    <main class="min-w-0 flex-1">
-      <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
-            <span class="i-lucide-arrow-left" aria-hidden="true" />
-            返回{{ meta.listLabel }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            草稿可暂存不完整内容；提交时校验必填、关联和金额规则。
-          </p>
-        </div>
+  <EntityFormShell
+    :title="title"
+    subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
+    :back-label="`返回${meta.listLabel}`"
+    :sections="sections"
+    :state="shellState"
+    :state-title="shellStateTitle"
+    :state-description="loadError"
+    state-action-label="重新加载"
+    @back="leaveToList"
+    @state-action="initialize"
+  >
+    <template #status>
+      <template v-if="shellState === 'ready'">
         <span v-if="draft.status || draft.approvalStatus" class="chip bg-surface-3 text-ink-soft">
           {{ draft.approvalStatus || draft.status }}
         </span>
-      </header>
+      </template>
+    </template>
 
-      <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
+    <form
+      ref="formElement"
+      class="flex flex-col gap-4"
+      @focusout="validateFieldOnBlur"
+      @submit.prevent
+    >
+      <MasterDataFormFields
+        v-model="draft"
+        :kind="kind"
+        :field-errors="fieldErrors"
+        :fetch-customers="fetchCustomers"
+        :fetch-projects="fetchProjects"
+        :fetch-crews="fetchCrews"
+        @clear-error="clearFieldError"
+      />
 
-      <form v-else class="flex flex-col gap-4" @submit.prevent>
-        <MasterDataFormFields
-          v-model="draft"
-          :kind="kind"
-          :field-errors="fieldErrors"
-          :fetch-customers="fetchCustomers"
-          :fetch-projects="fetchProjects"
-          :fetch-crews="fetchCrews"
-          @clear-error="clearFieldError"
-        />
+      <MasterDataAttachmentSection
+        :title="attachmentTitle"
+        :desktop-picker="desktopAttachmentPicker"
+        :attachments="attachments"
+        :pending-attachments="pendingAttachments"
+        :pending-remove-ids="pendingRemoveIds"
+        :pending-restore-ids="pendingRestoreIds"
+        @pick-native="pickNativeFiles"
+        @files="handleFiles"
+        @toggle-existing="toggleExistingAttachment"
+        @remove-pending="removePending"
+        @update-pending-category="updatePendingCategory"
+      />
 
-        <MasterDataAttachmentSection
-          :title="attachmentTitle"
-          :desktop-picker="desktopAttachmentPicker"
-          :attachments="attachments"
-          :pending-attachments="pendingAttachments"
-          :pending-remove-ids="pendingRemoveIds"
-          :pending-restore-ids="pendingRestoreIds"
-          @pick-native="pickNativeFiles"
-          @files="handleFiles"
-          @toggle-existing="toggleExistingAttachment"
-          @remove-pending="removePending"
-          @update-pending-category="updatePendingCategory"
-        />
+      <section id="section-note" class="panel scroll-mt-4 p-4">
+        <SectionHeader title="备注" />
+        <textarea v-model="draft.note" rows="4" class="field-input w-full" placeholder="补充说明" />
+      </section>
+    </form>
 
-        <section id="section-note" class="panel scroll-mt-4 p-4">
-          <SectionHeader title="备注" />
-          <textarea v-model="draft.note" rows="4" class="field-input w-full" placeholder="补充说明" />
-        </section>
-
-        <FormFooter
-          v-model="closeAfterSave"
-          :dirty="dirty"
-          close-after-save
-          :loading-action="loadingAction"
-          @action="handleFooterAction"
-        />
-      </form>
-    </main>
-  </div>
+    <template #footer>
+      <FormFooter
+        v-model="closeAfterSave"
+        class="mt-4"
+        :dirty="dirty"
+        close-after-save
+        :loading-action="loadingAction"
+        @action="handleFooterAction"
+      />
+    </template>
+  </EntityFormShell>
 </template>

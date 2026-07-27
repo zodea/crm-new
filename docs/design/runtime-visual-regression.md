@@ -12,7 +12,7 @@
 | 列表 | `/project` | 工具栏、密集表格与分页 |
 | 详情 | `/project/proj_demo_001` | 详情壳、页签与内容区 |
 | 统一实体详情壳 | `/dev/detail-shell` | 长标题、指标、业务模块顺序、可选右栏及响应式退化 |
-| 整页表单 | `/project/form` | 主操作可达与键盘顺序 |
+| 整页表单 | `/project/form` | 统一表单壳、分区导航、主操作可达与键盘顺序 |
 | 复杂工作台 | `/subcontract/quantity` | 局部横向滚动与密集矩阵 |
 | Dialog / Sheet | `/subcontract/quantity`、`/` | 浮层层级、Esc 关闭和焦点归还 |
 
