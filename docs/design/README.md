@@ -39,6 +39,8 @@ DC重构设计源码/
 
 当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。后者是 #181 下的证据登记册，不复制页面字段规格，也不在 #183 完成前替代本页列出的视觉权威链。
 
+运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
+
 ## 文档放置规则
 
 - 新的架构或不可逆技术决策：写入 `docs/adr/`。

@@ -26,7 +26,10 @@ export default defineConfig({
     ? undefined
     : {
         command: 'node ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3100',
-        env: { NUXT_IGNORE_LOCK: '1' },
+        env: {
+          NUXT_DEVTOOLS: 'false',
+          NUXT_IGNORE_LOCK: '1',
+        },
         url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
