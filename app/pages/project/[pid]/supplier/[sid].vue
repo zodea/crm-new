@@ -140,8 +140,8 @@ onMounted(async () => {
     <div v-if="activeTab === 'overview'" class="border border-line bg-panel p-4">
       <div class="project-supplier-overview grid gap-4">
         <div>
-          <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-            <span class="w-0.5 h-3.5 bg-brand rounded-full" /> 项目信息
+          <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+            <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" /> 项目信息
           </h4>
           <div class="form-grid">
             <div class="form-cell">
@@ -165,8 +165,8 @@ onMounted(async () => {
           </div>
         </div>
         <div>
-          <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-            <span class="w-0.5 h-3.5 bg-brand rounded-full" /> 分供方信息
+          <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+            <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" /> 分供方信息
           </h4>
           <div class="form-grid">
             <div class="form-cell">

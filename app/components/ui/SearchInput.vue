@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// pill 搜索框（KitAtoms）：左置放大镜图标 + 圆角胶囊输入，即输即筛。
-// 基准：DC重构设计源码/kit/KitAtoms.jsx SearchInput。
+// 紧凑搜索框：左置放大镜图标 + 小圆角矩形输入，即输即筛。
+// 表面几何遵循 ADR 0013 的红圈只读参考裁定，颜色继续消费瑞航令牌。
 withDefaults(defineProps<{
   placeholder?: string
   width?: number

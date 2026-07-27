@@ -2,12 +2,8 @@
    普通内容面使用小圆角描边且不浮起；阴影只保留给弹层。
    间距紧凑但不拥挤：panel 内 12–16，元素间 8–12。 */
 :root {
-  /* —— 圆角 —— */
-  --radius-card: 4px;   /* 面板 / 卡片 */
-  --radius-btn: 4px;    /* 按钮 / 输入框 */
-  --radius-sm: 3px;     /* 分页 / 小控件 */
-  --radius-pill: 999px; /* chip / 圆形按钮 */
-  --radius: 4px;        /* 通用（原应用 --radius） */
+  /* 形状与普通内容面阴影由 content-v5.css 单一维护。 */
+  --radius: var(--radius-btn);
 
   /* —— 间距阶（4 基准） —— */
   --space-1: 4px;
@@ -24,7 +20,6 @@
   --content-max: 1480px;/* 主内容最大宽 */
 
   /* —— 阴影 —— */
-  --shadow-card: none;
   --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
   --shadow: var(--shadow-card); /* 原应用 --shadow */
 

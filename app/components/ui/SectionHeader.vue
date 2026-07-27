@@ -1,7 +1,6 @@
 <script setup lang="ts">
-// 区块标题（KitAtoms §3.2）：4×16 品牌竖条 + 标题 + 右侧扩展槽。
-// 基准：DC重构设计源码/kit/KitAtoms.jsx SectionHeader。
-// 标题走默认插槽，右侧操作/说明走 #extra 插槽。
+// 区块标题：≤34px 浅灰层级条 + 3×14 品牌竖条。
+// 已有调用同时使用默认插槽和 title/subtitle 属性；右侧操作走 #extra 插槽。
 withDefaults(defineProps<{
   mb?: number
   title?: string
@@ -16,7 +15,7 @@ withDefaults(defineProps<{
 <template>
   <div
     data-ui="section-header"
-    class="min-h-8 flex items-center gap-2 border-y border-line bg-surface-2 px-3"
+    class="section-heading"
     :style="{ marginBottom: `${mb}px` }"
   >
     <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
