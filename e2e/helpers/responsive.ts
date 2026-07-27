@@ -15,22 +15,17 @@ export async function expectNoPageOverflow(page: Page, context: string) {
 
 export async function expectLocalHorizontalScroll(root: Locator, context: string) {
   const metrics = await root.evaluate((element) => {
-    const candidates = [element, ...element.querySelectorAll<HTMLElement>('*')]
-    for (const candidate of candidates) {
-      if (!(candidate instanceof HTMLElement))
-        continue
-      const overflowX = getComputedStyle(candidate).overflowX
-      if (/auto|scroll/.test(overflowX) && candidate.scrollWidth > candidate.clientWidth + 1) {
-        return {
-          client: candidate.clientWidth,
-          scroll: candidate.scrollWidth,
-        }
-      }
+    if (!(element instanceof HTMLElement))
+      return null
+    return {
+      client: element.clientWidth,
+      overflowX: getComputedStyle(element).overflowX,
+      scroll: element.scrollWidth,
     }
-    return null
   })
 
   expect(metrics, `${context} 应具有独立横向滚动容器`).not.toBeNull()
+  expect(metrics!.overflowX, `${context} 应由目标容器自身承载横向滚动`).toMatch(/auto|scroll/)
   expect(metrics!.scroll, `${context} 的内容应宽于局部容器`).toBeGreaterThan(metrics!.client)
 }
 
@@ -64,11 +59,34 @@ export async function expectTabSequence(
   await start.focus()
   await expect(start, `${context} 起点`).toBeFocused()
 
-  for (const target of targets) {
-    await tabUntilFocused(page, target)
-    await expect(target, `${context} Tab 顺序`).toBeFocused()
-    await expectInViewport(target, `${context} Tab 目标`)
+  let expectedIndex = 0
+  for (let step = 0; step < 100; step++) {
+    await page.keyboard.press('Tab')
+
+    if (await start.evaluate(element => element === document.activeElement))
+      throw new Error(`${context} 在命中全部目标前发生了焦点回绕`)
+
+    let focusedTarget = -1
+    for (let index = 0; index < targets.length; index++) {
+      if (await targets[index]!.evaluate(element => element === document.activeElement)) {
+        focusedTarget = index
+        break
+      }
+    }
+    if (focusedTarget === -1)
+      continue
+
+    expect(
+      focusedTarget,
+      `${context} 的第 ${expectedIndex + 1} 个关键焦点目标顺序错误`,
+    ).toBe(expectedIndex)
+    await expectInViewport(targets[focusedTarget]!, `${context} Tab 目标`)
+    expectedIndex++
+    if (expectedIndex === targets.length)
+      return
   }
+
+  throw new Error(`${context} 在 100 次 Tab 内未按顺序命中全部关键目标`)
 }
 
 export async function expectEscapeReturnsFocus(
@@ -84,6 +102,15 @@ export async function expectEscapeReturnsFocus(
 }
 
 export async function expectOverlayAboveShell(overlay: Locator, context: string) {
+  await overlay.evaluate(async (element) => {
+    const surface = element.closest('[data-overlay-surface]')
+      ?? element.querySelector('[data-overlay-surface]')
+      ?? element
+    await Promise.all(surface.getAnimations({ subtree: true }).map(animation =>
+      animation.finished.catch(() => undefined),
+    ))
+  })
+
   const levels = await overlay.evaluate((element) => {
     const zIndex = (target: Element | null) => {
       if (!target)
@@ -95,8 +122,22 @@ export async function expectOverlayAboveShell(overlay: Locator, context: string)
       '[data-shell-topbar], [data-shell-tabbar], [data-sidebar="sidebar"]',
     )
 
+    const surface = element.closest('[data-overlay-surface]')
+      ?? element.querySelector('[data-overlay-surface]')
+      ?? element
+    const rect = surface.getBoundingClientRect()
+    const hit = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    )
+
     return {
+      hitInsideOverlay: hit === surface || (hit != null && surface.contains(hit)),
+      hitSummary: hit
+        ? `${hit.tagName.toLowerCase()}${hit.id ? `#${hit.id}` : ''}.${[...hit.classList].slice(0, 3).join('.')}`
+        : 'none',
       overlay: zIndex(element),
+      surface: zIndex(surface),
       shell: Math.max(
         0,
         ...Array.from(shellElements)
@@ -106,5 +147,9 @@ export async function expectOverlayAboveShell(overlay: Locator, context: string)
     }
   })
 
-  expect(levels.overlay, `${context} 浮层层级`).toBeGreaterThan(levels.shell)
+  expect(levels.surface, `${context} 浮层表面层级`).toBeGreaterThan(levels.shell)
+  expect(
+    levels.hitInsideOverlay,
+    `${context} 中心重叠点应命中浮层自身，实际命中 ${levels.hitSummary}`,
+  ).toBe(true)
 }

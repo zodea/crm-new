@@ -11,6 +11,10 @@ export default defineNuxtConfig({
     paddleOcrBaseUrl: 'https://paddleocr.aistudio-app.com',
     paddleOcrRequestTimeoutMs: 120_000,
     paddleOcrPollTimeoutMs: 600_000,
+    public: {
+      // 仅由隔离的视觉回归配置置为 demo，测试会据此拒绝外部或未知数据环境。
+      visualBaselineMode: '',
+    },
   },
 
   modules: [
@@ -69,6 +73,12 @@ export default defineNuxtConfig({
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        ...(process.env.NUXT_PUBLIC_VISUAL_BASELINE_MODE
+          ? [{
+              name: 'ruihang-data-profile',
+              content: process.env.NUXT_PUBLIC_VISUAL_BASELINE_MODE,
+            }]
+          : []),
       ],
     },
   },
