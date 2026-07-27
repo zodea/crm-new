@@ -30,6 +30,9 @@ const dateLabel = computed(() => {
   const weekday = weekdayFormatter.format(now.value).replace('星期', '周')
   return `${dateFormatter.format(now.value)} · ${weekday}`
 })
+const notificationLabel = computed(() => unreadCount.value
+  ? `打开通知中心，${unreadCount.value} 条未读`
+  : '打开通知中心，没有未读消息')
 </script>
 
 <template>
@@ -56,7 +59,7 @@ const dateLabel = computed(() => {
         type="button"
         class="shell-icon-button relative"
         title="通知中心"
-        aria-label="打开通知中心"
+        :aria-label="notificationLabel"
         :aria-pressed="showNotifications"
         @click="showNotifications = true"
       >
