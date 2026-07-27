@@ -253,7 +253,7 @@ onMounted(() => {
         <!-- 归属（与校对表单一致：项目 / 个人开支） -->
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-12px font-600 text-ink-soft">归属</span>
-          <div class="inline-flex overflow-hidden border border-line rounded-[6px]">
+          <div class="inline-flex overflow-hidden border border-line rounded-[var(--radius-btn)]">
             <button
               v-for="k in (['project', 'personal'] as const)"
               :key="k"

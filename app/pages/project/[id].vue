@@ -46,7 +46,7 @@ onMounted(async () => {
           <span class="i-lucide-arrow-left text-14px" />
         </NuxtLink>
         <span
-          class="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-brand-soft text-20px text-brand font-800"
+          class="grid h-11 w-11 flex-none place-items-center rounded-[var(--radius-card)] bg-brand-soft text-20px text-brand font-800"
           aria-hidden="true"
         >
           {{ project.name.slice(0, 1) }}

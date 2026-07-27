@@ -34,7 +34,7 @@ const visiblePages = computed(() => {
   <!-- 汇总条基准（STYLE-GUIDE §3.7 / #110 阶段⑤ E1）：surface-2 底、左统计 + 右分页 -->
   <nav
     aria-label="表格分页"
-    class="table-pager flex items-center justify-between gap-1.5 border-t border-line bg-surface-2 px-3 py-2.5 text-13px"
+    class="table-pager flex items-center justify-between gap-1.5 border-t border-line bg-surface-2 px-3 py-2 text-13px"
   >
     <span class="text-ink-soft">共 {{ total }} 条</span>
     <div class="table-pager__actions ml-auto min-w-0 flex flex-wrap items-center justify-end gap-1.5">

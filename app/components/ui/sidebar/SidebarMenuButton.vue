@@ -46,7 +46,7 @@ const ownedLayerStyle = useOwnedOverlayLayerStyle()
         align="center"
         :side-offset="6"
         data-overlay-owned
-        class="overlay-layer-owned rounded-[6px] border border-line bg-panel px-2.5 py-1.5 text-12px text-ink shadow-[var(--shadow-pop)] data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95"
+        class="overlay-layer-owned rounded-[var(--radius-sm)] border border-line bg-panel px-2.5 py-1.5 text-12px text-ink shadow-[var(--shadow-pop)] data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95"
         :style="ownedLayerStyle"
       >
         <template v-if="typeof tooltip === 'string'">

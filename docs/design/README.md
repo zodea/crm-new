@@ -6,9 +6,9 @@
 
 | 优先级 | 要回答的问题 | 唯一权威源 |
 |---|---|---|
-| 1 | 当前界面实际长什么样 | `DC重构设计源码/app.dc.html`；屏幕源码为 `DC重构设计源码/kit/**/*.jsx` |
+| 1 | 当前模块构图、颜色与字段位置 | `DC重构设计源码/app.dc.html`；屏幕源码为 `DC重构设计源码/kit/**/*.jsx` |
 | 2 | 颜色、间距、圆角等令牌 | `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css` |
-| 3 | 自适应、响应式和视觉冲突规则 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) |
+| 3 | 表面几何、信息密度、自适应和视觉冲突规则 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；其中 2026-07-27 补充裁定记录红圈 CRM 的只读参考边界 |
 | 4 | 当前功能是否要做、做到什么程度 | [GitHub Issues](https://github.com/zodea/crm-new/issues) 中当下状态的 Issue；关闭 Issue 不作为新工作的规格 |
 | 5 | 页面字段、Tab、业务边界 | [`docs/rewrite/pages/`](../rewrite/pages/)；整页表单的视觉分区和控件实现同时对照设计稿 `kit/forms/*.jsx`（[ADR 0014](../adr/0014-full-page-entity-forms.md)） |
 | 6 | 数据实体、关系和迁移 | [DATABASE.md](../rewrite/DATABASE.md) |
@@ -17,7 +17,7 @@
 
 发生冲突时按表中优先级判断，但有两个例外：
 
-- `app.dc.html` 的某个固定视口只是参考样态；与 ADR 0013 的响应式契约冲突时，以 ADR 0013 为准，并同轮补齐设计稿。
+- `app.dc.html` 的某个固定视口只是参考样态；与 ADR 0013 的响应式或表面密度补充裁定冲突时，以 ADR 0013 为准，并同轮补齐设计稿令牌。
 - Issue 已明确变更业务口径时，必须同轮更新 `docs/rewrite` 或 ADR，不能长期依赖评论覆盖旧正文。
 
 ## 当前设计源码只保留这些入口

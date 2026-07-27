@@ -19,7 +19,7 @@ defineProps<{
   >
     <span
       data-nav-mark
-      class="grid flex-none place-items-center border border-line rounded-[7px] bg-surface-3 font-800 text-ink-soft"
+      class="grid flex-none place-items-center border border-line rounded-[var(--radius-btn)] bg-surface-3 font-800 text-ink-soft"
       :class="collapsed ? 'h-full w-full border-0 bg-transparent text-15px' : 'h-[26px] w-[26px] text-13px'"
       aria-hidden="true"
     >{{ item.mark }}</span>

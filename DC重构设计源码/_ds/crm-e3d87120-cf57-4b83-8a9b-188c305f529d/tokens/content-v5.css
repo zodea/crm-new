@@ -39,8 +39,9 @@
   /* ── 字体与形状：与效果稿一致 ── */
   --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --radius-card: 12px;
-  --radius-btn: 8px;
-  --radius-sm: 8px;
+  /* #110：只收敛表面几何；颜色与语义令牌保持不变。 */
+  --radius-card: 4px;
+  --radius-btn: 4px;
+  --radius-sm: 3px;
   --radius-pill: 999px;
 }

@@ -1,12 +1,13 @@
-/* 形状·间距·阴影令牌 — 扫描件助手
-   容器更圆（卡片 12）、控件更挺（按钮/输入 8）。两级阴影：L1 卡片浮起 / L2 弹层柔和扩散。
+/* 形状·间距·阴影令牌 — 瑞航 CRM
+   普通内容面使用小圆角描边且不浮起；阴影只保留给弹层。
    间距紧凑但不拥挤：panel 内 12–16，元素间 8–12。 */
 :root {
   /* —— 圆角 —— */
-  --radius-card: 12px;  /* 面板 / 卡片 */
-  --radius-btn: 8px;    /* 按钮 / 输入框 */
+  --radius-card: 4px;   /* 面板 / 卡片 */
+  --radius-btn: 4px;    /* 按钮 / 输入框 */
+  --radius-sm: 3px;     /* 分页 / 小控件 */
   --radius-pill: 999px; /* chip / 圆形按钮 */
-  --radius: 10px;       /* 通用（原应用 --radius） */
+  --radius: 4px;        /* 通用（原应用 --radius） */
 
   /* —— 间距阶（4 基准） —— */
   --space-1: 4px;
@@ -23,7 +24,7 @@
   --content-max: 1480px;/* 主内容最大宽 */
 
   /* —— 阴影 —— */
-  --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-card: none;
   --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
   --shadow: var(--shadow-card); /* 原应用 --shadow */
 

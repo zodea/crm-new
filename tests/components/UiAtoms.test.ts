@@ -2,11 +2,32 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 import SearchInput from '~/components/ui/SearchInput.vue'
+import SectionHeader from '~/components/ui/SectionHeader.vue'
 import SegTab from '~/components/ui/SegTab.vue'
 import SelectFilter from '~/components/ui/SelectFilter.vue'
 import TablePager from '~/components/ui/TablePager.vue'
 
 describe('ui atom public contracts', () => {
+  it('renders section labels already supplied through props or the default slot', () => {
+    const { unmount } = render(SectionHeader, {
+      props: {
+        title: '基本信息',
+        subtitle: '保持字段顺序',
+      },
+    })
+
+    expect(screen.getByText('基本信息')).not.toBeNull()
+    expect(screen.getByText('保持字段顺序')).not.toBeNull()
+    unmount()
+
+    render(SectionHeader, {
+      slots: {
+        default: '项目经营数据',
+      },
+    })
+    expect(screen.getByText('项目经营数据')).not.toBeNull()
+  })
+
   it('updates SearchInput through its accessible searchbox contract', async () => {
     const onUpdate = vi.fn()
     const { container } = render(SearchInput, {

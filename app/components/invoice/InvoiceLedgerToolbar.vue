@@ -22,7 +22,7 @@ const view = defineModel<'table' | 'card'>('view', { required: true })
 
     <div class="ml-auto flex flex-wrap items-center gap-2.5">
       <SearchInput v-model="search" placeholder="搜索编号、供应商、归属…" :width="230" />
-      <div class="inline-flex overflow-hidden border border-line-strong rounded-[8px] bg-panel">
+      <div class="inline-flex overflow-hidden border border-line-strong rounded-[var(--radius-btn)] bg-panel">
         <button
           v-for="option in (['table', 'card'] as const)"
           :key="option"

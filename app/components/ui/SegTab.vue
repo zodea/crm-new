@@ -25,7 +25,7 @@ const active = defineModel<string>()
         v-for="t in tabs"
         :key="t.key"
         :value="t.key"
-        class="group -mb-px inline-flex cursor-pointer items-center gap-[6px] whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-[14px] py-[9px] text-[13px] font-500 text-ink-soft transition-colors hover:text-brand data-[state=active]:border-brand data-[state=active]:font-700 data-[state=active]:text-brand-deep focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
+        class="group -mb-px h-8 inline-flex cursor-pointer items-center gap-[6px] whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-3 py-0 text-[13px] font-500 text-ink-soft transition-colors hover:text-brand data-[state=active]:border-brand data-[state=active]:font-700 data-[state=active]:text-brand-deep focus-visible:[outline:2px_solid_var(--brand)] focus-visible:[outline-offset:-2px]"
       >
         {{ t.label }}
         <span
