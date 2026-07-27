@@ -10,6 +10,7 @@ let mem: TestDb
 let failCredentialStatusUpdate = false
 let failRefreshAfterCommit = false
 let refreshReadsFail = false
+let connectionSelectCount = 0
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => {
@@ -18,6 +19,7 @@ vi.mock('~/lib/db/connection', () => ({
     return mem.execute(sql, params)
   },
   select: async (sql: string, params?: unknown[]) => {
+    connectionSelectCount += 1
     if (refreshReadsFail)
       throw new Error('模拟缓存刷新失败')
     return mem.select(sql, params)
@@ -51,6 +53,7 @@ beforeEach(async () => {
   failCredentialStatusUpdate = false
   failRefreshAfterCommit = false
   refreshReadsFail = false
+  connectionSelectCount = 0
   mem = await createMemoryDb()
   await runMigrations(mem)
   setActivePinia(createPinia())
@@ -116,11 +119,26 @@ afterEach(() => {
 })
 
 describe('supplier detail store', () => {
+  it('deduplicates overlapping loads for the same supplier and keeps loading state accurate', async () => {
+    const store = useSupplierDetailStore()
+    const first = store.load('s1')
+    const second = store.load('s1')
+
+    expect(store.isLoading('s1')).toBe(true)
+    await Promise.all([first, second])
+
+    expect(connectionSelectCount).toBe(5)
+    expect(store.isLoading('s1')).toBe(false)
+    expect(store.hasSnapshot('s1')).toBe(true)
+  })
+
   it('按 supplierId 缓存 6 Tab 数据并实时计算跨项目汇总', async () => {
     await mem.execute(`UPDATE suppliers SET credential_status = 'reviewing' WHERE id = 's1'`)
     const supplierStore = useSupplierStore()
     const store = useSupplierDetailStore()
+    expect(store.hasSnapshot('s1')).toBe(false)
     await store.load('s1')
+    expect(store.hasSnapshot('s1')).toBe(true)
 
     const snapshot = store.bySupplier('s1')
     expect(snapshot.credentials).toHaveLength(2)

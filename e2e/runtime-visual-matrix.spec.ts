@@ -64,6 +64,23 @@ function workspaceSensitive(page: Page): Locator[] {
   ]
 }
 
+function entityDetailSensitive(page: Page): Locator[] {
+  const shell = page.locator('[data-ui="entity-detail-shell"]')
+  return [
+    ...stableSensitive(page),
+    ...tableSensitive(page),
+    shell.locator('[data-ui="entity-detail-mark"]'),
+    shell.locator('header h2'),
+    shell.locator('header p'),
+    shell.locator('header .chip'),
+    shell.locator('[data-ui="entity-detail-summary"] .font-mono'),
+    shell.locator('ol li strong'),
+    shell.locator('ol li span'),
+    shell.locator('[role="tab"] .font-mono'),
+    shell.locator('aside li span:not([aria-hidden="true"])'),
+  ]
+}
+
 async function redactSensitiveText(locators: Locator[]) {
   await Promise.all(locators.map(locator =>
     locator.evaluateAll(elements => elements.forEach(element =>
@@ -147,6 +164,17 @@ const SAMPLES: VisualSample[] = [
     ],
   },
   {
+    key: 'entity-detail-shell',
+    path: '/dev/detail-shell',
+    prepare: async (page) => {
+      await expect(page.getByRole('heading', {
+        name: '华南区域机电设备与建筑辅材长期战略合作分供方有限公司',
+      })).toBeVisible()
+      await expect(page.getByRole('complementary', { name: '文件与动态' })).toBeVisible()
+    },
+    sensitive: page => entityDetailSensitive(page),
+  },
+  {
     key: 'form',
     path: '/project/form',
     prepare: async (page) => {
@@ -212,7 +240,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test.describe('#184 六类运行态视觉基线', () => {
+test.describe('#184 / #186 运行态视觉基线', () => {
   for (const sample of SAMPLES) {
     for (const width of RESPONSIVE_WIDTHS) {
       test(`${sample.key} @ ${width}px`, async ({ page }) => {

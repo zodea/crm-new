@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type StatePanelKind = 'loading' | 'empty' | 'error'
+type StatePanelKind = 'loading' | 'empty' | 'error' | 'forbidden'
 
 const {
   kind,
@@ -25,6 +25,8 @@ const role = computed(() => kind === 'error' ? 'alert' : 'status')
 const iconClass = computed(() => {
   if (kind === 'error')
     return 'i-lucide-circle-alert text-danger'
+  if (kind === 'forbidden')
+    return 'i-lucide-lock-keyhole text-warn'
   return 'i-lucide-inbox text-ink-faint'
 })
 </script>

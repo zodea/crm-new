@@ -132,9 +132,14 @@ function rowToInvoice(row: Record<string, unknown>): SupplierInvoiceSummary {
 export const useSupplierDetailStore = defineStore('supplier-detail', () => {
   const snapshots = shallowRef<Record<string, SupplierDetailSnapshot>>({})
   const loadingIds = shallowRef(new Set<string>())
+  const inFlightLoads = new Map<string, Promise<void>>()
 
   function bySupplier(supplierId: string): SupplierDetailSnapshot {
     return snapshots.value[supplierId] ?? EMPTY_SNAPSHOT
+  }
+
+  function hasSnapshot(supplierId: string): boolean {
+    return Object.hasOwn(snapshots.value, supplierId)
   }
 
   function isLoading(supplierId: string): boolean {
@@ -269,15 +274,30 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
   }
 
   async function load(supplierId: string) {
-    setLoading(supplierId, true)
+    const inFlight = inFlightLoads.get(supplierId)
+    if (inFlight)
+      return inFlight
+
+    const task = (async () => {
+      setLoading(supplierId, true)
+      try {
+        await loadSnapshot(supplierId)
+        const statusChanged = await withTransaction(tx => syncCredentialStatusInTransaction(tx, supplierId))
+        if (statusChanged)
+          await useSupplierStore().load()
+      }
+      finally {
+        setLoading(supplierId, false)
+      }
+    })()
+    inFlightLoads.set(supplierId, task)
+
     try {
-      await loadSnapshot(supplierId)
-      const statusChanged = await withTransaction(tx => syncCredentialStatusInTransaction(tx, supplierId))
-      if (statusChanged)
-        await useSupplierStore().load()
+      await task
     }
     finally {
-      setLoading(supplierId, false)
+      if (inFlightLoads.get(supplierId) === task)
+        inFlightLoads.delete(supplierId)
     }
   }
 
@@ -348,5 +368,5 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     return true
   }
 
-  return { bySupplier, isLoading, load, addCredential, removeCredential, undoCredential }
+  return { bySupplier, hasSnapshot, isLoading, load, addCredential, removeCredential, undoCredential }
 })
