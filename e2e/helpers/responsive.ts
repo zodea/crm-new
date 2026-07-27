@@ -106,8 +106,14 @@ export async function expectOverlayAboveShell(overlay: Locator, context: string)
     const surface = element.closest('[data-overlay-surface]')
       ?? element.querySelector('[data-overlay-surface]')
       ?? element
-    await Promise.all(surface.getAnimations({ subtree: true }).map(animation =>
-      animation.finished.catch(() => undefined),
+    const animated = [
+      surface,
+      ...document.querySelectorAll('[data-overlay-backdrop]'),
+    ]
+    await Promise.all(animated.flatMap(target =>
+      target.getAnimations({ subtree: true }).map(animation =>
+        animation.finished.catch(() => undefined),
+      ),
     ))
   })
 
@@ -125,19 +131,60 @@ export async function expectOverlayAboveShell(overlay: Locator, context: string)
     const surface = element.closest('[data-overlay-surface]')
       ?? element.querySelector('[data-overlay-surface]')
       ?? element
+    const backdrop = [...document.querySelectorAll<HTMLElement>('[data-overlay-backdrop]')]
+      .findLast((candidate) => {
+        const rect = candidate.getBoundingClientRect()
+        const style = getComputedStyle(candidate)
+        return rect.width > 0
+          && rect.height > 0
+          && style.display !== 'none'
+          && style.visibility !== 'hidden'
+      })
     const rect = surface.getBoundingClientRect()
     const hit = document.elementFromPoint(
       rect.left + rect.width / 2,
       rect.top + rect.height / 2,
     )
+    const shellHits = Array.from(shellElements)
+      .filter(shell =>
+        shell !== surface
+        && !surface.contains(shell)
+        && !shell.contains(surface),
+      )
+      .map((shell) => {
+        const shellRect = shell.getBoundingClientRect()
+        if (shellRect.width <= 0 || shellRect.height <= 0)
+          return null
+        const x = shellRect.left + shellRect.width / 2
+        const y = shellRect.top + shellRect.height / 2
+        const shellHit = document.elementFromPoint(x, y)
+        const covered = shellHit != null && (
+          shellHit === surface
+          || surface.contains(shellHit)
+          || shellHit === backdrop
+          || (backdrop?.contains(shellHit) ?? false)
+        )
+        return {
+          covered,
+          hit: shellHit?.tagName.toLowerCase() ?? 'none',
+          shell: shell.getAttribute('data-shell-topbar') != null
+            ? 'topbar'
+            : shell.getAttribute('data-shell-tabbar') != null
+              ? 'tabbar'
+              : 'sidebar',
+        }
+      })
+      .filter(item => item != null)
 
     return {
+      backdropFound: backdrop != null,
       hitInsideOverlay: hit === surface || (hit != null && surface.contains(hit)),
       hitSummary: hit
         ? `${hit.tagName.toLowerCase()}${hit.id ? `#${hit.id}` : ''}.${[...hit.classList].slice(0, 3).join('.')}`
         : 'none',
       overlay: zIndex(element),
       surface: zIndex(surface),
+      shellHits,
       shell: Math.max(
         0,
         ...Array.from(shellElements)
@@ -147,9 +194,14 @@ export async function expectOverlayAboveShell(overlay: Locator, context: string)
     }
   })
 
-  expect(levels.surface, `${context} 浮层表面层级`).toBeGreaterThan(levels.shell)
+  expect(levels.backdropFound, `${context} 应具有可见 backdrop`).toBe(true)
   expect(
     levels.hitInsideOverlay,
     `${context} 中心重叠点应命中浮层自身，实际命中 ${levels.hitSummary}`,
   ).toBe(true)
+  expect(levels.shellHits.length, `${context} 应与至少一个应用壳元素形成验证点`).toBeGreaterThan(0)
+  expect(
+    levels.shellHits.filter(item => !item.covered),
+    `${context} 的应用壳重叠点应由 surface 或 backdrop 覆盖`,
+  ).toEqual([])
 }

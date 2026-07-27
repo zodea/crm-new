@@ -50,7 +50,11 @@ onMounted(load)
         <div v-for="group in snapshot.groups" :key="group.id" class="grid grid-cols-[minmax(100px,1fr)_minmax(120px,2fr)_42px] items-center gap-2 text-11px">
           <span class="truncate font-700 text-ink">{{ group.name }}</span>
           <span class="relative h-2 overflow-hidden rounded-full bg-surface-3">
-            <span class="absolute inset-y-0 left-0 rounded-full bg-brand" :style="{ width: `${Math.round(group.actualProgress * 100)}%` }" />
+            <span
+              data-testid="project-schedule-progress-value"
+              class="absolute inset-y-0 left-0 rounded-full bg-brand"
+              :style="{ width: `${Math.round(group.actualProgress * 100)}%` }"
+            />
           </span>
           <span class="text-right text-ink-soft">{{ Math.round(group.actualProgress * 100) }}%</span>
         </div>
