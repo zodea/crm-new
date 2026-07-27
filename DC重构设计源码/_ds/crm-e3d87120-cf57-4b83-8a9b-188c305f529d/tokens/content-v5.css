@@ -1,3 +1,4 @@
+@import "./typography.css";
 @import "./spacing.css";
 
 /*
@@ -38,9 +39,7 @@
   --danger-soft: rgb(253 219 224);
   --danger-ink: #9D313E;
 
-  /* ── 字体与形状：与效果稿一致 ── */
-  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* ── 形状：与效果稿一致 ── */
   /* #110：只收敛表面几何；颜色与语义令牌保持不变。 */
   --radius-card: 4px;
   --radius-btn: 4px;

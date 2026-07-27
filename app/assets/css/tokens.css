@@ -8,9 +8,6 @@
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow-form-footer: none;
 
-  /* ── 字距 ── */
-  --tracking-wide: 0.02em;
-
   /* ── 应用外壳专属布局；公共尺寸由 content-v5 → spacing.css 提供 ── */
   --sidebar-w-collapsed: 68px;
   --tabbar-h: 40px;
