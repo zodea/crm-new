@@ -165,7 +165,7 @@ test.describe('F3 资金表单、真实分摊与人工支付确认', () => {
 
   test('六条表单在桌面响应式矩阵均无页面级横向溢出', async ({ page }) => {
     test.setTimeout(120_000)
-    for (const width of [768, 1024, 1366]) {
+    for (const width of [768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 })
       for (const form of FORM_ROUTES) {
         await page.goto(form.path)
