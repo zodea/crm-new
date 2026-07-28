@@ -99,7 +99,7 @@ export const NAV_TREE: NavNode[] = [
   ] },
 ]
 
-/** 搜索完整导航树；分组名命中时保留组内全部叶子。 */
+/** 搜索完整导航树；分组只作为匹配叶子的上下文，不放大搜索结果。 */
 export function filterNavTree(tree: NavNode[], query: string): NavNode[] {
   const keyword = query.trim().toLocaleLowerCase('zh-CN')
   if (!keyword)
@@ -110,9 +110,6 @@ export function filterNavTree(tree: NavNode[], query: string): NavNode[] {
   return tree.flatMap((node): NavNode[] => {
     if (node.type === 'item')
       return matches(node.label) || matches(node.hint) ? [node] : []
-
-    if (matches(node.label))
-      return [node]
 
     const items = node.items.filter(item => matches(item.label) || matches(item.hint))
     return items.length ? [{ ...node, items }] : []

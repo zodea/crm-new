@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NotificationKind, NotificationType } from '~/stores/notifications'
+import { useMediaQuery } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import {
   DialogContent,
@@ -27,6 +28,8 @@ const emit = defineEmits<{
 const notificationStore = useNotificationStore()
 const { items, unreadCount } = storeToRefs(notificationStore)
 const { layerStyle } = useModalLayerRegistration(toRef(props, 'open'))
+const isCompact = useMediaQuery('(max-width: 768px)', { ssrWidth: 1024 })
+const sheetPlacement = computed(() => isCompact.value ? 'bottom' : 'right')
 
 const activeKind = shallowRef<NotificationKind>('todo')
 const query = shallowRef('')
@@ -78,15 +81,25 @@ async function openItem(id: string) {
       />
       <DialogContent
         data-overlay-surface
-        class="overlay-layer-surface fixed inset-y-0 right-0 flex h-svh w-[min(390px,100vw)] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+        :data-sheet-placement="sheetPlacement"
+        class="notification-sheet overlay-layer-surface fixed flex flex-col bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
+        :class="isCompact
+          ? 'notification-sheet--bottom inset-x-0 bottom-0 w-screen border-t border-line rounded-t-[var(--radius-card)] data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom'
+          : 'inset-y-0 right-0 h-svh w-[min(390px,100vw)] border-l border-line data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'"
         :style="layerStyle"
       >
+        <div
+          v-if="isCompact"
+          data-sheet-handle
+          class="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-line-strong"
+          aria-hidden="true"
+        />
         <div class="flex h-[54px] shrink-0 items-center justify-between border-b border-line px-4">
           <div>
             <DialogTitle class="text-15px font-700">
               消息中心
             </DialogTitle>
-            <DialogDescription class="mt-0.5 text-11px text-ink-soft">
+            <DialogDescription data-notification-count class="mt-0.5 text-11px text-ink-soft">
               {{ unreadCount ? `${unreadCount} 条未读消息` : '消息均已读' }}
             </DialogDescription>
           </div>
@@ -108,14 +121,14 @@ async function openItem(id: string) {
               class="relative flex h-10 items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-1 text-13px font-600 text-ink-soft data-[state=active]:border-brand data-[state=active]:text-brand"
             >
               待办
-              <span class="font-mono text-10px tabular-nums">{{ todoCount }}</span>
+              <span data-notification-count class="font-mono text-10px tabular-nums">{{ todoCount }}</span>
             </TabsTrigger>
             <TabsTrigger
               value="notice"
               class="relative flex h-10 items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-1 text-13px font-600 text-ink-soft data-[state=active]:border-brand data-[state=active]:text-brand"
             >
               通知
-              <span class="font-mono text-10px tabular-nums">{{ noticeCount }}</span>
+              <span data-notification-count class="font-mono text-10px tabular-nums">{{ noticeCount }}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -202,3 +215,9 @@ async function openItem(id: string) {
     </DialogPortal>
   </DialogRoot>
 </template>
+
+<style scoped>
+.notification-sheet--bottom {
+  height: min(82svh, 680px);
+}
+</style>

@@ -30,6 +30,18 @@ describe('侧栏导航树', () => {
     expect(delivery.map(item => item.key)).toEqual(['delivery'])
   })
 
+  it('分组名称命中时仍只返回真正匹配的叶子', () => {
+    const results = filterNavTree(NAV_TREE, '分包')
+      .flatMap(node => node.type === 'group' ? node.items : [node])
+
+    expect(results.map(item => item.key)).toEqual([
+      'subContract',
+      'subChange',
+      'subSettle',
+    ])
+    expect(results.every(item => `${item.label} ${item.hint}`.includes('分包'))).toBe(true)
+  })
+
   it('空关键词返回完整导航树', () => {
     expect(filterNavTree(NAV_TREE, '')).toBe(NAV_TREE)
   })

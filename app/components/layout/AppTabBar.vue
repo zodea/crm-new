@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onKeyStroke, useEventListener } from '@vueuse/core'
+import { onKeyStroke, useEventListener, useResizeObserver } from '@vueuse/core'
 import { useOverlayStack, useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
@@ -12,8 +12,34 @@ const { hasActiveModal } = useOverlayStack()
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
 
 const tabListEl = useTemplateRef<HTMLElement>('tabListEl')
+const tabTrackEl = useTemplateRef<HTMLElement>('tabTrackEl')
 const tabEls = useTemplateRef<HTMLElement[]>('tabEl')
 const menuEl = useTemplateRef<HTMLElement>('menuEl')
+const canScrollBackward = shallowRef(false)
+const canScrollForward = shallowRef(false)
+const hasTabOverflow = computed(() => canScrollBackward.value || canScrollForward.value)
+
+function syncScrollControls() {
+  const element = tabListEl.value
+  if (!element) {
+    canScrollBackward.value = false
+    canScrollForward.value = false
+    return
+  }
+  const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth)
+  canScrollBackward.value = element.scrollLeft > 1
+  canScrollForward.value = element.scrollLeft < maxScrollLeft - 1
+}
+
+function pageTabs(direction: -1 | 1) {
+  const element = tabListEl.value
+  if (!element)
+    return
+  element.scrollBy({
+    left: direction * Math.max(160, element.clientWidth * 0.75),
+    behavior: 'smooth',
+  })
+}
 
 watch(
   () => route.fullPath,
@@ -36,6 +62,7 @@ watch(
       block: 'nearest',
       inline: 'nearest',
     })
+    syncScrollControls()
   },
   { flush: 'post' },
 )
@@ -62,6 +89,20 @@ useEventListener(tabListEl, 'wheel', (event) => {
   event.preventDefault()
   element.scrollLeft += event.deltaY || event.deltaX
 }, { passive: false })
+useEventListener(tabListEl, 'scroll', syncScrollControls, { passive: true })
+useResizeObserver(
+  () => [tabListEl.value, tabTrackEl.value],
+  syncScrollControls,
+)
+
+watch(
+  () => tabsStore.tabs.length,
+  async () => {
+    await nextTick()
+    syncScrollControls()
+  },
+  { flush: 'post', immediate: true },
+)
 
 const menu = shallowRef({ open: false, x: 0, y: 0, key: '' })
 
@@ -157,47 +198,75 @@ onKeyStroke('Escape', () => closeMenu(true))
     class="sticky top-[var(--header-h)] z-[var(--z-shell-tabbar)] flex h-[var(--tabbar-h)] shrink-0 border-b border-line bg-surface-2"
   >
     <nav
+      id="shell-route-tabs"
       ref="tabListEl"
-      class="tabbar-scroll min-w-0 flex flex-1 items-stretch gap-[2px] overflow-x-auto overflow-y-hidden px-[16px]"
+      class="tabbar-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-[16px]"
       aria-label="已打开页面"
     >
       <div
-        v-for="tab in tabsStore.tabs"
-        :key="tab.key"
-        ref="tabEl"
-        :data-tab-key="tab.key"
-        data-shell-tab
-        :data-active="tab.key === tabsStore.activeKey"
-        class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center gap-[6px] whitespace-nowrap px-[12px] text-13px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
-        :class="tab.key === tabsStore.activeKey
-          ? 'browser-tab--active font-800 text-brand'
-          : 'font-600 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
-        @contextmenu.prevent="openMenu($event, tab.key)"
+        ref="tabTrackEl"
+        class="h-full min-w-max flex items-stretch gap-[2px]"
       >
-        <button
-          type="button"
-          data-tab-trigger
-          class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent p-0 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
-          :aria-current="tab.key === tabsStore.activeKey ? 'page' : undefined"
-          @click="goTab(tab.fullPath, tab.key)"
-          @keydown="openKeyboardMenu($event, tab.key)"
+        <div
+          v-for="tab in tabsStore.tabs"
+          :key="tab.key"
+          ref="tabEl"
+          :data-tab-key="tab.key"
+          data-shell-tab
+          :data-active="tab.key === tabsStore.activeKey"
+          class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center gap-[6px] whitespace-nowrap px-[12px] text-13px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
+          :class="tab.key === tabsStore.activeKey
+            ? 'browser-tab--active font-800 text-brand'
+            : 'font-600 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
+          @contextmenu.prevent="openMenu($event, tab.key)"
         >
-          <span class="truncate">{{ tab.title }}</span>
-        </button>
-        <button
-          v-if="tab.closable"
-          type="button"
-          class="grid h-4 w-4 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent p-0 text-13px leading-none text-ink-soft outline-none hover:bg-danger-soft hover:text-danger-ink focus-visible:[box-shadow:0_0_0_2px_var(--brand)]"
-          title="关闭页签"
-          :aria-label="`关闭 ${tab.title}`"
-          @click.stop="closeAndFollow(tab.key)"
-        >
-          <span class="i-lucide-x h-[12px] w-[12px]" aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            data-tab-trigger
+            class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent p-0 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
+            :aria-current="tab.key === tabsStore.activeKey ? 'page' : undefined"
+            @click="goTab(tab.fullPath, tab.key)"
+            @keydown="openKeyboardMenu($event, tab.key)"
+          >
+            <span class="truncate">{{ tab.title }}</span>
+          </button>
+          <button
+            v-if="tab.closable"
+            type="button"
+            class="grid h-4 w-4 shrink-0 place-items-center border-0 rounded-[4px] bg-transparent p-0 text-13px leading-none text-ink-soft outline-none hover:bg-danger-soft hover:text-danger-ink focus-visible:[box-shadow:0_0_0_2px_var(--brand)]"
+            title="关闭页签"
+            :aria-label="`关闭 ${tab.title}`"
+            @click.stop="closeAndFollow(tab.key)"
+          >
+            <span class="i-lucide-x h-[12px] w-[12px]" aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </nav>
 
     <div class="flex shrink-0 items-center gap-1 border-l border-line bg-surface-2 px-2">
+      <button
+        v-if="hasTabOverflow"
+        type="button"
+        class="tab-page-button"
+        :disabled="!canScrollBackward"
+        aria-label="向前翻动页签"
+        aria-controls="shell-route-tabs"
+        @click="pageTabs(-1)"
+      >
+        <span class="i-lucide-chevron-left h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      <button
+        v-if="hasTabOverflow"
+        type="button"
+        class="tab-page-button"
+        :disabled="!canScrollForward"
+        aria-label="向后翻动页签"
+        aria-controls="shell-route-tabs"
+        @click="pageTabs(1)"
+      >
+        <span class="i-lucide-chevron-right h-3.5 w-3.5" aria-hidden="true" />
+      </button>
       <span class="px-1 text-12px text-ink-faint" title="当前页签数量">
         <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span> 个页签
       </span>
@@ -315,5 +384,32 @@ onKeyStroke('Escape', () => closeMenu(true))
 
 .tab-menu-item:disabled:hover {
   background: transparent;
+}
+
+.tab-page-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-btn);
+  color: var(--ink-soft);
+  background: transparent;
+}
+
+.tab-page-button:hover:not(:disabled) {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.tab-page-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--brand);
+  outline: none;
+}
+
+.tab-page-button:disabled {
+  color: var(--ink-faint);
+  opacity: 0.45;
 }
 </style>

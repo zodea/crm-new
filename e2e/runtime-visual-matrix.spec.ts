@@ -103,6 +103,20 @@ async function expectVisualEnvironment(page: Page) {
   })
 }
 
+async function navigateFromSidebar(page: Page, width: number, label: string) {
+  if (width < 1024) {
+    await page.getByRole('button', { name: '切换侧边栏' }).click()
+    const sheet = page.getByRole('dialog', { name: '导航菜单' })
+    await expect(sheet).toBeVisible()
+    await sheet.getByRole('link', { name: label, exact: true }).click()
+  }
+  else {
+    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
+    await sidebar.getByRole('link', { name: label, exact: true }).click()
+  }
+  await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
+}
+
 const SAMPLES: VisualSample[] = [
   {
     key: 'shell',
@@ -118,6 +132,71 @@ const SAMPLES: VisualSample[] = [
       page.locator('[data-shell-workspace]'),
     ],
     sensitive: page => stableSensitive(page),
+  },
+  {
+    key: 'shell-stress',
+    path: '/',
+    prepare: async (page, width) => {
+      await navigateFromSidebar(page, width, '项目列表')
+      const detailLink = page.getByRole('link', { name: '查看项目详情' }).first()
+      await expect(detailLink).toBeVisible()
+      await detailLink.click()
+      await expect(page).toHaveURL(/\/project\/[^/]+$/)
+
+      for (const label of [
+        '施工合同',
+        '分包合同',
+        '工程量管理',
+        '工资核算',
+        '材料采购合同',
+        '送货单识别',
+        '单价对比',
+        '发票识别',
+        '发票台账',
+        '分供方',
+      ])
+        await navigateFromSidebar(page, width, label)
+
+      const tabList = page.getByRole('navigation', { name: '已打开页面' })
+      await expect(page.getByRole('button', { name: '向前翻动页签' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '向后翻动页签' })).toBeVisible()
+      expect(await tabList.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true)
+
+      if (width < 1024)
+        await page.getByRole('button', { name: '切换侧边栏' }).click()
+      await page.getByRole('searchbox', { name: '搜索菜单' }).fill('合同')
+      const firstResult = page.locator('[data-sidebar="sidebar"]').last().getByRole('link', { name: '施工合同' })
+      await expect(firstResult).toBeVisible()
+      await expect(firstResult).toBeInViewport()
+      if (width < 1024) {
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('dialog', { name: '导航菜单' })).toBeHidden()
+      }
+    },
+    sensitive: page => [
+      ...stableSensitive(page),
+      page.locator('[data-shell-workspace] *'),
+      page.locator('[data-shell-tab] [data-tab-trigger] > .truncate'),
+    ],
+  },
+  {
+    key: 'notification-sheet',
+    path: '/',
+    prepare: async (page, width) => {
+      await page.getByRole('button', { name: /打开通知中心/ }).click()
+      const sheet = page.getByRole('dialog', { name: '消息中心' })
+      await expect(sheet).toBeVisible()
+      await expect(sheet).toHaveAttribute('data-sheet-placement', width <= 768 ? 'bottom' : 'right')
+      await sheet.evaluate(element =>
+        Promise.all(element.getAnimations().map(animation => animation.finished)),
+      )
+    },
+    sensitive: page => [
+      ...stableSensitive(page),
+      page.locator('[data-shell-workspace] *'),
+      page.getByRole('dialog', { name: '消息中心' }).locator('[data-notification-count]'),
+      page.getByRole('dialog', { name: '消息中心' }).locator('article span:not([aria-hidden="true"])'),
+    ],
   },
   {
     key: 'list',
@@ -240,7 +319,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test.describe('#184 / #186 / #187 运行态视觉基线', () => {
+test.describe('#184 / #186 / #187 / #188 运行态视觉基线', () => {
   for (const sample of SAMPLES) {
     for (const width of RESPONSIVE_WIDTHS) {
       test(`${sample.key} @ ${width}px`, async ({ page }) => {
@@ -288,6 +367,10 @@ test.describe('#184 / #186 / #187 运行态视觉基线', () => {
             }
             nuxt-devtools-frame {
               display: none !important;
+            }
+            .today-line,
+            .today-label {
+              left: 50% !important;
             }
           `,
         })

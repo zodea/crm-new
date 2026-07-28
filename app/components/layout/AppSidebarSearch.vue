@@ -47,6 +47,7 @@ watch(
       ref="inputEl"
       v-model="query"
       type="search"
+      aria-label="搜索菜单"
       class="min-w-0 flex-1 border-0 bg-transparent text-13px text-[var(--shell-sidebar-text)] outline-none placeholder:text-[var(--shell-sidebar-muted)]"
       placeholder="搜索菜单"
       autocomplete="off"
