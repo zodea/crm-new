@@ -2,6 +2,7 @@ import type {
   TargetCostCategoryRow,
   TargetCostVersionRow,
 } from '~/lib/project/cost-control'
+import type { ProjectDeliveryArchiveRow } from '~/lib/project/delivery-archive'
 import type { ProjectDetailAggregate } from '~/lib/project/detail-aggregate'
 import type { ProjectInvoiceSummary, ProjectOperationSummary } from '~/lib/project/detail-summary'
 import type {
@@ -18,6 +19,7 @@ import { db } from '~/lib/db/client'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadProjectCostControl } from '~/lib/project/cost-control'
+import { loadProjectDeliveryArchive } from '~/lib/project/delivery-archive'
 import { loadProjectDetailAggregates } from '~/lib/project/detail-aggregate'
 import { loadProjectExpenditureRelations } from '~/lib/project/expenditure-relations'
 import { loadProjectFinanceFacts } from '~/lib/project/finance-facts'
@@ -112,6 +114,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
   const subcontractChanges = shallowRef<SubcontractChangeRow[]>([])
   const expenditureSettlements = shallowRef<ExpenditureSettlementRow[]>([])
   const paymentRecords = shallowRef<ProjectPaymentRecordRow[]>([])
+  const deliveries = shallowRef<ProjectDeliveryArchiveRow[]>([])
   const aggregateRows = shallowRef<ProjectDetailAggregate[]>([])
   const loading = shallowRef(false)
   const loaded = shallowRef(false)
@@ -156,6 +159,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         costControl,
         expenditureRelations,
         financeFacts,
+        deliveryArchive,
       ] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('contracts', 'AND kind = ? ORDER BY created_at DESC'),
@@ -192,6 +196,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         loadProjectCostControl(db),
         loadProjectExpenditureRelations(db),
         loadProjectFinanceFacts(db),
+        loadProjectDeliveryArchive(db),
       ])
 
       constructionContracts.value = contracts.map(row => ({
@@ -265,6 +270,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
       subcontractChanges.value = expenditureRelations.changes
       expenditureSettlements.value = expenditureRelations.settlements
       paymentRecords.value = financeFacts.paymentRecords
+      deliveries.value = deliveryArchive
       aggregateRows.value = aggregates
       loaded.value = true
     }
@@ -289,6 +295,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
     subcontractChanges: readonly(subcontractChanges),
     expenditureSettlements: readonly(expenditureSettlements),
     paymentRecords: readonly(paymentRecords),
+    deliveries: readonly(deliveries),
     operationSummaries,
     invoiceOutputSummaries,
     invoiceSummaries,

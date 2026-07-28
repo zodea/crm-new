@@ -16,9 +16,9 @@ describe('project detail subtable definitions', () => {
       'fund',
       'current',
       'payment',
+      'material',
     ])
     expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'placeholder').map(tab => tab.key)).toEqual([
-      'material',
       'acceptance',
     ])
   })
