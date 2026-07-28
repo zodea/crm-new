@@ -303,13 +303,14 @@ openDrawer({
 
 **用途**：列表、详情与工作区的加载、空数据、错误和重试共用 `app/components/ui/StatePanel.vue`；表格自身的业务空态由 `KitTable.empty` 承载。页面不得再散落纯文字「加载中…」或无引导的「暂无数据」。
 
-**三态语义**：
+**四态语义**：
 
 | 状态 | 可达性 | 结构与动作 |
 | --- | --- | --- |
 | `loading` | `role=status`、`aria-busy=true`、可读加载名称 | 使用贴近内容结构的 shimmer skeleton；页面级禁用巨型 spinner |
 | `empty` | `role=status`、业务标题作为可访问名称 | 业务标题 + 原因/下一步说明 + 可选主动作 |
 | `error` | `role=alert`、assertive live region | 失败标题 + 可读原因 +「重新加载」动作；重试期间回到 loading |
+| `forbidden` | `role=status`、权限标题作为可访问名称 | 锁图标 + 权限范围说明；这是预期权限边界，不误报为系统故障 |
 
 `compact` 只缩减区块高度，用于有缓存内容时在列表上方提示刷新失败，不改变角色与动作语义。按钮内部提交态仍遵循第 06 节按钮三态：只有小 spinner，不把按钮进度放大成页面进度。
 
@@ -330,7 +331,7 @@ openDrawer({
 
 ```vue
 <StatePanel
-  kind="loading | empty | error"
+  kind="loading | empty | error | forbidden"
   title="业务状态标题"
   description="原因或下一步"
   action-label="可选动作"
@@ -342,4 +343,60 @@ openDrawer({
   :empty="{ title, description, actionLabel }"
   @empty-action="clearFiltersOrCreate"
 />
+```
+
+---
+
+## 10 · 实体详情壳 `entity-detail-shell` ✅ 已定案（2026-07-27）
+
+**用途**：`app/components/ui/EntityDetailShell.vue` 统一实体详情的页面层级：返回、标题/编号、状态与操作、可选摘要指标、主内容和可选右栏。壳只提供布局、状态落点和插槽，不读取 store、不定义业务页签、不决定流程事实或指标顺序。
+
+**参考、差异与最终处理**：
+
+| 核对项 | 参考结构 | #186 前 app | 最终处理 |
+| --- | --- | --- | --- |
+| 顶部摘要 | `DC重构设计源码/kit/DetailShell.jsx`：返回 + 标题/编号 + 状态 + 操作，下接指标 | 项目、合同、分供方各自复制头部，长标题有截断/换行差异 | 固定统一头部；`mark/status/actions/metadata/summary` 均为可选插槽 |
+| 模块顺序 | 参考壳展示指标、页签、内容，但不同实体可缺省 | 各详情自行排列流程、指标、页签 | 默认插槽完全由业务页编排；壳不把流程、指标、页签写死 |
+| 辅助右栏 | 参考壳按文书/文件是否存在决定右栏 | 分供方有右栏，项目/合同结构不一致 | `aside` 存在才启用；容器不足时堆到主内容下方，主内容始终 `min-width:0` |
+| 页面状态 | 参考设计稿只有不存在的简略落点 | 各页散落文字 loading/不存在 | 复用 `StatePanel`：loading、empty、error、forbidden、not-found；页面仍持有领域加载与权限判断 |
+| 代表详情 | 参考详情数据不可写入仓库；当前直接证据仍不足 | 分供方已有真实 6 页签、跨项目汇总和文件栏 | 迁移 `/base/supplier/:id`；保留真实 store/动作/页签，仅更换页面组织壳与状态呈现 |
+
+线上参考站当前只有 `R-DETAIL-PRIOR` 历史结构线索；#186 不把邻近模板写成目标页事实。分供方字段、动作和同屏差异继续由 #193 按严格只读协议核对，#186 只裁定跨实体稳定层级。
+
+**插槽与编排边界**：
+
+- `mark`：实体首字、图标或小型标记。
+- `status` / `actions` / `metadata`：状态、页面动作与副标题补充；业务权限与事件留在调用页。
+- `summary`：可选指标区；指标口径由业务页计算。
+- 默认插槽：流程事实、指标、页签、表单或子表按业务证据自由排序。
+- `aside`：文件、动态或只读辅助信息；没有内容时不留空列。
+
+**状态契约**：`state` 支持 `ready | loading | empty | error | forbidden | not-found`。壳只把调用页给出的判定映射到统一状态表面，并发、缓存、重试与权限来源仍归领域 store/page；有缓存刷新失败时，调用页可保持 `ready` 并在默认插槽顶部放 compact `StatePanel`。
+
+**响应式与可达性**：
+
+- 长标题允许自然换行，编号/副标题可断行，状态与操作独立换行；不得用标题截断掩盖信息。
+- 右栏在详情容器达到 68rem 时并列，否则堆叠；按可用容器而不是截图宽度判断。
+- 页签可换行/局部横滚；密集子表由调用点提供明确 `overflow-x:auto` 边界，页面本身不得横滚。
+- 返回入口、操作组、状态角色和 `aside` complementary 名称均可读；页签继续复用 reka-ui 键盘导航。
+
+**与 #78 Sheet 的审计结论**：#186 不采用也不替代只读速览 Sheet，明确延期。实体详情是可导航的整页信息架构，右栏在窄容器直接堆叠即可；把整页详情塞进 Sheet 会改变任务模型。#78 继续用于消息通知或列表行级只读速览，不是 `EntityDetailShell` blocker。
+
+**调用签名**：
+
+```vue
+<EntityDetailShell
+  :state="pageState"
+  :title="entityName"
+  :back-to="listRoute"
+  @state-action="retry"
+>
+  <template #status />
+  <template #actions />
+  <template #summary />
+
+  <!-- 业务页自行编排流程、指标、页签与子表 -->
+
+  <template #aside />
+</EntityDetailShell>
 ```

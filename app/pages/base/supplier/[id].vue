@@ -2,6 +2,7 @@
 import type { StatusTone } from '~/lib/supplier/status'
 import type { SupplierDetailSnapshot } from '~/stores/supplier-detail'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE } from '~/lib/supplier/status'
+import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 type DetailTab = 'detail' | 'credential' | 'projects' | 'contracts' | 'payments' | 'invoices'
@@ -15,6 +16,11 @@ const { warning } = useKitUI()
 const supplierId = computed(() => route.params.id as string)
 const supplier = computed(() => store.byId(supplierId.value))
 const snapshot = computed<SupplierDetailSnapshot>(() => detailStore.bySupplier(supplierId.value))
+const hasSnapshot = computed(() => detailStore.hasSnapshot(supplierId.value))
+const settledSupplierId = shallowRef('')
+const loadingSupplierId = shallowRef('')
+const loadError = shallowRef('')
+let latestLoadRequest = 0
 
 useTabTitle(() => supplier.value?.name)
 
@@ -53,85 +59,144 @@ const summaryRows = computed(() => [
   { label: '应付余额', value: yuan(snapshot.value.summary.payableBalance), danger: snapshot.value.summary.payableBalance > 0 },
 ])
 
-watch(supplierId, async (id) => {
-  await store.load()
-  await detailStore.load(id)
-}, { immediate: true })
+const shellState = computed(() => {
+  if (supplier.value && hasSnapshot.value)
+    return 'ready'
+  if (loadingSupplierId.value === supplierId.value || settledSupplierId.value !== supplierId.value)
+    return 'loading'
+  if (loadError.value)
+    return 'error'
+  return 'not-found'
+})
+const shellStateTitle = computed(() => {
+  if (shellState.value === 'loading')
+    return '正在加载分供方详情'
+  if (shellState.value === 'not-found')
+    return '分供方不存在或已删除'
+  return '分供方详情加载失败'
+})
+const shellStateDescription = computed(() =>
+  shellState.value === 'not-found'
+    ? '该分供方可能已被删除，可返回列表查看。'
+    : loadError.value,
+)
+
+async function loadSupplier() {
+  const id = supplierId.value
+  const request = ++latestLoadRequest
+  loadError.value = ''
+  loadingSupplierId.value = id
+  try {
+    await store.load()
+    if (request !== latestLoadRequest)
+      return
+    if (store.byId(id))
+      await detailStore.load(id)
+  }
+  catch (cause) {
+    if (request !== latestLoadRequest)
+      return
+    loadError.value = `分供方详情加载失败：${toErrorMessage(cause)}`
+  }
+  finally {
+    if (request === latestLoadRequest) {
+      settledSupplierId.value = id
+      loadingSupplierId.value = ''
+    }
+  }
+}
+
+watch(supplierId, () => void loadSupplier(), { immediate: true })
 </script>
 
 <template>
-  <div v-if="supplier" class="flex min-w-0 flex-col gap-4">
-    <header class="panel px-4 py-3">
-      <div class="flex flex-wrap items-center gap-3">
-        <NuxtLink to="/base/supplier" class="btn-secondary px-2.5" aria-label="返回分供方列表">
-          <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回列表
-        </NuxtLink>
-        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand">
-          {{ supplier.name.slice(0, 1) }}
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <h2 class="truncate text-18px font-800 text-ink">
-              {{ supplier.name }}
-            </h2>
-            <span class="chip" :class="credentialChipClass(supplier.credentialStatus)">
-              {{ CREDENTIAL_STATUS_LABEL[supplier.credentialStatus] || supplier.credentialStatus }}
-            </span>
-          </div>
-          <p class="mt-1 truncate text-11px text-ink-soft">
-            {{ supplier.supplierCategory || '未分类' }} · 评价 {{ supplier.rating || '—' }} ·
-            联系人 {{ supplier.contact || '—' }} · {{ supplier.contactPhone || '—' }}
-          </p>
-        </div>
+  <EntityDetailShell
+    :title="supplier?.name ?? '分供方详情'"
+    :subtitle="supplier
+      ? `${supplier.supplierCategory || '未分类'} · 评价 ${supplier.rating || '—'} · 联系人 ${supplier.contact || '—'} · ${supplier.contactPhone || '—'}`
+      : ''"
+    back-to="/base/supplier"
+    back-label="返回分供方列表"
+    aside-label="分供方文件与动态"
+    :state="shellState"
+    :state-title="shellStateTitle"
+    :state-description="shellStateDescription"
+    :state-action-label="shellState === 'error' ? '重新加载' : ''"
+    @state-action="loadSupplier"
+  >
+    <template #mark>
+      <div
+        v-if="supplier"
+        class="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand"
+      >
+        {{ supplier.name.slice(0, 1) }}
+      </div>
+    </template>
+
+    <template #status>
+      <span v-if="supplier" class="chip" :class="credentialChipClass(supplier.credentialStatus)">
+        {{ CREDENTIAL_STATUS_LABEL[supplier.credentialStatus] || supplier.credentialStatus }}
+      </span>
+    </template>
+
+    <template #actions>
+      <template v-if="supplier">
         <button type="button" class="btn-secondary" @click="warning(`工商查询接口接入后可查询「${supplier.name}」`)">
           <span class="i-lucide-search-check mr-1" aria-hidden="true" />爱企查
         </button>
         <button type="button" class="btn-primary" @click="navigateTo(`/base/supplier/form/${supplier.id}`)">
           <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
         </button>
-      </div>
-    </header>
+      </template>
+    </template>
 
-    <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-      <main class="min-w-0">
-        <nav class="mb-4 overflow-x-auto" aria-label="分供方详情分类">
-          <SegTab v-model="activeTab" :tabs="tabs" />
-        </nav>
-
-        <SupplierDetailTab v-if="activeTab === 'detail'" :supplier="supplier" />
-        <SupplierCredentialTab
-          v-else-if="activeTab === 'credential'"
-          :supplier-id="supplier.id"
-          :snapshot="snapshot"
+    <template #summary>
+      <MetricGrid v-if="supplier" data-testid="supplier-summary" :cols="6">
+        <Metric
+          v-for="row in summaryRows"
+          :key="row.label"
+          :label="row.label"
+          :value="row.value"
+          :tone="row.danger ? 'danger' : undefined"
+          :big="row.label === '应付余额'"
         />
-        <SupplierReadonlySummaryTab v-else :supplier-id="supplier.id" :tab="summaryTab" :snapshot="snapshot" />
-      </main>
+      </MetricGrid>
+    </template>
 
-      <aside class="flex min-w-0 flex-col gap-4">
-        <section class="panel p-4" aria-label="跨项目汇总">
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-13px font-700 text-ink">
-              跨项目汇总
-            </h3>
-            <span class="chip chip-ok">实时</span>
-          </div>
-          <dl data-testid="supplier-summary">
-            <div
-              v-for="(row, index) in summaryRows"
-              :key="row.label"
-              class="flex items-center justify-between gap-3 py-2"
-              :class="index ? 'border-t border-line' : ''"
-            >
-              <dt class="text-11px text-ink-soft">
-                {{ row.label }}
-              </dt>
-              <dd class="font-mono text-13px font-700" :class="row.danger ? 'text-danger' : 'text-ink'">
-                {{ row.value }}
-              </dd>
-            </div>
-          </dl>
-        </section>
+    <StatePanel
+      v-if="supplier && hasSnapshot && loadingSupplierId === supplierId"
+      kind="loading"
+      title="正在刷新分供方详情"
+      compact
+      class="mb-4"
+    />
+    <StatePanel
+      v-else-if="supplier && loadError"
+      kind="error"
+      title="分供方详情刷新失败"
+      :description="loadError"
+      action-label="重新加载"
+      compact
+      class="mb-4"
+      @action="loadSupplier"
+    />
 
+    <template v-if="supplier">
+      <nav class="mb-4 overflow-x-auto" aria-label="分供方详情分类">
+        <SegTab v-model="activeTab" :tabs="tabs" />
+      </nav>
+
+      <SupplierDetailTab v-if="activeTab === 'detail'" :supplier="supplier" />
+      <SupplierCredentialTab
+        v-else-if="activeTab === 'credential'"
+        :supplier-id="supplier.id"
+        :snapshot="snapshot"
+      />
+      <SupplierReadonlySummaryTab v-else :supplier-id="supplier.id" :tab="summaryTab" :snapshot="snapshot" />
+    </template>
+
+    <template #aside>
+      <div v-if="supplier" class="flex min-w-0 flex-col gap-4">
         <section class="panel p-4" aria-label="证照文件管理">
           <div class="mb-2 flex items-center justify-between">
             <h3 class="text-13px font-700 text-ink">
@@ -161,11 +226,7 @@ watch(supplierId, async (id) => {
             V2 接入后台后启用
           </p>
         </section>
-      </aside>
-    </div>
-  </div>
-
-  <div v-else class="panel py-12 text-center text-12px text-ink-faint">
-    {{ store.loading ? '正在加载分供方…' : '分供方不存在或已删除' }}
-  </div>
+      </div>
+    </template>
+  </EntityDetailShell>
 </template>

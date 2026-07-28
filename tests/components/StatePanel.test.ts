@@ -47,4 +47,18 @@ describe('statePanel', () => {
     await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
     expect(view.emitted().action).toHaveLength(1)
   })
+
+  it('presents a permission boundary as an expected status instead of an error alert', () => {
+    render(StatePanel, {
+      props: {
+        kind: 'forbidden',
+        title: '无权查看该详情',
+        description: '请联系管理员申请对应业务范围。',
+      },
+    })
+
+    expect(screen.getByRole('status', { name: '无权查看该详情' })).not.toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('请联系管理员申请对应业务范围。')).not.toBeNull()
+  })
 })
