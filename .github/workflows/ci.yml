@@ -1,24 +1,44 @@
 name: CI
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      run_quality:
+        description: Run lint, typecheck, unit/component tests, and static generation
+        required: true
+        default: true
+        type: boolean
+      run_e2e:
+        description: Run Playwright behavior tests
+        required: true
+        default: false
+        type: boolean
+      run_visual:
+        description: Run Windows visual regression tests
+        required: true
+        default: false
+        type: boolean
+      run_rust:
+        description: Run Tauri Rust tests
+        required: true
+        default: false
+        type: boolean
+      base_sha:
+        description: Optional lint diff base; defaults to HEAD^
+        required: false
+        type: string
+      e2e_targets:
+        description: Optional space-separated Playwright files; empty runs all E2E tests
+        required: false
+        type: string
 
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   quality:
     name: quality
+    if: ${{ inputs.run_quality }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -47,10 +67,10 @@ jobs:
       - name: Lint changed code
         shell: bash
         env:
-          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASE_SHA: ${{ inputs.base_sha }}
         run: |
           base_sha="$BASE_SHA"
-          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+          if [[ -z "$base_sha" ]] || ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then
             base_sha="$(git rev-parse HEAD^)"
           fi
 
@@ -81,6 +101,7 @@ jobs:
 
   e2e:
     name: e2e
+    if: ${{ inputs.run_e2e }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -109,7 +130,17 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: End-to-end tests
-        run: pnpm test:e2e
+        shell: bash
+        env:
+          E2E_TARGETS: ${{ inputs.e2e_targets }}
+        run: |
+          if [[ -z "$E2E_TARGETS" ]]; then
+            pnpm test:e2e
+            exit 0
+          fi
+
+          read -r -a targets <<< "$E2E_TARGETS"
+          pnpm exec playwright test "${targets[@]}"
 
       - name: Upload Playwright diagnostics
         if: ${{ !cancelled() }}
@@ -122,6 +153,7 @@ jobs:
 
   visual:
     name: visual
+    if: ${{ inputs.run_visual }}
     runs-on: windows-2022
     timeout-minutes: 30
 
@@ -163,6 +195,7 @@ jobs:
 
   rust:
     name: rust
+    if: ${{ inputs.run_rust }}
     runs-on: windows-latest
     timeout-minutes: 30
 

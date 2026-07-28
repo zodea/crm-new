@@ -72,6 +72,8 @@ Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-trac
 
 修 bug 时先建立能失败的复现；界面修改除行为断言外还要验证实际视口、滚动边界、键盘焦点与浮层层次。不要用静态源码检查替代运行态验收。
 
+GitHub Actions 只手动按需调用；调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
+
 ## 5. 文档纪律
 
 - 单一权威源：词义 → `CONTEXT.md`；架构决策 → `docs/adr/`；数据模型 → `docs/rewrite/DATABASE.md`；当前界面对标权威链 → ADR 0013 与 `docs/design/README.md`。
