@@ -64,6 +64,22 @@ function workspaceSensitive(page: Page): Locator[] {
   ]
 }
 
+function homeSensitive(page: Page): Locator[] {
+  const dashboard = page.locator('[data-home-dashboard]')
+  return [
+    ...stableSensitive(page),
+    dashboard.locator('.project-switcher-root [class*="truncate"]'),
+    dashboard.locator('[data-ui="state-panel"] h2, [data-ui="state-panel"] p'),
+    dashboard.locator('[data-home-partial] h2, [data-home-partial] p'),
+    dashboard.locator('.home-schedule header strong'),
+    dashboard.locator('.home-schedule .month-label'),
+    dashboard.locator('.home-schedule .group-button .truncate'),
+    dashboard.locator('.home-schedule .task-button .truncate'),
+    dashboard.locator('.home-schedule .chip'),
+    dashboard.locator('.home-schedule statuschip'),
+  ]
+}
+
 function entityDetailSensitive(page: Page): Locator[] {
   const shell = page.locator('[data-ui="entity-detail-shell"]')
   return [
@@ -132,6 +148,47 @@ const SAMPLES: VisualSample[] = [
       page.locator('[data-shell-workspace]'),
     ],
     sensitive: page => stableSensitive(page),
+  },
+  {
+    key: 'home-dashboard-default',
+    path: '/?project=proj_demo_001',
+    prepare: async (page) => {
+      await expect(page.locator('[data-home-dashboard] .home-schedule')).toBeVisible()
+    },
+    sensitive: page => homeSensitive(page),
+  },
+  {
+    key: 'home-dashboard-loading',
+    path: '/dev/home-dashboard?state=loading',
+    prepare: async (page) => {
+      await expect(page.locator('[data-home-dashboard] [data-state="loading"]')).toBeVisible()
+    },
+    sensitive: page => homeSensitive(page),
+  },
+  {
+    key: 'home-dashboard-empty',
+    path: '/dev/home-dashboard?state=schedule-empty',
+    prepare: async (page) => {
+      await expect(page.locator('[data-home-dashboard] [data-state="empty"]')).toBeVisible()
+    },
+    sensitive: page => homeSensitive(page),
+  },
+  {
+    key: 'home-dashboard-partial',
+    path: '/dev/home-dashboard?state=partial',
+    prepare: async (page) => {
+      await expect(page.locator('[data-home-dashboard] [data-home-partial]')).toBeVisible()
+      await expect(page.locator('[data-home-dashboard] .home-schedule')).toBeVisible()
+    },
+    sensitive: page => homeSensitive(page),
+  },
+  {
+    key: 'home-dashboard-error',
+    path: '/dev/home-dashboard?state=error',
+    prepare: async (page) => {
+      await expect(page.locator('[data-home-dashboard] [data-state="error"]')).toBeVisible()
+    },
+    sensitive: page => homeSensitive(page),
   },
   {
     key: 'shell-stress',
@@ -319,7 +376,7 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test.describe('#184 / #186 / #187 / #188 运行态视觉基线', () => {
+test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
   for (const sample of SAMPLES) {
     for (const width of RESPONSIVE_WIDTHS) {
       test(`${sample.key} @ ${width}px`, async ({ page }) => {
