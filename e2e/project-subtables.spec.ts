@@ -15,6 +15,13 @@ test('项目详情十页签：四个真实页签读取 SQLite，六个待建设�
   const construction = page.getByRole('region', { name: '施工合同' })
   await expect(construction.getByText('合和新城施工总承包合同', { exact: true })).toBeVisible()
   await expect(construction.getByText('¥32,388,422.00', { exact: true })).toBeVisible()
+  await expect(construction.getByText('含税合同金额合计')).toContainText('¥32,388,422.00')
+  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('总承包')
+  await expect(construction.getByText('施工合同（1）', { exact: true })).toBeVisible()
+  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('不存在的合同')
+  await expect(construction.getByText('施工合同（0）', { exact: true })).toBeVisible()
+  await expect(construction.getByText('¥0.00', { exact: true })).toBeVisible()
+  await construction.getByRole('searchbox', { name: '搜索施工合同' }).fill('')
   await expect(page.getByRole('region', { name: '补充协议' }).getByText('¥320,000.00', { exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '甲方变洽签' }).getByText('¥120,000.00', { exact: true })).toBeVisible()
 

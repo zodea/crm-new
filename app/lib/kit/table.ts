@@ -108,6 +108,6 @@ export function clampPage(page: number, total: number, pageSize: number): number
 }
 
 /** 客户端分页切片(1 起始页码);越界返回空数组。 */
-export function paginate<T>(rows: T[], page: number, pageSize: number): T[] {
+export function paginate<T>(rows: readonly T[], page: number, pageSize: number): T[] {
   return rows.slice((page - 1) * pageSize, page * pageSize)
 }
