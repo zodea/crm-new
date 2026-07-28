@@ -26,7 +26,7 @@ export const PROJECT_DETAIL_TABS: readonly ProjectDetailTabDefinition[] = [
   { key: 'current', label: '往来款', kind: 'real' },
   { key: 'payment', label: '支付明细', kind: 'real' },
   { key: 'material', label: '物资管理', kind: 'real' },
-  { key: 'acceptance', label: '竣工验收及保修', kind: 'placeholder' },
+  { key: 'acceptance', label: '竣工验收及保修', kind: 'real' },
 ] as const
 
 interface InvoiceOwnership {

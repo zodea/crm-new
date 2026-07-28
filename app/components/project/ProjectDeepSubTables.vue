@@ -38,6 +38,9 @@ const paymentRecords = computed(() =>
 const deliveries = computed(() =>
   detailStore.deliveries.filter(row => row.projectId === props.projectId),
 )
+const acceptances = computed(() =>
+  detailStore.acceptances.filter(row => row.projectId === props.projectId),
+)
 
 const targetCostColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
@@ -159,6 +162,20 @@ const deliveryColumns: KitTableColumn[] = [
   { field: 'ocrStatus', title: '识别状态', width: 110, filterable: true },
   { field: 'reviewFlag', title: '核对标记', minWidth: 150, filterable: true },
   { field: 'storedStatus', title: '入库状态', width: 100, filterable: true },
+]
+const acceptanceColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#' },
+  { field: 'documentNo', title: '单据编号', width: 160, slot: 'link' },
+  { field: 'type', title: '类型', width: 110, filterable: true },
+  { field: 'name', title: '名称', minWidth: 220 },
+  { field: 'contractName', title: '施工合同', minWidth: 220, filterable: true },
+  { field: 'documentDate', title: '单据日期', type: 'date' },
+  { field: 'contractEstimate', title: '合同估算', type: 'money', width: 145 },
+  { field: 'acceptor', title: '验收人', width: 120, filterable: true },
+  { field: 'warrantyOwner', title: '保修负责人', width: 130, filterable: true },
+  { field: 'conclusion', title: '结论', minWidth: 180 },
+  { field: 'statusLabel', title: '生命周期状态', width: 120, filterable: true },
+  { field: 'attachmentCount', title: '附件数', width: 90, align: 'right' },
 ]
 </script>
 
@@ -344,6 +361,22 @@ const deliveryColumns: KitTableColumn[] = [
     <template #link="{ row }">
       <NuxtLink :to="row.sourcePath" class="cell--link">
         {{ row.orderNo || '查看到货归档' }}
+      </NuxtLink>
+    </template>
+  </ProjectSubTableSection>
+
+  <ProjectSubTableSection
+    v-else-if="tab === 'acceptance'"
+    title="竣工验收与保修"
+    :columns="acceptanceColumns"
+    :rows="acceptances"
+    :loading="detailStore.loading"
+    :summary-fields="[{ field: 'effectiveEstimate', label: '正式单据合同估算合计' }]"
+    empty="当前项目尚无竣工验收或保修记录"
+  >
+    <template #link="{ row }">
+      <NuxtLink :to="row.sourcePath" class="cell--link">
+        {{ row.documentNo || '查看验收/保修单据' }}
       </NuxtLink>
     </template>
   </ProjectSubTableSection>

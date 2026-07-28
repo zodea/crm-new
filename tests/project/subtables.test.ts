@@ -5,7 +5,7 @@ import {
 } from '~/lib/project/subtables'
 
 describe('project detail subtable definitions', () => {
-  it('keeps the completed budget slice real and the remaining deep tabs explicit', () => {
+  it('marks all ten project detail tabs as real after the functional slices close', () => {
     expect(PROJECT_DETAIL_TABS).toHaveLength(10)
     expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'real').map(tab => tab.key)).toEqual([
       'detail',
@@ -17,10 +17,9 @@ describe('project detail subtable definitions', () => {
       'current',
       'payment',
       'material',
-    ])
-    expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'placeholder').map(tab => tab.key)).toEqual([
       'acceptance',
     ])
+    expect(PROJECT_DETAIL_TABS.filter(tab => tab.kind === 'placeholder')).toEqual([])
   })
 })
 
