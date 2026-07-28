@@ -1,6 +1,6 @@
 # PRD：KitUI 交互原语第二波（红圈对标）
 
-> 依据：2026-07-11 红圈线上走查，[差距清单](../dc-rebuild/2026-07-11-红圈补采差距清单.md) §1/§2/§6。
+> 依据：2026-07-11 红圈线上走查，[非权威差距证据](../research/red-circle-ui-gap-2026-07-11.md) §1/§2/§6；当前范围与状态以 GitHub Issues 和 ADR 0014 / 0015 为准。
 > 第一波（确认/表单/导出/导入/抽屉/按钮）见 #74 与 #75–#81，本文**不重复**其范围。
 > 底座约束：ADR 0008——交互型组件基于 **reka-ui**，样式 **UnoCSS**（零 Tailwind 引擎），toast 走 **vue-sonner** 双泳道；`useKitUI()` 调用签名向后兼容（只增不改）。
 > 纯逻辑一律放 `app/lib/kit/*.ts`（可 vitest 单测），组件放 `app/components/ui/*`，全局弹层挂 `KitUIHost.vue`。

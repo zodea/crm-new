@@ -1,24 +1,27 @@
 # Triage 标签
 
-技能以五个规范 triage 角色描述 issue 状态。本文件把角色映射到本仓库实际使用的标签字符串——全部使用规范默认名,五个标签在 GitHub 上均存在。
+每个经过分诊的 Issue 必须同时具有：
 
-| 技能中的角色 | 本仓库标签 | 含义 |
-| --- | --- | --- |
-| `needs-triage` | `needs-triage` | 待维护者评估 |
-| `needs-info` | `needs-info` | 等报告人补充信息 |
-| `ready-for-agent` | `ready-for-agent` | 已定稿,AFK agent 可直接领取 |
-| `ready-for-human` | `ready-for-human` | 需人工实现 |
-| `wontfix` | `wontfix` | 不做 |
+1. 恰好一个类别角色：`bug` 或 `enhancement`。
+2. 恰好一个状态角色：`needs-triage`、`needs-info`、`ready-for-agent`、`ready-for-human`、`wontfix`。
 
-技能提到某个角色时(如「apply the AFK-ready triage label」),使用表中对应的标签字符串。
+## 状态角色
 
-注:已有的 `question` 标签保留「普通提问」原始用途,不参与 triage 状态机。
+| 标签 | 含义 |
+| --- | --- |
+| `needs-triage` | 尚未完成范围和验收判断 |
+| `needs-info` | 缺少报告人才能提供的关键事实 |
+| `ready-for-agent` | 规格、依赖和验收足够明确，可由 agent 领取 |
+| `ready-for-human` | 需要人工判断、权限、外部协调或人工实现 |
+| `wontfix` | 明确不处理，正文或评论必须写原因 |
 
-## Category(类型)标签
+状态迁移时移除旧状态标签，不能同时保留两个状态。
 
-规范角色里的 category 是 `bug` / `enhancement`;本仓库用更细的类型词汇,`enhancement` 按内容对应三个细分:
+## 类别与附加标签
 
-- `bug` → `bug`
-- `enhancement` → `infra`(基础设施)/ `feat`(功能页面)/ `ui`(UI 组件)之一;纯文档任务用 `documentation`
+- `bug`：现有承诺行为错误、回归或缺陷。
+- `enhancement`：新能力、重构、文档治理或体验改进。
 
-triage 时每个 issue 打恰好一个类型标签 + 一个状态标签;优先级 `P1`/`P2`/`P3` 是独立维度,另加。
+`ui`、`documentation`、`infra`、`feat` 等是主题标签，可按需附加，但不能替代 `bug` / `enhancement` 类别角色。`P1` / `P2` / `P3` 是优先级，也不参与类别或状态计数。
+
+`question` 只表示普通提问，不参与 triage 状态机。
