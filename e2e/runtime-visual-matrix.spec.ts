@@ -54,9 +54,13 @@ function workspaceSensitive(page: Page): Locator[] {
     page.getByRole('combobox'),
     page.locator('[data-shell-workspace] .font-mono'),
     page.locator('[data-shell-workspace] strong'),
+    page.locator('section[aria-label="阶段进度"] article > div:first-child > span:not(.font-mono)'),
     page.locator('.quantity-matrix thead th:not(.quantity-matrix__corner)'),
     page.locator('.quantity-matrix tbody th[role="rowheader"]'),
     page.locator('[data-testid="quantity-matrix-cell"] > span'),
+    page.locator('[data-testid="quantity-assignment-unit-picker"] > div:first-child > span'),
+    page.locator('[data-testid="quantity-assignment-unit-picker"] fieldset section > div:first-child label'),
+    page.locator('[data-testid="quantity-assignment-unit-picker"] .quantity-assignment-unit-grid label > span'),
   ]
 }
 
@@ -262,7 +266,7 @@ test.describe('#184 六类运行态视觉基线', () => {
         await sample.prepare(page, width)
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
         if (sample.key === 'detail') {
-          await page.locator('[data-shell-workspace] section.panel [style*="width"]')
+          await page.getByTestId('project-schedule-progress-value')
             .evaluateAll(elements => elements.forEach((element) => {
               if (element instanceof HTMLElement)
                 element.style.width = '50%'
