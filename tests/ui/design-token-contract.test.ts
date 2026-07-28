@@ -8,6 +8,16 @@ const DESIGN_TOKEN_PATH = join(
   PROJECT_ROOT,
   'DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css',
 )
+const DESIGN_SPACING_PATH = join(
+  PROJECT_ROOT,
+  'DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/spacing.css',
+)
+const DESIGN_STYLES_PATH = join(
+  PROJECT_ROOT,
+  'DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css',
+)
+const DESIGN_HTML_PATH = join(PROJECT_ROOT, 'DC重构设计源码/app.dc.html')
+const APP_TOKEN_BRIDGE_PATH = join(PROJECT_ROOT, 'app/assets/css/tokens.css')
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.vue'])
 const RUNTIME_TOKEN_PREFIXES = ['--reka-']
 
@@ -38,6 +48,7 @@ describe('design token contract', () => {
       ...sourceFiles(APP_ROOT),
       join(PROJECT_ROOT, 'uno.config.ts'),
       DESIGN_TOKEN_PATH,
+      DESIGN_SPACING_PATH,
     ]
     const source = files
       .map(file => withoutComments(readFileSync(file, 'utf8')))
@@ -66,5 +77,41 @@ describe('design token contract', () => {
 
     for (const token of requiredTokens)
       expect(definitions.has(token), token).toBe(true)
+  })
+
+  it('keeps one owner for each global token across the design entry and app bridge', () => {
+    const owners = new Map<string, string[]>()
+    const ownerFiles = [DESIGN_TOKEN_PATH, DESIGN_SPACING_PATH, APP_TOKEN_BRIDGE_PATH]
+
+    for (const file of ownerFiles) {
+      const definitions = matches(
+        withoutComments(readFileSync(file, 'utf8')),
+        /(?:^|[;{,\s])(--[\w-]+)\s*:/gm,
+      )
+      for (const token of definitions)
+        owners.set(token, [...(owners.get(token) ?? []), file])
+    }
+
+    const duplicates = [...owners]
+      .filter(([, files]) => files.length > 1)
+      .map(([token, files]) => `${token}: ${files.join(', ')}`)
+      .sort()
+
+    expect(duplicates).toEqual([])
+  })
+
+  it('wires spacing, current design styles and the Nuxt bridge through explicit entries', () => {
+    const designTokens = readFileSync(DESIGN_TOKEN_PATH, 'utf8')
+    const designStyles = readFileSync(DESIGN_STYLES_PATH, 'utf8')
+    const designHtml = readFileSync(DESIGN_HTML_PATH, 'utf8')
+    const appBridge = readFileSync(APP_TOKEN_BRIDGE_PATH, 'utf8')
+
+    expect(designTokens).toMatch(/^@import "\.\/spacing\.css";/)
+    expect(designStyles).toContain('@import "./tokens/content-v5.css";')
+    expect(designStyles).not.toContain('@import "./tokens/colors.css";')
+    expect(designStyles).not.toContain('@import "./tokens/spacing.css";')
+    expect(designHtml.match(/<link rel="stylesheet"/g)).toHaveLength(1)
+    expect(designHtml).toContain('crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css')
+    expect(appBridge).toMatch(/^@import ".+\/tokens\/content-v5\.css";/)
   })
 })

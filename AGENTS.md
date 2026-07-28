@@ -37,7 +37,7 @@ Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-trac
 
 ## 3. 设计与界面实现
 
-- 全站视觉唯一基准是 `DC重构设计源码/app.dc.html`，屏幕源码在 `DC重构设计源码/kit/`；约束见 ADR 0013。
+- 有直接对应页时，登录态运行参考决定构图、密度、控件状态和安全交互路径；`DC重构设计源码/app.dc.html` 与 `kit/` 是瑞航品牌、DC 独有能力和无直接参考页的唯一视觉基准。证据与只读边界见 `docs/design/runtime-reference-audit.md`，冲突裁定见 ADR 0013。
 - 固定视口截图不是固定尺寸合同。每次界面工作按设计参考视口及 390 / 768 / 1024 / 1280–1440px 验证；密集表格只能在自己的区域横向滚动。
 - 业务实体新增/编辑使用独立路由的整页表单；弹窗只用于行级小对象、确认和明确的轻量任务，见 ADR 0014。
 - 框架组件的默认观感与设计稿冲突时，以设计稿定制或替换；可达性和交互底座约束仍按 ADR 0008 / 0009。
@@ -74,7 +74,7 @@ Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-trac
 
 ## 5. 文档纪律
 
-- 单一权威源：词义 → `CONTEXT.md`；架构决策 → `docs/adr/`；数据模型 → `docs/rewrite/DATABASE.md`；当前视觉 → `app.dc.html`。
+- 单一权威源：词义 → `CONTEXT.md`；架构决策 → `docs/adr/`；数据模型 → `docs/rewrite/DATABASE.md`；当前界面对标权威链 → ADR 0013 与 `docs/design/README.md`。
 - 二次文档只链接，不复制字段表、色值或状态快照。
 - 决策或实现状态变化时，同一提交更新权威源和受影响入口；暂不能重写的历史材料移入 `docs/research/` 并标明“非权威源”。
 - 完成的临时计划、反馈轮、TODO 和交接副本应删除；Git 历史就是参考档案。

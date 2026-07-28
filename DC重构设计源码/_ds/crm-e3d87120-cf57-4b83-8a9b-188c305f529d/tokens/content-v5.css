@@ -1,8 +1,10 @@
+@import "./spacing.css";
+
 /*
  * 瑞航 CRM 内容区视觉令牌（v5）
  *
- * 唯一权威源：Nuxt 应用与设计稿均直接加载本文件。应用外壳的尺寸、
- * 侧栏和页签令牌不在这里定义，避免把设计稿的旧外壳带回运行时。
+ * 当前入口：Nuxt 应用与设计稿均直接加载本文件；间距与动效由上方
+ * spacing.css 唯一提供。应用外壳专属令牌不在这里定义。
  */
 :root {
   /* ── 基底色：保留效果稿的轻机构灰层次 ── */
@@ -49,13 +51,4 @@
   /* 浮层仍由 --shadow-pop 提供层次；别名供 Nuxt 与设计稿共用。 */
   --shadow-float: var(--shadow-pop);
   --shadow-dialog: var(--shadow-pop);
-
-  /* 间距阶由运行时唯一入口直接提供，避免业务组件依赖 fallback。 */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
 }
