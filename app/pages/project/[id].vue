@@ -27,18 +27,38 @@ function statusChip(status: string): string {
 const activeTab = ref('detail')
 const tabs = PROJECT_DETAIL_TABS
 
-// 首次加载完成标记：区分「加载中」与「加载完成但项目不存在/已软删」两态，
-// 避免深链直达时在 load 前一闪「不存在」；软删后（列表页删除经共享 store 联动）此页
-// project 变 undefined 且 ready=true，落到不存在态而非永远「加载中」。
-const ready = shallowRef(false)
-onMounted(async () => {
-  await store.load()
-  ready.value = true
-})
+async function loadProject() {
+  try {
+    await store.load()
+  }
+  catch {
+    // Store exposes the user-facing error; the page renders the shared retry state.
+  }
+}
+
+onMounted(() => void loadProject())
 </script>
 
 <template>
   <div v-if="project">
+    <StatePanel
+      v-if="store.loading"
+      kind="loading"
+      title="正在刷新项目详情"
+      compact
+      class="mb-3"
+    />
+    <StatePanel
+      v-else-if="store.error"
+      kind="error"
+      title="项目详情刷新失败"
+      :description="store.error"
+      action-label="重新加载"
+      compact
+      class="mb-3"
+      @action="loadProject"
+    />
+
     <!-- 顶栏 -->
     <div class="border border-line bg-panel mb-3 px-4 py-3">
       <div class="flex items-center gap-3 mb-2">
@@ -124,21 +144,33 @@ onMounted(async () => {
     </div>
   </div>
 
-  <div v-else-if="!ready || store.loading" class="py-12 text-center text-ink-faint">
-    加载中...
-  </div>
+  <StatePanel
+    v-else-if="store.loading || !store.loaded"
+    kind="loading"
+    title="正在加载项目详情"
+  />
+
+  <StatePanel
+    v-else-if="store.error"
+    kind="error"
+    title="项目详情加载失败"
+    :description="store.error"
+    action-label="重新加载"
+    @action="loadProject"
+  />
 
   <!-- 加载完成但项目不存在或已被软删除：给出明确空态与返回入口，而非永远「加载中」 -->
-  <div v-else class="flex flex-col items-center gap-3 py-16 text-center">
-    <span class="i-lucide-file-x h-8 w-8 text-ink-faint" aria-hidden="true" />
-    <p class="text-14px text-ink font-700">
-      项目不存在或已被删除
-    </p>
-    <p class="text-12px text-ink-faint">
-      该项目可能已在别处被删除，可返回列表查看。
-    </p>
-    <NuxtLink to="/project" class="btn-secondary mt-1">
-      <span class="i-lucide-arrow-left text-13px mr-1" /> 返回项目列表
-    </NuxtLink>
-  </div>
+  <StatePanel
+    v-else
+    kind="empty"
+    title="项目不存在或已被删除"
+    description="该项目可能已在别处被删除，可返回列表查看。"
+  >
+    <template #action>
+      <NuxtLink to="/project" class="btn-secondary">
+        <span class="i-lucide-arrow-left text-13px mr-1" aria-hidden="true" />
+        返回项目列表
+      </NuxtLink>
+    </template>
+  </StatePanel>
 </template>

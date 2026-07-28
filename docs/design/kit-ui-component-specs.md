@@ -296,3 +296,50 @@ openDrawer({
 `v-model` 只表达本界面中的当前项目单值；项目主数据仍归项目 Pinia store，切换后的排程加载与路由同步由页面 action 负责。
 
 **施工进度设计稿落点**：`SchedulePlanScreen.jsx` 工具栏当前三个项目按钮整体替换成一个 `ProjectSwitcher`；其右侧「整体进度 → 日期/说明 → 设为基线 → 新建楼栋分组」次序不变。设计稿需补关闭态、搜索展开态、空结果态和 390px 全屏态，并在 `app.dc.html` 中可实际切换项目。
+
+---
+
+## 09 · 页面状态 `state-panel` / 表格空态 ✅ 已定案（2026-07-27）
+
+**用途**：列表、详情与工作区的加载、空数据、错误和重试共用 `app/components/ui/StatePanel.vue`；表格自身的业务空态由 `KitTable.empty` 承载。页面不得再散落纯文字「加载中…」或无引导的「暂无数据」。
+
+**三态语义**：
+
+| 状态 | 可达性 | 结构与动作 |
+| --- | --- | --- |
+| `loading` | `role=status`、`aria-busy=true`、可读加载名称 | 使用贴近内容结构的 shimmer skeleton；页面级禁用巨型 spinner |
+| `empty` | `role=status`、业务标题作为可访问名称 | 业务标题 + 原因/下一步说明 + 可选主动作 |
+| `error` | `role=alert`、assertive live region | 失败标题 + 可读原因 +「重新加载」动作；重试期间回到 loading |
+
+`compact` 只缩减区块高度，用于有缓存内容时在列表上方提示刷新失败，不改变角色与动作语义。按钮内部提交态仍遵循第 06 节按钮三态：只有小 spinner，不把按钮进度放大成页面进度。
+
+**表格空态**：`KitTable.empty` 兼容原有字符串，也接受 `{ title, description?, actionLabel? }`。传对象时组件发出 `emptyAction`，由业务页决定清筛选、创建首条记录等动作；不能在通用表格里猜业务路由。
+
+**与 #97 KitListShell 的边界**：#185 不采用也不替代 `KitListShell`，明确延期到具有真实左树、视图切换或服务端汇总需求的领域列表票。`StatePanel` 与 `KitTable` 状态契约保持可组合，未来进入 `ListShell` 时直接复用；不能为完成状态原语而虚构列表壳业务。
+
+**页面状态机**：
+
+1. 首次请求未完成：loading，不先闪 empty。
+2. 成功且无数据：empty；筛选无结果与业务从未建档必须使用不同文案和动作。
+3. 失败且无缓存：error；失败但有缓存可显示 compact error，并保留旧数据。
+4. 点击重试：立即清旧错误并回 loading；成功进入默认/empty，失败更新 error。并发加载必须采用“最新请求胜出”，过期请求不得覆盖新数据或提前结束 loading。
+
+表头筛选参与业务空态时，「清除筛选」除重置页面筛选模型外，还必须调用 `KitTable.clearFilter()` 清除 vxe-table 内部选中态，保证筛选图标、弹层选项与实际数据一致。
+
+**调用签名**：
+
+```vue
+<StatePanel
+  kind="loading | empty | error"
+  title="业务状态标题"
+  description="原因或下一步"
+  action-label="可选动作"
+  :compact="false"
+  @action="retryOrContinue"
+/>
+
+<KitTable
+  :empty="{ title, description, actionLabel }"
+  @empty-action="clearFiltersOrCreate"
+/>
+```

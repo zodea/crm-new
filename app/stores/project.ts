@@ -14,6 +14,7 @@ import {
   loadProjectForm,
   saveProjectForm,
 } from '~/lib/master-data/forms'
+import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 import { toNum } from '~/lib/util/number'
 
@@ -175,9 +176,14 @@ function rowToProject(row: Record<string, unknown>): Project {
 export const useProjectStore = defineStore('project', () => {
   const list = shallowRef<Project[]>([])
   const loading = shallowRef(false)
+  const loaded = shallowRef(false)
+  const error = shallowRef('')
+  let latestLoad = 0
 
   async function load() {
+    const loadId = ++latestLoad
     loading.value = true
+    error.value = ''
     try {
       const visibleProjects = selectVisibleSql('projects')
       const rows = await select<Record<string, unknown>>(
@@ -190,10 +196,19 @@ export const useProjectStore = defineStore('project', () => {
          LEFT JOIN customers AS secondary_customer ON secondary_customer.id = project.secondary_customer_id
          ORDER BY project.created_at DESC`,
       )
-      list.value = rows.map(rowToProject)
+      if (loadId === latestLoad)
+        list.value = rows.map(rowToProject)
+    }
+    catch (cause) {
+      if (loadId === latestLoad)
+        error.value = `项目加载失败：${toErrorMessage(cause)}`
+      throw cause
     }
     finally {
-      loading.value = false
+      if (loadId === latestLoad) {
+        loading.value = false
+        loaded.value = true
+      }
     }
   }
 
@@ -245,6 +260,8 @@ export const useProjectStore = defineStore('project', () => {
   return {
     list: readonly(list),
     loading: readonly(loading),
+    loaded: readonly(loaded),
+    error: readonly(error),
     load,
     byId,
     add,
