@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 })
 
 const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+useModalLayerRegistration(computed(() => isMobile.value && openMobile.value))
 </script>
 
 <template>
@@ -35,13 +36,15 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
   <DialogRoot v-else-if="isMobile" :open="openMobile" v-bind="$attrs" @update:open="setOpenMobile">
     <DialogPortal>
       <DialogOverlay
-        class="shell-layer-overlay fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        data-overlay-backdrop
+        class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
       />
       <DialogContent
         data-sidebar="sidebar"
         data-mobile="true"
+        data-overlay-surface
         :class="cn(
-          'shell-layer-drawer fixed inset-y-0 flex h-svh w-[var(--sidebar-width)] flex-col bg-sidebar p-0 text-sidebar-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'fixed inset-y-0 z-[var(--z-overlay-surface)] flex h-svh w-[var(--sidebar-width)] flex-col bg-sidebar p-0 text-sidebar-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
           side === 'right'
             ? 'right-0 border-l border-sidebar-border data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'
             : 'left-0 border-r border-sidebar-border data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
