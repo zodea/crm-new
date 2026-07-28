@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const ROUTES = [
   ['/owner/change/new', '新建 · 甲方变洽签'],
@@ -24,17 +25,8 @@ async function chooseLookup(
   await page.getByRole('option').filter({ hasText: optionText }).first().click()
 }
 
-async function expectNoPageOverflow(page: Page, context: string) {
-  const widths = await page.evaluate(() => ({
-    client: document.documentElement.clientWidth,
-    scroll: document.documentElement.scrollWidth,
-  }))
-  expect(widths.scroll, `${context} 不应产生页面级横向溢出`)
-    .toBeLessThanOrEqual(widths.client)
-}
-
 test.describe('F5 甲方与分包整页表单', () => {
-  for (const width of [390, 768, 1024, 1440]) {
+  for (const width of RESPONSIVE_WIDTHS) {
     test(`八类表单在 ${width}px 视口可达且无页面级横向溢出`, async ({ page }) => {
       test.setTimeout(180_000)
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
