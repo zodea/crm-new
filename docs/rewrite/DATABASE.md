@@ -1428,8 +1428,9 @@ interface FilePayload {
 | 工序实际完成率（`has_qty=0`） | `schedule_tasks.manual_progress` |
 | 工序计划应完成率 | `clamp((today − plannedStart) / (plannedFinish − plannedStart), 0, 1)` |
 | 提前/延后天数 | `(实际完成率 − 计划应完成率) × durationDays`（分组/项目行按子工序工期加权） |
-| 项目目标成本（按科目） | `SELECT cost_category, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.target_cost_id=t.id WHERE t.project_id=? AND t.is_baseline=1 AND t.deleted_at IS NULL GROUP BY cost_category` |
+| 项目目标成本（按科目） | `SELECT cost_category, SUM(amount) FROM target_cost_items ti JOIN target_costs t ON ti.target_cost_id=t.id WHERE t.project_id=? AND t.is_baseline=1 AND t.status='submitted' AND t.deleted_at IS NULL AND ti.deleted_at IS NULL GROUP BY cost_category`；草稿基线不进入正式控制 |
 | 项目实际成本（按科目） | 专业分包/合同劳务/材料/机械/其他=对应已确认支出结算；工人工资=已发放工资快照；费用报销=已确认报销。付款和送货单不重复计入成本 |
+| 项目已签/已付（按科目） | 已签=正式支出合同主额 + 非草稿补充协议；已付=已确认 `payment_records` 经付款申请分摊到合同后按 `contracts.cost_category` 聚合。无合同归属的支付不得按用途文本猜入成本分类 |
 | 成本偏差率 | `(实际 − 目标) / 目标`（科目级与合计级） |
 
 ### 4.7 清单量差与产值（subcontract-quantity.md · CONTEXT.md「三量」「变更单」「月度报量」）

@@ -172,6 +172,12 @@ onMounted(() => Promise.all([
     />
   </div>
 
+  <ProjectDeepSubTables
+    v-else-if="tab === 'budget'"
+    :tab="tab"
+    :project-id="projectId"
+  />
+
   <div
     v-else-if="placeholder"
     class="flex min-h-56 flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-panel px-6 py-12 text-center shadow-[var(--shadow-card)]"

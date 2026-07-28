@@ -115,6 +115,9 @@ function changeFilters(payload: {
           {{ row.status || '—' }}
         </slot>
       </template>
+      <template #source="{ row, rowIndex }">
+        <slot name="source" :row="row" :row-index="rowIndex" />
+      </template>
     </KitTable>
     <div
       v-if="summaries.length"
