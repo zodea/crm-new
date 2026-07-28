@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.26.0",
   "scripts": {
     "build": "nuxt build",
+    "design:sync-manifest": "node scripts/sync-design-token-manifest.mjs",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
