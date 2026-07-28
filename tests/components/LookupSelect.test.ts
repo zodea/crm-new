@@ -29,12 +29,18 @@ describe('lookupSelect public behavior', () => {
     render(LookupSelect, {
       props: {
         'fetch': fetchOptions,
+        'field': 'projectId',
+        'invalid': true,
+        'descriptionId': 'project-error',
         'placeholder': '选择项目',
         'onUpdate:modelValue': onUpdate,
       },
     })
 
     const input = screen.getByRole('combobox', { name: '选择项目' })
+    expect(input.getAttribute('data-field')).toBe('projectId')
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(input.getAttribute('aria-describedby')).toBe('project-error')
     await fireEvent.focus(input)
     await fireEvent.update(input, '车')
 

@@ -25,6 +25,9 @@ import { toErrorMessage } from '~/lib/util/error'
 
 interface Props {
   fetch: (keyword: string) => Promise<LookupOption[]>
+  field?: string
+  invalid?: boolean
+  descriptionId?: string
   recentKey?: string
   allowCreate?: boolean
   disabledReason?: string
@@ -32,6 +35,9 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  field: undefined,
+  invalid: false,
+  descriptionId: undefined,
   recentKey: undefined,
   allowCreate: false,
   disabledReason: undefined,
@@ -299,7 +305,10 @@ watch(
   >
     <ComboboxAnchor
       class="relative flex min-h-8 w-full items-center rounded-[var(--radius-btn)] border border-line bg-panel focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--brand-ring)]"
-      :class="disabledReason ? 'cursor-not-allowed bg-surface-2 opacity-70' : undefined"
+      :class="[
+        disabledReason ? 'cursor-not-allowed bg-surface-2 opacity-70' : undefined,
+        invalid ? 'border-danger! ring-1 ring-danger/20' : undefined,
+      ]"
     >
       <ComboboxInput
         :model-value="query"
@@ -307,7 +316,10 @@ watch(
         :placeholder="placeholder"
         :disabled="!!disabledReason"
         :aria-disabled="disabledReason ? 'true' : undefined"
+        :aria-describedby="descriptionId"
+        :aria-invalid="invalid || undefined"
         :aria-label="placeholder"
+        :data-field="field"
         class="min-w-0 flex-1 border-0 bg-transparent px-2.5 py-1.5 text-14px text-ink outline-none placeholder:text-ink-faint"
         @update:model-value="handleQueryChange"
       />
