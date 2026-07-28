@@ -64,7 +64,7 @@ Nuxt 路由级实现结果：
 | 送货单识别与归档 | 工作台和归档页面已存在 | [#42：OCR 到核对入库](https://github.com/zodea/crm-new/issues/42)、[#113：设计稿双区闭环修正](https://github.com/zodea/crm-new/issues/113) |
 | 发票台账 | 识别、归档与列表基础已存在 | [#70：打印、导入拒绝、编辑删除入口](https://github.com/zodea/crm-new/issues/70) |
 | 工程量 / 工资 | 工程量矩阵和责任配置已存在 | [#37：量差总表与真实取数](https://github.com/zodea/crm-new/issues/37) |
-| 全站视觉与表格 | 已使用共享原语并完成部分响应式 | [#110](https://github.com/zodea/crm-new/issues/110)、[#112](https://github.com/zodea/crm-new/issues/112) 的剩余阶段 |
+| 全站视觉与表格 | 已使用共享原语并完成部分响应式；#112 已关闭 | [#181](https://github.com/zodea/crm-new/issues/181) 与 [#183–#206](https://github.com/zodea/crm-new/issues/183) 的逐屏对标链 |
 | 浮层层次 | Dialog/Sheet/Popover 底座已存在 | [#166：浮层遮挡、滚动锁与容器布局](https://github.com/zodea/crm-new/issues/166) |
 
 项目详情已在 [#173–#180](https://github.com/zodea/crm-new/issues/180) 完成只读子表、阶段文件、成本/合同/资金/物资/验收关系、正式事实口径、来源穿透及四档响应式验收，因此不再列入“已搭但未闭环”。这不改变路由总数，只改变闭环状态。
