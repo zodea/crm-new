@@ -6,6 +6,10 @@ import {
   selectVisibleSql,
   visibleCond,
 } from '~/lib/db/soft-delete'
+import {
+  formalOwnerChangeSql,
+  nonDraftStatusSql,
+} from '~/lib/project/formal-facts'
 
 export interface ProjectDetailAggregate extends ProjectOperationSummary {
   projectId: string
@@ -30,12 +34,17 @@ interface ProjectSumRow {
   total: number
 }
 
-async function loadProjectSums(db: SoftDb, table: string, valueColumn: string): Promise<Map<string, number>> {
+async function loadNonDraftProjectSums(
+  db: SoftDb,
+  table: 'invoice_applications' | 'receipt_registrations',
+  valueColumn: string,
+): Promise<Map<string, number>> {
   const rows = await db.select<ProjectSumRow>(`
     ${hiddenCtes(table)}
     SELECT r.project_id, COALESCE(SUM(r."${valueColumn}"), 0) AS total
     FROM "${table}" r
     WHERE ${visibleCond(table, 'r')}
+      AND ${nonDraftStatusSql('r.status')}
     GROUP BY r.project_id
   `)
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
@@ -49,6 +58,7 @@ async function loadConstructionContractSums(db: SoftDb): Promise<Map<string, num
     WHERE ${visibleCond('contracts', 'contract')}
       AND contract.kind = '施工'
       AND contract.project_id IS NOT NULL
+      AND ${nonDraftStatusSql('contract.status')}
     GROUP BY contract.project_id
   `)
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
@@ -76,9 +86,22 @@ async function loadConstructionSupplementSums(db: SoftDb): Promise<Map<string, n
     WHERE ${visibleCond('contract_supplements', 'supplement')}
       AND ${visibleCond('contracts', 'contract')}
       AND contract.kind = '施工'
-      AND supplement.status NOT IN ('draft', '草稿')
+      AND ${nonDraftStatusSql('contract.status')}
+      AND ${nonDraftStatusSql('supplement.status')}
       AND contract.project_id IS NOT NULL
     GROUP BY contract.project_id
+  `)
+  return new Map(rows.map(row => [row.project_id, number(row.total)]))
+}
+
+async function loadFormalOwnerChangeSums(db: SoftDb): Promise<Map<string, number>> {
+  const rows = await db.select<ProjectSumRow>(`
+    ${hiddenCtes('owner_change_orders')}
+    SELECT change.project_id, COALESCE(SUM(change.tax_inc_amount), 0) AS total
+    FROM owner_change_orders AS change
+    WHERE ${visibleCond('owner_change_orders', 'change')}
+      AND ${formalOwnerChangeSql('change')}
+    GROUP BY change.project_id
   `)
   return new Map(rows.map(row => [row.project_id, number(row.total)]))
 }
@@ -105,13 +128,13 @@ export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDe
     db.select<{ id: string }>(selectVisibleSql('projects', 'ORDER BY id')),
     loadConstructionContractSums(db),
     loadConstructionSupplementSums(db),
-    loadProjectSums(db, 'owner_change_orders', 'tax_inc_amount'),
-    loadProjectSums(db, 'receipt_registrations', 'amount'),
+    loadFormalOwnerChangeSums(db),
+    loadNonDraftProjectSums(db, 'receipt_registrations', 'amount'),
     loadConfirmedPaymentSums(db),
     loadCurrentSums(db, 'receipt'),
     loadCurrentSums(db, 'payment'),
-    loadProjectSums(db, 'invoice_applications', 'amount'),
-    loadProjectSums(db, 'invoice_applications', 'tax_amount'),
+    loadNonDraftProjectSums(db, 'invoice_applications', 'amount'),
+    loadNonDraftProjectSums(db, 'invoice_applications', 'tax_amount'),
   ])
 
   return projects.map(({ id: projectId }) => {
@@ -134,7 +157,7 @@ export async function loadProjectDetailAggregates(db: SoftDb): Promise<ProjectDe
       currentReceipt,
       currentPayment,
       managementFee,
-      availableBalance: projectReceipt + currentReceipt - paymentAmount - currentPayment - managementFee,
+      availableBalance: projectReceipt + currentReceipt - paymentAmount - currentPayment,
       outputAmount: outputAmounts.get(projectId) ?? 0,
       outputTax: outputTaxes.get(projectId) ?? 0,
     }

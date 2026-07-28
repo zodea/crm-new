@@ -38,7 +38,7 @@ const placeholder = computed(() =>
 
 const constructionColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'name', title: '合同名称', minWidth: 220 },
+  { field: 'name', title: '合同名称', minWidth: 220, slot: 'link' },
   { field: 'contractNo', title: '合同编号', width: 180 },
   { field: 'category', title: '合同类别', width: 110, filterable: true },
   { field: 'amount', title: '含税合同金额', type: 'money', width: 150 },
@@ -47,22 +47,25 @@ const constructionColumns: KitTableColumn[] = [
 ]
 const supplementColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'name', title: '协议名称', minWidth: 240 },
+  { field: 'name', title: '协议名称', minWidth: 240, slot: 'link' },
   { field: 'amount', title: '协议金额', type: 'money', width: 140 },
   { field: 'signDate', title: '签约日期', type: 'date' },
+  { field: 'status', title: '协议状态', width: 100, filterable: true },
 ]
 const changeColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'changeNo', title: '变更编号', width: 140 },
+  { field: 'changeNo', title: '变更编号', width: 140, slot: 'link' },
   { field: 'contractName', title: '合同名称', minWidth: 220 },
   { field: 'taxIncAmount', title: '含税审定金额', type: 'money', width: 150 },
   { field: 'taxExcAmount', title: '不含税审定金额', type: 'money', width: 160 },
   { field: 'appliedAmount', title: '已申请金额', type: 'money', width: 140 },
   { field: 'approvalDate', title: '审定日期', type: 'date' },
+  { field: 'status', title: '单据状态', width: 100, filterable: true },
+  { field: 'formalState', title: '合计口径', width: 110, filterable: true },
 ]
 const invoiceApplicationColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'name', title: '开票申请名称', minWidth: 240 },
+  { field: 'name', title: '开票申请名称', minWidth: 240, slot: 'link' },
   { field: 'amount', title: '开票金额', type: 'money', width: 140 },
   { field: 'taxRate', title: '税率(%)', width: 90, align: 'right' },
   { field: 'taxAmount', title: '税额', type: 'money', width: 130 },
@@ -71,7 +74,7 @@ const invoiceApplicationColumns: KitTableColumn[] = [
 ]
 const receivedInvoiceColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'invoiceNumber', title: '发票号码', minWidth: 170 },
+  { field: 'invoiceNumber', title: '发票号码', minWidth: 170, slot: 'link' },
   { field: 'seller', title: '销方名称', minWidth: 200 },
   { field: 'totalAmount', title: '价税合计', type: 'money', width: 140 },
   { field: 'taxAmount', title: '税额', type: 'money', width: 120 },
@@ -80,16 +83,17 @@ const receivedInvoiceColumns: KitTableColumn[] = [
 ]
 const receiptColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'receiptNo', title: '收款编号', width: 150 },
+  { field: 'receiptNo', title: '收款编号', width: 150, slot: 'link' },
   { field: 'receiptDate', title: '收款日期', type: 'date' },
   { field: 'amount', title: '收款金额', type: 'money', width: 150 },
   { field: 'paymentMethod', title: '支付方式', width: 110 },
   { field: 'payerUnit', title: '支付单位', minWidth: 200 },
   { field: 'cumulativeReceivable', title: '累计应收', type: 'money', width: 150 },
+  { field: 'status', title: '单据状态', width: 100, filterable: true },
 ]
 const paymentColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },
-  { field: 'applicationNo', title: '付款编号', width: 150 },
+  { field: 'applicationNo', title: '付款编号', width: 150, slot: 'link' },
   { field: 'approvalStatus', title: '审批状态', width: 100 },
   { field: 'applicant', title: '申请人', width: 100 },
   { field: 'amount', title: '申请金额', type: 'money', width: 140 },
@@ -111,22 +115,40 @@ onMounted(() => Promise.all([
       :columns="constructionColumns"
       :rows="constructionContracts"
       :loading="detailStore.loading"
-      :summary-fields="[{ field: 'amount', label: '含税合同金额合计' }]"
-    />
+      :summary-fields="[{ field: 'effectiveAmount', label: '正式含税合同金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || row.contractNo || '查看施工合同' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
     <ProjectSubTableSection
       title="补充协议"
       :columns="supplementColumns"
       :rows="supplementAgreements"
       :loading="detailStore.loading"
-      :summary-fields="[{ field: 'amount', label: '协议金额合计' }]"
-    />
+      :summary-fields="[{ field: 'effectiveAmount', label: '有效协议金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || '查看关联施工合同' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
     <ProjectSubTableSection
       title="甲方变洽签"
       :columns="changeColumns"
       :rows="ownerChangeOrders"
       :loading="detailStore.loading"
-      :summary-fields="[{ field: 'taxIncAmount', label: '含税审定金额合计' }]"
-    />
+      :summary-fields="[{ field: 'effectiveTaxIncAmount', label: '正式含税审定金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.changeNo || '查看甲方变洽签' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
   </div>
 
   <div v-else-if="tab === 'tax'" class="space-y-5">
@@ -136,10 +158,16 @@ onMounted(() => Promise.all([
       :rows="invoiceApplications"
       :loading="detailStore.loading"
       :summary-fields="[
-        { field: 'amount', label: '开票金额合计' },
-        { field: 'taxAmount', label: '税额合计' },
+        { field: 'effectiveAmount', label: '正式开票金额合计' },
+        { field: 'effectiveTaxAmount', label: '正式税额合计' },
       ]"
-    />
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.name || '查看开票申请' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
     <ProjectSubTableSection
       title="收票登记"
       :columns="receivedInvoiceColumns"
@@ -149,7 +177,13 @@ onMounted(() => Promise.all([
         { field: 'totalAmount', label: '价税合计' },
         { field: 'taxAmount', label: '税额合计' },
       ]"
-    />
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="`/finance/invoice/${row.id}`" class="cell--link">
+          {{ row.invoiceNumber || row.fileName || '查看归档发票' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
   </div>
 
   <div v-else-if="tab === 'fund'" class="space-y-5">
@@ -158,8 +192,14 @@ onMounted(() => Promise.all([
       :columns="receiptColumns"
       :rows="receiptRegistrations"
       :loading="detailStore.loading"
-      :summary-fields="[{ field: 'amount', label: '收款金额合计' }]"
-    />
+      :summary-fields="[{ field: 'effectiveAmount', label: '正式收款金额合计' }]"
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.receiptNo || '查看收款登记' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
     <ProjectSubTableSection
       title="付款申请"
       :columns="paymentColumns"
@@ -169,7 +209,13 @@ onMounted(() => Promise.all([
         { field: 'amount', label: '申请金额合计' },
         { field: 'paidAmount', label: '已付金额合计' },
       ]"
-    />
+    >
+      <template #link="{ row }">
+        <NuxtLink :to="row.sourcePath" class="cell--link">
+          {{ row.applicationNo || '查看付款申请' }}
+        </NuxtLink>
+      </template>
+    </ProjectSubTableSection>
   </div>
 
   <ProjectDeepSubTables
