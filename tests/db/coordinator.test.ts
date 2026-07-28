@@ -125,4 +125,47 @@ describe('桌面数据库连接协调器', () => {
       'select:AFTER_FAILURE',
     ])
   })
+
+  it('只在独立写入或事务提交成功后持久化浏览器快照', async () => {
+    const events: string[] = []
+    const driver = driverWithLog(events)
+    driver.persist = async () => {
+      events.push('persist')
+    }
+    const coordinator = createDbCoordinator(async () => driver)
+
+    await coordinator.execute('STANDALONE_WRITE')
+    await coordinator.withTransaction(async (tx) => {
+      await tx.execute('TRANSACTION_WRITE')
+    })
+
+    expect(events).toEqual([
+      'execute:STANDALONE_WRITE',
+      'persist',
+      'execute:BEGIN',
+      'execute:TRANSACTION_WRITE',
+      'execute:COMMIT',
+      'persist',
+    ])
+  })
+
+  it('事务回滚后不持久化中间快照', async () => {
+    const events: string[] = []
+    const driver = driverWithLog(events)
+    driver.persist = async () => {
+      events.push('persist')
+    }
+    const coordinator = createDbCoordinator(async () => driver)
+
+    await expect(coordinator.withTransaction(async (tx) => {
+      await tx.execute('TRANSACTION_WRITE')
+      throw new Error('stop')
+    })).rejects.toThrow('stop')
+
+    expect(events).toEqual([
+      'execute:BEGIN',
+      'execute:TRANSACTION_WRITE',
+      'execute:ROLLBACK',
+    ])
+  })
 })

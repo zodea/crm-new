@@ -1,6 +1,11 @@
 export interface DbDriver {
   execute: (sql: string, params?: unknown[]) => Promise<void>
   select: <T>(sql: string, params?: unknown[]) => Promise<T[]>
+  /**
+   * Flushes a driver-managed snapshot after a successful logical write.
+   * Native SQLite persists by itself; the browser sql.js driver implements this hook.
+   */
+  persist?: () => Promise<void>
   close: () => Promise<void>
 }
 
@@ -46,6 +51,7 @@ export function createDbCoordinator(load: () => Promise<DbDriver>) {
     return runExclusive(async () => {
       const raw = await rawDriver()
       await raw.execute(sql, params)
+      await raw.persist?.()
     })
   }
 
@@ -59,6 +65,7 @@ export function createDbCoordinator(load: () => Promise<DbDriver>) {
   async function close(): Promise<void> {
     return runExclusive(async () => {
       const raw = await rawDriver()
+      await raw.persist?.()
       await raw.close()
       driver = null
       initializing = null
@@ -84,6 +91,7 @@ export function createDbCoordinator(load: () => Promise<DbDriver>) {
       try {
         const result = await work(tx)
         await raw.execute('COMMIT')
+        await raw.persist?.()
         return result
       }
       catch (error) {
