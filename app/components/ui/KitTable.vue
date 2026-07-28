@@ -152,6 +152,32 @@ defineExpose({ clearCheckbox })
       @checkbox-change="onCheckboxChange"
       @checkbox-all="onCheckboxChange"
     >
+      <template #loading>
+        <div
+          data-ui="kit-table-loading"
+          role="status"
+          aria-label="正在加载表格数据"
+          class="mx-auto w-[min(720px,80vw)] space-y-2 p-4"
+        >
+          <div
+            v-for="index in 5"
+            :key="index"
+            aria-hidden="true"
+            class="grid grid-cols-[16%_30%_22%_1fr] gap-3"
+          >
+            <span v-for="segment in 4" :key="segment" data-ui="kit-table-shimmer" class="kit-table__shimmer h-3" />
+          </div>
+        </div>
+      </template>
+
+      <template #empty>
+        <div data-ui="kit-table-empty" class="flex flex-col items-center justify-center px-6 py-10 text-center">
+          <span aria-hidden="true" class="i-lucide-inbox mb-2 h-7 w-7 text-ink-faint" />
+          <strong class="text-14px font-700 text-ink">{{ empty }}</strong>
+          <span class="mt-1 text-12px text-ink-faint">请调整筛选条件，或检查当前业务范围。</span>
+        </div>
+      </template>
+
       <template v-for="({ col, vxeProps, slot }, i) in normalized" :key="col.field ?? `${col.type}:${i}`">
         <vxe-column
           v-if="col.type === 'seq'"
@@ -188,3 +214,27 @@ defineExpose({ clearCheckbox })
     />
   </div>
 </template>
+
+<style scoped>
+.kit-table__shimmer {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+
+.kit-table__shimmer::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 72%), transparent);
+  content: "";
+  animation: kit-table-shimmer 1.5s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes kit-table-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+</style>

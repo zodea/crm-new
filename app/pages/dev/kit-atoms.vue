@@ -106,10 +106,10 @@ const activeNode = shallowRef('p1')
       <!-- ③ SearchInput -->
       <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
-          ③ SearchInput — pill 搜索框（即输即筛）
+          ③ SearchInput — 紧凑矩形搜索框（即输即筛）
         </h2>
         <p class="text-12px text-ink-soft mb-3">
-          左置放大镜，圆角胶囊；下方列表随输入实时收窄。
+          左置放大镜，小圆角矩形；下方列表随输入实时收窄。
         </p>
         <SearchInput v-model="keyword" placeholder="搜索分供方名…" :width="240" />
         <div class="flex flex-wrap gap-1.5 mt-3">
@@ -124,7 +124,7 @@ const activeNode = shallowRef('p1')
           ④ SectionHeader — 品牌竖条区块标题
         </h2>
         <p class="text-12px text-ink-soft mb-3">
-          4×16 品牌竖条 + 标题；右侧 extra 插槽放操作/说明。
+          浅灰层级条 + 3×14 品牌竖条 + 标题；右侧 extra 插槽放操作/说明。
         </p>
         <SectionHeader>项目经营数据</SectionHeader>
         <SectionHeader :mb="0">

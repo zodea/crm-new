@@ -57,8 +57,8 @@ function display(supplier: Supplier, key: keyof Supplier): string {
 <template>
   <div>
     <!-- 基础信息 -->
-    <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-      <span class="w-0.5 h-3.5 bg-brand rounded-full" />
+    <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+      <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
       基础信息
     </h4>
     <div class="form-grid mb-5">
@@ -76,8 +76,8 @@ function display(supplier: Supplier, key: keyof Supplier): string {
     </div>
 
     <!-- 开票/银行信息 -->
-    <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-      <span class="w-0.5 h-3.5 bg-brand rounded-full" />
+    <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+      <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
       开票/银行信息
     </h4>
     <div class="form-grid mb-5">
@@ -94,8 +94,8 @@ function display(supplier: Supplier, key: keyof Supplier): string {
     </div>
 
     <!-- 联系人信息 -->
-    <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-      <span class="w-0.5 h-3.5 bg-brand rounded-full" />
+    <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+      <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
       联系人信息
     </h4>
     <div class="form-grid mb-5">
@@ -110,8 +110,8 @@ function display(supplier: Supplier, key: keyof Supplier): string {
     </div>
 
     <!-- 系统信息 -->
-    <h4 class="text-13px font-700 text-ink mb-2 flex items-center gap-1.5">
-      <span class="w-0.5 h-3.5 bg-brand rounded-full" />
+    <h4 class="section-heading mb-2 text-13px font-700 text-ink">
+      <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
       系统信息
     </h4>
     <div class="form-grid">

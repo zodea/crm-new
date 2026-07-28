@@ -6,7 +6,6 @@
 :root {
   /* ── 外层应用框架 ── */
   --sidebar-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
-  --shadow-card: none;
   --shadow-form-footer: none;
 
   /* ── 选中内描边（导航项 active，对齐设计稿 spacing.css）── */
