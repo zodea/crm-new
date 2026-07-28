@@ -27,7 +27,7 @@ function isCurrent(path: string): boolean {
       v-for="item in previewRoutes"
       :key="item.to"
       :to="item.to"
-      class="inline-flex h-8 items-center gap-1.5 rounded-[6px] px-3 text-12px font-700 transition-colors duration-[var(--dur-fast)]"
+      class="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-btn)] px-3 text-12px font-700 transition-colors duration-[var(--dur-fast)]"
       :class="isCurrent(item.to)
         ? 'bg-brand-soft text-brand-deep'
         : 'text-ink-soft hover:bg-surface-2 hover:text-ink'"

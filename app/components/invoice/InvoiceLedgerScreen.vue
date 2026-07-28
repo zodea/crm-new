@@ -296,7 +296,7 @@ onMounted(() => {
             <div
               v-for="inv in rows"
               :key="inv.id"
-              class="flex flex-col overflow-hidden border border-line rounded-[12px] bg-panel shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] hover:border-line-strong hover:-translate-y-0.5"
+              class="panel panel-hover flex flex-col overflow-hidden"
             >
               <div
                 class="grid cursor-pointer place-items-center border-b border-line bg-surface-2 p-2.5"

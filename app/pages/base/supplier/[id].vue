@@ -66,7 +66,7 @@ watch(supplierId, async (id) => {
         <NuxtLink to="/base/supplier" class="btn-secondary px-2.5" aria-label="返回分供方列表">
           <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回列表
         </NuxtLink>
-        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-brand-soft text-18px font-800 text-brand">
+        <div class="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-18px font-800 text-brand">
           {{ supplier.name.slice(0, 1) }}
         </div>
         <div class="min-w-0 flex-1">

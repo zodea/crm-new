@@ -51,8 +51,8 @@ const normalized = computed(() => columns.map((raw) => {
   return { col, slot, vxeProps: buildColProps(col, slot) }
 }))
 
-/** 40px 表头 + 40px 数据行，字号增大后仍保持紧凑，兜住 ≥minRows 行展示高度。 */
-const minHeight = computed(() => 40 + minRows * 40)
+/** 38px 表头 + 38px 数据行，字号增大后仍保持紧凑，兜住 ≥minRows 行展示高度。 */
+const minHeight = computed(() => 38 + minRows * 38)
 
 /** 跨页连续序号:seq 列从当前页偏移起算,而不是每页都从 1 开始。 */
 const seqConfig = computed(() =>

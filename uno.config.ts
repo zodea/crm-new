@@ -89,7 +89,7 @@ export default defineConfig({
       },
     },
 
-    // 统一形状阶梯：交互控件 8px、卡片/弹窗 12px、小控件 8px。
+    // 统一形状阶梯由 tokens.css 控制；业务卡片与控件采用参考站的紧凑矩形几何。
     borderRadius: {
       lg: 'var(--radius-card)',
       md: 'var(--radius-btn)',
@@ -191,11 +191,9 @@ export default defineConfig({
   ],
 
   shortcuts: {
-    // L1 卡片底座（DESIGN-TASTE §4.1 / ADR 0007，#110 B1）：一切内容容器的唯一配方，
-    // 内边距由调用处按 12–16 自持（表格卡 0 + overflow-hidden）；卡内不再嵌套圆角阴影。
-    // 可点卡片叠加 panel-hover（hover 边转 brand + 阴影升级）。
+    // L1 内容底座：边框承担层级，不使用悬浮阴影；内边距仍由业务组件自持。
     'panel': 'border border-line rounded-[var(--radius-card)] bg-panel shadow-[var(--shadow-card)]',
-    'panel-hover': 'transition-[border-color,box-shadow] duration-[var(--dur-fast)] hover:border-brand hover:shadow-[var(--shadow-pop)]',
+    'panel-hover': 'transition-[border-color,background-color] duration-[var(--dur-fast)] hover:border-brand hover:bg-surface-2',
 
     // 按钮：五变体层级语言（权威源 DESIGN-TASTE §4.2，#109）。
     // 缺省 = btn-secondary 安静按钮；实心蓝只属于 btn-accent（每屏 ≤1 枚核心 CTA）；

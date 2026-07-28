@@ -2,13 +2,14 @@
 
 > 生成方式：按 `stitch-design-taste` skill 的品味编码框架，对本项目**用户认可的满意版本**做的一次系统提炼（2026-07-17 快照）。
 > **基准 = 线上 Claude Design**：claude.ai/design 项目「瑞航CRM-NEW」，仓库镜像为 `DC重构设计源码/app.dc.html` + `kit/*.jsx` + `_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/*.css`。本文所有数值均实测自该镜像，不是凭空设计。
+> **2026-07-27 补充**：登录态红圈 CRM 只补充表面几何与信息密度；瑞航颜色、模块顺序、字段位置和业务逻辑不随参考站变化，详见 ADR 0013。
 >
 > **与既有权威源的关系**（本文是「品味层」，不推翻任何权威源）：
 > - 色值/形状令牌唯一权威源 = `DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css`。本文 hex 为快照，冲突以该文件为准。
 > - 内容区风格 [ADR 0007](../adr/0007-unified-visual-style-rounded-cards.md)、交互底座 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)、表格 [ADR 0009](../adr/0009-vxe-table-as-datagrid-engine.md) 继续有效；**全站布局/排版/颜色（含应用外壳）基准 = [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)**，[ADR 0011](../adr/0011-redesign-application-shell.md) 仅存外壳行为条款。
 > - 与 [DESIGN-SYSTEM.md](../rewrite/DESIGN-SYSTEM.md)（既有 design 文档）的分工：那是逐组件规格清单；本文回答「为什么线上版本好看、哪些做法绝对不许、本地要往哪重构」。两文冲突处见 §8.2（已发现的冲突本文已点名）。
 >
-> **本轮只出文档，不改代码。** 后续任何页面实装/重构，以本文 §4–§7 为对照检查表。
+> 后续任何页面实装/重构，以本文 §4–§7 为对照检查表；现行几何值已随 Issue #110 落入共享令牌与通用原语。
 
 ---
 
@@ -16,11 +17,11 @@
 
 | 轴 | 定位 | 说明 |
 |---|---|---|
-| 密度 Density | **7 / 10（双档）** | 仪表盘区「疏朗」（≈5：卡片留白 16–20px、指标大数字）；台账表格区「致密」（≈8：40px 行高、11–13px label、单元格水平 padding 6px）。两档共存是本产品的签名，不许拉平。 |
+| 密度 Density | **7 / 10（双档）** | 仪表盘区保留可扫读留白（面板 12–16px、指标大数字）；台账表格区更致密（38px 行高、11–13px label、单元格水平 padding 6px）。两档共存，不改变信息编排。 |
 | 变化 Variance | **2 / 10** | 对称、可预期。CRM 工作台靠肌肉记忆吃饭：列表页/详情页模板全站同构（§5），不做非对称炫技。skill 默认值 Variance 8 **不适用**本项目。 |
 | 动效 Motion | **2 / 10** | 克制、瞬时反馈。skill 默认的 spring 物理与常驻微动效 **不适用**本项目（§6 覆盖声明）。 |
 
-**一句话气质**：「疏朗仪表盘 × 高密度台账」——圆角卡片 + 轻阴影 + 充足留白 + 克制线条；数据密而不挤，蓝色安静而不喧哗。
+**一句话气质**：「克制面板 × 高密度台账」——小圆角 + 无卡片阴影 + 清楚分隔 + 适量留白；数据密而不挤，蓝色安静而不喧哗。
 
 ---
 
@@ -29,8 +30,8 @@
 工地记账员的桌面工具：机构级严肃感 + 数据密集型专业工具。像一间光线充足的项目部办公室——白纸台账、冷蓝灰文件柜、一枚深蓝公章（品牌蓝只在盖章处出现）。
 
 **正面（满意版本这样做）**：
-- 白纸卡片浮在轻机构灰画布上，1px 冷灰描边 + 一层几乎看不见的阴影（`--shadow-card`），层级靠留白和分隔线，不靠堆叠。
-- 品牌蓝是「章」不是「墙」：整屏扫过去，实心蓝色块不超过一处（核心 CTA / 选中态），其余蓝只以细节出现——4×16 竖条、下划线、蓝链、聚焦环。
+- 白纸面板落在轻机构灰画布上，1px 冷灰描边、小圆角、无卡片阴影；层级靠浅灰标题条、留白和分隔线，不靠堆叠。
+- 品牌蓝是「章」不是「墙」：整屏扫过去，实心蓝色块不超过一处（核心 CTA / 选中态），其余蓝只以细节出现——3×14 竖条、下划线、蓝链、聚焦环。
 - 数字是主角：金额/编号/日期一律等宽字体 + tabular-nums，右对齐，字重 600–800；文字 label 退居 11–12px 灰色。
 
 **反面（一眼廉价，出现即改）**：
@@ -130,9 +131,9 @@
 
 ## 4. 组件风格配方（实测自 kit / _ds_bundle）
 
-### 4.1 Panel（L1 卡片，一切内容的容器）
+### 4.1 Panel（L1 内容面，一切内容的容器）
 
-白底 `--panel` + `1px solid --line` + 圆角 `--radius-card`(12px) + `--shadow-card`（`0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.06)`）。默认内边距 16（普通卡 14–18，表格卡 0 + `overflow:hidden`）。可点卡片 hover：边框转 `--brand` + 阴影升级 `--shadow-pop`。
+白底 `--panel` + `1px solid --line` + 圆角 `--radius-card`(4px) + 无卡片阴影。默认内边距 12–16（表格面 0 + `overflow:hidden`）。可点面板 hover：边框转 `--brand` 或底色转 `--surface-2`，不位移、不升级阴影。
 **不嵌套卡片**——卡内分区用 1px 分隔线或 `--surface-2` 底，绝不再套一层圆角阴影。
 
 ### 4.2 按钮：五变体 + 「每屏一枚章」铁律
@@ -147,18 +148,18 @@
 | ghost | 透明；hover `--brand-soft` 底 + `--brand` 字 | 工具性弱操作、收起/展开 |
 | danger | 白底 + `--line-strong` 边 + `--danger` 字；hover 红边 + `rgba(220,38,38,.05)` 底 | 删除等破坏性操作（静默红，不实心） |
 
-尺寸：sm `5px 11px`/12px、**md `7px 12px`/13px**、lg `9px 16px`/14px；字重 600；圆角 `--radius-btn`(8px)。
+尺寸：sm `5px 11px`/12px、**md `7px 12px`/13px**、lg `9px 16px`/14px；字重 600；圆角 `--radius-btn`(4px)。
 交互态：hover = 平面变色（无位移无发光）；**active = `scale(0.97)`**（skill「tactile push」的本项目实现）；disabled = opacity .5。
 
 ### 4.3 IconButton（表格操作列 / 工具条）
 
-28×28 描边白底方按钮，圆角 8px，图标 ≈16px `--ink-soft`；hover 蓝边蓝字；`tone="danger"` 红字、hover 红边浅红底。操作列统一纯图标 + `title`，不混文字按钮。
+28×28 描边白底方按钮，圆角 4px，图标 ≈16px `--ink-soft`；hover 蓝边蓝字；`tone="danger"` 红字、hover 红边浅红底。操作列统一纯图标 + `title`，不混文字按钮。
 
 ### 4.4 数字展示：StatCard / Metric / MetricGrid
 
-- **StatCard**：Panel 内 label（12/700/`--ink-soft`）+ 大数字（24/800，行高 1.1，tone 上色）。`clickable` 时升级为可跳卡（hover 蓝框浮起）。
+- **StatCard**：Panel 内 label（12/700/`--ink-soft`）+ 大数字（24/800，行高 1.1，tone 上色）。`clickable` 时升级为可跳面板（hover 蓝框或浅底，不浮起）。
 - **Metric**：label（11/600/`--ink-faint` + ⓘ公式 tooltip）+ mono 数字（big 17.5/800，普通 13.5/700，`letter-spacing:-0.015em`）。两位小数完整展示，禁省略号。
-- **MetricGrid**：宽屏的 `cols` 只表示**最多列数/语义分组提示**，不是所有宽度锁列。重复指标优先 `repeat(auto-fit, minmax(min(100%, var(--metric-min)), 1fr))`，或用容器查询在 1/2/N 列间降级；`gap:1px` + `--line` 底色透出细分隔线，外框 1px + 圆角 10 + `overflow:hidden`。金额必须完整可读，不能靠压缩列宽或省略号维持列数。
+- **MetricGrid**：宽屏的 `cols` 只表示**最多列数/语义分组提示**，不是所有宽度锁列。重复指标优先 `repeat(auto-fit, minmax(min(100%, var(--metric-min)), 1fr))`，或用容器查询在 1/2/N 列间降级；`gap:1px` + `--line` 底色透出细分隔线，外框 1px + 圆角 4 + `overflow:hidden`。金额必须完整可读，不能靠压缩列宽或省略号维持列数。
 
 ### 4.5 StatusChip
 
@@ -166,16 +167,16 @@ pill（圆角 999px）浅底深字：`padding 4px 10px`、12px/600、非交互�
 
 ### 4.6 SegTab（业务内容分段 tab，下划线式）
 
-容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项 `padding 9px 14px`、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab（应用外壳路由页签除外，视觉归 ADR 0013 的 40px 红圈式页签栏，行为归 ADR 0011）。
+容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项高 32px、水平 padding 12px、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab（应用外壳路由页签除外，视觉归 ADR 0013 的 40px 红圈式页签栏，行为归 ADR 0011）。
 
 ### 4.7 SelectFilter / SearchInput（工具栏两件套）
 
-- **SelectFilter**：label（12/700/`--ink-soft`）+ 原生 select（`appearance:none`，`1px --line-strong` 边、圆角 8px、13px/600、`padding 7px 30px 7px 12px`）+ 自绘 chevron-down（14px `--ink-faint`）。多分类筛选一律收进下拉并入工具栏，**不做 pill 平铺占行**。
-- **SearchInput**：pill 圆角 999px、`1px --line-strong` 边、`padding 8px 14px 8px 32px`、13px，左内嵌 14px search 图标，默认宽 210px。
+- **SelectFilter**：label（12/700/`--ink-soft`）+ 原生 select（`appearance:none`，`1px --line-strong` 边、圆角 4px、13px/600、`padding 7px 30px 7px 12px`）+ 自绘 chevron-down（14px `--ink-faint`）。多分类筛选一律收进下拉并入工具栏，**不做 pill 平铺占行**。
+- **SearchInput**：小圆角矩形（4px）、`1px --line-strong` 边、`padding 8px 14px 8px 32px`、13px，左内嵌 14px search 图标，默认宽 210px。
 
 ### 4.8 TreeNav（左树导航）
 
-Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `--brand-soft` 底 + 800 字重 + `--brand-deep`；计数 pill mono 11px（选中白底，未选中 `--surface-3`）。发票台账/清单页同构复用。
+Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 4、选中 `--brand-soft` 底 + 800 字重 + `--brand-deep`；计数 pill mono 11px（选中白底，未选中 `--surface-3`）。发票台账/清单页同构复用。
 
 ### 4.9 EntityLink / MoneyLink（全站穿透语言）
 
@@ -184,7 +185,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 
 ### 4.10 表格（KitTable / vxe-table，ADR 0009）
 
-12px 圆角 Panel 承载（padding 0）；表头 `--surface-2` 底、13/700/`--ink-soft`、高 40px；数据行 14px、高 40px、单元格水平 padding 6px、分隔 `1px --line`、hover `--surface-3`；首列序号 `--ink-soft`；名称列蓝链；金额列 mono 右对齐 600–700；操作列右对齐 IconButton 排；底部汇总条 `--surface-2` 底（左统计 + 右分页）。分页按钮 28×28（同 IconButton 语言，active 实心蓝）。
+4px 圆角 Panel 承载（padding 0、无阴影）；表头 `--surface-2` 底、13/700/`--ink-soft`、高 38px；数据行 14px、高 38px、单元格水平 padding 6px、分隔 `1px --line`、hover `--surface-3`；首列序号 `--ink-soft`；名称列蓝链；金额列 mono 右对齐 600–700；操作列右对齐 IconButton 排；底部汇总条 `--surface-2` 底（左统计 + 右分页）。分页按钮 28×28（同 IconButton 语言，active 实心蓝）。
 
 ### 4.11 加载 / 空态 / 错误态
 
@@ -199,7 +200,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 8、选中 `
 **页面模板全站同构**（强制响应式契约见 [ADR 0013「响应式与自适应契约」](../adr/0013-align-all-ui-to-online-design.md)，此处只记品味要点）：
 
 - **列表页**：工具栏卡（标题 + 计数 → SelectFilter 组 → 搜索 → 按钮组，一行收齐）→ 可选汇总卡行 → 表格卡。按钮组从左到右由弱到强，accent 永远最右。
-- **详情页**：顶部摘要卡（返回 + 头像方块 + 标题行 + 摘要格行）→ SegTab / SectionHeader 分区。SectionHeader = 4×16px 品牌竖条 + 15/800 标题——品牌蓝作「章」的又一处。
+- **详情页**：顶部摘要面板（返回 + 头像方块 + 标题行 + 摘要格行）→ SegTab / SectionHeader 分区。SectionHeader = 不超过 34px 的 `--surface-2` 层级条 + 3×14px 品牌竖条 + 13/700 标题；模块顺序不因样式参考而改变。
 - **流式网格优先**：重复卡片按最小可读宽度自适应，可使用 `auto-fit` / `auto-fill` + `minmax()`；语义栏位可显式给宽屏列数或比例，但必须用容器/视口断点提供降列、堆叠、Tab 或 Sheet 退化。比例列是宽屏构图，不是固定画布。
 - **禁整页横滚**：宽内容（大表格/矩阵/甘特）在自身容器内 `overflow-x:auto`。SegTab 用 wrap 不用横滚。
 - **SVG 图表**：`viewBox` + 百分比宽随容器缩放；需要重绘时观察**容器**而非只监听窗口，不写死画布宽高。

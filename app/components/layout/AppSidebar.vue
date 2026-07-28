@@ -117,7 +117,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
         aria-label="返回首页"
         @click="onNavigate"
       >
-        <span class="grid h-9 w-9 flex-none place-items-center rounded-[8px] bg-brand text-16px font-800 text-white" aria-hidden="true">瑞</span>
+        <span class="grid h-9 w-9 flex-none place-items-center rounded-[var(--radius-btn)] bg-brand text-16px font-800 text-white" aria-hidden="true">瑞</span>
         <span v-if="!isVisuallyCollapsed" class="min-w-0 flex-1">
           <span class="block truncate text-16px font-800 leading-[1.2]">瑞航 CRM</span>
           <span class="mt-[2px] block truncate text-11px leading-[1.35] text-ink-soft">工程财务管理</span>

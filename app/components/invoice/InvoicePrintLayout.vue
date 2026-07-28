@@ -206,7 +206,7 @@ useEventListener(() => document, 'click', () => {
           :key="slot.invoice.id"
           :data-print-invoice-id="slot.invoice.id"
           :data-rotation="slot.rotation"
-          class="relative min-h-0 min-w-0 overflow-hidden border rounded-[8px] bg-panel p-2 text-left"
+          class="relative min-h-0 min-w-0 overflow-hidden border rounded-[var(--radius-card)] bg-panel p-2 text-left"
           :class="selectedInvoiceId === slot.invoice.id ? 'border-brand ring-2 ring-brand/20' : 'border-line'"
           @contextmenu.prevent="openContextMenu($event, slot.invoice.id)"
         >
@@ -264,7 +264,7 @@ useEventListener(() => document, 'click', () => {
       v-if="contextMenu"
       ref="contextMenuRef"
       data-invoice-rotation-menu
-      class="fixed z-60 w-32 border border-line rounded-[8px] bg-panel p-1 shadow-[var(--shadow-float)]"
+      class="fixed z-60 w-32 border border-line rounded-[var(--radius-btn)] bg-panel p-1 shadow-[var(--shadow-float)]"
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       role="menu"
       @click.stop

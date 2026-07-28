@@ -12,12 +12,12 @@ defineProps<{
     <div class="mb-3 text-12px font-700 text-ink-soft">
       发票原图
     </div>
-    <div class="mx-auto border border-line rounded-[10px] bg-panel p-4 shadow-[var(--shadow-card)]" style="aspect-ratio: 1/1.4142; max-width: 560px">
+    <div class="mx-auto border border-line rounded-[var(--radius-card)] bg-panel p-4 shadow-[var(--shadow-card)]" style="aspect-ratio: 1/1.4142; max-width: 560px">
       <object
         v-if="previewUrl"
         :data="previewUrl"
         :aria-label="invoice?.fileName || '上传发票原图'"
-        class="h-full w-full rounded-[6px] object-contain"
+        class="h-full w-full rounded-[var(--radius-sm)] object-contain"
       />
       <div v-else-if="invoice" class="h-full flex items-center justify-center">
         <div class="text-center">

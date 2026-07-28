@@ -4,13 +4,24 @@
 // 标题走默认插槽，右侧操作/说明走 #extra 插槽。
 withDefaults(defineProps<{
   mb?: number
-}>(), { mb: 12 })
+  title?: string
+  subtitle?: string
+}>(), {
+  mb: 12,
+  subtitle: '',
+  title: '',
+})
 </script>
 
 <template>
-  <div class="flex items-center gap-[10px]" :style="{ marginBottom: `${mb}px` }">
-    <span aria-hidden="true" class="h-[16px] w-[4px] flex-none rounded-[2px] bg-brand" />
-    <span class="text-[15px] font-800 text-ink"><slot /></span>
+  <div
+    data-ui="section-header"
+    class="min-h-8 flex items-center gap-2 border-y border-line bg-surface-2 px-3"
+    :style="{ marginBottom: `${mb}px` }"
+  >
+    <span aria-hidden="true" class="h-3.5 w-[3px] flex-none rounded-[1px] bg-brand" />
+    <span class="shrink-0 text-[13px] font-700 text-ink"><slot>{{ title }}</slot></span>
+    <span v-if="subtitle" class="min-w-0 truncate text-[11px] text-ink-faint" :title="subtitle">{{ subtitle }}</span>
     <span v-if="$slots.extra" class="ml-auto"><slot name="extra" /></span>
   </div>
 </template>

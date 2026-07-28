@@ -7,12 +7,12 @@
   --vxe-font-color: var(--ink);
   --vxe-ui-font-family: var(--font-sans);
   --vxe-ui-font-size-default: 14px;
-  --vxe-ui-table-row-height-default: 40px;
+  --vxe-ui-table-row-height-default: 38px;
   --vxe-ui-table-cell-padding-default: 6px;
   --vxe-table-border-color: var(--line);
   --vxe-table-header-background-color: var(--surface-2);
   --vxe-table-header-font-color: var(--ink-soft);
-  --vxe-table-header-font-weight: 600;
+  --vxe-table-header-font-weight: 700;
   --vxe-table-body-background-color: var(--panel);
   --vxe-table-row-hover-background-color: var(--surface-3);
   --vxe-table-row-current-background-color: var(--brand-soft);
@@ -33,15 +33,16 @@
   border-right: 1px solid var(--line);
 }
 
-/* 表头和数据行统一 40px，字号放大但不再叠加单元格外层留白。 */
+/* 表头和数据行统一 38px，字号放大但不再叠加单元格外层留白。 */
 .vxe-table .vxe-header--column {
-  height: 40px;
+  height: 38px;
   padding: 0 !important;
   font-size: 13px;
+  font-weight: 700;
 }
 
 .vxe-table .vxe-body--column {
-  height: 40px;
+  height: 38px;
   padding: 0 !important;
   font-size: 14px;
 }
