@@ -36,7 +36,7 @@ DC重构设计源码/
 
 - [施工进度「前后置依赖设置」设计补图任务书](./schedule-dependency-editor-brief.md)：补齐工序详情内的依赖摘要、独立 FS + lag 设置弹窗及冲突状态；完成后必须合入 `app.dc.html`，本文本身不替代视觉基准。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；不要从历史 PRD 或完成报告统计。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。后者是 #181 下的证据登记册，不复制页面字段规格，也不在 #183 完成前替代本页列出的视觉权威链。
 
 ## 文档放置规则
 
