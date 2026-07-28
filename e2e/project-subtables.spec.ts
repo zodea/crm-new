@@ -34,7 +34,7 @@ test('项目详情十页签：已完成页签读取 SQLite，未完成页签显�
   await expect(page.getByRole('region', { name: '收款登记' }).getByText('¥25,367,027.00', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('region', { name: '付款申请' }).getByText('¥4,200,000.00', { exact: true }).first()).toBeVisible()
 
-  for (const tab of ['支出合同管理', '往来款', '支付明细', '物资管理', '竣工验收及保修']) {
+  for (const tab of ['往来款', '支付明细', '物资管理', '竣工验收及保修']) {
     await contentTabs.getByRole('tab', { name: tab, exact: true }).click()
     await expect(page.getByRole('heading', { name: tab, exact: true })).toBeVisible()
     await expect(page.getByText('待建设', { exact: true })).toBeVisible()
