@@ -1358,8 +1358,8 @@ interface FilePayload {
 | 合同付款 | `SUM(payment_record_application_allocations.allocated_amount)`，连接已确认 `payment_records`、付款申请和支出合同后按项目过滤 |
 | 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='issued'`（界面“已发放”） |
 | 动态成本 | 五类已确认 `expenditure_settlements.totalAmount` + 已发放工资 + 已确认费用报销（§10.4） |
-| 往来收款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'receipt' AND deleted_at IS NULL` |
-| 往来付款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'payment' AND deleted_at IS NULL` |
+| 往来收款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'receipt' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
+| 往来付款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'payment' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
 | 收支差额 | 全部已确认资金流入 − 全部已确认资金流出（§10.6） |
 | 工程款余缺 | 项目合同收款 − 合同付款 |
 | 项目可用资金余额 | 项目收款 + 往来收款 − 合同付款 − 工资支付 − 往来付款 − 其他已确认流出 |

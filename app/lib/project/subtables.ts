@@ -23,8 +23,8 @@ export const PROJECT_DETAIL_TABS: readonly ProjectDetailTabDefinition[] = [
   { key: 'expenditure', label: '支出合同管理', kind: 'real' },
   { key: 'tax', label: '票税管理', kind: 'real' },
   { key: 'fund', label: '资金管理', kind: 'real' },
-  { key: 'current', label: '往来款', kind: 'placeholder' },
-  { key: 'payment', label: '支付明细', kind: 'placeholder' },
+  { key: 'current', label: '往来款', kind: 'real' },
+  { key: 'payment', label: '支付明细', kind: 'real' },
   { key: 'material', label: '物资管理', kind: 'placeholder' },
   { key: 'acceptance', label: '竣工验收及保修', kind: 'placeholder' },
 ] as const
