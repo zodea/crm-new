@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onKeyStroke, useEventListener } from '@vueuse/core'
+import { useOverlayStack, useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
 
@@ -7,6 +8,8 @@ const route = useRoute()
 const router = useRouter()
 const tabsStore = useTabsStore()
 const kit = useKitUI()
+const { hasActiveModal } = useOverlayStack()
+const ownedLayerStyle = useOwnedOverlayLayerStyle()
 
 const tabListEl = useTemplateRef<HTMLElement>('tabListEl')
 const tabEls = useTemplateRef<HTMLElement[]>('tabEl')
@@ -63,6 +66,8 @@ useEventListener(tabListEl, 'wheel', (event) => {
 const menu = shallowRef({ open: false, x: 0, y: 0, key: '' })
 
 async function showMenu(key: string, x: number, y: number) {
+  if (hasActiveModal.value)
+    return
   menu.value = {
     open: true,
     x: Math.min(x, window.innerWidth - 148),
@@ -97,6 +102,11 @@ function closeMenu(restoreFocus = false) {
       ?.focus())
   }
 }
+
+watch(hasActiveModal, (active) => {
+  if (active)
+    closeMenu()
+})
 
 function onMenuKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
@@ -207,8 +217,9 @@ onKeyStroke('Escape', () => closeMenu(true))
     <div
       v-if="menu.open"
       ref="menuEl"
-      class="shell-layer-popover fixed min-w-[136px] border border-line rounded-[var(--radius-btn)] bg-panel py-1 shadow-[var(--shadow-pop)]"
-      :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
+      data-overlay-owned
+      class="overlay-layer-owned fixed min-w-[136px] border border-line rounded-[var(--radius-btn)] bg-panel py-1 shadow-[var(--shadow-pop)]"
+      :style="[ownedLayerStyle, { left: `${menu.x}px`, top: `${menu.y}px` }]"
       role="menu"
       @click.stop
       @keydown="onMenuKeydown"

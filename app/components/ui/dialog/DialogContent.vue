@@ -37,7 +37,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 // 窗口外点遮罩仍正常关闭（#79 语义不变），Esc 不受影响（走 escapeKeyDown，非本回调）。
 const GRACE_MS = 300
 const rootContext = injectDialogRootContext()
-useModalLayerRegistration(computed(() => rootContext.modal.value && rootContext.open.value))
+const { layerStyle } = useModalLayerRegistration(computed(() => rootContext.modal.value && rootContext.open.value))
 const openedAt = ref(0)
 watch(() => rootContext.open.value, (isOpen) => {
   if (isOpen)
@@ -56,13 +56,15 @@ function onPointerDownOutside(e: PointerDownOutsideEvent) {
   <DialogPortal>
     <DialogOverlay
       data-overlay-backdrop
-      class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+      class="overlay-layer-backdrop fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
+      :style="layerStyle"
     />
     <DialogContent
       v-bind="{ ...forwarded, ...$attrs }"
       data-overlay-surface
+      :style="layerStyle"
       :class="cn(
-        'fixed left-1/2 top-1/2 z-[var(--z-overlay-surface)] -translate-x-1/2 -translate-y-1/2 border border-line bg-panel shadow-[var(--shadow-pop)] rounded-[var(--radius-card)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:dialog-in data-[state=closed]:dialog-out',
+        'overlay-layer-surface fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 border border-line bg-panel shadow-[var(--shadow-pop)] rounded-[var(--radius-card)] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:dialog-in data-[state=closed]:dialog-out',
         props.class,
       )"
       @pointer-down-outside="onPointerDownOutside"

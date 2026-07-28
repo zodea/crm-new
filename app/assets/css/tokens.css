@@ -25,8 +25,7 @@
   --tabbar-h: 40px;
 
   /* 浮层组合契约（ADR 0016）。
-     同一交互浮层平面依靠 portal DOM 顺序表达打开/嵌套顺序：
-     每组 backdrop 先于 surface，后开的所属子浮层自然覆盖来源浮层。 */
+     同一交互平面按实际模态栈分配小步进槽位；组件种类不决定高低。 */
   --z-form-footer: 15;
   --z-shell-tabbar: 19;
   --z-shell-header: 20;
@@ -36,13 +35,8 @@
   --z-overlay-backdrop: var(--z-overlay-plane);
   --z-overlay-surface: var(--z-overlay-plane);
   --z-overlay-owned: var(--z-overlay-plane);
+  --z-devtools: 8900;
   --z-toast: 9100;
-
-  /* expand 阶段兼容别名；#169–#172 迁移完成后收缩。 */
-  --z-shell-modal: var(--z-page-fullscreen);
-  --z-shell-overlay: var(--z-overlay-backdrop);
-  --z-shell-drawer: var(--z-overlay-surface);
-  --z-shell-popover: var(--z-overlay-owned);
 
   /* ADR 0013：外壳固定为设计稿浅色值；变量名保留，避免组件大范围改名。 */
   --shell-sidebar-bg: var(--panel);
@@ -127,16 +121,16 @@
   z-index: var(--z-shell-sidebar);
 }
 
-.shell-layer-overlay {
-  z-index: var(--z-shell-overlay);
+.overlay-layer-backdrop {
+  z-index: calc(var(--z-overlay-backdrop) + var(--overlay-layer-offset, 0));
 }
 
-.shell-layer-drawer {
-  z-index: var(--z-shell-drawer);
+.overlay-layer-surface {
+  z-index: calc(var(--z-overlay-surface) + var(--overlay-layer-offset, 0));
 }
 
-.shell-layer-popover {
-  z-index: var(--z-shell-popover);
+.overlay-layer-owned {
+  z-index: calc(var(--z-overlay-owned) + var(--overlay-layer-offset, 0));
 }
 
 .shell-icon-button {

@@ -14,6 +14,7 @@ import {
   ComboboxViewport,
 } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
+import { useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 import { useToast } from '~/composables/useToast'
 import {
   highlightMatch,
@@ -42,6 +43,7 @@ const emit = defineEmits<{
 }>()
 
 const model = defineModel<string | null>({ default: null })
+const ownedLayerStyle = useOwnedOverlayLayerStyle()
 const toast = useToast()
 const open = shallowRef(false)
 const query = shallowRef('')
@@ -351,7 +353,8 @@ watch(
         align="start"
         :side-offset="5"
         data-overlay-owned
-        class="z-[var(--z-overlay-owned)] min-w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[var(--radius-btn)] border border-line bg-panel shadow-[var(--shadow-pop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95"
+        class="overlay-layer-owned min-w-[var(--reka-combobox-trigger-width)] overflow-hidden rounded-[var(--radius-btn)] border border-line bg-panel shadow-[var(--shadow-pop)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95"
+        :style="ownedLayerStyle"
       >
         <ComboboxViewport class="max-h-72 overflow-y-auto p-1">
           <ComboboxGroup v-if="recentKey && recents.items.value.length > 0">

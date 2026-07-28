@@ -13,6 +13,7 @@ import {
   TabsRoot,
   TabsTrigger,
 } from 'reka-ui'
+import { useModalLayerRegistration } from '~/composables/useOverlayStack'
 import { NOTIFICATION_TYPE_META } from '~/stores/notifications'
 
 const props = defineProps<{
@@ -25,7 +26,7 @@ const emit = defineEmits<{
 
 const notificationStore = useNotificationStore()
 const { items, unreadCount } = storeToRefs(notificationStore)
-useModalLayerRegistration(toRef(props, 'open'))
+const { layerStyle } = useModalLayerRegistration(toRef(props, 'open'))
 
 const activeKind = shallowRef<NotificationKind>('todo')
 const query = shallowRef('')
@@ -72,11 +73,13 @@ async function openItem(id: string) {
     <DialogPortal>
       <DialogOverlay
         data-overlay-backdrop
-        class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        class="overlay-layer-backdrop fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        :style="layerStyle"
       />
       <DialogContent
         data-overlay-surface
-        class="fixed inset-y-0 right-0 z-[var(--z-overlay-surface)] flex h-svh w-[min(390px,100vw)] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+        class="overlay-layer-surface fixed inset-y-0 right-0 flex h-svh w-[min(390px,100vw)] flex-col border-l border-line bg-panel text-ink shadow-[var(--shadow-pop)] outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right"
+        :style="layerStyle"
       >
         <div class="flex h-[54px] shrink-0 items-center justify-between border-b border-line px-4">
           <div>

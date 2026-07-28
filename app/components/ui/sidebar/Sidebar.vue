@@ -5,6 +5,7 @@
 // theme(spacing.4) → 1rem，w-(--x) → w-[var(--x)]（UnoCSS 语法）。
 import type { SidebarProps } from '.'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
+import { useModalLayerRegistration } from '~/composables/useOverlayStack'
 import { cn } from '~/lib/utils'
 import { SIDEBAR_WIDTH_MOBILE, useSidebar } from './utils'
 
@@ -20,7 +21,7 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 })
 
 const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-useModalLayerRegistration(computed(() => isMobile.value && openMobile.value))
+const { layerStyle } = useModalLayerRegistration(computed(() => isMobile.value && openMobile.value))
 </script>
 
 <template>
@@ -37,19 +38,20 @@ useModalLayerRegistration(computed(() => isMobile.value && openMobile.value))
     <DialogPortal>
       <DialogOverlay
         data-overlay-backdrop
-        class="fixed inset-0 z-[var(--z-overlay-backdrop)] bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        class="overlay-layer-backdrop fixed inset-0 bg-[var(--overlay)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0"
+        :style="layerStyle"
       />
       <DialogContent
         data-sidebar="sidebar"
         data-mobile="true"
         data-overlay-surface
         :class="cn(
-          'fixed inset-y-0 z-[var(--z-overlay-surface)] flex h-svh w-[var(--sidebar-width)] flex-col bg-sidebar p-0 text-sidebar-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'overlay-layer-surface fixed inset-y-0 flex h-svh w-[var(--sidebar-width)] flex-col bg-sidebar p-0 text-sidebar-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
           side === 'right'
             ? 'right-0 border-l border-sidebar-border data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right'
             : 'left-0 border-r border-sidebar-border data-[state=open]:slide-in-from-left data-[state=closed]:slide-out-to-left',
         )"
-        :style="{ '--sidebar-width': SIDEBAR_WIDTH_MOBILE }"
+        :style="[layerStyle, { '--sidebar-width': SIDEBAR_WIDTH_MOBILE }]"
       >
         <DialogTitle class="sr-only">
           导航菜单
