@@ -4,12 +4,15 @@
 // + SidebarInset 主区（动作顶栏 AppTopbar + 路由页签 AppTabBar + keep-alive 页面）。
 // 页签隔离：page-key=fullPath 让每个页签是独立组件实例（表单/内部 state 互不串），
 // 配合 keepalive 缓存；滚动位置按页签 key 手动存取（滚动容器是共享的，keep-alive 不覆盖）。
+import { useScrollLock } from '@vueuse/core'
 import { pruneTabPageWrappers, tabPageCacheName } from '~/lib/tabs/page-cache'
 import { deriveKey, MAX_TABS } from '~/lib/tabs/tab-machine'
 
 const route = useRoute()
 const tabsStore = useTabsStore()
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
+const { hasActiveModal } = useOverlayStack()
+const workspaceScrollLocked = useScrollLock(scrollEl)
 const scrollPos = new Map<string, number>()
 const keepAliveNames = computed(() => {
   const invalidated = new Set(tabsStore.invalidatedKeys)
@@ -21,6 +24,15 @@ const keepAliveOptions = computed(() => ({
   include: keepAliveNames.value,
   max: MAX_TABS + 1,
 }))
+
+watch(
+  [hasActiveModal, scrollEl],
+  ([locked, workspace]) => {
+    if (workspace)
+      workspaceScrollLocked.value = locked
+  },
+  { flush: 'post', immediate: true },
+)
 
 watch(
   () => route.fullPath,

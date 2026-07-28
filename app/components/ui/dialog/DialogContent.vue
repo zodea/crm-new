@@ -11,6 +11,7 @@ import {
   useForwardPropsEmits,
 } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
+import { useModalLayerRegistration } from '~/composables/useOverlayStack'
 import { cn } from '~/lib/utils'
 
 // shadcn-vue DialogContent：portal + 遮罩（中性黑轻遮罩 --overlay = rgb(0 0 0/28%)，不上毛玻璃）+ 居中面板。
@@ -36,6 +37,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 // 窗口外点遮罩仍正常关闭（#79 语义不变），Esc 不受影响（走 escapeKeyDown，非本回调）。
 const GRACE_MS = 300
 const rootContext = injectDialogRootContext()
+useModalLayerRegistration(computed(() => rootContext.modal.value && rootContext.open.value))
 const openedAt = ref(0)
 watch(() => rootContext.open.value, (isOpen) => {
   if (isOpen)
