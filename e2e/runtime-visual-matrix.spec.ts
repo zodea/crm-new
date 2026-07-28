@@ -9,6 +9,7 @@ import {
   expectTabSequence,
   RESPONSIVE_WIDTHS,
 } from './helpers/responsive'
+import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './helpers/visual-environment'
 
 const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
   390: 844,
@@ -23,13 +24,62 @@ interface VisualSample {
   path: string | ((width: number) => string)
   prepare: (page: Page, width: number) => Promise<void>
   masks?: (page: Page, width: number) => Locator[]
+  sensitive?: (page: Page, width: number) => Locator[]
 }
 
-function stableMasks(page: Page): Locator[] {
+function stableSensitive(page: Page): Locator[] {
   return [
     page.locator('[data-shell-topbar] time'),
     page.locator('[data-shell-topbar] [class*="bg-danger"]'),
+    page.locator('[data-shell-tab][data-active="true"] [data-tab-trigger] > .truncate'),
+    page.locator('[data-shell-tabbar] [title="当前页签数量"]'),
   ]
+}
+
+function tableSensitive(page: Page): Locator[] {
+  return [
+    page.locator('.vxe-body--row .vxe-cell--label').filter({
+      hasNot: page.locator('button'),
+    }),
+    page.locator('.vxe-body--row a:not(.icon-btn)'),
+    page.locator('.vxe-body--row span.font-600'),
+    page.locator('nav[aria-label="表格分页"] > span'),
+    page.locator('nav[aria-label="表格分页"] [data-pager-page]'),
+    page.locator('nav[aria-label="表格分页"] select'),
+  ]
+}
+
+function workspaceSensitive(page: Page): Locator[] {
+  return [
+    page.getByRole('combobox'),
+    page.locator('[data-shell-workspace] .font-mono'),
+    page.locator('[data-shell-workspace] strong'),
+    page.locator('.quantity-matrix thead th:not(.quantity-matrix__corner)'),
+    page.locator('.quantity-matrix tbody th[role="rowheader"]'),
+    page.locator('[data-testid="quantity-matrix-cell"] > span'),
+  ]
+}
+
+async function redactSensitiveText(locators: Locator[]) {
+  await Promise.all(locators.map(locator =>
+    locator.evaluateAll(elements => elements.forEach(element =>
+      element.setAttribute('data-visual-sensitive', ''),
+    )),
+  ))
+}
+
+async function expectVisualEnvironment(page: Page) {
+  const actual = await page.evaluate(() => {
+    return {
+      mode: document.querySelector<HTMLMetaElement>('meta[name="ruihang-data-profile"]')?.content,
+      origin: window.location.origin,
+    }
+  })
+
+  expect(actual).toEqual({
+    mode: VISUAL_DATA_PROFILE,
+    origin: new URL(VISUAL_BASE_URL).origin,
+  })
 }
 
 const SAMPLES: VisualSample[] = [
@@ -44,19 +94,25 @@ const SAMPLES: VisualSample[] = [
         await expect(page.locator('[data-sidebar="sidebar"]').first()).toBeVisible()
     },
     masks: page => [
-      ...stableMasks(page),
       page.locator('[data-shell-workspace]'),
     ],
+    sensitive: page => stableSensitive(page),
   },
   {
     key: 'list',
     path: '/project',
     prepare: async (page) => {
       await expect(page.locator('.vxe-body--row').first()).toBeVisible()
+      await page.locator('.vxe-body--row span[class*="cell--status"], .vxe-body--row span.font-600')
+        .evaluateAll(elements => elements.forEach(element =>
+          element.setAttribute('data-visual-status', ''),
+        ))
     },
-    masks: page => [
-      ...stableMasks(page),
-      page.locator('.vxe-body--row'),
+    sensitive: page => [
+      ...stableSensitive(page),
+      ...tableSensitive(page),
+      page.locator('.vxe-body--row [data-visual-status]'),
+      page.locator('[data-shell-workspace] section.panel').first().locator('.text-12px.text-ink-soft').first(),
     ],
   },
   {
@@ -65,11 +121,24 @@ const SAMPLES: VisualSample[] = [
     prepare: async (page) => {
       await expect(page.getByRole('tablist').first()).toBeVisible()
     },
-    masks: page => [
-      ...stableMasks(page),
+    sensitive: page => [
+      ...stableSensitive(page),
+      ...tableSensitive(page),
       page.locator('[data-shell-topbar] h1'),
+      page.locator('[data-shell-workspace] h2'),
+      page.locator('[data-shell-workspace] h2').locator('xpath=../following-sibling::div[1]'),
+      page.locator('[data-shell-workspace] h2').locator('xpath=following-sibling::span[1]'),
+      page.locator('[data-shell-workspace] h2').locator('xpath=../../preceding-sibling::span[1]'),
+      page.locator('[data-shell-workspace] .info-cell > div:last-child'),
       page.locator('[data-shell-workspace] .font-mono'),
-      page.locator('[data-shell-workspace] .vxe-body--row'),
+      page.locator('[data-shell-workspace] strong'),
+      page.locator('[data-shell-workspace] .text-right'),
+      page.locator('[data-shell-workspace] section[aria-labelledby="project-phase-title"] [class*="min-w-48"]'),
+      page.locator('[data-shell-workspace] .space-y-1\\.5 > div > .chip'),
+      page.locator('[data-shell-workspace] section[aria-labelledby="project-phase-title"] button[aria-label*="文件，共"]'),
+      page.locator('[data-shell-workspace] section.panel.mb-3 .grid.gap-2 > div > span:first-child'),
+      page.locator('[data-shell-workspace] #project-file-list-title + .chip'),
+      page.locator('[data-shell-workspace] .chip-brand'),
       page.locator('[data-shell-workspace] a.cell--link'),
     ],
   },
@@ -80,7 +149,7 @@ const SAMPLES: VisualSample[] = [
       await expect(page.getByRole('heading', { name: '新建 · 项目' })).toBeVisible()
       await expect(page.getByRole('group', { name: '表单操作' })).toBeVisible()
     },
-    masks: page => stableMasks(page),
+    sensitive: page => stableSensitive(page),
   },
   {
     key: 'workspace',
@@ -88,10 +157,10 @@ const SAMPLES: VisualSample[] = [
     prepare: async (page) => {
       await expect(page.getByRole('grid', { name: '工程量楼层房号矩阵' })).toBeVisible()
     },
-    masks: page => [
-      ...stableMasks(page),
-      page.getByRole('combobox'),
-      page.getByTestId('quantity-matrix-cell'),
+    sensitive: page => [
+      ...stableSensitive(page),
+      ...workspaceSensitive(page),
+      page.getByText(/\d+\s*\/\s*\d+\s*户/),
     ],
   },
   {
@@ -107,11 +176,12 @@ const SAMPLES: VisualSample[] = [
       await page.getByRole('button', { name: '责任配置', exact: true }).click()
       await expect(page.getByRole('dialog', { name: '户 × 工种责任配置' })).toBeVisible()
     },
-    masks: (page, width) => [
-      ...stableMasks(page),
+    sensitive: (page, width) => [
+      ...stableSensitive(page),
+      ...workspaceSensitive(page),
       ...(width < 1024
-        ? []
-        : [page.getByTestId('quantity-assignment-unit-picker')]),
+        ? [page.locator('[data-shell-workspace] *')]
+        : []),
     ],
   },
 ]
@@ -140,19 +210,49 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('#184 六类运行态视觉基线', () => {
   for (const sample of SAMPLES) {
-    test(`${sample.key} 覆盖四档视口`, async ({ page }) => {
-      test.setTimeout(120_000)
-
-      for (const width of RESPONSIVE_WIDTHS) {
+    for (const width of RESPONSIVE_WIDTHS) {
+      test(`${sample.key} @ ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         const path = typeof sample.path === 'function' ? sample.path(width) : sample.path
         await page.goto(path)
         await page.waitForLoadState('networkidle')
+        await expectVisualEnvironment(page)
         await page.addStyleTag({
           content: `
             *, *::before, *::after {
               caret-color: transparent !important;
               transition-duration: 0s !important;
+            }
+            [data-visual-sensitive],
+            [data-visual-sensitive] * {
+              color: transparent !important;
+              -webkit-text-fill-color: transparent !important;
+              text-shadow: none !important;
+            }
+            [data-visual-status] {
+              position: relative;
+            }
+            [data-visual-status]::after {
+              position: absolute;
+              top: 50%;
+              left: 0;
+              width: 30px;
+              height: 4px;
+              border-radius: 999px;
+              content: "";
+              transform: translateY(-50%);
+            }
+            [data-visual-status].cell--status-warn::after {
+              background: var(--warn);
+            }
+            [data-visual-status].cell--status-ok::after {
+              background: var(--ok);
+            }
+            [data-visual-status].text-brand-deep::after {
+              background: var(--brand);
+            }
+            [data-visual-status].text-ink-soft::after {
+              background: var(--ink-faint);
             }
             nuxt-devtools-frame {
               display: none !important;
@@ -160,17 +260,25 @@ test.describe('#184 六类运行态视觉基线', () => {
           `,
         })
         await sample.prepare(page, width)
+        await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
+        if (sample.key === 'detail') {
+          await page.locator('[data-shell-workspace] section.panel [style*="width"]')
+            .evaluateAll(elements => elements.forEach((element) => {
+              if (element instanceof HTMLElement)
+                element.style.width = '50%'
+            }))
+        }
         await expectNoPageOverflow(page, `${sample.key} @ ${width}px`)
 
         await expect(page).toHaveScreenshot(`${sample.key}-${width}.png`, {
           animations: 'disabled',
           caret: 'hide',
-          mask: sample.masks?.(page, width) ?? stableMasks(page),
+          mask: sample.masks?.(page, width) ?? [],
           maskColor: MASK_COLOR,
-          maxDiffPixelRatio: 0.001,
+          maxDiffPixels: 0,
         })
-      }
-    })
+      })
+    }
   }
 })
 
