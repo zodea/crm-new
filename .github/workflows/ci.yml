@@ -9,12 +9,12 @@ on:
         default: true
         type: boolean
       run_e2e:
-        description: Run Playwright behavior tests
+        description: Run Playwright behavior tests once for a merged PR batch
         required: true
         default: false
         type: boolean
       run_visual:
-        description: Run Windows visual regression tests
+        description: Run Windows visual regression once for a merged PR batch
         required: true
         default: false
         type: boolean
@@ -24,7 +24,7 @@ on:
         default: false
         type: boolean
       base_sha:
-        description: Optional lint diff base; defaults to HEAD^
+        description: Previous validated batch SHA used as lint diff base; defaults to HEAD^
         required: false
         type: string
       e2e_targets:

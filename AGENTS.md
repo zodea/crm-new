@@ -72,7 +72,7 @@ Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-trac
 
 修 bug 时先建立能失败的复现；界面修改除行为断言外还要验证实际视口、滚动边界、键盘焦点与浮层层次。不要用静态源码检查替代运行态验收。
 
-GitHub Actions 只手动按需调用；调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
+GitHub Actions 只手动按需调用；单个 PR 不运行 E2E/Visual，一批 PR 合并完成后才按批次手动运行一次。调用前必须先估算 runner-minutes、说明所选套件并等待用户确认。选择规则与费用基线见 [`docs/agents/ci-usage.md`](docs/agents/ci-usage.md)。
 
 ## 5. 文档纪律
 
