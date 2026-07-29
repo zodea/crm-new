@@ -7,6 +7,10 @@ import {
   softDelete,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import {
+  effectiveMasterDataCapabilities,
+  parseCapabilityColumn,
+} from '~/lib/master-data/capabilities'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 
@@ -105,6 +109,8 @@ export type CrewAssignmentLevel = 'crew' | 'worker'
 export interface CrewFormDraft extends FormIdentity {
   name?: string
   trade?: string
+  capabilityTrades?: string[]
+  capabilityItems?: string[]
   contactName?: string
   contactPhone?: string
   defaultPayRatio?: number | null
@@ -129,6 +135,8 @@ export interface WorkerFormDraft extends FormIdentity {
   bankAccount?: string
   bankCode?: string
   trade?: string
+  capabilityTrades?: string[]
+  capabilityItems?: string[]
   skillLevel?: string
   dailyWage?: number | null
   crewId?: string | null
@@ -465,6 +473,11 @@ export async function saveCrewForm(
     throw new Error('房租补贴单价：为必填项（共 1 处）')
   if (action !== 'draft' && draft.mgmtFeeEnabled && nullableNumber(draft.mgmtFeePrice) == null)
     throw new Error('管理提成单价：为必填项（共 1 处）')
+  const capabilities = effectiveMasterDataCapabilities(
+    draft.trade,
+    draft.capabilityTrades ?? [],
+    draft.capabilityItems ?? [],
+  )
 
   return persistForm({
     ownerType: 'crew',
@@ -474,6 +487,8 @@ export async function saveCrewForm(
   }, draft.id, {
     name: text(draft.name),
     trade: text(draft.trade),
+    trade_capabilities: JSON.stringify(capabilities.trades),
+    item_capabilities: JSON.stringify(capabilities.itemNames),
     contact_name: text(draft.contactName),
     contact_phone: text(draft.contactPhone),
     default_pay_ratio: nullableNumber(draft.defaultPayRatio) ?? 0.95,
@@ -516,6 +531,11 @@ export async function saveWorkerForm(
     ])
   }
   assertNonNegative('参考日工资', draft.dailyWage)
+  const capabilities = effectiveMasterDataCapabilities(
+    draft.trade,
+    draft.capabilityTrades ?? [],
+    draft.capabilityItems ?? [],
+  )
 
   return withTransaction(async (tx) => {
     if (action !== 'draft' || draft.crewId)
@@ -538,6 +558,8 @@ export async function saveWorkerForm(
       emergency_contact: text(draft.emergencyContact),
       emergency_phone: text(draft.emergencyPhone),
       trade: text(draft.trade),
+      trade_capabilities: JSON.stringify(capabilities.trades),
+      item_capabilities: JSON.stringify(capabilities.itemNames),
       skill_level: text(draft.skillLevel),
       daily_wage: nullableNumber(draft.dailyWage),
       current_project_id: nullableText(draft.currentProjectId),
@@ -789,10 +811,18 @@ function customerFromRow(row: Record<string, unknown>): CustomerFormDraft & { id
 }
 
 function crewFromRow(row: Record<string, unknown>): CrewFormDraft & { id: string } {
+  const primaryTrade = rawText(row.trade)
+  const capabilities = effectiveMasterDataCapabilities(
+    primaryTrade,
+    parseCapabilityColumn(row.trade_capabilities),
+    parseCapabilityColumn(row.item_capabilities),
+  )
   return {
     id: row.id as string,
     name: rawText(row.name),
-    trade: rawText(row.trade),
+    trade: primaryTrade,
+    capabilityTrades: capabilities.trades.filter(trade => trade !== primaryTrade),
+    capabilityItems: capabilities.itemNames,
     contactName: rawText(row.contact_name),
     contactPhone: rawText(row.contact_phone),
     defaultPayRatio: nullableNumber(row.default_pay_ratio),
@@ -807,6 +837,12 @@ function crewFromRow(row: Record<string, unknown>): CrewFormDraft & { id: string
 }
 
 function workerFromRow(row: Record<string, unknown>): WorkerFormDraft & { id: string } {
+  const primaryTrade = rawText(row.trade)
+  const capabilities = effectiveMasterDataCapabilities(
+    primaryTrade,
+    parseCapabilityColumn(row.trade_capabilities),
+    parseCapabilityColumn(row.item_capabilities),
+  )
   return {
     id: row.id as string,
     crewId: nullableText(row.crew_id),
@@ -817,7 +853,9 @@ function workerFromRow(row: Record<string, unknown>): WorkerFormDraft & { id: st
     hometown: rawText(row.hometown),
     emergencyContact: rawText(row.emergency_contact),
     emergencyPhone: rawText(row.emergency_phone),
-    trade: rawText(row.trade),
+    trade: primaryTrade,
+    capabilityTrades: capabilities.trades.filter(trade => trade !== primaryTrade),
+    capabilityItems: capabilities.itemNames,
     skillLevel: rawText(row.skill_level),
     dailyWage: nullableNumber(row.daily_wage),
     currentProjectId: nullableText(row.current_project_id),

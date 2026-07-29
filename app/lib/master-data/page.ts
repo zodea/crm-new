@@ -134,6 +134,8 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
     case 'crew':
       return {
         ...common,
+        capabilityTrades: [],
+        capabilityItems: [],
         defaultPayRatio: 0.95,
         rentSubsidyEnabled: false,
         mgmtFeeEnabled: false,
@@ -143,6 +145,8 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
     case 'worker':
       return {
         ...common,
+        capabilityTrades: [],
+        capabilityItems: [],
         crewId: null,
         currentProjectId: null,
         familyGroupId: null,

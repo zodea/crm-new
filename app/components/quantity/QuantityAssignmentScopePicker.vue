@@ -9,15 +9,24 @@ const props = withDefaults(defineProps<{
   units: readonly QuantityAssignmentWorkspaceUnit[]
   options: readonly QuantityAssignmentScopeOption[]
   trade: string
+  allowedItemNames?: readonly string[]
   disabled?: boolean
 }>(), {
+  allowedItemNames: () => [],
   disabled: false,
 })
 
 const selectedScopeKeys = defineModel<string[]>({ required: true })
 
 function optionsFor(unit: QuantityAssignmentWorkspaceUnit): QuantityAssignmentScopeOption[] {
-  return props.options.filter(option => option.templateId === unit.templateId && option.trade === props.trade)
+  return props.options.filter(option => (
+    option.templateId === unit.templateId
+    && option.trade === props.trade
+    && (
+      !props.allowedItemNames.length
+      || props.allowedItemNames.includes(option.itemName)
+    )
+  ))
 }
 
 function optionKey(unitId: string, option: QuantityAssignmentScopeOption): string {

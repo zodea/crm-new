@@ -4415,6 +4415,42 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    // 存量只维护单一 trade；回填为能力列表后仍保留 trade 作为主工种与旧查询兼容字段。
+    version: 26,
+    name: 'crew-worker-capabilities',
+    async up(db) {
+      for (const table of ['crews', 'workers'] as const) {
+        await addColumnIfMissing(db, table, 'trade_capabilities', `TEXT NOT NULL DEFAULT '[]'`)
+        await addColumnIfMissing(db, table, 'item_capabilities', `TEXT NOT NULL DEFAULT '[]'`)
+        const rows = await db.select<{
+          id: string
+          trade: string | null
+          trade_capabilities: string | null
+        }>(`
+          SELECT id, trade, trade_capabilities
+          FROM ${table}
+        `)
+        for (const row of rows) {
+          const primaryTrade = row.trade?.trim() ?? ''
+          let configured: unknown = []
+          try {
+            configured = JSON.parse(row.trade_capabilities || '[]')
+          }
+          catch {
+            configured = []
+          }
+          if (Array.isArray(configured) && configured.length > 0)
+            continue
+          await db.execute(`
+            UPDATE ${table}
+            SET trade_capabilities = ?
+            WHERE id = ?
+          `, [JSON.stringify(primaryTrade ? [primaryTrade] : []), row.id])
+        }
+      }
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

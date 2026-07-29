@@ -42,6 +42,11 @@ function fieldClass(field: keyof CrewFormDraft) {
         <input v-model="draft.contactPhone" :class="fieldClass('contactPhone')" data-field="contactPhone" @input="emit('clearError', 'contactPhone')">
         <span v-if="fieldErrors.contactPhone" class="field-error">{{ fieldErrors.contactPhone }}</span>
       </label>
+      <MasterDataCapabilityFields
+        v-model:trades="draft.capabilityTrades"
+        v-model:items="draft.capabilityItems"
+        :primary-trade="draft.trade"
+      />
     </div>
   </section>
 

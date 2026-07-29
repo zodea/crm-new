@@ -106,6 +106,11 @@ function fieldClass(field: keyof WorkerFormDraft) {
         <span class="field-label">亲属组 ID</span>
         <input v-model="draft.familyGroupId" class="field-input w-full">
       </label>
+      <MasterDataCapabilityFields
+        v-model:trades="draft.capabilityTrades"
+        v-model:items="draft.capabilityItems"
+        :primary-trade="draft.trade"
+      />
     </div>
   </section>
 
