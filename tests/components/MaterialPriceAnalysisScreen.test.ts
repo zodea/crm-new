@@ -132,6 +132,9 @@ describe('materialPriceAnalysisScreen', () => {
     expect(within(official).getByText('¥2,046.92/千米')).not.toBeNull()
     expect(within(official).getByText('已换算 ¥2.04692/m')).not.toBeNull()
     expect(within(official).getByText('+36.79%')).not.toBeNull()
+    expect(within(official).getByText('信息价环比')).not.toBeNull()
+    expect(within(official).getByText('-0.47%')).not.toBeNull()
+    expect(within(official).getByText(/-¥0\.00958\/m · 较 2026-05/)).not.toBeNull()
     expect(within(official).getByText(/信息价是市场综合参考，不是政府定价/)).not.toBeNull()
     expect(screen.getAllByText('广州官方信息价')).toHaveLength(2)
 

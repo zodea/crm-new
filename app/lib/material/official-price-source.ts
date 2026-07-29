@@ -46,6 +46,13 @@ export interface OfficialMarketDeviation {
   rate: number
 }
 
+export interface OfficialPriceMonthlyChange {
+  previousMonth: string
+  currentMonth: string
+  amount: number
+  rate: number
+}
+
 export interface OfficialMaterialPriceImportRow {
   sourceId: string
   category: string
@@ -281,5 +288,25 @@ export function calculateOfficialMarketDeviation(
     officialPrice,
     amount,
     rate: amount / officialPrice,
+  }
+}
+
+export function calculateLatestOfficialPriceChange(
+  series: OfficialMaterialPriceSeries | null,
+): OfficialPriceMonthlyChange | null {
+  if (!series || series.points.length < 2)
+    return null
+
+  const previous = series.points.at(-2)
+  const current = series.points.at(-1)
+  if (!previous || !current || previous.price <= 0)
+    return null
+
+  const amount = current.price - previous.price
+  return {
+    previousMonth: previous.month,
+    currentMonth: current.month,
+    amount,
+    rate: amount / previous.price,
   }
 }

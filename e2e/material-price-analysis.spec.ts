@@ -143,6 +143,8 @@ test.describe('材料单价分析真实价格事实', () => {
     await expect(page.getByRole('heading', { name: 'BV 电线 · 2.5 mm²' })).toBeVisible()
     await expect(page.getByText('官方与市场趋势', { exact: true })).toBeVisible()
     await expect(page.getByRole('img', { name: 'BV 电线 2.5 mm² 价格趋势图' })).toBeVisible()
+    await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('信息价环比')).toBeVisible()
+    await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('-0.47%')).toBeVisible()
     await page.getByText(/查看全部 \d+ 个价格来源/).click()
     await expect(page.getByRole('link', { name: /XS-TREND-002/ })).toHaveAttribute(
       'href',

@@ -5,7 +5,10 @@ import type {
   OfficialMaterialPriceSeries,
 } from '~/lib/material/official-price-source'
 import { computed } from 'vue'
-import { GUANGZHOU_OFFICIAL_PRICE_SOURCE } from '~/lib/material/official-price-source'
+import {
+  calculateLatestOfficialPriceChange,
+  GUANGZHOU_OFFICIAL_PRICE_SOURCE,
+} from '~/lib/material/official-price-source'
 
 const props = defineProps<{
   category: OfficialMaterialCategory
@@ -14,6 +17,7 @@ const props = defineProps<{
 }>()
 
 const latestPoint = computed(() => props.series?.points.at(-1) ?? null)
+const monthlyChange = computed(() => calculateLatestOfficialPriceChange(props.series))
 
 function money(value: number, digits = 2): string {
   return `¥${value.toLocaleString('zh-CN', {
@@ -23,8 +27,8 @@ function money(value: number, digits = 2): string {
 }
 
 function signedMoney(value: number): string {
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${money(value, 5)}`
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${money(Math.abs(value), 5)}`
 }
 
 function signedPercent(value: number): string {
@@ -91,6 +95,20 @@ function signedPercent(value: number): string {
           </span>
         </div>
         <div class="info-cell">
+          <span class="text-11px text-ink-soft">信息价环比</span>
+          <strong
+            v-if="monthlyChange"
+            class="mt-1 block font-mono text-14px"
+            :class="monthlyChange.rate > 0 ? 'text-warn' : monthlyChange.rate < 0 ? 'text-ok' : 'text-ink'"
+          >
+            {{ signedPercent(monthlyChange.rate) }}
+          </strong>
+          <span v-else class="mt-1 block text-12px text-ink-faint">至少需要两期</span>
+          <span v-if="monthlyChange" class="mt-0.5 block text-10px text-ink-faint">
+            {{ signedMoney(monthlyChange.amount) }}/{{ series.identity.normalizedUnit }} · 较 {{ monthlyChange.previousMonth }}
+          </span>
+        </div>
+        <div class="info-cell">
           <span class="text-11px text-ink-soft">最新发布期</span>
           <strong class="mt-1 block font-mono text-14px text-ink">{{ latestPoint.month }}</strong>
           <a
@@ -135,7 +153,7 @@ function signedPercent(value: number): string {
 
 .official-price__facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
 }

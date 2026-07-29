@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  calculateLatestOfficialPriceChange,
   calculateOfficialMarketDeviation,
   classifyOfficialMaterialCategory,
   OFFICIAL_MATERIAL_CATEGORIES,
@@ -122,6 +123,15 @@ describe('材料单价分析', () => {
     expect(deviation?.amount).toBeCloseTo(0.75308, 5)
     expect(deviation?.rate).toBeCloseTo(0.75308 / 2.04692, 8)
     expect(calculateOfficialMarketDeviation(430, null)).toBeNull()
+
+    const monthlyChange = calculateLatestOfficialPriceChange(series)
+    expect(monthlyChange).toMatchObject({
+      previousMonth: '2026-05',
+      currentMonth: '2026-06',
+    })
+    expect(monthlyChange?.amount).toBeCloseTo(-0.00958, 5)
+    expect(monthlyChange?.rate).toBeCloseTo(-0.00958 / 2.0565, 8)
+    expect(calculateLatestOfficialPriceChange(null)).toBeNull()
   })
 
   it('只把已归档、已明确分供方且单价有效的材料行归一为价格事实', () => {
