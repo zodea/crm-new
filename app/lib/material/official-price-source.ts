@@ -1,3 +1,5 @@
+import { parseWireMaterialIdentity } from './wire-identity'
+
 export interface OfficialMaterialCategory {
   id: string
   order: number
@@ -11,6 +13,8 @@ export interface OfficialMaterialIdentity {
   materialCode: string
   materialName: string
   model: string
+  cores: number
+  sectionMm2: number
   spec: string
   sourceUnit: string
   normalizedUnit: string
@@ -126,7 +130,9 @@ const BV_2_5_IDENTITY: OfficialMaterialIdentity = {
   materialCode: '280304800070120011',
   materialName: '铜芯聚氯乙烯绝缘电线 BV',
   model: 'BV',
-  spec: '2.5 mm²',
+  cores: 1,
+  sectionMm2: 2.5,
+  spec: '1×2.5 mm²',
   sourceUnit: '千米',
   normalizedUnit: 'm',
   lookupKey: 'guangzhou-cost-station::280304800070120011::2.5mm²::m',
@@ -200,13 +206,6 @@ function normalizeIdentityText(value: string): string {
     .trim()
 }
 
-function normalizeSpec(value: string): string {
-  return normalizeIdentityText(value)
-    .toLocaleLowerCase('zh-CN')
-    .replace(/\s+/g, '')
-    .replace(/㎡|m²|mm²|mm2/g, matched => matched.startsWith('m') && !matched.startsWith('mm') ? 'm²' : 'mm²')
-}
-
 function normalizeUnit(value: string): string {
   const unit = normalizeIdentityText(value).toLocaleLowerCase('zh-CN')
   if (['m', '米'].includes(unit))
@@ -220,11 +219,6 @@ function normalizeUnit(value: string): string {
   if (['t', '吨'].includes(unit))
     return '吨'
   return unit
-}
-
-function isBvModel(name: string): boolean {
-  const normalized = normalizeIdentityText(name).toUpperCase()
-  return /(?:^|[^A-Z0-9])BV(?:[^A-Z0-9]|$)/.test(normalized)
 }
 
 export function officialMaterialCategoryById(id: string): OfficialMaterialCategory {
@@ -245,11 +239,17 @@ export function classifyOfficialMaterialCategory(
 export function resolveOfficialMaterialIdentity(
   material: OfficialMaterialMatchInput,
 ): OfficialMaterialIdentity | null {
-  const spec = normalizeSpec(material.spec)
+  const wireIdentity = parseWireMaterialIdentity(material)
   const unit = normalizeUnit(material.unit)
 
-  if (isBvModel(material.name) && spec === '2.5mm²' && unit === 'm')
+  if (
+    wireIdentity?.model === 'BV'
+    && wireIdentity.cores === 1
+    && wireIdentity.sectionMm2 === 2.5
+    && unit === 'm'
+  ) {
     return BV_2_5_IDENTITY
+  }
 
   return null
 }

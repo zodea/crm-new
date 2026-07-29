@@ -119,9 +119,9 @@ describe('materialPriceAnalysisScreen', () => {
     const wire = within(catalog).getByRole('option', { name: /BV 电线.*2\.5 mm².*m/ })
     await fireEvent.click(wire)
 
-    expect(screen.getByRole('heading', { name: 'BV 电线 · 2.5 mm²' })).not.toBeNull()
+    expect(screen.getByRole('heading', { name: 'BV 电线 · 1×2.5 mm²' })).not.toBeNull()
     expect(screen.getByText('官方与市场趋势')).not.toBeNull()
-    expect(screen.getByRole('img', { name: 'BV 电线 2.5 mm² 价格趋势图' })).not.toBeNull()
+    expect(screen.getByRole('img', { name: 'BV 电线 1×2.5 mm² 价格趋势图' })).not.toBeNull()
     expect(screen.getByRole('link', { name: /XS-002/ })).not.toBeNull()
     expect(
       screen.getByRole('link', { name: '查看广州官方价格信息' }).getAttribute('href'),
@@ -150,6 +150,30 @@ describe('materialPriceAnalysisScreen', () => {
     expect(screen.getByText('最低价')).not.toBeNull()
     expect(screen.getAllByText('¥410.00').length).toBeGreaterThan(0)
     expect(screen.getByText('价差')).not.toBeNull()
+  })
+
+  it('使用等价截面写法搜索时都能找到同一电线材料', async () => {
+    render(MaterialPriceAnalysisScreen, {
+      props: {
+        records,
+        suppliers,
+        projects,
+        contracts,
+      },
+      global,
+    })
+
+    const search = screen.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
+
+    await fireEvent.update(search, '2.5mm2')
+    expect(
+      screen.getByRole('option', { name: /BV 电线.*1×2\.5 mm².*m/ }),
+    ).not.toBeNull()
+
+    await fireEvent.update(search, '1×2.5 mm²')
+    expect(
+      screen.getByRole('option', { name: /BV 电线.*1×2\.5 mm².*m/ }),
+    ).not.toBeNull()
   })
 
   it('支持按官方材料大类过滤材料，但分类不会伪造官方价格', async () => {

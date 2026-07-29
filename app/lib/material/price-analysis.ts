@@ -6,6 +6,7 @@ import {
   classifyOfficialMaterialCategory,
   resolveOfficialMaterialIdentity,
 } from './official-price-source'
+import { parseWireMaterialIdentity } from './wire-identity'
 
 export interface DeliveryPriceLineInput {
   id: string
@@ -44,7 +45,7 @@ export interface MaterialPriceFact {
 
 export interface MaterialPriceCatalogItem {
   key: string
-  /** 稳定的“名称+规格+单位”归一键，供后续官方信息价事实源做只读匹配。 */
+  /** 稳定材料身份键；电线使用“型号+芯数+截面+单位”，其他材料使用“名称+规格+单位”。 */
   officialPriceLookupKey: string
   /** 官方月刊大类；分类只用于检索，不代表已有官方价格。 */
   category: OfficialMaterialCategory
@@ -117,10 +118,11 @@ function normalizeText(value: string): string {
     .trim()
 }
 
-function identityText(value: string): string {
+export function normalizeMaterialIdentityText(value: string): string {
   return normalizeText(value)
     .toLocaleLowerCase('zh-CN')
     .replace(/\s+/g, '')
+    .replace(/[×✕*]/g, 'x')
     .replace(/m2/g, 'm²')
     .replace(/m3/g, 'm³')
 }
@@ -132,9 +134,11 @@ function normalizeMaterialSpec(value: string): string {
 }
 
 export function normalizeMaterialUnit(value: string): string {
-  const unit = identityText(value)
+  const unit = normalizeMaterialIdentityText(value)
   if (['m', '米'].includes(unit))
     return 'm'
+  if (['km', '千米', '公里'].includes(unit))
+    return 'km'
   if (['m²', '㎡', '平方米', '平方'].includes(unit))
     return '㎡'
   if (['m³', '立方米', '立方', '方'].includes(unit))
@@ -148,9 +152,9 @@ export function normalizeMaterialUnit(value: string): string {
 
 function materialKey(name: string, spec: string, unit: string): string {
   return [
-    identityText(name),
-    identityText(spec),
-    identityText(normalizeMaterialUnit(unit)),
+    normalizeMaterialIdentityText(name),
+    normalizeMaterialIdentityText(spec),
+    normalizeMaterialIdentityText(normalizeMaterialUnit(unit)),
   ].join('::')
 }
 
@@ -185,20 +189,32 @@ export function buildMaterialPriceCatalog(
 
       const spec = normalizeMaterialSpec(line.spec)
       const unit = normalizeMaterialUnit(line.unit)
-      const key = materialKey(name, spec, unit)
-      const officialMatchInput = { name, spec, unit }
+      const wireIdentity = parseWireMaterialIdentity({ name, spec })
+      const normalizedName = wireIdentity?.displayName ?? name
+      const normalizedSpec = wireIdentity?.displaySpec ?? spec
+      const key = wireIdentity
+        ? `${wireIdentity.key}::${normalizeMaterialIdentityText(unit)}`
+        : materialKey(normalizedName, normalizedSpec, unit)
+      const officialMatchInput = {
+        name: normalizedName,
+        spec: normalizedSpec,
+        unit,
+      }
+      const aliasSearchText = normalizeMaterialIdentityText(materialLabel(name, spec, unit))
       const item = byMaterial.get(key) ?? {
         key,
         officialPriceLookupKey: key,
         category: classifyOfficialMaterialCategory(officialMatchInput),
         officialIdentity: resolveOfficialMaterialIdentity(officialMatchInput),
-        name,
-        spec,
+        name: normalizedName,
+        spec: normalizedSpec,
         unit,
-        label: materialLabel(name, spec, unit),
-        searchText: identityText(materialLabel(name, spec, unit)),
+        label: materialLabel(normalizedName, normalizedSpec, unit),
+        searchText: normalizeMaterialIdentityText(materialLabel(normalizedName, normalizedSpec, unit)),
         facts: [],
       }
+      if (!item.searchText.includes(aliasSearchText))
+        item.searchText = `${item.searchText} ${aliasSearchText}`
       item.facts.push({
         id: `${record.id}:${line.id}`,
         deliveryRecordId: record.id,

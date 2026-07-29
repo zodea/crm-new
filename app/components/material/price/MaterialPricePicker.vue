@@ -2,6 +2,7 @@
 import type { MaterialPriceCatalogItem } from '~/lib/material/price-analysis'
 import { computed, shallowRef, watch } from 'vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
+import { normalizeMaterialIdentityText } from '~/lib/material/price-analysis'
 
 const props = defineProps<{
   materials: readonly MaterialPriceCatalogItem[]
@@ -21,20 +22,13 @@ const categories = computed(() => {
 })
 
 const filteredMaterials = computed(() => {
-  const needle = query.value
-    .normalize('NFKC')
-    .toLocaleLowerCase('zh-CN')
-    .replace(/\s+/g, '')
-    .trim()
+  const needle = normalizeMaterialIdentityText(query.value)
   return props.materials.filter((material) => {
     const categoryMatched = selectedCategoryId.value === 'all'
       || material.category.id === selectedCategoryId.value
     const searchMatched = !needle
       || material.searchText.includes(needle)
-      || material.category.name
-        .toLocaleLowerCase('zh-CN')
-        .replace(/\s+/g, '')
-        .includes(needle)
+      || normalizeMaterialIdentityText(material.category.name).includes(needle)
     return categoryMatched && searchMatched
   })
 })

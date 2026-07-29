@@ -12,6 +12,7 @@ import {
   buildMaterialPriceCatalog,
   buildSupplierContractRows,
 } from '~/lib/material/price-analysis'
+import { parseWireMaterialIdentity } from '~/lib/material/wire-identity'
 
 const suppliers = [
   { id: 'supplier-a', name: '甲厂' },
@@ -48,6 +49,248 @@ function delivery(
 }
 
 describe('材料单价分析', () => {
+  it('把 BV 全称、简称及常见单芯截面写法解析为同一稳定身份', () => {
+    expect([
+      parseWireMaterialIdentity({
+        name: '铜芯聚氯乙烯绝缘电线',
+        spec: '2.5',
+      }),
+      parseWireMaterialIdentity({
+        name: 'BV 电线 2.5mm2',
+        spec: '',
+      }),
+      parseWireMaterialIdentity({
+        name: 'BV',
+        spec: '1×2.5',
+      }),
+      parseWireMaterialIdentity({
+        name: 'BV1*2.5',
+        spec: '',
+      }),
+    ]).toEqual(Array.from({ length: 4 }, () => ({
+      model: 'BV',
+      cores: 1,
+      sectionMm2: 2.5,
+      key: 'wire::BV::1x2.5mm2',
+      displayName: 'BV 电线',
+      displaySpec: '1×2.5 mm²',
+    })))
+  })
+
+  it('规格栏为空时可从名称中的 BV 与裸截面解析身份', () => {
+    expect(parseWireMaterialIdentity({
+      name: 'BV 2.5',
+      spec: '',
+    })).toEqual({
+      model: 'BV',
+      cores: 1,
+      sectionMm2: 2.5,
+      key: 'wire::BV::1x2.5mm2',
+      displayName: 'BV 电线',
+      displaySpec: '1×2.5 mm²',
+    })
+  })
+
+  it('为 BVR 与 YJV 形成各自稳定身份，且不与同截面 BV 合并', () => {
+    expect([
+      parseWireMaterialIdentity({ name: 'BVR 软电线', spec: '1×2.5 mm²' }),
+      parseWireMaterialIdentity({ name: '铜芯聚氯乙烯绝缘软电线', spec: '2.5' }),
+    ]).toEqual(Array.from({ length: 2 }, () => ({
+      model: 'BVR',
+      cores: 1,
+      sectionMm2: 2.5,
+      key: 'wire::BVR::1x2.5mm2',
+      displayName: 'BVR 电线',
+      displaySpec: '1×2.5 mm²',
+    })))
+
+    expect(parseWireMaterialIdentity({
+      name: 'YJV 铜芯交联聚乙烯绝缘电力电缆',
+      spec: '3*2.5mm2',
+    })).toEqual({
+      model: 'YJV',
+      cores: 3,
+      sectionMm2: 2.5,
+      key: 'wire::YJV::3x2.5mm2',
+      displayName: 'YJV 电缆',
+      displaySpec: '3×2.5 mm²',
+    })
+  })
+
+  it('不把阻燃、耐火或铠装型号变体解析为普通 BV/YJV', () => {
+    expect(parseWireMaterialIdentity({
+      name: 'ZR-BV 电线',
+      spec: '1×2.5 mm²',
+    })).toBeNull()
+    expect(parseWireMaterialIdentity({
+      name: 'NH-BV 电线',
+      spec: '2.5mm2',
+    })).toBeNull()
+    expect(parseWireMaterialIdentity({
+      name: 'YJV22 电缆',
+      spec: '4×25 mm²',
+    })).toBeNull()
+  })
+
+  it('不把 YJV 复合截面规格截断后并入单一截面材料', () => {
+    expect(parseWireMaterialIdentity({
+      name: 'YJV 电缆',
+      spec: '4×25+1×16 mm²',
+    })).toBeNull()
+  })
+
+  it('材料目录按规范电线身份归并别名，同时隔离不同型号', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('bv-full-name', 'supplier-a', '2026-04-01', [
+        {
+          id: 'line-bv-full',
+          materialName: '铜芯聚氯乙烯绝缘电线',
+          spec: '2.5',
+          unit: '米',
+          unitPrice: 2.5,
+        },
+      ]),
+      delivery('bv-short-name', 'supplier-a', '2026-05-01', [
+        {
+          id: 'line-bv-short',
+          materialName: 'BV1*2.5',
+          spec: '',
+          unit: 'm',
+          unitPrice: 2.8,
+        },
+      ]),
+      delivery('bvr', 'supplier-b', '2026-05-02', [
+        {
+          id: 'line-bvr',
+          materialName: 'BVR 电线',
+          spec: '1×2.5 mm²',
+          unit: '米',
+          unitPrice: 3.1,
+        },
+      ]),
+    ], suppliers, projects)
+
+    expect(catalog).toHaveLength(2)
+    expect(catalog.find(material => material.name === 'BV 电线')).toMatchObject({
+      key: 'wire::BV::1x2.5mm2::m',
+      name: 'BV 电线',
+      spec: '1×2.5 mm²',
+      unit: 'm',
+      facts: [
+        { deliveryRecordId: 'bv-full-name', price: 2.5 },
+        { deliveryRecordId: 'bv-short-name', price: 2.8 },
+      ],
+    })
+    expect(catalog.find(material => material.name === 'BVR 电线')).toMatchObject({
+      key: 'wire::BVR::1x2.5mm2::m',
+      facts: [{ deliveryRecordId: 'bvr', price: 3.1 }],
+    })
+  })
+
+  it('型号变体在目录中保持独立，且不关联普通 BV 官方价格', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('bv', 'supplier-a', '2026-05-01', [{
+        id: 'line-bv',
+        materialName: 'BV 电线',
+        spec: '1×2.5 mm²',
+        unit: 'm',
+        unitPrice: 2.5,
+      }]),
+      delivery('zr-bv', 'supplier-a', '2026-05-02', [{
+        id: 'line-zr-bv',
+        materialName: 'ZR-BV 电线',
+        spec: '1×2.5 mm²',
+        unit: 'm',
+        unitPrice: 2.8,
+      }]),
+      delivery('nh-bv', 'supplier-b', '2026-05-03', [{
+        id: 'line-nh-bv',
+        materialName: 'NH-BV 电线',
+        spec: '2.5mm2',
+        unit: 'm',
+        unitPrice: 3,
+      }]),
+      delivery('yjv', 'supplier-b', '2026-05-04', [{
+        id: 'line-yjv',
+        materialName: 'YJV 电缆',
+        spec: '4×25 mm²',
+        unit: 'm',
+        unitPrice: 80,
+      }]),
+      delivery('yjv22', 'supplier-b', '2026-05-05', [{
+        id: 'line-yjv22',
+        materialName: 'YJV22 电缆',
+        spec: '4×25 mm²',
+        unit: 'm',
+        unitPrice: 90,
+      }]),
+      delivery('yjv-composite', 'supplier-b', '2026-05-06', [{
+        id: 'line-yjv-composite',
+        materialName: 'YJV 电缆',
+        spec: '4×25+1×16 mm²',
+        unit: 'm',
+        unitPrice: 100,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toHaveLength(6)
+    expect(catalog.find(material => material.name === 'BV 电线')?.officialIdentity)
+      .toMatchObject({ materialCode: '280304800070120011' })
+    for (const variantName of ['ZR-BV 电线', 'NH-BV 电线', 'YJV22 电缆']) {
+      expect(catalog.find(material => material.name === variantName)?.officialIdentity)
+        .toBeNull()
+    }
+    expect(catalog.find(material => material.name === 'YJV 电缆')?.key)
+      .not
+      .toBe(catalog.find(material => material.name === 'YJV22 电缆')?.key)
+    expect(catalog.find(material => material.spec === '4×25+1×16 mm²')?.key)
+      .not
+      .toBe(catalog.find(material => material.spec === '4×25 mm²')?.key)
+  })
+
+  it('米与 m、千米与 km 分别归并，但不跨量级合并或改价', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('meter-cn', 'supplier-a', '2026-04-01', [{
+        id: 'line-meter-cn',
+        materialName: 'BV 电线',
+        spec: '2.5mm2',
+        unit: '米',
+        unitPrice: 2.5,
+      }]),
+      delivery('meter-en', 'supplier-b', '2026-04-02', [{
+        id: 'line-meter-en',
+        materialName: '铜芯聚氯乙烯绝缘电线',
+        spec: '1×2.5',
+        unit: 'm',
+        unitPrice: 2.6,
+      }]),
+      delivery('kilometer', 'supplier-c', '2026-04-03', [{
+        id: 'line-kilometer',
+        materialName: 'BV1*2.5',
+        spec: '',
+        unit: '千米',
+        unitPrice: 2500,
+      }]),
+      delivery('kilometer-en', 'supplier-a', '2026-04-04', [{
+        id: 'line-kilometer-en',
+        materialName: 'BV 电线',
+        spec: '1×2.5 mm²',
+        unit: 'km',
+        unitPrice: 2600,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toHaveLength(2)
+    expect(catalog.find(material => material.unit === 'm')?.facts).toHaveLength(2)
+    expect(catalog.find(material => material.unit === 'km')).toMatchObject({
+      key: 'wire::BV::1x2.5mm2::km',
+      facts: [
+        { price: 2500 },
+        { price: 2600 },
+      ],
+    })
+  })
+
   it('提供官方月刊十二大类，但只有核实过的编码规格单位才关联价格', () => {
     expect(OFFICIAL_MATERIAL_CATEGORIES).toHaveLength(12)
     expect(OFFICIAL_MATERIAL_CATEGORIES.map(category => category.name)).toContain('电线电缆')
@@ -74,7 +317,9 @@ describe('材料单价分析', () => {
     })).toMatchObject({
       materialCode: '280304800070120011',
       model: 'BV',
-      spec: '2.5 mm²',
+      cores: 1,
+      sectionMm2: 2.5,
+      spec: '1×2.5 mm²',
       sourceUnit: '千米',
       normalizedUnit: 'm',
     })
@@ -82,6 +327,21 @@ describe('材料单价分析', () => {
       name: 'BVR 电线',
       spec: '2.5 mm²',
       unit: 'm',
+    })).toBeNull()
+    expect(resolveOfficialMaterialIdentity({
+      name: 'BV 电线',
+      spec: '1×4 mm²',
+      unit: 'm',
+    })).toBeNull()
+    expect(resolveOfficialMaterialIdentity({
+      name: 'YJV 电缆',
+      spec: '1×2.5 mm²',
+      unit: 'm',
+    })).toBeNull()
+    expect(resolveOfficialMaterialIdentity({
+      name: 'BV 电线',
+      spec: '1×2.5 mm²',
+      unit: '千米',
     })).toBeNull()
     expect(resolveOfficialMaterialIdentity({
       name: '水泥',
@@ -151,7 +411,7 @@ describe('材料单价分析', () => {
     expect(catalog).toHaveLength(1)
     expect(catalog[0]).toMatchObject({
       name: 'BV 电线',
-      spec: '2.5 mm²',
+      spec: '1×2.5 mm²',
       unit: 'm',
       category: {
         id: 'wire-cable',
@@ -162,7 +422,7 @@ describe('材料单价分析', () => {
       },
     })
     expect(catalog[0]?.facts).toHaveLength(2)
-    expect(catalog[0]?.officialPriceLookupKey).toContain('bv电线')
+    expect(catalog[0]?.officialPriceLookupKey).toBe('wire::BV::1x2.5mm2::m')
     expect(catalog[0]?.facts.map(fact => fact.deliveryRecordId)).toEqual(['archived-1', 'archived-2'])
   })
 
