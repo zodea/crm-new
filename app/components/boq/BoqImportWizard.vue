@@ -89,11 +89,13 @@ const processSteps = computed(() => {
   return names.map((name, index) => ({
     id: name,
     label: labels[index]!,
-    status: stepper.isCurrent(name)
-      ? 'active' as const
-      : stepper.isAfter(name)
-        ? 'completed' as const
-        : 'pending' as const,
+    status: name === 'upload' && parsed.value && stepper.isCurrent(name)
+      ? 'completed' as const
+      : stepper.isCurrent(name) && (name !== 'upload' || parsing.value)
+        ? 'active' as const
+        : stepper.isAfter(name)
+          ? 'completed' as const
+          : 'pending' as const,
   }))
 })
 

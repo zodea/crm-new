@@ -8,6 +8,7 @@ import type { BoqAttachmentView, BoqChangeOrderView, BoqLineView } from '~/lib/b
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
 import { toErrorMessage } from '~/lib/util/error'
+import { yuan } from '~/lib/util/money'
 
 type BoqTab = 'lines' | 'changes' | 'monthly'
 
@@ -395,20 +396,20 @@ onMounted(initialize)
 
 <template>
   <div class="boq-workspace min-w-0 space-y-4">
-    <section class="panel p-4">
-      <div class="flex flex-wrap items-start gap-3">
-        <div class="min-w-52 flex-1">
+    <section data-testid="boq-workspace-header" class="boq-header panel px-3 py-2">
+      <div class="boq-header__main">
+        <div class="boq-header__title min-w-0">
           <div class="text-11px font-700 tracking-wide text-brand">
-            合同工程量清单
+            合同清单 · 变更 · 月度报量
           </div>
-          <h1 class="mt-0.5 text-20px font-850 text-ink">
-            BOQ · 变更 · 月度报量
+          <h1 class="mt-0.5 text-18px font-850 text-ink">
+            合同工程量清单
           </h1>
-          <p class="mt-1 text-12px text-ink-soft">
-            合同量与合同价只认已确认清单和已签证变更；工资单价仍由班组责任独立维护。
+          <p class="mt-0.5 truncate text-11px text-ink-soft">
+            {{ store.workspace ? `${store.workspace.projectName} · ${store.workspace.contractName}` : '选择项目与施工合同后查看' }}
           </p>
         </div>
-        <div class="min-w-52">
+        <div class="boq-header__field min-w-0">
           <span class="field-label block">项目</span>
           <ProjectSwitcher
             v-model="projectId"
@@ -418,11 +419,17 @@ onMounted(initialize)
             aria-label="选择清单项目"
           />
         </div>
-        <div class="min-w-64">
+        <div class="boq-header__field min-w-0">
           <span class="field-label block">施工合同</span>
-          <SelectFilter v-model="contractId" :options="contractOptions" :min-width="250" placeholder="选择施工合同" />
+          <SelectFilter
+            v-model="contractId"
+            :options="contractOptions"
+            :min-width="0"
+            placeholder="选择施工合同"
+            full-width
+          />
         </div>
-        <div class="flex flex-wrap gap-2 self-end">
+        <div class="boq-header__actions flex gap-2">
           <button type="button" class="btn-secondary" :disabled="!store.workspace" @click="exportAll">
             <span class="i-lucide-download mr-1" /> 导出台账
           </button>
@@ -435,12 +442,16 @@ onMounted(initialize)
         </div>
       </div>
 
-      <MetricGrid v-if="store.workspace" class="mt-4" :cols="4">
-        <Metric label="清单行" :value="store.workspace.summary.lineCount" />
-        <Metric label="原合同合价" :value="store.workspace.summary.baseAmount" money />
-        <Metric label="已签证变更" :value="store.workspace.summary.approvedChangeAmount" tone="brand" money />
-        <Metric label="当前合同合价" :value="store.workspace.summary.effectiveAmount" money />
-      </MetricGrid>
+      <dl v-if="store.workspace" class="boq-summary-strip" aria-label="合同清单摘要">
+        <div><dt>清单行</dt><dd>{{ store.workspace.summary.lineCount }}</dd></div>
+        <div><dt>原合同合价</dt><dd>{{ yuan(store.workspace.summary.baseAmount) }}</dd></div>
+        <div>
+          <dt>已签证变更</dt><dd class="text-brand">
+            {{ yuan(store.workspace.summary.approvedChangeAmount) }}
+          </dd>
+        </div>
+        <div><dt>当前合同合价</dt><dd>{{ yuan(store.workspace.summary.effectiveAmount) }}</dd></div>
+      </dl>
     </section>
 
     <section class="panel overflow-hidden px-3 pt-1">
@@ -529,7 +540,86 @@ onMounted(initialize)
 
 <style scoped>
 .boq-workspace { container-type: inline-size; overflow: hidden; }
+.boq-header__main {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(11rem, 13rem) minmax(14rem, 19rem) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+.boq-header__field :deep([role="combobox"]),
+.boq-header__field :deep([data-testid="project-switcher-trigger"]) {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.boq-header__field :deep([role="combobox"]) {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.boq-header__field :deep([role="combobox"] > span:first-child) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.boq-header__actions {
+  align-items: center;
+  align-self: end;
+  white-space: nowrap;
+}
+.boq-summary-strip {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  margin-top: 0.625rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+.boq-summary-strip > div {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0 0.875rem;
+  border-left: 1px solid var(--line);
+}
+.boq-summary-strip > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.boq-summary-strip dt {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.boq-summary-strip dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .boq-catalog-summary { display: none; }
+@container (max-width: 68rem) {
+  .boq-header__main {
+    grid-template-columns: minmax(10rem, 12rem) minmax(13rem, 1fr) auto;
+  }
+  .boq-header__title { grid-column: 1 / -1; }
+}
+@container (max-width: 44rem) {
+  .boq-header__main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .boq-header__title,
+  .boq-header__actions { grid-column: 1 / -1; }
+  .boq-header__actions { justify-content: flex-end; }
+}
+@container (max-width: 32rem) {
+  .boq-header__main { grid-template-columns: minmax(0, 1fr); }
+  .boq-header__title,
+  .boq-header__actions { grid-column: auto; }
+  .boq-header__actions { justify-content: stretch; }
+  .boq-header__actions > * { flex: 1 1 0; justify-content: center; }
+}
 @container (max-width: 58rem) {
   .boq-lines-layout { grid-template-columns: minmax(0, 1fr); }
   .boq-catalog-filter { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--panel); }

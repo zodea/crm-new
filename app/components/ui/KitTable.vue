@@ -12,6 +12,14 @@ interface KitTableEmptyState {
   actionLabel?: string
 }
 
+interface KitTableResizeConfig {
+  dragMode?: 'auto' | 'fixed'
+  showDragTip?: boolean
+  isDblclickAutoWidth?: boolean
+  minWidth?: number
+  maxWidth?: number
+}
+
 const {
   columns,
   data,
@@ -23,6 +31,7 @@ const {
   empty = '暂无数据',
   remoteFilter = false,
   checkMethod,
+  resizeConfig,
 } = defineProps<{
   columns: KitTableColumn[]
   data: T[]
@@ -38,6 +47,8 @@ const {
   remoteFilter?: boolean
   /** checkbox 列的行级可勾判定(如 excel 来源票无扫描件不可勾);缺省全部可勾。 */
   checkMethod?: (row: T) => boolean
+  /** 领域表格按需收紧列宽拖拽；未传时维持既有 vxe 行为。 */
+  resizeConfig?: KitTableResizeConfig
 }>()
 
 const emit = defineEmits<{
@@ -98,8 +109,12 @@ function buildColProps(col: NormalizedKitColumn, slot: string | undefined): Reco
     p.width = col.width
   if (col.minWidth != null)
     p.minWidth = col.minWidth
+  if (col.maxWidth != null)
+    p.maxWidth = col.maxWidth
   if (col.fixed)
     p.fixed = col.fixed
+  if (col.resizable != null)
+    p.resizable = col.resizable
   if (col.className)
     p.className = col.className
   if (!slot)
@@ -168,6 +183,7 @@ defineExpose({ clearCheckbox, clearFilter })
       show-overflow="title"
       :row-config="{ isHover: true, keyField: rowKey }"
       :column-config="{ resizable: true }"
+      :resizable-config="resizeConfig"
       :filter-config="{ remote: remoteFilter }"
       :seq-config="seqConfig"
       :checkbox-config="checkboxConfig"
@@ -224,6 +240,7 @@ defineExpose({ clearCheckbox, clearFilter })
           :width="col.width"
           :align="col.align"
           :fixed="col.fixed"
+          :resizable="col.resizable"
         />
         <vxe-column
           v-else-if="col.type === 'checkbox'"
@@ -232,6 +249,7 @@ defineExpose({ clearCheckbox, clearFilter })
           :width="col.width"
           :align="col.align"
           :fixed="col.fixed"
+          :resizable="col.resizable"
         />
         <vxe-column v-else v-bind="vxeProps">
           <template v-if="slot" #default="{ row, rowIndex }">
