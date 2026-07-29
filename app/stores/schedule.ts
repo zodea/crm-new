@@ -71,7 +71,11 @@ export interface CreateScheduleGroupDraft {
   buildingIds: readonly string[]
   startDate: string
   overlapMode: ScheduleOverlapMode
-  tasks: readonly ({ templateKey: string } & Omit<ScheduleTemplatePlanInput, 'key'>)[]
+  tasks: readonly ({
+    templateKey: string
+    predecessorKey?: string | null
+    predecessorDisabled?: boolean
+  } & Omit<ScheduleTemplatePlanInput, 'key'>)[]
 }
 
 export interface UpdateScheduleTaskPatch {
@@ -279,6 +283,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const contracts = shallowRef<ScheduleContractOption[]>([])
   const processLibraries = shallowRef<Awaited<ReturnType<typeof loadScheduleProcessLibraries>>>([])
   const processTasks = shallowRef<Awaited<ReturnType<typeof loadScheduleProcessLibraryTasks>>>([])
+  const processTasksLibraryId = shallowRef('')
+  let processTaskRequestGeneration = 0
   const snapshot = shallowRef<ScheduleProjectView | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -322,7 +328,13 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   async function loadProcessLibraryTasks(libraryId: string) {
-    processTasks.value = await loadScheduleProcessLibraryTasks(db, libraryId)
+    const generation = ++processTaskRequestGeneration
+    const loaded = await loadScheduleProcessLibraryTasks(db, libraryId)
+    if (generation !== processTaskRequestGeneration)
+      return []
+    processTasks.value = loaded
+    processTasksLibraryId.value = libraryId
+    return loaded
   }
 
   async function previewContractBinding(groupId: string, contractId: string) {
@@ -501,7 +513,52 @@ export const useScheduleStore = defineStore('schedule', () => {
           await logCreate(tx, 'schedule_group_buildings', id)
         }
 
-        let previous: { id: string, plannedFinish: string } | null = null
+        const enabledTaskKeys = new Set(templates.map(({ row }) => row.key))
+        const resolvedPredecessorByKey = new Map<string, string | null>()
+        const resolvedPredecessorDisabledByKey = new Map<string, boolean>()
+        for (const [index, { row, template }] of templates.entries()) {
+          const taskDraft = draft.tasks.find(task => task.templateKey === row.key)
+          const hasExplicitPredecessor = taskDraft?.predecessorKey !== undefined
+          const configuredPredecessor = hasExplicitPredecessor
+            ? taskDraft.predecessorKey ?? null
+            : template.predecessorKey
+          resolvedPredecessorByKey.set(
+            row.key,
+            configuredPredecessor && enabledTaskKeys.has(configuredPredecessor)
+              ? configuredPredecessor
+              : hasExplicitPredecessor
+                ? null
+                : templates[index - 1]?.row.key ?? null,
+          )
+          resolvedPredecessorDisabledByKey.set(
+            row.key,
+            hasExplicitPredecessor
+              ? Boolean(taskDraft?.predecessorDisabled)
+              : configuredPredecessor && enabledTaskKeys.has(configuredPredecessor)
+                ? template.predecessorDisabled
+                : false,
+          )
+        }
+        const plannedRowByKey = new Map(templates.map(({ row }) => [row.key, row]))
+        for (const [successorKey, predecessorKey] of resolvedPredecessorByKey) {
+          if (!predecessorKey || resolvedPredecessorDisabledByKey.get(successorKey))
+            continue
+          const predecessor = plannedRowByKey.get(predecessorKey)
+          const successor = plannedRowByKey.get(successorKey)
+          if (
+            predecessor
+            && successor
+            && calendarDays(predecessor.plannedStart, successor.plannedStart) < 0
+          ) {
+            throw new Error('后续工序开始日期不能早于仍启用的前置工序；请先调整日期或置灰冲突关系')
+          }
+        }
+
+        const createdTaskByKey = new Map<string, {
+          id: string
+          plannedFinish: string
+          plannedStart: string
+        }>()
         for (const [index, { row, template }] of templates.entries()) {
           const taskId = generateId('schedule_task')
           const stageId = template.stageCode ? stageByCode.get(template.stageCode)! : null
@@ -517,6 +574,8 @@ export const useScheduleStore = defineStore('schedule', () => {
             durationDays: row.durationDays,
             stageCode: template.stageCode ?? '',
             itemCodes: template.itemCodes,
+            predecessorKey: resolvedPredecessorByKey.get(row.key) ?? null,
+            predecessorDisabled: resolvedPredecessorDisabledByKey.get(row.key) ?? false,
           })
           await tx.execute(
             `INSERT INTO schedule_tasks
@@ -570,17 +629,41 @@ export const useScheduleStore = defineStore('schedule', () => {
               }
             }
           }
-          if (previous) {
+          createdTaskByKey.set(row.key, {
+            id: taskId,
+            plannedStart: row.plannedStart,
+            plannedFinish: row.plannedFinish,
+          })
+        }
+        for (const { row } of templates) {
+          const successor = createdTaskByKey.get(row.key)!
+          const predecessorKey = resolvedPredecessorByKey.get(row.key) ?? null
+          const predecessor = predecessorKey
+            ? createdTaskByKey.get(predecessorKey)
+            : null
+          if (predecessor) {
             const dependencyId = generateId('schedule_dependency')
             await tx.execute(
               `INSERT INTO task_dependencies
                 (id, pred_id, succ_id, dependency_type, lag_days)
                VALUES (?, ?, ?, 'FS', ?)`,
-              [dependencyId, previous.id, taskId, calendarDays(previous.plannedFinish, row.plannedStart)],
+              [
+                dependencyId,
+                predecessor.id,
+                successor.id,
+                calendarDays(predecessor.plannedFinish, successor.plannedStart),
+              ],
             )
             await logCreate(tx, 'task_dependencies', dependencyId)
+            if (resolvedPredecessorDisabledByKey.get(row.key)) {
+              await softDelete(
+                tx,
+                'task_dependencies',
+                dependencyId,
+                SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
+              )
+            }
           }
-          previous = { id: taskId, plannedFinish: row.plannedFinish }
         }
       })
       await reload(draft.projectId, today)
@@ -1165,6 +1248,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     contracts: readonly(contracts),
     processLibraries: readonly(processLibraries),
     processTasks: readonly(processTasks),
+    processTasksLibraryId: readonly(processTasksLibraryId),
     snapshot: readonly(snapshot),
     loading: readonly(loading),
     saving: readonly(saving),

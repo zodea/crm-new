@@ -195,6 +195,8 @@
 | `app/pages/schedule/[pid]/bind/[gid].vue` | `/schedule/:pid/bind/:gid` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 采用整页选择与只读复核，不使用复杂弹窗；合同名称/编号检索、楼栋覆盖、分项映射和数量差异按本地 ADR 0017 领域契约呈现 | 进入页面不写入；只有无阻断且再次确认“确认绑定”才切换范围依据，成功后返回原施工进度分组 | C-FORM |
 | `app/pages/schedule/index.vue` | `/schedule` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 待 #191 只读核对 | C-DENSE |
 | `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 待 #191 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/schedule/process-library/form.vue` | `/schedule/process-library/form` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 遵循 ADR 0014 整页表单与本地甘特/精确表格双视图；无直接参考页时以 DC 品牌原语为准 | 进入页面只读来源版本；只有“保存为新版本”才新增库与工序定义，绝不回写来源版本 | C-FORM |
+| `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-LIST-PRIOR | 版本列表沿用本地紧凑表格与局部横向滚动；不照搬无直接参考的业务结构 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 分类型测量 | 动态单据写入路径保持现有契约 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 分类型测量 | 动态类型与权限保持现有契约 | C-DENSE |

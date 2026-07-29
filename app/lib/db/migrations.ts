@@ -4831,6 +4831,61 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 34,
+    name: 'schedule-process-library-predecessors',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'schedule_process_library_tasks',
+        'predecessor_task_key',
+        `TEXT DEFAULT NULL`,
+      )
+      await db.execute(`
+        UPDATE schedule_process_library_tasks AS current
+        SET predecessor_task_key = (
+          SELECT previous.task_key
+          FROM schedule_process_library_tasks AS previous
+          WHERE previous.library_id = current.library_id
+            AND previous.deleted_at IS NULL
+            AND (
+              previous.sort_order < current.sort_order
+              OR (
+                previous.sort_order = current.sort_order
+                AND previous.id < current.id
+              )
+            )
+          ORDER BY previous.sort_order DESC, previous.id DESC
+          LIMIT 1
+        )
+        WHERE current.deleted_at IS NULL
+          AND current.predecessor_task_key IS NULL
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_schedule_process_library_predecessor
+        ON schedule_process_library_tasks(library_id, predecessor_task_key)
+        WHERE deleted_at IS NULL
+      `)
+    },
+  },
+  {
+    version: 35,
+    name: 'schedule-process-library-predecessor-disabled-repair',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'schedule_process_library_tasks',
+        'predecessor_disabled',
+        `INTEGER NOT NULL DEFAULT 0 CHECK (predecessor_disabled IN (0, 1))`,
+      )
+      await db.execute(`
+        UPDATE schedule_process_library_tasks
+        SET predecessor_disabled = 0
+        WHERE predecessor_disabled IS NULL
+           OR predecessor_disabled NOT IN (0, 1)
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

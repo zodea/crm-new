@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleGroupView, ScheduleTaskView } from '~/lib/schedule/read-model'
+import { Button } from '~/components/ui/button'
 import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -354,6 +355,12 @@ onMounted(initialize)
           />
         </div>
         <div class="flex flex-wrap gap-2 self-end">
+          <Button as-child>
+            <NuxtLink to="/schedule/process-library">
+              <span class="i-lucide-library" aria-hidden="true" />
+              标准工序库
+            </NuxtLink>
+          </Button>
           <button type="button" class="btn-secondary" :disabled="!store.snapshot?.groups.length" @click="setBaseline">
             <span class="i-lucide-git-commit-horizontal mr-1" /> 设置基准
           </button>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleOverlapMode } from '~/lib/schedule/planning'
-import { calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
+import { addCalendarDays, calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
@@ -9,6 +9,8 @@ interface TaskDraft {
   enabled: boolean
   durationDays: number
   anchorStart: string | null
+  predecessorKey: string | null
+  predecessorDisabled: boolean
 }
 
 type WizardStep = 1 | 2 | 3
@@ -39,6 +41,14 @@ const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMod
   anchorStart: task.anchorStart,
 }))))
 const planByKey = computed(() => new Map(plannedRows.value.map(row => [row.key, row])))
+const ganttRows = computed(() => plannedRows.value.map(row => ({
+  key: row.key,
+  name: templateByKey.value.get(row.key)?.name ?? row.key,
+  trade: templateByKey.value.get(row.key)?.trade ?? '',
+  color: templateByKey.value.get(row.key)?.color ?? '#64748b',
+  plannedStart: row.plannedStart,
+  plannedFinish: row.plannedFinish,
+})))
 const enabledCount = computed(() => tasks.value.filter(task => task.enabled).length)
 const finishDate = computed(() => plannedRows.value.map(row => row.plannedFinish).sort().at(-1) ?? '—')
 const projectOptions = computed(() => store.catalog.map(project => ({
@@ -93,6 +103,8 @@ function processValidationMessage(): string | null {
 }
 
 function nextStep() {
+  if (currentStep.value === 1 && (!initialized.value || loadingRange.value))
+    return
   const validation = currentStep.value === 1
     ? rangeValidationMessage()
     : processValidationMessage()
@@ -110,11 +122,17 @@ function previousStep() {
 }
 
 function predecessorLabel(templateKey: string): string {
-  const index = plannedRows.value.findIndex(row => row.key === templateKey)
-  if (index <= 0)
+  const task = tasks.value.find(candidate => candidate.templateKey === templateKey)
+  if (!task?.predecessorKey)
     return '—'
-  const predecessor = plannedRows.value[index - 1]!
-  const successor = plannedRows.value[index]!
+  if (task.predecessorDisabled) {
+    const predecessorName = templateByKey.value.get(task.predecessorKey)?.name ?? '原前置工序'
+    return `${predecessorName} · 已置灰`
+  }
+  const predecessor = planByKey.value.get(task.predecessorKey)
+  const successor = planByKey.value.get(templateKey)
+  if (!predecessor || !successor)
+    return '—'
   const predecessorName = templateByKey.value.get(predecessor.key)?.name ?? '前置工序'
   const lag = calendarDays(predecessor.plannedFinish, successor.plannedStart)
   return `${predecessorName} · FS${lag ? `${lag > 0 ? '+' : ''}${lag}天` : ''}`
@@ -122,6 +140,7 @@ function predecessorLabel(templateKey: string): string {
 
 async function loadRange(reset = true) {
   loadingRange.value = true
+  await nextTick()
   try {
     await store.loadContracts(projectId.value)
     if (reset) {
@@ -142,13 +161,109 @@ async function loadRange(reset = true) {
   }
 }
 
-function resetProcessTasks() {
-  tasks.value = store.processTasks.map(template => ({
+function resetProcessTasks(
+  sourceTasks = store.processTasks,
+) {
+  tasks.value = sourceTasks.map(template => ({
     templateKey: template.key,
     enabled: true,
     durationDays: template.durationDays,
     anchorStart: null,
+    predecessorKey: template.predecessorKey,
+    predecessorDisabled: template.predecessorDisabled,
   }))
+}
+
+async function updateTaskWindow(payload: {
+  key: string
+  plannedStart: string
+  plannedFinish: string
+}) {
+  const task = tasks.value.find(candidate => candidate.templateKey === payload.key)
+  if (!task)
+    return false
+  const currentPlan = planByKey.value.get(payload.key)
+  const nextAnchorStart = currentPlan?.plannedStart === payload.plannedStart
+    ? task.anchorStart
+    : payload.plannedStart
+  const patchedTasks = tasks.value.map(candidate => candidate.templateKey === payload.key
+    ? {
+        ...candidate,
+        anchorStart: nextAnchorStart,
+        durationDays: calendarDays(payload.plannedStart, payload.plannedFinish) + 1,
+      }
+    : candidate)
+  const nextPlanByKey = new Map(planTemplateTasks(
+    startDate.value,
+    overlapMode.value,
+    patchedTasks.map(candidate => ({
+      key: candidate.templateKey,
+      enabled: candidate.enabled,
+      durationDays: candidate.durationDays,
+      anchorStart: candidate.anchorStart,
+    })),
+  ).map(row => [row.key, row]))
+  const conflictedSuccessorKeys = patchedTasks
+    .filter(candidate => candidate.enabled && candidate.predecessorKey && !candidate.predecessorDisabled)
+    .filter((candidate) => {
+      const predecessor = nextPlanByKey.get(candidate.predecessorKey!)
+      const successor = nextPlanByKey.get(candidate.templateKey)
+      return Boolean(
+        predecessor
+        && successor
+        && calendarDays(predecessor.plannedStart, successor.plannedStart) < 0,
+      )
+    })
+    .map(candidate => candidate.templateKey)
+  if (conflictedSuccessorKeys.length) {
+    const approved = await confirm({
+      variant: 'simple',
+      title: `本次调期会冲突 ${conflictedSuccessorKeys.length} 条前置关系`,
+      message: '继续后只把冲突关系置灰并保留；生成排程后仍可在依赖设置中恢复。',
+      confirmLabel: '调期并置灰冲突',
+    })
+    if (!approved)
+      return false
+    const conflictSet = new Set(conflictedSuccessorKeys)
+    tasks.value = patchedTasks.map(candidate => conflictSet.has(candidate.templateKey)
+      ? { ...candidate, predecessorDisabled: true }
+      : candidate)
+    return true
+  }
+  tasks.value = patchedTasks
+  return true
+}
+
+async function updateTaskDuration(task: TaskDraft, event: Event) {
+  const input = event.target as HTMLInputElement
+  const durationDays = Math.max(1, Math.trunc(Number(input.value) || 1))
+  const currentPlan = planByKey.value.get(task.templateKey)
+  if (!currentPlan)
+    return
+  const accepted = await updateTaskWindow({
+    key: task.templateKey,
+    plannedStart: currentPlan.plannedStart,
+    plannedFinish: addCalendarDays(currentPlan.plannedStart, durationDays - 1),
+  })
+  if (!accepted)
+    input.value = String(task.durationDays)
+}
+
+async function updateTaskAnchor(task: TaskDraft, event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.value) {
+    tasks.value = tasks.value.map(candidate => candidate.templateKey === task.templateKey
+      ? { ...candidate, anchorStart: null }
+      : candidate)
+    return
+  }
+  const accepted = await updateTaskWindow({
+    key: task.templateKey,
+    plannedStart: input.value,
+    plannedFinish: addCalendarDays(input.value, task.durationDays - 1),
+  })
+  if (!accepted)
+    input.value = task.anchorStart ?? ''
 }
 
 watch(projectId, async (next, previous) => {
@@ -167,14 +282,22 @@ watch(contractId, async (next, previous) => {
   ) {
     return
   }
-  await store.loadBuildings(projectId.value, next)
-  buildingIds.value = store.buildings.map(building => building.id)
+  loadingRange.value = true
+  await nextTick()
+  try {
+    await store.loadBuildings(projectId.value, next)
+    buildingIds.value = store.buildings.map(building => building.id)
+  }
+  finally {
+    loadingRange.value = false
+  }
 })
 
 watch(scopeBasis, async (next, previous) => {
   if (!initialized.value || loadingRange.value || next === previous)
     return
   loadingRange.value = true
+  await nextTick()
   try {
     if (next === 'contract') {
       contractId.value = contractId.value
@@ -196,8 +319,10 @@ watch(scopeBasis, async (next, previous) => {
 watch(processLibraryId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
-  await store.loadProcessLibraryTasks(next)
-  resetProcessTasks()
+  const loaded = await store.loadProcessLibraryTasks(next)
+  if (processLibraryId.value !== next || store.processTasksLibraryId !== next)
+    return
+  resetProcessTasks(loaded)
 })
 
 function toggleBuilding(id: string) {
@@ -251,8 +376,8 @@ onMounted(async () => {
     ?? store.processLibraries[0]?.id
     ?? ''
   if (processLibraryId.value) {
-    await store.loadProcessLibraryTasks(processLibraryId.value)
-    resetProcessTasks()
+    const loaded = await store.loadProcessLibraryTasks(processLibraryId.value)
+    resetProcessTasks(loaded)
   }
   const requested = String(route.query.project ?? '')
   projectId.value = store.catalog.find(project => project.id === requested)?.id ?? store.catalog[0]?.id ?? ''
@@ -446,8 +571,18 @@ onMounted(async () => {
           <div class="rounded-lg bg-brand-soft px-3 py-2 text-11px text-brand-deep">
             {{ activeProcessLibrary?.name ?? '标准工序' }} · 已启用 {{ enabledCount }} 道 · 预计完成 {{ finishDate }}
           </div>
+          <NuxtLink
+            to="/schedule/process-library"
+            class="text-11px font-700 text-brand hover:underline"
+          >
+            维护标准工序库 →
+          </NuxtLink>
         </div>
       </header>
+      <ScheduleTemplateGanttEditor
+        :rows="ganttRows"
+        @update-window="updateTaskWindow"
+      />
       <div class="process-scroll overflow-x-auto" data-testid="schedule-new-process-scroll">
         <div class="process-table min-w-760px">
           <div class="process-row process-head">
@@ -457,9 +592,29 @@ onMounted(async () => {
             <input v-model="task.enabled" type="checkbox" class="accent-[var(--brand)]" :aria-label="`启用${templateByKey.get(task.templateKey)?.name}`">
             <span class="min-w-0 truncate font-700 text-ink"><i class="mr-2 inline-block h-2 w-2 rounded-full" :style="{ background: templateByKey.get(task.templateKey)?.color }" />{{ templateByKey.get(task.templateKey)?.name }}</span>
             <span>{{ templateByKey.get(task.templateKey)?.trade }}</span>
-            <input v-model.number="task.durationDays" type="number" min="1" max="365" class="field-input w-20" :disabled="!task.enabled">
-            <input v-model="task.anchorStart" type="date" class="field-input w-34" :disabled="!task.enabled">
-            <span class="truncate" :title="predecessorLabel(task.templateKey)">
+            <input
+              :value="task.durationDays"
+              type="number"
+              min="1"
+              max="365"
+              class="field-input w-20"
+              :disabled="!task.enabled"
+              :aria-label="`${templateByKey.get(task.templateKey)?.name}默认工期`"
+              @change="updateTaskDuration(task, $event)"
+            >
+            <input
+              :value="task.anchorStart ?? ''"
+              type="date"
+              class="field-input w-34"
+              :disabled="!task.enabled"
+              :aria-label="`${templateByKey.get(task.templateKey)?.name}锚点开始`"
+              @change="updateTaskAnchor(task, $event)"
+            >
+            <span
+              class="truncate"
+              :class="task.predecessorDisabled && 'text-ink-faint line-through'"
+              :title="predecessorLabel(task.templateKey)"
+            >
               {{ task.enabled ? predecessorLabel(task.templateKey) : '—' }}
             </span>
             <span>{{ planByKey.get(task.templateKey)?.plannedStart ?? '—' }}<br><small>{{ planByKey.get(task.templateKey)?.plannedFinish ?? '—' }}</small></span>
@@ -536,7 +691,13 @@ onMounted(async () => {
         上一步
       </button>
       <span v-else />
-      <button v-if="currentStep < 3" type="button" class="btn-primary" @click="nextStep">
+      <button
+        v-if="currentStep < 3"
+        type="button"
+        class="btn-primary"
+        :disabled="currentStep === 1 && (!initialized || loadingRange)"
+        @click="nextStep"
+      >
         {{ currentStep === 1 ? '下一步：选择工序' : '下一步：预览排程' }}
       </button>
       <button v-else type="button" class="btn-accent" :disabled="store.saving" @click="submit">

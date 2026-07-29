@@ -661,7 +661,7 @@ END;
 > [ADR 0017](../adr/0017-provisional-schedule-before-contract.md) 将楼栋分组范围依据扩为 `scope_basis IN ('contract','provisional')`。`scope_basis='contract'` 时 `schedule_groups.contract_id` 必填，且只能指向一份同项目的 `contracts(kind='施工')`；分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，只有清单行的显式楼栋字段才可证明合同覆盖。`scope_basis='provisional'` 时 `contract_id` 必须为 NULL，候选楼栋来自项目手工区域树，量值来自户型模板的手工分项与暂估量。两种依据不能在同一分组混用，合同分组禁止跨合同混组；`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
 >
 > 目标约束为 `CHECK ((scope_basis='contract' AND contract_id IS NOT NULL) OR (scope_basis='provisional' AND contract_id IS NULL))`，并增加 `contract_bound_at TEXT NULL`。v27 为兼容历史 seed/测试夹具，暂容许旧写路径省略 `scope_basis`；新建组 action 必须显式写入，读取旧空值时只按 `contract_id` 回退判定。内部暂估绑定合同必须走领域 action：校验同项目施工合同、显式楼栋覆盖、分项映射和数量差异；分组内任一楼栋缺合同覆盖证据时整个事务失败。成功时只更新范围依据与合同引用并记录审计日志，不重建分组、任务、依赖、基线或完成事实，也不覆盖户型模板中的暂估量。既有 `contract_id IS NOT NULL` 分组迁移为 `scope_basis='contract'`；无法证明合同来源的旧分组迁移为 `provisional` 并持续提示待绑定。
-> 标准工序库按版本保存全局可复用定义。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码和分项码均以创建时快照为准。之后修改或停用全局库不会追溯改写既有项目 WBS。
+> 标准工序库按 [ADR 0018](../adr/0018-versioned-schedule-process-library.md) 保存全局不可变版本。基于旧版只能沿用相同 `code` 新建下一版本；`schedule_process_library_tasks.predecessor_task_key` 保存前置身份，`predecessor_disabled=1` 表示因顺序冲突已置灰但未删除。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码、分项码及前置状态均以创建时快照为准。禁用关系仍创建 `task_dependencies` 后按 `schedule:conflict-reschedule` 软删除，之后全局库变化不会追溯改写既有项目 WBS。迁移历史冻结为：v34 只增加并回填 `predecessor_task_key`，v35 再通过 `addColumnIfMissing` 增加 `predecessor_disabled` 并把空值或非法值回填为 `0`，以覆盖已经登记 v34 的存量数据库。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 > `schedule_task_floor_plans` 由排程域拥有，唯一范围为 `task_id + floor_id + boq_line_id`；初建时从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。BOQ 只提供稳定 `boq_line_id`，不保存第二份计划。
@@ -1348,7 +1348,7 @@ interface FilePayload {
 | `floors` | `building_id` | `buildings.id` | N:1 | 楼层 → 楼栋 |
 | `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
 | `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
-| `schedule_process_library_tasks` | `library_id` | `schedule_process_libraries.id` | N:1 | 标准工序定义 → 标准工序库版本 |
+| `schedule_process_library_tasks` | `library_id` | `schedule_process_libraries.id` | N:1 | 标准工序定义 → 不可变标准工序库版本；前置 key 与 disabled 状态随版本保存 |
 | `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
 | `schedule_groups` | `contract_id` | `contracts.id`（`kind='施工'`） | N:1 | 条件外键；`scope_basis='contract'` 时必填且项目必须一致，`provisional` 时必须为空；合同分组禁止跨合同混组 |
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
