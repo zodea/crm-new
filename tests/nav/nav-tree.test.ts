@@ -123,6 +123,7 @@ describe('侧栏导航树', () => {
       expect(activeNavKey(`${route}/new`)).toBe(key)
       expect(activeNavKey(`${route}/f4_1`)).toBe(key)
     }
+    expect(activeNavKey('/material/delivery/archive/form')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
   })
 

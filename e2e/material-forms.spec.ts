@@ -65,6 +65,10 @@ const RESPONSIVE_ROUTES = [
     path: '/material/delivery/archive/form/del_mdv001_0',
     title: /编辑 · 送货单归档/,
   },
+  {
+    path: '/material/delivery/archive/form',
+    title: '新建 · 送货单归档',
+  },
 ] as const
 
 async function chooseLookup(
@@ -250,7 +254,7 @@ test.describe('F4 物资领域整页表单', () => {
     await expect(page.getByText('大板东建材-送货单-0712.pdf', { exact: true })).toBeVisible()
   })
 
-  test('十一条整页表单在响应式验收矩阵中无页面级横向溢出', async ({ page }, testInfo) => {
+  test('十二条整页表单在响应式验收矩阵中无页面级横向溢出', async ({ page }, testInfo) => {
     test.setTimeout(240_000)
     for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })

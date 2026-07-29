@@ -15,8 +15,6 @@ const search = shallowRef('')
 const selectedNode = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
-const showForm = shallowRef(false)
-const editingRecord = shallowRef<DeliveryRecord | null>(null)
 
 function projectName(id: string): string {
   return projectStore.byId(id)?.name ?? '未知项目'
@@ -124,16 +122,6 @@ function materialSummary(record: DeliveryRecord): string {
   return `${names.slice(0, 2).join('、')} 等 ${names.length} 项`
 }
 
-function openCreate() {
-  editingRecord.value = null
-  showForm.value = true
-}
-
-function openEdit(record: DeliveryRecord) {
-  editingRecord.value = record
-  showForm.value = true
-}
-
 async function handleDelete(record: DeliveryRecord) {
   const label = record.orderNo || record.id
   const ok = await confirm({
@@ -185,9 +173,9 @@ onMounted(refresh)
         <button class="btn-secondary" :disabled="store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
         </button>
-        <button class="btn-accent" @click="openCreate">
+        <NuxtLink to="/material/delivery/archive/form" class="btn-accent">
           <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
-        </button>
+        </NuxtLink>
       </div>
     </div>
 
@@ -235,13 +223,28 @@ onMounted(refresh)
           </template>
           <template #action="{ row }">
             <div class="flex items-center gap-1">
-              <NuxtLink :to="`/material/delivery/archive/${row.id}`" class="icon-btn" title="详情">
+              <NuxtLink
+                :to="`/material/delivery/archive/${row.id}`"
+                class="icon-btn"
+                title="详情"
+                :aria-label="`查看送货单 ${row.orderNo || row.id}`"
+              >
                 <span class="i-lucide-file-text text-14px" />
               </NuxtLink>
-              <button class="icon-btn" title="编辑" @click="openEdit(row)">
+              <NuxtLink
+                :to="`/material/delivery/archive/form/${row.id}`"
+                class="icon-btn"
+                title="编辑"
+                :aria-label="`编辑送货单 ${row.orderNo || row.id}`"
+              >
                 <span class="i-lucide-square-pen text-14px" />
-              </button>
-              <button class="icon-btn-danger" title="删除" @click="handleDelete(row)">
+              </NuxtLink>
+              <button
+                class="icon-btn-danger"
+                title="删除"
+                :aria-label="`删除送货单 ${row.orderNo || row.id}`"
+                @click="handleDelete(row)"
+              >
                 <span class="i-lucide-trash-2 text-14px" />
               </button>
             </div>
@@ -254,8 +257,6 @@ onMounted(refresh)
         </div>
       </div>
     </div>
-
-    <DeliveryRecordFormDialog v-model:open="showForm" :record="editingRecord" />
   </div>
 </template>
 

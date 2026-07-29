@@ -5,11 +5,21 @@ import type { DeliveryLineDraft, DeliveryRecordInput } from '~/stores/delivery-r
 import { onBeforeRouteLeave } from 'vue-router'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 interface EditableDeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amountSource'> {
   key: string
   amount: number | null
   amountSource: DeliveryAmountSource
+}
+
+interface DeliveryArchiveDraft {
+  projectId: string | null
+  supplierId: string | null
+  orderNo: string
+  deliveryDate: string
+  note: string
+  lines: EditableDeliveryLine[]
 }
 
 const route = useRoute()
@@ -18,32 +28,24 @@ const materialStore = useMaterialStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
-const recordId = computed(() => String(route.params.id))
-const record = computed(() => store.byId(recordId.value))
-const pageFullPath = route.fullPath
-const pageKey = deriveKey(pageFullPath)
-const title = computed(() => `编辑 · 送货单归档${record.value?.orderNo ? ` ${record.value.orderNo}` : ''}`)
+const recordId = computed(() => {
+  const value = route.params.id
+  return typeof value === 'string' ? value.trim() : ''
+})
+const isCreate = computed(() => !recordId.value)
+const record = computed(() => recordId.value ? store.byId(recordId.value) : undefined)
+const pageFullPath = computed(() => route.fullPath)
+const pageKey = computed(() => deriveKey(pageFullPath.value))
+const title = computed(() => isCreate.value
+  ? '新建 · 送货单归档'
+  : `编辑 · 送货单归档${record.value?.orderNo ? ` ${record.value.orderNo}` : ''}`)
 useTabTitle(title)
 
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
-const draft = ref<{
-  projectId: string | null
-  supplierId: string | null
-  orderNo: string
-  deliveryDate: string
-  note: string
-  lines: EditableDeliveryLine[]
-}>({
-  projectId: null,
-  supplierId: null,
-  orderNo: '',
-  deliveryDate: '',
-  note: '',
-  lines: [],
-})
+const draft = ref<DeliveryArchiveDraft>(emptyDraft())
 let allowLeave = false
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value)
@@ -51,9 +53,41 @@ const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value
 const fetchProjects = materialStore.searchProjects
 const fetchSuppliers = materialStore.searchSuppliers
 
+function emptyLine(): EditableDeliveryLine {
+  return {
+    key: `delivery-line-new-${Date.now()}`,
+    materialName: '',
+    spec: '',
+    unit: '',
+    qty: null,
+    unitPrice: null,
+    amount: 0,
+    amountSource: 'calculated',
+    note: '',
+  }
+}
+
+function emptyDraft(): DeliveryArchiveDraft {
+  return {
+    projectId: null,
+    supplierId: null,
+    orderNo: '',
+    deliveryDate: toLocalDateInputValue(),
+    note: '',
+    lines: [emptyLine()],
+  }
+}
+
 async function initialize() {
   loading.value = true
   try {
+    if (isCreate.value) {
+      draft.value = emptyDraft()
+      await nextTick()
+      savedSnapshot.value = JSON.stringify(draft.value)
+      return
+    }
+
     await store.load()
     const current = record.value
     if (!current) {
@@ -91,7 +125,7 @@ async function initialize() {
   }
 }
 
-function patch(patchValue: Partial<typeof draft.value>) {
+function patch(patchValue: Partial<DeliveryArchiveDraft>) {
   draft.value = { ...draft.value, ...patchValue }
 }
 
@@ -110,16 +144,18 @@ async function save() {
     return
   }
   const current = record.value
-  if (!current)
-    return
-  const accepted = await confirm({
-    variant: 'simple',
-    title: '修改已归档送货单',
-    message: `送货单「${current.orderNo || current.id}」已归档。确认修改归属、单据字段和材料明细？OCR 原文与原件留痕不会被覆盖。`,
-    confirmLabel: '确认修改',
-  })
-  if (!accepted)
-    return
+  if (!isCreate.value) {
+    if (!current)
+      return
+    const accepted = await confirm({
+      variant: 'simple',
+      title: '修改已归档送货单',
+      message: `送货单「${current.orderNo || current.id}」已归档。确认修改归属、单据字段和材料明细？OCR 原文与原件留痕不会被覆盖。`,
+      confirmLabel: '确认修改',
+    })
+    if (!accepted)
+      return
+  }
 
   loadingAction.value = 'save'
   try {
@@ -131,26 +167,39 @@ async function save() {
       note: draft.value.note,
       lines: lines.map(({ key: _key, ...line }): DeliveryLineDraft => line),
     }
-    const logId = await store.update(current.id, input)
-    if (!logId) {
-      error('保存失败：送货单不存在或已删除')
+    let savedId: string
+    if (current) {
+      const logId = await store.update(current.id, input)
+      if (!logId) {
+        error('保存失败：送货单不存在或已删除')
+        return
+      }
+      savedId = current.id
+      success('送货单归档已更新')
+    }
+    else {
+      savedId = await store.add(input)
+      success('送货单归档已新增')
+    }
+
+    allowLeave = true
+    tabsStore.close(pageKey.value)
+    if (closeAfterSave.value) {
+      await navigateTo(`/material/delivery/archive/${savedId}`)
       return
     }
-    success('送货单归档已更新')
-    allowLeave = true
-    if (closeAfterSave.value) {
-      tabsStore.close(pageKey)
-      await navigateTo(`/material/delivery/archive/${current.id}`)
+    if (isCreate.value) {
+      await navigateTo(`/material/delivery/archive/form/${savedId}`)
       return
     }
     await initialize()
-    allowLeave = false
   }
   catch (cause) {
     error(`保存失败：${toErrorMessage(cause)}`)
   }
   finally {
     loadingAction.value = null
+    allowLeave = false
   }
 }
 
@@ -174,14 +223,16 @@ async function leaveToDetail() {
       return
   }
   allowLeave = true
-  tabsStore.close(pageKey)
-  await navigateTo(`/material/delivery/archive/${recordId.value}`)
+  tabsStore.close(pageKey.value)
+  await navigateTo(isCreate.value
+    ? '/material/delivery/archive'
+    : `/material/delivery/archive/${recordId.value}`)
 }
 
 onBeforeRouteLeave(async () => {
   if (allowLeave || !dirty.value)
     return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
+  if (tabsStore.tabs.some(tab => tab.key === pageKey.value))
     return true
   const leave = await confirm({
     variant: 'simple',
@@ -190,19 +241,25 @@ onBeforeRouteLeave(async () => {
     confirmLabel: '放弃修改',
   })
   if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
+    tabsStore.open({ fullPath: pageFullPath.value, title: title.value })
   return leave
 })
 
-onMounted(() => {
+watch(recordId, () => {
+  allowLeave = false
   void initialize()
-})
+}, { immediate: true })
 </script>
 
 <template>
-  <div v-if="record" class="mx-auto flex w-full max-w-1440px flex-col gap-4 pb-6">
+  <div class="mx-auto flex w-full max-w-1440px flex-col gap-4 pb-6">
     <header class="panel flex flex-wrap items-center gap-3 px-4 py-3">
-      <button type="button" class="icon-btn" title="返回送货单详情" @click="leaveToDetail">
+      <button
+        type="button"
+        class="icon-btn"
+        :title="isCreate ? '返回送货单归档库' : '返回送货单详情'"
+        @click="leaveToDetail"
+      >
         <span class="i-lucide-arrow-left text-14px" aria-hidden="true" />
       </button>
       <div class="min-w-0 flex-1">
@@ -210,26 +267,36 @@ onMounted(() => {
           {{ title }}
         </h1>
         <p class="mt-0.5 text-11px text-ink-faint">
-          归档不是终态：归属与结构化字段可修正；原件和 OCR 原文只留痕，不随修改覆盖。
+          {{ isCreate
+            ? '手工补录送货单归档；保存后即进入材料台账。'
+            : '归档不是终态：归属与结构化字段可修正；原件和 OCR 原文只留痕，不随修改覆盖。' }}
         </p>
       </div>
-      <span class="chip-ok">已归档</span>
+      <span :class="isCreate ? 'chip-brand' : 'chip-ok'">
+        {{ isCreate ? '手工新增' : '已归档' }}
+      </span>
     </header>
 
     <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
       正在载入送货单…
     </div>
 
-    <form v-else class="flex flex-col gap-4" @submit.prevent>
-      <div class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(22.5rem,40%)_minmax(0,1fr)]">
+    <form v-else-if="isCreate || record" class="flex flex-col gap-4" @submit.prevent>
+      <div
+        class="grid min-w-0 items-start gap-4"
+        :class="record
+          ? 'xl:grid-cols-[minmax(22.5rem,40%)_minmax(0,1fr)]'
+          : 'mx-auto w-full max-w-1080px'"
+      >
         <DeliveryRecordSourcePanel
+          v-if="record"
           :record-id="record.id"
           min-height="clamp(28rem, 68dvh, 50rem)"
           class="self-start xl:sticky xl:top-4"
         />
 
         <div class="flex min-w-0 flex-col gap-4">
-          <section class="panel p-4">
+          <section v-if="record" class="panel p-4">
             <SectionHeader title="档案留痕" subtitle="以下原文不随结构化归属修改" />
             <div class="mt-3 grid gap-2 sm:grid-cols-2">
               <div class="info-cell rounded-[var(--radius-control)] border border-line">
@@ -288,12 +355,19 @@ onMounted(() => {
       <FormFooter
         v-model="closeAfterSave"
         :actions="['cancel', 'save']"
-        :labels="{ save: '保存归档修改' }"
+        :labels="{ save: isCreate ? '保存送货单' : '保存归档修改' }"
         :dirty="dirty"
         close-after-save
         :loading-action="loadingAction"
         @action="handleFooterAction"
       />
     </form>
+
+    <div v-else class="panel px-5 py-10 text-center text-13px text-ink-soft">
+      未找到该送货单（可能已被删除）。
+      <NuxtLink to="/material/delivery/archive" class="cell--link ml-2">
+        返回送货单归档库
+      </NuxtLink>
+    </div>
   </div>
 </template>

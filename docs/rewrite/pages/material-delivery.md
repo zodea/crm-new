@@ -102,13 +102,13 @@ ProblemDialog:
 
 ---
 
-## 二、归档行编辑
+## 二、归档手工新增与编辑
 
-`deliveryArchiveForm` 是归档库记录的整页编辑入口，归档不是终态；保存前使用二次确认。
+`deliveryArchiveForm` 是归档库统一的整页表单入口：`/material/delivery/archive/form` 手工新增，`/material/delivery/archive/form/:id` 编辑既有记录。列表的“新增送货单”和行内“编辑”、详情页“编辑”都导航到该整页路由，不再打开大型弹窗。编辑既有归档时保存前使用二次确认；手工新增保存后即归档并进入材料台账。
 
 | 分区 | 字段与规则 |
 |---|---|
-| 档案信息 | 文件名、OCR 识别公司只读留痕 |
+| 档案信息 | 仅编辑既有记录时显示文件名、OCR 识别公司与原件只读留痕 |
 | 归属 | 项目*、分供方（可空=未区分分供方），均为真实 lookup |
 | 单据字段 | 送货单号、送货日期、材料摘要、单据金额 |
 | 备注 | 备注 |
@@ -134,6 +134,8 @@ ProblemDialog:
 | `DeliveryReviewPanel` | 多张单切换、复核进度与归档入口 |
 | `DeliveryDocumentFields` | 只读接收草稿，发出单头/项目/分供方字段变更事件 |
 | `DeliveryItemsEditor` | 只读接收材料行，发出逐格编辑事件并显示金额不平 |
+| `DeliveryArchiveFormPage` | 归档库手工新增/编辑统一整页表单；编辑态保留原件和 OCR 留痕 |
+| `DeliveryArchiveLineGrid` | 整页表单材料明细录入、复制、删除与金额勾稽 |
 | `useDeliveryRecognitionWorkspace` | 页面本地状态、识别、主数据建议、别名记忆、归档与打印回执编排 |
 
 以下为尚未全部落地的历史目标组件：
