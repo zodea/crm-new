@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-07-28
+> 核对日期：2026-07-29
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -33,19 +33,17 @@ Nuxt 路由级实现结果：
 
 | 状态 | 数量 | 占比 |
 | --- | ---: | ---: |
-| 已有对应界面 | 90 | 90.9% |
-| **未实现** | **9** | **9.1%** |
+| 已有对应界面 | 92 | 92.9% |
+| **未实现** | **7** | **7.1%** |
 
 设计稿中存在一个不可达的通用 `detail` 残留，没有任何导航或动作进入，本次不计入 99 个可达界面；历史实现状态也不再混进当前分母。
 
-## 3. 未实现的 9 个界面
+## 3. 未实现的 7 个界面
 
 | 设计界面 | Nuxt 现状 | 判定 | 实施票 |
 | --- | --- | --- | --- |
 | 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
 | OCR 设置 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#204](https://github.com/zodea/crm-new/issues/204) |
-| 工资核算 / 工资进度款 | `/subcontract/payroll` 已实现 A/C1/C2 真实来源、核对、组内实际发放分配、发放快照及已发放单 A4/Excel 导出；B 合同清单仍待闭环 | 已搭但未闭环 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| 考勤与零星签工工作台 | `/subcontract/attendance` 已实现 C1 月矩阵；`/subcontract/daywork` 已实现 C2 逐日签工与证明确认，两种来源同月互斥 | 已实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 班组详情 | `/base/crew/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 工人详情 | `/base/worker/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 目标成本详情 | 只有列表/编辑能力，没有设计稿树形详情的对应路由 | 未实现 | [#191](https://github.com/zodea/crm-new/issues/191) |
@@ -65,7 +63,7 @@ Nuxt 路由级实现结果：
 | 客户 / 班组 / 工人 | 主数据列表与表单已存在，部分详情仍缺失 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
-| 工程量 / 工资 / 考勤 | 工程量矩阵和责任配置已存在，工资与考勤仍有占位 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 工程量 / 工资 / 考勤 | 工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |
 | 收入 / 支出 / 发票 | 票款列表、表单、识别和台账基础已存在 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204) |
 | 导入 / 导出工具 | 配置页和映射工作台已存在 | [#205](https://github.com/zodea/crm-new/issues/205) |
