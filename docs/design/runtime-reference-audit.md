@@ -4,7 +4,7 @@
 >
 > 父计划：[#181](https://github.com/zodea/crm-new/issues/181)
 >
-> 核对日期：2026-07-27
+> 核对日期：2026-07-29
 
 本文是全部生产 Nuxt 路由的运行态参考证据登记册，不是第二份页面规格。字段、业务规则和数据关系仍以 `docs/rewrite/pages/`、`DATABASE.md`、`CONTEXT.md` 为准；实际实现状态仍看 `ui-implementation-status.md`。
 
@@ -18,7 +18,7 @@
 
 ## 2. 严格只读观察协议
 
-参考站只允许页面导航、页签切换、分页和语义明确的只读详情展开。禁止新增、修改、删除、保存、提交、上传、下载、导出、审批和任何状态变更；不点击语义不明确、可能立即生效或会触发文件传输的控件。无法确认无副作用时立即停止，由用户亲自操作或补充说明。
+参考站只允许页面导航、页签切换、分页、语义明确的只读详情展开，以及用户在 2026-07-29 明确授权的“打开空白新建页核对后直接关闭/取消”。进入新建页后不得录入、粘贴、上传、选择业务对象、保存、提交或触发任何写入；仍禁止修改、删除、下载、导出、审批和任何状态变更。不点击语义不明确、可能立即生效或会触发文件传输的控件。无法确认无副作用时立即停止，由用户亲自操作或补充说明。
 
 只读证据按以下顺序登记：
 
@@ -58,8 +58,14 @@
 | `R-SHELL-LIVE` | 当前直接证据 | 已登录参考站全局外壳；活动业务页签保持在用户原先打开的页面 | 桌面窗口，`RootWebArea` 约 1568×1153，2026-07-27 | 仅通过 Windows 无障碍树读取和安全界面状态切换：侧栏主体约 215px、顶栏约 50px、路由页签约 28–32px、通知面板约 360px；参考站菜单搜索“分包”显示 5 个站内入口，其中“分包产值确认”“分包签证结算”是参考站独有能力，不构成给瑞航新增或改名路由的授权。瑞航只按自身叶子名称/提示过滤，因此本地同词结果保持“分包变洽签”“分包合同”“分包结算”3 项。分组收起后立即恢复，两个已打开页签切换后恢复原页，通知面板只打开读取并由同一入口关闭。未触发已读、删除、处理、提交、导入、导出或任何业务动作；未保存参考截图和业务值。 |
 | `R-HOME-LIVE` | 当前直接证据 | 已登录参考站“默认首页” | 桌面窗口，内容区约 1348×1071，2026-07-27 | 仅通过 Windows 无障碍树读取并在观察后恢复用户原活动页签：上方为待办、周历日程、公告，当前分别显示暂无待办、暂无日程、暂无公告；下方有项目信息、目标成本、付款申请、费用报销四个快捷入口。未见项目切换、施工进度甘特、经营指标卡或统计图表。未点击快捷入口、加号或任何业务动作，未保存参考截图和业务值。 |
 | `R-SUBCONTRACT-LIST-LIVE` | 当前直接证据 | `默认首页 > 分包及人工 > 分包合同`；活动业务页签为“分包合同” | 桌面窗口，`RootWebArea` 约 1568×1153，2026-07-27 | 用户先打开目标页，本轮仅通过浏览器辅助功能树读取：确认左侧合同分类、搜索/筛选、紧凑工具栏、超宽合同表格及表格内横向延展；“导入/新建”只确认控件存在，未触发；未把任何行级业务值写入仓库或公开 Issue |
+| `R-TABLE-LIVE` | 当前直接证据 | 已登录参考站采购合同编辑表、采购合同列表与分供方列表 | 桌面窗口，2026-07-28 | 严格只读观察并测量：编辑表表头约 36px；列表表头约 34px、数据行约 36px；宽表只在表格内部横滚，重要列与末尾操作列固定；可调列手柄仅位于表头右边缘，命中区约 7px、`right:-4px`、`cursor:col-resize`。仅切换既有页签、打开并关闭筛选/看板设置等只读浮层；未执行新增、编辑、删除、保存、提交、审批、上传、下载、导入或导出，也未记录业务值。 |
+| `R-MATERIAL-CONTRACT-LIVE` | 当前直接证据 | `默认首页 > 乙供材管理 > 材料采购合同` | Chrome 内容视口约 1280×1024，2026-07-29 | 列表为“左侧单层合同分类 + 顶部单行搜索/图标工具栏 + 单一紧凑宽表 + 底部汇总和分页”；合同名为蓝色详情入口，末列为固定省略号操作。安全右键合同名称未出现参考站自定义业务菜单；单击名称打开详情页签。未打开省略号菜单，未执行导入或任何行级动作。 |
+| `R-FORM-LIVE` | 当前直接证据 | 空白“新建支出合同·材料采购合同”与“新建分供方·大宗供应商”页 | Chrome 内容视口约 1280×1024，2026-07-29 | 经用户明确授权，只打开空白新建页后取消：复杂合同表单使用约 140px 左分区导航、两列字段网格、纵向分区、局部明细表和固定底部操作条；较短的分供方表单不保留空左栏，直接使用两列字段网格、内容区纵向滚动和同一固定底部操作条。分供方先以小型类型选择对话框确定表单种类，再进入整页表单；类型选择弹窗不承载实体字段。未录入、粘贴、上传、保存或提交。 |
+| `R-DETAIL-LIVE` | 当前直接证据 | 材料采购合同名称单击进入“详情-支出合同”页签 | Chrome 内容视口约 1280×1024，2026-07-29 | 详情采用“顶部摘要与动作 + 左侧审批轨迹/业务内容 + 右侧审批记录栏 + 页内标签”的整页结构；变更历史、增补合同和基础信息均在详情内容区内分段，不再套大弹窗。只打开并关闭详情，未触发复制、变更、打印、转计划或任何写操作。 |
+| `R-PROJECT-LIST-LIVE` | 当前直接证据 | `默认首页 > 项目信息` | Chrome 内容视口约 1280×1024，2026-07-29 | 项目列表为“左侧业务流程阶段 + 顶部单行搜索/筛选/设置工具栏 + 紧凑表格 + 右下分页”；本次观察到导入入口，未观察到新建入口。项目名称和金额使用链接态，操作保持右侧固定。未点击导入、筛选、设置或行级操作。 |
+| `R-SUPPLIER-LIST-LIVE` | 当前直接证据 | 已打开业务页签“分供方” | Chrome 内容视口约 1280×1024，2026-07-29 | 分供方列表不设空白左树，搜索/刷新/排序/筛选/设置/导入/新建保持一行，表格占满剩余宽度并在加载时原位显示骨架。新建入口先弹出供应商类型选择，确认默认类型后进入整页表单；取消后返回原列表。未录入、保存、提交、导入或触发行级操作。 |
 
-上一次实施无法读取浏览器正文，因此当时生成的项目详情“当前直接证据”和线框不成立，已在本轮撤销。项目详情恢复为 `R-DETAIL-PRIOR`，等待 #190 按本协议重新观察。当前直接证据覆盖全局外壳、默认首页与上述分包合同列表；外壳证据只支持导航、页签和通知的结构/只读状态，不能外推为任何业务页字段或写入行为。
+上一次实施无法读取浏览器正文，因此当时生成的项目详情“当前直接证据”和线框不成立，已在本轮撤销。项目详情仍保持 `R-DETAIL-PRIOR`，等待 #190 对项目详情目标页重新观察；`R-DETAIL-LIVE` 只覆盖材料采购合同详情，不能外推项目字段。当前直接证据覆盖全局外壳、默认首页、上述合同列表/空白新建/合同详情和项目列表；外壳证据只支持导航、页签和通知的结构/只读状态，不能外推为其他业务页字段或写入行为。
 
 ## 4. 业务约束档案
 
@@ -82,12 +88,12 @@
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-DETAIL-PRIOR | #186 已迁入统一详情壳并完成四档布局回归；具体字段与参考同屏差异仍待 #193 测量 | 待 #193 严格只读核对；现有 6 页签、文件与业务动作契约保持不变 | C-BASE |
-| `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-PRIOR | #187 已迁入统一整页表单壳并完成四档及 200% 等效宽度回归；具体字段与参考同屏差异仍待 #193 测量 | 现有保存、提交、dirty、页签缓存和附件 action 保持；待 #193 严格只读核对 | C-FORM |
-| `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-LIST-PRIOR | 待 #193 同屏测量 | 待 #193 只读核对 | C-DENSE |
+| `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #187 已迁入统一整页表单壳；参考空白态进一步确认短表单不保留空左栏、两列字段网格、内容滚动与固定底部操作 | 类型选择后只进入空白表单并取消；现有保存、提交、dirty、页签缓存和附件 action 保持 | C-FORM |
+| `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | 已确认无空左树、单行工具栏、原位骨架、紧凑表头/行高、内部横滚与固定操作列 | 仅打开空白新建流程后取消；未录入、筛选、保存、提交、导入或执行行级操作 | C-DENSE |
 | `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-BASE |
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
-| `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-DETAIL-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-BASE |
+| `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-DETAIL-LIVE | 参考合同详情已确认顶部摘要、审批轨迹、右侧审批栏与页内标签；本地字段和业务动作继续按权威规格 | 仅打开并关闭材料采购合同详情；未触发详情动作 | C-BASE |
 | `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | 无安全直接证据 | 禁止触发上传或导入 | C-TOOL |
 | `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-DENSE |
 | `app/pages/contract/company-expense/form/[id].vue` | `/contract/company-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
@@ -96,9 +102,9 @@
 | `app/pages/contract/construction/form/[id].vue` | `/contract/construction/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/construction/form/index.vue` | `/contract/construction/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/construction/index.vue` | `/contract/construction` | 核心合同 | 列表 | #195 | R-LIST-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-DENSE |
-| `app/pages/contract/material/form/[id].vue` | `/contract/material/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/material/form/index.vue` | `/contract/material/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/material/index.vue` | `/contract/material` | 核心合同 | 列表 | #195 | R-LIST-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-DENSE |
+| `app/pages/contract/material/form/[id].vue` | `/contract/material/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | 复用左分区导航、两列字段网格、局部明细表和底部固定操作条；编辑态字段差异仍按本地规格 | 写入路径保持现有契约；参考站仅观察空白新建态 | C-FORM |
+| `app/pages/contract/material/form/index.vue` | `/contract/material/form` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | 已确认独立页签整页表单、分区导航、两列主体、局部明细表和固定底部动作 | 仅进入空白页、切换分区并取消，未录入或保存 | C-FORM |
+| `app/pages/contract/material/index.vue` | `/contract/material` | 核心合同 | 列表 | #195 | R-MATERIAL-CONTRACT-LIVE | 已确认左分类、单行工具栏、紧凑表格、固定操作列及底部汇总/分页；具体字段继续按本地规格 | 仅打开既有详情与空白新建页；未执行录入、保存、提交、导入或行级动作 | C-DENSE |
 | `app/pages/contract/other-expense/form/[id].vue` | `/contract/other-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/other-expense/form/index.vue` | `/contract/other-expense/form` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/other-expense/index.vue` | `/contract/other-expense` | 辅助合同与结算 | 列表 | #196 | R-LIST-PRIOR | 待 #196 同屏测量 | 待 #196 只读核对 | C-DENSE |
@@ -140,7 +146,7 @@
 | `app/pages/material/delivery/archive/form/[id].vue` | `/material/delivery/archive/form/:id` | 送货单闭环 | 整页表单 | #201 | R-FORM-PRIOR | 待 #201 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/delivery/archive/index.vue` | `/material/delivery/archive` | 送货单闭环 | 工作台 | #201 | R-WORKBENCH-PRIOR | 待 #201 同屏测量 | 待 #201 只读核对 | C-DENSE |
 | `app/pages/material/delivery/index.vue` | `/material/delivery` | 送货单闭环 | 工作台 | #201 | R-WORKBENCH-PRIOR | 待 #201 同屏测量 | OCR/归档动作保持现有契约 | C-DENSE |
-| `app/pages/material/price.vue` | `/material/price` | 材料价格 | 特殊工具 | #207 | R-TOOL-PENDING | 无安全直接证据；独立 needs-info #207 等待参考路径和业务归属裁定 | #207 裁定前保留现有价格规则与交互 | C-TOOL |
+| `app/pages/material/price.vue` | `/material/price` | 材料价格 | 特殊工具 | #207 | R-TOOL-PENDING | 2026-07-29 按用户定稿完成“搜索选材料→趋势/厂家比较→来源→合同历史”及 390/768/1024/1440px 回归；没有直接参考页证据，不声称已对齐参考站 | 搜索、材料切换、最多 4 家趋势、最新价横向比较及只读送货单/合同下钻已验证；不触发参考站或本地业务写入 | C-TOOL |
 | `app/pages/material/requisition/[id].vue` | `/material/requisition/:id` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/requisition/index.vue` | `/material/requisition` | 自购材 | 列表 | #199 | R-LIST-PRIOR | 待 #199 同屏测量 | 待 #199 只读核对 | C-DENSE |
 | `app/pages/material/requisition/new.vue` | `/material/requisition/new` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
@@ -175,7 +181,7 @@
 | `app/pages/project/[pid]/supplier/[sid].vue` | `/project/:pid/supplier/:sid` | 项目分供方 | 详情 | #192 | R-DETAIL-PRIOR | 待 #192 同屏测量 | 待 #192 只读核对 | C-BASE |
 | `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-TOOL-PENDING | 无安全直接证据 | 禁止触发上传或导入 | C-TOOL |
 | `app/pages/project/form/[[id]].vue` | `/project/form/:id?` | 项目 | 整页表单 | #190 | R-FORM-PRIOR | #187 随 MasterData 共享入口迁入统一整页表单壳；具体字段与参考同屏差异仍待 #190 测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/project/index.vue` | `/project` | 项目 | 列表 | #190 | R-LIST-PRIOR | 待 #190 同屏测量 | 待 #190 只读核对 | C-DENSE |
+| `app/pages/project/index.vue` | `/project` | 项目 | 列表 | #190 | R-PROJECT-LIST-LIVE | 参考已确认左流程阶段、单行工具栏、紧凑表格和右下分页；本地新建能力继续按项目规格保留 | 未触发导入、筛选、设置或行级操作 | C-DENSE |
 | `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/project/penalty/index.vue` | `/project/penalty` | 甲方单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 同屏测量 | 待 #197 只读核对 | C-DENSE |
 | `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
@@ -191,6 +197,7 @@
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工资核算规则保持现有契约 | C-DENSE |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 待 #198 同屏测量 | 待 #198 只读核对 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工程量写入路径保持现有契约 | C-DENSE |
+| `app/pages/subcontract/quantity/template.vue` | `/subcontract/quantity/template` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 待 #198 同屏测量 | 户型模板写入路径保持现有契约 | C-FORM |
 
 ## 6. 维护规则
 
