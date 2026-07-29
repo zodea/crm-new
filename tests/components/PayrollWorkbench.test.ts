@@ -89,8 +89,8 @@ describe('payroll workbench components', () => {
     })
   })
 
-  it('released detail is read-only and explains the frozen field snapshot', () => {
-    render(PayrollStatementDetail, {
+  it('released detail is read-only and exposes only frozen-snapshot print/export actions', async () => {
+    const { emitted } = render(PayrollStatementDetail, {
       props: {
         statement: {
           id: 'statement-a',
@@ -155,6 +155,97 @@ describe('payroll workbench components', () => {
     expect(screen.getByText(/后续改量改价不追溯/)).not.toBeNull()
     expect(screen.queryByRole('button', { name: '核对并锁定现场量' })).toBeNull()
     expect(screen.queryByRole('spinbutton', { name: '墙砖铺贴工资单价' })).toBeNull()
+    expect(document.querySelectorAll('[data-payroll-print-page]')).toHaveLength(1)
+
+    await fireEvent.click(screen.getByRole('button', { name: '打印 A4' }))
+    await fireEvent.click(screen.getByRole('button', { name: '导出 Excel' }))
+    expect(emitted().print).toHaveLength(1)
+    expect(emitted().export).toHaveLength(1)
+  })
+
+  it('c2 released detail prints a signed daywork page before the wage page', () => {
+    render(PayrollStatementDetail, {
+      props: {
+        statement: {
+          id: 'statement-c2',
+          projectId: 'project-a',
+          projectName: '项目甲',
+          crewId: 'crew-a',
+          crewName: '零星班',
+          leaderWorkerId: 'worker-a',
+          leaderName: '张师傅',
+          subjectConfigId: 'config-c2',
+          month: '2026-07',
+          purpose: 'final',
+          periodKind: 'monthly',
+          formatFamily: 'C2',
+          quantitySource: 'field',
+          status: 'released',
+          needsRecheck: false,
+          payRatio: 1,
+          cumulativeAmount: 180,
+          previouslyPaid: 0,
+          grossAmount: 180,
+          actualAmount: 180,
+          sourceVersion: 'daywork-v1',
+          sourceUpdatedAt: '2026-07-28',
+          checkedSourceVersion: 'daywork-v1',
+          adjustmentReason: '',
+          operatorName: '项目经理',
+          submittedAt: '2026-07-29',
+          checkedAt: '2026-07-28',
+          releasedAt: '2026-07-29',
+          note: '证明人确认后计薪。',
+          members: [{
+            workerId: 'worker-a',
+            workerName: '张师傅',
+            isLeader: true,
+          }],
+          memberWorkerIds: ['worker-a'],
+          allocationRecorded: true,
+          allocations: [{
+            workerId: 'worker-a',
+            workerName: '张师傅',
+            isLeader: true,
+            allocatedAmountFen: 18000,
+            amount: 180,
+          }],
+          lines: [{
+            id: 'line-c2',
+            workerId: 'worker-a',
+            itemId: null,
+            itemName: '零星用工',
+            unit: '工',
+            quantity: 0.5,
+            unitPrice: 360,
+            amount: 180,
+          }],
+          dayworkRecords: [{
+            id: 'daywork-a',
+            projectId: 'project-a',
+            crewId: 'crew-a',
+            workerId: 'worker-a',
+            workerName: '张师傅',
+            workDate: '2026-07-12',
+            workContent: '临时修补',
+            startTime: '08:00',
+            endTime: '12:00',
+            laborUnits: 0.5,
+            witness: '李工',
+            confirmedOn: '2026-07-12',
+            status: 'confirmed',
+            note: '',
+            createdAt: '2026-07-12',
+            updatedAt: '2026-07-12',
+          }],
+        },
+      },
+      global: { components: { NuxtLink: NuxtLinkStub } },
+    })
+
+    expect(document.querySelectorAll('[data-payroll-print-page]')).toHaveLength(2)
+    expect(document.querySelector('[data-payroll-print-kind="daywork"]')).not.toBeNull()
+    expect(document.querySelector('[data-payroll-print-kind="wage"]')).not.toBeNull()
   })
 
   it('validates the release total and persists a complete member split', async () => {

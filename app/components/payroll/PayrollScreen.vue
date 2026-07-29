@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { nextTick, onMounted } from 'vue'
+import { createPayrollWorkbookExport } from '~/lib/payroll/export'
 
 const store = usePayrollStore()
 const kit = useKitUI()
@@ -19,6 +20,24 @@ async function run(action: () => Promise<void>, success: string) {
   catch (cause) {
     kit.error(cause instanceof Error ? cause.message : String(cause))
   }
+}
+
+async function exportSelected() {
+  if (!store.selected)
+    return
+  try {
+    await kit.exportFile(createPayrollWorkbookExport(store.selected))
+  }
+  catch (cause) {
+    kit.error(cause instanceof Error ? cause.message : String(cause))
+  }
+}
+
+async function printSelected() {
+  if (!store.selected || store.selected.status !== 'released')
+    return
+  await nextTick()
+  window.print()
 }
 </script>
 
@@ -63,6 +82,8 @@ async function run(action: () => Promise<void>, success: string) {
         @update-price="(lineId, price) => run(() => store.updatePrice(lineId, price), '工资单价已更新')"
         @check="run(store.checkSelected, '已按现场复核量完成核对')"
         @release="(amount, allocations) => run(() => store.releaseSelected(amount, allocations), '实际发放与组内分配已登记并冻结快照')"
+        @print="printSelected"
+        @export="exportSelected"
       />
     </div>
   </main>

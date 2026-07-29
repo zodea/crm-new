@@ -88,6 +88,19 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
     await expect(page.getByText(/已按现场复核量快照发放/)).toBeVisible()
     await expect(page.getByRole('region', { name: '组内实际发放分配' })).toBeVisible()
     await expect(page.locator('.status-chip').filter({ hasText: '已发放' })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: '导出 Excel' })).toBeEnabled()
+    await expect(page.locator('[data-payroll-print-page]')).toHaveCount(1)
+    await page.evaluate(() => {
+      Object.assign(window, { __payrollPrintCalls: 0 })
+      window.print = () => {
+        const state = window as Window & { __payrollPrintCalls: number }
+        state.__payrollPrintCalls += 1
+      }
+    })
+    await page.getByRole('button', { name: '打印 A4' }).click()
+    expect(await page.evaluate(() => (
+      window as Window & { __payrollPrintCalls: number }
+    ).__payrollPrintCalls)).toBe(1)
 
     await page.reload()
     await page.getByLabel('工资筛选与建单').locator(':scope > div').first().locator('select').first().selectOption('proj_demo_001')

@@ -4,6 +4,7 @@ import type {
   WageStatement,
 } from '~/lib/payroll/statements'
 import { ref } from 'vue'
+import PayrollPrintSheet from '~/components/payroll/PayrollPrintSheet.vue'
 import PayrollReleaseAllocationDialog from '~/components/payroll/PayrollReleaseAllocationDialog.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   updatePrice: [lineId: string, unitPrice: number]
   check: []
   release: [actualAmount: number, allocations: WageAllocationInput[]]
+  print: []
+  export: []
 }>()
 
 const releaseDialogOpen = ref(false)
@@ -60,9 +63,20 @@ function money(value: number | null) {
 
       <div
         v-if="statement.status === 'released'"
-        class="mx-4 mt-4 rounded-md bg-success-soft px-3 py-2 text-12px text-success"
+        class="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-success-soft px-3 py-2 text-12px text-success"
       >
-        已按现场复核量快照发放 {{ money(statement.actualAmount) }}；后续改量改价不追溯本月。
+        <span>
+          已按{{ statement.formatFamily === 'C2' ? '签工' : statement.formatFamily === 'C1' ? '考勤' : '现场复核量' }}快照发放
+          {{ money(statement.actualAmount) }}；后续改量改价不追溯本月。
+        </span>
+        <span v-if="statement.formatFamily !== 'B'" class="flex flex-wrap gap-2">
+          <button type="button" class="btn-ghost" @click="emit('print')">
+            打印 A4
+          </button>
+          <button type="button" class="btn-ghost" @click="emit('export')">
+            导出 Excel
+          </button>
+        </span>
       </div>
       <section
         v-if="statement.status === 'released'"
@@ -178,6 +192,7 @@ function money(value: number | null) {
         <table>
           <thead>
             <tr>
+              <th>工人</th>
               <th>分项</th>
               <th>工程量</th>
               <th>工资单价</th>
@@ -186,6 +201,7 @@ function money(value: number | null) {
           </thead>
           <tbody>
             <tr v-for="line in statement.lines" :key="line.id">
+              <td>{{ statement.members.find(member => member.workerId === line.workerId)?.workerName || line.workerId }}</td>
               <td>{{ line.itemName }}</td>
               <td class="font-mono">
                 {{ line.quantity }} {{ line.unit }}
@@ -240,6 +256,10 @@ function money(value: number | null) {
         :statement="statement"
         @update:open="releaseDialogOpen = $event"
         @confirm="(actualAmount, allocations) => emit('release', actualAmount, allocations)"
+      />
+      <PayrollPrintSheet
+        v-if="statement.status === 'released' && statement.formatFamily !== 'B'"
+        :statement="statement"
       />
     </template>
   </section>
