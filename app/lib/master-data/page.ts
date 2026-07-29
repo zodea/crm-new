@@ -53,6 +53,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '客户列表',
     listPath: '/base/customer',
     newPath: '/base/customer/form',
+    detailPath: '/base/customer',
     defaultAttachmentCategory: 'invoice',
     sections: [
       { key: 'basic', label: '基础信息' },

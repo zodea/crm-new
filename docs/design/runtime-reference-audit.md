@@ -85,6 +85,7 @@
 | `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 已迁入统一详情壳并补齐真实成员、能力、项目/工程量、工资与扣罚只读关联；具体参考同屏差异仍待 #194 测量 | 仅展示真实外键关系；无班组-合同直连时不虚构合同；写入仍走整页表单 | C-DENSE |
 | `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/crew/index.vue` | `/base/crew` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
+| `app/pages/base/customer/[id].vue` | `/base/customer/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 已迁入统一详情壳并完成客户主数据、名下项目、施工合同与收款台账的只读聚合；具体参考同屏差异仍待 #194 测量 | 仅按客户、项目、合同和收款真实外键下钻；不从名称或合同金额推算收款，不包含写入动作 | C-DENSE |
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-DETAIL-PRIOR | #186 已迁入统一详情壳并完成四档布局回归；具体字段与参考同屏差异仍待 #193 测量 | 待 #193 严格只读核对；现有 6 页签、文件与业务动作契约保持不变 | C-BASE |
