@@ -10,6 +10,7 @@ defineProps<{
   title: string
   loading: boolean
   projectOptions: ProjectOption[]
+  statusOptions?: ProjectOption[]
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 
 const search = defineModel<string>('search', { required: true })
 const project = defineModel<string>('project', { required: true })
+const status = defineModel<string>('status')
 </script>
 
 <template>
@@ -48,6 +50,13 @@ const project = defineModel<string>('project', { required: true })
         data-ui="contract-list-toolbar-actions"
         class="contract-list-toolbar__actions min-w-0 flex flex-wrap items-center gap-2.5"
       >
+        <SelectFilter
+          v-if="statusOptions?.length && status"
+          v-model="status"
+          label="状态"
+          :options="statusOptions"
+          :min-width="112"
+        />
         <SearchInput v-model="search" placeholder="搜索合同名称 / 编号" :width="220" />
         <Button variant="outline" size="icon" title="刷新" :disabled="loading" @click="emit('refresh')">
           <span class="i-lucide-refresh-cw h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />
@@ -94,7 +103,7 @@ const project = defineModel<string>('project', { required: true })
   }
 }
 
-@container (min-width: 700px) {
+@container (min-width: 56.25rem) {
   .contract-list-toolbar__layout {
     grid-template-columns: max-content minmax(12rem, 14rem) minmax(0, 1fr);
   }

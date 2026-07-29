@@ -53,3 +53,53 @@ for (const width of RESPONSIVE_WIDTHS) {
     expect(Math.abs(filteredToolbarHeight - toolbarHeight)).toBeLessThanOrEqual(1)
   })
 }
+
+test('材料采购合同列表复刻单层分类与紧凑省略号操作', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/contract/material')
+  await page.waitForLoadState('networkidle')
+
+  await expect(page.getByText('材料采购合同分类', { exact: true })).toBeVisible()
+  await expect(page.getByText('全部材料采购合同', { exact: true })).toBeVisible()
+  const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
+  await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
+  await expect(page.locator('[data-ui="contract-list-toolbar"] + .panel')).toHaveCount(0)
+  const rowMenu = page.locator('[data-ui="row-action-menu-trigger"]').first()
+  await expect(rowMenu).toBeVisible()
+  const targetLabel = await rowMenu.getAttribute('aria-label')
+  const targetName = targetLabel?.replace(/合同操作$/, '') ?? ''
+  const mainRows = page.locator('.vxe-table--main-wrapper .vxe-body--row')
+  const rowCount = await mainRows.count()
+  await rowMenu.focus()
+  await rowMenu.press('Enter')
+  const menu = page.getByRole('menu').first()
+  await expect(menu).toBeVisible()
+  await menu.getByRole('menuitem', { name: '删除' }).click()
+  const confirm = page.getByRole('dialog', { name: /删除材料采购合同/ })
+  await expect(confirm).toBeVisible()
+  await expect(page.locator('a').filter({ hasText: targetName }).first()).toBeVisible()
+  await expect(mainRows).toHaveCount(rowCount)
+  await confirm.getByRole('button', { name: '取消' }).click()
+  await expect(confirm).toBeHidden()
+  await expect(page.getByRole('link', { name: targetName, exact: true }).first()).toBeVisible()
+  await expect(mainRows).toHaveCount(rowCount)
+  await expect(rowMenu).toBeFocused()
+  await expectNoPageOverflow(page, '材料采购合同列表')
+  await expectLocalHorizontalScroll(
+    page.locator('.vxe-table--scroll-x-handle').first(),
+    '材料采购合同表格',
+  )
+})
+
+for (const width of RESPONSIVE_WIDTHS) {
+  test(`材料采购合同工具栏在 ${width}px 不隐藏状态与新增操作`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/contract/material')
+    await page.waitForLoadState('networkidle')
+
+    const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
+    await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: '新增材料采购合同' })).toBeVisible()
+    await expectNoPageOverflow(page, `${width}px 材料采购合同列表`)
+  })
+}

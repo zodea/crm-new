@@ -68,6 +68,12 @@ const viewTabs = computed(() => [
     count: catRows.value.filter(c => c.status === s).length,
   })),
 ])
+const viewOptions = computed(() =>
+  viewTabs.value.map(item => ({
+    key: item.key,
+    label: `${item.label} ${item.count}`,
+  })),
+)
 
 const filtered = computed(() =>
   view.value === 'all' ? catRows.value : catRows.value.filter(c => c.status === view.value),
@@ -78,6 +84,16 @@ const catItems = computed<TreeNode[]>(() => {
   const inView = (rows: Contract[]) =>
     view.value === 'all' ? rows : rows.filter(c => c.status === view.value)
   const base = inView(searched.value)
+  if (kind === '材采') {
+    return [
+      {
+        key: 'all',
+        label: '全部材料采购合同',
+        icon: 'i-lucide-folder',
+        count: base.length,
+      },
+    ]
+  }
   return [
     { key: 'all', label: `全部${title.value}`, icon: 'i-lucide-folder', count: base.length },
     ...CONTRACT_SUB_KINDS.map(s => ({
@@ -127,7 +143,7 @@ const columns = computed<KitTableColumn[]>(() => {
     { field: 'balance', title: labels.value.balance, width: 130, align: 'right', slot: 'balance' },
     { field: 'signDate', title: '签约日期', type: 'date' },
     { field: 'status', title: '合同状态', width: 96, slot: 'status' },
-    { title: '操作', type: 'action' },
+    { title: '操作', type: 'action', width: 56 },
   )
   return cols
 })
@@ -189,6 +205,39 @@ function openEdit(row: Contract) {
   void navigateTo(formPath(formKind(), row.id))
 }
 
+const rowActions = [
+  { key: 'detail', label: '查看详情', icon: 'i-lucide-file-text' },
+  { key: 'edit', label: '编辑', icon: 'i-lucide-square-pen' },
+  { key: 'delete', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' as const },
+] as const
+
+async function handleRowAction(action: string, row: Contract) {
+  if (action === 'detail') {
+    await navigateTo(`/contract/${row.id}`)
+    return
+  }
+  if (action === 'edit') {
+    openEdit(row)
+    return
+  }
+  if (action === 'delete') {
+    await handleDelete(row)
+    restoreRowActionFocus(row)
+  }
+}
+
+function restoreRowActionFocus(row: Contract) {
+  window.setTimeout(() => {
+    const label = `${row.name}合同操作`
+    const trigger = [...document.querySelectorAll<HTMLElement>('[data-ui="row-action-menu-trigger"]')]
+      .find(element =>
+        element.getAttribute('aria-label') === label
+        && element.offsetParent !== null,
+      )
+    trigger?.focus()
+  })
+}
+
 function formKind(): F2FormKind {
   const values: Record<ContractKind, F2FormKind> = {
     施工: 'construction',
@@ -233,22 +282,28 @@ onMounted(() => {
     <ContractListToolbar
       v-model:search="searchText"
       v-model:project="projFilter"
+      v-model:status="view"
       :title="title"
       :loading="store.loading"
       :project-options="projOptions"
+      :status-options="kind === '材采' ? viewOptions : undefined"
       @refresh="refresh"
       @create="openCreate"
     />
 
     <!-- 业务态视图（默认履约中） -->
-    <div class="panel px-3">
+    <div v-if="kind !== '材采'" class="panel px-3">
       <SegTab v-model="view" :tabs="viewTabs" />
     </div>
 
-    <div :class="kind === '分包' ? 'flex items-start gap-3' : ''">
-      <!-- 分包页：劳务/专业左分类 -->
-      <div v-if="kind === '分包'" class="w-52 shrink-0">
-        <TreeNav v-model="subCat" title="分包合同分类" :items="catItems" />
+    <div :class="kind !== '施工' ? 'flex items-start gap-3' : ''">
+      <!-- 分包按劳务/专业分类；材采保留参考页的单层合同分类。 -->
+      <div v-if="kind !== '施工'" class="w-52 shrink-0">
+        <TreeNav
+          v-model="subCat"
+          :title="kind === '材采' ? '材料采购合同分类' : '分包合同分类'"
+          :items="catItems"
+        />
       </div>
 
       <div class="min-w-0 flex-1">
@@ -288,17 +343,11 @@ onMounted(() => {
             <span class="chip" :class="statusChip(row.status)">{{ row.status }}</span>
           </template>
           <template #action="{ row }">
-            <div class="flex items-center gap-1">
-              <NuxtLink :to="`/contract/${row.id}`" class="icon-btn" title="详情">
-                <span class="i-lucide-file-text text-14px" />
-              </NuxtLink>
-              <button class="icon-btn" title="编辑" @click="openEdit(row)">
-                <span class="i-lucide-square-pen text-14px" />
-              </button>
-              <button class="icon-btn-danger" title="删除" @click="handleDelete(row)">
-                <span class="i-lucide-trash-2 text-14px" />
-              </button>
-            </div>
+            <RowActionMenu
+              :items="rowActions"
+              :label="`${row.name}合同操作`"
+              @select="handleRowAction($event, row)"
+            />
           </template>
         </KitTable>
 
