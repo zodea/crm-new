@@ -9,6 +9,7 @@ import type {
 import type { WageQuantitySource } from '~/lib/quantity/wage-source'
 import { defineStore } from 'pinia'
 import { getDb, withTransaction } from '~/lib/db/connection'
+import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
 import {
   buildWageDraftSource,
   checkWageStatement,
@@ -25,7 +26,12 @@ function currentMonth(): string {
 
 export const usePayrollStore = defineStore('payroll-workbench', () => {
   const statements = shallowRef<WageStatement[]>([])
-  const options = shallowRef<PayrollWorkbenchOptions>({ projects: [], crews: [], workers: [] })
+  const options = shallowRef<PayrollWorkbenchOptions>({
+    projects: [],
+    crews: [],
+    workers: [],
+    c2SubjectConfigs: [],
+  })
   const selectedId = ref('')
   const loading = ref(false)
   const error = ref('')
@@ -76,22 +82,40 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     memberWorkerIds: string[]
     dailyRate?: number
     overtimeRate?: number
+    c2Rate?: number
+    dayworkRuleText?: string
     adjustmentReason?: string
     operatorName?: string
   }) {
     if (input.formatFamily === 'B')
       throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
-    if (input.formatFamily === 'C2')
-      throw new Error('C2 零星签工必须先录入签工记录，不能从考勤或工程量生成')
     const id = await withTransaction(async (tx) => {
-      const source = await buildWageDraftSource(tx, input)
-      if (!source.lines.length)
-        throw new Error('当前责任范围没有对应口径的工程量，不能生成空工资单')
+      const subjectConfigId = input.formatFamily === 'C2'
+        ? await upsertC2SubjectConfig(tx, {
+            projectId: input.projectId,
+            crewId: input.crewId,
+            leaderWorkerId: input.leaderWorkerId,
+            unitRate: Number(input.c2Rate ?? 0),
+            ruleText: input.dayworkRuleText ?? '',
+          })
+        : null
+      const source = await buildWageDraftSource(tx, {
+        ...input,
+        subjectConfigId,
+      })
+      if (!source.lines.length) {
+        throw new Error(input.formatFamily === 'C2'
+          ? '当前责任范围没有已确认签工记录，不能生成空工资单'
+          : '当前责任范围没有对应口径的工程量，不能生成空工资单')
+      }
       return createWageStatementDraft(tx, {
         ...input,
+        subjectConfigId,
         lines: source.lines,
         sourceVersion: source.sourceVersion,
         sourceUpdatedAt: source.sourceUpdatedAt,
+        sourceRecordIds: source.sourceRecordIds,
+        note: source.subjectConfig?.ruleText,
       }, { withinTransaction: true })
     })
     filters.projectId = input.projectId
@@ -138,8 +162,10 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
         dailyRate: statement.lines.find(line => line.itemName === '计时工资')?.unitPrice,
         overtimeRate: statement.lines.find(line => line.itemName === '加班工资')?.unitPrice,
         fallbackRatesByWorker,
+        subjectConfigId: statement.subjectConfigId,
+        statementId: statement.id,
       })
-      const checkedLines = statement.formatFamily === 'C1'
+      const checkedLines = statement.formatFamily === 'C1' || statement.formatFamily === 'C2'
         ? source.lines
         : source.lines.map(line => ({
             ...line,
@@ -148,6 +174,8 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
       await checkWageStatement(tx, statement.id, checkedLines, {
         sourceVersion: source.sourceVersion,
         sourceUpdatedAt: source.sourceUpdatedAt,
+        sourceRecordIds: source.sourceRecordIds,
+        subjectConfig: source.subjectConfig,
       }, { withinTransaction: true })
     })
     await load()

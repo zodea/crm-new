@@ -8,6 +8,15 @@ const options = {
   projects: [{ id: 'project-a', name: '项目甲', code: 'PA' }],
   crews: [{ id: 'crew-a', name: '泥水班' }],
   workers: [{ id: 'worker-a', name: '张师傅', crewId: 'crew-a' }],
+  c2SubjectConfigs: [{
+    id: 'config-c2',
+    projectId: 'project-a',
+    crewId: 'crew-a',
+    leaderWorkerId: 'worker-a',
+    unitRate: 360,
+    ruleText: '证明人确认后生效。',
+    updatedAt: '2026-07-29',
+  }],
 }
 
 const NuxtLinkStub = defineComponent({
@@ -33,7 +42,7 @@ describe('payroll workbench components', () => {
     expect(within(source).getByRole('option', { name: '现场复核量' })).not.toBeNull()
     const format = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资格式族' })
     expect(within(format).getByRole<HTMLOptionElement>('option', { name: /B · 合同清单直报/ }).disabled).toBe(true)
-    expect(within(format).getByRole<HTMLOptionElement>('option', { name: /C2 · 零星签工/ }).disabled).toBe(true)
+    expect(within(format).getByRole<HTMLOptionElement>('option', { name: /C2 · 零星签工/ }).disabled).toBe(false)
     await fireEvent.update(format, 'C1')
     const period = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资期间档' })
     expect(within(period).getByRole<HTMLOptionElement>('option', { name: '结算 95%' }).disabled).toBe(true)
@@ -53,6 +62,33 @@ describe('payroll workbench components', () => {
     })
   })
 
+  it('c2 uses the persisted subject config and locks signed work at 100%', async () => {
+    const { emitted } = render(PayrollFilters, {
+      props: {
+        options,
+        filters: { projectId: 'project-a', month: '2026-07', status: '', crewId: 'crew-a' },
+      },
+      global: { components: { NuxtLink: NuxtLinkStub } },
+    })
+    await fireEvent.click(screen.getByRole('button', { name: '生成月度草稿' }))
+    await fireEvent.update(screen.getByRole('combobox', { name: '工资格式族' }), 'C2')
+
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C2 大工单价' }).value).toBe('360')
+    expect(screen.getByRole<HTMLInputElement>('textbox', { name: 'C2 签工确认规则' }).value)
+      .toBe('证明人确认后生效。')
+    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '工资取数口径' }).value).toBe('field')
+    expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '工资取数口径' }).disabled).toBe(true)
+
+    await fireEvent.click(screen.getByRole('button', { name: '确认生成草稿' }))
+    expect(emitted().create?.[0]?.[0]).toMatchObject({
+      formatFamily: 'C2',
+      quantitySource: 'field',
+      payRatio: 1,
+      c2Rate: 360,
+      dayworkRuleText: '证明人确认后生效。',
+    })
+  })
+
   it('released detail is read-only and explains the frozen field snapshot', () => {
     render(PayrollStatementDetail, {
       props: {
@@ -64,6 +100,7 @@ describe('payroll workbench components', () => {
           crewName: '泥水班',
           leaderWorkerId: 'worker-a',
           leaderName: '张师傅',
+          subjectConfigId: null,
           month: '2026-07',
           purpose: 'final',
           periodKind: 'settlement',
@@ -96,6 +133,7 @@ describe('payroll workbench components', () => {
             unitPrice: 20,
             amount: 1840,
           }],
+          dayworkRecords: [],
         },
       },
     })
@@ -117,6 +155,7 @@ describe('payroll workbench components', () => {
           crewName: '泥水班',
           leaderWorkerId: 'worker-a',
           leaderName: '张师傅',
+          subjectConfigId: null,
           month: '2026-07',
           purpose: 'advance',
           periodKind: 'monthly',
@@ -140,6 +179,7 @@ describe('payroll workbench components', () => {
           note: '',
           memberWorkerIds: ['worker-a'],
           lines: [],
+          dayworkRecords: [],
         },
       },
     })

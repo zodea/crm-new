@@ -1,5 +1,10 @@
+import type { C2SubjectConfig, SignedDayworkRecord } from './daywork'
 import type { WageQuantitySource } from '~/lib/quantity/wage-source'
 import { generateId } from '~/lib/util/id'
+import {
+  listC2SubjectConfigs,
+  listStatementDayworkRecords,
+} from './daywork'
 
 export interface PayrollDb {
   execute: (sql: string, params?: unknown[]) => Promise<void>
@@ -12,9 +17,17 @@ export type WageFormatFamily = 'A' | 'B' | 'C1' | 'C2'
 export type WagePeriodKind = 'monthly' | 'settlement' | 'retention'
 export type WageReleaseResult = 'released' | 'needs_recheck'
 
+export interface C2SubjectConfigSnapshot {
+  id: string
+  unitRate: number
+  ruleText: string
+}
+
 export interface WageSourceAudit {
   sourceVersion: string
   sourceUpdatedAt: string | null
+  sourceRecordIds?: readonly string[]
+  subjectConfig?: C2SubjectConfigSnapshot
 }
 
 export interface WageStatementLineInput {
@@ -38,11 +51,13 @@ export interface WageStatementDraftInput {
   payRatio: number
   lines: readonly WageStatementLineInput[]
   memberWorkerIds?: readonly string[]
+  subjectConfigId?: string | null
   sourceVersion?: string
   sourceUpdatedAt?: string | null
   adjustmentReason?: string
   operatorName?: string
   note?: string
+  sourceRecordIds?: readonly string[]
 }
 
 export interface WageStatementLine extends WageStatementLineInput {
@@ -58,6 +73,7 @@ export interface WageStatement {
   crewName: string
   leaderWorkerId: string
   leaderName: string
+  subjectConfigId: string | null
   month: string
   purpose: WageStatementPurpose
   periodKind: WagePeriodKind
@@ -81,6 +97,7 @@ export interface WageStatement {
   note: string
   memberWorkerIds: string[]
   lines: WageStatementLine[]
+  dayworkRecords: SignedDayworkRecord[]
 }
 
 export interface WageStatementFilter {
@@ -101,6 +118,7 @@ export interface PayrollWorkbenchOptions {
   projects: PayrollOption[]
   crews: PayrollOption[]
   workers: PayrollOption[]
+  c2SubjectConfigs: C2SubjectConfig[]
 }
 
 interface StatementRow {
@@ -111,6 +129,7 @@ interface StatementRow {
   crew_name: string | null
   leader_worker_id: string
   leader_name: string
+  subject_config_id: string | null
   month: string
   format_family: WageFormatFamily
   period_kind: WagePeriodKind
@@ -183,8 +202,9 @@ function stableSourceVersion(
   lines: readonly WageStatementLineInput[],
   sourceUpdatedAt: string | null = null,
   includeUnitPrice = false,
+  salt = '',
 ): string {
-  const value = `${sourceUpdatedAt ?? ''}\n${lines
+  const value = `${sourceUpdatedAt ?? ''}\n${salt}\n${lines
     .map(line => [
       line.workerId,
       line.itemId ?? '',
@@ -347,6 +367,45 @@ async function replaceLines(
   }
 }
 
+async function replaceDayworkLinks(
+  db: PayrollDb,
+  statementId: string,
+  dayworkRecordIds: readonly string[],
+): Promise<void> {
+  const recordIds = [...new Set(dayworkRecordIds)]
+  if (recordIds.length) {
+    const placeholders = recordIds.map(() => '?').join(', ')
+    const [occupied] = await db.select<{
+      daywork_record_id: string
+      statement_id: string
+    }>(`
+      SELECT link.daywork_record_id, link.statement_id
+      FROM wage_statement_daywork_records link
+      JOIN wage_statements statement
+        ON statement.id = link.statement_id
+       AND statement.deleted_at IS NULL
+      WHERE link.daywork_record_id IN (${placeholders})
+        AND link.statement_id <> ?
+        AND link.deleted_at IS NULL
+      LIMIT 1
+    `, [...recordIds, statementId])
+    if (occupied)
+      throw new Error('存在已归属其他工资单的签工记录，不能重复计薪')
+  }
+  await db.execute(`
+    UPDATE wage_statement_daywork_records
+    SET deleted_at = datetime('now')
+    WHERE statement_id = ? AND deleted_at IS NULL
+  `, [statementId])
+  for (const dayworkRecordId of recordIds) {
+    await db.execute(`
+      INSERT INTO wage_statement_daywork_records (
+        id, statement_id, daywork_record_id
+      ) VALUES (?, ?, ?)
+    `, [generateId('wage_daywork'), statementId, dayworkRecordId])
+  }
+}
+
 export async function createWageStatementDraft(
   db: PayrollDb,
   input: WageStatementDraftInput,
@@ -359,12 +418,26 @@ export async function createWageStatementDraft(
   const periodKind = input.periodKind ?? 'monthly'
   if (formatFamily === 'B')
     throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
-  if (formatFamily === 'C2')
-    throw new Error('C2 零星签工必须先实现签工来源，当前不能生成工资单')
   if (formatFamily === 'C1' && periodKind !== 'monthly')
     throw new Error('C1 当前只支持月度考勤工资，结算与尾款档尚未实现')
   if (formatFamily === 'C1' && input.lines.length === 0)
     throw new Error('C1 必须先录入至少一条当月考勤，不能生成空工资单')
+  if (formatFamily === 'C2' && periodKind !== 'monthly')
+    throw new Error('C2 零星签工只支持月度工资单')
+  if (formatFamily === 'C2' && input.quantitySource !== 'field')
+    throw new Error('C2 零星签工固定使用已确认签工记录')
+  if (formatFamily === 'C2' && input.payRatio !== 1)
+    throw new Error('C2 零星签工固定按已确认工数 100% 核算')
+  if (
+    formatFamily === 'C2'
+    && (
+      !input.subjectConfigId
+      || !input.lines.length
+      || !(input.sourceRecordIds?.length)
+    )
+  ) {
+    throw new Error('C2 必须先配置请款主体并录入至少一条已确认签工记录')
+  }
   if (!Number.isFinite(input.payRatio) || input.payRatio < 0 || input.payRatio > 1)
     throw new Error('发放比例必须在 0% 到 100% 之间')
   if (input.purpose === 'final' && input.quantitySource !== 'field')
@@ -376,10 +449,40 @@ export async function createWageStatementDraft(
   if (periodKind === 'retention' && input.payRatio !== 1)
     throw new Error('尾款档固定按 100% 收口')
   await validateWageParticipants(db, input)
+  if (formatFamily === 'C2') {
+    const [config] = await db.select<{ id: string }>(`
+      SELECT id
+      FROM payroll_subject_configs
+      WHERE id = ?
+        AND project_id = ?
+        AND leader_worker_id = ?
+        AND format_family = 'C2'
+        AND enabled = 1
+        AND deleted_at IS NULL
+    `, [input.subjectConfigId, input.projectId, input.leaderWorkerId])
+    if (!config)
+      throw new Error('C2 请款主体配置不存在、已停用或与当前项目负责人不匹配')
+    const participantIds = [...new Set([
+      input.leaderWorkerId,
+      ...(input.memberWorkerIds ?? []),
+    ])]
+    const participantPlaceholders = participantIds.map(() => '?').join(', ')
+    const [attendance] = await db.select<{ id: string }>(`
+      SELECT id
+      FROM attendance_records
+      WHERE project_id = ?
+        AND substr(work_date, 1, 7) = ?
+        AND worker_id IN (${participantPlaceholders})
+        AND deleted_at IS NULL
+      LIMIT 1
+    `, [input.projectId, input.month, ...participantIds])
+    if (attendance)
+      throw new Error('C2 请款成员当月已有考勤记录，不能同时按签工计薪')
+  }
 
   const id = generateId('wage_statement')
   const cumulativeAmount = cumulativeTotal(input.lines, input.payRatio)
-  const previouslyPaid = formatFamily === 'C1'
+  const previouslyPaid = formatFamily === 'C1' || formatFamily === 'C2'
     ? 0
     : await releasedTotal(db, {
         projectId: input.projectId,
@@ -390,16 +493,18 @@ export async function createWageStatementDraft(
   const persist = async () => {
     await db.execute(`
       INSERT INTO wage_statements (
-        id, project_id, crew_id, leader_worker_id, month, format_family,
+        id, project_id, crew_id, leader_worker_id, subject_config_id,
+        month, format_family,
         period_kind, purpose, quantity_source, status, pay_ratio,
         cumulative_amount, previously_paid, gross_amount,
         source_version, source_updated_at, adjustment_reason, operator_name, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
       input.projectId,
       input.crewId ?? null,
       input.leaderWorkerId,
+      input.subjectConfigId ?? null,
       input.month,
       formatFamily,
       periodKind,
@@ -417,6 +522,8 @@ export async function createWageStatementDraft(
     ])
     await replaceMembers(db, id, input.leaderWorkerId, input.memberWorkerIds ?? [])
     await replaceLines(db, id, input.lines)
+    if (formatFamily === 'C2')
+      await replaceDayworkLinks(db, id, input.sourceRecordIds ?? [])
   }
   if (options.withinTransaction) {
     await persist()
@@ -454,8 +561,9 @@ export async function checkWageStatement(
     project_id: string
     leader_worker_id: string
     format_family: WageFormatFamily
+    subject_config_id: string | null
   }>(
-    `SELECT status, pay_ratio, project_id, leader_worker_id, format_family
+    `SELECT status, pay_ratio, project_id, leader_worker_id, format_family, subject_config_id
      FROM wage_statements
      WHERE id = ? AND deleted_at IS NULL`,
     [statementId],
@@ -464,9 +572,18 @@ export async function checkWageStatement(
     throw new Error('工资单不存在')
   if (statement.status === 'released')
     throw new Error('该工资单已发放，快照不可修改')
+  if (
+    statement.format_family === 'C2'
+    && (
+      !audit.subjectConfig
+      || audit.subjectConfig.id !== statement.subject_config_id
+    )
+  ) {
+    throw new Error('C2 核对必须使用当前请款主体配置')
+  }
   const sourceVersion = audit.sourceVersion || stableSourceVersion(fieldLines)
   const cumulativeAmount = cumulativeTotal(fieldLines, statement.pay_ratio)
-  const previouslyPaid = statement.format_family === 'C1'
+  const previouslyPaid = statement.format_family === 'C1' || statement.format_family === 'C2'
     ? 0
     : await releasedTotal(db, {
         projectId: statement.project_id,
@@ -477,6 +594,8 @@ export async function checkWageStatement(
 
   const persist = async () => {
     await replaceLines(db, statementId, fieldLines)
+    if (statement.format_family === 'C2')
+      await replaceDayworkLinks(db, statementId, audit.sourceRecordIds ?? [])
     await db.execute(`
       UPDATE wage_statements
       SET quantity_source = 'field',
@@ -488,6 +607,7 @@ export async function checkWageStatement(
           source_version = ?,
           source_updated_at = ?,
           checked_source_version = ?,
+          note = CASE WHEN format_family = 'C2' THEN ? ELSE note END,
           checked_at = datetime('now'),
           updated_at = datetime('now')
       WHERE id = ?
@@ -498,6 +618,7 @@ export async function checkWageStatement(
       sourceVersion,
       audit.sourceUpdatedAt ?? null,
       sourceVersion,
+      audit.subjectConfig?.ruleText ?? '',
       statementId,
     ])
   }
@@ -563,7 +684,7 @@ export async function releaseWageStatement(
     return 'needs_recheck'
   }
 
-  const previouslyPaid = statement.formatFamily === 'C1'
+  const previouslyPaid = statement.formatFamily === 'C1' || statement.formatFamily === 'C2'
     ? 0
     : await releasedTotal(db, {
         projectId: statement.projectId,
@@ -600,6 +721,9 @@ export async function releaseWageStatement(
     submittedAt,
     memberWorkerIds: statement.memberWorkerIds,
     lines: statement.lines,
+    dayworkRecords: statement.dayworkRecords,
+    subjectConfig: currentSource.subjectConfig ?? null,
+    note: statement.note,
   })
   await db.execute(`
     UPDATE wage_statements
@@ -658,6 +782,7 @@ function mapStatement(
   row: StatementRow,
   lines: WageStatementLine[],
   memberWorkerIds: string[],
+  dayworkRecords: SignedDayworkRecord[],
 ): WageStatement {
   const snapshot = row.status === 'released'
     ? parseReleaseSnapshot(row.snapshot_json)
@@ -670,6 +795,7 @@ function mapStatement(
     crewName: snapshot?.crewName ?? row.crew_name ?? '',
     leaderWorkerId: row.leader_worker_id,
     leaderName: snapshot?.leaderName || row.leader_name,
+    subjectConfigId: row.subject_config_id,
     month: row.month,
     formatFamily: row.format_family,
     periodKind: row.period_kind,
@@ -691,9 +817,10 @@ function mapStatement(
     submittedAt: snapshot?.submittedAt ?? row.submitted_at,
     checkedAt: row.checked_at,
     releasedAt: row.released_at,
-    note: row.note,
+    note: snapshot?.note ?? row.note,
     memberWorkerIds: snapshot?.memberWorkerIds ?? memberWorkerIds,
     lines: snapshot?.lines ?? lines,
+    dayworkRecords: snapshot?.dayworkRecords ?? dayworkRecords,
   }
 }
 
@@ -710,6 +837,8 @@ interface WageReleaseSnapshot {
   submittedAt: string
   memberWorkerIds: string[]
   lines: WageStatementLine[]
+  dayworkRecords: SignedDayworkRecord[]
+  note: string
 }
 
 function parseReleaseSnapshot(value: string | null): WageReleaseSnapshot | null {
@@ -742,6 +871,10 @@ function parseReleaseSnapshot(value: string | null): WageReleaseSnapshot | null 
       submittedAt: typeof snapshot.submittedAt === 'string' ? snapshot.submittedAt : '',
       memberWorkerIds: snapshot.memberWorkerIds.filter(id => typeof id === 'string'),
       lines: snapshot.lines,
+      dayworkRecords: Array.isArray(snapshot.dayworkRecords)
+        ? snapshot.dayworkRecords
+        : [],
+      note: typeof snapshot.note === 'string' ? snapshot.note : '',
     }
   }
   catch {
@@ -753,6 +886,7 @@ const STATEMENT_SELECT = `
   SELECT ws.id, ws.project_id, p.name AS project_name,
          ws.crew_id, c.name AS crew_name,
          ws.leader_worker_id, w.name AS leader_name,
+         ws.subject_config_id,
          ws.month, ws.format_family, ws.period_kind, ws.purpose,
          ws.quantity_source, ws.status, ws.needs_recheck,
          ws.pay_ratio, ws.cumulative_amount, ws.previously_paid,
@@ -786,11 +920,12 @@ export async function loadWageStatement(
   )
   if (!row)
     return null
-  const [lines, memberWorkerIds] = await Promise.all([
+  const [lines, memberWorkerIds, dayworkRecords] = await Promise.all([
     loadLines(db, statementId),
     loadMemberWorkerIds(db, statementId),
+    listStatementDayworkRecords(db, statementId),
   ])
-  return mapStatement(row, lines, memberWorkerIds)
+  return mapStatement(row, lines, memberWorkerIds, dayworkRecords)
 }
 
 export async function listWageStatements(
@@ -822,11 +957,12 @@ export async function listWageStatements(
     params,
   )
   return Promise.all(rows.map(async (row) => {
-    const [lines, memberWorkerIds] = await Promise.all([
+    const [lines, memberWorkerIds, dayworkRecords] = await Promise.all([
       loadLines(db, row.id),
       loadMemberWorkerIds(db, row.id),
+      listStatementDayworkRecords(db, row.id),
     ])
-    return mapStatement(row, lines, memberWorkerIds)
+    return mapStatement(row, lines, memberWorkerIds, dayworkRecords)
   }))
 }
 
@@ -834,7 +970,7 @@ export async function loadPayrollWorkbenchOptions(
   db: PayrollDb,
   projectId = '',
 ): Promise<PayrollWorkbenchOptions> {
-  const [projects, crews, workers] = await Promise.all([
+  const [projects, crews, workers, c2SubjectConfigs] = await Promise.all([
     db.select<{ id: string, name: string, code: string }>(`
       SELECT id, name, code FROM projects
       WHERE deleted_at IS NULL ORDER BY name, code
@@ -863,11 +999,13 @@ export async function loadPayrollWorkbenchOptions(
         )
       ORDER BY w.name
     `, [projectId, projectId, projectId]),
+    listC2SubjectConfigs(db, projectId),
   ])
   return {
     projects,
     crews,
     workers: workers.map(row => ({ id: row.id, name: row.name, crewId: row.crew_id })),
+    c2SubjectConfigs,
   }
 }
 
@@ -876,11 +1014,13 @@ export interface WageDraftBuildInput {
   crewId?: string | null
   leaderWorkerId: string
   memberWorkerIds?: readonly string[]
+  statementId?: string
   month?: string
   formatFamily?: WageFormatFamily
   quantitySource: WageQuantitySource
   dailyRate?: number
   overtimeRate?: number
+  subjectConfigId?: string | null
   fallbackRatesByWorker?: Readonly<Record<string, {
     dailyRate: number
     overtimeRate: number
@@ -910,8 +1050,144 @@ export async function buildWageDraftSource(
 
   if (formatFamily === 'B')
     throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量生成工资行')
-  if (formatFamily === 'C2')
-    throw new Error('C2 零星签工尚未接入签工来源，不能生成工资行')
+
+  if (formatFamily === 'C2') {
+    if (!input.month)
+      throw new Error('C2 零星签工必须指定月份')
+    if (!input.subjectConfigId)
+      throw new Error('C2 必须先建立请款主体×项目配置')
+    const [config] = await db.select<{
+      id: string
+      project_id: string
+      leader_worker_id: string
+      unit_rate: number
+      rule_text: string
+      updated_at: string
+    }>(`
+      SELECT id, project_id, leader_worker_id, unit_rate, rule_text, updated_at
+      FROM payroll_subject_configs
+      WHERE id = ?
+        AND format_family = 'C2'
+        AND enabled = 1
+        AND deleted_at IS NULL
+    `, [input.subjectConfigId])
+    if (
+      !config
+      || config.project_id !== input.projectId
+      || config.leader_worker_id !== input.leaderWorkerId
+    ) {
+      throw new Error('C2 请款主体配置与当前项目负责人不匹配')
+    }
+    const defaultRate = Number(config.unit_rate)
+    const placeholders = memberWorkerIds.map(() => '?').join(', ')
+    const records = memberWorkerIds.length
+      ? await db.select<{
+          id: string
+          worker_id: string
+          worker_name: string
+          work_date: string
+          work_content: string
+          start_time: string
+          end_time: string
+          labor_units: number
+          witness: string
+          confirmed_on: string | null
+          updated_at: string
+        }>(`
+          SELECT record.id, record.worker_id, worker.name AS worker_name,
+                 record.work_date, record.work_content,
+                 record.start_time, record.end_time, record.labor_units,
+                 record.witness, record.confirmed_on, record.updated_at
+          FROM signed_daywork_records record
+          JOIN workers worker
+            ON worker.id = record.worker_id
+           AND worker.deleted_at IS NULL
+          WHERE record.project_id = ?
+            AND substr(record.work_date, 1, 7) = ?
+            AND record.status = 'confirmed'
+            AND record.worker_id IN (${placeholders})
+            AND record.deleted_at IS NULL
+            AND NOT EXISTS (
+              SELECT 1
+              FROM wage_statement_daywork_records link
+              JOIN wage_statements linked_statement
+                ON linked_statement.id = link.statement_id
+               AND linked_statement.deleted_at IS NULL
+              WHERE link.daywork_record_id = record.id
+                AND link.deleted_at IS NULL
+                AND (? IS NULL OR link.statement_id <> ?)
+            )
+            ${input.crewId ? 'AND record.crew_id = ?' : ''}
+          ORDER BY record.work_date, record.start_time, record.id
+        `, [
+          input.projectId,
+          input.month,
+          ...memberWorkerIds,
+          input.statementId ?? null,
+          input.statementId ?? null,
+          ...(input.crewId ? [input.crewId] : []),
+        ])
+      : []
+    const grouped = new Map<string, {
+      workerName: string
+      quantity: number
+      updatedAt: string | null
+    }>()
+    for (const record of records) {
+      const current = grouped.get(record.worker_id) ?? {
+        workerName: record.worker_name,
+        quantity: 0,
+        updatedAt: null,
+      }
+      current.quantity = rounded(current.quantity + Number(record.labor_units))
+      current.updatedAt = !current.updatedAt || record.updated_at > current.updatedAt
+        ? record.updated_at
+        : current.updatedAt
+      grouped.set(record.worker_id, current)
+    }
+    const lines = [...grouped.entries()].map(([workerId, group]) => {
+      const unitPrice = defaultRate
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0)
+        throw new Error(`C2 大工单价必须大于 0：${group.workerName}`)
+      return {
+        workerId,
+        itemId: null,
+        itemName: `零星签工 · ${group.workerName}`,
+        unit: '工',
+        quantity: group.quantity,
+        unitPrice,
+      }
+    })
+    const sourceUpdatedAt = records.reduce<string | null>((latest, record) =>
+      !latest || record.updated_at > latest ? record.updated_at : latest, config.updated_at)
+    return {
+      lines,
+      sourceVersion: stableSourceVersion(
+        lines,
+        sourceUpdatedAt,
+        true,
+        `${config.id}|${config.unit_rate}|${config.rule_text}|${records.map(record => [
+          record.id,
+          record.worker_id,
+          record.work_date,
+          record.work_content,
+          record.start_time,
+          record.end_time,
+          record.labor_units,
+          record.witness,
+          record.confirmed_on ?? '',
+          record.updated_at,
+        ].join('|')).join('\n')}`,
+      ),
+      sourceUpdatedAt,
+      sourceRecordIds: records.map(record => record.id),
+      subjectConfig: {
+        id: config.id,
+        unitRate: Number(config.unit_rate),
+        ruleText: config.rule_text,
+      },
+    }
+  }
 
   if (formatFamily === 'C1') {
     if (!input.month)
@@ -1151,10 +1427,14 @@ export async function loadCurrentWageSourceAudit(
     dailyRate,
     overtimeRate,
     fallbackRatesByWorker,
+    subjectConfigId: statement.subjectConfigId,
+    statementId: statement.id,
   })
   return {
     sourceVersion: source.sourceVersion,
     sourceUpdatedAt: source.sourceUpdatedAt,
+    sourceRecordIds: source.sourceRecordIds,
+    subjectConfig: source.subjectConfig,
   }
 }
 
@@ -1178,8 +1458,8 @@ export async function updateDraftLinePrice(
     throw new Error('工资单不存在')
   if (statement.status !== 'draft')
     throw new Error('只有草稿可以调整单价')
-  if (statement.format_family === 'C1')
-    throw new Error('C1 工资标准来自工人档案，不能在工资单中统一改价')
+  if (statement.format_family === 'C1' || statement.format_family === 'C2')
+    throw new Error(`${statement.format_family} 工资标准来自责任配置，不能在工资明细中改价`)
   await db.execute(`
     UPDATE wage_statement_lines
     SET unit_price = ?, amount = ROUND(quantity * ?, 2), updated_at = datetime('now')

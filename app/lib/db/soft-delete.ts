@@ -242,10 +242,16 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'crew_id', table: 'crews' },
     { column: 'current_project_id', table: 'projects' },
   ],
+  payroll_subject_configs: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'leader_worker_id', table: 'workers' },
+  ],
   wage_statements: [
     { column: 'project_id', table: 'projects' },
     { column: 'crew_id', table: 'crews' },
     { column: 'leader_worker_id', table: 'workers' },
+    { column: 'subject_config_id', table: 'payroll_subject_configs' },
   ],
   wage_statement_lines: [
     { column: 'statement_id', table: 'wage_statements' },
@@ -259,6 +265,15 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'project_id', table: 'projects' },
     { column: 'crew_id', table: 'crews' },
     { column: 'worker_id', table: 'workers' },
+  ],
+  signed_daywork_records: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  wage_statement_daywork_records: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'daywork_record_id', table: 'signed_daywork_records' },
   ],
   target_costs: [{ column: 'project_id', table: 'projects' }],
   target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],

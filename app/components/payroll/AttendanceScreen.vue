@@ -35,9 +35,14 @@ async function save(input: Parameters<typeof store.save>[0]) {
           工人 × 日期 × 工时；计时工资依据，计件工资合理性校验
         </p>
       </div>
-      <NuxtLink to="/subcontract/payroll" class="btn-secondary">
-        返回工资核算
-      </NuxtLink>
+      <div class="flex flex-wrap gap-2">
+        <NuxtLink to="/subcontract/daywork" class="btn-secondary">
+          打开零星签工
+        </NuxtLink>
+        <NuxtLink to="/subcontract/payroll" class="btn-primary">
+          返回工资核算
+        </NuxtLink>
+      </div>
     </header>
 
     <section class="panel flex flex-wrap items-end gap-3 p-4" aria-label="考勤筛选">

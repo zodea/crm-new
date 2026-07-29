@@ -165,6 +165,18 @@ export async function upsertAttendanceRecord(db: PayrollDb, input: AttendanceInp
   if (lockedBook?.format_family === 'C1')
     throw new Error('该月 C1 工资已发放，考勤已锁定；后补工时需走后续调整流程')
 
+  const [signedDaywork] = await db.select<{ id: string }>(`
+    SELECT id
+    FROM signed_daywork_records
+    WHERE project_id = ?
+      AND worker_id = ?
+      AND substr(work_date, 1, 7) = substr(?, 1, 7)
+      AND deleted_at IS NULL
+    LIMIT 1
+  `, [input.projectId, input.workerId, input.workDate])
+  if (signedDaywork)
+    throw new Error('该人员当月已有 C2 签工记录，不能再录入考勤')
+
   const [current] = await db.select<{ id: string }>(`
     SELECT id FROM attendance_records
     WHERE project_id = ? AND worker_id = ? AND work_date = ? AND deleted_at IS NULL

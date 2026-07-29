@@ -194,6 +194,7 @@
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 分类型测量 | 动态类型与权限保持现有契约 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 分类型测量 | 动态单据写入路径保持现有契约 | C-FORM |
 | `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 考勤写入路径保持现有契约 | C-DENSE |
+| `app/pages/subcontract/daywork.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | C2 逐日签工独立整页；待后续同屏测量 A4 记录表 | 签工与考勤同月互斥，已发月份冻结 | C-DENSE |
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工资核算规则保持现有契约 | C-DENSE |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 待 #198 同屏测量 | 待 #198 只读核对 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工程量写入路径保持现有契约 | C-DENSE |

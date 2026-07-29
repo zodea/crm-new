@@ -7,7 +7,7 @@ import type {
   WageStatementPurpose,
 } from '~/lib/payroll/statements'
 import type { WageQuantitySource } from '~/lib/quantity/wage-source'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, shallowRef, watch } from 'vue'
 
 const props = defineProps<{
   options: PayrollWorkbenchOptions
@@ -29,12 +29,14 @@ const emit = defineEmits<{
     memberWorkerIds: string[]
     dailyRate?: number
     overtimeRate?: number
+    c2Rate?: number
+    dayworkRuleText?: string
     adjustmentReason?: string
     operatorName?: string
   }]
 }>()
 
-const open = ref(false)
+const open = shallowRef(false)
 const draft = reactive({
   projectId: props.filters.projectId ?? '',
   crewId: props.filters.crewId ?? '',
@@ -48,6 +50,8 @@ const draft = reactive({
   memberWorkerIds: [] as string[],
   dailyRate: 400,
   overtimeRate: 50,
+  c2Rate: 350,
+  dayworkRuleText: '当日用工由证明人确认后生效；半工按 0.5 工计。',
   adjustmentReason: '',
   operatorName: '',
 })
@@ -62,6 +66,12 @@ const eligibleMembers = computed(() =>
     const leader = eligibleWorkers.value.find(candidate => candidate.id === draft.leaderWorkerId)
     return worker.crewId === leader?.crewId
   }),
+)
+const activeC2Config = computed(() =>
+  props.options.c2SubjectConfigs.find(config =>
+    config.projectId === draft.projectId
+    && config.leaderWorkerId === draft.leaderWorkerId,
+  ),
 )
 
 watch(() => props.filters, (filters) => {
@@ -91,10 +101,18 @@ watch(() => draft.periodKind, (periodKind) => {
 })
 
 watch(() => draft.formatFamily, (formatFamily) => {
-  if (formatFamily !== 'C1')
+  if (formatFamily !== 'C1' && formatFamily !== 'C2')
     return
   draft.periodKind = 'monthly'
   draft.purpose = 'advance'
+  if (formatFamily === 'C2') {
+    draft.quantitySource = 'field'
+    draft.payRatioPercent = 100
+    if (activeC2Config.value) {
+      draft.c2Rate = activeC2Config.value.unitRate
+      draft.dayworkRuleText = activeC2Config.value.ruleText
+    }
+  }
 })
 
 watch(() => draft.leaderWorkerId, () => {
@@ -102,6 +120,13 @@ watch(() => draft.leaderWorkerId, () => {
     eligibleMembers.value.some(worker => worker.id === id),
   )
 })
+
+watch(activeC2Config, (config) => {
+  if (!config || draft.formatFamily !== 'C2')
+    return
+  draft.c2Rate = config.unitRate
+  draft.dayworkRuleText = config.ruleText
+}, { immediate: true })
 
 function patchFilter(key: keyof WageStatementFilter, value: string) {
   emit('update:filters', { ...props.filters, [key]: value })
@@ -123,6 +148,8 @@ function submit() {
     memberWorkerIds: [...draft.memberWorkerIds],
     dailyRate: draft.formatFamily === 'C1' ? draft.dailyRate : undefined,
     overtimeRate: draft.formatFamily === 'C1' ? draft.overtimeRate : undefined,
+    c2Rate: draft.formatFamily === 'C2' ? draft.c2Rate : undefined,
+    dayworkRuleText: draft.formatFamily === 'C2' ? draft.dayworkRuleText : undefined,
     adjustmentReason: draft.adjustmentReason,
     operatorName: draft.operatorName,
   })
@@ -183,6 +210,9 @@ function submit() {
       <NuxtLink to="/subcontract/attendance" class="btn-secondary">
         打开考勤
       </NuxtLink>
+      <NuxtLink to="/subcontract/daywork" class="btn-secondary">
+        录入 C2 签工
+      </NuxtLink>
     </div>
 
     <form v-if="open" class="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-3 xl:grid-cols-6" @submit.prevent="submit">
@@ -217,7 +247,7 @@ function submit() {
           <option value="A">A · 户型派生</option>
           <option value="B" disabled>B · 合同清单直报（后续）</option>
           <option value="C1">C1 · 月薪时工</option>
-          <option value="C2" disabled>C2 · 零星签工（后续）</option>
+          <option value="C2">C2 · 零星签工</option>
         </select>
       </label>
       <label class="field">
@@ -231,13 +261,13 @@ function submit() {
         <span>期间档</span>
         <select v-model="draft.periodKind" aria-label="工资期间档">
           <option value="monthly">月度进度</option>
-          <option value="settlement" :disabled="draft.formatFamily === 'C1'">结算 95%</option>
-          <option value="retention" :disabled="draft.formatFamily === 'C1'">尾款 100%</option>
+          <option value="settlement" :disabled="draft.formatFamily === 'C1' || draft.formatFamily === 'C2'">结算 95%</option>
+          <option value="retention" :disabled="draft.formatFamily === 'C1' || draft.formatFamily === 'C2'">尾款 100%</option>
         </select>
       </label>
       <label class="field">
         <span>工资取数口径</span>
-        <select v-model="draft.quantitySource" aria-label="工资取数口径" :disabled="draft.purpose === 'final'">
+        <select v-model="draft.quantitySource" aria-label="工资取数口径" :disabled="draft.purpose === 'final' || draft.formatFamily === 'C2'">
           <option value="provisional">暂估量</option>
           <option value="field">现场复核量</option>
         </select>
@@ -254,6 +284,16 @@ function submit() {
         <label class="field">
           <span>档案未配置时默认加班时薪</span>
           <input v-model.number="draft.overtimeRate" aria-label="C1 加班时薪" type="number" min="0" step="0.01">
+        </label>
+      </template>
+      <template v-else-if="draft.formatFamily === 'C2'">
+        <label class="field">
+          <span>默认大工单价</span>
+          <input v-model.number="draft.c2Rate" aria-label="C2 大工单价" type="number" min="0.01" step="0.01">
+        </label>
+        <label class="field md:col-span-2 xl:col-span-5">
+          <span>签工确认规则</span>
+          <input v-model="draft.dayworkRuleText" aria-label="C2 签工确认规则" type="text">
         </label>
       </template>
       <fieldset class="md:col-span-3 xl:col-span-6">
@@ -286,13 +326,13 @@ function submit() {
             B 类必须从合同清单解析工资行；来源未接入前禁止按 A 类工程量代建。
           </template>
           <template v-else-if="draft.formatFamily === 'C2'">
-            C2 以逐日签工记录为依据；签工来源未接入前禁止建单。
+            C2 只汇总本月已确认签工；待确认记录不会计薪，也不会生成考勤。
           </template>
           <template v-else>
             合同量只用于收支与量差对比，不会进入工资取数。
           </template>
         </p>
-        <button type="submit" class="btn-primary" :disabled="draft.formatFamily === 'B' || draft.formatFamily === 'C2'">
+        <button type="submit" class="btn-primary" :disabled="draft.formatFamily === 'B'">
           确认生成草稿
         </button>
       </div>

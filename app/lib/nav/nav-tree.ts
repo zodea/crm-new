@@ -219,8 +219,13 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
   if (path.startsWith('/subcontract/settlement'))
     return 'subSettle'
   // 考勤从工资页进入，归属工资核算入口
-  if (path.startsWith('/subcontract/payroll') || path.startsWith('/subcontract/attendance'))
+  if (
+    path.startsWith('/subcontract/payroll')
+    || path.startsWith('/subcontract/attendance')
+    || path.startsWith('/subcontract/daywork')
+  ) {
     return 'payroll'
+  }
   if (path.startsWith('/owner-material/control'))
     return 'omTotal'
   if (path.startsWith('/owner-material/requisition'))

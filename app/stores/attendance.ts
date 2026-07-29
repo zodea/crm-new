@@ -1,6 +1,6 @@
 import type { AttendanceRecord } from '~/lib/payroll/attendance'
 import { defineStore } from 'pinia'
-import { getDb } from '~/lib/db/connection'
+import { getDb, withTransaction } from '~/lib/db/connection'
 import {
   listAttendanceBlockedWorkerIds,
   listAttendanceRecords,
@@ -14,7 +14,12 @@ function currentMonth(): string {
 
 export const useAttendanceStore = defineStore('attendance-workbench', () => {
   const records = shallowRef<AttendanceRecord[]>([])
-  const options = shallowRef({ projects: [], crews: [], workers: [] } as Awaited<ReturnType<typeof loadPayrollWorkbenchOptions>>)
+  const options = shallowRef({
+    projects: [],
+    crews: [],
+    workers: [],
+    c2SubjectConfigs: [],
+  } as Awaited<ReturnType<typeof loadPayrollWorkbenchOptions>>)
   const blockedWorkerIds = shallowRef<string[]>([])
   const filters = reactive({
     projectId: '',
@@ -54,7 +59,7 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
   }
 
   async function save(input: Parameters<typeof upsertAttendanceRecord>[1]) {
-    await upsertAttendanceRecord(await getDb(), input)
+    await withTransaction(tx => upsertAttendanceRecord(tx, input))
     await load()
   }
 

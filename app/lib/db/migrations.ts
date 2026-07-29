@@ -4693,6 +4693,83 @@ export const migrations: Migration[] = [
       await migratePayrollAuditV29(db)
     },
   },
+  {
+    version: 30,
+    name: 'signed-daywork-payroll-source',
+    async up(db) {
+      await execScript(db, `
+        CREATE TABLE IF NOT EXISTS payroll_subject_configs (
+          id               TEXT PRIMARY KEY,
+          project_id       TEXT NOT NULL REFERENCES projects(id),
+          crew_id          TEXT REFERENCES crews(id),
+          leader_worker_id TEXT NOT NULL REFERENCES workers(id),
+          format_family    TEXT NOT NULL DEFAULT 'C2'
+                           CHECK (format_family = 'C2'),
+          unit_rate        REAL NOT NULL CHECK (unit_rate > 0),
+          rule_text        TEXT NOT NULL DEFAULT '',
+          enabled          INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at       TEXT DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS signed_daywork_records (
+          id             TEXT PRIMARY KEY,
+          project_id     TEXT NOT NULL REFERENCES projects(id),
+          crew_id        TEXT REFERENCES crews(id),
+          worker_id      TEXT NOT NULL REFERENCES workers(id),
+          work_date      TEXT NOT NULL,
+          work_content   TEXT NOT NULL DEFAULT '',
+          start_time     TEXT NOT NULL DEFAULT '',
+          end_time       TEXT NOT NULL DEFAULT '',
+          labor_units    REAL NOT NULL CHECK (labor_units IN (0.5, 1)),
+          witness        TEXT NOT NULL DEFAULT '',
+          confirmed_on   TEXT,
+          status         TEXT NOT NULL DEFAULT 'draft'
+                         CHECK (status IN ('draft', 'confirmed')),
+          note           TEXT NOT NULL DEFAULT '',
+          created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at     TEXT DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS wage_statement_daywork_records (
+          id                TEXT PRIMARY KEY,
+          statement_id      TEXT NOT NULL REFERENCES wage_statements(id),
+          daywork_record_id TEXT NOT NULL REFERENCES signed_daywork_records(id),
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at        TEXT DEFAULT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_project_date
+          ON signed_daywork_records(project_id, work_date);
+        CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_project
+          ON payroll_subject_configs(project_id, format_family);
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_worker_date
+          ON signed_daywork_records(worker_id, work_date);
+        CREATE INDEX IF NOT EXISTS idx_wage_daywork_statement
+          ON wage_statement_daywork_records(statement_id);
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_records_deleted
+          ON signed_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_deleted
+          ON payroll_subject_configs(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_daywork_records_deleted
+          ON wage_statement_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_signed_daywork_slot
+          ON signed_daywork_records(project_id, worker_id, work_date, start_time, end_time)
+          WHERE deleted_at IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_payroll_subject_config
+          ON payroll_subject_configs(project_id, leader_worker_id, format_family)
+          WHERE deleted_at IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_daywork_record
+          ON wage_statement_daywork_records(daywork_record_id)
+          WHERE deleted_at IS NULL;
+      `)
+      await addColumnIfMissing(
+        db,
+        'wage_statements',
+        'subject_config_id',
+        'TEXT REFERENCES payroll_subject_configs(id)',
+      )
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

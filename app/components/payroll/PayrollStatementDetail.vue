@@ -43,7 +43,7 @@ function money(value: number | null) {
           <p class="mt-1 text-12px text-ink-soft">
             {{ statement.formatFamily }} 族 ·
             {{ statement.periodKind === 'retention' ? '尾款 100%' : statement.periodKind === 'settlement' ? '结算档' : '月度进度' }} ·
-            {{ statement.quantitySource === 'field' ? '现场复核量' : '暂估量' }}
+            {{ statement.formatFamily === 'C2' ? '已确认签工' : statement.quantitySource === 'field' ? '现场复核量' : '暂估量' }}
             × {{ Math.round(statement.payRatio * 100) }}%
           </p>
         </div>
@@ -88,6 +88,59 @@ function money(value: number | null) {
         </template>
       </p>
 
+      <section v-if="statement.formatFamily === 'C2'" class="mx-4 mt-4 overflow-hidden rounded-md border border-line">
+        <header class="flex flex-wrap items-center justify-between gap-2 bg-surface-2 px-3 py-2">
+          <div>
+            <h3 class="text-13px font-800 text-ink">
+              零星签工核对
+            </h3>
+            <p class="mt-0.5 text-11px text-ink-soft">
+              {{ statement.dayworkRecords.length }} 条确认记录 · 半工按 0.5 工
+            </p>
+          </div>
+          <NuxtLink to="/subcontract/daywork" class="btn-ghost">
+            打开签工台账
+          </NuxtLink>
+        </header>
+        <div class="max-w-full overflow-x-auto">
+          <table class="min-w-180">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>施工内容</th>
+                <th>起止时间</th>
+                <th>用工人</th>
+                <th>用工数</th>
+                <th>证明人</th>
+                <th>确认日期</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="record in statement.dayworkRecords" :key="record.id">
+                <td class="font-mono">
+                  {{ record.workDate }}
+                </td>
+                <td>{{ record.workContent }}</td>
+                <td class="font-mono">
+                  {{ record.startTime }}–{{ record.endTime }}
+                </td>
+                <td>{{ record.workerName }}</td>
+                <td class="font-mono">
+                  {{ record.laborUnits }}
+                </td>
+                <td>{{ record.witness }}</td>
+                <td class="font-mono">
+                  {{ record.confirmedOn }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-if="statement.note" class="border-t border-line px-3 py-2 text-11px leading-5 text-ink-soft">
+          {{ statement.note }}
+        </p>
+      </section>
+
       <div class="payroll-detail__table" tabindex="0">
         <table>
           <thead>
@@ -106,7 +159,7 @@ function money(value: number | null) {
               </td>
               <td>
                 <input
-                  v-if="statement.status === 'draft' && statement.formatFamily !== 'C1'"
+                  v-if="statement.status === 'draft' && statement.formatFamily !== 'C1' && statement.formatFamily !== 'C2'"
                   :aria-label="`${line.itemName}工资单价`"
                   type="number"
                   min="0"
@@ -131,7 +184,11 @@ function money(value: number | null) {
           class="btn-primary"
           @click="emit('check')"
         >
-          {{ statement.needsRecheck ? '重新核对现场量' : '核对并锁定现场量' }}
+          {{
+            statement.needsRecheck
+              ? (statement.formatFamily === 'C2' ? '重新核对签工' : '重新核对现场量')
+              : (statement.formatFamily === 'C2' ? '核对并锁定签工' : '核对并锁定现场量')
+          }}
         </button>
         <template v-else>
           <label class="flex items-center gap-2 text-12px font-700 text-ink-soft">

@@ -19,7 +19,23 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
     await expect(source.locator('option')).toHaveText(['暂估量', '现场复核量'])
     const format = page.getByRole('combobox', { name: '工资格式族' })
     await expect(format.locator('option[value="B"]')).toHaveAttribute('disabled', '')
-    await expect(format.locator('option[value="C2"]')).toHaveAttribute('disabled', '')
+    await expect(format.locator('option[value="C2"]')).not.toHaveAttribute('disabled', '')
+    await format.selectOption('C2')
+    await expect(page.getByLabel('C2 大工单价')).toBeVisible()
+    await expect(source).toHaveValue('field')
+    await expect(source).toBeDisabled()
+    await expectDocumentDoesNotOverflow(page)
+  })
+
+  test('C2 使用独立逐日签工页，不复用考勤矩阵', async ({ page }) => {
+    await page.goto('/subcontract/daywork')
+    await expect(page.getByRole('heading', { name: '零星签工' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('form', { name: '新增签工记录' })).toBeVisible()
+    await expect(page.getByLabel('用工数').locator('option')).toHaveText([
+      '整工 · 1',
+      '半工 · 0.5',
+    ])
+    await expect(page.getByText(/只有已确认记录会进入 C2 工资/)).toBeVisible()
     await expectDocumentDoesNotOverflow(page)
   })
 
@@ -113,6 +129,10 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
         scroll: element.scrollWidth,
       }))
       expect(widths.scroll).toBeGreaterThan(widths.client)
+
+      await page.goto('/subcontract/daywork')
+      await expect(page.getByRole('heading', { name: '零星签工' })).toBeVisible({ timeout: 20_000 })
+      await expectDocumentDoesNotOverflow(page)
     })
   }
 })

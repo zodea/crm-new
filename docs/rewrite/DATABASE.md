@@ -436,10 +436,13 @@ CREATE TABLE project_aliases (
 | UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选模板房间 × 分项下钻范围；户身份由所属指派提供 |
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
-| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；`format_family=A/B/C1/C2`（当前写入口仅开放 A/C1，B/C2 待来源闭环），`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
+| PayrollSubjectConfig | `payroll_subject_configs` | `id` | C2 请款主体×项目配置；保存负责人、班组、默认大工单价和可编辑签工确认规则，活跃自然键为项目×负责人×格式族 |
+| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；`format_family=A/B/C1/C2`（当前开放 A/C1/C2，B 待真实合同清单），`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
 | WageStatementMember | `wage_statement_members` | `id` | 请款簿成员归属；同一请款簿包含一名负责人和零至多名成员，负责人同时记入成员表 |
 | WageStatementLine | `wage_statement_lines` | `id` | 月度分项快照：工人、分项、单位、工程量、工资单价、金额；核对时按现场量/考勤替换，发放后只读 |
 | AttendanceRecord | `attendance_records` | `id` | 工人×日期唯一；正常工时、加班工时、施工内容，重复录入覆盖同一工作日；日期必须真实存在，正常+加班总工时不得超过 24 小时，C2 签工成员不得录考勤 |
+| SignedDayworkRecord | `signed_daywork_records` | `id` | C2 逐日签工事实；项目、班组、人员、日期、施工内容、起止时间、整工/半工、证明人与确认日期；只有 `confirmed` 记录计薪；同人同日时段不重叠且合计不超过 1 工 |
+| WageStatementDayworkRecord | `wage_statement_daywork_records` | `id` | C2 工资单与本次核对签工记录的显式关联；每条有效签工只能归属一张有效工资单，发放时完整记录与主体费率/规则另入 `snapshot_json` |
 
 > ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资与考勤表（禁用旧名）。工资单不是纯计算视图：草稿可活算，核对强制刷新现场复核量，发放时冻结量、价、比例、明细及实际发放金额。合同量禁止进入应付取数。
 
@@ -1227,10 +1230,13 @@ penalty_settlement_deductions(
 | `unit_assignments` | `unit_id` / `crew_id` / `worker_id` | `units.id` / `crews.id` / `workers.id` | N:1 | 户 × 工种责任，不存完成；班组/个人二选一 |
 | `unit_assignment_scopes` | `assignment_id` / `room_id` / `item_id` | `unit_assignments.id` / `rooms.id` / `items.id` | N:1 | 个人指派模板房间 × 分项下钻；户由 assignment 唯一确定 |
 | `unit_stage_completions` | `unit_id` / `stage_id` / `assignment_id` | `units.id` / `construction_stages.id` / `unit_assignments.id` | N:1 | 户 × 工序阶段完成事实；assignment 只作完成时责任审计引用 |
-| `wage_statements` | `project_id` / `crew_id` | `projects.id` / `crews.id` | N:1 | 负责人请款簿头；项目、负责人、月份、格式族、档位为活跃自然键 |
+| `payroll_subject_configs` | `project_id` / `crew_id` / `leader_worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 请款主体×项目费率与规则配置 |
+| `wage_statements` | `project_id` / `crew_id` / `subject_config_id` | `projects.id` / `crews.id` / `payroll_subject_configs.id` | N:1 | 负责人请款簿头；项目、负责人、月份、格式族、档位为活跃自然键 |
 | `wage_statement_members` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 请款簿负责人及成员归属 |
 | `wage_statement_lines` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
 | `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；工人×日期唯一 |
+| `signed_daywork_records` | `project_id` / `crew_id` / `worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 逐日签工来源；整工 1 / 半工 0.5 |
+| `wage_statement_daywork_records` | `statement_id` / `daywork_record_id` | `wage_statements.id` / `signed_daywork_records.id` | N:1 | C2 核对来源关联；活跃 `daywork_record_id` 全局唯一，禁止重复计薪 |
 | `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
 | `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
 | `project_aliases` | `projectId` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |

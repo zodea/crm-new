@@ -44,8 +44,8 @@ Nuxt 路由级实现结果：
 | --- | --- | --- | --- |
 | 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
 | OCR 设置 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#204](https://github.com/zodea/crm-new/issues/204) |
-| 工资核算 / 工资进度款 | `/subcontract/payroll` 仍为明确的待实现占位，设计稿对应工资工具未落地 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| 考勤工作台 | `/subcontract/attendance` 仍为明确的待实现占位 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 工资核算 / 工资进度款 | `/subcontract/payroll` 已实现 A/C1/C2 真实来源、核对、发放快照；B 合同清单、组内分配和打印导出仍待闭环 | 已搭但未闭环 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 考勤与零星签工工作台 | `/subcontract/attendance` 已实现 C1 月矩阵；`/subcontract/daywork` 已实现 C2 逐日签工与证明确认，两种来源同月互斥 | 已实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 班组详情 | `/base/crew/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 工人详情 | `/base/worker/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 目标成本详情 | 只有列表/编辑能力，没有设计稿树形详情的对应路由 | 未实现 | [#191](https://github.com/zodea/crm-new/issues/191) |
