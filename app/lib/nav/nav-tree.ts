@@ -74,7 +74,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'invoiceLedger', mark: '账', icon: 'i-lucide-book-open-check', label: '发票台账', hint: '收票·打印·修改', to: '/finance/ledger' },
     { key: 'invoice', mark: '票', icon: 'i-lucide-scan-text', label: '发票识别', hint: '上传·校对·排版', to: '/finance/invoice' },
     { key: 'payApply', mark: '付', icon: 'i-lucide-badge-dollar-sign', label: '付款申请', hint: '10 类业务', to: '/finance/payment' },
-    { key: 'payManage', mark: '管', icon: 'i-lucide-hand-coins', label: '付款管理', hint: '待支付工作台' },
+    { key: 'payManage', mark: '管', icon: 'i-lucide-hand-coins', label: '付款管理', hint: '待支付工作台', to: '/finance/payment-management' },
     { key: 'receipt', mark: '收', icon: 'i-lucide-circle-dollar-sign', label: '收款登记', hint: '关联合同·开票', to: '/finance/receipt' },
     { key: 'invApply', mark: '开', icon: 'i-lucide-file-plus-2', label: '开票申请', hint: '收入侧起点', to: '/finance/billing' },
     { key: 'current', mark: '往', icon: 'i-lucide-repeat-2', label: '往来收付', hint: '非合同类', to: '/finance/current' },
@@ -176,6 +176,8 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'invoice'
   if (path.startsWith('/finance/ledger'))
     return 'invoiceLedger'
+  if (path.startsWith('/finance/payment-management'))
+    return 'payManage'
   if (path.startsWith('/finance/payment'))
     return 'payApply'
   if (path.startsWith('/finance/receipt'))

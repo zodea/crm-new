@@ -10,7 +10,7 @@ describe('侧栏导航树', () => {
     expect(leaves().every(item => item.icon.startsWith('i-lucide-'))).toBe(true)
   })
 
-  it('按名称或副提示搜索，并保留待建项的不可导航状态', () => {
+  it('按名称或副提示搜索，并返回真实导航入口', () => {
     const byLabel = filterNavTree(NAV_TREE, '付款申请')
     const payment = byLabel.flatMap(node => node.type === 'group' ? node.items : [node])
     expect(payment).toHaveLength(1)
@@ -22,8 +22,10 @@ describe('侧栏导航树', () => {
     const pendingPayment = filterNavTree(NAV_TREE, '待支付工作台')
       .flatMap(node => node.type === 'group' ? node.items : [node])
     expect(pendingPayment).toHaveLength(1)
-    expect(pendingPayment[0]).toMatchObject({ key: 'payManage' })
-    expect(pendingPayment[0]).not.toHaveProperty('to')
+    expect(pendingPayment[0]).toMatchObject({
+      key: 'payManage',
+      to: '/finance/payment-management',
+    })
 
     const byHint = filterNavTree(NAV_TREE, 'OCR 处理区')
     const delivery = byHint.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -125,6 +127,13 @@ describe('侧栏导航树', () => {
     }
     expect(activeNavKey('/material/delivery/archive/form')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
+  })
+
+  it('付款管理工作台入口已启用，且不会被付款申请前缀误点亮', () => {
+    expect(leaves().find(item => item.key === 'payManage')?.to)
+      .toBe('/finance/payment-management')
+    expect(activeNavKey('/finance/payment-management')).toBe('payManage')
+    expect(activeNavKey('/finance/payment/payment_1')).toBe('payApply')
   })
 
   it('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮', () => {

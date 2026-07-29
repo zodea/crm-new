@@ -140,6 +140,7 @@ describe('资金单据路由标题', () => {
     ['/finance/billing/new', '开票申请'],
     ['/finance/current/current_1', '往来收付'],
     ['/finance/reimbursement/reimbursement_1', '费用报销'],
+    ['/finance/payment-management', '付款管理'],
     ['/finance/payment/payment_1', '付款申请'],
     ['/finance/records/record_1', '支付记录'],
   ])('%s 使用具体业务标题而不是笼统的“资金管理”', (path, title) => {

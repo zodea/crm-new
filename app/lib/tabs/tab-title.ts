@@ -44,6 +44,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/finance/billing'), title: '开票申请', subtitle: '收入侧开票 · 购方信息快照' },
   { test: p => p.startsWith('/finance/current'), title: '往来收付', subtitle: '非合同往来 · 收付台账' },
   { test: p => p.startsWith('/finance/reimbursement'), title: '费用报销', subtitle: '费用明细 · 票据与经办' },
+  { test: p => p.startsWith('/finance/payment-management'), title: '付款管理', subtitle: '待支付工作台 · 批复金额与银行实际支付' },
   { test: p => p.startsWith('/finance/payment'), title: '付款申请', subtitle: '关联结算 · 发票勾稽 · 审批支付' },
   { test: p => p.startsWith('/finance/records'), title: '支付记录', subtitle: '银行支付 · 付款申请分摊' },
   { test: p => p.startsWith('/finance'), title: '资金管理' },
