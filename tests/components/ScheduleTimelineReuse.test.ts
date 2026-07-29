@@ -132,4 +132,42 @@ describe('施工排程时间轴复用', () => {
       plannedFinish: '2026-05-31',
     }])
   })
+
+  it('快速拖动即使没有中间 pointermove 也以 pointerup 最终位置提交日期', async () => {
+    const board = render(ScheduleBoard, {
+      props: {
+        snapshot,
+        today: '2026-05-20',
+      },
+      global,
+    })
+
+    const planBar = screen.getByRole('button', { name: '移动工序：放线及新建墙体' })
+    const chart = planBar.closest('.chart-cell')
+    expect(chart).not.toBeNull()
+    Object.assign(planBar, { setPointerCapture: vi.fn() })
+    Object.assign(chart!, {
+      getBoundingClientRect: () => ({ width: 610 }),
+    })
+
+    await fireEvent.pointerDown(planBar, { pointerId: 8, clientX: 100 })
+    await fireEvent.pointerUp(planBar, { pointerId: 8, clientX: 110 })
+
+    expect(board.emitted().rescheduleTask?.[0]).toEqual([{
+      task: snapshot.groups[0]!.tasks[0],
+      plannedStart: '2026-05-02',
+      plannedFinish: '2026-05-31',
+    }])
+
+    const durationHandle = screen.getByRole('button', { name: '调整工期：放线及新建墙体' })
+    Object.assign(durationHandle, { setPointerCapture: vi.fn() })
+    await fireEvent.pointerDown(durationHandle, { pointerId: 9, clientX: 100 })
+    await fireEvent.pointerUp(durationHandle, { pointerId: 9, clientX: 110 })
+
+    expect(board.emitted().rescheduleTask?.[1]).toEqual([{
+      task: snapshot.groups[0]!.tasks[0],
+      plannedStart: '2026-05-01',
+      plannedFinish: '2026-05-31',
+    }])
+  })
 })

@@ -310,19 +310,26 @@ function startDrag(event: PointerEvent, task: ScheduleTaskView, mode: 'move' | '
   }
 }
 
-function moveDrag(event: PointerEvent) {
-  if (!drag.value || drag.value.pointerId !== event.pointerId)
+function updateDragPreview(clientX: number) {
+  if (!drag.value)
     return
   drag.value = {
     ...drag.value,
-    deltaDays: Math.round((event.clientX - drag.value.startX) / drag.value.chartWidth * axisDays.value),
+    deltaDays: Math.round((clientX - drag.value.startX) / drag.value.chartWidth * axisDays.value),
   }
   applyDragPreview()
+}
+
+function moveDrag(event: PointerEvent) {
+  if (!drag.value || drag.value.pointerId !== event.pointerId)
+    return
+  updateDragPreview(event.clientX)
 }
 
 function finishDrag(event: PointerEvent) {
   if (!drag.value || drag.value.pointerId !== event.pointerId)
     return
+  updateDragPreview(event.clientX)
   const preview = dragPreview.value
   const current = drag.value
   drag.value = null
