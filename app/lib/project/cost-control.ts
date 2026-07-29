@@ -103,7 +103,13 @@ function contractPath(category: CostCategory): string {
 }
 
 function settlementPath(category: CostCategory): string {
+  if (category === '工人工资')
+    return '/subcontract/payroll'
   return category === '材料' ? '/material/settlement' : '/contract/other-settlement'
+}
+
+function paymentPath(category: CostCategory): string {
+  return category === '工人工资' ? '/subcontract/payroll' : '/finance/records'
 }
 
 function factKey(projectId: string, category: CostCategory): string {
@@ -136,6 +142,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
     settlementRows,
     paymentRows,
     reimbursementRows,
+    wageRows,
   ] = await Promise.all([
     db.select<Record<string, unknown>>(`
       ${hiddenCtesFor('target_costs')}
@@ -230,6 +237,15 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
         AND reimbursement.project_id IS NOT NULL
       ORDER BY reimbursement.project_id, reimbursement.id, line.sort_order, line.id
     `),
+    db.select<Record<string, unknown>>(`
+      ${hiddenCtesFor('wage_statements')}
+      SELECT statement.id, statement.project_id, statement.actual_amount
+      FROM wage_statements AS statement
+      WHERE ${visibleCond('wage_statements', 'statement')}
+        AND statement.status = 'released'
+        AND statement.project_id IS NOT NULL
+      ORDER BY statement.project_id, statement.released_at, statement.id
+    `),
   ])
 
   const facts = new Map<string, CostFact>()
@@ -295,6 +311,17 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
     current.reimbursementIds.add(text(row.id))
   }
 
+  for (const row of wageRows) {
+    const projectId = text(row.project_id)
+    if (!projectId)
+      continue
+    const current = getFact(projectId, '工人工资')
+    const actualAmount = number(row.actual_amount)
+    current.settledAmount += actualAmount
+    current.paidAmount += actualAmount
+    current.paymentIds.add(text(row.id))
+  }
+
   const baselineProjects = new Set(
     targetRows
       .filter(row => row.is_baseline === 1 && row.status === 'submitted')
@@ -329,7 +356,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
         : '/project/target-cost',
       contractPath: contractPath(row.category),
       settlementPath: settlementPath(row.category),
-      paymentPath: '/finance/records',
+      paymentPath: paymentPath(row.category),
       reimbursementPath: '/finance/reimbursement',
     }))
     .sort((left, right) =>
