@@ -1,7 +1,7 @@
 # 施工进度计划 — WBS 排程 + 工程量联动 + 成本对比
 
 > 路由: `/schedule` · `/schedule/:pid`
-> 页面: `pages/schedule/index.vue` · `pages/schedule/[pid].vue`
+> 页面: `pages/schedule/index.vue` · `pages/schedule/[pid]/index.vue`
 > 蓝本来源: `docs/合和新城7期施工进度计划表 （户内）2026.04.22.pdf`（MS-Project 式现场进度计划表规范）
 > 术语: `CONTEXT.md`（施工进度计划 / 工序 / 楼栋分组）· 数据关系: `DATABASE.md`
 > 定位: **工期 × 工程量** 这条线的组织主轴，替代原首页硬编码里程碑卡 + 独立楼层甘特的割裂形态。

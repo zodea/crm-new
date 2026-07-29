@@ -93,6 +93,7 @@ describe('施工进度页签文案', () => {
     ['/schedule', '施工进度'],
     ['/schedule/project_1', '施工进度'],
     ['/schedule/new', '新建楼栋分组'],
+    ['/schedule/project_1/bind/group_1', '绑定施工合同'],
   ])('%s 使用稳定业务标题，不把项目 id 或 new 当作标题', (path, title) => {
     expect(routeTitle(path)).toBe(title)
   })
@@ -100,6 +101,7 @@ describe('施工进度页签文案', () => {
   it('工作台与新建页分别说明排程和生成流程', () => {
     expect(routeSubtitle('/schedule')).toBe('WBS 排程 · 计划与实际进度')
     expect(routeSubtitle('/schedule/new')).toBe('选择楼栋 · 标准工序 · 生成排程')
+    expect(routeSubtitle('/schedule/project_1/bind/group_1')).toBe('楼栋覆盖 · 分项映射 · 数量差异')
   })
 })
 

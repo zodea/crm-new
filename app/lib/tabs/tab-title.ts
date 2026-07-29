@@ -16,6 +16,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p === '/', title: '首页', subtitle: '在建工程总览' },
   { test: p => p.startsWith('/settings/ocr'), title: 'OCR 设置', subtitle: '引擎状态 · 单据接入 · 参数边界' },
   { test: p => p === '/schedule/new', title: '新建楼栋分组', subtitle: '选择楼栋 · 标准工序 · 生成排程' },
+  { test: p => /^\/schedule\/[^/]+\/bind\/[^/]+\/?$/.test(p), title: '绑定施工合同', subtitle: '楼栋覆盖 · 分项映射 · 数量差异' },
   { test: p => p === '/schedule' || /^\/schedule\/[^/]+\/?$/.test(p), title: '施工进度', subtitle: 'WBS 排程 · 计划与实际进度' },
   { test: p => p.startsWith('/project/target-cost/form'), title: '目标成本表单', subtitle: '版本基线 · 金额基准 · 附件' },
   { test: p => p.startsWith('/project/target-cost'), title: '目标成本', subtitle: '项目成本版本 · 对比基线' },

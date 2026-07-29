@@ -53,7 +53,7 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、版本化标准工序、三步建组、项目区域配置、甘特调期/工期拖拽、依赖冲突保护，以及目标成本版本详情与正式成本对比已实现；暂估转合同差异绑定仍待闭环 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
+| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、版本化标准工序、三步建组、项目区域配置、甘特调期/工期拖拽、依赖冲突保护，以及目标成本版本详情与正式成本对比已实现；暂估分组现可在独立页面复核楼栋、分项与数量差异后绑定同项目施工合同 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
 | 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
 | 客户 / 班组 / 工人 | 列表、整页表单和详情均已存在；详情只按真实外键聚合项目、合同/收款、工程量、工资、考勤、签工和扣罚，具体参考同屏差异仍待验收 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |

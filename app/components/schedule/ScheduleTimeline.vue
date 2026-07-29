@@ -470,6 +470,18 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
               <span v-else class="truncate">{{ row.label }}</span>
 
               <span v-if="row.kind === 'task' && row.task.hasQty" class="i-lucide-link flex-none text-brand" aria-label="可下钻工程量" />
+              <template v-if="row.kind === 'group' && row.group.scopeBasis === 'provisional'">
+                <span class="pending-contract-chip">待绑定合同</span>
+                <NuxtLink
+                  v-if="mode === 'workspace'"
+                  :to="`/schedule/${row.group.projectId}/bind/${row.group.id}`"
+                  class="binding-entry"
+                  aria-label="绑定施工合同"
+                >
+                  <span class="i-lucide-link-2" aria-hidden="true" />
+                  <span>绑定</span>
+                </NuxtLink>
+              </template>
               <span v-if="mode === 'overview' && row.kind === 'group'" class="status-label">
                 {{ groupStatusLabel(row.group) }}
               </span>
@@ -570,6 +582,9 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
 .toggle-button { display: grid; width: 20px; height: 20px; flex: none; place-items: center; color: var(--ink-soft); }
 .add-task-button { display: grid; width: 20px; height: 20px; flex: none; place-items: center; border-radius: var(--radius-sm); color: var(--brand); }
 .add-task-button:hover { background: var(--brand-soft); }
+.pending-contract-chip { flex: none; border-radius: 999px; background: var(--warn-soft); padding: 2px 6px; color: var(--warn-ink); font-size: 9px; font-weight: 700; line-height: 1; }
+.binding-entry { display: inline-flex; flex: none; align-items: center; gap: 2px; border-radius: var(--radius-sm); color: var(--brand-deep); font-size: 9px; font-weight: 700; }
+.binding-entry:hover { color: var(--brand); text-decoration: underline; }
 .status-label { margin-left: auto; flex: none; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; }
 .month-label { position: absolute; top: 9px; transform: translateX(4px); white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .month-line, .today-line { position: absolute; inset-block: 0; width: 1px; background: var(--line); pointer-events: none; }

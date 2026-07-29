@@ -25,6 +25,10 @@ import {
   withUpdateLog,
 } from '~/lib/db/soft-delete'
 import {
+  bindScheduleContract,
+  previewScheduleContractBinding,
+} from '~/lib/schedule/contract-binding'
+import {
   addCalendarDays,
   calendarDays,
   dependencyConflictPreview,
@@ -319,6 +323,33 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function loadProcessLibraryTasks(libraryId: string) {
     processTasks.value = await loadScheduleProcessLibraryTasks(db, libraryId)
+  }
+
+  async function previewContractBinding(groupId: string, contractId: string) {
+    return previewScheduleContractBinding(db, groupId, contractId)
+  }
+
+  async function bindContract(
+    groupId: string,
+    contractId: string,
+    today = activeToday,
+  ) {
+    saving.value = true
+    error.value = ''
+    try {
+      const result = await withTransaction(tx =>
+        bindScheduleContract(tx, groupId, contractId),
+      )
+      await loadProject(result.preview.projectId, today)
+      return result
+    }
+    catch (cause) {
+      error.value = `施工合同绑定失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      saving.value = false
+    }
   }
 
   async function loadProject(projectId: string, today = toLocalDateInputValue()) {
@@ -1143,6 +1174,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     loadContracts,
     loadProcessLibraries,
     loadProcessLibraryTasks,
+    previewContractBinding,
+    bindContract,
     loadProject,
     createGroup,
     updateTask,
