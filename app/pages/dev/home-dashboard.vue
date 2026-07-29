@@ -29,6 +29,7 @@ const partialSnapshot = {
   name: '状态预览项目',
   code: 'DEMO-HOME-001',
   dependencies: [],
+  disabledDependencies: [],
   plannedStart: '2026-05-01',
   plannedFinish: '2026-09-30',
   actualProgress: 0.32,

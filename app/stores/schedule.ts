@@ -17,6 +17,7 @@ import { execute, select, withTransaction } from '~/lib/db/connection'
 import {
   hiddenCtesFor,
   logCreate,
+  restoreRecord,
   selectVisibleSql,
   softDelete,
   undoOperation,
@@ -26,8 +27,14 @@ import {
 import {
   addCalendarDays,
   calendarDays,
+  dependencyConflictPreview,
   dependencyConflicts,
+  dependencyWouldCycle,
+  normalizeDependencyLag,
   planTemplateTasks,
+  SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
+  SCHEDULE_DEPENDENCY_MANUAL_REMOVE_OPERATOR,
+  SCHEDULE_DEPENDENCY_RESTORE_OPERATOR,
 } from '~/lib/schedule/planning'
 import {
   loadScheduleProcessLibraries,
@@ -661,8 +668,11 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   function validatedDependency(
     tasks: readonly ScheduleTaskView[],
+    dependencies: readonly ScheduleDependencyInput[],
     successorId: string,
     predecessorId: string,
+    lagDays: number,
+    currentDependencyId?: string,
   ) {
     const successor = tasks.find(task => task.id === successorId)
     const predecessor = tasks.find(task => task.id === predecessorId)
@@ -670,6 +680,16 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw new Error('前置工序与后续工序必须属于同一楼栋分组')
     if (successor.id === predecessor.id)
       throw new Error('工序不能依赖自身')
+    if (predecessor.plannedStart >= successor.plannedStart)
+      throw new Error('前置工序的计划开始必须早于当前工序')
+    normalizeDependencyLag(lagDays)
+    if (dependencyWouldCycle(dependencies, {
+      predecessorId,
+      successorId,
+      excludeDependencyId: currentDependencyId,
+    })) {
+      throw new Error('该前后置关系会形成循环依赖')
+    }
     return { predecessor, successor }
   }
 
@@ -680,7 +700,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     predecessorId: string,
     lagDays: number,
   ) {
-    const normalizedLag = Math.trunc(lagDays)
+    const normalizedLag = normalizeDependencyLag(lagDays)
     if (current) {
       return withUpdateLog(tx, 'task_dependencies', current.id, () => tx.execute(
         `UPDATE task_dependencies
@@ -750,8 +770,15 @@ export const useScheduleStore = defineStore('schedule', () => {
     today = activeToday,
   ) {
     const tasks = snapshot.value?.groups.flatMap(group => group.tasks) ?? []
-    const { successor } = validatedDependency(tasks, successorId, predecessorId)
     const current = snapshot.value?.dependencies.find(dependency => dependency.succId === successorId)
+    const { successor } = validatedDependency(
+      tasks,
+      snapshot.value?.dependencies ?? [],
+      successorId,
+      predecessorId,
+      lagDays,
+      current?.id,
+    )
     saving.value = true
     try {
       const logId = await withTransaction(tx =>
@@ -780,8 +807,16 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw new Error('工序不存在或已删除')
     validatedTaskPatch(current, draft.task)
     validateFloorPlanPatches(current, draft.floorPlans)
-    if (draft.dependency)
-      validatedDependency(tasks, taskId, draft.dependency.predecessorId)
+    if (draft.dependency) {
+      validatedDependency(
+        tasks,
+        snapshot.value?.dependencies ?? [],
+        taskId,
+        draft.dependency.predecessorId,
+        draft.dependency.lagDays,
+        snapshot.value?.dependencies.find(dependency => dependency.succId === taskId)?.id,
+      )
+    }
     const currentDependency = snapshot.value?.dependencies.find(dependency => dependency.succId === taskId)
 
     saving.value = true
@@ -806,6 +841,129 @@ export const useScheduleStore = defineStore('schedule', () => {
         ...logs,
         conflicts: dependencyConflicts(nextTasks, snapshot.value?.dependencies ?? []),
       }
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  function previewTaskReschedule(
+    taskId: string,
+    patch: Pick<UpdateScheduleTaskPatch, 'plannedStart' | 'plannedFinish'>,
+  ) {
+    const currentSnapshot = snapshot.value
+    const tasks = currentSnapshot?.groups.flatMap(group => group.tasks) ?? []
+    const current = tasks.find(task => task.id === taskId)
+    if (!current)
+      throw new Error('工序不存在或已删除')
+    validatedTaskPatch(current, patch)
+    const nextTasks = tasks.map(task => task.id === taskId
+      ? {
+          ...task,
+          plannedStart: patch.plannedStart ?? task.plannedStart,
+          plannedFinish: patch.plannedFinish ?? task.plannedFinish,
+        }
+      : task)
+    const dependencies = currentSnapshot?.dependencies ?? []
+    const conflicts = dependencyConflicts(nextTasks, dependencies)
+      .filter((conflict) => {
+        const dependency = dependencies.find(row => row.id === conflict.dependencyId)
+        return dependency?.predId === taskId || dependency?.succId === taskId
+      })
+    return { conflicts }
+  }
+
+  async function rescheduleTask(
+    taskId: string,
+    patch: Pick<UpdateScheduleTaskPatch, 'plannedStart' | 'plannedFinish'>,
+    dependencyIdsToDisable: readonly string[],
+    today = activeToday,
+  ) {
+    const current = snapshot.value?.groups.flatMap(group => group.tasks).find(task => task.id === taskId)
+    if (!current)
+      throw new Error('工序不存在或已删除')
+    const preview = previewTaskReschedule(taskId, patch)
+    const expectedIds = [...new Set(preview.conflicts.map(conflict => conflict.dependencyId))].sort()
+    const approvedIds = [...new Set(dependencyIdsToDisable)].sort()
+    if (expectedIds.length !== approvedIds.length || expectedIds.some((id, index) => id !== approvedIds[index]))
+      throw new Error('依赖冲突状态已变化，请重新确认本次调期')
+
+    saving.value = true
+    try {
+      const result = await withTransaction(async (tx) => {
+        const taskLogId = await persistTaskPatch(tx, current, patch)
+        const disabledDependencyLogIds: string[] = []
+        for (const dependencyId of expectedIds) {
+          const logId = await softDelete(
+            tx,
+            'task_dependencies',
+            dependencyId,
+            SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
+          )
+          if (logId)
+            disabledDependencyLogIds.push(logId)
+        }
+        return { taskLogId, disabledDependencyLogIds }
+      })
+      await loadProject(current.projectId, today)
+      return result
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  async function removeDependency(dependencyId: string, today = activeToday) {
+    const current = snapshot.value?.dependencies.find(dependency => dependency.id === dependencyId)
+    if (!current)
+      return null
+    const successor = snapshot.value?.groups
+      .flatMap(group => group.tasks)
+      .find(task => task.id === current.succId)
+    const logId = await softDelete(
+      db,
+      'task_dependencies',
+      dependencyId,
+      SCHEDULE_DEPENDENCY_MANUAL_REMOVE_OPERATOR,
+    )
+    if (successor)
+      await loadProject(successor.projectId, today)
+    return logId
+  }
+
+  async function restoreDependency(dependencyId: string, today = activeToday) {
+    const currentSnapshot = snapshot.value
+    const dependency = currentSnapshot?.disabledDependencies.find(row => row.id === dependencyId)
+    const tasks = currentSnapshot?.groups.flatMap(group => group.tasks) ?? []
+    if (!dependency)
+      throw new Error('已禁用的前后置关系不存在')
+    if (currentSnapshot?.dependencies.some(row => row.succId === dependency.succId))
+      throw new Error('当前后续工序已有其他前置关系，不能恢复为多前置')
+    const { predecessor, successor } = validatedDependency(
+      tasks,
+      currentSnapshot?.dependencies ?? [],
+      dependency.succId,
+      dependency.predId,
+      dependency.lagDays,
+    )
+    const preview = dependencyConflictPreview({
+      predecessorFinish: predecessor.plannedFinish,
+      successorStart: successor.plannedStart,
+      lagDays: dependency.lagDays,
+    })
+    if (preview.hasConflict)
+      throw new Error(`计划日期仍冲突：后续工序至少应从 ${preview.earliestStart} 开始`)
+
+    saving.value = true
+    try {
+      const logId = await restoreRecord(
+        db,
+        'task_dependencies',
+        dependencyId,
+        SCHEDULE_DEPENDENCY_RESTORE_OPERATOR,
+      )
+      await loadProject(successor.projectId, today)
+      return logId
     }
     finally {
       saving.value = false
@@ -991,6 +1149,10 @@ export const useScheduleStore = defineStore('schedule', () => {
     updateFloorPlans,
     updateDependency,
     saveTaskPlan,
+    previewTaskReschedule,
+    rescheduleTask,
+    removeDependency,
+    restoreDependency,
     setBaseline,
     addTask,
     removeTask,

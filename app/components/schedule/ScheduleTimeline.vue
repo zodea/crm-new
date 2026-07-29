@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { ScheduleGroupView, ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import { computed, shallowRef, watch } from 'vue'
-import { calendarDays } from '~/lib/schedule/planning'
+import {
+  calendarDays,
+  rescheduledTaskWindow,
+} from '~/lib/schedule/planning'
 
 type TimelineMode = 'overview' | 'workspace'
 type MobileView = 'wbs' | 'gantt'
@@ -27,10 +30,29 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   selectTask: [task: ScheduleTaskView]
   addTask: [group: ScheduleGroupView]
+  rescheduleTask: [payload: {
+    task: ScheduleTaskView
+    plannedStart: string
+    plannedFinish: string
+  }]
 }>()
 
 const mobileView = shallowRef<MobileView>('wbs')
 const expandedGroupIds = shallowRef<Set<string>>(new Set())
+const drag = shallowRef<{
+  task: ScheduleTaskView
+  mode: 'move' | 'resize-finish'
+  pointerId: number
+  startX: number
+  chartWidth: number
+  deltaDays: number
+} | null>(null)
+const dragPreview = shallowRef<{
+  taskId: string
+  plannedStart: string
+  plannedFinish: string
+} | null>(null)
+const draggedRecently = shallowRef(false)
 
 watch(
   () => props.snapshot.id,
@@ -118,7 +140,10 @@ const dependencyPaths = computed(() => {
     return []
   const taskById = new Map(props.snapshot.groups.flatMap(group => group.tasks).map(task => [task.id, task]))
   const rowIndexById = new Map(rows.value.map((row, index) => [row.id, index]))
-  return props.snapshot.dependencies.flatMap((dependency) => {
+  return [
+    ...props.snapshot.dependencies.map(dependency => ({ dependency, disabled: false })),
+    ...props.snapshot.disabledDependencies.map(dependency => ({ dependency, disabled: true })),
+  ].flatMap(({ dependency, disabled }) => {
     const predecessor = taskById.get(dependency.predId)
     const successor = taskById.get(dependency.succId)
     const predecessorIndex = rowIndexById.get(dependency.predId)
@@ -130,6 +155,7 @@ const dependencyPaths = computed(() => {
     const elbowX = Math.max(fromX + 1.2, (fromX + toX) / 2)
     return [{
       id: dependency.id,
+      disabled,
       d: `M ${fromX} ${predecessorIndex * 36 + 18} H ${elbowX} V ${successorIndex * 36 + 18} H ${toX}`,
     }]
   })
@@ -160,6 +186,26 @@ function barWidth(start: string | null, finish: string | null): number {
   if (!start || !finish)
     return 0
   return Math.max(0.8, (calendarDays(start, finish) + 1) / axisDays.value * 100)
+}
+
+function displayStart(row: TimelineRow): string | null {
+  return row.kind === 'task' && dragPreview.value?.taskId === row.id
+    ? dragPreview.value.plannedStart
+    : row.start
+}
+
+function displayFinish(row: TimelineRow): string | null {
+  return row.kind === 'task' && dragPreview.value?.taskId === row.id
+    ? dragPreview.value.plannedFinish
+    : row.finish
+}
+
+function barStart(row: TimelineRow): string {
+  return displayStart(row) ?? axisStart.value
+}
+
+function barFinish(row: TimelineRow): string {
+  return displayFinish(row) ?? axisStart.value
 }
 
 function percent(value: number): string {
@@ -223,6 +269,102 @@ function isHighlighted(row: TimelineRow): boolean {
     ? row.id === props.highlightedGroupId
     : row.kind === 'task' && row.id === props.highlightedTaskId
 }
+
+function applyDragPreview() {
+  if (!drag.value)
+    return
+  const next = rescheduledTaskWindow({
+    plannedStart: drag.value.task.plannedStart,
+    plannedFinish: drag.value.task.plannedFinish,
+    deltaDays: drag.value.deltaDays,
+    mode: drag.value.mode,
+  })
+  dragPreview.value = {
+    taskId: drag.value.task.id,
+    ...next,
+  }
+}
+
+function startDrag(event: PointerEvent, task: ScheduleTaskView, mode: 'move' | 'resize-finish') {
+  if (props.mode !== 'workspace')
+    return
+  const target = event.currentTarget as HTMLElement
+  const chart = target.closest('.chart-cell')
+  if (!chart)
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  target.setPointerCapture(event.pointerId)
+  drag.value = {
+    task,
+    mode,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    chartWidth: Math.max(chart.getBoundingClientRect().width, 1),
+    deltaDays: 0,
+  }
+  dragPreview.value = {
+    taskId: task.id,
+    plannedStart: task.plannedStart,
+    plannedFinish: task.plannedFinish,
+  }
+}
+
+function moveDrag(event: PointerEvent) {
+  if (!drag.value || drag.value.pointerId !== event.pointerId)
+    return
+  drag.value = {
+    ...drag.value,
+    deltaDays: Math.round((event.clientX - drag.value.startX) / drag.value.chartWidth * axisDays.value),
+  }
+  applyDragPreview()
+}
+
+function finishDrag(event: PointerEvent) {
+  if (!drag.value || drag.value.pointerId !== event.pointerId)
+    return
+  const preview = dragPreview.value
+  const current = drag.value
+  drag.value = null
+  dragPreview.value = null
+  if (!preview || !current.deltaDays)
+    return
+  draggedRecently.value = true
+  setTimeout(() => {
+    draggedRecently.value = false
+  }, 0)
+  emit('rescheduleTask', {
+    task: current.task,
+    plannedStart: preview.plannedStart,
+    plannedFinish: preview.plannedFinish,
+  })
+}
+
+function cancelDrag(event: PointerEvent) {
+  if (!drag.value || drag.value.pointerId !== event.pointerId)
+    return
+  drag.value = null
+  dragPreview.value = null
+}
+
+function openTaskFromBar(task: ScheduleTaskView) {
+  if (!draggedRecently.value)
+    emit('selectTask', task)
+}
+
+function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', deltaDays: number) {
+  if (props.mode !== 'workspace')
+    return
+  emit('rescheduleTask', {
+    task,
+    ...rescheduledTaskWindow({
+      plannedStart: task.plannedStart,
+      plannedFinish: task.plannedFinish,
+      deltaDays,
+      mode,
+    }),
+  })
+}
 </script>
 
 <template>
@@ -284,6 +426,7 @@ function isHighlighted(row: TimelineRow): boolean {
             :key="dependency.id"
             :d="dependency.d"
             class="dependency-path"
+            :class="dependency.disabled && 'is-disabled'"
             marker-end="url(#schedule-dependency-arrow)"
           />
         </svg>
@@ -360,18 +503,38 @@ function isHighlighted(row: TimelineRow): boolean {
                 row.kind === 'task' && taskState(row.task) === 'late-start' && 'is-late',
               ]"
               :style="{
-                'left': `${position(row.start)}%`,
-                'width': `${barWidth(row.start, row.finish)}%`,
+                'left': `${position(barStart(row))}%`,
+                'width': `${barWidth(displayStart(row), displayFinish(row))}%`,
                 '--bar-color': row.kind === 'task' ? row.task.color : 'var(--brand)',
               }"
               :disabled="row.kind !== 'task'"
-              :aria-label="row.kind === 'task' ? `查看时间轴：${row.label}` : undefined"
-              :title="`${row.label}：${row.start} 至 ${row.finish}`"
-              @click="row.kind === 'task' && emit('selectTask', row.task)"
+              :aria-label="row.kind === 'task' ? `移动工序：${row.label}` : undefined"
+              :title="`${row.label}：${displayStart(row)} 至 ${displayFinish(row)}；拖动整体可调日期`"
+              @click="row.kind === 'task' && openTaskFromBar(row.task)"
+              @pointerdown="row.kind === 'task' && startDrag($event, row.task, 'move')"
+              @pointermove="moveDrag"
+              @pointerup="finishDrag"
+              @pointercancel="cancelDrag"
+              @keydown.left.prevent="row.kind === 'task' && nudgeTask(row.task, 'move', -1)"
+              @keydown.right.prevent="row.kind === 'task' && nudgeTask(row.task, 'move', 1)"
             >
               <span class="actual-fill" :style="{ width: percent(row.actual) }" />
               <span v-if="row.kind === 'task' && row.task.baselineStart" class="baseline-mark" />
             </button>
+            <button
+              v-if="mode === 'workspace' && row.kind === 'task'"
+              type="button"
+              class="duration-handle"
+              :style="{ left: `calc(${position(barFinish(row))}% - 5px)` }"
+              :aria-label="`调整工期：${row.label}`"
+              title="拖动右缘调整计划完成日；左缘保持不动"
+              @pointerdown="startDrag($event, row.task, 'resize-finish')"
+              @pointermove="moveDrag"
+              @pointerup="finishDrag"
+              @pointercancel="cancelDrag"
+              @keydown.left.prevent="nudgeTask(row.task, 'resize-finish', -1)"
+              @keydown.right.prevent="nudgeTask(row.task, 'resize-finish', 1)"
+            />
             <span v-if="mode === 'workspace' && row.kind === 'task' && dependencyLabel(row.id)" class="dependency-label">
               {{ dependencyLabel(row.id) }}
             </span>
@@ -406,15 +569,19 @@ function isHighlighted(row: TimelineRow): boolean {
 .month-line { border-left: 1px dashed color-mix(in srgb, var(--line) 65%, transparent); background: transparent; }
 .today-line { z-index: 3; width: 2px; background: var(--danger); opacity: .6; }
 .today-label { position: absolute; z-index: 4; top: -1px; transform: translateX(-50%); border-radius: var(--radius-sm); background: var(--danger-soft); padding-inline: 4px; color: var(--danger); font-size: 9px; font-weight: 800; }
-.plan-bar { position: absolute; top: 9px; height: 18px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, var(--ink)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bar-color) 18%, var(--panel)); cursor: pointer; }
+.plan-bar { position: absolute; top: 9px; height: 18px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, var(--ink)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bar-color) 18%, var(--panel)); cursor: grab; touch-action: none; }
+.plan-bar:active { cursor: grabbing; }
 .plan-bar:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--brand-ring); }
 .plan-bar.is-rollup { top: 11px; height: 14px; border-radius: 2px; cursor: default; }
 .plan-bar.is-late { border: 1.5px dashed var(--danger); }
 .actual-fill { position: absolute; inset-block: 0; left: 0; max-width: 100%; border-radius: 2px; background: var(--bar-color); opacity: .86; }
 .baseline-mark { position: absolute; inset: 2px; border: 1px dashed var(--ink); opacity: .55; }
+.duration-handle { position: absolute; z-index: 4; top: 7px; width: 10px; height: 22px; border-inline: 2px solid var(--brand-deep); border-radius: 2px; cursor: ew-resize; touch-action: none; opacity: 0; }
+.chart-cell:hover .duration-handle, .duration-handle:focus-visible { opacity: .9; background: color-mix(in srgb, var(--panel) 72%, transparent); }
 .dependency-label { position: absolute; right: 5px; top: 10px; max-width: 44%; overflow: hidden; color: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .dependency-overlay { position: absolute; z-index: 3; top: 34px; overflow: visible; pointer-events: none; }
 .dependency-path { fill: none; stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
+.dependency-path.is-disabled { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 2 4; opacity: .55; }
 .mobile-view-switch { display: none; align-items: center; width: max-content; margin: 8px 10px; border-radius: var(--radius-btn); background: var(--surface-3); padding: 2px; }
 .view-button { border-radius: calc(var(--radius-btn) - 2px); padding: 4px 10px; color: var(--ink-soft); font-size: 11px; }
 .view-button.is-active { background: var(--panel); color: var(--brand-deep); box-shadow: var(--shadow-card); font-weight: 700; }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addCalendarDays,
+  dependencyConflictPreview,
   dependencyConflicts,
+  dependencyWouldCycle,
   planTemplateTasks,
+  rescheduledTaskWindow,
   scheduleDeviationDays,
   schedulePlannedProgress,
 } from '~/lib/schedule/planning'
@@ -56,5 +60,64 @@ describe('施工进度纯领域规则', () => {
       successorId: 'b',
       requiredDate: '2026-07-15',
     })])
+  })
+
+  it('依赖预览实时给出最早日期和冲突天数，lag 只接受 -365..365', () => {
+    expect(dependencyConflictPreview({
+      predecessorFinish: '2026-07-20',
+      successorStart: '2026-07-18',
+      lagDays: 2,
+    })).toEqual({
+      earliestStart: '2026-07-22',
+      conflictDays: 4,
+      hasConflict: true,
+    })
+    expect(dependencyConflictPreview({
+      predecessorFinish: '2026-07-20',
+      successorStart: '2026-07-22',
+      lagDays: 2,
+    }).hasConflict).toBe(false)
+    expect(() => dependencyConflictPreview({
+      predecessorFinish: '2026-07-20',
+      successorStart: '2026-07-22',
+      lagDays: 366,
+    })).toThrow(/-365.*365/)
+    expect(() => dependencyConflictPreview({
+      predecessorFinish: '2026-07-20',
+      successorStart: '2026-07-22',
+      lagDays: 1.5,
+    })).toThrow(/整数/)
+  })
+
+  it('新增或恢复依赖会拦截自环和跨多跳循环', () => {
+    const dependencies = [
+      { id: 'ab', predId: 'a', succId: 'b', dependencyType: 'FS' as const, lagDays: 0 },
+      { id: 'bc', predId: 'b', succId: 'c', dependencyType: 'FS' as const, lagDays: 0 },
+    ]
+    expect(dependencyWouldCycle(dependencies, { predecessorId: 'c', successorId: 'a' })).toBe(true)
+    expect(dependencyWouldCycle(dependencies, { predecessorId: 'a', successorId: 'c' })).toBe(false)
+    expect(dependencyWouldCycle(dependencies, { predecessorId: 'a', successorId: 'a' })).toBe(true)
+  })
+
+  it('甘特拖动整体平移日期，右缘只调整工期且不允许负工期', () => {
+    expect(rescheduledTaskWindow({
+      plannedStart: '2026-07-01',
+      plannedFinish: '2026-07-10',
+      deltaDays: 3,
+      mode: 'move',
+    })).toEqual({
+      plannedStart: '2026-07-04',
+      plannedFinish: '2026-07-13',
+    })
+    expect(rescheduledTaskWindow({
+      plannedStart: '2026-07-01',
+      plannedFinish: '2026-07-10',
+      deltaDays: -20,
+      mode: 'resize-finish',
+    })).toEqual({
+      plannedStart: '2026-07-01',
+      plannedFinish: '2026-07-01',
+    })
+    expect(addCalendarDays('2026-07-01', 3)).toBe('2026-07-04')
   })
 })

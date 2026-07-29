@@ -285,4 +285,126 @@ describe('schedule store：排程唯一 action 写路径', () => {
       durationDays: 9,
     })
   })
+
+  it('甘特调期遇到 FS 冲突时只软禁用关系，日期修复后才允许恢复', async () => {
+    const store = useScheduleStore()
+    const settingOut = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'setting-out')!
+    const waterproof = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'waterproof')!
+    await store.createGroup({
+      projectId: 'p1',
+      contractId: 'contract-main',
+      name: '拖拽验证组',
+      buildingIds: ['b1'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: settingOut.key, enabled: true, durationDays: 5, anchorStart: null },
+        { templateKey: waterproof.key, enabled: true, durationDays: 5, anchorStart: null },
+      ],
+    }, '2026-07-01')
+
+    const [predecessor, successor] = store.snapshot!.groups[0]!.tasks
+    const dependency = store.snapshot!.dependencies.find(row => row.succId === successor!.id)!
+    const preview = store.previewTaskReschedule(successor!.id, {
+      plannedStart: '2026-07-03',
+      plannedFinish: '2026-07-07',
+    })
+    expect(preview.conflicts.map(row => row.dependencyId)).toEqual([dependency.id])
+
+    const result = await store.rescheduleTask(successor!.id, {
+      plannedStart: '2026-07-03',
+      plannedFinish: '2026-07-07',
+    }, [dependency.id], '2026-07-01')
+    expect(result.disabledDependencyLogIds).toHaveLength(1)
+    expect(store.snapshot!.dependencies).toEqual([])
+    expect(store.snapshot!.disabledDependencies).toEqual([
+      expect.objectContaining({
+        id: dependency.id,
+        predId: predecessor!.id,
+        succId: successor!.id,
+        disabledReason: 'schedule-conflict',
+        auditLogId: expect.any(String),
+      }),
+    ])
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/计划日期仍冲突/)
+
+    await store.rescheduleTask(successor!.id, {
+      plannedStart: '2026-07-06',
+      plannedFinish: '2026-07-10',
+    }, [], '2026-07-01')
+    await mem.execute(
+      `INSERT INTO task_dependencies
+        (id, pred_id, succ_id, dependency_type, lag_days)
+       VALUES ('active-other', ?, ?, 'FS', 0)`,
+      [predecessor!.id, successor!.id],
+    )
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/已有其他前置关系/)
+    await mem.execute(`UPDATE task_dependencies SET deleted_at = datetime('now') WHERE id = 'active-other'`)
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01')).resolves.toBeTruthy()
+    expect(store.snapshot!.dependencies).toEqual([
+      expect.objectContaining({ id: dependency.id }),
+    ])
+    await store.removeDependency(dependency.id, '2026-07-01')
+    expect(store.snapshot!.disabledDependencies).toEqual([])
+    const [manualDeleteLog] = await mem.select<{ operator: string }>(
+      `SELECT operator
+       FROM operation_logs
+       WHERE table_name = 'task_dependencies'
+         AND record_id = ?
+         AND action = 'delete'
+       ORDER BY rowid DESC
+       LIMIT 1`,
+      [dependency.id],
+    )
+    expect(manualDeleteLog?.operator).toBe('schedule:manual-remove')
+  })
+
+  it('依赖编辑只接受同组较早工序、合法 lag，且恢复会拦截循环', async () => {
+    const store = useScheduleStore()
+    const templates = SCHEDULE_TASK_TEMPLATES.slice(0, 3)
+    await store.createGroup({
+      projectId: 'p1',
+      contractId: 'contract-main',
+      name: '依赖验证组',
+      buildingIds: ['b1'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: templates.map(template => ({
+        templateKey: template.key,
+        enabled: true,
+        durationDays: 3,
+        anchorStart: null,
+      })),
+    }, '2026-07-01')
+    const [first, second, third] = store.snapshot!.groups[0]!.tasks
+
+    await expect(store.updateDependency(first!.id, second!.id, 0, '2026-07-01'))
+      .rejects
+      .toThrow(/计划开始必须早于/)
+    await expect(store.updateDependency(third!.id, first!.id, 366, '2026-07-01'))
+      .rejects
+      .toThrow(/-365.*365/)
+
+    const dependency = store.snapshot!.dependencies.find(row => row.succId === second!.id)!
+    await store.rescheduleTask(second!.id, {
+      plannedStart: '2026-07-02',
+      plannedFinish: '2026-07-04',
+    }, [dependency.id], '2026-07-01')
+    await mem.execute(
+      `INSERT INTO task_dependencies
+        (id, pred_id, succ_id, dependency_type, lag_days)
+       VALUES ('cycle-third-first', ?, ?, 'FS', 0)`,
+      [third!.id, first!.id],
+    )
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/循环依赖/)
+  })
 })

@@ -15,6 +15,7 @@ const selectedProjectId = shallowRef('')
 const initialized = shallowRef(false)
 const selectedTask = shallowRef<ScheduleTaskView | null>(null)
 const taskDialogOpen = shallowRef(false)
+const dependencyDialogOpen = shallowRef(false)
 const highlightedGroupId = computed(() => String(route.query.group ?? ''))
 
 const selectedGroupName = computed(() => {
@@ -25,12 +26,26 @@ const selectedGroupName = computed(() => {
 const selectedDependency = computed(() => selectedTask.value
   ? store.snapshot?.dependencies.find(dependency => dependency.succId === selectedTask.value?.id) ?? null
   : null)
+const selectedGroupTasks = computed(() => {
+  const task = selectedTask.value
+  if (!task)
+    return []
+  return store.snapshot?.groups.find(candidate => candidate.id === task.groupId)?.tasks ?? []
+})
 const predecessorTasks = computed(() => {
   const task = selectedTask.value
   if (!task)
     return []
-  const group = store.snapshot?.groups.find(candidate => candidate.id === task.groupId)
-  return group?.tasks.filter(candidate => candidate.sortOrder < task.sortOrder) ?? []
+  return selectedGroupTasks.value.filter(candidate =>
+    candidate.id !== task.id
+    && candidate.plannedStart < task.plannedStart,
+  )
+})
+const selectedDisabledDependencies = computed(() => {
+  const task = selectedTask.value
+  return task
+    ? store.snapshot?.disabledDependencies.filter(dependency => dependency.succId === task.id) ?? []
+    : []
 })
 
 const projectOptions = computed(() => store.catalog.map(project => ({
@@ -88,7 +103,40 @@ watch(
 
 function openTask(task: ScheduleTaskView) {
   selectedTask.value = task
+  dependencyDialogOpen.value = false
   taskDialogOpen.value = true
+}
+
+async function openDependencyEditor() {
+  taskDialogOpen.value = false
+  await nextTick()
+  dependencyDialogOpen.value = true
+}
+
+async function returnToTaskDetail() {
+  const taskId = selectedTask.value?.id
+  dependencyDialogOpen.value = false
+  if (taskId) {
+    selectedTask.value = store.snapshot?.groups
+      .flatMap(group => group.tasks)
+      .find(task => task.id === taskId) ?? selectedTask.value
+  }
+  await nextTick()
+  taskDialogOpen.value = Boolean(selectedTask.value)
+}
+
+async function closeDependencyEditor(dirty: boolean) {
+  if (dirty) {
+    const approved = await confirm({
+      variant: 'simple',
+      title: '放弃依赖设置修改？',
+      message: '前置工序或 Lag 尚未保存，关闭后本次修改不会保留。',
+      confirmLabel: '放弃修改',
+    })
+    if (!approved)
+      return
+  }
+  await returnToTaskDetail()
 }
 
 async function setBaseline() {
@@ -146,6 +194,88 @@ async function removeTask() {
     await store.removeTask(selectedTask.value.id, today)
     taskDialogOpen.value = false
     success('工序已删除')
+  }
+  catch (cause) {
+    error(toErrorMessage(cause))
+  }
+}
+
+async function saveDependency(payload: { predecessorId: string, lagDays: number }) {
+  if (!selectedTask.value)
+    return
+  try {
+    const result = await store.updateDependency(
+      selectedTask.value.id,
+      payload.predecessorId,
+      payload.lagDays,
+      today,
+    )
+    await returnToTaskDetail()
+    success('前后置依赖已保存')
+    if (result.conflicts.length)
+      warning(`当前计划存在 ${result.conflicts.length} 条日期冲突，关系已保留供排程核对`)
+  }
+  catch (cause) {
+    error(toErrorMessage(cause))
+  }
+}
+
+async function removeDependency(dependencyId: string) {
+  const approved = await confirm({
+    variant: 'simple',
+    title: '移除当前前后置依赖？',
+    message: '这是主动移除：关系会软删除并保留操作日志，但不会显示为“调期冲突待恢复”。',
+    confirmLabel: '移除依赖',
+  })
+  if (!approved)
+    return
+  try {
+    await store.removeDependency(dependencyId, today)
+    await returnToTaskDetail()
+    success('前后置依赖已移除')
+  }
+  catch (cause) {
+    error(toErrorMessage(cause))
+  }
+}
+
+async function restoreDependency(dependencyId: string) {
+  try {
+    await store.restoreDependency(dependencyId, today)
+    success('前后置依赖已恢复')
+  }
+  catch (cause) {
+    error(toErrorMessage(cause))
+  }
+}
+
+async function rescheduleTask(payload: {
+  task: ScheduleTaskView
+  plannedStart: string
+  plannedFinish: string
+}) {
+  try {
+    const patch = {
+      plannedStart: payload.plannedStart,
+      plannedFinish: payload.plannedFinish,
+    }
+    const preview = store.previewTaskReschedule(payload.task.id, patch)
+    const conflictIds = [...new Set(preview.conflicts.map(conflict => conflict.dependencyId))]
+    if (conflictIds.length) {
+      const conflictLines = preview.conflicts
+        .slice(0, 3)
+        .map(conflict => `${conflict.predecessorName} → ${conflict.successorName}（至少 ${conflict.requiredDate}）`)
+      const approved = await confirm({
+        variant: 'simple',
+        title: `本次调期会冲突 ${conflictIds.length} 条依赖`,
+        message: `${conflictLines.join('；')}${preview.conflicts.length > 3 ? '；…' : ''}。继续后只置灰这些关系，不会清除记录。`,
+        confirmLabel: '调期并置灰冲突',
+      })
+      if (!approved)
+        return
+    }
+    await store.rescheduleTask(payload.task.id, patch, conflictIds, today)
+    success(conflictIds.length ? '计划已调整，冲突依赖已置灰' : '计划日期已调整')
   }
   catch (cause) {
     error(toErrorMessage(cause))
@@ -286,6 +416,7 @@ onMounted(initialize)
       :highlighted-group-id="highlightedGroupId"
       @select-task="openTask"
       @add-task="addTask"
+      @reschedule-task="rescheduleTask"
     />
 
     <ScheduleTaskDialog
@@ -298,6 +429,22 @@ onMounted(initialize)
       @save="saveTask"
       @remove="removeTask"
       @drill="drillQuantity"
+      @edit-dependency="openDependencyEditor"
+    />
+
+    <ScheduleDependencyDialog
+      v-model:open="dependencyDialogOpen"
+      :task="selectedTask"
+      :group-name="selectedGroupName"
+      :group-tasks="selectedGroupTasks"
+      :dependencies="store.snapshot?.dependencies ?? []"
+      :dependency="selectedDependency"
+      :disabled-dependencies="selectedDisabledDependencies"
+      :busy="store.saving"
+      @save="saveDependency"
+      @remove="removeDependency"
+      @restore="restoreDependency"
+      @request-close="closeDependencyEditor"
     />
   </div>
 </template>

@@ -11,6 +11,11 @@ defineProps<{
 const emit = defineEmits<{
   selectTask: [task: ScheduleTaskView]
   addTask: [group: ScheduleGroupView]
+  rescheduleTask: [payload: {
+    task: ScheduleTaskView
+    plannedStart: string
+    plannedFinish: string
+  }]
 }>()
 </script>
 
@@ -32,6 +37,7 @@ const emit = defineEmits<{
       :highlighted-group-id="highlightedGroupId"
       @select-task="emit('selectTask', $event)"
       @add-task="emit('addTask', $event)"
+      @reschedule-task="emit('rescheduleTask', $event)"
     />
   </section>
 </template>

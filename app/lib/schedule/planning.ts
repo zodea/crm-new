@@ -40,6 +40,17 @@ export interface ScheduleDependencyConflict {
   actualDate: string
 }
 
+export interface ScheduleDependencyPreview {
+  earliestStart: string
+  conflictDays: number
+  hasConflict: boolean
+}
+
+export type ScheduleTaskDragMode = 'move' | 'resize-finish'
+export const SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR = 'schedule:conflict-reschedule'
+export const SCHEDULE_DEPENDENCY_MANUAL_REMOVE_OPERATOR = 'schedule:manual-remove'
+export const SCHEDULE_DEPENDENCY_RESTORE_OPERATOR = 'schedule:dependency-restore'
+
 function parseCalendarDate(value: string): number {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
   if (!match)
@@ -57,6 +68,86 @@ export function addCalendarDays(value: string, days: number): string {
 
 export function calendarDays(from: string, to: string): number {
   return Math.round((parseCalendarDate(to) - parseCalendarDate(from)) / 86_400_000)
+}
+
+export function normalizeDependencyLag(lagDays: number): number {
+  if (!Number.isFinite(lagDays) || !Number.isInteger(lagDays))
+    throw new Error('Lag 天数必须是整数')
+  if (lagDays < -365 || lagDays > 365)
+    throw new Error('Lag 天数必须在 -365 到 365 之间')
+  return lagDays
+}
+
+export function dependencyConflictPreview(input: {
+  predecessorFinish: string
+  successorStart: string
+  lagDays: number
+}): ScheduleDependencyPreview {
+  const earliestStart = addCalendarDays(
+    input.predecessorFinish,
+    normalizeDependencyLag(input.lagDays),
+  )
+  const conflictDays = Math.max(0, calendarDays(input.successorStart, earliestStart))
+  return {
+    earliestStart,
+    conflictDays,
+    hasConflict: conflictDays > 0,
+  }
+}
+
+export function dependencyWouldCycle(
+  dependencies: readonly ScheduleDependencyInput[],
+  input: {
+    predecessorId: string
+    successorId: string
+    excludeDependencyId?: string
+  },
+): boolean {
+  if (input.predecessorId === input.successorId)
+    return true
+  const outgoing = new Map<string, string[]>()
+  for (const dependency of dependencies) {
+    if (dependency.id === input.excludeDependencyId)
+      continue
+    outgoing.set(
+      dependency.predId,
+      [...(outgoing.get(dependency.predId) ?? []), dependency.succId],
+    )
+  }
+  const pending = [input.successorId]
+  const visited = new Set<string>()
+  while (pending.length) {
+    const taskId = pending.pop()!
+    if (taskId === input.predecessorId)
+      return true
+    if (visited.has(taskId))
+      continue
+    visited.add(taskId)
+    pending.push(...(outgoing.get(taskId) ?? []))
+  }
+  return false
+}
+
+export function rescheduledTaskWindow(input: {
+  plannedStart: string
+  plannedFinish: string
+  deltaDays: number
+  mode: ScheduleTaskDragMode
+}): { plannedStart: string, plannedFinish: string } {
+  const deltaDays = Math.trunc(input.deltaDays)
+  if (input.mode === 'move') {
+    return {
+      plannedStart: addCalendarDays(input.plannedStart, deltaDays),
+      plannedFinish: addCalendarDays(input.plannedFinish, deltaDays),
+    }
+  }
+  const proposedFinish = addCalendarDays(input.plannedFinish, deltaDays)
+  return {
+    plannedStart: input.plannedStart,
+    plannedFinish: calendarDays(input.plannedStart, proposedFinish) < 0
+      ? input.plannedStart
+      : proposedFinish,
+  }
 }
 
 export function planTemplateTasks(

@@ -37,6 +37,7 @@ const snapshot: ScheduleProjectView = {
   actualProgress: 0.5,
   deviationDays: -2,
   dependencies: [],
+  disabledDependencies: [],
   groups: [{
     id: 'group-1',
     projectId: 'project-1',
@@ -117,5 +118,18 @@ describe('施工排程时间轴复用', () => {
     expect(boardTimeline.textContent).toContain('放线及新建墙体')
     await fireEvent.click(screen.getByRole('button', { name: '放线及新建墙体', exact: true }))
     expect(board.emitted().selectTask?.[0]).toEqual([snapshot.groups[0]!.tasks[0]])
+    const durationHandle = screen.getByRole('button', { name: '调整工期：放线及新建墙体' })
+    Object.assign(durationHandle, { setPointerCapture: vi.fn() })
+    await fireEvent.pointerDown(durationHandle, { pointerId: 4, clientX: 20 })
+    await fireEvent.pointerMove(durationHandle, { pointerId: 4, clientX: 200 })
+    await fireEvent.pointerCancel(durationHandle, { pointerId: 4, clientX: 200 })
+    expect(board.emitted().rescheduleTask).toBeUndefined()
+
+    await fireEvent.keyDown(durationHandle, { key: 'ArrowRight' })
+    expect(board.emitted().rescheduleTask?.[0]).toEqual([{
+      task: snapshot.groups[0]!.tasks[0],
+      plannedStart: '2026-05-01',
+      plannedFinish: '2026-05-31',
+    }])
   })
 })
