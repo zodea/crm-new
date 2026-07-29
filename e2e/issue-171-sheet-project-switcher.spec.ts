@@ -5,7 +5,6 @@ async function openHome(page: import('@playwright/test').Page, width: number) {
   await page.addInitScript(() => {
     localStorage.removeItem('ruihang-sidebar-pinned')
     localStorage.removeItem('ruihang-sidebar-groups')
-    localStorage.removeItem('crm-recent-project-ids')
   })
   await page.goto('/')
   await page.waitForLoadState('networkidle')
@@ -70,6 +69,7 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
       const search = page.getByRole('combobox', { name: '搜索项目' })
       await expect(search).toBeVisible()
       await expect(search).toBeFocused()
+      await expect(page.getByText('最近使用', { exact: true })).toHaveCount(0)
 
       if (width <= 768) {
         const dialog = page.getByRole('dialog', { name: '选择项目' })
@@ -83,8 +83,14 @@ test.describe('Issue #171：Sheet、通知抽屉与项目切换器', () => {
         await expect(popover).toHaveCSS('z-index', '9000')
       }
 
-      const alternative = page
-        .getByRole('listbox', { name: '全部项目' })
+      const projectList = page.getByRole('listbox', { name: '全部项目' })
+      const firstOption = projectList.getByRole('option').first()
+      await expect(firstOption).toHaveCSS('border-top-width', '0px')
+
+      await search.fill('锦绣华庭')
+      await expect(projectList.getByRole('option')).toHaveCount(1)
+
+      const alternative = projectList
         .locator('[role="option"][aria-selected="false"]')
         .first()
       await expect(alternative).toBeVisible()

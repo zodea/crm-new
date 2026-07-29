@@ -258,7 +258,7 @@ openDrawer({
 
 **用途**：在施工进度、首页、项目驾驶舱等项目上下文界面切换当前项目。项目数量从 1、3、12 到更多时始终使用同一个 `ProjectSwitcher`，不按数量维护多种皮肤。
 
-**组件归属**：首个实现放在 `app/components/project/ProjectSwitcher.vue`，由项目域提供项目名称、编码、权限和最近使用排序。暂不为了抽象而新增无实际第二调用域的 `ContextSwitcher`；后续出现真实的公司/仓库等同构上下文后再提炼。
+**组件归属**：首个实现放在 `app/components/project/ProjectSwitcher.vue`，由项目域提供项目名称、编码和权限。暂不为了抽象而新增无实际第二调用域的 `ContextSwitcher`；后续出现真实的公司/仓库等同构上下文后再提炼。
 
 **关闭状态**：
 
@@ -270,8 +270,8 @@ openDrawer({
 **打开状态**：
 
 1. 顶部搜索框，打开即聚焦；按项目名称与项目编码过滤。
-2. 「最近使用」最多 5 项；没有历史时整个分组不显示。
-3. 「全部项目」垂直滚动；当前项目显示 check 与 `aria-selected`，不能只靠颜色。
+2. 搜索框下方只有一个「全部项目」滚动列表，不显示「最近使用」分组，不保存额外的访问历史。
+3. 当前项目显示 check 与 `aria-selected`，不能只靠颜色；项目选项清除浏览器默认按钮边框。
 4. 空结果、加载、加载失败、无权限分别有明确状态。
 5. 选中后立即关闭并请求切换；加载失败恢复原项目，system toast 报错。
 
@@ -289,7 +289,6 @@ openDrawer({
 <ProjectSwitcher
   v-model="projectId"
   :projects="projectOptions"
-  :recent-project-ids="recentProjectIds"
   :loading="loading"
   :disabled="disabled"
 />

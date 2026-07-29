@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useLocalStorage, useMediaQuery } from '@vueuse/core'
+import { useMediaQuery } from '@vueuse/core'
 import {
   DialogContent,
   DialogDescription,
@@ -24,13 +24,11 @@ interface ProjectOption {
 
 const props = withDefaults(defineProps<{
   projects: readonly ProjectOption[]
-  recentProjectIds?: readonly string[]
   loading?: boolean
   error?: string
   disabled?: boolean
   ariaLabel?: string
 }>(), {
-  recentProjectIds: () => [],
   loading: false,
   error: '',
   disabled: false,
@@ -42,15 +40,10 @@ const model = defineModel<string>({ required: true })
 const open = shallowRef(false)
 const panelId = `project-switcher-${useId()}`
 const isCompact = useMediaQuery('(max-width: 768px)', { ssrWidth: 1024 })
-const storedRecentProjectIds = useLocalStorage<string[]>('crm-recent-project-ids', [])
 const { layerStyle: modalLayerStyle } = useModalLayerRegistration(computed(() => isCompact.value && open.value))
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
 
 const currentProject = computed(() => props.projects.find(project => project.id === model.value) ?? null)
-const effectiveRecentProjectIds = computed(() => [...new Set([
-  ...storedRecentProjectIds.value,
-  ...props.recentProjectIds,
-])].filter(id => props.projects.some(project => project.id === id)).slice(0, 5))
 
 function statusClass(status = ''): string {
   if (status.includes('竣工') || status.includes('结算'))
@@ -71,10 +64,6 @@ function openFromKeyboard(event: KeyboardEvent) {
 
 function selectProject(projectId: string) {
   model.value = projectId
-  storedRecentProjectIds.value = [
-    projectId,
-    ...storedRecentProjectIds.value.filter(id => id !== projectId),
-  ].slice(0, 5)
   open.value = false
 }
 </script>
@@ -117,7 +106,6 @@ function selectProject(projectId: string) {
         >
           <ProjectSwitcherPanel
             :projects="projects"
-            :recent-project-ids="effectiveRecentProjectIds"
             :selected-id="model"
             :loading="loading"
             :error="error"
@@ -186,7 +174,6 @@ function selectProject(projectId: string) {
           <ProjectSwitcherPanel
             class="min-h-0 flex-1"
             :projects="projects"
-            :recent-project-ids="effectiveRecentProjectIds"
             :selected-id="model"
             :loading="loading"
             :error="error"
