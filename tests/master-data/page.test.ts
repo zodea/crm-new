@@ -6,6 +6,6 @@ describe('master data route metadata', () => {
     expect(FORM_META.target_cost.detailPath).toBe('/project/target-cost')
     expect(FORM_META.customer.detailPath).toBeUndefined()
     expect(FORM_META.crew.detailPath).toBe('/base/crew')
-    expect(FORM_META.worker.detailPath).toBeUndefined()
+    expect(FORM_META.worker.detailPath).toBe('/base/worker')
   })
 })

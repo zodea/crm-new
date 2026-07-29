@@ -81,6 +81,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '工人列表',
     listPath: '/base/worker',
     newPath: '/base/worker/form',
+    detailPath: '/base/worker',
     defaultAttachmentCategory: 'certificate',
     sections: [
       { key: 'personal', label: '个人信息' },

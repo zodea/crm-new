@@ -90,7 +90,7 @@
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-DETAIL-PRIOR | #186 已迁入统一详情壳并完成四档布局回归；具体字段与参考同屏差异仍待 #193 测量 | 待 #193 严格只读核对；现有 6 页签、文件与业务动作契约保持不变 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #187 已迁入统一整页表单壳；参考空白态进一步确认短表单不保留空左栏、两列字段网格、内容滚动与固定底部操作 | 类型选择后只进入空白表单并取消；现有保存、提交、dirty、页签缓存和附件 action 保持 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | 已确认无空左树、单行工具栏、原位骨架、紧凑表头/行高、内部横滚与固定操作列 | 仅打开空白新建流程后取消；未录入、筛选、保存、提交、导入或执行行级操作 | C-DENSE |
-| `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-BASE |
+| `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 已迁入统一详情壳并补齐个人资料、班组、能力、附件、项目责任、考勤、签工、工资与关联人员；具体参考同屏差异仍待 #194 测量 | 只读展示真实外键关系；没有个人工资分配时不以整单金额反推；写入仍走整页表单 | C-DENSE |
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
 | `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-DETAIL-LIVE | 参考合同详情已确认顶部摘要、审批轨迹、右侧审批栏与页内标签；本地字段和业务动作继续按权威规格 | 仅打开并关闭材料采购合同详情；未触发详情动作 | C-BASE |
