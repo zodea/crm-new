@@ -8,7 +8,14 @@ import {
   SidebarHeader,
   useSidebar,
 } from '~/components/ui/sidebar'
-import { activeNavKey, DEFAULT_OPEN_GROUPS, ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import {
+  activeNavKey,
+  DEFAULT_OPEN_GROUPS,
+  ensureActiveGroupOpen,
+  filterNavTree,
+  NAV_TREE,
+  toggleExclusiveGroup,
+} from '~/lib/nav/nav-tree'
 
 const route = useRoute()
 const contractStore = useContractStore()
@@ -46,10 +53,10 @@ watch(
 )
 
 watch(
-  [activeKey, openGroupKeys],
-  ([key, openKeys]) => {
-    const next = ensureActiveGroupOpen(openKeys, key)
-    if (next !== openKeys)
+  activeKey,
+  (key) => {
+    const next = ensureActiveGroupOpen(openGroupKeys.value, key)
+    if (next !== openGroupKeys.value)
       openGroupKeys.value = next
   },
   { immediate: true },
@@ -60,9 +67,7 @@ function togglePinned() {
 }
 
 function toggleGroup(key: string) {
-  openGroupKeys.value = openGroupKeys.value.includes(key)
-    ? openGroupKeys.value.filter(current => current !== key)
-    : [...openGroupKeys.value, key]
+  openGroupKeys.value = toggleExclusiveGroup(openGroupKeys.value, key)
 }
 
 function isGroupOpen(key: string): boolean {
@@ -80,7 +85,7 @@ function openSearch() {
 
 function openGroupFromRail(key: string) {
   if (!openGroupKeys.value.includes(key))
-    openGroupKeys.value = [...openGroupKeys.value, key]
+    openGroupKeys.value = [key]
   forcePeek.value = true
 }
 

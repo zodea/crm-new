@@ -115,21 +115,24 @@ export function filterNavTree(tree: NavNode[], query: string): NavNode[] {
   })
 }
 
-/** 默认展开的分组：对齐设计稿批A（除「设置」外全部展开） */
-export const DEFAULT_OPEN_GROUPS: string[] = NAV_TREE
-  .filter((n): n is NavGroup => n.type === 'group' && n.key !== 'g-settings')
-  .map(n => n.key)
+/** 默认不展开目录；进入具体业务路由时由当前导航归属自动打开一个分组。 */
+export const DEFAULT_OPEN_GROUPS: string[] = []
 
-/** 合并持久化展开状态与当前路由归属，当前分组始终优先展开。 */
+/** 把旧版多开持久化状态收敛为单开，并在路由变化时优先打开当前分组。 */
 export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | null): string[] {
   if (!activeKey)
-    return openKeys
+    return openKeys.length ? [openKeys.at(-1)!] : []
   const group = NAV_TREE.find((node): node is NavGroup =>
     node.type === 'group' && node.items.some(item => item.key === activeKey),
   )
-  if (!group || openKeys.includes(group.key))
-    return openKeys
-  return [...openKeys, group.key]
+  if (!group)
+    return openKeys.length ? [openKeys.at(-1)!] : []
+  return openKeys.length === 1 && openKeys[0] === group.key ? openKeys : [group.key]
+}
+
+/** 一级目录手风琴：打开新目录会关闭旧目录，再次点击当前目录则全部收起。 */
+export function toggleExclusiveGroup(openKeys: string[], key: string): string[] {
+  return openKeys.length === 1 && openKeys[0] === key ? [] : [key]
 }
 
 /**

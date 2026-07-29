@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { activeNavKey, ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import {
+  activeNavKey,
+  DEFAULT_OPEN_GROUPS,
+  ensureActiveGroupOpen,
+  filterNavTree,
+  NAV_TREE,
+  toggleExclusiveGroup,
+} from '~/lib/nav/nav-tree'
 
 function leaves() {
   return NAV_TREE.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -48,9 +55,18 @@ describe('侧栏导航树', () => {
     expect(filterNavTree(NAV_TREE, '')).toBe(NAV_TREE)
   })
 
-  it('本地状态恢复后仍展开当前叶子所属分组', () => {
+  it('目录使用单开手风琴，恢复旧状态时只保留当前路由所属分组', () => {
+    expect(DEFAULT_OPEN_GROUPS).toEqual([])
     expect(ensureActiveGroupOpen([], 'project')).toEqual(['g-project'])
     expect(ensureActiveGroupOpen(['g-project'], 'project')).toEqual(['g-project'])
+    expect(ensureActiveGroupOpen(['g-owner', 'g-material', 'g-settings'], 'project'))
+      .toEqual(['g-project'])
+    expect(ensureActiveGroupOpen(['g-owner', 'g-material'], null)).toEqual(['g-material'])
+  })
+
+  it('点击一级目录时关闭前一个，再次点击当前目录则收起', () => {
+    expect(toggleExclusiveGroup(['g-project'], 'g-owner')).toEqual(['g-owner'])
+    expect(toggleExclusiveGroup(['g-owner'], 'g-owner')).toEqual([])
   })
 
   it('送货单归档库入口可导航，列表与详情都点亮归档库', () => {
