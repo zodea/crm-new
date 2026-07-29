@@ -169,9 +169,9 @@ function navigateToSection(key: string) {
   grid-template-columns: minmax(0, 1fr);
 }
 
-@container entity-form-shell (min-width: 56.25rem) {
+@container entity-form-shell (min-width: 48rem) {
   .entity-form-shell__layout[data-has-sections="true"] {
-    grid-template-columns: 11rem minmax(0, 1fr);
+    grid-template-columns: 9rem minmax(0, 1fr);
   }
 
   .entity-form-shell__sections {

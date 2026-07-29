@@ -64,6 +64,7 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
       await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
         timeout: 20_000,
       })
+      await expect(page.locator('[data-ui="entity-form-shell"]')).toBeVisible()
       await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button')).toHaveCount(5)
 
       await page.locator(form.field).fill(name)
@@ -81,6 +82,7 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
 
   test('材采明细新增、复制、删除与派生合计在真实页面成立', async ({ page }) => {
     await page.goto('/contract/material/form')
+    await expect(page.getByRole('navigation', { name: '表单分区' })).toBeVisible()
     await page.getByTestId('add-contract-line').click()
     await page.getByTestId('contract-line-name-0').fill('E2E瓷砖')
     await page.getByTestId('contract-line-qty-0').fill('3')
@@ -132,6 +134,7 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
     await expect(page).toHaveURL(/\/contract\/construction\/form\/[^/?]+$/)
+    await expect(page.getByRole('checkbox', { name: '【保存】后关闭' })).not.toBeChecked()
     await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('e2e-contract.pdf', { exact: true })).toBeVisible()
 
