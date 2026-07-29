@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import type { QuantityEntrySource } from '~/lib/quantity/entry-source'
 import type {
   QuantityTemplateLineDraft,
   QuantityTemplateNewItemDraft,
   QuantityTemplateRoomDraft,
 } from '~/lib/quantity/template'
+import {
+  defaultQuantityEntrySource,
+  QUANTITY_ENTRY_SOURCE_OPTIONS,
+} from '~/lib/quantity/entry-source'
 import { evaluateQuantityFormula } from '~/lib/quantity/formula'
 
 interface ItemOption {
@@ -35,6 +40,22 @@ const emit = defineEmits<{
 const formulaResults = computed(() => new Map(
   props.lines.map(line => [line.key, evaluateQuantityFormula(line.fieldFormula)]),
 ))
+const entrySourceByLine = reactive<Record<string, QuantityEntrySource>>({})
+
+watch(
+  () => props.lines.map(line => line.key),
+  (keys) => {
+    const activeKeys = new Set(keys)
+    for (const key of Object.keys(entrySourceByLine)) {
+      if (!activeKeys.has(key))
+        delete entrySourceByLine[key]
+    }
+    for (const line of props.lines) {
+      entrySourceByLine[line.key] ??= defaultQuantityEntrySource(line)
+    }
+  },
+  { immediate: true },
+)
 
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
@@ -73,17 +94,29 @@ function roomLabel(roomKey: string): string {
 function itemLabel(itemId: string): string {
   return props.itemOptions.find(item => item.key === itemId)?.label ?? '未知分项'
 }
+
+function entrySource(line: QuantityTemplateLineDraft): QuantityEntrySource {
+  return entrySourceByLine[line.key] ?? defaultQuantityEntrySource(line)
+}
+
+function setEntrySource(line: QuantityTemplateLineDraft, event: Event) {
+  entrySourceByLine[line.key] = selectValue(event) as QuantityEntrySource
+}
+
+function quantityLabel(value: number | null): string {
+  return value == null ? '—' : String(value)
+}
 </script>
 
 <template>
-  <section id="form-section-items" class="mt-6 scroll-mt-4 border-t border-line pt-5">
+  <section id="section-items" class="mt-6 scroll-mt-4 border-t border-line pt-5">
     <div class="mb-2 flex flex-wrap items-center gap-2">
       <div>
         <h3 class="text-13px font-800 text-ink">
           房间 × 分项 × 三量
         </h3>
         <p class="mt-0.5 text-11px text-ink-soft">
-          识别原值只读；现场量由算式实时计算，非法算式会阻止整份保存。
+          每行先选择当前录入口径；三量分别保存，切换不会清空其他口径。现场量由算式实时计算。
         </p>
       </div>
       <button type="button" class="btn-secondary ml-auto" @click="emit('addManualItem')">
@@ -98,7 +131,11 @@ function itemLabel(itemId: string): string {
       <div class="mb-2 text-11px font-800 text-ink">
         随模板一起建立的手工分项
       </div>
-      <div v-for="item in props.newItems" :key="item.key" class="mb-2 grid grid-cols-[1fr_1.4fr_1fr_0.7fr_auto] gap-2 last:mb-0">
+      <div
+        v-for="item in props.newItems"
+        :key="item.key"
+        class="mb-2 grid grid-cols-1 gap-2 last:mb-0 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_0.7fr_auto]"
+      >
         <input :value="item.code" class="field-input min-w-0" aria-label="新分项编码" placeholder="编码" @input="emit('updateNewItem', { key: item.key, field: 'code', value: inputValue($event) })">
         <input :value="item.name" class="field-input min-w-0" aria-label="新分项名称" placeholder="分项名称" @input="emit('updateNewItem', { key: item.key, field: 'name', value: inputValue($event) })">
         <input :value="item.trade" class="field-input min-w-0" aria-label="新分项工种" placeholder="工种" @input="emit('updateNewItem', { key: item.key, field: 'trade', value: inputValue($event) })">
@@ -110,7 +147,7 @@ function itemLabel(itemId: string): string {
     </div>
 
     <div class="overflow-x-auto rounded-[var(--radius-btn)] border border-line">
-      <table class="min-w-[1080px] w-full text-10px">
+      <table class="min-w-[980px] w-full text-10px">
         <thead class="bg-surface-2 text-ink-soft">
           <tr>
             <th class="min-w-28 px-2 py-2 text-left">
@@ -119,20 +156,14 @@ function itemLabel(itemId: string): string {
             <th class="min-w-44 px-2 py-2 text-left">
               分项
             </th>
-            <th class="w-24 px-2 py-2 text-right">
-              识别原值
+            <th class="w-28 px-2 py-2 text-left">
+              录入来源
             </th>
-            <th class="w-24 px-2 py-2 text-right">
-              当前合同量
-            </th>
-            <th class="w-24 px-2 py-2 text-right">
-              暂估量
+            <th class="min-w-52 px-2 py-2 text-left">
+              当前录入
             </th>
             <th class="min-w-48 px-2 py-2 text-left">
-              现场复核算式
-            </th>
-            <th class="w-24 px-2 py-2 text-right">
-              现场量
+              三量摘要
             </th>
             <th class="min-w-32 px-2 py-2 text-left">
               备注
@@ -168,37 +199,75 @@ function itemLabel(itemId: string): string {
                 </option>
               </select>
             </td>
-            <td class="p-1 text-right font-mono">
-              <span v-if="line.recognizedContractQty != null" class="inline-block px-2 py-2 text-ink-soft">{{ line.recognizedContractQty }}</span>
-              <span v-else class="inline-block px-2 py-2 text-ink-faint">手工</span>
-            </td>
             <td class="p-1">
-              <input :value="line.contractQty ?? ''" type="number" min="0" step="0.001" class="field-input w-full text-right font-mono" aria-label="当前合同量" @input="emit('updateLine', { key: line.key, field: 'contractQty', value: numberInput($event) })">
-            </td>
-            <td class="p-1">
-              <input :value="line.provisionalQty ?? ''" type="number" min="0" step="0.001" class="field-input w-full text-right font-mono" aria-label="暂估量" @input="emit('updateLine', { key: line.key, field: 'provisionalQty', value: numberInput($event) })">
+              <select
+                :value="entrySource(line)"
+                class="field-input w-full"
+                aria-label="录入来源"
+                @change="setEntrySource(line, $event)"
+              >
+                <option
+                  v-for="option in QUANTITY_ENTRY_SOURCE_OPTIONS"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </option>
+              </select>
             </td>
             <td class="p-1">
               <input
-                :value="line.fieldFormula"
-                class="field-input w-full font-mono"
-                :class="formulaResult(line).ok ? '' : 'border-danger text-danger'"
-                aria-label="现场复核算式"
-                placeholder="如 客厅（3.2×4）"
-                @input="emit('updateLine', { key: line.key, field: 'fieldFormula', value: inputValue($event) })"
+                v-if="entrySource(line) === 'contract'"
+                :value="line.contractQty ?? ''"
+                type="number"
+                min="0"
+                step="0.001"
+                class="field-input w-full text-right font-mono"
+                aria-label="当前合同量"
+                @input="emit('updateLine', { key: line.key, field: 'contractQty', value: numberInput($event) })"
               >
-              <div v-if="formulaError(line)" class="mt-1 px-1 text-9px text-danger" role="alert">
-                {{ formulaError(line) }}
+              <input
+                v-else-if="entrySource(line) === 'provisional'"
+                :value="line.provisionalQty ?? ''"
+                type="number"
+                min="0"
+                step="0.001"
+                class="field-input w-full text-right font-mono"
+                aria-label="暂估量"
+                @input="emit('updateLine', { key: line.key, field: 'provisionalQty', value: numberInput($event) })"
+              >
+              <template v-else>
+                <input
+                  :value="line.fieldFormula"
+                  class="field-input w-full font-mono"
+                  :class="formulaResult(line).ok ? '' : 'border-danger text-danger'"
+                  aria-label="现场复核算式"
+                  placeholder="如 客厅（3.2×4）"
+                  @input="emit('updateLine', { key: line.key, field: 'fieldFormula', value: inputValue($event) })"
+                >
+                <div v-if="formulaError(line)" class="mt-1 px-1 text-9px text-danger" role="alert">
+                  {{ formulaError(line) }}
+                </div>
+              </template>
+            </td>
+            <td class="p-2">
+              <div class="flex flex-wrap gap-x-3 gap-y-1 text-10px text-ink-soft">
+                <span>合同 <b class="font-mono text-ink">{{ quantityLabel(line.contractQty) }}</b></span>
+                <span>暂估 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
+                <span>现场 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
+              </div>
+              <div class="mt-1 text-9px text-ink-faint">
+                识别原值：{{ line.recognizedContractQty == null ? '手工' : line.recognizedContractQty }}
               </div>
             </td>
-            <td class="p-1 text-right font-mono">
-              <span v-if="formulaValue(line) != null" class="inline-block px-2 py-2 font-800 text-brand-deep">
-                {{ formulaValue(line) }}
-              </span>
-              <span v-else class="inline-block px-2 py-2 text-ink-faint">—</span>
-            </td>
             <td class="p-1">
-              <input :value="line.note" class="field-input w-full" aria-label="模板明细备注" placeholder="备注" @input="emit('updateLine', { key: line.key, field: 'note', value: inputValue($event) })">
+              <input
+                :value="line.note"
+                class="field-input w-full"
+                aria-label="模板明细备注"
+                placeholder="备注"
+                @input="emit('updateLine', { key: line.key, field: 'note', value: inputValue($event) })"
+              >
             </td>
             <td class="px-1 py-1 text-center">
               <button type="button" class="icon-btn-danger h-7 w-7" aria-label="删除三量明细" @click="emit('removeLine', line)">
@@ -207,7 +276,7 @@ function itemLabel(itemId: string): string {
             </td>
           </tr>
           <tr v-if="!props.lines.length">
-            <td colspan="9" class="px-4 py-8 text-center text-ink-faint">
+            <td colspan="7" class="px-4 py-8 text-center text-ink-faint">
               暂无三量明细；可选择已有分项，或在无 BOQ 时新增手工分项。
             </td>
           </tr>

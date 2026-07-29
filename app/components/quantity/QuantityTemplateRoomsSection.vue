@@ -17,7 +17,7 @@ function inputValue(event: Event): string {
 </script>
 
 <template>
-  <section id="form-section-rooms" class="mt-6 scroll-mt-4 border-t border-line pt-5">
+  <section id="section-rooms" class="mt-6 scroll-mt-4 border-t border-line pt-5">
     <div class="mb-2 flex items-center gap-2">
       <div>
         <h3 class="text-13px font-800 text-ink">

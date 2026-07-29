@@ -9,6 +9,7 @@ import { toErrorMessage } from '~/lib/util/error'
 const props = defineProps<{
   projectId: string
   unitId: string
+  returnTo?: string
 }>()
 
 const store = useQuantityStore()
@@ -111,9 +112,9 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
   <div class="quantity-unit-detail flex min-w-0 flex-col gap-4">
     <section class="panel min-w-0 px-4 py-3">
       <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <NuxtLink to="/subcontract/quantity" class="btn-secondary flex-none">
+        <NuxtLink :to="props.returnTo || '/subcontract/quantity'" class="btn-secondary flex-none">
           <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />
-          返回矩阵
+          返回工程量矩阵
         </NuxtLink>
         <div class="min-w-0">
           <h2 class="truncate text-15px font-800 text-ink">

@@ -20,7 +20,6 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
     await page.getByRole('button', { name: '详情 101户' }).click()
-    await page.getByRole('link', { name: /打开户施工详情/ }).click()
 
     await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/]+\/[^/]+$/)
     await expect(page.getByRole('heading', { name: /1栋 1层 101户/ })).toBeVisible()
@@ -51,7 +50,6 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
     await page.getByRole('button', { name: '详情 101户' }).click()
-    await page.getByRole('link', { name: /打开户施工详情/ }).click()
     await expect(page.getByRole('heading', { name: /1栋 1层 101户/ })).toBeVisible()
 
     await page.setViewportSize({ width: 390, height: 844 })
@@ -72,7 +70,6 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     await cells.nth(2).focus()
     await cells.nth(2).press('Enter')
     await page.getByRole('button', { name: '详情 101户' }).click()
-    await page.getByRole('link', { name: /打开户施工详情/ }).click()
 
     await page.getByRole('region', { name: '泥水工施工记录' }).getByRole('button', { name: '登记' }).first().click()
     const dialog = page.getByRole('dialog').filter({ hasText: '阶段完成登记' })
