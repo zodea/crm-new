@@ -36,6 +36,8 @@ const {
   removeItem,
   applySupplierSuggestion,
   archiveSelected,
+  openPrint,
+  excludePrint,
 } = useDeliveryRecognitionWorkspace(pageRef)
 </script>
 
@@ -74,6 +76,8 @@ const {
           @upload="openFilePicker()"
           @recognize="recognizeOne"
           @remove="removeFile"
+          @open-print="openPrint"
+          @exclude-print="excludePrint"
         />
       </template>
       <template #source>
@@ -100,6 +104,8 @@ const {
           @remove-item="removeItem"
           @apply-supplier-suggestion="applySupplierSuggestion"
           @archive="archiveSelected"
+          @open-print="openPrint"
+          @exclude-print="excludePrint"
         />
       </template>
     </AdaptiveWorkbench>

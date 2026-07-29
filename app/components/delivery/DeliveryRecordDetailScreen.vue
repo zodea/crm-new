@@ -88,8 +88,7 @@ onMounted(refresh)
       :delivery-date="record.deliveryDate"
       :line-count="record.lines.length"
       :total-amount="record.totalAmount"
-      :archived="record.archived"
-      :stored="record.stored"
+      :print-disposition="record.printDisposition"
     />
 
     <div class="delivery-record-layout grid min-w-0 items-start gap-4">

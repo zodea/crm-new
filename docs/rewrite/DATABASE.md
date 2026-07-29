@@ -88,7 +88,7 @@ projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→�
               └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
 invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
-delivery_records ─1:N→ delivery_lines（「入库」写材料明细；单价对比=聚合查询视图，无独立表）
+delivery_records ─1:N→ delivery_lines（送货单归档即写入材料台账；单价对比=聚合查询视图，无独立表）
 projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑人工确认、同写法后续自动，CONTEXT.md「工地」）
 ```
 
@@ -367,7 +367,7 @@ CREATE TABLE payment_application_invoice_allocations (
 | OwnerMaterialUse | `owner_material_uses` | `id` | `material-management.md`（甲供材领用） |
 | OwnerMaterialDirect | `owner_material_directs` | `id` | `material-management.md`（甲供材直入直出） |
 | DeliveryRecord | `delivery_records` | `id` | `material-delivery.md`（送货单头：处理区/归档库双区字段） |
-| DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（明细行：入库=材料数据，供单价对比/分供方详情读取） |
+| DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（归档明细即材料数据，供单价对比/分供方详情读取） |
 | ProjectAlias | `project_aliases` | `id` | CONTEXT.md「工地」（工地名写法变体 → 项目归一，2026-07-06 grill 定） |
 
 > ~~PriceComparison `price_comparisons`~~ **已移除**：单价对比是对 `delivery_lines` 的聚合查询视图（同材料跨分供方/跨时间比价），无独立存储；未来若需收藏对比方案再议。
@@ -381,8 +381,11 @@ CREATE TABLE delivery_records (
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
-  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；核对完成不自动置位
-  stored    INTEGER DEFAULT 0,       -- 已入库（写材料数据，与归档并行的两条路）
+  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；送货单 archived=1 即已入库/可供单价分析
+  stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
+  printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
+  printedAt TEXT,                    -- 仅真实打印完成后的用户回执写入；打开打印窗口不得写
+  printExcludedAt TEXT,              -- 明确排除打印范围的时间；排除不写 printedAt
   reviewFlag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
   note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
 );
@@ -397,6 +400,8 @@ CREATE TABLE delivery_lines (
 );
 
 > `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
+
+> 迁移 v25 将所有存量 `archived=1` 记录的 `stored` 兼容镜像回填为 1，并把存量打印处置初始化为 `excluded`：历史数据无法可靠反推是否打印，升级时不得伪造 `printedAt`，也不得突然形成大批待打印任务。此后新归档由 store 显式写 `printDisposition='pending'`；只有“打印成功回执”写 `printed`，手动排除只写 `excluded`。
 
 项目详情的到货视图只查询 `delivery_records.archived=1` 且头/项目/分供方祖先未软删的记录，并聚合未软删 `delivery_lines`。原件正文继续归属 `file_refs(owner_type='delivery_record', owner_id=delivery_records.id, category='source')`；`delivery_records.file_name` 仅作兼容显示，不建立详情附件副本。
 

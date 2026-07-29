@@ -15,7 +15,10 @@ const record = {
   filePath: '',
   ocrStatus: 'reviewed',
   archived: true,
-  stored: false,
+  stored: true,
+  printDisposition: 'pending',
+  printedAt: '',
+  printExcludedAt: '',
   reviewFlag: '',
   note: '',
   createdAt: '2026-05-10',
@@ -116,19 +119,18 @@ vi.stubGlobal('useSupplierStore', () => ({
 }))
 
 describe('deliveryRecordDetailScreen', () => {
-  it('明确区分已归档单据与尚未入库材料，并移除没有有效交互的提示图标', async () => {
+  it('归档即显示已入库，并以可读说明区分待打印状态', async () => {
     render(DeliveryRecordDetailScreen, { global })
 
-    const archivedMetric = screen.getByRole('group', { name: '归档状态' })
-    expect(within(archivedMetric).getByText('已归档')).not.toBeNull()
-
     const storedMetric = screen.getByRole('group', { name: '入库状态' })
-    expect(within(storedMetric).getByText('尚未入库')).not.toBeNull()
+    expect(within(storedMetric).getByText('已入库')).not.toBeNull()
+
+    const printMetric = screen.getByRole('group', { name: '打印状态' })
+    expect(within(printMetric).getByText('待打印')).not.toBeNull()
 
     const explanation = screen.getByRole('status', { name: '送货单状态说明' })
-    expect(explanation.textContent).toContain('归档仅表示送货单已进入归档库')
-    expect(explanation.textContent).toContain('材料明细尚未写入库存')
-    expect(explanation.textContent).toContain('当前版本尚未提供入库动作')
+    expect(explanation.textContent).toContain('归档即视为已入库')
+    expect(explanation.textContent).toContain('尚未收到打印成功回执')
 
     expect(screen.queryByTitle('有效材料明细行')).toBeNull()
     expect(screen.queryByTitle('入库供单价对比，留第二趟')).toBeNull()

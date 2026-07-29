@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DeliveryPrintDisposition } from '~/stores/delivery-record'
 import { computed } from 'vue'
 import { yuan } from '~/lib/util/money'
 
@@ -6,18 +7,20 @@ const props = defineProps<{
   deliveryDate: string
   lineCount: number
   totalAmount: number
-  archived: boolean
-  stored: boolean
+  printDisposition: DeliveryPrintDisposition
 }>()
 
-const archivedLabel = computed(() => props.archived ? '已归档' : '尚未归档')
-const storedLabel = computed(() => props.stored ? '已入库' : '尚未入库')
+const printLabel = computed(() => ({
+  pending: '待打印',
+  printed: '已打印',
+  excluded: '已排除',
+})[props.printDisposition])
 const lifecycleDescription = computed(() => {
-  if (props.archived && props.stored)
-    return '归档表示送货单已进入归档库；材料明细也已写入库存。'
-  if (props.archived)
-    return '归档仅表示送货单已进入归档库；材料明细尚未写入库存。归档与入库是两个独立动作，当前版本尚未提供入库动作。'
-  return '送货单尚未归档，不能从归档库详情进入后续处理。'
+  if (props.printDisposition === 'pending')
+    return '归档即视为已入库，材料明细可用于单价分析；当前尚未收到打印成功回执，文件继续保留在待打印范围。'
+  if (props.printDisposition === 'printed')
+    return '归档即视为已入库；该文件已由用户确认实际打印成功。'
+  return '归档即视为已入库；该文件已明确排除打印范围，但没有记录为已打印。'
 })
 </script>
 
@@ -27,8 +30,8 @@ const lifecycleDescription = computed(() => {
       <Metric label="送货日期" :value="deliveryDate || '—'" />
       <Metric label="材料项数" :value="lineCount" />
       <Metric label="金额合计" :value="yuan(totalAmount)" tone="brand" big />
-      <Metric label="归档状态" :value="archivedLabel" :tone="archived ? 'ok' : 'danger'" />
-      <Metric label="入库状态" :value="storedLabel" :tone="stored ? 'ok' : undefined" />
+      <Metric label="入库状态" value="已入库" tone="ok" />
+      <Metric label="打印状态" :value="printLabel" :tone="printDisposition === 'printed' ? 'ok' : undefined" />
     </MetricGrid>
 
     <div

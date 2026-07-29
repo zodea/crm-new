@@ -56,7 +56,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
     const db = await createMemoryDb()
     await runMigrations(db)
 
-    expect(LATEST_VERSION).toBe(F5_MIGRATION_VERSION)
+    expect(LATEST_VERSION).toBeGreaterThanOrEqual(F5_MIGRATION_VERSION)
     const tables = await listTables(db)
     for (const table of [
       'project_acceptances',
@@ -176,7 +176,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
     `)
 
     const result = await runMigrations(db)
-    expect(result.applied).toEqual(['v24 f5-owner-subcontract-documents'])
+    expect(result.applied).toContain('v24 f5-owner-subcontract-documents')
     expect(await db.select(`
       SELECT id, change_type, document_type
       FROM boq_change_orders

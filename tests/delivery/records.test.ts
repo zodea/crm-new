@@ -1,7 +1,7 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
+import { migrations, runMigrations } from '~/lib/db/migrations'
 import { editDeliveryAmountLine } from '~/lib/delivery/review'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
@@ -60,6 +60,9 @@ describe('送货单 pass-1：版本化持久化', () => {
       'order_no',
       'delivery_date',
       'file_name',
+      'print_disposition',
+      'printed_at',
+      'print_excluded_at',
       'note',
       'created_at',
       'updated_at',
@@ -79,6 +82,41 @@ describe('送货单 pass-1：版本化持久化', () => {
       'deleted_at',
     ]))
 
+    db.close()
+  })
+
+  it('升级存量归档记录时视为已入库，但不伪造打印成功回执', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= 24))
+    await db.execute(`INSERT INTO projects (id, name) VALUES ('p-legacy-print', '存量打印项目')`)
+    await db.execute(`
+      INSERT INTO delivery_records (
+        id, project_id, order_no, archived, stored, ocr_status
+      )
+      VALUES (
+        'del-legacy-print', 'p-legacy-print', 'LEGACY-PRINT-1', 1, 0, 'reviewed'
+      )
+    `)
+
+    const result = await runMigrations(db)
+    const [record] = await db.select<{
+      stored: number
+      print_disposition: string
+      printed_at: string | null
+      print_excluded_at: string | null
+    }>(`
+      SELECT stored, print_disposition, printed_at, print_excluded_at
+      FROM delivery_records
+      WHERE id = 'del-legacy-print'
+    `)
+
+    expect(result.applied).toContain('v25 delivery-archive-print-disposition')
+    expect(record).toEqual({
+      stored: 1,
+      print_disposition: 'excluded',
+      printed_at: null,
+      print_excluded_at: null,
+    })
     db.close()
   })
 
@@ -118,12 +156,83 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       orderNo: 'SH-001',
       ocrStatus: 'reviewed',
       archived: true,
+      stored: true,
+      printDisposition: 'pending',
+      printedAt: '',
+      printExcludedAt: '',
       totalAmount: 10760,
     })
     expect(store.byId(id)?.lines.map(line => ({ name: line.materialName, amount: line.amount }))).toEqual([
       { name: 'HRB400 螺纹钢', amount: 9500 },
       { name: '水泥', amount: 1260 },
     ])
+  })
+
+  it('归档默认待打印；排除打印不写已打印，只有打印回执才写已打印', async () => {
+    const store = useDeliveryRecordStore()
+    const firstId = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-PRINT-001',
+      deliveryDate: '2026-07-18',
+      note: '',
+      lines: [{ materialName: '待打印材料', spec: '', unit: '件', qty: 1, unitPrice: 10, note: '' }],
+    })
+
+    let [first] = await mem.select<{
+      print_disposition: string
+      printed_at: string | null
+      print_excluded_at: string | null
+    }>(`
+      SELECT print_disposition, printed_at, print_excluded_at
+      FROM delivery_records
+      WHERE id = ?
+    `, [firstId])
+    expect(first).toEqual({
+      print_disposition: 'pending',
+      printed_at: null,
+      print_excluded_at: null,
+    })
+
+    await store.excludeFromPrint(firstId)
+    ;[first] = await mem.select<{
+      print_disposition: string
+      printed_at: string | null
+      print_excluded_at: string | null
+    }>(`
+      SELECT print_disposition, printed_at, print_excluded_at
+      FROM delivery_records
+      WHERE id = ?
+    `, [firstId])
+    expect(first).toMatchObject({
+      print_disposition: 'excluded',
+      printed_at: null,
+    })
+    expect(first?.print_excluded_at).toBeTruthy()
+
+    const secondId = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-PRINT-002',
+      deliveryDate: '2026-07-18',
+      note: '',
+      lines: [{ materialName: '打印回执材料', spec: '', unit: '件', qty: 2, unitPrice: 10, note: '' }],
+    })
+    await store.confirmPrintReceipt(secondId)
+    const [second] = await mem.select<{
+      print_disposition: string
+      printed_at: string | null
+      print_excluded_at: string | null
+    }>(`
+      SELECT print_disposition, printed_at, print_excluded_at
+      FROM delivery_records
+      WHERE id = ?
+    `, [secondId])
+    expect(second).toMatchObject({
+      print_disposition: 'printed',
+      print_excluded_at: null,
+    })
+    expect(second?.printed_at).toBeTruthy()
   })
 
   it('人工复核金额独立持久化，不在保存时被数量×单价覆盖', async () => {

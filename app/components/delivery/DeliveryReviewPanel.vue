@@ -32,6 +32,8 @@ const emit = defineEmits<{
   addItem: []
   removeItem: [index: number]
   applySupplierSuggestion: []
+  openPrint: [id: string]
+  excludePrint: [id: string]
 }>()
 
 const amountStatus = computed(() => {
@@ -135,6 +137,23 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
       </div>
     </template>
 
+    <div v-else-if="file?.printDisposition === 'pending'" class="flex flex-1 flex-col items-center justify-center px-6 text-center">
+      <span class="i-lucide-printer mb-2 text-26px text-brand" />
+      <p class="text-13px font-800 text-ink">
+        已归档并入库，等待打印
+      </p>
+      <p class="mt-1 max-w-96 text-10px leading-5 text-ink-faint">
+        打开原件完成系统打印后，再确认“已完成打印”；取消或打印失败不会改变状态。
+      </p>
+      <div class="mt-4 flex flex-wrap justify-center gap-2">
+        <button type="button" class="btn-accent" @click="emit('openPrint', file.id)">
+          <span class="i-lucide-printer mr-1" />打开打印
+        </button>
+        <button type="button" class="btn-secondary" @click="emit('excludePrint', file.id)">
+          排除打印
+        </button>
+      </div>
+    </div>
     <div v-else-if="file?.ocrStatus === 'processing'" class="flex flex-1 flex-col items-center justify-center text-11px text-brand">
       <span class="i-lucide-loader-circle mb-2 animate-spin text-24px" />
       PaddleOCR-VL 正在识别版面与表格…

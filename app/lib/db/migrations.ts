@@ -4386,6 +4386,35 @@ export const migrations: Migration[] = [
       await migrateF5OwnerSubcontractDocuments(db)
     },
   },
+  {
+    // 送货单归档即进入材料台账；打印是独立后续动作，绝不能由归档或打开打印窗口冒充成功。
+    // 存量记录无法可靠判断是否已打印，统一排除出新待打印队列，避免升级后突然出现大量历史待办。
+    version: 25,
+    name: 'delivery-archive-print-disposition',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'delivery_records',
+        'print_disposition',
+        `TEXT NOT NULL DEFAULT 'excluded'
+          CHECK (print_disposition IN ('pending', 'printed', 'excluded'))`,
+      )
+      await addColumnIfMissing(db, 'delivery_records', 'printed_at', 'TEXT')
+      await addColumnIfMissing(db, 'delivery_records', 'print_excluded_at', 'TEXT')
+      await db.execute(`
+        UPDATE delivery_records
+        SET stored = 1
+        WHERE archived = 1
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_delivery_pending_print
+        ON delivery_records(print_disposition, archived)
+        WHERE deleted_at IS NULL
+          AND archived = 1
+          AND print_disposition = 'pending';
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

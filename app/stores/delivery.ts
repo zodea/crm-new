@@ -1,5 +1,6 @@
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
+import type { DeliveryPrintDisposition } from '~/stores/delivery-record'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef } from 'vue'
 import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
@@ -50,6 +51,8 @@ export interface DeliveryFile {
   engine: string
   model: string
   preprocessed: boolean
+  archivedRecordIds: string[]
+  printDisposition: DeliveryPrintDisposition | null
 }
 
 export interface DeliveryReviewInput {
@@ -121,6 +124,8 @@ export const useDeliveryStore = defineStore('delivery', () => {
         engine: '',
         model: '',
         preprocessed: false,
+        archivedRecordIds: [],
+        printDisposition: null,
       })
     }
     files.value = [...files.value, ...next]
@@ -252,21 +257,87 @@ export const useDeliveryStore = defineStore('delivery', () => {
     }, sourceFile)
 
     const remainingDocs = file.docs.filter(doc => doc.id !== documentId)
-    if (remainingDocs.length)
-      replaceFile(fileId, { docs: remainingDocs })
-    else
-      removeFile(fileId)
+    const archivedRecordIds = [...file.archivedRecordIds, recordId]
+    replaceFile(fileId, {
+      docs: remainingDocs,
+      archivedRecordIds,
+      printDisposition: remainingDocs.length ? null : 'pending',
+    })
     return recordId
   }
 
   const pendingFiles = computed(() => files.value.filter(file => file.ocrStatus === 'pending' || file.ocrStatus === 'failed'))
+  const pendingPrintFiles = computed(() => files.value.filter(file => file.printDisposition === 'pending'))
   const stats = computed(() => ({
     total: files.value.length,
     pending: files.value.filter(file => file.ocrStatus === 'pending').length,
     processing: files.value.filter(file => file.ocrStatus === 'processing').length,
-    done: files.value.filter(file => file.ocrStatus === 'done').length,
+    done: files.value.filter(file => file.ocrStatus === 'done' && file.docs.length > 0).length,
     failed: files.value.filter(file => file.ocrStatus === 'failed').length,
+    awaitingPrint: pendingPrintFiles.value.length,
   }))
+
+  async function loadPendingPrintQueue(): Promise<void> {
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    const representedRecordIds = new Set(files.value.flatMap(file => file.archivedRecordIds))
+    const restored: DeliveryFile[] = recordStore.pendingPrintRecords
+      .filter(record => !representedRecordIds.has(record.id))
+      .map(record => ({
+        id: `print:${record.id}`,
+        name: record.fileName || `送货单 ${record.orderNo || record.id}`,
+        kind: fileKind(record.fileName),
+        size: 0,
+        supplierText: '',
+        docs: [],
+        ocrStatus: 'done',
+        ocrError: '',
+        rawText: '',
+        engine: '',
+        model: '',
+        preprocessed: false,
+        archivedRecordIds: [record.id],
+        printDisposition: 'pending',
+      }))
+    if (restored.length)
+      files.value = [...files.value, ...restored]
+  }
+
+  async function loadFileForPrint(fileId: string): Promise<File> {
+    const file = byId(fileId)
+    if (!file || file.printDisposition !== 'pending')
+      throw new Error('待打印送货单不存在')
+    const sessionSource = sourceFiles.get(fileId)
+    if (sessionSource)
+      return sessionSource
+    const recordId = file.archivedRecordIds[0]
+    if (!recordId)
+      throw new Error('待打印送货单缺少归档记录')
+    const source = await useDeliveryRecordStore().loadSourceFile(recordId)
+    if (!source)
+      throw new Error('该送货单未保存原件，无法打开打印')
+    const restored = new File([Uint8Array.from(source.bytes)], source.fileName || file.name, {
+      type: source.mimeType || 'application/octet-stream',
+    })
+    sourceFiles.set(fileId, restored)
+    return restored
+  }
+
+  async function excludeFileFromPrint(fileId: string): Promise<void> {
+    const file = byId(fileId)
+    if (!file || file.printDisposition !== 'pending')
+      throw new Error('待打印送货单不存在')
+    await useDeliveryRecordStore().excludeManyFromPrint(file.archivedRecordIds)
+    removeFile(fileId)
+  }
+
+  async function confirmFilePrintReceipt(fileId: string): Promise<void> {
+    const file = byId(fileId)
+    if (!file || file.printDisposition !== 'pending')
+      throw new Error('待打印送货单不存在')
+    await useDeliveryRecordStore().confirmManyPrintReceipts(file.archivedRecordIds)
+    removeFile(fileId)
+  }
 
   function incompleteReasons(file: DeliveryFile): string[] {
     const reasons: string[] = []
@@ -293,6 +364,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     files: readonly(files),
     recognitionProgress: readonly(recognitionProgress),
     pendingFiles,
+    pendingPrintFiles,
     stats,
     byId,
     uploadFiles,
@@ -300,6 +372,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
     recognizeMany,
     removeFile,
     archiveDocument,
+    loadPendingPrintQueue,
+    loadFileForPrint,
+    excludeFileFromPrint,
+    confirmFilePrintReceipt,
     incompleteReasons,
   }
 })

@@ -75,9 +75,18 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     return { passed: checks.filter(Boolean).length, total: checks.length }
   })
 
-  function selectFile(id: string) {
+  async function selectFile(id: string) {
     selectedFileId.value = id
     selectedDocumentId.value = store.byId(id)?.docs[0]?.id ?? null
+    const file = store.byId(id)
+    if (file?.printDisposition === 'pending' && !previewFiles.has(id)) {
+      try {
+        previewFiles.set(id, await store.loadFileForPrint(id))
+      }
+      catch {
+        // 无原件时右侧待打印说明仍可用；点“打开打印”会给出明确错误。
+      }
+    }
   }
 
   function selectDocument(id: string) {
@@ -196,6 +205,10 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     const file = store.byId(id)
     if (!file)
       return
+    if (file.printDisposition === 'pending') {
+      warning('待打印文件只能在打印成功或明确排除后移出队列')
+      return
+    }
     const ok = await confirm({
       variant: 'simple',
       title: '移出识别队列',
@@ -358,8 +371,92 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     }
   }
 
+  async function openPrint(id: string) {
+    let printUrl = ''
+    try {
+      const source = await store.loadFileForPrint(id)
+      previewFiles.set(id, source)
+      printUrl = URL.createObjectURL(source)
+      const printWindow = window.open(printUrl, '_blank')
+      if (!printWindow) {
+        URL.revokeObjectURL(printUrl)
+        warning('浏览器拦截了原件窗口，请允许弹出窗口后重试')
+        return
+      }
+      printWindow.opener = null
+      let printRequested = false
+      const requestSystemPrint = () => {
+        if (printRequested || printWindow.closed)
+          return
+        printRequested = true
+        try {
+          printWindow.focus()
+          printWindow.print()
+        }
+        catch {
+          // 某些内置 PDF 查看器不允许脚本调起打印；原件窗口仍保留供用户手动打印。
+        }
+      }
+      printWindow.addEventListener('load', requestSystemPrint, { once: true })
+      window.setTimeout(requestSystemPrint, 800)
+      window.setTimeout(() => URL.revokeObjectURL(printUrl), 5 * 60 * 1000)
+    }
+    catch (caught) {
+      warning(caught instanceof Error ? caught.message : '送货单原件打开失败')
+      return
+    }
+
+    const didPrint = await confirm({
+      variant: 'simple',
+      title: '确认打印结果',
+      message: '原件已在新窗口打开。请先在该窗口完成系统打印；只有打印机实际输出成功后，才点击“已完成打印”。取消或打印失败请点“暂不确认”，文件会继续留在待打印范围。',
+      confirmLabel: '已完成打印',
+      cancelLabel: '暂不确认',
+    })
+    if (!didPrint)
+      return
+
+    try {
+      await promise(store.confirmFilePrintReceipt(id), {
+        loading: '正在登记打印回执…',
+        success: '已登记打印成功，文件已移出待打印范围',
+        error: caught => caught instanceof Error ? caught.message : '打印回执登记失败',
+      })
+      ensureSelection()
+    }
+    catch {
+      // promise toast 已展示失败原因；保留在待打印范围，避免误判为已打印。
+    }
+  }
+
+  async function excludePrint(id: string) {
+    const file = store.byId(id)
+    if (!file)
+      return
+    const excluded = await confirm({
+      variant: 'simple',
+      title: '排除打印范围',
+      message: `确认本次不打印「${file.name}」？这只会标记为“已排除”，不会冒充已打印。`,
+      confirmLabel: '排除打印',
+    })
+    if (!excluded)
+      return
+    try {
+      await promise(store.excludeFileFromPrint(id), {
+        loading: '正在排除打印范围…',
+        success: '已排除打印，未记录为已打印',
+        error: caught => caught instanceof Error ? caught.message : '排除打印失败',
+      })
+      ensureSelection()
+    }
+    catch {
+      // promise toast 已展示失败原因；保留当前待打印任务继续处理。
+    }
+  }
+
   onMounted(() => {
     Promise.all([
+      store.loadPendingPrintQueue(),
       projectStore.load(),
       projectAliasStore.load(),
       supplierStore.load(),
@@ -394,5 +491,7 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     removeItem,
     applySupplierSuggestion,
     archiveSelected,
+    openPrint,
+    excludePrint,
   }
 }
