@@ -94,7 +94,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'worker', mark: '工', icon: 'i-lucide-user-round', label: '工人信息', hint: '人员证书', to: '/base/worker' },
   ] },
   { type: 'group', key: 'g-settings', label: '设置', icon: 'i-lucide-settings', items: [
-    { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数' },
+    { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数', to: '/settings/ocr' },
   ] },
 ]
 
@@ -139,6 +139,8 @@ export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | nu
 export function activeNavKey(path: string, contractKindOfDetail?: string | null): string | null {
   if (path === '/')
     return 'home'
+  if (path.startsWith('/settings/ocr'))
+    return 'ocrSettings'
   if (path.startsWith('/schedule'))
     return 'schedule'
   if (path.startsWith('/project/target-cost'))

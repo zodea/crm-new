@@ -192,6 +192,7 @@
 | `app/pages/schedule/[pid].vue` | `/schedule/:pid` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 排程写入路径保持现有契约 | C-DENSE |
 | `app/pages/schedule/index.vue` | `/schedule` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 待 #191 只读核对 | C-DENSE |
 | `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 待 #191 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-WORKBENCH-PRIOR | 无可安全对标的直接参考页；按 DC 品牌与统一表格原语实现脱敏运行状态、单据接入矩阵和参数边界 | 仅 GET 读取同源服务端脱敏状态；不读取、保存或回显 Token，不提供未接入能力的假控件 | C-BASE |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 分类型测量 | 动态单据写入路径保持现有契约 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 分类型测量 | 动态类型与权限保持现有契约 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 分类型测量 | 动态单据写入路径保持现有契约 | C-FORM |
