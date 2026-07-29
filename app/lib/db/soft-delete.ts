@@ -242,6 +242,24 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'crew_id', table: 'crews' },
     { column: 'current_project_id', table: 'projects' },
   ],
+  wage_statements: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'leader_worker_id', table: 'workers' },
+  ],
+  wage_statement_lines: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  wage_statement_members: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  attendance_records: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
   target_costs: [{ column: 'project_id', table: 'projects' }],
   target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],
   settlements: [{ column: 'project_supplier_id', table: 'project_suppliers' }],

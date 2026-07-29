@@ -397,6 +397,116 @@ CREATE TABLE IF NOT EXISTS file_refs (
 );
 `
 
+export const BATCH_5_PAYROLL_ATTENDANCE = `
+-- ═══════ 工资与考勤（负责人请款簿制） ═══════
+
+CREATE TABLE IF NOT EXISTS wage_statements (
+  id                 TEXT PRIMARY KEY,
+  project_id         TEXT NOT NULL REFERENCES projects(id),
+  crew_id            TEXT REFERENCES crews(id),
+  leader_worker_id   TEXT NOT NULL REFERENCES workers(id),
+  month              TEXT NOT NULL,
+  format_family      TEXT NOT NULL DEFAULT 'A'
+                     CHECK (format_family IN ('A', 'B', 'C1', 'C2')),
+  period_kind        TEXT NOT NULL DEFAULT 'monthly'
+                     CHECK (period_kind IN ('monthly', 'settlement', 'retention')),
+  purpose            TEXT NOT NULL DEFAULT 'advance'
+                     CHECK (purpose IN ('advance', 'final')),
+  quantity_source    TEXT NOT NULL
+                     CHECK (quantity_source IN ('provisional', 'field')),
+  status             TEXT NOT NULL DEFAULT 'draft'
+                     CHECK (status IN ('draft', 'checked', 'released')),
+  needs_recheck      INTEGER NOT NULL DEFAULT 0 CHECK (needs_recheck IN (0, 1)),
+  pay_ratio          REAL NOT NULL DEFAULT 1 CHECK (pay_ratio >= 0 AND pay_ratio <= 1),
+  cumulative_amount  REAL NOT NULL DEFAULT 0,
+  previously_paid    REAL NOT NULL DEFAULT 0,
+  gross_amount       REAL NOT NULL DEFAULT 0,
+  actual_amount      REAL,
+  source_version     TEXT NOT NULL DEFAULT '',
+  source_updated_at  TEXT,
+  checked_source_version TEXT NOT NULL DEFAULT '',
+  adjustment_reason  TEXT NOT NULL DEFAULT '',
+  operator_name      TEXT NOT NULL DEFAULT '',
+  snapshot_json      TEXT,
+  checked_at         TEXT,
+  submitted_at       TEXT,
+  released_at        TEXT,
+  note               TEXT NOT NULL DEFAULT '',
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at         TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wage_statement_lines (
+  id            TEXT PRIMARY KEY,
+  statement_id  TEXT NOT NULL REFERENCES wage_statements(id),
+  worker_id     TEXT NOT NULL REFERENCES workers(id),
+  item_id       TEXT,
+  item_name     TEXT NOT NULL,
+  unit          TEXT NOT NULL DEFAULT '',
+  quantity      REAL NOT NULL DEFAULT 0,
+  unit_price    REAL NOT NULL DEFAULT 0,
+  amount        REAL NOT NULL DEFAULT 0,
+  sort_order    INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS wage_statement_members (
+  id            TEXT PRIMARY KEY,
+  statement_id  TEXT NOT NULL REFERENCES wage_statements(id),
+  worker_id     TEXT NOT NULL REFERENCES workers(id),
+  is_leader     INTEGER NOT NULL DEFAULT 0 CHECK (is_leader IN (0, 1)),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at    TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id             TEXT PRIMARY KEY,
+  project_id     TEXT NOT NULL REFERENCES projects(id),
+  crew_id        TEXT REFERENCES crews(id),
+  worker_id      TEXT NOT NULL REFERENCES workers(id),
+  work_date      TEXT NOT NULL,
+  hours          REAL NOT NULL DEFAULT 0 CHECK (hours >= 0 AND hours <= 24),
+  overtime_hours REAL NOT NULL DEFAULT 0 CHECK (overtime_hours >= 0 AND overtime_hours <= 24),
+  work_content   TEXT NOT NULL DEFAULT '',
+  note           TEXT NOT NULL DEFAULT '',
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at     TEXT DEFAULT NULL,
+  CHECK (hours + overtime_hours <= 24)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wage_statements_project_month
+  ON wage_statements(project_id, month);
+CREATE INDEX IF NOT EXISTS idx_wage_statement_lines_statement
+  ON wage_statement_lines(statement_id);
+CREATE INDEX IF NOT EXISTS idx_wage_statement_members_statement
+  ON wage_statement_members(statement_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_project_date
+  ON attendance_records(project_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_worker_date
+  ON attendance_records(worker_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_wage_statements_deleted
+  ON wage_statements(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wage_statement_lines_deleted
+  ON wage_statement_lines(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wage_statement_members_deleted
+  ON wage_statement_members(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_attendance_records_deleted
+  ON attendance_records(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_book_period
+  ON wage_statements(project_id, leader_worker_id, month, format_family, period_kind)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_member
+  ON wage_statement_members(statement_id, worker_id)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_attendance_worker_day
+  ON attendance_records(project_id, worker_id, work_date)
+  WHERE deleted_at IS NULL;
+`
+
 export const INDEXES = `
 -- ═══════ 索引 ═══════
 
@@ -431,5 +541,6 @@ export const ALL_SCHEMA = [
   BATCH_2_DEPS_1,
   BATCH_3_DEPS_2,
   BATCH_4_POLYMORPHIC,
+  BATCH_5_PAYROLL_ATTENDANCE,
   INDEXES,
 ].join('\n')

@@ -1,4 +1,4 @@
-import { ALL_SCHEMA } from './schema'
+import { ALL_SCHEMA, BATCH_5_PAYROLL_ATTENDANCE } from './schema'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
 export interface MigrationDb {
@@ -4104,6 +4104,60 @@ async function migrateScheduleProcessLibraryV27(db: MigrationDb): Promise<void> 
   `, [libraryId])
 }
 
+async function migratePayrollAuditV29(db: MigrationDb): Promise<void> {
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'format_family',
+    `TEXT NOT NULL DEFAULT 'A' CHECK (format_family IN ('A', 'B', 'C1', 'C2'))`,
+  )
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'period_kind',
+    `TEXT NOT NULL DEFAULT 'monthly' CHECK (period_kind IN ('monthly', 'settlement', 'retention'))`,
+  )
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'needs_recheck',
+    `INTEGER NOT NULL DEFAULT 0 CHECK (needs_recheck IN (0, 1))`,
+  )
+  await addColumnIfMissing(db, 'wage_statements', 'cumulative_amount', 'REAL NOT NULL DEFAULT 0')
+  await addColumnIfMissing(db, 'wage_statements', 'previously_paid', 'REAL NOT NULL DEFAULT 0')
+  await addColumnIfMissing(db, 'wage_statements', 'source_version', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'source_updated_at', 'TEXT')
+  await addColumnIfMissing(db, 'wage_statements', 'checked_source_version', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'adjustment_reason', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'operator_name', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'submitted_at', 'TEXT')
+  await execScript(db, `
+    CREATE TABLE IF NOT EXISTS wage_statement_members (
+      id            TEXT PRIMARY KEY,
+      statement_id  TEXT NOT NULL REFERENCES wage_statements(id),
+      worker_id     TEXT NOT NULL REFERENCES workers(id),
+      is_leader     INTEGER NOT NULL DEFAULT 0 CHECK (is_leader IN (0, 1)),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at    TEXT DEFAULT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wage_statement_members_statement
+      ON wage_statement_members(statement_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_member
+      ON wage_statement_members(statement_id, worker_id)
+      WHERE deleted_at IS NULL;
+    DROP INDEX IF EXISTS uq_wage_statement_book_month;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_book_period
+      ON wage_statements(project_id, leader_worker_id, month, format_family, period_kind)
+      WHERE deleted_at IS NULL;
+  `)
+  await db.execute(`
+    INSERT OR IGNORE INTO wage_statement_members (id, statement_id, worker_id, is_leader)
+    SELECT 'wage_member_' || id, id, leader_worker_id, 1
+    FROM wage_statements
+    WHERE deleted_at IS NULL
+  `)
+}
+
 /**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
@@ -4623,6 +4677,20 @@ export const migrations: Migration[] = [
     name: 'schedule-provisional-scope-process-library',
     async up(db) {
       await migrateScheduleProcessLibraryV27(db)
+    },
+  },
+  {
+    version: 28,
+    name: 'payroll-attendance-workbenches',
+    async up(db) {
+      await execScript(db, BATCH_5_PAYROLL_ATTENDANCE)
+    },
+  },
+  {
+    version: 29,
+    name: 'payroll-audit-period-members',
+    async up(db) {
+      await migratePayrollAuditV29(db)
     },
   },
 ]

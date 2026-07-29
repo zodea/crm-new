@@ -51,7 +51,6 @@ export const NAV_TREE: NavNode[] = [
     { key: 'quantity', mark: '量', icon: 'i-lucide-grid-3x3', label: '工程量管理', hint: '矩阵可视化', to: '/subcontract/quantity' },
     { key: 'boqList', mark: '单', icon: 'i-lucide-list-tree', label: '工程量清单', hint: '分项·三量', to: '/contract/boq' },
     { key: 'payroll', mark: '资', icon: 'i-lucide-wallet-cards', label: '工资核算', hint: '核算发放', to: '/subcontract/payroll' },
-    { key: 'wageSlip', mark: '款', icon: 'i-lucide-badge-dollar-sign', label: '工资进度款', hint: '铺贴核算工具' },
   ] },
   { type: 'group', key: 'g-material', label: '乙供材管理', icon: 'i-lucide-package', items: [
     { key: 'matContract', mark: '采', icon: 'i-lucide-shopping-cart', label: '材料采购合同', hint: '采购台账', to: '/contract/material' },
