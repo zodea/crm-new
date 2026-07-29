@@ -74,7 +74,6 @@ onMounted(refresh)
           {{ project?.name ?? record.projectId }} · {{ supplier?.name ?? '未区分分供方' }}
         </div>
       </div>
-      <span class="chip-ok">已归档</span>
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <NuxtLink :to="`/material/delivery/archive/form/${record.id}`" class="btn-secondary">
           <span class="i-lucide-square-pen mr-1 text-13px" /> 编辑
@@ -85,12 +84,13 @@ onMounted(refresh)
       </div>
     </div>
 
-    <MetricGrid :cols="4">
-      <Metric label="送货日期" :value="record.deliveryDate || '—'" />
-      <Metric label="材料项数" :value="record.lines.length" formula="有效材料明细行" />
-      <Metric label="金额合计" :value="yuan(record.totalAmount)" tone="brand" big />
-      <Metric label="入库状态" :value="record.stored ? '已入库' : '未入库'" formula="入库供单价对比，留第二趟" />
-    </MetricGrid>
+    <DeliveryRecordSummary
+      :delivery-date="record.deliveryDate"
+      :line-count="record.lines.length"
+      :total-amount="record.totalAmount"
+      :archived="record.archived"
+      :stored="record.stored"
+    />
 
     <div class="delivery-record-layout grid min-w-0 items-start gap-4">
       <DeliveryRecordSourcePanel
