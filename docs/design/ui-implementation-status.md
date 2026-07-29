@@ -58,12 +58,12 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、版本化标准工序、三步建组和依赖冲突保护已实现；项目区域配置、甘特建组拖拽及暂估转合同差异绑定仍待闭环 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
+| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、版本化标准工序、三步建组、项目区域配置和依赖冲突保护已实现；甘特建组拖拽及暂估转合同差异绑定仍待闭环 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
 | 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
 | 客户 / 班组 / 工人 | 主数据列表与表单已存在，部分详情仍缺失 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
-| 工程量 / 工资 / 考勤 | 工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 工程量 / 工资 / 考勤 | 无合同项目区域、工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |
 | 收入 / 支出 / 发票 | 票款列表、表单、识别和台账基础已存在 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204) |
 | 导入 / 导出工具 | 配置页和映射工作台已存在 | [#205](https://github.com/zodea/crm-new/issues/205) |

@@ -143,7 +143,7 @@
 | `app/pages/material/arrival/index.vue` | `/material/arrival` | 自购材 | 列表 | #199 | R-LIST-PRIOR | 待 #199 同屏测量 | 待 #199 只读核对 | C-DENSE |
 | `app/pages/material/arrival/new.vue` | `/material/arrival/new` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/delivery/archive/[id].vue` | `/material/delivery/archive/:id` | 送货单闭环 | 详情 | #201 | R-DETAIL-PRIOR | 待 #201 同屏测量 | 待 #201 只读核对 | C-BASE |
-| `app/pages/material/delivery/archive/form/[id].vue` | `/material/delivery/archive/form/:id` | 送货单闭环 | 整页表单 | #201 | R-FORM-PRIOR | 待 #201 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/material/delivery/archive/form/[[id]].vue` | `/material/delivery/archive/form/:id?` | 送货单闭环 | 整页表单 | #201 | R-FORM-PRIOR | 待 #201 同屏测量；同一路由统一新建/编辑 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/delivery/archive/index.vue` | `/material/delivery/archive` | 送货单闭环 | 工作台 | #201 | R-WORKBENCH-PRIOR | 待 #201 同屏测量 | 待 #201 只读核对 | C-DENSE |
 | `app/pages/material/delivery/index.vue` | `/material/delivery` | 送货单闭环 | 工作台 | #201 | R-WORKBENCH-PRIOR | 待 #201 同屏测量 | OCR/归档动作保持现有契约 | C-DENSE |
 | `app/pages/material/price.vue` | `/material/price` | 材料价格 | 特殊工具 | #207 | R-TOOL-PENDING | 2026-07-29 按用户定稿完成“搜索选材料→趋势/厂家比较→来源→合同历史”及 390/768/1024/1440px 回归；没有直接参考页证据，不声称已对齐参考站 | 搜索、材料切换、最多 4 家趋势、最新价横向比较及只读送货单/合同下钻已验证；不触发参考站或本地业务写入 | C-TOOL |
@@ -198,6 +198,7 @@
 | `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工资核算规则保持现有契约 | C-DENSE |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 待 #198 同屏测量 | 待 #198 只读核对 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工程量写入路径保持现有契约 | C-DENSE |
+| `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 复用统一整页表单壳；具体区域配置参考仍待 #198 同屏测量 | 只新增楼栋、楼层、户并记录日志；合同可选，归档矩阵禁止写入 | C-FORM |
 | `app/pages/subcontract/quantity/template.vue` | `/subcontract/quantity/template` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 待 #198 同屏测量 | 户型模板写入路径保持现有契约 | C-FORM |
 
 ## 6. 维护规则
