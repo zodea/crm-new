@@ -19,6 +19,7 @@ describe('delivery queue panel', () => {
           engine: '',
           model: '',
           preprocessed: false,
+          printBatchId: 'delivery-1',
           archivedRecordIds: ['delivery-1'],
           printDisposition: 'pending',
         }],
@@ -32,8 +33,10 @@ describe('delivery queue panel', () => {
     expect(screen.queryByTitle('移出队列')).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: '打开打印' }))
-    await fireEvent.click(screen.getByRole('button', { name: '排除' }))
+    await fireEvent.click(screen.getByRole('button', { name: '登记已打印' }))
+    await fireEvent.click(screen.getByRole('button', { name: '排除打印' }))
     expect(emitted().openPrint).toEqual([['print:delivery-1']])
+    expect(emitted().confirmPrint).toEqual([['print:delivery-1']])
     expect(emitted().excludePrint).toEqual([['print:delivery-1']])
   })
 })

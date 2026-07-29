@@ -15,6 +15,7 @@ const emit = defineEmits<{
   recognize: [id: string]
   remove: [id: string]
   openPrint: [id: string]
+  confirmPrint: [id: string]
   excludePrint: [id: string]
 }>()
 
@@ -93,15 +94,24 @@ function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: strin
           </div>
         </div>
 
-        <div class="mt-2 flex items-center justify-end gap-1 border-t border-line/70 pt-1.5">
+        <div class="mt-2 flex flex-wrap items-center justify-end gap-1 border-t border-line/70 pt-1.5">
+          <button
+            v-if="file.printDisposition === 'pending'"
+            type="button"
+            class="btn-secondary px-2 py-1 text-10px"
+            title="只打开送货单原件和系统打印窗口，不改变打印状态"
+            @click.stop="emit('openPrint', file.id)"
+          >
+            <span class="i-lucide-printer mr-1 text-11px" />打开打印
+          </button>
           <button
             v-if="file.printDisposition === 'pending'"
             type="button"
             class="btn-primary px-2 py-1 text-10px"
-            title="打开送货单原件并在打印成功后确认"
-            @click.stop="emit('openPrint', file.id)"
+            title="打印机实际输出后，登记打印回执并移出待打印范围"
+            @click.stop="emit('confirmPrint', file.id)"
           >
-            <span class="i-lucide-printer mr-1 text-11px" />打开打印
+            登记已打印
           </button>
           <button
             v-if="file.printDisposition === 'pending'"
@@ -110,7 +120,7 @@ function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: strin
             title="不打印本文件并移出待打印范围"
             @click.stop="emit('excludePrint', file.id)"
           >
-            排除
+            排除打印
           </button>
           <button
             v-if="file.printDisposition == null && (file.ocrStatus === 'pending' || file.ocrStatus === 'failed')"

@@ -383,6 +383,7 @@ CREATE TABLE delivery_records (
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
   archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；送货单 archived=1 即已入库/可供单价分析
   stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
+  printBatchId TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
   printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
   printedAt TEXT,                    -- 仅真实打印完成后的用户回执写入；打开打印窗口不得写
   printExcludedAt TEXT,              -- 明确排除打印范围的时间；排除不写 printedAt
@@ -402,6 +403,8 @@ CREATE TABLE delivery_lines (
 > `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
 
 > 迁移 v25 将所有存量 `archived=1` 记录的 `stored` 兼容镜像回填为 1，并把存量打印处置初始化为 `excluded`：历史数据无法可靠反推是否打印，升级时不得伪造 `printedAt`，也不得突然形成大批待打印任务。此后新归档由 store 显式写 `printDisposition='pending'`；只有“打印成功回执”写 `printed`，手动排除只写 `excluded`。
+>
+> 迁移 v32 增加 `printBatchId`：存量按记录 ID 一单一批回填，新上传的同一原件拆成多张送货单时共享批次 ID。打印/排除只能把整批从 `pending` 原子推进到 `printed` / `excluded`；任一记录已终结时整批拒绝并回滚，禁止旧页面把两个终态互相覆盖。
 
 项目详情的到货视图只查询 `delivery_records.archived=1` 且头/项目/分供方祖先未软删的记录，并聚合未软删 `delivery_lines`。原件正文继续归属 `file_refs(owner_type='delivery_record', owner_id=delivery_records.id, category='source')`；`delivery_records.file_name` 仅作兼容显示，不建立详情附件副本。
 

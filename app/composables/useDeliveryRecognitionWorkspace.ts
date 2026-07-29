@@ -403,19 +403,22 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     }
     catch (caught) {
       warning(caught instanceof Error ? caught.message : '送货单原件打开失败')
-      return
     }
+  }
 
+  async function confirmPrint(id: string) {
+    const file = store.byId(id)
+    if (!file)
+      return
     const didPrint = await confirm({
       variant: 'simple',
-      title: '确认打印结果',
-      message: '原件已在新窗口打开。请先在该窗口完成系统打印；只有打印机实际输出成功后，才点击“已完成打印”。取消或打印失败请点“暂不确认”，文件会继续留在待打印范围。',
-      confirmLabel: '已完成打印',
-      cancelLabel: '暂不确认',
+      title: '登记实际打印回执',
+      message: `确认打印机已经实际输出「${file.name}」？登记后文件才会移出待打印范围；只打开过预览或取消打印时不要确认。`,
+      confirmLabel: '确认已实际打印',
+      cancelLabel: '暂不登记',
     })
     if (!didPrint)
       return
-
     try {
       await promise(store.confirmFilePrintReceipt(id), {
         loading: '正在登记打印回执…',
@@ -492,6 +495,7 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     applySupplierSuggestion,
     archiveSelected,
     openPrint,
+    confirmPrint,
     excludePrint,
   }
 }

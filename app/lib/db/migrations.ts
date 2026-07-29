@@ -4794,6 +4794,30 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 32,
+    name: 'delivery-print-batches',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'delivery_records',
+        'print_batch_id',
+        `TEXT NOT NULL DEFAULT ''`,
+      )
+      await db.execute(`
+        UPDATE delivery_records
+        SET print_batch_id = id
+        WHERE trim(print_batch_id) = ''
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_delivery_pending_print_batch
+        ON delivery_records(print_batch_id, print_disposition)
+        WHERE deleted_at IS NULL
+          AND archived = 1
+          AND print_disposition = 'pending'
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

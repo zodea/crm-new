@@ -33,6 +33,7 @@ const emit = defineEmits<{
   removeItem: [index: number]
   applySupplierSuggestion: []
   openPrint: [id: string]
+  confirmPrint: [id: string]
   excludePrint: [id: string]
 }>()
 
@@ -143,11 +144,14 @@ function relayAmountEdit(index: number, field: 'qty' | 'unitPrice' | 'amount', v
         已归档并入库，等待打印
       </p>
       <p class="mt-1 max-w-96 text-10px leading-5 text-ink-faint">
-        打开原件完成系统打印后，再确认“已完成打印”；取消或打印失败不会改变状态。
+        “打开打印”只打开原件，不改变状态；打印机实际输出后再单独登记。取消或打印失败时不用操作，文件会继续保留。
       </p>
       <div class="mt-4 flex flex-wrap justify-center gap-2">
-        <button type="button" class="btn-accent" @click="emit('openPrint', file.id)">
+        <button type="button" class="btn-secondary" @click="emit('openPrint', file.id)">
           <span class="i-lucide-printer mr-1" />打开打印
+        </button>
+        <button type="button" class="btn-accent" @click="emit('confirmPrint', file.id)">
+          登记已打印
         </button>
         <button type="button" class="btn-secondary" @click="emit('excludePrint', file.id)">
           排除打印

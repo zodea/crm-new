@@ -104,6 +104,16 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
 
   await page.getByRole('button', { name: '核对完成并归档', exact: true }).click()
   await expect(page.getByText('已完成核对并进入归档库', { exact: true })).toBeVisible()
+  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '登记已打印', exact: true }).first()).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await page.getByRole('button', { name: '登记已打印', exact: true }).first().click()
+  const printReceiptDialog = page.getByRole('dialog', { name: '登记实际打印回执' })
+  await expect(printReceiptDialog).toContainText(/只打开过预览或取消打印时不要确认/)
+  await printReceiptDialog.getByRole('button', { name: '确认已实际打印', exact: true }).click()
+  await expect(page.getByText('已登记打印成功，文件已移出待打印范围', { exact: true })).toBeVisible()
   await expect(page.getByText('上传 PDF 或图片开始识别', { exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: '归档库', exact: true }).click()

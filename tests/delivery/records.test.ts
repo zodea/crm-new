@@ -60,6 +60,7 @@ describe('送货单 pass-1：版本化持久化', () => {
       'order_no',
       'delivery_date',
       'file_name',
+      'print_batch_id',
       'print_disposition',
       'printed_at',
       'print_excluded_at',
@@ -101,18 +102,21 @@ describe('送货单 pass-1：版本化持久化', () => {
     const result = await runMigrations(db)
     const [record] = await db.select<{
       stored: number
+      print_batch_id: string
       print_disposition: string
       printed_at: string | null
       print_excluded_at: string | null
     }>(`
-      SELECT stored, print_disposition, printed_at, print_excluded_at
+      SELECT stored, print_batch_id, print_disposition, printed_at, print_excluded_at
       FROM delivery_records
       WHERE id = 'del-legacy-print'
     `)
 
     expect(result.applied).toContain('v25 delivery-archive-print-disposition')
+    expect(result.applied).toContain('v32 delivery-print-batches')
     expect(record).toEqual({
       stored: 1,
+      print_batch_id: 'del-legacy-print',
       print_disposition: 'excluded',
       printed_at: null,
       print_excluded_at: null,
@@ -157,6 +161,7 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       ocrStatus: 'reviewed',
       archived: true,
       stored: true,
+      printBatchId: id,
       printDisposition: 'pending',
       printedAt: '',
       printExcludedAt: '',
@@ -209,6 +214,9 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       printed_at: null,
     })
     expect(first?.print_excluded_at).toBeTruthy()
+    await expect(
+      store.confirmPrintReceipt(firstId),
+    ).rejects.toThrow('打印状态已变化')
 
     const secondId = await store.add({
       projectId: 'p1',
@@ -233,6 +241,50 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       print_excluded_at: null,
     })
     expect(second?.printed_at).toBeTruthy()
+    await expect(
+      store.excludeFromPrint(secondId),
+    ).rejects.toThrow('打印状态已变化')
+  })
+
+  it('批量打印回执遇到任一非待打印记录时整批回滚', async () => {
+    const store = useDeliveryRecordStore()
+    const firstId = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-PRINT-BATCH-001',
+      deliveryDate: '2026-07-18',
+      printBatchId: 'batch-shared',
+      note: '',
+      lines: [{ materialName: '第一张材料', spec: '', unit: '件', qty: 1, unitPrice: 10, note: '' }],
+    })
+    const secondId = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-PRINT-BATCH-002',
+      deliveryDate: '2026-07-18',
+      printBatchId: 'batch-shared',
+      note: '',
+      lines: [{ materialName: '第二张材料', spec: '', unit: '件', qty: 1, unitPrice: 20, note: '' }],
+    })
+
+    await store.excludeFromPrint(firstId)
+    await expect(
+      store.confirmManyPrintReceipts([firstId, secondId]),
+    ).rejects.toThrow('打印状态已变化')
+
+    expect(await mem.select<{
+      id: string
+      print_disposition: string
+      printed_at: string | null
+    }>(`
+      SELECT id, print_disposition, printed_at
+      FROM delivery_records
+      WHERE id IN (?, ?)
+      ORDER BY id
+    `, [firstId, secondId])).toEqual([
+      { id: firstId, print_disposition: 'excluded', printed_at: null },
+      { id: secondId, print_disposition: 'pending', printed_at: null },
+    ].sort((a, b) => a.id.localeCompare(b.id)))
   })
 
   it('人工复核金额独立持久化，不在保存时被数量×单价覆盖', async () => {

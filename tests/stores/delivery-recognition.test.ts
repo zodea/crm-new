@@ -311,6 +311,7 @@ describe('delivery store 真实识别与归档管线', () => {
       expect.objectContaining({
         id: `print:${recordId}`,
         name: '跨刷新待打印.pdf',
+        printBatchId: recordId,
         archivedRecordIds: [recordId],
         printDisposition: 'pending',
       }),
@@ -318,5 +319,41 @@ describe('delivery store 真实识别与归档管线', () => {
     const source = await restoredStore.loadFileForPrint(`print:${recordId}`)
     expect(source.name).toBe('跨刷新待打印.pdf')
     expect(new Uint8Array(await source.arrayBuffer())).toEqual(sourceBytes)
+  })
+
+  it('同一上传文件拆成多张送货单时，刷新后仍恢复为一个打印任务', async () => {
+    const recordStore = useDeliveryRecordStore()
+    const source = new File(['shared-source'], '一份文件两张单.pdf', { type: 'application/pdf' })
+    const firstId = await recordStore.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-BATCH-001',
+      deliveryDate: '2026-07-19',
+      printBatchId: 'shared-print-batch',
+      note: '',
+      lines: [{ materialName: '第一张材料', spec: '', unit: '件', qty: 1, unitPrice: 20, note: '' }],
+    }, source)
+    const secondId = await recordStore.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-BATCH-002',
+      deliveryDate: '2026-07-19',
+      printBatchId: 'shared-print-batch',
+      note: '',
+      lines: [{ materialName: '第二张材料', spec: '', unit: '件', qty: 2, unitPrice: 30, note: '' }],
+    }, source)
+
+    setActivePinia(createPinia())
+    const restoredStore = useDeliveryStore()
+    await restoredStore.loadPendingPrintQueue()
+
+    expect(restoredStore.pendingPrintFiles).toHaveLength(1)
+    expect(restoredStore.pendingPrintFiles[0]).toMatchObject({
+      id: 'print:shared-print-batch',
+      printBatchId: 'shared-print-batch',
+      printDisposition: 'pending',
+    })
+    expect(restoredStore.pendingPrintFiles[0]?.archivedRecordIds)
+      .toEqual(expect.arrayContaining([firstId, secondId]))
   })
 })

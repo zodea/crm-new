@@ -59,7 +59,7 @@ async function createChecked(): Promise<string> {
 
 describe('wage statement member allocations', () => {
   it('v31 creates the allocation table', async () => {
-    expect(migrations.at(-1)?.version).toBe(31)
+    expect(migrations.some(migration => migration.version === 31)).toBe(true)
     expect(await listTables(db)).toContain('wage_statement_allocations')
   })
 

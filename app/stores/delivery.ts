@@ -51,6 +51,7 @@ export interface DeliveryFile {
   engine: string
   model: string
   preprocessed: boolean
+  printBatchId: string
   archivedRecordIds: string[]
   printDisposition: DeliveryPrintDisposition | null
 }
@@ -109,6 +110,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const next: DeliveryFile[] = []
     for (const file of uploadedFiles) {
       const id = generateId('dfile')
+      const printBatchId = generateId('delivery_print_batch')
       sourceFiles.set(id, file)
       ids.push(id)
       next.push({
@@ -124,6 +126,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
         engine: '',
         model: '',
         preprocessed: false,
+        printBatchId,
         archivedRecordIds: [],
         printDisposition: null,
       })
@@ -243,6 +246,7 @@ export const useDeliveryStore = defineStore('delivery', () => {
       deliveryDate: input.deliveryDate,
       rawSiteText: input.siteText,
       fileName: file.name,
+      printBatchId: file.printBatchId,
       note: input.note,
       lines: items.map(item => ({
         materialName: item.name,
@@ -281,10 +285,18 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const recordStore = useDeliveryRecordStore()
     await recordStore.load()
     const representedRecordIds = new Set(files.value.flatMap(file => file.archivedRecordIds))
-    const restored: DeliveryFile[] = recordStore.pendingPrintRecords
-      .filter(record => !representedRecordIds.has(record.id))
-      .map(record => ({
-        id: `print:${record.id}`,
+    const groups = new Map<string, typeof recordStore.pendingPrintRecords>()
+    for (const record of recordStore.pendingPrintRecords) {
+      if (representedRecordIds.has(record.id))
+        continue
+      const group = groups.get(record.printBatchId) ?? []
+      group.push(record)
+      groups.set(record.printBatchId, group)
+    }
+    const restored: DeliveryFile[] = [...groups.entries()].map(([printBatchId, records]) => {
+      const record = records[0]!
+      return {
+        id: `print:${printBatchId}`,
         name: record.fileName || `送货单 ${record.orderNo || record.id}`,
         kind: fileKind(record.fileName),
         size: 0,
@@ -296,9 +308,11 @@ export const useDeliveryStore = defineStore('delivery', () => {
         engine: '',
         model: '',
         preprocessed: false,
-        archivedRecordIds: [record.id],
+        printBatchId,
+        archivedRecordIds: records.map(item => item.id),
         printDisposition: 'pending',
-      }))
+      }
+    })
     if (restored.length)
       files.value = [...files.value, ...restored]
   }

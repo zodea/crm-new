@@ -37,6 +37,7 @@ const {
   applySupplierSuggestion,
   archiveSelected,
   openPrint,
+  confirmPrint,
   excludePrint,
 } = useDeliveryRecognitionWorkspace(pageRef)
 </script>
@@ -77,6 +78,7 @@ const {
           @recognize="recognizeOne"
           @remove="removeFile"
           @open-print="openPrint"
+          @confirm-print="confirmPrint"
           @exclude-print="excludePrint"
         />
       </template>
@@ -105,6 +107,7 @@ const {
           @apply-supplier-suggestion="applySupplierSuggestion"
           @archive="archiveSelected"
           @open-print="openPrint"
+          @confirm-print="confirmPrint"
           @exclude-print="excludePrint"
         />
       </template>
