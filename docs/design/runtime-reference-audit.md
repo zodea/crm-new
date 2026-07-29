@@ -82,7 +82,7 @@
 
 | Page | Route | 业务域 | 模板 | 实施票 | 参考证据 | 布局差异 | 交互差异 | 业务约束 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-BASE |
+| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | 已迁入统一详情壳并补齐真实成员、能力、项目/工程量、工资与扣罚只读关联；具体参考同屏差异仍待 #194 测量 | 仅展示真实外键关系；无班组-合同直连时不虚构合同；写入仍走整页表单 | C-DENSE |
 | `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/base/crew/index.vue` | `/base/crew` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | 待 #194 同屏测量 | 待 #194 只读核对 | C-DENSE |
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | 待 #194 同屏测量 | 写入路径保持现有契约 | C-FORM |

@@ -67,6 +67,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '班组列表',
     listPath: '/base/crew',
     newPath: '/base/crew/form',
+    detailPath: '/base/crew',
     defaultAttachmentCategory: 'agreement',
     sections: [
       { key: 'basic', label: '基本信息' },
