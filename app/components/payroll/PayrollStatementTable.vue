@@ -21,7 +21,7 @@ const columns: KitTableColumn[] = [
   { field: 'grossAmount', title: '核算应发', width: 120, type: 'money' },
   { field: 'actualAmount', title: '实际发放', width: 120, type: 'money' },
   { field: 'status', title: '状态', width: 92, slot: 'status' },
-  { type: 'action', title: '操作', width: 88, fixed: 'right' },
+  { type: 'action', title: '操作', width: 132, fixed: 'right' },
 ]
 
 const statusLabel = {
@@ -56,9 +56,14 @@ const statusLabel = {
         </span>
       </template>
       <template #action="{ row }">
-        <button type="button" class="text-12px font-700 text-brand" @click="emit('select', row.id)">
-          {{ selectedId === row.id ? '查看中' : '查看' }}
-        </button>
+        <div class="flex items-center gap-3 whitespace-nowrap">
+          <button type="button" class="text-12px font-700 text-brand" @click="emit('select', row.id)">
+            {{ selectedId === row.id ? '查看中' : '查看' }}
+          </button>
+          <NuxtLink :to="`/subcontract/payroll/${row.id}`" class="text-12px font-700 text-brand">
+            详情
+          </NuxtLink>
+        </div>
       </template>
     </KitTable>
   </section>
