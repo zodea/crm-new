@@ -30,13 +30,16 @@ import {
   planTemplateTasks,
 } from '~/lib/schedule/planning'
 import {
+  loadScheduleProcessLibraries,
+  loadScheduleProcessLibraryTasks,
+} from '~/lib/schedule/process-library'
+import {
   loadScheduleBuildingCoverage,
   loadScheduleBuildings,
   loadScheduleCatalog,
   loadScheduleContracts,
   loadScheduleProject,
 } from '~/lib/schedule/read-model'
-import { SCHEDULE_TEMPLATE_BY_KEY } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -50,7 +53,9 @@ const db: ScheduleDb = { execute, select }
 
 export interface CreateScheduleGroupDraft {
   projectId: string
-  contractId: string
+  scopeBasis?: 'contract' | 'provisional'
+  contractId?: string | null
+  processLibraryId?: string
   name: string
   buildingIds: readonly string[]
   startDate: string
@@ -261,6 +266,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const buildings = shallowRef<ScheduleBuildingOption[]>([])
   const buildingCoverage = shallowRef<ScheduleBuildingCoverage[]>([])
   const contracts = shallowRef<ScheduleContractOption[]>([])
+  const processLibraries = shallowRef<Awaited<ReturnType<typeof loadScheduleProcessLibraries>>>([])
+  const processTasks = shallowRef<Awaited<ReturnType<typeof loadScheduleProcessLibraryTasks>>>([])
   const snapshot = shallowRef<ScheduleProjectView | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -299,6 +306,14 @@ export const useScheduleStore = defineStore('schedule', () => {
     contracts.value = projectId ? await loadScheduleContracts(db, projectId) : []
   }
 
+  async function loadProcessLibraries() {
+    processLibraries.value = await loadScheduleProcessLibraries(db)
+  }
+
+  async function loadProcessLibraryTasks(libraryId: string) {
+    processTasks.value = await loadScheduleProcessLibraryTasks(db, libraryId)
+  }
+
   async function loadProject(projectId: string, today = toLocalDateInputValue()) {
     const request = ++latestRequest
     activeProjectId = projectId
@@ -329,8 +344,13 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function createGroup(draft: CreateScheduleGroupDraft, today = toLocalDateInputValue()) {
     const name = draft.name.trim()
-    if (!draft.projectId || !draft.contractId || !name)
-      throw new Error('项目、施工合同与分组名称必填')
+    const scopeBasis = draft.scopeBasis ?? (draft.contractId ? 'contract' : 'provisional')
+    if (!draft.projectId || !name)
+      throw new Error('项目与分组名称必填')
+    if (scopeBasis === 'contract' && !draft.contractId)
+      throw new Error('合同清单模式必须选择施工合同')
+    if (scopeBasis === 'provisional' && draft.contractId)
+      throw new Error('内部暂估模式不能绑定施工合同')
     const buildingIds = [...new Set(draft.buildingIds)]
     if (!buildingIds.length)
       throw new Error('请至少选择一栋楼')
@@ -342,28 +362,43 @@ export const useScheduleStore = defineStore('schedule', () => {
     if (!plannedRows.length)
       throw new Error('请至少选择一道工序')
 
-    const templates = plannedRows.map((row) => {
-      const template = SCHEDULE_TEMPLATE_BY_KEY.get(row.key)
-      if (!template)
-        throw new Error(`未知工序模板：${row.key}`)
-      return { row, template }
-    })
     const groupId = generateId('schedule_group')
     saving.value = true
     error.value = ''
     try {
       await withTransaction(async (tx) => {
-        const buildings = (await loadScheduleBuildings(tx, draft.projectId, draft.contractId))
-          .filter(building => buildingIds.includes(building.id))
-        if (buildings.length !== buildingIds.length)
-          throw new Error('楼栋范围包含无效、已删除或不属于该合同清单的记录')
+        const libraries = await loadScheduleProcessLibraries(tx)
+        const processLibrary = draft.processLibraryId
+          ? libraries.find(row => row.id === draft.processLibraryId)
+          : libraries.find(row => row.isDefault) ?? libraries[0]
+        if (!processLibrary)
+          throw new Error('标准工序库无效或已停用')
+        const libraryTasks = await loadScheduleProcessLibraryTasks(tx, processLibrary.id)
+        const libraryTaskByKey = new Map(libraryTasks.map(task => [task.key, task]))
+        const templates = plannedRows.map((row) => {
+          const template = libraryTaskByKey.get(row.key)
+          if (!template)
+            throw new Error(`标准工序库不包含工序：${row.key}`)
+          return { row, template }
+        })
 
-        const [contract] = await tx.select<{ id: string }>(
-          selectVisibleSql('contracts', `AND id = ? AND project_id = ? AND kind = '施工'`),
-          [draft.contractId, draft.projectId],
-        )
-        if (!contract)
-          throw new Error('施工合同无效、已删除或不属于当前项目')
+        const contractId = scopeBasis === 'contract' ? draft.contractId! : ''
+        const buildings = (await loadScheduleBuildings(tx, draft.projectId, contractId))
+          .filter(building => buildingIds.includes(building.id))
+        if (buildings.length !== buildingIds.length) {
+          throw new Error(scopeBasis === 'contract'
+            ? '楼栋范围包含无效、已删除或不属于该合同清单的记录'
+            : '楼栋范围包含无效、已删除、已排程或不属于当前项目的记录')
+        }
+
+        if (scopeBasis === 'contract') {
+          const [contract] = await tx.select<{ id: string }>(
+            selectVisibleSql('contracts', `AND id = ? AND project_id = ? AND kind = '施工'`),
+            [contractId, draft.projectId],
+          )
+          if (!contract)
+            throw new Error('施工合同无效、已删除或不属于当前项目')
+        }
 
         const stageCodes = templates.flatMap(({ template }) => template.stageCode ? [template.stageCode] : [])
         const itemCodes = templates.flatMap(({ template }) => template.itemCodes)
@@ -388,7 +423,7 @@ export const useScheduleStore = defineStore('schedule', () => {
         const boqLinesByItem = await loadBoqLinesByItem(
           tx,
           draft.projectId,
-          draft.contractId,
+          contractId,
           [...itemByCode.values()],
         )
         const floors = await loadFloorsByBuildings(tx, buildingIds)
@@ -399,9 +434,22 @@ export const useScheduleStore = defineStore('schedule', () => {
           [draft.projectId],
         )
         await tx.execute(
-          `INSERT INTO schedule_groups (id, project_id, contract_id, name, sort_order)
-           VALUES (?, ?, ?, ?, ?)`,
-          [groupId, draft.projectId, draft.contractId, name, Number(order?.next_order) || 10],
+          `INSERT INTO schedule_groups
+            (id, project_id, contract_id, scope_basis, process_library_id,
+             process_library_name_snapshot, process_library_version_snapshot,
+             name, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            groupId,
+            draft.projectId,
+            contractId || null,
+            scopeBasis,
+            processLibrary.id,
+            processLibrary.name,
+            processLibrary.version,
+            name,
+            Number(order?.next_order) || 10,
+          ],
         )
         await logCreate(tx, 'schedule_groups', groupId)
 
@@ -419,11 +467,25 @@ export const useScheduleStore = defineStore('schedule', () => {
         for (const [index, { row, template }] of templates.entries()) {
           const taskId = generateId('schedule_task')
           const stageId = template.stageCode ? stageByCode.get(template.stageCode)! : null
+          const templateSnapshot = JSON.stringify({
+            libraryId: processLibrary.id,
+            libraryName: processLibrary.name,
+            libraryVersion: processLibrary.version,
+            libraryTaskId: template.id,
+            key: template.key,
+            name: template.name,
+            trade: template.trade,
+            color: template.color,
+            durationDays: row.durationDays,
+            stageCode: template.stageCode ?? '',
+            itemCodes: template.itemCodes,
+          })
           await tx.execute(
             `INSERT INTO schedule_tasks
               (id, project_id, group_id, name, trade, color, duration_days,
-               planned_start, planned_finish, has_qty, manual_progress, stage_id, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               planned_start, planned_finish, has_qty, manual_progress, stage_id, sort_order,
+               source_library_task_id, source_library_version, template_snapshot_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               taskId,
               draft.projectId,
@@ -438,6 +500,9 @@ export const useScheduleStore = defineStore('schedule', () => {
               stageId ? null : 0,
               stageId,
               (index + 1) * 10,
+              template.id,
+              processLibrary.version,
+              templateSnapshot,
             ],
           )
           await logCreate(tx, 'schedule_tasks', taskId)
@@ -776,7 +841,10 @@ export const useScheduleStore = defineStore('schedule', () => {
     today = activeToday,
   ) {
     const group = snapshot.value?.groups.find(candidate => candidate.id === groupId)
-    const template = SCHEDULE_TEMPLATE_BY_KEY.get(draft.templateKey)
+    const template = group
+      ? (await loadScheduleProcessLibraryTasks(db, group.processLibraryId))
+          .find(candidate => candidate.key === draft.templateKey)
+      : undefined
     if (!group || !template)
       throw new Error('楼栋分组或工序模板不存在')
     const taskId = generateId('schedule_task')
@@ -811,8 +879,9 @@ export const useScheduleStore = defineStore('schedule', () => {
       await tx.execute(
         `INSERT INTO schedule_tasks
           (id, project_id, group_id, name, trade, color, duration_days,
-           planned_start, planned_finish, has_qty, manual_progress, stage_id, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           planned_start, planned_finish, has_qty, manual_progress, stage_id, sort_order,
+           source_library_task_id, source_library_version, template_snapshot_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           taskId,
           group.projectId,
@@ -827,6 +896,21 @@ export const useScheduleStore = defineStore('schedule', () => {
           stage ? null : 0,
           stage?.id ?? null,
           sortOrder,
+          template.id,
+          template.libraryVersion,
+          JSON.stringify({
+            libraryId: template.libraryId,
+            libraryName: group.processLibraryName,
+            libraryVersion: template.libraryVersion,
+            libraryTaskId: template.id,
+            key: template.key,
+            name: template.name,
+            trade: template.trade,
+            color: template.color,
+            durationDays: template.durationDays,
+            stageCode: template.stageCode ?? '',
+            itemCodes: template.itemCodes,
+          }),
         ],
       )
       await logCreate(tx, 'schedule_tasks', taskId)
@@ -890,6 +974,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     buildings: readonly(buildings),
     buildingCoverage: readonly(buildingCoverage),
     contracts: readonly(contracts),
+    processLibraries: readonly(processLibraries),
+    processTasks: readonly(processTasks),
     snapshot: readonly(snapshot),
     loading: readonly(loading),
     saving: readonly(saving),
@@ -897,6 +983,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     loadCatalog,
     loadBuildings,
     loadContracts,
+    loadProcessLibraries,
+    loadProcessLibraryTasks,
     loadProject,
     createGroup,
     updateTask,

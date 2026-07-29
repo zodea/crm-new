@@ -193,4 +193,96 @@ describe('schedule store：排程唯一 action 写路径', () => {
       expect.objectContaining({ id: 'b2', inContract: false, scheduled: false }),
     ]))
   })
+
+  it('无合同时可按内部暂估范围建组，并冻结标准工序库快照', async () => {
+    const store = useScheduleStore()
+    await store.loadProcessLibraries()
+
+    expect(store.processLibraries).toEqual([
+      expect.objectContaining({
+        code: 'decoration-standard-v1',
+        name: '精装修标准工序',
+        version: 1,
+        taskCount: 22,
+      }),
+    ])
+    const libraryId = store.processLibraries[0]!.id
+    await store.loadProcessLibraryTasks(libraryId)
+    const settingOut = store.processTasks.find(task => task.key === 'setting-out')!
+
+    await store.loadBuildings('p1')
+    expect(store.buildings.map(building => building.id)).toEqual(['b1', 'b2'])
+
+    const groupId = await store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '内部暂估·2栋',
+      buildingIds: ['b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: settingOut.key, enabled: true, durationDays: 9, anchorStart: null },
+      ],
+    }, '2026-07-01')
+
+    expect(store.snapshot?.groups[0]).toMatchObject({
+      id: groupId,
+      scopeBasis: 'provisional',
+      contractId: '',
+      processLibraryId: libraryId,
+      processLibraryName: '精装修标准工序',
+      processLibraryVersion: 1,
+      buildingIds: ['b2'],
+    })
+    expect(store.snapshot?.groups[0]!.tasks[0]).toMatchObject({
+      name: '放线及新建墙体',
+      durationDays: 9,
+      sourceLibraryTaskId: settingOut.id,
+      sourceLibraryVersion: 1,
+    })
+
+    const [persistedGroup] = await mem.select<{
+      scope_basis: string
+      contract_id: string | null
+      process_library_name_snapshot: string
+    }>(`
+      SELECT scope_basis, contract_id, process_library_name_snapshot
+      FROM schedule_groups
+      WHERE id = ?
+    `, [groupId])
+    expect(persistedGroup).toEqual({
+      scope_basis: 'provisional',
+      contract_id: null,
+      process_library_name_snapshot: '精装修标准工序',
+    })
+
+    const [persistedTask] = await mem.select<{
+      name: string
+      duration_days: number
+      template_snapshot_json: string
+    }>(`
+      SELECT name, duration_days, template_snapshot_json
+      FROM schedule_tasks
+      WHERE group_id = ?
+    `, [groupId])
+    expect(JSON.parse(persistedTask!.template_snapshot_json)).toMatchObject({
+      key: 'setting-out',
+      name: '放线及新建墙体',
+      durationDays: 9,
+      libraryVersion: 1,
+    })
+
+    await mem.execute(`
+      UPDATE schedule_process_library_tasks
+      SET name = '全局库后续改名', duration_days = 99
+      WHERE id = ?
+    `, [settingOut.id])
+    await store.loadProject('p1', '2026-07-01')
+    expect(store.snapshot?.groups[0]!.tasks[0]).toMatchObject({
+      name: '放线及新建墙体',
+      durationDays: 9,
+    })
+  })
 })

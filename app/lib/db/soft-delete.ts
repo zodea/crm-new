@@ -72,6 +72,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'unit_id', table: 'units' },
     { column: 'stage_id', table: 'construction_stages' },
   ],
+  schedule_process_libraries: [],
+  schedule_process_library_tasks: [
+    { column: 'library_id', table: 'schedule_process_libraries' },
+  ],
   schedule_groups: [
     { column: 'project_id', table: 'projects' },
     { column: 'contract_id', table: 'contracts' },

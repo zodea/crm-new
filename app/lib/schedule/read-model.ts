@@ -75,12 +75,20 @@ export interface ScheduleTaskView {
   actualFinish: string | null
   plannedProgress: number
   deviationDays: number
+  sourceLibraryTaskId: string | null
+  sourceLibraryVersion: number | null
 }
+
+export type ScheduleScopeBasis = 'contract' | 'provisional'
 
 export interface ScheduleGroupView {
   id: string
   projectId: string
   contractId: string
+  scopeBasis: ScheduleScopeBasis
+  processLibraryId: string
+  processLibraryName: string
+  processLibraryVersion: number | null
   name: string
   sortOrder: number
   buildingIds: readonly string[]
@@ -108,7 +116,17 @@ export interface ScheduleProjectView {
 
 interface ProjectRow { id: string, name: string, code: string | null, status: string | null }
 interface BuildingRow { id: string, project_id: string, code: string, name: string }
-interface GroupRow { id: string, project_id: string, contract_id: string | null, name: string, sort_order: number }
+interface GroupRow {
+  id: string
+  project_id: string
+  contract_id: string | null
+  scope_basis: ScheduleScopeBasis | null
+  process_library_id: string | null
+  process_library_name_snapshot: string
+  process_library_version_snapshot: number | null
+  name: string
+  sort_order: number
+}
 interface GroupBuildingRow { group_id: string, building_id: string, building_name: string }
 interface TaskRow {
   id: string
@@ -127,6 +145,8 @@ interface TaskRow {
   manual_progress: number | null
   stage_id: string | null
   sort_order: number
+  source_library_task_id: string | null
+  source_library_version: number | null
 }
 interface TaskItemRow { task_id: string, item_id: string, boq_line_id: string | null, item_name: string }
 interface FloorPlanRow {
@@ -199,7 +219,18 @@ export async function loadScheduleBuildings(
 ): Promise<ScheduleBuildingOption[]> {
   if (!contractId) {
     const rows = await db.select<BuildingRow>(
-      selectVisibleSql('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'),
+      `${hiddenCtesFor('buildings', 'schedule_group_buildings')}
+       SELECT building_row.*
+       FROM buildings building_row
+       WHERE ${visibleCond('buildings', 'building_row')}
+         AND building_row.project_id = ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM schedule_group_buildings group_building
+           WHERE group_building.building_id = building_row.id
+             AND ${visibleCond('schedule_group_buildings', 'group_building')}
+         )
+       ORDER BY building_row.sort_order, building_row.code, building_row.id`,
       [projectId],
     )
     return rows.map(row => ({
@@ -498,6 +529,10 @@ export async function loadScheduleProject(
         actualProgress,
         today,
       }),
+      sourceLibraryTaskId: task.source_library_task_id,
+      sourceLibraryVersion: task.source_library_version == null
+        ? null
+        : Number(task.source_library_version),
     }
     taskViews.set(task.group_id, [...(taskViews.get(task.group_id) ?? []), view])
   }
@@ -509,6 +544,12 @@ export async function loadScheduleProject(
       id: group.id,
       projectId: group.project_id,
       contractId: group.contract_id ?? '',
+      scopeBasis: group.scope_basis ?? (group.contract_id ? 'contract' : 'provisional'),
+      processLibraryId: group.process_library_id ?? '',
+      processLibraryName: group.process_library_name_snapshot,
+      processLibraryVersion: group.process_library_version_snapshot == null
+        ? null
+        : Number(group.process_library_version_snapshot),
       name: group.name,
       sortOrder: Number(group.sort_order) || 0,
       buildingIds: groupBuildings.map(row => row.building_id),

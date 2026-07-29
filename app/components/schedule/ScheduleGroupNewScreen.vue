@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleOverlapMode } from '~/lib/schedule/planning'
 import { calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
-import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
@@ -19,20 +18,17 @@ const { confirm, error, success } = useKitUI()
 
 const projectId = shallowRef('')
 const contractId = shallowRef('')
+const scopeBasis = shallowRef<'contract' | 'provisional'>('contract')
+const processLibraryId = shallowRef('')
 const name = ref('精装修楼栋组')
 const startDate = shallowRef(toLocalDateInputValue())
 const overlapMode = shallowRef<ScheduleOverlapMode>('half')
 const buildingIds = ref<string[]>([])
-const tasks = ref<TaskDraft[]>(SCHEDULE_TASK_TEMPLATES.map(template => ({
-  templateKey: template.key,
-  enabled: true,
-  durationDays: template.durationDays,
-  anchorStart: null,
-})))
+const tasks = ref<TaskDraft[]>([])
 const initialized = shallowRef(false)
 const loadingRange = shallowRef(false)
 
-const templateByKey = new Map(SCHEDULE_TASK_TEMPLATES.map(template => [template.key, template]))
+const templateByKey = computed(() => new Map(store.processTasks.map(template => [template.key, template])))
 const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMode.value, tasks.value.map(task => ({
   key: task.templateKey,
   enabled: task.enabled,
@@ -50,6 +46,13 @@ const contractOptions = computed(() => store.contracts.map(contract => ({
   key: contract.id,
   label: `${contract.name}${contract.no ? ` · ${contract.no}` : ''} · ${contract.lineCount} 条清单`,
 })))
+const processLibraryOptions = computed(() => store.processLibraries.map(library => ({
+  key: library.id,
+  label: `${library.name} · v${library.version} · ${library.taskCount} 道`,
+})))
+const activeProcessLibrary = computed(() =>
+  store.processLibraries.find(library => library.id === processLibraryId.value),
+)
 const coverageSummary = computed(() => ({
   contract: store.buildingCoverage.filter(building => building.inContract).length,
   scheduled: store.buildingCoverage.filter(building => building.inContract && building.scheduled).length,
@@ -67,7 +70,7 @@ function predecessorLabel(templateKey: string): string {
     return '—'
   const predecessor = plannedRows.value[index - 1]!
   const successor = plannedRows.value[index]!
-  const predecessorName = templateByKey.get(predecessor.key)?.name ?? '前置工序'
+  const predecessorName = templateByKey.value.get(predecessor.key)?.name ?? '前置工序'
   const lag = calendarDays(predecessor.plannedFinish, successor.plannedStart)
   return `${predecessorName} · FS${lag ? `${lag > 0 ? '+' : ''}${lag}天` : ''}`
 }
@@ -80,14 +83,27 @@ async function loadRange(reset = true) {
       contractId.value = store.contracts.find(contract => contract.lineCount > 0)?.id
         ?? store.contracts[0]?.id
         ?? ''
+      scopeBasis.value = contractId.value ? 'contract' : 'provisional'
     }
-    await store.loadBuildings(projectId.value, contractId.value)
+    await store.loadBuildings(
+      projectId.value,
+      scopeBasis.value === 'contract' ? contractId.value : '',
+    )
     if (reset)
       buildingIds.value = store.buildings.map(building => building.id)
   }
   finally {
     loadingRange.value = false
   }
+}
+
+function resetProcessTasks() {
+  tasks.value = store.processTasks.map(template => ({
+    templateKey: template.key,
+    enabled: true,
+    durationDays: template.durationDays,
+    anchorStart: null,
+  }))
 }
 
 watch(projectId, async (next, previous) => {
@@ -97,10 +113,46 @@ watch(projectId, async (next, previous) => {
 })
 
 watch(contractId, async (next, previous) => {
-  if (!initialized.value || loadingRange.value || !next || next === previous)
+  if (
+    !initialized.value
+    || loadingRange.value
+    || scopeBasis.value !== 'contract'
+    || !next
+    || next === previous
+  ) {
     return
+  }
   await store.loadBuildings(projectId.value, next)
   buildingIds.value = store.buildings.map(building => building.id)
+})
+
+watch(scopeBasis, async (next, previous) => {
+  if (!initialized.value || loadingRange.value || next === previous)
+    return
+  loadingRange.value = true
+  try {
+    if (next === 'contract') {
+      contractId.value = contractId.value
+        || store.contracts.find(contract => contract.lineCount > 0)?.id
+        || store.contracts[0]?.id
+        || ''
+    }
+    else {
+      contractId.value = ''
+    }
+    await store.loadBuildings(projectId.value, next === 'contract' ? contractId.value : '')
+    buildingIds.value = store.buildings.map(building => building.id)
+  }
+  finally {
+    loadingRange.value = false
+  }
+})
+
+watch(processLibraryId, async (next, previous) => {
+  if (!initialized.value || !next || next === previous)
+    return
+  await store.loadProcessLibraryTasks(next)
+  resetProcessTasks()
 })
 
 function toggleBuilding(id: string) {
@@ -114,8 +166,15 @@ function toggleAllTasks(enabled: boolean) {
 }
 
 async function submit() {
-  if (!projectId.value || !contractId.value || !name.value.trim()) {
-    error('请选择项目、施工合同并填写分组名称')
+  if (
+    !projectId.value
+    || !name.value.trim()
+    || !processLibraryId.value
+    || (scopeBasis.value === 'contract' && !contractId.value)
+  ) {
+    error(scopeBasis.value === 'contract'
+      ? '请选择项目、施工合同、标准工序库并填写分组名称'
+      : '请选择项目、标准工序库并填写分组名称')
     return
   }
   if (!buildingIds.value.length || !enabledCount.value) {
@@ -134,7 +193,9 @@ async function submit() {
   try {
     const groupId = await store.createGroup({
       projectId: projectId.value,
-      contractId: contractId.value,
+      scopeBasis: scopeBasis.value,
+      contractId: scopeBasis.value === 'contract' ? contractId.value : null,
+      processLibraryId: processLibraryId.value,
       name: name.value,
       buildingIds: buildingIds.value,
       startDate: startDate.value,
@@ -150,7 +211,14 @@ async function submit() {
 }
 
 onMounted(async () => {
-  await store.loadCatalog()
+  await Promise.all([store.loadCatalog(), store.loadProcessLibraries()])
+  processLibraryId.value = store.processLibraries.find(library => library.isDefault)?.id
+    ?? store.processLibraries[0]?.id
+    ?? ''
+  if (processLibraryId.value) {
+    await store.loadProcessLibraryTasks(processLibraryId.value)
+    resetProcessTasks()
+  }
   const requested = String(route.query.project ?? '')
   projectId.value = store.catalog.find(project => project.id === requested)?.id ?? store.catalog[0]?.id ?? ''
   if (projectId.value)
@@ -193,7 +261,22 @@ onMounted(async () => {
             <span class="field-label block">分组名称</span>
             <input v-model="name" class="field-input w-full" maxlength="80">
           </label>
-          <div>
+          <fieldset>
+            <legend class="field-label">
+              范围依据
+            </legend>
+            <div class="mt-1 grid grid-cols-2 gap-2">
+              <label class="scope-option" :class="scopeBasis === 'contract' && 'is-active'">
+                <input v-model="scopeBasis" type="radio" value="contract" class="accent-[var(--brand)]">
+                <span><b>合同清单</b><small>按已确认清单控范围</small></span>
+              </label>
+              <label class="scope-option" :class="scopeBasis === 'provisional' && 'is-active'">
+                <input v-model="scopeBasis" type="radio" value="provisional" class="accent-[var(--brand)]">
+                <span><b>内部暂估</b><small>合同未签先排计划</small></span>
+              </label>
+            </div>
+          </fieldset>
+          <div v-if="scopeBasis === 'contract'">
             <span class="field-label block">施工合同</span>
             <SelectFilter v-model="contractId" aria-label="施工合同" :options="contractOptions" :min-width="210" placeholder="选择施工合同" />
             <span v-if="!store.contracts.length" class="mt-1 block text-11px text-danger">
@@ -202,6 +285,16 @@ onMounted(async () => {
             <span v-else-if="store.contracts.every(contract => !contract.lineCount)" class="mt-1 block text-11px text-warning">
               合同尚未导入清单；请先拆表确认楼栋范围后再建组。
             </span>
+          </div>
+          <div v-else class="rounded-lg border border-warning/30 bg-warning/8 p-3 text-11px text-ink-soft">
+            <b class="block text-warning">待绑定合同</b>
+            范围读取项目手工楼栋，工程量读取户型模板暂估量，不会标记为合同确认值。
+            <NuxtLink
+              :to="{ path: '/subcontract/quantity', query: { project: projectId || undefined } }"
+              class="mt-1 block font-700 text-brand hover:underline"
+            >
+              打开工程量管理，维护暂估量 →
+            </NuxtLink>
           </div>
           <label>
             <span class="field-label block">计划开始</span>
@@ -228,7 +321,7 @@ onMounted(async () => {
             <legend class="field-label">
               楼栋范围
             </legend>
-            <div v-if="store.buildingCoverage.length" class="mt-1 flex flex-wrap gap-1.5 text-10px">
+            <div v-if="scopeBasis === 'contract' && store.buildingCoverage.length" class="mt-1 flex flex-wrap gap-1.5 text-10px">
               <span class="chip-brand">合同范围 {{ coverageSummary.contract }}</span>
               <span class="chip-ok">未纳入 {{ coverageSummary.available }}</span>
               <span class="chip">已纳入 {{ coverageSummary.scheduled }}</span>
@@ -241,9 +334,11 @@ onMounted(async () => {
               </label>
             </div>
             <p v-else class="mt-1 text-11px text-danger">
-              清单未提供可验证的显式楼栋范围，或合同范围已全部纳入排程。
+              {{ scopeBasis === 'contract'
+                ? '清单未提供可验证的显式楼栋范围，或合同范围已全部纳入排程。'
+                : '当前项目尚未维护可用楼栋，或楼栋已全部纳入排程。' }}
             </p>
-            <p v-if="outsideBuildingNames" class="mt-1 text-10px text-ink-faint">
+            <p v-if="scopeBasis === 'contract' && outsideBuildingNames" class="mt-1 text-10px text-ink-faint">
               项目库中不属于本合同：{{ outsideBuildingNames }}
             </p>
           </fieldset>
@@ -259,13 +354,20 @@ onMounted(async () => {
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
           <div>
             <h2 class="text-13px font-800 text-ink">
-              22 道精装修标准工序
+              {{ activeProcessLibrary?.taskCount ?? 0 }} 道{{ activeProcessLibrary?.name ?? '标准工序' }}
             </h2>
             <p class="text-11px text-ink-faint">
               可停用、改工期，或为个别工序指定锚点日期。
             </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <SelectFilter
+              v-model="processLibraryId"
+              aria-label="标准工序库"
+              :options="processLibraryOptions"
+              :min-width="210"
+              placeholder="选择标准工序库"
+            />
             <button type="button" class="btn-ghost" @click="toggleAllTasks(true)">
               全选
             </button>
@@ -300,6 +402,10 @@ onMounted(async () => {
 <style scoped>
 .schedule-new { container-type: inline-size; overflow: hidden; }
 .new-layout { display: grid; grid-template-columns: minmax(240px, 26%) minmax(0, 1fr); }
+.scope-option { display: flex; min-width: 0; cursor: pointer; align-items: flex-start; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; color: var(--ink-soft); }
+.scope-option.is-active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-deep); }
+.scope-option b, .scope-option small { display: block; }
+.scope-option small { margin-top: 2px; color: var(--ink-faint); font-size: 10px; line-height: 1.35; }
 .process-row { display: grid; grid-template-columns: 42px minmax(210px, 1.4fr) 76px 86px 142px minmax(150px, 1fr) 126px; align-items: center; min-height: 42px; gap: 8px; border-bottom: 1px solid var(--line); padding: 6px 12px; color: var(--ink-soft); font-size: 11px; }
 .process-row > :nth-child(n+4) { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .process-head { min-height: 34px; background: var(--surface-2); color: var(--ink-faint); font-size: 10px; font-weight: 700; }

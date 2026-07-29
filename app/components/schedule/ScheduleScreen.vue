@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ScheduleGroupView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
-import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
@@ -154,7 +153,11 @@ async function removeTask() {
 }
 
 async function addTask(group: ScheduleGroupView) {
-  const options = SCHEDULE_TASK_TEMPLATES.filter(template => !group.tasks.some(task => task.name === template.name))
+  await store.loadProcessLibraryTasks(group.processLibraryId)
+  const options = store.processTasks
+    .filter(template => !group.tasks.some(task =>
+      task.sourceLibraryTaskId === template.id || task.name === template.name,
+    ))
   if (!options.length) {
     warning('标准工序已全部加入当前分组')
     return

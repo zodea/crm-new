@@ -3938,6 +3938,173 @@ async function migrateF3FinanceForms(db: MigrationDb): Promise<void> {
 }
 
 /**
+ * v27 内置工序库的冻结种子。迁移是历史事实，后续调整标准工序必须新增版本，
+ * 不得修改这份 v1 快照，否则旧库与新库会得到不同结果。
+ */
+const V27_DECORATION_PROCESS_TASKS = [
+  ['setting-out', '放线及新建墙体', 30, '泥水工', '#8b5cf6', '', '[]'],
+  ['plumbing', '给排水安装', 30, '水暖工', '#f59e0b', '', '[]'],
+  ['waterproof', '卫生间回填及防水', 30, '防水工', '#06b6d4', 'WP-02', '["WP-WALL","WP-FLOOR"]'],
+  ['wiring', '电线敷设', 30, '水电工', '#f59e0b', '', '[]'],
+  ['air-conditioning', '空调安装（天花机）', 18, '水电工', '#f59e0b', '', '[]'],
+  ['ceiling', '天花龙骨及封板（含楼梯）', 30, '木工', '#d97706', 'CEILING', '["DEC-CEILING"]'],
+  ['leveling', '水泥沙找平', 18, '泥水工', '#6366f1', 'LEVELING', '["DEC-LEVELING"]'],
+  ['gypsum-line', '石膏线安装', 18, '油漆工', '#10b981', 'GYPSUM-LINE', '["DEC-GYPSUM-LINE"]'],
+  ['wall-tile', '墙砖粘贴', 50, '泥水工', '#6366f1', 'MASON-WALL', '["DEC-WALL-TILE"]'],
+  ['floor-tile', '地砖铺贴', 30, '泥水工', '#4f46e5', 'MASON-FLOOR', '["DEC-FLOOR-TILE"]'],
+  ['putty-1', '天花及墙身一遍腻子', 20, '油漆工', '#10b981', 'PUTTY-01', '["DEC-PUTTY"]'],
+  ['putty-2', '天花及墙身二遍腻子', 20, '油漆工', '#10b981', 'PUTTY-02', '["DEC-PUTTY"]'],
+  ['doors', '户内门安装', 18, '木工', '#d97706', '', '[]'],
+  ['wood-floor', '木地板安装', 25, '木工', '#d97706', 'WOOD-FLOOR', '["DEC-WOOD-FLOOR"]'],
+  ['latex-paint', '天花及墙身乳胶漆', 30, '油漆工', '#059669', 'LATEX-PAINT', '["DEC-LATEX-PAINT"]'],
+  ['aluminum-ceiling', '铝扣板安装', 20, '干挂工', '#0ea5e9', 'ALUMINUM-CEILING', '["DEC-ALUMINUM-CEILING"]'],
+  ['kitchen-cabinet', '橱柜安装', 20, '木工', '#d97706', '', '[]'],
+  ['fixed-cabinet', '固装柜子安装', 25, '木工', '#d97706', '', '[]'],
+  ['finishing-paint', '收口石膏线及油漆', 10, '油漆工', '#10b981', '', '[]'],
+  ['switch-light', '开关插座及灯具安装', 20, '水电工', '#f59e0b', '', '[]'],
+  ['sanitary-hardware', '五金洁具安装', 20, '水电工', '#f59e0b', '', '[]'],
+  ['cleaning', '开荒保洁', 8, '杂工', '#9ca3af', '', '[]'],
+] as const
+
+async function migrateScheduleProcessLibraryV27(db: MigrationDb): Promise<void> {
+  await execScript(db, `
+    CREATE TABLE IF NOT EXISTS schedule_process_libraries (
+      id          TEXT PRIMARY KEY,
+      code        TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      version     INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      description TEXT NOT NULL DEFAULT '',
+      is_default  INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at  TEXT DEFAULT NULL
+    );
+    CREATE TABLE IF NOT EXISTS schedule_process_library_tasks (
+      id              TEXT PRIMARY KEY,
+      library_id      TEXT NOT NULL REFERENCES schedule_process_libraries(id),
+      task_key        TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      trade           TEXT NOT NULL DEFAULT '',
+      color           TEXT NOT NULL DEFAULT '#64748b',
+      duration_days   INTEGER NOT NULL DEFAULT 1 CHECK (duration_days > 0),
+      stage_code      TEXT NOT NULL DEFAULT '',
+      item_codes_json TEXT NOT NULL DEFAULT '[]',
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at      TEXT DEFAULT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_library_code_version
+      ON schedule_process_libraries(code, version)
+      WHERE deleted_at IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_default
+      ON schedule_process_libraries(is_default)
+      WHERE deleted_at IS NULL AND is_default = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_library_task_key
+      ON schedule_process_library_tasks(library_id, task_key)
+      WHERE deleted_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_library_tasks_library
+      ON schedule_process_library_tasks(library_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_libraries_deleted
+      ON schedule_process_libraries(deleted_at)
+      WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_library_tasks_deleted
+      ON schedule_process_library_tasks(deleted_at)
+      WHERE deleted_at IS NOT NULL;
+  `)
+
+  await addColumnIfMissing(
+    db,
+    'schedule_groups',
+    'scope_basis',
+    `TEXT CHECK (scope_basis IN ('contract', 'provisional'))`,
+  )
+  await addColumnIfMissing(db, 'schedule_groups', 'contract_bound_at', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_id', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_name_snapshot', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_version_snapshot', 'INTEGER')
+  await addColumnIfMissing(db, 'schedule_tasks', 'source_library_task_id', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_tasks', 'source_library_version', 'INTEGER')
+  await addColumnIfMissing(db, 'schedule_tasks', 'template_snapshot_json', `TEXT NOT NULL DEFAULT '{}'`)
+
+  await db.execute(`
+    UPDATE schedule_groups
+    SET scope_basis = CASE WHEN contract_id IS NULL THEN 'provisional' ELSE 'contract' END
+  `)
+
+  await db.execute('DROP TRIGGER IF EXISTS trg_schedule_group_scope_insert')
+  await db.execute('DROP TRIGGER IF EXISTS trg_schedule_group_scope_update')
+  await db.execute(`
+    CREATE TRIGGER trg_schedule_group_scope_insert
+    BEFORE INSERT ON schedule_groups
+    WHEN NEW.scope_basis IS NOT NULL
+      AND (
+        (NEW.scope_basis = 'contract' AND NEW.contract_id IS NULL)
+        OR (NEW.scope_basis = 'provisional' AND NEW.contract_id IS NOT NULL)
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule scope basis mismatch');
+    END
+  `)
+  await db.execute(`
+    CREATE TRIGGER trg_schedule_group_scope_update
+    BEFORE UPDATE OF scope_basis, contract_id ON schedule_groups
+    WHEN NEW.scope_basis IS NOT NULL
+      AND (
+        (NEW.scope_basis = 'contract' AND NEW.contract_id IS NULL)
+        OR (NEW.scope_basis = 'provisional' AND NEW.contract_id IS NOT NULL)
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule scope basis mismatch');
+    END
+  `)
+  await execScript(db, `
+    CREATE INDEX IF NOT EXISTS idx_schedule_groups_scope_basis
+      ON schedule_groups(project_id, scope_basis);
+    CREATE INDEX IF NOT EXISTS idx_schedule_groups_process_library
+      ON schedule_groups(process_library_id);
+  `)
+
+  const libraryId = 'schedule_process_library_decoration_v1'
+  await db.execute(`
+    INSERT INTO schedule_process_libraries
+      (id, code, name, version, description, is_default, sort_order)
+    VALUES (?, 'decoration-standard-v1', '精装修标准工序', 1, '22 道精装修标准工序', 1, 10)
+    ON CONFLICT(id) DO NOTHING
+  `, [libraryId])
+  for (const [index, task] of V27_DECORATION_PROCESS_TASKS.entries()) {
+    const [key, name, durationDays, trade, color, stageCode, itemCodesJson] = task
+    await db.execute(`
+      INSERT INTO schedule_process_library_tasks
+        (id, library_id, task_key, name, trade, color, duration_days,
+         stage_code, item_codes_json, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO NOTHING
+    `, [
+      `schedule_process_library_task_${key}`,
+      libraryId,
+      key,
+      name,
+      trade,
+      color,
+      durationDays,
+      stageCode,
+      itemCodesJson,
+      (index + 1) * 10,
+    ])
+  }
+
+  await db.execute(`
+    UPDATE schedule_groups
+    SET process_library_id = ?,
+        process_library_name_snapshot = '精装修标准工序',
+        process_library_version_snapshot = 1
+    WHERE process_library_id IS NULL
+  `, [libraryId])
+}
+
+/**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
  */
@@ -4449,6 +4616,13 @@ export const migrations: Migration[] = [
           `, [JSON.stringify(primaryTrade ? [primaryTrade] : []), row.id])
         }
       }
+    },
+  },
+  {
+    version: 27,
+    name: 'schedule-provisional-scope-process-library',
+    async up(db) {
+      await migrateScheduleProcessLibraryV27(db)
     },
   },
 ]
