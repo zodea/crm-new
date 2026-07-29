@@ -1,7 +1,7 @@
 # 工程量管理 — 户型模板 + 指派矩阵 + 阶段完成
 
-> 路由：`/subcontract/quantity` · `/subcontract/quantity/:pid/:uid`（`uid` = 户 ID）
-> 页面：`pages/subcontract/quantity/index.vue` · `pages/subcontract/quantity/[pid]/[uid].vue`
+> 路由：`/subcontract/quantity` · `/subcontract/quantity/region` · `/subcontract/quantity/:pid/:uid`（`uid` = 户 ID）
+> 页面：`pages/subcontract/quantity/index.vue` · `pages/subcontract/quantity/region.vue` · `pages/subcontract/quantity/[pid]/[uid].vue`
 > 架构决策：[ADR 0010](../../adr/0010-quantity-matrix-and-construction-record-model.md)
 > 数据模型：[DATABASE.md §2.6 / §3.4 / §4.7](../DATABASE.md)
 > 术语：`CONTEXT.md`（户型模板 / 工程量指派 / 阶段完成 / 施工记录）
@@ -15,6 +15,8 @@
 ## 一、区域与户型模板
 
 区域树为“楼栋 → 楼层 → 户”；户挂一个项目内户型模板，并通过活链接看到模板房间。房间不逐户复制：模板房间拥有稳定身份，某户的一间房由“户 + 模板房间”共同指认。楼层结构可复制到其他楼层，但复制只产生区域初始快照，不建立跨楼层联动。
+
+“项目区域”使用独立整页表单，不依赖施工合同。空项目可依次新增楼栋、楼层和户；同级编码唯一，户型模板必须属于当前项目。区域新增与户型模板入口互相返回，补齐户后可回工程量矩阵继续责任配置，也可直接进入新建楼栋分组。矩阵归档后区域结构锁定，不允许继续新增。
 
 户型模板维护“房间 × 工种 × 分项 × 三量”：
 

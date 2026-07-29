@@ -26,6 +26,7 @@ const emit = defineEmits<{
   exportByCategory: []
   importData: []
   manageAssignments: []
+  manageRegions: []
   manageTemplates: []
   toggleArchive: []
   refresh: []
@@ -100,6 +101,10 @@ const viewTabs = [
         <button type="button" class="btn-secondary" @click="emit('manageAssignments')">
           <span class="i-lucide-users-round mr-1 text-13px" aria-hidden="true" />
           责任配置
+        </button>
+        <button type="button" class="btn-secondary" @click="emit('manageRegions')">
+          <span class="i-lucide-building-2 mr-1 text-13px" aria-hidden="true" />
+          项目区域
         </button>
         <button type="button" class="btn-secondary" @click="emit('manageTemplates')">
           <span class="i-lucide-layout-template mr-1 text-13px" aria-hidden="true" />

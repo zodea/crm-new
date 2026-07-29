@@ -220,6 +220,15 @@ async function openTemplates() {
   })
 }
 
+async function openRegions() {
+  if (!projectId.value)
+    return
+  await router.push({
+    path: '/subcontract/quantity/region',
+    query: { project: projectId.value },
+  })
+}
+
 async function openUnitDetail(cell: QuantityMatrixCell) {
   await router.push({
     path: `/subcontract/quantity/${projectId.value}/${cell.unitId}`,
@@ -349,6 +358,7 @@ onMounted(initialize)
       @export-ledger="exportLedger"
       @export-by-category="exportByCategory"
       @toggle-archive="toggleArchive"
+      @manage-regions="openRegions"
       @manage-templates="openTemplates"
       @manage-assignments="openAssignments()"
       @refresh="retry"
@@ -444,8 +454,11 @@ onMounted(initialize)
         当前项目尚未配置楼栋和户
       </div>
       <p class="text-12px text-ink-soft">
-        这里只展示真实区域数据，不在组件内补 mock 矩阵。
+        这里只展示真实区域数据。先建立楼栋、楼层和户，再继续责任配置或排程。
       </p>
+      <button type="button" class="btn-primary mt-1" @click="openRegions">
+        配置项目区域
+      </button>
     </section>
 
     <section
@@ -457,8 +470,11 @@ onMounted(initialize)
         当前楼栋尚未配置楼层和户
       </div>
       <p class="text-12px text-ink-soft">
-        切换其他楼栋，或在后续区域配置入口补齐结构。
+        切换其他楼栋，或补齐当前楼栋下的楼层和户。
       </p>
+      <button type="button" class="btn-primary mt-1" @click="openRegions">
+        配置楼层与户
+      </button>
     </section>
 
     <template v-else-if="snapshot">

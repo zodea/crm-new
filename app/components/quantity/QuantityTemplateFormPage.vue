@@ -64,6 +64,12 @@ const shellDescription = computed(() => props.projectId
   ? store.templateError
   : '请从工程量矩阵选择项目后进入户型模板。')
 const returnTo = computed(() => {
+  if (route.query.return === 'region') {
+    return {
+      path: '/subcontract/quantity/region',
+      query: { project: props.projectId },
+    }
+  }
   return quantityMatrixReturnPath(route.query)
 })
 const itemOptions = computed(() => [

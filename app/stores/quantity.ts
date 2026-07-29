@@ -1,8 +1,14 @@
+import type { SoftDb } from '~/lib/db/soft-delete'
 import type { QuantityAssignmentBatchDraft, QuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
 import type { QuantityBatchCompletionDraft } from '~/lib/quantity/batch-completion'
 import type { QuantityCompletionDraft, QuantityCompletionWorkspace } from '~/lib/quantity/completion'
 import type { QuantityStageProgress } from '~/lib/quantity/derived'
 import type { QuantityCatalogProject, QuantityProjectSnapshot } from '~/lib/quantity/read-model'
+import type {
+  QuantityRegionNodeDraft,
+  QuantityRegionUnitDraft,
+  QuantityRegionWorkspace,
+} from '~/lib/quantity/region'
 import type { QuantityTemplateDraft, QuantityTemplateWorkspace } from '~/lib/quantity/template'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
@@ -14,6 +20,12 @@ import { persistQuantityBatchCompletion } from '~/lib/quantity/batch-completion'
 import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from '~/lib/quantity/completion'
 import { loadQuantityStageProgress } from '~/lib/quantity/derived'
 import { loadQuantityCatalog, loadQuantityProjectSnapshot } from '~/lib/quantity/read-model'
+import {
+  loadQuantityRegionWorkspace,
+  persistQuantityBuilding,
+  persistQuantityFloor,
+  persistQuantityUnit,
+} from '~/lib/quantity/region'
 import {
   deleteQuantityTemplate,
   loadQuantityTemplateWorkspace,
@@ -41,6 +53,10 @@ export const useQuantityStore = defineStore('quantity', () => {
   const completionLoading = shallowRef(false)
   const completionSaving = shallowRef(false)
   const completionError = shallowRef('')
+  const regionWorkspace = shallowRef<QuantityRegionWorkspace | null>(null)
+  const regionLoading = shallowRef(false)
+  const regionSaving = shallowRef(false)
+  const regionError = shallowRef('')
   let pending = 0
   let latestProjectRequest = 0
   let pendingTemplateRequests = 0
@@ -49,6 +65,7 @@ export const useQuantityStore = defineStore('quantity', () => {
   let latestAssignmentRequest = 0
   let pendingCompletionRequests = 0
   let latestCompletionRequest = 0
+  let latestRegionRequest = 0
 
   function beginRequest() {
     pending += 1
@@ -134,6 +151,73 @@ export const useQuantityStore = defineStore('quantity', () => {
       pendingTemplateRequests = Math.max(0, pendingTemplateRequests - 1)
       templateLoading.value = pendingTemplateRequests > 0
     }
+  }
+
+  async function loadRegion(projectId: string) {
+    const request = ++latestRegionRequest
+    regionLoading.value = true
+    regionError.value = ''
+    if (regionWorkspace.value?.projectId !== projectId)
+      regionWorkspace.value = null
+    try {
+      const result = projectId
+        ? await loadQuantityRegionWorkspace(db, projectId)
+        : null
+      if (request === latestRegionRequest)
+        regionWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestRegionRequest) {
+        regionWorkspace.value = null
+        regionError.value = `项目区域加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      if (request === latestRegionRequest)
+        regionLoading.value = false
+    }
+  }
+
+  async function saveRegionNode(
+    projectId: string,
+    operation: (tx: SoftDb) => Promise<string>,
+  ) {
+    regionSaving.value = true
+    regionError.value = ''
+    try {
+      const id = await withTransaction(operation)
+      try {
+        await Promise.all([
+          loadRegion(projectId),
+          loadProject(projectId),
+          loadCatalog(),
+        ])
+      }
+      catch (cause) {
+        regionError.value = `项目区域已保存，但刷新失败：${toErrorMessage(cause)}；请重新打开页面加载最新数据。`
+      }
+      return id
+    }
+    catch (cause) {
+      regionError.value = `项目区域保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      regionSaving.value = false
+    }
+  }
+
+  async function createRegionBuilding(projectId: string, draft: QuantityRegionNodeDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityBuilding(tx, projectId, draft))
+  }
+
+  async function createRegionFloor(projectId: string, buildingId: string, draft: QuantityRegionNodeDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityFloor(tx, projectId, buildingId, draft))
+  }
+
+  async function createRegionUnit(projectId: string, floorId: string, draft: QuantityRegionUnitDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityUnit(tx, projectId, floorId, draft))
   }
 
   async function saveTemplate(draft: QuantityTemplateDraft) {
@@ -397,6 +481,10 @@ export const useQuantityStore = defineStore('quantity', () => {
     completionLoading: readonly(completionLoading),
     completionSaving: readonly(completionSaving),
     completionError: readonly(completionError),
+    regionWorkspace: readonly(regionWorkspace),
+    regionLoading: readonly(regionLoading),
+    regionSaving: readonly(regionSaving),
+    regionError: readonly(regionError),
     loadCatalog,
     loadProject,
     loadTemplates,
@@ -408,6 +496,10 @@ export const useQuantityStore = defineStore('quantity', () => {
     loadCompletion,
     saveCompletion,
     saveBatchCompletion,
+    loadRegion,
+    createRegionBuilding,
+    createRegionFloor,
+    createRegionUnit,
     archiveMatrix,
     unarchiveMatrix,
   }
