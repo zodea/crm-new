@@ -47,7 +47,6 @@ const KitTableStub = defineComponent({
       type: Array,
       required: true,
     },
-    resizeConfig: Object,
   },
   setup(props, { slots }) {
     return () => {
@@ -58,9 +57,6 @@ const KitTableStub = defineComponent({
         'data-testid': 'boq-table-contract',
         'data-action-width': action?.width,
         'data-action-resizable': String((action as { resizable?: boolean })?.resizable),
-        'data-double-click-auto': String((props.resizeConfig as { isDblclickAutoWidth?: boolean })?.isDblclickAutoWidth),
-        'data-min-width': String((props.resizeConfig as { minWidth?: number })?.minWidth),
-        'data-max-width': String((props.resizeConfig as { maxWidth?: number })?.maxWidth),
       }, first ? slots.action?.({ row: first, rowIndex: 0 }) : [])
     }
   },
@@ -91,9 +87,6 @@ describe('boqLinesTable', () => {
     const contract = screen.getByTestId('boq-table-contract')
     expect(Number(contract.dataset.actionWidth)).toBeLessThanOrEqual(160)
     expect(contract.dataset.actionResizable).toBe('false')
-    expect(contract.dataset.doubleClickAuto).toBe('true')
-    expect(contract.dataset.minWidth).toBe('56')
-    expect(contract.dataset.maxWidth).toBe('480')
     expect(screen.getByRole('button', { name: /编辑清单行/ })).not.toBeNull()
     expect(screen.getByRole('button', { name: /现场算式/ })).not.toBeNull()
     expect(screen.getByRole('button', { name: /楼层计划/ })).not.toBeNull()

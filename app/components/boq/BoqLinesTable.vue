@@ -35,14 +35,6 @@ const columns: KitTableColumn[] = [
   { type: 'action', title: '操作', width: 144, resizable: false },
 ]
 
-const resizeConfig = {
-  dragMode: 'auto' as const,
-  showDragTip: true,
-  isDblclickAutoWidth: true,
-  minWidth: 56,
-  maxWidth: 480,
-}
-
 const filteredLines = computed(() => {
   const keyword = props.search.trim().toLocaleLowerCase('zh-CN')
   const scopeLineIds = boqCatalogScopeLineIds(props.scopeKey, props.catalog)
@@ -81,7 +73,6 @@ function decimal(value: number): string {
       :data="[...filteredLines]"
       :loading="loading"
       :min-rows="10"
-      :resize-config="resizeConfig"
       empty="当前目录没有清单行"
     >
       <template #quantity="{ row }">
@@ -157,20 +148,3 @@ function decimal(value: number): string {
     </KitTable>
   </div>
 </template>
-
-<style scoped>
-.boq-lines-table :deep(.vxe-table--header-wrapper .vxe-header--column) {
-  height: 36px;
-}
-
-.boq-lines-table :deep(.vxe-header--column .vxe-cell--col-resizable) {
-  right: -4px;
-  width: 7px;
-  cursor: col-resize;
-}
-
-.boq-lines-table :deep(.vxe-header--column .vxe-cell--col-resizable:hover::before) {
-  height: 100%;
-  background: var(--brand);
-}
-</style>

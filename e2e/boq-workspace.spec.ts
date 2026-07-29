@@ -34,7 +34,7 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(page.getByText('(原 26)', { exact: true })).toBeVisible()
 
     await page.getByRole('tab', { name: /变更单/ }).click()
-    await expect(page.getByRole('cell', { name: 'BG-2026-001' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'BG-2026-001', exact: true })).toBeVisible()
     await expect(page.getByText('已签证', { exact: true }).last()).toBeVisible()
 
     await page.getByRole('tab', { name: /月度报量/ }).click()
@@ -81,7 +81,8 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await page.getByRole('button', { name: /现场算式：墙砖铺贴/ }).first().click()
     await expect(page).toHaveURL(/\/subcontract\/quantity\?.*boqLine=/)
     await expect(page.getByText('来自合同工程量清单', { exact: true })).toBeVisible()
-    await expect(page.getByRole('dialog', { name: '户型模板与三量' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '户型模板与三量' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '保存模板', exact: true })).toBeVisible()
 
     await page.goto('/contract/boq')
     await page.waitForLoadState('networkidle')
@@ -169,6 +170,12 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
       await expect(page.getByRole('tab', { name: /合同清单/ })).toBeVisible()
       await page.getByRole('tab', { name: /变更单/ }).click()
       await expect(page.getByRole('button', { name: '新建变更单', exact: true })).toBeVisible()
+      const changeTable = page.locator('.boq-change-table')
+      const changeActionHeader = changeTable.getByRole('columnheader', { name: '操作', exact: true }).last()
+      await expect(changeActionHeader).toBeVisible()
+      expect((await changeActionHeader.boundingBox())?.width).toBeLessThanOrEqual(58)
+      await expect(changeActionHeader.locator('.vxe-cell--col-resizable')).toHaveCount(0)
+      await expect(changeTable.getByRole('button', { name: /变更单操作/ }).last()).toBeVisible()
       await page.getByRole('tab', { name: /月度报量/ }).click()
       await expect(page.getByText('自动汇总 + 手调留痕', { exact: true })).toBeVisible()
       await expectDocumentDoesNotOverflow(page)
