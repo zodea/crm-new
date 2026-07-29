@@ -2,7 +2,9 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
+import { createDefaultOcrRecognitionSettings } from '~/lib/ocr/settings'
 import { useInvoiceStore } from '~/stores/invoice'
+import { useOcrSettingsStore } from '~/stores/ocr-settings'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
@@ -62,6 +64,12 @@ describe('invoice store 真实识别管线', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(MARKDOWN))
     vi.stubGlobal('fetch', fetchMock)
     const file = new File([new Uint8Array([1, 2, 3])], '一季度发票.pdf', { type: 'application/pdf' })
+    await useOcrSettingsStore().save({
+      ...createDefaultOcrRecognitionSettings(),
+      useDocUnwarping: false,
+      useChartRecognition: true,
+      requestTimeoutMs: 45_000,
+    }, mem)
     const store = useInvoiceStore()
 
     const [id] = await store.uploadInvoices([file])
@@ -78,6 +86,13 @@ describe('invoice store 真实识别管线', () => {
     })
     const uploaded = (fetchMock.mock.calls[0]?.[1]?.body as FormData).get('file')
     expect(uploaded).toBe(file)
+    expect(JSON.parse(String(
+      (fetchMock.mock.calls[0]?.[1]?.body as FormData).get('options'),
+    ))).toMatchObject({
+      useDocUnwarping: false,
+      useChartRecognition: true,
+      requestTimeoutMs: 45_000,
+    })
     expect(store.recognitionError(id!)).toBe('')
   })
 

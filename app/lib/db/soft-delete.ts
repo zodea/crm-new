@@ -317,6 +317,7 @@ export const INFRA_TABLES = [
   'import_batches',
   'reconciliation_issues',
   'contract_legacy_mappings',
+  'ocr_settings',
 ]
 
 function assertBusinessTable(table: string): void {

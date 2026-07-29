@@ -1,10 +1,10 @@
-import { PADDLE_OCR_MODEL } from '../../utils/paddleocr-cloud'
+import { buildOcrRuntimeStatus } from '../../utils/ocr-runtime-options'
 
 export default defineEventHandler((event) => {
   const config = useRuntimeConfig(event)
-  return {
+  return buildOcrRuntimeStatus({
     configured: Boolean(String(config.paddleOcrAccessToken || '').trim()),
-    engine: 'paddleocr-official-api' as const,
-    model: PADDLE_OCR_MODEL,
-  }
+    requestTimeoutMs: config.paddleOcrRequestTimeoutMs,
+    pollTimeoutMs: config.paddleOcrPollTimeoutMs,
+  })
 })

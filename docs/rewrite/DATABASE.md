@@ -418,6 +418,8 @@ CREATE TABLE project_aliases (
 
 > `project_aliases` 已由迁移 v8 落地：人工选定项目并完成核对时记忆 `rawSiteText`，同一归一化写法后续自动预选；若该写法已属于其他项目则拒绝静默改绑。
 
+`ocr_settings` 是不参与通用软删除和操作日志的本机基础设施表（迁移 v33）。固定单例 `id='default'`，`settings_json` 只保存 PaddleOCR-VL 已接线的非敏感识别能力、请求/轮询超时和暂未接线的只读人工校对阈值；Access Token、API 地址和模型名禁止进入该表。
+
 ### 2.6 分包及人工类
 
 | 实体 | 表名 | PK | 设计文档 |

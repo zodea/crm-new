@@ -15,6 +15,7 @@ import { formatFileSize } from '~/lib/util/file'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { round2 } from '~/lib/util/number'
+import { useOcrSettingsStore } from '~/stores/ocr-settings'
 import { useProjectStore } from '~/stores/project'
 
 export interface Invoice {
@@ -143,6 +144,7 @@ function rowToInvoice(row: Record<string, unknown>): Invoice {
 export type ArchiveResult = ArchiveCheckResult
 
 export const useInvoiceStore = defineStore('invoice', () => {
+  const ocrSettingsStore = useOcrSettingsStore()
   const list = shallowRef<Invoice[]>([])
   const archivedAggregateRows = shallowRef<ArchivedInvoiceAggregate[]>([])
   const loading = shallowRef(false)
@@ -313,10 +315,13 @@ export const useInvoiceStore = defineStore('invoice', () => {
     clearRecognitionError(id)
     recognitionProgress.value[id] = 0
     try {
+      if (!ocrSettingsStore.loaded)
+        await ocrSettingsStore.load()
       const r = await recognizeInvoice({ file }, {
         onProgress: (percent) => {
           recognitionProgress.value[id] = percent
         },
+        runtimeOptions: ocrSettingsStore.recognitionOptions,
       })
       const current = byId(id)
       if (!current)

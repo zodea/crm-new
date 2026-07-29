@@ -34,7 +34,17 @@ describe('recognizeDocument', () => {
     const result = await recognizeDocument(file, {
       fetch: fetchMock,
       onProgress: value => progress.push(value),
-      useDocOrientationClassify: false,
+      runtimeOptions: {
+        useDocOrientationClassify: false,
+        useDocUnwarping: false,
+        useLayoutDetection: true,
+        useChartRecognition: true,
+        useSealRecognition: false,
+        useOcrForImageBlock: true,
+        formatBlockContent: false,
+        requestTimeoutMs: 90_000,
+        pollTimeoutMs: 480_000,
+      },
     })
 
     expect(result).toEqual(OCR_RESULT)
@@ -47,7 +57,18 @@ describe('recognizeDocument', () => {
     expect(uploaded).toBe(file)
     expect(uploaded.name).toBe('电子发票.png')
     expect(uploaded.size).toBe(4)
-    expect((init?.body as FormData).get('useDocOrientationClassify')).toBe('false')
+    expect(JSON.parse(String((init?.body as FormData).get('options')))).toEqual({
+      useDocOrientationClassify: false,
+      useDocUnwarping: false,
+      useLayoutDetection: true,
+      useChartRecognition: true,
+      useSealRecognition: false,
+      useOcrForImageBlock: true,
+      formatBlockContent: false,
+      requestTimeoutMs: 90_000,
+      pollTimeoutMs: 480_000,
+    })
+    expect((init?.body as FormData).get('useDocOrientationClassify')).toBeNull()
   })
 
   it('保留服务端稳定错误码、可重试标记和用户可读信息', async () => {

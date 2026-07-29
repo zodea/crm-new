@@ -51,7 +51,21 @@ export interface OcrRecognitionResult {
 export interface RecognizeDocumentOptions {
   fetch?: typeof globalThis.fetch
   onProgress?: (percent: number) => void
+  runtimeOptions?: OcrRuntimeRequestOptions
+  /** @deprecated 使用 runtimeOptions.useDocOrientationClassify。 */
   useDocOrientationClassify?: boolean
+}
+
+export interface OcrRuntimeRequestOptions {
+  useDocOrientationClassify?: boolean
+  useDocUnwarping?: boolean
+  useLayoutDetection?: boolean
+  useChartRecognition?: boolean
+  useSealRecognition?: boolean
+  useOcrForImageBlock?: boolean
+  formatBlockContent?: boolean
+  requestTimeoutMs?: number
+  pollTimeoutMs?: number
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -136,8 +150,13 @@ export async function recognizeDocument(
   const fetchImpl = options.fetch ?? globalThis.fetch
   const form = new FormData()
   form.append('file', file)
+  const runtimeOptions: OcrRuntimeRequestOptions = {
+    ...options.runtimeOptions,
+  }
   if (options.useDocOrientationClassify != null)
-    form.append('useDocOrientationClassify', String(options.useDocOrientationClassify))
+    runtimeOptions.useDocOrientationClassify = options.useDocOrientationClassify
+  if (Object.keys(runtimeOptions).length)
+    form.append('options', JSON.stringify(runtimeOptions))
   options.onProgress?.(5)
 
   let response: Response

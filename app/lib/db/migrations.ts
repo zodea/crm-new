@@ -4818,6 +4818,19 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 33,
+    name: 'ocr-recognition-settings',
+    async up(db) {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS ocr_settings (
+          id            TEXT PRIMARY KEY CHECK (id = 'default'),
+          settings_json TEXT NOT NULL,
+          updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

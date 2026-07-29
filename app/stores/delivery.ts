@@ -9,6 +9,7 @@ import { prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
+import { useOcrSettingsStore } from '~/stores/ocr-settings'
 
 export type DeliveryOcrStatus = 'pending' | 'processing' | 'done' | 'failed'
 
@@ -93,6 +94,7 @@ function fileKind(fileName: string): DeliveryFile['kind'] {
 }
 
 export const useDeliveryStore = defineStore('delivery', () => {
+  const ocrSettingsStore = useOcrSettingsStore()
   const files = shallowRef<DeliveryFile[]>([])
   const recognitionProgress = reactive<Record<string, number>>({})
   const sourceFiles = new Map<string, File>()
@@ -152,8 +154,14 @@ export const useDeliveryStore = defineStore('delivery', () => {
     recognitionProgress[id] = 0
     try {
       const prepared = await prepareDeliveryOcrImage(source)
+      if (!ocrSettingsStore.loaded)
+        await ocrSettingsStore.load()
       const result = await recognizeDocument(prepared.file, {
-        useDocOrientationClassify: prepared.useDocOrientationClassify,
+        runtimeOptions: {
+          ...ocrSettingsStore.recognitionOptions,
+          useDocOrientationClassify: ocrSettingsStore.recognitionOptions.useDocOrientationClassify
+            && prepared.useDocOrientationClassify,
+        },
         onProgress: (progress) => {
           recognitionProgress[id] = progress
         },
