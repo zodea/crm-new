@@ -583,7 +583,7 @@ def cover_story(meta: GuideMeta) -> list[Flowable]:
         metadata,
         Spacer(1, 28 * mm),
         Paragraph(
-            "本指南按实际可用状态标注操作入口，并记录已经确认、尚待实现的新项目启动流程。",
+            "本指南只说明当前已经实现且可操作的流程；未完成能力不写成已上线功能。",
             ParagraphStyle(
                 "CoverNote",
                 fontName="RuihangSans",
@@ -596,7 +596,7 @@ def cover_story(meta: GuideMeta) -> list[Flowable]:
     ]
 
 
-def draw_cover(canvas) -> None:
+def draw_cover(canvas, meta: GuideMeta) -> None:
     canvas.saveState()
     canvas.setAuthor("瑞航 CRM")
     canvas.setFillColor(BRAND)
@@ -606,11 +606,11 @@ def draw_cover(canvas) -> None:
     canvas.setFont("RuihangSans", 8)
     canvas.setFillColor(INK_FAINT)
     canvas.drawString(27 * mm, 11 * mm, "瑞航 CRM")
-    canvas.drawRightString(A4[0] - 27 * mm, 11 * mm, "新项目启动与施工排程")
+    canvas.drawRightString(A4[0] - 27 * mm, 11 * mm, meta.title)
     canvas.restoreState()
 
 
-def draw_page(canvas, page_number: int) -> None:
+def draw_page(canvas, page_number: int, meta: GuideMeta) -> None:
     canvas.saveState()
     canvas.setStrokeColor(colors.white)
     canvas.setStrokeColor(LINE)
@@ -619,7 +619,7 @@ def draw_page(canvas, page_number: int) -> None:
     canvas.setFillColor(colors.black)
     canvas.setFillColor(INK_FAINT)
     canvas.line(22 * mm, 15 * mm, A4[0] - 22 * mm, 15 * mm)
-    canvas.drawString(22 * mm, 9.5 * mm, "产品流程说明")
+    canvas.drawString(22 * mm, 9.5 * mm, meta.title)
     canvas.drawRightString(A4[0] - 22 * mm, 9.5 * mm, f"第 {page_number} 页")
     canvas.restoreState()
 
@@ -627,8 +627,9 @@ def draw_page(canvas, page_number: int) -> None:
 class GuideCanvas(pdf_canvas.Canvas):
     """在正文之后绘制页眉页脚，避免分页内容遮挡页面装饰。"""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, guide_meta: GuideMeta, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self._guide_meta = guide_meta
         self._saved_page_states: list[dict] = []
 
     def showPage(self) -> None:
@@ -639,9 +640,9 @@ class GuideCanvas(pdf_canvas.Canvas):
         for state in self._saved_page_states:
             self.__dict__.update(state)
             if self._pageNumber == 1:
-                draw_cover(self)
+                draw_cover(self, self._guide_meta)
             else:
-                draw_page(self, self._pageNumber - 1)
+                draw_page(self, self._pageNumber - 1, self._guide_meta)
             pdf_canvas.Canvas.showPage(self)
         pdf_canvas.Canvas.save(self)
 
@@ -666,7 +667,10 @@ def build_pdf(source_path: Path, output_path: Path) -> None:
     content_width = A4[0] - document.leftMargin - document.rightMargin
     story: list[Flowable] = cover_story(meta)
     story.extend(markdown_story(body, styles, content_width))
-    document.build(story, canvasmaker=GuideCanvas)
+    def canvas_maker(*args, **kwargs):
+        return GuideCanvas(*args, guide_meta=meta, **kwargs)
+
+    document.build(story, canvasmaker=canvas_maker)
 
 
 def parse_args() -> argparse.Namespace:
