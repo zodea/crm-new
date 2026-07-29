@@ -185,6 +185,7 @@
 | `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/project/penalty/index.vue` | `/project/penalty` | 甲方单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 同屏测量 | 待 #197 只读核对 | C-DENSE |
 | `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/project/target-cost/[id].vue` | `/project/target-cost/:id` | 项目进度成本 | 详情 | #191 | R-DETAIL-PRIOR | 待 #191 同屏测量 | 只读汇总所选版本与项目正式成本事实 | C-DENSE |
 | `app/pages/project/target-cost/form/[[id]].vue` | `/project/target-cost/form/:id?` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 待 #191 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/project/target-cost/index.vue` | `/project/target-cost` | 项目进度成本 | 列表 | #191 | R-LIST-PRIOR | 待 #191 同屏测量 | 待 #191 只读核对 | C-DENSE |
 | `app/pages/schedule/[pid].vue` | `/schedule/:pid` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 排程写入路径保持现有契约 | C-DENSE |

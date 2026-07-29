@@ -168,6 +168,7 @@ describe('project cost control read model', () => {
       settledAmount: 190,
       paidAmount: 130,
       remainingAmount: 2410,
+      sourcePath: '/project/target-cost/target-baseline',
     })
     expect(result.versions.find(row => row.id === 'target-draft')?.status).toBe('草稿（不入控制）')
 
@@ -200,6 +201,7 @@ describe('project cost control read model', () => {
     expect(rows.find(row => row.category === '材料')).toMatchObject({
       targetAmount: 600,
       signedAmount: 200,
+      targetPath: '/project/target-cost/target-baseline',
     })
     expect(rows.find(row => row.category === '工人工资')).toMatchObject({
       targetAmount: 300,

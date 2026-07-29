@@ -352,7 +352,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
       paymentCount: row.paymentIds.size,
       reimbursementCount: row.reimbursementIds.size,
       targetPath: row.targetCostId
-        ? `/project/target-cost/form/${row.targetCostId}`
+        ? `/project/target-cost/${row.targetCostId}`
         : '/project/target-cost',
       contractPath: contractPath(row.category),
       settlementPath: settlementPath(row.category),
@@ -403,7 +403,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
       targetAmount,
       ...actual,
       remainingAmount: targetAmount - actual.settledAmount,
-      sourcePath: `/project/target-cost/form/${text(row.id)}`,
+      sourcePath: `/project/target-cost/${text(row.id)}`,
     }
   })
 

@@ -28,6 +28,7 @@ interface FormMeta {
   listLabel: string
   listPath: string
   newPath: string
+  detailPath?: string
   defaultAttachmentCategory: string
   sections: FormSection[]
 }
@@ -109,6 +110,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '目标成本列表',
     listPath: '/project/target-cost',
     newPath: '/project/target-cost/form',
+    detailPath: '/project/target-cost',
     defaultAttachmentCategory: 'budget',
     sections: [
       { key: 'basic', label: '基本信息' },

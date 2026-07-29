@@ -116,11 +116,18 @@ async function remove(row: MasterDataListRow) {
 }
 
 const rowActions = computed(() => [
+  ...(meta.value.detailPath
+    ? [{ key: 'detail', label: '查看详情', icon: 'i-lucide-file-text' }]
+    : []),
   { key: 'edit', label: '编辑', icon: 'i-lucide-square-pen' },
   { key: 'delete', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' as const },
 ])
 
 async function handleRowAction(action: string, row: MasterDataListRow) {
+  if (action === 'detail' && meta.value.detailPath) {
+    await navigateTo(`${meta.value.detailPath}/${row.id}`)
+    return
+  }
   if (action === 'edit') {
     await navigateTo(`${meta.value.newPath}/${row.id}`)
     return
