@@ -455,3 +455,34 @@ openDrawer({
   </template>
 </EntityFormShell>
 ```
+
+---
+
+## 12 · 数据表格 `kit-table` ✅ 已定案（2026-07-29）
+
+**用途**：`app/components/ui/KitTable.vue` 统一跨领域列表的紧凑密度、表格内横滚、固定重要列、列宽调整、空态和受控分页；字段、业务列宽与行内动作仍由领域调用点决定。
+
+**运行参考规格**：
+
+- 表头与数据行默认 36px；调用点可通过 `rowHeight` 明确覆盖，但不得在页面内分别改表头和行高。
+- 宽表只能在 `KitTable` 自身滚动区横向滚动，应用工作区与页面不得横滚；390 / 768 / 1024 / 1440px 均按此验收。
+- 可调整列的命中区只位于该列表头右边缘：7px、`right:-4px`、`cursor:col-resize`；悬停显示品牌色竖线。拖该列表头的右边界只改变当前列：向右增宽、向左缩窄，双击按内容自适应。
+- 默认开启拖拽提示和双击自适配；`resizeConfig.isDblclickAutoWidth=false` 可按领域关闭，`resizable=false` 可关闭整表列宽调整，单列 `resizable=false` 优先。
+- `action` 列默认宽 112px、固定右侧且禁止拖拽，避免固定右列出现左侧含混手柄；业务动作超过该宽度时必须显式加宽，不能靠通用表格猜测或静默裁切。
+- `seq` / 重要名称列可由业务显式固定左侧；固定方向和显式宽度始终优先于默认值。
+
+**调用签名**：
+
+```vue
+<KitTable
+  :columns="columns"
+  :data="rows"
+  :row-height="36"
+  :resizable="true"
+  :resize-config="{
+    isDblclickAutoWidth: true,
+    minWidth: 48,
+    maxWidth: 480,
+  }"
+/>
+```

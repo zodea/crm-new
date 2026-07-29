@@ -22,14 +22,28 @@ describe('列配置归一化:normalizeKitColumn', () => {
     expect(col.align).toBe('center')
   })
 
-  it('seq 列默认窄宽居中,action 列默认右固定', () => {
+  it('seq 列默认窄宽居中,action 列默认紧凑右固定且禁止拖拽', () => {
     const seq = normalizeKitColumn({ title: '#', type: 'seq' })
     expect(seq.width).toBe(52)
     expect(seq.align).toBe('center')
 
     const action = normalizeKitColumn({ title: '操作', type: 'action' })
     expect(action.fixed).toBe('right')
-    expect(action.width).toBe(130)
+    expect(action.width).toBe(112)
+    expect(action.resizable).toBe(false)
+  })
+
+  it('action 列仍尊重业务显式宽度、固定方向和拖拽开关', () => {
+    const action = normalizeKitColumn({
+      title: '操作',
+      type: 'action',
+      width: 292,
+      fixed: 'left',
+      resizable: true,
+    })
+    expect(action.width).toBe(292)
+    expect(action.fixed).toBe('left')
+    expect(action.resizable).toBe(true)
   })
 
   it('date 列默认 110 宽', () => {

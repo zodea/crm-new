@@ -60,12 +60,14 @@ export function normalizeKitColumn(col: KitTableColumn): NormalizedKitColumn {
     else if (type === 'date')
       out.width = 110
     else if (type === 'action')
-      out.width = 130
+      out.width = 112
     else
       out.minWidth = 120
   }
-  if (type === 'action')
+  if (type === 'action') {
     out.fixed = col.fixed ?? 'right'
+    out.resizable = col.resizable ?? false
+  }
   return out
 }
 

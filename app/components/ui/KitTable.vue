@@ -31,7 +31,9 @@ const {
   empty = '暂无数据',
   remoteFilter = false,
   checkMethod,
-  resizeConfig,
+  resizable = true,
+  rowHeight = 36,
+  resizeConfig: resizeConfigInput,
 } = defineProps<{
   columns: KitTableColumn[]
   data: T[]
@@ -47,7 +49,11 @@ const {
   remoteFilter?: boolean
   /** checkbox 列的行级可勾判定(如 excel 来源票无扫描件不可勾);缺省全部可勾。 */
   checkMethod?: (row: T) => boolean
-  /** 领域表格按需收紧列宽拖拽；未传时维持既有 vxe 行为。 */
+  /** 是否允许列宽拖拽；固定操作列仍由列契约默认禁拖。 */
+  resizable?: boolean
+  /** 表头与数据行的统一高度；默认采用运行参考的 36px 紧凑密度。 */
+  rowHeight?: number
+  /** 领域表格可覆盖拖拽边界，或关闭双击自适配。 */
   resizeConfig?: KitTableResizeConfig
 }>()
 
@@ -69,8 +75,26 @@ const normalized = computed(() => columns.map((raw) => {
   return { col, slot, vxeProps: buildColProps(col, slot) }
 }))
 
-/** 38px 表头 + 38px 数据行，字号增大后仍保持紧凑，兜住 ≥minRows 行展示高度。 */
-const minHeight = computed(() => 38 + minRows * 38)
+/** 表头 + 数据行使用同一紧凑高度，兜住 ≥minRows 行展示高度。 */
+const effectiveRowHeight = computed(() => Math.max(32, rowHeight))
+const minHeight = computed(() => effectiveRowHeight.value * (minRows + 1))
+const rootStyle = computed(() => ({
+  '--kit-table-row-height': `${effectiveRowHeight.value}px`,
+}))
+const rowConfig = computed(() => ({
+  isHover: true,
+  keyField: rowKey,
+  height: effectiveRowHeight.value,
+}))
+const columnConfig = computed(() => ({ resizable }))
+const effectiveResizeConfig = computed<KitTableResizeConfig>(() => ({
+  dragMode: 'fixed',
+  showDragTip: true,
+  isDblclickAutoWidth: true,
+  minWidth: 48,
+  maxWidth: 480,
+  ...resizeConfigInput,
+}))
 const emptyState = computed<KitTableEmptyState>(() =>
   typeof empty === 'string'
     ? {
@@ -173,7 +197,11 @@ defineExpose({ clearCheckbox, clearFilter })
 </script>
 
 <template>
-  <div class="panel min-w-0 overflow-hidden">
+  <div
+    data-ui="kit-table"
+    class="kit-table panel min-w-0 max-w-full overflow-hidden"
+    :style="rootStyle"
+  >
     <vxe-table
       ref="tableRef"
       :data="data"
@@ -181,9 +209,9 @@ defineExpose({ clearCheckbox, clearFilter })
       :min-height="minHeight"
       :empty-text="emptyState.title"
       show-overflow="title"
-      :row-config="{ isHover: true, keyField: rowKey }"
-      :column-config="{ resizable: true }"
-      :resizable-config="resizeConfig"
+      :row-config="rowConfig"
+      :column-config="columnConfig"
+      :resizable-config="effectiveResizeConfig"
       :filter-config="{ remote: remoteFilter }"
       :seq-config="seqConfig"
       :checkbox-config="checkboxConfig"
@@ -272,6 +300,34 @@ defineExpose({ clearCheckbox, clearFilter })
 </template>
 
 <style scoped>
+.kit-table {
+  width: 100%;
+}
+
+.kit-table :deep(.vxe-table) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.kit-table :deep(.vxe-header--column),
+.kit-table :deep(.vxe-body--column) {
+  height: var(--kit-table-row-height);
+}
+
+/* 参考站的列宽手柄只属于当前列右缘，避免“拖左列还是右列”的含混。 */
+.kit-table :deep(.vxe-header--column .vxe-cell--col-resizable) {
+  right: -4px;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.kit-table :deep(.vxe-header--column .vxe-cell--col-resizable:hover::before),
+.kit-table :deep(.vxe-header--column .vxe-cell--col-resizable:focus-visible::before) {
+  height: 100%;
+  background: var(--brand);
+}
+
 .kit-table__shimmer {
   position: relative;
   overflow: hidden;
