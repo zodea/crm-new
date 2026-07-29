@@ -27,6 +27,7 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
+import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -53,11 +54,18 @@ const routeId = (() => {
   return Array.isArray(value) ? value[0] : value
 })()
 const isEditing = Boolean(routeId)
+const routeSupplierCategory = computed(() => {
+  const value = route.query.category
+  const category = Array.isArray(value) ? value[0] : value
+  return typeof category === 'string' && SUPPLIER_CATEGORIES.some(item => item === category)
+    ? category
+    : ''
+})
 const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
 useTabTitle(title)
 
 const draft = ref<MasterDataPageDraft>(
-  formDefaults(props.kind) as MasterDataPageDraft,
+  createDefaultDraft(),
 )
 const attachments = shallowRef<FormAttachment[]>([])
 const pendingAttachments = shallowRef<PendingMasterDataAttachment[]>([])
@@ -82,6 +90,9 @@ const dirty = computed(() => hydrated.value && (
 ))
 
 const sections = computed(() => meta.value.sections)
+const shellSections = computed(() =>
+  props.kind === 'supplier' ? [] : sections.value,
+)
 const attachmentTitle = computed(() => props.kind === 'worker' ? '证书档案' : '附件')
 const requiredFields = computed(() =>
   new Map<string, string>(formRequiredFields(props.kind)),
@@ -114,6 +125,17 @@ async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
   }
 }
 
+function createDefaultDraft(): MasterDataPageDraft {
+  const defaults = formDefaults(props.kind) as MasterDataPageDraft
+  if (props.kind !== 'supplier' || isEditing || !routeSupplierCategory.value)
+    return defaults
+
+  return {
+    ...defaults,
+    supplierCategory: routeSupplierCategory.value,
+  }
+}
+
 async function initialize() {
   hydrated.value = false
   loading.value = true
@@ -125,7 +147,7 @@ async function initialize() {
   let shouldFocus = false
   try {
     if (!routeId) {
-      draft.value = formDefaults(props.kind) as MasterDataPageDraft
+      draft.value = createDefaultDraft()
       attachments.value = []
     }
     else {
@@ -274,7 +296,7 @@ async function handleFooterAction(action: FormFooterAction) {
     if (action === 'saveNew') {
       allowLeave = true
       if (route.path === meta.value.newPath) {
-        draft.value = formDefaults(props.kind) as MasterDataPageDraft
+        draft.value = createDefaultDraft()
         attachments.value = []
         savedSnapshot.value = JSON.stringify(draft.value)
         allowLeave = false
@@ -426,6 +448,11 @@ onMounted(() => {
   desktopAttachmentPicker.value = isTauri()
   void initialize()
 })
+
+watch(routeSupplierCategory, () => {
+  if (props.kind === 'supplier' && !isEditing)
+    void initialize()
+})
 </script>
 
 <template>
@@ -433,7 +460,7 @@ onMounted(() => {
     :title="title"
     subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
     :back-label="`返回${meta.listLabel}`"
-    :sections="sections"
+    :sections="shellSections"
     :state="shellState"
     :state-title="shellStateTitle"
     :state-description="loadError"
@@ -451,7 +478,9 @@ onMounted(() => {
 
     <form
       ref="formElement"
+      :data-ui="kind === 'supplier' ? 'supplier-form-scroll' : undefined"
       class="flex flex-col gap-4"
+      :class="{ 'supplier-form-scroll': kind === 'supplier' }"
       @focusout="validateFieldOnBlur"
       @submit.prevent
     >
@@ -497,3 +526,13 @@ onMounted(() => {
     </template>
   </EntityFormShell>
 </template>
+
+<style scoped>
+.supplier-form-scroll {
+  max-height: calc(100dvh - var(--header-h, 52px) - var(--tabbar-h, 36px) - 13rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+</style>

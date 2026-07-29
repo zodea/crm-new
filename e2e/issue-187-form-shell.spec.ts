@@ -85,19 +85,7 @@ test.describe('Issue #187：统一整页表单壳', () => {
       await expect(footer).toHaveCSS('position', 'sticky')
       await expect(footer).toBeInViewport()
       const sections = shell.getByRole('navigation', { name: '表单分区' })
-      if (width === 1440) {
-        await expect(sections).toBeVisible()
-        const companyName = page.getByLabel('公司全称 *')
-        await companyName.fill('分区导航保留的草稿')
-        const urlBefore = page.url()
-        await sections.getByRole('link', { name: '联系人信息' }).click()
-        await expect(page).toHaveURL(urlBefore)
-        await expect(companyName).toHaveValue('分区导航保留的草稿')
-        await expect(page.locator('#section-contact')).toBeInViewport()
-      }
-      else {
-        await expect(sections).toBeHidden()
-      }
+      await expect(sections).toBeHidden()
       await expectNoPageOverflow(page, `统一表单壳 @ ${width}px`)
     })
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterSuppliers } from '~/lib/supplier/list'
+import { filterSuppliers, sortSuppliers } from '~/lib/supplier/list'
 
 const rows = [
   {
@@ -11,6 +11,7 @@ const rows = [
     contact: '陈志强',
     contactPhone: '13802201234',
     credentialStatus: 'qualified',
+    updatedAt: '2026-07-01T10:00:00.000Z',
   },
   {
     name: '陈家泥水班组',
@@ -21,6 +22,7 @@ const rows = [
     contact: '陈家旺',
     contactPhone: '13802209988',
     credentialStatus: 'incomplete',
+    updatedAt: '2026-07-20T10:00:00.000Z',
   },
 ]
 
@@ -39,5 +41,18 @@ describe('分供方列表筛选', () => {
     expect(filterSuppliers(rows, { search: '材料供应商', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
     expect(filterSuppliers(rows, { search: '陈志强', category: 'all', credentialStatus: 'all' })).toEqual([rows[0]])
     expect(filterSuppliers(rows, { search: '9988', category: 'all', credentialStatus: 'all' })).toEqual([rows[1]])
+  })
+
+  it('按名称、类别或更新时间产生稳定只读排序，不改写原数组', () => {
+    expect(sortSuppliers(rows, 'name-desc').map(row => row.name)).toEqual([
+      '广州市大板东建材有限公司',
+      '陈家泥水班组',
+    ])
+    expect(sortSuppliers(rows, 'category-asc').map(row => row.supplierCategory)).toEqual([
+      '材料供应商',
+      '劳务分包商',
+    ])
+    expect(sortSuppliers(rows, 'updated-desc')).toEqual([rows[1], rows[0]])
+    expect(rows[0]?.name).toBe('广州市大板东建材有限公司')
   })
 })
