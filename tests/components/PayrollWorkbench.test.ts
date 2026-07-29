@@ -122,7 +122,20 @@ describe('payroll workbench components', () => {
           checkedAt: '2026-07-28',
           releasedAt: '2026-07-29',
           note: '',
+          members: [{
+            workerId: 'worker-a',
+            workerName: '张师傅',
+            isLeader: true,
+          }],
           memberWorkerIds: ['worker-a'],
+          allocationRecorded: true,
+          allocations: [{
+            workerId: 'worker-a',
+            workerName: '张师傅',
+            isLeader: true,
+            allocatedAmountFen: 180000,
+            amount: 1800,
+          }],
           lines: [{
             id: 'line-a',
             workerId: 'worker-a',
@@ -144,8 +157,8 @@ describe('payroll workbench components', () => {
     expect(screen.queryByRole('spinbutton', { name: '墙砖铺贴工资单价' })).toBeNull()
   })
 
-  it('does not enable release for a sub-cent or over-pay input', async () => {
-    render(PayrollStatementDetail, {
+  it('validates the release total and persists a complete member split', async () => {
+    const { emitted } = render(PayrollStatementDetail, {
       props: {
         statement: {
           id: 'statement-zero',
@@ -177,18 +190,51 @@ describe('payroll workbench components', () => {
           checkedAt: '2026-07-28',
           releasedAt: null,
           note: '',
-          memberWorkerIds: ['worker-a'],
+          members: [
+            {
+              workerId: 'worker-a',
+              workerName: '张师傅',
+              isLeader: true,
+            },
+            {
+              workerId: 'worker-b',
+              workerName: '李师傅',
+              isLeader: false,
+            },
+          ],
+          memberWorkerIds: ['worker-a', 'worker-b'],
+          allocationRecorded: false,
+          allocations: [],
           lines: [],
           dayworkRecords: [],
         },
       },
     })
 
+    await fireEvent.click(screen.getByRole('button', { name: '填写发放分配' }))
     const release = screen.getByRole<HTMLButtonElement>('button', { name: '确认已发放' })
     expect(release.disabled).toBe(false)
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放金额' }), '0.004')
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: '张师傅分配金额' }).value).toBe('100')
+    expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: '李师傅分配金额' }).value).toBe('0')
+
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '0.004')
     expect(release.disabled).toBe(true)
-    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放金额' }), '100.01')
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '100.01')
     expect(release.disabled).toBe(true)
+
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '实际发放总额' }), '100')
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '张师傅分配金额' }), '60')
+    expect(release.disabled).toBe(true)
+    await fireEvent.update(screen.getByRole('spinbutton', { name: '李师傅分配金额' }), '40')
+    expect(release.disabled).toBe(false)
+    await fireEvent.click(release)
+
+    expect(emitted().release?.[0]).toEqual([
+      100,
+      [
+        { workerId: 'worker-a', amount: 60 },
+        { workerId: 'worker-b', amount: 40 },
+      ],
+    ])
   })
 })

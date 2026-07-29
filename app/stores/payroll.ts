@@ -1,5 +1,6 @@
 import type {
   PayrollWorkbenchOptions,
+  WageAllocationInput,
   WageFormatFamily,
   WagePeriodKind,
   WageStatement,
@@ -181,12 +182,17 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     await load()
   }
 
-  async function releaseSelected(actualAmount: number) {
+  async function releaseSelected(
+    actualAmount: number,
+    allocations: readonly WageAllocationInput[] = [],
+  ) {
     if (!selected.value)
       return
     try {
       const statementId = selected.value.id
-      const result = await withTransaction(tx => releaseWageStatement(tx, statementId, actualAmount))
+      const result = await withTransaction(tx =>
+        releaseWageStatement(tx, statementId, actualAmount, {}, allocations),
+      )
       if (result === 'needs_recheck')
         throw new Error('现场工程量或考勤来源已变化，请重新核对后再发放')
     }

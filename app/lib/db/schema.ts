@@ -522,6 +522,16 @@ CREATE TABLE IF NOT EXISTS wage_statement_daywork_records (
   deleted_at        TEXT DEFAULT NULL
 );
 
+CREATE TABLE IF NOT EXISTS wage_statement_allocations (
+  id                   TEXT PRIMARY KEY,
+  statement_id         TEXT NOT NULL REFERENCES wage_statements(id),
+  worker_id            TEXT NOT NULL REFERENCES workers(id),
+  allocated_amount_fen INTEGER NOT NULL DEFAULT 0 CHECK (allocated_amount_fen >= 0),
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at           TEXT DEFAULT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_wage_statements_project_month
   ON wage_statements(project_id, month);
 CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_project
@@ -540,6 +550,8 @@ CREATE INDEX IF NOT EXISTS idx_signed_daywork_worker_date
   ON signed_daywork_records(worker_id, work_date);
 CREATE INDEX IF NOT EXISTS idx_wage_daywork_statement
   ON wage_statement_daywork_records(statement_id);
+CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_statement
+  ON wage_statement_allocations(statement_id);
 CREATE INDEX IF NOT EXISTS idx_wage_statements_deleted
   ON wage_statements(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_deleted
@@ -554,6 +566,8 @@ CREATE INDEX IF NOT EXISTS idx_signed_daywork_records_deleted
   ON signed_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_wage_statement_daywork_records_deleted
   ON wage_statement_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_deleted
+  ON wage_statement_allocations(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_book_period
   ON wage_statements(project_id, leader_worker_id, month, format_family, period_kind)
   WHERE deleted_at IS NULL;
@@ -571,6 +585,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_signed_daywork_slot
   WHERE deleted_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_daywork_record
   ON wage_statement_daywork_records(daywork_record_id)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_allocation_worker
+  ON wage_statement_allocations(statement_id, worker_id)
   WHERE deleted_at IS NULL;
 `
 

@@ -51,7 +51,7 @@ async function confirmDaywork(workerId: string, workDate: string, units: 0.5 | 1
 
 describe('c2 signed daywork source', () => {
   it('v30 creates the signed record and statement-link tables', async () => {
-    expect(migrations.at(-1)?.version).toBe(30)
+    expect(migrations.some(migration => migration.version === 30)).toBe(true)
     expect(await listTables(db)).toEqual(expect.arrayContaining([
       'payroll_subject_configs',
       'signed_daywork_records',

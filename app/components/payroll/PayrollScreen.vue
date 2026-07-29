@@ -62,7 +62,7 @@ async function run(action: () => Promise<void>, success: string) {
         :statement="store.selected"
         @update-price="(lineId, price) => run(() => store.updatePrice(lineId, price), '工资单价已更新')"
         @check="run(store.checkSelected, '已按现场复核量完成核对')"
-        @release="amount => run(() => store.releaseSelected(amount), '实际发放已登记并冻结快照')"
+        @release="(amount, allocations) => run(() => store.releaseSelected(amount, allocations), '实际发放与组内分配已登记并冻结快照')"
       />
     </div>
   </main>

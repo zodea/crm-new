@@ -275,6 +275,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'statement_id', table: 'wage_statements' },
     { column: 'daywork_record_id', table: 'signed_daywork_records' },
   ],
+  wage_statement_allocations: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
   target_costs: [{ column: 'project_id', table: 'projects' }],
   target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],
   settlements: [{ column: 'project_supplier_id', table: 'project_suppliers' }],

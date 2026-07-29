@@ -80,11 +80,13 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
 
     await page.getByRole('button', { name: '核对并锁定现场量' }).click()
     await expect(page.locator('.status-chip').filter({ hasText: '已核对' })).toHaveCount(1)
-    await expect(page.getByLabel('实际发放金额')).toBeVisible()
-    const firstRelease = Number(await page.getByLabel('实际发放金额').inputValue())
+    await page.getByRole('button', { name: '填写发放分配' }).click()
+    await expect(page.getByLabel('实际发放总额')).toBeVisible()
+    const firstRelease = Number(await page.getByLabel('实际发放总额').inputValue())
     expect(firstRelease).toBeGreaterThan(0)
     await page.getByRole('button', { name: '确认已发放' }).click()
     await expect(page.getByText(/已按现场复核量快照发放/)).toBeVisible()
+    await expect(page.getByRole('region', { name: '组内实际发放分配' })).toBeVisible()
     await expect(page.locator('.status-chip').filter({ hasText: '已发放' })).toHaveCount(1)
 
     await page.reload()
@@ -107,8 +109,7 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
     await expect(page.locator('.status-chip').filter({ hasText: '已核对' })).toHaveCount(1)
     const releasedText = `¥${firstRelease.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
     await expect(page.getByText(`累计口径 ${releasedText} − 已发 ${releasedText}`)).toBeVisible()
-    await expect(page.getByLabel('实际发放金额')).toHaveValue('0')
-    await expect(page.getByRole('button', { name: '确认已发放' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '填写发放分配' })).toBeDisabled()
   })
 
   for (const viewport of [

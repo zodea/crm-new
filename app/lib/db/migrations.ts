@@ -4770,6 +4770,30 @@ export const migrations: Migration[] = [
       )
     },
   },
+  {
+    version: 31,
+    name: 'wage-statement-member-allocations',
+    async up(db) {
+      await execScript(db, `
+        CREATE TABLE IF NOT EXISTS wage_statement_allocations (
+          id                   TEXT PRIMARY KEY,
+          statement_id         TEXT NOT NULL REFERENCES wage_statements(id),
+          worker_id            TEXT NOT NULL REFERENCES workers(id),
+          allocated_amount_fen INTEGER NOT NULL DEFAULT 0 CHECK (allocated_amount_fen >= 0),
+          created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at           TEXT DEFAULT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_statement
+          ON wage_statement_allocations(statement_id);
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_deleted
+          ON wage_statement_allocations(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_allocation_worker
+          ON wage_statement_allocations(statement_id, worker_id)
+          WHERE deleted_at IS NULL;
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

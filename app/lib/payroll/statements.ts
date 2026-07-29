@@ -65,6 +65,23 @@ export interface WageStatementLine extends WageStatementLineInput {
   amount: number
 }
 
+export interface WageStatementMember {
+  workerId: string
+  workerName: string
+  isLeader: boolean
+}
+
+export interface WageAllocationInput {
+  workerId: string
+  amount: number
+}
+
+export interface WageStatementAllocation extends WageAllocationInput {
+  workerName: string
+  isLeader: boolean
+  allocatedAmountFen: number
+}
+
 export interface WageStatement {
   id: string
   projectId: string
@@ -95,7 +112,10 @@ export interface WageStatement {
   checkedAt: string | null
   releasedAt: string | null
   note: string
+  members: WageStatementMember[]
   memberWorkerIds: string[]
+  allocationRecorded: boolean
+  allocations: WageStatementAllocation[]
   lines: WageStatementLine[]
   dayworkRecords: SignedDayworkRecord[]
 }
@@ -188,6 +208,10 @@ function assertLines(lines: readonly WageStatementLineInput[]) {
 
 function rounded(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function amountInCents(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100)
 }
 
 function cumulativeTotal(lines: readonly WageStatementLineInput[], payRatio: number): number {
@@ -404,6 +428,76 @@ async function replaceDayworkLinks(
       ) VALUES (?, ?, ?)
     `, [generateId('wage_daywork'), statementId, dayworkRecordId])
   }
+}
+
+async function replaceAllocations(
+  db: PayrollDb,
+  statementId: string,
+  allocations: readonly WageStatementAllocation[],
+): Promise<void> {
+  await db.execute(`
+    UPDATE wage_statement_allocations
+    SET deleted_at = datetime('now'), updated_at = datetime('now')
+    WHERE statement_id = ? AND deleted_at IS NULL
+  `, [statementId])
+  for (const allocation of allocations) {
+    await db.execute(`
+      INSERT INTO wage_statement_allocations (
+        id, statement_id, worker_id, allocated_amount_fen
+      ) VALUES (?, ?, ?, ?)
+    `, [
+      generateId('wage_allocation'),
+      statementId,
+      allocation.workerId,
+      allocation.allocatedAmountFen,
+    ])
+  }
+}
+
+function normalizeAllocations(
+  statement: WageStatement,
+  actualAmount: number,
+  allocations: readonly WageAllocationInput[],
+): WageStatementAllocation[] {
+  const requested = allocations.length
+    ? allocations
+    : statement.members.map(member => ({
+        workerId: member.workerId,
+        amount: member.isLeader ? actualAmount : 0,
+      }))
+  const members = new Map(statement.members.map(member => [member.workerId, member]))
+  const seen = new Set<string>()
+  const amounts = new Map<string, number>()
+  for (const allocation of requested) {
+    const member = members.get(allocation.workerId)
+    if (!member)
+      throw new Error('实际发放金额只能分配给当前请款簿成员')
+    if (seen.has(allocation.workerId))
+      throw new Error('同一成员不能重复分配实际发放金额')
+    seen.add(allocation.workerId)
+    if (!Number.isFinite(allocation.amount) || allocation.amount < 0)
+      throw new Error('成员分配金额必须是大于或等于 0 的有效数字')
+    const cents = allocation.amount * 100
+    if (Math.abs(cents - Math.round(cents)) > 1e-8)
+      throw new Error('成员分配金额必须精确到分')
+    amounts.set(allocation.workerId, Math.round(cents))
+  }
+  if (seen.size !== members.size)
+    throw new Error('组内分配必须包含负责人和全部成员，未分配成员请填 0')
+  const normalized = statement.members.map(member => ({
+    workerId: member.workerId,
+    workerName: member.workerName,
+    isLeader: member.isLeader,
+    allocatedAmountFen: amounts.get(member.workerId) ?? 0,
+    amount: (amounts.get(member.workerId) ?? 0) / 100,
+  }))
+  const allocatedCents = normalized.reduce(
+    (sum, allocation) => sum + amountInCents(allocation.amount),
+    0,
+  )
+  if (allocatedCents !== amountInCents(actualAmount))
+    throw new Error('成员分配合计必须等于实际发放金额')
+  return normalized
 }
 
 export async function createWageStatementDraft(
@@ -652,6 +746,7 @@ export async function releaseWageStatement(
     operatorName?: string
     adjustmentReason?: string
   } = {},
+  allocations: readonly WageAllocationInput[] = [],
 ): Promise<WageReleaseResult> {
   if (!Number.isFinite(actualAmount))
     throw new Error('实际发放金额必须是有效数字')
@@ -697,6 +792,11 @@ export async function releaseWageStatement(
     throw new Error('当前累计应付已全部发放，本次应发为 0，不能重复发放')
   if (normalizedActualAmount > grossAmount)
     throw new Error(`实际发放金额不能超过本次应发 ${grossAmount.toFixed(2)} 元`)
+  const normalizedAllocations = normalizeAllocations(
+    statement,
+    normalizedActualAmount,
+    allocations,
+  )
 
   const submittedAt = new Date().toISOString()
   const operatorName = audit.operatorName?.trim() || statement.operatorName
@@ -720,11 +820,20 @@ export async function releaseWageStatement(
     operatorName,
     submittedAt,
     memberWorkerIds: statement.memberWorkerIds,
+    members: statement.members,
+    allocations: normalizedAllocations,
+    allocationRecorded: true,
+    actualAmountFen: amountInCents(normalizedActualAmount),
+    allocationTotalFen: normalizedAllocations.reduce(
+      (sum, allocation) => sum + allocation.allocatedAmountFen,
+      0,
+    ),
     lines: statement.lines,
     dayworkRecords: statement.dayworkRecords,
     subjectConfig: currentSource.subjectConfig ?? null,
     note: statement.note,
   })
+  await replaceAllocations(db, statementId, normalizedAllocations)
   await db.execute(`
     UPDATE wage_statements
     SET status = 'released',
@@ -781,7 +890,8 @@ async function loadLines(db: PayrollDb, statementId: string): Promise<WageStatem
 function mapStatement(
   row: StatementRow,
   lines: WageStatementLine[],
-  memberWorkerIds: string[],
+  members: WageStatementMember[],
+  allocations: WageStatementAllocation[],
   dayworkRecords: SignedDayworkRecord[],
 ): WageStatement {
   const snapshot = row.status === 'released'
@@ -818,7 +928,10 @@ function mapStatement(
     checkedAt: row.checked_at,
     releasedAt: row.released_at,
     note: snapshot?.note ?? row.note,
-    memberWorkerIds: snapshot?.memberWorkerIds ?? memberWorkerIds,
+    members: snapshot?.members.length ? snapshot.members : members,
+    memberWorkerIds: snapshot?.memberWorkerIds ?? members.map(member => member.workerId),
+    allocationRecorded: snapshot?.allocationRecorded ?? allocations.length > 0,
+    allocations: snapshot?.allocations ?? allocations,
     lines: snapshot?.lines ?? lines,
     dayworkRecords: snapshot?.dayworkRecords ?? dayworkRecords,
   }
@@ -836,6 +949,11 @@ interface WageReleaseSnapshot {
   operatorName: string
   submittedAt: string
   memberWorkerIds: string[]
+  members: WageStatementMember[]
+  allocationRecorded: boolean
+  actualAmountFen: number
+  allocationTotalFen: number
+  allocations: WageStatementAllocation[]
   lines: WageStatementLine[]
   dayworkRecords: SignedDayworkRecord[]
   note: string
@@ -870,6 +988,19 @@ function parseReleaseSnapshot(value: string | null): WageReleaseSnapshot | null 
       operatorName: typeof snapshot.operatorName === 'string' ? snapshot.operatorName : '',
       submittedAt: typeof snapshot.submittedAt === 'string' ? snapshot.submittedAt : '',
       memberWorkerIds: snapshot.memberWorkerIds.filter(id => typeof id === 'string'),
+      members: Array.isArray(snapshot.members)
+        ? snapshot.members
+        : [],
+      allocationRecorded: snapshot.allocationRecorded === true,
+      actualAmountFen: typeof snapshot.actualAmountFen === 'number'
+        ? snapshot.actualAmountFen
+        : amountInCents(snapshot.actualAmount),
+      allocationTotalFen: typeof snapshot.allocationTotalFen === 'number'
+        ? snapshot.allocationTotalFen
+        : 0,
+      allocations: Array.isArray(snapshot.allocations)
+        ? snapshot.allocations
+        : [],
       lines: snapshot.lines,
       dayworkRecords: Array.isArray(snapshot.dayworkRecords)
         ? snapshot.dayworkRecords
@@ -900,14 +1031,58 @@ const STATEMENT_SELECT = `
   LEFT JOIN crews c ON c.id = ws.crew_id
 `
 
-async function loadMemberWorkerIds(db: PayrollDb, statementId: string): Promise<string[]> {
-  const rows = await db.select<{ worker_id: string }>(`
-    SELECT worker_id
-    FROM wage_statement_members
-    WHERE statement_id = ? AND deleted_at IS NULL
-    ORDER BY is_leader DESC, created_at, id
+async function loadMembers(db: PayrollDb, statementId: string): Promise<WageStatementMember[]> {
+  const rows = await db.select<{
+    worker_id: string
+    worker_name: string
+    is_leader: number
+  }>(`
+    SELECT member.worker_id, worker.name AS worker_name, member.is_leader
+    FROM wage_statement_members member
+    JOIN workers worker
+      ON worker.id = member.worker_id
+     AND worker.deleted_at IS NULL
+    WHERE member.statement_id = ? AND member.deleted_at IS NULL
+    ORDER BY member.is_leader DESC, member.created_at, member.id
   `, [statementId])
-  return rows.map(row => row.worker_id)
+  return rows.map(row => ({
+    workerId: row.worker_id,
+    workerName: row.worker_name,
+    isLeader: Boolean(row.is_leader),
+  }))
+}
+
+async function loadAllocations(
+  db: PayrollDb,
+  statementId: string,
+): Promise<WageStatementAllocation[]> {
+  const rows = await db.select<{
+    worker_id: string
+    worker_name: string
+    is_leader: number
+    allocated_amount_fen: number
+  }>(`
+    SELECT allocation.worker_id, worker.name AS worker_name,
+           member.is_leader, allocation.allocated_amount_fen
+    FROM wage_statement_allocations allocation
+    JOIN workers worker
+      ON worker.id = allocation.worker_id
+     AND worker.deleted_at IS NULL
+    JOIN wage_statement_members member
+      ON member.statement_id = allocation.statement_id
+     AND member.worker_id = allocation.worker_id
+     AND member.deleted_at IS NULL
+    WHERE allocation.statement_id = ?
+      AND allocation.deleted_at IS NULL
+    ORDER BY allocation.created_at, allocation.id
+  `, [statementId])
+  return rows.map(row => ({
+    workerId: row.worker_id,
+    workerName: row.worker_name,
+    isLeader: Boolean(row.is_leader),
+    allocatedAmountFen: Number(row.allocated_amount_fen),
+    amount: Number(row.allocated_amount_fen) / 100,
+  }))
 }
 
 export async function loadWageStatement(
@@ -920,12 +1095,13 @@ export async function loadWageStatement(
   )
   if (!row)
     return null
-  const [lines, memberWorkerIds, dayworkRecords] = await Promise.all([
+  const [lines, members, allocations, dayworkRecords] = await Promise.all([
     loadLines(db, statementId),
-    loadMemberWorkerIds(db, statementId),
+    loadMembers(db, statementId),
+    loadAllocations(db, statementId),
     listStatementDayworkRecords(db, statementId),
   ])
-  return mapStatement(row, lines, memberWorkerIds, dayworkRecords)
+  return mapStatement(row, lines, members, allocations, dayworkRecords)
 }
 
 export async function listWageStatements(
@@ -957,12 +1133,13 @@ export async function listWageStatements(
     params,
   )
   return Promise.all(rows.map(async (row) => {
-    const [lines, memberWorkerIds, dayworkRecords] = await Promise.all([
+    const [lines, members, allocations, dayworkRecords] = await Promise.all([
       loadLines(db, row.id),
-      loadMemberWorkerIds(db, row.id),
+      loadMembers(db, row.id),
+      loadAllocations(db, row.id),
       listStatementDayworkRecords(db, row.id),
     ])
-    return mapStatement(row, lines, memberWorkerIds, dayworkRecords)
+    return mapStatement(row, lines, members, allocations, dayworkRecords)
   }))
 }
 

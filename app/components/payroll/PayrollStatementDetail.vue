@@ -1,22 +1,20 @@
 <script setup lang="ts">
-import type { WageStatement } from '~/lib/payroll/statements'
-import { computed, ref, watch } from 'vue'
+import type {
+  WageAllocationInput,
+  WageStatement,
+} from '~/lib/payroll/statements'
+import { ref } from 'vue'
+import PayrollReleaseAllocationDialog from '~/components/payroll/PayrollReleaseAllocationDialog.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 
-const props = defineProps<{ statement: WageStatement | null }>()
+defineProps<{ statement: WageStatement | null }>()
 const emit = defineEmits<{
   updatePrice: [lineId: string, unitPrice: number]
   check: []
-  release: [actualAmount: number]
+  release: [actualAmount: number, allocations: WageAllocationInput[]]
 }>()
 
-const actualAmount = ref(0)
-const normalizedActualAmount = computed(() =>
-  Math.round((actualAmount.value + Number.EPSILON) * 100) / 100,
-)
-watch(() => props.statement, (statement) => {
-  actualAmount.value = statement?.grossAmount ?? 0
-}, { immediate: true })
+const releaseDialogOpen = ref(false)
 
 function money(value: number | null) {
   return value == null ? '—' : `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
@@ -66,6 +64,41 @@ function money(value: number | null) {
       >
         已按现场复核量快照发放 {{ money(statement.actualAmount) }}；后续改量改价不追溯本月。
       </div>
+      <section
+        v-if="statement.status === 'released'"
+        class="mx-4 mt-3 overflow-hidden rounded-md border border-line"
+        aria-label="组内实际发放分配"
+      >
+        <header class="flex items-center justify-between gap-3 bg-surface-2 px-3 py-2">
+          <h3 class="text-12px font-800 text-ink">
+            组内实际发放
+          </h3>
+          <span class="text-11px text-ink-faint">
+            {{ statement.allocationRecorded ? `${statement.allocations.length} 人` : '无历史记录' }}
+          </span>
+        </header>
+        <div
+          v-if="statement.allocationRecorded"
+          class="grid gap-x-4 gap-y-2 px-3 py-2.5 sm:grid-cols-2"
+        >
+          <div
+            v-for="allocation in statement.allocations"
+            :key="allocation.workerId"
+            class="flex min-w-0 items-center justify-between gap-3 text-12px"
+          >
+            <span class="min-w-0 truncate text-ink-soft">
+              {{ allocation.workerName }}
+              <small v-if="allocation.isLeader" class="ml-1 text-brand">负责人</small>
+            </span>
+            <strong class="shrink-0 font-mono text-ink">
+              {{ money(allocation.amount) }}
+            </strong>
+          </div>
+        </div>
+        <p v-else class="px-3 py-2.5 text-12px text-ink-soft">
+          该历史工资单生成时尚未记录组内分配，系统不会推测收款人。
+        </p>
+      </section>
       <div
         v-else-if="statement.needsRecheck"
         class="mx-4 mt-4 rounded-md bg-danger-soft px-3 py-2 text-12px text-danger"
@@ -191,20 +224,23 @@ function money(value: number | null) {
           }}
         </button>
         <template v-else>
-          <label class="flex items-center gap-2 text-12px font-700 text-ink-soft">
-            实际发放
-            <input v-model.number="actualAmount" aria-label="实际发放金额" class="h-9 w-36 rounded border border-line px-2 font-mono text-ink" type="number" min="0" :max="statement.grossAmount" step="0.01">
-          </label>
           <button
             type="button"
             class="btn-primary"
-            :disabled="statement.grossAmount <= 0 || normalizedActualAmount <= 0 || normalizedActualAmount > statement.grossAmount"
-            @click="emit('release', normalizedActualAmount)"
+            :disabled="statement.grossAmount <= 0"
+            @click="releaseDialogOpen = true"
           >
-            确认已发放
+            填写发放分配
           </button>
         </template>
       </footer>
+
+      <PayrollReleaseAllocationDialog
+        :open="releaseDialogOpen"
+        :statement="statement"
+        @update:open="releaseDialogOpen = $event"
+        @confirm="(actualAmount, allocations) => emit('release', actualAmount, allocations)"
+      />
     </template>
   </section>
 </template>
