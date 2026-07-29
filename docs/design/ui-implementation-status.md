@@ -60,7 +60,7 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 施工进度 / 目标成本 | 列表、合同排程和编辑基础已存在；内部暂估排程、项目区域配置与建组三步向导待实现 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
+| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、版本化标准工序、三步建组和依赖冲突保护已实现；项目区域配置、甘特建组拖拽及暂估转合同差异绑定仍待闭环 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md) |
 | 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
 | 客户 / 班组 / 工人 | 主数据列表与表单已存在，部分详情仍缺失 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |

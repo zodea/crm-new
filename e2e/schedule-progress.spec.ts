@@ -126,16 +126,43 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     })
   }
 
-  test('新建楼栋分组是独立页面并提供 22 道可调整工序', async ({ page }) => {
+  test('新建楼栋分组按范围、工序、预览三步完成', async ({ page }) => {
     await page.goto('/schedule/new?project=proj_demo_001')
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: '新建排程步骤' })).toBeVisible()
+    await expect(page.locator('[data-schedule-wizard-step="1"]')).toBeVisible()
     const contractSelect = page.getByRole('combobox', { name: '施工合同' })
     await expect(contractSelect).toBeVisible()
     await expect(contractSelect).toContainText(/合和新城施工总承包合同.*10 条清单/)
+    await page.getByRole('radio', { name: /内部暂估/ }).check()
+    await expect(contractSelect).toHaveCount(0)
+    await expect(page.locator('[data-schedule-wizard-step="1"] input[type="checkbox"]:checked')).toHaveCount(1)
+    await expect(page.getByText('3栋', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-schedule-wizard-step="2"]')).toHaveCount(0)
+    await expectDocumentDoesNotOverflow(page)
+
+    await page.getByRole('button', { name: '下一步：选择工序' }).click()
+    await expect(page.locator('[data-schedule-wizard-step="2"]')).toBeVisible()
     await expect(page.getByText('FS 前置', { exact: true })).toBeVisible()
     await expect(page.locator('.process-row').filter({ has: page.locator('input[type="checkbox"]') })).toHaveCount(22)
+    await expect(page.getByRole('button', { name: '生成排程', exact: true })).toHaveCount(0)
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    const processScroll = page.getByTestId('schedule-new-process-scroll')
+    await expect(processScroll).toBeVisible()
+    expect(await processScroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBeTruthy()
+    await expectDocumentDoesNotOverflow(page)
+
+    await page.getByRole('button', { name: '下一步：预览排程' }).click()
+    const previewStep = page.locator('[data-schedule-wizard-step="3"]')
+    await expect(previewStep).toBeVisible()
+    await expect(previewStep.getByText('范围依据', { exact: true })).toBeVisible()
+    await expect(previewStep.locator('tbody tr')).toHaveCount(22)
     await expect(page.getByRole('button', { name: '生成排程', exact: true })).toBeVisible()
+    const previewScroll = page.getByTestId('schedule-new-preview-scroll')
+    expect(await previewScroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBeTruthy()
+    await expectDocumentDoesNotOverflow(page)
   })
 })

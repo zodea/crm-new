@@ -28,11 +28,11 @@ beforeEach(async () => {
 afterEach(() => db.close())
 
 describe('工程量演示 seed', () => {
-  it('真实 seedIfEmpty 贯通两户型、两楼栋、多楼层、双泥水班组与跨月阶段完成', async () => {
+  it('真实 seedIfEmpty 贯通两户型、三楼栋、多楼层、双泥水班组与跨月阶段完成', async () => {
     await seedIfEmpty(db)
 
     expect(await count('house_type_templates')).toBe(2)
-    expect(await count('buildings')).toBe(2)
+    expect(await count('buildings')).toBe(3)
     expect(await count('floors')).toBeGreaterThanOrEqual(4)
     expect(await count('units')).toBeGreaterThanOrEqual(8)
 

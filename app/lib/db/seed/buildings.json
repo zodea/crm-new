@@ -12,5 +12,12 @@
     "code": "2",
     "name": "2栋",
     "sort_order": 20
+  },
+  {
+    "id": "qty_bld_3",
+    "project_id": "proj_demo_001",
+    "code": "3",
+    "name": "3栋",
+    "sort_order": 30
   }
 ]
