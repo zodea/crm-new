@@ -5,11 +5,16 @@ import type {
   QuantityTemplateNewItemDraft,
   QuantityTemplateRoomDraft,
 } from '~/lib/quantity/template'
+import type { WageQuantitySource } from '~/lib/quantity/wage-source'
+import { computed, reactive, shallowRef, watch } from 'vue'
+import QuantityFieldFormulaCell from '~/components/quantity/QuantityFieldFormulaCell.vue'
+import WageQuantitySourcePicker from '~/components/quantity/WageQuantitySourcePicker.vue'
 import {
   defaultQuantityEntrySource,
   QUANTITY_ENTRY_SOURCE_OPTIONS,
 } from '~/lib/quantity/entry-source'
 import { evaluateQuantityFormula } from '~/lib/quantity/formula'
+import { resolveWageQuantity, wageQuantityRequest } from '~/lib/quantity/wage-source'
 
 interface ItemOption {
   key: string
@@ -41,6 +46,23 @@ const formulaResults = computed(() => new Map(
   props.lines.map(line => [line.key, evaluateQuantityFormula(line.fieldFormula)]),
 ))
 const entrySourceByLine = reactive<Record<string, QuantityEntrySource>>({})
+const wagePreviewSource = shallowRef<WageQuantitySource>('provisional')
+const wagePreview = computed(() => {
+  let total = 0
+  let missing = 0
+  const request = wageQuantityRequest('advance', wagePreviewSource.value)
+  for (const line of props.lines) {
+    const resolution = resolveWageQuantity({
+      provisionalQty: line.provisionalQty,
+      fieldQty: formulaValue(line),
+    }, request)
+    if (resolution.quantity == null)
+      missing += 1
+    else
+      total += resolution.quantity
+  }
+  return { total, missing }
+})
 
 watch(
   () => props.lines.map(line => line.key),
@@ -75,11 +97,6 @@ function numberInput(event: Event): number | null {
 
 function formulaResult(line: QuantityTemplateLineDraft) {
   return formulaResults.value.get(line.key) ?? evaluateQuantityFormula(line.fieldFormula)
-}
-
-function formulaError(line: QuantityTemplateLineDraft): string {
-  const result = formulaResult(line)
-  return result.ok ? '' : result.error
 }
 
 function formulaValue(line: QuantityTemplateLineDraft): number | null {
@@ -118,6 +135,16 @@ function quantityLabel(value: number | null): string {
         <p class="mt-0.5 text-11px text-ink-soft">
           每行先选择当前录入口径；三量分别保存，切换不会清空其他口径。现场量由算式实时计算。
         </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[var(--radius-btn)] bg-surface-2 px-2 py-1">
+        <WageQuantitySourcePicker v-model="wagePreviewSource" />
+        <span class="text-10px text-ink-soft" data-testid="wage-preview-total">
+          预览合计 <b class="font-mono text-ink">{{ wagePreview.total }}</b>
+        </span>
+        <span v-if="wagePreview.missing" class="text-10px text-warning-deep">
+          缺量 {{ wagePreview.missing }} 行
+        </span>
+        <span class="text-9px text-ink-faint">最终结算固定取现场复核量</span>
       </div>
       <button type="button" class="btn-secondary ml-auto" @click="emit('addManualItem')">
         <span class="i-lucide-list-plus mr-1" aria-hidden="true" />新增手工分项
@@ -237,24 +264,17 @@ function quantityLabel(value: number | null): string {
                 @input="emit('updateLine', { key: line.key, field: 'provisionalQty', value: numberInput($event) })"
               >
               <template v-else>
-                <input
-                  :value="line.fieldFormula"
-                  class="field-input w-full font-mono"
-                  :class="formulaResult(line).ok ? '' : 'border-danger text-danger'"
-                  aria-label="现场复核算式"
-                  placeholder="如 客厅（3.2×4）"
-                  @input="emit('updateLine', { key: line.key, field: 'fieldFormula', value: inputValue($event) })"
-                >
-                <div v-if="formulaError(line)" class="mt-1 px-1 text-9px text-danger" role="alert">
-                  {{ formulaError(line) }}
-                </div>
+                <QuantityFieldFormulaCell
+                  :formula="line.fieldFormula"
+                  @update-formula="emit('updateLine', { key: line.key, field: 'fieldFormula', value: $event })"
+                />
               </template>
             </td>
             <td class="p-2">
               <div class="flex flex-wrap gap-x-3 gap-y-1 text-10px text-ink-soft">
-                <span>合同 <b class="font-mono text-ink">{{ quantityLabel(line.contractQty) }}</b></span>
-                <span>暂估 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
-                <span>现场 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
+                <span>合同/对比 <b class="font-mono text-ink">{{ quantityLabel(line.contractQty) }}</b></span>
+                <span>工资预付 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
+                <span>工资结算 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
               </div>
               <div class="mt-1 text-9px text-ink-faint">
                 识别原值：{{ line.recognizedContractQty == null ? '手工' : line.recognizedContractQty }}

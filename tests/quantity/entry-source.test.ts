@@ -11,24 +11,18 @@ describe('quantity entry source', () => {
     })).toBe('provisional')
   })
 
-  it('已有事实优先定位现场复核，其次暂估量、合同量', () => {
+  it('施工前默认先展示合同量，没有合同量时才就近定位其他已有口径', () => {
     expect(defaultQuantityEntrySource({
       recognizedContractQty: 10,
       contractQty: 11,
       provisionalQty: 12,
       fieldFormula: '3×5',
-    })).toBe('field')
-    expect(defaultQuantityEntrySource({
-      recognizedContractQty: 10,
-      contractQty: 11,
-      provisionalQty: 12,
-      fieldFormula: '',
-    })).toBe('provisional')
-    expect(defaultQuantityEntrySource({
-      recognizedContractQty: 10,
-      contractQty: 11,
-      provisionalQty: null,
-      fieldFormula: '',
     })).toBe('contract')
+    expect(defaultQuantityEntrySource({
+      recognizedContractQty: null,
+      contractQty: null,
+      provisionalQty: 12,
+      fieldFormula: '3×5',
+    })).toBe('field')
   })
 })

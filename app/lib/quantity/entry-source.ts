@@ -18,14 +18,15 @@ export const QUANTITY_ENTRY_SOURCE_OPTIONS: readonly {
 
 /**
  * 录入来源只控制当前显示的编辑器，不改变三量分别存储的领域事实。
- * 新建手工明细默认从暂估量开始；BOQ 或已有量按已有事实就近定位。
+ * 新建手工明细默认从暂估量开始；已有合同量时优先展示合同约定，
+ * 让施工前阅读态与后续量差/收支对照使用同一口径。
  */
 export function defaultQuantityEntrySource(line: QuantityEntrySourceLine): QuantityEntrySource {
+  if (line.recognizedContractQty != null || line.contractQty != null)
+    return 'contract'
   if (line.fieldFormula.trim())
     return 'field'
   if (line.provisionalQty != null)
     return 'provisional'
-  if (line.recognizedContractQty != null || line.contractQty != null)
-    return 'contract'
   return 'provisional'
 }
