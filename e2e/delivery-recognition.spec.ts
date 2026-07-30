@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 
@@ -18,6 +19,12 @@ const MARKDOWN = `
   <tr><td></td><td>合计</td><td></td><td></td><td></td><td></td><td>622.00</td></tr>
 </table>
 `
+
+async function chooseLookup(page: Page, label: string, keyword: string, optionText: string) {
+  const input = page.getByLabel(label)
+  await input.fill(keyword)
+  await page.getByRole('option').filter({ hasText: optionText }).first().click()
+}
 
 test('送货单闭环：上传识别、主数据匹配、人工核对并自动进入归档库', async ({ page }) => {
   test.setTimeout(90_000)
@@ -104,6 +111,16 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
 
   await page.getByRole('button', { name: '核对完成并归档', exact: true }).click()
   await expect(page.getByText('已完成核对并进入归档库', { exact: true })).toBeVisible()
+  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '登记已打印', exact: true }).first()).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await page.getByRole('button', { name: '登记已打印', exact: true }).first().click()
+  const printReceiptDialog = page.getByRole('dialog', { name: '登记实际打印回执' })
+  await expect(printReceiptDialog).toContainText(/只打开过预览或取消打印时不要确认/)
+  await printReceiptDialog.getByRole('button', { name: '确认已实际打印', exact: true }).click()
+  await expect(page.getByText('已登记打印成功，文件已移出待打印范围', { exact: true })).toBeVisible()
   await expect(page.getByText('上传 PDF 或图片开始识别', { exact: true })).toBeVisible()
 
   await page.getByRole('link', { name: '归档库', exact: true }).click()
@@ -130,15 +147,18 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
 test('旧送货单未保存原件时，详情和编辑都提供明确的补传入口', async ({ page }) => {
   test.setTimeout(90_000)
   await page.goto('/material/delivery/archive')
-  await expect(page.getByRole('button', { name: '新增送货单', exact: true })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('link', { name: '新增送货单', exact: true })).toBeVisible({ timeout: 60_000 })
 
-  await page.getByRole('button', { name: '新增送货单', exact: true }).click()
-  const createDialog = page.getByRole('dialog')
-  await createDialog.locator('select').nth(0).selectOption('proj_demo_001')
-  await createDialog.locator('input[placeholder="例如 SH-2026-0715-001"]').fill('SH-E2E-NO-SOURCE')
-  await createDialog.locator('input[placeholder="材料名称"]').fill('手工补录材料')
-  await createDialog.getByRole('button', { name: '保存送货单', exact: true }).click()
-  await expect(page.getByText('送货单已新增', { exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '新增送货单', exact: true }).click()
+  await expect(page).toHaveURL('/material/delivery/archive/form')
+  await expect(page.getByRole('heading', { name: '新建 · 送货单归档' })).toBeVisible()
+  await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+  await page.getByLabel('送货单号').fill('SH-E2E-NO-SOURCE')
+  await page.getByLabel('材料名称').fill('手工补录材料')
+  await page.getByRole('button', { name: '保存送货单', exact: true }).click()
+  await expect(page.getByText('送货单归档已新增', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/material\/delivery\/archive\/[^/]+$/)
+  await page.getByTitle('返回归档库').click()
 
   const manualLink = page.getByRole('link', { name: 'SH-E2E-NO-SOURCE', exact: true })
   await expect(page.getByText('缺原件', { exact: true }).first()).toBeVisible()

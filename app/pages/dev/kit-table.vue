@@ -80,7 +80,7 @@ const wideColumns: KitTableColumn[] = [
   { field: 'received', title: '已收款', type: 'money', width: 140 },
   { field: 'receivable', title: '应收余额', type: 'money', width: 140 },
   { field: 'invoiced', title: '已开票', type: 'money', width: 140 },
-  { field: 'startPlan', title: '计划开工', type: 'date' },
+  { field: 'startPlan', title: '计划开工', type: 'date', resizable: false },
   { field: 'endPlan', title: '计划竣工', type: 'date' },
   { field: 'note', title: '备注', minWidth: 200 },
   { title: '操作', type: 'action', width: 96 },
@@ -159,18 +159,36 @@ const fewColumns: KitTableColumn[] = [
           @filter-change="onFilterChange"
         >
           <template #name="{ row }">
-            <span class="cell--link" @click="toast.info(`打开项目:${row.name}`)">{{ row.name }}</span>
+            <button
+              type="button"
+              class="cell--link border-0 bg-transparent p-0"
+              @click="toast.info(`打开项目:${row.name}`)"
+            >
+              {{ row.name }}
+            </button>
           </template>
           <template #status="{ row }">
             <span :class="STATUS_COLOR[row.status as string] || ''">{{ row.status }}</span>
           </template>
           <template #action="{ row }">
             <div class="flex items-center gap-1">
-              <button class="icon-btn" title="编辑" @click="toast.info(`编辑 ${row.code}`)">
-                <span class="i-lucide-square-pen text-14px" />
+              <button
+                type="button"
+                class="icon-btn"
+                title="编辑"
+                :aria-label="`编辑 ${row.code}`"
+                @click="toast.info(`编辑 ${row.code}`)"
+              >
+                <span aria-hidden="true" class="i-lucide-square-pen text-14px" />
               </button>
-              <button class="icon-btn-danger" title="删除" @click="toast.warning(`删除 ${row.code}(演示)`)">
-                <span class="i-lucide-trash-2 text-14px" />
+              <button
+                type="button"
+                class="icon-btn-danger"
+                title="删除"
+                :aria-label="`删除 ${row.code}`"
+                @click="toast.warning(`删除 ${row.code}(演示)`)"
+              >
+                <span aria-hidden="true" class="i-lucide-trash-2 text-14px" />
               </button>
             </div>
           </template>

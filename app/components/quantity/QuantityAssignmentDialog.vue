@@ -9,6 +9,8 @@ import { onBeforeRouteLeave } from 'vue-router'
 import {
   parseQuantityAssignmentScopeKey,
   previewQuantityAssignmentConflicts,
+  quantityAssigneeIsCandidate,
+  quantityAssigneeRequiresDetailedScope,
   quantityAssignmentScopeKey,
 } from '~/lib/quantity/assignment'
 import { ALL_QUANTITY_FILTER } from '~/lib/quantity/matrix'
@@ -55,11 +57,6 @@ const assigneeTabs = [
   { key: 'worker', label: '个人责任' },
 ]
 
-const scopeTabs = [
-  { key: 'whole', label: '整户工种' },
-  { key: 'detailed', label: '指定房间分项' },
-]
-
 const workspace = computed(() => store.assignmentWorkspace?.projectId === props.projectId
   ? store.assignmentWorkspace
   : null)
@@ -81,16 +78,54 @@ const tradeOptions = computed(() => (workspace.value?.trades ?? []).map(trade =>
   label: trade,
 })))
 
+function itemNamesForTrade(source: QuantityAssignmentWorkspace, trade: string): string[] {
+  return [...new Set(
+    source.scopeOptions
+      .filter(option => option.trade === trade)
+      .map(option => option.itemName),
+  )]
+}
+
+const selectedTradeItemNames = computed(() => workspace.value
+  ? itemNamesForTrade(workspace.value, selectedTrade.value)
+  : [])
+
 const assigneeOptions = computed(() => (workspace.value?.assignees ?? [])
-  .filter(assignee => assignee.kind === assigneeKind.value && assignee.trade === selectedTrade.value)
+  .filter(assignee => (
+    assignee.kind === assigneeKind.value
+    && quantityAssigneeIsCandidate(
+      assignee,
+      selectedTrade.value,
+      selectedTradeItemNames.value,
+    )
+  ))
   .map(assignee => ({
     key: assignee.id,
-    label: assignee.name,
+    label: assignee.itemNames.length
+      ? `${assignee.name} · ${assignee.itemNames.length}项能力`
+      : `${assignee.name} · 全部活项`,
   })))
 
-const selectedAssigneeName = computed(() => workspace.value?.assignees.find(assignee => (
+const selectedAssignee = computed(() => workspace.value?.assignees.find(assignee => (
   assignee.kind === assigneeKind.value && assignee.id === assigneeId.value
-))?.name ?? '')
+)))
+const selectedAssigneeName = computed(() => selectedAssignee.value?.name ?? '')
+const selectedAssigneeNeedsDetailedScope = computed(() => {
+  const assignee = selectedAssignee.value
+  return assignee
+    ? quantityAssigneeRequiresDetailedScope(
+        assignee,
+        selectedTrade.value,
+        selectedTradeItemNames.value,
+      )
+    : false
+})
+const scopeTabs = computed(() => selectedAssigneeNeedsDetailedScope.value
+  ? [{ key: 'detailed', label: '指定房间分项' }]
+  : [
+      { key: 'whole', label: '整户工种' },
+      { key: 'detailed', label: '指定房间分项' },
+    ])
 
 function draftSignature(): string {
   return JSON.stringify({
@@ -141,10 +176,35 @@ function hydrateDraft(source: QuantityAssignmentWorkspace) {
     ? currentAssignment(source, initialUnit.id, selectedTrade.value)
     : undefined
   assigneeKind.value = selectedCurrent?.assigneeKind ?? 'crew'
-  assigneeId.value = selectedCurrent?.assigneeId ?? ''
+  const currentAssignee = selectedCurrent
+    ? source.assignees.find(assignee => (
+        assignee.kind === selectedCurrent.assigneeKind
+        && assignee.id === selectedCurrent.assigneeId
+      ))
+    : undefined
+  assigneeId.value = currentAssignee && quantityAssigneeIsCandidate(
+    currentAssignee,
+    selectedTrade.value,
+    itemNamesForTrade(source, selectedTrade.value),
+  )
+    ? currentAssignee.id
+    : ''
   note.value = selectedCurrent?.note ?? ''
   hydratedNote.value = note.value
-  scopeMode.value = selectedCurrent?.scopes.length || selectedCurrent?.hasInvalidScopes ? 'detailed' : 'whole'
+  scopeMode.value = (
+    selectedCurrent?.scopes.length
+    || selectedCurrent?.hasInvalidScopes
+    || (
+      currentAssignee
+      && quantityAssigneeRequiresDetailedScope(
+        currentAssignee,
+        selectedTrade.value,
+        itemNamesForTrade(source, selectedTrade.value),
+      )
+    )
+  )
+    ? 'detailed'
+    : 'whole'
   selectedScopeKeys.value = selectedCurrent?.scopes.map(scope => quantityAssignmentScopeKey({
     unitId: initialUnit!.id,
     roomId: scope.roomId,
@@ -220,6 +280,13 @@ watch(assigneeId, (next, previous) => {
   if (note.value === hydratedNote.value)
     note.value = ''
   hydratedNote.value = ''
+  selectedScopeKeys.value = []
+  scopeMode.value = 'whole'
+}, { flush: 'sync' })
+
+watch(selectedAssigneeNeedsDetailedScope, (required) => {
+  if (required)
+    scopeMode.value = 'detailed'
 }, { flush: 'sync' })
 
 watch(scopeMode, (mode) => {
@@ -477,9 +544,16 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
                 :placeholder="assigneeOptions.length ? '请选择责任人' : '当前工种无候选'"
               />
               <span class="text-11px text-ink-faint">
-                候选按基础资料中的工种严格匹配
+                候选按基础资料中的工种与活项能力匹配
               </span>
             </div>
+            <p
+              v-if="selectedTrade && !assigneeOptions.length"
+              class="rounded-[var(--radius-btn)] bg-warn-soft px-3 py-2.5 text-12px text-warn-ink"
+              role="status"
+            >
+              当前工种没有兼容{{ assigneeKind === 'crew' ? '班组' : '人员' }}。请先到基础信息维护可承接工种与活项能力。
+            </p>
           </div>
 
           <label class="grid gap-1.5">
@@ -526,6 +600,9 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
           </p>
           <template v-else>
             <SegTab v-model="scopeMode" :tabs="scopeTabs" />
+            <p v-if="selectedAssigneeNeedsDetailedScope" class="rounded-[var(--radius-btn)] bg-warn-soft px-3 py-2.5 text-12px text-warn-ink">
+              该人员只配置了部分活项，责任范围必须细化到兼容的房间 × 分项。
+            </p>
             <p v-if="scopeMode === 'whole'" class="rounded-[var(--radius-btn)] bg-brand-soft/40 px-3 py-3 text-12px text-brand-deep">
               个人负责所选户的整个 {{ selectedTrade || '工种' }} 范围，不写明细 scope。
             </p>
@@ -535,6 +612,7 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
               :units="selectedUnits"
               :options="workspace.scopeOptions"
               :trade="selectedTrade"
+              :allowed-item-names="selectedAssignee?.itemNames ?? []"
               :disabled="store.assignmentSaving"
             />
           </template>

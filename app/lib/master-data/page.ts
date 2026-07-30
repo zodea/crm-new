@@ -28,6 +28,7 @@ interface FormMeta {
   listLabel: string
   listPath: string
   newPath: string
+  detailPath?: string
   defaultAttachmentCategory: string
   sections: FormSection[]
 }
@@ -52,6 +53,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '客户列表',
     listPath: '/base/customer',
     newPath: '/base/customer/form',
+    detailPath: '/base/customer',
     defaultAttachmentCategory: 'invoice',
     sections: [
       { key: 'basic', label: '基础信息' },
@@ -66,6 +68,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '班组列表',
     listPath: '/base/crew',
     newPath: '/base/crew/form',
+    detailPath: '/base/crew',
     defaultAttachmentCategory: 'agreement',
     sections: [
       { key: 'basic', label: '基本信息' },
@@ -79,6 +82,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '工人列表',
     listPath: '/base/worker',
     newPath: '/base/worker/form',
+    detailPath: '/base/worker',
     defaultAttachmentCategory: 'certificate',
     sections: [
       { key: 'personal', label: '个人信息' },
@@ -109,6 +113,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '目标成本列表',
     listPath: '/project/target-cost',
     newPath: '/project/target-cost/form',
+    detailPath: '/project/target-cost',
     defaultAttachmentCategory: 'budget',
     sections: [
       { key: 'basic', label: '基本信息' },
@@ -134,6 +139,8 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
     case 'crew':
       return {
         ...common,
+        capabilityTrades: [],
+        capabilityItems: [],
         defaultPayRatio: 0.95,
         rentSubsidyEnabled: false,
         mgmtFeeEnabled: false,
@@ -143,6 +150,8 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
     case 'worker':
       return {
         ...common,
+        capabilityTrades: [],
+        capabilityItems: [],
         crewId: null,
         currentProjectId: null,
         familyGroupId: null,

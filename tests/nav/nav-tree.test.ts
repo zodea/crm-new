@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { activeNavKey, ensureActiveGroupOpen, filterNavTree, NAV_TREE } from '~/lib/nav/nav-tree'
+import {
+  activeNavKey,
+  DEFAULT_OPEN_GROUPS,
+  ensureActiveGroupOpen,
+  filterNavTree,
+  NAV_TREE,
+  toggleExclusiveGroup,
+} from '~/lib/nav/nav-tree'
 
 function leaves() {
   return NAV_TREE.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -10,7 +17,7 @@ describe('侧栏导航树', () => {
     expect(leaves().every(item => item.icon.startsWith('i-lucide-'))).toBe(true)
   })
 
-  it('按名称或副提示搜索，并保留待建项的不可导航状态', () => {
+  it('按名称或副提示搜索，并返回真实导航入口', () => {
     const byLabel = filterNavTree(NAV_TREE, '付款申请')
     const payment = byLabel.flatMap(node => node.type === 'group' ? node.items : [node])
     expect(payment).toHaveLength(1)
@@ -22,8 +29,10 @@ describe('侧栏导航树', () => {
     const pendingPayment = filterNavTree(NAV_TREE, '待支付工作台')
       .flatMap(node => node.type === 'group' ? node.items : [node])
     expect(pendingPayment).toHaveLength(1)
-    expect(pendingPayment[0]).toMatchObject({ key: 'payManage' })
-    expect(pendingPayment[0]).not.toHaveProperty('to')
+    expect(pendingPayment[0]).toMatchObject({
+      key: 'payManage',
+      to: '/finance/payment-management',
+    })
 
     const byHint = filterNavTree(NAV_TREE, 'OCR 处理区')
     const delivery = byHint.flatMap(node => node.type === 'group' ? node.items : [node])
@@ -46,9 +55,18 @@ describe('侧栏导航树', () => {
     expect(filterNavTree(NAV_TREE, '')).toBe(NAV_TREE)
   })
 
-  it('本地状态恢复后仍展开当前叶子所属分组', () => {
+  it('目录使用单开手风琴，恢复旧状态时只保留当前路由所属分组', () => {
+    expect(DEFAULT_OPEN_GROUPS).toEqual([])
     expect(ensureActiveGroupOpen([], 'project')).toEqual(['g-project'])
     expect(ensureActiveGroupOpen(['g-project'], 'project')).toEqual(['g-project'])
+    expect(ensureActiveGroupOpen(['g-owner', 'g-material', 'g-settings'], 'project'))
+      .toEqual(['g-project'])
+    expect(ensureActiveGroupOpen(['g-owner', 'g-material'], null)).toEqual(['g-material'])
+  })
+
+  it('点击一级目录时关闭前一个，再次点击当前目录则收起', () => {
+    expect(toggleExclusiveGroup(['g-project'], 'g-owner')).toEqual(['g-owner'])
+    expect(toggleExclusiveGroup(['g-owner'], 'g-owner')).toEqual([])
   })
 
   it('送货单归档库入口可导航，列表与详情都点亮归档库', () => {
@@ -123,7 +141,15 @@ describe('侧栏导航树', () => {
       expect(activeNavKey(`${route}/new`)).toBe(key)
       expect(activeNavKey(`${route}/f4_1`)).toBe(key)
     }
+    expect(activeNavKey('/material/delivery/archive/form')).toBe('deliveryArchive')
     expect(activeNavKey('/material/delivery/archive/form/delivery_1')).toBe('deliveryArchive')
+  })
+
+  it('付款管理工作台入口已启用，且不会被付款申请前缀误点亮', () => {
+    expect(leaves().find(item => item.key === 'payManage')?.to)
+      .toBe('/finance/payment-management')
+    expect(activeNavKey('/finance/payment-management')).toBe('payManage')
+    expect(activeNavKey('/finance/payment/payment_1')).toBe('payApply')
   })
 
   it('f5 八类甲方与分包单据入口全部启用，新增和编辑路由保持来源导航点亮', () => {

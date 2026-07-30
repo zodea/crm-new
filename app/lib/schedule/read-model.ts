@@ -2,7 +2,11 @@ import type { ScheduleDependencyInput, ScheduleDependencyType } from './planning
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadQuantityStageProgress } from '~/lib/quantity/derived'
-import { scheduleDeviationDays, schedulePlannedProgress } from './planning'
+import {
+  SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
+  scheduleDeviationDays,
+  schedulePlannedProgress,
+} from './planning'
 
 export interface ScheduleCatalogProject {
   id: string
@@ -75,12 +79,20 @@ export interface ScheduleTaskView {
   actualFinish: string | null
   plannedProgress: number
   deviationDays: number
+  sourceLibraryTaskId: string | null
+  sourceLibraryVersion: number | null
 }
+
+export type ScheduleScopeBasis = 'contract' | 'provisional'
 
 export interface ScheduleGroupView {
   id: string
   projectId: string
   contractId: string
+  scopeBasis: ScheduleScopeBasis
+  processLibraryId: string
+  processLibraryName: string
+  processLibraryVersion: number | null
   name: string
   sortOrder: number
   buildingIds: readonly string[]
@@ -99,6 +111,7 @@ export interface ScheduleProjectView {
   code: string
   groups: readonly ScheduleGroupView[]
   dependencies: readonly ScheduleDependencyInput[]
+  disabledDependencies: readonly ScheduleDisabledDependencyView[]
   plannedStart: string | null
   plannedFinish: string | null
   actualProgress: number
@@ -108,7 +121,23 @@ export interface ScheduleProjectView {
 
 interface ProjectRow { id: string, name: string, code: string | null, status: string | null }
 interface BuildingRow { id: string, project_id: string, code: string, name: string }
-interface GroupRow { id: string, project_id: string, contract_id: string | null, name: string, sort_order: number }
+interface GroupRow {
+  id: string
+  project_id: string
+  contract_id: string | null
+  scope_basis: ScheduleScopeBasis | null
+  process_library_id: string | null
+  process_library_name_snapshot: string
+  process_library_version_snapshot: number | null
+  name: string
+  sort_order: number
+}
+
+export interface ScheduleDisabledDependencyView extends ScheduleDependencyInput {
+  disabledAt: string
+  disabledReason: 'schedule-conflict'
+  auditLogId: string
+}
 interface GroupBuildingRow { group_id: string, building_id: string, building_name: string }
 interface TaskRow {
   id: string
@@ -127,6 +156,8 @@ interface TaskRow {
   manual_progress: number | null
   stage_id: string | null
   sort_order: number
+  source_library_task_id: string | null
+  source_library_version: number | null
 }
 interface TaskItemRow { task_id: string, item_id: string, boq_line_id: string | null, item_name: string }
 interface FloorPlanRow {
@@ -149,6 +180,8 @@ interface DependencyRow {
   succ_id: string
   dependency_type: ScheduleDependencyType
   lag_days: number
+  deleted_at?: string
+  delete_log_id?: string
 }
 
 function rollup(tasks: readonly ScheduleTaskView[]) {
@@ -199,7 +232,18 @@ export async function loadScheduleBuildings(
 ): Promise<ScheduleBuildingOption[]> {
   if (!contractId) {
     const rows = await db.select<BuildingRow>(
-      selectVisibleSql('buildings', 'AND project_id = ? ORDER BY sort_order, code, id'),
+      `${hiddenCtesFor('buildings', 'schedule_group_buildings')}
+       SELECT building_row.*
+       FROM buildings building_row
+       WHERE ${visibleCond('buildings', 'building_row')}
+         AND building_row.project_id = ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM schedule_group_buildings group_building
+           WHERE group_building.building_id = building_row.id
+             AND ${visibleCond('schedule_group_buildings', 'group_building')}
+         )
+       ORDER BY building_row.sort_order, building_row.code, building_row.id`,
       [projectId],
     )
     return rows.map(row => ({
@@ -337,6 +381,7 @@ export async function loadScheduleProject(
       code: project.code ?? '',
       groups: [],
       dependencies: [],
+      disabledDependencies: [],
       plannedStart: null,
       plannedFinish: null,
       actualProgress: 0,
@@ -409,6 +454,32 @@ export async function loadScheduleProject(
         selectVisibleSql('task_dependencies', `AND pred_id IN (${taskPlaceholders}) AND succ_id IN (${taskPlaceholders})
           ORDER BY created_at, id`),
         [...taskIds, ...taskIds],
+      )
+    : []
+  const disabledDependencyRows = taskIds.length
+    ? await db.select<DependencyRow>(
+        `SELECT dependency.id,
+                dependency.pred_id,
+                dependency.succ_id,
+                dependency.dependency_type,
+                dependency.lag_days,
+                dependency.deleted_at,
+                delete_log.id AS delete_log_id
+         FROM task_dependencies dependency
+         JOIN operation_logs delete_log
+           ON delete_log.rowid = (
+             SELECT MAX(candidate_log.rowid)
+             FROM operation_logs candidate_log
+             WHERE candidate_log.table_name = 'task_dependencies'
+               AND candidate_log.record_id = dependency.id
+               AND candidate_log.action = 'delete'
+           )
+         WHERE dependency.deleted_at IS NOT NULL
+           AND delete_log.operator = ?
+           AND dependency.pred_id IN (${taskPlaceholders})
+           AND dependency.succ_id IN (${taskPlaceholders})
+         ORDER BY dependency.deleted_at DESC, dependency.id`,
+        [SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR, ...taskIds, ...taskIds],
       )
     : []
 
@@ -498,6 +569,10 @@ export async function loadScheduleProject(
         actualProgress,
         today,
       }),
+      sourceLibraryTaskId: task.source_library_task_id,
+      sourceLibraryVersion: task.source_library_version == null
+        ? null
+        : Number(task.source_library_version),
     }
     taskViews.set(task.group_id, [...(taskViews.get(task.group_id) ?? []), view])
   }
@@ -509,6 +584,12 @@ export async function loadScheduleProject(
       id: group.id,
       projectId: group.project_id,
       contractId: group.contract_id ?? '',
+      scopeBasis: group.scope_basis ?? (group.contract_id ? 'contract' : 'provisional'),
+      processLibraryId: group.process_library_id ?? '',
+      processLibraryName: group.process_library_name_snapshot,
+      processLibraryVersion: group.process_library_version_snapshot == null
+        ? null
+        : Number(group.process_library_version_snapshot),
       name: group.name,
       sortOrder: Number(group.sort_order) || 0,
       buildingIds: groupBuildings.map(row => row.building_id),
@@ -527,12 +608,23 @@ export async function loadScheduleProject(
     dependencyType: row.dependency_type,
     lagDays: Number(row.lag_days) || 0,
   }))
+  const disabledDependencies: ScheduleDisabledDependencyView[] = disabledDependencyRows.map(row => ({
+    id: row.id,
+    predId: row.pred_id,
+    succId: row.succ_id,
+    dependencyType: row.dependency_type,
+    lagDays: Number(row.lag_days) || 0,
+    disabledAt: row.deleted_at!,
+    disabledReason: 'schedule-conflict',
+    auditLogId: row.delete_log_id!,
+  }))
   return {
     id: project.id,
     name: project.name,
     code: project.code ?? '',
     groups: groupViews,
     dependencies,
+    disabledDependencies,
     plannedStart: minDate(allTasks.map(task => task.plannedStart)),
     plannedFinish: maxDate(allTasks.map(task => task.plannedFinish)),
     ...rollup(allTasks),

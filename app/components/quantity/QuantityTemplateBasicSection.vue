@@ -20,7 +20,7 @@ const name = defineModel<string>('name', { required: true })
 </script>
 
 <template>
-  <section id="form-section-basic" class="scroll-mt-4">
+  <section id="section-basic" class="scroll-mt-4">
     <div class="mb-3 flex flex-wrap items-end gap-3 rounded-[var(--radius-btn)] border border-line bg-surface-2 p-3">
       <label class="min-w-52 flex-1">
         <span class="field-label">当前模板</span>
@@ -44,7 +44,7 @@ const name = defineModel<string>('name', { required: true })
       </button>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
       <label>
         <span class="field-label">户型编码 *</span>
         <input v-model="code" class="field-input w-full" placeholder="如 A / B / C" autocomplete="off">

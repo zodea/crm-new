@@ -51,7 +51,6 @@ export const NAV_TREE: NavNode[] = [
     { key: 'quantity', mark: '量', icon: 'i-lucide-grid-3x3', label: '工程量管理', hint: '矩阵可视化', to: '/subcontract/quantity' },
     { key: 'boqList', mark: '单', icon: 'i-lucide-list-tree', label: '工程量清单', hint: '分项·三量', to: '/contract/boq' },
     { key: 'payroll', mark: '资', icon: 'i-lucide-wallet-cards', label: '工资核算', hint: '核算发放', to: '/subcontract/payroll' },
-    { key: 'wageSlip', mark: '款', icon: 'i-lucide-badge-dollar-sign', label: '工资进度款', hint: '铺贴核算工具' },
   ] },
   { type: 'group', key: 'g-material', label: '乙供材管理', icon: 'i-lucide-package', items: [
     { key: 'matContract', mark: '采', icon: 'i-lucide-shopping-cart', label: '材料采购合同', hint: '采购台账', to: '/contract/material' },
@@ -75,7 +74,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'invoiceLedger', mark: '账', icon: 'i-lucide-book-open-check', label: '发票台账', hint: '收票·打印·修改', to: '/finance/ledger' },
     { key: 'invoice', mark: '票', icon: 'i-lucide-scan-text', label: '发票识别', hint: '上传·校对·排版', to: '/finance/invoice' },
     { key: 'payApply', mark: '付', icon: 'i-lucide-badge-dollar-sign', label: '付款申请', hint: '10 类业务', to: '/finance/payment' },
-    { key: 'payManage', mark: '管', icon: 'i-lucide-hand-coins', label: '付款管理', hint: '待支付工作台' },
+    { key: 'payManage', mark: '管', icon: 'i-lucide-hand-coins', label: '付款管理', hint: '待支付工作台', to: '/finance/payment-management' },
     { key: 'receipt', mark: '收', icon: 'i-lucide-circle-dollar-sign', label: '收款登记', hint: '关联合同·开票', to: '/finance/receipt' },
     { key: 'invApply', mark: '开', icon: 'i-lucide-file-plus-2', label: '开票申请', hint: '收入侧起点', to: '/finance/billing' },
     { key: 'current', mark: '往', icon: 'i-lucide-repeat-2', label: '往来收付', hint: '非合同类', to: '/finance/current' },
@@ -95,7 +94,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'worker', mark: '工', icon: 'i-lucide-user-round', label: '工人信息', hint: '人员证书', to: '/base/worker' },
   ] },
   { type: 'group', key: 'g-settings', label: '设置', icon: 'i-lucide-settings', items: [
-    { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数' },
+    { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数', to: '/settings/ocr' },
   ] },
 ]
 
@@ -116,21 +115,24 @@ export function filterNavTree(tree: NavNode[], query: string): NavNode[] {
   })
 }
 
-/** 默认展开的分组：对齐设计稿批A（除「设置」外全部展开） */
-export const DEFAULT_OPEN_GROUPS: string[] = NAV_TREE
-  .filter((n): n is NavGroup => n.type === 'group' && n.key !== 'g-settings')
-  .map(n => n.key)
+/** 默认不展开目录；进入具体业务路由时由当前导航归属自动打开一个分组。 */
+export const DEFAULT_OPEN_GROUPS: string[] = []
 
-/** 合并持久化展开状态与当前路由归属，当前分组始终优先展开。 */
+/** 把旧版多开持久化状态收敛为单开，并在路由变化时优先打开当前分组。 */
 export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | null): string[] {
   if (!activeKey)
-    return openKeys
+    return openKeys.length ? [openKeys.at(-1)!] : []
   const group = NAV_TREE.find((node): node is NavGroup =>
     node.type === 'group' && node.items.some(item => item.key === activeKey),
   )
-  if (!group || openKeys.includes(group.key))
-    return openKeys
-  return [...openKeys, group.key]
+  if (!group)
+    return openKeys.length ? [openKeys.at(-1)!] : []
+  return openKeys.length === 1 && openKeys[0] === group.key ? openKeys : [group.key]
+}
+
+/** 一级目录手风琴：打开新目录会关闭旧目录，再次点击当前目录则全部收起。 */
+export function toggleExclusiveGroup(openKeys: string[], key: string): string[] {
+  return openKeys.length === 1 && openKeys[0] === key ? [] : [key]
 }
 
 /**
@@ -140,6 +142,8 @@ export function ensureActiveGroupOpen(openKeys: string[], activeKey: string | nu
 export function activeNavKey(path: string, contractKindOfDetail?: string | null): string | null {
   if (path === '/')
     return 'home'
+  if (path.startsWith('/settings/ocr'))
+    return 'ocrSettings'
   if (path.startsWith('/schedule'))
     return 'schedule'
   if (path.startsWith('/project/target-cost'))
@@ -175,6 +179,8 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
     return 'invoice'
   if (path.startsWith('/finance/ledger'))
     return 'invoiceLedger'
+  if (path.startsWith('/finance/payment-management'))
+    return 'payManage'
   if (path.startsWith('/finance/payment'))
     return 'payApply'
   if (path.startsWith('/finance/receipt'))
@@ -220,8 +226,13 @@ export function activeNavKey(path: string, contractKindOfDetail?: string | null)
   if (path.startsWith('/subcontract/settlement'))
     return 'subSettle'
   // 考勤从工资页进入，归属工资核算入口
-  if (path.startsWith('/subcontract/payroll') || path.startsWith('/subcontract/attendance'))
+  if (
+    path.startsWith('/subcontract/payroll')
+    || path.startsWith('/subcontract/attendance')
+    || path.startsWith('/subcontract/daywork')
+  ) {
     return 'payroll'
+  }
   if (path.startsWith('/owner-material/control'))
     return 'omTotal'
   if (path.startsWith('/owner-material/requisition'))

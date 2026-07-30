@@ -1,7 +1,7 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import { defineStore } from 'pinia'
-import { readonly, shallowRef } from 'vue'
+import { computed, readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
@@ -34,6 +34,8 @@ export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amount
   sortOrder: number
 }
 
+export type DeliveryPrintDisposition = 'pending' | 'printed' | 'excluded'
+
 export interface DeliveryRecord {
   id: string
   projectId: string
@@ -46,6 +48,10 @@ export interface DeliveryRecord {
   ocrStatus: string
   archived: boolean
   stored: boolean
+  printBatchId: string
+  printDisposition: DeliveryPrintDisposition
+  printedAt: string
+  printExcludedAt: string
   reviewFlag: string
   note: string
   createdAt: string
@@ -64,6 +70,7 @@ export interface DeliveryRecordInput {
   rawSiteText?: string
   fileName?: string
   filePath?: string
+  printBatchId?: string
   lines: DeliveryLineDraft[]
 }
 
@@ -258,7 +265,18 @@ function rowToRecord(
     filePath: (row.file_path ?? '') as string,
     ocrStatus: (row.ocr_status ?? 'reviewed') as string,
     archived: Boolean(row.archived),
-    stored: Boolean(row.stored),
+    // v25 起归档即视为已入库；stored 只保留作存量兼容镜像。
+    stored: Boolean(row.archived),
+    printBatchId: (row.print_batch_id || row.id) as string,
+    printDisposition: (
+      row.print_disposition === 'pending'
+      || row.print_disposition === 'printed'
+      || row.print_disposition === 'excluded'
+        ? row.print_disposition
+        : 'excluded'
+    ) as DeliveryPrintDisposition,
+    printedAt: (row.printed_at ?? '') as string,
+    printExcludedAt: (row.print_excluded_at ?? '') as string,
     reviewFlag: (row.review_flag ?? '') as string,
     note: (row.note ?? '') as string,
     createdAt: (row.created_at ?? '') as string,
@@ -387,13 +405,15 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     // File 读取与编码可能失败，必须在开启 SQLite 事务前完成。
     const source = sourceFile ? await prepareSourceFile(sourceFile) : null
     const id = generateId('del')
+    const printBatchId = input.printBatchId?.trim() || id
     const now = new Date().toISOString()
     await withTransaction(async (tx) => {
       await tx.execute(
         `INSERT INTO delivery_records
           (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
-           ocr_status, archived, stored, review_flag, note, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 0, '', ?, ?, ?)`,
+           ocr_status, archived, stored, print_batch_id, print_disposition, printed_at, print_excluded_at,
+           review_flag, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 1, ?, 'pending', NULL, NULL, '', ?, ?, ?)`,
         [
           id,
           input.projectId,
@@ -403,6 +423,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.deliveryDate,
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
+          printBatchId,
           input.note.trim(),
           now,
           now,
@@ -415,6 +436,80 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     })
     await load()
     return id
+  }
+
+  async function updatePrintDisposition(
+    ids: readonly string[],
+    disposition: Exclude<DeliveryPrintDisposition, 'pending'>,
+  ): Promise<void> {
+    const uniqueIds = [...new Set(ids.filter(Boolean))]
+    if (!uniqueIds.length)
+      return
+    const now = new Date().toISOString()
+    await withTransaction(async (tx) => {
+      const placeholders = uniqueIds.map(() => '?').join(', ')
+      const rows = await tx.select<{
+        id: string
+        print_disposition: DeliveryPrintDisposition
+      }>(`
+        SELECT id, print_disposition
+        FROM delivery_records
+        WHERE id IN (${placeholders})
+          AND archived = 1
+          AND deleted_at IS NULL
+      `, uniqueIds)
+      if (
+        rows.length !== uniqueIds.length
+        || rows.some(row => row.print_disposition !== 'pending')
+      ) {
+        throw new Error('送货单打印状态已变化，请刷新后重试')
+      }
+
+      for (const id of uniqueIds) {
+        let changed = 0
+        const logId = await withUpdateLog(tx, 'delivery_records', id, async () => {
+          await tx.execute(
+            `UPDATE delivery_records
+             SET print_disposition = ?,
+                 printed_at = ?,
+                 print_excluded_at = ?,
+                 updated_at = ?
+             WHERE id = ?
+               AND archived = 1
+               AND print_disposition = 'pending'
+               AND deleted_at IS NULL`,
+            [
+              disposition,
+              disposition === 'printed' ? now : null,
+              disposition === 'excluded' ? now : null,
+              now,
+              id,
+            ],
+          )
+          const [result] = await tx.select<{ count: number }>('SELECT changes() AS count')
+          changed = Number(result?.count ?? 0)
+        })
+        if (!logId || changed !== 1)
+          throw new Error('送货单打印状态已变化，请刷新后重试')
+      }
+    })
+    await load()
+  }
+
+  async function excludeFromPrint(id: string): Promise<void> {
+    await updatePrintDisposition([id], 'excluded')
+  }
+
+  async function excludeManyFromPrint(ids: readonly string[]): Promise<void> {
+    await updatePrintDisposition(ids, 'excluded')
+  }
+
+  async function confirmPrintReceipt(id: string): Promise<void> {
+    await updatePrintDisposition([id], 'printed')
+  }
+
+  async function confirmManyPrintReceipts(ids: readonly string[]): Promise<void> {
+    await updatePrintDisposition(ids, 'printed')
   }
 
   async function update(id: string, input: DeliveryRecordInput): Promise<string | null> {
@@ -561,8 +656,13 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     loading: readonly(loading),
     load,
     byId,
+    pendingPrintRecords: computed(() => list.value.filter(record => record.printDisposition === 'pending')),
     add,
     update,
+    excludeFromPrint,
+    excludeManyFromPrint,
+    confirmPrintReceipt,
+    confirmManyPrintReceipts,
     loadSourceFile,
     saveSourceFile,
     remove: softActions.remove,

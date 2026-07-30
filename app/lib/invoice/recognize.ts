@@ -46,6 +46,8 @@ export interface RecognizeOptions {
   stepMs?: number
   /** 测试/宿主注入的网络边界；业务调用保持缺省，统一走同源 OCR 代理。 */
   fetch?: RecognizeDocumentOptions['fetch']
+  /** 从本机 OCR 设置读取、由服务端再次白名单校验的 PaddleOCR-VL 参数。 */
+  runtimeOptions?: RecognizeDocumentOptions['runtimeOptions']
 }
 
 // ── 置信度分档（OCR 设置页的"置信度分档阈值"默认值；置信度仅作参考，判决权在人）──
@@ -212,6 +214,7 @@ export async function recognizeInvoice(
   const cloud = await recognizeDocument(input.file, {
     fetch: options.fetch,
     onProgress: options.onProgress,
+    runtimeOptions: options.runtimeOptions,
   })
   const parsed = parseInvoiceText(cloud.markdownPages.join('\n\n'))
   const hasUsableInvoiceData = Boolean(

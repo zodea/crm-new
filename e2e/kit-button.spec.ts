@@ -26,6 +26,20 @@ test.describe('KitButton 三态原语', () => {
     const during = await button.boundingBox()
     expect(during?.width).toBeCloseTo(before?.width ?? 0, 0)
 
+    const geometry = await button.evaluate((element) => {
+      const buttonRect = element.getBoundingClientRect()
+      const spinnerRect = element.querySelector<HTMLElement>('[data-kit-button-spinner]')!.getBoundingClientRect()
+      const labelRect = element.querySelector<HTMLElement>('[data-kit-button-label]')!.getBoundingClientRect()
+      return {
+        leftInset: spinnerRect.left - buttonRect.left,
+        rightGap: labelRect.left - spinnerRect.right,
+        labelRightInset: buttonRect.right - labelRect.right,
+      }
+    })
+    expect(geometry.leftInset).toBeGreaterThanOrEqual(3.5)
+    expect(geometry.rightGap).toBeGreaterThanOrEqual(3.5)
+    expect(geometry.labelRightInset).toBeGreaterThanOrEqual(3.5)
+
     await expect(button).toBeEnabled({ timeout: 3_000 })
     await expect(button).toHaveAttribute('data-state', 'default')
   })

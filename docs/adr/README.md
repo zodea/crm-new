@@ -20,6 +20,8 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0014](./0014-full-page-entity-forms.md) | 业务实体使用整页表单 | 已采纳并已落地 |
 | [0015](./0015-form-persistence-and-payment-reconciliation.md) | 表单持久化与付款勾稽 | 已采纳并已落地 |
 | [0016](./0016-overlay-composition-contract.md) | 浮层组合采用单交互平面与模态栈契约 | 已采纳，迁移中 |
+| [0017](./0017-provisional-schedule-before-contract.md) | 内部暂估排程允许先建计划、后绑定合同 | 已采纳并已落地 |
+| [0018](./0018-versioned-schedule-process-library.md) | 标准工序库采用不可变版本与可恢复的前置关系 | 已采纳并已落地 |
 
 ## 写作边界
 

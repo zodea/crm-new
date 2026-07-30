@@ -80,6 +80,7 @@ describe('project delivery archive read model', () => {
         sourceFileId: 'delivery-source-file',
         hasSourceFile: true,
         sourceStatus: '原件已关联',
+        printStatus: '已排除',
         sourcePath: '/material/delivery/archive/delivery-archived',
       }),
       expect.objectContaining({

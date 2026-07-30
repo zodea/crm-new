@@ -27,14 +27,14 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     page.on('pageerror', error => pageErrors.push(error.message))
 
     await page.goto('/contract/boq')
-    await expect(page.getByRole('heading', { name: 'BOQ · 变更 · 月度报量' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: '合同工程量清单' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('project-switcher-trigger')).toContainText('合和新城')
     const wallRow = page.getByRole('row').filter({ hasText: '墙砖铺贴' }).first()
     await expect(wallRow).toBeVisible()
     await expect(page.getByText('(原 26)', { exact: true })).toBeVisible()
 
     await page.getByRole('tab', { name: /变更单/ }).click()
-    await expect(page.getByRole('cell', { name: 'BG-2026-001' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'BG-2026-001', exact: true })).toBeVisible()
     await expect(page.getByText('已签证', { exact: true }).last()).toBeVisible()
 
     await page.getByRole('tab', { name: /月度报量/ }).click()
@@ -81,7 +81,8 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await page.getByRole('button', { name: /现场算式：墙砖铺贴/ }).first().click()
     await expect(page).toHaveURL(/\/subcontract\/quantity\?.*boqLine=/)
     await expect(page.getByText('来自合同工程量清单', { exact: true })).toBeVisible()
-    await expect(page.getByRole('dialog', { name: '户型模板与三量' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '户型模板与三量' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '保存模板', exact: true })).toBeVisible()
 
     await page.goto('/contract/boq')
     await page.waitForLoadState('networkidle')
@@ -91,6 +92,68 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(dialog).toBeVisible()
     await expect(dialog.getByText('分项 × 楼层计划', { exact: true })).toBeVisible()
     await expect(dialog.getByText(/1栋 · 1层/).first()).toBeVisible()
+  })
+
+  test('清单页头部保持紧凑，固定操作列不挤占页面且横滚留在表格内', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 900 })
+    await page.goto('/contract/boq')
+    await page.waitForLoadState('networkidle')
+
+    const header = page.getByTestId('boq-workspace-header')
+    await expect(header).toBeVisible()
+    expect((await header.boundingBox())?.height).toBeLessThanOrEqual(190)
+
+    const fixedActions = page.locator('.boq-lines-layout .vxe-table--fixed-right-wrapper').first()
+    await expect(fixedActions).toBeVisible()
+    expect((await fixedActions.boundingBox())?.width).toBeLessThanOrEqual(160)
+
+    const tablePanel = page.locator('.boq-lines-layout .vxe-table').first()
+    const horizontalScroller = page.locator('.boq-lines-layout .vxe-table--scroll-x-wrapper').first()
+    await expect(horizontalScroller).toBeVisible()
+    const tableBox = await tablePanel.boundingBox()
+    const scrollerBox = await horizontalScroller.boundingBox()
+    expect(scrollerBox!.x).toBeGreaterThanOrEqual(tableBox!.x)
+    expect(scrollerBox!.x + scrollerBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1)
+    await expectDocumentDoesNotOverflow(page)
+  })
+
+  test('清单列只从右缘拖拽，双击手柄恢复自适应且固定操作列不位移', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 900 })
+    await page.goto('/contract/boq')
+    await page.waitForLoadState('networkidle')
+
+    const unitTypeHeader = page.locator('.boq-lines-table .vxe-header--column')
+      .filter({ hasText: '户型' })
+      .first()
+    const handle = unitTypeHeader.locator('.vxe-cell--col-resizable')
+    await handle.scrollIntoViewIfNeeded()
+    await expect(handle).toBeVisible()
+    expect(await handle.evaluate(element => ({
+      cursor: getComputedStyle(element).cursor,
+      right: getComputedStyle(element).right,
+      width: getComputedStyle(element).width,
+    }))).toEqual({
+      cursor: 'col-resize',
+      right: '-4px',
+      width: '7px',
+    })
+
+    const actionFixed = page.locator('.boq-lines-table .vxe-table--fixed-right-wrapper')
+    const actionWidthBefore = (await actionFixed.boundingBox())!.width
+    await expect(actionFixed.locator('.vxe-cell--col-resizable')).toHaveCount(0)
+
+    const widthBefore = (await unitTypeHeader.boundingBox())!.width
+    const handleBox = (await handle.boundingBox())!
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(handleBox.x + 70, handleBox.y + handleBox.height / 2)
+    await page.mouse.up()
+    expect((await unitTypeHeader.boundingBox())!.width).toBeGreaterThan(widthBefore + 40)
+
+    await handle.dblclick()
+    expect((await unitTypeHeader.boundingBox())!.width).toBeLessThan(widthBefore + 10)
+    expect((await actionFixed.boundingBox())!.width).toBe(actionWidthBefore)
+    await expectDocumentDoesNotOverflow(page)
   })
 
   for (const viewport of [
@@ -107,6 +170,12 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
       await expect(page.getByRole('tab', { name: /合同清单/ })).toBeVisible()
       await page.getByRole('tab', { name: /变更单/ }).click()
       await expect(page.getByRole('button', { name: '新建变更单', exact: true })).toBeVisible()
+      const changeTable = page.locator('.boq-change-table')
+      const changeActionHeader = changeTable.getByRole('columnheader', { name: '操作', exact: true }).last()
+      await expect(changeActionHeader).toBeVisible()
+      expect((await changeActionHeader.boundingBox())?.width).toBeLessThanOrEqual(58)
+      await expect(changeActionHeader.locator('.vxe-cell--col-resizable')).toHaveCount(0)
+      await expect(changeTable.getByRole('button', { name: /变更单操作/ }).last()).toBeVisible()
       await page.getByRole('tab', { name: /月度报量/ }).click()
       await expect(page.getByText('自动汇总 + 手调留痕', { exact: true })).toBeVisible()
       await expectDocumentDoesNotOverflow(page)

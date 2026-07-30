@@ -10,9 +10,21 @@ const VxeTableStub = defineComponent({
       default: () => [],
     },
     loading: Boolean,
+    minHeight: Number,
+    rowConfig: Object,
+    columnConfig: Object,
+    resizableConfig: Object,
   },
   setup(props, { slots }) {
-    return () => h('div', props.loading ? slots.loading?.() : props.data.length ? slots.default?.() : slots.empty?.())
+    return () => h('div', {
+      'data-ui': 'vxe-table-stub',
+      'data-min-height': String(props.minHeight),
+      'data-row-height': String((props.rowConfig as { height?: number } | undefined)?.height),
+      'data-resizable': String((props.columnConfig as { resizable?: boolean } | undefined)?.resizable),
+      'data-drag-mode': String((props.resizableConfig as { dragMode?: string } | undefined)?.dragMode),
+      'data-drag-tip': String((props.resizableConfig as { showDragTip?: boolean } | undefined)?.showDragTip),
+      'data-double-click-auto': String((props.resizableConfig as { isDblclickAutoWidth?: boolean } | undefined)?.isDblclickAutoWidth),
+    }, props.loading ? slots.loading?.() : props.data.length ? slots.default?.() : slots.empty?.())
   },
 })
 
@@ -92,5 +104,42 @@ describe('kitTable visual states', () => {
     expect(screen.getByText('新建第一个项目后，可在这里跟踪阶段与经营数据。')).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '新增项目' }))
     expect(view.emitted().emptyAction).toHaveLength(1)
+  })
+
+  it('uses the compact 36px density and right-edge resize contract by default', () => {
+    render(KitTable, {
+      props: {
+        columns: [{ field: 'name', title: '名称' }],
+        data: [{ id: 1, name: '合和新城' }],
+        minRows: 3,
+      },
+      global,
+    })
+
+    const table = document.querySelector<HTMLElement>('[data-ui="vxe-table-stub"]')
+    expect(table?.dataset.minHeight).toBe('144')
+    expect(table?.dataset.rowHeight).toBe('36')
+    expect(table?.dataset.resizable).toBe('true')
+    expect(table?.dataset.dragMode).toBe('fixed')
+    expect(table?.dataset.dragTip).toBe('true')
+    expect(table?.dataset.doubleClickAuto).toBe('true')
+  })
+
+  it('allows a caller to disable column resizing and double-click auto fit', () => {
+    render(KitTable, {
+      props: {
+        columns: [{ field: 'name', title: '名称' }],
+        data: [{ id: 1, name: '合和新城' }],
+        resizable: false,
+        resizeConfig: {
+          isDblclickAutoWidth: false,
+        },
+      },
+      global,
+    })
+
+    const table = document.querySelector<HTMLElement>('[data-ui="vxe-table-stub"]')
+    expect(table?.dataset.resizable).toBe('false')
+    expect(table?.dataset.doubleClickAuto).toBe('false')
   })
 })

@@ -7,6 +7,7 @@ import type {
 } from '~/lib/quantity/template'
 import { useEventListener } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import { quantityMatrixReturnPath } from '~/lib/quantity/navigation'
 import {
   blankQuantityTemplateDraft,
   borrowedQuantityTemplateDraft,
@@ -19,16 +20,19 @@ const props = defineProps<{
   initialBoqLineId?: string
 }>()
 
-const open = defineModel<boolean>('open', { required: true })
 const store = useQuantityStore()
+const route = useRoute()
+const router = useRouter()
 const { confirm, error, success, undoToast, warning } = useKitUI()
 
 const selectedTemplateId = shallowRef('')
 const draft = ref<QuantityTemplateDraft | null>(null)
 const baseline = shallowRef('')
 const initializing = shallowRef(false)
+const loadingAction = shallowRef<'save' | null>(null)
 let localSequence = 0
 let initializeSequence = 0
+let allowLeave = false
 
 interface RoomUpdate { key: string, field: 'code' | 'name', value: string }
 interface NewItemUpdate { key: string, field: 'code' | 'name' | 'trade' | 'unit', value: string }
@@ -47,6 +51,27 @@ const workspace = computed(() => store.templateWorkspace?.projectId === props.pr
   : null)
 const selectedTemplate = computed(() => workspace.value?.templates.find(template => template.id === selectedTemplateId.value) ?? null)
 const dirty = computed(() => draft.value != null && JSON.stringify(draft.value) !== baseline.value)
+const shellState = computed(() => {
+  if (!props.projectId)
+    return 'error'
+  if (initializing.value)
+    return 'loading'
+  if (store.templateError && !draft.value)
+    return 'error'
+  return 'ready'
+})
+const shellDescription = computed(() => props.projectId
+  ? store.templateError
+  : '请从工程量矩阵选择项目后进入户型模板。')
+const returnTo = computed(() => {
+  if (route.query.return === 'region') {
+    return {
+      path: '/subcontract/quantity/region',
+      query: { project: props.projectId },
+    }
+  }
+  return quantityMatrixReturnPath(route.query)
+})
 const itemOptions = computed(() => [
   ...(workspace.value?.items ?? []).map(item => ({
     key: item.id,
@@ -73,11 +98,11 @@ function selectDraft(templateId: string) {
 }
 
 async function initialize(sequence: number, projectId: string) {
-  if (sequence !== initializeSequence || !open.value || props.projectId !== projectId)
+  if (sequence !== initializeSequence || props.projectId !== projectId)
     return
   try {
     await store.loadTemplates(projectId)
-    if (sequence !== initializeSequence || !open.value || props.projectId !== projectId || workspace.value?.projectId !== projectId)
+    if (sequence !== initializeSequence || props.projectId !== projectId || workspace.value?.projectId !== projectId)
       return
     const linkedLine = props.initialBoqLineId
       ? workspace.value.lines.find(line => line.boqLineId === props.initialBoqLineId)
@@ -100,11 +125,11 @@ async function initialize(sequence: number, projectId: string) {
   }
 }
 
-function requestInitialize(isOpen: boolean, projectId: string) {
+function requestInitialize(projectId: string) {
   const sequence = ++initializeSequence
   draft.value = null
   baseline.value = ''
-  if (!isOpen || !projectId) {
+  if (!projectId) {
     initializing.value = false
     return
   }
@@ -114,8 +139,8 @@ function requestInitialize(isOpen: boolean, projectId: string) {
 }
 
 watch(
-  [open, () => props.projectId, () => props.initialBoqLineId],
-  ([isOpen, projectId]) => requestInitialize(isOpen, projectId),
+  [() => props.projectId, () => props.initialBoqLineId],
+  ([projectId]) => requestInitialize(projectId),
   { immediate: true },
 )
 
@@ -134,10 +159,18 @@ async function confirmDiscard(message = '当前户型模板有未保存修改，
   })
 }
 
+function discardLocalDraft() {
+  if (!baseline.value)
+    return
+  draft.value = JSON.parse(baseline.value) as QuantityTemplateDraft
+}
+
 async function requestClose() {
   if (!await confirmDiscard())
     return
-  open.value = false
+  discardLocalDraft()
+  allowLeave = true
+  await router.push(returnTo.value)
 }
 
 async function requestTemplateChange(event: Event) {
@@ -305,6 +338,7 @@ async function save() {
     return
   }
   try {
+    loadingAction.value = 'save'
     const operationProjectId = draft.value.projectId
     let result: Awaited<ReturnType<typeof store.saveTemplate>>
     try {
@@ -323,7 +357,6 @@ async function save() {
     }
     else {
       baseline.value = JSON.stringify(draft.value)
-      open.value = false
     }
     success('户型模板已保存')
     if (store.templateError)
@@ -341,7 +374,6 @@ async function save() {
         }
         if (store.templateError) {
           warning(store.templateError)
-          open.value = false
         }
         else if (workspace.value) {
           const restored = workspace.value.templates.find(template => template.id === result.templateId)
@@ -353,6 +385,9 @@ async function save() {
   }
   catch (cause) {
     error(toErrorMessage(cause))
+  }
+  finally {
+    loadingAction.value = null
   }
 }
 
@@ -387,7 +422,6 @@ async function removeTemplate() {
     }
     else {
       draft.value = null
-      open.value = false
     }
     if (store.templateError)
       warning(store.templateError)
@@ -403,7 +437,6 @@ async function removeTemplate() {
       }
       if (store.templateError) {
         warning(store.templateError)
-        open.value = false
       }
       else if (workspace.value) {
         const restored = workspace.value.templates.find(candidate => candidate.id === template.id)
@@ -418,45 +451,63 @@ async function removeTemplate() {
 }
 
 onBeforeRouteLeave(async () => {
-  if (!open.value)
+  if (allowLeave)
     return true
-  return confirmDiscard('离开工程量页面会放弃当前未保存的户型模板草稿，确认继续？')
+  const approved = await confirmDiscard('离开工程量页面会放弃当前未保存的户型模板草稿，确认继续？')
+  if (approved)
+    discardLocalDraft()
+  return approved
 })
 
 useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
-  if (!open.value || (!dirty.value && !store.templateSaving))
+  if (!dirty.value && !store.templateSaving)
     return
   event.preventDefault()
   event.returnValue = ''
 })
+
+onActivated(() => {
+  allowLeave = false
+})
+
+useTabTitle(() => selectedTemplate.value
+  ? `编辑 · ${selectedTemplate.value.name || selectedTemplate.value.code}户型模板`
+  : '新建 · 户型模板')
 </script>
 
 <template>
-  <FormDialog
-    :open="open"
-    :busy="store.templateSaving"
+  <EntityFormShell
+    data-testid="quantity-template-form"
     title="户型模板与三量"
+    subtitle="房间、分项与三量属于同一户型模板；保存后挂靠户通过活链接同步读取。"
+    back-label="返回工程量矩阵"
     :sections="sections"
-    save-label="保存模板"
-    width="min(1180px, calc(100dvw - var(--space-6, 24px)))"
-    @save="save"
-    @cancel="requestClose"
+    :state="shellState"
+    state-title="户型模板加载失败"
+    :state-description="shellDescription"
+    state-action-label="重新加载"
+    @back="requestClose"
+    @state-action="requestInitialize(projectId)"
   >
-    <section v-if="initializing" class="flex min-h-48 items-center justify-center gap-2" role="status">
-      <span class="i-lucide-loader-circle animate-spin text-brand" aria-hidden="true" />
-      <span class="text-12px text-ink-soft">正在读取户型模板…</span>
-    </section>
+    <template #status>
+      <span v-if="selectedTemplate" class="chip-brand">活链接 {{ selectedTemplate.unitCount }} 户</span>
+      <span v-if="dirty" class="status-warn">有未保存修改</span>
+    </template>
 
-    <section v-else-if="store.templateError && !draft" class="rounded-[var(--radius-btn)] border border-danger/35 bg-danger-soft p-4" role="alert">
-      <div class="text-13px font-800 text-danger">
-        户型模板加载失败
-      </div>
-      <p class="mt-1 text-12px text-ink-soft">
-        {{ store.templateError }}
-      </p>
-    </section>
+    <template #actions>
+      <button
+        v-if="draft && selectedTemplate"
+        type="button"
+        class="btn-danger"
+        :disabled="selectedTemplate.unitCount > 0 || store.templateSaving || store.templateLoading || initializing"
+        :title="selectedTemplate.unitCount ? `仍挂靠 ${selectedTemplate.unitCount} 户，不能删除` : '删除未挂靠模板'"
+        @click="removeTemplate"
+      >
+        删除模板
+      </button>
+    </template>
 
-    <template v-else-if="draft && workspace">
+    <section v-if="draft && workspace" class="panel min-w-0 p-4">
       <fieldset :disabled="store.templateSaving || store.templateLoading || initializing" class="contents">
         <QuantityTemplateBasicSection
           v-model:code="draft.code"
@@ -491,19 +542,16 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
           @update-line="updateLine"
         />
       </fieldset>
-    </template>
+    </section>
 
-    <template #actions>
-      <button
-        v-if="draft && selectedTemplate"
-        type="button"
-        class="btn-danger mr-auto"
-        :disabled="selectedTemplate.unitCount > 0 || store.templateSaving || store.templateLoading || initializing"
-        :title="selectedTemplate.unitCount ? `仍挂靠 ${selectedTemplate.unitCount} 户，不能删除` : '删除未挂靠模板'"
-        @click="removeTemplate"
-      >
-        删除模板
-      </button>
+    <template #footer>
+      <FormFooter
+        :actions="['cancel', 'save']"
+        :labels="{ save: '保存模板' }"
+        :dirty="dirty"
+        :loading-action="loadingAction"
+        @action="(action) => action === 'save' ? save() : requestClose()"
+      />
     </template>
-  </FormDialog>
+  </EntityFormShell>
 </template>

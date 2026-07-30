@@ -1,4 +1,4 @@
-import { ALL_SCHEMA } from './schema'
+import { ALL_SCHEMA, BATCH_5_PAYROLL_ATTENDANCE } from './schema'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
 export interface MigrationDb {
@@ -3938,6 +3938,227 @@ async function migrateF3FinanceForms(db: MigrationDb): Promise<void> {
 }
 
 /**
+ * v27 内置工序库的冻结种子。迁移是历史事实，后续调整标准工序必须新增版本，
+ * 不得修改这份 v1 快照，否则旧库与新库会得到不同结果。
+ */
+const V27_DECORATION_PROCESS_TASKS = [
+  ['setting-out', '放线及新建墙体', 30, '泥水工', '#8b5cf6', '', '[]'],
+  ['plumbing', '给排水安装', 30, '水暖工', '#f59e0b', '', '[]'],
+  ['waterproof', '卫生间回填及防水', 30, '防水工', '#06b6d4', 'WP-02', '["WP-WALL","WP-FLOOR"]'],
+  ['wiring', '电线敷设', 30, '水电工', '#f59e0b', '', '[]'],
+  ['air-conditioning', '空调安装（天花机）', 18, '水电工', '#f59e0b', '', '[]'],
+  ['ceiling', '天花龙骨及封板（含楼梯）', 30, '木工', '#d97706', 'CEILING', '["DEC-CEILING"]'],
+  ['leveling', '水泥沙找平', 18, '泥水工', '#6366f1', 'LEVELING', '["DEC-LEVELING"]'],
+  ['gypsum-line', '石膏线安装', 18, '油漆工', '#10b981', 'GYPSUM-LINE', '["DEC-GYPSUM-LINE"]'],
+  ['wall-tile', '墙砖粘贴', 50, '泥水工', '#6366f1', 'MASON-WALL', '["DEC-WALL-TILE"]'],
+  ['floor-tile', '地砖铺贴', 30, '泥水工', '#4f46e5', 'MASON-FLOOR', '["DEC-FLOOR-TILE"]'],
+  ['putty-1', '天花及墙身一遍腻子', 20, '油漆工', '#10b981', 'PUTTY-01', '["DEC-PUTTY"]'],
+  ['putty-2', '天花及墙身二遍腻子', 20, '油漆工', '#10b981', 'PUTTY-02', '["DEC-PUTTY"]'],
+  ['doors', '户内门安装', 18, '木工', '#d97706', '', '[]'],
+  ['wood-floor', '木地板安装', 25, '木工', '#d97706', 'WOOD-FLOOR', '["DEC-WOOD-FLOOR"]'],
+  ['latex-paint', '天花及墙身乳胶漆', 30, '油漆工', '#059669', 'LATEX-PAINT', '["DEC-LATEX-PAINT"]'],
+  ['aluminum-ceiling', '铝扣板安装', 20, '干挂工', '#0ea5e9', 'ALUMINUM-CEILING', '["DEC-ALUMINUM-CEILING"]'],
+  ['kitchen-cabinet', '橱柜安装', 20, '木工', '#d97706', '', '[]'],
+  ['fixed-cabinet', '固装柜子安装', 25, '木工', '#d97706', '', '[]'],
+  ['finishing-paint', '收口石膏线及油漆', 10, '油漆工', '#10b981', '', '[]'],
+  ['switch-light', '开关插座及灯具安装', 20, '水电工', '#f59e0b', '', '[]'],
+  ['sanitary-hardware', '五金洁具安装', 20, '水电工', '#f59e0b', '', '[]'],
+  ['cleaning', '开荒保洁', 8, '杂工', '#9ca3af', '', '[]'],
+] as const
+
+async function migrateScheduleProcessLibraryV27(db: MigrationDb): Promise<void> {
+  await execScript(db, `
+    CREATE TABLE IF NOT EXISTS schedule_process_libraries (
+      id          TEXT PRIMARY KEY,
+      code        TEXT NOT NULL,
+      name        TEXT NOT NULL,
+      version     INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+      description TEXT NOT NULL DEFAULT '',
+      is_default  INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at  TEXT DEFAULT NULL
+    );
+    CREATE TABLE IF NOT EXISTS schedule_process_library_tasks (
+      id              TEXT PRIMARY KEY,
+      library_id      TEXT NOT NULL REFERENCES schedule_process_libraries(id),
+      task_key        TEXT NOT NULL,
+      name            TEXT NOT NULL,
+      trade           TEXT NOT NULL DEFAULT '',
+      color           TEXT NOT NULL DEFAULT '#64748b',
+      duration_days   INTEGER NOT NULL DEFAULT 1 CHECK (duration_days > 0),
+      stage_code      TEXT NOT NULL DEFAULT '',
+      item_codes_json TEXT NOT NULL DEFAULT '[]',
+      sort_order      INTEGER NOT NULL DEFAULT 0,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at      TEXT DEFAULT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_library_code_version
+      ON schedule_process_libraries(code, version)
+      WHERE deleted_at IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_default
+      ON schedule_process_libraries(is_default)
+      WHERE deleted_at IS NULL AND is_default = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_schedule_process_library_task_key
+      ON schedule_process_library_tasks(library_id, task_key)
+      WHERE deleted_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_library_tasks_library
+      ON schedule_process_library_tasks(library_id, sort_order);
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_libraries_deleted
+      ON schedule_process_libraries(deleted_at)
+      WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_schedule_process_library_tasks_deleted
+      ON schedule_process_library_tasks(deleted_at)
+      WHERE deleted_at IS NOT NULL;
+  `)
+
+  await addColumnIfMissing(
+    db,
+    'schedule_groups',
+    'scope_basis',
+    `TEXT CHECK (scope_basis IN ('contract', 'provisional'))`,
+  )
+  await addColumnIfMissing(db, 'schedule_groups', 'contract_bound_at', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_id', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_name_snapshot', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'schedule_groups', 'process_library_version_snapshot', 'INTEGER')
+  await addColumnIfMissing(db, 'schedule_tasks', 'source_library_task_id', 'TEXT')
+  await addColumnIfMissing(db, 'schedule_tasks', 'source_library_version', 'INTEGER')
+  await addColumnIfMissing(db, 'schedule_tasks', 'template_snapshot_json', `TEXT NOT NULL DEFAULT '{}'`)
+
+  await db.execute(`
+    UPDATE schedule_groups
+    SET scope_basis = CASE WHEN contract_id IS NULL THEN 'provisional' ELSE 'contract' END
+  `)
+
+  await db.execute('DROP TRIGGER IF EXISTS trg_schedule_group_scope_insert')
+  await db.execute('DROP TRIGGER IF EXISTS trg_schedule_group_scope_update')
+  await db.execute(`
+    CREATE TRIGGER trg_schedule_group_scope_insert
+    BEFORE INSERT ON schedule_groups
+    WHEN NEW.scope_basis IS NOT NULL
+      AND (
+        (NEW.scope_basis = 'contract' AND NEW.contract_id IS NULL)
+        OR (NEW.scope_basis = 'provisional' AND NEW.contract_id IS NOT NULL)
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule scope basis mismatch');
+    END
+  `)
+  await db.execute(`
+    CREATE TRIGGER trg_schedule_group_scope_update
+    BEFORE UPDATE OF scope_basis, contract_id ON schedule_groups
+    WHEN NEW.scope_basis IS NOT NULL
+      AND (
+        (NEW.scope_basis = 'contract' AND NEW.contract_id IS NULL)
+        OR (NEW.scope_basis = 'provisional' AND NEW.contract_id IS NOT NULL)
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'schedule scope basis mismatch');
+    END
+  `)
+  await execScript(db, `
+    CREATE INDEX IF NOT EXISTS idx_schedule_groups_scope_basis
+      ON schedule_groups(project_id, scope_basis);
+    CREATE INDEX IF NOT EXISTS idx_schedule_groups_process_library
+      ON schedule_groups(process_library_id);
+  `)
+
+  const libraryId = 'schedule_process_library_decoration_v1'
+  await db.execute(`
+    INSERT INTO schedule_process_libraries
+      (id, code, name, version, description, is_default, sort_order)
+    VALUES (?, 'decoration-standard-v1', '精装修标准工序', 1, '22 道精装修标准工序', 1, 10)
+    ON CONFLICT(id) DO NOTHING
+  `, [libraryId])
+  for (const [index, task] of V27_DECORATION_PROCESS_TASKS.entries()) {
+    const [key, name, durationDays, trade, color, stageCode, itemCodesJson] = task
+    await db.execute(`
+      INSERT INTO schedule_process_library_tasks
+        (id, library_id, task_key, name, trade, color, duration_days,
+         stage_code, item_codes_json, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO NOTHING
+    `, [
+      `schedule_process_library_task_${key}`,
+      libraryId,
+      key,
+      name,
+      trade,
+      color,
+      durationDays,
+      stageCode,
+      itemCodesJson,
+      (index + 1) * 10,
+    ])
+  }
+
+  await db.execute(`
+    UPDATE schedule_groups
+    SET process_library_id = ?,
+        process_library_name_snapshot = '精装修标准工序',
+        process_library_version_snapshot = 1
+    WHERE process_library_id IS NULL
+  `, [libraryId])
+}
+
+async function migratePayrollAuditV29(db: MigrationDb): Promise<void> {
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'format_family',
+    `TEXT NOT NULL DEFAULT 'A' CHECK (format_family IN ('A', 'B', 'C1', 'C2'))`,
+  )
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'period_kind',
+    `TEXT NOT NULL DEFAULT 'monthly' CHECK (period_kind IN ('monthly', 'settlement', 'retention'))`,
+  )
+  await addColumnIfMissing(
+    db,
+    'wage_statements',
+    'needs_recheck',
+    `INTEGER NOT NULL DEFAULT 0 CHECK (needs_recheck IN (0, 1))`,
+  )
+  await addColumnIfMissing(db, 'wage_statements', 'cumulative_amount', 'REAL NOT NULL DEFAULT 0')
+  await addColumnIfMissing(db, 'wage_statements', 'previously_paid', 'REAL NOT NULL DEFAULT 0')
+  await addColumnIfMissing(db, 'wage_statements', 'source_version', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'source_updated_at', 'TEXT')
+  await addColumnIfMissing(db, 'wage_statements', 'checked_source_version', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'adjustment_reason', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'operator_name', `TEXT NOT NULL DEFAULT ''`)
+  await addColumnIfMissing(db, 'wage_statements', 'submitted_at', 'TEXT')
+  await execScript(db, `
+    CREATE TABLE IF NOT EXISTS wage_statement_members (
+      id            TEXT PRIMARY KEY,
+      statement_id  TEXT NOT NULL REFERENCES wage_statements(id),
+      worker_id     TEXT NOT NULL REFERENCES workers(id),
+      is_leader     INTEGER NOT NULL DEFAULT 0 CHECK (is_leader IN (0, 1)),
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at    TEXT DEFAULT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_wage_statement_members_statement
+      ON wage_statement_members(statement_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_member
+      ON wage_statement_members(statement_id, worker_id)
+      WHERE deleted_at IS NULL;
+    DROP INDEX IF EXISTS uq_wage_statement_book_month;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_book_period
+      ON wage_statements(project_id, leader_worker_id, month, format_family, period_kind)
+      WHERE deleted_at IS NULL;
+  `)
+  await db.execute(`
+    INSERT OR IGNORE INTO wage_statement_members (id, statement_id, worker_id, is_leader)
+    SELECT 'wage_member_' || id, id, leader_worker_id, 1
+    FROM wage_statements
+    WHERE deleted_at IS NULL
+  `)
+}
+
+/**
  * 全部迁移，按 version 升序执行。新增 schema 变更 = 追加一个更高 version 的条目。
  * v1 为基线：全量建表（全部 IF NOT EXISTS），对「已有表但无版本记录」的存量库同样收敛。
  */
@@ -4384,6 +4605,285 @@ export const migrations: Migration[] = [
     name: 'f5-owner-subcontract-documents',
     async up(db) {
       await migrateF5OwnerSubcontractDocuments(db)
+    },
+  },
+  {
+    // 送货单归档即进入材料台账；打印是独立后续动作，绝不能由归档或打开打印窗口冒充成功。
+    // 存量记录无法可靠判断是否已打印，统一排除出新待打印队列，避免升级后突然出现大量历史待办。
+    version: 25,
+    name: 'delivery-archive-print-disposition',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'delivery_records',
+        'print_disposition',
+        `TEXT NOT NULL DEFAULT 'excluded'
+          CHECK (print_disposition IN ('pending', 'printed', 'excluded'))`,
+      )
+      await addColumnIfMissing(db, 'delivery_records', 'printed_at', 'TEXT')
+      await addColumnIfMissing(db, 'delivery_records', 'print_excluded_at', 'TEXT')
+      await db.execute(`
+        UPDATE delivery_records
+        SET stored = 1
+        WHERE archived = 1
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_delivery_pending_print
+        ON delivery_records(print_disposition, archived)
+        WHERE deleted_at IS NULL
+          AND archived = 1
+          AND print_disposition = 'pending';
+      `)
+    },
+  },
+  {
+    // 存量只维护单一 trade；回填为能力列表后仍保留 trade 作为主工种与旧查询兼容字段。
+    version: 26,
+    name: 'crew-worker-capabilities',
+    async up(db) {
+      for (const table of ['crews', 'workers'] as const) {
+        await addColumnIfMissing(db, table, 'trade_capabilities', `TEXT NOT NULL DEFAULT '[]'`)
+        await addColumnIfMissing(db, table, 'item_capabilities', `TEXT NOT NULL DEFAULT '[]'`)
+        const rows = await db.select<{
+          id: string
+          trade: string | null
+          trade_capabilities: string | null
+        }>(`
+          SELECT id, trade, trade_capabilities
+          FROM ${table}
+        `)
+        for (const row of rows) {
+          const primaryTrade = row.trade?.trim() ?? ''
+          let configured: unknown = []
+          try {
+            configured = JSON.parse(row.trade_capabilities || '[]')
+          }
+          catch {
+            configured = []
+          }
+          if (Array.isArray(configured) && configured.length > 0)
+            continue
+          await db.execute(`
+            UPDATE ${table}
+            SET trade_capabilities = ?
+            WHERE id = ?
+          `, [JSON.stringify(primaryTrade ? [primaryTrade] : []), row.id])
+        }
+      }
+    },
+  },
+  {
+    version: 27,
+    name: 'schedule-provisional-scope-process-library',
+    async up(db) {
+      await migrateScheduleProcessLibraryV27(db)
+    },
+  },
+  {
+    version: 28,
+    name: 'payroll-attendance-workbenches',
+    async up(db) {
+      await execScript(db, BATCH_5_PAYROLL_ATTENDANCE)
+    },
+  },
+  {
+    version: 29,
+    name: 'payroll-audit-period-members',
+    async up(db) {
+      await migratePayrollAuditV29(db)
+    },
+  },
+  {
+    version: 30,
+    name: 'signed-daywork-payroll-source',
+    async up(db) {
+      await execScript(db, `
+        CREATE TABLE IF NOT EXISTS payroll_subject_configs (
+          id               TEXT PRIMARY KEY,
+          project_id       TEXT NOT NULL REFERENCES projects(id),
+          crew_id          TEXT REFERENCES crews(id),
+          leader_worker_id TEXT NOT NULL REFERENCES workers(id),
+          format_family    TEXT NOT NULL DEFAULT 'C2'
+                           CHECK (format_family = 'C2'),
+          unit_rate        REAL NOT NULL CHECK (unit_rate > 0),
+          rule_text        TEXT NOT NULL DEFAULT '',
+          enabled          INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+          created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at       TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at       TEXT DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS signed_daywork_records (
+          id             TEXT PRIMARY KEY,
+          project_id     TEXT NOT NULL REFERENCES projects(id),
+          crew_id        TEXT REFERENCES crews(id),
+          worker_id      TEXT NOT NULL REFERENCES workers(id),
+          work_date      TEXT NOT NULL,
+          work_content   TEXT NOT NULL DEFAULT '',
+          start_time     TEXT NOT NULL DEFAULT '',
+          end_time       TEXT NOT NULL DEFAULT '',
+          labor_units    REAL NOT NULL CHECK (labor_units IN (0.5, 1)),
+          witness        TEXT NOT NULL DEFAULT '',
+          confirmed_on   TEXT,
+          status         TEXT NOT NULL DEFAULT 'draft'
+                         CHECK (status IN ('draft', 'confirmed')),
+          note           TEXT NOT NULL DEFAULT '',
+          created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at     TEXT DEFAULT NULL
+        );
+        CREATE TABLE IF NOT EXISTS wage_statement_daywork_records (
+          id                TEXT PRIMARY KEY,
+          statement_id      TEXT NOT NULL REFERENCES wage_statements(id),
+          daywork_record_id TEXT NOT NULL REFERENCES signed_daywork_records(id),
+          created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at        TEXT DEFAULT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_project_date
+          ON signed_daywork_records(project_id, work_date);
+        CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_project
+          ON payroll_subject_configs(project_id, format_family);
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_worker_date
+          ON signed_daywork_records(worker_id, work_date);
+        CREATE INDEX IF NOT EXISTS idx_wage_daywork_statement
+          ON wage_statement_daywork_records(statement_id);
+        CREATE INDEX IF NOT EXISTS idx_signed_daywork_records_deleted
+          ON signed_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_payroll_subject_configs_deleted
+          ON payroll_subject_configs(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_daywork_records_deleted
+          ON wage_statement_daywork_records(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_signed_daywork_slot
+          ON signed_daywork_records(project_id, worker_id, work_date, start_time, end_time)
+          WHERE deleted_at IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_payroll_subject_config
+          ON payroll_subject_configs(project_id, leader_worker_id, format_family)
+          WHERE deleted_at IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_daywork_record
+          ON wage_statement_daywork_records(daywork_record_id)
+          WHERE deleted_at IS NULL;
+      `)
+      await addColumnIfMissing(
+        db,
+        'wage_statements',
+        'subject_config_id',
+        'TEXT REFERENCES payroll_subject_configs(id)',
+      )
+    },
+  },
+  {
+    version: 31,
+    name: 'wage-statement-member-allocations',
+    async up(db) {
+      await execScript(db, `
+        CREATE TABLE IF NOT EXISTS wage_statement_allocations (
+          id                   TEXT PRIMARY KEY,
+          statement_id         TEXT NOT NULL REFERENCES wage_statements(id),
+          worker_id            TEXT NOT NULL REFERENCES workers(id),
+          allocated_amount_fen INTEGER NOT NULL DEFAULT 0 CHECK (allocated_amount_fen >= 0),
+          created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at           TEXT DEFAULT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_statement
+          ON wage_statement_allocations(statement_id);
+        CREATE INDEX IF NOT EXISTS idx_wage_statement_allocations_deleted
+          ON wage_statement_allocations(deleted_at) WHERE deleted_at IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_wage_statement_allocation_worker
+          ON wage_statement_allocations(statement_id, worker_id)
+          WHERE deleted_at IS NULL;
+      `)
+    },
+  },
+  {
+    version: 32,
+    name: 'delivery-print-batches',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'delivery_records',
+        'print_batch_id',
+        `TEXT NOT NULL DEFAULT ''`,
+      )
+      await db.execute(`
+        UPDATE delivery_records
+        SET print_batch_id = id
+        WHERE trim(print_batch_id) = ''
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_delivery_pending_print_batch
+        ON delivery_records(print_batch_id, print_disposition)
+        WHERE deleted_at IS NULL
+          AND archived = 1
+          AND print_disposition = 'pending'
+      `)
+    },
+  },
+  {
+    version: 33,
+    name: 'ocr-recognition-settings',
+    async up(db) {
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS ocr_settings (
+          id            TEXT PRIMARY KEY CHECK (id = 'default'),
+          settings_json TEXT NOT NULL,
+          updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `)
+    },
+  },
+  {
+    version: 34,
+    name: 'schedule-process-library-predecessors',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'schedule_process_library_tasks',
+        'predecessor_task_key',
+        `TEXT DEFAULT NULL`,
+      )
+      await db.execute(`
+        UPDATE schedule_process_library_tasks AS current
+        SET predecessor_task_key = (
+          SELECT previous.task_key
+          FROM schedule_process_library_tasks AS previous
+          WHERE previous.library_id = current.library_id
+            AND previous.deleted_at IS NULL
+            AND (
+              previous.sort_order < current.sort_order
+              OR (
+                previous.sort_order = current.sort_order
+                AND previous.id < current.id
+              )
+            )
+          ORDER BY previous.sort_order DESC, previous.id DESC
+          LIMIT 1
+        )
+        WHERE current.deleted_at IS NULL
+          AND current.predecessor_task_key IS NULL
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_schedule_process_library_predecessor
+        ON schedule_process_library_tasks(library_id, predecessor_task_key)
+        WHERE deleted_at IS NULL
+      `)
+    },
+  },
+  {
+    version: 35,
+    name: 'schedule-process-library-predecessor-disabled-repair',
+    async up(db) {
+      await addColumnIfMissing(
+        db,
+        'schedule_process_library_tasks',
+        'predecessor_disabled',
+        `INTEGER NOT NULL DEFAULT 0 CHECK (predecessor_disabled IN (0, 1))`,
+      )
+      await db.execute(`
+        UPDATE schedule_process_library_tasks
+        SET predecessor_disabled = 0
+        WHERE predecessor_disabled IS NULL
+           OR predecessor_disabled NOT IN (0, 1)
+      `)
     },
   },
 ]

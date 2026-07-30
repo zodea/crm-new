@@ -17,19 +17,27 @@ const emit = defineEmits<{
   }]
   remove: []
   drill: []
+  editDependency: []
 }>()
 const open = defineModel<boolean>('open', { required: true })
 
 const plannedStart = shallowRef('')
 const plannedFinish = shallowRef('')
 const manualPercent = shallowRef(0)
-const predecessorId = shallowRef('')
-const lagDays = shallowRef(0)
 const floorPlans = ref<{ id: string, plannedStart: string, plannedFinish: string }[]>([])
-const predecessorOptions = computed(() => props.predecessorTasks.map(task => ({
-  key: task.id,
-  label: task.name,
-})))
+const predecessor = computed(() =>
+  props.predecessorTasks.find(task => task.id === props.dependency?.predId) ?? null,
+)
+const dependencySummary = computed(() => {
+  if (!props.dependency)
+    return '尚未设置前置工序'
+  const predecessorName = predecessor.value?.name ?? '当前前置工序'
+  if (!props.dependency.lagDays)
+    return `${predecessorName}完成后，${props.task?.name ?? '当前工序'}即可开始`
+  if (props.dependency.lagDays > 0)
+    return `${predecessorName}完成后等待 ${props.dependency.lagDays} 天，${props.task?.name ?? '当前工序'}开始`
+  return `${props.task?.name ?? '当前工序'}可在${predecessorName}完成前 ${Math.abs(props.dependency.lagDays)} 天搭接`
+})
 
 watch([open, () => props.task], ([isOpen, task]) => {
   if (!isOpen || !task)
@@ -37,8 +45,6 @@ watch([open, () => props.task], ([isOpen, task]) => {
   plannedStart.value = task.plannedStart
   plannedFinish.value = task.plannedFinish
   manualPercent.value = Math.round((task.manualProgress ?? task.actualProgress) * 100)
-  predecessorId.value = props.dependency?.predId ?? props.predecessorTasks.at(-1)?.id ?? ''
-  lagDays.value = props.dependency?.lagDays ?? 0
   floorPlans.value = task.floorPlans.map(plan => ({
     id: plan.id,
     plannedStart: plan.plannedStart,
@@ -55,9 +61,7 @@ function save() {
       plannedFinish: plannedFinish.value,
       ...(!props.task.hasQty ? { manualProgress: manualPercent.value / 100 } : {}),
     },
-    dependency: predecessorId.value
-      ? { predecessorId: predecessorId.value, lagDays: lagDays.value }
-      : null,
+    dependency: null,
     floorPlans: floorPlans.value.filter((plan) => {
       const current = props.task?.floorPlans.find(candidate => candidate.id === plan.id)
       return current
@@ -98,24 +102,25 @@ function save() {
         </label>
       </div>
 
-      <section v-if="predecessorTasks.length" class="rounded-lg border border-line p-3">
-        <div class="mb-2 text-12px font-800 text-ink">
-          FS 前后置关系
-        </div>
-        <div class="grid grid-cols-[minmax(0,1fr)_112px] gap-3">
-          <div>
-            <span class="field-label block">前置工序</span>
-            <SelectFilter
-              v-model="predecessorId"
-              aria-label="前置工序"
-              :options="predecessorOptions"
-              :min-width="260"
-            />
+      <section class="rounded-lg border border-line p-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-12px font-800 text-ink">
+              前后置依赖
+            </div>
+            <p class="mt-0.5 truncate text-11px text-ink-faint" :title="dependencySummary">
+              {{ dependencySummary }}
+            </p>
           </div>
-          <label>
-            <span class="field-label block">Lag（天）</span>
-            <input v-model.number="lagDays" type="number" min="-365" max="365" class="field-input w-full">
-          </label>
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="busy || (!dependency && !predecessorTasks.length)"
+            :title="!dependency && !predecessorTasks.length ? '当前没有同组且计划日期更早的工序' : undefined"
+            @click="emit('editDependency')"
+          >
+            {{ dependency ? '修改依赖' : '设置依赖' }}
+          </Button>
         </div>
       </section>
 

@@ -88,7 +88,7 @@ projects ─1:N→ boq_change_orders（变更单四档：草稿→已上报→�
               └─已签证─自动生成→ owner_change_orders 台账行（1:1 ledgerId 追溯，ADR-0002）
 projects ─1:N→ monthly_statements ─1:N→ monthly_statement_lines（月度报量：自动汇总草稿+手调）
 invoices = 识别+台账单表（ADR-0001，废弃 ticket_registrations）→ 归属：projects 或 个人开支
-delivery_records ─1:N→ delivery_lines（「入库」写材料明细；单价对比=聚合查询视图，无独立表）
+delivery_records ─1:N→ delivery_lines（送货单归档即写入材料台账；单价对比=聚合查询视图，无独立表）
 projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑人工确认、同写法后续自动，CONTEXT.md「工地」）
 ```
 
@@ -367,7 +367,7 @@ CREATE TABLE payment_application_invoice_allocations (
 | OwnerMaterialUse | `owner_material_uses` | `id` | `material-management.md`（甲供材领用） |
 | OwnerMaterialDirect | `owner_material_directs` | `id` | `material-management.md`（甲供材直入直出） |
 | DeliveryRecord | `delivery_records` | `id` | `material-delivery.md`（送货单头：处理区/归档库双区字段） |
-| DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（明细行：入库=材料数据，供单价对比/分供方详情读取） |
+| DeliveryLine | `delivery_lines` | `id` | `material-delivery.md`（归档明细即材料数据，供单价对比/分供方详情读取） |
 | ProjectAlias | `project_aliases` | `id` | CONTEXT.md「工地」（工地名写法变体 → 项目归一，2026-07-06 grill 定） |
 
 > ~~PriceComparison `price_comparisons`~~ **已移除**：单价对比是对 `delivery_lines` 的聚合查询视图（同材料跨分供方/跨时间比价），无独立存储；未来若需收藏对比方案再议。
@@ -381,8 +381,12 @@ CREATE TABLE delivery_records (
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
-  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；核对完成不自动置位
-  stored    INTEGER DEFAULT 0,       -- 已入库（写材料数据，与归档并行的两条路）
+  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；送货单 archived=1 即已入库/可供单价分析
+  stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
+  printBatchId TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
+  printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
+  printedAt TEXT,                    -- 仅真实打印完成后的用户回执写入；打开打印窗口不得写
+  printExcludedAt TEXT,              -- 明确排除打印范围的时间；排除不写 printedAt
   reviewFlag TEXT,                   -- 问题标记（缺公司/缺日期/缺单号/0明细行/待复核）
   note TEXT, createdAt TEXT, updatedAt TEXT, deleted_at TEXT
 );
@@ -398,6 +402,10 @@ CREATE TABLE delivery_lines (
 
 > `delivery_lines.amount` 是人工复核后的独立金额，不是数据库生成列。默认可由 `qty × unitPrice` 补出；`amountSource='calculated'` 时数量/单价继续联动，`ocr` / `manual` 时冻结票面或人工金额。迁移 v9 将无法可靠反推来源的存量行标为 `manual`，避免升级后覆盖既有值。`qty × unitPrice = amount` 仅作为界面勾稽规则，不作为写入时强制重算规则。
 
+> 迁移 v25 将所有存量 `archived=1` 记录的 `stored` 兼容镜像回填为 1，并把存量打印处置初始化为 `excluded`：历史数据无法可靠反推是否打印，升级时不得伪造 `printedAt`，也不得突然形成大批待打印任务。此后新归档由 store 显式写 `printDisposition='pending'`；只有“打印成功回执”写 `printed`，手动排除只写 `excluded`。
+>
+> 迁移 v32 增加 `printBatchId`：存量按记录 ID 一单一批回填，新上传的同一原件拆成多张送货单时共享批次 ID。打印/排除只能把整批从 `pending` 原子推进到 `printed` / `excluded`；任一记录已终结时整批拒绝并回滚，禁止旧页面把两个终态互相覆盖。
+
 项目详情的到货视图只查询 `delivery_records.archived=1` 且头/项目/分供方祖先未软删的记录，并聚合未软删 `delivery_lines`。原件正文继续归属 `file_refs(owner_type='delivery_record', owner_id=delivery_records.id, category='source')`；`delivery_records.file_name` 仅作兼容显示，不建立详情附件副本。
 
 CREATE TABLE project_aliases (
@@ -409,6 +417,8 @@ CREATE TABLE project_aliases (
 ```
 
 > `project_aliases` 已由迁移 v8 落地：人工选定项目并完成核对时记忆 `rawSiteText`，同一归一化写法后续自动预选；若该写法已属于其他项目则拒绝静默改绑。
+
+`ocr_settings` 是不参与通用软删除和操作日志的本机基础设施表（迁移 v33）。固定单例 `id='default'`，`settings_json` 只保存 PaddleOCR-VL 已接线的非敏感识别能力、请求/轮询超时和暂未接线的只读人工校对阈值；Access Token、API 地址和模型名禁止进入该表。
 
 ### 2.6 分包及人工类
 
@@ -431,11 +441,16 @@ CREATE TABLE project_aliases (
 | UnitAssignmentScope | `unit_assignment_scopes` | `id` | 个人指派可选模板房间 × 分项下钻范围；户身份由所属指派提供 |
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
-| WageStatement | `wage_statements` | `id` | ⚠️ 口径已随 [#117](https://github.com/zodea/crm-new/issues/117) 进度款域重构更新（2026-07-20）：单据主体=**负责人请款簿**（请款主体×月），三态生命周期（草稿/已核对/已发放固化实际金额）、单据级比例、格式族 A/B/C1/C2、全项目递增请款序号；「本期支付总额权重分摊」待 #117 未决⑥。**字段细化随工资域批次 PRD**，以 #117 定稿为权威 |
-| WageStatementLine | `wage_statement_lines` | `id` | 同上（工人行快照：应发/实发可直改/开户行/卡号） |
-| AttendanceRecord | `attendance_records` | `id` | 考勤（工人×日期×工时，**待细化**） |
+| PayrollSubjectConfig | `payroll_subject_configs` | `id` | C2 请款主体×项目配置；保存负责人、班组、默认大工单价和可编辑签工确认规则，活跃自然键为项目×负责人×格式族 |
+| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；`format_family=A/B/C1/C2`（当前开放 A/C1/C2，B 待真实合同清单），`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
+| WageStatementMember | `wage_statement_members` | `id` | 请款簿成员归属；同一请款簿包含一名负责人和零至多名成员，负责人同时记入成员表 |
+| WageStatementAllocation | `wage_statement_allocations` | `id` | 已发工资单的组内实际收款分配；按整数分保存，成员集合必须与请款簿成员完全一致，零金额保留且分配合计必须严格等于实际发放金额 |
+| WageStatementLine | `wage_statement_lines` | `id` | 月度分项快照：工人、分项、单位、工程量、工资单价、金额；核对时按现场量/考勤替换，发放后只读 |
+| AttendanceRecord | `attendance_records` | `id` | 工人×日期唯一；正常工时、加班工时、施工内容，重复录入覆盖同一工作日；日期必须真实存在，正常+加班总工时不得超过 24 小时，C2 签工成员不得录考勤 |
+| SignedDayworkRecord | `signed_daywork_records` | `id` | C2 逐日签工事实；项目、班组、人员、日期、施工内容、起止时间、整工/半工、证明人与确认日期；只有 `confirmed` 记录计薪；同人同日时段不重叠且合计不超过 1 工 |
+| WageStatementDayworkRecord | `wage_statement_daywork_records` | `id` | C2 工资单与本次核对签工记录的显式关联；每条有效签工只能归属一张有效工资单，发放时完整记录与主体费率/规则另入 `snapshot_json` |
 
-> ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资三表（禁用旧名）。工资单是**快照**（生成时计算应发 + 人工改实发），不是纯计算视图——反馈轮 8 定稿「实发逐人可直改」。
+> ~~PayrollRecord `payroll_records`~~ **已细化拆分**为上述工资与考勤表（禁用旧名）。工资单不是纯计算视图：草稿可活算，核对强制刷新现场复核量，发放时冻结量、价、比例、明细及实际发放金额。合同量禁止进入应付取数。
 
 以下是 #103 的目标物理模型；列名统一为 snake_case。模板房间直接落 `rooms`，但它属于户型模板而非某一户；某户的房间实例由 `(unit_id, room_id)` 组合指认，不建立逐户房间副本。
 
@@ -634,6 +649,8 @@ END;
 | Floor | `floors` | `id` | `subcontract-quantity.md`（楼层） |
 | Unit | `units` | `id` | `subcontract-quantity.md`（户） |
 | Room | `rooms` | `id` | `subcontract-quantity.md`（户型模板内的稳定范围节点：普通房间或整户范围；不按户物化） |
+| ScheduleProcessLibrary | `schedule_process_libraries` | `id` | `schedule-progress.md`（可复用标准工序库版本） |
+| ScheduleProcessLibraryTask | `schedule_process_library_tasks` | `id` | `schedule-progress.md`（标准库工序定义） |
 | ScheduleGroup | `schedule_groups` | `id` | `schedule-progress.md`（楼栋分组） |
 | ScheduleGroupBuilding | `schedule_group_buildings` | `id` | `schedule-progress.md`（分组×楼栋） |
 | ScheduleTask | `schedule_tasks` | `id` | `schedule-progress.md`（工序/WBS） |
@@ -641,7 +658,10 @@ END;
 | TaskItemMap | `task_item_map` | `id` | `schedule-progress.md`（工序↔分项） |
 | ScheduleTaskFloorPlan | `schedule_task_floor_plans` | `id` | `schedule-progress.md`（分项×楼层自动计划及个别微调） |
 
-> `schedule_groups.contract_id` 是 v15 落地的合同域外键，指向且只指向一份 `contracts(kind='施工')`；`project_id` 必须与合同所属项目一致。分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供；只有清单行的显式楼栋字段才可证明合同覆盖，户型只在已确认楼栋内部筛选适用楼层，空白通用行或同名户型不得反推合同楼栋。禁止跨合同混组。`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
+> [ADR 0017](../adr/0017-provisional-schedule-before-contract.md) 将楼栋分组范围依据扩为 `scope_basis IN ('contract','provisional')`。`scope_basis='contract'` 时 `schedule_groups.contract_id` 必填，且只能指向一份同项目的 `contracts(kind='施工')`；分组候选楼栋、户型和套数由该合同下已确认的 `boq_files` / `boq_lines` 拆表结果提供，只有清单行的显式楼栋字段才可证明合同覆盖。`scope_basis='provisional'` 时 `contract_id` 必须为 NULL，候选楼栋来自项目手工区域树，量值来自户型模板的手工分项与暂估量。两种依据不能在同一分组混用，合同分组禁止跨合同混组；`construction_contracts` 仅作旧 IA 兼容，不得再保存新的 BOQ/进度引用。
+>
+> 目标约束为 `CHECK ((scope_basis='contract' AND contract_id IS NOT NULL) OR (scope_basis='provisional' AND contract_id IS NULL))`，并增加 `contract_bound_at TEXT NULL`。v27 为兼容历史 seed/测试夹具，暂容许旧写路径省略 `scope_basis`；新建组 action 必须显式写入，读取旧空值时只按 `contract_id` 回退判定。内部暂估绑定合同必须走领域 action：校验同项目施工合同、显式楼栋覆盖、分项映射和数量差异；分组内任一楼栋缺合同覆盖证据时整个事务失败。成功时只更新范围依据与合同引用并记录审计日志，不重建分组、任务、依赖、基线或完成事实，也不覆盖户型模板中的暂估量。既有 `contract_id IS NOT NULL` 分组迁移为 `scope_basis='contract'`；无法证明合同来源的旧分组迁移为 `provisional` 并持续提示待绑定。
+> 标准工序库按 [ADR 0018](../adr/0018-versioned-schedule-process-library.md) 保存全局不可变版本。基于旧版只能沿用相同 `code` 新建下一版本；`schedule_process_library_tasks.predecessor_task_key` 保存前置身份，`predecessor_disabled=1` 表示因顺序冲突已置灰但未删除。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码、分项码及前置状态均以创建时快照为准。禁用关系仍创建 `task_dependencies` 后按 `schedule:conflict-reschedule` 软删除，之后全局库变化不会追溯改写既有项目 WBS。迁移历史冻结为：v34 只增加并回填 `predecessor_task_key`，v35 再通过 `addColumnIfMissing` 增加 `predecessor_disabled` 并把空值或非法值回填为 `0`，以覆盖已经登记 v34 的存量数据库。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
 > `schedule_task_floor_plans` 由排程域拥有，唯一范围为 `task_id + floor_id + boq_line_id`；初建时从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。BOQ 只提供稳定 `boq_line_id`，不保存第二份计划。
@@ -1161,7 +1181,7 @@ penalty_settlement_deductions(
 | `monthly_statements` | `project_id` / `contract_id` | `projects.id` / `contracts.id` | N:1 | 月度报量单 |
 | `monthly_statement_lines` | `statement_id` / `boq_line_id` | `monthly_statements.id` / `boq_lines.id` | N:1 | 报量行 |
 | `house_type_template_items` | `boq_line_id` | `boq_lines.id` | N:1 | 户型分项从已确认 BOQ 行带出工程量；NULL 表示人工兜底 |
-| `schedule_groups` | `contract_id` | `contracts.id` | N:1 | 楼栋分组只属于一份施工合同 |
+| `schedule_groups` | `contract_id` | `contracts.id` | N:1 | 条件外键；合同清单模式必填，内部暂估模式为空 |
 | `task_item_map` | `boq_line_id` | `boq_lines.id` | N:1 | 计划分解只引用 BOQ，不复制合同量/合同价 |
 | `contracts` | `project_id` / `customer_id` / `supplier_id` | `projects.id` / `customers.id` / `suppliers.id` | N:1 | canonical 项目合同仓；施工侧引用客户，支出侧引用分供方 |
 | `contract_supplements` | `contract_id` | `contracts.id` | N:1 | canonical 合同补充协议（施工/支出侧共用） |
@@ -1216,9 +1236,14 @@ penalty_settlement_deductions(
 | `unit_assignments` | `unit_id` / `crew_id` / `worker_id` | `units.id` / `crews.id` / `workers.id` | N:1 | 户 × 工种责任，不存完成；班组/个人二选一 |
 | `unit_assignment_scopes` | `assignment_id` / `room_id` / `item_id` | `unit_assignments.id` / `rooms.id` / `items.id` | N:1 | 个人指派模板房间 × 分项下钻；户由 assignment 唯一确定 |
 | `unit_stage_completions` | `unit_id` / `stage_id` / `assignment_id` | `units.id` / `construction_stages.id` / `unit_assignments.id` | N:1 | 户 × 工序阶段完成事实；assignment 只作完成时责任审计引用 |
-| `wage_statements` | `projectId` / `crewId` | `projects.id` / `crews.id` | N:1 | 月度进度款单 |
-| `wage_statement_lines` | `statementId` / `workerId` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
-| `attendance_records` | `projectId` / `workerId` | `projects.id` / `workers.id` | N:1 | 考勤（待细化） |
+| `payroll_subject_configs` | `project_id` / `crew_id` / `leader_worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 请款主体×项目费率与规则配置 |
+| `wage_statements` | `project_id` / `crew_id` / `subject_config_id` | `projects.id` / `crews.id` / `payroll_subject_configs.id` | N:1 | 负责人请款簿头；项目、负责人、月份、格式族、档位为活跃自然键 |
+| `wage_statement_members` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 请款簿负责人及成员归属 |
+| `wage_statement_allocations` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 发放时组内实际收款分配；数据库保存整数分，显示名、负责人标识和金额同时进入发放快照 |
+| `wage_statement_lines` | `statement_id` / `worker_id` | `wage_statements.id` / `workers.id` | N:1 | 工人工资行（快照） |
+| `attendance_records` | `project_id` / `worker_id` | `projects.id` / `workers.id` | N:1 | C1 日工/加班来源；工人×日期唯一 |
+| `signed_daywork_records` | `project_id` / `crew_id` / `worker_id` | `projects.id` / `crews.id` / `workers.id` | N:1 | C2 逐日签工来源；整工 1 / 半工 0.5 |
+| `wage_statement_daywork_records` | `statement_id` / `daywork_record_id` | `wage_statements.id` / `signed_daywork_records.id` | N:1 | C2 核对来源关联；活跃 `daywork_record_id` 全局唯一，禁止重复计薪 |
 | `delivery_records` | `projectId` / `supplierId` | `projects.id` / `suppliers.id` | N:1 | 送货单（supplierId 可空=未区分分供方兜底） |
 | `delivery_lines` | `deliveryRecordId` | `delivery_records.id` | N:1 | 送货单明细行 |
 | `project_aliases` | `projectId` | `projects.id` | N:1 | 工地名别名 → 项目归一（CONTEXT.md「工地」） |
@@ -1323,8 +1348,9 @@ interface FilePayload {
 | `floors` | `building_id` | `buildings.id` | N:1 | 楼层 → 楼栋 |
 | `units` | `floor_id` | `floors.id` | N:1 | 户 → 楼层 |
 | `units` | `house_type_template_id` | `house_type_templates.id` | N:1 | 户 → 户型模板；房间通过模板活链接派生 |
+| `schedule_process_library_tasks` | `library_id` | `schedule_process_libraries.id` | N:1 | 标准工序定义 → 不可变标准工序库版本；前置 key 与 disabled 状态随版本保存 |
 | `schedule_groups` | `projectId` | `projects.id` | N:1 | 楼栋分组 → 项目 |
-| `schedule_groups` | `contract_id` | `contracts.id`（`kind='施工'`） | N:1 | 楼栋分组 → 唯一施工合同；必填、项目必须一致、禁止跨合同混组；`construction_contracts` 仅作旧 IA 兼容 |
+| `schedule_groups` | `contract_id` | `contracts.id`（`kind='施工'`） | N:1 | 条件外键；`scope_basis='contract'` 时必填且项目必须一致，`provisional` 时必须为空；合同分组禁止跨合同混组 |
 | `schedule_group_buildings` | `groupId` | `schedule_groups.id` | N:1 | 分组×楼栋 |
 | `schedule_group_buildings` | `buildingId` | `buildings.id` | N:1 | 一分组含多栋 |
 | `schedule_tasks` | `projectId` | `projects.id` | N:1 | 工序 → 项目 |
@@ -1360,7 +1386,7 @@ interface FilePayload {
 | 变更后合同额 | 主合同 + 增补 + 变洽签 |
 | 项目收款 | `SELECT SUM(amount) FROM receipt_registrations WHERE project_id = ? AND status NOT IN ('draft','草稿')` |
 | 确认支付 | `SELECT SUM(amount) FROM payment_records WHERE project_id = ? AND confirmation_status = 'confirmed'`；是否分摊到付款申请另由 §4.2.1 的勾稽差额表达 |
-| 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='issued'`（界面“已发放”） |
+| 工人工资支付 | `SUM(wage_statements.actual_amount)`，仅 `status='released'`（界面“已发放”） |
 | 动态成本 | 五类已确认 `expenditure_settlements.totalAmount` + 已发放工资 + 已确认费用报销（§10.4） |
 | 往来收款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'receipt' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
 | 往来付款 | `SELECT SUM(amount) FROM current_transactions WHERE project_id = ? AND direction = 'payment' AND status NOT IN ('draft','草稿') AND deleted_at IS NULL` |
@@ -1460,11 +1486,12 @@ interface FilePayload {
 第 1 批（无外键依赖）
   customers, suppliers, bank_codes, crews
   company_expense_contracts, stock_checks, import_batches
+  schedule_process_libraries
 
 第 2 批（只依赖第 1 批）
   projects
   supplier_credentials, supplier_credential_requirements
-  stock_check_lines
+  stock_check_lines, schedule_process_library_tasks
 
 第 3 批（依赖第 2 批）
   workers, project_suppliers, phase_tasks
@@ -1931,7 +1958,7 @@ unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
 
 ```text
 工资动态成本 = Σ wage_statements.actual_amount
-WHERE status = 'issued'
+WHERE status = 'released'
 
 工资资金流出 = 同一集合
 ```

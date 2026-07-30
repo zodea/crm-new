@@ -1,9 +1,11 @@
-# PRD · 送货单识别（识别中心）：上传→整理树→分区→识别→校对→入库/归档
+# PRD · 送货单识别：上传→整理树→分区→识别→校对→归档→打印处置
 
 > 状态：草稿（2026-07-05 自主生成，待用户检查）
 > 关联：移植分析 `docs/research/invoice-recognition-app-port-plan.md`、UX 基准 `docs/research/ocr-ux-benchmark.md`、OCR 策略 `docs/research/ocr-recognition-strategy.md`(待补)、`docs/adr/0006-*`(待写)
 > 蓝本：`docs/rewrite/pages/material-delivery.md`；术语：`CONTEXT.md`（入库/归档/识别中心/分供方/个人开支）
 > 源实现：`zodea/invoice-recognition-app`（送货单能力已跑通，本 PRD 是"优化后移植进 新app"）
+>
+> **2026-07-29 用户决策覆盖旧“入库/归档并行”方案**：送货单归档即视为已入库并可供单价分析，不再另设入库动作。打印是归档后的独立处置：新归档默认待打印；只有真实打印后的明确回执写 `printed`，手动排除只写 `excluded`。下文若仍有历史迁移语境中的“入库”一词，均不代表新增第二个业务按钮。
 
 ---
 
@@ -18,7 +20,7 @@
 
 ## Problem Statement
 
-作为工程财务/乙供材管理员，我现在没有一个能把纸质**送货单**从扫描件走到"材料数据**入库**供单价对比 + **归档**留存"的真实闭环：
+作为工程财务/乙供材管理员，我需要把纸质**送货单**从扫描件走到“归档即形成材料数据供单价对比”，并在打印成功或明确排除前保留原件待办：
 
 - 移植第一波（#47）把送货单列为 Out of Scope、排在倒数第二波；新app 里 `app/stores/delivery.ts` 是**纯 mock**、**无数据库表**、**无识别逻辑**，`material/delivery.vue` 只有 UI 骨架。
 - 我手上其实已有一套跑通的送货单识别实现（`invoice-recognition-app`：整理树/分区/云VL识别/明细行结构化/识别明细库入库/单价对比），但它停在旧技术栈、且"更新太多版后界面变差"。
@@ -28,11 +30,11 @@
 
 在 新app 识别中心新增**送货单识别**单页工作台（与发票识别分开、独立页面），把 `invoice-recognition-app` 的送货单六阶段能力移植进来并对齐 新app 架构：
 
-1. **六阶段闭环**：上传→整理树（文件夹层级推断 工地→公司 归属）→分区→识别（统一识别接口，桩/真引擎见 ADR-0006）→人工校对（左图右表明细行）→输出**两条并行路径**——**入库**（写 `delivery_records` 供单价对比）与**归档/导出**（导出整理包）。
+1. **六阶段闭环**：上传→整理树（文件夹层级推断 工地→公司 归属）→分区→识别（统一识别接口，桩/真引擎见 ADR-0006）→人工校对（左图右表明细行）→**归档即入库**（写 `delivery_records` / `delivery_lines` 供单价对比）→打印处置（待打印 / 已打印 / 已排除）。
 2. **核心逻辑直接移植**：`delivery-parse`（明细行抽取）、`vl-parse`（一个 PDF 拆多单）、`delivery-tree`（整理树）、`recognized-store`（入库差异合并）、`price-compare`（单价对比）都是纯函数，lift 进 `app/lib/recognize/`，落 SQLite。
 3. **数据落 SQLite**：新建 `delivery_records` 表（自然键=工地+公司+单号，唯一索引），单价对比读同一张表，闭环。分供方走 新app `suppliers` 共享主数据（跨项目共享，不重名两套档案）。
 4. **UX 对齐业界优秀产品**（见 UX 基准）：常驻六阶段步骤指示器、点明细行↔高亮原图边界框、明细行类 Excel 逐格编辑 + Magic Grid 原图拖线兜底、逐行置信色阶、业务勾稽（数量×单价=金额不平标红）、公司来源三层优先级徽章。
-5. **对齐 CONTEXT.md 术语**：入库≠归档（两条并行路径）；送货单必须归项目；识别是动作、台账/归档库是资产。
+5. **对齐 CONTEXT.md 术语**：送货单归档即入库；送货单必须归项目；识别是动作、台账/归档库是资产；打印成功必须有显式回执。
 
 ## User Stories
 
@@ -70,14 +72,14 @@
 23. 作为乙供材管理员，我想手动覆盖公司名/日期/单号/增删明细行/移动分区，这样人工始终能纠正机器。
 24. 作为乙供材管理员，我想识别失败/无法读取/公司冲突/部分识别集中到一个问题汇总弹窗，这样批量收口异常。
 
-### 阶段六 · 输出（两条并行路径）
-25. 作为乙供材管理员，我想把校对定稿的送货单**入库**到识别明细库（自然键=工地+公司+单号），供分供方详情/单价对比读取，这样材料数据沉淀成资产。
-26. 作为乙供材管理员，我想入库时对已存在的同键记录做差异合并（全新静默入库、完全相同跳过、有冲突勾选才覆盖否则保留旧值），这样反复入库不乱。
-27. 作为乙供材管理员，我想缺公司名或缺单号的单被扣下（heldBack）单列等补、不入库，这样自然键完整性有保障。
-28. 作为乙供材管理员，我想**归档/导出**整理包（每分区一个子文件夹、同公司可合并 PDF、生成"送货单整理汇总.xlsx"），这样纸质留存有序。
-29. 作为乙供材管理员，我想入库与归档是**两条并行路径**、可只做一个也可都做，这样两种用途互不绑架（对齐 CONTEXT.md「入库」≠「归档」）。
+### 阶段六 · 归档与打印处置
+25. 作为乙供材管理员，我想把校对定稿的送货单归档到材料台账（自然键=项目+分供方+单号），归档明细立即供分供方详情/单价对比读取。
+26. 作为乙供材管理员，我想归档时对已存在的同键记录做差异合并（全新写入、完全相同跳过、有冲突人工确认），避免重复归档扰乱材料数据。
+27. 作为乙供材管理员，我想缺项目或缺关键自然键的单被扣下单列等补、不归档，保证材料台账完整性。
+28. 作为乙供材管理员，我想新归档原件默认保留在待打印范围，打印机实际输出成功后再确认回执并移出队列。
+29. 作为乙供材管理员，我想可以明确把某原件排除打印；排除只记 `excluded`，不能显示为已打印。
 
-### 单价对比（入库下游闭环）
+### 单价对比（归档下游闭环）
 30. 作为乙供材管理员，我想单价对比页读 `delivery_records`（+ 可选历史 Excel），把规格归一化后精确归组，行=材料列=供应商展示最近价/区间/最低价，这样跨供应商比价一目了然。
 31. 作为乙供材管理员，我想运费/搬运/管理费等非材料项默认从比价里剔除（可学习留痕），这样比价只比材料。
 32. 作为乙供材管理员，我想对归组过粗/过细的材料手动并组，这样比价分组贴合我的真实口径。
@@ -95,7 +97,7 @@
 
 - **独立页面**：送货单识别与发票识别**分开**（不共用工作台，只共用底层原语：上传区/统一识别接口/左图右X 布局/置信度着色/BoundingBoxOverlay/明细网格）。路由沿用 `/material/delivery`，~~侧边栏归入**识别中心**菜单组~~（⛔ 识别中心组已退役 2026-07-09：送货单识别归**乙供材管理**组，现行导航结构以设计稿 NAV 锁定版为准——ADR 0013 / CONTEXT.md「识别中心」词条）。
 - **纯逻辑层移植**（`app/lib/recognize/`，lift-as-is/with-adapt，JS→TS + 单测同搬）：`delivery-parse.ts`(源 parse.js)、`vl-parse.ts`、`delivery-tree.ts`、`supplier-match.ts`(源 supplier-db.js 的匹配/归一化纯函数)、`recognized-store.ts`(classifyUpsert/recordsEqual/docToRecord)、`price-compare.ts`。详见移植方案 §2/§8。
-- **新表 `delivery_records`**：`site TEXT + company TEXT + order_no TEXT`（三者唯一索引），`date`、`note`、`items JSON`（或子表 `delivery_record_items`）；`classifyUpsert` 的 inserted/identical/conflicts 改成 SQL upsert；缺公司/单号 → heldBack 不入库。**这是「入库」落点**，导出归档是另一条路。
+- **表 `delivery_records`**：归档头与打印处置；`delivery_lines` 保存材料明细。归档动作同时形成单据资产和材料台账资格；`print_disposition` 只表达打印后续，不参与单价分析资格判断。
 - **分区/整理树落 delivery store**：`app/stores/delivery.ts` 从 mock 换真数据，补 staging(整理树)/partition(分区)/requestOcr/降级 actions；`matchSupplier` 数据源改查 `suppliers` 表（含 alias，若无则补一列或 JSON）。
 - **统一识别接口**：`app/lib/recognize/engine.ts` 封装引擎，对上暴露 `recognize(docType, pages) → { markdownPages, layoutRegions?, engine }`。引擎已定为 **PaddleOCR-VL-1.6 单模型（本地自托管为主，MLX-VLM/llama.cpp）**（ADR-0006）：一个模型出 OCR+表格+手写+版面 Markdown，送货单明细行由 `vl-parse.js` 在 Markdown 上抽取；本地走 localhost 无 CORS，云端 aistudio 仅开发期脱敏用。
 - **OCR 设置页 + 拦截门**：`app/stores/ocr-settings.ts`（token 留 localStorage 不进库/不进代码/不进 git）+ 蓝本形态设置页 + KitUI confirm 拦截门（记住 ack）。
@@ -116,7 +118,7 @@
   - `price-compare`：规格归一化归组、每供应商最近价、lowest、运费剔除、obs 去重正确。
   - **先例**：源项目 `scripts/selftest.mjs` / `test-invoices.mjs` 的离线回归可直接移植为 vitest 用例。
 - **数据层接缝（SQLite）**：`delivery_records` 的 upsert（自然键唯一、冲突保留旧值/勾选覆盖）、单价对比读回同表；走 `connection.ts` 的 execute/select + sql.js 内存库测。
-- **Playwright E2E（等 UI 就位）**：送货单主干旅程——上传文件夹→整理树归属→分区→识别（桩/真）→校对（改明细行+双向高亮）→入库（差异合并）→单价对比读回；只覆盖主干不逐像素。
+- **Playwright E2E（等 UI 就位）**：送货单主干旅程——上传文件夹→整理树归属→分区→识别（桩/真）→校对→归档并由单价对比读回→待打印→打印回执或排除；只覆盖主干不逐像素。
 - **视觉验收**：与蓝本 + UX 基准逐屏人工对照。
 
 ## Out of Scope

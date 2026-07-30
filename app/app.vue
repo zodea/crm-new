@@ -92,5 +92,6 @@ function pageKey(r: { fullPath: string }) {
 <style scoped>
 .shell-workspace {
   padding: clamp(var(--space-3, 12px), 2vw, var(--space-5, 20px)) clamp(var(--space-3, 12px), 2vw, var(--space-6, 24px)) clamp(var(--space-5, 20px), 3vw, 36px);
+  scrollbar-gutter: stable;
 }
 </style>

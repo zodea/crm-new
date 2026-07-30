@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-07-28
+> 核对日期：2026-07-29
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -33,23 +33,16 @@ Nuxt 路由级实现结果：
 
 | 状态 | 数量 | 占比 |
 | --- | ---: | ---: |
-| 已有对应界面 | 90 | 90.9% |
-| **未实现** | **9** | **9.1%** |
+| 已有对应界面 | 97 | 98.0% |
+| **未实现** | **2** | **2.0%** |
 
 设计稿中存在一个不可达的通用 `detail` 残留，没有任何导航或动作进入，本次不计入 99 个可达界面；历史实现状态也不再混进当前分母。
 
-## 3. 未实现的 9 个界面
+## 3. 未实现的 2 个界面
 
 | 设计界面 | Nuxt 现状 | 判定 | 实施票 |
 | --- | --- | --- | --- |
 | 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
-| OCR 设置 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#204](https://github.com/zodea/crm-new/issues/204) |
-| 工资核算 / 工资进度款 | `/subcontract/payroll` 仍为明确的待实现占位，设计稿对应工资工具未落地 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| 考勤工作台 | `/subcontract/attendance` 仍为明确的待实现占位 | 未实现 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| 班组详情 | `/base/crew/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
-| 工人详情 | `/base/worker/[id]` 为待实现占位 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
-| 目标成本详情 | 只有列表/编辑能力，没有设计稿树形详情的对应路由 | 未实现 | [#191](https://github.com/zodea/crm-new/issues/191) |
-| 客户详情 | 只有列表/编辑能力，没有名下项目、合同、收款反向聚合详情 | 未实现 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 请款簿详情 | 设计稿有可达二级界面，Nuxt 无对应路由 | 未实现 | [#197](https://github.com/zodea/crm-new/issues/197) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
@@ -60,17 +53,18 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 施工进度 / 目标成本 | 列表、排程和编辑基础已存在 | [#191](https://github.com/zodea/crm-new/issues/191) |
+| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、独立标准工序库列表与整页版本表单、三步建组、模板甘特/精确表格同源编辑、前置轻量弹窗和冲突软禁用、项目区域配置，以及目标成本版本详情与正式成本对比已实现；暂估分组可在独立页面复核差异后绑定同项目施工合同 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md)、[ADR 0018](../adr/0018-versioned-schedule-process-library.md) |
 | 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
-| 客户 / 班组 / 工人 | 主数据列表与表单已存在，部分详情仍缺失 | [#194](https://github.com/zodea/crm-new/issues/194) |
+| 客户 / 班组 / 工人 | 列表、整页表单和详情均已存在；详情只按真实外键聚合项目、合同/收款、工程量、工资、考勤、签工和扣罚，具体参考同屏差异仍待验收 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
-| 工程量 / 工资 / 考勤 | 工程量矩阵和责任配置已存在，工资与考勤仍有占位 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| 工程量 / 工资 / 考勤 | 无合同项目区域、工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |
 | 收入 / 支出 / 发票 | 票款列表、表单、识别和台账基础已存在 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204) |
 | 导入 / 导出工具 | 配置页和映射工作台已存在 | [#205](https://github.com/zodea/crm-new/issues/205) |
 | 全站视觉与交互 | 已使用共享原语并完成部分响应式；#112 已关闭 | [#181](https://github.com/zodea/crm-new/issues/181)、[#206](https://github.com/zodea/crm-new/issues/206) |
-| 材料价格分析 | 页面基础已存在，参考路径与归属待确认 | [#207](https://github.com/zodea/crm-new/issues/207) |
+| 材料价格分析 | 已接真实归档送货单价格、材料搜索选择、趋势/厂家比较、来源追溯、材采合同历史，以及已核实的广州 BV 2.5 mm² 2026 年 2–6 月官方信息价趋势/偏差；其他官方材料仍须逐项核实编码规格单位 | [#207](https://github.com/zodea/crm-new/issues/207) |
+| OCR 设置 | `/settings/ocr` 已完成紧凑纵向工作台：脱敏运行状态、单据接入矩阵、7 项 PaddleOCR-VL 文档能力、有界请求/轮询超时、本机 SQLite 保存及发票/送货单请求接线；传统 PP-OCRv6 参数、服务端密钥和未接线阈值不做假配置 | [#204](https://github.com/zodea/crm-new/issues/204)、[ADR 0006](../adr/0006-ocr-paddleocr-vl-single-model.md) |
 
 应用外壳已在 #188 完成导航精确过滤、路由页签显式翻屏、通知 Sheet 四档响应式、键盘/Esc/焦点返回/滚动锁和脱敏视觉基线；后续全站票只处理各业务页面，不再重复改写外壳状态机。首页已在 #189 完成严格只读参考核对、真实项目切换、单一施工进度甘特、切换失败回退、加载/空/部分数据/错误状态和四档视觉回归，因此不再列入“已搭但未闭环”；后续施工进度领域能力仍由 #191 继续完善。项目详情已在 [#173–#180](https://github.com/zodea/crm-new/issues/180) 完成只读子表、阶段文件、成本/合同/资金/物资/验收关系、正式事实口径、来源穿透及四档响应式验收，因此不再列入“已搭但未闭环”。这些结论不改变路由总数，只改变闭环状态。
 

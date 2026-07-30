@@ -19,7 +19,10 @@ export interface KitTableColumn {
   type?: KitColumnType
   width?: number
   minWidth?: number
+  maxWidth?: number
   fixed?: 'left' | 'right'
+  /** 固定操作列等结构列可关闭拖拽，避免 vxe 把固定右列的手柄翻到左边。 */
+  resizable?: boolean
   align?: 'left' | 'center' | 'right'
   /**
    * 列头筛选:true → 从当前数据行推导选项(适合非分页小表);
@@ -57,12 +60,14 @@ export function normalizeKitColumn(col: KitTableColumn): NormalizedKitColumn {
     else if (type === 'date')
       out.width = 110
     else if (type === 'action')
-      out.width = 130
+      out.width = 112
     else
       out.minWidth = 120
   }
-  if (type === 'action')
+  if (type === 'action') {
     out.fixed = col.fixed ?? 'right'
+    out.resizable = col.resizable ?? false
+  }
   return out
 }
 

@@ -51,6 +51,7 @@ export interface OpenResult {
  * 打开/复用页签：
  * - 已存在 → 激活并刷新 fullPath，**保留已有 title**——动态标题（setTitle 回填的记录名/后缀）
  *   不被调用方的静态路由标题打回（#98：KeepAlive 切回、预占页签两种时序都靠这条兜底）；
+ *   但历史空标题/「未命名」属于路由注册缺失，不是动态标题，复用时用当前稳定标题修复；
  * - 不存在且未超限 → 新增并激活；
  * - 不存在且已达上限（不含首页）→ 阻断（state 原样返回，blocked=true）。
  */
@@ -59,7 +60,13 @@ export function openTab(state: TabsState, input: { fullPath: string, title: stri
   const existing = state.tabs.find(t => t.key === key)
   if (existing) {
     const tabs = state.tabs.map(t =>
-      t.key === key ? { ...t, fullPath: input.fullPath } : t,
+      t.key === key
+        ? {
+            ...t,
+            title: t.title && t.title !== '未命名' ? t.title : input.title,
+            fullPath: input.fullPath,
+          }
+        : t,
     )
     return { state: { tabs, activeKey: key }, blocked: false }
   }

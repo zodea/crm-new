@@ -32,6 +32,17 @@ async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
+async function chooseLookup(
+  page: import('@playwright/test').Page,
+  label: string,
+  keyword: string,
+  optionText: string,
+) {
+  const input = page.getByLabel(label)
+  await input.fill(keyword)
+  await page.getByRole('option').filter({ hasText: optionText }).first().click()
+}
+
 async function expectWorkbenchMode(
   page: import('@playwright/test').Page,
   compact: boolean,
@@ -160,13 +171,15 @@ test.describe('Issue #112 R2：高风险业务工作区', () => {
     await page.goto('/material/delivery/archive')
     await page.waitForLoadState('networkidle')
 
-    await page.getByRole('button', { name: '新增送货单', exact: true }).click()
-    const form = page.getByRole('dialog', { name: '新增送货单' })
-    await form.locator('select').nth(0).selectOption('proj_demo_001')
-    await form.locator('input[placeholder="例如 SH-2026-0715-001"]').fill('SH-R2-390')
-    await form.locator('input[placeholder="材料名称"]').fill('R2 响应式材料')
-    await form.getByRole('button', { name: '保存送货单', exact: true }).click()
-    await expect(page.getByText('送货单已新增', { exact: true })).toBeVisible()
+    await page.getByRole('link', { name: '新增送货单', exact: true }).click()
+    await expect(page).toHaveURL('/material/delivery/archive/form')
+    await expect(page.getByRole('heading', { name: '新建 · 送货单归档' })).toBeVisible()
+    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await page.getByLabel('送货单号').fill('SH-R2-390')
+    await page.getByLabel('材料名称').fill('R2 响应式材料')
+    await page.getByRole('button', { name: '保存送货单', exact: true }).click()
+    await expect(page.getByText('送货单归档已新增', { exact: true })).toBeVisible()
+    await page.goto('/material/delivery/archive')
 
     const scopeTrigger = page.getByRole('button', { name: '选择归档范围' })
     await scopeTrigger.press('Enter')

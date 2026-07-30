@@ -14,6 +14,14 @@ describe('project cost control read model', () => {
     `)
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('supplier-cost', '成本分供方')`)
     await db.execute(`
+      INSERT INTO crews (id, name, trade)
+      VALUES ('crew-cost', '成本班组', '泥水工')
+    `)
+    await db.execute(`
+      INSERT INTO workers (id, crew_id, name, trade, current_project_id)
+      VALUES ('worker-cost', 'crew-cost', '成本工人', '泥水工', 'project-cost')
+    `)
+    await db.execute(`
       INSERT INTO target_costs (
         id, project_id, name, is_baseline, tax_inclusive_total, status
       )
@@ -135,6 +143,21 @@ describe('project cost control read model', () => {
         ('reimbursement-line-confirmed', 'reimbursement-confirmed', '差旅', 40),
         ('reimbursement-line-draft', 'reimbursement-draft', '草稿费用', 900)
     `)
+    await db.execute(`
+      INSERT INTO wage_statements (
+        id, project_id, crew_id, leader_worker_id, month,
+        format_family, quantity_source, status, pay_ratio, actual_amount
+      )
+      VALUES
+        (
+          'wage-released', 'project-cost', 'crew-cost', 'worker-cost', '2026-07',
+          'A', 'field', 'released', 1, 70
+        ),
+        (
+          'wage-draft', 'project-cost', 'crew-cost', 'worker-cost', '2026-08',
+          'A', 'field', 'draft', 1, 900
+        )
+    `)
 
     const result = await loadProjectCostControl(db)
     const baseline = result.versions.find(row => row.id === 'target-baseline')
@@ -142,9 +165,10 @@ describe('project cost control read model', () => {
       status: '当前基线',
       targetAmount: 2600,
       signedAmount: 360,
-      settledAmount: 120,
-      paidAmount: 60,
-      remainingAmount: 2480,
+      settledAmount: 190,
+      paidAmount: 130,
+      remainingAmount: 2410,
+      sourcePath: '/project/target-cost/target-baseline',
     })
     expect(result.versions.find(row => row.id === 'target-draft')?.status).toBe('草稿（不入控制）')
 
@@ -177,11 +201,17 @@ describe('project cost control read model', () => {
     expect(rows.find(row => row.category === '材料')).toMatchObject({
       targetAmount: 600,
       signedAmount: 200,
+      targetPath: '/project/target-cost/target-baseline',
     })
     expect(rows.find(row => row.category === '工人工资')).toMatchObject({
       targetAmount: 300,
       signedAmount: 0,
-      settledAmount: 0,
+      settledAmount: 70,
+      paidAmount: 70,
+      remainingAmount: 230,
+      paymentCount: 1,
+      settlementPath: '/subcontract/payroll',
+      paymentPath: '/subcontract/payroll',
     })
     expect(rows.find(row => row.category === '费用报销')).toMatchObject({
       targetAmount: 200,

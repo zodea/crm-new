@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import type { DeliveryOcrStatus } from '~/stores/delivery'
-
 defineProps<{
-  stats: Record<DeliveryOcrStatus | 'total', number>
+  stats: {
+    total: number
+    pending: number
+    processing: number
+    done: number
+    failed: number
+    awaitingPrint: number
+  }
   pendingCount: number
 }>()
 
@@ -20,7 +25,7 @@ const emit = defineEmits<{
           送货单识别工作台
         </div>
         <div class="mt-0.5 text-11px text-ink-faint">
-          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 人工核对后自动归档
+          PaddleOCR-VL 1.6 · 自动裁边扶正 · 表格提取 · 归档即入库 · 打印单独回执
         </div>
       </div>
       <button type="button" class="btn-secondary" :disabled="!pendingCount" @click="emit('recognizeAll')">
@@ -39,14 +44,14 @@ const emit = defineEmits<{
       <span class="i-lucide-folder-up text-20px text-brand" />
       <span>
         <b class="block text-12px text-ink">拖拽或点击上传 PDF / 图片</b>
-        <span class="text-10px text-ink-faint">支持 PDF、PNG、JPG、JPEG；文件仅在当前识别会话保留</span>
+        <span class="text-10px text-ink-faint">支持 PDF、PNG、JPG、JPEG；归档后待打印原件会跨刷新保留</span>
       </span>
     </button>
 
     <div class="delivery-workbench-stats grid gap-3">
       <StatCard label="队列文件" :value="stats.total" icon="i-lucide-files" color="brand" />
       <StatCard label="待识别" :value="stats.pending + stats.processing" icon="i-lucide-clock" color="warn" />
-      <StatCard label="待核对" :value="stats.done" icon="i-lucide-file-check" color="ok" />
+      <StatCard label="待核对 / 打印" :value="stats.done + stats.awaitingPrint" icon="i-lucide-file-check" color="ok" />
       <StatCard label="识别失败" :value="stats.failed" icon="i-lucide-circle-x" color="danger" />
     </div>
   </div>

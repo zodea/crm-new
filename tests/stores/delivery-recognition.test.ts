@@ -208,6 +208,9 @@ describe('delivery store 真实识别与归档管线', () => {
       order_no: 'SH-2026-001',
       ocr_status: 'reviewed',
       archived: 1,
+      stored: 1,
+      print_disposition: 'pending',
+      printed_at: null,
       file_name: '待归档.pdf',
     })
     expect(lines).toHaveLength(1)
@@ -232,6 +235,125 @@ describe('delivery store 真实识别与归档管线', () => {
       mimeType: 'application/pdf',
     })
     expect(coldSource?.bytes).toEqual(sourceBytes)
+    expect(store.byId(fileId!)).toMatchObject({
+      docs: [],
+      archivedRecordIds: [recordId],
+      printDisposition: 'pending',
+    })
+
+    await store.excludeFileFromPrint(fileId!)
+    const [excluded] = await mem.select<Record<string, unknown>>(
+      'SELECT print_disposition, printed_at FROM delivery_records WHERE id = ?',
+      [recordId],
+    )
+    expect(excluded).toEqual({
+      print_disposition: 'excluded',
+      printed_at: null,
+    })
     expect(store.byId(fileId!)).toBeUndefined()
+  })
+
+  it('只有明确打印成功回执才把归档文件移出待打印队列', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [fileId] = store.uploadFiles([new File(['print'], '待打印回执.pdf', { type: 'application/pdf' })])
+    await store.recognizeFile(fileId!)
+    const doc = store.byId(fileId!)?.docs[0]
+
+    const recordId = await store.archiveDocument(fileId!, doc!.id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: doc!.orderNo,
+      deliveryDate: doc!.deliveryDate,
+      siteText: doc!.siteText,
+      docType: doc!.docType,
+      note: doc!.note,
+      items: doc!.items,
+    })
+    expect(store.pendingPrintFiles.map(file => file.id)).toEqual([fileId])
+
+    const [beforeReceipt] = await mem.select<Record<string, unknown>>(
+      'SELECT print_disposition, printed_at FROM delivery_records WHERE id = ?',
+      [recordId],
+    )
+    expect(beforeReceipt).toEqual({
+      print_disposition: 'pending',
+      printed_at: null,
+    })
+
+    await store.confirmFilePrintReceipt(fileId!)
+    const [afterReceipt] = await mem.select<Record<string, unknown>>(
+      'SELECT print_disposition, printed_at FROM delivery_records WHERE id = ?',
+      [recordId],
+    )
+    expect(afterReceipt?.print_disposition).toBe('printed')
+    expect(afterReceipt?.printed_at).toBeTruthy()
+    expect(store.byId(fileId!)).toBeUndefined()
+  })
+
+  it('刷新后从归档记录恢复待打印队列，并按需读取原件', async () => {
+    const recordStore = useDeliveryRecordStore()
+    const sourceBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46])
+    const recordId = await recordStore.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-PRINT-RESTORE',
+      deliveryDate: '2026-07-19',
+      note: '',
+      lines: [{ materialName: '跨刷新材料', spec: '', unit: '件', qty: 1, unitPrice: 20, note: '' }],
+    }, new File([sourceBytes], '跨刷新待打印.pdf', { type: 'application/pdf' }))
+
+    setActivePinia(createPinia())
+    const restoredStore = useDeliveryStore()
+    await restoredStore.loadPendingPrintQueue()
+
+    expect(restoredStore.pendingPrintFiles).toEqual([
+      expect.objectContaining({
+        id: `print:${recordId}`,
+        name: '跨刷新待打印.pdf',
+        printBatchId: recordId,
+        archivedRecordIds: [recordId],
+        printDisposition: 'pending',
+      }),
+    ])
+    const source = await restoredStore.loadFileForPrint(`print:${recordId}`)
+    expect(source.name).toBe('跨刷新待打印.pdf')
+    expect(new Uint8Array(await source.arrayBuffer())).toEqual(sourceBytes)
+  })
+
+  it('同一上传文件拆成多张送货单时，刷新后仍恢复为一个打印任务', async () => {
+    const recordStore = useDeliveryRecordStore()
+    const source = new File(['shared-source'], '一份文件两张单.pdf', { type: 'application/pdf' })
+    const firstId = await recordStore.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-BATCH-001',
+      deliveryDate: '2026-07-19',
+      printBatchId: 'shared-print-batch',
+      note: '',
+      lines: [{ materialName: '第一张材料', spec: '', unit: '件', qty: 1, unitPrice: 20, note: '' }],
+    }, source)
+    const secondId = await recordStore.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'SH-BATCH-002',
+      deliveryDate: '2026-07-19',
+      printBatchId: 'shared-print-batch',
+      note: '',
+      lines: [{ materialName: '第二张材料', spec: '', unit: '件', qty: 2, unitPrice: 30, note: '' }],
+    }, source)
+
+    setActivePinia(createPinia())
+    const restoredStore = useDeliveryStore()
+    await restoredStore.loadPendingPrintQueue()
+
+    expect(restoredStore.pendingPrintFiles).toHaveLength(1)
+    expect(restoredStore.pendingPrintFiles[0]).toMatchObject({
+      id: 'print:shared-print-batch',
+      printBatchId: 'shared-print-batch',
+      printDisposition: 'pending',
+    })
+    expect(restoredStore.pendingPrintFiles[0]?.archivedRecordIds)
+      .toEqual(expect.arrayContaining([firstId, secondId]))
   })
 })

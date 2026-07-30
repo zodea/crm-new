@@ -57,7 +57,7 @@ const columns: KitTableColumn[] = [
   { field: 'totalAmount', title: '变更金额', type: 'money', width: 128 },
   { field: 'approvedAt', title: '签证日期', type: 'date', width: 110 },
   { field: 'attachmentCount', title: '附件', width: 72, align: 'center' },
-  { type: 'action', title: '操作', width: 292 },
+  { type: 'action', title: '操作', width: 56 },
 ]
 
 const lineOptionByLabel = computed(() => new Map(props.workspace.lines.map(line => [
@@ -70,6 +70,44 @@ const statusClass: Record<string, string> = {
   submitted: 'chip-brand',
   rejected: 'chip-danger',
   approved: 'chip-ok',
+}
+
+type ChangeRowActionKey = 'attach' | 'submit' | 'reject' | 'approve' | 'revise' | 'remove'
+
+interface ChangeRowAction {
+  key: ChangeRowActionKey
+  label: string
+  icon: string
+  tone?: 'danger'
+}
+
+function rowActions(order: BoqChangeOrderView): ChangeRowAction[] {
+  const actions: ChangeRowAction[] = []
+  if (order.status === 'draft' || order.status === 'rejected') {
+    actions.push({
+      key: 'submit',
+      label: order.status === 'rejected' ? '重新上报' : '上报',
+      icon: 'i-lucide-send',
+    })
+  }
+  if (order.status === 'submitted') {
+    actions.push(
+      { key: 'approve', label: '签证', icon: 'i-lucide-badge-check' },
+      { key: 'reject', label: '退回', icon: 'i-lucide-undo-2' },
+    )
+  }
+  if (order.status === 'approved') {
+    actions.push({
+      key: 'revise',
+      label: '更正',
+      icon: 'i-lucide-square-pen',
+    })
+  }
+  actions.push(
+    { key: 'attach', label: '登记附件', icon: 'i-lucide-paperclip' },
+    { key: 'remove', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' },
+  )
+  return actions
 }
 
 async function createChange() {
@@ -215,6 +253,33 @@ async function reviseApproved(order: BoqChangeOrderView) {
   })
 }
 
+async function handleRowAction(action: string, order: BoqChangeOrderView) {
+  switch (action as ChangeRowActionKey) {
+    case 'attach':
+      chooseAttachment(order.id)
+      break
+    case 'submit':
+      emit('transition', {
+        orderId: order.id,
+        target: 'submitted',
+        note: order.status === 'rejected' ? '补充资料后重新上报' : '已提交甲方',
+      })
+      break
+    case 'reject':
+      await reject(order)
+      break
+    case 'approve':
+      await approve(order)
+      break
+    case 'revise':
+      await reviseApproved(order)
+      break
+    case 'remove':
+      emit('remove', order)
+      break
+  }
+}
+
 function chooseAttachment(orderId: string) {
   attachmentOrderId.value = orderId
   openFileDialog()
@@ -282,6 +347,7 @@ onChange(async (files) => {
     </div>
 
     <KitTable
+      class="boq-change-table"
       :columns="columns"
       :data="[...workspace.changes]"
       :loading="busy"
@@ -295,31 +361,11 @@ onChange(async (files) => {
         <span :class="statusClass[row.status]">{{ BOQ_CHANGE_STATUS_LABEL[row.status] }}</span>
       </template>
       <template #action="{ row }">
-        <div class="flex items-center justify-end gap-1">
-          <button type="button" class="btn-ghost px-2 py-1 text-11px" @click="chooseAttachment(row.id)">
-            附件
-          </button>
-          <button
-            v-if="row.status === 'draft' || row.status === 'rejected'"
-            type="button"
-            class="btn-primary px-2 py-1 text-11px"
-            @click="emit('transition', { orderId: row.id, target: 'submitted', note: row.status === 'rejected' ? '补充资料后重新上报' : '已提交甲方' })"
-          >
-            上报
-          </button>
-          <button v-if="row.status === 'submitted'" type="button" class="btn-ghost px-2 py-1 text-11px" @click="reject(row)">
-            退回
-          </button>
-          <button v-if="row.status === 'submitted'" type="button" class="btn-primary px-2 py-1 text-11px" @click="approve(row)">
-            签证
-          </button>
-          <button v-if="row.status === 'approved'" type="button" class="btn-ghost px-2 py-1 text-11px" @click="reviseApproved(row)">
-            更正
-          </button>
-          <button type="button" class="btn-danger px-2 py-1 text-11px" @click="emit('remove', row)">
-            删除
-          </button>
-        </div>
+        <RowActionMenu
+          :items="rowActions(row)"
+          :label="`${row.code}变更单操作`"
+          @select="handleRowAction($event, row)"
+        />
       </template>
     </KitTable>
 

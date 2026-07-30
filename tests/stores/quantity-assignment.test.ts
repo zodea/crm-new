@@ -3,7 +3,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { softDelete } from '~/lib/db/soft-delete'
-import { quantityAssignmentFingerprint } from '~/lib/quantity/assignment'
+import {
+  quantityAssigneeIsCandidate,
+  quantityAssigneeRequiresDetailedScope,
+  quantityAssignmentFingerprint,
+} from '~/lib/quantity/assignment'
 import { useQuantityStore } from '~/stores/quantity'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -136,6 +140,60 @@ describe('quantity store：户×工种责任配置唯一写路径', () => {
     expect(store.assignmentWorkspace?.assignments).toEqual([
       expect.objectContaining({ id: 'a-old', unitId: 'u1', assigneeId: 'crew-old', scopes: [] }),
     ])
+  })
+
+  it('候选按多工种与活项能力过滤，存量单一 trade 仍兼容', async () => {
+    await mem.execute(`
+      INSERT INTO crews (
+        id, name, trade, trade_capabilities, item_capabilities
+      ) VALUES
+        ('crew-cross', '跨工种班组', '木工', '["木工","泥水工"]', '[]'),
+        ('crew-partial', '仅墙砖班组', '泥水工', '["泥水工"]', '["墙砖"]')
+    `)
+    await mem.execute(`
+      INSERT INTO workers (
+        id, name, trade, trade_capabilities, item_capabilities
+      ) VALUES (
+        'worker-partial', '墙砖师傅', '油漆工', '["油漆工","泥水工"]', '["墙砖"]'
+      )
+    `)
+    const store = useQuantityStore()
+    await store.loadAssignments('p1')
+    const source = store.assignmentWorkspace!
+    const mudItems = source.scopeOptions
+      .filter(option => option.trade === '泥水工')
+      .map(option => option.itemName)
+    const byId = new Map(source.assignees.map(assignee => [assignee.id, assignee]))
+
+    expect(quantityAssigneeIsCandidate(byId.get('crew-old')!, '泥水工', mudItems)).toBe(true)
+    expect(quantityAssigneeIsCandidate(byId.get('crew-cross')!, '泥水工', mudItems)).toBe(true)
+    expect(quantityAssigneeIsCandidate(byId.get('crew-partial')!, '泥水工', mudItems)).toBe(false)
+    expect(quantityAssigneeIsCandidate(byId.get('worker-partial')!, '泥水工', mudItems)).toBe(true)
+    expect(quantityAssigneeRequiresDetailedScope(
+      byId.get('worker-partial')!,
+      '泥水工',
+      mudItems,
+    )).toBe(true)
+  })
+
+  it('保存前再次拒绝不兼容责任人以及部分活项人员的整工种责任', async () => {
+    await mem.execute(`
+      INSERT INTO workers (
+        id, name, trade, trade_capabilities, item_capabilities
+      ) VALUES (
+        'worker-partial', '墙砖师傅', '泥水工', '["泥水工"]', '["墙砖"]'
+      )
+    `)
+    const store = useQuantityStore()
+
+    await expect(store.saveAssignments(assignmentDraft({
+      assigneeKind: 'worker',
+      assigneeId: 'worker-water',
+    }))).rejects.toThrow('能力与当前工种或活项不兼容')
+    await expect(store.saveAssignments(assignmentDraft({
+      assigneeKind: 'worker',
+      assigneeId: 'worker-partial',
+    }))).rejects.toThrow('必须指定房间分项范围')
   })
 
   it('批量指派逐户落日志，且不写任何阶段完成字段', async () => {

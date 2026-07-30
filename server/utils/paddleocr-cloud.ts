@@ -1,3 +1,5 @@
+import { OCR_RUNTIME_BOOLEAN_DEFAULTS } from './ocr-runtime-options'
+
 export const PADDLE_OCR_DEFAULT_BASE_URL = 'https://paddleocr.aistudio-app.com'
 export const PADDLE_OCR_MODEL = 'PaddleOCR-VL-1.6'
 
@@ -60,6 +62,8 @@ export interface PaddleOcrCloudInput {
   contentType: string
   data: Uint8Array
   pageRanges?: string
+  options?: PaddleOcrCloudDocumentOptions
+  /** @deprecated 请改用 options.useDocOrientationClassify。 */
   useDocOrientationClassify?: boolean
   onProgress?: (percent: number) => void
 }
@@ -94,14 +98,18 @@ interface JobStatus {
   errorMsg?: string
 }
 
-const OFFICIAL_OPTIONS = {
-  useDocOrientationClassify: true,
-  useDocUnwarping: true,
-  useLayoutDetection: true,
-  useChartRecognition: false,
-  useSealRecognition: true,
-  useOcrForImageBlock: true,
-  formatBlockContent: true,
+export interface PaddleOcrCloudDocumentOptions {
+  useDocOrientationClassify?: boolean
+  useDocUnwarping?: boolean
+  useLayoutDetection?: boolean
+  useChartRecognition?: boolean
+  useSealRecognition?: boolean
+  useOcrForImageBlock?: boolean
+  formatBlockContent?: boolean
+}
+
+export const PADDLE_OCR_DEFAULT_DOCUMENT_OPTIONS = {
+  ...OCR_RUNTIME_BOOLEAN_DEFAULTS,
   restructurePages: false,
   returnMarkdownImages: false,
   visualize: false,
@@ -294,9 +302,11 @@ export class PaddleOcrCloudClient {
     const form = new FormData()
     form.append('model', PADDLE_OCR_MODEL)
     form.append('optionalPayload', JSON.stringify({
-      ...OFFICIAL_OPTIONS,
+      ...PADDLE_OCR_DEFAULT_DOCUMENT_OPTIONS,
+      ...input.options,
       useDocOrientationClassify: input.useDocOrientationClassify
-        ?? OFFICIAL_OPTIONS.useDocOrientationClassify,
+        ?? input.options?.useDocOrientationClassify
+        ?? PADDLE_OCR_DEFAULT_DOCUMENT_OPTIONS.useDocOrientationClassify,
     }))
     if (input.pageRanges)
       form.append('pageRanges', input.pageRanges)

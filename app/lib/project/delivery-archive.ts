@@ -16,7 +16,7 @@ export interface ProjectDeliveryArchiveRow {
   sourceStatus: string
   ocrStatus: string
   reviewFlag: string
-  storedStatus: string
+  printStatus: string
   sourcePath: string
 }
 
@@ -86,7 +86,9 @@ export async function loadProjectDeliveryArchive(
       sourceStatus: source ? '原件已关联' : text(row.file_name) ? '仅文件名' : '无原件',
       ocrStatus: text(row.ocr_status),
       reviewFlag: text(row.review_flag),
-      storedStatus: row.stored === 1 ? '已入库' : '未入库',
+      printStatus: row.print_disposition === 'printed'
+        ? '已打印'
+        : row.print_disposition === 'pending' ? '待打印' : '已排除',
       sourcePath: `/material/delivery/archive/${text(row.id)}`,
     }
   })

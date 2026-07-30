@@ -15,11 +15,16 @@ import {
   quantityMonthOptions,
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
+import {
+  buildQuantityFilterQuery,
+  readQuantityFilterQuery,
+} from '~/lib/quantity/navigation'
 import { buildScheduleReturnLocation, parseScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
 const route = useRoute()
+const router = useRouter()
 const { confirm, error: toastError, exportFile, formModal, openImportTab, success, warning } = useKitUI()
 
 const projectId = shallowRef('')
@@ -29,7 +34,6 @@ const viewMode = shallowRef<QuantityMatrixViewMode>('trade')
 const trade = shallowRef(ALL_QUANTITY_FILTER)
 const assigneeKey = shallowRef(ALL_QUANTITY_FILTER)
 const initialized = shallowRef(false)
-const templateDialogOpen = shallowRef(false)
 const assignmentDialogOpen = shallowRef(false)
 const assignmentInitialUnitId = shallowRef('')
 const assignmentInitialTrade = shallowRef(ALL_QUANTITY_FILTER)
@@ -131,9 +135,11 @@ async function initialize() {
   projectId.value = preferred?.id ?? ''
   if (projectId.value)
     await loadSelectedProject(true, Boolean(scheduleContext.value))
-  if (fromBoq.value)
-    templateDialogOpen.value = true
+  if (!scheduleContext.value && store.snapshot)
+    restoreRouteFilters(store.snapshot)
   initialized.value = true
+  if (fromBoq.value)
+    await openTemplates()
 }
 
 watch(projectId, async (next, previous) => {
@@ -166,6 +172,68 @@ function completeCell(cell: QuantityMatrixCell): void {
   completionUnitId.value = cell.unitId
   completionInitialStageId.value = cell.summary?.stageId ?? ''
   completionDialogOpen.value = true
+}
+
+function quantityFilterQuery() {
+  return buildQuantityFilterQuery({
+    project: projectId.value,
+    building: buildingId.value,
+    month: month.value,
+    view: viewMode.value,
+    trade: trade.value,
+    assignee: assigneeKey.value,
+  })
+}
+
+function restoreRouteFilters(next: QuantityProjectSnapshot) {
+  const context = readQuantityFilterQuery(route.query)
+  const requestedBuilding = context.building ?? ''
+  if (requestedBuilding && next.buildings.some(row => row.id === requestedBuilding))
+    buildingId.value = requestedBuilding
+
+  const requestedMonth = context.month ?? ''
+  if (requestedMonth && quantityMonthOptions(next).some(option => option.key === requestedMonth))
+    month.value = requestedMonth
+
+  const requestedView = context.view ?? ''
+  if (requestedView === 'trade' || requestedView === 'crew')
+    viewMode.value = requestedView
+
+  const requestedTrade = context.trade ?? ''
+  if (requestedTrade && quantityTradeOptions(next).some(option => option.key === requestedTrade))
+    trade.value = requestedTrade
+
+  const requestedAssignee = context.assignee ?? ''
+  if (requestedAssignee && quantityAssigneeOptions(next).some(option => option.key === requestedAssignee))
+    assigneeKey.value = requestedAssignee
+}
+
+async function openTemplates() {
+  if (!projectId.value)
+    return
+  await router.push({
+    path: '/subcontract/quantity/template',
+    query: {
+      ...quantityFilterQuery(),
+      ...(boqLineId.value ? { boqLine: boqLineId.value } : {}),
+    },
+  })
+}
+
+async function openRegions() {
+  if (!projectId.value)
+    return
+  await router.push({
+    path: '/subcontract/quantity/region',
+    query: { project: projectId.value },
+  })
+}
+
+async function openUnitDetail(cell: QuantityMatrixCell) {
+  await router.push({
+    path: `/subcontract/quantity/${projectId.value}/${cell.unitId}`,
+    query: quantityFilterQuery(),
+  })
 }
 
 // 导入走 ADR 0005 映射页签：三类目标 + 旧合一行迁移预检（蓝本§六）。
@@ -290,7 +358,8 @@ onMounted(initialize)
       @export-ledger="exportLedger"
       @export-by-category="exportByCategory"
       @toggle-archive="toggleArchive"
-      @manage-templates="templateDialogOpen = true"
+      @manage-regions="openRegions"
+      @manage-templates="openTemplates"
       @manage-assignments="openAssignments()"
       @refresh="retry"
     />
@@ -385,8 +454,11 @@ onMounted(initialize)
         当前项目尚未配置楼栋和户
       </div>
       <p class="text-12px text-ink-soft">
-        这里只展示真实区域数据，不在组件内补 mock 矩阵。
+        这里只展示真实区域数据。先建立楼栋、楼层和户，再继续责任配置或排程。
       </p>
+      <button type="button" class="btn-primary mt-1" @click="openRegions">
+        配置项目区域
+      </button>
     </section>
 
     <section
@@ -398,26 +470,22 @@ onMounted(initialize)
         当前楼栋尚未配置楼层和户
       </div>
       <p class="text-12px text-ink-soft">
-        切换其他楼栋，或在后续区域配置入口补齐结构。
+        切换其他楼栋，或补齐当前楼栋下的楼层和户。
       </p>
+      <button type="button" class="btn-primary mt-1" @click="openRegions">
+        配置楼层与户
+      </button>
     </section>
 
     <template v-else-if="snapshot">
       <QuantityProgressCards :progress="store.stageProgress" />
       <QuantityWorkspace
-        :project-id="projectId"
         :matrix="matrix"
         @configure="configureCell"
         @complete="completeCell"
+        @detail="openUnitDetail"
       />
     </template>
-
-    <QuantityTemplateDialog
-      v-if="projectId"
-      v-model:open="templateDialogOpen"
-      :project-id="projectId"
-      :initial-boq-line-id="boqLineId"
-    />
 
     <QuantityAssignmentDialog
       v-if="projectId"

@@ -140,6 +140,55 @@ describe('paddleOcrCloudClient', () => {
     })
   })
 
+  it('把已校验的 VL 能力原样合并进官方 optionalPayload', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { jobId: 'configured_job' } }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: { state: 'done', resultUrl: { jsonUrl: 'https://result.example/configured.jsonl' } },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        result: {
+          dataInfo: {},
+          layoutParsingResults: [{ markdown: { text: '# 已配置' }, prunedResult: {} }],
+        },
+      })))
+    const client = new PaddleOcrCloudClient({
+      accessToken: 'test',
+      fetch: fetchMock,
+      sleep: async () => {},
+    })
+
+    await client.recognize({
+      fileName: 'configured.pdf',
+      contentType: 'application/pdf',
+      data: new Uint8Array([1]),
+      options: {
+        useDocOrientationClassify: false,
+        useDocUnwarping: false,
+        useLayoutDetection: true,
+        useChartRecognition: true,
+        useSealRecognition: false,
+        useOcrForImageBlock: false,
+        formatBlockContent: false,
+      },
+    })
+
+    const form = fetchMock.mock.calls[0]?.[1]?.body as FormData
+    expect(JSON.parse(String(form.get('optionalPayload')))).toEqual({
+      useDocOrientationClassify: false,
+      useDocUnwarping: false,
+      useLayoutDetection: true,
+      useChartRecognition: true,
+      useSealRecognition: false,
+      useOcrForImageBlock: false,
+      formatBlockContent: false,
+      restructurePages: false,
+      returnMarkdownImages: false,
+      visualize: false,
+    })
+  })
+
   it.each([
     [401, 'authentication', false],
     [403, 'authentication', false],

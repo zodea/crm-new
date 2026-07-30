@@ -72,6 +72,10 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'unit_id', table: 'units' },
     { column: 'stage_id', table: 'construction_stages' },
   ],
+  schedule_process_libraries: [],
+  schedule_process_library_tasks: [
+    { column: 'library_id', table: 'schedule_process_libraries' },
+  ],
   schedule_groups: [
     { column: 'project_id', table: 'projects' },
     { column: 'contract_id', table: 'contracts' },
@@ -238,6 +242,43 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'crew_id', table: 'crews' },
     { column: 'current_project_id', table: 'projects' },
   ],
+  payroll_subject_configs: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'leader_worker_id', table: 'workers' },
+  ],
+  wage_statements: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'leader_worker_id', table: 'workers' },
+    { column: 'subject_config_id', table: 'payroll_subject_configs' },
+  ],
+  wage_statement_lines: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  wage_statement_members: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  attendance_records: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  signed_daywork_records: [
+    { column: 'project_id', table: 'projects' },
+    { column: 'crew_id', table: 'crews' },
+    { column: 'worker_id', table: 'workers' },
+  ],
+  wage_statement_daywork_records: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'daywork_record_id', table: 'signed_daywork_records' },
+  ],
+  wage_statement_allocations: [
+    { column: 'statement_id', table: 'wage_statements' },
+    { column: 'worker_id', table: 'workers' },
+  ],
   target_costs: [{ column: 'project_id', table: 'projects' }],
   target_cost_items: [{ column: 'target_cost_id', table: 'target_costs' }],
   settlements: [{ column: 'project_supplier_id', table: 'project_suppliers' }],
@@ -276,6 +317,7 @@ export const INFRA_TABLES = [
   'import_batches',
   'reconciliation_issues',
   'contract_legacy_mappings',
+  'ocr_settings',
 ]
 
 function assertBusinessTable(table: string): void {

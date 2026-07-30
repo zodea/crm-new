@@ -76,6 +76,24 @@ describe('openTab：打开/复用/超限', () => {
     expect(r.state.tabs.find(t => t.key === '/project/1')!.title).toBe('合和新城') // 动态标题保留
   })
 
+  it('复用历史“未命名”页签时用当前稳定路由标题修复，不要求用户手工关闭重开', () => {
+    const state = openTab(initialTabsState(), {
+      fullPath: '/schedule',
+      title: '未命名',
+    }).state
+
+    const result = openTab(state, {
+      fullPath: '/schedule?project=project_1',
+      title: '施工进度',
+    })
+
+    expect(result.state.tabs).toHaveLength(2)
+    expect(result.state.tabs.find(tab => tab.key === '/schedule')).toMatchObject({
+      title: '施工进度',
+      fullPath: '/schedule?project=project_1',
+    })
+  })
+
   it('不同 query 复用同一页签（旧规则「不同 query 不同页签」已被穿透预筛规则取代）', () => {
     let s = openTab(initialTabsState(), { fullPath: '/project/1?tab=a', title: 'A' }).state
     s = openTab(s, { fullPath: '/project/1?tab=b', title: 'B' }).state

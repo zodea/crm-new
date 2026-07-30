@@ -14,6 +14,9 @@ const emit = defineEmits<{
   upload: []
   recognize: [id: string]
   remove: [id: string]
+  openPrint: [id: string]
+  confirmPrint: [id: string]
+  excludePrint: [id: string]
 }>()
 
 const STATUS: Record<DeliveryOcrStatus, { label: string, cls: string }> = {
@@ -25,6 +28,12 @@ const STATUS: Record<DeliveryOcrStatus, { label: string, cls: string }> = {
 
 function itemCount(file: DeepReadonly<DeliveryFile>): number {
   return file.docs.reduce((sum, doc) => sum + doc.items.length, 0)
+}
+
+function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: string } {
+  if (file.printDisposition === 'pending')
+    return { label: '已入库 · 待打印', cls: 'chip-warn' }
+  return STATUS[file.ocrStatus]
 }
 </script>
 
@@ -65,12 +74,15 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
               {{ file.name }}
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-1.5">
-              <span class="chip text-9px" :class="STATUS[file.ocrStatus].cls">
-                {{ file.ocrStatus === 'processing' ? `识别中 ${progress[file.id] ?? 0}%` : STATUS[file.ocrStatus].label }}
+              <span class="chip text-9px" :class="statusOf(file).cls">
+                {{ file.ocrStatus === 'processing' ? `识别中 ${progress[file.id] ?? 0}%` : statusOf(file).label }}
               </span>
               <span class="text-9px text-ink-faint">{{ formatFileSize(file.size) }}</span>
             </div>
-            <div v-if="file.ocrStatus === 'done'" class="mt-1.5 text-10px text-ink-soft">
+            <div v-if="file.printDisposition === 'pending'" class="mt-1.5 text-10px text-ink-soft">
+              已归档并进入材料台账；打印成功或明确排除前保留在此。
+            </div>
+            <div v-else-if="file.ocrStatus === 'done'" class="mt-1.5 text-10px text-ink-soft">
               <div class="truncate" :title="file.supplierText">
                 {{ file.supplierText || '未识别分供方' }}
               </div>
@@ -82,9 +94,36 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
           </div>
         </div>
 
-        <div class="mt-2 flex items-center justify-end gap-1 border-t border-line/70 pt-1.5">
+        <div class="mt-2 flex flex-wrap items-center justify-end gap-1 border-t border-line/70 pt-1.5">
           <button
-            v-if="file.ocrStatus === 'pending' || file.ocrStatus === 'failed'"
+            v-if="file.printDisposition === 'pending'"
+            type="button"
+            class="btn-secondary px-2 py-1 text-10px"
+            title="只打开送货单原件和系统打印窗口，不改变打印状态"
+            @click.stop="emit('openPrint', file.id)"
+          >
+            <span class="i-lucide-printer mr-1 text-11px" />打开打印
+          </button>
+          <button
+            v-if="file.printDisposition === 'pending'"
+            type="button"
+            class="btn-primary px-2 py-1 text-10px"
+            title="打印机实际输出后，登记打印回执并移出待打印范围"
+            @click.stop="emit('confirmPrint', file.id)"
+          >
+            登记已打印
+          </button>
+          <button
+            v-if="file.printDisposition === 'pending'"
+            type="button"
+            class="btn-secondary px-2 py-1 text-10px"
+            title="不打印本文件并移出待打印范围"
+            @click.stop="emit('excludePrint', file.id)"
+          >
+            排除打印
+          </button>
+          <button
+            v-if="file.printDisposition == null && (file.ocrStatus === 'pending' || file.ocrStatus === 'failed')"
             type="button"
             class="icon-btn h-7 w-7"
             title="识别"
@@ -93,6 +132,7 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
             <span class="i-lucide-scan-text text-12px" />
           </button>
           <button
+            v-if="file.printDisposition == null"
             type="button"
             class="icon-btn-danger h-7 w-7"
             title="移出队列"

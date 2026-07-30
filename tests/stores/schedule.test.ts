@@ -193,4 +193,302 @@ describe('schedule store：排程唯一 action 写路径', () => {
       expect.objectContaining({ id: 'b2', inContract: false, scheduled: false }),
     ]))
   })
+
+  it('无合同时可按内部暂估范围建组，并冻结标准工序库快照', async () => {
+    const store = useScheduleStore()
+    await store.loadProcessLibraries()
+
+    expect(store.processLibraries).toEqual([
+      expect.objectContaining({
+        code: 'decoration-standard-v1',
+        name: '精装修标准工序',
+        version: 1,
+        taskCount: 22,
+      }),
+    ])
+    const libraryId = store.processLibraries[0]!.id
+    await store.loadProcessLibraryTasks(libraryId)
+    const settingOut = store.processTasks.find(task => task.key === 'setting-out')!
+
+    await store.loadBuildings('p1')
+    expect(store.buildings.map(building => building.id)).toEqual(['b1', 'b2'])
+
+    const groupId = await store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '内部暂估·2栋',
+      buildingIds: ['b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: settingOut.key, enabled: true, durationDays: 9, anchorStart: null },
+      ],
+    }, '2026-07-01')
+
+    expect(store.snapshot?.groups[0]).toMatchObject({
+      id: groupId,
+      scopeBasis: 'provisional',
+      contractId: '',
+      processLibraryId: libraryId,
+      processLibraryName: '精装修标准工序',
+      processLibraryVersion: 1,
+      buildingIds: ['b2'],
+    })
+    expect(store.snapshot?.groups[0]!.tasks[0]).toMatchObject({
+      name: '放线及新建墙体',
+      durationDays: 9,
+      sourceLibraryTaskId: settingOut.id,
+      sourceLibraryVersion: 1,
+    })
+
+    const [persistedGroup] = await mem.select<{
+      scope_basis: string
+      contract_id: string | null
+      process_library_name_snapshot: string
+    }>(`
+      SELECT scope_basis, contract_id, process_library_name_snapshot
+      FROM schedule_groups
+      WHERE id = ?
+    `, [groupId])
+    expect(persistedGroup).toEqual({
+      scope_basis: 'provisional',
+      contract_id: null,
+      process_library_name_snapshot: '精装修标准工序',
+    })
+
+    const [persistedTask] = await mem.select<{
+      name: string
+      duration_days: number
+      template_snapshot_json: string
+    }>(`
+      SELECT name, duration_days, template_snapshot_json
+      FROM schedule_tasks
+      WHERE group_id = ?
+    `, [groupId])
+    expect(JSON.parse(persistedTask!.template_snapshot_json)).toMatchObject({
+      key: 'setting-out',
+      name: '放线及新建墙体',
+      durationDays: 9,
+      libraryVersion: 1,
+    })
+
+    await mem.execute(`
+      UPDATE schedule_process_library_tasks
+      SET name = '全局库后续改名', duration_days = 99
+      WHERE id = ?
+    `, [settingOut.id])
+    await store.loadProject('p1', '2026-07-01')
+    expect(store.snapshot?.groups[0]!.tasks[0]).toMatchObject({
+      name: '放线及新建墙体',
+      durationDays: 9,
+    })
+  })
+
+  it('甘特调期遇到 FS 冲突时只软禁用关系，日期修复后才允许恢复', async () => {
+    const store = useScheduleStore()
+    const settingOut = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'setting-out')!
+    const waterproof = SCHEDULE_TASK_TEMPLATES.find(template => template.key === 'waterproof')!
+    await store.createGroup({
+      projectId: 'p1',
+      contractId: 'contract-main',
+      name: '拖拽验证组',
+      buildingIds: ['b1'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: settingOut.key, enabled: true, durationDays: 5, anchorStart: null },
+        { templateKey: waterproof.key, enabled: true, durationDays: 5, anchorStart: null },
+      ],
+    }, '2026-07-01')
+
+    const [predecessor, successor] = store.snapshot!.groups[0]!.tasks
+    const dependency = store.snapshot!.dependencies.find(row => row.succId === successor!.id)!
+    const preview = store.previewTaskReschedule(successor!.id, {
+      plannedStart: '2026-07-03',
+      plannedFinish: '2026-07-07',
+    })
+    expect(preview.conflicts.map(row => row.dependencyId)).toEqual([dependency.id])
+
+    const result = await store.rescheduleTask(successor!.id, {
+      plannedStart: '2026-07-03',
+      plannedFinish: '2026-07-07',
+    }, [dependency.id], '2026-07-01')
+    expect(result.disabledDependencyLogIds).toHaveLength(1)
+    expect(store.snapshot!.dependencies).toEqual([])
+    expect(store.snapshot!.disabledDependencies).toEqual([
+      expect.objectContaining({
+        id: dependency.id,
+        predId: predecessor!.id,
+        succId: successor!.id,
+        disabledReason: 'schedule-conflict',
+        auditLogId: expect.any(String),
+      }),
+    ])
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/计划日期仍冲突/)
+
+    await store.rescheduleTask(successor!.id, {
+      plannedStart: '2026-07-06',
+      plannedFinish: '2026-07-10',
+    }, [], '2026-07-01')
+    await mem.execute(
+      `INSERT INTO task_dependencies
+        (id, pred_id, succ_id, dependency_type, lag_days)
+       VALUES ('active-other', ?, ?, 'FS', 0)`,
+      [predecessor!.id, successor!.id],
+    )
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/已有其他前置关系/)
+    await mem.execute(`UPDATE task_dependencies SET deleted_at = datetime('now') WHERE id = 'active-other'`)
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01')).resolves.toBeTruthy()
+    expect(store.snapshot!.dependencies).toEqual([
+      expect.objectContaining({ id: dependency.id }),
+    ])
+    await store.removeDependency(dependency.id, '2026-07-01')
+    expect(store.snapshot!.disabledDependencies).toEqual([])
+    const [manualDeleteLog] = await mem.select<{ operator: string }>(
+      `SELECT operator
+       FROM operation_logs
+       WHERE table_name = 'task_dependencies'
+         AND record_id = ?
+         AND action = 'delete'
+       ORDER BY rowid DESC
+       LIMIT 1`,
+      [dependency.id],
+    )
+    expect(manualDeleteLog?.operator).toBe('schedule:manual-remove')
+  })
+
+  it('建组保留并软禁用冲突前置关系，未置灰时拒绝错序日期', async () => {
+    const store = useScheduleStore()
+    await store.loadProcessLibraries()
+    const libraryId = store.processLibraries[0]!.id
+    await store.loadProcessLibraryTasks(libraryId)
+    const [settingOut, plumbing] = store.processTasks
+
+    await expect(store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '未确认错序',
+      buildingIds: ['b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        {
+          templateKey: settingOut!.key,
+          enabled: true,
+          durationDays: 5,
+          anchorStart: '2026-07-05',
+          predecessorKey: null,
+          predecessorDisabled: false,
+        },
+        {
+          templateKey: plumbing!.key,
+          enabled: true,
+          durationDays: 5,
+          anchorStart: '2026-07-01',
+          predecessorKey: settingOut!.key,
+          predecessorDisabled: false,
+        },
+      ],
+    }, '2026-07-01')).rejects.toThrow(/不能早于仍启用的前置工序/)
+
+    await store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '已确认置灰',
+      buildingIds: ['b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        {
+          templateKey: settingOut!.key,
+          enabled: true,
+          durationDays: 5,
+          anchorStart: '2026-07-05',
+          predecessorKey: null,
+          predecessorDisabled: false,
+        },
+        {
+          templateKey: plumbing!.key,
+          enabled: true,
+          durationDays: 5,
+          anchorStart: '2026-07-01',
+          predecessorKey: settingOut!.key,
+          predecessorDisabled: true,
+        },
+      ],
+    }, '2026-07-01')
+
+    expect(store.snapshot!.dependencies).toEqual([])
+    expect(store.snapshot!.disabledDependencies).toEqual([
+      expect.objectContaining({
+        predId: store.snapshot!.groups[0]!.tasks[0]!.id,
+        succId: store.snapshot!.groups[0]!.tasks[1]!.id,
+        disabledReason: 'schedule-conflict',
+      }),
+    ])
+    const [successor] = await mem.select<{ template_snapshot_json: string }>(`
+      SELECT template_snapshot_json
+      FROM schedule_tasks
+      WHERE group_id = ? AND name = ?
+    `, [store.snapshot!.groups[0]!.id, plumbing!.name])
+    expect(JSON.parse(successor!.template_snapshot_json)).toMatchObject({
+      predecessorKey: settingOut!.key,
+      predecessorDisabled: true,
+    })
+  })
+
+  it('依赖编辑只接受同组较早工序、合法 lag，且恢复会拦截循环', async () => {
+    const store = useScheduleStore()
+    const templates = SCHEDULE_TASK_TEMPLATES.slice(0, 3)
+    await store.createGroup({
+      projectId: 'p1',
+      contractId: 'contract-main',
+      name: '依赖验证组',
+      buildingIds: ['b1'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: templates.map(template => ({
+        templateKey: template.key,
+        enabled: true,
+        durationDays: 3,
+        anchorStart: null,
+      })),
+    }, '2026-07-01')
+    const [first, second, third] = store.snapshot!.groups[0]!.tasks
+
+    await expect(store.updateDependency(first!.id, second!.id, 0, '2026-07-01'))
+      .rejects
+      .toThrow(/计划开始必须早于/)
+    await expect(store.updateDependency(third!.id, first!.id, 366, '2026-07-01'))
+      .rejects
+      .toThrow(/-365.*365/)
+
+    const dependency = store.snapshot!.dependencies.find(row => row.succId === second!.id)!
+    await store.rescheduleTask(second!.id, {
+      plannedStart: '2026-07-02',
+      plannedFinish: '2026-07-04',
+    }, [dependency.id], '2026-07-01')
+    await mem.execute(
+      `INSERT INTO task_dependencies
+        (id, pred_id, succ_id, dependency_type, lag_days)
+       VALUES ('cycle-third-first', ?, ?, 'FS', 0)`,
+      [third!.id, first!.id],
+    )
+    await store.loadProject('p1', '2026-07-01')
+    await expect(store.restoreDependency(dependency.id, '2026-07-01'))
+      .rejects
+      .toThrow(/循环依赖/)
+  })
 })

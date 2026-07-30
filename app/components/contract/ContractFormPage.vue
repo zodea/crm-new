@@ -70,7 +70,10 @@ const draft = ref<PageDraft>(f2FormDefaults(props.kind) as PageDraft)
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
-const closeAfterSave = shallowRef(true)
+const closeAfterSave = useState<boolean>(
+  `contract-form-close-after-save:${props.kind}`,
+  () => true,
+)
 const savedSnapshot = shallowRef('')
 let allowLeave = false
 
@@ -336,95 +339,66 @@ onMounted(() => void initialize())
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      v-if="sections.length >= 3"
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
-    >
-      <a
-        v-for="section in sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
-      >
-        {{ section.label }}
-      </a>
-    </aside>
+  <EntityFormShell
+    :title="title"
+    :subtitle="`${meta.subtitle}；草稿允许缺项，提交时校验真实关联与金额勾稽。`"
+    :back-label="`返回${meta.listLabel}`"
+    :sections="sections"
+    :state="loading ? 'loading' : 'ready'"
+    state-title="正在载入表单"
+    @back="leaveToList"
+  >
+    <template #status>
+      <span v-if="draft.status" class="chip bg-surface-3 text-ink-soft">
+        {{ draft.status }}
+      </span>
+    </template>
 
-    <main class="min-w-0 flex-1">
-      <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <button
-            type="button"
-            class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep"
-            @click="leaveToList"
-          >
-            <span class="i-lucide-arrow-left" aria-hidden="true" />
-            返回{{ meta.listLabel }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            {{ meta.subtitle }}；草稿允许缺项，提交时校验真实关联与金额勾稽。
-          </p>
-        </div>
-        <span v-if="draft.status" class="chip bg-surface-3 text-ink-soft">
-          {{ draft.status }}
-        </span>
-      </header>
+    <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
+      <ContractFormFields
+        :kind="kind"
+        :editing="isEditing"
+        :draft="draft"
+        :field-errors="fieldErrors"
+        :fetch-projects="fetchProjects"
+        :fetch-customers="fetchCustomers"
+        :fetch-suppliers="fetchSuppliers"
+        :fetch-original-contracts="fetchOriginalContracts"
+        :fetch-other-expense-contracts="fetchOtherExpenseContracts"
+        :aggregate="aggregate"
+        :selected-contract-amount="selectedContractAmount"
+        @patch="patchDraft"
+        @clear-error="clearFieldError"
+      />
 
-      <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
+      <ContractLineItemsEditor
+        v-if="kind === 'material' && !draft.isSupplement"
+        :lines="draft.lineItems ?? []"
+        @update="patchDraft({ lineItems: $event })"
+      />
 
-      <form v-else class="flex flex-col gap-4" @submit.prevent>
-        <ContractFormFields
-          :kind="kind"
-          :editing="isEditing"
-          :draft="draft"
-          :field-errors="fieldErrors"
-          :fetch-projects="fetchProjects"
-          :fetch-customers="fetchCustomers"
-          :fetch-suppliers="fetchSuppliers"
-          :fetch-original-contracts="fetchOriginalContracts"
-          :fetch-other-expense-contracts="fetchOtherExpenseContracts"
-          :aggregate="aggregate"
-          :selected-contract-amount="selectedContractAmount"
-          @patch="patchDraft"
-          @clear-error="clearFieldError"
-        />
+      <ContractAttachmentSection
+        :attachments="attachments"
+        :pending-attachments="pendingAttachments"
+        :pending-remove-ids="pendingRemoveIds"
+        :pending-restore-ids="pendingRestoreIds"
+        :desktop-picker="desktopAttachmentPicker"
+        :note="draft.note ?? ''"
+        @pick-native="pickNativeFiles"
+        @files="handleFiles"
+        @toggle-existing="toggleExistingAttachment"
+        @remove-pending="removePending"
+        @patch-pending="patchPending"
+        @update-note="patchDraft({ note: $event })"
+      />
 
-        <ContractLineItemsEditor
-          v-if="kind === 'material' && !draft.isSupplement"
-          :lines="draft.lineItems ?? []"
-          @update="patchDraft({ lineItems: $event })"
-        />
-
-        <ContractAttachmentSection
-          :attachments="attachments"
-          :pending-attachments="pendingAttachments"
-          :pending-remove-ids="pendingRemoveIds"
-          :pending-restore-ids="pendingRestoreIds"
-          :desktop-picker="desktopAttachmentPicker"
-          :note="draft.note ?? ''"
-          @pick-native="pickNativeFiles"
-          @files="handleFiles"
-          @toggle-existing="toggleExistingAttachment"
-          @remove-pending="removePending"
-          @patch-pending="patchPending"
-          @update-note="patchDraft({ note: $event })"
-        />
-
-        <FormFooter
-          v-model="closeAfterSave"
-          :dirty="dirty"
-          close-after-save
-          :loading-action="loadingAction"
-          @action="handleFooterAction"
-        />
-      </form>
-    </main>
-  </div>
+      <FormFooter
+        v-model="closeAfterSave"
+        :dirty="dirty"
+        close-after-save
+        :loading-action="loadingAction"
+        @action="handleFooterAction"
+      />
+    </form>
+  </EntityFormShell>
 </template>

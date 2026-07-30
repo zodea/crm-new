@@ -161,7 +161,7 @@ const deliveryColumns: KitTableColumn[] = [
   { field: 'sourceStatus', title: '原件状态', width: 110, filterable: true },
   { field: 'ocrStatus', title: '识别状态', width: 110, filterable: true },
   { field: 'reviewFlag', title: '核对标记', minWidth: 150, filterable: true },
-  { field: 'storedStatus', title: '入库状态', width: 100, filterable: true },
+  { field: 'printStatus', title: '打印状态', width: 100, filterable: true },
 ]
 const acceptanceColumns: KitTableColumn[] = [
   { type: 'seq', title: '#' },

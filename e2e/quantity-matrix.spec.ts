@@ -46,7 +46,7 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
     await cells.nth(1).press('ArrowDown')
     await expect(cells.nth(3)).toBeFocused()
 
-    // 1层 01户在 5/6 月分别完成墙砖与地砖；总览只显示 6 月最近阶段，详情保留两条。
+    // 1层 01户在 5/6 月分别完成墙砖与地砖；总览只显示 6 月最近阶段，完整记录进入独立详情页。
     const monthFilter = page.getByRole('combobox', { name: '月份', exact: true })
     await monthFilter.click()
     await page.getByRole('option', { name: '2026年05月', exact: true }).click()
@@ -67,12 +67,10 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
     await complete.press('Tab')
     await expect(detail).toBeFocused()
     await detail.click()
-    const inspector = page.getByRole('region', { name: '101户阶段时间线' })
-    await expect(inspector).toContainText('地砖铺贴')
-    await expect(inspector).toContainText('墙砖铺贴')
-
-    await detail.press('Escape')
-    await expect(cells.nth(2)).toBeFocused()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/]+\/[^/?]+\?/)
+    await expect(page.getByRole('heading', { name: /1栋 1层 101户/ })).toBeVisible()
+    await page.getByRole('link', { name: '返回工程量矩阵' }).click()
+    await expect(page.getByRole('combobox', { name: '月份', exact: true })).toHaveText(/全部月份/)
     expect(pageErrors).toEqual([])
   })
 

@@ -11,6 +11,7 @@
 | 数据实体、字段、关系与迁移 | [`docs/rewrite/DATABASE.md`](./rewrite/DATABASE.md) |
 | 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
+| 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |
 | 当前还有哪些界面未实现或未闭环 | [`docs/design/ui-implementation-status.md`](./design/ui-implementation-status.md) |
 | 当前工作是否已定稿、由谁领取 | [GitHub Issues](https://github.com/zodea/crm-new/issues) |
 | Agent 如何开工、分诊和提交 | [`docs/agents/`](./agents/) |
@@ -27,6 +28,7 @@
 - `adr/`：已经采纳的、会约束后续实现的决策；入口见 [`adr/README.md`](./adr/README.md)。
 - `agents/`：仓库协作规则，不承载产品规格。
 - `design/`：设计入口、组件规格和视觉验收规则。
+- `guides/`：面向最终用户的操作说明 Markdown 权威源；PDF 是同源生成的交付物。
 - `rewrite/`：当前架构、数据模型、通用业务模式与页面蓝本。
 - `prd/`：仍有独立价值的产品需求文档；落地状态以 Issue 为准。
 - `implementation/`：仍在执行的实施拆解，不是架构或业务权威源。

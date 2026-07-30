@@ -266,8 +266,16 @@ export async function seedScheduleDemo(db: MigrationDb) {
     return
 
   const buildings = await db.select<{ id: string }>(
-    `SELECT id FROM buildings
-     WHERE project_id = ? AND deleted_at IS NULL
+    `SELECT building.id
+     FROM buildings building
+     WHERE building.project_id = ?
+       AND building.deleted_at IS NULL
+       AND EXISTS (
+         SELECT 1
+         FROM floors floor_row
+         WHERE floor_row.building_id = building.id
+           AND floor_row.deleted_at IS NULL
+       )
      ORDER BY sort_order, code, id`,
     [DEMO_SCHEDULE_PROJECT_ID],
   )

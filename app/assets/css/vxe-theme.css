@@ -7,7 +7,7 @@
   --vxe-font-color: var(--ink);
   --vxe-ui-font-family: var(--font-sans);
   --vxe-ui-font-size-default: 14px;
-  --vxe-ui-table-row-height-default: 38px;
+  --vxe-ui-table-row-height-default: 36px;
   --vxe-ui-table-cell-padding-default: 6px;
   --vxe-table-border-color: var(--line);
   --vxe-table-header-background-color: var(--surface-2);
@@ -33,16 +33,16 @@
   border-right: 1px solid var(--line);
 }
 
-/* 表头和数据行统一 38px，字号放大但不再叠加单元格外层留白。 */
+/* 表头和数据行统一 36px，对齐登录态运行参考的紧凑数据密度。 */
 .vxe-table .vxe-header--column {
-  height: 38px;
+  height: 36px;
   padding: 0 !important;
   font-size: 13px;
   font-weight: 700;
 }
 
 .vxe-table .vxe-body--column {
-  height: 38px;
+  height: 36px;
   padding: 0 !important;
   font-size: 14px;
 }

@@ -93,14 +93,20 @@ watch(
     :data-state="state.phase"
     :data-lock-width="state.lockWidth || undefined"
   >
-    <span class="relative inline-grid place-items-center">
+    <span
+      class="relative inline-flex items-center justify-center"
+      :class="state.showSpinner ? 'gap-1' : undefined"
+    >
       <span
         v-if="state.showSpinner"
         data-kit-button-spinner
-        class="i-lucide-loader-circle absolute right-full mr-0.5 h-3 w-3 animate-spin motion-reduce:animate-none"
+        class="h-3 w-3 shrink-0 inline-grid place-items-center"
         aria-hidden="true"
-      />
+      >
+        <span class="i-lucide-loader-circle h-2.5 w-2.5 animate-spin motion-reduce:animate-none" />
+      </span>
       <span
+        data-kit-button-label
         class="transition-[opacity,transform] duration-[var(--dur-fast)] motion-reduce:transition-none"
         :class="state.showCheck ? 'scale-90 opacity-0' : undefined"
       >

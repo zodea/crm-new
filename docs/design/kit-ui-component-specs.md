@@ -258,7 +258,7 @@ openDrawer({
 
 **用途**：在施工进度、首页、项目驾驶舱等项目上下文界面切换当前项目。项目数量从 1、3、12 到更多时始终使用同一个 `ProjectSwitcher`，不按数量维护多种皮肤。
 
-**组件归属**：首个实现放在 `app/components/project/ProjectSwitcher.vue`，由项目域提供项目名称、编码、权限和最近使用排序。暂不为了抽象而新增无实际第二调用域的 `ContextSwitcher`；后续出现真实的公司/仓库等同构上下文后再提炼。
+**组件归属**：首个实现放在 `app/components/project/ProjectSwitcher.vue`，由项目域提供项目名称、编码和权限。暂不为了抽象而新增无实际第二调用域的 `ContextSwitcher`；后续出现真实的公司/仓库等同构上下文后再提炼。
 
 **关闭状态**：
 
@@ -270,8 +270,8 @@ openDrawer({
 **打开状态**：
 
 1. 顶部搜索框，打开即聚焦；按项目名称与项目编码过滤。
-2. 「最近使用」最多 5 项；没有历史时整个分组不显示。
-3. 「全部项目」垂直滚动；当前项目显示 check 与 `aria-selected`，不能只靠颜色。
+2. 搜索框下方只有一个「全部项目」滚动列表，不显示「最近使用」分组，不保存额外的访问历史。
+3. 当前项目显示 check 与 `aria-selected`，不能只靠颜色；项目选项清除浏览器默认按钮边框。
 4. 空结果、加载、加载失败、无权限分别有明确状态。
 5. 选中后立即关闭并请求切换；加载失败恢复原项目，system toast 报错。
 
@@ -289,7 +289,6 @@ openDrawer({
 <ProjectSwitcher
   v-model="projectId"
   :projects="projectOptions"
-  :recent-project-ids="recentProjectIds"
   :loading="loading"
   :disabled="disabled"
 />
@@ -455,4 +454,35 @@ openDrawer({
     <FormFooter @action="handleDomainAction" />
   </template>
 </EntityFormShell>
+```
+
+---
+
+## 12 · 数据表格 `kit-table` ✅ 已定案（2026-07-29）
+
+**用途**：`app/components/ui/KitTable.vue` 统一跨领域列表的紧凑密度、表格内横滚、固定重要列、列宽调整、空态和受控分页；字段、业务列宽与行内动作仍由领域调用点决定。
+
+**运行参考规格**：
+
+- 表头与数据行默认 36px；调用点可通过 `rowHeight` 明确覆盖，但不得在页面内分别改表头和行高。
+- 宽表只能在 `KitTable` 自身滚动区横向滚动，应用工作区与页面不得横滚；390 / 768 / 1024 / 1440px 均按此验收。
+- 可调整列的命中区只位于该列表头右边缘：7px、`right:-4px`、`cursor:col-resize`；悬停显示品牌色竖线。拖该列表头的右边界只改变当前列：向右增宽、向左缩窄，双击按内容自适应。
+- 默认开启拖拽提示和双击自适配；`resizeConfig.isDblclickAutoWidth=false` 可按领域关闭，`resizable=false` 可关闭整表列宽调整，单列 `resizable=false` 优先。
+- `action` 列默认宽 112px、固定右侧且禁止拖拽，避免固定右列出现左侧含混手柄；业务动作超过该宽度时必须显式加宽，不能靠通用表格猜测或静默裁切。
+- `seq` / 重要名称列可由业务显式固定左侧；固定方向和显式宽度始终优先于默认值。
+
+**调用签名**：
+
+```vue
+<KitTable
+  :columns="columns"
+  :data="rows"
+  :row-height="36"
+  :resizable="true"
+  :resize-config="{
+    isDblclickAutoWidth: true,
+    minWidth: 48,
+    maxWidth: 480,
+  }"
+/>
 ```

@@ -42,7 +42,7 @@ const columns = computed<KitTableColumn[]>(() => {
         { field: 'contact', title: '联系人', width: 110 },
         { field: 'contactPhone', title: '联系电话', width: 130 },
         { field: 'status', title: '状态', width: 90 },
-        { title: '操作', type: 'action', width: 96 },
+        { title: '操作', type: 'action', width: 56 },
       ]
     case 'crew':
       return [
@@ -51,7 +51,7 @@ const columns = computed<KitTableColumn[]>(() => {
         { field: 'contactName', title: '负责人', width: 110 },
         { field: 'contactPhone', title: '联系电话', width: 130 },
         { field: 'status', title: '状态', width: 90 },
-        { title: '操作', type: 'action', width: 96 },
+        { title: '操作', type: 'action', width: 56 },
       ]
     case 'worker':
       return [
@@ -61,7 +61,7 @@ const columns = computed<KitTableColumn[]>(() => {
         { field: 'projectName', title: '当前项目', minWidth: 170 },
         { field: 'projectStatus', title: '在场状态', width: 100 },
         { field: 'phone', title: '联系电话', width: 130 },
-        { title: '操作', type: 'action', width: 96 },
+        { title: '操作', type: 'action', width: 56 },
       ]
     case 'target_cost':
       return [
@@ -71,7 +71,7 @@ const columns = computed<KitTableColumn[]>(() => {
         { field: 'taxInclusiveTotal', title: '含税合价', type: 'money', width: 140 },
         { field: 'signedContractSum', title: '已签合同额', type: 'money', width: 140 },
         { field: 'status', title: '状态', width: 90 },
-        { title: '操作', type: 'action', width: 96 },
+        { title: '操作', type: 'action', width: 56 },
       ]
   }
   return []
@@ -113,6 +113,27 @@ async function remove(row: MasterDataListRow) {
   catch (cause) {
     warning(`无法删除「${row.name}」：${toErrorMessage(cause)}`)
   }
+}
+
+const rowActions = computed(() => [
+  ...(meta.value.detailPath
+    ? [{ key: 'detail', label: '查看详情', icon: 'i-lucide-file-text' }]
+    : []),
+  { key: 'edit', label: '编辑', icon: 'i-lucide-square-pen' },
+  { key: 'delete', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' as const },
+])
+
+async function handleRowAction(action: string, row: MasterDataListRow) {
+  if (action === 'detail' && meta.value.detailPath) {
+    await navigateTo(`${meta.value.detailPath}/${row.id}`)
+    return
+  }
+  if (action === 'edit') {
+    await navigateTo(`${meta.value.newPath}/${row.id}`)
+    return
+  }
+  if (action === 'delete')
+    await remove(row)
 }
 
 async function removeThroughStore(id: string) {
@@ -163,24 +184,11 @@ onActivated(() => {
       :empty="`暂无${meta.label}数据`"
     >
       <template #action="{ row }">
-        <div class="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            class="icon-btn"
-            :aria-label="`编辑${row.name}`"
-            @click="navigateTo(`${meta.newPath}/${row.id}`)"
-          >
-            <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="icon-btn-danger"
-            :aria-label="`删除${row.name}`"
-            @click="remove(row)"
-          >
-            <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
-          </button>
-        </div>
+        <RowActionMenu
+          :items="rowActions"
+          :label="`${row.name}${meta.label}操作`"
+          @select="handleRowAction($event, row)"
+        />
       </template>
     </KitTable>
   </div>

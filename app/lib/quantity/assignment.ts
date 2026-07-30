@@ -1,6 +1,12 @@
 import type { QuantityAssigneeKind } from './read-model'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtes, logCreate, selectVisibleSql, softDelete, visibleCond } from '~/lib/db/soft-delete'
+import {
+  capabilityAllowsItem,
+  capabilityAllowsTrade,
+  capabilityCoversItems,
+  effectiveMasterDataCapabilities,
+} from '~/lib/master-data/capabilities'
 import { generateId } from '~/lib/util/id'
 
 export interface QuantityAssignmentWorkspaceUnit {
@@ -21,6 +27,8 @@ export interface QuantityAssignmentAssignee {
   id: string
   name: string
   trade: string
+  trades: readonly string[]
+  itemNames: readonly string[]
 }
 
 export interface QuantityAssignmentScope {
@@ -129,6 +137,8 @@ interface MasterAssigneeRow {
   id: string
   name: string
   trade: string | null
+  trade_capabilities: string | null
+  item_capabilities: string | null
 }
 
 interface AssignmentRow {
@@ -172,6 +182,61 @@ interface ScopeOptionRow {
 function numberValue(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function assigneeCapability(assignee: QuantityAssignmentAssignee) {
+  return effectiveMasterDataCapabilities(
+    assignee.trade,
+    assignee.trades,
+    assignee.itemNames,
+  )
+}
+
+export function quantityAssigneeSupportsTrade(
+  assignee: QuantityAssignmentAssignee,
+  trade: string,
+): boolean {
+  return capabilityAllowsTrade(assigneeCapability(assignee), trade)
+}
+
+export function quantityAssigneeAllowsItem(
+  assignee: QuantityAssignmentAssignee,
+  trade: string,
+  itemName: string,
+): boolean {
+  return capabilityAllowsItem(assigneeCapability(assignee), trade, itemName)
+}
+
+export function quantityAssigneeCoversTrade(
+  assignee: QuantityAssignmentAssignee,
+  trade: string,
+  itemNames: readonly string[],
+): boolean {
+  return capabilityCoversItems(assigneeCapability(assignee), trade, itemNames)
+}
+
+export function quantityAssigneeIsCandidate(
+  assignee: QuantityAssignmentAssignee,
+  trade: string,
+  itemNames: readonly string[],
+): boolean {
+  if (!quantityAssigneeSupportsTrade(assignee, trade))
+    return false
+  if (!itemNames.length || !assignee.itemNames.length)
+    return true
+  if (assignee.kind === 'crew')
+    return quantityAssigneeCoversTrade(assignee, trade, itemNames)
+  return itemNames.some(itemName => quantityAssigneeAllowsItem(assignee, trade, itemName))
+}
+
+export function quantityAssigneeRequiresDetailedScope(
+  assignee: QuantityAssignmentAssignee,
+  trade: string,
+  itemNames: readonly string[],
+): boolean {
+  return assignee.kind === 'worker'
+    && quantityAssigneeIsCandidate(assignee, trade, itemNames)
+    && !quantityAssigneeCoversTrade(assignee, trade, itemNames)
 }
 
 function strictLog(logId: string | null, message: string): string {
@@ -402,18 +467,36 @@ export async function loadQuantityAssignmentWorkspace(
   const crewRows = await db.select<MasterAssigneeRow>(selectVisibleSql('crews'))
   const workerRows = await db.select<MasterAssigneeRow>(selectVisibleSql('workers'))
   const assignees = [
-    ...crewRows.map<QuantityAssignmentAssignee>(row => ({
-      kind: 'crew',
-      id: row.id,
-      name: row.name,
-      trade: row.trade?.trim() ?? '',
-    })),
-    ...workerRows.map<QuantityAssignmentAssignee>(row => ({
-      kind: 'worker',
-      id: row.id,
-      name: row.name,
-      trade: row.trade?.trim() ?? '',
-    })),
+    ...crewRows.map<QuantityAssignmentAssignee>((row) => {
+      const capability = effectiveMasterDataCapabilities(
+        row.trade,
+        row.trade_capabilities,
+        row.item_capabilities,
+      )
+      return {
+        kind: 'crew',
+        id: row.id,
+        name: row.name,
+        trade: row.trade?.trim() ?? '',
+        trades: capability.trades,
+        itemNames: capability.itemNames,
+      }
+    }),
+    ...workerRows.map<QuantityAssignmentAssignee>((row) => {
+      const capability = effectiveMasterDataCapabilities(
+        row.trade,
+        row.trade_capabilities,
+        row.item_capabilities,
+      )
+      return {
+        kind: 'worker',
+        id: row.id,
+        name: row.name,
+        trade: row.trade?.trim() ?? '',
+        trades: capability.trades,
+        itemNames: capability.itemNames,
+      }
+    }),
   ]
     .sort((left, right) => (
       Number(left.kind === 'worker') - Number(right.kind === 'worker')
@@ -577,10 +660,19 @@ export async function persistQuantityAssignments(
   ))
   if (!targetAssignee)
     throw new Error('所选责任人不存在')
-  if (targetAssignee.trade !== trade)
-    throw new Error('所选责任人的工种与当前工种不一致')
   if (!workspace.trades.includes(trade))
     throw new Error('当前项目不存在该工种')
+  const targetItemNames = workspace.scopeOptions
+    .filter(option => option.trade === trade)
+    .map(option => option.itemName)
+  if (!quantityAssigneeIsCandidate(targetAssignee, trade, targetItemNames))
+    throw new Error('所选责任人的能力与当前工种或活项不兼容')
+  if (
+    !draft.scopes.length
+    && quantityAssigneeRequiresDetailedScope(targetAssignee, trade, targetItemNames)
+  ) {
+    throw new Error('所选个人只配置了部分活项，必须指定房间分项范围')
+  }
 
   const unitsById = new Map(workspace.units.map(unit => [unit.id, unit]))
   if (unitIds.some(unitId => !unitsById.has(unitId)))
@@ -615,6 +707,14 @@ export async function persistQuantityAssignments(
         throw new Error(`户「${unit.name}」的个人范围不属于其挂靠户型`)
       if (!scopeOptions.has(`${unit.templateId}\u0000${scope.roomId}\u0000${scope.itemId}\u0000${trade}`))
         throw new Error(`户「${unit.name}」的个人范围分项与当前工种不一致`)
+      const option = workspace.scopeOptions.find(candidate => (
+        candidate.templateId === unit.templateId
+        && candidate.roomId === scope.roomId
+        && candidate.itemId === scope.itemId
+        && candidate.trade === trade
+      ))
+      if (!option || !quantityAssigneeAllowsItem(targetAssignee, trade, option.itemName))
+        throw new Error(`户「${unit.name}」的个人范围包含责任人未配置的活项`)
     }
   }
 
