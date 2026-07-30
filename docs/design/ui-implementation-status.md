@@ -17,35 +17,57 @@
 
 “已搭但未闭环”不能被统计成“未实现”，也不能因为页面能打开就宣称完成。
 
-本文的 99 个界面按设计稿中的可达业务屏幕统计，不等于 Nuxt 文件路由模板数量。`app/pages/dev/` 以外的全部生产路由、运行态参考证据和后续实施票统一登记在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)；两种口径不得相加或互相覆盖。
+缺口有两个方向，必须分开统计，不得互相抵消：
+
+- **设计稿有、实现没有**（本文原有口径「未实现」）。
+- **实现有、设计稿没有**（`design-pending`）。实现跑到设计稿前面同样是缺口 —— 它让 ADR 0013 第 3 级权威源失效，评审时无据可对。
+
+三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**99** 是设计稿可达业务屏幕（62 常规 + 37 整页表单，不含不可达的 `detail` 残留）。#181 / #206 正文的 115 是过期数字。
 
 ## 2. 当前总数
 
-设计稿当前可达界面清单：
+下表由 `pnpm design:sync-coverage` 从两侧注册表现算写入，逐条明细见 [`design-coverage.json`](./design-coverage.json)；**不要手改**，改了会被 `tests/ui/design-token-contract.test.ts` 的「设计覆盖契约」判红。
 
-| 类型 | 数量 | 说明 |
-| --- | ---: | --- |
-| 常规界面 | 62 | 50 个主导航界面 + 12 个可达的详情/工具等二级界面 |
-| 整页表单 | 37 | `kit/forms/*.jsx` 注册的新增/编辑表单 |
-| **合计** | **99** | 不含开发专用页和不可达的设计残留 |
+<!-- design-coverage:begin -->
+| 口径 | 数量 |
+| --- | ---: |
+| 设计稿 PAGE 路由 | 63 |
+| 设计稿整页表单路由 | 37 |
+| 设计稿侧栏分组 / 叶子 | 9 / 50 |
+| 实现生产路由（排除 dev） | 126 |
+| 实现侧栏叶子 | 50 |
+| 已覆盖 | 116 |
+| 待补设计（实现有、设计稿没有） | 10 |
+| 已退役（设计稿有、实现不做） | 1 |
+<!-- design-coverage:end -->
 
-Nuxt 路由级实现结果：
+侧栏 IA 已 1:1：实现与设计稿各 50 个叶子、key 与 label 逐条一致，且实现侧每个叶子都已填 `to`（无灰显占位）。
 
-| 状态 | 数量 | 占比 |
-| --- | ---: | ---: |
-| 已有对应界面 | 97 | 98.0% |
-| **未实现** | **2** | **2.0%** |
+## 3. 设计稿有、实现没有
 
-设计稿中存在一个不可达的通用 `detail` 残留，没有任何导航或动作进入，本次不计入 99 个可达界面；历史实现状态也不再混进当前分母。
+**当前为 0。** 上一版本文列出的两个「未实现」均已落地，本文当时未同轮更新：
 
-## 3. 未实现的 2 个界面
+| 设计界面 | 落地提交 | 现状 |
+| --- | --- | --- |
+| 付款管理 | `c61465a` | `/finance/payment-management`，侧栏 `payManage` 已填 `to` |
+| 请款簿详情 | `fda6c38` | `/subcontract/payroll/:id`，走统一详情壳 |
 
-| 设计界面 | Nuxt 现状 | 判定 | 实施票 |
-| --- | --- | --- | --- |
-| 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
-| 请款簿详情 | 设计稿有可达二级界面，Nuxt 无对应路由 | 未实现 | [#197](https://github.com/zodea/crm-new/issues/197) |
+唯一不映射到实现的设计屏是不可达的 `detail`（「施工明细」，头注 2026-07-19 自标待删，能力已由 `quantityUnit` 户详情承接），在 `design-coverage.json` 中登记为 `retired`。
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
+
+## 3b. 实现有、设计稿没有（待补设计 10 条）
+
+由 [#244](https://github.com/zodea/crm-new/issues/244) 统一补齐；每条的原因与归属票在 `design-coverage.json` 的 `screenParity` 内登记，缺原因或缺归属票会让契约测试变红。
+
+| 生产路由 | 缺什么 | 归属票 |
+| --- | --- | --- |
+| `/schedule/process-library` · `/schedule/process-library/form` | 标准工序库列表与版本编辑（ADR 0018） | [#191](https://github.com/zodea/crm-new/issues/191) |
+| `/schedule/:pid/bind/:gid` | 暂估排程绑定施工合同复核（ADR 0017） | [#191](https://github.com/zodea/crm-new/issues/191) |
+| `/subcontract/attendance` · `/subcontract/daywork` | 工资考勤网格、逐日签工录入 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| `/subcontract/quantity/region` · `/subcontract/quantity/template` | 区域配置整页表单；户型模板在设计稿仍是大 Dialog，违反 ADR 0014 | [#198](https://github.com/zodea/crm-new/issues/198) |
+| `/export/config/:jobId` · `/import/mapping/:entity` | 设计稿只有 `KitUI.exportModal` / `importModal` 弹窗，违反 ADR 0004 / 0005 | [#205](https://github.com/zodea/crm-new/issues/205) |
+| `/project/:pid/supplier/import` | 项目×分供方导入向导 | [#192](https://github.com/zodea/crm-new/issues/192) |
 
 ## 4. 已搭但未闭环
 

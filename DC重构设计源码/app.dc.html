@@ -10,7 +10,8 @@
 
 <helmet>
   <link rel="stylesheet" href="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- 锁定版本：@latest 会随上游变化导致设计稿不可复现（#244 覆盖契约断言外部依赖必须锁版本） -->
+  <script src="https://unpkg.com/lucide@1.27.0"></script>
   <script src="_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/_ds_bundle.js"></script>
   <script src="kit/data.js"></script>
   <!-- 双轨数据：data.local.js(gitignored,车陂真实数据)存在则覆写 KIT_DATA 的 p5 切片；线上/仓库无此文件,静默回落假数据 -->
