@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { KitTableColumn } from '~/lib/kit/table'
+import type { TreeNode } from '~/lib/kit/tree-nav'
 import { useTimeoutFn } from '@vueuse/core'
 import { Button } from '~/components/ui/button'
 import { toErrorMessage } from '~/lib/util/error'
@@ -232,6 +234,44 @@ function handleDemoFormAction(action: DemoFormAction) {
   demoFormLoading.value = action
   finishDemoFormAction()
 }
+
+// W2-5 ListShell 列表页模板（#97）
+const demoListTreeKey = shallowRef('all')
+const demoListViewKey = shallowRef('all')
+const demoListRows = [
+  { id: 'contract-1', name: '施工总承包合同', status: 'active', owner: '我', amount: 32388422.52 },
+  { id: 'contract-2', name: '精装修材料采购合同', status: 'active', owner: '团队', amount: 19393316.46 },
+  { id: 'contract-3', name: '旧设备租赁合同', status: 'paused', owner: '我', amount: 682000 },
+  { id: 'contract-4', name: '临时仓库租赁合同', status: 'void', owner: '团队', amount: 240000 },
+  { id: 'contract-5', name: '历史维护合同', status: 'terminated', owner: '团队', amount: 96000 },
+]
+const demoListTree: TreeNode[] = [
+  { key: 'all', label: '全部合同', count: demoListRows.length, icon: 'i-lucide-files' },
+  { key: 'active', label: '履约', count: 2, icon: 'i-lucide-circle-check', tone: 'brand' },
+  { key: 'paused', label: '中止', count: 1, icon: 'i-lucide-circle-pause', tone: 'warn' },
+  { key: 'void', label: '废除', count: 1, icon: 'i-lucide-ban' },
+  { key: 'terminated', label: '终止', count: 1, icon: 'i-lucide-circle-off' },
+]
+const demoListViews = [
+  { key: 'all', label: '全部视图' },
+  { key: 'mine', label: '我负责的' },
+]
+const demoListColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#', width: 52 },
+  { field: 'name', title: '合同名称', minWidth: 220 },
+  { field: 'status', title: '合同状态', width: 100 },
+  { field: 'owner', title: '负责人', width: 90 },
+  { field: 'amount', title: '变更后合同金额', type: 'money', width: 170 },
+]
+const visibleDemoListRows = computed(() => demoListRows.filter(row =>
+  (demoListTreeKey.value === 'all' || row.status === demoListTreeKey.value)
+  && (demoListViewKey.value === 'all' || row.owner === '我'),
+))
+const demoListSummary = computed(() => ({
+  变更后合同金额总和: visibleDemoListRows.value.reduce((sum, row) => sum + row.amount, 0),
+  合同数量: visibleDemoListRows.value.length,
+  当前视图: demoListViews.find(view => view.key === demoListViewKey.value)?.label ?? '全部视图',
+}))
 
 // ⑧ 需分类的多文件导出（ADR 0004 / #80）
 async function demoConfiguredExport() {
@@ -572,6 +612,48 @@ async function demoImportMapping() {
         <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
           dirty：{{ demoFormDirty }}；保存后关闭：{{ demoCloseAfterSave }}
         </p>
+      </section>
+
+      <!-- W2-5 ListShell 列表页模板 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-5 ListShell — 左树、视图与汇总行（#97）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          切换合同状态或“我负责的”视图，页面负责过滤数据并把汇总结果回传给列表壳；收起左树可观察无空白布局。
+        </p>
+        <ListShell
+          v-model:tree-key="demoListTreeKey"
+          v-model:view-key="demoListViewKey"
+          :tree="demoListTree"
+          :views="demoListViews"
+          :summary="demoListSummary"
+        >
+          <template #toolbar>
+            <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <span class="text-12px text-ink-faint">
+                当前 {{ visibleDemoListRows.length }} 条
+              </span>
+              <button type="button" class="btn-secondary min-h-8">
+                导入
+              </button>
+              <button type="button" class="btn-accent min-h-8">
+                新建合同
+              </button>
+            </div>
+          </template>
+          <template #table>
+            <div class="min-w-0 overflow-x-auto">
+              <div class="min-w-170">
+                <KitTable
+                  :columns="demoListColumns"
+                  :data="visibleDemoListRows"
+                  :min-rows="5"
+                />
+              </div>
+            </div>
+          </template>
+        </ListShell>
       </section>
 
       <!-- ⑧ 配置导出页签 -->
