@@ -120,4 +120,30 @@ test.describe('Issue #103 Slice 2：只读工程量矩阵', () => {
     expect(metrics.overflowX).toMatch(/auto|scroll/)
     await documentDoesNotOverflow(page)
   })
+
+  test('量差总表读取真实三量并在窄屏浮层内局部横滚', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/subcontract/quantity')
+    await page.waitForLoadState('networkidle')
+
+    const trigger = page.getByRole('button', { name: '量差总表' })
+    await trigger.click()
+    const dialog = page.getByRole('dialog').filter({ hasText: '量差总表' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText(/不产生独立台账/)).toBeVisible()
+    await expect(dialog.getByRole('combobox', { name: '对比口径' })).toBeVisible()
+    await expect(dialog.locator('[data-ui="kit-table"]')).toBeVisible()
+    await documentDoesNotOverflow(page)
+
+    const tableScroll = dialog.locator('[data-ui="kit-table"] .vxe-table--body-inner-wrapper').first()
+    const widths = await tableScroll.evaluate(element => ({
+      client: element.clientWidth,
+      scroll: element.scrollWidth,
+    }))
+    expect(widths.scroll).toBeGreaterThan(widths.client)
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(trigger).toBeFocused()
+  })
 })

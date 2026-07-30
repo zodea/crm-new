@@ -28,7 +28,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
 
     const crewSelect = editor.getByRole('combobox', { name: '班组' })
     await crewSelect.click()
-    await page.getByRole('option', { name: '泥水B班', exact: true }).click()
+    await page.getByRole('option', { name: /泥水B班/ }).click()
     await editor.getByRole('button', { name: '保存责任' }).click()
 
     let replacement = page.getByRole('dialog').filter({ hasText: '替换现有责任' }).last()
@@ -63,7 +63,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     await page.getByRole('option', { name: '水暖工', exact: true }).click()
     await editor.getByRole('tab', { name: '个人责任' }).click()
     await editor.getByRole('combobox', { name: '个人' }).click()
-    await page.getByRole('option', { name: '周伟峰', exact: true }).click()
+    await page.getByRole('option', { name: /周伟峰/ }).click()
     await editor.getByRole('checkbox', { name: '选择2层202户' }).check()
     await editor.getByRole('tab', { name: '指定房间分项' }).click()
     const scope = editor.getByRole('checkbox', { name: /选择202户.*给排水管安装/ })

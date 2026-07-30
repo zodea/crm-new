@@ -22,6 +22,7 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{
   batchComplete: []
+  viewVariance: []
   exportLedger: []
   exportByCategory: []
   importData: []
@@ -109,6 +110,10 @@ const viewTabs = [
         <button type="button" class="btn-secondary" @click="emit('manageTemplates')">
           <span class="i-lucide-layout-template mr-1 text-13px" aria-hidden="true" />
           户型模板
+        </button>
+        <button type="button" class="btn-secondary" :disabled="loading" @click="emit('viewVariance')">
+          <span class="i-lucide-chart-no-axes-combined mr-1 text-13px" aria-hidden="true" />
+          量差总表
         </button>
         <button type="button" class="btn-secondary" :disabled="loading" @click="emit('importData')">
           <span class="i-lucide-file-up mr-1 text-13px" aria-hidden="true" />
