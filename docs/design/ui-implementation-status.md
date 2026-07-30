@@ -85,7 +85,7 @@
 | 分供方主数据 | #193 已闭环参考式列表、真实聚合筛选、ProjectSupplier 关联、统一七类新建、整页主数据表单、脱敏详情、6 类汇总穿透和分类文件区；[#13](https://github.com/zodea/crm-new/issues/13) 提供真实证照、OCR、有效期与人工审核；#192 提供项目维度合作工作台和文件导入 | 已闭环 |
 | 客户 / 班组 / 工人 | #194 已闭环三类真实数据列表、整页表单与详情：领域搜索筛选、脱敏、软删除撤回、深链/下钻、真实人数与项目聚合、档案/在场状态分离，以及 390 / 768 / 1024 / 1440px 局部横滚与键盘验收 | 已闭环 |
 | 核心合同 / 工程量清单 | #195 已闭环施工、分包、材料采购三类真实筛选列表与分页、通用合同详情、材料采购共享明细编辑网格、合同清单/变更/月度报量工作台和逐 sheet 导入错误恢复；金额及来源单据只按真实外键聚合，并完成四档局部横滚与键盘验收 | 已闭环 |
-| 辅助合同 / 结算 | 其他支出、公司支出及结算列表和整页表单基础已存在 | [#196](https://github.com/zodea/crm-new/issues/196) |
+| 辅助合同 / 结算 | 四类列表和整页表单已有 canonical 数据与真实 lookup 基础；#196 按 `CompanyExpScreen`、`OtherExpScreen`、`OtherSettleScreen`、`MatSettleScreen` 及对应表单直接源码收拢公司/项目边界、状态筛选、金额汇总、分页、空错状态和结算来源回填。公司/其他支出合同及两类结算均无持久化业务明细实体，`KitEditGrid` 不适用 | [#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
 | 工程量 / 工资 / 考勤 | 无合同项目区域、工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |

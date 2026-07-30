@@ -29,7 +29,13 @@ const props = defineProps<{
     invoiced: number
     paid: number
   } | null
-  selectedContractAmount?: number | null
+  selectedContract?: {
+    projectName: string
+    supplierName: string
+    amount: number
+    paid: number
+  } | null
+  eligibleSettlementContractCount?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -71,7 +77,8 @@ const TAX_RATE_OPTIONS = [13, 9, 6, 3, 1, 0].map(rate => ({
 }))
 const PAYMENT_CYCLE_OPTIONS = options(['月付', '季付', '年付', '一次性'])
 const COMPANY_CATEGORY_OPTIONS = options(['房租', '软件', '其他'])
-const FORM_STATUS_OPTIONS = options(['草稿', '审批中'])
+const COMPANY_STATUS_OPTIONS = options(['草稿', '审批中', '履约中', '已结清'])
+const SETTLEMENT_STATUS_OPTIONS = options(['草稿', '待确认', '已确认'])
 
 function patch(field: keyof PageDraft, value: unknown) {
   emit('patch', { [field]: value } as Partial<PageDraft>)
@@ -90,6 +97,19 @@ function inputValue(event: Event): string {
 
 function inputNumber(event: Event): number {
   return Number((event.target as HTMLInputElement).value) || 0
+}
+
+function errorId(field: keyof PageDraft) {
+  return `contract-form-${props.kind}-${String(field)}-error`
+}
+
+function errorDescriptionId(field: keyof PageDraft) {
+  return props.fieldErrors[String(field)] ? errorId(field) : undefined
+}
+
+function inputNullableNumber(event: Event): number | null {
+  const value = (event.target as HTMLInputElement).value
+  return value === '' ? null : Number(value)
 }
 
 function inputChecked(event: Event): boolean {
@@ -116,10 +136,12 @@ function inputChecked(event: Event): boolean {
           <input
             :value="draft.name"
             :class="fieldClass('name')"
+            :aria-invalid="Boolean(fieldErrors.name)"
+            :aria-describedby="errorDescriptionId('name')"
             data-testid="contract-name"
             @input="patch('name', inputValue($event))"
           >
-          <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
+          <span v-if="fieldErrors.name" :id="errorId('name')" class="field-error">{{ fieldErrors.name }}</span>
         </label>
 
         <label class="field-block form-span-full">
@@ -141,11 +163,13 @@ function inputChecked(event: Event): boolean {
           <LookupSelect
             :model-value="draft.originalContractId"
             :fetch="fetchOriginalContracts"
+            :invalid="Boolean(fieldErrors.originalContractId)"
+            :description-id="errorDescriptionId('originalContractId')"
             :recent-key="`supplement-original-${kind}`"
             placeholder="检索原合同"
             @update:model-value="patch('originalContractId', $event)"
           />
-          <span v-if="fieldErrors.originalContractId" class="field-error">{{ fieldErrors.originalContractId }}</span>
+          <span v-if="fieldErrors.originalContractId" :id="errorId('originalContractId')" class="field-error">{{ fieldErrors.originalContractId }}</span>
         </label>
 
         <template v-else>
@@ -154,33 +178,39 @@ function inputChecked(event: Event): boolean {
             <LookupSelect
               :model-value="draft.projectId"
               :fetch="fetchProjects"
+              :invalid="Boolean(fieldErrors.projectId)"
+              :description-id="errorDescriptionId('projectId')"
               :recent-key="`contract-project-${kind}`"
               placeholder="检索项目"
               @update:model-value="patch('projectId', $event)"
             />
-            <span v-if="fieldErrors.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
+            <span v-if="fieldErrors.projectId" :id="errorId('projectId')" class="field-error">{{ fieldErrors.projectId }}</span>
           </label>
           <label v-if="kind === 'construction'" class="field-block">
             <span class="field-label">甲方（客户） *</span>
             <LookupSelect
               :model-value="draft.customerId"
               :fetch="fetchCustomers"
+              :invalid="Boolean(fieldErrors.customerId)"
+              :description-id="errorDescriptionId('customerId')"
               recent-key="construction-contract-customer"
               placeholder="检索客户"
               @update:model-value="patch('customerId', $event)"
             />
-            <span v-if="fieldErrors.customerId" class="field-error">{{ fieldErrors.customerId }}</span>
+            <span v-if="fieldErrors.customerId" :id="errorId('customerId')" class="field-error">{{ fieldErrors.customerId }}</span>
           </label>
           <label v-if="isExpenseContract" class="field-block">
             <span class="field-label">乙方（分供方） *</span>
             <LookupSelect
               :model-value="draft.supplierId"
               :fetch="fetchSuppliers"
+              :invalid="Boolean(fieldErrors.supplierId)"
+              :description-id="errorDescriptionId('supplierId')"
               :recent-key="`contract-supplier-${kind}`"
               placeholder="检索分供方"
               @update:model-value="patch('supplierId', $event)"
             />
-            <span v-if="fieldErrors.supplierId" class="field-error">{{ fieldErrors.supplierId }}</span>
+            <span v-if="fieldErrors.supplierId" :id="errorId('supplierId')" class="field-error">{{ fieldErrors.supplierId }}</span>
           </label>
           <div v-if="kind === 'subcontract'" class="field-block">
             <span class="field-label">分包类别</span>
@@ -210,10 +240,12 @@ function inputChecked(event: Event): boolean {
             :value="draft.content"
             rows="3"
             :class="fieldClass('content')"
+            :aria-invalid="Boolean(fieldErrors.content)"
+            :aria-describedby="errorDescriptionId('content')"
             data-testid="contract-content"
             @input="patch('content', inputValue($event))"
           />
-          <span v-if="fieldErrors.content" class="field-error">{{ fieldErrors.content }}</span>
+          <span v-if="fieldErrors.content" :id="errorId('content')" class="field-error">{{ fieldErrors.content }}</span>
         </label>
         <label class="field-block">
           <span class="field-label">签约日期 *</span>
@@ -221,10 +253,12 @@ function inputChecked(event: Event): boolean {
             :value="draft.signDate"
             type="date"
             :class="fieldClass('signDate')"
+            :aria-invalid="Boolean(fieldErrors.signDate)"
+            :aria-describedby="errorDescriptionId('signDate')"
             data-testid="contract-sign-date"
             @input="patch('signDate', inputValue($event))"
           >
-          <span v-if="fieldErrors.signDate" class="field-error">{{ fieldErrors.signDate }}</span>
+          <span v-if="fieldErrors.signDate" :id="errorId('signDate')" class="field-error">{{ fieldErrors.signDate }}</span>
         </label>
         <div class="field-block">
           <span class="field-label">{{ isSupplement ? '协议状态' : '合同状态' }}</span>
@@ -268,10 +302,12 @@ function inputChecked(event: Event): boolean {
             min="0"
             step="0.01"
             :class="fieldClass('amount')"
+            :aria-invalid="Boolean(fieldErrors.amount)"
+            :aria-describedby="errorDescriptionId('amount')"
             data-testid="contract-amount"
             @input="patch('amount', inputNumber($event))"
           >
-          <span v-if="fieldErrors.amount" class="field-error">{{ fieldErrors.amount }}</span>
+          <span v-if="fieldErrors.amount" :id="errorId('amount')" class="field-error">{{ fieldErrors.amount }}</span>
         </label>
         <template v-if="!isSupplement">
           <div class="field-block">
@@ -433,8 +469,8 @@ function inputChecked(event: Event): boolean {
         </label>
         <label class="field-block">
           <span class="field-label">合同名称 *</span>
-          <input :value="draft.name" :class="fieldClass('name')" data-testid="company-contract-name" @input="patch('name', inputValue($event))">
-          <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
+          <input :value="draft.name" :class="fieldClass('name')" :aria-invalid="Boolean(fieldErrors.name)" :aria-describedby="errorDescriptionId('name')" data-testid="company-contract-name" @input="patch('name', inputValue($event))">
+          <span v-if="fieldErrors.name" :id="errorId('name')" class="field-error">{{ fieldErrors.name }}</span>
         </label>
         <div class="field-block">
           <span class="field-label">类别</span>
@@ -448,13 +484,13 @@ function inputChecked(event: Event): boolean {
         </div>
         <label class="field-block">
           <span class="field-label">对方单位 *</span>
-          <input :value="draft.counterparty" :class="fieldClass('counterparty')" @input="patch('counterparty', inputValue($event))">
-          <span v-if="fieldErrors.counterparty" class="field-error">{{ fieldErrors.counterparty }}</span>
+          <input :value="draft.counterparty" :class="fieldClass('counterparty')" :aria-invalid="Boolean(fieldErrors.counterparty)" :aria-describedby="errorDescriptionId('counterparty')" @input="patch('counterparty', inputValue($event))">
+          <span v-if="fieldErrors.counterparty" :id="errorId('counterparty')" class="field-error">{{ fieldErrors.counterparty }}</span>
         </label>
         <label class="field-block">
           <span class="field-label">签订日期 *</span>
-          <input :value="draft.signDate" type="date" :class="fieldClass('signDate')" @input="patch('signDate', inputValue($event))">
-          <span v-if="fieldErrors.signDate" class="field-error">{{ fieldErrors.signDate }}</span>
+          <input :value="draft.signDate" type="date" :class="fieldClass('signDate')" :aria-invalid="Boolean(fieldErrors.signDate)" :aria-describedby="errorDescriptionId('signDate')" @input="patch('signDate', inputValue($event))">
+          <span v-if="fieldErrors.signDate" :id="errorId('signDate')" class="field-error">{{ fieldErrors.signDate }}</span>
         </label>
         <label class="field-block">
           <span class="field-label">租期或服务期</span>
@@ -464,7 +500,7 @@ function inputChecked(event: Event): boolean {
           <span class="field-label">状态</span>
           <SelectFilter
             :model-value="draft.status"
-            :options="FORM_STATUS_OPTIONS"
+            :options="COMPANY_STATUS_OPTIONS"
             aria-label="公司支出状态"
             full-width
             @update:model-value="patch('status', $event)"
@@ -477,7 +513,8 @@ function inputChecked(event: Event): boolean {
       <div class="form-fields-grid">
         <label class="field-block">
           <span class="field-label">合同金额 *</span>
-          <input :value="draft.amount ?? 0" type="number" min="0" step="0.01" :class="fieldClass('amount')" @input="patch('amount', inputNumber($event))">
+          <input :value="draft.amount ?? 0" type="number" min="0" step="0.01" :class="fieldClass('amount')" :aria-invalid="Boolean(fieldErrors.amount)" :aria-describedby="errorDescriptionId('amount')" @input="patch('amount', inputNumber($event))">
+          <span v-if="fieldErrors.amount" :id="errorId('amount')" class="field-error">{{ fieldErrors.amount }}</span>
         </label>
         <div class="field-block">
           <span class="field-label">付款周期</span>
@@ -510,32 +547,49 @@ function inputChecked(event: Event): boolean {
         </label>
         <label class="field-block">
           <span class="field-label">结算名称 *</span>
-          <input :value="draft.name" :class="fieldClass('name')" data-testid="settlement-name" @input="patch('name', inputValue($event))">
-          <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
+          <input :value="draft.name" :class="fieldClass('name')" :aria-invalid="Boolean(fieldErrors.name)" :aria-describedby="errorDescriptionId('name')" data-testid="settlement-name" @input="patch('name', inputValue($event))">
+          <span v-if="fieldErrors.name" :id="errorId('name')" class="field-error">{{ fieldErrors.name }}</span>
         </label>
         <label class="field-block">
           <span class="field-label">项目 *</span>
           <LookupSelect
             :model-value="draft.projectId"
             :fetch="fetchProjects"
+            :invalid="Boolean(fieldErrors.projectId)"
+            :description-id="errorDescriptionId('projectId')"
             recent-key="other-settlement-project"
             placeholder="检索项目"
             @update:model-value="patch('projectId', $event)"
           />
-          <span v-if="fieldErrors.projectId" class="field-error">{{ fieldErrors.projectId }}</span>
+          <span v-if="fieldErrors.projectId" :id="errorId('projectId')" class="field-error">{{ fieldErrors.projectId }}</span>
         </label>
-        <label class="field-block">
+        <div class="field-block">
           <span class="field-label">{{ isMaterialSettlement ? '材料采购合同' : '其他支出合同' }} *</span>
           <LookupSelect
             :model-value="draft.contractId"
             :fetch="fetchOtherExpenseContracts"
+            :invalid="Boolean(fieldErrors.contractId)"
+            :description-id="errorDescriptionId('contractId')"
             :recent-key="isMaterialSettlement ? 'material-settlement-contract' : 'other-settlement-contract'"
             :disabled-reason="draft.projectId ? undefined : '请先选择项目'"
             :placeholder="isMaterialSettlement ? '检索材料采购合同' : '检索其他支出合同'"
             @update:model-value="patch('contractId', $event)"
           />
-          <span v-if="fieldErrors.contractId" class="field-error">{{ fieldErrors.contractId }}</span>
-        </label>
+          <span v-if="fieldErrors.contractId" :id="errorId('contractId')" class="field-error">{{ fieldErrors.contractId }}</span>
+          <div
+            v-if="draft.projectId && eligibleSettlementContractCount === 0"
+            role="status"
+            class="field-error flex flex-wrap items-center gap-x-2 gap-y-1"
+          >
+            <span>当前项目暂无可结算的{{ isMaterialSettlement ? '材料采购合同' : '其他支出合同' }}，请先建立对应合同。</span>
+            <NuxtLink
+              :to="isMaterialSettlement ? '/contract/material' : '/contract/other-expense'"
+              class="font-700 text-brand underline underline-offset-2"
+            >
+              前往合同列表
+            </NuxtLink>
+          </div>
+        </div>
       </div>
     </section>
     <section id="section-amount" class="panel scroll-mt-4 p-4">
@@ -543,12 +597,25 @@ function inputChecked(event: Event): boolean {
       <div class="form-fields-grid">
         <label class="field-block">
           <span class="field-label">结算金额 *</span>
-          <input :value="draft.totalAmount ?? 0" type="number" min="0" step="0.01" :class="fieldClass('totalAmount')" data-testid="settlement-amount" @input="patch('totalAmount', inputNumber($event))">
+          <input :value="draft.totalAmount ?? 0" type="number" min="0" step="0.01" :class="fieldClass('totalAmount')" :aria-invalid="Boolean(fieldErrors.totalAmount)" :aria-describedby="errorDescriptionId('totalAmount')" data-testid="settlement-amount" @input="patch('totalAmount', inputNumber($event))">
+          <span v-if="fieldErrors.totalAmount" :id="errorId('totalAmount')" class="field-error">{{ fieldErrors.totalAmount }}</span>
+        </label>
+        <label class="field-block">
+          <span class="field-label">不含税结算金额</span>
+          <input :value="draft.amount ?? ''" type="number" min="0" step="0.01" class="field-input w-full" data-testid="settlement-tax-exclusive-amount" @input="patch('amount', inputNullableNumber($event))">
+        </label>
+        <label class="field-block">
+          <span class="field-label">税额</span>
+          <input :value="draft.taxAmount ?? ''" type="number" min="0" step="0.01" class="field-input w-full" data-testid="settlement-tax-amount" @input="patch('taxAmount', inputNullableNumber($event))">
+        </label>
+        <label class="field-block">
+          <span class="field-label">税率（%）</span>
+          <input :value="draft.taxRate ?? ''" type="number" min="0" step="0.01" class="field-input w-full" data-testid="settlement-tax-rate" @input="patch('taxRate', inputNullableNumber($event))">
         </label>
         <label class="field-block">
           <span class="field-label">结算日期 *</span>
-          <input :value="draft.settlementDate" type="date" :class="fieldClass('settlementDate')" @input="patch('settlementDate', inputValue($event))">
-          <span v-if="fieldErrors.settlementDate" class="field-error">{{ fieldErrors.settlementDate }}</span>
+          <input :value="draft.settlementDate" type="date" :class="fieldClass('settlementDate')" :aria-invalid="Boolean(fieldErrors.settlementDate)" :aria-describedby="errorDescriptionId('settlementDate')" @input="patch('settlementDate', inputValue($event))">
+          <span v-if="fieldErrors.settlementDate" :id="errorId('settlementDate')" class="field-error">{{ fieldErrors.settlementDate }}</span>
         </label>
         <label class="field-block">
           <span class="field-label">结算期间</span>
@@ -562,7 +629,7 @@ function inputChecked(event: Event): boolean {
           <span class="field-label">状态</span>
           <SelectFilter
             :model-value="draft.status"
-            :options="FORM_STATUS_OPTIONS"
+            :options="SETTLEMENT_STATUS_OPTIONS"
             aria-label="结算状态"
             full-width
             @update:model-value="patch('status', $event)"
@@ -574,14 +641,24 @@ function inputChecked(event: Event): boolean {
       <SectionHeader title="合同情况（带出）" />
       <div class="mt-3 grid gap-2 sm:grid-cols-2">
         <div class="info-cell rounded-[var(--radius-control)] border border-line">
+          <span class="block text-11px text-ink-faint">项目</span>
+          <strong class="mt-1 block text-13px text-ink">{{ selectedContract?.projectName || '—' }}</strong>
+        </div>
+        <div class="info-cell rounded-[var(--radius-control)] border border-line">
+          <span class="block text-11px text-ink-faint">分供方</span>
+          <strong class="mt-1 block text-13px text-ink">{{ selectedContract?.supplierName || '—' }}</strong>
+        </div>
+        <div class="info-cell rounded-[var(--radius-control)] border border-line">
           <span class="block text-11px text-ink-faint">合同金额</span>
           <strong class="mt-1 block font-mono text-16px text-ink">
-            {{ selectedContractAmount == null ? '—' : selectedContractAmount.toFixed(2) }}
+            {{ selectedContract == null ? '—' : selectedContract.amount.toFixed(2) }}
           </strong>
         </div>
         <div class="info-cell rounded-[var(--radius-control)] border border-line">
-          <span class="block text-11px text-ink-faint">关联规则</span>
-          <strong class="mt-1 block text-13px text-ink">项目、分供方由合同真实关系带出</strong>
+          <span class="block text-11px text-ink-faint">累计支付</span>
+          <strong class="mt-1 block font-mono text-16px text-ink">
+            {{ selectedContract == null ? '—' : selectedContract.paid.toFixed(2) }}
+          </strong>
         </div>
       </div>
     </section>

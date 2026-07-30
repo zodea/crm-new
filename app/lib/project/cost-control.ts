@@ -196,8 +196,9 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
       JOIN contracts AS contract ON contract.id = settlement.contract_id
       WHERE ${visibleCond('expenditure_settlements', 'settlement')}
         AND ${visibleCond('contracts', 'contract')}
-        AND settlement.status = 'confirmed'
-      ORDER BY settlement.created_at, settlement.id
+        AND settlement.status IN ('confirmed', 'approved', '已确认', '已审批')
+        AND contract.status NOT IN ('draft', '草稿')
+        ORDER BY settlement.created_at, settlement.id
     `),
     db.select<Record<string, unknown>>(`
       ${hiddenCtesFor(

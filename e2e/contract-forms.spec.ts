@@ -40,6 +40,12 @@ const FORM_ROUTES = [
     field: '[data-testid="settlement-name"]',
     editUrl: /\/contract\/other-settlement\/form\/[^/?]+$/,
   },
+  {
+    path: '/material/settlement/form',
+    title: '新建 · 材料采购结算',
+    field: '[data-testid="settlement-name"]',
+    editUrl: /\/material\/settlement\/form\/[^/?]+$/,
+  },
 ] as const
 
 async function chooseLookup(
@@ -54,7 +60,7 @@ async function chooseLookup(
 }
 
 test.describe('F2 canonical 合同与支出结算整页表单', () => {
-  test('六条命名路由均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
+  test('七条命名路由均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
     test.setTimeout(120_000)
     await page.setViewportSize({ width: 390, height: 844 })
 
@@ -180,7 +186,9 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await expect(page).toHaveURL(/\/contract\/other-expense\/form\/[^/?]+$/)
 
     await page.locator('a[href="/contract/other-settlement"]').click()
-    await page.getByTestId('create-aux-contract').click()
+    await page.getByRole('region', { name: '其他支出结算列表工具栏' })
+      .getByRole('button', { name: '新建其他支出结算' })
+      .click()
     await page.getByTestId('settlement-name').fill(`E2E结算-${suffix}`)
     await chooseLookup(page, '检索项目', '合和新城', '合和新城')
     await chooseLookup(page, '检索其他支出合同', expenseName, expenseName)
@@ -189,10 +197,10 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
     await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+$/)
-    await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('待确认', { exact: true }).first()).toBeVisible()
   })
 
-  test('六条表单在响应式参考矩阵均无页面级横向溢出', async ({ page }) => {
+  test('七条表单在响应式参考矩阵均无页面级横向溢出', async ({ page }) => {
     test.setTimeout(120_000)
     for (const width of RESPONSIVE_WIDTHS.slice(1)) {
       await page.setViewportSize({ width, height: 900 })

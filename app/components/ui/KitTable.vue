@@ -135,7 +135,9 @@ function buildColProps(col: NormalizedKitColumn, slot: string | undefined): Reco
     p.minWidth = col.minWidth
   if (col.maxWidth != null)
     p.maxWidth = col.maxWidth
-  if (col.fixed)
+  // vxe-table 会在固定列容器中复制空态插槽，产生重复的 status 与可聚焦按钮。
+  // 无数据时无需固定列，关闭 fixed 可确保空态只渲染一次。
+  if (col.fixed && data.length > 0)
     p.fixed = col.fixed
   if (col.resizable != null)
     p.resizable = col.resizable

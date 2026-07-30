@@ -84,9 +84,34 @@ describe('project cost control read model', () => {
           80, '2026-07-01', 'confirmed'
         ),
         (
+          'settlement-approved', 'JS-002', '已审批结算', '专业分包',
+          'project-cost', 'supplier-cost', 'contract-professional',
+          1, '2026-07-02', 'approved'
+        ),
+        (
+          'settlement-confirmed-cn', 'JS-003', '中文已确认结算', '专业分包',
+          'project-cost', 'supplier-cost', 'contract-professional',
+          2, '2026-07-03', '已确认'
+        ),
+        (
+          'settlement-approved-cn', 'JS-004', '中文已审批结算', '专业分包',
+          'project-cost', 'supplier-cost', 'contract-professional',
+          3, '2026-07-04', '已审批'
+        ),
+        (
+          'settlement-pending', 'JS-PENDING', '待确认结算', '专业分包',
+          'project-cost', 'supplier-cost', 'contract-professional',
+          900, '2026-07-05', '待确认'
+        ),
+        (
           'settlement-draft', 'JS-DRAFT', '结算草稿', '专业分包',
           'project-cost', 'supplier-cost', 'contract-professional',
-          900, '2026-07-02', 'draft'
+          900, '2026-07-06', 'draft'
+        ),
+        (
+          'settlement-draft-contract', 'JS-DRAFT-CONTRACT', '草稿合同已确认结算', '材料',
+          'project-cost', 'supplier-cost', 'contract-draft',
+          900, '2026-07-07', '已确认'
         )
     `)
     await db.execute(`
@@ -165,9 +190,9 @@ describe('project cost control read model', () => {
       status: '当前基线',
       targetAmount: 2600,
       signedAmount: 360,
-      settledAmount: 190,
+      settledAmount: 196,
       paidAmount: 130,
-      remainingAmount: 2410,
+      remainingAmount: 2404,
       sourcePath: '/project/target-cost/target-baseline',
     })
     expect(result.versions.find(row => row.id === 'target-draft')?.status).toBe('草稿（不入控制）')
@@ -185,11 +210,11 @@ describe('project cost control read model', () => {
     expect(rows.find(row => row.category === '专业分包')).toMatchObject({
       targetAmount: 1000,
       signedAmount: 110,
-      settledAmount: 80,
+      settledAmount: 86,
       paidAmount: 60,
-      remainingAmount: 920,
+      remainingAmount: 914,
       contractCount: 1,
-      settlementCount: 1,
+      settlementCount: 4,
       paymentCount: 1,
     })
     expect(rows.find(row => row.category === '合同劳务')).toMatchObject({
@@ -201,6 +226,7 @@ describe('project cost control read model', () => {
     expect(rows.find(row => row.category === '材料')).toMatchObject({
       targetAmount: 600,
       signedAmount: 200,
+      settledAmount: 0,
       targetPath: '/project/target-cost/target-baseline',
     })
     expect(rows.find(row => row.category === '工人工资')).toMatchObject({
