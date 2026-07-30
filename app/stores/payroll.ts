@@ -9,6 +9,7 @@ import type {
 } from '~/lib/payroll/statements'
 import type { WageQuantitySource } from '~/lib/quantity/wage-source'
 import { defineStore } from 'pinia'
+import { computed, reactive, ref, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
 import {
@@ -25,6 +26,25 @@ function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
 
+export interface PayrollDraftCreateInput {
+  projectId: string
+  crewId?: string | null
+  leaderWorkerId: string
+  month: string
+  purpose: WageStatementPurpose
+  periodKind: WagePeriodKind
+  formatFamily: WageFormatFamily
+  quantitySource: WageQuantitySource
+  payRatio: number
+  memberWorkerIds: string[]
+  dailyRate?: number
+  overtimeRate?: number
+  c2Rate?: number
+  dayworkRuleText?: string
+  adjustmentReason?: string
+  operatorName?: string
+}
+
 export const usePayrollStore = defineStore('payroll-workbench', () => {
   const statements = shallowRef<WageStatement[]>([])
   const options = shallowRef<PayrollWorkbenchOptions>({
@@ -36,6 +56,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   const selectedId = ref('')
   const loading = ref(false)
   const error = ref('')
+  let loadSequence = 0
   const filters = reactive<WageStatementFilter>({
     projectId: '',
     month: currentMonth(),
@@ -47,47 +68,74 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     statements.value.find(statement => statement.id === selectedId.value) ?? null,
   )
 
-  async function load() {
+  async function resolveOptions(projectId: string) {
+    const db = await getDb()
+    let resolvedProjectId = projectId
+    let nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
+    if (!resolvedProjectId && nextOptions.projects[0]) {
+      resolvedProjectId = nextOptions.projects[0].id
+      nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
+    }
+    return { db, resolvedProjectId, nextOptions }
+  }
+
+  async function loadOptions(projectId = filters.projectId ?? '') {
+    const sequence = ++loadSequence
     loading.value = true
     error.value = ''
     try {
-      const db = await getDb()
-      let nextOptions = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      if (!filters.projectId && nextOptions.projects[0])
-        filters.projectId = nextOptions.projects[0].id
-      if (filters.projectId)
-        nextOptions = await loadPayrollWorkbenchOptions(db, filters.projectId)
+      const { resolvedProjectId, nextOptions } = await resolveOptions(projectId)
+      if (sequence !== loadSequence)
+        return nextOptions
+      filters.projectId = resolvedProjectId
       options.value = nextOptions
-      statements.value = await listWageStatements(db, filters)
+      return nextOptions
+    }
+    catch (cause) {
+      if (sequence !== loadSequence)
+        return options.value
+      error.value = cause instanceof Error ? cause.message : String(cause)
+      throw cause
+    }
+    finally {
+      if (sequence === loadSequence)
+        loading.value = false
+    }
+  }
+
+  async function load() {
+    const sequence = ++loadSequence
+    const requestedFilters: WageStatementFilter = { ...filters }
+    loading.value = true
+    error.value = ''
+    statements.value = []
+    selectedId.value = ''
+    try {
+      const { db, resolvedProjectId, nextOptions } = await resolveOptions(requestedFilters.projectId ?? '')
+      const nextFilters: WageStatementFilter = {
+        ...requestedFilters,
+        projectId: resolvedProjectId,
+      }
+      const nextStatements = await listWageStatements(db, nextFilters)
+      if (sequence !== loadSequence)
+        return
+      Object.assign(filters, nextFilters)
+      options.value = nextOptions
+      statements.value = nextStatements
       if (!statements.value.some(statement => statement.id === selectedId.value))
         selectedId.value = statements.value[0]?.id ?? ''
     }
     catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      if (sequence === loadSequence)
+        error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
-      loading.value = false
+      if (sequence === loadSequence)
+        loading.value = false
     }
   }
 
-  async function createDraft(input: {
-    projectId: string
-    crewId?: string | null
-    leaderWorkerId: string
-    month: string
-    purpose: WageStatementPurpose
-    periodKind: WagePeriodKind
-    formatFamily: WageFormatFamily
-    quantitySource: WageQuantitySource
-    payRatio: number
-    memberWorkerIds: string[]
-    dailyRate?: number
-    overtimeRate?: number
-    c2Rate?: number
-    dayworkRuleText?: string
-    adjustmentReason?: string
-    operatorName?: string
-  }) {
+  async function createDraft(input: PayrollDraftCreateInput) {
     if (input.formatFamily === 'B')
       throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
     const id = await withTransaction(async (tx) => {
@@ -210,6 +258,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     error,
     filters,
     load,
+    loadOptions,
     createDraft,
     updatePrice,
     checkSelected,

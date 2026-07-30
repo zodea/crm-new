@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import { nextTick, onMounted } from 'vue'
 import { createPayrollWorkbookExport } from '~/lib/payroll/export'
+import {
+  payrollFiltersFromQuery,
+  payrollListLocation,
+} from '~/lib/payroll/navigation'
 
 const store = usePayrollStore()
 const kit = useKitUI()
+const route = useRoute()
 
-onMounted(store.load)
+onMounted(async () => {
+  Object.assign(store.filters, payrollFiltersFromQuery(route.query, store.filters))
+  await store.load()
+  await navigateTo(payrollListLocation(store.filters), { replace: true })
+})
 
 async function reload(filters: typeof store.filters) {
   Object.assign(store.filters, filters)
+  await navigateTo(payrollListLocation(store.filters), { replace: true })
   await store.load()
 }
 
@@ -64,7 +74,6 @@ async function printSelected() {
       :options="store.options"
       :filters="store.filters"
       @update:filters="reload"
-      @create="input => run(() => store.createDraft(input), '工资草稿已生成')"
     />
     <PayrollSummary :statements="store.statements" />
     <p v-if="store.error" role="alert" class="rounded-md bg-danger-soft px-3 py-2 text-12px text-danger">

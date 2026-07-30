@@ -6,9 +6,9 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 86,
-    "appPageFiles": 126,
+    "appPageFiles": 127,
     "appNavLeaves": 50,
-    "covered": 126,
+    "covered": 127,
     "designPending": 0,
     "retired": 0,
     "navTitleVariants": 6
@@ -649,6 +649,11 @@
     {
       "appRoute": "/subcontract/payroll/:id",
       "designRoute": "payrollDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/payroll/new",
+      "designRoute": "payroll",
       "status": "covered"
     },
     {

@@ -208,14 +208,15 @@
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 动态类型映射到分包变洽签或分包结算的真实标题、字段分区和状态动作；两类均不补造无持久化实体支撑的明细网格 | 编辑返回原类型列表；分供方、合同、附件和结算只走真实外键，错误定位首个无效字段 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-SUB-DOC-DC | 两类列表分别采用真实列、搜索提示、项目/类型/状态筛选、汇总、分页和业务空态；宽表局部横滚 | 保留项目、合同或分供方来源 query 并可清除；编号/名称进入原类型编辑页 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页按动态类型显示真实标题、来源、金额、备注和附件分区，不使用通用占位标题或虚构明细 | 项目、合同和分供方只选择真实关联记录；草稿、上报和确认沿用本地状态校验 | C-FORM |
-| `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 考勤写入路径保持现有契约 | C-DENSE |
-| `app/pages/subcontract/daywork.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | C2 逐日签工独立整页；待后续同屏测量 A4 记录表 | 签工与考勤同月互斥，已发月份冻结 | C-DENSE |
-| `app/pages/subcontract/payroll/[id].vue` | `/subcontract/payroll/:id` | 工程量与工资 | 详情 | #197 | R-DETAIL-PRIOR | 已迁入统一详情壳，成员分配、核算行与 C2 签工均使用 KitTable；具体参考同屏差异仍待 #197 测量 | 仅展示真实工资单外键与 released 冻结快照；草稿/已核对金额不计为正式已发，不包含写入动作 | C-DENSE |
-| `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工资核算规则保持现有契约 | C-DENSE |
-| `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 待 #198 同屏测量 | 待 #198 只读核对 | C-DENSE |
-| `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | 待 #198 同屏测量 | 工程量写入路径保持现有契约 | C-DENSE |
-| `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 复用统一整页表单壳；具体区域配置参考仍待 #198 同屏测量 | 只新增楼栋、楼层、户并记录日志；合同可选，归档矩阵禁止写入 | C-FORM |
-| `app/pages/subcontract/quantity/template.vue` | `/subcontract/quantity/template` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 待 #198 同屏测量 | 户型模板写入路径保持现有契约 | C-FORM |
+| `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | #198 已完成真实名册/人日/工时/锁定汇总、31 日矩阵、固定首列、保存进行态、错误保留和 390px 编辑区退化 | 只写 `attendance_records`；C2 人员与 C1 已发月份锁定，未实现能力不补演示数字 | C-DENSE |
+| `app/pages/subcontract/daywork.vue` | `/subcontract/daywork` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | C2 逐日签工独立整页，列表与表单保持紧凑纵向工作流 | 签工与考勤同月互斥，已发月份冻结；只有已确认记录进入工资 | C-DENSE |
+| `app/pages/subcontract/payroll/[id].vue` | `/subcontract/payroll/:id` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 统一详情壳承载成员分配、核算行、C2 签工、来源版本和发放快照 | 只展示真实工资单外键与 released 冻结快照；草稿/已核对金额不计为正式已发 | C-DENSE |
+| `app/pages/subcontract/payroll/index.vue` | `/subcontract/payroll` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | #198 收敛为项目/月/班组/状态筛选、真实汇总、请款簿台账与详情；大型建单表单迁出 | query 与新建页往返保留；A/C1/C2 可用，B 因显式数据关系未定继续禁用 | C-DENSE |
+| `app/pages/subcontract/payroll/new.vue` | `/subcontract/payroll/new` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 参考工资字段按 ADR 0014 迁入独立整页建单，分建单范围、工资口径、请款组员和经办说明 | 取消/成功返回原台账筛选；页面与 store/服务均阻止 B 类伪建单 | C-FORM |
+| `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-DETAIL-PRIOR | 矩阵单元直接进入户施工详情，不在矩阵下方插入二次时间线；返回恢复项目、楼栋、月份、视角、工种和责任人 | pid/uid 真实归属校验；责任、阶段完成和三量只读派生不落第二表 | C-DENSE |
+| `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-WORKBENCH-PRIOR | #198 完成双视角矩阵、冻结首列/表头、筛选汇总、责任/完成入口、直接下钻和真实量差总表 | 矩阵与量差宽表各自在自身区域横滚；量差读三量、合同价轨和已审批变更，无楼栋归属的变更单列待分摊且只计一次，不保存副本 | C-DENSE |
+| `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 统一整页表单壳承载楼栋→楼层→户配置，并与户型模板、排程来源往返 | 只新增真实区域并记录日志；合同可选，归档矩阵禁止写入 | C-FORM |
+| `app/pages/subcontract/quantity/template.vue` | `/subcontract/quantity/template` | 工程量与工资 | 整页表单 | #198 | R-FORM-PRIOR | 从大型 Dialog 迁为独立路由，分基本信息、房间与三量明细；录入口径显式区分合同/暂估/现场 | 三量分别保存；现场量保存算式与结果，未保存离开需确认 | C-FORM |
 
 ## 6. 维护规则
 
