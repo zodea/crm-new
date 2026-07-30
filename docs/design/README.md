@@ -35,7 +35,7 @@ DC重构设计源码/
 
 ## 当前待补设计
 
-- [施工进度「前后置依赖设置」设计补图任务书](./schedule-dependency-editor-brief.md)：补齐工序详情内的依赖摘要、独立 FS + lag 设置弹窗及冲突状态；完成后必须合入 `app.dc.html`，本文本身不替代视觉基准。
+**当前为空。** 唯一在列的[施工进度「前后置依赖设置」设计补图任务书](./schedule-dependency-editor-brief.md)已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入 `DC重构设计源码/kit/SchedulePlanScreen.jsx`：工序详情内的依赖摘要行、单层 FS + lag 设置视图、日期预览与冲突 warning、候选限制与环检测、调期冲突的灰色虚线保留与恢复入口均已落到设计源码，视觉基准回到 `app.dc.html` 本身。该 brief 保留为历史规格说明，不再作为待办。
 
 当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。后者是 #181 下的证据登记册，不复制页面字段规格，也不在 #183 完成前替代本页列出的视觉权威链。
 
