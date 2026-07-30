@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import {
+  assessMasterDataDeletion,
   deleteMasterDataRecord,
   listFormAttachments,
   loadCrewForm,
@@ -502,6 +503,20 @@ describe('f1 整页表单领域 action', () => {
     })
   })
 
+  it('客户统一社会信用代码冲突时返回可理解的领域提示', async () => {
+    await saveCustomerForm({
+      name: '第一建设单位',
+      contact: '陈经理',
+      taxNo: '914400001234567890',
+    }, 'submit')
+
+    await expect(saveCustomerForm({
+      name: '第二建设单位',
+      contact: '李经理',
+      taxNo: '914400001234567890',
+    }, 'submit')).rejects.toThrow('统一社会信用代码已被客户「第一建设单位」使用')
+  })
+
   it('普通分供方表单保存不会覆盖独立纳税人核验留痕', async () => {
     const supplier = await saveSupplierForm({
       name: '核验留痕分供方',
@@ -729,6 +744,12 @@ describe('f1 整页表单领域 action', () => {
   })
 
   it('客户与班组删除约束在领域事务内检查项目、合同和在册工人', async () => {
+    await expect(assessMasterDataDeletion('customer', 'customer-ref'))
+      .resolves
+      .toEqual(expect.objectContaining({
+        blockedReason: expect.stringContaining('活跃项目'),
+        impact: [],
+      }))
     await expect(deleteMasterDataRecord('customer', 'customer-ref'))
       .rejects
       .toThrow('活跃项目')
@@ -748,9 +769,38 @@ describe('f1 整页表单领域 action', () => {
       INSERT INTO workers (id, name, crew_id)
       VALUES ('worker-crew-ref', '在册工人', 'crew-ref')
     `)
+    await expect(assessMasterDataDeletion('crew', 'crew-ref'))
+      .resolves
+      .toEqual(expect.objectContaining({
+        blockedReason: expect.stringContaining('在册工人'),
+        impact: [],
+      }))
     await expect(deleteMasterDataRecord('crew', 'crew-ref'))
       .rejects
       .toThrow('在册工人')
+  })
+
+  it('工人删除评估合并多角色关联并要求按级联流程确认', async () => {
+    await mem.execute(`
+      INSERT INTO workers (id, name)
+      VALUES ('worker-cascade', '级联工人')
+    `)
+    await mem.execute(`
+      INSERT INTO penalty_records (
+        id, projectId, workerId, responsibleWorkerId, reason, amount
+      )
+      VALUES (
+        'penalty-worker-cascade', 'project-ref', 'worker-cascade',
+        'worker-cascade', '整改扣罚', 100
+      )
+    `)
+
+    await expect(assessMasterDataDeletion('worker', 'worker-cascade'))
+      .resolves
+      .toEqual({
+        blockedReason: '',
+        impact: [{ label: '扣罚记录', n: 1 }],
+      })
   })
 
   it('六类头表共用软删除、恢复与日志边界', async () => {

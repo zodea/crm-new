@@ -3,5 +3,5 @@ definePageMeta({ name: 'crewForm' })
 </script>
 
 <template>
-  <MasterDataFormPage kind="crew" />
+  <MasterDataFormPage kind="crew" return-to-detail />
 </template>

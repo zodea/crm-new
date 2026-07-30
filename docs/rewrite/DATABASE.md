@@ -437,13 +437,9 @@ CREATE TABLE project_aliases (
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | Crew | `crews` | `id` | `base-crew.md` |
-| CrewWorker | `crew_workers` | `id` | `base-crew.md` |
-| CrewProjectConfig | `crew_project_config` | `id` | `base-crew.md` |
-| CrewProjectItem | `crew_project_items` | `id` | `base-crew.md` |
 | Worker | `workers` | `id` | `base-worker.md` |
-| WorkerCert | `worker_certs` | `id` | `base-worker.md` |
 | PenaltyRecord | `penalty_records` | `id` | `base-crew.md` / `base-worker.md` |
-| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，班组单价走 `crew_project_items`） |
+| Item | `items` | `id` | `subcontract-quantity.md`（分项定义：**项目×分部/工种**，不挂班组——分项是合同计量口径；谁做记在 `unit_assignments`，当前物理模型没有“班组×项目×分项单价”表） |
 | ItemUnitPrice | `item_unit_prices` | `id` | `boq-import.md`（E 类零星维修分项单价库；不进入合同工程量/合同价轨） |
 | HouseTypeTemplate | `house_type_templates` | `id` | **ADR 0010**：户型模板（项目×户型，活链接多户） |
 | HouseTypeTemplateItem | `house_type_template_items` | `id` | **ADR 0010**：模板明细/三量（稳定模板房间×分项，工种从分项读取；清单量/暂估量/现场量算式，户型层共享、量可手改留痕） |
@@ -1168,7 +1164,8 @@ penalty_settlement_deductions(
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
 | `projects` | `customer_id` / `secondary_customer_id` | `customers.id` | N:1 | 项目 → 主/次客户；名称文本列只作迁移输入 |
-| `workers` | `crew_id` / `current_project_id` | `crews.id` / `projects.id` | N:1 | 工人 → 班组/当前项目 |
+| `workers` | `crew_id` | `crews.id` | N:1 | 工人 → 所属班组；班组是主档归属父级 |
+| `workers` | `current_project_id` | `projects.id` | N:1 | 工人当前项目引用；仅表示当前分配，不是工人主档的删除父级，项目不可见时工人仍保留 |
 | `project_suppliers` | `projectId` | `projects.id` | N:1 | 项目×分供方关联 |
 | `project_suppliers` | `supplierId` | `suppliers.id` | N:1 | |
 | `supplier_credentials` | `supplierId` | `suppliers.id` | N:1 | 分供方证照 |
@@ -1232,14 +1229,10 @@ penalty_settlement_deductions(
 
 ### 3.4 分包及人工关联
 
+当前物理 schema 不存在独立的 `crew_workers`、`crew_project_config`、`crew_project_items` 或 `worker_certs`。班组成员以 `workers.crew_id` 表达（见 §3.1）；班组参与项目从成员当前项目、`unit_assignments` 与 `wage_statements` 的真实事实聚合；班组和工人附件走 §4 的多态 `file_refs`。不得恢复蓝本中的幽灵表名，若要新增班组项目单价或证件有效期能力，必须先完成领域决策与迁移设计。
+
 | 表 | 外键字段 | 引用 | 关系 | 说明 |
 |---|---|---|---|---|
-| `crew_workers` | `crewId` | `crews.id` | N:1 | 工人 → 班组 |
-| `crew_workers` | `workerId` | `workers.id` | N:1 | 工人 → 班组 |
-| `crew_project_config` | `crewId` | `crews.id` | N:1 | 班组项目配置 → 班组 |
-| `crew_project_config` | `projectId` | `projects.id` | N:1 | 班组项目配置 → 项目 |
-| `crew_project_items` | `configId` | `crew_project_config.id` | N:1 | 分项单价 → 班组项目配置 |
-| `worker_certs` | `workerId` | `workers.id` | N:1 | 工人证书 → 工人 |
 | `penalty_records` | `projectId` | `projects.id` | N:1 | 扣罚 → 项目 |
 | `penalty_records` | `crewId` | `crews.id` | N:1 | 扣罚 → 班组（可选） |
 | `penalty_records` | `workerId` | `workers.id` | N:1 | 扣罚 → 工人（可选） |
@@ -1326,8 +1319,8 @@ penalty_settlement_deductions(
 | `owner_penalty` | OwnerPenalty | 甲方联系单 |
 | `subcontract_change_order` | SubcontractChangeOrder | 分包签证单 |
 | `unit_stage_completion` | UnitStageCompletion | 验收照片（挂“户 × 工序阶段”；缺照片只允许取消/存草稿） |
+| `crew` | Crew | 班组合作协议及其他班组档案附件 |
 | `worker` | Worker | 工人证件照片/信息文件 |
-| `worker_cert` | WorkerCert | 证书扫描件（身份证/特种作业证等） |
 | `penalty_record` | PenaltyRecord | 罚款照片/整改前后对比照/联系单扫描件 |
 
 ```ts
@@ -1524,13 +1517,13 @@ interface FilePayload {
   owner_material_uses, owner_material_directs, delivery_records, project_aliases
   import_source_refs, reconciliation_issues
   buildings, schedule_groups, target_costs, items
-  crew_workers, crew_project_config, worker_certs, penalty_records
+  penalty_records
   construction_stages, house_type_templates, monthly_statements
 
 第 4 批（头表子表/分摊）
   material_arrival_lines, expense_reimbursement_lines
   floors, rooms, schedule_group_buildings, schedule_tasks, target_cost_items
-  crew_project_items, construction_stage_items
+  construction_stage_items
   boq_files, boq_change_orders
   payment_application_settlement_allocations
   payment_application_invoice_allocations

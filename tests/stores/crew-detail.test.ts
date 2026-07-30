@@ -57,6 +57,10 @@ beforeEach(async () => {
         'project-a', '在场', '2025-01-02', 'worker-a', 'submitted'
       ),
       (
+        'worker-left', 'crew-a', '李强', '泥水工', '13511220003',
+        'project-b', '离场', '2024-09-01', NULL, 'submitted'
+      ),
+      (
         'worker-deleted', 'crew-a', '已删工人', '泥水工', '',
         'project-a', '离场', '', NULL, 'submitted'
       )
@@ -151,7 +155,7 @@ describe('crew detail store', () => {
       itemCapabilities: ['墙砖', '地砖'],
       assignmentLevel: 'crew',
     })
-    expect(detail?.members).toHaveLength(2)
+    expect(detail?.members).toHaveLength(3)
     expect(detail?.members).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'worker-a',
@@ -162,6 +166,11 @@ describe('crew detail store', () => {
         id: 'worker-b',
         name: '王芳',
         linkedWorkerName: '虞建华',
+      }),
+      expect.objectContaining({
+        id: 'worker-left',
+        name: '李强',
+        projectStatus: '离场',
       }),
     ]))
     expect(detail?.projects).toEqual([
@@ -178,6 +187,7 @@ describe('crew detail store', () => {
         projectId: 'project-b',
         projectName: '锦绣华庭',
         sources: ['工资单'],
+        activeMemberCount: 0,
         wageStatementCount: 1,
         wageGrossAmount: 1200,
         releasedWageAmount: 1000,
@@ -192,7 +202,7 @@ describe('crew detail store', () => {
       }),
     ])
     expect(detail?.summary).toEqual({
-      memberCount: 2,
+      memberCount: 3,
       activeMemberCount: 2,
       projectCount: 2,
       assignedUnitCount: 1,

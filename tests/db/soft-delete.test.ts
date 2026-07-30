@@ -459,6 +459,21 @@ describe('写路径包装:logCreate / withUpdateLog', () => {
     db.close()
   })
 
+  it('当前项目只是工人分配引用，项目删除后不隐藏跨项目工人主档', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO crews (id, name) VALUES ('crew1', '综合班组')`)
+    await db.execute(`
+      INSERT INTO workers (id, crew_id, name, current_project_id)
+      VALUES ('worker1', 'crew1', '张师傅', 'p1')
+    `)
+
+    await softDelete(db, 'projects', 'p1')
+
+    const rows = await selectVisible(db, 'workers')
+    expect(rows.map(row => row.id)).toEqual(['worker1'])
+    db.close()
+  })
+
   it('supplier 与 supplier_credentials 的通用日志兜底只保留安全字段', async () => {
     const db = await createMemoryDb()
     await runMigrations(db)

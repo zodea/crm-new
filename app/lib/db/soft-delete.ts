@@ -241,7 +241,6 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   ],
   workers: [
     { column: 'crew_id', table: 'crews' },
-    { column: 'current_project_id', table: 'projects' },
   ],
   payroll_subject_configs: [
     { column: 'project_id', table: 'projects' },
@@ -716,16 +715,20 @@ export interface DownstreamCount {
   n: number
 }
 
-/** parentTable 的直接子表清单(以任意列指向 parentTable 的表,含自引用,如 suppliers→suppliers)。 */
-function childTablesOf(parentTable: string): { table: string, column: string }[] {
-  const result: { table: string, column: string }[] = []
+/** parentTable 的直接子表清单；同一子表可由多个角色列指向同一父表。 */
+function childTablesOf(parentTable: string): { table: string, columns: string[] }[] {
+  const byTable = new Map<string, string[]>()
   for (const [table, refs] of Object.entries(PARENT_REFS)) {
     for (const ref of refs) {
-      if (ref.table === parentTable)
-        result.push({ table, column: ref.column })
+      if (ref.table !== parentTable)
+        continue
+      const columns = byTable.get(table) ?? []
+      if (!columns.includes(ref.column))
+        columns.push(ref.column)
+      byTable.set(table, columns)
     }
   }
-  return result
+  return [...byTable].map(([table, columns]) => ({ table, columns }))
 }
 
 /**
@@ -741,10 +744,13 @@ function childTablesOf(parentTable: string): { table: string, column: string }[]
 export async function downstreamImpact(db: SoftDb, parentTable: string, id: string): Promise<DownstreamCount[]> {
   assertBusinessTable(parentTable)
   const children = childTablesOf(parentTable)
-  const counts = await Promise.all(children.map(async ({ table, column }) => {
+  const counts = await Promise.all(children.map(async ({ table, columns }) => {
+    const relation = columns
+      .map(column => `"${table}"."${column}" = ?`)
+      .join(' OR ')
     const [row] = await db.select<{ n: number }>(
-      `${hiddenCtes(table)} SELECT COUNT(*) AS n FROM "${table}" WHERE ${visibleCond(table)} AND "${table}"."${column}" = ?`,
-      [id],
+      `${hiddenCtes(table)} SELECT COUNT(*) AS n FROM "${table}" WHERE ${visibleCond(table)} AND (${relation})`,
+      columns.map(() => id),
     )
     return { table, n: row?.n ?? 0 }
   }))

@@ -24,7 +24,7 @@ function fieldClass(field: keyof CrewFormDraft) {
     <div class="form-fields-grid mt-3">
       <label class="field-block">
         <span class="field-label">班组名称 *</span>
-        <input v-model="draft.name" :class="fieldClass('name')" data-field="name" @input="emit('clearError', 'name')">
+        <input v-model="draft.name" :class="fieldClass('name')" data-field="name" autocomplete="organization" @input="emit('clearError', 'name')">
         <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
       </label>
       <label class="field-block">
@@ -34,12 +34,12 @@ function fieldClass(field: keyof CrewFormDraft) {
       </label>
       <label class="field-block">
         <span class="field-label">负责人 *</span>
-        <input v-model="draft.contactName" :class="fieldClass('contactName')" data-field="contactName" @input="emit('clearError', 'contactName')">
+        <input v-model="draft.contactName" :class="fieldClass('contactName')" data-field="contactName" autocomplete="name" @input="emit('clearError', 'contactName')">
         <span v-if="fieldErrors.contactName" class="field-error">{{ fieldErrors.contactName }}</span>
       </label>
       <label class="field-block">
         <span class="field-label">联系电话 *</span>
-        <input v-model="draft.contactPhone" :class="fieldClass('contactPhone')" data-field="contactPhone" @input="emit('clearError', 'contactPhone')">
+        <input v-model="draft.contactPhone" :class="fieldClass('contactPhone')" data-field="contactPhone" type="tel" inputmode="tel" autocomplete="tel" @input="emit('clearError', 'contactPhone')">
         <span v-if="fieldErrors.contactPhone" class="field-error">{{ fieldErrors.contactPhone }}</span>
       </label>
       <MasterDataCapabilityFields
@@ -51,15 +51,18 @@ function fieldClass(field: keyof CrewFormDraft) {
   </section>
 
   <section id="section-pay" class="panel scroll-mt-4 p-4">
-    <SectionHeader title="计薪与提成" />
+    <SectionHeader
+      title="计薪与提成"
+      subtitle="以下为班组档案默认值，不按项目复制配置"
+    />
     <div class="form-fields-grid mt-3">
       <label class="field-block">
         <span class="field-label">默认发放比例</span>
-        <input v-model.number="draft.defaultPayRatio" type="number" min="0" max="1" step="0.01" class="field-input w-full">
+        <input v-model.number="draft.defaultPayRatio" data-field="defaultPayRatio" type="number" inputmode="decimal" min="0" max="1" step="0.01" class="field-input w-full">
       </label>
       <label class="field-block">
         <span class="field-label">指派粒度</span>
-        <select v-model="draft.assignmentLevel" class="field-input w-full">
+        <select v-model="draft.assignmentLevel" data-field="assignmentLevel" class="field-input w-full">
           <option value="crew">班组</option>
           <option value="worker">个人</option>
         </select>
@@ -73,7 +76,7 @@ function fieldClass(field: keyof CrewFormDraft) {
       </label>
       <label class="field-block">
         <span class="field-label">房租补贴单价</span>
-        <input v-model.number="draft.rentSubsidyPrice" type="number" min="0" step="0.01" :disabled="!draft.rentSubsidyEnabled" class="field-input w-full">
+        <input v-model.number="draft.rentSubsidyPrice" data-field="rentSubsidyPrice" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!draft.rentSubsidyEnabled" class="field-input w-full">
       </label>
       <label class="field-block">
         <span class="field-label">管理提成</span>
@@ -84,7 +87,7 @@ function fieldClass(field: keyof CrewFormDraft) {
       </label>
       <label class="field-block">
         <span class="field-label">管理提成单价</span>
-        <input v-model.number="draft.mgmtFeePrice" type="number" min="0" step="0.01" :disabled="!draft.mgmtFeeEnabled" class="field-input w-full">
+        <input v-model.number="draft.mgmtFeePrice" data-field="mgmtFeePrice" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!draft.mgmtFeeEnabled" class="field-input w-full">
       </label>
     </div>
   </section>
