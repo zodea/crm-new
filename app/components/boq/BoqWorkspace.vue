@@ -346,10 +346,24 @@ async function removeAttachment(attachment: BoqAttachmentView) {
   }
 }
 
+function onBasisMismatch(label: string) {
+  toastError(`无法识别取数基准「${label}」，请重新选择后再生成，避免按错误口径报量`)
+}
+
 async function generateMonthly(payload: { month: string, basis: QuantityBasis }) {
   try {
     await store.generateMonthly(payload.month, payload.basis)
     success(`${payload.month} 月度报量草稿已按${quantityBasisLabel(payload.basis)}生成`)
+  }
+  catch (cause) {
+    toastError(toErrorMessage(cause))
+  }
+}
+
+async function regenerateMonthly(payload: { statementId: string, basis: QuantityBasis }) {
+  try {
+    await store.regenerateMonthly(payload.statementId, payload.basis)
+    success(`草稿已按${quantityBasisLabel(payload.basis)}重算`)
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
@@ -550,6 +564,8 @@ onMounted(initialize)
       :busy="store.saving"
       @select="store.loadStatement"
       @generate="generateMonthly"
+      @regenerate="regenerateMonthly"
+      @basis-mismatch="onBasisMismatch"
       @adjust="adjustMonthly"
       @export="exportMonthly"
     />

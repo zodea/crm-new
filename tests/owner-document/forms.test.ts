@@ -249,6 +249,31 @@ describe('f5 甲方/分包单据领域事务', () => {
     ).rejects.toThrow('已生效纯金额签证不可直接删除')
   })
 
+  it('甲方报量单与月度报量是同一条单据，自动完成量读同一个已冻结基准', async () => {
+    await mem.execute(
+      `UPDATE house_type_template_items
+       SET provisional_qty = 9, contract_qty = 8
+       WHERE id = 'hti-owner'`,
+    )
+    // 该期次的报量单已按暂估量冻结，甲方侧不能仍按默认现场量派生。
+    await mem.execute(`
+      INSERT INTO monthly_statements
+        (id, project_id, contract_id, month, period_no, status, quantity_basis)
+      VALUES ('ms-owner-basis', 'project-owner', 'contract-owner',
+              '2026-07', '2026-07', 'draft', 'provisional')
+    `)
+    const lines = await listOwnerDocumentBoqLines(
+      'project-owner',
+      'contract-owner',
+      '2026-07',
+    )
+    expect(lines).toEqual([expect.objectContaining({
+      id: 'boq-line-owner',
+      autoQty: 9,
+      missingQtyCount: 0,
+    })])
+  })
+
   it('合同清单行按基准缺量时标注缺数，不回退到其他量源', async () => {
     // 现场复核量缺失：既不能顶替成暂估/合同量，也不能只报 0 让缺数看不出来。
     await mem.execute(

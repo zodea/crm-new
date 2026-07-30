@@ -20,6 +20,8 @@ defineProps<{
 const emit = defineEmits<{
   select: [statementId: string]
   generate: [payload: { month: string, basis: QuantityBasis }]
+  regenerate: [payload: { statementId: string, basis: QuantityBasis }]
+  basisMismatch: [label: string]
   adjust: [payload: { lineId: string, adjustedQty: number, note: string }]
   export: [statement: MonthlyStatementView]
 }>()
@@ -69,11 +71,43 @@ async function generate() {
   })
   if (!values)
     return
+  // formModal 的 select 只承载标签，这里按标签回查枚举。回查不中说明标签与枚举
+  // 已经不同步，此时必须报错：静默落回默认基准会让用户选「合同量」却拿到现场量单据。
   const basis = QUANTITY_BASIS_OPTIONS
     .find(option => option.label === String(values.basis))
     ?.value
-    ?? DEFAULT_PROGRESS_QUANTITY_BASIS
+  if (!basis) {
+    emit('basisMismatch', String(values.basis))
+    return
+  }
   emit('generate', { month: String(values.month), basis })
+}
+
+async function changeBasis(statement: MonthlyStatementView) {
+  const values = await formModal({
+    title: `更换「${statement.month}」取数基准`,
+    subtitle: '仅草稿可换。重算会按新基准覆盖自动量与合价，已填的手调量将被清除。',
+    saveText: '重算草稿',
+    fields: [{
+      key: 'basis',
+      label: '取数基准',
+      type: 'select',
+      options: QUANTITY_BASIS_OPTIONS.map(option => option.label),
+      value: QUANTITY_BASIS_LABELS[statement.quantityBasis],
+      required: true,
+    }],
+  })
+  if (!values)
+    return
+  const basis = QUANTITY_BASIS_OPTIONS
+    .find(option => option.label === String(values.basis))
+    ?.value
+  if (!basis) {
+    emit('basisMismatch', String(values.basis))
+    return
+  }
+  if (basis !== statement.quantityBasis)
+    emit('regenerate', { statementId: statement.id, basis })
 }
 
 async function adjust(line: MonthlyStatementLineView) {
@@ -149,6 +183,15 @@ async function adjust(line: MonthlyStatementLineView) {
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <button
+            v-if="statement.status === 'draft'"
+            type="button"
+            class="btn-secondary"
+            :disabled="busy"
+            @click="changeBasis(statement)"
+          >
+            <span class="i-lucide-refresh-cw mr-1" /> 换基准重算
+          </button>
           <NuxtLink
             :to="`/owner/report/${statement.id}`"
             class="btn-secondary"

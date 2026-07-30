@@ -249,8 +249,11 @@ monthly_statements(
 -- (contract_id, month) 对活跃报量单唯一。
 -- 状态沿用存量值：draft=草稿，adjusted=已有真实申报金额，exported=已有真实审定金额。
 -- 清单工作台手调/导出不推进状态；v37 仅以 audited_amount 保留“已审定”，其余旧 adjusted/exported 保守回草稿。
--- v39 `quantity_basis` 冻结生成时选定的取数基准，缺省 field。生成后基准不随三量或界面选择漂移；
+-- v39 `quantity_basis` 记录本单选定的取数基准，缺省 field。基准归每次报量单，不做项目全局唯一。
 -- 派生只读所选基准自己的列，缺量报错阻断生成，不跨口径回退，也不按 0 静默计入。
+-- draft 期可经换基准重算改写 quantity_basis 与全部行（旧行软删、手调量随之失效）；
+-- 一旦进入 adjusted/exported 即冻结，改口径必须走重新申报，不静默改写历史金额。
+-- 甲方报量单（owner_report）与本表是同一条记录，自动完成量必须读同一个 quantity_basis。
 
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,

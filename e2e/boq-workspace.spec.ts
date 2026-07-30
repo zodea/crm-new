@@ -155,6 +155,17 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(page.getByRole('cell', { name: '¥1,584.00', exact: true }).first()).toBeVisible()
     await expect(page.getByText('¥1,512.00')).toHaveCount(0)
 
+    // 草稿阶段基准仍可换：改回现场复核量后金额随之重算。
+    await page.getByRole('button', { name: '换基准重算' }).click()
+    const regenerateDialog = page.getByRole('dialog')
+    await expect(regenerateDialog).toBeVisible()
+    await regenerateDialog.getByLabel('取数基准').selectOption('现场复核量')
+    await regenerateDialog.getByRole('button', { name: '重算草稿' }).click()
+
+    await expect(page.getByText('草稿已按现场复核量重算')).toBeVisible()
+    await expect(page.getByText('取数基准 现场复核量')).toBeVisible()
+    await expect(page.getByRole('cell', { name: '¥1,512.00', exact: true }).first()).toBeVisible()
+
     await expectDocumentDoesNotOverflow(page)
     expect(pageErrors).toEqual([])
   })

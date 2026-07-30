@@ -5,6 +5,7 @@ import {
   generateMonthlyStatement,
   loadMonthlyQuantities,
   loadMonthlyStatement,
+  regenerateMonthlyStatement,
 } from '~/lib/boq/monthly'
 import { runMigrations } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
@@ -128,6 +129,56 @@ describe('boq monthly statements', () => {
       totalAmount: 1584,
     })
     expect(statement?.lines[0]).toMatchObject({ autoQty: 44, amount: 1584 })
+  })
+
+  it('草稿可换基准重算，提交后冻结不再允许改基准', async () => {
+    const generated = await generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'field',
+    )
+    expect(generated.totalAmount).toBe(1512)
+
+    // 草稿阶段：基准仍可改，金额随之重算。
+    await regenerateMonthlyStatement(db, generated.statementId, 'provisional')
+    const redone = await loadMonthlyStatement(db, generated.statementId)
+    expect(redone).toMatchObject({ quantityBasis: 'provisional', totalAmount: 1584 })
+    expect(redone?.lines[0]).toMatchObject({ autoQty: 44, amount: 1584 })
+
+    // 已申报后基准冻结。
+    await db.execute(
+      `UPDATE monthly_statements SET status = 'adjusted' WHERE id = ?`,
+      [generated.statementId],
+    )
+    await expect(regenerateMonthlyStatement(
+      db,
+      generated.statementId,
+      'field',
+    )).rejects.toThrow('只有草稿')
+  })
+
+  it('换基准时缺量同样阻断，不会把草稿改成金额偏低的单据', async () => {
+    const generated = await generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'provisional',
+    )
+    await db.execute(
+      `UPDATE house_type_template_items SET field_qty = NULL WHERE id = 'qty_hti_a_pipe'`,
+    )
+    await expect(regenerateMonthlyStatement(
+      db,
+      generated.statementId,
+      'field',
+    )).rejects.toThrow('现场复核量缺失')
+
+    // 阻断后原草稿保持原基准与金额，不被改坏。
+    const kept = await loadMonthlyStatement(db, generated.statementId)
+    expect(kept).toMatchObject({ quantityBasis: 'provisional', totalAmount: 1584 })
   })
 
   it('records manual adjustment trace without advancing the owner report lifecycle', async () => {

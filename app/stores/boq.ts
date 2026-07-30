@@ -23,6 +23,7 @@ import {
   DEFAULT_PROGRESS_QUANTITY_BASIS,
   generateMonthlyStatement,
   loadMonthlyStatement,
+  regenerateMonthlyStatement,
 } from '~/lib/boq/monthly'
 import { loadBoqCatalog, loadBoqWorkspace } from '~/lib/boq/read-model'
 import { execute, select, withTransaction } from '~/lib/db/connection'
@@ -321,6 +322,15 @@ export const useBoqStore = defineStore('boq', () => {
     return result
   }
 
+  async function regenerateMonthly(statementId: string, basis: QuantityBasis) {
+    const result = await save(
+      '月度报量换基准重算',
+      () => withTransaction(tx => regenerateMonthlyStatement(tx, statementId, basis)),
+    )
+    await loadStatement(statementId)
+    return result
+  }
+
   async function adjustMonthly(lineId: string, adjustedQty: number, note: string) {
     const result = await save(
       '月度报量调整',
@@ -360,6 +370,7 @@ export const useBoqStore = defineStore('boq', () => {
     loadAttachmentFile,
     removeAttachment,
     generateMonthly,
+    regenerateMonthly,
     adjustMonthly,
     undo,
   }

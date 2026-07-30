@@ -1,9 +1,13 @@
 /**
- * 工程量取数基准的单一权威定义。
+ * 工程量取数基准的权威定义。
  *
- * 量差总表、进度款报量与工资核算都从这里取基准的枚举、列名与显示名，
- * 避免各自维护第二份口径。工资轨只允许 provisional / field，
- * 该收窄规则由 `~/lib/quantity/wage-source` 单独承载，不在此处放宽。
+ * 当前消费方：进度款报量（`~/lib/boq/monthly`）与甲方报量单。
+ * 量差总表（`~/lib/quantity/variance` 的 `QuantityVarianceBasis`）和工资轨
+ * （`~/lib/quantity/wage-source`）仍各自持有同名枚举与标签，尚未收编到此处；
+ * 迁移它们属于独立工作单元，在完成前不要把本文件描述成全域唯一定义。
+ *
+ * 工资轨只允许 provisional / field，该收窄规则由 `~/lib/quantity/wage-source`
+ * 单独承载，不在此处放宽。
  */
 export type QuantityBasis = 'contract' | 'provisional' | 'field'
 
@@ -13,12 +17,17 @@ export const QUANTITY_BASIS_LABELS: Readonly<Record<QuantityBasis, string>> = {
   field: '现场复核量',
 }
 
-/** 基准到 `house_type_template_items` 列名的映射；调用方必须走此表，不得自行拼列名。 */
-export const QUANTITY_BASIS_COLUMNS: Readonly<Record<QuantityBasis, string>> = {
+/**
+ * 基准到 `house_type_template_items` 列名的映射。
+ *
+ * 值经 `as const` 收窄为字面量联合，保证插入 SQL 的列名可证明来自这三个常量，
+ * 不会退化成任意 string。新增消费方应走此表而不是自行拼列名。
+ */
+export const QUANTITY_BASIS_COLUMNS = {
   contract: 'contract_qty',
   provisional: 'provisional_qty',
   field: 'field_qty',
-}
+} as const satisfies Record<QuantityBasis, string>
 
 export const QUANTITY_BASIS_OPTIONS: readonly {
   value: QuantityBasis

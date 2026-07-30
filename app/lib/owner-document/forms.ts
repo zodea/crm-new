@@ -1,13 +1,14 @@
 import type { BoqChangeLineDraft, BoqDirectiveType, BoqDocumentType } from '~/lib/boq/change'
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
+import type { QuantityBasis } from '~/lib/quantity/basis'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
   replaceBoqChangeOrderDraft,
   transitionBoqChangeOrder,
 } from '~/lib/boq/change'
-import { loadMonthlyQuantities } from '~/lib/boq/monthly'
+import { DEFAULT_PROGRESS_QUANTITY_BASIS, loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
   logCreate,
@@ -17,6 +18,7 @@ import {
   withUpdateLog,
 } from '~/lib/db/soft-delete'
 import { applyFileRefChanges, listFileRefs } from '~/lib/forms/file-refs'
+import { isQuantityBasis } from '~/lib/quantity/basis'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
 
@@ -534,7 +536,13 @@ async function saveOwnerReport(
     throw new Error('报量明细必须关联项目与施工合同')
 
   const quantities = projectId && contractId && periodNo
-    ? await loadMonthlyQuantities(tx, projectId, contractId, periodNo)
+    ? await loadMonthlyQuantities(
+        tx,
+        projectId,
+        contractId,
+        periodNo,
+        await resolveReportQuantityBasis(tx, projectId, contractId, periodNo),
+      )
     : []
   const autoQtyById = new Map(
     quantities.map(row => [row.boq_line_id, numberValue(row.auto_qty)]),
@@ -1657,6 +1665,29 @@ export async function listOwnerDocumentForms(
   return rows.map(toListRecord)
 }
 
+/**
+ * 甲方报量单与 BOQ 工作台的月度报量是 `monthly_statements` 里的同一条记录，
+ * 因此自动完成量必须读同一个已冻结基准；该期次尚无单据时才回落默认基准。
+ */
+async function resolveReportQuantityBasis(
+  db: { select: typeof select },
+  projectId: string,
+  contractId: string,
+  periodNo: string,
+): Promise<QuantityBasis> {
+  const [row] = await db.select<{ quantity_basis: string | null }>(
+    `SELECT quantity_basis
+     FROM monthly_statements
+     WHERE project_id = ? AND contract_id = ? AND month = ? AND deleted_at IS NULL
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    [projectId, contractId, periodNo],
+  )
+  return isQuantityBasis(row?.quantity_basis)
+    ? row.quantity_basis
+    : DEFAULT_PROGRESS_QUANTITY_BASIS
+}
+
 export async function listOwnerDocumentBoqLines(
   projectId: string,
   contractId: string,
@@ -1679,7 +1710,13 @@ export async function listOwnerDocumentBoqLines(
     ORDER BY sort_order, id
   `, [projectId, contractId])
   const quantities = periodNo
-    ? await loadMonthlyQuantities({ select }, projectId, contractId, periodNo)
+    ? await loadMonthlyQuantities(
+        { select },
+        projectId,
+        contractId,
+        periodNo,
+        await resolveReportQuantityBasis({ select }, projectId, contractId, periodNo),
+      )
     : []
   const quantityByLineId = new Map(
     quantities.map(row => [row.boq_line_id, row]),
