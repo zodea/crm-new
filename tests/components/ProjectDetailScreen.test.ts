@@ -111,6 +111,7 @@ describe('项目详情运行态信息流', () => {
           ProjectMetrics: labeledStub('项目经营数据、往来款、票据信息'),
           ProjectWorkflowPanel: labeledStub('审批与业务流'),
           ProjectScheduleCard: labeledStub('施工进度排程'),
+          ProjectSupplierLinksPanel: labeledStub('项目分供方'),
           ProjectTimeline: labeledStub('阶段时间线与阶段任务'),
           ProjectTeamPanel: labeledStub('项目组成员'),
           ProjectFileCabinet: labeledStub('项目文件'),
@@ -138,6 +139,7 @@ describe('项目详情运行态信息流', () => {
       'schedule',
       'timeline',
       'tabs',
+      'suppliers',
       'team',
       'files',
     ])

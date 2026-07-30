@@ -5,6 +5,7 @@
 ## 当前指南
 
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)
+- [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)
 - [OCR 设置使用说明](./ocr-settings.md)
@@ -15,6 +16,9 @@
 
 ```powershell
 python scripts/generate-project-guide-pdf.py
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/project-supplier-workbench.md `
+  --output output/pdf/瑞航CRM_项目分供方工作台与文件导入使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/material-price-analysis.md `
   --output output/pdf/瑞航CRM_材料单价分析使用说明.pdf
@@ -30,6 +34,7 @@ python scripts/generate-project-guide-pdf.py `
 
 ```text
 output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
+output/pdf/瑞航CRM_项目分供方工作台与文件导入使用指南.pdf
 output/pdf/瑞航CRM_材料单价分析使用说明.pdf
 output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
 output/pdf/瑞航CRM_OCR设置使用说明.pdf

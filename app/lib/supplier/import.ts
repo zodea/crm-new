@@ -2,8 +2,108 @@ import type { Supplier } from '~/stores/supplier'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { toNum } from '~/lib/util/number'
 
+export const PROJECT_SUPPLIER_FILE_CATEGORIES = [
+  '合同',
+  '请款',
+  '收票',
+  '付款',
+  '结算',
+  '资质',
+  '其他',
+] as const
+
+export type ProjectSupplierFileCategory = (typeof PROJECT_SUPPLIER_FILE_CATEGORIES)[number]
+export type ProjectSupplierMatchSource = 'name' | 'alias' | 'unmatched'
+
+export interface ProjectSupplierImportMatch {
+  category: ProjectSupplierFileCategory
+  supplierId: string
+  supplierName: string
+  matchSource: ProjectSupplierMatchSource
+}
+
+export interface ProjectSupplierImportSupplier {
+  id: string
+  name: string
+  aliases: readonly string[]
+}
+
+export interface ProjectSupplierImportItem extends ProjectSupplierImportMatch {
+  key: string
+  file: File
+  createSupplierConfirmed: boolean
+}
+
+const CATEGORY_KEYWORDS: Readonly<Record<ProjectSupplierFileCategory, readonly string[]>> = {
+  合同: ['合同', '协议'],
+  请款: ['请款', '申请款', '进度款'],
+  收票: ['收票', '发票', '票据'],
+  付款: ['付款', '回单', '支付'],
+  结算: ['结算', '决算'],
+  资质: ['资质', '证照', '营业执照'],
+  其他: [],
+}
+
 function text(value: unknown): string {
   return value == null ? '' : String(value).trim()
+}
+
+function comparable(value: string): string {
+  return value.toLocaleLowerCase('zh-CN').replace(/[^\p{L}\p{N}]+/gu, '')
+}
+
+export function inferProjectSupplierFileCategory(fileName: string): ProjectSupplierFileCategory {
+  const normalized = comparable(fileName)
+  for (const category of PROJECT_SUPPLIER_FILE_CATEGORIES) {
+    if (category !== '其他' && CATEGORY_KEYWORDS[category].some(keyword => normalized.includes(comparable(keyword))))
+      return category
+  }
+  return '其他'
+}
+
+export function inferProjectSupplierName(fileName: string, projectName = ''): string {
+  const extensionless = fileName.replace(/\.[^.]+$/, '')
+  let candidate = extensionless
+  if (projectName)
+    candidate = candidate.replaceAll(projectName, ' ')
+  for (const keywords of Object.values(CATEGORY_KEYWORDS)) {
+    for (const keyword of keywords)
+      candidate = candidate.replaceAll(keyword, ' ')
+  }
+  candidate = candidate
+    .replace(/\b\d{6,}\b/g, ' ')
+    .replace(/[_—–·()[\]（）【】]+/g, ' ')
+    .replace(/\s*-\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return candidate || '待确认分供方'
+}
+
+/**
+ * 仅使用本地文件名与现有分供方名称/别名做确定性匹配；不读取文件内容，也不伪装成 OCR。
+ * 多个名称同时命中时取最长命中项，降低简称抢占全称的概率。
+ */
+export function classifyProjectSupplierImportFile(
+  fileName: string,
+  suppliers: readonly ProjectSupplierImportSupplier[],
+  projectName = '',
+): ProjectSupplierImportMatch {
+  const normalizedFileName = comparable(fileName)
+  const matches = suppliers.flatMap(supplier => [
+    { supplier, label: supplier.name, source: 'name' as const },
+    ...supplier.aliases.map(label => ({ supplier, label, source: 'alias' as const })),
+  ])
+    .map(match => ({ ...match, normalizedLabel: comparable(match.label) }))
+    .filter(match => match.normalizedLabel.length >= 2 && normalizedFileName.includes(match.normalizedLabel))
+    .sort((left, right) => right.normalizedLabel.length - left.normalizedLabel.length)
+
+  const best = matches[0]
+  return {
+    category: inferProjectSupplierFileCategory(fileName),
+    supplierId: best?.supplier.id ?? '',
+    supplierName: best?.supplier.name ?? inferProjectSupplierName(fileName, projectName),
+    matchSource: best?.source ?? 'unmatched',
+  }
 }
 
 function aliases(value: unknown): string[] {

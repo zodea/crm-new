@@ -1,130 +1,129 @@
 <script setup lang="ts">
+import type { FileRefDraft } from '~/lib/forms/file-refs'
+import type { ProjectSupplierImportItem } from '~/lib/supplier/import'
+import { computed, shallowRef } from 'vue'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
+import { toErrorMessage } from '~/lib/util/error'
+
 const route = useRoute()
-const pid = computed(() => route.params.pid as string)
+const router = useRouter()
+const pid = computed(() => String(route.params.pid ?? ''))
 const projStore = useProjectStore()
 const supStore = useSupplierStore()
 const psStore = useProjectSupplierStore()
-const toast = useToast()
+const { error, success } = useKitUI()
+const busy = shallowRef(false)
+const initialized = shallowRef(false)
 
 const project = computed(() => projStore.byId(pid.value))
-const step = shallowRef(1)
-
-const selectedSupplierIds = ref<Set<string>>(new Set())
-
-const availableSuppliers = computed(() =>
-  supStore.list.filter(s => !psStore.byProjectAndSupplier(pid.value, s.id)),
+const suppliers = computed(() => supStore.list.map(supplier => ({
+  id: supplier.id,
+  name: supplier.name,
+  aliases: supplier.aliases,
+})))
+const existingSupplierIds = computed(() =>
+  new Set(psStore.byProject(pid.value).map(relationship => relationship.supplierId)),
 )
 
-function toggleSupplier(id: string) {
-  if (selectedSupplierIds.value.has(id))
-    selectedSupplierIds.value.delete(id)
-  else selectedSupplierIds.value.add(id)
-}
-
-async function doImport() {
-  for (const sid of selectedSupplierIds.value) {
-    await psStore.add(pid.value, sid)
+async function initialize() {
+  try {
+    await Promise.all([projStore.load(), supStore.load(), psStore.load()])
   }
-  toast.success(`已关联 ${selectedSupplierIds.value.size} 家分供方`)
-  step.value = 3
+  catch (cause) {
+    error('导入向导加载失败', toErrorMessage(cause))
+  }
+  finally {
+    initialized.value = true
+  }
 }
 
-onMounted(async () => {
-  await Promise.all([projStore.load(), supStore.load(), psStore.load()])
-})
+async function confirmImport(items: readonly ProjectSupplierImportItem[]) {
+  if (busy.value || !project.value)
+    return
+  busy.value = true
+  try {
+    const groups = new Map<string, {
+      supplierId: string
+      supplierName: string
+      files: FileRefDraft[]
+    }>()
+
+    for (const item of items) {
+      const key = item.supplierId || `new:${item.supplierName.trim().toLocaleLowerCase('zh-CN')}`
+      const group = groups.get(key) ?? {
+        supplierId: item.supplierId,
+        supplierName: item.supplierName.trim(),
+        files: [],
+      }
+      group.files.push(await fileRefDraftFromFile(item.file, { category: item.category }))
+      groups.set(key, group)
+    }
+
+    const result = await psStore.importFiles(pid.value, [...groups.values()])
+    await supStore.load()
+
+    success(
+      `已归档 ${result.fileCount} 个文件，关联 ${result.relationshipCount} 家分供方`,
+      [
+        result.createdSupplierCount ? `新建分供方 ${result.createdSupplierCount} 家` : '',
+        result.reusedRelationshipCount ? `复用已有关系 ${result.reusedRelationshipCount} 条` : '',
+      ].filter(Boolean).join('；') || '项目分供方关系已生成',
+    )
+    await router.push({
+      path: `/project/${pid.value}`,
+      query: { tab: 'expenditure' },
+    })
+  }
+  catch (cause) {
+    error('项目分供方导入失败', toErrorMessage(cause))
+  }
+  finally {
+    busy.value = false
+  }
+}
+
+onMounted(initialize)
 </script>
 
 <template>
-  <div>
-    <div class="flex items-center gap-3 mb-4">
-      <NuxtLink :to="`/project/${pid}`" class="icon-btn" title="返回项目">
-        <span class="i-lucide-arrow-left text-14px" />
-      </NuxtLink>
-      <h2 class="text-14px font-800 text-ink">
-        项目分供方导入 — {{ project?.name || '...' }}
-      </h2>
-    </div>
-
-    <!-- 步骤指示 -->
-    <div class="flex items-center gap-2 mb-4 text-12px">
-      <span :class="step >= 1 ? 'text-brand font-700' : 'text-ink-faint'">① 选择分供方</span>
-      <span class="text-line">→</span>
-      <span :class="step >= 2 ? 'text-brand font-700' : 'text-ink-faint'">② 确认关联</span>
-      <span class="text-line">→</span>
-      <span :class="step >= 3 ? 'text-ok font-700' : 'text-ink-faint'">③ 完成</span>
-    </div>
-
-    <!-- Step 1: 选择 -->
-    <div v-if="step === 1" class="border border-line bg-panel p-4">
-      <p class="text-13px text-ink-soft mb-3">
-        选择要关联到「{{ project?.name }}」的分供方（已关联的不会重复显示）
-      </p>
-      <div class="space-y-1.5 mb-4 max-h-[400px] overflow-y-auto">
-        <label
-          v-for="s in availableSuppliers"
-          :key="s.id"
-          class="flex items-center gap-2.5 px-3 py-2 border border-line cursor-pointer hover:bg-surface-3"
-          :class="selectedSupplierIds.has(s.id) ? 'bg-brand-soft/30 border-brand' : ''"
-        >
-          <input
-            type="checkbox"
-            :checked="selectedSupplierIds.has(s.id)"
-            class="accent-brand"
-            @change="toggleSupplier(s.id)"
-          >
-          <div>
-            <div class="text-13px font-600">{{ s.name }}</div>
-            <div class="text-11px text-ink-soft">{{ s.supplierCategory }} · {{ s.contact || '—' }}</div>
-          </div>
-        </label>
-      </div>
-      <div v-if="!availableSuppliers.length" class="py-4 text-center text-ink-faint text-13px">
-        所有分供方已关联到此项目
-      </div>
-      <div class="flex justify-end gap-2">
-        <button
-          class="btn-primary"
-          :disabled="selectedSupplierIds.size === 0"
-          @click="step = 2"
-        >
-          下一步 ({{ selectedSupplierIds.size }} 家)
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 2: 确认 -->
-    <div v-else-if="step === 2" class="border border-line bg-panel p-4">
-      <p class="text-13px text-ink-soft mb-3">
-        确认将以下 {{ selectedSupplierIds.size }} 家分供方关联到「{{ project?.name }}」？
-      </p>
-      <div class="space-y-1 mb-4">
-        <div
-          v-for="sid in selectedSupplierIds"
-          :key="sid"
-          class="px-3 py-2 border border-line text-13px"
-        >
-          {{ supStore.byId(sid)?.name || sid }}
-        </div>
-      </div>
-      <div class="flex justify-end gap-2">
-        <button class="btn-secondary" @click="step = 1">
-          上一步
-        </button>
-        <button class="btn-accent" @click="doImport">
-          确认关联
-        </button>
-      </div>
-    </div>
-
-    <!-- Step 3: 完成 -->
-    <div v-else class="border border-line bg-panel p-8 text-center">
-      <span class="i-lucide-circle-check text-32px text-ok mb-2 block mx-auto" />
-      <p class="text-14px font-700 text-ok mb-2">
-        导入完成
-      </p>
-      <NuxtLink :to="`/project/${pid}`" class="btn-secondary">
+  <div class="min-w-0 space-y-4">
+    <section class="panel p-4">
+      <NuxtLink
+        :to="{ path: `/project/${pid}`, query: { tab: 'expenditure' } }"
+        class="inline-flex items-center gap-1 text-11px font-700 text-brand"
+      >
+        <span class="i-lucide-arrow-left" aria-hidden="true" />
         返回项目详情
       </NuxtLink>
-    </div>
+      <h1 class="mt-1 text-20px font-850 text-ink">
+        项目分供方文件导入
+      </h1>
+      <p class="mt-1 text-12px text-ink-soft">
+        {{ project?.name || '正在读取项目…' }} · 文件只归档到项目分供方关系，不回写分供方证照。
+      </p>
+    </section>
+
+    <StatePanel
+      v-if="!initialized"
+      kind="loading"
+      title="正在读取项目与分供方"
+      description="准备本地分类所需资料。"
+    />
+    <StatePanel
+      v-else-if="!project"
+      kind="error"
+      title="项目不存在或已删除"
+      description="无法继续导入，请返回项目列表重新选择。"
+      action-label="返回项目列表"
+      @action="router.push('/project')"
+    />
+    <ProjectSupplierImportWizard
+      v-else
+      :project-name="project.name"
+      :suppliers="suppliers"
+      :existing-supplier-ids="existingSupplierIds"
+      :busy="busy"
+      @confirm="confirmImport"
+    />
   </div>
 </template>

@@ -203,7 +203,10 @@ watch(
         </section>
       </main>
 
-      <aside class="flex min-w-0 flex-col gap-3" aria-label="项目组成员与文件">
+      <aside class="flex min-w-0 flex-col gap-3" aria-label="项目分供方、项目组成员与文件">
+        <div data-project-module="suppliers">
+          <ProjectSupplierLinksPanel :project-id="props.projectId" />
+        </div>
         <div data-project-module="team">
           <ProjectTeamPanel :project="project" />
         </div>
