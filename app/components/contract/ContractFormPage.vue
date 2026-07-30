@@ -67,6 +67,9 @@ const title = computed(() =>
 useTabTitle(title)
 
 const draft = ref<PageDraft>(f2FormDefaults(props.kind) as PageDraft)
+const lineItemsEditor = useTemplateRef<{
+  validate: () => { row: number, key: string }[]
+}>('lineItemsEditor')
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
@@ -255,6 +258,17 @@ async function handleFooterAction(action: FormFooterAction) {
         : 'save'
   if (saveAction !== 'draft' && !validateRequired())
     return
+  if (saveAction !== 'draft' && props.kind === 'material') {
+    const lineErrors = lineItemsEditor.value?.validate() ?? []
+    if (lineErrors.length) {
+      warning(`采购合同明细还有 ${lineErrors.length} 处必填项未填写`)
+      await nextTick()
+      document.querySelector<HTMLElement>(
+        '#section-lines [aria-invalid="true"]',
+      )?.focus()
+      return
+    }
+  }
 
   loadingAction.value = action
   try {
@@ -373,6 +387,7 @@ onMounted(() => void initialize())
 
       <ContractLineItemsEditor
         v-if="kind === 'material' && !draft.isSupplement"
+        ref="lineItemsEditor"
         :lines="draft.lineItems ?? []"
         @update="patchDraft({ lineItems: $event })"
       />

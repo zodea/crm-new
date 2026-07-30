@@ -6,7 +6,7 @@ import type {
   KitEditGridValidationError,
 } from '~/lib/kit/edit-grid'
 import type { KitTableColumn } from '~/lib/kit/table'
-import { computed, shallowRef, useTemplateRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import {
   aggregateRows,
   applyDerive,
@@ -54,7 +54,6 @@ defineSlots<Record<string, (props: {
 }) => unknown>>()
 
 const model = defineModel<T[]>({ required: true })
-const table = useTemplateRef<{ clearCheckbox: () => void }>('table')
 const selectedRows = shallowRef<RenderedRow[]>([])
 const pickerLoading = shallowRef(false)
 const actionError = shallowRef('')
@@ -76,8 +75,10 @@ const hasSelectionOps = computed(() =>
 const tableColumns = computed<KitTableColumn[]>(() => [
   ...(hasSelectionOps.value
     ? [{
-        type: 'checkbox' as const,
-        title: '',
+        field: '__kitSelection',
+        type: 'text' as const,
+        title: '选择',
+        slot: '__kitSelection',
         width: 40,
         fixed: 'left' as const,
         resizable: false,
@@ -156,13 +157,14 @@ function lookupModelValue(column: KitEditGridColumn<T>, row: RenderedRow) {
   return typeof value === 'string' ? value : null
 }
 
-function onCheckboxChange(rows: RenderedRow[]) {
-  selectedRows.value = rows
+function toggleSelected(row: RenderedRow, selected: boolean) {
+  selectedRows.value = selected
+    ? [...selectedRows.value.filter(item => item.__kitRowKey !== row.__kitRowKey), row]
+    : selectedRows.value.filter(item => item.__kitRowKey !== row.__kitRowKey)
 }
 
 function clearSelection() {
   selectedRows.value = []
-  table.value?.clearCheckbox()
 }
 
 function canAppend(count: number) {
@@ -306,14 +308,21 @@ defineExpose({ validate })
     </div>
 
     <KitTable
-      ref="table"
       :columns="tableColumns"
       :data="renderedRows"
       :min-rows="minRows"
       row-key="__kitRowKey"
       :empty="{ title: '暂无明细', description: readonly ? '当前没有可查看的明细。' : '可点击“添加”或使用选择器补充明细。' }"
-      @checkbox-change="onCheckboxChange"
     >
+      <template #__kitSelection="{ row }">
+        <input
+          type="checkbox"
+          class="h-4 w-4 accent-[var(--brand)]"
+          :checked="selectedIndices.includes(row.__kitRowIndex)"
+          :aria-label="`选择第 ${row.__kitRowIndex + 1} 行`"
+          @change="toggleSelected(row, ($event.target as HTMLInputElement).checked)"
+        >
+      </template>
       <template
         v-for="column in columns"
         :key="column.key"

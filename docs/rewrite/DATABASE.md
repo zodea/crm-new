@@ -246,6 +246,8 @@ monthly_statements(
   created_at, updated_at, deleted_at
 )
 -- (contract_id, month) 对活跃报量单唯一。
+-- 状态沿用存量值：draft=草稿，adjusted=已有真实申报金额，exported=已有真实审定金额。
+-- 清单工作台手调/导出不推进状态；v37 仅以 audited_amount 保留“已审定”，其余旧 adjusted/exported 保守回草稿。
 
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,

@@ -21,7 +21,6 @@ import {
   adjustMonthlyStatementLine,
   generateMonthlyStatement,
   loadMonthlyStatement,
-  markMonthlyStatementExported,
 } from '~/lib/boq/monthly'
 import { loadBoqCatalog, loadBoqWorkspace } from '~/lib/boq/read-model'
 import { execute, select, withTransaction } from '~/lib/db/connection'
@@ -326,15 +325,6 @@ export const useBoqStore = defineStore('boq', () => {
     return result
   }
 
-  async function markMonthlyExported(statementId: string) {
-    const result = await save(
-      '月度报量导出状态更新',
-      () => withTransaction(tx => markMonthlyStatementExported(tx, statementId)),
-    )
-    await loadStatement(statementId)
-    return result
-  }
-
   async function undo(logIds: readonly string[]) {
     return save('撤回', () => withTransaction(async (tx) => {
       for (const logId of [...logIds].reverse())
@@ -365,7 +355,6 @@ export const useBoqStore = defineStore('boq', () => {
     removeAttachment,
     generateMonthly,
     adjustMonthly,
-    markMonthlyExported,
     undo,
   }
 })

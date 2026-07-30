@@ -1116,7 +1116,7 @@ describe('v36 分供方证照审核底座', () => {
     expect(await listTables(db)).not.toContain('supplier_credential_requirements')
     expect(await listTables(db)).not.toContain('supplier_credential_audits')
     expect(await listTables(db)).not.toContain('supplier_audits')
-    expect(await runMigrations(db)).toMatchObject({ from: 35, to: 36 })
+    expect(await runMigrations(db)).toMatchObject({ from: 35, to: 37 })
     db.close()
   })
 })

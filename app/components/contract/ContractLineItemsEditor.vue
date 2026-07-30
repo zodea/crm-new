@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ContractLineItemDraft } from '~/lib/contract/forms'
+import type { KitEditGridColumn } from '~/lib/kit/edit-grid'
 import { useFullscreen } from '@vueuse/core'
-import { computed, shallowRef } from 'vue'
+import { computed, shallowRef, useTemplateRef } from 'vue'
 import {
   contractLineItemAmount,
   contractLineItemsTotal,
@@ -18,10 +19,76 @@ const emit = defineEmits<{
 const editor = shallowRef<HTMLElement>()
 const showImporter = shallowRef(false)
 const tsvText = shallowRef('')
+const grid = useTemplateRef<{
+  validate: () => { row: number, key: string }[]
+}>('grid')
 const { isFullscreen, toggle: toggleFullscreen } = useFullscreen(editor)
 const total = computed(() => contractLineItemsTotal(props.lines))
 const UNIT_OPTIONS = ['㎡', 'm', '块', '套', '吨', '包', '桶', '樘', '个']
-  .map(unit => ({ key: unit, label: unit }))
+
+type EditableContractLine = ContractLineItemDraft & Record<string, unknown>
+
+const linesModel = computed<EditableContractLine[]>({
+  get: () => props.lines as EditableContractLine[],
+  set: lines => emit('update', lines),
+})
+
+const columns: KitEditGridColumn<EditableContractLine>[] = [
+  {
+    key: 'materialName',
+    label: '物资名称',
+    required: true,
+    minWidth: 180,
+  },
+  {
+    key: 'spec',
+    label: '规格型号',
+    minWidth: 140,
+  },
+  {
+    key: 'brand',
+    label: '品牌',
+    minWidth: 120,
+  },
+  {
+    key: 'unit',
+    label: '单位',
+    type: 'select',
+    options: UNIT_OPTIONS,
+    width: 90,
+  },
+  {
+    key: 'qty',
+    label: '数量',
+    type: 'number',
+    required: true,
+    width: 110,
+  },
+  {
+    key: 'taxInclusiveUnitPrice',
+    label: '含税单价',
+    type: 'number',
+    required: true,
+    width: 130,
+  },
+  {
+    key: 'amount',
+    label: '含税金额',
+    type: 'readonly',
+    derive: row => contractLineItemAmount(row),
+    width: 140,
+  },
+  {
+    key: 'plannedArrivalDate',
+    label: '计划到货日期',
+    minWidth: 150,
+  },
+  {
+    key: 'note',
+    label: '备注',
+    minWidth: 160,
+  },
+]
 
 function addLine() {
   emit('update', [
@@ -36,28 +103,6 @@ function addLine() {
       plannedArrivalDate: '',
       note: '',
     },
-  ])
-}
-
-function patchLine(index: number, patch: Partial<ContractLineItemDraft>) {
-  emit('update', props.lines.map((line, lineIndex) =>
-    lineIndex === index ? { ...line, ...patch } : line,
-  ))
-}
-
-function removeLine(index: number) {
-  emit('update', props.lines.filter((_, lineIndex) => lineIndex !== index))
-}
-
-function copyLine(index: number) {
-  const source = props.lines[index]
-  if (!source)
-    return
-  const copy = { ...source, id: undefined }
-  emit('update', [
-    ...props.lines.slice(0, index + 1),
-    copy,
-    ...props.lines.slice(index + 1),
   ])
 }
 
@@ -97,13 +142,11 @@ function importTsv() {
   showImporter.value = false
 }
 
-function inputValue(event: Event): string {
-  return (event.target as HTMLInputElement).value
+function validate() {
+  return grid.value?.validate() ?? []
 }
 
-function inputNumber(event: Event): number {
-  return Number((event.target as HTMLInputElement).value) || 0
-}
+defineExpose({ validate })
 </script>
 
 <template>
@@ -172,143 +215,34 @@ function inputNumber(event: Event): number {
       </div>
     </div>
 
-    <div class="overflow-x-auto">
-      <table class="min-w-1100px w-full border-collapse text-12px">
-        <thead class="bg-surface-2 text-left text-ink-soft">
-          <tr>
-            <th class="w-10 px-2 py-2 text-center">
-              #
-            </th>
-            <th class="min-w-36 px-2 py-2">
-              物资名称 *
-            </th>
-            <th class="min-w-28 px-2 py-2">
-              规格型号
-            </th>
-            <th class="min-w-24 px-2 py-2">
-              品牌
-            </th>
-            <th class="w-20 px-2 py-2">
-              单位
-            </th>
-            <th class="w-24 px-2 py-2 text-right">
-              数量 *
-            </th>
-            <th class="w-28 px-2 py-2 text-right">
-              含税单价 *
-            </th>
-            <th class="w-28 px-2 py-2 text-right">
-              含税金额
-            </th>
-            <th class="w-34 px-2 py-2">
-              计划到货日期
-            </th>
-            <th class="min-w-28 px-2 py-2">
-              备注
-            </th>
-            <th class="w-20 px-2 py-2">
-              操作
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(line, index) in lines"
-            :key="line.id ?? `new-${index}`"
-            class="border-t border-line"
+    <div class="p-3">
+      <p v-if="lines.length" class="mb-2 text-11px text-ink-faint">
+        勾选明细后可批量复制或删除；表格只在自身区域横向滚动。
+      </p>
+      <KitEditGrid
+        ref="grid"
+        v-model="linesModel"
+        label="采购合同明细"
+        :columns="columns"
+        :row-ops="['copy', 'del']"
+        :summary="[{ key: 'amount', agg: 'sum' }]"
+        :min-rows="4"
+      >
+        <template #cell-amount="{ row }">
+          <span class="block px-2 text-right font-mono text-12px text-ink">
+            {{ contractLineItemAmount(row).toFixed(2) }}
+          </span>
+        </template>
+        <template #cell-plannedArrivalDate="{ row, rowIndex, update }">
+          <input
+            :value="row.plannedArrivalDate ?? ''"
+            type="date"
+            class="field-input h-7 w-full px-2 text-12px"
+            :aria-label="`计划到货日期，第 ${rowIndex + 1} 行`"
+            @input="update(($event.target as HTMLInputElement).value)"
           >
-            <td class="px-2 py-2 text-center font-mono text-ink-faint">
-              {{ index + 1 }}
-            </td>
-            <td class="px-2 py-2">
-              <input
-                :value="line.materialName"
-                class="field-input w-full"
-                :data-testid="`contract-line-name-${index}`"
-                @input="patchLine(index, { materialName: inputValue($event) })"
-              >
-            </td>
-            <td class="px-2 py-2">
-              <input :value="line.spec" class="field-input w-full" @input="patchLine(index, { spec: inputValue($event) })">
-            </td>
-            <td class="px-2 py-2">
-              <input :value="line.brand" class="field-input w-full" @input="patchLine(index, { brand: inputValue($event) })">
-            </td>
-            <td class="px-2 py-2">
-              <SelectFilter
-                :model-value="line.unit"
-                :options="UNIT_OPTIONS"
-                aria-label="计量单位"
-                :min-width="64"
-                full-width
-                @update:model-value="patchLine(index, { unit: $event })"
-              />
-            </td>
-            <td class="px-2 py-2">
-              <input
-                :value="line.qty ?? 0"
-                type="number"
-                min="0"
-                step="0.01"
-                class="field-input w-full text-right font-mono"
-                :data-testid="`contract-line-qty-${index}`"
-                @input="patchLine(index, { qty: inputNumber($event) })"
-              >
-            </td>
-            <td class="px-2 py-2">
-              <input
-                :value="line.taxInclusiveUnitPrice ?? 0"
-                type="number"
-                min="0"
-                step="0.01"
-                class="field-input w-full text-right font-mono"
-                :data-testid="`contract-line-price-${index}`"
-                @input="patchLine(index, { taxInclusiveUnitPrice: inputNumber($event) })"
-              >
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-ink">
-              {{ contractLineItemAmount(line).toFixed(2) }}
-            </td>
-            <td class="px-2 py-2">
-              <input
-                :value="line.plannedArrivalDate"
-                type="date"
-                class="field-input w-full"
-                @input="patchLine(index, { plannedArrivalDate: inputValue($event) })"
-              >
-            </td>
-            <td class="px-2 py-2">
-              <input :value="line.note" class="field-input w-full" @input="patchLine(index, { note: inputValue($event) })">
-            </td>
-            <td class="px-2 py-2">
-              <div class="flex items-center gap-1">
-                <button type="button" class="icon-btn" title="复制明细" @click="copyLine(index)">
-                  <span class="i-lucide-copy text-12px" aria-hidden="true" />
-                </button>
-                <button type="button" class="icon-btn-danger" title="删除明细" @click="removeLine(index)">
-                  <span class="i-lucide-trash-2 text-12px" aria-hidden="true" />
-                </button>
-              </div>
-            </td>
-          </tr>
-          <tr v-if="lines.length === 0">
-            <td colspan="11" class="px-4 py-8 text-center text-12px text-ink-faint">
-              暂无采购明细，点击“新增明细”开始录入。
-            </td>
-          </tr>
-        </tbody>
-        <tfoot v-if="lines.length" class="border-t border-line-strong bg-surface-2">
-          <tr>
-            <td colspan="7" class="px-3 py-2 text-right font-700 text-ink-soft">
-              合计
-            </td>
-            <td class="px-2 py-2 text-right font-mono font-800 text-brand-deep">
-              {{ total.toFixed(2) }}
-            </td>
-            <td colspan="3" />
-          </tr>
-        </tfoot>
-      </table>
+        </template>
+      </KitEditGrid>
     </div>
   </section>
 </template>

@@ -96,15 +96,15 @@
 | `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成个人资料、班组、能力、附件、项目责任、考勤、签工、工资、扣罚与关联人员区块及四档回归 | 身份/联系/银行信息脱敏；档案与在场状态分离；工资和扣罚真实下钻且不反推个人金额 | C-DENSE |
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页编辑返回详情及主档字段闭环 | 班组、当前项目保存真实 ID；项目不可见时不连带隐藏跨项目工人主档 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | #194 已完成班组/项目/档案状态/在场状态/进退场日期/安全教育列、领域筛选与四档局部横滚回归 | 电话和身份证脱敏；键盘可进入详情；存在工资、扣罚等下游时触发级联安全确认 | C-DENSE |
-| `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-DETAIL-LIVE | 参考合同详情已确认顶部摘要、审批轨迹、右侧审批栏与页内标签；本地字段和业务动作继续按权威规格 | 仅打开并关闭材料采购合同详情；未触发详情动作 | C-BASE |
-| `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | 无安全直接证据 | 禁止触发上传或导入 | C-TOOL |
-| `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-DENSE |
+| `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-DETAIL-LIVE | #195 已按参考构图完成顶部摘要、合同阶段、金额、本地基本信息、真实关联单据、材料采购明细与合同文件页签；不补造审批人或关联记录 | 参考仅打开并关闭材料采购合同详情；本地按真实外键和文件引用验证 | C-BASE |
+| `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | #195 已按本地清单拆表蓝本完成三步导入、逐 sheet 映射、持久缺失字段错误与四档无整页横滚回归；无红圈安全直接证据，不宣称同屏复刻 | 未对参考站触发上传或导入；A–E 格式与人工确认口径以 `docs/rewrite/pages/boq-import.md` 为准 | C-TOOL |
+| `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | #195 已完成目录/密集表格/变更/月度报量三页签、完整合同编号、直接业务入口、金额完整显示、键盘与四档局部横滚回归；无红圈安全直接证据 | 原始金额不做 MoneyLink；清单手调/导出不推进甲方报量状态；布局权威见 `docs/rewrite/pages/boq-import.md` | C-DENSE |
 | `app/pages/contract/company-expense/form/[id].vue` | `/contract/company-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/company-expense/form/index.vue` | `/contract/company-expense/form` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/company-expense/index.vue` | `/contract/company-expense` | 辅助合同与结算 | 列表 | #196 | R-LIST-PRIOR | 待 #196 同屏测量 | 待 #196 只读核对 | C-DENSE |
-| `app/pages/contract/construction/form/[id].vue` | `/contract/construction/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/construction/form/index.vue` | `/contract/construction/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/construction/index.vue` | `/contract/construction` | 核心合同 | 列表 | #195 | R-LIST-PRIOR | 待 #195 同屏测量 | 待 #195 只读核对 | C-DENSE |
+| `app/pages/contract/construction/form/[id].vue` | `/contract/construction/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #195 已完成整页分区、真实 lookup、草稿/提交校验和四档局部滚动回归 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/contract/construction/form/index.vue` | `/contract/construction/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #195 已完成整页分区、真实 lookup、草稿/提交校验和四档局部滚动回归 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/contract/construction/index.vue` | `/contract/construction` | 核心合同 | 列表 | #195 | R-LIST-PRIOR | #195 已统一项目/客户/状态/搜索工具栏、收入侧金额口径、分页、长编号与四档局部横滚 | 本地聚合只按合同真实外键；未扩张参考写操作 | C-DENSE |
 | `app/pages/contract/material/form/[id].vue` | `/contract/material/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | 复用左分区导航、两列字段网格、局部明细表和底部固定操作条；编辑态字段差异仍按本地规格 | 写入路径保持现有契约；参考站仅观察空白新建态 | C-FORM |
 | `app/pages/contract/material/form/index.vue` | `/contract/material/form` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | 已确认独立页签整页表单、分区导航、两列主体、局部明细表和固定底部动作 | 仅进入空白页、切换分区并取消，未录入或保存 | C-FORM |
 | `app/pages/contract/material/index.vue` | `/contract/material` | 核心合同 | 列表 | #195 | R-MATERIAL-CONTRACT-LIVE | 已确认左分类、单行工具栏、紧凑表格、固定操作列及底部汇总/分页；具体字段继续按本地规格 | 仅打开既有详情与空白新建页；未执行录入、保存、提交、导入或行级动作 | C-DENSE |
@@ -114,9 +114,9 @@
 | `app/pages/contract/other-settlement/form/[id].vue` | `/contract/other-settlement/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/other-settlement/form/index.vue` | `/contract/other-settlement/form` | 辅助合同与结算 | 整页表单 | #196 | R-FORM-PRIOR | 待 #196 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/contract/other-settlement/index.vue` | `/contract/other-settlement` | 辅助合同与结算 | 列表 | #196 | R-LIST-PRIOR | 待 #196 同屏测量 | 待 #196 只读核对 | C-DENSE |
-| `app/pages/contract/subcontract/form/[id].vue` | `/contract/subcontract/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/subcontract/form/index.vue` | `/contract/subcontract/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | 待 #195 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/contract/subcontract/index.vue` | `/contract/subcontract` | 核心合同 | 列表 | #195 | R-SUBCONTRACT-LIST-LIVE | 参考页为左分类 + 紧凑工具栏 + 单一超宽表格面；当前实现另分标题工具栏、状态页签、左侧 TreeNav 和独立汇总面，待 #195 同屏测量 | 参考仅确认分类、搜索/筛选及导入/新建入口存在；行内链接和写操作均未触发，当前新增/编辑/删除契约继续保留 | C-DENSE |
+| `app/pages/contract/subcontract/form/[id].vue` | `/contract/subcontract/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #195 已完成整页分区、真实 lookup、草稿/提交校验和四档局部滚动回归 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/contract/subcontract/form/index.vue` | `/contract/subcontract/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #195 已完成整页分区、真实 lookup、草稿/提交校验和四档局部滚动回归 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/contract/subcontract/index.vue` | `/contract/subcontract` | 核心合同 | 列表 | #195 | R-SUBCONTRACT-LIST-LIVE | #195 已收敛为参考式左分类、单行项目/分供方/状态/搜索工具栏、紧凑超宽表格与分页，保留劳务/专业业务分类 | 参考仅确认分类、搜索/筛选及导入/新建入口存在；本地行内详情和写路径沿用真实契约 | C-DENSE |
 | `app/pages/export/config/[jobId].vue` | `/export/config/:jobId` | 导入导出 | 特殊工具 | #205 | R-TOOL-PENDING | 无安全直接证据 | 禁止触发下载或导出 | C-TOOL |
 | `app/pages/finance/billing/[id].vue` | `/finance/billing/:id` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 待 #202 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/billing/index.vue` | `/finance/billing` | 收入财务 | 列表 | #202 | R-LIST-PRIOR | 待 #202 同屏测量 | 待 #202 只读核对 | C-DENSE |

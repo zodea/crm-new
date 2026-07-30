@@ -5392,6 +5392,23 @@ export const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 37,
+    name: 'monthly-statement-owner-lifecycle-repair',
+    async up(db) {
+      // 旧版 adjusted/exported 分别表示“手调过/导出过”；reported_amount 在
+      // 保存草稿时也会写入，不能作为已申报证据。没有可靠审定事实时保守回草稿，
+      // 由用户重新申报；只有 audited_amount 能保留为已审定。
+      await db.execute(`
+        UPDATE monthly_statements
+        SET status = CASE
+          WHEN audited_amount IS NOT NULL THEN 'exported'
+          ELSE 'draft'
+        END
+        WHERE status IN ('adjusted', 'exported')
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

@@ -14,32 +14,10 @@ const KitTableStub = defineComponent({
       default: () => [],
     },
   },
-  emits: ['checkboxChange'],
-  setup(props, { emit, expose, slots }) {
-    const selected = shallowRef<unknown[]>([])
-    function toggle(row: unknown, checked: boolean) {
-      selected.value = checked
-        ? [...selected.value, row]
-        : selected.value.filter(candidate => candidate !== row)
-      emit('checkboxChange', selected.value)
-    }
-    function clearCheckbox() {
-      selected.value = []
-      emit('checkboxChange', [])
-    }
-    expose({ clearCheckbox })
+  setup(props, { slots }) {
     return () => h('table', { 'aria-label': '明细网格表格' }, [
       h('tbody', (props.data as Record<string, unknown>[]).map((row, rowIndex) =>
         h('tr', { key: String(row.__kitRowKey) }, [
-          h('td', [
-            h('input', {
-              'aria-label': `选择第 ${rowIndex + 1} 行`,
-              'type': 'checkbox',
-              'checked': selected.value.includes(row),
-              'onChange': (event: Event) =>
-                toggle(row, (event.target as HTMLInputElement).checked),
-            }),
-          ]),
           ...(props.columns as { field?: string, slot?: string }[])
             .filter(column => column.field)
             .map(column => h('td', column.slot

@@ -15,7 +15,7 @@ export const BOQ_CHANGE_STATUS_LABEL: Record<BoqChangeStatus, string> = {
 }
 
 export const BOQ_MONTHLY_STATUS_LABEL: Record<'draft' | 'adjusted' | 'exported', string> = {
-  draft: '自动草稿',
-  adjusted: '已手调',
-  exported: '已导出',
+  draft: '草稿',
+  adjusted: '已申报',
+  exported: '已审定',
 }

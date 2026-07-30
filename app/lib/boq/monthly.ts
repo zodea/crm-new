@@ -264,8 +264,8 @@ export async function adjustMonthlyStatementLine(
   )
   if (!statement)
     throw new Error('月度报量单不存在或已删除')
-  if (statement.status === 'exported')
-    throw new Error('已导出的月度报量不能直接调整')
+  if (statement.status !== 'draft')
+    throw new Error('只有草稿状态的月度报量可以从清单工作台调整')
 
   const logIds: string[] = []
   const lineLogId = await withUpdateLog(db, 'monthly_statement_lines', statementLineId, () => db.execute(
@@ -285,23 +285,11 @@ export async function adjustMonthlyStatementLine(
   )
   const statementLogId = await withUpdateLog(db, 'monthly_statements', line.statement_id, () => db.execute(
     `UPDATE monthly_statements
-     SET status = 'adjusted', total_amount = ?, updated_at = datetime('now')
+     SET total_amount = ?, updated_at = datetime('now')
      WHERE id = ?`,
     [round2(numberValue(total?.amount)), line.statement_id],
   ))
   if (statementLogId)
     logIds.push(statementLogId)
   return logIds
-}
-
-export async function markMonthlyStatementExported(
-  db: SoftDb,
-  statementId: string,
-): Promise<string | null> {
-  return withUpdateLog(db, 'monthly_statements', statementId, () => db.execute(
-    `UPDATE monthly_statements
-     SET status = 'exported', updated_at = datetime('now')
-     WHERE id = ?`,
-    [statementId],
-  ))
 }

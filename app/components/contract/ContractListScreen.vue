@@ -17,8 +17,6 @@ import { yuan } from '~/lib/util/money'
 const { kind } = defineProps<{ kind: ContractKind }>()
 
 const store = useContractStore()
-const projectStore = useProjectStore()
-const supplierStore = useSupplierStore()
 const { confirm, undoToast, error } = useKitUI()
 
 const KIND_TITLE: Record<ContractKind, string> = {
@@ -33,13 +31,29 @@ const kindRows = computed(() => store.byKind(kind))
 // ── 筛选状态：搜索 / 项目 / 业务态视图（默认履约中）/ 分包左分类 ──
 const searchText = shallowRef('')
 const projFilter = shallowRef('all') // reka Select 不接受空串值，'all' 哨兵
+const partyFilter = shallowRef('all')
 const view = shallowRef('履约中') // 默认业务态视图 = 履约中（设计稿 defaultView: 'active'）
 const subCat = shallowRef('all') // 分包左分类：all | 劳务 | 专业
 
 const projOptions = computed(() => [
   { key: 'all', label: '全部项目' },
-  ...projectStore.list.map(p => ({ key: p.id, label: p.name })),
+  ...[...new Map(kindRows.value.map(row => [
+    row.projectId,
+    { key: row.projectId, label: row.projectName || row.projectId },
+  ])).values()],
 ])
+const partyLabel = computed(() => kind === '施工' ? '客户' : '分供方')
+const partyOptions = computed(() => {
+  const rows = kindRows.value
+    .map(row => kind === '施工'
+      ? { key: row.customerId ?? '', label: row.customerName }
+      : { key: row.supplierId ?? '', label: row.supplierName })
+    .filter(option => option.key && option.label)
+  return [
+    { key: 'all', label: `全部${partyLabel.value}` },
+    ...[...new Map(rows.map(option => [option.key, option])).values()],
+  ]
+})
 
 // ── 数据管线：kind 切片 → 项目/搜索 → （分包）分类 → 视图 → 分页 ──
 const searched = computed(() => {
@@ -47,6 +61,9 @@ const searched = computed(() => {
   const proj = projFilter.value
   return kindRows.value.filter((c) => {
     if (proj !== 'all' && c.projectId !== proj)
+      return false
+    const partyId = kind === '施工' ? c.customerId : c.supplierId
+    if (partyFilter.value !== 'all' && partyId !== partyFilter.value)
       return false
     if (!q)
       return true
@@ -116,7 +133,7 @@ function onPageChange(e: { page: number, pageSize: number }) {
   pageSize.value = e.pageSize
 }
 // 筛选/视图变化后回到第 1 页
-watch([searchText, projFilter, view, subCat], () => {
+watch([searchText, projFilter, partyFilter, view, subCat], () => {
   page.value = 1
 })
 
@@ -180,13 +197,7 @@ function statusChip(status: string): string {
 }
 
 function projectName(id: string): string {
-  return projectStore.byId(id)?.name ?? '—'
-}
-function projectDeveloper(id: string): string {
-  return projectStore.byId(id)?.developer || '—'
-}
-function supplierName(id: string | null): string {
-  return id ? supplierStore.byId(id)?.name ?? '—' : '—'
+  return kindRows.value.find(row => row.projectId === id)?.projectName || '—'
 }
 
 // ── CRUD ──
@@ -197,9 +208,10 @@ function openCreate() {
 async function refresh() {
   searchText.value = ''
   projFilter.value = 'all'
+  partyFilter.value = 'all'
   view.value = '履约中'
   subCat.value = 'all'
-  await Promise.all([store.load(), projectStore.load(), supplierStore.load()])
+  await store.load()
 }
 function openEdit(row: Contract) {
   void navigateTo(formPath(formKind(), row.id))
@@ -272,8 +284,6 @@ async function handleDelete(row: Contract) {
 
 onMounted(() => {
   store.load()
-  projectStore.load()
-  supplierStore.load()
 })
 </script>
 
@@ -282,23 +292,21 @@ onMounted(() => {
     <ContractListToolbar
       v-model:search="searchText"
       v-model:project="projFilter"
+      v-model:party="partyFilter"
       v-model:status="view"
       :title="title"
       :loading="store.loading"
       :project-options="projOptions"
-      :status-options="kind === '材采' ? viewOptions : undefined"
+      :party-label="partyLabel"
+      :party-options="partyOptions"
+      :status-options="viewOptions"
       @refresh="refresh"
       @create="openCreate"
     />
 
-    <!-- 业务态视图（默认履约中） -->
-    <div v-if="kind !== '材采'" class="panel px-3">
-      <SegTab v-model="view" :tabs="viewTabs" />
-    </div>
-
-    <div :class="kind !== '施工' ? 'flex items-start gap-3' : ''">
+    <div :class="kind !== '施工' ? 'grid min-w-0 gap-3 sm:grid-cols-[13rem_minmax(0,1fr)] sm:items-start' : ''">
       <!-- 分包按劳务/专业分类；材采保留参考页的单层合同分类。 -->
-      <div v-if="kind !== '施工'" class="w-52 shrink-0">
+      <div v-if="kind !== '施工'" class="min-w-0 sm:w-52">
         <TreeNav
           v-model="subCat"
           :title="kind === '材采' ? '材料采购合同分类' : '分包合同分类'"
@@ -315,7 +323,7 @@ onMounted(() => {
           @page-change="onPageChange"
         >
           <template #name="{ row }">
-            <NuxtLink :to="`/contract/${row.id}`" class="cell--link">
+            <NuxtLink :to="`/contract/${row.id}`" class="cell--link" :title="row.name">
               {{ row.name }}
             </NuxtLink>
           </template>
@@ -325,11 +333,14 @@ onMounted(() => {
             </NuxtLink>
           </template>
           <template #client="{ row }">
-            {{ projectDeveloper(row.projectId) }}
+            <NuxtLink v-if="row.customerId" :to="`/base/customer/${row.customerId}`" class="cell--link">
+              {{ row.customerName || '—' }}
+            </NuxtLink>
+            <span v-else>—</span>
           </template>
           <template #supplier="{ row }">
             <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
-              {{ supplierName(row.supplierId) }}
+              {{ row.supplierName || '—' }}
             </NuxtLink>
             <span v-else>—</span>
           </template>

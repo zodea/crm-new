@@ -39,6 +39,7 @@ const previewRows = ref<BoqImportRow[]>([])
 const excludedRowKeys = ref<Set<string>>(new Set())
 const parsing = shallowRef(false)
 const parseError = shallowRef('')
+const mappingError = shallowRef('')
 const reviewConfirmed = shallowRef(false)
 
 const fieldDefinitions: readonly {
@@ -125,6 +126,7 @@ const { onChange, open: openFileDialog } = useFileDialog({
 async function handleFile(file: File) {
   parsing.value = true
   parseError.value = ''
+  mappingError.value = ''
   try {
     const result = parseBoqWorkbook(await file.arrayBuffer(), file.name)
     parsed.value = result
@@ -175,6 +177,14 @@ function updateMapping(field: BoqImportField, column: string | undefined) {
   else
     delete next[field]
   mappings.value = { ...mappings.value, [selectedSheetName.value]: next }
+  const source = parsed.value
+  const incomplete = source?.sheets.find(sheet => !mappingComplete(sheet.name))
+  if (!incomplete) {
+    mappingError.value = ''
+    return
+  }
+  const labels = missingRequiredFields(incomplete.name).map(item => item.label)
+  mappingError.value = `工作表「${incomplete.name}」缺少必填映射：${labels.join('、')}。请选择来源列后再预览。`
 }
 
 function rowKey(row: BoqImportRow): string {
@@ -217,11 +227,22 @@ function finalizedRows(): BoqImportRow[] {
   })
 }
 
-function mappingComplete(sheetName: string): boolean {
+function isRequiredField(field: typeof fieldDefinitions[number]): boolean {
+  return Boolean(field.required && !(field.key === 'qty' && parsed.value?.formatClass === 'E'))
+}
+
+function missingRequiredFields(sheetName: string): typeof fieldDefinitions[number][] {
   const mapping = mappings.value[sheetName] ?? {}
   return fieldDefinitions
-    .filter(field => field.required && !(field.key === 'qty' && parsed.value?.formatClass === 'E'))
-    .every(field => Boolean(mapping[field.key]))
+    .filter(field => isRequiredField(field) && !mapping[field.key])
+}
+
+function mappingComplete(sheetName: string): boolean {
+  return missingRequiredFields(sheetName).length === 0
+}
+
+function isCurrentFieldMissing(field: typeof fieldDefinitions[number]): boolean {
+  return isRequiredField(field) && !currentMapping.value[field.key]
 }
 
 function goToConfirm() {
@@ -236,10 +257,13 @@ function buildPreview() {
   const incomplete = source.sheets.find(sheet => !mappingComplete(sheet.name))
   if (incomplete) {
     selectedSheetName.value = incomplete.name
-    toastError(`工作表「${incomplete.name}」缺少必填映射`)
+    const labels = missingRequiredFields(incomplete.name).map(field => field.label)
+    mappingError.value = `工作表「${incomplete.name}」缺少必填映射：${labels.join('、')}。请选择来源列后再预览。`
+    toastError(mappingError.value)
     return
   }
   try {
+    mappingError.value = ''
     previewRows.value = source.sheets.flatMap(sheet =>
       buildBoqImportRows(sheet, mappings.value[sheet.name] ?? {}, source.formatClass),
     )
@@ -250,7 +274,8 @@ function buildPreview() {
     stepper.goTo('preview')
   }
   catch (cause) {
-    toastError(toErrorMessage(cause))
+    mappingError.value = toErrorMessage(cause)
+    toastError(mappingError.value)
   }
 }
 
@@ -290,22 +315,23 @@ function confirmImport() {
         class="grid min-h-72 cursor-pointer place-items-center border-2 rounded-[var(--radius-card)] border-dashed p-6 text-center transition-colors"
         :class="isOverDropZone ? 'border-brand bg-brand-soft' : 'border-line-strong bg-surface-2 hover:border-brand'"
         role="button"
+        aria-label="选择文件"
         tabindex="0"
         @click="openFileDialog()"
         @keydown.enter.prevent="openFileDialog()"
         @keydown.space.prevent="openFileDialog()"
       >
         <div>
-          <span class="i-lucide-file-spreadsheet text-36px text-brand" />
+          <span class="i-lucide-file-spreadsheet text-36px text-brand" aria-hidden="true" />
           <h2 class="mt-3 text-15px font-800 text-ink">
             拖入或选择施工清单
           </h2>
           <p class="mt-1 text-12px text-ink-soft">
             支持 XLSX / XLS / CSV；自动扫描前 20 行识别真实表头。
           </p>
-          <button type="button" class="btn-primary mt-4" :disabled="parsing">
+          <span class="btn-primary mt-4 inline-flex" aria-hidden="true">
             {{ parsing ? '正在识别…' : '选择文件' }}
-          </button>
+          </span>
         </div>
       </div>
 
@@ -349,14 +375,32 @@ function confirmImport() {
           :min-width="220"
         />
       </div>
+      <div
+        v-if="mappingError"
+        class="border-b border-danger/30 bg-danger-soft px-4 py-3 text-12px text-danger"
+        role="alert"
+        data-testid="boq-mapping-error"
+      >
+        <div class="flex items-start gap-2">
+          <span class="i-lucide-circle-alert mt-0.5 shrink-0" aria-hidden="true" />
+          <span>{{ mappingError }}</span>
+        </div>
+      </div>
       <div v-if="selectedSheet" class="grid gap-[1px] bg-line sm:grid-cols-2 lg:grid-cols-3">
         <label
           v-for="field in fieldDefinitions"
           :key="field.key"
           class="min-w-0 bg-panel p-3"
+          :class="isCurrentFieldMissing(field) && mappingError ? 'outline outline-1 outline-inset outline-danger/50' : ''"
         >
           <span class="mb-1 flex items-center gap-1 text-12px font-700 text-ink-soft">
             {{ field.label }} <b v-if="field.required" class="text-danger">*</b>
+            <small
+              v-if="isCurrentFieldMissing(field) && mappingError"
+              class="ml-auto font-600 text-danger"
+            >
+              必填未映射
+            </small>
           </span>
           <SelectFilter
             :model-value="currentMapping[field.key]"
