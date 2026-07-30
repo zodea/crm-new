@@ -1,6 +1,7 @@
 import type { ScheduleProjectView } from '~/lib/schedule/read-model'
-import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, shallowRef, watch } from 'vue'
 import HomeScheduleOverview from '~/components/home/HomeScheduleOverview.vue'
 import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
@@ -91,6 +92,93 @@ const global = {
 }
 
 describe('施工排程时间轴复用', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  it('今天线读取本机系统日期，不使用传入的固定演示日期', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 4, 20, 12))
+    const board = render(ScheduleBoard, {
+      props: {
+        snapshot,
+        today: '2026-06-01',
+      },
+      global,
+    })
+
+    expect(document.querySelector('.today-label')?.getAttribute('style')).toContain('31.1475')
+    board.unmount()
+    vi.useRealTimers()
+  })
+
+  it('以同一棵 WBS Tree 呈现首页与工作台，并默认只展开首个楼栋分组', async () => {
+    const secondGroup = {
+      ...snapshot.groups[0]!,
+      id: 'group-2',
+      name: '3栋-4栋',
+      buildingIds: ['building-3', 'building-4'],
+      buildingNames: ['3栋', '4栋'],
+      tasks: [{
+        ...snapshot.groups[0]!.tasks[0]!,
+        id: 'task-2',
+        groupId: 'group-2',
+        name: '给排水安装',
+      }],
+    }
+    const twoGroupSnapshot = {
+      ...snapshot,
+      groups: [snapshot.groups[0]!, secondGroup],
+    }
+
+    const board = render(ScheduleBoard, {
+      props: {
+        snapshot: twoGroupSnapshot,
+        today: '2026-05-20',
+      },
+      global,
+    })
+
+    expect(screen.getByRole('tree', { name: '施工排程 WBS' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '放线及新建墙体', exact: true })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '给排水安装', exact: true })).toBeNull()
+    expect(screen.getByRole('columnheader', { name: /计划起止/ })).not.toBeNull()
+    expect(screen.queryByText('计划开始', { exact: true })).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: '展开分组：3栋-4栋' }))
+    expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: '向3栋-4栋追加工序' }))
+    expect(board.emitted().addTask?.[0]).toEqual([secondGroup])
+    expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
+
+    const secondGroupItem = screen.getByRole('treeitem', { name: /3栋-4栋/ })
+    await fireEvent.click(within(secondGroupItem).getByText('61天', { exact: true }))
+    expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
+
+    secondGroupItem.focus()
+    await fireEvent.keyDown(secondGroupItem, { key: 'ArrowLeft' })
+    expect(screen.queryByRole('button', { name: '给排水安装', exact: true })).toBeNull()
+    await fireEvent.keyDown(secondGroupItem, { key: 'ArrowRight' })
+    expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
+    expect(JSON.parse(window.sessionStorage.getItem('schedule-wbs-expanded-groups') ?? '{}')).toEqual({
+      'project-1': ['group-1', 'group-2'],
+    })
+    board.unmount()
+
+    render(HomeScheduleOverview, {
+      props: {
+        snapshot: twoGroupSnapshot,
+        today: '2026-05-20',
+      },
+      global,
+    })
+    expect(screen.getByRole('tree', { name: '施工排程 WBS' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /追加工序/ })).toBeNull()
+  })
+
   it('首页和施工进度页通过同一可观察时间轴呈现同一工序', async () => {
     const home = render(HomeScheduleOverview, {
       props: {
@@ -100,7 +188,7 @@ describe('施工排程时间轴复用', () => {
       global,
     })
 
-    const homeTimeline = screen.getByRole('grid', { name: '施工排程时间轴' })
+    const homeTimeline = screen.getByTestId('home-schedule-scroll')
     expect(homeTimeline.textContent).toContain('放线及新建墙体')
     await fireEvent.click(screen.getByRole('button', { name: '放线及新建墙体', exact: true }))
     expect(home.emitted().selectTask?.[0]).toEqual([snapshot.groups[0]!.tasks[0]])
@@ -114,7 +202,7 @@ describe('施工排程时间轴复用', () => {
       global,
     })
 
-    const boardTimeline = screen.getByRole('grid', { name: '施工排程时间轴' })
+    const boardTimeline = screen.getByTestId('schedule-scroll')
     expect(boardTimeline.textContent).toContain('放线及新建墙体')
     await fireEvent.click(screen.getByRole('button', { name: '放线及新建墙体', exact: true }))
     expect(board.emitted().selectTask?.[0]).toEqual([snapshot.groups[0]!.tasks[0]])

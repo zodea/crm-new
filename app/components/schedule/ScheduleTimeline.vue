@@ -1,19 +1,55 @@
 <script setup lang="ts">
+import type { TreeItemSelectEvent, TreeItemToggleEvent } from 'reka-ui'
 import type { ScheduleGroupView, ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
+import { useNow } from '@vueuse/core'
+import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
 import {
   calendarDays,
   rescheduledTaskWindow,
 } from '~/lib/schedule/planning'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { useScheduleStore } from '~/stores/schedule'
 
 type TimelineMode = 'overview' | 'workspace'
 type MobileView = 'wbs' | 'gantt'
 type TaskState = 'done' | 'doing' | 'late-start' | 'pending'
 
-type TimelineRow
-  = | { kind: 'project', id: string, label: string, start: string | null, finish: string | null, actual: number, deviation: number }
-    | { kind: 'group', id: string, label: string, group: ScheduleGroupView, start: string | null, finish: string | null, actual: number, deviation: number }
-    | { kind: 'task', id: string, label: string, task: ScheduleTaskView, start: string, finish: string, actual: number, deviation: number }
+interface ProjectRow {
+  kind: 'project'
+  id: string
+  label: string
+  start: string | null
+  finish: string | null
+  actual: number
+  deviation: number
+}
+
+interface GroupRow {
+  kind: 'group'
+  id: string
+  label: string
+  group: ScheduleGroupView
+  start: string | null
+  finish: string | null
+  actual: number
+  deviation: number
+  children: TaskRow[]
+}
+
+interface TaskRow {
+  kind: 'task'
+  id: string
+  label: string
+  task: ScheduleTaskView
+  start: string
+  finish: string
+  actual: number
+  deviation: number
+}
+
+type TimelineTreeRow = GroupRow | TaskRow
+type TimelineRow = ProjectRow | TimelineTreeRow
 
 const props = withDefaults(defineProps<{
   snapshot: ScheduleProjectView
@@ -37,8 +73,24 @@ const emit = defineEmits<{
   }]
 }>()
 
+const ROW_HEIGHT = 34
+
+const scheduleStore = useScheduleStore()
 const mobileView = shallowRef<MobileView>('wbs')
-const expandedGroupIds = shallowRef<Set<string>>(new Set())
+const systemNow = useNow({ interval: 60_000 })
+const systemToday = computed(() => toLocalDateInputValue(systemNow.value))
+const expandedGroupIds = computed<string[]>({
+  get() {
+    const validIds = new Set(props.snapshot.groups.map(group => group.id))
+    const stored = scheduleStore.expandedGroupIdsByProject[props.snapshot.id]
+    if (stored)
+      return stored.filter(groupId => validIds.has(groupId))
+    return props.snapshot.groups[0] ? [props.snapshot.groups[0].id] : []
+  },
+  set(groupIds) {
+    scheduleStore.setExpandedGroupIds(props.snapshot.id, groupIds)
+  },
+})
 const drag = shallowRef<{
   task: ScheduleTaskView
   mode: 'move' | 'resize-finish'
@@ -55,68 +107,66 @@ const dragPreview = shallowRef<{
 const draggedRecently = shallowRef(false)
 
 watch(
-  () => props.snapshot.id,
-  () => {
-    expandedGroupIds.value = new Set(props.snapshot.groups.map(group => group.id))
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.highlightedGroupId,
-  (groupId) => {
-    if (!groupId || expandedGroupIds.value.has(groupId))
+  [() => props.snapshot.id, () => props.highlightedGroupId],
+  ([, groupId]) => {
+    if (!groupId || expandedGroupIds.value.includes(groupId))
       return
-    expandedGroupIds.value = new Set([...expandedGroupIds.value, groupId])
+    expandedGroupIds.value = [...expandedGroupIds.value, groupId]
   },
   { immediate: true },
 )
 
-const rows = computed<TimelineRow[]>(() => {
-  const result: TimelineRow[] = []
-  if (props.mode === 'workspace') {
-    result.push({
-      kind: 'project',
-      id: props.snapshot.id,
-      label: props.snapshot.name,
-      start: props.snapshot.plannedStart,
-      finish: props.snapshot.plannedFinish,
-      actual: props.snapshot.actualProgress,
-      deviation: props.snapshot.deviationDays,
-    })
-  }
+const projectRow = computed<ProjectRow>(() => ({
+  kind: 'project',
+  id: props.snapshot.id,
+  label: props.snapshot.name,
+  start: props.snapshot.plannedStart,
+  finish: props.snapshot.plannedFinish,
+  actual: props.snapshot.actualProgress,
+  deviation: props.snapshot.deviationDays,
+}))
 
-  for (const group of props.snapshot.groups) {
-    result.push({
-      kind: 'group',
-      id: group.id,
-      label: group.name,
-      group,
-      start: group.plannedStart,
-      finish: group.plannedFinish,
-      actual: group.actualProgress,
-      deviation: group.deviationDays,
-    })
-    if (!expandedGroupIds.value.has(group.id))
-      continue
-    for (const task of group.tasks) {
-      result.push({
-        kind: 'task',
-        id: task.id,
-        label: task.name,
-        task,
-        start: task.plannedStart,
-        finish: task.plannedFinish,
-        actual: task.actualProgress,
-        deviation: task.deviationDays,
-      })
-    }
+const treeRows = computed<GroupRow[]>(() =>
+  props.snapshot.groups.map(group => ({
+    kind: 'group',
+    id: group.id,
+    label: group.name,
+    group,
+    start: group.plannedStart,
+    finish: group.plannedFinish,
+    actual: group.actualProgress,
+    deviation: group.deviationDays,
+    children: group.tasks.map(task => ({
+      kind: 'task',
+      id: task.id,
+      label: task.name,
+      task,
+      start: task.plannedStart,
+      finish: task.plannedFinish,
+      actual: task.actualProgress,
+      deviation: task.deviationDays,
+    })),
+  })),
+)
+
+const visibleTreeRows = computed<TimelineTreeRow[]>(() => {
+  const result: TimelineTreeRow[] = []
+  for (const group of treeRows.value) {
+    result.push(group)
+    if (expandedGroupIds.value.includes(group.id))
+      result.push(...group.children)
   }
   return result
 })
 
-const axisStart = computed(() => monthStart(props.snapshot.plannedStart ?? props.today))
-const axisFinish = computed(() => monthFinish(props.snapshot.plannedFinish ?? props.today))
+const rows = computed<TimelineRow[]>(() =>
+  props.mode === 'workspace'
+    ? [projectRow.value, ...visibleTreeRows.value]
+    : visibleTreeRows.value,
+)
+
+const axisStart = computed(() => monthStart(props.snapshot.plannedStart ?? systemToday.value))
+const axisFinish = computed(() => monthFinish(props.snapshot.plannedFinish ?? systemToday.value))
 const axisDays = computed(() => Math.max(calendarDays(axisStart.value, axisFinish.value) + 1, 1))
 
 const monthTicks = computed(() => {
@@ -156,7 +206,7 @@ const dependencyPaths = computed(() => {
     return [{
       id: dependency.id,
       disabled,
-      d: `M ${fromX} ${predecessorIndex * 36 + 18} H ${elbowX} V ${successorIndex * 36 + 18} H ${toX}`,
+      d: `M ${fromX} ${predecessorIndex * ROW_HEIGHT + ROW_HEIGHT / 2} H ${elbowX} V ${successorIndex * ROW_HEIGHT + ROW_HEIGHT / 2} H ${toX}`,
     }]
   })
 })
@@ -212,6 +262,16 @@ function percent(value: number): string {
   return `${Math.round(value * 100)}%`
 }
 
+function compactDate(value: string): string {
+  return value.slice(5).replace('-', '.')
+}
+
+function planRange(row: TimelineRow): string {
+  if (!row.start || !row.finish)
+    return '—'
+  return `${compactDate(row.start)}~${compactDate(row.finish)}`
+}
+
 function deviationLabel(days: number): string {
   if (!days)
     return '正常'
@@ -223,7 +283,7 @@ function taskState(task: ScheduleTaskView): TaskState {
     return 'done'
   if (task.actualProgress > 0)
     return 'doing'
-  if (calendarDays(task.plannedStart, props.today) > 0)
+  if (calendarDays(task.plannedStart, systemToday.value) > 0)
     return 'late-start'
   return 'pending'
 }
@@ -246,6 +306,29 @@ function groupStatusLabel(group: ScheduleGroupView): string {
   return `${percent(group.actualProgress)}${pace}`
 }
 
+function rowStatusLabel(row: TimelineRow): string {
+  if (row.kind === 'task')
+    return taskStatusLabel(row.task)
+  if (!row.deviation)
+    return '按计划'
+  return row.deviation > 0
+    ? `领先${row.deviation}天`
+    : `落后${Math.abs(row.deviation)}天`
+}
+
+function rowStatusTone(row: TimelineRow): 'ok' | 'brand' | 'warn' | 'danger' | 'neutral' {
+  if (row.kind !== 'task')
+    return row.deviation > 0 ? 'ok' : row.deviation < 0 ? 'warn' : 'brand'
+  const state = taskState(row.task)
+  if (state === 'late-start')
+    return 'danger'
+  if (state === 'pending')
+    return 'neutral'
+  if (state === 'doing')
+    return row.deviation < 0 ? 'warn' : 'brand'
+  return row.deviation < 0 ? 'danger' : 'ok'
+}
+
 function dependencyLabel(taskId: string): string {
   const dependency = props.snapshot.dependencies.find(candidate => candidate.succId === taskId)
   if (!dependency)
@@ -256,12 +339,32 @@ function dependencyLabel(taskId: string): string {
 }
 
 function toggleGroup(groupId: string) {
-  const next = new Set(expandedGroupIds.value)
-  if (next.has(groupId))
-    next.delete(groupId)
+  expandedGroupIds.value = expandedGroupIds.value.includes(groupId)
+    ? expandedGroupIds.value.filter(id => id !== groupId)
+    : [...expandedGroupIds.value, groupId]
+}
+
+function treeRowKey(row: TimelineTreeRow): string {
+  return row.id
+}
+
+function treeRowChildren(row: TimelineTreeRow): TimelineTreeRow[] | undefined {
+  return row.kind === 'group' ? row.children : undefined
+}
+
+function handleTreeSelect(event: TreeItemSelectEvent<TimelineTreeRow>, row: TimelineTreeRow) {
+  event.preventDefault()
+  if (!(event.detail.originalEvent instanceof KeyboardEvent))
+    return
+  if (row.kind === 'group')
+    toggleGroup(row.id)
   else
-    next.add(groupId)
-  expandedGroupIds.value = next
+    emit('selectTask', row.task)
+}
+
+function handleTreeToggle(event: TreeItemToggleEvent<TimelineTreeRow>) {
+  if (!(event.detail.originalEvent instanceof KeyboardEvent))
+    event.preventDefault()
 }
 
 function isHighlighted(row: TimelineRow): boolean {
@@ -395,11 +498,11 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
       tabindex="0"
       :aria-label="mode === 'overview' ? '首页施工进度甘特，可横向滚动' : '施工进度排程表，可横向滚动'"
     >
-      <div class="timeline-grid" role="grid" aria-label="施工排程时间轴">
+      <div class="timeline-grid">
         <div class="timeline-row" role="row">
           <div class="label-cell axis-cell" role="columnheader">
             <template v-if="mode === 'workspace'">
-              <span>WBS / 工序</span><span>工期</span><span>计划开始</span><span>计划完成</span><span>实际</span><span>偏差</span>
+              <span>WBS · 分组 / 工序</span><span>工期</span><span>计划起止</span><span>实际</span><span>状态</span>
             </template>
             <span v-else>楼栋分组 / 工序</span>
           </div>
@@ -410,16 +513,16 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
               class="month-label"
               :style="{ left: `${tick.left}%` }"
             >{{ tick.label }}</span>
-            <span class="today-line" :style="{ left: `${position(today)}%` }" />
-            <span class="today-label" :style="{ left: `${position(today)}%` }">今天</span>
+            <span class="today-line" :style="{ left: `${position(systemToday)}%` }" />
+            <span class="today-label" :style="{ left: `${position(systemToday)}%` }">今天</span>
           </div>
         </div>
 
         <svg
           v-if="dependencyPaths.length"
           class="dependency-overlay"
-          :viewBox="`0 0 100 ${rows.length * 36}`"
-          :style="{ height: `${rows.length * 36}px` }"
+          :viewBox="`0 0 100 ${rows.length * ROW_HEIGHT}`"
+          :style="{ height: `${rows.length * ROW_HEIGHT}px` }"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
@@ -438,127 +541,187 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
           />
         </svg>
 
-        <div v-for="row in rows" :key="row.id" class="timeline-row" role="row">
+        <div v-if="mode === 'workspace'" class="timeline-row" data-kind="project">
           <div
             class="label-cell data-row"
-            :data-kind="row.kind"
-            :data-highlighted="isHighlighted(row) ? 'true' : undefined"
-            role="gridcell"
+            data-kind="project"
           >
-            <div class="label-main" :class="row.kind === 'task' && 'is-task'">
-              <button
-                v-if="row.kind === 'group'"
-                type="button"
-                class="toggle-button"
-                :aria-label="`${expandedGroupIds.has(row.id) ? '折叠' : '展开'}分组：${row.label}`"
-                @click="toggleGroup(row.id)"
-              >
-                <span :class="expandedGroupIds.has(row.id) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" />
-              </button>
-              <span v-else-if="row.kind === 'project'" class="i-lucide-folder-kanban flex-none text-brand" />
-              <span v-else class="task-dot" :style="{ backgroundColor: row.task.color }" />
-
-              <button
-                v-if="row.kind === 'task'"
-                type="button"
-                class="task-name"
-                :aria-label="row.label"
-                @click="emit('selectTask', row.task)"
-              >
-                {{ row.label }}
-              </button>
-              <span v-else class="truncate">{{ row.label }}</span>
-
-              <span v-if="row.kind === 'task' && row.task.hasQty" class="i-lucide-link flex-none text-brand" aria-label="可下钻工程量" />
-              <template v-if="row.kind === 'group' && row.group.scopeBasis === 'provisional'">
-                <span class="pending-contract-chip">待绑定合同</span>
-                <NuxtLink
-                  v-if="mode === 'workspace'"
-                  :to="`/schedule/${row.group.projectId}/bind/${row.group.id}`"
-                  class="binding-entry"
-                  aria-label="绑定施工合同"
-                >
-                  <span class="i-lucide-link-2" aria-hidden="true" />
-                  <span>绑定</span>
-                </NuxtLink>
-              </template>
-              <span v-if="mode === 'overview' && row.kind === 'group'" class="status-label">
-                {{ groupStatusLabel(row.group) }}
-              </span>
-              <span v-if="mode === 'overview' && row.kind === 'task'" class="status-label">
-                {{ taskStatusLabel(row.task) }}
-              </span>
-              <button
-                v-if="mode === 'workspace' && row.kind === 'group'"
-                type="button"
-                class="add-task-button"
-                :aria-label="`向${row.label}追加工序`"
-                @click="emit('addTask', row.group)"
-              >
-                <span class="i-lucide-plus" />
-              </button>
+            <div class="label-main">
+              <span class="i-lucide-building-2 project-icon" aria-hidden="true" />
+              <span class="truncate">{{ projectRow.label }}</span>
             </div>
-
-            <template v-if="mode === 'workspace'">
-              <span>{{ row.start && row.finish ? calendarDays(row.start, row.finish) + 1 : '—' }}天</span>
-              <span>{{ row.start ?? '—' }}</span>
-              <span>{{ row.finish ?? '—' }}</span>
-              <span>{{ percent(row.actual) }}</span>
-              <span :class="row.deviation < 0 ? 'text-danger' : row.deviation > 0 ? 'text-ok' : 'text-ink-soft'">
-                {{ deviationLabel(row.deviation) }}
+            <span>{{ projectRow.start && projectRow.finish ? calendarDays(projectRow.start, projectRow.finish) + 1 : '—' }}天</span>
+            <span>{{ planRange(projectRow) }}</span>
+            <span class="font-700">{{ percent(projectRow.actual) }}</span>
+            <span>
+              <span class="row-status" :data-tone="rowStatusTone(projectRow)">
+                {{ rowStatusLabel(projectRow) }}
               </span>
-            </template>
-          </div>
-
-          <div class="chart-cell data-row" :data-kind="row.kind" role="gridcell">
-            <span v-for="tick in monthTicks" :key="tick.key" class="month-line" :style="{ left: `${tick.left}%` }" />
-            <span class="today-line" :style="{ left: `${position(today)}%` }" />
-            <button
-              v-if="row.start && row.finish"
-              type="button"
-              class="plan-bar"
-              :class="[
-                row.kind !== 'task' && 'is-rollup',
-                row.kind === 'task' && taskState(row.task) === 'late-start' && 'is-late',
-              ]"
-              :style="{
-                'left': `${position(barStart(row))}%`,
-                'width': `${barWidth(displayStart(row), displayFinish(row))}%`,
-                '--bar-color': row.kind === 'task' ? row.task.color : 'var(--brand)',
-              }"
-              :disabled="row.kind !== 'task'"
-              :aria-label="row.kind === 'task' ? `移动工序：${row.label}` : undefined"
-              :title="`${row.label}：${displayStart(row)} 至 ${displayFinish(row)}；拖动整体可调日期`"
-              @click="row.kind === 'task' && openTaskFromBar(row.task)"
-              @pointerdown="row.kind === 'task' && startDrag($event, row.task, 'move')"
-              @pointermove="moveDrag"
-              @pointerup="finishDrag"
-              @pointercancel="cancelDrag"
-              @keydown.left.prevent="row.kind === 'task' && nudgeTask(row.task, 'move', -1)"
-              @keydown.right.prevent="row.kind === 'task' && nudgeTask(row.task, 'move', 1)"
-            >
-              <span class="actual-fill" :style="{ width: percent(row.actual) }" />
-              <span v-if="row.kind === 'task' && row.task.baselineStart" class="baseline-mark" />
-            </button>
-            <button
-              v-if="mode === 'workspace' && row.kind === 'task'"
-              type="button"
-              class="duration-handle"
-              :style="{ left: `calc(${position(barFinish(row))}% - 5px)` }"
-              :aria-label="`调整工期：${row.label}`"
-              title="拖动右缘调整计划完成日；左缘保持不动"
-              @pointerdown="startDrag($event, row.task, 'resize-finish')"
-              @pointermove="moveDrag"
-              @pointerup="finishDrag"
-              @pointercancel="cancelDrag"
-              @keydown.left.prevent="nudgeTask(row.task, 'resize-finish', -1)"
-              @keydown.right.prevent="nudgeTask(row.task, 'resize-finish', 1)"
-            />
-            <span v-if="mode === 'workspace' && row.kind === 'task' && dependencyLabel(row.id)" class="dependency-label">
-              {{ dependencyLabel(row.id) }}
             </span>
           </div>
+
+          <div class="chart-cell data-row" data-kind="project">
+            <span v-for="tick in monthTicks" :key="tick.key" class="month-line" :style="{ left: `${tick.left}%` }" />
+            <span class="today-line" :style="{ left: `${position(systemToday)}%` }" />
+            <button
+              v-if="projectRow.start && projectRow.finish"
+              type="button"
+              class="plan-bar is-rollup"
+              :style="{
+                'left': `${position(barStart(projectRow))}%`,
+                'width': `${barWidth(displayStart(projectRow), displayFinish(projectRow))}%`,
+                '--bar-color': 'var(--brand)',
+              }"
+              disabled
+              :title="`${projectRow.label}：${displayStart(projectRow)} 至 ${displayFinish(projectRow)}`"
+            >
+              <span class="actual-fill" :style="{ width: percent(projectRow.actual) }" />
+            </button>
+          </div>
         </div>
+
+        <TreeRoot
+          v-slot="{ flattenItems }"
+          v-model:expanded="expandedGroupIds"
+          as="div"
+          :items="treeRows"
+          :get-key="treeRowKey"
+          :get-children="treeRowChildren"
+          class="timeline-tree"
+          aria-label="施工排程 WBS"
+        >
+          <TreeItem
+            v-for="item in flattenItems"
+            v-slot="{ isExpanded, handleToggle }"
+            :key="item._id"
+            v-bind="item.bind"
+            as="div"
+            class="timeline-row"
+            :data-kind="item.value.kind"
+            :data-highlighted="isHighlighted(item.value) ? 'true' : undefined"
+            @select="handleTreeSelect($event, item.value)"
+            @toggle="handleTreeToggle"
+          >
+            <div
+              class="label-cell data-row"
+              :data-kind="item.value.kind"
+            >
+              <div class="label-main" :class="item.value.kind === 'task' && 'is-task'">
+                <button
+                  v-if="item.value.kind === 'group'"
+                  type="button"
+                  class="tree-trigger"
+                  :aria-label="`${isExpanded ? '折叠' : '展开'}分组：${item.value.label}`"
+                  @click.stop="handleToggle"
+                >
+                  <span :class="isExpanded ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" aria-hidden="true" />
+                  <span class="truncate">{{ item.value.label }}</span>
+                </button>
+                <template v-else>
+                  <span class="task-dot" :style="{ backgroundColor: item.value.task.color }" aria-hidden="true" />
+                  <button
+                    type="button"
+                    class="task-name"
+                    :aria-label="item.value.label"
+                    @click.stop="emit('selectTask', item.value.task)"
+                  >
+                    {{ item.value.label }}
+                  </button>
+                  <span v-if="item.value.task.hasQty" class="i-lucide-link task-link-icon" aria-label="可下钻工程量" />
+                </template>
+
+                <template v-if="item.value.kind === 'group' && item.value.group.scopeBasis === 'provisional'">
+                  <span class="pending-contract-chip">待绑定合同</span>
+                  <NuxtLink
+                    v-if="mode === 'workspace'"
+                    :to="`/schedule/${item.value.group.projectId}/bind/${item.value.group.id}`"
+                    class="binding-entry"
+                    aria-label="绑定施工合同"
+                    @click.stop
+                  >
+                    <span class="i-lucide-link-2" aria-hidden="true" />
+                    <span>绑定</span>
+                  </NuxtLink>
+                </template>
+                <span v-if="mode === 'overview' && item.value.kind === 'group'" class="status-label">
+                  {{ groupStatusLabel(item.value.group) }}
+                </span>
+                <span v-if="mode === 'overview' && item.value.kind === 'task'" class="status-label">
+                  {{ taskStatusLabel(item.value.task) }}
+                </span>
+                <button
+                  v-if="mode === 'workspace' && item.value.kind === 'group'"
+                  type="button"
+                  class="add-task-button"
+                  :aria-label="`向${item.value.label}追加工序`"
+                  @click.stop="emit('addTask', item.value.group)"
+                >
+                  <span class="i-lucide-plus" aria-hidden="true" />
+                </button>
+              </div>
+
+              <template v-if="mode === 'workspace'">
+                <span>{{ item.value.start && item.value.finish ? calendarDays(item.value.start, item.value.finish) + 1 : '—' }}天</span>
+                <span>{{ planRange(item.value) }}</span>
+                <span :class="item.value.kind !== 'task' && 'font-700'">{{ percent(item.value.actual) }}</span>
+                <span>
+                  <span class="row-status" :data-tone="rowStatusTone(item.value)">
+                    {{ rowStatusLabel(item.value) }}
+                  </span>
+                </span>
+              </template>
+            </div>
+
+            <div class="chart-cell data-row" :data-kind="item.value.kind">
+              <span v-for="tick in monthTicks" :key="tick.key" class="month-line" :style="{ left: `${tick.left}%` }" />
+              <span class="today-line" :style="{ left: `${position(systemToday)}%` }" />
+              <button
+                v-if="item.value.start && item.value.finish"
+                type="button"
+                class="plan-bar"
+                :class="[
+                  item.value.kind !== 'task' && 'is-rollup',
+                  item.value.kind === 'task' && taskState(item.value.task) === 'late-start' && 'is-late',
+                ]"
+                :style="{
+                  'left': `${position(barStart(item.value))}%`,
+                  'width': `${barWidth(displayStart(item.value), displayFinish(item.value))}%`,
+                  '--bar-color': item.value.kind === 'task' ? item.value.task.color : 'var(--brand)',
+                }"
+                :disabled="item.value.kind !== 'task'"
+                :aria-label="item.value.kind === 'task' ? `移动工序：${item.value.label}` : undefined"
+                :title="`${item.value.label}：${displayStart(item.value)} 至 ${displayFinish(item.value)}${item.value.kind === 'task' ? '；拖动整体可调日期' : ''}`"
+                @click="item.value.kind === 'task' && openTaskFromBar(item.value.task)"
+                @pointerdown="item.value.kind === 'task' && startDrag($event, item.value.task, 'move')"
+                @pointermove="moveDrag"
+                @pointerup="finishDrag"
+                @pointercancel="cancelDrag"
+                @keydown.left.prevent.stop="item.value.kind === 'task' && nudgeTask(item.value.task, 'move', -1)"
+                @keydown.right.prevent.stop="item.value.kind === 'task' && nudgeTask(item.value.task, 'move', 1)"
+              >
+                <span class="actual-fill" :style="{ width: percent(item.value.actual) }" />
+                <span v-if="item.value.kind === 'task' && item.value.task.baselineStart" class="baseline-mark" />
+              </button>
+              <button
+                v-if="mode === 'workspace' && item.value.kind === 'task'"
+                type="button"
+                class="duration-handle"
+                :style="{ left: `calc(${position(barFinish(item.value))}% - 5px)` }"
+                :aria-label="`调整工期：${item.value.label}`"
+                title="拖动右缘调整计划完成日；左缘保持不动"
+                @pointerdown="startDrag($event, item.value.task, 'resize-finish')"
+                @pointermove="moveDrag"
+                @pointerup="finishDrag"
+                @pointercancel="cancelDrag"
+                @keydown.left.prevent.stop="nudgeTask(item.value.task, 'resize-finish', -1)"
+                @keydown.right.prevent.stop="nudgeTask(item.value.task, 'resize-finish', 1)"
+              />
+              <span v-if="mode === 'workspace' && item.value.kind === 'task' && dependencyLabel(item.value.id)" class="dependency-label">
+                {{ dependencyLabel(item.value.id) }}
+              </span>
+            </div>
+          </TreeItem>
+        </TreeRoot>
       </div>
     </div>
   </div>
@@ -568,66 +731,95 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
 .schedule-timeline { min-width: 0; container-type: inline-size; }
 .timeline-scroll { max-width: 100%; overflow-x: auto; outline: none; }
 .timeline-scroll:focus-visible { box-shadow: inset 0 0 0 2px var(--brand-ring); }
-.timeline-grid { position: relative; display: grid; }
-.timeline-row { display: contents; }
-.label-cell { min-width: 0; border-right: 1px solid var(--line); }
+.timeline-grid { position: relative; }
+.timeline-row { display: grid; min-width: 0; grid-template-columns: var(--wbs-width) minmax(var(--chart-min), 1fr); }
+.timeline-tree { display: block; outline: none; }
+.timeline-tree > .timeline-row:focus-visible { outline: none; }
+.timeline-tree > .timeline-row:focus-visible .label-cell { box-shadow: inset 3px 0 0 var(--brand); }
+.label-cell { min-width: 0; border-right: 1px solid var(--line); box-sizing: border-box; }
 .chart-cell { position: relative; min-width: 0; overflow: hidden; }
-.axis-cell { position: sticky; top: 0; z-index: 4; height: 34px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); font-size: 10px; font-weight: 700; }
-.data-row { height: 36px; border-bottom: 1px solid var(--line); font-size: 11px; }
+.axis-cell { position: sticky; top: 0; z-index: 4; height: 26px; border-bottom: 1px solid var(--line); background: var(--surface-2); color: var(--ink-faint); font-size: 10px; font-weight: 700; }
+.data-row { height: 34px; border-bottom: 1px solid var(--line); font-size: 11px; }
 .label-main { min-width: 0; display: flex; align-items: center; gap: 6px; }
-.label-main.is-task { padding-left: 32px; }
-.task-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); text-align: left; }
+.label-main.is-task { padding-left: 38px !important; }
+.project-icon { flex: none; color: var(--brand); font-size: 13px; }
+.tree-trigger, .task-name, .add-task-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+}
+.tree-trigger { display: flex; min-width: 0; align-items: center; gap: 4px; color: var(--ink); cursor: pointer; }
+.tree-trigger > [class*='i-lucide'] { width: 14px; height: 14px; flex: none; color: var(--ink-soft); }
+.tree-trigger:hover { color: var(--brand-deep); }
+.task-name { min-width: 0; overflow: hidden; color: var(--ink); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; font-weight: 600; }
 .task-name:hover { color: var(--brand); }
 .task-dot { width: 8px; height: 8px; flex: none; border-radius: 2px; }
-.toggle-button { display: grid; width: 20px; height: 20px; flex: none; place-items: center; color: var(--ink-soft); }
-.add-task-button { display: grid; width: 20px; height: 20px; flex: none; place-items: center; border-radius: var(--radius-sm); color: var(--brand); }
-.add-task-button:hover { background: var(--brand-soft); }
+.task-link-icon { flex: none; color: var(--brand); font-size: 11px; }
+.add-task-button { display: grid; width: 18px; height: 18px; flex: none; margin-left: 2px; place-items: center; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--brand); cursor: pointer; }
+.add-task-button:hover { border-color: var(--brand); background: var(--brand-soft); }
+.add-task-button:focus-visible, .tree-trigger:focus-visible, .task-name:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .pending-contract-chip { flex: none; border-radius: 999px; background: var(--warn-soft); padding: 2px 6px; color: var(--warn-ink); font-size: 9px; font-weight: 700; line-height: 1; }
 .binding-entry { display: inline-flex; flex: none; align-items: center; gap: 2px; border-radius: var(--radius-sm); color: var(--brand-deep); font-size: 9px; font-weight: 700; }
 .binding-entry:hover { color: var(--brand); text-decoration: underline; }
 .status-label { margin-left: auto; flex: none; color: var(--ink-soft); font-family: var(--font-mono); font-size: 10px; font-variant-numeric: tabular-nums; }
-.month-label { position: absolute; top: 9px; transform: translateX(4px); white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.row-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.row-status[data-tone='ok'] { background: var(--ok-soft); color: var(--ok-ink); }
+.row-status[data-tone='brand'] { background: var(--brand-soft); color: var(--brand-deep); }
+.row-status[data-tone='warn'] { background: var(--warn-soft); color: var(--warn-ink); }
+.row-status[data-tone='danger'] { background: var(--danger-soft); color: var(--danger-ink); }
+.row-status[data-tone='neutral'] { background: var(--surface-3); color: var(--ink-soft); }
+.month-label { position: absolute; top: 6px; transform: translateX(4px); white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .month-line, .today-line { position: absolute; inset-block: 0; width: 1px; background: var(--line); pointer-events: none; }
 .month-line { border-left: 1px dashed color-mix(in srgb, var(--line) 65%, transparent); background: transparent; }
 .today-line { z-index: 3; width: 2px; background: var(--danger); opacity: .6; }
-.today-label { position: absolute; z-index: 4; top: -1px; transform: translateX(-50%); border-radius: var(--radius-sm); background: var(--danger-soft); padding-inline: 4px; color: var(--danger); font-size: 9px; font-weight: 800; }
-.plan-bar { position: absolute; top: 9px; height: 18px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, var(--ink)); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--bar-color) 18%, var(--panel)); cursor: grab; touch-action: none; }
+.today-label { position: absolute; z-index: 4; top: 2px; transform: translateX(-50%); border-radius: 3px; background: var(--danger-soft); padding-inline: 4px; color: var(--danger); font-size: 9px; font-weight: 800; }
+.plan-bar { position: absolute; top: 10px; height: 14px; min-width: 6px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--bar-color) 76%, var(--ink)); border-radius: 4px; background: color-mix(in srgb, var(--bar-color) 20%, var(--panel)); cursor: grab; touch-action: none; }
 .plan-bar:active { cursor: grabbing; }
 .plan-bar:hover:not(:disabled) { box-shadow: 0 0 0 2px var(--brand-ring); }
-.plan-bar.is-rollup { top: 11px; height: 14px; border-radius: 2px; cursor: default; }
+.plan-bar.is-rollup { cursor: default; }
 .plan-bar.is-late { border: 1.5px dashed var(--danger); }
 .actual-fill { position: absolute; inset-block: 0; left: 0; max-width: 100%; border-radius: 2px; background: var(--bar-color); opacity: .86; }
 .baseline-mark { position: absolute; inset: 2px; border: 1px dashed var(--ink); opacity: .55; }
-.duration-handle { position: absolute; z-index: 4; top: 7px; width: 10px; height: 22px; border-inline: 2px solid var(--brand-deep); border-radius: 2px; cursor: ew-resize; touch-action: none; opacity: 0; }
+.duration-handle { position: absolute; z-index: 4; top: 6px; width: 10px; height: 22px; border-inline: 2px solid var(--brand-deep); border-radius: 2px; cursor: ew-resize; touch-action: none; opacity: 0; }
 .chart-cell:hover .duration-handle, .duration-handle:focus-visible { opacity: .9; background: color-mix(in srgb, var(--panel) 72%, transparent); }
 .dependency-label { position: absolute; right: 5px; top: 10px; max-width: 44%; overflow: hidden; color: var(--ink-faint); font-family: var(--font-mono); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.dependency-overlay { position: absolute; z-index: 3; top: 34px; overflow: visible; pointer-events: none; }
+.dependency-overlay { position: absolute; z-index: 3; top: 26px; overflow: visible; pointer-events: none; }
 .dependency-path { fill: none; stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
 .dependency-path.is-disabled { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 2 4; opacity: .55; }
 .mobile-view-switch { display: none; align-items: center; width: max-content; margin: 8px 10px; border-radius: var(--radius-btn); background: var(--surface-3); padding: 2px; }
-.view-button { border-radius: calc(var(--radius-btn) - 2px); padding: 4px 10px; color: var(--ink-soft); font-size: 11px; }
+.view-button { border: 0; border-radius: calc(var(--radius-btn) - 2px); background: transparent; padding: 4px 10px; color: var(--ink-soft); font: inherit; font-size: 11px; cursor: pointer; }
 .view-button.is-active { background: var(--panel); color: var(--brand-deep); box-shadow: var(--shadow-card); font-weight: 700; }
 
-.schedule-timeline[data-mode='overview'] .timeline-grid { grid-template-columns: clamp(180px, 22%, 236px) minmax(524px, 1fr); min-width: 760px; }
+.schedule-timeline[data-mode='overview'] .timeline-grid { --wbs-width: clamp(180px, 22%, 236px); --chart-min: 524px; min-width: 760px; }
 .schedule-timeline[data-mode='overview'] .label-cell { display: flex; align-items: center; padding-inline: 10px; }
 .schedule-timeline[data-mode='overview'] .data-row[data-kind='group'] { background: color-mix(in srgb, var(--surface-2) 90%, var(--panel)); font-weight: 700; }
 .schedule-timeline[data-mode='overview'] .data-row[data-kind='task'] { background: var(--panel); }
+.schedule-timeline[data-mode='overview'] .timeline-row[data-kind='task']:hover .data-row { background: var(--brand-soft); }
 
-.schedule-timeline[data-mode='workspace'] .timeline-grid { grid-template-columns: 590px minmax(600px, 1fr); min-width: 1190px; }
-.schedule-timeline[data-mode='workspace'] .label-cell { display: grid; grid-template-columns: minmax(190px, 2fr) 46px 78px 78px 48px 72px; align-items: center; gap: 6px; padding-inline: 10px; }
-.schedule-timeline[data-mode='workspace'] .label-cell > span:not(:first-child) { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.schedule-timeline[data-mode='workspace'] .data-row[data-kind='project'] { background: color-mix(in srgb, var(--brand-soft) 45%, var(--panel)); font-weight: 800; }
+.schedule-timeline[data-mode='workspace'] .timeline-grid { --wbs-width: 480px; --chart-min: 600px; min-width: 1080px; }
+.schedule-timeline[data-mode='workspace'] .label-cell { display: grid; grid-template-columns: 216px 42px 96px 46px 80px; align-items: center; padding: 0; }
+.schedule-timeline[data-mode='workspace'] .label-cell > * { height: 100%; min-width: 0; border-right: 1px solid var(--line); padding-inline: 8px; box-sizing: border-box; }
+.schedule-timeline[data-mode='workspace'] .label-cell > :last-child { border-right: 0; }
+.schedule-timeline[data-mode='workspace'] .label-cell > span:not(:first-child) { display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.schedule-timeline[data-mode='workspace'] .data-row[data-kind='project'] { background: var(--brand-soft); font-weight: 800; }
 .schedule-timeline[data-mode='workspace'] .data-row[data-kind='group'] { background: var(--surface-2); font-weight: 700; }
-.schedule-timeline[data-mode='workspace'] .dependency-overlay { left: 590px; width: calc(100% - 590px); }
+.schedule-timeline[data-mode='workspace'] .data-row[data-kind='task'] { background: var(--panel); }
+.schedule-timeline[data-mode='workspace'] .timeline-row[data-kind='task']:hover .data-row { background: var(--brand-soft); }
+.schedule-timeline[data-mode='workspace'] .timeline-row[data-kind='group'] .label-main { padding-left: 18px; }
+.schedule-timeline[data-mode='workspace'] .dependency-overlay { left: 480px; width: calc(100% - 480px); }
 
-.data-row[data-highlighted='true'] { background: var(--brand-soft) !important; box-shadow: inset 3px 0 0 var(--brand); }
+.timeline-row[data-highlighted='true'] .data-row { background: var(--brand-soft) !important; }
+.timeline-row[data-highlighted='true'] .label-cell { box-shadow: inset 3px 0 0 var(--brand); }
 
 @container (max-width: 52rem) {
   .schedule-timeline[data-mode='workspace'] .mobile-view-switch { display: inline-flex; }
-  .schedule-timeline[data-mode='workspace'][data-view='wbs'] .timeline-grid { grid-template-columns: minmax(560px, 1fr); min-width: 560px; }
+  .schedule-timeline[data-mode='workspace'][data-view='wbs'] .timeline-grid { --wbs-width: minmax(480px, 1fr); min-width: 480px; }
+  .schedule-timeline[data-mode='workspace'][data-view='wbs'] .timeline-row { grid-template-columns: minmax(480px, 1fr); }
   .schedule-timeline[data-mode='workspace'][data-view='wbs'] .chart-cell,
   .schedule-timeline[data-mode='workspace'][data-view='wbs'] .dependency-overlay { display: none; }
-  .schedule-timeline[data-mode='workspace'][data-view='gantt'] .timeline-grid { grid-template-columns: minmax(660px, 1fr); min-width: 660px; }
+  .schedule-timeline[data-mode='workspace'][data-view='gantt'] .timeline-grid { min-width: 660px; }
+  .schedule-timeline[data-mode='workspace'][data-view='gantt'] .timeline-row { grid-template-columns: minmax(660px, 1fr); }
   .schedule-timeline[data-mode='workspace'][data-view='gantt'] .label-cell { display: none; }
   .schedule-timeline[data-mode='workspace'][data-view='gantt'] .dependency-overlay { left: 0; width: 100%; }
 }
