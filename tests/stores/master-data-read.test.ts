@@ -19,7 +19,7 @@ beforeEach(async () => {
   await mem.execute(`
     INSERT INTO customers (id, name, aliases, tax_no, contact, status)
     VALUES
-      ('customer-1', '睿航建设', '睿航,瑞航', '914400001', '陈经理', 'submitted'),
+      ('customer-1', '睿航建设', '["睿航","瑞航"]', '914400001', '陈经理', 'submitted'),
       ('customer-deleted', '已删客户', '', '914400002', '', 'draft')
   `)
   await mem.execute(`
@@ -37,10 +37,12 @@ beforeEach(async () => {
   await mem.execute(`
     INSERT INTO workers (
       id, name, trade, phone, crew_id, current_project_id, project_status
+      , id_card, safety_education
     )
     VALUES (
       'worker-1', '张师傅', '泥水', '13900139000',
-      'crew-1', 'project-1', '在场'
+      'crew-1', 'project-1', '在场',
+      '440101199001011234', 1
     )
   `)
   await mem.execute(`
@@ -60,6 +62,7 @@ describe('master data read store', () => {
     const store = useMasterDataReadStore()
 
     await store.load('customer')
+    await store.load('crew')
     await store.load('worker')
     await store.load('target_cost')
 
@@ -67,7 +70,17 @@ describe('master data read store', () => {
       expect.objectContaining({
         id: 'customer-1',
         name: '睿航建设',
+        aliases: ['睿航', '瑞航'],
         contact: '陈经理',
+      }),
+    ])
+    expect(store.rowsByKind.crew).toEqual([
+      expect.objectContaining({
+        id: 'crew-1',
+        memberCount: 1,
+        activeMemberCount: 1,
+        projectCount: 1,
+        projectNames: ['合和新城'],
       }),
     ])
     expect(store.rowsByKind.worker).toEqual([
@@ -75,6 +88,8 @@ describe('master data read store', () => {
         id: 'worker-1',
         crewName: '泥水班组',
         projectName: '合和新城',
+        idCard: '440101199001011234',
+        safetyEducationLabel: '已完成',
       }),
     ])
     expect(store.rowsByKind.target_cost).toEqual([
@@ -102,6 +117,32 @@ describe('master data read store', () => {
     ])
     await expect(store.searchCrews('泥水')).resolves.toEqual([
       { id: 'crew-1', label: '泥水班组' },
+    ])
+  })
+
+  it('客户祖先删除后项目不再计入班组或工人列表，但跨项目工人主档仍保留', async () => {
+    const store = useMasterDataReadStore()
+    await mem.execute(`
+      UPDATE customers
+      SET deleted_at = '2026-07-30T00:00:00.000Z'
+      WHERE id = 'customer-1'
+    `)
+
+    await store.load('crew')
+    await store.load('worker')
+
+    expect(store.rowsByKind.crew).toEqual([
+      expect.objectContaining({
+        id: 'crew-1',
+        projectCount: 0,
+        projectNames: [],
+      }),
+    ])
+    expect(store.rowsByKind.worker).toEqual([
+      expect.objectContaining({
+        id: 'worker-1',
+        projectName: null,
+      }),
     ])
   })
 })

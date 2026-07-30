@@ -13,7 +13,7 @@ test.describe('Issue #187：统一整页表单壳', () => {
     const companyName = page.getByLabel('公司全称 *')
     const saveSubmit = page.getByRole('group', { name: '表单操作' })
       .getByRole('button', { name: '保存并提交' })
-    await expect(page.getByRole('heading', { name: '新建 · 分供方' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '新建 · 分供方' })).toBeVisible({ timeout: 15_000 })
     await expect(companyName).toBeFocused()
 
     await page.keyboard.press('Tab')

@@ -28,19 +28,24 @@ describe('ui atom public contracts', () => {
     expect(screen.getByText('项目经营数据')).not.toBeNull()
   })
 
-  it('updates SearchInput through its accessible searchbox contract', async () => {
+  it('keeps SearchInput width on its responsive wrapper', async () => {
     const onUpdate = vi.fn()
     const { container } = render(SearchInput, {
       props: {
         'modelValue': '',
         'placeholder': '搜索项目',
         'width': 280,
+        'class': 'w-72',
         'onUpdate:modelValue': onUpdate,
       },
     })
 
+    const root = container.firstElementChild as HTMLElement
     const input = screen.getByRole('searchbox', { name: '搜索项目' })
-    expect(input.getAttribute('style')).toContain('width: 280px')
+    expect(root.getAttribute('style')).toContain('width: 280px')
+    expect(root.classList).toContain('max-w-full')
+    expect(input.getAttribute('style')).toBeNull()
+    expect(input.classList).toContain('w-full')
 
     await fireEvent.update(input, '滨江')
     expect(onUpdate).toHaveBeenLastCalledWith('滨江')

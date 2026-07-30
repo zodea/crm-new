@@ -10,7 +10,7 @@ const model = defineModel<string>()
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative min-w-0 max-w-full" :style="{ width: `${width}px` }">
     <span aria-hidden="true" class="absolute left-[12px] top-1/2 flex -translate-y-1/2">
       <span class="i-lucide-search h-[14px] w-[14px] text-ink-faint" />
     </span>
@@ -19,8 +19,7 @@ const model = defineModel<string>()
       type="search"
       :placeholder="placeholder"
       :aria-label="placeholder"
-      class="h-8 border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[32px] pr-[14px] text-[13px] text-ink outline-none placeholder:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
-      :style="{ width: `${width}px` }"
+      class="h-8 min-w-0 w-full box-border border border-line-strong rounded-[var(--radius-btn)] bg-panel pl-[32px] pr-[14px] text-[13px] text-ink outline-none placeholder:text-ink-faint focus-visible:border-brand focus-visible:shadow-[0_0_0_3px_var(--brand-ring)]"
     >
   </div>
 </template>

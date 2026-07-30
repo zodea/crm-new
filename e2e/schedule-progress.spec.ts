@@ -17,7 +17,13 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await expect(page.getByRole('heading', { name: 'WBS 排程与实际进度' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('project-switcher-trigger')).toContainText('合和新城')
     await expect(page.getByText('户内1栋-2栋', { exact: true })).toBeVisible()
-    await expect(page.getByText('2026-05-06', { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('tree', { name: '施工排程 WBS' })).toBeVisible()
+
+    const chartStarts = await page.locator('.timeline-row .chart-cell').evaluateAll(elements =>
+      elements.slice(0, 3).map(element => Math.round(element.getBoundingClientRect().left)),
+    )
+    expect(new Set(chartStarts).size).toBe(1)
+    await expect(page.getByText('05.06~10.23', { exact: true }).first()).toBeVisible()
     await expect(page.locator('.dependency-path').first()).toBeVisible()
 
     await page.getByRole('button', { name: '放线及新建墙体', exact: true }).click()
@@ -104,7 +110,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
 
     const plumbingRow = page.locator('.label-cell.data-row[data-kind="task"]')
       .filter({ hasText: '给排水安装' })
-    await expect(plumbingRow).toContainText('2026-05-08')
+    await expect(plumbingRow).toContainText('05.08')
     const plumbingBar = page.getByRole('button', { name: '移动工序：给排水安装' })
     await plumbingBar.scrollIntoViewIfNeeded()
     const plumbingBox = await plumbingBar.boundingBox()
@@ -117,7 +123,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     const conflictConfirm = page.getByRole('dialog', { name: /本次调期会冲突/ })
     await expect(conflictConfirm).toBeVisible()
     await conflictConfirm.getByRole('button', { name: '取消' }).click()
-    await expect(plumbingRow).toContainText('2026-05-08')
+    await expect(plumbingRow).toContainText('05.08')
     await expect(page.locator('.dependency-path.is-disabled')).toHaveCount(0)
 
     const plumbingBoxAgain = await plumbingBar.boundingBox()
@@ -136,12 +142,12 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
       .getByRole('button', { name: '调期并置灰冲突' })
       .click()
     await expect(page.getByText('计划已调整，冲突依赖已置灰', { exact: true })).toBeVisible()
-    await expect(plumbingRow).not.toContainText('2026-05-08')
+    await expect(plumbingRow).not.toContainText('05.08')
     await expect(page.locator('.dependency-path.is-disabled').first()).toBeVisible()
 
     const cleanupRow = page.locator('.label-cell.data-row[data-kind="task"]')
       .filter({ hasText: '开荒保洁' })
-    await expect(cleanupRow).toContainText('2026-10-23')
+    await expect(cleanupRow).toContainText('10.23')
     const finishHandle = page.getByRole('button', { name: '调整工期：开荒保洁' })
     await finishHandle.scrollIntoViewIfNeeded()
     const finishBox = await finishHandle.boundingBox()
@@ -151,7 +157,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await page.mouse.move(finishBox!.x + finishBox!.width / 2 + 16, finishBox!.y + finishBox!.height / 2)
     await page.mouse.up()
     await expect(page.getByText('计划日期已调整', { exact: true })).toBeVisible()
-    await expect(cleanupRow).not.toContainText('2026-10-23')
+    await expect(cleanupRow).not.toContainText('10.23')
     await expectDocumentDoesNotOverflow(page)
   })
 

@@ -166,7 +166,7 @@ onMounted(refresh)
       <div class="delivery-archive__actions ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
         <SearchInput
           v-model="search"
-          class="delivery-archive__search w-72 max-w-full"
+          class="delivery-archive__search max-w-full"
           placeholder="搜索单号、项目、分供方、材料"
           :width="288"
         />

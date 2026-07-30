@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
 import { toErrorMessage } from '~/lib/util/error'
+import { maskPhone } from '~/lib/util/privacy'
 
 const props = defineProps<{
   crewId: string
@@ -117,7 +118,7 @@ watch(() => props.crewId, () => void loadCrew(), { immediate: true })
       <MetricGrid v-if="crew && detail" :cols="5" data-testid="crew-summary">
         <Metric label="工种类型" :value="crew.trade || '—'" />
         <Metric label="负责人" :value="crew.contactName || '—'" />
-        <Metric label="联系电话" :value="crew.contactPhone || '—'" />
+        <Metric label="联系电话" :value="maskPhone(crew.contactPhone) || '—'" />
         <Metric label="工人数" :value="`${detail.summary.memberCount} 人`" />
         <Metric label="关联项目数" :value="`${detail.summary.projectCount} 个`" />
       </MetricGrid>

@@ -1,5 +1,4 @@
 import type { TransactionDb } from '~/lib/db/coordinator'
-import { isTauri } from '@tauri-apps/api/core'
 import { select } from '~/lib/db/connection'
 import {
   logCreate,
@@ -15,7 +14,7 @@ export interface FileRefDraft {
   mimeType?: string
   category?: string
   uploader?: string
-  /** 浏览器模式的持久化正文；桌面端优先保留 filePath，避免重复占用 SQLite。 */
+  /** 可跨重启读取的持久化正文；legacy filePath 只作迁移留痕，不授予读取权限。 */
   payloadBase64?: string
 }
 
@@ -194,27 +193,28 @@ export async function listFileRefsByOwnerType(
 }
 
 export async function loadFileRefContent(
-  file: Pick<FileRefRecord, 'id' | 'filePath' | 'mimeType'>,
+  file: Pick<FileRefRecord, 'id' | 'ownerType' | 'ownerId'>,
 ): Promise<FileRefContent | null> {
-  const [payload] = await select<{ encoding: string, content: string }>(`
-    SELECT encoding, content
-    FROM file_payloads
-    WHERE file_ref_id = ?
+  const [payload] = await select<{
+    encoding: string | null
+    content: string | null
+    mime_type: string
+  }>(`
+    SELECT payload.encoding, payload.content, file.mime_type
+    FROM file_refs AS file
+    LEFT JOIN file_payloads AS payload ON payload.file_ref_id = file.id
+    WHERE file.id = ?
+      AND file.owner_type = ?
+      AND file.owner_id = ?
+      AND file.deleted_at IS NULL
     LIMIT 1
-  `, [file.id])
-  if (payload) {
-    if (payload.encoding !== 'base64')
-      throw new Error(`不支持的附件编码：${payload.encoding}`)
-    return {
-      bytes: base64ToBytes(payload.content),
-      mimeType: file.mimeType || 'application/octet-stream',
-    }
-  }
-  if (!file.filePath || !isTauri())
+  `, [file.id, file.ownerType, file.ownerId])
+  if (!payload?.content)
     return null
-  const { readFile } = await import('@tauri-apps/plugin-fs')
+  if (payload.encoding !== 'base64')
+    throw new Error(`不支持的附件编码：${payload.encoding}`)
   return {
-    bytes: await readFile(file.filePath),
-    mimeType: file.mimeType || 'application/octet-stream',
+    bytes: base64ToBytes(payload.content),
+    mimeType: payload.mime_type || 'application/octet-stream',
   }
 }

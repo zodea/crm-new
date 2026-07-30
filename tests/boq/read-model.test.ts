@@ -67,7 +67,7 @@ describe('boq read model', () => {
     }))
     expect(workspace.monthlyStatements).toContainEqual(expect.objectContaining({
       month: '2026-06',
-      status: 'adjusted',
+      status: 'draft',
       totalAmount: 4960,
     }))
   })

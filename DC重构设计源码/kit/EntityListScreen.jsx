@@ -24,7 +24,7 @@
 //   pageSize / tableMinWidth 透传 KitTable
 (function () {
   if (window.EntityListScreen) { window.EntityListPreload = window.EntityListPreload || function () { return null; }; return; }
-  const DS = () => window.DesignSystem_e3d87 || window.DesignSystem_e3d871 || {};
+  const DS = () => window.DesignSystem_e3d871 || {};
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, modal: () => {}, undoToast: () => {}, importModal: () => {} };
 
   function EntityListScreen({ meta, params, navigate }) {

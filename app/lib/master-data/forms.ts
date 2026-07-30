@@ -1,6 +1,8 @@
 import type { TransactionDb } from '~/lib/db/coordinator'
+import type { ConfirmImpact } from '~/lib/kit/confirm'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
+  downstreamImpact as downstreamImpactCounts,
   logCreate,
   restoreRecord,
   selectVisibleSql,
@@ -11,10 +13,15 @@ import {
   effectiveMasterDataCapabilities,
   parseCapabilityColumn,
 } from '~/lib/master-data/capabilities'
+import { writeSupplierAudit } from '~/lib/supplier/audit'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 
 export type MasterDataSaveAction = 'draft' | 'save' | 'submit'
+export type MasterDataRegistryOwnerType = Extract<
+  MasterDataOwnerType,
+  'customer' | 'crew' | 'worker'
+>
 export type MasterDataOwnerType
   = | 'supplier'
     | 'customer'
@@ -76,6 +83,10 @@ export interface SupplierFormDraft extends FormIdentity {
   registeredDate?: string
   address?: string
   taxpayerType?: string
+  taxpayerVerificationStatus?: string
+  taxpayerVerificationSource?: string
+  taxpayerVerifiedAt?: string | null
+  taxpayerVerificationNote?: string
   mainBusiness?: string
   invoiceName?: string
   invoiceAddress?: string
@@ -218,6 +229,22 @@ const MASTER_DATA_TABLES: Record<MasterDataOwnerType, string> = {
   worker: 'workers',
   project: 'projects',
   target_cost: 'target_costs',
+}
+
+const MASTER_DATA_IMPACT_LABELS: Record<string, string> = {
+  attendance_records: '考勤记录',
+  invoice_applications: '开票申请',
+  penalty_records: '扣罚记录',
+  payroll_subject_configs: '工资主体配置',
+  projects: '项目',
+  receipt_registrations: '收款记录',
+  signed_daywork_records: '签工记录',
+  unit_assignments: '工程量责任',
+  wage_statement_allocations: '工资分配',
+  wage_statement_lines: '工资明细',
+  wage_statement_members: '工资成员',
+  wage_statements: '工资单',
+  workers: '工人',
 }
 
 function text(value: unknown): string {
@@ -433,6 +460,7 @@ export async function saveCustomerForm(
     ])
   }
 
+  const taxNo = text(draft.taxNo)
   return persistForm({
     ownerType: 'customer',
     table: 'customers',
@@ -441,7 +469,7 @@ export async function saveCustomerForm(
   }, draft.id, {
     name: text(draft.name),
     aliases: JSON.stringify(draft.aliases ?? []),
-    tax_no: text(draft.taxNo),
+    tax_no: taxNo,
     legal_rep: text(draft.legalRep),
     registered_address: text(draft.registeredAddress),
     invoice_name: text(draft.invoiceName),
@@ -450,7 +478,23 @@ export async function saveCustomerForm(
     contact: text(draft.contact),
     contact_phone: text(draft.contactPhone),
     note: rawText(draft.note),
-  }, action, { attachments })
+  }, action, {
+    attachments,
+    beforePersist: async (tx, id) => {
+      if (!taxNo)
+        return
+      const [duplicate] = await tx.select<{ name: string }>(`
+        SELECT name
+        FROM customers
+        WHERE tax_no = ?
+          AND id <> ?
+          AND deleted_at IS NULL
+        LIMIT 1
+      `, [taxNo, id])
+      if (duplicate)
+        throw new Error(`统一社会信用代码已被客户「${duplicate.name}」使用`)
+    },
+  })
 }
 
 export async function saveCrewForm(
@@ -735,12 +779,34 @@ async function persistFormInExistingTransaction(
   const columns = Object.keys(values)
   let logId: string | null
   if (existing) {
-    logId = await withUpdateLog(tx, config.table, id, () => tx.execute(
-      `UPDATE "${config.table}"
-       SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
-       WHERE id = ?`,
-      [...columns.map(column => values[column]), new Date().toISOString(), id],
-    ))
+    const now = new Date().toISOString()
+    if (config.table === 'suppliers') {
+      const changedFields = columns.filter(column =>
+        JSON.stringify(existing[column]) !== JSON.stringify(values[column]),
+      )
+      await tx.execute(
+        `UPDATE suppliers
+         SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
+         WHERE id = ?`,
+        [...columns.map(column => values[column]), now, id],
+      )
+      logId = await writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'update',
+        outcome: changedFields.length ? 'updated' : 'unchanged',
+        sourceCategory: 'form',
+        changedFields,
+        createdAt: now,
+      })
+    }
+    else {
+      logId = await withUpdateLog(tx, config.table, id, () => tx.execute(
+        `UPDATE "${config.table}"
+         SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
+         WHERE id = ?`,
+        [...columns.map(column => values[column]), now, id],
+      ))
+    }
   }
   else {
     const now = new Date().toISOString()
@@ -750,7 +816,16 @@ async function persistFormInExistingTransaction(
        VALUES (?, ${columns.map(() => '?').join(', ')}, ?, ?)`,
       [id, ...columns.map(column => values[column]), now, now],
     )
-    logId = await logCreate(tx, config.table, id)
+    logId = config.table === 'suppliers'
+      ? await writeSupplierAudit(tx, {
+          supplierId: id,
+          action: 'create',
+          outcome: 'created',
+          sourceCategory: 'form',
+          changedFields: columns,
+          createdAt: now,
+        })
+      : await logCreate(tx, config.table, id)
   }
 
   const attachmentIds = await applyAttachmentChanges(
@@ -778,6 +853,10 @@ function supplierFromRow(row: Record<string, unknown>): SupplierFormDraft & { id
     registeredDate: rawText(row.registered_date),
     address: rawText(row.address),
     taxpayerType: rawText(row.taxpayer_type),
+    taxpayerVerificationStatus: rawText(row.taxpayer_verification_status) || 'not_checked',
+    taxpayerVerificationSource: rawText(row.taxpayer_verification_source),
+    taxpayerVerifiedAt: row.taxpayer_verified_at == null ? null : rawText(row.taxpayer_verified_at),
+    taxpayerVerificationNote: rawText(row.taxpayer_verification_note),
     mainBusiness: rawText(row.main_business),
     invoiceName: rawText(row.invoice_name),
     invoiceAddress: rawText(row.invoice_address),
@@ -1018,40 +1097,33 @@ export async function deleteMasterDataRecord(
   id: string,
 ): Promise<string | null> {
   return withTransaction(async (tx) => {
-    if (ownerType === 'customer') {
-      const projects = await tx.select<{ id: string }>(
-        selectVisibleSql(
-          'projects',
-          'AND (customer_id = ? OR secondary_customer_id = ?)',
-        ),
-        [id, id],
-      )
-      if (projects.length > 0)
-        throw new Error(`客户仍被 ${projects.length} 个活跃项目引用`)
-
-      const contractColumns = await tx.select<{ name: string }>(
-        `SELECT name FROM pragma_table_info('contracts')`,
-      )
-      if (contractColumns.some(column => column.name === 'customer_id')) {
-        const [contracts] = await tx.select<{ total: number }>(`
-          SELECT COUNT(*) AS total
-          FROM contracts
-          WHERE customer_id = ? AND deleted_at IS NULL
-        `, [id])
-        if ((contracts?.total ?? 0) > 0)
-          throw new Error(`客户仍被 ${contracts!.total} 份活跃施工合同引用`)
-      }
+    if (ownerType === 'customer' || ownerType === 'crew' || ownerType === 'worker') {
+      const blockedReason = await masterDataDeleteBlockReason(tx, ownerType, id)
+      if (blockedReason)
+        throw new Error(blockedReason)
     }
 
-    if (ownerType === 'crew') {
-      const workers = await tx.select<{ id: string }>(
-        selectVisibleSql('workers', 'AND crew_id = ?'),
+    if (ownerType === 'supplier') {
+      const [supplier] = await tx.select<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM suppliers WHERE id = ?',
         [id],
       )
-      if (workers.length > 0)
-        throw new Error(`班组仍有 ${workers.length} 名在册工人`)
+      if (!supplier || supplier.deleted_at != null)
+        return null
+      const now = new Date().toISOString()
+      await tx.execute(
+        'UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        [now, now, id],
+      )
+      return writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'delete',
+        outcome: 'deleted',
+        sourceCategory: 'form',
+        changedFields: ['deleted_at'],
+        createdAt: now,
+      })
     }
-
     return softDelete(tx, MASTER_DATA_TABLES[ownerType], id)
   })
 }
@@ -1060,5 +1132,98 @@ export async function restoreMasterDataRecord(
   ownerType: MasterDataOwnerType,
   id: string,
 ): Promise<string | null> {
-  return withTransaction(tx => restoreRecord(tx, MASTER_DATA_TABLES[ownerType], id))
+  return withTransaction(async (tx) => {
+    if (ownerType !== 'supplier')
+      return restoreRecord(tx, MASTER_DATA_TABLES[ownerType], id)
+    const [supplier] = await tx.select<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM suppliers WHERE id = ?',
+      [id],
+    )
+    if (!supplier || supplier.deleted_at == null)
+      return null
+    const now = new Date().toISOString()
+    await tx.execute(
+      'UPDATE suppliers SET deleted_at = NULL, updated_at = ? WHERE id = ?',
+      [now, id],
+    )
+    return writeSupplierAudit(tx, {
+      supplierId: id,
+      action: 'restore',
+      outcome: 'restored',
+      sourceCategory: 'form',
+      changedFields: ['deleted_at'],
+      createdAt: now,
+    })
+  })
+}
+
+async function masterDataDeleteBlockReason(
+  tx: TransactionDb,
+  ownerType: MasterDataRegistryOwnerType,
+  id: string,
+): Promise<string> {
+  if (ownerType === 'customer') {
+    const projects = await tx.select<{ id: string }>(
+      selectVisibleSql(
+        'projects',
+        'AND (customer_id = ? OR secondary_customer_id = ?)',
+      ),
+      [id, id],
+    )
+    if (projects.length > 0)
+      return `客户仍被 ${projects.length} 个活跃项目引用`
+
+    const contractColumns = await tx.select<{ name: string }>(
+      `SELECT name FROM pragma_table_info('contracts')`,
+    )
+    if (contractColumns.some(column => column.name === 'customer_id')) {
+      const [contracts] = await tx.select<{ total: number }>(`
+        SELECT COUNT(*) AS total
+        FROM contracts
+        WHERE customer_id = ? AND deleted_at IS NULL
+      `, [id])
+      if ((contracts?.total ?? 0) > 0)
+        return `客户仍被 ${contracts!.total} 份活跃施工合同引用`
+    }
+  }
+
+  if (ownerType === 'crew') {
+    const workers = await tx.select<{ id: string }>(
+      selectVisibleSql('workers', 'AND crew_id = ?'),
+      [id],
+    )
+    if (workers.length > 0)
+      return `班组仍有 ${workers.length} 名在册工人`
+  }
+
+  return ''
+}
+
+export interface MasterDataDeleteAssessment {
+  blockedReason: string
+  impact: ConfirmImpact[]
+}
+
+export async function assessMasterDataDeletion(
+  ownerType: MasterDataRegistryOwnerType,
+  id: string,
+): Promise<MasterDataDeleteAssessment> {
+  return withTransaction(async (tx) => {
+    const blockedReason = await masterDataDeleteBlockReason(tx, ownerType, id)
+    if (blockedReason)
+      return { blockedReason, impact: [] }
+
+    const counts = await downstreamImpactCounts(
+      tx,
+      MASTER_DATA_TABLES[ownerType],
+      id,
+    )
+    return {
+      blockedReason: '',
+      impact: counts.map(item => ({
+        label: MASTER_DATA_IMPACT_LABELS[item.table] ?? item.table,
+        n: item.n,
+      })),
+    }
+  })
 }

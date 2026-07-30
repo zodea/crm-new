@@ -1,8 +1,11 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import { defineComponent } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent } from 'vue'
 import CustomerDetailOverview from '~/components/master-data/CustomerDetailOverview.vue'
 import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
+import CustomerFormFields from '~/components/master-data/CustomerFormFields.vue'
+
+vi.stubGlobal('computed', computed)
 
 const KitTable = defineComponent({
   props: ['data', 'empty'],
@@ -138,5 +141,50 @@ describe('客户详情展示', () => {
     })
     expect(wrapper.get('[data-testid="empty"]').text()).toBe('暂无施工合同')
     expect(wrapper.find('[data-testid="row"]').exists()).toBe(false)
+  })
+})
+
+describe('客户表单浏览器语义', () => {
+  it('为浏览器自动填充提供稳定字段名，并把联系电话声明为电话输入', () => {
+    const wrapper = mount(CustomerFormFields, {
+      props: {
+        modelValue: {
+          name: '',
+          aliases: [],
+          taxNo: '',
+          legalRep: '',
+          registeredAddress: '',
+          invoiceName: '',
+          bank: '',
+          bankAccount: '',
+          contact: '',
+          contactPhone: '',
+        },
+        fieldErrors: {},
+      },
+      global: {
+        components: {
+          SectionHeader: defineComponent({
+            props: ['title'],
+            template: '<h2>{{ title }}</h2>',
+          }),
+        },
+      },
+    })
+
+    const inputs = Object.fromEntries(
+      wrapper.findAll('input').map(input => [input.attributes('name'), input]),
+    )
+
+    expect(inputs['customer-name']?.attributes('autocomplete')).toBe('organization')
+    expect(inputs['customer-registered-address']?.attributes('autocomplete')).toBe('street-address')
+    expect(inputs['customer-contact']?.attributes('autocomplete')).toBe('name')
+    expect(inputs['customer-contact-phone']?.attributes()).toMatchObject({
+      autocomplete: 'tel',
+      type: 'tel',
+    })
+    expect(inputs['customer-tax-no']?.attributes('spellcheck')).toBe('false')
+    expect(inputs['customer-bank-account']?.attributes('spellcheck')).toBe('false')
+    expect(inputs['customer-aliases']?.attributes('placeholder')).toBe('多个别名用逗号或顿号分隔…')
   })
 })

@@ -1,30 +1,46 @@
 <script setup lang="ts">
 import type { ConfiguredExportSource, ExportData } from '~/lib/kit/export'
 import type { KitTableColumn } from '~/lib/kit/table'
+import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import * as XLSX from 'xlsx'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { projectLedgerRows } from '~/lib/project/export'
 import { summarizeProjectFinance } from '~/lib/project/finance'
-import { filterProjectColumns, filterProjects } from '~/lib/project/list'
+import { filterProjectColumns } from '~/lib/project/list'
 import { PROJECT_STATUS_TONE, PROJECT_STATUSES } from '~/lib/project/status'
 import { toErrorMessage } from '~/lib/util/error'
+import { yuan } from '~/lib/util/money'
 
 const store = useProjectStore()
 const detailStore = useProjectDetailStore()
 const { confirm, undoToast, success, error, exportFile, openImportTab } = useKitUI()
 
 const searchText = shallowRef('')
-const statusFilter = shallowRef('all')
+const selectedPhase = shallowRef('all')
+const sortMode = shallowRef<'updated-desc' | 'name-asc'>('updated-desc')
+const filtersVisible = shallowRef(true)
+const density = shallowRef<'compact' | 'comfortable'>('compact')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
 const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
 
-const statusOptions = [
-  { key: 'all', label: '全部状态' },
-  ...PROJECT_STATUSES.map(status => ({ key: status, label: status })),
+const SEARCH_FIELDS = [
+  'name',
+  'code',
+  'address',
+  'contractName',
+  'developer',
+  'manager',
+  'execManager',
+  'builder',
+] as const satisfies readonly (keyof Project)[]
+const IMPORTED_PHASES_KEY = 'imported-phases'
+const listViews = [
+  { key: 'updated-desc', label: '最近更新' },
+  { key: 'name-asc', label: '项目名称' },
 ]
 
 // 列表页状态一律纯文字色，chip 只进详情页/表单（DESIGN-TASTE §2.3/§4.5，#110 阶段⑤）
@@ -35,35 +51,136 @@ const toneText: Record<StatusTone, string> = {
   ok: 'cell--status-ok',
 }
 
-const filtered = computed(() => filterProjectColumns(
-  filterProjects(store.list, {
-    search: searchText.value,
-    status: statusFilter.value,
-  }),
-  columnFilters.value,
-))
+const searched = computed(() => {
+  const query = searchText.value.trim().toLocaleLowerCase('zh-CN')
+  if (!query)
+    return store.list
+  return store.list.filter(project =>
+    SEARCH_FIELDS.some(field =>
+      String(project[field] ?? '').toLocaleLowerCase('zh-CN').includes(query),
+    ),
+  )
+})
+
+const importedPhases = computed(() =>
+  [...new Set(searched.value.map(project => project.status))]
+    .filter(status => status && !PROJECT_STATUSES.includes(status as typeof PROJECT_STATUSES[number]))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN')),
+)
+
+function phaseMatches(project: Project, phase: string): boolean {
+  return phase === 'all'
+    || project.status === phase
+    || (phase === IMPORTED_PHASES_KEY && importedPhases.value.includes(project.status))
+}
+
+const phaseTree = computed<TreeNode[]>(() => {
+  const count = (phase: string) => searched.value.filter(project => phaseMatches(project, phase)).length
+  const items: TreeNode[] = [
+    {
+      key: 'all',
+      label: '全部项目',
+      icon: 'i-lucide-folder',
+      count: searched.value.length,
+    },
+    ...PROJECT_STATUSES.map(status => ({
+      key: status,
+      label: status,
+      icon: status === '施工中'
+        ? 'i-lucide-hard-hat'
+        : status === '筹备中'
+          ? 'i-lucide-clipboard-check'
+          : status === '停工'
+            ? 'i-lucide-circle-pause'
+            : 'i-lucide-circle-check-big',
+      count: count(status),
+    })),
+  ]
+  if (importedPhases.value.length) {
+    items.push({
+      key: IMPORTED_PHASES_KEY,
+      label: '待归一阶段',
+      icon: 'i-lucide-archive',
+      count: importedPhases.value.reduce((total, status) => total + count(status), 0),
+      children: importedPhases.value.map(status => ({
+        key: status,
+        label: status,
+        count: count(status),
+      })),
+    })
+  }
+  return items
+})
+
+const phaseRows = computed(() =>
+  searched.value.filter(project => phaseMatches(project, selectedPhase.value)),
+)
+
+const filtered = computed(() => {
+  const rows = filterProjectColumns(phaseRows.value, columnFilters.value)
+  return [...rows].sort((a, b) => {
+    if (sortMode.value === 'name-asc')
+      return a.name.localeCompare(b.name, 'zh-CN')
+    return b.updatedAt.localeCompare(a.updatedAt)
+  })
+})
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
 
-// 金额列（累计收入/预算总额）不是 Project 存储字段（口径见 lib/project/finance，#65 聚合），
-// 表格数据行按页切片后就地补上，Project 类型保持纯净。
+const baselineBudgetByProject = computed(() => new Map(
+  detailStore.targetCosts
+    .filter(row => row.status === '当前基线')
+    .map(row => [row.projectId, row.targetAmount]),
+))
+
+// 金额列不是 Project 存储字段：收入来自正式收款聚合，预算来自当前目标成本基线。
+// 任一事实尚未载入或不存在时保持 null，由表格显示「—」。
 const tableRows = computed(() => pageRows.value.map((project) => {
-  const summary = detailStore.operationSummaries[project.id]
+  const operation = detailStore.operationSummaries[project.id]
   return {
     ...project,
-    ...summarizeProjectFinance(project, summary
-      ? {
-          income: summary.projectReceipt,
-          mainContractAmount: summary.mainContractAmount,
-        }
-      : undefined),
+    ...summarizeProjectFinance({
+      income: operation?.projectReceipt ?? null,
+      budget: baselineBudgetByProject.value.get(project.id) ?? null,
+    }),
   }
 }))
 
+const summary = computed(() => {
+  let income = 0
+  let budget = 0
+  let knownIncome = 0
+  let knownBudget = 0
+  for (const project of filtered.value) {
+    const operation = detailStore.operationSummaries[project.id]
+    const amounts = summarizeProjectFinance({
+      income: operation?.projectReceipt ?? null,
+      budget: baselineBudgetByProject.value.get(project.id) ?? null,
+    })
+    if (amounts.income != null) {
+      income += amounts.income
+      knownIncome += 1
+    }
+    if (amounts.budget != null) {
+      budget += amounts.budget
+      knownBudget += 1
+    }
+  }
+  return {
+    total: filtered.value.length,
+    income: knownIncome === filtered.value.length && knownIncome > 0 ? income : null,
+    budget: knownBudget === filtered.value.length && knownBudget > 0 ? budget : null,
+    missingIncome: filtered.value.length - knownIncome,
+    missingBudget: filtered.value.length - knownBudget,
+  }
+})
+
+const tableRowHeight = computed(() => density.value === 'compact' ? 36 : 44)
+
 const hasActiveFilters = computed(() => Boolean(
   searchText.value.trim()
-  || statusFilter.value !== 'all'
+  || selectedPhase.value !== 'all'
   || columnFilters.value.some(filter => filter.values.length > 0),
 ))
 
@@ -81,16 +198,15 @@ const emptyState = computed(() => {
       }
 })
 
-// 设计稿 ProjectScreen.jsx 红圈 13 列（顺序即列序）；金额列走 money 两位小数（元）。
+// 运行参考列序；本地没有采购/仓管/预算/生产经理字段，因此不生成虚假空列。
 const columns = computed<KitTableColumn[]>(() => [
   { field: 'name', title: '项目名称', minWidth: 170, fixed: 'left', slot: 'name' },
-  { field: 'status', title: '业务流程阶段', width: 118, filterable: deriveFilterOptions(store.list, 'status'), slot: 'status' },
-  { field: 'income', title: '累计收入', type: 'money', width: 130 },
+  { field: 'status', title: '业务阶段', width: 128, filterable: deriveFilterOptions(store.list, 'status'), slot: 'status' },
+  { field: 'income', title: '累计收入合同金额', type: 'money', width: 150 },
   { field: 'budget', title: '预算总额', type: 'money', width: 130 },
-  { field: 'startDate', title: '计划开工', type: 'date', width: 104 },
-  { field: 'plannedEnd', title: '计划竣工日期', type: 'date', width: 118, filterable: deriveFilterOptions(store.list, 'plannedEnd') },
+  { field: 'plannedEnd', title: '计划竣工', type: 'date', width: 112, filterable: deriveFilterOptions(store.list, 'plannedEnd') },
+  { field: 'actualEnd', title: '实际竣工', type: 'date', width: 112 },
   { field: 'manager', title: '项目经理', width: 92, filterable: deriveFilterOptions(store.list, 'manager') },
-  { field: 'actualEnd', title: '实际竣工日期', type: 'date', width: 118 },
   { field: 'execManager', title: '执行经理', width: 92 },
   { field: 'contractName', title: '项目合同名称', minWidth: 200 },
   { field: 'developer', title: '客户', minWidth: 150, filterable: deriveFilterOptions(store.list, 'developer'), slot: 'developer' },
@@ -98,7 +214,7 @@ const columns = computed<KitTableColumn[]>(() => [
   { title: '操作', type: 'action', width: 116 },
 ])
 
-watch([searchText, statusFilter], () => {
+watch([searchText, selectedPhase, sortMode], () => {
   page.value = 1
 })
 
@@ -132,7 +248,7 @@ async function refresh() {
 
 async function clearFilters() {
   searchText.value = ''
-  statusFilter.value = 'all'
+  selectedPhase.value = 'all'
   columnFilters.value = []
   page.value = 1
   await tableRef.value?.clearFilter()
@@ -275,20 +391,6 @@ onMounted(() => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <ProjectListToolbar
-      v-model:search="searchText"
-      v-model:status="statusFilter"
-      :total="store.list.length"
-      :visible="filtered.length"
-      :loading="store.loading"
-      :status-options="statusOptions"
-      @refresh="refresh"
-      @create="openCreate"
-      @import="openImport"
-      @export-ledger="exportLedger"
-      @export-by-category="exportByCategory"
-    />
-
     <StatePanel
       v-if="store.error"
       kind="error"
@@ -299,45 +401,99 @@ onMounted(() => {
       @action="loadProjects"
     />
 
-    <KitTable
-      v-if="!store.error || store.list.length > 0"
-      ref="tableRef"
-      :columns="columns"
-      :data="tableRows"
-      :loading="store.loading || !store.loaded"
-      :page="{ page: currentPage, pageSize, total: filtered.length }"
-      remote-filter
-      :empty="emptyState"
-      @page-change="handlePageChange"
-      @filter-change="handleColumnFilter"
-      @empty-action="handleEmptyAction"
+    <ListShell
+      v-model:tree-key="selectedPhase"
+      v-model:view-key="sortMode"
+      :tree="filtersVisible ? phaseTree : []"
+      :views="listViews"
+      :summary="{
+        项目数量: summary.total,
+        累计收入: yuan(summary.income),
+        预算总额: yuan(summary.budget),
+      }"
     >
-      <template #name="{ row }">
-        <EntityLink :id="row.id" type="project" :label="row.name" />
+      <template #toolbar>
+        <ProjectListToolbar
+          v-model:search="searchText"
+          v-model:sort-mode="sortMode"
+          v-model:filters-visible="filtersVisible"
+          v-model:density="density"
+          :total="store.list.length"
+          :visible="filtered.length"
+          :loading="store.loading"
+          @refresh="refresh"
+          @create="openCreate"
+          @import="openImport"
+          @export-ledger="exportLedger"
+          @export-by-category="exportByCategory"
+        />
       </template>
 
-      <template #status="{ row }">
-        <span :class="statusClass(row.status)">{{ row.status }}</span>
+      <template #table>
+        <KitTable
+          v-if="!store.error || store.list.length > 0"
+          ref="tableRef"
+          :columns="columns"
+          :data="tableRows"
+          :loading="store.loading || !store.loaded"
+          :row-height="tableRowHeight"
+          :page="{ page: currentPage, pageSize, total: filtered.length }"
+          remote-filter
+          :empty="emptyState"
+          @page-change="handlePageChange"
+          @filter-change="handleColumnFilter"
+          @empty-action="handleEmptyAction"
+        >
+          <template #name="{ row }">
+            <EntityLink :id="row.id" type="project" :label="row.name" />
+          </template>
+
+          <template #status="{ row }">
+            <span :class="statusClass(row.status)">{{ row.status }}</span>
+          </template>
+
+          <template #developer="{ row }">
+            <EntityLink :id="row.customerId" type="customer" :label="row.developer" />
+          </template>
+
+          <template #action="{ row }">
+            <div class="flex items-center justify-end gap-1">
+              <NuxtLink
+                :to="`/project/${row.id}`"
+                class="icon-btn"
+                title="详情"
+                :aria-label="`查看${row.name}项目详情`"
+              >
+                <span class="i-lucide-file-text text-14px" aria-hidden="true" />
+              </NuxtLink>
+              <button class="icon-btn" title="编辑" aria-label="编辑项目" @click="openEdit(row)">
+                <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
+              </button>
+              <button class="icon-btn-danger" title="删除" aria-label="删除项目" @click="handleDelete(row)">
+                <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
+              </button>
+            </div>
+          </template>
+        </KitTable>
       </template>
 
-      <template #developer="{ row }">
-        <!-- 客户详情未实装 → EntityLink 自动退化纯文本，实装后回填映射即全站上线（specs §07） -->
-        <EntityLink type="customer" :label="row.developer" />
-      </template>
-
-      <template #action="{ row }">
-        <div class="flex items-center justify-end gap-1">
-          <NuxtLink :to="`/project/${row.id}`" class="icon-btn" title="详情" aria-label="查看项目详情">
-            <span class="i-lucide-file-text text-14px" aria-hidden="true" />
-          </NuxtLink>
-          <button class="icon-btn" title="编辑" aria-label="编辑项目" @click="openEdit(row)">
-            <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
-          </button>
-          <button class="icon-btn-danger" title="删除" aria-label="删除项目" @click="handleDelete(row)">
-            <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
-          </button>
+      <template #summary>
+        <div
+          v-if="!store.error || store.list.length > 0"
+          class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1"
+          aria-label="项目列表汇总"
+        >
+          <span>显示 <b class="font-mono text-ink">{{ summary.total }}</b> 个项目</span>
+          <span>
+            累计收入 <b class="font-mono text-ink">{{ yuan(summary.income) }}</b>
+            <small v-if="summary.missingIncome" class="ml-1 text-ink-faint">缺失 {{ summary.missingIncome }} 个</small>
+          </span>
+          <span>
+            预算总额 <b class="font-mono text-ink">{{ yuan(summary.budget) }}</b>
+            <small v-if="summary.missingBudget" class="ml-1 text-ink-faint">缺失 {{ summary.missingBudget }} 个</small>
+          </span>
         </div>
       </template>
-    </KitTable>
+    </ListShell>
   </div>
 </template>

@@ -11,6 +11,7 @@ import type {
   ScheduleProjectView,
   ScheduleTaskView,
 } from '~/lib/schedule/read-model'
+import { useSessionStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { execute, select, withTransaction } from '~/lib/db/connection'
@@ -277,6 +278,10 @@ async function loadBoqLinesByItem(
 }
 
 export const useScheduleStore = defineStore('schedule', () => {
+  const expandedGroupIdsByProject = useSessionStorage<Record<string, string[]>>(
+    'schedule-wbs-expanded-groups',
+    {},
+  )
   const catalog = shallowRef<ScheduleCatalogProject[]>([])
   const buildings = shallowRef<ScheduleBuildingOption[]>([])
   const buildingCoverage = shallowRef<ScheduleBuildingCoverage[]>([])
@@ -292,6 +297,13 @@ export const useScheduleStore = defineStore('schedule', () => {
   let activeProjectId = ''
   let activeToday = toLocalDateInputValue()
   let latestRequest = 0
+
+  function setExpandedGroupIds(projectId: string, groupIds: readonly string[]) {
+    expandedGroupIdsByProject.value = {
+      ...expandedGroupIdsByProject.value,
+      [projectId]: [...new Set(groupIds)],
+    }
+  }
 
   async function loadCatalog() {
     catalog.value = await loadScheduleCatalog(db)
@@ -1242,6 +1254,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   return {
+    expandedGroupIdsByProject: readonly(expandedGroupIdsByProject),
     catalog: readonly(catalog),
     buildings: readonly(buildings),
     buildingCoverage: readonly(buildingCoverage),
@@ -1253,6 +1266,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     loading: readonly(loading),
     saving: readonly(saving),
     error: readonly(error),
+    setExpandedGroupIds,
     loadCatalog,
     loadBuildings,
     loadContracts,

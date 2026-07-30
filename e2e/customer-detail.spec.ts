@@ -51,6 +51,22 @@ test.describe('Issue #194：客户详情', () => {
     await expectNoPageOverflow(page, '客户详情窄窗')
   })
 
+  test('业务页签支持深链、方向键切换并同步地址', async ({ page }) => {
+    await page.goto('/base/customer/customer_demo_001?tab=contracts&from=list')
+
+    const contractTab = page.getByRole('tab', { name: /施工合同/ })
+    const receiptTab = page.getByRole('tab', { name: /收款明细/ })
+    await expect(contractTab).toHaveAttribute('aria-selected', 'true')
+    await contractTab.focus()
+    await page.keyboard.press('ArrowRight')
+
+    await expect(receiptTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page).toHaveURL(/tab=receipts/)
+    await expect(page).toHaveURL(/from=list/)
+    await expect(page.getByRole('link', { name: 'SK-2026-001' }))
+      .toHaveAttribute('href', '/finance/receipt/rr_mz0x1_0')
+  })
+
   test('不存在的客户展示不存在状态并保留返回入口', async ({ page }) => {
     await page.goto('/base/customer/not-exists')
 

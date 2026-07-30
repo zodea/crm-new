@@ -49,7 +49,7 @@ const { onChange, open: openFileDialog } = useFileDialog({
 })
 
 const columns: KitTableColumn[] = [
-  { field: 'code', title: '变更编号', width: 132, fixed: 'left' },
+  { field: 'code', title: '变更编号', width: 132, fixed: 'left', slot: 'code' },
   { field: 'name', title: '变更名称', minWidth: 180 },
   { field: 'changeType', title: '类型', width: 90, slot: 'changeType' },
   { field: 'status', title: '状态', width: 92, slot: 'status' },
@@ -354,6 +354,19 @@ onChange(async (files) => {
       :min-rows="10"
       empty="当前合同还没有变更单"
     >
+      <template #code="{ row }">
+        <NuxtLink
+          v-if="row.ledgerId"
+          :to="`/owner/change/${row.id}`"
+          class="font-mono text-11px font-700 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
+          :title="`打开已签证业主变更单 ${row.code}`"
+        >
+          {{ row.code }}
+        </NuxtLink>
+        <span v-else class="font-mono text-11px font-700 text-ink">
+          {{ row.code }}
+        </span>
+      </template>
       <template #changeType="{ row }">
         {{ BOQ_CHANGE_TYPE_LABEL[row.changeType] }}
       </template>

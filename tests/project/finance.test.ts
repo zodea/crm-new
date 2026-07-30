@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { summarizeProjectFinance } from '~/lib/project/finance'
 
 describe('项目列表金额列取值', () => {
-  it('无详情聚合时，预算总额回退合同金额（万元）换算为元', () => {
-    expect(summarizeProjectFinance({ contractAmount: 3238.84 }))
-      .toEqual({ income: 0, budget: 32388400 })
+  it('无真实聚合时保持未知，不用合同金额冒充预算', () => {
+    expect(summarizeProjectFinance())
+      .toEqual({ income: null, budget: null })
   })
 
-  it('合同金额为空按 0 处理，不产出 NaN', () => {
-    expect(summarizeProjectFinance({ contractAmount: null }))
+  it('保留真实的零值事实', () => {
+    expect(summarizeProjectFinance({ income: 0, budget: 0 }))
       .toEqual({ income: 0, budget: 0 })
   })
 })

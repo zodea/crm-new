@@ -459,6 +459,61 @@ describe('写路径包装:logCreate / withUpdateLog', () => {
     db.close()
   })
 
+  it('当前项目只是工人分配引用，项目删除后不隐藏跨项目工人主档', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO crews (id, name) VALUES ('crew1', '综合班组')`)
+    await db.execute(`
+      INSERT INTO workers (id, crew_id, name, current_project_id)
+      VALUES ('worker1', 'crew1', '张师傅', 'p1')
+    `)
+
+    await softDelete(db, 'projects', 'p1')
+
+    const rows = await selectVisible(db, 'workers')
+    expect(rows.map(row => row.id)).toEqual(['worker1'])
+    db.close()
+  })
+
+  it('supplier 与 supplier_credentials 的通用日志兜底只保留安全字段', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db)
+    await db.execute(`
+      INSERT INTO suppliers (id, name, tax_no, bank_account)
+      VALUES ('sensitive-supplier', '敏感分供方', 'SECRET-TAX', 'SECRET-ACCOUNT')
+    `)
+    await db.execute(`
+      INSERT INTO supplier_credentials (
+        id, supplier_id, category, file_name, ocr_result, ocr_confirmed_result
+      )
+      VALUES (
+        'sensitive-credential', 'sensitive-supplier', '营业执照', 'license.pdf',
+        '{"taxNo":"OCR-SECRET"}', '{"bankAccount":"OCR-ACCOUNT"}'
+      )
+    `)
+
+    await logCreate(db, 'suppliers', 'sensitive-supplier')
+    await logCreate(db, 'supplier_credentials', 'sensitive-credential')
+    const logs = await db.select<{ table_name: string, after_data: string }>(`
+      SELECT table_name, after_data
+      FROM operation_logs
+      WHERE record_id IN ('sensitive-supplier', 'sensitive-credential')
+      ORDER BY rowid
+    `)
+    expect(JSON.stringify(logs)).not.toMatch(
+      /SECRET-TAX|SECRET-ACCOUNT|OCR-SECRET|OCR-ACCOUNT|ocr_result|ocr_confirmed_result/,
+    )
+    expect(JSON.parse(logs[0]!.after_data)).toMatchObject({
+      id: 'sensitive-supplier',
+      credential_status: 'incomplete',
+    })
+    expect(JSON.parse(logs[1]!.after_data)).toMatchObject({
+      id: 'sensitive-credential',
+      supplier_id: 'sensitive-supplier',
+      category: '营业执照',
+    })
+    db.close()
+  })
+
   it('withUpdateLog 落前后快照;记录不存在/已删则不执行写入、不落幽灵日志', async () => {
     const db = await dbWithProject()
     const logId = await withUpdateLog(db, 'projects', 'p1', async () => {

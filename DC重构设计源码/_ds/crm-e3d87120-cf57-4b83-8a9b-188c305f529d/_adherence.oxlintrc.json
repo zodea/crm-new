@@ -17,8 +17,7 @@
           {
             "group": [
               "components/core/**",
-              "components/navigation/**",
-              "ui_kits/scanner-assistant/**"
+              "components/navigation/**"
             ],
             "message": "Import design-system components from 'index.js', not component internals."
           }

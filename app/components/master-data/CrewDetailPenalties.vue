@@ -26,6 +26,7 @@ function statusClass(status: string): string {
 
     <div
       v-if="penalties.length"
+      data-testid="crew-penalties-scroll"
       class="crew-table-scroll overflow-x-auto"
       tabindex="0"
       aria-label="班组扣罚记录表格，可横向滚动"
@@ -72,6 +73,7 @@ function statusClass(status: string): string {
                 v-if="penalty.projectId"
                 :to="`/project/${penalty.projectId}`"
                 class="cell--link"
+                :title="penalty.projectName || '未命名项目'"
               >
                 {{ penalty.projectName || '未命名项目' }}
               </NuxtLink>
@@ -92,7 +94,11 @@ function statusClass(status: string): string {
               </span>
             </td>
             <td>
-              <NuxtLink :to="`/project/penalty/${penalty.id}`" class="cell--link">
+              <NuxtLink
+                :to="`/project/penalty/${penalty.id}`"
+                class="cell--link"
+                :title="`查看扣罚记录${penalty.no ? ` ${penalty.no}` : ''}`"
+              >
                 {{ penalty.no || '查看' }}
               </NuxtLink>
             </td>

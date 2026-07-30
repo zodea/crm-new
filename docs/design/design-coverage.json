@@ -1,0 +1,1066 @@
+{
+  "$schema": "本文件由 pnpm design:sync-coverage 生成；status 只允许 covered / design-pending / retired。",
+  "counts": {
+    "designPageRoutes": 69,
+    "designFormRoutes": 40,
+    "designNavGroups": 9,
+    "designNavLeaves": 50,
+    "designMountedScreens": 86,
+    "appPageFiles": 126,
+    "appNavLeaves": 50,
+    "covered": 126,
+    "designPending": 0,
+    "retired": 0,
+    "navTitleVariants": 6
+  },
+  "screenParity": [
+    {
+      "appRoute": "/",
+      "designRoute": "home",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/crew",
+      "designRoute": "crew",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/crew/:id",
+      "designRoute": "crewDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/crew/form/:id?",
+      "designRoute": "crewForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/customer",
+      "designRoute": "customer",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/customer/:id",
+      "designRoute": "customerDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/customer/form/:id?",
+      "designRoute": "customerForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/supplier",
+      "designRoute": "supplier",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/supplier/:id",
+      "designRoute": "supplierDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/supplier/form/:id?",
+      "designRoute": "supplierForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/worker",
+      "designRoute": "worker",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/worker/:id",
+      "designRoute": "workerDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/worker/form/:id?",
+      "designRoute": "workerForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/:id",
+      "designRoute": "contractDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/boq",
+      "designRoute": "boqList",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/boq/import",
+      "designRoute": "boqImport",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/company-expense",
+      "designRoute": "companyExp",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/company-expense/form",
+      "designRoute": "companyExpForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/company-expense/form/:id",
+      "designRoute": "companyExpForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/construction",
+      "designRoute": "conContract",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/construction/form",
+      "designRoute": "conContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/construction/form/:id",
+      "designRoute": "conContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/material",
+      "designRoute": "matContract",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/material/form",
+      "designRoute": "matContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/material/form/:id",
+      "designRoute": "matContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-expense",
+      "designRoute": "otherExp",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-expense/form",
+      "designRoute": "otherExpForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-expense/form/:id",
+      "designRoute": "otherExpForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-settlement",
+      "designRoute": "otherSettle",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-settlement/form",
+      "designRoute": "otherSettleForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-settlement/form/:id",
+      "designRoute": "otherSettleForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/subcontract",
+      "designRoute": "subContract",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/subcontract/form",
+      "designRoute": "subContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/subcontract/form/:id",
+      "designRoute": "subContractForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/export/config/:jobId",
+      "designRoute": "exportConfig",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/billing",
+      "designRoute": "invApply",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/billing/:id",
+      "designRoute": "invApplyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/billing/new",
+      "designRoute": "invApplyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/current",
+      "designRoute": "current",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/current/:id",
+      "designRoute": "currentForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/current/new",
+      "designRoute": "currentForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/invoice",
+      "designRoute": "invoice",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/invoice/:id",
+      "designRoute": "invoiceEdit",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/invoice/factor",
+      "designRoute": "factor",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/ledger",
+      "designRoute": "invoiceLedger",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/payment",
+      "designRoute": "payApply",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/payment-management",
+      "designRoute": "payManage",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/payment/:id",
+      "designRoute": "payApplyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/payment/new",
+      "designRoute": "payApplyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/receipt",
+      "designRoute": "receipt",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/receipt/:id",
+      "designRoute": "receiptForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/receipt/new",
+      "designRoute": "receiptForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/records",
+      "designRoute": "payRecord",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/records/:id",
+      "designRoute": "payRecordForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/records/new",
+      "designRoute": "payRecordForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/reimbursement",
+      "designRoute": "reimburse",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/reimbursement/:id",
+      "designRoute": "reimburseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/reimbursement/new",
+      "designRoute": "reimburseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/import/mapping/:entity",
+      "designRoute": "importMapping",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/arrival",
+      "designRoute": "matArrival",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/arrival/:id",
+      "designRoute": "matArrivalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/arrival/new",
+      "designRoute": "matArrivalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/delivery",
+      "designRoute": "delivery",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/delivery/archive",
+      "designRoute": "deliveryArchive",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/delivery/archive/:id",
+      "designRoute": "deliveryArchiveForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/delivery/archive/form/:id?",
+      "designRoute": "deliveryArchiveForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/price",
+      "designRoute": "price",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/requisition",
+      "designRoute": "matRequisition",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/requisition/:id",
+      "designRoute": "matRequisitionForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/requisition/new",
+      "designRoute": "matRequisitionForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/settlement",
+      "designRoute": "matSettle",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/settlement/form",
+      "designRoute": "matSettleForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/settlement/form/:id",
+      "designRoute": "matSettleForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/stock-check",
+      "designRoute": "stockCheck",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/stock-check/:id",
+      "designRoute": "stockCheckForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/stock-check/new",
+      "designRoute": "stockCheckForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/use",
+      "designRoute": "matUse",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/use/:id",
+      "designRoute": "matUseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/material/use/new",
+      "designRoute": "matUseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/arrival",
+      "designRoute": "omArrival",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/arrival/:id",
+      "designRoute": "omArrivalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/arrival/new",
+      "designRoute": "omArrivalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/control",
+      "designRoute": "omTotal",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/control/:id",
+      "designRoute": "omTotalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/control/new",
+      "designRoute": "omTotalForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/direct",
+      "designRoute": "omDirect",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/direct/:id",
+      "designRoute": "omDirectForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/direct/new",
+      "designRoute": "omDirectForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/requisition",
+      "designRoute": "omRequisition",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/requisition/:id",
+      "designRoute": "omRequisitionForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/requisition/new",
+      "designRoute": "omRequisitionForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/use",
+      "designRoute": "omUse",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/use/:id",
+      "designRoute": "omUseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner-material/use/new",
+      "designRoute": "omUseForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner/:kind",
+      "designRoute": [
+        "ownerChange",
+        "ownerReport",
+        "acceptance",
+        "finalSettle",
+        "ownerPenalty"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner/:kind/:id",
+      "designRoute": [
+        "ownerChangeForm",
+        "ownerReportForm",
+        "acceptanceForm",
+        "finalSettleForm",
+        "ownerPenaltyForm"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner/:kind/new",
+      "designRoute": [
+        "ownerChangeForm",
+        "ownerReportForm",
+        "acceptanceForm",
+        "finalSettleForm",
+        "ownerPenaltyForm"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project",
+      "designRoute": "project",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/:id",
+      "designRoute": "projectDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/:pid/supplier/:sid",
+      "designRoute": "projectSupplier",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/:pid/supplier/import",
+      "designRoute": "projectSupplierImport",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/form/:id?",
+      "designRoute": "projectForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/penalty",
+      "designRoute": "projPenalty",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/penalty/:id",
+      "designRoute": "projPenaltyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/penalty/new",
+      "designRoute": "projPenaltyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/target-cost",
+      "designRoute": "targetCost",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/target-cost/:id",
+      "designRoute": "targetCostDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/target-cost/form/:id?",
+      "designRoute": "targetCostForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule",
+      "designRoute": "schedule",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule/:pid",
+      "designRoute": "schedule",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule/:pid/bind/:gid",
+      "designRoute": "scheduleBind",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule/new",
+      "designRoute": "scheduleGroupNew",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule/process-library",
+      "designRoute": "processLibrary",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/schedule/process-library/form",
+      "designRoute": "processLibraryForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/settings/ocr",
+      "designRoute": "ocrSettings",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/:kind",
+      "designRoute": [
+        "subChange",
+        "subSettle"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/:kind/:id",
+      "designRoute": [
+        "subChangeForm",
+        "subSettleForm"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/:kind/new",
+      "designRoute": [
+        "subChangeForm",
+        "subSettleForm"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/attendance",
+      "designRoute": "attendance",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/daywork",
+      "designRoute": "daywork",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/payroll",
+      "designRoute": "payroll",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/payroll/:id",
+      "designRoute": "payrollDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity",
+      "designRoute": "quantity",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/:pid/:uid",
+      "designRoute": "quantityUnit",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/region",
+      "designRoute": "quantityRegionForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/template",
+      "designRoute": "quantityTemplateForm",
+      "status": "covered"
+    }
+  ],
+  "designOnly": [],
+  "navTitleVariants": [
+    {
+      "key": "project",
+      "navLabel": "项目列表",
+      "pageTitle": "施工项目",
+      "reason": "侧栏用短名「项目列表」区分同组的施工进度/目标成本；页标题用业务全称「施工项目」。属短名 vs 全称，保留。"
+    },
+    {
+      "key": "boqList",
+      "navLabel": "工程量清单",
+      "pageTitle": "工程量清单管理",
+      "reason": "侧栏短名「工程量清单」；页标题「工程量清单管理」。属短名 vs 全称，保留。"
+    },
+    {
+      "key": "omDirect",
+      "navLabel": "直入直出",
+      "pageTitle": "甲供材直入直出",
+      "reason": "侧栏在「甲供材管理」组内省略域前缀「直入直出」；页标题带全称「甲供材直入直出」以便页签可独立辨识。保留。"
+    },
+    {
+      "key": "factor",
+      "navLabel": "开票·税额工具",
+      "pageTitle": "开票因子推算 · 税额计算",
+      "reason": "侧栏短名「开票·税额工具」；页标题「开票因子推算 · 税额计算」列出两项能力。属短名 vs 全称，保留。"
+    },
+    {
+      "key": "supplier",
+      "navLabel": "分供方",
+      "pageTitle": "分供方资料库",
+      "reason": "侧栏短名「分供方」；页标题「分供方资料库」点明这是跨项目共享主数据库。属短名 vs 全称，保留。"
+    },
+    {
+      "key": "worker",
+      "navLabel": "工人信息",
+      "pageTitle": "工人信息库",
+      "reason": "侧栏短名「工人信息」；页标题「工人信息库」点明主数据库性质。属短名 vs 全称，保留。"
+    }
+  ],
+  "navParity": [
+    {
+      "key": "home",
+      "appNavTo": "/",
+      "appLabel": "首页",
+      "designLabel": "首页",
+      "designPageTitle": "首页"
+    },
+    {
+      "key": "project",
+      "appNavTo": "/project",
+      "appLabel": "项目列表",
+      "designLabel": "项目列表",
+      "designPageTitle": "施工项目"
+    },
+    {
+      "key": "schedule",
+      "appNavTo": "/schedule",
+      "appLabel": "施工进度",
+      "designLabel": "施工进度",
+      "designPageTitle": "施工进度"
+    },
+    {
+      "key": "targetCost",
+      "appNavTo": "/project/target-cost",
+      "appLabel": "目标成本",
+      "designLabel": "目标成本",
+      "designPageTitle": "目标成本"
+    },
+    {
+      "key": "conContract",
+      "appNavTo": "/contract/construction",
+      "appLabel": "施工合同",
+      "designLabel": "施工合同",
+      "designPageTitle": "施工合同"
+    },
+    {
+      "key": "ownerChange",
+      "appNavTo": "/owner/change",
+      "appLabel": "甲方变洽签",
+      "designLabel": "甲方变洽签",
+      "designPageTitle": "甲方变洽签"
+    },
+    {
+      "key": "ownerReport",
+      "appNavTo": "/owner/report",
+      "appLabel": "甲方报量",
+      "designLabel": "甲方报量",
+      "designPageTitle": "甲方报量"
+    },
+    {
+      "key": "acceptance",
+      "appNavTo": "/owner/acceptance",
+      "appLabel": "竣工验收·保修",
+      "designLabel": "竣工验收·保修",
+      "designPageTitle": "竣工验收·保修"
+    },
+    {
+      "key": "finalSettle",
+      "appNavTo": "/owner/final-settlement",
+      "appLabel": "最终结算",
+      "designLabel": "最终结算",
+      "designPageTitle": "最终结算"
+    },
+    {
+      "key": "ownerPenalty",
+      "appNavTo": "/owner/penalty",
+      "appLabel": "甲方罚扣单",
+      "designLabel": "甲方罚扣单",
+      "designPageTitle": "甲方罚扣单"
+    },
+    {
+      "key": "boqImport",
+      "appNavTo": "/contract/boq/import",
+      "appLabel": "清单拆表",
+      "designLabel": "清单拆表",
+      "designPageTitle": "清单拆表"
+    },
+    {
+      "key": "subContract",
+      "appNavTo": "/contract/subcontract",
+      "appLabel": "分包合同",
+      "designLabel": "分包合同",
+      "designPageTitle": "分包合同"
+    },
+    {
+      "key": "subChange",
+      "appNavTo": "/subcontract/change",
+      "appLabel": "分包变洽签",
+      "designLabel": "分包变洽签",
+      "designPageTitle": "分包变洽签"
+    },
+    {
+      "key": "subSettle",
+      "appNavTo": "/subcontract/settlement",
+      "appLabel": "分包结算",
+      "designLabel": "分包结算",
+      "designPageTitle": "分包结算"
+    },
+    {
+      "key": "projPenalty",
+      "appNavTo": "/project/penalty",
+      "appLabel": "项目罚扣",
+      "designLabel": "项目罚扣",
+      "designPageTitle": "项目罚扣"
+    },
+    {
+      "key": "quantity",
+      "appNavTo": "/subcontract/quantity",
+      "appLabel": "工程量管理",
+      "designLabel": "工程量管理",
+      "designPageTitle": "工程量管理"
+    },
+    {
+      "key": "boqList",
+      "appNavTo": "/contract/boq",
+      "appLabel": "工程量清单",
+      "designLabel": "工程量清单",
+      "designPageTitle": "工程量清单管理"
+    },
+    {
+      "key": "payroll",
+      "appNavTo": "/subcontract/payroll",
+      "appLabel": "工资核算",
+      "designLabel": "工资核算",
+      "designPageTitle": "工资核算"
+    },
+    {
+      "key": "matContract",
+      "appNavTo": "/contract/material",
+      "appLabel": "材料采购合同",
+      "designLabel": "材料采购合同",
+      "designPageTitle": "材料采购合同"
+    },
+    {
+      "key": "matRequisition",
+      "appNavTo": "/material/requisition",
+      "appLabel": "下料单",
+      "designLabel": "下料单",
+      "designPageTitle": "下料单"
+    },
+    {
+      "key": "matArrival",
+      "appNavTo": "/material/arrival",
+      "appLabel": "材料到货",
+      "designLabel": "材料到货",
+      "designPageTitle": "材料到货"
+    },
+    {
+      "key": "matUse",
+      "appNavTo": "/material/use",
+      "appLabel": "材料领用",
+      "designLabel": "材料领用",
+      "designPageTitle": "材料领用"
+    },
+    {
+      "key": "matSettle",
+      "appNavTo": "/material/settlement",
+      "appLabel": "材料采购结算",
+      "designLabel": "材料采购结算",
+      "designPageTitle": "材料采购结算"
+    },
+    {
+      "key": "stockCheck",
+      "appNavTo": "/material/stock-check",
+      "appLabel": "库存盘点",
+      "designLabel": "库存盘点",
+      "designPageTitle": "库存盘点"
+    },
+    {
+      "key": "delivery",
+      "appNavTo": "/material/delivery",
+      "appLabel": "送货单识别",
+      "designLabel": "送货单识别",
+      "designPageTitle": "送货单识别"
+    },
+    {
+      "key": "deliveryArchive",
+      "appNavTo": "/material/delivery/archive",
+      "appLabel": "送货单归档库",
+      "designLabel": "送货单归档库",
+      "designPageTitle": "送货单归档库"
+    },
+    {
+      "key": "price",
+      "appNavTo": "/material/price",
+      "appLabel": "单价对比",
+      "designLabel": "单价对比",
+      "designPageTitle": "单价对比"
+    },
+    {
+      "key": "omTotal",
+      "appNavTo": "/owner-material/control",
+      "appLabel": "甲供材总控量",
+      "designLabel": "甲供材总控量",
+      "designPageTitle": "甲供材总控量"
+    },
+    {
+      "key": "omRequisition",
+      "appNavTo": "/owner-material/requisition",
+      "appLabel": "甲供材下料单",
+      "designLabel": "甲供材下料单",
+      "designPageTitle": "甲供材下料单"
+    },
+    {
+      "key": "omArrival",
+      "appNavTo": "/owner-material/arrival",
+      "appLabel": "甲供材到货",
+      "designLabel": "甲供材到货",
+      "designPageTitle": "甲供材到货"
+    },
+    {
+      "key": "omUse",
+      "appNavTo": "/owner-material/use",
+      "appLabel": "甲供材领用",
+      "designLabel": "甲供材领用",
+      "designPageTitle": "甲供材领用"
+    },
+    {
+      "key": "omDirect",
+      "appNavTo": "/owner-material/direct",
+      "appLabel": "直入直出",
+      "designLabel": "直入直出",
+      "designPageTitle": "甲供材直入直出"
+    },
+    {
+      "key": "invoiceLedger",
+      "appNavTo": "/finance/ledger",
+      "appLabel": "发票台账",
+      "designLabel": "发票台账",
+      "designPageTitle": "发票台账"
+    },
+    {
+      "key": "invoice",
+      "appNavTo": "/finance/invoice",
+      "appLabel": "发票识别",
+      "designLabel": "发票识别",
+      "designPageTitle": "发票识别"
+    },
+    {
+      "key": "payApply",
+      "appNavTo": "/finance/payment",
+      "appLabel": "付款申请",
+      "designLabel": "付款申请",
+      "designPageTitle": "付款申请"
+    },
+    {
+      "key": "payManage",
+      "appNavTo": "/finance/payment-management",
+      "appLabel": "付款管理",
+      "designLabel": "付款管理",
+      "designPageTitle": "付款管理"
+    },
+    {
+      "key": "receipt",
+      "appNavTo": "/finance/receipt",
+      "appLabel": "收款登记",
+      "designLabel": "收款登记",
+      "designPageTitle": "收款登记"
+    },
+    {
+      "key": "invApply",
+      "appNavTo": "/finance/billing",
+      "appLabel": "开票申请",
+      "designLabel": "开票申请",
+      "designPageTitle": "开票申请"
+    },
+    {
+      "key": "current",
+      "appNavTo": "/finance/current",
+      "appLabel": "往来收付",
+      "designLabel": "往来收付",
+      "designPageTitle": "往来收付"
+    },
+    {
+      "key": "payRecord",
+      "appNavTo": "/finance/records",
+      "appLabel": "支付记录",
+      "designLabel": "支付记录",
+      "designPageTitle": "支付记录"
+    },
+    {
+      "key": "reimburse",
+      "appNavTo": "/finance/reimbursement",
+      "appLabel": "费用报销",
+      "designLabel": "费用报销",
+      "designPageTitle": "费用报销"
+    },
+    {
+      "key": "factor",
+      "appNavTo": "/finance/invoice/factor",
+      "appLabel": "开票·税额工具",
+      "designLabel": "开票·税额工具",
+      "designPageTitle": "开票因子推算 · 税额计算"
+    },
+    {
+      "key": "companyExp",
+      "appNavTo": "/contract/company-expense",
+      "appLabel": "公司支出合同",
+      "designLabel": "公司支出合同",
+      "designPageTitle": "公司支出合同"
+    },
+    {
+      "key": "otherExp",
+      "appNavTo": "/contract/other-expense",
+      "appLabel": "其他支出合同",
+      "designLabel": "其他支出合同",
+      "designPageTitle": "其他支出合同"
+    },
+    {
+      "key": "otherSettle",
+      "appNavTo": "/contract/other-settlement",
+      "appLabel": "其他支出结算",
+      "designLabel": "其他支出结算",
+      "designPageTitle": "其他支出结算"
+    },
+    {
+      "key": "supplier",
+      "appNavTo": "/base/supplier",
+      "appLabel": "分供方",
+      "designLabel": "分供方",
+      "designPageTitle": "分供方资料库"
+    },
+    {
+      "key": "customer",
+      "appNavTo": "/base/customer",
+      "appLabel": "客户",
+      "designLabel": "客户",
+      "designPageTitle": "客户"
+    },
+    {
+      "key": "crew",
+      "appNavTo": "/base/crew",
+      "appLabel": "班组管理",
+      "designLabel": "班组管理",
+      "designPageTitle": "班组管理"
+    },
+    {
+      "key": "worker",
+      "appNavTo": "/base/worker",
+      "appLabel": "工人信息",
+      "designLabel": "工人信息",
+      "designPageTitle": "工人信息库"
+    },
+    {
+      "key": "ocrSettings",
+      "appNavTo": "/settings/ocr",
+      "appLabel": "OCR 设置",
+      "designLabel": "OCR 设置",
+      "designPageTitle": "OCR 设置"
+    }
+  ]
+}

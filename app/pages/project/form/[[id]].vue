@@ -3,5 +3,9 @@ definePageMeta({ name: 'projectForm' })
 </script>
 
 <template>
-  <MasterDataFormPage kind="project" />
+  <MasterDataFormPage
+    kind="project"
+    hide-sections
+    return-to-detail
+  />
 </template>

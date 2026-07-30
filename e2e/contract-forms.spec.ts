@@ -84,24 +84,45 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await page.goto('/contract/material/form')
     await expect(page.getByRole('navigation', { name: '表单分区' })).toBeVisible()
     await page.getByTestId('add-contract-line').click()
-    await page.getByTestId('contract-line-name-0').fill('E2E瓷砖')
-    await page.getByTestId('contract-line-qty-0').fill('3')
-    await page.getByTestId('contract-line-price-0').fill('12.5')
-    await expect(page.getByText('37.50', { exact: true })).toHaveCount(3)
+    await page.getByRole('textbox', { name: '物资名称，第 1 行' }).fill('E2E瓷砖')
+    await page.getByRole('spinbutton', { name: '数量，第 1 行' }).fill('3')
+    await page.getByRole('spinbutton', { name: '含税单价，第 1 行' }).fill('12.5')
+    await expect(page.getByText('37.50', { exact: true })).toHaveCount(2)
 
-    await page.getByRole('button', { name: '复制明细' }).click()
-    await expect(page.getByTestId('contract-line-name-1')).toHaveValue('E2E瓷砖')
-    await page.getByRole('button', { name: '删除明细' }).first().click()
-    await expect(page.getByTestId('contract-line-name-0')).toHaveValue('E2E瓷砖')
-    await expect(page.getByTestId('contract-line-name-1')).toHaveCount(0)
+    await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
+    await page.getByRole('button', { name: '复制选中' }).click()
+    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('E2E瓷砖')
+    await page.getByRole('checkbox', { name: '选择第 1 行' }).check()
+    await page.getByRole('button', { name: '删除选中' }).click()
+    await expect(page.getByRole('textbox', { name: '物资名称，第 1 行' })).toHaveValue('E2E瓷砖')
+    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveCount(0)
 
     await page.getByTestId('import-contract-lines').click()
     await page.getByTestId('contract-lines-tsv').fill(
       '砂浆\tM10\t品牌A\t包\t2\t15\t2026-08-01\tTSV导入',
     )
     await page.getByTestId('confirm-contract-lines-import').click()
-    await expect(page.getByTestId('contract-line-name-1')).toHaveValue('砂浆')
-    await expect(page.getByText('67.50', { exact: true })).toHaveCount(2)
+    await expect(page.getByRole('textbox', { name: '物资名称，第 2 行' })).toHaveValue('砂浆')
+    await expect(page.getByText('67.50', { exact: true })).toHaveCount(1)
+  })
+
+  test('材采提交会阻止空明细并聚焦首个无效单元格', async ({ page }) => {
+    await page.goto('/contract/material/form')
+    await page.getByTestId('contract-name').fill(`E2E材采校验-${Date.now()}`)
+    await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+    await chooseLookup(page, '检索分供方', '广州市大板东', '广州市大板东建材有限公司')
+    await page.getByTestId('contract-content').fill('E2E 材料采购内容')
+    await page.getByTestId('contract-sign-date').fill('2026-07-30')
+    await page.getByTestId('contract-amount').fill('100')
+    await page.getByTestId('add-contract-line').click()
+
+    const firstInvalidCell = page.getByRole('textbox', { name: '物资名称，第 1 行' })
+    await page.getByRole('button', { name: '保存并提交' }).click()
+
+    await expect(page).toHaveURL('/contract/material/form')
+    await expect(firstInvalidCell).toHaveAttribute('aria-invalid', 'true')
+    await expect(firstInvalidCell).toBeFocused()
+    await expect(page.getByText(/采购合同明细还有 \d+ 处必填项未填写/)).toBeVisible()
   })
 
   test('保存并新建会在同一页可靠重置为空表单', async ({ page }) => {

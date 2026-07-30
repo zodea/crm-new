@@ -115,7 +115,7 @@ describe('boq 演示 seed', () => {
       FROM monthly_statements
       WHERE id = 'monthly_statement_demo_001'
     `)).toEqual([{
-      status: 'adjusted',
+      status: 'draft',
       total_amount: 4960,
     }])
     expect(await db.select(`

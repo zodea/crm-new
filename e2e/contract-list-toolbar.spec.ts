@@ -17,28 +17,40 @@ for (const width of RESPONSIVE_WIDTHS) {
     await expect(toolbar.getByText(/共\s*\d+\s*份/)).toHaveCount(0)
     await expect(toolbar.getByText(/当前\s*\d+\s*份/)).toHaveCount(0)
     await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
+    await expect(toolbar.getByRole('combobox', { name: '分供方' })).toBeVisible()
+    await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
     await expect(toolbar.getByRole('searchbox', { name: '搜索合同名称 / 编号' })).toBeVisible()
     await expect(toolbar.getByRole('button', { name: '刷新' })).toBeVisible()
     await expect(toolbar.getByRole('button', { name: '新增分包合同' })).toBeVisible()
 
     const titleBox = await toolbar.getByRole('heading', { name: '分包合同' }).boundingBox()
     const projectBox = await toolbar.getByRole('combobox', { name: '项目' }).boundingBox()
+    const partyBox = await toolbar.getByRole('combobox', { name: '分供方' }).boundingBox()
     const search = toolbar.getByRole('searchbox', { name: '搜索合同名称 / 编号' })
     const searchBox = await search.boundingBox()
     const createBox = await toolbar.getByRole('button', { name: '新增分包合同' }).boundingBox()
     expect(titleBox).not.toBeNull()
     expect(projectBox).not.toBeNull()
+    expect(partyBox).not.toBeNull()
     expect(searchBox).not.toBeNull()
     expect(createBox).not.toBeNull()
 
-    if (width >= 768) {
+    if (width >= 1280) {
       expect(Math.abs(titleBox!.y - projectBox!.y)).toBeLessThanOrEqual(8)
+      expect(Math.abs(projectBox!.y - partyBox!.y)).toBeLessThanOrEqual(8)
       expect(Math.abs(projectBox!.y - searchBox!.y)).toBeLessThanOrEqual(8)
+      expect(Math.abs(searchBox!.y - createBox!.y)).toBeLessThanOrEqual(8)
+    }
+    else if (width >= 768) {
+      expect(Math.abs(titleBox!.y - projectBox!.y)).toBeLessThanOrEqual(8)
+      expect(Math.abs(projectBox!.y - partyBox!.y)).toBeLessThanOrEqual(8)
+      expect(searchBox!.y).toBeGreaterThan(projectBox!.y)
       expect(Math.abs(searchBox!.y - createBox!.y)).toBeLessThanOrEqual(8)
     }
     else {
       expect(projectBox!.y).toBeGreaterThanOrEqual(titleBox!.y)
-      expect(searchBox!.y).toBeGreaterThanOrEqual(projectBox!.y)
+      expect(partyBox!.y).toBeGreaterThan(projectBox!.y)
+      expect(searchBox!.y).toBeGreaterThan(partyBox!.y)
     }
 
     await expectNoPageOverflow(page, `${width}px 分包合同列表`)
@@ -46,6 +58,14 @@ for (const width of RESPONSIVE_WIDTHS) {
       page.locator('.vxe-table--scroll-x-handle').first(),
       `${width}px 分包合同表格`,
     )
+    if (width === 390) {
+      const category = await page.getByText('分包合同分类', { exact: true }).boundingBox()
+      const table = await page.locator('.vxe-table--main-wrapper').first().boundingBox()
+      expect(category).not.toBeNull()
+      expect(table).not.toBeNull()
+      expect(table!.width).toBeGreaterThan(300)
+      expect(table!.y).toBeGreaterThan(category!.y)
+    }
 
     const toolbarHeight = (await toolbar.boundingBox())!.height
     await search.fill('不存在的合同')
@@ -63,6 +83,7 @@ test('材料采购合同列表复刻单层分类与紧凑省略号操作', async
   await expect(page.getByText('全部材料采购合同', { exact: true })).toBeVisible()
   const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
   await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
+  await expect(toolbar.getByRole('combobox', { name: '分供方' })).toBeVisible()
   await expect(page.locator('[data-ui="contract-list-toolbar"] + .panel')).toHaveCount(0)
   const rowMenu = page.locator('[data-ui="row-action-menu-trigger"]').first()
   await expect(rowMenu).toBeVisible()
@@ -103,3 +124,12 @@ for (const width of RESPONSIVE_WIDTHS) {
     await expectNoPageOverflow(page, `${width}px 材料采购合同列表`)
   })
 }
+
+test('施工合同统一提供项目、客户与状态筛选', async ({ page }) => {
+  await page.goto('/contract/construction')
+
+  const toolbar = page.locator('[data-ui="contract-list-toolbar"]')
+  await expect(toolbar.getByRole('combobox', { name: '项目' })).toBeVisible()
+  await expect(toolbar.getByRole('combobox', { name: '客户' })).toBeVisible()
+  await expect(toolbar.getByRole('combobox', { name: '状态' })).toBeVisible()
+})

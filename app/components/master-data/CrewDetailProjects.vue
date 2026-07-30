@@ -55,7 +55,11 @@ defineProps<{
         <tbody>
           <tr v-for="project in projects" :key="project.projectId">
             <td>
-              <NuxtLink :to="`/project/${project.projectId}`" class="cell--link font-700">
+              <NuxtLink
+                :to="`/project/${project.projectId}`"
+                class="cell--link font-700"
+                :title="project.projectName || '未命名项目'"
+              >
                 {{ project.projectName || '未命名项目' }}
               </NuxtLink>
               <span v-if="project.projectCode" class="mt-0.5 block text-10px text-ink-faint">

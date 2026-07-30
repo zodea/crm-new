@@ -19,6 +19,11 @@ const emit = defineEmits<{
 }>()
 
 const { formModal } = useKitUI()
+const statusClass: Record<MonthlyStatementView['status'], string> = {
+  draft: 'chip-brand',
+  adjusted: 'chip-warn',
+  exported: 'chip-ok',
+}
 
 const columns: KitTableColumn[] = [
   { type: 'seq', title: '#', width: 52 },
@@ -97,7 +102,7 @@ async function adjust(line: MonthlyStatementLineView) {
         >
           <div class="flex items-center justify-between gap-2">
             <strong class="text-12px text-ink">{{ item.month }}</strong>
-            <span :class="item.status === 'exported' ? 'chip-ok' : item.status === 'adjusted' ? 'chip-warn' : 'chip-brand'">
+            <span :class="statusClass[item.status]">
               {{ BOQ_MONTHLY_STATUS_LABEL[item.status] }}
             </span>
           </div>
@@ -121,9 +126,17 @@ async function adjust(line: MonthlyStatementLineView) {
             {{ BOQ_MONTHLY_STATUS_LABEL[statement.status] }} · 共 {{ statement.lines.length }} 个分项
           </p>
         </div>
-        <button type="button" class="btn-primary" @click="emit('export', statement)">
-          <span class="i-lucide-download mr-1" /> 导出本月
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <NuxtLink
+            :to="`/owner/report/${statement.id}`"
+            class="btn-secondary"
+          >
+            <span class="i-lucide-external-link mr-1" /> 打开甲方报量单
+          </NuxtLink>
+          <button type="button" class="btn-primary" @click="emit('export', statement)">
+            <span class="i-lucide-download mr-1" /> 导出本月
+          </button>
+        </div>
       </div>
       <KitTable
         v-if="statement"
@@ -136,7 +149,8 @@ async function adjust(line: MonthlyStatementLineView) {
           <button
             type="button"
             class="btn-ghost px-2 py-1 text-11px"
-            :disabled="statement.status === 'exported'"
+            :disabled="statement.status !== 'draft'"
+            :title="statement.status === 'draft' ? '调整本期报量' : '已申报或已审定，请在甲方报量单中处理'"
             @click="adjust(row)"
           >
             调整

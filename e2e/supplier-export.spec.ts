@@ -94,7 +94,7 @@ test('分供方单文件导出：当前筛选行生成真实 xlsx 并走浏览�
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: '导出台账', exact: true }).click(),
+    page.getByRole('button', { name: '导出分供方台账', exact: true }).click(),
   ])
 
   expect(download.suggestedFilename()).toMatch(/^分供方台账_\d{4}-\d{2}-\d{2}\.xlsx$/)
@@ -106,7 +106,7 @@ test('分供方单文件导出：当前筛选行生成真实 xlsx 并走浏览�
     '公司全称': '广州市大板东建材有限公司',
     '简称/别名': '大板东',
     '分供方类别': '材料供应商',
-    '资料状态': '合格',
+    '资料状态': '资料缺失',
     '税号': '91440101MA5CBX1234',
   })
 
@@ -122,13 +122,13 @@ test('分供方分类导出：按类别/资料状态真实写出 10 个逐户 xl
 
   await page.goto('/base/supplier')
   await page.waitForLoadState('networkidle')
-  await page.getByRole('button', { name: '分类导出', exact: true }).click()
+  await page.getByRole('button', { name: '分类导出分供方', exact: true }).click()
 
   await expect(page).toHaveURL(/\/export\/config\/[^/]+$/)
   await expect(page.getByText('分供方资料 · 10 个文件', { exact: true })).toBeVisible()
   await expect(page.getByLabel('一级目录字段')).toHaveValue('supplierCategory')
   await expect(page.getByLabel('二级目录字段')).toHaveValue('credentialStatus')
-  await expect(page.getByRole('status')).toHaveText('材料供应商/合格/广州市大板东建材有限公司.xlsx')
+  await expect(page.getByRole('status')).toHaveText('材料供应商/资料缺失/广州市大板东建材有限公司.xlsx')
 
   await page.getByRole('button', { name: '开始导出' }).click()
   await expect(page.locator('[data-sonner-toaster][data-y-position="top"]')
@@ -137,15 +137,15 @@ test('分供方分类导出：按类别/资料状态真实写出 10 个逐户 xl
 
   const state = await page.evaluate(() => (window as SupplierExportWindow).__supplierExportTest)
   const expectedFiles = [
-    ['材料供应商/合格/广州市大板东建材有限公司.xlsx', '广州市大板东建材有限公司', '材料供应商', '合格'],
+    ['材料供应商/资料缺失/广州市大板东建材有限公司.xlsx', '广州市大板东建材有限公司', '材料供应商', '资料缺失'],
     ['材料供应商/资料缺失/花城珠江电线电缆有限公司.xlsx', '花城珠江电线电缆有限公司', '材料供应商', '资料缺失'],
-    ['材料供应商/合格/汇丰水泥制品有限公司.xlsx', '汇丰水泥制品有限公司', '材料供应商', '合格'],
+    ['材料供应商/资料缺失/汇丰水泥制品有限公司.xlsx', '汇丰水泥制品有限公司', '材料供应商', '资料缺失'],
     ['材料供应商/资料缺失/穗建五金机电经营部.xlsx', '穗建五金机电经营部', '材料供应商', '资料缺失'],
     ['专业分包商/资料缺失/鸿运建筑防水工程有限公司.xlsx', '鸿运建筑防水工程有限公司', '专业分包商', '资料缺失'],
-    ['劳务分包商/合格/陈家泥水班组.xlsx', '陈家泥水班组', '劳务分包商', '合格'],
-    ['材料供应商/合格/广东宏宇陶瓷有限公司.xlsx', '广东宏宇陶瓷有限公司', '材料供应商', '合格'],
+    ['劳务分包商/资料缺失/陈家泥水班组.xlsx', '陈家泥水班组', '劳务分包商', '资料缺失'],
+    ['材料供应商/资料缺失/广东宏宇陶瓷有限公司.xlsx', '广东宏宇陶瓷有限公司', '材料供应商', '资料缺失'],
     ['专业分包商/资料缺失/佛山华铝装饰工程有限公司.xlsx', '佛山华铝装饰工程有限公司', '专业分包商', '资料缺失'],
-    ['专业分包商/合格/广州赛雄脚手架工程有限公司.xlsx', '广州赛雄脚手架工程有限公司', '专业分包商', '合格'],
+    ['专业分包商/资料缺失/广州赛雄脚手架工程有限公司.xlsx', '广州赛雄脚手架工程有限公司', '专业分包商', '资料缺失'],
     ['专业分包商/资料缺失/恒安机电安装工程有限公司.xlsx', '恒安机电安装工程有限公司', '专业分包商', '资料缺失'],
   ] as const
 

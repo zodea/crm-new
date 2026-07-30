@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const store = usePhaseTaskStore()
 const { preview, download } = useFileRefAccess()
-const expanded = shallowRef(false)
+const expanded = shallowRef(true)
 
 const projectTasks = computed(() =>
   props.tasks.filter(task => task.projectId === props.projectId && task.id),
@@ -34,10 +34,10 @@ function uploadedAt(value: string): string {
 </script>
 
 <template>
-  <section class="mt-3 border-t border-line pt-3" aria-labelledby="project-file-list-title">
+  <section class="panel min-w-0 overflow-hidden" aria-labelledby="project-file-list-title">
     <button
       type="button"
-      class="flex w-full items-center gap-2 rounded-[var(--radius-control)] px-1 py-1.5 text-left"
+      class="flex w-full items-center gap-2 border-b border-line bg-surface-2 px-3 py-2 text-left"
       :aria-expanded="expanded"
       aria-controls="project-file-list-content"
       @click="expanded = !expanded"
@@ -55,7 +55,7 @@ function uploadedAt(value: string): string {
     <div
       v-if="expanded"
       id="project-file-list-content"
-      class="mt-2 overflow-hidden rounded-[var(--radius-control)] border border-line"
+      class="min-w-0 overflow-x-auto"
     >
       <div
         v-if="files.length === 0"
@@ -63,7 +63,7 @@ function uploadedAt(value: string): string {
       >
         尚未从阶段任务登记项目文件
       </div>
-      <div v-else class="divide-y divide-line">
+      <div v-else class="min-w-64 divide-y divide-line">
         <div
           v-for="file in files"
           :key="file.id"

@@ -1,6 +1,7 @@
 import type { ScheduleProjectView } from '~/lib/schedule/read-model'
 import { render, screen } from '@testing-library/vue'
-import { describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, shallowRef, watch } from 'vue'
 import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
@@ -58,6 +59,11 @@ const snapshot: ScheduleProjectView = {
 }
 
 describe('内部暂估排程绑定入口', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+    setActivePinia(createPinia())
+  })
+
   it('只给待绑定合同分组显示状态与独立页面入口', async () => {
     const view = render(ScheduleBoard, {
       props: {

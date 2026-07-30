@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-07-29
+> 核对日期：2026-07-30
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -17,35 +17,63 @@
 
 “已搭但未闭环”不能被统计成“未实现”，也不能因为页面能打开就宣称完成。
 
-本文的 99 个界面按设计稿中的可达业务屏幕统计，不等于 Nuxt 文件路由模板数量。`app/pages/dev/` 以外的全部生产路由、运行态参考证据和后续实施票统一登记在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)；两种口径不得相加或互相覆盖。
+缺口有两个方向，必须分开统计，不得互相抵消：
+
+- **设计稿有、实现没有**（本文原有口径「未实现」）。
+- **实现有、设计稿没有**（`design-pending`）。实现跑到设计稿前面同样是缺口 —— 它让 ADR 0013 第 3 级权威源失效，评审时无据可对。
+
+三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**109** 是设计稿可达业务屏幕（69 常规 + 40 整页表单，#244 回填 7 屏 + 3 表单后的口径，此前为 99）。#181 / #206 正文的 115 是过期数字。
 
 ## 2. 当前总数
 
-设计稿当前可达界面清单：
+下表由 `pnpm design:sync-coverage` 从两侧注册表现算写入，逐条明细见 [`design-coverage.json`](./design-coverage.json)；**不要手改**，改了会被 `tests/ui/design-token-contract.test.ts` 的「设计覆盖契约」判红。
 
-| 类型 | 数量 | 说明 |
-| --- | ---: | --- |
-| 常规界面 | 62 | 50 个主导航界面 + 12 个可达的详情/工具等二级界面 |
-| 整页表单 | 37 | `kit/forms/*.jsx` 注册的新增/编辑表单 |
-| **合计** | **99** | 不含开发专用页和不可达的设计残留 |
+<!-- design-coverage:begin -->
+| 口径 | 数量 |
+| --- | ---: |
+| 设计稿 PAGE 路由 | 69 |
+| 设计稿整页表单路由 | 40 |
+| 设计稿侧栏分组 / 叶子 | 9 / 50 |
+| 实现生产路由（排除 dev） | 126 |
+| 实现侧栏叶子 | 50 |
+| 已覆盖 | 126 |
+| 待补设计（实现有、设计稿没有） | 0 |
+| 已退役（设计稿有、实现不做） | 0 |
+<!-- design-coverage:end -->
 
-Nuxt 路由级实现结果：
+侧栏 IA 已 1:1：实现与设计稿各 50 个叶子、key 与 label 逐条一致，且实现侧每个叶子都已填 `to`（无灰显占位）。
 
-| 状态 | 数量 | 占比 |
-| --- | ---: | ---: |
-| 已有对应界面 | 97 | 98.0% |
-| **未实现** | **2** | **2.0%** |
+## 3. 设计稿有、实现没有
 
-设计稿中存在一个不可达的通用 `detail` 残留，没有任何导航或动作进入，本次不计入 99 个可达界面；历史实现状态也不再混进当前分母。
+**当前为 0。** 上一版本文列出的两个「未实现」均已落地，本文当时未同轮更新：
 
-## 3. 未实现的 2 个界面
+| 设计界面 | 落地提交 | 现状 |
+| --- | --- | --- |
+| 付款管理 | `c61465a` | `/finance/payment-management`，侧栏 `payManage` 已填 `to` |
+| 请款簿详情 | `fda6c38` | `/subcontract/payroll/:id`，走统一详情壳 |
 
-| 设计界面 | Nuxt 现状 | 判定 | 实施票 |
-| --- | --- | --- | --- |
-| 付款管理 | 侧栏项缺少 `to`，无页面路由 | 未实现 | [#203](https://github.com/zodea/crm-new/issues/203) |
-| 请款簿详情 | 设计稿有可达二级界面，Nuxt 无对应路由 | 未实现 | [#197](https://github.com/zodea/crm-new/issues/197) |
+此前唯一不映射到实现的设计屏是不可达的 `detail`（「施工明细」，头注 2026-07-19 自标待删，能力已由 `quantityUnit` 户详情承接），已连同 `AppShell` / `QuantityScreen`（v1）/ `SettingsDialog` / `WageSlipScreen` 四个未挂载文件一并从设计源码删除，历史查 Git。`design-coverage.json` 的 `designOnly` 现为空。
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
+
+## 3b. 实现有、设计稿没有
+
+**当前为 0。** [#244](https://github.com/zodea/crm-new/issues/244) 已把此前 10 条无落点的生产路由全部补进设计源码：
+
+| 生产路由 | 设计稿落点 | 依据 |
+| --- | --- | --- |
+| `/schedule/process-library` | `processLibrary`（`ScheduleProcessLibraryScreen.jsx`） | ADR 0018 不可变版本、建组冻结快照 |
+| `/schedule/process-library/form` | `processLibraryForm`（`kit/forms/ScheduleForms.jsx`） | 已发布版本只读，沿用原 `code` 新建下一版 |
+| `/schedule/:pid/bind/:gid` | `scheduleBind`（`ScheduleBindScreen.jsx`） | ADR 0017 楼栋覆盖 / 分项映射 / 数量差异三段校验，未覆盖楼栋阻断绑定 |
+| `/subcontract/attendance` | `attendance`（`AttendanceScreen.jsx`） | 工人 × 日期矩阵、已发放月份封锁、矩阵只在自身容器横滚 |
+| `/subcontract/daywork` | `daywork`（`DayworkScreen.jsx`） | 仅已签字记录参与 C2 取数 |
+| `/subcontract/quantity/region` | `quantityRegionForm` | 楼栋→楼层区间→户号规则，无合同项目也可先配 |
+| `/subcontract/quantity/template` | `quantityTemplateForm` | 按 ADR 0014 + #198 从大 Dialog 迁为独立路由整页表单 |
+| `/export/config/:jobId` | `exportConfig`（`ExportConfigScreen.jsx`） | ADR 0004 独立配置页签 + 三步步骤条，写盘 ≠ 业务完成 |
+| `/import/mapping/:entity` | `importMapping`（`ImportMappingScreen.jsx`） | ADR 0005 三步向导 + 行级拒绝清单不静默丢弃 |
+| `/project/:pid/supplier/import` | `projectSupplierImport`（`ProjectSupplierImportScreen.jsx`） | 重复关系跳过、新分供方须人工指定七类后才建 |
+
+新增三仓 `processLibraries` / `quantityRegions` / `houseTypeTemplates` 已入 `AppData.jsx` 的 `PLAIN_COLLS`，演示数据在 `kit/data.js`（值全部匿名虚构，ADR 0014 §9）。
 
 ## 4. 已搭但未闭环
 
@@ -53,10 +81,11 @@ Nuxt 路由级实现结果：
 
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
-| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、独立标准工序库列表与整页版本表单、三步建组、模板甘特/精确表格同源编辑、前置轻量弹窗和冲突软禁用、项目区域配置，以及目标成本版本详情与正式成本对比已实现；暂估分组可在独立页面复核差异后绑定同项目施工合同 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md)、[ADR 0018](../adr/0018-versioned-schedule-process-library.md) |
-| 项目×分供方 / 分供方 | 工作台、列表、详情与表单基础已存在 | [#192](https://github.com/zodea/crm-new/issues/192)、[#193](https://github.com/zodea/crm-new/issues/193) |
-| 客户 / 班组 / 工人 | 列表、整页表单和详情均已存在；详情只按真实外键聚合项目、合同/收款、工程量、工资、考勤、签工和扣罚，具体参考同屏差异仍待验收 | [#194](https://github.com/zodea/crm-new/issues/194) |
-| 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
+| 施工进度 / 目标成本 | WBS、合同/内部暂估排程、独立标准工序库列表与整页版本表单、三步建组、模板甘特/精确表格同源编辑、前置轻量弹窗和冲突软禁用、项目区域配置，以及目标成本版本详情与正式成本对比已实现；首页与施工进度页已共用 Reka WBS Tree + 甘特核心，默认首组展开、按项目会话记忆且写操作仅留在施工进度页；暂估分组可在独立页面复核差异后绑定同项目施工合同 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md)、[ADR 0018](../adr/0018-versioned-schedule-process-library.md) |
+| 分供方主数据 | #193 已闭环参考式列表、真实聚合筛选、ProjectSupplier 关联、统一七类新建、整页主数据表单、脱敏详情、6 类汇总穿透和分类文件区；[#13](https://github.com/zodea/crm-new/issues/13) 提供真实证照、OCR、有效期与人工审核；#192 提供项目维度合作工作台和文件导入 | 已闭环 |
+| 客户 / 班组 / 工人 | #194 已闭环三类真实数据列表、整页表单与详情：领域搜索筛选、脱敏、软删除撤回、深链/下钻、真实人数与项目聚合、档案/在场状态分离，以及 390 / 768 / 1024 / 1440px 局部横滚与键盘验收 | 已闭环 |
+| 核心合同 / 工程量清单 | #195 已闭环施工、分包、材料采购三类真实筛选列表与分页、通用合同详情、材料采购共享明细编辑网格、合同清单/变更/月度报量工作台和逐 sheet 导入错误恢复；金额及来源单据只按真实外键聚合，并完成四档局部横滚与键盘验收 | 已闭环 |
+| 辅助合同 / 结算 | 其他支出、公司支出及结算列表和整页表单基础已存在 | [#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |
 | 工程量 / 工资 / 考勤 | 无合同项目区域、工程量三量与责任配置、C1 月考勤、C2 逐日签工、A/C1/C2 工资核对、组内分配、发放冻结及 A4/Excel 输出已实现；B 合同清单工资仍因合同责任归属和成本防双计规则未定而禁用 | [#198](https://github.com/zodea/crm-new/issues/198) |
 | 乙供 / 甲供 / 送货归档 | 物资单据、库存与识别归档基础已存在 | [#199](https://github.com/zodea/crm-new/issues/199)、[#200](https://github.com/zodea/crm-new/issues/200)、[#201](https://github.com/zodea/crm-new/issues/201) |
@@ -66,7 +95,7 @@ Nuxt 路由级实现结果：
 | 材料价格分析 | 已接真实归档送货单价格、材料搜索选择、趋势/厂家比较、来源追溯、材采合同历史，以及已核实的广州 BV 2.5 mm² 2026 年 2–6 月官方信息价趋势/偏差；其他官方材料仍须逐项核实编码规格单位 | [#207](https://github.com/zodea/crm-new/issues/207) |
 | OCR 设置 | `/settings/ocr` 已完成紧凑纵向工作台：脱敏运行状态、单据接入矩阵、7 项 PaddleOCR-VL 文档能力、有界请求/轮询超时、本机 SQLite 保存及发票/送货单请求接线；传统 PP-OCRv6 参数、服务端密钥和未接线阈值不做假配置 | [#204](https://github.com/zodea/crm-new/issues/204)、[ADR 0006](../adr/0006-ocr-paddleocr-vl-single-model.md) |
 
-应用外壳已在 #188 完成导航精确过滤、路由页签显式翻屏、通知 Sheet 四档响应式、键盘/Esc/焦点返回/滚动锁和脱敏视觉基线；后续全站票只处理各业务页面，不再重复改写外壳状态机。首页已在 #189 完成严格只读参考核对、真实项目切换、单一施工进度甘特、切换失败回退、加载/空/部分数据/错误状态和四档视觉回归，因此不再列入“已搭但未闭环”；后续施工进度领域能力仍由 #191 继续完善。项目详情已在 [#173–#180](https://github.com/zodea/crm-new/issues/180) 完成只读子表、阶段文件、成本/合同/资金/物资/验收关系、正式事实口径、来源穿透及四档响应式验收，因此不再列入“已搭但未闭环”。这些结论不改变路由总数，只改变闭环状态。
+应用外壳已在 #188 完成导航精确过滤、路由页签显式翻屏、通知 Sheet 四档响应式、键盘/Esc/焦点返回/滚动锁和脱敏视觉基线；后续全站票只处理各业务页面，不再重复改写外壳状态机。首页已在 #189 完成严格只读参考核对、真实项目切换、单一施工进度甘特、切换失败回退、加载/空/部分数据/错误状态和四档视觉回归，因此不再列入“已搭但未闭环”；后续施工进度领域能力仍由 #191 继续完善。项目详情已在 [#173–#180](https://github.com/zodea/crm-new/issues/180) 完成真实业务子表与来源穿透，并在 #190 进一步完成项目列表左侧状态树、紧凑宽表、详情双栏信息流、十个页签复用和项目整页表单的五档响应式验收；项目列表、详情和表单因此不再列入“已搭但未闭环”。项目×分供方已在 #192 接入项目详情入口，完成真实合同/请款/收票/支付分摊/两类结算聚合、源单穿透、合作文件预览下载、合作终态结算，以及“选择文件—文件名分类与人工调整—确认生成”的本地事务导入；该范围也不再列入未闭环。以上结论不改变路由总数，只改变闭环状态。
 
 ## 5. 维护方式
 

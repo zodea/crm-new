@@ -1,3 +1,3 @@
 <template>
-  <MasterDataSimpleList kind="worker" />
+  <MasterDataRegistryList kind="worker" />
 </template>

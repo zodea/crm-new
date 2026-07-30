@@ -25,7 +25,7 @@ function change(status: BoqChangeOrderView['status']): BoqChangeOrderView {
     directiveType: '',
     totalAmount: 100,
     approvedAt: status === 'approved' ? '2026-07-29' : null,
-    ledgerId: null,
+    ledgerId: status === 'approved' ? 'ledger-approved' : null,
     attachmentCount: 0,
     attachments: [],
     lines: [],
@@ -76,7 +76,10 @@ const KitTableStub = defineComponent({
         'data-testid': 'boq-change-table-contract',
         'data-action-width': action?.width,
       }, (props.data as BoqChangeOrderView[]).map((row, rowIndex) =>
-        h('div', { key: row.id }, slots.action?.({ row, rowIndex })),
+        h('div', { key: row.id }, [
+          slots.code?.({ row, rowIndex }),
+          slots.action?.({ row, rowIndex }),
+        ]),
       ))
     }
   },
@@ -86,6 +89,14 @@ const global = {
   components: {
     KitTable: KitTableStub,
     RowActionMenu,
+    NuxtLink: defineComponent({
+      props: { to: { type: [String, Object], required: true } },
+      setup(props, { slots }) {
+        return () => h('a', {
+          href: typeof props.to === 'string' ? props.to : (props.to as { path: string }).path,
+        }, slots.default?.())
+      },
+    }),
   },
 }
 
@@ -152,5 +163,16 @@ describe('boqChangeWorkspace', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'BG-approved变更单操作' }))
     expect(within(screen.getByRole('menu', { name: 'BG-approved变更单操作' }))
       .getByRole('menuitem', { name: '更正' })).not.toBeNull()
+  })
+
+  it('已签证变更编号按真实来源单进入业主变更单，未签证编号不造死链', () => {
+    render(BoqChangeWorkspace, {
+      props: { workspace },
+      global,
+    })
+
+    expect(screen.queryByRole('link', { name: 'BG-draft' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'BG-approved' }).getAttribute('href'))
+      .toBe('/owner/change/change-approved')
   })
 })

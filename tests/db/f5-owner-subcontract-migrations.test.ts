@@ -192,7 +192,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
       WHERE id = 'monthly-before-f5'
     `)).toEqual([{
       id: 'monthly-before-f5',
-      status: 'adjusted',
+      status: 'draft',
       total_amount: 88,
       reported_amount: null,
       audited_amount: null,

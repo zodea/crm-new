@@ -19,6 +19,10 @@ const props = withDefaults(defineProps<{
   money?: boolean
   /** 金额穿透目标（specs §07）：给定即渲染 MoneyLink，0/空自动退化。 */
   to?: RouteLocationRaw | null
+  /** OperatingMetric 完整性：有值时在卡片内显示，避免只给整组一个笼统状态。 */
+  status?: string
+  cutoff?: string
+  missingSources?: string
 }>(), { money: false, to: null })
 
 const display = computed(() =>
@@ -55,5 +59,34 @@ const toneClass = computed(() => {
         {{ display }}
       </template>
     </div>
+    <dl
+      v-if="status || cutoff || missingSources"
+      class="mt-2 space-y-0.5 border-t border-line-soft pt-2 text-10px leading-4 text-ink-faint"
+    >
+      <div v-if="status" class="flex min-w-0 gap-1">
+        <dt class="shrink-0">
+          状态
+        </dt>
+        <dd class="min-w-0 truncate" :title="status">
+          {{ status }}
+        </dd>
+      </div>
+      <div v-if="cutoff" class="flex min-w-0 gap-1">
+        <dt class="shrink-0">
+          汇总截止
+        </dt>
+        <dd class="min-w-0 truncate" :title="cutoff">
+          {{ cutoff }}
+        </dd>
+      </div>
+      <div v-if="missingSources" class="flex min-w-0 gap-1">
+        <dt class="shrink-0">
+          缺失来源
+        </dt>
+        <dd class="min-w-0 truncate" :title="missingSources">
+          {{ missingSources }}
+        </dd>
+      </div>
+    </dl>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CrewDetailMember } from '~/stores/crew-detail'
 import { formatMoney } from '~/lib/util/money'
+import { maskPhone } from '~/lib/util/privacy'
 
 defineProps<{
   members: readonly CrewDetailMember[]
@@ -52,11 +53,23 @@ defineProps<{
         <tbody>
           <tr v-for="member in members" :key="member.id">
             <td>
-              <NuxtLink :to="`/base/worker/${member.id}`" class="cell--link font-700">
+              <NuxtLink
+                :to="`/base/worker/${member.id}`"
+                class="cell--link font-700"
+                :title="member.name"
+              >
                 {{ member.name }}
               </NuxtLink>
+              <NuxtLink
+                v-if="member.linkedWorkerId"
+                :to="`/base/worker/${member.linkedWorkerId}`"
+                class="ml-2 whitespace-nowrap text-11px text-brand no-underline hover:underline"
+                :title="`关联人员：${member.linkedWorkerName}`"
+              >
+                ↔ {{ member.linkedWorkerName }}
+              </NuxtLink>
               <span
-                v-if="member.linkedWorkerName"
+                v-else-if="member.linkedWorkerName"
                 class="ml-2 whitespace-nowrap text-11px text-ink-faint"
                 :title="`关联人员：${member.linkedWorkerName}`"
               >
@@ -69,6 +82,7 @@ defineProps<{
                 v-if="member.currentProjectId"
                 :to="`/project/${member.currentProjectId}`"
                 class="cell--link"
+                :title="member.currentProjectName || '未命名项目'"
               >
                 {{ member.currentProjectName || '未命名项目' }}
               </NuxtLink>
@@ -80,7 +94,7 @@ defineProps<{
               </span>
             </td>
             <td class="font-mono">
-              {{ member.phone || '—' }}
+              {{ maskPhone(member.phone) || '—' }}
             </td>
             <td class="text-right font-mono tabular-nums">
               {{ member.dailyWage == null ? '—' : `${formatMoney(member.dailyWage)} 元/天` }}
