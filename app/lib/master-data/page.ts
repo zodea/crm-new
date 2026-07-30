@@ -98,6 +98,7 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '项目列表',
     listPath: '/project',
     newPath: '/project/form',
+    detailPath: '/project',
     defaultAttachmentCategory: 'filing',
     sections: [
       { key: 'basic', label: '基本信息' },

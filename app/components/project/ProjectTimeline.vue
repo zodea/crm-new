@@ -144,8 +144,6 @@ onMounted(() => store.load())
       </template>
     </div>
 
-    <ProjectFileList :project-id="projectId" :tasks="tasks" />
-
     <ProjectPhaseEditor
       v-model:open="showEditor"
       :project-id="projectId"

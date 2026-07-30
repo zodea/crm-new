@@ -31,9 +31,14 @@ import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   kind: MasterDataOwnerType
-}>()
+  hideSections?: boolean
+  returnToDetail?: boolean
+}>(), {
+  hideSections: false,
+  returnToDetail: false,
+})
 
 const route = useRoute()
 const supplierStore = useSupplierStore()
@@ -62,6 +67,16 @@ const routeSupplierCategory = computed(() => {
     : ''
 })
 const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
+const returnPath = computed(() =>
+  props.returnToDetail && isEditing && meta.value.detailPath
+    ? `${meta.value.detailPath}/${routeId}`
+    : meta.value.listPath,
+)
+const backLabel = computed(() =>
+  props.returnToDetail && isEditing
+    ? `返回${meta.value.label}详情`
+    : `返回${meta.value.listLabel}`,
+)
 useTabTitle(title)
 
 const draft = ref<MasterDataPageDraft>(
@@ -91,7 +106,7 @@ const dirty = computed(() => hydrated.value && (
 
 const sections = computed(() => meta.value.sections)
 const shellSections = computed(() =>
-  props.kind === 'supplier' ? [] : sections.value,
+  props.hideSections || props.kind === 'supplier' ? [] : sections.value,
 )
 const attachmentTitle = computed(() => props.kind === 'worker' ? '证书档案' : '附件')
 const requiredFields = computed(() =>
@@ -271,7 +286,7 @@ async function saveThroughStore(action: MasterDataSaveAction) {
 
 async function handleFooterAction(action: FormFooterAction) {
   if (action === 'cancel') {
-    await leaveToList()
+    await leaveForm()
     return
   }
 
@@ -311,7 +326,10 @@ async function handleFooterAction(action: FormFooterAction) {
     if (closeAfterSave.value) {
       allowLeave = true
       tabsStore.close(pageKey)
-      await navigateTo(meta.value.listPath)
+      const closePath = props.returnToDetail && meta.value.detailPath
+        ? `${meta.value.detailPath}/${routeId ?? result.id}`
+        : meta.value.listPath
+      await navigateTo(closePath)
       return
     }
 
@@ -409,12 +427,12 @@ function toggleExistingAttachment(id: string) {
     : [...pendingRemoveIds.value, id]
 }
 
-async function leaveToList() {
+async function leaveForm() {
   if (dirty.value) {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
-      message: '当前表单还有未保存内容，确认放弃并返回列表？',
+      message: `当前表单还有未保存内容，确认放弃并${isEditing && props.returnToDetail ? '返回详情' : '返回列表'}？`,
       confirmLabel: '放弃修改',
     })
     if (!leave)
@@ -422,7 +440,7 @@ async function leaveToList() {
   }
   allowLeave = true
   tabsStore.close(pageKey)
-  await navigateTo(meta.value.listPath)
+  await navigateTo(returnPath.value)
 }
 
 onBeforeRouteLeave(async () => {
@@ -459,13 +477,13 @@ watch(routeSupplierCategory, () => {
   <EntityFormShell
     :title="title"
     subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
-    :back-label="`返回${meta.listLabel}`"
+    :back-label="backLabel"
     :sections="shellSections"
     :state="shellState"
     :state-title="shellStateTitle"
     :state-description="loadError"
     state-action-label="重新加载"
-    @back="leaveToList"
+    @back="leaveForm"
     @state-action="initialize"
   >
     <template #status>
