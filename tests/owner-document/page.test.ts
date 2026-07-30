@@ -19,6 +19,39 @@ describe('f5 单据页面模型', () => {
     }
   })
 
+  it('八类表单提供准确分区和对应合同入口', () => {
+    const ownerKinds = [
+      'owner_change',
+      'owner_report',
+      'acceptance',
+      'final_settlement',
+      'owner_penalty',
+    ] as const
+    const expenditureKinds = [
+      'sub_change',
+      'sub_settlement',
+      'project_penalty',
+    ] as const
+
+    for (const kind of ownerKinds) {
+      expect(OWNER_DOCUMENT_META[kind].contractListPath).toBe('/contract/construction')
+      expect(OWNER_DOCUMENT_META[kind].contractListLabel).toBe('施工合同列表')
+    }
+    for (const kind of expenditureKinds) {
+      expect(OWNER_DOCUMENT_META[kind].contractListPath).toBe('/contract/subcontract')
+      expect(OWNER_DOCUMENT_META[kind].contractListLabel).toBe('分包合同列表')
+    }
+
+    expect(OWNER_DOCUMENT_META.owner_change.sections.map(section => section.label))
+      .toEqual(['基本信息', '变更明细', '附件与备注'])
+    expect(OWNER_DOCUMENT_META.acceptance.sections.map(section => section.label))
+      .toEqual(['验收信息', '附件与备注'])
+    expect(OWNER_DOCUMENT_META.final_settlement.sections.map(section => section.label))
+      .toEqual(['结算信息', '附件与备注'])
+    expect(OWNER_DOCUMENT_META.project_penalty.sections.map(section => section.label))
+      .toEqual(['罚扣信息', '附件与备注'])
+  })
+
   it('默认值按单据类型隔离，行式单据只初始化自己的明细', () => {
     expect(ownerDocumentDefaults('owner_change')).toMatchObject({
       status: 'draft',

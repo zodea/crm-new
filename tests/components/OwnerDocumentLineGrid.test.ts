@@ -148,4 +148,32 @@ describe('ownerDocumentLineGrid behavior', () => {
     expect(wrapper.text()).toContain('合计 ¥40.00')
     expect(wrapper.text()).toContain('40.00')
   })
+
+  it('renders a focusable detail error and gives row actions distinct keyboard names', async () => {
+    const wrapper = mount(OwnerDocumentLineGrid, {
+      props: {
+        kind: 'owner_change',
+        lines: [{
+          operation: 'qty',
+          itemName: '',
+          unit: '',
+          deltaQty: null,
+          newUnitPrice: null,
+        }],
+        boqLines,
+        error: '至少填写一条有效的变更明细',
+      },
+      attachTo: document.body,
+      global,
+    })
+
+    const alert = wrapper.get('[data-field="lines"]')
+    expect(alert.attributes('tabindex')).toBe('-1')
+    await alert.element.focus()
+    expect(document.activeElement).toBe(alert.element)
+    expect(wrapper.get('[aria-label="复制第 1 行"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="删除第 1 行"]').exists()).toBe(true)
+
+    wrapper.unmount()
+  })
 })

@@ -5,9 +5,11 @@ import { loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { runMigrations } from '~/lib/db/migrations'
 import {
   listOwnerDocumentAttachments,
+  listOwnerDocumentContractOptions,
   listOwnerDocumentForms,
   loadOwnerDocumentForm,
   loadPenaltyDeductions,
+  ownerDocumentStatusIsEditable,
 } from '~/lib/owner-document/forms'
 import { useOwnerDocumentStore } from '~/stores/owner-document'
 import { createMemoryDb } from '../helpers/memory-db'
@@ -190,6 +192,20 @@ describe('f5 甲方/分包单据领域事务', () => {
         appliedAmount: 48,
       },
     })
+    expect(await listOwnerDocumentForms('owner_change')).toEqual([
+      expect.objectContaining({
+        id: saved.id,
+        no: 'BQ-OWNER-001',
+        contractId: 'contract-owner',
+        contractName: '施工合同',
+        type: 'site_visa',
+        amount: 50,
+        secondaryAmount: 45,
+        tertiaryAmount: 48,
+        date: '2026-07-26',
+        status: 'approved',
+      }),
+    ])
     expect(await mem.select(`
       SELECT COUNT(*) AS count
       FROM owner_change_orders
@@ -429,6 +445,12 @@ describe('f5 甲方/分包单据领域事务', () => {
       noticeNo: 'LX-001',
       amount: 10,
     })
+    expect(await listOwnerDocumentForms('owner_penalty')).toEqual([
+      expect.objectContaining({
+        id: ownerPenalty.id,
+        noticeNo: 'LX-001',
+      }),
+    ])
     expect(await loadOwnerDocumentForm('sub_change', subChange.id)).toMatchObject({
       supplierId: 'supplier-sub',
       contractId: 'contract-sub',
@@ -460,6 +482,12 @@ describe('f5 甲方/分包单据领域事务', () => {
     await expect(
       store.deductProjectPenalty(penalty.id, subSettlement.id, 1),
     ).rejects.toThrow()
+    await expect(store.removeForm('sub_settlement', subSettlement.id))
+      .rejects
+      .toThrow('只有草稿或已退回单据可以删除')
+    await expect(store.removeForm('project_penalty', penalty.id))
+      .rejects
+      .toThrow('只有草稿或已退回单据可以删除')
 
     await expect(store.saveForm('sub_settlement', {
       no: 'FBJS-BAD',
@@ -492,13 +520,13 @@ describe('f5 甲方/分包单据领域事务', () => {
       contractId: 'contract-owner',
       documentDate: '2026-07-27',
       warrantyOwner: '王工',
-    }, 'submit')
+    }, 'draft')
 
     expect(updated.id).toBe(created.id)
     expect(await loadOwnerDocumentForm('acceptance', created.id)).toMatchObject({
       type: 'warranty',
       name: '保修移交',
-      status: 'submitted',
+      status: 'draft',
       warrantyOwner: '王工',
     })
     expect(await listOwnerDocumentForms('acceptance')).toEqual([
@@ -506,7 +534,7 @@ describe('f5 甲方/分包单据领域事务', () => {
         id: created.id,
         no: 'YS-DRAFT-001',
         name: '保修移交',
-        status: 'submitted',
+        status: 'draft',
       }),
     ])
 
@@ -514,6 +542,70 @@ describe('f5 甲方/分包单据领域事务', () => {
     expect(await listOwnerDocumentForms('acceptance')).toEqual([])
     expect(await store.restoreForm('acceptance', created.id)).toEqual(expect.any(String))
     expect(await listOwnerDocumentForms('acceptance')).toHaveLength(1)
+    await store.saveForm('acceptance', {
+      id: created.id,
+      no: 'YS-DRAFT-001',
+      type: 'warranty',
+      name: '保修移交',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      documentDate: '2026-07-27',
+      warrantyOwner: '王工',
+    }, 'submit')
+    await expect(store.removeForm('acceptance', created.id))
+      .rejects
+      .toThrow('只有草稿或已退回单据可以删除')
+  })
+
+  it('草稿合同不进入候选，伪造合同 ID 也不能保存业务单据', async () => {
+    await mem.execute(`
+      INSERT INTO contracts (
+        id, no, name, kind, project_id, supplier_id, amount, status
+      )
+      VALUES
+        (
+          'contract-owner-draft', 'SG-DRAFT', '草稿施工合同', '施工',
+          'project-owner', NULL, 100, 'draft'
+        ),
+        (
+          'contract-sub-draft', 'FB-DRAFT', '草稿分包合同', '分包',
+          'project-owner', 'supplier-sub', 80, '草稿'
+        )
+    `)
+
+    expect(await listOwnerDocumentContractOptions(
+      'project-owner',
+      'owner',
+      '',
+      '草稿',
+    )).toEqual([])
+    expect(await listOwnerDocumentContractOptions(
+      'project-owner',
+      'expenditure',
+      'supplier-sub',
+      '草稿',
+    )).toEqual([])
+
+    const store = useOwnerDocumentStore()
+    await expect(store.saveForm('acceptance', {
+      name: '伪造草稿合同验收',
+      projectId: 'project-owner',
+      contractId: 'contract-owner-draft',
+      documentDate: '2026-07-30',
+    }, 'submit')).rejects.toThrow('草稿合同不能用于业务单据')
+    await expect(store.saveForm('sub_settlement', {
+      name: '伪造草稿合同结算',
+      projectId: 'project-owner',
+      supplierId: 'supplier-sub',
+      contractId: 'contract-sub-draft',
+      totalAmount: 10,
+      settlementDate: '2026-07-30',
+    }, 'submit')).rejects.toThrow('草稿合同不能用于业务单据')
+
+    expect(ownerDocumentStatusIsEditable('draft')).toBe(true)
+    expect(ownerDocumentStatusIsEditable('rejected')).toBe(true)
+    expect(ownerDocumentStatusIsEditable('confirmed')).toBe(false)
+    expect(ownerDocumentStatusIsEditable('deducted')).toBe(false)
   })
 
   it('甲方变更、月度报量与项目罚扣草稿允许缺少项目、合同和必填业务字段', async () => {

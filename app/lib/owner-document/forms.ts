@@ -56,10 +56,21 @@ export interface OwnerDocumentListRecord {
   id: string
   no: string
   name: string
+  noticeNo?: string
   projectId: string | null
   projectName: string
-  counterpartyName: string
+  contractId: string | null
+  contractName: string
+  supplierId: string | null
+  supplierName: string
+  crewId: string | null
+  crewName: string
+  type: string
+  period: string
   amount: number
+  secondaryAmount: number
+  tertiaryAmount: number
+  quantity: number | null
   date: string
   status: string
 }
@@ -112,6 +123,7 @@ interface ContractRef {
   kind: string
   name: string
   amount: number
+  status: string
 }
 
 const FILE_OWNER_TYPES: Record<Exclude<OwnerDocumentKind, 'owner_change'>, string> = {
@@ -142,6 +154,10 @@ function text(value: unknown): string {
 function numberValue(value: unknown): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+export function ownerDocumentStatusIsEditable(status: string): boolean {
+  return ['draft', 'rejected', '草稿', '已退回'].includes(text(status))
 }
 
 function nullableNumber(value: unknown): number | null {
@@ -188,7 +204,7 @@ async function assertEditableDraft(
   )
   if (!record)
     throw new Error(`${label}不存在或已删除`)
-  if (!['draft', 'rejected'].includes(record.status))
+  if (!ownerDocumentStatusIsEditable(record.status))
     throw new Error(`只有草稿或已退回${label}可以编辑`)
 }
 
@@ -200,12 +216,14 @@ async function activeContract(
   supplierId?: string | null,
 ): Promise<ContractRef> {
   const [contract] = await tx.select<ContractRef>(`
-    SELECT id, project_id, supplier_id, kind, name, amount
+    SELECT id, project_id, supplier_id, kind, name, amount, status
     FROM contracts
     WHERE id = ? AND project_id = ? AND deleted_at IS NULL
   `, [contractId, projectId])
   if (!contract)
     throw new Error('合同不存在、已删除或不属于所选项目')
+  if (['draft', '草稿'].includes(contract.status))
+    throw new Error('草稿合同不能用于业务单据')
   if (side === 'owner' && contract.kind !== '施工')
     throw new Error('甲方单据只能关联施工合同')
   if (side === 'expenditure' && contract.kind === '施工')
@@ -1278,6 +1296,7 @@ export async function listOwnerDocumentContractOptions(
       ON supplier.id = contract.supplier_id AND supplier.deleted_at IS NULL
     WHERE contract.deleted_at IS NULL
       AND contract.project_id = ?
+      AND contract.status NOT IN ('draft', '草稿')
       AND ${side === 'owner' ? 'contract.kind = \'施工\'' : 'contract.kind <> \'施工\''}
       AND (? = '' OR contract.supplier_id = ?)
       AND (contract.no LIKE ? OR contract.name LIKE ?)
@@ -1480,22 +1499,36 @@ export async function listOwnerDocumentForms(
 ): Promise<OwnerDocumentListRecord[]> {
   if (kind === 'owner_change') {
     const rows = await select<Record<string, unknown>>(`
+      SELECT * FROM (
       SELECT change_order.id, change_order.code AS no, change_order.name,
              change_order.project_id, project.name AS project_name,
-             contract.name AS counterparty_name, change_order.total_amount AS amount,
-             change_order.application_date AS document_date, change_order.status,
-             change_order.created_at
+             change_order.contract_id, contract.name AS contract_name,
+             NULL AS supplier_id, '' AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             change_order.document_type AS business_type, '' AS period,
+             COALESCE(change_order.approved_tax_inclusive_amount, change_order.total_amount, 0) AS amount,
+             COALESCE(change_order.approved_tax_exclusive_amount, 0) AS secondary_amount,
+             COALESCE(change_order.applied_tax_exclusive_amount, 0) AS tertiary_amount,
+             NULL AS quantity,
+             COALESCE(NULLIF(change_order.approved_at, ''), change_order.application_date) AS document_date,
+             change_order.status, change_order.created_at
       FROM boq_change_orders change_order
       LEFT JOIN projects project ON project.id = change_order.project_id
       LEFT JOIN contracts contract ON contract.id = change_order.contract_id
       WHERE change_order.deleted_at IS NULL
       UNION ALL
       SELECT ledger.id, ledger.change_no, ledger.name, ledger.project_id,
-             project.name, ledger.contract_name, ledger.tax_inc_amount,
-             ledger.application_date, ledger.status, ledger.created_at
+             project.name, ledger.contract_id, ledger.contract_name,
+             NULL, '', NULL, '',
+             ledger.document_type, '',
+             ledger.tax_inc_amount, ledger.tax_exc_amount, ledger.applied_amount,
+             NULL,
+             COALESCE(NULLIF(ledger.approval_date, ''), ledger.application_date),
+             ledger.status, ledger.created_at
       FROM owner_change_orders ledger
       LEFT JOIN projects project ON project.id = ledger.project_id
       WHERE ledger.source_type = 'manual' AND ledger.deleted_at IS NULL
+      ) AS list_record
       ORDER BY created_at DESC, id DESC
     `)
     return rows.map(toListRecord)
@@ -1505,8 +1538,17 @@ export async function listOwnerDocumentForms(
     owner_report: `
       SELECT statement.id, statement.no, statement.period_no AS name,
              statement.project_id, project.name AS project_name,
-             contract.name AS counterparty_name,
-             COALESCE(statement.audited_amount, statement.reported_amount, statement.total_amount, 0) AS amount,
+             statement.contract_id, contract.name AS contract_name,
+             NULL AS supplier_id, '' AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             '' AS business_type, statement.period_no AS period,
+             COALESCE(statement.reported_amount, statement.total_amount, 0) AS amount,
+             COALESCE(statement.audited_amount, 0) AS secondary_amount,
+             CASE
+               WHEN statement.audited_amount IS NULL THEN 0
+               ELSE statement.audited_amount - COALESCE(statement.reported_amount, statement.total_amount, 0)
+             END AS tertiary_amount,
+             NULL AS quantity,
              statement.application_date AS document_date, statement.status,
              statement.created_at
       FROM monthly_statements statement
@@ -1515,8 +1557,13 @@ export async function listOwnerDocumentForms(
       WHERE statement.deleted_at IS NULL`,
     acceptance: `
       SELECT document.id, document.no, document.name, document.project_id,
-             project.name AS project_name, contract.name AS counterparty_name,
+             project.name AS project_name,
+             document.contract_id, contract.name AS contract_name,
+             NULL AS supplier_id, '' AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             document.type AS business_type, '' AS period,
              COALESCE(document.contract_estimate, 0) AS amount,
+             0 AS secondary_amount, 0 AS tertiary_amount, NULL AS quantity,
              document.document_date, document.status, document.created_at
       FROM project_acceptances document
       LEFT JOIN projects project ON project.id = document.project_id
@@ -1524,17 +1571,28 @@ export async function listOwnerDocumentForms(
       WHERE document.deleted_at IS NULL`,
     final_settlement: `
       SELECT document.id, document.no, document.name, document.project_id,
-             project.name AS project_name, contract.name AS counterparty_name,
+             project.name AS project_name,
+             document.contract_id, contract.name AS contract_name,
+             NULL AS supplier_id, '' AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             '' AS business_type, '' AS period,
              document.settlement_amount AS amount,
+             0 AS secondary_amount, 0 AS tertiary_amount, NULL AS quantity,
              document.submission_date AS document_date, document.status, document.created_at
       FROM owner_final_settlements document
       LEFT JOIN projects project ON project.id = document.project_id
       LEFT JOIN contracts contract ON contract.id = document.contract_id
       WHERE document.deleted_at IS NULL`,
     owner_penalty: `
-      SELECT document.id, document.no, document.reason AS name, document.project_id,
-             project.name AS project_name, contract.name AS counterparty_name,
-             document.amount, document.penalty_date AS document_date,
+      SELECT document.id, document.no, document.reason AS name, document.notice_no,
+             document.project_id,
+             project.name AS project_name,
+             document.contract_id, contract.name AS contract_name,
+             NULL AS supplier_id, '' AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             '' AS business_type, '' AS period,
+             document.amount, 0 AS secondary_amount, 0 AS tertiary_amount,
+             NULL AS quantity, document.penalty_date AS document_date,
              document.status, document.created_at
       FROM owner_penalties document
       LEFT JOIN projects project ON project.id = document.project_id
@@ -1542,30 +1600,50 @@ export async function listOwnerDocumentForms(
       WHERE document.deleted_at IS NULL`,
     sub_change: `
       SELECT document.id, document.no, document.reason AS name, document.project_id,
-             project.name AS project_name, supplier.name AS counterparty_name,
-             document.approved_amount AS amount, document.change_date AS document_date,
+             project.name AS project_name,
+             document.contract_id, contract.name AS contract_name,
+             document.supplier_id, supplier.name AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             document.change_type AS business_type, '' AS period,
+             document.approved_amount AS amount,
+             COALESCE(document.actual_approved_price, 0) AS secondary_amount,
+             0 AS tertiary_amount, document.changed_area AS quantity,
+             document.change_date AS document_date,
              document.status, document.created_at
       FROM subcontract_change_orders document
       LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
       LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
       WHERE document.deleted_at IS NULL`,
     sub_settlement: `
       SELECT document.id, document.no, document.name, document.project_id,
-             project.name AS project_name, supplier.name AS counterparty_name,
-             document.total_amount AS amount, document.settlement_date AS document_date,
+             project.name AS project_name,
+             document.contract_id, contract.name AS contract_name,
+             document.supplier_id, supplier.name AS supplier_name,
+             NULL AS crew_id, '' AS crew_name,
+             document.settlement_type AS business_type, document.settlement_period AS period,
+             document.total_amount AS amount,
+             0 AS secondary_amount, 0 AS tertiary_amount, NULL AS quantity,
+             document.settlement_date AS document_date,
              document.status, document.created_at
       FROM expenditure_settlements document
       LEFT JOIN projects project ON project.id = document.project_id
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
       LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
       WHERE document.biz_type = '分包' AND document.deleted_at IS NULL`,
     project_penalty: `
       SELECT document.id, document.no, document.reason AS name,
              document.projectId AS project_id, project.name AS project_name,
-             COALESCE(supplier.name, crew.name, '') AS counterparty_name,
-             document.amount, document.penaltyDate AS document_date,
+             document.contract_id, contract.name AS contract_name,
+             document.supplier_id, supplier.name AS supplier_name,
+             document.crewId AS crew_id, crew.name AS crew_name,
+             document.deduction_method AS business_type, '' AS period,
+             document.amount, 0 AS secondary_amount, 0 AS tertiary_amount,
+             NULL AS quantity, document.penaltyDate AS document_date,
              document.status, document.createdAt AS created_at
       FROM penalty_records document
       LEFT JOIN projects project ON project.id = document.projectId
+      LEFT JOIN contracts contract ON contract.id = document.contract_id
       LEFT JOIN suppliers supplier ON supplier.id = document.supplier_id
       LEFT JOIN crews crew ON crew.id = document.crewId
       WHERE document.source = 'project' AND document.deleted_at IS NULL`,
@@ -1619,10 +1697,21 @@ function toListRecord(row: Record<string, unknown>): OwnerDocumentListRecord {
     id: text(row.id),
     no: text(row.no),
     name: text(row.name),
+    noticeNo: text(row.notice_no),
     projectId: text(row.project_id) || null,
     projectName: text(row.project_name),
-    counterpartyName: text(row.counterparty_name),
+    contractId: text(row.contract_id) || null,
+    contractName: text(row.contract_name),
+    supplierId: text(row.supplier_id) || null,
+    supplierName: text(row.supplier_name),
+    crewId: text(row.crew_id) || null,
+    crewName: text(row.crew_name),
+    type: text(row.business_type),
+    period: text(row.period),
     amount: numberValue(row.amount),
+    secondaryAmount: numberValue(row.secondary_amount),
+    tertiaryAmount: numberValue(row.tertiary_amount),
+    quantity: nullableNumber(row.quantity),
     date: text(row.document_date),
     status: text(row.status),
   }
@@ -1666,6 +1755,15 @@ export async function deleteOwnerDocumentForm(
       if (ledger?.status === 'approved')
         throw new Error('已生效纯金额签证不可直接删除，请新建更正单留痕')
     }
+    const [record] = await tx.select<{ status: string }>(
+      `SELECT status FROM "${table}"
+       WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    )
+    if (!record)
+      return null
+    if (!ownerDocumentStatusIsEditable(record.status))
+      throw new Error('只有草稿或已退回单据可以删除')
     return softDelete(tx, table, id)
   })
 }

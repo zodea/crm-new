@@ -15,10 +15,12 @@ const props = defineProps<{
   boqLines: OwnerDocumentBoqLine[]
   readonly?: boolean
   auditMode?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
   update: [lines: GridLine[]]
+  clearError: []
 }>()
 
 const root = useTemplateRef<HTMLElement>('root')
@@ -102,6 +104,7 @@ function selectBoqLine(index: number, id: string) {
 }
 
 function add() {
+  emit('clearError')
   emit('update', [
     ...props.lines,
     props.kind === 'owner_change'
@@ -128,12 +131,14 @@ function add() {
 }
 
 function copy(index: number) {
+  emit('clearError')
   const next = [...props.lines]
   next.splice(index + 1, 0, { ...props.lines[index], id: undefined })
   emit('update', next)
 }
 
 function remove(index: number) {
+  emit('clearError')
   emit('update', props.lines.filter((_, current) => current !== index))
 }
 </script>
@@ -167,7 +172,18 @@ function remove(index: number) {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto">
+    <p
+      v-if="error"
+      id="owner-document-lines-error"
+      data-field="lines"
+      role="alert"
+      tabindex="-1"
+      class="m-3 rounded-[var(--radius-control)] border border-danger/30 bg-danger/5 px-3 py-2 text-12px text-danger outline-none focus:ring-2 focus:ring-danger/30"
+    >
+      {{ error }}
+    </p>
+
+    <div data-testid="owner-document-line-scroll" class="min-h-0 flex-1 overflow-auto">
       <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
         <template #operation="{ row, rowIndex }">
           <select
@@ -290,10 +306,10 @@ function remove(index: number) {
           >
         </template>
         <template #action="{ rowIndex }">
-          <button v-if="kind === 'owner_change'" type="button" class="icon-btn" title="复制" :disabled="readonly" @click="copy(rowIndex)">
+          <button v-if="kind === 'owner_change'" type="button" class="icon-btn" title="复制" :aria-label="`复制第 ${rowIndex + 1} 行`" :disabled="readonly" @click="copy(rowIndex)">
             <span class="i-lucide-copy" aria-hidden="true" />
           </button>
-          <button type="button" class="icon-btn-danger" title="删除" :disabled="readonly" @click="remove(rowIndex)">
+          <button type="button" class="icon-btn-danger" title="删除" :aria-label="`删除第 ${rowIndex + 1} 行`" :disabled="readonly" @click="remove(rowIndex)">
             <span class="i-lucide-trash-2" aria-hidden="true" />
           </button>
         </template>

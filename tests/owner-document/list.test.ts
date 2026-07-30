@@ -1,0 +1,120 @@
+import type { OwnerDocumentListRecord } from '~/lib/owner-document/forms'
+import { describe, expect, it } from 'vitest'
+import {
+  filterOwnerDocumentRows,
+  OWNER_DOCUMENT_LIST_CONFIG,
+  ownerDocumentStatusClass,
+  ownerDocumentStatusLabelForList,
+  ownerDocumentStatusViewKey,
+  ownerDocumentTypeLabel,
+} from '~/lib/owner-document/list'
+
+const rows: OwnerDocumentListRecord[] = [
+  {
+    id: 'change-1',
+    no: 'BQ-001',
+    name: '地下室签证',
+    projectId: 'project-1',
+    projectName: '合和新城',
+    contractId: 'contract-1',
+    contractName: '合和新城施工合同',
+    supplierId: null,
+    supplierName: '',
+    crewId: null,
+    crewName: '',
+    type: 'site_visa',
+    period: '',
+    amount: 120,
+    secondaryAmount: 110,
+    tertiaryAmount: 108,
+    quantity: null,
+    date: '2026-07-30',
+    status: 'approved',
+  },
+  {
+    id: 'change-2',
+    no: 'BQ-002',
+    name: '门窗变更',
+    projectId: 'project-2',
+    projectName: '科学城公寓',
+    contractId: 'contract-2',
+    contractName: '科学城施工合同',
+    supplierId: null,
+    supplierName: '',
+    crewId: null,
+    crewName: '',
+    type: 'change_negotiation',
+    period: '',
+    amount: 80,
+    secondaryAmount: 75,
+    tertiaryAmount: 70,
+    quantity: null,
+    date: '2026-07-29',
+    status: 'submitted',
+  },
+]
+
+describe('owner document list configuration', () => {
+  it('八类列表保留各自真实业务列与金额汇总口径', () => {
+    expect(Object.keys(OWNER_DOCUMENT_LIST_CONFIG)).toHaveLength(8)
+    expect(OWNER_DOCUMENT_LIST_CONFIG.owner_change.columns.map(column => column.title))
+      .toEqual(expect.arrayContaining([
+        '含税审定金额',
+        '无税审定金额',
+        '无税申报金额',
+      ]))
+    expect(OWNER_DOCUMENT_LIST_CONFIG.owner_report.columns.map(column => column.title))
+      .toEqual(expect.arrayContaining(['申报产值', '审定金额', '审定差额']))
+    expect(OWNER_DOCUMENT_LIST_CONFIG.sub_change.columns.map(column => column.title))
+      .toEqual(expect.arrayContaining(['乙方（分供方）', '变更面积', '实际审定价']))
+    expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.title))
+      .toContain('结算类型')
+  })
+
+  it('按搜索、项目、类型、状态与来源 query 共同收窄真实 ID', () => {
+    expect(filterOwnerDocumentRows('owner_change', rows, {
+      search: '地下室',
+      project: 'project-1',
+      type: 'site_visa',
+      statusView: 'approved',
+      routeProject: 'project-1',
+      routeContract: 'contract-1',
+    })).toEqual([rows[0]])
+
+    expect(filterOwnerDocumentRows('owner_change', rows, {
+      search: '施工合同',
+      project: 'all',
+      type: 'all',
+      statusView: 'submitted',
+      routeProject: 'project-1',
+    })).toEqual([])
+  })
+
+  it('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户', () => {
+    expect(ownerDocumentStatusViewKey('owner_report', 'adjusted')).toBe('reported')
+    expect(ownerDocumentStatusLabelForList('owner_change', 'submitted')).toBe('已上报')
+    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('申诉中')
+    expect(ownerDocumentStatusLabelForList('acceptance', 'expired')).toBe('已到期')
+    expect(ownerDocumentStatusViewKey('project_penalty', 'draft')).toBe('draft')
+    expect(ownerDocumentStatusLabelForList('project_penalty', 'draft')).toBe('草稿')
+    expect(ownerDocumentStatusLabelForList('project_penalty', 'repairing')).toBe('整改中')
+    expect(ownerDocumentStatusLabelForList('project_penalty', 'repaired_self')).toBe('自行整改')
+    expect(ownerDocumentStatusClass('sub_change', 'rejected')).toBe('chip-danger')
+    expect(ownerDocumentTypeLabel('owner_change', 'site_visa')).toBe('现场签证')
+  })
+
+  it('甲方罚扣可按联系单编号搜索', () => {
+    const penalty = {
+      ...rows[0],
+      id: 'penalty-1',
+      noticeNo: 'LX-2026-001',
+      status: 'submitted',
+    }
+    expect(filterOwnerDocumentRows('owner_penalty', [penalty], {
+      search: 'LX-2026-001',
+      project: 'all',
+      type: 'all',
+      statusView: 'all',
+    })).toEqual([penalty])
+  })
+})

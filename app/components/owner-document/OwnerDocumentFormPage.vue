@@ -9,12 +9,16 @@ import type {
 } from '~/lib/owner-document/forms'
 import { useDebounceFn } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
+import {
+  ownerDocumentStatusClass,
+  ownerDocumentStatusLabelForList,
+} from '~/lib/owner-document/list'
 import {
   OWNER_DOCUMENT_META,
   ownerDocumentDefaults,
   ownerDocumentFormPath,
   ownerDocumentLineAmount,
-  ownerDocumentStatusLabel,
   validateOwnerDocumentForm,
 } from '~/lib/owner-document/page'
 import { deriveKey } from '~/lib/tabs/tab-machine'
@@ -38,8 +42,6 @@ const routeId = computed(() => {
 const isEditing = computed(() => Boolean(routeId.value))
 const pageFullPath = route.fullPath
 const pageKey = deriveKey(pageFullPath)
-const title = computed(() => `${isEditing.value ? '查看/编辑' : '新建'} · ${meta.value.label}`)
-useTabTitle(title)
 
 const draft = ref<OwnerDocumentDraft>(ownerDocumentDefaults(props.kind))
 const boqLines = shallowRef<OwnerDocumentBoqLine[]>([])
@@ -61,13 +63,19 @@ const {
 } = useOwnerDocumentFormAttachments()
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
+const loadError = shallowRef('')
+const eligibleContractCount = shallowRef<number | null>(null)
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
 let allowLeave = false
 
 const status = computed(() => String(draft.value.status ?? 'draft'))
-const editable = computed(() => status.value === 'draft' || status.value === 'rejected')
+const editable = computed(() => ownerDocumentStatusIsEditable(status.value))
+const title = computed(() =>
+  `${isEditing.value ? (editable.value ? '编辑' : '查看') : '新建'} · ${meta.value.label}`,
+)
+useTabTitle(title)
 const {
   loading: lifecycleLoading,
   penaltyDeductions,
@@ -104,6 +112,25 @@ const footerLabels = computed(() => ({
   saveSubmit: meta.value.postLabel,
   save: '保存附件',
 }))
+const sections = computed(() => {
+  if (
+    props.kind !== 'project_penalty'
+    || (!canDeductPenalty.value && penaltyDeductions.value.length === 0)
+  ) {
+    return meta.value.sections
+  }
+  const attachments = meta.value.sections.find(section => section.key === 'attachments')
+  return [
+    ...meta.value.sections.filter(section => section.key !== 'attachments'),
+    { key: 'deduction', label: '结算抵扣' },
+    ...(attachments ? [attachments] : []),
+  ]
+})
+const pageState = computed(() => {
+  if (loading.value)
+    return 'loading'
+  return loadError.value ? 'error' : 'ready'
+})
 
 async function basicLookup(
   kind: 'crew' | 'project' | 'supplier',
@@ -134,6 +161,25 @@ async function fetchContracts(keyword: string): Promise<LookupOption[]> {
     supplierId,
     keyword,
   )
+}
+
+let contractAvailabilitySequence = 0
+async function refreshContractAvailability() {
+  const sequence = ++contractAvailabilitySequence
+  if (!draft.value.projectId) {
+    eligibleContractCount.value = null
+    return
+  }
+  eligibleContractCount.value = null
+  try {
+    const options = await fetchContracts('')
+    if (sequence === contractAvailabilitySequence)
+      eligibleContractCount.value = options.length
+  }
+  catch {
+    if (sequence === contractAvailabilitySequence)
+      eligibleContractCount.value = null
+  }
 }
 
 const refreshBoqLines = useDebounceFn(async () => {
@@ -234,7 +280,9 @@ const refreshContractSummary = useDebounceFn(async () => {
 
 async function initialize() {
   loading.value = true
+  loadError.value = ''
   fieldErrors.value = {}
+  eligibleContractCount.value = null
   clearPendingAttachments()
   try {
     const id = routeId.value
@@ -263,12 +311,14 @@ async function initialize() {
     }
     await refreshBoqLines()
     await refreshContractSummary()
+    await refreshContractAvailability()
     updateDerivedAmounts()
     await nextTick()
     savedSnapshot.value = JSON.stringify(draft.value)
   }
   catch (cause) {
-    error(`载入失败：${toErrorMessage(cause)}`)
+    loadError.value = toErrorMessage(cause)
+    error(`载入失败：${loadError.value}`)
   }
   finally {
     loading.value = false
@@ -287,6 +337,8 @@ function patchDraft(patch: Partial<OwnerDocumentDraft>) {
   draft.value = next
   if ('projectId' in patch || 'contractId' in patch || 'periodNo' in patch)
     void refreshBoqLines()
+  if ('projectId' in patch || 'supplierId' in patch)
+    void refreshContractAvailability()
   if (
     'projectId' in patch
     || 'contractId' in patch
@@ -299,6 +351,7 @@ function patchDraft(patch: Partial<OwnerDocumentDraft>) {
 
 function patchLines(lines: Array<Record<string, unknown>>) {
   draft.value = { ...draft.value, lines }
+  clearFieldError('lines')
   updateDerivedAmounts()
 }
 
@@ -326,8 +379,15 @@ function validateSubmit(): boolean {
   const errors = validateOwnerDocumentForm(props.kind, draft.value)
   fieldErrors.value = errors
   const messages = Object.values(errors)
-  if (messages.length)
+  if (messages.length) {
     warning(`${messages[0]}（共 ${messages.length} 处）`)
+    const firstField = Object.keys(errors)[0]
+    void nextTick(() => {
+      document
+        .querySelector<HTMLElement>(`form [data-field="${firstField}"]`)
+        ?.focus()
+    })
+  }
   return messages.length === 0
 }
 
@@ -440,161 +500,144 @@ onMounted(() => void initialize())
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      v-if="meta.sections.length >= 3"
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
-    >
-      <a
-        v-for="section in meta.sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
+  <EntityFormShell
+    :title="title"
+    :subtitle="`${meta.subtitle}；关联对象均保存真实 ID，附件与业务单据同事务提交。`"
+    :back-label="`返回${meta.label}`"
+    :sections="sections"
+    :state="pageState"
+    :state-title="pageState === 'error' ? `${meta.label}载入失败` : `正在载入${meta.label}`"
+    :state-description="loadError ? `无法载入${meta.label}：${loadError}` : ''"
+    state-action-label="重新载入"
+    @back="leaveToList"
+    @state-action="initialize"
+  >
+    <template #status>
+      <span class="chip" :class="ownerDocumentStatusClass(kind, status)">
+        {{ ownerDocumentStatusLabelForList(kind, status) }}
+      </span>
+    </template>
+
+    <template #actions>
+      <KitButton
+        v-if="canApproveChange"
+        :loading="lifecycleLoading"
+        @click="approveChange"
       >
-        {{ section.label }}
-      </a>
-    </aside>
+        <span class="i-lucide-badge-check mr-1" aria-hidden="true" />确认签证
+      </KitButton>
+      <KitButton
+        v-if="auditMode"
+        :loading="lifecycleLoading"
+        @click="auditReport"
+      >
+        <span class="i-lucide-stamp mr-1" aria-hidden="true" />确认审定
+      </KitButton>
+      <KitButton
+        v-if="acceptanceAction"
+        :loading="lifecycleLoading"
+        @click="moveAcceptance"
+      >
+        <span class="i-lucide-shield-check mr-1" aria-hidden="true" />{{ acceptanceAction.label }}
+      </KitButton>
+    </template>
 
-    <main class="min-w-0 flex-1">
-      <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
-            <span class="i-lucide-arrow-left" aria-hidden="true" />返回{{ meta.label }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            {{ meta.subtitle }}；关联对象均保存真实 ID，附件与业务单据同事务提交。
-          </p>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="chip" :class="editable ? 'chip-brand' : 'chip-ok'">
-            {{ ownerDocumentStatusLabel(status) }}
-          </span>
-          <KitButton
-            v-if="canApproveChange"
-            :loading="lifecycleLoading"
-            @click="approveChange"
-          >
-            <span class="i-lucide-badge-check mr-1" aria-hidden="true" />确认签证
-          </KitButton>
-          <KitButton
-            v-if="auditMode"
-            :loading="lifecycleLoading"
-            @click="auditReport"
-          >
-            <span class="i-lucide-stamp mr-1" aria-hidden="true" />确认审定
-          </KitButton>
-          <KitButton
-            v-if="acceptanceAction"
-            :loading="lifecycleLoading"
-            @click="moveAcceptance"
-          >
-            <span class="i-lucide-shield-check mr-1" aria-hidden="true" />{{ acceptanceAction.label }}
-          </KitButton>
-        </div>
-      </header>
+    <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
+      <OwnerDocumentFormFields
+        :kind="kind"
+        :draft="draft"
+        :field-errors="fieldErrors"
+        :eligible-contract-count="eligibleContractCount"
+        :readonly="!editable"
+        :fetch-projects="fetchProjects"
+        :fetch-suppliers="fetchSuppliers"
+        :fetch-contracts="fetchContracts"
+        :fetch-crews="fetchCrews"
+        @patch="patchDraft"
+        @clear-error="clearFieldError"
+      />
 
-      <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
+      <OwnerDocumentLineGrid
+        v-if="kind === 'owner_change' || kind === 'owner_report'"
+        :kind="kind"
+        :lines="draft.lines ?? []"
+        :boq-lines="boqLines"
+        :readonly="!editable"
+        :audit-mode="auditMode"
+        :error="fieldErrors.lines"
+        @update="patchLines"
+        @clear-error="clearFieldError('lines')"
+      />
 
-      <form v-else class="flex flex-col gap-4" @submit.prevent>
-        <OwnerDocumentFormFields
-          :kind="kind"
-          :draft="draft"
-          :field-errors="fieldErrors"
-          :readonly="!editable"
-          :fetch-projects="fetchProjects"
-          :fetch-suppliers="fetchSuppliers"
-          :fetch-contracts="fetchContracts"
-          :fetch-crews="fetchCrews"
-          @patch="patchDraft"
-          @clear-error="clearFieldError"
-        />
-
-        <OwnerDocumentLineGrid
-          v-if="kind === 'owner_change' || kind === 'owner_report'"
-          :kind="kind"
-          :lines="draft.lines ?? []"
-          :boq-lines="boqLines"
-          :readonly="!editable"
-          :audit-mode="auditMode"
-          @update="patchLines"
-        />
-
-        <section
-          v-if="kind === 'project_penalty' && (canDeductPenalty || penaltyDeductions.length)"
-          id="section-deduction"
-          class="panel scroll-mt-4 p-4"
-        >
-          <SectionHeader title="结算抵扣" />
-          <div v-if="canDeductPenalty" class="form-fields-grid mt-3">
-            <div class="field-block">
-              <span class="field-label">分包结算 *</span>
-              <LookupSelect
-                v-model="deductionSettlementId"
-                :fetch="fetchSettlements"
-                recent-key="project-penalty-settlement"
-                placeholder="检索可抵扣的分包结算"
-              />
-            </div>
-            <label class="field-block">
-              <span class="field-label">本次抵扣金额 *</span>
-              <input v-model.number="deductionAmount" type="number" min="0.01" step="0.01" class="field-input w-full font-mono">
-            </label>
-            <label class="field-block form-span-full">
-              <span class="field-label">抵扣说明</span>
-              <textarea v-model="deductionNote" rows="2" class="field-input w-full" />
-            </label>
-            <div class="form-span-full flex justify-end">
-              <KitButton :loading="lifecycleLoading" @click="deductPenalty">
-                <span class="i-lucide-circle-minus mr-1" aria-hidden="true" />执行结算抵扣
-              </KitButton>
-            </div>
+      <section
+        v-if="kind === 'project_penalty' && (canDeductPenalty || penaltyDeductions.length)"
+        id="section-deduction"
+        class="panel scroll-mt-4 p-4"
+      >
+        <SectionHeader title="结算抵扣" />
+        <div v-if="canDeductPenalty" class="form-fields-grid mt-3">
+          <div class="field-block">
+            <span class="field-label">分包结算 *</span>
+            <LookupSelect
+              v-model="deductionSettlementId"
+              :fetch="fetchSettlements"
+              recent-key="project-penalty-settlement"
+              placeholder="检索可抵扣的分包结算"
+            />
           </div>
-          <div v-if="penaltyDeductions.length" class="mt-4 grid gap-2">
-            <div
-              v-for="item in penaltyDeductions"
-              :key="item.id"
-              class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[var(--radius-control)] border border-line bg-surface-2 px-3 py-2 text-12px"
-            >
-              <strong class="text-ink">{{ item.settlementNo }} · {{ item.settlementName }}</strong>
-              <span class="font-mono font-700 text-danger">-¥{{ item.amount.toFixed(2) }}</span>
-              <span class="text-ink-faint">{{ item.note || '无说明' }}</span>
-              <span class="ml-auto text-ink-faint">{{ item.createdAt }}</span>
-            </div>
+          <label class="field-block">
+            <span class="field-label">本次抵扣金额 *</span>
+            <input v-model.number="deductionAmount" type="number" min="0.01" step="0.01" class="field-input w-full font-mono">
+          </label>
+          <label class="field-block form-span-full">
+            <span class="field-label">抵扣说明</span>
+            <textarea v-model="deductionNote" rows="2" class="field-input w-full" />
+          </label>
+          <div class="form-span-full flex justify-end">
+            <KitButton :loading="lifecycleLoading" @click="deductPenalty">
+              <span class="i-lucide-circle-minus mr-1" aria-hidden="true" />执行结算抵扣
+            </KitButton>
           </div>
-        </section>
+        </div>
+        <div v-if="penaltyDeductions.length" class="mt-4 grid gap-2">
+          <div
+            v-for="item in penaltyDeductions"
+            :key="item.id"
+            class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[var(--radius-control)] border border-line bg-surface-2 px-3 py-2 text-12px"
+          >
+            <strong class="text-ink">{{ item.settlementNo }} · {{ item.settlementName }}</strong>
+            <span class="font-mono font-700 text-danger">-¥{{ item.amount.toFixed(2) }}</span>
+            <span class="text-ink-faint">{{ item.note || '无说明' }}</span>
+            <span class="ml-auto text-ink-faint">{{ item.createdAt }}</span>
+          </div>
+        </div>
+      </section>
 
-        <FileRefAttachmentSection
-          :attachments="attachments"
-          :pending-attachments="pendingAttachments"
-          :pending-remove-ids="pendingRemoveIds"
-          :pending-restore-ids="pendingRestoreIds"
-          :desktop-picker="desktopAttachmentPicker"
-          :note="String(draft.note ?? '')"
-          :note-readonly="!editable"
-          @pick-native="pickNativeFiles"
-          @files="handleFiles"
-          @toggle-existing="toggleExistingAttachment"
-          @remove-pending="removePending"
-          @patch-pending="patchPending"
-          @update-note="patchDraft({ note: $event })"
-        />
+      <FileRefAttachmentSection
+        :attachments="attachments"
+        :pending-attachments="pendingAttachments"
+        :pending-remove-ids="pendingRemoveIds"
+        :pending-restore-ids="pendingRestoreIds"
+        :desktop-picker="desktopAttachmentPicker"
+        :note="String(draft.note ?? '')"
+        :note-readonly="!editable"
+        @pick-native="pickNativeFiles"
+        @files="handleFiles"
+        @toggle-existing="toggleExistingAttachment"
+        @remove-pending="removePending"
+        @patch-pending="patchPending"
+        @update-note="patchDraft({ note: $event })"
+      />
 
-        <FormFooter
-          v-model="closeAfterSave"
-          :actions="footerActions"
-          :labels="footerLabels"
-          :dirty="dirty"
-          :close-after-save="editable"
-          :loading-action="loadingAction"
-          @action="handleFooterAction"
-        />
-      </form>
-    </main>
-  </div>
+      <FormFooter
+        v-model="closeAfterSave"
+        :actions="footerActions"
+        :labels="footerLabels"
+        :dirty="dirty"
+        :close-after-save="editable"
+        :loading-action="loadingAction"
+        @action="handleFooterAction"
+      />
+    </form>
+  </EntityFormShell>
 </template>

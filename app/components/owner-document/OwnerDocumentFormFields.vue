@@ -2,6 +2,7 @@
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { OwnerDocumentDraft, OwnerDocumentKind } from '~/lib/owner-document/forms'
 import { computed } from 'vue'
+import { OWNER_DOCUMENT_META } from '~/lib/owner-document/page'
 
 type FieldType = 'text' | 'date' | 'month' | 'number' | 'lookup' | 'select' | 'readonly' | 'textarea'
 type LookupKey = 'projectId' | 'supplierId' | 'contractId' | 'crewId'
@@ -21,6 +22,7 @@ const props = defineProps<{
   kind: OwnerDocumentKind
   draft: OwnerDocumentDraft
   fieldErrors: Record<string, string>
+  eligibleContractCount?: number | null
   readonly?: boolean
   fetchProjects: (keyword: string) => Promise<LookupOption[]>
   fetchSuppliers: (keyword: string) => Promise<LookupOption[]>
@@ -197,6 +199,21 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
 }
 
 const fields = computed(() => FIELDS[props.kind])
+const meta = computed(() => OWNER_DOCUMENT_META[props.kind])
+const basicSectionLabel = computed(() =>
+  meta.value.sections.find(section => section.key === 'basic')?.label ?? '基本信息',
+)
+const hasNoEligibleContract = computed(() =>
+  Boolean(props.draft.projectId) && props.eligibleContractCount === 0,
+)
+const contractEmptyMessage = computed(() => {
+  if (props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty') {
+    return props.draft.supplierId
+      ? '当前项目与分供方暂无可选的分包合同，请先建立对应合同。'
+      : '当前项目暂无可选的分包合同，请先建立对应合同。'
+  }
+  return '当前项目暂无可选的施工合同，请先建立对应合同。'
+})
 
 function patch(key: string, value: unknown) {
   emit('patch', { [key]: value })
@@ -213,6 +230,14 @@ function inputNumber(event: Event): number | null {
     return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function errorId(field: string): string {
+  return `owner-document-${props.kind}-${field}-error`
+}
+
+function errorDescriptionId(field: string): string | undefined {
+  return props.fieldErrors[field] ? errorId(field) : undefined
 }
 
 function lookupFor(key: string) {
@@ -244,7 +269,7 @@ function readonlyValue(field: FieldDef): string {
 
 <template>
   <section id="section-basic" class="panel scroll-mt-4 p-4">
-    <SectionHeader title="基本信息" />
+    <SectionHeader :title="basicSectionLabel" />
     <div class="form-fields-grid mt-3">
       <template v-for="field in fields" :key="field.key">
         <div v-if="field.type === 'lookup'" class="field-block">
@@ -253,12 +278,25 @@ function readonlyValue(field: FieldDef): string {
             :data-testid="`owner-document-${field.key}`"
             :model-value="typeof draft[field.key] === 'string' ? draft[field.key] as string : null"
             :fetch="lookupFor(field.key)"
+            :field="field.key"
+            :invalid="Boolean(fieldErrors[field.key])"
+            :description-id="errorDescriptionId(field.key)"
             :recent-key="`owner-document-${kind}-${field.key}`"
             :disabled-reason="disabledReason(field.key)"
             :placeholder="`检索${field.label}`"
             @update:model-value="patch(field.key, $event)"
           />
-          <span v-if="fieldErrors[field.key]" class="field-error">{{ fieldErrors[field.key] }}</span>
+          <span v-if="fieldErrors[field.key]" :id="errorId(field.key)" class="field-error">{{ fieldErrors[field.key] }}</span>
+          <div
+            v-if="field.key === 'contractId' && hasNoEligibleContract"
+            role="status"
+            class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-12px text-danger"
+          >
+            <span>{{ contractEmptyMessage }}</span>
+            <NuxtLink :to="meta.contractListPath" class="font-700 text-brand-deep underline">
+              前往{{ meta.contractListLabel }}
+            </NuxtLink>
+          </div>
         </div>
 
         <div v-else-if="field.type === 'select'" class="field-block">
@@ -270,9 +308,12 @@ function readonlyValue(field: FieldDef): string {
             :disabled="readonly"
             full-width
             :aria-label="field.label"
+            :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
+            :aria-describedby="errorDescriptionId(field.key)"
+            :data-field="field.key"
             @update:model-value="patch(field.key, $event)"
           />
-          <span v-if="fieldErrors[field.key]" class="field-error">{{ fieldErrors[field.key] }}</span>
+          <span v-if="fieldErrors[field.key]" :id="errorId(field.key)" class="field-error">{{ fieldErrors[field.key] }}</span>
         </div>
 
         <div v-else-if="field.type === 'readonly'" class="field-block">
@@ -300,6 +341,9 @@ function readonlyValue(field: FieldDef): string {
             class="field-input w-full"
             :disabled="readonly"
             :placeholder="field.placeholder"
+            :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
+            :aria-describedby="errorDescriptionId(field.key)"
+            :data-field="field.key"
             @input="patch(field.key, inputValue($event))"
           />
           <input
@@ -313,9 +357,12 @@ function readonlyValue(field: FieldDef): string {
             :class="{ 'font-mono': field.type === 'number' || field.type === 'date' || field.type === 'month' || field.key === 'no' }"
             :disabled="readonly"
             :placeholder="field.placeholder"
+            :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
+            :aria-describedby="errorDescriptionId(field.key)"
+            :data-field="field.key"
             @input="patch(field.key, field.type === 'number' ? inputNumber($event) : inputValue($event))"
           >
-          <span v-if="fieldErrors[field.key]" class="field-error">{{ fieldErrors[field.key] }}</span>
+          <span v-if="fieldErrors[field.key]" :id="errorId(field.key)" class="field-error">{{ fieldErrors[field.key] }}</span>
         </label>
       </template>
     </div>
