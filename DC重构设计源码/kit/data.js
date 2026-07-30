@@ -1348,3 +1348,36 @@
   // 指派粒度（户详情复选树用）：个人=可下钻到成员逐人勾选；班组=只能整组指派。泥水按个人分发（grill 定稿）。
   ((d && d.crews) || []).forEach((c) => { if (c.assignLevel == null) c.assignLevel = /泥水/.test(c.trade || c.name) ? "个人" : "班组"; });
 })();
+
+// #244 设计稿回填：排程与工程量配置域三仓的代表性演示数据。
+// 每仓 1~2 行，量级与写法风格贴近真实业务，值全部匿名虚构（ADR 0014 §9）。
+(function () {
+  const d = window.KIT_DATA;
+  if (!d) return;
+
+  d.processLibraries = d.processLibraries || [
+    { id: "pl1", code: "STD-HOME", name: "户内装修标准工序库", version: 2, scope: "户内装修",
+      status: "已发布", usedByGroups: 3, updatedAt: "2026-06-18",
+      tasks: ["放线", "给排水", "电气配管", "墙砖粘贴", "地砖铺贴", "一遍腻子", "二遍腻子", "乳胶漆", "木门安装", "洁具安装", "开荒保洁"],
+      note: "第 2 版把「电气配管」从墙砖之后前移到给排水之后（现场返工反馈）。" },
+    { id: "pl2", code: "STD-PUB", name: "公区装修标准工序库", version: 1, scope: "公区装修",
+      status: "草稿", usedByGroups: 0, updatedAt: "2026-06-26",
+      tasks: ["放线", "墙面基层", "石材干挂", "吊顶龙骨", "吊顶封板", "灯具安装"], note: "" },
+  ];
+
+  d.quantityRegions = d.quantityRegions || [
+    { id: "qr1", projectName: "合和新城·3 号楼", building: "3 号楼", floorFrom: 1, floorTo: 18,
+      unitsPerFloor: 8, unitRule: "楼层+序号（如 0301）", unitPrefix: "", note: "屋面层不计入户数，单独作公区范围。" },
+  ];
+
+  d.houseTypeTemplates = d.houseTypeTemplates || [
+    { id: "htt1", projectName: "合和新城·3 号楼", code: "A", area: 89.6, borrowFrom: "不借用",
+      rooms: ["客厅", "主卧", "次卧", "厨房", "卫生间", "阳台"],
+      lines: ["泥水|墙砖粘贴|48.6|50|m²", "泥水|地砖铺贴|28.4|29|m²", "油漆|一遍腻子|92.4|95|m²", "油漆|二遍腻子|92.4|95|m²"],
+      note: "" },
+    { id: "htt2", projectName: "合和新城·3 号楼", code: "B", area: 76.2, borrowFrom: "A",
+      rooms: ["客厅", "主卧", "厨房", "卫生间", "阳台"],
+      lines: ["泥水|墙砖粘贴|41.2|42|m²", "泥水|地砖铺贴|24.1|25|m²", "油漆|一遍腻子|78.5|80|m²"],
+      note: "由 A 户型快照复制后删掉次卧，之后与 A 互不影响。" },
+  ];
+})();

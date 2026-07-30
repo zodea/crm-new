@@ -37,9 +37,13 @@ export function renderCountsBlock(counts) {
   ].join('\n')
 }
 
-/** 读出文档里两个标记之间的正文（不含标记行本身）。 */
+/**
+ * 读出文档里两个标记之间的正文（不含标记行本身）。
+ * 行尾统一归一为 LF：git 在 Windows 检出时会把文件转成 CRLF，
+ * 而 renderCountsBlock 产出 LF —— 不归一会让内容相同的块被判为不等。
+ */
 export function readCountsBlock(docPath = STATUS_DOC_PATH) {
-  const source = readFileSync(docPath, 'utf8')
+  const source = readFileSync(docPath, 'utf8').replaceAll('\r\n', '\n')
   const from = source.indexOf(COVERAGE_BLOCK_BEGIN)
   const to = source.indexOf(COVERAGE_BLOCK_END)
   if (from < 0 || to < 0 || to < from)

@@ -1,15 +1,15 @@
 {
   "$schema": "本文件由 pnpm design:sync-coverage 生成；status 只允许 covered / design-pending / retired。",
   "counts": {
-    "designPageRoutes": 62,
-    "designFormRoutes": 37,
+    "designPageRoutes": 69,
+    "designFormRoutes": 40,
     "designNavGroups": 9,
     "designNavLeaves": 50,
-    "designMountedScreens": 78,
+    "designMountedScreens": 86,
     "appPageFiles": 126,
     "appNavLeaves": 50,
-    "covered": 116,
-    "designPending": 10,
+    "covered": 126,
+    "designPending": 0,
     "retired": 0,
     "navTitleVariants": 6
   },
@@ -186,10 +186,8 @@
     },
     {
       "appRoute": "/export/config/:jobId",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "设计稿只有 KitUI.exportModal 弹窗；ADR 0004 要求\"需目录分类→独立配置页签\"",
-      "issue": 205
+      "designRoute": "exportConfig",
+      "status": "covered"
     },
     {
       "appRoute": "/finance/billing",
@@ -308,10 +306,8 @@
     },
     {
       "appRoute": "/import/mapping/:entity",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "设计稿只有 KitUI.importModal 弹窗；ADR 0005 要求独立页签三步向导",
-      "issue": 205
+      "designRoute": "importMapping",
+      "status": "covered"
     },
     {
       "appRoute": "/material/arrival",
@@ -538,10 +534,8 @@
     },
     {
       "appRoute": "/project/:pid/supplier/import",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "项目×分供方导入向导（选择文件→自动分类与人工调整→确认生成）在设计稿无屏",
-      "issue": 192
+      "designRoute": "projectSupplierImport",
+      "status": "covered"
     },
     {
       "appRoute": "/project/form/:id?",
@@ -590,10 +584,8 @@
     },
     {
       "appRoute": "/schedule/:pid/bind/:gid",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "暂估排程绑定施工合同复核（ADR 0017 楼栋覆盖校验与数量差异）在设计稿无屏",
-      "issue": 191
+      "designRoute": "scheduleBind",
+      "status": "covered"
     },
     {
       "appRoute": "/schedule/new",
@@ -602,17 +594,13 @@
     },
     {
       "appRoute": "/schedule/process-library",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "标准工序库（ADR 0018 不可变版本 + 置灰保留前置关系）在设计稿无任何屏",
-      "issue": 191
+      "designRoute": "processLibrary",
+      "status": "covered"
     },
     {
       "appRoute": "/schedule/process-library/form",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "标准工序库版本编辑（甘特与精确表格共用同一份任务草稿）在设计稿无整页表单",
-      "issue": 191
+      "designRoute": "processLibraryForm",
+      "status": "covered"
     },
     {
       "appRoute": "/settings/ocr",
@@ -645,17 +633,13 @@
     },
     {
       "appRoute": "/subcontract/attendance",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "工资考勤网格（工人×日期矩阵 + 封锁工人）在设计稿无屏",
-      "issue": 198
+      "designRoute": "attendance",
+      "status": "covered"
     },
     {
       "appRoute": "/subcontract/daywork",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "逐日签工录入（C2 格式族签工闭环）在设计稿无屏",
-      "issue": 198
+      "designRoute": "daywork",
+      "status": "covered"
     },
     {
       "appRoute": "/subcontract/payroll",
@@ -679,17 +663,13 @@
     },
     {
       "appRoute": "/subcontract/quantity/region",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "楼栋→楼层→户区域配置整页表单在设计稿无落点（无合同项目的区域配置）",
-      "issue": 198
+      "designRoute": "quantityRegionForm",
+      "status": "covered"
     },
     {
       "appRoute": "/subcontract/quantity/template",
-      "designRoute": null,
-      "status": "design-pending",
-      "reason": "户型模板在设计稿仍是大 Dialog，实现已按 ADR 0014 与 #198 定稿迁为独立路由整页表单",
-      "issue": 198
+      "designRoute": "quantityTemplateForm",
+      "status": "covered"
     }
   ],
   "designOnly": [],

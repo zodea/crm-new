@@ -98,6 +98,9 @@
       <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="BaseFormsPreload" from="./kit/forms/BaseForms.jsx" hint-size="0,0"></x-import>
       </sc-if>
+      <sc-if value="{{ false }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleFormsPreload" from="./kit/forms/ScheduleForms.jsx" hint-size="0,0"></x-import>
+      </sc-if>
       <sc-if value="{{ isEntityForm }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="EntityFormScreen" from="./kit/FormPage.jsx" route="{{ routeName }}" params="{{ params }}" navigate="{{ navigate }}" hint-size="100%,600px"></x-import>
       </sc-if>
@@ -287,6 +290,28 @@
       <sc-if value="{{ isPrice }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="PriceScreen" from="./kit/PriceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" hint-size="100%,500px"></x-import>
       </sc-if>
+      <!-- #244 设计稿回填：实现已上线但设计稿此前无落点的 7 个屏 -->
+      <sc-if value="{{ isProcessLibrary }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleProcessLibraryScreen" from="./kit/ScheduleProcessLibraryScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isScheduleBind }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ScheduleBindScreen" from="./kit/ScheduleBindScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isAttendance }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="AttendanceScreen" from="./kit/AttendanceScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isDaywork }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="DayworkScreen" from="./kit/DayworkScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isExportConfig }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ExportConfigScreen" from="./kit/ExportConfigScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isImportMapping }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ImportMappingScreen" from="./kit/ImportMappingScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
+      <sc-if value="{{ isProjectSupplierImport }}" hint-placeholder-val="{{ false }}">
+        <x-import component-from-global-scope="ProjectSupplierImportScreen" from="./kit/ProjectSupplierImportScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
+      </sc-if>
     </main>
   </div>
 </div>
@@ -357,6 +382,14 @@ const PAGE = {
   payroll:       { title: "工资核算",  subtitle: "项目 → 班组瀑布 → 请款簿总表（负责人制）" },
   payrollDetail: { title: "请款簿",  subtitle: "核对两步流 · A4 单据（格式族 A/B/C1/C2）" },
   price:         { title: "单价对比",  subtitle: "材料价格分析" },
+  // #244 设计稿回填：以下 7 屏对应实现已上线、设计稿此前无落点的生产路由
+  processLibrary:{ title: "标准工序库", subtitle: "分包及人工 · 不可变版本 · 建组冻结快照" },
+  scheduleBind:  { title: "绑定施工合同", subtitle: "暂估排程复核 · 楼栋覆盖 / 分项映射 / 数量差异" },
+  attendance:    { title: "工资考勤",  subtitle: "分包及人工 · 月考勤 · 已发放封锁" },
+  daywork:       { title: "逐日签工",  subtitle: "分包及人工 · 签字后方参与工资取数" },
+  exportConfig:  { title: "导出配置",  subtitle: "需目录分类 · 范围/分类/格式/保存目标" },
+  importMapping: { title: "导入字段匹配", subtitle: "模板驱动 · 行级拒绝清单不静默丢弃" },
+  projectSupplierImport: { title: "导入合作分供方", subtitle: "自动分类 · 人工确认新建 · 重复关系跳过" },
 };
 
 class Component extends DCLogic {
@@ -817,6 +850,13 @@ class Component extends DCLogic {
       isPayroll:       route === "payroll",
       isPayrollDetail: route === "payrollDetail",
       isPrice:         route === "price",
+      isProcessLibrary:        route === "processLibrary",
+      isScheduleBind:          route === "scheduleBind",
+      isAttendance:            route === "attendance",
+      isDaywork:               route === "daywork",
+      isExportConfig:          route === "exportConfig",
+      isImportMapping:         route === "importMapping",
+      isProjectSupplierImport: route === "projectSupplierImport",
       // 顶栏日期按实际当天渲染；此前硬编码为某次演示当天，会被误当规格
       today:           (() => {
         const now = new Date();

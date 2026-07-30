@@ -22,7 +22,7 @@
 - **设计稿有、实现没有**（本文原有口径「未实现」）。
 - **实现有、设计稿没有**（`design-pending`）。实现跑到设计稿前面同样是缺口 —— 它让 ADR 0013 第 3 级权威源失效，评审时无据可对。
 
-三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**99** 是设计稿可达业务屏幕（62 常规 + 37 整页表单）。#181 / #206 正文的 115 是过期数字。
+三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**109** 是设计稿可达业务屏幕（69 常规 + 40 整页表单，#244 回填 7 屏 + 3 表单后的口径，此前为 99）。#181 / #206 正文的 115 是过期数字。
 
 ## 2. 当前总数
 
@@ -31,13 +31,13 @@
 <!-- design-coverage:begin -->
 | 口径 | 数量 |
 | --- | ---: |
-| 设计稿 PAGE 路由 | 62 |
-| 设计稿整页表单路由 | 37 |
+| 设计稿 PAGE 路由 | 69 |
+| 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
 | 实现生产路由（排除 dev） | 126 |
 | 实现侧栏叶子 | 50 |
-| 已覆盖 | 116 |
-| 待补设计（实现有、设计稿没有） | 10 |
+| 已覆盖 | 126 |
+| 待补设计（实现有、设计稿没有） | 0 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -56,18 +56,24 @@
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
 
-## 3b. 实现有、设计稿没有（待补设计 10 条）
+## 3b. 实现有、设计稿没有
 
-由 [#244](https://github.com/zodea/crm-new/issues/244) 统一补齐；每条的原因与归属票在 `design-coverage.json` 的 `screenParity` 内登记，缺原因或缺归属票会让契约测试变红。
+**当前为 0。** [#244](https://github.com/zodea/crm-new/issues/244) 已把此前 10 条无落点的生产路由全部补进设计源码：
 
-| 生产路由 | 缺什么 | 归属票 |
+| 生产路由 | 设计稿落点 | 依据 |
 | --- | --- | --- |
-| `/schedule/process-library` · `/schedule/process-library/form` | 标准工序库列表与版本编辑（ADR 0018） | [#191](https://github.com/zodea/crm-new/issues/191) |
-| `/schedule/:pid/bind/:gid` | 暂估排程绑定施工合同复核（ADR 0017） | [#191](https://github.com/zodea/crm-new/issues/191) |
-| `/subcontract/attendance` · `/subcontract/daywork` | 工资考勤网格、逐日签工录入 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| `/subcontract/quantity/region` · `/subcontract/quantity/template` | 区域配置整页表单；户型模板在设计稿仍是大 Dialog，违反 ADR 0014 | [#198](https://github.com/zodea/crm-new/issues/198) |
-| `/export/config/:jobId` · `/import/mapping/:entity` | 设计稿只有 `KitUI.exportModal` / `importModal` 弹窗，违反 ADR 0004 / 0005 | [#205](https://github.com/zodea/crm-new/issues/205) |
-| `/project/:pid/supplier/import` | 项目×分供方导入向导 | [#192](https://github.com/zodea/crm-new/issues/192) |
+| `/schedule/process-library` | `processLibrary`（`ScheduleProcessLibraryScreen.jsx`） | ADR 0018 不可变版本、建组冻结快照 |
+| `/schedule/process-library/form` | `processLibraryForm`（`kit/forms/ScheduleForms.jsx`） | 已发布版本只读，沿用原 `code` 新建下一版 |
+| `/schedule/:pid/bind/:gid` | `scheduleBind`（`ScheduleBindScreen.jsx`） | ADR 0017 楼栋覆盖 / 分项映射 / 数量差异三段校验，未覆盖楼栋阻断绑定 |
+| `/subcontract/attendance` | `attendance`（`AttendanceScreen.jsx`） | 工人 × 日期矩阵、已发放月份封锁、矩阵只在自身容器横滚 |
+| `/subcontract/daywork` | `daywork`（`DayworkScreen.jsx`） | 仅已签字记录参与 C2 取数 |
+| `/subcontract/quantity/region` | `quantityRegionForm` | 楼栋→楼层区间→户号规则，无合同项目也可先配 |
+| `/subcontract/quantity/template` | `quantityTemplateForm` | 按 ADR 0014 + #198 从大 Dialog 迁为独立路由整页表单 |
+| `/export/config/:jobId` | `exportConfig`（`ExportConfigScreen.jsx`） | ADR 0004 独立配置页签 + 三步步骤条，写盘 ≠ 业务完成 |
+| `/import/mapping/:entity` | `importMapping`（`ImportMappingScreen.jsx`） | ADR 0005 三步向导 + 行级拒绝清单不静默丢弃 |
+| `/project/:pid/supplier/import` | `projectSupplierImport`（`ProjectSupplierImportScreen.jsx`） | 重复关系跳过、新分供方须人工指定七类后才建 |
+
+新增三仓 `processLibraries` / `quantityRegions` / `houseTypeTemplates` 已入 `AppData.jsx` 的 `PLAIN_COLLS`，演示数据在 `kit/data.js`（值全部匿名虚构，ADR 0014 §9）。
 
 ## 4. 已搭但未闭环
 
