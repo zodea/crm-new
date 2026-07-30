@@ -104,7 +104,9 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | Customer | `customers` | `id` | `base-customer.md` |
 | Supplier | `suppliers` | `id` | `base-supplier.md` |
 | SupplierCredential | `supplier_credentials` | `id` | `base-supplier.md` |
-| SupplierCredentialRequirement | `supplier_credential_requirements` | `id` | `base-supplier.md`（#13 目标模型，待迁移落地） |
+| SupplierCredentialRequirement | `supplier_credential_requirements` | `id` | `base-supplier.md`（迁移 v36） |
+| SupplierCredentialAudit | `supplier_credential_audits` | `id` | `base-supplier.md`（迁移 v36，脱敏审计） |
+| SupplierAudit | `supplier_audits` | `id` | `base-supplier.md`（迁移 v36，脱敏审计） |
 | FileRef | `file_refs` | `id` | 共用 |
 | FilePayload | `file_payloads` | `fileRefId` | 共用（附件正文，仅按需读取） |
 | BankCode | `bank_codes` | `id` | `base-worker.md` §五（银行行号字典，内置 seed，无外键） |
@@ -121,15 +123,25 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 | `taxpayer_type` | 纳税人类型 | 选填，默认“未核验”；经官方查询或人工资料确认后填写，“未查到”不得自动推导为“小规模纳税人” |
 | `credential_status` | 资料齐全度与人工核验结论 | `incomplete` 缺失/过期；`reviewing` 齐全待核验；`qualified` 人工合格；`rejected` 人工退回 |
 
-Issue #13 目标字段补充 `credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''`：人工通过记录时间和可选备注，人工退回时备注必填；操作人字段待账号体系落地后补充。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。
+`credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''` 是供应商级人工核验凭证：人工通过记录时间和可选备注，人工退回时备注必填；操作人字段待账号体系落地后补充。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。迁移 v36 会把没有该级凭证的旧 `qualified` / `rejected` 按真实文件重新计算，不用单份证照的 `verified_at` 冒充整户审核。
 
 广东省内分供方可从应用打开[广东省电子税务局一般纳税人资格查询](https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx)辅助核验。应用只负责复制税号、打开官网及记录人工确认结果；验证码由用户在官网完成，不爬取页面、不绕过验证码，也不把该页面当作稳定 API。
 
-`supplier_credential_requirements` 用于持久化“分供方 × 证照类别”的要求，而 `supplier_credentials` 只保存实际已收到的文件。目标字段至少包含 `supplier_id`、`category`、`requirement`（`not_applicable | optional | required`）、`reason`、`updated_at`，并对 `(supplier_id, category)` 唯一。默认规则：营业执照、法人身份证、银行账户资料为 `required`；资质证书、品牌授权书/证明为 `not_applicable`；其余资料为 `optional`。只有被明确改为 `required` 的条件资料，缺失或过期时才影响资料齐全度。
+`supplier_credential_requirements` 用于持久化“分供方 × 证照类别”的要求，而 `supplier_credentials` 只保存实际已收到的文件。前者保存 `supplier_id`、canonical `category`、`requirement`（`not_applicable | optional | required`）、`reason`、`updated_at`、`deleted_at`，并对活跃 `(supplier_id, category)` 唯一。默认规则：营业执照、法人身份证、银行账户资料为 `required`；签约代表身份证、资质证书、品牌授权书为 `not_applicable`；其余资料为 `optional`。只有被明确改为 `required` 的条件资料，缺失或过期时才影响资料齐全度。
+
+迁移 v36 为 `supplier_credentials` 增加 `file_ref_id`、`valid_from`、`expires_at`、`long_term`、`ocr_confirmed_result`、`ocr_confirmed_at`、`ocr_review_status`。真实原件以有效的 `file_refs(owner_type='supplier_credential', owner_id=credential.id)` + `file_payloads` 保存，`file_ref_id` 是证照元数据到该原件的唯一活跃关联。迁移会把 legacy 非空 `supplier_credentials.file_path` 回填为 `file_ref` 以保留迁移线索，但路径本身不授予读取权限、也不计入齐全度；旧记录必须由用户重新选择原件上传，只有持久化正文存在时才算“已收到”。`ocr_result` 与置信度在识别成功时立即保存并标记 `pending`；“稍后核对”或重启不丢失。最终确认另存于 `ocr_confirmed_result` / `ocr_confirmed_at` 并标记 `confirmed`，不得覆盖原始候选或上一次确认痕迹。
+
+有效期的“已过期 / 30 天内临期”统一按 `Asia/Shanghai` 业务日期判断，避免 UTC 日界线造成提前或延后一天。证照新增、OCR 核对、独立有效期编辑、删除和撤回写入 `supplier_credential_audits`：该表只保存动作、分类变化、变更字段名、有效期前后值与置信度，不保存 OCR 原文或人工确认正文；删除/撤回按明确的证照 ID 与 `deleted_at` 在同一事务恢复。上述动作不得使用通用 `operation_logs` 对 `supplier_credentials` 或 `suppliers` 做整行前后快照，避免复制 OCR 原文、税号和银行账号。
+
+供应商新增、编辑、导入、删除/撤回、人工资料核验与纳税人核验统一写 `supplier_audits`。该表只保存 `action`、规范化 `outcome`、`source_category`、变更字段名、备注是否存在和时间，不保存税号、银行账号、核验备注正文或外部来源原文。供应商与证照即使误走通用日志，快照也必须先按安全字段白名单脱敏；迁移 v36 会逐行清洗历史 `operation_logs` 中 `suppliers` / `supplier_credentials` 的敏感快照，坏 JSON 安全置空而不阻断升级。
+
+迁移 v36 创建严格限定关键列的 `AFTER UPDATE OF name, unique_code, tax_no, legal_rep, address, bank, bank_account` 触发器。只有这些字段的 `OLD/NEW` 实际不同且旧状态为人工 `qualified/rejected` 时，才清除人工凭证并按真实原件、逐类别要求和上海业务日回算 `incomplete/reviewing`；纳税人核验、备注和 `updated_at` 更新不得误触发。列表每次加载前还会按当前上海业务日批量检查人工结论，只让已经缺失/过期或无有效凭证的历史人工态失效，仍有效的人工结论保持不变。除 `reviewCredentials` 外，表单、store 和导入入口均不得写入 `qualified/rejected` 或伪造审核时间/备注。
+
+同一迁移为纳税人辅助核验增加 `taxpayer_verification_status`（`not_checked | confirmed_general | not_found | manually_confirmed`）、`taxpayer_verification_source`、`taxpayer_verified_at`、`taxpayer_verification_note`；`not_found` 必须保持 `taxpayer_type='未核验'`，不得推导为小规模纳税人。
 
 “银行账户资料”是统一业务类别，兼容“银行开户许可证 / 开户许可证 / 基本存款账户信息 / 基本存款账户信息表”等历史名称；“品牌授权书 / 品牌授权证明”同样按一个类别读取，迁移不得造成附件丢失或误报缺失。
 
-已人工合格后，如必需资料的文件、分类、有效期、要求状态或相关 OCR 确认值发生变化，原核验结论必须失效并按规则重算；只修改可选资料不撤销合格。
+已人工合格后，仅当必需资料的文件、最终分类、有效期、要求状态或确认后采用的相关主数据实际发生变化时，原核验结论才失效并按规则重算；重新识别得到待核对候选、置信度变化和重复保存相同规范化值不得单独撤销合格。
 
 ### 2.2 项目关联实体
 
@@ -801,6 +813,8 @@ projects += (
 
 > F1 表结构由迁移 v19 落地。旧客户名、工人当前项目名仅在唯一匹配时转为真实 ID；分供方旧层级及歧义/缺失映射写入 `reconciliation_issues` 后删除停止写入的旧列。迁移对账可能尚无可确认的项目，因此该表的 `project_id` 允许为空，并以实体定位列保存来源。
 
+> 分供方证照审核底座由迁移 v36 补齐；其新增列与要求表见 §2.1，不能从 v19 的 F1 通用表单批次反推证照闭环。
+
 #### 2.10.3 F2 合同与支出结算
 
 ```sql
@@ -1158,6 +1172,10 @@ penalty_settlement_deductions(
 | `project_suppliers` | `projectId` | `projects.id` | N:1 | 项目×分供方关联 |
 | `project_suppliers` | `supplierId` | `suppliers.id` | N:1 | |
 | `supplier_credentials` | `supplierId` | `suppliers.id` | N:1 | 分供方证照 |
+| `supplier_credentials` | `file_ref_id` | `file_refs.id` | 0..1:1 | 证照元数据 → 唯一活跃原件 |
+| `supplier_credential_requirements` | `supplier_id` | `suppliers.id` | N:1 | 分供方逐类别要求覆盖 |
+| `supplier_credential_audits` | `supplier_id` / `credential_id` | `suppliers.id` / `supplier_credentials.id` | N:1 | 不含 OCR 正文的证照动作审计 |
+| `supplier_audits` | `supplier_id` | `suppliers.id` | N:1 | 不含敏感字段正文的供应商动作审计 |
 | `settlements` | `projectSupplierId` | `project_suppliers.id` | 1:1 | 结算（每个关联最多一条） |
 | `phase_tasks` | `projectId` | `projects.id` | N:1 | 阶段任务 |
 
@@ -1610,6 +1628,14 @@ CREATE INDEX idx_subcontract_changes_project ON subcontract_change_orders(projec
 
 -- 证照查询
 CREATE INDEX idx_supplier_credentials_sup ON supplier_credentials(supplierId);
+CREATE INDEX idx_supplier_credential_requirements_supplier
+  ON supplier_credential_requirements(supplier_id);
+CREATE UNIQUE INDEX uq_supplier_credential_requirement
+  ON supplier_credential_requirements(supplier_id, category)
+  WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX uq_supplier_credential_file_ref
+  ON supplier_credentials(file_ref_id)
+  WHERE file_ref_id IS NOT NULL AND deleted_at IS NULL;
 
 -- 文件多态查询
 CREATE INDEX idx_file_refs_owner ON file_refs(owner_type, owner_id);

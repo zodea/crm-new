@@ -8,7 +8,7 @@ import {
 } from '~/lib/supplier/import'
 
 describe('分供方导入行归一', () => {
-  it('把中文资料状态、别名文本和数值文本转为 store 可写数据', () => {
+  it('忽略外部资料状态，只归一可导入的主数据字段', () => {
     expect(normalizeSupplierImportRow({
       name: '  华东建材有限公司  ',
       supplierCategory: '专业分包商',
@@ -20,21 +20,25 @@ describe('分供方导入行归一', () => {
       name: '华东建材有限公司',
       externalRef: 'OLD-SUP-001',
       supplierCategory: '专业分包商',
-      credentialStatus: 'qualified',
       aliases: ['华东', '东建', 'HD', '板东'],
       registeredCapital: 280.5,
     })
+    expect(normalizeSupplierImportRow({
+      name: '华东建材有限公司',
+      credentialStatus: '合格',
+    })).not.toHaveProperty('credentialStatus')
   })
 
-  it('非法类别归一为其他，空资料状态回落为资料缺失', () => {
-    expect(normalizeSupplierImportRow({
+  it('非法类别归一为其他，外部资料状态不进入自动状态机', () => {
+    const normalized = normalizeSupplierImportRow({
       name: '测试供应方',
       supplierCategory: '未知类别',
       credentialStatus: '',
-    })).toMatchObject({
-      supplierCategory: '其他',
-      credentialStatus: 'incomplete',
     })
+    expect(normalized).toMatchObject({
+      supplierCategory: '其他',
+    })
+    expect(normalized).not.toHaveProperty('credentialStatus')
   })
 
   it('未映射的可选字段保持缺席，供重导更新保留既有资料', () => {

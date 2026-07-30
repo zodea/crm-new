@@ -112,9 +112,18 @@ interface SupplierCredential {
   supplierId: string              // → Supplier.id
   category: CredentialCategory
   fileName: string
-  filePath: string                // Tauri 本地路径
+  filePath: string                // legacy 迁移路径留痕（证照域不读取）
+  fileRefId: string | null
+  fileSize: number
+  mimeType: string
+  hasAccessibleFile: boolean      // 已持久化 payload；路径本身不算可访问
+  validFrom: string
+  expiresAt: string
+  longTerm: boolean
   ocrResult: Record<string, unknown>  // OCR 识别回填字段
   ocrConfidence: number | null    // 识别置信度
+  ocrConfirmedResult: Record<string, unknown>
+  ocrConfirmedAt: string | null
   verifiedAt: string | null       // 审核通过时间
   addedAt: string
 }
@@ -276,6 +285,10 @@ Tab 3 和 Tab 4/5/6 的视角不同：Tab 3 按项目维度，Tab 4/5/6 按单�
 ### credentialStatus 流转
 
 > ✅ Issue #13 已确认：资料齐全不等于合格，必须经过人工核验。内部值 `reviewing` 的界面文案统一显示“齐全待核验”。
+>
+> 数据底座已由迁移 v36 落地：证照原件只有在有效 `file_refs + file_payloads` 下才算已收到；legacy 桌面路径只保留迁移线索，不授予应用读取权限，用户必须重新选择原件上传。原始 OCR、待核对状态与人工确认值分列保存，“稍后核对”或重启后仍可继续；OCR 类别与当前类别冲突时默认保留当前类别并记录决定。OCR 更新只写不含正文的专用脱敏审计；逐类别要求、按 `Asia/Shanghai` 业务日期计算的有效期和供应商级人工核验凭证参与同一状态机。存量 `qualified/rejected` 没有供应商级凭证时会重算为 `incomplete/reviewing`。
+
+> 供应商主数据、人工资料核验和纳税人核验只写 `supplier_audits` 脱敏审计，记录动作、结果、来源类别、变更字段名、备注是否存在和时间，不复制税号、银行账号、OCR 或备注正文。关键工商/银行字段由数据库触发器统一使旧人工结论失效；列表加载还会按当天上海业务日淘汰已经过期的 `qualified`。普通表单、store 和导入不能直接制造 `qualified/rejected`。
 
 | 动作 | 结果 |
 |---|---|

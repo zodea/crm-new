@@ -103,6 +103,7 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
     { column: 'floor_id', table: 'floors' },
   ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
+  supplier_credential_requirements: [{ column: 'supplier_id', table: 'suppliers' }],
   project_suppliers: [
     { column: 'project_id', table: 'projects' },
     { column: 'supplier_id', table: 'suppliers' },
@@ -318,6 +319,8 @@ export const INFRA_TABLES = [
   'reconciliation_issues',
   'contract_legacy_mappings',
   'ocr_settings',
+  'supplier_credential_audits',
+  'supplier_audits',
 ]
 
 function assertBusinessTable(table: string): void {
@@ -441,9 +444,66 @@ export interface OperationLogInput {
   operator?: string
 }
 
+function operationSnapshotForStorage(
+  table: string,
+  snapshot: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!snapshot)
+    return null
+  if (
+    table !== 'suppliers'
+    && table !== 'supplier_credentials'
+    && !(table === 'file_refs' && snapshot.owner_type === 'supplier_credential')
+  ) {
+    return snapshot
+  }
+
+  const sanitized: Record<string, unknown> = {}
+  const allowedKeys = table === 'suppliers'
+    ? [
+        'id',
+        'deleted_at',
+        'credential_status',
+        'credential_reviewed_at',
+        'approval_status',
+        'created_at',
+        'updated_at',
+      ]
+    : table === 'supplier_credentials'
+      ? [
+          'id',
+          'supplier_id',
+          'category',
+          'file_ref_id',
+          'valid_from',
+          'expires_at',
+          'long_term',
+          'ocr_confidence',
+          'ocr_confirmed_at',
+          'ocr_review_status',
+          'verified_at',
+          'added_at',
+          'deleted_at',
+        ]
+      : [
+          'id',
+          'owner_type',
+          'owner_id',
+          'uploaded_at',
+          'deleted_at',
+        ]
+  for (const key of allowedKeys) {
+    if (Object.hasOwn(snapshot, key))
+      sanitized[key] = snapshot[key]
+  }
+  return sanitized
+}
+
 /** 落一条操作日志,返回日志 id(撤回句柄)。created_at 显式写毫秒级 ISO,同秒多条日志仍可按时间排序 */
 export async function logOperation(db: SoftDb, input: OperationLogInput): Promise<string> {
   const id = generateId('oplog')
+  const before = operationSnapshotForStorage(input.table, input.before)
+  const after = operationSnapshotForStorage(input.table, input.after)
   await db.execute(
     `INSERT INTO operation_logs (id, table_name, record_id, action, before_data, after_data, operator, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -452,8 +512,8 @@ export async function logOperation(db: SoftDb, input: OperationLogInput): Promis
       input.table,
       input.recordId,
       input.action,
-      input.before ? JSON.stringify(input.before) : null,
-      input.after ? JSON.stringify(input.after) : null,
+      before ? JSON.stringify(before) : null,
+      after ? JSON.stringify(after) : null,
       input.operator ?? '',
       new Date().toISOString(),
     ],

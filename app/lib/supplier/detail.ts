@@ -1,32 +1,22 @@
 import { round2 } from '~/lib/util/number'
 
-export const SUPPLIER_CREDENTIAL_CATEGORIES = [
-  '营业执照',
-  '法人身份证',
-  '银行开户许可证',
-  '签约代表身份证',
-  '品牌授权证明',
-  '合同模板',
-  '完税证明',
-  '过往业绩合同',
-  '施工照片',
-  '其他',
-] as const
-
-export type SupplierCredentialCategory = (typeof SUPPLIER_CREDENTIAL_CATEGORIES)[number]
-
-export const REQUIRED_SUPPLIER_CREDENTIALS: readonly SupplierCredentialCategory[] = [
-  '营业执照',
-  '法人身份证',
-  '银行开户许可证',
-]
-
-export function resolveCredentialStatus(categories: readonly string[]): 'incomplete' | 'qualified' {
-  const present = new Set(categories)
-  return REQUIRED_SUPPLIER_CREDENTIALS.every(category => present.has(category))
-    ? 'qualified'
-    : 'incomplete'
-}
+export {
+  canonicalCredentialCategory,
+  credentialExpiryState,
+  defaultCredentialRequirement,
+  REQUIRED_SUPPLIER_CREDENTIALS,
+  resolveAutomaticCredentialStatus,
+  resolveCredentialStatus,
+  shanghaiBusinessDate,
+  SUPPLIER_CREDENTIAL_CATEGORIES,
+} from '~/lib/supplier/credentials'
+export type {
+  AutomaticCredentialStatus,
+  SupplierCredentialCategory,
+  SupplierCredentialExpiryState,
+  SupplierCredentialRequirement,
+  SupplierCredentialRequirementFact,
+} from '~/lib/supplier/credentials'
 
 export interface SupplierProjectRelation {
   id: string

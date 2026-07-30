@@ -11,6 +11,7 @@ import {
   effectiveMasterDataCapabilities,
   parseCapabilityColumn,
 } from '~/lib/master-data/capabilities'
+import { writeSupplierAudit } from '~/lib/supplier/audit'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 
@@ -76,6 +77,10 @@ export interface SupplierFormDraft extends FormIdentity {
   registeredDate?: string
   address?: string
   taxpayerType?: string
+  taxpayerVerificationStatus?: string
+  taxpayerVerificationSource?: string
+  taxpayerVerifiedAt?: string | null
+  taxpayerVerificationNote?: string
   mainBusiness?: string
   invoiceName?: string
   invoiceAddress?: string
@@ -735,12 +740,34 @@ async function persistFormInExistingTransaction(
   const columns = Object.keys(values)
   let logId: string | null
   if (existing) {
-    logId = await withUpdateLog(tx, config.table, id, () => tx.execute(
-      `UPDATE "${config.table}"
-       SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
-       WHERE id = ?`,
-      [...columns.map(column => values[column]), new Date().toISOString(), id],
-    ))
+    const now = new Date().toISOString()
+    if (config.table === 'suppliers') {
+      const changedFields = columns.filter(column =>
+        JSON.stringify(existing[column]) !== JSON.stringify(values[column]),
+      )
+      await tx.execute(
+        `UPDATE suppliers
+         SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
+         WHERE id = ?`,
+        [...columns.map(column => values[column]), now, id],
+      )
+      logId = await writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'update',
+        outcome: changedFields.length ? 'updated' : 'unchanged',
+        sourceCategory: 'form',
+        changedFields,
+        createdAt: now,
+      })
+    }
+    else {
+      logId = await withUpdateLog(tx, config.table, id, () => tx.execute(
+        `UPDATE "${config.table}"
+         SET ${columns.map(column => `"${column}" = ?`).join(', ')}, updated_at = ?
+         WHERE id = ?`,
+        [...columns.map(column => values[column]), now, id],
+      ))
+    }
   }
   else {
     const now = new Date().toISOString()
@@ -750,7 +777,16 @@ async function persistFormInExistingTransaction(
        VALUES (?, ${columns.map(() => '?').join(', ')}, ?, ?)`,
       [id, ...columns.map(column => values[column]), now, now],
     )
-    logId = await logCreate(tx, config.table, id)
+    logId = config.table === 'suppliers'
+      ? await writeSupplierAudit(tx, {
+          supplierId: id,
+          action: 'create',
+          outcome: 'created',
+          sourceCategory: 'form',
+          changedFields: columns,
+          createdAt: now,
+        })
+      : await logCreate(tx, config.table, id)
   }
 
   const attachmentIds = await applyAttachmentChanges(
@@ -778,6 +814,10 @@ function supplierFromRow(row: Record<string, unknown>): SupplierFormDraft & { id
     registeredDate: rawText(row.registered_date),
     address: rawText(row.address),
     taxpayerType: rawText(row.taxpayer_type),
+    taxpayerVerificationStatus: rawText(row.taxpayer_verification_status) || 'not_checked',
+    taxpayerVerificationSource: rawText(row.taxpayer_verification_source),
+    taxpayerVerifiedAt: row.taxpayer_verified_at == null ? null : rawText(row.taxpayer_verified_at),
+    taxpayerVerificationNote: rawText(row.taxpayer_verification_note),
     mainBusiness: rawText(row.main_business),
     invoiceName: rawText(row.invoice_name),
     invoiceAddress: rawText(row.invoice_address),
@@ -1052,6 +1092,27 @@ export async function deleteMasterDataRecord(
         throw new Error(`班组仍有 ${workers.length} 名在册工人`)
     }
 
+    if (ownerType === 'supplier') {
+      const [supplier] = await tx.select<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM suppliers WHERE id = ?',
+        [id],
+      )
+      if (!supplier || supplier.deleted_at != null)
+        return null
+      const now = new Date().toISOString()
+      await tx.execute(
+        'UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        [now, now, id],
+      )
+      return writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'delete',
+        outcome: 'deleted',
+        sourceCategory: 'form',
+        changedFields: ['deleted_at'],
+        createdAt: now,
+      })
+    }
     return softDelete(tx, MASTER_DATA_TABLES[ownerType], id)
   })
 }
@@ -1060,5 +1121,27 @@ export async function restoreMasterDataRecord(
   ownerType: MasterDataOwnerType,
   id: string,
 ): Promise<string | null> {
-  return withTransaction(tx => restoreRecord(tx, MASTER_DATA_TABLES[ownerType], id))
+  return withTransaction(async (tx) => {
+    if (ownerType !== 'supplier')
+      return restoreRecord(tx, MASTER_DATA_TABLES[ownerType], id)
+    const [supplier] = await tx.select<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM suppliers WHERE id = ?',
+      [id],
+    )
+    if (!supplier || supplier.deleted_at == null)
+      return null
+    const now = new Date().toISOString()
+    await tx.execute(
+      'UPDATE suppliers SET deleted_at = NULL, updated_at = ? WHERE id = ?',
+      [now, id],
+    )
+    return writeSupplierAudit(tx, {
+      supplierId: id,
+      action: 'restore',
+      outcome: 'restored',
+      sourceCategory: 'form',
+      changedFields: ['deleted_at'],
+      createdAt: now,
+    })
+  })
 }

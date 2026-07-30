@@ -7,13 +7,15 @@ import type {
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
-import { execute, select } from '~/lib/db/connection'
-import { createSoftDeleteActions, downstreamImpact as downstreamImpactCounts, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import { select, withTransaction } from '~/lib/db/connection'
+import { downstreamImpact as downstreamImpactCounts, selectVisibleSql } from '~/lib/db/soft-delete'
 import {
   listFormAttachments,
   loadSupplierForm,
   saveSupplierForm,
 } from '~/lib/master-data/forms'
+import { writeSupplierAudit } from '~/lib/supplier/audit'
+import { revalidateSupplierCredentialStatuses } from '~/lib/supplier/credentials'
 import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
@@ -57,6 +59,10 @@ export interface Supplier {
   credentialStatus: string
   credentialReviewedAt: string | null
   credentialReviewNote: string
+  taxpayerVerificationStatus: string
+  taxpayerVerificationSource: string
+  taxpayerVerifiedAt: string | null
+  taxpayerVerificationNote: string
   approvalStatus: string
   source: string
   note: string
@@ -107,6 +113,10 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   credentialStatus: { col: 'credential_status', toBind: d => d.credentialStatus ?? 'incomplete', fromRow: r => (r.credential_status ?? 'incomplete') as string },
   credentialReviewedAt: { col: 'credential_reviewed_at', toBind: d => d.credentialReviewedAt ?? null, fromRow: r => (r.credential_reviewed_at ?? null) as string | null },
   credentialReviewNote: { col: 'credential_review_note', toBind: d => d.credentialReviewNote ?? '', fromRow: r => (r.credential_review_note ?? '') as string },
+  taxpayerVerificationStatus: { col: 'taxpayer_verification_status', toBind: d => d.taxpayerVerificationStatus ?? 'not_checked', fromRow: r => (r.taxpayer_verification_status ?? 'not_checked') as string },
+  taxpayerVerificationSource: { col: 'taxpayer_verification_source', toBind: d => d.taxpayerVerificationSource ?? '', fromRow: r => (r.taxpayer_verification_source ?? '') as string },
+  taxpayerVerifiedAt: { col: 'taxpayer_verified_at', toBind: d => d.taxpayerVerifiedAt ?? null, fromRow: r => (r.taxpayer_verified_at ?? null) as string | null },
+  taxpayerVerificationNote: { col: 'taxpayer_verification_note', toBind: d => d.taxpayerVerificationNote ?? '', fromRow: r => (r.taxpayer_verification_note ?? '') as string },
   approvalStatus: { col: 'approval_status', toBind: d => d.approvalStatus ?? 'draft', fromRow: r => (r.approval_status ?? 'draft') as string },
   source: { col: 'source', toBind: d => d.source ?? 'manual', fromRow: r => (r.source ?? 'manual') as string },
   note: { col: 'note', toBind: d => d.note ?? '', fromRow: r => (r.note ?? '') as string },
@@ -142,9 +152,10 @@ export const useSupplierStore = defineStore('supplier', () => {
   const list = shallowRef<Supplier[]>([])
   const loading = shallowRef(false)
 
-  async function load() {
+  async function load(businessDate?: string) {
     loading.value = true
     try {
+      await revalidateSupplierCredentialStatuses(db, businessDate)
       const rows = await select<Record<string, unknown>>(
         selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
       )
@@ -159,11 +170,28 @@ export const useSupplierStore = defineStore('supplier', () => {
     return list.value.find(s => s.id === id)
   }
 
-  async function add(data: Partial<Supplier>) {
+  async function add(data: Partial<Supplier>, sourceCategory = 'store') {
     const id = generateId('sup')
     const now = new Date().toISOString()
-    await execute(INSERT_SQL, [id, ...supplierToBindings(data), now, now])
-    await logCreate(db, 'suppliers', id)
+    const safeData: Partial<Supplier> = {
+      ...data,
+      credentialStatus: 'incomplete',
+      credentialReviewedAt: null,
+      credentialReviewNote: '',
+    }
+    await withTransaction(async (tx) => {
+      await tx.execute(INSERT_SQL, [id, ...supplierToBindings(safeData), now, now])
+      await writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'create',
+        outcome: 'created',
+        sourceCategory,
+        changedFields: SUPPLIER_COLS.filter(column =>
+          !['credential_status', 'credential_reviewed_at', 'credential_review_note'].includes(column),
+        ),
+        createdAt: now,
+      })
+    })
     await load()
     return id
   }
@@ -172,29 +200,60 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function upsertImported(data: Partial<Supplier>) {
     const externalRef = data.externalRef?.trim() ?? ''
     if (!externalRef)
-      return add(withSupplierImportCreateDefaults(data))
+      return add(withSupplierImportCreateDefaults(data), 'import')
 
     const [row] = await select<Record<string, unknown>>(
       selectVisibleSql('suppliers', 'AND external_ref = ? LIMIT 1'),
       [externalRef],
     )
     if (!row)
-      return add(withSupplierImportCreateDefaults({ ...data, externalRef }))
+      return add(withSupplierImportCreateDefaults({ ...data, externalRef }), 'import')
 
     const existing = rowToSupplier(row)
-    await update(existing.id, { ...existing, ...data, externalRef })
+    await update(existing.id, { ...existing, ...data, externalRef }, 'import')
     return existing.id
   }
 
   /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
-  async function update(id: string, data: Partial<Supplier>) {
+  async function update(id: string, data: Partial<Supplier>, sourceCategory = 'store') {
     const now = new Date().toISOString()
-    const logId = await withUpdateLog(db, 'suppliers', id, () => execute(
-      UPDATE_SQL,
-      [...supplierToBindings(data), now, id],
-    ))
+    const auditId = await withTransaction(async (tx) => {
+      const [row] = await tx.select<Record<string, unknown>>(
+        `SELECT * FROM suppliers WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (!row)
+        return null
+      const existing = rowToSupplier(row)
+      const safeData: Partial<Supplier> = {
+        ...existing,
+        ...data,
+        credentialStatus: existing.credentialStatus,
+        credentialReviewedAt: existing.credentialReviewedAt,
+        credentialReviewNote: existing.credentialReviewNote,
+      }
+      const changedFields = SUPPLIER_COLUMN_KEYS
+        .filter((key) => {
+          const column = SUPPLIER_COLUMNS[key]
+          return JSON.stringify(column.toBind(existing))
+            !== JSON.stringify(column.toBind(safeData))
+        })
+        .map(key => SUPPLIER_COLUMNS[key].col)
+      await tx.execute(
+        UPDATE_SQL,
+        [...supplierToBindings(safeData), now, id],
+      )
+      return writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'update',
+        outcome: changedFields.length ? 'updated' : 'unchanged',
+        sourceCategory,
+        changedFields,
+        createdAt: now,
+      })
+    })
     await load()
-    return logId
+    return auditId
   }
 
   async function saveForm(
@@ -216,7 +275,99 @@ export const useSupplierStore = defineStore('supplier', () => {
       .map(c => ({ label: TABLE_LABELS[c.table] ?? c.table, n: c.n }))
   }
 
-  const { remove, restore, undo } = createSoftDeleteActions(db, 'suppliers', load)
+  async function remove(id: string) {
+    const auditId = await withTransaction(async (tx) => {
+      const [supplier] = await tx.select<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM suppliers WHERE id = ?',
+        [id],
+      )
+      if (!supplier || supplier.deleted_at != null)
+        return null
+      const now = new Date().toISOString()
+      await tx.execute(
+        'UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?',
+        [now, now, id],
+      )
+      return writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'delete',
+        outcome: 'deleted',
+        sourceCategory: 'store',
+        changedFields: ['deleted_at'],
+        createdAt: now,
+      })
+    })
+    await load()
+    return auditId
+  }
+
+  async function restore(id: string) {
+    const auditId = await withTransaction(async (tx) => {
+      const [supplier] = await tx.select<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM suppliers WHERE id = ?',
+        [id],
+      )
+      if (!supplier || supplier.deleted_at == null)
+        return null
+      const now = new Date().toISOString()
+      await tx.execute(
+        'UPDATE suppliers SET deleted_at = NULL, updated_at = ? WHERE id = ?',
+        [now, id],
+      )
+      return writeSupplierAudit(tx, {
+        supplierId: id,
+        action: 'restore',
+        outcome: 'restored',
+        sourceCategory: 'store',
+        changedFields: ['deleted_at'],
+        createdAt: now,
+      })
+    })
+    await load()
+    return auditId
+  }
+
+  async function undo(auditId: string) {
+    const changed = await withTransaction(async (tx) => {
+      const [audit] = await tx.select<{
+        supplier_id: string
+        action: 'delete' | 'restore' | string
+      }>(
+        `SELECT supplier_id, action FROM supplier_audits WHERE id = ?`,
+        [auditId],
+      )
+      if (!audit || !['delete', 'restore'].includes(audit.action))
+        return false
+      const [supplier] = await tx.select<{ deleted_at: string | null }>(
+        'SELECT deleted_at FROM suppliers WHERE id = ?',
+        [audit.supplier_id],
+      )
+      if (!supplier)
+        return false
+      const undoDelete = audit.action === 'delete'
+      if ((undoDelete && supplier.deleted_at == null)
+        || (!undoDelete && supplier.deleted_at != null)) {
+        return false
+      }
+      const now = new Date().toISOString()
+      await tx.execute(
+        `UPDATE suppliers SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+        [undoDelete ? null : now, now, audit.supplier_id],
+      )
+      await writeSupplierAudit(tx, {
+        supplierId: audit.supplier_id,
+        action: undoDelete ? 'restore' : 'delete',
+        outcome: undoDelete ? 'undo_delete' : 'undo_restore',
+        sourceCategory: 'undo',
+        changedFields: ['deleted_at'],
+        createdAt: now,
+      })
+      return true
+    })
+    if (changed)
+      await load()
+    return changed
+  }
 
   return {
     list: readonly(list),

@@ -502,6 +502,110 @@ describe('f1 整页表单领域 action', () => {
     })
   })
 
+  it('普通分供方表单保存不会覆盖独立纳税人核验留痕', async () => {
+    const supplier = await saveSupplierForm({
+      name: '核验留痕分供方',
+      supplierCategory: '材料供应商',
+      taxpayerType: '一般纳税人',
+      contact: '陈经理',
+    }, 'submit')
+    await mem.execute(
+      `UPDATE suppliers
+       SET taxpayer_verification_status = 'confirmed_general',
+           taxpayer_verification_source = '广东省电子税务局',
+           taxpayer_verified_at = '2026-07-30T01:02:03.000Z',
+           taxpayer_verification_note = '官网人工核验'
+       WHERE id = ?`,
+      [supplier.id],
+    )
+
+    const draft = await loadSupplierForm(supplier.id)
+    expect(draft).not.toBeNull()
+    await saveSupplierForm({
+      ...draft!,
+      contact: '更新后的联系人',
+      taxpayerVerificationStatus: 'not_checked',
+      taxpayerVerificationSource: '',
+      taxpayerVerifiedAt: null,
+      taxpayerVerificationNote: '',
+    }, 'submit')
+
+    const [row] = await mem.select<{
+      taxpayer_verification_status: string
+      taxpayer_verification_source: string
+      taxpayer_verified_at: string | null
+      taxpayer_verification_note: string
+    }>(
+      `SELECT taxpayer_verification_status, taxpayer_verification_source,
+              taxpayer_verified_at, taxpayer_verification_note
+       FROM suppliers WHERE id = ?`,
+      [supplier.id],
+    )
+    expect(row).toEqual({
+      taxpayer_verification_status: 'confirmed_general',
+      taxpayer_verification_source: '广东省电子税务局',
+      taxpayer_verified_at: '2026-07-30T01:02:03.000Z',
+      taxpayer_verification_note: '官网人工核验',
+    })
+  })
+
+  it('分供方表单只写脱敏审计，关键工商字段变化使人工结论失效', async () => {
+    const supplier = await saveSupplierForm({
+      name: '表单敏感分供方',
+      supplierCategory: '材料供应商',
+      contact: '联系人',
+      taxNo: 'FORM-SECRET-TAX',
+      bankAccount: 'FORM-SECRET-ACCOUNT',
+    }, 'submit')
+    await mem.execute(`
+      UPDATE suppliers
+      SET credential_status = 'qualified',
+          credential_reviewed_at = '2026-07-30T08:00:00.000Z',
+          credential_review_note = '人工通过'
+      WHERE id = ?
+    `, [supplier.id])
+
+    const draft = await loadSupplierForm(supplier.id)
+    await saveSupplierForm({
+      ...draft!,
+      taxNo: 'FORM-SECRET-TAX-UPDATED',
+    }, 'submit')
+
+    expect(await mem.select(`
+      SELECT credential_status, credential_reviewed_at, credential_review_note
+      FROM suppliers WHERE id = ?
+    `, [supplier.id])).toEqual([{
+      credential_status: 'incomplete',
+      credential_reviewed_at: null,
+      credential_review_note: '',
+    }])
+    expect(await mem.select(`
+      SELECT id FROM operation_logs
+      WHERE table_name = 'suppliers' AND record_id = ?
+    `, [supplier.id])).toEqual([])
+    expect(JSON.stringify(await mem.select(`
+      SELECT action, outcome, source_category, changed_fields, note_present
+      FROM supplier_audits WHERE supplier_id = ?
+      ORDER BY rowid
+    `, [supplier.id]))).not.toMatch(/FORM-SECRET|人工通过/)
+    expect(await mem.select(`
+      SELECT action, source_category, changed_fields
+      FROM supplier_audits WHERE supplier_id = ?
+      ORDER BY rowid
+    `, [supplier.id])).toEqual([
+      {
+        action: 'create',
+        source_category: 'form',
+        changed_fields: expect.any(String),
+      },
+      {
+        action: 'update',
+        source_category: 'form',
+        changed_fields: '["tax_no"]',
+      },
+    ])
+  })
+
   it('切换目标成本基线在同一事务内取消旧基线并记录两条更新日志', async () => {
     const first = await saveTargetCostForm({
       projectId: 'project-ref',

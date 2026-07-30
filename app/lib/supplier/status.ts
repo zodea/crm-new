@@ -15,7 +15,7 @@ export type CredentialStatus = (typeof CREDENTIAL_STATUSES)[number]
 
 export const CREDENTIAL_STATUS_LABEL: Record<string, string> = {
   incomplete: '资料缺失',
-  reviewing: '审核中',
+  reviewing: '齐全待核验',
   qualified: '合格',
   rejected: '退回',
 }

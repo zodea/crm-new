@@ -17,6 +17,9 @@ const BASELINE_TABLES = [
   'invoices',
   'crews',
   'supplier_credentials',
+  'supplier_credential_requirements',
+  'supplier_credential_audits',
+  'supplier_audits',
   'project_suppliers',
   'phase_tasks',
   'construction_contracts',
@@ -822,6 +825,298 @@ describe('v13 工程量报量阶段映射：单一计量入口', () => {
     ])
     await expect(db.execute(`UPDATE construction_stage_items
       SET is_reporting_stage = 1 WHERE id = 'mapping-reporting-1'`)).rejects.toThrow(/UNIQUE constraint failed/i)
+    db.close()
+  })
+})
+
+describe('v36 分供方证照审核底座', () => {
+  it('归一历史类别，并把没有供应商级凭证的旧人工态重算为自动态', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= 35))
+    await db.execute(`
+      INSERT INTO suppliers (
+        id, name, credential_status, credential_reviewed_at, credential_review_note
+      )
+      VALUES
+        ('supplier-unproved', '无凭证旧合格', 'qualified', NULL, ''),
+        (
+          'supplier-proved', '有凭证人工合格', 'qualified',
+          '2026-07-01T09:00:00.000Z', '人工核验通过'
+        ),
+        (
+          'supplier-rejected-unproved', '无凭证旧退回', 'rejected',
+          '2026-07-01T09:00:00.000Z', ''
+        ),
+        ('supplier-empty-path', '空路径旧资料', 'qualified', NULL, '')
+    `)
+    for (const supplierId of [
+      'supplier-unproved',
+      'supplier-proved',
+      'supplier-rejected-unproved',
+    ]) {
+      await db.execute(`
+        INSERT INTO supplier_credentials (
+          id, supplier_id, category, file_name, file_path
+        )
+        VALUES
+          (?, ?, '营业执照', '营业执照.pdf', ?),
+          (?, ?, '法人身份证', '法人身份证.pdf', ?),
+          (?, ?, '基本存款账户信息表', '账户资料.pdf', ?)
+      `, [
+        `${supplierId}-license`,
+        supplierId,
+        `C:\\legacy\\${supplierId}-license.pdf`,
+        `${supplierId}-legal`,
+        supplierId,
+        `C:\\legacy\\${supplierId}-legal.pdf`,
+        `${supplierId}-bank`,
+        supplierId,
+        `C:\\legacy\\${supplierId}-bank.pdf`,
+      ])
+    }
+    await db.execute(`
+      INSERT INTO supplier_credentials (id, supplier_id, category, file_name, file_path)
+      VALUES
+        ('empty-license', 'supplier-empty-path', '营业执照', '营业执照.pdf', ''),
+        ('empty-legal', 'supplier-empty-path', '法人身份证', '法人身份证.pdf', ''),
+        ('empty-bank', 'supplier-empty-path', '基本存款账户信息表', '账户资料.pdf', '')
+    `)
+    await db.execute(`
+      INSERT INTO file_refs (
+        id, owner_type, owner_id, file_name, file_path, uploader
+      )
+      VALUES (
+        'legacy-sensitive-file', 'supplier_credential',
+        'legacy-sensitive-owner', 'SECRET-TAX-license.pdf',
+        'D:\\legacy\\SECRET-PATH\\license.pdf', 'SECRET-UPLOADER'
+      )
+    `)
+    await db.execute(`
+      INSERT INTO operation_logs (
+        id, table_name, record_id, action, before_data, after_data
+      )
+      VALUES
+        (
+          'legacy-supplier-log', 'suppliers', 'supplier-unproved', 'update',
+          '{"id":"supplier-unproved","tax_no":"SECRET-TAX","bank_account":"SECRET-ACCOUNT","credential_status":"qualified"}',
+          '{"id":"supplier-unproved","taxpayer_verification_note":"SECRET-NOTE","credential_status":"qualified"}'
+        ),
+        (
+          'legacy-credential-log', 'supplier_credentials', 'supplier-unproved-license', 'update',
+          '{"id":"supplier-unproved-license","supplier_id":"supplier-unproved","ocr_result":{"taxNo":"OCR-SECRET"}}',
+          '{"id":"supplier-unproved-license","supplier_id":"supplier-unproved","ocr_confirmed_result":{"bankAccount":"OCR-ACCOUNT"}}'
+        ),
+        (
+          'legacy-bad-log', 'supplier_credentials', 'supplier-unproved-license', 'update',
+          '{bad json',
+          NULL
+        ),
+        (
+          'legacy-file-ref-log', 'file_refs', 'legacy-sensitive-file', 'create',
+          NULL,
+          '{"id":"legacy-sensitive-file","owner_type":"supplier_credential","owner_id":"legacy-sensitive-owner","file_name":"SECRET-TAX-license.pdf","file_path":"D:\\\\legacy\\\\SECRET-PATH\\\\license.pdf","uploader":"SECRET-UPLOADER","uploaded_at":"2026-07-01T09:00:00.000Z"}'
+        ),
+        (
+          'legacy-file-ref-bad-log', 'file_refs', 'legacy-sensitive-file', 'update',
+          '{malformed SECRET-TAX SECRET-PATH',
+          NULL
+        )
+    `)
+
+    const result = await runMigrations(db)
+
+    expect(result.to).toBe(LATEST_VERSION)
+    expect(await listTables(db)).toContain('supplier_credential_requirements')
+    expect(await listTables(db)).toContain('supplier_credential_audits')
+    expect(await listTables(db)).toContain('supplier_audits')
+    expect(await columnNames(db, 'supplier_credentials')).toEqual(expect.arrayContaining([
+      'file_ref_id',
+      'valid_from',
+      'expires_at',
+      'long_term',
+      'ocr_confirmed_result',
+      'ocr_confirmed_at',
+      'ocr_review_status',
+    ]))
+    expect(await columnNames(db, 'suppliers')).toEqual(expect.arrayContaining([
+      'taxpayer_verification_status',
+      'taxpayer_verification_source',
+      'taxpayer_verified_at',
+      'taxpayer_verification_note',
+    ]))
+    expect(await db.select(`
+      SELECT id, credential_status, credential_reviewed_at, credential_review_note
+      FROM suppliers
+      WHERE id LIKE 'supplier-%'
+      ORDER BY id
+    `)).toEqual([
+      {
+        id: 'supplier-empty-path',
+        credential_status: 'incomplete',
+        credential_reviewed_at: null,
+        credential_review_note: '',
+      },
+      {
+        id: 'supplier-proved',
+        credential_status: 'incomplete',
+        credential_reviewed_at: null,
+        credential_review_note: '',
+      },
+      {
+        id: 'supplier-rejected-unproved',
+        credential_status: 'incomplete',
+        credential_reviewed_at: null,
+        credential_review_note: '',
+      },
+      {
+        id: 'supplier-unproved',
+        credential_status: 'incomplete',
+        credential_reviewed_at: null,
+        credential_review_note: '',
+      },
+    ])
+    expect(await db.select(`
+      SELECT id, before_data, after_data
+      FROM operation_logs
+      WHERE id LIKE 'legacy-%'
+      ORDER BY id
+    `)).toEqual([
+      {
+        id: 'legacy-bad-log',
+        before_data: null,
+        after_data: null,
+      },
+      {
+        id: 'legacy-credential-log',
+        before_data: '{"id":"supplier-unproved-license","supplier_id":"supplier-unproved"}',
+        after_data: '{"id":"supplier-unproved-license","supplier_id":"supplier-unproved"}',
+      },
+      {
+        id: 'legacy-file-ref-bad-log',
+        before_data: null,
+        after_data: null,
+      },
+      {
+        id: 'legacy-file-ref-log',
+        before_data: null,
+        after_data: '{"id":"legacy-sensitive-file","owner_type":"supplier_credential","owner_id":"legacy-sensitive-owner","uploaded_at":"2026-07-01T09:00:00.000Z"}',
+      },
+      {
+        id: 'legacy-supplier-log',
+        before_data: '{"id":"supplier-unproved","credential_status":"qualified"}',
+        after_data: '{"id":"supplier-unproved","credential_status":"qualified"}',
+      },
+    ])
+
+    await db.execute(`
+      UPDATE suppliers
+      SET tax_no = 'NEW-TAX'
+      WHERE id = 'supplier-proved'
+    `)
+    expect(await db.select(`
+      SELECT credential_status, credential_reviewed_at, credential_review_note
+      FROM suppliers WHERE id = 'supplier-proved'
+    `)).toEqual([{
+      credential_status: 'incomplete',
+      credential_reviewed_at: null,
+      credential_review_note: '',
+    }])
+    await db.execute(`
+      UPDATE suppliers
+      SET credential_status = 'qualified',
+          credential_reviewed_at = '2026-07-30T10:00:00.000Z',
+          taxpayer_verification_note = '仅改核验记录'
+      WHERE id = 'supplier-proved'
+    `)
+    expect(await db.select(`
+      SELECT credential_status, credential_reviewed_at
+      FROM suppliers WHERE id = 'supplier-proved'
+    `)).toEqual([{
+      credential_status: 'qualified',
+      credential_reviewed_at: '2026-07-30T10:00:00.000Z',
+    }])
+    await db.execute(`
+      UPDATE suppliers
+      SET name = '空路径资料已改名'
+      WHERE id = 'supplier-empty-path'
+    `)
+    expect(await db.select(`
+      SELECT credential_status, credential_reviewed_at
+      FROM suppliers WHERE id = 'supplier-empty-path'
+    `)).toEqual([{
+      credential_status: 'incomplete',
+      credential_reviewed_at: null,
+    }])
+    expect(await db.select(`
+      SELECT DISTINCT category
+      FROM supplier_credentials
+      WHERE supplier_id LIKE 'supplier-%'
+      ORDER BY category
+    `)).toEqual([
+      { category: '法人身份证' },
+      { category: '营业执照' },
+      { category: '银行账户资料' },
+    ])
+    expect(await db.select(`
+      SELECT credential.id, credential.file_ref_id, file.file_path
+      FROM supplier_credentials AS credential
+      JOIN file_refs AS file ON file.id = credential.file_ref_id
+      WHERE credential.supplier_id = 'supplier-unproved'
+      ORDER BY credential.id
+    `)).toEqual([
+      {
+        id: 'supplier-unproved-bank',
+        file_ref_id: 'file_ref_supplier_credential_supplier-unproved-bank',
+        file_path: 'C:\\legacy\\supplier-unproved-bank.pdf',
+      },
+      {
+        id: 'supplier-unproved-legal',
+        file_ref_id: 'file_ref_supplier_credential_supplier-unproved-legal',
+        file_path: 'C:\\legacy\\supplier-unproved-legal.pdf',
+      },
+      {
+        id: 'supplier-unproved-license',
+        file_ref_id: 'file_ref_supplier_credential_supplier-unproved-license',
+        file_path: 'C:\\legacy\\supplier-unproved-license.pdf',
+      },
+    ])
+    expect(await db.select(`
+      SELECT file_ref_id
+      FROM supplier_credentials
+      WHERE supplier_id = 'supplier-empty-path'
+      ORDER BY id
+    `)).toEqual([
+      { file_ref_id: null },
+      { file_ref_id: null },
+      { file_ref_id: null },
+    ])
+    db.close()
+  })
+
+  it('迁移中断会回滚列和新表，随后可完整重跑', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= 35))
+    let injected = false
+    const interrupted: MigrationDb = {
+      async execute(sql, params) {
+        if (!injected && sql.includes('CREATE TABLE IF NOT EXISTS supplier_credential_requirements')) {
+          injected = true
+          throw new Error('测试注入：v36 执行中断')
+        }
+        await db.execute(sql, params)
+      },
+      select(sql, params) {
+        return db.select(sql, params)
+      },
+    }
+
+    await expect(runMigrations(interrupted)).rejects.toThrow('测试注入：v36 执行中断')
+    expect(injected).toBe(true)
+    expect(await columnNames(db, 'supplier_credentials')).not.toContain('file_ref_id')
+    expect(await listTables(db)).not.toContain('supplier_credential_requirements')
+    expect(await listTables(db)).not.toContain('supplier_credential_audits')
+    expect(await listTables(db)).not.toContain('supplier_audits')
+    expect(await runMigrations(db)).toMatchObject({ from: 35, to: 36 })
     db.close()
   })
 })

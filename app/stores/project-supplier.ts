@@ -6,6 +6,7 @@ import { db } from '~/lib/db/client'
 import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, hiddenCtes, logCreate, restoreRecord, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
 import { applyFileRefChanges } from '~/lib/forms/file-refs'
+import { writeSupplierAudit } from '~/lib/supplier/audit'
 import { generateId } from '~/lib/util/id'
 
 export type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' | 'settled'
@@ -210,7 +211,20 @@ export const useProjectSupplierStore = defineStore('project-supplier', () => {
             ) VALUES (?, ?, '[]', '其他', 'incomplete', 'draft', 'file-import', ?, ?)`,
             [supplierId, group.supplierName, now, now],
           )
-          await logCreate(tx, 'suppliers', supplierId)
+          await writeSupplierAudit(tx, {
+            supplierId,
+            action: 'create',
+            outcome: 'created',
+            sourceCategory: 'project_file_import',
+            changedFields: [
+              'name',
+              'aliases',
+              'supplier_category',
+              'approval_status',
+              'source',
+            ],
+            createdAt: now,
+          })
           createdSupplierCount += 1
         }
 

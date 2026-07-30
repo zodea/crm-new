@@ -54,7 +54,7 @@ Nuxt 路由级实现结果：
 | 范围 | 现有基础 | 未闭环权威 |
 | --- | --- | --- |
 | 施工进度 / 目标成本 | WBS、合同/内部暂估排程、独立标准工序库列表与整页版本表单、三步建组、模板甘特/精确表格同源编辑、前置轻量弹窗和冲突软禁用、项目区域配置，以及目标成本版本详情与正式成本对比已实现；首页与施工进度页已共用 Reka WBS Tree + 甘特核心，默认首组展开、按项目会话记忆且写操作仅留在施工进度页；暂估分组可在独立页面复核差异后绑定同项目施工合同 | [#191](https://github.com/zodea/crm-new/issues/191)、[ADR 0017](../adr/0017-provisional-schedule-before-contract.md)、[ADR 0018](../adr/0018-versioned-schedule-process-library.md) |
-| 分供方主数据 | 列表、详情与整页表单基础已存在；项目维度合作工作台和文件导入已由 #192 闭环，不在本行重复统计 | [#193](https://github.com/zodea/crm-new/issues/193) |
+| 分供方主数据 | 列表、详情与整页表单基础已存在；[#13](https://github.com/zodea/crm-new/issues/13) 已闭环真实证照文件、OCR 人工核对、资料要求/有效期、自动齐全度、人工审核和纳税人核验留痕；项目维度合作工作台和文件导入已由 #192 闭环 | [#193](https://github.com/zodea/crm-new/issues/193) |
 | 客户 / 班组 / 工人 | 列表、整页表单和详情均已存在；详情只按真实外键聚合项目、合同/收款、工程量、工资、考勤、签工和扣罚，具体参考同屏差异仍待验收 | [#194](https://github.com/zodea/crm-new/issues/194) |
 | 核心合同 / 辅助合同 / 结算 | 列表、详情和整页表单基础已存在 | [#195](https://github.com/zodea/crm-new/issues/195)、[#196](https://github.com/zodea/crm-new/issues/196) |
 | 甲方 / 分包单据与罚扣 | 动态单据列表和表单基础已存在 | [#197](https://github.com/zodea/crm-new/issues/197) |

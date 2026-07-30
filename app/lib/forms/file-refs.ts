@@ -15,7 +15,7 @@ export interface FileRefDraft {
   mimeType?: string
   category?: string
   uploader?: string
-  /** 浏览器模式的持久化正文；桌面端优先保留 filePath，避免重复占用 SQLite。 */
+  /** 可跨重启读取的持久化正文；legacy filePath 只作迁移留痕，不授予读取权限。 */
   payloadBase64?: string
 }
 
@@ -194,7 +194,7 @@ export async function listFileRefsByOwnerType(
 }
 
 export async function loadFileRefContent(
-  file: Pick<FileRefRecord, 'id' | 'filePath' | 'mimeType'>,
+  file: Pick<FileRefRecord, 'id' | 'ownerType' | 'filePath' | 'mimeType'>,
 ): Promise<FileRefContent | null> {
   const [payload] = await select<{ encoding: string, content: string }>(`
     SELECT encoding, content
@@ -211,6 +211,8 @@ export async function loadFileRefContent(
     }
   }
   if (!file.filePath || !isTauri())
+    return null
+  if (file.ownerType === 'supplier_credential')
     return null
   const { readFile } = await import('@tauri-apps/plugin-fs')
   return {

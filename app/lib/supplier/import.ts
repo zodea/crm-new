@@ -1,5 +1,5 @@
 import type { Supplier } from '~/stores/supplier'
-import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { toNum } from '~/lib/util/number'
 
 export const PROJECT_SUPPLIER_FILE_CATEGORIES = [
@@ -129,13 +129,6 @@ function supplierCategory(value: unknown): Supplier['supplierCategory'] {
     : '其他'
 }
 
-function credentialStatus(value: unknown): Supplier['credentialStatus'] {
-  const status = text(value)
-  if (CREDENTIAL_STATUSES.includes(status as (typeof CREDENTIAL_STATUSES)[number]))
-    return status
-  return Object.entries(CREDENTIAL_STATUS_LABEL).find(([, label]) => label === status)?.[0] ?? 'incomplete'
-}
-
 /** 映射页签行 → 分供方 store 可写数据；拒绝空名并归一枚举、别名、数值。 */
 export function normalizeSupplierImportRow(row: Record<string, unknown>): Partial<Supplier> {
   const name = text(row.name)
@@ -150,7 +143,6 @@ export function normalizeSupplierImportRow(row: Record<string, unknown>): Partia
   assignIfPresent(data, row, 'externalRef', text)
   assignIfPresent(data, row, 'aliases', aliases)
   assignIfPresent(data, row, 'supplierCategory', supplierCategory)
-  assignIfPresent(data, row, 'credentialStatus', credentialStatus)
   assignIfPresent(data, row, 'uniqueCode', text)
   assignIfPresent(data, row, 'taxNo', text)
   assignIfPresent(data, row, 'legalRep', text)

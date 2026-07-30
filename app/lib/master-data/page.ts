@@ -133,6 +133,10 @@ export function formDefaults(kind: MasterDataOwnerType): Record<string, unknown>
         ...common,
         aliases: [],
         taxpayerType: '未核验',
+        taxpayerVerificationStatus: 'not_checked',
+        taxpayerVerificationSource: '',
+        taxpayerVerifiedAt: null,
+        taxpayerVerificationNote: '',
         approvalStatus: 'draft',
       }
     case 'customer':
