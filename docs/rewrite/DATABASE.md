@@ -242,12 +242,15 @@ boq_change_lines(
 
 monthly_statements(
   id, project_id -> projects.id, contract_id -> contracts.id, month,
-  status ['draft'|'adjusted'|'exported'], total_amount, note,
+  status ['draft'|'adjusted'|'exported'], total_amount,
+  quantity_basis ['contract'|'provisional'|'field'], note,
   created_at, updated_at, deleted_at
 )
 -- (contract_id, month) 对活跃报量单唯一。
 -- 状态沿用存量值：draft=草稿，adjusted=已有真实申报金额，exported=已有真实审定金额。
 -- 清单工作台手调/导出不推进状态；v37 仅以 audited_amount 保留“已审定”，其余旧 adjusted/exported 保守回草稿。
+-- v39 `quantity_basis` 冻结生成时选定的取数基准，缺省 field。生成后基准不随三量或界面选择漂移；
+-- 派生只读所选基准自己的列，缺量报错阻断生成，不跨口径回退，也不按 0 静默计入。
 
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,

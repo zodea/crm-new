@@ -103,6 +103,14 @@ function selectBoqLine(index: number, id: string) {
   })
 }
 
+/** 缺量事实挂在合同清单行上，明细草稿只存报量值，取用时按行回查。 */
+function missingQtyCount(row: GridLine): number {
+  const boqLineId = String(row.boqLineId ?? '')
+  if (!boqLineId)
+    return 0
+  return props.boqLines.find(line => line.id === boqLineId)?.missingQtyCount ?? 0
+}
+
 function add() {
   emit('clearError')
   emit('update', [
@@ -262,7 +270,15 @@ function remove(index: number) {
           >
         </template>
         <template #autoQty="{ row }">
-          <span class="font-mono font-700">{{ Number(row.autoQty || 0).toFixed(3) }}</span>
+          <span
+            class="font-mono font-700"
+            :class="missingQtyCount(row) ? 'text-danger' : ''"
+          >{{ Number(row.autoQty || 0).toFixed(3) }}</span>
+          <span
+            v-if="missingQtyCount(row)"
+            class="ml-1 text-10px text-danger"
+            :title="`${missingQtyCount(row)} 条模板明细缺该基准工程量，自动完成量不完整，不会用其他量源替代`"
+          >缺量</span>
         </template>
         <template #reportedQty="{ row, rowIndex }">
           <input

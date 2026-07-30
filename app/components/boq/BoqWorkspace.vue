@@ -5,8 +5,10 @@ import type {
 } from '~/lib/boq/change'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqAttachmentView, BoqChangeOrderView, BoqLineView } from '~/lib/boq/read-model'
+import type { QuantityBasis } from '~/lib/quantity/basis'
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
+import { quantityBasisLabel } from '~/lib/quantity/basis'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
@@ -344,10 +346,10 @@ async function removeAttachment(attachment: BoqAttachmentView) {
   }
 }
 
-async function generateMonthly(month: string) {
+async function generateMonthly(payload: { month: string, basis: QuantityBasis }) {
   try {
-    await store.generateMonthly(month)
-    success(`${month} 月度报量草稿已生成`)
+    await store.generateMonthly(payload.month, payload.basis)
+    success(`${payload.month} 月度报量草稿已按${quantityBasisLabel(payload.basis)}生成`)
   }
   catch (cause) {
     toastError(toErrorMessage(cause))

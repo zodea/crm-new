@@ -2,7 +2,13 @@
 import type { MonthlyStatementLineView, MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqWorkspace } from '~/lib/boq/read-model'
 import type { KitTableColumn } from '~/lib/kit/table'
+import type { QuantityBasis } from '~/lib/quantity/basis'
+import { DEFAULT_PROGRESS_QUANTITY_BASIS } from '~/lib/boq/monthly'
 import { BOQ_MONTHLY_STATUS_LABEL } from '~/lib/boq/presentation'
+import {
+  QUANTITY_BASIS_LABELS,
+  QUANTITY_BASIS_OPTIONS,
+} from '~/lib/quantity/basis'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 defineProps<{
@@ -13,7 +19,7 @@ defineProps<{
 
 const emit = defineEmits<{
   select: [statementId: string]
-  generate: [month: string]
+  generate: [payload: { month: string, basis: QuantityBasis }]
   adjust: [payload: { lineId: string, adjustedQty: number, note: string }]
   export: [statement: MonthlyStatementView]
 }>()
@@ -41,18 +47,33 @@ const columns: KitTableColumn[] = [
 async function generate() {
   const values = await formModal({
     title: '生成月度报量',
-    subtitle: '按 #103 已完成的报量阶段，取当前量 × 已签证合同价自动汇总。',
+    subtitle: '按已完成的报量阶段，取所选基准量 × 已签证合同价汇总；所选基准缺量时不代用其他口径。',
     saveText: '生成草稿',
-    fields: [{
-      key: 'month',
-      label: '报量月份',
-      value: toLocalDateInputValue().slice(0, 7),
-      placeholder: 'yyyy-mm',
-      required: true,
-    }],
+    fields: [
+      {
+        key: 'month',
+        label: '报量月份',
+        value: toLocalDateInputValue().slice(0, 7),
+        placeholder: 'yyyy-mm',
+        required: true,
+      },
+      {
+        key: 'basis',
+        label: '取数基准',
+        type: 'select',
+        options: QUANTITY_BASIS_OPTIONS.map(option => option.label),
+        value: QUANTITY_BASIS_LABELS[DEFAULT_PROGRESS_QUANTITY_BASIS],
+        required: true,
+      },
+    ],
   })
-  if (values)
-    emit('generate', String(values.month))
+  if (!values)
+    return
+  const basis = QUANTITY_BASIS_OPTIONS
+    .find(option => option.label === String(values.basis))
+    ?.value
+    ?? DEFAULT_PROGRESS_QUANTITY_BASIS
+  emit('generate', { month: String(values.month), basis })
 }
 
 async function adjust(line: MonthlyStatementLineView) {
@@ -124,6 +145,7 @@ async function adjust(line: MonthlyStatementLineView) {
           </h2>
           <p class="text-11px text-ink-soft">
             {{ BOQ_MONTHLY_STATUS_LABEL[statement.status] }} · 共 {{ statement.lines.length }} 个分项
+            · 取数基准 {{ statement.quantityBasisLabel }}
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -164,7 +186,7 @@ async function adjust(line: MonthlyStatementLineView) {
             选择或生成一份月度报量
           </p>
           <p class="mt-1 text-11px text-ink-soft">
-            自动量来自已完成的报量阶段，合同价来自已签证 BOQ。
+            自动量来自已完成的报量阶段按所选基准取数，合同价来自已签证 BOQ。
           </p>
         </div>
       </div>

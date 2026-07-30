@@ -5,6 +5,7 @@ import { loadMonthlyQuantities } from '~/lib/boq/monthly'
 import { runMigrations } from '~/lib/db/migrations'
 import {
   listOwnerDocumentAttachments,
+  listOwnerDocumentBoqLines,
   listOwnerDocumentContractOptions,
   listOwnerDocumentForms,
   loadOwnerDocumentForm,
@@ -248,6 +249,25 @@ describe('f5 甲方/分包单据领域事务', () => {
     ).rejects.toThrow('已生效纯金额签证不可直接删除')
   })
 
+  it('合同清单行按基准缺量时标注缺数，不回退到其他量源', async () => {
+    // 现场复核量缺失：既不能顶替成暂估/合同量，也不能只报 0 让缺数看不出来。
+    await mem.execute(
+      `UPDATE house_type_template_items
+       SET field_qty = NULL, provisional_qty = 9, contract_qty = 8
+       WHERE id = 'hti-owner'`,
+    )
+    const lines = await listOwnerDocumentBoqLines(
+      'project-owner',
+      'contract-owner',
+      '2026-07',
+    )
+    expect(lines).toEqual([expect.objectContaining({
+      id: 'boq-line-owner',
+      autoQty: 0,
+      missingQtyCount: 1,
+    })])
+  })
+
   it('月度报量从阶段完成事实派生自动量，忽略客户端伪造值并保留申报与审定量', async () => {
     const store = useOwnerDocumentStore()
     expect(await loadMonthlyQuantities(
@@ -255,7 +275,7 @@ describe('f5 甲方/分包单据领域事务', () => {
       'project-owner',
       'contract-owner',
       '2026-07',
-    )).toEqual([{ boq_line_id: 'boq-line-owner', auto_qty: 3 }])
+    )).toEqual([{ boq_line_id: 'boq-line-owner', auto_qty: 3, missing_count: 0 }])
     const saved = await store.saveForm('owner_report', {
       no: 'BL-OWNER-001',
       projectId: 'project-owner',

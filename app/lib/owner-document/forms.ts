@@ -82,6 +82,8 @@ export interface OwnerDocumentBoqLine {
   qty: number
   unitPrice: number
   autoQty: number
+  /** 取数基准下缺量的模板明细条数；> 0 表示自动完成量不完整，需在界面显式标注。 */
+  missingQtyCount: number
 }
 
 export interface OwnerReportAuditDraft {
@@ -1679,17 +1681,21 @@ export async function listOwnerDocumentBoqLines(
   const quantities = periodNo
     ? await loadMonthlyQuantities({ select }, projectId, contractId, periodNo)
     : []
-  const autoQtyById = new Map(
-    quantities.map(row => [row.boq_line_id, numberValue(row.auto_qty)]),
+  const quantityByLineId = new Map(
+    quantities.map(row => [row.boq_line_id, row]),
   )
-  return rows.map(row => ({
-    id: row.id,
-    itemName: row.item_name,
-    unit: row.unit,
-    qty: numberValue(row.effective_qty),
-    unitPrice: numberValue(row.effective_unit_price),
-    autoQty: autoQtyById.get(row.id) ?? 0,
-  }))
+  return rows.map((row) => {
+    const quantity = quantityByLineId.get(row.id)
+    return {
+      id: row.id,
+      itemName: row.item_name,
+      unit: row.unit,
+      qty: numberValue(row.effective_qty),
+      unitPrice: numberValue(row.effective_unit_price),
+      autoQty: numberValue(quantity?.auto_qty),
+      missingQtyCount: numberValue(quantity?.missing_count),
+    }
+  })
 }
 
 function toListRecord(row: Record<string, unknown>): OwnerDocumentListRecord {

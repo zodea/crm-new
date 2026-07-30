@@ -7,6 +7,7 @@ import type { BoqLinePatch } from '~/lib/boq/lines'
 import type { MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqCatalogProject, BoqWorkspace } from '~/lib/boq/read-model'
 import type { ExportFileOptions } from '~/lib/kit/export'
+import type { QuantityBasis } from '~/lib/quantity/basis'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import {
@@ -19,6 +20,7 @@ import { persistBoqImport } from '~/lib/boq/import'
 import { persistBoqLinePatch } from '~/lib/boq/lines'
 import {
   adjustMonthlyStatementLine,
+  DEFAULT_PROGRESS_QUANTITY_BASIS,
   generateMonthlyStatement,
   loadMonthlyStatement,
 } from '~/lib/boq/monthly'
@@ -301,7 +303,10 @@ export const useBoqStore = defineStore('boq', () => {
     )
   }
 
-  async function generateMonthly(month: string) {
+  async function generateMonthly(
+    month: string,
+    basis: QuantityBasis = DEFAULT_PROGRESS_QUANTITY_BASIS,
+  ) {
     const result = await save(
       '月度报量生成',
       () => withTransaction(tx => generateMonthlyStatement(
@@ -309,6 +314,7 @@ export const useBoqStore = defineStore('boq', () => {
         activeProjectId,
         activeContractId,
         month,
+        basis,
       )),
     )
     await loadStatement(result.statementId)

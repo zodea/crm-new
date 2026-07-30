@@ -204,7 +204,8 @@ const refreshBoqLines = useDebounceFn(async () => {
             return boqLine ? { ...line, autoQty: boqLine.autoQty } : line
           })
         : boqLines.value
-            .filter(line => line.autoQty > 0)
+            // 缺量行自动量为 0，仍要带入并在网格标注，否则缺数会被悄悄漏报。
+            .filter(line => line.autoQty > 0 || line.missingQtyCount > 0)
             .map(line => ({
               boqLineId: line.id,
               itemName: line.itemName,

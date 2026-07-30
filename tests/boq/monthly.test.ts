@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   adjustMonthlyStatementLine,
   generateMonthlyStatement,
+  loadMonthlyQuantities,
   loadMonthlyStatement,
 } from '~/lib/boq/monthly'
 import { runMigrations } from '~/lib/db/migrations'
@@ -54,6 +55,79 @@ describe('boq monthly statements', () => {
       'con_demo_sg01',
       '2026-04',
     )).rejects.toThrow('已存在')
+  })
+
+  it('每个基准只读自己的口径，不跨口径静默代用', async () => {
+    // 让三量互不相同，确保断言能区分基准，而不是碰巧读到同值。
+    await db.execute(
+      `UPDATE house_type_template_items SET contract_qty = 40 WHERE id = 'qty_hti_a_pipe'`,
+    )
+
+    expect(await loadMonthlyQuantities(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'contract',
+    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 40, missing_count: 0 }])
+
+    expect(await loadMonthlyQuantities(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'provisional',
+    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 44, missing_count: 0 }])
+
+    expect(await loadMonthlyQuantities(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'field',
+    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 42, missing_count: 0 }])
+  })
+
+  it('所选基准缺量时显式暴露，不回退到其他口径也不按 0 计入', async () => {
+    await db.execute(
+      `UPDATE house_type_template_items SET field_qty = NULL WHERE id = 'qty_hti_a_pipe'`,
+    )
+
+    // 现场量缺失必须报缺，不能悄悄用暂估量 44 或合同量 42 顶替。
+    expect(await loadMonthlyQuantities(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'field',
+    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 0, missing_count: 1 }])
+
+    await expect(generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'field',
+    )).rejects.toThrow('现场复核量缺失')
+  })
+
+  it('基准切换真实改变已生成报量单的金额并落库基准', async () => {
+    const generated = await generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'provisional',
+    )
+    // 暂估量 44 × 合同单价 36，而不是现场量 42 的 1512。
+    expect(generated.totalAmount).toBe(1584)
+
+    const statement = await loadMonthlyStatement(db, generated.statementId)
+    expect(statement).toMatchObject({
+      quantityBasis: 'provisional',
+      totalAmount: 1584,
+    })
+    expect(statement?.lines[0]).toMatchObject({ autoQty: 44, amount: 1584 })
   })
 
   it('records manual adjustment trace without advancing the owner report lifecycle', async () => {

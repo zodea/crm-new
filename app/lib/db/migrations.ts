@@ -694,6 +694,8 @@ CREATE TABLE IF NOT EXISTS monthly_statements (
   status       TEXT NOT NULL DEFAULT 'draft'
                CHECK (status IN ('draft', 'adjusted', 'exported')),
   total_amount REAL NOT NULL DEFAULT 0,
+  quantity_basis TEXT NOT NULL DEFAULT 'field'
+               CHECK (quantity_basis IN ('contract', 'provisional', 'field')),
   note         TEXT NOT NULL DEFAULT '',
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
@@ -5523,6 +5525,21 @@ export const migrations: Migration[] = [
         }
         throw error
       }
+    },
+  },
+  {
+    version: 39,
+    name: 'monthly-statement-quantity-basis',
+    async up(db) {
+      // 旧库的报量按 field→provisional→contract 静默回退派生，无法回溯当时用的是哪一口径。
+      // 存量单据统一标注为默认基准 field，新单据由生成时显式选择并冻结。
+      await addColumnIfMissing(
+        db,
+        'monthly_statements',
+        'quantity_basis',
+        `TEXT NOT NULL DEFAULT 'field'
+         CHECK (quantity_basis IN ('contract', 'provisional', 'field'))`,
+      )
     },
   },
 ]
