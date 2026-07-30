@@ -147,6 +147,29 @@ async function demoFormModal() {
     kit.success('分供方已创建')
 }
 
+// W2-3 typeSelect 业务类型选择（#95）
+const PAYMENT_APPLICATION_TYPE_OPTIONS = [
+  { value: 'contract-labor-material', label: '有合同（人材料分包）付款申请', hint: '关联合同、结算额度与发票' },
+  { value: 'no-contract-labor-material', label: '无合同（人材料分包）付款申请' },
+  { value: 'contract-labor-advance', label: '有合同（人分包）预付款申请' },
+  { value: 'contract-material-advance', label: '有合同（材料）预付款申请' },
+  { value: 'no-contract-material-advance', label: '无合同（材料）预付款申请' },
+  { value: 'project-management-fee', label: '项目（管理费）付款申请' },
+  { value: 'project-expense', label: '项目（项目费用）付款申请' },
+  { value: 'company-payment', label: '公司付款申请' },
+] as const
+
+async function demoTypeSelect() {
+  const value = await kit.typeSelect({
+    title: '新建付款申请',
+    options: PAYMENT_APPLICATION_TYPE_OPTIONS,
+    defaultValue: 'contract-labor-material',
+  })
+  lastResult.value = value
+    ? `typeSelect 确定返回：${value}`
+    : 'typeSelect 已取消（返回 null）'
+}
+
 // ⑥ 单文件直接保存（ADR 0004）
 async function demoDirectExport() {
   try {
@@ -445,6 +468,19 @@ async function demoImportMapping() {
         </p>
         <button class="btn-secondary" @click="demoFormModal">
           打开表单弹窗
+        </button>
+      </section>
+
+      <!-- W2-3 typeSelect -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-3 typeSelect — 业务类型选择弹窗（#95）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          付款申请 8 类单选范本；支持双击确定、方向键移动与 Enter 确定，取消、Esc 和遮罩关闭都返回 null。
+        </p>
+        <button class="btn-secondary" @click="demoTypeSelect">
+          新建付款申请
         </button>
       </section>
 

@@ -3,7 +3,7 @@ import type { FormModalOptions, FormValues } from '~/lib/kit/form-modal'
 import { shallowRef } from 'vue'
 
 // KitUI 原语（Vue 版）——单宿主 + composable 调用，底座 shadcn-vue（ADR 0008）：
-// confirm/formModal 走 reka-ui Dialog，toast 走 vue-sonner；语义对照 DC 设计稿 window.KitUI。
+// confirm/formModal/typeSelect 走 reka-ui Dialog，toast 走 vue-sonner；语义对照 DC 设计稿 window.KitUI。
 // 状态定义在模块级，任意页面 useKitUI() 拿到的都是同一份，由全局 <KitUIHost/> 渲染。
 
 // ── Confirm（Promise 化确认弹窗，三档 simple/batch/cascade，ADR 0003 + 规格 §01）──
@@ -20,6 +20,20 @@ export interface ConfirmOptions {
   requireTyping?: string
   /** cascade：预提交挂起时长（ms），缺省 ≥3000；关联多可传更大 */
   holdMs?: number
+  confirmLabel?: string
+  cancelLabel?: string
+}
+
+export interface TypeSelectOption {
+  value: string
+  label: string
+  hint?: string
+}
+
+export interface TypeSelectOptions {
+  title: string
+  options: readonly TypeSelectOption[]
+  defaultValue?: string
   confirmLabel?: string
   cancelLabel?: string
 }
@@ -87,11 +101,45 @@ function resolveFormModal(values: FormValues | null) {
   s.resolve(values)
 }
 
+// ── TypeSelect（大单据三段式新建的业务类型首段）──
+interface TypeSelectState {
+  id: number
+  resolve: (value: string | null) => void
+}
+
+const typeSelectState = shallowRef<TypeSelectState | null>(null)
+const typeSelectOpts = shallowRef<TypeSelectOptions | null>(null)
+let typeSelectSeq = 0
+
+/** 打开业务类型选择弹窗；确定返回 option.value，所有安全退出路径返回 null。 */
+export function typeSelect(opts: TypeSelectOptions): Promise<string | null> {
+  const prev = typeSelectState.value
+  if (prev) {
+    typeSelectState.value = null
+    prev.resolve(null)
+  }
+  typeSelectOpts.value = {
+    ...opts,
+    options: opts.options.map(option => ({ ...option })),
+  }
+  return new Promise<string | null>((resolve) => {
+    typeSelectState.value = { id: typeSelectSeq++, resolve }
+  })
+}
+
+function resolveTypeSelect(value: string | null) {
+  const state = typeSelectState.value
+  if (!state)
+    return
+  typeSelectState.value = null
+  state.resolve(value)
+}
+
 // 注：ripple（蓝色水波动效）已全域废弃（见 ADR 0004），不提供该原语。
 
 /**
  * KitUI 原语统一入口（语义对照 DC 设计稿 window.KitUI，底座 shadcn-vue，ADR 0008）。
- * toast 家族复用既有单宿主 useToast；confirm/formModal 走本模块状态。
+ * toast 家族复用既有单宿主 useToast；confirm/formModal/typeSelect 走本模块状态。
  */
 export function useKitUI() {
   const toast = useToast()
@@ -112,6 +160,7 @@ export function useKitUI() {
     undoToast: toast.undo,
     confirm,
     formModal,
+    typeSelect,
     exportFile,
     openExportTab,
     openImportTab,
@@ -127,5 +176,8 @@ export function useKitUIHostState() {
     formModalState,
     formModalOpts,
     resolveFormModal,
+    typeSelectState,
+    typeSelectOpts,
+    resolveTypeSelect,
   }
 }
