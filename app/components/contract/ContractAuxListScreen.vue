@@ -94,7 +94,7 @@ onActivated(() => {
         </p>
       </div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索名称、编号或关联方" class="w-64" />
+        <SearchInput v-model="search" placeholder="搜索名称、编号或关联方" :width="256" />
         <KitButton variant="secondary" :loading="loading" @click="load">
           <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />
           刷新

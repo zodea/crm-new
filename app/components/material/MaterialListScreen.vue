@@ -169,7 +169,7 @@ onActivated(() => {
         </p>
       </div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索材料、编号或项目" class="w-68" />
+        <SearchInput v-model="search" placeholder="搜索材料、编号或项目" :width="272" />
         <KitButton variant="secondary" :loading="materialStore.loading" @click="load">
           <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
         </KitButton>
