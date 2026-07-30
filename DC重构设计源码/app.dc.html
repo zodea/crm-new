@@ -48,7 +48,7 @@
         <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
         <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; min-height:16px;">{{ pageSubtitle }}</div>
       </div>
-      <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">2026年6月29日 · 周一</div>
+      <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">{{ today }}</div>
     </header>
     {{ tabbar }}
     <main style="flex:1; padding:20px 24px 36px; min-height:0; overflow-y:auto;">
@@ -278,9 +278,6 @@
       <sc-if value="{{ isQuantityUnit }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="QuantityUnitScreen" from="./kit/QuantityUnitScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,600px"></x-import>
       </sc-if>
-      <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
-        <x-import component-from-global-scope="AppDetailScreen" from="./kit/DetailScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
-      </sc-if>
       <sc-if value="{{ isPayroll }}" hint-placeholder-val="{{ false }}">
         <x-import component-from-global-scope="PayrollScreen" from="./kit/PayrollScreen.jsx" data="{{ kitData }}" navigate="{{ navigate }}" params="{{ params }}" hint-size="100%,500px"></x-import>
       </sc-if>
@@ -354,10 +351,9 @@ const PAGE = {
   boqImport:     { title: "清单拆表",  subtitle: "上传 → 确认 → 拆表结果" },
   boqList:       { title: "工程量清单管理", subtitle: "分部 · 工种 · 分项 · 三量" },
   factor:        { title: "开票因子推算 · 税额计算", subtitle: "因子推断数量 · 价税分离 · 人民币大写" },
-  delivery:      { title: "送货单整理", subtitle: "识别中心 · 上传 · OCR · 分区归档" },
+  delivery:      { title: "送货单识别", subtitle: "乙供材管理 · 上传 · OCR · 核对归档" },
   quantity:      { title: "工程量管理", subtitle: "楼层 × 户号 × 分项 · 按月着色" },
   quantityUnit:  { title: "户详情", subtitle: "房间级三量 · 完成勾选 · 验收照片" },
-  detail:        { title: "施工明细",  subtitle: "楼层 × 工种 明细" },
   payroll:       { title: "工资核算",  subtitle: "项目 → 班组瀑布 → 请款簿总表（负责人制）" },
   payrollDetail: { title: "请款簿",  subtitle: "核对两步流 · A4 单据（格式族 A/B/C1/C2）" },
   price:         { title: "单价对比",  subtitle: "材料价格分析" },
@@ -370,9 +366,9 @@ class Component extends DCLogic {
     tabs: [{ id: "home", route: "home", params: {}, title: "首页" }],
     activeId: "home",
     collapsed: false,
-    // 批A 新侧栏 10 组（导航 Artifact 锁定版）：识别中心组退役，默认展开已实装的主线组
-    groupOpen: { "g-project": true, "g-main": true, "g-sub": true, "g-material": true, "g-owner-material": true,
-      "g-finance": true, "g-other": true, "g-base": true, "g-settings": false },
+    // 侧栏结构 = 1 个顶层项（首页）+ 9 个分组，共 50 个叶子（识别中心组已于 2026-07-09 退役，4 项迁回各域）。
+    // openGroup = null 表示跟随当前路由所属分组（单开手风琴，见 _buildSidebar）。
+    openGroup: null,
   };
 
   _tabSeq = 0;
@@ -537,7 +533,7 @@ class Component extends DCLogic {
     const fp = window.KIT_FORM_PAGES && window.KIT_FORM_PAGES[r];
     if (fp && fp.listRoute) r = fp.listRoute;
     if (key === "payroll") return r === "payroll" || r === "payrollDetail";
-    if (key === "quantity") return r === "quantity" || r === "detail" || r === "quantityUnit";
+    if (key === "quantity") return r === "quantity" || r === "quantityUnit";
     if (key === "crew") return r === "crew" || r === "crewDetail";
     if (key === "supplier") return r === "supplier" || r === "supplierDetail";
     if (key === "worker") return r === "worker" || r === "workerDetail";
@@ -558,7 +554,7 @@ class Component extends DCLogic {
   }
 
   _buildSidebar() {
-    const { collapsed, groupOpen } = this.state;
+    const { collapsed, openGroup } = this.state;
     const DS = window.DesignSystem_e3d871;
     if (!DS) return null;
     const { NavItem, Icon } = DS;
@@ -566,8 +562,9 @@ class Component extends DCLogic {
     const isActive = k => this._isActive(k);
     const W = collapsed ? 68 : 248;
 
-    // 批A 新侧栏（导航 Artifact 锁定版 10 组·约30实体）：识别中心组退役（4 项迁回各域）；
-    // disabled:true = 后续批次占位（B 资金 / C 主合同生命周期+分包单据+目标成本 / D 材料域 / E 其他合同+客户）
+    // 侧栏导航（锁定版）：1 个顶层项 + 9 个分组 = 50 个叶子，与实现 app/lib/nav/nav-tree.ts 逐条对齐
+    // （key 与 label 一致性由 tests/ui/design-token-contract.test.ts 的设计覆盖契约断言）。
+    // 所有叶子均已实装，不再保留「待建 / 待设计」占位机制。
     const NAV = [
       { type: "item", key: "home", mark: "首", label: "首页", hint: "总览" },
       { type: "group", key: "g-project", label: "项目信息", icon: "building", items: [
@@ -643,30 +640,24 @@ class Component extends DCLogic {
       ]},
     ];
 
-    const toggleGroup = key => this.setState(s => ({ groupOpen: { ...s.groupOpen, [key]: !s.groupOpen[key] } }));
+    // 一级目录单开手风琴：对齐实现 app/lib/nav/nav-tree.ts 的 toggleExclusiveGroup /
+    // ensureActiveGroupOpen —— 默认展开当前路由所属分组；打开新目录会关闭旧目录；
+    // 再次点击当前目录则全部收起；切到别的业务域后重新跟随路由。
+    const activeGroupKey = (NAV.find(n => n.type === "group" && n.items.some(it => isActive(it.key))) || {}).key || null;
+    const openKey = openGroup && openGroup.followedGroup === activeGroupKey ? openGroup.key : activeGroupKey;
+    const toggleGroup = key => this.setState({
+      openGroup: { followedGroup: activeGroupKey, key: openKey === key ? null : key },
+    });
 
     const miniBtn = n => React.createElement("button", {
-      key: n.key, onClick: n.disabled ? undefined : () => navigate(n.key), title: n.label + (n.disabled ? "（后续批次）" : ""),
+      key: n.key, onClick: () => navigate(n.key), title: n.label,
       style: { display: "grid", placeItems: "center", width: 40, height: 40, margin: "2px auto",
-        border: "1px solid", borderRadius: "var(--radius-btn)", cursor: n.disabled ? "not-allowed" : "pointer",
-        fontSize: 15, fontWeight: 800, opacity: n.disabled ? 0.38 : 1,
+        border: "1px solid", borderRadius: "var(--radius-btn)", cursor: "pointer",
+        fontSize: 15, fontWeight: 800,
         background: isActive(n.key) ? "var(--brand-soft)" : "var(--surface-2)",
         borderColor: isActive(n.key) ? "rgba(57,118,198,0.25)" : "var(--line)",
         color: isActive(n.key) ? "var(--brand)" : "var(--ink-soft)" }
     }, n.mark);
-
-    // 组内占位项（后续批次未实装）：灰显 + 「待建」徽标，不可点
-    const stubItem = it => React.createElement("div", { key: it.key, title: it.label + " · 后续批次实装",
-      style: { display: "flex", alignItems: "center", gap: 10, padding: "7px 10px",
-        borderRadius: "var(--radius-btn)", opacity: 0.42, cursor: "not-allowed", userSelect: "none" } },
-      React.createElement("span", { style: { display: "grid", placeItems: "center", width: 26, height: 26,
-        borderRadius: 7, background: "var(--surface-3)", border: "1px solid var(--line)",
-        fontWeight: 800, fontSize: 13, color: "var(--ink-soft)", flex: "none" } }, it.mark),
-      React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--ink-soft)", flex: 1,
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.label),
-      React.createElement("span", { style: { fontSize: 10.5, background: "var(--surface-2)", border: "1px solid var(--line)",
-        borderRadius: 4, padding: "1px 5px", flex: "none" } }, "待建")
-    );
 
     const navItems = NAV.map(n => {
       if (n.type === "item") {
@@ -675,24 +666,8 @@ class Component extends DCLogic {
           active: isActive(n.key), onClick: () => navigate(n.key)
         });
       }
-      if (n.type === "disabled") {
-        if (collapsed) return React.createElement("button", { key: n.key, title: "暂未开放",
-          style: { display: "grid", placeItems: "center", width: 40, height: 40, margin: "2px auto",
-            border: "1px solid var(--line)", borderRadius: 8, cursor: "not-allowed", opacity: 0.38,
-            background: "var(--surface-2)", fontSize: 15, fontWeight: 800, color: "var(--ink-soft)" } }, n.mark);
-        return React.createElement("div", { key: n.key, title: "暂未开放",
-          style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
-            borderRadius: "var(--radius-btn)", opacity: 0.38, cursor: "not-allowed", userSelect: "none" } },
-          React.createElement("span", { style: { display: "grid", placeItems: "center", width: 28, height: 28,
-            borderRadius: 8, background: "var(--surface-3)", border: "1px solid var(--line)",
-            fontWeight: 800, fontSize: 14, color: "var(--ink-soft)", flex: "none" } }, n.mark),
-          React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: "var(--ink-soft)" } }, n.label),
-          React.createElement("span", { style: { fontSize: 11, background: "var(--surface-2)", border: "1px solid var(--line)",
-            borderRadius: 4, padding: "1px 6px", marginLeft: "auto" } }, "待设计")
-        );
-      }
       if (n.type === "group") {
-        const isOpen = groupOpen[n.key];
+        const isOpen = openKey === n.key;
         if (collapsed) return React.createElement(React.Fragment, { key: n.key },
           React.createElement("div", { style: { height: 1, background: "var(--line)", margin: "8px 6px" } }),
           ...n.items.map(it => miniBtn(it))
@@ -708,7 +683,7 @@ class Component extends DCLogic {
           ),
           isOpen && React.createElement("div", {
             style: { display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, marginLeft: 8, borderLeft: "1px solid var(--line)" } },
-            ...n.items.map(it => it.disabled ? stubItem(it) : React.createElement(NavItem, {
+            ...n.items.map(it => React.createElement(NavItem, {
               key: it.key, mark: it.mark, label: it.label, hint: it.hint,
               active: isActive(it.key), onClick: () => navigate(it.key)
             }))
@@ -750,7 +725,7 @@ class Component extends DCLogic {
         ),
         !collapsed && React.createElement("div", { style: { paddingTop: 12, fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.7 } },
           React.createElement("div", null, "本地工具 · 数据不上传"),
-          React.createElement("div", null, "v2.0 · 工程量 / 工资模块")
+          React.createElement("div", null, "设计稿运行态 · 非生产构建")
         )
       )
     );
@@ -839,10 +814,14 @@ class Component extends DCLogic {
       isDelivery:      route === "delivery",
       isQuantity:      route === "quantity",
       isQuantityUnit:  route === "quantityUnit",
-      isDetail:        route === "detail",
       isPayroll:       route === "payroll",
       isPayrollDetail: route === "payrollDetail",
       isPrice:         route === "price",
+      // 顶栏日期按实际当天渲染；此前硬编码为某次演示当天，会被误当规格
+      today:           (() => {
+        const now = new Date();
+        return now.getFullYear() + "年" + (now.getMonth() + 1) + "月" + now.getDate() + "日 · 周" + "日一二三四五六"[now.getDay()];
+      })(),
       kitData:         window.KIT_DATA || null,
       navigate:        this.navigate,
       params,

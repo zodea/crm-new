@@ -1,17 +1,17 @@
 {
   "$schema": "本文件由 pnpm design:sync-coverage 生成；status 只允许 covered / design-pending / retired。",
   "counts": {
-    "designPageRoutes": 63,
+    "designPageRoutes": 62,
     "designFormRoutes": 37,
     "designNavGroups": 9,
     "designNavLeaves": 50,
-    "designMountedScreens": 79,
+    "designMountedScreens": 78,
     "appPageFiles": 126,
     "appNavLeaves": 50,
     "covered": 116,
     "designPending": 10,
-    "retired": 1,
-    "navTitleVariants": 7
+    "retired": 0,
+    "navTitleVariants": 6
   },
   "screenParity": [
     {
@@ -692,13 +692,7 @@
       "issue": 198
     }
   ],
-  "designOnly": [
-    {
-      "designRoute": "detail",
-      "status": "retired",
-      "reason": "遗留屏「施工明细」：头注 2026-07-19 自标待删，侧栏无入口，能力已由 quantityUnit 户详情承接"
-    }
-  ],
+  "designOnly": [],
   "navTitleVariants": [
     {
       "key": "project",
@@ -711,12 +705,6 @@
       "navLabel": "工程量清单",
       "pageTitle": "工程量清单管理",
       "reason": "侧栏短名「工程量清单」；页标题「工程量清单管理」。属短名 vs 全称，保留。"
-    },
-    {
-      "key": "delivery",
-      "navLabel": "送货单识别",
-      "pageTitle": "送货单整理",
-      "reason": "真冲突：侧栏「送货单识别」vs 页标题「送货单整理」，同一屏两个动词。CONTEXT.md「归档」词条以识别→核对→归档为口径，页标题应收敛为「送货单识别」（阶段 4 处理）。"
     },
     {
       "key": "omDirect",
@@ -917,7 +905,7 @@
       "appNavTo": "/material/delivery",
       "appLabel": "送货单识别",
       "designLabel": "送货单识别",
-      "designPageTitle": "送货单整理"
+      "designPageTitle": "送货单识别"
     },
     {
       "key": "deliveryArchive",

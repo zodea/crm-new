@@ -145,6 +145,56 @@
           t.children && h("div", { style: { paddingLeft: 14 } }, ...t.children.map((c) => btn(c, true)))))));
   }
 
-  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink, MoneyLink };
+  // —— 页面状态面板（state: loading|empty|error|forbidden；compact 只缩高度不改语义）——
+  // 契约见 docs/design/kit-ui-component-specs.md §09；页面级禁用巨型 spinner，
+  // error 走 role=alert，「筛选无结果」与「从未建档」必须给不同文案。
+  function StatePanel({ state, title, description, actionLabel, onAction, compact }) {
+    const { Button, Icon } = DS();
+    const SPEC = {
+      loading: { icon: "loader", tone: "var(--ink-faint)", role: "status", live: "polite" },
+      empty: { icon: "inbox", tone: "var(--ink-faint)", role: "status", live: "polite" },
+      error: { icon: "triangle-alert", tone: "var(--danger)", role: "alert", live: "assertive" },
+      forbidden: { icon: "lock", tone: "var(--warn)", role: "status", live: "polite" },
+    };
+    const spec = SPEC[state] || SPEC.empty;
+    return h("div", {
+      role: spec.role, "aria-live": spec.live, "aria-busy": state === "loading" ? "true" : undefined,
+      style: { display: "grid", placeItems: "center", gap: 8, textAlign: "center",
+        padding: compact ? "16px 12px" : "40px 24px", border: "1px solid var(--line)",
+        borderRadius: "var(--radius-card)", background: "var(--panel)" } },
+      Icon && h(Icon, { name: spec.icon, size: compact ? 18 : 24, color: spec.tone }),
+      h("div", { style: { fontSize: 13, fontWeight: 700, color: "var(--ink)" } }, title),
+      description && h("div", { style: { fontSize: 12, color: "var(--ink-soft)", maxWidth: 420 } }, description),
+      actionLabel && onAction && Button && h(Button, { variant: "secondary", size: "sm", onClick: onAction }, actionLabel));
+  }
+
+  // —— 行操作下拉菜单（items: [{key,label,danger,disabled,onSelect}]）——
+  // 表格操作列统一「纯图标触发 + 下拉」，不把多个文字按钮平铺进窄列。
+  function RowActionMenu({ items, label = "更多操作" }) {
+    const { Icon } = DS();
+    const [open, setOpen] = React.useState(false);
+    return h("div", { style: { position: "relative", display: "inline-flex" } },
+      h("button", {
+        type: "button", "aria-haspopup": "menu", "aria-expanded": open ? "true" : "false", title: label,
+        onClick: () => setOpen(v => !v), onBlur: () => setTimeout(() => setOpen(false), 120),
+        style: { display: "grid", placeItems: "center", width: 26, height: 26, cursor: "pointer",
+          border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)",
+          color: "var(--ink-soft)" } },
+        Icon ? h(Icon, { name: "ellipsis", size: 14 }) : "···"),
+      open && h("div", { role: "menu",
+        style: { position: "absolute", right: 0, top: 30, zIndex: 9000, minWidth: 148, padding: 4,
+          background: "var(--panel)", border: "1px solid var(--line)", borderRadius: "var(--radius-card)",
+          boxShadow: "var(--shadow-pop)" } },
+        ...items.map(it => h("button", {
+          key: it.key, role: "menuitem", type: "button", disabled: !!it.disabled,
+          onClick: () => { setOpen(false); it.onSelect && it.onSelect(); },
+          style: { display: "block", width: "100%", textAlign: "left", border: 0, padding: "7px 10px",
+            fontSize: 13, borderRadius: "var(--radius-sm)", background: "transparent",
+            cursor: it.disabled ? "not-allowed" : "pointer",
+            color: it.disabled ? "var(--ink-faint)" : it.danger ? "var(--danger-ink)" : "var(--ink)" } },
+          it.label))));
+  }
+
+  window.KitAtoms = { SelectFilter, SegTab, SearchInput, SectionHeader, Metric, MetricGrid, TreeNav, EntityLink, MoneyLink, StatePanel, RowActionMenu };
   window.KitAtomsScreen = function () { return null; };
 })();

@@ -22,7 +22,7 @@
 - **设计稿有、实现没有**（本文原有口径「未实现」）。
 - **实现有、设计稿没有**（`design-pending`）。实现跑到设计稿前面同样是缺口 —— 它让 ADR 0013 第 3 级权威源失效，评审时无据可对。
 
-三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**99** 是设计稿可达业务屏幕（62 常规 + 37 整页表单，不含不可达的 `detail` 残留）。#181 / #206 正文的 115 是过期数字。
+三个路由数字口径不同，不得相加：`git ls-files app/pages` 的 **131** 是页面文件数（含 5 个 `app/pages/dev/` 调试页）；**126** 是排除 dev 后的生产路由，与 [`runtime-reference-audit.md`](./runtime-reference-audit.md) §5 矩阵同口径；**99** 是设计稿可达业务屏幕（62 常规 + 37 整页表单）。#181 / #206 正文的 115 是过期数字。
 
 ## 2. 当前总数
 
@@ -31,14 +31,14 @@
 <!-- design-coverage:begin -->
 | 口径 | 数量 |
 | --- | ---: |
-| 设计稿 PAGE 路由 | 63 |
+| 设计稿 PAGE 路由 | 62 |
 | 设计稿整页表单路由 | 37 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
 | 实现生产路由（排除 dev） | 126 |
 | 实现侧栏叶子 | 50 |
 | 已覆盖 | 116 |
 | 待补设计（实现有、设计稿没有） | 10 |
-| 已退役（设计稿有、实现不做） | 1 |
+| 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
 侧栏 IA 已 1:1：实现与设计稿各 50 个叶子、key 与 label 逐条一致，且实现侧每个叶子都已填 `to`（无灰显占位）。
@@ -52,7 +52,7 @@
 | 付款管理 | `c61465a` | `/finance/payment-management`，侧栏 `payManage` 已填 `to` |
 | 请款簿详情 | `fda6c38` | `/subcontract/payroll/:id`，走统一详情壳 |
 
-唯一不映射到实现的设计屏是不可达的 `detail`（「施工明细」，头注 2026-07-19 自标待删，能力已由 `quantityUnit` 户详情承接），在 `design-coverage.json` 中登记为 `retired`。
+此前唯一不映射到实现的设计屏是不可达的 `detail`（「施工明细」，头注 2026-07-19 自标待删，能力已由 `quantityUnit` 户详情承接），已连同 `AppShell` / `QuantityScreen`（v1）/ `SettingsDialog` / `WageSlipScreen` 四个未挂载文件一并从设计源码删除，历史查 Git。`design-coverage.json` 的 `designOnly` 现为空。
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和详情动作。
 

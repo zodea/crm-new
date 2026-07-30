@@ -14,8 +14,8 @@
 | 项 | 规格 |
 |---|---|
 | 遮罩 | `rgba(0,0,0,.28)`(中性轻遮罩,2026-07-05 由品牌蓝改中性黑),**不上毛玻璃**(Tauri 性价比低) |
-| 圆角 | 弹窗/卡片 `--radius-card`(12px),按钮/输入 `--radius-btn`(8px,勘误:旧文写 10px,镜像 content-v5.css 实值 8px),小控件 `--radius-sm`(8px) |
-| 浮层阴影 | `--shadow-pop` |
+| 圆角 | 弹窗/卡片 `--radius-card`(**4px**),按钮/输入 `--radius-btn`(**4px**),小控件 `--radius-sm`(**3px**),胶囊 `--radius-pill` 仅留给状态/计数/进度语义。2026-07-27 ADR 0013 补充裁定把形状阶梯定为 4/4/3px,本行此前仍写 12/8/8px 的旧稿值(#244 同步);值以 `content-v5.css` 为准 |
+| 浮层阴影 | `--shadow-pop`(卡片本身 `--shadow-card: none`,可点面板只变边框或底色,不上浮) |
 | 进出动效 | `--dur-dialog`(220ms)+ `--ease-snappy`;进场 `opacity 0→1 + translateY(12→0)` |
 | 退路 | Esc 关闭、遮罩点击关闭、焦点锁定在浮层内 |
 | 配色语义 | 建设性主操作 = `--brand`;破坏性确认 = `--danger`;取消 = ghost 灰 |
