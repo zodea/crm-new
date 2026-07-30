@@ -42,7 +42,10 @@ export interface ScheduleFloorPlanView {
   floorId: string
   floorName: string
   buildingName: string
-  boqLineId: string
+  itemId: string
+  boqLineId: string | null
+  sourceBasis: ScheduleScopeBasis
+  provisionalQty: number | null
   itemName: string
   plannedStart: string
   plannedFinish: string
@@ -166,7 +169,10 @@ interface FloorPlanRow {
   floor_id: string
   floor_name: string
   building_name: string
-  boq_line_id: string
+  item_id: string
+  boq_line_id: string | null
+  source_basis: ScheduleScopeBasis
+  provisional_qty: number | null
   item_name: string
   planned_start: string
   planned_finish: string
@@ -427,8 +433,11 @@ export async function loadScheduleProject(
                 plan.floor_id,
                 floor_row.name AS floor_name,
                 building.name AS building_name,
+                plan.item_id,
                 plan.boq_line_id,
-                boq_line.item_name,
+                plan.source_basis,
+                plan.provisional_qty,
+                COALESCE(boq_line.item_name, item.name) AS item_name,
                 plan.planned_start,
                 plan.planned_finish,
                 plan.is_manual,
@@ -437,14 +446,15 @@ export async function loadScheduleProject(
          FROM schedule_task_floor_plans plan
          JOIN floors floor_row ON floor_row.id = plan.floor_id
          JOIN buildings building ON building.id = floor_row.building_id
-         JOIN boq_lines boq_line ON boq_line.id = plan.boq_line_id
+         JOIN items item ON item.id = plan.item_id
+         LEFT JOIN boq_lines boq_line ON boq_line.id = plan.boq_line_id
          WHERE ${visibleCond('schedule_task_floor_plans', 'plan')}
            AND plan.task_id IN (${taskPlaceholders})
          ORDER BY plan.task_id,
                   plan.sort_order,
                   building.sort_order,
                   floor_row.sort_order,
-                  boq_line.sort_order,
+                  plan.item_id,
                   plan.id`,
         taskIds,
       )
@@ -497,7 +507,10 @@ export async function loadScheduleProject(
       floorId: row.floor_id,
       floorName: row.floor_name,
       buildingName: row.building_name,
+      itemId: row.item_id,
       boqLineId: row.boq_line_id,
+      sourceBasis: row.source_basis,
+      provisionalQty: row.provisional_qty == null ? null : Number(row.provisional_qty),
       itemName: row.item_name,
       plannedStart: row.planned_start,
       plannedFinish: row.planned_finish,
@@ -554,7 +567,7 @@ export async function loadScheduleProject(
       itemNames: mappedItems.map(item => item.item_name),
       boqLineIds: [...new Set([
         ...mappedItems.flatMap(item => item.boq_line_id ? [item.boq_line_id] : []),
-        ...floorPlans.map(plan => plan.boqLineId),
+        ...floorPlans.flatMap(plan => plan.boqLineId ? [plan.boqLineId] : []),
       ])],
       floorPlans,
       applicableUnits,

@@ -190,6 +190,21 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
   }
 
   test('新建楼栋分组按范围、工序、预览三步完成', async ({ page }) => {
+    await page.goto('/subcontract/quantity/region?project=proj_demo_001')
+    await page.waitForLoadState('networkidle')
+    await page.getByLabel('楼栋列表').getByRole('button', { name: /3栋/ }).click()
+    const floorSection = page.locator('#section-floor')
+    await floorSection.getByLabel('楼层编码').fill('1F')
+    await floorSection.getByLabel('显示名称').fill('1层')
+    await floorSection.getByRole('button', { name: '新增楼层' }).click()
+    await expect(page.getByLabel('楼层列表').getByRole('button', { name: /1层/ })).toBeVisible()
+    const unitSection = page.locator('#section-unit')
+    await unitSection.getByLabel('户编码').fill('101')
+    await unitSection.getByLabel('显示名称').fill('101户')
+    await unitSection.getByLabel('户型模板').selectOption({ index: 1 })
+    await unitSection.getByRole('button', { name: '新增户' }).click()
+    await expect(page.getByLabel('户列表').getByText('101户', { exact: true })).toBeVisible()
+
     await page.goto('/schedule/new?project=proj_demo_001')
     await page.waitForLoadState('networkidle')
 
@@ -203,6 +218,7 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await expect(contractSelect).toHaveCount(0)
     await expect(page.locator('[data-schedule-wizard-step="1"] input[type="checkbox"]:checked')).toHaveCount(1)
     await expect(page.getByText('3栋', { exact: true })).toBeVisible()
+    await expect(page.getByText(/1 层 · 1 户 · \d+ 项 · 暂估量/)).toBeVisible()
     await expect(page.locator('[data-schedule-wizard-step="2"]')).toHaveCount(0)
     await expectDocumentDoesNotOverflow(page)
 
@@ -211,6 +227,8 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     await expect(page.getByText('FS 前置', { exact: true })).toBeVisible()
     await expect(page.locator('.process-row').filter({ has: page.locator('input[type="checkbox"]') })).toHaveCount(22)
     await expect(page.getByRole('button', { name: '生成排程', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: '清空' }).click()
+    await page.getByRole('checkbox', { name: '启用放线及新建墙体' }).check()
 
     await page.setViewportSize({ width: 390, height: 844 })
     const processScroll = page.getByTestId('schedule-new-process-scroll')
@@ -222,10 +240,49 @@ test.describe('Issue #114：施工进度 WBS 排程', () => {
     const previewStep = page.locator('[data-schedule-wizard-step="3"]')
     await expect(previewStep).toBeVisible()
     await expect(previewStep.getByText('范围依据', { exact: true })).toBeVisible()
-    await expect(previewStep.locator('tbody tr')).toHaveCount(22)
+    await expect(previewStep.getByText('覆盖核对', { exact: true })).toBeVisible()
+    await expect(previewStep.getByText('依赖冲突', { exact: true })).toBeVisible()
+    await expect(previewStep.getByText('阻断项', { exact: true })).toBeVisible()
+    await expect(previewStep.locator('tbody tr')).toHaveCount(1)
     await expect(page.getByRole('button', { name: '生成排程', exact: true })).toBeVisible()
     const previewScroll = page.getByTestId('schedule-new-preview-scroll')
     expect(await previewScroll.evaluate(element => element.scrollWidth > element.clientWidth)).toBeTruthy()
+    await expectDocumentDoesNotOverflow(page)
+  })
+
+  test('无项目区域时可直达楼栋楼层户配置并保留项目与返回参数', async ({ page }) => {
+    await page.goto('/schedule/new?project=proj_demo_002')
+    await page.waitForLoadState('networkidle')
+
+    await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible()
+    await page.getByRole('radio', { name: /内部暂估/ }).check()
+    await page.getByLabel('分组名称').fill('返回后保留的暂估分组')
+    await expect(page.getByText('当前项目尚未维护可用楼栋，或楼栋已全部纳入排程。')).toBeVisible()
+    const configureRegion = page.getByRole('link', { name: '配置楼栋、楼层与户' })
+    await expect(configureRegion).toBeVisible()
+    await expect(configureRegion).toHaveAttribute(
+      'href',
+      /\/subcontract\/quantity\/region\?project=proj_demo_002&return=schedule&resume=region/,
+    )
+    await configureRegion.click()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\/region\?project=proj_demo_002&return=schedule&resume=region/)
+    await expect(page.getByTestId('quantity-region-form')
+      .getByRole('heading', { name: '项目区域配置' })).toBeVisible()
+    const createTemplate = page.getByRole('link', { name: '新建户型模板' })
+    await expect(createTemplate).toHaveAttribute(
+      'href',
+      /\/subcontract\/quantity\/template\?project=proj_demo_002&return=region&origin=schedule&resume=region/,
+    )
+    await createTemplate.click()
+    await expect(page).toHaveURL(
+      /\/subcontract\/quantity\/template\?project=proj_demo_002&return=region&origin=schedule&resume=region/,
+    )
+    await page.getByRole('button', { name: '返回区域配置' }).click()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\/region\?project=proj_demo_002&return=schedule&resume=region/)
+    await page.getByRole('button', { name: '返回新建排程' }).click()
+    await expect(page).toHaveURL(/\/schedule\/new\?project=proj_demo_002&resume=region/)
+    await expect(page.getByLabel('分组名称')).toHaveValue('返回后保留的暂估分组')
+    await expect(page.getByRole('radio', { name: /内部暂估/ })).toBeChecked()
     await expectDocumentDoesNotOverflow(page)
   })
 })

@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import type { TargetCostItemDraft } from '~/lib/target-cost/items'
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { yuan } from '~/lib/util/money'
 
 type DetailTab = 'items' | 'comparison'
 
 const route = useRoute()
 const store = useTargetCostDetailStore()
-const { current, loadedId, loading, error } = storeToRefs(store)
+const { current, loadedId, loading, error, savingItems } = storeToRefs(store)
+const { confirm, success, warning, error: notifyError } = useKitUI()
 
 const targetCostId = computed(() => String(route.params.id ?? ''))
 const activeTab = shallowRef<DetailTab>('items')
+const editingItems = shallowRef(false)
+const itemDrafts = shallowRef<TargetCostItemDraft[]>([])
+const itemEditor = useTemplateRef<{
+  validate: () => Promise<{ row: number, key: string }[]>
+}>('itemEditor')
 const detail = computed(() =>
   current.value?.header.id === targetCostId.value ? current.value : null,
 )
@@ -32,6 +40,10 @@ const statusLabel = computed(() =>
 const statusClass = computed(() =>
   header.value?.status === 'submitted' ? 'chip-ok' : 'chip-warn',
 )
+const itemDraftsDirty = computed(() =>
+  editingItems.value
+  && JSON.stringify(itemDrafts.value) !== JSON.stringify(detail.value?.items ?? []),
+)
 
 useTabTitle(() => header.value?.name)
 
@@ -45,7 +57,76 @@ async function load() {
   await store.load(targetCostId.value)
 }
 
+function beginItemEdit() {
+  if (!detail.value)
+    return
+  itemDrafts.value = detail.value.items.map(item => ({ ...item }))
+  editingItems.value = true
+}
+
+function discardItemDrafts() {
+  editingItems.value = false
+  itemDrafts.value = []
+}
+
+async function confirmDiscard(message: string): Promise<boolean> {
+  if (!itemDraftsDirty.value)
+    return true
+  return confirm({
+    variant: 'simple',
+    title: '放弃科目修改',
+    message,
+    confirmLabel: '放弃修改',
+  })
+}
+
+async function cancelItemEdit() {
+  if (!await confirmDiscard('当前科目明细还有未保存内容，确认放弃？'))
+    return
+  discardItemDrafts()
+}
+
+async function saveItems() {
+  if (!targetCostId.value)
+    return
+  const errors = await itemEditor.value?.validate() ?? []
+  if (errors.length) {
+    warning(`还有 ${errors.length} 处科目明细需要修正`)
+    return
+  }
+  try {
+    await store.saveItems(targetCostId.value, itemDrafts.value)
+    discardItemDrafts()
+    success('科目明细已保存')
+  }
+  catch (cause) {
+    await itemEditor.value?.validate()
+    notifyError(`科目明细保存失败：${cause instanceof Error ? cause.message : '未知错误'}`)
+  }
+}
+
+async function guardUnsavedRouteChange() {
+  const accepted = await confirmDiscard('当前科目明细还有未保存内容，离开后修改将丢失，确认放弃并离开？')
+  if (accepted)
+    discardItemDrafts()
+  return accepted
+}
+
+onBeforeRouteLeave(guardUnsavedRouteChange)
+onBeforeRouteUpdate(guardUnsavedRouteChange)
+
+useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
+  if (!itemDraftsDirty.value)
+    return
+  event.preventDefault()
+  event.returnValue = ''
+})
+
 watch(targetCostId, () => void load(), { immediate: true })
+watch(targetCostId, () => {
+  editingItems.value = false
+  itemDrafts.value = []
+})
 </script>
 
 <template>
@@ -110,9 +191,18 @@ watch(targetCostId, () => void load(), { immediate: true })
         <SegTab v-model="activeTab" :tabs="tabs" />
       </nav>
 
+      <TargetCostItemEditor
+        v-if="activeTab === 'items' && editingItems"
+        ref="itemEditor"
+        v-model="itemDrafts"
+        :saving="savingItems"
+        @save="saveItems"
+        @cancel="cancelItemEdit"
+      />
       <TargetCostItemTable
-        v-if="activeTab === 'items'"
+        v-else-if="activeTab === 'items'"
         :items="detail.items"
+        @edit="beginItemEdit"
       />
       <TargetCostComparisonTable
         v-else

@@ -1,3 +1,3 @@
 <template>
-  <MasterDataSimpleList kind="target_cost" />
+  <TargetCostListScreen />
 </template>

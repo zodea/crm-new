@@ -213,7 +213,31 @@ async function loadMappedItems(db: SoftDb, groupId: string): Promise<ItemRow[]> 
   )
 }
 
-async function loadProvisionalQuantities(
+async function loadFrozenProvisionalQuantities(
+  db: SoftDb,
+  groupId: string,
+  itemIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (!itemIds.length)
+    return new Map()
+  const rows = await db.select<QuantityRow>(
+    `${hiddenCtesFor('schedule_task_floor_plans', 'schedule_tasks')}
+     SELECT plan.item_id,
+            SUM(COALESCE(plan.provisional_qty, 0)) AS qty
+     FROM schedule_task_floor_plans plan
+     JOIN schedule_tasks task ON task.id = plan.task_id
+     WHERE ${visibleCond('schedule_task_floor_plans', 'plan')}
+       AND ${visibleCond('schedule_tasks', 'task')}
+       AND task.group_id = ?
+       AND plan.source_basis = 'provisional'
+       AND plan.item_id IN (${placeholders(itemIds)})
+     GROUP BY plan.item_id`,
+    [groupId, ...itemIds],
+  )
+  return new Map(rows.map(row => [row.item_id, numberValue(row.qty)]))
+}
+
+async function loadLegacyTemplateProvisionalQuantities(
   db: SoftDb,
   groupId: string,
   itemIds: readonly string[],
@@ -246,6 +270,26 @@ async function loadProvisionalQuantities(
     [groupId, ...itemIds],
   )
   return new Map(rows.map(row => [row.item_id, numberValue(row.qty)]))
+}
+
+async function loadProvisionalQuantities(
+  db: SoftDb,
+  groupId: string,
+  itemIds: readonly string[],
+): Promise<Map<string, number>> {
+  const frozenQuantities = await loadFrozenProvisionalQuantities(db, groupId, itemIds)
+  const legacyItemIds = itemIds.filter(itemId => !frozenQuantities.has(itemId))
+  if (!legacyItemIds.length)
+    return frozenQuantities
+
+  // 兼容 v38 前只生成 task_item_map、尚无楼层计划快照的暂估分项。
+  // 升级后新增过工序的分组可能同时包含冻结行与旧映射，回退必须逐分项合并。
+  const legacyQuantities = await loadLegacyTemplateProvisionalQuantities(
+    db,
+    groupId,
+    legacyItemIds,
+  )
+  return new Map([...legacyQuantities, ...frozenQuantities])
 }
 
 async function loadContractQuantities(

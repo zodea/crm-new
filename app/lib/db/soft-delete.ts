@@ -101,6 +101,7 @@ export const PARENT_REFS: Record<string, ParentRef[]> = {
   schedule_task_floor_plans: [
     { column: 'task_id', table: 'schedule_tasks' },
     { column: 'floor_id', table: 'floors' },
+    { column: 'item_id', table: 'items' },
   ],
   supplier_credentials: [{ column: 'supplier_id', table: 'suppliers' }],
   supplier_credential_requirements: [{ column: 'supplier_id', table: 'suppliers' }],

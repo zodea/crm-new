@@ -1,4 +1,8 @@
 import type {
+  ContractAuxListKind,
+  ContractAuxRow,
+} from '~/lib/contract/aux-list'
+import type {
   ContractFormAttachmentChanges,
   F2FormDraft,
   F2FormKind,
@@ -71,17 +75,6 @@ export interface Contract {
   updatedAt: string
 }
 
-export interface ContractAuxRow {
-  id: string
-  no: string
-  name: string
-  projectName: string
-  partyName: string
-  amount: number
-  date: string
-  status: string
-}
-
 type ContractLookupTable = 'projects' | 'customers' | 'suppliers'
 
 /** 金额字段归一:空串 / NaN / nullish → 0(四级金额链默认 0,与 schema DEFAULT 0 一致) */
@@ -143,10 +136,15 @@ function rowToContract(row: Record<string, unknown>): Contract {
 export const useContractStore = defineStore('contract', () => {
   const list = shallowRef<Contract[]>([])
   const auxLists = shallowRef<Record<string, ContractAuxRow[]>>({})
+  const auxLoading = shallowRef<Partial<Record<ContractAuxListKind, boolean>>>({})
+  const auxErrors = shallowRef<Partial<Record<ContractAuxListKind, string>>>({})
+  const auxLoadSequence: Partial<Record<ContractAuxListKind, number>> = {}
   const loading = shallowRef(false)
+  const loadError = shallowRef('')
 
   async function load() {
     loading.value = true
+    loadError.value = ''
     try {
       const rows = await select<Record<string, unknown>>(`
         ${hiddenCtesFor(
@@ -255,6 +253,10 @@ export const useContractStore = defineStore('contract', () => {
       `)
       list.value = rows.map(rowToContract)
     }
+    catch (cause) {
+      loadError.value = cause instanceof Error ? cause.message : '合同列表载入失败'
+      throw cause
+    }
     finally {
       loading.value = false
     }
@@ -269,8 +271,16 @@ export const useContractStore = defineStore('contract', () => {
     return list.value.filter(c => c.kind === kind)
   }
 
-  function auxByKind(kind: F2FormKind) {
+  function auxByKind(kind: ContractAuxListKind) {
     return auxLists.value[kind] ?? []
+  }
+
+  function auxLoadingFor(kind: ContractAuxListKind) {
+    return auxLoading.value[kind] ?? false
+  }
+
+  function auxError(kind: ContractAuxListKind) {
+    return auxErrors.value[kind] ?? ''
   }
 
   async function searchLookup(
@@ -335,6 +345,7 @@ export const useContractStore = defineStore('contract', () => {
     }>(selectVisibleSql('contracts', `
       AND kind = ?
       AND project_id = ?
+      AND status NOT IN ('draft', '草稿')
       AND (name LIKE ? OR no LIKE ?)
       ORDER BY sign_date DESC, created_at DESC
       LIMIT 50
@@ -352,17 +363,26 @@ export const useContractStore = defineStore('contract', () => {
   }
 
   async function loadAux(
-    kind: 'other_expense' | 'company_expense' | 'other_settlement' | 'material_settlement',
+    kind: ContractAuxListKind,
   ) {
-    loading.value = true
+    const sequence = (auxLoadSequence[kind] ?? 0) + 1
+    auxLoadSequence[kind] = sequence
+    auxLoading.value = { ...auxLoading.value, [kind]: true }
+    auxErrors.value = { ...auxErrors.value, [kind]: '' }
     try {
       let rows: ContractAuxRow[]
       if (kind === 'other_expense') {
         rows = await select<ContractAuxRow>(`
         ${hiddenCtesFor('contracts')}
         SELECT contract.id, contract.no, contract.name,
+               COALESCE(contract.project_id, '') AS projectId,
                COALESCE(project.name, '') AS projectName,
-               COALESCE(supplier.name, '') AS partyName,
+               COALESCE(contract.supplier_id, '') AS supplierId,
+               COALESCE(supplier.name, '') AS supplierName,
+               '' AS contractId, '' AS contractName,
+               COALESCE(contract.other_expense_kind, '') AS category,
+               COALESCE(supplier.name, '') AS counterparty,
+               COALESCE(contract.service_period, '') AS period,
                contract.amount, contract.sign_date AS date, contract.status
         FROM contracts AS contract
         LEFT JOIN projects AS project
@@ -379,7 +399,9 @@ export const useContractStore = defineStore('contract', () => {
           id: string
           no: string
           name: string
+          category: string
           counterparty: string
+          service_period: string
           amount: number
           sign_date: string
           status: string
@@ -388,8 +410,15 @@ export const useContractStore = defineStore('contract', () => {
           id: row.id,
           no: row.no,
           name: row.name,
+          projectId: '',
           projectName: '',
-          partyName: row.counterparty,
+          supplierId: '',
+          supplierName: '',
+          contractId: '',
+          contractName: '',
+          category: row.category,
+          counterparty: row.counterparty,
+          period: row.service_period,
           amount: Number(row.amount),
           date: row.sign_date,
           status: row.status,
@@ -399,8 +428,15 @@ export const useContractStore = defineStore('contract', () => {
         rows = await select<ContractAuxRow>(`
         ${hiddenCtesFor('expenditure_settlements')}
         SELECT settlement.id, settlement.no, settlement.name,
+               COALESCE(settlement.project_id, '') AS projectId,
                COALESCE(project.name, '') AS projectName,
-               COALESCE(contract.name, '') AS partyName,
+               COALESCE(settlement.supplier_id, '') AS supplierId,
+               COALESCE(supplier.name, '') AS supplierName,
+               COALESCE(settlement.contract_id, '') AS contractId,
+               COALESCE(contract.name, '') AS contractName,
+               COALESCE(settlement.biz_type, '') AS category,
+               '' AS counterparty,
+               COALESCE(settlement.settlement_period, '') AS period,
                settlement.total_amount AS amount,
                settlement.settlement_date AS date, settlement.status
         FROM expenditure_settlements AS settlement
@@ -408,6 +444,8 @@ export const useContractStore = defineStore('contract', () => {
           ON project.id = settlement.project_id AND project.deleted_at IS NULL
         LEFT JOIN contracts AS contract
           ON contract.id = settlement.contract_id AND contract.deleted_at IS NULL
+        LEFT JOIN suppliers AS supplier
+          ON supplier.id = settlement.supplier_id AND supplier.deleted_at IS NULL
         WHERE ${visibleCond('expenditure_settlements', 'settlement')}
           AND settlement.biz_type ${kind === 'material_settlement'
             ? `IN ('材料', '材采')`
@@ -415,10 +453,21 @@ export const useContractStore = defineStore('contract', () => {
         ORDER BY settlement.created_at DESC
         `)
       }
-      auxLists.value = { ...auxLists.value, [kind]: rows }
+      if (auxLoadSequence[kind] === sequence)
+        auxLists.value = { ...auxLists.value, [kind]: rows }
+    }
+    catch (cause) {
+      if (auxLoadSequence[kind] === sequence) {
+        auxErrors.value = {
+          ...auxErrors.value,
+          [kind]: cause instanceof Error ? cause.message : '列表载入失败',
+        }
+      }
+      throw cause
     }
     finally {
-      loading.value = false
+      if (auxLoadSequence[kind] === sequence)
+        auxLoading.value = { ...auxLoading.value, [kind]: false }
     }
   }
 
@@ -429,37 +478,52 @@ export const useContractStore = defineStore('contract', () => {
     attachments?: ContractFormAttachmentChanges,
   ) {
     const result = await saveF2Form(kind, draft, action, attachments)
-    await load()
+    await refreshAfterMutation(kind)
     return result
+  }
+
+  function isAuxKind(kind: F2FormKind): kind is ContractAuxListKind {
+    return kind === 'company_expense'
+      || kind === 'other_settlement'
+      || kind === 'material_settlement'
+      || kind === 'other_expense'
+  }
+
+  async function refreshAfterMutation(kind: F2FormKind) {
+    const refreshes: Promise<unknown>[] = []
+    if (isAuxKind(kind))
+      refreshes.push(loadAux(kind))
+    if (kind !== 'company_expense' && kind !== 'other_settlement' && kind !== 'material_settlement')
+      refreshes.push(load())
+    await Promise.all(refreshes.map(refresh => refresh.catch(() => undefined)))
   }
 
   async function removeForm(kind: F2FormKind, id: string) {
     const logId = await deleteF2Form(kind, id)
-    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'material_settlement' || kind === 'other_expense')
-      await loadAux(kind)
-    if (kind !== 'company_expense' && kind !== 'other_settlement' && kind !== 'material_settlement')
-      await load()
+    await refreshAfterMutation(kind)
     return logId
   }
 
   async function undoForm(kind: F2FormKind, logId: string) {
     const restored = await undoOperation(db, logId)
-    if (kind === 'company_expense' || kind === 'other_settlement' || kind === 'material_settlement' || kind === 'other_expense')
-      await loadAux(kind)
-    if (kind !== 'company_expense' && kind !== 'other_settlement' && kind !== 'material_settlement')
-      await load()
+    await refreshAfterMutation(kind)
     return restored
   }
 
   return {
     list: readonly(list),
     auxLists: readonly(auxLists),
+    auxLoading: readonly(auxLoading),
+    auxErrors: readonly(auxErrors),
     loading: readonly(loading),
+    loadError: readonly(loadError),
     load,
     loadAux,
     byId,
     byKind,
     auxByKind,
+    auxLoadingFor,
+    auxError,
     searchProjects,
     searchCustomers,
     searchSuppliers,

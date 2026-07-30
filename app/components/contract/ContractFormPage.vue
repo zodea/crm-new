@@ -72,6 +72,7 @@ const lineItemsEditor = useTemplateRef<{
 }>('lineItemsEditor')
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
+const loadError = shallowRef('')
 const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = useState<boolean>(
   `contract-form-close-after-save:${props.kind}`,
@@ -107,10 +108,40 @@ const aggregate = computed(() => {
   }
 })
 
-const selectedContractAmount = computed(() => {
+const selectedContract = computed(() => {
   if (!draft.value.contractId)
     return null
-  return contractStore.byId(draft.value.contractId)?.amount ?? null
+  const contract = contractStore.byId(draft.value.contractId)
+  if (!contract)
+    return null
+  return {
+    projectName: contract.projectName,
+    supplierName: contract.supplierName,
+    amount: contract.amount,
+    paid: contract.paid,
+  }
+})
+const eligibleSettlementContractCount = computed(() => {
+  if (
+    !draft.value.projectId
+    || (props.kind !== 'other_settlement' && props.kind !== 'material_settlement')
+  ) {
+    return null
+  }
+  const expectedKind = props.kind === 'material_settlement' ? '材采' : '其他支出'
+  return contractStore.list
+    .filter(contract =>
+      String(contract.kind) === expectedKind
+      && contract.projectId === draft.value.projectId
+      && !['draft', '草稿'].includes(contract.status),
+    )
+    .length
+})
+
+const pageState = computed(() => {
+  if (loading.value)
+    return 'loading'
+  return loadError.value ? 'error' : 'ready'
 })
 
 const fetchProjects = contractStore.searchProjects
@@ -133,6 +164,7 @@ function fetchOtherExpenseContracts(keyword: string) {
 
 async function initialize() {
   loading.value = true
+  loadError.value = ''
   fieldErrors.value = {}
   resetAttachments()
   try {
@@ -172,7 +204,8 @@ async function initialize() {
     savedSnapshot.value = JSON.stringify(draft.value)
   }
   catch (cause) {
-    error(`载入失败：${toErrorMessage(cause)}`)
+    loadError.value = toErrorMessage(cause)
+    error(`载入失败：${loadError.value}`)
   }
   finally {
     loading.value = false
@@ -240,8 +273,14 @@ function validateRequired(): boolean {
   }
   fieldErrors.value = errors
   const messages = Object.values(errors)
-  if (messages.length)
+  if (messages.length) {
     warning(`${messages[0]}（共 ${messages.length} 处）`)
+    void nextTick(() => {
+      document
+        .querySelector<HTMLElement>('form [aria-invalid="true"]')
+        ?.focus()
+    })
+  }
   return messages.length === 0
 }
 
@@ -358,9 +397,12 @@ onMounted(() => void initialize())
     :subtitle="`${meta.subtitle}；草稿允许缺项，提交时校验真实关联与金额勾稽。`"
     :back-label="`返回${meta.listLabel}`"
     :sections="sections"
-    :state="loading ? 'loading' : 'ready'"
-    state-title="正在载入表单"
+    :state="pageState"
+    :state-title="pageState === 'error' ? '表单载入失败' : '正在载入表单'"
+    :state-description="loadError ? `无法载入${meta.label}：${loadError}` : ''"
+    state-action-label="重新载入"
     @back="leaveToList"
+    @state-action="initialize"
   >
     <template #status>
       <span v-if="draft.status" class="chip bg-surface-3 text-ink-soft">
@@ -380,7 +422,8 @@ onMounted(() => void initialize())
         :fetch-original-contracts="fetchOriginalContracts"
         :fetch-other-expense-contracts="fetchOtherExpenseContracts"
         :aggregate="aggregate"
-        :selected-contract-amount="selectedContractAmount"
+        :selected-contract="selectedContract"
+        :eligible-settlement-contract-count="eligibleSettlementContractCount"
         @patch="patchDraft"
         @clear-error="clearFieldError"
       />

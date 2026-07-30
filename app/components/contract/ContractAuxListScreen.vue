@@ -1,45 +1,157 @@
 <script setup lang="ts">
-import type { F2FormKind } from '~/lib/contract/forms'
-import type { KitTableColumn } from '~/lib/kit/table'
-import type { ContractAuxRow } from '~/stores/contract'
+import type {
+  ContractAuxListKind,
+  ContractAuxRow,
+} from '~/lib/contract/aux-list'
+import {
+  CONTRACT_AUX_LIST_CONFIG,
+  contractAuxStatusClass,
+  filterContractAuxRows,
+} from '~/lib/contract/aux-list'
 import { F2_FORM_META, formPath } from '~/lib/contract/page'
+import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
-  kind: 'other_expense' | 'company_expense' | 'other_settlement' | 'material_settlement'
+  kind: ContractAuxListKind
 }>()
 
+const route = useRoute()
 const contractStore = useContractStore()
 const { confirm, undoToast, error } = useKitUI()
-const meta = computed(() => F2_FORM_META[props.kind])
-const rows = computed(() => contractStore.auxByKind(props.kind))
-const loading = computed(() => contractStore.loading)
-const search = shallowRef('')
 
-const filtered = computed(() => {
-  const keyword = search.value.trim().toLowerCase()
-  if (!keyword)
-    return rows.value
-  return rows.value.filter(row =>
-    [row.no, row.name, row.projectName, row.partyName]
-      .some(value => value.toLowerCase().includes(keyword)),
-  )
+const meta = computed(() => F2_FORM_META[props.kind])
+const config = computed(() => CONTRACT_AUX_LIST_CONFIG[props.kind])
+const rows = computed(() => contractStore.auxByKind(props.kind))
+const loading = computed(() => contractStore.auxLoadingFor(props.kind))
+const loadError = computed(() => contractStore.auxError(props.kind))
+
+const search = shallowRef('')
+const projectFilter = shallowRef('all')
+const categoryFilter = shallowRef('all')
+const statusFilter = shallowRef('all')
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
+
+function queryText(key: 'project' | 'contract' | 'supplier'): string {
+  const value = route.query[key]
+  return Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
+}
+
+const routeProject = computed(() =>
+  props.kind === 'company_expense' ? '' : queryText('project'),
+)
+const routeContract = computed(() =>
+  props.kind.endsWith('_settlement') ? queryText('contract') : '',
+)
+const routeSupplier = computed(() =>
+  props.kind === 'company_expense' ? '' : queryText('supplier'),
+)
+
+const filtered = computed(() => filterContractAuxRows(props.kind, rows.value, {
+  search: search.value,
+  project: projectFilter.value,
+  category: categoryFilter.value,
+  status: statusFilter.value,
+  routeProject: routeProject.value,
+  routeContract: routeContract.value,
+  routeSupplier: routeSupplier.value,
+}))
+
+const currentPage = computed(() =>
+  clampPage(page.value, filtered.value.length, pageSize.value),
+)
+const pageRows = computed(() =>
+  paginate(filtered.value, currentPage.value, pageSize.value),
+)
+const summaryAmount = computed(() =>
+  filtered.value.reduce((total, row) => total + Number(row.amount || 0), 0),
+)
+
+interface FilterOption {
+  key: string
+  label: string
+}
+
+function distinctOptions(
+  key: 'projectId' | 'category' | 'status',
+  labelKey: 'projectName' | 'category' | 'status',
+  allLabel: string,
+): FilterOption[] {
+  const values = rows.value
+    .map(row => ({ key: row[key], label: row[labelKey] }))
+    .filter(option => option.key && option.label)
+  return [
+    { key: 'all', label: allLabel },
+    ...[...new Map(values.map(option => [option.key, option])).values()]
+      .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN')),
+  ]
+}
+
+const projectOptions = computed(() =>
+  distinctOptions('projectId', 'projectName', '全部项目'),
+)
+const categoryOptions = computed(() =>
+  distinctOptions('category', 'category', '全部类别'),
+)
+const statusOptions = computed(() =>
+  distinctOptions('status', 'status', '全部状态'),
+)
+
+const contextFilters = computed(() => {
+  const contexts: Array<{ key: 'project' | 'contract' | 'supplier', label: string }> = []
+  if (routeProject.value) {
+    const label = rows.value.find(row => row.projectId === routeProject.value)?.projectName
+      || routeProject.value
+    contexts.push({ key: 'project', label: `项目：${label}` })
+  }
+  if (routeContract.value) {
+    const label = rows.value.find(row => row.contractId === routeContract.value)?.contractName
+      || routeContract.value
+    contexts.push({ key: 'contract', label: `合同：${label}` })
+  }
+  if (routeSupplier.value) {
+    const label = rows.value.find(row => row.supplierId === routeSupplier.value)?.supplierName
+      || routeSupplier.value
+    contexts.push({ key: 'supplier', label: `分供方：${label}` })
+  }
+  return contexts
 })
 
-const columns: KitTableColumn[] = [
-  { title: '#', type: 'seq', width: 54 },
-  { field: 'name', title: '名称', minWidth: 220, fixed: 'left', slot: 'name' },
-  { field: 'no', title: '编号', width: 170 },
-  { field: 'projectName', title: '项目', minWidth: 160 },
-  { field: 'partyName', title: '关联方/源合同', minWidth: 200 },
-  { field: 'amount', title: '含税金额', type: 'money', width: 140 },
-  { field: 'date', title: '签订/结算日期', type: 'date', width: 128 },
-  { field: 'status', title: '状态', width: 100, slot: 'status' },
-  { title: '操作', type: 'action', width: 104 },
-]
+const hasLocalFilters = computed(() =>
+  Boolean(search.value)
+  || projectFilter.value !== 'all'
+  || categoryFilter.value !== 'all'
+  || statusFilter.value !== 'all',
+)
+
+const emptyState = computed(() => {
+  if (rows.value.length === 0) {
+    return {
+      title: `暂无${meta.value.listLabel}`,
+      description: `当前业务范围内还没有${meta.value.label}，可从新建开始。`,
+      actionLabel: `新建${meta.value.label}`,
+    }
+  }
+  return {
+    title: `没有符合条件的${meta.value.label}`,
+    description: '请调整搜索、项目、类别或状态筛选条件。',
+    actionLabel: '清除筛选',
+  }
+})
+
+const rowActions = [
+  { key: 'edit', label: '编辑', icon: 'i-lucide-square-pen' },
+  { key: 'delete', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' as const },
+] as const
 
 async function load() {
-  await contractStore.loadAux(props.kind)
+  try {
+    await contractStore.loadAux(props.kind)
+  }
+  catch {
+    // Store 持有可重试错误态；此处避免挂载生命周期产生未处理拒绝。
+  }
 }
 
 function openCreate() {
@@ -50,6 +162,65 @@ function openEdit(row: ContractAuxRow) {
   void navigateTo(formPath(props.kind, row.id))
 }
 
+function sourceContractPath(row: ContractAuxRow): string {
+  return props.kind === 'material_settlement'
+    ? formPath('material', row.contractId)
+    : formPath('other_expense', row.contractId)
+}
+
+async function clearRouteFilter(key: 'project' | 'contract' | 'supplier') {
+  const query = { ...route.query }
+  delete query[key]
+  await navigateTo({ path: route.path, query }, { replace: true })
+}
+
+async function resetFilters() {
+  search.value = ''
+  projectFilter.value = 'all'
+  categoryFilter.value = 'all'
+  statusFilter.value = 'all'
+  if (contextFilters.value.length) {
+    const query = { ...route.query }
+    delete query.project
+    delete query.contract
+    delete query.supplier
+    await navigateTo({ path: route.path, query }, { replace: true })
+  }
+}
+
+function handleEmptyAction() {
+  if (rows.value.length === 0)
+    openCreate()
+  else
+    void resetFilters()
+}
+
+function handlePageChange(payload: { page: number, pageSize: number }) {
+  page.value = payload.page
+  pageSize.value = payload.pageSize
+}
+
+async function handleRowAction(action: string, row: ContractAuxRow) {
+  if (action === 'edit') {
+    openEdit(row)
+    return
+  }
+  if (action === 'delete')
+    await handleDelete(row)
+}
+
+function restoreRowActionFocus(row: ContractAuxRow) {
+  window.setTimeout(() => {
+    const label = `${row.name}${meta.value.label}操作`
+    const trigger = [...document.querySelectorAll<HTMLElement>('[data-ui="row-action-menu-trigger"]')]
+      .find(element =>
+        element.getAttribute('aria-label') === label
+        && element.offsetParent !== null,
+      )
+    trigger?.focus()
+  })
+}
+
 async function handleDelete(row: ContractAuxRow) {
   const accepted = await confirm({
     variant: 'simple',
@@ -57,10 +228,12 @@ async function handleDelete(row: ContractAuxRow) {
     message: `确认删除「${row.name}」？有关联付款分摊或下游单据时会阻止删除。`,
     confirmLabel: '删除',
   })
-  if (!accepted)
+  if (!accepted) {
+    restoreRowActionFocus(row)
     return
+  }
   try {
-    const logId = await contractStore.removeForm(props.kind as F2FormKind, row.id)
+    const logId = await contractStore.removeForm(props.kind, row.id)
     if (!logId) {
       error('记录不存在或已删除')
       return
@@ -72,68 +245,142 @@ async function handleDelete(row: ContractAuxRow) {
   catch (cause) {
     error(cause instanceof Error ? cause.message : '删除失败')
   }
+  finally {
+    restoreRowActionFocus(row)
+  }
 }
 
-onMounted(() => {
-  void load()
-})
+watch(
+  [search, projectFilter, categoryFilter, statusFilter, routeProject, routeContract, routeSupplier],
+  () => page.value = 1,
+)
+
+let hasActivated = false
+onMounted(() => void load())
 onActivated(() => {
+  if (!hasActivated) {
+    hasActivated = true
+    return
+  }
   void load()
 })
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-4">
-    <header class="panel flex flex-wrap items-center gap-3 px-4 py-3">
-      <div>
-        <h1 class="text-17px font-800 text-ink">
-          {{ meta.listLabel }}
-        </h1>
-        <p class="mt-0.5 text-11px text-ink-faint">
-          {{ meta.subtitle }}
-        </p>
-      </div>
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索名称、编号或关联方" :width="256" />
-        <KitButton variant="secondary" :loading="loading" @click="load">
-          <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />
-          刷新
-        </KitButton>
-        <KitButton data-testid="create-aux-contract" @click="openCreate">
-          <span class="i-lucide-plus mr-1" aria-hidden="true" />
-          新建{{ meta.label }}
-        </KitButton>
-      </div>
-    </header>
+  <div class="flex min-w-0 flex-col gap-3">
+    <ContractAuxListToolbar
+      v-model:search="search"
+      v-model:project="projectFilter"
+      v-model:category="categoryFilter"
+      v-model:status="statusFilter"
+      :title="meta.listLabel"
+      :subtitle="meta.subtitle"
+      :create-label="`新建${meta.label}`"
+      :loading="loading"
+      :search-placeholder="config.searchPlaceholder"
+      :show-project="config.showProjectFilter"
+      :show-category="config.showCategoryFilter"
+      :project-options="projectOptions"
+      :category-options="categoryOptions"
+      :status-options="statusOptions"
+      @refresh="load"
+      @create="openCreate"
+    />
 
-    <div class="panel overflow-hidden">
-      <KitTable :columns="columns" :data="filtered" :loading="loading">
+    <div
+      v-if="contextFilters.length"
+      data-ui="contract-aux-route-context"
+      class="flex min-w-0 flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand/25 bg-brand-soft px-3 py-2"
+      aria-label="来源筛选"
+    >
+      <span class="text-11px font-700 text-brand-deep">来源范围</span>
+      <button
+        v-for="context in contextFilters"
+        :key="context.key"
+        type="button"
+        class="chip chip-brand gap-1 border-0 cursor-pointer"
+        :aria-label="`清除${context.label}筛选`"
+        @click="clearRouteFilter(context.key)"
+      >
+        {{ context.label }}
+        <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
+      </button>
+    </div>
+
+    <StatePanel
+      v-if="loadError && !loading"
+      kind="error"
+      :title="`${meta.listLabel}载入失败`"
+      :description="loadError"
+      action-label="重新载入"
+      @action="load"
+    />
+
+    <div v-else class="min-w-0">
+      <KitTable
+        data-ui="contract-aux-table"
+        :columns="config.columns"
+        :data="pageRows"
+        :loading="loading"
+        :page="{ page: currentPage, pageSize, total: filtered.length }"
+        :empty="emptyState"
+        @page-change="handlePageChange"
+        @empty-action="handleEmptyAction"
+      >
         <template #name="{ row }">
-          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
+          <NuxtLink :to="formPath(kind, row.id)" class="cell--link" :title="row.name">
             {{ row.name }}
-          </button>
+          </NuxtLink>
+        </template>
+        <template #project="{ row }">
+          <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
+            {{ row.projectName || '—' }}
+          </NuxtLink>
+          <span v-else>—</span>
+        </template>
+        <template #supplier="{ row }">
+          <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
+            {{ row.supplierName || '—' }}
+          </NuxtLink>
+          <span v-else>—</span>
+        </template>
+        <template #contract="{ row }">
+          <NuxtLink v-if="row.contractId" :to="sourceContractPath(row)" class="cell--link">
+            {{ row.contractName || '—' }}
+          </NuxtLink>
+          <span v-else>—</span>
         </template>
         <template #status="{ row }">
-          <span class="chip" :class="row.status === '审批中' ? 'chip-ok' : 'chip-brand'">
+          <span class="chip" :class="contractAuxStatusClass(row.status)">
             {{ row.status }}
           </span>
         </template>
         <template #action="{ row }">
-          <div class="flex items-center gap-1">
-            <button class="icon-btn" title="编辑" @click="openEdit(row)">
-              <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
-            </button>
-            <button class="icon-btn-danger" title="删除" @click="handleDelete(row)">
-              <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
-            </button>
-          </div>
+          <RowActionMenu
+            :items="rowActions"
+            :label="`${row.name}${meta.label}操作`"
+            @select="handleRowAction($event, row)"
+          />
         </template>
       </KitTable>
-      <div class="border-t border-line bg-surface-2 px-4 py-2 text-right text-12px text-ink-soft">
-        共 {{ filtered.length }} 条 · 金额合计
-        <strong class="ml-1 font-mono text-ink">
-          {{ yuan(filtered.reduce((total, row) => total + Number(row.amount || 0), 0)) }}
-        </strong>
+
+      <div
+        data-ui="contract-aux-summary"
+        class="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 border-x border-b border-line bg-surface-2 px-4 py-2 text-12px text-ink-soft"
+      >
+        <span>{{ config.countLabel }}：<strong class="text-ink">{{ filtered.length }}</strong></span>
+        <span>
+          {{ config.amountLabel }}：
+          <strong class="font-mono text-ink">{{ yuan(summaryAmount) }}</strong>
+        </span>
+        <button
+          v-if="hasLocalFilters || contextFilters.length"
+          type="button"
+          class="border-0 bg-transparent p-0 text-12px font-700 text-brand-deep"
+          @click="resetFilters"
+        >
+          清除筛选
+        </button>
       </div>
     </div>
   </div>

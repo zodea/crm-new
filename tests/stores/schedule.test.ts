@@ -197,6 +197,25 @@ describe('schedule store：排程唯一 action 写路径', () => {
   it('无合同时可按内部暂估范围建组，并冻结标准工序库快照', async () => {
     const store = useScheduleStore()
     await store.loadProcessLibraries()
+    await mem.execute(`
+      INSERT INTO house_type_templates (id, project_id, code, name)
+      VALUES ('template-b2', 'p1', 'B', 'B户型')
+    `)
+    await mem.execute(`
+      INSERT INTO rooms (id, template_id, code, name)
+      VALUES ('room-b2', 'template-b2', 'whole', '整户')
+    `)
+    await mem.execute(`
+      INSERT INTO units (id, floor_id, house_type_template_id, code, name)
+      VALUES ('unit-b2', 'f2', 'template-b2', '101', '101户')
+    `)
+    await mem.execute(`
+      INSERT INTO house_type_template_items
+        (id, room_id, item_id, provisional_qty, sort_order)
+      VALUES
+        ('hti-b2-wall', 'room-b2', 'i-wp-wall', 12.5, 10),
+        ('hti-b2-floor', 'room-b2', 'i-wp-floor', 8, 20)
+    `)
 
     expect(store.processLibraries).toEqual([
       expect.objectContaining({
@@ -209,9 +228,42 @@ describe('schedule store：排程唯一 action 写路径', () => {
     const libraryId = store.processLibraries[0]!.id
     await store.loadProcessLibraryTasks(libraryId)
     const settingOut = store.processTasks.find(task => task.key === 'setting-out')!
+    const waterproof = store.processTasks.find(task => task.key === 'waterproof')!
 
     await store.loadBuildings('p1')
     expect(store.buildings.map(building => building.id)).toEqual(['b1', 'b2'])
+    const provisionalPreview = await store.previewProvisionalScope(['b1', 'b2'])
+    expect(provisionalPreview.buildings).toEqual([
+      expect.objectContaining({
+        buildingId: 'b1',
+        floorCount: 2,
+        unitCount: 0,
+        typedUnitCount: 0,
+        itemCount: 0,
+        totalQty: 0,
+      }),
+      expect.objectContaining({
+        buildingId: 'b2',
+        floorCount: 1,
+        unitCount: 1,
+        typedUnitCount: 1,
+        itemCount: 2,
+        totalQty: 20.5,
+      }),
+    ])
+    await expect(store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '内部暂估·混选空楼栋',
+      buildingIds: ['b1', 'b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: waterproof.key, enabled: true, durationDays: 8, anchorStart: null },
+      ],
+    }, '2026-07-01')).rejects.toThrow(/1栋.*防水.*有效暂估量/)
 
     const groupId = await store.createGroup({
       projectId: 'p1',
@@ -224,6 +276,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
       overlapMode: 'seq',
       tasks: [
         { templateKey: settingOut.key, enabled: true, durationDays: 9, anchorStart: null },
+        { templateKey: waterproof.key, enabled: true, durationDays: 8, anchorStart: null },
       ],
     }, '2026-07-01')
 
@@ -273,6 +326,85 @@ describe('schedule store：排程唯一 action 写路径', () => {
       durationDays: 9,
       libraryVersion: 1,
     })
+    const [provisionalTask] = await mem.select<{
+      template_snapshot_json: string
+    }>(`
+      SELECT template_snapshot_json
+      FROM schedule_tasks
+      WHERE group_id = ? AND name = ?
+    `, [groupId, waterproof.name])
+    expect(JSON.parse(provisionalTask!.template_snapshot_json)).toMatchObject({
+      key: waterproof.key,
+      provisionalFloorPlans: [
+        {
+          floorId: 'f2',
+          itemId: 'i-wp-wall',
+          provisionalQty: 12.5,
+          unitCount: 1,
+        },
+        {
+          floorId: 'f2',
+          itemId: 'i-wp-floor',
+          provisionalQty: 8,
+          unitCount: 1,
+        },
+      ],
+    })
+    const provisionalAutomaticTask = store.snapshot!.groups[0]!.tasks
+      .find(task => task.name === waterproof.name)!
+    expect(provisionalAutomaticTask.floorPlans).toEqual([
+      expect.objectContaining({
+        floorId: 'f2',
+        itemId: 'i-wp-wall',
+        boqLineId: null,
+        sourceBasis: 'provisional',
+        provisionalQty: 12.5,
+      }),
+      expect.objectContaining({
+        floorId: 'f2',
+        itemId: 'i-wp-floor',
+        boqLineId: null,
+        sourceBasis: 'provisional',
+        provisionalQty: 8,
+      }),
+    ])
+    expect(await mem.select(`
+      SELECT plan.floor_id,
+             plan.item_id,
+             plan.boq_line_id,
+             plan.source_basis,
+             plan.provisional_qty
+      FROM schedule_task_floor_plans AS plan
+      JOIN schedule_tasks AS task ON task.id = plan.task_id
+      WHERE task.group_id = ? AND task.name = ?
+      ORDER BY plan.sort_order
+    `, [groupId, waterproof.name])).toEqual([
+      {
+        floor_id: 'f2',
+        item_id: 'i-wp-wall',
+        boq_line_id: null,
+        source_basis: 'provisional',
+        provisional_qty: 12.5,
+      },
+      {
+        floor_id: 'f2',
+        item_id: 'i-wp-floor',
+        boq_line_id: null,
+        source_basis: 'provisional',
+        provisional_qty: 8,
+      },
+    ])
+    expect(await mem.select(`
+      SELECT item_id, boq_line_id
+      FROM task_item_map
+      WHERE task_id = (
+        SELECT id FROM schedule_tasks WHERE group_id = ? AND name = ?
+      )
+      ORDER BY item_id
+    `, [groupId, waterproof.name])).toEqual([
+      { item_id: 'i-wp-floor', boq_line_id: null },
+      { item_id: 'i-wp-wall', boq_line_id: null },
+    ])
 
     await mem.execute(`
       UPDATE schedule_process_library_tasks
@@ -284,6 +416,57 @@ describe('schedule store：排程唯一 action 写路径', () => {
       name: '放线及新建墙体',
       durationDays: 9,
     })
+  })
+
+  it('内部暂估分组新增自动工序时逐栋校验暂估量覆盖', async () => {
+    const store = useScheduleStore()
+    await store.loadProcessLibraries()
+    const libraryId = store.processLibraries[0]!.id
+    await store.loadProcessLibraryTasks(libraryId)
+    const settingOut = store.processTasks.find(task => task.key === 'setting-out')!
+    const waterproof = store.processTasks.find(task => task.key === 'waterproof')!
+    await mem.execute(`
+      INSERT INTO house_type_templates (id, project_id, code, name)
+      VALUES ('template-b2-add', 'p1', 'B-ADD', 'B户型')
+    `)
+    await mem.execute(`
+      INSERT INTO rooms (id, template_id, code, name)
+      VALUES ('room-b2-add', 'template-b2-add', 'whole', '整户')
+    `)
+    await mem.execute(`
+      INSERT INTO units (id, floor_id, house_type_template_id, code, name)
+      VALUES ('unit-b2-add', 'f2', 'template-b2-add', '101', '101户')
+    `)
+    await mem.execute(`
+      INSERT INTO house_type_template_items
+        (id, room_id, item_id, provisional_qty, sort_order)
+      VALUES
+        ('hti-b2-add-wall', 'room-b2-add', 'i-wp-wall', 12.5, 10),
+        ('hti-b2-add-floor', 'room-b2-add', 'i-wp-floor', 8, 20)
+    `)
+    const groupId = await store.createGroup({
+      projectId: 'p1',
+      scopeBasis: 'provisional',
+      contractId: null,
+      processLibraryId: libraryId,
+      name: '内部暂估·逐栋新增校验',
+      buildingIds: ['b1', 'b2'],
+      startDate: '2026-07-01',
+      overlapMode: 'seq',
+      tasks: [
+        { templateKey: settingOut.key, enabled: true, durationDays: 5, anchorStart: null },
+      ],
+    }, '2026-07-01')
+
+    await expect(store.addTask(groupId, {
+      templateKey: waterproof.key,
+      plannedStart: '2026-07-06',
+    }, '2026-07-01')).rejects.toThrow(/1栋.*防水.*有效暂估量/)
+    expect(store.snapshot!.groups[0]!.tasks).toHaveLength(1)
+    expect(await mem.select<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM schedule_tasks WHERE group_id = ?`,
+      [groupId],
+    )).toEqual([{ total: 1 }])
   })
 
   it('甘特调期遇到 FS 冲突时只软禁用关系，日期修复后才允许恢复', async () => {

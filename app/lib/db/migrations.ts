@@ -5409,6 +5409,122 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 38,
+    name: 'schedule-provisional-floor-plan-sources',
+    async up(db) {
+      const invalidRows = await db.select<{ id: string }>(`
+        SELECT plan.id
+        FROM schedule_task_floor_plans AS plan
+        LEFT JOIN boq_lines AS boq_line ON boq_line.id = plan.boq_line_id
+        WHERE boq_line.item_id IS NULL
+        LIMIT 1
+      `)
+      if (invalidRows.length) {
+        throw new Error(
+          `排程楼层计划 ${invalidRows[0]!.id} 缺少可回填的 BOQ 分项，无法安全升级暂估来源模型`,
+        )
+      }
+
+      await db.execute('BEGIN')
+      try {
+        await db.execute(`
+          CREATE TABLE schedule_task_floor_plans_v38_new (
+            id              TEXT PRIMARY KEY,
+            task_id         TEXT NOT NULL REFERENCES schedule_tasks(id),
+            floor_id        TEXT NOT NULL REFERENCES floors(id),
+            item_id         TEXT NOT NULL REFERENCES items(id),
+            boq_line_id     TEXT REFERENCES boq_lines(id),
+            source_basis    TEXT NOT NULL
+                            CHECK (source_basis IN ('contract', 'provisional')),
+            provisional_qty REAL,
+            planned_start   TEXT NOT NULL,
+            planned_finish  TEXT NOT NULL,
+            is_manual       INTEGER NOT NULL DEFAULT 0 CHECK (is_manual IN (0, 1)),
+            note            TEXT NOT NULL DEFAULT '',
+            sort_order      INTEGER NOT NULL DEFAULT 0,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT DEFAULT NULL,
+            CHECK (planned_finish >= planned_start),
+            CHECK (
+              (
+                source_basis = 'contract'
+                AND boq_line_id IS NOT NULL
+                AND provisional_qty IS NULL
+              )
+              OR (
+                source_basis = 'provisional'
+                AND boq_line_id IS NULL
+                AND provisional_qty IS NOT NULL
+                AND provisional_qty >= 0
+              )
+            )
+          )
+        `)
+        await db.execute(`
+          INSERT INTO schedule_task_floor_plans_v38_new (
+            id, task_id, floor_id, item_id, boq_line_id, source_basis,
+            provisional_qty, planned_start, planned_finish, is_manual,
+            note, sort_order, created_at, updated_at, deleted_at
+          )
+          SELECT
+            plan.id,
+            plan.task_id,
+            plan.floor_id,
+            boq_line.item_id,
+            plan.boq_line_id,
+            'contract',
+            NULL,
+            plan.planned_start,
+            plan.planned_finish,
+            plan.is_manual,
+            plan.note,
+            plan.sort_order,
+            plan.created_at,
+            plan.updated_at,
+            plan.deleted_at
+          FROM schedule_task_floor_plans AS plan
+          JOIN boq_lines AS boq_line ON boq_line.id = plan.boq_line_id
+        `)
+        await db.execute('DROP TABLE schedule_task_floor_plans')
+        await db.execute(
+          'ALTER TABLE schedule_task_floor_plans_v38_new RENAME TO schedule_task_floor_plans',
+        )
+        await execScript(db, `
+          CREATE INDEX idx_schedule_floor_plans_task
+            ON schedule_task_floor_plans(task_id);
+          CREATE INDEX idx_schedule_floor_plans_floor
+            ON schedule_task_floor_plans(floor_id);
+          CREATE INDEX idx_schedule_floor_plans_item
+            ON schedule_task_floor_plans(item_id);
+          CREATE INDEX idx_schedule_floor_plans_boq
+            ON schedule_task_floor_plans(boq_line_id);
+          CREATE INDEX idx_schedule_task_floor_plans_deleted
+            ON schedule_task_floor_plans(deleted_at) WHERE deleted_at IS NOT NULL;
+          CREATE UNIQUE INDEX uq_schedule_floor_plan_contract_scope
+            ON schedule_task_floor_plans(task_id, floor_id, boq_line_id)
+            WHERE deleted_at IS NULL
+              AND source_basis = 'contract'
+              AND boq_line_id IS NOT NULL;
+          CREATE UNIQUE INDEX uq_schedule_floor_plan_provisional_scope
+            ON schedule_task_floor_plans(task_id, floor_id, item_id)
+            WHERE deleted_at IS NULL
+              AND source_basis = 'provisional';
+        `)
+        await db.execute('COMMIT')
+      }
+      catch (error) {
+        try {
+          await db.execute('ROLLBACK')
+        }
+        catch {
+          // 保留原始迁移错误。
+        }
+        throw error
+      }
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

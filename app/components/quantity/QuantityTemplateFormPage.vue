@@ -63,11 +63,19 @@ const shellState = computed(() => {
 const shellDescription = computed(() => props.projectId
   ? store.templateError
   : '请从工程量矩阵选择项目后进入户型模板。')
+const returnLabel = computed(() => route.query.return === 'region'
+  ? '返回区域配置'
+  : '返回工程量矩阵')
 const returnTo = computed(() => {
   if (route.query.return === 'region') {
+    const returnToSchedule = route.query.origin === 'schedule'
     return {
       path: '/subcontract/quantity/region',
-      query: { project: props.projectId },
+      query: {
+        project: props.projectId,
+        return: returnToSchedule ? 'schedule' : undefined,
+        resume: returnToSchedule && route.query.resume === 'region' ? 'region' : undefined,
+      },
     }
   }
   return quantityMatrixReturnPath(route.query)
@@ -480,7 +488,7 @@ useTabTitle(() => selectedTemplate.value
     data-testid="quantity-template-form"
     title="户型模板与三量"
     subtitle="房间、分项与三量属于同一户型模板；保存后挂靠户通过活链接同步读取。"
-    back-label="返回工程量矩阵"
+    :back-label="returnLabel"
     :sections="sections"
     :state="shellState"
     state-title="户型模板加载失败"

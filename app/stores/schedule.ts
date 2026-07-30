@@ -120,6 +120,33 @@ interface FloorRow {
   sort_order: number
   unitTypes: readonly string[]
 }
+interface ProvisionalFloorSourceRow {
+  building_id: string
+  floor_id: string
+  item_id: string
+  item_code: string
+  provisional_qty: number
+  unit_count: number
+}
+
+export interface ScheduleProvisionalBuildingPreview {
+  buildingId: string
+  floorCount: number
+  unitCount: number
+  typedUnitCount: number
+  itemCount: number
+  itemCodes: readonly string[]
+  totalQty: number
+}
+
+export interface ScheduleProvisionalScopePreview {
+  floorCount: number
+  unitCount: number
+  itemCount: number
+  itemCodes: readonly string[]
+  totalQty: number
+  buildings: readonly ScheduleProvisionalBuildingPreview[]
+}
 
 function floorPlanWindow(
   plannedStart: string,
@@ -226,6 +253,7 @@ function applicableFloors(line: BoqLineRow, floors: readonly FloorRow[]): FloorR
 async function createFloorPlans(
   targetDb: ScheduleDb,
   taskId: string,
+  itemId: string,
   boqLineId: string,
   floors: readonly FloorRow[],
   plannedStart: string,
@@ -236,12 +264,14 @@ async function createFloorPlans(
     const window = floorPlanWindow(plannedStart, plannedFinish, index, floors.length)
     await targetDb.execute(
       `INSERT INTO schedule_task_floor_plans
-        (id, task_id, floor_id, boq_line_id, planned_start, planned_finish, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (id, task_id, floor_id, item_id, boq_line_id, source_basis,
+         planned_start, planned_finish, sort_order)
+       VALUES (?, ?, ?, ?, ?, 'contract', ?, ?, ?)`,
       [
         planId,
         taskId,
         floor.id,
+        itemId,
         boqLineId,
         window.plannedStart,
         window.plannedFinish,
@@ -250,6 +280,57 @@ async function createFloorPlans(
     )
     await logCreate(targetDb, 'schedule_task_floor_plans', planId)
   }
+}
+
+async function loadProvisionalFloorSources(
+  targetDb: ScheduleDb,
+  buildingIds: readonly string[],
+  itemIds: readonly string[] = [],
+): Promise<ProvisionalFloorSourceRow[]> {
+  const uniqueBuildingIds = [...new Set(buildingIds)]
+  const uniqueItemIds = [...new Set(itemIds)]
+  if (!uniqueBuildingIds.length)
+    return []
+  const itemFilter = uniqueItemIds.length
+    ? `AND template_item.item_id IN (${uniqueItemIds.map(() => '?').join(', ')})`
+    : ''
+  return targetDb.select<ProvisionalFloorSourceRow>(
+    `${hiddenCtesFor(
+      'floors',
+      'units',
+      'house_type_templates',
+      'rooms',
+      'house_type_template_items',
+      'items',
+    )}
+     SELECT floor_row.building_id,
+            unit_row.floor_id,
+            template_item.item_id,
+            item.code AS item_code,
+            SUM(template_item.provisional_qty) AS provisional_qty,
+            COUNT(DISTINCT unit_row.id) AS unit_count
+     FROM units unit_row
+     JOIN floors floor_row ON floor_row.id = unit_row.floor_id
+     JOIN house_type_templates template
+       ON template.id = unit_row.house_type_template_id
+     JOIN rooms room_row ON room_row.template_id = template.id
+     JOIN house_type_template_items template_item
+       ON template_item.room_id = room_row.id
+     JOIN items item ON item.id = template_item.item_id
+     WHERE ${visibleCond('units', 'unit_row')}
+       AND ${visibleCond('floors', 'floor_row')}
+       AND ${visibleCond('house_type_templates', 'template')}
+       AND ${visibleCond('rooms', 'room_row')}
+       AND ${visibleCond('house_type_template_items', 'template_item')}
+       AND ${visibleCond('items', 'item')}
+       AND floor_row.building_id IN (${uniqueBuildingIds.map(() => '?').join(', ')})
+       AND template_item.provisional_qty IS NOT NULL
+       ${itemFilter}
+     GROUP BY floor_row.building_id, unit_row.floor_id, template_item.item_id, item.code
+     ORDER BY floor_row.building_id, floor_row.sort_order, unit_row.floor_id,
+              template_item.item_id`,
+    [...uniqueBuildingIds, ...uniqueItemIds],
+  )
 }
 
 async function loadBoqLinesByItem(
@@ -333,6 +414,65 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   async function loadContracts(projectId: string) {
     contracts.value = projectId ? await loadScheduleContracts(db, projectId) : []
+  }
+
+  async function previewProvisionalScope(
+    buildingIds: readonly string[],
+  ): Promise<ScheduleProvisionalScopePreview> {
+    const rows = await loadProvisionalFloorSources(db, buildingIds)
+    const uniqueBuildingIds = [...new Set(buildingIds)]
+    const unitSummaries = uniqueBuildingIds.length
+      ? await db.select<{
+          building_id: string
+          floor_count: number
+          unit_count: number
+          typed_unit_count: number
+        }>(
+          `${hiddenCtesFor('floors', 'units', 'house_type_templates')}
+           SELECT floor_row.building_id,
+                  COUNT(DISTINCT floor_row.id) AS floor_count,
+                  COUNT(DISTINCT unit_row.id) AS unit_count,
+                  COUNT(DISTINCT CASE
+                    WHEN template.id IS NOT NULL THEN unit_row.id
+                  END) AS typed_unit_count
+           FROM floors floor_row
+           LEFT JOIN units unit_row
+             ON unit_row.floor_id = floor_row.id
+            AND ${visibleCond('units', 'unit_row')}
+           LEFT JOIN house_type_templates template
+             ON template.id = unit_row.house_type_template_id
+            AND ${visibleCond('house_type_templates', 'template')}
+           WHERE ${visibleCond('floors', 'floor_row')}
+             AND floor_row.building_id IN (${uniqueBuildingIds.map(() => '?').join(', ')})
+           GROUP BY floor_row.building_id`,
+          uniqueBuildingIds,
+        )
+      : []
+    const unitsByBuilding = new Map(unitSummaries.map(row => [row.building_id, row]))
+    const buildings = uniqueBuildingIds.map((buildingId) => {
+      const buildingRows = rows.filter(row => row.building_id === buildingId)
+      const unitSummary = unitsByBuilding.get(buildingId)
+      return {
+        buildingId,
+        floorCount: Number(unitSummary?.floor_count) || 0,
+        unitCount: Number(unitSummary?.unit_count) || 0,
+        typedUnitCount: Number(unitSummary?.typed_unit_count) || 0,
+        itemCount: new Set(buildingRows.map(row => row.item_id)).size,
+        itemCodes: [...new Set(buildingRows.map(row => row.item_code))],
+        totalQty: buildingRows.reduce(
+          (sum, row) => sum + (Number(row.provisional_qty) || 0),
+          0,
+        ),
+      }
+    })
+    return {
+      floorCount: buildings.reduce((sum, building) => sum + building.floorCount, 0),
+      unitCount: buildings.reduce((sum, building) => sum + building.unitCount, 0),
+      itemCount: new Set(rows.map(row => row.item_id)).size,
+      itemCodes: [...new Set(rows.map(row => row.item_code))],
+      totalQty: buildings.reduce((sum, building) => sum + building.totalQty, 0),
+      buildings,
+    }
   }
 
   async function loadProcessLibraries() {
@@ -489,6 +629,31 @@ export const useScheduleStore = defineStore('schedule', () => {
           [...itemByCode.values()],
         )
         const floors = await loadFloorsByBuildings(tx, buildingIds)
+        const provisionalSources = scopeBasis === 'provisional'
+          ? await loadProvisionalFloorSources(tx, buildingIds, [...itemByCode.values()])
+          : []
+        const provisionalSourcesByItem = new Map<string, ProvisionalFloorSourceRow[]>()
+        for (const source of provisionalSources) {
+          provisionalSourcesByItem.set(
+            source.item_id,
+            [...(provisionalSourcesByItem.get(source.item_id) ?? []), source],
+          )
+        }
+        if (scopeBasis === 'provisional') {
+          for (const building of buildings) {
+            const taskWithoutQuantity = templates.find(({ template }) =>
+              template.itemCodes.length
+              && !template.itemCodes.some(code =>
+                (provisionalSourcesByItem.get(itemByCode.get(code)!) ?? [])
+                  .some(source => source.building_id === building.id)),
+            )
+            if (taskWithoutQuantity) {
+              throw new Error(
+                `「${building.name}」缺少「${taskWithoutQuantity.template.name}」对应分项的有效暂估量`,
+              )
+            }
+          }
+        }
 
         const [order] = await tx.select<{ next_order: number }>(
           `SELECT COALESCE(MAX(sort_order), 0) + 10 AS next_order
@@ -574,6 +739,25 @@ export const useScheduleStore = defineStore('schedule', () => {
         for (const [index, { row, template }] of templates.entries()) {
           const taskId = generateId('schedule_task')
           const stageId = template.stageCode ? stageByCode.get(template.stageCode)! : null
+          const provisionalFloorPlans = scopeBasis === 'provisional'
+            ? template.itemCodes.flatMap((itemCode, itemIndex) => {
+                const itemId = itemByCode.get(itemCode)!
+                const sources = provisionalSourcesByItem.get(itemId) ?? []
+                return sources.map((source, floorIndex) => ({
+                  floorId: source.floor_id,
+                  itemId,
+                  provisionalQty: Number(source.provisional_qty) || 0,
+                  unitCount: Number(source.unit_count) || 0,
+                  sortOrder: (itemIndex + 1) * 1000 + (floorIndex + 1) * 10,
+                  ...floorPlanWindow(
+                    row.plannedStart,
+                    row.plannedFinish,
+                    floorIndex,
+                    sources.length,
+                  ),
+                }))
+              })
+            : []
           const templateSnapshot = JSON.stringify({
             libraryId: processLibrary.id,
             libraryName: processLibrary.name,
@@ -586,6 +770,7 @@ export const useScheduleStore = defineStore('schedule', () => {
             durationDays: row.durationDays,
             stageCode: template.stageCode ?? '',
             itemCodes: template.itemCodes,
+            provisionalFloorPlans,
             predecessorKey: resolvedPredecessorByKey.get(row.key) ?? null,
             predecessorDisabled: resolvedPredecessorDisabledByKey.get(row.key) ?? false,
           })
@@ -633,12 +818,33 @@ export const useScheduleStore = defineStore('schedule', () => {
                 await createFloorPlans(
                   tx,
                   taskId,
+                  itemId,
                   boqLine.id,
                   lineFloors,
                   row.plannedStart,
                   row.plannedFinish,
                 )
               }
+            }
+            for (const plan of provisionalFloorPlans.filter(candidate => candidate.itemId === itemId)) {
+              const planId = generateId('schedule_floor_plan')
+              await tx.execute(
+                `INSERT INTO schedule_task_floor_plans
+                  (id, task_id, floor_id, item_id, boq_line_id, source_basis,
+                   provisional_qty, planned_start, planned_finish, sort_order)
+                 VALUES (?, ?, ?, ?, NULL, 'provisional', ?, ?, ?, ?)`,
+                [
+                  planId,
+                  taskId,
+                  plan.floorId,
+                  itemId,
+                  plan.provisionalQty,
+                  plan.plannedStart,
+                  plan.plannedFinish,
+                  plan.sortOrder,
+                ],
+              )
+              await logCreate(tx, 'schedule_task_floor_plans', planId)
             }
           }
           createdTaskByKey.set(row.key, {
@@ -721,14 +927,15 @@ export const useScheduleStore = defineStore('schedule', () => {
         current.id,
       ],
     ))
-    const plansByBoqLine = new Map<string, typeof current.floorPlans>()
+    const plansBySource = new Map<string, typeof current.floorPlans>()
     for (const plan of current.floorPlans) {
-      plansByBoqLine.set(
-        plan.boqLineId,
-        [...(plansByBoqLine.get(plan.boqLineId) ?? []), plan],
+      const sourceKey = plan.boqLineId ?? `item:${plan.itemId}`
+      plansBySource.set(
+        sourceKey,
+        [...(plansBySource.get(sourceKey) ?? []), plan],
       )
     }
-    for (const plans of plansByBoqLine.values()) {
+    for (const plans of plansBySource.values()) {
       const orderedPlans = [...plans].sort((left, right) => left.sortOrder - right.sortOrder)
       for (const [index, plan] of orderedPlans.entries()) {
         if (plan.isManual)
@@ -1158,6 +1365,49 @@ export const useScheduleStore = defineStore('schedule', () => {
         [...itemByCode.values()],
       )
       const floors = await loadFloorsByBuildings(tx, group.buildingIds)
+      const provisionalSources = group.scopeBasis === 'provisional'
+        ? await loadProvisionalFloorSources(tx, group.buildingIds, [...itemByCode.values()])
+        : []
+      const provisionalSourcesByItem = new Map<string, ProvisionalFloorSourceRow[]>()
+      for (const source of provisionalSources) {
+        provisionalSourcesByItem.set(
+          source.item_id,
+          [...(provisionalSourcesByItem.get(source.item_id) ?? []), source],
+        )
+      }
+      if (group.scopeBasis === 'provisional' && template.itemCodes.length) {
+        for (const [index, buildingId] of group.buildingIds.entries()) {
+          const hasQuantity = template.itemCodes.some(code =>
+            (provisionalSourcesByItem.get(itemByCode.get(code)!) ?? [])
+              .some(source => source.building_id === buildingId),
+          )
+          if (!hasQuantity) {
+            const buildingName = group.buildingNames[index] ?? buildingId
+            throw new Error(
+              `「${buildingName}」缺少「${template.name}」对应分项的有效暂估量`,
+            )
+          }
+        }
+      }
+      const provisionalFloorPlans = group.scopeBasis === 'provisional'
+        ? template.itemCodes.flatMap((itemCode, itemIndex) => {
+            const itemId = itemByCode.get(itemCode)!
+            const sources = provisionalSourcesByItem.get(itemId) ?? []
+            return sources.map((source, floorIndex) => ({
+              floorId: source.floor_id,
+              itemId,
+              provisionalQty: Number(source.provisional_qty) || 0,
+              unitCount: Number(source.unit_count) || 0,
+              sortOrder: (itemIndex + 1) * 1000 + (floorIndex + 1) * 10,
+              ...floorPlanWindow(
+                draft.plannedStart,
+                plannedFinish,
+                floorIndex,
+                sources.length,
+              ),
+            }))
+          })
+        : []
       const lastTask = [...group.tasks].sort((left, right) => left.sortOrder - right.sortOrder).at(-1)
       const sortOrder = (lastTask?.sortOrder ?? 0) + 10
       await tx.execute(
@@ -1194,6 +1444,7 @@ export const useScheduleStore = defineStore('schedule', () => {
             durationDays: template.durationDays,
             stageCode: template.stageCode ?? '',
             itemCodes: template.itemCodes,
+            provisionalFloorPlans,
           }),
         ],
       )
@@ -1214,12 +1465,33 @@ export const useScheduleStore = defineStore('schedule', () => {
             await createFloorPlans(
               tx,
               taskId,
+              itemId,
               boqLine.id,
               lineFloors,
               draft.plannedStart,
               plannedFinish,
             )
           }
+        }
+        for (const plan of provisionalFloorPlans.filter(candidate => candidate.itemId === itemId)) {
+          const planId = generateId('schedule_floor_plan')
+          await tx.execute(
+            `INSERT INTO schedule_task_floor_plans
+              (id, task_id, floor_id, item_id, boq_line_id, source_basis,
+               provisional_qty, planned_start, planned_finish, sort_order)
+             VALUES (?, ?, ?, ?, NULL, 'provisional', ?, ?, ?, ?)`,
+            [
+              planId,
+              taskId,
+              plan.floorId,
+              itemId,
+              plan.provisionalQty,
+              plan.plannedStart,
+              plan.plannedFinish,
+              plan.sortOrder,
+            ],
+          )
+          await logCreate(tx, 'schedule_task_floor_plans', planId)
         }
       }
       if (lastTask) {
@@ -1270,6 +1542,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     loadCatalog,
     loadBuildings,
     loadContracts,
+    previewProvisionalScope,
     loadProcessLibraries,
     loadProcessLibraryTasks,
     previewContractBinding,

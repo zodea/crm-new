@@ -237,7 +237,7 @@ test.describe('F4 物资领域整页表单', () => {
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
     await expect(page).toHaveURL(/\/material\/settlement\/form\/[^/?]+$/)
-    await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('待确认', { exact: true }).first()).toBeVisible()
 
     await page.goto('/material/delivery/archive/del_mdv001_0')
     await page.getByRole('link', { name: '编辑' }).click()
