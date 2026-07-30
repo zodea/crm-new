@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { KitEditGridColumn } from '~/lib/kit/edit-grid'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import { useTimeoutFn } from '@vueuse/core'
@@ -237,6 +238,51 @@ async function fetchDemoLookup(keyword: string) {
 
 function demoLookupCreate() {
   lastResult.value = 'LookupSelect 抛出 create，由业务页面接管新建流程'
+}
+
+// W2-2 KitEditGrid 明细网格（#94）
+type DemoEditGridLine = {
+  name?: string
+  unit?: string
+  quantity?: number | null
+  unitPrice?: number | null
+  amount?: number
+} & Record<string, unknown>
+
+const demoEditGrid = useTemplateRef<{
+  validate: () => { row: number, key: string }[]
+}>('demoEditGrid')
+const demoEditGridRows = shallowRef<DemoEditGridLine[]>([
+  { name: '玻化砖', unit: '㎡', quantity: 120, unitPrice: 68 },
+  { name: '瓷砖胶', unit: '袋', quantity: 32, unitPrice: 42 },
+])
+const demoEditGridColumns: KitEditGridColumn<DemoEditGridLine>[] = [
+  { key: 'name', label: '材料名称', required: true, minWidth: 180 },
+  { key: 'unit', label: '单位', type: 'select', options: ['项', '㎡', 'm', '袋'], width: 100 },
+  { key: 'quantity', label: '数量', type: 'number', required: true, width: 120 },
+  { key: 'unitPrice', label: '单价', type: 'number', width: 130 },
+  {
+    key: 'amount',
+    label: '合价',
+    type: 'readonly',
+    width: 140,
+    derive: row => Number(row.quantity || 0) * Number(row.unitPrice || 0),
+  },
+]
+
+async function pickDemoEditGridRows(): Promise<DemoEditGridLine[]> {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  return [
+    { name: '防水涂料', unit: '桶', quantity: 6, unitPrice: 285 },
+    { name: '成品保护膜', unit: '㎡', quantity: 80, unitPrice: 3.5 },
+  ]
+}
+
+function validateDemoEditGrid() {
+  const errors = demoEditGrid.value?.validate() ?? []
+  lastResult.value = errors.length
+    ? `KitEditGrid 发现 ${errors.length} 处必填项`
+    : 'KitEditGrid 校验通过'
 }
 
 // W2-4 FormFooter 保存动作组（#96）
@@ -620,6 +666,30 @@ async function demoImportMapping() {
         <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
           当前选中 ID：{{ demoLookupId ?? '未选择' }}
         </p>
+      </section>
+
+      <!-- W2-2 KitEditGrid 明细网格 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-2 KitEditGrid — 受控明细网格（#94）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          行数据由页面持有；网格统一提供添加、勾选复制/删除、批量选择、派生金额、汇总和必填定位。
+        </p>
+        <KitEditGrid
+          ref="demoEditGrid"
+          v-model="demoEditGridRows"
+          label="材料清单"
+          :columns="demoEditGridColumns"
+          :summary="[{ key: 'amount', agg: 'sum' }]"
+          :picker="{ label: '选择材料', onPick: pickDemoEditGridRows }"
+          :max="20"
+        />
+        <div class="mt-3 flex justify-end">
+          <KitButton type="button" @click="validateDemoEditGrid">
+            校验明细
+          </KitButton>
+        </div>
       </section>
 
       <!-- W2-4 FormFooter 保存动作组 -->
