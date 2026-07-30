@@ -1,226 +1,242 @@
 # 项目×分供方 — 项目维度工作台
 
-> 路由: `/project/:pid/supplier/:sid`  
-> 页面: `pages/project/[pid]/supplier/[sid].vue`  
-> 关联: `base-supplier.md`（主数据）· `contract-base.md`（合同）· `finance-payment.md`（付款）· `finance-ticket.md`（收票）  
-> 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
+> 工作台路由：`/project/:pid/supplier/:sid`
+>
+> 文件导入路由：`/project/:pid/supplier/import`
+>
+> 关联：[`base-supplier.md`](./base-supplier.md) · [`contract-forms.md`](./contract-forms.md) · [`finance-payment.md`](./finance-payment.md) · [`finance-invoice.md`](./finance-invoice.md)
+>
+> 数据权威：[`DATABASE.md`](../DATABASE.md) · [`CONTEXT.md`](../../../CONTEXT.md) · [ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md)
 
 ---
 
 ## 定位
 
-**ProjectSupplier（项目×分供方）** 是某个项目下某个分供方的合作关系工作台。它是 Supplier 主数据和项目业务单据之间的枢纽：
+**ProjectSupplier（项目×分供方）** 是一个项目和一个分供方之间的合作关系。工作台把该关系下的真实合同、付款申请、发票、支付记录、支出结算单和附件组织到同一信息流，但不复制源单字段，也不在本页完成源单新增、编辑或审批。
 
-| 层 | 职责 | 页面 |
-|---|---|---|
-| Supplier | 公司主数据、证照 | `/base/supplier/:id` |
-| **ProjectSupplier** | **项目维度状态、聚合指标、源单据关联、结算锁定** | **`/project/:pid/supplier/:sid`** |
-| 采购合同 | 合同 CRUD、审批、明细行 | `/material/contract/:id`（→ `material-contract.md`） |
-| 付款申请 | 请款/付款 CRUD、审批 | `/finance/payment/:id`（→ `finance-payment.md`） |
-| 收票登记 | 收票 CRUD、审批 | `/finance/ticket/:id`（→ `finance-ticket.md`） |
+| 层 | 职责 | 当前路由 |
+| --- | --- | --- |
+| Supplier | 跨项目共享的公司主数据、证照和开票资料 | `/base/supplier/:sid` |
+| **ProjectSupplier** | **项目维度合作状态、真实事实汇总、源单穿透、合作文件** | **`/project/:pid/supplier/:sid`** |
+| 支出合同 | 分包、材采、其他支出合同及附件 | `/contract/:id` |
+| 付款申请 | 请款、结算/发票分摊和审批状态 | `/finance/payment/:id` |
+| 发票台账 | 收票原件、归档状态、含税金额和税额 | `/finance/invoice/:id` |
+| 支付记录 | 银行回单、人工确认和付款申请分摊 | `/finance/records/:id` |
+| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 见“来源穿透” |
 
-本页所有合同/请款/收票/付款的**新增、编辑、审批**操作都跳转到各自独立模块完成。本页只做**聚合展示 + 跳转 + 结算确认**。
-
----
-
-## 一、业务流程
-
-```
-① 选择合格分供方 ──→ ② 关联项目（生成 ProjectSupplier）
-                           │
-                           ▼
-                      ③ 合同签订 ──→ ④ 请款申请 ──→ ⑤ 收票登记
-                      源: 采购合同     源: 付款申请     源: 收票登记
-                                          │               │
-                                          ▼               ▼
-                                      ⑥ 付款流水 ──→ ⑦ 最终结算
-                                      源: 付款申请     本页确认终态
-                                          │               │
-                                          └─ 多轮请款 ─→ ④  上传PDF/二次确认/锁定只读
-```
-
-各阶段操作入口：
-
-| 阶段 | 操作位置 | 动作 |
-|---|---|---|
-| ③ 合同签订 | 采购合同模块 `/material/contract` | 新建合同时选择项目+分供方 |
-| ④ 请款申请 | 付款申请模块 `/finance/payment` | 新建请款时关联项目+分供方+合同 |
-| ⑤ 收票登记 | 收票登记模块 `/finance/ticket` | 新建收票时关联项目+分供方 |
-| ⑥ 付款流水 | 付款申请模块 `/finance/payment` | 请款审批通过后录入付款 |
-| ⑦ 最终结算 | **本页** | 填写结算金额、上传结算 PDF、二次确认后锁定 |
+项目详情右栏列出已有 ProjectSupplier 关系，并提供“从文件导入分供方”入口。工作台内的项目名和分供方名分别返回项目详情和分供方详情。
 
 ---
 
-## 二、数据模型
+## 一、事实归属
 
-### ProjectSupplier
+工作台是只读聚合层。除“项目×分供方合作终态结算确认”外，各业务对象仍由自己的模块维护。
+
+| 工作台内容 | 唯一事实来源 | 汇总口径 |
+| --- | --- | --- |
+| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 非草稿支出合同 `amount` + 该合同非草稿补充协议 `amount`；不得读取迁移兼容列 `contracts.changed/paid` |
+| 请款 | `payment_applications` | 只把有效审批态的 `approved_amount` 计入已批请款；列表保留草稿、提交中等状态供追溯 |
+| 收票 | `invoices` | 列表按项目和分供方关联；汇总只计 `account_status='archived'` 的 `total_amount` 与 `tax_amount` |
+| 付款 | `payment_records` + `payment_record_application_allocations` + `payment_applications` | 只计已确认支付，并按分摊到当前项目×分供方付款申请的 `allocated_amount` 归属；不得把整张回单金额或手写实付副本直接归入 |
+| 支出结算 | `expenditure_settlements` | 只计有效确认态的 `total_amount`，保留合同、分供方和项目外键 |
+| 合作文件 | `file_refs` | 按真实 owner 分组；向导导入文件固定挂 `owner_type='project_supplier'` |
+
+### 实时摘要
 
 ```ts
-type ProjectSupplierStatus =
-  | 'collecting'   // 资料收集中（刚关联，尚未签合同）
-  | 'contracted'   // 已签合同
-  | 'claiming'     // 请款中（含多轮）
-  | 'paid'         // 已付款（部分/全部）
-  | 'settled'      // 已结算（终态，数据锁定只读）
-
-interface ProjectSupplier {
-  id: string
-  projectId: string               // → Project.id
-  supplierId: string              // → Supplier.id
-  status: ProjectSupplierStatus
-
-  // V2 预留：审批相关
-  reviewerId: string | null       // 当前审核人（V1 不启用）
-
-  // 源单据 id 索引（通过外键关联，非冗余存储）
-  // 实际查询走 SQL JOIN：WHERE projectId = X AND supplierId = Y
-
-  // 结算（唯一在本页完成的写操作）
-  settlement: Settlement | null
-
-  note: string
-  createdAt: string
-  updatedAt: string
+interface ProjectSupplierWorkbenchSummary {
+  contractTotal: number // 有效合同额
+  claimedTotal: number // 有效审批态的批复金额
+  invoiceTotal: number // 已归档进项票含税金额
+  taxTotal: number // 已归档进项票税额
+  paidTotal: number // 已确认支付对当前关系的有效分摊
+  settlementTotal: number // 已确认支出结算单金额
+  balance: number // contractTotal - paidTotal
 }
 ```
 
-### Settlement（结算 — 本页独有）
+这些字段是查询时聚合，不回写 ProjectSupplier，也不作为可编辑金额。
+
+---
+
+## 二、两类“结算”必须分开
+
+### 支出结算单
+
+`expenditure_settlements` 是分包、材料采购或其他支出合同在过程/完工节点形成的真实付款依据。它可以被付款申请分摊，是“支出结算单”页签和经营汇总的来源。
+
+来源路由按单据类型区分：
+
+| 类型 | 详情/编辑路由 |
+| --- | --- |
+| 分包结算 | `/subcontract/settlement/:id` |
+| 材料结算 | `/material/settlement/form/:id` |
+| 其他支出结算 | `/contract/other-settlement/form/:id` |
+
+### 合作终态结算确认
+
+`settlements` 与 ProjectSupplier 1:1，只表示该合作关系最终关闭。它不参与付款申请—结算分摊，也不能替代 `expenditure_settlements`。
 
 ```ts
 interface Settlement {
   id: string
-  projectSupplierId: string       // → ProjectSupplier.id
+  projectSupplierId: string
   date: string
-  finalAmount: number             // 最终结算金额（可与合同额不同）
-  pdfFile: FileRef | null         // 结算确认书 PDF
+  finalAmount: number
+  pdfFile: FileRef | null
   note: string
-  // 确认后 ProjectSupplier.status → 'settled'，数据锁定只读
 }
 ```
 
-### ComputedSummary（实时计算，不存储）
+工作台必须把“支出结算单”列表和“合作终态结算确认”分区展示，禁止用一个“结算额”混合两者。
+
+---
+
+## 三、合作状态
 
 ```ts
-interface ComputedSummary {
-  contractTotal: number           // Σ 关联合同.变更后合同额
-  claimedTotal: number            // Σ 已批准请款.金额
-  paidTotal: number               // Σ 付款流水.金额
-  invoiceTotal: number            // Σ 收票.含税金额
-  taxTotal: number                // Σ 收票.税额
-  balance: number                 // contractTotal - paidTotal
-  settlementGap: number           // settlement.finalAmount - paidTotal（结算后）
-}
+type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' | 'settled'
 ```
 
-> 合同(MaterialContract)、请款(Claim)、收票(InvoiceRef)、付款(Payment) 的完整数据模型见各自模块文档。  
-> 全局外键关系见 → `DATABASE.md`
+| 状态 | 标签 | 默认查看内容 |
+| --- | --- | --- |
+| `collecting` | 资料收集中 | 合同 |
+| `contracted` | 已签合同 | 请款 |
+| `claiming` | 请款中 | 请款 |
+| `paid` | 已付款 | 付款 |
+| `settled` | 已结算 | 结算 |
+
+工作台只读取权威状态，不根据金额或列表条数自行反推、复制或改写状态机。合同、请款、支付等源模块若改变合作状态，必须在各自保存事务中完成；工作台不得以展示逻辑替代领域写入。
 
 ---
 
-## 三、状态机
-
-| 当前状态 | 触发动作 | 目标状态 | 前置条件 |
-|---|---|---|---|
-| `collecting` | 关联合同签订完成 | `contracted` | 采购合同模块中有关联本项目+分供方的合同 |
-| `contracted` | 新建请款 | `claiming` | 付款申请模块中创建关联本项目+分供方的 Claim |
-| `claiming` | 请款审批通过 + 录入付款 | `paid` | Claim approved + Payment 记录 |
-| `claiming` | 请款驳回 | `contracted` | Claim rejected |
-| `paid` | 发起新请款 | `claiming` | 多轮请款（分阶段施工） |
-| `paid` | 确认结算 | `settled` | 填写结算金额 + 上传结算 PDF + 二次确认 |
-
-状态变更说明：
-- `collecting → contracted`：被动触发，采购合同模块新建合同时自动更新
-- `contracted → claiming`：被动触发，付款申请模块新建请款时自动更新
-- `paid → settled`：**主动触发**，在本页完成
-
-### 状态 → 默认视图
-
-| 状态 | 默认 Tab | 说明 |
-|---|---|---|
-| `collecting` | 合同 | 引导用户去采购合同模块补合同 |
-| `contracted` | 请款 | 合同已签，提示可发起请款 |
-| `claiming` | 请款 | 查看审批状态 |
-| `paid` | 付款 | 查看付款流水和余额 |
-| `settled` | 结算 | 只读查看 |
-
----
-
-## 四、详情页交互
-
-### 入口
-
-从项目详情页的「支出合同管理」tab 或「分供方列表」中点击分供方名称 → 进入本页。
+## 四、工作台结构
 
 ### 顶部摘要
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ [← 返回项目]  项目: 合和新城 × 分供方: 大板东建材                      │
-│ 状态: [已签合同]  合同额: ¥38.5万  请款: ¥12万  收票: ¥8万  已付: ¥10万  │
-│ 应付余额: ¥28.5万                                                    │
-└──────────────────────────────────────────────────────────────────────┘
-```
+顶部显示返回项目、项目名、分供方名、合作状态，以及有效合同额、已批请款、已归档收票、已确认付款、支出结算额和应付余额。金额为零时显示数值但不伪造下钻；加载失败时显示错误和重试入口。
 
-### Tab（6 个）
+### 业务页签
 
-| # | Tab | 内容 | 操作 |
-|---|---|---|---|
-| 1 | 合作概览 | 项目信息、分供方信息、状态、关键金额、最近动态 | 编辑备注 |
-| 2 | 合同 | 只读合同列表: 合同号/名称/金额/变更后金额/附件数 | [+ 新建] → 跳转采购合同模块；行点击 → 跳转合同详情 |
-| 3 | 请款 | 只读请款列表: 单号/状态/申请金额/审批金额/附件数 | [+ 新建] → 跳转付款申请模块；行点击 → 跳转请款详情 |
-| 4 | 收票 | 只读收票列表: 发票号/开票日期/含税金额/税额/发票类型 | [+ 新建] → 跳转收票登记模块；行点击 → 跳转收票详情 |
-| 5 | 付款 | 只读付款列表: 日期/金额/方式/凭证/关联请款单号 | [+ 新建] → 跳转付款申请模块；行点击 → 跳转付款详情 |
-| 6 | 结算 | 结算金额/结算PDF/尾款差额/锁定状态 | **本页操作**: 填写结算金额 + 上传PDF + [确认结算]（二次确认弹窗） |
+| 页签 | 内容 | 真实来源 |
+| --- | --- | --- |
+| 合作概览 | 项目信息、分供方信息、合作状态和金额摘要 | `projects`、`suppliers`、`project_suppliers` 及实时聚合 |
+| 合同 | 合同号、名称、类别、状态、原合同额、有效合同额、签订日期、附件数 | `contracts`、`contract_supplements` |
+| 请款 | 申请单号、名称、状态、申请金额、批复金额、申请日期、回票类型、附件数 | `payment_applications` |
+| 收票 | 发票号、日期、类型、含税金额、税额、归档状态 | `invoices` |
+| 付款 | 支付单号、日期、本关系分摊金额、方式、凭证、确认状态、关联请款 | 支付记录与有效分摊 |
+| 结算 | 支出结算单列表 + 合作终态结算确认 | `expenditure_settlements`、`settlements` |
 
-### 源单据跳转规则
+业务表格只在自身区域横向滚动。行级“查看源单”进入真实来源，不在工作台复制编辑表单。
 
-各 tab 的 [+ 新建] 按钮和行点击都跳转到对应模块页面，跳转时携带筛选参数：
+### 来源穿透
 
-| 目标模块 | 携带参数 |
-|---|---|
-| 采购合同 | `projectId` + `supplierId` |
-| 付款申请 | `projectId` + `supplierId` |
-| 收票登记 | `projectId` + `supplierId` |
+| 来源 | 当前可达路由 |
+| --- | --- |
+| 合同 | `/contract/:id` |
+| 付款申请 | `/finance/payment/:id` |
+| 发票 | `/finance/invoice/:id` |
+| 支付记录 | `/finance/records/:id` |
+| 分包结算 | `/subcontract/settlement/:id` |
+| 材料结算 | `/material/settlement/form/:id` |
+| 其他支出结算 | `/contract/other-settlement/form/:id` |
 
-### 右侧辅助区
+现有新增表单不会统一读取 `projectId`、`supplierId` 查询参数，因此工作台不得宣称已自动预填。没有真实预填能力的入口只写“前往对应模块”，不能伪装成已带筛选的新建流程。收票新增继续进入 `/finance/invoice` 的上传识别工作台，不虚构 `/finance/invoice/new`。
 
-| 区域 | V1 状态 |
-|---|---|
-| 文件管理 | **启用**（展示本项目×分供方关联的所有文件，按来源分组） |
-| 审批时间线 | 留空（V2） |
-| 评论 | 留空（V2） |
-| 动态 | 留空（V2） |
+### 文件区
+
+文件按“合作档案、合同、付款申请、发票原件、支付记录、支出结算、最终结算”等真实来源分组。每个文件保留文件名、类别、大小、上传人和时间；有源单的分组可以进入源单。预览或下载只读取现有文件内容，不改变业务状态。
+
+通过导入向导进入的文件只属于 ProjectSupplier 合作档案，不回写为分供方证照，也不自动生成合同、请款、发票、支付或结算单。
 
 ---
 
-## 五、批量导入向导
+## 五、文件驱动导入向导
 
-路由: `/project/:pid/supplier/import`
+路由：`/project/:pid/supplier/import`
 
-用于批量把文件和分供方挂到项目维度。
+该导入以文件为起点，不是从已有分供方列表批量勾选关系，也不等同于全局分供方 Excel 导入。
 
-### 三步向导
+### 第一步：选择文件
 
-| 步骤 | 内容 |
-|---|---|
-| 1 选择文件 | 选择文件夹或多选文件，展示文件名/大小/类型 |
-| 2 自动分类 + 人工调整 | 识别分供方名、文件类别、项目归属；可下拉修正 |
-| 3 确认生成 | 预览将生成的 ProjectSupplier 记录，确认后回项目详情 |
+- 支持拖入或多选文件。
+- 支持选择文件夹；浏览器提供目录选择能力时读取目录内文件。
+- 预览文件名、相对路径、大小和类型。
+- 同一批次按“相对路径或文件名 + 大小 + 最后修改时间”去重。
+
+### 第二步：文件名分类与人工调整
+
+自动分类只使用本地文件名和现有分供方名称/别名，不读取文件正文、不上传云端，也不声称执行 OCR。
+
+分供方匹配顺序：
+
+1. 文件名命中现有分供方公司全称；
+2. 未命中全称时匹配别名；
+3. 多个名称同时命中时优先最长名称；
+4. 无匹配时从文件名移除项目名、类别关键词、日期和分隔符，得到候选名称；
+5. 所有结果均允许人工改选现有分供方或改为新分供方。
+
+文件类别由文件名关键词初分为：
+
+| 类别 | 代表关键词 |
+| --- | --- |
+| 合同 | 合同、协议 |
+| 请款 | 请款、申请款、进度款 |
+| 收票 | 收票、发票、票据 |
+| 付款 | 付款、回单、支付 |
+| 结算 | 结算、决算 |
+| 资质 | 资质、证照、营业执照 |
+| 其他 | 未命中上述关键词 |
+
+用户可以逐文件调整分供方和类别。未匹配现有分供方时，必须编辑或确认候选名称，并明确勾选“写入分供方主数据”；未确认不得进入下一步。
+
+确认新建的最小分供方使用当前安全默认：
+
+- 类别：`其他`
+- 资料状态：`incomplete`（资料缺失）
+- 审批状态：`draft`
+- 来源：`file-import`
+
+导入文件仍只挂到 ProjectSupplier，不成为该分供方的资质证照。
+
+### 第三步：确认生成
+
+确认页按分供方分组预览：
+
+- 新建分供方主数据；
+- 新建项目关系；
+- 复用已有项目关系；
+- 每个关系下将归档的文件和类别。
+
+提交后，新分供方、ProjectSupplier 关系、文件元数据与浏览器文件正文在同一事务中保存；任一写入失败则整批回滚。成功后返回当前项目详情的支出业务页签。
 
 ### 生成规则
 
-1. 已存在同项目同分供方关系时不重复创建
-2. 分供方不存在时进入候选状态，由用户确认是否写入 Supplier 主数据
-3. 文件只挂到 ProjectSupplier，不回写分供方证照
+1. 同一项目、同一分供方的可见关系直接复用，不重复创建。
+2. 只有软删除关系时恢复原关系，并以 `collecting` 重新开始合作。
+3. 同一候选名称的多个文件合并到一个新分供方和一个 ProjectSupplier 关系。
+4. 未经用户确认的候选分供方不写入主数据。
+5. 文件固定写入 `file_refs(owner_type='project_supplier', owner_id=ProjectSupplier.id)`。
+6. 导入不创建或修改合同、付款申请、发票、支付记录、支出结算单或分供方证照。
 
 ---
 
-## 六、验收要点
+## 六、响应式与键盘
 
-1. ProjectSupplier 只保存项目维度关系和结算数据
-2. 合同、请款、收票、付款的新增/编辑/审批不在本页完成，全部跳转到独立模块
-3. 结算确认是本页唯一的写操作，确认后终态锁定
-4. 所有 tab 的金额汇总都能跳转到源单据（带项目+分供方筛选）
-5. 请款和付款允许多轮、多次
-6. 状态变更除结算外都是被动触发（由源模块的操作自动更新）
-7. `reviewerId` V1 预留不启用
+- 390、768、1024、1280–1440px 下页面不得产生文档级横向滚动。
+- 业务宽表、文件清单和向导文件表只能在各自区域横向滚动。
+- 页签在窄屏允许局部横向滚动；摘要卡和向导分组按可用宽度换行。
+- 文件选择、移除、分供方/类别调整、候选确认、上一步、下一步和最终确认都必须有可见焦点，并可通过键盘完成。
+- 加载、空数据、错误、保存中和成功反馈必须使用共享状态与 KitUI 反馈，不以静态零值掩盖未加载或失败。
+
+---
+
+## 七、验收边界
+
+1. 工作台只展示真实项目×分供方事实，金额不读旧静态汇总列。
+2. 合同、请款、收票、付款和支出结算的写操作仍在独立模块完成。
+3. 支出结算单与合作终态结算确认明确分开。
+4. 来源链接全部进入当前实际存在的路由。
+5. 导入以文件为起点，自动分类明确是本地文件名规则，并要求人工复核。
+6. 已有关系复用；新分供方只有明确确认后才创建；关系和文件刷新后仍可见。
+7. 工作台和向导在四类视口、局部滚动和键盘操作下可用。

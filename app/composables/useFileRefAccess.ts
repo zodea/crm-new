@@ -2,6 +2,15 @@ import type { FileRefRecord } from '~/lib/forms/file-refs'
 import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 
+const SAFE_PREVIEW_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'text/plain',
+])
+
 function objectUrl(file: FileRefRecord, bytes: Uint8Array): string {
   const copy = bytes.slice()
   return URL.createObjectURL(new Blob([copy.buffer], {
@@ -13,6 +22,10 @@ export function useFileRefAccess() {
   const { error, warning } = useKitUI()
 
   async function preview(file: FileRefRecord) {
+    if (!SAFE_PREVIEW_MIME_TYPES.has(file.mimeType.trim().toLowerCase())) {
+      warning('该文件类型不支持安全预览，请下载后查看')
+      return
+    }
     try {
       const content = await loadFileRefContent(file)
       if (!content) {

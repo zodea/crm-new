@@ -25,6 +25,12 @@ test.describe('Issue #194：工人详情', () => {
         .toHaveAttribute('href', '/base/worker')
       await expect(shell.getByText('泥水A班', { exact: true }).first()).toBeVisible()
       await expect(shell.getByTestId('worker-profile')).toBeVisible()
+      await expect(shell.getByText('档案：草稿', { exact: true })).toBeVisible()
+      await expect(shell.getByText('在场：在场', { exact: true })).toBeVisible()
+      await expect(shell.getByText('135 **** 0003', { exact: true })).toBeVisible()
+      await expect(shell.getByText('3624 **** 6789', { exact: true })).toBeVisible()
+      await expect(shell.getByText('13511220003', { exact: true })).toHaveCount(0)
+      await expect(shell.getByText('362426198712146789', { exact: true })).toHaveCount(0)
       await expect(shell.getByTestId('worker-projects')).toBeVisible()
       await expect(shell.getByTestId('worker-labor-facts')).toBeVisible()
       await expectNoPageOverflow(page, `工人详情 @ ${width}px`)
@@ -36,7 +42,9 @@ test.describe('Issue #194：工人详情', () => {
     await page.goto('/base/worker/wkr_demo_003')
 
     await expectLocalHorizontalScroll(
-      page.getByTestId('worker-assignment-scroll'),
+      page.getByTestId('worker-assignment-scroll')
+        .locator('.vxe-table--body-inner-wrapper')
+        .first(),
       '工人责任单元表',
     )
     await expectNoPageOverflow(page, '工人详情窄窗')

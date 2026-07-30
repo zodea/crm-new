@@ -3,7 +3,7 @@ import type { MasterDataCapabilities } from '~/lib/master-data/capabilities'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { effectiveMasterDataCapabilities } from '~/lib/master-data/capabilities'
 
-export type WorkerProjectSource = '当前项目' | '工程量责任' | '考勤' | '签工' | '工资单'
+export type WorkerProjectSource = '当前项目' | '工程量责任' | '考勤' | '签工' | '工资单' | '扣罚'
 
 export interface WorkerMaster {
   id: string
@@ -138,6 +138,21 @@ export interface WorkerWageStatement {
   lines: WorkerWageLine[]
 }
 
+export interface WorkerPenalty {
+  id: string
+  no: string
+  projectId: string | null
+  projectName: string
+  source: string
+  sourceLabel: string
+  location: string
+  reason: string
+  amount: number
+  penaltyDate: string
+  status: string
+  statusLabel: string
+}
+
 export interface WorkerDetailSummary {
   projectCount: number
   assignedUnitCount: number
@@ -149,6 +164,7 @@ export interface WorkerDetailSummary {
   releasedStatementCount: number
   knownAllocatedAmount: number
   missingAllocationCount: number
+  penaltyAmount: number
 }
 
 export interface WorkerDetail {
@@ -162,6 +178,7 @@ export interface WorkerDetail {
   attendance: WorkerAttendance[]
   daywork: WorkerDaywork[]
   wageStatements: WorkerWageStatement[]
+  penalties: WorkerPenalty[]
   summary: WorkerDetailSummary
 }
 
@@ -196,6 +213,39 @@ function round(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+const PENALTY_SOURCE_LABEL: Record<string, string> = {
+  inspection: '管理巡检',
+  owner_notice: '甲方/监理联系单',
+  acceptance: '完工验收',
+  project: '项目处罚',
+}
+
+const PENALTY_STATUS_LABEL: Record<string, string> = {
+  draft: '草稿',
+  pending: '待处理',
+  repairing: '整改中',
+  repaired_self: '自行修复',
+  repaired_other: '他人代修',
+  deducted: '已扣罚',
+}
+
+const WORKER_RECORD_STATUS_LABEL: Record<string, string> = {
+  draft: '草稿',
+  submitted: '已提交',
+  approved: '已审核',
+  rejected: '已退回',
+  active: '在用',
+  inactive: '停用',
+}
+
+export function workerRecordStatusLabel(status: string): string {
+  return WORKER_RECORD_STATUS_LABEL[status] ?? (status || '未定')
+}
+
+export function workerPresenceStatusLabel(status: string): string {
+  return status || '未登记'
+}
+
 function addProjectSource(
   projects: Map<string, WorkerProject>,
   input: { id: string, name: string, code: string, status: string },
@@ -214,7 +264,7 @@ function addProjectSource(
 
 async function loadWorkerRow(db: MigrationDb, workerId: string): Promise<WorkerRow | null> {
   const rows = await db.select<WorkerRow>(
-    `${hiddenCtesFor('workers')}
+    `${hiddenCtesFor('workers', 'projects')}
      SELECT
        w.*,
        c.name AS crew_name,
@@ -226,7 +276,9 @@ async function loadWorkerRow(db: MigrationDb, workerId: string): Promise<WorkerR
        p.status AS current_project_status
      FROM workers w
      LEFT JOIN crews c ON c.id = w.crew_id
-     LEFT JOIN projects p ON p.id = w.current_project_id
+     LEFT JOIN projects p
+       ON p.id = w.current_project_id
+      AND ${visibleCond('projects', 'p')}
      WHERE ${visibleCond('workers', 'w')} AND w.id = ?`,
     [workerId],
   )
@@ -495,22 +547,54 @@ async function loadWageStatements(db: MigrationDb, workerId: string): Promise<Wo
   })
 }
 
+async function loadPenalties(db: MigrationDb, workerId: string): Promise<WorkerPenalty[]> {
+  const rows = await db.select<Record<string, unknown>>(
+    `${hiddenCtesFor('penalty_records')}
+     SELECT penalty.*, project.name AS project_name
+     FROM penalty_records penalty
+     LEFT JOIN projects project ON project.id = penalty.projectId
+     WHERE ${visibleCond('penalty_records', 'penalty')}
+       AND (penalty.workerId = ? OR penalty.responsibleWorkerId = ?)
+     ORDER BY penalty.penaltyDate DESC, penalty.createdAt DESC, penalty.id DESC`,
+    [workerId, workerId],
+  )
+  return rows.map((row) => {
+    const source = text(row.source)
+    const status = text(row.status)
+    return {
+      id: text(row.id),
+      no: text(row.no),
+      projectId: text(row.projectId) || null,
+      projectName: text(row.project_name),
+      source,
+      sourceLabel: PENALTY_SOURCE_LABEL[source] ?? (source || '—'),
+      location: text(row.location) || [text(row.building), text(row.floor), text(row.room)].filter(Boolean).join(' / '),
+      reason: text(row.reason),
+      amount: number(row.amount),
+      penaltyDate: text(row.penaltyDate),
+      status,
+      statusLabel: PENALTY_STATUS_LABEL[status] ?? (status || '—'),
+    }
+  })
+}
+
 export async function loadWorkerDetail(db: MigrationDb, workerId: string): Promise<WorkerDetail | null> {
   const row = await loadWorkerRow(db, workerId)
   if (!row)
     return null
 
-  const [relatedWorkers, attachments, assignments, attendance, daywork, wageStatements] = await Promise.all([
+  const [relatedWorkers, attachments, assignments, attendance, daywork, wageStatements, penalties] = await Promise.all([
     loadRelatedWorkers(db, row),
     loadAttachments(db, workerId),
     loadAssignments(db, workerId),
     loadAttendance(db, workerId),
     loadDaywork(db, workerId),
     loadWageStatements(db, workerId),
+    loadPenalties(db, workerId),
   ])
 
   const projects = new Map<string, WorkerProject>()
-  if (row.current_project_id) {
+  if (row.current_project_id && row.current_project_name) {
     addProjectSource(projects, {
       id: row.current_project_id,
       name: text(row.current_project_name),
@@ -549,6 +633,16 @@ export async function loadWorkerDetail(db: MigrationDb, workerId: string): Promi
       code: '',
       status: '',
     }, '工资单')
+  }
+  for (const penalty of penalties) {
+    if (!penalty.projectId)
+      continue
+    addProjectSource(projects, {
+      id: penalty.projectId,
+      name: penalty.projectName,
+      code: '',
+      status: '',
+    }, '扣罚')
   }
 
   const releasedStatements = wageStatements.filter(statement => statement.status === 'released')
@@ -596,6 +690,7 @@ export async function loadWorkerDetail(db: MigrationDb, workerId: string): Promi
     attendance,
     daywork,
     wageStatements,
+    penalties,
     summary: {
       projectCount: projects.size,
       assignedUnitCount: new Set(assignments.map(assignment => assignment.unitId)).size,
@@ -612,6 +707,7 @@ export async function loadWorkerDetail(db: MigrationDb, workerId: string): Promi
       missingAllocationCount: releasedStatements
         .filter(statement => !statement.allocationRecorded)
         .length,
+      penaltyAmount: round(penalties.reduce((sum, penalty) => sum + penalty.amount, 0)),
     },
   }
 }

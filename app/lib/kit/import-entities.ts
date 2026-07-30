@@ -111,7 +111,6 @@ const PROJECT_FIELDS: readonly ImportTemplateField[] = [
 const SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
   { key: 'name', label: '公司全称', required: true, aliases: ['分供方名称', '供应商名称', '名称'] },
   { key: 'supplierCategory', label: '分供方类别', aliases: ['类别', '合作类别'] },
-  { key: 'credentialStatus', label: '资料状态', aliases: ['资质状态'] },
   { key: 'aliases', label: '简称/别名', aliases: ['简称', '别名'] },
   { key: 'uniqueCode', label: '统一社会信用代码', aliases: ['信用代码'] },
   { key: 'taxNo', label: '税号', aliases: ['纳税人识别号'] },

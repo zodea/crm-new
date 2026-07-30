@@ -10,7 +10,7 @@
     "bank_account": "6217 8500 1234 5678",
     "contact": "陈志强",
     "contact_phone": "13802201234",
-    "credential_status": "qualified",
+    "credential_status": "incomplete",
     "note": "钢材",
     "created_at": "2026-06-01T00:00:05.000Z",
     "updated_at": "2026-06-01T00:00:05.000Z"
@@ -42,7 +42,7 @@
     "bank_account": "6217 0001 2233 4455",
     "contact": "黄国华",
     "contact_phone": "13602209012",
-    "credential_status": "qualified",
+    "credential_status": "incomplete",
     "note": "商砼",
     "created_at": "2026-06-01T00:00:03.000Z",
     "updated_at": "2026-06-01T00:00:03.000Z"
@@ -90,7 +90,7 @@
     "bank_account": "6228 4801 2233 9900",
     "contact": "陈家旺",
     "contact_phone": "13802209988",
-    "credential_status": "qualified",
+    "credential_status": "incomplete",
     "note": "泥水劳务",
     "created_at": "2026-05-31T23:59:59.000Z",
     "updated_at": "2026-05-31T23:59:59.000Z"
@@ -106,7 +106,7 @@
     "bank_account": "6222 0203 1122 5566",
     "contact": "罗建平",
     "contact_phone": "13902203344",
-    "credential_status": "qualified",
+    "credential_status": "incomplete",
     "note": "瓷砖",
     "created_at": "2026-05-31T23:59:58.000Z",
     "updated_at": "2026-05-31T23:59:58.000Z"
@@ -138,7 +138,7 @@
     "bank_account": "6217 8501 5566 3344",
     "contact": "麦志雄",
     "contact_phone": "13802207788",
-    "credential_status": "qualified",
+    "credential_status": "incomplete",
     "note": "脚手架搭设",
     "created_at": "2026-05-31T23:59:56.000Z",
     "updated_at": "2026-05-31T23:59:56.000Z"

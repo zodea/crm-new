@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { KitEditGridColumn } from '~/lib/kit/edit-grid'
+import type { KitTableColumn } from '~/lib/kit/table'
+import type { TreeNode } from '~/lib/kit/tree-nav'
 import { useTimeoutFn } from '@vueuse/core'
 import { Button } from '~/components/ui/button'
 import { toErrorMessage } from '~/lib/util/error'
@@ -145,6 +148,29 @@ async function demoFormModal() {
     kit.success('分供方已创建')
 }
 
+// W2-3 typeSelect 业务类型选择（#95）
+const PAYMENT_APPLICATION_TYPE_OPTIONS = [
+  { value: 'contract-labor-material', label: '有合同（人材料分包）付款申请', hint: '关联合同、结算额度与发票' },
+  { value: 'no-contract-labor-material', label: '无合同（人材料分包）付款申请' },
+  { value: 'contract-labor-advance', label: '有合同（人分包）预付款申请' },
+  { value: 'contract-material-advance', label: '有合同（材料）预付款申请' },
+  { value: 'no-contract-material-advance', label: '无合同（材料）预付款申请' },
+  { value: 'project-management-fee', label: '项目（管理费）付款申请' },
+  { value: 'project-expense', label: '项目（项目费用）付款申请' },
+  { value: 'company-payment', label: '公司付款申请' },
+] as const
+
+async function demoTypeSelect() {
+  const value = await kit.typeSelect({
+    title: '新建付款申请',
+    options: PAYMENT_APPLICATION_TYPE_OPTIONS,
+    defaultValue: 'contract-labor-material',
+  })
+  lastResult.value = value
+    ? `typeSelect 确定返回：${value}`
+    : 'typeSelect 已取消（返回 null）'
+}
+
 // ⑥ 单文件直接保存（ADR 0004）
 async function demoDirectExport() {
   try {
@@ -214,6 +240,51 @@ function demoLookupCreate() {
   lastResult.value = 'LookupSelect 抛出 create，由业务页面接管新建流程'
 }
 
+// W2-2 KitEditGrid 明细网格（#94）
+type DemoEditGridLine = {
+  name?: string
+  unit?: string
+  quantity?: number | null
+  unitPrice?: number | null
+  amount?: number
+} & Record<string, unknown>
+
+const demoEditGrid = useTemplateRef<{
+  validate: () => { row: number, key: string }[]
+}>('demoEditGrid')
+const demoEditGridRows = shallowRef<DemoEditGridLine[]>([
+  { name: '玻化砖', unit: '㎡', quantity: 120, unitPrice: 68 },
+  { name: '瓷砖胶', unit: '袋', quantity: 32, unitPrice: 42 },
+])
+const demoEditGridColumns: KitEditGridColumn<DemoEditGridLine>[] = [
+  { key: 'name', label: '材料名称', required: true, minWidth: 180 },
+  { key: 'unit', label: '单位', type: 'select', options: ['项', '㎡', 'm', '袋'], width: 100 },
+  { key: 'quantity', label: '数量', type: 'number', required: true, width: 120 },
+  { key: 'unitPrice', label: '单价', type: 'number', width: 130 },
+  {
+    key: 'amount',
+    label: '合价',
+    type: 'readonly',
+    width: 140,
+    derive: row => Number(row.quantity || 0) * Number(row.unitPrice || 0),
+  },
+]
+
+async function pickDemoEditGridRows(): Promise<DemoEditGridLine[]> {
+  await new Promise(resolve => setTimeout(resolve, 300))
+  return [
+    { name: '防水涂料', unit: '桶', quantity: 6, unitPrice: 285 },
+    { name: '成品保护膜', unit: '㎡', quantity: 80, unitPrice: 3.5 },
+  ]
+}
+
+function validateDemoEditGrid() {
+  const errors = demoEditGrid.value?.validate() ?? []
+  lastResult.value = errors.length
+    ? `KitEditGrid 发现 ${errors.length} 处必填项`
+    : 'KitEditGrid 校验通过'
+}
+
 // W2-4 FormFooter 保存动作组（#96）
 type DemoFormAction = 'cancel' | 'draft' | 'saveNew' | 'saveSubmit' | 'save'
 const demoFormDirty = shallowRef(false)
@@ -232,6 +303,44 @@ function handleDemoFormAction(action: DemoFormAction) {
   demoFormLoading.value = action
   finishDemoFormAction()
 }
+
+// W2-5 ListShell 列表页模板（#97）
+const demoListTreeKey = shallowRef('all')
+const demoListViewKey = shallowRef('all')
+const demoListRows = [
+  { id: 'contract-1', name: '施工总承包合同', status: 'active', owner: '我', amount: 32388422.52 },
+  { id: 'contract-2', name: '精装修材料采购合同', status: 'active', owner: '团队', amount: 19393316.46 },
+  { id: 'contract-3', name: '旧设备租赁合同', status: 'paused', owner: '我', amount: 682000 },
+  { id: 'contract-4', name: '临时仓库租赁合同', status: 'void', owner: '团队', amount: 240000 },
+  { id: 'contract-5', name: '历史维护合同', status: 'terminated', owner: '团队', amount: 96000 },
+]
+const demoListTree: TreeNode[] = [
+  { key: 'all', label: '全部合同', count: demoListRows.length, icon: 'i-lucide-files' },
+  { key: 'active', label: '履约', count: 2, icon: 'i-lucide-circle-check', tone: 'brand' },
+  { key: 'paused', label: '中止', count: 1, icon: 'i-lucide-circle-pause', tone: 'warn' },
+  { key: 'void', label: '废除', count: 1, icon: 'i-lucide-ban' },
+  { key: 'terminated', label: '终止', count: 1, icon: 'i-lucide-circle-off' },
+]
+const demoListViews = [
+  { key: 'all', label: '全部视图' },
+  { key: 'mine', label: '我负责的' },
+]
+const demoListColumns: KitTableColumn[] = [
+  { type: 'seq', title: '#', width: 52 },
+  { field: 'name', title: '合同名称', minWidth: 220 },
+  { field: 'status', title: '合同状态', width: 100 },
+  { field: 'owner', title: '负责人', width: 90 },
+  { field: 'amount', title: '变更后合同金额', type: 'money', width: 170 },
+]
+const visibleDemoListRows = computed(() => demoListRows.filter(row =>
+  (demoListTreeKey.value === 'all' || row.status === demoListTreeKey.value)
+  && (demoListViewKey.value === 'all' || row.owner === '我'),
+))
+const demoListSummary = computed(() => ({
+  变更后合同金额总和: visibleDemoListRows.value.reduce((sum, row) => sum + row.amount, 0),
+  合同数量: visibleDemoListRows.value.length,
+  当前视图: demoListViews.find(view => view.key === demoListViewKey.value)?.label ?? '全部视图',
+}))
 
 // ⑧ 需分类的多文件导出（ADR 0004 / #80）
 async function demoConfiguredExport() {
@@ -408,6 +517,19 @@ async function demoImportMapping() {
         </button>
       </section>
 
+      <!-- W2-3 typeSelect -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-3 typeSelect — 业务类型选择弹窗（#95）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          付款申请 8 类单选范本；支持双击确定、方向键移动与 Enter 确定，取消、Esc 和遮罩关闭都返回 null。
+        </p>
+        <button class="btn-secondary" @click="demoTypeSelect">
+          新建付款申请
+        </button>
+      </section>
+
       <!-- ⑤-b FormDialog：ADR 0014 仅保留给行级小对象/兜底 -->
       <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
@@ -546,6 +668,30 @@ async function demoImportMapping() {
         </p>
       </section>
 
+      <!-- W2-2 KitEditGrid 明细网格 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-2 KitEditGrid — 受控明细网格（#94）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          行数据由页面持有；网格统一提供添加、勾选复制/删除、批量选择、派生金额、汇总和必填定位。
+        </p>
+        <KitEditGrid
+          ref="demoEditGrid"
+          v-model="demoEditGridRows"
+          label="材料清单"
+          :columns="demoEditGridColumns"
+          :summary="[{ key: 'amount', agg: 'sum' }]"
+          :picker="{ label: '选择材料', onPick: pickDemoEditGridRows }"
+          :max="20"
+        />
+        <div class="mt-3 flex justify-end">
+          <KitButton type="button" @click="validateDemoEditGrid">
+            校验明细
+          </KitButton>
+        </div>
+      </section>
+
       <!-- W2-4 FormFooter 保存动作组 -->
       <section class="panel p-4">
         <h2 class="text-13px font-700 text-ink mb-1">
@@ -572,6 +718,48 @@ async function demoImportMapping() {
         <p class="mt-2 text-11px text-ink-faint" aria-live="polite">
           dirty：{{ demoFormDirty }}；保存后关闭：{{ demoCloseAfterSave }}
         </p>
+      </section>
+
+      <!-- W2-5 ListShell 列表页模板 -->
+      <section class="panel p-4">
+        <h2 class="text-13px font-700 text-ink mb-1">
+          W2-5 ListShell — 左树、视图与汇总行（#97）
+        </h2>
+        <p class="text-12px text-ink-soft mb-3">
+          切换合同状态或“我负责的”视图，页面负责过滤数据并把汇总结果回传给列表壳；收起左树可观察无空白布局。
+        </p>
+        <ListShell
+          v-model:tree-key="demoListTreeKey"
+          v-model:view-key="demoListViewKey"
+          :tree="demoListTree"
+          :views="demoListViews"
+          :summary="demoListSummary"
+        >
+          <template #toolbar>
+            <div class="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              <span class="text-12px text-ink-faint">
+                当前 {{ visibleDemoListRows.length }} 条
+              </span>
+              <button type="button" class="btn-secondary min-h-8">
+                导入
+              </button>
+              <button type="button" class="btn-accent min-h-8">
+                新建合同
+              </button>
+            </div>
+          </template>
+          <template #table>
+            <div class="min-w-0 overflow-x-auto">
+              <div class="min-w-170">
+                <KitTable
+                  :columns="demoListColumns"
+                  :data="visibleDemoListRows"
+                  :min-rows="5"
+                />
+              </div>
+            </div>
+          </template>
+        </ListShell>
       </section>
 
       <!-- ⑧ 配置导出页签 -->

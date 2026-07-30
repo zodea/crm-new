@@ -65,6 +65,34 @@ describe('contract store:唯一写路径 action 闭环', () => {
     })
   })
 
+  it('施工合同变更后金额包含有效增补与已审定甲方变洽签', async () => {
+    const store = useContractStore()
+    const { id } = await store.saveForm('construction', {
+      name: '变更金额合同',
+      projectId: 'p1',
+      customerId: 'customer-1',
+      amount: 100,
+    }, 'draft')
+    await mem.execute(`
+      INSERT INTO contract_supplements (
+        id, contract_id, no, name, amount, status
+      )
+      VALUES ('supplement-1', ?, 'BC-001', '有效增补', 20, '有效')
+    `, [id])
+    await mem.execute(`
+      INSERT INTO owner_change_orders (
+        id, project_id, contract_id, change_no, tax_inc_amount, status, approval_date
+      )
+      VALUES
+        ('change-approved', 'p1', ?, 'BG-001', 30, 'approved', ''),
+        ('change-legacy', 'p1', ?, 'BG-002', 10, 'draft', '2025-12-01'),
+        ('change-draft', 'p1', ?, 'BG-003', 40, 'draft', '')
+    `, [id, id, id])
+
+    await store.load()
+    expect(store.byId(id)?.changed).toBe(160)
+  })
+
   it('byKind:施工/分包/材采三类切片互不串台', async () => {
     const store = useContractStore()
     await store.saveForm('construction', {

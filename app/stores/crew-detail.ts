@@ -261,15 +261,14 @@ function mergeProjectAssociations(
   }
 
   for (const member of members) {
-    if (!member.currentProjectId)
+    if (!member.currentProjectId || member.projectStatus !== '在场')
       continue
     const project = ensureProject({
       projectId: member.currentProjectId,
       projectName: member.currentProjectName,
     })
     project.sourceSet.add('在场成员')
-    if (member.projectStatus === '在场')
-      project.activeMemberCount += 1
+    project.activeMemberCount += 1
   }
 
   for (const row of assignments) {
@@ -342,7 +341,7 @@ export const useCrewDetailStore = defineStore('crew-detail', () => {
 
     const [memberRows, assignmentRows, wageRows, penaltyRows] = await Promise.all([
       select<Record<string, unknown>>(
-        `${hiddenCtes('workers')}
+        `${hiddenCtesFor('workers', 'projects')}
          SELECT
            worker.*,
            project.name AS current_project_name,
@@ -350,6 +349,7 @@ export const useCrewDetailStore = defineStore('crew-detail', () => {
          FROM workers AS worker
          LEFT JOIN projects AS project
            ON project.id = worker.current_project_id
+          AND ${visibleCond('projects', 'project')}
          LEFT JOIN workers AS linked_worker
            ON linked_worker.id = worker.linked_worker_id
           AND linked_worker.deleted_at IS NULL

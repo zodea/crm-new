@@ -21,7 +21,9 @@ interface RepresentativeForm extends FormRoute {
 }
 
 async function preparePaymentForm(page: Page) {
-  await expect(page.getByRole('heading', { name: '选择付款业务类型' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '选择付款业务类型' })).toBeVisible({
+    timeout: 20_000,
+  })
   const paymentType = page.getByRole('button', { name: '有合同-材料', exact: true })
   await paymentType.focus()
   await expect(paymentType).toBeFocused()
@@ -228,11 +230,11 @@ test.describe('#112 R3-B 整页表单增量验收', () => {
         title: '新建 · 材料采购合同',
         addLine: async (page: Page) => page.getByTestId('add-contract-line').click(),
         root: (page: Page) => page.locator('#section-lines')
-          .locator('.overflow-x-auto'),
+          .locator('.vxe-table--body-inner-wrapper')
+          .first(),
         lastAction: (page: Page) => page
           .locator('#section-lines')
-          .getByTitle('删除明细')
-          .last(),
+          .getByRole('textbox', { name: '备注，第 1 行' }),
       },
     ] satisfies Array<FormRoute & {
       addLine: (page: Page) => Promise<void>

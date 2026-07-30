@@ -26,9 +26,12 @@ export interface Contract {
   /** 劳务|专业,仅 kind=分包 */
   subKind: string
   projectId: string
+  projectName: string
   customerId: string | null
+  customerName: string
   /** 施工合同(乙方=我方)为 null */
   supplierId: string | null
+  supplierName: string
   /** 含税合同金额 */
   amount: number
   /** 变更后合同金额 */
@@ -97,8 +100,11 @@ function rowToContract(row: Record<string, unknown>): Contract {
     kind: (row.kind ?? '施工') as ContractKind,
     subKind: (row.sub_kind ?? '') as string,
     projectId: (row.project_id ?? '') as string,
+    projectName: (row.project_name ?? '') as string,
     customerId: (row.customer_id ?? null) as string | null,
+    customerName: (row.customer_name ?? '') as string,
     supplierId: (row.supplier_id ?? null) as string | null,
+    supplierName: (row.supplier_name ?? '') as string,
     amount: toMoney(row.amount),
     changed: toMoney(row.changed),
     settled: toMoney(row.settled),
@@ -147,47 +153,103 @@ export const useContractStore = defineStore('contract', () => {
           'contracts',
           'contract_supplements',
           'expenditure_settlements',
+          'monthly_statements',
           'invoices',
+          'invoice_applications',
+          'receipt_registrations',
+          'owner_change_orders',
           'payment_applications',
           'payment_records',
           'payment_record_application_allocations',
         )}
         SELECT contract.*,
-               contract.amount + COALESCE((
-                 SELECT SUM(supplement.amount)
-                 FROM contract_supplements AS supplement
-                 WHERE supplement.contract_id = contract.id
-                   AND ${visibleCond('contract_supplements', 'supplement')}
-                   AND supplement.status NOT IN ('draft', '草稿')
-               ), 0) AS changed,
-               COALESCE((
-                 SELECT SUM(settlement.total_amount)
-                 FROM expenditure_settlements AS settlement
-                 WHERE settlement.contract_id = contract.id
-                   AND ${visibleCond('expenditure_settlements', 'settlement')}
-                   AND settlement.status NOT IN ('draft', '草稿')
-               ), 0) AS settled,
-               COALESCE((
-                 SELECT SUM(invoice.total_amount)
-                 FROM invoices AS invoice
-                 WHERE invoice.contract_id = contract.id
-                   AND ${visibleCond('invoices', 'invoice')}
-                   AND invoice.account_status = 'archived'
-               ), 0) AS invoiced,
-               COALESCE((
-                 SELECT SUM(allocation.allocated_amount)
-                 FROM payment_record_application_allocations AS allocation
-                 JOIN payment_records AS payment
-                   ON payment.id = allocation.payment_record_id
-                 JOIN payment_applications AS application
-                   ON application.id = allocation.payment_application_id
-                 WHERE application.contract_id = contract.id
-                   AND ${visibleCond('payment_record_application_allocations', 'allocation')}
-                   AND ${visibleCond('payment_records', 'payment')}
-                   AND ${visibleCond('payment_applications', 'application')}
-                   AND payment.confirmation_status = 'confirmed'
-               ), 0) AS paid
+               project.name AS project_name,
+               COALESCE(customer.name, '') AS customer_name,
+               COALESCE(supplier.name, '') AS supplier_name,
+               contract.amount
+               + COALESCE((
+                   SELECT SUM(supplement.amount)
+                   FROM contract_supplements AS supplement
+                   WHERE supplement.contract_id = contract.id
+                     AND ${visibleCond('contract_supplements', 'supplement')}
+                     AND supplement.status NOT IN ('draft', '草稿')
+                 ), 0)
+               + CASE WHEN contract.kind = '施工'
+                   THEN COALESCE((
+                     SELECT SUM(change_order.tax_inc_amount)
+                     FROM owner_change_orders AS change_order
+                     WHERE change_order.contract_id = contract.id
+                       AND ${visibleCond('owner_change_orders', 'change_order')}
+                       AND (
+                         change_order.source_locked = 1
+                         OR change_order.status = 'approved'
+                         OR trim(change_order.approval_date) <> ''
+                       )
+                   ), 0)
+                   ELSE 0
+                 END AS changed,
+               CASE WHEN contract.kind = '施工'
+                 THEN COALESCE((
+                   SELECT SUM(COALESCE(
+                     statement.audited_amount,
+                     statement.reported_amount,
+                     statement.total_amount
+                   ))
+                   FROM monthly_statements AS statement
+                   WHERE statement.contract_id = contract.id
+                     AND ${visibleCond('monthly_statements', 'statement')}
+                     AND statement.status <> 'draft'
+                 ), 0)
+                 ELSE COALESCE((
+                   SELECT SUM(settlement.total_amount)
+                   FROM expenditure_settlements AS settlement
+                   WHERE settlement.contract_id = contract.id
+                     AND ${visibleCond('expenditure_settlements', 'settlement')}
+                     AND settlement.status NOT IN ('draft', '草稿')
+                 ), 0)
+               END AS settled,
+               CASE WHEN contract.kind = '施工'
+                 THEN COALESCE((
+                   SELECT SUM(application.amount)
+                   FROM invoice_applications AS application
+                   WHERE application.contract_id = contract.id
+                     AND ${visibleCond('invoice_applications', 'application')}
+                     AND application.status NOT IN ('draft', '草稿')
+                 ), 0)
+                 ELSE COALESCE((
+                   SELECT SUM(invoice.total_amount)
+                   FROM invoices AS invoice
+                   WHERE invoice.contract_id = contract.id
+                     AND ${visibleCond('invoices', 'invoice')}
+                     AND invoice.account_status = 'archived'
+                 ), 0)
+               END AS invoiced,
+               CASE WHEN contract.kind = '施工'
+                 THEN COALESCE((
+                   SELECT SUM(receipt.amount)
+                   FROM receipt_registrations AS receipt
+                   WHERE receipt.contract_id = contract.id
+                     AND ${visibleCond('receipt_registrations', 'receipt')}
+                     AND receipt.status NOT IN ('draft', '草稿')
+                 ), 0)
+                 ELSE COALESCE((
+                   SELECT SUM(allocation.allocated_amount)
+                   FROM payment_record_application_allocations AS allocation
+                   JOIN payment_records AS payment
+                     ON payment.id = allocation.payment_record_id
+                   JOIN payment_applications AS application
+                     ON application.id = allocation.payment_application_id
+                   WHERE application.contract_id = contract.id
+                     AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+                     AND ${visibleCond('payment_records', 'payment')}
+                     AND ${visibleCond('payment_applications', 'application')}
+                     AND payment.confirmation_status = 'confirmed'
+                 ), 0)
+               END AS paid
         FROM contracts AS contract
+        JOIN projects AS project ON project.id = contract.project_id
+        LEFT JOIN customers AS customer ON customer.id = contract.customer_id
+        LEFT JOIN suppliers AS supplier ON supplier.id = contract.supplier_id
         WHERE ${visibleCond('contracts', 'contract')}
         ORDER BY contract.created_at DESC
       `)

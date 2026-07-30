@@ -95,10 +95,9 @@ describe('项目详情票据信息（DATABASE.md §4.2 / ADR-0001）', () => {
 })
 
 describe('项目列表金额列与详情聚合同源', () => {
-  it('优先使用详情聚合的累计收入与主合同金额', () => {
+  it('使用正式收款与当前目标成本基线，不混用合同额', () => {
     expect(summarizeProjectFinance(
-      { contractAmount: 3238.84 },
-      { income: 25367027, mainContractAmount: 32388422 },
-    )).toEqual({ income: 25367027, budget: 32388422 })
+      { income: 25367027, budget: 28600000 },
+    )).toEqual({ income: 25367027, budget: 28600000 })
   })
 })

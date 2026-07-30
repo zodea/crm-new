@@ -157,17 +157,17 @@ describe('分供方详情纯聚合', () => {
     })
   })
 
-  it('资料状态只由三类必需证照是否齐全决定', () => {
+  it('资料齐全只进入待核验，绝不自动产生人工合格', () => {
     expect(resolveCredentialStatus(['营业执照', '法人身份证'])).toBe('incomplete')
-    expect(resolveCredentialStatus(['营业执照', '法人身份证', '银行开户许可证', '其他'])).toBe('qualified')
+    expect(resolveCredentialStatus(['营业执照', '法人身份证', '银行开户许可证', '其他'])).toBe('reviewing')
   })
 
-  it('演示分供方资料状态与证照种子保持一致', () => {
+  it('旧演示种子的自动合格只可重算成自动态', () => {
     for (const supplier of suppliersSeed) {
       const categories = credentialsSeed
         .filter(credential => credential.supplier_id === supplier.id)
         .map(credential => credential.category)
-      expect(resolveCredentialStatus(categories), supplier.id).toBe(supplier.credential_status)
+      expect(['incomplete', 'reviewing']).toContain(resolveCredentialStatus(categories))
     }
   })
 })

@@ -56,7 +56,7 @@ describe('boq monthly statements', () => {
     )).rejects.toThrow('已存在')
   })
 
-  it('records manual adjustment trace without changing the automatic quantity', async () => {
+  it('records manual adjustment trace without advancing the owner report lifecycle', async () => {
     const generated = await generateMonthlyStatement(
       db,
       'proj_demo_001',
@@ -71,7 +71,7 @@ describe('boq monthly statements', () => {
     expect(logIds).toHaveLength(2)
     const adjusted = await loadMonthlyStatement(db, generated.statementId)
     expect(adjusted).toMatchObject({
-      status: 'adjusted',
+      status: 'draft',
       totalAmount: 1440,
     })
     expect(adjusted?.lines[0]).toMatchObject({
@@ -81,5 +81,29 @@ describe('boq monthly statements', () => {
       amount: 1440,
       note: '现场复核扣减',
     })
+  })
+
+  it('rejects quantity adjustments after the owner report has been submitted', async () => {
+    const generated = await generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+    )
+    const statement = await loadMonthlyStatement(db, generated.statementId)
+    const line = statement?.lines[0]
+    expect(line).toBeDefined()
+
+    await db.execute(
+      `UPDATE monthly_statements SET status = 'adjusted' WHERE id = ?`,
+      [generated.statementId],
+    )
+
+    await expect(adjustMonthlyStatementLine(
+      db,
+      line!.id,
+      40,
+      '已申报后不允许从清单工作台更改',
+    )).rejects.toThrow('只有草稿状态')
   })
 })

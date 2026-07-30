@@ -10,7 +10,9 @@ defineProps<{
   title: string
   loading: boolean
   projectOptions: ProjectOption[]
-  statusOptions?: ProjectOption[]
+  partyLabel: string
+  partyOptions: ProjectOption[]
+  statusOptions: ProjectOption[]
 }>()
 
 const emit = defineEmits<{
@@ -20,7 +22,8 @@ const emit = defineEmits<{
 
 const search = defineModel<string>('search', { required: true })
 const project = defineModel<string>('project', { required: true })
-const status = defineModel<string>('status')
+const party = defineModel<string>('party', { required: true })
+const status = defineModel<string>('status', { required: true })
 </script>
 
 <template>
@@ -46,12 +49,21 @@ const status = defineModel<string>('status')
         />
       </div>
 
+      <div class="contract-list-toolbar__party min-w-0">
+        <SelectFilter
+          v-model="party"
+          :label="partyLabel"
+          :options="partyOptions"
+          :placeholder="`全部${partyLabel}`"
+          :min-width="160"
+        />
+      </div>
+
       <div
         data-ui="contract-list-toolbar-actions"
         class="contract-list-toolbar__actions min-w-0 flex flex-wrap items-center gap-2.5"
       >
         <SelectFilter
-          v-if="statusOptions?.length && status"
           v-model="status"
           label="状态"
           :options="statusOptions"
@@ -80,11 +92,13 @@ const status = defineModel<string>('status')
   grid-template-columns: minmax(0, 1fr);
 }
 
-.contract-list-toolbar__project :deep(label) {
+.contract-list-toolbar__project :deep(label),
+.contract-list-toolbar__party :deep(label) {
   width: 100%;
 }
 
-.contract-list-toolbar__project :deep(button) {
+.contract-list-toolbar__project :deep(button),
+.contract-list-toolbar__party :deep(button) {
   flex: 1 1 auto;
 }
 
@@ -94,7 +108,7 @@ const status = defineModel<string>('status')
 
 @container (min-width: 32rem) {
   .contract-list-toolbar__layout {
-    grid-template-columns: max-content minmax(12rem, 16rem);
+    grid-template-columns: max-content minmax(12rem, 1fr) minmax(12rem, 1fr);
   }
 
   .contract-list-toolbar__actions {
@@ -105,7 +119,7 @@ const status = defineModel<string>('status')
 
 @container (min-width: 56.25rem) {
   .contract-list-toolbar__layout {
-    grid-template-columns: max-content minmax(12rem, 14rem) minmax(0, 1fr);
+    grid-template-columns: max-content minmax(10rem, 14rem) minmax(10rem, 14rem) minmax(0, 1fr);
   }
 
   .contract-list-toolbar__actions {
@@ -117,7 +131,7 @@ const status = defineModel<string>('status')
 
 @container (min-width: 900px) {
   .contract-list-toolbar__layout {
-    grid-template-columns: max-content minmax(13rem, 18rem) minmax(0, 1fr);
+    grid-template-columns: max-content minmax(12rem, 16rem) minmax(12rem, 16rem) minmax(0, 1fr);
   }
 }
 </style>

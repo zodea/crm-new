@@ -8,10 +8,13 @@ const props = defineProps<{
   customerId: string
 }>()
 
+const route = useRoute()
+const router = useRouter()
 const store = useCustomerDetailStore()
 const detail = computed(() => store.byCustomer(props.customerId))
 const customer = computed(() => detail.value?.customer ?? null)
-const activeTab = shallowRef<CustomerRelationTab>('projects')
+const relationTabKeys = new Set<CustomerRelationTab>(['projects', 'contracts', 'receipts'])
+const activeTab = shallowRef<CustomerRelationTab>(validRelationTab(route.query.tab))
 const settledId = shallowRef('')
 const loadingId = shallowRef('')
 const loadError = shallowRef('')
@@ -31,6 +34,29 @@ const shellState = computed<'ready' | 'loading' | 'error' | 'not-found'>(() => {
     return 'loading'
   return loadError.value ? 'error' : 'not-found'
 })
+const relationTabs = computed(() => [
+  { key: 'projects', label: '名下项目', count: detail.value?.projects.length ?? 0 },
+  { key: 'contracts', label: '施工合同', count: detail.value?.contracts.length ?? 0 },
+  { key: 'receipts', label: '收款明细', count: detail.value?.receipts.length ?? 0 },
+])
+
+function validRelationTab(value: unknown): CustomerRelationTab {
+  const candidate = Array.isArray(value) ? value[0] : value
+  return typeof candidate === 'string' && relationTabKeys.has(candidate as CustomerRelationTab)
+    ? candidate as CustomerRelationTab
+    : 'projects'
+}
+
+function selectRelationTab(value: string | undefined) {
+  const next = validRelationTab(value)
+  activeTab.value = next
+  const query = { ...route.query }
+  if (next === 'projects')
+    delete query.tab
+  else
+    query.tab = next
+  void router.replace({ query })
+}
 
 async function loadCustomer() {
   const id = props.customerId
@@ -52,10 +78,15 @@ async function loadCustomer() {
   }
 }
 
-watch(() => props.customerId, () => {
-  activeTab.value = 'projects'
-  void loadCustomer()
-}, { immediate: true })
+watch(
+  () => route.query.tab,
+  value => activeTab.value = validRelationTab(value),
+)
+watch(
+  () => props.customerId,
+  () => void loadCustomer(),
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -117,24 +148,13 @@ watch(() => props.customerId, () => {
           <h3 id="customer-relations-heading" class="m-0 mr-auto text-14px font-800 text-ink">
             业务关系
           </h3>
-          <div class="flex min-w-0 max-w-full overflow-x-auto" role="tablist" aria-label="客户业务关系">
-            <button
-              v-for="tab in ([
-                { id: 'projects', label: `名下项目 ${detail.projects.length}` },
-                { id: 'contracts', label: `施工合同 ${detail.contracts.length}` },
-                { id: 'receipts', label: `收款明细 ${detail.receipts.length}` },
-              ] as const)"
-              :key="tab.id"
-              type="button"
-              role="tab"
-              :aria-selected="activeTab === tab.id"
-              class="shrink-0 border-b-2 px-3 py-2 text-12px font-700"
-              :class="activeTab === tab.id ? 'border-brand text-brand' : 'border-transparent text-ink-soft hover:text-ink'"
-              @click="activeTab = tab.id"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
+          <nav class="min-w-0 max-w-full overflow-x-auto" aria-label="客户业务关系">
+            <SegTab
+              :model-value="activeTab"
+              :tabs="relationTabs"
+              @update:model-value="selectRelationTab"
+            />
+          </nav>
         </div>
         <div class="min-w-0 p-3">
           <CustomerDetailRelations

@@ -612,7 +612,7 @@ async function seedSuppliers(db: MigrationDb) {
       bankAccount: '4400 1234 5678 0001',
       contact: '张三',
       contactPhone: '13900001001',
-      credentialStatus: 'qualified',
+      credentialStatus: 'incomplete',
     },
     {
       name: '广州市顺利圆铝业有限公司',
@@ -638,7 +638,7 @@ async function seedSuppliers(db: MigrationDb) {
       mainBusiness: '建筑劳务分包、泥水工程、木工工程',
       contact: '陈工',
       contactPhone: '13900003001',
-      credentialStatus: 'qualified',
+      credentialStatus: 'incomplete',
     },
     {
       name: '佛山市南海区鸿运五金建材经营部',
@@ -660,7 +660,7 @@ async function seedSuppliers(db: MigrationDb) {
       mainBusiness: '塔吊租赁、施工电梯、脚手架',
       contact: '周经理',
       contactPhone: '13900005001',
-      credentialStatus: 'reviewing',
+      credentialStatus: 'incomplete',
     },
   ]
 

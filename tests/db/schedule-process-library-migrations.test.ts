@@ -104,7 +104,10 @@ describe('标准工序库与内部暂估排程迁移', () => {
       .not
       .toContain('predecessor_disabled')
 
-    const result = await runMigrations(db)
+    const result = await runMigrations(
+      db,
+      migrations.filter(migration => migration.version <= PREDECESSOR_DISABLED_REPAIR_VERSION),
+    )
 
     expect(result).toEqual({
       from: PREDECESSOR_MIGRATION_VERSION,

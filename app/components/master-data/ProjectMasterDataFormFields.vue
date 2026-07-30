@@ -54,7 +54,13 @@ function fieldClass(field: keyof ProjectFormDraft) {
       </label>
       <label class="field-block">
         <span class="field-label">客户2</span>
-        <LookupSelect v-model="draft.secondaryCustomerId" :fetch="fetchCustomers" recent-key="project-secondary-customers" placeholder="检索次客户" />
+        <LookupSelect
+          v-model="draft.secondaryCustomerId"
+          :fetch="fetchCustomers"
+          field="secondaryCustomerId"
+          recent-key="project-secondary-customers"
+          placeholder="检索次客户"
+        />
       </label>
       <label class="field-block">
         <span class="field-label">工程地域</span>

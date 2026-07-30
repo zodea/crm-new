@@ -153,6 +153,22 @@ async function seedLaborFacts(mem: TestDb) {
        id, statement_id, worker_id, allocated_amount_fen
      ) VALUES ('allocation_1', 'statement_known', 'worker_1', 80000)`,
   )
+  await mem.execute(
+    `INSERT INTO penalty_records (
+       id, no, projectId, crewId, workerId, source, building, floor, room,
+       reason, amount, penaltyDate, responsibleWorkerId, status
+     ) VALUES
+       (
+         'penalty_direct', 'FK-001', 'proj_current', 'crew_1', 'worker_1',
+         'inspection', '1栋', '2层', '201户', '防水收口不完整', 300,
+         '2026-06-18', NULL, 'pending'
+       ),
+       (
+         'penalty_responsible', 'FK-002', 'proj_history', 'crew_1', NULL,
+         'project', '', '', '', '材料清理不及时', 200,
+         '2026-04-03', 'worker_1', 'deducted'
+       )`,
+  )
 }
 
 afterEach(() => {
@@ -193,11 +209,11 @@ describe('工人详情只读模型', () => {
     expect(detail?.projects).toEqual([
       expect.objectContaining({
         id: 'proj_current',
-        sources: expect.arrayContaining(['当前项目', '工程量责任', '考勤', '工资单']),
+        sources: expect.arrayContaining(['当前项目', '工程量责任', '考勤', '工资单', '扣罚']),
       }),
       expect.objectContaining({
         id: 'proj_history',
-        sources: expect.arrayContaining(['签工', '工资单']),
+        sources: expect.arrayContaining(['签工', '工资单', '扣罚']),
       }),
     ])
     expect(detail?.attendance).toEqual([
@@ -220,6 +236,23 @@ describe('工人详情只读模型', () => {
         allocationRecorded: false,
       }),
     ])
+    expect(detail?.penalties).toEqual([
+      expect.objectContaining({
+        id: 'penalty_direct',
+        projectName: '翠湖花园',
+        sourceLabel: '管理巡检',
+        location: '1栋 / 2层 / 201户',
+        amount: 300,
+        statusLabel: '待处理',
+      }),
+      expect.objectContaining({
+        id: 'penalty_responsible',
+        projectName: '锦绣华庭',
+        sourceLabel: '项目处罚',
+        amount: 200,
+        statusLabel: '已扣罚',
+      }),
+    ])
     expect(detail?.summary).toMatchObject({
       projectCount: 2,
       assignedUnitCount: 1,
@@ -231,6 +264,7 @@ describe('工人详情只读模型', () => {
       releasedStatementCount: 2,
       knownAllocatedAmount: 800,
       missingAllocationCount: 1,
+      penaltyAmount: 500,
     })
   })
 
@@ -246,6 +280,7 @@ describe('工人详情只读模型', () => {
     expect(detail?.attendance).toEqual([])
     expect(detail?.daywork).toEqual([])
     expect(detail?.wageStatements).toEqual([])
+    expect(detail?.penalties).toEqual([])
     expect(detail?.summary).toMatchObject({
       projectCount: 0,
       assignedUnitCount: 0,
@@ -267,6 +302,7 @@ describe('工人详情只读模型', () => {
     expect(detail?.assignments).toEqual([])
     expect(detail?.attendance).toEqual([])
     expect(detail?.wageStatements.map(statement => statement.id)).toEqual(['statement_unknown'])
+    expect(detail?.penalties.map(penalty => penalty.id)).toEqual(['penalty_responsible'])
 
     await mem.execute(`UPDATE workers SET deleted_at = '2026-07-29' WHERE id = 'worker_1'`)
     await expect(loadWorkerDetail(mem, 'worker_1')).resolves.toBeNull()

@@ -11,11 +11,11 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       .toEqual({ kind: 'link', to: '/contract/fb01', text: '总包合同' })
     expect(resolveEntityLink({ type: 'invoice', id: 'iv9', label: '票 00058760' }))
       .toEqual({ kind: 'link', to: '/finance/invoice/iv9', text: '票 00058760' })
+    expect(resolveEntityLink({ type: 'customer', id: 'c1', label: '保利发展' }))
+      .toEqual({ kind: 'link', to: '/base/customer/c1', text: '保利发展' })
   })
 
-  it('未实装类型（customer/crew/worker）退化纯文本，不做死链', () => {
-    expect(resolveEntityLink({ type: 'customer', id: 'c1', label: '保利发展' }))
-      .toEqual({ kind: 'text', text: '保利发展' })
+  it('未实装类型（crew/worker）退化纯文本，不做死链', () => {
     expect(resolveEntityLink({ type: 'crew', id: 'g1', label: '泥水一组' }))
       .toEqual({ kind: 'text', text: '泥水一组' })
   })
@@ -28,6 +28,6 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
   })
 
   it('映射表只登记已实装详情页', () => {
-    expect(Object.keys(ENTITY_ROUTES).sort()).toEqual(['contract', 'invoice', 'project', 'supplier'])
+    expect(Object.keys(ENTITY_ROUTES).sort()).toEqual(['contract', 'customer', 'invoice', 'project', 'supplier'])
   })
 })

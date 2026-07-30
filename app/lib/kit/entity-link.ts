@@ -21,6 +21,7 @@ export const ENTITY_ROUTES: Partial<Record<EntityLinkType, (id: string) => strin
   supplier: id => `/base/supplier/${id}`,
   contract: id => `/contract/${id}`,
   invoice: id => `/finance/invoice/${id}`,
+  customer: id => `/base/customer/${id}`,
 }
 
 export function resolveEntityLink(input: {

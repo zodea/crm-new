@@ -1,6 +1,6 @@
 # KitUI 交互原语组件规格（可落地模板）
 
-> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文的**结构锚点、变体/状态、配色令牌、行为规则、调用签名仍然有效**（那是设计语言，与实现无关）。迁移映射见 [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md)。
+> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文的**结构锚点、变体/状态、配色令牌、行为规则、调用签名仍然有效**（那是设计语言，与实现无关）。迁移映射见 [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md)。
 
 把每类交互敲定的方向翻译成**照着就能写组件**的规格:结构锚点、变体/状态、配色令牌、行为规则、调用签名。与另外两份分工:方向从 [interaction-style-references.md](./interaction-style-references.md) 挑,为什么这么定见 `docs/adr/`,本文只答「照着怎么写」。
 
@@ -91,6 +91,45 @@ await formModal({
   submitLabel?,                   // 与 title 动词一致
 }) // resolve(values) 提交 / resolve(null) 取消
 ```
+
+---
+
+## 02-b · 业务类型选择弹窗 `typeSelect` ✅ 已落地（#95）
+
+**用途**：大单据“三段式新建”的第一段，只负责在进入独立整页表单前选择业务类型。付款申请 8 类型是开发页范本；原语不读取领域 store、不创建单据，也不替代 `EntityFormShell`。
+
+**结构锚点**：标题与简短说明 → 可滚动单选列表 → footer（取消 ghost 左 · 确定品牌色右）。选项使用原生 radio 语义，label 为可访问名称，hint 只补充差异，不替代类型全名。
+
+**选择与键盘**：
+
+- 打开时优先选中有效 `defaultValue`，否则选中第一项；空选项时确定按钮禁用。
+- ↑/↓ 在选项间循环移动并同步真实焦点，Enter 返回当前 `option.value`。
+- 单击只选择；双击选项等价于“选择并确定”。
+- footer 取消、Esc、遮罩关闭统一返回 `null`；确定返回选中值。
+- 同类请求抢占时，旧 Promise 立即以 `null` 落定；Dialog 保持打开、选项与默认值原地换新，并在 DOM 更新后把焦点移到新选中 radio。
+
+**堆叠契约**：挂载于唯一 `KitUIHost`，与 confirm/formModal 共享 ADR 0016 模态栈。后打开的弹层取得更高栈槽；遮罩与 Esc 只关闭顶层，关闭后焦点回到下层当前选项，最后一层关闭后再回到原触发点。typeSelect 不抢占其他种类原语，各 Promise 独立落定。
+
+**调用签名**：
+
+```ts
+const selected = await useKitUI().typeSelect({
+  title: '新建付款申请',
+  options: [
+    {
+      value: 'contract-labor-material',
+      label: '有合同（人材料分包）付款申请',
+      hint: '关联合同、结算额度与发票',
+    },
+  ],
+  defaultValue: 'contract-labor-material',
+  confirmLabel: '确定', // 可选
+  cancelLabel: '取消', // 可选
+})
+// string：确定后的 option.value；null：取消 / Esc / 遮罩 / 同类抢占
+```
+
+开发验收入口为 `/dev/kit-ui` 的付款申请 8 类型示例；返回值在页面底部“最近一次返回值”区域回读。
 
 ---
 
@@ -433,7 +472,7 @@ openDrawer({
 
 - #79：旧表单弹窗范围已由 ADR 0014 替代；#187 在整页形态采用其吸底动作、首次聚焦、校验双通道、提交三态和 dirty 拦截语义，弹窗仅保留轻量对象兜底。
 - #94 `KitEditGrid`：继续作为跨领域明细网格独立原语；代表 MasterData 表单没有可编辑明细矩阵，本期明确延期，不阻塞表单壳。
-- #95 `typeSelect`：继续作为付款申请等“三段式新建”独立原语；代表 MasterData 表单没有业务类型首段，本期明确延期，不阻塞表单壳。
+- #95 `typeSelect`：已作为付款申请等“三段式新建”的独立首段原语落地；代表 MasterData 表单没有业务类型首段，所以 `EntityFormShell` 不内置也不替代它。后续付款申请领域流程可直接调用该原语，再进入对应整页表单。
 
 **调用签名**：
 

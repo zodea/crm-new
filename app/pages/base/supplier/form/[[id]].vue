@@ -3,5 +3,5 @@ definePageMeta({ name: 'supplierForm' })
 </script>
 
 <template>
-  <MasterDataFormPage kind="supplier" />
+  <MasterDataFormPage kind="supplier" :return-to-detail="true" />
 </template>

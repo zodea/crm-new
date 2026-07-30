@@ -384,7 +384,6 @@ async function exportMonthly(statement: MonthlyStatementView) {
       store.workspace.projectName,
       store.workspace.contractName,
     ))
-    await store.markMonthlyExported(statement.id)
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
@@ -405,8 +404,25 @@ onMounted(initialize)
           <h1 class="mt-0.5 text-18px font-850 text-ink">
             合同工程量清单
           </h1>
-          <p class="mt-0.5 truncate text-11px text-ink-soft">
-            {{ store.workspace ? `${store.workspace.projectName} · ${store.workspace.contractName}` : '选择项目与施工合同后查看' }}
+          <p v-if="store.workspace" class="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-11px text-ink-soft">
+            <span>{{ store.workspace.projectName }}</span>
+            <span aria-hidden="true">·</span>
+            <EntityLink
+              :id="store.workspace.contractId"
+              type="contract"
+              :label="store.workspace.contractName"
+            />
+            <span aria-hidden="true">·</span>
+            <span
+              class="min-w-0 break-all font-mono tabular-nums"
+              :title="store.workspace.contractNo"
+              data-testid="boq-contract-number"
+            >
+              {{ store.workspace.contractNo || '未编号' }}
+            </span>
+          </p>
+          <p v-else class="mt-0.5 text-11px text-ink-soft">
+            选择项目与施工合同后查看
           </p>
         </div>
         <div class="boq-header__field min-w-0">

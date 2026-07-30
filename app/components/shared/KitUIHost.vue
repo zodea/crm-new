@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // KitUI 全局单宿主：一处挂载，任意页面通过 useKitUI() 触发原语。
-// toast/undoToast 由 <ToastHost/> 渲染；confirm 复用 <ConfirmDialog/>；
-// formModal 走 <KitFormModal/>。（ripple 已全域废弃，见 ADR 0004）
+// toast/undoToast 由 <ToastHost/> 渲染；confirm、formModal、typeSelect
+// 均复用 reka-ui Dialog 与全局模态栈。（ripple 已全域废弃，见 ADR 0004）
 const {
   confirmState,
   confirmOpts,
@@ -9,6 +9,9 @@ const {
   formModalState,
   formModalOpts,
   resolveFormModal,
+  typeSelectState,
+  typeSelectOpts,
+  resolveTypeSelect,
 } = useKitUIHostState()
 </script>
 
@@ -29,5 +32,12 @@ const {
     :options="formModalOpts"
     @save="resolveFormModal($event)"
     @cancel="resolveFormModal(null)"
+  />
+
+  <KitTypeSelectDialog
+    :open="!!typeSelectState"
+    :options="typeSelectOpts"
+    @select="resolveTypeSelect($event)"
+    @cancel="resolveTypeSelect(null)"
   />
 </template>

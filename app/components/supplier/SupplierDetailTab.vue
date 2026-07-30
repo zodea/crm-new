@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Supplier } from '~/stores/supplier'
+import { maskBankAccount, maskIdentifier, maskPhone } from '~/lib/util/privacy'
 
 defineProps<{
   supplier: Supplier
@@ -9,16 +10,18 @@ interface FieldDef {
   label: string
   key: keyof Supplier
   mono?: boolean
+  privacy?: 'identifier' | 'phone' | 'bank'
   span?: number
 }
 
 const basicFields: FieldDef[] = [
   { label: '公司全称', key: 'name', span: 3 },
+  { label: '简称/别名', key: 'aliases', span: 2 },
   { label: '分供方类别', key: 'supplierCategory' },
   { label: '业务类型', key: 'businessType' },
   { label: '评价等级', key: 'rating' },
-  { label: '统一社会信用代码', key: 'uniqueCode', mono: true },
-  { label: '税号', key: 'taxNo', mono: true },
+  { label: '统一社会信用代码', key: 'uniqueCode', mono: true, privacy: 'identifier' },
+  { label: '税号', key: 'taxNo', mono: true, privacy: 'identifier' },
   { label: '法定代表人', key: 'legalRep' },
   { label: '注册资金', key: 'registeredCapital' },
   { label: '注册日期', key: 'registeredDate' },
@@ -30,22 +33,28 @@ const basicFields: FieldDef[] = [
 const invoiceFields: FieldDef[] = [
   { label: '开票名称', key: 'invoiceName' },
   { label: '纳税人类型', key: 'taxpayerType' },
-  { label: '电话', key: 'phone' },
+  { label: '电话', key: 'phone', privacy: 'phone' },
   { label: '开户行', key: 'bank' },
-  { label: '银行账号', key: 'bankAccount', mono: true },
+  { label: '银行账号', key: 'bankAccount', mono: true, privacy: 'bank' },
   { label: '开票地址', key: 'invoiceAddress' },
 ]
 
 const contactFields: FieldDef[] = [
   { label: '主要联系人(签约代表)', key: 'contact' },
-  { label: '联系方式', key: 'contactPhone' },
-  { label: '来源', key: 'source' },
+  { label: '联系方式', key: 'contactPhone', privacy: 'phone' },
+  { label: '职务', key: 'contactTitle' },
 ]
 
-function display(supplier: Supplier, key: keyof Supplier): string {
-  const val = supplier[key]
+function display(supplier: Supplier, field: FieldDef): string {
+  const val = supplier[field.key]
   if (val == null || val === '')
     return '—'
+  if (typeof val === 'string' && field.privacy === 'identifier')
+    return maskIdentifier(val)
+  if (typeof val === 'string' && field.privacy === 'phone')
+    return maskPhone(val)
+  if (typeof val === 'string' && field.privacy === 'bank')
+    return maskBankAccount(val)
   if (typeof val === 'number')
     return val.toLocaleString()
   if (Array.isArray(val))
@@ -70,7 +79,7 @@ function display(supplier: Supplier, key: keyof Supplier): string {
       >
         <span class="text-9px text-ink-faint">{{ f.label }}</span>
         <span class="text-12px" :class="f.mono ? 'font-mono' : ''">
-          {{ display(supplier, f.key) }}
+          {{ display(supplier, f) }}
         </span>
       </div>
     </div>
@@ -88,7 +97,7 @@ function display(supplier: Supplier, key: keyof Supplier): string {
       >
         <span class="text-9px text-ink-faint">{{ f.label }}</span>
         <span class="text-12px" :class="f.mono ? 'font-mono' : ''">
-          {{ display(supplier, f.key) }}
+          {{ display(supplier, f) }}
         </span>
       </div>
     </div>
@@ -105,7 +114,7 @@ function display(supplier: Supplier, key: keyof Supplier): string {
         class="form-cell"
       >
         <span class="text-9px text-ink-faint">{{ f.label }}</span>
-        <span class="text-12px">{{ display(supplier, f.key) }}</span>
+        <span class="text-12px">{{ display(supplier, f) }}</span>
       </div>
     </div>
 
@@ -122,6 +131,10 @@ function display(supplier: Supplier, key: keyof Supplier): string {
       <div class="form-cell">
         <span class="text-9px text-ink-faint">更新时间</span>
         <span class="text-12px">{{ supplier.updatedAt?.slice(0, 19).replace('T', ' ') || '—' }}</span>
+      </div>
+      <div class="form-cell">
+        <span class="text-9px text-ink-faint">来源</span>
+        <span class="text-12px">{{ supplier.source || '—' }}</span>
       </div>
       <div class="form-cell">
         <span class="text-9px text-ink-faint">备注</span>

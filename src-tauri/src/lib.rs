@@ -1,4 +1,9 @@
-use std::{fs::create_dir_all, future::Future, time::Duration};
+use std::{
+    fs::create_dir_all,
+    future::Future,
+    process::Command,
+    time::Duration,
+};
 
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
@@ -9,6 +14,8 @@ use tauri_plugin_sql::{DbInstances, DbPool};
 use tokio::sync::Mutex;
 
 const APP_DATABASE_URL: &str = "sqlite:crm.db";
+const GUANGDONG_TAX_QUERY_URL: &str =
+    "https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx";
 
 #[derive(Default)]
 pub struct AppDatabasePreparation(Mutex<Option<SqlitePool>>);
@@ -81,6 +88,51 @@ async fn prepare_app_database(
         .await
 }
 
+fn is_allowed_external_url(url: &str) -> bool {
+    url == GUANGDONG_TAX_QUERY_URL
+}
+
+#[cfg(target_os = "windows")]
+fn spawn_external_url(url: &str) -> Result<(), String> {
+    Command::new("rundll32")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开系统默认浏览器：{error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn spawn_external_url(url: &str) -> Result<(), String> {
+    Command::new("open")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开系统默认浏览器：{error}"))
+}
+
+#[cfg(all(unix, not(target_os = "macos"), not(target_os = "android")))]
+fn spawn_external_url(url: &str) -> Result<(), String> {
+    Command::new("xdg-open")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开系统默认浏览器：{error}"))
+}
+
+#[cfg(any(target_os = "android", target_os = "ios"))]
+fn spawn_external_url(_url: &str) -> Result<(), String> {
+    Err("当前移动端未启用外部浏览器能力".to_string())
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !is_allowed_external_url(&url) {
+        return Err("不允许打开未登记的外部地址".to_string());
+    }
+    spawn_external_url(&url)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -88,7 +140,10 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(AppDatabasePreparation::default())
-        .invoke_handler(tauri::generate_handler![prepare_app_database])
+        .invoke_handler(tauri::generate_handler![
+            prepare_app_database,
+            open_external_url
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -101,4 +156,16 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_allowed_external_url, GUANGDONG_TAX_QUERY_URL};
+
+    #[test]
+    fn external_url_allowlist_only_contains_tax_query() {
+        assert!(is_allowed_external_url(GUANGDONG_TAX_QUERY_URL));
+        assert!(!is_allowed_external_url("https://example.com"));
+        assert!(!is_allowed_external_url("file:///C:/Windows/System32"));
+    }
 }

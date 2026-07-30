@@ -55,7 +55,12 @@ const receiptColumns: KitTableColumn[] = [
 </script>
 
 <template>
-  <section class="min-w-0" :aria-label="tab === 'projects' ? '名下项目' : tab === 'contracts' ? '施工合同' : '收款明细'">
+  <section
+    class="min-w-0"
+    role="tabpanel"
+    tabindex="0"
+    :aria-label="tab === 'projects' ? '名下项目' : tab === 'contracts' ? '施工合同' : '收款明细'"
+  >
     <KitTable
       v-if="tab === 'projects'"
       :columns="projectColumns"
@@ -64,7 +69,11 @@ const receiptColumns: KitTableColumn[] = [
       :empty="{ title: '暂无名下项目', description: '当前客户尚未通过主客户或次客户字段关联项目。' }"
     >
       <template #project="{ row }">
-        <NuxtLink :to="`/project/${row.id}`" class="cell--link">
+        <NuxtLink
+          :to="`/project/${row.id}`"
+          class="cell--link block max-w-full truncate"
+          :title="row.name || row.id"
+        >
           {{ row.name || row.id }}
         </NuxtLink>
       </template>
@@ -81,12 +90,21 @@ const receiptColumns: KitTableColumn[] = [
       :empty="{ title: '暂无施工合同', description: '仅展示 customer_id 指向当前客户的施工合同。' }"
     >
       <template #contract="{ row }">
-        <NuxtLink :to="`/contract/${row.id}`" class="cell--link">
+        <NuxtLink
+          :to="`/contract/${row.id}`"
+          class="cell--link block max-w-full truncate"
+          :title="row.name || row.no || row.id"
+        >
           {{ row.name || row.no || row.id }}
         </NuxtLink>
       </template>
       <template #project="{ row }">
-        <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
+        <NuxtLink
+          v-if="row.projectId"
+          :to="`/project/${row.projectId}`"
+          class="cell--link block max-w-full truncate"
+          :title="row.projectName || row.projectId"
+        >
           {{ row.projectName || row.projectId }}
         </NuxtLink>
         <span v-else>—</span>
@@ -104,18 +122,32 @@ const receiptColumns: KitTableColumn[] = [
       :empty="{ title: '暂无收款记录', description: '当前客户尚未登记收款；不会从合同金额推算收款。' }"
     >
       <template #receipt="{ row }">
-        <NuxtLink :to="`/finance/receipt/${row.id}`" class="cell--link font-mono">
+        <NuxtLink
+          :to="`/finance/receipt/${row.id}`"
+          class="cell--link block max-w-full truncate font-mono"
+          :title="row.no || row.id"
+        >
           {{ row.no || row.id }}
         </NuxtLink>
       </template>
       <template #project="{ row }">
-        <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
+        <NuxtLink
+          v-if="row.projectId"
+          :to="`/project/${row.projectId}`"
+          class="cell--link block max-w-full truncate"
+          :title="row.projectName || row.projectId"
+        >
           {{ row.projectName || row.projectId }}
         </NuxtLink>
         <span v-else>—</span>
       </template>
       <template #contract="{ row }">
-        <NuxtLink v-if="row.contractId" :to="`/contract/${row.contractId}`" class="cell--link">
+        <NuxtLink
+          v-if="row.contractId"
+          :to="`/contract/${row.contractId}`"
+          class="cell--link block max-w-full truncate"
+          :title="row.contractName || row.contractId"
+        >
           {{ row.contractName || row.contractId }}
         </NuxtLink>
         <span v-else>—</span>

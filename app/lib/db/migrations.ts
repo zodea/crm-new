@@ -4886,6 +4886,529 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 36,
+    name: 'supplier-credential-review-foundation',
+    async up(db) {
+      await db.execute('BEGIN IMMEDIATE')
+      try {
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'file_ref_id',
+          'TEXT REFERENCES file_refs(id)',
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'valid_from',
+          `TEXT NOT NULL DEFAULT ''`,
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'expires_at',
+          `TEXT NOT NULL DEFAULT ''`,
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'long_term',
+          `INTEGER NOT NULL DEFAULT 0 CHECK (long_term IN (0, 1))`,
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'ocr_confirmed_result',
+          `TEXT NOT NULL DEFAULT '{}'`,
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'ocr_confirmed_at',
+          'TEXT',
+        )
+        await addColumnIfMissing(
+          db,
+          'supplier_credentials',
+          'ocr_review_status',
+          `TEXT NOT NULL DEFAULT 'not_started'
+            CHECK (ocr_review_status IN ('not_started', 'pending', 'confirmed'))`,
+        )
+        await db.execute(`
+          UPDATE supplier_credentials
+          SET ocr_review_status = CASE
+            WHEN ocr_confirmed_at IS NOT NULL THEN 'confirmed'
+            WHEN trim(COALESCE(ocr_result, '')) NOT IN ('', '{}') THEN 'pending'
+            ELSE 'not_started'
+          END
+        `)
+        await addColumnIfMissing(
+          db,
+          'suppliers',
+          'taxpayer_verification_status',
+          `TEXT NOT NULL DEFAULT 'not_checked'
+            CHECK (taxpayer_verification_status IN (
+              'not_checked', 'confirmed_general', 'not_found', 'manually_confirmed'
+            ))`,
+        )
+        await addColumnIfMissing(
+          db,
+          'suppliers',
+          'taxpayer_verification_source',
+          `TEXT NOT NULL DEFAULT ''`,
+        )
+        await addColumnIfMissing(
+          db,
+          'suppliers',
+          'taxpayer_verified_at',
+          'TEXT',
+        )
+        await addColumnIfMissing(
+          db,
+          'suppliers',
+          'taxpayer_verification_note',
+          `TEXT NOT NULL DEFAULT ''`,
+        )
+
+        await execScript(db, `
+          CREATE TABLE IF NOT EXISTS supplier_credential_requirements (
+            id          TEXT PRIMARY KEY,
+            supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+            category    TEXT NOT NULL,
+            requirement TEXT NOT NULL CHECK (
+              requirement IN ('not_applicable', 'optional', 'required')
+            ),
+            reason      TEXT NOT NULL DEFAULT '',
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at  TEXT DEFAULT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS supplier_credential_audits (
+            id                    TEXT PRIMARY KEY,
+            supplier_id           TEXT NOT NULL REFERENCES suppliers(id),
+            credential_id         TEXT NOT NULL REFERENCES supplier_credentials(id),
+            action                TEXT NOT NULL CHECK (
+              action IN (
+                'credential_create', 'ocr_recognition', 'ocr_review', 'validity_update',
+                'credential_delete', 'credential_restore'
+              )
+            ),
+            category_before       TEXT NOT NULL DEFAULT '',
+            category_after        TEXT NOT NULL DEFAULT '',
+            changed_fields        TEXT NOT NULL DEFAULT '[]',
+            valid_from_before     TEXT NOT NULL DEFAULT '',
+            valid_from_after      TEXT NOT NULL DEFAULT '',
+            expires_at_before     TEXT NOT NULL DEFAULT '',
+            expires_at_after      TEXT NOT NULL DEFAULT '',
+            long_term_before      INTEGER NOT NULL DEFAULT 0,
+            long_term_after       INTEGER NOT NULL DEFAULT 0,
+            confidence            REAL,
+            created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE TABLE IF NOT EXISTS supplier_audits (
+            id              TEXT PRIMARY KEY,
+            supplier_id     TEXT NOT NULL REFERENCES suppliers(id),
+            action          TEXT NOT NULL CHECK (
+              action IN (
+                'create', 'update', 'delete', 'restore',
+                'credential_review', 'taxpayer_verification'
+              )
+            ),
+            outcome         TEXT NOT NULL DEFAULT '',
+            source_category TEXT NOT NULL DEFAULT '',
+            changed_fields  TEXT NOT NULL DEFAULT '[]',
+            note_present    INTEGER NOT NULL DEFAULT 0
+                            CHECK (note_present IN (0, 1)),
+            created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_supplier_audits_supplier
+            ON supplier_audits(supplier_id, created_at);
+
+          CREATE INDEX IF NOT EXISTS idx_supplier_credential_audits_credential
+            ON supplier_credential_audits(credential_id, created_at);
+
+          CREATE INDEX IF NOT EXISTS idx_supplier_credential_requirements_supplier
+            ON supplier_credential_requirements(supplier_id);
+
+          CREATE INDEX IF NOT EXISTS idx_supplier_credential_requirements_deleted
+            ON supplier_credential_requirements(deleted_at)
+            WHERE deleted_at IS NOT NULL;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_supplier_credential_requirement
+            ON supplier_credential_requirements(supplier_id, category)
+            WHERE deleted_at IS NULL;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_supplier_credential_file_ref
+            ON supplier_credentials(file_ref_id)
+            WHERE file_ref_id IS NOT NULL AND deleted_at IS NULL;
+        `)
+
+        await db.execute(`
+          CREATE TRIGGER IF NOT EXISTS trg_suppliers_invalidate_credential_review
+          AFTER UPDATE OF
+            name, unique_code, tax_no, legal_rep, address, bank, bank_account
+          ON suppliers
+          WHEN OLD.credential_status IN ('qualified', 'rejected')
+            AND (
+              NEW.name IS NOT OLD.name
+              OR NEW.unique_code IS NOT OLD.unique_code
+              OR NEW.tax_no IS NOT OLD.tax_no
+              OR NEW.legal_rep IS NOT OLD.legal_rep
+              OR NEW.address IS NOT OLD.address
+              OR NEW.bank IS NOT OLD.bank
+              OR NEW.bank_account IS NOT OLD.bank_account
+            )
+          BEGIN
+            UPDATE suppliers
+            SET credential_status = CASE
+                  WHEN NOT EXISTS (
+                    SELECT required.category
+                    FROM (
+                      SELECT '营业执照' AS category
+                      UNION ALL SELECT '法人身份证'
+                      UNION ALL SELECT '银行账户资料'
+                    ) AS required
+                    WHERE COALESCE((
+                      SELECT requirement.requirement
+                      FROM supplier_credential_requirements AS requirement
+                      WHERE requirement.supplier_id = NEW.id
+                        AND requirement.category = required.category
+                        AND requirement.deleted_at IS NULL
+                      LIMIT 1
+                    ), 'required') = 'required'
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM supplier_credentials AS credential
+                        WHERE credential.supplier_id = NEW.id
+                          AND credential.category = required.category
+                          AND credential.deleted_at IS NULL
+                          AND (
+                            credential.long_term = 1
+                            OR trim(credential.expires_at) = ''
+                            OR credential.expires_at >= date('now', '+8 hours')
+                          )
+                          AND EXISTS (
+                            SELECT 1
+                            FROM file_refs AS file
+                            JOIN file_payloads AS payload ON payload.file_ref_id = file.id
+                            WHERE file.id = credential.file_ref_id
+                              AND file.owner_type = 'supplier_credential'
+                              AND file.owner_id = credential.id
+                              AND file.deleted_at IS NULL
+                          )
+                      )
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM supplier_credential_requirements AS requirement
+                    WHERE requirement.supplier_id = NEW.id
+                      AND requirement.requirement = 'required'
+                      AND requirement.deleted_at IS NULL
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM supplier_credentials AS credential
+                        WHERE credential.supplier_id = NEW.id
+                          AND credential.category = requirement.category
+                          AND credential.deleted_at IS NULL
+                          AND (
+                            credential.long_term = 1
+                            OR trim(credential.expires_at) = ''
+                            OR credential.expires_at >= date('now', '+8 hours')
+                          )
+                          AND EXISTS (
+                            SELECT 1
+                            FROM file_refs AS file
+                            JOIN file_payloads AS payload ON payload.file_ref_id = file.id
+                            WHERE file.id = credential.file_ref_id
+                              AND file.owner_type = 'supplier_credential'
+                              AND file.owner_id = credential.id
+                              AND file.deleted_at IS NULL
+                          )
+                      )
+                  )
+                  THEN 'reviewing'
+                  ELSE 'incomplete'
+                END,
+                credential_reviewed_at = NULL,
+                credential_review_note = ''
+            WHERE id = NEW.id;
+          END;
+        `)
+
+        const sensitiveLogs = await db.select<{
+          id: string
+          table_name: 'suppliers' | 'supplier_credentials' | 'file_refs'
+          before_data: string | null
+          after_data: string | null
+        }>(`
+          SELECT id, table_name, before_data, after_data
+          FROM operation_logs
+          WHERE table_name IN ('suppliers', 'supplier_credentials')
+             OR (
+               table_name = 'file_refs'
+               AND (
+                 EXISTS (
+                   SELECT 1
+                   FROM file_refs AS current_file
+                   WHERE current_file.id = operation_logs.record_id
+                     AND current_file.owner_type = 'supplier_credential'
+                 )
+                 OR
+                 CASE WHEN json_valid(before_data)
+                   THEN json_extract(before_data, '$.owner_type')
+                 END = 'supplier_credential'
+                 OR CASE WHEN json_valid(after_data)
+                   THEN json_extract(after_data, '$.owner_type')
+                 END = 'supplier_credential'
+               )
+             )
+        `)
+        const sanitizeSensitiveSnapshot = (
+          table: 'suppliers' | 'supplier_credentials' | 'file_refs',
+          value: string | null,
+        ): string | null => {
+          if (!value)
+            return null
+          try {
+            const source = JSON.parse(value) as Record<string, unknown>
+            const sanitized: Record<string, unknown> = {}
+            const allowedKeys = table === 'suppliers'
+              ? [
+                  'id',
+                  'deleted_at',
+                  'credential_status',
+                  'credential_reviewed_at',
+                  'approval_status',
+                  'created_at',
+                  'updated_at',
+                ]
+              : table === 'supplier_credentials'
+                ? [
+                    'id',
+                    'supplier_id',
+                    'category',
+                    'file_ref_id',
+                    'valid_from',
+                    'expires_at',
+                    'long_term',
+                    'ocr_confidence',
+                    'ocr_confirmed_at',
+                    'ocr_review_status',
+                    'verified_at',
+                    'added_at',
+                    'deleted_at',
+                  ]
+                : [
+                    'id',
+                    'owner_type',
+                    'owner_id',
+                    'uploaded_at',
+                    'deleted_at',
+                  ]
+            for (const key of allowedKeys) {
+              if (Object.hasOwn(source, key))
+                sanitized[key] = source[key]
+            }
+            return JSON.stringify(sanitized)
+          }
+          catch {
+            return null
+          }
+        }
+        for (const log of sensitiveLogs) {
+          await db.execute(
+            `UPDATE operation_logs
+             SET before_data = ?, after_data = ?
+             WHERE id = ?`,
+            [
+              sanitizeSensitiveSnapshot(log.table_name, log.before_data),
+              sanitizeSensitiveSnapshot(log.table_name, log.after_data),
+              log.id,
+            ],
+          )
+        }
+
+        await db.execute(`
+          UPDATE supplier_credentials
+          SET category = CASE trim(category)
+            WHEN '银行开户许可证' THEN '银行账户资料'
+            WHEN '开户许可证' THEN '银行账户资料'
+            WHEN '基本存款账户信息' THEN '银行账户资料'
+            WHEN '基本存款账户信息表' THEN '银行账户资料'
+            WHEN '品牌授权证明' THEN '品牌授权书'
+            ELSE trim(category)
+          END
+        `)
+        await db.execute(`
+          INSERT OR IGNORE INTO file_refs (
+            id, owner_type, owner_id, file_name, file_path, file_size,
+            mime_type, category, uploader, uploaded_at
+          )
+          SELECT
+            'file_ref_supplier_credential_' || credential.id,
+            'supplier_credential',
+            credential.id,
+            credential.file_name,
+            trim(credential.file_path),
+            0,
+            '',
+            credential.category,
+            'migration-v36',
+            credential.added_at
+          FROM supplier_credentials AS credential
+          WHERE credential.deleted_at IS NULL
+            AND trim(credential.file_path) <> ''
+            AND NOT EXISTS (
+              SELECT 1
+              FROM file_refs AS file
+              WHERE file.owner_type = 'supplier_credential'
+                AND file.owner_id = credential.id
+                AND file.deleted_at IS NULL
+            )
+        `)
+        await db.execute(`
+          UPDATE supplier_credentials
+          SET file_ref_id = (
+            SELECT file.id
+            FROM file_refs AS file
+            WHERE file.owner_type = 'supplier_credential'
+              AND file.owner_id = supplier_credentials.id
+              AND file.deleted_at IS NULL
+            ORDER BY file.uploaded_at DESC, file.id DESC
+            LIMIT 1
+          )
+          WHERE file_ref_id IS NULL
+        `)
+
+        // 旧 qualified/rejected 没有供应商级人工凭证时只能回到自动态；
+        // 单条证照 verified_at 不能冒充对整个分供方作出的人工核验结论。
+        await db.execute(`
+          WITH suppliers_to_recalculate AS (
+            SELECT supplier.id
+            FROM suppliers AS supplier
+            WHERE supplier.deleted_at IS NULL
+              AND (
+                supplier.credential_status IN ('incomplete', 'reviewing')
+                OR (
+                  supplier.credential_status = 'qualified'
+                  AND supplier.credential_reviewed_at IS NULL
+                )
+                OR (
+                  supplier.credential_status = 'rejected'
+                  AND (
+                    supplier.credential_reviewed_at IS NULL
+                    OR trim(supplier.credential_review_note) = ''
+                  )
+                )
+                OR supplier.credential_status IS NULL
+                OR supplier.credential_status NOT IN (
+                  'incomplete', 'reviewing', 'qualified', 'rejected'
+                )
+                OR (
+                  supplier.credential_status IN ('qualified', 'rejected')
+                  AND EXISTS (
+                    SELECT required.category
+                    FROM (
+                      SELECT '营业执照' AS category
+                      UNION ALL SELECT '法人身份证'
+                      UNION ALL SELECT '银行账户资料'
+                    ) AS required
+                    WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM supplier_credentials AS credential
+                      WHERE credential.supplier_id = supplier.id
+                        AND credential.deleted_at IS NULL
+                        AND credential.category = required.category
+                        AND (
+                          credential.long_term = 1
+                          OR trim(credential.expires_at) = ''
+                          OR credential.expires_at >= date('now', '+8 hours')
+                        )
+                        AND EXISTS (
+                          SELECT 1
+                          FROM file_refs AS file
+                          JOIN file_payloads AS payload ON payload.file_ref_id = file.id
+                          WHERE file.id = credential.file_ref_id
+                            AND file.owner_type = 'supplier_credential'
+                            AND file.owner_id = credential.id
+                            AND file.deleted_at IS NULL
+                        )
+                    )
+                  )
+                )
+              )
+          )
+          UPDATE suppliers
+          SET credential_status = CASE
+                WHEN NOT EXISTS (
+                  SELECT required.category
+                  FROM (
+                    SELECT '营业执照' AS category
+                    UNION ALL SELECT '法人身份证'
+                    UNION ALL SELECT '银行账户资料'
+                  ) AS required
+                  WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM supplier_credentials AS credential
+                    WHERE credential.supplier_id = suppliers.id
+                      AND credential.deleted_at IS NULL
+                      AND credential.category = required.category
+                      AND (
+                        credential.long_term = 1
+                        OR trim(credential.expires_at) = ''
+                        OR credential.expires_at >= date('now', '+8 hours')
+                      )
+                      AND EXISTS (
+                        SELECT 1
+                        FROM file_refs AS file
+                        JOIN file_payloads AS payload ON payload.file_ref_id = file.id
+                        WHERE file.id = credential.file_ref_id
+                          AND file.owner_type = 'supplier_credential'
+                          AND file.owner_id = credential.id
+                          AND file.deleted_at IS NULL
+                      )
+                  )
+                )
+                THEN 'reviewing'
+                ELSE 'incomplete'
+              END,
+              credential_reviewed_at = NULL,
+              credential_review_note = ''
+          WHERE id IN (SELECT id FROM suppliers_to_recalculate)
+        `)
+        await db.execute('COMMIT')
+      }
+      catch (error) {
+        try {
+          await db.execute('ROLLBACK')
+        }
+        catch {
+          // 保留原始迁移错误。
+        }
+        throw error
+      }
+    },
+  },
+  {
+    version: 37,
+    name: 'monthly-statement-owner-lifecycle-repair',
+    async up(db) {
+      // 旧版 adjusted/exported 分别表示“手调过/导出过”；reported_amount 在
+      // 保存草稿时也会写入，不能作为已申报证据。没有可靠审定事实时保守回草稿，
+      // 由用户重新申报；只有 audited_amount 能保留为已审定。
+      await db.execute(`
+        UPDATE monthly_statements
+        SET status = CASE
+          WHEN audited_amount IS NOT NULL THEN 'exported'
+          ELSE 'draft'
+        END
+        WHERE status IN ('adjusted', 'exported')
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

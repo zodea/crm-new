@@ -36,7 +36,7 @@ const contractColumns: KitTableColumn[] = [
 
 const paymentColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
-  { field: 'applicationNo', title: '申请编号', width: 160, fixed: 'left' },
+  { field: 'applicationNo', title: '申请编号', width: 160, fixed: 'left', slot: 'payment' },
   { field: 'name', title: '请款名称', minWidth: 180 },
   { field: 'projectName', title: '项目', minWidth: 160, slot: 'project' },
   { field: 'amount', title: '申请金额', type: 'money', width: 130 },
@@ -79,7 +79,13 @@ const visibleInvoices = computed(() => {
   if (!keyword)
     return [...props.snapshot.invoices]
   return props.snapshot.invoices.filter(row =>
-    [row.invoiceNumber, row.invoiceType, row.projectName].some(value => value.toLowerCase().includes(keyword)),
+    [
+      row.invoiceNumber,
+      row.invoiceType,
+      row.projectName,
+      row.invoiceDate,
+      String(row.totalAmount),
+    ].some(value => value.toLowerCase().includes(keyword)),
   )
 })
 
@@ -162,7 +168,7 @@ function date(value: string): string {
     <template v-else-if="tab === 'payments'">
       <div class="flex flex-wrap items-center gap-2">
         <p class="mr-auto text-11px text-ink-soft">
-          来源：付款申请表实时汇总；付款申请详情页尚未建设，当前只读。
+          来源：付款申请表实时汇总；点击申请编号可追溯源单。
         </p>
         <select v-model="paymentOrder" class="field-input h-8 text-11px" aria-label="请款付款排序">
           <option value="date">
@@ -174,6 +180,11 @@ function date(value: string): string {
         </select>
       </div>
       <KitTable :columns="paymentColumns" :data="visiblePayments" empty="暂无请款/付款记录">
+        <template #payment="{ row }">
+          <NuxtLink :to="`/finance/payment/${row.id}`" class="cell--link font-mono">
+            {{ row.applicationNo || row.id }}
+          </NuxtLink>
+        </template>
         <template #project="{ row }">
           <NuxtLink :to="`/project/${row.projectId}`" class="cell--link">
             {{ row.projectName || row.projectId }}
@@ -193,7 +204,7 @@ function date(value: string): string {
         <p class="mr-auto text-11px text-ink-soft">
           来源：已归档发票单表，严格按 supplierId 汇总，不做名称猜测。
         </p>
-        <input v-model="invoiceSearch" type="search" class="field-input h-8 w-56 text-11px" placeholder="搜索发票号、类型、项目…">
+        <input v-model="invoiceSearch" type="search" class="field-input h-8 w-64 text-11px" placeholder="搜索发票号、类型、项目、金额或日期…">
       </div>
       <KitTable :columns="invoiceColumns" :data="visibleInvoices" empty="暂无已归档收票记录">
         <template #invoice="{ row }">
