@@ -1,5 +1,5 @@
-/* 基础重置 — 扫描件助手
-   贴合原应用 src/styles.css：极简重置 + 细滚动条 + 正文默认。 */
+/* 基础重置 — 瑞航 CRM
+   极简重置 + 细滚动条 + 正文默认。色值与形状令牌见 tokens/content-v5.css。 */
 * {
   box-sizing: border-box;
 }

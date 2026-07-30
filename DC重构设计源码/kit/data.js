@@ -1,5 +1,5 @@
-// 扫描件助手 UI Kit — 演示数据（贴近工地/财务场景，非真实企业）
-// 暴露到 window 供各屏共享。
+// 瑞航 CRM 设计稿 — 演示数据（贴近工地/财务场景，值全部匿名虚构，非真实企业）
+// 暴露到 window 供各屏共享。真实数据覆写层为 gitignored 的 kit/data.local.js，绝不入库、绝不推送。
 (function () {
   const invoices = [
     { id: "i1", name: "scan_0615_001.pdf", size: "1.2 MB", pages: 1, type: "增值税专用发票",
