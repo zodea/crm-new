@@ -255,6 +255,19 @@ describe('supplier credential tab', () => {
     expect(screen.getByText('存在冲突')).not.toBeNull()
   })
 
+  it('重载后仍在证照行明确显示已持久化的 OCR 冲突', () => {
+    setup(snapshot([
+      credential({
+        category: '资质证书',
+        ocrResult: ocrResult(),
+        ocrReviewStatus: 'pending',
+      }),
+    ]))
+
+    expect(screen.getByText('待核对 · 存在冲突')).not.toBeNull()
+    expect(screen.getByRole('button', { name: '继续核对 合成资质证书.pdf' })).not.toBeNull()
+  })
+
   it('批量队列首份识别失败后继续处理下一份', async () => {
     recognizeDocument
       .mockRejectedValueOnce(new Error('首份识别失败'))
@@ -332,7 +345,7 @@ describe('supplier credential tab', () => {
       ocrReviewStatus: 'pending',
     })
     const second = setup(snapshot([pending]))
-    expect(screen.getByText('待核对')).not.toBeNull()
+    expect(screen.getByText(/^待核对/)).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '继续核对 合成资质证书.pdf' }))
     await screen.findByRole('region', { name: '核对 OCR 识别结果' })
     expect(recognizeDocument).toHaveBeenCalledTimes(1)

@@ -9,7 +9,7 @@ const SUPPLIER_NAME = '穗建五金机电经营部'
 const CREDENTIAL_FILE = 'E2E银行账户资料.pdf'
 
 test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双页联动', async ({ page }) => {
-  test.setTimeout(60_000)
+  test.setTimeout(90_000)
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
   const ocrMarkdownPages = [
@@ -62,6 +62,11 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   const detailTabs = page.getByRole('navigation', { name: '分供方详情分类' })
   await expect(detailTabs.getByRole('tab')).toHaveCount(6)
   await expect(detailTabs.getByRole('tab', { name: '详细资料', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(supplierHeader).toContainText('138 **** 3456')
+  await expect(page.getByText('9144 **** 3456').first()).toBeVisible()
+  await expect(page.getByText('6228 **** 7788').first()).toBeVisible()
+  await expect(page.getByText('91440104MA5JKL3456', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('6228 4800 5566 7788', { exact: true })).toHaveCount(0)
 
   const summary = page.getByTestId('supplier-summary')
   await expect(summary).toContainText('合作项目1 个')
@@ -84,7 +89,9 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   await detailTabs.getByRole('tab', { name: '请款/付款汇总 (2)', exact: true }).click()
   await expect(page.getByRole('cell', { name: '五金机电采购首期请款', exact: true })).toBeVisible()
   await expect(page.getByRole('columnheader', { name: '实际付款', exact: true })).toBeVisible()
-  await expect(page.getByText('来源：付款申请表实时汇总；付款申请详情页尚未建设，当前只读。', { exact: true })).toBeVisible()
+  await expect(page.getByText('来源：付款申请表实时汇总；点击申请编号可追溯源单。', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'FK-2026-CG-004', exact: true }))
+    .toHaveAttribute('href', '/finance/payment/pa_demo_sup004_1')
 
   await detailTabs.getByRole('tab', { name: '收票汇总 (1)', exact: true }).click()
   await expect(page.getByRole('link', { name: '09442026000058702', exact: true })).toBeVisible()
@@ -121,14 +128,15 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   await page.getByRole('group', { name: '表单操作' })
     .getByRole('button', { name: '保存', exact: true })
     .click()
-  await page.getByRole('link', { name: SUPPLIER_NAME, exact: true }).click()
+  await expect(page).toHaveURL('/base/supplier/sup_demo_004?tab=credential')
+  await expect(detailTabs.getByRole('tab', { name: /证照附件/ })).toHaveAttribute('aria-selected', 'true')
   await expect(supplierHeader).toContainText('联系人 E2E周经理')
 
   const tabBar = page.getByRole('navigation', { name: '已打开页面' })
   await tabBar.getByRole('button', { name: '分供方', exact: true }).click()
   await page.getByRole('button', { name: '编辑分供方', exact: true }).click()
   await expect(page.getByLabel('主要联系人 *', { exact: true })).toHaveValue('E2E周经理')
-  await page.getByRole('button', { name: '返回分供方列表' }).click()
+  await page.getByRole('button', { name: '返回分供方详情' }).click()
 
   expect(pageErrors, '分供方详情旅程不应产生客户端运行错误').toEqual([])
 })

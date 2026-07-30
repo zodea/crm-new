@@ -8,7 +8,12 @@ import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { select, withTransaction } from '~/lib/db/connection'
-import { downstreamImpact as downstreamImpactCounts, selectVisibleSql } from '~/lib/db/soft-delete'
+import {
+  downstreamImpact as downstreamImpactCounts,
+  hiddenCtesFor,
+  selectVisibleSql,
+  visibleCond,
+} from '~/lib/db/soft-delete'
 import {
   listFormAttachments,
   loadSupplierForm,
@@ -68,6 +73,19 @@ export interface Supplier {
   note: string
   createdAt: string
   updatedAt: string
+}
+
+export interface SupplierListStats {
+  projectCount: number
+  contractTotal: number
+  paidTotal: number
+  payableBalance: number
+  projectIds: string[]
+}
+
+export interface SupplierProjectFilterOption {
+  id: string
+  name: string
 }
 
 /** 可写数据列（排除主键与时间戳：id 由 generateId 生成，created_at/updated_at 由写路径注入 now）。 */
@@ -150,16 +168,92 @@ function rowToSupplier(row: Record<string, unknown>): Supplier {
 
 export const useSupplierStore = defineStore('supplier', () => {
   const list = shallowRef<Supplier[]>([])
+  const listStats = shallowRef<Record<string, SupplierListStats>>({})
+  const projectOptions = shallowRef<SupplierProjectFilterOption[]>([])
   const loading = shallowRef(false)
 
   async function load(businessDate?: string) {
     loading.value = true
     try {
       await revalidateSupplierCredentialStatuses(db, businessDate)
-      const rows = await select<Record<string, unknown>>(
-        selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
-      )
+      const [rows, statsRows, projectRows] = await Promise.all([
+        select<Record<string, unknown>>(
+          selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
+        ),
+        select<Record<string, unknown>>(`
+          ${hiddenCtesFor(
+            'suppliers',
+            'project_suppliers',
+            'contracts',
+            'payment_applications',
+            'payment_record_application_allocations',
+            'payment_records',
+          )}
+          SELECT supplier.id AS supplier_id,
+                 (
+                   SELECT COUNT(DISTINCT relation.project_id)
+                   FROM project_suppliers AS relation
+                   WHERE relation.supplier_id = supplier.id
+                     AND ${visibleCond('project_suppliers', 'relation')}
+                 ) AS project_count,
+                 (
+                   SELECT COALESCE(SUM(contract.amount), 0)
+                   FROM contracts AS contract
+                   WHERE contract.supplier_id = supplier.id
+                     AND ${visibleCond('contracts', 'contract')}
+                 ) AS contract_total,
+                 (
+                   SELECT COALESCE(SUM(allocation.allocated_amount), 0)
+                   FROM payment_applications AS application
+                   JOIN payment_record_application_allocations AS allocation
+                     ON allocation.payment_application_id = application.id
+                    AND ${visibleCond('payment_record_application_allocations', 'allocation')}
+                   JOIN payment_records AS payment
+                     ON payment.id = allocation.payment_record_id
+                    AND ${visibleCond('payment_records', 'payment')}
+                    AND payment.confirmation_status = 'confirmed'
+                   WHERE application.supplier_id = supplier.id
+                     AND ${visibleCond('payment_applications', 'application')}
+                 ) AS paid_total,
+                 (
+                   SELECT GROUP_CONCAT(DISTINCT relation.project_id)
+                   FROM project_suppliers AS relation
+                   WHERE relation.supplier_id = supplier.id
+                     AND ${visibleCond('project_suppliers', 'relation')}
+                 ) AS project_ids
+          FROM suppliers AS supplier
+          WHERE ${visibleCond('suppliers', 'supplier')}
+        `),
+        select<Record<string, unknown>>(`
+          ${hiddenCtesFor('project_suppliers', 'projects', 'suppliers')}
+          SELECT DISTINCT project.id, project.name
+          FROM project_suppliers AS relation
+          JOIN projects AS project
+            ON project.id = relation.project_id
+           AND ${visibleCond('projects', 'project')}
+          JOIN suppliers AS supplier
+            ON supplier.id = relation.supplier_id
+           AND ${visibleCond('suppliers', 'supplier')}
+          WHERE ${visibleCond('project_suppliers', 'relation')}
+          ORDER BY project.name
+        `),
+      ])
       list.value = rows.map(rowToSupplier)
+      listStats.value = Object.fromEntries(statsRows.map((row) => {
+        const contractTotal = Number(row.contract_total ?? 0)
+        const paidTotal = Number(row.paid_total ?? 0)
+        return [String(row.supplier_id), {
+          projectCount: Number(row.project_count ?? 0),
+          contractTotal,
+          paidTotal,
+          payableBalance: contractTotal - paidTotal,
+          projectIds: String(row.project_ids ?? '').split(',').filter(Boolean),
+        } satisfies SupplierListStats]
+      }))
+      projectOptions.value = projectRows.map(row => ({
+        id: String(row.id),
+        name: String(row.name || row.id),
+      }))
     }
     finally {
       loading.value = false
@@ -371,6 +465,8 @@ export const useSupplierStore = defineStore('supplier', () => {
 
   return {
     list: readonly(list),
+    listStats: readonly(listStats),
+    projectOptions: readonly(projectOptions),
     loading: readonly(loading),
     load,
     byId,

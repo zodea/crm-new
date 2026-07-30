@@ -598,6 +598,32 @@ function expiryPresentation(credential: SupplierCredential): {
     return { className: 'chip-ok', label: `有效 · ${credential.expiresAt}` }
   return { className: 'chip-warn', label: '有效期未录入' }
 }
+
+function hasPersistedOcrConflict(credential: SupplierCredential): boolean {
+  if (credential.ocrReviewStatus !== 'pending')
+    return false
+  try {
+    if (!Array.isArray(credential.ocrResult.markdownPages))
+      return false
+    const parsed = parseCredentialOcr(
+      credential.ocrResult as unknown as OcrRecognitionResult,
+      credential.fileName,
+    )
+    return parsed.category.category !== credential.category
+      || buildOcrReviewFields(parsed, credential).some(field => field.conflict)
+  }
+  catch {
+    return false
+  }
+}
+
+function ocrReviewLabel(credential: SupplierCredential): string {
+  if (credential.ocrReviewStatus === 'confirmed')
+    return '已核对'
+  if (credential.ocrReviewStatus === 'pending')
+    return hasPersistedOcrConflict(credential) ? '待核对 · 存在冲突' : '待核对'
+  return '未识别'
+}
 </script>
 
 <template>
@@ -787,7 +813,7 @@ function expiryPresentation(credential: SupplierCredential): {
               </td>
               <td class="px-3 py-2">
                 <span :class="credential.ocrReviewStatus === 'confirmed' ? 'chip chip-ok' : 'chip chip-warn'">
-                  {{ credential.ocrReviewStatus === 'confirmed' ? '已核对' : credential.ocrReviewStatus === 'pending' ? '待核对' : '未识别' }}
+                  {{ ocrReviewLabel(credential) }}
                 </span>
               </td>
               <td class="px-3 py-2 font-mono text-11px text-ink-soft">

@@ -105,8 +105,11 @@ const dirty = computed(() => hydrated.value && (
 ))
 
 const sections = computed(() => meta.value.sections)
+const usesSupplierCredentialFlow = computed(() =>
+  meta.value.attachmentMode === 'supplierCredential',
+)
 const shellSections = computed(() =>
-  props.hideSections || props.kind === 'supplier' ? [] : sections.value,
+  props.hideSections || meta.value.hideSectionNav ? [] : sections.value,
 )
 const attachmentTitle = computed(() => props.kind === 'worker' ? '证书档案' : '附件')
 const requiredFields = computed(() =>
@@ -168,7 +171,9 @@ async function initialize() {
     else {
       const [record, files] = await Promise.all([
         loadRecord(routeId),
-        listFormAttachments(props.kind, routeId, true),
+        usesSupplierCredentialFlow.value
+          ? Promise.resolve([])
+          : listFormAttachments(props.kind, routeId, true),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -302,7 +307,9 @@ async function handleFooterAction(action: FormFooterAction) {
   loadingAction.value = action
   try {
     const result = await saveThroughStore(saveAction)
-    success(saveAction === 'draft' ? '草稿已保存' : '保存成功')
+    success(saveAction === 'draft'
+      ? '草稿已保存'
+      : meta.value.saveSuccessMessage ?? '保存成功')
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
@@ -325,11 +332,20 @@ async function handleFooterAction(action: FormFooterAction) {
 
     if (closeAfterSave.value) {
       allowLeave = true
-      tabsStore.close(pageKey)
-      const closePath = props.returnToDetail && meta.value.detailPath
-        ? `${meta.value.detailPath}/${routeId ?? result.id}`
+      const detailSuffix = meta.value.postSaveDetailTab
+        ? `?tab=${encodeURIComponent(meta.value.postSaveDetailTab)}`
+        : ''
+      const closePath = (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
+        ? `${meta.value.detailPath}/${routeId ?? result.id}${detailSuffix}`
         : meta.value.listPath
-      await navigateTo(closePath)
+      if (meta.value.postSaveDetailTab) {
+        await navigateTo(closePath)
+        tabsStore.close(pageKey)
+      }
+      else {
+        tabsStore.close(pageKey)
+        await navigateTo(closePath)
+      }
       return
     }
 
@@ -488,7 +504,7 @@ watch(routeSupplierCategory, () => {
   >
     <template #status>
       <template v-if="shellState === 'ready'">
-        <span v-if="draft.status || draft.approvalStatus" class="chip bg-surface-3 text-ink-soft">
+        <span v-if="!meta.hideStatus && (draft.status || draft.approvalStatus)" class="chip bg-surface-3 text-ink-soft">
           {{ draft.approvalStatus || draft.status }}
         </span>
       </template>
@@ -513,6 +529,7 @@ watch(routeSupplierCategory, () => {
       />
 
       <MasterDataAttachmentSection
+        v-if="!usesSupplierCredentialFlow"
         :title="attachmentTitle"
         :desktop-picker="desktopAttachmentPicker"
         :attachments="attachments"
@@ -525,6 +542,31 @@ watch(routeSupplierCategory, () => {
         @remove-pending="removePending"
         @update-pending-category="updatePendingCategory"
       />
+
+      <section
+        v-else
+        id="section-attachments"
+        data-ui="supplier-credential-guidance"
+        class="panel scroll-mt-4 p-4"
+      >
+        <SectionHeader
+          title="证照资料"
+          subtitle="证照原件、OCR 核对、有效期和人工审核统一在分供方详情维护。"
+        />
+        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 border border-brand/20 bg-brand-soft/35 p-3 text-12px text-ink-soft">
+          <span class="i-lucide-shield-check shrink-0 text-18px text-brand" aria-hidden="true" />
+          <p class="min-w-52 flex-1 leading-5">
+            此处只保存主数据，不会把普通附件伪装成证照。保存后进入“证照附件”，按真实文件、资料要求和人工核验规则完成准入。
+          </p>
+          <NuxtLink
+            v-if="isEditing && routeId"
+            :to="`/base/supplier/${routeId}?tab=credential`"
+            class="btn-secondary shrink-0"
+          >
+            前往证照附件
+          </NuxtLink>
+        </div>
+      </section>
 
       <section id="section-note" class="panel scroll-mt-4 p-4">
         <SectionHeader title="备注" />

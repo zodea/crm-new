@@ -141,6 +141,37 @@ afterEach(() => {
 })
 
 describe('supplier detail store', () => {
+  it('列表聚合排除已软删项目及其合同、付款和合作关系', async () => {
+    const supplierStore = useSupplierStore()
+    await supplierStore.load()
+
+    expect(supplierStore.listStats.s1).toEqual({
+      projectCount: 1,
+      contractTotal: 1000,
+      paidTotal: 200,
+      payableBalance: 800,
+      projectIds: ['p1'],
+    })
+    expect(supplierStore.projectOptions).toEqual([{ id: 'p1', name: '项目甲' }])
+
+    await mem.execute(`
+      UPDATE projects
+      SET deleted_at = '2026-07-30T00:00:00.000Z'
+      WHERE id = 'p1'
+    `)
+    await supplierStore.load()
+
+    expect(supplierStore.byId('s1')).toBeTruthy()
+    expect(supplierStore.listStats.s1).toEqual({
+      projectCount: 0,
+      contractTotal: 0,
+      paidTotal: 0,
+      payableBalance: 0,
+      projectIds: [],
+    })
+    expect(supplierStore.projectOptions).toEqual([])
+  })
+
   it('deduplicates overlapping loads for the same supplier and keeps loading state accurate', async () => {
     const store = useSupplierDetailStore()
     const first = store.load('s1')

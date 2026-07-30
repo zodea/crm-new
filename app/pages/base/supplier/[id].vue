@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { StatusTone } from '~/lib/supplier/status'
-import type { SupplierDetailSnapshot } from '~/stores/supplier-detail'
+import type { SupplierCredential, SupplierDetailSnapshot } from '~/stores/supplier-detail'
 import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE } from '~/lib/supplier/status'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
+import { maskPhone } from '~/lib/util/privacy'
 
 type DetailTab = 'detail' | 'credential' | 'projects' | 'contracts' | 'payments' | 'invoices'
 type ReadonlyTab = Exclude<DetailTab, 'detail' | 'credential'>
@@ -12,6 +13,7 @@ const route = useRoute()
 const store = useSupplierStore()
 const detailStore = useSupplierDetailStore()
 const { warning } = useKitUI()
+const { preview, download } = useFileRefAccess()
 
 const supplierId = computed(() => route.params.id as string)
 const supplier = computed(() => store.byId(supplierId.value))
@@ -25,6 +27,12 @@ let latestLoadRequest = 0
 useTabTitle(() => supplier.value?.name)
 
 const activeTab = shallowRef<DetailTab>('detail')
+const routeTab = computed<DetailTab | null>(() => {
+  const value = Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab
+  return ['detail', 'credential', 'projects', 'contracts', 'payments', 'invoices'].includes(String(value))
+    ? value as DetailTab
+    : null
+})
 const summaryTab = computed<ReadonlyTab>(() => {
   if (activeTab.value === 'detail' || activeTab.value === 'credential')
     return 'projects'
@@ -51,13 +59,27 @@ function credentialChipClass(status: string): string {
 }
 
 const summaryRows = computed(() => [
-  { label: '合作项目', value: `${snapshot.value.summary.projectCount} 个` },
-  { label: '合同总额', value: yuan(snapshot.value.summary.contractTotal) },
-  { label: '累计请款', value: yuan(snapshot.value.summary.claimedTotal) },
-  { label: '累计收票', value: yuan(snapshot.value.summary.invoiceTotal) },
-  { label: '累计已付', value: yuan(snapshot.value.summary.paidTotal) },
-  { label: '应付余额', value: yuan(snapshot.value.summary.payableBalance), danger: snapshot.value.summary.payableBalance > 0 },
+  { label: '合作项目', value: `${snapshot.value.summary.projectCount} 个`, tab: 'projects' as const },
+  { label: '合同总额', value: yuan(snapshot.value.summary.contractTotal), tab: 'contracts' as const },
+  { label: '累计请款', value: yuan(snapshot.value.summary.claimedTotal), tab: 'payments' as const },
+  { label: '累计收票', value: yuan(snapshot.value.summary.invoiceTotal), tab: 'invoices' as const },
+  { label: '累计已付', value: yuan(snapshot.value.summary.paidTotal), tab: 'payments' as const },
+  {
+    label: '应付余额',
+    value: yuan(snapshot.value.summary.payableBalance),
+    danger: snapshot.value.summary.payableBalance > 0,
+    tab: 'payments' as const,
+  },
 ])
+const credentialGroups = computed(() => {
+  const groups = new Map<string, SupplierCredential[]>()
+  for (const credential of snapshot.value.credentials) {
+    const items = groups.get(credential.category) ?? []
+    items.push(credential)
+    groups.set(credential.category, items)
+  }
+  return [...groups.entries()].map(([category, items]) => ({ category, items }))
+})
 
 const shellState = computed(() => {
   if (supplier.value && hasSnapshot.value)
@@ -106,14 +128,32 @@ async function loadSupplier() {
   }
 }
 
+function openCredentialFile(
+  action: 'preview' | 'download',
+  credential: SupplierCredential,
+) {
+  if (!credential.fileRef || !credential.hasAccessibleFile) {
+    warning('该历史记录没有可读取的原文件，请在证照附件中重新上传')
+    activeTab.value = 'credential'
+    return
+  }
+  void (action === 'preview'
+    ? preview(credential.fileRef)
+    : download(credential.fileRef))
+}
+
 watch(supplierId, () => void loadSupplier(), { immediate: true })
+watch(routeTab, (tab) => {
+  if (tab)
+    activeTab.value = tab
+}, { immediate: true })
 </script>
 
 <template>
   <EntityDetailShell
     :title="supplier?.name ?? '分供方详情'"
     :subtitle="supplier
-      ? `${supplier.supplierCategory || '未分类'} · 评价 ${supplier.rating || '—'} · 联系人 ${supplier.contact || '—'} · ${supplier.contactPhone || '—'}`
+      ? `${supplier.supplierCategory || '未分类'} · 评价 ${supplier.rating || '—'} · 联系人 ${supplier.contact || '—'} · ${maskPhone(supplier.contactPhone) || '—'}`
       : ''"
     back-to="/base/supplier"
     back-label="返回分供方列表"
@@ -152,14 +192,21 @@ watch(supplierId, () => void loadSupplier(), { immediate: true })
 
     <template #summary>
       <MetricGrid v-if="supplier" data-testid="supplier-summary" :cols="6">
-        <Metric
+        <button
           v-for="row in summaryRows"
           :key="row.label"
-          :label="row.label"
-          :value="row.value"
-          :tone="row.danger ? 'danger' : undefined"
-          :big="row.label === '应付余额'"
-        />
+          type="button"
+          class="min-w-0 border-0 bg-transparent p-0 text-left hover:bg-surface-2 focus-visible:outline-brand"
+          :aria-label="`查看${row.label}明细`"
+          @click="activeTab = row.tab"
+        >
+          <Metric
+            :label="row.label"
+            :value="row.value"
+            :tone="row.danger ? 'danger' : undefined"
+            :big="row.label === '应付余额'"
+          />
+        </button>
       </MetricGrid>
     </template>
 
@@ -206,13 +253,38 @@ watch(supplierId, () => void loadSupplier(), { immediate: true })
               <span class="i-lucide-upload" aria-hidden="true" />
             </button>
           </div>
-          <ul v-if="snapshot.credentials.length" class="divide-y divide-line">
-            <li v-for="credential in snapshot.credentials" :key="credential.id" class="flex items-center gap-2 py-2">
-              <span class="i-lucide-file-text shrink-0 text-14px text-ink-faint" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate text-11px" :title="credential.fileName">{{ credential.fileName }}</span>
-              <span class="text-9px text-ink-faint">{{ credential.category }}</span>
-            </li>
-          </ul>
+          <div v-if="credentialGroups.length" class="grid gap-3">
+            <section v-for="group in credentialGroups" :key="group.category" class="min-w-0">
+              <h4 class="mb-1 flex items-center gap-1 text-10px font-700 text-ink-soft">
+                <span class="i-lucide-folder text-12px text-brand" aria-hidden="true" />
+                {{ group.category }} · {{ group.items.length }}
+              </h4>
+              <ul class="divide-y divide-line border-l border-line pl-2">
+                <li v-for="credential in group.items" :key="credential.id" class="flex items-center gap-1 py-1.5">
+                  <span class="i-lucide-file-text shrink-0 text-12px text-ink-faint" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate text-11px" :title="credential.fileName">{{ credential.fileName }}</span>
+                  <button
+                    type="button"
+                    class="icon-btn shrink-0"
+                    :aria-label="`文件管理预览 ${credential.fileName}`"
+                    title="预览"
+                    @click="openCredentialFile('preview', credential)"
+                  >
+                    <span class="i-lucide-eye text-12px" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-btn shrink-0"
+                    :aria-label="`文件管理下载 ${credential.fileName}`"
+                    title="下载"
+                    @click="openCredentialFile('download', credential)"
+                  >
+                    <span class="i-lucide-download text-12px" aria-hidden="true" />
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </div>
           <p v-else class="py-3 text-center text-11px text-ink-faint">
             暂无证照文件
           </p>

@@ -13,6 +13,7 @@ defineProps<{
   loading: boolean
   categoryOptions: FilterOption[]
   statusOptions: FilterOption[]
+  projectOptions: FilterOption[]
   sortOptions: FilterOption[]
   columnsExpanded: boolean
 }>()
@@ -29,6 +30,9 @@ const emit = defineEmits<{
 const search = defineModel<string>('search', { required: true })
 const category = defineModel<string>('category', { required: true })
 const credentialStatus = defineModel<string>('credentialStatus', { required: true })
+const project = defineModel<string>('project', { required: true })
+const debtOnly = defineModel<boolean>('debtOnly', { required: true })
+const credentialMissingOnly = defineModel<boolean>('credentialMissingOnly', { required: true })
 const sort = defineModel<SupplierListSort>('sort', { required: true })
 </script>
 
@@ -68,6 +72,23 @@ const sort = defineModel<SupplierListSort>('sort', { required: true })
           <SelectFilter v-model="sort" label="排序" :options="sortOptions" :min-width="132" />
           <SelectFilter v-model="category" label="类别" :options="categoryOptions" :min-width="145" />
           <SelectFilter v-model="credentialStatus" label="资料" :options="statusOptions" :min-width="132" />
+          <SelectFilter v-model="project" label="项目" :options="projectOptions" :min-width="150" />
+          <Button
+            variant="outline"
+            :aria-pressed="debtOnly"
+            :class="debtOnly ? 'border-brand text-brand-deep' : ''"
+            @click="debtOnly = !debtOnly"
+          >
+            欠款
+          </Button>
+          <Button
+            variant="outline"
+            :aria-pressed="credentialMissingOnly"
+            :class="credentialMissingOnly ? 'border-brand text-brand-deep' : ''"
+            @click="credentialMissingOnly = !credentialMissingOnly"
+          >
+            证照缺失
+          </Button>
           <Button
             variant="outline"
             size="icon"

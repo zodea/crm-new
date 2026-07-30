@@ -29,6 +29,11 @@ interface FormMeta {
   listPath: string
   newPath: string
   detailPath?: string
+  attachmentMode?: 'form' | 'supplierCredential'
+  saveSuccessMessage?: string
+  postSaveDetailTab?: string
+  hideStatus?: boolean
+  hideSectionNav?: boolean
   defaultAttachmentCategory: string
   sections: FormSection[]
 }
@@ -39,6 +44,12 @@ export const FORM_META: Record<MasterDataOwnerType, FormMeta> = {
     listLabel: '分供方列表',
     listPath: '/base/supplier',
     newPath: '/base/supplier/form',
+    detailPath: '/base/supplier',
+    attachmentMode: 'supplierCredential',
+    saveSuccessMessage: '分供方主数据已保存，请继续核对证照资料',
+    postSaveDetailTab: 'credential',
+    hideStatus: true,
+    hideSectionNav: true,
     defaultAttachmentCategory: '其他',
     sections: [
       { key: 'basic', label: '基础信息' },
