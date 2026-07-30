@@ -66,6 +66,8 @@
 | `R-PROJECT-LIST-LIVE` | 当前直接证据 | `默认首页 > 项目信息` | Chrome 内容视口约 1280×1024，2026-07-29 | 项目列表为“左侧业务流程阶段 + 顶部单行搜索/筛选/设置工具栏 + 紧凑表格 + 右下分页”；本次观察到导入入口，未观察到新建入口。项目名称和金额使用链接态，操作保持右侧固定。未点击导入、筛选、设置或行级操作。 |
 | `R-PROJECT-DETAIL-LIVE` | 当前直接证据 | `默认首页 > 项目信息 > 项目名称` | Chrome 内容视口约 1280×1024，2026-07-30 | 项目详情为“紧凑标题与五项元数据 + 项目经营数据/往来款/票据信息 + 左侧审批流程与项目阶段 + 右侧项目团队与文件”的宽屏双栏结构，区块使用轻边界而非层层大卡片。仅通过项目名称进入并读取结构，未触发编辑、上传、下载、审批或任何写入；未保存业务名称、人员、金额等参考值。 |
 | `R-SUPPLIER-LIST-LIVE` | 当前直接证据 | 已打开业务页签“分供方” | Chrome 内容视口约 1280×1024，2026-07-29 | 分供方列表不设空白左树，搜索/刷新/排序/筛选/设置/导入/新建保持一行，表格占满剩余宽度并在加载时原位显示骨架。新建入口先弹出供应商类型选择，确认默认类型后进入整页表单；取消后返回原列表。未录入、保存、提交、导入或触发行级操作。 |
+| `R-TARGET-COST-LOCAL` | 固定本地脱敏资料与 DC 直接源码，非目标页运行态 | `红圈系统/业务流转.md` 的 `targetCost3X` / `targetCostListDetails3X` 脱敏关系；`DC重构设计源码/kit/TargetCostListScreen.jsx`、`TargetCostDetailScreen.jsx`、`forms/BaseForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 本地脱敏资料只证明目标成本头、清单明细和预算/已签/实际/申请四轨关系；DC 源码直接提供列表、整页表单和清单详情的本产品构图。当前没有按严格只读协议观察到红圈目标成本列表、详情或表单，`R-HOME-LIVE` 只证明首页存在“目标成本”快捷入口，不能外推目标页字段、操作或布局。 |
+| `R-SCHEDULE-LOCAL` | DC 独有能力的固定本地蓝本，非红圈目标页运行态 | `docs/合和新城7期施工进度计划表 （户内）2026.04.22.pdf`、`DC重构设计源码/kit/SchedulePlanScreen.jsx`、`ScheduleGroupNewScreen.jsx`、`ScheduleBindScreen.jsx`、`ScheduleProcessLibraryScreen.jsx`、`forms/ScheduleForms.jsx`、ADR 0017 / 0018 | 固定源码桌面构图与本地生产四档验证 | 本地脱敏红圈资料未登记施工排程对象；`红圈系统/业务流转.md` 仅能提供成本、合同和结算来源关系。因此 WBS、甘特、内部暂估、标准工序库和合同后绑定均按瑞航本地蓝本裁定，不宣称复制红圈目标页。[#244](https://github.com/zodea/crm-new/issues/244) 已合入工序库、合同绑定和整页表单的设计源码落点，但仍保持 open 以追平依赖弹窗细节和四档设计稿验收；#191 只负责生产数据与交互闭环。 |
 
 上一次实施无法读取浏览器正文，因此当时生成的项目详情“当前直接证据”和线框不成立，已在本轮撤销；#190 已按严格只读协议重新观察并登记为 `R-PROJECT-DETAIL-LIVE`。`R-DETAIL-LIVE` 仍只覆盖材料采购合同详情，不能外推项目字段。当前直接证据覆盖全局外壳、默认首页、上述合同列表/空白新建/合同详情，以及项目列表和项目详情；外壳证据只支持导航、页签和通知的结构/只读状态，不能外推为其他业务页字段或写入行为。
 
@@ -189,15 +191,15 @@
 | `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/project/penalty/index.vue` | `/project/penalty` | 甲方单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 同屏测量 | 待 #197 只读核对 | C-DENSE |
 | `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 甲方单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/project/target-cost/[id].vue` | `/project/target-cost/:id` | 项目进度成本 | 详情 | #191 | R-DETAIL-PRIOR | 待 #191 同屏测量 | 只读汇总所选版本与项目正式成本事实 | C-DENSE |
-| `app/pages/project/target-cost/form/[[id]].vue` | `/project/target-cost/form/:id?` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 待 #191 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/project/target-cost/index.vue` | `/project/target-cost` | 项目进度成本 | 列表 | #191 | R-LIST-PRIOR | 待 #191 同屏测量 | 待 #191 只读核对 | C-DENSE |
-| `app/pages/schedule/[pid]/index.vue` | `/schedule/:pid` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 排程写入路径保持现有契约 | C-DENSE |
-| `app/pages/schedule/[pid]/bind/[gid].vue` | `/schedule/:pid/bind/:gid` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 采用整页选择与只读复核，不使用复杂弹窗；合同名称/编号检索、楼栋覆盖、分项映射和数量差异按本地 ADR 0017 领域契约呈现 | 进入页面不写入；只有无阻断且再次确认“确认绑定”才切换范围依据，成功后返回原施工进度分组 | C-FORM |
-| `app/pages/schedule/index.vue` | `/schedule` | 项目进度成本 | 工作台 | #191 | R-WORKBENCH-PRIOR | 待 #191 同屏测量 | 待 #191 只读核对 | C-DENSE |
-| `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 待 #191 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/schedule/process-library/form.vue` | `/schedule/process-library/form` | 项目进度成本 | 整页表单 | #191 | R-FORM-PRIOR | 遵循 ADR 0014 整页表单与本地甘特/精确表格双视图；无直接参考页时以 DC 品牌原语为准 | 进入页面只读来源版本；只有“保存为新版本”才新增库与工序定义，绝不回写来源版本 | C-FORM |
-| `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-LIST-PRIOR | 版本列表沿用本地紧凑表格与局部横向滚动；不照搬无直接参考的业务结构 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
+| `app/pages/project/target-cost/[id].vue` | `/project/target-cost/:id` | 项目进度成本 | 详情 | #191 | R-TARGET-COST-LOCAL | DC 有直接目标成本详情源码；生产页据此保留版本摘要与科目清单，并以本地真实合同、结算、工资、报销事实形成成本对比。没有红圈目标页运行态证据，不复制审批栏、导入动作或示例字段 | 科目明细只写当前版本；成本对比只读正式源单并穿透现有路由，不从名称或录入汇总值反推 | C-DENSE |
+| `app/pages/project/target-cost/form/[[id]].vue` | `/project/target-cost/form/:id?` | 项目进度成本 | 整页表单 | #191 | R-TARGET-COST-LOCAL | DC 有目标成本版本头整页表单源码；现有参考运行证据只支持邻近短表单的两列字段网格、纵向滚动和固定底部动作，不把材料合同或分供方字段外推到目标成本 | 版本头与科目明细分开保存；草稿、提交、项目 lookup 和基线切换继续按本地事务契约 | C-FORM |
+| `app/pages/project/target-cost/index.vue` | `/project/target-cost` | 项目进度成本 | 列表 | #191 | R-TARGET-COST-LOCAL | DC 有直接目标成本列表源码；生产页采用单行搜索/项目/基线/状态筛选、紧凑金额表格、名称详情入口与本地分页。没有红圈目标列表的安全直接证据，不宣称同屏复刻 | 金额只展示 `target_costs` 版本头事实；项目、状态和基线筛选不改写数据，名称进入专用详情 | C-DENSE |
+| `app/pages/schedule/[pid]/index.vue` | `/schedule/:pid` | 项目进度成本 | 工作台 | #191 | R-SCHEDULE-LOCAL | 红圈没有可对应的施工排程目标页；采用 DC 施工进度源码与本地进度计划 PDF，呈现同一 WBS Tree + 甘特核心、计划/实际对照和局部横滚；#244 已完成设计源覆盖 | 排程写入、工程量下钻、拖拽冲突保护与项目上下文保持本地契约 | C-DENSE |
+| `app/pages/schedule/[pid]/bind/[gid].vue` | `/schedule/:pid/bind/:gid` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | 红圈无目标页；采用 #244 已补齐的 `ScheduleBindScreen.jsx` 与 ADR 0017，展示合同检索、楼栋覆盖、分项映射和冻结数量差异 | 进入页面不写入；只有无阻断且再次确认“确认绑定”才切换范围依据；预览与绑定均读取建组时冻结的暂估量 | C-FORM |
+| `app/pages/schedule/index.vue` | `/schedule` | 项目进度成本 | 工作台 | #191 | R-SCHEDULE-LOCAL | 红圈没有可对应的施工排程目标页；采用 DC 施工进度源码与本地进度计划 PDF，呈现同一 WBS Tree + 甘特核心、计划/实际对照和局部横滚；#244 已完成设计源覆盖 | 默认/空计划/部分完成/延期冲突/加载错误均按本地状态解释 | C-DENSE |
+| `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | DC 有新建排程源码但形态早于当前三步向导；业务字段只取其本地蓝本，生产结构按“范围 → 工序 → 确认”与 ADR 0017 / 0018 裁定，不声称红圈有目标页 | 无项目区域时直达区域配置；内部暂估只读手工暂估量；第三步集中汇总范围、依据、周期、依赖与阻断项，失败保留草稿并可重试 | C-FORM |
+| `app/pages/schedule/process-library/form.vue` | `/schedule/process-library/form` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `forms/ScheduleForms.jsx`、ADR 0014 与本地甘特/精确表格双视图 | 进入页面只读来源版本；只有“保存为新版本”才新增库与工序定义，绝不回写来源版本 | C-FORM |
+| `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `ScheduleProcessLibraryScreen.jsx`、本地紧凑列表模板与局部横向滚动 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 整页表单 | #197 | R-FORM-PRIOR | 待 #197 分类型测量 | 动态单据写入路径保持现有契约 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-LIST-PRIOR | 待 #197 分类型测量 | 动态类型与权限保持现有契约 | C-DENSE |

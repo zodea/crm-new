@@ -8,6 +8,23 @@ async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Pa
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
+async function prepareProvisionalBuilding(page: import('@playwright/test').Page) {
+  await page.goto('/subcontract/quantity/region?project=proj_demo_001')
+  await page.waitForLoadState('networkidle')
+  await page.getByLabel('楼栋列表').getByRole('button', { name: /3栋/ }).click()
+  const floorSection = page.locator('#section-floor')
+  await floorSection.getByLabel('楼层编码').fill('1F')
+  await floorSection.getByLabel('显示名称').fill('1层')
+  await floorSection.getByRole('button', { name: '新增楼层' }).click()
+  await expect(page.getByLabel('楼层列表').getByRole('button', { name: /1层/ })).toBeVisible()
+  const unitSection = page.locator('#section-unit')
+  await unitSection.getByLabel('户编码').fill('101')
+  await unitSection.getByLabel('显示名称').fill('101户')
+  await unitSection.getByLabel('户型模板').selectOption({ index: 1 })
+  await unitSection.getByRole('button', { name: '新增户' }).click()
+  await expect(page.getByLabel('户列表').getByText('101户', { exact: true })).toBeVisible()
+}
+
 test.describe('标准工序库版本维护与建组甘特', () => {
   test('复用已打开的表单页签时按 source 重新初始化，并可切回空白草稿', async ({ page }) => {
     await page.goto('/schedule/process-library')
@@ -68,6 +85,7 @@ test.describe('标准工序库版本维护与建组甘特', () => {
 
   test('390px 页面不横滚，建组第二步甘特与精确工期共用一个状态', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
+    await prepareProvisionalBuilding(page)
     await page.goto('/schedule/new?project=proj_demo_001')
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible({ timeout: 20_000 })
@@ -101,6 +119,7 @@ test.describe('标准工序库版本维护与建组甘特', () => {
   })
 
   test('顺排前序后移会带动后续重算，精确日期错序仍走同一确认', async ({ page }) => {
+    await prepareProvisionalBuilding(page)
     await page.goto('/schedule/new?project=proj_demo_001')
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('heading', { name: '楼栋分组与标准工序' })).toBeVisible({ timeout: 20_000 })

@@ -90,7 +90,15 @@ function renderHarness(
       async function validate() {
         errorCount.value = grid.value?.validate().length ?? 0
       }
-      return { rows, grid, errorCount, validate }
+      async function showDomainErrors() {
+        grid.value?.setErrors([{
+          row: 0,
+          key: 'unitPrice',
+          message: '单价必须是非负数',
+        }])
+        await grid.value?.focusFirstError()
+      }
+      return { rows, grid, errorCount, showDomainErrors, validate }
     },
     template: `
       <form @submit.prevent="validate">
@@ -104,6 +112,7 @@ function renderHarness(
           :max="max"
         />
         <button type="submit">校验明细</button>
+        <button type="button" @click="showDomainErrors">显示领域错误</button>
         <output data-testid="rows-json">{{ JSON.stringify(rows) }}</output>
         <output data-testid="error-count">{{ errorCount }}</output>
       </form>
@@ -152,6 +161,22 @@ describe('kit edit grid', () => {
     expect(screen.getByRole('textbox', { name: '名称，第 1 行' }).getAttribute('aria-invalid')).toBe('true')
     expect(screen.getByRole('spinbutton', { name: '数量，第 1 行' }).getAttribute('aria-invalid')).toBe('true')
     expect(screen.getByRole('alert').textContent).toContain('2 处')
+  })
+
+  it('回填逐字段领域错误并把焦点定位到首个错误单元格', async () => {
+    renderHarness([{
+      name: '墙砖',
+      unit: '㎡',
+      qty: 2,
+      unitPrice: -1,
+    }])
+
+    await fireEvent.click(screen.getByRole('button', { name: '显示领域错误' }))
+
+    const unitPrice = screen.getByRole('spinbutton', { name: '单价，第 1 行' })
+    expect(unitPrice.getAttribute('aria-invalid')).toBe('true')
+    expect(unitPrice).toBe(document.activeElement)
+    expect(screen.getByText('单价必须是非负数')).not.toBeNull()
   })
 
   it('选择器批量插入返回行，取消不改变数据', async () => {

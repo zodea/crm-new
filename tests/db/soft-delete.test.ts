@@ -238,6 +238,54 @@ describe('可见性:软删过滤 + 祖先过滤(ADR 0003)', () => {
     db.close()
   })
 
+  it('合同清单软删后仍保留已冻结的排程楼层计划可见性', async () => {
+    const db = await dbWithProject()
+    await db.execute(`INSERT INTO contracts (id, name, kind, project_id)
+      VALUES ('contract1', '施工合同', '施工', 'p1')`)
+    await db.execute(`INSERT INTO boq_files (id, contract_id, file_name, parse_status, line_count)
+      VALUES ('boq-file1', 'contract1', '施工清单.xlsx', 'parsed', 1)`)
+    await db.execute(`INSERT INTO items (id, project_id, code, name, trade)
+      VALUES ('item1', 'p1', 'IT-01', '墙砖', '泥工')`)
+    await db.execute(`INSERT INTO boq_lines (
+      id, boq_file_id, project_id, contract_id, item_id, item_name, qty, trace_key
+    ) VALUES (
+      'boq-line1', 'boq-file1', 'p1', 'contract1', 'item1', '墙砖', 20, 'sheet·1'
+    )`)
+    await db.execute(`INSERT INTO buildings (id, project_id, code, name)
+      VALUES ('building1', 'p1', 'B1', '1号楼')`)
+    await db.execute(`INSERT INTO floors (id, building_id, code, name)
+      VALUES ('floor1', 'building1', 'F1', '一层')`)
+    await db.execute(`INSERT INTO schedule_groups (
+      id, project_id, contract_id, scope_basis, name
+    ) VALUES (
+      'group1', 'p1', 'contract1', 'contract', '1号楼'
+    )`)
+    await db.execute(`INSERT INTO construction_stages (id, project_id, code, name, trade)
+      VALUES ('stage1', 'p1', 'ST-01', '墙砖', '泥工')`)
+    await db.execute(`INSERT INTO schedule_tasks (
+      id, project_id, group_id, name, duration_days, planned_start, planned_finish,
+      has_qty, stage_id
+    ) VALUES (
+      'task1', 'p1', 'group1', '墙砖', 1, '2026-07-01', '2026-07-01',
+      1, 'stage1'
+    )`)
+    await db.execute(`INSERT INTO schedule_task_floor_plans (
+      id, task_id, floor_id, item_id, boq_line_id, source_basis,
+      planned_start, planned_finish
+    ) VALUES (
+      'plan1', 'task1', 'floor1', 'item1', 'boq-line1', 'contract',
+      '2026-07-01', '2026-07-01'
+    )`)
+
+    await softDelete(db, 'boq_lines', 'boq-line1')
+
+    expect(await selectVisible(db, 'boq_lines')).toEqual([])
+    expect(await selectVisible(db, 'schedule_task_floor_plans')).toEqual([
+      expect.objectContaining({ id: 'plan1', boq_line_id: 'boq-line1' }),
+    ])
+    db.close()
+  })
+
   it('级联只标父级:删项目后子级(挂靠/发票)隐藏,但子级自身 deleted_at 仍为 NULL', async () => {
     const db = await dbWithProject()
     await db.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '华东建材')`)

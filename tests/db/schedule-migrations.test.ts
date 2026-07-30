@@ -78,7 +78,10 @@ const REQUIRED_COLUMNS: Record<(typeof SCHEDULE_TABLES)[number], string[]> = {
     'id',
     'task_id',
     'floor_id',
+    'item_id',
     'boq_line_id',
+    'source_basis',
+    'provisional_qty',
     'planned_start',
     'planned_finish',
     'is_manual',
@@ -104,7 +107,10 @@ const REQUIRED_INDEXES = [
   'idx_task_item_map_item',
   'idx_schedule_floor_plans_task',
   'idx_schedule_floor_plans_floor',
+  'idx_schedule_floor_plans_item',
   'idx_schedule_floor_plans_boq',
+  'uq_schedule_floor_plan_contract_scope',
+  'uq_schedule_floor_plan_provisional_scope',
   ...SCHEDULE_TABLES.map(table => `idx_${table}_deleted`),
 ]
 
@@ -141,6 +147,7 @@ const EXPECTED_FOREIGN_KEYS: Record<(typeof SCHEDULE_TABLES)[number], ForeignKey
   schedule_task_floor_plans: [
     { source_column: 'task_id', target_table: 'schedule_tasks', target_column: 'id' },
     { source_column: 'floor_id', target_table: 'floors', target_column: 'id' },
+    { source_column: 'item_id', target_table: 'items', target_column: 'id' },
     { source_column: 'boq_line_id', target_table: 'boq_lines', target_column: 'id' },
   ],
 }
@@ -264,41 +271,167 @@ describe('施工进度排程数据底座', () => {
         'stage-schedule'
       )`)
     await db.execute(`INSERT INTO schedule_task_floor_plans
-      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      (id, task_id, floor_id, item_id, boq_line_id, source_basis, planned_start, planned_finish)
       VALUES (
         'floor-plan',
         'task-floor-plan',
         'floor-schedule',
+        'item-schedule',
         'boq-line-schedule',
+        'contract',
         '2026-07-01',
         '2026-07-05'
       )`)
 
     await expect(db.execute(`INSERT INTO schedule_task_floor_plans
-      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      (id, task_id, floor_id, item_id, boq_line_id, source_basis, planned_start, planned_finish)
       VALUES (
         'floor-plan-duplicate',
         'task-floor-plan',
         'floor-schedule',
+        'item-schedule',
         'boq-line-schedule',
+        'contract',
         '2026-07-06',
         '2026-07-10'
       )`))
       .rejects
       .toThrow(/UNIQUE constraint failed/i)
     await expect(db.execute(`INSERT INTO schedule_task_floor_plans
-      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      (id, task_id, floor_id, item_id, boq_line_id, source_basis, planned_start, planned_finish)
       VALUES (
         'floor-plan-invalid',
         'task-floor-plan',
         'floor-schedule',
+        'item-schedule',
         'boq-line-schedule',
+        'contract',
         '2026-07-10',
         '2026-07-01'
       )`))
       .rejects
       .toThrow(/CHECK constraint failed/i)
 
+    await db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, item_id, source_basis, provisional_qty, planned_start, planned_finish)
+      VALUES (
+        'floor-plan-provisional',
+        'task-floor-plan',
+        'floor-schedule',
+        'item-schedule',
+        'provisional',
+        12.5,
+        '2026-07-01',
+        '2026-07-05'
+      )`)
+    await expect(db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, item_id, source_basis, provisional_qty, planned_start, planned_finish)
+      VALUES (
+        'floor-plan-provisional-duplicate',
+        'task-floor-plan',
+        'floor-schedule',
+        'item-schedule',
+        'provisional',
+        8,
+        '2026-07-06',
+        '2026-07-10'
+      )`))
+      .rejects
+      .toThrow(/UNIQUE constraint failed/i)
+
+    db.close()
+  })
+
+  it('v38 从真实 BOQ 分项回填合同计划并保留软删与时间戳', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= 37))
+    await insertScheduleAncestors(db)
+    await db.execute(`INSERT INTO floors (id, building_id, code, name)
+      VALUES ('floor-v38', 'building-schedule', 'F1', '1层')`)
+    await db.execute(`INSERT INTO contracts (id, project_id, kind, name)
+      VALUES ('contract-v38', 'project-schedule', '施工', '排程合同')`)
+    await db.execute(`INSERT INTO boq_files (id, contract_id, file_name, parse_status)
+      VALUES ('boq-file-v38', 'contract-v38', '清单.xlsx', 'parsed')`)
+    await db.execute(`INSERT INTO boq_lines
+      (id, boq_file_id, project_id, contract_id, item_id, item_name, trace_key)
+      VALUES (
+        'boq-line-v38', 'boq-file-v38', 'project-schedule', 'contract-v38',
+        'item-schedule', '墙砖', 'v38·1'
+      )`)
+    await db.execute(`INSERT INTO schedule_tasks
+      (id, project_id, group_id, name, planned_start, planned_finish, has_qty, stage_id)
+      VALUES (
+        'task-v38', 'project-schedule', 'group-schedule', '墙砖铺贴',
+        '2026-07-01', '2026-07-10', 1, 'stage-schedule'
+      )`)
+    await db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish,
+       note, sort_order, created_at, updated_at, deleted_at)
+      VALUES (
+        'plan-v38', 'task-v38', 'floor-v38', 'boq-line-v38',
+        '2026-07-01', '2026-07-05', '保留备注', 30,
+        '2026-06-01 01:02:03', '2026-06-02 04:05:06', '2026-06-03 07:08:09'
+      )`)
+
+    await runMigrations(db, migrations)
+
+    expect(await db.select(`
+      SELECT id, task_id, floor_id, item_id, boq_line_id, source_basis,
+             provisional_qty, planned_start, planned_finish, note, sort_order,
+             created_at, updated_at, deleted_at
+      FROM schedule_task_floor_plans
+      WHERE id = 'plan-v38'
+    `)).toEqual([{
+      id: 'plan-v38',
+      task_id: 'task-v38',
+      floor_id: 'floor-v38',
+      item_id: 'item-schedule',
+      boq_line_id: 'boq-line-v38',
+      source_basis: 'contract',
+      provisional_qty: null,
+      planned_start: '2026-07-01',
+      planned_finish: '2026-07-05',
+      note: '保留备注',
+      sort_order: 30,
+      created_at: '2026-06-01 01:02:03',
+      updated_at: '2026-06-02 04:05:06',
+      deleted_at: '2026-06-03 07:08:09',
+    }])
+    db.close()
+  })
+
+  it('v38 遇到无法回填分项的旧计划时阻断且不登记迁移', async () => {
+    const db = await createMemoryDb()
+    await runMigrations(db, migrations.filter(migration => migration.version <= 37))
+    await insertScheduleAncestors(db)
+    await db.execute(`INSERT INTO floors (id, building_id, code, name)
+      VALUES ('floor-v38-invalid', 'building-schedule', 'F1', '1层')`)
+    await db.execute(`INSERT INTO contracts (id, project_id, kind, name)
+      VALUES ('contract-v38-invalid', 'project-schedule', '施工', '排程合同')`)
+    await db.execute(`INSERT INTO boq_files (id, contract_id, file_name, parse_status)
+      VALUES ('boq-file-v38-invalid', 'contract-v38-invalid', '清单.xlsx', 'parsed')`)
+    await db.execute(`INSERT INTO boq_lines
+      (id, boq_file_id, project_id, contract_id, item_name, trace_key)
+      VALUES (
+        'boq-line-v38-invalid', 'boq-file-v38-invalid', 'project-schedule',
+        'contract-v38-invalid', '未知分项', 'v38·invalid'
+      )`)
+    await db.execute(`INSERT INTO schedule_tasks
+      (id, project_id, group_id, name, planned_start, planned_finish, has_qty, stage_id)
+      VALUES (
+        'task-v38-invalid', 'project-schedule', 'group-schedule', '墙砖铺贴',
+        '2026-07-01', '2026-07-10', 1, 'stage-schedule'
+      )`)
+    await db.execute(`INSERT INTO schedule_task_floor_plans
+      (id, task_id, floor_id, boq_line_id, planned_start, planned_finish)
+      VALUES (
+        'plan-v38-invalid', 'task-v38-invalid', 'floor-v38-invalid',
+        'boq-line-v38-invalid', '2026-07-01', '2026-07-05'
+      )`)
+
+    await expect(runMigrations(db, migrations)).rejects.toThrow(/缺少可回填的 BOQ 分项/)
+    expect(await db.select(`SELECT version FROM schema_migrations WHERE version = 38`)).toEqual([])
+    expect(await columnNames(db, 'schedule_task_floor_plans')).not.toContain('source_basis')
     db.close()
   })
 
