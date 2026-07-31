@@ -134,6 +134,49 @@
     return <StatusChip tone="neutral">待识别</StatusChip>;
   }
 
+  // #201 左栏：处理队列。宽屏常驻，点选即在右两栏载入原件与字段；窄屏不渲染（退化为卡片网格）。
+  // 队列只承载「选哪一张」，不重复卡片网格的移动/删除动作，避免同一操作两处入口。
+  function QueueList({ files, activeId, onPick }) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", minWidth: 0, border: "1px solid var(--line)",
+        borderRadius: 12, background: "var(--panel)", overflow: "hidden", alignSelf: "start" }}>
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)",
+          fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 6 }}>
+          处理队列<span style={{ fontFamily: "var(--font-mono)" }}>({files.length})</span>
+        </div>
+        <div style={{ overflowY: "auto", maxHeight: "calc(100dvh - var(--header-h) - 270px)" }}>
+          {files.length === 0 && (
+            <div style={{ padding: "26px 14px", textAlign: "center", color: "var(--ink-faint)", fontSize: 12.5, lineHeight: 1.9 }}>
+              <Icon name="inbox" size={22} color="var(--line-strong)" />
+              <div style={{ marginTop: 6, fontWeight: 700, color: "var(--ink-soft)" }}>当前分区没有待处理文件</div>
+              <div>拖入工地文件夹或切换上方分区</div>
+            </div>
+          )}
+          {files.map((f) => {
+            const on = f.id === activeId;
+            return (
+              <button key={f.id} type="button" onClick={() => onPick(f)}
+                style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid var(--line)",
+                  borderLeft: "3px solid " + (on ? "var(--brand)" : "transparent"), cursor: "pointer",
+                  background: on ? "var(--brand-soft)" : "transparent", padding: "9px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: on ? 800 : 600, overflow: "hidden",
+                    textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.name}>{f.name}</span>
+                  {f.conflict && <span title="公司名与红章冲突" style={{ color: "var(--danger)", fontWeight: 800, flex: "none" }}>!</span>}
+                </div>
+                <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  {ocrChip(f)}
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 10.5, color: "var(--ink-faint)", overflow: "hidden",
+                    textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.company}>{f.company}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function FileCard({ f, partitions, onOpen, onMove, onDel }) {
     return (
       <Panel padding={0} style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
@@ -206,7 +249,9 @@
   }
 
   // —— 左图右表核对弹层（90vw 大弹窗）：头部字段置信度着色 + 材料明细行可编辑表格 ——
-  function ReviewModal({ file, narrow, onClose, onFinish }) {
+  // #201：核对内容有两种承载 —— 宽屏 inline 进三栏工作台的「原件 + 字段/材料行」两栏，
+  // 窄屏回落为全屏弹层（三栏在窄屏无法并置，退化为队列单列 + 弹层核对）。逻辑只此一份。
+  function ReviewModal({ file, narrow, inline, onClose, onFinish }) {
     const r0 = React.useMemo(() => file.result || genResult(file), [file.id]);
     const [head, setHead] = React.useState(() => ({ no: { ...r0.head.no }, date: { ...r0.head.date }, supplier: { ...r0.head.supplier }, site: { ...r0.head.site } }));
     const [items, setItems] = React.useState(() => r0.items.map((it, i) => ({ ...it, _id: "r" + i })));
@@ -290,9 +335,8 @@
     };
 
     const thStyle = (right) => ({ padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--ink-soft)", textAlign: right ? "right" : "left", whiteSpace: "nowrap" });
-    return (
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: 24 }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 12, width: "90vw", maxWidth: 1280, maxHeight: "90vh", overflow: "auto", boxShadow: "var(--shadow-pop)" }}>
+    const inner = (
+      <React.Fragment>
           {/* 头部 */}
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "var(--panel)", zIndex: 2 }}>
             <div>
@@ -300,7 +344,7 @@
               <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>左图右表逐字段核对 · 黄/红为低置信字段，确认或改正后才能核对完成</div>
             </div>
             <span style={{ marginLeft: "auto", flex: "none" }}>{canFinish ? <StatusChip tone="ok">字段全部就绪</StatusChip> : <StatusChip tone={hasDanger ? "danger" : "warn"}>{remaining.length} 个低置信字段待确认</StatusChip>}</span>
-            <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 22, lineHeight: 1, color: "var(--ink-soft)", flex: "none" }}>×</button>
+            {!inline && <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 22, lineHeight: 1, color: "var(--ink-soft)", flex: "none" }}>×</button>}
           </div>
 
           {/* 左图右表 */}
@@ -375,6 +419,21 @@
               }} style={{ border: 0, background: "var(--brand)", color: "#fff", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: canFinish ? 1 : .5 }}>核对完成</button>
             </span>
           </div>
+      </React.Fragment>
+    );
+
+    if (inline) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, background: "var(--panel)",
+          border: "1px solid var(--line)", borderRadius: 12, overflow: "auto", maxHeight: "calc(100dvh - var(--header-h) - 220px)" }}>
+          {inner}
+        </div>
+      );
+    }
+    return (
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(16,24,40,0.45)", display: "grid", placeItems: "center", padding: 24 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--panel)", borderRadius: 12, width: "90vw", maxWidth: 1280, maxHeight: "90dvh", overflow: "auto", boxShadow: "var(--shadow-pop)" }}>
+          {inner}
         </div>
       </div>
     );
@@ -580,10 +639,34 @@
           <span style={{ marginLeft: "auto" }}><IconButton icon="folder-plus" title="新增分区" onClick={() => UI().formModal({ title: "新增分区（工地）", fields: [{ key: "name", label: "分区名称", placeholder: "如 合和新城", full: true }], onSave: (vals) => { if (!vals.name) { UI().toast("分区名称不能为空", "danger"); return; } setExtraParts((p) => [...p, vals.name]); setPartition(vals.name); UI().toast("已新增分区「" + vals.name + "」", "ok"); } })} /></span>
         </div>
 
-        {/* 文件卡片网格：语义固定 4 列（窄窗切两排=2 列），列宽随容器等比缩放 */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${narrow ? 2 : 4}, 1fr)`, gap: 14 }}>
-          {visible.map((f) => <FileCard key={f.id} f={f} partitions={partNames} onOpen={openFile} onMove={moveFile} onDel={delFile} />)}
-        </div>
+        {/* #201 处理区：宽屏三栏（队列 | 原件 | 字段与材料行），三栏各自局部滚动、不锁死高度；
+            窄屏无法并置三栏，退化为卡片网格单列旅程 + 全屏弹层核对。 */}
+        {narrow ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+            {visible.map((f) => <FileCard key={f.id} f={f} partitions={partNames} onOpen={openFile} onMove={moveFile} onDel={delFile} />)}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "268px minmax(0, 1fr)", gap: 14, alignItems: "start" }}>
+            <QueueList files={visible} activeId={reviewId} onPick={openFile} />
+            {reviewFile ? (
+              <ReviewModal key={reviewFile.id} file={reviewFile} narrow={false} inline
+                onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />
+            ) : (
+              <div style={{ border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)", padding: "48px 24px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: "var(--ink-faint)" }}>
+                <Icon name="scan-text" size={30} color="var(--line-strong)" />
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink-soft)" }}>
+                  {visible.length ? "从左侧队列选择一张送货单" : "当前分区没有待处理文件"}
+                </div>
+                <div style={{ fontSize: 12, lineHeight: 1.8, textAlign: "center", maxWidth: 420 }}>
+                  {visible.length
+                    ? "待识别的单据点选后先跑 OCR，识别完成即在此处载入原件与字段；已识别的直接进入核对。"
+                    : "拖入工地文件夹开始，或切换上方分区标签查看其他工地。"}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <details style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px" }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--brand)" }}>使用说明 / 注意事项</summary>
@@ -598,7 +681,8 @@
 
         {recog && <RecognizeOverlay name={recog.name} pct={recog.pct} />}
         {batch && <BatchOverlay batch={batch} />}
-        {reviewFile && <ReviewModal key={reviewFile.id} file={reviewFile} narrow={narrow} onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />}
+        {/* 弹层只在窄屏使用；宽屏同一组件以 inline 形态嵌在三栏右侧，不重复挂两份 */}
+        {narrow && reviewFile && <ReviewModal key={reviewFile.id} file={reviewFile} narrow onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />}
       </div>
     );
   }
