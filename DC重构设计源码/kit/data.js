@@ -771,9 +771,9 @@
   // 库存盘点 pd01：盘点明细（盈亏聚合示范）
   patch(d.stockChecks, "pd01", {
     lines: [
-      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", bookQty: 2600, realQty: 2588, diffQty: -12, diffAmount: -513.6 },
-      { material: "瓷砖胶", spec: "20kg/包", unit: "包", bookQty: 640, realQty: 640, diffQty: 0, diffAmount: 0 },
-      { material: "阳角线", spec: "2440mm", unit: "根", bookQty: 950, realQty: 962, diffQty: 12, diffAmount: 114 },
+      { material: "全抛釉瓷砖", spec: "800×800", unit: "块", bookQty: 2600, actualQty: 2588, diffQty: -12, diffAmount: -513.6 },
+      { material: "瓷砖胶", spec: "20kg/包", unit: "包", bookQty: 640, actualQty: 640, diffQty: 0, diffAmount: 0 },
+      { material: "阳角线", spec: "2440mm", unit: "根", bookQty: 950, actualQty: 962, diffQty: 12, diffAmount: 114 },
     ],
   });
   // 工人 w1：银行/紧急联系人/技能档案
