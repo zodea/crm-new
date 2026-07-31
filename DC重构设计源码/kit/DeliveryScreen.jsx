@@ -329,7 +329,6 @@
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, background: "var(--panel)", zIndex: 2 }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800 }}>送货单核对 · {file.name}</div>
-              <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>左图右表逐字段核对 · 黄/红为低置信字段，确认或改正后才能核对完成</div>
             </div>
             <span style={{ marginLeft: "auto", flex: "none" }}>{canFinish ? <StatusChip tone="ok">字段全部就绪</StatusChip> : <StatusChip tone={hasDanger ? "danger" : "warn"}>{remaining.length} 个低置信字段待确认</StatusChip>}</span>
             {!inline && <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 22, lineHeight: 1, color: "var(--ink-soft)", flex: "none" }}>×</button>}
@@ -342,7 +341,10 @@
             <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               {/* 头部字段 2×2 */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 8 }}>票面字段（着色=OCR 置信度：绿 ≥90% / 黄 70–90% / 红 &lt;70%）</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
+                  票面字段
+                  <span style={{ fontWeight: 500, fontSize: 11, color: "var(--ink-faint)" }}>置信度 绿 ≥90 · 黄 70–90 · 红 &lt;70</span>
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {HEADS.map(([k, label]) => headField(k, label))}
                 </div>
@@ -350,7 +352,7 @@
 
               {/* 材料明细行表格 */}
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6 }}>材料明细（行级可编辑 · 金额 = 数量 × 单价 自动计算）</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 6 }}>材料明细</div>
                 <div style={{ border: "1px solid var(--line)", borderRadius: 8, overflowX: "auto" }}>
                   <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
                     <thead style={{ background: "var(--surface-2)" }}>
@@ -395,8 +397,10 @@
 
           {/* 底部操作 */}
           <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 12, position: "sticky", bottom: 0, background: "var(--panel)", zIndex: 2 }}>
-            <Icon name="info" size={14} color="var(--brand)" />
-            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{canFinish ? "全部字段就绪，可核对完成；完成后单据标记已核对、归档到收货工地分区，可入库" : "剩余 " + remaining.length + " 个黄/红低置信字段：修改字段值或点「确认」后才能核对完成"}</span>
+            {!canFinish && <Icon name="info" size={14} color="var(--warn)" />}
+            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+              {canFinish ? "核对完成后按「收货工地」归档，可入库" : "剩余 " + remaining.length + " 个低置信字段待确认"}
+            </span>
             <span style={{ marginLeft: "auto", display: "inline-flex", gap: 8, flex: "none" }}>
               <button onClick={onClose} style={{ border: "1px solid var(--line)", background: "var(--surface-2)", color: "var(--ink)", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>取消</button>
               <button onClick={() => {
@@ -593,7 +597,7 @@
           <Icon name="folder-open" size={22} color="var(--brand)" />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, color: "var(--ink)" }}>拖拽工地文件夹到此处</div>
-            <div style={{ fontSize: 12 }}>按工地 → 分供方 → 文件自动整理成树状结构</div>
+            <div style={{ fontSize: 12 }}>按工地 → 分供方自动整理</div>
           </div>
           <Button icon="upload" onClick={() => UI().folderPicker(() => { const part = partNames[0] || "未分区"; addFiles(part); UI().toast("已导入 2 个文件到「" + part + "」，待识别", "ok"); })}>选择文件夹</Button>
         </div>
@@ -659,8 +663,7 @@
               borderRadius: 12, background: "var(--panel)", padding: 12 }}>
               {reviewFile
                 ? <DocSketch name={reviewFile.name} />
-                : <PaneEmpty icon="image" title="未选择单据"
-                    desc="从队列选择一张单据后，在此查看原件；核对时原件与字段并排，不用来回切换。" />}
+                : <PaneEmpty icon="image" title="未选择单据" desc="从队列选择后在此查看原件" />}
             </div>
           )}
 
@@ -670,22 +673,10 @@
                   onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />
               : <PaneEmpty icon="scan-text"
                   title={visible.length ? "从队列选择一张送货单" : "当前分区没有待处理文件"}
-                  desc={visible.length
-                    ? "待识别的单据点选后先跑 OCR，识别完成即载入字段与材料明细；已识别的直接进入核对。"
-                    : "拖入工地文件夹开始，或切换上方分区标签查看其他工地。"} />
+                  desc={visible.length ? "待识别的会先跑 OCR，完成后载入字段与材料明细" : "拖入工地文件夹，或切换上方分区"} />
           )}
         </div>
 
-        <details style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px" }}>
-          <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--brand)" }}>使用说明 / 注意事项</summary>
-          <ul style={{ marginTop: 10, paddingLeft: 18, color: "var(--ink)", lineHeight: 1.8, fontSize: 13 }}>
-            <li><b>识别 → 核对 → 入库</b>：识别完成后打开左图右表核对弹层；黄/红低置信字段确认后才能核对完成，核对完成的单据才可入库。</li>
-            <li><b>识别全部</b>：逐张排队识别，全绿单据自动核对通过，含黄/红字段的停在待核对列表。</li>
-            <li><b>公司名称以红章为准</b>：OCR 预填后请按红章核对，可手动覆盖。</li>
-            <li><b>分区 ＝ 工地</b>：每个工地一个 Excel；用文件卡上的"分区"移动归属，核对完成按收货工地自动归档。</li>
-            <li><b>导出归档</b>：每个分区一个子文件夹，内含按公司命名的 PDF + 汇总 Excel。</li>
-          </ul>
-        </details>
 
         {recog && <RecognizeOverlay name={recog.name} pct={recog.pct} />}
         {batch && <BatchOverlay batch={batch} />}
