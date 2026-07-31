@@ -1,7 +1,22 @@
 // ProjectSupplierScreen — 项目×分供方 工作台（project-supplier.md）
 // 定位：某项目下某分供方的合作关系枢纽。本页只做「聚合展示 + 跳转源模块 + 结算确认」；
 //   合同/请款/收票/付款的新增编辑审批都跳转各自模块，结算是本页唯一写操作（二次确认后锁定只读）。
-// 状态机：collecting → contracted → claiming → paid → settled（settled 为终态、锁定）。
+// 状态：collecting → contracted → claiming → paid → settled（settled 为人工终态、锁定）。
+//
+// #245 方案定夺（原票为 needs-info，ADR 未规定，按下述口径先行定稿）：
+//   状态不是可被驳回「回退」的枚举字段，而是每次从真实单据事实派生：
+//     有结算 → settled（唯一人工终态）；有确认付款 → paid；有在批请款 → claiming；
+//     有生效合同 → contracted；否则 collecting。
+//   因此一轮请款被驳回时只是删掉该轮请款事实，状态自动回落到剩余事实的派生值 ——
+//   历史已有确认付款的合作关系回落到 paid 而不是 contracted，不会把既有履约阶段藏起来。
+//   多轮请款并存时取最靠后的阶段（任一轮在批即 claiming，已有付款即 paid）。
+//
+// #246 方案定夺（同上，先行定稿）：
+//   · 不要求所有请款已付才能结算 —— 在途请款是常态，阻断会让结算做不了；
+//     但未付请款必须在结算页显式列出，并在二次确认里再陈述一次。
+//   · 结算金额可小于已付（形成应退尾差），也可为 0（零结算）；两者都必须填原因。
+//   · 负尾差是警示 + 必填原因，不阻断 —— 多付需退回是真实业务，阻断等于否认这个事实。
+//   · 结算确认书：单份、application/pdf、≤10MB。
 (function () {
   const { Button, IconButton, StatusChip, Panel, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {} };
@@ -36,6 +51,18 @@
     settled: { label: "已结算", tone: "ok", tab: "settle" },
   };
   const FLOW = ["collecting", "contracted", "claiming", "paid", "settled"];
+
+  // #245：状态由真实单据事实派生，不做被动迁移，也就不存在「驳回后回退到哪一档」的选择题。
+  // 驳回 = 该轮请款事实消失 → 重新派生；历史付款仍在，状态就仍是 paid。
+  function deriveStatus(facts) {
+    const f = facts || {};
+    if (f.settlement) return { status: "settled", reason: "已确认结算并锁定" };
+    if ((f.payments || []).length) return { status: "paid", reason: (f.payments || []).length + " 笔确认付款" };
+    const pending = (f.claims || []).filter((c) => c.status !== "已驳回");
+    if (pending.length) return { status: "claiming", reason: pending.length + " 轮请款在批" };
+    if ((f.contracts || []).some((c) => c.status === "已生效")) return { status: "contracted", reason: "已有生效合同" };
+    return { status: "collecting", reason: "尚无生效合同" };
+  }
 
   // —— 每（项目×分供方）mock：一份合理的采购合作数据（供应商名进标签，金额按名 hash 微调）——
   function mockFor(supplierName) {
@@ -129,8 +156,12 @@
     const taxTotal = invoices.reduce((s, c) => s + c.tax, 0);
     const balance = contractTotal - paidTotal;
 
-    const [status, setStatus] = React.useState("paid"); // demo 初始：已付款（可演示结算）
     const [settlement, setSettlement] = React.useState(null); // {finalAmount, date, pdf, note}
+    // #245：状态不落库、不做被动迁移，每次从当前真实事实派生 —— 驳回只是事实消失，状态自然回落
+    const derived = deriveStatus({ settlement, payments, claims, contracts });
+    const status = derived.status;
+    // 未付请款 = 已批请款 − 已确认付款；#246 不因它阻断结算，但必须显式列出
+    const unpaidTotal = Math.max(0, claimedTotal - paidTotal);
     const [note, setNote] = React.useState("首次合作，材料按批到货、按进度请款。");
     const [tab, setTab] = React.useState("overview");
     // 结算表单本地态
@@ -142,16 +173,29 @@
     const jump = (module) => (kind, row) =>
       UI().toast("跳转「" + module + "」模块（带 " + projectName + " + " + supplierName + " 筛选" + (kind === "row" ? "，定位该单据" : "，新建") + "）（演示）");
 
+    // #246：负尾差与零结算都是真实业务，不阻断；但必须填原因，并在二次确认里陈述未付请款。
+    const settleAmtNum = Number(String(settleAmt).replace(/[^\d.\-]/g, "")) || 0;
+    const settleDiff = settleAmtNum - paidTotal;   // < 0 表示已付超出结算额，需退回
+    const needsReason = settleDiff < 0 || settleAmtNum === 0;
+    const reasonMissing = needsReason && !settleNote.trim();
+
     const confirmSettle = () => {
-      const amt = Number(String(settleAmt).replace(/[^\d.\-]/g, "")) || 0;
-      if (amt <= 0) { UI().toast("请填写结算金额", "danger"); return; }
+      if (settleAmtNum < 0) { UI().toast("结算金额不能为负数", "danger"); return; }
       if (!settlePdf) { UI().toast("请先上传结算确认书 PDF", "danger"); return; }
+      if (reasonMissing) {
+        UI().toast(settleAmtNum === 0 ? "零结算必须填写原因" : "结算金额低于已付，必须填写原因", "danger");
+        return;
+      }
+      const lines = ["结算金额 " + yuan(settleAmtNum) + "。"];
+      if (unpaidTotal > 0) lines.push("注意：仍有已批未付请款 " + yuan(unpaidTotal) + "，结算后这部分不会自动作废，需在付款模块另行处理。");
+      if (settleDiff < 0) lines.push("已付超出结算额 " + yuan(-settleDiff) + "，将形成应退尾差。");
+      if (settleAmtNum === 0) lines.push("本次为零结算。");
+      lines.push("确认后本合作关系状态置为「已结算」并锁定为只读，不可再改。");
       UI().confirm({
         title: "确认结算并锁定？", danger: true, confirmText: "确认结算",
-        message: "结算金额 " + yuan(amt) + "。确认后本合作关系状态置为「已结算」并锁定为只读，不可再改。",
+        message: lines.join(""),
         onConfirm: () => {
-          setSettlement({ finalAmount: amt, date: "2026-07-09", pdf: "结算确认书.pdf", note: settleNote });
-          setStatus("settled");
+          setSettlement({ finalAmount: settleAmtNum, date: "2026-07-09", pdf: "结算确认书.pdf", note: settleNote });
           setTab("settle");
           UI().toast("已结算并锁定", "ok");
         },
@@ -186,6 +230,11 @@
                 {locked && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: "var(--ink-faint)" }}><Icon name="lock" size={12} />已锁定只读</span>}
               </div>
               <div style={{ marginTop: 10 }}><StatusStepper status={status} /></div>
+              {/* #245：显式说明当前状态是从哪些事实派生的，避免被误当成可被驳回回退的枚举字段 */}
+              <div style={{ marginTop: 7, fontSize: 11, color: "var(--ink-faint)", lineHeight: 1.7 }}>
+                当前状态由真实单据事实派生：<b style={{ color: "var(--ink-soft)" }}>{derived.reason}</b>。
+                请款被驳回只删除该轮请款事实并重新派生 —— 已有确认付款时仍停在「已付款」，不会退回「已签合同」。
+              </div>
             </div>
             <Button icon="pencil" onClick={() => UI().formModal({ title: "编辑合作备注", fields: [{ key: "note", label: "备注", type: "textarea", value: note, full: true }], onSave: (v) => { setNote(v.note || ""); UI().toast("已保存", "ok"); } })} disabled={locked}>备注</Button>
           </div>
@@ -308,13 +357,36 @@
                         <div style={{ fontSize: 12.5, color: "var(--ink-soft)", background: "var(--warn-soft)", border: "1px solid var(--warn)", borderRadius: 8, padding: "9px 12px" }}>
                           结算是本页唯一写操作。填写结算金额、上传结算确认书后确认，状态置为「已结算」并锁定只读。当前已付 {yuan(paidTotal)}。
                         </div>
-                        <label style={{ fontSize: 13, fontWeight: 600 }}>结算金额（可与合同额不同）
+
+                        {/* #246：未付请款不阻断结算，但必须显式列出 */}
+                        {unpaidTotal > 0 && (
+                          <div style={{ fontSize: 12.5, border: "1px solid var(--line-strong)", background: "var(--surface-2)", borderRadius: 8, padding: "9px 12px", lineHeight: 1.75 }}>
+                            <b style={{ color: "var(--ink)" }}>仍有已批未付请款 {yuan(unpaidTotal)}</b>
+                            <span style={{ color: "var(--ink-soft)" }}>（已批 {yuan(claimedTotal)} − 已付 {yuan(paidTotal)}）。</span>
+                            <br /><span style={{ color: "var(--ink-soft)" }}>不阻断结算 —— 在途请款是常态；但结算后这部分不会自动作废，需到付款模块另行处理。</span>
+                          </div>
+                        )}
+
+                        <label style={{ fontSize: 13, fontWeight: 600 }}>结算金额（可与合同额不同，允许为 0）
                           <input value={settleAmt} onChange={(e) => setSettleAmt(e.target.value)} style={{ display: "block", marginTop: 6, width: "100%", boxSizing: "border-box", border: "1px solid var(--line-strong)", borderRadius: 8, padding: "9px 11px", fontSize: 14, fontFamily: "var(--font-mono)", outline: "none" }} />
                         </label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Button size="sm" icon={settlePdf ? "check" : "upload"} variant={settlePdf ? "secondary" : "primary"} onClick={() => { setSettlePdf(true); UI().toast("已上传结算确认书（演示）", "ok"); }}>{settlePdf ? "结算确认书.pdf 已上传" : "上传结算确认书 PDF"}</Button>
+                        {/* #246：尾差实时呈现。负尾差＝已付超出结算额，警示但不阻断 */}
+                        <div style={{ fontSize: 12.5, borderRadius: 8, padding: "9px 12px", lineHeight: 1.75,
+                          border: "1px solid " + (settleDiff < 0 ? "var(--warn)" : "var(--line-strong)"),
+                          background: settleDiff < 0 ? "var(--warn-soft)" : "var(--surface-2)" }}>
+                          尾差（结算 − 已付）：
+                          <b style={{ fontFamily: "var(--font-mono)", color: settleDiff < 0 ? "var(--warn-ink)" : "var(--ink)" }}>{yuan(settleDiff)}</b>
+                          {settleDiff < 0 && <span style={{ color: "var(--warn-ink)" }}> · 已付超出结算额，将形成应退尾差，需填写原因后方可结算（不阻断）</span>}
+                          {settleDiff > 0 && <span style={{ color: "var(--ink-soft)" }}> · 尚有应付尾款，结算后转由付款模块处理</span>}
+                          {settleAmtNum === 0 && <span style={{ color: "var(--warn-ink)" }}> · 零结算必须填写原因</span>}
                         </div>
-                        <label style={{ fontSize: 13, fontWeight: 600 }}>结算备注
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                          <Button size="sm" icon={settlePdf ? "check" : "upload"} variant={settlePdf ? "secondary" : "primary"} onClick={() => { setSettlePdf(true); UI().toast("已上传结算确认书（演示）", "ok"); }}>{settlePdf ? "结算确认书.pdf 已上传" : "上传结算确认书 PDF"}</Button>
+                          <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>单份 · application/pdf · ≤10MB</span>
+                        </div>
+                        <label style={{ fontSize: 13, fontWeight: 600 }}>
+                          结算备注{needsReason && <b style={{ color: "var(--danger)" }}> · 必填原因</b>}
                           <textarea value={settleNote} onChange={(e) => setSettleNote(e.target.value)} rows={2} style={{ display: "block", marginTop: 6, width: "100%", boxSizing: "border-box", border: "1px solid var(--line-strong)", borderRadius: 8, padding: "9px 11px", fontSize: 13, outline: "none", resize: "vertical" }} />
                         </label>
                         <div><Button variant="primary" icon="badge-check" onClick={confirmSettle}>确认结算</Button></div>
