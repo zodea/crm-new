@@ -8,8 +8,10 @@
 //   window.EntityFormScreen                           分发器：按 route 查注册表渲染 KitFormPage
 // spec 契约（specFn(params) 返回）：
 //   { coll, entity, listRoute, title, statusKey?, row,           row=编辑目标行（null=新建）
-//     fields:[KitUI.buildFormBody 字段契约], coerce(vals)->patch, newDefaults()->obj, cols? }
-// 行为要点：草稿=跳过必填校验+statusKey 写「草稿」；保存并提交=statusKey 写「审批中」；
+//     fields:[KitUI.buildFormBody 字段契约], coerce(vals)->patch, newDefaults()->obj, cols?,
+//     submitLabel?, submitStatus? }   提交按钮文案与提交后状态（对齐实现端 postLabel：如
+//       材料到货 submitLabel:"保存并入库" submitStatus:"已过账"；缺省 = "保存并提交" / "审批中"）
+// 行为要点：草稿=跳过必填校验+statusKey 写「草稿」；保存并提交=statusKey 写 submitStatus（默认「审批中」）；
 //   保存并新建=落库后原地重开空表单；页签切走自动缓存填写值（含明细行）、切回恢复（决议 8d 硬性要求）。
 (function () {
   if (window.KitFormPage) { window.KitFormPagePreload = window.KitFormPagePreload || function () { return null; }; return; }
@@ -160,7 +162,7 @@
       const patch = spec.coerce(fb.getVals());
       if (spec.statusKey) {
         if (action === "draft") patch[spec.statusKey] = "草稿";
-        else if (action === "saveSubmit") patch[spec.statusKey] = "审批中";
+        else if (action === "saveSubmit") patch[spec.statusKey] = spec.submitStatus || "审批中";
         else if (isDraftRow && !patch[spec.statusKey]) patch[spec.statusKey] = "草稿";   // 草稿续存但未提交：维持草稿态
       }
       let savedId = spec.row ? spec.row.id : null;
@@ -174,7 +176,9 @@
       delete window.KIT_FORM_CACHE[cacheKey];
       doneRef.current = true;
       UI.toast(action === "draft" ? "已保存草稿（列表「草稿」视图可续填提交）"
-        : action === "saveSubmit" ? "已保存并提交审批「" + spec.title + "」"
+        : action === "saveSubmit" ? (spec.submitLabel
+          ? spec.submitLabel.replace("保存并", "") + "成功「" + spec.title + "」"
+          : "已保存并提交审批「" + spec.title + "」")
         : action === "saveNew" ? "已保存「" + spec.title + "」，已为你新开一张"
         : (spec.row ? "已保存修改" : "已新建 1 条「" + spec.title + "」"), "ok");
       if (action === "saveNew") { setEditId(null); setInstanceKey((k) => k + 1); return; }
@@ -235,7 +239,7 @@
             <button type="button" style={btnStyle()} onClick={doCancel}>取消</button>
             <button type="button" disabled={!dirty} style={btnStyle(dirty ? "" : "disabled")} onClick={() => doSave("draft")}>保存草稿</button>
             <button type="button" style={btnStyle()} onClick={() => doSave("saveNew")}>保存并新建</button>
-            <button type="button" style={btnStyle()} onClick={() => doSave("saveSubmit")}>保存并提交</button>
+            <button type="button" style={btnStyle()} onClick={() => doSave("saveSubmit")}>{spec.submitLabel || "保存并提交"}</button>
             <button type="button" style={btnStyle("primary")} onClick={() => doSave("save")}>保存</button>
           </div>
         </div>
