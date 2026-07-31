@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// 工作台工具栏。子模式切换（字段校对 / 打印排版）内联在这一条里，不再独占一行——
+// 版式按设计稿 InvoiceScreen 收拢，语义仍是 reka Tabs（SegTab pill 变体）。
+import { CONFIDENCE_THRESHOLDS } from '~/lib/invoice/recognize'
+
 defineProps<{
   total: number
   pendingCount: number
@@ -12,23 +16,36 @@ const emit = defineEmits<{
   recognize: []
   pass: []
 }>()
+
+const mode = defineModel<string>('mode', { required: true })
+
+const modeTabs = [
+  { key: 'review', label: '字段校对', icon: 'i-lucide-list-checks' },
+  { key: 'print', label: '打印排版', icon: 'i-lucide-printer' },
+]
+
+// 图例文案从阈值常量派生：写死的百分比会跟常量漂移（原先图例写 80，常量已是 85）
+const okPct = Math.round(CONFIDENCE_THRESHOLDS.ok * 100)
+const warnPct = Math.round(CONFIDENCE_THRESHOLDS.warn * 100)
+const legend = [
+  { dot: 'bg-ok', text: `≥${okPct} 可信` },
+  { dot: 'bg-warn', text: `${warnPct}–${okPct} 待确认` },
+  { dot: 'bg-danger', text: `<${warnPct} 低置信` },
+]
 </script>
 
 <template>
-  <section class="panel mb-3.5 flex flex-wrap items-center gap-3 p-3.5">
-    <div class="mr-1 flex flex-none items-baseline gap-2">
-      <h2 class="text-14px font-800 text-ink">
-        发票识别
-      </h2>
-      <span class="text-12px text-ink-soft">
-        识别队列 <b class="font-mono text-ink">{{ total }}</b> 张
-      </span>
-    </div>
+  <section class="panel mb-3 flex flex-wrap items-center gap-3 p-3.5">
+    <SegTab v-model="mode" :tabs="modeTabs" variant="pill" class="flex-none" />
+
+    <span class="text-12px text-ink-soft">
+      识别队列 <b class="font-mono text-ink">{{ total }}</b> 张
+    </span>
 
     <div class="hidden items-center gap-3 text-11px text-ink-soft xl:flex">
-      <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-ok" />≥95 可信</span>
-      <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-warn" />80–95 待确认</span>
-      <span class="inline-flex items-center gap-1"><i class="h-2 w-2 rounded-full bg-danger" />&lt;80 低置信</span>
+      <span v-for="item in legend" :key="item.text" class="inline-flex items-center gap-1">
+        <i class="h-2 w-2 rounded-full" :class="item.dot" />{{ item.text }}
+      </span>
     </div>
 
     <div class="ml-auto flex flex-wrap items-center gap-2">

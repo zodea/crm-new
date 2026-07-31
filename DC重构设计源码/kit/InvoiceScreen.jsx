@@ -1,5 +1,6 @@
 // InvoiceScreen — 发票识别工作台（按实现端 app/components/invoice/InvoiceWorkspaceScreen.vue 校准）
-// 单一校对工作台 + 全页拖拽上传 + 两个子模式：字段校对 / 打印排版。
+// 单一校对工作台 + 全页拖拽上传 + 两个子模式：字段校对 / 打印排版
+// （子模式切换内联在工具栏那一条里，不独占一行；实现端同步走 SegTab 的 pill 变体）。
 // 三栏 = 队列 | 原件（排版模式下换成 A4 排版） | 校对，与实现端 AdaptiveWorkbench 同构：
 // 宽屏 minmax(12rem,18rem) minmax(18rem,.95fr) minmax(20rem,1.05fr) 并置、高度 clamp(24rem,72dvh,52rem)；
 // 窄屏切分段 Tab 一次一栏（三个面板都保留，不整页替换）。
@@ -105,15 +106,22 @@
         style={{ display: "flex", flexDirection: "column", gap: 12, position: "relative" }}>
         <style>{"@keyframes invSpin{to{transform:rotate(360deg)}}"}</style>
 
-        {/* 顶部操作栏 */}
+        {/* 顶部操作栏：子模式切换内联在这一条里，不独占一行 */}
         <Panel padding={14} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flex: "none" }}>
-            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>发票识别</h2>
-            <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>识别队列 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{workspace.length}</b> 张</span>
+          <div style={{ display: "inline-flex", flex: "none", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", overflow: "hidden", background: "var(--panel)" }}>
+            {[["review", "字段校对", "list-checks"], ["print", "打印排版", "printer"]].map(([k, lbl, ic]) => (
+              <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 32, border: 0, padding: "0 12px", fontSize: 13, cursor: "pointer",
+                  fontWeight: mode === k ? 800 : 600, background: mode === k ? "var(--brand-soft)" : "var(--panel)", color: mode === k ? "var(--brand-deep)" : "var(--ink-soft)" }}>
+                <Icon name={ic} size={14} />{lbl}
+              </button>
+            ))}
           </div>
+          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>识别队列 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{workspace.length}</b> 张</span>
           {!narrow && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 12, fontSize: 11, color: "var(--ink-soft)" }}>
-              {[["ok", "≥95 可信"], ["warn", "85–95 待确认"], ["danger", "<85 低置信"]].map(([tone, txt]) => (
+              {/* 图例百分比与 CONF_THRESHOLD 同源，不写死——写死会跟阈值漂移 */}
+              {[["ok", "≥" + INV.CONF_THRESHOLD.ok + " 可信"], ["warn", INV.CONF_THRESHOLD.warn + "–" + INV.CONF_THRESHOLD.ok + " 待确认"], ["danger", "<" + INV.CONF_THRESHOLD.warn + " 低置信"]].map(([tone, txt]) => (
                 <span key={tone} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: DOT[tone], flex: "none" }} />{txt}
                 </span>
@@ -147,11 +155,6 @@
               批量通过{greens.length ? " " + greens.length : ""}
             </Button>
           </div>
-        </Panel>
-
-        {/* 子模式：字段校对 / 打印排版 */}
-        <Panel padding={0} style={{ padding: "0 12px", overflow: "hidden" }}>
-          {KA().SegTab && KA().SegTab({ active: mode, onChange: setMode, tabs: [{ key: "review", label: "字段校对" }, { key: "print", label: "打印排版" }] })}
         </Panel>
 
         {/* 窄屏分段：三个面板都保留，一次显示一栏 */}
