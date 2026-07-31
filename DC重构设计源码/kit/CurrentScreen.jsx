@@ -1,68 +1,48 @@
-// CurrentScreen — 往来收付列表（资金域批B）：非合同类往来收/付并页，业务态视图=收款/付款/全部（默认收款）。
-// 口径：direction 决定收付泳道（收→ok 绿 / 付→danger 红）；projectId 可为 null=公司层面往来，项目列显"—"；净额=Σ收−Σ付可为负。
-// params.project 由项目详情金额穿透带入 → projectId 预筛（可一键摘除，进入时 ELS 自动切「全部」视图）。
+// CurrentScreen — 往来收付（按实现端 app/components/finance/FinanceListScreen.vue kind=current 校准）
+// 标准单表列表：# / 名称对象(link) / 编号 / 项目 / 关联方类型 / 金额 / 日期 / 状态 / 操作(编辑)；底部金额合计。
+// 口径（stores/finance.ts loadList current）：名称=往来单位 counterparty；关联方=收付方向
+// （SQL CASE direction 收→「收款」/ 其余→「付款」）；演示数据 currents 无 status 字段，状态兜底「草稿」。
 (function () {
   if (window.CurrentScreen) return;
 
   function CurrentScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
-    const { StatusChip } = window.DesignSystem_e3d871 || {};
-    const projects = A.rows("projects");
-    const dirTone = { "收": "ok", "付": "danger" };
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const meta = {
-      entity: "current",
-      title: "往来收付",
-      coll: "currents",
-      formRoute: "currentForm",   // 整页表单（grill 决议 2026-07-18）
-      columns: [
-        { key: "no", label: "单据编号", width: 150, mono: true },
-        { key: "direction", label: "方向", width: 72,
-          render: (v) => (StatusChip ? <StatusChip tone={dirTone[v] || "neutral"}>{v}</StatusChip> : v),
-          form: { type: "select", options: ["收", "付"] } },
-        { key: "projectId", label: "项目", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
-          form: { type: "select", options: projects.map((p) => p.name),
-            toLabel: (id) => { const p = A.get("projects", id); return p ? p.name : id; },
-            toValue: (name) => { const p = projects.find((x) => x.name === name); return p ? p.id : name; } } },
-        { key: "counterparty", label: "对方单位", width: 220 },
-        { key: "amount", label: "金额", width: 130, money: true, align: "right" },
-        { key: "method", label: "方式", width: 110, form: { type: "select", options: ["银行转账", "内部转账", "现金"] } },
-        { key: "date", label: "日期", width: 110, mono: true, form: { type: "date" } },
-        { key: "note", label: "备注", width: 180 },
-      ],
-      views: [
-        { key: "in", label: "收款", filter: (r) => r.direction === "收" },
-        { key: "out", label: "付款", filter: (r) => r.direction === "付" },
-        { key: "all", label: "全部" },
-      ],
-      defaultView: "in",
-      filters: [
-        { key: "proj", label: "项目",
-          options: [{ key: "all", label: "全部项目" }, ...projects.map((p) => ({ key: p.id, label: p.name }))],
-          match: (r, val) => r.projectId === val },
-      ],
-      searchKeys: ["no", "counterparty", "note"],
-      summary: (rows) => {
-        const sum = (dir) => Math.round(rows.reduce((s, r) => s + (r.direction === dir ? (r.amount || 0) : 0), 0) * 100) / 100;
-        const inSum = sum("收"), outSum = sum("付");
-        return [
-          { label: "往来收款总和", value: inSum },
-          { label: "往来付款总和", value: outSum },
-          { label: "净额(收-付)", value: Math.round((inSum - outSum) * 100) / 100 },
-        ];
-      },
-      fromParams: (p) => {
-        if (!p.project) return null;
-        const proj = A.get("projects", p.project);
-        return { label: "项目：" + ((proj && proj.name) || p.project), filter: (r) => r.projectId === p.project };
-      },
-      newDefaults: () => ({ direction: "收", method: "银行转账" }),
-      tableMinWidth: 1320,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    const rows = A.rows("currents").map((r) => ({
+      id: r.id,
+      name: r.counterparty || "",                                           // 名称=往来单位
+      no: r.no || "",
+      projectName: projName(r.projectId),                                   // SQL COALESCE(project.name, '')（公司层面往来=空）
+      partyName: r.direction === "收" ? "收款" : "付款",                    // 关联方=收付方向
+      amount: Number(r.amount) || 0,
+      date: r.date || "",
+      status: r.status || "草稿",
+    }));
+
+    return (
+      <Std
+        title="往来收付" subtitle="非合同往来 · 收付方向统一台账"
+        searchPlaceholder="搜索名称、编号、项目或关联方" searchKeys={["no", "name", "projectName", "partyName", "status"]}
+        createLabel="新建往来收付" onCreate={() => nav && nav("currentForm", {})}
+        onRowOpen={(r) => nav && nav("currentForm", { id: r.id })}
+        columns={[
+          { key: "name", label: "名称/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 160 },
+          { key: "partyName", label: "关联方/类型", minWidth: 180 },
+          { key: "amount", label: "金额", width: 140, align: "right", money: true },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={rows} tableMinWidth={1200}
+        footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
+      />
+    );
   }
 
   window.CurrentScreen = CurrentScreen;
