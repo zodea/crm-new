@@ -588,7 +588,10 @@ async function saveOwnerReport(
       UPDATE monthly_statements
       SET project_id = ?, contract_id = ?, month = ?, no = ?, period_no = ?,
           application_date = ?, status = ?, total_amount = ?, reported_amount = ?,
-          audited_amount = NULL, note = ?, updated_at = datetime('now')
+          audited_amount = NULL, note = ?,
+          operator_name = CASE WHEN ? = 'submit' THEN ? ELSE operator_name END,
+          submitted_at = CASE WHEN ? = 'submit' THEN datetime('now') ELSE submitted_at END,
+          updated_at = datetime('now')
       WHERE id = ?
     `, [
       projectId,
@@ -601,6 +604,9 @@ async function saveOwnerReport(
       reportedAmount,
       reportedAmount,
       text(draft.note),
+      action,
+      text(draft.operatorName),
+      action,
       id,
     ]))
     const existingLines = await tx.select<{ id: string }>(
@@ -1189,6 +1195,7 @@ async function loadOwnerReport(id: string): Promise<Record<string, unknown> | nu
     contractId: head.contract_id,
     periodNo: head.period_no || head.month,
     applicationDate: head.application_date,
+    operatorName: head.operator_name ?? '',
     status: head.status === 'exported' ? 'audited' : head.status === 'adjusted' ? 'reported' : 'draft',
     reportedAmount,
     auditedAmount,

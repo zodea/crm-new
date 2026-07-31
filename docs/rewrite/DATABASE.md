@@ -243,7 +243,8 @@ boq_change_lines(
 monthly_statements(
   id, project_id -> projects.id, contract_id -> contracts.id, month,
   status ['draft'|'adjusted'|'exported'], total_amount,
-  quantity_basis ['contract'|'provisional'|'field'], note,
+  quantity_basis ['contract'|'provisional'|'field'],
+  source_version, source_updated_at, operator_name, submitted_at, note,
   created_at, updated_at, deleted_at
 )
 -- (contract_id, month) 对活跃报量单唯一。
@@ -254,6 +255,10 @@ monthly_statements(
 -- draft 期可经换基准重算改写 quantity_basis 与全部行（旧行软删、手调量随之失效）；
 -- 一旦进入 adjusted/exported 即冻结，改口径必须走重新申报，不静默改写历史金额。
 -- 甲方报量单（owner_report）与本表是同一条记录，自动完成量必须读同一个 quantity_basis。
+-- v40 `source_version` / `source_updated_at` 在生成与换基准重算时写入：版本指纹覆盖基准、量与单价，
+-- 用于证明一张已申报报量单依据的是哪一版事实，不必事后回比源表。
+-- `operator_name` / `submitted_at` 只在申报（action=submit）时冻结；草稿期保持空，
+-- 不拿生成时间或 application_date（用户手填的申报日期）冒充系统提交证据。
 
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,

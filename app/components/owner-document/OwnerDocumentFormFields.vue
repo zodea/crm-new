@@ -79,6 +79,7 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
     { key: 'contractId', label: '施工合同', type: 'lookup', required: true },
     { key: 'periodNo', label: '报量期次', type: 'month', required: true },
     { key: 'applicationDate', label: '申报日期', type: 'date', required: true },
+    { key: 'operatorName', label: '报量经办人', placeholder: '用于申报快照审计' },
     { key: 'reportedAmount', label: '申报金额', type: 'readonly' },
     { key: 'auditedAmount', label: '审定金额', type: 'readonly' },
     { key: 'auditDifference', label: '审定差额', type: 'readonly' },

@@ -70,7 +70,11 @@ describe('boq monthly statements', () => {
       'con_demo_sg01',
       '2026-04',
       'contract',
-    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 40, missing_count: 0 }])
+    )).toEqual([expect.objectContaining({
+      boq_line_id: 'boq_line_demo_a_pipe',
+      auto_qty: 40,
+      missing_count: 0,
+    })])
 
     expect(await loadMonthlyQuantities(
       db,
@@ -78,7 +82,11 @@ describe('boq monthly statements', () => {
       'con_demo_sg01',
       '2026-04',
       'provisional',
-    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 44, missing_count: 0 }])
+    )).toEqual([expect.objectContaining({
+      boq_line_id: 'boq_line_demo_a_pipe',
+      auto_qty: 44,
+      missing_count: 0,
+    })])
 
     expect(await loadMonthlyQuantities(
       db,
@@ -86,7 +94,11 @@ describe('boq monthly statements', () => {
       'con_demo_sg01',
       '2026-04',
       'field',
-    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 42, missing_count: 0 }])
+    )).toEqual([expect.objectContaining({
+      boq_line_id: 'boq_line_demo_a_pipe',
+      auto_qty: 42,
+      missing_count: 0,
+    })])
   })
 
   it('所选基准缺量时显式暴露，不回退到其他口径也不按 0 计入', async () => {
@@ -101,7 +113,11 @@ describe('boq monthly statements', () => {
       'con_demo_sg01',
       '2026-04',
       'field',
-    )).toEqual([{ boq_line_id: 'boq_line_demo_a_pipe', auto_qty: 0, missing_count: 1 }])
+    )).toEqual([expect.objectContaining({
+      boq_line_id: 'boq_line_demo_a_pipe',
+      auto_qty: 0,
+      missing_count: 1,
+    })])
 
     await expect(generateMonthlyStatement(
       db,
@@ -179,6 +195,34 @@ describe('boq monthly statements', () => {
     // 阻断后原草稿保持原基准与金额，不被改坏。
     const kept = await loadMonthlyStatement(db, generated.statementId)
     expect(kept).toMatchObject({ quantityBasis: 'provisional', totalAmount: 1584 })
+  })
+
+  it('生成时保存来源版本与时间，源数据变化后重算版本随之改变', async () => {
+    const generated = await generateMonthlyStatement(
+      db,
+      'proj_demo_001',
+      'con_demo_sg01',
+      '2026-04',
+      'field',
+    )
+    const first = await loadMonthlyStatement(db, generated.statementId)
+    expect(first?.sourceVersion).toMatch(/^boq-qty-/)
+    expect(first?.sourceUpdatedAt).toBeTruthy()
+    // 尚未申报，提交时间与操作者留空，不能拿生成时间冒充申报证据。
+    expect(first?.submittedAt).toBeNull()
+    expect(first?.operatorName).toBe('')
+
+    // 源数据版本要覆盖三量与完成事实两侧，因此这里同时推进两个 updated_at。
+    await db.execute(
+      `UPDATE house_type_template_items
+       SET field_qty = 50, updated_at = '2027-05-01 10:00:00'
+       WHERE id = 'qty_hti_a_pipe'`,
+    )
+    await regenerateMonthlyStatement(db, generated.statementId, 'field')
+    const second = await loadMonthlyStatement(db, generated.statementId)
+    expect(second?.sourceVersion).not.toBe(first?.sourceVersion)
+    expect(second?.sourceUpdatedAt).toBe('2027-05-01 10:00:00')
+    expect(second?.totalAmount).toBe(1800)
   })
 
   it('records manual adjustment trace without advancing the owner report lifecycle', async () => {

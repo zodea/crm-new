@@ -181,6 +181,18 @@ async function adjust(line: MonthlyStatementLineView) {
             {{ BOQ_MONTHLY_STATUS_LABEL[statement.status] }} · 共 {{ statement.lines.length }} 个分项
             · 取数基准 {{ statement.quantityBasisLabel }}
           </p>
+          <p v-if="statement.sourceVersion" class="mt-0.5 text-10px text-ink-faint">
+            来源版本 {{ statement.sourceVersion }}
+            <template v-if="statement.sourceUpdatedAt">
+              · 数据更新于 {{ statement.sourceUpdatedAt }}
+            </template>
+            <template v-if="statement.submittedAt">
+              · 申报于 {{ statement.submittedAt }}
+            </template>
+            <template v-if="statement.operatorName">
+              · 经办 {{ statement.operatorName }}
+            </template>
+          </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <button

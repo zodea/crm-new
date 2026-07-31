@@ -696,6 +696,10 @@ CREATE TABLE IF NOT EXISTS monthly_statements (
   total_amount REAL NOT NULL DEFAULT 0,
   quantity_basis TEXT NOT NULL DEFAULT 'field'
                CHECK (quantity_basis IN ('contract', 'provisional', 'field')),
+  source_version    TEXT NOT NULL DEFAULT '',
+  source_updated_at TEXT DEFAULT NULL,
+  operator_name     TEXT NOT NULL DEFAULT '',
+  submitted_at      TEXT DEFAULT NULL,
   note         TEXT NOT NULL DEFAULT '',
   created_at   TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
@@ -5540,6 +5544,18 @@ export const migrations: Migration[] = [
         `TEXT NOT NULL DEFAULT 'field'
          CHECK (quantity_basis IN ('contract', 'provisional', 'field'))`,
       )
+    },
+  },
+  {
+    version: 40,
+    name: 'monthly-statement-source-audit',
+    async up(db) {
+      // 存量报量单没有留下取数时的事实版本与申报人，无法证明用的是哪一版工程量。
+      // 补审计列后由新的生成/重算/申报路径写入；旧单据留空，不追认伪造的审计值。
+      await addColumnIfMissing(db, 'monthly_statements', 'source_version', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'monthly_statements', 'source_updated_at', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'monthly_statements', 'operator_name', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'monthly_statements', 'submitted_at', 'TEXT DEFAULT NULL')
     },
   },
 ]

@@ -249,6 +249,46 @@ describe('f5 甲方/分包单据领域事务', () => {
     ).rejects.toThrow('已生效纯金额签证不可直接删除')
   })
 
+  it('申报时冻结经办人与提交时间，存草稿不写审计值', async () => {
+    const store = useOwnerDocumentStore()
+    const draft = {
+      no: 'BL-OWNER-AUDIT',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      periodNo: '2026-07',
+      applicationDate: '2026-07-25',
+      operatorName: '张工',
+      lines: [{
+        boqLineId: 'boq-line-owner',
+        itemName: '墙砖铺贴',
+        unit: '㎡',
+        reportedQty: 3,
+        unitPrice: 20,
+      }],
+    }
+    const saved = await store.saveForm('owner_report', draft, 'draft')
+    const afterDraft = await mem.select<{
+      operator_name: string
+      submitted_at: string | null
+    }>(
+      `SELECT operator_name, submitted_at FROM monthly_statements WHERE id = ?`,
+      [saved.id],
+    )
+    // 草稿期不落审计值：还没申报，不能留下"已申报"的痕迹。
+    expect(afterDraft[0]).toMatchObject({ operator_name: '', submitted_at: null })
+
+    await store.saveForm('owner_report', { ...draft, id: saved.id }, 'submit')
+    const afterSubmit = await mem.select<{
+      operator_name: string
+      submitted_at: string | null
+    }>(
+      `SELECT operator_name, submitted_at FROM monthly_statements WHERE id = ?`,
+      [saved.id],
+    )
+    expect(afterSubmit[0]?.operator_name).toBe('张工')
+    expect(afterSubmit[0]?.submitted_at).toBeTruthy()
+  })
+
   it('甲方报量单与月度报量是同一条单据，自动完成量读同一个已冻结基准', async () => {
     await mem.execute(
       `UPDATE house_type_template_items
@@ -300,7 +340,11 @@ describe('f5 甲方/分包单据领域事务', () => {
       'project-owner',
       'contract-owner',
       '2026-07',
-    )).toEqual([{ boq_line_id: 'boq-line-owner', auto_qty: 3, missing_count: 0 }])
+    )).toEqual([expect.objectContaining({
+      boq_line_id: 'boq-line-owner',
+      auto_qty: 3,
+      missing_count: 0,
+    })])
     const saved = await store.saveForm('owner_report', {
       no: 'BL-OWNER-001',
       projectId: 'project-owner',
