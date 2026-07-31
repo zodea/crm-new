@@ -5,6 +5,19 @@
 (function () {
   const { Button, Panel, StatusChip, Icon, IconButton } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), modal: () => {}, formModal: () => {}, exportModal: () => {}, undoToast: () => {}, folderPicker: (cb) => cb && cb("D:\\瑞航资料\\送货单") };
+  const KA = () => window.KitAtoms || {};
+
+  // 三栏各自的空态：窄屏分段时同样要能说清「这一栏为什么是空的」
+  function PaneEmpty({ icon, title, desc }) {
+    return (
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 8, padding: "40px 20px", color: "var(--ink-faint)" }}>
+        <Icon name={icon} size={28} color="var(--line-strong)" />
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink-soft)", textAlign: "center" }}>{title}</div>
+        <div style={{ fontSize: 12, lineHeight: 1.8, textAlign: "center", maxWidth: 380 }}>{desc}</div>
+      </div>
+    );
+  }
 
   // 识别中转圈动画 keyframes（一次性注入）
   if (!document.getElementById("dlv-spin-style")) {
@@ -14,11 +27,12 @@
     document.head.appendChild(st);
   }
 
-  // 最小宽度两排：窗口 <1360（内容区约 <1100）时卡片网格列数减半，等比缩放、不用 auto-fit 自动换行
+  // 三栏并置的下限。实现端 AdaptiveWorkbench 用容器查询在 960px 容器宽切分段；
+  // 设计稿没有容器查询基础设施，按侧栏约 240px 折算为视口 1200px，取同一条界线。
   const useNarrow = () => {
-    const [narrow, setNarrow] = React.useState(window.innerWidth < 1360);
+    const [narrow, setNarrow] = React.useState(window.innerWidth < 1200);
     React.useEffect(() => {
-      const onR = () => setNarrow(window.innerWidth < 1360);
+      const onR = () => setNarrow(window.innerWidth < 1200);
       window.addEventListener("resize", onR);
       return () => window.removeEventListener("resize", onR);
     }, []);
@@ -136,7 +150,7 @@
 
   // #201 左栏：处理队列。宽屏常驻，点选即在右两栏载入原件与字段；窄屏不渲染（退化为卡片网格）。
   // 队列只承载「选哪一张」，不重复卡片网格的移动/删除动作，避免同一操作两处入口。
-  function QueueList({ files, activeId, onPick }) {
+  function QueueList({ files, activeId, onPick, onDel }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0, border: "1px solid var(--line)",
         borderRadius: 12, background: "var(--panel)", overflow: "hidden", alignSelf: "start" }}>
@@ -155,21 +169,26 @@
           {files.map((f) => {
             const on = f.id === activeId;
             return (
-              <button key={f.id} type="button" onClick={() => onPick(f)}
-                style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid var(--line)",
-                  borderLeft: "3px solid " + (on ? "var(--brand)" : "transparent"), cursor: "pointer",
-                  background: on ? "var(--brand-soft)" : "transparent", padding: "9px 12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: on ? 800 : 600, overflow: "hidden",
-                    textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.name}>{f.name}</span>
-                  {f.conflict && <span title="公司名与红章冲突" style={{ color: "var(--danger)", fontWeight: 800, flex: "none" }}>!</span>}
-                </div>
-                <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                  {ocrChip(f)}
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 10.5, color: "var(--ink-faint)", overflow: "hidden",
-                    textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.company}>{f.company}</span>
-                </div>
-              </button>
+              <div key={f.id} style={{ display: "flex", alignItems: "stretch", borderBottom: "1px solid var(--line)",
+                borderLeft: "3px solid " + (on ? "var(--brand)" : "transparent"),
+                background: on ? "var(--brand-soft)" : "transparent" }}>
+                <button type="button" onClick={() => onPick(f)}
+                  style={{ flex: 1, minWidth: 0, textAlign: "left", border: 0, background: "transparent", cursor: "pointer", padding: "9px 4px 9px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: on ? 800 : 600, overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.name}>{f.name}</span>
+                    {f.conflict && <span title="公司名与红章冲突" style={{ color: "var(--danger)", fontWeight: 800, flex: "none" }}>!</span>}
+                  </div>
+                  <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                    {ocrChip(f)}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 10.5, color: "var(--ink-faint)", overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.company}>{f.company}</span>
+                  </div>
+                </button>
+                <span style={{ flex: "none", display: "grid", placeItems: "center", paddingRight: 6 }}>
+                  <IconButton icon="trash-2" tone="danger" title={"删除「" + f.name + "」"} onClick={() => onDel(f)} />
+                </span>
+              </div>
             );
           })}
         </div>
@@ -177,40 +196,9 @@
     );
   }
 
-  function FileCard({ f, partitions, onOpen, onMove, onDel }) {
-    return (
-      <Panel padding={0} style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {/* 缩略图占位（送货单：单字方块） */}
-        <div style={{ height: 120, background: "var(--surface-2)", display: "grid", placeItems: "center", borderBottom: "1px solid var(--line)", position: "relative" }}>
-          <span style={{ color: "var(--brand)", fontSize: 28, fontWeight: 800, opacity: .55 }}>单</span>
-          <span style={{ position: "absolute", top: 8, right: 8 }}>{ocrChip(f)}</span>
-        </div>
-        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: f.conflict ? "var(--warn-ink)" : "var(--ink-soft)" }}>
-            {f.conflict && <Icon name="triangle-alert" size={13} color="var(--warn)" />}
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.company}</span>
-          </div>
-          <div style={{ display: "flex", gap: 12, fontSize: 12, color: "var(--ink-soft)", fontFamily: "var(--font-mono)" }}>
-            <span>{f.date}</span><span>No.{f.no}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--ink-soft)" }}>{f.material}</div>
-          <div style={{ display: "flex", gap: 6, marginTop: 4, alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: "var(--ink-faint)" }}>分区</span>
-            <button title="移动到其他分区" onClick={() => UI().formModal({
-              title: "移动分区 · " + f.name, fields: [{ key: "partition", label: "目标分区（工地）", type: "select", options: partitions, value: f.partition, full: true }],
-              saveText: "移动", onSave: (vals) => { onMove(f.id, vals.partition); UI().toast("已移动到「" + vals.partition + "」", "ok"); },
-            })} style={{ border: 0, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--brand)", background: "var(--brand-soft)", padding: "2px 8px", borderRadius: 999 }}>{f.partition}</button>
-            <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
-              <IconButton icon={f.ocr === "todo" ? "scan-text" : "file-check"} title={f.ocr === "todo" ? "识别" : f.ocr === "review" ? "核对" : "查看核对结果"} onClick={() => onOpen(f)} />
-              <IconButton icon="zoom-in" title="放大" onClick={() => UI().modal({ title: f.name, subtitle: f.company, width: 520, bodyHTML: '<div style="height:280px;display:grid;place-items:center;background:var(--surface-2);border-radius:8px;color:var(--brand);font-size:40px;font-weight:800;opacity:.5">单</div>' })} />
-              <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => UI().confirm({ title: "删除文件", message: "确定删除「" + f.name + "」？删除为软删除，可在 5 秒内撤回。", danger: true, confirmText: "删除", onConfirm: () => onDel(f) })} />
-            </span>
-          </div>
-        </div>
-      </Panel>
-    );
-  }
+  // 说明：原「文件卡片网格 + 移动分区弹窗」已随三栏改造移除。
+  // 卡片网格在三栏工作台里没有位置，且分区归属与实现端一致 —— 由核对栏的「收货工地」
+  // 字段决定，核对完成时按该值归档，不再另设一个只改归属的入口。
 
   // —— 左侧送货单占位图（灰底表格轮廓 SVG + 文件名） ——
   function DocSketch({ name }) {
@@ -347,9 +335,9 @@
             {!inline && <button onClick={onClose} style={{ border: 0, background: "transparent", cursor: "pointer", fontSize: 22, lineHeight: 1, color: "var(--ink-soft)", flex: "none" }}>×</button>}
           </div>
 
-          {/* 左图右表 */}
-          <div style={{ padding: 16, display: "grid", gridTemplateColumns: narrow ? "1fr" : "minmax(0, 2fr) minmax(0, 3fr)", gap: 16, alignItems: "start" }}>
-            <DocSketch name={file.name} />
+          {/* 弹层内是左图右表；inline 进三栏时原件已是独立的一栏，这里只留字段与明细 */}
+          <div style={{ padding: 16, display: "grid", gridTemplateColumns: narrow || inline ? "1fr" : "minmax(0, 2fr) minmax(0, 3fr)", gap: 16, alignItems: "start" }}>
+            {!inline && <DocSketch name={file.name} />}
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               {/* 头部字段 2×2 */}
@@ -488,12 +476,12 @@
     ]);
     const [recog, setRecog] = React.useState(null);      // 单张识别中 { name, pct }
     const [batch, setBatch] = React.useState(null);      // 批量排队 { total, done, name }
-    const [reviewId, setReviewId] = React.useState(null); // 核对弹层文件 id
+    const [reviewId, setReviewId] = React.useState(null); // 当前核对的文件 id（宽屏进右栏 / 窄屏进核对分段）
+    const [pane, setPane] = React.useState("queue");      // 窄屏分段：queue | source | review
     const timerRef = React.useRef(null);
     React.useEffect(() => () => { clearInterval(timerRef.current); clearTimeout(timerRef.current); }, []);
 
     const withResult = (x) => ({ ...x, result: resultOf(x) });
-    const moveFile = (id, part) => setFiles((l) => l.map((x) => (x.id === id ? { ...x, partition: part } : x)));
     const delFile = (f) => {
       const idx = files.findIndex((x) => x.id === f.id);
       setFiles((l) => l.filter((x) => x.id !== f.id));
@@ -510,6 +498,7 @@
       if (fl.ocr !== "todo") {
         setFiles((l) => l.map((x) => (x.id === fl.id ? withResult(x) : x)));
         setReviewId(fl.id);
+        setPane("review"); // 窄屏分段时跟随跳到核对栏，宽屏该状态不参与布局
         return;
       }
       let pct = 5;
@@ -521,7 +510,7 @@
         if (pct >= 100) {
           clearInterval(timerRef.current);
           setFiles((l) => l.map((x) => (x.id === fl.id ? { ...withResult(x), ocr: "review" } : x)));
-          setTimeout(() => { setRecog(null); setReviewId(fl.id); }, 320);
+          setTimeout(() => { setRecog(null); setReviewId(fl.id); setPane("review"); }, 320);
         }
       }, 140);
     };
@@ -639,34 +628,53 @@
           <span style={{ marginLeft: "auto" }}><IconButton icon="folder-plus" title="新增分区" onClick={() => UI().formModal({ title: "新增分区（工地）", fields: [{ key: "name", label: "分区名称", placeholder: "如 合和新城", full: true }], onSave: (vals) => { if (!vals.name) { UI().toast("分区名称不能为空", "danger"); return; } setExtraParts((p) => [...p, vals.name]); setPartition(vals.name); UI().toast("已新增分区「" + vals.name + "」", "ok"); } })} /></span>
         </div>
 
-        {/* #201 处理区：宽屏三栏（队列 | 原件 | 字段与材料行），三栏各自局部滚动、不锁死高度；
-            窄屏无法并置三栏，退化为卡片网格单列旅程 + 全屏弹层核对。 */}
-        {narrow ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-            {visible.map((f) => <FileCard key={f.id} f={f} partitions={partNames} onOpen={openFile} onMove={moveFile} onDel={delFile} />)}
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "268px minmax(0, 1fr)", gap: 14, alignItems: "start" }}>
-            <QueueList files={visible} activeId={reviewId} onPick={openFile} />
-            {reviewFile ? (
-              <ReviewModal key={reviewFile.id} file={reviewFile} narrow={false} inline
-                onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />
-            ) : (
-              <div style={{ border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)", padding: "48px 24px",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: "var(--ink-faint)" }}>
-                <Icon name="scan-text" size={30} color="var(--line-strong)" />
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink-soft)" }}>
-                  {visible.length ? "从左侧队列选择一张送货单" : "当前分区没有待处理文件"}
-                </div>
-                <div style={{ fontSize: 12, lineHeight: 1.8, textAlign: "center", maxWidth: 420 }}>
-                  {visible.length
-                    ? "待识别的单据点选后先跑 OCR，识别完成即在此处载入原件与字段；已识别的直接进入核对。"
-                    : "拖入工地文件夹开始，或切换上方分区标签查看其他工地。"}
-                </div>
-              </div>
-            )}
+        {/* #201 处理区三栏：队列 | 原件 | 字段与材料行。与实现端 AdaptiveWorkbench 同构 ——
+            宽屏 17rem / 38% / 1fr 并置，高度 clamp(24rem,72dvh,52rem) 不锁死、每栏各自局部滚动；
+            窄屏切分段 Tab 一次一栏。不回落成卡片网格：那样原件栏会整个丢失，
+            而三栏内容在窄屏同样要可达。 */}
+        {narrow && KA().SegTab && (
+          <div style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "0 12px", overflow: "hidden" }}>
+            {KA().SegTab({
+              active: pane,
+              onChange: setPane,
+              tabs: [
+                { key: "queue", label: "队列", count: visible.length },
+                { key: "source", label: "原件" },
+                { key: "review", label: "核对", count: reviewFile ? undefined : 0 },
+              ],
+            })}
           </div>
         )}
+
+        <div style={{ display: "grid", gap: 12, minWidth: 0,
+          gridTemplateColumns: narrow ? "1fr" : "17rem minmax(0, 38%) minmax(0, 1fr)",
+          blockSize: narrow ? "auto" : "clamp(24rem, 72dvh, 52rem)" }}>
+
+          {(!narrow || pane === "queue") && (
+            <QueueList files={visible} activeId={reviewId} onPick={openFile} onDel={delFile} />
+          )}
+
+          {(!narrow || pane === "source") && (
+            <div style={{ minWidth: 0, minHeight: 0, overflow: "auto", border: "1px solid var(--line)",
+              borderRadius: 12, background: "var(--panel)", padding: 12 }}>
+              {reviewFile
+                ? <DocSketch name={reviewFile.name} />
+                : <PaneEmpty icon="image" title="未选择单据"
+                    desc="从队列选择一张单据后，在此查看原件；核对时原件与字段并排，不用来回切换。" />}
+            </div>
+          )}
+
+          {(!narrow || pane === "review") && (
+            reviewFile
+              ? <ReviewModal key={reviewFile.id} file={reviewFile} narrow={narrow} inline
+                  onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />
+              : <PaneEmpty icon="scan-text"
+                  title={visible.length ? "从队列选择一张送货单" : "当前分区没有待处理文件"}
+                  desc={visible.length
+                    ? "待识别的单据点选后先跑 OCR，识别完成即载入字段与材料明细；已识别的直接进入核对。"
+                    : "拖入工地文件夹开始，或切换上方分区标签查看其他工地。"} />
+          )}
+        </div>
 
         <details style={{ background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px" }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--brand)" }}>使用说明 / 注意事项</summary>
@@ -681,8 +689,8 @@
 
         {recog && <RecognizeOverlay name={recog.name} pct={recog.pct} />}
         {batch && <BatchOverlay batch={batch} />}
-        {/* 弹层只在窄屏使用；宽屏同一组件以 inline 形态嵌在三栏右侧，不重复挂两份 */}
-        {narrow && reviewFile && <ReviewModal key={reviewFile.id} file={reviewFile} narrow onClose={() => setReviewId(null)} onFinish={(out) => finishReview(reviewFile, out)} />}
+        {/* 核对内容只由三栏中的「核对」栏承载：宽屏并置、窄屏走分段。
+            这里不再另挂全屏弹层 —— 否则窄屏会同时渲染分段栏和弹层两份同样的核对界面。 */}
       </div>
     );
   }
