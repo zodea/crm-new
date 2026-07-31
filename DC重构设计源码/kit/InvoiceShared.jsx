@@ -306,7 +306,7 @@
   // A4 排版栏（实现端 InvoicePrintLayout.vue）：单栏面板，直接占三栏工作台的「排版」栏——
   // 队列与校对栏在排版模式下原样保留，不整页替换成排版视图。
   // 预览按当前页铺全部队列发票（含未勾选的），勾选只决定打印范围与底部合计。
-  function PrintLayout({ rows, selId, onSelect, onPrint }) {
+  function PrintLayout({ rows, selId, onSelect, onPrint, onBack, backLabel }) {
     const { Icon } = DS();
     const [perPage, setPerPage] = React.useState(2);
     const [page, setPage] = React.useState(1);
@@ -348,7 +348,7 @@
     const barBtn = (disabled) => ({ border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "transparent", padding: "2px 8px", fontSize: 11, color: disabled ? "var(--ink-faint)" : "var(--ink-soft)", cursor: disabled ? "not-allowed" : "pointer" });
     const toolBtn = { display: "inline-flex", alignItems: "center", gap: 4, border: "1px solid var(--line-strong)", background: "#fff", borderRadius: "var(--radius-btn)", padding: "5px 10px", fontSize: 12, color: "var(--ink)", cursor: "pointer" };
 
-    return React.createElement("section", { "aria-label": "发票打印排版", style: { display: "flex", flexDirection: "column", height: "100%", minWidth: 0, overflow: "hidden", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", background: "var(--panel)", boxShadow: "var(--shadow-card)" } },
+    const sheet = React.createElement("section", { "aria-label": "发票打印排版", style: { display: "flex", flexDirection: "column", height: "100%", minWidth: 0, overflow: "hidden", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", background: "var(--panel)", boxShadow: "var(--shadow-card)" } },
       // 工具条
       React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)", flex: "none" } },
         React.createElement("strong", { style: { marginRight: "auto", fontSize: 12, color: "var(--ink)" } }, "打印排版"),
@@ -409,6 +409,47 @@
           React.createElement("div", { style: { background: "var(--surface-2)", padding: 16 } },
             React.createElement("div", { style: { margin: "0 auto", maxWidth: 720, background: "#fff", padding: 16 } }, invoiceSvg(zoomInv)))
         )
+      )
+    );
+
+    // 工作台「打印排版」子模式：单栏，直接占三栏中的一栏。
+    if (!onBack) return sheet;
+
+    // 台账「打印呈现」(#70)：整页两栏 —— 左发票列表负责勾选打印范围与快速跳到对应 A4 页，
+    // 右侧复用同一块排版面板（state 提在这一层，两栏读写同一份勾选/旋转/页码，不做第二套实现）。
+    const excelRows = rows.filter((i) => i.source === "excel");
+    return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" } },
+        React.createElement(DS().Button, { icon: "arrow-left", onClick: onBack }, backLabel || "返回台账"),
+        React.createElement("span", { style: { fontSize: 13, color: "var(--ink-soft)" } },
+          "打印排版 · 每页 ", React.createElement("b", { style: { color: "var(--ink)", fontFamily: "var(--font-mono)" } }, perPage),
+          " 张 · 共 ", React.createElement("b", { style: { color: "var(--ink)", fontFamily: "var(--font-mono)" } }, pageCount), " 页")
+      ),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(12rem, 17rem) minmax(0, 1fr)", gap: 12, blockSize: "clamp(28rem, 76dvh, 56rem)" } },
+        // 左：发票列表 · 勾选打印范围
+        React.createElement("div", { style: { display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", background: "var(--panel)", boxShadow: "var(--shadow-card)" } },
+          React.createElement("div", { style: { flex: "none", padding: "10px 12px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" } }, "发票列表 · 勾选打印范围"),
+          React.createElement("div", { style: { flex: 1, minHeight: 0, overflowY: "auto" } },
+            ...rows.map((inv) => {
+              const idx = chosen.findIndex((c) => c.id === inv.id);
+              const onPage = idx > -1 ? Math.floor(idx / perPage) + 1 : -1;
+              return React.createElement("div", { key: inv.id,
+                onClick: () => { const at = rows.findIndex((r) => r.id === inv.id); if (at > -1) setPage(Math.floor(at / perPage) + 1); onSelect && onSelect(inv.id); },
+                style: { display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderBottom: "1px solid var(--line)", cursor: "pointer", background: selId === inv.id ? "var(--brand-soft)" : "transparent" } },
+                React.createElement("input", { type: "checkbox", "aria-label": "勾选发票 " + (inv.number || inv.name), checked: !!sel[inv.id], onClick: (e) => e.stopPropagation(), onChange: () => setSel((s) => ({ ...s, [inv.id]: !s[inv.id] })), style: { cursor: "pointer", flex: "none" } }),
+                React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+                  React.createElement("div", { style: { fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, inv.number ? inv.number.slice(-8) : inv.name),
+                  React.createElement("div", { style: { fontSize: 11, color: "var(--ink-soft)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, inv.seller || inv.buyer)),
+                onPage > 0 && React.createElement("span", { style: { flex: "none", fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--ink-faint)" } }, "P" + onPage)
+              );
+            }),
+            rows.length === 0 && React.createElement("div", { style: { padding: 20, fontSize: 12, color: "var(--ink-soft)", textAlign: "center" } }, "无可打印发票")
+          ),
+          // 只有排除掉纯数据票时才说明去向，别在没有被排除的情况下白讲一句
+          excelRows.length > 0 && React.createElement("div", { style: { flex: "none", borderTop: "1px solid var(--line)", background: "var(--surface-2)", padding: "8px 12px", fontSize: 11, color: "var(--ink-soft)" } },
+            "另有 " + excelRows.length + " 张 Excel 导入的纯数据票无扫描件，勾选后只占版位不出图")
+        ),
+        sheet
       )
     );
   }

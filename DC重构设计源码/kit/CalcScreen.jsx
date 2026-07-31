@@ -1,8 +1,8 @@
-// CalcScreen — 开票因子测算（按实现端 app/pages/finance/invoice/factor.vue 及
-// app/components/finance/invoice/factor/ 三个组件校准）。
-// 两件事装在一张卡里：上半「精确加法组合」——给定目标值，穷举恰好等于它的因子×数量组合；
-// 下半「税额计算」——含税金额 + 税率 → 不含税/税额/大写，全部按分计算。
-// 原「目标金额 ÷ 单价 = 推算数量」的因子推算已不是实现端的算法，整块替换。
+// CalcScreen — 开票因子测算。版式沿用原设计稿：顶部税额计算单行横排（输入 + 四格结果，点格即复制），
+// 下面 330px 左栏「开票因子」+ 右栏结果表。
+// 算法按实现端 app/pages/finance/invoice/factor.vue 校准：不是「目标金额 ÷ 单价 = 推算数量 + 近似方案」，
+// 而是精确加法组合 —— 全程按分整数搜索，只返回恰好等于目标值的组合，不给近似解。
+// 顶部含税金额一值两用：既是税额计算的输入，也是组合求解的目标值（算完税额直接拿去凑组合）。
 (function () {
   const { Button, Panel, Icon, IconButton } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
@@ -139,21 +139,29 @@
 
   function CalcScreen() {
     const vw = useVw();
-    const wide = vw >= 1280;   // xl
-    const md = vw >= 768;
-    const sm = vw >= 640;
+    const narrow = vw < 1000;   // 两栏并置下限；以下左右栏改上下叠
 
-    const [target, setTarget] = React.useState(10);
+    // 顶部含税金额既是税额计算的输入，也是因子组合的目标值 —— 算完税额直接拿这个数去凑组合，
+    // 不在两处各填一遍（这条联动是原设计稿的做法，实现端拆成了两个独立输入）。
+    const [target, setTarget] = React.useState("128640");
+    const [rate, setRate] = React.useState(13);
     const [maxResults, setMaxResults] = React.useState(100);
+    // 默认因子取开票场景的量级（材料单价），不是教学用的 2/4——那样解的数量级会大到没有参考价值
     const [factors, setFactors] = React.useState([
-      { id: 1, value: 2, maxQuantity: null, allowDecimal: false },
-      { id: 2, value: 4, maxQuantity: 5, allowDecimal: false },
+      { id: 1, value: 640, maxQuantity: null, allowDecimal: false },
+      { id: 2, value: 960, maxQuantity: null, allowDecimal: false },
     ]);
     const [include, setInclude] = React.useState("");
     const [exclude, setExclude] = React.useState("");
     const [result, setResult] = React.useState(null);
-    const [status, setStatus] = React.useState("配置目标值和因子后开始计算");
-    const [mask, setMask] = React.useState(null); // { ms }
+    const [status, setStatus] = React.useState("填写因子后点击「计算」");
+
+    // —— 税额：全部按分整数运算，不含税 + 税额 == 含税 恒成立 ——
+    const totalFen = target === "" ? null : toFen(target);
+    const rateOk = Number.isInteger(Number(rate)) && Number(rate) >= 1 && Number(rate) <= 13;
+    const tax = totalFen != null && totalFen > 0 && rateOk
+      ? (() => { const noTax = Math.round(totalFen / (1 + Number(rate) / 100)); return { totalFen, noTaxFen: noTax, taxFen: totalFen - noTax }; })()
+      : null;
 
     const addFactor = () => setFactors((l) => [...l, { id: l.reduce((m, f) => Math.max(m, f.id), 0) + 1, value: null, maxQuantity: null, allowDecimal: false }]);
     const removeFactor = (id) => setFactors((l) => l.filter((f) => f.id !== id));
@@ -164,19 +172,15 @@
       if (!Number.isFinite(t) || t <= 0) { setStatus("请输入有效的目标值"); setResult(null); return; }
       const valid = fs.filter((f) => Number.isFinite(Number(f.value)) && Number(f.value) > 0);
       if (!valid.length) { setStatus("请至少添加一个有效因子"); setResult(null); return; }
-      const t0 = performance.now();
-      const r = solve(valid, toFen(t), {
+      setResult(solve(valid, toFen(t), {
         maxResults: cap,
         includeFactor: inc === "" || inc == null ? null : Number(inc),
         excludeFactor: exc === "" || exc == null ? null : Number(exc),
-      });
-      // 实现端把求解放 Worker，>150ms 才浮出遮罩；设计稿同步求解，按实测耗时补一帧遮罩示意
-      if (performance.now() - t0 > 150) { setMask({ ms: r.elapsedMs }); setTimeout(() => setMask(null), 260); }
-      setResult(r); setStatus("");
+      }));
+      setStatus("");
     }, []);
-
     const calculate = () => run(target, factors, include, exclude, maxResults);
-    // 筛选条件变化后自动重算（实现端 300ms 防抖）
+    // 必须包含 / 排除因子改动后自动重算（已算过才重算，避免首屏空跑）
     React.useEffect(() => {
       if (!result) return;
       const t = setTimeout(() => run(target, factors, include, exclude, maxResults), 300);
@@ -197,223 +201,153 @@
         : "共 " + shown + " 条解（总数未统计），用时 " + result.elapsedMs + " ms";
     })();
 
-    const splitCols = wide ? "360px minmax(0, 1fr)" : "minmax(0, 1fr)";
-    const th = { height: 40, padding: "0 6px", fontSize: 13, fontWeight: 700, color: "var(--ink-soft)", textAlign: "left" };
-    const td = { height: 40, padding: "0 6px", fontSize: 14 };
+    // 顶排结果格：点格即复制
+    const cell = (label, raw, display) => (
+      <div key={label} onClick={() => { copy(raw); }} title="点击复制"
+        style={{ flex: 1, minWidth: 0, padding: "6px 14px", borderLeft: "1px solid var(--line)", cursor: "copy" }}>
+        <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{label}</div>
+        <div style={{ marginTop: 2, fontSize: label === "大写" ? 12.5 : 15, fontWeight: 700, fontFamily: label === "大写" ? "inherit" : "var(--font-mono)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink)" }}>{display}</div>
+      </div>
+    );
+
+    const TH = { padding: "10px 12px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", background: "var(--surface-2)", position: "sticky", top: 0, whiteSpace: "nowrap", textAlign: "left" };
+    const TD = { padding: "10px 12px", fontSize: 13, verticalAlign: "middle" };
+    const miniInp = { ...inp, padding: "6px 9px", fontSize: 12.5, ...mono };
 
     return (
-      <div style={{ position: "relative", overflow: "hidden", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", background: "var(--panel)", boxShadow: "var(--shadow-card)",
-        display: wide ? "grid" : "block", gridTemplateRows: wide ? "auto minmax(0, 1fr) auto" : null,
-        // 实现端整卡 h-full 撑满 h-svh 外壳；设计稿外壳是普通滚动页，用同族 clamp 给等价高度
-        blockSize: wide ? "clamp(28rem, 76dvh, 56rem)" : "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-        {/* 头部：标题 + 目标值 / 返回解数量 / 开始计算 */}
-        <header style={{ display: "grid", gridTemplateColumns: splitCols, borderBottom: "1px solid var(--line)" }}>
-          <div style={{ alignSelf: "center", padding: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>精确加法组合</h1>
-            <p style={{ margin: "4px 0 0", maxWidth: "42ch", fontSize: 11, lineHeight: 1.5, color: "var(--ink-faint)" }}>金额按分精确计算，仅返回恰好等于目标值的组合</p>
+        {/* 税额计算 —— 单行横排：输入 + 四格结果，点任一格即复制 */}
+        <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 0, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 14 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, flex: "none" }}>税额计算</span>
+            <input aria-label="含税金额" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="含税金额"
+              style={{ ...inp, ...mono, width: 150, fontSize: 15, fontWeight: 700 }} />
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <span style={{ fontSize: 12, color: "var(--ink-soft)", flex: "none" }}>税率%</span>
+              <input aria-label="税率" type="number" min="1" max="13" step="1" value={rate} onChange={(e) => setRate(e.target.value === "" ? "" : Number(e.target.value))} placeholder="13"
+                style={{ ...inp, ...mono, width: 56, textAlign: "center", borderColor: rateOk ? "var(--line-strong)" : "var(--danger)" }} />
+            </label>
           </div>
-          <div style={{ display: "grid", alignItems: "end", gap: 12, padding: 16,
-            gridTemplateColumns: md ? "minmax(220px, 1fr) 140px 160px" : "minmax(0, 1fr)",
-            borderTop: wide ? 0 : "1px solid var(--line)", borderLeft: wide ? "1px solid var(--line)" : 0 }}>
-            <div>
-              <label htmlFor="factor-target" style={label}>目标值</label>
-              <input id="factor-target" type="number" min="0" step="any" value={target} placeholder="请输入目标值"
-                onChange={(e) => setTarget(e.target.value)} style={{ ...inp, ...mono, fontSize: 16, fontWeight: 700 }} />
-            </div>
-            <div>
-              <label htmlFor="factor-max" style={label}>返回解数量</label>
-              <input id="factor-max" type="number" min="1" max="5000" value={maxResults} placeholder="默认 100"
-                onChange={(e) => setMaxResults(e.target.value)} style={{ ...inp, ...mono }} />
-            </div>
-            <Button variant="primary" icon="calculator" disabled={!factors.length} onClick={calculate} style={{ width: "100%", height: 34 }}>开始计算</Button>
-          </div>
-        </header>
+          {tax
+            ? [cell("价税合计", (tax.totalFen / 100).toFixed(2), "¥" + fmtFen(tax.totalFen)),
+               cell("不含税金额", (tax.noTaxFen / 100).toFixed(2), "¥" + fmtFen(tax.noTaxFen)),
+               cell("税额", (tax.taxFen / 100).toFixed(2), "¥" + fmtFen(tax.taxFen)),
+               cell("大写", moneyToChinese(tax.totalFen / 100), moneyToChinese(tax.totalFen / 100))]
+            : <div style={{ flex: 1, minWidth: 200, padding: "6px 14px", borderLeft: "1px solid var(--line)", fontSize: 12, color: rateOk ? "var(--ink-faint)" : "var(--danger)" }}>
+                {rateOk ? "输入含税金额后，此排显示 价税合计 / 不含税 / 税额 / 大写，点击任一格即复制" : "税率请输入 1-13 的正整数"}
+              </div>}
+        </Panel>
 
-        {/* 主体：因子配置 | 精确组合结果 */}
-        <div style={{ display: "grid", gridTemplateColumns: splitCols, minHeight: 0, overflow: wide ? "hidden" : "visible" }}>
-          {/* 左：因子配置 */}
-          <section style={{ minWidth: 0, padding: 16, minHeight: wide ? 0 : null, overflowY: wide ? "auto" : "visible", borderRight: wide ? "1px solid var(--line)" : 0 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: narrow ? "minmax(0,1fr)" : "330px minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+
+          {/* ── 左：开票因子 + 求解参数 ── */}
+          <Panel padding={0} style={{ overflow: "hidden" }}>
+            <div style={{ padding: "12px 14px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>开票因子（单价）</span>
+              <Button size="sm" icon="plus" onClick={addFactor}>添加</Button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 72px 40px 26px", gap: 6, alignItems: "center", padding: "7px 10px", background: "var(--surface-2)", fontSize: 10.5, fontWeight: 700, color: "var(--ink-faint)" }}>
+              <span>因子值</span><span style={{ textAlign: "right" }}>最大次数</span><span style={{ textAlign: "center" }}>小数</span><span />
+            </div>
+            {factors.map((f) => (
+              <div key={f.id} style={{ display: "grid", gridTemplateColumns: "1fr 72px 40px 26px", gap: 6, alignItems: "center", padding: "7px 10px", borderTop: "1px solid var(--line)" }}>
+                <input type="number" min="0" step="any" aria-label={"因子 " + f.id + " 的数值"} placeholder="单价"
+                  value={f.value == null ? "" : f.value} onChange={(e) => patchFactor(f.id, "value", e.target.value === "" ? null : Number(e.target.value))}
+                  style={{ ...miniInp, minWidth: 0 }} />
+                <input type="number" min="0" step="any" aria-label={"因子 " + f.id + " 的最大次数"} placeholder="不限"
+                  value={f.maxQuantity == null ? "" : f.maxQuantity} onChange={(e) => patchFactor(f.id, "maxQuantity", e.target.value === "" ? null : Number(e.target.value))}
+                  style={{ ...miniInp, minWidth: 0, textAlign: "right" }} />
+                <label title="允许小数数量：只生成单价×数量恰为整分的组合" style={{ display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  <input type="checkbox" checked={f.allowDecimal} onChange={(e) => patchFactor(f.id, "allowDecimal", e.target.checked)} style={{ accentColor: "var(--brand)" }} />
+                </label>
+                <button type="button" aria-label={"删除因子 " + f.id} onClick={() => removeFactor(f.id)}
+                  style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--ink-faint)", display: "grid", placeItems: "center" }}>
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
+            ))}
+            {!factors.length && <div style={{ padding: "26px 12px", textAlign: "center", fontSize: 12, color: "var(--ink-faint)", borderTop: "1px solid var(--line)" }}>暂无因子，点「添加」开始配置</div>}
+
+            {/* 求解参数：只在这一处出现，不与因子行混排 */}
+            <div style={{ borderTop: "1px solid var(--line)", padding: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>因子配置</h2>
-                <p style={{ margin: "2px 0 0", fontSize: 10, lineHeight: 1.5, color: "var(--ink-faint)" }}>小数数量仅生成单价乘数量恰为整分的组合</p>
+                <label htmlFor="calc-include" style={label}>必须包含因子</label>
+                <input id="calc-include" type="number" step="any" placeholder="例如 4" value={include} onChange={(e) => setInclude(e.target.value)} style={miniInp} />
               </div>
-              <Button size="sm" icon="plus" onClick={addFactor}>添加因子</Button>
-            </div>
-            <div style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-btn)", overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(86px,1fr) 106px 46px 28px", alignItems: "center", gap: 6, padding: "8px 10px", background: "var(--surface-2)", fontSize: 10, fontWeight: 700, color: "var(--ink-faint)" }}>
-                <span>因子值</span><span style={{ textAlign: "right" }}>最大次数/数量</span><span style={{ textAlign: "center" }}>小数</span><span />
+              <div>
+                <label htmlFor="calc-exclude" style={label}>排除因子</label>
+                <input id="calc-exclude" type="number" step="any" placeholder="例如 2" value={exclude} onChange={(e) => setExclude(e.target.value)} style={miniInp} />
               </div>
-              {factors.map((f) => (
-                <div key={f.id} style={{ display: "grid", gridTemplateColumns: "minmax(86px,1fr) 106px 46px 28px", alignItems: "center", gap: 6, padding: "8px 10px", borderTop: "1px solid var(--line)" }}>
-                  <input type="number" min="0" step="any" aria-label={"因子 " + f.id + " 的数值"} placeholder="数值"
-                    value={f.value == null ? "" : f.value} onChange={(e) => patchFactor(f.id, "value", e.target.value === "" ? null : Number(e.target.value))}
-                    style={{ ...inp, ...mono, padding: "4px 8px", fontSize: 12, minWidth: 0 }} />
-                  <input type="number" min="0" step="any" aria-label={"因子 " + f.id + " 的最大数量"} placeholder="不限"
-                    value={f.maxQuantity == null ? "" : f.maxQuantity} onChange={(e) => patchFactor(f.id, "maxQuantity", e.target.value === "" ? null : Number(e.target.value))}
-                    style={{ ...inp, ...mono, padding: "4px 8px", fontSize: 12, textAlign: "right", minWidth: 0 }} />
-                  <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, fontSize: 11, color: "var(--ink-soft)", cursor: "pointer" }}>
-                    <input type="checkbox" checked={f.allowDecimal} onChange={(e) => patchFactor(f.id, "allowDecimal", e.target.checked)} style={{ accentColor: "var(--brand)" }} />
-                    <span>是</span>
-                  </label>
-                  <IconButton icon="x" tone="danger" title={"删除因子 " + f.id} onClick={() => removeFactor(f.id)} />
-                </div>
-              ))}
-              {!factors.length && <div style={{ padding: "32px 12px", textAlign: "center", fontSize: 12, color: "var(--ink-faint)" }}>暂无因子，点击“添加因子”开始配置</div>}
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label htmlFor="calc-max" style={label}>返回解数量（上限 {MAX_RESULTS.toLocaleString("zh-CN")}）</label>
+                <input id="calc-max" type="number" min="1" max={MAX_RESULTS} placeholder="默认 100" value={maxResults} onChange={(e) => setMaxResults(e.target.value)} style={miniInp} />
+              </div>
             </div>
-          </section>
+            <div style={{ padding: 12, borderTop: "1px solid var(--line)" }}>
+              <Button variant="primary" icon="calculator" fullWidth disabled={!factors.length} onClick={calculate} style={{ width: "100%" }}>计算</Button>
+            </div>
+          </Panel>
 
-          {/* 右：精确组合结果 */}
-          <section style={{ display: "flex", flexDirection: "column", minWidth: 0, minHeight: wide ? 0 : null }}>
-            <div style={{ flex: "none", padding: 16, borderBottom: "1px solid var(--line)" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>精确组合结果</h2>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--ink-faint)" }}>筛选条件变化后自动重算，保证展示结果完整准确</p>
-                </div>
-                {result && result.mode && <span style={{ flex: "none", fontSize: 11, fontWeight: 600, color: "var(--ink-faint)" }}>{result.mode === "light" ? "轻量搜索" : "可达性剪枝"}</span>}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: sm ? "1fr 1fr" : "1fr", gap: 8 }}>
-                <div>
-                  <label htmlFor="factor-include" style={label}>必须包含因子</label>
-                  <input id="factor-include" type="number" step="any" placeholder="例如 4" value={include} onChange={(e) => setInclude(e.target.value)} style={{ ...inp, ...mono }} />
-                </div>
-                <div>
-                  <label htmlFor="factor-exclude" style={label}>排除因子</label>
-                  <input id="factor-exclude" type="number" step="any" placeholder="例如 2" value={exclude} onChange={(e) => setExclude(e.target.value)} style={{ ...inp, ...mono }} />
-                </div>
-              </div>
-              <div aria-live="polite" style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, borderRadius: "var(--radius-btn)", background: "var(--surface-2)", padding: "8px 12px", fontSize: 12, color: "var(--ink-soft)" }}>
-                <Icon name="info" size={13} color="var(--brand)" />
+          {/* ── 右：结果表 ── */}
+          <Panel padding={0} style={{ overflow: "hidden" }}>
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)" }}>
+                {result ? "推算结果 — 目标 " + Number(target).toLocaleString("zh-CN") : "填写因子后点击「计算」"}
+              </span>
+              {result && result.mode && <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 600, color: "var(--ink-faint)" }}>{result.mode === "light" ? "轻量搜索" : "可达性剪枝"}</span>}
+            </div>
+
+            {/* 汇总条：总解数 / 展示条数 / 耗时；截断与超时都如实说明。
+                未算过时不出这条——空态区已经在说同一件事，不重复一遍。 */}
+            {(result || /^请/.test(status)) && (
+              <div aria-live="polite" style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12, color: /^请/.test(status) ? "var(--danger)" : "var(--ink-soft)" }}>
+                <Icon name="info" size={13} color={/^请/.test(status) ? "var(--danger)" : "var(--brand)"} />
                 <span>{summary}</span>
               </div>
-            </div>
+            )}
 
             {result && result.solutions.length ? (
-              <div style={{ flex: wide ? 1 : "none", minHeight: 0, maxHeight: wide ? "none" : 520, overflow: "auto" }}>
-                <table style={{ width: "100%", minWidth: 620, borderCollapse: "collapse" }}>
-                  <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface-2)" }}>
-                    <tr style={{ borderBottom: "1px solid var(--line)" }}>
-                      <th style={{ ...th, width: 56 }}>#</th>
-                      <th style={th}>表达式（点击复制）</th>
-                      <th style={th}>使用项（单项可点）</th>
-                      <th style={{ ...th, width: 80, textAlign: "right" }}>总数</th>
+              <div style={{ overflow: "auto", maxHeight: "clamp(20rem, 60dvh, 44rem)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ ...TH, width: 52 }}>#</th>
+                      <th style={TH}>表达式（点击复制）</th>
+                      <th style={TH}>使用项（单项可点）</th>
+                      <th style={{ ...TH, width: 72, textAlign: "right" }}>总数</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.solutions.map((s, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid var(--line)" }}>
-                        <td style={{ ...td, color: "var(--ink-faint)" }}>{i + 1}</td>
-                        <td style={td}>
+                      <tr key={i} style={{ borderTop: "1px solid var(--line)" }}>
+                        <td style={{ ...TD, color: "var(--ink-faint)", ...mono }}>{i + 1}</td>
+                        <td style={TD}>
                           <button type="button" title="复制整条表达式" onClick={() => copy(expr(s))} style={{ ...linkBtn, ...mono, fontWeight: 700 }}>{expr(s)}</button>
                         </td>
-                        <td style={td}>
+                        <td style={TD}>
                           <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
                             {s.map((it) => (
                               <button key={it.factorId + "-" + it.quantity} type="button" title="复制该使用项" onClick={() => copy(fmtPart(it))} style={{ ...linkBtn, ...mono, color: "var(--ink-soft)" }}>{fmtPart(it)}</button>
                             ))}
                           </span>
                         </td>
-                        <td style={{ ...td, ...mono, textAlign: "right", fontWeight: 700 }}>{fmtQty(s.reduce((n, it) => n + it.quantity, 0))}</td>
+                        <td style={{ ...TD, ...mono, textAlign: "right", fontWeight: 700 }}>{fmtQty(s.reduce((n, it) => n + it.quantity, 0))}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div style={{ flex: 1, display: "grid", placeItems: "center", minHeight: 256, padding: 32, textAlign: "center" }}>
-                <div>
-                  <Icon name="sigma" size={32} color="var(--ink-faint)" />
-                  <p style={{ margin: "8px 0 0", fontSize: 13, fontWeight: 600, color: "var(--ink-soft)" }}>暂无组合结果</p>
-                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--ink-faint)" }}>配置目标值和因子后点击“开始计算”</p>
-                </div>
+              <div style={{ padding: 48, textAlign: "center", color: "var(--ink-faint)", fontSize: 13 }}>
+                <Icon name="sigma" size={30} color="var(--ink-faint)" />
+                <div style={{ marginTop: 8 }}>在左侧维护因子单价，填好目标含税金额后点击「计算」</div>
+                <div style={{ marginTop: 4, fontSize: 12 }}>只返回恰好等于目标值的组合，不给近似解</div>
               </div>
             )}
-          </section>
+          </Panel>
         </div>
-
-        <TaxCalculator wide={wide} md={md} splitCols={splitCols} />
-
-        {mask && (
-          <div role="status" aria-live="polite" style={{ position: "fixed", inset: 0, zIndex: 50, display: "grid", placeItems: "center", background: "rgba(255,255,255,0.88)", backdropFilter: "blur(2px)" }}>
-            <div style={{ width: 256, padding: 24, textAlign: "center", border: "1px solid var(--line)", borderRadius: "var(--radius-card)", background: "var(--panel)", boxShadow: "var(--shadow-pop)" }}>
-              <Icon name="hourglass" size={28} color="var(--brand)" />
-              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700 }}>计算中…</div>
-              <div style={{ marginTop: 4, fontSize: 12, ...mono, color: "var(--ink-faint)" }}>{mask.ms} ms</div>
-              <Button onClick={() => setMask(null)} style={{ marginTop: 16, padding: "0 24px" }}>取消</Button>
-            </div>
-          </div>
-        )}
       </div>
-    );
-  }
-
-  // —— 税额计算（含税金额 + 税率 → 不含税 / 税额 / 大写，按分计算并自动勾稽）——
-  function TaxCalculator({ wide, md, splitCols }) {
-    const [total, setTotal] = React.useState("");
-    const [rate, setRate] = React.useState(13);
-    const [res, setRes] = React.useState(null);
-    const [err, setErr] = React.useState("");
-
-    const calc = () => {
-      const totalFen = total === "" ? null : toFen(total);
-      const r = Number(rate);
-      if (totalFen == null || !Number.isFinite(totalFen) || totalFen < 0) { setErr("请输入有效的含税金额"); setRes(null); return; }
-      if (!Number.isInteger(r) || r < 1 || r > 13) { setErr("税率请输入 1-13 的正整数"); setRes(null); return; }
-      const noTaxFen = Math.round(totalFen / (1 + r / 100));
-      setRes({ totalFen, noTaxFen, taxFen: totalFen - noTaxFen });
-      setErr("");
-    };
-
-    const cellBtnMoney = { ...linkBtn, ...mono, display: "block", marginTop: 4, fontSize: 14, fontWeight: 700 };
-    const cellBtnCn = { ...linkBtn, display: "block", marginTop: 4, width: "100%", fontSize: 12, lineHeight: 1.5, color: "var(--ink-soft)", overflowWrap: "anywhere" };
-    const cell = (title, fen, borderRight, borderTop) => (
-      <div key={title} style={{ minWidth: 0, padding: "12px 16px", borderRight: borderRight ? "1px solid var(--line)" : 0, borderTop: borderTop ? "1px solid var(--line)" : 0 }}>
-        <span style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--ink-faint)" }}>{title}</span>
-        <button type="button" onClick={() => copy((fen / 100).toFixed(2))} style={cellBtnMoney}>{fmtFen(fen)}</button>
-        <button type="button" onClick={() => copy(moneyToChinese(fen / 100))} style={cellBtnCn}>{moneyToChinese(fen / 100)}</button>
-      </div>
-    );
-
-    return (
-      <section style={{ borderTop: "1px solid var(--line)", background: "var(--surface-2)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: splitCols }}>
-          <div style={{ alignSelf: "center", padding: "12px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="receipt-text" size={15} color="var(--brand)" />
-              <h2 style={{ margin: 0, fontSize: 13, fontWeight: 800 }}>税额计算</h2>
-            </div>
-            <p style={{ margin: "4px 0 0", fontSize: 10, color: "var(--ink-faint)" }}>金额按分计算，结果自动勾稽</p>
-          </div>
-          <div style={{ display: "grid", alignItems: "end", gap: 12, padding: "12px 16px",
-            gridTemplateColumns: md ? "minmax(220px, 1fr) 104px 190px" : "minmax(0, 1fr)",
-            borderTop: wide ? 0 : "1px solid var(--line)", borderLeft: wide ? "1px solid var(--line)" : 0 }}>
-            <div>
-              <label htmlFor="tax-total" style={label}>含税合同金额</label>
-              <input id="tax-total" type="number" min="0" step="0.01" placeholder="597140.00" value={total} onChange={(e) => setTotal(e.target.value)} style={{ ...inp, ...mono }} />
-            </div>
-            <div>
-              <label htmlFor="tax-rate" style={label}>税率（%）</label>
-              <input id="tax-rate" type="number" min="1" max="13" step="1" inputMode="numeric" placeholder="13" value={rate} onChange={(e) => setRate(e.target.value === "" ? "" : Number(e.target.value))} style={{ ...inp, ...mono }} />
-            </div>
-            <Button variant="primary" onClick={calc} style={{ width: "100%", height: 34 }}>计算税额和不含税金额</Button>
-          </div>
-        </div>
-
-        {err && <p role="alert" style={{ margin: 0, borderTop: "1px solid var(--line)", padding: "8px 16px", fontSize: 12, color: "var(--danger)" }}>{err}</p>}
-
-        {res && (
-          <div style={{ display: "grid", gridTemplateColumns: md ? "repeat(3, minmax(0,1fr))" : "minmax(0,1fr)", borderTop: "1px solid var(--line)", fontSize: 12 }}>
-            {cell("不含税金额", res.noTaxFen, md, false)}
-            {cell("税额", res.taxFen, md, !md)}
-            {cell("含税金额", res.totalFen, false, !md)}
-            <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--line)", padding: "8px 16px", fontSize: 10, ...mono, color: "var(--ink-faint)" }}>
-              校验：{fmtFen(res.noTaxFen)} + {fmtFen(res.taxFen)} = {fmtFen(res.totalFen)}
-            </div>
-          </div>
-        )}
-      </section>
     );
   }
 

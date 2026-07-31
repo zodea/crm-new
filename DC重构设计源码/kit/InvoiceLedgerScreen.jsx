@@ -1,7 +1,7 @@
-// InvoiceLedgerScreen — 发票台账页（按实现端 app/components/invoice/InvoiceLedgerScreen.vue 校准）
-// 左树（按归属，只带张数角标）+ 右表 表格/卡片两视图 + 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
+// InvoiceLedgerScreen — 发票台账页（版式与列按实现端 app/components/invoice/InvoiceLedgerScreen.vue 校准）
+// 左树（按归属，只带张数角标）+ 右表 表格/卡片/打印三呈现 + 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
 // 口径：台账 = 已归档；「待归档」= 已校对未归档的过渡态（两态模型下归档必有归属，不存在「已归档但未归项目」）。
-// 打印排版只在识别工作台承载，台账不再另开一套打印/导出/导入入口。
+// 打印 / 导出 / 导入是 #70 的待实现能力，实现端尚未落地——设计稿按目标态保留，不跟着实现端删。
 (function () {
   const { Button, StatusChip, IconButton, Panel, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {} };
@@ -37,6 +37,8 @@
   const TH = { padding: "12px 14px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: "left", whiteSpace: "nowrap" };
   const TD = { padding: "12px 14px", fontSize: 13, verticalAlign: "middle" };
   const FILTERABLE = ["供应商", "类型", "来源"]; // 与实现端 KitTable 列 filterable 一致
+  const EXP_STRUCT = ["按归属", "按供应商", "按票据类型", "按开票月份"];
+  const EXP_NAME = [{ label: "发票号后8位", sample: "58760021" }, { label: "供应商简称", sample: "大板东建材" }, { label: "开票日期", sample: "2026-06-28" }, { label: "归属名称", sample: "车陂商业大楼" }];
 
   function InvoiceLedgerScreen({ navigate }) {
     if (!I()) return <Panel style={{ padding: 40, textAlign: "center", color: "var(--ink-soft)" }}>加载中…</Panel>;
@@ -46,9 +48,10 @@
     const cardCols = vw < 640 ? 1 : vw < 1024 ? 2 : 3;
     const store = INV.useStore();
     const [node, setNode] = React.useState("__all");  // __all / 项目名 / __own / __pending
-    const [view, setView] = React.useState("table");  // table | card
+    const [view, setView] = React.useState("table");  // table | card | print
     const [search, setSearch] = React.useState("");
     const [checked, setChecked] = React.useState({});
+    const [expOpen, setExpOpen] = React.useState(false);
 
     const posted = store.live.filter((i) => i.account === "posted");
     const groups = {
@@ -102,12 +105,53 @@
       },
     });
 
+    // —— 打印 / 导出 / 导入（#70）——
+    // 导出目标：有勾选就只导勾选的，没勾选导当前节点的全部。
+    const exportTarget = () => (checkedRows.length ? checkedRows : rows);
+    const doExport = (kind, anchor) => {
+      const target = exportTarget();
+      if (kind === "打印 PDF") { setView("print"); return; }
+      if (kind === "导出原件") {
+        const scans = target.filter((i) => i.source !== "excel");
+        UI().exportModal({
+          title: "导出原件", subtitle: "共 " + scans.length + " 张 · 原始扫描件按文件夹组织",
+          count: scans.length, unit: "张", ext: ".pdf", anchor,
+          structureOptions: EXP_STRUCT, nameOptions: EXP_NAME,
+        });
+        return;
+      }
+      UI().exportModal({
+        title: "导出 Excel 台账", subtitle: "共 " + target.length + " 条结构化数据",
+        count: target.length, unit: "条", ext: ".xlsx", anchor,
+        structureOptions: ["不分层", "按归属", "按开票月份"],
+        nameOptions: [{ label: "发票台账", sample: "发票台账" }, { label: "导出日期", sample: "2026-07-03" }],
+      });
+    };
+    // 导入走导入映射页签（ADR 0005，不再是废弃的 importModal）；
+    // 发票域叠加的行级拒绝规则：映射必含归属，缺归属的行整行拒绝并列清单，其余照常入台账。
+    const doImport = () => navigate("importMapping", { entity: "invoice" });
+
     // 归属列：个人开支 / 项目蓝链 / 待归档
     const ownerCell = (inv) => INV.ownerKindOf(inv) === "personal"
       ? <span style={{ color: "var(--brand-deep)" }}>个人开支</span>
       : inv.project
         ? <NameLink type="project" coll="projects" name={inv.project} fallback={<span style={{ color: "var(--ink-soft)" }}>{inv.project}</span>} />
         : <StatusChip tone="warn">待归档</StatusChip>;
+
+    // 打印呈现（#70）：整页切到打印排版，左列表快速跳对应 A4 页，「返回台账」回列表。
+    // 打印范围 = 有勾选就打勾选的，没勾选打当前节点全部。
+    if (view === "print") {
+      return (
+        <INV.PrintLayout
+          rows={exportTarget()}
+          selId={null}
+          onSelect={() => {}}
+          onPrint={(i) => INV.update(i.id, { printCount: (i.printCount || 0) + 1, lastPrintedAt: "2026-07-03" })}
+          onBack={() => setView("table")}
+          backLabel="返回台账"
+        />
+      );
+    }
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -130,6 +174,21 @@
                 </button>
               ))}
             </div>
+            <Button icon="printer" onClick={() => setView("print")}>打印</Button>
+            <div style={{ position: "relative" }}>
+              <Button icon="download" iconRight="chevron-down" onClick={() => setExpOpen(!expOpen)}>导出</Button>
+              {expOpen && (
+                <div onClick={() => setExpOpen(false)} style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, minWidth: 150, background: "var(--panel)", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", boxShadow: "var(--shadow-pop)", padding: 4, zIndex: 20 }}>
+                  {["打印 PDF", "导出原件", "导出 Excel"].map((t) => (
+                    <button key={t} type="button" onClick={(e) => doExport(t, e.currentTarget)}
+                      style={{ display: "block", width: "100%", padding: "7px 10px", fontSize: 13, border: 0, background: "transparent", borderRadius: "var(--radius-sm)", textAlign: "left", color: "var(--ink)", cursor: "pointer" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--brand-soft)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>{t}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button icon="upload" onClick={doImport}>导入</Button>
           </div>
         </Panel>
 

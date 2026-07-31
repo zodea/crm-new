@@ -127,12 +127,24 @@
   }
 
   // —— 左树导航（items: [{key,label,icon,count,tone,children?:[{...}]}]；active/onChange）——
-  function TreeNav({ title, items, active, onChange }) {
+  // 可选 onNodeDrop(nodeKey, payload)：把树节点变成拖放目标（如把归档文件拖到节点上改归属）。
+  // 不传就是纯导航树，行为与原来完全一致。footer 挂节点级动作（如「新建分供方节点」）。
+  // ⚠ KitAtoms 各件是被「直接当函数调用」的（KA().TreeNav({...})），hooks 会记到调用方头上，
+  //   而调用点普遍写成 `KA().TreeNav && KA().TreeNav(...)` 的条件调用 —— 所以这里一律不许用 hook。
+  //   拖放高亮走原生事件直接改 style，不进 React state。
+  function TreeNav({ title, items, active, onChange, onNodeDrop, footer }) {
     const { Icon, Panel } = DS();
     const btn = (t, sub) => {
       const on = active === t.key;
       const ink = t.tone === "warn" && !on ? "var(--warn-ink)" : on ? "var(--brand-deep)" : "var(--ink)";
-      return h("button", { key: t.key, onClick: () => onChange(t.key), style: { display: "flex", alignItems: "center", gap: 8, width: "100%", border: 0, borderRadius: 8, padding: sub ? "6px 10px" : "8px 10px", cursor: "pointer", textAlign: "left", background: on ? "var(--brand-soft)" : "transparent", marginBottom: 2 } },
+      const rest = (el) => { el.style.background = on ? "var(--brand-soft)" : "transparent"; el.style.borderColor = "transparent"; };
+      const drop = onNodeDrop ? {
+        onDragOver: (e) => { e.preventDefault(); e.currentTarget.style.background = "var(--brand-soft)"; e.currentTarget.style.borderColor = "var(--brand)"; },
+        onDragLeave: (e) => rest(e.currentTarget),
+        onDrop: (e) => { e.preventDefault(); rest(e.currentTarget); const payload = e.dataTransfer.getData("text/plain"); if (payload) onNodeDrop(t.key, payload); },
+      } : null;
+      // 边框常驻占位（透明），拖拽高亮只换颜色，不让节点在悬停时跳动
+      return h("button", { key: t.key, onClick: () => onChange(t.key), ...drop, style: { display: "flex", alignItems: "center", gap: 8, width: "100%", border: "1px dashed transparent", borderRadius: 8, padding: sub ? "6px 10px" : "8px 10px", cursor: "pointer", textAlign: "left", background: on ? "var(--brand-soft)" : "transparent", marginBottom: 2 } },
         Icon && h(Icon, { name: t.icon || (sub ? "wrench" : "folder"), size: sub ? 12 : 14, color: on ? "var(--brand)" : (t.tone === "warn" ? "var(--warn)" : t.tone === "brand" ? "var(--brand)" : "var(--ink-faint)") }),
         h("span", { style: { flex: 1, fontSize: sub ? 12.5 : 13, fontWeight: on ? 800 : sub ? 500 : 600, color: ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, t.label),
         t.count != null && h("span", { style: { fontSize: 11, fontFamily: "var(--font-mono)", color: on ? "var(--brand)" : "var(--ink-faint)", background: on ? "#fff" : "var(--surface-3)", borderRadius: 999, padding: "1px 7px" } }, t.count));
@@ -142,7 +154,8 @@
       h("div", { style: { padding: 6 } },
         ...items.map((t) => h("div", { key: t.key },
           btn(t, false),
-          t.children && h("div", { style: { paddingLeft: 14 } }, ...t.children.map((c) => btn(c, true)))))));
+          t.children && h("div", { style: { paddingLeft: 14 } }, ...t.children.map((c) => btn(c, true)))))),
+      footer && h("div", { style: { padding: "8px 10px", borderTop: "1px solid var(--line)" } }, footer));
   }
 
   // —— 页面状态面板（state: loading|empty|error|forbidden；compact 只缩高度不改语义）——
