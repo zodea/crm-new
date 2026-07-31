@@ -299,8 +299,10 @@ export async function loadQuantityVarianceFacts(
       trade: first.trade,
       unit: first.unit ?? '',
       contractQty: adjustment.approvedDeltaQty,
-      provisionalQty: 0,
-      fieldQty: 0,
+      // 签证只调整合同量，暂估量与现场量里没有对应事实。填 0 会让工资口径下
+      // 凭空出现「结余」并被算进合计；按缺值处理才如实暴露「签证量尚未落到三量」。
+      provisionalQty: null,
+      fieldQty: null,
       effectiveUnitPrice: adjustment.effectiveUnitPrice,
       updatedAt: adjustment.updatedAt,
     })

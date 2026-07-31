@@ -50,15 +50,37 @@ describe('工程量量差总表', () => {
     expect(unallocatedChange).toMatchObject({
       sourceLineCount: 1,
       contractQty: 2,
-      basisQty: 0,
-      differenceQty: -2,
+      basisQty: null,
+      differenceQty: null,
       contractUnitPrice: 260,
-      differenceAmount: -520,
+      differenceAmount: null,
+      basisStatus: 'missing',
+      missingBasisCount: 1,
     })
     expect(rows
       .filter(row => row.itemName === '墙砖铺贴')
       .reduce((sum, row) => sum + (row.contractQty ?? 0), 0))
       .toBe(232)
+  })
+
+  it('待分摊签证只调整合同量，工资口径下按缺值暴露而不产生虚假结余', async () => {
+    const facts = await loadQuantityVarianceFacts(db, 'proj_demo_001')
+    const contractChange = buildQuantityVarianceRows(facts, 'contract')
+      .find(row => row.buildingName === '待分摊签证')
+    expect(contractChange).toMatchObject({
+      contractQty: 2,
+      basisQty: 2,
+      differenceQty: 0,
+      differenceAmount: 0,
+      basisStatus: 'complete',
+    })
+
+    for (const basis of ['provisional', 'field'] as const) {
+      const change = buildQuantityVarianceRows(facts, basis)
+        .find(row => row.buildingName === '待分摊签证')
+      expect(change?.basisQty, basis).toBeNull()
+      expect(change?.differenceAmount, basis).toBeNull()
+    }
   })
 
   it('只采用已审批的最新价格变更，草稿变更不得进入金额口径', async () => {
@@ -108,7 +130,8 @@ describe('工程量量差总表', () => {
     )
     expect(unallocatedChange).toMatchObject({
       contractUnitPrice: 300,
-      differenceAmount: -600,
+      differenceAmount: null,
+      basisStatus: 'missing',
     })
   })
 
