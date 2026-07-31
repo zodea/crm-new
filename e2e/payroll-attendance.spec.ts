@@ -13,7 +13,11 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
     await page.goto('/subcontract/payroll')
     await expect(page.getByRole('heading', { name: '工资核算' }).last()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText(/合同量仅用于收入、量差和毛利对照/)).toBeVisible()
-    await page.getByRole('link', { name: '新建工资草稿' }).click()
+    // 台账筛选是异步载入的，链接带上 query 才说明筛选已就绪。
+    // 不等这一步就点，等于在载入中途导航，用例会偶发失败在 URL 上。
+    const newDraft = page.getByRole('link', { name: '新建工资草稿' })
+    await expect(newDraft).toHaveAttribute('href', /\/subcontract\/payroll\/new\?/)
+    await newDraft.click()
     await expect(page).toHaveURL(/\/subcontract\/payroll\/new\?/)
     await expect(page.getByRole('heading', { name: '新建工资草稿' })).toBeVisible()
     const source = page.getByRole('combobox', { name: '工资取数口径' })
