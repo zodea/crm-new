@@ -1,12 +1,13 @@
 // PayManageScreen — 付款管理（按实现端 app/components/finance/payment-management/* 校准的待支付工作台）
 // 校准依据：PaymentManagementScreen.vue 四段构图（工具栏 / 5 指标汇总 / 待支付·已付清·全部 SegTab / 分页表格）
 // + stores/payment-management.ts 口径：
-//   范围     = 只看已批复申请（实现端 status IN approved/已审批/已批复；设计稿数据=剔除「审批中」）
-//   已支付   = Σ 已确认支付记录的申请分摊（设计稿演绎：Σ payRecords[payApplyId=本申请].amount）
+//   范围     = 只看已批复申请（实现端 status IN approved/已审批/已批复 白名单；设计稿词表加「已付款」——
+//              该词表付款后状态改写为已付款，实现端付款后仍是 approved 故无此项）
+//   已支付   = Σ 已确认支付记录的申请分摊（仅计 status=已确认，对应实现端 confirmation_status='confirmed'）
 //   应付余额 = max(批复金额 − 已支付, 0)，正数标红
 //   支付状态 = 批复为 0 / 待支付 / 部分支付 / 已付清 / 超额支付（推导列，非存储字段）
-//   回票状态 = 待回票 / 部分回票 / 已回票 / 无需发票（设计稿演绎：invoiceState 已收票→已回票、待追回→待回票；
-//              演示数据无发票分摊明细，「部分回票」不出现）
+//   回票状态 = 待回票 / 部分回票 / 已回票 / 无需发票（按发票分摊 Σ invoiceLinks.iLink 对批复金额推导；
+//              invoiceState 是回票类型输入字段，仅「无需发票」直接决定状态）
 // 本页不新建申请（工具栏无新建按钮，同实现端）；行操作=查看付款申请 / 登记支付记录。
 // 简化点：实现端「登记支付记录」带申请/金额/项目/分供方预填参数跳新建；设计稿 payRecordForm 暂不消费
 // 预填参数（仍原样传 payApplyId 以备表单侧接入），效果等于进入空白新建。
@@ -33,13 +34,18 @@
 
     // —— 行口径推导（对齐 stores/payment-management.ts 的 mapRow）——
     const payRecords = A.rows("payRecords");
-    const paidOf = (id) => r2(payRecords.filter((z) => z.payApplyId === id).reduce((s, z) => s + (Number(z.amount) || 0), 0));
+    const paidOf = (id) => r2(payRecords.filter((z) => z.payApplyId === id && z.status === "已确认").reduce((s, z) => s + (Number(z.amount) || 0), 0));
     const payStatus = (approved, paid) => approved <= 0 ? "批复为 0"
       : paid <= 0 ? "待支付" : paid < approved ? "部分支付" : paid > approved ? "超额支付" : "已付清";
-    const invStatus = (state) => state === "无需发票" ? "无需发票" : state === "已收票" ? "已回票" : "待回票";
+    // 回票状态按发票分摊推导（payment-management.ts 口径）；invoiceState 只有「无需发票」直接决定状态
+    const invStatus = (r, approved) => {
+      if (r.invoiceState === "无需发票") return "无需发票";
+      const linked = r2((r.invoiceLinks || []).reduce((s, l) => s + (Number(l.iLink) || 0), 0));
+      return linked <= 0 ? "待回票" : approved > 0 && linked < approved ? "部分回票" : "已回票";
+    };
 
     const base = A.rows("payApplies")
-      .filter((r) => r.status !== "审批中")                               // 只看已批复
+      .filter((r) => ["已审批", "已批复", "已付款"].includes(r.status))   // 只看已批复（白名单，表单新写入的 草稿/已提交 不进本工作台）
       .map((r) => {
         const approved = r2(Number(r.approvedAmount) || 0);
         const paid = paidOf(r.id);
@@ -52,7 +58,7 @@
           approvedAmount: approved, paidAmount: paid,
           dueAmount: r2(Math.max(approved - paid, 0)),
           paymentStatus: payStatus(approved, paid),
-          invoiceStatus: invStatus(r.invoiceState),
+          invoiceStatus: invStatus(r, approved),
           applyDate: r.applyDate || "",
         };
       });

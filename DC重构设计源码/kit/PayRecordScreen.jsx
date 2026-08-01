@@ -16,7 +16,7 @@
 
     const rows = A.rows("payRecords").map((r) => ({
       id: r.id,
-      name: r.account || "",                                                // 名称=收款方
+      name: r.payeeName || r.account || "",                                 // 名称=收款方（实现端 payee_name AS display_name；旧演示行兜底账户名）
       no: r.no || "",
       projectName: r.projectId ? projName(r.projectId) : "公司付款",        // SQL COALESCE(project.name, '公司付款')
       partyName: (A.get("payApplies", r.payApplyId) || {}).name || "—",     // 关联方=用途（关联付款申请名）

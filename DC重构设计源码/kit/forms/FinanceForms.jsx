@@ -16,8 +16,8 @@
 //      draftNo/draftDue=承兑汇票号/到期日、periodLabel=收款期次、bankRef=银行流水号、buyer/buyerTaxNo=购方、
 //      tax=税额、rate=税率(存"9%"字符串，表单按数字展示)、content/remark=开票内容/票面备注、date=各单据日期、
 //      account/bank/bankNo=收款账户三件套、items/settleLinks/invoiceLinks=明细网格。实现端对应字段见各表单注释。
-//   ④ 实现端有而 data.js 无演示值的新字段（reviewStatus、payeeName、purpose、approvalNote、allocations、
-//      source、ocrPayload、fieldConfidence 等）直接补上，旧行表单留空即可。
+//   ④ 实现端有的新字段直接补上；其中必填字段（payeeName/voucherNo/bankRef 等）在 data.js 已补演示值，
+//      否则存量行会被保存校验拦死。非必填新字段（reviewStatus、purpose、ocrPayload 等）旧行表单留空即可。
 //   ⑤ 勾稽近似：实现端关联结算/发票/付款申请分摊均为真实实体 lookup 单列 + 金额 + 备注三列网格；
 //      设计稿无勾稽数据源，以「单号/名称/源单金额」多列 text 近似 lookup 信息，分摊金额列对齐 summaryKeys。
 //   ⑥ 付款申请业务类型对齐实现端 PAYMENT_BIZ_TYPES 10 类（表单内可改，同实现端）；PayApplyScreen 的
