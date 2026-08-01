@@ -39,12 +39,13 @@
       { key: "name", label: "项目名称" },
       { key: "region", label: "工程地域" },
     ],
+    // 演示行与 data.js 全局世界观同源（合和新城系项目/客户；地域=广州各区）
     files: [
-      { row: { developer: "宏远置业", status: "在建", name: "宏远云著一期", region: "华东" } },
-      { row: { developer: "宏远置业", status: "收尾", name: "宏远云著二期", region: "华东" } },
-      { row: { developer: "泽信地产", status: "在建", name: "泽信璟园", region: "华南" } },
-      { row: { developer: "明州城投", status: "结算", name: "明州人才公寓", region: "华东" } },
-      { row: { developer: "", status: "在建", name: "老旧片区改造试点", region: "华北" } }, // 空客户 → 预览演示 fallback「未分类客户」
+      { row: { developer: "合和地产集团", status: "在建", name: "合和新城", region: "广州·白云" } },
+      { row: { developer: "锦绣置业有限公司", status: "在建", name: "锦绣华庭", region: "广州·番禺" } },
+      { row: { developer: "翠湖投资", status: "收尾", name: "翠湖花园", region: "广州·黄埔" } },
+      { row: { developer: "天河城建投资", status: "在建", name: "车陂商业大楼", region: "广州·天河" } },
+      { row: { developer: "", status: "在建", name: "科学城人才公寓", region: "广州·黄埔" } }, // 空客户 → 预览演示 fallback「未分类客户」
     ],
   };
   // 空值兜底（实现端由 structure/naming 规则的 fallback 字段携带）
