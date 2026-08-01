@@ -49,7 +49,7 @@
           { key: "date", label: "日期", width: 128, mono: true },
           { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
         ]}
-        rows={rows} tableMinWidth={1200}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
         footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
       />
     );

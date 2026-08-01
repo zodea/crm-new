@@ -10,11 +10,14 @@
 //   预览导入步  ：ImportPreviewStep.vue —— 前 200 行预览表 + 行级「删除」剔除异实体行（导入开始后锁定）+
 //                 「导入进度」done/total 条 + 失败面板「重试失败行」续导（已成功行不重复）+ 页脚 取消/上一步/开始导入。
 //   未登记实体  ：路由参数不在注册表 → 警示空态「导入实体未登记」+「关闭此页签」。
-// 与 2026-07-30 文字规格版的差异：实现端没有「行级拒绝清单 / 下载拒绝清单 / 可导入统计卡 / 返回来源列表按钮 /
-// 自动匹配·人工指定标注 / 源列在左版式」，一律删除；三色态、必填门控、失败续导、页脚门控文案按实现端补齐。
+// 与 2026-07-30 文字规格版的差异：实现端没有「可导入统计卡 / 返回来源列表按钮 / 自动匹配·人工指定标注 /
+// 源列在左版式」，一律删除；三色态、必填门控、失败续导、页脚门控文案按实现端补齐。
+// 行级拒绝清单为 #70 US45 目标态（2026-08-01 裁定：确认需要，实现端 useImportRunner 待补逐行校验）：
+//   validateRow 逐行校验，不过 → 整行拒绝进清单并继续（不阻断）；完成后有拒绝行则不自动关页签，
+//   展示 行号/关键值/拒绝原因 清单 + 下载拒绝清单。瞬时故障（FAIL 前缀）仍走「失败停+续导」，两者语义并存。
 // 演示数据内置于本屏（匿名虚构），不改 data.js：
-//   - supplier 实体字段取实现端 import-entities.ts SUPPLIER_FIELDS 的匿名子集；
-//   - invoice 实体在实现端注册表尚未登记（#70 US45 待开发），此处按同一通用结构预演（发票专属的行级拒绝不在通用屏内）；
+//   - supplier 实体字段取实现端 import-entities.ts SUPPLIER_FIELDS 的匿名子集；末行公司全称为空 → 行级拒绝；
+//   - invoice 实体在实现端注册表尚未登记（#70 US45 待开发），按同一通用结构预演；末行缺归属 → 整行拒绝；
 //   - 「匹配标识」以 FAIL 开头的行首次写入失败、重试成功 —— 对应实现端 demo-supplier 的失败续导旅程。
 // 设计稿运行时：取消/导入完成后 navigate 回来源列表，模拟实现端「关闭页签并回到上一页签」。
 (function () {
@@ -60,10 +63,14 @@
         // FAIL 前缀：首次写入失败、重试成功（对应实现端 demo-supplier 的演示瞬时故障）
         { "供应商": "众邦装饰工程有限公司", "类别": "专业分包", "简称": "众邦装饰", "信用代码": "913100000000000107", "法人": "周奕", "联系人": "周奕", "联系电话": "13800000107", "开票资料": "普通发票", "匹配标识": "FAIL-S07" },
         { "供应商": "川南幕墙科技有限公司", "类别": "专业分包", "简称": "川南幕墙", "信用代码": "913100000000000108", "法人": "吴刚", "联系人": "吴刚", "联系电话": "13800000108", "开票资料": "增值税专用发票", "匹配标识": "LG-S08" },
+        // 行级拒绝演示（#70 US45 目标态）：必填「公司全称」为空 → 整行拒绝进清单，不阻断其余行
+        { "供应商": "", "类别": "材料供应", "简称": "未名建材", "信用代码": "913100000000000109", "法人": "钱枫", "联系人": "钱枫", "联系电话": "13800000109", "开票资料": "普通发票", "匹配标识": "LG-S09" },
       ],
+      // 逐行校验（实现端 useImportRunner 待补的行级拒绝口径；返回 null=通过 / 字符串=拒绝原因）
+      validateRow: (r) => (!r.name ? "必填字段「公司全称」为空，整行拒绝" : null),
     },
     // 发票台账：实现端注册表尚未登记（#70 US45 待开发），按目标态预演同一通用结构；
-    // 发票域「缺归属整行拒绝」等专属校验属于该实体未来的 importRow 内部逻辑，不改变本屏结构。
+    // 「缺归属整行拒绝」以 validateRow 演示（2026-08-01 裁定：行级拒绝确认需要，实现端补齐）。
     invoice: {
       key: "invoice", label: "发票台账", back: "invoiceLedger",
       file: "发票台账_2026-06.xlsx",
@@ -87,7 +94,10 @@
         { "发票号码": "04400000014", "开票日期": "2026-06-16", "购方名称": "瑞航建设集团有限公司", "销方名称": "明诚检测技术有限公司", "价税合计": "10600.00", "税额": "600.00", "发票类型": "增值税专用发票", "项目": "临江商务楼", "经办人": "郑一鸣" },
         { "发票号码": "04400000015", "开票日期": "2026-06-21", "购方名称": "瑞航建设集团有限公司", "销方名称": "泰安商品混凝土有限公司", "价税合计": "226000.00", "税额": "26000.00", "发票类型": "增值税专用发票", "项目": "云悦府一期", "经办人": "何静" },
         { "发票号码": "04400000016", "开票日期": "2026-06-28", "购方名称": "瑞航建设集团有限公司", "销方名称": "宏图钢结构工程有限公司", "价税合计": "339000.00", "税额": "39000.00", "发票类型": "增值税专用发票", "项目": "临江商务楼", "经办人": "郑一鸣" },
+        // 缺归属整行拒绝演示（#70 US45）：「项目」为空 → 该行拒绝进清单，其余行照常写入
+        { "发票号码": "04400000017", "开票日期": "2026-06-30", "购方名称": "瑞航建设集团有限公司", "销方名称": "众邦装饰工程有限公司", "价税合计": "41200.00", "税额": "1200.00", "发票类型": "普通发票", "项目": "", "经办人": "何静" },
       ],
+      validateRow: (r) => (!r.project ? "缺归属：未指定对应项目，整行拒绝" : null),
     },
   };
 
@@ -226,7 +236,8 @@
     const [mapping, setMapping] = React.useState({});        // 字段 key → { column, confidence }
     const [excluded, setExcluded] = React.useState({});      // 原始行号 → true（删除按它记账，不随过滤位移）
     const [run, setRun] = React.useState({ phase: "idle", done: 0, total: 0, error: null });
-    const rt = React.useRef({ rows: [], done: 0 });          // 运行游标（重试从失败行续导）
+    const [rejected, setRejected] = React.useState([]);      // 行级拒绝清单（#70 US45 目标态）
+    const rt = React.useRef({ rows: [], done: 0, rejected: [] }); // 运行游标（重试从失败行续导）
     const failedOnce = React.useRef({});                     // FAIL 行首次失败记账（重试成功）
     const timer = React.useRef(null);
     // 对应实现端 onUnmounted → runner.cancel()：离开本屏即停止推进
@@ -303,13 +314,32 @@
     const tick = () => {
       const rows = rt.current.rows; const i = rt.current.done;
       if (i >= rows.length) {
+        const rej = rt.current.rejected;
+        const okCount = i - rej.length;
         setRun({ phase: "completed", done: i, total: rows.length, error: null });
-        UI.toast("已导入 " + i + " 行：" + cfg.label, "ok");
-        // 成功只发一条 system toast，然后自动关闭页签（此处以回来源列表模拟）
-        timer.current = setTimeout(() => navigate(cfg.back), 800);
+        if (rej.length) {
+          // 有行级拒绝：不自动关页签，留在本页展示拒绝清单（#70 US45）
+          UI.toast("已导入 " + okCount + " 行，" + rej.length + " 行被拒绝：" + cfg.label, "warn");
+        } else {
+          UI.toast("已导入 " + okCount + " 行：" + cfg.label, "ok");
+          // 成功只发一条 system toast，然后自动关闭页签（此处以回来源列表模拟）
+          timer.current = setTimeout(() => navigate(cfg.back), 800);
+        }
         return;
       }
       timer.current = setTimeout(() => {
+        // 行级校验（#70 US45 目标态）：不通过 → 整行拒绝进清单，跳过继续，不阻断导入
+        const vErr = cfg.validateRow ? cfg.validateRow(rows[i]) : null;
+        if (vErr) {
+          const keyField = cfg.fields[0];
+          const keyVal = rows[i][keyField.key];
+          rt.current.rejected.push({ rowNo: i + 1, keyLabel: keyField.label, keyVal: keyVal == null || keyVal === "" ? "—" : String(keyVal), reason: vErr });
+          rt.current.done = i + 1;
+          setRejected(rt.current.rejected.slice());
+          setRun({ phase: "running", done: i + 1, total: rows.length, error: null });
+          tick();
+          return;
+        }
         const ref = String(rows[i].externalRef == null ? "" : rows[i].externalRef);
         if (ref.indexOf("FAIL") === 0 && !failedOnce.current[ref]) {
           failedOnce.current[ref] = 1;
@@ -322,8 +352,9 @@
       }, 110);
     };
     const startImport = () => {
-      if (run.phase === "running" || !kept.length) return;
-      rt.current = { rows: kept.map((e) => e.row), done: 0 };
+      if (run.phase === "running" || run.phase === "completed" || !kept.length) return;
+      rt.current = { rows: kept.map((e) => e.row), done: 0, rejected: [] };
+      setRejected([]);
       setRun({ phase: "running", done: 0, total: kept.length, error: null });
       tick();
     };
@@ -529,6 +560,42 @@
               </P>
             ) : null}
 
+            {/* 行级拒绝清单（#70 US45 目标态；2026-08-01 裁定确认需要，实现端 useImportRunner 待补逐行校验） */}
+            {run.phase === "completed" && rejected.length ? (
+              <div role="alert" style={{ marginTop: 16, border: "1px solid rgba(217,119,6,0.4)", borderRadius: "var(--radius-btn)", background: "var(--warn-soft)", overflow: "hidden" }}>
+                <div style={{ padding: 12 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--warn-ink)" }}>行级拒绝清单 · {rejected.length} 行未写入</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--ink-soft)" }}>
+                    被拒绝的行未写入台账，已导入的 {run.done - rejected.length} 行不受影响；修正源文件后可重新发起导入。
+                  </p>
+                </div>
+                <div style={{ overflowX: "auto", background: "#fff" }}>
+                  <table style={{ width: "100%", minWidth: 520, borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", textAlign: "left" }}>
+                        <th style={{ padding: "7px 12px", fontSize: 11, fontWeight: 700, color: "var(--ink-faint)", width: 54 }}>行号</th>
+                        <th style={{ padding: "7px 12px", fontSize: 11, fontWeight: 700, color: "var(--ink-faint)" }}>{rejected[0].keyLabel}</th>
+                        <th style={{ padding: "7px 12px", fontSize: 11, fontWeight: 700, color: "var(--ink-faint)" }}>拒绝原因</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rejected.map((r) => (
+                        <tr key={r.rowNo} style={{ borderBottom: "1px solid var(--line)" }}>
+                          <td style={{ padding: "7px 12px", fontFamily: "var(--font-mono)", color: "var(--ink-faint)" }}>{r.rowNo}</td>
+                          <td style={{ padding: "7px 12px", color: "var(--ink)" }}>{r.keyVal}</td>
+                          <td style={{ padding: "7px 12px", color: "var(--danger-ink)", fontWeight: 600 }}>{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ padding: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {Button ? <Button icon="download" onClick={() => UI.toast("已下载拒绝清单（演示）：" + rejected.length + " 行", "ok")}>下载拒绝清单</Button> : null}
+                  {Button ? <Button variant="ghost" onClick={cancelTab}>关闭页签</Button> : null}
+                </div>
+              </div>
+            ) : null}
+
             {run.phase === "failed" ? (
               /* 失败面板：保留页签、从失败行续导（已成功行不重复入库） */
               <div role="alert" style={{ marginTop: 16, padding: 12, border: "1px solid rgba(220,38,38,0.35)", borderRadius: "var(--radius-btn)", background: "var(--danger-soft)" }}>
@@ -547,7 +614,7 @@
                   {Button ? <Button variant="secondary" disabled={locked} onClick={() => { if (!locked) setStep("mapping"); }}>上一步</Button> : null}
                   {Button ? (
                     <Button variant="accent" icon={run.phase === "running" ? "loader-circle" : undefined}
-                      disabled={!kept.length || run.phase === "running"} onClick={startImport}>
+                      disabled={!kept.length || run.phase === "running" || run.phase === "completed"} onClick={startImport}>
                       开始导入
                     </Button>
                   ) : null}

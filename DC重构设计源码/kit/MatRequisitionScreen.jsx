@@ -1,6 +1,6 @@
 // MatRequisitionScreen — 下料单（按实现端 app/components/material/MaterialListScreen.vue kind=mat_requisition 校准）
 // 标准单表列表：# / 材料对象(link) / 编号 / 项目 / 数量 / 日期 / 状态 / 操作(编辑+删除)；底部数量合计。
-// 实现端没有视图 chip/下拉筛选/导入导出/列显隐 —— 一并不放（形态铁律见 kit/StdListScreen.jsx 头注释）。
+// 筛选/分页为 #199/#200 验收条目标态（2026-08-01 裁定：实现端待补齐，设计稿先行）；其余形态铁律见 kit/StdListScreen.jsx 头注释。
 (function () {
   if (window.MatRequisitionScreen) return;
 
@@ -37,7 +37,7 @@
           { key: "date", label: "日期", width: 128, mono: true },
           { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
         ]}
-        rows={rows} tableMinWidth={1100}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"name",label:"材料"}, {key:"status",label:"状态"}]} tableMinWidth={1100}
         footerSummary={(list) => ({ label: "当前数量合计", value: list.reduce((s, r) => s + r.quantity, 0).toLocaleString("zh-CN") })}
       />
     );

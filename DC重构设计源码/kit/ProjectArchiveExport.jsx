@@ -52,9 +52,17 @@
         L("01/" + s.dir, s.dir, phaseDone[i] != null ? phaseDone[i] : nf("01/" + s.dir + proj.id, 0, 3),
           { taskTotal: s.taskTotal }))));
 
-    // 02 分供方：01_甲供材(来源=omTotals 的甲供来源单位) / 02_乙供材(来源=本项目 分包+材采 合同的乙方)
+    // 02 分供方：01_甲供材(供货单位) / 02_乙供材(来源=本项目 分包+材采 合同的乙方)
+    // 甲供材供货单位：数据仓暂无独立供货商实体（omTotals.party 是甲方），按 #248 2026-08-01 裁定
+    // 先以固定虚构供货商名对齐演示世界观；正式建模后把这里换成真实供货商数据源即可。
+    const OM_SUPPLIERS = ["广州粤建钢材贸易有限公司", "广州珠联水泥制品有限公司"];
     const jgParties = []; const seenP = {};
-    rows("omTotals").forEach((o) => { if (o.projectId === proj.id && o.party && !seenP[o.party]) { seenP[o.party] = 1; jgParties.push(o.party); } });
+    rows("omTotals").forEach((o) => {
+      if (o.projectId === proj.id && o.party && !seenP[o.party]) {
+        seenP[o.party] = 1;
+        jgParties.push(OM_SUPPLIERS[jgParties.length % OM_SUPPLIERS.length]);
+      }
+    });
     const nJg = G("02/jg", "01_甲供材", "package", jgParties.map((p) => {
       const k = "02/jg/" + p;
       return G(k, p, "truck", [
