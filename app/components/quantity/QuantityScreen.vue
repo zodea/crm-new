@@ -41,6 +41,7 @@ const completionDialogOpen = shallowRef(false)
 const completionUnitId = shallowRef('')
 const completionInitialStageId = shallowRef('')
 const batchCompletionDialogOpen = shallowRef(false)
+const varianceDialogOpen = shallowRef(false)
 const boqLineId = computed(() => String(route.query.boqLine ?? ''))
 const fromBoq = computed(() => Boolean(boqLineId.value))
 
@@ -360,6 +361,7 @@ onMounted(initialize)
       @toggle-archive="toggleArchive"
       @manage-regions="openRegions"
       @manage-templates="openTemplates"
+      @view-variance="varianceDialogOpen = true"
       @manage-assignments="openAssignments()"
       @refresh="retry"
     />
@@ -510,6 +512,13 @@ onMounted(initialize)
       :project-id="projectId"
       :initial-building-id="buildingId"
       :initial-trade="trade"
+    />
+
+    <QuantityVarianceDialog
+      v-if="projectId"
+      v-model:open="varianceDialogOpen"
+      :project-id="projectId"
+      :initial-building-id="buildingId"
     />
   </div>
 </template>

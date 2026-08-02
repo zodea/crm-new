@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type {
   PayrollWorkbenchOptions,
-  WageFormatFamily,
-  WagePeriodKind,
   WageStatementFilter,
-  WageStatementPurpose,
 } from '~/lib/payroll/statements'
-import type { WageQuantitySource } from '~/lib/quantity/wage-source'
-import { computed, reactive, shallowRef, watch } from 'vue'
+import { computed } from 'vue'
+import {
+  payrollDraftLocation,
+  payrollFilterQuery,
+} from '~/lib/payroll/navigation'
 
 const props = defineProps<{
   options: PayrollWorkbenchOptions
@@ -16,149 +16,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:filters': [filters: WageStatementFilter]
-  'create': [input: {
-    projectId: string
-    crewId: string | null
-    leaderWorkerId: string
-    month: string
-    purpose: WageStatementPurpose
-    periodKind: WagePeriodKind
-    formatFamily: WageFormatFamily
-    quantitySource: WageQuantitySource
-    payRatio: number
-    memberWorkerIds: string[]
-    dailyRate?: number
-    overtimeRate?: number
-    c2Rate?: number
-    dayworkRuleText?: string
-    adjustmentReason?: string
-    operatorName?: string
-  }]
 }>()
 
-const open = shallowRef(false)
-const draft = reactive({
-  projectId: props.filters.projectId ?? '',
-  crewId: props.filters.crewId ?? '',
-  leaderWorkerId: '',
-  month: props.filters.month ?? new Date().toISOString().slice(0, 7),
-  purpose: 'advance' as WageStatementPurpose,
-  periodKind: 'monthly' as WagePeriodKind,
-  formatFamily: 'A' as WageFormatFamily,
-  quantitySource: 'provisional' as WageQuantitySource,
-  payRatioPercent: 80,
-  memberWorkerIds: [] as string[],
-  dailyRate: 400,
-  overtimeRate: 50,
-  c2Rate: 350,
-  dayworkRuleText: '当日用工由证明人确认后生效；半工按 0.5 工计。',
-  adjustmentReason: '',
-  operatorName: '',
-})
-
-const eligibleWorkers = computed(() =>
-  props.options.workers.filter(worker => !draft.crewId || worker.crewId === draft.crewId),
-)
-const eligibleMembers = computed(() =>
-  eligibleWorkers.value.filter((worker) => {
-    if (worker.id === draft.leaderWorkerId)
-      return false
-    const leader = eligibleWorkers.value.find(candidate => candidate.id === draft.leaderWorkerId)
-    return worker.crewId === leader?.crewId
-  }),
-)
-const activeC2Config = computed(() =>
-  props.options.c2SubjectConfigs.find(config =>
-    config.projectId === draft.projectId
-    && config.leaderWorkerId === draft.leaderWorkerId,
-  ),
-)
-
-watch(() => props.filters, (filters) => {
-  draft.projectId = filters.projectId ?? draft.projectId
-  draft.crewId = filters.crewId ?? draft.crewId
-  draft.month = filters.month ?? draft.month
-}, { deep: true })
-
-watch(() => draft.crewId, () => {
-  if (!eligibleWorkers.value.some(worker => worker.id === draft.leaderWorkerId))
-    draft.leaderWorkerId = eligibleWorkers.value[0]?.id ?? ''
-}, { immediate: true })
-
-watch(() => draft.purpose, (purpose) => {
-  if (purpose === 'final')
-    draft.quantitySource = 'field'
-  if (purpose === 'advance' && draft.periodKind !== 'monthly')
-    draft.periodKind = 'monthly'
-})
-
-watch(() => draft.periodKind, (periodKind) => {
-  if (periodKind === 'monthly')
-    return
-  draft.purpose = 'final'
-  draft.quantitySource = 'field'
-  draft.payRatioPercent = periodKind === 'retention' ? 100 : 95
-})
-
-watch(() => draft.formatFamily, (formatFamily) => {
-  if (formatFamily !== 'C1' && formatFamily !== 'C2')
-    return
-  draft.periodKind = 'monthly'
-  draft.purpose = 'advance'
-  if (formatFamily === 'C2') {
-    draft.quantitySource = 'field'
-    draft.payRatioPercent = 100
-    if (activeC2Config.value) {
-      draft.c2Rate = activeC2Config.value.unitRate
-      draft.dayworkRuleText = activeC2Config.value.ruleText
-    }
-  }
-})
-
-watch(() => draft.leaderWorkerId, () => {
-  draft.memberWorkerIds = draft.memberWorkerIds.filter(id =>
-    eligibleMembers.value.some(worker => worker.id === id),
-  )
-})
-
-watch(activeC2Config, (config) => {
-  if (!config || draft.formatFamily !== 'C2')
-    return
-  draft.c2Rate = config.unitRate
-  draft.dayworkRuleText = config.ruleText
-}, { immediate: true })
+const draftLocation = computed(() => payrollDraftLocation(props.filters))
+const relatedQuery = computed(() => payrollFilterQuery(props.filters))
 
 function patchFilter(key: keyof WageStatementFilter, value: string) {
   emit('update:filters', { ...props.filters, [key]: value })
 }
-
-function submit() {
-  if (!draft.projectId || !draft.leaderWorkerId)
-    return
-  emit('create', {
-    projectId: draft.projectId,
-    crewId: draft.crewId || null,
-    leaderWorkerId: draft.leaderWorkerId,
-    month: draft.month,
-    purpose: draft.purpose,
-    periodKind: draft.periodKind,
-    formatFamily: draft.formatFamily,
-    quantitySource: draft.quantitySource,
-    payRatio: draft.payRatioPercent / 100,
-    memberWorkerIds: [...draft.memberWorkerIds],
-    dailyRate: draft.formatFamily === 'C1' ? draft.dailyRate : undefined,
-    overtimeRate: draft.formatFamily === 'C1' ? draft.overtimeRate : undefined,
-    c2Rate: draft.formatFamily === 'C2' ? draft.c2Rate : undefined,
-    dayworkRuleText: draft.formatFamily === 'C2' ? draft.dayworkRuleText : undefined,
-    adjustmentReason: draft.adjustmentReason,
-    operatorName: draft.operatorName,
-  })
-  open.value = false
-}
 </script>
 
 <template>
-  <section class="panel p-4" aria-label="工资筛选与建单">
+  <section class="panel p-4" aria-label="工资筛选与入口">
     <div class="flex flex-wrap items-end gap-3">
       <label class="field">
         <span>项目</span>
@@ -204,139 +73,28 @@ function submit() {
           <option value="released">已发放</option>
         </select>
       </label>
-      <button type="button" class="btn-primary ml-auto" @click="open = !open">
-        生成月度草稿
-      </button>
-      <NuxtLink to="/subcontract/attendance" class="btn-secondary">
-        打开考勤
-      </NuxtLink>
-      <NuxtLink to="/subcontract/daywork" class="btn-secondary">
-        录入 C2 签工
-      </NuxtLink>
+
+      <div class="ml-auto flex flex-wrap items-center gap-2">
+        <NuxtLink :to="draftLocation" class="btn-primary">
+          新建工资草稿
+        </NuxtLink>
+        <NuxtLink :to="{ path: '/subcontract/attendance', query: relatedQuery }" class="btn-secondary">
+          打开考勤
+        </NuxtLink>
+        <NuxtLink :to="{ path: '/subcontract/daywork', query: relatedQuery }" class="btn-secondary">
+          录入 C2 签工
+        </NuxtLink>
+      </div>
     </div>
 
-    <form v-if="open" class="mt-4 grid gap-3 border-t border-line pt-4 md:grid-cols-3 xl:grid-cols-6" @submit.prevent="submit">
-      <label class="field">
-        <span>建单项目</span>
-        <select v-model="draft.projectId" required>
-          <option v-for="project in options.projects" :key="project.id" :value="project.id">
-            {{ project.name }}
-          </option>
-        </select>
-      </label>
-      <label class="field">
-        <span>责任班组</span>
-        <select v-model="draft.crewId">
-          <option value="">个人责任</option>
-          <option v-for="crew in options.crews" :key="crew.id" :value="crew.id">
-            {{ crew.name }}
-          </option>
-        </select>
-      </label>
-      <label class="field">
-        <span>请款负责人</span>
-        <select v-model="draft.leaderWorkerId" required>
-          <option v-for="worker in eligibleWorkers" :key="worker.id" :value="worker.id">
-            {{ worker.name }}
-          </option>
-        </select>
-      </label>
-      <label class="field">
-        <span>格式族</span>
-        <select v-model="draft.formatFamily" aria-label="工资格式族">
-          <option value="A">A · 户型派生</option>
-          <option value="B" disabled>B · 合同清单直报（后续）</option>
-          <option value="C1">C1 · 月薪时工</option>
-          <option value="C2">C2 · 零星签工</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>单据用途</span>
-        <select v-model="draft.purpose" aria-label="单据用途">
-          <option value="advance">进度预付</option>
-          <option value="final">最终结算</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>期间档</span>
-        <select v-model="draft.periodKind" aria-label="工资期间档">
-          <option value="monthly">月度进度</option>
-          <option value="settlement" :disabled="draft.formatFamily === 'C1' || draft.formatFamily === 'C2'">结算 95%</option>
-          <option value="retention" :disabled="draft.formatFamily === 'C1' || draft.formatFamily === 'C2'">尾款 100%</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>工资取数口径</span>
-        <select v-model="draft.quantitySource" aria-label="工资取数口径" :disabled="draft.purpose === 'final' || draft.formatFamily === 'C2'">
-          <option value="provisional">暂估量</option>
-          <option value="field">现场复核量</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>本月发放比例</span>
-        <input v-model.number="draft.payRatioPercent" type="number" min="0" max="100" step="1">
-      </label>
-      <template v-if="draft.formatFamily === 'C1'">
-        <label class="field">
-          <span>档案未配置时默认日薪</span>
-          <input v-model.number="draft.dailyRate" aria-label="C1 日薪" type="number" min="0" step="0.01">
-        </label>
-        <label class="field">
-          <span>档案未配置时默认加班时薪</span>
-          <input v-model.number="draft.overtimeRate" aria-label="C1 加班时薪" type="number" min="0" step="0.01">
-        </label>
-      </template>
-      <template v-else-if="draft.formatFamily === 'C2'">
-        <label class="field">
-          <span>默认大工单价</span>
-          <input v-model.number="draft.c2Rate" aria-label="C2 大工单价" type="number" min="0.01" step="0.01">
-        </label>
-        <label class="field md:col-span-2 xl:col-span-5">
-          <span>签工确认规则</span>
-          <input v-model="draft.dayworkRuleText" aria-label="C2 签工确认规则" type="text">
-        </label>
-      </template>
-      <fieldset class="md:col-span-3 xl:col-span-6">
-        <legend class="mb-2 text-12px font-700 text-ink-soft">
-          请款簿组员
-        </legend>
-        <div class="flex flex-wrap gap-2">
-          <label
-            v-for="worker in eligibleMembers"
-            :key="worker.id"
-            class="inline-flex items-center gap-2 rounded border border-line px-2 py-1 text-12px text-ink"
-          >
-            <input v-model="draft.memberWorkerIds" type="checkbox" :value="worker.id">
-            {{ worker.name }}
-          </label>
-          <span v-if="!eligibleMembers.length" class="text-11px text-ink-faint">当前范围暂无可选组员</span>
-        </div>
-      </fieldset>
-      <label class="field md:col-span-1 xl:col-span-2">
-        <span>经办人</span>
-        <input v-model="draft.operatorName" aria-label="工资经办人" type="text" placeholder="用于发放快照审计">
-      </label>
-      <label class="field md:col-span-2 xl:col-span-4">
-        <span>人工调整原因</span>
-        <input v-model="draft.adjustmentReason" aria-label="工资调整原因" type="text" placeholder="如有手工调价，请填写原因">
-      </label>
-      <div class="md:col-span-3 xl:col-span-6 flex items-center justify-between gap-3">
-        <p class="text-11px text-ink-soft">
-          <template v-if="draft.formatFamily === 'B'">
-            B 类必须从合同清单解析工资行；来源未接入前禁止按 A 类工程量代建。
-          </template>
-          <template v-else-if="draft.formatFamily === 'C2'">
-            C2 只汇总本月已确认签工；待确认记录不会计薪，也不会生成考勤。
-          </template>
-          <template v-else>
-            合同量只用于收支与量差对比，不会进入工资取数。
-          </template>
-        </p>
-        <button type="submit" class="btn-primary" :disabled="draft.formatFamily === 'B'">
-          确认生成草稿
-        </button>
-      </div>
-    </form>
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-11px text-ink-faint">
+      <p>
+        A、C1、C2 在同一工资工作台建单、核对与发放；已发放单据仅展示冻结快照。
+      </p>
+      <p>
+        B · 合同清单直报：等待合同工资清单关系接入
+      </p>
+    </div>
   </section>
 </template>
 
@@ -349,6 +107,7 @@ function submit() {
   font-size: .75rem;
   font-weight: 700;
 }
+
 .field select,
 .field input {
   height: 2.25rem;

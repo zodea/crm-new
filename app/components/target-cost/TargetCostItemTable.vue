@@ -2,8 +2,15 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TargetCostDetailItem } from '~/lib/target-cost/detail'
 
-defineProps<{
+withDefaults(defineProps<{
   items: readonly TargetCostDetailItem[]
+  editable?: boolean
+}>(), {
+  editable: true,
+})
+
+const emit = defineEmits<{
+  edit: []
 }>()
 
 const columns: KitTableColumn[] = [
@@ -29,6 +36,15 @@ const columns: KitTableColumn[] = [
           当前版本共 {{ items.length }} 行；金额来自该版本自身明细。
         </p>
       </div>
+      <KitButton
+        v-if="editable"
+        type="button"
+        variant="secondary"
+        @click="emit('edit')"
+      >
+        <span class="i-lucide-list-pen mr-1" aria-hidden="true" />
+        编辑科目明细
+      </KitButton>
     </div>
     <KitTable
       :columns="columns"
@@ -37,7 +53,7 @@ const columns: KitTableColumn[] = [
       :resizable="true"
       :empty="{
         title: '当前版本尚无科目明细',
-        description: '可先编辑版本头；科目维护能力后续仍在本详情工作台内闭环。',
+        description: '点击“编辑科目明细”，按成本科目补充预算行。',
       }"
     />
   </section>

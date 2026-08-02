@@ -37,6 +37,7 @@ export interface KitEditGridPicker<T extends KitEditGridRow = KitEditGridRow> {
 export interface KitEditGridValidationError {
   row: number
   key: string
+  message?: string
 }
 
 function isEmpty(value: unknown): boolean {

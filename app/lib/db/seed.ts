@@ -398,13 +398,15 @@ export async function seedScheduleDemo(db: MigrationDb) {
             )
             await db.execute(
               `INSERT INTO schedule_task_floor_plans
-                (id, task_id, floor_id, boq_line_id, planned_start, planned_finish, sort_order)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, task_id, floor_id, item_id, boq_line_id, source_basis,
+                 planned_start, planned_finish, sort_order)
+               VALUES (?, ?, ?, ?, ?, 'contract', ?, ?, ?)
                ON CONFLICT DO NOTHING`,
               [
                 `schedule_floor_plan_demo_${index + 1}_${mapIndex + 1}_${floorIndex + 1}`,
                 id,
                 floor.id,
+                itemId,
                 boqLineId,
                 addCalendarDays(plannedStart, startOffset),
                 addCalendarDays(plannedStart, finishOffset),

@@ -26,42 +26,96 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
     crewId: '',
     month: currentMonth(),
   })
-  const loading = ref(false)
-  const error = ref('')
+  const loading = shallowRef(false)
+  const saving = shallowRef(false)
+  const error = shallowRef('')
+  let loadSequence = 0
 
-  async function load() {
+  async function load(loadOptions: { clearFacts?: boolean } = {}) {
+    const sequence = ++loadSequence
+    const requestedScope = {
+      projectId: filters.projectId,
+      crewId: filters.crewId,
+      month: filters.month,
+    }
+    if (loadOptions.clearFacts) {
+      records.value = []
+      blockedWorkerIds.value = []
+    }
     loading.value = true
     error.value = ''
     try {
       const db = await getDb()
-      options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      if (!filters.projectId)
-        filters.projectId = options.value.projects[0]?.id ?? ''
-      if (filters.projectId)
-        options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      if (filters.projectId) {
-        [records.value, blockedWorkerIds.value] = await Promise.all([
-          listAttendanceRecords(db, filters),
-          listAttendanceBlockedWorkerIds(db, filters),
-        ])
+      let projectId = requestedScope.projectId
+      let nextOptions = await loadPayrollWorkbenchOptions(db, projectId)
+      if (!projectId) {
+        projectId = nextOptions.projects[0]?.id ?? ''
+        if (projectId)
+          nextOptions = await loadPayrollWorkbenchOptions(db, projectId)
       }
-      else {
-        records.value = []
-        blockedWorkerIds.value = []
-      }
+      const crewId = requestedScope.crewId
+        && nextOptions.crews.some(crew => crew.id === requestedScope.crewId)
+        ? requestedScope.crewId
+        : ''
+      const [nextRecords, nextBlockedWorkerIds] = projectId
+        ? await Promise.all([
+            listAttendanceRecords(db, {
+              projectId,
+              crewId,
+              month: requestedScope.month,
+            }),
+            listAttendanceBlockedWorkerIds(db, {
+              projectId,
+              month: requestedScope.month,
+            }),
+          ])
+        : [[], []]
+      const scopeChangedDuringLoad = (
+        filters.projectId !== requestedScope.projectId
+        || filters.crewId !== requestedScope.crewId
+        || filters.month !== requestedScope.month
+      )
+      if (sequence !== loadSequence || scopeChangedDuringLoad)
+        return
+      filters.projectId = projectId
+      filters.crewId = crewId
+      options.value = nextOptions
+      records.value = nextRecords
+      blockedWorkerIds.value = nextBlockedWorkerIds
     }
     catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      if (sequence === loadSequence)
+        error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
-      loading.value = false
+      if (sequence === loadSequence)
+        loading.value = false
     }
   }
 
   async function save(input: Parameters<typeof upsertAttendanceRecord>[1]) {
-    await withTransaction(tx => upsertAttendanceRecord(tx, input))
-    await load()
+    if (saving.value)
+      return false
+    saving.value = true
+    try {
+      await withTransaction(tx => upsertAttendanceRecord(tx, input))
+      await load()
+      return true
+    }
+    finally {
+      saving.value = false
+    }
   }
 
-  return { records, options, blockedWorkerIds, filters, loading, error, load, save }
+  return {
+    records,
+    options,
+    blockedWorkerIds,
+    filters,
+    loading,
+    saving,
+    error,
+    load,
+    save,
+  }
 })

@@ -8,6 +8,15 @@ async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
+// 现场复核单元格静态态只显示计算结果，进入编辑态才暴露算式输入框。
+async function editFieldFormula(row: import('@playwright/test').Locator) {
+  const editor = row.getByRole('textbox', { name: '现场复核算式' })
+  if (!await editor.isVisible())
+    await row.getByRole('button', { name: /现场复核量.*点击编辑算式/ }).click()
+  await expect(editor).toBeVisible()
+  return editor
+}
+
 async function openTemplateForm(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: '户型模板', exact: true }).click()
   await expect(page).toHaveURL(/\/subcontract\/quantity\/template\?/)
@@ -27,8 +36,9 @@ test.describe('Issue #103 Slice 3：户型模板活链接与三量', () => {
     const wallItem = form.getByRole('combobox', { name: /分项 .*墙砖铺贴/ }).first()
     const wallRow = wallItem.locator('xpath=ancestor::tr')
     await wallRow.getByRole('combobox', { name: '录入来源' }).selectOption('field')
-    const formula = wallRow.getByRole('textbox', { name: '现场复核算式' })
+    const formula = await editFieldFormula(wallRow)
     await formula.fill('客厅（2＋3）×4')
+    await formula.press('Enter')
     await expect(wallRow).toContainText('20')
 
     await form.getByRole('button', { name: '保存模板' }).click()
@@ -48,9 +58,11 @@ test.describe('Issue #103 Slice 3：户型模板活链接与三量', () => {
     form = await openTemplateForm(page)
     await expect(form.getByLabel('户型名称 *')).toHaveValue('A户型（现场修订）')
     const savedWallRow = form.getByRole('combobox', { name: /分项 .*墙砖铺贴/ }).first().locator('xpath=ancestor::tr')
-    await expect(savedWallRow.getByRole('textbox', { name: '现场复核算式' })).toHaveValue('客厅（2＋3）×4')
+    await expect(savedWallRow).toContainText('20')
+    const savedFormula = await editFieldFormula(savedWallRow)
+    await expect(savedFormula).toHaveValue('客厅（2＋3）×4')
 
-    await savedWallRow.getByRole('textbox', { name: '现场复核算式' }).fill('2÷0')
+    await savedFormula.fill('2÷0')
     await expect(savedWallRow.getByRole('alert')).toContainText('不能除以 0')
     await form.getByRole('button', { name: '保存模板' }).click()
     await expect(page.getByText(/现场量算式无效.*不能除以 0/)).toBeVisible()
@@ -79,7 +91,9 @@ test.describe('Issue #103 Slice 3：户型模板活链接与三量', () => {
     await form.getByRole('textbox', { name: '新分项工种' }).fill('油漆工')
     const manualRow = form.getByRole('combobox', { name: /分项 .*第一遍腻子/ }).locator('xpath=ancestor::tr')
     await manualRow.getByRole('combobox', { name: '录入来源' }).selectOption('field')
-    await manualRow.getByRole('textbox', { name: '现场复核算式' }).fill('整户：2×5')
+    const manualFormula = await editFieldFormula(manualRow)
+    await manualFormula.fill('整户：2×5')
+    await manualFormula.press('Enter')
     await expect(manualRow).toContainText('10')
 
     await form.getByRole('button', { name: '保存模板' }).click()

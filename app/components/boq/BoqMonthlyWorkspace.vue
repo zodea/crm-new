@@ -2,7 +2,13 @@
 import type { MonthlyStatementLineView, MonthlyStatementView } from '~/lib/boq/monthly'
 import type { BoqWorkspace } from '~/lib/boq/read-model'
 import type { KitTableColumn } from '~/lib/kit/table'
+import type { QuantityBasis } from '~/lib/quantity/basis'
+import { DEFAULT_PROGRESS_QUANTITY_BASIS } from '~/lib/boq/monthly'
 import { BOQ_MONTHLY_STATUS_LABEL } from '~/lib/boq/presentation'
+import {
+  QUANTITY_BASIS_LABELS,
+  QUANTITY_BASIS_OPTIONS,
+} from '~/lib/quantity/basis'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 defineProps<{
@@ -13,7 +19,9 @@ defineProps<{
 
 const emit = defineEmits<{
   select: [statementId: string]
-  generate: [month: string]
+  generate: [payload: { month: string, basis: QuantityBasis }]
+  regenerate: [payload: { statementId: string, basis: QuantityBasis }]
+  basisMismatch: [label: string]
   adjust: [payload: { lineId: string, adjustedQty: number, note: string }]
   export: [statement: MonthlyStatementView]
 }>()
@@ -41,18 +49,65 @@ const columns: KitTableColumn[] = [
 async function generate() {
   const values = await formModal({
     title: '生成月度报量',
-    subtitle: '按 #103 已完成的报量阶段，取当前量 × 已签证合同价自动汇总。',
+    subtitle: '按已完成的报量阶段，取所选基准量 × 已签证合同价汇总；所选基准缺量时不代用其他口径。',
     saveText: '生成草稿',
+    fields: [
+      {
+        key: 'month',
+        label: '报量月份',
+        value: toLocalDateInputValue().slice(0, 7),
+        placeholder: 'yyyy-mm',
+        required: true,
+      },
+      {
+        key: 'basis',
+        label: '取数基准',
+        type: 'select',
+        options: QUANTITY_BASIS_OPTIONS.map(option => option.label),
+        value: QUANTITY_BASIS_LABELS[DEFAULT_PROGRESS_QUANTITY_BASIS],
+        required: true,
+      },
+    ],
+  })
+  if (!values)
+    return
+  // formModal 的 select 只承载标签，这里按标签回查枚举。回查不中说明标签与枚举
+  // 已经不同步，此时必须报错：静默落回默认基准会让用户选「合同量」却拿到现场量单据。
+  const basis = QUANTITY_BASIS_OPTIONS
+    .find(option => option.label === String(values.basis))
+    ?.value
+  if (!basis) {
+    emit('basisMismatch', String(values.basis))
+    return
+  }
+  emit('generate', { month: String(values.month), basis })
+}
+
+async function changeBasis(statement: MonthlyStatementView) {
+  const values = await formModal({
+    title: `更换「${statement.month}」取数基准`,
+    subtitle: '仅草稿可换。重算会按新基准覆盖自动量与合价，已填的手调量将被清除。',
+    saveText: '重算草稿',
     fields: [{
-      key: 'month',
-      label: '报量月份',
-      value: toLocalDateInputValue().slice(0, 7),
-      placeholder: 'yyyy-mm',
+      key: 'basis',
+      label: '取数基准',
+      type: 'select',
+      options: QUANTITY_BASIS_OPTIONS.map(option => option.label),
+      value: QUANTITY_BASIS_LABELS[statement.quantityBasis],
       required: true,
     }],
   })
-  if (values)
-    emit('generate', String(values.month))
+  if (!values)
+    return
+  const basis = QUANTITY_BASIS_OPTIONS
+    .find(option => option.label === String(values.basis))
+    ?.value
+  if (!basis) {
+    emit('basisMismatch', String(values.basis))
+    return
+  }
+  if (basis !== statement.quantityBasis)
+    emit('regenerate', { statementId: statement.id, basis })
 }
 
 async function adjust(line: MonthlyStatementLineView) {
@@ -124,9 +179,31 @@ async function adjust(line: MonthlyStatementLineView) {
           </h2>
           <p class="text-11px text-ink-soft">
             {{ BOQ_MONTHLY_STATUS_LABEL[statement.status] }} · 共 {{ statement.lines.length }} 个分项
+            · 取数基准 {{ statement.quantityBasisLabel }}
+          </p>
+          <p v-if="statement.sourceVersion" class="mt-0.5 text-10px text-ink-faint">
+            来源版本 {{ statement.sourceVersion }}
+            <template v-if="statement.sourceUpdatedAt">
+              · 数据更新于 {{ statement.sourceUpdatedAt }}
+            </template>
+            <template v-if="statement.submittedAt">
+              · 申报于 {{ statement.submittedAt }}
+            </template>
+            <template v-if="statement.operatorName">
+              · 经办 {{ statement.operatorName }}
+            </template>
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
+          <button
+            v-if="statement.status === 'draft'"
+            type="button"
+            class="btn-secondary"
+            :disabled="busy"
+            @click="changeBasis(statement)"
+          >
+            <span class="i-lucide-refresh-cw mr-1" /> 换基准重算
+          </button>
           <NuxtLink
             :to="`/owner/report/${statement.id}`"
             class="btn-secondary"
@@ -164,7 +241,7 @@ async function adjust(line: MonthlyStatementLineView) {
             选择或生成一份月度报量
           </p>
           <p class="mt-1 text-11px text-ink-soft">
-            自动量来自已完成的报量阶段，合同价来自已签证 BOQ。
+            自动量来自已完成的报量阶段按所选基准取数，合同价来自已签证 BOQ。
           </p>
         </div>
       </div>

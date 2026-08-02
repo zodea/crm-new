@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { ScheduleOverlapMode } from '~/lib/schedule/planning'
+import type {
+  ScheduleProvisionalBuildingPreview,
+  ScheduleProvisionalScopePreview,
+} from '~/stores/schedule'
 import { addCalendarDays, calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -13,12 +17,24 @@ interface TaskDraft {
   predecessorDisabled: boolean
 }
 
+interface ScheduleWizardDraft {
+  projectId: string
+  contractId: string
+  scopeBasis: 'contract' | 'provisional'
+  processLibraryId: string
+  name: string
+  startDate: string
+  overlapMode: ScheduleOverlapMode
+  buildingIds: string[]
+  tasks: TaskDraft[]
+}
+
 type WizardStep = 1 | 2 | 3
 
 const route = useRoute()
 const router = useRouter()
 const store = useScheduleStore()
-const { confirm, error, success } = useKitUI()
+const { confirm, error, success, warning } = useKitUI()
 
 const projectId = shallowRef('')
 const contractId = shallowRef('')
@@ -31,7 +47,9 @@ const buildingIds = ref<string[]>([])
 const tasks = ref<TaskDraft[]>([])
 const initialized = shallowRef(false)
 const loadingRange = shallowRef(false)
+const loadError = shallowRef('')
 const currentStep = shallowRef<WizardStep>(1)
+const provisionalPreview = shallowRef<ScheduleProvisionalScopePreview | null>(null)
 
 const templateByKey = computed(() => new Map(store.processTasks.map(template => [template.key, template])))
 const plannedRows = computed(() => planTemplateTasks(startDate.value, overlapMode.value, tasks.value.map(task => ({
@@ -76,6 +94,15 @@ const outsideBuildingNames = computed(() => store.buildingCoverage
   .filter(building => !building.inContract)
   .map(building => building.name)
   .join('、'))
+const provisionalBuildingPreviewById = computed(() => new Map(
+  (provisionalPreview.value?.buildings ?? []).map(building => [building.buildingId, building]),
+))
+const selectedProvisionalBuildings = computed(() => buildingIds.value
+  .map(id => provisionalBuildingPreviewById.value.get(id))
+  .filter((building): building is ScheduleProvisionalBuildingPreview => Boolean(building)))
+const disabledConflictCount = computed(() => tasks.value
+  .filter(task => task.enabled && task.predecessorDisabled)
+  .length)
 const wizardSteps = [
   { step: 1, label: '确定范围', hint: '项目、依据与楼栋' },
   { step: 2, label: '调整工序', hint: '工序库、工期与日期' },
@@ -102,15 +129,111 @@ function processValidationMessage(): string | null {
   return null
 }
 
-function nextStep() {
+const provisionalRangeBlockers = computed(() => {
+  if (scopeBasis.value !== 'provisional' || !provisionalPreview.value)
+    return []
+  const blockers: string[] = []
+  for (const buildingId of buildingIds.value) {
+    const building = store.buildings.find(candidate => candidate.id === buildingId)
+    const label = building?.name ?? buildingId
+    const preview = provisionalBuildingPreviewById.value.get(buildingId)
+    if (!preview?.floorCount) {
+      blockers.push(`${label}未维护楼层`)
+      continue
+    }
+    if (!preview.unitCount) {
+      blockers.push(`${label}未维护户`)
+      continue
+    }
+    if (preview.typedUnitCount < preview.unitCount) {
+      blockers.push(`${label}有${preview.unitCount - preview.typedUnitCount}户未关联户型`)
+      continue
+    }
+    if (!preview.itemCount || preview.totalQty <= 0) {
+      blockers.push(`${label}无有效暂估量`)
+    }
+  }
+  return blockers
+})
+const provisionalTaskBlockers = computed(() => {
+  if (scopeBasis.value !== 'provisional' || !provisionalPreview.value)
+    return []
+  const blockers: string[] = []
+  for (const buildingId of buildingIds.value) {
+    const building = store.buildings.find(candidate => candidate.id === buildingId)
+    const label = building?.name ?? buildingId
+    const preview = provisionalBuildingPreviewById.value.get(buildingId)
+    if (
+      !preview?.floorCount
+      || !preview.unitCount
+      || preview.typedUnitCount < preview.unitCount
+      || !preview.itemCount
+      || preview.totalQty <= 0
+    ) {
+      continue
+    }
+    const availableCodes = new Set(preview.itemCodes)
+    for (const task of tasks.value.filter(candidate => candidate.enabled)) {
+      const template = templateByKey.value.get(task.templateKey)
+      const itemCodes = template?.itemCodes ?? []
+      if (itemCodes.length && !itemCodes.some(code => availableCodes.has(code)))
+        blockers.push(`${label}缺少「${template?.name ?? task.templateKey}」暂估量`)
+    }
+  }
+  return blockers
+})
+const confirmationBlockers = computed(() => {
+  const blockers = [
+    rangeValidationMessage(),
+    processValidationMessage(),
+  ].filter((message): message is string => Boolean(message))
+  blockers.push(...provisionalRangeBlockers.value, ...provisionalTaskBlockers.value)
+  return blockers
+})
+const coverageReview = computed(() => {
+  if (scopeBasis.value === 'contract') {
+    return `合同 ${coverageSummary.value.contract} 栋 · 已纳入 ${coverageSummary.value.scheduled} 栋 · 本次 ${buildingIds.value.length} 栋 · 超范围 ${coverageSummary.value.outside} 栋`
+  }
+  const preview = provisionalPreview.value
+  if (!preview)
+    return `本次 ${buildingIds.value.length} 栋 · 暂估量待核对`
+  const itemCodes = new Set(selectedProvisionalBuildings.value.flatMap(building => building.itemCodes))
+  const unitCount = selectedProvisionalBuildings.value
+    .reduce((sum, building) => sum + building.unitCount, 0)
+  const totalQty = selectedProvisionalBuildings.value
+    .reduce((sum, building) => sum + building.totalQty, 0)
+  return `${buildingIds.value.length} 栋 · ${unitCount} 户 · ${itemCodes.size} 个有效分项 · 暂估量 ${totalQty}`
+})
+
+async function nextStep() {
   if (currentStep.value === 1 && (!initialized.value || loadingRange.value))
     return
-  const validation = currentStep.value === 1
-    ? rangeValidationMessage()
-    : processValidationMessage()
-  if (validation) {
-    error(validation)
+  const blockers = currentStep.value === 1
+    ? [rangeValidationMessage(), ...provisionalRangeBlockers.value]
+    : [
+        processValidationMessage(),
+        ...provisionalRangeBlockers.value,
+        ...provisionalTaskBlockers.value,
+      ]
+  const blocker = blockers.find((message): message is string => Boolean(message))
+  if (blocker) {
+    error(blocker)
     return
+  }
+  if (currentStep.value === 2 && scopeBasis.value === 'provisional') {
+    try {
+      provisionalPreview.value = await store.previewProvisionalScope(
+        store.buildings.map(building => building.id),
+      )
+    }
+    catch (cause) {
+      loadError.value = `内部暂估范围核对失败：${toErrorMessage(cause)}`
+      error(loadError.value)
+      return
+    }
+  }
+  else if (currentStep.value === 2) {
+    provisionalPreview.value = null
   }
   if (currentStep.value < 3)
     currentStep.value = (currentStep.value + 1) as WizardStep
@@ -140,6 +263,7 @@ function predecessorLabel(templateKey: string): string {
 
 async function loadRange(reset = true) {
   loadingRange.value = true
+  loadError.value = ''
   await nextTick()
   try {
     await store.loadContracts(projectId.value)
@@ -155,6 +279,15 @@ async function loadRange(reset = true) {
     )
     if (reset)
       buildingIds.value = store.buildings.map(building => building.id)
+    provisionalPreview.value = scopeBasis.value === 'provisional'
+      ? await store.previewProvisionalScope(store.buildings.map(building => building.id))
+      : null
+    return true
+  }
+  catch (cause) {
+    loadError.value = `排程范围加载失败：${toErrorMessage(cause)}`
+    error(loadError.value)
+    return false
   }
   finally {
     loadingRange.value = false
@@ -287,6 +420,11 @@ watch(contractId, async (next, previous) => {
   try {
     await store.loadBuildings(projectId.value, next)
     buildingIds.value = store.buildings.map(building => building.id)
+    provisionalPreview.value = null
+  }
+  catch (cause) {
+    loadError.value = `合同楼栋范围加载失败：${toErrorMessage(cause)}`
+    error(loadError.value)
   }
   finally {
     loadingRange.value = false
@@ -310,6 +448,13 @@ watch(scopeBasis, async (next, previous) => {
     }
     await store.loadBuildings(projectId.value, next === 'contract' ? contractId.value : '')
     buildingIds.value = store.buildings.map(building => building.id)
+    provisionalPreview.value = next === 'provisional'
+      ? await store.previewProvisionalScope(store.buildings.map(building => building.id))
+      : null
+  }
+  catch (cause) {
+    loadError.value = `排程范围加载失败：${toErrorMessage(cause)}`
+    error(loadError.value)
   }
   finally {
     loadingRange.value = false
@@ -319,10 +464,16 @@ watch(scopeBasis, async (next, previous) => {
 watch(processLibraryId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
-  const loaded = await store.loadProcessLibraryTasks(next)
-  if (processLibraryId.value !== next || store.processTasksLibraryId !== next)
-    return
-  resetProcessTasks(loaded)
+  try {
+    const loaded = await store.loadProcessLibraryTasks(next)
+    if (processLibraryId.value !== next || store.processTasksLibraryId !== next)
+      return
+    resetProcessTasks(loaded)
+  }
+  catch (cause) {
+    loadError.value = `标准工序加载失败：${toErrorMessage(cause)}`
+    error(loadError.value)
+  }
 })
 
 function toggleBuilding(id: string) {
@@ -331,12 +482,79 @@ function toggleBuilding(id: string) {
     : [...buildingIds.value, id]
 }
 
+function provisionalBuildingStatus(id: string) {
+  const preview = provisionalBuildingPreviewById.value.get(id)
+  if (!preview)
+    return { label: '暂估量核对中', blocked: true }
+  if (!preview.floorCount)
+    return { label: '缺楼层', blocked: true }
+  if (!preview.unitCount)
+    return { label: `${preview.floorCount} 层 · 缺户`, blocked: true }
+  if (preview.typedUnitCount < preview.unitCount) {
+    return {
+      label: `${preview.floorCount} 层 · ${preview.unitCount} 户 · ${preview.unitCount - preview.typedUnitCount} 户缺户型`,
+      blocked: true,
+    }
+  }
+  if (!preview.itemCount || preview.totalQty <= 0) {
+    return {
+      label: `${preview.floorCount} 层 · ${preview.unitCount} 户 · 无有效暂估量`,
+      blocked: true,
+    }
+  }
+  return {
+    label: `${preview.floorCount} 层 · ${preview.unitCount} 户 · ${preview.itemCount} 项 · 暂估量 ${preview.totalQty}`,
+    blocked: false,
+  }
+}
+
+function draftStorageKey(id: string) {
+  return `schedule-new-region-draft:${id}`
+}
+
+function saveDraftForRegion() {
+  if (!projectId.value || typeof window === 'undefined')
+    return
+  const draft: ScheduleWizardDraft = {
+    projectId: projectId.value,
+    contractId: contractId.value,
+    scopeBasis: scopeBasis.value,
+    processLibraryId: processLibraryId.value,
+    name: name.value,
+    startDate: startDate.value,
+    overlapMode: overlapMode.value,
+    buildingIds: [...buildingIds.value],
+    tasks: tasks.value.map(task => ({ ...task })),
+  }
+  window.sessionStorage.setItem(draftStorageKey(projectId.value), JSON.stringify(draft))
+}
+
+function readRegionDraft(id: string): ScheduleWizardDraft | null {
+  if (route.query.resume !== 'region' || !id || typeof window === 'undefined')
+    return null
+  const serialized = window.sessionStorage.getItem(draftStorageKey(id))
+  if (!serialized)
+    return null
+  try {
+    const parsed = JSON.parse(serialized) as ScheduleWizardDraft
+    return parsed.projectId === id ? parsed : null
+  }
+  catch {
+    return null
+  }
+}
+
+function clearRegionDraft(id: string) {
+  if (id && typeof window !== 'undefined')
+    window.sessionStorage.removeItem(draftStorageKey(id))
+}
+
 function toggleAllTasks(enabled: boolean) {
   tasks.value = tasks.value.map(task => ({ ...task, enabled }))
 }
 
 async function submit() {
-  const validation = rangeValidationMessage() ?? processValidationMessage()
+  const validation = confirmationBlockers.value[0]
   if (validation) {
     error(validation)
     return
@@ -370,21 +588,62 @@ async function submit() {
   }
 }
 
-onMounted(async () => {
-  await Promise.all([store.loadCatalog(), store.loadProcessLibraries()])
-  processLibraryId.value = store.processLibraries.find(library => library.isDefault)?.id
-    ?? store.processLibraries[0]?.id
-    ?? ''
-  if (processLibraryId.value) {
-    const loaded = await store.loadProcessLibraryTasks(processLibraryId.value)
-    resetProcessTasks(loaded)
+async function initialize() {
+  initialized.value = false
+  loadError.value = ''
+  try {
+    await Promise.all([store.loadCatalog(), store.loadProcessLibraries()])
+    const requested = String(route.query.project ?? '')
+    const requestedProjectId = store.catalog.find(project => project.id === requested)?.id
+      ?? store.catalog[0]?.id
+      ?? ''
+    const restoredDraft = readRegionDraft(requestedProjectId)
+    processLibraryId.value = restoredDraft
+      && store.processLibraries.some(library => library.id === restoredDraft.processLibraryId)
+      ? restoredDraft.processLibraryId
+      : store.processLibraries.find(library => library.isDefault)?.id
+        ?? store.processLibraries[0]?.id
+        ?? ''
+    if (processLibraryId.value) {
+      const loaded = await store.loadProcessLibraryTasks(processLibraryId.value)
+      resetProcessTasks(loaded)
+      if (restoredDraft) {
+        const restoredTasks = new Map(restoredDraft.tasks.map(task => [task.templateKey, task]))
+        tasks.value = tasks.value.map(task => ({ ...task, ...restoredTasks.get(task.templateKey) }))
+      }
+    }
+    projectId.value = requestedProjectId
+    if (projectId.value)
+      await loadRange(true)
+    if (restoredDraft) {
+      name.value = restoredDraft.name
+      startDate.value = restoredDraft.startDate
+      overlapMode.value = restoredDraft.overlapMode
+      scopeBasis.value = restoredDraft.scopeBasis
+      contractId.value = restoredDraft.contractId
+      await loadRange(false)
+      const availableIds = new Set(store.buildings.map(building => building.id))
+      const restoredBuildingIds = restoredDraft.buildingIds.filter(id => availableIds.has(id))
+      const removedBuildingCount = restoredDraft.buildingIds.length - restoredBuildingIds.length
+      buildingIds.value = restoredBuildingIds.length || restoredDraft.buildingIds.length
+        ? restoredBuildingIds
+        : store.buildings.map(building => building.id)
+      if (removedBuildingCount) {
+        warning(`区域配置已变化，已从排程范围移除 ${removedBuildingCount} 栋失效楼栋，请重新核对范围`)
+      }
+      clearRegionDraft(requestedProjectId)
+    }
   }
-  const requested = String(route.query.project ?? '')
-  projectId.value = store.catalog.find(project => project.id === requested)?.id ?? store.catalog[0]?.id ?? ''
-  if (projectId.value)
-    await loadRange(true)
-  initialized.value = true
-})
+  catch (cause) {
+    loadError.value = `排程向导加载失败：${toErrorMessage(cause)}`
+    error(loadError.value)
+  }
+  finally {
+    initialized.value = true
+  }
+}
+
+onMounted(initialize)
 </script>
 
 <template>
@@ -403,7 +662,7 @@ onMounted(async () => {
       </div>
     </header>
 
-    <nav class="wizard-stepper panel" aria-label="新建排程步骤">
+    <nav v-if="!loadError" class="wizard-stepper panel" aria-label="新建排程步骤">
       <div
         v-for="item in wizardSteps"
         :key="item.step"
@@ -425,7 +684,26 @@ onMounted(async () => {
     </nav>
 
     <section
-      v-if="currentStep === 1"
+      v-if="loadError"
+      class="panel grid min-h-56 place-items-center p-5 text-center"
+      role="alert"
+    >
+      <div class="max-w-xl">
+        <span class="i-lucide-circle-alert text-24px text-danger" aria-hidden="true" />
+        <h2 class="mt-2 text-14px font-800 text-ink">
+          排程向导加载失败
+        </h2>
+        <p class="mt-1 text-12px text-danger">
+          {{ loadError }}
+        </p>
+        <button type="button" class="btn-primary mt-3" @click="initialize">
+          重新加载
+        </button>
+      </div>
+    </section>
+
+    <section
+      v-else-if="currentStep === 1"
       class="panel mx-auto w-full max-w-5xl p-4 sm:p-5"
       data-schedule-wizard-step="1"
     >
@@ -495,10 +773,21 @@ onMounted(async () => {
             <span v-if="coverageSummary.outside" class="chip-warn">超合同范围 {{ coverageSummary.outside }}</span>
           </div>
           <div v-if="store.buildings.length" class="building-grid mt-2 max-h-92 overflow-y-auto pr-1">
-            <label v-for="building in store.buildings" :key="building.id" class="flex min-w-0 items-center gap-2 rounded px-2 py-2 text-12px hover:bg-surface-2">
+            <label v-for="building in store.buildings" :key="building.id" class="flex min-w-0 items-start gap-2 rounded px-2 py-2 text-12px hover:bg-surface-2">
               <input :checked="buildingIds.includes(building.id)" type="checkbox" class="shrink-0 accent-[var(--brand)]" @change="toggleBuilding(building.id)">
-              <span class="min-w-0 truncate">{{ building.name }}</span>
-              <span class="shrink-0 text-ink-faint">{{ building.code }}</span>
+              <span class="min-w-0 flex-1">
+                <span class="flex min-w-0 items-center gap-2">
+                  <b class="min-w-0 truncate font-700 text-ink">{{ building.name }}</b>
+                  <span class="shrink-0 text-ink-faint">{{ building.code }}</span>
+                </span>
+                <small
+                  v-if="scopeBasis === 'provisional'"
+                  class="mt-0.5 block"
+                  :class="provisionalBuildingStatus(building.id).blocked ? 'text-danger' : 'text-ink-faint'"
+                >
+                  {{ provisionalBuildingStatus(building.id).label }}
+                </small>
+              </span>
             </label>
           </div>
           <p v-else class="mt-2 text-11px text-danger">
@@ -506,6 +795,21 @@ onMounted(async () => {
               ? '清单未提供可验证的显式楼栋范围，或合同范围已全部纳入排程。'
               : '当前项目尚未维护可用楼栋，或楼栋已全部纳入排程。' }}
           </p>
+          <NuxtLink
+            v-if="scopeBasis === 'provisional' && !store.buildings.length"
+            :to="{
+              path: '/subcontract/quantity/region',
+              query: {
+                project: projectId || undefined,
+                return: 'schedule',
+                resume: 'region',
+              },
+            }"
+            class="btn-primary mt-3 w-fit"
+            @click="saveDraftForRegion"
+          >
+            配置楼栋、楼层与户
+          </NuxtLink>
           <p v-if="scopeBasis === 'contract' && outsideBuildingNames" class="mt-2 text-10px text-ink-faint">
             项目库中不属于本合同：{{ outsideBuildingNames }}
           </p>
@@ -643,7 +947,25 @@ onMounted(async () => {
         <div><span>标准工序</span><strong>{{ enabledCount }} 道</strong></div>
         <div><span>计划开始</span><strong>{{ startDate }}</strong></div>
         <div><span>预计完成</span><strong>{{ finishDate }}</strong></div>
+        <div><span>覆盖核对</span><strong :title="coverageReview">{{ coverageReview }}</strong></div>
+        <div>
+          <span>依赖冲突</span>
+          <strong>{{ disabledConflictCount ? `${disabledConflictCount} 条已确认置灰` : '无冲突' }}</strong>
+        </div>
+        <div>
+          <span>阻断项</span>
+          <strong :class="confirmationBlockers.length ? 'text-danger' : 'text-ok'">
+            {{ confirmationBlockers.length ? `${confirmationBlockers.length} 项待处理` : '0 项，可生成' }}
+          </strong>
+        </div>
       </div>
+      <p
+        v-if="confirmationBlockers.length"
+        class="mx-4 mb-4 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-11px text-danger sm:mx-5"
+        role="alert"
+      >
+        {{ confirmationBlockers.join('；') }}
+      </p>
       <p
         v-if="scopeBasis === 'provisional'"
         class="mx-4 mb-4 rounded-lg border border-warning/30 bg-warning/8 px-3 py-2 text-11px text-warning sm:mx-5"
@@ -686,7 +1008,7 @@ onMounted(async () => {
       </div>
     </section>
 
-    <footer class="wizard-actions panel">
+    <footer v-if="!loadError" class="wizard-actions panel">
       <button v-if="currentStep > 1" type="button" class="btn-ghost" @click="previousStep">
         上一步
       </button>
@@ -700,7 +1022,13 @@ onMounted(async () => {
       >
         {{ currentStep === 1 ? '下一步：选择工序' : '下一步：预览排程' }}
       </button>
-      <button v-else type="button" class="btn-accent" :disabled="store.saving" @click="submit">
+      <button
+        v-else
+        type="button"
+        class="btn-accent"
+        :disabled="store.saving || confirmationBlockers.length > 0"
+        @click="submit"
+      >
         <span v-if="store.saving" class="i-lucide-loader-circle mr-1 animate-spin" />
         生成排程
       </button>

@@ -63,8 +63,10 @@ beforeEach(async () => {
   await db.execute(`INSERT INTO task_item_map (id, task_id, item_id, boq_line_id) VALUES
     ('task-map-wall', 'task-wall', 'item-wall', 'boq-wall')`)
   await db.execute(`INSERT INTO schedule_task_floor_plans
-    (id, task_id, floor_id, boq_line_id, planned_start, planned_finish, sort_order) VALUES
-    ('floor-plan-wall', 'task-wall', 'f1', 'boq-wall', '2026-07-01', '2026-07-10', 10)`)
+    (id, task_id, floor_id, item_id, boq_line_id, source_basis,
+     planned_start, planned_finish, sort_order) VALUES
+    ('floor-plan-wall', 'task-wall', 'f1', 'item-wall', 'boq-wall', 'contract',
+     '2026-07-01', '2026-07-10', 10)`)
   await db.execute(`INSERT INTO task_dependencies
     (id, pred_id, succ_id, dependency_type, lag_days) VALUES
     ('dep', 'task-wall', 'task-clean', 'FS', 1)`)

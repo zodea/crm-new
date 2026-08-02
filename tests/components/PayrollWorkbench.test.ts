@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
+import PayrollDraftFormFields from '~/components/payroll/PayrollDraftFormFields.vue'
 import PayrollFilters from '~/components/payroll/PayrollFilters.vue'
 import PayrollStatementDetail from '~/components/payroll/PayrollStatementDetail.vue'
 
@@ -35,7 +36,19 @@ describe('payroll workbench components', () => {
       global: { components: { NuxtLink: NuxtLinkStub } },
     })
 
-    await fireEvent.click(screen.getByRole('button', { name: '生成月度草稿' }))
+    expect(screen.getByText('新建工资草稿')).not.toBeNull()
+    expect(screen.queryByTestId('payroll-draft-form')).toBeNull()
+    expect(emitted().create).toBeUndefined()
+  })
+
+  it('new draft form exposes only provisional/field quantity and final locks field', async () => {
+    const { emitted } = render(PayrollDraftFormFields, {
+      props: {
+        options,
+        initialFilters: { projectId: 'project-a', month: '2026-07', status: '', crewId: 'crew-a' },
+      },
+    })
+
     const source = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资取数口径' })
     expect(within(source).queryByRole('option', { name: /合同量/ })).toBeNull()
     expect(within(source).getByRole('option', { name: '暂估量' })).not.toBeNull()
@@ -52,8 +65,8 @@ describe('payroll workbench components', () => {
     expect(source.value).toBe('field')
     expect(source.disabled).toBe(true)
 
-    await fireEvent.click(screen.getByRole('button', { name: '确认生成草稿' }))
-    expect(emitted().create?.[0]?.[0]).toMatchObject({
+    await fireEvent.click(screen.getByRole('button', { name: '生成工资草稿' }))
+    expect(emitted().submit?.[0]?.[0]).toMatchObject({
       projectId: 'project-a',
       crewId: 'crew-a',
       leaderWorkerId: 'worker-a',
@@ -63,14 +76,12 @@ describe('payroll workbench components', () => {
   })
 
   it('c2 uses the persisted subject config and locks signed work at 100%', async () => {
-    const { emitted } = render(PayrollFilters, {
+    const { emitted } = render(PayrollDraftFormFields, {
       props: {
         options,
-        filters: { projectId: 'project-a', month: '2026-07', status: '', crewId: 'crew-a' },
+        initialFilters: { projectId: 'project-a', month: '2026-07', status: '', crewId: 'crew-a' },
       },
-      global: { components: { NuxtLink: NuxtLinkStub } },
     })
-    await fireEvent.click(screen.getByRole('button', { name: '生成月度草稿' }))
     await fireEvent.update(screen.getByRole('combobox', { name: '工资格式族' }), 'C2')
 
     expect(screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C2 大工单价' }).value).toBe('360')
@@ -79,14 +90,46 @@ describe('payroll workbench components', () => {
     expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '工资取数口径' }).value).toBe('field')
     expect(screen.getByRole<HTMLSelectElement>('combobox', { name: '工资取数口径' }).disabled).toBe(true)
 
-    await fireEvent.click(screen.getByRole('button', { name: '确认生成草稿' }))
-    expect(emitted().create?.[0]?.[0]).toMatchObject({
+    await fireEvent.click(screen.getByRole('button', { name: '生成工资草稿' }))
+    expect(emitted().submit?.[0]?.[0]).toMatchObject({
       formatFamily: 'C2',
       quantitySource: 'field',
       payRatio: 1,
       c2Rate: 360,
       dayworkRuleText: '证明人确认后生效。',
     })
+  })
+
+  it('shows C1 and C2 rate errors and focuses the first invalid rate', async () => {
+    const { emitted } = render(PayrollDraftFormFields, {
+      props: {
+        options,
+        initialFilters: { projectId: 'project-a', month: '2026-07', status: '', crewId: 'crew-a' },
+      },
+    })
+    const format = screen.getByRole<HTMLSelectElement>('combobox', { name: '工资格式族' })
+    const submit = screen.getByRole('button', { name: '生成工资草稿' })
+
+    await fireEvent.update(format, 'C1')
+    const dailyRate = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C1 日薪' })
+    await fireEvent.update(dailyRate, '-1')
+    await fireEvent.click(submit)
+    await nextTick()
+
+    expect(screen.getByRole('alert').textContent).toContain('C1 默认日薪不能为负数')
+    expect(document.activeElement).toBe(dailyRate)
+    expect(emitted().submit).toBeUndefined()
+
+    await fireEvent.update(dailyRate, '400')
+    await fireEvent.update(format, 'C2')
+    const c2Rate = screen.getByRole<HTMLInputElement>('spinbutton', { name: 'C2 大工单价' })
+    await fireEvent.update(c2Rate, '0')
+    await fireEvent.click(submit)
+    await nextTick()
+
+    expect(screen.getByRole('alert').textContent).toContain('C2 大工单价必须大于 0')
+    expect(document.activeElement).toBe(c2Rate)
+    expect(emitted().submit).toBeUndefined()
   })
 
   it('released detail is read-only and exposes only frozen-snapshot print/export actions', async () => {

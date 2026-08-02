@@ -13,12 +13,9 @@ const { success, warning, info, undoToast, confirm, promise } = useKitUI()
 const searchText = shallowRef('')
 const workspaceFilter = shallowRef<'all' | 'recognizing' | 'suggested' | 'warning' | 'danger'>('all')
 const selectedId = shallowRef<string | null>(null)
+// 子模式的 tab 定义随工具栏走（内联在工具栏那一条里，不再独占一行）
 const workspaceMode = shallowRef<'review' | 'print'>('review')
 const activePane = shallowRef<'queue' | 'source' | 'review'>('queue')
-const workspaceModes = [
-  { key: 'review', label: '字段校对' },
-  { key: 'print', label: '打印排版' },
-]
 const paneLabels = computed(() => ({
   queue: '队列',
   source: workspaceMode.value === 'print' ? '排版' : '原件',
@@ -336,6 +333,7 @@ onMounted(() => {
     </div>
 
     <InvoiceWorkspaceToolbar
+      v-model:mode="workspaceMode"
       :total="workspaceRows.length"
       :pending-count="pendingCount"
       :suggested-count="store.suggestPass.length"
@@ -345,10 +343,6 @@ onMounted(() => {
       @recognize="handleBatchRecognize"
       @pass="handleBatchPass"
     />
-
-    <div class="panel mb-3 px-3">
-      <SegTab v-model="workspaceMode" :tabs="workspaceModes" />
-    </div>
 
     <!-- #60 单一校对工作台：宽屏三栏；窄容器分段但保留三个面板实例与编辑状态。 -->
     <AdaptiveWorkbench

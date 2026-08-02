@@ -10,6 +10,8 @@ export interface OwnerDocumentMeta {
   label: string
   subtitle: string
   listPath: string
+  contractListPath: string
+  contractListLabel: string
   routeScope: 'owner' | 'subcontract' | 'project'
   routeKind: string
   postLabel: string
@@ -22,6 +24,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '甲方变洽签',
     subtitle: '变更洽商、现场签证与指令闭环',
     listPath: '/owner/change',
+    contractListPath: '/contract/construction',
+    contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'change',
     postLabel: '保存并上报',
@@ -36,6 +40,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '甲方报量',
     subtitle: '合同清单自动完成量、申报量与审定量',
     listPath: '/owner/report',
+    contractListPath: '/contract/construction',
+    contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'report',
     postLabel: '保存并申报',
@@ -50,6 +56,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '竣工验收·保修',
     subtitle: '验收、移交与保修责任归档',
     listPath: '/owner/acceptance',
+    contractListPath: '/contract/construction',
+    contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'acceptance',
     postLabel: '保存并提交',
@@ -63,6 +71,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '最终结算',
     subtitle: '施工合同最终报审及收款差额',
     listPath: '/owner/final-settlement',
+    contractListPath: '/contract/construction',
+    contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'final-settlement',
     postLabel: '保存并提交',
@@ -76,6 +86,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '甲方罚扣单',
     subtitle: '甲方对我方罚款、扣款与申诉说明',
     listPath: '/owner/penalty',
+    contractListPath: '/contract/construction',
+    contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'penalty',
     postLabel: '保存并提交',
@@ -89,6 +101,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '分包变洽签',
     subtitle: '分包增项、签证与审批金额',
     listPath: '/subcontract/change',
+    contractListPath: '/contract/subcontract',
+    contractListLabel: '分包合同列表',
     routeScope: 'subcontract',
     routeKind: 'change',
     postLabel: '保存并提交',
@@ -102,6 +116,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '分包结算',
     subtitle: '复用支出结算事实的分包结算单',
     listPath: '/subcontract/settlement',
+    contractListPath: '/contract/subcontract',
+    contractListLabel: '分包合同列表',
     routeScope: 'subcontract',
     routeKind: 'settlement',
     postLabel: '保存并确认',
@@ -115,6 +131,8 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
     label: '项目罚扣',
     subtitle: '班组、分供方罚扣及结算抵扣闭环',
     listPath: '/project/penalty',
+    contractListPath: '/contract/subcontract',
+    contractListLabel: '分包合同列表',
     routeScope: 'project',
     routeKind: 'penalty',
     postLabel: '保存并提交',

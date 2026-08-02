@@ -164,6 +164,7 @@ interface ContractReferenceRow {
   customer_id: string | null
   supplier_id: string | null
   amount: number
+  status: string
   deleted_at: string | null
 }
 
@@ -779,6 +780,8 @@ async function saveExpenditureSettlement(
     throw new Error(`所选合同不是${contractLabel}`)
   if (contract && draft.projectId && contract.project_id !== draft.projectId)
     throw new Error(`${contractLabel}与所选项目不一致`)
+  if (contract && ['draft', '草稿'].includes(contract.status))
+    throw new Error(`${contractLabel}仍为草稿，不能办理结算`)
   if (action === 'submit') {
     requireFields([
       ['结算名称', draft.name],
@@ -805,7 +808,7 @@ async function saveExpenditureSettlement(
     normalizedText(draft.settlementDate),
     rawText(draft.settlementPeriod),
     rawText(draft.deductionNote),
-    lifecycleStatus(action, draft.status, '审批中'),
+    lifecycleStatus(action, draft.status, '待确认'),
     rawText(draft.note),
     now,
   ]

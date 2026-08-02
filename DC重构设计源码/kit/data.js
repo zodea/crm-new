@@ -548,6 +548,8 @@
     { id: "a8", name: "花城电缆-0301.jpg", projectId: "p2", supplierId: "s2", ocrCompany: "花城珠江电线电缆有限公司", no: "DH0301", date: "2026-03-01", material: "电缆 YJV 3×25 / 5000 米", amount: 230000 },
     { id: "a9", name: "穗建五金-0610.pdf", projectId: "p2", supplierId: "s4", ocrCompany: "穗建五金机电经营部", no: "S06103", date: "2026-06-10", material: "镀锌钢管 DN50 等 3 项", amount: 4180 },
     { id: "a10", name: "大板东防水-0330.pdf", projectId: "p3", supplierId: "s1", ocrCompany: "广州市大板东建材有限公司", no: "DH0330B", date: "2026-03-30", material: "防水卷材 SBS / 1200 卷", amount: 384000 },
+    // 手工补录行：无扫描原件（归档库「原件」列的「缺原件」态样本）
+    { id: "a11", name: "", projectId: "p2", supplierId: "s4", ocrCompany: "穗建五金机电经营部", no: "S06277", date: "2026-06-27", material: "膨胀螺栓 M10 / 25 盒", amount: 600, note: "手工补录，对方未给单" },
   ];
 
   // ——— 批D 轻实体仓：乙供材单据（红圈05）+ 甲供材整域（红圈06）（稳定 id 够蓝链，金额/数量 mock）———

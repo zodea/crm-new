@@ -1,224 +1,317 @@
-// DeliveryArchiveScreen — 送货单归档库（批D §3，原 P3；乙供材管理组，route=deliveryArchive）。
-// 与「送货单识别」（DeliveryScreen 处理区）双区拆分：处理区放待识别/待核对，归档库放核对完成后归档件。
-// 左树两级 项目→分供方（分供方按合同签订日期升序）+ 每项目 ⚠「未区分分供方」兜底节点 + 节点文件数量角标（只数量不金额）。
-// 归档不是终态：文件可拖拽改归属 / 「改归属」按钮，任何修改弹二次确认（CONTEXT「归档」）；未区分分供方给分供方库模糊纠错一键替换。
+// DeliveryArchiveScreen — 送货单归档库（按实现端 app/components/delivery/DeliveryArchiveScreen.vue 校准）
+// 左树两级 项目 → 分供方（分供方按材采合同签订日期升序）+ 每项目 ⚠「未区分分供方」兜底节点 + 节点份数角标。
+// 右表标准列表：搜索 / 分页 / 行内 详情·改归属·编辑·删除；底部只报当前筛选份数与金额合计。
+// 归档不是终态：行可拖到左树节点改归属（弹二次确认），行内「改归属」按钮是它的键盘可达等价入口；
+// 「新建分供方节点」可先建空节点，归档时自动落入。这两项实现端尚未落地，设计稿按目标态保留。
+// 窄屏左树收成「归档范围」抽屉（一次只显示一层：先选项目，再选分供方）。
 (function () {
   if (window.DeliveryArchiveScreen) return;
   const { Panel, Button, IconButton, Icon, StatusChip } = window.DesignSystem_e3d871 || {};
-  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, undoToast: () => {} };
-  const UN = "un";  // 未区分分供方 sentinel
+  const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), modal: () => {}, undoToast: () => {} };
+  const KA = () => window.KitAtoms || {};
+  const UN = "un";       // 未区分分供方 sentinel
+  const PAGE_SIZE = 10;
 
-  function DeliveryArchiveScreen({ data }) {
+  // 左树右表并置的下限：实现端按 60rem 容器宽切分段，设计稿侧栏约 240px，折算视口 1200px。
+  const useVw = () => {
+    const [vw, setVw] = React.useState(window.innerWidth);
+    React.useEffect(() => {
+      const onR = () => setVw(window.innerWidth);
+      window.addEventListener("resize", onR);
+      return () => window.removeEventListener("resize", onR);
+    }, []);
+    return vw;
+  };
+
+  const yuan = (v) => "¥" + Number(v || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // 窄屏归档范围抽屉：一次只显示一层，先选项目再选分供方
+  function ScopeSheet({ tree, sel, onSelect, labelOf }) {
+    const [open, setOpen] = React.useState(false);
+    const [proj, setProj] = React.useState(null);
+    const row = (on) => ({ display: "flex", width: "100%", minWidth: 0, alignItems: "center", gap: 8, border: 0, borderBottom: "1px solid var(--line)", borderRadius: "var(--radius-btn)", background: on ? "var(--brand-soft)" : "transparent", color: on ? "var(--brand-deep)" : "var(--ink)", padding: "12px 10px", textAlign: "left", fontSize: 13, fontWeight: 600, cursor: "pointer" });
+    const count = (n) => <span style={{ flex: "none", borderRadius: 999, background: "var(--surface-3)", padding: "1px 7px", fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{n}</span>;
+    const pick = (k) => { onSelect(k); setOpen(false); };
+    return (
+      <React.Fragment>
+        <button type="button" aria-label="选择归档范围" onClick={() => { setProj(null); setOpen(true); }}
+          style={{ display: "flex", width: "100%", minWidth: 0, alignItems: "center", justifyContent: "flex-start", gap: 8, border: "1px solid var(--line-strong)", borderRadius: "var(--radius-btn)", background: "var(--panel)", padding: "7px 10px", fontSize: 13, cursor: "pointer" }}>
+          <Icon name="folders" size={13} color="var(--ink-soft)" />
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>{labelOf(sel)}</span>
+          <Icon name="chevron-right" size={13} color="var(--ink-faint)" />
+        </button>
+        {open && (
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 70, background: "var(--overlay, rgba(16,24,40,0.45))" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", insetBlock: 0, right: 0, width: "min(360px, calc(100vw - 24px))", display: "flex", flexDirection: "column", borderLeft: "1px solid var(--line)", background: "var(--panel)", boxShadow: "var(--shadow-pop)" }}>
+              <header style={{ flex: "none", height: 64, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", borderBottom: "1px solid var(--line)" }}>
+                {proj && <IconButton icon="arrow-left" title="返回项目列表" onClick={() => setProj(null)} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{proj ? proj.label : "选择项目"}</div>
+                  <div style={{ marginTop: 2, fontSize: 11, color: "var(--ink-soft)" }}>{proj ? "选择分供方" : "一次只显示一层"}</div>
+                </div>
+                <IconButton icon="x" title="关闭归档范围" onClick={() => setOpen(false)} />
+              </header>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 8 }}>
+                {!proj && tree.map((t) => t.key === "all"
+                  ? <button key={t.key} type="button" style={row(sel === t.key)} onClick={() => pick(t.key)}><Icon name="archive" size={14} color="var(--brand)" /><span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>{count(t.count)}</button>
+                  : <button key={t.key} type="button" style={row(false)} onClick={() => (t.children.length ? setProj(t) : pick(t.key))}><Icon name="building" size={14} color="var(--ink-faint)" /><span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>{count(t.count)}<Icon name="chevron-right" size={13} color="var(--ink-faint)" /></button>)}
+                {proj && (
+                  <React.Fragment>
+                    <button type="button" style={row(sel === proj.key)} onClick={() => pick(proj.key)}><Icon name="users" size={14} color="var(--brand)" /><span style={{ flex: 1, minWidth: 0 }}>全部分供方</span>{count(proj.count)}</button>
+                    {proj.children.map((c) => (
+                      <button key={c.key} type="button" style={row(sel === c.key)} onClick={() => pick(c.key)}>
+                        <Icon name={c.warn ? "triangle-alert" : "hard-hat"} size={14} color={c.warn ? "var(--warn)" : "var(--ink-faint)"} />
+                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>{count(c.count)}
+                      </button>
+                    ))}
+                  </React.Fragment>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </React.Fragment>
+    );
+  }
+
+  function DeliveryArchiveScreen() {
     const A = window.APP;
-    const KA = window.KitAtoms || {};
-    if (!A || !KA.EntityLink) return null;
+    if (!A || !KA().EntityLink) return null;
     A.use();
+    const EL = KA().EntityLink;
+    const vw = useVw();
+    const narrow = vw < 1200;
 
-    // 2026-07-18 表单补全轮：归档行切共享仓 APP.deliveryArchives（整页表单 deliveryArchiveForm 编辑实时联动）
     const files = A.rows("deliveryArchives");
-    const [sel, setSel] = React.useState("p1");
-    const [dropHot, setDropHot] = React.useState(null);   // 拖拽悬停高亮节点
+    const [sel, setSel] = React.useState("all");
+    const [search, setSearch] = React.useState("");
+    const [page, setPage] = React.useState(1);
     const [extraNodes, setExtraNodes] = React.useState([]); // 手动新建的空分供方节点 [{projectId,supplierId}]
 
     const projects = A.rows("projects");
     const suppliers = A.rows("suppliers");
     const contracts = A.rows("contracts");
-    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : id; };
-    const supName = (id) => { const s = A.get("suppliers", id); return s ? ((s.aliases && s.aliases[0]) || s.name) : id; };
-    const supFull = (id) => { const s = A.get("suppliers", id); return s ? s.name : id; };
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : "未知项目"; };
+    const supName = (id) => { if (!id) return "未区分分供方"; const s = A.get("suppliers", id); return s ? s.name : "未知分供方"; };
 
-    // 分供方在某项目下的合同签订日期（升序排序键；无合同 → 排最后）
-    const signKey = (pid, sid) => {
-      const list = contracts.filter((c) => c.projectId === pid && c.supplierId === sid && c.signDate);
-      if (!list.length) return "9999-99-99";
-      return list.reduce((m, c) => (c.signDate < m ? c.signDate : m), list[0].signDate);
+    // 分供方在某项目下的材采合同签订日期（升序排序键；无合同 → 排最后）
+    const signKey = (pid, sid) => contracts
+      .filter((c) => c.projectId === pid && c.supplierId === sid && c.signDate)
+      .map((c) => c.signDate).sort()[0] || "￿";
+
+    // —— 左树：全部送货单 + 项目（有归档件的才出现）→ 分供方 ——
+    // extraNodes：手动新建、还没有归档件的空分供方节点（归档时自动落入）
+    const tree = [{ key: "all", label: "全部送货单", icon: "archive", count: files.length }].concat(
+      projects.map((p) => {
+        const rows = files.filter((f) => f.projectId === p.id);
+        const sids = [];
+        rows.forEach((f) => { const k = f.supplierId || null; if (sids.indexOf(k) < 0) sids.push(k); });
+        extraNodes.filter((n) => n.projectId === p.id).forEach((n) => { if (sids.indexOf(n.supplierId) < 0) sids.push(n.supplierId); });
+        sids.sort((a, b) => (a == null ? 1 : b == null ? -1 : (signKey(p.id, a) < signKey(p.id, b) ? -1 : signKey(p.id, a) > signKey(p.id, b) ? 1 : supName(a).localeCompare(supName(b), "zh-CN"))));
+        return {
+          key: "project:" + p.id, label: p.name, icon: "building", count: rows.length,
+          children: sids.map((sid) => ({
+            key: "supplier:" + p.id + ":" + (sid || UN), label: supName(sid),
+            icon: sid ? "hard-hat" : "triangle-alert", tone: sid ? undefined : "warn", warn: !sid,
+            count: rows.filter((f) => (f.supplierId || null) === sid).length,
+          })),
+        };
+      }).filter((n) => n.count > 0 || extraNodes.some((x) => x.projectId === n.key.slice(8))));
+
+    const labelOf = (key) => {
+      for (const t of tree) {
+        if (t.key === key) return t.label;
+        const c = (t.children || []).find((x) => x.key === key);
+        if (c) return t.label + " · " + c.label;
+      }
+      return "全部送货单";
     };
 
-    // —— 建树：项目 → 分供方(按合同签订日期升序) + ⚠未区分分供方兜底 ——
-    const byProj = {};
-    files.forEach((f) => {
-      const g = (byProj[f.projectId] = byProj[f.projectId] || {});
-      const k = f.supplierId || UN;
-      (g[k] = g[k] || []).push(f);
-    });
-    extraNodes.forEach((n) => { const g = (byProj[n.projectId] = byProj[n.projectId] || {}); g[n.supplierId] = g[n.supplierId] || []; });
-    const projIds = projects.map((p) => p.id).filter((pid) => byProj[pid]);
-    const tree = projIds.map((pid) => {
-      const g = byProj[pid];
-      const supKeys = Object.keys(g).filter((k) => k !== UN).sort((a, b) => (signKey(pid, a) < signKey(pid, b) ? -1 : 1));
-      const children = supKeys.map((sk) => ({ key: pid + "__" + sk, sid: sk, label: supName(sk), count: g[sk].length, sign: signKey(pid, sk) }));
-      if (g[UN]) children.push({ key: pid + "__" + UN, sid: UN, label: "⚠ 未区分分供方", count: g[UN].length, warn: true });
-      return { key: pid, pid, label: projName(pid), count: Object.values(g).reduce((s, a) => s + a.length, 0), children };
-    });
+    const nodeRows = sel === "all" ? files
+      : sel.indexOf("project:") === 0 ? files.filter((f) => f.projectId === sel.slice(8))
+      : (() => { const [, pid, sid] = sel.split(":"); return files.filter((f) => f.projectId === pid && (sid === UN ? !f.supplierId : f.supplierId === sid)); })();
 
-    // —— 选中节点 → 文件列表 ——
-    const parse = (key) => (key.indexOf("__") > -1 ? { pid: key.split("__")[0], sid: key.split("__")[1] } : { pid: key, sid: null });
-    const cur = parse(sel);
-    const shown = files.filter((f) => {
-      if (f.projectId !== cur.pid) return false;
-      if (cur.sid == null) return true;                       // 项目根：全部
-      if (cur.sid === UN) return !f.supplierId;               // 未区分
-      return f.supplierId === cur.sid;
-    });
+    const kw = search.trim().toLowerCase();
+    const filtered = kw
+      ? nodeRows.filter((f) => [f.no, f.note, projName(f.projectId), supName(f.supplierId), f.material].some((v) => v && String(v).toLowerCase().indexOf(kw) > -1))
+      : nodeRows;
+    React.useEffect(() => setPage(1), [sel, search]);
 
-    // —— 改归属（拖拽 / 按钮）：二次确认 ——
+    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const cur = Math.min(page, pageCount);
+    const rows = filtered.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
+    const totalAmount = filtered.reduce((s, f) => s + (Number(f.amount) || 0), 0);
+
+    // —— 改归属：归档不是终态，留改错通道；拖拽与「改归属」按钮走同一条确认路径 ——
+    // （拖拽是纯鼠标操作，行内按钮是它的键盘可达等价入口，不是第二套逻辑）
     const reassign = (fileId, pid, sid) => {
       const f = files.find((x) => x.id === fileId);
       if (!f) return;
-      const toSup = sid === UN || sid == null ? "未区分分供方" : supFull(sid);
-      if (f.projectId === pid && (f.supplierId || null) === (sid === UN ? null : sid)) return;
+      const nextSid = sid === UN ? null : sid;
+      if (f.projectId === pid && (f.supplierId || null) === nextSid) return;
       UI().confirm({
         title: "改归属确认", confirmText: "确认改归属",
-        message: "将「" + f.name + "」改归属到\n项目：" + projName(pid) + "\n分供方：" + toSup + "\n\n归档库为可改错通道，此修改会即时生效。",
+        message: "将「" + (f.no && f.no !== "—" ? f.no : f.name || f.id) + "」改归属到\n项目：" + projName(pid)
+          + "\n分供方：" + (nextSid ? supName(nextSid) : "未区分分供方") + "\n\n此修改即时生效。",
         onConfirm: () => {
-          A.update("deliveryArchives", fileId, { projectId: pid, supplierId: sid === UN ? null : sid });
-          UI().toast("已改归属到「" + projName(pid) + " · " + toSup + "」", "ok");
-          setSel(pid + (sid == null ? "" : "__" + sid));
+          A.update("deliveryArchives", fileId, { projectId: pid, supplierId: nextSid });
+          UI().toast("已改归属到「" + projName(pid) + " · " + (nextSid ? supName(nextSid) : "未区分分供方") + "」", "ok");
+          setSel(nextSid ? "supplier:" + pid + ":" + nextSid : "project:" + pid);
         },
       });
     };
+    // 树节点 drop：项目节点 → 只改项目；分供方节点 → 项目 + 分供方一起改
+    const onNodeDrop = (nodeKey, fileId) => {
+      if (nodeKey === "all") return;
+      if (nodeKey.indexOf("project:") === 0) {
+        const f = files.find((x) => x.id === fileId);
+        reassign(fileId, nodeKey.slice(8), f ? (f.supplierId || UN) : UN);
+        return;
+      }
+      const [, pid, sid] = nodeKey.split(":");
+      reassign(fileId, pid, sid);
+    };
     const editAttr = (f) => UI().formModal({
-      title: "改归属 · " + f.name, cols: 2, width: 560,
+      title: "改归属 · " + (f.no && f.no !== "—" ? f.no : f.name || f.id), cols: 2, width: 560, saveText: "改归属",
       fields: [
-        { key: "projectId", label: "项目", type: "select", options: projects.map((p) => p.name), value: projName(f.projectId), full: true },
-        { key: "supplierId", label: "分供方", type: "select", options: ["（未区分分供方）"].concat(suppliers.map((s) => s.name)), value: f.supplierId ? supFull(f.supplierId) : "（未区分分供方）", full: true },
+        { key: "project", label: "项目", type: "select", options: projects.map((p) => p.name), value: projName(f.projectId), full: true },
+        { key: "supplier", label: "分供方", type: "select", options: ["（未区分分供方）"].concat(suppliers.map((s) => s.name)), value: f.supplierId ? supName(f.supplierId) : "（未区分分供方）", full: true },
       ],
-      saveText: "改归属",
       onSave: (v) => {
-        const pid = (projects.find((p) => p.name === v.projectId) || {}).id || f.projectId;
-        const sid = v.supplierId === "（未区分分供方）" ? UN : ((suppliers.find((s) => s.name === v.supplierId) || {}).id || UN);
+        const pid = (projects.find((p) => p.name === v.project) || {}).id || f.projectId;
+        const sid = v.supplier === "（未区分分供方）" ? UN : ((suppliers.find((s) => s.name === v.supplier) || {}).id || UN);
         reassign(f.id, pid, sid);
       },
     });
-
-    // —— 分供方名模糊纠错：OCR 名在分供方库模糊匹配 → 建议 + 一键替换（二次确认） ——
-    const fuzzy = (ocrName) => {
-      if (!ocrName) return null;
-      return suppliers.find((s) => (s.aliases || []).some((a) => ocrName.includes(a) || a.includes(ocrName.slice(0, 3)))
-        || ocrName.includes(s.name.slice(0, 4)) || s.name.includes(ocrName.slice(0, 4))) || null;
+    // 手动新建空分供方节点（从分供方库选）：归档时自动落入，不必先有文件
+    const addNode = () => {
+      const pid = sel.indexOf("project:") === 0 ? sel.slice(8) : sel.indexOf("supplier:") === 0 ? sel.split(":")[1] : (projects[0] || {}).id;
+      if (!pid) { UI().toast("请先选中一个项目节点", "danger"); return; }
+      UI().formModal({
+        title: "新建分供方节点 · " + projName(pid), saveText: "新建节点",
+        fields: [{ key: "supplier", label: "从分供方库选择", type: "select", options: suppliers.map((s) => s.name), full: true }],
+        onSave: (v) => {
+          const s = suppliers.find((x) => x.name === v.supplier);
+          if (!s) { UI().toast("请选择分供方", "danger"); return; }
+          setExtraNodes((n) => [...n, { projectId: pid, supplierId: s.id }]);
+          setSel("supplier:" + pid + ":" + s.id);
+          UI().toast("已在「" + projName(pid) + "」下新建节点「" + s.name + "」，归档时自动落入", "ok");
+        },
+      });
     };
 
-    // —— 手动新建分供方节点（从分供方库选） ——
-    const addNode = () => UI().formModal({
-      title: "新建分供方节点 · " + projName(cur.pid),
-      fields: [{ key: "sid", label: "从分供方库选择", type: "select", options: suppliers.map((s) => s.name), full: true }],
-      saveText: "新建节点",
-      onSave: (v) => {
-        const s = suppliers.find((x) => x.name === v.sid);
-        if (!s) { UI().toast("请选择分供方", "danger"); return; }
-        setExtraNodes((n) => [...n, { projectId: cur.pid, supplierId: s.id }]);
-        setSel(cur.pid + "__" + s.id);
-        UI().toast("已在「" + projName(cur.pid) + "」下新建节点「" + s.name + "」（归档时自动落入）", "ok");
+    const openForm = (id) => window.DC && window.DC.navigate("deliveryArchiveForm", id ? { id } : {});
+    const del = (f) => UI().confirm({
+      title: "删除送货单", confirmText: "删除", danger: true,
+      message: "确认删除送货单「" + (f.no && f.no !== "—" ? f.no : f.name || f.id) + "」？材料明细会随送货单一同隐藏，10 秒内可撤回。",
+      onConfirm: () => {
+        A.softDel("deliveryArchives", f.id);
+        UI().undoToast("已删除送货单「" + (f.no && f.no !== "—" ? f.no : f.name || f.id) + "」", () => A.restore("deliveryArchives", f.id));
       },
     });
-
-    // —— 树节点渲染（自带拖放目标） ——
-    const nodeStyle = (on, warn, hot, sub) => ({
-      display: "flex", alignItems: "center", gap: 8, width: "100%", border: hot ? "1px dashed var(--brand)" : "1px solid transparent",
-      borderRadius: 8, padding: sub ? "6px 10px" : "8px 10px", cursor: "pointer", textAlign: "left", marginBottom: 2,
-      background: on ? "var(--brand-soft)" : hot ? "var(--brand-soft)" : "transparent",
+    // 设计稿外壳没有独立的归档详情路由，详情用只读弹层承载（编辑仍走整页表单 deliveryArchiveForm）
+    const detail = (f) => UI().modal({
+      title: "送货单 " + (f.no && f.no !== "—" ? f.no : "（未编号）"), subtitle: projName(f.projectId) + " · " + supName(f.supplierId), width: 520,
+      bodyHTML: '<div style="font-size:13px;line-height:2">'
+        + '<div><span style="color:var(--ink-soft)">送货日期：</span><span style="font-family:var(--font-mono)">' + f.date + "</span></div>"
+        + '<div><span style="color:var(--ink-soft)">材料明细：</span>' + f.material + "</div>"
+        + '<div><span style="color:var(--ink-soft)">金额：</span><b style="font-family:var(--font-mono)">' + yuan(f.amount) + "</b></div>"
+        + '<div><span style="color:var(--ink-soft)">原件：</span>' + (f.name ? f.name : "缺原件（手工补录）") + "</div>"
+        + '<div><span style="color:var(--ink-soft)">备注：</span>' + (f.note || "—") + "</div></div>",
     });
-    const treeNode = (t, sub, dropTarget) => {
-      const on = sel === t.key;
-      const ink = t.warn && !on ? "var(--warn-ink)" : on ? "var(--brand-deep)" : "var(--ink)";
-      return (
-        <button key={t.key} onClick={() => setSel(t.key)}
-          onDragOver={(e) => { e.preventDefault(); setDropHot(t.key); }}
-          onDragLeave={() => setDropHot((h) => (h === t.key ? null : h))}
-          onDrop={(e) => { e.preventDefault(); setDropHot(null); const id = e.dataTransfer.getData("text/plain"); if (id) reassign(id, dropTarget.pid, dropTarget.sid); }}
-          style={nodeStyle(on, t.warn, dropHot === t.key, sub)}>
-          {Icon && <Icon name={t.warn ? "triangle-alert" : sub ? "hard-hat" : "building"} size={sub ? 12 : 14} color={on ? "var(--brand)" : t.warn ? "var(--warn)" : "var(--ink-faint)"} />}
-          <span style={{ flex: 1, fontSize: sub ? 12.5 : 13, fontWeight: on ? 800 : sub ? 500 : 700, color: ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.label}</span>
-          <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: on ? "var(--brand)" : "var(--ink-faint)", background: on ? "#fff" : "var(--surface-3)", borderRadius: 999, padding: "1px 7px" }}>{t.count}</span>
-        </button>
-      );
-    };
+
+    const TH = { padding: "10px 12px", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", textAlign: "left", whiteSpace: "nowrap" };
+    const TD = { padding: "10px 12px", fontSize: 13, verticalAlign: "middle" };
+    const pagerBtn = (off) => ({ minWidth: 30, height: 28, border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--panel)", color: off ? "var(--ink-faint)" : "var(--ink-soft)", fontSize: 12, cursor: off ? "not-allowed" : "pointer" });
 
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "252px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-        {/* 左树 */}
-        <Panel padding={0} style={{ overflow: "hidden" }}>
-          <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)", display: "flex", alignItems: "center" }}>
-            归档库 · 项目 → 分供方
-            <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontWeight: 600 }}>{files.length}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+        {/* 工具栏 */}
+        <Panel padding={0} style={{ display: "flex", alignItems: narrow ? "flex-start" : "center", flexDirection: narrow ? "column" : "row", gap: 12, padding: "12px 16px" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>送货单归档库</div>
+            <div style={{ marginTop: 2, fontSize: 12, color: "var(--ink-faint)" }}>手工录入 · 项目 → 分供方 · 详情与材料明细</div>
           </div>
-          <div style={{ padding: 6, maxHeight: 560, overflow: "auto" }}>
-            {tree.map((p) => (
-              <div key={p.key}>
-                {treeNode(p, false, { pid: p.pid, sid: null })}
-                <div style={{ paddingLeft: 14 }}>
-                  {p.children.map((c) => treeNode(c, true, { pid: p.pid, sid: c.sid }))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ padding: "8px 10px", borderTop: "1px solid var(--line)" }}>
-            <Button size="sm" icon="folder-plus" onClick={addNode} style={{ width: "100%" }}>新建分供方节点</Button>
+          <div style={{ marginLeft: narrow ? 0 : "auto", width: narrow ? "100%" : "auto", display: "flex", minWidth: 0, flexWrap: "wrap", alignItems: "center", justifyContent: narrow ? "flex-start" : "flex-end", gap: 12 }}>
+            {KA().SearchInput && KA().SearchInput({ value: search, onChange: setSearch, placeholder: "搜索单号、项目、分供方、材料", width: narrow ? "100%" : 288 })}
+            <Button icon="refresh-cw" onClick={() => UI().toast("已刷新")}>刷新</Button>
+            <Button variant="primary" icon="plus" onClick={() => openForm(null)}>新增送货单</Button>
           </div>
         </Panel>
 
-        {/* 右列表 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, fontWeight: 800 }}>
-              {cur.sid == null ? <KA.EntityLink type="project" id={cur.pid} /> : <span><KA.EntityLink type="project" id={cur.pid} />{" · "}{cur.sid === UN ? <span style={{ color: "var(--warn-ink)" }}>未区分分供方</span> : <KA.EntityLink type="supplier" id={cur.sid} />}</span>}
-              <span style={{ marginLeft: 6, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>（{shown.length}）</span>
-            </span>
-            <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--ink-soft)" }}>拖拽文件到左树节点即可改归属（弹二次确认）</span>
-          </div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0, flexDirection: narrow ? "column" : "row" }}>
+          {narrow
+            ? <div style={{ width: "100%" }}><ScopeSheet tree={tree} sel={sel} onSelect={setSel} labelOf={labelOf} /></div>
+            : <div style={{ width: 256, flex: "none" }}>{KA().TreeNav && KA().TreeNav({
+                title: "归档库 · 项目 → 分供方", items: tree, active: sel, onChange: setSel, onNodeDrop,
+                footer: <Button size="sm" icon="folder-plus" onClick={addNode} style={{ width: "100%" }}>新建分供方节点</Button>,
+              })}</div>}
 
-          <Panel padding={0} style={{ overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 110px 96px minmax(0,2fr) 120px 130px", gap: 0, padding: "9px 14px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 11.5, fontWeight: 700, color: "var(--ink-soft)" }}>
-              <span>文件 / OCR 识别公司名</span><span>单号</span><span>日期</span><span>材料明细</span><span style={{ textAlign: "right" }}>金额</span><span style={{ textAlign: "center" }}>操作</span>
-            </div>
-            {shown.length === 0 && <div style={{ padding: "28px 0", textAlign: "center", color: "var(--ink-faint)", fontSize: 13 }}>该节点暂无归档文件</div>}
-            {shown.map((f) => {
-              const misMatch = !f.supplierId;
-              const sug = misMatch ? fuzzy(f.ocrCompany) : null;
-              return (
-                <div key={f.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", f.id); e.dataTransfer.effectAllowed = "move"; }}
-                  style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 110px 96px minmax(0,2fr) 120px 130px", gap: 0, padding: "10px 14px", borderBottom: "1px solid var(--line)", alignItems: "center", cursor: "grab" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Icon name="grip-vertical" size={13} color="var(--ink-faint)" />
-                      <span style={{ fontWeight: 700, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: misMatch ? "var(--warn-ink)" : "var(--ink-soft)", paddingLeft: 19, marginTop: 2 }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>OCR：{f.ocrCompany}</span>
-                    </div>
-                    {sug && (
-                      <div style={{ paddingLeft: 19, marginTop: 4 }}>
-                        <button onClick={() => UI().confirm({ title: "分供方模糊匹配", confirmText: "替换归并",
-                          message: "OCR 识别名「" + f.ocrCompany + "」\n模糊匹配到分供方库：" + sug.name + "\n\n替换后该文件归入此分供方节点。",
-                          onConfirm: () => { A.update("deliveryArchives", f.id, { supplierId: sug.id }); UI().toast("已归并到「" + sug.name + "」", "ok"); } })}
-                          style={{ border: "1px solid var(--brand)", background: "var(--brand-soft)", color: "var(--brand-deep)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                          <Icon name="wand-sparkles" size={11} color="var(--brand)" />建议归并到「{(sug.aliases && sug.aliases[0]) || sug.name}」
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-soft)" }}>{f.no}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-soft)" }}>{f.date}</span>
-                  <span style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.material}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 700, textAlign: "right" }}>¥{Number(f.amount || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  <span style={{ display: "inline-flex", gap: 4, justifyContent: "center" }}>
-                    {/* 2026-07-18 表单补全轮：归档行整页编辑（单号/日期/材料/金额此前无编辑入口） */}
-                    <IconButton icon="square-pen" title="编辑归档信息" onClick={() => (window.DC && window.DC.navigate ? window.DC.navigate("deliveryArchiveForm", { id: f.id }) : null)} />
-                    <IconButton icon="folder-input" title="改归属" onClick={() => editAttr(f)} />
-                    <IconButton icon="zoom-in" title="预览原件" onClick={() => UI().modal && UI().modal({ title: f.name, subtitle: f.ocrCompany, width: 520, bodyHTML: '<div style="height:280px;display:grid;place-items:center;background:var(--surface-2);border-radius:8px;color:var(--brand);font-size:40px;font-weight:800;opacity:.5">单</div>' })} />
-                  </span>
+          <div style={{ minWidth: 0, flex: 1, width: narrow ? "100%" : "auto" }}>
+            <Panel padding={0} style={{ overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
+                  <thead style={{ background: "var(--surface-2)" }}>
+                    <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                      <th style={{ ...TH, width: 48 }}>#</th>
+                      <th style={{ ...TH, minWidth: 160 }}>送货单号</th>
+                      <th style={{ ...TH, width: 112 }}>送货日期</th>
+                      <th style={{ ...TH, width: 96, textAlign: "center" }}>原件</th>
+                      <th style={{ ...TH, minWidth: 150 }}>所属项目</th>
+                      <th style={{ ...TH, minWidth: 200 }}>分供方</th>
+                      <th style={{ ...TH, minWidth: 220 }}>材料明细</th>
+                      <th style={{ ...TH, width: 130, textAlign: "right" }}>金额</th>
+                      <th style={{ ...TH, minWidth: 160 }}>备注</th>
+                      <th style={{ ...TH, width: 158, textAlign: "center" }}>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((f, i) => (
+                      <tr key={f.id} draggable
+                        onDragStart={(e) => { e.dataTransfer.setData("text/plain", f.id); e.dataTransfer.effectAllowed = "move"; }}
+                        style={{ borderBottom: "1px solid var(--line)", cursor: "grab" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")} onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                        <td style={{ ...TD, color: "var(--ink-faint)", fontFamily: "var(--font-mono)" }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Icon name="grip-vertical" size={12} color="var(--ink-faint)" />{(cur - 1) * PAGE_SIZE + i + 1}
+                          </span>
+                        </td>
+                        <td style={TD}><button onClick={() => detail(f)} style={{ border: 0, background: "transparent", padding: 0, color: "var(--brand)", fontWeight: 600, fontFamily: "var(--font-mono)", cursor: "pointer" }}>{f.no && f.no !== "—" ? f.no : "未编号送货单"}</button></td>
+                        <td style={{ ...TD, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{f.date}</td>
+                        <td style={{ ...TD, textAlign: "center" }}>{f.name ? <StatusChip tone="ok">可核对</StatusChip> : <StatusChip tone="danger">缺原件</StatusChip>}</td>
+                        <td style={TD}><EL type="project" id={f.projectId} /></td>
+                        {/* 分供方列显全称（与左树节点、实现端 supplierName 同口径），不退化成 EntityLink 默认的简称 */}
+                        <td style={TD}>{f.supplierId ? <EL type="supplier" id={f.supplierId} label={supName(f.supplierId)} /> : <StatusChip tone="warn">未区分分供方</StatusChip>}</td>
+                        <td style={{ ...TD, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={f.material}>{f.material}</td>
+                        <td style={{ ...TD, textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700 }}>{yuan(f.amount)}</td>
+                        <td style={{ ...TD, color: "var(--ink-soft)" }}>{f.note || "—"}</td>
+                        <td style={{ ...TD, textAlign: "center" }}>
+                          <span style={{ display: "inline-flex", gap: 4 }}>
+                            <IconButton icon="file-text" title="详情" onClick={() => detail(f)} />
+                            <IconButton icon="folder-input" title="改归属" onClick={() => editAttr(f)} />
+                            <IconButton icon="square-pen" title="编辑" onClick={() => openForm(f.id)} />
+                            <IconButton icon="trash-2" tone="danger" title="删除" onClick={() => del(f)} />
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 && <tr><td colSpan={10} style={{ ...TD, padding: 32, textAlign: "center", color: "var(--ink-soft)" }}>当前节点暂无送货单</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              {filtered.length > PAGE_SIZE && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, padding: "10px 16px", borderTop: "1px solid var(--line)", background: "var(--surface-2)", fontSize: 12, color: "var(--ink-soft)" }}>
+                  <button type="button" disabled={cur <= 1} onClick={() => setPage(cur - 1)} style={pagerBtn(cur <= 1)}>‹</button>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>{cur} / {pageCount}</span>
+                  <button type="button" disabled={cur >= pageCount} onClick={() => setPage(cur + 1)} style={pagerBtn(cur >= pageCount)}>›</button>
                 </div>
-              );
-            })}
-            <div style={{ padding: "9px 14px", background: "var(--surface-2)", fontSize: 12.5, color: "var(--ink-soft)", display: "flex", gap: 22 }}>
-              <span>本节点文件：<b style={{ fontFamily: "var(--font-mono)" }}>{shown.length}</b> 份</span>
-              <span>金额合计：<b style={{ fontFamily: "var(--font-mono)" }}>¥{shown.reduce((s, f) => s + (Number(f.amount) || 0), 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></span>
-            </div>
-          </Panel>
+              )}
+            </Panel>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--ink-soft)" }}>
-            <Icon name="info" size={13} color="var(--brand)" />
-            归档规则：核对完成即自动归档，核对是归档唯一前置；未指定项目禁止导入。归档不是终态，改归属/字段一律弹二次确认（留改错通道）。
+            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: "8px 24px", borderRadius: "var(--radius-card)", background: "var(--surface-2)", padding: "8px 16px", fontSize: 12, color: "var(--ink-soft)" }}>
+              <span>当前筛选：<b style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{filtered.length}</b> 份</span>
+              <span>金额合计：<b style={{ fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{yuan(totalAmount)}</b></span>
+            </div>
           </div>
         </div>
       </div>

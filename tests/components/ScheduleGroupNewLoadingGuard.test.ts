@@ -31,8 +31,26 @@ const GanttStub = defineComponent({
   },
 })
 
+const validProvisionalPreview = {
+  floorCount: 1,
+  unitCount: 1,
+  itemCount: 1,
+  itemCodes: ['ITEM-1'],
+  totalQty: 10,
+  buildings: [{
+    buildingId: 'building-1',
+    floorCount: 1,
+    unitCount: 1,
+    typedUnitCount: 1,
+    itemCount: 1,
+    itemCodes: ['ITEM-1'],
+    totalQty: 10,
+  }],
+}
+
 describe('新建排程范围加载保护', () => {
   afterEach(() => {
+    window.sessionStorage.clear()
     vi.unstubAllGlobals()
   })
 
@@ -80,6 +98,7 @@ describe('新建排程范围加载保护', () => {
         predecessorDisabled: false,
       }]),
       loadContracts: vi.fn().mockResolvedValue(undefined),
+      previewProvisionalScope: vi.fn().mockResolvedValue(validProvisionalPreview),
       loadBuildings: vi.fn(async () => {
         loadBuildingsCalls += 1
         if (loadBuildingsCalls === 1)
@@ -131,5 +150,187 @@ describe('新建排程范围加载保护', () => {
     await waitFor(() => expect((nextStep as HTMLButtonElement).disabled).toBe(false))
     await fireEvent.click(nextStep)
     expect(screen.getByRole('heading', { name: '调整标准工序' })).not.toBeNull()
+  })
+
+  it('初始化失败时显示页面内错误并可重试恢复向导', async () => {
+    const loadCatalog = vi.fn()
+      .mockRejectedValueOnce(new Error('catalog offline'))
+      .mockResolvedValue(undefined)
+    const store = {
+      catalog: [{ id: 'project-1', name: '测试项目', code: 'P-01' }],
+      contracts: [],
+      processLibraries: [{
+        id: 'library-1',
+        name: '标准工序',
+        version: 1,
+        taskCount: 1,
+        isDefault: true,
+      }],
+      processTasks: [{
+        key: 'setting-out',
+        name: '放线',
+        trade: '泥水工',
+        color: '#64748b',
+        durationDays: 3,
+        predecessorKey: null,
+        predecessorDisabled: false,
+      }],
+      processTasksLibraryId: 'library-1',
+      buildings: [{ id: 'building-1', name: '1栋', code: 'B1' }],
+      buildingCoverage: [],
+      saving: false,
+      loadCatalog,
+      loadProcessLibraries: vi.fn().mockResolvedValue(undefined),
+      loadProcessLibraryTasks: vi.fn().mockResolvedValue([{
+        key: 'setting-out',
+        name: '放线',
+        trade: '泥水工',
+        color: '#64748b',
+        durationDays: 3,
+        predecessorKey: null,
+        predecessorDisabled: false,
+      }]),
+      loadContracts: vi.fn().mockResolvedValue(undefined),
+      previewProvisionalScope: vi.fn().mockResolvedValue(validProvisionalPreview),
+      loadBuildings: vi.fn().mockResolvedValue(undefined),
+      createGroup: vi.fn(),
+    }
+
+    vi.stubGlobal('computed', computed)
+    vi.stubGlobal('nextTick', nextTick)
+    vi.stubGlobal('onMounted', onMounted)
+    vi.stubGlobal('ref', ref)
+    vi.stubGlobal('shallowRef', shallowRef)
+    vi.stubGlobal('watch', watch)
+    vi.stubGlobal('useRoute', () => ({ query: { project: 'project-1' } }))
+    vi.stubGlobal('useRouter', () => ({ push: vi.fn() }))
+    vi.stubGlobal('useScheduleStore', () => store)
+    vi.stubGlobal('useKitUI', () => ({
+      confirm: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+    }))
+
+    render(ScheduleGroupNewScreen, {
+      global: {
+        components: {
+          NuxtLink: NuxtLinkStub,
+          ScheduleTemplateGanttEditor: GanttStub,
+          SelectFilter: SelectFilterStub,
+        },
+      },
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toContain('catalog offline')
+    await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
+    await waitFor(() => expect(loadCatalog).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('navigation', { name: '新建排程步骤' })).not.toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('区域草稿在异步恢复失败时保留，重试成功后恢复并提示失效楼栋', async () => {
+    const draft = {
+      projectId: 'project-1',
+      contractId: '',
+      scopeBasis: 'provisional',
+      processLibraryId: 'library-1',
+      name: '区域返回草稿',
+      startDate: '2026-08-01',
+      overlapMode: 'half',
+      buildingIds: ['building-1', 'building-removed'],
+      tasks: [{
+        templateKey: 'setting-out',
+        enabled: true,
+        durationDays: 5,
+        anchorStart: null,
+        predecessorKey: null,
+        predecessorDisabled: false,
+      }],
+    }
+    const draftKey = 'schedule-new-region-draft:project-1'
+    window.sessionStorage.setItem(draftKey, JSON.stringify(draft))
+    const loadProcessLibraryTasks = vi.fn()
+      .mockRejectedValueOnce(new Error('process library offline'))
+      .mockResolvedValue([{
+        key: 'setting-out',
+        name: '放线',
+        trade: '泥水工',
+        color: '#64748b',
+        durationDays: 3,
+        predecessorKey: null,
+        predecessorDisabled: false,
+      }])
+    const warning = vi.fn()
+    const store = {
+      catalog: [{ id: 'project-1', name: '测试项目', code: 'P-01' }],
+      contracts: [],
+      processLibraries: [{
+        id: 'library-1',
+        name: '标准工序',
+        version: 1,
+        taskCount: 1,
+        isDefault: true,
+      }],
+      processTasks: [{
+        key: 'setting-out',
+        name: '放线',
+        trade: '泥水工',
+        color: '#64748b',
+        durationDays: 3,
+        predecessorKey: null,
+        predecessorDisabled: false,
+        itemCodes: [],
+      }],
+      processTasksLibraryId: 'library-1',
+      buildings: [{ id: 'building-1', name: '1栋', code: 'B1' }],
+      buildingCoverage: [],
+      saving: false,
+      loadCatalog: vi.fn().mockResolvedValue(undefined),
+      loadProcessLibraries: vi.fn().mockResolvedValue(undefined),
+      loadProcessLibraryTasks,
+      loadContracts: vi.fn().mockResolvedValue(undefined),
+      previewProvisionalScope: vi.fn().mockResolvedValue(validProvisionalPreview),
+      loadBuildings: vi.fn().mockResolvedValue(undefined),
+      createGroup: vi.fn(),
+    }
+
+    vi.stubGlobal('computed', computed)
+    vi.stubGlobal('nextTick', nextTick)
+    vi.stubGlobal('onMounted', onMounted)
+    vi.stubGlobal('ref', ref)
+    vi.stubGlobal('shallowRef', shallowRef)
+    vi.stubGlobal('watch', watch)
+    vi.stubGlobal('useRoute', () => ({ query: { project: 'project-1', resume: 'region' } }))
+    vi.stubGlobal('useRouter', () => ({ push: vi.fn() }))
+    vi.stubGlobal('useScheduleStore', () => store)
+    vi.stubGlobal('useKitUI', () => ({
+      confirm: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+      warning,
+    }))
+
+    render(ScheduleGroupNewScreen, {
+      global: {
+        components: {
+          NuxtLink: NuxtLinkStub,
+          ScheduleTemplateGanttEditor: GanttStub,
+          SelectFilter: SelectFilterStub,
+        },
+      },
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toContain('process library offline')
+    expect(window.sessionStorage.getItem(draftKey)).toBe(JSON.stringify(draft))
+
+    await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
+
+    await waitFor(() => {
+      expect((screen.getByLabelText('分组名称') as HTMLInputElement).value).toBe('区域返回草稿')
+    })
+    await waitFor(() => expect(window.sessionStorage.getItem(draftKey)).toBeNull())
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('已从排程范围移除 1 栋失效楼栋'),
+    )
   })
 })

@@ -3,6 +3,7 @@ import type {
   AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
   OwnerDocumentKind,
+  OwnerDocumentListRecord,
   OwnerDocumentSaveAction,
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
@@ -29,33 +30,58 @@ import {
 } from '~/lib/owner-document/forms'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
-  const records = shallowRef<Partial<Record<OwnerDocumentKind, Record<string, unknown>[]>>>({})
+  const records = shallowRef<Partial<Record<OwnerDocumentKind, OwnerDocumentListRecord[]>>>({})
+  const listLoading = shallowRef<Partial<Record<OwnerDocumentKind, boolean>>>({})
+  const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
+  const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
   const loading = shallowRef(false)
 
   async function loadKind(kind: OwnerDocumentKind) {
-    loading.value = true
+    const sequence = (listLoadSequence[kind] ?? 0) + 1
+    listLoadSequence[kind] = sequence
+    listLoading.value = { ...listLoading.value, [kind]: true }
+    listErrors.value = { ...listErrors.value, [kind]: '' }
     try {
       const rows = await listOwnerDocumentForms(kind)
-      records.value = { ...records.value, [kind]: rows }
+      if (listLoadSequence[kind] === sequence)
+        records.value = { ...records.value, [kind]: rows }
       return rows
     }
-    finally {
-      loading.value = false
+    catch (cause) {
+      if (listLoadSequence[kind] === sequence) {
+        listErrors.value = {
+          ...listErrors.value,
+          [kind]: cause instanceof Error ? cause.message : '列表载入失败',
+        }
+      }
+      throw cause
     }
+    finally {
+      if (listLoadSequence[kind] === sequence)
+        listLoading.value = { ...listLoading.value, [kind]: false }
+    }
+  }
+
+  function recordsFor(kind: OwnerDocumentKind) {
+    return records.value[kind] ?? []
+  }
+
+  function listLoadingFor(kind: OwnerDocumentKind) {
+    return listLoading.value[kind] ?? false
+  }
+
+  function listError(kind: OwnerDocumentKind) {
+    return listErrors.value[kind] ?? ''
+  }
+
+  async function refreshAfterMutation(kind: OwnerDocumentKind) {
+    await loadKind(kind).catch(() => undefined)
   }
 
   async function loadOne(kind: OwnerDocumentKind, id: string) {
     loading.value = true
     try {
-      const record = await loadOwnerDocumentForm(kind, id)
-      const current = records.value[kind] ?? []
-      records.value = {
-        ...records.value,
-        [kind]: record
-          ? [record, ...current.filter(item => item.id !== id)]
-          : current.filter(item => item.id !== id),
-      }
-      return record
+      return await loadOwnerDocumentForm(kind, id)
     }
     finally {
       loading.value = false
@@ -121,7 +147,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading.value = true
     try {
       const result = await saveOwnerDocumentForm(kind, draft, action, attachments)
-      await loadOne(kind, result.id)
+      await refreshAfterMutation(kind)
       return result
     }
     finally {
@@ -133,7 +159,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading.value = true
     try {
       await approveOwnerChange(id, approvedAt)
-      return await loadOne('owner_change', id)
+      await refreshAfterMutation('owner_change')
     }
     finally {
       loading.value = false
@@ -144,7 +170,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading.value = true
     try {
       await auditOwnerReport(id, draft)
-      return await loadOne('owner_report', id)
+      await refreshAfterMutation('owner_report')
     }
     finally {
       loading.value = false
@@ -155,7 +181,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading.value = true
     try {
       await transitionAcceptance(id, target)
-      return await loadOne('acceptance', id)
+      await refreshAfterMutation('acceptance')
     }
     finally {
       loading.value = false
@@ -171,7 +197,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     loading.value = true
     try {
       await deductProjectPenalty(penaltyId, settlementId, amount, note)
-      return await loadOne('project_penalty', penaltyId)
+      await refreshAfterMutation('project_penalty')
     }
     finally {
       loading.value = false
@@ -181,14 +207,14 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   async function removeForm(kind: OwnerDocumentKind, id: string) {
     const logId = await deleteOwnerDocumentForm(kind, id)
     if (logId)
-      await loadKind(kind)
+      await refreshAfterMutation(kind)
     return logId
   }
 
   async function restoreForm(kind: OwnerDocumentKind, id: string) {
     const logId = await restoreOwnerDocumentForm(kind, id)
     if (logId)
-      await loadKind(kind)
+      await refreshAfterMutation(kind)
     return logId
   }
 
@@ -208,8 +234,13 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
 
   return {
     records: readonly(records),
+    listLoading: readonly(listLoading),
+    listErrors: readonly(listErrors),
     loading: readonly(loading),
     loadKind,
+    recordsFor,
+    listLoadingFor,
+    listError,
     loadOne,
     loadAttachments,
     loadBoqLines,

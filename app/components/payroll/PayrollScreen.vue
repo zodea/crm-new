@@ -1,14 +1,35 @@
 <script setup lang="ts">
 import { nextTick, onMounted } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { createPayrollWorkbookExport } from '~/lib/payroll/export'
+import {
+  payrollFiltersFromQuery,
+  payrollListLocation,
+  shouldSyncPayrollListUrl,
+} from '~/lib/payroll/navigation'
 
 const store = usePayrollStore()
 const kit = useKitUI()
+const route = useRoute()
 
-onMounted(store.load)
+// 导航离开在 route 更新之前触发，用它判断用户是否已经点走。
+let hasLeftPage = false
+onBeforeRouteLeave(() => {
+  hasLeftPage = true
+})
+
+onMounted(async () => {
+  Object.assign(store.filters, payrollFiltersFromQuery(route.query, store.filters))
+  await store.load()
+  // 载入期间用户可能已经点进建单页；此时补写地址栏会把人拉回列表。
+  if (!shouldSyncPayrollListUrl(route.path, hasLeftPage))
+    return
+  await navigateTo(payrollListLocation(store.filters), { replace: true })
+})
 
 async function reload(filters: typeof store.filters) {
   Object.assign(store.filters, filters)
+  await navigateTo(payrollListLocation(store.filters), { replace: true })
   await store.load()
 }
 
@@ -64,7 +85,6 @@ async function printSelected() {
       :options="store.options"
       :filters="store.filters"
       @update:filters="reload"
-      @create="input => run(() => store.createDraft(input), '工资草稿已生成')"
     />
     <PayrollSummary :statements="store.statements" />
     <p v-if="store.error" role="alert" class="rounded-md bg-danger-soft px-3 py-2 text-12px text-danger">

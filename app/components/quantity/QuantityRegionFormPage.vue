@@ -5,6 +5,8 @@ import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
   projectId: string
+  returnSource?: 'quantity' | 'schedule'
+  resumeSchedule?: boolean
 }>()
 
 const store = useQuantityStore()
@@ -37,11 +39,22 @@ const matrixPath = computed(() => ({
 }))
 const schedulePath = computed(() => ({
   path: '/schedule/new',
-  query: { project: props.projectId },
+  query: {
+    project: props.projectId,
+    resume: props.resumeSchedule ? 'region' : undefined,
+  },
 }))
+const backPath = computed(() => props.returnSource === 'schedule'
+  ? schedulePath.value
+  : matrixPath.value)
 const templatePath = computed(() => ({
   path: '/subcontract/quantity/template',
-  query: { project: props.projectId, return: 'region' },
+  query: {
+    project: props.projectId,
+    return: 'region',
+    origin: props.returnSource === 'schedule' ? 'schedule' : undefined,
+    resume: props.resumeSchedule ? 'region' : undefined,
+  },
 }))
 const hasDraft = computed(() => [
   buildingDraft.code,
@@ -172,7 +185,7 @@ useTabTitle(() => workspace.value
     data-testid="quantity-region-form"
     title="项目区域配置"
     subtitle="按楼栋 → 楼层 → 户建立施工范围；合同不是前置条件，户必须挂靠本项目户型模板。"
-    back-label="返回工程量矩阵"
+    :back-label="returnSource === 'schedule' ? '返回新建排程' : '返回工程量矩阵'"
     :sections="[
       { key: 'building', label: '楼栋' },
       { key: 'floor', label: '楼层' },
@@ -182,7 +195,7 @@ useTabTitle(() => workspace.value
     state-title="项目区域加载失败"
     :state-description="shellDescription"
     state-action-label="重新加载"
-    @back="router.push(matrixPath)"
+    @back="router.push(backPath)"
     @state-action="initialize"
   >
     <template #status>

@@ -15,10 +15,12 @@ const props = defineProps<{
   boqLines: OwnerDocumentBoqLine[]
   readonly?: boolean
   auditMode?: boolean
+  error?: string
 }>()
 
 const emit = defineEmits<{
   update: [lines: GridLine[]]
+  clearError: []
 }>()
 
 const root = useTemplateRef<HTMLElement>('root')
@@ -101,7 +103,16 @@ function selectBoqLine(index: number, id: string) {
   })
 }
 
+/** 缺量事实挂在合同清单行上，明细草稿只存报量值，取用时按行回查。 */
+function missingQtyCount(row: GridLine): number {
+  const boqLineId = String(row.boqLineId ?? '')
+  if (!boqLineId)
+    return 0
+  return props.boqLines.find(line => line.id === boqLineId)?.missingQtyCount ?? 0
+}
+
 function add() {
+  emit('clearError')
   emit('update', [
     ...props.lines,
     props.kind === 'owner_change'
@@ -128,12 +139,14 @@ function add() {
 }
 
 function copy(index: number) {
+  emit('clearError')
   const next = [...props.lines]
   next.splice(index + 1, 0, { ...props.lines[index], id: undefined })
   emit('update', next)
 }
 
 function remove(index: number) {
+  emit('clearError')
   emit('update', props.lines.filter((_, current) => current !== index))
 }
 </script>
@@ -167,7 +180,18 @@ function remove(index: number) {
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto">
+    <p
+      v-if="error"
+      id="owner-document-lines-error"
+      data-field="lines"
+      role="alert"
+      tabindex="-1"
+      class="m-3 rounded-[var(--radius-control)] border border-danger/30 bg-danger/5 px-3 py-2 text-12px text-danger outline-none focus:ring-2 focus:ring-danger/30"
+    >
+      {{ error }}
+    </p>
+
+    <div data-testid="owner-document-line-scroll" class="min-h-0 flex-1 overflow-auto">
       <KitTable :style="{ minWidth: `${gridMinWidth}px` }" :columns="columns" :data="lines" :min-rows="3" empty="暂无明细">
         <template #operation="{ row, rowIndex }">
           <select
@@ -246,7 +270,15 @@ function remove(index: number) {
           >
         </template>
         <template #autoQty="{ row }">
-          <span class="font-mono font-700">{{ Number(row.autoQty || 0).toFixed(3) }}</span>
+          <span
+            class="font-mono font-700"
+            :class="missingQtyCount(row) ? 'text-danger' : ''"
+          >{{ Number(row.autoQty || 0).toFixed(3) }}</span>
+          <span
+            v-if="missingQtyCount(row)"
+            class="ml-1 text-10px text-danger"
+            :title="`${missingQtyCount(row)} 条模板明细缺该基准工程量，自动完成量不完整，不会用其他量源替代`"
+          >缺量</span>
         </template>
         <template #reportedQty="{ row, rowIndex }">
           <input
@@ -290,10 +322,10 @@ function remove(index: number) {
           >
         </template>
         <template #action="{ rowIndex }">
-          <button v-if="kind === 'owner_change'" type="button" class="icon-btn" title="复制" :disabled="readonly" @click="copy(rowIndex)">
+          <button v-if="kind === 'owner_change'" type="button" class="icon-btn" title="复制" :aria-label="`复制第 ${rowIndex + 1} 行`" :disabled="readonly" @click="copy(rowIndex)">
             <span class="i-lucide-copy" aria-hidden="true" />
           </button>
-          <button type="button" class="icon-btn-danger" title="删除" :disabled="readonly" @click="remove(rowIndex)">
+          <button type="button" class="icon-btn-danger" title="删除" :aria-label="`删除第 ${rowIndex + 1} 行`" :disabled="readonly" @click="remove(rowIndex)">
             <span class="i-lucide-trash-2" aria-hidden="true" />
           </button>
         </template>

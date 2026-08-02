@@ -14,6 +14,9 @@ const LookupSelect = defineComponent({
   props: {
     modelValue: { type: String, default: null },
     disabledReason: { type: String, default: '' },
+    invalid: { type: Boolean, default: false },
+    descriptionId: { type: String, default: '' },
+    field: { type: String, default: '' },
     placeholder: { type: String, default: '' },
   },
   emits: ['update:modelValue'],
@@ -23,6 +26,9 @@ const LookupSelect = defineComponent({
       type="button"
       :disabled="Boolean(disabledReason)"
       :data-disabled-reason="disabledReason"
+      :data-field="field"
+      :aria-invalid="invalid || undefined"
+      :aria-describedby="descriptionId || undefined"
       @click="$emit('update:modelValue', 'real-id')"
     >
       {{ placeholder }}
@@ -55,6 +61,10 @@ const global = {
     LookupSelect,
     SectionHeader,
     SelectFilter,
+    NuxtLink: defineComponent({
+      props: { to: { type: String, required: true } },
+      template: '<a :href="to"><slot /></a>',
+    }),
   },
 }
 
@@ -99,5 +109,55 @@ describe('ownerDocumentFormFields data flow', () => {
       .toBe('已生效单据不可修改')
     expect(wrapper.get('[data-testid="owner-document-name"]').attributes('disabled'))
       .toBeDefined()
+  })
+
+  it('associates ordinary and lookup errors with their controls', () => {
+    const wrapper = mount(OwnerDocumentFormFields, {
+      props: {
+        kind: 'owner_change',
+        draft: ownerDocumentDefaults('owner_change'),
+        fieldErrors: {
+          name: '变更名称为必填项',
+          projectId: '项目为必填项',
+        },
+        fetchProjects: fetchLookup,
+        fetchSuppliers: fetchLookup,
+        fetchContracts: fetchLookup,
+        fetchCrews: fetchLookup,
+      },
+      global,
+    })
+
+    const name = wrapper.get('[data-testid="owner-document-name"]')
+    expect(name.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get(`#${name.attributes('aria-describedby')}`).text())
+      .toBe('变更名称为必填项')
+
+    const project = wrapper.get('[data-testid="owner-document-projectId"]')
+    expect(project.attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get(`#${project.attributes('aria-describedby')}`).text())
+      .toBe('项目为必填项')
+  })
+
+  it('shows the matching contract list when a project has no eligible contract', () => {
+    const wrapper = mount(OwnerDocumentFormFields, {
+      props: {
+        kind: 'sub_settlement',
+        draft: {
+          ...ownerDocumentDefaults('sub_settlement'),
+          projectId: 'project-real',
+        },
+        fieldErrors: {},
+        eligibleContractCount: 0,
+        fetchProjects: fetchLookup,
+        fetchSuppliers: fetchLookup,
+        fetchContracts: fetchLookup,
+        fetchCrews: fetchLookup,
+      },
+      global,
+    })
+
+    expect(wrapper.get('[role="status"]').text()).toContain('当前项目暂无可选的分包合同')
+    expect(wrapper.get('a').attributes('href')).toBe('/contract/subcontract')
   })
 })

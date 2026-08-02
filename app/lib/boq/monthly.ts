@@ -1,8 +1,18 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
-import { hiddenCtesFor, logCreate, selectVisibleSql, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import type { QuantityBasis } from '~/lib/quantity/basis'
+import { hiddenCtesFor, logCreate, selectVisibleSql, softDelete, visibleCond, withUpdateLog } from '~/lib/db/soft-delete'
+import {
+  assertQuantityBasis,
+  isQuantityBasis,
+  QUANTITY_BASIS_COLUMNS,
+  quantityBasisLabel,
+} from '~/lib/quantity/basis'
 import { generateId } from '~/lib/util/id'
 import { round2 } from '~/lib/util/number'
 import { loadBoqWorkspace } from './read-model'
+
+/** 报量默认基准：进度款报的是已完成工序的实测量，缺量时报缺而不是回退到其他口径。 */
+export const DEFAULT_PROGRESS_QUANTITY_BASIS: QuantityBasis = 'field'
 
 export interface MonthlyStatementLineView {
   id: string
@@ -25,6 +35,15 @@ export interface MonthlyStatementView {
   month: string
   status: 'draft' | 'adjusted' | 'exported'
   totalAmount: number
+  /** 本单选定的取数基准；草稿可换基准重算，申报后冻结。 */
+  quantityBasis: QuantityBasis
+  quantityBasisLabel: string
+  /** 取数时的事实版本指纹与源数据最后更新时间，供申报后追溯用的是哪一版事实。 */
+  sourceVersion: string
+  sourceUpdatedAt: string | null
+  /** 申报时冻结的操作者与提交时间；草稿期为空，不拿生成时间冒充申报证据。 */
+  operatorName: string
+  submittedAt: string | null
   note: string
   lines: readonly MonthlyStatementLineView[]
 }
@@ -39,6 +58,10 @@ export interface GenerateMonthlyStatementResult {
 export interface MonthlyQuantityRow {
   boq_line_id: string
   auto_qty: number
+  /** 所选基准下缺量的模板明细条数；> 0 表示该行不可直接报量。 */
+  missing_count: number
+  /** 该行所依据的三量与完成事实里最后一次更新的时间，用于证明报量的数据版本。 */
+  source_updated_at: string | null
 }
 
 interface StatementRow {
@@ -48,6 +71,11 @@ interface StatementRow {
   month: string
   status: 'draft' | 'adjusted' | 'exported'
   total_amount: number
+  quantity_basis: string | null
+  source_version: string | null
+  source_updated_at: string | null
+  operator_name: string | null
+  submitted_at: string | null
   note: string
 }
 
@@ -78,12 +106,21 @@ function assertMonth(month: string) {
     throw new Error('报量月份格式必须为 yyyy-mm')
 }
 
+/**
+ * 按指定基准派生当月已完成工序的报量数量。
+ *
+ * 只读所选基准自己的列：缺量以 `missing_count` 显式暴露，不跨口径回退，
+ * 也不把缺量当成 0 计入 `auto_qty`，避免生成金额偏低却看不出缺数的报量单。
+ */
 export async function loadMonthlyQuantities(
   db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId: string,
   month: string,
+  basis: QuantityBasis = DEFAULT_PROGRESS_QUANTITY_BASIS,
 ): Promise<MonthlyQuantityRow[]> {
+  assertQuantityBasis(basis)
+  const quantityColumn = QUANTITY_BASIS_COLUMNS[basis]
   return db.select<MonthlyQuantityRow>(
     `${hiddenCtesFor(
       'unit_stage_completions',
@@ -92,7 +129,9 @@ export async function loadMonthlyQuantities(
       'boq_lines',
     )}
      SELECT hti.boq_line_id,
-            SUM(COALESCE(hti.field_qty, hti.provisional_qty, hti.contract_qty, 0)) AS auto_qty
+            COALESCE(SUM(hti.${quantityColumn}), 0) AS auto_qty,
+            SUM(CASE WHEN hti.${quantityColumn} IS NULL THEN 1 ELSE 0 END) AS missing_count,
+            MAX(MAX(hti.updated_at, usc.updated_at)) AS source_updated_at
      FROM unit_stage_completions usc
      JOIN units unit_row ON unit_row.id = usc.unit_id
      JOIN floors floor_row ON floor_row.id = unit_row.floor_id
@@ -121,13 +160,105 @@ export async function loadMonthlyQuantities(
   )
 }
 
+interface StatementBuildRow {
+  line: { id: string, itemName: string, unit: string, effectiveUnitPrice: number }
+  autoQty: number
+  amount: number
+}
+
+interface StatementBuildResult {
+  rows: StatementBuildRow[]
+  sourceVersion: string
+  sourceUpdatedAt: string | null
+}
+
+/**
+ * 报量取数的版本指纹。
+ *
+ * 同时覆盖基准、量与单价：只要任一发生变化，版本就变，据此可以证明
+ * 一张已申报的报量单用的是哪一版事实，而不是事后再去比对源表。
+ */
+function statementSourceVersion(
+  basis: QuantityBasis,
+  rows: readonly StatementBuildRow[],
+  sourceUpdatedAt: string | null,
+): string {
+  const value = `${basis}\n${sourceUpdatedAt ?? ''}\n${rows
+    .map(row => [
+      row.line.id,
+      round2(row.autoQty),
+      round2(row.line.effectiveUnitPrice),
+    ].join('|'))
+    .sort()
+    .join('\n')}`
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `boq-qty-${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
+
+/**
+ * 按基准派生一份报量行草案。缺量在这里统一阻断：生成和换基准重算都要挡住，
+ * 否则会留下一张金额偏低、事后无从追溯的报量单。
+ */
+async function buildStatementRows(
+  db: SoftDb,
+  projectId: string,
+  contractId: string,
+  month: string,
+  basis: QuantityBasis,
+): Promise<StatementBuildResult> {
+  const workspace = await loadBoqWorkspace(db, projectId, contractId)
+  if (!workspace)
+    throw new Error('施工合同不存在、已删除或不属于所选项目')
+  const lineById = new Map(workspace.lines.map(line => [line.id, line]))
+  const quantities = await loadMonthlyQuantities(db, projectId, contractId, month, basis)
+  const rows = quantities.flatMap((quantity) => {
+    const line = lineById.get(quantity.boq_line_id)
+    if (!line)
+      return []
+    const autoQty = numberValue(quantity.auto_qty)
+    return [{
+      line,
+      autoQty,
+      missingCount: numberValue(quantity.missing_count),
+      sourceUpdatedAt: quantity.source_updated_at,
+      amount: round2(autoQty * line.effectiveUnitPrice),
+    }]
+  })
+  const missingItems = rows
+    .filter(row => row.missingCount > 0)
+    .map(row => row.line.itemName)
+  if (missingItems.length) {
+    throw new Error(
+      `${quantityBasisLabel(basis)}缺失：${[...new Set(missingItems)].join('、')}`,
+    )
+  }
+  if (!rows.length)
+    throw new Error(`${month} 没有可报量的已完成工程量`)
+  const sourceUpdatedAt = rows.reduce<string | null>((latest, row) => {
+    if (!row.sourceUpdatedAt)
+      return latest
+    return !latest || row.sourceUpdatedAt > latest ? row.sourceUpdatedAt : latest
+  }, null)
+  return {
+    rows,
+    sourceUpdatedAt,
+    sourceVersion: statementSourceVersion(basis, rows, sourceUpdatedAt),
+  }
+}
+
 export async function generateMonthlyStatement(
   db: SoftDb,
   projectId: string,
   contractId: string,
   month: string,
+  basis: QuantityBasis = DEFAULT_PROGRESS_QUANTITY_BASIS,
 ): Promise<GenerateMonthlyStatementResult> {
   assertMonth(month)
+  assertQuantityBasis(basis)
   const [existing] = await db.select<{ id: string }>(
     `SELECT id
      FROM monthly_statements
@@ -137,33 +268,32 @@ export async function generateMonthlyStatement(
   if (existing)
     throw new Error(`${month} 月度报量已存在`)
 
-  const workspace = await loadBoqWorkspace(db, projectId, contractId)
-  if (!workspace)
-    throw new Error('施工合同不存在、已删除或不属于所选项目')
-  const lineById = new Map(workspace.lines.map(line => [line.id, line]))
-  const quantities = await loadMonthlyQuantities(db, projectId, contractId, month)
-  const rows = quantities.flatMap((quantity) => {
-    const line = lineById.get(quantity.boq_line_id)
-    if (!line)
-      return []
-    const autoQty = numberValue(quantity.auto_qty)
-    return [{
-      line,
-      autoQty,
-      amount: round2(autoQty * line.effectiveUnitPrice),
-    }]
-  })
-  if (!rows.length)
-    throw new Error(`${month} 没有可报量的已完成工程量`)
+  const { rows, sourceVersion, sourceUpdatedAt } = await buildStatementRows(
+    db,
+    projectId,
+    contractId,
+    month,
+    basis,
+  )
 
   const statementId = generateId('monthly_statement')
   const totalAmount = round2(rows.reduce((total, row) => total + row.amount, 0))
   const logIds: string[] = []
   await db.execute(
     `INSERT INTO monthly_statements
-      (id, project_id, contract_id, month, status, total_amount)
-     VALUES (?, ?, ?, ?, 'draft', ?)`,
-    [statementId, projectId, contractId, month, totalAmount],
+      (id, project_id, contract_id, month, status, total_amount, quantity_basis,
+       source_version, source_updated_at)
+     VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
+    [
+      statementId,
+      projectId,
+      contractId,
+      month,
+      totalAmount,
+      basis,
+      sourceVersion,
+      sourceUpdatedAt,
+    ],
   )
   const statementLogId = await logCreate(db, 'monthly_statements', statementId)
   if (statementLogId)
@@ -195,6 +325,91 @@ export async function generateMonthlyStatement(
   return { statementId, lineCount: rows.length, totalAmount, logIds }
 }
 
+/**
+ * 草稿阶段换取数基准并重算。
+ *
+ * 基准归每次报量单而不是项目全局，且只在草稿期可变：已申报/已审定的单据必须冻结，
+ * 需要改口径时走重新申报流程，不在这里静默改写历史金额。手调量会被丢弃——
+ * 它是针对旧基准自动量做的修正，换基准后不再成立。
+ */
+export async function regenerateMonthlyStatement(
+  db: SoftDb,
+  statementId: string,
+  basis: QuantityBasis,
+): Promise<GenerateMonthlyStatementResult> {
+  assertQuantityBasis(basis)
+  const [statement] = await db.select<{
+    project_id: string
+    contract_id: string
+    month: string
+    status: string
+  }>(
+    `SELECT project_id, contract_id, month, status
+     FROM monthly_statements
+     WHERE id = ? AND deleted_at IS NULL`,
+    [statementId],
+  )
+  if (!statement)
+    throw new Error('月度报量单不存在或已删除')
+  if (statement.status !== 'draft')
+    throw new Error('只有草稿状态的月度报量可以更换取数基准')
+
+  const { rows, sourceVersion, sourceUpdatedAt } = await buildStatementRows(
+    db,
+    statement.project_id,
+    statement.contract_id,
+    statement.month,
+    basis,
+  )
+  const totalAmount = round2(rows.reduce((total, row) => total + row.amount, 0))
+  const logIds: string[] = []
+
+  const existingLines = await db.select<{ id: string }>(
+    `SELECT id FROM monthly_statement_lines
+     WHERE statement_id = ? AND deleted_at IS NULL`,
+    [statementId],
+  )
+  for (const line of existingLines) {
+    const removedLogId = await softDelete(db, 'monthly_statement_lines', line.id)
+    if (removedLogId)
+      logIds.push(removedLogId)
+  }
+  for (const [index, row] of rows.entries()) {
+    const lineId = generateId('monthly_statement_line')
+    await db.execute(
+      `INSERT INTO monthly_statement_lines
+        (id, statement_id, boq_line_id, item_name, unit, auto_qty, adjusted_qty,
+         unit_price, amount, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+      [
+        lineId,
+        statementId,
+        row.line.id,
+        row.line.itemName,
+        row.line.unit,
+        row.autoQty,
+        row.line.effectiveUnitPrice,
+        row.amount,
+        (index + 1) * 10,
+      ],
+    )
+    const lineLogId = await logCreate(db, 'monthly_statement_lines', lineId)
+    if (lineLogId)
+      logIds.push(lineLogId)
+  }
+  const statementLogId = await withUpdateLog(db, 'monthly_statements', statementId, () => db.execute(
+    `UPDATE monthly_statements
+     SET quantity_basis = ?, total_amount = ?,
+         source_version = ?, source_updated_at = ?,
+         updated_at = datetime('now')
+     WHERE id = ?`,
+    [basis, totalAmount, sourceVersion, sourceUpdatedAt, statementId],
+  ))
+  if (statementLogId)
+    logIds.push(statementLogId)
+  return { statementId, lineCount: rows.length, totalAmount, logIds }
+}
+
 export async function loadMonthlyStatement(
   db: SoftDb,
   statementId: string,
@@ -212,6 +427,9 @@ export async function loadMonthlyStatement(
     ),
     [statementId],
   )
+  const quantityBasis = isQuantityBasis(statement.quantity_basis)
+    ? statement.quantity_basis
+    : DEFAULT_PROGRESS_QUANTITY_BASIS
   return {
     id: statement.id,
     projectId: statement.project_id,
@@ -219,6 +437,12 @@ export async function loadMonthlyStatement(
     month: statement.month,
     status: statement.status,
     totalAmount: numberValue(statement.total_amount),
+    quantityBasis,
+    quantityBasisLabel: quantityBasisLabel(quantityBasis),
+    sourceVersion: statement.source_version ?? '',
+    sourceUpdatedAt: statement.source_updated_at,
+    operatorName: statement.operator_name ?? '',
+    submittedAt: statement.submitted_at,
     note: statement.note,
     lines: lines.map((line) => {
       const autoQty = numberValue(line.auto_qty)

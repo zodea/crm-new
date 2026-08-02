@@ -242,12 +242,23 @@ boq_change_lines(
 
 monthly_statements(
   id, project_id -> projects.id, contract_id -> contracts.id, month,
-  status ['draft'|'adjusted'|'exported'], total_amount, note,
+  status ['draft'|'adjusted'|'exported'], total_amount,
+  quantity_basis ['contract'|'provisional'|'field'],
+  source_version, source_updated_at, operator_name, submitted_at, note,
   created_at, updated_at, deleted_at
 )
 -- (contract_id, month) 对活跃报量单唯一。
 -- 状态沿用存量值：draft=草稿，adjusted=已有真实申报金额，exported=已有真实审定金额。
 -- 清单工作台手调/导出不推进状态；v37 仅以 audited_amount 保留“已审定”，其余旧 adjusted/exported 保守回草稿。
+-- v39 `quantity_basis` 记录本单选定的取数基准，缺省 field。基准归每次报量单，不做项目全局唯一。
+-- 派生只读所选基准自己的列，缺量报错阻断生成，不跨口径回退，也不按 0 静默计入。
+-- draft 期可经换基准重算改写 quantity_basis 与全部行（旧行软删、手调量随之失效）；
+-- 一旦进入 adjusted/exported 即冻结，改口径必须走重新申报，不静默改写历史金额。
+-- 甲方报量单（owner_report）与本表是同一条记录，自动完成量必须读同一个 quantity_basis。
+-- v40 `source_version` / `source_updated_at` 在生成与换基准重算时写入：版本指纹覆盖基准、量与单价，
+-- 用于证明一张已申报报量单依据的是哪一版事实，不必事后回比源表。
+-- `operator_name` / `submitted_at` 只在申报（action=submit）时冻结；草稿期保持空，
+-- 不拿生成时间或 application_date（用户手填的申报日期）冒充系统提交证据。
 
 monthly_statement_lines(
   id, statement_id -> monthly_statements.id, boq_line_id -> boq_lines.id,
@@ -674,7 +685,7 @@ END;
 > 标准工序库按 [ADR 0018](../adr/0018-versioned-schedule-process-library.md) 保存全局不可变版本。基于旧版只能沿用相同 `code` 新建下一版本；`schedule_process_library_tasks.predecessor_task_key` 保存前置身份，`predecessor_disabled=1` 表示因顺序冲突已置灰但未删除。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码、分项码及前置状态均以创建时快照为准。禁用关系仍创建 `task_dependencies` 后按 `schedule:conflict-reschedule` 软删除，之后全局库变化不会追溯改写既有项目 WBS。迁移历史冻结为：v34 只增加并回填 `predecessor_task_key`，v35 再通过 `addColumnIfMissing` 增加 `predecessor_disabled` 并把空值或非法值回填为 `0`，以覆盖已经登记 v34 的存量数据库。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
-> `schedule_task_floor_plans` 由排程域拥有，唯一范围为 `task_id + floor_id + boq_line_id`；初建时从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。BOQ 只提供稳定 `boq_line_id`，不保存第二份计划。
+> `schedule_task_floor_plans` 由排程域拥有，并以 `source_basis` 区分来源。合同清单行保存 `item_id + boq_line_id`，唯一范围为 `task_id + floor_id + boq_line_id`；内部暂估行保存 `item_id + provisional_qty`、`boq_line_id=NULL`，唯一范围为 `task_id + floor_id + item_id`。两种来源均从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。v38 只从真实 `boq_lines.item_id` 回填存量合同计划；缺少可验证分项的旧行会阻断迁移，不伪造 BOQ。`boq_line_id` 是来源追溯引用，不是该排程行的可见性祖先：BOQ 行后续软删除不能隐藏已冻结的楼层计划。内部暂估后补合同时仅改变分组依据，预览与写入统一聚合分组内有效 `provisional_qty` 快照；既有暂估计划行继续保持 `source_basis='provisional'`，不被户型模板后续修改或合同量覆盖。
 
 ### 2.8 目标成本类（成本控制基线）
 
@@ -1372,7 +1383,7 @@ interface FilePayload {
 | `schedule_tasks` | `stage_id` | `construction_stages.id` | N:1 | 工序任务 → 稳定阶段；`has_qty=1` 必填 |
 | `task_dependencies` | `predId` / `succId` | `schedule_tasks.id` | N:1 | 前后置依赖（FS/SS/FF/SF + lag） |
 | `task_item_map` | `taskId` | `schedule_tasks.id` | N:1 | 工序 → 分项映射 |
-| `schedule_task_floor_plans` | `task_id` / `floor_id` / `boq_line_id` | `schedule_tasks.id` / `floors.id` / `boq_lines.id` | N:1 | 排程域拥有的分项×楼层计划；自动分摊后允许单层微调，BOQ 仅作来源引用 |
+| `schedule_task_floor_plans` | `task_id` / `floor_id` / `item_id` / `boq_line_id` | `schedule_tasks.id` / `floors.id` / `items.id` / `boq_lines.id` | N:1 | 排程域拥有的分项×楼层计划；`source_basis=contract` 必须有 BOQ，`provisional` 只保留暂估量且 BOQ 为空 |
 
 > 工序实际进度不另存值：运行时按 `schedule_tasks.stage_id` + `schedule_group_buildings` 聚合 `unit_stage_completions(status='completed')`；`task_item_map` 只圈定应做户、量值和下钻范围（见 `schedule-progress.md` §五）。
 
@@ -1704,7 +1715,14 @@ CREATE INDEX idx_task_deps_succ ON task_dependencies(succId);
 CREATE INDEX idx_task_item_map_task ON task_item_map(taskId);
 CREATE INDEX idx_schedule_floor_plans_task ON schedule_task_floor_plans(task_id);
 CREATE INDEX idx_schedule_floor_plans_floor ON schedule_task_floor_plans(floor_id);
+CREATE INDEX idx_schedule_floor_plans_item ON schedule_task_floor_plans(item_id);
 CREATE INDEX idx_schedule_floor_plans_boq ON schedule_task_floor_plans(boq_line_id);
+CREATE UNIQUE INDEX uq_schedule_floor_plan_contract_scope
+  ON schedule_task_floor_plans(task_id, floor_id, boq_line_id)
+  WHERE deleted_at IS NULL AND source_basis = 'contract' AND boq_line_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_schedule_floor_plan_provisional_scope
+  ON schedule_task_floor_plans(task_id, floor_id, item_id)
+  WHERE deleted_at IS NULL AND source_basis = 'provisional';
 
 -- 基础主数据
 CREATE UNIQUE INDEX uq_crews_name_active

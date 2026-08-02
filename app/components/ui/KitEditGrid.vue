@@ -6,7 +6,7 @@ import type {
   KitEditGridValidationError,
 } from '~/lib/kit/edit-grid'
 import type { KitTableColumn } from '~/lib/kit/table'
-import { computed, shallowRef } from 'vue'
+import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import {
   aggregateRows,
   applyDerive,
@@ -58,6 +58,8 @@ const selectedRows = shallowRef<RenderedRow[]>([])
 const pickerLoading = shallowRef(false)
 const actionError = shallowRef('')
 const validationActive = shallowRef(false)
+const manualValidationErrors = shallowRef<KitEditGridValidationError[]>([])
+const root = useTemplateRef<HTMLElement>('root')
 
 const derivedRows = computed(() => applyDerive(model.value, columns))
 const renderedRows = computed<RenderedRow[]>(() =>
@@ -100,9 +102,14 @@ const selectedIndices = computed(() =>
     .sort((a, b) => a - b),
 )
 
-const validationErrors = computed(() =>
-  validationActive.value ? validateRows(model.value, columns) : [],
-)
+const validationErrors = computed(() => {
+  const errors = validationActive.value ? validateRows(model.value, columns) : []
+  const seen = new Set(errors.map(error => `${error.row}:${error.key}`))
+  return [
+    ...errors,
+    ...manualValidationErrors.value.filter(error => !seen.has(`${error.row}:${error.key}`)),
+  ]
+})
 const validationErrorKeys = computed(() =>
   new Set(validationErrors.value.map(error => `${error.row}:${error.key}`)),
 )
@@ -125,11 +132,19 @@ function errorId(rowIndex: number, key: string) {
   return `kit-edit-grid-${rowIndex}-${key}-error`
 }
 
+function errorMessage(rowIndex: number, key: string, label: string) {
+  return validationErrors.value
+    .find(error => error.row === rowIndex && error.key === key)
+    ?.message ?? `${label}为必填项`
+}
+
 function updateRow(rowIndex: number, key: string, value: unknown) {
   const next = model.value.map((row, index) =>
     index === rowIndex ? { ...row, [key]: value } : row)
   model.value = next
   actionError.value = ''
+  manualValidationErrors.value = manualValidationErrors.value
+    .filter(error => error.row !== rowIndex || error.key !== key)
 }
 
 function updateNumber(rowIndex: number, key: string, event: Event) {
@@ -178,6 +193,7 @@ function addRow() {
   if (!canAppend(1))
     return
   model.value = [...model.value, {} as T]
+  manualValidationErrors.value = []
   clearSelection()
 }
 
@@ -198,6 +214,7 @@ function copySelected() {
     next.push(copy)
   })
   model.value = next
+  manualValidationErrors.value = []
   clearSelection()
 }
 
@@ -206,6 +223,7 @@ function deleteSelected() {
     return
   const selected = new Set(selectedIndices.value)
   model.value = model.value.filter((_, index) => !selected.has(index))
+  manualValidationErrors.value = []
   clearSelection()
 }
 
@@ -219,6 +237,7 @@ async function pickRows() {
     if (!picked?.length || !canAppend(picked.length))
       return
     model.value = [...model.value, ...picked.map(row => ({ ...row }))]
+    manualValidationErrors.value = []
     clearSelection()
   }
   catch (error) {
@@ -235,17 +254,37 @@ function validate(): KitEditGridValidationError[] {
   return validateRows(model.value, columns)
 }
 
+function setErrors(errors: readonly KitEditGridValidationError[]) {
+  validationActive.value = true
+  manualValidationErrors.value = errors.map(error => ({ ...error }))
+}
+
+async function focusFirstError() {
+  await nextTick()
+  const first = validationErrors.value[0]
+  if (!first)
+    return false
+  const cells = root.value?.querySelectorAll<HTMLElement>('[data-kit-grid-cell]')
+  const target = cells
+    ? [...cells].find(cell => cell.dataset.kitGridCell === `${first.row}:${first.key}`)
+    : null
+  target?.focus()
+  target?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  return Boolean(target)
+}
+
 function formatSummary(value: number) {
   return new Intl.NumberFormat('zh-CN', {
     maximumFractionDigits: 2,
   }).format(value)
 }
 
-defineExpose({ validate })
+defineExpose({ focusFirstError, setErrors, validate })
 </script>
 
 <template>
   <section
+    ref="root"
     data-ui="kit-edit-grid"
     class="min-w-0 max-w-full space-y-2"
     :aria-label="label"
@@ -362,6 +401,7 @@ defineExpose({ validate })
             :aria-label="`${column.label}，第 ${row.__kitRowIndex + 1} 行`"
             :aria-invalid="isInvalid(row.__kitRowIndex, column.key) || undefined"
             :aria-describedby="isInvalid(row.__kitRowIndex, column.key) ? errorId(row.__kitRowIndex, column.key) : undefined"
+            :data-kit-grid-cell="`${row.__kitRowIndex}:${column.key}`"
             @change="event => updateRow(row.__kitRowIndex, column.key, (event.target as HTMLSelectElement).value)"
           >
             <option value="">
@@ -385,6 +425,7 @@ defineExpose({ validate })
             :aria-label="`${column.label}，第 ${row.__kitRowIndex + 1} 行`"
             :aria-invalid="isInvalid(row.__kitRowIndex, column.key) || undefined"
             :aria-describedby="isInvalid(row.__kitRowIndex, column.key) ? errorId(row.__kitRowIndex, column.key) : undefined"
+            :data-kit-grid-cell="`${row.__kitRowIndex}:${column.key}`"
             @input="updateNumber(row.__kitRowIndex, column.key, $event)"
           >
           <input
@@ -396,14 +437,15 @@ defineExpose({ validate })
             :aria-label="`${column.label}，第 ${row.__kitRowIndex + 1} 行`"
             :aria-invalid="isInvalid(row.__kitRowIndex, column.key) || undefined"
             :aria-describedby="isInvalid(row.__kitRowIndex, column.key) ? errorId(row.__kitRowIndex, column.key) : undefined"
+            :data-kit-grid-cell="`${row.__kitRowIndex}:${column.key}`"
             @input="event => updateRow(row.__kitRowIndex, column.key, (event.target as HTMLInputElement).value)"
           >
           <span
             v-if="isInvalid(row.__kitRowIndex, column.key)"
             :id="errorId(row.__kitRowIndex, column.key)"
-            class="sr-only"
+            class="block px-2 pt-0.5 text-10px leading-4 text-danger"
           >
-            {{ column.label }}为必填项
+            {{ errorMessage(row.__kitRowIndex, column.key, column.label) }}
           </span>
         </slot>
       </template>

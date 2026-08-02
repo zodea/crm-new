@@ -9,9 +9,38 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
+const contractStoreTestState = vi.hoisted(() => ({
+  failCompanyExpenseSelect: false,
+  failCoreContractSelect: false,
+  companyExpenseSelectOverrides: [] as Array<() => Promise<unknown[]>>,
+}))
+
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
-  select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
+  select: async (sql: string, params?: unknown[]) => {
+    if (
+      contractStoreTestState.failCoreContractSelect
+      && sql.includes('SELECT contract.*')
+      && sql.includes('FROM contracts AS contract')
+    ) {
+      throw new Error('模拟核心合同刷新失败')
+    }
+    if (
+      sql.includes('company_expense_contracts')
+      && !params?.length
+      && contractStoreTestState.companyExpenseSelectOverrides.length > 0
+    ) {
+      return contractStoreTestState.companyExpenseSelectOverrides.shift()!()
+    }
+    if (
+      contractStoreTestState.failCompanyExpenseSelect
+      && sql.includes('company_expense_contracts')
+      && !params?.length
+    ) {
+      throw new Error('模拟辅助列表刷新失败')
+    }
+    return mem.select(sql, params)
+  },
   withTransaction: async <T>(
     work: (tx: Pick<TestDb, 'execute' | 'select'>) => Promise<T>,
   ) => {
@@ -29,6 +58,9 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
+  contractStoreTestState.failCompanyExpenseSelect = false
+  contractStoreTestState.failCoreContractSelect = false
+  contractStoreTestState.companyExpenseSelectOverrides = []
   mem = await createMemoryDb()
   await runMigrations(mem)
   await mem.execute(`INSERT INTO customers (id, name) VALUES ('customer-1', '演示客户')`)
@@ -214,6 +246,116 @@ describe('contract store:唯一写路径 action 闭环', () => {
     expect(await store.undoForm('construction', logId!)).toBe(true)
     expect(store.list).toHaveLength(1)
     expect(store.byId(id)!.name).toBe('要删的')
+  })
+
+  it('辅助合同删除与撤回不因后续列表刷新失败而误报写入失败', async () => {
+    const store = useContractStore()
+    const { id } = await store.saveForm('company_expense', {
+      name: '待删除公司支出合同',
+      counterparty: '服务商',
+      signDate: '2026-07-30',
+      amount: 100,
+    }, 'submit')
+
+    contractStoreTestState.failCompanyExpenseSelect = true
+    const logId = await store.removeForm('company_expense', id)
+    expect(logId).toBeTruthy()
+    expect(store.auxError('company_expense')).toBe('模拟辅助列表刷新失败')
+    expect(await mem.select<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM company_expense_contracts WHERE id = ?',
+      [id],
+    )).toEqual([{ deleted_at: expect.any(String) }])
+
+    await expect(store.undoForm('company_expense', logId!)).resolves.toBe(true)
+    expect(store.auxError('company_expense')).toBe('模拟辅助列表刷新失败')
+    expect(await mem.select<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM company_expense_contracts WHERE id = ?',
+      [id],
+    )).toEqual([{ deleted_at: null }])
+  })
+
+  it('辅助列表仅采纳最新请求且不占用核心合同 loading', async () => {
+    const store = useContractStore()
+    let resolveFirst!: (rows: unknown[]) => void
+    const firstRows = new Promise<unknown[]>((resolve) => {
+      resolveFirst = resolve
+    })
+    contractStoreTestState.companyExpenseSelectOverrides.push(
+      () => firstRows,
+      async () => [{
+        id: 'new',
+        no: 'NEW',
+        name: '新请求',
+        category: '软件',
+        counterparty: '新服务商',
+        service_period: '一年',
+        amount: 200,
+        sign_date: '2026-07-30',
+        status: '履约中',
+      }],
+    )
+
+    const firstLoad = store.loadAux('company_expense')
+    expect(store.loading).toBe(false)
+    expect(store.auxLoadingFor('company_expense')).toBe(true)
+
+    await store.loadAux('company_expense')
+    resolveFirst([{
+      id: 'old',
+      no: 'OLD',
+      name: '旧请求',
+      category: '服务',
+      counterparty: '旧服务商',
+      service_period: '一月',
+      amount: 100,
+      sign_date: '2026-07-01',
+      status: '草稿',
+    }])
+    await firstLoad
+
+    expect(store.auxLoadingFor('company_expense')).toBe(false)
+    expect(store.auxByKind('company_expense').map(row => row.name)).toEqual(['新请求'])
+  })
+
+  it('核心合同写入成功后刷新失败不会误报保存失败', async () => {
+    const store = useContractStore()
+    contractStoreTestState.failCoreContractSelect = true
+
+    const result = await store.saveForm('construction', {
+      name: '已提交但刷新失败',
+      projectId: 'p1',
+      customerId: 'customer-1',
+    }, 'draft')
+
+    expect(result.id).toBeTruthy()
+    expect(store.loadError).toBe('模拟核心合同刷新失败')
+    expect(await mem.select<{ name: string }>(
+      'SELECT name FROM contracts WHERE id = ?',
+      [result.id],
+    )).toEqual([{ name: '已提交但刷新失败' }])
+  })
+
+  it('其他支出删除成功后核心合同刷新失败不会误报删除失败', async () => {
+    const store = useContractStore()
+    const { id } = await store.saveForm('other_expense', {
+      name: '待删除其他支出',
+      projectId: 'p1',
+      supplierId: 'supplier-1',
+      content: '服务内容',
+      signDate: '2026-07-30',
+      amount: 100,
+    }, 'submit')
+
+    contractStoreTestState.failCoreContractSelect = true
+    const logId = await store.removeForm('other_expense', id)
+
+    expect(logId).toBeTruthy()
+    expect(store.loadError).toBe('模拟核心合同刷新失败')
+    expect(store.auxByKind('other_expense')).toHaveLength(0)
+    expect(await mem.select<{ deleted_at: string | null }>(
+      'SELECT deleted_at FROM contracts WHERE id = ?',
+      [id],
+    )).toEqual([{ deleted_at: expect.any(String) }])
   })
 
   it('祖先过滤:父项目软删则合同隐藏,恢复项目即重现(ADR 0003 只标父级)', async () => {

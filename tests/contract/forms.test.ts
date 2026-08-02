@@ -181,7 +181,7 @@ describe('f2 合同与支出结算领域 action', () => {
       project_id: 'project-contract',
       supplier_id: 'supplier-contract',
       contract_id: otherExpense.id,
-      status: '审批中',
+      status: '待确认',
     }])
     expect(await loadF2Form('other_settlement', settlement.id))
       .toMatchObject({ id: settlement.id, contractId: otherExpense.id })
@@ -589,6 +589,29 @@ describe('f2 合同与支出结算领域 action', () => {
 
     const contractLogId = await deleteF2Form('other_expense', contract.id)
     expect(contractLogId).toBeTruthy()
+  })
+
+  it('草稿合同不进入结算候选且不能被结算单引用', async () => {
+    const store = useContractStore()
+    const contract = await store.saveForm('other_expense', {
+      name: '仍为草稿的其他支出合同',
+      projectId: 'project-contract',
+      supplierId: 'supplier-contract',
+      amount: 100,
+    }, 'draft')
+
+    await expect(store.searchSettlementContracts(
+      'other_settlement',
+      'project-contract',
+      '仍为草稿',
+    )).resolves.toEqual([])
+    await expect(store.saveForm('other_settlement', {
+      name: '不应保存的结算',
+      projectId: 'project-contract',
+      contractId: contract.id,
+      totalAmount: 80,
+      settlementDate: '2026-07-30',
+    }, 'submit')).rejects.toThrow('仍为草稿，不能办理结算')
   })
 
   it('编辑态锁定合同类型与主从身份，错误路由不能改写既有实体', async () => {

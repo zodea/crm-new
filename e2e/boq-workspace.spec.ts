@@ -131,6 +131,45 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(error).toContainText('请选择来源列后再预览')
   })
 
+  test('生成月度报量按所选取数基准计算并在单据上冻结基准', async ({ page }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', error => pageErrors.push(error.message))
+
+    await page.goto('/contract/boq?tab=monthly')
+    await page.waitForLoadState('networkidle')
+
+    await page.getByRole('button', { name: '生成月度报量' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByLabel('报量月份').fill('2026-04')
+    // 默认现场复核量；本次显式改用暂估量，验证基准真的参与取数而不是只改标签。
+    await dialog.getByLabel('取数基准').selectOption('暂估量')
+    await dialog.getByRole('button', { name: '生成草稿' }).click()
+
+    await expect(page.getByText('2026-04 月度报量草稿已按暂估量生成')).toBeVisible()
+    await expect(page.getByText('取数基准 暂估量')).toBeVisible()
+    // 暂估量 44 × 合同单价 36 = 1584，而非现场量 42 的 1512。
+    // vxe-table 固定列会把一行拆成两个 tr，因此按单元格断言而不是按整行。
+    await expect(page.getByRole('cell', { name: '给排水管安装', exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('cell', { name: '44', exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('cell', { name: '¥1,584.00', exact: true }).first()).toBeVisible()
+    await expect(page.getByText('¥1,512.00')).toHaveCount(0)
+
+    // 草稿阶段基准仍可换：改回现场复核量后金额随之重算。
+    await page.getByRole('button', { name: '换基准重算' }).click()
+    const regenerateDialog = page.getByRole('dialog')
+    await expect(regenerateDialog).toBeVisible()
+    await regenerateDialog.getByLabel('取数基准').selectOption('现场复核量')
+    await regenerateDialog.getByRole('button', { name: '重算草稿' }).click()
+
+    await expect(page.getByText('草稿已按现场复核量重算')).toBeVisible()
+    await expect(page.getByText('取数基准 现场复核量')).toBeVisible()
+    await expect(page.getByRole('cell', { name: '¥1,512.00', exact: true }).first()).toBeVisible()
+
+    await expectDocumentDoesNotOverflow(page)
+    expect(pageErrors).toEqual([])
+  })
+
   test('清单行通过稳定引用进入现场算式与排程楼层计划', async ({ page }) => {
     await page.goto('/contract/boq')
     await page.waitForLoadState('networkidle')
