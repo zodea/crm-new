@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills Atlas · 当前技能总览</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #080d18;
+  --panel: rgba(18, 28, 48, .82);
+  --panel-strong: #121d32;
+  --text: #eef4ff;
+  --muted: #8fa1bd;
+  --line: rgba(150, 174, 214, .16);
+  --cyan: #74e0d2;
+  --blue: #8da9ff;
+  --violet: #c2a6ff;
+  --orange: #ffb86b;
+  --green: #91e6a2;
+  --shadow: 0 24px 70px rgba(0, 0, 0, .35);
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; background: var(--bg); }
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% -10%, rgba(116, 224, 210, .16), transparent 34rem),
+    radial-gradient(circle at 93% 4%, rgba(141, 169, 255, .18), transparent 32rem),
+    linear-gradient(130deg, #080d18 0%, #0b1322 52%, #0a1020 100%);
+  font: 15px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+button, input, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.shell { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding: 34px 0 72px; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 40px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 750; letter-spacing: .02em; }
+.brand-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; color: #0a1220; background: linear-gradient(135deg, var(--cyan), var(--blue)); box-shadow: 0 8px 25px rgba(116, 224, 210, .2); }
+.source-note { color: var(--muted); font-size: 12px; text-align: right; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); gap: 42px; align-items: end; margin-bottom: 30px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--cyan); font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.eyebrow::before { content: ""; width: 28px; height: 1px; background: var(--cyan); box-shadow: 0 0 14px var(--cyan); }
+h1 { max-width: 780px; margin: 14px 0 12px; font-size: clamp(42px, 6vw, 84px); line-height: .98; letter-spacing: -.07em; }
+.hero-copy { max-width: 690px; margin: 0; color: var(--muted); font-size: 17px; }
+.hero-side { padding: 24px; border: 1px solid var(--line); border-radius: 22px; background: linear-gradient(145deg, rgba(24, 39, 67, .85), rgba(15, 25, 44, .54)); box-shadow: var(--shadow); }
+.hero-side strong { display: block; margin-bottom: 6px; font-size: 20px; }
+.hero-side p { margin: 0; color: var(--muted); font-size: 13px; }
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
+.stat { padding: 18px 20px; border: 1px solid var(--line); border-radius: 17px; background: rgba(16, 27, 46, .68); }
+.stat-value { display: block; color: var(--text); font-size: 30px; font-weight: 800; letter-spacing: -.05em; }
+.stat-label { color: var(--muted); font-size: 12px; }
+.toolbar { position: sticky; top: 12px; z-index: 5; display: grid; grid-template-columns: minmax(250px, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px; margin-bottom: 20px; border: 1px solid rgba(150, 174, 214, .22); border-radius: 18px; background: rgba(9, 17, 30, .8); backdrop-filter: blur(18px); box-shadow: 0 18px 50px rgba(0,0,0,.22); }
+.search-wrap { position: relative; }
+.search-wrap span { position: absolute; top: 50%; left: 14px; color: var(--muted); transform: translateY(-50%); }
+input, select { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: rgba(255, 255, 255, .045); }
+input { padding: 0 14px 0 40px; }
+select { padding: 0 38px 0 14px; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 18px) 19px, calc(100% - 13px) 19px; background-size: 5px 5px; background-repeat: no-repeat; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.filter { min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: transparent; cursor: pointer; transition: .2s ease; }
+.filter:hover { border-color: rgba(116,224,210,.5); color: var(--text); }
+.filter.active { border-color: rgba(116,224,210,.7); color: #08131b; background: var(--cyan); box-shadow: 0 0 0 4px rgba(116, 224, 210, .09); }
+.toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.toggle input { width: 16px; min-height: 16px; accent-color: var(--cyan); }
+.results-line { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin: 0 0 14px; }
+.results-line h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.results-line span { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.card { position: relative; display: flex; flex-direction: column; min-height: 245px; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(155deg, rgba(20, 32, 54, .8), rgba(12, 21, 37, .75)); box-shadow: 0 12px 30px rgba(0,0,0,.12); cursor: pointer; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.card:hover { transform: translateY(-4px); border-color: rgba(116,224,210,.48); box-shadow: 0 20px 44px rgba(0,0,0,.25); }
+.card:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+.card-index { position: absolute; top: 16px; right: 17px; color: rgba(143,161,189,.45); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.card-head { padding-right: 34px; }
+.card h3 { margin: 0 0 8px; font-size: 19px; letter-spacing: -.035em; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px; }
+.badge { display: inline-flex; align-items: center; min-height: 23px; padding: 0 8px; border: 1px solid rgba(141,169,255,.3); border-radius: 999px; color: var(--blue); background: rgba(141,169,255,.08); font-size: 11px; font-weight: 700; }
+.badge.source-matt { border-color: rgba(194,166,255,.35); color: var(--violet); background: rgba(194,166,255,.08); }
+.badge.source-antfu { border-color: rgba(255,184,107,.38); color: var(--orange); background: rgba(255,184,107,.08); }
+.badge.source-system { border-color: rgba(145,230,162,.38); color: var(--green); background: rgba(145,230,162,.08); }
+.description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; margin: 0; color: #b7c4d9; font-size: 13px; line-height: 1.65; }
+.card-foot { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-top: auto; padding-top: 18px; color: var(--muted); font-size: 11px; }
+.path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.arrow { color: var(--cyan); font-size: 16px; }
+.empty { display: none; padding: 70px 20px; border: 1px dashed var(--line); border-radius: 18px; color: var(--muted); text-align: center; }
+.empty.visible { display: block; }
+footer { display: flex; justify-content: space-between; gap: 18px; margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(3, 7, 14, .72); backdrop-filter: blur(8px); }
+.modal-backdrop.open { display: flex; }
+.modal { width: min(700px, 100%); max-height: min(720px, calc(100vh - 44px)); overflow: auto; padding: 28px; border: 1px solid rgba(150,174,214,.25); border-radius: 22px; background: #101a2d; box-shadow: 0 30px 100px rgba(0,0,0,.55); }
+.modal-top { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
+.modal h2 { margin: 0 0 7px; font-size: 28px; letter-spacing: -.045em; }
+.close { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: transparent; cursor: pointer; }
+.close:hover { color: var(--text); border-color: var(--cyan); }
+.modal-description { color: #bdc9dc; }
+.installations { display: grid; gap: 9px; margin-top: 22px; }
+.installation { padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px; background: rgba(255,255,255,.035); }
+.installation-label { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 4px; color: var(--text); font-size: 12px; font-weight: 700; }
+.installation-path { color: var(--muted); font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 22px; } .toolbar { grid-template-columns: 1fr 1fr; } .search-wrap { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .shell { width: min(100% - 28px, 1480px); padding-top: 22px; } .topbar { align-items: flex-start; } .source-note { max-width: 160px; } h1 { font-size: 52px; } .stat-grid { grid-template-columns: repeat(2, 1fr); } .toolbar { position: static; grid-template-columns: 1fr; } .search-wrap { grid-column: auto; } footer { flex-direction: column; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="topbar">
+    <a class="brand" href="#" aria-label="Skills Atlas"><span class="brand-mark">✦</span><span>Skills Atlas</span></a>
+    <div class="source-note">LOCAL INVENTORY<br><span id="generated-date">generated 2026-08-02</span></div>
+  </div>
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Agent capability map</div>
+      <h1>看见每一个<br>可用技能。</h1>
+      <p class="hero-copy">当前本机 Codex 与 .agents 技能的可交互地图。搜索一个词，按来源过滤，或打开卡片查看它的安装位置与用途。</p>
+    </div>
+    <aside class="hero-side">
+      <strong>一张地图，两套安装层</strong>
+      <p>同名技能会合并为一张卡片，并保留 Codex 与 .agents 的全部安装记录。系统技能、Matt Pocock、Anthony Fu 以及本地技能都可单独筛选。</p>
+    </aside>
+  </section>
+  <section class="stat-grid" aria-label="技能统计">
+    <div class="stat"><span class="stat-value" id="stat-skills">0</span><span class="stat-label">unique skills / 去重技能</span></div>
+    <div class="stat"><span class="stat-value" id="stat-installs">0</span><span class="stat-label">install records / 安装记录</span></div>
+    <div class="stat"><span class="stat-value" id="stat-sources">0</span><span class="stat-label">sources / 来源</span></div>
+    <div class="stat"><span class="stat-value" id="stat-areas">0</span><span class="stat-label">areas / 能力领域</span></div>
+  </section>
+  <section class="toolbar" aria-label="技能筛选">
+    <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索名称、用途或路径…" autocomplete="off"></label>
+    <select id="sort" aria-label="排序方式">
+      <option value="name">按名称排序</option>
+      <option value="source">按来源排序</option>
+      <option value="area">按领域排序</option>
+      <option value="installs">按安装数排序</option>
+    </select>
+    <label class="toggle"><input id="show-duplicates" type="checkbox">显示重复安装</label>
+  </section>
+  <div class="filter-row" id="source-filters" aria-label="来源筛选"></div>
+  <div class="filter-row" id="area-filters" aria-label="领域筛选"></div>
+  <div class="results-line"><h2>Skill inventory</h2><span id="results-count">0 results</span></div>
+  <section class="grid" id="grid" aria-live="polite"></section>
+  <div class="empty" id="empty">没有符合条件的技能。试试缩短搜索词，或清除筛选。</div>
+  <footer><span>源文件：本机各技能目录内的 <code>SKILL.md</code></span><span>点击卡片查看完整安装详情</span></footer>
+</main>
+<div class="modal-backdrop" id="modal-backdrop" role="presentation">
+  <article class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-top"><div><h2 id="modal-title"></h2><div id="modal-badges" class="badges"></div></div><button class="close" id="close-modal" aria-label="关闭">×</button></div>
+    <p class="modal-description" id="modal-description"></p>
+    <div class="installations" id="modal-installations"></div>
+  </article>
+</div>
+<script>
+const records = [{"name":"antfu","description":"Anthony Fu's opinionated tooling and conventions for JavaScript/TypeScript projects. Use when setting up new projects, configuring ESLint/Prettier alternatives, monorepos, library publishing, or when the user mentions Anthony Fu's preferences.","root":"agents","path":"antfu","source":"antfu/skills","area":"Frontend & tooling"},{"name":"antfu-design","description":"antfu-style design conventions, broadened. UnoCSS-first, class-based semantic tokens with dual light/dark for tooling and devtools UIs, plus design-read, anti-slop, and micro-interaction polish for landing pages and product surfaces. Use when building or refactoring any interface with UnoCSS.","root":"agents","path":"antfu-design","source":"antfu/skills","area":"Frontend & tooling"},{"name":"ask-matt","description":"Ask which skill or flow fits your situation. A router over the skills in this repo.","root":"agents","path":"ask-matt","source":"mattpocock/skills","area":"General"},{"name":"batch-grill-me","description":"A relentless interview that asks every frontier question at once, round by round.","root":"agents","path":"batch-grill-me","source":"mattpocock/skills","area":"Collaboration"},{"name":"claude-handoff","description":"Hand the current conversation off to a fresh background agent that picks up the work immediately.","root":"agents","path":"claude-handoff","source":"mattpocock/skills","area":"Collaboration"},{"name":"codebase-design","description":"Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.","root":"agents","path":"codebase-design","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"code-review","description":"Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\".","root":"agents","path":"code-review","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"design-an-interface","description":"Generate multiple radically different interface designs for a module using parallel sub-agents. Use when user wants to design an API, explore interface options, compare module shapes, or mentions \"design it twice\".","root":"agents","path":"design-an-interface","source":"mattpocock/skills","area":"General"},{"name":"design-taste-frontend","description":"Anti-slop frontend skill for landing pages, portfolios, and redesigns. The agent reads the brief, infers the right design direction, and ships interfaces that do not look templated. Real design systems when applicable, audit-first on redesigns, strict pre-flight check.","root":"codex","path":"taste-skill","source":"Local / Codex","area":"General"},{"name":"diagnosing-bugs","description":"Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.","root":"agents","path":"diagnosing-bugs","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"domain-modeling","description":"Build and sharpen a project's domain model. Use when the user wants to pin down domain terminology or a ubiquitous language, record an architectural decision, or when another skill needs to maintain the domain model.","root":"agents","path":"domain-modeling","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"edit-article","description":"Edit and improve articles by restructuring sections, improving clarity, and tightening prose. Use when user wants to edit, revise, or improve an article draft.","root":"agents","path":"edit-article","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"git-guardrails-claude-code","description":"Set up Claude Code hooks to block dangerous git commands (push, reset --hard, clean, branch -D, etc.) before they execute. Use when user wants to prevent destructive git operations, add git safety hooks, or block git push/reset in Claude Code.","root":"agents","path":"git-guardrails-claude-code","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"git-guardrails-claude-code","description":"Set up Claude Code hooks to block dangerous git commands (push, reset --hard, clean, branch -D, etc.) before they execute. Use when user wants to prevent destructive git operations, add git safety hooks, or block git push/reset in Claude Code.","root":"codex","path":"git-guardrails-claude-code","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"grilling","description":"Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.","root":"agents","path":"grilling","source":"mattpocock/skills","area":"Collaboration"},{"name":"grill-me","description":"A relentless interview to sharpen a plan or design.","root":"agents","path":"grill-me","source":"mattpocock/skills","area":"Collaboration"},{"name":"grill-me","description":"Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions \"grill me\".","root":"codex","path":"grill-me","source":"mattpocock/skills","area":"Collaboration"},{"name":"grill-with-docs","description":"A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.","root":"agents","path":"grill-with-docs","source":"mattpocock/skills","area":"Collaboration"},{"name":"grill-with-docs","description":"Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions.","root":"codex","path":"grill-with-docs","source":"mattpocock/skills","area":"Collaboration"},{"name":"handoff","description":"Compact the current conversation into a handoff document for another agent to pick up.","root":"agents","path":"handoff","source":"mattpocock/skills","area":"Collaboration"},{"name":"handoff","description":"Compact the current conversation into a handoff document for another agent to pick up.","root":"codex","path":"handoff","source":"mattpocock/skills","area":"Collaboration"},{"name":"imagegen","description":"Generate or edit raster images when the task benefits from AI-created bitmap visuals such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts. Use when Codex should create a brand-new image, transform an existing image, or derive visual variants from references, and the output should be a bitmap asset rather than repo-native code or vector. Do not use when the task is better handled by editing existing SVG/vector/code-native assets, extending an established icon or logo system, or building the visual directly in HTML/CSS/canvas.","root":"codex","path":".system/imagegen","source":"OpenAI system","area":"Codex system"},{"name":"implement","description":"Implement a piece of work based on a spec or set of tickets.","root":"agents","path":"implement","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"improve-codebase-architecture","description":"Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.","root":"agents","path":"improve-codebase-architecture","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"improve-codebase-architecture","description":"Find deepening opportunities in a codebase, informed by the domain language in CONTEXT.md and the decisions in docs/adr/. Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled modules, or make a codebase more testable and AI-navigable.","root":"codex","path":"improve-codebase-architecture","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"loop-me","description":"Grill me about specs for the workflows I want to build, within this workspace.","root":"agents","path":"loop-me","source":"mattpocock/skills","area":"Collaboration"},{"name":"migrate-to-shoehorn","description":"Migrate test files from `as` type assertions to @total-typescript/shoehorn. Use when user mentions shoehorn, wants to replace `as` in tests, or needs partial test data.","root":"agents","path":"migrate-to-shoehorn","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"migrate-to-shoehorn","description":"Migrate test files from `as` type assertions to @total-typescript/shoehorn. Use when user mentions shoehorn, wants to replace `as` in tests, or needs partial test data.","root":"codex","path":"migrate-to-shoehorn","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"nitro","description":"Nitro is the framework-agnostic server toolkit (powering Nuxt) for building and deploying web servers anywhere. Use when working with nitro.config, server routes/event handlers, route rules, caching, storage, tasks, websockets, or deploying to Node/Bun/Deno/Cloudflare/Vercel.","root":"agents","path":"nitro","source":"antfu/skills","area":"Frontend & tooling"},{"name":"nuxt","description":"Nuxt full-stack Vue framework with SSR, auto-imports, and file-based routing. Use when working with Nuxt apps, server routes, useFetch, middleware, or hybrid rendering.","root":"agents","path":"nuxt","source":"antfu/skills","area":"Frontend & tooling"},{"name":"obsidian-vault","description":"Search, create, and manage notes in the Obsidian vault with wikilinks and index notes. Use when user wants to find, create, or organize notes in Obsidian.","root":"agents","path":"obsidian-vault","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"openai-docs","description":"Use when the user asks how to build with OpenAI products or APIs, asks about Codex itself or choosing Codex surfaces, needs up-to-date official documentation with citations, help choosing the latest model for a use case, latest/current/default-model prompting guidance, or model upgrade and prompt-upgrade guidance; use OpenAI docs MCP tools for non-Codex docs questions, use the Codex manual helper first for broad Codex self-knowledge, and restrict fallback browsing to official OpenAI domains.","root":"codex","path":".system/openai-docs","source":"OpenAI system","area":"Codex system"},{"name":"pinia","description":"Pinia official Vue state management library, type-safe and extensible. Use when defining stores, working with state/getters/actions, or implementing store patterns in Vue apps.","root":"agents","path":"pinia","source":"antfu/skills","area":"Frontend & tooling"},{"name":"plugin-creator","description":"Create and scaffold plugin directories for Codex with a required `.codex-plugin/plugin.json`, optional plugin folders/files, valid manifest defaults, and personal-marketplace entries by default. Use when Codex needs to create a new personal plugin, add optional plugin structure, generate or update marketplace entries for plugin ordering and availability metadata, or update an existing local plugin during development with the CLI-driven cachebuster and reinstall flow.","root":"codex","path":".system/plugin-creator","source":"OpenAI system","area":"Codex system"},{"name":"pnpm","description":"Node.js package manager with strict dependency resolution. Use when running pnpm specific commands, configuring workspaces via pnpm-workspace.yaml, or managing dependencies with catalogs, patches, overrides, config dependencies, or the global virtual store.","root":"agents","path":"pnpm","source":"antfu/skills","area":"Frontend & tooling"},{"name":"prototype","description":"Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like.","root":"agents","path":"prototype","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"prototype","description":"Build a throwaway prototype to flesh out a design before committing to it. Routes between two branches — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route. Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design options, or says \"prototype this\", \"let me play with it\", \"try a few designs\".","root":"codex","path":"prototype","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"qa","description":"Interactive QA session where user reports bugs or issues conversationally, and the agent files GitHub issues. Explores the codebase in the background for context and domain language. Use when user wants to report bugs, do QA, file issues conversationally, or mentions \"QA session\".","root":"agents","path":"qa","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"request-refactor-plan","description":"Create a detailed refactor plan with tiny commits via user interview, then file it as a GitHub issue. Use when user wants to plan a refactor, create a refactoring RFC, or break a refactor into safe incremental steps.","root":"agents","path":"request-refactor-plan","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"research","description":"Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.","root":"agents","path":"research","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"resolving-merge-conflicts","description":"Use when you need to resolve an in-progress git merge/rebase conflict.","root":"agents","path":"resolving-merge-conflicts","source":"mattpocock/skills","area":"General"},{"name":"review-agent","description":"Perform a read-only, defect-first review of a specified code change and return every actionable finding. Use when another agent delegates review of uncommitted changes, a base-branch diff, a commit, or custom review instructions.","root":"codex","path":".system/review-agent","source":"OpenAI system","area":"Codex system"},{"name":"scaffold-exercises","description":"Create exercise directory structures with sections, problems, solutions, and explainers that pass linting. Use when user wants to scaffold exercises, create exercise stubs, or set up a new course section.","root":"agents","path":"scaffold-exercises","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"scaffold-exercises","description":"Create exercise directory structures with sections, problems, solutions, and explainers that pass linting. Use when user wants to scaffold exercises, create exercise stubs, or set up a new course section.","root":"codex","path":"scaffold-exercises","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"setup-matt-pocock-skills","description":"Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.","root":"agents","path":"setup-matt-pocock-skills","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"setup-matt-pocock-skills","description":"Sets up an `## Agent skills` block in AGENTS.md/CLAUDE.md and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local markdown), triage label vocabulary, and domain doc layout. Run before first use of `to-issues`, `to-prd`, `triage`, `diagnose`, `tdd`, `improve-codebase-architecture`, or `zoom-out` — or if those skills appear to be missing context about the issue tracker, triage labels, or domain docs.","root":"codex","path":"setup-matt-pocock-skills","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"setup-pre-commit","description":"Set up Husky pre-commit hooks with lint-staged (Prettier), type checking, and tests in the current repo. Use when user wants to add pre-commit hooks, set up Husky, configure lint-staged, or add commit-time formatting/typechecking/testing.","root":"agents","path":"setup-pre-commit","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"setup-pre-commit","description":"Set up Husky pre-commit hooks with lint-staged (Prettier), type checking, and tests in the current repo. Use when user wants to add pre-commit hooks, set up Husky, configure lint-staged, or add commit-time formatting/typechecking/testing.","root":"codex","path":"setup-pre-commit","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"setup-ts-deep-modules","description":"Wire dependency-cruiser into a TypeScript repo so each package is a deep module — implementation hidden in subfolders, reachable only through its entry-point files. User-invoked.","root":"agents","path":"setup-ts-deep-modules","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"skill-creator","description":"Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Codex's capabilities with specialized knowledge, workflows, or tool integrations.","root":"codex","path":".system/skill-creator","source":"OpenAI system","area":"Codex system"},{"name":"skill-installer","description":"Install Codex skills into $CODEX_HOME/skills from a curated list or a GitHub repo path. Use when a user asks to list installable skills, install a curated skill, or install a skill from another repo (including private repos).","root":"codex","path":".system/skill-installer","source":"OpenAI system","area":"Codex system"},{"name":"slidev","description":"Create and present web-based slidedecks for developers using Slidev with Markdown, Vue components, code highlighting, animations, and interactive features. Use when building technical presentations, conference talks, code walkthroughs, teaching materials, or developer decks.","root":"agents","path":"slidev","source":"antfu/skills","area":"General"},{"name":"tdd","description":"Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests.","root":"agents","path":"tdd","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"tdd","description":"Test-driven development with red-green-refactor loop. Use when user wants to build features or fix bugs using TDD, mentions \"red-green-refactor\", wants integration tests, or asks for test-first development.","root":"codex","path":"tdd","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"teach","description":"Teach the user a new skill or concept, within this workspace.","root":"agents","path":"teach","source":"mattpocock/skills","area":"Collaboration"},{"name":"to-questionnaire","description":"Turn a decision you can't fully answer into a questionnaire for someone else to fill in.","root":"agents","path":"to-questionnaire","source":"mattpocock/skills","area":"Collaboration"},{"name":"to-spec","description":"Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.","root":"agents","path":"to-spec","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"to-tickets","description":"Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally, or native blocking links on a real tracker.","root":"agents","path":"to-tickets","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"triage","description":"Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs.","root":"agents","path":"triage","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"triage","description":"Triage issues through a state machine driven by triage roles. Use when user wants to create an issue, triage issues, review incoming bugs or feature requests, prepare issues for an AFK agent, or manage issue workflow.","root":"codex","path":"triage","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"tsdown","description":"Bundle TypeScript and JavaScript libraries with blazing-fast speed powered by Rolldown. Use when building libraries, generating type declarations, bundling for multiple formats, or migrating from tsup.","root":"agents","path":"tsdown","source":"antfu/skills","area":"Frontend & tooling"},{"name":"turborepo","description":"Turborepo monorepo build system guidance. Triggers on: turbo.json, task pipelines, dependsOn, caching, remote cache, the \"turbo\" CLI, --filter, --affected, CI optimization, environment variables, internal packages, monorepo structure/best practices, and boundaries.  Use when user: configures tasks/workflows/pipelines, creates packages, sets up monorepo, shares code between apps, runs changed/affected packages, debugs cache, or has apps/packages directories.","root":"agents","path":"turborepo","source":"antfu/skills","area":"Frontend & tooling"},{"name":"ubiquitous-language","description":"Extract a DDD-style ubiquitous language glossary from the current conversation, flagging ambiguities and proposing canonical terms. Saves to UBIQUITOUS_LANGUAGE.md. Use when user wants to define domain terms, build a glossary, harden terminology, create a ubiquitous language, or mentions \"domain model\" or \"DDD\".","root":"agents","path":"ubiquitous-language","source":"mattpocock/skills","area":"General"},{"name":"unocss","description":"UnoCSS instant atomic CSS engine, superset of Tailwind CSS. Use when configuring UnoCSS, writing utility rules, shortcuts, or working with presets like Wind, Icons, Attributify.","root":"agents","path":"unocss","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vite","description":"Vite build tool configuration, plugin API, SSR, and Vite 8 Rolldown migration. Use when working with Vite projects, vite.config.ts, Vite plugins, or building libraries/SSR apps with Vite.","root":"agents","path":"vite","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vitepress","description":"VitePress static site generator powered by Vite and Vue. Use when building documentation sites, configuring themes, or writing Markdown with Vue components.","root":"agents","path":"vitepress","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vitest","description":"Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.","root":"agents","path":"vitest","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vue","description":"Vue 3 Composition API, script setup macros, reactivity system, and built-in components. Use when writing Vue SFCs, defineProps/defineEmits/defineModel, watchers, or using Transition/Teleport/Suspense/KeepAlive.","root":"agents","path":"vue","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vue-best-practices","description":"MUST be used for Vue.js tasks. Strongly recommends Composition API with `\u003cscript setup>` and TypeScript as the standard approach. Covers Vue 3, SSR, Volar, vue-tsc. Load for any Vue, .vue files, Vue Router, Pinia, or Vite with Vue work. ALWAYS use Composition API unless the project explicitly requires Options API.","root":"agents","path":"vue-best-practices","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vue-router-best-practices","description":"Vue Router 4 patterns, navigation guards, route params, and route-component lifecycle interactions.","root":"agents","path":"vue-router-best-practices","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vue-testing-best-practices","description":"Use for Vue.js testing. Covers Vitest, Vue Test Utils, component testing, mocking, testing patterns, and Playwright for E2E testing.","root":"agents","path":"vue-testing-best-practices","source":"antfu/skills","area":"Frontend & tooling"},{"name":"vueuse-functions","description":"Apply VueUse composables where appropriate to build concise, maintainable Vue.js / Nuxt features.","root":"agents","path":"vueuse-functions","source":"antfu/skills","area":"Frontend & tooling"},{"name":"wayfinder","description":"Plan a huge chunk of work — more than one agent session can hold — as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear.","root":"agents","path":"wayfinder","source":"mattpocock/skills","area":"Engineering workflow"},{"name":"web-design-guidelines","description":"Review UI code for Web Interface Guidelines compliance. Use when asked to \"review my UI\", \"check accessibility\", \"audit design\", \"review UX\", or \"check my site against best practices\".","root":"agents","path":"web-design-guidelines","source":"antfu/skills","area":"General"},{"name":"wizard","description":"Generate an interactive bash wizard that walks a human through a manual procedure — third-party setup, a one-off migration, an A→B state transition — opening URLs, capturing values, confirming each step, and writing .env files and GitHub Actions secrets.","root":"agents","path":"wizard","source":"mattpocock/skills","area":"Collaboration"},{"name":"writing-beats","description":"Writing, exploit — assemble raw material into a journey of beats, grounding each term before a beat leans on it.","root":"agents","path":"writing-beats","source":"mattpocock/skills","area":"Collaboration"},{"name":"writing-fragments","description":"Writing, explore — mine raw fragments, no structure yet.","root":"agents","path":"writing-fragments","source":"mattpocock/skills","area":"Collaboration"},{"name":"writing-great-skills","description":"Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable.","root":"agents","path":"writing-great-skills","source":"mattpocock/skills","area":"Collaboration"},{"name":"writing-shape","description":"Writing, exploit — shape raw material into an article, paragraph by paragraph.","root":"agents","path":"writing-shape","source":"mattpocock/skills","area":"Collaboration"}];
+const generatedAt = "2026-08-02";
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+const sourceLabel = (source) => source === "mattpocock/skills" ? "Matt Pocock" : source === "antfu/skills" ? "Anthony Fu" : source === "OpenAI system" ? "OpenAI system" : source;
+const sourceClass = (source) => source === "mattpocock/skills" ? "source-matt" : source === "antfu/skills" ? "source-antfu" : source === "OpenAI system" ? "source-system" : "";
+const grouped = Object.values(records.reduce((map, record) => {
+  const key = record.name;
+  if (!map[key]) map[key] = { name: key, description: record.description, area: record.area, records: [] };
+  if (!map[key].description && record.description) map[key].description = record.description;
+  map[key].records.push(record);
+  return map;
+}, {}));
+const state = { query: "", source: "all", area: "all", sort: "name", duplicates: false };
+const sourceValues = [...new Set(grouped.flatMap((item) => item.records.map((record) => record.source)))].sort();
+const areaValues = [...new Set(grouped.map((item) => item.area))].sort();
+const sourceFilters = document.querySelector("#source-filters");
+const areaFilters = document.querySelector("#area-filters");
+const grid = document.querySelector("#grid");
+const empty = document.querySelector("#empty");
+const resultsCount = document.querySelector("#results-count");
+const modalBackdrop = document.querySelector("#modal-backdrop");
+const modalTitle = document.querySelector("#modal-title");
+const modalBadges = document.querySelector("#modal-badges");
+const modalDescription = document.querySelector("#modal-description");
+const modalInstallations = document.querySelector("#modal-installations");
+
+document.querySelector("#generated-date").textContent = "generated " + generatedAt;
+document.querySelector("#stat-skills").textContent = grouped.length;
+document.querySelector("#stat-installs").textContent = records.length;
+document.querySelector("#stat-sources").textContent = sourceValues.length;
+document.querySelector("#stat-areas").textContent = areaValues.length;
+
+function makeFilter(container, label, value, active) {
+  const button = document.createElement("button");
+  button.className = "filter" + (active ? " active" : "");
+  button.type = "button";
+  button.textContent = label;
+  button.dataset.value = value;
+  button.addEventListener("click", () => {
+    if (container === sourceFilters) state.source = value;
+    else state.area = value;
+    renderFilters();
+    render();
+  });
+  container.appendChild(button);
+}
+function renderFilters() {
+  sourceFilters.innerHTML = "";
+  makeFilter(sourceFilters, "全部来源", "all", state.source === "all");
+  sourceValues.forEach((source) => makeFilter(sourceFilters, sourceLabel(source), source, state.source === source));
+  areaFilters.innerHTML = "";
+  makeFilter(areaFilters, "全部领域", "all", state.area === "all");
+  areaValues.forEach((area) => makeFilter(areaFilters, area, area, state.area === area));
+}
+function filteredItems() {
+  const query = state.query.trim().toLowerCase();
+  return grouped.filter((item) => {
+    const matchesQuery = !query || [item.name, item.description, item.area, ...item.records.map((record) => record.path + " " + record.source)].join(" ").toLowerCase().includes(query);
+    const matchesSource = state.source === "all" || item.records.some((record) => record.source === state.source);
+    const matchesArea = state.area === "all" || item.area === state.area;
+    return matchesQuery && matchesSource && matchesArea;
+  }).sort((left, right) => {
+    if (state.sort === "installs") return right.records.length - left.records.length || left.name.localeCompare(right.name);
+    if (state.sort === "source") return sourceLabel(left.records[0].source).localeCompare(sourceLabel(right.records[0].source)) || left.name.localeCompare(right.name);
+    if (state.sort === "area") return left.area.localeCompare(right.area) || left.name.localeCompare(right.name);
+    return left.name.localeCompare(right.name);
+  });
+}
+function openModal(item) {
+  modalTitle.textContent = item.name;
+  modalDescription.textContent = item.description || "No description in SKILL.md.";
+  modalBadges.innerHTML = '<span class="badge">' + esc(item.area) + '</span>' + [...new Set(item.records.map((record) => record.source))].map((source) => '<span class="badge ' + sourceClass(source) + '">' + esc(sourceLabel(source)) + '</span>').join("");
+  modalInstallations.innerHTML = item.records.map((record) => '<div class="installation"><div class="installation-label"><span>' + esc(record.root === "codex" ? "Codex" : ".agents") + ' · ' + esc(sourceLabel(record.source)) + '</span><span>' + esc(record.area) + '</span></div><div class="installation-path">' + esc(record.path) + '/SKILL.md</div></div>').join("");
+  modalBackdrop.classList.add("open");
+  document.querySelector("#close-modal").focus();
+}
+function render() {
+  const items = filteredItems();
+  resultsCount.textContent = items.length + " / " + grouped.length + " skills";
+  grid.innerHTML = items.map((item, index) => {
+    const primary = item.records[0];
+    const shownRecords = state.duplicates ? item.records : [primary];
+    const sourceBadges = [...new Set(item.records.map((record) => '<span class="badge ' + sourceClass(record.source) + '">' + esc(sourceLabel(record.source)) + '</span>'))].join("");
+    const installNote = item.records.length > 1 ? item.records.length + " installations" : "1 installation";
+    return '<article class="card" tabindex="0" role="button" data-name="' + esc(item.name) + '"><span class="card-index">' + String(index + 1).padStart(2, "0") + '</span><div class="card-head"><h3>' + esc(item.name) + '</h3><div class="badges"><span class="badge">' + esc(item.area) + '</span>' + sourceBadges + '</div></div><p class="description">' + esc(item.description || "No description in SKILL.md.") + '</p><div class="card-foot"><span class="path">' + esc(shownRecords.map((record) => record.path).join(" · ")) + '</span><span class="arrow">↗</span></div></article>';
+  }).join("");
+  empty.classList.toggle("visible", items.length === 0);
+  grid.querySelectorAll(".card").forEach((card) => {
+    const item = grouped.find((candidate) => candidate.name === card.dataset.name);
+    card.addEventListener("click", () => openModal(item));
+    card.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openModal(item); } });
+  });
+}
+document.querySelector("#search").addEventListener("input", (event) => { state.query = event.target.value; render(); });
+document.querySelector("#sort").addEventListener("change", (event) => { state.sort = event.target.value; render(); });
+document.querySelector("#show-duplicates").addEventListener("change", (event) => { state.duplicates = event.target.checked; render(); });
+document.querySelector("#close-modal").addEventListener("click", () => modalBackdrop.classList.remove("open"));
+modalBackdrop.addEventListener("click", (event) => { if (event.target === modalBackdrop) modalBackdrop.classList.remove("open"); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") modalBackdrop.classList.remove("open"); });
+renderFilters();
+render();
+</script>
+</body>
+</html>
+
