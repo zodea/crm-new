@@ -4,6 +4,7 @@
 > 页面: `pages/finance/invoice/index.vue` · `factor.vue`
 > 交互模式: `CRM-PATTERNS.md` · 色值: `DESIGN-SYSTEM.md` v5
 > 最后更新: 2026-07-03（反馈轮 7 架构调整）
+> 真实票据 Excel 结构、WPS/Office 兼容和格式参照见 [`real-ticket-excel-reference.md`](./real-ticket-excel-reference.md)。
 
 ---
 
