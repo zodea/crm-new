@@ -7,7 +7,9 @@ import type { ProjectGroupKey } from '~/lib/invoice/ledger-nodes'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { Invoice } from '~/stores/invoice'
+import { createInvoiceLedgerXlsx, INVOICE_XLSX_MIME } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
+import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 const store = useInvoiceStore()
@@ -15,7 +17,7 @@ const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const router = useRouter()
 const route = useRoute()
-const { confirm, error, formModal, success, undoToast, warning } = useKitUI()
+const { confirm, error, exportFile, formModal, openImportTab, success, undoToast, warning } = useKitUI()
 
 // ── 左树：全部 / 项目一级 / 个人开支 / 待归档 ──
 const node = shallowRef('__all')
@@ -103,6 +105,32 @@ const rows = computed(() => {
       .some(v => v && v.toLowerCase().includes(kw)),
   )
 })
+
+async function openImport() {
+  try {
+    await openImportTab({ entity: 'invoice' })
+  }
+  catch (cause) {
+    error(`导入打开失败：${toErrorMessage(cause)}`)
+  }
+}
+
+async function exportExcel() {
+  if (!rows.value.length) {
+    warning('当前筛选下没有可导出的发票')
+    return
+  }
+  try {
+    await exportFile({
+      data: createInvoiceLedgerXlsx(rows.value),
+      defaultName: `发票台账_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      mimeType: INVOICE_XLSX_MIME,
+    })
+  }
+  catch (cause) {
+    error(`导出失败：${toErrorMessage(cause)}`)
+  }
+}
 
 // ── 右表（KitTable，ADR 0009）：供应商 / 类型 / 来源列头筛选 ──
 const columns = computed<KitTableColumn[]>(() => [
@@ -227,6 +255,8 @@ onMounted(() => {
       v-model:view="view"
       :total="allRows.length"
       :visible="rows.length"
+      @import="openImport"
+      @export="exportExcel"
     />
 
     <!-- 左树右表 -->

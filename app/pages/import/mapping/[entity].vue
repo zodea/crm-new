@@ -149,7 +149,8 @@ onUnmounted(() => {
       </div>
 
       <section v-if="currentStep === 'upload'" aria-label="第一步：上传">
-        <ImportUploadStep @loaded="onLoaded" />
+        <InvoiceWorkbookUploadStep v-if="entityKey === 'invoice'" @loaded="onLoaded" />
+        <ImportUploadStep v-else @loaded="onLoaded" />
         <div class="mt-4 flex justify-end">
           <Button variant="ghost" @click="closeImportTab">
             取消
