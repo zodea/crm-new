@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { parseSheetForMapping } from '~/lib/util/excel'
+import { parseSheetForMapping, parseWorkbookForMapping } from '~/lib/util/excel'
 
 function workbookBuffer(rows: unknown[][]): ArrayBuffer {
   const ws = XLSX.utils.aoa_to_sheet(rows)
@@ -10,6 +10,29 @@ function workbookBuffer(rows: unknown[][]): ArrayBuffer {
 }
 
 describe('导入源解析：原始表头 + 行', () => {
+  it('多 sheet 工作簿识别标题下表头，并展开数据区合并值', async () => {
+    const first = XLSX.utils.aoa_to_sheet([
+      ['费用报销发票'],
+      ['发票日期', '发票号码', '公司名称', '金额'],
+      ['2026/08/04', '001', '广州建材', 10],
+      ['2026/08/05', '002', undefined, 20],
+    ])
+    first['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }, { s: { r: 2, c: 2 }, e: { r: 3, c: 2 } }]
+    const summary = XLSX.utils.aoa_to_sheet([['来源 sheet', '总数'], ['Sheet1', 30]])
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, first, '百信')
+    XLSX.utils.book_append_sheet(workbook, summary, '汇总')
+
+    const parsed = await parseWorkbookForMapping(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer)
+    const sheet = parsed.sheets[0]!
+
+    expect(parsed.sheets.map(item => item.name)).toEqual(['百信', '汇总'])
+    expect(sheet.headerRow).toBe(1)
+    expect(sheet.mergeRanges).toEqual(expect.arrayContaining(['A1:D1', 'C3:C4']))
+    expect(sheet.columns).toEqual(['发票日期', '发票号码', '公司名称', '金额'])
+    expect(sheet.rows[1]).toMatchObject({ 公司名称: '广州建材', 金额: '20' })
+  })
+
   it('第一行作表头，数据行按单元格显示格式转文本（所见即所得）', async () => {
     const sheet = await parseSheetForMapping(workbookBuffer([
       ['分供方名称', '类别', '匹配标识'],
