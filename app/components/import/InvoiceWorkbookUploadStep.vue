@@ -2,6 +2,7 @@
 import type { RawImportSheet, RawImportWorkbook } from '~/lib/util/excel'
 import { useDropZone } from '@vueuse/core'
 import { computed, shallowRef, useTemplateRef } from 'vue'
+import { createInvoiceImportTemplateXlsx, INVOICE_XLSX_MIME } from '~/lib/invoice/excel'
 import { toErrorMessage } from '~/lib/util/error'
 import { parseWorkbookForMapping } from '~/lib/util/excel'
 
@@ -14,6 +15,7 @@ const error = shallowRef<string | null>(null)
 const workbook = shallowRef<RawImportWorkbook | null>(null)
 const selectedSheetName = shallowRef('')
 const fileName = shallowRef('')
+const { exportFile } = useKitUI()
 
 const dropZone = useTemplateRef('dropZone')
 const { isOverDropZone } = useDropZone(dropZone, {
@@ -65,6 +67,19 @@ function onPick(event: Event) {
   input.value = ''
 }
 
+async function downloadTemplate() {
+  try {
+    await exportFile({
+      data: createInvoiceImportTemplateXlsx(),
+      defaultName: '发票导入模板.xlsx',
+      mimeType: INVOICE_XLSX_MIME,
+    })
+  }
+  catch (cause) {
+    error.value = `模板下载失败：${toErrorMessage(cause)}`
+  }
+}
+
 function useSelectedSheet() {
   const sheet = selectedSheet.value
   if (!sheet)
@@ -82,6 +97,21 @@ function reset() {
 
 <template>
   <section aria-label="上传发票工作簿">
+    <div v-if="!workbook" class="mb-3 flex flex-wrap items-center justify-between gap-3 border border-brand/25 rounded-[var(--radius-card)] bg-brand-soft p-4">
+      <div class="min-w-0">
+        <p class="text-13px text-brand-deep font-700">
+          第一次导入？先下载标准模板
+        </p>
+        <p class="mt-1 text-11px text-ink-soft">
+          模板已包含发票号码、价税合计、归属项目等字段，并附有填写说明。
+        </p>
+      </div>
+      <button type="button" class="btn-secondary shrink-0" @click="downloadTemplate">
+        <span class="i-lucide-download mr-1 text-13px" aria-hidden="true" />
+        下载发票模板
+      </button>
+    </div>
+
     <label
       v-if="!workbook"
       ref="dropZone"

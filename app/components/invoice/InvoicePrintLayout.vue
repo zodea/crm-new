@@ -1,21 +1,18 @@
 <script setup lang="ts">
-import type { PrintPerPage, PrintRotation } from '~/lib/invoice/print-layout'
+import type { InvoicePrintRequest, PrintPerPage, PrintRotation } from '~/lib/invoice/print-layout'
 import type { Invoice } from '~/stores/invoice'
 import { buildPrintLayout, normalizePrintRotation, rotatePrintItems } from '~/lib/invoice/print-layout'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
   invoices: readonly Invoice[]
+  printConfirmation: InvoicePrintRequest | null
 }>()
 
 const emit = defineEmits<{
-  print: [payload: {
-    ids: string[]
-    rotations: Record<string, PrintRotation>
-    perPage: PrintPerPage
-    pageCount: number
-    totalAmount: number
-  }]
+  print: [payload: InvoicePrintRequest]
+  confirmPrint: []
+  cancelPrint: []
 }>()
 
 const selectedInvoiceId = defineModel<string | null>('selectedId', { required: true })
@@ -255,7 +252,20 @@ useEventListener(() => document, 'click', () => {
       <div data-testid="invoice-print-summary" class="mb-2 text-center text-11px font-600 text-ink-soft">
         已勾 {{ layout.selectedCount }} 张 · {{ layout.pageCount }} 页 A4 · 金额合计 {{ yuan(layout.totalAmount) }}
       </div>
-      <button type="button" class="btn-primary w-full" :disabled="!layout.selectedCount" @click="requestPrint">
+      <div v-if="printConfirmation" class="mb-2 border border-warn/35 rounded-[var(--radius-btn)] bg-warn-soft p-3 text-11px text-warn-ink" role="status">
+        <p class="font-700">
+          系统打印窗口已关闭，确认打印机已经实际输出吗？
+        </p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button type="button" class="btn-primary px-3 py-1.5" @click="emit('confirmPrint')">
+            已完成打印
+          </button>
+          <button type="button" class="btn-ghost px-3 py-1.5" @click="emit('cancelPrint')">
+            未打印
+          </button>
+        </div>
+      </div>
+      <button type="button" class="btn-primary w-full" :disabled="!layout.selectedCount || printConfirmation !== null" @click="requestPrint">
         <span class="i-lucide-printer mr-1" aria-hidden="true" />打印选中
       </button>
     </div>
