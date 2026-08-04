@@ -21,6 +21,14 @@ const {
   supplierSuggestion,
   amountSummary,
   reviewProgress,
+  reviewIssues,
+  canArchive,
+  queueStatusCounts,
+  queueStatuses,
+  duplicates,
+  duplicateSelectedId,
+  duplicatePreview,
+  duplicateLoading,
   saving,
   isOverDropZone,
   openFilePicker,
@@ -29,6 +37,11 @@ const {
   recognizeOne,
   recognizeAll,
   removeFile,
+  classifySelected,
+  openSupplierForm,
+  confirmNoOrderNo,
+  selectDuplicate,
+  reviewDuplicate,
   patchDraft,
   patchItem,
   editItemAmount,
@@ -59,8 +72,18 @@ const {
     <DeliveryWorkbenchHeader
       :stats="store.stats"
       :pending-count="store.pendingFiles.length"
+      :status-counts="queueStatusCounts"
       @upload="openFilePicker()"
       @recognize-all="recognizeAll"
+    />
+
+    <DeliveryDuplicateReviewPanel
+      :duplicates="duplicates"
+      :selected-id="duplicateSelectedId"
+      :preview="duplicatePreview"
+      :loading="duplicateLoading"
+      @select="selectDuplicate"
+      @confirm="reviewDuplicate"
     />
 
     <AdaptiveWorkbench
@@ -73,6 +96,7 @@ const {
           :files="store.files"
           :selected-id="selectedFileId"
           :progress="store.recognitionProgress"
+          :status-by-file="queueStatuses"
           @select="selectFile"
           @upload="openFilePicker()"
           @recognize="recognizeOne"
@@ -96,6 +120,9 @@ const {
           :supplier-suggestion="supplierSuggestion"
           :amount-summary="amountSummary"
           :review-progress="reviewProgress"
+          :review-issues="reviewIssues"
+          :can-archive="canArchive"
+          :queue-status="queueStatuses[selectedFile?.id ?? ''] ?? { label: '待选择', cls: 'chip' }"
           :saving="saving"
           @select-document="selectDocument"
           @recognize="recognizeOne()"
@@ -105,6 +132,9 @@ const {
           @add-item="addItem"
           @remove-item="removeItem"
           @apply-supplier-suggestion="applySupplierSuggestion"
+          @open-supplier-form="openSupplierForm"
+          @confirm-no-order-no="confirmNoOrderNo"
+          @classify="classifySelected"
           @archive="archiveSelected"
           @open-print="openPrint"
           @confirm-print="confirmPrint"

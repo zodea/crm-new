@@ -66,6 +66,11 @@ const routeSupplierCategory = computed(() => {
     ? category
     : ''
 })
+const routeSupplierName = computed(() => {
+  const value = route.query.name
+  const name = Array.isArray(value) ? value[0] : value
+  return typeof name === 'string' ? name.trim() : ''
+})
 const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
 const returnPath = computed(() =>
   props.returnToDetail && isEditing && meta.value.detailPath
@@ -145,12 +150,13 @@ async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
 
 function createDefaultDraft(): MasterDataPageDraft {
   const defaults = formDefaults(props.kind) as MasterDataPageDraft
-  if (props.kind !== 'supplier' || isEditing || !routeSupplierCategory.value)
+  if (props.kind !== 'supplier' || isEditing)
     return defaults
 
   return {
     ...defaults,
-    supplierCategory: routeSupplierCategory.value,
+    ...(routeSupplierCategory.value ? { supplierCategory: routeSupplierCategory.value } : {}),
+    ...(routeSupplierName.value ? { name: routeSupplierName.value } : {}),
   }
 }
 

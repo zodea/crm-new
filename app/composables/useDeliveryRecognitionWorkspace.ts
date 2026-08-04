@@ -1,12 +1,26 @@
-import type { ShallowRef } from 'vue'
-import type { DeliveryReviewInput } from '~/stores/delivery'
+import type { DeepReadonly, ShallowRef } from 'vue'
+import type { DeliveryReviewIssue, DeliveryReviewIssueKey } from '~/lib/delivery/review'
+import type { DeliveryDoc, DeliveryDuplicate, DeliveryFile, DeliveryReviewInput } from '~/stores/delivery'
 import { matchProjectText, matchSupplierName } from '~/lib/delivery/match'
-import { editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { deliveryReviewIssueDetails, editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { isRecognizableFile, RECOGNIZABLE_FILE_ACCEPT } from '~/lib/invoice/recognize'
 import { generateId } from '~/lib/util/id'
 
 type DraftPatch = Partial<Omit<DeliveryReviewInput, 'items'>>
 type ItemTextPatch = Partial<Pick<DeliveryReviewInput['items'][number], 'name' | 'spec' | 'unit' | 'note'>>
+
+export interface DeliveryQueueStatus {
+  label: string
+  cls: string
+  tone: 'ok' | 'warn' | 'danger' | 'brand' | 'neutral'
+}
+
+export interface DeliveryDuplicatePreview {
+  duplicateUrl: string
+  duplicateKind: DeliveryFile['kind']
+  representativeUrl: string
+  representativeKind: DeliveryFile['kind']
+}
 
 function normalizedAlias(value: string): string {
   return value
@@ -27,6 +41,17 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
   const reviewDraft = shallowRef<DeliveryReviewInput | null>(null)
   const saving = shallowRef(false)
   const previewFiles = shallowReactive(new Map<string, File>())
+  const duplicateSelectedId = shallowRef<string | null>(null)
+  const duplicatePreview = shallowRef<DeliveryDuplicatePreview | null>(null)
+  const duplicateLoading = shallowRef(false)
+  let duplicateObjectUrls: string[] = []
+
+  // Pinia setup stores normally unwrap refs, but keeping this projection tolerant
+  // of both forms also makes the queue stable during HMR and persisted-state restore.
+  const duplicateList = computed<readonly DeliveryDuplicate[]>(() => {
+    const value = store.duplicates as unknown as DeliveryDuplicate[] | { value?: DeliveryDuplicate[] } | undefined
+    return Array.isArray(value) ? value : value?.value ?? []
+  })
 
   const selectedFile = computed(() => selectedFileId.value ? store.byId(selectedFileId.value) : undefined)
   const selectedDocument = computed(() => selectedFile.value?.docs.find(doc => doc.id === selectedDocumentId.value))
@@ -62,17 +87,125 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     reviewDraft.value?.items ?? [],
     selectedDocument.value?.statedTotal ?? null,
   ))
-  const reviewProgress = computed(() => {
+  const reviewIssues = computed<DeliveryReviewIssue[]>(() => {
+    const file = selectedFile.value
+    const document = selectedDocument.value
     const draft = reviewDraft.value
-    const checks = [
-      Boolean(draft?.projectId),
-      Boolean(draft?.supplierId),
-      Boolean(draft?.deliveryDate),
-      Boolean(draft?.orderNo || draft?.docType === '收据'),
-      Boolean(draft?.items.some(item => item.name.trim())),
-      amountSummary.value.balanced && !draft?.items.some(item => /待复核|低置信/.test(item.note)),
-    ]
-    return { passed: checks.filter(Boolean).length, total: checks.length }
+    if (!file || !document || !draft || file.intakeDecision !== 'material')
+      return []
+    const amountHasIssue = amountSummary.value.mismatchedLineIds.length > 0
+      || amountSummary.value.statedBalanced === false
+    const details = deliveryReviewIssueDetails(
+      { ...draft, statedTotal: document.statedTotal, confirmations: {
+        ...draft.confirmations,
+        humanReviewed: true,
+        amountReviewed: !amountHasIssue || Boolean(draft.note.trim()),
+      } },
+      {
+        requiresAmountReview: amountHasIssue,
+        requiresQualityReview: document.quality !== 'normal'
+          || draft.items.some(item => /低置信|待复核/.test(item.note)),
+      },
+    )
+    return details.filter(issue => issue.key !== 'human-reviewed')
+  })
+  const reviewProgress = computed(() => {
+    const total = 6
+    const blockingKeys = new Set<DeliveryReviewIssueKey>(['project', 'supplier', 'date', 'order-no', 'items', 'amount'])
+    const blockingCount = reviewIssues.value.filter(issue => blockingKeys.has(issue.key)).length
+    return { passed: total - Math.min(total, blockingCount), total }
+  })
+  const canArchive = computed(() => Boolean(
+    selectedFile.value
+    && selectedDocument.value
+    && reviewDraft.value
+    && reviewIssues.value.every(issue => !['human-reviewed', 'quality'].includes(issue.key)),
+  ))
+
+  function policyFor(file: DeepReadonly<DeliveryFile>, document: DeepReadonly<DeliveryDoc>) {
+    return {
+      requiresAmountReview: summarizeDeliveryAmounts(document.items, document.statedTotal).mismatchedLineIds.length > 0
+        || summarizeDeliveryAmounts(document.items, document.statedTotal).statedBalanced === false,
+      requiresQualityReview: document.quality !== 'normal'
+        || document.items.some(item => /低置信|待复核/.test(item.note)),
+      nonMaterial: file.intakeDecision !== 'material',
+    }
+  }
+
+  function draftForStatus(file: DeepReadonly<DeliveryFile>, document: DeepReadonly<DeliveryDoc>): DeliveryReviewInput {
+    const project = matchProjectText([document.siteText, file.name], projectCandidates.value)
+    const supplier = matchSupplierName(
+      document.supplierText || file.supplierText,
+      supplierStore.list.map(item => ({ id: item.id, name: item.name, aliases: item.aliases })),
+    )
+    return {
+      projectId: project?.id ?? '',
+      supplierId: supplier?.kind === 'exact' ? supplier.id : null,
+      orderNo: document.orderNo,
+      deliveryDate: document.deliveryDate,
+      siteText: document.siteText,
+      docType: document.docType,
+      note: '',
+      items: document.items.map(item => ({ ...item })),
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: false,
+        noOrderNoConfirmed: false,
+        qualityReviewed: false,
+      },
+    }
+  }
+
+  const queueStatuses = computed<Readonly<Record<string, DeliveryQueueStatus>>>(() => {
+    const result: Record<string, DeliveryQueueStatus> = {}
+    for (const file of store.files) {
+      if (file.printDisposition === 'pending') {
+        result[file.id] = { label: '已入库 · 待打印', cls: 'chip-warn', tone: 'warn' }
+        continue
+      }
+      if (file.intakeDecision !== 'material') {
+        result[file.id] = { label: '人工分流', cls: 'chip-danger', tone: 'danger' }
+        continue
+      }
+      if (file.ocrStatus === 'processing') {
+        result[file.id] = { label: '识别中', cls: 'chip-brand', tone: 'brand' }
+        continue
+      }
+      if (file.ocrStatus === 'pending') {
+        result[file.id] = { label: '待识别', cls: 'chip-brand', tone: 'brand' }
+        continue
+      }
+      if (file.ocrStatus === 'failed') {
+        result[file.id] = { label: '识别失败', cls: 'chip-danger', tone: 'danger' }
+        continue
+      }
+      const document = file.docs[0]
+      if (!document) {
+        result[file.id] = { label: '待复核', cls: 'chip-warn', tone: 'warn' }
+        continue
+      }
+      const isSelected = file.id === selectedFileId.value && document.id === selectedDocumentId.value
+      const issues = isSelected
+        ? reviewIssues.value
+        : deliveryReviewIssueDetails(draftForStatus(file, document), policyFor(file, document))
+            .filter(issue => issue.key !== 'human-reviewed')
+      result[file.id] = issues.length
+        ? { label: '待复核', cls: 'chip-warn', tone: 'warn' }
+        : { label: '待人工归档', cls: 'chip-ok', tone: 'ok' }
+    }
+    return result
+  })
+  const queueStatusCounts = computed(() => {
+    const counts = { archive: 0, review: 0, triage: 0, duplicate: duplicateList.value.length }
+    Object.values(queueStatuses.value).forEach((status) => {
+      if (status.label === '待人工归档')
+        counts.archive += 1
+      else if (status.label === '待复核')
+        counts.review += 1
+      else if (status.label === '人工分流')
+        counts.triage += 1
+    })
+    return counts
   })
 
   async function selectFile(id: string) {
@@ -117,8 +250,14 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
       deliveryDate: document.deliveryDate,
       siteText: document.siteText,
       docType: document.docType,
-      note: document.note,
+      note: '',
       items: document.items.map(item => ({ ...item })),
+      confirmations: {
+        humanReviewed: false,
+        amountReviewed: false,
+        noOrderNoConfirmed: false,
+        qualityReviewed: false,
+      },
     }
   }
 
@@ -165,14 +304,18 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
       warning('请选择 PDF、PNG、JPG 或 JPEG 文件')
       return
     }
-    const ids = store.uploadFiles(picked)
-    ids.forEach((id, index) => {
-      const file = picked[index]
+    const result = await store.uploadFilesDetailed(picked)
+    result.ids.forEach((id, index) => {
+      const file = result.acceptedFiles[index]
       if (file)
         previewFiles.set(id, file)
     })
-    selectFile(ids[0]!)
-    await runRecognition(ids, `识别 ${ids.length} 个送货文件`)
+    if (result.ids[0]) {
+      await selectFile(result.ids[0])
+      await runRecognition(result.ids, `识别 ${result.ids.length} 个送货文件`)
+    }
+    if (result.duplicates.length)
+      warning(`已跳过 ${result.duplicates.length} 份完全重复文件，可在“重复核查区”查看原件对照`)
   }
 
   const { isOverDropZone } = useDropZone(pageRef, {
@@ -199,6 +342,77 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
       return
     }
     await runRecognition(ids, `批量识别 ${ids.length} 个文件`)
+  }
+
+  function classifySelected(decision: 'material' | 'non-material') {
+    const id = selectedFileId.value
+    if (!id)
+      return
+    store.setIntakeDecision(id, decision)
+    if (decision === 'material')
+      warning('已改判为材料送货单，请单独点击“开始 OCR”')
+  }
+
+  async function openSupplierForm(initialName: string) {
+    const name = initialName.trim()
+    await navigateTo({
+      path: '/base/supplier/form',
+      query: {
+        category: '材料供应商',
+        ...(name ? { name } : {}),
+      },
+    })
+  }
+
+  function confirmNoOrderNo() {
+    if (!reviewDraft.value)
+      return
+    reviewDraft.value = {
+      ...reviewDraft.value,
+      confirmations: {
+        ...reviewDraft.value.confirmations,
+        noOrderNoConfirmed: true,
+      },
+    }
+  }
+
+  function releaseDuplicateObjectUrls() {
+    duplicateObjectUrls.forEach(url => URL.revokeObjectURL(url))
+    duplicateObjectUrls = []
+    duplicatePreview.value = null
+  }
+
+  async function selectDuplicate(id: string) {
+    duplicateSelectedId.value = id
+    duplicateLoading.value = true
+    releaseDuplicateObjectUrls()
+    try {
+      const duplicate = duplicateList.value.find(item => item.id === id)
+      if (!duplicate)
+        return
+      const [duplicateFile, representativeFile] = await Promise.all([
+        store.loadDuplicateFile(id),
+        store.loadDuplicateRepresentativeFile(id),
+      ])
+      if (!duplicateFile || !representativeFile)
+        return
+      const duplicateUrl = URL.createObjectURL(duplicateFile)
+      const representativeUrl = URL.createObjectURL(representativeFile)
+      duplicateObjectUrls = [duplicateUrl, representativeUrl]
+      duplicatePreview.value = {
+        duplicateUrl,
+        duplicateKind: duplicate.kind,
+        representativeUrl,
+        representativeKind: /.pdf$/i.test(representativeFile.name) ? 'pdf' : 'image',
+      }
+    }
+    finally {
+      duplicateLoading.value = false
+    }
+  }
+
+  function reviewDuplicate(id: string) {
+    store.confirmDuplicate(id)
   }
 
   async function removeFile(id: string) {
@@ -311,47 +525,40 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     const draft = reviewDraft.value
     if (!file || !document || !draft || saving.value)
       return
-    if (!draft.projectId) {
-      warning('核对完成前必须选择所属项目')
-      return
-    }
-    const validItems = draft.items
-      .map(item => ({ ...item, name: item.name.trim() }))
-      .filter(item => item.name)
-    if (!validItems.length) {
-      warning('至少保留一条材料明细')
+    const validItems = draft.items.map(item => ({ ...item, name: item.name.trim() }))
+    const blockingIssues = reviewIssues.value.filter(issue =>
+      !['human-reviewed', 'quality'].includes(issue.key),
+    )
+    if (blockingIssues.length) {
+      warning(`请先处理右侧标记的问题：${blockingIssues.map(issue => issue.label).join('；')}`)
       return
     }
 
-    const summary = summarizeDeliveryAmounts(validItems, document.statedTotal)
-    const cautions: string[] = []
-    if (!draft.supplierId)
-      cautions.push('分供方将归到“未区分分供方”')
-    if (!draft.deliveryDate)
-      cautions.push('缺少送货日期')
-    if (!draft.orderNo && draft.docType !== '收据')
-      cautions.push('缺少送货单号')
-    if (summary.mismatchedLineIds.length)
-      cautions.push(`${summary.mismatchedLineIds.length} 行数量×单价与金额不符`)
-    if (summary.statedBalanced === false)
-      cautions.push('票面合计与当前材料金额合计不符')
-    const lowConfidenceRows = validItems.filter(item => /待复核|低置信/.test(item.note)).length
-    if (lowConfidenceRows)
-      cautions.push(`${lowConfidenceRows} 行含 OCR 低置信字段`)
-    if (cautions.length) {
-      const ok = await confirm({
-        variant: 'simple',
-        title: '带提醒完成核对',
-        message: `${cautions.map(item => `· ${item}`).join('\n')}\n\n仍要完成核对并自动归档吗？`,
-        confirmLabel: '已核对，继续归档',
-      })
-      if (!ok)
-        return
-    }
+    const qualityNeedsConfirmation = reviewIssues.value.some(issue => issue.key === 'quality')
+    const ok = await confirm({
+      variant: 'simple',
+      title: '确认人工归档',
+      message: qualityNeedsConfirmation
+        ? '请确认已查看原件，并已人工复核手写、模糊或低置信内容。确认后才会归档。'
+        : '请确认已查看原件，并确认右侧 OCR 草稿与原件一致。系统不会自动归档。',
+      confirmLabel: '确认人工归档',
+      cancelLabel: '继续修改',
+    })
+    if (!ok)
+      return
 
     saving.value = true
     try {
-      const input: DeliveryReviewInput = { ...draft, items: validItems }
+      const input: DeliveryReviewInput = {
+        ...draft,
+        items: validItems,
+        confirmations: {
+          ...draft.confirmations,
+          humanReviewed: true,
+          qualityReviewed: true,
+          amountReviewed: true,
+        },
+      }
       await promise((async () => {
         await projectAliasStore.remember(input.projectId, input.siteText)
         await rememberSupplierAlias(input.supplierId)
@@ -466,6 +673,23 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     ])
   })
 
+  watch(() => duplicateList.value.map(item => item.id), (ids) => {
+    if (!duplicateSelectedId.value && ids[0]) {
+      void selectDuplicate(ids[0])
+    }
+    else if (duplicateSelectedId.value && !ids.includes(duplicateSelectedId.value)) {
+      duplicateSelectedId.value = ids[0] ?? null
+      if (ids[0]) {
+        void selectDuplicate(ids[0])
+      }
+      else {
+        releaseDuplicateObjectUrls()
+      }
+    }
+  }, { immediate: true })
+
+  onBeforeUnmount(releaseDuplicateObjectUrls)
+
   return {
     store,
     projectStore,
@@ -477,6 +701,14 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     previewUrl,
     reviewDraft,
     supplierSuggestion,
+    reviewIssues,
+    canArchive,
+    queueStatuses,
+    queueStatusCounts,
+    duplicates: duplicateList,
+    duplicateSelectedId,
+    duplicatePreview,
+    duplicateLoading,
     amountSummary,
     reviewProgress,
     saving,
@@ -487,6 +719,11 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     recognizeOne,
     recognizeAll,
     removeFile,
+    classifySelected,
+    openSupplierForm,
+    confirmNoOrderNo,
+    selectDuplicate,
+    reviewDuplicate,
     patchDraft,
     patchItem,
     editItemAmount,
