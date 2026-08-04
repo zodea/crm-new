@@ -7,6 +7,7 @@ defineProps<{
   files: readonly DeepReadonly<DeliveryFile>[]
   selectedId: string | null
   progress: Readonly<Record<string, number>>
+  statusByFile?: Readonly<Record<string, { label: string, cls: string }>>
 }>()
 
 const emit = defineEmits<{
@@ -30,7 +31,9 @@ function itemCount(file: DeepReadonly<DeliveryFile>): number {
   return file.docs.reduce((sum, doc) => sum + doc.items.length, 0)
 }
 
-function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: string } {
+function statusOf(file: DeepReadonly<DeliveryFile>, statusByFile: Readonly<Record<string, { label: string, cls: string }>> = {}): { label: string, cls: string } {
+  if (statusByFile[file.id])
+    return statusByFile[file.id]!
   if (file.printDisposition === 'pending')
     return { label: '已入库 · 待打印', cls: 'chip-warn' }
   return STATUS[file.ocrStatus]
@@ -54,6 +57,13 @@ function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: strin
       </button>
     </div>
 
+    <div class="flex flex-wrap items-center gap-1.5 border-b border-line bg-panel px-3 py-2 text-9px text-ink-faint">
+      <span class="chip-ok">待人工归档</span>
+      <span class="chip-warn">待复核</span>
+      <span class="chip-danger">人工分流</span>
+      <span class="ml-1">文件名后的颜色表示当前处理状态</span>
+    </div>
+
     <div class="min-h-0 flex-1 overflow-y-auto p-2">
       <div
         v-for="file in files"
@@ -74,8 +84,8 @@ function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: strin
               {{ file.name }}
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-1.5">
-              <span class="chip text-9px" :class="statusOf(file).cls">
-                {{ file.ocrStatus === 'processing' ? `识别中 ${progress[file.id] ?? 0}%` : statusOf(file).label }}
+              <span class="chip text-9px" :class="statusOf(file, statusByFile).cls">
+                {{ file.ocrStatus === 'processing' ? `识别中 ${progress[file.id] ?? 0}%` : statusOf(file, statusByFile).label }}
               </span>
               <span class="text-9px text-ink-faint">{{ formatFileSize(file.size) }}</span>
             </div>
@@ -87,9 +97,6 @@ function statusOf(file: DeepReadonly<DeliveryFile>): { label: string, cls: strin
                 {{ file.supplierText || '未识别分供方' }}
               </div>
               <div>{{ file.docs.length }} 张单 · {{ itemCount(file) }} 条明细</div>
-            </div>
-            <div v-else-if="file.ocrError" class="mt-1.5 line-clamp-2 text-10px text-danger" :title="file.ocrError">
-              {{ file.ocrError }}
             </div>
           </div>
         </div>

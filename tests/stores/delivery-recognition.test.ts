@@ -89,7 +89,7 @@ describe('delivery store 真实识别与归档管线', () => {
     const file = new File([new Uint8Array([1, 2, 3])], '旋转送货单.png', { type: 'image/png' })
     const store = useDeliveryStore()
 
-    const [id] = store.uploadFiles([file])
+    const [id] = await store.uploadFiles([file])
     expect(await store.recognizeFile(id!)).toBe(true)
 
     expect(store.byId(id!)).toMatchObject({
@@ -120,7 +120,7 @@ describe('delivery store 真实识别与归档管线', () => {
       .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN))
     vi.stubGlobal('fetch', fetchMock)
     const store = useDeliveryStore()
-    const [id] = store.uploadFiles([new File(['x'], '可重试.pdf')])
+    const [id] = await store.uploadFiles([new File(['x'], '可重试.pdf')])
 
     expect(await store.recognizeFile(id!)).toBe(false)
     expect(store.byId(id!)).toMatchObject({ ocrStatus: 'failed', ocrError: '在线 OCR 暂时不可用' })
@@ -131,7 +131,7 @@ describe('delivery store 真实识别与归档管线', () => {
   it('仅有 OCR 金额时不伪造数量和单价，也不误报 0×0 金额不平', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(AMOUNT_ONLY_LINE_MARKDOWN)))
     const store = useDeliveryStore()
-    const [id] = store.uploadFiles([new File(['x'], '脱敏送货单.pdf')])
+    const [id] = await store.uploadFiles([new File(['x'], '脱敏送货单.pdf')])
 
     expect(await store.recognizeFile(id!)).toBe(true)
     const doc = store.byId(id!)?.docs[0]
@@ -156,7 +156,7 @@ describe('delivery store 真实识别与归档管线', () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()
     const sourceBytes = new Uint8Array([0x00, 0x80, 0xFF])
-    const [fileId] = store.uploadFiles([
+    const [fileId] = await store.uploadFiles([
       new File([sourceBytes], '待归档.pdf', { type: 'application/pdf' }),
     ])
     await store.recognizeFile(fileId!)
@@ -172,7 +172,7 @@ describe('delivery store 真实识别与归档管线', () => {
       docType: doc!.docType,
       note: doc!.note,
       items: doc!.items,
-    })).rejects.toThrow('必须选择项目')
+    })).rejects.toThrow('必须选择所属项目')
 
     const recordId = await store.archiveDocument(fileId!, doc!.id, {
       projectId: 'p1',
@@ -183,6 +183,12 @@ describe('delivery store 真实识别与归档管线', () => {
       docType: doc!.docType,
       note: doc!.note,
       items: doc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
     })
     const [record] = await mem.select<Record<string, unknown>>(
       'SELECT * FROM delivery_records WHERE id = ?',
@@ -256,7 +262,7 @@ describe('delivery store 真实识别与归档管线', () => {
   it('只有明确打印成功回执才把归档文件移出待打印队列', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()
-    const [fileId] = store.uploadFiles([new File(['print'], '待打印回执.pdf', { type: 'application/pdf' })])
+    const [fileId] = await store.uploadFiles([new File(['print'], '待打印回执.pdf', { type: 'application/pdf' })])
     await store.recognizeFile(fileId!)
     const doc = store.byId(fileId!)?.docs[0]
 
@@ -269,6 +275,12 @@ describe('delivery store 真实识别与归档管线', () => {
       docType: doc!.docType,
       note: doc!.note,
       items: doc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
     })
     expect(store.pendingPrintFiles.map(file => file.id)).toEqual([fileId])
 

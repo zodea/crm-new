@@ -7,7 +7,7 @@ import type { Supplier } from '~/stores/supplier'
 
 type DraftPatch = Partial<Omit<DeliveryReviewInput, 'items'>>
 
-defineProps<{
+const props = defineProps<{
   draft: DeepReadonly<DeliveryReviewInput>
   file: DeliveryFile
   document: DeliveryDoc
@@ -19,7 +19,25 @@ defineProps<{
 const emit = defineEmits<{
   patch: [patch: DraftPatch]
   applySupplierSuggestion: []
+  openSupplierForm: [initialName: string]
 }>()
+
+const supplierSearch = shallowRef('')
+const supplierOpen = shallowRef(false)
+
+const selectedSupplierName = computed(() =>
+  props.suppliers.find(supplier => supplier.id === props.draft.supplierId)?.name ?? '',
+)
+const supplierMatches = computed(() => {
+  const needle = supplierSearch.value.trim().toLocaleLowerCase('zh-CN')
+  return props.suppliers.filter(supplier => !needle || [supplier.name, ...supplier.aliases]
+    .some(value => value.toLocaleLowerCase('zh-CN').includes(needle)))
+})
+const canAddSupplier = computed(() => Boolean(
+  supplierOpen.value
+  && supplierSearch.value.trim()
+  && !props.suppliers.some(supplier => supplier.name === supplierSearch.value.trim()),
+))
 
 function valueOf(event: Event): string {
   return (event.target as HTMLInputElement | HTMLSelectElement).value
@@ -33,9 +51,35 @@ function patchProject(event: Event) {
   emit('patch', { projectId: valueOf(event) })
 }
 
-function patchSupplier(event: Event) {
-  emit('patch', { supplierId: valueOf(event) || null })
+function openSupplierSearch() {
+  supplierSearch.value = selectedSupplierName.value || props.document.supplierText || props.file.supplierText
+  supplierOpen.value = true
 }
+
+function patchSupplierSearch(event: Event) {
+  const value = valueOf(event)
+  supplierSearch.value = value
+  supplierOpen.value = true
+  const exact = props.suppliers.find(supplier => supplier.name === value)
+  emit('patch', { supplierId: exact?.id ?? null })
+}
+
+function chooseSupplier(supplier: DeepReadonly<Supplier>) {
+  supplierSearch.value = supplier.name
+  supplierOpen.value = false
+  emit('patch', { supplierId: supplier.id })
+}
+
+function openCreateSupplier() {
+  const value = supplierSearch.value.trim()
+  if (value)
+    emit('openSupplierForm', value)
+}
+
+watch(() => [props.draft.supplierId, props.document.id], () => {
+  if (!supplierOpen.value)
+    supplierSearch.value = selectedSupplierName.value
+}, { immediate: true })
 
 function patchDocType(event: Event) {
   emit('patch', { docType: valueOf(event) as DeliveryReviewInput['docType'] })
@@ -61,14 +105,44 @@ function patchDocType(event: Event) {
       </div>
       <div>
         <label class="field-label">分供方</label>
-        <select :value="draft.supplierId ?? ''" class="field-input w-full" @change="patchSupplier">
-          <option value="">
-            未区分分供方
-          </option>
-          <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-            {{ supplier.name }}
-          </option>
-        </select>
+        <div class="relative">
+          <input
+            :value="supplierOpen ? supplierSearch : selectedSupplierName"
+            class="field-input w-full"
+            :class="!draft.supplierId ? 'border-danger' : ''"
+            placeholder="搜索分供方名称"
+            autocomplete="off"
+            @focus="openSupplierSearch"
+            @input="patchSupplierSearch"
+          >
+          <button
+            v-if="canAddSupplier"
+            type="button"
+            class="delivery-supplier-create"
+            aria-label="跳转新增分供方"
+            title="跳转新增分供方"
+            @mousedown.prevent
+            @click="openCreateSupplier"
+          >
+            <span class="i-lucide-plus text-14px" />
+          </button>
+          <div v-if="supplierOpen" class="delivery-supplier-options">
+            <button
+              v-for="supplier in supplierMatches"
+              :key="supplier.id"
+              type="button"
+              class="delivery-supplier-option"
+              :class="supplier.id === draft.supplierId ? 'bg-brand-soft text-brand-deep' : ''"
+              @mousedown.prevent
+              @click="chooseSupplier(supplier)"
+            >
+              {{ supplier.name }}
+            </button>
+            <div v-if="!supplierMatches.length" class="px-2 py-1.5 text-10px text-ink-faint">
+              {{ supplierSearch.trim() ? '暂无匹配，点击输入框右侧 + 新增' : '暂无分供方' }}
+            </div>
+          </div>
+        </div>
         <div class="mt-1 flex min-w-0 items-center gap-1 text-9px">
           <span class="shrink-0 text-ink-faint">OCR:</span>
           <span class="truncate text-ink-soft" :title="document.supplierText || file.supplierText">
@@ -142,5 +216,55 @@ function patchDocType(event: Event) {
 
 .delivery-document-fields__full {
   grid-column: 1 / -1;
+}
+
+.delivery-supplier-create {
+  position: absolute;
+  inset-block: 1px;
+  right: 1px;
+  width: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0 var(--radius-btn) var(--radius-btn) 0;
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.delivery-supplier-create:hover {
+  background: var(--brand-soft);
+}
+
+.delivery-supplier-options {
+  position: absolute;
+  z-index: 20;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  max-height: 12rem;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-btn);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+}
+
+.delivery-supplier-option {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+
+.delivery-supplier-option:hover {
+  background: var(--surface-3);
 }
 </style>
