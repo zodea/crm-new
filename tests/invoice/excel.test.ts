@@ -1,7 +1,7 @@
 import type { Invoice } from '~/stores/invoice'
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { createInvoiceLedgerXlsx, invoiceLedgerRows } from '~/lib/invoice/excel'
+import { createInvoiceImportTemplateXlsx, createInvoiceLedgerXlsx, invoiceLedgerRows } from '~/lib/invoice/excel'
 
 function invoice(overrides: Partial<Invoice> = {}): Invoice {
   return {
@@ -46,6 +46,19 @@ function invoice(overrides: Partial<Invoice> = {}): Invoice {
 }
 
 describe('发票台账 Excel 导出', () => {
+  it('生成可下载的发票导入模板和填写说明', () => {
+    const workbook = XLSX.read(createInvoiceImportTemplateXlsx(), { type: 'array' })
+    const worksheet = workbook.Sheets['发票导入']!
+    const instructions = workbook.Sheets['填写说明']!
+
+    expect(workbook.SheetNames).toEqual(['发票导入', '填写说明'])
+    expect(worksheet.B2?.v).toBe('发票号码')
+    expect(worksheet.E2?.v).toBe('价税合计')
+    expect(worksheet.H2?.v).toBe('归属项目')
+    expect(instructions.A3?.v).toBe('发票号码')
+    expect(instructions.C5?.v).toContain('个人开支')
+  })
+
   it('保留业务值并写入标题合并、重复值合并和金额格式', () => {
     const rows = [
       invoice(),

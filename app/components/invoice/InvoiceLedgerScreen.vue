@@ -3,11 +3,12 @@
 // 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
 // 口径：台账 = 已归档（DATABASE.md §4.2）；「待归档」= 已校对未归档过渡态（#57，
 // 替代设计稿旧模型的「未归项目」——两态模型下归档必有归属，见 issue #69 评论）。
+import type { InvoiceLedgerExportRow } from '~/lib/invoice/excel'
 import type { ProjectGroupKey } from '~/lib/invoice/ledger-nodes'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { Invoice } from '~/stores/invoice'
-import { createInvoiceLedgerXlsx, INVOICE_XLSX_MIME } from '~/lib/invoice/excel'
+import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
@@ -18,6 +19,11 @@ const supplierStore = useSupplierStore()
 const router = useRouter()
 const route = useRoute()
 const { confirm, error, exportFile, formModal, openImportTab, success, undoToast, warning } = useKitUI()
+const exportPreviewOpen = shallowRef(false)
+const exportPreviewRows = shallowRef<InvoiceLedgerExportRow[]>([])
+const exportPreviewFileName = shallowRef('')
+const exportSaving = shallowRef(false)
+const exportPreviewTotal = computed(() => exportPreviewRows.value.reduce((sum, row) => sum + row.totalAmount, 0))
 
 // ── 左树：全部 / 项目一级 / 个人开支 / 待归档 ──
 const node = shallowRef('__all')
@@ -115,20 +121,33 @@ async function openImport() {
   }
 }
 
-async function exportExcel() {
+function openExportPreview() {
   if (!rows.value.length) {
     warning('当前筛选下没有可导出的发票')
     return
   }
+  exportPreviewRows.value = invoiceLedgerRows(rows.value)
+  exportPreviewFileName.value = `发票台账_${new Date().toISOString().slice(0, 10)}.xlsx`
+  exportPreviewOpen.value = true
+}
+
+async function confirmExport() {
+  if (exportSaving.value || !exportPreviewRows.value.length)
+    return
+  exportSaving.value = true
   try {
     await exportFile({
-      data: createInvoiceLedgerXlsx(rows.value),
-      defaultName: `发票台账_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      data: createInvoiceLedgerXlsxFromRows(exportPreviewRows.value),
+      defaultName: exportPreviewFileName.value,
       mimeType: INVOICE_XLSX_MIME,
     })
+    exportPreviewOpen.value = false
   }
   catch (cause) {
     error(`导出失败：${toErrorMessage(cause)}`)
+  }
+  finally {
+    exportSaving.value = false
   }
 }
 
@@ -256,7 +275,7 @@ onMounted(() => {
       :total="allRows.length"
       :visible="rows.length"
       @import="openImport"
-      @export="exportExcel"
+      @export="openExportPreview"
     />
 
     <!-- 左树右表 -->
@@ -382,5 +401,14 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <InvoiceExportPreview
+      v-model:open="exportPreviewOpen"
+      :rows="exportPreviewRows"
+      :total-amount="exportPreviewTotal"
+      :file-name="exportPreviewFileName"
+      :saving="exportSaving"
+      @confirm="confirmExport"
+    />
   </div>
 </template>
