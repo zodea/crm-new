@@ -3,6 +3,7 @@
 > 路由: `/material/delivery`
 > 页面: `pages/material/delivery/index.vue` → `components/delivery/DeliveryRecognitionScreen.vue`
 > 来源: 现有 DeliveryView + delivery store 代码分析；2026-07-17 已接入真实 OCR 闭环
+> 真实票据 Excel 结构、合并单元格和导入导出兼容规则见 [`real-ticket-excel-reference.md`](./real-ticket-excel-reference.md)。
 
 > **现行 IA：处理区与归档库双区。** 权威见 `CONTEXT.md`「归档」词条、[#42](https://github.com/zodea/crm-new/issues/42) 与 [#113](https://github.com/zodea/crm-new/issues/113)：
 > - **处理区 = 送货单识别**（乙供材管理 · route `delivery`，本页下文的上传/整理树/识别/核对流程）：放**待识别 / 识别中 / 待核对 / 待打印**；归档后原件仍留在待打印范围，直到收到打印成功回执或被明确排除。
