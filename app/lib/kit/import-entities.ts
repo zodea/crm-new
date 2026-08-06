@@ -38,6 +38,8 @@ export interface ImportEntityDef {
   key: string
   label: string
   fields: readonly ImportTemplateField[]
+  /** 返回可预期的业务拒绝原因；瞬时写入故障仍由 importRow 抛出并停在当前行。 */
+  validateRow?: (row: Record<string, unknown>) => string | null | undefined | Promise<string | null | undefined>
   /** 逐行入库；抛错即导入步失败，重试从失败行续导。 */
   importRow: (row: Record<string, unknown>) => Promise<void>
 }
@@ -181,11 +183,45 @@ function invoiceDataFromRow(row: Record<string, unknown>) {
   }
 }
 
+function invoiceImportValidationError(
+  data: ReturnType<typeof invoiceDataFromRow>,
+  projectNames: readonly string[],
+): string | null {
+  if (!data.invoiceNumber)
+    return '发票号码不能为空'
+  if (data.totalAmount <= 0)
+    return '价税合计不能为空或必须大于 0'
+  if (!data.projectName)
+    return '缺归属：请填写对应项目；个人开支请填写“个人开支”'
+
+  if (PERSONAL_OWNER_VALUES.has(data.projectName))
+    return null
+
+  const matches = projectNames.filter(name => name === data.projectName)
+  if (matches.length !== 1)
+    return `缺归属：项目“${data.projectName}”未唯一匹配到有效项目`
+  return null
+}
+
 export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
   'invoice': {
     key: 'invoice',
     label: '发票台账',
     fields: INVOICE_FIELDS,
+    async validateRow(row) {
+      const projectStore = useProjectStore()
+      if (!projectStore.list.length)
+        await projectStore.load()
+      try {
+        return invoiceImportValidationError(
+          invoiceDataFromRow(row),
+          projectStore.list.map(project => project.name),
+        )
+      }
+      catch (cause) {
+        return cause instanceof Error ? cause.message : '发票字段格式无效'
+      }
+    },
     async importRow(row) {
       const invoiceStore = useInvoiceStore()
       const projectStore = useProjectStore()
@@ -195,14 +231,14 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
         await projectStore.load()
 
       const data = invoiceDataFromRow(row)
-      if (!data.invoiceNumber)
-        throw new Error('发票号码不能为空')
-      if (data.totalAmount <= 0)
-        throw new Error('价税合计不能为空或必须大于 0')
+      const validationError = invoiceImportValidationError(
+        data,
+        projectStore.list.map(project => project.name),
+      )
+      if (validationError)
+        throw new Error(validationError)
 
       const isPersonal = PERSONAL_OWNER_VALUES.has(data.projectName)
-      if (!data.projectName)
-        throw new Error('归属不能为空；个人开支请填写“个人开支”')
 
       const project = isPersonal
         ? []
@@ -247,7 +283,7 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
         reviewStatus: 'reviewed',
         accountStatus: 'none',
         dupStatus: 'normal',
-        ownerKind: null,
+        ownerKind: incoming.ownerKind,
         fileName: '',
         filePath: '',
         fileSize: '',

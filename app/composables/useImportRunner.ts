@@ -4,9 +4,21 @@ import { nextTick, shallowRef } from 'vue'
 import { toErrorMessage } from '~/lib/util/error'
 
 export type ImportRunResult
-  = | { status: 'completed' }
+  = | { status: 'completed', rejected?: readonly ImportRowRejection[] }
     | { status: 'failed', error: unknown }
     | { status: 'cancelled' }
+
+export interface ImportRowRejection {
+  /** 保留传入 rows 中的 0 起始索引，页面可映射回原始工作表行号。 */
+  index: number
+  row: Record<string, unknown>
+  reason: string
+}
+
+export type ImportRowValidator = (
+  row: Record<string, unknown>,
+  index: number,
+) => string | null | undefined | Promise<string | null | undefined>
 
 export interface ImportRunnerEnvironment {
   /** 注入 seam：生产中让 Vue 提交一次 DOM，单测可用立即 resolved。 */
@@ -18,9 +30,11 @@ export interface ImportRunner {
   error: ShallowRef<string | null>
   done: ShallowRef<number>
   total: ShallowRef<number>
+  rejected: ShallowRef<readonly ImportRowRejection[]>
   start: (
     rows: readonly Record<string, unknown>[],
     importRow: (row: Record<string, unknown>) => Promise<void>,
+    validateRow?: ImportRowValidator,
   ) => Promise<ImportRunResult>
   retry: () => Promise<ImportRunResult>
   reset: () => void
@@ -36,8 +50,10 @@ export function useImportRunner(
   const error = shallowRef<string | null>(null)
   const done = shallowRef(0)
   const total = shallowRef(0)
+  const rejected = shallowRef<readonly ImportRowRejection[]>([])
   let pendingRows: readonly Record<string, unknown>[] = []
   let sink: ((row: Record<string, unknown>) => Promise<void>) | null = null
+  let validator: ImportRowValidator | null = null
   let cancelled = false
   let lastYieldAt = 0
 
@@ -46,8 +62,10 @@ export function useImportRunner(
     error.value = null
     done.value = 0
     total.value = 0
+    rejected.value = []
     pendingRows = []
     sink = null
+    validator = null
     cancelled = false
   }
 
@@ -72,6 +90,15 @@ export function useImportRunner(
       }
       const row = pendingRows[done.value]!
       try {
+        const reason = validator ? await validator(row, done.value) : null
+        if (reason) {
+          rejected.value = [
+            ...rejected.value,
+            { index: done.value, row, reason },
+          ]
+          done.value += 1
+          continue
+        }
         await sink!(row)
       }
       catch (cause) {
@@ -83,18 +110,22 @@ export function useImportRunner(
     }
 
     phase.value = 'completed'
-    return { status: 'completed' }
+    return rejected.value.length
+      ? { status: 'completed', rejected: rejected.value }
+      : { status: 'completed' }
   }
 
   async function start(
     rows: readonly Record<string, unknown>[],
     importRow: (row: Record<string, unknown>) => Promise<void>,
+    validateRow?: ImportRowValidator,
   ): Promise<ImportRunResult> {
     if (phase.value === 'running')
       throw new Error('导入正在进行中')
     reset()
     pendingRows = [...rows]
     sink = importRow
+    validator = validateRow ?? null
     total.value = pendingRows.length
     return await runFromCursor()
   }
@@ -105,5 +136,5 @@ export function useImportRunner(
     return await runFromCursor()
   }
 
-  return { phase, error, done, total, start, retry, reset, cancel }
+  return { phase, error, done, total, rejected, start, retry, reset, cancel }
 }
