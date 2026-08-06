@@ -199,7 +199,7 @@ useEventListener(() => document, 'click', () => {
 
     <section class="panel h-full min-w-0 w-full overflow-hidden flex flex-col" aria-label="发票打印排版">
       <div class="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 px-3 py-2.5">
-        <button v-if="props.fullPage" type="button" class="btn-ghost px-2 py-1" @click="emit('back')">
+        <button v-if="props.fullPage && !printConfirmation" type="button" class="btn-ghost px-2 py-1" @click="emit('back')">
           <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回台账
         </button>
         <strong class="mr-auto text-12px text-ink">打印排版</strong>

@@ -48,7 +48,6 @@ const filtered = computed(() => {
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
-const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 const filterDefinitions = computed<ListFilterDefinition[]>(() => [
   {
     key: 'project',
@@ -84,6 +83,11 @@ function onFilterChange(key: string, value: string) {
     partyFilter.value = value
   else if (key === 'status')
     statusFilter.value = value
+}
+
+function onPageChange(event: { page: number, pageSize: number }) {
+  page.value = event.page
+  pageSize.value = event.pageSize
 }
 
 const columns: KitTableColumn[] = [
@@ -141,17 +145,20 @@ onActivated(() => {
 
     <ListFilterBar
       v-model:query="search"
-      v-model:page="page"
-      v-model:page-size="pageSize"
       :filters="filterDefinitions"
       :total="rows.length"
       :filtered="filtered.length"
-      :page-count="pageCount"
       @filter-change="onFilterChange"
     />
 
     <div class="panel overflow-hidden">
-      <KitTable :columns="columns" :data="pageRows" :loading="loading">
+      <KitTable
+        :columns="columns"
+        :data="pageRows"
+        :loading="loading"
+        :page="{ page: currentPage, pageSize, total: filtered.length }"
+        @page-change="onPageChange"
+      >
         <template #name="{ row }">
           <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
             {{ row.name || '未命名记录' }}

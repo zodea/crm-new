@@ -146,12 +146,14 @@ function csvCell(value: unknown): string {
 async function downloadRejections() {
   if (!runner.rejected.value.length)
     return
+  const originalKeys = [...new Set(runner.rejected.value.flatMap(rejection => Object.keys(rejection.row)))]
   const lines = [
-    ['原始行号', '关键值', '拒绝原因'].map(csvCell).join(','),
+    ['原始行号', '关键值', '拒绝原因', ...originalKeys].map(csvCell).join(','),
     ...runner.rejected.value.map(rejection => [
       rejectionRowNumber(rejection),
       rejectionKey(rejection),
       rejection.reason,
+      ...originalKeys.map(key => rejection.row[key]),
     ].map(csvCell).join(',')),
   ]
   try {

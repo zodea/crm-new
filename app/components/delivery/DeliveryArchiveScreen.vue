@@ -88,6 +88,7 @@ const filtered = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase('zh-CN')
   return nodeFiltered.value.filter(record => [
     record.orderNo,
+    record.fileName,
     record.note,
     projectName(record.projectId),
     supplierName(record.supplierId),

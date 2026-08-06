@@ -125,17 +125,29 @@ async function openImport() {
   }
 }
 
+const columnFilters = shallowRef<Record<string, readonly unknown[]>>({})
+const tableFilteredRows = computed(() => {
+  const activeFilters = Object.entries(columnFilters.value)
+    .filter(([, values]) => values.length > 0)
+  if (!activeFilters.length)
+    return rows.value
+  return rows.value.filter((row) => {
+    const values = row as unknown as Record<string, unknown>
+    return activeFilters.every(([field, filters]) => filters.includes(values[field]))
+  })
+})
+
+const printableRows = computed(() => tableFilteredRows.value.filter(canCheck))
+
 function openExportPreview() {
-  if (!rows.value.length) {
+  if (!tableFilteredRows.value.length) {
     warning('当前筛选下没有可导出的发票')
     return
   }
-  exportPreviewRows.value = invoiceLedgerRows(rows.value)
+  exportPreviewRows.value = invoiceLedgerRows(tableFilteredRows.value)
   exportPreviewFileName.value = `发票台账_${new Date().toISOString().slice(0, 10)}.xlsx`
   exportPreviewOpen.value = true
 }
-
-const printableRows = computed(() => rows.value.filter(canCheck))
 
 function openPrint() {
   if (!printableRows.value.length) {
@@ -224,6 +236,10 @@ const columns = computed<KitTableColumn[]>(() => [
   { title: '操作', type: 'action', width: 118 },
 ])
 
+function onLedgerFilterChange(payload: { filters: { field: string, values: unknown[] }[] }) {
+  columnFilters.value = Object.fromEntries(payload.filters.map(filter => [filter.field, filter.values]))
+}
+
 /** excel 导入票无扫描件：不可勾选（勾选服务于打印/导出原件） */
 function canCheck(row: Invoice) {
   return row.source !== 'excel'
@@ -233,11 +249,13 @@ function canCheck(row: Invoice) {
 const checkedRows = shallowRef<Invoice[]>([])
 const checkedTotal = computed(() => checkedRows.value.reduce((s, inv) => s + inv.totalAmount, 0))
 
-const tableEl = useTemplateRef<{ clearCheckbox: () => void }>('tableEl')
+const tableEl = useTemplateRef<{ clearCheckbox: () => void, clearFilter: () => Promise<void> | void }>('tableEl')
 
 // 切树节点 / 搜索 / 切视图都会改变行集，勾选集随之失效
 watch([node, searchText, view], () => {
   tableEl.value?.clearCheckbox()
+  columnFilters.value = {}
+  void tableEl.value?.clearFilter()
   checkedRows.value = []
 })
 
@@ -339,7 +357,7 @@ onMounted(() => {
         v-model:search="searchText"
         v-model:view="view"
         :total="allRows.length"
-        :visible="rows.length"
+        :visible="tableFilteredRows.length"
         @import="openImport"
         @print="openPrint"
         @export="openExportPreview"
@@ -360,6 +378,7 @@ onMounted(() => {
             :check-method="canCheck"
             empty="该归属下暂无发票。"
             @checkbox-change="(list: Invoice[]) => checkedRows = list"
+            @filter-change="onLedgerFilterChange"
           >
             <template #number="{ row }">
               <button

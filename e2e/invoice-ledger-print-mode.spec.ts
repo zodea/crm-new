@@ -27,6 +27,7 @@ test('发票台账打印入口：进入双栏选择、打印确认并返回台�
   expect(await page.evaluate(() => (window as Window & { __invoiceLedgerPrintCalls: number }).__invoiceLedgerPrintCalls)).toBe(1)
   const confirmation = page.getByRole('dialog', { name: '确认打印结果' })
   await expect(confirmation).toBeVisible()
+  await expect(page.getByRole('button', { name: '返回台账', exact: true })).toBeHidden()
   await confirmation.getByRole('button', { name: '取消', exact: true }).click()
   await expect(confirmation).toBeHidden()
 
