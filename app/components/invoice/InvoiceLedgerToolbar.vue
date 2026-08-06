@@ -7,6 +7,7 @@ defineProps<{
 const emit = defineEmits<{
   import: []
   export: []
+  print: []
 }>()
 
 const search = defineModel<string>('search', { required: true })
@@ -29,6 +30,10 @@ const view = defineModel<'table' | 'card'>('view', { required: true })
       <button type="button" class="btn-secondary" @click="emit('import')">
         <span class="i-lucide-file-input mr-1 text-13px" aria-hidden="true" />
         导入 Excel
+      </button>
+      <button type="button" class="btn-secondary" @click="emit('print')">
+        <span class="i-lucide-printer mr-1 text-13px" aria-hidden="true" />
+        打印 PDF
       </button>
       <button type="button" class="btn-primary" @click="emit('export')">
         <span class="i-lucide-file-spreadsheet mr-1 text-13px" aria-hidden="true" />
