@@ -2,6 +2,7 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { DeliveryRecord } from '~/stores/delivery-record'
+import { createDeliveryLedgerXlsx, DELIVERY_XLSX_MIME, deliveryLedgerRows } from '~/lib/delivery/export'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
@@ -9,9 +10,11 @@ const store = useDeliveryRecordStore()
 const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const contractStore = useContractStore()
-const { confirm, undoToast, error } = useKitUI()
+const { confirm, error, exportFile, undoToast } = useKitUI()
 
 const search = shallowRef('')
+const dateFrom = shallowRef('')
+const dateTo = shallowRef('')
 const selectedNode = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
@@ -83,24 +86,42 @@ const nodeFiltered = computed(() => {
 
 const filtered = computed(() => {
   const keyword = search.value.trim().toLocaleLowerCase('zh-CN')
-  if (!keyword)
-    return nodeFiltered.value
   return nodeFiltered.value.filter(record => [
     record.orderNo,
     record.note,
     projectName(record.projectId),
     supplierName(record.supplierId),
     ...record.lines.map(line => `${line.materialName} ${line.spec}`),
-  ].some(value => value.toLocaleLowerCase('zh-CN').includes(keyword)))
+  ].some(value => (!keyword || value.toLocaleLowerCase('zh-CN').includes(keyword))
+    && (!dateFrom.value || record.deliveryDate >= dateFrom.value)
+    && (!dateTo.value || record.deliveryDate <= dateTo.value)))
 })
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate([...filtered.value], currentPage.value, pageSize.value))
 const totalAmount = computed(() => filtered.value.reduce((sum, record) => sum + record.totalAmount, 0))
 
-watch([search, selectedNode], () => {
+watch([search, dateFrom, dateTo, selectedNode], () => {
   page.value = 1
 })
+
+async function exportExcel() {
+  if (!filtered.value.length) {
+    error('当前筛选下没有可导出的送货单')
+    return
+  }
+  const rows = deliveryLedgerRows(filtered.value, { projectName, supplierName })
+  try {
+    await exportFile({
+      data: createDeliveryLedgerXlsx(rows),
+      defaultName: `送货单明细_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      mimeType: DELIVERY_XLSX_MIME,
+    })
+  }
+  catch (cause) {
+    error(cause instanceof Error ? `导出失败：${cause.message}` : '导出失败')
+  }
+}
 
 const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
@@ -170,8 +191,19 @@ onMounted(refresh)
           placeholder="搜索单号、项目、分供方、材料"
           :width="288"
         />
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+          <span>从</span>
+          <input v-model="dateFrom" type="date" class="field-input h-8 text-11px" aria-label="开始日期">
+        </label>
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+          <span>至</span>
+          <input v-model="dateTo" type="date" class="field-input h-8 text-11px" aria-label="结束日期">
+        </label>
         <button class="btn-secondary" :disabled="store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
+        </button>
+        <button class="btn-secondary" :disabled="store.loading || !filtered.length" @click="exportExcel">
+          <span class="i-lucide-file-spreadsheet mr-1 text-13px" /> 导出 Excel
         </button>
         <NuxtLink to="/material/delivery/archive/form" class="btn-accent">
           <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
