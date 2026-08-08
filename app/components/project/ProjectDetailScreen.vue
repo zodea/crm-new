@@ -17,6 +17,7 @@ const tabs = PROJECT_DETAIL_TABS
 const tabKeys = new Set<ProjectDetailTabKey>(tabs.map(tab => tab.key))
 const project = computed(() => store.byId(props.projectId))
 const activeTab = shallowRef<ProjectDetailTabKey>(validTab(route.query.tab))
+const archiveOpen = shallowRef(false)
 
 useTabTitle(() => project.value?.name)
 
@@ -119,6 +120,9 @@ watch(
           </p>
         </div>
         <div class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2" role="group" aria-label="项目详情操作">
+          <button type="button" class="btn-secondary" aria-label="导出项目档案包" @click="archiveOpen = true">
+            <span class="i-lucide-archive mr-1" aria-hidden="true" />导出档案包
+          </button>
           <NuxtLink :to="`/project/form/${project.id}`" class="btn-secondary" aria-label="编辑项目">
             <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
           </NuxtLink>
@@ -172,20 +176,19 @@ watch(
       </dl>
     </header>
 
-    <div data-project-module="metrics">
-      <ProjectMetrics :project-id="props.projectId" />
-    </div>
-
     <div class="project-detail__body grid min-w-0 items-start gap-3">
       <main class="min-w-0">
+        <div data-project-module="timeline">
+          <ProjectTimeline :project-id="props.projectId" />
+        </div>
+        <div data-project-module="metrics">
+          <ProjectMetrics :project-id="props.projectId" />
+        </div>
         <div data-project-module="workflow">
           <ProjectWorkflowPanel :project="project" />
         </div>
         <div data-project-module="schedule">
           <ProjectScheduleCard :project-id="props.projectId" />
-        </div>
-        <div data-project-module="timeline">
-          <ProjectTimeline :project-id="props.projectId" />
         </div>
 
         <section data-project-module="tabs" class="panel min-w-0 overflow-hidden" aria-label="项目业务明细">
@@ -215,6 +218,11 @@ watch(
         </div>
       </aside>
     </div>
+
+    <ProjectArchiveExportDialog
+      v-model:open="archiveOpen"
+      :project-id="props.projectId"
+    />
   </div>
 
   <StatePanel
