@@ -1,13 +1,12 @@
 <script setup lang="ts">
+import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type {
   MaterialFormKind,
   MaterialFormRecordMap,
 } from '~/lib/material/forms'
-import {
-  MATERIAL_FORM_META,
-  materialFormPath,
-} from '~/lib/material/page'
+import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
+import { MATERIAL_FORM_META, materialFormPath } from '~/lib/material/page'
 
 type MaterialRecord = MaterialFormRecordMap[MaterialFormKind]
 
@@ -32,6 +31,10 @@ const projectStore = useProjectStore()
 const { confirm, undoToast, error } = useKitUI()
 const meta = computed(() => MATERIAL_FORM_META[props.kind])
 const search = shallowRef('')
+const projectFilter = shallowRef('')
+const statusFilter = shallowRef('')
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
 
 const records = computed(() =>
   (materialStore.records[props.kind] ?? []) as MaterialRecord[],
@@ -91,13 +94,52 @@ function rowFrom(record: MaterialRecord): MaterialListRow {
 const rows = computed(() => records.value.map(rowFrom))
 const filtered = computed(() => {
   const keyword = search.value.trim().toLowerCase()
-  if (!keyword)
-    return rows.value
-  return rows.value.filter(row =>
-    [row.no, row.name, row.projectName, row.status]
-      .some(value => value.toLowerCase().includes(keyword)),
-  )
+  return rows.value.filter((row) => {
+    if (projectFilter.value && row.projectName !== projectFilter.value)
+      return false
+    if (statusFilter.value && row.status !== statusFilter.value)
+      return false
+    if (!keyword)
+      return true
+    return [row.no, row.name, row.projectName, row.status]
+      .some(value => value.toLowerCase().includes(keyword))
+  })
 })
+
+const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
+const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
+const filterDefinitions = computed<ListFilterDefinition[]>(() => [
+  {
+    key: 'project',
+    label: '项目',
+    value: projectFilter.value,
+    options: deriveFilterOptions(rows.value, 'projectName')
+      .map(option => ({ label: option.label, value: String(option.value) })),
+  },
+  {
+    key: 'status',
+    label: '状态',
+    value: statusFilter.value,
+    options: deriveFilterOptions(rows.value, 'status')
+      .map(option => ({ label: option.label, value: String(option.value) })),
+  },
+])
+
+watch([search, projectFilter, statusFilter, pageSize], () => {
+  page.value = 1
+})
+
+function onFilterChange(key: string, value: string) {
+  if (key === 'project')
+    projectFilter.value = value
+  else if (key === 'status')
+    statusFilter.value = value
+}
+
+function onPageChange(event: { page: number, pageSize: number }) {
+  page.value = event.page
+  pageSize.value = event.pageSize
+}
 
 const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', width: 54 },
@@ -169,7 +211,6 @@ onActivated(() => {
         </p>
       </div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索材料、编号或项目" :width="272" />
         <KitButton variant="secondary" :loading="materialStore.loading" @click="load">
           <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
         </KitButton>
@@ -179,8 +220,22 @@ onActivated(() => {
       </div>
     </header>
 
+    <ListFilterBar
+      v-model:query="search"
+      :filters="filterDefinitions"
+      :total="rows.length"
+      :filtered="filtered.length"
+      @filter-change="onFilterChange"
+    />
+
     <div class="panel overflow-hidden">
-      <KitTable :columns="columns" :data="filtered" :loading="materialStore.loading">
+      <KitTable
+        :columns="columns"
+        :data="pageRows"
+        :loading="materialStore.loading"
+        :page="{ page: currentPage, pageSize, total: filtered.length }"
+        @page-change="onPageChange"
+      >
         <template #name="{ row }">
           <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
             {{ row.name }}
@@ -206,7 +261,7 @@ onActivated(() => {
         </template>
       </KitTable>
       <div class="border-t border-line bg-surface-2 px-4 py-2 text-right text-12px text-ink-soft">
-        共 {{ filtered.length }} 条 · 当前数量合计
+        当前页 {{ pageRows.length }} 条 · 筛选后数量合计
         <strong class="ml-1 font-mono text-ink">
           {{ filtered.reduce((total, row) => total + row.quantity, 0).toLocaleString('zh-CN') }}
         </strong>
