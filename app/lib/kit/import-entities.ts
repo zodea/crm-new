@@ -1,4 +1,5 @@
 import type { ImportTemplateField } from './import-mapping'
+import type { Invoice } from '~/stores/invoice'
 import type { Project } from '~/stores/project'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
 import { normalizeProjectStatus } from '~/lib/project/status'
@@ -10,6 +11,7 @@ import {
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { parseJsonColumn } from '~/lib/util/json'
+import { round2 } from '~/lib/util/number'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
@@ -36,6 +38,8 @@ export interface ImportEntityDef {
   key: string
   label: string
   fields: readonly ImportTemplateField[]
+  /** 返回可预期的业务拒绝原因；瞬时写入故障仍由 importRow 抛出并停在当前行。 */
+  validateRow?: (row: Record<string, unknown>) => string | null | undefined | Promise<string | null | undefined>
   /** 逐行入库；抛错即导入步失败，重试从失败行续导。 */
   importRow: (row: Record<string, unknown>) => Promise<void>
 }
@@ -133,7 +137,160 @@ const SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
   EXTERNAL_REF_FIELD,
 ]
 
+const INVOICE_FIELDS: readonly ImportTemplateField[] = [
+  { key: 'invoiceNumber', label: '发票号码', required: true, aliases: ['发票号', '单据编号', '票号'] },
+  { key: 'invoiceDate', label: '发票日期', aliases: ['开票日期', '日期'] },
+  { key: 'seller', label: '供应商', aliases: ['公司名称', '开票单位'] },
+  { key: 'buyer', label: '购买方', aliases: ['购方', '购买单位'] },
+  { key: 'totalAmount', label: '价税合计', required: true, aliases: ['金额', '含税金额', '总金额'] },
+  { key: 'taxAmount', label: '税额' },
+  { key: 'invoiceType', label: '票据类型', aliases: ['发票类型', '类型'] },
+  { key: 'projectName', label: '归属项目', aliases: ['使用工地', '项目', '对应项目'] },
+  { key: 'remark', label: '备注' },
+  EXTERNAL_REF_FIELD,
+]
+
+const PERSONAL_OWNER_VALUES = new Set(['个人', '个人开支', '个人费用'])
+
+function importText(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function importAmount(value: unknown, label: string): number {
+  const text = importText(value).replace(/[￥¥,\s]/g, '')
+  if (!text)
+    return 0
+  const amount = Number(text)
+  if (!Number.isFinite(amount))
+    throw new Error(`${label}不是有效金额：${text}`)
+  return round2(amount)
+}
+
+function invoiceDataFromRow(row: Record<string, unknown>) {
+  const totalAmount = importAmount(row.totalAmount, '价税合计')
+  const taxAmount = importAmount(row.taxAmount, '税额')
+  return {
+    invoiceNumber: importText(row.invoiceNumber),
+    invoiceDate: importText(row.invoiceDate),
+    seller: importText(row.seller),
+    buyer: importText(row.buyer),
+    totalAmount,
+    taxAmount,
+    amount: round2(totalAmount - taxAmount),
+    invoiceType: importText(row.invoiceType) || '增值税普通发票',
+    projectName: importText(row.projectName),
+    remark: importText(row.remark),
+  }
+}
+
+function invoiceImportValidationError(
+  data: ReturnType<typeof invoiceDataFromRow>,
+  projectNames: readonly string[],
+): string | null {
+  if (!data.invoiceNumber)
+    return '发票号码不能为空'
+  if (data.totalAmount <= 0)
+    return '价税合计不能为空或必须大于 0'
+  if (!data.projectName)
+    return '缺归属：请填写对应项目；个人开支请填写“个人开支”'
+
+  if (PERSONAL_OWNER_VALUES.has(data.projectName))
+    return null
+
+  const matches = projectNames.filter(name => name === data.projectName)
+  if (matches.length !== 1)
+    return `缺归属：项目“${data.projectName}”未唯一匹配到有效项目`
+  return null
+}
+
 export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
+  'invoice': {
+    key: 'invoice',
+    label: '发票台账',
+    fields: INVOICE_FIELDS,
+    async validateRow(row) {
+      const projectStore = useProjectStore()
+      if (!projectStore.list.length)
+        await projectStore.load()
+      try {
+        return invoiceImportValidationError(
+          invoiceDataFromRow(row),
+          projectStore.list.map(project => project.name),
+        )
+      }
+      catch (cause) {
+        return cause instanceof Error ? cause.message : '发票字段格式无效'
+      }
+    },
+    async importRow(row) {
+      const invoiceStore = useInvoiceStore()
+      const projectStore = useProjectStore()
+      if (!invoiceStore.list.length)
+        await invoiceStore.load()
+      if (!projectStore.list.length)
+        await projectStore.load()
+
+      const data = invoiceDataFromRow(row)
+      const validationError = invoiceImportValidationError(
+        data,
+        projectStore.list.map(project => project.name),
+      )
+      if (validationError)
+        throw new Error(validationError)
+
+      const isPersonal = PERSONAL_OWNER_VALUES.has(data.projectName)
+
+      const project = isPersonal
+        ? []
+        : projectStore.list.filter(item => item.name === data.projectName)
+      if (!isPersonal && project.length !== 1)
+        throw new Error(`归属项目“${data.projectName}”未唯一匹配到有效项目`)
+
+      const existing = invoiceStore.list.find(invoice => invoice.invoiceNumber === data.invoiceNumber)
+      const current = existing as unknown as Invoice | undefined
+      const incoming = {
+        ...data,
+        projectName: isPersonal ? '个人开支' : project[0]!.name,
+        projectId: isPersonal ? null : project[0]!.id,
+        ownerKind: isPersonal ? 'personal' as const : 'project' as const,
+      }
+
+      if (existing) {
+        const patch: Partial<Invoice> = {}
+        for (const key of ['invoiceDate', 'seller', 'buyer', 'invoiceType', 'projectName', 'remark'] as const) {
+          if (!current![key] && incoming[key])
+            patch[key] = incoming[key]
+        }
+        if (!current!.totalAmount && incoming.totalAmount)
+          patch.totalAmount = incoming.totalAmount
+        if (!current!.taxAmount && incoming.taxAmount)
+          patch.taxAmount = incoming.taxAmount
+        if (!current!.amount && incoming.amount)
+          patch.amount = incoming.amount
+        if (!current!.projectId && incoming.projectId)
+          patch.projectId = incoming.projectId
+        if (!current!.ownerKind && incoming.ownerKind)
+          patch.ownerKind = incoming.ownerKind
+        if (Object.keys(patch).length)
+          await invoiceStore.update(current!.id, { ...current!, ...patch })
+        return
+      }
+
+      await invoiceStore.add({
+        ...incoming,
+        source: 'excel',
+        ocrStatus: 'done',
+        reviewStatus: 'reviewed',
+        accountStatus: 'none',
+        dupStatus: 'normal',
+        ownerKind: incoming.ownerKind,
+        fileName: '',
+        filePath: '',
+        fileSize: '',
+        pageCount: 0,
+      })
+    },
+  },
   'project': {
     key: 'project',
     label: '施工项目',
