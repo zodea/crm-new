@@ -67,6 +67,7 @@ export interface DeliveryRecordInput {
   orderNo: string
   deliveryDate: string
   note: string
+  reviewFlag?: string
   rawSiteText?: string
   fileName?: string
   filePath?: string
@@ -413,7 +414,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
            ocr_status, archived, stored, print_batch_id, print_disposition, printed_at, print_excluded_at,
            review_flag, note, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 1, ?, 'pending', NULL, NULL, '', ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reviewed', 1, 1, ?, 'pending', NULL, NULL, ?, ?, ?, ?)`,
         [
           id,
           input.projectId,
@@ -424,6 +425,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
           printBatchId,
+          input.reviewFlag?.trim() ?? '',
           input.note.trim(),
           now,
           now,

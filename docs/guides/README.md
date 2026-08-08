@@ -11,6 +11,7 @@
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)
 - [OCR 设置使用说明](./ocr-settings.md)
+- [送货单归档与 Excel 导出使用说明](./material-delivery.md)
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 
 ## PDF 生成
