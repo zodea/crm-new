@@ -151,6 +151,8 @@ const SUPPLIER_FOLDERS: Record<string, string> = {
   payment_record: '04_付款凭证',
   settlement: '05_结算',
   expenditure_settlement: '05_结算',
+  material_requisition: '06_到货与物资',
+  material_arrival: '06_到货与物资',
   delivery_record: '06_到货与物资',
 }
 
@@ -279,18 +281,26 @@ function ownerFolderForSupplier(
   return [ROOT_SUPPLIER, '02_乙供材', sanitizeSegment(supplierName || supplierId), ...suffix.split('/')]
 }
 
+function ownerMaterialFolder(project: ProjectArchiveProject, ownerType: string): string[] {
+  const suffix = PROJECT_OWNER_FOLDERS[ownerType] ?? '07_物资单据'
+  return [ROOT_SUPPLIER, '01_甲供材', sanitizeSegment(project.developer || '项目甲方'), ...suffix.split('/')]
+}
+
 function buildProjectFolders(
   tasks: Map<string, { phaseIndex: number, taskIndex: number, title: string }>,
   suppliers: Map<string, string>,
   projectSuppliers: Map<string, { supplierId: string, label: string }>,
   crews: Map<string, string>,
   workers: Map<string, { name: string, crewId: string | null }>,
+  project: ProjectArchiveProject,
 ): ProjectArchiveFolder[] {
   const folders: ProjectArchiveFolder[] = [
     { key: 'project-manifest', path: [ROOT_PROJECT, '00_档案说明与清单'], label: '档案说明与清单' },
     { key: 'project-basic', path: [ROOT_PROJECT, '01_项目基本信息'], label: '项目基本信息' },
     { key: 'project-other', path: [ROOT_PROJECT, '09_其他项目单据'], label: '其他项目单据' },
     { key: 'supplier-root', path: [ROOT_SUPPLIER], label: '分供方' },
+    { key: 'supplier-owner-material-root', path: [ROOT_SUPPLIER, '01_甲供材'], label: '甲供材' },
+    { key: 'supplier-owner-material-project', path: ownerMaterialFolder(project, 'owner_material_control').slice(0, 4), label: project.developer || '项目甲方' },
     { key: 'supplier-material-root', path: [ROOT_SUPPLIER, '02_乙供材'], label: '乙供材分供方' },
     { key: 'crew-root', path: [ROOT_CREW], label: '班组与工人' },
     { key: 'unsorted', path: [ROOT_UNSORTED], label: '无法确定业务归属的文件' },
@@ -511,15 +521,31 @@ function sourceRecordOwner(
   const id = text(row.id)
   if (!id)
     return undefined
-  const supplierId = text(row.supplier_id || row.supplierId)
-  if (supplierId && context.suppliers.has(supplierId)) {
-    const supplierName = context.suppliers.get(supplierId) || supplierId
+  if (ownerType.startsWith('owner_material_')) {
     return {
       type: ownerType,
       id,
       label: text(row.name) || `${ownerType} ${id}`,
-      supplierId,
-      folderPath: ownerFolderForSupplier(ownerType, supplierId, supplierName),
+      folderPath: ownerMaterialFolder(context.project, ownerType),
+    }
+  }
+  const supplierId = text(row.supplier_id || row.supplierId)
+  const projectSupplierId = text(row.project_supplier_id)
+  const relationshipSupplierId = context.projectSuppliers.get(projectSupplierId)?.supplierId || ''
+  const contractId = text(row.contract_id)
+  const contract = context.contracts.get(contractId)
+    || context.constructionContracts.get(contractId)
+    || context.expenditureContracts.get(contractId)
+  const contractSupplierId = text(contract?.supplier_id)
+  const resolvedSupplierId = supplierId || relationshipSupplierId || contractSupplierId
+  if (resolvedSupplierId && context.suppliers.has(resolvedSupplierId)) {
+    const supplierName = context.suppliers.get(resolvedSupplierId) || resolvedSupplierId
+    return {
+      type: ownerType,
+      id,
+      label: text(row.name) || `${ownerType} ${id}`,
+      supplierId: resolvedSupplierId,
+      folderPath: ownerFolderForSupplier(ownerType, resolvedSupplierId, supplierName),
     }
   }
   const projectFolder = PROJECT_OWNER_FOLDERS[ownerType]
@@ -653,7 +679,7 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
     })
   }
 
-  const relatedTables: Array<[string, string]> = [
+  const relatedTables: Array<[string, string, string?]> = [
     ['invoice', 'invoices'],
     ['payment_application', 'payment_applications'],
     ['payment_record', 'payment_records'],
@@ -666,7 +692,7 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
     ['boq_change_order', 'boq_change_orders'],
     ['monthly_statement', 'monthly_statements'],
     ['target_cost', 'target_costs'],
-    ['penalty_record', 'penalty_records'],
+    ['penalty_record', 'penalty_records', 'projectId'],
     ['material_requisition', 'material_requisitions'],
     ['material_arrival', 'material_arrivals'],
     ['owner_material_control', 'owner_material_controls'],
@@ -679,8 +705,8 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
     ['current_transaction', 'current_transactions'],
     ['expense_reimbursement', 'expense_reimbursements'],
   ]
-  const relatedRows = await Promise.all(relatedTables.map(async ([ownerType, table]) => {
-    const rows = await selectProjectRows<RelatedRecord>(table, projectId)
+  const relatedRows = await Promise.all(relatedTables.map(async ([ownerType, table, projectColumn]) => {
+    const rows = await selectProjectRows<RelatedRecord>(table, projectId, projectColumn)
     return [ownerType, rows] as const
   }))
   for (const [ownerType, rows] of relatedRows) {
@@ -798,7 +824,7 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
     const owner = context.owners.get(ownerMapKey(row.owner_type, row.owner_id))!
     return mapFileRef(row, owner, payloadIds.has(row.id))
   }))
-  const folders = buildProjectFolders(tasks, suppliers, projectSuppliers, context.crews, context.workers)
+  const folders = buildProjectFolders(tasks, suppliers, projectSuppliers, context.crews, context.workers, context.project)
   return {
     project: context.project,
     folders,
