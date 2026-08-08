@@ -41,6 +41,25 @@ describe('导入执行器', () => {
     expect(runner.error.value).toBe('演示写入失败：FAIL-1')
   })
 
+  it('可预期的行级校验拒绝会继续导入并保留拒绝清单', async () => {
+    const importRow = vi.fn().mockResolvedValue(undefined)
+    const runner = useImportRunner(runnerEnvironment())
+
+    await expect(runner.start(rows, importRow, async (row) => {
+      return row.name === '南方设备' ? '缺归属项目' : null
+    })).resolves.toMatchObject({
+      status: 'completed',
+      rejected: [{ index: 1, row: rows[1], reason: '缺归属项目' }],
+    })
+
+    expect(importRow).toHaveBeenCalledTimes(2)
+    expect(importRow).not.toHaveBeenCalledWith(rows[1])
+    expect(runner.done.value).toBe(3)
+    expect(runner.rejected.value).toEqual([
+      { index: 1, row: rows[1], reason: '缺归属项目' },
+    ])
+  })
+
   it('重试从失败行续导，不重复入库已成功行', async () => {
     const importRow = vi.fn()
       .mockResolvedValueOnce(undefined)

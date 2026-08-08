@@ -1,6 +1,14 @@
 export type PrintPerPage = 1 | 2 | 4
 export type PrintRotation = 0 | 90 | 180 | 270
 
+export interface InvoicePrintRequest {
+  ids: string[]
+  rotations: Record<string, PrintRotation>
+  perPage: PrintPerPage
+  pageCount: number
+  totalAmount: number
+}
+
 export interface PrintableInvoice {
   id: string
   totalAmount: number
