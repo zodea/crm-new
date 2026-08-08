@@ -22,7 +22,7 @@ const isExpanded = computed(() => props.expandedKeys.has(props.node.key))
 
 function leaves(node: ProjectArchiveTreeNode): ProjectArchiveTreeNode[] {
   if (node.kind === 'file')
-    return node.file?.hasPayload ? [node] : []
+    return node.file?.hasPayload && node.file.sensitivity === 'normal' ? [node] : []
   return (node.children ?? []).flatMap(child => leaves(child))
 }
 
@@ -36,13 +36,9 @@ function selectionState(node: ProjectArchiveTreeNode): 'on' | 'off' | 'mixed' {
   return selected === 0 ? 'off' : selected === candidates.length ? 'on' : 'mixed'
 }
 
-function containsSelectedSensitive(node: ProjectArchiveTreeNode): boolean {
-  if (node.kind === 'file')
-    return node.sensitive === true && !!node.file && props.selectedKeys.has(node.file.id)
-  return (node.children ?? []).some(child => containsSelectedSensitive(child))
-}
-
 function labelForCheckbox(node: ProjectArchiveTreeNode): string {
+  if (node.kind === 'file' && node.sensitive)
+    return `查看 ${node.label}，原件导出权限待配置`
   return `${selectionState(node) === 'on' ? '取消' : '勾选'} ${node.label}`
 }
 </script>
@@ -72,11 +68,11 @@ function labelForCheckbox(node: ProjectArchiveTreeNode): string {
         class="grid h-5 w-5 shrink-0 place-items-center rounded-[var(--radius-sm)] border text-10px focus-visible:outline-2 focus-visible:outline-brand"
         :class="[
           selectionState(node) === 'on' ? 'border-brand bg-brand text-white' : selectionState(node) === 'mixed' ? 'border-brand bg-brand-soft text-brand' : 'border-line-strong bg-panel text-transparent',
-          node.kind === 'file' && !node.file?.hasPayload ? 'cursor-not-allowed opacity-50' : '',
+          node.kind === 'file' && (!node.file?.hasPayload || node.file.sensitivity === 'sensitive') ? 'cursor-not-allowed opacity-50' : '',
         ]"
         :aria-checked="selectionState(node) === 'mixed' ? 'mixed' : selectionState(node) === 'on'"
         :aria-label="labelForCheckbox(node)"
-        :disabled="node.kind === 'file' && !node.file?.hasPayload"
+        :disabled="node.kind === 'file' && (!node.file?.hasPayload || node.file.sensitivity === 'sensitive')"
         @click="emit('toggle', node)"
       >
         <span v-if="selectionState(node) === 'on'" class="i-lucide-check" aria-hidden="true" />
@@ -92,10 +88,10 @@ function labelForCheckbox(node: ProjectArchiveTreeNode): string {
         {{ node.label }}
       </span>
       <span v-if="node.sensitive" class="chip-warn shrink-0 text-10px">
-        敏感
+        仅查看
       </span>
-      <span v-if="containsSelectedSensitive(node)" class="chip-danger shrink-0 text-10px">
-        已选敏感
+      <span v-if="node.kind === 'file' && node.sensitive" class="chip-warn shrink-0 text-10px">
+        原件导出待配置
       </span>
       <span v-if="node.kind === 'file' && !node.file?.hasPayload" class="chip-warn shrink-0 text-10px">
         原件缺失

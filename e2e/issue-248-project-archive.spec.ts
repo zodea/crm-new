@@ -28,7 +28,7 @@ test.describe('Issue #248：项目详情阶段重排与档案包导出', () => {
       await expect(dialog).toBeVisible()
       await expect(dialog.getByText(/合和新城 · 按统一目录合同生成 ZIP/)).toBeVisible()
       await expect(dialog.getByRole('tree', { name: '项目档案导出范围' })).toBeVisible()
-      await expect(dialog.getByText(/敏感资料：默认排除/)).toBeVisible()
+      await expect(dialog.getByText('证照可查看 · 原件导出权限待配置 · 当前 ZIP 不包含证照原件', { exact: true })).toBeVisible()
       await expect(dialog.getByRole('button', { name: '开始导出 ZIP' })).toBeVisible()
       await expectNoPageOverflow(page, `${viewport.width}px 项目档案导出对话框`)
     })
