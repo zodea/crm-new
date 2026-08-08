@@ -91,10 +91,10 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   await expect(orderNumberInput).toHaveValue('SH-E2E-20260717')
   await expect(page.locator('input[placeholder="材料名称"]').first()).toHaveValue('普通硅酸盐水泥')
   const reviewPanel = page.locator('section').filter({
-    has: page.getByText('识别结果校对', { exact: true }),
+    has: page.getByText('人工复核与归档', { exact: true }),
   })
   await expect(reviewPanel.locator('select').nth(0)).toHaveValue('proj_demo_001')
-  await expect(reviewPanel.locator('select').nth(1)).toHaveValue('sup_demo_001')
+  await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]')).not.toHaveValue('')
   await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
   expect(uploadedDerivedImage).toBe(true)
   expect(disabledSecondOrientationPass).toBe(true)
@@ -109,13 +109,14 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   await amountInput.fill('622')
   await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: '核对完成并归档', exact: true }).click()
-  await expect(page.getByText('已完成核对并进入归档库', { exact: true })).toBeVisible()
-  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '确认人工归档', exact: true }).click()
+  const archiveDialog = page.getByRole('dialog').filter({ hasText: '请确认已查看原件' })
+  await archiveDialog.getByRole('button', { name: '确认人工归档', exact: true }).click()
+  await expect(page.getByText('已入库 · 待打印', { exact: true }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: '登记已打印', exact: true }).first()).toBeVisible()
 
   await page.reload()
-  await expect(page.getByText('已入库 · 待打印', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText('已入库 · 待打印', { exact: true }).first()).toBeVisible({ timeout: 60_000 })
   await page.getByRole('button', { name: '登记已打印', exact: true }).first().click()
   const printReceiptDialog = page.getByRole('dialog', { name: '登记实际打印回执' })
   await expect(printReceiptDialog).toContainText(/只打开过预览或取消打印时不要确认/)
@@ -209,10 +210,10 @@ test('模糊分供方只给建议，不会在人工采用前直接绑定', async
   await chooser.setFiles({ name: '合和新城-模糊分供方.png', mimeType: 'image/png', buffer: PNG_1PX })
 
   const reviewPanel = page.locator('section').filter({
-    has: page.getByText('识别结果校对', { exact: true }),
+    has: page.getByText('人工复核与归档', { exact: true }),
   })
-  await expect(reviewPanel.locator('select').nth(1)).toHaveValue('')
+  await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]')).toHaveValue('')
   await expect(page.getByRole('button', { name: '采用并记为别名', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '采用并记为别名', exact: true }).click()
-  await expect(reviewPanel.locator('select').nth(1)).toHaveValue('sup_demo_001')
+  await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]')).not.toHaveValue('')
 })
