@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
-const { confirm, error, exportFile, success, warning } = useKitUI()
+const { error, exportFile, success, warning } = useKitUI()
 
 const snapshot = shallowRef<ProjectArchiveSnapshot | null>(null)
 const loading = shallowRef(false)
@@ -26,7 +26,7 @@ function folderKeys(nodes: readonly ProjectArchiveTreeNode[]): string[] {
 
 function selectableFiles(node: ProjectArchiveTreeNode): ProjectArchiveTreeNode[] {
   if (node.kind === 'file')
-    return node.file?.hasPayload ? [node] : []
+    return node.file?.hasPayload && node.file.sensitivity === 'normal' ? [node] : []
   return (node.children ?? []).flatMap(child => selectableFiles(child))
 }
 
@@ -48,9 +48,7 @@ const visibleTree = computed(() => {
     .filter((node): node is ProjectArchiveTreeNode => !!node)
 })
 
-const selectedFiles = computed(() => snapshot.value?.files.filter(file => selectedKeys.value.has(file.id) && file.hasPayload) ?? [])
-const selectedMissingFiles = computed(() => snapshot.value?.files.filter(file => selectedKeys.value.has(file.id) && !file.hasPayload) ?? [])
-const selectedSensitiveFiles = computed(() => selectedFiles.value.filter(file => file.sensitivity === 'sensitive'))
+const selectedFiles = computed(() => snapshot.value?.files.filter(file => selectedKeys.value.has(file.id) && file.hasPayload && file.sensitivity === 'normal') ?? [])
 const defaultSelectedCount = computed(() => snapshot.value?.files.filter(file => file.sensitivity === 'normal' && file.hasPayload).length ?? 0)
 
 function resetSelection(next: ProjectArchiveSnapshot) {
@@ -95,21 +93,15 @@ async function toggleFile(node: ProjectArchiveTreeNode) {
     warning('该附件只有元数据，原件正文未保存，不能加入 ZIP')
     return
   }
+  if (file.sensitivity === 'sensitive') {
+    warning('该证照可在系统中查看，原件导出下载权限待后续配置')
+    return
+  }
   const next = new Set(selectedKeys.value)
   if (next.has(file.id)) {
     next.delete(file.id)
     replaceSelection(next)
     return
-  }
-  if (file.sensitivity === 'sensitive') {
-    const approved = await confirm({
-      title: '勾选敏感资料？',
-      message: `「${file.fileName}」属于敏感资料。本次导出会在文件清单中留下“包含敏感资料”记录，是否继续？`,
-      confirmLabel: '确认勾选',
-      cancelLabel: '取消',
-    })
-    if (!approved)
-      return
   }
   next.add(file.id)
   replaceSelection(next)
@@ -127,21 +119,14 @@ async function toggleNode(node: ProjectArchiveTreeNode) {
   }
   const next = new Set(selectedKeys.value)
   const shouldSelect = selectionState(node) !== 'on'
-  let skippedSensitive = 0
   for (const candidate of files) {
     const file = candidate.file!
-    if (shouldSelect && file.sensitivity === 'sensitive') {
-      skippedSensitive += 1
-      continue
-    }
     if (shouldSelect)
       next.add(file.id)
     else
       next.delete(file.id)
   }
   replaceSelection(next)
-  if (shouldSelect && skippedSensitive)
-    warning(`敏感资料不会随目录批量勾选，已跳过 ${skippedSensitive} 个，请逐项显式勾选`)
 }
 
 function toggleExpanded(key: string) {
@@ -197,16 +182,6 @@ async function startExport() {
     warning('请至少选择一个有原件正文的文件')
     return
   }
-  if (selectedSensitiveFiles.value.length) {
-    const approved = await confirm({
-      title: '导出包含敏感资料',
-      message: `本次选择包含 ${selectedSensitiveFiles.value.length} 个敏感资料。导出清单将记录该事实；请确认导出副本的保管范围后继续。`,
-      confirmLabel: '仍要导出',
-      cancelLabel: '返回调整',
-    })
-    if (!approved)
-      return
-  }
   await runExport()
 }
 
@@ -230,7 +205,7 @@ watch(query, (value) => {
       <DialogHeader class="shrink-0 border-b border-line px-5 py-4 pr-12">
         <DialogTitle>导出项目档案包 · 选择范围</DialogTitle>
         <DialogDescription class="mt-1 leading-5">
-          {{ snapshot?.project.name || '正在读取项目' }} · 按统一目录合同生成 ZIP；核心档案默认勾选，敏感资料默认排除。
+          {{ snapshot?.project.name || '正在读取项目' }} · 按统一目录合同生成 ZIP；核心档案默认勾选，证照可查看但原件导出权限待配置。
         </DialogDescription>
       </DialogHeader>
 
@@ -279,17 +254,14 @@ watch(query, (value) => {
 
       <div class="flex shrink-0 flex-wrap items-center gap-2 border-t border-line bg-surface-2 px-5 py-2.5 text-11px text-ink-soft">
         <span class="i-lucide-shield-alert text-danger" aria-hidden="true" />
-        <span>敏感资料：默认排除 · 逐项显式勾选 · 导出前再次警示 · 清单留痕</span>
-        <span v-if="selectedMissingFiles.length" class="chip-warn ml-auto">
-          选中缺失原件 {{ selectedMissingFiles.length }} 个
-        </span>
+        <span>证照可查看 · 原件导出权限待配置 · 当前 ZIP 不包含证照原件</span>
       </div>
 
       <DialogFooter class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-3">
         <div class="text-11px text-ink-soft">
           已选 <span class="font-mono font-700 text-brand">{{ selectedFiles.length }}</span> 个原件
           <span class="mx-1 text-ink-faint">·</span>
-          敏感 <span class="font-mono font-700" :class="selectedSensitiveFiles.length ? 'text-danger' : 'text-ink-soft'">{{ selectedSensitiveFiles.length }}</span> 个
+          证照原件不参与当前导出
         </div>
         <div class="flex items-center gap-2">
           <button type="button" class="btn-ghost" :disabled="exporting" @click="open = false">

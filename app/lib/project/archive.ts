@@ -47,7 +47,6 @@ export interface ProjectArchiveProject {
   code: string
   status: string
   manager: string
-  developer: string
 }
 
 export interface ProjectArchiveSnapshot {
@@ -281,9 +280,9 @@ function ownerFolderForSupplier(
   return [ROOT_SUPPLIER, '02_乙供材', sanitizeSegment(supplierName || supplierId), ...suffix.split('/')]
 }
 
-function ownerMaterialFolder(project: ProjectArchiveProject, ownerType: string): string[] {
+function ownerMaterialFolder(ownerType: string): string[] {
   const suffix = PROJECT_OWNER_FOLDERS[ownerType] ?? '07_物资单据'
-  return [ROOT_SUPPLIER, '01_甲供材', sanitizeSegment(project.developer || '项目甲方'), ...suffix.split('/')]
+  return [ROOT_SUPPLIER, '01_甲供材', '甲供材供货单位待配置', ...suffix.split('/')]
 }
 
 function buildProjectFolders(
@@ -292,7 +291,6 @@ function buildProjectFolders(
   projectSuppliers: Map<string, { supplierId: string, label: string }>,
   crews: Map<string, string>,
   workers: Map<string, { name: string, crewId: string | null }>,
-  project: ProjectArchiveProject,
 ): ProjectArchiveFolder[] {
   const folders: ProjectArchiveFolder[] = [
     { key: 'project-manifest', path: [ROOT_PROJECT, '00_档案说明与清单'], label: '档案说明与清单' },
@@ -300,7 +298,7 @@ function buildProjectFolders(
     { key: 'project-other', path: [ROOT_PROJECT, '09_其他项目单据'], label: '其他项目单据' },
     { key: 'supplier-root', path: [ROOT_SUPPLIER], label: '分供方' },
     { key: 'supplier-owner-material-root', path: [ROOT_SUPPLIER, '01_甲供材'], label: '甲供材' },
-    { key: 'supplier-owner-material-project', path: ownerMaterialFolder(project, 'owner_material_control').slice(0, 4), label: project.developer || '项目甲方' },
+    { key: 'supplier-owner-material-project', path: ownerMaterialFolder('owner_material_control').slice(0, 4), label: '甲供材供货单位待配置' },
     { key: 'supplier-material-root', path: [ROOT_SUPPLIER, '02_乙供材'], label: '乙供材分供方' },
     { key: 'crew-root', path: [ROOT_CREW], label: '班组与工人' },
     { key: 'unsorted', path: [ROOT_UNSORTED], label: '无法确定业务归属的文件' },
@@ -526,7 +524,7 @@ function sourceRecordOwner(
       type: ownerType,
       id,
       label: text(row.name) || `${ownerType} ${id}`,
-      folderPath: ownerMaterialFolder(context.project, ownerType),
+      folderPath: ownerMaterialFolder(ownerType),
     }
   }
   const supplierId = text(row.supplier_id || row.supplierId)
@@ -608,7 +606,6 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
       code: text(project.code),
       status: text(project.status),
       manager: text(project.manager),
-      developer: text(project.developer),
     },
     tasks,
     suppliers,
@@ -824,7 +821,7 @@ export async function loadProjectArchiveSnapshot(projectId: string): Promise<Pro
     const owner = context.owners.get(ownerMapKey(row.owner_type, row.owner_id))!
     return mapFileRef(row, owner, payloadIds.has(row.id))
   }))
-  const folders = buildProjectFolders(tasks, suppliers, projectSuppliers, context.crews, context.workers, context.project)
+  const folders = buildProjectFolders(tasks, suppliers, projectSuppliers, context.crews, context.workers)
   return {
     project: context.project,
     folders,
@@ -837,7 +834,7 @@ export function selectedArchiveFiles(
   snapshot: ProjectArchiveSnapshot,
   selectedFileIds: ReadonlySet<string>,
 ): ProjectArchiveFile[] {
-  return snapshot.files.filter(file => selectedFileIds.has(file.id) && file.hasPayload)
+  return snapshot.files.filter(file => selectedFileIds.has(file.id) && file.hasPayload && file.sensitivity === 'normal')
 }
 
 function escapeCsv(value: unknown): string {
@@ -866,8 +863,10 @@ function archiveManifestRows(
     上传人: file.uploader || '未记录',
     上传时间: file.uploadedAt || '未记录',
     敏感资料: file.sensitivity === 'sensitive' ? '是' : '否',
-    本次选择: selectedFileIds.has(file.id) ? '是' : '否',
-    导出状态: selectedFileIds.has(file.id) && file.hasPayload ? '已导出' : file.hasPayload ? '未选择' : '原件缺失，仅登记在清单',
+    本次选择: selectedFileIds.has(file.id) && file.sensitivity === 'normal' ? '是' : '否',
+    导出状态: file.sensitivity === 'sensitive'
+      ? '原件导出权限待配置'
+      : selectedFileIds.has(file.id) && file.hasPayload ? '已导出' : file.hasPayload ? '未选择' : '原件缺失，仅登记在清单',
     缺失原因: file.missingReason || '',
   }))
 }
@@ -999,7 +998,7 @@ export async function createProjectArchiveZip(
   options: ProjectArchiveZipOptions,
 ): Promise<{ data: Uint8Array, exportedFiles: readonly ProjectArchiveFile[], missingFiles: readonly ProjectArchiveFile[] }> {
   const selected = selectedArchiveFiles(snapshot, options.selectedFileIds)
-  const selectedWithMissing = snapshot.files.filter(file => options.selectedFileIds.has(file.id))
+  const selectedWithMissing = snapshot.files.filter(file => options.selectedFileIds.has(file.id) && file.sensitivity === 'normal')
   const missingFiles = selectedWithMissing.filter(file => !file.hasPayload)
   const loadContent = options.loadContent ?? (async (file: ProjectArchiveFile) => {
     const content = await loadFileRefContent({
@@ -1023,12 +1022,12 @@ export async function createProjectArchiveZip(
   const exportedAt = options.exportedAt ?? new Date().toISOString()
   const manifestRows = archiveManifestRows(snapshot, options.selectedFileIds)
   const directoryRows = archiveDirectoryRows(snapshot)
-  const sensitiveCount = selectedWithMissing.filter(file => file.sensitivity === 'sensitive').length
+  const sensitiveCount = snapshot.files.filter(file => file.sensitivity === 'sensitive').length
   const explanation = [
     `项目档案包：${snapshot.project.name}`,
     `项目编号：${snapshot.project.code || '未登记'}`,
     `导出时间：${exportedAt}`,
-    `本次导出文件：${exportedFiles.length} 个；原件缺失：${missingFiles.length} 个；敏感资料：${sensitiveCount} 个。`,
+    `本次导出文件：${exportedFiles.length} 个；原件缺失：${missingFiles.length} 个；可查看敏感资料：${sensitiveCount} 个（原件导出权限待配置）。`,
     '本 ZIP 的写盘完成只代表导出动作完成，不代表项目档案已经齐套；请以文件清单中的缺失和敏感留痕为准。',
   ].join('\n')
   const manifestCsv = [

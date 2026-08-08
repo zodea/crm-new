@@ -48,7 +48,6 @@ function snapshot(): ProjectArchiveSnapshot {
       code: 'P-001',
       status: '施工中',
       manager: '项目经理',
-      developer: '客户',
     },
     folders: [
       { key: 'project', path: ['01_项目信息与工程档案'], label: '项目档案' },
@@ -96,13 +95,14 @@ describe('项目档案包导出（Issue #248）', () => {
       loadContent: async file => file.id === 'file-missing' ? null : new TextEncoder().encode(file.id),
     })
     const names = zipLocalNames(result.data)
-    expect(result.exportedFiles.map(file => file.id)).toEqual(['file-normal', 'file-sensitive'])
+    expect(result.exportedFiles.map(file => file.id)).toEqual(['file-normal'])
     expect(result.missingFiles.map(file => file.id)).toEqual(['file-missing'])
     expect(names).toContain('01_项目信息与工程档案/01_项目基本信息/立项-批复.pdf')
     expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/导出说明.txt')
     expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/文件清单.csv')
     expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/项目档案目录.xlsx')
     expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/文件清单.xlsx')
+    expect(new TextDecoder().decode(result.data)).toContain('原件导出权限待配置')
   })
 
   it('同一输入生成的 zip 字节序列稳定', () => {

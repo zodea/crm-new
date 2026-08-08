@@ -30,7 +30,6 @@ const snapshot: ProjectArchiveSnapshot = {
     code: 'HHXC-01',
     status: '施工中',
     manager: '项目经理',
-    developer: '客户',
   },
   folders: [],
   files: [
@@ -130,23 +129,24 @@ describe('项目档案包导出选择器', () => {
 
     await waitFor(() => expect(screen.getByText(/合和新城/)).toBeTruthy())
     expect(screen.getByRole('checkbox', { name: '取消 立项批复.pdf' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('checkbox', { name: '勾选 银行卡资料.pdf' }).getAttribute('aria-checked')).toBe('false')
-    expect(screen.getAllByText('敏感').length).toBeGreaterThan(0)
+    expect(screen.getByRole('checkbox', { name: '查看 银行卡资料.pdf，原件导出权限待配置' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getAllByText('仅查看').length).toBeGreaterThan(0)
   })
 
-  it('显式勾选敏感资料时先走二次确认，确认后导出前再次确认', async () => {
-    kitUi.confirm.mockResolvedValue(true)
+  it('证照在目录中可见但不可勾选，当前导出只提交普通原件', async () => {
     render(ProjectArchiveExportDialog, {
       props: { projectId: 'project-1', open: true },
       global: { components: globalComponents },
     })
     await waitFor(() => expect(screen.getByText(/合和新城/)).toBeTruthy())
 
-    await fireEvent.click(screen.getByRole('checkbox', { name: '勾选 银行卡资料.pdf' }))
-    expect(kitUi.confirm).toHaveBeenCalledTimes(1)
+    const sensitiveCheckbox = screen.getByRole('checkbox', { name: '查看 银行卡资料.pdf，原件导出权限待配置' })
+    expect(sensitiveCheckbox.getAttribute('disabled')).not.toBeNull()
+    expect(screen.getAllByText('原件导出待配置').length).toBeGreaterThan(0)
     await fireEvent.click(screen.getByRole('button', { name: '开始导出 ZIP' }))
-    expect(kitUi.confirm).toHaveBeenCalledTimes(2)
+    expect(kitUi.confirm).not.toHaveBeenCalled()
     expect(createZip).toHaveBeenCalled()
+    expect(createZip.mock.calls[0][1].selectedFileIds).toEqual(new Set(['normal-1']))
     expect(kitUi.exportFile).toHaveBeenCalled()
   })
 })
