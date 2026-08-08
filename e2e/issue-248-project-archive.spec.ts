@@ -26,6 +26,7 @@ test.describe('Issue #248：项目详情阶段重排与档案包导出', () => {
       await trigger.click()
       const dialog = page.getByRole('dialog', { name: /导出项目档案包 · 选择范围/ })
       await expect(dialog).toBeVisible()
+      await expect(dialog.getByText(/合和新城 · 按统一目录合同生成 ZIP/)).toBeVisible()
       await expect(dialog.getByRole('tree', { name: '项目档案导出范围' })).toBeVisible()
       await expect(dialog.getByText(/敏感资料：默认排除/)).toBeVisible()
       await expect(dialog.getByRole('button', { name: '开始导出 ZIP' })).toBeVisible()
