@@ -129,14 +129,12 @@ async function snapshotWithPriceFacts(snapshot: number[]): Promise<number[]> {
 
 async function openPriceAnalysisWithFacts(page: Page) {
   await page.goto('/material/price')
-  try {
-    await expect(page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' }))
-      .toBeVisible({ timeout: 15_000 })
-  }
-  catch {
-    await expect(page.getByText('尚无可分析的材料价格', { exact: true }))
-      .toBeVisible({ timeout: 5_000 })
-  }
+  await Promise.any([
+    page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
+      .waitFor({ state: 'visible', timeout: 15_000 }),
+    page.getByText('尚无可分析的材料价格', { exact: true })
+      .waitFor({ state: 'visible', timeout: 15_000 }),
+  ])
 
   const seededSnapshot = await readBrowserSnapshot(page)
   await writeBrowserSnapshot(page, await snapshotWithPriceFacts(seededSnapshot))

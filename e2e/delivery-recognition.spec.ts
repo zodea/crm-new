@@ -94,7 +94,8 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
     has: page.getByText('人工复核与归档', { exact: true }),
   })
   await expect(reviewPanel.locator('select').nth(0)).toHaveValue('proj_demo_001')
-  await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]')).not.toHaveValue('')
+  await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]'))
+    .toHaveValue('广州市大板东建材有限公司')
   await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
   expect(uploadedDerivedImage).toBe(true)
   expect(disabledSecondOrientationPass).toBe(true)
