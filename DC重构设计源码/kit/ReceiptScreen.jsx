@@ -1,62 +1,48 @@
-// ReceiptScreen — 收款登记列表（收入侧：甲方回款，关联施工合同）：EntityListScreen meta 一份生成整页。
-// 口径：与 contracts.paid(施工=累计收款) 对齐；合同 select 只列施工合同（收款只挂收入侧主合同）；
-// fromParams 承接合同详情金额穿透（params.contract → 按 contractId 预筛，label 解析合同名）。
+// ReceiptScreen — 收款登记（按实现端 app/components/finance/FinanceListScreen.vue kind=receipt 校准）
+// 标准单表列表：# / 名称对象(link) / 编号 / 项目 / 关联方类型 / 金额 / 日期 / 状态 / 操作(编辑)；底部金额合计。
+// 口径（stores/finance.ts loadList receipt）：名称=客户名（SQL COALESCE(customer.name, payer_account)，
+// 演示数据取 payer 快照）；关联方=施工合同名；演示数据 receipts 无 status 字段，状态兜底「草稿」。
 (function () {
   if (window.ReceiptScreen) return;
 
   function ReceiptScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
-    const projects = A.rows("projects");
-    const contracts = A.rows("contracts").filter((c) => c.kind === "施工");
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const meta = {
-      entity: "receipt",
-      title: "收款登记",
-      coll: "receipts",
-      columns: [
-        { key: "no", label: "收款单号", width: 140, mono: true },
-        { key: "projectId", label: "项目名称", width: 150, render: (v) => <KA.EntityLink type="project" id={v} />,
-          form: { type: "select", options: projects.map((p) => p.name),
-            toLabel: (id) => { const p = A.get("projects", id); return p ? p.name : id; },
-            toValue: (name) => { const p = projects.find((x) => x.name === name); return p ? p.id : name; } } },
-        { key: "contractId", label: "施工合同", width: 220, render: (v) => <KA.EntityLink type="contract" id={v} />,
-          form: { type: "select", options: contracts.map((c) => c.name),
-            toLabel: (id) => { const c = A.get("contracts", id); return c ? c.name : id; },
-            toValue: (name) => { const c = contracts.find((x) => x.name === name); return c ? c.id : name; } } },
-        { key: "payer", label: "付款方（甲方）", width: 180 },
-        { key: "amount", label: "收款金额", width: 130, money: true, align: "right" },
-        { key: "method", label: "收款方式", width: 110, form: { type: "select", options: ["银行转账", "银行承兑", "现金"] } },
-        { key: "date", label: "收款日期", width: 110, mono: true, form: { type: "date" } },
-      ],
-      views: [
-        { key: "all", label: "全部" },
-        { key: "year", label: "本年", filter: (r) => r.date && r.date.startsWith("2026") },
-        { key: "draft", label: "银行承兑", filter: (r) => r.method === "银行承兑" },
-      ],
-      defaultView: "all",
-      filters: [
-        { key: "proj", label: "项目",
-          options: [{ key: "all", label: "全部项目" }, ...projects.map((p) => ({ key: p.id, label: p.name }))],
-          match: (r, val) => r.projectId === val },
-      ],
-      searchKeys: ["no", "payer"],
-      summary: (rows) => [
-        { label: "收款金额总和", value: Math.round(rows.reduce((s, r) => s + (r.amount || 0), 0) * 100) / 100 },
-      ],
-      fromParams: (p) => {
-        if (!p.contract) return null;
-        const c = A.get("contracts", p.contract);
-        return { label: "合同：" + (c ? c.name : p.contract), filter: (r) => r.contractId === p.contract };
-      },
-      newDefaults: () => ({ method: "银行转账" }),
-      formRoute: "receiptForm",   // 整页表单（kit/forms/FinanceForms.jsx，grill 决议 2026-07-18）
-      statusKey: "status",
-      tableMinWidth: 1180,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    const rows = A.rows("receipts").map((r) => ({
+      id: r.id,
+      name: r.payer || "",                                                  // 名称=客户名（甲方付款方）
+      no: r.no || "",
+      projectName: projName(r.projectId),                                   // SQL COALESCE(project.name, '')
+      partyName: (A.get("contracts", r.contractId) || {}).name || "",       // 关联方=施工合同名
+      amount: Number(r.amount) || 0,
+      date: r.date || "",
+      status: r.status || "草稿",
+    }));
+
+    return (
+      <Std
+        title="收款登记" subtitle="合同收款事实 · 真实项目/施工合同/客户"
+        searchPlaceholder="搜索名称、编号、项目或关联方" searchKeys={["no", "name", "projectName", "partyName", "status"]}
+        createLabel="新建收款登记" onCreate={() => nav && nav("receiptForm", {})}
+        onRowOpen={(r) => nav && nav("receiptForm", { id: r.id })}
+        columns={[
+          { key: "name", label: "名称/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 160 },
+          { key: "partyName", label: "关联方/类型", minWidth: 180 },
+          { key: "amount", label: "金额", width: 140, align: "right", money: true },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"name",label:"客户"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
+        footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
+      />
+    );
   }
 
   window.ReceiptScreen = ReceiptScreen;

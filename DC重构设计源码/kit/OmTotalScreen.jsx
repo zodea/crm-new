@@ -1,46 +1,47 @@
-// OmTotalScreen — 甲供材总控量（甲供材管理组；红圈06）：EntityListScreen meta 一份生成整页。
-// 口径：甲方供货、无采购合同；总控量/已到货/已用/剩余（剩余=总控−已用，计算列）；供货方=项目甲方。
+// OmTotalScreen — 甲供材总控量（按实现端 app/components/material/MaterialListScreen.vue kind=owner_control 校准）
+// 标准单表列表：# / 材料对象(link) / 编号 / 项目 / 数量 / 日期 / 状态 / 操作(编辑+删除)；底部数量合计。
+// 筛选/分页为 #199/#200 验收条目标态（2026-08-01 裁定：实现端待补齐，设计稿先行）；其余形态铁律见 kit/StdListScreen.jsx 头注释。
 (function () {
   if (window.OmTotalScreen) return;
 
   function OmTotalScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const UI = () => window.KitUI || { confirm: (o) => o.onConfirm && o.onConfirm(), undoToast: function () {} };
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const projects = A.rows("projects");
-    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : id; };
-    const qtyCell = (v, r) => <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{Number(v || 0).toLocaleString("zh-CN")} {r.unit}</span>;
+    // 演示数据行没有 date/status 字段（总控是基准台账），按实现端兜底：日期空、状态「草稿」
+    const rows = A.rows("omTotals").map((r) => ({
+      id: r.id, name: r.material || "甲供材总控量", no: r.no || "", projectName: projName(r.projectId),
+      quantity: Number(r.totalQty) || 0, unit: r.unit || "", date: r.date || "", status: r.status || "草稿",
+    }));
 
-    const meta = {
-      entity: "omTotal", coll: "omTotals", title: "甲供材总控量",
-      formRoute: "omTotalForm",   // 整页表单（grill 决议 2026-07-18）
-      columns: [
-        { key: "no", label: "总控编号", width: 140, mono: true },
-        { key: "projectId", label: "项目", width: 140, render: (v) => <KA.EntityLink type="project" id={v} />,
-          form: { type: "select", options: projects.map((p) => p.name), toLabel: projName, toValue: (name) => ((projects.find((p) => p.name === name)) || {}).id } },
-        { key: "material", label: "甲供材料", width: 200, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
-        { key: "totalQty", label: "总控量", width: 110, align: "right", render: qtyCell, form: { type: "number" } },
-        { key: "arrivedQty", label: "已到货", width: 110, align: "right", render: qtyCell, form: { type: "number" } },
-        { key: "usedQty", label: "已领用", width: 110, align: "right", render: qtyCell, form: { type: "number" } },
-        { key: "remain", label: "剩余可用", width: 110, align: "right", noForm: true, form: false,
-          render: (v, r) => { const d = (Number(r.totalQty) || 0) - (Number(r.usedQty) || 0); return <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: d <= 0 ? "var(--danger-ink)" : "var(--ink)" }}>{d.toLocaleString("zh-CN")} {r.unit}</span>; } },
-        { key: "unit", label: "单位", width: 70 },
-        { key: "party", label: "供货方（甲方）", width: 160 },
-      ],
-      views: [{ key: "all", label: "全部" }],
-      defaultView: "all",
-      filters: [{ key: "proj", label: "项目",
-        options: [{ key: "all", label: "全部项目" }].concat(projects.map((p) => ({ key: p.id, label: p.name }))),
-        match: (r, val) => r.projectId === val }],
-      searchKeys: ["no", "material", "party"],
-      summary: (rows) => [{ label: "甲供材料项数", value: rows.length + " 项" }],
-      fromParams: (p) => { if (p && p.project) { const pr = A.get("projects", p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; } return null; },
-      newDefaults: () => ({ arrivedQty: 0, usedQty: 0 }),
-      tableMinWidth: 1260,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    return (
+      <Std
+        title="甲供材总控量" subtitle="总控、到货、领用三量对账 · 累计值不可手工修改"
+        searchPlaceholder="搜索材料、编号或项目" searchKeys={["no", "name", "projectName", "status"]}
+        createLabel="新建甲供材总控量" onCreate={() => nav && nav("omTotalForm", {})}
+        onRowOpen={(r) => nav && nav("omTotalForm", { id: r.id })}
+        onDelete={(r) => UI().confirm({
+          title: "删除甲供材总控量", confirmText: "删除", danger: true,
+          message: "确认删除「" + (r.no || r.name) + "」？已生效事实删除后，相关库存和累计量会立即重新派生。",
+          onConfirm: () => { A.softDel("omTotals", r.id); UI().undoToast("已删除「" + (r.no || r.name) + "」", () => A.restore("omTotals", r.id)); },
+        })}
+        columns={[
+          { key: "name", label: "材料/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 170 },
+          { key: "quantity", label: "数量", width: 130, align: "right", render: (v, r) => <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{Number(v).toLocaleString("zh-CN")} {r.unit}</span> },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"name",label:"材料"}, {key:"status",label:"状态"}]} tableMinWidth={1100}
+        footerSummary={(list) => ({ label: "当前数量合计", value: list.reduce((s, r) => s + r.quantity, 0).toLocaleString("zh-CN") })}
+      />
+    );
   }
 
   window.OmTotalScreen = OmTotalScreen;

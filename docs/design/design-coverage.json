@@ -5,13 +5,13 @@
     "designFormRoutes": 40,
     "designNavGroups": 9,
     "designNavLeaves": 50,
-    "designMountedScreens": 86,
+    "designMountedScreens": 88,
     "appPageFiles": 127,
     "appNavLeaves": 50,
     "covered": 127,
     "designPending": 0,
     "retired": 0,
-    "navTitleVariants": 6
+    "navTitleVariants": 7
   },
   "screenParity": [
     {
@@ -692,6 +692,12 @@
       "reason": "侧栏短名「工程量清单」；页标题「工程量清单管理」。属短名 vs 全称，保留。"
     },
     {
+      "key": "price",
+      "navLabel": "单价对比",
+      "pageTitle": "材料价格分析",
+      "reason": "短菜单名 vs 完整页标题：#207 裁定页内为四维材料价格分析，侧栏保留实现端现名「单价对比」，实现端更名后同步"
+    },
+    {
       "key": "omDirect",
       "navLabel": "直入直出",
       "pageTitle": "甲供材直入直出",
@@ -904,7 +910,7 @@
       "appNavTo": "/material/price",
       "appLabel": "单价对比",
       "designLabel": "单价对比",
-      "designPageTitle": "单价对比"
+      "designPageTitle": "材料价格分析"
     },
     {
       "key": "omTotal",

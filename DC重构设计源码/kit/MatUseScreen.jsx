@@ -1,48 +1,47 @@
-// MatUseScreen — 材料领用（出库，乙供材管理组；红圈05 材料领用）：EntityListScreen meta 一份生成整页。
-// 口径：项目/仓库/领用人/用途；无金额链（出库按数量），底部汇总=领用单数。
+// MatUseScreen — 材料领用（按实现端 app/components/material/MaterialListScreen.vue kind=mat_use 校准）
+// 标准单表列表：# / 材料对象(link) / 编号 / 项目 / 数量 / 日期 / 状态 / 操作(编辑+删除)；底部数量合计。
+// 筛选/分页为 #199/#200 验收条目标态（2026-08-01 裁定：实现端待补齐，设计稿先行）；其余形态铁律见 kit/StdListScreen.jsx 头注释。
 (function () {
   if (window.MatUseScreen) return;
 
   function MatUseScreen({ params, navigate }) {
-    const KA = window.KitAtoms || {};
-    const ELS = window.EntityListScreen;
     const A = window.APP;
-    if (!ELS || !KA.EntityLink || !A) return null;
+    const Std = window.StdListScreen;
+    if (!A || !Std) return null;
+    A.use();
+    const UI = () => window.KitUI || { confirm: (o) => o.onConfirm && o.onConfirm(), undoToast: function () {} };
+    const nav = navigate || (window.DC && window.DC.navigate);
+    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : (id || ""); };
 
-    const projects = A.rows("projects");
-    const projName = (id) => { const p = A.get("projects", id); return p ? p.name : id; };
+    // 演示数据行可能没有 status 字段（领用过账即事实），按实现端兜底为「草稿」
+    const rows = A.rows("matUses").map((r) => ({
+      id: r.id, name: r.material || "材料领用", no: r.no || "", projectName: projName(r.projectId),
+      quantity: Number(r.qty) || 0, unit: r.unit || "", date: r.date || "", status: r.status || "草稿",
+    }));
 
-    const meta = {
-      entity: "matUse", coll: "matUses", title: "材料领用",
-      formRoute: "matUseForm",   // 整页表单（grill 决议 2026-07-18）
-      columns: [
-        { key: "no", label: "领用单号", width: 150, mono: true },
-        { key: "projectId", label: "项目", width: 140, render: (v) => <KA.EntityLink type="project" id={v} />,
-          form: { type: "select", options: projects.map((p) => p.name), toLabel: projName, toValue: (name) => ((projects.find((p) => p.name === name)) || {}).id } },
-        { key: "warehouse", label: "领用仓库", width: 140, form: { type: "select", options: ["中心仓", "合和新城现场仓"] } },
-        { key: "material", label: "材料名称", width: 200, render: (v) => <span style={{ fontWeight: 700 }}>{v}</span> },
-        { key: "qty", label: "领用数量", width: 120, align: "right", render: (v, r) => <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{Number(v || 0).toLocaleString("zh-CN")} {r.unit}</span>, form: { type: "number" } },
-        { key: "unit", label: "单位", width: 70 },
-        { key: "receiver", label: "领用人", width: 96 },
-        { key: "useFor", label: "用途/部位", width: 180 },
-        { key: "date", label: "领用日期", width: 108, mono: true, form: { type: "date" } },
-      ],
-      views: [
-        { key: "all", label: "全部" },
-        { key: "center", label: "中心仓", filter: (r) => r.warehouse === "中心仓" },
-        { key: "site", label: "现场仓", filter: (r) => r.warehouse !== "中心仓" },
-      ],
-      defaultView: "all",
-      filters: [{ key: "proj", label: "项目",
-        options: [{ key: "all", label: "全部项目" }].concat(projects.map((p) => ({ key: p.id, label: p.name }))),
-        match: (r, val) => r.projectId === val }],
-      searchKeys: ["no", "material", "receiver", "useFor"],
-      summary: (rows) => [{ label: "领用单数", value: rows.length + " 单" }],
-      fromParams: (p) => { if (p && p.project) { const pr = A.get("projects", p.project); return { label: "项目：" + (pr ? pr.name : p.project), filter: (r) => r.projectId === p.project }; } return null; },
-      newDefaults: () => ({ warehouse: "中心仓" }),
-      tableMinWidth: 1360,
-    };
-    return <ELS meta={meta} params={params} navigate={navigate} />;
+    return (
+      <Std
+        title="材料领用" subtitle="乙供材出库事实 · 过账前校验实时可用库存"
+        searchPlaceholder="搜索材料、编号或项目" searchKeys={["no", "name", "projectName", "status"]}
+        createLabel="新建材料领用" onCreate={() => nav && nav("matUseForm", {})}
+        onRowOpen={(r) => nav && nav("matUseForm", { id: r.id })}
+        onDelete={(r) => UI().confirm({
+          title: "删除材料领用", confirmText: "删除", danger: true,
+          message: "确认删除「" + (r.no || r.name) + "」？已生效事实删除后，相关库存和累计量会立即重新派生。",
+          onConfirm: () => { A.softDel("matUses", r.id); UI().undoToast("已删除「" + (r.no || r.name) + "」", () => A.restore("matUses", r.id)); },
+        })}
+        columns={[
+          { key: "name", label: "材料/对象", minWidth: 220, link: true },
+          { key: "no", label: "编号", width: 170, mono: true },
+          { key: "projectName", label: "项目", minWidth: 170 },
+          { key: "quantity", label: "数量", width: 130, align: "right", render: (v, r) => <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{Number(v).toLocaleString("zh-CN")} {r.unit}</span> },
+          { key: "date", label: "日期", width: 128, mono: true },
+          { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
+        ]}
+        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"name",label:"材料"}, {key:"status",label:"状态"}]} tableMinWidth={1100}
+        footerSummary={(list) => ({ label: "当前数量合计", value: list.reduce((s, r) => s + r.quantity, 0).toLocaleString("zh-CN") })}
+      />
+    );
   }
 
   window.MatUseScreen = MatUseScreen;
