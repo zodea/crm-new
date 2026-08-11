@@ -221,9 +221,9 @@ onMounted(refresh)
         <button class="btn-secondary" :disabled="store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
         </button>
-        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后，图片原件会同时加入合并 PDF；未勾选时保留在 ZIP 的原件/图片目录">
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
           <input v-model="convertImagesToPdf" type="checkbox">
-          <span>图片转 PDF</span>
+          <span>图片另生成 PDF</span>
         </label>
         <button class="btn-secondary" :disabled="store.loading || exportingArchive || !filtered.length" @click="exportArchive">
           <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}

@@ -64,6 +64,8 @@ export interface DeliveryArchiveExportResult {
   rows: readonly DeliveryExportRow[]
   sources: readonly DeliveryArchiveSource[]
   missingRecordIds: readonly string[]
+  pdfSourceCount: number
+  imagePdfFileName: string | null
 }
 
 function rowException(
@@ -248,44 +250,6 @@ async function imageToJpeg(source: DeliveryArchiveSource): Promise<PdfPageImage>
   }
 }
 
-async function renderPdf(source: DeliveryArchiveSource): Promise<PdfPageImage[]> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
-  const loadingTask = pdfjs.getDocument({ data: source.bytes })
-  const pdf = await loadingTask.promise
-  const pages: PdfPageImage[] = []
-  try {
-    for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-      const page = await pdf.getPage(pageIndex)
-      const viewport = page.getViewport({ scale: 1.5 })
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.ceil(viewport.width))
-      canvas.height = Math.max(1, Math.ceil(viewport.height))
-      const context = canvas.getContext('2d')
-      if (!context)
-        throw new Error(`无法渲染 PDF 原件：${source.fileName}`)
-      await page.render({ canvas: null, canvasContext: context, viewport }).promise
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(value => value ? resolve(value) : reject(new Error(`无法编码 PDF 页面：${source.fileName}`)), 'image/jpeg', 0.94)
-      })
-      const bytes = new Uint8Array(await blob.arrayBuffer())
-      pages.push({
-        bytes,
-        width: canvas.width,
-        height: canvas.height,
-        widthPoints: viewport.width / 1.5,
-        heightPoints: viewport.height / 1.5,
-      })
-      page.cleanup()
-    }
-  }
-  finally {
-    await pdf.cleanup()
-    await loadingTask.destroy()
-  }
-  return pages
-}
-
 function ascii(value: string): Uint8Array {
   return new TextEncoder().encode(value)
 }
@@ -353,7 +317,7 @@ function sourceKey(record: DeliveryRecord): string {
 
 function sourcePath(source: DeliveryArchiveSource, usedPaths: Set<string>): string {
   const extension = /\.(pdf|png|jpe?g)$/i.exec(source.fileName)?.[1]?.toLowerCase() || 'bin'
-  const folder = extension === 'pdf' ? '原件/PDF' : '原件/图片'
+  const folder = isPdf(source) ? '原件/PDF' : '原件/图片'
   const originalName = sanitizeSegment(source.fileName, `${source.recordId}.${extension}`)
   const dot = originalName.lastIndexOf('.')
   const stem = dot > 0 ? originalName.slice(0, dot) : originalName
@@ -413,6 +377,31 @@ async function loadUniqueSources(
   return { sources, sourceByRecord, missingRecordIds }
 }
 
+function deliveryArchiveExplanation(
+  sources: readonly DeliveryArchiveSource[],
+  missingRecordIds: readonly string[],
+  convertImagesToPdf: boolean,
+  imagePdfFileName: string | null,
+  convertedImageCount: number,
+): Uint8Array {
+  const pdfSourceCount = sources.filter(isPdf).length
+  const imageSourceCount = sources.filter(isImage).length
+  const lines = [
+    '送货单原件包导出说明',
+    `原件共 ${sources.length} 份：PDF ${pdfSourceCount} 份，图片 ${imageSourceCount} 份。`,
+    `PDF 原件未重建或合并，均以原始字节整份保存在“原件/PDF/”；多页 PDF 和共用 PDF 不拆分、不重排，共用源只保留一份。`,
+    imagePdfFileName
+      ? `已将 ${convertedImageCount} 份图片原件另行封装为“${imagePdfFileName}”；该文件只包含图片，不包含 PDF 原件。`
+      : convertImagesToPdf
+        ? '已选择图片转 PDF，但本次没有可转换的 PNG/JPG 图片，因此未生成图片合并 PDF。'
+        : '本次未选择图片转 PDF；图片原件保持原格式保存在“原件/图片/”。',
+    missingRecordIds.length
+      ? `缺少原件的记录（${missingRecordIds.length}）：${missingRecordIds.join('、')}。缺失状态同时写入“送货单明细.xlsx”的异常说明。`
+      : '本次导出记录均已找到原件。',
+  ]
+  return new TextEncoder().encode(lines.join('\n'))
+}
+
 export async function createDeliveryArchiveZip(
   records: readonly DeliveryRecord[],
   resolvers: DeliveryExportResolvers,
@@ -420,17 +409,25 @@ export async function createDeliveryArchiveZip(
 ): Promise<DeliveryArchiveExportResult> {
   const { sources, sourceByRecord, missingRecordIds } = await loadUniqueSources(records, options.loadSource)
   const rows = deliveryLedgerRows(records, resolvers, sourceByRecord)
-  const pdfPages: PdfPageImage[] = []
-  for (const source of sources) {
-    if (isPdf(source))
-      pdfPages.push(...await renderPdf(source))
-    else if (isImage(source) && options.convertImagesToPdf)
-      pdfPages.push(await imageToJpeg(source))
-  }
+  const imageSources = options.convertImagesToPdf ? sources.filter(isImage) : []
+  const imagePages: PdfPageImage[] = []
+  for (const source of imageSources)
+    imagePages.push(await imageToJpeg(source))
+  const imagePdfFileName = imagePages.length ? '图片原件合并.pdf' : null
   const usedSourcePaths = new Set<string>()
   const zipFiles = [
     { path: '送货单明细.xlsx', data: exportDataToBytes(createDeliveryLedgerXlsx(rows)) },
-    { path: '送货单合并.pdf', data: createImagePdf(pdfPages) },
+    {
+      path: '导出说明.txt',
+      data: deliveryArchiveExplanation(
+        sources,
+        missingRecordIds,
+        options.convertImagesToPdf,
+        imagePdfFileName,
+        imagePages.length,
+      ),
+    },
+    ...(imagePdfFileName ? [{ path: imagePdfFileName, data: createImagePdf(imagePages) }] : []),
     ...sources.map(source => ({ path: sourcePath(source, usedSourcePaths), data: source.bytes })),
   ]
   return {
@@ -438,5 +435,7 @@ export async function createDeliveryArchiveZip(
     rows,
     sources,
     missingRecordIds,
+    pdfSourceCount: sources.filter(isPdf).length,
+    imagePdfFileName,
   }
 }
