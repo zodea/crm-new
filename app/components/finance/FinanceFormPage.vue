@@ -411,6 +411,30 @@ onMounted(() => void initialize())
         </div>
       </header>
 
+      <section
+        v-if="!showPaymentTypeStep && kind === 'receipt'"
+        class="mb-4 grid min-w-0 gap-3 rounded-[var(--radius-card)] border border-ok/25 bg-ok-soft px-4 py-3 sm:grid-cols-4"
+        aria-label="收款方向"
+        data-testid="receipt-direction-summary"
+      >
+        <div>
+          <span class="text-11px text-ink-faint">资金方向</span>
+          <strong class="mt-1 block text-14px text-ok-deep">收入</strong>
+        </div>
+        <div>
+          <span class="text-11px text-ink-faint">付款方</span>
+          <strong class="mt-1 block text-14px text-ink">甲方客户</strong>
+        </div>
+        <div>
+          <span class="text-11px text-ink-faint">收款方</span>
+          <strong class="mt-1 block text-14px text-ink">我方乙方</strong>
+        </div>
+        <div class="sm:text-right">
+          <span class="text-11px text-ink-faint">本次收款事实</span>
+          <strong class="mt-1 block font-mono text-16px text-ok-deep">+¥{{ Number(draft.amount || 0).toFixed(2) }}</strong>
+        </div>
+      </section>
+
       <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
         正在载入表单…
       </div>

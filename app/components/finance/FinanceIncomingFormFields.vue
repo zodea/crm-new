@@ -73,6 +73,15 @@ function fieldClass(field: string) {
           <LookupSelect :model-value="draft.customerId" :fetch="fetchCustomers" recent-key="finance-receipt-customer" placeholder="检索客户" @update:model-value="patch('customerId', $event)" />
           <span v-if="fieldErrors?.customerId" class="field-error">{{ fieldErrors.customerId }}</span>
         </div>
+        <div class="field-block">
+          <span class="field-label">收款方（我方乙方）</span>
+          <div class="field-input flex items-center bg-surface-2 text-ink-soft" data-testid="receipt-payee">
+            我方乙方
+          </div>
+          <p class="field-hint">
+            收款登记固定表示甲方客户向我方收款账户支付的真实收入。
+          </p>
+        </div>
         <label class="field-block">
           <span class="field-label">付款方账号</span>
           <input :value="draft.payerAccount" class="field-input w-full" @input="patch('payerAccount', inputValue($event))">
