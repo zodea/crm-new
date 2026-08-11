@@ -305,6 +305,8 @@ monthly_statement_lines(
 --   deleted_at     TEXT  软删除（§8）
 ```
 
+归档当前值仍写回 `invoices` 并作为台账、价格分析和打印的唯一事实。归档 action 同一事务另向 `operation_logs(table_name='invoice_archive_provenance')` 写不可变审计快照，分开保存来源信息、原始 OCR、逐字段人工修订和归档时人工确认的当前值；读取审计不得反向覆盖 `invoices` 当前值。
+
 ```sql
 -- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。
 -- project_suppliers 的 1:1 `settlements` 只表示合作关系终态关闭，不得作为付款勾稽源单。

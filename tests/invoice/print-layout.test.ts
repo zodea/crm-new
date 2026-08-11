@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPrintLayout, normalizePrintRotation, rotatePrintItems } from '~/lib/invoice/print-layout'
+import { buildPrintLayout, checkPrintableInvoice, normalizePrintRotation, rotatePrintItems } from '~/lib/invoice/print-layout'
 
 const invoices = [
   { id: 'inv-1', totalAmount: 100, printRotation: 0 },
@@ -48,5 +48,30 @@ describe('发票打印排版', () => {
     expect(page).toEqual({ 'inv-1': 90, 'inv-2': 180, 'inv-3': 0 })
     expect(normalizePrintRotation(-90)).toBe(270)
     expect(normalizePrintRotation(450)).toBe(90)
+  })
+
+  it('#257 打印队列只接收识别完成、人工确认且未重复排除的当前值', () => {
+    expect(checkPrintableInvoice({
+      id: 'confirmed',
+      totalAmount: 100,
+      printRotation: 0,
+      ocrStatus: 'done',
+      reviewStatus: 'reviewed',
+      dupStatus: 'normal',
+    })).toEqual({ ok: true })
+    expect(checkPrintableInvoice({
+      id: 'unreviewed',
+      totalAmount: 100,
+      printRotation: 0,
+      ocrStatus: 'done',
+      reviewStatus: 'unreviewed',
+      dupStatus: 'normal',
+    }).ok).toBe(false)
+
+    const layout = buildPrintLayout([
+      { ...invoices[0]!, ocrStatus: 'done', reviewStatus: 'reviewed', dupStatus: 'normal' },
+      { ...invoices[1]!, ocrStatus: 'failed', reviewStatus: 'reviewed', dupStatus: 'normal' },
+    ], new Set(['inv-1', 'inv-2']), 2, {})
+    expect(layout.pages.flat().map(slot => slot.invoice.id)).toEqual(['inv-1'])
   })
 })
