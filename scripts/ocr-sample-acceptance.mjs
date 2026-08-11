@@ -338,8 +338,8 @@ async function buildReport({ root, mode, perGroup }) {
 export {
   buildReport,
   classifyDocument,
-  classifyPath,
   classifyFormat,
+  classifyPath,
   createComparisonSkeleton,
   createSampleRecord,
   selectRepresentativeSamples,
