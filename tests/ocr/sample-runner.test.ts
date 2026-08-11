@@ -76,6 +76,11 @@ describe('ocr 真实样本运行结果摘要', () => {
       type: 'certificate',
       needsReview: false,
     })
+    expect(classifyContent('项目移交单\n入户门\n接收人：某某')).toMatchObject({
+      type: 'other',
+      needsReview: true,
+      evidenceKeywords: expect.arrayContaining(['移交单', '入户门']),
+    })
   })
 
   it('将 429 明确识别为限流，而不是请求或识别失败', () => {
@@ -201,6 +206,25 @@ describe('ocr 真实样本运行结果摘要', () => {
       await rm(fixture.root, { recursive: true, force: true })
       await rm(fixture.output, { recursive: true, force: true })
     }
+  })
+
+  it('目录与内容同类但内容证据不足时仍标记待复核', () => {
+    const summary = summarizeOcrPayload({
+      markdownPages: ['送货日期：2026-04-29'],
+    }, {
+      folderClassification: {
+        ...folderInvoice,
+        type: 'delivery',
+        evidenceKeywords: ['送货单'],
+      },
+    })
+
+    expect(summary.classificationComparison).toMatchObject({
+      status: 'needs-review',
+      folderType: 'delivery',
+      contentType: 'delivery',
+      needsReview: true,
+    })
   })
 
   it('限流耗尽本轮重试时标记 pending-retry，并在汇总中单列而非计入失败', async () => {
