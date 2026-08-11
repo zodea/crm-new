@@ -200,6 +200,12 @@ export function financeFormPath(kind: F3FormKind, id?: string): string {
   return id ? `${base}/${id}` : `${base}/new`
 }
 
+export function financeDetailPath(kind: F3FormKind, id: string): string {
+  if (kind === 'payment_application')
+    return `/finance/payment/${id}/detail`
+  return financeFormPath(kind, id)
+}
+
 export function validateFinanceForm(
   kind: F3FormKind,
   draft: FinancePageDraft,

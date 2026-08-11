@@ -1,6 +1,6 @@
 # 付款申请 — 10 类业务表单 + 结算/发票勾稽
 
-> 路由：`/finance/payment` · `/finance/payment/new` · `/finance/payment/:id`
+> 路由：`/finance/payment` · `/finance/payment/new` · `/finance/payment/:id`（编辑）· `/finance/payment/:id/detail`（只读详情）
 > 设计来源：`DC重构设计源码/kit/PayApplyScreen.jsx` · `kit/forms/FinanceForms.jsx` 的 `payApplyForm`
 > 表单形态：[ADR 0014](../../adr/0014-full-page-entity-forms.md) 整页实体表单
 > 持久化与勾稽：[ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md)
@@ -112,7 +112,8 @@
 
 - 默认视图可继续按待追回发票筛选，但显示值必须由回票类型与待回票金额派生。
 - 列表至少展示编号、名称、类型、项目/收款单位、申请/批复/已付金额、回票状态、支付状态、申请日期。
-- 详情分别显示合同聚合、结算分摊、发票分摊与支付记录分摊；每笔支付显示回单、金额、日期、人工确认状态和本申请分摊金额。源单号使用 EntityLink，下钻到真实源单。
+- 点击列表名称进入只读详情；编辑动作仍进入 `/finance/payment/:id` 整页表单。详情分别显示合同聚合、结算分摊、发票分摊与支付记录分摊；每笔支付显示回单、金额、日期、人工确认状态和本申请分摊金额。源单号使用 EntityLink，下钻到真实源单。
+- 详情页的智能业务洞察只读取真实源单实时派生审批状态、结算/发票勾稽、付款上限和跨项目/分供方摘要；没有审批数据时不补造审批人、时间线或评论。
 - 金额穿透遵守全站 MoneyLink 契约，0/空退化为普通文本。
 
 ---

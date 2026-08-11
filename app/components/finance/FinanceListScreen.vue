@@ -3,7 +3,7 @@ import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
-import { F3_FORM_META, financeFormPath } from '~/lib/finance/page'
+import { F3_FORM_META, financeDetailPath, financeFormPath } from '~/lib/finance/page'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -118,6 +118,10 @@ function openEdit(row: FinanceListRow) {
   void navigateTo(financeFormPath(props.kind, row.id))
 }
 
+function openDetail(row: FinanceListRow) {
+  void navigateTo(financeDetailPath(props.kind, row.id))
+}
+
 onMounted(() => {
   void load()
 })
@@ -164,7 +168,7 @@ onActivated(() => {
         @page-change="onPageChange"
       >
         <template #name="{ row }">
-          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
+          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
             {{ row.name || (isReceipt ? '待补充甲方客户' : '未命名记录') }}
           </button>
         </template>
