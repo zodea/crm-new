@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildReport,
   classifyDocument,
+  classifyPath,
   classifyFormat,
   createComparisonSkeleton,
   selectRepresentativeSamples,
@@ -11,7 +12,21 @@ describe('ocr 本地样本验收清单', () => {
   it('按路径区分发票和送货单，未知资料不猜测', () => {
     expect(classifyDocument('发票/专用发票/供应商.pdf')).toBe('invoice')
     expect(classifyDocument('合和新城送货单/送货单-001.jpg')).toBe('delivery')
-    expect(classifyDocument('分供方附件/营业执照.pdf')).toBe('unknown')
+    expect(classifyDocument('分供方附件/营业执照.pdf')).toBe('certificate')
+  })
+
+  it('目录分类保留证据与待复核状态，不把路径当作业务事实', () => {
+    expect(classifyPath('发票/合同-补充协议.pdf')).toMatchObject({
+      type: 'unknown',
+      needsReview: true,
+      evidenceKeywords: expect.arrayContaining(['发票', '合同', '补充协议']),
+      source: 'folder-and-file-name',
+    })
+    expect(classifyPath('分供方附件/营业执照.pdf')).toMatchObject({
+      type: 'certificate',
+      confidence: expect.any(Number),
+      evidenceKeywords: ['营业执照'],
+    })
   })
 
   it('按扩展名区分 PDF 和图片，不支持格式返回空值', () => {

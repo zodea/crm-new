@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, parse, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
@@ -15,11 +13,23 @@ const SUPPORTED_EXTENSIONS = new Map([
 const DOCUMENT_TYPE_RULES = [
   {
     type: 'invoice',
-    keywords: ['发票', 'invoice', '税票'],
+    keywords: ['发票', '专用发票', '普通发票', '增值税', 'invoice', '税票'],
   },
   {
     type: 'delivery',
-    keywords: ['送货', '送货单', 'delivery', '收料单', '入库单'],
+    keywords: ['送货', '送货单', 'delivery', '收料单', '收料', '入库单', '到货'],
+  },
+  {
+    type: 'contract',
+    keywords: ['合同', '补充协议', '协议书', '采购合同', '供货合同', 'contract', 'agreement'],
+  },
+  {
+    type: 'certificate',
+    keywords: ['营业执照', '统一社会信用代码', '证照', '公司资料', '资质证书', '许可证', 'certificate', 'license'],
+  },
+  {
+    type: 'other',
+    keywords: ['其他', '其它', '杂项', '待归类', '待分类', 'other', 'misc'],
   },
 ]
 
@@ -43,6 +53,9 @@ const COMPARISON_FIELDS = {
     'receiver',
     'siteName',
   ],
+  contract: ['contractNumber', 'partyA', 'partyB', 'signDate'],
+  certificate: ['companyName', 'unifiedSocialCreditCode', 'legalRepresentative'],
+  other: [],
   unknown: [],
 }
 
@@ -143,14 +156,41 @@ function normalizeForMatching(value) {
 }
 
 function classifyDocument(relativePath) {
+  return classifyPath(relativePath).type
+}
+
+function classifyPath(relativePath) {
   const matchingPath = normalizeForMatching(relativePath)
   const matches = DOCUMENT_TYPE_RULES
-    .filter(rule => rule.keywords.some(keyword => matchingPath.includes(normalizeForMatching(keyword))))
-    .map(rule => rule.type)
+    .map(rule => ({
+      type: rule.type,
+      keywords: rule.keywords.filter(keyword => matchingPath.includes(normalizeForMatching(keyword))),
+    }))
+    .filter(match => match.keywords.length > 0)
 
-  if (matches.length === 1)
-    return matches[0]
-  return 'unknown'
+  const evidenceKeywords = matches.flatMap(match => match.keywords)
+  const candidates = matches.map(match => match.type)
+
+  if (matches.length === 1) {
+    const type = matches[0].type
+    return {
+      type,
+      confidence: type === 'other' ? 0.72 : 0.9,
+      evidenceKeywords,
+      candidates,
+      needsReview: type === 'other',
+      source: 'folder-and-file-name',
+    }
+  }
+
+  return {
+    type: 'unknown',
+    confidence: 0,
+    evidenceKeywords,
+    candidates,
+    needsReview: true,
+    source: 'folder-and-file-name',
+  }
 }
 
 function classifyFormat(filePath) {
@@ -199,12 +239,14 @@ function createComparisonSkeleton(documentType) {
 function createSampleRecord(filePath, rootDirectory) {
   const relativePath = relative(rootDirectory, filePath)
   const format = classifyFormat(filePath)
-  const documentType = classifyDocument(relativePath)
+  const folderClassification = classifyPath(relativePath)
+  const documentType = folderClassification.type
   return {
     id: `${documentType}:${format}:${relativePath}`,
     relativePath: relativePath.split(sep).join('/'),
     fileName: basename(filePath),
     documentType,
+    folderClassification,
     format,
     sizeBytes: null,
     scenarioTags: scenarioTags(relativePath),
@@ -263,6 +305,12 @@ function summarize(samples, selectedSamples, rootDirectory, mode) {
       lineItemFields: COMPARISON_LINE_FIELDS,
       differences: '只记录差异摘要与待复核字段，不写入完整 OCR 原文。',
     },
+    classificationContract: {
+      folderClassification: '仅根据目录与文件名生成候选，不作为业务事实。',
+      contentClassification: '仅根据 OCR 文本中的脱敏关键词与结构信号生成独立候选。',
+      conflictAction: '只列出安全摘要并标记待复核，不自动移动原件或修改业务数据。',
+      supportedTypes: ['invoice', 'delivery', 'contract', 'certificate', 'other', 'unknown'],
+    },
     samples: selectedSamples,
   }
 }
@@ -290,6 +338,7 @@ async function buildReport({ root, mode, perGroup }) {
 export {
   buildReport,
   classifyDocument,
+  classifyPath,
   classifyFormat,
   createComparisonSkeleton,
   createSampleRecord,
