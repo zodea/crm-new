@@ -13,7 +13,7 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
-import { deliveryNaturalKey, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
+import { deliveryNaturalKey, hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
 
 export interface DeliveryLineDraft {
@@ -77,7 +77,13 @@ export interface DeliveryRecordInput {
   fileName?: string
   filePath?: string
   printBatchId?: string
+  confirmations?: DeliveryRecordConfirmations
   lines: DeliveryLineDraft[]
+}
+
+export interface DeliveryRecordConfirmations {
+  noOrderNoConfirmed?: boolean
+  pricePendingConfirmed?: boolean
 }
 
 export interface DeliveryRecordSourceFile {
@@ -237,6 +243,35 @@ function validateInput(input: DeliveryRecordInput): NormalizedDeliveryLineDraft[
   if (!lines.length)
     throw new Error('至少添加一条材料明细')
   return lines
+}
+
+const MANAGED_REVIEW_FLAGS = new Set(['原件无单号', '价格待补录'])
+
+function reviewFlagTokens(values: readonly (string | undefined)[]): string[] {
+  return values.flatMap(value => (value ?? '').split(/[；;]/))
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function deriveReviewFlag(
+  orderNo: string,
+  lines: readonly NormalizedDeliveryLineDraft[],
+  confirmations: DeliveryRecordConfirmations | undefined,
+  ...existingFlags: (string | undefined)[]
+): string {
+  const tokens = reviewFlagTokens(existingFlags)
+    .filter(token => !MANAGED_REVIEW_FLAGS.has(token))
+  if (!orderNo) {
+    if (confirmations?.noOrderNoConfirmed !== true)
+      throw new Error('缺少送货单号，请先确认原件确实无单号')
+    tokens.push('原件无单号')
+  }
+  if (hasDeliveryPricePending(lines)) {
+    if (confirmations?.pricePendingConfirmed !== true)
+      throw new Error('缺少单价或金额，请先确认按“价格待补录”归档')
+    tokens.push('价格待补录')
+  }
+  return [...new Set(tokens)].join('；')
 }
 
 function rowToLine(row: Record<string, unknown>, currentValueConfirmed: boolean): DeliveryLine {
@@ -475,6 +510,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     await withTransaction(async (tx) => {
+      const reviewFlag = deriveReviewFlag(orderNo, lines, input.confirmations, input.reviewFlag)
       await assertDeliveryNaturalKeyAvailable(tx, input)
       await tx.execute(
         `INSERT INTO delivery_records
@@ -492,7 +528,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
           printBatchId,
-          input.reviewFlag?.trim() ?? '',
+          reviewFlag,
           input.note.trim(),
           now,
           now,
@@ -586,16 +622,32 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     const logId = await withTransaction(async (tx) => {
+      const [existing] = await tx.select<{ review_flag: string | null }>(
+        `SELECT review_flag
+         FROM delivery_records
+         WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (!existing)
+        return null
+      const reviewFlag = deriveReviewFlag(
+        orderNo,
+        lines,
+        input.confirmations,
+        existing.review_flag ?? '',
+        input.reviewFlag,
+      )
       await assertDeliveryNaturalKeyAvailable(tx, input, id)
       const updateLogId = await withUpdateLog(tx, 'delivery_records', id, () => tx.execute(
         `UPDATE delivery_records
-         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, note=?, updated_at=?
+         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, review_flag=?, note=?, updated_at=?
          WHERE id=?`,
         [
           input.projectId,
           input.supplierId || null,
           orderNo || null,
           input.deliveryDate,
+          reviewFlag,
           input.note.trim(),
           now,
           id,

@@ -3,7 +3,7 @@ import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import type { DeliveryPrintDisposition } from '~/stores/delivery-record'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef } from 'vue'
-import { deliveryNaturalKey, deliveryReviewIssues, hasDeliveryPricePending, normalizeDeliveryOrderNo, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { deliveryNaturalKey, deliveryReviewIssues, normalizeDeliveryOrderNo, summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
 import { recognizeDocument } from '~/lib/recognize/engine'
 import { prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
@@ -505,8 +505,6 @@ export const useDeliveryStore = defineStore('delivery', () => {
       throw new Error('原文件已不在当前会话，请重新上传')
 
     const reviewFlags = [
-      hasDeliveryPricePending(items) ? '价格待补录' : '',
-      !orderNo ? '原件无单号' : '',
       document.quality !== 'normal' ? `${document.quality}已人工复核` : '',
       amountSummary.mismatchedLineIds.length || amountSummary.statedBalanced === false
         ? '金额已人工复核'
@@ -522,6 +520,10 @@ export const useDeliveryStore = defineStore('delivery', () => {
       printBatchId: file.printBatchId,
       note: normalizedInput.note,
       reviewFlag: reviewFlags,
+      confirmations: {
+        noOrderNoConfirmed: normalizedInput.confirmations?.noOrderNoConfirmed === true,
+        pricePendingConfirmed: normalizedInput.confirmations?.humanReviewed === true,
+      },
       lines: items.map(item => ({
         materialName: item.name,
         spec: item.spec,

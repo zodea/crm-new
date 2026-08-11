@@ -3,6 +3,7 @@ import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type { DeliveryLineDraft, DeliveryRecordInput } from '~/stores/delivery-record'
 import { onBeforeRouteLeave } from 'vue-router'
+import { hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -143,6 +144,30 @@ async function save() {
     warning('至少填写一条材料明细')
     return
   }
+  const confirmations = {
+    noOrderNoConfirmed: false,
+    pricePendingConfirmed: false,
+  }
+  if (!normalizeDeliveryOrderNo(draft.value.orderNo)) {
+    confirmations.noOrderNoConfirmed = await confirm({
+      variant: 'simple',
+      title: '确认原件确实无单号',
+      message: '当前送货单号为空。请再次对照原件，只有原件确实没有单号时才可按无单号归档。',
+      confirmLabel: '确认无单号',
+    })
+    if (!confirmations.noOrderNoConfirmed)
+      return
+  }
+  if (hasDeliveryPricePending(lines)) {
+    confirmations.pricePendingConfirmed = await confirm({
+      variant: 'simple',
+      title: '确认按价格待补录归档',
+      message: '当前至少一条明细缺少单价或金额。确认后仍可归档，但会标记为“价格待补录”，且在补齐前不进入材料价格分析。',
+      confirmLabel: '确认待补录',
+    })
+    if (!confirmations.pricePendingConfirmed)
+      return
+  }
   const current = record.value
   if (!isCreate.value) {
     if (!current)
@@ -165,6 +190,7 @@ async function save() {
       orderNo: draft.value.orderNo,
       deliveryDate: draft.value.deliveryDate,
       note: draft.value.note,
+      confirmations,
       lines: lines.map(({ key: _key, ...line }): DeliveryLineDraft => line),
     }
     let savedId: string
