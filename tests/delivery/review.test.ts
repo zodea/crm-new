@@ -55,7 +55,7 @@ describe('送货单人工复核金额', () => {
     expect(editDeliveryAmountLine(amountOnly, 'qty', Number.NaN)).toMatchObject({ qty: null, amount: 386 })
   })
 
-  it('#257 识别未完成、自然键重复或人工确认金额缺失时不得归档', () => {
+  it('#257 识别未完成和自然键重复仍阻断，缺价格经人工确认后允许归档', () => {
     const base = {
       projectId: 'project-1',
       supplierId: 'supplier-1',
@@ -83,6 +83,64 @@ describe('送货单人工复核金额', () => {
       ...base,
       note: '',
       items: [{ ...base.items[0]!, amount: null }],
-    }).some(issue => issue.key === 'amount')).toBe(true)
+    })).toEqual([])
+  })
+
+  it('材料名称、单位和非零数量继续作为归档硬门禁', () => {
+    const base = {
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'DL-002',
+      deliveryDate: '2026-06-02',
+      docType: '材料送货单',
+      note: '',
+      items: [{
+        id: 'line-1',
+        name: 'BV 电线',
+        unit: 'm',
+        qty: 10,
+        unitPrice: null,
+        amount: null,
+        amountSource: 'manual' as const,
+      }],
+      confirmations: { humanReviewed: true },
+    }
+
+    for (const item of [
+      { ...base.items[0]!, name: '' },
+      { ...base.items[0]!, unit: '' },
+      { ...base.items[0]!, qty: 0 },
+    ]) {
+      expect(deliveryReviewIssueDetails({ ...base, items: [item] })
+        .some(issue => issue.key === 'items')).toBe(true)
+    }
+  })
+
+  it('金额与数量乘单价不一致时仍需人工复核并记录原因', () => {
+    const input = {
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'DL-003',
+      deliveryDate: '2026-06-03',
+      docType: '材料送货单',
+      note: '',
+      items: [{
+        id: 'line-1',
+        name: 'BV 电线',
+        unit: 'm',
+        qty: 10,
+        unitPrice: 2.5,
+        amount: 20,
+        amountSource: 'manual' as const,
+      }],
+      confirmations: { humanReviewed: true },
+    }
+
+    expect(deliveryReviewIssueDetails(input).some(issue => issue.key === 'amount')).toBe(true)
+    expect(deliveryReviewIssueDetails({
+      ...input,
+      note: '已对照原件，票面金额按 20 元保留',
+      confirmations: { humanReviewed: true, amountReviewed: true },
+    }).some(issue => issue.key === 'amount')).toBe(false)
   })
 })

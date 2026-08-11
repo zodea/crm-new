@@ -164,15 +164,13 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'items', label: '至少保留一条材料明细' })
 
   const invalidAmountLines = input.items.filter(item =>
-    item.amount == null
-    || !Number.isFinite(item.amount)
-    || item.amount < 0
+    (item.amount != null && (!Number.isFinite(item.amount) || item.amount < 0))
     || (item.unitPrice != null && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0)),
   )
   if (invalidAmountLines.length) {
-    issues.push({ key: 'amount', label: '每条材料明细必须保留人工确认后的有效金额；缺失或异常金额不能归档' })
+    issues.push({ key: 'amount', label: '单价或金额存在异常数值，必须人工修正后才能归档' })
     if (!input.note.trim())
-      issues.push({ key: 'amount', label: '金额缺失或异常必须记录保留票面金额或修正金额的原因' })
+      issues.push({ key: 'amount', label: '单价或金额异常必须记录保留票面值或修正值的原因' })
   }
 
   const summary = summarizeDeliveryAmounts(input.items, input.statedTotal ?? null)
