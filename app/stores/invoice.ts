@@ -4,6 +4,8 @@ import type {
   InvoiceArchiveAuditRecord,
   InvoiceArchiveProvenance,
 } from '~/lib/invoice/archive'
+import type { InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
+import type { InvoiceExportSettingsDatabase } from '~/lib/invoice/preferences'
 import type { InvoiceItem } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
@@ -13,6 +15,8 @@ import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, logOperation, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkInvoiceArchiveReady, checkNotDuplicate } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
+import { createDefaultInvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
+import { loadInvoiceExportStyleSetting, saveInvoiceExportStyleSetting } from '~/lib/invoice/preferences'
 import { normalizePrintRotation } from '~/lib/invoice/print-layout'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
 import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
@@ -238,6 +242,8 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const list = shallowRef<Invoice[]>([])
   const archivedAggregateRows = shallowRef<ArchivedInvoiceAggregate[]>([])
   const loading = shallowRef(false)
+  const invoiceExportStyle = shallowRef<InvoiceXlsxStyleConfig>(createDefaultInvoiceXlsxStyleConfig())
+  const invoiceExportStyleLoaded = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
   /** 原文件仅保留在当前应用会话，不写入 SQLite，也不进入 Vue 响应式代理。 */
@@ -319,6 +325,21 @@ export const useInvoiceStore = defineStore('invoice', () => {
     )
     const snapshot = parseOperationSnapshot(row?.after_data ?? null)
     return snapshot as InvoiceArchiveAuditRecord | null
+  }
+
+  async function loadInvoiceExportStyle(database: InvoiceExportSettingsDatabase = db) {
+    invoiceExportStyle.value = await loadInvoiceExportStyleSetting(database)
+    invoiceExportStyleLoaded.value = true
+    return invoiceExportStyle.value
+  }
+
+  async function saveInvoiceExportStyle(
+    next: InvoiceXlsxStyleConfig,
+    database: InvoiceExportSettingsDatabase = db,
+  ) {
+    invoiceExportStyle.value = await saveInvoiceExportStyleSetting(database, next)
+    invoiceExportStyleLoaded.value = true
+    return invoiceExportStyle.value
   }
 
   async function markRecognitionFailed(inv: Invoice) {
@@ -763,5 +784,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), recognitionError, load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
 })

@@ -274,6 +274,7 @@ monthly_statement_lines(
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | Invoice | `invoices` | `id` | `finance-invoice.md`（识别+台账**单表**，ADR-0001；归属：项目 或 个人开支） |
+| InvoiceExportSetting | `invoice_export_settings` | `id='default'` | ADR 0004（发票 XLSX 默认样式，本机单例） |
 | InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（销项=开票申请） |
 | ReceiptRegistration | `receipt_registrations` | `id` | `finance-receipt.md` |
 | ExpenditureSettlement | `expenditure_settlements` | `id` | 支出合同过程/完工结算统一源单；与 `project_suppliers` 终态关闭用的 `settlements` 不同 |
@@ -306,6 +307,8 @@ monthly_statement_lines(
 ```
 
 归档当前值仍写回 `invoices` 并作为台账、价格分析和打印的唯一事实。归档 action 同一事务另向 `operation_logs(table_name='invoice_archive_provenance')` 写不可变审计快照，分开保存来源信息、原始 OCR、逐字段人工修订和归档时人工确认的当前值；读取审计不得反向覆盖 `invoices` 当前值。
+
+`invoice_export_settings` 是发票领域的本机单例配置表（迁移 v41），`settings_json` 保存发票台账 XLSX 的行列尺寸、字体、边框、格式、冻结与合并默认值。业务预览只保留本次草稿；保存和加载必须经 invoice store action 进入 SQLite，浏览器开发态随数据库 snapshot fallback 持久化，不再另写 `localStorage`，也不得复用只属于 OCR 的 `ocr_settings`。
 
 ```sql
 -- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。

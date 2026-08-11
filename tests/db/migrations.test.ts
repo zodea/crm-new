@@ -15,6 +15,7 @@ const BASELINE_TABLES = [
   'projects',
   'suppliers',
   'invoices',
+  'invoice_export_settings',
   'crews',
   'supplier_credentials',
   'supplier_credential_requirements',
@@ -262,6 +263,34 @@ describe('迁移机制：版本化顺序迁移', () => {
       { version: 1, name: 'b', up: async () => {} },
     ]
     await expect(runMigrations(db, list)).rejects.toThrow('版本号重复')
+    db.close()
+  })
+})
+
+describe('v41 发票导出设置', () => {
+  it('从 v40 存量库升级时创建独立设置表', async () => {
+    const db = await createMemoryDb()
+    await db.execute(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        applied_at TEXT DEFAULT (datetime('now'))
+      )
+    `)
+    await db.execute(`
+      INSERT INTO schema_migrations (version, name)
+      VALUES (40, 'monthly-statement-source-audit')
+    `)
+
+    const result = await runMigrations(db)
+
+    expect(result).toMatchObject({ from: 40, to: 41 })
+    expect(await listTables(db)).toContain('invoice_export_settings')
+    expect(await columnNames(db, 'invoice_export_settings')).toEqual([
+      'id',
+      'settings_json',
+      'updated_at',
+    ])
     db.close()
   })
 })
