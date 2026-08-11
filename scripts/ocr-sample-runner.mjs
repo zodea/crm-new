@@ -31,11 +31,11 @@ const CONTENT_CLASSIFICATION_RULES = [
   },
   {
     type: 'certificate',
-    keywords: ['营业执照', '统一社会信用代码', '法定代表人', '注册资本', '经营范围', '开户许可证', '资质证书', '许可证', '公司资料'],
+    keywords: ['营业执照', '统一社会信用代码', '法定代表人', '注册资本', '经营范围', '开户许可证', '资质证书', '许可证', '公司资料', '身份证', '居民身份证', '公民身份号码'],
   },
   {
     type: 'other',
-    keywords: ['报价单', '对账单', '结算单', '付款申请', '银行回单', '验收报告', '会议纪要', '项目清单'],
+    keywords: ['报价单', '对账单', '结算单', '付款申请', '银行回单', '验收报告', '会议纪要', '项目清单', '移交单', '移交记录', '交接单', '入户门'],
   },
 ]
 
@@ -176,7 +176,7 @@ function roundConfidence(value) {
 function classifyContent(text) {
   const normalizedText = String(text ?? '').toLocaleLowerCase('zh-CN')
   const ranked = CONTENT_CLASSIFICATION_RULES
-    .map(rule => {
+    .map((rule) => {
       const evidenceKeywords = rule.keywords.filter(keyword =>
         normalizedText.includes(keyword.toLocaleLowerCase('zh-CN')),
       )
@@ -256,13 +256,16 @@ function compareClassifications(folderClassification, contentClassification) {
       suggestionAction: 'OCR 内容证据不足，保留目录候选并人工查看原件；不要据此写入业务数据。',
     }
   }
+  const needsReview = Boolean(folderClassification?.needsReview || contentClassification?.needsReview)
   return {
-    status: 'consistent',
+    status: needsReview ? 'needs-review' : 'consistent',
     kind: null,
     folderType,
     contentType,
-    needsReview: Boolean(folderClassification?.needsReview || contentClassification?.needsReview),
-    suggestionAction: null,
+    needsReview,
+    suggestionAction: needsReview
+      ? '目录与内容候选暂未冲突，但证据不足或存在低置信信号；保留原文件并人工复核。'
+      : null,
   }
 }
 
@@ -306,10 +309,6 @@ function ocrMarkdownPages(payload) {
       : []
 }
 
-function ocrText(payload) {
-  return ocrMarkdownPages(payload).join('\n')
-}
-
 function folderClassificationFor(input) {
   if (input && typeof input === 'object' && input.folderClassification)
     return input.folderClassification
@@ -346,8 +345,8 @@ function localParserComparison({ text, markdownPages, folderClassification, cont
   const parserType = ['invoice', 'delivery'].includes(folderClassification.type)
     ? folderClassification.type
     : ['invoice', 'delivery'].includes(contentClassification.type)
-      ? contentClassification.type
-      : null
+        ? contentClassification.type
+        : null
   if (!parserType) {
     return {
       status: 'not-applicable',
@@ -732,7 +731,9 @@ async function run(options, dependencies = {}) {
   async function waitForRequestSlot() {
     const previous = requestGate.tail
     let release
-    requestGate.tail = new Promise(resolve => { release = resolve })
+    requestGate.tail = new Promise((resolve) => {
+      release = resolve
+    })
     await previous
     try {
       const delay = Math.max(0, requestGate.nextAllowedAt - now())
