@@ -2,6 +2,7 @@ import type { DeliveryRecord } from '~/stores/delivery-record'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as XLSX from 'xlsx'
 import { createDeliveryArchiveZip, createDeliveryLedgerXlsx, deliveryLedgerRows } from '~/lib/delivery/export'
+import { DELIVERY_EXPORT_JPEG_BASE64, DELIVERY_EXPORT_PNG_BASE64 } from '../fixtures/delivery-export-images'
 
 function record(overrides: Partial<DeliveryRecord> = {}): DeliveryRecord {
   return {
@@ -69,8 +70,9 @@ function zipEntries(data: Uint8Array): { name: string, data: Uint8Array }[] {
   return entries
 }
 
-function hexBytes(value: string): Uint8Array {
-  return new Uint8Array(value.match(/.{2}/g)?.map(byte => Number.parseInt(byte, 16)) ?? [])
+function base64Bytes(value: string): Uint8Array {
+  const binary = atob(value)
+  return Uint8Array.from(binary, character => character.charCodeAt(0))
 }
 
 describe('送货单 Excel 导出', () => {
@@ -214,11 +216,10 @@ describe('送货单 Excel 导出', () => {
     expect(new TextDecoder().decode(explanation?.data)).toContain('PDF 原件未重建或合并')
   })
 
-  it('勾选图片转 PDF 时真实走完 PNG/JPG 解码、画布编码与 PDF 封装且不栅格化 PDF 原件', async () => {
-    const pngBytes = hexBytes('89504E470D0A1A0A0000000D494844520000000100000001')
-    const jpgBytes = hexBytes('FFD8FFE000104A46494600010100000100010000FFD9')
+  it('用浏览器 API 边界替身覆盖 PNG/JPG 到图片 PDF 的生产编排且不栅格化 PDF 原件', async () => {
+    const pngBytes = base64Bytes(DELIVERY_EXPORT_PNG_BASE64)
+    const jpgBytes = base64Bytes(DELIVERY_EXPORT_JPEG_BASE64)
     const pdfBytes = new TextEncoder().encode('%PDF-1.7\n% keep original objects\n%%EOF')
-    const encodedJpeg = hexBytes('FFD8FFC00011080001000103011100021100031100FFD9')
     const records = [
       record({ id: 'image-png', orderNo: 'IMG-001', fileName: '原件.png', hasSourceFile: true, printBatchId: 'image-png' }),
       record({ id: 'image-jpg', orderNo: 'IMG-002', fileName: '原件.jpg', hasSourceFile: true, printBatchId: 'image-jpg' }),
@@ -234,7 +235,7 @@ describe('送货单 Excel 导出', () => {
     const drawImage = vi.fn()
     const fillRect = vi.fn()
     const toBlob = vi.fn((callback: BlobCallback) => {
-      callback(new Blob([encodedJpeg], { type: 'image/jpeg' }))
+      callback(new Blob([jpgBytes], { type: 'image/jpeg' }))
     })
     const canvas = {
       width: 0,
