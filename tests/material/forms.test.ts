@@ -62,6 +62,15 @@ beforeEach(async () => {
     VALUES ('supplier-material', '材料分供方', 'approved')
   `)
   await mem.execute(`
+    UPDATE suppliers
+    SET supplier_category = '材料供应商'
+    WHERE id = 'supplier-material'
+  `)
+  await mem.execute(`
+    INSERT INTO project_suppliers (id, project_id, supplier_id, status)
+    VALUES ('project-supplier-material', 'project-material', 'supplier-material', 'contracted')
+  `)
+  await mem.execute(`
     INSERT INTO crews (id, name, status)
     VALUES ('crew-material', '材料班组', '在场')
   `)
