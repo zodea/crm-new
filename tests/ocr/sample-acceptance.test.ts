@@ -1,9 +1,12 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   buildReport,
   classifyDocument,
-  classifyPath,
   classifyFormat,
+  classifyPath,
   createComparisonSkeleton,
   selectRepresentativeSamples,
 } from '../../scripts/ocr-sample-acceptance.mjs'
@@ -63,22 +66,35 @@ describe('ocr 本地样本验收清单', () => {
     ])
   })
 
-  it('扫描真实样本时只输出元数据和对照骨架，不包含 OCR 原文', async () => {
-    const report = await buildReport({
-      root: '需过滤文件夹',
-      mode: 'representative',
-      perGroup: 1,
-    })
+  it('扫描本地样本时只输出元数据和对照骨架，不依赖私有样本目录', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'crm-ocr-acceptance-'))
+    try {
+      const invoiceDirectory = join(root, '发票')
+      const deliveryDirectory = join(root, '送货单')
+      await mkdir(invoiceDirectory)
+      await mkdir(deliveryDirectory)
+      await writeFile(join(invoiceDirectory, 'invoice.pdf'), '%PDF-1.4\n')
+      await writeFile(join(deliveryDirectory, 'delivery.jpg'), 'synthetic-image-fixture')
 
-    expect(report.safety).toEqual({
-      callsOcrApi: false,
-      includesRawOcr: false,
-      includesFileContent: false,
-      productDataMutation: false,
-    })
-    expect(report.totals.supportedFiles).toBeGreaterThan(0)
-    expect(report.totals.selectedFiles).toBeGreaterThan(0)
-    expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
-    expect(JSON.stringify(report)).not.toContain('accessToken')
+      const report = await buildReport({
+        root,
+        mode: 'representative',
+        perGroup: 1,
+      })
+
+      expect(report.safety).toEqual({
+        callsOcrApi: false,
+        includesRawOcr: false,
+        includesFileContent: false,
+        productDataMutation: false,
+      })
+      expect(report.totals.supportedFiles).toBe(2)
+      expect(report.totals.selectedFiles).toBe(2)
+      expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
+      expect(JSON.stringify(report)).not.toContain('accessToken')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
