@@ -253,4 +253,17 @@ describe('桌面导出目录适配器', () => {
       .toThrow('当前目录权限不允许创建导出子目录')
     expect(root.getDirectoryHandle).not.toHaveBeenCalled()
   })
+
+  it('浏览器没有 File System Access API 时返回明确的不支持目录目标', async () => {
+    vi.mocked(isTauri).mockReturnValue(false)
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('document', {})
+
+    const target = await pickExportDirectory({ recursive: true })
+
+    expect(target).toMatchObject({
+      displayPath: '浏览器下载',
+      supportsSubdirectories: false,
+    })
+  })
 })

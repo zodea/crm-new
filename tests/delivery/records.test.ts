@@ -8,36 +8,43 @@ import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 let mem: TestDb
 let failTransactionSql: RegExp | null = null
+let transactionQueue: Promise<void> = Promise.resolve()
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),
-  withTransaction: async <T>(work: (tx: TestDb) => Promise<T>) => {
-    await mem.execute('BEGIN')
-    try {
-      const result = await work({
-        ...mem,
-        async execute(sql, params) {
-          if (failTransactionSql?.test(sql))
-            throw new Error('injected transaction failure')
-          return mem.execute(sql, params)
-        },
-        async select<T>(sql: string, params?: unknown[]) {
-          return mem.select<T>(sql, params)
-        },
-      })
-      await mem.execute('COMMIT')
-      return result
+  withTransaction: <T>(work: (tx: TestDb) => Promise<T>) => {
+    const operation = async () => {
+      await mem.execute('BEGIN')
+      try {
+        const result = await work({
+          ...mem,
+          async execute(sql, params) {
+            if (failTransactionSql?.test(sql))
+              throw new Error('injected transaction failure')
+            return mem.execute(sql, params)
+          },
+          async select<T>(sql: string, params?: unknown[]) {
+            return mem.select<T>(sql, params)
+          },
+        })
+        await mem.execute('COMMIT')
+        return result
+      }
+      catch (error) {
+        await mem.execute('ROLLBACK')
+        throw error
+      }
     }
-    catch (error) {
-      await mem.execute('ROLLBACK')
-      throw error
-    }
+    const result = transactionQueue.then(operation, operation)
+    transactionQueue = result.then(() => undefined, () => undefined)
+    return result
   },
 }))
 
 beforeEach(async () => {
   failTransactionSql = null
+  transactionQueue = Promise.resolve()
   mem = await createMemoryDb()
   await runMigrations(mem)
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城')`)
@@ -342,6 +349,7 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       orderNo: 'FEE-NULL-001',
       deliveryDate: '2026-07-17',
       note: '费用凭证',
+      confirmations: { pricePendingConfirmed: true },
       lines: [{
         materialName: '卸货服务费',
         spec: '',
@@ -373,6 +381,7 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       orderNo: 'SH-NULL-AMOUNT-001',
       deliveryDate: '2026-07-17',
       note: '',
+      confirmations: { pricePendingConfirmed: true },
       lines: [{
         materialName: '待复核材料',
         spec: '',
@@ -641,7 +650,152 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
     })).rejects.toThrow('至少添加一条材料明细')
   })
 
-  it('分供方已明确时，空单号仍受项目+分供方+单号自然键约束', async () => {
+  it('直接新增会拒绝与存量非规范单号等价的自然键', async () => {
+    await mem.execute(`
+      INSERT INTO delivery_records
+        (id, project_id, supplier_id, order_no, delivery_date, ocr_status, archived, stored)
+      VALUES ('legacy-order-abc', 'p1', 's1', 'abc', '2026-07-15', 'reviewed', 1, 1)
+    `)
+    const store = useDeliveryRecordStore()
+
+    await expect(store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: ' ＡｂＣ ',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })).rejects.toThrow('送货单自然键重复')
+
+    const [{ count: recordCount }] = await mem.select<{ count: number }>(
+      'SELECT count(*) AS count FROM delivery_records WHERE deleted_at IS NULL',
+    )
+    const [{ count: lineCount }] = await mem.select<{ count: number }>(
+      'SELECT count(*) AS count FROM delivery_lines WHERE deleted_at IS NULL',
+    )
+    expect({ recordCount, lineCount }).toEqual({ recordCount: 1, lineCount: 0 })
+  })
+
+  it('直接新增在持久边界把非空单号写成规范值', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '  ｄｅｆ－００１  ',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    const [row] = await mem.select<{ order_no: string | null }>(
+      'SELECT order_no FROM delivery_records WHERE id = ?',
+      [id],
+    )
+    expect(row?.order_no).toBe('DEF-001')
+    expect(store.byId(id)?.orderNo).toBe('DEF-001')
+  })
+
+  it('直接编辑会拒绝与另一张送货单等价的单号并整体回滚', async () => {
+    const store = useDeliveryRecordStore()
+    await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'ABC',
+      deliveryDate: '2026-07-15',
+      note: '',
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 1, unitPrice: 400, note: '' }],
+    })
+    const editedId = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'DEF',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    await expect(store.update(editedId, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'ａｂｃ',
+      deliveryDate: '2026-07-17',
+      note: '不应保存',
+      lines: [{ materialName: '错误材料', spec: '', unit: '件', qty: 1, unitPrice: 1, note: '' }],
+    })).rejects.toThrow('送货单自然键重复')
+
+    await store.load()
+    expect(store.byId(editedId)).toMatchObject({
+      orderNo: 'DEF',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂' }],
+    })
+    const [{ count: updateLogCount }] = await mem.select<{ count: number }>(
+      `SELECT count(*) AS count
+       FROM operation_logs
+       WHERE table_name = 'delivery_records' AND record_id = ? AND action = 'update'`,
+      [editedId],
+    )
+    expect(updateLogCount).toBe(0)
+  })
+
+  it('直接编辑排除自身自然键并把等价单号保持为规范值', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'ABC',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    })
+
+    await expect(store.update(id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '  ａｂｃ  ',
+      deliveryDate: '2026-07-17',
+      note: '仅更新同一张单据',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 2, unitPrice: 80, note: '' }],
+    })).resolves.toEqual(expect.any(String))
+
+    const [row] = await mem.select<{ order_no: string | null }>(
+      'SELECT order_no FROM delivery_records WHERE id = ?',
+      [id],
+    )
+    expect(row?.order_no).toBe('ABC')
+    expect(store.byId(id)).toMatchObject({ orderNo: 'ABC', totalAmount: 160 })
+  })
+
+  it('并发新增等价单号时仅一张成功且数据库自然键保持唯一', async () => {
+    const store = useDeliveryRecordStore()
+    const input = {
+      projectId: 'p1',
+      supplierId: 's1',
+      deliveryDate: '2026-07-16',
+      note: '',
+      lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
+    }
+
+    const results = await Promise.allSettled([
+      store.add({ ...input, orderNo: 'race-abc' }),
+      store.add({ ...input, orderNo: 'ＲＡＣＥ－ＡＢＣ' }),
+    ])
+    const fulfilled = results.filter(result => result.status === 'fulfilled')
+    const rejected = results.filter(result => result.status === 'rejected')
+
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+    expect(String(rejected[0]?.reason)).toContain('送货单自然键重复')
+    const rows = await mem.select<{ order_no: string | null }>(
+      `SELECT order_no
+       FROM delivery_records
+       WHERE project_id = 'p1' AND supplier_id = 's1' AND deleted_at IS NULL`,
+    )
+    expect(rows).toEqual([{ order_no: 'RACE-ABC' }])
+  })
+
+  it('空单号不形成自然键，同项目和分供方可连续归档多张无单号单据', async () => {
     const store = useDeliveryRecordStore()
     const input = {
       projectId: 'p1',
@@ -649,11 +803,111 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       orderNo: '',
       deliveryDate: '2026-07-16',
       note: '',
+      confirmations: { noOrderNoConfirmed: true },
       lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
     }
 
-    await store.add(input)
-    await expect(store.add(input)).rejects.toThrow()
+    const firstId = await store.add(input)
+    const secondId = await store.add(input)
+
+    expect(secondId).not.toBe(firstId)
+    expect(store.list.filter(record => record.orderNo === '')).toHaveLength(2)
+    expect(store.list.every(record => !record.naturalKeyDuplicate)).toBe(true)
+  })
+
+  it('直接新增必须取得当前无单号与价格待补录确认，取消时不写入任何记录', async () => {
+    const store = useDeliveryRecordStore()
+    const pendingInput = {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '\u3000',
+      deliveryDate: '2026-07-18',
+      note: '',
+      lines: [{
+        materialName: '待补价水泥',
+        spec: '',
+        unit: '吨',
+        qty: 1,
+        unitPrice: null,
+        amount: null,
+        note: '',
+      }],
+    }
+
+    await expect(store.add(pendingInput)).rejects.toThrow('确认原件确实无单号')
+    await expect(store.add({
+      ...pendingInput,
+      confirmations: { noOrderNoConfirmed: true },
+    })).rejects.toThrow('确认按“价格待补录”归档')
+
+    const [{ count: recordCount }] = await mem.select<{ count: number }>(
+      'SELECT count(*) AS count FROM delivery_records WHERE deleted_at IS NULL',
+    )
+    const [{ count: lineCount }] = await mem.select<{ count: number }>(
+      'SELECT count(*) AS count FROM delivery_lines WHERE deleted_at IS NULL',
+    )
+    expect({ recordCount, lineCount }).toEqual({ recordCount: 0, lineCount: 0 })
+  })
+
+  it('新增和编辑按当前事实重建受管复核标记并保留其他人工复核标记', async () => {
+    const store = useDeliveryRecordStore()
+    const id = await store.add({
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'MANAGED-FLAG-001',
+      deliveryDate: '2026-07-18',
+      note: '',
+      reviewFlag: '金额已人工复核；原件无单号；价格待补录',
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 1, unitPrice: 400, amount: 400, note: '' }],
+    })
+
+    expect(store.byId(id)?.reviewFlag).toBe('金额已人工复核')
+
+    await expect(store.update(id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '\u3000',
+      deliveryDate: '2026-07-18',
+      note: '',
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 1, unitPrice: null, amount: null, note: '' }],
+    })).rejects.toThrow('确认原件确实无单号')
+    expect(store.byId(id)).toMatchObject({
+      orderNo: 'MANAGED-FLAG-001',
+      reviewFlag: '金额已人工复核',
+      lines: [{ unitPrice: 400, amount: 400 }],
+    })
+
+    await store.update(id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '\u3000',
+      deliveryDate: '2026-07-18',
+      note: '',
+      confirmations: {
+        noOrderNoConfirmed: true,
+        pricePendingConfirmed: true,
+      },
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 1, unitPrice: null, amount: null, note: '' }],
+    })
+    expect(store.byId(id)).toMatchObject({
+      orderNo: '',
+      reviewFlag: '金额已人工复核；原件无单号；价格待补录',
+      lines: [{ unitPrice: null, amount: null }],
+    })
+
+    await store.update(id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: 'managed-flag-002',
+      deliveryDate: '2026-07-19',
+      note: '',
+      lines: [{ materialName: '水泥', spec: '', unit: '吨', qty: 2, unitPrice: 410, amount: 820, note: '' }],
+    })
+    expect(store.byId(id)).toMatchObject({
+      orderNo: 'MANAGED-FLAG-002',
+      reviewFlag: '金额已人工复核',
+      lines: [{ unitPrice: 410, amount: 820 }],
+    })
   })
 
   it('归档库只暴露已归档送货单，不混入后续 OCR 处理区记录', async () => {

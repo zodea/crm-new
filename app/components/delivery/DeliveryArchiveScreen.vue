@@ -2,7 +2,7 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { DeliveryRecord } from '~/stores/delivery-record'
-import { createDeliveryLedgerXlsx, DELIVERY_XLSX_MIME, deliveryLedgerRows } from '~/lib/delivery/export'
+import { createDeliveryArchiveZip, DELIVERY_ZIP_MIME } from '~/lib/delivery/export'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
@@ -10,7 +10,7 @@ const store = useDeliveryRecordStore()
 const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const contractStore = useContractStore()
-const { confirm, error, exportFile, undoToast } = useKitUI()
+const { confirm, error, exportFile, warning, undoToast } = useKitUI()
 
 const search = shallowRef('')
 const dateFrom = shallowRef('')
@@ -18,6 +18,8 @@ const dateTo = shallowRef('')
 const selectedNode = shallowRef('all')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
+const convertImagesToPdf = shallowRef(false)
+const exportingArchive = shallowRef(false)
 
 function projectName(id: string): string {
   return projectStore.byId(id)?.name ?? '未知项目'
@@ -106,21 +108,32 @@ watch([search, dateFrom, dateTo, selectedNode], () => {
   page.value = 1
 })
 
-async function exportExcel() {
+async function exportArchive() {
   if (!filtered.value.length) {
     error('当前筛选下没有可导出的送货单')
     return
   }
-  const rows = deliveryLedgerRows(filtered.value, { projectName, supplierName })
+  exportingArchive.value = true
   try {
-    await exportFile({
-      data: createDeliveryLedgerXlsx(rows),
-      defaultName: `送货单明细_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      mimeType: DELIVERY_XLSX_MIME,
+    const result = await createDeliveryArchiveZip(filtered.value, { projectName, supplierName }, {
+      convertImagesToPdf: convertImagesToPdf.value,
+      loadSource: record => store.loadSourceFile(record.id),
     })
+    const exportResult = await exportFile({
+      data: result.data,
+      defaultName: `送货单原件包_${new Date().toISOString().slice(0, 10)}.zip`,
+      mimeType: DELIVERY_ZIP_MIME,
+    })
+    if (exportResult.status === 'cancelled')
+      return
+    if (result.missingRecordIds.length)
+      warning(`${result.missingRecordIds.length} 份送货单缺少原件，异常已写入 Excel`)
   }
   catch (cause) {
     error(cause instanceof Error ? `导出失败：${cause.message}` : '导出失败')
+  }
+  finally {
+    exportingArchive.value = false
   }
 }
 
@@ -203,8 +216,12 @@ onMounted(refresh)
         <button class="btn-secondary" :disabled="store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
         </button>
-        <button class="btn-secondary" :disabled="store.loading || !filtered.length" @click="exportExcel">
-          <span class="i-lucide-file-spreadsheet mr-1 text-13px" /> 导出 Excel
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
+          <input v-model="convertImagesToPdf" type="checkbox">
+          <span>图片另生成 PDF</span>
+        </label>
+        <button class="btn-secondary" :disabled="store.loading || exportingArchive || !filtered.length" @click="exportArchive">
+          <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}
         </button>
         <NuxtLink to="/material/delivery/archive/form" class="btn-accent">
           <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单

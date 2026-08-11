@@ -1,3 +1,4 @@
+import type { DeliveryPriceRecordInput } from '~/lib/material/price-analysis'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
@@ -23,7 +24,7 @@ const global = {
   },
 }
 
-const records = [
+const records: DeliveryPriceRecordInput[] = [
   {
     id: 'delivery-1',
     projectId: 'project-a',
@@ -31,9 +32,13 @@ const records = [
     orderNo: 'XS-001',
     deliveryDate: '2026-04-01',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
     lines: [
-      { id: 'line-1', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.5 },
-      { id: 'line-2', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 410 },
+      { id: 'line-1', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.5, amount: 25, currentValueConfirmed: true },
+      { id: 'line-2', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 410, amount: 410, currentValueConfirmed: true },
     ],
   },
   {
@@ -43,8 +48,12 @@ const records = [
     orderNo: 'XS-002',
     deliveryDate: '2026-05-01',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
     lines: [
-      { id: 'line-3', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.8 },
+      { id: 'line-3', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.8, amount: 28, currentValueConfirmed: true },
     ],
   },
   {
@@ -54,8 +63,12 @@ const records = [
     orderNo: 'XS-003',
     deliveryDate: '2026-05-02',
     archived: true,
+    reviewStatus: 'reviewed',
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
     lines: [
-      { id: 'line-4', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 430 },
+      { id: 'line-4', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 430, amount: 430, currentValueConfirmed: true },
     ],
   },
 ]

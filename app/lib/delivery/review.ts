@@ -24,6 +24,20 @@ export interface DeliveryReviewConfirmations {
   qualityReviewed: boolean
 }
 
+/** 送货单当前值之外的原始/修订留痕，不参与金额或材料事实计算。 */
+export interface DeliveryReviewProvenance {
+  sourceId: string
+  sourceFileName?: string
+  originalOcr?: Readonly<Record<string, unknown>> | null
+  revisions?: readonly {
+    field: string
+    from: unknown
+    to: unknown
+    reason: string
+    at: string
+  }[]
+}
+
 export interface DeliveryReviewInput {
   projectId: string
   supplierId: string | null
@@ -37,6 +51,28 @@ export interface DeliveryReviewInput {
     unit: string
   })[]
   confirmations?: Partial<DeliveryReviewConfirmations>
+  /** 存在时必须是识别完成态；手工录入可不传。 */
+  ocrStatus?: string
+  /** 导入/去重或数据库唯一键发现的送货单自然键冲突。 */
+  naturalKeyDuplicate?: boolean
+  /** 当前结构化值是否已经由用户对照原件确认。 */
+  currentValuesConfirmed?: boolean
+  provenance?: DeliveryReviewProvenance
+}
+
+export function normalizeDeliveryOrderNo(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleUpperCase('zh-CN')
+}
+
+export function deliveryNaturalKey(
+  input: Pick<DeliveryReviewInput, 'projectId' | 'supplierId' | 'orderNo'>,
+): string | null {
+  const projectId = input.projectId.trim()
+  const supplierId = input.supplierId?.trim() ?? ''
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+  if (!projectId || !supplierId || !orderNo)
+    return null
+  return JSON.stringify([projectId, supplierId, orderNo])
 }
 
 export interface DeliveryReviewPolicy {
@@ -45,7 +81,7 @@ export interface DeliveryReviewPolicy {
   requiresQualityReview?: boolean
 }
 
-export type DeliveryReviewIssueKey = 'non-material' | 'project' | 'supplier' | 'date' | 'order-no' | 'items' | 'amount' | 'quality' | 'human-reviewed'
+export type DeliveryReviewIssueKey = 'non-material' | 'ocr-status' | 'duplicate' | 'project' | 'supplier' | 'date' | 'order-no' | 'items' | 'amount' | 'quality' | 'human-reviewed'
 
 export interface DeliveryReviewIssue {
   key: DeliveryReviewIssueKey
@@ -123,13 +159,17 @@ export function deliveryReviewIssueDetails(
 
   if (policy.nonMaterial)
     issues.push({ key: 'non-material', label: '当前文件属于非材料/待处理，必须人工改判为材料到货后才能归档' })
+  if (input.ocrStatus && input.ocrStatus !== 'done')
+    issues.push({ key: 'ocr-status', label: '送货单识别尚未完成，不能进入归档终态' })
+  if (input.naturalKeyDuplicate)
+    issues.push({ key: 'duplicate', label: '送货单自然键重复，需先完成重复记录复核' })
   if (!input.projectId)
     issues.push({ key: 'project', label: '必须选择所属项目' })
   if (!input.supplierId)
     issues.push({ key: 'supplier', label: '必须人工选择已有分供方，或先确认新增分供方' })
   if (!input.deliveryDate)
     issues.push({ key: 'date', label: '缺少送货日期，必须依据原件人工补录' })
-  if (!input.orderNo && !confirmations.noOrderNoConfirmed)
+  if (!normalizeDeliveryOrderNo(input.orderNo) && !confirmations.noOrderNoConfirmed)
     issues.push({ key: 'order-no', label: '缺少送货单号；只有确认原件确实无单号后才能归档' })
 
   const invalidLines = input.items.filter(item =>
@@ -140,6 +180,16 @@ export function deliveryReviewIssueDetails(
   if (!input.items.length)
     issues.push({ key: 'items', label: '至少保留一条材料明细' })
 
+  const invalidAmountLines = input.items.filter(item =>
+    (item.amount != null && (!Number.isFinite(item.amount) || item.amount < 0))
+    || (item.unitPrice != null && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0)),
+  )
+  if (invalidAmountLines.length) {
+    issues.push({ key: 'amount', label: '单价或金额存在异常数值，必须人工修正后才能归档' })
+    if (!input.note.trim())
+      issues.push({ key: 'amount', label: '单价或金额异常必须记录保留票面值或修正值的原因' })
+  }
+
   const summary = summarizeDeliveryAmounts(input.items, input.statedTotal ?? null)
   if (policy.requiresAmountReview || summary.mismatchedLineIds.length || summary.statedBalanced === false) {
     if (!confirmations.amountReviewed)
@@ -149,7 +199,7 @@ export function deliveryReviewIssueDetails(
   }
   if (policy.requiresQualityReview && !confirmations.qualityReviewed)
     issues.push({ key: 'quality', label: '手写、模糊或低置信内容必须人工复核确认' })
-  if (!confirmations.humanReviewed)
+  if (!confirmations.humanReviewed || input.currentValuesConfirmed === false)
     issues.push({ key: 'human-reviewed', label: '请先查看原件并确认 OCR 草稿，再点击归档' })
 
   return issues.filter((issue, index, all) => all.findIndex(candidate => candidate.key === issue.key && candidate.label === issue.label) === index)

@@ -13,6 +13,7 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { deliveryNaturalKey, hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
 
 export interface DeliveryLineDraft {
@@ -31,6 +32,7 @@ export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amount
   deliveryRecordId: string
   amount: number | null
   amountSource: DeliveryAmountSource
+  currentValueConfirmed: boolean
   sortOrder: number
 }
 
@@ -46,6 +48,9 @@ export interface DeliveryRecord {
   fileName: string
   filePath: string
   ocrStatus: string
+  reviewStatus: 'reviewed' | 'unreviewed'
+  naturalKeyDuplicate: boolean
+  currentValuesConfirmed: boolean
   archived: boolean
   stored: boolean
   printBatchId: string
@@ -72,7 +77,13 @@ export interface DeliveryRecordInput {
   fileName?: string
   filePath?: string
   printBatchId?: string
+  confirmations?: DeliveryRecordConfirmations
   lines: DeliveryLineDraft[]
+}
+
+export interface DeliveryRecordConfirmations {
+  noOrderNoConfirmed?: boolean
+  pricePendingConfirmed?: boolean
 }
 
 export interface DeliveryRecordSourceFile {
@@ -234,7 +245,36 @@ function validateInput(input: DeliveryRecordInput): NormalizedDeliveryLineDraft[
   return lines
 }
 
-function rowToLine(row: Record<string, unknown>): DeliveryLine {
+const MANAGED_REVIEW_FLAGS = new Set(['原件无单号', '价格待补录'])
+
+function reviewFlagTokens(values: readonly (string | undefined)[]): string[] {
+  return values.flatMap(value => (value ?? '').split(/[；;]/))
+    .map(value => value.trim())
+    .filter(Boolean)
+}
+
+function deriveReviewFlag(
+  orderNo: string,
+  lines: readonly NormalizedDeliveryLineDraft[],
+  confirmations: DeliveryRecordConfirmations | undefined,
+  ...existingFlags: (string | undefined)[]
+): string {
+  const tokens = reviewFlagTokens(existingFlags)
+    .filter(token => !MANAGED_REVIEW_FLAGS.has(token))
+  if (!orderNo) {
+    if (confirmations?.noOrderNoConfirmed !== true)
+      throw new Error('缺少送货单号，请先确认原件确实无单号')
+    tokens.push('原件无单号')
+  }
+  if (hasDeliveryPricePending(lines)) {
+    if (confirmations?.pricePendingConfirmed !== true)
+      throw new Error('缺少单价或金额，请先确认按“价格待补录”归档')
+    tokens.push('价格待补录')
+  }
+  return [...new Set(tokens)].join('；')
+}
+
+function rowToLine(row: Record<string, unknown>, currentValueConfirmed: boolean): DeliveryLine {
   return {
     id: row.id as string,
     deliveryRecordId: row.delivery_record_id as string,
@@ -245,16 +285,25 @@ function rowToLine(row: Record<string, unknown>): DeliveryLine {
     unitPrice: toNullableNumber(row.unit_price),
     amount: toNullableNumber(row.amount),
     amountSource: amountSourceOf(row.amount_source, 'manual'),
+    currentValueConfirmed,
     note: (row.note ?? '') as string,
     sortOrder: toNumber(row.sort_order),
   }
+}
+
+type DeliveryRecordWithoutDuplicateFlag = Omit<DeliveryRecord, 'naturalKeyDuplicate'>
+
+function currentValuesConfirmedFromRow(row: Record<string, unknown>): boolean {
+  return Boolean(row.archived) && row.ocr_status === 'reviewed'
 }
 
 function rowToRecord(
   row: Record<string, unknown>,
   lines: DeliveryLine[],
   hasSourceFile: boolean,
-): DeliveryRecord {
+): DeliveryRecordWithoutDuplicateFlag {
+  const ocrStatus = (row.ocr_status ?? 'pending') as string
+  const currentValuesConfirmed = currentValuesConfirmedFromRow(row)
   return {
     id: row.id as string,
     projectId: row.project_id as string,
@@ -264,7 +313,9 @@ function rowToRecord(
     deliveryDate: (row.delivery_date ?? '') as string,
     fileName: (row.file_name ?? '') as string,
     filePath: (row.file_path ?? '') as string,
-    ocrStatus: (row.ocr_status ?? 'reviewed') as string,
+    ocrStatus,
+    reviewStatus: currentValuesConfirmed ? 'reviewed' : 'unreviewed',
+    currentValuesConfirmed,
     archived: Boolean(row.archived),
     // v25 起归档即视为已入库；stored 只保留作存量兼容镜像。
     stored: Boolean(row.archived),
@@ -286,6 +337,50 @@ function rowToRecord(
     lines,
     totalAmount: roundMoney(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
   }
+}
+
+function withNaturalKeyDuplicateFlags(
+  records: readonly DeliveryRecordWithoutDuplicateFlag[],
+): DeliveryRecord[] {
+  const counts = new Map<string, number>()
+  for (const record of records) {
+    const key = deliveryNaturalKey(record)
+    if (key)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return records.map((record) => {
+    const key = deliveryNaturalKey(record)
+    return {
+      ...record,
+      naturalKeyDuplicate: key != null && (counts.get(key) ?? 0) > 1,
+    }
+  })
+}
+
+async function assertDeliveryNaturalKeyAvailable(
+  tx: SoftDb,
+  input: Pick<DeliveryRecordInput, 'projectId' | 'supplierId' | 'orderNo'>,
+  excludeId?: string,
+): Promise<void> {
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+  if (!input.projectId.trim() || !input.supplierId?.trim() || !orderNo)
+    return
+
+  const params: unknown[] = [input.projectId, input.supplierId]
+  const excludeSql = excludeId ? 'AND id <> ?' : ''
+  if (excludeId)
+    params.push(excludeId)
+  const rows = await tx.select<{ order_no: string | null }>(
+    `SELECT order_no
+     FROM delivery_records
+     WHERE project_id = ?
+       AND supplier_id = ?
+       AND deleted_at IS NULL
+       ${excludeSql}`,
+    params,
+  )
+  if (rows.some(row => normalizeDeliveryOrderNo(row.order_no ?? '') === orderNo))
+    throw new Error('送货单自然键重复，不能重复归档')
 }
 
 async function insertLines(tx: SoftDb, recordId: string, lines: NormalizedDeliveryLineDraft[], now: string): Promise<void> {
@@ -378,19 +473,24 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
              AND source.deleted_at IS NULL`,
         ),
       ])
+      const currentValuesConfirmedByRecord = new Map(recordRows.map(row => [
+        row.id as string,
+        currentValuesConfirmedFromRow(row),
+      ]))
       const linesByRecord = new Map<string, DeliveryLine[]>()
       for (const row of lineRows) {
-        const line = rowToLine(row)
+        const recordId = row.delivery_record_id as string
+        const line = rowToLine(row, currentValuesConfirmedByRecord.get(recordId) === true)
         const lines = linesByRecord.get(line.deliveryRecordId) ?? []
         lines.push(line)
         linesByRecord.set(line.deliveryRecordId, lines)
       }
       const sourceRecordIds = new Set(sourceRows.map(row => row.owner_id))
-      list.value = recordRows.map(row => rowToRecord(
+      list.value = withNaturalKeyDuplicateFlags(recordRows.map(row => rowToRecord(
         row,
         linesByRecord.get(row.id as string) ?? [],
         sourceRecordIds.has(row.id as string),
-      ))
+      )))
     }
     finally {
       loading.value = false
@@ -407,8 +507,11 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     const source = sourceFile ? await prepareSourceFile(sourceFile) : null
     const id = generateId('del')
     const printBatchId = input.printBatchId?.trim() || id
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     await withTransaction(async (tx) => {
+      const reviewFlag = deriveReviewFlag(orderNo, lines, input.confirmations, input.reviewFlag)
+      await assertDeliveryNaturalKeyAvailable(tx, input)
       await tx.execute(
         `INSERT INTO delivery_records
           (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
@@ -420,12 +523,12 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.projectId,
           input.supplierId || null,
           input.rawSiteText?.trim() ?? '',
-          input.orderNo.trim(),
+          orderNo || null,
           input.deliveryDate,
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
           printBatchId,
-          input.reviewFlag?.trim() ?? '',
+          reviewFlag,
           input.note.trim(),
           now,
           now,
@@ -516,17 +619,35 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
 
   async function update(id: string, input: DeliveryRecordInput): Promise<string | null> {
     const lines = validateInput(input)
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     const logId = await withTransaction(async (tx) => {
+      const [existing] = await tx.select<{ review_flag: string | null }>(
+        `SELECT review_flag
+         FROM delivery_records
+         WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      )
+      if (!existing)
+        return null
+      const reviewFlag = deriveReviewFlag(
+        orderNo,
+        lines,
+        input.confirmations,
+        existing.review_flag ?? '',
+        input.reviewFlag,
+      )
+      await assertDeliveryNaturalKeyAvailable(tx, input, id)
       const updateLogId = await withUpdateLog(tx, 'delivery_records', id, () => tx.execute(
         `UPDATE delivery_records
-         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, note=?, updated_at=?
+         SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, review_flag=?, note=?, updated_at=?
          WHERE id=?`,
         [
           input.projectId,
           input.supplierId || null,
-          input.orderNo.trim(),
+          orderNo || null,
           input.deliveryDate,
+          reviewFlag,
           input.note.trim(),
           now,
           id,

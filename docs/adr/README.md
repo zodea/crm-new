@@ -22,6 +22,7 @@ ADR 记录“已经采纳且会约束后续实现”的决策。新决策使用�
 | [0016](./0016-overlay-composition-contract.md) | 浮层组合采用单交互平面与模态栈契约 | 已采纳，迁移中 |
 | [0017](./0017-provisional-schedule-before-contract.md) | 内部暂估排程允许先建计划、后绑定合同 | 已采纳并已落地 |
 | [0018](./0018-versioned-schedule-process-library.md) | 标准工序库采用不可变版本与可恢复的前置关系 | 已采纳并已落地 |
+| [0019](./0019-delivery-export-source-preservation.md) | 送货单导出的原件保真与可选图片转换 | 已采纳；#23 部分落地，多 PDF 对象级合并待实现 |
 
 ## 写作边界
 
