@@ -69,6 +69,13 @@ describe('#257 票据归档终态门禁与数据守恒', () => {
     invoiceDate: '2026-06-01',
     seller: '甲供应商',
     totalAmount: 113,
+    provenance: {
+      sourceKind: 'manual' as const,
+      sourceId: 'manual-INV-001',
+      sourceInfo: { entry: 'manual' },
+      originalOcr: null,
+      revisions: [],
+    },
   })
 
   it('只允许人工确认后的当前值进入归档，原始 OCR/修订/来源留痕不改变台账值', () => {
@@ -77,6 +84,7 @@ describe('#257 票据归档终态门禁与数据守恒', () => {
       provenance: {
         sourceKind: 'ocr',
         sourceId: 'source-1',
+        sourceInfo: { fileName: 'source-1.pdf' },
         originalOcr: { totalAmount: 110 },
         revisions: [{ field: 'totalAmount', from: 110, to: 113, reason: '票面人工复核', at: '2026-06-02T08:00:00Z' }],
       },
