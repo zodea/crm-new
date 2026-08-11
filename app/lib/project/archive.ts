@@ -293,7 +293,7 @@ function buildProjectFolders(
   workers: Map<string, { name: string, crewId: string | null }>,
 ): ProjectArchiveFolder[] {
   const folders: ProjectArchiveFolder[] = [
-    { key: 'project-manifest', path: [ROOT_PROJECT, '00_档案说明与清单'], label: '档案说明与清单' },
+    { key: 'project-manifest', path: ['00_档案说明与清单'], label: '00_档案说明与清单' },
     { key: 'project-basic', path: [ROOT_PROJECT, '01_项目基本信息'], label: '项目基本信息' },
     { key: 'project-other', path: [ROOT_PROJECT, '09_其他项目单据'], label: '其他项目单据' },
     { key: 'supplier-root', path: [ROOT_SUPPLIER], label: '分供方' },
@@ -355,9 +355,10 @@ function buildArchiveTree(
     let currentPath: string[] = []
     for (const label of path) {
       currentPath = [...currentPath, label]
-      const parent = current?.children ?? [...roots.values()]
       const key = folderKey(currentPath)
-      let found = parent.find(node => node.key === key) as MutableFolder | undefined
+      let found = current
+        ? current.children.find(node => node.key === key) as MutableFolder | undefined
+        : roots.get(key)
       if (!found) {
         found = {
           key,
@@ -365,7 +366,10 @@ function buildArchiveTree(
           kind: 'folder',
           children: [],
         }
-        parent.push(found)
+        if (current)
+          current.children.push(found)
+        else
+          roots.set(key, found)
       }
       current = found
     }
@@ -1059,10 +1063,10 @@ export async function createProjectArchiveZip(
     ].map(escapeCsv).join(',')),
   ].join('\n')
   zipFiles.push(
-    { path: `${ROOT_PROJECT}/00_档案说明与清单/导出说明.txt`, data: new TextEncoder().encode(explanation) },
-    { path: `${ROOT_PROJECT}/00_档案说明与清单/文件清单.csv`, data: new TextEncoder().encode(manifestCsv) },
-    { path: `${ROOT_PROJECT}/00_档案说明与清单/项目档案目录.xlsx`, data: toXlsx(directoryRows) },
-    { path: `${ROOT_PROJECT}/00_档案说明与清单/文件清单.xlsx`, data: toXlsx(manifestRows) },
+    { path: '00_档案说明与清单/导出说明.txt', data: new TextEncoder().encode(explanation) },
+    { path: '00_档案说明与清单/文件清单.csv', data: new TextEncoder().encode(manifestCsv) },
+    { path: '00_档案说明与清单/项目档案目录.xlsx', data: toXlsx(directoryRows) },
+    { path: '00_档案说明与清单/文件清单.xlsx', data: toXlsx(manifestRows) },
   )
   return {
     data: createZip(zipFiles),
