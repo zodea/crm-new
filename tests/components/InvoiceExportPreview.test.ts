@@ -74,11 +74,13 @@ describe('发票导出预览样式草稿', () => {
     await waitFor(() => expect((freezeRows as HTMLInputElement).value).toBe('7'))
 
     await fireEvent.update(freezeRows, '5')
+    await fireEvent.update(screen.getByRole('textbox', { name: '文本格式' }), '@ "文本"')
     await fireEvent.click(screen.getByRole('button', { name: '保存为台账默认样式' }))
 
     await waitFor(() => expect(database.execute).toHaveBeenCalledTimes(1))
     const saved = JSON.parse(String(database.execute.mock.calls[0]?.[1]?.[0]))
     expect(saved.freezeRows).toBe(5)
+    expect(saved.textFormat).toBe('@ "文本"')
     expect((await screen.findByRole('status')).textContent).toContain('已保存')
     expect(localStorage.length).toBe(0)
   })

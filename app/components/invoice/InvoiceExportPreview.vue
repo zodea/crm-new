@@ -401,6 +401,7 @@ function previewColumnStyle(key: ColumnKey) {
                   <div class="grid gap-2">
                     <label class="text-10px text-ink-soft">日期格式<select v-model="draft.dateFormat" class="field-input mt-1 w-full text-11px"><option value="yyyy&quot;年&quot;m&quot;月&quot;d&quot;日&quot;;@">2026年8月11日</option><option value="yyyy-mm-dd">2026-08-11</option><option value="yyyy/mm/dd">2026/08/11</option></select></label>
                     <label class="text-10px text-ink-soft">金额格式<select v-model="draft.moneyFormat" class="field-input mt-1 w-full text-11px"><option value="0.00_);[Red]\\(0.00\\)">1,234.56（负数红色）</option><option value="#,##0.00">1,234.56</option><option value="0.00">1234.56</option></select></label>
+                    <label class="text-10px text-ink-soft">文本格式<input v-model="draft.textFormat" class="field-input mt-1 w-full text-11px" placeholder="如 @ 或 @ &quot;文本&quot;"></label>
                     <label class="inline-flex items-center gap-2 text-11px text-ink-soft"><input v-model="draft.mergeTitle" type="checkbox" class="accent-brand">合并标题行</label>
                     <label class="inline-flex items-center gap-2 text-11px text-ink-soft"><input v-model="draft.mergeRepeatedValues" type="checkbox" class="accent-brand">合并连续相同的供应商和归属项目</label>
                   </div>

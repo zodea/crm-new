@@ -109,6 +109,7 @@ describe('发票台账 Excel 导出', () => {
       columnWidths: { seller: 42, remark: 31 },
       dateFormat: 'yyyy-mm-dd',
       moneyFormat: '#,##0.00',
+      textFormat: '@ "文本"',
       mergeTitle: false,
       mergeRepeatedValues: false,
       headerFont: { name: '微软雅黑', sz: 11, bold: false },
@@ -135,6 +136,7 @@ describe('发票台账 Excel 导出', () => {
     })
     expect(sheet.cells.A2?.font.bold).toBeUndefined()
     expect(sheet.cells.A3?.numberFormat).toBe('yyyy-mm-dd')
+    expect(sheet.cells.B3?.numberFormat).toBe('@ "文本"')
     expect(sheet.cells.E3?.numberFormat).toBe('#,##0.00')
     expect(sheet.mergedCells).toEqual([])
   })
