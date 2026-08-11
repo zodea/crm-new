@@ -125,6 +125,33 @@ function fetchPaymentApplications(keyword: string) {
   }, keyword)
 }
 
+function queryValue(key: string): string {
+  const value = route.query[key]
+  return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
+}
+
+async function applyPaymentRecordPrefill(base: FinancePageDraft): Promise<FinancePageDraft> {
+  if (props.kind !== 'payment_record')
+    return base
+  const paymentApplicationId = queryValue('paymentApplicationId')
+  if (!paymentApplicationId)
+    return base
+  const application = await loadFinanceForm('payment_application', paymentApplicationId)
+  if (!application)
+    return base
+  const amount = Number(queryValue('amount')) || 0
+  return {
+    ...base,
+    projectId: queryValue('projectId') || application.projectId || null,
+    supplierId: queryValue('supplierId') || application.supplierId || null,
+    purpose: application.name || application.no || '',
+    amount,
+    applicationAllocations: amount > 0
+      ? [{ paymentApplicationId, allocatedAmount: amount, note: '' }]
+      : [],
+  } as FinancePageDraft
+}
+
 async function initialize() {
   loading.value = true
   resetAttachments()
@@ -132,6 +159,7 @@ async function initialize() {
     const id = routeId.value
     if (!id) {
       draft.value = f3FormDefaults(props.kind) as FinancePageDraft
+      draft.value = await applyPaymentRecordPrefill(draft.value)
       paymentTypeSelected.value = props.kind !== 'payment_application'
     }
     else {
@@ -410,6 +438,30 @@ onMounted(() => void initialize())
           </KitButton>
         </div>
       </header>
+
+      <section
+        v-if="!showPaymentTypeStep && kind === 'receipt'"
+        class="mb-4 grid min-w-0 gap-3 rounded-[var(--radius-card)] border border-ok/25 bg-ok-soft px-4 py-3 sm:grid-cols-4"
+        aria-label="收款方向"
+        data-testid="receipt-direction-summary"
+      >
+        <div>
+          <span class="text-11px text-ink-faint">资金方向</span>
+          <strong class="mt-1 block text-14px text-ok-deep">收入</strong>
+        </div>
+        <div>
+          <span class="text-11px text-ink-faint">付款方</span>
+          <strong class="mt-1 block text-14px text-ink">甲方客户</strong>
+        </div>
+        <div>
+          <span class="text-11px text-ink-faint">收款方</span>
+          <strong class="mt-1 block text-14px text-ink">我方乙方</strong>
+        </div>
+        <div class="sm:text-right">
+          <span class="text-11px text-ink-faint">本次收款事实</span>
+          <strong class="mt-1 block font-mono text-16px text-ok-deep">+¥{{ Number(draft.amount || 0).toFixed(2) }}</strong>
+        </div>
+      </section>
 
       <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
         正在载入表单…

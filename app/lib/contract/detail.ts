@@ -364,7 +364,7 @@ async function loadPayments(
       application.status
     ORDER BY application.apply_date DESC, application.created_at DESC
   `, [contractId])
-  return mapDocuments(rows, '付款申请', id => `/finance/payment/${id}`)
+  return mapDocuments(rows, '付款申请', id => `/finance/payment/${id}/detail`)
 }
 
 async function loadMaterialDocuments(

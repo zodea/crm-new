@@ -3,6 +3,7 @@ import type {
   PaymentManagementRow,
   PaymentManagementSummary,
 } from '~/stores/payment-management'
+import { financeDetailPath } from '~/lib/finance/page'
 import { clampPage, paginate } from '~/lib/kit/table'
 
 type PaymentView = 'due' | 'paid' | 'all'
@@ -96,7 +97,7 @@ function setProject(value: string) {
 }
 
 function openApplication(row: PaymentManagementRow) {
-  void navigateTo(`/finance/payment/${row.id}`)
+  void navigateTo(financeDetailPath('payment_application', row.id))
 }
 
 function createPayment(row: PaymentManagementRow) {

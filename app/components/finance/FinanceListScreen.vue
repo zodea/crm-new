@@ -3,7 +3,7 @@ import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
-import { F3_FORM_META, financeFormPath } from '~/lib/finance/page'
+import { F3_FORM_META, financeDetailPath, financeFormPath } from '~/lib/finance/page'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -72,6 +72,9 @@ const filterDefinitions = computed<ListFilterDefinition[]>(() => [
   },
 ])
 
+const isReceipt = computed(() => props.kind === 'receipt')
+const amountSummaryLabel = computed(() => isReceipt.value ? '筛选后收款合计' : '筛选后金额合计')
+
 watch([search, projectFilter, partyFilter, statusFilter, pageSize], () => {
   page.value = 1
 })
@@ -90,17 +93,18 @@ function onPageChange(event: { page: number, pageSize: number }) {
   pageSize.value = event.pageSize
 }
 
-const columns: KitTableColumn[] = [
+const columns = computed<KitTableColumn[]>(() => [
   { title: '#', type: 'seq', width: 54 },
-  { field: 'name', title: '名称/对象', minWidth: 220, fixed: 'left', slot: 'name' },
-  { field: 'no', title: '编号', width: 170 },
+  { field: 'name', title: isReceipt.value ? '付款方（甲方客户）' : '名称/对象', minWidth: 220, fixed: 'left', slot: 'name' },
+  { field: 'no', title: isReceipt.value ? '收款编号' : '编号', width: 170 },
   { field: 'projectName', title: '项目', minWidth: 160 },
-  { field: 'partyName', title: '关联方/类型', minWidth: 180 },
-  { field: 'amount', title: '金额', type: 'money', width: 140 },
-  { field: 'date', title: '日期', type: 'date', width: 128 },
+  { field: 'partyName', title: isReceipt.value ? '施工合同（可选）' : '关联方/类型', minWidth: 180 },
+  ...(isReceipt.value ? [{ title: '收款方', field: 'receiptPayee', minWidth: 140, slot: 'receiptPayee' } satisfies KitTableColumn] : []),
+  { field: 'amount', title: isReceipt.value ? '收款金额' : '金额', type: 'money', width: 140 },
+  { field: 'date', title: isReceipt.value ? '收款日期' : '日期', type: 'date', width: 128 },
   { field: 'statusLabel', title: '状态', width: 110, slot: 'status' },
   { title: '操作', type: 'action', width: 72 },
-]
+])
 
 async function load() {
   await financeStore.loadList(props.kind)
@@ -112,6 +116,10 @@ function openCreate() {
 
 function openEdit(row: FinanceListRow) {
   void navigateTo(financeFormPath(props.kind, row.id))
+}
+
+function openDetail(row: FinanceListRow) {
+  void navigateTo(financeDetailPath(props.kind, row.id))
 }
 
 onMounted(() => {
@@ -160,14 +168,17 @@ onActivated(() => {
         @page-change="onPageChange"
       >
         <template #name="{ row }">
-          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
-            {{ row.name || '未命名记录' }}
+          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
+            {{ row.name || (isReceipt ? '待补充甲方客户' : '未命名记录') }}
           </button>
         </template>
         <template #status="{ row }">
           <span class="chip" :class="['已确认', '已审批', '已支付'].includes(row.statusLabel) ? 'chip-ok' : 'chip-brand'">
             {{ row.statusLabel }}
           </span>
+        </template>
+        <template #receiptPayee>
+          <span class="text-ink-soft">我方乙方</span>
         </template>
         <template #action="{ row }">
           <button class="icon-btn" title="编辑" @click="openEdit(row)">
@@ -176,7 +187,7 @@ onActivated(() => {
         </template>
       </KitTable>
       <div class="border-t border-line bg-surface-2 px-4 py-2 text-right text-12px text-ink-soft">
-        当前页 {{ pageRows.length }} 条 · 筛选后金额合计
+        当前页 {{ pageRows.length }} 条 · {{ amountSummaryLabel }}
         <strong class="ml-1 font-mono text-ink">
           {{ yuan(filtered.reduce((total, row) => total + row.amount, 0)) }}
         </strong>

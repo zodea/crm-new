@@ -276,6 +276,54 @@ describe('f3 六条资金表单领域 action', () => {
   })
 })
 
+describe('收款登记业务边界', () => {
+  it('付款方必须是真实客户 ID，施工合同可选且金额保持收入正向事实', async () => {
+    const store = useFinanceStore()
+
+    await mem.execute(`
+      INSERT INTO customers (id, name, tax_no, status)
+      VALUES ('customer-other-project', '其他项目客户', '91440100OTHER', 'submitted')
+    `)
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-missing',
+      amount: 88,
+    }, 'submit')).rejects.toThrow('付款方客户不存在或已删除')
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-other-project',
+      amount: 88,
+    }, 'submit')).rejects.toThrow('付款方客户必须是所选项目的主客户')
+
+    const receipt = await store.saveForm('receipt', {
+      no: 'SK-OPTIONAL-CONTRACT',
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      contractId: null,
+      customerId: 'customer-finance',
+      amount: 88,
+    }, 'submit')
+    expect(await loadFinanceForm('receipt', receipt.id)).toMatchObject({
+      projectId: 'project-finance',
+      contractId: null,
+      customerId: 'customer-finance',
+      amount: 88,
+      status: 'submitted',
+    })
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-finance',
+      amount: -1,
+    }, 'draft')).rejects.toThrow('收款金额不能为负数')
+  })
+})
+
 describe('付款申请票款勾稽', () => {
   it('分别执行先票后款、先款后票、无需发票三种提交规则', async () => {
     const store = useFinanceStore()

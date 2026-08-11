@@ -96,6 +96,8 @@ export const useFinanceStore = defineStore('finance', () => {
     try {
       const result = await saveFinanceForm(kind, draft, action, attachments)
       await loadOne(kind, result.id)
+      if (kind === 'receipt' && listRows.value.receipt)
+        await loadList('receipt')
       return result
     }
     finally {
@@ -123,7 +125,7 @@ export const useFinanceStore = defineStore('finance', () => {
           result = await select(`
             ${hiddenCtesFor('receipt_registrations')}
             SELECT receipt.id, receipt.no,
-                   COALESCE(customer.name, receipt.payer_account, '') AS display_name,
+                   COALESCE(customer.name, '待补充甲方客户') AS display_name,
                    COALESCE(project.name, '') AS project_name,
                    COALESCE(contract.name, '') AS party_name,
                    receipt.amount AS display_amount,

@@ -434,13 +434,16 @@ async function validateReceipt(
   )
   if (nullableId(draft.projectId) && !project)
     throw new Error('项目不存在或已删除')
+  const customerId = nullableId(draft.customerId)
   const customer = await activeRow<{ id: string }>(
     tx,
     'customers',
-    draft.customerId,
+    customerId,
   )
-  if (nullableId(draft.customerId) && !customer)
+  if (customerId && !customer)
     throw new Error('付款方客户不存在或已删除')
+  if (project && customerId && project.customer_id !== customerId)
+    throw new Error('付款方客户必须是所选项目的主客户')
   if (draft.contractId) {
     const contract = await assertReference<{
       project_id: string
@@ -451,7 +454,7 @@ async function validateReceipt(
       throw new Error('收款登记只能关联施工合同')
     if (contract.project_id !== draft.projectId)
       throw new Error('施工合同不属于所选项目')
-    if (draft.customerId && contract.customer_id && contract.customer_id !== draft.customerId)
+    if (customerId && contract.customer_id && contract.customer_id !== customerId)
       throw new Error('付款方客户与施工合同不一致')
   }
   if (action !== 'draft') {
@@ -765,6 +768,23 @@ function needsSettlementAllocation(bizType: string): boolean {
   return bizType.startsWith('有合同-')
 }
 
+function expenseContractMatchesPaymentType(
+  bizType: string,
+  contract: { kind: string, sub_kind: string | null },
+): boolean {
+  if (bizType === '预付款')
+    return ['分包', '材采', '其他支出'].includes(contract.kind)
+  if (bizType === '有合同-合同劳务')
+    return contract.kind === '分包' && contract.sub_kind === '劳务'
+  if (bizType === '有合同-专业分包')
+    return contract.kind === '分包' && contract.sub_kind === '专业'
+  if (bizType === '有合同-材料')
+    return contract.kind === '材采'
+  if (bizType === '有合同-机械' || bizType === '有合同-其他')
+    return contract.kind === '其他支出'
+  return true
+}
+
 async function validatePaymentApplicationAllocations(
   tx: TransactionDb,
   draft: PaymentApplicationFormDraft,
@@ -884,9 +904,14 @@ async function savePaymentApplication(
       project_id: string
       supplier_id: string | null
       kind: string
+      sub_kind: string | null
     }>(tx, 'contracts', draft.contractId, '关联合同')
     if (projectId && contract.project_id !== projectId)
       throw new Error('关联合同不属于所选项目')
+    if (!expenseContractMatchesPaymentType(text(draft.bizType), contract))
+      throw new Error('关联合同类型与付款申请业务类型不一致')
+    if (!contract.supplier_id)
+      throw new Error('关联合同未指向实际分供方，不能作为付款对象依据')
     if (draft.supplierId && contract.supplier_id && contract.supplier_id !== draft.supplierId)
       throw new Error('收款单位与关联合同不一致')
   }
