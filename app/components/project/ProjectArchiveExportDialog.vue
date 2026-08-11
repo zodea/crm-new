@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
-const { error, exportFile, success, warning } = useKitUI()
+const { error, exportFile, warning } = useKitUI()
 
 const snapshot = shallowRef<ProjectArchiveSnapshot | null>(null)
 const loading = shallowRef(false)
@@ -159,12 +159,13 @@ async function runExport() {
       selectedFileIds: selectedKeys.value,
     })
     const date = new Date().toISOString().slice(0, 10)
-    await exportFile({
+    const exportResult = await exportFile({
       data: result.data,
       defaultName: `${sanitizeSegment(current.project.name)}_档案包_${date}.zip`,
       mimeType: 'application/zip',
     })
-    success(`项目档案包已生成，共 ${result.exportedFiles.length} 个原件`)
+    if (exportResult.status === 'cancelled')
+      return
     if (result.missingFiles.length)
       warning(`有 ${result.missingFiles.length} 个附件原件缺失，详情已写入文件清单`)
     open.value = false

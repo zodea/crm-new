@@ -134,7 +134,7 @@ describe('项目档案包导出选择器', () => {
   })
 
   it('证照在目录中可见但不可勾选，当前导出只提交普通原件', async () => {
-    render(ProjectArchiveExportDialog, {
+    const view = render(ProjectArchiveExportDialog, {
       props: { projectId: 'project-1', open: true },
       global: { components: globalComponents },
     })
@@ -148,5 +148,24 @@ describe('项目档案包导出选择器', () => {
     expect(createZip).toHaveBeenCalled()
     expect(createZip.mock.calls[0][1].selectedFileIds).toEqual(new Set(['normal-1']))
     expect(kitUi.exportFile).toHaveBeenCalled()
+    expect(kitUi.success).not.toHaveBeenCalled()
+    expect(view.emitted()['update:open']).toContainEqual([false])
+  })
+
+  it('用户取消写盘时静默保留弹窗，不误报导出成功', async () => {
+    kitUi.exportFile.mockResolvedValueOnce({ status: 'cancelled' })
+    const view = render(ProjectArchiveExportDialog, {
+      props: { projectId: 'project-1', open: true },
+      global: { components: globalComponents },
+    })
+    await waitFor(() => expect(screen.getByText(/合和新城/)).toBeTruthy())
+
+    await fireEvent.click(screen.getByRole('button', { name: '开始导出 ZIP' }))
+    await waitFor(() => expect(kitUi.exportFile).toHaveBeenCalledOnce())
+
+    expect(kitUi.success).not.toHaveBeenCalled()
+    expect(kitUi.error).not.toHaveBeenCalled()
+    expect(view.emitted()['update:open']).toBeUndefined()
+    expect(screen.getByRole('button', { name: '开始导出 ZIP' })).toBeTruthy()
   })
 })
