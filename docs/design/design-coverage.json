@@ -6,10 +6,10 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "appPageFiles": 127,
+    "appPageFiles": 128,
     "appNavLeaves": 50,
     "covered": 127,
-    "designPending": 0,
+    "designPending": 1,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -253,6 +253,13 @@
       "appRoute": "/finance/payment/:id",
       "designRoute": "payApplyForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/finance/payment/:id/detail",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "本轮补齐的付款申请只读详情工作台，暂无一一对应的 DC 页面；沿用 EntityDetailShell 的详情骨架，并以用户提供的智能业务洞察侧栏为结构线索，先登记为待补设计。",
+      "issue": "#203"
     },
     {
       "appRoute": "/finance/payment/new",

@@ -125,6 +125,33 @@ function fetchPaymentApplications(keyword: string) {
   }, keyword)
 }
 
+function queryValue(key: string): string {
+  const value = route.query[key]
+  return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
+}
+
+async function applyPaymentRecordPrefill(base: FinancePageDraft): Promise<FinancePageDraft> {
+  if (props.kind !== 'payment_record')
+    return base
+  const paymentApplicationId = queryValue('paymentApplicationId')
+  if (!paymentApplicationId)
+    return base
+  const application = await loadFinanceForm('payment_application', paymentApplicationId)
+  if (!application)
+    return base
+  const amount = Number(queryValue('amount')) || 0
+  return {
+    ...base,
+    projectId: queryValue('projectId') || application.projectId || null,
+    supplierId: queryValue('supplierId') || application.supplierId || null,
+    purpose: application.name || application.no || '',
+    amount,
+    applicationAllocations: amount > 0
+      ? [{ paymentApplicationId, allocatedAmount: amount, note: '' }]
+      : [],
+  } as FinancePageDraft
+}
+
 async function initialize() {
   loading.value = true
   resetAttachments()
@@ -132,6 +159,7 @@ async function initialize() {
     const id = routeId.value
     if (!id) {
       draft.value = f3FormDefaults(props.kind) as FinancePageDraft
+      draft.value = await applyPaymentRecordPrefill(draft.value)
       paymentTypeSelected.value = props.kind !== 'payment_application'
     }
     else {

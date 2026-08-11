@@ -91,7 +91,7 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   await expect(page.getByRole('columnheader', { name: '实际付款', exact: true })).toBeVisible()
   await expect(page.getByText('来源：付款申请表实时汇总；点击申请编号可追溯源单。', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'FK-2026-CG-004', exact: true }))
-    .toHaveAttribute('href', '/finance/payment/pa_demo_sup004_1')
+    .toHaveAttribute('href', '/finance/payment/pa_demo_sup004_1/detail')
 
   await detailTabs.getByRole('tab', { name: '收票汇总 (1)', exact: true }).click()
   await expect(page.getByRole('link', { name: '09442026000058702', exact: true })).toBeVisible()

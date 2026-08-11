@@ -67,5 +67,25 @@ test.describe('Issue #203：付款管理', () => {
     await expect(page).toHaveURL(/\/finance\/records\/new\?/)
     await expect(page).toHaveURL(/paymentApplicationId=pa_demo_sup004_1/)
     await expect(page.getByRole('heading', { name: /新建 · 支付记录/ })).toBeVisible()
+    await expect(page.getByTestId('finance-amount')).toHaveValue('20000')
+  })
+
+  test('付款申请详情展示真实勾稽洞察，并能回填登记支付流程', async ({ page }) => {
+    await page.goto('/finance/payment/pa_demo_sup004_1/detail')
+
+    await expect(page.getByRole('heading', { name: '五金机电采购首期请款' })).toBeVisible()
+    await expect(page.getByTestId('payment-application-insight')).toBeVisible()
+    await expect(page.getByText('跨项目/分供方付款', { exact: true })).toBeVisible()
+    await expect(page.getByRole('group', { name: '待支付' })).toContainText('¥20,000.00')
+
+    await page.getByTestId('payment-application-edit').click()
+    await expect(page).toHaveURL('/finance/payment/pa_demo_sup004_1')
+    await expect(page.getByRole('heading', { name: /编辑 · 付款申请/ })).toBeVisible()
+
+    await page.goto('/finance/payment/pa_demo_sup004_1/detail')
+    await page.getByTestId('payment-application-create-payment').click()
+    await expect(page).toHaveURL(/\/finance\/records\/new\?/)
+    await expect(page).toHaveURL(/paymentApplicationId=pa_demo_sup004_1/)
+    await expect(page.getByTestId('finance-amount')).toHaveValue('20000')
   })
 })

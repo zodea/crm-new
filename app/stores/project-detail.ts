@@ -340,7 +340,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
         paymentMethod: '',
         actualPayment: number(row.derived_paid_amount),
         acceptor: (row.approval_note ?? '') as string,
-        sourcePath: `/finance/payment/${row.id as string}`,
+        sourcePath: `/finance/payment/${row.id as string}/detail`,
       }))
       currentReceipts.value = financeFacts.currentReceipts
       currentPayments.value = financeFacts.currentPayments

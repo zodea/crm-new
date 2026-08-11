@@ -68,7 +68,7 @@ test('项目驾驶舱与正式源事实同口径，并提供只读来源穿透',
 
   const applications = page.getByRole('region', { name: '付款申请', exact: true })
   await expect(applications.getByRole('link', { name: 'FK-2026-001' }).first())
-    .toHaveAttribute('href', '/finance/payment/pa_mz0x1_0')
+    .toHaveAttribute('href', '/finance/payment/pa_mz0x1_0/detail')
   await expect(applications.getByText('已付金额合计')).toContainText('¥4,200,000.00')
 
   expect(pageErrors, '跨页签来源穿透旅程不应产生客户端运行错误').toEqual([])

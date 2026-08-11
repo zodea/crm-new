@@ -181,7 +181,7 @@ function date(value: string): string {
       </div>
       <KitTable :columns="paymentColumns" :data="visiblePayments" empty="暂无请款/付款记录">
         <template #payment="{ row }">
-          <NuxtLink :to="`/finance/payment/${row.id}`" class="cell--link font-mono">
+          <NuxtLink :to="`/finance/payment/${row.id}/detail`" class="cell--link font-mono">
             {{ row.applicationNo || row.id }}
           </NuxtLink>
         </template>

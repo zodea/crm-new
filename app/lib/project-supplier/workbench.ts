@@ -160,7 +160,7 @@ function settlementPath(row: Record<string, unknown>): string {
 
 const FILE_SOURCE: Record<string, { label: string, path: (id: string) => string }> = {
   contract: { label: '合同', path: id => `/contract/${id}` },
-  payment_application: { label: '付款申请', path: id => `/finance/payment/${id}` },
+  payment_application: { label: '付款申请', path: id => `/finance/payment/${id}/detail` },
   payment_record: { label: '支付记录', path: id => `/finance/records/${id}` },
   expenditure_settlement: { label: '支出结算', path: id => `/contract/other-settlement/form/${id}` },
   settlement: { label: '最终结算', path: () => '' },
@@ -315,7 +315,7 @@ export async function loadProjectSupplierWorkbench(
     applyDate: text(row.apply_date),
     invoiceState: text(row.invoice_state),
     attachmentCount: number(row.attachment_count),
-    sourcePath: `/finance/payment/${text(row.id)}`,
+    sourcePath: `/finance/payment/${text(row.id)}/detail`,
   }))
   const invoices = invoiceRows.map<ProjectSupplierInvoiceFact>(row => ({
     id: text(row.id),

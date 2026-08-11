@@ -135,6 +135,7 @@
 | `app/pages/finance/invoice/index.vue` | `/finance/invoice` | 发票台账 | 工作台 | #204 | R-WORKBENCH-PRIOR | 待 #204 同屏测量 | 待 #204 只读核对 | C-DENSE |
 | `app/pages/finance/ledger.vue` | `/finance/ledger` | 发票台账 | 工作台 | #204 | R-WORKBENCH-PRIOR | 待 #204 同屏测量 | 待 #204 只读核对 | C-DENSE |
 | `app/pages/finance/payment/[id].vue` | `/finance/payment/:id` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/finance/payment/[id]/detail.vue` | `/finance/payment/:id/detail` | 支出财务 | 详情 | #203 | R-DETAIL-PRIOR | 暂无一一对应的详情设计稿；以用户提供的智能业务洞察侧栏作结构线索 | 详情仅展示真实派生的合同、结算、发票、支付勾稽；编辑与登记支付分别进入整页表单，不伪造审批轨迹 | C-DENSE |
 | `app/pages/finance/payment/index.vue` | `/finance/payment` | 支出财务 | 列表 | #203 | R-LIST-PRIOR | 待 #203 同屏测量 | 待 #203 只读核对 | C-DENSE |
 | `app/pages/finance/payment/new.vue` | `/finance/payment/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/payment-management/index.vue` | `/finance/payment-management` | 支出财务 | 工作台 | #203 | R-WORKBENCH-PRIOR | 设计稿 PayManageScreen；待 #203 同屏测量 | 只读核对批复与已确认支付；登记支付跳整页支付记录 | C-DENSE |
