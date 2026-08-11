@@ -9,6 +9,7 @@ import {
   invoiceImportReview,
   invoiceLedgerRows,
   parseInvoiceWorkbookForMapping,
+  readInvoiceWorkbookStyleReadback,
 } from '~/lib/invoice/excel'
 import { createSyntheticInvoiceWorkbook } from '../fixtures/invoice-workbook'
 
@@ -212,5 +213,52 @@ describe('发票 Excel 导入/回读来源证据', () => {
       '000000000000000021',
       '000000000000000022',
     ])
+  })
+
+  it('导出后重新读取仍保留实际 XLSX 样式、行列尺寸、冻结和合并关系', async () => {
+    const bytes = createInvoiceLedgerXlsx([
+      invoice({ invoiceNumber: '000000000000000021', totalAmount: 10 }),
+      invoice({ id: 'inv-test-2', invoiceNumber: '000000000000000022', totalAmount: 20 }),
+    ])
+
+    const readback = await readInvoiceWorkbookStyleReadback(bytes)
+    const sheet = readback.sheets[0]!
+
+    expect(readback.issues).toEqual([])
+    expect(sheet.freezeRows).toBe(2)
+    expect(sheet.columns[0]).toMatchObject({ wch: 15 })
+    expect(sheet.columns[2]).toMatchObject({ wch: 30 })
+    expect(sheet.rows[0]).toMatchObject({ hpt: 24 })
+    expect(sheet.rows[1]).toMatchObject({ hpt: 28 })
+    expect(sheet.rows[2]).toMatchObject({ hpt: 32 })
+    expect(sheet.cells.A1).toMatchObject({
+      font: { name: '等线', sz: 16, bold: true },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    })
+    expect(sheet.cells.A2).toMatchObject({
+      font: { name: '等线', sz: 14, bold: true },
+      border: { top: { style: 'thin' }, bottom: { style: 'thin' } },
+    })
+    expect(sheet.cells.A3?.numberFormat).toBe('yyyy"年"m"月"d"日";@')
+    expect(sheet.cells.E3?.numberFormat).toBe('0.00_);[Red]\\(0.00\\)')
+    expect(sheet.mergedCells).toEqual(expect.arrayContaining(['A1:H1', 'C3:C4', 'F3:F4']))
+  })
+
+  it('样式包读取失败时保留业务行，但把格式问题写入逐行复核', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+      ['发票号码', '价税合计'],
+      ['000000000000000099', 99],
+    ]), '明细')
+    const xlsBytes = XLSX.write(
+      workbook,
+      { type: 'array', bookType: 'xls' },
+    ) as ArrayBuffer
+
+    const parsed = await parseInvoiceWorkbookForMapping(xlsBytes, '格式异常.xls')
+    const sheet = parsed.sheets[0]!
+
+    expect(sheet.styleIssues.length).toBeGreaterThan(0)
+    expect(sheet.styleIssues[0]).toMatchObject({ sheetName: sheet.name })
   })
 })
