@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { deliveryReviewIssueDetails, editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
 
 describe('送货单人工复核金额', () => {
   it('计算行随数量/单价更新，OCR 或手改金额不被覆盖', () => {
@@ -53,5 +53,36 @@ describe('送货单人工复核金额', () => {
       balanced: true,
     })
     expect(editDeliveryAmountLine(amountOnly, 'qty', Number.NaN)).toMatchObject({ qty: null, amount: 386 })
+  })
+
+  it('#257 识别未完成、自然键重复或人工确认金额缺失时不得归档', () => {
+    const base = {
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'DL-001',
+      deliveryDate: '2026-06-01',
+      docType: '材料送货单',
+      note: '人工复核记录',
+      items: [{
+        id: 'line-1',
+        name: 'BV 电线',
+        unit: 'm',
+        qty: 10,
+        unitPrice: null,
+        amount: 25,
+        amountSource: 'manual' as const,
+      }],
+      confirmations: { humanReviewed: true },
+    }
+
+    expect(deliveryReviewIssueDetails({ ...base, ocrStatus: 'pending' })
+      .some(issue => issue.key === 'ocr-status')).toBe(true)
+    expect(deliveryReviewIssueDetails({ ...base, naturalKeyDuplicate: true })
+      .some(issue => issue.key === 'duplicate')).toBe(true)
+    expect(deliveryReviewIssueDetails({
+      ...base,
+      note: '',
+      items: [{ ...base.items[0]!, amount: null }],
+    }).some(issue => issue.key === 'amount')).toBe(true)
   })
 })

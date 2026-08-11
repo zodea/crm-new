@@ -6,7 +6,7 @@ import { computed, readonly, ref, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
-import { checkArchiveOwnership, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
+import { checkInvoiceArchiveReady, checkNotDuplicate } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
 import { normalizePrintRotation } from '~/lib/invoice/print-layout'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
@@ -444,17 +444,20 @@ export const useInvoiceStore = defineStore('invoice', () => {
     if (!inv)
       return { ok: false, reason: '发票不存在或已删除' }
 
-    const dupCheck = checkNotDuplicate(inv.dupStatus)
-    if (!dupCheck.ok)
-      return dupCheck
-
-    const reviewedCheck = checkReviewed(inv.reviewStatus)
-    if (!reviewedCheck.ok)
-      return reviewedCheck
-
-    const ownershipCheck = checkArchiveOwnership(ownerKind, projectId)
-    if (!ownershipCheck.ok)
-      return ownershipCheck
+    const ready = checkInvoiceArchiveReady({
+      ocrStatus: inv.ocrStatus,
+      reviewStatus: inv.reviewStatus,
+      dupStatus: inv.dupStatus,
+      ownerKind,
+      projectId,
+      invoiceNumber: inv.invoiceNumber,
+      invoiceDate: inv.invoiceDate,
+      seller: inv.seller,
+      totalAmount: inv.totalAmount,
+      currentValuesConfirmed: inv.reviewStatus === 'reviewed',
+    })
+    if (!ready.ok)
+      return ready
 
     const now = new Date().toISOString()
     const logId = await withUpdateLog(db, 'invoices', id, () => execute(

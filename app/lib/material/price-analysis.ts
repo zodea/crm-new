@@ -14,6 +14,10 @@ export interface DeliveryPriceLineInput {
   spec: string
   unit: string
   unitPrice: number | null
+  /** 识别/导入后的当前单价是否已由人工确认；未传时沿用历史已归档记录语义。 */
+  currentValueConfirmed?: boolean
+  originalOcrUnitPrice?: number | null
+  revisionReason?: string
 }
 
 export interface DeliveryPriceRecordInput {
@@ -24,6 +28,11 @@ export interface DeliveryPriceRecordInput {
   deliveryDate: string
   archived: boolean
   lines: readonly DeliveryPriceLineInput[]
+  /** 存在时必须是人工核对完成态。 */
+  reviewStatus?: string
+  ocrStatus?: string
+  naturalKeyDuplicate?: boolean
+  currentValuesConfirmed?: boolean
 }
 
 export interface PricePartyInput {
@@ -41,6 +50,14 @@ export interface MaterialPriceFact {
   supplierId: string
   supplierName: string
   price: number
+  /** 当前价格事实的来源留痕；分析只读取 price，不回写原始 OCR 或修订值。 */
+  provenance: {
+    sourceKind: 'delivery'
+    sourceRecordId: string
+    sourceLineId: string
+    originalOcrUnitPrice: number | null
+    revisionReason: string
+  }
 }
 
 export interface MaterialPriceCatalogItem {
@@ -176,16 +193,35 @@ export function buildMaterialPriceCatalog(
   const byMaterial = new Map<string, MaterialPriceCatalogItem>()
 
   for (const record of records) {
-    if (!record.archived || !record.supplierId)
+    if (
+      !record.archived
+      || !record.supplierId
+      || !record.projectId
+      || !record.orderNo.trim()
+      || !record.deliveryDate.trim()
+      || (record.reviewStatus != null && record.reviewStatus !== 'reviewed')
+      || (record.ocrStatus != null && record.ocrStatus !== 'done')
+      || record.naturalKeyDuplicate === true
+      || record.currentValuesConfirmed === false
+    ) {
       continue
+    }
     const supplierName = supplierNames.get(record.supplierId)
     if (!supplierName)
       continue
 
     for (const line of record.lines) {
       const name = normalizeText(line.materialName)
-      if (!name || NON_MATERIAL_CHARGE.test(name) || !isValidPrice(line.unitPrice))
+      if (
+        !line.id.trim()
+        || !name
+        || !normalizeText(line.unit)
+        || NON_MATERIAL_CHARGE.test(name)
+        || !isValidPrice(line.unitPrice)
+        || line.currentValueConfirmed === false
+      ) {
         continue
+      }
 
       const spec = normalizeMaterialSpec(line.spec)
       const unit = normalizeMaterialUnit(line.unit)
@@ -225,6 +261,13 @@ export function buildMaterialPriceCatalog(
         supplierId: record.supplierId,
         supplierName,
         price: line.unitPrice,
+        provenance: {
+          sourceKind: 'delivery',
+          sourceRecordId: record.id,
+          sourceLineId: line.id,
+          originalOcrUnitPrice: line.originalOcrUnitPrice ?? null,
+          revisionReason: line.revisionReason ?? '',
+        },
       })
       byMaterial.set(key, item)
     }

@@ -24,6 +24,20 @@ export interface DeliveryReviewConfirmations {
   qualityReviewed: boolean
 }
 
+/** 送货单当前值之外的原始/修订留痕，不参与金额或材料事实计算。 */
+export interface DeliveryReviewProvenance {
+  sourceId: string
+  sourceFileName?: string
+  originalOcr?: Readonly<Record<string, unknown>> | null
+  revisions?: readonly {
+    field: string
+    from: unknown
+    to: unknown
+    reason: string
+    at: string
+  }[]
+}
+
 export interface DeliveryReviewInput {
   projectId: string
   supplierId: string | null
@@ -37,6 +51,11 @@ export interface DeliveryReviewInput {
     unit: string
   })[]
   confirmations?: Partial<DeliveryReviewConfirmations>
+  /** 存在时必须是识别完成态；手工录入可不传。 */
+  ocrStatus?: string
+  /** 导入/去重或数据库唯一键发现的送货单自然键冲突。 */
+  naturalKeyDuplicate?: boolean
+  provenance?: DeliveryReviewProvenance
 }
 
 export interface DeliveryReviewPolicy {
@@ -45,7 +64,7 @@ export interface DeliveryReviewPolicy {
   requiresQualityReview?: boolean
 }
 
-export type DeliveryReviewIssueKey = 'non-material' | 'project' | 'supplier' | 'date' | 'order-no' | 'items' | 'amount' | 'quality' | 'human-reviewed'
+export type DeliveryReviewIssueKey = 'non-material' | 'ocr-status' | 'duplicate' | 'project' | 'supplier' | 'date' | 'order-no' | 'items' | 'amount' | 'quality' | 'human-reviewed'
 
 export interface DeliveryReviewIssue {
   key: DeliveryReviewIssueKey
@@ -123,6 +142,10 @@ export function deliveryReviewIssueDetails(
 
   if (policy.nonMaterial)
     issues.push({ key: 'non-material', label: '当前文件属于非材料/待处理，必须人工改判为材料到货后才能归档' })
+  if (input.ocrStatus && input.ocrStatus !== 'done')
+    issues.push({ key: 'ocr-status', label: '送货单识别尚未完成，不能进入归档终态' })
+  if (input.naturalKeyDuplicate)
+    issues.push({ key: 'duplicate', label: '送货单自然键重复，需先完成重复记录复核' })
   if (!input.projectId)
     issues.push({ key: 'project', label: '必须选择所属项目' })
   if (!input.supplierId)
@@ -139,6 +162,18 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'items', label: '每条明细必须人工确认材料名称、单位和非零数量' })
   if (!input.items.length)
     issues.push({ key: 'items', label: '至少保留一条材料明细' })
+
+  const invalidAmountLines = input.items.filter(item =>
+    item.amount == null
+    || !Number.isFinite(item.amount)
+    || item.amount < 0
+    || (item.unitPrice != null && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0)),
+  )
+  if (invalidAmountLines.length) {
+    issues.push({ key: 'amount', label: '每条材料明细必须保留人工确认后的有效金额；缺失或异常金额不能归档' })
+    if (!input.note.trim())
+      issues.push({ key: 'amount', label: '金额缺失或异常必须记录保留票面金额或修正金额的原因' })
+  }
 
   const summary = summarizeDeliveryAmounts(input.items, input.statedTotal ?? null)
   if (policy.requiresAmountReview || summary.mismatchedLineIds.length || summary.statedBalanced === false) {
