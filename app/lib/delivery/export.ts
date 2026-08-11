@@ -1,8 +1,11 @@
 import type { ExportData } from '~/lib/kit/export'
-import type { DeliveryRecord } from '~/stores/delivery-record'
+import type { DeliveryRecord, DeliveryRecordSourceFile } from '~/stores/delivery-record'
 import * as XLSX from 'xlsx'
+import { appendCollisionSuffix, exportDataToBytes } from '~/lib/kit/export'
+import { createZip, sanitizeSegment } from '~/lib/project/archive'
 
 export const DELIVERY_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+export const DELIVERY_ZIP_MIME = 'application/zip'
 
 export interface DeliveryExportRow {
   projectName: string
@@ -39,10 +42,40 @@ export interface DeliveryExportResolvers {
   supplierName: (id: string | null) => string
 }
 
-function rowException(record: DeliveryRecord, line: DeliveryRecord['lines'][number]): string {
+export interface DeliveryExportSourceInfo {
+  fileName: string
+  shared: boolean
+  available?: boolean
+}
+
+export interface DeliveryArchiveSource extends DeliveryRecordSourceFile {
+  recordId: string
+  sourceKey: string
+  shared: boolean
+}
+
+export interface DeliveryArchiveExportOptions {
+  convertImagesToPdf: boolean
+  loadSource: (record: DeliveryRecord) => Promise<DeliveryRecordSourceFile | null>
+}
+
+export interface DeliveryArchiveExportResult {
+  data: Uint8Array
+  rows: readonly DeliveryExportRow[]
+  sources: readonly DeliveryArchiveSource[]
+  missingRecordIds: readonly string[]
+}
+
+function rowException(
+  record: DeliveryRecord,
+  line: DeliveryRecord['lines'][number],
+  source?: DeliveryExportSourceInfo,
+): string {
   const reasons: string[] = []
-  if (!record.hasSourceFile)
+  if (!record.hasSourceFile || source?.available === false)
     reasons.push('缺少原件')
+  if (source?.shared)
+    reasons.push('多单共用原件/无法拆分')
   if (!record.supplierId)
     reasons.push('未区分分供方')
   if (line.qty == null || line.unitPrice == null || line.amount == null)
@@ -57,24 +90,33 @@ function rowException(record: DeliveryRecord, line: DeliveryRecord['lines'][numb
 export function deliveryLedgerRows(
   records: readonly DeliveryRecord[],
   resolvers: DeliveryExportResolvers,
+  sources: ReadonlyMap<string, DeliveryExportSourceInfo> = new Map(),
 ): DeliveryExportRow[] {
   return records
-    .flatMap(record => record.lines.map(line => ({
-      projectName: resolvers.projectName(record.projectId),
-      supplierName: resolvers.supplierName(record.supplierId),
-      orderNo: record.orderNo,
-      deliveryDate: record.deliveryDate,
-      materialName: line.materialName,
-      spec: line.spec,
-      unit: line.unit,
-      quantity: line.qty,
-      unitPrice: line.unitPrice,
-      amount: line.amount,
-      sourceFile: record.hasSourceFile ? `${record.fileName || '原件'} / —` : '—',
-      exception: rowException(record, line),
-    })))
+    .flatMap(record => record.lines.map((line) => {
+      const source = sources.get(record.id)
+      return {
+        projectName: resolvers.projectName(record.projectId),
+        supplierName: resolvers.supplierName(record.supplierId),
+        orderNo: record.orderNo,
+        deliveryDate: record.deliveryDate,
+        materialName: line.materialName,
+        spec: line.spec,
+        unit: line.unit,
+        quantity: line.qty,
+        unitPrice: line.unitPrice,
+        amount: line.amount,
+        sourceFile: source?.available === false
+          ? '—'
+          : source
+            ? `${source.fileName} / ${source.shared ? '共用原件' : '—'}`
+            : record.hasSourceFile ? `${record.fileName || '原件'} / —` : '—',
+        exception: rowException(record, line, source),
+      }
+    }))
     .sort((a, b) => a.projectName.localeCompare(b.projectName, 'zh-CN')
       || a.supplierName.localeCompare(b.supplierName, 'zh-CN')
+      || a.deliveryDate.localeCompare(b.deliveryDate)
       || a.orderNo.localeCompare(b.orderNo, 'zh-CN')
       || a.materialName.localeCompare(b.materialName, 'zh-CN'))
 }
@@ -121,4 +163,280 @@ export function createDeliveryLedgerXlsx(rows: readonly DeliveryExportRow[]): Ex
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, worksheet, '送货单明细')
   return writeWorkbook(workbook)
+}
+
+interface PdfPageImage {
+  bytes: Uint8Array
+  width: number
+  height: number
+  widthPoints: number
+  heightPoints: number
+}
+
+const IMAGE_MIME_RE = /^image\/(?:png|jpe?g)$/i
+
+function isPdf(source: DeliveryRecordSourceFile): boolean {
+  return source.mimeType === 'application/pdf' || /\.pdf$/i.test(source.fileName)
+}
+
+function isImage(source: DeliveryRecordSourceFile): boolean {
+  return IMAGE_MIME_RE.test(source.mimeType) || /\.(?:png|jpe?g)$/i.test(source.fileName)
+}
+
+function imageJpegDimensions(bytes: Uint8Array): { width: number, height: number } | null {
+  if (bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8)
+    return null
+  let offset = 2
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xFF) {
+      offset += 1
+      continue
+    }
+    const marker = bytes[offset + 1]!
+    offset += 2
+    if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7))
+      continue
+    if (offset + 2 > bytes.length)
+      return null
+    const length = (bytes[offset]! << 8) | bytes[offset + 1]!
+    if (length < 2 || offset + length > bytes.length)
+      return null
+    const isFrame = (marker >= 0xC0 && marker <= 0xC3)
+      || (marker >= 0xC5 && marker <= 0xC7)
+      || (marker >= 0xC9 && marker <= 0xCB)
+      || (marker >= 0xCD && marker <= 0xCF)
+    if (isFrame) {
+      return {
+        height: (bytes[offset + 3]! << 8) | bytes[offset + 4]!,
+        width: (bytes[offset + 5]! << 8) | bytes[offset + 6]!,
+      }
+    }
+    offset += length
+  }
+  return null
+}
+
+async function imageToJpeg(source: DeliveryArchiveSource): Promise<PdfPageImage> {
+  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined')
+    throw new Error(`无法将图片原件转换为 PDF：当前环境不支持图片渲染（${source.fileName}）`)
+  const bitmap = await createImageBitmap(new Blob([source.bytes as unknown as BlobPart], { type: source.mimeType }))
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, bitmap.width)
+    canvas.height = Math.max(1, bitmap.height)
+    const context = canvas.getContext('2d')
+    if (!context)
+      throw new Error(`无法将图片原件转换为 PDF：${source.fileName}`)
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(bitmap, 0, 0)
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(value => value ? resolve(value) : reject(new Error(`无法编码图片原件：${source.fileName}`)), 'image/jpeg', 0.94)
+    })
+    const bytes = new Uint8Array(await blob.arrayBuffer())
+    const dimensions = imageJpegDimensions(bytes) ?? { width: bitmap.width, height: bitmap.height }
+    return {
+      bytes,
+      width: dimensions.width,
+      height: dimensions.height,
+      widthPoints: dimensions.width * 72 / 96,
+      heightPoints: dimensions.height * 72 / 96,
+    }
+  }
+  finally {
+    bitmap.close()
+  }
+}
+
+async function renderPdf(source: DeliveryArchiveSource): Promise<PdfPageImage[]> {
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  const loadingTask = pdfjs.getDocument({ data: source.bytes })
+  const pdf = await loadingTask.promise
+  const pages: PdfPageImage[] = []
+  try {
+    for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
+      const page = await pdf.getPage(pageIndex)
+      const viewport = page.getViewport({ scale: 1.5 })
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.ceil(viewport.width))
+      canvas.height = Math.max(1, Math.ceil(viewport.height))
+      const context = canvas.getContext('2d')
+      if (!context)
+        throw new Error(`无法渲染 PDF 原件：${source.fileName}`)
+      await page.render({ canvas: null, canvasContext: context, viewport }).promise
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(value => value ? resolve(value) : reject(new Error(`无法编码 PDF 页面：${source.fileName}`)), 'image/jpeg', 0.94)
+      })
+      const bytes = new Uint8Array(await blob.arrayBuffer())
+      pages.push({
+        bytes,
+        width: canvas.width,
+        height: canvas.height,
+        widthPoints: viewport.width / 1.5,
+        heightPoints: viewport.height / 1.5,
+      })
+      page.cleanup()
+    }
+  }
+  finally {
+    await pdf.cleanup()
+    await loadingTask.destroy()
+  }
+  return pages
+}
+
+function ascii(value: string): Uint8Array {
+  return new TextEncoder().encode(value)
+}
+
+function concatBytes(chunks: readonly Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0))
+  let offset = 0
+  for (const chunk of chunks) {
+    result.set(chunk, offset)
+    offset += chunk.length
+  }
+  return result
+}
+
+function pdfNumber(value: number): string {
+  return Math.max(1, value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+function createImagePdf(pages: readonly PdfPageImage[]): Uint8Array {
+  const objects: Uint8Array[] = [new Uint8Array()]
+  const pageRefs: number[] = []
+  const object = (body: Uint8Array | string): number => {
+    objects.push(typeof body === 'string' ? ascii(body) : body)
+    return objects.length - 1
+  }
+  const catalogRef = object('')
+  const pagesRef = object('')
+  for (const [index, page] of pages.entries()) {
+    const imageRef = object(concatBytes([
+      ascii(`<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.bytes.length} >>\nstream\n`),
+      page.bytes,
+      ascii('\nendstream'),
+    ]))
+    const content = ascii(`q\n${pdfNumber(page.widthPoints)} 0 0 ${pdfNumber(page.heightPoints)} 0 0 cm\n/Im${index + 1} Do\nQ\n`)
+    const contentRef = object(concatBytes([
+      ascii(`<< /Length ${content.length} >>\nstream\n`),
+      content,
+      ascii('endstream'),
+    ]))
+    const pageRef = object(`<< /Type /Page /Parent ${pagesRef} 0 R /MediaBox [0 0 ${pdfNumber(page.widthPoints)} ${pdfNumber(page.heightPoints)}] /Resources << /XObject << /Im${index + 1} ${imageRef} 0 R >> >> /Contents ${contentRef} 0 R >>`)
+    pageRefs.push(pageRef)
+  }
+  objects[catalogRef] = ascii(`<< /Type /Catalog /Pages ${pagesRef} 0 R >>`)
+  objects[pagesRef] = ascii(`<< /Type /Pages /Kids [${pageRefs.map(ref => `${ref} 0 R`).join(' ')}] /Count ${pageRefs.length} >>`)
+
+  const chunks: Uint8Array[] = [ascii('%PDF-1.7\n%\xFF\xFF\xFF\xFF\n')]
+  const offsets: number[] = [0]
+  let offset = chunks[0]!.length
+  for (let index = 1; index < objects.length; index += 1) {
+    const prefix = ascii(`${index} 0 obj\n`)
+    const suffix = ascii('\nendobj\n')
+    offsets[index] = offset
+    chunks.push(prefix, objects[index]!, suffix)
+    offset += prefix.length + objects[index]!.length + suffix.length
+  }
+  const xrefOffset = offset
+  const xref = [`xref\n0 ${objects.length}\n`, '0000000000 65535 f \n', ...offsets.slice(1).map(value => `${String(value).padStart(10, '0')} 00000 n \n`)].join('')
+  chunks.push(ascii(`${xref}trailer\n<< /Size ${objects.length} /Root ${catalogRef} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`))
+  return concatBytes(chunks)
+}
+
+function sourceKey(record: DeliveryRecord): string {
+  return record.printBatchId.trim() || record.id
+}
+
+function sourcePath(source: DeliveryArchiveSource, usedPaths: Set<string>): string {
+  const extension = /\.(pdf|png|jpe?g)$/i.exec(source.fileName)?.[1]?.toLowerCase() || 'bin'
+  const folder = extension === 'pdf' ? '原件/PDF' : '原件/图片'
+  const originalName = sanitizeSegment(source.fileName, `${source.recordId}.${extension}`)
+  const dot = originalName.lastIndexOf('.')
+  const stem = dot > 0 ? originalName.slice(0, dot) : originalName
+  const extensionSuffix = dot > 0 ? originalName.slice(dot) : ''
+  let sequence = 1
+  let name = originalName
+  let path = `${folder}/${name}`
+  while (usedPaths.has(path.toLowerCase())) {
+    sequence += 1
+    name = appendCollisionSuffix(`${stem}${extensionSuffix}`, sequence)
+    path = `${folder}/${name}`
+  }
+  usedPaths.add(path.toLowerCase())
+  return path
+}
+
+async function loadUniqueSources(
+  records: readonly DeliveryRecord[],
+  loadSource: DeliveryArchiveExportOptions['loadSource'],
+): Promise<{ sources: DeliveryArchiveSource[], sourceByRecord: Map<string, DeliveryExportSourceInfo>, missingRecordIds: string[] }> {
+  const sorted = [...records].sort((a, b) => a.projectId.localeCompare(b.projectId)
+    || (a.supplierId || '').localeCompare(b.supplierId || '')
+    || a.deliveryDate.localeCompare(b.deliveryDate)
+    || a.orderNo.localeCompare(b.orderNo, 'zh-CN'))
+  const groups = new Map<string, DeliveryRecord[]>()
+  for (const record of sorted) {
+    const key = sourceKey(record)
+    groups.set(key, [...(groups.get(key) ?? []), record])
+  }
+  const sources: DeliveryArchiveSource[] = []
+  const sourceByRecord = new Map<string, DeliveryExportSourceInfo>()
+  const missingRecordIds: string[] = []
+  for (const [key, group] of groups) {
+    let loaded: DeliveryRecordSourceFile | null = null
+    let owner: DeliveryRecord | undefined
+    for (const record of group) {
+      if (!record.hasSourceFile)
+        continue
+      loaded = await loadSource(record)
+      if (loaded) {
+        owner = record
+        break
+      }
+    }
+    if (!loaded || !owner) {
+      for (const record of group) {
+        missingRecordIds.push(record.id)
+        sourceByRecord.set(record.id, { fileName: record.fileName || '原件', shared: group.length > 1, available: false })
+      }
+      continue
+    }
+    const source: DeliveryArchiveSource = { ...loaded, recordId: owner.id, sourceKey: key, shared: group.length > 1 }
+    sources.push(source)
+    for (const record of group)
+      sourceByRecord.set(record.id, { fileName: loaded.fileName, shared: group.length > 1 })
+  }
+  return { sources, sourceByRecord, missingRecordIds }
+}
+
+export async function createDeliveryArchiveZip(
+  records: readonly DeliveryRecord[],
+  resolvers: DeliveryExportResolvers,
+  options: DeliveryArchiveExportOptions,
+): Promise<DeliveryArchiveExportResult> {
+  const { sources, sourceByRecord, missingRecordIds } = await loadUniqueSources(records, options.loadSource)
+  const rows = deliveryLedgerRows(records, resolvers, sourceByRecord)
+  const pdfPages: PdfPageImage[] = []
+  for (const source of sources) {
+    if (isPdf(source))
+      pdfPages.push(...await renderPdf(source))
+    else if (isImage(source) && options.convertImagesToPdf)
+      pdfPages.push(await imageToJpeg(source))
+  }
+  const usedSourcePaths = new Set<string>()
+  const zipFiles = [
+    { path: '送货单明细.xlsx', data: exportDataToBytes(createDeliveryLedgerXlsx(rows)) },
+    { path: '送货单合并.pdf', data: createImagePdf(pdfPages) },
+    ...sources.map(source => ({ path: sourcePath(source, usedSourcePaths), data: source.bytes })),
+  ]
+  return {
+    data: createZip(zipFiles),
+    rows,
+    sources,
+    missingRecordIds,
+  }
 }
