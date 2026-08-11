@@ -616,7 +616,7 @@ function appendNumberFormats(stylesXml: string, formats: readonly string[]): { x
     ids.set(format, id)
     children.push(`<numFmt numFmtId="${id}" formatCode="${xmlEscape(format)}"/>`)
   }
-  const sectionRegex = /<numFmts([^>]*)>(?:[\s\S]*?)<\/numFmts>/
+  const sectionRegex = /<numFmts([^>]*)>[\s\S]*?<\/numFmts>/
   const match = sectionRegex.exec(stylesXml)
   if (!match)
     throw new Error('XLSX styles.xml 缺少 numFmts')
@@ -666,7 +666,7 @@ function patchStylesXml(
   }
   if (!cellXfs)
     throw new Error('XLSX styles.xml 缺少 cellXfs')
-  const sectionRegex = /<cellXfs[^>]*>(?:[\s\S]*?)<\/cellXfs>/
+  const sectionRegex = /<cellXfs[^>]*>[\s\S]*?<\/cellXfs>/
   const match = sectionRegex.exec(xml)
   if (!match)
     throw new Error('XLSX styles.xml 缺少 cellXfs')
@@ -942,13 +942,6 @@ function sourceRowKind(
   if (hasTotalMarker(values))
     return 'total'
   return 'data'
-}
-
-/** 持久化边界统一收敛为完整样式，损坏或非对象记录回退到领域默认值。 */
-export function normalizeInvoiceXlsxStyleConfig(value: unknown): InvoiceXlsxStyleConfig {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return createDefaultInvoiceXlsxStyleConfig()
-  return resolveInvoiceStyleConfig(value as InvoiceXlsxStyleConfig)
 }
 
 function normalizedInvoiceKey(value: unknown): string {
@@ -1283,7 +1276,7 @@ export function createInvoiceImportTemplateXlsx(styleConfig: InvoiceXlsxStyleCon
   cellStyleAddresses(instructions, 0, 0, 0, 2, 'title')
   cellStyleAddresses(instructions, 1, 1, 0, 2, 'header')
   cellStyleAddresses(instructions, 2, 8, 0, 2, 'data')
-  setRowHeights(instructions, [config.titleRowHeight, config.headerRowHeight, ...Array<number>(7).fill(config.dataRowHeight)])
+  setRowHeights(instructions, [config.titleRowHeight, config.headerRowHeight, ...(Array.from({ length: 7 }).fill(config.dataRowHeight) as number[])])
   XLSX.utils.book_append_sheet(workbook, instructions, '填写说明')
   return writeWorkbook(workbook, config)
 }
@@ -1330,7 +1323,7 @@ export function createInvoiceLedgerXlsxFromRows(
   setRowHeights(worksheet, [
     config.titleRowHeight,
     config.headerRowHeight,
-    ...Array<number>(rows.length).fill(config.dataRowHeight),
+    ...(Array.from({ length: rows.length }).fill(config.dataRowHeight) as number[]),
     config.totalRowHeight,
   ])
 
