@@ -3,7 +3,7 @@
 // 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
 // 口径：台账 = 已归档（DATABASE.md §4.2）；「待归档」= 已校对未归档过渡态（#57，
 // 替代设计稿旧模型的「未归项目」——两态模型下归档必有归属，见 issue #69 评论）。
-import type { InvoiceLedgerExportRow } from '~/lib/invoice/excel'
+import type { InvoiceLedgerExportRow, InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
 import type { ProjectGroupKey } from '~/lib/invoice/ledger-nodes'
 import type { InvoicePrintRequest } from '~/lib/invoice/print-layout'
 import type { KitTableColumn } from '~/lib/kit/table'
@@ -196,13 +196,13 @@ function leavePrint() {
   printMode.value = false
 }
 
-async function confirmExport() {
+async function confirmExport(styleConfig: InvoiceXlsxStyleConfig) {
   if (exportSaving.value || !exportPreviewRows.value.length)
     return
   exportSaving.value = true
   try {
     await exportFile({
-      data: createInvoiceLedgerXlsxFromRows(exportPreviewRows.value),
+      data: createInvoiceLedgerXlsxFromRows(exportPreviewRows.value, styleConfig),
       defaultName: exportPreviewFileName.value,
       mimeType: INVOICE_XLSX_MIME,
     })
