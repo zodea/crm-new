@@ -117,6 +117,11 @@ describe('项目详情运行态信息流', () => {
           ProjectFileCabinet: labeledStub('项目文件'),
           ProjectDetailTab: labeledStub('详细资料内容'),
           ProjectSubTables: labeledStub('业务子表内容'),
+          ProjectArchiveExportDialog: defineComponent({
+            props: ['open', 'projectId'],
+            emits: ['update:open'],
+            template: '<div data-ui="project-archive-export-dialog" />',
+          }),
           StatePanel: labeledStub('页面状态'),
         },
       },
@@ -127,6 +132,7 @@ describe('项目详情运行态信息流', () => {
     expect(screen.getAllByText('施工中')).toHaveLength(2)
     expect(screen.queryByText(/状态锁定/)).toBeNull()
     expect(screen.getByRole('link', { name: '关闭项目详情' }).getAttribute('href')).toBe('/project')
+    expect(screen.getByRole('button', { name: '导出项目档案包' })).not.toBeNull()
 
     for (const value of ['施工中', '自营', '陈志强', '广州合和置业', '广州睿瑛装饰'])
       expect(screen.getAllByText(value).length).toBeGreaterThan(0)
@@ -134,10 +140,10 @@ describe('项目详情运行态信息流', () => {
     const modules = [...document.querySelectorAll('[data-project-module]')]
       .map(element => element.getAttribute('data-project-module'))
     expect(modules).toEqual([
+      'timeline',
       'metrics',
       'workflow',
       'schedule',
-      'timeline',
       'tabs',
       'suppliers',
       'team',
