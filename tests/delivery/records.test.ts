@@ -641,7 +641,7 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
     })).rejects.toThrow('至少添加一条材料明细')
   })
 
-  it('分供方已明确时，空单号仍受项目+分供方+单号自然键约束', async () => {
+  it('空单号不形成自然键，同项目和分供方可连续归档多张无单号单据', async () => {
     const store = useDeliveryRecordStore()
     const input = {
       projectId: 'p1',
@@ -652,8 +652,12 @@ describe('送货单 pass-1：store CRUD 闭环', () => {
       lines: [{ materialName: '砂', spec: '', unit: '方', qty: 1, unitPrice: 80, note: '' }],
     }
 
-    await store.add(input)
-    await expect(store.add(input)).rejects.toThrow()
+    const firstId = await store.add(input)
+    const secondId = await store.add(input)
+
+    expect(secondId).not.toBe(firstId)
+    expect(store.list.filter(record => record.orderNo === '')).toHaveLength(2)
+    expect(store.list.every(record => !record.naturalKeyDuplicate)).toBe(true)
   })
 
   it('归档库只暴露已归档送货单，不混入后续 OCR 处理区记录', async () => {

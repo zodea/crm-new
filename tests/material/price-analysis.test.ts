@@ -35,6 +35,8 @@ function delivery(
     spec: string
     unit: string
     unitPrice: number | null
+    amount?: number | null
+    currentValueConfirmed?: boolean
   }>,
 ) {
   return {
@@ -44,7 +46,17 @@ function delivery(
     orderNo: id.toUpperCase(),
     deliveryDate,
     archived: true,
-    lines,
+    reviewStatus: 'reviewed' as const,
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    lines: lines.map(line => ({
+      ...line,
+      amount: line.amount === undefined
+        ? (line.unitPrice == null ? null : 1)
+        : line.amount,
+      currentValueConfirmed: line.currentValueConfirmed ?? true,
+    })),
   }
 }
 
@@ -434,6 +446,21 @@ describe('材料单价分析', () => {
         spec: '2.5 mm²',
         unit: '米',
         unitPrice: null,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toEqual([])
+  })
+
+  it('已有有效单价但金额待补录的明细仍不进入价格分析', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('amount-pending', 'supplier-a', '2026-05-08', [{
+        id: 'line-amount-pending',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: null,
       }]),
     ], suppliers, projects)
 

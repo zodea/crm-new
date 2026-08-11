@@ -13,6 +13,7 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
+import { deliveryNaturalKey } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
 
 export interface DeliveryLineDraft {
@@ -31,6 +32,7 @@ export interface DeliveryLine extends Omit<DeliveryLineDraft, 'amount' | 'amount
   deliveryRecordId: string
   amount: number | null
   amountSource: DeliveryAmountSource
+  currentValueConfirmed: boolean
   sortOrder: number
 }
 
@@ -46,6 +48,9 @@ export interface DeliveryRecord {
   fileName: string
   filePath: string
   ocrStatus: string
+  reviewStatus: 'reviewed' | 'unreviewed'
+  naturalKeyDuplicate: boolean
+  currentValuesConfirmed: boolean
   archived: boolean
   stored: boolean
   printBatchId: string
@@ -234,7 +239,7 @@ function validateInput(input: DeliveryRecordInput): NormalizedDeliveryLineDraft[
   return lines
 }
 
-function rowToLine(row: Record<string, unknown>): DeliveryLine {
+function rowToLine(row: Record<string, unknown>, currentValueConfirmed: boolean): DeliveryLine {
   return {
     id: row.id as string,
     deliveryRecordId: row.delivery_record_id as string,
@@ -245,16 +250,25 @@ function rowToLine(row: Record<string, unknown>): DeliveryLine {
     unitPrice: toNullableNumber(row.unit_price),
     amount: toNullableNumber(row.amount),
     amountSource: amountSourceOf(row.amount_source, 'manual'),
+    currentValueConfirmed,
     note: (row.note ?? '') as string,
     sortOrder: toNumber(row.sort_order),
   }
+}
+
+type DeliveryRecordWithoutDuplicateFlag = Omit<DeliveryRecord, 'naturalKeyDuplicate'>
+
+function currentValuesConfirmedFromRow(row: Record<string, unknown>): boolean {
+  return Boolean(row.archived) && row.ocr_status === 'reviewed'
 }
 
 function rowToRecord(
   row: Record<string, unknown>,
   lines: DeliveryLine[],
   hasSourceFile: boolean,
-): DeliveryRecord {
+): DeliveryRecordWithoutDuplicateFlag {
+  const ocrStatus = (row.ocr_status ?? 'pending') as string
+  const currentValuesConfirmed = currentValuesConfirmedFromRow(row)
   return {
     id: row.id as string,
     projectId: row.project_id as string,
@@ -264,7 +278,9 @@ function rowToRecord(
     deliveryDate: (row.delivery_date ?? '') as string,
     fileName: (row.file_name ?? '') as string,
     filePath: (row.file_path ?? '') as string,
-    ocrStatus: (row.ocr_status ?? 'reviewed') as string,
+    ocrStatus,
+    reviewStatus: currentValuesConfirmed ? 'reviewed' : 'unreviewed',
+    currentValuesConfirmed,
     archived: Boolean(row.archived),
     // v25 起归档即视为已入库；stored 只保留作存量兼容镜像。
     stored: Boolean(row.archived),
@@ -286,6 +302,24 @@ function rowToRecord(
     lines,
     totalAmount: roundMoney(lines.reduce((sum, line) => sum + (line.amount ?? 0), 0)),
   }
+}
+
+function withNaturalKeyDuplicateFlags(
+  records: readonly DeliveryRecordWithoutDuplicateFlag[],
+): DeliveryRecord[] {
+  const counts = new Map<string, number>()
+  for (const record of records) {
+    const key = deliveryNaturalKey(record)
+    if (key)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return records.map((record) => {
+    const key = deliveryNaturalKey(record)
+    return {
+      ...record,
+      naturalKeyDuplicate: key != null && (counts.get(key) ?? 0) > 1,
+    }
+  })
 }
 
 async function insertLines(tx: SoftDb, recordId: string, lines: NormalizedDeliveryLineDraft[], now: string): Promise<void> {
@@ -378,19 +412,24 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
              AND source.deleted_at IS NULL`,
         ),
       ])
+      const currentValuesConfirmedByRecord = new Map(recordRows.map(row => [
+        row.id as string,
+        currentValuesConfirmedFromRow(row),
+      ]))
       const linesByRecord = new Map<string, DeliveryLine[]>()
       for (const row of lineRows) {
-        const line = rowToLine(row)
+        const recordId = row.delivery_record_id as string
+        const line = rowToLine(row, currentValuesConfirmedByRecord.get(recordId) === true)
         const lines = linesByRecord.get(line.deliveryRecordId) ?? []
         lines.push(line)
         linesByRecord.set(line.deliveryRecordId, lines)
       }
       const sourceRecordIds = new Set(sourceRows.map(row => row.owner_id))
-      list.value = recordRows.map(row => rowToRecord(
+      list.value = withNaturalKeyDuplicateFlags(recordRows.map(row => rowToRecord(
         row,
         linesByRecord.get(row.id as string) ?? [],
         sourceRecordIds.has(row.id as string),
-      ))
+      )))
     }
     finally {
       loading.value = false
@@ -420,7 +459,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.projectId,
           input.supplierId || null,
           input.rawSiteText?.trim() ?? '',
-          input.orderNo.trim(),
+          input.orderNo.trim() || null,
           input.deliveryDate,
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
@@ -525,7 +564,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
         [
           input.projectId,
           input.supplierId || null,
-          input.orderNo.trim(),
+          input.orderNo.trim() || null,
           input.deliveryDate,
           input.note.trim(),
           now,

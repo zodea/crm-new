@@ -260,6 +260,230 @@ describe('delivery store 真实识别与归档管线', () => {
     expect(store.byId(fileId!)).toBeUndefined()
   })
 
+  it('人工确认后的真实归档记录可直接进入材料单价分析', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [fileId] = await store.uploadFiles([
+      new File(['confirmed-price'], '已确认价格.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(fileId!)
+    const doc = store.byId(fileId!)?.docs[0]
+    expect(doc).toBeTruthy()
+
+    const recordId = await store.archiveDocument(fileId!, doc!.id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: doc!.orderNo,
+      deliveryDate: doc!.deliveryDate,
+      siteText: doc!.siteText,
+      docType: doc!.docType,
+      note: doc!.note,
+      items: doc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
+    })
+
+    setActivePinia(createPinia())
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    expect(recordStore.byId(recordId)).toMatchObject({
+      ocrStatus: 'reviewed',
+      reviewStatus: 'reviewed',
+      naturalKeyDuplicate: false,
+      currentValuesConfirmed: true,
+      lines: [{
+        amount: 622,
+        currentValueConfirmed: true,
+      }],
+    })
+
+    const catalog = buildMaterialPriceCatalog(
+      recordStore.list,
+      [{ id: 's1', name: '广州示例建材有限公司' }],
+      [{ id: 'p1', name: '合和新城' }],
+    )
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toEqual([
+      expect.objectContaining({
+        deliveryRecordId: recordId,
+        price: 155.5,
+      }),
+    ])
+  })
+
+  it('归档记录的当前值确认态从持久化复核状态派生', async () => {
+    await mem.execute(`
+      INSERT INTO delivery_records
+        (id, project_id, supplier_id, order_no, delivery_date, ocr_status, archived, stored)
+      VALUES ('unconfirmed-archive', 'p1', 's1', 'SH-UNCONFIRMED', '2026-07-20', 'pending', 1, 1)
+    `)
+    await mem.execute(`
+      INSERT INTO delivery_lines
+        (id, delivery_record_id, material_name, spec, unit, qty, unit_price, amount, amount_source, sort_order)
+      VALUES ('unconfirmed-line', 'unconfirmed-archive', 'BV 电线', '2.5 mm²', '米', 10, 2.8, 28, 'manual', 0)
+    `)
+
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    expect(recordStore.byId('unconfirmed-archive')).toMatchObject({
+      reviewStatus: 'unreviewed',
+      currentValuesConfirmed: false,
+      lines: [{ currentValueConfirmed: false }],
+    })
+    expect(buildMaterialPriceCatalog(
+      recordStore.list,
+      [{ id: 's1', name: '广州示例建材有限公司' }],
+      [{ id: 'p1', name: '合和新城' }],
+    )).toEqual([])
+  })
+
+  it('重新识别尚未完成时不能把旧草稿归档', async () => {
+    let finishRerecognition!: (response: Response) => void
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => {
+        finishRerecognition = resolve
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useDeliveryStore()
+    const [fileId] = await store.uploadFiles([
+      new File(['rerecognize'], '重新识别.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(fileId!)
+    const doc = store.byId(fileId!)?.docs[0]
+    expect(doc).toBeTruthy()
+
+    const rerecognition = store.recognizeFile(fileId!)
+    expect(store.byId(fileId!)?.ocrStatus).toBe('processing')
+    let archiveError: unknown
+    try {
+      await store.archiveDocument(fileId!, doc!.id, {
+        projectId: 'p1',
+        supplierId: 's1',
+        orderNo: doc!.orderNo,
+        deliveryDate: doc!.deliveryDate,
+        siteText: doc!.siteText,
+        docType: doc!.docType,
+        note: doc!.note,
+        items: doc!.items,
+        confirmations: {
+          humanReviewed: true,
+          amountReviewed: true,
+          noOrderNoConfirmed: false,
+          qualityReviewed: true,
+        },
+      })
+    }
+    catch (cause) {
+      archiveError = cause
+    }
+    finishRerecognition(ocrResponse(DELIVERY_MARKDOWN))
+    await rerecognition
+
+    expect(archiveError).toBeInstanceOf(Error)
+    expect((archiveError as Error).message).toContain('识别尚未完成')
+  })
+
+  it('真实归档库已存在相同自然键时在写库前阻断归档', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN))
+      .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [firstFileId] = await store.uploadFiles([
+      new File(['first-natural-key'], '自然键一.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(firstFileId!)
+    const firstDoc = store.byId(firstFileId!)?.docs[0]
+    expect(firstDoc).toBeTruthy()
+    await store.archiveDocument(firstFileId!, firstDoc!.id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: firstDoc!.orderNo,
+      deliveryDate: firstDoc!.deliveryDate,
+      siteText: firstDoc!.siteText,
+      docType: firstDoc!.docType,
+      note: firstDoc!.note,
+      items: firstDoc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
+    })
+
+    const [secondFileId] = await store.uploadFiles([
+      new File(['second-natural-key'], '自然键二.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(secondFileId!)
+    const secondDoc = store.byId(secondFileId!)?.docs[0]
+    expect(secondDoc).toBeTruthy()
+
+    await expect(store.archiveDocument(secondFileId!, secondDoc!.id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: secondDoc!.orderNo,
+      deliveryDate: secondDoc!.deliveryDate,
+      siteText: secondDoc!.siteText,
+      docType: secondDoc!.docType,
+      note: secondDoc!.note,
+      items: secondDoc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
+    })).rejects.toThrow('送货单自然键重复')
+
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    expect(recordStore.list).toHaveLength(1)
+  })
+
+  it('连续归档两张已确认无单号的送货单时不误判自然键重复', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN))
+      .mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const archivedIds: string[] = []
+
+    for (const [index, content] of ['no-order-one', 'no-order-two'].entries()) {
+      const [fileId] = await store.uploadFiles([
+        new File([content], `无单号-${index + 1}.pdf`, { type: 'application/pdf' }),
+      ])
+      await store.recognizeFile(fileId!)
+      const doc = store.byId(fileId!)?.docs[0]
+      expect(doc).toBeTruthy()
+      archivedIds.push(await store.archiveDocument(fileId!, doc!.id, {
+        projectId: 'p1',
+        supplierId: 's1',
+        orderNo: '',
+        deliveryDate: doc!.deliveryDate,
+        siteText: doc!.siteText,
+        docType: doc!.docType,
+        note: doc!.note,
+        items: doc!.items,
+        confirmations: {
+          humanReviewed: true,
+          amountReviewed: true,
+          noOrderNoConfirmed: true,
+          qualityReviewed: true,
+        },
+      }))
+    }
+
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    expect(archivedIds).toHaveLength(2)
+    expect(recordStore.list.map(record => record.orderNo)).toEqual(['', ''])
+    expect(recordStore.list.every(record => !record.naturalKeyDuplicate)).toBe(true)
+  })
+
   it('只有明确打印成功回执才把归档文件移出待打印队列', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()
@@ -411,21 +635,11 @@ describe('delivery store 真实识别与归档管线', () => {
     )
     const recordStore = useDeliveryRecordStore()
     const archived = recordStore.byId(recordId)!
-    const catalog = buildMaterialPriceCatalog([{
-      id: archived.id,
-      projectId: archived.projectId,
-      supplierId: archived.supplierId,
-      orderNo: archived.orderNo,
-      deliveryDate: archived.deliveryDate,
-      archived: archived.archived,
-      lines: archived.lines.map(item => ({
-        id: item.id,
-        materialName: item.materialName,
-        spec: item.spec,
-        unit: item.unit,
-        unitPrice: item.unitPrice,
-      })),
-    }], [{ id: 's1', name: '广州示例建材有限公司' }], [{ id: 'p1', name: '合和新城' }])
+    const catalog = buildMaterialPriceCatalog(
+      [archived],
+      [{ id: 's1', name: '广州示例建材有限公司' }],
+      [{ id: 'p1', name: '合和新城' }],
+    )
 
     expect(row?.review_flag).toContain('价格待补录')
     expect(line).toEqual({ unit_price: null, amount: null })

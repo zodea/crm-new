@@ -55,7 +55,20 @@ export interface DeliveryReviewInput {
   ocrStatus?: string
   /** 导入/去重或数据库唯一键发现的送货单自然键冲突。 */
   naturalKeyDuplicate?: boolean
+  /** 当前结构化值是否已经由用户对照原件确认。 */
+  currentValuesConfirmed?: boolean
   provenance?: DeliveryReviewProvenance
+}
+
+export function deliveryNaturalKey(
+  input: Pick<DeliveryReviewInput, 'projectId' | 'supplierId' | 'orderNo'>,
+): string | null {
+  const projectId = input.projectId.trim()
+  const supplierId = input.supplierId?.trim() ?? ''
+  const orderNo = input.orderNo.normalize('NFKC').trim().toLocaleUpperCase('zh-CN')
+  if (!projectId || !supplierId || !orderNo)
+    return null
+  return JSON.stringify([projectId, supplierId, orderNo])
 }
 
 export interface DeliveryReviewPolicy {
@@ -182,7 +195,7 @@ export function deliveryReviewIssueDetails(
   }
   if (policy.requiresQualityReview && !confirmations.qualityReviewed)
     issues.push({ key: 'quality', label: '手写、模糊或低置信内容必须人工复核确认' })
-  if (!confirmations.humanReviewed)
+  if (!confirmations.humanReviewed || input.currentValuesConfirmed === false)
     issues.push({ key: 'human-reviewed', label: '请先查看原件并确认 OCR 草稿，再点击归档' })
 
   return issues.filter((issue, index, all) => all.findIndex(candidate => candidate.key === issue.key && candidate.label === issue.label) === index)

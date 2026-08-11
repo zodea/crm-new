@@ -3,7 +3,7 @@ import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import type { DeliveryPrintDisposition } from '~/stores/delivery-record'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef } from 'vue'
-import { deliveryReviewIssues, hasDeliveryPricePending, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { deliveryNaturalKey, deliveryReviewIssues, hasDeliveryPricePending, summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
 import { recognizeDocument } from '~/lib/recognize/engine'
 import { prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
@@ -470,9 +470,23 @@ export const useDeliveryStore = defineStore('delivery', () => {
       throw new Error('待核对送货单不存在')
     const items = input.items
       .map(item => ({ ...item, name: item.name.trim() }))
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    const naturalKey = deliveryNaturalKey(input)
+    const naturalKeyDuplicate = Boolean(
+      naturalKey
+      && recordStore.list.some(record => deliveryNaturalKey(record) === naturalKey),
+    )
     const amountSummary = summarizeDeliveryAmounts(items, document.statedTotal)
     const issues = deliveryReviewIssues(
-      { ...input, items, statedTotal: document.statedTotal },
+      {
+        ...input,
+        items,
+        statedTotal: document.statedTotal,
+        ocrStatus: file.ocrStatus,
+        naturalKeyDuplicate,
+        currentValuesConfirmed: input.confirmations?.humanReviewed === true,
+      },
       {
         nonMaterial: file.intakeDecision !== 'material'
           || NON_MATERIAL_DOC_TYPES.has(input.docType),
@@ -488,7 +502,6 @@ export const useDeliveryStore = defineStore('delivery', () => {
     if (!sourceFile)
       throw new Error('原文件已不在当前会话，请重新上传')
 
-    const recordStore = useDeliveryRecordStore()
     const reviewFlags = [
       hasDeliveryPricePending(items) ? '价格待补录' : '',
       !input.orderNo ? '原件无单号' : '',
