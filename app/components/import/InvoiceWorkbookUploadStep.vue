@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import type { RawImportSheet, RawImportWorkbook } from '~/lib/util/excel'
+import type { InvoiceImportSheet, InvoiceImportWorkbook } from '~/lib/invoice/excel'
 import { useDropZone } from '@vueuse/core'
 import { computed, shallowRef, useTemplateRef } from 'vue'
-import { createInvoiceImportTemplateXlsx, INVOICE_XLSX_MIME } from '~/lib/invoice/excel'
+import { createInvoiceImportTemplateXlsx, INVOICE_XLSX_MIME, parseInvoiceWorkbookForMapping } from '~/lib/invoice/excel'
 import { toErrorMessage } from '~/lib/util/error'
-import { parseWorkbookForMapping } from '~/lib/util/excel'
 
 const emit = defineEmits<{
-  loaded: [sheet: RawImportSheet]
+  loaded: [sheet: InvoiceImportSheet]
 }>()
 
 const parsing = shallowRef(false)
 const error = shallowRef<string | null>(null)
-const workbook = shallowRef<RawImportWorkbook | null>(null)
+const workbook = shallowRef<InvoiceImportWorkbook | null>(null)
 const selectedSheetName = shallowRef('')
 const fileName = shallowRef('')
 const { exportFile } = useKitUI()
@@ -28,10 +27,18 @@ const selectedSheet = computed(() =>
   ?? null,
 )
 
-function chooseDefaultSheet(sheets: readonly RawImportSheet[]) {
-  selectedSheetName.value = sheets.find(sheet => sheet.rows.length && sheet.columns.length)?.name
+function chooseDefaultSheet(sheets: readonly InvoiceImportSheet[]) {
+  selectedSheetName.value = sheets.find(sheet => sheet.sheetKind === 'data' && sheet.rows.length && sheet.columns.length)?.name
     ?? sheets[0]?.name
     ?? ''
+}
+
+function sheetKindLabel(sheet: InvoiceImportSheet): string {
+  if (sheet.sheetKind === 'data')
+    return '业务明细'
+  if (sheet.sheetKind === 'summary')
+    return '汇总/非明细'
+  return '空白预留'
 }
 
 async function handleFile(file: File | undefined) {
@@ -45,7 +52,7 @@ async function handleFile(file: File | undefined) {
   parsing.value = true
   error.value = null
   try {
-    const parsed = await parseWorkbookForMapping(file)
+    const parsed = await parseInvoiceWorkbookForMapping(file, file.name)
     if (!parsed.sheets.length)
       throw new Error('文件中没有工作表')
     workbook.value = parsed
@@ -137,7 +144,7 @@ function reset() {
             {{ fileName }}
           </p>
           <p class="mt-1 text-11px text-ink-soft">
-            已解析 {{ workbook.sheets.length }} 个工作表；先选择实际业务明细 Sheet，再进入字段映射。
+            已解析 {{ workbook.sheets.length }} 个工作表；原始行号、显示值、合并区域和公式证据会随本次导入保留。
           </p>
         </div>
         <button type="button" class="btn-ghost text-12px" @click="reset">
@@ -152,12 +159,15 @@ function reset() {
           </label>
           <select id="invoice-workbook-sheet" v-model="selectedSheetName" class="field-input w-full">
             <option v-for="sheet in workbook.sheets" :key="sheet.name" :value="sheet.name">
-              {{ sheet.name }} · {{ sheet.rows.length }} 行
+              {{ sheet.name }} · {{ sheetKindLabel(sheet) }} · {{ sheet.rows.length }} 条业务行
             </option>
           </select>
         </div>
 
         <div v-if="selectedSheet" class="min-w-0 flex flex-wrap items-end gap-1.5 pb-0.5">
+          <span :class="selectedSheet.sheetKind === 'data' ? 'chip-brand' : 'chip-warn'">
+            {{ sheetKindLabel(selectedSheet) }}
+          </span>
           <span class="chip-brand">表头第 {{ selectedSheet.headerRow + 1 }} 行</span>
           <span v-if="selectedSheet.mergeRanges.length" class="chip-ok">
             合并 {{ selectedSheet.mergeRanges.length }} 处
@@ -174,12 +184,15 @@ function reset() {
       <div v-if="selectedSheet?.mergeRanges.length" class="mt-3 border border-brand/25 rounded-[var(--radius-btn)] bg-brand-soft p-3 text-11px text-brand-deep">
         已识别合并区域，数据区的合并续行会展开为每条业务行；标题合并只作为来源布局元数据保留。
       </div>
+      <div v-if="selectedSheet && selectedSheet.ignoredRows.length" class="mt-3 border border-line rounded-[var(--radius-btn)] bg-surface-2 p-3 text-11px text-ink-soft">
+        已保留 {{ selectedSheet.ignoredRows.length }} 行非业务来源记录（合计、空白预留或汇总），不会直接写入发票台账。
+      </div>
 
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
         <p class="text-11px text-ink-faint">
-          {{ selectedSheet?.range || '—' }} · 仅导入当前选中的工作表
+          {{ selectedSheet?.range || '—' }} · 仅导入当前选中的业务明细工作表
         </p>
-        <button type="button" class="btn-accent" :disabled="!selectedSheet?.rows.length" @click="useSelectedSheet">
+        <button type="button" class="btn-accent" :disabled="selectedSheet?.sheetKind !== 'data' || !selectedSheet?.rows.length" @click="useSelectedSheet">
           使用此工作表
         </button>
       </div>
