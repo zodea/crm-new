@@ -312,6 +312,13 @@ function resolveInvoiceStyleConfig(config: InvoiceXlsxStyleConfig = {}): Invoice
   }
 }
 
+/** 持久化边界统一收敛为完整样式，损坏或非对象记录回退到领域默认值。 */
+export function normalizeInvoiceXlsxStyleConfig(value: unknown): InvoiceXlsxStyleConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return createDefaultInvoiceXlsxStyleConfig()
+  return resolveInvoiceStyleConfig(value as InvoiceXlsxStyleConfig)
+}
+
 function xmlEscape(value: string): string {
   return value
     .replaceAll('&', '&amp;')
