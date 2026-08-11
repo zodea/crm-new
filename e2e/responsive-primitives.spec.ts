@@ -4,7 +4,8 @@ const MATRIX = [
   { width: 390, height: 844, metricColumns: 2, formColumns: 1, gutter: 12, path: '/dev/kit-atoms' },
   { width: 768, height: 900, metricColumns: 4, formColumns: 3, gutter: 15.36, path: '/dev/kit-atoms' },
   { width: 1024, height: 900, metricColumns: 4, formColumns: 3, gutter: 20.48, path: '/dev/kit-atoms' },
-  { width: 1440, height: 1000, metricColumns: 5, formColumns: 5, gutter: 24, path: '/project/proj_demo_001' },
+  // 项目详情在宽屏仍保留辅助栏；主内容列按最小可读宽度自然为 4 列。
+  { width: 1440, height: 1000, metricColumns: 4, formColumns: 4, gutter: 24, path: '/project/proj_demo_001' },
 ] as const
 
 async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
