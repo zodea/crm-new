@@ -95,6 +95,49 @@ describe('发票台账 Excel 导出', () => {
       { s: { r: 2, c: 5 }, e: { r: 3, c: 5 } },
     ]))
   })
+
+  it('把导出样式设置写入实际 XLSX，并按设置关闭合并', async () => {
+    const bytes = createInvoiceLedgerXlsx([
+      invoice(),
+      invoice({ id: 'inv-test-2', invoiceNumber: '87654321', totalAmount: 20 }),
+    ], {
+      freezeRows: 1,
+      titleRowHeight: 18,
+      headerRowHeight: 22,
+      dataRowHeight: 26,
+      totalRowHeight: 20,
+      columnWidths: { seller: 42, remark: 31 },
+      dateFormat: 'yyyy-mm-dd',
+      moneyFormat: '#,##0.00',
+      mergeTitle: false,
+      mergeRepeatedValues: false,
+      headerFont: { name: '微软雅黑', sz: 11, bold: false },
+      border: {
+        top: { style: 'medium', color: 'FF112233' },
+        bottom: { style: 'dotted', color: 'FF112233' },
+        left: { style: 'none' },
+        right: { style: 'none' },
+      },
+    })
+
+    const readback = await readInvoiceWorkbookStyleReadback(bytes)
+    const sheet = readback.sheets[0]!
+    expect(readback.issues).toEqual([])
+    expect(sheet.freezeRows).toBe(1)
+    expect(sheet.columns[2]).toMatchObject({ wch: 42 })
+    expect(sheet.columns[7]).toMatchObject({ wch: 31 })
+    expect(sheet.rows[0]).toMatchObject({ hpt: 18 })
+    expect(sheet.rows[1]).toMatchObject({ hpt: 22 })
+    expect(sheet.rows[2]).toMatchObject({ hpt: 26 })
+    expect(sheet.cells.A2).toMatchObject({
+      font: { name: '微软雅黑', sz: 11 },
+      border: { top: { style: 'medium' }, bottom: { style: 'dotted' } },
+    })
+    expect(sheet.cells.A2?.font.bold).toBeUndefined()
+    expect(sheet.cells.A3?.numberFormat).toBe('yyyy-mm-dd')
+    expect(sheet.cells.E3?.numberFormat).toBe('#,##0.00')
+    expect(sheet.mergedCells).toEqual([])
+  })
 })
 
 describe('发票 Excel 导入/回读来源证据', () => {
