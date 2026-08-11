@@ -24,6 +24,10 @@ async function readBrowserSnapshot(page: Page): Promise<number[]> {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('crm-new-browser', 1)
+      request.addEventListener('upgradeneeded', () => {
+        if (!request.result.objectStoreNames.contains('database_snapshots'))
+          request.result.createObjectStore('database_snapshots')
+      })
       request.addEventListener('success', () => resolve(request.result), { once: true })
       request.addEventListener('error', () => reject(request.error), { once: true })
     })
@@ -46,6 +50,10 @@ async function writeBrowserSnapshot(page: Page, bytes: number[]) {
   await page.evaluate(async (snapshot) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('crm-new-browser', 1)
+      request.addEventListener('upgradeneeded', () => {
+        if (!request.result.objectStoreNames.contains('database_snapshots'))
+          request.result.createObjectStore('database_snapshots')
+      })
       request.addEventListener('success', () => resolve(request.result), { once: true })
       request.addEventListener('error', () => reject(request.error), { once: true })
     })
@@ -121,8 +129,12 @@ async function snapshotWithPriceFacts(snapshot: number[]): Promise<number[]> {
 
 async function openPriceAnalysisWithFacts(page: Page) {
   await page.goto('/material/price')
-  await expect(page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' }))
-    .toBeVisible({ timeout: 15_000 })
+  await Promise.any([
+    page.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
+      .waitFor({ state: 'visible', timeout: 15_000 }),
+    page.getByText('尚无可分析的材料价格', { exact: true })
+      .waitFor({ state: 'visible', timeout: 15_000 }),
+  ])
 
   const seededSnapshot = await readBrowserSnapshot(page)
   await writeBrowserSnapshot(page, await snapshotWithPriceFacts(seededSnapshot))
@@ -140,9 +152,9 @@ test.describe('材料单价分析真实价格事实', () => {
     await search.fill('电线')
     await page.getByRole('option', { name: /BV 电线.*2\.5 mm².*m/ }).click()
 
-    await expect(page.getByRole('heading', { name: 'BV 电线 · 2.5 mm²' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'BV 电线 · 1×2.5 mm²' })).toBeVisible()
     await expect(page.getByText('官方与市场趋势', { exact: true })).toBeVisible()
-    await expect(page.getByRole('img', { name: 'BV 电线 2.5 mm² 价格趋势图' })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'BV 电线 1×2.5 mm² 价格趋势图' })).toBeVisible()
     await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('信息价环比')).toBeVisible()
     await expect(page.getByRole('region', { name: '官方信息价对比' }).getByText('-0.47%')).toBeVisible()
     await page.getByText(/查看全部 \d+ 个价格来源/).click()
@@ -174,7 +186,7 @@ test.describe('材料单价分析真实价格事实', () => {
       await search.fill('电线')
       await page.getByRole('option', { name: /BV 电线.*2\.5 mm².*m/ }).click()
 
-      const chart = page.getByRole('img', { name: 'BV 电线 2.5 mm² 价格趋势图' })
+      const chart = page.getByRole('img', { name: 'BV 电线 1×2.5 mm² 价格趋势图' })
       await chart.scrollIntoViewIfNeeded()
       await expectInViewport(chart, `${width}px 价格趋势图`)
       await expectNoPageOverflow(page, `${width}px 材料单价分析`)
