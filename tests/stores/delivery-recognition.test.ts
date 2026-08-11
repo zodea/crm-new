@@ -482,6 +482,15 @@ describe('delivery store 真实识别与归档管线', () => {
     expect(archivedIds).toHaveLength(2)
     expect(recordStore.list.map(record => record.orderNo)).toEqual(['', ''])
     expect(recordStore.list.every(record => !record.naturalKeyDuplicate)).toBe(true)
+    const catalog = buildMaterialPriceCatalog(
+      recordStore.list,
+      [{ id: 's1', name: '广州示例建材有限公司' }],
+      [{ id: 'p1', name: '合和新城' }],
+    )
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toHaveLength(2)
+    expect(catalog[0]?.facts.map(fact => fact.deliveryOrderNo).sort())
+      .toEqual([...archivedIds].sort())
   })
 
   it('只有明确打印成功回执才把归档文件移出待打印队列', async () => {

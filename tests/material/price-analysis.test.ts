@@ -467,6 +467,29 @@ describe('材料单价分析', () => {
     expect(catalog).toEqual([])
   })
 
+  it('无单号但金额、单价和人工确认态完整的归档明细可进入价格目录', () => {
+    const catalog = buildMaterialPriceCatalog([{
+      ...delivery('no-order-number', 'supplier-a', '2026-05-09', [{
+        id: 'line-no-order-number',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: 28,
+      }]),
+      orderNo: '',
+    }], suppliers, projects)
+
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toEqual([
+      expect.objectContaining({
+        deliveryRecordId: 'no-order-number',
+        deliveryOrderNo: 'no-order-number',
+        price: 2.8,
+      }),
+    ])
+  })
+
   it('#257 价格分析只读取人工确认后的当前单价，并保留原始/修订来源留痕', () => {
     const catalog = buildMaterialPriceCatalog([
       {

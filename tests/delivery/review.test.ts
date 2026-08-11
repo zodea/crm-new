@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { deliveryReviewIssueDetails, editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import {
+  deliveryNaturalKey,
+  deliveryReviewIssueDetails,
+  editDeliveryAmountLine,
+  normalizeDeliveryOrderNo,
+  summarizeDeliveryAmounts,
+} from '~/lib/delivery/review'
+
+describe('送货单号规范化', () => {
+  it('用 NFKC、首尾去空格和大写形成持久化与自然键共用值', () => {
+    expect(normalizeDeliveryOrderNo('  ａｂｃ－１２３  ')).toBe('ABC-123')
+    expect(normalizeDeliveryOrderNo('　')).toBe('')
+    expect(deliveryNaturalKey({
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: ' abc-123 ',
+    })).toBe(deliveryNaturalKey({
+      projectId: 'project-1',
+      supplierId: 'supplier-1',
+      orderNo: 'ＡＢＣ－１２３',
+    }))
+  })
+})
 
 describe('送货单人工复核金额', () => {
   it('计算行随数量/单价更新，OCR 或手改金额不被覆盖', () => {

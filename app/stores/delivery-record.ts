@@ -13,7 +13,7 @@ import {
   undoOperation,
   withUpdateLog,
 } from '~/lib/db/soft-delete'
-import { deliveryNaturalKey } from '~/lib/delivery/review'
+import { deliveryNaturalKey, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { generateId } from '~/lib/util/id'
 
 export interface DeliveryLineDraft {
@@ -322,6 +322,32 @@ function withNaturalKeyDuplicateFlags(
   })
 }
 
+async function assertDeliveryNaturalKeyAvailable(
+  tx: SoftDb,
+  input: Pick<DeliveryRecordInput, 'projectId' | 'supplierId' | 'orderNo'>,
+  excludeId?: string,
+): Promise<void> {
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+  if (!input.projectId.trim() || !input.supplierId?.trim() || !orderNo)
+    return
+
+  const params: unknown[] = [input.projectId, input.supplierId]
+  const excludeSql = excludeId ? 'AND id <> ?' : ''
+  if (excludeId)
+    params.push(excludeId)
+  const rows = await tx.select<{ order_no: string | null }>(
+    `SELECT order_no
+     FROM delivery_records
+     WHERE project_id = ?
+       AND supplier_id = ?
+       AND deleted_at IS NULL
+       ${excludeSql}`,
+    params,
+  )
+  if (rows.some(row => normalizeDeliveryOrderNo(row.order_no ?? '') === orderNo))
+    throw new Error('送货单自然键重复，不能重复归档')
+}
+
 async function insertLines(tx: SoftDb, recordId: string, lines: NormalizedDeliveryLineDraft[], now: string): Promise<void> {
   for (const [index, line] of lines.entries()) {
     const id = generateId('dline')
@@ -446,8 +472,10 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
     const source = sourceFile ? await prepareSourceFile(sourceFile) : null
     const id = generateId('del')
     const printBatchId = input.printBatchId?.trim() || id
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     await withTransaction(async (tx) => {
+      await assertDeliveryNaturalKeyAvailable(tx, input)
       await tx.execute(
         `INSERT INTO delivery_records
           (id, project_id, supplier_id, raw_site_text, order_no, delivery_date, file_name, file_path,
@@ -459,7 +487,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
           input.projectId,
           input.supplierId || null,
           input.rawSiteText?.trim() ?? '',
-          input.orderNo.trim() || null,
+          orderNo || null,
           input.deliveryDate,
           input.fileName?.trim() || source?.fileName || '',
           input.filePath?.trim() ?? '',
@@ -555,8 +583,10 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
 
   async function update(id: string, input: DeliveryRecordInput): Promise<string | null> {
     const lines = validateInput(input)
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
     const now = new Date().toISOString()
     const logId = await withTransaction(async (tx) => {
+      await assertDeliveryNaturalKeyAvailable(tx, input, id)
       const updateLogId = await withUpdateLog(tx, 'delivery_records', id, () => tx.execute(
         `UPDATE delivery_records
          SET project_id=?, supplier_id=?, order_no=?, delivery_date=?, note=?, updated_at=?
@@ -564,7 +594,7 @@ export const useDeliveryRecordStore = defineStore('delivery-record', () => {
         [
           input.projectId,
           input.supplierId || null,
-          input.orderNo.trim() || null,
+          orderNo || null,
           input.deliveryDate,
           input.note.trim(),
           now,

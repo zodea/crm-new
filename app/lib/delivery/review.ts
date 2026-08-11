@@ -60,12 +60,16 @@ export interface DeliveryReviewInput {
   provenance?: DeliveryReviewProvenance
 }
 
+export function normalizeDeliveryOrderNo(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleUpperCase('zh-CN')
+}
+
 export function deliveryNaturalKey(
   input: Pick<DeliveryReviewInput, 'projectId' | 'supplierId' | 'orderNo'>,
 ): string | null {
   const projectId = input.projectId.trim()
   const supplierId = input.supplierId?.trim() ?? ''
-  const orderNo = input.orderNo.normalize('NFKC').trim().toLocaleUpperCase('zh-CN')
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
   if (!projectId || !supplierId || !orderNo)
     return null
   return JSON.stringify([projectId, supplierId, orderNo])

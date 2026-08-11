@@ -197,7 +197,6 @@ export function buildMaterialPriceCatalog(
       !record.archived
       || !record.supplierId
       || !record.projectId
-      || !record.orderNo.trim()
       || !record.deliveryDate.trim()
       || record.reviewStatus !== 'reviewed'
       // 识别工作区以 done 表示识别完成；归档库历史字段以 reviewed 表示人工核对终态。
