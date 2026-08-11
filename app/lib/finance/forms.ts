@@ -427,7 +427,7 @@ async function validateReceipt(
   action: F3SaveAction,
 ): Promise<number> {
   const amount = nonNegativeMoney('收款金额', draft.amount)
-  const project = await activeRow<{ id: string, customer_id: string | null }>(
+  const project = await activeRow<{ id: string }>(
     tx,
     'projects',
     draft.projectId,
