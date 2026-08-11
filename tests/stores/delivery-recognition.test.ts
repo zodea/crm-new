@@ -493,6 +493,46 @@ describe('delivery store 真实识别与归档管线', () => {
       .toEqual([...archivedIds].sort())
   })
 
+  it('全角空白单号按无单号处理，必须明确确认后才能归档', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [fileId] = await store.uploadFiles([
+      new File(['blank-order-number'], '全角空白单号.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(fileId!)
+    const doc = store.byId(fileId!)?.docs[0]
+    expect(doc).toBeTruthy()
+    const input = {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: '　 ',
+      deliveryDate: doc!.deliveryDate,
+      siteText: doc!.siteText,
+      docType: doc!.docType,
+      note: doc!.note,
+      items: doc!.items,
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
+    }
+
+    await expect(store.archiveDocument(fileId!, doc!.id, input)).rejects.toThrow('缺少送货单号')
+
+    const recordId = await store.archiveDocument(fileId!, doc!.id, {
+      ...input,
+      confirmations: { ...input.confirmations, noOrderNoConfirmed: true },
+    })
+    const recordStore = useDeliveryRecordStore()
+    await recordStore.load()
+    expect(recordStore.byId(recordId)).toMatchObject({
+      orderNo: '',
+      reviewFlag: expect.stringContaining('原件无单号'),
+    })
+  })
+
   it('只有明确打印成功回执才把归档文件移出待打印队列', async () => {
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
     const store = useDeliveryStore()

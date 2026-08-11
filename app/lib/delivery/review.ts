@@ -169,7 +169,7 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'supplier', label: '必须人工选择已有分供方，或先确认新增分供方' })
   if (!input.deliveryDate)
     issues.push({ key: 'date', label: '缺少送货日期，必须依据原件人工补录' })
-  if (!input.orderNo && !confirmations.noOrderNoConfirmed)
+  if (!normalizeDeliveryOrderNo(input.orderNo) && !confirmations.noOrderNoConfirmed)
     issues.push({ key: 'order-no', label: '缺少送货单号；只有确认原件确实无单号后才能归档' })
 
   const invalidLines = input.items.filter(item =>

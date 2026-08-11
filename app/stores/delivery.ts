@@ -3,7 +3,7 @@ import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import type { DeliveryPrintDisposition } from '~/stores/delivery-record'
 import { defineStore } from 'pinia'
 import { computed, reactive, readonly, shallowRef } from 'vue'
-import { deliveryNaturalKey, deliveryReviewIssues, hasDeliveryPricePending, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { deliveryNaturalKey, deliveryReviewIssues, hasDeliveryPricePending, normalizeDeliveryOrderNo, summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { parseDeliveryMarkdown } from '~/lib/recognize/delivery-parse'
 import { recognizeDocument } from '~/lib/recognize/engine'
 import { prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
@@ -468,11 +468,13 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const document = file?.docs.find(doc => doc.id === documentId)
     if (!file || !document)
       throw new Error('待核对送货单不存在')
-    const items = input.items
+    const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+    const normalizedInput = { ...input, orderNo }
+    const items = normalizedInput.items
       .map(item => ({ ...item, name: item.name.trim() }))
     const recordStore = useDeliveryRecordStore()
     await recordStore.load()
-    const naturalKey = deliveryNaturalKey(input)
+    const naturalKey = deliveryNaturalKey(normalizedInput)
     const naturalKeyDuplicate = Boolean(
       naturalKey
       && recordStore.list.some(record => deliveryNaturalKey(record) === naturalKey),
@@ -480,12 +482,12 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const amountSummary = summarizeDeliveryAmounts(items, document.statedTotal)
     const issues = deliveryReviewIssues(
       {
-        ...input,
+        ...normalizedInput,
         items,
         statedTotal: document.statedTotal,
         ocrStatus: file.ocrStatus,
         naturalKeyDuplicate,
-        currentValuesConfirmed: input.confirmations?.humanReviewed === true,
+        currentValuesConfirmed: normalizedInput.confirmations?.humanReviewed === true,
       },
       {
         nonMaterial: file.intakeDecision !== 'material'
@@ -504,21 +506,21 @@ export const useDeliveryStore = defineStore('delivery', () => {
 
     const reviewFlags = [
       hasDeliveryPricePending(items) ? '价格待补录' : '',
-      !input.orderNo ? '原件无单号' : '',
+      !orderNo ? '原件无单号' : '',
       document.quality !== 'normal' ? `${document.quality}已人工复核` : '',
       amountSummary.mismatchedLineIds.length || amountSummary.statedBalanced === false
         ? '金额已人工复核'
         : '',
     ].filter(Boolean).join('；')
     const recordId = await recordStore.add({
-      projectId: input.projectId,
-      supplierId: input.supplierId,
-      orderNo: input.orderNo,
-      deliveryDate: input.deliveryDate,
-      rawSiteText: input.siteText,
+      projectId: normalizedInput.projectId,
+      supplierId: normalizedInput.supplierId,
+      orderNo,
+      deliveryDate: normalizedInput.deliveryDate,
+      rawSiteText: normalizedInput.siteText,
       fileName: file.name,
       printBatchId: file.printBatchId,
-      note: input.note,
+      note: normalizedInput.note,
       reviewFlag: reviewFlags,
       lines: items.map(item => ({
         materialName: item.name,
