@@ -6,7 +6,6 @@ import type {
   InvoiceLedgerExportRow,
   InvoiceXlsxStyleConfig,
 } from '~/lib/invoice/excel'
-import { useLocalStorage } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import {
   createDefaultInvoiceXlsxStyleConfig,
@@ -14,6 +13,7 @@ import {
   MONEY_FORMAT,
 } from '~/lib/invoice/excel'
 import { yuan } from '~/lib/util/money'
+import { useInvoiceStore } from '~/stores/invoice'
 
 const props = defineProps<{
   rows: readonly InvoiceLedgerExportRow[]
@@ -27,6 +27,7 @@ const emit = defineEmits<{
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
+const invoiceStore = useInvoiceStore()
 const PREVIEW_LIMIT = 200
 const visibleRows = computed(() => props.rows.slice(0, PREVIEW_LIMIT))
 const hiddenCount = computed(() => Math.max(0, props.rows.length - PREVIEW_LIMIT))
@@ -54,12 +55,10 @@ interface StyleDraft {
   border: InvoiceBorderStyle
 }
 
-const STYLE_STORAGE_KEY = 'ruihang-invoice-ledger-xlsx-style'
-const storedStyle = useLocalStorage<InvoiceXlsxStyleConfig>(
-  STYLE_STORAGE_KEY,
-  createDefaultInvoiceXlsxStyleConfig(),
-)
 const styleSaved = ref(false)
+const styleLoading = ref(false)
+const styleSaving = ref(false)
+const styleSaveError = ref('')
 
 const columnDefinitions: readonly { key: ColumnKey, label: string }[] = [
   { key: 'invoiceDate', label: '发票日期' },
@@ -152,22 +151,52 @@ function toConfig(draft: StyleDraft): InvoiceXlsxStyleConfig {
   }
 }
 
-const draft = ref<StyleDraft>(toDraft(storedStyle.value))
+const draft = ref<StyleDraft>(toDraft(invoiceStore.invoiceExportStyle))
+let styleLoadAttempt = 0
 
-watch(open, (isOpen) => {
-  if (isOpen) {
-    draft.value = toDraft(storedStyle.value)
-    styleSaved.value = false
+watch(open, async (isOpen) => {
+  const attempt = ++styleLoadAttempt
+  if (!isOpen) {
+    styleLoading.value = false
+    return
   }
-})
+  styleLoading.value = true
+  styleSaved.value = false
+  styleSaveError.value = ''
+  try {
+    if (!invoiceStore.invoiceExportStyleLoaded)
+      await invoiceStore.loadInvoiceExportStyle()
+    if (open.value && attempt === styleLoadAttempt)
+      draft.value = toDraft(invoiceStore.invoiceExportStyle)
+  }
+  catch {
+    if (attempt === styleLoadAttempt)
+      styleSaveError.value = '默认样式读取失败，本次仍可使用初始样式导出。'
+  }
+  finally {
+    if (attempt === styleLoadAttempt)
+      styleLoading.value = false
+  }
+}, { immediate: true })
 
 function display(value: string | number): string {
   return value === '' ? '—' : String(value)
 }
 
-function saveDefaultStyle() {
-  storedStyle.value = toConfig(draft.value)
-  styleSaved.value = true
+async function saveDefaultStyle() {
+  styleSaving.value = true
+  styleSaveError.value = ''
+  try {
+    await invoiceStore.saveInvoiceExportStyle(toConfig(draft.value))
+    styleSaved.value = true
+  }
+  catch {
+    styleSaved.value = false
+    styleSaveError.value = '默认样式保存失败，请稍后重试。'
+  }
+  finally {
+    styleSaving.value = false
+  }
 }
 
 function restoreDefaultStyle() {
@@ -306,7 +335,14 @@ function previewColumnStyle(key: ColumnKey) {
                 <span v-if="styleSaved" class="chip-ok shrink-0" role="status">已保存</span>
               </div>
 
-              <div class="max-h-[620px] overflow-y-auto p-4">
+              <p v-if="styleLoading" class="px-4 pt-3 text-11px text-ink-soft" role="status">
+                正在载入默认样式…
+              </p>
+              <fieldset
+                :disabled="styleLoading"
+                :aria-busy="styleLoading"
+                class="m-0 max-h-[620px] min-w-0 overflow-y-auto border-0 p-4"
+              >
                 <section class="border-b border-line pb-4">
                   <h3 class="mb-2 text-11px font-800 text-ink">
                     版式与行高
@@ -374,11 +410,14 @@ function previewColumnStyle(key: ColumnKey) {
                   <button type="button" class="btn-secondary text-11px" @click="restoreDefaultStyle">
                     恢复默认
                   </button>
-                  <button type="button" class="btn-secondary text-11px" @click="saveDefaultStyle">
-                    保存为台账默认样式
+                  <button type="button" class="btn-secondary text-11px" :disabled="styleSaving" @click="saveDefaultStyle">
+                    {{ styleSaving ? '正在保存…' : '保存为台账默认样式' }}
                   </button>
                 </div>
-              </div>
+                <p v-if="styleSaveError" class="mt-2 text-11px text-danger" role="alert">
+                  {{ styleSaveError }}
+                </p>
+              </fieldset>
             </aside>
           </div>
         </div>
@@ -391,7 +430,7 @@ function previewColumnStyle(key: ColumnKey) {
             <button type="button" class="btn-ghost" :disabled="saving" @click="open = false">
               取消
             </button>
-            <button type="button" class="btn-primary" :disabled="saving || !rows.length" @click="confirmExport">
+            <button type="button" class="btn-primary" :disabled="saving || styleLoading || !rows.length" @click="confirmExport">
               <span v-if="saving" class="i-lucide-loader-circle mr-1 animate-spin" aria-hidden="true" />
               {{ saving ? '正在保存…' : '确认导出' }}
             </button>

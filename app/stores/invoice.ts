@@ -1,13 +1,22 @@
-import type { ArchiveCheckResult } from '~/lib/invoice/archive'
+import type { MigrationDb } from '~/lib/db/migrations'
+import type {
+  ArchiveCheckResult,
+  InvoiceArchiveAuditRecord,
+  InvoiceArchiveProvenance,
+} from '~/lib/invoice/archive'
+import type { InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
+import type { InvoiceExportSettingsDatabase } from '~/lib/invoice/preferences'
 import type { InvoiceItem } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
 import { computed, readonly, ref, shallowRef } from 'vue'
 import { db } from '~/lib/db/client'
 import { execute, select, withTransaction } from '~/lib/db/connection'
-import { createSoftDeleteActions, logCreate, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
+import { createSoftDeleteActions, logCreate, logOperation, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkInvoiceArchiveReady, checkNotDuplicate } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
+import { createDefaultInvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
+import { loadInvoiceExportStyleSetting, saveInvoiceExportStyleSetting } from '~/lib/invoice/preferences'
 import { normalizePrintRotation } from '~/lib/invoice/print-layout'
 import { recognizeInvoice } from '~/lib/invoice/recognize'
 import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
@@ -141,6 +150,91 @@ function rowToInvoice(row: Record<string, unknown>): Invoice {
   }
 }
 
+const INVOICE_ARCHIVE_PROVENANCE_LOG = 'invoice_archive_provenance'
+const INVOICE_RECOGNITION_LOG_OPERATOR = 'system:invoice-recognition'
+const INVOICE_ARCHIVE_CONCURRENT_CHANGE = 'INVOICE_ARCHIVE_CONCURRENT_CHANGE'
+const ARCHIVE_PROVENANCE_FIELDS = [
+  ['invoiceType', 'invoice_type'],
+  ['invoiceNumber', 'invoice_number'],
+  ['invoiceDate', 'invoice_date'],
+  ['buyer', 'buyer'],
+  ['buyerTaxNo', 'buyer_tax_no'],
+  ['seller', 'seller'],
+  ['sellerTaxNo', 'seller_tax_no'],
+  ['amount', 'amount'],
+  ['taxAmount', 'tax_amount'],
+  ['totalAmount', 'total_amount'],
+  ['taxRate', 'tax_rate'],
+  ['remark', 'remark'],
+  ['items', 'items'],
+] as const
+
+interface InvoiceOperationLogRow {
+  before_data: string | null
+  after_data: string | null
+  operator: string
+  created_at: string
+}
+
+function parseOperationSnapshot(value: string | null): Record<string, unknown> | null {
+  if (!value)
+    return null
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null
+  }
+  catch {
+    return null
+  }
+}
+
+function provenanceFieldValue(snapshot: Record<string, unknown>, column: string): unknown {
+  const value = snapshot[column]
+  if (column !== 'items' || typeof value !== 'string')
+    return value
+  return parseJsonColumn<InvoiceItem[]>(value, [])
+}
+
+function provenanceValues(snapshot: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(ARCHIVE_PROVENANCE_FIELDS.map(([field, column]) => [
+    field,
+    provenanceFieldValue(snapshot, column),
+  ]))
+}
+
+function valuesDiffer(before: unknown, after: unknown): boolean {
+  return JSON.stringify(before) !== JSON.stringify(after)
+}
+
+function archiveCurrentValues(
+  invoice: Invoice,
+  ownerKind: 'project' | 'personal',
+  projectId: string | null,
+  projectName: string,
+): Readonly<Record<string, unknown>> {
+  return {
+    invoiceType: invoice.invoiceType,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceDate: invoice.invoiceDate,
+    buyer: invoice.buyer,
+    buyerTaxNo: invoice.buyerTaxNo,
+    seller: invoice.seller,
+    sellerTaxNo: invoice.sellerTaxNo,
+    amount: invoice.amount,
+    taxAmount: invoice.taxAmount,
+    totalAmount: invoice.totalAmount,
+    taxRate: invoice.taxRate,
+    remark: invoice.remark,
+    items: invoice.items,
+    ownerKind,
+    projectId,
+    projectName,
+    supplierId: invoice.supplierId,
+  }
+}
+
 export type ArchiveResult = ArchiveCheckResult
 
 export const useInvoiceStore = defineStore('invoice', () => {
@@ -148,6 +242,8 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const list = shallowRef<Invoice[]>([])
   const archivedAggregateRows = shallowRef<ArchivedInvoiceAggregate[]>([])
   const loading = shallowRef(false)
+  const invoiceExportStyle = shallowRef<InvoiceXlsxStyleConfig>(createDefaultInvoiceXlsxStyleConfig())
+  const invoiceExportStyleLoaded = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
   /** 原文件仅保留在当前应用会话，不写入 SQLite，也不进入 Vue 响应式代理。 */
@@ -160,6 +256,90 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   function clearRecognitionError(id: string) {
     delete recognitionErrors.value[id]
+  }
+
+  async function loadInvoiceExportStyle(database: InvoiceExportSettingsDatabase = db) {
+    invoiceExportStyle.value = await loadInvoiceExportStyleSetting(database)
+    invoiceExportStyleLoaded.value = true
+    return invoiceExportStyle.value
+  }
+
+  async function saveInvoiceExportStyle(
+    next: InvoiceXlsxStyleConfig,
+    database: InvoiceExportSettingsDatabase = db,
+  ) {
+    invoiceExportStyle.value = await saveInvoiceExportStyleSetting(database, next)
+    invoiceExportStyleLoaded.value = true
+    return invoiceExportStyle.value
+  }
+
+  async function buildArchiveProvenance(
+    invoice: Invoice,
+    database: MigrationDb = db,
+  ): Promise<InvoiceArchiveProvenance> {
+    const logs = await database.select<InvoiceOperationLogRow>(
+      `SELECT before_data, after_data, operator, created_at
+       FROM operation_logs
+       WHERE table_name = 'invoices' AND record_id = ? AND action = 'update'
+       ORDER BY rowid`,
+      [invoice.id],
+    )
+    const snapshots = logs.map(log => ({
+      ...log,
+      before: parseOperationSnapshot(log.before_data),
+      after: parseOperationSnapshot(log.after_data),
+    }))
+    const explicitRecognitionIndexes = snapshots.flatMap((log, index) =>
+      log.operator === INVOICE_RECOGNITION_LOG_OPERATOR ? [index] : [],
+    )
+    const recognizedIndex = explicitRecognitionIndexes.at(-1) ?? snapshots.findIndex(log =>
+      log.after?.ocr_status === 'done' && log.before?.ocr_status !== 'done',
+    )
+    const recognized = recognizedIndex >= 0 ? snapshots[recognizedIndex]?.after ?? null : null
+    const sourceKind: InvoiceArchiveProvenance['sourceKind'] = invoice.source === 'excel'
+      ? 'excel'
+      : recognized
+        ? 'ocr'
+        : 'manual'
+    const revisions = recognizedIndex < 0
+      ? []
+      : snapshots.slice(recognizedIndex + 1).flatMap((log) => {
+          if (log.operator === INVOICE_RECOGNITION_LOG_OPERATOR)
+            return []
+          if (!log.before || !log.after)
+            return []
+          return ARCHIVE_PROVENANCE_FIELDS.flatMap(([field, column]) => {
+            const from = provenanceFieldValue(log.before!, column)
+            const to = provenanceFieldValue(log.after!, column)
+            return valuesDiffer(from, to)
+              ? [{ field, from, to, reason: '人工校对', at: log.created_at }]
+              : []
+          })
+        })
+    return {
+      sourceKind,
+      sourceId: invoice.filePath || invoice.fileName || invoice.id,
+      sourceInfo: {
+        source: invoice.source,
+        ...(invoice.fileName ? { fileName: invoice.fileName } : {}),
+        ...(invoice.filePath ? { filePath: invoice.filePath } : {}),
+      },
+      originalOcr: recognized ? provenanceValues(recognized) : null,
+      revisions,
+    }
+  }
+
+  async function loadInvoiceArchiveAudit(id: string): Promise<InvoiceArchiveAuditRecord | null> {
+    const [row] = await select<{ after_data: string | null }>(
+      `SELECT after_data
+       FROM operation_logs
+       WHERE table_name = ? AND record_id = ? AND action = 'create'
+       ORDER BY rowid DESC
+       LIMIT 1`,
+      [INVOICE_ARCHIVE_PROVENANCE_LOG, id],
+    )
+    const snapshot = parseOperationSnapshot(row?.after_data ?? null)
+    return snapshot as InvoiceArchiveAuditRecord | null
   }
 
   async function markRecognitionFailed(inv: Invoice) {
@@ -236,12 +416,12 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   /** @returns 操作日志 id;记录不存在/已删时不写入并返回 null(调用方据此提示失败) */
   /** 全列覆写：data 必须是「最新行 + 改动」的合并结果（`{ ...byId(id), ...patch }`），缺列会被写回默认值。 */
-  async function update(id: string, data: Partial<Invoice>) {
+  async function update(id: string, data: Partial<Invoice>, operator = '') {
     const now = new Date().toISOString()
     const logId = await withUpdateLog(db, 'invoices', id, () => execute(
       UPDATE_SQL,
       [...invoiceToBindings(data), now, id],
-    ))
+    ), operator)
     await load()
     return logId
   }
@@ -336,7 +516,7 @@ export const useInvoiceStore = defineStore('invoice', () => {
         ocrStatus: 'done',
         reviewStatus: 'unreviewed',
         dupStatus: dupRows.length ? 'duplicate' : 'normal',
-      })
+      }, INVOICE_RECOGNITION_LOG_OPERATOR)
       if (logId)
         clearRecognitionError(id)
       return logId != null
@@ -440,34 +620,77 @@ export const useInvoiceStore = defineStore('invoice', () => {
    * 避免 project_id 与 project_name 各自指向不同项目、界面显示与实际归属对不上。
    */
   async function archiveInvoice(id: string, ownerKind: 'project' | 'personal', projectId?: string | null, projectName?: string): Promise<ArchiveResult> {
-    const inv = byId(id)
-    if (!inv)
-      return { ok: false, reason: '发票不存在或已删除' }
+    let result: ArchiveResult = { ok: false, reason: '发票不存在或已删除' }
+    try {
+      await withTransaction(async (tx) => {
+        const [row] = await tx.select<Record<string, unknown>>(
+          `SELECT * FROM invoices WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
+          [id],
+        )
+        if (!row)
+          return
 
-    const ready = checkInvoiceArchiveReady({
-      ocrStatus: inv.ocrStatus,
-      reviewStatus: inv.reviewStatus,
-      dupStatus: inv.dupStatus,
-      ownerKind,
-      projectId,
-      invoiceNumber: inv.invoiceNumber,
-      invoiceDate: inv.invoiceDate,
-      seller: inv.seller,
-      totalAmount: inv.totalAmount,
-      currentValuesConfirmed: inv.reviewStatus === 'reviewed',
-    })
-    if (!ready.ok)
-      return ready
+        const inv = rowToInvoice(row)
+        const provenance = await buildArchiveProvenance(inv, tx)
+        const ready = checkInvoiceArchiveReady({
+          ocrStatus: inv.ocrStatus,
+          reviewStatus: inv.reviewStatus,
+          dupStatus: inv.dupStatus,
+          ownerKind,
+          projectId,
+          invoiceNumber: inv.invoiceNumber,
+          invoiceDate: inv.invoiceDate,
+          seller: inv.seller,
+          totalAmount: inv.totalAmount,
+          currentValuesConfirmed: inv.reviewStatus === 'reviewed',
+          provenance,
+        })
+        if (!ready.ok) {
+          result = ready
+          return
+        }
 
-    const now = new Date().toISOString()
-    const logId = await withUpdateLog(db, 'invoices', id, () => execute(
-      `UPDATE invoices SET account_status='archived', owner_kind=?, project_id=?, project_name=?, archived_at=?, updated_at=? WHERE id=?`,
-      [ownerKind, ownerKind === 'project' ? projectId : null, ownerKind === 'project' ? (projectName ?? '') : '', now, now, id],
-    ))
+        const now = new Date().toISOString()
+        const archivedProjectId = ownerKind === 'project' ? projectId ?? null : null
+        const archivedProjectName = ownerKind === 'project' ? projectName ?? '' : ''
+        const archiveAudit: InvoiceArchiveAuditRecord = {
+          invoiceId: id,
+          archivedAt: now,
+          currentValues: archiveCurrentValues(inv, ownerKind, archivedProjectId, archivedProjectName),
+          provenance,
+        }
+        const logId = await withUpdateLog(tx, 'invoices', id, async () => {
+          await tx.execute(
+            `UPDATE invoices
+             SET account_status='archived', owner_kind=?, project_id=?, project_name=?, archived_at=?, updated_at=?
+             WHERE id=? AND deleted_at IS NULL AND updated_at=? AND account_status=?`,
+            [ownerKind, archivedProjectId, archivedProjectName, now, now, id, inv.updatedAt, inv.accountStatus],
+          )
+          const [written] = await tx.select<{ archived_at: string | null }>(
+            `SELECT archived_at FROM invoices WHERE id = ? AND deleted_at IS NULL LIMIT 1`,
+            [id],
+          )
+          if (written?.archived_at !== now)
+            throw new Error(INVOICE_ARCHIVE_CONCURRENT_CHANGE)
+        })
+        if (!logId)
+          return
+        await logOperation(tx, {
+          table: INVOICE_ARCHIVE_PROVENANCE_LOG,
+          recordId: id,
+          action: 'create',
+          after: archiveAudit as unknown as Record<string, unknown>,
+        })
+        result = { ok: true }
+      })
+    }
+    catch (error) {
+      if (!(error instanceof Error) || error.message !== INVOICE_ARCHIVE_CONCURRENT_CHANGE)
+        throw error
+      result = { ok: false, reason: '发票已被其他操作更新，请重新加载后重试' }
+    }
     await load()
-    if (!logId)
-      return { ok: false, reason: '发票不存在或已删除' }
-    return { ok: true }
+    return result
   }
 
   /** 「建议通过」池(#63):工作台内全绿扫描件——只标记不自动归档,是「批量通过」的放行范围。 */
@@ -561,5 +784,5 @@ export const useInvoiceStore = defineStore('invoice', () => {
 
   const { remove, restore, undo } = createSoftDeleteActions(db, 'invoices', load)
 
-  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), recognitionProgress: readonly(recognitionProgress), recognitionError, load, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, batchPass, recordPrinted, remove, restore, undo }
+  return { list: readonly(list), archivedInvoiceSummaries, loading: readonly(loading), invoiceExportStyle: readonly(invoiceExportStyle), invoiceExportStyleLoaded: readonly(invoiceExportStyleLoaded), recognitionProgress: readonly(recognitionProgress), recognitionError, load, loadInvoiceExportStyle, saveInvoiceExportStyle, byId, documents, pendingReview, pendingRecognition, suggestPass, ledger, ledgerGroups, add, update, correctField, confirmField, startRecognition, uploadInvoices, recognizeMany, recognizeAllPending, confirmInvoice, archiveInvoice, loadInvoiceArchiveAudit, batchPass, recordPrinted, remove, restore, undo }
 })
