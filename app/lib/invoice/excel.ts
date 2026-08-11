@@ -581,7 +581,7 @@ interface InvoiceStylePatchContext {
 
 function numberFormatIdMap(stylesXml: string): Map<string, number> {
   const formats = new Map<string, number>([['General', 0], [TEXT_FORMAT, 49]])
-  for (const match of stylesXml.matchAll(/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"[^>]*>(?:<\/numFmt>)?/g))
+  for (const match of stylesXml.matchAll(/<numFmt[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"[^>]*>(?:<\/numFmt>)?/g))
     formats.set(match[2]!.replaceAll('&quot;', '"'), Number(match[1]))
   return formats
 }
@@ -616,7 +616,7 @@ function appendNumberFormats(stylesXml: string, formats: readonly string[]): { x
     ids.set(format, id)
     children.push(`<numFmt numFmtId="${id}" formatCode="${xmlEscape(format)}"/>`)
   }
-  const sectionRegex = /<numFmts\b([^>]*)>([\s\S]*?)<\/numFmts>/
+  const sectionRegex = /<numFmts([^>]*)>(?:[\s\S]*?)<\/numFmts>/
   const match = sectionRegex.exec(stylesXml)
   if (!match)
     throw new Error('XLSX styles.xml 缺少 numFmts')
@@ -666,7 +666,7 @@ function patchStylesXml(
   }
   if (!cellXfs)
     throw new Error('XLSX styles.xml 缺少 cellXfs')
-  const sectionRegex = /<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/
+  const sectionRegex = /<cellXfs[^>]*>(?:[\s\S]*?)<\/cellXfs>/
   const match = sectionRegex.exec(xml)
   if (!match)
     throw new Error('XLSX styles.xml 缺少 cellXfs')
@@ -678,7 +678,7 @@ function patchStylesXml(
 }
 
 function setCellStyleId(xml: string, roleMap: InvoiceStylePlan['roles'], context: InvoiceStylePatchContext): string {
-  return xml.replace(/<c\b([^>]*\br="([A-Z]+\d+)"[^>]*)>/g, (tag, attributes: string, address: string) => {
+  return xml.replace(/<c([^>]*r="([A-Z]+\d+)"[^>]*)>/g, (tag, attributes: string, address: string) => {
     const planned = roleMap.get(address)
     if (!planned)
       return tag
@@ -779,7 +779,7 @@ function parseWorksheetStyle(
   sheetXml: string,
   styleDefinitions: readonly InvoiceCellStyleSnapshot[],
 ): InvoiceWorksheetStyleSnapshot {
-  const pane = /<pane\b[^>]*state="frozen"[^>]*>(?:<\/pane>)?/.exec(sheetXml)?.[0]
+  const pane = /<pane[^>]*state="frozen"[^>]*>(?:<\/pane>)?/.exec(sheetXml)?.[0]
   const freezeRows = pane ? xmlNumberAttribute(pane, 'ySplit') ?? 0 : 0
   const columns = xmlTagList(xmlSection(sheetXml, 'cols'), 'col').map((column) => {
     const width = xmlNumberAttribute(column, 'width') ?? 0
@@ -796,7 +796,7 @@ function parseWorksheetStyle(
     return hpt != null && row != null ? [{ row, hpt }] : []
   })
   const cells: Record<string, InvoiceCellStyleSnapshot> = {}
-  for (const cellXml of sheetXml.match(/<c\b[^>]*\br="[A-Z]+\d+"[^>]*>(?:[\s\S]*?<\/c>|\s*\/\s*>)/g) ?? []) {
+  for (const cellXml of sheetXml.match(/<c[^>]*r="[A-Z]+\d+"[^>]*>(?:[\s\S]*?<\/c>|\s*\/\s*>)/g) ?? []) {
     const address = xmlAttribute(cellXml, 'r')
     if (!address)
       continue
@@ -808,7 +808,7 @@ function parseWorksheetStyle(
       continue
     cells[address] = { ...style, styleId }
   }
-  const mergedCells = [...sheetXml.matchAll(/<mergeCell\b[^>]*ref="([^"]+)"[^>]*>(?:<\/mergeCell>)?/g)].map(match => decodeXmlAttribute(match[1]) ?? '')
+  const mergedCells = [...sheetXml.matchAll(/<mergeCell[^>]*ref="([^"]+)"[^>]*>(?:<\/mergeCell>)?/g)].map(match => decodeXmlAttribute(match[1]) ?? '')
   return { sheetName, freezeRows, columns, rows, cells, mergedCells }
 }
 
@@ -1014,7 +1014,7 @@ function readInvoiceSheet(
       .map(cell => `${cell.columnName}（${cell.address}）：${cell.formulaStatus === 'missing-cache' ? '缺少缓存值' : '缓存值异常'}`)
     const rowNumber = absoluteRow + 1
     const rowStyleIssues = styleIssues
-      .filter(issue => issue.sourceRow == null || issue.sourceRow === rowNumber || issue.address != null && cells.some(cell => cell.address === issue.address))
+      .filter(issue => issue.sourceRow == null || issue.sourceRow === rowNumber || (issue.address != null && cells.some(cell => cell.address === issue.address)))
       .map(issue => issue.reason)
     const rowKind = sourceRowKind(rowValues, sheetKind, invoiceNumberColumn >= 0 ? invoiceNumberColumn : null)
     const sourceRow: InvoiceSourceRow = {
@@ -1283,7 +1283,7 @@ export function createInvoiceImportTemplateXlsx(styleConfig: InvoiceXlsxStyleCon
   cellStyleAddresses(instructions, 0, 0, 0, 2, 'title')
   cellStyleAddresses(instructions, 1, 1, 0, 2, 'header')
   cellStyleAddresses(instructions, 2, 8, 0, 2, 'data')
-  setRowHeights(instructions, [config.titleRowHeight, config.headerRowHeight, ...Array.from({ length: 7 }).fill(config.dataRowHeight)])
+  setRowHeights(instructions, [config.titleRowHeight, config.headerRowHeight, ...Array<number>(7).fill(config.dataRowHeight)])
   XLSX.utils.book_append_sheet(workbook, instructions, '填写说明')
   return writeWorkbook(workbook, config)
 }
@@ -1330,7 +1330,7 @@ export function createInvoiceLedgerXlsxFromRows(
   setRowHeights(worksheet, [
     config.titleRowHeight,
     config.headerRowHeight,
-    ...Array.from({ length: rows.length }).fill(config.dataRowHeight),
+    ...Array<number>(rows.length).fill(config.dataRowHeight),
     config.totalRowHeight,
   ])
 
