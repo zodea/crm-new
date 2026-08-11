@@ -280,12 +280,24 @@ describe('收款登记业务边界', () => {
   it('付款方必须是真实客户 ID，施工合同可选且金额保持收入正向事实', async () => {
     const store = useFinanceStore()
 
+    await mem.execute(`
+      INSERT INTO customers (id, name, tax_no, status)
+      VALUES ('customer-other-project', '其他项目客户', '91440100OTHER', 'submitted')
+    `)
+
     await expect(store.saveForm('receipt', {
       receiptDate: '2026-07-21',
       projectId: 'project-finance',
       customerId: 'customer-missing',
       amount: 88,
     }, 'submit')).rejects.toThrow('付款方客户不存在或已删除')
+
+    await expect(store.saveForm('receipt', {
+      receiptDate: '2026-07-21',
+      projectId: 'project-finance',
+      customerId: 'customer-other-project',
+      amount: 88,
+    }, 'submit')).rejects.toThrow('付款方客户必须是所选项目的主客户')
 
     const receipt = await store.saveForm('receipt', {
       no: 'SK-OPTIONAL-CONTRACT',
