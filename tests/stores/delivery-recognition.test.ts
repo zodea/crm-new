@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import { buildMaterialPriceCatalog } from '~/lib/material/price-analysis'
 import { useDeliveryStore } from '~/stores/delivery'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { createMemoryDb } from '../helpers/memory-db'
@@ -367,5 +368,67 @@ describe('delivery store 真实识别与归档管线', () => {
     })
     expect(restoredStore.pendingPrintFiles[0]?.archivedRecordIds)
       .toEqual(expect.arrayContaining([firstId, secondId]))
+  })
+
+  it('缺单价和金额经人工确认后归档为价格待补录，且不进入价格分析', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(DELIVERY_MARKDOWN)))
+    const store = useDeliveryStore()
+    const [fileId] = await store.uploadFiles([
+      new File(['price-pending'], '价格待补录.pdf', { type: 'application/pdf' }),
+    ])
+    await store.recognizeFile(fileId!)
+    const doc = store.byId(fileId!)?.docs[0]
+    expect(doc).toBeTruthy()
+
+    const recordId = await store.archiveDocument(fileId!, doc!.id, {
+      projectId: 'p1',
+      supplierId: 's1',
+      orderNo: doc!.orderNo,
+      deliveryDate: doc!.deliveryDate,
+      siteText: doc!.siteText,
+      docType: doc!.docType,
+      note: '已核对送货事实，票面价格待后续补录',
+      items: doc!.items.map(item => ({
+        ...item,
+        unitPrice: null,
+        amount: null,
+        amountSource: 'manual',
+      })),
+      confirmations: {
+        humanReviewed: true,
+        amountReviewed: true,
+        noOrderNoConfirmed: false,
+        qualityReviewed: true,
+      },
+    })
+    const [row] = await mem.select<{ review_flag: string }>(
+      'SELECT review_flag FROM delivery_records WHERE id = ?',
+      [recordId],
+    )
+    const [line] = await mem.select<{ unit_price: number | null, amount: number | null }>(
+      'SELECT unit_price, amount FROM delivery_lines WHERE delivery_record_id = ?',
+      [recordId],
+    )
+    const recordStore = useDeliveryRecordStore()
+    const archived = recordStore.byId(recordId)!
+    const catalog = buildMaterialPriceCatalog([{
+      id: archived.id,
+      projectId: archived.projectId,
+      supplierId: archived.supplierId,
+      orderNo: archived.orderNo,
+      deliveryDate: archived.deliveryDate,
+      archived: archived.archived,
+      lines: archived.lines.map(item => ({
+        id: item.id,
+        materialName: item.materialName,
+        spec: item.spec,
+        unit: item.unit,
+        unitPrice: item.unitPrice,
+      })),
+    }], [{ id: 's1', name: '广州示例建材有限公司' }], [{ id: 'p1', name: '合和新城' }])
+
+    expect(row?.review_flag).toContain('价格待补录')
+    expect(line).toEqual({ unit_price: null, amount: null })
+    expect(catalog).toEqual([])
   })
 })
