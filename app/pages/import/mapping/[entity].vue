@@ -3,6 +3,7 @@ import type { ImportRowRejection, ImportRunResult } from '~/composables/useImpor
 import type { ImportColumnMatch, ImportStepId } from '~/lib/kit/import-mapping'
 import type { RawImportSheet } from '~/lib/util/excel'
 import { Button } from '~/components/ui/button'
+import { annotateInvoiceImportRows, getInvoiceImportSourceMeta } from '~/lib/invoice/excel'
 import { getImportEntity } from '~/lib/kit/import-entities'
 import {
   autoMatchColumns,
@@ -32,6 +33,7 @@ const runner = useImportRunner()
 const { done, error, phase, total } = runner
 const { exportFile } = useKitUI()
 const rowNumbers = new WeakMap<Record<string, unknown>, number>()
+const invoiceStore = useInvoiceStore()
 
 const steps = computed(() => importStepperSteps({
   currentStep: currentStep.value,
@@ -39,7 +41,10 @@ const steps = computed(() => importStepperSteps({
 }))
 const fieldStatus = computed(() => computeFieldStatus(mapping.value, fields))
 const missingRequired = computed(() => listMissingRequiredFields(mapping.value, fields))
-const allRows = computed(() => buildImportRows(mapping.value, sheet.value?.rows ?? []))
+const mappedRows = computed(() => buildImportRows(mapping.value, sheet.value?.rows ?? []))
+const allRows = computed(() => entityKey === 'invoice'
+  ? annotateInvoiceImportRows(mappedRows.value, invoiceStore.list.map(invoice => invoice.invoiceNumber))
+  : mappedRows.value)
 const keptEntries = computed(() => allRows.value
   .map((row, index) => ({ index, row }))
   .filter(entry => !excludedRows.value.has(entry.index)))
@@ -131,6 +136,9 @@ async function retryImport() {
 }
 
 function rejectionRowNumber(rejection: ImportRowRejection): number {
+  const sourceRow = getInvoiceImportSourceMeta(rejection.row)?.sourceRow
+  if (entityKey === 'invoice' && sourceRow)
+    return sourceRow
   return rowNumbers.get(rejection.row) ?? rejection.index + 2
 }
 
@@ -147,12 +155,21 @@ async function downloadRejections() {
   if (!runner.rejected.value.length)
     return
   const originalKeys = [...new Set(runner.rejected.value.flatMap(rejection => Object.keys(rejection.row)))]
+  const invoiceRejectionColumns = entityKey === 'invoice'
+    ? ['来源文件', '来源Sheet', '来源原始行', '来源键', '复核原因']
+    : []
   const lines = [
-    ['原始行号', '关键值', '拒绝原因', ...originalKeys].map(csvCell).join(','),
+    ['原始行号', '关键值', '拒绝原因', ...invoiceRejectionColumns, ...originalKeys].map(csvCell).join(','),
     ...runner.rejected.value.map(rejection => [
       rejectionRowNumber(rejection),
       rejectionKey(rejection),
       rejection.reason,
+      ...(entityKey === 'invoice'
+        ? (() => {
+            const source = getInvoiceImportSourceMeta(rejection.row)
+            return [source?.sourceFileName ?? '', source?.sourceSheet ?? '', source?.sourceRow ?? '', source?.sourceKey ?? '', source?.reviewReasons.join('；') ?? '']
+          })()
+        : []),
       ...originalKeys.map(key => rejection.row[key]),
     ].map(csvCell).join(',')),
   ]

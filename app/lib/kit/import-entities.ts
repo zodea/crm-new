@@ -2,6 +2,7 @@ import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
 import type { Project } from '~/stores/project'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
+import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
 import { normalizeProjectStatus } from '~/lib/project/status'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
@@ -213,6 +214,15 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
       if (!projectStore.list.length)
         await projectStore.load()
       try {
+        const sourceReview = getInvoiceImportSourceMeta(row)?.reviewReasons ?? []
+        if (sourceReview.length)
+          return `来源复核：${sourceReview.join('；')}`
+        const invoiceStore = useInvoiceStore()
+        if (!invoiceStore.list.length)
+          await invoiceStore.load()
+        const naturalKey = invoiceNaturalKey(row)
+        if (naturalKey && invoiceStore.list.some(invoice => invoiceNaturalKey({ invoiceNumber: invoice.invoiceNumber }) === naturalKey))
+          return `发票号码已存在：${String(row.invoiceNumber).trim()}，请逐行复核后再导入`
         return invoiceImportValidationError(
           invoiceDataFromRow(row),
           projectStore.list.map(project => project.name),
