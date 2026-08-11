@@ -318,6 +318,7 @@ export const INFRA_TABLES = [
   'import_batches',
   'reconciliation_issues',
   'contract_legacy_mappings',
+  'invoice_export_settings',
   'ocr_settings',
   'supplier_credential_audits',
   'supplier_audits',

@@ -69,6 +69,12 @@ export interface InvoiceXlsxStyleConfig {
   headerRowHeight?: number
   dataRowHeight?: number
   totalRowHeight?: number
+  columnWidths?: Partial<Record<keyof InvoiceLedgerExportRow, number>>
+  dateFormat?: string
+  moneyFormat?: string
+  textFormat?: string
+  mergeTitle?: boolean
+  mergeRepeatedValues?: boolean
   titleFont?: Partial<InvoiceFontStyle>
   headerFont?: Partial<InvoiceFontStyle>
   dataFont?: Partial<InvoiceFontStyle>
@@ -146,6 +152,12 @@ interface InvoiceResolvedStyleConfig {
   headerRowHeight: number
   dataRowHeight: number
   totalRowHeight: number
+  columnWidths: Record<keyof InvoiceLedgerExportRow, number>
+  dateFormat: string
+  moneyFormat: string
+  textFormat: string
+  mergeTitle: boolean
+  mergeRepeatedValues: boolean
   titleFont: InvoiceFontStyle
   headerFont: InvoiceFontStyle
   dataFont: InvoiceFontStyle
@@ -166,6 +178,21 @@ const DEFAULT_INVOICE_STYLE: InvoiceResolvedStyleConfig = {
   headerRowHeight: 28,
   dataRowHeight: 32,
   totalRowHeight: 24,
+  columnWidths: {
+    invoiceDate: 15,
+    invoiceNumber: 23,
+    seller: 30,
+    invoiceType: 16,
+    totalAmount: 12,
+    projectName: 24,
+    source: 14,
+    remark: 24,
+  },
+  dateFormat: DATE_FORMAT,
+  moneyFormat: MONEY_FORMAT,
+  textFormat: TEXT_FORMAT,
+  mergeTitle: true,
+  mergeRepeatedValues: true,
   titleFont: { name: '等线', sz: 16, bold: true },
   headerFont: { name: '等线', sz: 14, bold: true },
   dataFont: { name: '等线', sz: 12 },
@@ -200,6 +227,33 @@ export interface InvoiceLedgerExportRow {
   projectName: string
   source: string
   remark: string
+}
+
+/** 发票台账导出设置的初始值；界面和导出库共用，避免预览与文件各自维护一套默认值。 */
+export function createDefaultInvoiceXlsxStyleConfig(): InvoiceXlsxStyleConfig {
+  return {
+    freezeRows: DEFAULT_INVOICE_STYLE.freezeRows,
+    titleRowHeight: DEFAULT_INVOICE_STYLE.titleRowHeight,
+    headerRowHeight: DEFAULT_INVOICE_STYLE.headerRowHeight,
+    dataRowHeight: DEFAULT_INVOICE_STYLE.dataRowHeight,
+    totalRowHeight: DEFAULT_INVOICE_STYLE.totalRowHeight,
+    columnWidths: { ...DEFAULT_INVOICE_STYLE.columnWidths },
+    dateFormat: DEFAULT_INVOICE_STYLE.dateFormat,
+    moneyFormat: DEFAULT_INVOICE_STYLE.moneyFormat,
+    textFormat: DEFAULT_INVOICE_STYLE.textFormat,
+    mergeTitle: DEFAULT_INVOICE_STYLE.mergeTitle,
+    mergeRepeatedValues: DEFAULT_INVOICE_STYLE.mergeRepeatedValues,
+    titleFont: { ...DEFAULT_INVOICE_STYLE.titleFont },
+    headerFont: { ...DEFAULT_INVOICE_STYLE.headerFont },
+    dataFont: { ...DEFAULT_INVOICE_STYLE.dataFont },
+    totalFont: { ...DEFAULT_INVOICE_STYLE.totalFont },
+    border: {
+      top: { ...DEFAULT_INVOICE_STYLE.border.top },
+      bottom: { ...DEFAULT_INVOICE_STYLE.border.bottom },
+      left: { ...DEFAULT_INVOICE_STYLE.border.left },
+      right: { ...DEFAULT_INVOICE_STYLE.border.right },
+    },
+  }
 }
 
 const EXPORT_COLUMNS: readonly { key: keyof InvoiceLedgerExportRow, label: string, width: number }[] = [
@@ -244,12 +298,25 @@ function resolveInvoiceStyleConfig(config: InvoiceXlsxStyleConfig = {}): Invoice
     headerRowHeight: config.headerRowHeight ?? DEFAULT_INVOICE_STYLE.headerRowHeight,
     dataRowHeight: config.dataRowHeight ?? DEFAULT_INVOICE_STYLE.dataRowHeight,
     totalRowHeight: config.totalRowHeight ?? DEFAULT_INVOICE_STYLE.totalRowHeight,
+    columnWidths: { ...DEFAULT_INVOICE_STYLE.columnWidths, ...config.columnWidths },
+    dateFormat: config.dateFormat || DEFAULT_INVOICE_STYLE.dateFormat,
+    moneyFormat: config.moneyFormat || DEFAULT_INVOICE_STYLE.moneyFormat,
+    textFormat: config.textFormat || DEFAULT_INVOICE_STYLE.textFormat,
+    mergeTitle: config.mergeTitle ?? DEFAULT_INVOICE_STYLE.mergeTitle,
+    mergeRepeatedValues: config.mergeRepeatedValues ?? DEFAULT_INVOICE_STYLE.mergeRepeatedValues,
     titleFont: mergeFont(config.titleFont, DEFAULT_INVOICE_STYLE.titleFont),
     headerFont: mergeFont(config.headerFont, DEFAULT_INVOICE_STYLE.headerFont),
     dataFont: mergeFont(config.dataFont, DEFAULT_INVOICE_STYLE.dataFont),
     totalFont: mergeFont(config.totalFont, DEFAULT_INVOICE_STYLE.totalFont),
     border: mergeBorder(config.border),
   }
+}
+
+/** 持久化边界统一收敛为完整样式，损坏或非对象记录回退到领域默认值。 */
+export function normalizeInvoiceXlsxStyleConfig(value: unknown): InvoiceXlsxStyleConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return createDefaultInvoiceXlsxStyleConfig()
+  return resolveInvoiceStyleConfig(value as InvoiceXlsxStyleConfig)
 }
 
 function xmlEscape(value: string): string {
@@ -1303,23 +1370,27 @@ export function createInvoiceLedgerXlsxFromRows(
   const dataStartRow = 2
   const totalRow = dataStartRow + rows.length
 
-  worksheet['!cols'] = EXPORT_COLUMNS.map(column => ({ wch: column.width }))
-  worksheet['!merges'] = [{
-    s: { r: 0, c: 0 },
-    e: { r: 0, c: EXPORT_COLUMNS.length - 1 },
-  }]
-  mergeContiguousValues(worksheet, rows, 2, dataStartRow)
-  mergeContiguousValues(worksheet, rows, 5, dataStartRow)
+  worksheet['!cols'] = EXPORT_COLUMNS.map(column => ({ wch: config.columnWidths[column.key] ?? column.width }))
+  worksheet['!merges'] = config.mergeTitle
+    ? [{
+        s: { r: 0, c: 0 },
+        e: { r: 0, c: EXPORT_COLUMNS.length - 1 },
+      }]
+    : []
+  if (config.mergeRepeatedValues) {
+    mergeContiguousValues(worksheet, rows, 2, dataStartRow)
+    mergeContiguousValues(worksheet, rows, 5, dataStartRow)
+  }
 
   newInvoiceStylePlan(worksheet, config.freezeRows)
   cellStyleAddresses(worksheet, 0, 0, 0, EXPORT_COLUMNS.length - 1, 'title')
   cellStyleAddresses(worksheet, 1, 1, 0, EXPORT_COLUMNS.length - 1, 'header')
   cellStyleAddresses(worksheet, dataStartRow, totalRow - 1, 0, EXPORT_COLUMNS.length - 1, 'data', {
-    0: DATE_FORMAT,
-    1: TEXT_FORMAT,
-    4: MONEY_FORMAT,
+    0: config.dateFormat,
+    1: config.textFormat,
+    4: config.moneyFormat,
   })
-  cellStyleAddresses(worksheet, totalRow, totalRow, 0, EXPORT_COLUMNS.length - 1, 'total', { 4: MONEY_FORMAT })
+  cellStyleAddresses(worksheet, totalRow, totalRow, 0, EXPORT_COLUMNS.length - 1, 'total', { 4: config.moneyFormat })
   setRowHeights(worksheet, [
     config.titleRowHeight,
     config.headerRowHeight,
@@ -1330,18 +1401,18 @@ export function createInvoiceLedgerXlsxFromRows(
   for (let row = dataStartRow; row < totalRow; row++) {
     const dateCell = worksheet[cellAddress(row, 0)]
     if (dateCell)
-      dateCell.z = DATE_FORMAT
+      dateCell.z = config.dateFormat
     const amountCell = worksheet[cellAddress(row, 4)]
     if (amountCell) {
       amountCell.t = 'n'
-      amountCell.z = MONEY_FORMAT
+      amountCell.z = config.moneyFormat
     }
   }
 
   const totalCell = worksheet[cellAddress(totalRow, 4)] ?? { t: 'n', v: 0 }
   totalCell.t = 'n'
   totalCell.v = rows.reduce((sum, row) => sum + row.totalAmount, 0)
-  totalCell.z = MONEY_FORMAT
+  totalCell.z = config.moneyFormat
   worksheet[cellAddress(totalRow, 4)] = totalCell
   worksheet['!ref'] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
