@@ -389,6 +389,16 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await expectVisualEnvironment(page)
         await page.addStyleTag({
           content: `
+            :root {
+              --font-sans: "Microsoft YaHei", sans-serif !important;
+              --font-mono: Consolas, "Courier New", monospace !important;
+            }
+            [data-shell-topbar] [class*="bg-danger"] {
+              width: 16px !important;
+              min-width: 16px !important;
+              padding: 0 !important;
+              font-size: 0 !important;
+            }
             *, *::before, *::after {
               caret-color: transparent !important;
               transition-duration: 0s !important;
