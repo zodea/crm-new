@@ -399,6 +399,9 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
               padding: 0 !important;
               font-size: 0 !important;
             }
+            input[type="date"][data-visual-empty-date]::-webkit-datetime-edit {
+              color: transparent !important;
+            }
             *, *::before, *::after {
               caret-color: transparent !important;
               transition-duration: 0s !important;
@@ -444,6 +447,10 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
           `,
         })
         await sample.prepare(page, width)
+        await page.locator('input[type="date"]').evaluateAll(inputs => inputs.forEach((input) => {
+          if (input instanceof HTMLInputElement && !input.value)
+            input.dataset.visualEmptyDate = ''
+        }))
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
         if (sample.key === 'detail') {
           await page.getByTestId('project-schedule-progress-value')
