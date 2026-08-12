@@ -120,16 +120,18 @@ async function expectVisualEnvironment(page: Page) {
 }
 
 async function navigateFromSidebar(page: Page, width: number, label: string) {
+  let sidebar: Locator
   if (width < 1024) {
     await page.getByRole('button', { name: '切换侧边栏' }).click()
-    const sheet = page.getByRole('dialog', { name: '导航菜单' })
-    await expect(sheet).toBeVisible()
-    await sheet.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.getByRole('dialog', { name: '导航菜单' })
+    await expect(sidebar).toBeVisible()
   }
   else {
-    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
-    await sidebar.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.locator('[data-sidebar="sidebar"]').first()
   }
+
+  await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
+  await sidebar.getByRole('link', { name: label, exact: true }).click()
   await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
 }
 
@@ -195,7 +197,7 @@ const SAMPLES: VisualSample[] = [
     path: '/',
     prepare: async (page, width) => {
       await navigateFromSidebar(page, width, '项目列表')
-      const detailLink = page.getByRole('link', { name: '查看项目详情' }).first()
+      const detailLink = page.getByRole('link', { name: '合和新城', exact: true }).first()
       await expect(detailLink).toBeVisible()
       await detailLink.click()
       await expect(page).toHaveURL(/\/project\/[^/]+$/)
