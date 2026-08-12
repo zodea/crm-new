@@ -67,19 +67,17 @@ async function expectOwnerPageContract(page: Page, kind: string) {
 }
 
 test.describe('Issue #200 甲供材页面', () => {
-  test('五条页面在四档视口可运行，并保持甲供边界', async ({ page }) => {
-    test.setTimeout(180_000)
-
-    for (const width of [390, 768, 1024, 1440]) {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      for (const route of OWNER_MATERIAL_ROUTES) {
+  for (const width of [390, 768, 1024, 1440]) {
+    for (const route of OWNER_MATERIAL_ROUTES) {
+      test(`${route.title} @ ${width}px 可运行并保持甲供边界`, async ({ page }) => {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
         await page.goto(route.path)
         await expect(page.getByRole('heading', { name: route.title })).toBeVisible({ timeout: 20_000 })
         await expectOwnerPageContract(page, route.kind)
         await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
-      }
+      })
     }
-  })
+  }
 
   test('总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量', async ({ page }) => {
     test.setTimeout(180_000)
