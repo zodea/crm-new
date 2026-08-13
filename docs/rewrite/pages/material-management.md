@@ -2,6 +2,104 @@
 
 > 表单蓝本：`MaterialForms.jsx` 中除 `deliveryArchiveForm` 外的 10 条路由
 > 持久化权威：`DATABASE.md` §2.5
+> 视觉参考：[ADR 0013](../../adr/0013-align-all-ui-to-online-design.md) · [运行态参考审计](../../design/runtime-reference-audit.md)
+
+## 运行态参考与当前边界（2026-08-13）
+
+本轮以“车陂商业大楼项目”为主样本，按严格只读协议查看参考站的仓库档案、下料单、材料到货、材料领用、乙供材直入直出、批量调拨、库存盘点、材料采购合同及合同内“物资管理”页签；材料采购结算沿用 [`contract-forms.md`](./contract-forms.md) 的同轮直接证据。未点击新建、编辑、删除、上传、下载、导入、导出、审批、打印、评论或文件操作。
+
+### 参考列表与详情构图
+
+| 参考入口 | 可见读模型 | 当前样本 | 对瑞航的约束 |
+| --- | --- | --- | --- |
+| 仓库档案 | 仓库名称、类型、项目、状态、计价方式、描述、负责人、创建时间、项目默认仓库、操作 | 0 条 | 即使为空也保留仓库专属表头；仓库不是自由文本筛选项 |
+| 下料单 | 单据名称、业务类型、审批状态、项目、供应商、到货情况、明细数、已完成/部分/未完成入库数、创建日期、编号、操作 | 0 条 | 到货进度是由关联到货事实聚合的读模型，不写回手工累计列 |
+| 材料到货 | 编号、填单时差、源单据、类型、项目、分供方、送货单号、到货日、仓库、采购类型、生效/领料/可结算/付款状态、累计结算/付款、备注、操作 | 0 条 | 源单、送货单、合同、仓库、结算和付款必须保留真实 ID；空表也不能压成通用“材料/对象”列 |
+| 材料领用 | 编号、类型、项目、出库日、分供方、仓库、领料人、生效状态、是否班组领用、班组、班组合同、出库金额、非班组说明、操作 | 0 条 | 班组与班组合同是独立关系；领用不能只剩材料名称、数量和日期 |
+| 乙供材直入直出 | 编号、业务类型、负责人、项目、创建人、审批状态、到货金额、创建时间、送货单号、合同、分供方、领料人、修改人/时间、操作 | 0 条 | 它是乙供材专属业务单据，不得复用甲供材直入直出实体 |
+| 批量调拨 | 编号、计划日期、调出项目/仓库、调入项目/仓库、生效状态、生单状态、附件、操作 | 0 条 | 调出与调入两端都需要真实项目、仓库 ID；不能用备注表达调拨 |
+| 库存盘点 | 编号、项目、仓库、盘点人、盘点日期、生效状态、操作 | 0 条 | 盘点归属必须可追到项目和仓库；明细继续由瑞航本地规格裁定 |
+| 材采合同 · 物资管理 | 新/历史入库、直入直出、新/历史出库五组；保留原单、日期、仓库、金额、结算余额、付款状态、班组合同等专属列 | 当前合同五组均为 0 条 | 合同详情即物资链的只读聚合入口；没有记录仍展示五组表头和真实空态 |
+
+所有列表采用“有业务意义时才出现的单层分类 + 单行工具栏 + 紧凑宽表 + 表格内横向滚动 + 底部汇总/分页”。流程阶段和状态使用小型节点或行内标签，不使用占据首屏的大卡片；详情资料采用白底标签—值平铺和轻边界分区，不给每个字段套灰色背景格。固定截图尺寸不是实现合同，仍需在 390 / 768 / 1024 / 1280–1440px 验证。
+
+### 只读跳转合同
+
+1. 列表的蓝色单据名称或编号先进入独立只读详情；编辑只由明确的“编辑”动作进入整页表单。当前四类材料列表把名称和“查看/编辑”都直接送进编辑表单，不符合该边界。
+2. 项目、分供方、材料采购合同、源单据、送货单、仓库、班组合同和结算名称都是关系入口；目标存在时按真实 ID 下钻，目标为空时展示“未记录”，不得用名称搜索猜 ID。
+3. 材料采购合同详情的“物资管理”汇总该合同下的新/历史入库、直入直出和新/历史出库；本地已有 `contract_id → material_requisitions/material_arrivals` 查询基础，但当前下钻仍进入编辑表单，且没有送货归档、出库批次和结算分摊关系。
+4. 送货单号进入 `/material/delivery/archive/:id`；归档详情中的项目、分供方继续进入各自详情。材料价格来源使用 `deliveryRecordId + deliveryLineId` 回到同一送货单，合作合同使用 `contractId` 回到合同详情。
+5. 任一详情返回列表时必须恢复来源路由、项目/状态/分类筛选、搜索、分页和滚动位置；不得只写死返回域首页。建议统一携带 `from` 或可序列化的列表 query，不把展示名称当返回键。
+
+### 当前本地完成度与实体数据
+
+| 本地范围 | 运行态数据 | 已有能力 | 待补缺口 |
+| --- | ---: | --- | --- |
+| `/material/requisition` | 0 条种子 | SQLite 头表、项目/材采合同 ID、到货派生量、整页表单 | 专属列表列、只读详情、到货进度计数、供应关系投影、返回上下文 |
+| `/material/arrival` | 0 条种子 | 头/明细事务、项目/分供方/合同/下料单 ID、库存派生 | 专属列表列、只读详情、仓库 ID、送货归档 ID、结算/付款快照 |
+| `/material/use` | 0 条种子 | 项目/班组 ID、仓库文本、实时库存校验 | 专属列表列、只读详情、仓库 ID、分供方/合同或来源批次、班组合同关系 |
+| `/material/stock-check` | 0 条种子 | 头/明细事务、账面量/实盘量/盈亏和生效库存 | 当前没有项目 ID、仓库 ID；通用列表仍显示无来源的“项目”筛选 |
+| 仓库档案 / 乙供材直入直出 / 批量调拨 | 无实体、无生产路由 | 无 | 先完成领域实体与迁移裁定，再实现列表/详情/整页表单；不得借用甲供材直入直出 |
+| `/material/settlement` | 0 条种子 | 复用真实 `expenditure_settlements` 与材采合同 | 只读详情、到货/送货分摊实体及付款余额读模型见 `contract-forms.md` |
+| `/material/delivery/archive` | 3 个归档头、4 条材料明细 | 项目→分供方树、列表、只读详情、项目/分供方下钻、原件缺失态 | 尚未与 `material_arrivals` 建立 canonical 关系；详情返回未保留树节点/筛选上下文 |
+| `/material/price` | 现有归档事实被过滤后为 0 个可分析材料 | 来源送货单和历史材采合同下钻均已实现 | `delivery_records.ocr_status='reviewed'` 与分析器要求 `ocrStatus='done'` 的词汇冲突会把 3 个归档头/4 条明细全部过滤，须在读边界统一状态而非补 Mock 数据 |
+
+现有实体数据不多：核心下料—到货—领用—盘点没有种子记录；可直接复用的是送货归档的 3 个头和 4 条材料明细，其中 2 个归档头已绑定分供方并含有效单价，足以先修通真实价格读链和跳转，之后再补充业务数据。
+
+### ID 链、断点与读接口契约
+
+当前可追溯主链为：
+
+```text
+project.id / supplier.id / contract.id
+  → material_requisitions.contract_id
+  → material_arrivals.requisition_id + contract_id + supplier_id
+  → 库存派生（warehouse 目前仍是文本）
+
+delivery_records.id
+  → delivery_lines.delivery_record_id
+  → 材料价格事实（deliveryRecordId + deliveryLineId）
+  → 送货单详情
+
+expenditure_settlements.contract_id
+  → payment/invoice allocations
+```
+
+尚未闭合的连接是 `warehouse.id`、到货 ↔ 送货归档、到货 ↔ 材料结算分摊、领用 ↔ 入库批次/采购来源，以及调拨两端。没有这些 ID 前，不能靠仓库名、送货单号、材料名或金额近似匹配。到货与送货归档究竟采用单一 `delivery_record_id` 还是分配桥表，必须在数据迁移票中根据“一张原件拆多单/多次入库”的实际口径裁定。
+
+后端读接口统一使用分页包络和关系引用；名称只作快照展示，写入仍保存 ID：
+
+```ts
+interface EntityRef {
+  id: string
+  no?: string
+  name: string
+}
+
+interface PageResult<T, S = never> {
+  items: T[]
+  page: number
+  pageSize: number
+  total: number
+  summary?: S
+}
+
+interface MaterialDocumentRef {
+  id: string
+  no: string
+  type: 'requisition' | 'arrival' | 'delivery' | 'use' | 'direct' | 'transfer' | 'stock-check' | 'settlement'
+}
+
+interface SettlementPaymentSnapshot {
+  settlementStatus: string | null
+  settledAmount: number | null
+  remainingSettleAmount: number | null
+  paymentStatus: string | null
+  paidAmount: number | null
+}
+```
+
+各列表 DTO 至少包含 `id/no/status/createdAt/updatedAt`，再按领域追加：下料单带 `project/contract/supplier` 与完成/部分/剩余入库计数；到货带 `sourceDocument/project/supplier/contract/deliveryRecord/warehouse` 及结算付款快照；领用带 `project/warehouse/receiver/crew/crewContract/sourceLots`；盘点带 `project/warehouse/checker/date`；调拨带调出/调入两端引用。上述是瑞航所需的 canonical 读模型，不是对参考站接口名或内部字段的复制。
 
 ## 一、乙供材
 
