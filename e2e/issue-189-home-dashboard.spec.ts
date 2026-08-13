@@ -16,12 +16,12 @@ test('Issue #189：首页默认工作台只展示真实排程并保持项目、�
   })
   await expect(page).toHaveURL('/?project=proj_demo_001')
 
-  const group = page.getByRole('button', { name: /户内1栋-2栋/ })
+  const expandedGroup = page.getByRole('button', { name: '折叠分组：户内1栋-2栋' })
   const task = page.getByRole('button', { name: /卫生间回填及防水/ }).first()
   await expect(task).toBeVisible()
-  await group.click()
+  await expandedGroup.click()
   await expect(task).toBeHidden()
-  await group.click()
+  await page.getByRole('button', { name: '展开分组：户内1栋-2栋' }).click()
   await expect(task).toBeVisible()
 
   const widths = await page.evaluate(() => ({
