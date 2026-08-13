@@ -109,22 +109,11 @@ project.id
 
 尚未闭合的连接是 `warehouse.id`、到货 ↔ 送货归档、到货 ↔ 材料结算分摊、领用 ↔ 入库批次/采购来源，以及调拨两端。甲供材还缺总计划头 ↔ 材料明细边界、下料 ↔ 到货、到货/领用/直入直出 ↔ 供货单位、送货单、仓库和班组合同的稳定 ID。当前 `customer_id` 只证明项目甲方关系，不能自动解释成参考列表中的“分供方”；项目档案包因此继续使用“甲供材供货单位待配置”，不冒用客户名。没有这些 ID 前，不能靠仓库名、送货单号、材料名或金额近似匹配。到货与送货归档究竟采用单一 `delivery_record_id` 还是分配桥表，必须在数据迁移票中根据“一张原件拆多单/多次入库”的实际口径裁定；甲供材供货单位身份和总计划头/行身份交由后续 DTO/迁移票集中裁定，不在空表走查中猜定。
 
-后端读接口统一使用分页包络和关系引用；名称只作快照展示，写入仍保存 ID：
+后端读接口统一使用 [`READ-MODELS.md`](../READ-MODELS.md) 的分页、关系、金额、空态与权限语义；名称只作快照展示，写入仍保存 ID。下列领域结构中的 `MoneyDTO` 均为固定两位十进制定点字符串：
 
 ```ts
-interface EntityRef {
-  id: string
-  no?: string
-  name: string
-}
-
-interface PageResult<T, S = never> {
-  items: T[]
-  page: number
-  pageSize: number
-  total: number
-  summary?: S
-}
+type EntityRef = EntityRefDTO
+type PageResult<T, S = null> = PageDTO<T, S>
 
 interface MaterialDocumentRef {
   id: string
@@ -134,10 +123,10 @@ interface MaterialDocumentRef {
 
 interface SettlementPaymentSnapshot {
   settlementStatus: string | null
-  settledAmount: number | null
-  remainingSettleAmount: number | null
+  settledAmount: MoneyDTO | null
+  remainingSettleAmount: MoneyDTO | null
   paymentStatus: string | null
-  paidAmount: number | null
+  paidAmount: MoneyDTO | null
 }
 
 interface OwnerMaterialControlListItem {
@@ -161,7 +150,7 @@ interface OwnerMaterialRequisitionListItem {
   project: EntityRef
   planDate: string | null
   requiredArrivalDate: string | null
-  totalAmount: number | null
+  totalAmount: MoneyDTO | null
   creator: EntityRef | null
   note: string | null
   arrivalProgress: {
@@ -185,7 +174,7 @@ interface OwnerMaterialArrivalListItem {
   purchaseType: string | null
   effectiveStatus: string | null
   issueStatus: string | null
-  totalAmount: number | null
+  totalAmount: MoneyDTO | null
   settlementPayment: SettlementPaymentSnapshot
   note: string | null
 }
@@ -222,7 +211,7 @@ interface OwnerMaterialDirectListItem {
 }
 ```
 
-各列表 DTO 至少包含 `id/no/status/createdAt/updatedAt`，再按领域追加：下料单带 `project/contract/supplier` 与完成/部分/剩余入库计数；到货带 `sourceDocument/project/supplier/contract/deliveryRecord/warehouse` 及结算付款快照；领用带 `project/warehouse/receiver/crew/crewContract/sourceLots`；盘点带 `project/warehouse/checker/date`；调拨带调出/调入两端引用。甲供材五类使用上面的可空读模型，金额用数值或 decimal 字符串在 API 边界统一转换，日期传 ISO 值，状态传本地稳定 code 并由前端显示中文；权限不可见、关系未配置和真实空值必须是三个可区分状态。上述是瑞航所需的 canonical 读模型，不是对参考站接口名或内部字段的复制；参考空表没有证明的字段只能保持 nullable，不得反向成为必填写模型。
+各列表 DTO 至少包含 `id/no/status/createdAt/updatedAt`，再按领域追加：下料单带 `project/contract/supplier` 与完成/部分/剩余入库计数；到货带 `sourceDocument/project/supplier/contract/deliveryRecord/warehouse` 及结算付款快照；领用带 `project/warehouse/receiver/crew/crewContract/sourceLots`；盘点带 `project/warehouse/checker/date`；调拨带调出/调入两端引用。甲供材五类使用上面的可空读模型，金额按 `MoneyDTO` 传输，日期传 ISO 值，状态传本地稳定 code 并由前端显示中文；权限不可见、关系未配置和真实空值必须是三个可区分状态。上述是瑞航所需的 canonical 读模型，不是对参考站接口名或内部字段的复制；参考空表没有证明的字段只能保持 nullable，不得反向成为必填写模型。
 
 ## 一、乙供材
 

@@ -1,6 +1,6 @@
 # 当前技术架构
 
-本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)。
+本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)。
 
 ## 1. 运行形态
 
@@ -82,6 +82,7 @@ Page / Domain component
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。
+- 列表、详情、工作台和未来 HTTP adapter 的读语义以 `READ-MODELS.md` 为契约；Pinia 不直接拼私有 URL，本地 SQLite adapter 与 HTTP adapter 不得各造一套空值、金额或权限含义。
 - 删除遵循软删除与撤回语义；具体约束见 `DATABASE.md` 和 ADR 0003。
 
 ## 5. 导航、页面与表单

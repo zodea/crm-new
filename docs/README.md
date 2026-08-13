@@ -9,6 +9,7 @@
 | 项目术语是什么意思 | [`CONTEXT.md`](../CONTEXT.md) |
 | 为什么采用某项架构或交互方案 | [`docs/adr/`](./adr/) |
 | 数据实体、字段、关系与迁移 | [`docs/rewrite/DATABASE.md`](./rewrite/DATABASE.md) |
+| 页面读模型、DTO 类型、空错权限和本地/后台适配边界 | [`docs/rewrite/READ-MODELS.md`](./rewrite/READ-MODELS.md) |
 | 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |

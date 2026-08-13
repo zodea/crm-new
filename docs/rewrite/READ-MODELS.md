@@ -1,0 +1,364 @@
+# 前后端读模型与 DTO 语义基线
+
+本文是当前生产页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 Wayfinder 的“固化跨域蓝色入口、目标路由与返回语义矩阵”裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
+
+当前实现仍以 Pinia → 领域服务 → SQLite（浏览器为 sql.js）读取；除 OCR 外尚无通用业务 HTTP API。本文冻结的是本地 adapter 与未来 HTTP adapter 必须共同实现的读语义，不授权页面直接请求私有地址，也不决定后台上线后的离线写入、冲突回放或双写策略。
+
+## 1. 边界与分级
+
+每个页面族按以下分级标记：
+
+- `A`：已有稳定 ID、SQLite 外键或确定性读模型，可直接成为后台读 DTO 基线。HTTP 未实现时由类型化本地 adapter 返回同一语义。
+- `B`：页面需要该字段或下钻，但 canonical 外键、身份或聚合来源尚未建立。DTO 必须保留显式缺口，关系落库前不得按名称、同项目、金额近似或文本用途猜接线。
+- `C`：文件、OCR、导入导出或桌面能力。继续走专用本地/Nitro adapter，不塞进通用业务列表接口；凭证、原始文件和私有地址不得进入普通 DTO。
+
+`A` 不等于已经有在线接口，`B` 不等于可以先返回假数据，`C` 也不等于 Mock。三类都必须展示真实加载、空、错误和权限状态。
+
+## 2. 共享语义类型
+
+### 2.1 标量
+
+```ts
+type OpaqueIdDTO = string
+type BusinessCodeDTO = string
+type ISODateDTO = string       // YYYY-MM-DD
+type ISODateTimeDTO = string   // ISO-8601，带时区或明确为 UTC
+type YearMonthDTO = string     // YYYY-MM
+
+// JSON 传输固定使用十进制定点字符串；禁止科学计数法和货币符号。
+type MoneyDTO = string         // 例："1234.50"，固定两位小数
+type QuantityDTO = string      // 最多六位小数，保留 0 与 null 的区别
+type RatioDTO = string         // 0..1，最多六位小数
+
+type CountDTO = number         // 非负安全整数
+type BoolDTO = boolean
+```
+
+SQLite 现阶段仍按 `REAL` 保存多数金额，工资分配按整数分保存。SQLite adapter 在 DTO 边界统一 `round2` 并编码为 `MoneyDTO`；写 adapter 在领域事务内转换和勾稽。Vue 页面可以在展示 adapter 后使用 `number` 计算布局和格式化，但不得把格式化字符串、浮点绝对相等或 `Number(value) || 0` 带回领域判断。全库是否迁移为整数分不在本票决定。
+
+编号、税号、银行账号、电话和外部键始终是字符串，保留前导零；计数才使用整数。日期缺失为 `null`，不是空日期或 `1970-01-01`。
+
+枚举传 `DATABASE.md` 或页面蓝本已经定义的 canonical code。现有合同状态等字段若以中文值作为当前 canonical code，可以原值传输，但不得另用显示标签、颜色或按钮文案发明第二套身份；未来改为英文 code 时必须做显式版本迁移和双向 adapter，不能逐页临时翻译。
+
+### 2.2 关系引用
+
+```ts
+type EntityKindDTO
+  = 'project' | 'customer' | 'supplier' | 'crew' | 'worker'
+    | 'contract' | 'settlement' | 'owner-document' | 'subcontract-document'
+    | 'invoice-application' | 'invoice' | 'receipt' | 'current-transaction'
+    | 'payment-application' | 'payment-record' | 'expense-reimbursement'
+    | 'material' | 'material-document' | 'delivery-record' | 'warehouse'
+    | 'wage-statement' | 'attendance' | 'schedule-group' | 'schedule-task'
+    | 'quantity-unit' | 'target-cost' | 'file'
+
+type EntityRefDTO =
+  | {
+      state: 'resolved'
+      entity: EntityKindDTO
+      id: OpaqueIdDTO
+      label: string
+      no: BusinessCodeDTO | null
+    }
+  | {
+      state: 'missing'
+      entity: EntityKindDTO
+      id: null
+      label: null
+      reason: 'not-configured' | 'not-recorded' | 'not-applicable'
+    }
+  | {
+      state: 'forbidden'
+      entity: EntityKindDTO
+      id: OpaqueIdDTO | null
+      label: null
+      reason: 'permission-denied'
+    }
+```
+
+DTO 不下发前端路由字符串。前端根据 `entity + id` 和跨域路由矩阵生成目标；无有效目标或无权限时显示普通文本/明确状态，不伪装蓝色链接。关系对象存在但其子集合为 0 条时返回 `state='resolved'` 和空数组，不能降格成 `missing`。
+
+### 2.3 分页、筛选、排序与汇总
+
+```ts
+interface SortDTO {
+  field: string
+  direction: 'asc' | 'desc'
+}
+
+interface PaginationDTO {
+  page: number       // 从 1 开始
+  pageSize: number
+  total: CountDTO    // 同一筛选条件下的总行数
+}
+
+interface EmptyDTO {
+  reason: 'no-records' | 'no-filter-match' | 'missing-relation'
+  missingRelations: EntityKindDTO[]
+}
+
+interface PageDTO<T, S = null> {
+  items: T[]
+  pagination: PaginationDTO
+  summary: S
+  empty: EmptyDTO | null
+  asOf: ISODateTimeDTO
+  sourceVersion: string | null
+  capabilities: string[]
+}
+```
+
+- 每个 operation 定义自己的强类型筛选键；项目、客户、分供方、合同、班组、工人等筛选只接收稳定 ID。
+- `pageSize` 先支持现有控件实际使用的 10、20、50、100；非法页码/排序字段返回参数错误，不静默换成其他字段。
+- 排序必须带稳定的 `id` 次序，避免翻页重复或漏行。状态 code、金额和日期按原始类型排序，不按中文标签或格式化文本排序。
+- `summary` 使用与 `items` 相同的完整筛选集，但在分页之前聚合；不能只汇总当前页。
+- 初始无业务记录用 `no-records`，有数据但筛选无命中用 `no-filter-match`，必需关系未配置导致无法查询用 `missing-relation`。
+
+### 2.4 可空值与聚合完整性
+
+```ts
+type CompletenessDTO
+  = 'complete' | 'partial' | 'pending' | 'not-applicable' | 'undefined'
+
+interface MetricDTO {
+  value: MoneyDTO | QuantityDTO | RatioDTO | CountDTO | null
+  unit: 'CNY' | 'quantity' | 'ratio' | 'count'
+  status: CompletenessDTO
+  missingSources: string[]
+  asOf: ISODateTimeDTO
+  drilldown: {
+    entity: EntityKindDTO
+    filters: Record<string, string>
+  } | null
+}
+```
+
+- `null` 表示事实缺失、尚不可算或该字段未知；`0` 只表示已知为零。
+- 成功读取且确实没有子记录返回 `[]`；未读取、无权限或父关系缺失不能返回假空数组。
+- 字段“不适用于该变体”应在变体 schema 中省略；字段适用但尚无事实必须显式返回 `null`。
+- 工程量现场量缺失必须保持 `null`；阶段/全户合计只有所有参与行都有值时才是 `complete`，不能用 `?? 0` 消除缺失。
+- 税负率、动态效益率等除法指标在分母为 0 或来源未取得时返回 `null + status`，不显示伪造 `0%`。
+
+### 2.5 错误、权限和并发
+
+```ts
+interface ProblemDTO {
+  code:
+    | 'invalid-query' | 'forbidden' | 'not-found'
+    | 'relationship-mismatch' | 'validation-failed'
+    | 'stale-source' | 'conflict' | 'unavailable' | 'internal-error'
+  message: string
+  retryable: boolean
+  fieldErrors: Record<string, string[]>
+  traceId: string | null
+}
+
+type ReadState<T> =
+  | { kind: 'idle' }
+  | { kind: 'loading', previous: T | null }
+  | { kind: 'ready', data: T }
+  | { kind: 'empty', data: T, empty: EmptyDTO }
+  | { kind: 'forbidden', problem: ProblemDTO }
+  | { kind: 'error', problem: ProblemDTO, previous: T | null }
+```
+
+- 整个页面族无读取权限返回 `forbidden`，不返回 200 + 空列表。单个关系不可见使用 `EntityRefDTO.state='forbidden'`，并按权限策略隐藏 label。
+- 父实体不存在返回 `not-found`；路径中的项目/合同/户等身份不匹配返回 `relationship-mismatch`，不得按同名对象回退。
+- 本地加载错误和 HTTP 错误都归一为 `ProblemDTO`；页面保留重试入口和原筛选，不把错误当空态。
+- 需要源版本保护的工程量、工资、排程、OCR 校对和导入结果带 `sourceVersion`；陈旧提交返回 `stale-source`，不覆盖新事实。
+- HTTP adapter 使用 400 表示查询格式错误、403 表示无权限、404 表示不存在或错配、409 表示冲突/陈旧来源、422 表示字段校验失败、503 表示可重试不可用、500 表示未分类内部错误；SQLite adapter 映射到相同 `ProblemDTO.code`。
+
+## 3. 20 个页面域的 DTO 映射
+
+下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 128 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
+
+| 代码 | 运行证据域 | 路由数 | 页面族与核心读形态 | 当前本地来源 | 分级与后台缺口 |
+| --- | --- | ---: | --- | --- | --- |
+| `home` | 首页 | 1 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
+| `project` | 项目 | 3 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | `projects`、项目详情聚合及各子域外键 | `A+B`；经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
+| `master-data` | 基础主数据 | 9 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | `customers`、`crews`、`workers`、责任/工资/扣罚读模型 | `A+B`；客户受权限限制时使用 forbidden；班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
+| `supplier` | 分供方 | 3 | 分供方主数据、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | `suppliers`、证照/要求/审计表及跨域聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
+| `project-supplier` | 项目分供方 | 2 | 项目×分供方详情、六类事实集合、合作文件与汇总；导入候选只作本地草稿 | `project_suppliers`、合同/请款/发票/支付/结算/文件真实外键 | `A+C`；事实 DTO 可直接后台化，文件名分类与人工确认保留本地工具 adapter；目标页消费 query 由路由矩阵解决，见 [`project-supplier.md`](./pages/project-supplier.md) |
+| `core-contract` | 核心合同 | 12 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | canonical `contracts`、补充协议、BOQ 和下游单据 | `A+B`；实际竣工、独立结清、合同级材料领用等没有 canonical 事实时为 null/空集合；禁止读取旧兼容表静态金额补聚合，见 [`core-contracts.md`](./pages/core-contracts.md) |
+| `aux-contract` | 辅助合同与结算 | 12 | 公司/其他支出合同、其他/材料结算列表和表单；项目/分供方/合同引用、金额链与状态 | 四类实体、`expenditure_settlements` 及真实分摊 | `A+B`；没有业务明细实体的类型不得返回虚构 lineItems；结算—到货分摊等待真实桥接，见 [`contract-forms.md`](./pages/contract-forms.md) |
+| `owner-document` | 甲方单据 | 3 | 六类单据变体的专属列表、只读详情投影与表单；项目/施工合同/客户、三档金额、附件/审批摘要 | 甲方单据表、月报量、BOQ 变更和 `file_refs` | `A+B`；申报/审定双金额、签认、审批轨迹只有持久化事实存在时返回；查看与编辑必须使用不同 capability，见 [`owner-documents.md`](./pages/owner-documents.md) |
+| `subcontract-document` | 分包单据 | 6 | 分包变更、分包结算、项目罚扣专属列表/详情投影/表单；合同/分供方/班组与抵扣关系 | 分包单据表、`penalty_records`、抵扣桥表 | `A+B`；签认金额、附件计数、转扣记录和未实现只读详情保持 partial，不用表单记录冒充详情，见 [`owner-documents.md`](./pages/owner-documents.md) |
+| `material` | 自购材 | 12 | 下料、到货、领用、盘点列表/详情投影/表单；材料行、来源单据、库存与结算付款状态 | 乙供材头/行表、合同/项目/分供方外键 | `A+B`；warehouse 仍为文本，到货—归档、结算分摊、领用批次和调拨两端缺稳定 ID，必须返回 missing-relation，见 [`material-management.md`](./pages/material-management.md) |
+| `owner-material` | 甲供材 | 15 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
+| `delivery` | 送货单闭环 | 4 | 处理区、归档库、归档详情/表单；送货头、材料行、归属、OCR/审核/归档/打印状态 | `delivery_records`、`delivery_lines`、`file_refs/file_payloads` | `A+C`；头/行和价格事实可后台化，原件字节、上传会话、OCR 轮询和桌面打印使用专用 adapter；文件名/路径不授予读取权限，见 [`material-delivery.md`](./pages/material-delivery.md) |
+| `material-price` | 材料价格 | 1 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 已归档送货行的确定性聚合，无独立价格表 | `A`；只返回有真实归档来源的事实，reviewed/done 名称差异由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
+| `finance-income` | 收入财务 | 9 | 开票申请、收款、往来列表/详情投影/表单；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；通用本地列表目前只带名称，后台 DTO 必须同时返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
+| `finance-expense` | 支出财务 | 11 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
+| `invoice` | 发票台账 | 4 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
+| `quantity-payroll` | 工程量与工资 | 9 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类工资在合同责任 FK 和成本防双计决策前禁用，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
+| `schedule-target-cost` | 项目进度成本 | 9 | WBS 分组/任务/依赖/楼层计划、标准库版本、合同绑定预览，目标成本列表/版本/科目与偏差指标 | 排程和目标成本读模型、工程量完成事实、合同/暂估快照 | `A`；排程以创建/绑定时 sourceVersion 和快照为准，目标/实际/已签/已付分别取真实源，不按用途文本归类，见 [`schedule-progress.md`](./pages/schedule-progress.md)、[`target-cost.md`](./pages/target-cost.md) |
+| `import-export` | 导入导出 | 2 | 实体映射候选、逐行错误、批次进度、导出配置与结果引用 | 本地 Excel adapter、`import_batches/source_refs/reconciliation_issues` | `A+C`；审计元数据可后台化，文件解析/生成先保留本地 adapter；原始文件值只进受控追溯，不进普通列表 DTO，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md) |
+| `ocr-settings` | 系统设置 | 1 | OCR 非敏感能力、超时、只读阈值和保存结果 | 本机 `ocr_settings`、三个 Nitro OCR operation | `C`；Token、API 地址和模型私有配置永不返回前端；桌面静态构建不能假定 Nitro 永久在线，见 [`finance-invoice.md`](./pages/finance-invoice.md)、[`material-delivery.md`](./pages/material-delivery.md) |
+
+### 3.1 当前实现落点
+
+后台接入时先在下列既有领域边界内增加 repository port，不创建全站万能 repository，也不让页面直接替换 Pinia：
+
+| 页面域 | 当前 Pinia / 领域读模型落点 |
+| --- | --- |
+| 首页、项目 | `app/stores/project.ts`、`project-detail.ts`、`phase-task.ts`；`app/lib/home/`、`app/lib/project/` |
+| 客户、班组、工人、分供方 | `app/stores/master-data-read.ts`、`customer-detail.ts`、`crew-detail.ts`、`worker-detail.ts`、`supplier.ts`、`supplier-detail.ts`；对应 `app/lib/customer/`、`worker/`、`supplier/` |
+| 核心/辅助合同、BOQ、甲方/分包单据 | `app/stores/contract.ts`、`contract-detail.ts`、`boq.ts`、`owner-document.ts`；`app/lib/contract/`、`boq/`、`owner-document/` |
+| 项目×分供方 | `app/stores/project-supplier.ts`；`app/lib/project-supplier/workbench.ts` |
+| 自购材、甲供材、送货归档、材料价格 | `app/stores/material.ts`、`delivery.ts`、`delivery-record.ts`；`app/lib/material/`、`delivery/` |
+| 收入/支出财务、发票 | `app/stores/finance.ts`、`payment-management.ts`、`invoice.ts`；`app/lib/finance/`、`invoice/` |
+| 付款洞察、应用消息 | `app/lib/finance/payment-detail.ts`、`app/components/finance/PaymentApplicationInsightPanel.vue`、`app/stores/notifications.ts`；当前通知静态 seed 只是待迁移实现，不是后台 DTO 样本 |
+| 工程量、工资、考勤、签工 | `app/stores/quantity.ts`、`payroll.ts`、`payroll-statement-detail.ts`、`attendance.ts`、`signed-daywork.ts`；`app/lib/quantity/`、`payroll/` |
+| 排程、标准库、目标成本 | `app/stores/schedule.ts`、`schedule-process-library.ts`、`target-cost-list.ts`、`target-cost-detail.ts`；`app/lib/schedule/`、`target-cost/` |
+| 导入、导出、OCR 设置 | `app/stores/export-workflows.ts`、`ocr-settings.ts` 及领域导入模块；`server/api/ocr/` 只承载 OCR 专用 operation |
+
+这些文件是当前实现入口，不是网络 schema 权威；共享 DTO 仍只在本文定义，数据库列只在 `DATABASE.md` 定义。
+
+### 3.2 跨路由公共读模型
+
+跨路由公共能力不增加生产路由计数，但必须使用与 20 个页面域相同的身份、金额、权限和完整度语义。参考站当前直接证据只证明付款申请详情挂载智能业务洞察；付款申请列表、支付记录列表和材料采购合同详情均未挂载。费用报销当前可见视图没有可用详情记录，不能据此推断永不挂载。最终挂载矩阵与蓝色报表行目标由 #290、#289 继续固化。
+
+#### 智能业务洞察
+
+洞察以当前单据为上下文，但不等于单项目数据。参考侧栏同时包含当前合同付款、结算/发票勾稽和跨项目/跨供应商应付报表；打开侧栏可观察到“记录上下文 → 规则/报表定义 → 聚合结果”的分层读取。后台不复制参考站配置对象，而提供瑞航自己的稳定读模型：
+
+```ts
+type InsightScopeLevelDTO =
+  | 'record'
+  | 'contract'
+  | 'project'
+  | 'supplier'
+  | 'cross-project'
+  | 'enterprise-visible'
+
+interface InsightScopeDTO {
+  level: InsightScopeLevelDTO
+  anchor: EntityRefDTO
+  visibility: 'complete' | 'permission-filtered' | 'unknown'
+}
+
+interface InsightCheckDTO {
+  key: string
+  ruleKey: string | null
+  ruleVersion: string | null
+  result: 'passed' | 'failed' | 'no-rule' | 'not-applicable' | 'pending'
+  severity: 'info' | 'warning' | 'error'
+  title: string
+  summary: string
+  metrics: MetricDTO[]
+}
+
+interface InsightReportDTO<Row> {
+  key: string
+  title: string
+  scope: InsightScopeDTO
+  columns: Array<{ key: string, label: string, valueType: 'text' | 'money' | 'count' | 'ratio' | 'entity-ref' }>
+  rows: PageDTO<Row>
+}
+
+interface InsightSectionDTO<Row> {
+  key: string
+  kind: 'rule-checks' | 'current-metrics' | 'report'
+  state: ReadState<InsightCheckDTO[] | MetricDTO[] | InsightReportDTO<Row>>
+}
+
+interface InsightDTO<Row = Record<string, unknown>> {
+  key: string
+  subject: EntityRefDTO
+  scope: InsightScopeDTO
+  attentionCount: number
+  sections: InsightSectionDTO<Row>[]
+  asOf: string
+  sourceVersion: string | null
+  completeness: CompletenessDTO
+}
+```
+
+- `no-rule` 与 `passed` 不同：页面显示“无匹配规则”时不能算检查通过，也不能算业务失败。
+- `permission-filtered` 与真正空表不同；跨项目报表只覆盖当前用户可见范围，汇总和行必须使用同一 capability 过滤。
+- `asOf` 是聚合统计时点，`sourceVersion` 是规则/报表定义或来源快照版本；两者都不能用组件挂载时间代替。
+- L2-7/L2-6 等参考标签只作为运行证据，不成为瑞航接口身份；本地使用稳定 `key`、维度和度量定义。
+- 当前 `PaymentApplicationInsightPanel` 的四类检查及“其他项目数量/已付总额”可作为 SQLite adapter 的首版来源；缺少的跨供应商行、规则版本和权限范围返回 `partial`，不得补静态行。
+- 缓存必须按作用域拆开：`record/contract` 指标以 `subject.id + sourceVersion` 为键并随付款单切换重算；`cross-project/enterprise-visible` 报表以 `report.key + 可见范围 + asOf + sourceVersion` 为键复用。不得把整个侧栏按项目或上一张付款单缓存，也不得为每张付款单重复获取同一全局报表。
+
+#### 全局通知与抄送事件
+
+全局 toast、顶栏未读角标和消息抽屉必须消费同一个事件读模型。通知点击的目标只返回实体身份和意图，前端通过 #289 的路由矩阵解析；后端不发送 Vue 路由字符串。
+
+```ts
+interface NotificationTargetDTO {
+  intent: 'open-entity' | 'open-list' | 'none'
+  subject: EntityRefDTO | null
+  context: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+}
+
+interface NotificationDTO {
+  eventId: OpaqueIdDTO
+  eventType: string
+  kind: 'todo' | 'notice'
+  title: string
+  summary: string
+  subject: EntityRefDTO | null
+  actor: EntityRefDTO | null
+  result: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed' | 'informational'
+  occurredAt: string
+  readAt: string | null
+  target: NotificationTargetDTO
+  permissionState: 'resolved' | 'forbidden' | 'missing'
+  deliveryState: 'queued' | 'delivered' | 'failed'
+}
+```
+
+- 同一 `eventId` 在 toast、未读数和消息抽屉中幂等；重复投递不能增加两次未读数。
+- toast 自动消失只改变呈现，不等于已读。何时写入 `readAt` 由 #290 固化，读 DTO 只报告已持久化事实。
+- 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
+- `app/stores/notifications.ts` 当前 5 条静态 seed 不得继续作为运行时 fallback。后台事件接入前使用真实空态；确定性 fixture 只允许存在于测试。
+- 参考刷新时可观察到持续实时通道，同时待办查询单独返回 `ccTotalCount`、`todoTotalCount`、`delayTodoTotalCount`、`totalCount` 和 `records`。当前证据不能把某条 toast 与具体传输帧强绑定，因此 DTO 保持传输无关；adapter 可用实时增量触发，再以分页查询对账未读数。
+
+## 4. 页面族响应最低字段
+
+### 4.1 列表
+
+每条列表行至少包含：
+
+- `id`；有业务编号时包含字符串 `no`；名称与状态用未格式化值。
+- 所有可点击实体的 `EntityRefDTO`，而不只有 `projectName/supplierName`。
+- 该页面判断所需的日期、枚举、金额、数量、附件计数和更新时间。
+- 只读聚合使用 `MetricDTO` 或等价完整性结构；可下钻聚合必须给出稳定 filters。
+- `PageDTO` 的 pagination、同筛选 summary、empty、asOf、sourceVersion、capabilities。
+
+### 4.2 详情
+
+详情响应至少包含：
+
+- `entity`：列表同一稳定 ID 和版本；不存在/错配使用明确问题码。
+- `summary`：关键字段与完整性，不复制可从 children 聚合的第二份可编辑余额。
+- `sections`：带稳定 `key` 的业务分区；每个分区含 `items`、`empty`、`asOf`，权限不可见不伪装 0 条。
+- `relations`：项目、客户、分供方、合同、班组、工人、来源单据等关系引用。
+- `files`：只返回文件元数据、capability 和受控 file id；不返回本地路径、认证 URL 或无授权 payload。
+- `capabilities`：查看、编辑、提交、审批、下载等分别声明；前端不从中文状态猜动作权限。
+
+### 4.3 表单预载与工作台
+
+- 表单预载将可编辑 draft、只读 lookup 和 sourceVersion 分开；只读名称不回写为外键。
+- 工作台共享同一实体/筛选上下文，分区状态不各自复制。队列项和详情都使用稳定 ID。
+- 上传、识别、核对、归档、确认支付、工资发放等是独立命令；读 DTO 只报告已持久化状态，不以 toast 或本地临时布尔值证明成功。
+- 写命令、幂等键、在线/离线权威与冲突回放由后续“确定当前界面的前后端数据契约与去 Mock 迁移边界”继续裁定。
+
+## 5. 本地 adapter 与后台迁移规则
+
+1. Pinia store 只依赖领域 repository port；SQLite adapter 与未来 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL 或 SQL。
+2. 当前没有通用业务 API 时继续使用 SQLite adapter；禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
+3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。
+4. 不做本地与在线静默双写。在线成为写权威后的离线队列、幂等、冲突和回放属于后续全局决策；在决策前保持单一现有写路径。
+5. OCR、文件和 Excel adapter 与普通业务 DTO 分离。普通 DTO 只引用受控 file id；二进制上传/下载使用专用能力和短期授权，不保存私有地址。
+6. 后台首批可从 `A` 域读取 operation 开始：项目/主数据、合同、项目分供方、财务台账、工程量/排程。任何含 `B` 字段的页面先返回明确 missing/partial，再另票补 canonical 关系。
+
+## 6. 验收
+
+- 运行证据矩阵的 20 个业务域、128 条生产路由都在本文件恰有一个页面域归属；路由新增、删除或改域时同一提交更新本矩阵。
+- `id/no/外部键` 为字符串；金额为两位十进制定点字符串；日期为 ISO；布尔为 JSON boolean；枚举传稳定 code，不传样式类名或中文标签作为唯一身份。
+- 真实 0、未知 null、空集合、缺关系、无权限、加载失败和筛选无结果均可区分。
+- 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
+- 当前无实体数据的页面保持真实空态，后台未接入时使用类型化 SQLite adapter，不引入 MockJS。
+- 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。

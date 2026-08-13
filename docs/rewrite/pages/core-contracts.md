@@ -113,15 +113,9 @@
 
 ## 四、后台接口投影
 
-后端接口以数据库真实外键为源，前端不再自行拼接名称或 Mock 聚合。建议稳定为三层响应：
+后端接口以数据库真实外键为源，前端不再自行拼接名称或 Mock 聚合。共享关系、金额、分页、空态、权限与错误语义统一引用 [`READ-MODELS.md`](../READ-MODELS.md)；其中 `MoneyDTO` 是固定两位十进制定点字符串，关系目标路由由前端路由矩阵生成。合同域稳定为三层响应：
 
 ```ts
-interface EntityRefDTO {
-  id: string
-  label: string
-  to?: string
-}
-
 interface ContractListQueryDTO {
   kind: 'construction' | 'subcontract' | 'material'
   q?: string
@@ -139,18 +133,18 @@ interface ContractListRowDTO {
   name: string
   kind: 'construction' | 'subcontract' | 'material'
   project: EntityRefDTO
-  party: EntityRefDTO | null
+  party: EntityRefDTO
   signDate: string | null
   actualCompletionDate?: string | null
   amounts: {
-    contract: number
-    changed: number
-    settled: number
-    invoiced: number
-    paid: number
-    bySettlementBalance: number
-    byInvoiceBalance?: number
-    completionSettlement?: number
+    contract: MoneyDTO
+    changed: MoneyDTO
+    settled: MoneyDTO
+    invoiced: MoneyDTO
+    paid: MoneyDTO
+    bySettlementBalance: MoneyDTO
+    byInvoiceBalance?: MoneyDTO
+    completionSettlement?: MoneyDTO
   }
   contractStatus: string
   settlementStatus?: string | null
@@ -162,11 +156,10 @@ interface RelatedDocumentDTO {
   type: string
   no: string
   name: string
-  amount: number | null
+  amount: MoneyDTO | null
   date: string | null
   status: string
-  source: { table: string, foreignKey: 'contract_id', contractId: string }
-  to?: string
+  contractId: OpaqueIdDTO
 }
 
 interface ContractDetailDTO {
@@ -180,7 +173,7 @@ interface ContractDetailDTO {
 }
 ```
 
-列表响应另带当前筛选结果的 `summary` 与 `pagination`；BOQ 工作台响应继续按 `projectId + contractId` 返回 `files / lines / changes / monthlyStatements / summary`。金额全部使用数值和明确币种/精度，不传格式化字符串；缺失关系返回 `null` 或空数组并说明空态原因，禁止用名称、同项目或相近金额补链。
+列表响应使用共享 `PageDTO`，汇总与分页读取同一筛选；BOQ 工作台响应继续按 `projectId + contractId` 返回 `files / lines / changes / monthlyStatements / summary`。金额不传货币符号或格式化文本；缺失关系、真实空集合与权限拒绝按共享语义区分，禁止用名称、同项目或相近金额补链。
 
 ## 五、响应式与可达性
 
