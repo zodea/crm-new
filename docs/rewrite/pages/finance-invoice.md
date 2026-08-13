@@ -556,3 +556,13 @@ select 下拉筛选：
 15. 导出弹出文件夹选择器，文件夹结构和命名规则可配置
 16. 台账→单张编辑跳 Tab 2 单张模式（宽屏两栏、窄屏单列/切换，无左栏列表），编辑完回台账
 17. Excel 导入的纯数据发票不可勾选打印（checkbox 置灰）
+
+---
+
+## 十二、参考收票登记与本地单表边界（2026-08-13）
+
+参考站“收票登记”是本地发票台账的相邻证据，不是一一对应的 OCR 工作台。它按票种树分类，专属列包含收票记录名称、项目、审批、收票分类、开票单位、合同、开票日期、含税/无税/税额、税率、票种、进项类型、发票代码、开票内容和剩余未关联付款金额；当前全局列表为明确的 `共0条`。项目详情“票税管理”另有真实收票登记聚合，证明项目、合同、开票单位与票款关系需要可下钻。
+
+本地继续遵守 ADR 0001：识别中间态和归档台账共用 `invoices`，不恢复 `ticket_registrations`。当前基础种子有 8 张发票，运行态发票台账显示 4 张已归档记录；其余记录按 OCR/审核/归档状态留在识别工作台。`/finance/invoice` 的上传、校对、排版、打印与 `/finance/invoice/factor` 没有参考站一一对应页面，继续由本页、ADR 0006、#251 与本地 DC 裁定。
+
+后端读模型至少提供 `id/invoiceNumber/invoiceDate/project/supplier/contract/totalAmount/netAmount/taxRate/taxAmount/invoiceType/inputType/content/accountStatus/source/printCount/lastPrintedAt/allocatedPaymentAmount/remainingAllocatableAmount`。关联对象返回 `{ id, name }`；付款余额从 `payment_application_invoice_allocations` 实时聚合。缺项目/分供方/合同时显示真实未归档或个人开支状态，不能按备注文本自动创建关系。

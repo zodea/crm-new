@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-08-08
+> 核对日期：2026-08-13
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -89,7 +89,7 @@
 | 甲方 / 分包单据与罚扣 | #197 已闭环 8 类真实数据列表与整页表单：动态标题、专属列/筛选/分页、来源 query、业务空错态、首错聚焦和四档局部横滚。甲方变洽签/报量复用量价子表，其余 6 类不补造明细；状态、附件和项目罚扣抵扣继续走本地真实事务 | 已闭环 |
 | 工程量 / 工资 / 考勤 | #198 已闭环工程量矩阵、量差总表、户型模板整页、单元直达详情、工资独立整页建单、真实考勤汇总与 31 日矩阵，以及 A/C1/C2 核对、组内分配、发放冻结和 A4/Excel 输出；B 合同清单工资因合同责任归属和成本防双计关系仍未具备而继续多层禁用，不冒充 A 类接线 | 已闭环 |
 | 乙供 / 甲供 / 送货归档 | #199 已闭环乙供/甲供表单与库存事务基础；#284、#285 的新运行态直接证据确认乙供与甲供列表仍全部共用“材料/对象”通用列，名称和查看动作直接进入编辑态，缺专属只读详情、关系蓝链和返回上下文。甲供五类无运行种子；参考空表仍分别保留总计划、需用、到货、领用、直入直出的专属列，当前本地项目“物资管理”又只有一张送货归档表，缺参考的总计划/需用计划/入库单三组读模型。仓库仍为文本，甲供供货单位身份未裁定；归档库已有 3 头/4 明细和真实详情下钻，但到货—送货归档 canonical 关系仍未建立 | [#201](https://github.com/zodea/crm-new/issues/201)、[#275](https://github.com/zodea/crm-new/issues/275)、[#284](https://github.com/zodea/crm-new/issues/284)、[#285](https://github.com/zodea/crm-new/issues/285) |
-| 收入 / 支出 / 发票 | 票款列表、表单、识别和台账基础已存在 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204) |
+| 收入 / 支出 / 发票 | 24 条生产路由、整页表单、SQLite 实体与票款勾稽基础均已存在；当前运行数据为开票 1、收款 1、往来 2、付款申请 3、支付记录 3、发票 8（台账归档态 4），费用报销与结算/发票分摊 seed 为 0。#286 直接证据确认开票、收款、往来、付款申请、报销和支付记录不能继续共用通用财务列：需补专属状态树/列/页尾汇总、名称/编号只读详情、项目/客户/分供方/合同/来源单据蓝链与返回上下文。付款管理和发票识别/台账已是独立工作台，前者需补合同/来源/部门列，后者继续按 ADR 0001 的单表状态机和本地 OCR/打印规格，不把参考“收票登记”空表误当 OCR 页面。参考保证金/备用金四页只记录布局，因本地无路由/实体不在本轮扩张 | [#202](https://github.com/zodea/crm-new/issues/202)、[#203](https://github.com/zodea/crm-new/issues/203)、[#204](https://github.com/zodea/crm-new/issues/204)、[#251](https://github.com/zodea/crm-new/issues/251)、[#275](https://github.com/zodea/crm-new/issues/275)、[#286](https://github.com/zodea/crm-new/issues/286) |
 | 导入 / 导出工具 | 配置页和映射工作台已存在 | [#205](https://github.com/zodea/crm-new/issues/205) |
 | 全站视觉与交互 | 已使用共享原语并完成部分响应式；#112 已关闭 | [#181](https://github.com/zodea/crm-new/issues/181)、[#206](https://github.com/zodea/crm-new/issues/206) |
 | 材料价格分析 | 页面结构、来源追溯、材采合同历史和已核实的广州 BV 2.5 mm² 官方信息价已实现；#284 实测发现现有 3 个归档头/4 条明细会因 `ocr_status='reviewed'` 与分析器要求 `done` 的状态词汇冲突全部被过滤，当前运行页错误显示无可分析数据。修复应统一识别/人工核对状态并复用真实归档事实，不补 Mock；其他官方材料继续保持“暂无核实价格” | [#207](https://github.com/zodea/crm-new/issues/207)、[#275](https://github.com/zodea/crm-new/issues/275)、[#284](https://github.com/zodea/crm-new/issues/284) |
