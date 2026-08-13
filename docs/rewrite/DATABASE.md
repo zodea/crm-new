@@ -1049,6 +1049,8 @@ owner_material_directs(
 
 甲供材累计到货、累计领用和剩余可用从甲供材事实聚合，不在 `owner_material_controls` 保存可编辑累计列。`deliveryArchiveForm` 更新 §2.5 的 `delivery_records`，其中材料摘要、数量与单据金额只作 `delivery_lines` 聚合展示；原件仍由 `file_refs(owner_type='delivery_record')` 保存。
 
+2026-08-13 运行态走查确认甲供材列表读模型还包含总计划头/可能的二级明细、供货分供方、源单、送货单、仓库、采购类型、班组合同及结算/付款快照；这些可观察列不等于已裁定写模型。当前 `customer_id` 只表示项目甲方，不得冒充供货分供方；现有五张甲供材表也没有证明总计划头/行、下料—到货、到货—送货归档或供货单位关系。关系未迁移前，读 DTO 对这些字段返回明确 `null`/未配置状态，项目档案目录继续使用“甲供材供货单位待配置”；禁止按名称、单号或金额猜外键。后续迁移必须先裁定供货单位实体身份和总计划头/明细边界，再建立真实外键或桥表。页面字段与可空 DTO 见 [`material-management.md`](./pages/material-management.md)。
+
 #### 2.10.6 F5 甲方/分包单据
 
 ```sql
