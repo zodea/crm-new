@@ -134,14 +134,16 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 来源 | 当前可达路由 |
 | --- | --- |
 | 合同 | `/contract/:id` |
-| 付款申请 | `/finance/payment/:id` |
+| 付款申请 | `/finance/payment/:id/detail` |
 | 发票 | `/finance/invoice/:id` |
 | 支付记录 | `/finance/records/:id` |
 | 分包结算 | `/subcontract/settlement/:id` |
 | 材料结算 | `/material/settlement/form/:id` |
 | 其他支出结算 | `/contract/other-settlement/form/:id` |
 
-现有新增表单不会统一读取 `projectId`、`supplierId` 查询参数，因此工作台不得宣称已自动预填。没有真实预填能力的入口只写“前往对应模块”，不能伪装成已带筛选的新建流程。收票新增继续进入 `/finance/invoice` 的上传识别工作台，不虚构 `/finance/invoice/new`。
+工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`；导入向导取消或完成后回到 `/project/:pid?tab=expenditure`。
+
+工作台当前会向合同、付款申请、收票和支付入口附带 `projectId`、`supplierId`、`returnTo`，但目标页尚未统一消费这些参数：合同表单不读取；付款申请新建页不读取普通项目/分供方预填；收票工作台不按它们自动筛选；支付记录只有同时提供真实 `paymentApplicationId` 时才按付款申请预填。因此这些入口目前只承诺“进入对应模块”，不能宣称已带筛选、自动预填或自动返回。后续跨域链接实施必须让目标页验证并消费真实 ID，或删除无效参数；不得用名称匹配和 Mock 数据补齐。收票新增继续进入 `/finance/invoice` 的上传识别工作台，不虚构 `/finance/invoice/new`。
 
 ### 文件区
 
