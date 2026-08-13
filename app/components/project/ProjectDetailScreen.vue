@@ -101,12 +101,7 @@ watch(
 
     <header class="panel min-w-0 overflow-hidden" aria-labelledby="project-detail-title">
       <div class="flex min-w-0 flex-wrap items-center gap-2.5 px-3 py-2.5">
-        <span
-          class="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-soft text-14px font-800 text-brand"
-          aria-hidden="true"
-        >
-          项
-        </span>
+        <span class="i-lucide-file-text h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
         <div class="min-w-48 flex-[1_1_22rem]">
           <div class="flex min-w-0 flex-wrap items-center gap-2">
             <h2 id="project-detail-title" class="m-0 min-w-0 break-words text-17px leading-6 font-800 text-ink">
@@ -132,8 +127,8 @@ watch(
         </div>
       </div>
 
-      <dl class="project-detail__metadata grid border-t border-line bg-line">
-        <div class="bg-panel px-3 py-2">
+      <dl class="project-detail__metadata m-0 grid border-t border-line">
+        <div class="project-detail__metadata-cell px-3 py-2">
           <dt class="text-9px text-ink-faint">
             业务流程阶段
           </dt>
@@ -141,7 +136,7 @@ watch(
             {{ project.status || '未登记' }}
           </dd>
         </div>
-        <div class="bg-panel px-3 py-2">
+        <div class="project-detail__metadata-cell px-3 py-2">
           <dt class="text-9px text-ink-faint">
             经营类型
           </dt>
@@ -149,7 +144,7 @@ watch(
             {{ project.operationType || '未登记' }}
           </dd>
         </div>
-        <div class="bg-panel px-3 py-2">
+        <div class="project-detail__metadata-cell px-3 py-2">
           <dt class="text-9px text-ink-faint">
             项目经理
           </dt>
@@ -157,7 +152,7 @@ watch(
             {{ project.manager || '未登记' }}
           </dd>
         </div>
-        <div class="bg-panel px-3 py-2">
+        <div class="project-detail__metadata-cell px-3 py-2">
           <dt class="text-9px text-ink-faint">
             客户(甲方)
           </dt>
@@ -165,7 +160,7 @@ watch(
             {{ project.developer || '未登记' }}
           </dd>
         </div>
-        <div class="bg-panel px-3 py-2">
+        <div class="project-detail__metadata-cell px-3 py-2">
           <dt class="text-9px text-ink-faint">
             承包单位
           </dt>
@@ -260,7 +255,15 @@ watch(
 
 .project-detail__metadata {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
-  gap: 1px;
+}
+
+.project-detail__metadata-cell {
+  min-width: 0;
+  background: transparent;
+}
+
+.project-detail__metadata-cell + .project-detail__metadata-cell {
+  border-left: 1px solid var(--line);
 }
 
 .project-detail__body {
