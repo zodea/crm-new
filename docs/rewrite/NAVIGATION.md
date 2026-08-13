@@ -1,0 +1,204 @@
+# 跨域导航与返回语义
+
+本文是瑞航 CRM 业务关系入口、目标视图和返回上下文的权威源。页面字段与布局看 [`pages/`](./pages/)，实体与外键看 [`DATABASE.md`](./DATABASE.md)，读 DTO 的金额、空态、权限和错误语义看 [`READ-MODELS.md`](./READ-MODELS.md)。参考站只提供运行态证据，不提供瑞航路由或实体身份。
+
+## 1. 目标与边界
+
+- 蓝色名称、编号、金额和聚合值只有在“稳定实体 ID + 已登记目标 + 查看能力”同时成立时才可点击。
+- 路由由前端矩阵生成；后台只返回实体引用、语义化目标和筛选 ID，不返回 Vue 路由字符串。
+- 新增/编辑仍走独立整页表单；关系主链接优先进入只读详情。当前只有表单路由的对象标为“读写混用”，不能宣称隐藏详情已闭合。
+- `0`、空列表、缺关系、权限不可见和加载失败是不同状态。聚合值为 `0` 时，只要后端明确返回可用下钻目标，入口仍可进入真实空列表；不得用金额是否为零猜可点击性。
+- 本文覆盖 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 20 个生产页面域及应用壳公共入口，不增加保证金、备用金、统计分析等当前没有本地路由的模块。
+
+## 2. 导航意图合同
+
+`EntityRefDTO` 负责身份，`NavigationIntentDTO` 负责“去哪里看”。多态单据必须带 canonical `variant`；例如只有 `entity='material-document' + variant='arrival'` 才能选择到货详情，不能按编号前缀或名称猜类型。
+
+```ts
+type NavigationIntentDTO =
+  | {
+      kind: 'entity-detail' | 'entity-subview' | 'source-record'
+      subject: EntityRefDTO
+      variant: string | null
+      view: string | null
+      filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+    }
+  | {
+      kind: 'entity-list'
+      entity: EntityKindDTO
+      variant: string | null
+      view: string | null
+      filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+    }
+  | {
+      kind: 'same-route-overlay'
+      subject: EntityRefDTO
+      view: string
+    }
+  | {
+      kind: 'unavailable'
+      reason: 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target'
+    }
+```
+
+约束：
+
+1. `subject.id` 和 `filters` 中的关系键只接受稳定 ID；label、业务编号和人员姓名只展示。
+2. `variant` 来自 canonical 业务类型，不等同于路由片段。前端注册表负责把它解析为站内路径。
+3. `view` 表示详情页签、区块或列表分类，不参与实体身份。
+4. `same-route-overlay` 不创建新路由。关闭后仍停留原记录，切换记录时必须以新的 `subject.id` 重算记录级数据。
+5. `unavailable` 渲染普通文本或明确“未接/无权限”状态，不伪装蓝链。
+
+### 2.1 返回上下文
+
+列表到详情的来源状态由前端生成，不由后台拼接：
+
+```ts
+interface NavigationOrigin {
+  route: string
+  query: Record<string, string>
+  tab: string | null
+  anchor: { kind: 'row' | 'section' | 'task', id: string } | null
+  page: number | null
+  scrollTop: number | null
+}
+```
+
+- `returnTo` 只接受站内相对路径，解析后必须命中生产路由白名单；拒绝协议、host、凭证、`//`、反斜线和越界路径。
+- 每个目标页只消费自己登记的 query；未知键丢弃。query 只恢复筛选/页签/来源，不覆盖路径实体 ID。
+- 详情加载、空态、错误或无权限时仍保留合法返回上下文；不能依赖浏览器历史“碰巧还在”。
+- 页码和滚动位置属于本地应用页签状态，不进入后台 DTO。目标记录不存在或关系错配时显示明确问题，并允许返回原筛选位置。
+- 应用内部页签实例 ID 只隔离视图状态，不是业务实体 ID，也不得写入业务接口。
+
+### 2.2 展示状态
+
+| 状态 | 入口 | 目标页 |
+| --- | --- | --- |
+| `resolved` | 蓝色可点击；金额可为 0 | 加载后显示数据或真实空表 |
+| `missing` | 普通文本/“未记录” | 不导航，不按名称补 ID |
+| `forbidden` | 脱敏文本或锁定状态 | 可显示无权限页，但不得泄露 label/明细 |
+| `not-connected` | 明确“未接” | 不进入空白表单冒充详情 |
+| `unverified-target` | 普通文本，并留在差异清单 | 后续取得只读直接证据再开放 |
+| `error` | 保留原入口与上下文 | 错误页提供重试和返回，不渲染成 0 条 |
+
+## 3. 已登记目标路由
+
+“当前状态”只描述本地实现；`读写混用` 表示路径存在但当前主体是编辑表单，仍需增加独立只读详情能力。
+
+| 实体/视图 | canonical variant / view | 目标路由 | 当前状态 |
+| --- | --- | --- | --- |
+| 项目 | detail | `/project/:id` | 已闭合 |
+| 客户 | detail | `/base/customer/:id` | 已闭合；参考权限不可见不影响本地路由 |
+| 分供方 | detail | `/base/supplier/:id` | 已闭合 |
+| 班组 | detail | `/base/crew/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
+| 工人 | detail | `/base/worker/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
+| 合同 | detail | `/contract/:id` | 已闭合；施工/分包/材采按合同类型分组 |
+| 项目×分供方 | overview / six tabs | `/project/:pid/supplier/:sid` | 已闭合；目标模块尚未统一消费来源 query |
+| 目标成本 | detail | `/project/target-cost/:id` | 已闭合；合同聚合区缺稳定锚点 |
+| 开票申请 | detail | `/finance/billing/:id` | 读写混用 |
+| 收款登记 | detail | `/finance/receipt/:id` | 读写混用 |
+| 往来收付 | receipt / payment | `/finance/current/:id` | 读写混用；参考往来付款目标待补证 |
+| 付款申请 | detail | `/finance/payment/:id/detail` | 已闭合 |
+| 支付记录 | detail | `/finance/records/:id` | 读写混用 |
+| 费用报销 | detail | `/finance/reimbursement/:id` | 读写混用；当前真实空态 |
+| 发票 | review / detail | `/finance/invoice/:id` | 已有单票工作台；来源返回仍需统一 |
+| 送货归档 | detail | `/material/delivery/archive/:id` | 已闭合 |
+| 工程量户 | detail | `/subcontract/quantity/:pid/:uid` | 已闭合；六项筛选可恢复 |
+| 工资单 | detail | `/subcontract/payroll/:id` | 详情已存在；返回筛选未闭合 |
+| 排程工序 | task subview | `/schedule` + `project/group/task` | 已闭合 |
+| 甲方单据 | change/report/acceptance/final-settlement/penalty | `/owner/:kind/:id` | 读写混用；验收/保修为同实体双视图 |
+| 分包单据 | change/settlement | `/subcontract/:kind/:id` | 读写混用 |
+| 项目罚扣 | penalty | `/project/penalty/:id` | 读写混用 |
+| 自购材单据 | requisition/arrival/use/stock-check | `/material/requisition/:id`、`/material/arrival/:id`、`/material/use/:id`、`/material/stock-check/:id` | 读写混用；variant 只能进入登记的具体路径 |
+| 甲供材单据 | control/requisition/arrival/use/direct | `/owner-material/control/:id`、`/owner-material/requisition/:id`、`/owner-material/arrival/:id`、`/owner-material/use/:id`、`/owner-material/direct/:id` | 读写混用；variant 只能进入登记的具体路径 |
+| 支出结算 | material/subcontract/other | 对应 `/material/settlement/form/:id`、`/subcontract/:kind/:id`（variant 为 settlement）、`/contract/other-settlement/form/:id` | 读写混用，且到货分摊关系未接 |
+| 仓库 | detail | — | 没有 canonical 实体/路由，保持 `not-connected` |
+| 文件 | controlled-viewer | — | 只按 capability 打开受控预览；文件名/路径不是权限 |
+
+## 4. 跨域关系矩阵
+
+状态含义：`闭合` 为目标与往返已实现；`部分` 为目标存在但来源筛选、只读层或公共解析未闭合；`缺身份` 为本地没有稳定关系 ID；`待只读页` 为当前会进入编辑表单；`待补证` 为参考目标未被安全确认；`非入口` 为明确不跳转。
+
+| 键 | 来源域 / 页面 | 可点击字段或动作 | 可点击条件 | 目标与携带上下文 | 返回语义 | 当前状态 / 后端要求 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `N-HOME-SCHEDULE` | `home` `/` | 当前项目施工进度 | `project.id` resolved | `/schedule?project=:projectId`；工序再带 `group/task` | 返回首页恢复项目与工序 | 闭合 |
+| `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id` | 返回项目列表原阶段/搜索/页码/滚动 | 部分；当前列表返回未统一恢复全部上下文 |
+| `N-PROJECT-INCOME` | `project` `/project` | 累计收入合同金额 | `MetricDTO.drilldown` 非空，金额可为 0 | `/contract/construction?project=:id` | 返回项目列表原上下文 | 部分；本地目标存在，列表金额仍是文本 |
+| `N-PROJECT-BUDGET` | `project` `/project` | 预算总额 | 同上 | `/project/target-cost?project=:id` | 返回项目列表原上下文 | 部分；目标成本列表需消费项目 query |
+| `N-PROJECT-ROLE` | `project` `/project` | 项目经理/执行经理及角色 | 必须有人员实体 ID | 项目成员只读视图，路由待定 | 返回项目列表原上下文 | 缺身份；当前只有姓名文本，禁止造链接 |
+| `N-PROJECT-CUSTOMER` | `project` `/project` | 客户 | `customer.id` resolved | `/base/customer/:id` | 返回项目列表原上下文 | 闭合；参考权限拒绝记为 forbidden |
+| `N-PROJECT-METRICS` | `project` `/project/:id` | 合同/收付/票税/支付金额 | 明确 drilldown，不以非零判断 | 同一项目详情 `?tab=construction,fund,current,tax,payment`，进项票也可到 `/finance/ledger?project=:id` | 返回同一项目与页签/子表 | 闭合主链；0 金额公共组件规则待统一 |
+| `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id` | 返回列表筛选 | 闭合 |
+| `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id`、`/contract/:id`、`/finance/receipt/:id`；页签 `contracts,receipts` | 返回客户详情原页签 | 闭合主链；收款只读页仍读写混用 |
+| `N-CREW-WORKER` | `master-data` 班组/工人详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 返回来源详情区块 | 部分；页面可达，班组/工人未进公共解析，工资/罚扣返回不完整 |
+| `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id` resolved | `/base/supplier/:id` | 返回 742 条列表原搜索/页码 | 部分；基础详情闭合，列表上下文待统一 |
+| `N-SUPPLIER-PROJECT` | `supplier` `/base/supplier/:id` | 合作项目 | `project.id + supplier.id` resolved | `/project/:pid/supplier/:sid`，`?tab=projects` 为来源视图 | 返回分供方详情合作项目页签 | 闭合 |
+| `N-SUPPLIER-CONTRACT` | `supplier` `/base/supplier/:id` | 累计合同/累计结算及行内合同、项目 | 明确聚合目标；允许目标 0 条 | `?tab=contracts`，行到 `/contract/:id`、`/project/:id` | 返回同一分供方页签/分页 | 部分；累计结算最终应进入结算视图，不可长期借合同页签代替 |
+| `N-SUPPLIER-INVOICE` | `supplier` `/base/supplier/:id` | 累计收票/发票号 | 明确聚合目标 | `?tab=invoices`，行到 `/finance/invoice/:id` | 返回同一页签/分页 | 闭合 |
+| `N-SUPPLIER-PAYMENT` | `supplier` `/base/supplier/:id` | 累计付款/付款申请号 | 明确聚合目标 | `?tab=payments`，行到 `/finance/payment/:id/detail` | 返回同一页签/分页 | 闭合 |
+| `N-SUPPLIER-NONACTION` | `supplier` 列表/详情 | 列表失效金额、应付金额 | 无可靠目标 | — | 不导航 | 非入口；不能复制“蓝色但无操作” |
+| `N-PROJECT-SUPPLIER-TABS` | `project-supplier` 工作台 | 项目/分供方名称与六页签 | 两个 ID resolved | `/project/:pid`、`/base/supplier/:sid`；`?tab=overview,contract,claim,ticket,payment,settlement` | 刷新/浏览器返回恢复页签 | 闭合 |
+| `N-PROJECT-SUPPLIER-SOURCES` | `project-supplier` 工作台 | 合同/请款/收票/支付/结算/文件来源 | 每行稳定源 ID + variant | `/contract/:id`、`/finance/payment/:id/detail`、`/finance/invoice/:id`、`/finance/records/:id` 与结算 variant 路由 | 返回项目×分供方原页签 | 部分；目标页未统一消费 `projectId/supplierId/returnTo` |
+| `N-CORE-CONTRACT` | `core-contract` 三类合同列表 | 合同名称、项目、客户/分供方 | 相应 ref resolved | `/contract/:id`、`/project/:id`、主数据详情 | 返回合同类别与列表筛选/页码/滚动 | 部分；详情返回仍多为静态根列表 |
+| `N-CONTRACT-SOURCE` | `core-contract` `/contract/:id` | 关联甲方/分包单据、BOQ 变更/月报量 | 源 ID + variant resolved | `/owner/:kind/:id`、`/subcontract/:kind/:id`、`/contract/boq?project=:pid&contract=:cid` | 返回合同原页签和行 | 部分；单据详情当前读写混用 |
+| `N-CONTRACT-SUPPLEMENT` | `core-contract` `/contract/:id` | 补充协议 | supplement ID resolved | `/contract/:id` 的补充协议聚焦视图 | 返回合同原区块 | 部分；尚无稳定 `focus` 深链，不保留无目标蓝字 |
+| `N-AUX-CONTRACT` | `aux-contract` 辅助合同/结算列表 | 名称、项目、分供方、来源合同 | ID + variant resolved | 当前进入各 variant 已登记的辅助合同/结算表单路径 | 返回原 `project/contract/supplier`、搜索/类型/状态/页码 | 待只读页；来源 query 可读但返回会丢失 |
+| `N-OWNER-DOCUMENT` | `owner-document` 甲方六类列表 | 编号/名称 | ID + canonical variant | 当前 `/owner/:kind/:id` | 返回来源列表及筛选 | 待只读页；参考已证明独立详情，当前是编辑表单 |
+| `N-OWNER-RELATIONS` | `owner-document` 甲方报量/验收详情 | 项目、施工合同、客户、源单 | ref resolved | `/project/:id`、`/contract/:id`、`/base/customer/:id` 与源单路由 | 返回原详情区块 | 部分；详情壳待实现；验收/保修共用同一实体双视图 |
+| `N-SUBCONTRACT-DOCUMENT` | `subcontract-document` 分包三类列表 | 编号/名称、项目、合同、分供方/班组 | ID + variant resolved | 当前 `/subcontract/:kind/:id` 或 `/project/penalty/:id` | 返回筛选/页码/滚动 | 待只读页；当前主链接进入编辑表单 |
+| `N-MATERIAL-DOCUMENT` | `material` 下料/到货/领用/盘点 | 单据编号/名称 | ID + variant resolved | 对应 `/material/requisition/:id`、`/material/arrival/:id`、`/material/use/:id`、`/material/stock-check/:id` | 返回列表项目/分供方/仓库/状态/页码 | 待只读页；现有路径均为编辑表单 |
+| `N-MATERIAL-RELATIONS` | `material` 单据/材采合同物资页签 | 项目、合同、分供方、送货归档、仓库、来源批次、结算 | 相应 ref resolved | `/project/:id`、`/contract/:id`、`/base/supplier/:id`、`/material/delivery/archive/:id` 及结算 variant | 返回来源页签/子表 | 部分；仓库、到货—归档、结算分摊、领用批次和调拨两端缺 canonical 关系 |
+| `N-OWNER-MATERIAL` | `owner-material` 五类列表/项目物资页签 | 单据号、项目、供货单位、送货单、仓库、班组/班组合同 | ID + variant resolved | 对应五条已登记的甲供材表单路径，关系到项目/主数据/合同/归档详情 | 返回来源、页签、子表、筛选、页码、滚动 | 待只读页；供货身份/总计划头行/仓库等缺关系时不得链接 |
+| `N-DELIVERY-ARCHIVE` | `delivery` 归档库/项目归档 | 送货单号、项目、分供方 | ref resolved | `/material/delivery/archive/:id`、`/project/:id`、`/base/supplier/:id` | 返回项目—分供方树、搜索、日期和页码 | 部分；详情闭合，返回树上下文待统一 |
+| `N-MATERIAL-PRICE` | `material-price` 价格事实 | 来源送货单、相关厂家历史合同 | 价格行必须有 delivery record/line ID；合同有 contract ID | `/material/delivery/archive/:id`、`/contract/:id` | 返回材料/规格/供应商/时间筛选 | 闭合主链；历史合同不是单个价格点来源 |
+| `N-FINANCE-INCOME` | `finance-income` 开票/收款/往来列表 | 申请名称或编号 | ID + variant resolved | `/finance/billing/:id`、`/finance/receipt/:id`、`/finance/current/:id` | 返回分类、搜索、页码和滚动 | 待只读页；当前三类均读写混用，往来付款参考目标待补证 |
+| `N-FINANCE-INCOME-REL` | `finance-income` 详情/项目财务页签 | 项目、客户、合同、来源单据 | ref resolved | `/project/:id`、`/base/customer/:id`、`/contract/:id` 与源单路由 | 返回详情原区块或项目财务页签 | 部分；通用列表 DTO 必须补真实关系 ID |
+| `N-PAYMENT-APPLICATION` | `finance-expense` 付款申请/付款管理/分供方/项目×分供方 | 申请编号/名称 | payment application ref resolved | `/finance/payment/:id/detail`；来源可带 `projectId/supplierId` | 返回原列表分类/筛选/页码或来源工作台 | 部分；专属详情闭合，来源返回未统一 |
+| `N-PAYMENT-DETAIL-REL` | `finance-expense` 付款申请详情 | 项目、分供方、合同、发票、支付记录 | ref resolved | `/project/:id`、`/base/supplier/:id`、`/contract/:id`、`/finance/invoice/:id`、`/finance/records/:id` | 返回同一付款申请页签 | 闭合主链 |
+| `N-PAYMENT-INSIGHT` | `finance-expense` `/finance/payment/:id/detail` | 业务洞察浮标 | 当前详情组件挂载且付款申请 ID resolved | 同路由右侧 overlay；请求按业务元数据名、记录 code、`detail` 位置计算 | 关闭仍在原记录；切记录必须换 subject；页签栏刷新收起 overlay | 直接证据；列表、合同详情、付款管理、支付记录、费用报销未挂载。通用引擎可配置其他实体，本地首版只承诺付款申请 |
+| `N-PAYMENT-INSIGHT-REPORT` | `finance-expense` 洞察跨项目/跨供应商报表 | 报表行/金额 | 只有返回明确 NavigationIntent 才可点 | 当前无已验证目标 | 保持 overlay 与当前付款记录 | 待补证；可见蓝色样式不能自动解释为链接 |
+| `N-PAYMENT-RECORD` | `finance-expense` 支付记录/报销 | 编号/名称、付款申请分摊 | stable ID | `/finance/records/:id`、`/finance/reimbursement/:id`、付款申请详情 | 返回原列表筛选 | 待只读页；支付/报销详情当前读写混用 |
+| `N-INVOICE` | `invoice` 收票/归档台账 | 发票号、项目、分供方、合同、付款申请 | 对应 ref resolved | `/finance/invoice/:id` 与项目/分供方/合同/付款详情 | 返回上传/校对/台账来源 | 部分；单表状态机正确，来源返回和关系 ID 仍需补齐 |
+| `N-SCHEDULE-QUANTITY` | `schedule-target-cost` 排程工序详情 | 工程量矩阵 | project/group/task/stage/item 稳定 ID | `/subcontract/quantity` + `project/group/buildings/task/stage/item`，名称与日期仅提示 | `/schedule?project=:pid&group=:gid&task=:tid` | 闭合 |
+| `N-QUANTITY-UNIT` | `quantity-payroll` 工程量矩阵 | 户施工详情 | project + unit ID resolved | `/subcontract/quantity/:pid/:uid`，带 `project/building/month/view/trade/assignee` | 原六项筛选 | 闭合 |
+| `N-PAYROLL-FLOW` | `quantity-payroll` 工资台账 | 新建草稿、考勤、工资详情 | 项目/月/班组及单据 ID resolved | `/subcontract/payroll/new`、`/subcontract/attendance`、`/subcontract/payroll/:id` | 返回 `project/month/crew/status` | 部分；建单/考勤闭合，详情固定退工资根路由 |
+| `N-DAYWORK-FLOW` | `quantity-payroll` 考勤/工资台账 | C2 零星签工 | 项目/月/班组上下文 | `/subcontract/daywork` | 返回考勤或工资原筛选 | 部分；当前忽略来源 query 且两侧都退根路由 |
+| `N-TARGET-COST` | `schedule-target-cost` 目标成本列表/详情 | 名称、项目、已签合同额 | ref 或明确聚合目标 | `/project/target-cost/:id`、`/project/:id`；已签合同额进入当前版本合同聚合区 | 返回列表筛选/详情区块 | 部分；名称/项目闭合，金额聚合锚点待实现 |
+| `N-IMPORT-EXPORT` | `import-export` 映射/导出配置 | 返回来源、错误行源实体、生成结果 | 来源为站内 route key；文件 capability resolved | 返回调用页或受控文件预览 | 恢复调用页上下文 | 部分；不得把原始文件路径或私有 URL 当路由 |
+| `N-OCR-SETTINGS` | `ocr-settings` `/settings/ocr` | 无业务实体关系入口 | — | 仅侧栏导航 `/settings/ocr` | 返回原应用页签 | 非入口；Token/API 地址永不进入导航 DTO |
+| `N-SHELL-NOTIFICATION` | `shell` 顶栏 toast/消息抽屉 | 消息主体/查看动作 | `NotificationDTO.target` resolved 且未 forbidden | 由本矩阵解析 `open-entity/open-list`；后台不传路由字符串 | 关闭抽屉后目标页保留自己的返回上下文 | 部分；本地静态 route 字符串和 5 条 seed 必须迁移 |
+| `N-SHELL-TABS` | `shell` 应用内部页签 | 页签切换、溢出、刷新 | 仅当前活动实例 | 切换不新建业务事实；刷新只重取当前页并重置局部 overlay | 页签状态按实例隔离 | 直接证据：28 个内部页签不等于 28 个浏览器页；详见 §5 |
+
+## 5. 付款洞察与多页签影响因素
+
+2026-08-13 的严格只读对照使用同一浏览器标签页内的 28 个应用页签完成。结论如下：
+
+1. **挂载位置**：目前直接验证的入口是付款申请详情。付款申请列表、支出合同详情、付款管理、支付记录和费用报销均没有可见入口。不能据此断言通用引擎永远只支持付款；公开前端实现显示它按业务元数据和记录 code 调用通用分析 operation，本地只在已有直接证据的付款申请详情落首版。
+2. **记录作用域**：两个付款申请详情都显示浮标；切换记录时当前合同/付款/票款检查会换成新记录结果，不能缓存上一单完整侧栏。
+3. **聚合作用域**：同一侧栏还包含跨项目和跨供应商报表。这部分不是当前项目私有数据，应按报表 key、用户可见范围、统计时点和来源版本缓存。
+4. **内部页签**：应用页签会保留各详情组件状态；面板打开时切换另一付款详情，可继续打开并换用新 subject。切到列表或其他业务页后入口和面板都不可见，没有观察到由页签数量造成的数据串页。
+5. **刷新**：页签栏刷新后右侧面板收起，但付款详情浮标仍存在；刷新影响局部展开状态，不决定功能资格。
+6. **浮标位置**：参考实现只把按钮位置按企业/记录保存为本地 UI 偏好。位置缓存不能携带洞察结果、权限或业务状态。
+7. **审批链**：普通详情分析与审批流分析是两个语义 operation；审批场景额外使用流程定义和活动节点身份。瑞航实现不能把“详情查看”结果直接当审批阻断结论。
+8. **面板蓝色样式**：当前跨项目/跨供应商表格的项目名和金额在可访问结构中不是已验证链接；在没有明确 target DTO 前保持只读表格，不按颜色猜跳转。
+
+因此，多开应用页签本身不是洞察出现的原因；真正影响因素是：页面是否挂载洞察组件、业务元数据是否配置、当前记录 ID/code、详情/审批位置、用户可见范围、统计时点/来源版本，以及局部 overlay 展开状态。
+
+## 6. 当前统一实施顺序
+
+1. 建立唯一前端 target registry，把现有 `EntityLink` 扩展到已存在的班组、工人、付款申请、支付记录、目标成本、送货归档和工程量户；多态对象必须通过 variant 解析。
+2. 建立站内 `returnTo` 编解码/校验器，并让列表、详情、项目×分供方、工资/C2、材料和财务目标页按白名单消费 query。
+3. 先为甲方/分包/材料/辅助合同结算/普通财务对象补独立只读详情，再把主链接从编辑表单切走；编辑入口保持显式动作。
+4. 金额链接改为由 `MetricDTO.drilldown` 决定；值为 0 可以进入真实空表，`null`、missing、forbidden 和无目标继续退化。
+5. 通知、洞察报表行和文件来源统一输出 `NavigationIntentDTO`，去掉 store 内业务 route 字符串；未知目标保持不可达而不是猜路径。
+6. 路由、目标、返回 query 或实体 variant 发生变化时，同一工作单元更新本文、[`READ-MODELS.md`](./READ-MODELS.md)、对应页面蓝本和验收测试。
+
+## 7. 验收
+
+- 20 个生产页面域及应用壳公共入口均在矩阵中有记录；没有入口的域也明确标为非入口。
+- 矩阵内所有具体目标路径均命中现有生产路由；规划中的通配说明不能冒充可访问 URL。
+- 每个蓝链均能区分 resolved、missing、forbidden、not-connected、unverified-target 和 error。
+- 列表 → 详情 → 关系目标 → 返回可恢复原筛选、页签、分页和必要锚点；无效 query 不改变实体身份。
+- 0 条目标能显示真实空态；未读取、权限不可见、错误和缺关系不显示伪造 0 条。
+- 付款洞察按记录级和跨域报表级分别缓存；切换应用页签、切换付款记录、局部刷新和关闭面板均不串用结果。
+- 通知与洞察只返回语义目标；后端、seed 和参考私有接口均不成为前端路由权威。

@@ -1,6 +1,6 @@
 # 当前技术架构
 
-本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)。
+本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
 
 ## 1. 运行形态
 
@@ -89,6 +89,7 @@ Page / Domain component
 
 - 侧栏信息架构的代码权威源是 `app/lib/nav/nav-tree.ts`；`to` 缺省表示入口尚未实现。
 - 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理。
+- 蓝色名称、编号、金额、消息目标和跨域来源返回必须遵守 [`NAVIGATION.md`](./NAVIGATION.md)；后台返回语义目标与稳定 ID，前端唯一 target registry 解析站内路径，多态单据不得用名称或编号猜 variant。
 - 业务实体新增/编辑采用整页表单路由；共享字段、保存动作、脏数据拦截和持久化能力位于 `app/components/forms/`、`app/lib/forms/` 及相关 store，见 ADR 0014 / 0015。
 - 行级小对象、确认和轻量选择器才使用 Dialog；不得把大型业务实体重新塞回通用 formModal。
 

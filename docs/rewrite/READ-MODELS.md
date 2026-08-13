@@ -76,7 +76,7 @@ type EntityRefDTO =
     }
 ```
 
-DTO 不下发前端路由字符串。前端根据 `entity + id` 和跨域路由矩阵生成目标；无有效目标或无权限时显示普通文本/明确状态，不伪装蓝色链接。关系对象存在但其子集合为 0 条时返回 `state='resolved'` 和空数组，不能降格成 `missing`。
+DTO 不下发前端路由字符串。前端根据 `entity + id` 与 [`NAVIGATION.md`](./NAVIGATION.md) 的 `NavigationIntentDTO` 和 target registry 生成目标；甲方/分包/材料等多态单据必须再带 canonical variant，不能按名称或编号猜路由。无有效目标或无权限时显示普通文本/明确状态，不伪装蓝色链接。关系对象存在但其子集合为 0 条时返回 `state='resolved'` 和空数组，不能降格成 `missing`；聚合值为 0 时是否可点由明确 drilldown 决定，不由数值猜测。
 
 ### 2.3 分页、筛选、排序与汇总
 
@@ -283,15 +283,9 @@ interface InsightDTO<Row = Record<string, unknown>> {
 
 #### 全局通知与抄送事件
 
-全局 toast、顶栏未读角标和消息抽屉必须消费同一个事件读模型。通知点击的目标只返回实体身份和意图，前端通过 #289 的路由矩阵解析；后端不发送 Vue 路由字符串。
+全局 toast、顶栏未读角标和消息抽屉必须消费同一个事件读模型。通知点击的目标只返回实体身份和意图，前端通过 [`NAVIGATION.md`](./NAVIGATION.md) 的 target registry 解析；后端不发送 Vue 路由字符串。
 
 ```ts
-interface NotificationTargetDTO {
-  intent: 'open-entity' | 'open-list' | 'none'
-  subject: EntityRefDTO | null
-  context: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
-}
-
 interface NotificationDTO {
   eventId: OpaqueIdDTO
   eventType: string
@@ -303,12 +297,13 @@ interface NotificationDTO {
   result: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed' | 'informational'
   occurredAt: string
   readAt: string | null
-  target: NotificationTargetDTO
+  target: NavigationIntentDTO
   permissionState: 'resolved' | 'forbidden' | 'missing'
   deliveryState: 'queued' | 'delivered' | 'failed'
 }
 ```
 
+- `NavigationIntentDTO` 以 [`NAVIGATION.md`](./NAVIGATION.md) 为唯一契约；通知 adapter 不返回前端路由字符串。
 - 同一 `eventId` 在 toast、未读数和消息抽屉中幂等；重复投递不能增加两次未读数。
 - toast 自动消失只改变呈现，不等于已读。何时写入 `readAt` 由 #290 固化，读 DTO 只报告已持久化事实。
 - 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
