@@ -11,6 +11,7 @@
 | 数据实体、字段、关系与迁移 | [`docs/rewrite/DATABASE.md`](./rewrite/DATABASE.md) |
 | 页面读模型、DTO 类型、空错权限和本地/后台适配边界 | [`docs/rewrite/READ-MODELS.md`](./rewrite/READ-MODELS.md) |
 | 蓝色入口、目标路由、页签和返回上下文 | [`docs/rewrite/NAVIGATION.md`](./rewrite/NAVIGATION.md) |
+| 智能洞察、全局消息和业务页签怎样挂载、恢复与对账 | [`docs/rewrite/PUBLIC-SURFACES.md`](./rewrite/PUBLIC-SURFACES.md) |
 | 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |

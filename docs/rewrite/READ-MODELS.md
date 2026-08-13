@@ -216,7 +216,7 @@ type ReadState<T> =
 
 ### 3.2 跨路由公共读模型
 
-跨路由公共能力不增加生产路由计数，但必须使用与 20 个页面域相同的身份、金额、权限和完整度语义。参考站当前直接证据只证明付款申请详情挂载智能业务洞察；付款申请列表、支付记录列表和材料采购合同详情均未挂载。费用报销当前可见视图没有可用详情记录，不能据此推断永不挂载。最终挂载矩阵与蓝色报表行目标由 #290、#289 继续固化。
+跨路由公共能力不增加生产路由计数，但必须使用与 20 个页面域相同的身份、金额、权限和完整度语义。参考站当前直接证据只证明付款申请详情挂载智能业务洞察；付款申请列表、付款管理/支付记录列表、材料采购合同详情和开票申请详情均未挂载。最终挂载、消息扇出和页签恢复矩阵见 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)，蓝色报表行目标见 [`NAVIGATION.md`](./NAVIGATION.md)。
 
 #### 智能业务洞察
 
@@ -235,6 +235,16 @@ interface InsightScopeDTO {
   level: InsightScopeLevelDTO
   anchor: EntityRefDTO
   visibility: 'complete' | 'permission-filtered' | 'unknown'
+}
+
+interface InsightAvailabilityDTO {
+  key: string
+  metadataKey: string
+  position: 'detail'
+  subject: EntityRefDTO
+  availability: 'available' | 'unavailable' | 'forbidden'
+  suiteVersion: string | null
+  asOf: string
 }
 
 interface InsightCheckDTO {
@@ -275,6 +285,7 @@ interface InsightDTO<Row = Record<string, unknown>> {
 ```
 
 - `no-rule` 与 `passed` 不同：页面显示“无匹配规则”时不能算检查通过，也不能算业务失败。
+- 页面先用 `metadataKey + position + subject.id` 读取 `InsightAvailabilityDTO`；只有 `available` 才挂载入口并允许读取内容。`unavailable` 不能显示空洞察抽屉，`forbidden` 不能泄露规则或报表存在性以外的数据。
 - `permission-filtered` 与真正空表不同；跨项目报表只覆盖当前用户可见范围，汇总和行必须使用同一 capability 过滤。
 - `asOf` 是聚合统计时点，`sourceVersion` 是规则/报表定义或来源快照版本；两者都不能用组件挂载时间代替。
 - L2-7/L2-6 等参考标签只作为运行证据，不成为瑞航接口身份；本地使用稳定 `key`、维度和度量定义。
@@ -301,11 +312,22 @@ interface NotificationDTO {
   permissionState: 'resolved' | 'forbidden' | 'missing'
   deliveryState: 'queued' | 'delivered' | 'failed'
 }
+
+interface NotificationOpenResultDTO {
+  eventId: OpaqueIdDTO
+  readAt: string
+  target:
+    | { state: 'resolved', intent: NavigationIntentDTO }
+    | { state: 'forbidden', subject: EntityRefDTO | null }
+    | { state: 'missing', subject: EntityRefDTO | null }
+}
 ```
 
 - `NavigationIntentDTO` 以 [`NAVIGATION.md`](./NAVIGATION.md) 为唯一契约；通知 adapter 不返回前端路由字符串。
 - 同一 `eventId` 在 toast、未读数和消息抽屉中幂等；重复投递不能增加两次未读数。
-- toast 自动消失只改变呈现，不等于已读。何时写入 `readAt` 由 #290 固化，读 DTO 只报告已持久化事实。
+- toast 自动消失、手动关闭和打开消息抽屉都只改变呈现，不等于已读。
+- 用户激活单条消息时调用 `openNotification(eventId)`；adapter 在同一事务内按当前权限解析目标并首次写入 `readAt`，返回 `NotificationOpenResultDTO`。`forbidden` / `missing` 仍保留消息记录，重复打开保持幂等。
+- 目标 resolved 后的前端渲染失败不回滚 `readAt`；消息仍可从抽屉重试目标。全部已读只能由显式批量命令写入。
 - 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
 - `app/stores/notifications.ts` 当前 5 条静态 seed 不得继续作为运行时 fallback。后台事件接入前使用真实空态；确定性 fixture 只允许存在于测试。
 - 参考刷新时可观察到持续实时通道，同时待办查询单独返回 `ccTotalCount`、`todoTotalCount`、`delayTodoTotalCount`、`totalCount` 和 `records`。当前证据不能把某条 toast 与具体传输帧强绑定，因此 DTO 保持传输无关；adapter 可用实时增量触发，再以分页查询对账未读数。

@@ -88,7 +88,7 @@ Page / Domain component
 ## 5. 导航、页面与表单
 
 - 侧栏信息架构的代码权威源是 `app/lib/nav/nav-tree.ts`；`to` 缺省表示入口尚未实现。
-- 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理。
+- 页面路由由 `app/pages/` 生成。列表、详情、表单之间的 active nav 和应用页签归属由 `app/lib/nav/`、`app/lib/tabs/` 统一处理；页签上限、可恢复 descriptor、活动页刷新和后台页暂停语义统一遵守 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)。
 - 蓝色名称、编号、金额、消息目标和跨域来源返回必须遵守 [`NAVIGATION.md`](./NAVIGATION.md)；后台返回语义目标与稳定 ID，前端唯一 target registry 解析站内路径，多态单据不得用名称或编号猜 variant。
 - 业务实体新增/编辑采用整页表单路由；共享字段、保存动作、脏数据拦截和持久化能力位于 `app/components/forms/`、`app/lib/forms/` 及相关 store，见 ADR 0014 / 0015。
 - 行级小对象、确认和轻量选择器才使用 Dialog；不得把大型业务实体重新塞回通用 formModal。
@@ -101,6 +101,7 @@ Page / Domain component
 - `app/components/shared/`：AppShell、KitUIHost、整页表单壳等跨领域组合。
 - `app/components/<domain>/`：只在某一业务语义成立的复杂组件，例如 WBS、甘特、工程量矩阵和票款分摊。
 - `useKitUI()` 是 toast / confirm / formModal 的稳定入口；页面不直接创建第二套全局浮层宿主。
+- 智能洞察可用性、右侧 Sheet、全局事件 inbox、toast/角标/消息抽屉扇出及单例实时通道属于应用壳公共能力；领域页只提供稳定 `metadataKey`、`subject` 和读模型 adapter，不自行建立第二套消息或洞察框架，见 [`PUBLIC-SURFACES.md`](./PUBLIC-SURFACES.md)。
 
 视觉权威、组件层次和响应式规则见 [`docs/design/README.md`](../design/README.md) 与 [`DESIGN-SYSTEM.md`](./DESIGN-SYSTEM.md)。
 
