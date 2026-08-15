@@ -25,6 +25,8 @@
 
     const rows = A.rows("payApplies").map((r) => ({
       id: r.id,
+      projectId: r.projectId || null,
+      supplierId: r.supplierId || null,
       name: r.name || "",                                                   // 名称=申请名称
       no: r.no || "",
       projectName: r.projectId ? projName(r.projectId) : "公司付款",        // SQL COALESCE(project.name, '公司付款')
@@ -33,6 +35,8 @@
       date: r.applyDate || "",
       status: r.status || "草稿",
     }));
+    const scopedRows = rows.filter((r) => (!(params && params.project) || r.projectId === params.project)
+      && (!(params && params.supplier) || r.supplierId === params.supplier));
 
     return (
       <Std
@@ -49,7 +53,7 @@
           { key: "date", label: "日期", width: 128, mono: true },
           { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
         ]}
-        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
+        rows={scopedRows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
         footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
       />
     );
