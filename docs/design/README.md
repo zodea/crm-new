@@ -35,7 +35,7 @@ DC重构设计源码/
 
 ## 当前待补设计
 
-**当前为 1 条。** `/finance/payment/:id/detail` 已有生产路由，但还没有一一对应的 DC 页面；它在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`，由 [#305](https://github.com/zodea/crm-new/issues/305) 随付款详情洞察切片补齐。此前的施工进度「前后置依赖设置」已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入设计源码，其 brief 仅保留历史说明，不再作为待办。
+**当前为 2 条。** `/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但还没有一一对应的 DC 页面；它们在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`，分别由 [#305](https://github.com/zodea/crm-new/issues/305) 与 [#294](https://github.com/zodea/crm-new/issues/294) 承接。迁移页在设计补齐前以运行契约、四档实际视口和表内局部滚动证据验收。此前的施工进度「前后置依赖设置」已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入设计源码，其 brief 仅保留历史说明，不再作为待办。
 
 当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。当前实施权威是父规格 [#292](https://github.com/zodea/crm-new/issues/292) 与账本票 [#276](https://github.com/zodea/crm-new/issues/276)；#181 / #182 / #183 只保留历史证据，不再代表当前 Issue 状态。
 

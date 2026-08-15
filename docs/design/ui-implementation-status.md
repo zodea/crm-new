@@ -29,16 +29,16 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 133 |
+| 实现页面文件（含 dev） | 134 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 128 |
-| 实现侧栏叶子 | 50 |
+| 实现生产路由（排除 dev） | 129 |
+| 实现侧栏叶子 | 51 |
 | 已覆盖 | 127 |
-| 待补设计（实现有、设计稿没有） | 1 |
+| 待补设计（实现有、设计稿没有） | 2 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
-侧栏 IA 当前为实现与设计稿各 50 个叶子，key、label 和实现 `to` 逐条一致；这只证明入口覆盖，不证明业务闭环。
+实现侧栏当前有 51 个叶子，设计稿为 50 个；新增的“本地数据迁移”属于下方显式登记的 `design-pending`，由 #294 的运行契约与四档视口证据暂时裁定，不把缺失设计静默算作覆盖。
 
 ## 3. 两向设计缺口
 
@@ -48,11 +48,12 @@
 
 ### 实现有、设计稿没有
 
-**当前为 1。** `/finance/payment/:id/detail` 已有生产路由，但没有一一对应的 DC 页面；由 [#305](https://github.com/zodea/crm-new/issues/305) 随付款详情洞察切片补齐。在此之前它保持 `design-pending`，不能写成设计已覆盖。
+**当前为 2。** `/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但没有一一对应的 DC 页面；分别由 [#305](https://github.com/zodea/crm-new/issues/305) 与 [#294](https://github.com/zodea/crm-new/issues/294) 承接。在补齐设计源码前保持 `design-pending`，不能写成设计已覆盖。
 
 | 生产路由 | 当前设计状态 | 实施票 |
 | --- | --- | --- |
 | `/finance/payment/:id/detail` | `design-pending` | [#305](https://github.com/zodea/crm-new/issues/305) |
+| `/settings/data-migration` | `design-pending` | [#294](https://github.com/zodea/crm-new/issues/294) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和只读详情动作。
 
@@ -81,7 +82,7 @@
 | 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目进度成本 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 导入导出 | 2 | [#278](https://github.com/zodea/crm-new/issues/278) |
+| 导入导出 | 3 | [#278](https://github.com/zodea/crm-new/issues/278)、[#294](https://github.com/zodea/crm-new/issues/294) |
 | 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
 <!-- implementation-frontier:end -->
 
@@ -90,7 +91,7 @@
 ## 5. 证据状态边界
 
 - 历史关闭票只证明当前页面基础的来源，不推导 #292 的生产完成状态。
-- 36 条历史证据和 8 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
+- 36 条历史证据和 9 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
 - `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐端点记录在生成账本；叙述结论只留在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，生成 JSON 只保存结构化键与权威源引用。
 - 当前已实现数量不在本轮提前汇总；每张实施票关闭时按其真实路由范围更新，避免把“路由存在”再次统计成“业务闭环”。
 

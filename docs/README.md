@@ -16,6 +16,7 @@
 | 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |
+| 如何将浏览器旧核心身份数据显式切换到中央后台 | [`docs/guides/local-data-migration.md`](./guides/local-data-migration.md) |
 | 当前还有哪些界面未实现或未闭环 | [`docs/design/ui-implementation-status.md`](./design/ui-implementation-status.md) |
 | 当前工作是否已定稿、由谁领取 | [GitHub Issues](https://github.com/zodea/crm-new/issues) |
 | Agent 如何开工、分诊和提交 | [`docs/agents/`](./agents/) |

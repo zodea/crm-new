@@ -14,6 +14,7 @@
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 - [付款申请与登记支付使用说明](./finance-payment.md)
 - [送货单归档与 Excel 导出使用说明](./material-delivery.md)
+- [本地核心身份数据迁移使用指南](./local-data-migration.md)
 
 ## PDF 生成
 
@@ -48,6 +49,9 @@ python scripts/generate-project-guide-pdf.py `
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/material-delivery.md `
   --output output/pdf/瑞航CRM_送货单归档与Excel导出使用说明.pdf
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/local-data-migration.md `
+  --output output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
 ```
 
 生成文件：
@@ -63,6 +67,7 @@ output/pdf/瑞航CRM_OCR设置使用说明.pdf
 output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
 output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
 output/pdf/瑞航CRM_送货单归档与Excel导出使用说明.pdf
+output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
 ```
 
 每次改变最终用户可见流程时，先更新 Markdown，再重新生成并逐页渲染检查 PDF。指南必须明确区分“当前已可用”和“已定稿待开发”，不能把目标规格写成已经上线。

@@ -2,7 +2,7 @@
 
 本文是当前生产页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 Wayfinder 的“固化跨域蓝色入口、目标路由与返回语义矩阵”裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
-当前实现以项目列表和来源感知详情作为第一条中央读链：`/project[/:id]` → Repository → HTTP adapter → `/api/read/projects[/:id]`。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。#293 已让浏览器正式项目新增/编辑经中央命令写入并回到同一读模型，命令契约见 [`COMMANDS.md`](./COMMANDS.md)。SQLite 迁移 adapter 使用相同 DTO 契约；尚未切换中央 HTTP 的页面域通过 ADR 0020 的 production/demo 本地快照边界隐藏或只读展示 seed。正式认证、生产数据迁移和其他领域中央写命令仍未接入。
+当前实现以项目列表和来源感知详情作为第一条中央读链：`/project[/:id]` → Repository → HTTP adapter → `/api/read/projects[/:id]`。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。#293 已让浏览器正式项目新增/编辑经中央命令写入并回到同一读模型，命令契约见 [`COMMANDS.md`](./COMMANDS.md)。#294 的已确认核心身份迁移会将项目实体并入这条正式读链；迁移快照、映射和对账同样只经 Repository/HTTP 读取。确认后不得为客户、分供方、班组、项目、工人或项目分供方回退到 production SQLite 的普通读 adapter。普通客户/分供方等页面的中央 Repository 接线仍由 #281 完成。当前中央端为可重置测试实例，不是生产持久化库；正式认证与其他领域中央写命令仍未接入。
 
 ## 1. 边界与分级
 
@@ -175,7 +175,7 @@ type ReadState<T> =
 
 ## 3. 20 个页面域的 DTO 映射
 
-下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 128 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
+下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 129 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
 
 | 代码 | 运行证据域 | 路由数 | 页面族与核心读形态 | 当前本地来源 | 分级与后台缺口 |
 | --- | --- | ---: | --- | --- | --- |
@@ -197,7 +197,7 @@ type ReadState<T> =
 | `invoice` | 发票台账 | 4 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
 | `quantity-payroll` | 工程量与工资 | 9 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类工资在合同责任 FK 和成本防双计决策前禁用，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
 | `schedule-target-cost` | 项目进度成本 | 9 | WBS 分组/任务/依赖/楼层计划、标准库版本、合同绑定预览，目标成本列表/版本/科目与偏差指标 | 排程和目标成本读模型、工程量完成事实、合同/暂估快照 | `A`；排程以创建/绑定时 sourceVersion 和快照为准，目标/实际/已签/已付分别取真实源，不按用途文本归类，见 [`schedule-progress.md`](./pages/schedule-progress.md)、[`target-cost.md`](./pages/target-cost.md) |
-| `import-export` | 导入导出 | 2 | 实体映射候选、逐行错误、批次进度、导出配置与结果引用 | 本地 Excel adapter、`import_batches/source_refs/reconciliation_issues` | `A+C`；审计元数据可后台化，文件解析/生成先保留本地 adapter；原始文件值只进受控追溯，不进普通列表 DTO，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md) |
+| `import-export` | 导入导出 | 3 | 实体映射候选、逐行错误、批次进度、导出配置、迁移对账与结果引用 | 本地 Excel/SQLite 快照 adapter、`import_batches/source_refs/reconciliation_issues` 与中央迁移快照 | `A+C`；审计元数据可后台化，文件解析/生成与整库备份保留本地 adapter；原始文件值和整库字节只进受控追溯，不进普通列表 DTO 或中央接口，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md)、[迁移指南](../guides/local-data-migration.md) |
 | `ocr-settings` | 系统设置 | 1 | OCR 非敏感能力、超时、只读阈值和保存结果 | 本机 `ocr_settings`、三个 Nitro OCR operation | `C`；Token、API 地址和模型私有配置永不返回前端；桌面静态构建不能假定 Nitro 永久在线，见 [`finance-invoice.md`](./pages/finance-invoice.md)、[`material-delivery.md`](./pages/material-delivery.md) |
 
 ### 3.1 当前实现落点
@@ -370,7 +370,7 @@ interface NotificationOpenResultDTO {
 ## 5. 本地 adapter 与后台迁移规则
 
 1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL 或 SQL。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。
-2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
+2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。#294 的迁移页经 `/api/migrations/core/*` 获取预检、批次、问题、映射和中央快照；只有中央 `authority='central'` 且活动批次与本机持久标记一致时，已迁移项目才作为正式项目读回。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；但确认切换的六类核心身份不得借此绕过中央或回退读取旧 production。禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
 3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。
 4. 不做本地与在线静默双写。项目在线命令失败时只保留明确的本地草稿，不改正式投影、不自动回放；其他领域在全局决策前保持各自单一现有写路径。
 5. OCR、文件和 Excel adapter 与普通业务 DTO 分离。普通 DTO 只引用受控 file id；二进制上传/下载使用专用能力和短期授权，不保存私有地址。
@@ -378,9 +378,9 @@ interface NotificationOpenResultDTO {
 
 ## 6. 验收
 
-- 运行证据矩阵的 20 个业务域、128 条生产路由都在本文件恰有一个页面域归属；路由新增、删除或改域时同一提交更新本矩阵。
+- 运行证据矩阵的 20 个业务域、129 条生产路由都在本文件恰有一个页面域归属；路由新增、删除或改域时同一提交更新本矩阵。
 - `id/no/外部键` 为字符串；金额为两位十进制定点字符串；日期为 ISO；布尔为 JSON boolean；枚举传稳定 code，不传样式类名或中文标签作为唯一身份。
 - 真实 0、未知 null、空集合、缺关系、无权限、加载失败和筛选无结果均可区分。
 - 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
-- 当前无实体数据的页面保持真实空态；项目列表、来源感知基础详情与新增/编辑命令由可重置中央实例证明 HTTP 链，其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS。
+- 当前无实体数据的页面保持真实空态；项目列表、来源感知基础详情与新增/编辑命令，以及核心身份迁移的批次快照，由可重置中央实例证明 HTTP 链。其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS；已确认切换的六类核心身份除外，不能以 SQLite adapter 作为正式回退路径。
 - 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。

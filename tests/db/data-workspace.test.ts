@@ -1,6 +1,10 @@
 import type { DbDriver } from '~/lib/db/coordinator'
 import { describe, expect, it, vi } from 'vitest'
-import { demoReadOnlyDriver, localDataWorkspace } from '~/lib/db/data-workspace'
+import {
+  demoReadOnlyDriver,
+  legacyProductionReadOnlyDriver,
+  localDataWorkspace,
+} from '~/lib/db/data-workspace'
 
 describe('local data workspace boundary', () => {
   it('keeps production empty and gives demo an isolated seeded snapshot', () => {
@@ -8,6 +12,11 @@ describe('local data workspace boundary', () => {
       snapshotKey: 'production',
       seedDemo: false,
       readOnly: false,
+    })
+    expect(localDataWorkspace(false, true)).toEqual({
+      snapshotKey: 'production',
+      seedDemo: false,
+      readOnly: true,
     })
     expect(localDataWorkspace(true)).toEqual({
       snapshotKey: 'demo',
@@ -46,5 +55,25 @@ describe('local data workspace boundary', () => {
     expect(execute).toHaveBeenCalledOnce()
     expect(execute).toHaveBeenCalledWith('BEGIN', undefined)
     expect(select).toHaveBeenCalledTimes(2)
+  })
+
+  it('locks the legacy production source after central cutover without disguising it as demo', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined)
+    const select = vi.fn().mockResolvedValue([{ id: 'legacy-project' }])
+    const close = vi.fn().mockResolvedValue(undefined)
+    const driver = legacyProductionReadOnlyDriver({ execute, select, close } satisfies DbDriver)
+
+    await expect(driver.select('SELECT * FROM projects')).rejects.toMatchObject({
+      code: 'legacy-production-read-only',
+    })
+    await expect(driver.execute('UPDATE projects SET name = ?')).rejects.toMatchObject({
+      code: 'legacy-production-read-only',
+    })
+    await expect(driver.execute('BEGIN')).rejects.toMatchObject({
+      code: 'legacy-production-read-only',
+    })
+
+    expect(select).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
   })
 })

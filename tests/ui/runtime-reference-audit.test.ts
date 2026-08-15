@@ -58,21 +58,21 @@ describe('runtime reference audit contract', () => {
 
     expect(committed).toEqual(ledger)
     expect(ledger.counts).toMatchObject({
-      trackedPageFiles: 133,
+      trackedPageFiles: 134,
       devPageFiles: 5,
-      productionRoutes: 128,
+      productionRoutes: 129,
       pageDomains: 20,
-      evidenceEndpointRecords: 128,
-      referenceEndpoints: 128,
+      evidenceEndpointRecords: 129,
+      referenceEndpoints: 129,
       referenceProfiles: 37,
       usedReferenceProfiles: 32,
       directEvidenceRoutes: 48,
       adjacentEvidenceRoutes: 18,
       localAuthorityRoutes: 18,
       historicalEvidenceRoutes: 36,
-      unverifiedTargetRoutes: 8,
+      unverifiedTargetRoutes: 9,
     })
-    expect(ledger.endpoints).toHaveLength(128)
+    expect(ledger.endpoints).toHaveLength(129)
     expect(ledger.domains).toHaveLength(20)
 
     for (const endpoint of ledger.endpoints) {
@@ -159,10 +159,10 @@ describe('runtime reference audit contract', () => {
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
     expect(status).toContain('> 核对日期：2026-08-15')
-    expect(status).toContain('| 实现页面文件（含 dev） | 133 |')
+    expect(status).toContain('| 实现页面文件（含 dev） | 134 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
-    expect(status).toContain('| 实现生产路由（排除 dev） | 128 |')
-    expect(status).toContain('**当前为 1。**')
+    expect(status).toContain('| 实现生产路由（排除 dev） | 129 |')
+    expect(status).toContain('**当前为 2。**')
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 
@@ -170,6 +170,10 @@ describe('runtime reference audit contract', () => {
       expect.objectContaining({
         appRoute: '/finance/payment/:id/detail',
         issue: '#305',
+      }),
+      expect.objectContaining({
+        appRoute: '/settings/data-migration',
+        issue: '#294',
       }),
     ])
     expect(designIndex).toContain('[#292](https://github.com/zodea/crm-new/issues/292)')
@@ -193,10 +197,10 @@ describe('runtime reference audit contract', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
     const endpoints = buildRuntimeEvidenceLedger().endpoints
-    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(128)
-    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(128)
-    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(128)
-    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(128)
+    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(129)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {

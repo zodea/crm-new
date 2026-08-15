@@ -41,7 +41,7 @@ const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['invoice', [304, 289]],
   ['quantity-payroll', [300, 301, 289]],
   ['schedule-target-cost', [300, 289]],
-  ['import-export', [278]],
+  ['import-export', [278, 294]],
   ['ocr-settings', [204]],
 ])
 
@@ -94,6 +94,7 @@ const RESTRICTED_TARGET_ROUTES = new Set(['/base/customer', '/project'])
 // 路由级参考视图是端点身份与证据等级覆盖的单一维护点；
 // 被多个本地路由复用的外部运行证据必须拆到具体目标视图。
 const REFERENCE_VIEW_BY_ROUTE = new Map([
+  ['/settings/data-migration', { id: 'core-data-migration-unobserved', label: '本地核心身份数据迁移；外部目标页未观察' }],
   ['/base/supplier/form/:id?', { id: 'supplier-form', label: '基础信息 > 分供方 > 新建分供方（编辑态未单独观察）', gradeOverride: 'adjacent' }],
   ['/contract/material/form', { id: 'material-contract-new', label: '乙供材管理 > 材料采购合同 > 新建支出合同·材料采购合同' }],
   ['/contract/material/form/:id', { id: 'material-contract-edit', label: '乙供材管理 > 材料采购合同 > 编辑（仅有相邻新建表单证据）', gradeOverride: 'adjacent' }],

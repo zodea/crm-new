@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-15",
   "counts": {
-    "trackedPageFiles": 133,
+    "trackedPageFiles": 134,
     "devPageFiles": 5,
-    "productionRoutes": 128,
+    "productionRoutes": 129,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 128,
-    "referenceEndpoints": 128,
+    "evidenceEndpointRecords": 129,
+    "referenceEndpoints": 129,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
     "directEvidenceRoutes": 48,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 18,
     "historicalEvidenceRoutes": 36,
-    "unverifiedTargetRoutes": 8,
+    "unverifiedTargetRoutes": 9,
     "designCoveredRoutes": 127,
-    "designPendingRoutes": 1
+    "designPendingRoutes": 2
   },
   "domains": [
     {
@@ -192,9 +192,10 @@
     {
       "code": "import-export",
       "domain": "导入导出",
-      "routeCount": 2,
+      "routeCount": 3,
       "implementationIssues": [
-        278
+        278,
+        294
       ]
     },
     {
@@ -1126,7 +1127,8 @@
       "domainCode": "import-export",
       "template": "特殊工具",
       "implementationIssues": [
-        278
+        278,
+        294
       ],
       "referenceProfile": "R-TOOL-PENDING",
       "referenceEndpointId": "unverified-F3D02BF01437",
@@ -1811,7 +1813,8 @@
       "domainCode": "import-export",
       "template": "特殊工具",
       "implementationIssues": [
-        278
+        278,
+        294
       ],
       "referenceProfile": "R-TOOL-PENDING",
       "referenceEndpointId": "unverified-8D0DA07FC598",
@@ -3398,6 +3401,33 @@
       "stateAndNavigationConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/settings/ocr"
+      },
+      "constraints": "C-TOOL"
+    },
+    {
+      "evidenceRecordId": "E-5921316E3C4F",
+      "page": "app/pages/settings/data-migration.vue",
+      "localRoute": "/settings/data-migration",
+      "domainCode": "import-export",
+      "template": "工作台",
+      "implementationIssues": [
+        278,
+        294
+      ],
+      "referenceProfile": "R-TOOL-PENDING",
+      "referenceEndpointId": "core-data-migration-unobserved",
+      "referenceEndpointLabel": "本地核心身份数据迁移；外部目标页未观察",
+      "evidenceGrade": "unverified-target",
+      "observationDate": null,
+      "observationDateStatus": "not-observed",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/data-migration"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/settings/data-migration"
       },
       "constraints": "C-TOOL"
     },

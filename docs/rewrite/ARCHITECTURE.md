@@ -9,8 +9,9 @@ Nuxt 4 SPA
 ├─ 浏览器当前生产目标
 │  ├─ 领域 Repository → 中央 HTTP 服务
 │  ├─ sql.js/IndexedDB 分为无 seed 的 production 快照与只读 demo 快照
+│  ├─ 核心身份迁移经 HTTP/Repository 切换；确认后旧 production 普通读写阻断，保留不可变备份供回滚
 │  ├─ Nitro /server/api/ocr 代理官方 OCR API
-│  └─ Nitro /api/read/projects 提供项目列表与详情的正式/演示隔离读链
+│  └─ Nitro /api/read/projects 提供项目列表与详情的正式/演示隔离读链，并消费已确认迁移的项目身份
 └─ Tauri 2 桌面态
    ├─ tauri-plugin-sql SQLite
    ├─ tauri-plugin-fs / dialog
@@ -19,7 +20,7 @@ Nuxt 4 SPA
 
 - `nuxt.config.ts` 设置 `ssr: false`；当前生产目标、中央权威与桌面范围由 ADR 0020 裁定。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
-- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；完整登录/RBAC、正式业务库和生产数据迁移仍未接入。
+- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；#294 的核心身份迁移会让已确认导入的项目进入正式项目读链。当前中央端仍是可重置测试实例，完整登录/RBAC 与生产持久化业务库尚未接入。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -53,6 +54,7 @@ app/
 │  ├─ forms/        # 整页表单契约与共享逻辑
 │  ├─ kit/          # KitUI 纯逻辑
 │  ├─ nav/          # 导航树与路由归属
+│  ├─ migration/    # 核心身份来源快照、映射契约与 HTTP Repository
 │  └─ <domain>/     # 领域纯逻辑、适配器与读写服务
 ├─ pages/           # Nuxt 文件路由；页面负责组合，不承担全部领域逻辑
 ├─ plugins/         # 数据库、组件库等运行时接入
@@ -93,11 +95,23 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
   includeDemo=true  ──► demo 本地快照（确定性 seed，驱动只读）
   开关变化          ──► 确认未保存内容 → 服务端授权 → 原子重载应用
                        └─ 统一清空旧 Pinia 投影、Lookup 最近选择域与连接
+
+核心身份迁移（#294）
+  设置 → 数据迁移页 ──► CoreMigrationStore ──► CoreMigrationRepository ──► /api/migrations/core/*
+        │                         │                         │
+        │                         │                         └─ 可重置中央测试实例：预检、dry-run、导入、确认、回滚
+        │                         ▼
+        └─ production 快照 ──► 不可变 IndexedDB 备份 ──► 拓扑映射/对账 ──► 用户确认
+                                                                            │
+                                                                            ├─ 六类身份正式读写仅走中央
+                                                                            └─ 回滚窗口内仅可由迁移适配器恢复备份
 ```
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
 - 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；项目导入与删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
+- #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。导入顺序固定为客户、分供方、班组、项目、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
+- 当前项目正式读链会消费已确认迁移的项目实体。客户、分供方、班组、工人和项目分供方的普通页面 Repository/中央接线由 #281 完成，#294 不在迁移页外复制这些页面功能。
 - `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
 - `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。

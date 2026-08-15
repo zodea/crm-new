@@ -11,7 +11,7 @@
 - `POST /api/commands/projects`：新建正式项目。
 - `PUT /api/commands/projects/:id`：用当前 `baseVersion` 编辑正式项目。
 
-项目导入、删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体写命令不在当前落点。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。
+项目导入、删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。
 
 ## 2. 命令信封
 
@@ -50,4 +50,4 @@ interface ProjectCommandRequestDTO {
 
 ## 5. 当前证明边界
 
-当前中央项目命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互；真实业务库、客户—项目—分供方核心身份迁移、对账与回滚由 #294 承接。`/api/testing/projects/reset` 只是测试协调边界，不是业务命令。
+当前中央项目命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目或分供方日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。

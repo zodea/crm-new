@@ -11,6 +11,7 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
     'project:list:read',
     'project:write',
     'demo:read',
+    'core:migration:write',
   ]),
 })
 

@@ -1,13 +1,17 @@
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { ProjectListSourceRow } from '../../app/lib/project/repository'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import {
   buildProjectDetailRead,
   buildProjectListPage,
+  IMPORTED_PROJECT_STATUS,
   parseProjectDetailQuery,
   parseProjectListQuery,
   ProjectRepositoryProblem,
 } from '../../app/lib/project/repository'
+import { resolveBusinessSession } from './business-session'
+import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 
@@ -77,6 +81,54 @@ function latestAsOf(rows: readonly ProjectListSourceRow[]): string {
   )
 }
 
+function projectRowsFromMigration(snapshot: CoreMigrationSnapshotDTO): ProjectListSourceRow[] {
+  if (snapshot.authority !== 'central')
+    return []
+  const names = new Map(snapshot.entities.map(entity => [entity.id, entity.name]))
+  return snapshot.entities
+    .filter(entity => entity.entityType === 'projects' && entity.deletedAt === null)
+    .map(entity => ({
+      dataOrigin: 'real',
+      id: entity.id,
+      name: entity.name,
+      code: entity.legacyId,
+      status: IMPORTED_PROJECT_STATUS,
+      contractAmount: entity.amount === null ? null : Number(entity.amount),
+      operationType: '',
+      startDate: null,
+      plannedEnd: null,
+      actualEnd: null,
+      plannedDuration: null,
+      manager: '',
+      execManager: '',
+      builder: '',
+      customerId: entity.references.customerId ?? null,
+      customerName: entity.references.customerId
+        ? names.get(entity.references.customerId) ?? null
+        : null,
+      customerPermission: 'allowed',
+      secondaryCustomerId: entity.references.secondaryCustomerId ?? null,
+      secondaryCustomerName: entity.references.secondaryCustomerId
+        ? names.get(entity.references.secondaryCustomerId) ?? null
+        : null,
+      secondaryCustomerPermission: 'allowed',
+      contractName: '',
+      contractor: '',
+      region: '',
+      riskLevel: '',
+      address: '',
+      income: null,
+      budget: null,
+      updatedAt: FIXED_AS_OF,
+    }))
+}
+
+const EMPTY_MIGRATION_SNAPSHOT: CoreMigrationSnapshotDTO = {
+  authority: 'local',
+  activeBatchId: null,
+  entities: [],
+}
+
 export function createProjectReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[]
     = sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
@@ -84,6 +136,8 @@ export function createProjectReadTestInstance(
     = sessionId => projectCommandTestInstance.rows(sessionId),
   resolveFormalSourceVersion: (sessionId?: string | null) => string
     = sessionId => projectCommandTestInstance.sourceVersion(sessionId),
+  resolveMigrationSnapshot: (sessionId?: string | null) => CoreMigrationSnapshotDTO
+    = () => EMPTY_MIGRATION_SNAPSHOT,
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -94,15 +148,24 @@ export function createProjectReadTestInstance(
       throw repositoryProblem('forbidden', '无项目查看权限', false)
     if (scenario === 'unavailable')
       throw repositoryProblem('unavailable', '中央后台测试实例暂时不可用', true)
+    const migrationSnapshot = resolveMigrationSnapshot(sessionId)
     const rows = scenario === 'ready'
-      ? [...resolveFormalRows(sessionId), ...PROJECT_READ_FIXTURE]
+      ? [
+          ...resolveFormalRows(sessionId),
+          ...projectRowsFromMigration(migrationSnapshot),
+          ...PROJECT_READ_FIXTURE,
+        ]
       : []
     return {
       capabilities: resolveCapabilities(sessionId),
       rows,
       asOf: latestAsOf(rows),
       sourceVersion: scenario === 'ready'
-        ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}`
+        ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
+          migrationSnapshot.authority === 'central'
+            ? migrationSnapshot.activeBatchId ?? 'migration-central'
+            : 'migration-local'
+        }`
         : SOURCE_VERSION,
     }
   }
@@ -154,4 +217,9 @@ export function createProjectReadTestInstance(
   }
 }
 
-export const projectReadTestInstance = createProjectReadTestInstance()
+export const projectReadTestInstance = createProjectReadTestInstance(
+  sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
+  sessionId => projectCommandTestInstance.rows(sessionId),
+  sessionId => projectCommandTestInstance.sourceVersion(sessionId),
+  () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
+)

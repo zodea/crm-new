@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 133,
+    "trackedPageFiles": 134,
     "devPageFiles": 5,
-    "appPageFiles": 128,
-    "appNavLeaves": 50,
+    "appPageFiles": 129,
+    "appNavLeaves": 51,
     "covered": 127,
-    "designPending": 1,
+    "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -612,6 +612,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/settings/data-migration",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "核心身份迁移是 #294 新增的浏览器专属工作台；当前先以运行契约、四档视口和局部滚动证据验收，尚无一一对应的 DC 页面。",
+      "issue": "#294"
+    },
+    {
       "appRoute": "/settings/ocr",
       "designRoute": "ocrSettings",
       "status": "covered"
@@ -1074,6 +1081,13 @@
       "appLabel": "工人信息",
       "designLabel": "工人信息",
       "designPageTitle": "工人信息库"
+    },
+    {
+      "key": "dataMigration",
+      "appNavTo": "/settings/data-migration",
+      "appLabel": "本地数据迁移",
+      "designLabel": null,
+      "designPageTitle": null
     },
     {
       "key": "ocrSettings",

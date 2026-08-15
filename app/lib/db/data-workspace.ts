@@ -10,6 +10,10 @@ export interface DemoWorkspaceWriteProblem extends Error {
   code: 'demo-workspace-read-only'
 }
 
+export interface LegacyProductionWriteProblem extends Error {
+  code: 'legacy-production-read-only'
+}
+
 const TRANSACTION_CONTROLS = new Set([
   'BEGIN',
   'BEGIN TRANSACTION',
@@ -25,10 +29,13 @@ const TRANSACTION_CONTROLS = new Set([
   'ROLLBACK TRANSACTION',
 ])
 
-export function localDataWorkspace(includeDemo: boolean): LocalDataWorkspace {
+export function localDataWorkspace(
+  includeDemo: boolean,
+  legacyProductionReadOnly = false,
+): LocalDataWorkspace {
   return includeDemo
     ? { snapshotKey: 'demo', seedDemo: true, readOnly: true }
-    : { snapshotKey: 'production', seedDemo: false, readOnly: false }
+    : { snapshotKey: 'production', seedDemo: false, readOnly: legacyProductionReadOnly }
 }
 
 function demoWorkspaceWriteProblem(): DemoWorkspaceWriteProblem {
@@ -63,6 +70,20 @@ export function demoReadOnlyDriver(driver: DbDriver): DbDriver {
         return Promise.reject(demoWorkspaceWriteProblem())
       return driver.select(sql, params)
     },
+    close: () => driver.close(),
+  }
+}
+
+function legacyProductionWriteProblem(): LegacyProductionWriteProblem {
+  return Object.assign(new Error('中央切换后旧 production 数据只作为迁移来源，不能继续写入'), {
+    code: 'legacy-production-read-only' as const,
+  })
+}
+
+export function legacyProductionReadOnlyDriver(driver: DbDriver): DbDriver {
+  return {
+    execute: () => Promise.reject(legacyProductionWriteProblem()),
+    select: () => Promise.reject(legacyProductionWriteProblem()),
     close: () => driver.close(),
   }
 }
