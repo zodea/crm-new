@@ -16,6 +16,7 @@ import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 const readStore = useProjectListStore()
+const commandStore = useProjectCommandStore()
 const dataVisibilityStore = useDataVisibilityStore()
 const includeDemo = computed(() => dataVisibilityStore.includeDemo)
 const { error, exportFile } = useKitUI()
@@ -31,7 +32,8 @@ const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
 const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
 
 const IMPORTED_PHASES_KEY = 'imported-phases'
-const WRITE_DISABLED_REASON = '项目写入尚未接入中央后台'
+const IMPORT_DISABLED_REASON = '项目导入尚未接入中央后台'
+const DELETE_DISABLED_REASON = '项目删除不在当前实施范围'
 const listViews = [
   { key: 'updated-desc', label: '最近更新' },
   { key: 'name-asc', label: '项目名称' },
@@ -98,6 +100,11 @@ const problem = computed(() => {
     ? state.problem
     : null
 })
+const createDisabledReason = computed(() =>
+  readPage.value?.capabilities.includes('project:write')
+    ? undefined
+    : '无项目写入权限',
+)
 
 const importedPhases = computed(() =>
   Object.keys(statusCounts.value)
@@ -164,7 +171,7 @@ const emptyState = computed(() => {
         description: includeDemo.value
           ? '当前正式与测试来源都没有项目记录。'
           : '正式工作区暂无项目。测试数据默认隐藏，可在顶部显式开启“包含测试数据”。',
-        actionLabel: '了解新增状态',
+        actionLabel: '新增项目',
       }
 })
 
@@ -233,8 +240,18 @@ async function clearFilters() {
 async function handleEmptyAction() {
   if (hasActiveFilters.value)
     await clearFilters()
+  else if (createDisabledReason.value)
+    error(createDisabledReason.value)
   else
-    error(WRITE_DISABLED_REASON)
+    await navigateTo('/project/form')
+}
+
+async function createProject() {
+  if (createDisabledReason.value) {
+    error(createDisabledReason.value)
+    return
+  }
+  await navigateTo('/project/form')
 }
 
 function columnFilterValues(field: string): string[] {
@@ -268,6 +285,22 @@ async function loadProjects() {
   await readStore.load(query)
 }
 
+let listActive = true
+let loadedWriteKey = ''
+
+function latestWriteKey(): string {
+  const write = commandStore.latestWrite
+  return write ? `${write.id}:${write.version}` : ''
+}
+
+function reloadForLatestWrite(): void {
+  const key = latestWriteKey()
+  if (!key || key === loadedWriteKey)
+    return
+  loadedWriteKey = key
+  void loadProjects()
+}
+
 function resetPageAndLoad() {
   if (page.value === 1)
     void loadProjects()
@@ -286,6 +319,14 @@ watch([selectedPhase, sortMode, includeDemo], resetPageAndLoad)
 watch([page, pageSize], () => {
   void loadProjects()
 })
+
+watch(
+  () => commandStore.latestWrite,
+  () => {
+    if (listActive)
+      reloadForLatestWrite()
+  },
+)
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -360,7 +401,17 @@ async function exportByCategory() {
 }
 
 onMounted(() => {
+  loadedWriteKey = latestWriteKey()
   void loadProjects()
+})
+
+onActivated(() => {
+  listActive = true
+  reloadForLatestWrite()
+})
+
+onDeactivated(() => {
+  listActive = false
 })
 </script>
 
@@ -426,7 +477,9 @@ onMounted(() => {
           :include-demo="includeDemo"
           :visible="visibleTotal"
           :loading="loading"
-          :write-disabled-reason="WRITE_DISABLED_REASON"
+          :import-disabled-reason="IMPORT_DISABLED_REASON"
+          :create-disabled-reason="createDisabledReason"
+          @create="createProject"
           @refresh="refresh"
           @export-ledger="exportLedger"
           @export-by-category="exportByCategory"
@@ -486,9 +539,19 @@ onMounted(() => {
               >
                 <span class="i-lucide-file-text text-14px" aria-hidden="true" />
               </NuxtLink>
+              <NuxtLink
+                v-if="row.dataOrigin === 'real' && !createDisabledReason"
+                :to="`/project/form/${encodeURIComponent(row.id)}?origin=real`"
+                class="icon-btn"
+                :aria-label="`编辑${row.name}项目`"
+                title="编辑项目"
+              >
+                <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
+              </NuxtLink>
               <button
+                v-else
                 class="icon-btn disabled:cursor-not-allowed disabled:opacity-45"
-                :title="row.dataOrigin === 'demo' ? '测试数据只能在演示工作区修改' : WRITE_DISABLED_REASON"
+                :title="row.dataOrigin === 'demo' ? '测试数据不能从正式入口修改' : createDisabledReason"
                 aria-label="编辑项目"
                 disabled
               >
@@ -496,7 +559,7 @@ onMounted(() => {
               </button>
               <button
                 class="icon-btn-danger disabled:cursor-not-allowed disabled:opacity-45"
-                :title="row.dataOrigin === 'demo' ? '测试数据只能在演示工作区修改' : WRITE_DISABLED_REASON"
+                :title="row.dataOrigin === 'demo' ? '测试数据不能从正式入口修改' : DELETE_DISABLED_REASON"
                 aria-label="删除项目"
                 disabled
               >

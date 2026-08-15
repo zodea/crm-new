@@ -9,6 +9,7 @@ import {
   ProjectRepositoryProblem,
 } from '../../app/lib/project/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
 
 export type ProjectReadTestScenario
   = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -69,9 +70,20 @@ function repositoryProblem(
   })
 }
 
+function latestAsOf(rows: readonly ProjectListSourceRow[]): string {
+  return rows.reduce(
+    (latest, row) => row.updatedAt > latest ? row.updatedAt : latest,
+    FIXED_AS_OF,
+  )
+}
+
 export function createProjectReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[]
     = sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
+  resolveFormalRows: (sessionId?: string | null) => readonly ProjectListSourceRow[]
+    = sessionId => projectCommandTestInstance.rows(sessionId),
+  resolveFormalSourceVersion: (sessionId?: string | null) => string
+    = sessionId => projectCommandTestInstance.sourceVersion(sessionId),
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -82,9 +94,16 @@ export function createProjectReadTestInstance(
       throw repositoryProblem('forbidden', '无项目查看权限', false)
     if (scenario === 'unavailable')
       throw repositoryProblem('unavailable', '中央后台测试实例暂时不可用', true)
+    const rows = scenario === 'ready'
+      ? [...resolveFormalRows(sessionId), ...PROJECT_READ_FIXTURE]
+      : []
     return {
       capabilities: resolveCapabilities(sessionId),
-      rows: scenario === 'ready' ? PROJECT_READ_FIXTURE : [],
+      rows,
+      asOf: latestAsOf(rows),
+      sourceVersion: scenario === 'ready'
+        ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}`
+        : SOURCE_VERSION,
     }
   }
 
@@ -110,8 +129,8 @@ export function createProjectReadTestInstance(
       return buildProjectListPage({
         rows: context.rows,
         query,
-        asOf: FIXED_AS_OF,
-        sourceVersion: SOURCE_VERSION,
+        asOf: context.asOf,
+        sourceVersion: context.sourceVersion,
         capabilities: context.capabilities,
       })
     },
@@ -127,8 +146,8 @@ export function createProjectReadTestInstance(
       return buildProjectDetailRead({
         rows: context.rows,
         query,
-        asOf: FIXED_AS_OF,
-        sourceVersion: SOURCE_VERSION,
+        asOf: context.asOf,
+        sourceVersion: context.sourceVersion,
         capabilities: context.capabilities,
       })
     },

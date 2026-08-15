@@ -17,7 +17,9 @@ import {
 } from './repository'
 
 export interface ProjectHttpFetchOptions {
+  method?: 'GET' | 'POST' | 'PUT'
   query?: Record<string, unknown>
+  body?: Record<string, any>
 }
 
 export type ProjectHttpFetcher = (
@@ -58,7 +60,7 @@ function problemPayload(cause: unknown): ProblemDTO | null {
   return candidate as unknown as ProblemDTO
 }
 
-async function readHttp<T>(
+export async function readProjectHttp<T>(
   request: () => Promise<unknown>,
   decode: (value: unknown) => T,
 ): Promise<T> {
@@ -80,7 +82,7 @@ export function createHttpProjectListRepository(
 ): ProjectListRepository {
   return {
     async list(query: ProjectListQueryDTO): Promise<ProjectListPageDTO> {
-      return readHttp(
+      return readProjectHttp(
         () => options.fetcher('/api/read/projects', {
           query: serializeProjectListQuery(query),
         }),
@@ -88,7 +90,7 @@ export function createHttpProjectListRepository(
       )
     },
     async get(query: ProjectDetailQueryDTO): Promise<ProjectDetailReadDTO> {
-      return readHttp(
+      return readProjectHttp(
         () => options.fetcher(`/api/read/projects/${encodeURIComponent(query.id)}`, {
           query: serializeProjectDetailQuery(query),
         }),

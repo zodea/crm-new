@@ -12,7 +12,7 @@ test('项目导入：中央写命令未接入时不从项目列表进入本地�
 
   const importButton = page.getByRole('button', { name: '导入项目', exact: true })
   await expect(importButton).toBeDisabled()
-  await expect(importButton).toHaveAttribute('title', '项目写入尚未接入中央后台')
+  await expect(importButton).toHaveAttribute('title', '项目导入尚未接入中央后台')
   await expect(page).toHaveURL(/\/project$/)
 
   expect(pageErrors, '只读边界不应产生客户端运行错误').toEqual([])

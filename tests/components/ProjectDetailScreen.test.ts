@@ -84,6 +84,7 @@ function renderDetail(props: Record<string, unknown>) {
 vi.stubGlobal('useNuxtApp', () => ({
   $repositories: { projectList: { get, list: vi.fn() } },
 }))
+vi.stubGlobal('useProjectCommandStore', () => ({ latestWrite: null }))
 vi.stubGlobal('useTabTitle', () => {})
 
 describe('项目详情中央来源边界', () => {
@@ -100,5 +101,17 @@ describe('项目详情中央来源边界', () => {
     expect(screen.queryByRole('link', { name: '编辑项目' })).toBeNull()
     expect(screen.queryByRole('button', { name: '导出项目档案包' })).toBeNull()
     expect(document.querySelector('[data-project-module]')).toBeNull()
+  })
+
+  it('正式项目且有写权限时提供显式来源的编辑入口', async () => {
+    get.mockResolvedValue({
+      ...detail,
+      item: { ...detail.item, dataOrigin: 'real' },
+      capabilities: ['project:list:read', 'project:write'],
+    })
+    renderDetail({ originHint: 'real', includeDemo: false })
+
+    const link = await screen.findByRole('link', { name: '编辑项目' })
+    expect(link.getAttribute('href')).toBe('/project/form/project-1?origin=real')
   })
 })

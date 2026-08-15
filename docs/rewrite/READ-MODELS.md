@@ -2,7 +2,7 @@
 
 本文是当前生产页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 Wayfinder 的“固化跨域蓝色入口、目标路由与返回语义矩阵”裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
-当前实现以项目列表和来源感知详情作为第一条中央读链：`/project[/:id]` → Repository → HTTP adapter → `/api/read/projects[/:id]`。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。SQLite 迁移 adapter 使用相同 DTO 契约；尚未切换中央 HTTP 的页面域通过 ADR 0020 的 production/demo 本地快照边界隐藏或只读展示 seed。中央写命令、正式认证和生产数据迁移仍未接入。
+当前实现以项目列表和来源感知详情作为第一条中央读链：`/project[/:id]` → Repository → HTTP adapter → `/api/read/projects[/:id]`。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。#293 已让浏览器正式项目新增/编辑经中央命令写入并回到同一读模型，命令契约见 [`COMMANDS.md`](./COMMANDS.md)。SQLite 迁移 adapter 使用相同 DTO 契约；尚未切换中央 HTTP 的页面域通过 ADR 0020 的 production/demo 本地快照边界隐藏或只读展示 seed。正式认证、生产数据迁移和其他领域中央写命令仍未接入。
 
 ## 1. 边界与分级
 
@@ -180,7 +180,7 @@ type ReadState<T> =
 | 代码 | 运行证据域 | 路由数 | 页面族与核心读形态 | 当前本地来源 | 分级与后台缺口 |
 | --- | --- | ---: | --- | --- | --- |
 | `home` | 首页 | 1 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
-| `project` | 项目 | 3 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表与只读详情已走中央 HTTP 读链；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
+| `project` | 项目 | 3 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
 | `master-data` | 基础主数据 | 9 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | `customers`、`crews`、`workers`、责任/工资/扣罚读模型 | `A+B`；客户受权限限制时使用 forbidden；班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
 | `supplier` | 分供方 | 3 | 分供方主数据、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | `suppliers`、证照/要求/审计表及跨域聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
 | `project-supplier` | 项目分供方 | 2 | 项目×分供方详情、六类事实集合、合作文件与汇总；导入候选只作本地草稿 | `project_suppliers`、合同/请款/发票/支付/结算/文件真实外键 | `A+C`；事实 DTO 可直接后台化，文件名分类与人工确认保留本地工具 adapter；目标页消费 query 由路由矩阵解决，见 [`project-supplier.md`](./pages/project-supplier.md) |
@@ -206,7 +206,7 @@ type ReadState<T> =
 
 | 页面域 | 当前 Pinia / 领域读模型落点 |
 | --- | --- |
-| 首页、项目 | 项目列表与来源感知基础详情：`app/stores/project-list.ts`、`app/lib/project/repository.ts`、`http-repository.ts`、`sqlite-repository.ts`、`server/api/read/projects.get.ts`、`server/api/read/projects/[id].get.ts`；首页、详情尚未接入的页签和写路径仍在 `app/stores/project.ts`、`project-detail.ts`、`phase-task.ts` 与既有 `app/lib/home/`、`app/lib/project/` |
+| 首页、项目 | 项目列表与来源感知基础详情：`app/stores/project-list.ts`、`app/lib/project/repository.ts`、`http-repository.ts`、`sqlite-repository.ts`、`server/api/read/projects.get.ts`、`server/api/read/projects/[id].get.ts`；正式项目表单与写入：`app/stores/project-command.ts`、`app/lib/project/command-contract.ts`、`command-http-repository.ts`、`server/api/read/projects/[id]/form.get.ts`、`server/api/commands/projects[/:id]`。首页与详情尚未接入的页签仍在 `project-detail.ts`、`phase-task.ts` 与既有 `app/lib/home/`、`app/lib/project/` |
 | 客户、班组、工人、分供方 | `app/stores/master-data-read.ts`、`customer-detail.ts`、`crew-detail.ts`、`worker-detail.ts`、`supplier.ts`、`supplier-detail.ts`；对应 `app/lib/customer/`、`worker/`、`supplier/` |
 | 核心/辅助合同、BOQ、甲方/分包单据 | `app/stores/contract.ts`、`contract-detail.ts`、`boq.ts`、`owner-document.ts`；`app/lib/contract/`、`boq/`、`owner-document/` |
 | 项目×分供方 | `app/stores/project-supplier.ts`；`app/lib/project-supplier/workbench.ts` |
@@ -365,14 +365,14 @@ interface NotificationOpenResultDTO {
 - 表单预载将可编辑 draft、只读 lookup 和 sourceVersion 分开；只读名称不回写为外键。
 - 工作台共享同一实体/筛选上下文，分区状态不各自复制。队列项和详情都使用稳定 ID。
 - 上传、识别、核对、归档、确认支付、工资发放等是独立命令；读 DTO 只报告已持久化状态，不以 toast 或本地临时布尔值证明成功。
-- 写命令、幂等键、在线/离线权威与冲突回放由后续“确定当前界面的前后端数据契约与去 Mock 迁移边界”继续裁定。
+- 项目新增/编辑的写命令、幂等键、乐观锁和失败本地草稿已由 [`COMMANDS.md`](./COMMANDS.md) 裁定；其他领域不得从这一实现自动推导通用 outbox 或合并策略。
 
 ## 5. 本地 adapter 与后台迁移规则
 
 1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL 或 SQL。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。
-2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
+2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
 3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。
-4. 不做本地与在线静默双写。在线成为写权威后的离线队列、幂等、冲突和回放属于后续全局决策；在决策前保持单一现有写路径。
+4. 不做本地与在线静默双写。项目在线命令失败时只保留明确的本地草稿，不改正式投影、不自动回放；其他领域在全局决策前保持各自单一现有写路径。
 5. OCR、文件和 Excel adapter 与普通业务 DTO 分离。普通 DTO 只引用受控 file id；二进制上传/下载使用专用能力和短期授权，不保存私有地址。
 6. 后台首批可从 `A` 域读取 operation 开始：项目/主数据、合同、项目分供方、财务台账、工程量/排程。任何含 `B` 字段的页面先返回明确 missing/partial，再另票补 canonical 关系。
 
@@ -382,5 +382,5 @@ interface NotificationOpenResultDTO {
 - `id/no/外部键` 为字符串；金额为两位十进制定点字符串；日期为 ISO；布尔为 JSON boolean；枚举传稳定 code，不传样式类名或中文标签作为唯一身份。
 - 真实 0、未知 null、空集合、缺关系、无权限、加载失败和筛选无结果均可区分。
 - 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
-- 当前无实体数据的页面保持真实空态；项目列表与来源感知基础详情由可重置中央实例证明 HTTP 读链，其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS。
+- 当前无实体数据的页面保持真实空态；项目列表、来源感知基础详情与新增/编辑命令由可重置中央实例证明 HTTP 链，其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS。
 - 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。

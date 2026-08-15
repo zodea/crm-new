@@ -2,8 +2,7 @@
 definePageMeta({ name: 'projectForm' })
 
 const route = useRoute()
-const dataVisibilityStore = useDataVisibilityStore()
-const isDemo = computed(() => route.query.origin === 'demo' || dataVisibilityStore.includeDemo)
+const isDemo = computed(() => route.query.origin === 'demo')
 </script>
 
 <template>

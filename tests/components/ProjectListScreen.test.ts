@@ -2,7 +2,19 @@ import type { ProjectListPageDTO, ProjectListQueryDTO, ProjectListSourceRow } fr
 import type { ReadState } from '~/types/read-model'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, nextTick, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  h,
+  nextTick,
+  onActivated,
+  onDeactivated,
+  onMounted,
+  reactive,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from 'vue'
 import ProjectListScreen from '~/components/project/ProjectListScreen.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { buildProjectListPage } from '~/lib/project/repository'
@@ -105,6 +117,7 @@ function projectPage(query: ProjectListQueryDTO = defaultQuery) {
     query,
     asOf: '2026-08-15T00:00:00.000Z',
     sourceVersion: 'component-test-v1',
+    capabilities: ['project:list:read', 'project:write'],
   })
 }
 
@@ -177,6 +190,7 @@ const KitTableStub = defineComponent({
           `${row.name} ${row.status}`,
           slots.origin?.({ row }),
           slots.developer?.({ row }),
+          slots.action?.({ row }),
         ])),
     ])
   },
@@ -190,7 +204,7 @@ const ProjectListToolbarStub = defineComponent({
     includeDemo: Boolean,
     visible: Number,
   },
-  emits: ['update:search'],
+  emits: ['update:search', 'create'],
   setup(props, { emit }) {
     return () => h('div', [
       h('input', {
@@ -200,6 +214,7 @@ const ProjectListToolbarStub = defineComponent({
         'onInput': (event: Event) =>
           emit('update:search', (event.target as HTMLInputElement).value),
       }),
+      h('button', { type: 'button', onClick: () => emit('create') }, '新增项目'),
       `正式 ${props.realTotal} 个${props.includeDemo ? `，测试 ${props.demoTotal} 个` : ''}，当前 ${props.visible} 个`,
     ])
   },
@@ -245,12 +260,19 @@ let dataVisibilityStore: {
   includeDemo: boolean
   setIncludeDemo: ReturnType<typeof vi.fn>
 }
+let projectCommandStore: {
+  latestWrite: { id: string, version: string } | null
+}
+const navigateTo = vi.fn()
 
 describe('project list screen', () => {
   beforeEach(() => {
     vi.stubGlobal('computed', computed)
-    vi.stubGlobal('navigateTo', vi.fn())
+    navigateTo.mockReset()
+    vi.stubGlobal('navigateTo', navigateTo)
     vi.stubGlobal('nextTick', nextTick)
+    vi.stubGlobal('onActivated', onActivated)
+    vi.stubGlobal('onDeactivated', onDeactivated)
     vi.stubGlobal('onMounted', onMounted)
     vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('useTemplateRef', useTemplateRef)
@@ -271,6 +293,8 @@ describe('project list screen', () => {
       retry: vi.fn(),
     })
     vi.stubGlobal('useProjectListStore', () => projectReadStore)
+    projectCommandStore = reactive({ latestWrite: null })
+    vi.stubGlobal('useProjectCommandStore', () => projectCommandStore)
     dataVisibilityStore = reactive({
       includeDemo: false,
       setIncludeDemo: vi.fn((next: boolean) => {
@@ -308,6 +332,25 @@ describe('project list screen', () => {
 
     expect(within(tree).queryByRole('button', { name: /项目立项/ })).toBeNull()
     expect(within(tree).queryByRole('button', { name: /保修结束/ })).toBeNull()
+  })
+
+  it('从列表新增正式项目，并为正式行提供来源明确的编辑入口', async () => {
+    render(ProjectListScreen, { global })
+
+    await fireEvent.click(screen.getByRole('button', { name: '新增项目' }))
+    expect(navigateTo).toHaveBeenCalledWith('/project/form')
+    expect(screen.getByRole('link', { name: '编辑合和新城项目' }).getAttribute('href'))
+      .toBe('/project/form/project-1?origin=real')
+  })
+
+  it('中央项目写入完成后重新读取列表投影', async () => {
+    render(ProjectListScreen, { global })
+    await waitFor(() => expect(projectReadStore.load).toHaveBeenCalledTimes(1))
+
+    projectCommandStore.latestWrite = { id: 'project-1', version: '2' }
+
+    await waitFor(() => expect(projectReadStore.load).toHaveBeenCalledTimes(2))
+    expect(projectReadStore.load).toHaveBeenLastCalledWith(defaultQuery)
   })
 
   it('只展示本地有事实来源的目标列，阶段筛选会更新紧凑宽表和汇总', async () => {

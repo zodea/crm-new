@@ -72,7 +72,7 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
     const summary = page.getByLabel('项目列表汇总')
     await expect(summary).toContainText(/测试数据.*累计收入\s*—.*收入缺失 10 个/)
     await expect(summary).toContainText(/测试数据.*预算总额\s*—.*预算缺失 10 个/)
-    await expect(page.getByRole('button', { name: '新增项目' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '新增项目' })).toBeEnabled()
     await expect(page.getByRole('button', { name: '导入项目' })).toBeDisabled()
   })
 

@@ -1,6 +1,6 @@
 # 当前技术架构
 
-本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
+本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，中央写入语义看 [`COMMANDS.md`](./COMMANDS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
 
 ## 1. 运行形态
 
@@ -70,7 +70,7 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 ## 4. 数据与状态流
 
 ```text
-项目列表与详情
+项目列表、详情与表单
   AppTopbar / DataVisibilityStore
         │ includeDemo 默认关闭并按工作区偏好持久化
         ▼
@@ -81,6 +81,13 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
                                                     ├─ real：正式来源，默认空且不 seed
                                                     └─ demo：独立夹具，capability 允许时只读叠加
 
+  ProjectForm ──► ProjectCommandStore ──► ProjectCommandRepository
+       │ 本地草稿只保留失败意图                  │
+       └──► HTTP adapter ──► /api/commands/projects[/:id]
+                                  ├─ server session/capability 重验
+                                  ├─ commandId 幂等 + baseVersion 乐观锁
+                                  └─ 成功后失效详情并从中央读模型读回
+
 尚未切换的页面域
   includeDemo=false ──► production 本地快照（未迁移域的过渡投影/写入暂存；不 seed）
   includeDemo=true  ──► demo 本地快照（确定性 seed，驱动只读）
@@ -90,7 +97,7 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
-- 项目列表和来源感知详情当前是中央只读切片；新增、导入、编辑和删除在中央写命令落地前保持禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
+- 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；项目导入与删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
 - `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
 - `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。

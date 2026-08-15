@@ -11,7 +11,9 @@ import type {
   FormFooterAction,
   MasterDataPageDraft,
 } from '~/lib/master-data/page'
+import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import { isTauri } from '@tauri-apps/api/core'
+import { onActivated } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import {
   listFormAttachments,
@@ -30,6 +32,10 @@ import {
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
+import {
+  ProjectCommandConflictError,
+  ProjectLocalDraftOnlyError,
+} from '~/stores/project-command'
 
 const props = withDefaults(defineProps<{
   kind: MasterDataOwnerType
@@ -46,19 +52,20 @@ const customerStore = useCustomerStore()
 const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
+const projectCommandStore = useProjectCommandStore()
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
 
 const meta = computed(() => FORM_META[props.kind])
-const pageFullPath = route.fullPath
-const pageKey = deriveKey(pageFullPath)
-const routeId = (() => {
+const pageFullPath = computed(() => route.fullPath)
+const pageKey = computed(() => deriveKey(pageFullPath.value))
+const routeId = computed(() => {
   const value = route.params.id
   return Array.isArray(value) ? value[0] : value
-})()
-const isEditing = Boolean(routeId)
+})
+const isEditing = computed(() => Boolean(routeId.value))
 const routeSupplierCategory = computed(() => {
   const value = route.query.category
   const category = Array.isArray(value) ? value[0] : value
@@ -71,14 +78,14 @@ const routeSupplierName = computed(() => {
   const name = Array.isArray(value) ? value[0] : value
   return typeof name === 'string' ? name.trim() : ''
 })
-const title = computed(() => `${isEditing ? '编辑' : '新建'} · ${meta.value.label}`)
+const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · ${meta.value.label}`)
 const returnPath = computed(() =>
-  props.returnToDetail && isEditing && meta.value.detailPath
-    ? `${meta.value.detailPath}/${routeId}`
+  props.returnToDetail && isEditing.value && meta.value.detailPath
+    ? `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
     : meta.value.listPath,
 )
 const backLabel = computed(() =>
-  props.returnToDetail && isEditing
+  props.returnToDetail && isEditing.value
     ? `返回${meta.value.label}详情`
     : `返回${meta.value.listLabel}`,
 )
@@ -99,8 +106,11 @@ const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
+const localDraftNotice = shallowRef('')
+const conflictLatest = shallowRef<ProjectFormReadDTO | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
+let lastInitializedTarget = ''
 
 const dirty = computed(() => hydrated.value && (
   JSON.stringify(draft.value) !== savedSnapshot.value
@@ -150,7 +160,7 @@ async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
 
 function createDefaultDraft(): MasterDataPageDraft {
   const defaults = formDefaults(props.kind) as MasterDataPageDraft
-  if (props.kind !== 'supplier' || isEditing)
+  if (props.kind !== 'supplier' || isEditing.value)
     return defaults
 
   return {
@@ -161,6 +171,7 @@ function createDefaultDraft(): MasterDataPageDraft {
 }
 
 async function initialize() {
+  lastInitializedTarget = `${props.kind}:${routeId.value ?? 'new'}`
   hydrated.value = false
   loading.value = true
   loadError.value = ''
@@ -168,18 +179,37 @@ async function initialize() {
   pendingAttachments.value = []
   pendingRemoveIds.value = []
   pendingRestoreIds.value = []
+  localDraftNotice.value = ''
+  conflictLatest.value = null
   let shouldFocus = false
   try {
-    if (!routeId) {
+    if (props.kind === 'project' && !isTauri()) {
+      const central = await projectCommandStore.hydrate(routeId.value ?? null)
+      draft.value = {
+        ...formDefaults(props.kind),
+        ...(central.draft ?? createDefaultDraft()),
+      } as MasterDataPageDraft
+      attachments.value = central.attachments
+      pendingAttachments.value = central.pendingAttachments.map((file, index) => ({
+        ...file,
+        localId: `restored-${index}-${file.fileName}`,
+      }))
+      pendingRemoveIds.value = central.pendingRemoveIds
+      pendingRestoreIds.value = central.pendingRestoreIds
+      if (central.restoredLocalDraft) {
+        localDraftNotice.value = '已恢复上次仅保留在本地的草稿；它尚未写入正式项目。'
+      }
+    }
+    else if (!routeId.value) {
       draft.value = createDefaultDraft()
       attachments.value = []
     }
     else {
       const [record, files] = await Promise.all([
-        loadRecord(routeId),
+        loadRecord(routeId.value),
         usesSupplierCredentialFlow.value
           ? Promise.resolve([])
-          : listFormAttachments(props.kind, routeId, true),
+          : listFormAttachments(props.kind, routeId.value, true),
       ])
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
@@ -289,7 +319,9 @@ async function saveThroughStore(action: MasterDataSaveAction) {
     case 'worker':
       return workerStore.save(draft.value, action, attachmentChanges())
     case 'project':
-      return projectStore.saveForm(draft.value, action, attachmentChanges())
+      return isTauri()
+        ? projectStore.saveForm(draft.value, action, attachmentChanges())
+        : projectCommandStore.saveForm(draft.value, action, attachmentChanges())
     case 'target_cost':
       return targetCostStore.save(draft.value, action, attachmentChanges())
   }
@@ -322,6 +354,8 @@ async function handleFooterAction(action: FormFooterAction) {
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
+      if (props.kind === 'project' && !isTauri())
+        projectCommandStore.startNewProject()
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -330,7 +364,7 @@ async function handleFooterAction(action: FormFooterAction) {
         allowLeave = false
       }
       else {
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
         await navigateTo(meta.value.newPath)
       }
       return
@@ -341,34 +375,75 @@ async function handleFooterAction(action: FormFooterAction) {
       const detailSuffix = meta.value.postSaveDetailTab
         ? `?tab=${encodeURIComponent(meta.value.postSaveDetailTab)}`
         : ''
+      const originSuffix = props.kind === 'project'
+        ? `${detailSuffix ? '&' : '?'}origin=real`
+        : ''
       const closePath = (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
-        ? `${meta.value.detailPath}/${routeId ?? result.id}${detailSuffix}`
+        ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
         : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
         await navigateTo(closePath)
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
       }
       else {
-        tabsStore.close(pageKey)
+        tabsStore.close(pageKey.value)
         await navigateTo(closePath)
       }
       return
     }
 
-    if (!isEditing) {
+    if (!isEditing.value) {
       allowLeave = true
-      tabsStore.close(pageKey)
+      tabsStore.close(pageKey.value)
       await navigateTo(`${meta.value.newPath}/${result.id}`)
       return
     }
     await initialize()
   }
   catch (cause) {
-    error(`保存失败：${toErrorMessage(cause)}`)
+    if (cause instanceof ProjectCommandConflictError) {
+      conflictLatest.value = cause.latest
+      localDraftNotice.value = '当前内容仍只保留在本地，未覆盖服务器最新版本。'
+      warning(cause.message)
+    }
+    else if (cause instanceof ProjectLocalDraftOnlyError) {
+      localDraftNotice.value = cause.message
+      error(cause.message)
+    }
+    else {
+      error(`保存失败：${toErrorMessage(cause)}`)
+    }
   }
   finally {
     loadingAction.value = null
   }
+}
+
+function keepLocalAgainstLatest() {
+  if (!conflictLatest.value)
+    return
+  projectCommandStore.rebase(conflictLatest.value.version)
+  conflictLatest.value = null
+  localDraftNotice.value = '已保留你的内容并基于服务器最新版本；请再次保存以提交。'
+}
+
+async function useLatestServerVersion() {
+  const latest = conflictLatest.value
+  if (!latest)
+    return
+  projectCommandStore.acceptLatest(latest)
+  draft.value = {
+    ...formDefaults(props.kind),
+    ...latest.draft,
+  } as MasterDataPageDraft
+  attachments.value = latest.attachments
+  pendingAttachments.value = []
+  pendingRemoveIds.value = []
+  pendingRestoreIds.value = []
+  conflictLatest.value = null
+  localDraftNotice.value = ''
+  await nextTick()
+  savedSnapshot.value = JSON.stringify(draft.value)
 }
 
 function appendPendingAttachments(files: FormAttachmentDraft[]) {
@@ -454,14 +529,14 @@ async function leaveForm() {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
-      message: `当前表单还有未保存内容，确认放弃并${isEditing && props.returnToDetail ? '返回详情' : '返回列表'}？`,
+      message: `当前表单还有未保存内容，确认放弃并${isEditing.value && props.returnToDetail ? '返回详情' : '返回列表'}？`,
       confirmLabel: '放弃修改',
     })
     if (!leave)
       return
   }
   allowLeave = true
-  tabsStore.close(pageKey)
+  tabsStore.close(pageKey.value)
   await navigateTo(returnPath.value)
 }
 
@@ -470,7 +545,7 @@ onBeforeRouteLeave(async () => {
     return true
 
   // 普通页签切换保留 KeepAlive 草稿；只有当前表单页签已被关闭时才拦截。
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
+  if (tabsStore.tabs.some(tab => tab.key === pageKey.value))
     return true
 
   const leave = await confirm({
@@ -480,7 +555,7 @@ onBeforeRouteLeave(async () => {
     confirmLabel: '放弃修改',
   })
   if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
+    tabsStore.open({ fullPath: pageFullPath.value, title: title.value })
   return leave
 })
 
@@ -489,8 +564,14 @@ onMounted(() => {
   void initialize()
 })
 
+onActivated(() => {
+  const target = `${props.kind}:${routeId.value ?? 'new'}`
+  if (lastInitializedTarget && target !== lastInitializedTarget)
+    void initialize()
+})
+
 watch(routeSupplierCategory, () => {
-  if (props.kind === 'supplier' && !isEditing)
+  if (props.kind === 'supplier' && !isEditing.value)
     void initialize()
 })
 </script>
@@ -515,6 +596,38 @@ watch(routeSupplierCategory, () => {
         </span>
       </template>
     </template>
+
+    <section
+      v-if="localDraftNotice"
+      data-ui="project-local-draft-notice"
+      class="border border-warn/35 bg-warn/8 px-3 py-2 text-12px leading-5 text-ink-soft"
+      role="status"
+    >
+      <b class="text-warn">本地草稿</b>
+      · {{ localDraftNotice }}
+    </section>
+
+    <section
+      v-if="conflictLatest"
+      data-ui="project-version-conflict"
+      class="border border-danger/30 bg-danger/6 p-3"
+      role="alert"
+    >
+      <h2 class="text-13px font-800 text-danger">
+        项目已被其他操作更新
+      </h2>
+      <p class="mt-1 text-12px leading-5 text-ink-soft">
+        服务器最新版本为 {{ conflictLatest.version }}。请选择保留当前内容后重试，或改用服务器版本。
+      </p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <button type="button" class="btn-primary" @click="keepLocalAgainstLatest">
+          保留我的内容
+        </button>
+        <button type="button" class="btn-secondary" @click="useLatestServerVersion">
+          改用服务器最新版
+        </button>
+      </div>
+    </section>
 
     <form
       ref="formElement"

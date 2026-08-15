@@ -168,10 +168,10 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
         exact: true,
       })
       await createProject.scrollIntoViewIfNeeded()
-      await expect(createProject).toBeDisabled()
+      await expect(createProject).toBeEnabled()
       await expect(createProject).toHaveAttribute(
         'title',
-        '项目写入尚未接入中央后台',
+        '新增正式项目',
       )
       await expectInViewport(createProject, `${viewport.label} 新增项目操作`)
 
@@ -180,12 +180,13 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
       await expect(detail).toBeVisible()
       await expectNoPageOverflow(page, `${viewport.label} 项目详情`)
 
-      const editProject = page.getByRole('link', {
+      await expect(page.getByRole('link', {
         name: '编辑项目',
         exact: true,
-      })
-      await tabUntilFocused(page, editProject)
-      await expectInViewport(editProject, `${viewport.label} 编辑项目操作`)
+      })).toHaveCount(0)
+      const closeDetail = page.getByRole('link', { name: '关闭项目详情' })
+      await tabUntilFocused(page, closeDetail)
+      await expectInViewport(closeDetail, `${viewport.label} 关闭项目详情操作`)
 
       await page.getByRole('tab', {
         name: '支出合同管理',

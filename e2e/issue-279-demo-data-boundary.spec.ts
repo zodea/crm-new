@@ -100,7 +100,7 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     const remove = page.getByRole('button', { name: '删除项目' }).first()
     await expect(edit).toBeDisabled()
     await expect(remove).toBeDisabled()
-    await expect(edit).toHaveAttribute('title', '测试数据只能在演示工作区修改')
+    await expect(edit).toHaveAttribute('title', '测试数据不能从正式入口修改')
 
     await page.goto('/project/proj_demo_001')
     await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
@@ -109,6 +109,10 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
 
     await page.goto('/project/form/proj_demo_001')
+    await expect(page.getByText('项目表单载入失败')).toBeVisible()
+    await expect(page.getByText('正式项目不存在')).toBeVisible()
+
+    await page.goto('/project/form/proj_demo_001?origin=demo')
     await expect(page.getByRole('status', { name: '测试数据不能从正式入口修改' })).toBeVisible()
     await expect(page.getByText('保存并查看')).toHaveCount(0)
   })

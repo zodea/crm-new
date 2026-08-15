@@ -3,7 +3,7 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
-import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 
@@ -17,11 +17,13 @@ const props = withDefaults(defineProps<{
 })
 
 const repository = useNuxtApp().$repositories.projectList
+const commandStore = useProjectCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
 const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
 let latestLoad = 0
+let hasActivated = false
 
 const item = computed(() => detail.value?.item ?? null)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
@@ -128,6 +130,20 @@ watch(
   () => void loadProject(),
   { immediate: true },
 )
+
+watch(
+  () => commandStore.latestWrite,
+  (write) => {
+    if (write?.id === props.projectId)
+      void loadProject()
+  },
+)
+
+onActivated(() => {
+  if (hasActivated)
+    void loadProject()
+  hasActivated = true
+})
 </script>
 
 <template>
@@ -159,6 +175,14 @@ watch(
         </div>
         <NuxtLink to="/project" class="btn-ghost ml-auto" aria-label="关闭项目详情">
           <span class="i-lucide-x mr-1" aria-hidden="true" />关闭
+        </NuxtLink>
+        <NuxtLink
+          v-if="!isDemo && detail?.capabilities.includes('project:write')"
+          :to="`/project/form/${encodeURIComponent(projectId)}?origin=real`"
+          class="btn-primary"
+          aria-label="编辑项目"
+        >
+          <span class="i-lucide-square-pen mr-1" aria-hidden="true" />编辑
         </NuxtLink>
       </div>
 

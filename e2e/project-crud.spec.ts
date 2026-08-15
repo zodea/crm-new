@@ -1,29 +1,21 @@
 import { expect, test } from '@playwright/test'
 
-// #288 将项目列表切换为中央后台权威读链。写命令尚未迁移前，列表必须明确
-// 保持只读，不能让旧的本地 SQLite CRUD 看起来像已写入中央后台。
+// #293 将正式项目新增/编辑切换为中央命令；导入与删除仍不在当前范围。
 
-test('项目列表：中央读链期间明确禁用新增、导入、编辑与删除', async ({ page }) => {
+test('项目列表：中央新增可用，未迁移的导入仍禁用', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
 
   await page.goto('/project')
-  await expect(page.getByRole('link', { name: '合和新城', exact: true }).first())
-    .toBeVisible({ timeout: 15_000 })
+  const create = page.getByRole('button', { name: '新增项目', exact: true }).first()
+  await expect(create).toBeVisible({ timeout: 15_000 })
 
-  const reason = '项目写入尚未接入中央后台'
-  await expect(page.getByRole('button', { name: '新增项目', exact: true }))
-    .toBeDisabled()
-  await expect(page.getByRole('button', { name: '新增项目', exact: true }))
-    .toHaveAttribute('title', reason)
+  await expect(create).toBeEnabled()
+  await expect(create).toHaveAttribute('title', '新增正式项目')
   await expect(page.getByRole('button', { name: '导入项目', exact: true }))
     .toBeDisabled()
   await expect(page.getByRole('button', { name: '导入项目', exact: true }))
-    .toHaveAttribute('title', reason)
-  await expect(page.getByRole('button', { name: '编辑项目', exact: true }).first())
-    .toBeDisabled()
-  await expect(page.getByRole('button', { name: '删除项目', exact: true }).first())
-    .toBeDisabled()
+    .toHaveAttribute('title', '项目导入尚未接入中央后台')
 
-  expect(pageErrors, '中央只读项目列表不应产生客户端运行错误').toEqual([])
+  expect(pageErrors, '中央项目列表不应产生客户端运行错误').toEqual([])
 })
