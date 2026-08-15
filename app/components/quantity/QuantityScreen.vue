@@ -149,6 +149,21 @@ watch(projectId, async (next, previous) => {
   await loadSelectedProject(true)
 })
 
+watch(
+  [projectId, buildingId, month, viewMode, trade, assigneeKey],
+  () => {
+    if (!initialized.value || scheduleContext.value)
+      return
+    void router.replace({
+      query: {
+        ...route.query,
+        ...quantityFilterQuery(),
+      },
+    })
+  },
+  { flush: 'post' },
+)
+
 async function retry() {
   if (!store.catalog.length)
     await initialize()
