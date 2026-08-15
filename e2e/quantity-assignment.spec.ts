@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+
 async function openCellConfigure(
   page: import('@playwright/test').Page,
   index: number,
@@ -12,6 +14,12 @@ async function openCellConfigure(
 }
 
 test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem(storageKey, 'true')
+    }, DATA_VISIBILITY_STORAGE_KEY)
+  })
+
   test('冲突取消保留选择，确认替换只更新当前责任并保留完成时责任', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
@@ -86,6 +94,25 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     await editor.getByRole('button', { name: '取消', exact: true }).click()
     await expect(editor).toBeHidden()
     expect(pageErrors).toEqual([])
+  })
+
+  test('责任编辑器 Esc 关闭后焦点回到触发按钮并解除背景滚动锁', async ({ page }) => {
+    await page.goto('/subcontract/quantity')
+    await page.waitForLoadState('networkidle')
+
+    const trigger = page.getByRole('button', { name: '责任配置', exact: true })
+    await trigger.click()
+    const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
+    await expect(editor).toBeVisible()
+    // 浮层打开期间锁住背景滚动是既有契约的一部分。
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
+
+    await page.keyboard.press('Escape')
+    await expect(editor).toBeHidden()
+    await expect(trigger).toBeFocused()
+    // 关闭后必须解锁：残留 overflow/pointer-events 会让整页失去滚动与点击。
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden')
+    await expect(page.locator('body')).not.toHaveCSS('pointer-events', 'none')
   })
 
   test('390px 责任编辑器不撑宽页面，楼层批选可用键盘操作', async ({ page }) => {

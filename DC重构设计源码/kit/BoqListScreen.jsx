@@ -1,24 +1,170 @@
 // BoqListScreen — 工程量清单管理页（分包及人工 · #38 · 反馈轮 7 新建）
 // 承接拆表结果：分部→工种→分项目录（左）+ 统一清单行含三量（右，合同量/暂估量/现场量）。
-// 合同量/合同单价的唯一来源；变更单 / 月度报量为后续深化入口。术语见 CONTEXT.md（三量/合同工程量清单）。
+// 合同量/合同单价的唯一来源；变更单与月度报量从本页进入各自工作台。术语见 CONTEXT.md（三量/合同工程量清单）。
 (function () {
   const { Button, StatusChip, Panel, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {}, confirm: (o) => o.onConfirm && o.onConfirm(), formModal: () => {}, modal: () => {}, undoToast: () => {} };
   const money = (v) => "¥" + Number(v || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2 });
   const num = (v) => Number(v || 0).toLocaleString("zh-CN");
+  const quantityValue = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const hasQuantity = (value) => quantityValue(value) !== null;
+  const quantityText = (value) => hasQuantity(value) ? num(value) : "缺失";
 
   // 清单行（三量：合同量/暂估量/现场量；现场量存算式）
   const ROWS = [
     { div: "楼地面工程", trade: "泥水", item: "客餐厅地砖铺贴 800×800", room: "客餐厅", unit: "㎡", con: 1564.8, est: 1564.8, site: 1520.4, siteExpr: "32.6×46+…", price: 78 },
-    { div: "楼地面工程", trade: "泥水", item: "阳台地砖铺贴 300×600", room: "阳台", unit: "㎡", con: 307.2, est: 307.2, site: 0, siteExpr: "", price: 72 },
+    { div: "楼地面工程", trade: "泥水", item: "阳台地砖铺贴 300×600", room: "阳台", unit: "㎡", con: 307.2, est: 307.2, site: null, siteExpr: "", price: 72 },
     { div: "楼地面工程", trade: "泥水", item: "卫生间地砖防滑 300×300", room: "主卫/次卫", unit: "㎡", con: 470.4, est: 470.4, site: 458.2, siteExpr: "9.8×46+…", price: 85 },
-    { div: "楼地面工程", trade: "自流平", item: "卧室自流平找平", room: "卧室", unit: "㎡", con: 2044.8, est: 2044.8, site: 0, siteExpr: "", price: 32 },
+    { div: "楼地面工程", trade: "自流平", item: "卧室自流平找平", room: "卧室", unit: "㎡", con: 2044.8, est: 2044.8, site: null, siteExpr: "", price: 32 },
     { div: "墙柱面工程", trade: "泥水", item: "厨房墙砖 300×600", room: "厨房", unit: "㎡", con: 1032, est: 1032, site: 1008, siteExpr: "21.5×46+…", price: 68 },
     { div: "墙柱面工程", trade: "泥水", item: "卫生间墙砖 300×600", room: "主卫/次卫", unit: "㎡", con: 1641.6, est: 1641.6, site: 1620, siteExpr: "34.2×46+…", price: 68 },
-    { div: "墙柱面工程", trade: "油漆", item: "墙面乳胶漆两遍", room: "客餐厅/卧室", unit: "㎡", con: 6163.2, est: 6163.2, site: 0, siteExpr: "", price: 26 },
-    { div: "墙柱面工程", trade: "油漆", item: "顶棚乳胶漆两遍", room: "全屋", unit: "㎡", con: 3787.2, est: 3787.2, site: 0, siteExpr: "", price: 28 },
+    { div: "墙柱面工程", trade: "油漆", item: "墙面乳胶漆两遍", room: "客餐厅/卧室", unit: "㎡", con: 6163.2, est: 6163.2, site: null, siteExpr: "", price: 26 },
+    { div: "墙柱面工程", trade: "油漆", item: "顶棚乳胶漆两遍", room: "全屋", unit: "㎡", con: 3787.2, est: 3787.2, site: null, siteExpr: "", price: 28 },
     { div: "装饰工程", trade: "石材", item: "窗台石 大理石", room: "各窗台", unit: "m", con: 393.6, est: 393.6, site: 393.6, siteExpr: "8.2×48", price: 220 },
   ];
+
+  const basisName = (key) => ({ con: "合同量", est: "暂估量", site: "现场量" }[key] || "合同量");
+  const statementRows = (rows, basis) => rows.map((r) => {
+    const autoQty = quantityValue(r[basis]);
+    return { id: r.id, item: r.item, room: r.room, unit: r.unit, price: r.price, con: r.con, est: r.est, site: r.site, autoQty, effectiveQty: autoQty, note: "" };
+  });
+
+  function MonthlyReportView({ contract, project, list, base, navigate, onBack }) {
+    const [month, setMonth] = React.useState("2026-07");
+    const [statements, setStatements] = React.useState(() => [{
+      id: "mr-2026-06", month: "2026-06", basis: "est", status: "已导出", rows: statementRows(list, "est"), createdAt: "2026-06-28",
+    }]);
+    const [activeId, setActiveId] = React.useState("mr-2026-06");
+    const active = statements.find((s) => s.id === activeId) || null;
+    const activeRows = active ? active.rows : [];
+    const autoTotal = activeRows.reduce((sum, r) => sum + (hasQuantity(r.autoQty) ? r.autoQty * r.price : 0), 0);
+    const effectiveTotal = activeRows.reduce((sum, r) => sum + (hasQuantity(r.effectiveQty) ? r.effectiveQty * r.price : 0), 0);
+    const missingRows = activeRows.filter((r) => !hasQuantity(r.autoQty));
+
+    const generate = () => {
+      const exists = statements.find((s) => s.month === month && s.status !== "已导出");
+      if (exists) { setActiveId(exists.id); UI().toast("已打开本月草稿"); return; }
+      const rows = statementRows(list, base);
+      const missing = rows.filter((r) => !hasQuantity(r.autoQty));
+      if (missing.length) { UI().toast(basisName(base) + "缺失：" + missing[0].item + (missing.length > 1 ? " 等 " + missing.length + " 项" : ""), "danger"); return; }
+      const id = "mr-" + month + "-" + Date.now();
+      setStatements((all) => [{ id, month, basis: base, status: "草稿", rows, createdAt: new Date().toISOString().slice(0, 10) }, ...all]);
+      setActiveId(id);
+      UI().toast("已生成月度报量草稿", "ok");
+    };
+
+    const updateBasis = (next) => {
+      if (!active || active.status === "已导出") return;
+      const nextRows = active.rows.map((r) => { const autoQty = quantityValue(r[next]); return { ...r, autoQty, effectiveQty: autoQty, note: "" }; });
+      const missing = nextRows.filter((r) => !hasQuantity(r.autoQty));
+      if (missing.length) { UI().toast(basisName(next) + "缺失：" + missing[0].item + (missing.length > 1 ? " 等 " + missing.length + " 项" : ""), "danger"); return; }
+      setStatements((all) => all.map((s) => s.id === active.id ? { ...s, basis: next, status: "草稿", rows: nextRows } : s));
+    };
+
+    const adjustRow = (row) => UI().formModal({
+      title: "调整本期报量",
+      cols: 1,
+      fields: [
+        { key: "qty", label: "本期报量", value: row.effectiveQty == null ? "" : String(row.effectiveQty), full: true },
+        { key: "note", label: "调整说明", type: "textarea", value: row.note || "", full: true },
+      ],
+      onSave: (v) => {
+        const qty = Number(v.qty);
+        if (!Number.isFinite(qty) || qty < 0) { UI().toast("请输入有效的报量", "danger"); return; }
+        setStatements((all) => all.map((s) => s.id === active.id ? { ...s, status: "已调整", rows: s.rows.map((r) => r.id === row.id ? { ...r, effectiveQty: qty, note: v.note || "" } : r) } : s));
+        UI().toast("已保存本期报量", "ok");
+      },
+    });
+
+    const exportStatement = () => {
+      if (!active) return;
+      if (missingRows.length) { UI().toast(basisName(active.basis) + "存在缺量，不能导出", "danger"); return; }
+      setStatements((all) => all.map((s) => s.id === active.id ? { ...s, status: "已导出" } : s));
+      UI().toast("已导出月度报量", "ok");
+    };
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <Panel padding={14} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <Button icon="arrow-left" onClick={onBack}>返回清单</Button>
+          <div style={{ minWidth: 180 }}>
+            <div style={{ fontSize: 17, fontWeight: 800 }}>月度报量</div>
+            <div style={{ marginTop: 2, fontSize: 12, color: "var(--ink-soft)" }}>{contract} · {project}</div>
+          </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="报量月份"
+              style={{ height: 34, padding: "0 9px", border: "1px solid var(--line-strong)", borderRadius: 7, color: "var(--ink)", background: "#fff" }} />
+            <Button variant="primary" icon="plus" onClick={generate}>生成草稿</Button>
+          </div>
+        </Panel>
+
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 25fr) minmax(0, 75fr)", gap: 16, alignItems: "start" }}>
+          <Panel padding={0} style={{ overflow: "hidden" }}>
+            <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--line)", fontSize: 13, fontWeight: 800 }}>报量单</div>
+            {statements.map((s) => (
+              <button key={s.id} type="button" onClick={() => setActiveId(s.id)} style={{ display: "block", width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid var(--line)", padding: "12px 14px", background: activeId === s.id ? "var(--brand-soft)" : "transparent", cursor: "pointer" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <b style={{ fontSize: 13 }}>{s.month}</b>
+                  <StatusChip tone={s.status === "已导出" ? "ok" : s.status === "已调整" ? "warn" : "brand"}>{s.status}</StatusChip>
+                </div>
+                <div style={{ marginTop: 5, fontSize: 11, color: "var(--ink-soft)" }}>{basisName(s.basis)} · {s.rows.length} 项</div>
+              </button>
+            ))}
+          </Panel>
+
+          <Panel padding={0} style={{ overflow: "hidden" }}>
+            {!active ? (
+              <div style={{ padding: 48, textAlign: "center", color: "var(--ink-soft)" }}>
+                <Icon name="file-output" size={28} color="var(--ink-faint)" />
+                <div style={{ marginTop: 10, fontWeight: 700, color: "var(--ink)" }}>请选择报量单</div>
+              </div>
+            ) : (
+              <>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>{active.month} 报量</div>
+                  <StatusChip tone={active.status === "已导出" ? "ok" : active.status === "已调整" ? "warn" : "brand"}>{active.status}</StatusChip>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <Button icon="external-link" onClick={() => navigate("ownerReport", { project, month: active.month, statementId: active.id })}>打开甲方报量</Button>
+                    <Button icon="download" onClick={exportStatement} disabled={active.status === "已导出"}>导出本月</Button>
+                  </div>
+                </div>
+                <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", borderBottom: "1px solid var(--line)", background: "var(--surface-2)" }}>
+                  <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>取数基准</span>
+                  <select value={active.basis} disabled={active.status === "已导出"} onChange={(e) => updateBasis(e.target.value)} style={{ height: 32, border: "1px solid var(--line-strong)", borderRadius: 7, padding: "0 8px", background: "#fff", fontSize: 12.5 }}>
+                    {["con", "est", "site"].map((k) => <option key={k} value={k}>{basisName(k)}</option>)}
+                  </select>
+                  <span style={{ marginLeft: "auto", fontSize: 12, color: missingRows.length ? "var(--danger-ink)" : "var(--ink-soft)" }}>自动 {money(autoTotal)} · 本期 {money(effectiveTotal)}{missingRows.length ? " · 缺量 " + missingRows.length + " 项" : ""}</span>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", minWidth: 780, borderCollapse: "collapse" }}>
+                    <thead><tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--line)" }}>
+                      {["分项名称", "单位", "自动取数", "本期报量", "单价", "本期金额", "调整说明", "操作"].map((h) => <th key={h} style={{ padding: "10px 12px", textAlign: h === "分项名称" || h === "调整说明" ? "left" : "right", fontSize: 12, color: "var(--ink-soft)", whiteSpace: "nowrap" }}>{h}</th>)}
+                    </tr></thead>
+                    <tbody>{activeRows.map((r) => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid var(--line)" }}>
+                        <td style={{ padding: "10px 12px", fontSize: 12.5, fontWeight: 600 }}>{r.item}<div style={{ marginTop: 2, fontSize: 11, color: "var(--ink-faint)" }}>{r.room}</div></td>
+                        <td style={{ padding: "10px 12px", fontSize: 12, textAlign: "right" }}>{r.unit}</td>
+                        <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: 12, textAlign: "right", color: hasQuantity(r.autoQty) ? "var(--ink-soft)" : "var(--danger-ink)" }}>{quantityText(r.autoQty)}</td>
+                        <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 800, textAlign: "right", color: hasQuantity(r.effectiveQty) ? "var(--ink)" : "var(--danger-ink)" }}>{quantityText(r.effectiveQty)}</td>
+                        <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: 12, textAlign: "right" }}>{money(r.price)}</td>
+                        <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, textAlign: "right" }}>{hasQuantity(r.effectiveQty) ? money(r.effectiveQty * r.price) : "—"}</td>
+                        <td style={{ padding: "10px 12px", maxWidth: 150, fontSize: 11.5, color: r.note ? "var(--warn-ink)" : "var(--ink-faint)", textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.note || "—"}</td>
+                        <td style={{ padding: "10px 12px", textAlign: "right" }}><Button size="sm" icon="square-pen" onClick={() => adjustRow(r)} disabled={active.status === "已导出"}>调整</Button></td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </Panel>
+        </div>
+      </div>
+    );
+  }
 
   function BoqListScreen({ navigate, params }) {
     const p = params || {};
@@ -29,6 +175,7 @@
     // 反馈轮8（七）：清单行转 state + 编辑模式（行内改单价/暂估量/现场量算式、新增分项、软删除）
     const [list, setList] = React.useState(() => ROWS.map((r, i) => ({ ...r, id: "bq" + i })));
     const [editing, setEditing] = React.useState(false);
+    const [monthlyOpen, setMonthlyOpen] = React.useState(false);
     const updRow = (id, patch) => setList((l) => l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
     const delRow = (r) => UI().confirm({
       title: "删除清单行", danger: true, confirmText: "删除",
@@ -50,7 +197,7 @@
       ],
       onSave: (v) => {
         if (!v.item) { UI().toast("分项名称不能为空", "danger"); return; }
-        setList((l) => [...l, { id: "bq_" + Date.now(), div: v.div, trade: v.trade, item: v.item, room: v.room || "—", unit: v.unit || "㎡", con: Number(v.con) || 0, est: Number(v.con) || 0, site: 0, siteExpr: "", price: Number(v.price) || 0, changed: true }]);
+        setList((l) => [...l, { id: "bq_" + Date.now(), div: v.div, trade: v.trade, item: v.item, room: v.room || "—", unit: v.unit || "㎡", con: quantityValue(v.con), est: null, site: null, siteExpr: "", price: Number(v.price) || 0, changed: true }]);
         UI().toast("已新增分项（标记为变更新增，待甲方确认）", "ok");
       },
     });
@@ -71,10 +218,15 @@
     list.forEach((r) => { let d = divs.find((x) => x.name === r.div); if (!d) { d = { name: r.div, trades: [] }; divs.push(d); } if (d.trades.indexOf(r.trade) < 0) d.trades.push(r.trade); });
     const match = (r) => sel === "__all" ? true : sel.indexOf("|") > -1 ? (r.div + "|" + r.trade) === sel : r.div === sel;
     const rows = list.filter(match);
-    const conTotal = rows.reduce((s, r) => s + r.con * r.price, 0);
+    const conTotal = rows.reduce((s, r) => s + (hasQuantity(r.con) ? r.con * r.price : 0), 0);
     const baseQty = (r) => r[base];
-    const baseTotal = rows.reduce((s, r) => s + baseQty(r) * r.price, 0);
-    const diffAmt = baseTotal - conTotal;
+    const comparableRows = rows.filter((r) => hasQuantity(r.con) && hasQuantity(baseQty(r)));
+    const baseTotal = comparableRows.reduce((s, r) => s + baseQty(r) * r.price, 0);
+    const comparableContractTotal = comparableRows.reduce((s, r) => s + r.con * r.price, 0);
+    const diffAmt = baseTotal - comparableContractTotal;
+    const missingCount = rows.length - comparableRows.length;
+
+    if (monthlyOpen) return <MonthlyReportView contract={contract} project={project} list={list} base={base} navigate={navigate} onBack={() => setMonthlyOpen(false)} />;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -83,11 +235,11 @@
           <span style={{ width: 40, height: 40, borderRadius: 10, background: "var(--brand-soft)", display: "grid", placeItems: "center", flex: "none" }}><Icon name="clipboard-list" size={20} color="var(--brand)" /></span>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>{contract}</div>
-            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>合同工程量清单 · 归属「{project}」· 合同量与合同单价唯一来源</div>
+            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>{project}</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button icon="git-compare" onClick={changeLog}>变更单</Button>
-            <Button icon="file-output" onClick={() => UI().toast("月度报量草稿（后续深化）")}>月度报量</Button>
+            <Button icon="file-output" onClick={() => setMonthlyOpen(true)}>月度报量</Button>
             <Button icon="upload" onClick={() => navigate("boqImport", { contract, project })}>重新拆表</Button>
             {editing && <Button icon="plus" onClick={addRow}>新增分项</Button>}
             <Button variant={editing ? "primary" : undefined} icon={editing ? "check" : "square-pen"} onClick={() => { setEditing(!editing); if (editing) UI().toast("已保存清单修改", "ok"); }}>{editing ? "完成编辑" : "编辑清单"}</Button>
@@ -104,8 +256,9 @@
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 20, flexWrap: "wrap", fontSize: 13 }}>
             <span style={{ color: "var(--ink-soft)" }}>合同量合价 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{money(conTotal)}</b></span>
-            <span style={{ color: "var(--ink-soft)" }}>基准量合价 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{money(baseTotal)}</b></span>
-            <span style={{ color: "var(--ink-soft)" }}>量差金额 <b style={{ color: diffAmt < 0 ? "var(--danger-ink)" : diffAmt > 0 ? "var(--ok-ink)" : "var(--ink)", fontFamily: "var(--font-mono)" }}>{diffAmt === 0 ? "¥0.00" : (diffAmt > 0 ? "+" : "") + money(diffAmt).slice(1)}</b></span>
+            <span style={{ color: "var(--ink-soft)" }}>可计算基准量合价 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{money(baseTotal)}</b></span>
+            <span style={{ color: "var(--ink-soft)" }}>可计算量差 <b style={{ color: diffAmt < 0 ? "var(--danger-ink)" : diffAmt > 0 ? "var(--ok-ink)" : "var(--ink)", fontFamily: "var(--font-mono)" }}>{diffAmt === 0 ? "¥0.00" : (diffAmt > 0 ? "+" : "") + money(diffAmt).slice(1)}</b></span>
+            {missingCount > 0 && <span style={{ color: "var(--danger-ink)" }}>缺值行 <b style={{ fontFamily: "var(--font-mono)" }}>{missingCount}</b></span>}
           </div>
         </Panel>
 
@@ -145,21 +298,22 @@
                         <td style={{ padding: "10px 14px", fontSize: 13 }}><div style={{ fontWeight: 600 }}>{r.item}{r.changed && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--warn-ink)", background: "#fff", border: "1px solid var(--warn)", borderRadius: 999, padding: "1px 6px" }}>变更新增</span>}</div><div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 2 }}>{r.div} · {r.trade}</div></td>
                         <td style={{ padding: "10px 14px", fontSize: 12.5, color: "var(--ink-soft)" }}>{r.room}</td>
                         <td style={{ padding: "10px 14px", fontSize: 12.5 }}>{r.unit}</td>
-                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "con" ? 700 : 400 }} title="合同量以清单/变更单为准，不在此直改">{num(r.con)}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "con" ? 700 : 400 }} title="合同量以清单/变更单为准，不在此直改">{quantityText(r.con)}</td>
                         <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", color: "var(--ink-soft)", fontWeight: base === "est" ? 700 : 400 }}>
-                          {editing ? edInp(r.est, (v) => updRow(r.id, { est: Number(v) || 0 })) : num(r.est)}
+                          {editing ? edInp(r.est == null ? "" : r.est, (v) => updRow(r.id, { est: quantityValue(v) })) : quantityText(r.est)}
                         </td>
                         <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: base === "site" ? 700 : 400 }} title={r.siteExpr}>
                           {editing ? edInp(r.siteExpr || "", (v) => {
                             // 现场量存算式本身：即时求值（仅 + - × × / 数字），失败保持原值
-                            let val = 0; try { val = Function('"use strict";return (' + v.replace(/×/g, "*").replace(/[^\d+\-*/.() ]/g, "") + ")")() || 0; } catch (e) { val = r.site; }
-                            updRow(r.id, { siteExpr: v, site: Math.round(val * 10) / 10 });
-                          }, 120, "算式 如 5.2×2.4+…") : (r.site ? num(r.site) : <span style={{ color: "var(--ink-faint)" }}>未录</span>)}
+                            if (!v.trim()) { updRow(r.id, { siteExpr: "", site: null }); return; }
+                            let val = r.site; try { const parsed = Function('"use strict";return (' + v.replace(/×/g, "*").replace(/[^\d+\-*/.() ]/g, "") + ")")(); if (Number.isFinite(parsed)) val = parsed; } catch (e) { /* 保留上次有效结果 */ }
+                            updRow(r.id, { siteExpr: v, site: hasQuantity(val) ? Math.round(val * 10) / 10 : null });
+                          }, 120, "算式 如 5.2×2.4+…") : (hasQuantity(r.site) ? num(r.site) : <span style={{ color: "var(--danger-ink)" }}>缺失</span>)}
                         </td>
                         <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right" }}>
                           {editing ? edInp(r.price, (v) => updRow(r.id, { price: Number(v) || 0 })) : money(r.price)}
                         </td>
-                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700 }}>{money(baseQty(r) * r.price)}</td>
+                        <td style={{ padding: "10px 14px", fontSize: 12.5, fontFamily: "var(--font-mono)", textAlign: "right", fontWeight: 700 }}>{hasQuantity(baseQty(r)) ? money(baseQty(r) * r.price) : <span style={{ color: "var(--danger-ink)" }}>缺失</span>}</td>
                         {editing && <td style={{ padding: "10px 14px", textAlign: "right" }}>
                           <button onClick={() => delRow(r)} title="删除（软删除可撤回）" style={{ border: 0, background: "transparent", cursor: "pointer", color: "var(--danger)", display: "inline-flex" }}><Icon name="trash-2" size={15} /></button>
                         </td>}
@@ -171,7 +325,6 @@
             </div>
             <div style={{ padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--surface-2)", display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--ink-soft)" }}>
               <span>共 <b style={{ color: "var(--ink)", fontFamily: "var(--font-mono)" }}>{rows.length}</b> 条清单行</span>
-              <span>现场量按算式录入（hover 查看），未录以基准量回退</span>
             </div>
           </Panel>
         </div>
