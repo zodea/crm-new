@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+
 async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -9,6 +11,12 @@ async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
 }
 
 test.describe('Issue #103 Slice 6A：户施工详情', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem(storageKey, 'true')
+    }, DATA_VISIBILITY_STORAGE_KEY)
+  })
+
   test('矩阵时间线进入详情页，工种→阶段→日期与三量合计贯通', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
@@ -41,6 +49,30 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
     await page.keyboard.press('Escape')
 
     expect(pageErrors).toEqual([])
+  })
+
+  test('下钻带走矩阵筛选，返回后按原筛选恢复', async ({ page }) => {
+    await page.goto('/subcontract/quantity')
+    await page.waitForLoadState('networkidle')
+
+    // 先把矩阵切到非默认筛选，返回时才能证明恢复的是用户的选择而不是默认值。
+    await page.getByRole('tab', { name: '班组矩阵' }).click()
+    await expect(page).toHaveURL(/view=crew/)
+    const matrixUrl = new URL(page.url())
+
+    const cells = page.getByTestId('quantity-matrix-cell')
+    await cells.nth(2).focus()
+    await cells.nth(2).press('Enter')
+    await page.getByRole('button', { name: /详情/ }).first().click()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\/[^/]+\/[^/]+/)
+    // 下钻地址必须带上筛选，否则返回时无从恢复。
+    await expect(page).toHaveURL(/view=crew/)
+
+    await page.getByRole('link', { name: '返回工程量矩阵' }).click()
+    await expect(page).toHaveURL(/\/subcontract\/quantity\?/)
+    await expect(page).toHaveURL(/view=crew/)
+    expect(new URL(page.url()).searchParams.get('project'))
+      .toBe(matrixUrl.searchParams.get('project'))
   })
 
   test('390px 页面无横滚，量明细仅自身局部横滚', async ({ page }) => {
