@@ -75,7 +75,7 @@ FileCard × N:
 ```
 触发: "识别全部" 或 单张识别
   └─ 调用统一 recognizeDocument(file) 接口
-      ├─ 图片可先生成裁边扶正派生件；PDF 保持原文件
+      ├─ 图片与可解析的单页 PDF 可生成裁边扶正 PNG 派生件；多页/解析失败 PDF 保持原文件
       ├─ 输出 Markdown / HTML 表格 / layout regions
       └─ 失败显式报错并允许会话内重试
 

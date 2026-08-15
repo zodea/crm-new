@@ -1,59 +1,111 @@
-import { describe, expect, it } from 'vitest'
-import { detectDocumentGeometry } from '~/lib/recognize/image-preprocess'
+/** @vitest-environment jsdom */
 
-function blankImage(width: number, height: number): Uint8ClampedArray {
-  return new Uint8ClampedArray(width * height * 4).fill(255)
-}
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-function pixel(data: Uint8ClampedArray, width: number, x: number, y: number, color = 40) {
-  const offset = (y * width + x) * 4
-  data[offset] = color
-  data[offset + 1] = color
-  data[offset + 2] = color
-  data[offset + 3] = 255
-}
+const { getDocumentMock } = vi.hoisted(() => ({
+  getDocumentMock: vi.fn(),
+}))
 
-function rectangle(data: Uint8ClampedArray, width: number, left: number, top: number, right: number, bottom: number) {
-  for (let x = left; x <= right; x += 1) {
-    pixel(data, width, x, top)
-    pixel(data, width, x, bottom)
-  }
-  for (let y = top; y <= bottom; y += 1) {
-    pixel(data, width, left, y)
-    pixel(data, width, right, y)
-  }
-  for (let y = top + 10; y < bottom; y += 10) {
-    for (let x = left; x <= right; x += 1)
-      pixel(data, width, x, y, 120)
-  }
-}
+vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+  getDocument: getDocumentMock,
+}))
 
-describe('detectDocumentGeometry', () => {
-  it('忽略贴边扫描黑线并找到页面中央的纵向票据', () => {
-    const width = 120
-    const height = 180
-    const data = blankImage(width, height)
-    for (let x = 0; x < width; x += 1)
-      pixel(data, width, x, 0)
-    rectangle(data, width, 38, 35, 92, 155)
+vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs', () => ({
+  WorkerMessageHandler: {},
+}))
 
-    const result = detectDocumentGeometry({ width, height, data })
+import { detectDocumentGeometry, prepareDeliveryOcrImage } from '~/lib/recognize/image-preprocess'
 
-    expect(result).toMatchObject({ x: 38, y: 35, width: 55, height: 121 })
-    expect(Math.abs(result!.angleRadians)).toBeGreaterThan(1.3)
+describe('prepareDeliveryOcrImage', () => {
+  beforeEach(() => {
+    getDocumentMock.mockReset()
+
+    const context = {
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      getImageData: vi.fn(() => ({
+        width: 2,
+        height: 2,
+        data: new Uint8ClampedArray(2 * 2 * 4),
+      })),
+      fillStyle: '#fff',
+      filter: 'none',
+    }
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      callback(new Blob(['derived'], { type: 'image/png' }))
+    })
   })
 
-  it('横向表格保持接近零度，纯白或无效图片不误裁', () => {
-    const width = 160
-    const height = 100
-    const data = blankImage(width, height)
-    rectangle(data, width, 15, 25, 145, 78)
+  it('将单页 PDF 渲染为图片后再进入图像预处理链路', async () => {
+    const render = vi.fn().mockResolvedValue(undefined)
+    const getPage = vi.fn().mockResolvedValue({
+      getViewport: () => ({ width: 1000, height: 1400 }),
+      render: () => ({ promise: render() }),
+    })
+    getDocumentMock.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage,
+        cleanup: vi.fn(),
+        destroy: vi.fn(),
+      }),
+      destroy: vi.fn(),
+    })
 
-    const result = detectDocumentGeometry({ width, height, data })
+    const source = new File(['pdf'], '2026.5.21广州德力.pdf', { type: 'application/pdf' })
+    const prepared = await prepareDeliveryOcrImage(source)
 
-    expect(result).not.toBeNull()
-    expect(Math.abs(result!.angleRadians)).toBeLessThan(0.1)
-    expect(detectDocumentGeometry({ width, height, data: blankImage(width, height) })).toBeNull()
-    expect(detectDocumentGeometry({ width: 1, height: 1, data: new Uint8ClampedArray(4) })).toBeNull()
+    expect(getDocumentMock).toHaveBeenCalledWith(expect.objectContaining({ data: expect.any(Uint8Array) }))
+    expect(getPage).toHaveBeenCalledWith(1)
+    expect(render).toHaveBeenCalledOnce()
+    expect(prepared.transformed).toBe(true)
+    expect(prepared.file.type).toBe('image/png')
+    expect(prepared.file.name).toBe('2026.5.21广州德力.ocr.png')
+    expect(prepared.useDocOrientationClassify).toBe(true)
+  })
+
+  it('多页 PDF 不拆页或渲染，保持原文件交给 VL', async () => {
+    const getPage = vi.fn()
+    getDocumentMock.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 2,
+        getPage,
+        cleanup: vi.fn(),
+      }),
+      destroy: vi.fn(),
+    })
+
+    const source = new File(['pdf'], 'multi-page.pdf', { type: 'application/pdf' })
+    const prepared = await prepareDeliveryOcrImage(source)
+
+    expect(getPage).not.toHaveBeenCalled()
+    expect(prepared).toEqual({
+      file: source,
+      transformed: false,
+      useDocOrientationClassify: true,
+    })
+  })
+
+  it('不会把竖排连通域误当成需要旋转 90° 的票据倾角', () => {
+    const width = 200
+    const height = 200
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    for (let y = 50; y < 150; y += 1) {
+      for (let x = 90; x < 110; x += 1) {
+        const offset = (y * width + x) * 4
+        data[offset] = 0
+        data[offset + 1] = 0
+        data[offset + 2] = 0
+        data[offset + 3] = 255
+      }
+    }
+
+    const geometry = detectDocumentGeometry({ width, height, data })
+
+    expect(geometry).not.toBeNull()
+    expect(geometry?.angleRadians).toBeCloseTo(0, 5)
   })
 })
