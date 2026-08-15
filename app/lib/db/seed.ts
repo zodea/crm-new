@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 import type { MigrationDb } from './migrations'
 import { addCalendarDays } from '~/lib/schedule/planning'
 import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
