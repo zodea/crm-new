@@ -29,6 +29,8 @@ export function renderCountsBlock(counts) {
     `| 设计稿 PAGE 路由 | ${counts.designPageRoutes} |`,
     `| 设计稿整页表单路由 | ${counts.designFormRoutes} |`,
     `| 设计稿侧栏分组 / 叶子 | ${counts.designNavGroups} / ${counts.designNavLeaves} |`,
+    `| 实现页面文件（含 dev） | ${counts.trackedPageFiles} |`,
+    `| 开发预览路由 | ${counts.devPageFiles} |`,
     `| 实现生产路由（排除 dev） | ${counts.appPageFiles} |`,
     `| 实现侧栏叶子 | ${counts.appNavLeaves} |`,
     `| 已覆盖 | ${counts.covered} |`,
@@ -180,8 +182,8 @@ export function pageFileToRoute(relativePath) {
   return `/${mapped.join('/')}`.replace(/\/$/, '') || '/'
 }
 
-/** 枚举 app/pages 下全部页面路由（dev/ 为开发者调试页，按 ui-implementation-status 口径排除）。 */
-export function readAppRoutes(pagesRoot = PAGES_ROOT) {
+/** 枚举 app/pages 下全部 Vue 页面文件，返回相对 app/pages 的稳定路径。 */
+export function readAppPageFiles(pagesRoot = PAGES_ROOT) {
   function walk(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const path = join(directory, entry.name)
@@ -192,7 +194,14 @@ export function readAppRoutes(pagesRoot = PAGES_ROOT) {
   }
 
   return walk(pagesRoot)
-    .map(path => pageFileToRoute(relative(pagesRoot, path)))
+    .map(path => relative(pagesRoot, path).replaceAll('\\', '/'))
+    .sort()
+}
+
+/** 枚举生产页面路由（dev/ 为开发者调试页，按 ui-implementation-status 口径排除）。 */
+export function readAppRoutes(pagesRoot = PAGES_ROOT) {
+  return readAppPageFiles(pagesRoot)
+    .map(path => pageFileToRoute(path))
     .filter(route => !route.startsWith('/dev/'))
     .sort()
 }
@@ -241,6 +250,7 @@ export function buildCoverage(curated = {}) {
   const design = readDesignRegistry()
   const designForms = readDesignFormRoutes()
   const appRoutes = readAppRoutes()
+  const appPageFiles = readAppPageFiles()
   const appNavLeaves = readAppNavLeaves()
   const designPageRoutes = new Set(design.pages.map(page => page.route))
 
@@ -327,6 +337,8 @@ export function buildCoverage(curated = {}) {
       designNavGroups: design.navGroups.length,
       designNavLeaves: design.navLeaves.length,
       designMountedScreens: design.screens.length,
+      trackedPageFiles: appPageFiles.length,
+      devPageFiles: appPageFiles.filter(path => path.startsWith('dev/')).length,
       appPageFiles: appRoutes.length,
       appNavLeaves: appNavLeaves.length,
       covered: screenParity.filter(entry => entry.status === 'covered').length,

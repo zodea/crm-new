@@ -2,6 +2,8 @@
 // type→route 映射唯一处：只登记已实装详情页，未实装类型自动退化纯文本——
 // 实装后在此回填映射即全站上线，别处不复制路由。
 
+import type { DataOriginDTO } from '~/types/read-model'
+
 export type EntityLinkType
   = | 'project'
     | 'supplier'
@@ -28,12 +30,20 @@ export function resolveEntityLink(input: {
   type: EntityLinkType
   id?: string | null
   label?: string | null
+  dataOrigin?: DataOriginDTO
 }): EntityLinkResolution {
   const text = input.label ?? null
   if (text == null || text === '')
     return { kind: 'empty' }
+  if (input.dataOrigin && input.type !== 'project')
+    return { kind: 'text', text }
   const route = ENTITY_ROUTES[input.type]
   if (!route || input.id == null || input.id === '')
     return { kind: 'text', text }
-  return { kind: 'link', to: route(input.id), text }
+  const target = route(input.id)
+  return {
+    kind: 'link',
+    to: input.dataOrigin ? `${target}?origin=${input.dataOrigin}` : target,
+    text,
+  }
 }

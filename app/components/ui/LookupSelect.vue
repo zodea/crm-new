@@ -22,6 +22,7 @@ import {
   recentStore,
 } from '~/lib/kit/lookup'
 import { toErrorMessage } from '~/lib/util/error'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 interface Props {
   fetch: (keyword: string) => Promise<LookupOption[]>
@@ -51,6 +52,9 @@ const emit = defineEmits<{
 const model = defineModel<string | null>({ default: null })
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
 const toast = useToast()
+const dataVisibilityStore = useDataVisibilityStore()
+// 查询候选、最近选择和 DB 共用启动插件已授权的 Pinia 决策。
+const lookupDataOrigin = dataVisibilityStore.includeDemo ? 'demo' : 'real'
 const open = shallowRef(false)
 const query = shallowRef('')
 const results = shallowRef<LookupOption[]>([])
@@ -59,9 +63,13 @@ const selectedOption = shallowRef<LookupOption>()
 const loading = shallowRef(false)
 
 const recentState = props.recentKey
-  ? useLocalStorage<LookupOption[]>(lookupRecentStorageKey(props.recentKey), [])
+  ? useLocalStorage<LookupOption[]>(lookupRecentStorageKey(
+      props.recentKey,
+      'workspace-default',
+      lookupDataOrigin,
+    ), [])
   : shallowRef<LookupOption[]>([])
-const recents = recentStore(props.recentKey ?? 'disabled', recentState)
+const recents = recentStore(recentState)
 
 const recentIds = computed(() => new Set(recents.items.value.map(item => item.id)))
 const visibleResults = computed(() =>

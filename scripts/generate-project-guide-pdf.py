@@ -218,7 +218,7 @@ class FlowDiagram(Flowable):
         super().__init__()
         self.steps = steps
         self.styles = styles
-        self.step_height = 58
+        self.step_height = 49
         self.width = 0
         self.height = len(steps) * self.step_height + 4
 
@@ -583,7 +583,7 @@ def cover_story(meta: GuideMeta) -> list[Flowable]:
         metadata,
         Spacer(1, 28 * mm),
         Paragraph(
-            "本指南只说明当前已经实现且可操作的流程；未完成能力不写成已上线功能。",
+            "本指南明确区分当前已经实现且可操作的流程，以及已定稿待开发能力；未完成能力不会写成已上线功能。",
             ParagraphStyle(
                 "CoverNote",
                 fontName="RuihangSans",

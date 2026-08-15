@@ -28,6 +28,7 @@ function snapshot(credentials: SupplierCredential[] = []): SupplierDetailSnapsho
       projectCount: 0,
       contractCount: 0,
       contractTotal: 0,
+      settledTotal: 0,
       claimedTotal: 0,
       invoiceTotal: 0,
       invoiceTaxTotal: 0,

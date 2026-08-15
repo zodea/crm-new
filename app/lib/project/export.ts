@@ -1,4 +1,26 @@
-import type { Project } from '~/stores/project'
+import type { DataOriginDTO } from '~/types/read-model'
+
+export interface ProjectLedgerSource {
+  dataOrigin: DataOriginDTO
+  name: string
+  status: string
+  contractAmount: number | string | null
+  operationType: string
+  startDate: string | null
+  plannedEnd: string | null
+  actualEnd: string | null
+  plannedDuration: number | null
+  manager: string
+  execManager: string
+  builder: string
+  developer: string
+  developer2: string
+  contractName: string
+  contractor: string
+  region: string
+  riskLevel: string
+  address: string
+}
 
 // 项目台账导出的纯逻辑（ADR 0004）：列标签映射与逐项目导出行投影，node 可测。
 // 实际写盘/xlsx 序列化在 ProjectListScreen（依赖 xlsx 与 KitUI exportFile），本层只产出
@@ -6,13 +28,14 @@ import type { Project } from '~/stores/project'
 
 export interface ProjectExportColumn {
   /** Project 字段名 */
-  key: keyof Project
+  key: keyof ProjectLedgerSource
   /** 导出表头（中文，红圈台账口径） */
   label: string
 }
 
 /** 台账导出列（顺序即导出表头顺序，红圈「项目信息」台账对齐）。 */
 export const PROJECT_EXPORT_COLUMNS: readonly ProjectExportColumn[] = [
+  { key: 'dataOrigin', label: '数据来源' },
   { key: 'name', label: '项目名称' },
   { key: 'status', label: '业务流程阶段' },
   { key: 'contractAmount', label: '合同金额（万元）' },
@@ -40,11 +63,17 @@ function cell(value: unknown): string | number {
   return typeof value === 'number' ? value : String(value)
 }
 
+function exportCell(key: keyof ProjectLedgerSource, value: unknown): string | number {
+  if (key === 'dataOrigin')
+    return value === 'demo' ? '测试数据' : '正式数据'
+  return cell(value)
+}
+
 /** 把项目集投影为导出行（每个项目一行，键为中文表头）。 */
 export function projectLedgerRows(
-  projects: readonly Project[],
+  projects: readonly ProjectLedgerSource[],
 ): Record<string, string | number>[] {
   return projects.map(p => Object.fromEntries(
-    PROJECT_EXPORT_COLUMNS.map(col => [col.label, cell(p[col.key])]),
+    PROJECT_EXPORT_COLUMNS.map(col => [col.label, exportCell(col.key, p[col.key])]),
   ))
 }

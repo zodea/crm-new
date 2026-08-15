@@ -83,6 +83,7 @@ export interface SupplierReadonlySummary {
   projectCount: number
   contractCount: number
   contractTotal: number
+  settledTotal: number
   claimedTotal: number
   invoiceTotal: number
   invoiceTaxTotal: number
@@ -146,11 +147,13 @@ export function buildSupplierReadonlySummary(
   invoices: readonly SupplierInvoiceSummary[],
 ): SupplierReadonlySummary {
   const contractTotal = round2(contracts.reduce((sum, row) => sum + row.amount, 0))
+  const settledTotal = round2(contracts.reduce((sum, row) => sum + row.settled, 0))
   const paidTotal = round2(payments.reduce((sum, row) => sum + row.actualPayment, 0))
   return {
     projectCount: projects.length,
     contractCount: contracts.length,
     contractTotal,
+    settledTotal,
     claimedTotal: round2(payments.reduce((sum, row) => sum + row.approvedAmount, 0)),
     invoiceTotal: round2(invoices.reduce((sum, row) => sum + row.totalAmount, 0)),
     invoiceTaxTotal: round2(invoices.reduce((sum, row) => sum + row.taxAmount, 0)),

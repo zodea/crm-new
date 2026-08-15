@@ -2,6 +2,7 @@
 // 穿透件·实体蓝链（specs §07 / CONTEXT.md「穿透」）：实体名一律蓝链跳详情，
 // 查无路由/无 id/无文案自动退化，不做死链。type→route 映射唯一处在 lib/kit/entity-link.ts。
 import type { EntityLinkType } from '~/lib/kit/entity-link'
+import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
 import { resolveEntityLink } from '~/lib/kit/entity-link'
 
@@ -9,6 +10,7 @@ const props = defineProps<{
   type: EntityLinkType
   id?: string | null
   label?: string | null
+  dataOrigin?: DataOriginDTO
 }>()
 
 const projectStore = useProjectStore()
@@ -39,6 +41,7 @@ const resolution = computed(() => resolveEntityLink({
   type: props.type,
   id: props.id,
   label: resolvedLabel.value,
+  dataOrigin: props.dataOrigin,
 }))
 </script>
 

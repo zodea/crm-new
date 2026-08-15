@@ -9,6 +9,8 @@ export type KitColumnType = 'seq' | 'checkbox' | 'text' | 'money' | 'date' | 'ac
 export interface KitFilterOption {
   label: string
   value: unknown
+  /** 受控远程筛选时由调用方回填当前选中态。 */
+  checked?: boolean
 }
 
 export interface KitTableColumn {

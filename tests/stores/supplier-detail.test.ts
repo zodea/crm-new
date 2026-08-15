@@ -227,6 +227,7 @@ describe('supplier detail store', () => {
       projectCount: 1,
       contractCount: 1,
       contractTotal: 1000,
+      settledTotal: 0,
       claimedTotal: 300,
       invoiceTotal: 120,
       invoiceTaxTotal: 20,

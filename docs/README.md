@@ -9,9 +9,14 @@
 | 项目术语是什么意思 | [`CONTEXT.md`](../CONTEXT.md) |
 | 为什么采用某项架构或交互方案 | [`docs/adr/`](./adr/) |
 | 数据实体、字段、关系与迁移 | [`docs/rewrite/DATABASE.md`](./rewrite/DATABASE.md) |
+| 页面读模型、DTO 类型、空错权限和本地/后台适配边界 | [`docs/rewrite/READ-MODELS.md`](./rewrite/READ-MODELS.md) |
+| 中央写命令、幂等、版本冲突和本地草稿边界 | [`docs/rewrite/COMMANDS.md`](./rewrite/COMMANDS.md) |
+| 蓝色入口、目标路由、页签和返回上下文 | [`docs/rewrite/NAVIGATION.md`](./rewrite/NAVIGATION.md) |
+| 智能洞察、全局消息和业务页签怎样挂载、恢复与对账 | [`docs/rewrite/PUBLIC-SURFACES.md`](./rewrite/PUBLIC-SURFACES.md) |
 | 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |
+| 如何将浏览器旧核心身份数据显式切换到中央后台 | [`docs/guides/local-data-migration.md`](./guides/local-data-migration.md) |
 | 当前还有哪些界面未实现或未闭环 | [`docs/design/ui-implementation-status.md`](./design/ui-implementation-status.md) |
 | 当前工作是否已定稿、由谁领取 | [GitHub Issues](https://github.com/zodea/crm-new/issues) |
 | Agent 如何开工、分诊和提交 | [`docs/agents/`](./agents/) |

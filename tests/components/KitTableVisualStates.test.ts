@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, useTemplateRef } from 'vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent, h, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import KitTable from '~/components/ui/KitTable.vue'
+
+const setFilter = vi.fn()
 
 const VxeTableStub = defineComponent({
   props: {
@@ -15,7 +17,8 @@ const VxeTableStub = defineComponent({
     columnConfig: Object,
     resizableConfig: Object,
   },
-  setup(props, { slots }) {
+  setup(props, { expose, slots }) {
+    expose({ setFilter })
     return () => h('div', {
       'data-ui': 'vxe-table-stub',
       'data-min-height': String(props.minHeight),
@@ -51,7 +54,10 @@ const global = {
 describe('kitTable visual states', () => {
   beforeAll(() => {
     vi.stubGlobal('computed', computed)
+    vi.stubGlobal('nextTick', nextTick)
+    vi.stubGlobal('onMounted', onMounted)
     vi.stubGlobal('useTemplateRef', useTemplateRef)
+    vi.stubGlobal('watch', watch)
   })
 
   afterAll(() => {
@@ -70,6 +76,10 @@ describe('kitTable visual states', () => {
 
     expect(screen.getByRole('status', { name: '正在加载表格数据' })).not.toBeNull()
     expect(document.querySelectorAll('[data-ui="kit-table-shimmer"]').length).toBeGreaterThan(0)
+  })
+
+  beforeEach(() => {
+    setFilter.mockReset()
   })
 
   it('composes an empty title with guidance', () => {
@@ -141,5 +151,26 @@ describe('kitTable visual states', () => {
     const table = document.querySelector<HTMLElement>('[data-ui="vxe-table-stub"]')
     expect(table?.dataset.resizable).toBe('false')
     expect(table?.dataset.doubleClickAuto).toBe('false')
+  })
+
+  it('syncs explicit remote filter facets into the mounted vxe table', async () => {
+    render(KitTable, {
+      props: {
+        columns: [{
+          field: 'status',
+          title: '业务阶段',
+          filterable: [{ label: '施工中', value: '施工中', checked: true }],
+        }],
+        data: [{ id: 1, status: '施工中' }],
+        remoteFilter: true,
+      },
+      global,
+    })
+
+    await waitFor(() => {
+      expect(setFilter).toHaveBeenCalledWith('status', [
+        { label: '施工中', value: '施工中', checked: true },
+      ])
+    })
   })
 })

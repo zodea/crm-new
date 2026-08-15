@@ -1,6 +1,12 @@
 # 数据库设计 — 全局实体关系 + 外键索引 + 建表顺序
 
-> 全模块 SQLite（tauri-plugin-sql）唯一参考。各页面文档定义业务字段，本文件管实体间关系。
+> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；后台物理库结构待迁移切片落地，不能把本文件中的本地 seed 策略解释为正式工作区初始化。
+
+当前落地事实（#279）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份的一次性分类、ID 映射、导入、对账和回滚由 #294 提供；其余领域仍由后续迁移票完成。
+
+当前落地事实（#293）：浏览器的正式项目新增/编辑已改由中央命令分配不透明 `projects.id`、记录递增 `version` 并生成最终更新时间。网络失败时的 `project-draft-*` 只是浏览器暂存意图，不是 `projects.id`、不得作外键。详细信封、幂等与冲突语义见 [`COMMANDS.md`](./COMMANDS.md)。
+
+当前落地事实（#294）：浏览器可把 `production` 快照中的客户、分供方、班组、项目、工人、项目分供方按此顺序迁入中央核心身份契约。迁移先将不可变备份的字节摘要、版本和 `sourceHash` 绑定同一批次，再以 `legacyId → serverId` 与 `batchId` 记录映射和来源；关系只接受明确旧 ID，缺少关联、孤儿、软删除、重复来源、数量/金额/计数差异和应用失败都须形成可归因对账记录，禁止以名称、编号或金额模糊匹配。保留源软删除事实本身是信息性记录；软删除丢失或其他实际差异才阻止确认。导入后服务端从实际中央实体重新对账，不能以 dry-run 计划代替写入事实。确认切换后六类身份的旧库普通读写均阻断，旧库只作为受保护备份的恢复来源；项目中央读链已经消费已确认导入的项目。当前中央端仍是可重置测试实例，未改变本文 SQLite 物理 schema，也不得被描述为生产持久化业务库；其他核心身份页面的中央接线留给 #281。
 
 ---
 
@@ -1054,6 +1060,8 @@ owner_material_directs(
 
 甲供材累计到货、累计领用和剩余可用从甲供材事实聚合，不在 `owner_material_controls` 保存可编辑累计列。`deliveryArchiveForm` 更新 §2.5 的 `delivery_records`，其中材料摘要、数量与单据金额只作 `delivery_lines` 聚合展示；原件仍由 `file_refs(owner_type='delivery_record')` 保存。
 
+2026-08-13 运行态走查确认甲供材列表读模型还包含总计划头/可能的二级明细、供货分供方、源单、送货单、仓库、采购类型、班组合同及结算/付款快照；这些可观察列不等于已裁定写模型。当前 `customer_id` 只表示项目甲方，不得冒充供货分供方；现有五张甲供材表也没有证明总计划头/行、下料—到货、到货—送货归档或供货单位关系。关系未迁移前，读 DTO 对这些字段返回明确 `null`/未配置状态，项目档案目录继续使用“甲供材供货单位待配置”；禁止按名称、单号或金额猜外键。后续迁移必须先裁定供货单位实体身份和总计划头/明细边界，再建立真实外键或桥表。页面字段与可空 DTO 见 [`material-management.md`](./pages/material-management.md)。
+
 #### 2.10.6 F5 甲方/分包单据
 
 ```sql
@@ -1875,6 +1883,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准：量=`house_type_template_items`、责任=`unit_assignments`、完成=`unit_stage_completions`，稳定阶段=`construction_stages`
 9. 付款申请头与结算/发票分摊必须由同一 action 事务写入；源单展示字段不得复制，提交勾稽与发票全局额度检查遵守 ADR 0015
 10. **禁用旧名**：`ticket_registrations`（→ `invoices` 单表，ADR-0001）、`payroll_records`（→ 工资三表）、`price_comparisons`（→ `delivery_lines` 聚合视图）、`quantities` / `quantity_records`（→ ADR 0010 分层表）
+11. 页面读模型、DTO 标量、关系引用、空错权限和 adapter 边界统一看 [`READ-MODELS.md`](./READ-MODELS.md)；DTO 中出现可观察字段不等于授权新增数据库列，写模型和 canonical 外键仍须先在本文件裁定
 
 ---
 

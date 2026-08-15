@@ -36,12 +36,12 @@ test.describe('Issue #112 R1：共享响应式原语', () => {
   }
 
   for (const viewport of MATRIX) {
-    test(`form-grid 在 ${viewport.width}px 使用容器驱动列数`, async ({ page }) => {
+    test(`项目资料网格在 ${viewport.width}px 使用容器驱动列数`, async ({ page }) => {
       await page.setViewportSize(viewport)
       await page.goto('/project/proj_demo_001')
       await page.waitForLoadState('networkidle')
 
-      const detailGrid = page.locator('.form-grid').first()
+      const detailGrid = page.locator('.project-info-section__grid').first()
       const detailColumns = await detailGrid.evaluate(element =>
         getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
       )

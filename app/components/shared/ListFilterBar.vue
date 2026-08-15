@@ -52,6 +52,5 @@ function updateFilter(key: string, event: Event) {
     <span class="ml-auto text-11px text-ink-faint">
       筛选后 <b class="font-mono text-ink">{{ filtered }}</b> 条<span v-if="filtered !== total"> · 共 {{ total }} 条</span>
     </span>
-
   </section>
 </template>
