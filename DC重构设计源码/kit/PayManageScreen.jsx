@@ -26,7 +26,7 @@
     const UI = () => window.KitUI || { toast: function () {} };
 
     const [q, setQ] = React.useState("");
-    const [proj, setProj] = React.useState("all");
+    const [proj, setProj] = React.useState((params && params.project) || "all");
     const [view, setView] = React.useState("due");   // 默认「待支付」（同实现端）
 
     const r2 = (n) => Math.round(n * 100) / 100;

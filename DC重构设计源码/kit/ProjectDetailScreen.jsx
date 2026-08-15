@@ -240,7 +240,6 @@
   }
 
   // —— 进度 · 成本 驾驶舱卡（#30 原样保留）：迷你甘特（分组级，数据同首页）+ 人材机四科目 目标/实际/偏差 ——
-  const SCHED_NAME = { p1: "合和新城", p2: "锦绣华庭", p3: "翠湖花园" };
   function ScheduleCostCard({ proj, navigate }) {
     const [, force] = React.useReducer((x) => x + 1, 0);
     React.useEffect(() => {
@@ -251,13 +250,13 @@
       return window.SCHEDULE.subscribe(force);
     }, []);
     const S = window.SCHEDULE;
-    const name = SCHED_NAME[proj.id];
+    const schedule = S && S.byProjectId ? S.byProjectId[proj.id] : null;
     const header = (
-      <SectionHeader extra={<Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule")}>打开施工进度</Button>}>
+      <SectionHeader extra={<Button size="sm" variant="secondary" icon="calendar-range" onClick={() => navigate("schedule", { projectId: proj.id })}>打开施工进度</Button>}>
         进度 · 成本
       </SectionHeader>
     );
-    if (!name) {
+    if (S && !schedule) {
       return (
         <Panel padding={16}>{header}
           <div style={{ padding: "18px 0", textAlign: "center", color: "var(--ink-faint)", fontSize: 12 }}>该项目暂无排程数据 · 可在「施工进度」新建楼栋分组套用工序模板</div>
@@ -266,7 +265,7 @@
     }
     if (!S) return <Panel padding={16}>{header}<div style={{ fontSize: 12, color: "var(--ink-soft)" }}>加载排程数据…</div></Panel>;
 
-    const p = S.state[name];
+    const p = schedule;
     const axisStart = p.start.slice(0, 8) + "01";
     const endD = S.D(p.plannedEnd); const axisEnd = new Date(endD.getFullYear(), endD.getMonth() + 1, 0);
     const total = Math.max((axisEnd - S.D(axisStart)) / 86400000, 1);
@@ -284,7 +283,7 @@
       <Panel padding={16}>{header}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 20 }}>
           {/* 左：迷你甘特（点击进入施工进度页） */}
-          <div onClick={() => navigate("schedule")} style={{ cursor: "pointer", minWidth: 0 }} title="点击打开施工进度">
+          <div onClick={() => navigate("schedule", { projectId: proj.id })} style={{ cursor: "pointer", minWidth: 0 }} title="点击打开施工进度">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 20, fontWeight: 800, fontFamily: "var(--font-mono)" }}>{Math.round(overall.pct * 100)}%</span>
               <StatusChip tone={overall.dev > 0 ? "ok" : overall.dev < 0 ? "warn" : "brand"}>
@@ -374,13 +373,12 @@
       return window.SCHEDULE.subscribe(force);
     }, []);
     const S = window.SCHEDULE;
-    const schedName = SCHED_NAME[proj.id];
-    const sp = schedName && S ? S.state[schedName] : null;
+    const sp = S && S.byProjectId ? S.byProjectId[proj.id] : null;
 
     // 阶段起止（施工中一段取排程；其余可经节点旁编辑图标修改）
     const [dates, setDates] = React.useState(() => (PHASE_DATES[proj.id] || PHASE_DATES.p1).map((d) => ({ s: d[0], e: d[1] })));
     const eff = dates.map((d, i) => (i === 2 && sp ? { s: sp.start, e: sp.plannedEnd } : d));
-    const today = sp ? sp.today : "2026-06-30";
+    const today = sp ? sp.today : iso(new Date());
 
     // 任务上传状态（初始铺底自 META.phaseDone，上传按钮真实翻转 → 节点分数联动）
     const [uploaded, setUploaded] = React.useState(() => {
@@ -459,7 +457,7 @@
                 ? { bd: "var(--ok)", bg: "var(--ok-soft)", ink: "var(--ok-ink)", icon: "check" }
                 : { bd: "var(--line-strong)", bg: "var(--panel)", ink: "var(--ink-faint)", icon: "clock" };
             return (
-              <button key={i} onClick={() => setOpenPhase(isOpen ? -1 : i)} style={{
+              <button key={i} type="button" aria-expanded={isOpen} aria-controls={isOpen ? "project-phase-tasks" : undefined} onClick={() => setOpenPhase(i)} style={{
                 border: "1.5px solid " + C.bd, background: C.bg, borderRadius: 10, padding: "10px 10px 8px",
                 cursor: "pointer", textAlign: "left", minWidth: 0,
                 boxShadow: isOpen ? "0 0 0 3px var(--brand-soft)" : "none", transition: "box-shadow var(--dur-fast)",
@@ -523,7 +521,7 @@
 
         {/* 展开：阶段任务清单（数字块 + 任务行 + 上传/查看） */}
         {openPhase >= 0 && PHASES[openPhase] && (
-          <div style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+          <div id="project-phase-tasks" style={{ marginTop: 14, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, fontWeight: 700 }}>{PHASES[openPhase].name} · 阶段任务</span>
               <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--ink-soft)" }}>{dot(eff[openPhase].s)} → {dot(eff[openPhase].e)}</span>

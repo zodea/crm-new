@@ -467,6 +467,242 @@
     );
   }
 
+  // —— 设计验证原型：送货单人工分流 → 人工归档（不读写真实数据） ——
+  // 访问方式：送货单识别页加 ?prototype=delivery-review。
+  // 当前只保留 A：三栏工作台；该原型只用于确认信息层级与操作路径，生产端实现不在这里复用代码。
+  const REVIEW_FILES = [
+    { id: "rp1", name: "大板东-0618.jpg", status: "待人工归档", kind: "材料到货", supplier: "广州市大板东建材有限公司", no: "DH0618", date: "2026-06-18", site: "合和新城", material: "防水卷材 SBS · 32 卷", amount: "¥10,240.00", flags: [] },
+    { id: "rp2", name: "收据-运费-0618.pdf", status: "待人工分流", kind: "疑似非材料", supplier: "广州市大板东建材有限公司", no: "—", date: "2026-06-18", site: "合和新城", material: "叉车服务费", amount: "¥800.00", flags: ["文件名疑似收据", "尚未进入 OCR"] },
+    { id: "rp3", name: "鹏程-送货单-0617.pdf", status: "待人工归档", kind: "材料到货", supplier: "广东鹏程建材有限公司", no: "PC0617", date: "2026-06-17", site: "锦绣华庭", material: "瓷砖胶 · 80 包", amount: "¥2,240.00", flags: ["金额待复核", "1 行数量×单价不一致"] },
+    { id: "rp4", name: "未命名扫描件.png", status: "待人工归档", kind: "材料到货", supplier: "未匹配供应商", no: "—", date: "—", site: "合和新城", material: "水泥 · 40 袋", amount: "—", flags: ["缺日期", "供应商需人工选择或新增", "原件无单号待确认"] },
+  ];
+  const DUPLICATE_FILES = [
+    { id: "dup1", duplicateName: "大板东-0618-副本.jpg", archivedName: "大板东-0618.jpg", duplicateNo: "DH0618", archivedNo: "DH0618", duplicateSupplier: "广州市大板东建材有限公司", archivedSupplier: "广州市大板东建材有限公司", duplicateSite: "合和新城", archivedSite: "合和新城" },
+  ];
+  const SUPPLIER_OPTIONS = ["广州市大板东建材有限公司", "广东鹏程建材有限公司", "汇丰水泥制品有限公司", "穗建五金机电经营部"];
+
+  function PrototypeStatus({ status, tone }) {
+    const resolvedTone = tone || (status === "待复核" ? "warn" : status === "待人工归档" ? "ok" : status === "已人工归档" ? "neutral" : status === "人工分流" ? "danger" : "neutral");
+    return <StatusChip tone={resolvedTone}>{status}</StatusChip>;
+  }
+
+  function PrototypeStat({ label, value, tone }) {
+    return (
+      <div style={{ flex: "1 1 150px", minWidth: 0, padding: "12px 14px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--panel)" }}>
+        <div style={{ fontSize: 11, color: "var(--ink-faint)" }}>{label}</div>
+        <div style={{ marginTop: 5, fontSize: 20, lineHeight: 1, fontWeight: 850, fontFamily: "var(--font-mono)", color: tone || "var(--ink)" }}>{value}</div>
+      </div>
+    );
+  }
+
+  function DeliveryReviewPrototype() {
+    const [files, setFiles] = React.useState(() => REVIEW_FILES.map((file) => ({ ...file })));
+    const [selectedId, setSelectedId] = React.useState("rp1");
+    const selected = files.find((file) => file.id === selectedId) || files[0];
+    const [drafts, setDrafts] = React.useState(() => Object.fromEntries(REVIEW_FILES.map((file) => {
+      const materialMatch = file.material.match(/^(.*?)\s*·\s*([\d.]+)\s*(\S+)$/);
+      return [file.id, {
+        no: file.no === "—" ? "" : file.no,
+        date: file.date === "—" ? "" : file.date,
+        supplier: file.supplier === "未匹配供应商" ? "" : file.supplier,
+        site: file.site === "—" ? "" : file.site,
+        name: materialMatch ? materialMatch[1] : file.material,
+        unit: materialMatch ? materialMatch[3] : "批",
+        qty: materialMatch ? materialMatch[2] : "",
+        price: "",
+        amount: file.amount === "—" ? "" : file.amount,
+        amountNote: "",
+        noOrderConfirmed: false,
+      }];
+    })));
+    const [supplierSearch, setSupplierSearch] = React.useState("");
+    const [supplierOpen, setSupplierOpen] = React.useState(false);
+    const [duplicateOpen, setDuplicateOpen] = React.useState(false);
+    const [duplicateReview, setDuplicateReview] = React.useState({});
+    const draft = drafts[selected.id] || {};
+    const reviewIssuesFor = (file, fileDraft) => {
+      if (file.status === "待人工分流") return file.flags.map((label, index) => ({ key: `intake-${index}`, label }));
+      if (file.status !== "待人工归档") return [];
+      const current = fileDraft || {};
+      const amountIssue = file.flags.some((flag) => flag.includes("金额"));
+      return [
+        !String(current.supplier || "").trim() && { key: "supplier", label: "供应商待人工选择或确认新增" },
+        !String(current.date || "").trim() && { key: "date", label: "缺日期：请从原件补录，不使用文件名或当前日期" },
+        !String(current.no || "").trim() && !current.noOrderConfirmed && { key: "no", label: "原件无单号：请确认，不生成虚假单号" },
+        amountIssue && !String(current.amountNote || "").trim() && { key: "amount", label: "金额待复核：请修正金额或填写保留票面值的原因" },
+      ].filter(Boolean);
+    };
+    const hasAmountIssue = selected.flags.some((flag) => flag.includes("金额"));
+    const issues = reviewIssuesFor(selected, draft);
+    const displayStatusFor = (file, fileDraft) => {
+      const fileIssues = reviewIssuesFor(file, fileDraft);
+      if (file.status === "待人工分流") return { status: "人工分流", tone: "danger" };
+      if (file.status === "待人工归档") return fileIssues.length ? { status: "待复核", tone: "warn" } : { status: "待人工归档", tone: "ok" };
+      if (file.status === "已人工归档") return { status: "已归档", tone: "neutral" };
+      if (file.status === "待 OCR") return { status: "待 OCR", tone: "brand" };
+      return { status: file.status, tone: "neutral" };
+    };
+    const countDisplayStatus = (status) => files.filter((file) => displayStatusFor(file, drafts[file.id]).status === status).length;
+    const readyToArchive = selected.status === "待人工归档" && issues.length === 0;
+    const updateDraft = (key, value) => setDrafts((all) => ({ ...all, [selected.id]: { ...all[selected.id], [key]: value } }));
+    React.useEffect(() => {
+      setSupplierOpen(false);
+      setSupplierSearch("");
+    }, [selectedId]);
+    const chooseSupplier = (name) => {
+      updateDraft("supplier", name);
+      setSupplierSearch(name);
+      setSupplierOpen(false);
+    };
+    const goToSupplierForm = () => {
+      const nav = window.DC && window.DC.navigate;
+      if (nav) nav("supplierForm", { type: "材料供应商", initialName: supplierSearch.trim() });
+      else UI().toast("设计稿导航尚未就绪，请从分供方资料库新建", "info");
+    };
+    const confirmNoOrder = () => updateDraft("noOrderConfirmed", true);
+    const confirmDuplicate = (id) => {
+      setDuplicateReview((all) => ({ ...all, [id]: "已核查" }));
+      UI().toast("已核对单号、供应商和所属项目；未要求核对编码", "ok");
+    };
+    const includeSelected = () => setFiles((all) => all.map((file) => file.id === selected.id ? { ...file, status: "待 OCR", kind: "材料到货", flags: ["已人工判断为材料到货", "待 OCR"] } : file));
+    const recognizeSelected = () => setFiles((all) => all.map((file) => file.id === selected.id ? { ...file, status: "待人工归档", flags: ["OCR 草稿已生成；仍需人工归档"] } : file));
+    const archiveSelected = () => {
+      if (!readyToArchive) { UI().toast("请先修正右侧标记的问题字段", "danger"); return; }
+      setFiles((all) => all.map((file) => file.id === selected.id ? { ...file, status: "已人工归档", flags: ["人工确认归档"] } : file));
+      UI().toast("已人工确认并归档；原件与 OCR 留痕保留", "ok");
+    };
+    const fieldHasIssue = (key) => issues.some((issue) => issue.key === key);
+    const editField = (key, label, placeholder) => (
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: fieldHasIssue(key) ? "var(--danger-ink)" : "var(--ink-soft)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>{label}{fieldHasIssue(key) && <StatusChip tone="danger">需处理</StatusChip>}</span>
+        <input value={draft[key] || ""} placeholder={placeholder} onChange={(event) => updateDraft(key, event.target.value)} style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: `1px solid ${fieldHasIssue(key) ? "var(--danger)" : "var(--line)"}`, borderRadius: 7, background: fieldHasIssue(key) ? "var(--danger-soft)" : "var(--surface-2)", color: "var(--ink)", fontSize: 12 }} />
+      </label>
+    );
+    const supplierMatches = SUPPLIER_OPTIONS.filter((name) => !supplierSearch.trim() || name.includes(supplierSearch.trim()));
+    const canAddSupplier = supplierOpen && supplierSearch.trim() && !SUPPLIER_OPTIONS.includes(supplierSearch.trim());
+    const supplierField = (
+      <label style={{ position: "relative", display: "flex", flexDirection: "column", gap: 4, fontSize: 10.5, color: fieldHasIssue("supplier") ? "var(--danger-ink)" : "var(--ink-soft)" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}>供应商{fieldHasIssue("supplier") && <StatusChip tone="danger">需处理</StatusChip>}</span>
+        <div style={{ position: "relative" }}>
+          <input value={supplierOpen ? supplierSearch : (draft.supplier || "")} placeholder="搜索供应商名称" onFocus={() => { setSupplierSearch(draft.supplier || ""); setSupplierOpen(true); }} onChange={(event) => { setSupplierSearch(event.target.value); setSupplierOpen(true); }} style={{ width: "100%", boxSizing: "border-box", padding: canAddSupplier ? "7px 36px 7px 8px" : "7px 8px", border: `1px solid ${fieldHasIssue("supplier") ? "var(--danger)" : "var(--line)"}`, borderRadius: 7, background: fieldHasIssue("supplier") ? "var(--danger-soft)" : "var(--surface-2)", color: "var(--ink)", fontSize: 12 }} />
+          {canAddSupplier && <button type="button" aria-label="跳转新增分供方" title="跳转新增分供方" onClick={(event) => { event.preventDefault(); event.stopPropagation(); goToSupplierForm(); }} style={{ position: "absolute", top: 1, right: 1, bottom: 1, width: 31, display: "grid", placeItems: "center", border: 0, borderLeft: "1px solid var(--line)", borderRadius: "0 6px 6px 0", background: "transparent", color: "var(--brand)", cursor: "pointer" }}><Icon name="plus" size={14} /></button>}
+        </div>
+        {supplierOpen && <div style={{ position: "absolute", zIndex: 12, left: 0, right: 0, top: "100%", marginTop: 4, padding: 5, border: "1px solid var(--line-strong)", borderRadius: 8, background: "var(--panel)", boxShadow: "var(--shadow-pop)" }}>
+          {supplierMatches.map((name) => <button key={name} type="button" onClick={() => chooseSupplier(name)} style={{ width: "100%", display: "block", padding: "7px 8px", border: 0, borderRadius: 5, background: name === draft.supplier ? "var(--brand-soft)" : "transparent", color: "var(--ink)", textAlign: "left", cursor: "pointer", fontSize: 11.5 }}>{name}</button>)}
+          {!supplierMatches.length && <div style={{ padding: "7px 8px", color: "var(--ink-faint)", fontSize: 11 }}>{supplierSearch.trim() ? "暂无匹配，点击输入框右侧 + 新增" : "暂无供应商"}</div>}
+        </div>}
+      </label>
+    );
+    const duplicatePaper = (name, no, supplier, site, tone) => (
+      <div style={{ minHeight: 228, padding: "17px 15px", border: "1px solid var(--line-strong)", background: "#fff", boxShadow: "var(--shadow-card)", transform: "rotate(-.5deg)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5, fontWeight: 850 }}><span>送货单</span><StatusChip tone={tone}>{tone === "ok" ? "已归档" : "重复件"}</StatusChip></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 14, color: "var(--ink-soft)", fontSize: 10 }}><span>单号：{no}</span><span>日期：2026-06-18</span><span>供应商：{supplier}</span><span>工地：{site}</span></div>
+        <div style={{ height: 83, marginTop: 13, border: "1px solid var(--line-strong)", background: "repeating-linear-gradient(to bottom, transparent 0, transparent 20px, var(--line) 21px)" }} />
+        <div style={{ marginTop: 10, color: "var(--ink-soft)", fontSize: 10 }}>材料明细与原件版式保留</div>
+        <div style={{ marginTop: 6, textAlign: "right", fontSize: 11.5, fontWeight: 800 }}>合计：¥10,240.00</div>
+        <div style={{ marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-faint)", fontSize: 9.5 }}>{name}</div>
+      </div>
+    );
+    const duplicatePane = (
+      <div style={{ marginTop: 12, padding: "11px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--panel)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name="copy-check" size={15} color="var(--ink-soft)" />
+          <div style={{ flex: 1 }}><b style={{ fontSize: 12 }}>重复核查区 · {DUPLICATE_FILES.length} 份</b><div style={{ marginTop: 3, color: "var(--ink-faint)", fontSize: 10.5 }}>重复件不进入主处理队列；先看两份送货单原件，再核对单号、供应商、所属项目，不核对编码。</div></div>
+          <Button size="sm" variant="secondary" icon={duplicateOpen ? "chevron-up" : "chevron-down"} onClick={() => setDuplicateOpen((open) => !open)}>{duplicateOpen ? "收起" : "打开核查"}</Button>
+        </div>
+        {duplicateOpen && <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>{DUPLICATE_FILES.map((item) => {
+          const reviewed = duplicateReview[item.id] === "已核查";
+          const comparisons = [["送货单号", item.duplicateNo, item.archivedNo], ["供应商", item.duplicateSupplier, item.archivedSupplier], ["所属项目", item.duplicateSite, item.archivedSite]];
+          return <div key={item.id} style={{ padding: 10, border: "1px solid var(--line)", borderRadius: 9, background: "var(--surface-2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}><b style={{ fontSize: 11.5 }}>原件对照</b><span style={{ color: "var(--ink-faint)", fontSize: 10.5 }}>{item.duplicateName} ↔ {item.archivedName}</span>{reviewed && <StatusChip tone="ok">已核查</StatusChip>}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 9, marginTop: 9 }}><div><div style={{ marginBottom: 5, color: "var(--danger-ink)", fontSize: 10.5, fontWeight: 750 }}>重复件原件</div>{duplicatePaper(item.duplicateName, item.duplicateNo, item.duplicateSupplier, item.duplicateSite, "warn")}</div><div><div style={{ marginBottom: 5, color: "var(--ok-ink)", fontSize: 10.5, fontWeight: 750 }}>已归档代表件原件</div>{duplicatePaper(item.archivedName, item.archivedNo, item.archivedSupplier, item.archivedSite, "ok")}</div></div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>{comparisons.map(([label, incoming, archived]) => <div key={label} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 7px", border: `1px solid ${incoming === archived ? "var(--ok)" : "var(--danger)"}`, borderRadius: 999, background: incoming === archived ? "var(--ok-soft)" : "var(--danger-soft)", color: incoming === archived ? "var(--ok-ink)" : "var(--danger-ink)", fontSize: 10.5 }}><b>{label}</b><span>{incoming === archived ? "一致" : "不一致"}</span></div>)}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}><span style={{ flex: 1, color: "var(--ink-faint)", fontSize: 10.5 }}>编码和文件内容已由重复检测处理，不在人工核查范围内。</span><Button size="sm" variant="primary" icon="check" disabled={reviewed} onClick={() => confirmDuplicate(item.id)}>{reviewed ? "已确认一致" : "确认与已归档一致"}</Button></div>
+          </div>;
+        })}</div>}
+      </div>
+    );
+    const commonHeader = (
+      <>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 360px" }}>
+            <div style={{ fontSize: 18, fontWeight: 850, letterSpacing: "-.02em" }}>送货单识别 · 人工归档原型</div>
+            <div style={{ marginTop: 5, color: "var(--ink-faint)", fontSize: 12 }}>先分流，再 OCR；OCR 只生成草稿，任何文件都要人工查看原件后归档。</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="secondary" icon="upload" onClick={() => UI().toast("原型不读取本地文件，仅演示上传后的状态", "info")}>上传文件</Button>
+            <Button variant="primary" icon="scan-text" onClick={() => UI().toast("只会识别“待 OCR”文件；疑似非材料文件保持待分流", "info")}>识别可处理文件</Button>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+          <PrototypeStat label="待人工归档" value={countDisplayStatus("待人工归档")} tone="var(--ok-ink)" />
+          <PrototypeStat label="待复核" value={countDisplayStatus("待复核")} tone="var(--warn-ink)" />
+          <PrototypeStat label="人工分流" value={countDisplayStatus("人工分流")} tone="var(--danger-ink)" />
+          <PrototypeStat label="重复待核查" value={DUPLICATE_FILES.length} tone="var(--ink-soft)" />
+          <PrototypeStat label="已归档" value={countDisplayStatus("已归档")} tone="var(--ink-soft)" />
+        </div>
+        <div style={{ display: "flex", gap: 9, alignItems: "center", marginTop: 12, padding: "9px 12px", border: "1px solid var(--warn)", borderRadius: 10, background: "var(--warn-soft)", color: "var(--warn-ink)", fontSize: 12 }}>
+          <Icon name="shield-check" size={15} color="var(--warn)" />
+          <b>人工归档闸门</b><span>完整、平衡、清晰的 OCR 结果也不会自动入库。</span>
+          <span style={{ marginLeft: "auto", fontFamily: "var(--font-mono)", fontSize: 11 }}>K 盘原件：只读</span>
+        </div>
+        {duplicatePane}
+      </>
+    );
+    const fileRow = (file, compact) => {
+      const rowStatus = displayStatusFor(file, drafts[file.id]);
+      return <button key={file.id} type="button" onClick={() => { setSelectedId(file.id); setSupplierOpen(false); }} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 9, padding: compact ? "10px 11px" : "11px 12px", textAlign: "left", border: 0, borderBottom: "1px solid var(--line)", borderLeft: selected.id === file.id ? "3px solid var(--brand)" : "3px solid transparent", background: selected.id === file.id ? "var(--brand-soft)" : "transparent", cursor: "pointer" }}>
+        <Icon name={file.status === "待人工分流" ? "file-warning" : "file-text"} size={15} color={rowStatus.tone === "danger" ? "var(--danger)" : rowStatus.tone === "warn" ? "var(--warn)" : "var(--brand)"} />
+          <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12.5, fontWeight: 750, color: "var(--ink)" }} title={file.name}>{file.name}</span><PrototypeStatus {...rowStatus} /></span>
+          <span style={{ display: "block", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10.5, color: "var(--ink-faint)" }}>{file.supplier} · {file.material}</span>
+        </span>
+      </button>;
+    };
+    const sourcePane = (
+      <div style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, padding: 12, border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><b style={{ fontSize: 12.5 }}>原件预览</b><span style={{ marginLeft: "auto", color: "var(--ink-faint)", fontSize: 10.5 }}>仅用于核对，不覆盖原件</span></div>
+        <div style={{ flex: 1, minHeight: 300, display: "grid", placeItems: "center", border: "1px solid var(--line)", borderRadius: 10, background: "var(--surface-2)", overflow: "hidden" }}>
+          <div style={{ width: "68%", minHeight: 300, padding: "24px 20px", border: "1px solid var(--line-strong)", background: "#fff", boxShadow: "var(--shadow-card)", transform: "rotate(-1deg)" }}>
+            <div style={{ textAlign: "center", fontSize: 15, fontWeight: 850 }}>送货单</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 20, fontSize: 10.5, color: "var(--ink-soft)" }}><span>单号：{selected.no}</span><span>日期：{selected.date}</span><span>供应商：{selected.supplier}</span><span>工地：{selected.site}</span></div>
+            <div style={{ height: 150, marginTop: 18, border: "1px solid var(--line-strong)", background: "repeating-linear-gradient(to bottom, transparent 0, transparent 28px, var(--line) 29px)" }} />
+            <div style={{ marginTop: 15, textAlign: "right", fontSize: 12, fontWeight: 800 }}>合计：{selected.amount}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><StatusChip tone="neutral">原件保留</StatusChip></div>
+      </div>
+    );
+    const reviewPane = (
+      <div style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", padding: 14, border: "1px solid var(--line)", borderRadius: 12, background: "var(--panel)" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}><div><div style={{ fontSize: 13.5, fontWeight: 850 }}>{issues.length ? "人工复核与归档" : "人工归档"}</div><div style={{ marginTop: 3, color: "var(--ink-faint)", fontSize: 10.5 }}>当前文件：{selected.name} · 左侧原件作为核对依据</div></div><div style={{ marginLeft: "auto" }}><PrototypeStatus {...displayStatusFor(selected, draft)} /></div></div>
+        {selected.status === "待人工分流" && <div style={{ marginTop: 14, padding: 11, border: "1px solid var(--danger)", borderRadius: 10, background: "var(--danger-soft)", color: "var(--danger-ink)", fontSize: 11.5, lineHeight: 1.7 }}><b>这是疑似非材料文件</b><div>{selected.flags.join("；")}。如确认它属于材料到货，请先人工改判，之后才进入 OCR/归档流程。</div><Button size="sm" variant="secondary" icon="scan-text" onClick={includeSelected} style={{ marginTop: 9 }}>人工纳入材料识别</Button></div>}
+        {selected.status === "待 OCR" && <div style={{ marginTop: 14, padding: 11, border: "1px solid var(--brand)", borderRadius: 10, background: "var(--brand-soft)", color: "var(--brand-deep)", fontSize: 11.5, lineHeight: 1.7 }}><b>已人工改判为材料到货</b><div>现在只对这份文件启动 OCR；其他待分流文件不受影响。</div><Button size="sm" variant="primary" icon="scan-text" onClick={recognizeSelected} style={{ marginTop: 9 }}>开始 OCR</Button></div>}
+        {selected.status !== "待人工分流" && selected.status !== "待 OCR" && selected.status !== "已人工归档" && selected.status !== "重复已跳过" && <>
+          <div style={{ marginTop: 12, padding: "9px 11px", border: `1px solid ${issues.length ? "var(--warn)" : "var(--ok)"}`, borderRadius: 9, background: issues.length ? "var(--warn-soft)" : "var(--ok-soft)", color: issues.length ? "var(--warn-ink)" : "var(--ok-ink)", fontSize: 11.5, lineHeight: 1.6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Icon name={issues.length ? "triangle-alert" : "circle-check"} size={15} color={issues.length ? "var(--warn)" : "var(--ok)"} /><b>{issues.length ? `发现 ${issues.length} 个需要处理的问题` : "未发现待处理问题，可直接人工归档"}</b></div>
+            {issues.length > 0 && <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 5 }}>{issues.map((issue) => <div key={issue.key}>· {issue.label}</div>)}</div>}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 14 }}>
+            {editField("no", "送货单号", "识别为空时可确认原件无单号")}
+            {editField("date", "送货日期", "从原件补录")}
+            {supplierField}
+            {editField("site", "所属项目", "选择项目")}
+          </div>
+          {fieldHasIssue("no") && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, color: "var(--danger-ink)", fontSize: 11 }}><span>如果原件确实没有单号：</span><Button size="sm" variant="secondary" icon="file-check" onClick={confirmNoOrder}>确认原件无单号</Button></div>}
+          <div style={{ marginTop: 14, overflow: "auto", border: "1px solid var(--line)", borderRadius: 9 }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}><thead><tr style={{ background: "var(--surface-2)" }}>{[["name", "材料名称"], ["unit", "单位"], ["qty", "数量"], ["price", "单价"], ["amount", "金额"]].map(([key, label]) => <th key={key} style={{ padding: "8px 7px", textAlign: "left", color: fieldHasIssue(key) ? "var(--danger-ink)" : "var(--ink-soft)", whiteSpace: "nowrap" }}>{label}</th>)}</tr></thead><tbody><tr>{["name", "unit", "qty", "price", "amount"].map((key) => <td key={key} style={{ padding: "7px", borderTop: "1px solid var(--line)" }}><input value={draft[key] || ""} placeholder={key === "price" ? "价格待补录" : ""} onChange={(event) => updateDraft(key, event.target.value)} style={{ width: "100%", boxSizing: "border-box", minWidth: key === "name" ? 116 : 58, padding: "6px 7px", border: `1px solid ${hasAmountIssue && key === "amount" ? "var(--danger)" : "var(--line)"}`, borderRadius: 6, background: hasAmountIssue && key === "amount" ? "var(--danger-soft)" : "var(--surface-2)", fontSize: 11.5, color: "var(--ink)" }} /></td>)}</tr></tbody></table></div>
+          {hasAmountIssue && <div style={{ marginTop: 10, padding: 10, border: "1px solid var(--danger)", borderRadius: 9, background: "var(--danger-soft)" }}><div style={{ color: "var(--danger-ink)", fontSize: 11.5, fontWeight: 750 }}>金额待复核</div><textarea value={draft.amountNote || ""} onChange={(event) => updateDraft("amountNote", event.target.value)} placeholder="填写修正金额依据，或说明保留票面金额的原因" style={{ width: "100%", boxSizing: "border-box", minHeight: 48, marginTop: 7, resize: "vertical", padding: "7px 8px", border: "1px solid var(--danger)", borderRadius: 7, background: "#fff", fontSize: 11.5 }} /></div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "auto", paddingTop: 14 }}><span style={{ flex: 1, color: readyToArchive ? "var(--ok-ink)" : "var(--warn-ink)", fontSize: 10.5 }}>{readyToArchive ? "问题已处理，可以人工归档" : "处理右侧标记的问题后即可归档"}</span><Button variant="primary" icon="archive" disabled={!readyToArchive} onClick={archiveSelected}>确认人工归档</Button></div>
+        </>}
+        {selected.status === "已人工归档" && <div style={{ marginTop: 18, padding: 16, border: "1px solid var(--ok)", borderRadius: 10, background: "var(--ok-soft)", color: "var(--ok-ink)", fontSize: 12, lineHeight: 1.8 }}><b>已完成人工归档</b><div>归档动作、原件和 OCR 草稿均保留留痕；后续修订不会覆盖原始 OCR 值。</div></div>}
+        {selected.status === "重复已跳过" && <div style={{ marginTop: 18, padding: 16, border: "1px dashed var(--line-strong)", borderRadius: 10, color: "var(--ink-soft)", fontSize: 12, lineHeight: 1.8 }}>该文件内容与代表文件完全一致，系统处理区不重复 OCR、不重复归档。原始参考文件不修改、不移动、不删除。</div>}
+      </div>
+    );
+
+    const body = <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 24%) minmax(280px, 36%) minmax(360px, 1fr)", gap: 12, minHeight: 610 }}><div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--panel)" }}><div style={{ padding: "11px 12px", borderBottom: "1px solid var(--line)", background: "var(--surface-2)" }}><div style={{ fontWeight: 800, fontSize: 12 }}>处理队列 · {files.length}</div><div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}><PrototypeStatus status="人工分流" tone="danger" /><PrototypeStatus status="待复核" tone="warn" /><PrototypeStatus status="待人工归档" tone="ok" /></div><div style={{ marginTop: 5, color: "var(--ink-faint)", fontSize: 10 }}>文件名后状态表示当前处理状态；具体问题进入右侧详情卡片修改。</div></div>{files.map((file) => fileRow(file, true))}</div>{sourcePane}{reviewPane}</div>;
+    return <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>{commonHeader}{body}</div>;
+  }
+
   function DeliveryScreen({ data }) {
     const narrow = useNarrow();
     const [partition, setPartition] = React.useState("all");
@@ -569,6 +805,10 @@
     const problemFiles = files.filter((f) => f.conflict || f.ocr === "review");
     const problems = problemFiles.length;
     const reviewFile = reviewId ? files.find((f) => f.id === reviewId) : null;
+
+    if (new URLSearchParams(window.location.search).get("prototype") === "delivery-review") {
+      return <DeliveryReviewPrototype />;
+    }
 
     // 问题汇总弹窗：真实文件清单 + 一键全部标记已复核
     const showProblems = () => {

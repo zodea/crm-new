@@ -34,10 +34,15 @@
 
   // 工序实例：{...模板, ps 计划开始, pf 计划完成, actual 0~1（hasQty=1 自动取工程量/演示预置；null=未开始）}
   const T = (i, ps, pf, actual) => ({ id: "t" + i, ...TEMPLATE[i], ps, pf, actual: actual == null ? 0 : actual, hasQty: TEMPLATE[i].item != null });
+  const systemToday = () => {
+    const now = new Date();
+    return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+  };
+  const TODAY = systemToday();
 
-  // ── 合和新城7期（today=2026-06-30，计划=PDF 原表）──
+  // ── 合和新城7期（今天取系统当前日期，计划=PDF 原表）──
   const HHXC = {
-    start: "2026-05-01", plannedEnd: "2026-10-31", today: "2026-06-30",
+    projectId: "p1", projectName: "合和新城", start: "2026-05-01", plannedEnd: "2026-10-31", today: TODAY,
     groups: [
       { id: "g1", name: "户内10栋-22栋", buildings: ["10栋", "12栋", "15栋", "18栋", "22栋"], collapsed: false,
         tasks: [
@@ -101,7 +106,7 @@
 
   // ── 锦绣华庭 / 翠湖花园（精简演示数据）──
   const JXHT = {
-    start: "2026-01-15", plannedEnd: "2027-03-15", today: "2026-06-30",
+    projectId: "p2", projectName: "锦绣华庭", start: "2026-01-15", plannedEnd: "2027-03-15", today: TODAY,
     groups: [
       { id: "g1", name: "1-5栋", buildings: ["1栋", "3栋", "5栋"], collapsed: false,
         tasks: [
@@ -128,7 +133,7 @@
     ],
   };
   const CHHY = {
-    start: "2024-11-20", plannedEnd: "2026-08-30", today: "2026-06-30",
+    projectId: "p3", projectName: "翠湖花园", start: "2024-11-20", plannedEnd: "2026-08-30", today: TODAY,
     groups: [
       { id: "g1", name: "全楼 B1F-顶层", buildings: ["主楼"], collapsed: false,
         tasks: [
@@ -149,6 +154,7 @@
   };
 
   const state = { "合和新城": HHXC, "锦绣华庭": JXHT, "翠湖花园": CHHY };
+  const byProjectId = { p1: HHXC, p2: JXHT, p3: CHHY };
 
   // ── 日期/进度工具 ──
   const dayMs = 86400000;
@@ -190,7 +196,7 @@
     Object.assign(t, patch); notify();
   };
 
-  window.SCHEDULE = { TEMPLATE, state, days, D, plannedPct, devDays, rollup, status, subscribe, notify, update };
+  window.SCHEDULE = { TEMPLATE, state, byProjectId, days, D, plannedPct, devDays, rollup, status, subscribe, notify, update };
 
   // x-import 需要一个组件导出（隐藏预载用，不渲染任何内容）
   window.ScheduleDataScreen = function ScheduleDataScreen() { return null; };
