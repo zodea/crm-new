@@ -121,6 +121,7 @@ function pad2(value: number): string {
 function findDate(lines: string[]): string {
   const text = lines.join(' ')
   const match = text.match(/(20\d{2})\s*[年.\-/]\s*(\d{1,2})\s*[月.\-/]\s*(\d{1,2})/)
+    || text.match(/(20\d{2})\s+(\d{1,2})\s+(\d{1,2})/)
     || text.match(/(20\d{2})(\d{2})(\d{2})/)
   if (!match)
     return ''
@@ -490,6 +491,12 @@ function tableItems(table: DeliveryTable): ParsedItems {
       total = round2(quantity * unitPrice)
     if (/^\d+(?:\.\d+)?$/.test(name) || (unit && !UNIT_RE.test(unit)) || total == null)
       note = [note, 'OCR 低置信字段（待复核）'].filter(Boolean).join('；')
+    const missingAmountFields = [
+      quantity != null && unitPrice == null ? '单价缺失' : '',
+      quantity != null && unitPrice == null && total == null ? '金额缺失' : '',
+    ].filter(Boolean)
+    if (missingAmountFields.length)
+      note = [note, `${missingAmountFields.join('、')}（待复核）`].filter(Boolean).join('；')
     if (quantity != null && unitPrice != null && total != null && Math.abs(round2(quantity * unitPrice) - total) > 0.01)
       note = [note, '金额与数量×单价不符（待复核）'].filter(Boolean).join('；')
 
@@ -521,7 +528,7 @@ function tableItems(table: DeliveryTable): ParsedItems {
 
 function reviewSummary(items: ParsedDeliveryItem[], statedTotal: number | null): Pick<ParsedDeliveryDocument, 'calculatedTotal' | 'balanced' | 'note'> {
   const calculatedTotal = round2(items.reduce((sum, item) => sum + (item.total ?? 0), 0))
-  const badRows = items.filter(item => /待复核/.test(item.note)).length
+  const badRows = items.filter(item => item.note.includes('金额与数量×单价不符')).length
   const notes: string[] = []
   if (badRows)
     notes.push(`${badRows} 行金额与数量×单价不符（待复核）`)
