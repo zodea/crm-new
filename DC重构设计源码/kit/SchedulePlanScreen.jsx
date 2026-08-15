@@ -6,12 +6,17 @@
   const { Button, Panel, StatusChip, Icon } = window.DesignSystem_e3d871;
   const UI = () => window.KitUI || { toast: () => {} };
 
-  const PROJECTS = ["合和新城", "锦绣华庭", "翠湖花园"];
+  const FALLBACK_PROJECTS = ["合和新城", "锦绣华庭", "翠湖花园"];
   const ROWH = 34;                    // 每行行高：左表与甘特共用，保证行对齐
   const COLS = { name: 216, dur: 42, plan: 96, act: 46, dev: 80 };
   const LEFTW = COLS.name + COLS.dur + COLS.plan + COLS.act + COLS.dev;
   const fmtS = s => s.slice(5).replace("-", ".");      // 06.13
   const fmtF = s => s.replace(/-/g, ".");
+
+  const projectNames = (S) => {
+    const scheduleNames = S && S.state ? Object.keys(S.state) : [];
+    return scheduleNames.length ? scheduleNames : FALLBACK_PROJECTS;
+  };
 
   // ── 单元格 ──
   const Cell = ({ w, children, align, pad, bold, mono, color }) => (
@@ -387,11 +392,29 @@
       return window.SCHEDULE.subscribe(force);
     }, []);
     const S = window.SCHEDULE;
-    const [proj, setProj] = React.useState((params && params.project) || "合和新城");
+    const options = projectNames(S);
+    const [proj, setProj] = React.useState(() => {
+      const requestedById = params && params.projectId && S && S.byProjectId ? S.byProjectId[params.projectId] : null;
+      const requested = requestedById ? requestedById.projectName : params && params.project;
+      if (requested && options.indexOf(requested) >= 0) return requested;
+      return options.find((name) => S && S.state && S.state[name]) || options[0] || FALLBACK_PROJECTS[0];
+    });
     const [modal, setModal] = React.useState(null);   // {kind:"task"|"addTask"|"addGroup", g, t}
     if (!S) return <Panel padding={18}><div style={{ fontSize: 12, color: "var(--ink-soft)" }}>加载排程数据…</div></Panel>;
 
     const p = S.state[proj];
+    if (!p) return (
+      <Panel padding={22}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: 9, background: "var(--surface-2)" }}><Icon name="calendar-x" size={18} color="var(--ink-soft)" /></span>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 14, fontWeight: 800 }}>当前项目暂无施工排程</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-soft)" }}>先建立楼栋分组，再维护工序计划。</div>
+          </div>
+          <Button variant="primary" icon="plus" onClick={() => navigate("scheduleGroupNew", { project: proj })}>新建排程</Button>
+        </div>
+      </Panel>
+    );
 
     // #244 回填：首次进入把隐式 FS 关系固化为显式依赖（对齐生产 task_dependencies 的 FS + lag），
     // 并把楼栋分组默认收敛为「只展开第一个」，与实现侧 ScheduleTimeline 的默认一致。
@@ -471,20 +494,16 @@
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* 工具栏 */}
         <Panel padding={12} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", gap: 6 }}>
-            {PROJECTS.map(n => (
-              <button key={n} onClick={() => setProj(n)} style={{
-                border: "1px solid", borderColor: proj === n ? "var(--brand)" : "var(--line)",
-                background: proj === n ? "var(--brand)" : "#fff", color: proj === n ? "#fff" : "var(--ink)",
-                borderRadius: "var(--radius-btn)", padding: "7px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{n}</button>
-            ))}
-          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 240 }}>
+            <span style={{ fontSize: 12, color: "var(--ink-soft)", fontWeight: 700, flex: "none" }}>项目</span>
+            <select aria-label="选择项目" value={proj} onChange={(e) => setProj(e.target.value)} style={{ minWidth: 220, maxWidth: "100%", height: 34, padding: "0 30px 0 10px", border: "1px solid var(--line-strong)", borderRadius: 8, background: "#fff", color: "var(--ink)", fontSize: 13, fontWeight: 700 }}>
+              {options.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
           <StatusChip tone={overall.dev > 0 ? "ok" : overall.dev < 0 ? "warn" : "brand"}>
             整体 {Math.round(overall.pct * 100)}%{overall.dev > 0 ? ` · 领先约${overall.dev}天` : overall.dev < 0 ? ` · 落后约${-overall.dev}天` : " · 按计划"}
           </StatusChip>
-          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
-            {fmtF(p.start)} → {fmtF(p.plannedEnd)} · 点行改期/填报 · 改动实时同步首页
-          </span>
+          <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>{fmtF(p.start)} → {fmtF(p.plannedEnd)}</span>
           <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
             <Button size="sm" icon="flag" onClick={() => UI().toast("已将当前计划保存为基线（V1 写入 schedule_baselines，偏差以基线对比）", "ok")}>设为基线</Button>
             <Button size="sm" variant="primary" icon="plus" onClick={() => navigate("scheduleGroupNew", { project: proj })}>新建楼栋分组</Button>
@@ -621,7 +640,6 @@
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 18, height: 0, borderTop: "1.5px dashed var(--ink-faint)", display: "inline-block" }} />已禁用依赖（保留可恢复）</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="link" size={11} style={{ color: "var(--brand)" }} />进度由工程量联动</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 14, height: 8, border: "1.5px dashed var(--danger)", borderRadius: 2, display: "inline-block" }} />应开未开</span>
-            <span style={{ marginLeft: "auto" }}>点击工序行 → 改期 / 依赖设置 / 手动填报 / 删除 · 分组行「+」→ 按模板添加工序</span>
           </div>
         </Panel>
 
