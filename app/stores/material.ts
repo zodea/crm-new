@@ -147,7 +147,27 @@ export const useMaterialStore = defineStore('material', () => {
 
   const searchProjects = (keyword: string) => searchLookup('projects', keyword)
   const searchCustomers = (keyword: string) => searchLookup('customers', keyword)
-  const searchSuppliers = (keyword: string) => searchLookup('suppliers', keyword)
+  async function searchSuppliers(
+    keyword: string,
+    projectId: string | null = null,
+  ): Promise<LookupOption[]> {
+    if (!projectId)
+      return searchLookup('suppliers', keyword)
+    const rows = await select<{ id: string, name: string }>(`
+      SELECT DISTINCT supplier.id, supplier.name
+      FROM suppliers AS supplier
+      JOIN project_suppliers AS relation
+        ON relation.supplier_id = supplier.id
+      WHERE supplier.deleted_at IS NULL
+        AND relation.deleted_at IS NULL
+        AND relation.project_id = ?
+        AND COALESCE(supplier.supplier_category, '') IN ('', '材料供应商')
+        AND supplier.name LIKE ?
+      ORDER BY supplier.name
+      LIMIT 50
+    `, [projectId, `%${keyword.trim()}%`])
+    return rows.map(row => ({ id: row.id, label: row.name }))
+  }
   const searchCrews = (keyword: string) => searchLookup('crews', keyword)
 
   async function searchContracts(

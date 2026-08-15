@@ -381,6 +381,7 @@ describe('delivery store 真实识别与归档管线', () => {
     catch (cause) {
       archiveError = cause
     }
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     finishRerecognition(ocrResponse(DELIVERY_MARKDOWN))
     await rerecognition
 

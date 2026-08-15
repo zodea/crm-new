@@ -2,6 +2,7 @@ const ANALYSIS_MAX_EDGE = 640
 const MIN_COMPONENT_SIDE_RATIO = 0.1
 const MIN_ROTATION_RADIANS = Math.PI / 180 * 1.5
 const CROP_PADDING_RATIO = 0.18
+const PDF_RENDER_SCALE = 3
 
 export interface PixelImageData {
   width: number
@@ -66,7 +67,13 @@ function componentAngle(component: Component): number {
   const minor = Math.max(0.0001, (trace - delta) / 2)
   if (major / minor < 1.15)
     return 0
-  return 0.5 * Math.atan2(2 * covarianceXY, covarianceXX - covarianceYY)
+  let angle = 0.5 * Math.atan2(2 * covarianceXY, covarianceXX - covarianceYY)
+  // 连通域可能来自票据右侧的竖排提示文字；将主轴折算到 ±45°，只把它当作轻微倾斜估计，避免误旋转 90°。
+  while (angle > Math.PI / 4)
+    angle -= Math.PI / 2
+  while (angle < -Math.PI / 4)
+    angle += Math.PI / 2
+  return angle
 }
 
 /**
@@ -191,81 +198,174 @@ function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   })
 }
 
-/**
- * 送货单图片在浏览器内自动裁白边、扶正并略微增强对比度。
- * 原文件仍用于界面预览；只有派生 PNG 上传到同源 OCR 代理。
- */
-export async function prepareDeliveryOcrImage(file: File): Promise<PreparedOcrImage> {
-  if (!/^image\/(?:png|jpe?g)$/i.test(file.type) || typeof createImageBitmap !== 'function') {
-    return { file, transformed: false, useDocOrientationClassify: true }
-  }
+type RasterSource = CanvasImageSource
 
-  let bitmap: ImageBitmap | null = null
+interface RasterSourceSize {
+  width: number
+  height: number
+}
+
+interface PdfRasterSource {
+  canvas: HTMLCanvasElement
+  size: RasterSourceSize
+}
+
+function unchangedOcrImage(file: File): PreparedOcrImage {
+  return { file, transformed: false, useDocOrientationClassify: true }
+}
+
+async function renderSinglePagePdf(file: File): Promise<PdfRasterSource | null> {
   try {
-    bitmap = await createImageBitmap(file)
-    const analysisScale = Math.min(1, ANALYSIS_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
-    const analysisCanvas = document.createElement('canvas')
-    analysisCanvas.width = Math.max(1, Math.round(bitmap.width * analysisScale))
-    analysisCanvas.height = Math.max(1, Math.round(bitmap.height * analysisScale))
-    const analysisContext = analysisCanvas.getContext('2d', { willReadFrequently: true })
-    if (!analysisContext)
-      return { file, transformed: false, useDocOrientationClassify: true }
-    analysisContext.drawImage(bitmap, 0, 0, analysisCanvas.width, analysisCanvas.height)
-    const geometry = detectDocumentGeometry(analysisContext.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height))
-    if (!geometry)
-      return { file, transformed: false, useDocOrientationClassify: true }
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    // 通过主线程 worker 入口避免在 Nuxt/Tauri 中额外配置 workerSrc，PDF.js 仍会异步解析页面。
+    await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(await file.arrayBuffer()),
+    })
+    const pdf = await loadingTask.promise
+    if (pdf.numPages !== 1) {
+      await pdf.cleanup()
+      await loadingTask.destroy()
+      return null
+    }
 
-    const sourceScaleX = bitmap.width / analysisCanvas.width
-    const sourceScaleY = bitmap.height / analysisCanvas.height
-    const padX = geometry.width * CROP_PADDING_RATIO
-    const padY = geometry.height * CROP_PADDING_RATIO
-    const cropX = clamp((geometry.x - padX) * sourceScaleX, 0, bitmap.width)
-    const cropY = clamp((geometry.y - padY) * sourceScaleY, 0, bitmap.height)
-    const cropRight = clamp((geometry.x + geometry.width + padX) * sourceScaleX, 0, bitmap.width)
-    const cropBottom = clamp((geometry.y + geometry.height + padY) * sourceScaleY, 0, bitmap.height)
-    const cropWidth = cropRight - cropX
-    const cropHeight = cropBottom - cropY
-    const rotation = Math.abs(geometry.angleRadians) >= MIN_ROTATION_RADIANS
-      ? -geometry.angleRadians
-      : 0
-    const cropped = cropWidth < bitmap.width * 0.94 || cropHeight < bitmap.height * 0.94
-    if (!cropped && rotation === 0)
-      return { file, transformed: false, useDocOrientationClassify: true }
+    const page = await pdf.getPage(1)
+    const viewport = page.getViewport({ scale: PDF_RENDER_SCALE })
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.ceil(viewport.width))
+    canvas.height = Math.max(1, Math.ceil(viewport.height))
+    const context = canvas.getContext('2d')
+    if (!context) {
+      await pdf.cleanup()
+      await loadingTask.destroy()
+      return null
+    }
 
-    const cosine = Math.abs(Math.cos(rotation))
-    const sine = Math.abs(Math.sin(rotation))
+    await page.render({ canvas: null, canvasContext: context, viewport }).promise
+    await pdf.cleanup()
+    await loadingTask.destroy()
+    return {
+      canvas,
+      size: { width: canvas.width, height: canvas.height },
+    }
+  }
+  catch {
+    return null
+  }
+}
+
+async function transformRasterSource(
+  file: File,
+  source: RasterSource,
+  sourceSize: RasterSourceSize,
+  forceOutput: boolean,
+): Promise<PreparedOcrImage> {
+  const analysisScale = Math.min(1, ANALYSIS_MAX_EDGE / Math.max(sourceSize.width, sourceSize.height))
+  const analysisCanvas = document.createElement('canvas')
+  analysisCanvas.width = Math.max(1, Math.round(sourceSize.width * analysisScale))
+  analysisCanvas.height = Math.max(1, Math.round(sourceSize.height * analysisScale))
+  const analysisContext = analysisCanvas.getContext('2d', { willReadFrequently: true })
+  if (!analysisContext)
+    return unchangedOcrImage(file)
+  analysisContext.drawImage(source, 0, 0, analysisCanvas.width, analysisCanvas.height)
+  const geometry = detectDocumentGeometry(analysisContext.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height))
+
+  if (!geometry) {
+    if (!forceOutput)
+      return unchangedOcrImage(file)
     const outputCanvas = document.createElement('canvas')
-    outputCanvas.width = Math.max(1, Math.ceil(cropWidth * cosine + cropHeight * sine))
-    outputCanvas.height = Math.max(1, Math.ceil(cropWidth * sine + cropHeight * cosine))
+    outputCanvas.width = sourceSize.width
+    outputCanvas.height = sourceSize.height
     const outputContext = outputCanvas.getContext('2d')
     if (!outputContext)
-      return { file, transformed: false, useDocOrientationClassify: true }
+      return unchangedOcrImage(file)
     outputContext.fillStyle = '#fff'
     outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height)
-    outputContext.translate(outputCanvas.width / 2, outputCanvas.height / 2)
-    outputContext.rotate(rotation)
     outputContext.filter = 'contrast(1.15)'
-    outputContext.drawImage(
-      bitmap,
-      cropX,
-      cropY,
-      cropWidth,
-      cropHeight,
-      -cropWidth / 2,
-      -cropHeight / 2,
-      cropWidth,
-      cropHeight,
-    )
-
+    outputContext.drawImage(source, 0, 0, outputCanvas.width, outputCanvas.height)
     const blob = await canvasBlob(outputCanvas)
     return {
       file: new File([blob], outputFileName(file.name), { type: 'image/png', lastModified: file.lastModified }),
       transformed: true,
-      useDocOrientationClassify: false,
+      useDocOrientationClassify: true,
     }
   }
+
+  const sourceScaleX = sourceSize.width / analysisCanvas.width
+  const sourceScaleY = sourceSize.height / analysisCanvas.height
+  const padX = geometry.width * CROP_PADDING_RATIO
+  const padY = geometry.height * CROP_PADDING_RATIO
+  const cropX = clamp((geometry.x - padX) * sourceScaleX, 0, sourceSize.width)
+  const cropY = clamp((geometry.y - padY) * sourceScaleY, 0, sourceSize.height)
+  const cropRight = clamp((geometry.x + geometry.width + padX) * sourceScaleX, 0, sourceSize.width)
+  const cropBottom = clamp((geometry.y + geometry.height + padY) * sourceScaleY, 0, sourceSize.height)
+  const cropWidth = cropRight - cropX
+  const cropHeight = cropBottom - cropY
+  const rotation = Math.abs(geometry.angleRadians) >= MIN_ROTATION_RADIANS
+    ? -geometry.angleRadians
+    : 0
+  const cropped = cropWidth < sourceSize.width * 0.94 || cropHeight < sourceSize.height * 0.94
+  if (!cropped && rotation === 0 && !forceOutput)
+    return unchangedOcrImage(file)
+
+  const cosine = Math.abs(Math.cos(rotation))
+  const sine = Math.abs(Math.sin(rotation))
+  const outputCanvas = document.createElement('canvas')
+  outputCanvas.width = Math.max(1, Math.ceil(cropWidth * cosine + cropHeight * sine))
+  outputCanvas.height = Math.max(1, Math.ceil(cropWidth * sine + cropHeight * cosine))
+  const outputContext = outputCanvas.getContext('2d')
+  if (!outputContext)
+    return unchangedOcrImage(file)
+  outputContext.fillStyle = '#fff'
+  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height)
+  outputContext.translate(outputCanvas.width / 2, outputCanvas.height / 2)
+  outputContext.rotate(rotation)
+  outputContext.filter = 'contrast(1.15)'
+  outputContext.drawImage(
+    source,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    -cropWidth / 2,
+    -cropHeight / 2,
+    cropWidth,
+    cropHeight,
+  )
+
+  const blob = await canvasBlob(outputCanvas)
+  return {
+    file: new File([blob], outputFileName(file.name), { type: 'image/png', lastModified: file.lastModified }),
+    transformed: true,
+    useDocOrientationClassify: false,
+  }
+}
+
+/**
+ * 送货单图片/PDF 在浏览器内自动裁白边、扶正并略微增强对比度。
+ * 原文件仍用于界面预览；只有派生 PNG 上传到同源 OCR 代理。
+ */
+export async function prepareDeliveryOcrImage(file: File): Promise<PreparedOcrImage> {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+  if (isPdf) {
+    const rendered = await renderSinglePagePdf(file)
+    if (!rendered)
+      return unchangedOcrImage(file)
+    const prepared = await transformRasterSource(file, rendered.canvas, rendered.size, true)
+    // PDF 可能带有 90° 页面方向；本地只做小角度纠偏，保留云端方向分类兜底。
+    return { ...prepared, useDocOrientationClassify: true }
+  }
+
+  if (!/^image\/(?:png|jpe?g)$/i.test(file.type) || typeof createImageBitmap !== 'function')
+    return unchangedOcrImage(file)
+
+  let bitmap: ImageBitmap | null = null
+  try {
+    bitmap = await createImageBitmap(file)
+    return transformRasterSource(file, bitmap, { width: bitmap.width, height: bitmap.height }, false)
+  }
   catch {
-    return { file, transformed: false, useDocOrientationClassify: true }
+    return unchangedOcrImage(file)
   }
   finally {
     bitmap?.close()

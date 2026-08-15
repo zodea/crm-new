@@ -89,7 +89,12 @@ const footerLabels = computed(() => ({
 
 const fetchProjects = materialStore.searchProjects
 const fetchCustomers = materialStore.searchCustomers
-const fetchSuppliers = materialStore.searchSuppliers
+function fetchSuppliers(keyword: string) {
+  return materialStore.searchSuppliers(
+    keyword,
+    props.kind === 'mat_arrival' ? draft.value.projectId ?? null : null,
+  )
+}
 const fetchCrews = materialStore.searchCrews
 function fetchContracts(keyword: string) {
   return materialStore.searchContracts(draft.value.projectId ?? null, keyword)
@@ -140,8 +145,12 @@ async function initialize() {
 function patchDraft(patch: Partial<MaterialPageDraft>) {
   const next = { ...draft.value, ...patch }
   if ('projectId' in patch) {
+    next.supplierId = null
     next.contractId = null
     next.requisitionId = null
+  }
+  else if ('supplierId' in patch) {
+    next.contractId = null
   }
   draft.value = next
 }

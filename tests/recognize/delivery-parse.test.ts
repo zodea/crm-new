@@ -17,6 +17,56 @@ const ROTATED_DELIVERY_MARKDOWN = `
 `
 
 describe('parseDeliveryMarkdown', () => {
+  it('兼容 OCR 将手写日期识别为空格分隔的年月日', () => {
+    const result = parseDeliveryMarkdown([`
+      # 广州德力五金机电有限公司庆丰电线厂门市部送货单
+      单号：0006477
+      日期：2026 5 21
+      <table>
+        <tr><td>名称及规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>电线</td><td>卷</td><td>1</td><td>100</td><td>100</td></tr>
+      </table>
+    `])
+
+    expect(result.docs[0]?.date).toBe('2026-05-21')
+  })
+
+  it('数量存在但单价和金额缺失时提示缺失，不误报为金额计算不一致', () => {
+    const result = parseDeliveryMarkdown([`
+      # 佛山市智道建筑材料有限公司送货单
+      单号：20260429001
+      日期：2026年4月29日
+      <table>
+        <tr><td>名称及规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>地面垫层砂浆#20</td><td>袋</td><td>10</td><td></td><td></td></tr>
+        <tr><td>计：</td><td></td><td></td><td></td><td>0</td></tr>
+      </table>
+    `])
+    const item = result.docs[0]?.items[0]
+
+    expect(item?.note).toContain('单价缺失')
+    expect(item?.note).toContain('金额缺失')
+    expect(item?.note).not.toContain('金额与数量×单价不符')
+    expect(result.docs[0]).toMatchObject({ balanced: false, statedTotal: 0 })
+  })
+
+  it('低置信待复核不等于金额不一致', () => {
+    const result = parseDeliveryMarkdown([`
+      # 广州德力五金机电有限公司庆丰电线厂门市部送货单
+      单号：0006477
+      <table>
+        <tr><td>名称及规格</td><td>单位</td><td>数量</td><td>单价</td><td>金额</td></tr>
+        <tr><td>无漆划划</td><td>1.49</td><td>183</td><td>4</td><td>732</td></tr>
+        <tr><td>合计</td><td></td><td></td><td></td><td>732</td></tr>
+      </table>
+    `])
+    const doc = result.docs[0]!
+
+    expect(doc.items[0]?.note).toContain('低置信')
+    expect(doc.note).not.toContain('金额与数量×单价不符')
+    expect(doc).toMatchObject({ calculatedTotal: 732, statedTotal: 732, balanced: true })
+  })
+
   it('解析旋转送货单的抬头、普通“单号”、日期、工地与 HTML 材料表', () => {
     const result = parseDeliveryMarkdown([ROTATED_DELIVERY_MARKDOWN])
 

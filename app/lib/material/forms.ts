@@ -395,6 +395,31 @@ async function assertOptionalReference(
     await assertReference(tx, table, id, label)
 }
 
+async function assertProjectSupplier(
+  tx: Pick<TransactionDb, 'select'>,
+  projectId: unknown,
+  supplierId: unknown,
+): Promise<void> {
+  const selectedProjectId = nullableId(projectId)
+  const selectedSupplierId = nullableId(supplierId)
+  if (!selectedProjectId || !selectedSupplierId)
+    return
+  const rows = await tx.select<{ id: string, supplier_category: string | null }>(`
+    SELECT relation.id, supplier.supplier_category
+    FROM project_suppliers AS relation
+    JOIN suppliers AS supplier ON supplier.id = relation.supplier_id
+    WHERE relation.project_id = ?
+      AND relation.supplier_id = ?
+      AND relation.deleted_at IS NULL
+      AND supplier.deleted_at IS NULL
+    LIMIT 1
+  `, [selectedProjectId, selectedSupplierId])
+  if (!rows[0])
+    throw new Error('分供方未关联所选项目')
+  if (rows[0].supplier_category && rows[0].supplier_category !== '材料供应商')
+    throw new Error('乙供材只能关联材料供应商')
+}
+
 async function assertMaterialContract(
   tx: Pick<TransactionDb, 'select'>,
   contractId: unknown,
@@ -727,6 +752,7 @@ async function saveMaterialArrival(
 ): Promise<PersistedHead> {
   await assertOptionalReference(tx, 'projects', draft.projectId, '项目')
   await assertOptionalReference(tx, 'suppliers', draft.supplierId, '分供方')
+  await assertProjectSupplier(tx, draft.projectId, draft.supplierId)
   await assertMaterialContract(tx, draft.contractId, draft.projectId, draft.supplierId)
   if (draft.requisitionId) {
     const requisition = await assertReference<{

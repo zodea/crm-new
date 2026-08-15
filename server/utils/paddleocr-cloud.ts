@@ -7,6 +7,7 @@ const JOBS_PATH = '/api/v2/ocr/jobs'
 const INITIAL_POLL_INTERVAL_MS = 3_000
 const POLL_INTERVAL_MULTIPLIER = 1.5
 const MAX_POLL_INTERVAL_MS = 15_000
+const SUBMIT_RETRY_DELAYS_MS = [1_500, 3_000] as const
 
 export type PaddleOcrCloudErrorCode
   = | 'missing-token'
@@ -123,6 +124,12 @@ function defaultSleep(milliseconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
+function shouldRetrySubmit(error: unknown): error is PaddleOcrCloudError {
+  return error instanceof PaddleOcrCloudError
+    && error.code === 'service-unavailable'
+    && /队列|排队/.test(error.message)
+}
+
 function apiMessage(payload: ApiPayload): string {
   const direct = payload.msg || payload.errorMsg || payload.message
   if (direct)
@@ -139,6 +146,12 @@ function errorForStatus(statusCode: number, message: string): PaddleOcrCloudErro
     })
   }
   if (statusCode === 400) {
+    if (/队列|排队|稍后重试/.test(message)) {
+      return new PaddleOcrCloudError('service-unavailable', message, {
+        retryable: true,
+        statusCode,
+      })
+    }
     return new PaddleOcrCloudError('invalid-request', message, { statusCode })
   }
   if (statusCode === 429) {
@@ -314,15 +327,25 @@ export class PaddleOcrCloudClient {
     fileBytes.set(input.data)
     form.append('file', new Blob([fileBytes.buffer], { type: input.contentType }), input.fileName)
 
-    const response = await this.request(`${this.baseUrl}${JOBS_PATH}`, {
-      method: 'POST',
-      headers: this.authHeaders(),
-      body: form,
-    })
-    const data = await this.apiData(response)
-    if (typeof data.jobId !== 'string' || !data.jobId)
-      throw new PaddleOcrCloudError('invalid-response', 'PaddleOCR 提交结果缺少 jobId')
-    return data.jobId
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const response = await this.request(`${this.baseUrl}${JOBS_PATH}`, {
+          method: 'POST',
+          headers: this.authHeaders(),
+          body: form,
+        })
+        const data = await this.apiData(response)
+        if (typeof data.jobId !== 'string' || !data.jobId)
+          throw new PaddleOcrCloudError('invalid-response', 'PaddleOCR 提交结果缺少 jobId')
+        return data.jobId
+      }
+      catch (error) {
+        const delay = SUBMIT_RETRY_DELAYS_MS[attempt]
+        if (!shouldRetrySubmit(error) || delay == null)
+          throw error
+        await this.sleep(delay)
+      }
+    }
   }
 
   private async poll(jobId: string, onProgress?: (percent: number) => void): Promise<string> {
