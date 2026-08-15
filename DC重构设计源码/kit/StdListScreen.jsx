@@ -1,7 +1,7 @@
 // StdListScreen — 标准单表列表屏（按实现端 app/components/material/MaterialListScreen.vue 与
 // app/components/finance/FinanceListScreen.vue 校准的共享底座；材料 9 屏 / 财务 6 屏薄壳复用）。
 // 实现端形态铁律：
-//   工具栏 = Panel（标题 17px/800 + 副标题 11px faint；右侧 搜索 272px + 刷新 + 新建）
+//   工具栏 = Panel（标题 17px/800；右侧 搜索 272px + 刷新 + 新建）
 //   表格   = 36px 紧凑行高、# 序号列、首列实体 link（点击进整页表单）、状态 chip（草稿=brand，其余=ok）、
 //            操作列 icon 按钮；横滚只发生在表格容器内；空态 = inbox 图标 + 标题 + 说明
 //   底部   = 「共 N 条 · <合计口径> <值>」右对齐合计条（材料=数量合计，财务=金额合计）
@@ -10,7 +10,7 @@
 //   分页   = 底部合计条左侧「第 x / y 页 ‹ ›」,pageSize 默认 10;搜索/筛选变化回到第 1 页
 //   实现端标准列表【没有】业务态视图 chip、导入导出、列显隐 —— 设计稿一并不放。
 // props 契约：
-//   title/subtitle          工具栏标题与副标题（照抄实现端 *_FORM_META label/subtitle）
+//   title/subtitle          工具栏标题；subtitle 保留兼容调用方但不在界面重复展示
 //   searchPlaceholder       搜索占位（材料/财务各自照抄实现端文案）
 //   searchKeys              搜索命中字段（按 row 展示值匹配）
 //   columns [{key,label,width,minWidth,align,mono,money,link,render(v,row)}]  不含 #/操作（自动补）
@@ -74,11 +74,10 @@
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-        {/* 工具栏（实现端：panel header，标题+副标题 / 搜索+刷新+新建） */}
+        {/* 工具栏（实现端：panel header，标题 / 搜索+刷新+新建） */}
         <Panel padding={0} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "12px 16px" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 800 }}>{props.title}</div>
-            <div style={{ marginTop: 2, fontSize: 11, color: "var(--ink-faint)" }}>{props.subtitle}</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
             <KA.SearchInput value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder={props.searchPlaceholder || "搜索"} width={272} />
@@ -151,7 +150,6 @@
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                         <Icon name="inbox" size={28} color="var(--ink-faint)" />
                         <b style={{ fontSize: 14, color: "var(--ink)" }}>{props.empty || "暂无数据"}</b>
-                        <span style={{ fontSize: 12, color: "var(--ink-faint)" }}>请调整筛选条件，或检查当前业务范围。</span>
                       </div>
                     </td>
                   </tr>

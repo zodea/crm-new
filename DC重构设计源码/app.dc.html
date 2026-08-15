@@ -46,7 +46,6 @@
     <header style="position:sticky; top:0; z-index:20; height:64px; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 24px; flex:none; gap:12px;">
       <div>
         <div style="font-size:18px; font-weight:800; line-height:1.2;">{{ pageTitle }}</div>
-        <div style="font-size:12px; color:var(--ink-soft); margin-top:2px; min-height:16px;">{{ pageSubtitle }}</div>
       </div>
       <div style="margin-left:auto; font-size:12px; color:var(--ink-soft);">{{ today }}</div>
     </header>
@@ -398,12 +397,14 @@ const PAGE = {
   projectSupplierImport: { title: "导入合作分供方", subtitle: "自动分类 · 人工确认新建 · 重复关系跳过" },
 };
 
+const INITIAL_DESIGN_PROTOTYPE = new URLSearchParams(window.location.search).get("prototype") === "delivery-review";
+
 class Component extends DCLogic {
   state = {
-    route: "home",
+    route: INITIAL_DESIGN_PROTOTYPE ? "delivery" : "home",
     params: {},
-    tabs: [{ id: "home", route: "home", params: {}, title: "首页" }],
-    activeId: "home",
+    tabs: INITIAL_DESIGN_PROTOTYPE ? [{ id: "delivery", route: "delivery", params: {}, title: "送货单识别" }] : [{ id: "home", route: "home", params: {}, title: "首页" }],
+    activeId: INITIAL_DESIGN_PROTOTYPE ? "delivery" : "home",
     collapsed: false,
     // 侧栏结构 = 1 个顶层项（首页）+ 9 个分组，共 50 个叶子（识别中心组已于 2026-07-09 退役，4 项迁回各域）。
     // openGroup = null 表示跟随当前路由所属分组（单开手风琴，见 _buildSidebar）。
@@ -701,7 +702,7 @@ class Component extends DCLogic {
     const navItems = NAV.map(n => {
       if (n.type === "item") {
         return collapsed ? miniBtn(n) : React.createElement(NavItem, {
-          key: n.key, mark: n.mark, label: n.label, hint: n.hint,
+          key: n.key, mark: n.mark, label: n.label, hint: null,
           active: isActive(n.key), onClick: () => navigate(n.key)
         });
       }
@@ -723,7 +724,7 @@ class Component extends DCLogic {
           isOpen && React.createElement("div", {
             style: { display: "flex", flexDirection: "column", gap: 2, paddingLeft: 8, marginLeft: 8, borderLeft: "1px solid var(--line)" } },
             ...n.items.map(it => React.createElement(NavItem, {
-              key: it.key, mark: it.mark, label: it.label, hint: it.hint,
+              key: it.key, mark: it.mark, label: it.label, hint: null,
               active: isActive(it.key), onClick: () => navigate(it.key)
             }))
           )
@@ -762,10 +763,6 @@ class Component extends DCLogic {
           React.createElement(Icon, { name: collapsed ? "panel-left-open" : "panel-left-close", size: 16 }),
           !collapsed && React.createElement("span", null, "收起侧栏")
         ),
-        !collapsed && React.createElement("div", { style: { paddingTop: 12, fontSize: 11, color: "var(--ink-soft)", lineHeight: 1.7 } },
-          React.createElement("div", null, "本地工具 · 数据不上传"),
-          React.createElement("div", null, "设计稿运行态 · 非生产构建")
-        )
       )
     );
   }

@@ -16,6 +16,8 @@
 
     const rows = A.rows("payRecords").map((r) => ({
       id: r.id,
+      projectId: r.projectId || null,
+      supplierId: r.supplierId || null,
       name: r.payeeName || r.account || "",                                 // 名称=收款方（实现端 payee_name AS display_name；旧演示行兜底账户名）
       no: r.no || "",
       projectName: r.projectId ? projName(r.projectId) : "公司付款",        // SQL COALESCE(project.name, '公司付款')
@@ -24,6 +26,8 @@
       date: r.date || "",
       status: r.status || "已确认",                                         // 确认状态兜底「已确认」
     }));
+    const scopedRows = rows.filter((r) => (!(params && params.project) || r.projectId === params.project)
+      && (!(params && params.supplier) || r.supplierId === params.supplier));
 
     return (
       <Std
@@ -40,7 +44,7 @@
           { key: "date", label: "日期", width: 128, mono: true },
           { key: "status", label: "状态", width: 110, render: (v) => window.stdStatusChip(v) },
         ]}
-        rows={rows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
+        rows={scopedRows} filters={[{key:"projectName",label:"项目"}, {key:"status",label:"状态"}]} tableMinWidth={1200}
         footerSummary={(list) => ({ label: "金额合计", value: "¥" + list.reduce((s, r) => s + r.amount, 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
       />
     );
