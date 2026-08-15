@@ -49,7 +49,7 @@ export interface CoverageEntry {
   designRoute: string | string[] | null
   status: string
   reason?: string
-  issue?: number
+  issue?: string
 }
 
 export interface Coverage {
@@ -73,6 +73,7 @@ export declare function readDesignFormRoutes(formsDir?: string): DesignFormRoute
 export declare function readAppNavLeaves(navTreePath?: string): AppNavLeaf[]
 export declare function readAppNavGroups(navTreePath?: string): { key: string, label: string }[]
 export declare function pageFileToRoute(relativePath: string): string
+export declare function readAppPageFiles(pagesRoot?: string): string[]
 export declare function readAppRoutes(pagesRoot?: string): string[]
 export declare function deriveDesignRoute(
   appRoute: string,

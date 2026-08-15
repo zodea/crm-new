@@ -216,14 +216,16 @@ describe('design coverage contract', () => {
   it('keeps sidebar labels identical between the app and the design source', () => {
     const { navParity } = coverage()
 
+    const pendingRoutes = new Set(coverage().screenParity.filter((entry: { status: string, issue?: string }) => entry.status === 'design-pending' && entry.issue).map((entry: { appRoute: string }) => entry.appRoute))
     const missingInDesign = navParity
-      .filter((entry: { designLabel: string | null }) => !entry.designLabel)
+      .filter((entry: { designLabel: string | null, appNavTo: string | null }) =>
+        !entry.designLabel && !pendingRoutes.has(entry.appNavTo ?? ''))
       .map((entry: { key: string }) => entry.key)
     expect(missingInDesign).toEqual([])
 
     const mismatched = navParity
       .filter((entry: { appLabel: string, designLabel: string | null }) =>
-        entry.appLabel !== entry.designLabel)
+        entry.designLabel !== null && entry.appLabel !== entry.designLabel)
       .map((entry: { key: string, appLabel: string, designLabel: string | null }) =>
         `${entry.key}: app「${entry.appLabel}」/ design「${entry.designLabel}」`)
     expect(mismatched).toEqual([])

@@ -15,6 +15,36 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       .toEqual({ kind: 'link', to: '/base/customer/c1', text: '保利发展' })
   })
 
+  it('项目来源感知链接始终显式携带来源身份', () => {
+    expect(resolveEntityLink({
+      type: 'project',
+      id: 'p1',
+      label: '测试项目',
+      dataOrigin: 'demo',
+    })).toEqual({ kind: 'link', to: '/project/p1?origin=demo', text: '测试项目' })
+    expect(resolveEntityLink({
+      type: 'project',
+      id: 'p1',
+      label: '正式项目',
+      dataOrigin: 'real',
+    })).toEqual({ kind: 'link', to: '/project/p1?origin=real', text: '正式项目' })
+  })
+
+  it('目标页未消费来源策略时，所有来源感知关联都退化为文本', () => {
+    expect(resolveEntityLink({
+      type: 'customer',
+      id: 'c-demo',
+      label: '演示客户',
+      dataOrigin: 'demo',
+    })).toEqual({ kind: 'text', text: '演示客户' })
+    expect(resolveEntityLink({
+      type: 'customer',
+      id: 'c-real',
+      label: '正式客户',
+      dataOrigin: 'real',
+    })).toEqual({ kind: 'text', text: '正式客户' })
+  })
+
   it('未实装类型（crew/worker）退化纯文本，不做死链', () => {
     expect(resolveEntityLink({ type: 'crew', id: 'g1', label: '泥水一组' }))
       .toEqual({ kind: 'text', text: '泥水一组' })

@@ -70,11 +70,28 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
 
   const summary = page.getByTestId('supplier-summary')
   await expect(summary).toContainText('合作项目1 个')
-  await expect(summary).toContainText('合同总额¥261,250.00')
-  await expect(summary).toContainText('累计请款¥121,139.00')
-  await expect(summary).toContainText('累计收票¥12,380.00')
-  await expect(summary).toContainText('累计已付¥101,138.00')
-  await expect(summary).toContainText('应付余额¥160,112.00')
+  await expect(summary).toContainText('累计合同金额¥261,250.00')
+  await expect(summary).toContainText('累计结算金额¥101,138.00')
+  await expect(summary).toContainText('累计收票金额¥12,380.00')
+  await expect(summary).toContainText('累计付款金额¥101,138.00')
+  await expect(summary).toContainText('应付金额¥160,112.00')
+  await expect(summary.getByRole('button', { name: '查看累计合同金额明细' })).toBeVisible()
+  await expect(summary.getByRole('button', { name: '查看累计结算金额明细' })).toBeVisible()
+  await expect(summary.getByRole('button', { name: '查看累计收票金额明细' })).toBeVisible()
+  await expect(summary.getByRole('button', { name: '查看累计付款金额明细' })).toBeVisible()
+  await expect(summary.getByRole('button', { name: '查看应付金额明细' })).toHaveCount(0)
+
+  await summary.getByRole('button', { name: '查看累计合同金额明细' }).click()
+  await expect(detailTabs.getByRole('tab', { name: '合同汇总 (3)', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004\?tab=contracts$/)
+  await expect(page.getByRole('columnheader', { name: '累计结算' })).toBeVisible()
+  await summary.getByRole('button', { name: '查看累计结算金额明细' }).click()
+  await expect(detailTabs.getByRole('tab', { name: '合同汇总 (3)', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await summary.getByRole('button', { name: '查看累计收票金额明细' }).click()
+  await expect(detailTabs.getByRole('tab', { name: '收票汇总 (1)', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004\?tab=invoices$/)
+  await summary.getByRole('button', { name: '查看累计付款金额明细' }).click()
+  await expect(detailTabs.getByRole('tab', { name: '请款/付款汇总 (2)', exact: true })).toHaveAttribute('aria-selected', 'true')
 
   await detailTabs.getByRole('tab', { name: '合作项目 (1)', exact: true }).click()
   await expect(page.getByRole('link', { name: '锦绣华庭', exact: true }))
@@ -139,6 +156,13 @@ test('分供方详情：6 Tab 实时汇总、证照软删除撤回与列表双�
   await page.getByRole('button', { name: '返回分供方详情' }).click()
 
   expect(pageErrors, '分供方详情旅程不应产生客户端运行错误').toEqual([])
+})
+
+test('分供方详情：聚合页签深链刷新后可恢复', async ({ page }) => {
+  await page.goto('/base/supplier/sup_demo_004?tab=invoices')
+  const detailTabs = page.getByRole('navigation', { name: '分供方详情分类' })
+  await expect(detailTabs.getByRole('tab', { name: '收票汇总 (1)', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('columnheader', { name: '发票号码' })).toBeVisible()
 })
 
 for (const width of [390, 768, 1024, 1280] as const) {

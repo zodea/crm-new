@@ -134,14 +134,15 @@ interface SupplierCredential {
 
 ```ts
 interface SupplierReadonlySummary {
-  supplierId: string
   projectCount: number            // 关联项目数
   contractCount: number           // 合同总数
   contractTotal: number           // 合同总额
+  settledTotal: number            // 累计结算金额
   claimedTotal: number            // 累计已审批请款
   invoiceTotal: number            // 累计收票金额
-  paidTotal: number               // 累计已付
-  payableBalance: number          // 应付余额 = contractTotal - paidTotal
+  invoiceTaxTotal: number         // 累计收票税额
+  paidTotal: number               // 累计付款金额
+  payableBalance: number          // 应付金额 = contractTotal - paidTotal
 }
 ```
 
@@ -241,7 +242,7 @@ interface SupplierReadonlySummary {
 | 1 | 详细资料 | 基础信息、开票信息、联系人信息 | 可编辑主数据 |
 | 2 | 证照附件 | 证照清单表格、批量下载、上传、OCR 重新识别 | 可维护证照 |
 | 3 | 合作项目 | ProjectSupplier 列表: 项目名/状态/合同额/已付/应付/结算状态 | 点击跳转 → ProjectSupplier 详情 |
-| 4 | 合同汇总 | 只读合同列表（跨项目），可按金额排序、按合同类型筛选 | 点击跳转 → 采购合同详情 |
+| 4 | 合同汇总 | 只读合同列表（跨项目），展示含税金额、累计结算和累计支付，可按金额排序、按合同类型筛选 | 点击跳转 → 采购合同详情 |
 | 5 | 请款/付款汇总 | 只读请款和付款列表（跨项目），可按时间/金额排序 | 点击跳转 → 付款申请详情 |
 | 6 | 收票汇总 | 只读收票列表（跨项目），可按发票号/金额/日期筛选 | 点击跳转 → 收票登记详情 |
 
@@ -304,16 +305,17 @@ Tab 3 和 Tab 4/5/6 的视角不同：Tab 3 按项目维度，Tab 4/5/6 按单�
 
 ## 七、跨项目只读汇总
 
-汇总只在详情页展示，不直接编辑源数据。顶部指标可点击切换到对应详情 Tab；项目、合同、付款申请和发票明细继续通过蓝色链接穿透真实源记录。
+汇总只在详情页展示，不直接编辑源数据。顶部“合作项目、累计合同金额、累计结算金额、累计收票金额、累计付款金额”是固定穿透入口并同步 `?tab=` 深链；“应付金额”只展示。入口对应的真实关系暂时没有记录时仍进入目标 Tab 的真实空态，不用 mock 填充。项目、合同、付款申请和发票明细继续通过蓝色链接穿透真实源记录。
 
 | 指标 | 计算来源 |
 |---|---|
 | 合作项目数 | COUNT(ProjectSupplier WHERE supplierId) |
-| 合同数 / 合同总额 | 采购合同表（→ `material-contract`） |
+| 合同数 / 累计合同金额 | 采购合同表（→ `contracts`） |
+| 累计结算金额 | 采购合同的累计结算字段（→ `contracts`，合同表同时展示该列） |
 | 累计已审批请款 | 付款申请表（→ `finance-payment`） |
-| 累计收票金额 / 税额 | 收票登记表（→ `finance-ticket`） |
-| 累计已付 | 付款流水表（→ `finance-payment`） |
-| 应付余额 | 合同总额 − 累计已付 |
+| 累计收票金额 / 税额 | 已归档发票表（→ `invoices`） |
+| 累计付款金额 | 付款申请实际付款字段（→ `payments`） |
+| 应付金额 | 累计合同金额 − 累计付款金额（只读、不穿透） |
 
 ---
 

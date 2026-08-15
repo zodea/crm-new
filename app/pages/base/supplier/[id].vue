@@ -9,7 +9,14 @@ import { maskPhone } from '~/lib/util/privacy'
 type DetailTab = 'detail' | 'credential' | 'projects' | 'contracts' | 'payments' | 'invoices'
 type ReadonlyTab = Exclude<DetailTab, 'detail' | 'credential'>
 
+interface SupplierSummaryRow {
+  label: string
+  value: string
+  tab?: ReadonlyTab
+}
+
 const route = useRoute()
+const router = useRouter()
 const store = useSupplierStore()
 const detailStore = useSupplierDetailStore()
 const { warning } = useKitUI()
@@ -27,9 +34,10 @@ let latestLoadRequest = 0
 useTabTitle(() => supplier.value?.name)
 
 const activeTab = shallowRef<DetailTab>('detail')
+const detailTabKeys = new Set<DetailTab>(['detail', 'credential', 'projects', 'contracts', 'payments', 'invoices'])
 const routeTab = computed<DetailTab | null>(() => {
   const value = Array.isArray(route.query.tab) ? route.query.tab[0] : route.query.tab
-  return ['detail', 'credential', 'projects', 'contracts', 'payments', 'invoices'].includes(String(value))
+  return detailTabKeys.has(String(value) as DetailTab)
     ? value as DetailTab
     : null
 })
@@ -58,19 +66,25 @@ function credentialChipClass(status: string): string {
   return tone ? chipToneClass[tone] : 'chip-warn'
 }
 
-const summaryRows = computed(() => [
+const summaryRows = computed<SupplierSummaryRow[]>(() => [
   { label: '合作项目', value: `${snapshot.value.summary.projectCount} 个`, tab: 'projects' as const },
-  { label: '合同总额', value: yuan(snapshot.value.summary.contractTotal), tab: 'contracts' as const },
-  { label: '累计请款', value: yuan(snapshot.value.summary.claimedTotal), tab: 'payments' as const },
-  { label: '累计收票', value: yuan(snapshot.value.summary.invoiceTotal), tab: 'invoices' as const },
-  { label: '累计已付', value: yuan(snapshot.value.summary.paidTotal), tab: 'payments' as const },
-  {
-    label: '应付余额',
-    value: yuan(snapshot.value.summary.payableBalance),
-    danger: snapshot.value.summary.payableBalance > 0,
-    tab: 'payments' as const,
-  },
+  { label: '累计合同金额', value: yuan(snapshot.value.summary.contractTotal), tab: 'contracts' as const },
+  { label: '累计结算金额', value: yuan(snapshot.value.summary.settledTotal), tab: 'contracts' as const },
+  { label: '累计收票金额', value: yuan(snapshot.value.summary.invoiceTotal), tab: 'invoices' as const },
+  { label: '累计付款金额', value: yuan(snapshot.value.summary.paidTotal), tab: 'payments' as const },
+  { label: '应付金额', value: yuan(snapshot.value.summary.payableBalance) },
 ])
+
+function selectDetailTab(value: string | undefined) {
+  const next = detailTabKeys.has(value as DetailTab) ? value as DetailTab : 'detail'
+  activeTab.value = next
+  const query = { ...route.query }
+  if (next === 'detail')
+    delete query.tab
+  else
+    query.tab = next
+  void router.replace({ query })
+}
 const credentialGroups = computed(() => {
   const groups = new Map<string, SupplierCredential[]>()
   for (const credential of snapshot.value.credentials) {
@@ -134,7 +148,7 @@ function openCredentialFile(
 ) {
   if (!credential.fileRef || !credential.hasAccessibleFile) {
     warning('该历史记录没有可读取的原文件，请在证照附件中重新上传')
-    activeTab.value = 'credential'
+    selectDetailTab('credential')
     return
   }
   void (action === 'preview'
@@ -144,8 +158,7 @@ function openCredentialFile(
 
 watch(supplierId, () => void loadSupplier(), { immediate: true })
 watch(routeTab, (tab) => {
-  if (tab)
-    activeTab.value = tab
+  activeTab.value = tab ?? 'detail'
 }, { immediate: true })
 </script>
 
@@ -192,21 +205,20 @@ watch(routeTab, (tab) => {
 
     <template #summary>
       <MetricGrid v-if="supplier" data-testid="supplier-summary" :cols="6">
-        <button
-          v-for="row in summaryRows"
-          :key="row.label"
-          type="button"
-          class="min-w-0 border-0 bg-transparent p-0 text-left hover:bg-surface-2 focus-visible:outline-brand"
-          :aria-label="`查看${row.label}明细`"
-          @click="activeTab = row.tab"
-        >
-          <Metric
-            :label="row.label"
-            :value="row.value"
-            :tone="row.danger ? 'danger' : undefined"
-            :big="row.label === '应付余额'"
-          />
-        </button>
+        <template v-for="row in summaryRows" :key="row.label">
+          <button
+            v-if="row.tab"
+            type="button"
+            class="min-w-0 border-0 bg-transparent p-0 text-left hover:bg-surface-2 focus-visible:outline-brand"
+            :aria-label="`查看${row.label}明细`"
+            @click="selectDetailTab(row.tab)"
+          >
+            <Metric :label="row.label" :value="row.value" tone="brand" />
+          </button>
+          <div v-else class="min-w-0">
+            <Metric :label="row.label" :value="row.value" />
+          </div>
+        </template>
       </MetricGrid>
     </template>
 
@@ -230,7 +242,11 @@ watch(routeTab, (tab) => {
 
     <template v-if="supplier">
       <nav class="mb-4 overflow-x-auto" aria-label="分供方详情分类">
-        <SegTab v-model="activeTab" :tabs="tabs" />
+        <SegTab
+          :model-value="activeTab"
+          :tabs="tabs"
+          @update:model-value="selectDetailTab"
+        />
       </nav>
 
       <SupplierDetailTab v-if="activeTab === 'detail'" :supplier="supplier" />
@@ -249,7 +265,7 @@ watch(routeTab, (tab) => {
             <h3 class="text-13px font-700 text-ink">
               文件管理
             </h3>
-            <button type="button" class="icon-btn" title="添加证照" aria-label="从文件管理添加证照" @click="activeTab = 'credential'">
+            <button type="button" class="icon-btn" title="添加证照" aria-label="从文件管理添加证照" @click="selectDetailTab('credential')">
               <span class="i-lucide-upload" aria-hidden="true" />
             </button>
           </div>

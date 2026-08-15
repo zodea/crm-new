@@ -1,54 +1,23 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import {
+  buildRuntimeEvidenceLedger,
+  IMPLEMENTATION_FRONTIER_BLOCK_BEGIN,
+  IMPLEMENTATION_FRONTIER_BLOCK_END,
+  renderImplementationFrontier,
+  renderRuntimeEvidenceSummary,
+  RUNTIME_EVIDENCE_LEDGER_PATH,
+  RUNTIME_SUMMARY_BLOCK_BEGIN,
+  RUNTIME_SUMMARY_BLOCK_END,
+} from '../../scripts/runtime-evidence-ledger.mjs'
 
 const PROJECT_ROOT = process.cwd()
-const PAGES_ROOT = join(PROJECT_ROOT, 'app/pages')
 const AUDIT_PATH = join(PROJECT_ROOT, 'docs/design/runtime-reference-audit.md')
+const COVERAGE_PATH = join(PROJECT_ROOT, 'docs/design/design-coverage.json')
+const DESIGN_INDEX_PATH = join(PROJECT_ROOT, 'docs/design/README.md')
+const STATUS_PATH = join(PROJECT_ROOT, 'docs/design/ui-implementation-status.md')
 const PAGE_TEMPLATES = new Set(['列表', '详情', '整页表单', '工作台', '特殊工具'])
-
-interface AuditRow {
-  page: string
-  route: string
-  domain: string
-  template: string
-  ticket: string
-  reference: string
-  layoutGap: string
-  interactionGap: string
-  constraints: string
-}
-
-function productionPageFiles(directory = PAGES_ROOT): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name)
-    if (entry.isDirectory()) {
-      const isRootDevDirectory = directory === PAGES_ROOT && entry.name === 'dev'
-      return isRootDevDirectory ? [] : productionPageFiles(path)
-    }
-    return extname(entry.name) === '.vue'
-      ? [relative(PROJECT_ROOT, path).replaceAll('\\', '/')]
-      : []
-  }).sort()
-}
-
-function nuxtRouteForPage(page: string): string {
-  const segments = page
-    .replace(/^app\/pages\//, '')
-    .replace(/\.vue$/, '')
-    .split('/')
-
-  if (segments.at(-1) === 'index')
-    segments.pop()
-
-  const route = segments
-    .map(segment => segment
-      .replace(/^\[\[([^\]]+)\]\]$/, ':$1?')
-      .replace(/^\[([^\]]+)\]$/, ':$1'))
-    .join('/')
-
-  return route ? `/${route}` : '/'
-}
 
 function markdownCells(line: string): string[] {
   return line
@@ -57,31 +26,19 @@ function markdownCells(line: string): string[] {
     .map(cell => cell.trim())
 }
 
-function auditRows(markdown: string): AuditRow[] {
-  return markdown
-    .split(/\r?\n/)
-    .filter(line => line.startsWith('| `app/pages/'))
-    .map((line) => {
-      const [page, route, domain, template, ticket, reference, layoutGap, interactionGap, constraints] = markdownCells(line)
-      return {
-        page: page.replaceAll('`', ''),
-        route: route.replaceAll('`', ''),
-        domain,
-        template,
-        ticket,
-        reference,
-        layoutGap,
-        interactionGap,
-        constraints,
-      }
-    })
-}
-
 function definedProfileCodes(markdown: string, prefix: 'R-' | 'C-'): Set<string> {
   return new Set(markdown
     .split(/\r?\n/)
     .filter(line => line.startsWith(`| \`${prefix}`))
     .map(line => markdownCells(line)[0].replaceAll('`', '')))
+}
+
+function generatedBlock(markdown: string, begin: string, end: string): string {
+  const from = markdown.indexOf(begin)
+  const to = markdown.indexOf(end)
+  expect(from, begin).toBeGreaterThanOrEqual(0)
+  expect(to, end).toBeGreaterThan(from)
+  return markdown.slice(from + begin.length, to).trim().replaceAll('\r\n', '\n')
 }
 
 function markdownSection(markdown: string, heading: string, nextHeading: string): string {
@@ -95,19 +52,155 @@ function markdownSection(markdown: string, heading: string, nextHeading: string)
 }
 
 describe('runtime reference audit contract', () => {
-  it('keeps one auditable row for every production route', () => {
+  it('recomputes one current evidence record for every production route and page domain', () => {
+    const ledger = buildRuntimeEvidenceLedger()
+    const committed = JSON.parse(readFileSync(RUNTIME_EVIDENCE_LEDGER_PATH, 'utf8'))
+
+    expect(committed).toEqual(ledger)
+    expect(ledger.counts).toMatchObject({
+      trackedPageFiles: 134,
+      devPageFiles: 5,
+      productionRoutes: 129,
+      pageDomains: 20,
+      evidenceEndpointRecords: 129,
+      referenceEndpoints: 129,
+      referenceProfiles: 37,
+      usedReferenceProfiles: 32,
+      directEvidenceRoutes: 48,
+      adjacentEvidenceRoutes: 18,
+      localAuthorityRoutes: 18,
+      historicalEvidenceRoutes: 36,
+      unverifiedTargetRoutes: 9,
+    })
+    expect(ledger.endpoints).toHaveLength(129)
+    expect(ledger.domains).toHaveLength(20)
+
+    for (const endpoint of ledger.endpoints) {
+      expect(endpoint.evidenceRecordId).toMatch(/^E-[0-9A-F]{12}$/)
+      expect(endpoint.referenceEndpointId).not.toBe('')
+      expect(endpoint.referenceEndpointLabel).not.toBe('')
+      expect(endpoint.evidenceGrade).toMatch(/^(direct|adjacent|historical|unverified-target|local-authority)$/)
+      expect(endpoint.observationDate === null || /^\d{4}-\d{2}-\d{2}$/.test(endpoint.observationDate)).toBe(true)
+      expect(endpoint.observationDateStatus).toMatch(/^(recorded|not-recorded-historical|not-observed|not-applicable-local-authority)$/)
+      expect(endpoint.permissionStatus).toMatch(/^(read-only-observed|read-only-observed-with-restricted-target|unverified|not-applicable)$/)
+      expect(endpoint.implementationIssues.length).toBeGreaterThan(0)
+      expect(endpoint.layoutConclusion).toEqual({
+        sourceDocument: 'docs/design/runtime-reference-audit.md',
+        routeKey: endpoint.localRoute,
+      })
+      expect(endpoint.stateAndNavigationConclusion).toEqual(endpoint.layoutConclusion)
+    }
+
+    expect(ledger.endpoints.filter(endpoint => endpoint.permissionStatus === 'read-only-observed-with-restricted-target').map(endpoint => endpoint.localRoute)).toEqual([
+      '/base/customer',
+      '/project',
+    ])
+    expect(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === 'adjacent').map(endpoint => endpoint.localRoute)).toEqual([
+      '/base/supplier/form/:id?',
+      '/contract/material/form/:id',
+      '/finance/invoice',
+      '/finance/payment/:id/detail',
+      '/material/settlement/form/:id',
+      '/owner/:kind/:id',
+      '/owner-material/arrival/:id',
+      '/owner-material/arrival/new',
+      '/owner-material/control/:id',
+      '/owner-material/control/new',
+      '/owner-material/direct/:id',
+      '/owner-material/direct/new',
+      '/owner-material/requisition/:id',
+      '/owner-material/requisition/new',
+      '/owner-material/use/:id',
+      '/owner-material/use/new',
+      '/project/:pid/supplier/:sid',
+      '/project/:pid/supplier/import',
+    ])
+    expect(new Set(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === 'historical').map(endpoint => endpoint.referenceProfile))).toEqual(new Set([
+      'R-LIST-PRIOR',
+      'R-FORM-PRIOR',
+      'R-DETAIL-PRIOR',
+      'R-WORKBENCH-PRIOR',
+    ]))
+    expect(new Set(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === 'unverified-target').map(endpoint => endpoint.referenceProfile))).toEqual(new Set(['R-TOOL-PENDING']))
+    expect(ledger.endpoints.filter(endpoint => endpoint.observationDate === null).every(endpoint => endpoint.observationDateStatus !== 'recorded')).toBe(true)
+
+    expect(ledger.endpoints.filter(endpoint => [
+      '/finance/payment',
+      '/finance/payment-management',
+      '/finance/records',
+    ].includes(endpoint.localRoute)).map(endpoint => ({
+      evidenceRecordId: endpoint.evidenceRecordId,
+      referenceEndpointId: endpoint.referenceEndpointId,
+      referenceEndpointLabel: endpoint.referenceEndpointLabel,
+    }))).toEqual([
+      {
+        evidenceRecordId: 'E-7C0131CDBA56',
+        referenceEndpointId: 'finance-payment-list',
+        referenceEndpointLabel: '资金管理 > 付款申请',
+      },
+      {
+        evidenceRecordId: 'E-45B4B7708E6F',
+        referenceEndpointId: 'finance-payment-management',
+        referenceEndpointLabel: '资金管理 > 付款管理',
+      },
+      {
+        evidenceRecordId: 'E-C2DAF212F5DF',
+        referenceEndpointId: 'finance-payment-records',
+        referenceEndpointLabel: '资金管理 > 支付记录',
+      },
+    ])
+  })
+
+  it('keeps design authority and implementation status aligned with the generated ledger', () => {
+    const ledger = buildRuntimeEvidenceLedger()
+    const status = readFileSync(STATUS_PATH, 'utf8')
+    const designIndex = readFileSync(DESIGN_INDEX_PATH, 'utf8')
+    const coverage = JSON.parse(readFileSync(COVERAGE_PATH, 'utf8'))
+    const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
+
+    expect(status).toContain('> 核对日期：2026-08-15')
+    expect(status).toContain('| 实现页面文件（含 dev） | 134 |')
+    expect(status).toContain('| 开发预览路由 | 5 |')
+    expect(status).toContain('| 实现生产路由（排除 dev） | 129 |')
+    expect(status).toContain('**当前为 2。**')
+    expect(status).toContain('`/finance/payment/:id/detail`')
+    expect(status).not.toMatch(/\| 已闭环 \|/)
+
+    expect(designPending).toEqual([
+      expect.objectContaining({
+        appRoute: '/finance/payment/:id/detail',
+        issue: '#305',
+      }),
+      expect.objectContaining({
+        appRoute: '/settings/data-migration',
+        issue: '#294',
+      }),
+    ])
+    expect(designIndex).toContain('[#292](https://github.com/zodea/crm-new/issues/292)')
+    expect(designIndex).toContain('[#276](https://github.com/zodea/crm-new/issues/276)')
+    expect(designIndex).toContain('`/finance/payment/:id/detail`')
+    expect(designIndex).not.toContain('**当前为空。**')
+
+    expect(generatedBlock(status, IMPLEMENTATION_FRONTIER_BLOCK_BEGIN, IMPLEMENTATION_FRONTIER_BLOCK_END)).toBe(
+      renderImplementationFrontier(ledger),
+    )
+    expect(generatedBlock(readFileSync(AUDIT_PATH, 'utf8'), RUNTIME_SUMMARY_BLOCK_BEGIN, RUNTIME_SUMMARY_BLOCK_END)).toBe(
+      renderRuntimeEvidenceSummary(ledger),
+    )
+
+    const currentIssues = new Set(ledger.domains.flatMap(domain => domain.implementationIssues))
+    for (const issue of currentIssues)
+      expect(status, `#${issue}`).toContain(`issues/${issue}`)
+  })
+
+  it('keeps one uniquely identified evidence endpoint for every production route', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
-    const markdown = readFileSync(AUDIT_PATH, 'utf8')
-    const rows = auditRows(markdown)
-    const pages = productionPageFiles()
-
-    expect(rows.map(row => row.page).sort()).toEqual(pages)
-    expect(new Set(rows.map(row => row.page)).size).toBe(rows.length)
-    expect(new Set(rows.map(row => row.route)).size).toBe(rows.length)
-
-    for (const row of rows)
-      expect(row.route, row.page).toBe(nuxtRouteForPage(row.page))
+    const endpoints = buildRuntimeEvidenceLedger().endpoints
+    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(129)
+    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(129)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {
@@ -115,15 +208,13 @@ describe('runtime reference audit contract', () => {
     const references = definedProfileCodes(markdown, 'R-')
     const constraints = definedProfileCodes(markdown, 'C-')
 
-    for (const row of auditRows(markdown)) {
-      expect(row.route, row.page).toMatch(/^\//)
-      expect(row.domain, row.page).not.toBe('')
-      expect(PAGE_TEMPLATES.has(row.template), row.page).toBe(true)
-      expect(row.ticket, row.page).toMatch(/^#\d+$/)
-      expect(references.has(row.reference), row.page).toBe(true)
-      expect(row.layoutGap, row.page).not.toBe('')
-      expect(row.interactionGap, row.page).not.toBe('')
-      expect(constraints.has(row.constraints), row.page).toBe(true)
+    for (const endpoint of buildRuntimeEvidenceLedger().endpoints) {
+      expect(endpoint.localRoute, endpoint.page).toMatch(/^\//)
+      expect(endpoint.domainCode, endpoint.page).not.toBe('')
+      expect(PAGE_TEMPLATES.has(endpoint.template), endpoint.page).toBe(true)
+      expect(endpoint.implementationIssues.every(Number.isInteger), endpoint.page).toBe(true)
+      expect(references.has(endpoint.referenceProfile), endpoint.page).toBe(true)
+      expect(constraints.has(endpoint.constraints), endpoint.page).toBe(true)
     }
   })
 

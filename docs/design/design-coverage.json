@@ -6,10 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "appPageFiles": 128,
-    "appNavLeaves": 50,
+    "trackedPageFiles": 134,
+    "devPageFiles": 5,
+    "appPageFiles": 129,
+    "appNavLeaves": 51,
     "covered": 127,
-    "designPending": 1,
+    "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -259,7 +261,7 @@
       "designRoute": null,
       "status": "design-pending",
       "reason": "本轮补齐的付款申请只读详情工作台，暂无一一对应的 DC 页面；沿用 EntityDetailShell 的详情骨架，并以用户提供的智能业务洞察侧栏为结构线索，先登记为待补设计。",
-      "issue": "#203"
+      "issue": "#305"
     },
     {
       "appRoute": "/finance/payment/new",
@@ -608,6 +610,13 @@
       "appRoute": "/schedule/process-library/form",
       "designRoute": "processLibraryForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/settings/data-migration",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "核心身份迁移是 #294 新增的浏览器专属工作台；当前先以运行契约、四档视口和局部滚动证据验收，尚无一一对应的 DC 页面。",
+      "issue": "#294"
     },
     {
       "appRoute": "/settings/ocr",
@@ -1072,6 +1081,13 @@
       "appLabel": "工人信息",
       "designLabel": "工人信息",
       "designPageTitle": "工人信息库"
+    },
+    {
+      "key": "dataMigration",
+      "appNavTo": "/settings/data-migration",
+      "appLabel": "本地数据迁移",
+      "designLabel": null,
+      "designPageTitle": null
     },
     {
       "key": "ocrSettings",

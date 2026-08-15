@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { ref } from 'vue'
 import {
   highlightMatch,
+  lookupRecentStorageKey,
   recentStore,
 } from '~/lib/kit/lookup'
 
@@ -27,9 +28,18 @@ describe('lookup keyword highlighting', () => {
 })
 
 describe('lookup recent selections', () => {
+  it('partitions business recents by workspace data origin', () => {
+    expect(lookupRecentStorageKey('projects', 'workspace-default', 'real')).toBe(
+      'kit-lookup:workspace-default:real:projects:recent',
+    )
+    expect(lookupRecentStorageKey('projects', 'workspace-default', 'demo')).toBe(
+      'kit-lookup:workspace-default:demo:projects:recent',
+    )
+  })
+
   it('keeps the five newest unique selections', () => {
     const state = ref<LookupOption[]>([])
-    const recents = recentStore('projects', state)
+    const recents = recentStore(state)
 
     for (let index = 1; index <= 6; index++) {
       recents.add({
@@ -55,7 +65,7 @@ describe('lookup recent selections', () => {
     const state = ref<LookupOption[]>([
       { id: 'project-1', label: '项目 1' },
     ])
-    const recents = recentStore('projects', state)
+    const recents = recentStore(state)
 
     recents.clear()
 

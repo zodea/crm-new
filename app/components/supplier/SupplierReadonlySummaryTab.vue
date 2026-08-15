@@ -29,6 +29,7 @@ const contractColumns: KitTableColumn[] = [
   { field: 'kind', title: '类型', width: 85 },
   { field: 'projectName', title: '项目', minWidth: 155, slot: 'project' },
   { field: 'amount', title: '含税金额', type: 'money', width: 135 },
+  { field: 'settled', title: '累计结算', type: 'money', width: 135 },
   { field: 'paid', title: '累计支付', type: 'money', width: 135 },
   { field: 'signDate', title: '签订日期', width: 115 },
   { field: 'status', title: '状态', width: 95, slot: 'status' },

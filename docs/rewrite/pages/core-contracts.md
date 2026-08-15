@@ -27,6 +27,18 @@
 | 分包 | 分供方 | 劳务 / 专业类别 | 累计收票、累计支付、按结算应付余额 |
 | 材料采购 | 分供方 | 材料采购合同分类 | 累计收票、累计支付、按结算应付余额 |
 
+### 参考运行态补齐目标（#282，已走查、待实现）
+
+当前三类列表已有真实合同、项目、客户/分供方和金额聚合，但专有列还没有完全复刻。后续实现必须保留同一紧凑表格骨架，同时按合同类型返回不同投影：
+
+| 合同类型 | 必须补齐的专有列 | 数据口径与缺口 |
+| --- | --- | --- |
+| 施工 | 实际竣工日期、签约日期、含税/变更后金额、合同已结算、累计开票、累计收款、按结算应收、开票未回 | `开票未回 = 累计开票 - 累计收款` 只作派生显示；实际竣工日期当前 canonical `contracts` 无字段，新增字段和迁移前显示“未记录”，不得用合同结束日期代替 |
+| 分包 | 劳务/专业类别、累计结算/收票/支付、按结算应付、按收票应付、完工审定金额、结算状态、结清状态 | 完工审定只汇总真实完工结算；按收票应付由收票与已确认支付派生；结清是独立业务事实，不能因余额为 0 自动认定 |
+| 材料采购 | 合同金额、变更后金额、累计结算/收票/支付、按结算/按收票应付 | 延续材料合同运行态证据，不把材料采购明细金额重复当作结算或收票事实 |
+
+合同名称、项目名称、施工甲方、支出侧乙方均为可聚焦关系入口。列表筛选必须写入 URL 查询参数（`q`、`project`、`party`、`status`、`category`、`page`、`pageSize`）；进入详情后关闭或返回要恢复原筛选、页码和滚动位置，而不是跳回无条件列表。
+
 列表聚合只读取合同外键可追溯的事实：
 
 - 变更后合同金额：施工合同为“合同金额 + 有效补充协议 + 已审定甲方变洽签”；分包、材料采购当前为“合同金额 + 有效补充协议”；
@@ -66,7 +78,104 @@
 - 施工和分包合同不显示采购明细，也不凭空增加合同明细。
 - 三类合同均显示“合同文件”，读取 `file_refs(owner_type='contract', owner_id=合同 ID)`；文件维护仍在合同编辑页完成。
 
-## 三、响应式与可达性
+运行态走查已证明三类合同不能继续只显示一组通用页签。通用“关联单据”读模型保留为后台聚合能力，前台按类型拆成下列稳定分组；没有记录时仍显示表头和真实空态。
+
+| 合同类型 | 详情分组 | 本地真实来源与下钻 |
+| --- | --- | --- |
+| 施工 | 详细资料 | `contracts`、合同附件；项目、客户走真实详情路由 |
+| 施工 | 补充合同 | `contract_supplements`；当前无独立详情路由，先深链到 `/contract/:id?tab=supplements&focus=:supplementId`，不能保留不可点击的蓝字 |
+| 施工 | 甲方变洽签 | `owner_change_orders.contract_id` → `/owner/change/:sourceId` |
+| 施工 | 验收结算 | `owner_final_settlements`、`owner_penalties`；按来源单据分别下钻，不合并成无类型通用行 |
+| 施工 | 票税管理 | `invoice_applications` 与销项开票事实；开票申请已有路由，开票登记缺失部分由财务链路票补齐，当前不能用申请状态冒充已开票登记 |
+| 施工 | 收款登记 | `receipt_registrations.contract_id` → `/finance/receipt/:id` |
+| 施工 | 竣工验收及保修 | `project_acceptances.contract_id`；竣工验收与保修到期为同一页签内两个分组 |
+| 分包 | 详细资料 | `contracts`、`contract_supplements`、合同附件；项目、分供方走真实详情路由 |
+| 分包 | 分包变洽签 | `subcontract_change_orders.contract_id` → `/subcontract/change/:id` |
+| 分包 | 收票登记 | `invoices.contract_id` → `/finance/invoice/:id` |
+| 分包 | 付款信息 | `payment_applications.contract_id` 与已确认 `payment_records` 分摊；付款申请和支付明细分区展示 |
+| 分包 | 支出结算 | `expenditure_settlements.contract_id`，按过程结算/完工结算分区 → `/subcontract/settlement/:id` |
+| 分包 | 项目罚扣 | `penalty_records.contract_id` 及 `penalty_settlement_deductions` → `/subcontract/penalty/:id` |
+| 分包 | 材料领用情况 | 参考页分新仓/历史领用；当前 `material_uses` 没有合同或分供方外键，先保留空页签和字段规格，不按项目/班组猜合同归属 |
+| 材料采购 | 详细资料、采购合同明细、物资管理、收票登记、付款信息、支出结算、项目罚扣 | 延续材料合同已完成的真实外键链；各分组复用同一来源 DTO，不复制静态金额 |
+
+审批历史和完整流程只在本地存在真实审批事件时显示；没有审批事件表时保留合同阶段，不用人员种子拼出参考审批流。参考站的打印、下载、评论、文件操作、转需用计划均未获写入验证，不纳入本轮复刻范围。
+
+## 三、工程量清单关联闭环
+
+`/contract/boq` 已由 SQLite 实体闭合，不使用 MockJS：
+
+- 项目与施工合同通过 `project_id + contract_id` 选择，合同名称进入 `/contract/:id`；查询参数保留 `project`、`contract` 和 `tab`。
+- 合同清单读取 `boq_files`、`boq_lines`，保留文件、sheet、行号来源追溯键；清单行可沿稳定 `boqLine` 进入现场工程量和排程。
+- 变更读取 `boq_change_orders`、`boq_change_lines`；只有已签证且存在 `ledger_id` 的编号可进入对应甲方变洽签，其他状态显示纯文本。
+- 月度报量读取 `monthly_statements`、`monthly_statement_lines`；同一记录进入 `/owner/report/:id`，草稿调整不推进申报/审定状态。
+- 当前脱敏种子含施工 12、分包 9、材采 10 份合同，但下游样本稀疏：补充协议、BOQ 文件、变更和月报量各只有少量样本。空态用于验证布局，不能伪造更多合作、票款或结算记录。
+- 参考站没有安全直接证据的导入、编辑、生成、导出与附件动作继续由 [`boq-import.md`](./boq-import.md)、ADR 0002 和本地事务测试裁定，不因只读走查改变。
+
+## 四、后台接口投影
+
+后端接口以数据库真实外键为源，前端不再自行拼接名称或 Mock 聚合。共享关系、金额、分页、空态、权限与错误语义统一引用 [`READ-MODELS.md`](../READ-MODELS.md)；其中 `MoneyDTO` 是固定两位十进制定点字符串，关系目标路由由前端路由矩阵生成。合同域稳定为三层响应：
+
+```ts
+interface ContractListQueryDTO {
+  kind: 'construction' | 'subcontract' | 'material'
+  q?: string
+  projectId?: string
+  partyId?: string
+  status?: string
+  category?: string
+  page: number
+  pageSize: number
+}
+
+interface ContractListRowDTO {
+  id: string
+  no: string
+  name: string
+  kind: 'construction' | 'subcontract' | 'material'
+  project: EntityRefDTO
+  party: EntityRefDTO
+  signDate: string | null
+  actualCompletionDate?: string | null
+  amounts: {
+    contract: MoneyDTO
+    changed: MoneyDTO
+    settled: MoneyDTO
+    invoiced: MoneyDTO
+    paid: MoneyDTO
+    bySettlementBalance: MoneyDTO
+    byInvoiceBalance?: MoneyDTO
+    completionSettlement?: MoneyDTO
+  }
+  contractStatus: string
+  settlementStatus?: string | null
+  clearanceStatus?: string | null
+}
+
+interface RelatedDocumentDTO {
+  id: string
+  type: string
+  no: string
+  name: string
+  amount: MoneyDTO | null
+  date: string | null
+  status: string
+  contractId: OpaqueIdDTO
+}
+
+interface ContractDetailDTO {
+  contract: ContractListRowDTO
+  sections: Array<{
+    key: string
+    label: string
+    rows: RelatedDocumentDTO[]
+    emptyReason?: 'no-records' | 'missing-relation' | 'permission-denied'
+  }>
+}
+```
+
+列表响应使用共享 `PageDTO`，汇总与分页读取同一筛选；BOQ 工作台响应继续按 `projectId + contractId` 返回 `files / lines / changes / monthlyStatements / summary`。金额不传货币符号或格式化文本；缺失关系、真实空集合与权限拒绝按共享语义区分，禁止用名称、同项目或相近金额补链。
+
+## 五、响应式与可达性
 
 - 在 390、768、1024、1280–1440px 无页面级横向滚动。
 - 合同长名称允许换行，长编号允许断行且完整保留。

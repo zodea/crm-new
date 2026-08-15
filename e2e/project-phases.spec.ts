@@ -10,7 +10,8 @@ test('项目六阶段：编辑任务后持久化并实时更新阶段卡进度',
   const timeline = page.locator('section[aria-labelledby="project-phase-title"]')
   for (const name of ['项目立项', '施工准备', '施工中', '完工及验收', '交付', '保修'])
     await expect(timeline.getByRole('button').filter({ hasText: name })).toHaveCount(1)
-  await expect(timeline.getByRole('button').filter({ hasText: '施工准备' })).toContainText('2/5')
+  const preparationPhase = timeline.getByRole('listitem').filter({ hasText: '施工准备' })
+  await expect(preparationPhase).toContainText('0/5')
 
   await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '编辑阶段任务 · 全部六阶段' })
@@ -22,7 +23,7 @@ test('项目六阶段：编辑任务后持久化并实时更新阶段卡进度',
   await dialog.getByRole('button', { name: '保存阶段任务' }).click()
 
   await expect(page.getByText('阶段任务已更新', { exact: true })).toBeVisible()
-  await expect(timeline.getByRole('button').filter({ hasText: '施工准备' })).toContainText('3/5')
+  await expect(preparationPhase).toContainText('1/5')
 
   // 重新打开编辑器，确认 action 重载后的 DB 值回填，而非只改了组件局部草稿。
   await timeline.getByRole('button', { name: '编辑阶段', exact: true }).click()

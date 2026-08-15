@@ -282,6 +282,7 @@ openDrawer({
 **MoneyLink(金额穿透)**:
 - `¥#,##0.00` mono/600 完整两位小数;**跳转目标由调用点传入**(目标列表路由 + 预筛 query),不建集中金额映射表——金额语义(合同额/请款/收票/已付…)归业务屏。
 - 值 0/空/未给目标 → 退化普通 mono 文本。**不做死链**(与 EntityLink 同一铁律)。
+- 固定聚合入口例外：只有运行态证据明确“零额仍可进入目标列表”，且本地目标页和真实 ID / 外键预筛均已实现时，业务屏可用带标签的按钮保留入口并显示真实空态；不得把此例外下沉到通用 MoneyLink，也不得为入口制造 mock 记录。
 
 **页签交互(对 CONTEXT.md 页签词条的补充边界)**:
 - **穿透预筛不进页签身份**:跳转激活目标列表页的既有页签并应用新预筛;预筛参数不参与「同路由同参数复用」判定。
@@ -497,7 +498,7 @@ openDrawer({
 
 ---
 
-## 12 · 数据表格 `kit-table` ✅ 已定案（2026-07-29）
+## 12 · 数据表格 `kit-table` ✅ 已定案（2026-08-15）
 
 **用途**：`app/components/ui/KitTable.vue` 统一跨领域列表的紧凑密度、表格内横滚、固定重要列、列宽调整、空态和受控分页；字段、业务列宽与行内动作仍由领域调用点决定。
 
@@ -509,6 +510,8 @@ openDrawer({
 - 默认开启拖拽提示和双击自适配；`resizeConfig.isDblclickAutoWidth=false` 可按领域关闭，`resizable=false` 可关闭整表列宽调整，单列 `resizable=false` 优先。
 - `action` 列默认宽 112px、固定右侧且禁止拖拽，避免固定右列出现左侧含混手柄；业务动作超过该宽度时必须显式加宽，不能靠通用表格猜测或静默裁切。
 - `seq` / 重要名称列可由业务显式固定左侧；固定方向和显式宽度始终优先于默认值。
+- 非分页小表可用 `filterable: true` 从当前行推导筛选项；受控分页必须传显式 `KitFilterOption[]`，选项来自后台完整快照 facet，不能从当前页反推。
+- `remoteFilter` 开启后，`KitTable` 不在当前页本地过滤，只发出包含全部列条件的 `filter-change`；调用方负责把条件交给 Repository 并回填新页。动态 facet 通过 vxe `setFilter` 同步，`KitFilterOption.checked` 表示受控选中态，刷新 facet 后不得丢失当前条件。
 
 **调用签名**：
 
@@ -523,5 +526,18 @@ openDrawer({
     minWidth: 48,
     maxWidth: 480,
   }"
+  remote-filter
+  @filter-change="loadWithColumnFilters"
 />
+```
+
+```ts
+const columns: KitTableColumn[] = [{
+  field: 'status',
+  title: '业务阶段',
+  filterable: facets.statuses.map(option => ({
+    ...option,
+    checked: selectedStatuses.includes(option.value),
+  })),
+}]
 ```

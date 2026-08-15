@@ -94,6 +94,7 @@ export const NAV_TREE: NavNode[] = [
     { key: 'worker', mark: '工', icon: 'i-lucide-user-round', label: '工人信息', hint: '人员证书', to: '/base/worker' },
   ] },
   { type: 'group', key: 'g-settings', label: '设置', icon: 'i-lucide-settings', items: [
+    { key: 'dataMigration', mark: '迁', icon: 'i-lucide-database-backup', label: '本地数据迁移', hint: '预检·备份', to: '/settings/data-migration' },
     { key: 'ocrSettings', mark: '设', icon: 'i-lucide-scan-search', label: 'OCR 设置', hint: '引擎·参数', to: '/settings/ocr' },
   ] },
 ]
@@ -142,6 +143,8 @@ export function toggleExclusiveGroup(openKeys: string[], key: string): string[] 
 export function activeNavKey(path: string, contractKindOfDetail?: string | null): string | null {
   if (path === '/')
     return 'home'
+  if (path.startsWith('/settings/data-migration'))
+    return 'dataMigration'
   if (path.startsWith('/settings/ocr'))
     return 'ocrSettings'
   if (path.startsWith('/schedule'))

@@ -175,7 +175,21 @@ const tableRef = useTemplateRef<{
   getCheckboxRecords: () => T[]
   clearCheckboxRow: () => void
   clearFilter?: () => Promise<void> | void
+  setFilter?: (field: string, options: KitFilterOption[]) => Promise<void> | void
 }>('tableRef')
+
+// vxe-column 只在注册时读取 filters；远程快照到达或 facet 更新后，
+// 必须通过表格 API 同步选项，否则表头虽出现漏斗，面板仍保留旧的空列表。
+async function syncFilterOptions(entries = normalized.value) {
+  await nextTick()
+  for (const { col } of entries) {
+    if (col.field && Array.isArray(col.filterable))
+      tableRef.value?.setFilter?.(col.field, col.filterable)
+  }
+}
+
+onMounted(syncFilterOptions)
+watch(normalized, syncFilterOptions, { flush: 'post' })
 
 const checkboxConfig = computed(() =>
   checkMethod ? { checkMethod: ({ row }: { row: T }) => checkMethod(row) } : {},
