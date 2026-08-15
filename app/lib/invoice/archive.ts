@@ -18,14 +18,22 @@ export interface ArchiveCheckResult {
 export interface InvoiceArchiveProvenance {
   sourceKind: 'ocr' | 'excel' | 'manual'
   sourceId: string
-  originalOcr?: Readonly<Record<string, unknown>> | null
-  revisions?: readonly {
+  sourceInfo: Readonly<Record<string, unknown>>
+  originalOcr: Readonly<Record<string, unknown>> | null
+  revisions: readonly {
     field: string
     from: unknown
     to: unknown
     reason: string
     at: string
   }[]
+}
+
+export interface InvoiceArchiveAuditRecord {
+  invoiceId: string
+  archivedAt: string
+  currentValues: Readonly<Record<string, unknown>>
+  provenance: InvoiceArchiveProvenance
 }
 
 /** 归档写路径使用的完整终态输入；可由 Invoice 映射，不接受 UI 自己拼校验结果。 */
@@ -43,7 +51,7 @@ export interface InvoiceArchiveCandidate {
   naturalKeyDuplicate?: boolean
   /** 需要时由调用方显式传入；缺省时以 reviewStatus='reviewed' 为人工确认凭据。 */
   currentValuesConfirmed?: boolean
-  provenance?: InvoiceArchiveProvenance
+  provenance: InvoiceArchiveProvenance
 }
 
 export function checkReviewed(reviewStatus: unknown): ArchiveCheckResult {
@@ -81,6 +89,14 @@ function validPositiveAmount(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0
 }
 
+function validProvenance(value: InvoiceArchiveProvenance | undefined): boolean {
+  if (!value || !requiredText(value.sourceId) || !value.sourceInfo || !Array.isArray(value.revisions))
+    return false
+  if (!['ocr', 'excel', 'manual'].includes(value.sourceKind))
+    return false
+  return value.sourceKind !== 'ocr' || value.originalOcr != null
+}
+
 /**
  * 票据进入归档/台账终态的唯一纯逻辑门禁。
  *
@@ -116,6 +132,8 @@ export function checkInvoiceArchiveReady(input: InvoiceArchiveCandidate): Archiv
     reasons.push('缺少销售方，不能进入归档终态')
   if (!validPositiveAmount(input.totalAmount))
     reasons.push('价税合计缺失或金额异常，不能进入归档终态')
+  if (!validProvenance(input.provenance))
+    reasons.push('缺少原始识别、人工修订或来源留痕，不能进入归档终态')
 
   return reasons.length ? { ok: false, reason: [...new Set(reasons)].join('；') } : { ok: true }
 }

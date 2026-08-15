@@ -35,6 +35,8 @@ function delivery(
     spec: string
     unit: string
     unitPrice: number | null
+    amount?: number | null
+    currentValueConfirmed?: boolean
   }>,
 ) {
   return {
@@ -44,7 +46,17 @@ function delivery(
     orderNo: id.toUpperCase(),
     deliveryDate,
     archived: true,
-    lines,
+    reviewStatus: 'reviewed' as const,
+    ocrStatus: 'reviewed',
+    naturalKeyDuplicate: false,
+    currentValuesConfirmed: true,
+    lines: lines.map(line => ({
+      ...line,
+      amount: line.amount === undefined
+        ? (line.unitPrice == null ? null : 1)
+        : line.amount,
+      currentValueConfirmed: line.currentValueConfirmed ?? true,
+    })),
   }
 }
 
@@ -424,6 +436,58 @@ describe('材料单价分析', () => {
     expect(catalog[0]?.facts).toHaveLength(2)
     expect(catalog[0]?.officialPriceLookupKey).toBe('wire::BV::1x2.5mm2::m')
     expect(catalog[0]?.facts.map(fact => fact.deliveryRecordId)).toEqual(['archived-1', 'archived-2'])
+  })
+
+  it('价格待补录的已归档明细不进入价格分析', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('price-pending', 'supplier-a', '2026-05-07', [{
+        id: 'line-price-pending',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: null,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toEqual([])
+  })
+
+  it('已有有效单价但金额待补录的明细仍不进入价格分析', () => {
+    const catalog = buildMaterialPriceCatalog([
+      delivery('amount-pending', 'supplier-a', '2026-05-08', [{
+        id: 'line-amount-pending',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: null,
+      }]),
+    ], suppliers, projects)
+
+    expect(catalog).toEqual([])
+  })
+
+  it('无单号但金额、单价和人工确认态完整的归档明细可进入价格目录', () => {
+    const catalog = buildMaterialPriceCatalog([{
+      ...delivery('no-order-number', 'supplier-a', '2026-05-09', [{
+        id: 'line-no-order-number',
+        materialName: 'BV 电线',
+        spec: '2.5 mm²',
+        unit: '米',
+        unitPrice: 2.8,
+        amount: 28,
+      }]),
+      orderNo: '',
+    }], suppliers, projects)
+
+    expect(catalog).toHaveLength(1)
+    expect(catalog[0]?.facts).toEqual([
+      expect.objectContaining({
+        deliveryRecordId: 'no-order-number',
+        deliveryOrderNo: 'no-order-number',
+        price: 2.8,
+      }),
+    ])
   })
 
   it('#257 价格分析只读取人工确认后的当前单价，并保留原始/修订来源留痕', () => {

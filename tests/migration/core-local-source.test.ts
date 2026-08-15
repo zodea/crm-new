@@ -57,7 +57,7 @@ function dependencies(
   return {
     isNative: () => false,
     isDemoActive: () => false,
-    currentSchemaVersion: vi.fn().mockResolvedValue(40),
+    currentSchemaVersion: vi.fn().mockResolvedValue(LATEST_VERSION),
     select: vi.fn(async (sql: string) => sourceRows(sql)),
     closeDatabase: vi.fn().mockResolvedValue(undefined),
     loadProductionSnapshot: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
@@ -65,7 +65,7 @@ function dependencies(
     createBackup: vi.fn().mockResolvedValue({
       backupId: 'core-source-hash',
       createdAt: '2026-08-15T01:00:00.000Z',
-      sourceSchemaVersion: 40,
+      sourceSchemaVersion: LATEST_VERSION,
       sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
       sourceHash: 'a'.repeat(64),
       snapshotSha256: 'b'.repeat(64),
@@ -216,7 +216,7 @@ describe('core migration local source', () => {
         new RegExp(`^core-migration-${protectedSource.sourceHash}-[a-f0-9]{64}$`),
       ),
       createdAt: '2026-08-15T01:00:00.000Z',
-      sourceSchemaVersion: 40,
+      sourceSchemaVersion: LATEST_VERSION,
       sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
       sourceHash: protectedSource.sourceHash,
       snapshotSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -261,7 +261,7 @@ describe('core migration local source', () => {
         metadata: {
           backupId: 'core-source-hash',
           createdAt: '2026-08-15T01:00:00.000Z',
-          sourceSchemaVersion: 40,
+          sourceSchemaVersion: LATEST_VERSION,
           sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
           sourceHash: 'a'.repeat(64),
           snapshotSha256: 'b'.repeat(64),

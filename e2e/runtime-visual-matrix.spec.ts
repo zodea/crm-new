@@ -120,16 +120,18 @@ async function expectVisualEnvironment(page: Page) {
 }
 
 async function navigateFromSidebar(page: Page, width: number, label: string) {
+  let sidebar: Locator
   if (width < 1024) {
     await page.getByRole('button', { name: '切换侧边栏' }).click()
-    const sheet = page.getByRole('dialog', { name: '导航菜单' })
-    await expect(sheet).toBeVisible()
-    await sheet.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.getByRole('dialog', { name: '导航菜单' })
+    await expect(sidebar).toBeVisible()
   }
   else {
-    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
-    await sidebar.getByRole('link', { name: label, exact: true }).click()
+    sidebar = page.locator('[data-sidebar="sidebar"]').first()
   }
+
+  await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
+  await sidebar.getByRole('link', { name: label, exact: true }).click()
   await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
 }
 
@@ -195,7 +197,7 @@ const SAMPLES: VisualSample[] = [
     path: '/',
     prepare: async (page, width) => {
       await navigateFromSidebar(page, width, '项目列表')
-      const detailLink = page.getByRole('link', { name: '查看项目详情' }).first()
+      const detailLink = page.getByRole('link', { name: '合和新城', exact: true }).first()
       await expect(detailLink).toBeVisible()
       await detailLink.click()
       await expect(page).toHaveURL(/\/project\/[^/]+$/)
@@ -387,6 +389,19 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await expectVisualEnvironment(page)
         await page.addStyleTag({
           content: `
+            :root {
+              --font-sans: "Microsoft YaHei", sans-serif !important;
+              --font-mono: Consolas, "Courier New", monospace !important;
+            }
+            [data-shell-topbar] [class*="bg-danger"] {
+              width: 16px !important;
+              min-width: 16px !important;
+              padding: 0 !important;
+              font-size: 0 !important;
+            }
+            input[type="date"][data-visual-empty-date]::-webkit-datetime-edit {
+              color: transparent !important;
+            }
             *, *::before, *::after {
               caret-color: transparent !important;
               transition-duration: 0s !important;
@@ -432,6 +447,10 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
           `,
         })
         await sample.prepare(page, width)
+        await page.locator('input[type="date"]').evaluateAll(inputs => inputs.forEach((input) => {
+          if (input instanceof HTMLInputElement && !input.value)
+            input.dataset.visualEmptyDate = ''
+        }))
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
         if (sample.key === 'detail') {
           await page.getByTestId('project-schedule-progress-value')

@@ -427,20 +427,23 @@ async function validateReceipt(
   action: F3SaveAction,
 ): Promise<number> {
   const amount = nonNegativeMoney('收款金额', draft.amount)
-  const project = await activeRow<{ id: string }>(
+  const project = await activeRow<{ id: string, customer_id: string | null }>(
     tx,
     'projects',
     draft.projectId,
   )
   if (nullableId(draft.projectId) && !project)
     throw new Error('项目不存在或已删除')
+  const customerId = nullableId(draft.customerId)
   const customer = await activeRow<{ id: string }>(
     tx,
     'customers',
-    draft.customerId,
+    customerId,
   )
-  if (nullableId(draft.customerId) && !customer)
+  if (customerId && !customer)
     throw new Error('付款方客户不存在或已删除')
+  if (project && customerId && project.customer_id !== customerId)
+    throw new Error('付款方客户必须是所选项目的主客户')
   if (draft.contractId) {
     const contract = await assertReference<{
       project_id: string
@@ -451,7 +454,7 @@ async function validateReceipt(
       throw new Error('收款登记只能关联施工合同')
     if (contract.project_id !== draft.projectId)
       throw new Error('施工合同不属于所选项目')
-    if (draft.customerId && contract.customer_id && contract.customer_id !== draft.customerId)
+    if (customerId && contract.customer_id && contract.customer_id !== customerId)
       throw new Error('付款方客户与施工合同不一致')
   }
   if (action !== 'draft') {

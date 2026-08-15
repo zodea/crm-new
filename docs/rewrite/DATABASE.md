@@ -280,6 +280,7 @@ monthly_statement_lines(
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | Invoice | `invoices` | `id` | `finance-invoice.md`（识别+台账**单表**，ADR-0001；归属：项目 或 个人开支） |
+| InvoiceExportSetting | `invoice_export_settings` | `id='default'`（本机单例设置表例外） | ADR 0004（发票 XLSX 默认样式，本机单例） |
 | InvoiceApplication | `invoice_applications` | `id` | `finance-billing.md`（销项=开票申请） |
 | ReceiptRegistration | `receipt_registrations` | `id` | `finance-receipt.md` |
 | ExpenditureSettlement | `expenditure_settlements` | `id` | 支出合同过程/完工结算统一源单；与 `project_suppliers` 终态关闭用的 `settlements` 不同 |
@@ -310,6 +311,10 @@ monthly_statement_lines(
 --                          与全局 ocr_confidence 口径不同不合并；分档阈值见 app/lib/invoice/recognize.ts）
 --   deleted_at     TEXT  软删除（§8）
 ```
+
+归档当前值仍写回 `invoices` 并作为台账、价格分析和打印的唯一事实。归档 action 同一事务另向 `operation_logs(table_name='invoice_archive_provenance')` 写不可变审计快照，分开保存来源信息、原始 OCR、逐字段人工修订和归档时人工确认的当前值；读取审计不得反向覆盖 `invoices` 当前值。
+
+`invoice_export_settings` 是发票领域的本机单例配置表（迁移 v41），`settings_json` 保存发票台账 XLSX 的行列尺寸、字体、边框、格式、冻结与合并默认值。业务预览只保留本次草稿；保存和加载必须经 invoice store action 进入 SQLite，浏览器开发态随数据库 snapshot fallback 持久化，不再另写 `localStorage`，也不得复用只属于 OCR 的 `ocr_settings`。
 
 ```sql
 -- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。
@@ -1248,6 +1253,8 @@ penalty_settlement_deductions(
 | `expense_reimbursements` | `project_id` | `projects.id` | N:1 | 费用报销 → 项目 |
 | `expense_reimbursement_lines` | `reimbursement_id` | `expense_reimbursements.id` | N:1 | 报销费用明细 |
 
+`invoice_export_settings` 是无外键的本机单例配置表；它只保存发票 XLSX 默认样式，不引用项目、发票或用户业务实体。
+
 ### 3.4 分包及人工关联
 
 当前物理 schema 不存在独立的 `crew_workers`、`crew_project_config`、`crew_project_items` 或 `worker_certs`。班组成员以 `workers.crew_id` 表达（见 §3.1）；班组参与项目从成员当前项目、`unit_assignments` 与 `wage_statements` 的真实事实聚合；班组和工人附件走 §4 的多态 `file_refs`。不得恢复蓝本中的幽灵表名，若要新增班组项目单价或证件有效期能力，必须先完成领域决策与迁移设计。
@@ -1518,7 +1525,7 @@ interface FilePayload {
 第 1 批（无外键依赖）
   customers, suppliers, bank_codes, crews
   company_expense_contracts, stock_checks, import_batches
-  schedule_process_libraries
+  schedule_process_libraries, invoice_export_settings
 
 第 2 批（只依赖第 1 批）
   projects
@@ -1604,6 +1611,7 @@ CREATE UNIQUE INDEX uq_paia_source ON payment_application_invoice_allocations(pa
 CREATE INDEX idx_invoices_project ON invoices(project_id);
 CREATE INDEX idx_invoices_supplier ON invoices(supplier_id);
 CREATE INDEX idx_invoices_account ON invoices(account_status);
+-- invoice_export_settings 只有固定单例主键，无外键和列表查询，不需要二级索引。
 
 -- ADR 0014 整页表单目标索引（F1-F5 迁移创建）
 CREATE UNIQUE INDEX uq_customers_tax_no
@@ -1869,7 +1877,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 2. 各模块设计文档只定义业务字段，实体间关系统一在本文件管理
 3. 所有业务表的删除操作使用软删除（§ 8.1），并记录操作日志（§ 8.2）
 4. 字段命名规范：camelCase（TypeScript 侧）→ snake_case（SQLite 列名），ORM 层自动转换
-5. 所有 id 字段使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）
+5. 所有业务实体 id 使用 `{表缩写}_{timestamp36}_{seq36}` 格式（如 `sup_m1abc_0`）；不参与业务关联的本机单例设置表可在 §2 明确登记例外并使用固定主键 `default`（当前仅 `ocr_settings`、`invoice_export_settings`）
 6. 遵守 [ADR 0015](../adr/0015-form-persistence-and-payment-reconciliation.md)：用户可编辑业务字段默认持久化（标量列 / lookup 外键 / grid 子表 / file_refs）；`readonly + compute`、`_` 展示字段和纯聚合不存。人工复核后具有审计意义的值例外，例如 `delivery_lines.amount` 必须独立存储，不能在保存时重算覆盖
 7. 新增支出类实体必须定义 **costCategory 归集口径**（专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，§ 2.8），否则成本对比（§ 4.6）会漏项
 8. 排程/进度类改动必须与 `schedule-progress.md` 双向同步（§ 2.7 / § 3.6 / § 4.6）；工程量矩阵以 **[ADR 0010](../adr/0010-quantity-matrix-and-construction-record-model.md)** 为准：量=`house_type_template_items`、责任=`unit_assignments`、完成=`unit_stage_completions`，稳定阶段=`construction_stages`

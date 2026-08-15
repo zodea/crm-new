@@ -312,6 +312,13 @@ function resolveInvoiceStyleConfig(config: InvoiceXlsxStyleConfig = {}): Invoice
   }
 }
 
+/** 持久化边界统一收敛为完整样式，损坏或非对象记录回退到领域默认值。 */
+export function normalizeInvoiceXlsxStyleConfig(value: unknown): InvoiceXlsxStyleConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return createDefaultInvoiceXlsxStyleConfig()
+  return resolveInvoiceStyleConfig(value as InvoiceXlsxStyleConfig)
+}
+
 function xmlEscape(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -994,7 +1001,6 @@ function hasTotalMarker(values: readonly string[]): boolean {
 function sourceRowKind(
   values: readonly string[],
   sheetKind: InvoiceSheetKind,
-  invoiceNumberColumn: number | null,
 ): InvoiceSourceRowKind {
   if (isBlankRow(values))
     return 'blank'
@@ -1002,12 +1008,6 @@ function sourceRowKind(
     return 'summary'
   if (hasTotalMarker(values))
     return 'total'
-  if (invoiceNumberColumn != null && !values[invoiceNumberColumn]?.trim()) {
-    // 公式合计行不一定写“合计”，但只要没有票号且存在金额/公式，仍保留为待复核的非业务行。
-    const hasAmountOrFormula = values.some(value => value.trim() !== '')
-    if (hasAmountOrFormula)
-      return 'total'
-  }
   return 'data'
 }
 
@@ -1076,7 +1076,7 @@ function readInvoiceSheet(
     const rowStyleIssues = styleIssues
       .filter(issue => issue.sourceRow == null || issue.sourceRow === rowNumber || (issue.address != null && cells.some(cell => cell.address === issue.address)))
       .map(issue => issue.reason)
-    const rowKind = sourceRowKind(rowValues, sheetKind, invoiceNumberColumn >= 0 ? invoiceNumberColumn : null)
+    const rowKind = sourceRowKind(rowValues, sheetKind)
     const sourceRow: InvoiceSourceRow = {
       sheetName,
       sourceRow: rowNumber,

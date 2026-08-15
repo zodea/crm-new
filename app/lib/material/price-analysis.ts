@@ -14,8 +14,9 @@ export interface DeliveryPriceLineInput {
   spec: string
   unit: string
   unitPrice: number | null
-  /** 识别/导入后的当前单价是否已由人工确认；未传时沿用历史已归档记录语义。 */
-  currentValueConfirmed?: boolean
+  amount: number | null
+  /** 识别/导入后的当前单价是否已由人工确认。 */
+  currentValueConfirmed: boolean
   originalOcrUnitPrice?: number | null
   revisionReason?: string
 }
@@ -28,11 +29,10 @@ export interface DeliveryPriceRecordInput {
   deliveryDate: string
   archived: boolean
   lines: readonly DeliveryPriceLineInput[]
-  /** 存在时必须是人工核对完成态。 */
-  reviewStatus?: string
-  ocrStatus?: string
-  naturalKeyDuplicate?: boolean
-  currentValuesConfirmed?: boolean
+  reviewStatus: 'reviewed' | 'unreviewed'
+  ocrStatus: string
+  naturalKeyDuplicate: boolean
+  currentValuesConfirmed: boolean
 }
 
 export interface PricePartyInput {
@@ -197,12 +197,12 @@ export function buildMaterialPriceCatalog(
       !record.archived
       || !record.supplierId
       || !record.projectId
-      || !record.orderNo.trim()
       || !record.deliveryDate.trim()
-      || (record.reviewStatus != null && record.reviewStatus !== 'reviewed')
-      || (record.ocrStatus != null && record.ocrStatus !== 'done')
-      || record.naturalKeyDuplicate === true
-      || record.currentValuesConfirmed === false
+      || record.reviewStatus !== 'reviewed'
+      // 识别工作区以 done 表示识别完成；归档库历史字段以 reviewed 表示人工核对终态。
+      || (record.ocrStatus !== 'done' && record.ocrStatus !== 'reviewed')
+      || record.naturalKeyDuplicate
+      || !record.currentValuesConfirmed
     ) {
       continue
     }
@@ -218,7 +218,8 @@ export function buildMaterialPriceCatalog(
         || !normalizeText(line.unit)
         || NON_MATERIAL_CHARGE.test(name)
         || !isValidPrice(line.unitPrice)
-        || line.currentValueConfirmed === false
+        || line.amount == null
+        || !line.currentValueConfirmed
       ) {
         continue
       }

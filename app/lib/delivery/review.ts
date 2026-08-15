@@ -55,7 +55,24 @@ export interface DeliveryReviewInput {
   ocrStatus?: string
   /** 导入/去重或数据库唯一键发现的送货单自然键冲突。 */
   naturalKeyDuplicate?: boolean
+  /** 当前结构化值是否已经由用户对照原件确认。 */
+  currentValuesConfirmed?: boolean
   provenance?: DeliveryReviewProvenance
+}
+
+export function normalizeDeliveryOrderNo(value: string): string {
+  return value.normalize('NFKC').trim().toLocaleUpperCase('zh-CN')
+}
+
+export function deliveryNaturalKey(
+  input: Pick<DeliveryReviewInput, 'projectId' | 'supplierId' | 'orderNo'>,
+): string | null {
+  const projectId = input.projectId.trim()
+  const supplierId = input.supplierId?.trim() ?? ''
+  const orderNo = normalizeDeliveryOrderNo(input.orderNo)
+  if (!projectId || !supplierId || !orderNo)
+    return null
+  return JSON.stringify([projectId, supplierId, orderNo])
 }
 
 export interface DeliveryReviewPolicy {
@@ -152,7 +169,7 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'supplier', label: '必须人工选择已有分供方，或先确认新增分供方' })
   if (!input.deliveryDate)
     issues.push({ key: 'date', label: '缺少送货日期，必须依据原件人工补录' })
-  if (!input.orderNo && !confirmations.noOrderNoConfirmed)
+  if (!normalizeDeliveryOrderNo(input.orderNo) && !confirmations.noOrderNoConfirmed)
     issues.push({ key: 'order-no', label: '缺少送货单号；只有确认原件确实无单号后才能归档' })
 
   const invalidLines = input.items.filter(item =>
@@ -164,15 +181,13 @@ export function deliveryReviewIssueDetails(
     issues.push({ key: 'items', label: '至少保留一条材料明细' })
 
   const invalidAmountLines = input.items.filter(item =>
-    item.amount == null
-    || !Number.isFinite(item.amount)
-    || item.amount < 0
+    (item.amount != null && (!Number.isFinite(item.amount) || item.amount < 0))
     || (item.unitPrice != null && (!Number.isFinite(item.unitPrice) || item.unitPrice < 0)),
   )
   if (invalidAmountLines.length) {
-    issues.push({ key: 'amount', label: '每条材料明细必须保留人工确认后的有效金额；缺失或异常金额不能归档' })
+    issues.push({ key: 'amount', label: '单价或金额存在异常数值，必须人工修正后才能归档' })
     if (!input.note.trim())
-      issues.push({ key: 'amount', label: '金额缺失或异常必须记录保留票面金额或修正金额的原因' })
+      issues.push({ key: 'amount', label: '单价或金额异常必须记录保留票面值或修正值的原因' })
   }
 
   const summary = summarizeDeliveryAmounts(input.items, input.statedTotal ?? null)
@@ -184,7 +199,7 @@ export function deliveryReviewIssueDetails(
   }
   if (policy.requiresQualityReview && !confirmations.qualityReviewed)
     issues.push({ key: 'quality', label: '手写、模糊或低置信内容必须人工复核确认' })
-  if (!confirmations.humanReviewed)
+  if (!confirmations.humanReviewed || input.currentValuesConfirmed === false)
     issues.push({ key: 'human-reviewed', label: '请先查看原件并确认 OCR 草稿，再点击归档' })
 
   return issues.filter((issue, index, all) => all.findIndex(candidate => candidate.key === issue.key && candidate.label === issue.label) === index)

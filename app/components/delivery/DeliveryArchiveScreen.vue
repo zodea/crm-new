@@ -10,7 +10,7 @@ const store = useDeliveryRecordStore()
 const projectStore = useProjectStore()
 const supplierStore = useSupplierStore()
 const contractStore = useContractStore()
-const { confirm, error, success, warning, undoToast } = useKitUI()
+const { confirm, error, exportFile, warning, undoToast } = useKitUI()
 
 const search = shallowRef('')
 const dateFrom = shallowRef('')
@@ -108,16 +108,6 @@ watch([search, dateFrom, dateTo, selectedNode], () => {
   page.value = 1
 })
 
-function downloadFile(data: Uint8Array, fileName: string, mimeType: string): void {
-  const blob = new Blob([data as unknown as BlobPart], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = fileName
-  anchor.click()
-  window.setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
 async function exportArchive() {
   if (!filtered.value.length) {
     error('当前筛选下没有可导出的送货单')
@@ -129,8 +119,13 @@ async function exportArchive() {
       convertImagesToPdf: convertImagesToPdf.value,
       loadSource: record => store.loadSourceFile(record.id),
     })
-    downloadFile(result.data, `送货单原件包_${new Date().toISOString().slice(0, 10)}.zip`, DELIVERY_ZIP_MIME)
-    success(`送货单原件包已下载，包含 ${result.sources.length} 份原件`)
+    const exportResult = await exportFile({
+      data: result.data,
+      defaultName: `送货单原件包_${new Date().toISOString().slice(0, 10)}.zip`,
+      mimeType: DELIVERY_ZIP_MIME,
+    })
+    if (exportResult.status === 'cancelled')
+      return
     if (result.missingRecordIds.length)
       warning(`${result.missingRecordIds.length} 份送货单缺少原件，异常已写入 Excel`)
   }
@@ -221,9 +216,9 @@ onMounted(refresh)
         <button class="btn-secondary" :disabled="store.loading" @click="refresh">
           <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
         </button>
-        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后，图片原件会同时加入合并 PDF；未勾选时保留在 ZIP 的原件/图片目录">
+        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
           <input v-model="convertImagesToPdf" type="checkbox">
-          <span>图片转 PDF</span>
+          <span>图片另生成 PDF</span>
         </label>
         <button class="btn-secondary" :disabled="store.loading || exportingArchive || !filtered.length" @click="exportArchive">
           <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}

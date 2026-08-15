@@ -1,12 +1,17 @@
 import type { ProjectArchiveSnapshot } from '~/lib/project/archive'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   archivePath,
   createProjectArchiveZip,
   createZip,
+  loadProjectArchiveSnapshot,
   sanitizeSegment,
   selectedArchiveFiles,
 } from '~/lib/project/archive'
+
+const select = vi.hoisted(() => vi.fn())
+
+vi.mock('~/lib/db/connection', () => ({ select }))
 
 function snapshot(): ProjectArchiveSnapshot {
   const normal = {
@@ -86,6 +91,25 @@ describe('项目档案包导出（Issue #248）', () => {
     expect(selectedArchiveFiles(current, selected).map(file => file.id)).toEqual(['file-normal'])
   })
 
+  it('目录预览把档案说明与清单展示为 ZIP 根级目录', async () => {
+    select.mockReset()
+    select.mockImplementation(async (sql: string) => sql.includes('FROM "projects"')
+      ? [{ id: 'project-1', name: '测试项目', code: 'P-001', status: '施工中', manager: '项目经理' }]
+      : [])
+
+    const current = await loadProjectArchiveSnapshot('project-1')
+    const manifestFolder = current.folders.find(folder => folder.key === 'project-manifest')
+    const projectRoot = current.tree.find(node => node.label === '01_项目信息与工程档案')
+
+    expect(manifestFolder?.path).toEqual(['00_档案说明与清单'])
+    expect(current.tree).toContainEqual(expect.objectContaining({
+      key: 'folder:00_档案说明与清单',
+      label: '00_档案说明与清单',
+      kind: 'folder',
+    }))
+    expect(projectRoot?.children?.some(node => node.label === '00_档案说明与清单')).toBe(false)
+  })
+
   it('zip 使用稳定排序，并把目录、清单和缺失原件留痕写入包内', async () => {
     const current = snapshot()
     const selected = new Set(['file-normal', 'file-sensitive', 'file-missing'])
@@ -98,10 +122,11 @@ describe('项目档案包导出（Issue #248）', () => {
     expect(result.exportedFiles.map(file => file.id)).toEqual(['file-normal'])
     expect(result.missingFiles.map(file => file.id)).toEqual(['file-missing'])
     expect(names).toContain('01_项目信息与工程档案/01_项目基本信息/立项-批复.pdf')
-    expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/导出说明.txt')
-    expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/文件清单.csv')
-    expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/项目档案目录.xlsx')
-    expect(names).toContain('01_项目信息与工程档案/00_档案说明与清单/文件清单.xlsx')
+    expect(names).toContain('00_档案说明与清单/导出说明.txt')
+    expect(names).toContain('00_档案说明与清单/文件清单.csv')
+    expect(names).toContain('00_档案说明与清单/项目档案目录.xlsx')
+    expect(names).toContain('00_档案说明与清单/文件清单.xlsx')
+    expect(names.some(name => name.startsWith('01_项目信息与工程档案/00_档案说明与清单/'))).toBe(false)
     expect(new TextDecoder().decode(result.data)).toContain('原件导出权限待配置')
   })
 

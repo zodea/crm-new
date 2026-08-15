@@ -19,6 +19,7 @@ export default defineConfig({
   outputDir: 'test-results/visual',
   use: {
     baseURL: VISUAL_BASE_URL,
+    locale: 'zh-CN',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     video: 'retain-on-failure',

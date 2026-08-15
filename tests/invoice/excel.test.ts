@@ -109,6 +109,7 @@ describe('发票台账 Excel 导出', () => {
       columnWidths: { seller: 42, remark: 31 },
       dateFormat: 'yyyy-mm-dd',
       moneyFormat: '#,##0.00',
+      textFormat: '@ "文本"',
       mergeTitle: false,
       mergeRepeatedValues: false,
       headerFont: { name: '微软雅黑', sz: 11, bold: false },
@@ -135,6 +136,7 @@ describe('发票台账 Excel 导出', () => {
     })
     expect(sheet.cells.A2?.font.bold).toBeUndefined()
     expect(sheet.cells.A3?.numberFormat).toBe('yyyy-mm-dd')
+    expect(sheet.cells.B3?.numberFormat).toBe('@ "文本"')
     expect(sheet.cells.E3?.numberFormat).toBe('#,##0.00')
     expect(sheet.mergedCells).toEqual([])
   })
@@ -205,6 +207,31 @@ describe('发票 Excel 导入/回读来源证据', () => {
     expect(getInvoiceImportSourceMeta(rows[1]!)?.formulaCells[0]).toMatchObject({
       formula: 'SUM(C3:C3)',
       formulaStatus: 'invalid',
+    })
+  })
+
+  it('缺少发票号码的真实业务行保留来源键并进入逐行复核，明确合计行才忽略', async () => {
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['发票号码', '供应商', '价税合计', '归属项目'],
+      ['', '缺号供应商', 88, '瑞航项目'],
+      ['总计', '', 88, ''],
+    ])
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, '明细')
+
+    const parsed = await parseInvoiceWorkbookForMapping(
+      XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer,
+      '缺号业务行.xlsx',
+    )
+    const sheet = parsed.sheets[0]!
+
+    expect(sheet.rows).toHaveLength(1)
+    expect(sheet.ignoredRows.map(row => row.sourceRow)).toEqual([3])
+    expect(sheet.rows[0]).toMatchObject({ 供应商: '缺号供应商', 价税合计: '88' })
+    expect(getInvoiceImportSourceMeta(sheet.rows[0]!)).toMatchObject({
+      sourceKey: '缺号业务行.xlsx::明细::2',
+      naturalKey: '',
+      reviewReasons: ['缺少发票号码，需逐行复核'],
     })
   })
 

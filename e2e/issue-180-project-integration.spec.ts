@@ -31,7 +31,7 @@ test('项目驾驶舱与正式源事实同口径，并提供只读来源穿透',
   await page.goto('/project/proj_demo_001')
   await page.waitForLoadState('networkidle')
 
-  const operation = page.locator('section[aria-labelledby="project-operation-title"]')
+  const operation = page.getByRole('region', { name: '项目经营数据' })
   await expect(operation.getByRole('group', { name: '确认支付' })).toContainText('¥4,200,000.00')
   await expect(operation.getByRole('group', { name: '管理费' })).toContainText('—')
   await expect(operation.getByRole('group', { name: '已知资金余额' })).toBeVisible()

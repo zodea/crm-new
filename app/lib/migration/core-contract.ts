@@ -3,7 +3,7 @@ import type { MoneyDTO } from '../../types/read-model'
 export const CORE_MIGRATION_CAPABILITY = 'core:migration:write' as const
 export const CORE_MIGRATION_CONTRACT_VERSION = 'core-migration.v1' as const
 export const CORE_MIGRATION_SOURCE_MODE = 'browser-production-snapshot' as const
-export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v40' as const
+export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v41' as const
 export const CORE_MIGRATION_TOPOLOGY = [
   'customers',
   'suppliers',
