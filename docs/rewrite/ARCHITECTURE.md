@@ -8,7 +8,8 @@
 Nuxt 4 SPA
 ├─ 浏览器开发态
 │  ├─ sql.js SQLite fallback
-│  └─ Nitro /server/api/ocr 代理官方 OCR API
+│  ├─ Nitro /server/api/ocr 代理官方 OCR API
+│  └─ Nitro /api/read/projects 提供第一条可重置中央读链
 └─ Tauri 2 桌面态
    ├─ tauri-plugin-sql SQLite
    ├─ tauri-plugin-fs / dialog
@@ -17,6 +18,7 @@ Nuxt 4 SPA
 
 - `nuxt.config.ts` 设置 `ssr: false`；生产产品以 Tauri 桌面应用为目标。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
+- 项目列表的 Nitro 实例用于验证后台权威读语义和迁移接缝；正式工作区、认证和生产数据迁移尚未接入，不能由此推断桌面端已经改为在线产品。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -67,20 +69,27 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 ## 4. 数据与状态流
 
 ```text
-Page / Domain component
-        │ 读取状态、调用 action
+项目列表
+  ProjectListScreen
+        │ 只读取 ReadState、调用 store action
         ▼
-     Pinia store
-        │ 调用领域服务 / DB coordinator
+  ProjectListStore
+        │ 只依赖 ProjectListRepository port
         ▼
-    app/lib/<domain> + app/lib/db
-        │
-        ▼
- SQLite（Tauri）或 sql.js（浏览器开发态）
+  HTTP adapter ──► Nitro /api/read/projects ──► 可重置中央测试实例
+
+同契约迁移来源
+  SQLite adapter ──► projects/customers/receipt_registrations/target_costs
+
+其余页面与写路径
+  Page / Domain component ──► Pinia store ──► 领域/DB 层
+        └────────────────────────────────────► SQLite 或 sql.js
 ```
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
+- 项目列表当前是中央只读切片；新增、导入、编辑和删除在中央写命令落地前保持禁用，不能回退本地写入并伪装成中央成功。
+- `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、unavailable 与 retry，不是业务 API。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。
 - 列表、详情、工作台和未来 HTTP adapter 的读语义以 `READ-MODELS.md` 为契约；Pinia 不直接拼私有 URL，本地 SQLite adapter 与 HTTP adapter 不得各造一套空值、金额或权限含义。
 - 删除遵循软删除与撤回语义；具体约束见 `DATABASE.md` 和 ADR 0003。

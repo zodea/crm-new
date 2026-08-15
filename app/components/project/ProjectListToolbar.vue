@@ -5,6 +5,7 @@ defineProps<{
   total: number
   visible: number
   loading: boolean
+  writeDisabledReason?: string
 }>()
 
 const emit = defineEmits<{
@@ -93,7 +94,13 @@ function toggleDensity() {
         >
           <span class="i-lucide-settings-2 h-3.5 w-3.5" aria-hidden="true" />
         </Button>
-        <Button variant="outline" aria-label="导入项目" title="导入项目（映射页签）" @click="emit('import')">
+        <Button
+          variant="outline"
+          aria-label="导入项目"
+          :title="writeDisabledReason || '导入项目（映射页签）'"
+          :disabled="Boolean(writeDisabledReason)"
+          @click="emit('import')"
+        >
           <span class="i-lucide-upload h-3.5 w-3.5" aria-hidden="true" />
           导入
         </Button>
@@ -105,7 +112,13 @@ function toggleDensity() {
           <span class="i-lucide-folder-tree h-3.5 w-3.5" aria-hidden="true" />
           分类导出
         </Button>
-        <Button variant="accent" aria-label="新增项目" @click="emit('create')">
+        <Button
+          variant="accent"
+          aria-label="新增项目"
+          :title="writeDisabledReason"
+          :disabled="Boolean(writeDisabledReason)"
+          @click="emit('create')"
+        >
           <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
           新增项目
         </Button>

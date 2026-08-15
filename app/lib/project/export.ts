@@ -1,4 +1,23 @@
-import type { Project } from '~/stores/project'
+export interface ProjectLedgerSource {
+  name: string
+  status: string
+  contractAmount: number | string | null
+  operationType: string
+  startDate: string | null
+  plannedEnd: string | null
+  actualEnd: string | null
+  plannedDuration: number | null
+  manager: string
+  execManager: string
+  builder: string
+  developer: string
+  developer2: string
+  contractName: string
+  contractor: string
+  region: string
+  riskLevel: string
+  address: string
+}
 
 // 项目台账导出的纯逻辑（ADR 0004）：列标签映射与逐项目导出行投影，node 可测。
 // 实际写盘/xlsx 序列化在 ProjectListScreen（依赖 xlsx 与 KitUI exportFile），本层只产出
@@ -6,7 +25,7 @@ import type { Project } from '~/stores/project'
 
 export interface ProjectExportColumn {
   /** Project 字段名 */
-  key: keyof Project
+  key: keyof ProjectLedgerSource
   /** 导出表头（中文，红圈台账口径） */
   label: string
 }
@@ -42,7 +61,7 @@ function cell(value: unknown): string | number {
 
 /** 把项目集投影为导出行（每个项目一行，键为中文表头）。 */
 export function projectLedgerRows(
-  projects: readonly Project[],
+  projects: readonly ProjectLedgerSource[],
 ): Record<string, string | number>[] {
   return projects.map(p => Object.fromEntries(
     PROJECT_EXPORT_COLUMNS.map(col => [col.label, cell(p[col.key])]),

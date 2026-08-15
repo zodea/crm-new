@@ -498,7 +498,7 @@ openDrawer({
 
 ---
 
-## 12 · 数据表格 `kit-table` ✅ 已定案（2026-07-29）
+## 12 · 数据表格 `kit-table` ✅ 已定案（2026-08-15）
 
 **用途**：`app/components/ui/KitTable.vue` 统一跨领域列表的紧凑密度、表格内横滚、固定重要列、列宽调整、空态和受控分页；字段、业务列宽与行内动作仍由领域调用点决定。
 
@@ -510,6 +510,8 @@ openDrawer({
 - 默认开启拖拽提示和双击自适配；`resizeConfig.isDblclickAutoWidth=false` 可按领域关闭，`resizable=false` 可关闭整表列宽调整，单列 `resizable=false` 优先。
 - `action` 列默认宽 112px、固定右侧且禁止拖拽，避免固定右列出现左侧含混手柄；业务动作超过该宽度时必须显式加宽，不能靠通用表格猜测或静默裁切。
 - `seq` / 重要名称列可由业务显式固定左侧；固定方向和显式宽度始终优先于默认值。
+- 非分页小表可用 `filterable: true` 从当前行推导筛选项；受控分页必须传显式 `KitFilterOption[]`，选项来自后台完整快照 facet，不能从当前页反推。
+- `remoteFilter` 开启后，`KitTable` 不在当前页本地过滤，只发出包含全部列条件的 `filter-change`；调用方负责把条件交给 Repository 并回填新页。动态 facet 通过 vxe `setFilter` 同步，`KitFilterOption.checked` 表示受控选中态，刷新 facet 后不得丢失当前条件。
 
 **调用签名**：
 
@@ -524,5 +526,18 @@ openDrawer({
     minWidth: 48,
     maxWidth: 480,
   }"
+  remote-filter
+  @filter-change="loadWithColumnFilters"
 />
+```
+
+```ts
+const columns: KitTableColumn[] = [{
+  field: 'status',
+  title: '业务阶段',
+  filterable: facets.statuses.map(option => ({
+    ...option,
+    checked: selectedStatuses.includes(option.value),
+  })),
+}]
 ```

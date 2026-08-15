@@ -1,8 +1,11 @@
-import { fireEvent, render, screen, within } from '@testing-library/vue'
+import type { ProjectListPageDTO, ProjectListQueryDTO, ProjectListSourceRow } from '~/lib/project/repository'
+import type { ReadState } from '~/types/read-model'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, defineComponent, h, nextTick, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectListScreen from '~/components/project/ProjectListScreen.vue'
 import ListShell from '~/components/ui/ListShell.vue'
+import { buildProjectListPage } from '~/lib/project/repository'
 
 const projects = [
   {
@@ -41,6 +44,59 @@ const projects = [
   },
 ]
 
+const sourceRows: ProjectListSourceRow[] = projects.map((project, index) => ({
+  id: project.id,
+  name: project.name,
+  code: project.code,
+  status: project.status,
+  contractAmount: project.contractAmount,
+  operationType: '自营',
+  startDate: null,
+  plannedEnd: project.plannedEnd,
+  actualEnd: project.actualEnd || null,
+  plannedDuration: null,
+  manager: project.manager,
+  execManager: project.execManager,
+  builder: project.builder,
+  customerId: project.customerId,
+  customerName: project.developer,
+  customerPermission: 'allowed',
+  secondaryCustomerId: null,
+  secondaryCustomerName: null,
+  secondaryCustomerPermission: 'allowed',
+  contractName: project.contractName,
+  contractor: '',
+  region: '广州',
+  riskLevel: '',
+  address: project.address,
+  income: index === 0 ? 320000 : null,
+  budget: index === 0 ? 800000 : null,
+  updatedAt: `${project.updatedAt}T00:00:00.000Z`,
+}))
+
+const defaultQuery: ProjectListQueryDTO = {
+  search: '',
+  status: null,
+  filters: {
+    statuses: [],
+    plannedEnds: [],
+    managers: [],
+    customerIds: [],
+  },
+  sort: 'updated-desc',
+  page: 1,
+  pageSize: 10,
+}
+
+function projectPage(query: ProjectListQueryDTO = defaultQuery) {
+  return buildProjectListPage({
+    rows: sourceRows,
+    query,
+    asOf: '2026-08-15T00:00:00.000Z',
+    sourceVersion: 'component-test-v1',
+  })
+}
+
 const TreeNavStub = defineComponent({
   props: {
     items: {
@@ -77,11 +133,29 @@ const KitTableStub = defineComponent({
     },
     rowHeight: Number,
   },
-  setup(props, { expose, slots }) {
+  emits: ['filter-change'],
+  setup(props, { emit, expose, slots }) {
     expose({ clearFilter: vi.fn() })
     return () => h('section', { 'aria-label': '项目宽表', 'data-row-height': props.rowHeight }, [
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
-        h('span', { role: 'columnheader' }, column.title))),
+        h('span', {
+          'role': 'columnheader',
+          'data-checked-values': Array.isArray(column.filterable)
+            ? column.filterable.filter((option: any) => option.checked).map((option: any) => option.value).join(',')
+            : '',
+        }, column.title))),
+      h('button', {
+        'type': 'button',
+        'aria-label': '应用无交集组合筛选',
+        'onClick': () => emit('filter-change', {
+          field: 'manager',
+          values: ['王经理'],
+          filters: [
+            { field: 'developer', values: ['customer-1'] },
+            { field: 'manager', values: ['王经理'] },
+          ],
+        }),
+      }),
       ...(props.data as any[]).map(row =>
         h('div', { role: 'row' }, [
           `${row.name} ${row.status}`,
@@ -142,6 +216,13 @@ const global = {
   },
 }
 
+let projectReadStore: {
+  state: ReadState<ProjectListPageDTO>
+  load: ReturnType<typeof vi.fn>
+  listAll: ReturnType<typeof vi.fn>
+  retry: ReturnType<typeof vi.fn>
+}
+
 describe('project list screen', () => {
   beforeEach(() => {
     vi.stubGlobal('computed', computed)
@@ -151,26 +232,26 @@ describe('project list screen', () => {
     vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('useTemplateRef', useTemplateRef)
     vi.stubGlobal('watch', watch)
+    projectReadStore = reactive({
+      state: { kind: 'ready', data: projectPage() },
+      load: vi.fn(async (query: ProjectListQueryDTO) => {
+        const page = projectPage(query)
+        projectReadStore.state = page.empty
+          ? { kind: 'empty', data: page, empty: page.empty }
+          : { kind: 'ready', data: page }
+      }),
+      listAll: vi.fn(async (query: ProjectListQueryDTO) => projectPage({
+        ...query,
+        page: 1,
+        pageSize: 100,
+      }).items),
+      retry: vi.fn(),
+    })
+    vi.stubGlobal('useProjectListStore', () => projectReadStore)
     vi.stubGlobal('useProjectStore', () => ({
-      list: projects,
-      loading: false,
-      loaded: true,
-      error: '',
-      load: vi.fn(),
       downstreamImpact: vi.fn(async () => []),
-    }))
-    vi.stubGlobal('useProjectDetailStore', () => ({
-      operationSummaries: {
-        'project-1': { projectReceipt: 320000, mainContractAmount: 1000000 },
-      },
-      targetCosts: [
-        {
-          projectId: 'project-1',
-          status: '当前基线',
-          targetAmount: 800000,
-        },
-      ],
-      load: vi.fn(async () => {}),
+      remove: vi.fn(),
+      undo: vi.fn(),
     }))
     vi.stubGlobal('useKitUI', () => ({
       confirm: vi.fn(),
@@ -236,9 +317,12 @@ describe('project list screen', () => {
     await fireEvent.update(screen.getByRole('searchbox', { name: '列表搜索' }), '李经理')
 
     const table = screen.getByRole('region', { name: '项目宽表' })
-    expect(within(table).getAllByRole('row')).toHaveLength(2)
-    expect(within(table).getByText(/合和新城/)).not.toBeNull()
-    expect(screen.getByText(/当前 1 个/)).not.toBeNull()
+    await waitFor(() => {
+      expect(within(table).getAllByRole('row')).toHaveLength(2)
+      expect(within(table).getByText(/合和新城/)).not.toBeNull()
+      expect(screen.getByText(/当前 1 个/)).not.toBeNull()
+    })
+    expect(projectReadStore.load).toHaveBeenLastCalledWith(expect.objectContaining({ search: '李经理' }))
   })
 
   it('全量汇总缺少任一项目事实时显示未知与缺失数，不把已知子集冒充总额', () => {
@@ -249,5 +333,26 @@ describe('project list screen', () => {
     expect(summary.textContent).toMatch(/预算总额\s*—\s*缺失 1 个/)
     expect(summary.textContent).not.toContain('¥320,000.00')
     expect(summary.textContent).not.toContain('¥800,000.00')
+  })
+
+  it('交叉筛选无命中后仍在动态 facet 中保留全部已选条件', async () => {
+    render(ProjectListScreen, { global })
+
+    await fireEvent.click(screen.getByRole('button', { name: '应用无交集组合筛选' }))
+
+    await waitFor(() => {
+      expect(projectReadStore.load).toHaveBeenLastCalledWith(expect.objectContaining({
+        filters: expect.objectContaining({
+          managers: ['王经理'],
+          customerIds: ['customer-1'],
+        }),
+      }))
+    })
+
+    const table = screen.getByRole('region', { name: '项目宽表' })
+    expect(within(table).getByRole('columnheader', { name: '项目经理' }).dataset.checkedValues)
+      .toBe('王经理')
+    expect(within(table).getByRole('columnheader', { name: '客户' }).dataset.checkedValues)
+      .toBe('customer-1')
   })
 })

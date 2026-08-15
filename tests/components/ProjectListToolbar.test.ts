@@ -74,4 +74,18 @@ describe('project list toolbar', () => {
     expect(view.emitted().exportLedger).toHaveLength(1)
     expect(view.emitted().exportByCategory).toHaveLength(1)
   })
+
+  it('中央后台只读切片不会让本地写入按钮伪装成可用', () => {
+    const reason = '项目写入尚未接入中央后台'
+    render(ProjectListToolbar, {
+      props: { ...props, writeDisabledReason: reason },
+      global,
+    })
+
+    for (const name of ['导入项目', '新增项目']) {
+      const button = screen.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      expect(button.getAttribute('title')).toBe(reason)
+    }
+  })
 })

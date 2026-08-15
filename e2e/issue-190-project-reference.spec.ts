@@ -168,7 +168,11 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
         exact: true,
       })
       await createProject.scrollIntoViewIfNeeded()
-      await tabUntilFocused(page, createProject)
+      await expect(createProject).toBeDisabled()
+      await expect(createProject).toHaveAttribute(
+        'title',
+        '项目写入尚未接入中央后台',
+      )
       await expectInViewport(createProject, `${viewport.label} 新增项目操作`)
 
       await page.goto('/project/proj_demo_001')
