@@ -35,9 +35,9 @@ DC重构设计源码/
 
 ## 当前待补设计
 
-**当前为空。** 唯一在列的[施工进度「前后置依赖设置」设计补图任务书](./schedule-dependency-editor-brief.md)已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入 `DC重构设计源码/kit/SchedulePlanScreen.jsx`：工序详情内的依赖摘要行、单层 FS + lag 设置视图、日期预览与冲突 warning、候选限制与环检测、调期冲突的灰色虚线保留与恢复入口均已落到设计源码，视觉基准回到 `app.dc.html` 本身。该 brief 保留为历史规格说明，不再作为待办。
+**当前为 1 条。** `/finance/payment/:id/detail` 已有生产路由，但还没有一一对应的 DC 页面；它在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`，由 [#305](https://github.com/zodea/crm-new/issues/305) 随付款详情洞察切片补齐。此前的施工进度「前后置依赖设置」已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入设计源码，其 brief 仅保留历史说明，不再作为待办。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)。后者是 #181 下的证据登记册，不复制页面字段规格，也不在 #183 完成前替代本页列出的视觉权威链。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。当前实施权威是父规格 [#292](https://github.com/zodea/crm-new/issues/292) 与账本票 [#276](https://github.com/zodea/crm-new/issues/276)；#181 / #182 / #183 只保留历史证据，不再代表当前 Issue 状态。
 
 运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
 

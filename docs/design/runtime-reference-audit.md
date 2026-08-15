@@ -1,10 +1,12 @@
 # 运行态参考差异矩阵
 
-> Issue：[#182](https://github.com/zodea/crm-new/issues/182)
+> 当前实施票：[#276](https://github.com/zodea/crm-new/issues/276)
 >
-> 父计划：[#181](https://github.com/zodea/crm-new/issues/181)
+> 父规格：[#292](https://github.com/zodea/crm-new/issues/292)
 >
-> 核对日期：2026-08-13
+> 历史来源：[#181](https://github.com/zodea/crm-new/issues/181)、[#182](https://github.com/zodea/crm-new/issues/182)
+>
+> 核对日期：2026-08-15
 
 本文是全部生产 Nuxt 路由的运行态参考证据登记册，不是第二份页面规格。字段、业务规则和数据关系仍以 `docs/rewrite/pages/`、`DATABASE.md`、`CONTEXT.md` 为准；实际实现状态仍看 `ui-implementation-status.md`。
 
@@ -85,7 +87,7 @@
 | `R-AUX-SETTLEMENT-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/OtherSettleScreen.jsx`、`MatSettleScreen.jsx`、`forms/ContractForms.jsx`、`forms/MaterialForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码规定其他支出结算与材料采购结算的项目、真实源合同、分供方、金额、日期、状态、筛选、汇总、分页和整页表单分区。两类结算均没有持久化业务明细实体，不能套用材料采购合同的 `KitEditGrid`；外部运行态只作为表格和表单几何佐证。 |
 | `R-OWNER-DOC-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/OwnerChangeScreen.jsx`、`OwnerReportScreen.jsx`、`AcceptanceScreen.jsx`、`FinalSettleScreen.jsx`、`OwnerPenaltyScreen.jsx`、`forms/OwnerDocForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码分别规定五类甲方单据的真实标题、列表列、搜索/项目/类型/状态筛选、金额汇总、分页和整页表单分区，不能退化为同一套通用占位界面。外部 `R-TABLE-LIVE`、`R-FORM-LIVE` 只佐证紧凑表格、局部横滚、两列字段与固定底栏等几何；状态名称、来源关系、附件归属及写入动作仍由本地数据库和页面规格裁定。 |
 | `R-SUB-DOC-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/SubChangeScreen.jsx`、`SubSettleScreen.jsx`、`ProjPenaltyScreen.jsx`、`forms/OwnerDocForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码分别规定分包变洽签、分包结算和项目罚扣的真实标题、列表列、搜索/项目/类型/状态筛选、金额汇总、分页和整页表单分区。外部运行态仅提供共性几何证据；分供方、合同、班组、结算抵扣、附件与状态动作必须沿用本地真实外键和事务契约，不从示例数据反推。 |
-| `R-SCHEDULE-LOCAL` | DC 独有能力的固定本地蓝本，非红圈目标页运行态 | `docs/合和新城7期施工进度计划表 （户内）2026.04.22.pdf`、`DC重构设计源码/kit/SchedulePlanScreen.jsx`、`ScheduleGroupNewScreen.jsx`、`ScheduleBindScreen.jsx`、`ScheduleProcessLibraryScreen.jsx`、`forms/ScheduleForms.jsx`、ADR 0017 / 0018 | 固定源码桌面构图与本地生产四档验证 | 本地脱敏红圈资料未登记施工排程对象；`红圈系统/业务流转.md` 仅能提供成本、合同和结算来源关系。因此 WBS、甘特、内部暂估、标准工序库和合同后绑定均按瑞航本地蓝本裁定，不宣称复制红圈目标页。[#244](https://github.com/zodea/crm-new/issues/244) 已合入工序库、合同绑定和整页表单的设计源码落点，但仍保持 open 以追平依赖弹窗细节和四档设计稿验收；#191 只负责生产数据与交互闭环。 |
+| `R-SCHEDULE-LOCAL` | DC 独有能力的固定本地蓝本，非红圈目标页运行态 | `docs/合和新城7期施工进度计划表 （户内）2026.04.22.pdf`、`DC重构设计源码/kit/SchedulePlanScreen.jsx`、`ScheduleGroupNewScreen.jsx`、`ScheduleBindScreen.jsx`、`ScheduleProcessLibraryScreen.jsx`、`forms/ScheduleForms.jsx`、ADR 0017 / 0018 | 固定源码桌面构图与本地生产四档验证 | 本地脱敏红圈资料未登记施工排程对象；`红圈系统/业务流转.md` 仅能提供成本、合同和结算来源关系。因此 WBS、甘特、内部暂估、标准工序库和合同后绑定均按瑞航本地蓝本裁定，不宣称复制红圈目标页。[#244](https://github.com/zodea/crm-new/issues/244) 已关闭并合入工序库、合同绑定和整页表单的设计源码落点；它只作为本地蓝本来源，不代表 #292 当前实施状态。 |
 | `R-ENGINEERING-FLOW-LOCAL` | 当前本地生产运行态直接证据；参考站无同构页面 | `/schedule`、`/schedule/:pid`、`/subcontract/quantity`、`/subcontract/quantity/:pid/:uid`、`/subcontract/quantity/region`、`/subcontract/quantity/template`、`/subcontract/payroll`、`/subcontract/payroll/new`、`/subcontract/payroll/:id`、`/subcontract/attendance`、`/subcontract/daywork`、班组/工人详情反向入口 | 390 / 768 / 1024 / 1440px，2026-08-13 | [#287](https://github.com/zodea/crm-new/issues/287) 仅执行本地只读导航、任务详情展开和多视口测量，未触发登记、保存、删除、导入、导出、打印或发放。合和新城种子可见 8 户、13 条当前责任和 12 条阶段完成/草稿事实；工资、考勤、签工没有运行种子，保持真实空台账。排程工序可携项目/分组/楼栋/任务/阶段/分项/计划区间进入工程量矩阵，返回后恢复同一任务详情；工程量户详情保留项目、楼栋、月份、视角、工种、责任人六项筛选，错误 pid/uid 显式失败。工资列表→建单→列表和工资列表↔考勤能恢复项目/月/班组/状态；独立工资详情返回、零星签工入参及其返回仍会丢失上下文。户详情明细保留 `null` 为“—”，但阶段小计和全户合计仍以 `?? 0` 汇总，存在把缺现场量误表为 0 的断点。施工合同/分包合同没有到工资责任的显式外键，B 类继续禁用；班组、工人和扣罚只按现有项目/责任/工资/罚扣事实反向聚合。四档下页面根均无横向溢出，工程量矩阵、考勤月表和 WBS 甘特只在各自容器滚动。 |
 
 上一次实施无法读取浏览器正文，因此当时生成的项目详情“当前直接证据”和线框不成立，已在后续严格只读观察中撤销并重建。`R-PROJECT-DETAIL-LIVE` 以用户指定的完整权限项目为主样本；`R-PROJECT-LIST-LIVE` 与 `R-TARGET-COST-LIVE` 补齐项目金额、人员与目标成本名称/金额的隐藏只读下钻；`R-CONSTRUCTION-CONTRACT-LIVE`、`R-SUBCONTRACT-CONTRACT-LIVE`、`R-DETAIL-LIVE` 与 `R-MATERIAL-CONTRACT-LIVE` 共同确认三类合同不能继续共用一组视觉页签，`R-SUPPLIER-DETAIL-LIVE` 则补齐材料合同乙方与往期合作聚合下钻。`R-OWNER-DOCUMENTS-LIVE`、`R-SUB-DOCUMENTS-LIVE`、`R-AUX-DOCUMENTS-LIVE`、`R-MATERIAL-SETTLEMENT-LIVE`、`R-MATERIAL-FLOW-LIVE` 和 `R-OWNER-MATERIAL-LIVE` 进一步确认单据空态也必须保留专属列表，蓝色名称先进入只读详情，项目/合同/客户或分供方关系与返回上下文是同一条导航契约；材料链还必须保留源单、仓库、送货单、班组合同、调拨两端及结算/付款状态。甲供材五类不能继续共用“材料/对象”列表，项目物资页也不能用一张送货归档表冒充总计划、需用计划和入库单；供货单位身份、总计划头/行和归档—入库关系仍等待本地 canonical 裁定。`R-CUSTOMER-LIST-LIVE` 只证明客户列表构图和受权限保护的入口。`R-ENGINEERING-FLOW-LOCAL` 则明确工程量、工资、考勤、签工和排程没有可直接套用的参考页，运行态差异必须按本地真实 ID、空值与冻结语义修复，不能从邻近统计页推断。参考站没有可安全确认的一一对应送货 OCR、归档库或价格分析页面，这三类瑞航独有工具继续由本地 DC、页面规格和真实 SQLite 数据裁定。上述证据仍不能把某一对象字段外推到另一对象，也不能把权限拒绝解释为不存在目标页；参考站的导入、编辑、打印、下载、评论和文件动作均未触发。当前直接证据只支持已实际打开的布局、只读状态和关系入口，不能外推未走查页面、写入行为或参考站私有数据契约。
@@ -101,9 +103,46 @@
 
 ## 5. 生产路由矩阵
 
-“待核对”是明确的证据状态，不代表页面已与参考站一致。业务实施票完成只读采集后，应在同一提交把证据档案升级为直接证据，并把对应差异改成已验证结论。
+“待核对”是明确的证据状态，不代表页面已与参考站一致。业务实施票完成只读采集后，应在同一提交把证据档案升级为直接证据，并把对应差异改成已验证结论。矩阵中的票号是形成当前页面基础的历史票，不表示它仍是当前前沿；当前票由上方生成账本按页面域统一给出。
 
-| Page | Route | 业务域 | 模板 | 实施票 | 参考证据 | 布局差异 | 交互差异 | 业务约束 |
+账本由 `node scripts/sync-runtime-evidence-ledger.mjs` 从页面文件、本矩阵、证据档案、[`READ-MODELS.md`](../rewrite/READ-MODELS.md) 和 [`design-coverage.json`](./design-coverage.json) 同步生成。每行是一个本地生产端点与具体参考视图的唯一映射，使用不受排序影响的 `evidenceRecordId` / `referenceEndpointId` 计数；被多个路由复用的聚合档案必须先拆成明确目标视图，未知目标只能登记为历史未记录或未验证。完整的证据等级、观测日期或缺失原因、权限状态和当前实施票见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。布局、状态和跳转叙述只保留在本矩阵，生成物用 `routeKey` 回指，不复制第二份状态快照。
+
+<!-- runtime-evidence-summary:begin -->
+| 可重算口径 | 数量 |
+| --- | ---: |
+| 跟踪页面文件 / dev / 生产路由 | 133 / 5 / 128 |
+| 页面域 | 20 |
+| 证据行 / 唯一参考端点 | 128 / 128 |
+| 参考证据档案 / 被路由使用 | 37 / 32 |
+| 直接 / 邻近 / 本地权威 | 48 / 18 / 18 |
+| 历史证据 / 未验证目标 | 36 / 8 |
+| 设计已覆盖 / 待补设计 | 127 / 1 |
+
+| 页面域 | 路由数 | 当前实施票 |
+| --- | ---: | --- |
+| 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
+| 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 分供方 | 3 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 甲方单据 | 3 | [#283](https://github.com/zodea/crm-new/issues/283)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 分包单据 | 6 | [#295](https://github.com/zodea/crm-new/issues/295)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 材料价格 | 1 | [#296](https://github.com/zodea/crm-new/issues/296)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 收入财务 | 9 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 支出财务 | 11 | [#303](https://github.com/zodea/crm-new/issues/303)、[#305](https://github.com/zodea/crm-new/issues/305)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 项目进度成本 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 导入导出 | 2 | [#278](https://github.com/zodea/crm-new/issues/278) |
+| 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
+<!-- runtime-evidence-summary:end -->
+
+| Page | Route | 业务域 | 模板 | 历史基础票 | 参考证据 | 布局差异 | 状态与跳转结论 | 业务约束 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成统一详情壳、真实成员/能力/项目工程量/工资/扣罚区块、长名称与四档无整页横滚回归 | 电话脱敏；工人、关联人员、项目和扣罚源单真实下钻；无事实时分别显示空态 | C-DENSE |
 | `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、电话输入语义、班组级计薪说明与开关联动回归 | 只写 `crews` 与班组附件；不恢复不存在的班组项目单价关系 | C-FORM |
