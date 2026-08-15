@@ -3,7 +3,9 @@ import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
-type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
+type Scenario = 'ready' | 'empty' | 'forbidden' | 'demo-forbidden' | 'unavailable'
+
+const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 
 function testSession(testInfo: TestInfo) {
   return Buffer.from(testInfo.testId, 'utf8').toString('base64url')
@@ -37,6 +39,9 @@ async function openProjectList(page: Page) {
 test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const sessionId = testSession(testInfo)
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem(storageKey, 'true')
+    }, DATA_VISIBILITY_STORAGE_KEY)
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
     await resetProjectBackend(page.context().request, 'ready', sessionId)
   })
@@ -58,14 +63,15 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
     expect(readRequests).toHaveLength(1)
     expect(readRequests[0]).toContain('page=1')
     expect(readRequests[0]).toContain('pageSize=10')
-    await expect(page.getByText('共 12 个')).toBeVisible()
+    expect(readRequests[0]).toContain('includeDemo=true')
+    await expect(page.getByLabel('项目来源数量')).toContainText('测试 12 个')
     await expect(page.getByText('无权限', { exact: true })).toBeVisible()
     await expect(page.getByText('翠湖投资', { exact: true })).toHaveCount(0)
     await expect(page.getByText('¥0.00', { exact: true }).first()).toBeVisible()
 
     const summary = page.getByLabel('项目列表汇总')
-    await expect(summary).toContainText(/累计收入\s*—\s*缺失 10 个/)
-    await expect(summary).toContainText(/预算总额\s*—\s*缺失 10 个/)
+    await expect(summary).toContainText(/测试数据.*累计收入\s*—.*收入缺失 10 个/)
+    await expect(summary).toContainText(/测试数据.*预算总额\s*—.*预算缺失 10 个/)
     await expect(page.getByRole('button', { name: '新增项目' })).toBeDisabled()
     await expect(page.getByRole('button', { name: '导入项目' })).toBeDisabled()
   })
@@ -121,8 +127,8 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
     expect((await response).ok()).toBe(true)
 
     await expect(page.getByRole('link', { name: '零星维修框架项目', exact: true })).toBeVisible()
-    await expect(page.getByText('共 1 个')).toBeVisible()
-    await expect(page.getByLabel('项目列表汇总')).toContainText('显示 1 个项目')
+    await expect(page.getByLabel('项目来源数量')).toContainText('测试 1 个')
+    await expect(page.getByLabel('项目列表汇总')).toContainText(/测试数据\s*1 个/)
   })
 
   test('中央实例真实无记录时显示 no-records，而非筛选空态', async ({ page }, testInfo) => {

@@ -6,6 +6,7 @@ import { ProjectRepositoryProblem } from '~/lib/project/repository'
 import { useProjectListStore } from '~/stores/project-list'
 
 const QUERY: ProjectListQueryDTO = {
+  includeDemo: false,
   search: '',
   status: null,
   filters: {
@@ -23,10 +24,11 @@ const PAGE = {
   items: [],
   pagination: { page: 1, pageSize: 10, total: 0 },
   summary: {
-    projectCount: 0,
-    statusCounts: {},
-    income: null,
-    budget: null,
+    facets: { statuses: [], plannedEnds: [], managers: [], customers: [] },
+    origins: {
+      real: { projectCount: 0, statusCounts: {}, income: null, budget: null },
+      demo: { projectCount: 0, statusCounts: {}, income: null, budget: null },
+    },
   },
   empty: { reason: 'no-records', missingRelations: [] },
   asOf: '2026-08-15T00:00:00.000Z',
@@ -41,7 +43,7 @@ describe('project list read state', () => {
     setActivePinia(createPinia())
     list.mockReset()
     vi.stubGlobal('useNuxtApp', () => ({
-      $repositories: { projectList: { list } },
+      $repositories: { projectList: { list, get: vi.fn() } },
     }))
   })
 

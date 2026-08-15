@@ -1,5 +1,6 @@
 import type { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { describe, expect, it } from 'vitest'
+import { createDemoWorkspaceTestInstance } from '../../server/utils/demo-workspace-test-instance'
 import { createProjectReadTestInstance } from '../../server/utils/project-read-test-instance'
 
 describe('project read resettable instance', () => {
@@ -18,13 +19,24 @@ describe('project read resettable instance', () => {
     >({
       problem: { code: 'forbidden' },
     })
-    await expect(instance.list(undefined, 'session-c')).resolves.toMatchObject({
+    await expect(instance.list({ includeDemo: 'true' }, 'session-c')).resolves.toMatchObject({
       pagination: { total: 12 },
     })
 
     instance.reset('ready', 'session-a')
-    await expect(instance.list(undefined, 'session-a')).resolves.toMatchObject({
+    await expect(instance.list({ includeDemo: 'true' }, 'session-a')).resolves.toMatchObject({
       pagination: { total: 12 },
+    })
+  })
+
+  it('uses the same server capability for the global demo workspace', async () => {
+    const demoWorkspace = createDemoWorkspaceTestInstance()
+    const instance = createProjectReadTestInstance(sessionId => demoWorkspace.capabilities(sessionId))
+    demoWorkspace.reset('forbidden', 'session-denied')
+
+    await expect(instance.list({ includeDemo: 'true' }, 'session-ready')).resolves.toBeDefined()
+    await expect(instance.list({ includeDemo: 'true' }, 'session-denied')).rejects.toMatchObject({
+      problem: { code: 'forbidden' },
     })
   })
 })

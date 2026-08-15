@@ -1,6 +1,7 @@
 // @unocss-include
 import { defineStore } from 'pinia'
 import { computed, shallowRef } from 'vue'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 export type NotificationKind = 'todo' | 'notice'
 export type NotificationType = 'payment' | 'payroll' | 'invoice' | 'delivery' | 'cert'
@@ -82,23 +83,25 @@ const SEED_ITEMS: NotificationItem[] = [
 ]
 
 export const useNotificationStore = defineStore('notifications', () => {
-  const items = shallowRef<NotificationItem[]>(SEED_ITEMS.map(item => ({ ...item })))
+  const dataVisibilityStore = useDataVisibilityStore()
+  const demoItems = shallowRef<NotificationItem[]>(SEED_ITEMS.map(item => ({ ...item })))
+  const items = computed(() => dataVisibilityStore.includeDemo ? demoItems.value : [])
   const unreadCount = computed(() => items.value.filter(item => !item.read).length)
 
   function add(item: NotificationItem) {
-    items.value = [{ ...item }, ...items.value.filter(current => current.id !== item.id)]
+    demoItems.value = [{ ...item }, ...demoItems.value.filter(current => current.id !== item.id)]
   }
 
   function markRead(id: string) {
-    items.value = items.value.map(item => item.id === id ? { ...item, read: true } : item)
+    demoItems.value = demoItems.value.map(item => item.id === id ? { ...item, read: true } : item)
   }
 
   function markAllRead() {
-    items.value = items.value.map(item => item.read ? item : { ...item, read: true })
+    demoItems.value = demoItems.value.map(item => item.read ? item : { ...item, read: true })
   }
 
   function remove(id: string) {
-    items.value = items.value.filter(item => item.id !== id)
+    demoItems.value = demoItems.value.filter(item => item.id !== id)
   }
 
   /** 点击通知的唯一写路径：先标已读，再把真实路由交给呈现层导航。 */

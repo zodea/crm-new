@@ -1,24 +1,25 @@
 # 当前技术架构
 
-本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
+本文描述仓库当前结构和模块边界，不维护逐页面完成度。依赖版本以 `package.json` 为准，浏览器中央权威与演示隔离决策看 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，界面完成度看 [`docs/design/ui-implementation-status.md`](../design/ui-implementation-status.md)，实体关系看 [`DATABASE.md`](./DATABASE.md)，页面读模型与后台 DTO 语义看 [`READ-MODELS.md`](./READ-MODELS.md)，跨域入口与返回语义看 [`NAVIGATION.md`](./NAVIGATION.md)。
 
 ## 1. 运行形态
 
 ```text
 Nuxt 4 SPA
-├─ 浏览器开发态
-│  ├─ sql.js SQLite fallback
+├─ 浏览器当前生产目标
+│  ├─ 领域 Repository → 中央 HTTP 服务
+│  ├─ sql.js/IndexedDB 分为无 seed 的 production 快照与只读 demo 快照
 │  ├─ Nitro /server/api/ocr 代理官方 OCR API
-│  └─ Nitro /api/read/projects 提供第一条可重置中央读链
+│  └─ Nitro /api/read/projects 提供项目列表与详情的正式/演示隔离读链
 └─ Tauri 2 桌面态
    ├─ tauri-plugin-sql SQLite
    ├─ tauri-plugin-fs / dialog
    └─ Nuxt 静态前端
 ```
 
-- `nuxt.config.ts` 设置 `ssr: false`；生产产品以 Tauri 桌面应用为目标。
+- `nuxt.config.ts` 设置 `ssr: false`；当前生产目标、中央权威与桌面范围由 ADR 0020 裁定。
 - OCR 凭证只存在 Nitro runtime config，不进入 public config 或前端持久化。桌面静态构建不能假定 Nitro 永远可用，最终本地自托管/云端边界遵守 ADR 0006。
-- 项目列表的 Nitro 实例用于验证后台权威读语义和迁移接缝；正式工作区、认证和生产数据迁移尚未接入，不能由此推断桌面端已经改为在线产品。
+- 项目列表与来源感知基础详情的 Nitro 实例已经实现默认 workspace/actor 会话、正式空来源、独立演示来源与 capability 校验；完整登录/RBAC、正式业务库和生产数据迁移仍未接入。
 - 平台差异经 `app/lib/platform/`、`app/lib/io/` 和数据库连接层收口，页面不直接散写 Tauri/浏览器判断。
 
 ## 2. 技术栈
@@ -59,7 +60,7 @@ app/
 ├─ types/           # 跨模块共享类型
 └─ workers/         # 重计算或文件处理 worker
 
-server/             # 仅服务端可见的 OCR 代理与凭证边界
+server/             # 仅服务端可见的 OCR 代理、业务读 API、会话与 capability 边界
 src-tauri/          # Tauri 壳、权限与打包
 tests/              # Vitest 单元/组件测试
 e2e/                # Playwright 用户旅程
@@ -69,27 +70,29 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
 ## 4. 数据与状态流
 
 ```text
-项目列表
-  ProjectListScreen
-        │ 只读取 ReadState、调用 store action
+项目列表与详情
+  AppTopbar / DataVisibilityStore
+        │ includeDemo 默认关闭并按工作区偏好持久化
         ▼
-  ProjectListStore
-        │ 只依赖 ProjectListRepository port
-        ▼
-  HTTP adapter ──► Nitro /api/read/projects ──► 可重置中央测试实例
+  ProjectListScreen ──► ProjectListStore ──┐
+  ProjectDetailScreen ─────────────────────┤ 只依赖 ProjectListRepository port
+                                          ▼
+  HTTP adapter ──► Nitro /api/read/projects[/:id] ──► 默认业务会话 + 可重置中央测试实例
+                                                    ├─ real：正式来源，默认空且不 seed
+                                                    └─ demo：独立夹具，capability 允许时只读叠加
 
-同契约迁移来源
-  SQLite adapter ──► projects/customers/receipt_registrations/target_costs
-
-其余页面与写路径
-  Page / Domain component ──► Pinia store ──► 领域/DB 层
-        └────────────────────────────────────► SQLite 或 sql.js
+尚未切换的页面域
+  includeDemo=false ──► production 本地快照（未迁移域的过渡投影/写入暂存；不 seed）
+  includeDemo=true  ──► demo 本地快照（确定性 seed，驱动只读）
+  开关变化          ──► 确认未保存内容 → 服务端授权 → 原子重载应用
+                       └─ 统一清空旧 Pinia 投影、Lookup 最近选择域与连接
 ```
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
-- 项目列表当前是中央只读切片；新增、导入、编辑和删除在中央写命令落地前保持禁用，不能回退本地写入并伪装成中央成功。
-- `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、unavailable 与 retry，不是业务 API。
+- 项目列表和来源感知详情当前是中央只读切片；新增、导入、编辑和删除在中央写命令落地前保持禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
+- `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
+- `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。
 - 列表、详情、工作台和未来 HTTP adapter 的读语义以 `READ-MODELS.md` 为契约；Pinia 不直接拼私有 URL，本地 SQLite adapter 与 HTTP adapter 不得各造一套空值、金额或权限含义。
 - 删除遵循软删除与撤回语义；具体约束见 `DATABASE.md` 和 ADR 0003。

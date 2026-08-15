@@ -45,6 +45,7 @@ const projects = [
 ]
 
 const sourceRows: ProjectListSourceRow[] = projects.map((project, index) => ({
+  dataOrigin: 'real',
   id: project.id,
   name: project.name,
   code: project.code,
@@ -74,7 +75,17 @@ const sourceRows: ProjectListSourceRow[] = projects.map((project, index) => ({
   updatedAt: `${project.updatedAt}T00:00:00.000Z`,
 }))
 
+const allSourceRows: ProjectListSourceRow[] = [
+  ...sourceRows,
+  {
+    ...sourceRows[0]!,
+    dataOrigin: 'demo',
+    id: 'project-demo-1',
+  },
+]
+
 const defaultQuery: ProjectListQueryDTO = {
+  includeDemo: false,
   search: '',
   status: null,
   filters: {
@@ -90,7 +101,7 @@ const defaultQuery: ProjectListQueryDTO = {
 
 function projectPage(query: ProjectListQueryDTO = defaultQuery) {
   return buildProjectListPage({
-    rows: sourceRows,
+    rows: allSourceRows,
     query,
     asOf: '2026-08-15T00:00:00.000Z',
     sourceVersion: 'component-test-v1',
@@ -132,11 +143,16 @@ const KitTableStub = defineComponent({
       default: () => [],
     },
     rowHeight: Number,
+    rowKey: String,
   },
   emits: ['filter-change'],
   setup(props, { emit, expose, slots }) {
     expose({ clearFilter: vi.fn() })
-    return () => h('section', { 'aria-label': '项目宽表', 'data-row-height': props.rowHeight }, [
+    return () => h('section', {
+      'aria-label': '项目宽表',
+      'data-row-height': props.rowHeight,
+      'data-row-key': props.rowKey,
+    }, [
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
         h('span', {
           'role': 'columnheader',
@@ -159,6 +175,7 @@ const KitTableStub = defineComponent({
       ...(props.data as any[]).map(row =>
         h('div', { role: 'row' }, [
           `${row.name} ${row.status}`,
+          slots.origin?.({ row }),
           slots.developer?.({ row }),
         ])),
     ])
@@ -168,7 +185,9 @@ const KitTableStub = defineComponent({
 const ProjectListToolbarStub = defineComponent({
   props: {
     search: String,
-    total: Number,
+    realTotal: Number,
+    demoTotal: Number,
+    includeDemo: Boolean,
     visible: Number,
   },
   emits: ['update:search'],
@@ -181,7 +200,7 @@ const ProjectListToolbarStub = defineComponent({
         'onInput': (event: Event) =>
           emit('update:search', (event.target as HTMLInputElement).value),
       }),
-      `共 ${props.total} 个，当前 ${props.visible} 个`,
+      `正式 ${props.realTotal} 个${props.includeDemo ? `，测试 ${props.demoTotal} 个` : ''}，当前 ${props.visible} 个`,
     ])
   },
 })
@@ -222,6 +241,10 @@ let projectReadStore: {
   listAll: ReturnType<typeof vi.fn>
   retry: ReturnType<typeof vi.fn>
 }
+let dataVisibilityStore: {
+  includeDemo: boolean
+  setIncludeDemo: ReturnType<typeof vi.fn>
+}
 
 describe('project list screen', () => {
   beforeEach(() => {
@@ -248,6 +271,13 @@ describe('project list screen', () => {
       retry: vi.fn(),
     })
     vi.stubGlobal('useProjectListStore', () => projectReadStore)
+    dataVisibilityStore = reactive({
+      includeDemo: false,
+      setIncludeDemo: vi.fn((next: boolean) => {
+        dataVisibilityStore.includeDemo = next
+      }),
+    })
+    vi.stubGlobal('useDataVisibilityStore', () => dataVisibilityStore)
     vi.stubGlobal('useProjectStore', () => ({
       downstreamImpact: vi.fn(async () => []),
       remove: vi.fn(),
@@ -287,6 +317,7 @@ describe('project list screen', () => {
     const headings = within(table).getAllByRole('columnheader').map(item => item.textContent)
     expect(headings).toEqual([
       '项目名称',
+      '数据来源',
       '业务阶段',
       '累计收入合同金额',
       '预算总额',
@@ -301,6 +332,7 @@ describe('project list screen', () => {
     ])
     expect(headings).not.toContain('采购经理')
     expect(table.getAttribute('data-row-height')).toBe('36')
+    expect(table.getAttribute('data-row-key')).toBe('rowIdentity')
     expect(screen.getByText('合和地产').getAttribute('data-entity-id')).toBe('customer-1')
 
     await fireEvent.click(screen.getByRole('button', { name: /施工中/ }))
@@ -309,6 +341,22 @@ describe('project list screen', () => {
     expect(within(table).getByText(/合和新城/)).not.toBeNull()
     expect(screen.getByText(/当前 1 个/)).not.toBeNull()
     expect(screen.getByLabelText('项目列表汇总').textContent).toMatch(/累计收入\s*¥320,000\.00/)
+  })
+
+  it('全局开关进入 Repository 查询，并把正式与测试行和汇总分组呈现', async () => {
+    render(ProjectListScreen, { global })
+
+    dataVisibilityStore.setIncludeDemo(true)
+
+    await waitFor(() => {
+      expect(projectReadStore.load).toHaveBeenLastCalledWith(expect.objectContaining({
+        includeDemo: true,
+      }))
+    })
+    expect(screen.getAllByText('测试数据').length).toBeGreaterThanOrEqual(2)
+    const summary = screen.getByLabelText('项目列表汇总')
+    expect(summary.textContent).toMatch(/正式数据\s*2 个/)
+    expect(summary.textContent).toMatch(/测试数据\s*1 个/)
   })
 
   it('搜索覆盖项目、客户和本地已有的项目经理、执行经理、施工员', async () => {
@@ -329,8 +377,8 @@ describe('project list screen', () => {
     render(ProjectListScreen, { global })
 
     const summary = screen.getByLabelText('项目列表汇总')
-    expect(summary.textContent).toMatch(/累计收入\s*—\s*缺失 1 个/)
-    expect(summary.textContent).toMatch(/预算总额\s*—\s*缺失 1 个/)
+    expect(summary.textContent).toMatch(/累计收入\s*—\s*收入缺失 1 个/)
+    expect(summary.textContent).toMatch(/预算总额\s*—\s*预算缺失 1 个/)
     expect(summary.textContent).not.toContain('¥320,000.00')
     expect(summary.textContent).not.toContain('¥800,000.00')
   })

@@ -1,4 +1,7 @@
+import type { DataOriginDTO } from '~/types/read-model'
+
 export interface ProjectLedgerSource {
+  dataOrigin: DataOriginDTO
   name: string
   status: string
   contractAmount: number | string | null
@@ -32,6 +35,7 @@ export interface ProjectExportColumn {
 
 /** 台账导出列（顺序即导出表头顺序，红圈「项目信息」台账对齐）。 */
 export const PROJECT_EXPORT_COLUMNS: readonly ProjectExportColumn[] = [
+  { key: 'dataOrigin', label: '数据来源' },
   { key: 'name', label: '项目名称' },
   { key: 'status', label: '业务流程阶段' },
   { key: 'contractAmount', label: '合同金额（万元）' },
@@ -59,11 +63,17 @@ function cell(value: unknown): string | number {
   return typeof value === 'number' ? value : String(value)
 }
 
+function exportCell(key: keyof ProjectLedgerSource, value: unknown): string | number {
+  if (key === 'dataOrigin')
+    return value === 'demo' ? '测试数据' : '正式数据'
+  return cell(value)
+}
+
 /** 把项目集投影为导出行（每个项目一行，键为中文表头）。 */
 export function projectLedgerRows(
   projects: readonly ProjectLedgerSource[],
 ): Record<string, string | number>[] {
   return projects.map(p => Object.fromEntries(
-    PROJECT_EXPORT_COLUMNS.map(col => [col.label, cell(p[col.key])]),
+    PROJECT_EXPORT_COLUMNS.map(col => [col.label, exportCell(col.key, p[col.key])]),
   ))
 }

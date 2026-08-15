@@ -1,5 +1,7 @@
-import type { EmptyDTO, EntityRefDTO, MetricDTO, MoneyDTO } from '../../types/read-model'
+import type { DataOriginDTO, EmptyDTO, EntityRefDTO, MetricDTO, MoneyDTO } from '../../types/read-model'
 import type {
+  ProjectDetailQueryDTO,
+  ProjectDetailReadDTO,
   ProjectListColumnFiltersDTO,
   ProjectListFacetOptionDTO,
   ProjectListPageDTO,
@@ -8,7 +10,7 @@ import type {
   ProjectListStatusFacetDTO,
   ProjectPageSize,
 } from './read-contract'
-import { isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import {
   IMPORTED_PROJECT_STATUS,
   PROJECT_PAGE_SIZES,
@@ -51,6 +53,15 @@ function stringList(value: unknown, label: string): string[] {
   }
 }
 
+function booleanValue(value: unknown, label: string): boolean {
+  const raw = one(value)
+  if (raw == null || raw === '' || raw === false || raw === 'false')
+    return false
+  if (raw === true || raw === 'true')
+    return true
+  invalidQuery(`${label}必须是 true 或 false`)
+}
+
 export function parseProjectListQuery(input: Record<string, unknown> = {}): ProjectListQueryDTO {
   const search = String(one(input.search) ?? '').trim()
   const statusValue = String(one(input.status) ?? '').trim()
@@ -65,6 +76,7 @@ export function parseProjectListQuery(input: Record<string, unknown> = {}): Proj
   if (!plannedEnds.every(isISODateDTO))
     invalidQuery('计划竣工筛选必须使用 ISO 日期')
   return {
+    includeDemo: booleanValue(input.includeDemo, '测试数据开关'),
     search,
     status: statusValue || null,
     filters: {
@@ -83,6 +95,7 @@ export function serializeProjectListQuery(
   query: ProjectListQueryDTO,
 ): Record<string, unknown> {
   return {
+    includeDemo: query.includeDemo,
     search: query.search,
     status: query.status,
     sort: query.sort,
@@ -92,6 +105,29 @@ export function serializeProjectListQuery(
     filterPlannedEnds: JSON.stringify(query.filters.plannedEnds),
     filterManagers: JSON.stringify(query.filters.managers),
     filterCustomerIds: JSON.stringify(query.filters.customerIds),
+  }
+}
+
+export function parseProjectDetailQuery(
+  id: string,
+  input: Record<string, unknown> = {},
+): ProjectDetailQueryDTO {
+  const origin = one(input.origin) ?? 'real'
+  if (!id || !isDataOriginDTO(origin))
+    invalidQuery('项目 ID 或数据来源无效')
+  return {
+    id,
+    origin,
+    includeDemo: booleanValue(input.includeDemo, '测试数据开关'),
+  }
+}
+
+export function serializeProjectDetailQuery(
+  query: ProjectDetailQueryDTO,
+): Record<string, unknown> {
+  return {
+    origin: query.origin,
+    includeDemo: query.includeDemo,
   }
 }
 
@@ -143,6 +179,7 @@ function customerRef(
 function projectMetric(
   value: number | null,
   projectId: string,
+  dataOrigin: DataOriginDTO,
   source: string,
   entity: 'receipt' | 'target-cost',
   asOf: string,
@@ -153,17 +190,20 @@ function projectMetric(
     status: value == null ? 'pending' : 'complete',
     missingSources: value == null ? [source] : [],
     asOf,
-    drilldown: { entity, filters: { projectId } },
+    drilldown: { entity, filters: { projectId, dataOrigin } },
   }
 }
 
 function summaryMetric(
   rows: readonly ProjectListSourceRow[],
+  dataOrigin: DataOriginDTO,
   field: 'income' | 'budget',
   entity: 'receipt' | 'target-cost',
   asOf: string,
 ): MetricDTO {
-  const missingSources = rows.filter(row => row[field] == null).map(row => row.id)
+  const missingSources = rows
+    .filter(row => row[field] == null)
+    .map(row => `${row.dataOrigin}:${row.id}`)
   const value = rows.length > 0 && missingSources.length === 0
     ? roundMoney(rows.reduce((total, row) => total + (row[field] ?? 0), 0))
     : null
@@ -173,7 +213,7 @@ function summaryMetric(
     status: rows.length === 0 ? 'undefined' : missingSources.length ? 'partial' : 'complete',
     missingSources,
     asOf,
-    drilldown: { entity, filters: {} },
+    drilldown: { entity, filters: { dataOrigin } },
   }
 }
 
@@ -279,8 +319,12 @@ function preserveSelectedFacets<T extends ProjectListFacetOptionDTO>(
   return [...merged.values()].sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
 }
 
-function toItem(row: ProjectListSourceRow, asOf: string): ProjectListPageDTO['items'][number] {
+export function buildProjectListItem(
+  row: ProjectListSourceRow,
+  asOf: string,
+): ProjectListPageDTO['items'][number] {
   return {
+    dataOrigin: row.dataOrigin,
     project: {
       state: 'resolved',
       entity: 'project',
@@ -310,9 +354,54 @@ function toItem(row: ProjectListSourceRow, asOf: string): ProjectListPageDTO['it
     region: row.region,
     riskLevel: row.riskLevel,
     address: row.address,
-    income: projectMetric(row.income, row.id, 'receipt-registrations', 'receipt', asOf),
-    budget: projectMetric(row.budget, row.id, 'target-cost-baseline', 'target-cost', asOf),
+    income: projectMetric(row.income, row.id, row.dataOrigin, 'receipt-registrations', 'receipt', asOf),
+    budget: projectMetric(row.budget, row.id, row.dataOrigin, 'target-cost-baseline', 'target-cost', asOf),
     updatedAt: row.updatedAt,
+  }
+}
+
+function validateProjectSourceRows(
+  rows: readonly ProjectListSourceRow[],
+  asOf: string,
+): void {
+  if (!isISODateTimeDTO(asOf)
+    || rows.some(row => !isDataOriginDTO(row.dataOrigin)
+      || !isISODateTimeDTO(row.updatedAt)
+      || ![row.startDate, row.plannedEnd, row.actualEnd].every(value => value === null || isISODateDTO(value)))) {
+    throw new ProjectRepositoryProblem(projectProblem(
+      'internal-error',
+      '项目读模型来源包含无效 ISO 日期或时间',
+    ))
+  }
+}
+
+export function buildProjectDetailRead(input: {
+  rows: readonly ProjectListSourceRow[]
+  query: ProjectDetailQueryDTO
+  asOf: string
+  sourceVersion: string | null
+  capabilities?: readonly string[]
+}): ProjectDetailReadDTO {
+  validateProjectSourceRows(input.rows, input.asOf)
+  if (input.query.origin === 'demo' && !input.query.includeDemo) {
+    throw new ProjectRepositoryProblem(projectProblem(
+      'not-found',
+      '项目不存在或当前来源不可见',
+    ))
+  }
+  const row = input.rows.find(candidate => candidate.id === input.query.id
+    && candidate.dataOrigin === input.query.origin)
+  if (!row) {
+    throw new ProjectRepositoryProblem(projectProblem(
+      'not-found',
+      '项目不存在或当前来源不可见',
+    ))
+  }
+  return {
+    item: buildProjectListItem(row, input.asOf),
+    asOf: input.asOf,
+    sourceVersion: input.sourceVersion,
+    capabilities: [...(input.capabilities ?? ['project:list:read'])],
   }
 }
 
@@ -321,17 +410,14 @@ export function buildProjectListPage(input: {
   query: ProjectListQueryDTO
   asOf: string
   sourceVersion: string | null
+  capabilities?: readonly string[]
 }): ProjectListPageDTO {
-  if (!isISODateTimeDTO(input.asOf)
-    || input.rows.some(row => !isISODateTimeDTO(row.updatedAt)
-      || ![row.startDate, row.plannedEnd, row.actualEnd].every(value => value === null || isISODateDTO(value)))) {
-    throw new ProjectRepositoryProblem(projectProblem(
-      'internal-error',
-      '项目读模型来源包含无效 ISO 日期或时间',
-    ))
-  }
+  validateProjectSourceRows(input.rows, input.asOf)
+  const visibleRows = input.query.includeDemo
+    ? input.rows
+    : input.rows.filter(row => row.dataOrigin === 'real')
   const queryText = input.query.search.toLocaleLowerCase('zh-CN')
-  const searched = input.rows.filter(row => !queryText || SEARCH_FIELDS.some(field =>
+  const searched = visibleRows.filter(row => !queryText || SEARCH_FIELDS.some(field =>
     searchableValue(row, field).toLocaleLowerCase('zh-CN').includes(queryText),
   ))
   const columnFiltered = searched.filter(row =>
@@ -342,34 +428,42 @@ export function buildProjectListPage(input: {
     const primary = input.query.sort === 'name-asc'
       ? a.name.localeCompare(b.name, 'zh-CN')
       : b.updatedAt.localeCompare(a.updatedAt)
-    return primary || a.id.localeCompare(b.id)
+    return primary
+      || a.dataOrigin.localeCompare(b.dataOrigin)
+      || a.id.localeCompare(b.id)
   })
   const offset = (input.query.page - 1) * input.query.pageSize
   const empty: EmptyDTO | null = filtered.length > 0
     ? null
     : {
-        reason: input.rows.length === 0 ? 'no-records' : 'no-filter-match',
+        reason: visibleRows.length === 0 ? 'no-records' : 'no-filter-match',
         missingRelations: [],
       }
   const statusFacetRows = searched.filter(row =>
     matchesColumnFilters(row, input.query.filters, 'statuses'),
   )
-  const filteredStatusFacets = statusFacets(filtered)
-  const statusCounts = Object.fromEntries(filteredStatusFacets.map(facet => [facet.value, facet.count]))
   const facetRows = (omit: FilterKey) => searched.filter(row =>
     matchesStatus(row, input.query.status)
     && matchesColumnFilters(row, input.query.filters, omit),
   )
+  const originSummary = (dataOrigin: DataOriginDTO) => {
+    const originRows = filtered.filter(row => row.dataOrigin === dataOrigin)
+    const originStatusFacets = statusFacets(originRows)
+    return {
+      projectCount: originRows.length,
+      statusCounts: Object.fromEntries(originStatusFacets.map(facet => [facet.value, facet.count])),
+      income: summaryMetric(originRows, dataOrigin, 'income', 'receipt', input.asOf),
+      budget: summaryMetric(originRows, dataOrigin, 'budget', 'target-cost', input.asOf),
+    }
+  }
   return {
-    items: sorted.slice(offset, offset + input.query.pageSize).map(row => toItem(row, input.asOf)),
+    items: sorted.slice(offset, offset + input.query.pageSize).map(row => buildProjectListItem(row, input.asOf)),
     pagination: {
       page: input.query.page,
       pageSize: input.query.pageSize,
       total: filtered.length,
     },
     summary: {
-      projectCount: filtered.length,
-      statusCounts,
       facets: {
         statuses: preserveSelectedFacets(
           statusFacets(statusFacetRows),
@@ -390,19 +484,21 @@ export function buildProjectListPage(input: {
           customerFacets(facetRows('customerIds')),
           input.query.filters.customerIds,
           (value) => {
-            const visible = input.rows.find(row => row.customerId === value
+            const visible = visibleRows.find(row => row.customerId === value
               && row.customerPermission === 'allowed'
               && row.customerName)
             return { value, label: visible?.customerName ?? '已选客户（当前不可见）' }
           },
         ),
       },
-      income: summaryMetric(filtered, 'income', 'receipt', input.asOf),
-      budget: summaryMetric(filtered, 'budget', 'target-cost', input.asOf),
+      origins: {
+        real: originSummary('real'),
+        demo: originSummary('demo'),
+      },
     },
     empty,
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,
-    capabilities: ['project:list:read'],
+    capabilities: [...(input.capabilities ?? ['project:list:read'])],
   }
 }

@@ -1,6 +1,12 @@
-import type { ProblemDTO } from '../../types/read-model'
-import type { ProjectListQueryDTO, ProjectListRepository, ProjectListSourceRow } from './repository'
+import type { DataOriginDTO, ProblemDTO } from '../../types/read-model'
+import type {
+  ProjectDetailQueryDTO,
+  ProjectListQueryDTO,
+  ProjectListRepository,
+  ProjectListSourceRow,
+} from './repository'
 import {
+  buildProjectDetailRead,
   buildProjectListPage,
   projectProblemFromUnknown,
   ProjectRepositoryProblem,
@@ -15,6 +21,8 @@ interface SqliteProjectRepositoryOptions {
   canReadProjects?: boolean
   canReadCustomers?: boolean
   canReadCustomer?: (id: string) => boolean
+  canViewDemo: boolean
+  dataOrigin: DataOriginDTO
   now?: () => string
   sourceVersion?: string | null
 }
@@ -38,9 +46,11 @@ function nullableNumber(value: unknown): number | null {
 function sourceRow(
   row: Record<string, unknown>,
   canReadCustomer: (id: string) => boolean,
+  dataOrigin: DataOriginDTO,
 ): ProjectListSourceRow {
   const customerId = nullableText(row.customer_id)
   return {
+    dataOrigin,
     id: text(row.id),
     name: text(row.name),
     code: text(row.code),
@@ -130,24 +140,55 @@ const PROJECT_LIST_SQL = `
 export function createSqliteProjectListRepository(
   options: SqliteProjectRepositoryOptions,
 ): ProjectListRepository {
+  function assertRead(includeDemo: boolean) {
+    if (options.canReadProjects === false) {
+      const problem: ProblemDTO = {
+        code: 'forbidden',
+        message: '无项目查看权限',
+        retryable: false,
+        fieldErrors: {},
+        traceId: null,
+      }
+      throw new ProjectRepositoryProblem(problem)
+    }
+    if (includeDemo && !options.canViewDemo) {
+      throw new ProjectRepositoryProblem({
+        code: 'forbidden',
+        message: '无测试数据查看权限',
+        retryable: false,
+        fieldErrors: {},
+        traceId: null,
+      })
+    }
+  }
+
+  async function sourceRows(): Promise<ProjectListSourceRow[]> {
+    const rows = await options.gateway.select<Record<string, unknown>>(PROJECT_LIST_SQL)
+    const canReadCustomer = (id: string) => options.canReadCustomers !== false
+      && (options.canReadCustomer?.(id) ?? true)
+    return rows.map(row => sourceRow(row, canReadCustomer, options.dataOrigin))
+  }
+
   return {
     async list(query: ProjectListQueryDTO) {
-      if (options.canReadProjects === false) {
-        const problem: ProblemDTO = {
-          code: 'forbidden',
-          message: '无项目查看权限',
-          retryable: false,
-          fieldErrors: {},
-          traceId: null,
-        }
-        throw new ProjectRepositoryProblem(problem)
-      }
       try {
-        const rows = await options.gateway.select<Record<string, unknown>>(PROJECT_LIST_SQL)
-        const canReadCustomer = (id: string) => options.canReadCustomers !== false
-          && (options.canReadCustomer?.(id) ?? true)
+        assertRead(query.includeDemo)
         return buildProjectListPage({
-          rows: rows.map(row => sourceRow(row, canReadCustomer)),
+          rows: await sourceRows(),
+          query,
+          asOf: options.now?.() ?? new Date().toISOString(),
+          sourceVersion: options.sourceVersion ?? null,
+        })
+      }
+      catch (cause) {
+        throw projectProblemFromUnknown(cause)
+      }
+    },
+    async get(query: ProjectDetailQueryDTO) {
+      try {
+        assertRead(query.includeDemo)
+        return buildProjectDetailRead({
+          rows: await sourceRows(),
           query,
           asOf: options.now?.() ?? new Date().toISOString(),
           sourceVersion: options.sourceVersion ?? null,

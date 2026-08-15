@@ -1,10 +1,18 @@
 import type { ProblemDTO } from '../../types/read-model'
-import type { ProjectListPageDTO, ProjectListQueryDTO, ProjectListRepository } from './repository'
+import type {
+  ProjectDetailQueryDTO,
+  ProjectDetailReadDTO,
+  ProjectListPageDTO,
+  ProjectListQueryDTO,
+  ProjectListRepository,
+} from './repository'
 import { isProblemCodeDTO } from '../../types/read-model'
 import {
+  decodeProjectDetailRead,
   decodeProjectListPage,
   projectProblemFromUnknown,
   ProjectRepositoryProblem,
+  serializeProjectDetailQuery,
   serializeProjectListQuery,
 } from './repository'
 
@@ -50,25 +58,42 @@ function problemPayload(cause: unknown): ProblemDTO | null {
   return candidate as unknown as ProblemDTO
 }
 
+async function readHttp<T>(
+  request: () => Promise<unknown>,
+  decode: (value: unknown) => T,
+): Promise<T> {
+  try {
+    return decode(await request())
+  }
+  catch (cause) {
+    if (cause instanceof ProjectRepositoryProblem)
+      throw cause
+    const remoteProblem = problemPayload(cause)
+    if (remoteProblem)
+      throw new ProjectRepositoryProblem(remoteProblem, { cause })
+    throw projectProblemFromUnknown(cause)
+  }
+}
+
 export function createHttpProjectListRepository(
   options: HttpProjectRepositoryOptions,
 ): ProjectListRepository {
   return {
     async list(query: ProjectListQueryDTO): Promise<ProjectListPageDTO> {
-      try {
-        const response = await options.fetcher('/api/read/projects', {
+      return readHttp(
+        () => options.fetcher('/api/read/projects', {
           query: serializeProjectListQuery(query),
-        })
-        return decodeProjectListPage(response)
-      }
-      catch (cause) {
-        if (cause instanceof ProjectRepositoryProblem)
-          throw cause
-        const remoteProblem = problemPayload(cause)
-        if (remoteProblem)
-          throw new ProjectRepositoryProblem(remoteProblem, { cause })
-        throw projectProblemFromUnknown(cause)
-      }
+        }),
+        decodeProjectListPage,
+      )
+    },
+    async get(query: ProjectDetailQueryDTO): Promise<ProjectDetailReadDTO> {
+      return readHttp(
+        () => options.fetcher(`/api/read/projects/${encodeURIComponent(query.id)}`, {
+          query: serializeProjectDetailQuery(query),
+        }),
+        decodeProjectDetailRead,
+      )
     },
   }
 }

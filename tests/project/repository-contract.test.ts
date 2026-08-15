@@ -12,6 +12,7 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 const NOW = '2026-08-15T00:00:00.000Z'
 const QUERY = {
+  includeDemo: true,
   search: '',
   status: null,
   filters: {
@@ -138,6 +139,7 @@ function contract(repository: () => Promise<ProjectListRepository>) {
       id: 'proj_demo_001',
       label: '合和新城',
     })
+    expect(first.items[0]?.dataOrigin).toBe('demo')
     const zeroBudget = first.items.find(item => item.project.id === 'proj_demo_002')
     expect(zeroBudget?.contractAmount).toBe('2560.00')
     expect(zeroBudget?.income.value).toBeNull()
@@ -149,10 +151,11 @@ function contract(repository: () => Promise<ProjectListRepository>) {
       label: null,
       reason: 'not-configured',
     })
-    expect(first.summary.income).toMatchObject({ value: null, status: 'partial' })
-    expect(first.summary.income.missingSources).toHaveLength(10)
-    expect(first.summary.budget).toMatchObject({ value: null, status: 'partial' })
-    expect(first.summary.budget.missingSources).toHaveLength(10)
+    expect(first.summary.origins.demo.income).toMatchObject({ value: null, status: 'partial' })
+    expect(first.summary.origins.demo.income.missingSources).toHaveLength(10)
+    expect(first.summary.origins.demo.budget).toMatchObject({ value: null, status: 'partial' })
+    expect(first.summary.origins.demo.budget.missingSources).toHaveLength(10)
+    expect(first.summary.origins.real.projectCount).toBe(0)
 
     const second = await repo.list({ ...QUERY, page: 2 })
     expect(second.pagination).toEqual({ page: 2, pageSize: 10, total: 12 })
@@ -162,9 +165,9 @@ function contract(repository: () => Promise<ProjectListRepository>) {
 
     const filtered = await repo.list({ ...QUERY, search: '合和', status: '施工中' })
     expect(filtered.items.map(item => item.project.id)).toEqual(['proj_demo_001'])
-    expect(filtered.summary.income.value).toBe('25367027.00')
+    expect(filtered.summary.origins.demo.income.value).toBe('25367027.00')
     expect(filtered.empty).toBeNull()
-    expect(filtered.summary.statusCounts).toEqual({ 施工中: 1 })
+    expect(filtered.summary.origins.demo.statusCounts).toEqual({ 施工中: 1 })
 
     const fullSnapshotFilter = await repo.list({
       ...QUERY,
@@ -175,7 +178,7 @@ function contract(repository: () => Promise<ProjectListRepository>) {
     })
     expect(fullSnapshotFilter.items.map(item => item.project.id)).toEqual(['proj_demo_012'])
     expect(fullSnapshotFilter.pagination.total).toBe(1)
-    expect(fullSnapshotFilter.summary.projectCount).toBe(1)
+    expect(fullSnapshotFilter.summary.origins.demo.projectCount).toBe(1)
 
     const crossFilterNoMatch = await repo.list({
       ...QUERY,
@@ -338,6 +341,8 @@ describe('project repository contract', () => {
 
     contract(async () => createSqliteProjectListRepository({
       gateway: db,
+      canViewDemo: true,
+      dataOrigin: 'demo',
       canReadCustomer: id => id !== 'customer_demo_003',
       now: () => NOW,
       sourceVersion: 'project-read-fixture-v1',
@@ -346,6 +351,8 @@ describe('project repository contract', () => {
     it('uses the same whole-page permission problem as HTTP', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        canViewDemo: true,
+        dataOrigin: 'demo',
         canReadProjects: false,
         now: () => NOW,
         sourceVersion: 'project-read-fixture-v1',
@@ -360,6 +367,8 @@ describe('project repository contract', () => {
     it('hides both primary and secondary customer labels without customer capability', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        canViewDemo: true,
+        dataOrigin: 'demo',
         canReadCustomers: false,
         now: () => NOW,
         sourceVersion: 'project-read-fixture-v1',
@@ -377,6 +386,8 @@ describe('project repository contract', () => {
     it('rejects a non-ISO SQLite snapshot timestamp', async () => {
       const repo = createSqliteProjectListRepository({
         gateway: db,
+        canViewDemo: true,
+        dataOrigin: 'demo',
         now: () => 'tomorrow',
       })
 

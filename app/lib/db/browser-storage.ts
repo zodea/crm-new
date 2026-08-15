@@ -1,7 +1,7 @@
 const DATABASE_NAME = 'crm-new-browser'
 const DATABASE_VERSION = 1
 const SNAPSHOT_STORE = 'database_snapshots'
-const PRIMARY_SNAPSHOT_KEY = 'main'
+export type BrowserDatabaseSnapshotKey = 'production' | 'demo'
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -39,13 +39,13 @@ async function openSnapshotDatabase(): Promise<IDBDatabase> {
   return requestResult(request)
 }
 
-export async function loadBrowserDatabase(): Promise<Uint8Array | null> {
+export async function loadBrowserDatabase(snapshotKey: BrowserDatabaseSnapshotKey): Promise<Uint8Array | null> {
   const database = await openSnapshotDatabase()
   try {
     const transaction = database.transaction(SNAPSHOT_STORE, 'readonly')
     const done = transactionDone(transaction)
     const value = await requestResult<ArrayBuffer | Uint8Array | undefined>(
-      transaction.objectStore(SNAPSHOT_STORE).get(PRIMARY_SNAPSHOT_KEY),
+      transaction.objectStore(SNAPSHOT_STORE).get(snapshotKey),
     )
     await done
     if (!value)
@@ -57,13 +57,16 @@ export async function loadBrowserDatabase(): Promise<Uint8Array | null> {
   }
 }
 
-export async function saveBrowserDatabase(snapshot: Uint8Array): Promise<void> {
+export async function saveBrowserDatabase(
+  snapshotKey: BrowserDatabaseSnapshotKey,
+  snapshot: Uint8Array,
+): Promise<void> {
   const database = await openSnapshotDatabase()
   try {
     const transaction = database.transaction(SNAPSHOT_STORE, 'readwrite')
     const done = transactionDone(transaction)
     await requestResult(
-      transaction.objectStore(SNAPSHOT_STORE).put(snapshot.slice().buffer, PRIMARY_SNAPSHOT_KEY),
+      transaction.objectStore(SNAPSHOT_STORE).put(snapshot.slice().buffer, snapshotKey),
     )
     await done
   }

@@ -4,8 +4,10 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repository'
 import type { StatusTone } from '~/lib/project/status'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import { resolveEntityLink } from '~/lib/kit/entity-link'
 import { projectLedgerRows } from '~/lib/project/export'
 import { projectListViewRow } from '~/lib/project/list'
 import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
@@ -14,6 +16,8 @@ import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
 const readStore = useProjectListStore()
+const dataVisibilityStore = useDataVisibilityStore()
+const includeDemo = computed(() => dataVisibilityStore.includeDemo)
 const { error, exportFile } = useKitUI()
 
 const searchText = shallowRef('')
@@ -41,6 +45,16 @@ const toneText: Record<StatusTone, string> = {
   ok: 'cell--status-ok',
 }
 
+function projectDetailPath(row: { id: string, name: string, dataOrigin: DataOriginDTO }): string {
+  const resolution = resolveEntityLink({
+    type: 'project',
+    id: row.id,
+    label: row.name,
+    dataOrigin: row.dataOrigin,
+  })
+  return resolution.kind === 'link' ? resolution.to : '/project'
+}
+
 const readPage = computed<ProjectListPageDTO | null>(() => {
   const state = readStore.state
   if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
@@ -59,6 +73,21 @@ const availableTotal = computed(() => Object.values(statusCounts.value)
   .reduce((total, count) => total + count, 0))
 const visibleTotal = computed(() => readPage.value?.pagination.total ?? 0)
 const summary = computed(() => readPage.value?.summary ?? null)
+const realSummary = computed(() => summary.value?.origins.real ?? null)
+const demoSummary = computed(() => summary.value?.origins.demo ?? null)
+const listSummary = computed<Record<string, string | number>>(() => {
+  const result: Record<string, string | number> = {
+    正式项目: realSummary.value?.projectCount ?? 0,
+    正式收入: yuan(realSummary.value?.income.value),
+    正式预算: yuan(realSummary.value?.budget.value),
+  }
+  if (includeDemo.value) {
+    result.测试项目 = demoSummary.value?.projectCount ?? 0
+    result.测试收入 = yuan(demoSummary.value?.income.value)
+    result.测试预算 = yuan(demoSummary.value?.budget.value)
+  }
+  return result
+})
 const loading = computed(() => readStore.state.kind === 'loading')
 const problem = computed(() => {
   const state = readStore.state
@@ -78,12 +107,13 @@ const importedPhases = computed(() =>
 
 const phaseTree = computed<TreeNode[]>(() => {
   const count = (phase: string) => statusCounts.value[phase] ?? 0
+  const visibleCount = (value: number) => includeDemo.value ? undefined : value
   const items: TreeNode[] = [
     {
       key: 'all',
       label: '全部项目',
       icon: 'i-lucide-folder',
-      count: availableTotal.value,
+      count: visibleCount(availableTotal.value),
     },
     ...PROJECT_STATUSES.map(status => ({
       key: status,
@@ -95,7 +125,7 @@ const phaseTree = computed<TreeNode[]>(() => {
           : status === '停工'
             ? 'i-lucide-circle-pause'
             : 'i-lucide-circle-check-big',
-      count: count(status),
+      count: visibleCount(count(status)),
     })),
   ]
   if (importedPhases.value.length) {
@@ -103,11 +133,11 @@ const phaseTree = computed<TreeNode[]>(() => {
       key: IMPORTED_PHASES_KEY,
       label: '待归一阶段',
       icon: 'i-lucide-archive',
-      count: importedPhases.value.reduce((total, status) => total + count(status), 0),
+      count: visibleCount(importedPhases.value.reduce((total, status) => total + count(status), 0)),
       children: importedPhases.value.map(status => ({
         key: status,
         label: status,
-        count: count(status),
+        count: visibleCount(count(status)),
       })),
     })
   }
@@ -131,14 +161,17 @@ const emptyState = computed(() => {
       }
     : {
         title: '还没有施工项目',
-        description: '新建第一个项目后，可在这里跟踪阶段与经营数据。',
-        actionLabel: '新增项目',
+        description: includeDemo.value
+          ? '当前正式与测试来源都没有项目记录。'
+          : '正式工作区暂无项目。测试数据默认隐藏，可在顶部显式开启“包含测试数据”。',
+        actionLabel: '了解新增状态',
       }
 })
 
 // 运行参考列序；本地没有采购/仓管/预算/生产经理字段，因此不生成虚假空列。
 const columns = computed<KitTableColumn[]>(() => [
   { field: 'name', title: '项目名称', minWidth: 170, fixed: 'left', slot: 'name' },
+  { field: 'dataOrigin', title: '数据来源', width: 88, slot: 'origin' },
   { field: 'status', title: '业务阶段', width: 128, filterable: controlledFacets('status', summary.value?.facets.statuses), slot: 'status' },
   { field: 'income', title: '累计收入合同金额', type: 'money', width: 150 },
   { field: 'budget', title: '预算总额', type: 'money', width: 130 },
@@ -211,6 +244,7 @@ function columnFilterValues(field: string): string[] {
 
 function currentQuery(): ProjectListQueryDTO {
   return {
+    includeDemo: includeDemo.value,
     search: searchText.value,
     status: selectedPhase.value === 'all'
       ? null
@@ -247,7 +281,7 @@ watch(searchText, () => {
   void loadSearch()
 })
 
-watch([selectedPhase, sortMode], resetPageAndLoad)
+watch([selectedPhase, sortMode, includeDemo], resetPageAndLoad)
 
 watch([page, pageSize], () => {
   void loadProjects()
@@ -379,11 +413,7 @@ onMounted(() => {
       v-model:view-key="sortMode"
       :tree="filtersVisible ? phaseTree : []"
       :views="listViews"
-      :summary="{
-        项目数量: summary?.projectCount ?? 0,
-        累计收入: yuan(summary?.income.value),
-        预算总额: yuan(summary?.budget.value),
-      }"
+      :summary="listSummary"
     >
       <template #toolbar>
         <ProjectListToolbar
@@ -391,7 +421,9 @@ onMounted(() => {
           v-model:sort-mode="sortMode"
           v-model:filters-visible="filtersVisible"
           v-model:density="density"
-          :total="availableTotal"
+          :real-total="realSummary?.projectCount ?? 0"
+          :demo-total="demoSummary?.projectCount ?? 0"
+          :include-demo="includeDemo"
           :visible="visibleTotal"
           :loading="loading"
           :write-disabled-reason="WRITE_DISABLED_REASON"
@@ -408,6 +440,7 @@ onMounted(() => {
           :data="tableRows"
           :loading="loading"
           :row-height="tableRowHeight"
+          row-key="rowIdentity"
           :page="{ page: readPage.pagination.page, pageSize: readPage.pagination.pageSize, total: readPage.pagination.total }"
           remote-filter
           :empty="emptyState"
@@ -416,7 +449,15 @@ onMounted(() => {
           @empty-action="handleEmptyAction"
         >
           <template #name="{ row }">
-            <EntityLink :id="row.id" type="project" :label="row.name" />
+            <EntityLink :id="row.id" type="project" :label="row.name" :data-origin="row.dataOrigin" />
+          </template>
+
+          <template #origin="{ row }">
+            <span
+              v-if="row.dataOrigin === 'demo'"
+              class="chip chip-warn"
+            >测试数据</span>
+            <span v-else class="text-11px font-600 text-ink-soft">正式数据</span>
           </template>
 
           <template #status="{ row }">
@@ -429,6 +470,7 @@ onMounted(() => {
               :id="row.customer.id"
               type="customer"
               :label="row.customer.label"
+              :data-origin="row.dataOrigin"
             />
             <span v-else-if="row.customer.state === 'forbidden'" class="text-ink-soft">无权限</span>
             <span v-else class="text-ink-faint">—</span>
@@ -437,7 +479,7 @@ onMounted(() => {
           <template #action="{ row }">
             <div class="flex items-center justify-end gap-1">
               <NuxtLink
-                :to="`/project/${row.id}`"
+                :to="projectDetailPath(row)"
                 class="icon-btn"
                 title="详情"
                 :aria-label="`查看${row.name}项目详情`"
@@ -446,7 +488,7 @@ onMounted(() => {
               </NuxtLink>
               <button
                 class="icon-btn disabled:cursor-not-allowed disabled:opacity-45"
-                :title="WRITE_DISABLED_REASON"
+                :title="row.dataOrigin === 'demo' ? '测试数据只能在演示工作区修改' : WRITE_DISABLED_REASON"
                 aria-label="编辑项目"
                 disabled
               >
@@ -454,7 +496,7 @@ onMounted(() => {
               </button>
               <button
                 class="icon-btn-danger disabled:cursor-not-allowed disabled:opacity-45"
-                :title="WRITE_DISABLED_REASON"
+                :title="row.dataOrigin === 'demo' ? '测试数据只能在演示工作区修改' : WRITE_DISABLED_REASON"
                 aria-label="删除项目"
                 disabled
               >
@@ -470,14 +512,25 @@ onMounted(() => {
           class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1"
           aria-label="项目列表汇总"
         >
-          <span>显示 <b class="font-mono text-ink">{{ summary?.projectCount ?? 0 }}</b> 个项目</span>
-          <span>
-            累计收入 <b class="font-mono text-ink">{{ yuan(summary?.income.value) }}</b>
-            <small v-if="summary?.income.missingSources.length" class="ml-1 text-ink-faint">缺失 {{ summary.income.missingSources.length }} 个</small>
+          <span data-origin-summary="real" class="inline-flex flex-wrap items-center gap-x-2">
+            <b class="text-ink">正式数据</b>
+            <span><b class="font-mono text-ink">{{ realSummary?.projectCount ?? 0 }}</b> 个</span>
+            <span>累计收入 <b class="font-mono text-ink">{{ yuan(realSummary?.income.value) }}</b></span>
+            <small v-if="realSummary?.income.missingSources.length" class="text-ink-faint">收入缺失 {{ realSummary.income.missingSources.length }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ yuan(realSummary?.budget.value) }}</b></span>
+            <small v-if="realSummary?.budget.missingSources.length" class="text-ink-faint">预算缺失 {{ realSummary.budget.missingSources.length }} 个</small>
           </span>
-          <span>
-            预算总额 <b class="font-mono text-ink">{{ yuan(summary?.budget.value) }}</b>
-            <small v-if="summary?.budget.missingSources.length" class="ml-1 text-ink-faint">缺失 {{ summary.budget.missingSources.length }} 个</small>
+          <span
+            v-if="includeDemo"
+            data-origin-summary="demo"
+            class="inline-flex flex-wrap items-center gap-x-2 border-l border-line pl-5"
+          >
+            <b class="text-warn">测试数据</b>
+            <span><b class="font-mono text-warn">{{ demoSummary?.projectCount ?? 0 }}</b> 个</span>
+            <span>累计收入 <b class="font-mono text-ink">{{ yuan(demoSummary?.income.value) }}</b></span>
+            <small v-if="demoSummary?.income.missingSources.length" class="text-ink-faint">收入缺失 {{ demoSummary.income.missingSources.length }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ yuan(demoSummary?.budget.value) }}</b></span>
+            <small v-if="demoSummary?.budget.missingSources.length" class="text-ink-faint">预算缺失 {{ demoSummary.budget.missingSources.length }} 个</small>
           </span>
         </div>
       </template>

@@ -7,6 +7,15 @@ export type QuantityDTO = string
 export type RatioDTO = string
 export type CountDTO = number
 
+export const DATA_ORIGINS = ['real', 'demo'] as const
+export type DataOriginDTO = typeof DATA_ORIGINS[number]
+
+const DATA_ORIGIN_SET: ReadonlySet<string> = new Set(DATA_ORIGINS)
+
+export function isDataOriginDTO(value: unknown): value is DataOriginDTO {
+  return typeof value === 'string' && DATA_ORIGIN_SET.has(value)
+}
+
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const ISO_DATE_TIME_PATTERN = /^(\d{4}-\d{2}-\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/
 

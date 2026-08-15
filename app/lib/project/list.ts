@@ -1,7 +1,9 @@
 import type { ProjectListItemDTO } from './repository'
-import type { EntityRefDTO, MetricDTO, MoneyDTO } from '~/types/read-model'
+import type { DataOriginDTO, EntityRefDTO, MetricDTO, MoneyDTO } from '~/types/read-model'
 
 export interface ProjectListViewRow {
+  dataOrigin: DataOriginDTO
+  rowIdentity: string
   id: string
   name: string
   code: string
@@ -35,6 +37,8 @@ function resolvedLabel(reference: EntityRefDTO): string {
 
 export function projectListViewRow(item: ProjectListItemDTO): ProjectListViewRow {
   return {
+    dataOrigin: item.dataOrigin,
+    rowIdentity: `${item.dataOrigin}:${item.project.id}`,
     id: item.project.id,
     name: item.project.label,
     code: item.code,

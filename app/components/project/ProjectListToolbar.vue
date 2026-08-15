@@ -2,7 +2,9 @@
 import { Button } from '~/components/ui/button'
 
 defineProps<{
-  total: number
+  realTotal: number
+  demoTotal: number
+  includeDemo: boolean
   visible: number
   loading: boolean
   writeDisabledReason?: string
@@ -44,9 +46,10 @@ function toggleDensity() {
         <h2 class="text-14px font-800 text-ink">
           施工项目
         </h2>
-        <span class="text-12px text-ink-soft">
-          共 <b class="font-mono text-ink">{{ total }}</b> 个
-          <template v-if="visible !== total">· 当前 {{ visible }} 个</template>
+        <span class="text-12px text-ink-soft" aria-label="项目来源数量">
+          正式 <b class="font-mono text-ink">{{ realTotal }}</b> 个
+          <template v-if="includeDemo">· 测试 <b class="font-mono text-warn">{{ demoTotal }}</b> 个</template>
+          <template v-if="visible !== realTotal + (includeDemo ? demoTotal : 0)">· 当前筛选 {{ visible }} 个</template>
         </span>
       </div>
 

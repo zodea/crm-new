@@ -1,6 +1,8 @@
 import type {
+  DataOriginDTO,
   EntityRefDTO,
   ISODateDTO,
+  ISODateTimeDTO,
   MetricDTO,
   MoneyDTO,
   OpaqueIdDTO,
@@ -22,6 +24,7 @@ export interface ProjectListColumnFiltersDTO {
 }
 
 export interface ProjectListQueryDTO {
+  includeDemo: boolean
   search: string
   status: string | null
   filters: ProjectListColumnFiltersDTO
@@ -30,7 +33,14 @@ export interface ProjectListQueryDTO {
   pageSize: ProjectPageSize
 }
 
+export interface ProjectDetailQueryDTO {
+  id: OpaqueIdDTO
+  origin: DataOriginDTO
+  includeDemo: boolean
+}
+
 export interface ProjectListSourceRow {
+  dataOrigin: DataOriginDTO
   id: string
   name: string
   code: string
@@ -61,6 +71,7 @@ export interface ProjectListSourceRow {
 }
 
 export interface ProjectListItemDTO {
+  dataOrigin: DataOriginDTO
   project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
   code: string
   status: string
@@ -101,18 +112,30 @@ export interface ProjectListFacetsDTO {
   customers: ProjectListFacetOptionDTO[]
 }
 
-export interface ProjectListSummaryDTO {
+export interface ProjectListOriginSummaryDTO {
   projectCount: number
   statusCounts: Record<string, number>
-  facets: ProjectListFacetsDTO
   income: MetricDTO
   budget: MetricDTO
 }
 
+export interface ProjectListSummaryDTO {
+  facets: ProjectListFacetsDTO
+  origins: Record<DataOriginDTO, ProjectListOriginSummaryDTO>
+}
+
 export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryDTO>
+
+export interface ProjectDetailReadDTO {
+  item: ProjectListItemDTO
+  asOf: ISODateTimeDTO
+  sourceVersion: string | null
+  capabilities: string[]
+}
 
 export interface ProjectListRepository {
   list: (query: ProjectListQueryDTO) => Promise<ProjectListPageDTO>
+  get: (query: ProjectDetailQueryDTO) => Promise<ProjectDetailReadDTO>
 }
 
 export class ProjectRepositoryProblem extends Error {

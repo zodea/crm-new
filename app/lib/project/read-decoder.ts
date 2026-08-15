@@ -1,12 +1,13 @@
 import type { MetricDTO, MoneyDTO } from '../../types/read-model'
 import type {
+  ProjectDetailReadDTO,
   ProjectListFacetOptionDTO,
   ProjectListItemDTO,
   ProjectListPageDTO,
   ProjectListStatusFacetDTO,
   ProjectPageSize,
 } from './read-contract'
-import { isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { isDataOriginDTO, isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import {
   PROJECT_PAGE_SIZES,
   projectProblem,
@@ -91,6 +92,7 @@ function isProjectItem(value: unknown): value is ProjectListItemDTO {
     'address',
   ]
   return stringFields.every(field => typeof value[field] === 'string')
+    && isDataOriginDTO(value.dataOrigin)
     && ['startDate', 'plannedEnd', 'actualEnd'].every(field =>
       isNullableISODate(value[field]),
     )
@@ -135,6 +137,14 @@ function isFacets(value: unknown): boolean {
     && value.customers.every(isFacetOption)
 }
 
+function isOriginSummary(value: unknown): boolean {
+  return isObject(value)
+    && Number.isSafeInteger(value.projectCount) && Number(value.projectCount) >= 0
+    && isStatusCounts(value.statusCounts)
+    && isMetric(value.income)
+    && isMetric(value.budget)
+}
+
 function isEmpty(value: unknown): boolean {
   return isObject(value)
     && ['no-records', 'no-filter-match', 'missing-relation'].includes(String(value.reason))
@@ -151,11 +161,10 @@ export function decodeProjectListPage(value: unknown): ProjectListPageDTO {
     && PROJECT_PAGE_SIZES.includes(value.pagination.pageSize as ProjectPageSize)
     && Number.isSafeInteger(value.pagination.total) && Number(value.pagination.total) >= 0
     && isObject(value.summary)
-    && Number.isSafeInteger(value.summary.projectCount) && Number(value.summary.projectCount) >= 0
-    && isStatusCounts(value.summary.statusCounts)
     && isFacets(value.summary.facets)
-    && isMetric(value.summary.income)
-    && isMetric(value.summary.budget)
+    && isObject(value.summary.origins)
+    && isOriginSummary(value.summary.origins.real)
+    && isOriginSummary(value.summary.origins.demo)
     && (value.empty === null || isEmpty(value.empty))
     && isISODateTimeDTO(value.asOf)
     && (value.sourceVersion === null || typeof value.sourceVersion === 'string')
@@ -168,6 +177,22 @@ export function decodeProjectListPage(value: unknown): ProjectListPageDTO {
     ))
   }
   return value as unknown as ProjectListPageDTO
+}
+
+export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
+  const valid = isObject(value)
+    && isProjectItem(value.item)
+    && isISODateTimeDTO(value.asOf)
+    && (value.sourceVersion === null || typeof value.sourceVersion === 'string')
+    && Array.isArray(value.capabilities)
+    && value.capabilities.every(capability => typeof capability === 'string')
+  if (!valid) {
+    throw new ProjectRepositoryProblem(projectProblem(
+      'internal-error',
+      '中央后台返回的项目详情读模型无效',
+    ))
+  }
+  return value as unknown as ProjectDetailReadDTO
 }
 
 export function projectProblemFromUnknown(cause: unknown): ProjectRepositoryProblem {
