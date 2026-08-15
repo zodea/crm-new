@@ -83,6 +83,32 @@ describe('materialLineGrid behavior', () => {
     }])
   })
 
+  it('保留未定价到货行，不将缺失单价显示为零金额', async () => {
+    const wrapper = mount(MaterialLineGrid, {
+      props: {
+        kind: 'mat_arrival',
+        lines: [{
+          materialName: '砂浆',
+          spec: '',
+          unit: '吨',
+          qty: 2,
+          unitPrice: null,
+          note: '',
+        }],
+      },
+      global,
+    })
+
+    expect(wrapper.text()).toContain('数量 2.000 · 含税金额 待补')
+    expect(wrapper.get('[data-testid="arrival-line-amount"]').text()).toBe('待补')
+
+    await wrapper.get('[data-testid="add-material-line"]').trigger('click')
+    expect(wrapper.emitted('update')?.at(-1)?.[0]).toEqual([
+      expect.objectContaining({ materialName: '砂浆', unitPrice: null }),
+      expect.objectContaining({ materialName: '', unitPrice: null }),
+    ])
+  })
+
   it('refreshes stock-check book quantities and keeps variance derived', async () => {
     const resolveBookQty = vi.fn(async () => 8)
     const lines = [{
