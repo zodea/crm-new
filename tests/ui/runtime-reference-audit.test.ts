@@ -38,7 +38,7 @@ function generatedBlock(markdown: string, begin: string, end: string): string {
   const to = markdown.indexOf(end)
   expect(from, begin).toBeGreaterThanOrEqual(0)
   expect(to, end).toBeGreaterThan(from)
-  return markdown.slice(from + begin.length, to).trim()
+  return markdown.slice(from + begin.length, to).trim().replaceAll('\r\n', '\n')
 }
 
 function markdownSection(markdown: string, heading: string, nextHeading: string): string {
