@@ -159,5 +159,7 @@ describe('materialFormFields data flow', () => {
     })
 
     expect(wrapper.get('[data-testid="material-stockStatus"]').text()).toBe('待入库')
+    expect(wrapper.get('[data-testid="material-supplierId"]').attributes('data-disabled-reason'))
+      .toBe('请先选择项目')
   })
 })

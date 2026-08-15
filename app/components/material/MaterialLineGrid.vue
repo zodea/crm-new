@@ -51,7 +51,10 @@ const summary = computed(() => {
       (sum, line) => sum + (Number(line.qty) || 0) * (Number(line.unitPrice) || 0),
       0,
     )
-    return `数量 ${qty.toFixed(3)} · 含税金额 ¥${amount.toFixed(2)}`
+    const hasUnpricedLine = props.lines.some(line =>
+      line.materialName?.trim() && Number(line.qty) > 0 && line.unitPrice == null,
+    )
+    return `数量 ${qty.toFixed(3)} · 含税金额 ${hasUnpricedLine ? '待补' : `¥${amount.toFixed(2)}`}`
   }
   const varianceQty = props.lines.reduce(
     (sum, line) => sum + (Number(line.actualQty) || 0) - (Number(line.bookQty) || 0),
@@ -86,7 +89,7 @@ function add() {
   emit('update', [
     ...props.lines,
     props.kind === 'mat_arrival'
-      ? { materialName: '', spec: '', unit: '', qty: 0, unitPrice: 0, note: '' }
+      ? { materialName: '', spec: '', unit: '', qty: 0, unitPrice: null, note: '' }
       : { materialName: '', spec: '', unit: '', bookQty: 0, actualQty: 0, varianceAmount: 0 },
   ])
 }
@@ -101,8 +104,10 @@ function remove(index: number) {
   emit('update', props.lines.filter((_, current) => current !== index))
 }
 
-function amount(line: MaterialGridLine): number {
-  return (Number(line.qty) || 0) * (Number(line.unitPrice) || 0)
+function amountLabel(line: MaterialGridLine): string {
+  if (line.materialName?.trim() && Number(line.qty) > 0 && line.unitPrice == null)
+    return '待补'
+  return ((Number(line.qty) || 0) * (Number(line.unitPrice) || 0)).toFixed(2)
 }
 
 function varianceQty(line: MaterialGridLine): number {
@@ -140,7 +145,7 @@ function importTsv() {
           spec,
           unit,
           qty: Number(qty) || 0,
-          unitPrice: Number(unitPrice) || 0,
+          unitPrice: unitPrice.trim() ? Number(unitPrice) || 0 : null,
           note,
         }
       }
@@ -231,7 +236,7 @@ function importTsv() {
           <input :value="row.unitPrice ?? ''" :disabled="readonly" type="number" min="0" step="0.01" class="field-input w-full text-right font-mono" aria-label="含税单价" @input="patch(rowIndex, { unitPrice: inputNumber($event) })">
         </template>
         <template #amount="{ row }">
-          <span class="font-mono font-700">{{ amount(row).toFixed(2) }}</span>
+          <span class="font-mono font-700" data-testid="arrival-line-amount">{{ amountLabel(row) }}</span>
         </template>
         <template #note="{ row, rowIndex }">
           <input :value="row.note" :disabled="readonly" class="field-input w-full" aria-label="明细备注" @input="patch(rowIndex, { note: inputValue($event) })">

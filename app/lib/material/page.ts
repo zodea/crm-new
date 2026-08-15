@@ -201,7 +201,7 @@ export function materialFormDefaults(kind: MaterialFormKind): MaterialPageDraft 
         arrivalDate: today(),
         qualityResult: '合格',
         stockStatus: 'pending',
-        lines: [{ materialName: '', spec: '', unit: '', qty: 0, unitPrice: 0 }],
+        lines: [{ materialName: '', spec: '', unit: '', qty: 0, unitPrice: null }],
       }
     case 'mat_use':
       return {
