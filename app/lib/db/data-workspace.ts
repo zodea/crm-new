@@ -44,13 +44,70 @@ function demoWorkspaceWriteProblem(): DemoWorkspaceWriteProblem {
   })
 }
 
+function sqlForClassification(sql: string): string | null {
+  const output: string[] = []
+  for (let index = 0; index < sql.length;) {
+    const current = sql.charAt(index)
+    const next = sql.charAt(index + 1)
+
+    if (current === '-' && next === '-') {
+      output.push(' ')
+      index += 2
+      while (index < sql.length && sql.charAt(index) !== '\n' && sql.charAt(index) !== '\r')
+        index += 1
+      continue
+    }
+
+    if (current === '/' && next === '*') {
+      output.push(' ')
+      index += 2
+      const end = sql.indexOf('*/', index)
+      if (end < 0)
+        return null
+      index = end + 2
+      continue
+    }
+
+    if (current === '\'' || current === '"' || current === '`' || current === '[') {
+      output.push(' ')
+      const closing = current === '[' ? ']' : current
+      index += 1
+      let closed = false
+      while (index < sql.length) {
+        if (sql.charAt(index) !== closing) {
+          index += 1
+          continue
+        }
+        if (sql.charAt(index + 1) === closing) {
+          index += 2
+          continue
+        }
+        index += 1
+        closed = true
+        break
+      }
+      if (!closed)
+        return null
+      continue
+    }
+
+    output.push(current)
+    index += 1
+  }
+  return output.join('')
+}
+
 function isReadOnlyQuery(sql: string): boolean {
-  const statement = sql.trim().replace(/;\s*$/, '')
-  if (statement.includes(';'))
+  const classified = sqlForClassification(sql)
+  if (classified == null)
     return false
-  if (/\b(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|ATTACH|DETACH|VACUUM|PRAGMA)\b/i.test(statement))
+  const statement = classified.trim().replace(/;\s*$/, '').trim()
+  if (!statement || statement.includes(';'))
     return false
-  return /^(?:SELECT|WITH)\b/i.test(statement)
+  if (!/^(?:SELECT|WITH)\b/i.test(statement))
+    return false
+  return !/\b(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER|ATTACH|DETACH|VACUUM|PRAGMA)\b/i
+    .test(statement)
 }
 
 function isTransactionControl(sql: string): boolean {

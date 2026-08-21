@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 
@@ -10,16 +11,17 @@ async function documentDoesNotOverflow(page: import('@playwright/test').Page) {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
-test.describe('Issue #103 Slice 6A：户施工详情', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript((storageKey) => {
-      localStorage.setItem(storageKey, 'true')
-    }, DATA_VISIBILITY_STORAGE_KEY)
-  })
+async function useDemoWorkspace(page: import('@playwright/test').Page) {
+  await page.addInitScript((storageKey) => {
+    localStorage.setItem(storageKey, 'true')
+  }, DATA_VISIBILITY_STORAGE_KEY)
+}
 
+test.describe('Issue #103 Slice 6A：户施工详情', () => {
   test('矩阵时间线进入详情页，工种→阶段→日期与三量合计贯通', async ({ page }) => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
+    await useDemoWorkspace(page)
 
     await page.goto('/subcontract/quantity')
     await page.waitForLoadState('networkidle')
@@ -52,6 +54,7 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('下钻带走矩阵筛选，返回后按原筛选恢复', async ({ page }) => {
+    await useDemoWorkspace(page)
     await page.goto('/subcontract/quantity')
     await page.waitForLoadState('networkidle')
 
@@ -76,6 +79,7 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('390px 页面无横滚，量明细仅自身局部横滚', async ({ page }) => {
+    await useDemoWorkspace(page)
     await page.goto('/subcontract/quantity')
     await page.waitForLoadState('networkidle')
     const cells = page.getByTestId('quantity-matrix-cell')
@@ -96,6 +100,8 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('缺照片软卡取消时保留输入，确认后按原日期和备注保存草稿', async ({ page }) => {
+    test.setTimeout(60_000)
+    await installQuantityProductionFixture(page)
     await page.goto('/subcontract/quantity')
     await page.waitForLoadState('networkidle')
     const cells = page.getByTestId('quantity-matrix-cell')
@@ -122,6 +128,7 @@ test.describe('Issue #103 Slice 6A：户施工详情', () => {
   })
 
   test('直接访问不存在的户显示错误态', async ({ page }) => {
+    await useDemoWorkspace(page)
     await page.goto('/subcontract/quantity/proj_demo_001/not-a-unit')
     await page.waitForLoadState('networkidle')
     await expect(page.getByRole('alert')).toContainText(/不属于当前项目|不存在/)

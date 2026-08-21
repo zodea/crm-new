@@ -200,7 +200,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     )
     await page.getByRole('button', { name: '运行预检' }).click()
     expect((await preflightResponse).ok()).toBe(true)
-    await expect(page.getByText('sqlite-v40', { exact: true })).toBeVisible()
+    await expect(page.getByText('sqlite-v41', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: '创建不可变备份' }).click()
     await expect(page.getByText('不可变备份', { exact: true })).toBeVisible()
@@ -308,7 +308,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       await installProductionSnapshot(page, await legacyProductionSnapshot({ withSoftDeletedSupplier: true }))
       await page.reload()
       await page.getByRole('button', { name: '运行预检' }).click()
-      await expect(page.getByText('sqlite-v40', { exact: true })).toBeVisible()
+      await expect(page.getByText('sqlite-v41', { exact: true })).toBeVisible()
       await page.getByRole('button', { name: '创建不可变备份' }).click()
       await page.getByRole('button', { name: '执行 dry-run' }).click()
       await expect(page.getByText('已保留软删除')).toBeVisible()
