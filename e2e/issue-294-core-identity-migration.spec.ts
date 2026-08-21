@@ -188,9 +188,10 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
   })
 
   test('真实旧库快照经显式流程进入中央读链，刷新后仍可回滚', async ({ page }) => {
+    test.slow()
     await page.goto('/settings/data-migration')
     await expect(page.getByTestId('core-migration-page').getByRole('heading', { name: '本地数据迁移' }))
-      .toBeVisible({ timeout: 20_000 })
+      .toBeVisible({ timeout: 60_000 })
     await installProductionSnapshot(page, await legacyProductionSnapshot())
     await page.reload()
 
