@@ -1,6 +1,6 @@
 # 运行态视觉与交互回归
 
-本入口落实 #184，并由 #188 补齐应用外壳压力态与通知 Sheet、#189 补齐首页默认与四种非理想状态，用同一套 Playwright 测试守住响应式布局和跨页面公共交互。基线只记录瑞航 CRM 的本地演示数据，不得写入参考系统截图、真实业务数据或动态运行指标。视觉任务固定在 Windows Server 2022 / Chromium 环境，普通跨平台 E2E 不自动加载平台截图。
+本入口落实 #184，并由 #188 补齐应用外壳压力态与通知 Sheet、#189 补齐首页默认与四种非理想状态，用同一套 Playwright 测试守住响应式布局和跨页面公共交互。基线显式启用 #279 的本地测试数据工作区，并固定业务时间，只记录瑞航 CRM 的脱敏演示数据及其只读状态；不得写入参考系统截图、真实业务数据或动态运行指标。视觉任务固定在 Windows Server 2022 / Chromium 环境，普通跨平台 E2E 不自动加载平台截图。
 
 ## 覆盖矩阵
 
@@ -17,7 +17,7 @@
 | 应用壳压力态 | 多个本地演示路由 | 长标题、路由页签溢出与翻屏、未读角标、导航搜索结果 |
 | 通知 Sheet | `/` | 桌面右侧 / 窄窗底部形态、脱敏内容、固定标题与操作区 |
 | 列表 | `/project` | 工具栏、密集表格与分页 |
-| 详情 | `/project/proj_demo_001` | 详情壳、页签与内容区 |
+| 详情 | `/project/proj_demo_001?origin=demo` | 来源感知的中央只读详情、详情壳、页签与内容区 |
 | 统一实体详情壳 | `/dev/detail-shell` | 长标题、指标、业务模块顺序、可选右栏及响应式退化 |
 | 整页表单 | `/project/form` | 统一表单壳、分区导航、主操作可达与键盘顺序 |
 | 复杂工作台 | `/subcontract/quantity` | 局部横向滚动与密集矩阵 |
@@ -32,7 +32,7 @@ pnpm test:visual
 pnpm test:visual:update
 ```
 
-专用配置 [`playwright.visual.config.ts`](../../playwright.visual.config.ts) 固定启动 `127.0.0.1:3101` 的全新本地服务，禁止复用已有服务、禁止 `PLAYWRIGHT_BASE_URL`，并要求页面报告 `demo` 数据档案。普通 [`playwright.config.ts`](../../playwright.config.ts) 排除视觉 spec，Windows CI 单独执行该任务。
+专用配置 [`playwright.visual.config.ts`](../../playwright.visual.config.ts) 固定启动 `127.0.0.1:3101` 的全新本地服务，禁止复用已有服务、禁止 `PLAYWRIGHT_BASE_URL`，并要求页面报告 `demo` 数据档案。每个样本还必须确认“测试数据”开关处于已授权状态；详情样本携带 `origin=demo`，以验证测试数据只能进入中央只读详情。普通 [`playwright.config.ts`](../../playwright.config.ts) 排除视觉 spec，Windows CI 单独执行该任务。
 
 只有确认界面变化符合当前 Issue、页面蓝本和设计权威链后才更新基线。更新后必须：
 
