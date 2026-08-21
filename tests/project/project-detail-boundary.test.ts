@@ -36,7 +36,7 @@ describe('project detail data-origin boundary', () => {
       id: 'proj_demo_001',
       origin: 'real',
       includeDemo: true,
-    })).rejects.toMatchObject({ problem: { code: 'not-found' } })
+    })).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
     await expect(repository.get({
       id: 'proj_demo_001',
       origin: 'demo',

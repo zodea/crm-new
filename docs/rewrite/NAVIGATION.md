@@ -49,6 +49,12 @@ type NavigationIntentDTO =
 4. `same-route-overlay` 不创建新路由。关闭后仍停留原记录，切换记录时必须以新的 `subject.id` 重算记录级数据。
 5. `unavailable` 渲染普通文本或明确“未接/无权限”状态，不伪装蓝链。
 
+### 当前运行落点（#312）
+
+唯一前端 Target Registry 位于 `app/lib/nav/target-registry.ts`。后台和 Repository 只返回上述 `NavigationIntentDTO`，不得返回 `/project/...` 等 Vue 路径；Registry 才能把登记过的 `entity + variant + stable id` 解析成站内目标。项目列表现在随每行返回 `kind='entity-detail'`、`entity='project'`、`variant='detail'` 和后台判定的 `filters.dataOrigin`，由 Registry 生成 `/project/:id?origin=:dataOrigin`。详情刷新仍只依赖路径 ID、来源 query 与中央读接口，不依赖列表组件留在内存。
+
+当前项目切片已经把 `resolved`、`missing`、`forbidden`、`not-connected`、`unverified-target` 和 `error` 分成稳定展示状态；未登记目标不会回退到 `/project` 或按名称猜路由。项目 ID 存在但 URL 来源不一致时显示 `relationship-mismatch`，不存在时显示 `not-found`，两者都不展示同名详情。本切片没有实现列表筛选、页码、滚动和焦点返回；这些仍由 #313 的 `returnTo` 合同承接。
+
 ### 2.1 返回上下文
 
 列表到详情的来源状态由前端生成，不由后台拼接：
@@ -136,7 +142,7 @@ interface NavigationOrigin {
 
 | 实体/视图 | canonical variant / view | 目标路由 | 当前状态 |
 | --- | --- | --- | --- |
-| 项目 | detail | `/project/:id` | 已闭合 |
+| 项目 | detail | `/project/:id` | 已闭合；唯一 Target Registry 生成来源感知路径 |
 | 客户 | detail | `/base/customer/:id` | 已闭合；参考权限不可见不影响本地路由 |
 | 分供方 | detail | `/base/supplier/:id` | 已闭合 |
 | 班组 | detail | `/base/crew/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
@@ -171,7 +177,7 @@ interface NavigationOrigin {
 | 键 | 来源域 / 页面 | 可点击字段或动作 | 可点击条件 | 目标与携带上下文 | 返回语义 | 当前状态 / 后端要求 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `N-HOME-SCHEDULE` | `home` `/` | 当前项目施工进度 | `project.id` resolved | `/schedule?project=:projectId`；工序再带 `group/task` | 返回首页恢复项目与工序 | 闭合 |
-| `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id` | 返回项目列表原阶段/搜索/页码/滚动 | 部分；当前列表返回未统一恢复全部上下文 |
+| `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id?origin=:dataOrigin`，路径由唯一 Target Registry 解析 | 返回项目列表原阶段/搜索/页码/滚动 | 目标闭合；语义 DTO、来源校验、深链刷新已实现，返回上下文仍由 #313 补齐 |
 | `N-PROJECT-INCOME` | `project` `/project` | 累计收入合同金额 | `MetricDTO.drilldown` 非空，金额可为 0 | `/contract/construction?project=:id` | 返回项目列表原上下文 | 部分；本地目标存在，列表金额仍是文本 |
 | `N-PROJECT-BUDGET` | `project` `/project` | 预算总额 | 同上 | `/project/target-cost?project=:id` | 返回项目列表原上下文 | 部分；目标成本列表需消费项目 query |
 | `N-PROJECT-ROLE` | `project` `/project` | 项目经理/执行经理及角色 | 必须有人员实体 ID | 项目成员只读视图，路由待定 | 返回项目列表原上下文 | 缺身份；当前只有姓名文本，禁止造链接 |
@@ -235,7 +241,7 @@ interface NavigationOrigin {
 
 ## 6. 当前统一实施顺序
 
-1. 建立唯一前端 target registry，把现有 `EntityLink` 扩展到已存在的班组、工人、付款申请、支付记录、目标成本、送货归档和工程量户；多态对象必须通过 variant 解析。
+1. 在 #312 已建立的唯一前端 Target Registry 上继续登记班组、工人、付款申请、支付记录、目标成本、送货归档和工程量户；多态对象必须通过 variant 解析。项目详情目标已经接入，不再新增领域内 route map。
 2. 建立站内 `returnTo` 编解码/校验器，并让列表、详情、项目×分供方、工资/C2、材料和财务目标页按白名单消费 query。
 3. 先为甲方/分包/材料/辅助合同结算/普通财务对象补独立只读详情，再把主链接从编辑表单切走；编辑入口保持显式动作。
 4. 金额链接改为由 `MetricDTO.drilldown` 决定；值为 0 可以进入真实空表，`null`、missing、forbidden 和无目标继续退化。

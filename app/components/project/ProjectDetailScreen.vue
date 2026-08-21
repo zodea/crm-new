@@ -4,7 +4,7 @@ import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
-import { projectProblemFromUnknown } from '~/lib/project/repository'
+import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 
 const props = withDefaults(defineProps<{
@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<{
 const repository = useNuxtApp().$repositories.projectList
 const commandStore = useProjectCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
-const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'error'>('loading')
+const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'mismatch' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
 let latestLoad = 0
@@ -106,6 +106,15 @@ async function loadProject() {
     })
     if (loadId !== latestLoad)
       return
+    if (result.item.dataOrigin !== props.originHint) {
+      detail.value = null
+      problem.value = projectProblem(
+        'relationship-mismatch',
+        '项目存在，但 URL 来源与中央身份不一致',
+      )
+      state.value = 'mismatch'
+      return
+    }
     detail.value = result
     state.value = 'ready'
     await nextTick()
@@ -117,11 +126,14 @@ async function loadProject() {
       return
     detail.value = null
     problem.value = projectProblemFromUnknown(cause).problem
-    state.value = problem.value.code === 'forbidden'
-      ? 'forbidden'
-      : problem.value.code === 'not-found' || problem.value.code === 'relationship-mismatch'
-        ? 'not-found'
-        : 'error'
+    if (problem.value.code === 'forbidden')
+      state.value = 'forbidden'
+    else if (problem.value.code === 'relationship-mismatch')
+      state.value = 'mismatch'
+    else if (problem.value.code === 'not-found')
+      state.value = 'not-found'
+    else
+      state.value = 'error'
   }
 }
 
@@ -269,6 +281,19 @@ onActivated(() => {
     action-label="重新加载"
     @action="loadProject"
   />
+  <StatePanel
+    v-else-if="state === 'mismatch'"
+    kind="empty"
+    title="项目身份与来源不匹配"
+    :description="problem?.message"
+  >
+    <template #action>
+      <NuxtLink to="/project" class="btn-secondary">
+        <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />
+        返回项目列表
+      </NuxtLink>
+    </template>
+  </StatePanel>
   <StatePanel
     v-else
     kind="empty"

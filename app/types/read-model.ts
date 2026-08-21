@@ -99,6 +99,38 @@ export type EntityRefDTO
     reason: 'permission-denied'
   }
 
+export type NavigationUnavailableReasonDTO
+  = 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target'
+
+interface EntityNavigationIntentDTO<Kind extends 'entity-detail' | 'entity-subview' | 'source-record'> {
+  kind: Kind
+  subject: EntityRefDTO
+  variant: string | null
+  view: string | null
+  filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+}
+
+export type NavigationIntentDTO
+  = EntityNavigationIntentDTO<'entity-detail'>
+    | EntityNavigationIntentDTO<'entity-subview'>
+    | EntityNavigationIntentDTO<'source-record'>
+    | {
+      kind: 'entity-list'
+      entity: EntityKindDTO
+      variant: string | null
+      view: string | null
+      filters: Record<string, OpaqueIdDTO | BusinessCodeDTO | null>
+    }
+    | {
+      kind: 'same-route-overlay'
+      subject: EntityRefDTO
+      view: string
+    }
+    | {
+      kind: 'unavailable'
+      reason: NavigationUnavailableReasonDTO
+    }
+
 export interface PaginationDTO {
   page: number
   pageSize: number

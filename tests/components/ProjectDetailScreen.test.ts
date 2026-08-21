@@ -8,6 +8,13 @@ const detail: ProjectDetailReadDTO = {
   item: {
     dataOrigin: 'demo',
     project: { state: 'resolved', entity: 'project', id: 'project-1', label: '合和新城', no: 'HHXC-01' },
+    navigation: {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '合和新城', no: 'HHXC-01' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    },
     code: 'HHXC-01',
     status: '施工中',
     contractAmount: '32000000.00',
@@ -113,5 +120,16 @@ describe('项目详情中央来源边界', () => {
 
     const link = await screen.findByRole('link', { name: '编辑项目' })
     expect(link.getAttribute('href')).toBe('/project/form/project-1?origin=real')
+  })
+
+  it('稳定区分来源错配，不按项目名称回退到其他来源', async () => {
+    get.mockResolvedValue(detail)
+    renderDetail({ originHint: 'real', includeDemo: true })
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('status', { name: '项目身份与来源不匹配' })).not.toBeNull()
+    })
+    expect(screen.getByText('项目存在，但 URL 来源与中央身份不一致')).not.toBeNull()
+    expect(screen.queryByRole('heading', { name: '合和新城' })).toBeNull()
   })
 })

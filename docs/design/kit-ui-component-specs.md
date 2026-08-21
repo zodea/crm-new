@@ -275,8 +275,9 @@ openDrawer({
 > 基准:`DC重构设计源码/kit/KitAtoms.jsx` EntityLink(批A 底座件①)+ MoneyLink(批B 铁律④);领域语言见 CONTEXT.md「穿透」词条。
 
 **EntityLink(实体蓝链)**:
-- type→route 映射**唯一处**(组件内 ENTITY_ROUTES 一张表,别处不复制);只登记已实装详情页(project/supplier/contract/invoice…),**未实装类型查无路由自动退化纯文本**——实装后回填映射即全站上线。
+- 语义目标→route 映射**唯一处**为 `app/lib/nav/target-registry.ts`；后台和 DTO 只返回 `NavigationIntentDTO`，组件及领域页面不得复制 route map。`EntityLink` 只负责展示，并为尚未迁移的旧调用把 `type/id/label` 适配成语义意图。Registry 只登记已实装详情页(project/supplier/contract/invoice…),**未实装类型查无路由自动退化纯文本或明确状态**——实装后回填 Registry 即全站上线。
 - label 缺省时按 type 从对应 store best-effort 解析(分供方取别名优先);解析为空 → 灰「—」。
+- forbidden 始终清空 label；调用方传入的名称也不得越过 `EntityRefDTO`/`NavigationIntentDTO` 的脱敏状态。
 - 视觉:`--brand`/600、hover 下划线、`font-size: inherit`;点击 stopPropagation(不触发行点击)。
 
 **MoneyLink(金额穿透)**:
