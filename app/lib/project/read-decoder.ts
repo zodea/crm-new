@@ -55,6 +55,7 @@ function isEntityRef(value: unknown, entity: 'project' | 'customer'): boolean {
     return false
   if (value.state === 'resolved') {
     return typeof value.id === 'string'
+      && value.id.trim().length > 0
       && typeof value.label === 'string'
       && (value.no === null || typeof value.no === 'string')
   }
@@ -69,6 +70,30 @@ function isEntityRef(value: unknown, entity: 'project' | 'customer'): boolean {
       && value.reason === 'permission-denied'
   }
   return false
+}
+
+function isProjectNavigation(
+  value: unknown,
+  project: unknown,
+  dataOrigin: unknown,
+): boolean {
+  if (!isObject(value)
+    || value.kind !== 'entity-detail'
+    || value.variant !== 'detail'
+    || value.view !== null
+    || !isObject(value.filters)
+    || Object.keys(value.filters).length !== 1
+    || value.filters.dataOrigin !== dataOrigin
+    || !isDataOriginDTO(value.filters.dataOrigin)
+    || !isObject(project)
+    || !isObject(value.subject)) {
+    return false
+  }
+  return value.subject.state === project.state
+    && value.subject.entity === project.entity
+    && value.subject.id === project.id
+    && value.subject.label === project.label
+    && value.subject.no === project.no
 }
 
 function isNullableISODate(value: unknown): value is string | null {
@@ -98,6 +123,7 @@ function isProjectItem(value: unknown): value is ProjectListItemDTO {
     )
     && isISODateTimeDTO(value.updatedAt)
     && isEntityRef(value.project, 'project')
+    && isProjectNavigation(value.navigation, value.project, value.dataOrigin)
     && isEntityRef(value.customer, 'customer')
     && isEntityRef(value.secondaryCustomer, 'customer')
     && (value.contractAmount === null || isMoney(value.contractAmount))

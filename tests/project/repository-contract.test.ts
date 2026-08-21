@@ -139,6 +139,14 @@ function contract(repository: () => Promise<ProjectListRepository>) {
       id: 'proj_demo_001',
       label: '合和新城',
     })
+    expect(first.items[0]?.navigation).toEqual({
+      kind: 'entity-detail',
+      subject: first.items[0]?.project,
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    })
+    expect(JSON.stringify(first.items[0]?.navigation)).not.toContain('/project')
     expect(first.items[0]?.dataOrigin).toBe('demo')
     const zeroBudget = first.items.find(item => item.project.id === 'proj_demo_002')
     expect(zeroBudget?.contractAmount).toBe('2560.00')
@@ -258,6 +266,44 @@ describe('project repository contract', () => {
           return {
             ...page,
             items: [{ ...page.items[0], status: 42 }],
+          }
+        },
+      })
+
+      await expect(repo.list(QUERY)).rejects.toMatchObject({
+        problem: { code: 'internal-error' },
+      })
+    })
+
+    it('rejects a backend route string in place of semantic navigation intent', async () => {
+      const repo = createHttpProjectListRepository({
+        fetcher: async (_url, options) => {
+          const page = await instance.list(options?.query)
+          return {
+            ...page,
+            items: [{ ...page.items[0], navigation: '/project/proj_demo_001' }],
+          }
+        },
+      })
+
+      await expect(repo.list(QUERY)).rejects.toMatchObject({
+        problem: { code: 'internal-error' },
+      })
+    })
+
+    it('rejects an empty stable project id at the HTTP boundary', async () => {
+      const repo = createHttpProjectListRepository({
+        fetcher: async (_url, options) => {
+          const page = await instance.list(options?.query)
+          const item = page.items[0]!
+          const project = { ...item.project, id: '' }
+          return {
+            ...page,
+            items: [{
+              ...item,
+              project,
+              navigation: { ...item.navigation, subject: project },
+            }],
           }
         },
       })

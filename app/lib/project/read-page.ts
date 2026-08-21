@@ -323,14 +323,22 @@ export function buildProjectListItem(
   row: ProjectListSourceRow,
   asOf: string,
 ): ProjectListPageDTO['items'][number] {
+  const project = {
+    state: 'resolved',
+    entity: 'project',
+    id: row.id,
+    label: row.name,
+    no: row.code || null,
+  } as const
   return {
     dataOrigin: row.dataOrigin,
-    project: {
-      state: 'resolved',
-      entity: 'project',
-      id: row.id,
-      label: row.name,
-      no: row.code || null,
+    project,
+    navigation: {
+      kind: 'entity-detail',
+      subject: project,
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: row.dataOrigin },
     },
     code: row.code,
     status: row.status,
@@ -392,9 +400,10 @@ export function buildProjectDetailRead(input: {
   const row = input.rows.find(candidate => candidate.id === input.query.id
     && candidate.dataOrigin === input.query.origin)
   if (!row) {
+    const sameId = input.rows.some(candidate => candidate.id === input.query.id)
     throw new ProjectRepositoryProblem(projectProblem(
-      'not-found',
-      '项目不存在或当前来源不可见',
+      sameId ? 'relationship-mismatch' : 'not-found',
+      sameId ? '项目存在，但 URL 来源与中央身份不一致' : '项目不存在或当前来源不可见',
     ))
   }
   return {

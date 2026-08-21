@@ -4,10 +4,8 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repository'
 import type { StatusTone } from '~/lib/project/status'
-import type { DataOriginDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
-import { resolveEntityLink } from '~/lib/kit/entity-link'
 import { projectLedgerRows } from '~/lib/project/export'
 import { projectListViewRow } from '~/lib/project/list'
 import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
@@ -45,16 +43,6 @@ const toneText: Record<StatusTone, string> = {
   brand: 'font-600 text-brand-deep',
   muted: 'font-600 text-ink-soft',
   ok: 'cell--status-ok',
-}
-
-function projectDetailPath(row: { id: string, name: string, dataOrigin: DataOriginDTO }): string {
-  const resolution = resolveEntityLink({
-    type: 'project',
-    id: row.id,
-    label: row.name,
-    dataOrigin: row.dataOrigin,
-  })
-  return resolution.kind === 'link' ? resolution.to : '/project'
 }
 
 const readPage = computed<ProjectListPageDTO | null>(() => {
@@ -502,7 +490,13 @@ onDeactivated(() => {
           @empty-action="handleEmptyAction"
         >
           <template #name="{ row }">
-            <EntityLink :id="row.id" type="project" :label="row.name" :data-origin="row.dataOrigin" />
+            <EntityLink
+              :id="row.id"
+              type="project"
+              :label="row.name"
+              :data-origin="row.dataOrigin"
+              :intent="row.navigation"
+            />
           </template>
 
           <template #origin="{ row }">
@@ -532,13 +526,23 @@ onDeactivated(() => {
           <template #action="{ row }">
             <div class="flex items-center justify-end gap-1">
               <NuxtLink
-                :to="projectDetailPath(row)"
+                v-if="row.target.state === 'resolved'"
+                :to="row.target.to"
                 class="icon-btn"
                 title="详情"
                 :aria-label="`查看${row.name}项目详情`"
               >
                 <span class="i-lucide-file-text text-14px" aria-hidden="true" />
               </NuxtLink>
+              <button
+                v-else
+                class="icon-btn disabled:cursor-not-allowed disabled:opacity-45"
+                :title="row.target.message"
+                :aria-label="`${row.name}项目详情${row.target.message}`"
+                disabled
+              >
+                <span class="i-lucide-file-text text-14px" aria-hidden="true" />
+              </button>
               <NuxtLink
                 v-if="row.dataOrigin === 'real' && !createDisabledReason"
                 :to="`/project/form/${encodeURIComponent(row.id)}?origin=real`"

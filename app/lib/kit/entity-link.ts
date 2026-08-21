@@ -1,8 +1,6 @@
-// 穿透件·实体蓝链纯逻辑（specs §07 / CONTEXT.md「穿透」词条）。
-// type→route 映射唯一处：只登记已实装详情页，未实装类型自动退化纯文本——
-// 实装后在此回填映射即全站上线，别处不复制路由。
-
-import type { DataOriginDTO } from '~/types/read-model'
+import type { NavigationTargetResolution } from '~/lib/nav/target-registry'
+import type { DataOriginDTO, NavigationIntentDTO } from '~/types/read-model'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 export type EntityLinkType
   = | 'project'
@@ -13,18 +11,7 @@ export type EntityLinkType
     | 'crew'
     | 'worker'
 
-export type EntityLinkResolution
-  = | { kind: 'link', to: string, text: string }
-    | { kind: 'text', text: string }
-    | { kind: 'empty' }
-
-export const ENTITY_ROUTES: Partial<Record<EntityLinkType, (id: string) => string>> = {
-  project: id => `/project/${id}`,
-  supplier: id => `/base/supplier/${id}`,
-  contract: id => `/contract/${id}`,
-  invoice: id => `/finance/invoice/${id}`,
-  customer: id => `/base/customer/${id}`,
-}
+export type EntityLinkResolution = NavigationTargetResolution | { state: 'empty', label: null }
 
 export function resolveEntityLink(input: {
   type: EntityLinkType
@@ -34,16 +21,24 @@ export function resolveEntityLink(input: {
 }): EntityLinkResolution {
   const text = input.label ?? null
   if (text == null || text === '')
-    return { kind: 'empty' }
+    return { state: 'empty', label: null }
   if (input.dataOrigin && input.type !== 'project')
-    return { kind: 'text', text }
-  const route = ENTITY_ROUTES[input.type]
-  if (!route || input.id == null || input.id === '')
-    return { kind: 'text', text }
-  const target = route(input.id)
-  return {
-    kind: 'link',
-    to: input.dataOrigin ? `${target}?origin=${input.dataOrigin}` : target,
-    text,
+    return { state: 'not-connected', label: text, message: '详情待接入' }
+  if (input.id == null || input.id === '')
+    return { state: 'missing', label: text, message: '未记录稳定身份' }
+
+  const intent: NavigationIntentDTO = {
+    kind: 'entity-detail',
+    subject: {
+      state: 'resolved',
+      entity: input.type,
+      id: input.id,
+      label: text,
+      no: null,
+    },
+    variant: 'detail',
+    view: null,
+    filters: input.dataOrigin ? { dataOrigin: input.dataOrigin } : {},
   }
+  return resolveNavigationTarget(intent)
 }

@@ -1,11 +1,15 @@
 import type { ProjectListItemDTO } from './repository'
+import type { NavigationTargetResolution } from '~/lib/nav/target-registry'
 import type { DataOriginDTO, EntityRefDTO, MetricDTO, MoneyDTO } from '~/types/read-model'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 export interface ProjectListViewRow {
   dataOrigin: DataOriginDTO
   rowIdentity: string
   id: string
   name: string
+  navigation: ProjectListItemDTO['navigation']
+  target: NavigationTargetResolution
   code: string
   status: string
   contractAmount: MoneyDTO | null
@@ -41,6 +45,8 @@ export function projectListViewRow(item: ProjectListItemDTO): ProjectListViewRow
     rowIdentity: `${item.dataOrigin}:${item.project.id}`,
     id: item.project.id,
     name: item.project.label,
+    navigation: item.navigation,
+    target: resolveNavigationTarget(item.navigation),
     code: item.code,
     status: item.status,
     contractAmount: item.contractAmount,

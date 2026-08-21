@@ -5,6 +5,7 @@ import type {
   ISODateTimeDTO,
   MetricDTO,
   MoneyDTO,
+  NavigationIntentDTO,
   OpaqueIdDTO,
   PageDTO,
   ProblemDTO,
@@ -73,6 +74,10 @@ export interface ProjectListSourceRow {
 export interface ProjectListItemDTO {
   dataOrigin: DataOriginDTO
   project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
+  navigation: Extract<NavigationIntentDTO, { kind: 'entity-detail' }> & {
+    subject: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
+    variant: 'detail'
+  }
   code: string
   status: string
   contractAmount: MoneyDTO | null
