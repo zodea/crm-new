@@ -25,6 +25,7 @@ import { withSupplierImportCreateDefaults } from '~/lib/supplier/import'
 import { generateId } from '~/lib/util/id'
 import { parseJsonColumn } from '~/lib/util/json'
 import { toNum } from '~/lib/util/number'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 // 子表中文标签（PARENT_REFS 无展示名，这是唯一需本地保留的信息；缺省回退表名；对称 stores/project.ts）。
 const TABLE_LABELS: Record<string, string> = {
@@ -167,6 +168,7 @@ function rowToSupplier(row: Record<string, unknown>): Supplier {
 }
 
 export const useSupplierStore = defineStore('supplier', () => {
+  const dataVisibilityStore = useDataVisibilityStore()
   const list = shallowRef<Supplier[]>([])
   const listStats = shallowRef<Record<string, SupplierListStats>>({})
   const projectOptions = shallowRef<SupplierProjectFilterOption[]>([])
@@ -175,7 +177,10 @@ export const useSupplierStore = defineStore('supplier', () => {
   async function load(businessDate?: string) {
     loading.value = true
     try {
-      await revalidateSupplierCredentialStatuses(db, businessDate)
+      // Demo snapshots are immutable evidence. Credential revalidation belongs to
+      // the writable production workspace; demo reads use the seeded status.
+      if (!dataVisibilityStore.includeDemo)
+        await revalidateSupplierCredentialStatuses(db, businessDate)
       const [rows, statsRows, projectRows] = await Promise.all([
         select<Record<string, unknown>>(
           selectVisibleSql('suppliers', 'ORDER BY created_at DESC'),
