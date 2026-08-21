@@ -53,7 +53,7 @@ type NavigationIntentDTO =
 
 唯一前端 Target Registry 位于 `app/lib/nav/target-registry.ts`。后台和 Repository 只返回上述 `NavigationIntentDTO`，不得返回 `/project/...` 等 Vue 路径；Registry 才能把登记过的 `entity + variant + stable id` 解析成站内目标。项目列表现在随每行返回 `kind='entity-detail'`、`entity='project'`、`variant='detail'` 和后台判定的 `filters.dataOrigin`，由 Registry 生成 `/project/:id?origin=:dataOrigin`。详情刷新仍只依赖路径 ID、来源 query 与中央读接口，不依赖列表组件留在内存。
 
-当前项目切片已经把 `resolved`、`missing`、`forbidden`、`not-connected`、`unverified-target` 和 `error` 分成稳定展示状态；未登记目标不会回退到 `/project` 或按名称猜路由。项目 ID 存在但 URL 来源不一致时显示 `relationship-mismatch`，不存在时显示 `not-found`，两者都不展示同名详情。本切片没有实现列表筛选、页码、滚动和焦点返回；这些仍由 #313 的 `returnTo` 合同承接。
+当前项目切片已经把 `resolved`、`missing`、`forbidden`、`not-connected`、`unverified-target` 和 `error` 分成稳定展示状态；未登记目标不会回退到 `/project` 或按名称猜路由。项目 ID 存在但 URL 来源不一致时显示 `relationship-mismatch`，不存在时显示 `not-found`，两者都不展示同名详情。#313 已补齐项目列表筛选、排序、页码、每页条数、应用页签、行锚点、滚动和焦点的 `returnTo` 往返合同。
 
 ### 2.1 返回上下文
 
@@ -75,6 +75,10 @@ interface NavigationOrigin {
 - 详情加载、空态、错误或无权限时仍保留合法返回上下文；不能依赖浏览器历史“碰巧还在”。
 - 页码和滚动位置属于本地应用页签状态，不进入后台 DTO。目标记录不存在或关系错配时显示明确问题，并允许返回原筛选位置。
 - 应用内部页签实例 ID 只隔离视图状态，不是业务实体 ID，也不得写入业务接口。
+
+#### 当前运行落点（#313）
+
+项目列表在进入详情前把已登记的搜索、阶段、排序、列筛选、页码和每页条数编码为站内 `/project` 相对路径，并以短期 `sessionStorage` 来源记录绑定应用页签、行锚点和工作区滚动位置。详情页在 ready、loading、forbidden、error、relationship-mismatch 和 not-found 状态都显示同一返回入口；直接深链、伪造、篡改、过期或跨路由来源统一降级到 `/project`。返回后优先恢复原行焦点；原行因删除、权限或筛选变化不存在时，降级聚焦项目列表标题。来源记录只存于当前浏览器会话，30 分钟到期后详情入口主动失效，不进入后台 DTO。
 
 ### 2.2 展示状态
 
@@ -177,7 +181,7 @@ interface NavigationOrigin {
 | 键 | 来源域 / 页面 | 可点击字段或动作 | 可点击条件 | 目标与携带上下文 | 返回语义 | 当前状态 / 后端要求 |
 | --- | --- | --- | --- | --- | --- | --- |
 | `N-HOME-SCHEDULE` | `home` `/` | 当前项目施工进度 | `project.id` resolved | `/schedule?project=:projectId`；工序再带 `group/task` | 返回首页恢复项目与工序 | 闭合 |
-| `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id?origin=:dataOrigin`，路径由唯一 Target Registry 解析 | 返回项目列表原阶段/搜索/页码/滚动 | 目标闭合；语义 DTO、来源校验、深链刷新已实现，返回上下文仍由 #313 补齐 |
+| `N-PROJECT-NAME` | `project` `/project` | 项目名称 | `project.id` resolved | `/project/:id?origin=:dataOrigin`，路径由唯一 Target Registry 解析 | 返回项目列表原阶段/搜索/排序/列筛选/页码/每页条数/应用页签/滚动/焦点 | 闭合；语义 DTO、来源校验、深链刷新与 #313 完整返回上下文已实现 |
 | `N-PROJECT-INCOME` | `project` `/project` | 累计收入合同金额 | `MetricDTO.drilldown` 非空，金额可为 0 | `/contract/construction?project=:id` | 返回项目列表原上下文 | 部分；本地目标存在，列表金额仍是文本 |
 | `N-PROJECT-BUDGET` | `project` `/project` | 预算总额 | 同上 | `/project/target-cost?project=:id` | 返回项目列表原上下文 | 部分；目标成本列表需消费项目 query |
 | `N-PROJECT-ROLE` | `project` `/project` | 项目经理/执行经理及角色 | 必须有人员实体 ID | 项目成员只读视图，路由待定 | 返回项目列表原上下文 | 缺身份；当前只有姓名文本，禁止造链接 |

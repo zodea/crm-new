@@ -13,6 +13,12 @@ const props = defineProps<{
   label?: string | null
   dataOrigin?: DataOriginDTO
   intent?: NavigationIntentDTO
+  returnTo?: string
+  returnContextId?: string
+}>()
+
+const emit = defineEmits<{
+  navigate: []
 }>()
 
 const projectStore = useProjectStore()
@@ -40,7 +46,11 @@ const resolvedLabel = computed(() => {
 })
 
 const resolution = computed(() => props.intent
-  ? resolveNavigationTarget(props.intent, { label: resolvedLabel.value })
+  ? resolveNavigationTarget(props.intent, {
+      label: resolvedLabel.value,
+      returnTo: props.returnTo,
+      returnContextId: props.returnContextId,
+    })
   : resolveEntityLink({
       type: props.type,
       id: props.id,
@@ -56,7 +66,7 @@ const resolution = computed(() => props.intent
     data-target-state="resolved"
     class="text-brand font-600 hover:underline"
     :title="`打开 ${resolution.label}`"
-    @click.stop
+    @click.stop="emit('navigate')"
   >
     {{ resolution.label }}
   </NuxtLink>

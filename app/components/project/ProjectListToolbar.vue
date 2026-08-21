@@ -44,7 +44,7 @@ function toggleDensity() {
       aria-label="项目列表工具栏"
     >
       <div class="mr-1 flex min-w-max flex-none items-baseline gap-2 px-1">
-        <h2 class="text-14px font-800 text-ink">
+        <h2 data-project-list-return-fallback tabindex="-1" class="text-14px font-800 text-ink outline-none">
           施工项目
         </h2>
         <span class="text-12px text-ink-soft" aria-label="项目来源数量">
@@ -55,7 +55,7 @@ function toggleDensity() {
       </div>
 
       <div class="ml-auto flex min-w-max items-center gap-2">
-        <SearchInput v-model="search" placeholder="搜索项目、客户、经理…" :width="220" />
+        <SearchInput v-model="search" placeholder="搜索项目、客户、经理…" :width="220" :maxlength="120" />
         <Button
           variant="outline"
           size="icon"

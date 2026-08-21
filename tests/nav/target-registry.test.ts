@@ -59,6 +59,19 @@ describe('唯一 Target Registry', () => {
     })
   })
 
+  it('只为项目详情附加已校验的列表来源上下文', () => {
+    const returnTo = '/project?nav=origin_313#project-row-real%3Aproject-1'
+
+    expect(resolveNavigationTarget(projectIntent(), {
+      returnTo,
+      returnContextId: 'origin_313',
+    })).toEqual({
+      state: 'resolved',
+      label: '中央项目一号',
+      to: `/project/project%2Fcentral-001?origin=real&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_313`,
+    })
+  })
+
   it('空白稳定 ID 退化为 missing，不生成项目根路径', () => {
     expect(resolveNavigationTarget(projectIntent({
       subject: {

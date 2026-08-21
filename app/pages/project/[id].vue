@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import {
+  loadProjectReturnOrigin,
+  resolveProjectReturnContext,
+} from '~/lib/nav/return-to'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
@@ -8,6 +12,16 @@ const projectId = computed(() => String(route.params.id ?? ''))
 const originHint = computed(() => isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : dataVisibilityStore.includeDemo ? 'demo' : 'real')
+const returnResolution = computed(() => resolveProjectReturnContext({
+  returnTo: route.query.returnTo,
+  contextId: route.query.returnContext,
+  now: Date.now(),
+  load: id => typeof sessionStorage === 'undefined'
+    ? null
+    : loadProjectReturnOrigin(id),
+}))
+const returnTo = computed(() => returnResolution.value.to)
+const returnExpiresAt = computed(() => returnResolution.value.origin?.expiresAt)
 </script>
 
 <template>
@@ -15,5 +29,7 @@ const originHint = computed(() => isDataOriginDTO(route.query.origin)
     :project-id="projectId"
     :origin-hint="originHint"
     :include-demo="dataVisibilityStore.includeDemo"
+    :return-to="returnTo"
+    :return-expires-at="returnExpiresAt"
   />
 </template>

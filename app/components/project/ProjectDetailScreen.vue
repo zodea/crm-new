@@ -4,6 +4,7 @@ import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
+import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 
@@ -11,9 +12,12 @@ const props = withDefaults(defineProps<{
   projectId: string
   originHint?: DataOriginDTO
   includeDemo?: boolean
+  returnTo?: string
+  returnExpiresAt?: number
 }>(), {
   originHint: 'real',
   includeDemo: false,
+  returnTo: '/project',
 })
 
 const repository = useNuxtApp().$repositories.projectList
@@ -185,9 +189,7 @@ onActivated(() => {
             {{ item.code || '未登记项目编号' }} · {{ item.contractName || item.region || '未登记合同名称' }}
           </p>
         </div>
-        <NuxtLink to="/project" class="btn-ghost ml-auto" aria-label="关闭项目详情">
-          <span class="i-lucide-x mr-1" aria-hidden="true" />关闭
-        </NuxtLink>
+        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" class="ml-auto" />
         <NuxtLink
           v-if="!isDemo && detail?.capabilities.includes('project:write')"
           :to="`/project/form/${encodeURIComponent(projectId)}?origin=real`"
@@ -266,13 +268,21 @@ onActivated(() => {
     v-else-if="state === 'loading'"
     kind="loading"
     title="正在从中央后台加载项目详情"
-  />
+  >
+    <template #action>
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+    </template>
+  </StatePanel>
   <StatePanel
     v-else-if="state === 'forbidden'"
     kind="forbidden"
     title="无项目查看权限"
     :description="problem?.message"
-  />
+  >
+    <template #action>
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+    </template>
+  </StatePanel>
   <StatePanel
     v-else-if="state === 'error'"
     kind="error"
@@ -280,7 +290,16 @@ onActivated(() => {
     :description="problem?.message"
     action-label="重新加载"
     @action="loadProject"
-  />
+  >
+    <template #action>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" class="btn-primary" @click="loadProject">
+          重新加载
+        </button>
+        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+      </div>
+    </template>
+  </StatePanel>
   <StatePanel
     v-else-if="state === 'mismatch'"
     kind="empty"
@@ -288,10 +307,7 @@ onActivated(() => {
     :description="problem?.message"
   >
     <template #action>
-      <NuxtLink to="/project" class="btn-secondary">
-        <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />
-        返回项目列表
-      </NuxtLink>
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
     </template>
   </StatePanel>
   <StatePanel
@@ -301,10 +317,7 @@ onActivated(() => {
     description="请确认测试数据开关与来源后返回项目列表重试。"
   >
     <template #action>
-      <NuxtLink to="/project" class="btn-secondary">
-        <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />
-        返回项目列表
-      </NuxtLink>
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
     </template>
   </StatePanel>
 </template>

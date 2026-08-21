@@ -1,8 +1,9 @@
 import type { ProjectDetailReadDTO } from '~/lib/project/repository'
-import { render, screen } from '@testing-library/vue'
+import { render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
+import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
 
 const detail: ProjectDetailReadDTO = {
   item: {
@@ -69,7 +70,7 @@ const NuxtLinkStub = defineComponent({
 
 const StatePanelStub = defineComponent({
   props: ['kind', 'title', 'description'],
-  template: '<section role="status" :aria-label="title"><h2>{{ title }}</h2><p>{{ description }}</p></section>',
+  template: '<section role="status" :aria-label="title"><h2>{{ title }}</h2><p>{{ description }}</p><slot name="action" /></section>',
 })
 
 function renderDetail(props: Record<string, unknown>) {
@@ -131,5 +132,40 @@ describe('项目详情中央来源边界', () => {
     })
     expect(screen.getByText('项目存在，但 URL 来源与中央身份不一致')).not.toBeNull()
     expect(screen.queryByRole('heading', { name: '合和新城' })).toBeNull()
+  })
+
+  it('加载与错误期间始终保留同一合法来源入口', async () => {
+    let finishLoad!: (value: ProjectDetailReadDTO) => void
+    const pending = new Promise<ProjectDetailReadDTO>((resolve) => {
+      finishLoad = resolve
+    })
+    get.mockReturnValue(pending)
+    const returnTo = '/project?search=%E5%90%88%E5%92%8C&nav=origin_313#project-row-demo%3Aproject-1'
+    renderDetail({ originHint: 'demo', includeDemo: true, returnTo })
+
+    const loading = screen.getByRole('status', { name: '正在从中央后台加载项目详情' })
+    expect(within(loading).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
+
+    finishLoad(null as unknown as ProjectDetailReadDTO)
+    const failed = await screen.findByRole('status', { name: '项目详情加载失败' })
+    expect(within(failed).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
+  })
+
+  it.each([
+    ['forbidden', '无项目查看权限'],
+    ['not-found', '项目不存在或当前来源不可见'],
+    ['relationship-mismatch', '项目身份与来源不匹配'],
+  ] as const)('%s 状态保留合法来源入口', async (code, title) => {
+    const failure = new ProjectRepositoryProblem(projectProblem(code, title))
+    get.mockResolvedValue({
+      get item() {
+        throw failure
+      },
+    } as unknown as ProjectDetailReadDTO)
+    const returnTo = '/project?nav=origin_313#project-row-real%3Aproject-1'
+    renderDetail({ originHint: 'real', returnTo })
+
+    const state = await screen.findByRole('status', { name: title })
+    expect(within(state).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
   })
 })
