@@ -37,11 +37,21 @@ describe('local data workspace boundary', () => {
     )
       .resolves
       .toEqual([{ id: 'demo-1' }])
+    await expect(
+      driver.select('SELECT * FROM operation_logs WHERE action = \'delete\''),
+    )
+      .resolves
+      .toEqual([{ id: 'demo-1' }])
     await expect(driver.select('DELETE FROM projects RETURNING id')).rejects.toMatchObject({
       code: 'demo-workspace-read-only',
     })
     await expect(
       driver.select('WITH selected AS (SELECT id FROM projects) DELETE FROM projects'),
+    )
+      .rejects
+      .toMatchObject({ code: 'demo-workspace-read-only' })
+    await expect(
+      driver.select('SELECT id FROM projects; DELETE FROM projects'),
     )
       .rejects
       .toMatchObject({ code: 'demo-workspace-read-only' })
@@ -54,7 +64,7 @@ describe('local data workspace boundary', () => {
     await expect(driver.execute('BEGIN')).resolves.toBeUndefined()
     expect(execute).toHaveBeenCalledOnce()
     expect(execute).toHaveBeenCalledWith('BEGIN', undefined)
-    expect(select).toHaveBeenCalledTimes(2)
+    expect(select).toHaveBeenCalledTimes(3)
   })
 
   it('locks the legacy production source after central cutover without disguising it as demo', async () => {

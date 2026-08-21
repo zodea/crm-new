@@ -1,6 +1,10 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import {
+  installMaterialProductionFixture,
+  MATERIAL_PRODUCTION_FIXTURE,
+} from './helpers/material-production-fixture'
 
 const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -8,9 +12,9 @@ const PNG_1PX = Buffer.from(
 )
 
 const MARKDOWN = `
-# 广州市大板东建材有限公司销售单
+# ${MATERIAL_PRODUCTION_FIXTURE.supplierName}销售单
 客户名称：广州市瑞航建筑工程有限公司
-送货地址：合和新城项目部
+送货地址：${MATERIAL_PRODUCTION_FIXTURE.projectSiteAlias}
 单号：SH-E2E-20260717
 日期：2026.07.17
 <table>
@@ -19,6 +23,10 @@ const MARKDOWN = `
   <tr><td></td><td>合计</td><td></td><td></td><td></td><td></td><td>622.00</td></tr>
 </table>
 `
+
+test.beforeEach(async ({ page }) => {
+  await installMaterialProductionFixture(page)
+})
 
 async function chooseLookup(page: Page, label: string, keyword: string, optionText: string) {
   const input = page.getByLabel(label)
@@ -82,7 +90,7 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   await page.getByRole('button', { name: '上传送货单', exact: true }).click()
   const chooser = await chooserPromise
   await chooser.setFiles({
-    name: '合和新城-大板东-送货单.png',
+    name: 'E2E正式物资项目-送货单.png',
     mimeType: 'image/png',
     buffer: Buffer.from(syntheticScan, 'base64'),
   })
@@ -93,9 +101,10 @@ test('送货单闭环：上传识别、主数据匹配、人工核对并自动�
   const reviewPanel = page.locator('section').filter({
     has: page.getByText('人工复核与归档', { exact: true }),
   })
-  await expect(reviewPanel.locator('select').nth(0)).toHaveValue('proj_demo_001')
+  await expect(reviewPanel.locator('select').nth(0))
+    .toHaveValue(MATERIAL_PRODUCTION_FIXTURE.projectId)
   await expect(reviewPanel.locator('input[placeholder="搜索分供方名称"]'))
-    .toHaveValue('广州市大板东建材有限公司')
+    .toHaveValue(MATERIAL_PRODUCTION_FIXTURE.supplierName)
   await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
   expect(uploadedDerivedImage).toBe(true)
   expect(disabledSecondOrientationPass).toBe(true)
@@ -154,7 +163,12 @@ test('旧送货单未保存原件时，详情和编辑都提供明确的补传�
   await page.getByRole('link', { name: '新增送货单', exact: true }).click()
   await expect(page).toHaveURL('/material/delivery/archive/form')
   await expect(page.getByRole('heading', { name: '新建 · 送货单归档' })).toBeVisible()
-  await chooseLookup(page, '检索项目', '合和新城', '合和新城')
+  await chooseLookup(
+    page,
+    '检索项目',
+    MATERIAL_PRODUCTION_FIXTURE.projectName,
+    MATERIAL_PRODUCTION_FIXTURE.projectName,
+  )
   await page.getByLabel('送货单号').fill('SH-E2E-NO-SOURCE')
   await page.getByLabel('材料名称').fill('手工补录材料')
   await page.getByRole('button', { name: '保存送货单', exact: true }).click()
@@ -193,7 +207,10 @@ test('旧送货单未保存原件时，详情和编辑都提供明确的补传�
 })
 
 test('模糊分供方只给建议，不会在人工采用前直接绑定', async ({ page }) => {
-  const fuzzyMarkdown = MARKDOWN.replace('广州市大板东建材有限公司', '广州市大板东建材有限公可')
+  const fuzzyMarkdown = MARKDOWN.replace(
+    MATERIAL_PRODUCTION_FIXTURE.supplierName,
+    MATERIAL_PRODUCTION_FIXTURE.supplierName.replace('司', '可'),
+  )
   await page.route('**/api/ocr/recognize', route => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -211,7 +228,11 @@ test('模糊分供方只给建议，不会在人工采用前直接绑定', async
   const chooserPromise = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: '上传送货单', exact: true }).click()
   const chooser = await chooserPromise
-  await chooser.setFiles({ name: '合和新城-模糊分供方.png', mimeType: 'image/png', buffer: PNG_1PX })
+  await chooser.setFiles({
+    name: 'E2E正式项目-模糊分供方.png',
+    mimeType: 'image/png',
+    buffer: Buffer.concat([PNG_1PX, Buffer.from('fuzzy-supplier')]),
+  })
 
   const reviewPanel = page.locator('section').filter({
     has: page.getByText('人工复核与归档', { exact: true }),

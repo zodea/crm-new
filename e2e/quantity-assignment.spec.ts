@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 async function openCellConfigure(
   page: import('@playwright/test').Page,
@@ -15,9 +14,8 @@ async function openCellConfigure(
 
 test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript((storageKey) => {
-      localStorage.setItem(storageKey, 'true')
-    }, DATA_VISIBILITY_STORAGE_KEY)
+    test.setTimeout(60_000)
+    await installQuantityProductionFixture(page)
   })
 
   test('冲突取消保留选择，确认替换只更新当前责任并保留完成时责任', async ({ page }) => {
@@ -51,7 +49,12 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     replacement = page.getByRole('dialog').filter({ hasText: '替换现有责任' }).last()
     await replacement.getByRole('button', { name: '确认替换', exact: true }).click()
 
-    await expect(editor).toBeHidden()
+    // 先等二次确认浮层真正退出；否则底层编辑器因 aria-hidden 会让
+    // toBeHidden 在保存尚未开始时产生假阳性。
+    await expect(replacement).toBeHidden()
+    // 保存包含责任工作区与矩阵读模型的完整刷新，在 CI/sql.js 下可能超过
+    // Playwright 默认 5 秒；仍以用户看到弹窗关闭作为完成信号。
+    await expect(editor).toBeHidden({ timeout: 15_000 })
     await expect(page.getByText('已更新 1 户的 泥水工 责任')).toBeVisible()
     await expect(cell).toHaveAccessibleName(/当前责任：.*泥水工 泥水B班/)
     await expect(cell).toHaveAccessibleName(/执行责任 泥水A班/)
@@ -78,7 +81,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     await scope.check()
     await editor.getByRole('button', { name: '保存责任' }).click()
 
-    await expect(editor).toBeHidden()
+    await expect(editor).toBeHidden({ timeout: 15_000 })
     await expect(page.getByText('已更新 1 户的 水暖工 责任')).toBeVisible()
 
     const tradeFilter = page.getByRole('combobox', { name: '工种' })
