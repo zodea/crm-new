@@ -187,7 +187,8 @@ const KitTableStub = defineComponent({
       }),
       ...(props.data as any[]).map(row =>
         h('div', { role: 'row' }, [
-          `${row.name} ${row.status}`,
+          slots.name?.({ row }),
+          row.status,
           slots.origin?.({ row }),
           slots.developer?.({ row }),
           slots.action?.({ row }),
@@ -207,6 +208,10 @@ const ProjectListToolbarStub = defineComponent({
   emits: ['update:search', 'create'],
   setup(props, { emit }) {
     return () => h('div', [
+      h('h2', {
+        'data-project-list-return-fallback': '',
+        'tabindex': -1,
+      }, '施工项目'),
       h('input', {
         'aria-label': '列表搜索',
         'type': 'search',
@@ -223,8 +228,17 @@ const ProjectListToolbarStub = defineComponent({
 const global = {
   components: {
     EntityLink: defineComponent({
-      props: ['id', 'label'],
-      template: '<span :data-entity-id="id">{{ label }}</span>',
+      props: ['id', 'label', 'returnTo', 'returnContextId'],
+      emits: ['navigate'],
+      template: `
+        <a
+          :href="'/project/' + id"
+          :data-entity-id="id"
+          :data-return-to="returnTo"
+          :data-return-context="returnContextId"
+          @click="$emit('navigate')"
+        >{{ label }}</a>
+      `,
     }),
     KitTable: KitTableStub,
     ListShell,
@@ -264,10 +278,24 @@ let projectCommandStore: {
   latestWrite: { id: string, version: string } | null
 }
 const navigateTo = vi.fn()
+const routerReplace = vi.fn()
+const route = reactive({
+  path: '/project',
+  fullPath: '/project',
+  hash: '',
+  query: {} as Record<string, string | string[]>,
+})
 
 describe('project list screen', () => {
   beforeEach(() => {
     vi.stubGlobal('computed', computed)
+    sessionStorage.clear()
+    route.fullPath = '/project'
+    route.hash = ''
+    route.query = {}
+    routerReplace.mockReset()
+    vi.stubGlobal('useRoute', () => route)
+    vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
     navigateTo.mockReset()
     vi.stubGlobal('navigateTo', navigateTo)
     vi.stubGlobal('nextTick', nextTick)
@@ -351,6 +379,73 @@ describe('project list screen', () => {
 
     await waitFor(() => expect(projectReadStore.load).toHaveBeenCalledTimes(2))
     expect(projectReadStore.load).toHaveBeenLastCalledWith(defaultQuery)
+  })
+
+  it('从路由恢复列表查询，并为项目主链接生成带行锚点的本地来源上下文', async () => {
+    route.query = {
+      search: '合和',
+      phase: '施工中',
+      sort: 'name-asc',
+      page: '1',
+      pageSize: '20',
+      status: ['施工中'],
+      manager: ['张经理'],
+    }
+    route.fullPath = '/project?search=%E5%90%88%E5%92%8C&phase=%E6%96%BD%E5%B7%A5%E4%B8%AD&sort=name-asc&page=1&pageSize=20&status=%E6%96%BD%E5%B7%A5%E4%B8%AD&manager=%E5%BC%A0%E7%BB%8F%E7%90%86'
+    const workspace = document.createElement('div')
+    workspace.dataset.shellWorkspace = ''
+    workspace.scrollTop = 684
+    document.body.append(workspace)
+
+    render(ProjectListScreen, { global })
+
+    await waitFor(() => expect(projectReadStore.load).toHaveBeenLastCalledWith({
+      includeDemo: false,
+      search: '合和',
+      status: '施工中',
+      filters: {
+        statuses: ['施工中'],
+        plannedEnds: [],
+        managers: ['张经理'],
+        customerIds: [],
+      },
+      sort: 'name-asc',
+      page: 1,
+      pageSize: 20,
+    }))
+
+    const link = screen.getByRole('link', { name: '合和新城' })
+    expect(link.dataset.returnTo).toContain('/project?search=%E5%90%88%E5%92%8C')
+    expect(link.dataset.returnTo).toContain('phase=%E6%96%BD%E5%B7%A5%E4%B8%AD')
+    expect(link.dataset.returnTo).toContain('pageSize=20')
+    expect(link.dataset.returnTo).toContain('#project-row-real%3Aproject-1')
+    expect(link.dataset.returnContext).toMatch(/^[\w-]{8,64}$/)
+
+    await fireEvent.click(link)
+
+    const stored = sessionStorage.getItem(`ruihang:project-return:${link.dataset.returnContext}`)
+    expect(stored).not.toBeNull()
+    expect(JSON.parse(stored!).scrollTop).toBe(684)
+  })
+
+  it('原行消失时把焦点降级到项目列表标题', async () => {
+    const contextId = 'origin_missing_row'
+    const returnTo = `/project?nav=${contextId}#project-row-real%3Amissing`
+    route.query = { nav: contextId }
+    route.fullPath = returnTo
+    sessionStorage.setItem(`ruihang:project-return:${contextId}`, JSON.stringify({
+      id: contextId,
+      returnTo,
+      tabKey: '/project',
+      anchorId: 'project-row-real:missing',
+      scrollTop: 320,
+      expiresAt: Date.now() + 60_000,
+    }))
+
+    render(ProjectListScreen, { global })
+
+    const heading = screen.getByRole('heading', { name: '施工项目' })
+    await waitFor(() => expect(document.activeElement).toBe(heading))
   })
 
   it('只展示本地有事实来源的目标列，阶段筛选会更新紧凑宽表和汇总', async () => {

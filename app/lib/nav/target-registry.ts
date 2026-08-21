@@ -3,6 +3,7 @@ import type {
   NavigationIntentDTO,
   NavigationUnavailableReasonDTO,
 } from '~/types/read-model'
+import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export type NavigationTargetState
@@ -22,6 +23,8 @@ export type NavigationTargetResolution
 
 interface ResolveNavigationTargetOptions {
   label?: string | null
+  returnTo?: string
+  returnContextId?: string
 }
 
 type ResolvedEntityRef = Extract<EntityRefDTO, { state: 'resolved' }>
@@ -120,10 +123,18 @@ export function resolveNavigationTarget(
   }
 
   try {
+    let to = builder(intent as EntityTargetIntent)
+    if (key === 'project:detail' && options.returnTo && options.returnContextId) {
+      const returnTo = validateProjectReturnTo(options.returnTo)
+      if (!returnTo || !isProjectReturnContextId(options.returnContextId))
+        throw new Error('invalid project return context')
+      const separator = to.includes('?') ? '&' : '?'
+      to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+    }
     return {
       state: 'resolved',
       label: intent.subject.label,
-      to: builder(intent as EntityTargetIntent),
+      to,
     }
   }
   catch {

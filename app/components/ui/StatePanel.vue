@@ -62,6 +62,9 @@ const iconClass = computed(() => {
           />
         </div>
       </div>
+      <div v-if="$slots.action" class="mt-5">
+        <slot name="action" />
+      </div>
     </template>
 
     <template v-else>

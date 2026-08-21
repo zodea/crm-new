@@ -6,6 +6,8 @@ import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repo
 import type { StatusTone } from '~/lib/project/status'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import { useProjectListReturnContext } from '~/composables/useProjectListReturnContext'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { projectLedgerRows } from '~/lib/project/export'
 import { projectListViewRow } from '~/lib/project/list'
 import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
@@ -268,6 +270,48 @@ function currentQuery(): ProjectListQueryDTO {
   }
 }
 
+const returnContext = useProjectListReturnContext({
+  readState: () => ({
+    search: searchText.value,
+    phase: selectedPhase.value,
+    sort: sortMode.value,
+    page: page.value,
+    pageSize: pageSize.value === 20 || pageSize.value === 50 ? pageSize.value : 10,
+    filters: {
+      statuses: columnFilterValues('status'),
+      plannedEnds: columnFilterValues('plannedEnd'),
+      managers: columnFilterValues('manager'),
+      customerIds: columnFilterValues('developer'),
+    },
+  }),
+  applyState: (state) => {
+    searchText.value = state.search
+    selectedPhase.value = state.phase
+    sortMode.value = state.sort
+    page.value = state.page
+    pageSize.value = state.pageSize
+    columnFilters.value = [
+      { field: 'status', values: state.filters.statuses },
+      { field: 'plannedEnd', values: state.filters.plannedEnds },
+      { field: 'manager', values: state.filters.managers },
+      { field: 'developer', values: state.filters.customerIds },
+    ].filter(filter => filter.values.length > 0)
+  },
+  fallbackFocus: () => document.querySelector<HTMLElement>('[data-project-list-return-fallback]'),
+})
+
+function projectDetailTarget(row: typeof tableRows.value[number]): string {
+  const resolution = resolveNavigationTarget(row.navigation, {
+    returnTo: returnContext.returnToFor(row.rowIdentity),
+    returnContextId: returnContext.contextId,
+  })
+  return resolution.state === 'resolved'
+    ? resolution.to
+    : row.target.state === 'resolved'
+      ? row.target.to
+      : '/project'
+}
+
 async function loadProjects() {
   const query = currentQuery()
   await readStore.load(query)
@@ -388,14 +432,22 @@ async function exportByCategory() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadedWriteKey = latestWriteKey()
-  void loadProjects()
+  await loadProjects()
+  await returnContext.restore({ allowFallback: true })
 })
+
+watch(readPage, (value) => {
+  if (value)
+    void returnContext.restore()
+}, { flush: 'post' })
 
 onActivated(() => {
   listActive = true
   reloadForLatestWrite()
+  if (readPage.value)
+    void returnContext.restore({ allowFallback: true })
 })
 
 onDeactivated(() => {
@@ -490,13 +542,18 @@ onDeactivated(() => {
           @empty-action="handleEmptyAction"
         >
           <template #name="{ row }">
-            <EntityLink
-              :id="row.id"
-              type="project"
-              :label="row.name"
-              :data-origin="row.dataOrigin"
-              :intent="row.navigation"
-            />
+            <span :id="returnContext.anchorId(row.rowIdentity)">
+              <EntityLink
+                :id="row.id"
+                type="project"
+                :label="row.name"
+                :data-origin="row.dataOrigin"
+                :intent="row.navigation"
+                :return-to="returnContext.returnToFor(row.rowIdentity)"
+                :return-context-id="returnContext.contextId"
+                @navigate="returnContext.capture(row.rowIdentity)"
+              />
+            </span>
           </template>
 
           <template #origin="{ row }">
@@ -527,10 +584,11 @@ onDeactivated(() => {
             <div class="flex items-center justify-end gap-1">
               <NuxtLink
                 v-if="row.target.state === 'resolved'"
-                :to="row.target.to"
+                :to="projectDetailTarget(row)"
                 class="icon-btn"
                 title="详情"
                 :aria-label="`查看${row.name}项目详情`"
+                @click="returnContext.capture(row.rowIdentity)"
               >
                 <span class="i-lucide-file-text text-14px" aria-hidden="true" />
               </NuxtLink>

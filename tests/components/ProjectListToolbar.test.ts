@@ -7,6 +7,7 @@ const SearchInputStub = defineComponent({
   props: {
     modelValue: String,
     placeholder: String,
+    maxlength: Number,
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
@@ -14,6 +15,7 @@ const SearchInputStub = defineComponent({
       'aria-label': props.placeholder,
       'type': 'search',
       'value': props.modelValue,
+      'maxlength': props.maxlength,
       'onInput': (event: Event) =>
         emit('update:modelValue', (event.target as HTMLInputElement).value),
     })
@@ -44,6 +46,7 @@ describe('project list toolbar', () => {
 
     expect(screen.getByRole('heading', { name: '施工项目' })).not.toBeNull()
     expect(screen.getByRole('searchbox', { name: '搜索项目、客户、经理…' })).not.toBeNull()
+    expect((screen.getByRole('searchbox', { name: '搜索项目、客户、经理…' }) as HTMLInputElement).maxLength).toBe(120)
     expect(screen.getByRole('button', { name: '刷新项目列表' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '切换项目排序' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '显示或隐藏阶段筛选' })).not.toBeNull()
