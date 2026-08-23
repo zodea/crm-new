@@ -13,6 +13,7 @@ import type {
   MasterDataPageDraft,
 } from '~/lib/master-data/page'
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
+import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
 import { isTauri } from '@tauri-apps/api/core'
 import { onActivated } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -30,6 +31,7 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
+import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
@@ -38,6 +40,7 @@ import {
   ProjectCommandConflictError,
   ProjectLocalDraftOnlyError,
 } from '~/stores/project-command'
+import { SupplierCommandConflictError, useSupplierCommandStore } from '~/stores/supplier-command'
 
 const props = withDefaults(defineProps<{
   kind: MasterDataOwnerType
@@ -56,6 +59,7 @@ const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
 const projectCommandStore = useProjectCommandStore()
 const customerCommandStore = () => useCustomerCommandStore()
+const supplierCommandStore = () => useSupplierCommandStore()
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
@@ -95,11 +99,27 @@ function customerDetailPath(id: string): string {
   }
   return `/base/customer/${encodeURIComponent(id)}?${query.toString()}`
 }
+function supplierDetailPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateSupplierReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/supplier/${encodeURIComponent(id)}?${query.toString()}`
+}
+function supplierCredentialPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateSupplierReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/supplier/credential/${encodeURIComponent(id)}?${query.toString()}`
+}
 const returnPath = computed(() =>
   props.returnToDetail && isEditing.value && meta.value.detailPath
     ? props.kind === 'customer'
       ? customerDetailPath(routeId.value ?? '')
-      : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
+      : props.kind === 'supplier'
+        ? supplierDetailPath(routeId.value ?? '')
+        : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
     : meta.value.listPath,
 )
 const backLabel = computed(() =>
@@ -125,7 +145,7 @@ const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
-const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | null>(null)
+const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 let lastInitializedTarget = ''
@@ -201,10 +221,12 @@ async function initialize() {
   conflictLatest.value = null
   let shouldFocus = false
   try {
-    if ((props.kind === 'project' || props.kind === 'customer') && !isTauri()) {
+    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier') && !isTauri()) {
       const central = props.kind === 'project'
         ? await projectCommandStore.hydrate(routeId.value ?? null)
-        : await customerCommandStore().hydrate(routeId.value ?? null)
+        : props.kind === 'customer'
+          ? await customerCommandStore().hydrate(routeId.value ?? null)
+          : await supplierCommandStore().hydrate(routeId.value ?? null)
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -331,7 +353,9 @@ function attachmentChanges(): FormAttachmentChanges {
 async function saveThroughStore(action: MasterDataSaveAction) {
   switch (props.kind) {
     case 'supplier':
-      return supplierStore.saveForm(draft.value, action, attachmentChanges())
+      return isTauri()
+        ? supplierStore.saveForm(draft.value, action, attachmentChanges())
+        : supplierCommandStore().saveForm(draft.value, action, attachmentChanges())
     case 'customer':
       return isTauri()
         ? customerStore.save(draft.value, action, attachmentChanges())
@@ -380,6 +404,8 @@ async function handleFooterAction(action: FormFooterAction) {
         projectCommandStore.startNewProject()
       if (props.kind === 'customer' && !isTauri())
         customerCommandStore().startNewCustomer()
+      if (props.kind === 'supplier' && !isTauri())
+        supplierCommandStore().startNewSupplier()
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -404,9 +430,11 @@ async function handleFooterAction(action: FormFooterAction) {
         : ''
       const closePath = props.kind === 'customer' && props.returnToDetail
         ? customerDetailPath(routeId.value ?? result.id)
-        : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
-            ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
-            : meta.value.listPath
+        : props.kind === 'supplier' && props.returnToDetail
+          ? supplierDetailPath(routeId.value ?? result.id)
+          : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
+              ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
+              : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
         await navigateTo(closePath)
         tabsStore.close(pageKey.value)
@@ -436,6 +464,10 @@ async function handleFooterAction(action: FormFooterAction) {
       conflictLatest.value = cause.latest
       warning(cause.message)
     }
+    else if (cause instanceof SupplierCommandConflictError) {
+      conflictLatest.value = cause.latest
+      warning(cause.message)
+    }
     else if (cause instanceof ProjectLocalDraftOnlyError) {
       localDraftNotice.value = cause.message
       error(cause.message)
@@ -454,6 +486,8 @@ function keepLocalAgainstLatest() {
     return
   if (props.kind === 'customer')
     customerCommandStore().rebase(conflictLatest.value.version)
+  else if (props.kind === 'supplier')
+    supplierCommandStore().rebase(conflictLatest.value.version)
   else
     projectCommandStore.rebase(conflictLatest.value.version)
   conflictLatest.value = null
@@ -466,6 +500,8 @@ async function useLatestServerVersion() {
     return
   if (props.kind === 'customer')
     customerCommandStore().acceptLatest(latest as CustomerFormReadDTO)
+  else if (props.kind === 'supplier')
+    supplierCommandStore().acceptLatest(latest as SupplierFormReadDTO)
   else
     projectCommandStore.acceptLatest(latest as ProjectFormReadDTO)
   draft.value = {
@@ -715,7 +751,7 @@ watch(routeSupplierCategory, () => {
           </p>
           <NuxtLink
             v-if="isEditing && routeId"
-            :to="`/base/supplier/${routeId}?tab=credential`"
+            :to="supplierCredentialPath(routeId)"
             class="btn-secondary shrink-0"
           >
             前往证照附件

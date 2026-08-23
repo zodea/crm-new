@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-15",
   "counts": {
-    "trackedPageFiles": 135,
+    "trackedPageFiles": 136,
     "devPageFiles": 5,
-    "productionRoutes": 130,
+    "productionRoutes": 131,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 130,
-    "referenceEndpoints": 130,
+    "evidenceEndpointRecords": 131,
+    "referenceEndpoints": 131,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
-    "directEvidenceRoutes": 49,
+    "directEvidenceRoutes": 50,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 18,
     "historicalEvidenceRoutes": 36,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 128,
+    "designCoveredRoutes": 129,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -50,7 +50,7 @@
     {
       "code": "supplier",
       "domain": "分供方",
-      "routeCount": 3,
+      "routeCount": 4,
       "implementationIssues": [
         281,
         289
@@ -381,8 +381,8 @@
         289
       ],
       "referenceProfile": "R-SUPPLIER-DETAIL-LIVE",
-      "referenceEndpointId": "r-supplier-detail-live",
-      "referenceEndpointLabel": "材料采购合同 > 合同名称 > 乙方名称 > 详情-分供方",
+      "referenceEndpointId": "supplier-detail-facts",
+      "referenceEndpointLabel": "基础信息 > 分供方详情 > 详细资料与四类事实页签",
       "evidenceGrade": "direct",
       "observationDate": "2026-08-13",
       "observationDateStatus": "recorded",
@@ -394,6 +394,33 @@
       "stateAndNavigationConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/base/supplier/:id"
+      },
+      "constraints": "C-BASE"
+    },
+    {
+      "evidenceRecordId": "E-41EF6B00AA02",
+      "page": "app/pages/base/supplier/credential/[id].vue",
+      "localRoute": "/base/supplier/credential/:id",
+      "domainCode": "supplier",
+      "template": "详情",
+      "implementationIssues": [
+        281,
+        289
+      ],
+      "referenceProfile": "R-SUPPLIER-DETAIL-LIVE",
+      "referenceEndpointId": "supplier-detail-credential-files",
+      "referenceEndpointLabel": "基础信息 > 分供方详情 > 文件管理与证照资料区",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-08-13",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "read-only-observed",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/base/supplier/credential/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/base/supplier/credential/:id"
       },
       "constraints": "C-BASE"
     },

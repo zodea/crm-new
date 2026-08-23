@@ -23,6 +23,24 @@ function projectIntent(overrides: Partial<NavigationIntentDTO> = {}): Navigation
 }
 
 describe('唯一 Target Registry', () => {
+  it('分供方事实使用稳定 ID 解析项目分供方视图与付款申请详情', () => {
+    expect(resolveNavigationTarget({
+      kind: 'entity-subview',
+      subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '项目一', no: null },
+      variant: 'supplier-workbench',
+      view: 'overview',
+      filters: { supplierId: 'supplier-1', dataOrigin: 'demo' },
+    })).toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1/supplier/supplier-1' })
+
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'payment-application', id: 'payment-1', label: 'FK-001', no: 'FK-001' },
+      variant: 'detail',
+      view: null,
+      filters: {},
+    })).toEqual({ state: 'resolved', label: 'FK-001', to: '/finance/payment/payment-1/detail' })
+  })
+
   it('收款详情要求稳定来源与客户上下文', () => {
     const subject = {
       state: 'resolved' as const,

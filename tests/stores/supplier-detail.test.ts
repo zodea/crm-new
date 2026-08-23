@@ -11,6 +11,7 @@ let failCredentialStatusUpdate = false
 let failRefreshAfterCommit = false
 let refreshReadsFail = false
 let connectionSelectCount = 0
+let transactionCount = 0
 
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => {
@@ -25,6 +26,7 @@ vi.mock('~/lib/db/connection', () => ({
     return mem.select(sql, params)
   },
   withTransaction: async <T>(work: (tx: Pick<TestDb, 'execute' | 'select'>) => Promise<T>) => {
+    transactionCount += 1
     await mem.execute('BEGIN')
     try {
       const result = await work({
@@ -54,6 +56,7 @@ beforeEach(async () => {
   failRefreshAfterCommit = false
   refreshReadsFail = false
   connectionSelectCount = 0
+  transactionCount = 0
   mem = await createMemoryDb()
   await runMigrations(mem)
   setActivePinia(createPinia())
@@ -141,6 +144,20 @@ afterEach(() => {
 })
 
 describe('supplier detail store', () => {
+  it('只读快照只执行查询，不启动状态同步事务或改写测试分供方', async () => {
+    await mem.execute(`UPDATE suppliers SET credential_status = 'reviewing' WHERE id = 's1'`)
+    const store = useSupplierDetailStore()
+
+    await store.loadReadonlySnapshot('s1')
+
+    expect(transactionCount).toBe(0)
+    expect(store.bySupplier('s1').credentials).toHaveLength(2)
+    const [supplier] = await mem.select<{ credential_status: string }>(
+      `SELECT credential_status FROM suppliers WHERE id = 's1'`,
+    )
+    expect(supplier?.credential_status).toBe('reviewing')
+  })
+
   it('列表聚合排除已软删项目及其合同、付款和合作关系', async () => {
     const supplierStore = useSupplierStore()
     await supplierStore.load()

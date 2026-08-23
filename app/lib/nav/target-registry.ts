@@ -29,7 +29,7 @@ interface ResolveNavigationTargetOptions {
 }
 
 type ResolvedEntityRef = Extract<EntityRefDTO, { state: 'resolved' }>
-type EntityTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-detail' }>
+type EntityTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-detail' | 'entity-subview' }>
   & { subject: ResolvedEntityRef }
 type TargetBuilder = (intent: EntityTargetIntent) => string
 
@@ -65,6 +65,23 @@ function customerPath(intent: EntityTargetIntent): string {
   return `${path}?origin=${dataOrigin}`
 }
 
+function supplierPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/base/supplier', intent)
+  const dataOrigin = intent.filters.dataOrigin
+  if (dataOrigin == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid supplier data origin')
+  return `${path}?origin=${dataOrigin}`
+}
+
+function projectSupplierPath(intent: EntityTargetIntent): string {
+  const supplierId = intent.filters.supplierId
+  if (typeof supplierId !== 'string' || !supplierId)
+    throw new Error('invalid supplier workbench context')
+  return `/project/${encodeURIComponent(intent.subject.id)}/supplier/${encodeURIComponent(supplierId)}`
+}
+
 function receiptPath(intent: EntityTargetIntent): string {
   const path = entityPath('/finance/receipt', intent)
   const dataOrigin = intent.filters.dataOrigin
@@ -76,11 +93,13 @@ function receiptPath(intent: EntityTargetIntent): string {
 
 const TARGET_REGISTRY = {
   'project:detail': projectPath,
+  'project:supplier-workbench': projectSupplierPath,
   'customer:detail': customerPath,
-  'supplier:detail': (intent: EntityTargetIntent) => entityPath('/base/supplier', intent),
+  'supplier:detail': supplierPath,
   'contract:detail': (intent: EntityTargetIntent) => entityPath('/contract', intent),
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
+  'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
 } satisfies Record<string, TargetBuilder>
 
 type RegisteredTargetKey = keyof typeof TARGET_REGISTRY
@@ -131,7 +150,7 @@ export function resolveNavigationTarget(
     return unavailable('missing', intent.subject.label)
   if (intent.kind === 'same-route-overlay')
     return unavailable('unverified-target', intent.subject.label)
-  if (intent.kind !== 'entity-detail')
+  if (intent.kind !== 'entity-detail' && intent.kind !== 'entity-subview')
     return unavailable('unverified-target', intent.subject.label)
 
   const key = `${intent.subject.entity}:${intent.variant ?? ''}`

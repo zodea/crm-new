@@ -567,6 +567,16 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     }
   }
 
+  async function loadReadonlySnapshot(supplierId: string) {
+    setLoading(supplierId, true)
+    try {
+      await loadSnapshot(supplierId)
+    }
+    finally {
+      setLoading(supplierId, false)
+    }
+  }
+
   async function insertCredential(tx: TransactionDb, input: AddSupplierCredentialInput) {
     const id = generateId('cred')
     const now = new Date().toISOString()
@@ -1251,6 +1261,7 @@ export const useSupplierDetailStore = defineStore('supplier-detail', () => {
     hasSnapshot,
     isLoading,
     load,
+    loadReadonlySnapshot,
     addCredential,
     addCredentials,
     recordCredentialOcrRecognition,
