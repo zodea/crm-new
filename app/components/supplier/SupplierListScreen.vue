@@ -1,428 +1,231 @@
 <script setup lang="ts">
-import type { DeepReadonly } from 'vue'
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { SupplierListSort } from '~/lib/supplier/list'
-import type { StatusTone } from '~/lib/supplier/status'
-import type { Supplier } from '~/stores/supplier'
-import { clampPage, paginate } from '~/lib/kit/table'
-import { createSupplierCategoryExport, createSupplierLedgerExport } from '~/lib/supplier/export'
-import { filterSuppliers, sortSuppliers } from '~/lib/supplier/list'
-import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
-import { toErrorMessage } from '~/lib/util/error'
+import type { SupplierListPageDTO, SupplierListQueryDTO, SupplierListSort } from '~/lib/supplier/repository'
+import { useDebounceFn } from '@vueuse/core'
+import { computed, nextTick, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { createSupplierReturnTo, supplierListNavigationStateFromQuery } from '~/lib/supplier/return-context'
+import { CREDENTIAL_STATUS_LABEL, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { yuan } from '~/lib/util/money'
-import { maskIdentifier, maskPhone } from '~/lib/util/privacy'
+import { useSupplierCommandStore } from '~/stores/supplier-command'
+import { useSupplierReadStore } from '~/stores/supplier-read'
 
-const store = useSupplierStore()
-const projectStore = useProjectStore()
-const projectSupplierStore = useProjectSupplierStore()
-const {
-  confirm,
-  formModal,
-  typeSelect,
-  undoToast,
-  success,
-  error,
-  exportFile,
-  openImportTab,
-} = useKitUI()
+const route = useRoute()
+const readStore = useSupplierReadStore()
+const commandStore = useSupplierCommandStore()
+const visibility = useDataVisibilityStore()
+const { error, typeSelect } = useKitUI()
+const initial = supplierListNavigationStateFromQuery(route.query)
+const search = shallowRef(initial.search)
+const category = shallowRef(initial.category)
+const credentialStatus = shallowRef(initial.credentialStatus)
+const sort = shallowRef<SupplierListSort>(initial.sort)
+const page = shallowRef(initial.page)
+const pageSize = shallowRef(initial.pageSize)
 
-const searchText = shallowRef('')
-const categoryFilter = shallowRef('all')
-const statusFilter = shallowRef('all')
-const projectFilter = shallowRef('all')
-const debtOnly = shallowRef(false)
-const credentialMissingOnly = shallowRef(false)
-const sort = shallowRef<SupplierListSort>('updated-desc')
-const columnsExpanded = shallowRef(false)
-const page = shallowRef(1)
-const pageSize = shallowRef(10)
-const loadError = shallowRef('')
-let latestLoadRequest = 0
-
-const categoryOptions = [
+const readPage = computed<SupplierListPageDTO | null>(() => {
+  const state = readStore.listState
+  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
+    return state.data
+  if (state.kind === 'loading' || state.kind === 'error')
+    return state.previous
+  return null
+})
+const rows = computed(() => (readPage.value?.items ?? []).map(item => ({
+  id: item.supplier.id,
+  identity: `${item.dataOrigin}:${item.supplier.id}`,
+  name: item.supplier.label,
+  dataOrigin: item.dataOrigin,
+  aliases: item.aliases,
+  taxNo: item.taxNo,
+  supplierCategory: item.supplierCategory,
+  credentialStatus: item.credentialStatus,
+  contact: item.contact,
+  contactPhone: item.contactPhone,
+  projectCount: item.projectCount,
+  contractAmount: item.contractAmount,
+  paymentAmount: item.paymentAmount,
+})))
+const loading = computed(() => readStore.listState.kind === 'loading')
+const problem = computed(() => ['forbidden', 'not-found', 'mismatch', 'error'].includes(readStore.listState.kind) && 'problem' in readStore.listState ? readStore.listState.problem : null)
+const summary = computed(() => ({
+  正式分供方: `${readPage.value?.summary.origins.real.supplierCount ?? 0} 家`,
+  ...(visibility.includeDemo ? { 测试分供方: `${readPage.value?.summary.origins.demo.supplierCount ?? 0} 家` } : {}),
+  累计合同额: yuan(Number(readPage.value?.summary.origins.real.contractAmount ?? 0) + (visibility.includeDemo ? Number(readPage.value?.summary.origins.demo.contractAmount ?? 0) : 0)),
+  确认实付: yuan(Number(readPage.value?.summary.origins.real.paymentAmount ?? 0) + (visibility.includeDemo ? Number(readPage.value?.summary.origins.demo.paymentAmount ?? 0) : 0)),
+}))
+const categoryOptions = computed(() => [
   { key: 'all', label: '全部类别' },
-  ...SUPPLIER_CATEGORIES.map(category => ({ key: category, label: category })),
-]
-const statusOptions = [
-  { key: 'all', label: '全部状态' },
-  ...CREDENTIAL_STATUSES.map(status => ({ key: status, label: CREDENTIAL_STATUS_LABEL[status] ?? status })),
-]
-const projectOptions = computed(() => [
-  { key: 'all', label: '全部项目' },
-  ...store.projectOptions.map(project => ({ key: project.id, label: project.name })),
+  ...(readPage.value?.summary.categories ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })),
 ])
-const associationProjectOptions = computed(() =>
-  projectStore.list.map(project => ({
-    id: project.id,
-    label: `${project.name || project.id}（${project.id}）`,
-  })),
-)
-const sortOptions = [
-  { key: 'updated-desc', label: '最近更新' },
-  { key: 'name-asc', label: '名称升序' },
-  { key: 'name-desc', label: '名称降序' },
-  { key: 'category-asc', label: '类别升序' },
-]
-
-const toneChip: Record<StatusTone, string> = {
-  warn: 'chip-warn',
-  brand: 'chip-brand',
-  ok: 'chip-ok',
-  danger: 'chip-danger',
-}
-
-const coreColumns: KitTableColumn[] = [
+const credentialOptions = computed(() => [
+  { key: 'all', label: '全部资料状态' },
+  ...(readPage.value?.summary.credentialStatuses ?? []).map(item => ({ key: item.value, label: `${CREDENTIAL_STATUS_LABEL[item.value] ?? item.label}（${item.count}）` })),
+])
+const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
-  { field: 'name', title: '分供方名称', minWidth: 190, fixed: 'left', slot: 'name' },
-  { field: 'supplierCategory', title: '分供方类别', width: 118 },
-  { field: 'uniqueCode', title: '统一社会信用代码', width: 190, slot: 'identityCode' },
-  { field: 'aliases', title: '简称', width: 120, slot: 'aliases' },
-  { field: 'credentialStatus', title: '资料状态', width: 100, slot: 'credentialStatus' },
-  { field: 'contact', title: '主要联系人', width: 104 },
-  { field: 'contactPhone', title: '联系方式', width: 126, slot: 'contactPhone' },
-  { field: 'projectCount', title: '合作项目', width: 92, align: 'right', slot: 'projectCount' },
-  { field: 'contractTotal', title: '累计合同额', width: 132, align: 'right', slot: 'contractTotal' },
-  { field: 'paidTotal', title: '累计已付', width: 124, align: 'right', slot: 'paidTotal' },
+  { field: 'name', title: '分供方名称', minWidth: 200, fixed: 'left', slot: 'name' },
+  { field: 'supplierCategory', title: '分供方类别', width: 125 },
+  { field: 'taxNo', title: '统一社会信用代码', width: 190 },
+  { field: 'aliases', title: '简称', width: 130, slot: 'aliases' },
+  { field: 'credentialStatus', title: '资料状态', width: 110, slot: 'credentialStatus' },
+  { field: 'contact', title: '主要联系人', width: 110 },
+  { field: 'contactPhone', title: '联系方式', width: 130 },
+  { field: 'projectCount', title: '合作项目', width: 95, align: 'right' },
+  { field: 'contractAmount', title: '有效合同额', type: 'money', width: 140 },
+  { field: 'paymentAmount', title: '确认实付', type: 'money', width: 130 },
+  { title: '操作', type: 'action', width: 86 },
 ]
-const extendedColumns: KitTableColumn[] = [
-  { field: 'mainBusiness', title: '主营业务', minWidth: 150 },
-  { field: 'bank', title: '开户行', minWidth: 180 },
-  { field: 'address', title: '注册地址', minWidth: 190 },
-]
-const columns = computed<KitTableColumn[]>(() => [
-  ...coreColumns,
-  ...(columnsExpanded.value ? extendedColumns : []),
-  { title: '操作', type: 'action', width: 188 },
-])
 
-const filtered = computed(() =>
-  filterSuppliers(store.list, {
-    search: searchText.value,
-    category: categoryFilter.value,
-    credentialStatus: statusFilter.value,
-  }).filter((supplier) => {
-    const stats = store.listStats[supplier.id]
-    if (projectFilter.value !== 'all' && !stats?.projectIds.includes(projectFilter.value))
-      return false
-    if (debtOnly.value && !((stats?.payableBalance ?? 0) > 0))
-      return false
-    if (credentialMissingOnly.value && supplier.credentialStatus !== 'incomplete')
-      return false
-    return true
-  }),
-)
-const sorted = computed(() => sortSuppliers(filtered.value, sort.value))
-const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
-const pageRows = computed(() => paginate(sorted.value, currentPage.value, pageSize.value))
-const listSummary = computed(() => {
-  const totals = filtered.value.reduce((result, supplier) => {
-    const stats = store.listStats[supplier.id]
-    result.contractTotal += stats?.contractTotal ?? 0
-    result.paidTotal += stats?.paidTotal ?? 0
-    return result
-  }, { contractTotal: 0, paidTotal: 0 })
+function currentQuery(): SupplierListQueryDTO {
   return {
-    当前分供方: `${filtered.value.length} 家`,
-    累计合同额: yuan(totals.contractTotal),
-    累计已付: yuan(totals.paidTotal),
+    includeDemo: visibility.includeDemo,
+    search: search.value,
+    category: category.value === 'all' ? null : category.value,
+    credentialStatus: credentialStatus.value === 'all' ? null : credentialStatus.value,
+    sort: sort.value,
+    page: page.value,
+    pageSize: pageSize.value,
   }
-})
-
-watch([searchText, categoryFilter, statusFilter, projectFilter, debtOnly, credentialMissingOnly, sort], () => {
-  page.value = 1
-})
-
-function statusClass(status: string): string {
-  const tone = CREDENTIAL_STATUS_TONE[status]
-  return tone ? toneChip[tone] : 'chip bg-surface-3 text-ink-soft'
 }
 
-async function openCreate() {
-  const category = await typeSelect({
+async function load() {
+  await readStore.loadList(currentQuery())
+  await focusReturnAnchor()
+}
+
+async function focusReturnAnchor() {
+  if (!route.hash.startsWith('#'))
+    return
+  const candidates = new Set<string>([route.hash.slice(1)])
+  let decoded = route.hash.slice(1)
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      decoded = decodeURIComponent(decoded)
+      candidates.add(decoded)
+    }
+    catch {
+      break
+    }
+  }
+  for (let frame = 0; frame < 4; frame += 1) {
+    await nextTick()
+    const anchor = [...candidates].map(id => document.getElementById(id)).find(Boolean)
+    const target = anchor?.querySelector<HTMLElement>('a, button')
+    if (target) {
+      target.focus({ preventScroll: true })
+      return
+    }
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  }
+}
+
+const debouncedLoad = useDebounceFn(() => {
+  page.value = 1
+  void load()
+}, 180)
+
+function detailTo(row: typeof rows.value[number]) {
+  const returnTo = createSupplierReturnTo(row.identity, {
+    search: search.value,
+    category: category.value,
+    credentialStatus: credentialStatus.value,
+    sort: sort.value,
+    page: page.value,
+    pageSize: pageSize.value,
+  })
+  return `/base/supplier/${encodeURIComponent(row.id)}?origin=${row.dataOrigin}&returnTo=${encodeURIComponent(returnTo)}`
+}
+
+async function createSupplier() {
+  if (!readPage.value?.capabilities.includes('supplier:write')) {
+    error('无分供方写入权限')
+    return
+  }
+  const selected = await typeSelect({
     title: '选择分供方类别',
-    options: SUPPLIER_CATEGORIES.map(item => ({
-      value: item,
-      label: item,
-    })),
+    options: SUPPLIER_CATEGORIES.map(value => ({ value, label: value })),
     defaultValue: SUPPLIER_CATEGORIES[0],
     confirmLabel: '进入新建表单',
   })
-  if (!category)
-    return
-  void navigateTo({
-    path: '/base/supplier/form',
-    query: { category },
-  })
+  if (selected)
+    void navigateTo({ path: '/base/supplier/form', query: { category: selected } })
 }
 
-function openEdit(supplier: DeepReadonly<Supplier>) {
-  void navigateTo(`/base/supplier/form/${supplier.id}`)
-}
-
-function handlePageChange(payload: { page: number, pageSize: number }) {
-  page.value = payload.page
-  pageSize.value = payload.pageSize
-}
-
-async function refresh() {
-  searchText.value = ''
-  categoryFilter.value = 'all'
-  statusFilter.value = 'all'
-  projectFilter.value = 'all'
-  debtOnly.value = false
-  credentialMissingOnly.value = false
+function clearFilters() {
+  search.value = ''
+  category.value = 'all'
+  credentialStatus.value = 'all'
   sort.value = 'updated-desc'
-  await loadListData()
+  page.value = 1
+  void load()
 }
 
-async function loadListData() {
-  const request = ++latestLoadRequest
-  loadError.value = ''
-  try {
-    await Promise.all([
-      store.load(),
-      projectStore.load(),
-      projectSupplierStore.load(),
-    ])
-  }
-  catch (cause) {
-    if (request === latestLoadRequest)
-      loadError.value = toErrorMessage(cause)
-  }
-}
-
-// 导出路一：当前筛选结果合成一个分供方台账，直接选择目录保存。
-async function exportLedger() {
-  if (!filtered.value.length) {
-    error('当前没有可导出的分供方')
-    return
-  }
-  try {
-    await exportFile(createSupplierLedgerExport(filtered.value))
-  }
-  catch (err) {
-    error(`导出失败：${toErrorMessage(err)}`)
-  }
-}
-
-// 导出路二：类别/资料状态两级目录，每家分供方一个文件，进入 ADR 0004 配置页签。
-async function exportByCategory() {
-  if (!filtered.value.length) {
-    error('当前没有可导出的分供方')
-    return
-  }
-  try {
-    await exportFile(createSupplierCategoryExport(filtered.value))
-  }
-  catch (err) {
-    error(`分类导出失败：${toErrorMessage(err)}`)
-  }
-}
-
-async function openImport() {
-  try {
-    await openImportTab({ entity: 'supplier' })
-  }
-  catch (err) {
-    error(`导入打开失败：${toErrorMessage(err)}`)
-  }
-}
-
-async function handleDelete(supplier: DeepReadonly<Supplier>) {
-  const impact = await store.downstreamImpact(supplier.id)
-  const cascade = impact.length > 0
-  const confirmed = await confirm(cascade
-    ? {
-        variant: 'cascade',
-        title: '删除分供方',
-        message: `“${supplier.name}”挂有下游数据，删除后其下游数据一并隐藏。`,
-        requireTyping: supplier.name,
-        impact,
-        confirmLabel: '删除',
-      }
-    : {
-        variant: 'simple',
-        title: '删除分供方',
-        message: `确认删除分供方「${supplier.name}」？删除后可在 10 秒内撤回。`,
-        confirmLabel: '删除',
-      })
-
-  if (!confirmed)
-    return
-
-  const logId = await store.remove(supplier.id)
-  if (!logId) {
-    error('删除失败：分供方不存在或已删除')
-    return
-  }
-  if (cascade)
-    success(`已删除「${supplier.name}」及其下游数据`)
-  else
-    undoToast(`已删除「${supplier.name}」`, () => store.undo(logId))
-}
-
-async function associateProject(supplier: DeepReadonly<Supplier>) {
-  if (!associationProjectOptions.value.length) {
-    error('暂无可关联项目，请先建立项目主数据')
-    return
-  }
-  const values = await formModal({
-    title: '关联合作项目',
-    subtitle: `为“${supplier.name}”建立项目合作关系；已有关系会直接复用。`,
-    saveText: '确认关联',
-    fields: [{
-      key: 'project',
-      label: '项目',
-      type: 'select',
-      value: associationProjectOptions.value[0]!.label,
-      options: associationProjectOptions.value.map(project => project.label),
-      required: true,
-    }],
-  })
-  if (!values)
-    return
-
-  const selected = associationProjectOptions.value.find(project =>
-    project.label === String(values.project),
-  )
-  if (!selected) {
-    error('所选项目不存在或已删除')
-    return
-  }
-
-  try {
-    const reused = Boolean(projectSupplierStore.byProjectAndSupplier(selected.id, supplier.id))
-    await projectSupplierStore.add(selected.id, supplier.id)
-    await store.load()
-    success(reused ? '该合作关系已存在，已为你保留原记录' : '合作项目已关联')
-  }
-  catch (cause) {
-    error(`关联失败：${toErrorMessage(cause)}`)
-  }
-}
-
-onMounted(() => {
-  void loadListData()
+watch([search, category, credentialStatus, sort], debouncedLoad)
+watch(() => visibility.includeDemo, () => {
+  page.value = 1
+  void load()
 })
+watch(() => commandStore.latestWrite, () => void load(), { deep: true })
+onMounted(() => void load())
+onActivated(() => void load())
 </script>
 
 <template>
-  <div class="min-w-0 grid gap-3">
-    <StatePanel
-      v-if="loadError"
-      kind="error"
-      title="分供方列表加载失败"
-      :description="loadError"
-      action-label="重新加载"
-      :compact="store.list.length > 0"
-      @action="loadListData"
-    />
-
-    <ListShell v-if="!loadError || store.list.length" :summary="listSummary">
+  <div class="grid min-w-0 gap-3">
+    <StatePanel v-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" title="分供方列表加载失败" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
+    <ListShell v-if="!problem || readPage" :summary="summary">
       <template #toolbar>
-        <SupplierListToolbar
-          v-model:search="searchText"
-          v-model:category="categoryFilter"
-          v-model:credential-status="statusFilter"
-          v-model:project="projectFilter"
-          v-model:debt-only="debtOnly"
-          v-model:credential-missing-only="credentialMissingOnly"
-          v-model:sort="sort"
-          :total="store.list.length"
-          :visible="filtered.length"
-          :loading="store.loading"
-          :category-options="categoryOptions"
-          :status-options="statusOptions"
-          :project-options="projectOptions"
-          :sort-options="sortOptions"
-          :columns-expanded="columnsExpanded"
-          @refresh="refresh"
-          @create="openCreate"
-          @import="openImport"
-          @toggle-columns="columnsExpanded = !columnsExpanded"
-          @export-ledger="exportLedger"
-          @export-by-category="exportByCategory"
-        />
+        <section class="panel flex min-w-0 flex-wrap items-center gap-2 p-2.5" data-supplier-list-return-fallback tabindex="-1">
+          <div class="mr-auto">
+            <h2 class="text-14px font-800 text-ink">
+              分供方资料库
+            </h2><p class="text-11px text-ink-soft">
+              共 {{ readPage?.pagination.total ?? 0 }} 家；测试数据按工作区开关显示
+            </p>
+          </div>
+          <SearchInput v-model="search" placeholder="搜索公司名、税号、简称…" :width="230" />
+          <SelectFilter v-model="category" label="类别" :options="categoryOptions" :min-width="145" />
+          <SelectFilter v-model="credentialStatus" label="资料" :options="credentialOptions" :min-width="140" />
+          <SelectFilter v-model="sort" label="排序" :options="[{ key: 'updated-desc', label: '最近更新' }, { key: 'name-asc', label: '名称升序' }, { key: 'name-desc', label: '名称降序' }, { key: 'category-asc', label: '类别升序' }]" :min-width="125" />
+          <button type="button" class="btn-secondary" :disabled="loading" @click="load">
+            <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
+          </button>
+          <button type="button" class="btn-primary" @click="createSupplier">
+            <span class="i-lucide-plus mr-1" aria-hidden="true" />新增分供方
+          </button>
+        </section>
       </template>
-
       <template #table>
         <div data-ui="supplier-list-table" class="min-w-0 max-w-full">
           <KitTable
             :columns="columns"
-            :data="pageRows"
-            :loading="store.loading"
-            :page="{ page: currentPage, pageSize, total: filtered.length }"
-            empty="没有符合筛选条件的分供方"
-            @page-change="handlePageChange"
+            :data="rows"
+            :loading="loading"
+            :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }"
+            :page-size-options="[10, 20, 50, 100]"
+            :empty="{ title: search || category !== 'all' || credentialStatus !== 'all' ? '没有符合条件的分供方' : '还没有分供方档案', description: '可调整筛选或新建正式分供方。', actionLabel: search || category !== 'all' || credentialStatus !== 'all' ? '清除筛选' : '新建分供方' }"
+            row-key="identity"
+            @empty-action="search || category !== 'all' || credentialStatus !== 'all' ? clearFilters() : createSupplier()"
+            @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }"
           >
             <template #name="{ row }">
-              <NuxtLink :to="`/base/supplier/${row.id}`" class="cell--link">
-                {{ row.name }}
-              </NuxtLink>
+              <div :id="`supplier-row-${row.identity}`">
+                <NuxtLink :to="detailTo(row)" class="cell--link">
+                  {{ row.name }}
+                </NuxtLink><span class="ml-1 text-10px text-ink-faint">{{ row.dataOrigin === 'demo' ? '测试' : '正式' }}</span>
+              </div>
             </template>
-
             <template #aliases="{ row }">
               {{ row.aliases.join('、') || '—' }}
             </template>
-
             <template #credentialStatus="{ row }">
-              <span :class="statusClass(row.credentialStatus)">
-                {{ CREDENTIAL_STATUS_LABEL[row.credentialStatus] || row.credentialStatus }}
-              </span>
+              <span :class="row.credentialStatus === 'complete' ? 'chip chip-ok' : 'chip chip-warn'">{{ CREDENTIAL_STATUS_LABEL[row.credentialStatus] ?? row.credentialStatus }}</span>
             </template>
-
-            <template #identityCode="{ row }">
-              <span class="font-mono" :title="row.uniqueCode || row.taxNo ? '已脱敏显示' : ''">
-                {{ maskIdentifier(row.uniqueCode || row.taxNo) || '—' }}
-              </span>
-            </template>
-
-            <template #contactPhone="{ row }">
-              <span class="font-mono" :title="row.contactPhone ? '已脱敏显示' : ''">
-                {{ maskPhone(row.contactPhone) || '—' }}
-              </span>
-            </template>
-
-            <template #projectCount="{ row }">
-              <span class="font-mono">{{ store.listStats[row.id]?.projectCount ?? 0 }}</span>
-            </template>
-
-            <template #contractTotal="{ row }">
-              <span class="font-mono">{{ yuan(store.listStats[row.id]?.contractTotal ?? 0) }}</span>
-            </template>
-
-            <template #paidTotal="{ row }">
-              <span class="font-mono">{{ yuan(store.listStats[row.id]?.paidTotal ?? 0) }}</span>
-            </template>
-
             <template #action="{ row }">
-              <div class="flex items-center justify-end gap-1">
-                <NuxtLink :to="`/base/supplier/${row.id}`" class="icon-btn" title="详情" aria-label="查看分供方详情">
+              <div class="flex justify-end">
+                <NuxtLink :to="detailTo(row)" class="icon-btn" :aria-label="`查看${row.name}分供方详情`">
                   <span class="i-lucide-file-text text-14px" aria-hidden="true" />
-                </NuxtLink>
-                <button class="icon-btn" title="编辑" aria-label="编辑分供方" @click="openEdit(row)">
-                  <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
-                </button>
-                <NuxtLink
-                  :to="`/base/supplier/${row.id}?tab=credential`"
-                  class="icon-btn"
-                  title="证照资料"
-                  aria-label="维护分供方证照"
-                >
-                  <span class="i-lucide-shield-check text-14px" aria-hidden="true" />
-                </NuxtLink>
-                <button
-                  type="button"
-                  class="icon-btn"
-                  title="关联项目"
-                  aria-label="关联分供方项目"
-                  @click="associateProject(row)"
-                >
-                  <span class="i-lucide-folders text-14px" aria-hidden="true" />
-                </button>
-                <button class="icon-btn-danger" title="删除" aria-label="删除分供方" @click="handleDelete(row)">
-                  <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
-                </button>
+                </NuxtLink><span class="icon-btn cursor-not-allowed opacity-40" title="请从分供方详情显式进入编辑"><span class="i-lucide-square-pen text-14px" aria-hidden="true" /></span>
               </div>
             </template>
           </KitTable>

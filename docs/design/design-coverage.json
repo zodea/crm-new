@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 135,
+    "trackedPageFiles": 136,
     "devPageFiles": 5,
-    "appPageFiles": 130,
+    "appPageFiles": 131,
     "appNavLeaves": 51,
-    "covered": 128,
+    "covered": 129,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -58,6 +58,11 @@
     },
     {
       "appRoute": "/base/supplier/:id",
+      "designRoute": "supplierDetail",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/base/supplier/credential/:id",
       "designRoute": "supplierDetail",
       "status": "covered"
     },

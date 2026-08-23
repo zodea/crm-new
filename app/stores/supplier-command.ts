@@ -1,0 +1,98 @@
+import type { FormAttachmentChanges, MasterDataSaveAction, SupplierFormDraft } from '~/lib/master-data/forms'
+import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
+import { defineStore } from 'pinia'
+import { readonly, shallowRef } from 'vue'
+import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
+import { supplierProblemFromUnknown } from '~/lib/supplier/repository'
+
+export class SupplierCommandConflictError extends Error {
+  constructor(public readonly latest: SupplierFormReadDTO) {
+    super('分供方已有更新版本，请选择如何处理')
+    this.name = 'SupplierCommandConflictError'
+  }
+}
+
+export const useSupplierCommandStore = defineStore('supplier-command', () => {
+  const targetSupplierId = shallowRef<string | null>(null)
+  const baseVersion = shallowRef<string | null>(null)
+  const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
+  let pendingCommand: { id: string, fingerprint: string } | null = null
+  const repository = () => useNuxtApp().$repositories.supplierCommands
+
+  async function hydrate(id: string | null) {
+    targetSupplierId.value = id
+    pendingCommand = null
+    const form = id ? await repository().loadForm(id) : null
+    baseVersion.value = form?.version ?? null
+    return {
+      draft: form?.draft ?? null,
+      attachments: [],
+      pendingAttachments: [],
+      pendingRemoveIds: [],
+      pendingRestoreIds: [],
+      restoredLocalDraft: null,
+    }
+  }
+
+  function startNewSupplier() {
+    targetSupplierId.value = null
+    baseVersion.value = null
+    pendingCommand = null
+  }
+
+  function rebase(version: string) {
+    baseVersion.value = version
+  }
+
+  function acceptLatest(latest: SupplierFormReadDTO) {
+    targetSupplierId.value = latest.draft.id
+    baseVersion.value = latest.version
+  }
+
+  async function saveForm(draft: SupplierFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    const id = targetSupplierId.value ?? draft.id ?? null
+    const context = await repository().context()
+    const attachmentChanges: FormAttachmentChanges = {
+      ...(attachments.add?.length ? { add: attachments.add } : {}),
+      ...(attachments.removeIds?.length ? { removeIds: attachments.removeIds } : {}),
+      ...(attachments.restoreIds?.length ? { restoreIds: attachments.restoreIds } : {}),
+    }
+    const content = { id, baseVersion: baseVersion.value, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments: attachmentChanges }
+    const fingerprint = JSON.stringify(content)
+    if (!pendingCommand || pendingCommand.fingerprint !== fingerprint)
+      pendingCommand = { id: crypto.randomUUID(), fingerprint }
+    try {
+      const result = await repository().execute({
+        ...(id ? { id } : {}),
+        workspaceId: context.workspaceId,
+        actorId: context.actorId,
+        requiredCapability: SUPPLIER_WRITE_CAPABILITY,
+        commandId: pendingCommand.id,
+        baseVersion: baseVersion.value,
+        action,
+        draft: content.draft,
+        attachments: attachmentChanges,
+      })
+      pendingCommand = null
+      targetSupplierId.value = result.id
+      baseVersion.value = result.version
+      latestWrite.value = { id: result.id, version: result.version }
+      return { id: result.id, logId: null, attachmentIds: result.attachmentIds }
+    }
+    catch (cause) {
+      const problem = supplierProblemFromUnknown(cause)
+      if (problem.problem.code === 'conflict' && id)
+        throw new SupplierCommandConflictError(await repository().loadForm(id))
+      throw problem
+    }
+  }
+
+  return {
+    latestWrite: readonly(latestWrite),
+    hydrate,
+    saveForm,
+    startNewSupplier,
+    rebase,
+    acceptLatest,
+  }
+})

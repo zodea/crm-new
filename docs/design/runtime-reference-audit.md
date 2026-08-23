@@ -112,20 +112,20 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 135 / 5 / 130 |
+| 跟踪页面文件 / dev / 生产路由 | 136 / 5 / 131 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 130 / 130 |
+| 证据行 / 唯一参考端点 | 131 / 131 |
 | 参考证据档案 / 被路由使用 | 37 / 32 |
-| 直接 / 邻近 / 本地权威 | 49 / 18 / 18 |
+| 直接 / 邻近 / 本地权威 | 50 / 18 / 18 |
 | 历史证据 / 未验证目标 | 36 / 9 |
-| 设计已覆盖 / 待补设计 | 128 / 2 |
+| 设计已覆盖 / 待补设计 | 129 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
 | 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
 | 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分供方 | 3 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -153,6 +153,7 @@
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、联系人输入语义及统一社会信用代码冲突反馈 | 保存仍走客户领域 action；敏感字段只在编辑流程维护 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-CUSTOMER-LIST-LIVE | 参考已确认无空左树、单行工具栏、紧凑宽表和分页；当前账号无可见客户，字段仍按本地真实模型收敛为名称/简称/税号/联系人/状态，不复制参考私有列 | 名称进入本地真实详情；税号与电话脱敏；参考详情受权限限制，不能据此更改本地外键、删除或表单契约 | C-DENSE |
 | `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #193 已按统一详情壳完成长名称、脱敏摘要、6 页签、可追溯汇总、分类文件区与四档布局回归；参考补验确认详情双栏、六页签及合同/结算/收票/付款聚合下钻语义 | 蓝色聚合值必须按真实外键进入对应关联列表，目标无可见记录时显示真实空态；灰色值不伪装入口。参考审批、评论、供应商层级和写动作仍不推断，资料状态与文件动作由本地 #13 契约裁定 | C-BASE |
+| `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 将既有证照文件、OCR、有效期、资料要求和人工核验从中央事实页签拆为无路由冲突的独立整页入口；复用参考详情文件管理区的构图证据，不外推参考站写动作 | 只接既有证照专用文件/审计边界；未接入时明确不可用，不写入第二套正式分供方；返回同一中央详情和来源 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #193 已确认短表单无空左栏、两列字段网格、内容滚动、固定底部操作和统一七类选择；主数据保存后进入真实证照流程 | 普通附件不伪装证照；`approvalStatus` 不展示，证照原件、OCR 与人工核验统一在详情维护 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | #193 已完成无空左树、单行工具栏、真实项目/欠款/资料筛选、聚合列、固定操作列、局部横滚和列表汇总回归 | 行级关联写入真实 ProjectSupplier；税号与电话脱敏；上级供应商和参考站未授权业务动作不引入 | C-DENSE |
 | `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成个人资料、班组、能力、附件、项目责任、考勤、签工、工资、扣罚与关联人员区块及四档回归 | 身份/联系/银行信息脱敏；档案与在场状态分离；工资和扣罚真实下钻且不反推个人金额 | C-DENSE |

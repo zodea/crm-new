@@ -11,6 +11,8 @@ describe('default business session boundary', () => {
         'project:write',
         'customer:list:read',
         'customer:write',
+        'supplier:list:read',
+        'supplier:write',
         'demo:read',
         'core:migration:write',
       ],

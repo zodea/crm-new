@@ -63,7 +63,9 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'contract:detail',
       'customer:detail',
       'invoice:detail',
+      'payment-application:detail',
       'project:detail',
+      'project:supplier-workbench',
       'receipt:detail',
       'supplier:detail',
     ])

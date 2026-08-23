@@ -190,11 +190,12 @@ interface NavigationOrigin {
 | `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id?origin=:dataOrigin` | 返回原搜索、状态、排序、页码、每页条数、滚动与行焦点；详情再显式进入正式编辑 | 闭合；#314 以白名单 `returnTo` + 有时效会话上下文恢复，直达或伪造来源回退 canonical 列表 |
 | `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id?origin=:dataOrigin`、`/contract/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`；页签 `contracts,receipts` | 收款详情返回客户详情的收款页签，并透传已校验的客户列表返回上下文 | 闭合；三类关系均由 Target Registry 按稳定 ID 进入只读目标，missing 与 forbidden 不生成死链；收款编辑仅从列表显式动作进入 `/finance/receipt/form/:id` |
 | `N-CREW-WORKER` | `master-data` 班组/工人详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 返回来源详情区块 | 部分；页面可达，班组/工人未进公共解析，工资/罚扣返回不完整 |
-| `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id` resolved | `/base/supplier/:id` | 返回 742 条列表原搜索/页码 | 部分；基础详情闭合，列表上下文待统一 |
+| `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id + dataOrigin` resolved | `/base/supplier/:id?origin=` | 返回中央列表原搜索、类别、资料状态、排序、页码与原行焦点 | 闭合 |
 | `N-SUPPLIER-PROJECT` | `supplier` `/base/supplier/:id` | 合作项目 | `project.id + supplier.id` resolved | `/project/:pid/supplier/:sid`，`?tab=projects` 为来源视图 | 返回分供方详情合作项目页签 | 闭合 |
-| `N-SUPPLIER-CONTRACT` | `supplier` `/base/supplier/:id` | 累计合同/累计结算及行内合同、项目 | 明确聚合目标；允许目标 0 条 | `?tab=contracts`，行到 `/contract/:id`、`/project/:id` | 返回同一分供方页签/分页 | 部分；累计结算最终应进入结算视图，不可长期借合同页签代替 |
+| `N-SUPPLIER-CONTRACT` | `supplier` `/base/supplier/:id` | 累计合同/累计结算及行内合同、项目 | 明确聚合目标；允许目标 0 条 | `?tab=contracts` / `?tab=settlements`，行到 `/contract/:id`、`/project/:id`；无 canonical 结算详情时行保持不可导航 | 返回同一分供方事实页签 | 闭合；结算不再借合同页签或旧累计字段 |
 | `N-SUPPLIER-INVOICE` | `supplier` `/base/supplier/:id` | 累计收票/发票号 | 明确聚合目标 | `?tab=invoices`，行到 `/finance/invoice/:id` | 返回同一页签/分页 | 闭合 |
 | `N-SUPPLIER-PAYMENT` | `supplier` `/base/supplier/:id` | 累计付款/付款申请号 | 明确聚合目标 | `?tab=payments`，行到 `/finance/payment/:id/detail` | 返回同一页签/分页 | 闭合 |
+| `N-SUPPLIER-CREDENTIAL` | `supplier` `/base/supplier/:id` | 证照附件 | 分供方稳定 ID | `/base/supplier/credential/:id` 独立专用路由 | 返回同一中央详情及来源 | 闭合既有专用文件/审计边界；未接入专用存储时显示不可用，不创建平行正式主档 |
 | `N-SUPPLIER-NONACTION` | `supplier` 列表/详情 | 列表失效金额、应付金额 | 无可靠目标 | — | 不导航 | 非入口；不能复制“蓝色但无操作” |
 | `N-PROJECT-SUPPLIER-TABS` | `project-supplier` 工作台 | 项目/分供方名称与六页签 | 两个 ID resolved | `/project/:pid`、`/base/supplier/:sid`；`?tab=overview,contract,claim,ticket,payment,settlement` | 刷新/浏览器返回恢复页签 | 闭合 |
 | `N-PROJECT-SUPPLIER-SOURCES` | `project-supplier` 工作台 | 合同/请款/收票/支付/结算/文件来源 | 每行稳定源 ID + variant | `/contract/:id`、`/finance/payment/:id/detail`、`/finance/invoice/:id`、`/finance/records/:id` 与结算 variant 路由 | 返回项目×分供方原页签 | 部分；目标页未统一消费 `projectId/supplierId/returnTo` |
