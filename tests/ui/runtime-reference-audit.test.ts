@@ -66,10 +66,10 @@ describe('runtime reference audit contract', () => {
       referenceEndpoints: 131,
       referenceProfiles: 37,
       usedReferenceProfiles: 32,
-      directEvidenceRoutes: 50,
+      directEvidenceRoutes: 52,
       adjacentEvidenceRoutes: 18,
       localAuthorityRoutes: 18,
-      historicalEvidenceRoutes: 36,
+      historicalEvidenceRoutes: 34,
       unverifiedTargetRoutes: 9,
     })
     expect(ledger.endpoints).toHaveLength(131)

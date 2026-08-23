@@ -25,7 +25,7 @@ export const IMPLEMENTATION_FRONTIER_BLOCK_END = '<!-- implementation-frontier:e
 const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['home', [278]],
   ['project', [288, 293, 294, 289]],
-  ['master-data', [281, 289]],
+  ['master-data', [281, 316, 289]],
   ['supplier', [281, 289]],
   ['project-supplier', [281, 289]],
   ['core-contract', [277, 282, 289]],

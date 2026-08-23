@@ -149,8 +149,11 @@ interface NavigationOrigin {
 | 项目 | detail | `/project/:id` | 已闭合；唯一 Target Registry 生成来源感知路径 |
 | 客户 | detail | `/base/customer/:id?origin=:dataOrigin` | 已闭合；唯一 Target Registry 生成来源感知路径，测试来源只读 |
 | 分供方 | detail | `/base/supplier/:id` | 已闭合 |
-| 班组 | detail | `/base/crew/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
-| 工人 | detail | `/base/worker/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
+| 班组 | detail | `/base/crew/:id?origin=&returnTo=` | 已闭合；公共 `EntityLink` 已登记 |
+| 工人 | detail | `/base/worker/:id?origin=&returnTo=` | 已闭合；公共 `EntityLink` 已登记 |
+| 工程量责任单元 | detail | `/subcontract/quantity/:pid/:uid` | 已闭合；必须同时持有项目 ID 与单元 ID；班组—工人中央入口携来源主体进入只读事实详情 |
+| 工资单 | detail | `/subcontract/payroll/:id` | 已闭合；班组—工人中央入口携来源主体进入只读事实详情 |
+| 项目扣罚 | penalty-detail | `/project/penalty/:id` | 已闭合；班组—工人中央入口进入只读事实详情，不落入旧编辑表单 |
 | 合同 | detail | `/contract/:id` | 已闭合；施工/分包/材采按合同类型分组 |
 | 项目×分供方 | overview / six tabs | `/project/:pid/supplier/:sid` | 已闭合；目标模块尚未统一消费来源 query |
 | 目标成本 | detail | `/project/target-cost/:id` | 已闭合；合同聚合区缺稳定锚点 |
@@ -163,11 +166,11 @@ interface NavigationOrigin {
 | 发票 | review / detail | `/finance/invoice/:id` | 已有单票工作台；来源返回仍需统一 |
 | 送货归档 | detail | `/material/delivery/archive/:id` | 已闭合 |
 | 工程量户 | detail | `/subcontract/quantity/:pid/:uid` | 已闭合；六项筛选可恢复 |
-| 工资单 | detail | `/subcontract/payroll/:id` | 详情已存在；返回筛选未闭合 |
+| 工资单 | detail | `/subcontract/payroll/:id` | 详情已存在；班组工人中央来源可安全返回，常规工资台账的全量筛选返回仍未闭合 |
 | 排程工序 | task subview | `/schedule` + `project/group/task` | 已闭合 |
 | 甲方单据 | change/report/acceptance/final-settlement/penalty | `/owner/:kind/:id` | 读写混用；验收/保修为同实体双视图 |
 | 分包单据 | change/settlement | `/subcontract/:kind/:id` | 读写混用 |
-| 项目罚扣 | penalty | `/project/penalty/:id` | 读写混用 |
+| 项目罚扣 | penalty | `/project/penalty/:id` | 班组工人中央来源为只读事实详情；其他入口仍读写混用 |
 | 自购材单据 | requisition/arrival/use/stock-check | `/material/requisition/:id`、`/material/arrival/:id`、`/material/use/:id`、`/material/stock-check/:id` | 读写混用；variant 只能进入登记的具体路径 |
 | 甲供材单据 | control/requisition/arrival/use/direct | `/owner-material/control/:id`、`/owner-material/requisition/:id`、`/owner-material/arrival/:id`、`/owner-material/use/:id`、`/owner-material/direct/:id` | 读写混用；variant 只能进入登记的具体路径 |
 | 支出结算 | material/subcontract/other | 对应 `/material/settlement/form/:id`、`/subcontract/:kind/:id`（variant 为 settlement）、`/contract/other-settlement/form/:id` | 读写混用，且到货分摊关系未接 |
@@ -189,7 +192,7 @@ interface NavigationOrigin {
 | `N-PROJECT-METRICS` | `project` `/project/:id` | 合同/收付/票税/支付金额 | 明确 drilldown，不以非零判断 | 同一项目详情 `?tab=construction,fund,current,tax,payment`，进项票也可到 `/finance/ledger?project=:id` | 返回同一项目与页签/子表 | 闭合主链；0 金额公共组件规则待统一 |
 | `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id?origin=:dataOrigin` | 返回原搜索、状态、排序、页码、每页条数、滚动与行焦点；详情再显式进入正式编辑 | 闭合；#314 以白名单 `returnTo` + 有时效会话上下文恢复，直达或伪造来源回退 canonical 列表 |
 | `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id?origin=:dataOrigin`、`/contract/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`；页签 `contracts,receipts` | 收款详情返回客户详情的收款页签，并透传已校验的客户列表返回上下文 | 闭合；三类关系均由 Target Registry 按稳定 ID 进入只读目标，missing 与 forbidden 不生成死链；收款编辑仅从列表显式动作进入 `/finance/receipt/form/:id` |
-| `N-CREW-WORKER` | `master-data` 班组/工人详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 返回来源详情区块 | 部分；页面可达，班组/工人未进公共解析，工资/罚扣返回不完整 |
+| `N-CREW-WORKER` | `master-data` 班组/工人列表与详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved，且来源一致 | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 所有目标都携白名单校验的 `returnTo` 返回班组/工人来源；列表保留搜索、工种、排序、页码 | 闭合；公共 Target Registry 按稳定 ID 解析；责任户/工资/扣罚携 `dataOrigin + ownerKind + ownerId` 进入只读事实详情，不按名称猜测或借编辑表单 |
 | `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id + dataOrigin` resolved | `/base/supplier/:id?origin=` | 返回中央列表原搜索、类别、资料状态、排序、页码与原行焦点 | 闭合 |
 | `N-SUPPLIER-PROJECT` | `supplier` `/base/supplier/:id` | 合作项目 | `project.id + supplier.id` resolved | `/project/:pid/supplier/:sid`，`?tab=projects` 为来源视图 | 返回分供方详情合作项目页签 | 闭合 |
 | `N-SUPPLIER-CONTRACT` | `supplier` `/base/supplier/:id` | 累计合同/累计结算及行内合同、项目 | 明确聚合目标；允许目标 0 条 | `?tab=contracts` / `?tab=settlements`，行到 `/contract/:id`、`/project/:id`；无 canonical 结算详情时行保持不可导航 | 返回同一分供方事实页签 | 闭合；结算不再借合同页签或旧累计字段 |

@@ -10,10 +10,10 @@
     "referenceEndpoints": 131,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
-    "directEvidenceRoutes": 50,
+    "directEvidenceRoutes": 52,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 18,
-    "historicalEvidenceRoutes": 36,
+    "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
     "designCoveredRoutes": 129,
     "designPendingRoutes": 2
@@ -44,6 +44,7 @@
       "routeCount": 9,
       "implementationIssues": [
         281,
+        316,
         289
       ]
     },
@@ -216,15 +217,16 @@
       "template": "详情",
       "implementationIssues": [
         281,
+        316,
         289
       ],
-      "referenceProfile": "R-DETAIL-PRIOR",
-      "referenceEndpointId": "historical-0D4D144FF492",
-      "referenceEndpointLabel": "历史详情目标未登记：/base/crew/:id",
-      "evidenceGrade": "historical",
-      "observationDate": null,
-      "observationDateStatus": "not-recorded-historical",
-      "permissionStatus": "unverified",
+      "referenceProfile": "R-ENGINEERING-FLOW-LOCAL",
+      "referenceEndpointId": "local-0D4D144FF492",
+      "referenceEndpointLabel": "本地权威端点：/base/crew/:id",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-08-13",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "not-applicable",
       "layoutConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/base/crew/:id"
@@ -243,6 +245,7 @@
       "template": "整页表单",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-FORM-PRIOR",
@@ -270,6 +273,7 @@
       "template": "列表",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-LIST-PRIOR",
@@ -297,6 +301,7 @@
       "template": "详情",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-DETAIL-PRIOR",
@@ -324,6 +329,7 @@
       "template": "整页表单",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-FORM-PRIOR",
@@ -351,6 +357,7 @@
       "template": "列表",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-CUSTOMER-LIST-LIVE",
@@ -486,15 +493,16 @@
       "template": "详情",
       "implementationIssues": [
         281,
+        316,
         289
       ],
-      "referenceProfile": "R-DETAIL-PRIOR",
-      "referenceEndpointId": "historical-6594F73DBF4B",
-      "referenceEndpointLabel": "历史详情目标未登记：/base/worker/:id",
-      "evidenceGrade": "historical",
-      "observationDate": null,
-      "observationDateStatus": "not-recorded-historical",
-      "permissionStatus": "unverified",
+      "referenceProfile": "R-ENGINEERING-FLOW-LOCAL",
+      "referenceEndpointId": "local-6594F73DBF4B",
+      "referenceEndpointLabel": "本地权威端点：/base/worker/:id",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-08-13",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "not-applicable",
       "layoutConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/base/worker/:id"
@@ -513,6 +521,7 @@
       "template": "整页表单",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-FORM-PRIOR",
@@ -540,6 +549,7 @@
       "template": "列表",
       "implementationIssues": [
         281,
+        316,
         289
       ],
       "referenceProfile": "R-LIST-PRIOR",

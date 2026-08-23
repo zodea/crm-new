@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from 'vue'
 const props = defineProps<{
   to: string
   expiresAt?: number
+  label?: string
 }>()
 
 const currentTime = shallowRef(Date.now())
@@ -35,6 +36,6 @@ onBeforeUnmount(() => {
 <template>
   <NuxtLink :to="target" class="btn-secondary flex-none">
     <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />
-    返回项目列表
+    {{ label || '返回项目列表' }}
   </NuxtLink>
 </template>
