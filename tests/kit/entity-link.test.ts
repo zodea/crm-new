@@ -31,19 +31,19 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     })).toEqual({ state: 'resolved', to: '/project/p1?origin=real', label: '正式项目' })
   })
 
-  it('目标页未消费来源策略时，所有来源感知关联都退化为文本', () => {
+  it('客户详情消费来源策略后，来源感知关联保留身份', () => {
     expect(resolveEntityLink({
       type: 'customer',
       id: 'c-demo',
       label: '演示客户',
       dataOrigin: 'demo',
-    })).toEqual({ state: 'not-connected', label: '演示客户', message: '详情待接入' })
+    })).toEqual({ state: 'resolved', to: '/base/customer/c-demo?origin=demo', label: '演示客户' })
     expect(resolveEntityLink({
       type: 'customer',
       id: 'c-real',
       label: '正式客户',
       dataOrigin: 'real',
-    })).toEqual({ state: 'not-connected', label: '正式客户', message: '详情待接入' })
+    })).toEqual({ state: 'resolved', to: '/base/customer/c-real?origin=real', label: '正式客户' })
   })
 
   it('未实装类型（crew/worker）退化纯文本，不做死链', () => {
@@ -64,6 +64,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'customer:detail',
       'invoice:detail',
       'project:detail',
+      'receipt:detail',
       'supplier:detail',
     ])
   })

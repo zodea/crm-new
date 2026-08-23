@@ -112,13 +112,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 134 / 5 / 129 |
+| 跟踪页面文件 / dev / 生产路由 | 135 / 5 / 130 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 129 / 129 |
+| 证据行 / 唯一参考端点 | 130 / 130 |
 | 参考证据档案 / 被路由使用 | 37 / 32 |
-| 直接 / 邻近 / 本地权威 | 48 / 18 / 18 |
+| 直接 / 邻近 / 本地权威 | 49 / 18 / 18 |
 | 历史证据 / 未验证目标 | 36 / 9 |
-| 设计已覆盖 / 待补设计 | 127 / 2 |
+| 设计已覆盖 / 待补设计 | 128 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
@@ -135,7 +135,7 @@
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 材料价格 | 1 | [#296](https://github.com/zodea/crm-new/issues/296)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 收入财务 | 9 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 收入财务 | 10 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 支出财务 | 11 | [#303](https://github.com/zodea/crm-new/issues/303)、[#305](https://github.com/zodea/crm-new/issues/305)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -195,8 +195,9 @@
 | `app/pages/finance/payment/index.vue` | `/finance/payment` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖申请编号/名称、项目/收款单位/合同、申请/批复/实付、成本、业务类型、支付/审批/生效/回票、结算与审批人；当前通用列表只显示基础 7 列 | 名称先进入只读详情；合同、结算、发票、项目、分供方与支付记录全部按真实外键下钻，来源 query 和列表筛选需可恢复 | C-DENSE |
 | `app/pages/finance/payment/new.vue` | `/finance/payment/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/payment-management/index.vue` | `/finance/payment-management` | 支出财务 | 工作台 | #203 | R-FINANCE-FLOW-LIVE | 本地已是独立工作台且运行有 2 条已批复申请；参考默认按支付状态分段，并额外展示合同、付款内容、来源单据/业务类型、所属部门和剩余待支付 | 只读核对批复与已确认支付；申请/项目/分供方/合同/来源单据可下钻，登记支付仍跳整页支付记录，来源字段无 canonical ID 时保持“未接”而非猜文本路由 | C-DENSE |
-| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 待 #202 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #202 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖收款编号/分类、项目/付款单位/合同、收款日期/金额/方式/类型与累计合同收款，编号进入只读详情；当前本地只有 1 条并缺分类与累计列 | 详情由有效收款聚合累计值，不回写合同静态金额；项目/客户/合同按真实 ID 下钻，编辑保持显式独立动作 | C-DENSE |
+| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #314 | R-FINANCE-FLOW-LIVE | 客户收款关系按稳定 ID 进入中央只读详情；详情展示收款、客户、项目与合同并返回客户收款页签 | 收款查看不得复用表单壳，来源错配/缺失/无权限分别呈现 | C-DENSE |
+| `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 原编辑表单迁至显式 form 路由，保持既有字段与保存契约 | 只从收款列表显式编辑动作进入 | C-FORM |
+| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #202 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖收款编号/分类、项目/付款单位/合同、收款日期/金额/方式/类型与累计合同收款，编号进入只读详情；当前本地只有 1 条并缺分类、累计列与中央来源身份 | 详情由有效收款聚合累计值，不回写合同静态金额；只有读模型明确返回来源与稳定 ID 时才下钻，旧本地行降级普通文本，编辑保持显式独立动作 | C-DENSE |
 | `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 待 #202 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/records/[id].vue` | `/finance/records/:id` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/records/index.vue` | `/finance/records` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考空表仍明确支付编号/日期/金额/方式、收款账户/开户行/账号和创建审计；当前本地有 3 条已确认支付但继续使用通用列表，未展示银行凭证身份 | 编号先进入只读详情，付款申请分摊和收款方下钻按真实 ID；银行流水唯一性、人工确认和 OCR 来源继续以 ADR 0015 为准 | C-DENSE |

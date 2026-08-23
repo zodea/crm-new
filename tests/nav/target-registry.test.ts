@@ -23,6 +23,59 @@ function projectIntent(overrides: Partial<NavigationIntentDTO> = {}): Navigation
 }
 
 describe('唯一 Target Registry', () => {
+  it('收款详情要求稳定来源与客户上下文', () => {
+    const subject = {
+      state: 'resolved' as const,
+      entity: 'receipt' as const,
+      id: 'receipt-1',
+      label: 'SK-001',
+      no: 'SK-001',
+    }
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject,
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo', customerId: 'customer-1' },
+    })).toEqual({
+      state: 'resolved',
+      label: 'SK-001',
+      to: '/finance/receipt/receipt-1?origin=demo&customerId=customer-1',
+    })
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject,
+      variant: 'detail',
+      view: null,
+      filters: {},
+    })).toMatchObject({ state: 'error' })
+  })
+
+  it('收款详情只透传已校验的客户列表返回上下文', () => {
+    const returnTo = '/base/customer?search=%E5%90%88%E5%92%8C&nav=origin_314#customer-row-demo%3Acustomer_demo_001'
+    const intent: NavigationIntentDTO = {
+      kind: 'entity-detail',
+      subject: {
+        state: 'resolved',
+        entity: 'receipt',
+        id: 'receipt-1',
+        label: 'SK-001',
+        no: 'SK-001',
+      },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo', customerId: 'customer-1' },
+    }
+
+    expect(resolveNavigationTarget(intent, {
+      returnTo,
+      returnContextId: 'origin_314',
+    })).toMatchObject({
+      state: 'resolved',
+      to: `/finance/receipt/receipt-1?origin=demo&customerId=customer-1&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_314`,
+    })
+  })
+
   it('只用语义意图和稳定 ID 解析项目 canonical 只读详情', () => {
     const intent = projectIntent()
 

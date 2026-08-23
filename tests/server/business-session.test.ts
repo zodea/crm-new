@@ -6,7 +6,14 @@ describe('default business session boundary', () => {
     expect(resolveBusinessSession()).toEqual({
       workspaceId: 'workspace-default',
       actorId: 'actor-default',
-      capabilities: ['project:list:read', 'project:write', 'demo:read', 'core:migration:write'],
+      capabilities: [
+        'project:list:read',
+        'project:write',
+        'customer:list:read',
+        'customer:write',
+        'demo:read',
+        'core:migration:write',
+      ],
     })
   })
 })

@@ -2,7 +2,7 @@
 
 本文是当前生产页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 Wayfinder 的“固化跨域蓝色入口、目标路由与返回语义矩阵”裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
-当前实现以项目列表和来源感知详情作为第一条中央读链：`/project[/:id]` → Repository → HTTP adapter → `/api/read/projects[/:id]`。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。#293 已让浏览器正式项目新增/编辑经中央命令写入并回到同一读模型，命令契约见 [`COMMANDS.md`](./COMMANDS.md)。#294 的核心身份迁移已把确认后的项目实体并入这条正式读链；迁移快照、映射和对账同样只经 Repository/HTTP 读取。#312 进一步让 `ProjectListItemDTO` 输出语义 `NavigationIntentDTO`，由唯一前端 Target Registry 解析项目详情路径；中央响应和 Repository 均不携带 Vue route 字符串。不得为客户、分供方、班组、项目、工人或项目分供方回退到 production SQLite 的普通读 adapter。普通客户/分供方等页面的中央 Repository 接线仍由 #281 完成。当前中央端为可重置测试实例，不是生产持久化库；正式认证与其他领域中央写命令仍未接入。
+当前实现已有两条中央主链：项目 `/project[/:id]` 与客户 `/base/customer[/:id]` 均经 Repository、HTTP adapter 和对应 `/api/read/*` operation 读取。服务端从固定会话边界注入默认 `workspaceId`、`actorId` 与 capability，正式来源默认无记录；演示夹具保持独立来源，只有请求显式携带 `includeDemo=true` 且会话拥有全局 `demo:read` 时才可读取。详情用服务端校验的 `(dataOrigin,id)` 定位，客户端 origin 只是请求意图，不能重新声明来源。#293 与 #314 已分别让浏览器正式项目、正式客户的新增/编辑经中央命令写入并回到各自读模型，命令契约见 [`COMMANDS.md`](./COMMANDS.md)。#294 的核心身份迁移把确认后的项目实体并入正式项目读链；迁移快照、映射和对账同样只经 Repository/HTTP 读取。项目和客户列表 DTO 输出语义 `NavigationIntentDTO`，由唯一前端 Target Registry 解析来源感知详情路径；中央响应和 Repository 均不携带 Vue route 字符串。不得为客户、分供方、班组、项目、工人或项目分供方回退到 production SQLite 的普通读 adapter。班组、工人、分供方等其余主数据的中央 Repository 接线仍由 #281 后续票完成。当前中央端为可重置测试实例，不是生产持久化库；正式认证与其他领域中央写命令仍未接入。
 
 ## 1. 边界与分级
 
@@ -175,13 +175,13 @@ type ReadState<T> =
 
 ## 3. 20 个页面域的 DTO 映射
 
-下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 129 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
+下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 130 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
 
 | 代码 | 运行证据域 | 路由数 | 页面族与核心读形态 | 当前本地来源 | 分级与后台缺口 |
 | --- | --- | ---: | --- | --- | --- |
 | `home` | 首页 | 1 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
 | `project` | 项目 | 3 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
-| `master-data` | 基础主数据 | 9 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | `customers`、`crews`、`workers`、责任/工资/扣罚读模型 | `A+B`；客户受权限限制时使用 forbidden；班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
+| `master-data` | 基础主数据 | 9 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | 客户中央 `CustomerReadRepository` / `CustomerCommandRepository`；其余仍为 `crews`、`workers` 与责任/工资/扣罚本地读模型 | `A+B`；客户列表、来源感知详情和正式新增/编辑已走中央 HTTP，稳定客户 ID 连接项目/施工合同/收款；missing、forbidden、来源错配分别呈现，测试客户只读。班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
 | `supplier` | 分供方 | 3 | 分供方主数据、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | `suppliers`、证照/要求/审计表及跨域聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
 | `project-supplier` | 项目分供方 | 2 | 项目×分供方详情、六类事实集合、合作文件与汇总；导入候选只作本地草稿 | `project_suppliers`、合同/请款/发票/支付/结算/文件真实外键 | `A+C`；事实 DTO 可直接后台化，文件名分类与人工确认保留本地工具 adapter；目标页消费 query 由路由矩阵解决，见 [`project-supplier.md`](./pages/project-supplier.md) |
 | `core-contract` | 核心合同 | 12 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | canonical `contracts`、补充协议、BOQ 和下游单据 | `A+B`；实际竣工、独立结清、合同级材料领用等没有 canonical 事实时为 null/空集合；禁止读取旧兼容表静态金额补聚合，见 [`core-contracts.md`](./pages/core-contracts.md) |
@@ -192,7 +192,7 @@ type ReadState<T> =
 | `owner-material` | 甲供材 | 15 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
 | `delivery` | 送货单闭环 | 4 | 处理区、归档库、归档详情/表单；送货头、材料行、归属、OCR/审核/归档/打印状态 | `delivery_records`、`delivery_lines`、`file_refs/file_payloads` | `A+C`；头/行和价格事实可后台化，原件字节、上传会话、OCR 轮询和桌面打印使用专用 adapter；文件名/路径不授予读取权限，见 [`material-delivery.md`](./pages/material-delivery.md) |
 | `material-price` | 材料价格 | 1 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 已归档送货行的确定性聚合，无独立价格表 | `A`；只返回有真实归档来源的事实，reviewed/done 名称差异由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
-| `finance-income` | 收入财务 | 9 | 开票申请、收款、往来列表/详情投影/表单；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；通用本地列表目前只带名称，后台 DTO 必须同时返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
+| `finance-income` | 收入财务 | 10 | 开票申请、中央只读收款详情、显式收款表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；#314 已闭合客户收款关系的中央只读目标，其他通用本地列表仍需后台 DTO 返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
 | `finance-expense` | 支出财务 | 11 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
 | `invoice` | 发票台账 | 4 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
 | `quantity-payroll` | 工程量与工资 | 9 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类工资在合同责任 FK 和成本防双计决策前禁用，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
@@ -207,7 +207,7 @@ type ReadState<T> =
 | 页面域 | 当前 Pinia / 领域读模型落点 |
 | --- | --- |
 | 首页、项目 | 项目列表与来源感知基础详情：`app/stores/project-list.ts`、`app/lib/project/repository.ts`、`http-repository.ts`、`sqlite-repository.ts`、`server/api/read/projects.get.ts`、`server/api/read/projects/[id].get.ts`；项目详情语义目标统一经 `app/lib/nav/target-registry.ts` 解析；正式项目表单与写入：`app/stores/project-command.ts`、`app/lib/project/command-contract.ts`、`command-http-repository.ts`、`server/api/read/projects/[id]/form.get.ts`、`server/api/commands/projects[/:id]`。首页与详情尚未接入的页签仍在 `project-detail.ts`、`phase-task.ts` 与既有 `app/lib/home/`、`app/lib/project/` |
-| 客户、班组、工人、分供方 | `app/stores/master-data-read.ts`、`customer-detail.ts`、`crew-detail.ts`、`worker-detail.ts`、`supplier.ts`、`supplier-detail.ts`；对应 `app/lib/customer/`、`worker/`、`supplier/` |
+| 客户、班组、工人、分供方 | 客户中央链：`app/stores/customer-read.ts`、`customer-command.ts`、`app/lib/customer/repository.ts`、`http-repository.ts`、`command-http-repository.ts` 与 `server/api/read/customers[/:id]`、`server/api/commands/customers[/:id]`；客户浏览器页面不得回退旧 `customer-detail.ts` / SQLite。班组、工人、分供方仍在 `master-data-read.ts`、`crew-detail.ts`、`worker-detail.ts`、`supplier.ts`、`supplier-detail.ts` |
 | 核心/辅助合同、BOQ、甲方/分包单据 | `app/stores/contract.ts`、`contract-detail.ts`、`boq.ts`、`owner-document.ts`；`app/lib/contract/`、`boq/`、`owner-document/` |
 | 项目×分供方 | `app/stores/project-supplier.ts`；`app/lib/project-supplier/workbench.ts` |
 | 自购材、甲供材、送货归档、材料价格 | `app/stores/material.ts`、`delivery.ts`、`delivery-record.ts`；`app/lib/material/`、`delivery/` |

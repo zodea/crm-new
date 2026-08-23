@@ -195,9 +195,10 @@ onMounted(() => Promise.all([
       :summary-fields="[{ field: 'effectiveAmount', label: '正式收款金额合计' }]"
     >
       <template #link="{ row }">
-        <NuxtLink :to="row.sourcePath" class="cell--link">
+        <NuxtLink v-if="row.sourcePath" :to="row.sourcePath" class="cell--link">
           {{ row.receiptNo || '查看收款登记' }}
         </NuxtLink>
+        <span v-else>{{ row.receiptNo || '未编号收款' }}</span>
       </template>
     </ProjectSubTableSection>
     <ProjectSubTableSection

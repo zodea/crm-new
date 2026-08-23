@@ -1,3 +1,3 @@
 <template>
-  <MasterDataRegistryList kind="customer" />
+  <CustomerListScreen />
 </template>

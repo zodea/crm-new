@@ -102,7 +102,7 @@ const statePresentation = computed(() => {
 
         <div class="min-w-48 flex-[1_1_24rem]">
           <div class="flex min-w-0 flex-wrap items-center gap-2">
-            <h2 class="m-0 min-w-0 break-words text-18px leading-6 font-800 text-ink">
+            <h2 data-entity-detail-title tabindex="-1" class="m-0 min-w-0 break-words text-18px leading-6 font-800 text-ink outline-none">
               {{ title }}
             </h2>
             <slot name="status" />

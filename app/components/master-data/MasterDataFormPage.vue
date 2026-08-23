@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PendingMasterDataAttachment } from './MasterDataAttachmentSection.vue'
+import type { CustomerFormReadDTO } from '~/lib/customer/command-contract'
 import type {
   FormAttachment,
   FormAttachmentChanges,
@@ -32,6 +33,7 @@ import {
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
+import { CustomerCommandConflictError, useCustomerCommandStore } from '~/stores/customer-command'
 import {
   ProjectCommandConflictError,
   ProjectLocalDraftOnlyError,
@@ -53,6 +55,7 @@ const crewStore = useCrewStore()
 const workerStore = useWorkerStore()
 const projectStore = useProjectStore()
 const projectCommandStore = useProjectCommandStore()
+const customerCommandStore = () => useCustomerCommandStore()
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
@@ -79,9 +82,24 @@ const routeSupplierName = computed(() => {
   return typeof name === 'string' ? name.trim() : ''
 })
 const title = computed(() => `${isEditing.value ? '编辑' : '新建'} · ${meta.value.label}`)
+function routeQueryText(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : Array.isArray(value) && typeof value[0] === 'string' ? value[0] : undefined
+}
+function customerDetailPath(id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = routeQueryText(route.query.returnTo)
+  const returnContext = routeQueryText(route.query.returnContext)
+  if (returnTo && returnContext) {
+    query.set('returnTo', returnTo)
+    query.set('returnContext', returnContext)
+  }
+  return `/base/customer/${encodeURIComponent(id)}?${query.toString()}`
+}
 const returnPath = computed(() =>
   props.returnToDetail && isEditing.value && meta.value.detailPath
-    ? `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
+    ? props.kind === 'customer'
+      ? customerDetailPath(routeId.value ?? '')
+      : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
     : meta.value.listPath,
 )
 const backLabel = computed(() =>
@@ -107,7 +125,7 @@ const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
-const conflictLatest = shallowRef<ProjectFormReadDTO | null>(null)
+const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 let lastInitializedTarget = ''
@@ -183,8 +201,10 @@ async function initialize() {
   conflictLatest.value = null
   let shouldFocus = false
   try {
-    if (props.kind === 'project' && !isTauri()) {
-      const central = await projectCommandStore.hydrate(routeId.value ?? null)
+    if ((props.kind === 'project' || props.kind === 'customer') && !isTauri()) {
+      const central = props.kind === 'project'
+        ? await projectCommandStore.hydrate(routeId.value ?? null)
+        : await customerCommandStore().hydrate(routeId.value ?? null)
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -196,7 +216,7 @@ async function initialize() {
       }))
       pendingRemoveIds.value = central.pendingRemoveIds
       pendingRestoreIds.value = central.pendingRestoreIds
-      if (central.restoredLocalDraft) {
+      if (props.kind === 'project' && central.restoredLocalDraft) {
         localDraftNotice.value = '已恢复上次仅保留在本地的草稿；它尚未写入正式项目。'
       }
     }
@@ -313,7 +333,9 @@ async function saveThroughStore(action: MasterDataSaveAction) {
     case 'supplier':
       return supplierStore.saveForm(draft.value, action, attachmentChanges())
     case 'customer':
-      return customerStore.save(draft.value, action, attachmentChanges())
+      return isTauri()
+        ? customerStore.save(draft.value, action, attachmentChanges())
+        : customerCommandStore().saveForm(draft.value, action, attachmentChanges())
     case 'crew':
       return crewStore.save(draft.value, action, attachmentChanges())
     case 'worker':
@@ -356,6 +378,8 @@ async function handleFooterAction(action: FormFooterAction) {
     if (action === 'saveNew') {
       if (props.kind === 'project' && !isTauri())
         projectCommandStore.startNewProject()
+      if (props.kind === 'customer' && !isTauri())
+        customerCommandStore().startNewCustomer()
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -378,9 +402,11 @@ async function handleFooterAction(action: FormFooterAction) {
       const originSuffix = props.kind === 'project'
         ? `${detailSuffix ? '&' : '?'}origin=real`
         : ''
-      const closePath = (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
-        ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
-        : meta.value.listPath
+      const closePath = props.kind === 'customer' && props.returnToDetail
+        ? customerDetailPath(routeId.value ?? result.id)
+        : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
+            ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
+            : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
         await navigateTo(closePath)
         tabsStore.close(pageKey.value)
@@ -406,6 +432,10 @@ async function handleFooterAction(action: FormFooterAction) {
       localDraftNotice.value = '当前内容仍只保留在本地，未覆盖服务器最新版本。'
       warning(cause.message)
     }
+    else if (cause instanceof CustomerCommandConflictError) {
+      conflictLatest.value = cause.latest
+      warning(cause.message)
+    }
     else if (cause instanceof ProjectLocalDraftOnlyError) {
       localDraftNotice.value = cause.message
       error(cause.message)
@@ -422,7 +452,10 @@ async function handleFooterAction(action: FormFooterAction) {
 function keepLocalAgainstLatest() {
   if (!conflictLatest.value)
     return
-  projectCommandStore.rebase(conflictLatest.value.version)
+  if (props.kind === 'customer')
+    customerCommandStore().rebase(conflictLatest.value.version)
+  else
+    projectCommandStore.rebase(conflictLatest.value.version)
   conflictLatest.value = null
   localDraftNotice.value = '已保留你的内容并基于服务器最新版本；请再次保存以提交。'
 }
@@ -431,7 +464,10 @@ async function useLatestServerVersion() {
   const latest = conflictLatest.value
   if (!latest)
     return
-  projectCommandStore.acceptLatest(latest)
+  if (props.kind === 'customer')
+    customerCommandStore().acceptLatest(latest as CustomerFormReadDTO)
+  else
+    projectCommandStore.acceptLatest(latest as ProjectFormReadDTO)
   draft.value = {
     ...formDefaults(props.kind),
     ...latest.draft,
@@ -614,7 +650,7 @@ watch(routeSupplierCategory, () => {
       role="alert"
     >
       <h2 class="text-13px font-800 text-danger">
-        项目已被其他操作更新
+        {{ meta.label }}已被其他操作更新
       </h2>
       <p class="mt-1 text-12px leading-5 text-ink-soft">
         服务器最新版本为 {{ conflictLatest.version }}。请选择保留当前内容后重试，或改用服务器版本。

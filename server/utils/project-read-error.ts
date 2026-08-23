@@ -1,4 +1,5 @@
 import type { ProblemDTO } from '../../app/types/read-model'
+import { CustomerRepositoryProblem } from '../../app/lib/customer/repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 
 const STATUS_BY_CODE: Partial<Record<ProblemDTO['code'], number>> = {
@@ -13,11 +14,11 @@ const STATUS_BY_CODE: Partial<Record<ProblemDTO['code'], number>> = {
 }
 
 export function throwProjectReadError(cause: unknown): never {
-  if (!(cause instanceof ProjectRepositoryProblem))
+  if (!(cause instanceof ProjectRepositoryProblem) && !(cause instanceof CustomerRepositoryProblem))
     throw cause
   throw createError({
     statusCode: STATUS_BY_CODE[cause.problem.code] ?? 500,
-    statusMessage: 'Project read failed',
+    statusMessage: 'Domain request failed',
     data: cause.problem,
   })
 }

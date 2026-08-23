@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 134,
+    "trackedPageFiles": 135,
     "devPageFiles": 5,
-    "appPageFiles": 129,
+    "appPageFiles": 130,
     "appNavLeaves": 51,
-    "covered": 127,
+    "covered": 128,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -275,6 +275,11 @@
     },
     {
       "appRoute": "/finance/receipt/:id",
+      "designRoute": "receiptForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/finance/receipt/form/:id",
       "designRoute": "receiptForm",
       "status": "covered"
     },

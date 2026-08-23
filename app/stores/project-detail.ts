@@ -326,7 +326,7 @@ export const useProjectDetailStore = defineStore('project-detail', () => {
           cumulativeReceivable: amount,
           status,
           effectiveAmount: effectiveAmount(amount, status),
-          sourcePath: `/finance/receipt/${id}`,
+          sourcePath: '',
         }
       })
       paymentApplications.value = payments.map(row => ({
