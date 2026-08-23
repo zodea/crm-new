@@ -116,15 +116,15 @@
 | 页面域 | 20 |
 | 证据行 / 唯一参考端点 | 131 / 131 |
 | 参考证据档案 / 被路由使用 | 37 / 32 |
-| 直接 / 邻近 / 本地权威 | 50 / 18 / 18 |
-| 历史证据 / 未验证目标 | 36 / 9 |
+| 直接 / 邻近 / 本地权威 | 52 / 18 / 18 |
+| 历史证据 / 未验证目标 | 34 / 9 |
 | 设计已覆盖 / 待补设计 | 129 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
 | 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
 | 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#316](https://github.com/zodea/crm-new/issues/316)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -146,9 +146,9 @@
 
 | Page | Route | 业务域 | 模板 | 历史基础票 | 参考证据 | 布局差异 | 状态与跳转结论 | 业务约束 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成统一详情壳、真实成员/能力/项目工程量/工资/扣罚区块、长名称与四档无整页横滚回归 | 电话脱敏；工人、关联人员、项目和扣罚源单真实下钻；无事实时分别显示空态 | C-DENSE |
-| `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、电话输入语义、班组级计薪说明与开关联动回归 | 只写 `crews` 与班组附件；不恢复不存在的班组项目单价关系 | C-FORM |
-| `app/pages/base/crew/index.vue` | `/base/crew` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | #194 已完成真实人数/在场人数/项目数、领域筛选、紧凑工具栏与四档局部横滚回归 | 名称下钻；电话脱敏；在册工人阻止删除，其他下游触发级联安全确认；不涉及 #191 目标成本列表 | C-DENSE |
+| `app/pages/base/crew/[id].vue` | `/base/crew/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核统一详情壳、真实成员/项目工程量/工资/扣罚聚合、稳定 ID 下钻、安全返回与四档无整页横滚 | 浏览器只读中央 Repository；电话脱敏；正式/测试来源隔离；无事实分别空态；Tauri 保留本地路径 | C-DENSE |
+| `app/pages/base/crew/form/[[id]].vue` | `/base/crew/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、幂等命令、乐观锁、返回详情和中央班组校验 | 中央附件未接入时不回退本地；Tauri 仍写 `crews` 与班组附件；不恢复不存在的班组项目单价关系 | C-FORM |
+| `app/pages/base/crew/index.vue` | `/base/crew` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央正式/测试隔离、真实人数/项目数、筛选、安全回程与四档局部横滚回归 | 浏览器无本地删除/快捷编辑；名称按稳定 ID 下钻；电话脱敏 | C-DENSE |
 | `app/pages/base/customer/[id].vue` | `/base/customer/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成客户主数据、名下项目、施工合同与收款台账的只读聚合、页签深链及四档回归 | 方向键切换页签；只按真实外键下钻，不从名称或合同金额推算收款 | C-DENSE |
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、联系人输入语义及统一社会信用代码冲突反馈 | 保存仍走客户领域 action；敏感字段只在编辑流程维护 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-CUSTOMER-LIST-LIVE | 参考已确认无空左树、单行工具栏、紧凑宽表和分页；当前账号无可见客户，字段仍按本地真实模型收敛为名称/简称/税号/联系人/状态，不复制参考私有列 | 名称进入本地真实详情；税号与电话脱敏；参考详情受权限限制，不能据此更改本地外键、删除或表单契约 | C-DENSE |
@@ -156,9 +156,9 @@
 | `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 将既有证照文件、OCR、有效期、资料要求和人工核验从中央事实页签拆为无路由冲突的独立整页入口；复用参考详情文件管理区的构图证据，不外推参考站写动作 | 只接既有证照专用文件/审计边界；未接入时明确不可用，不写入第二套正式分供方；返回同一中央详情和来源 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #193 已确认短表单无空左栏、两列字段网格、内容滚动、固定底部操作和统一七类选择；主数据保存后进入真实证照流程 | 普通附件不伪装证照；`approvalStatus` 不展示，证照原件、OCR 与人工核验统一在详情维护 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | #193 已完成无空左树、单行工具栏、真实项目/欠款/资料筛选、聚合列、固定操作列、局部横滚和列表汇总回归 | 行级关联写入真实 ProjectSupplier；税号与电话脱敏；上级供应商和参考站未授权业务动作不引入 | C-DENSE |
-| `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成个人资料、班组、能力、附件、项目责任、考勤、签工、工资、扣罚与关联人员区块及四档回归 | 身份/联系/银行信息脱敏；档案与在场状态分离；工资和扣罚真实下钻且不反推个人金额 | C-DENSE |
-| `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页编辑返回详情及主档字段闭环 | 班组、当前项目保存真实 ID；项目不可见时不连带隐藏跨项目工人主档 | C-FORM |
-| `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #194 | R-LIST-PRIOR | #194 已完成班组/项目/档案状态/在场状态/进退场日期/安全教育列、领域筛选与四档局部横滚回归 | 电话和身份证脱敏；键盘可进入详情；存在工资、扣罚等下游时触发级联安全确认 | C-DENSE |
+| `app/pages/base/worker/[id].vue` | `/base/worker/:id` | 基础主数据 | 详情 | #316 | R-ENGINEERING-FLOW-LOCAL | #316 已以本地中央测试接缝复核班组/项目/责任单元/工资单/扣罚与关联人员稳定 ID 链、隐私、未知工资分配和四档回归 | 身份/联系/银行信息脱敏；正式/测试来源隔离；工资分配缺失显示“历史未记录”，不反推金额 | C-DENSE |
+| `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、中央班组/项目选择、幂等命令、乐观锁和返回详情 | 班组与当前项目只保存同来源稳定 ID；中央附件未接入时不回退本地 | C-FORM |
+| `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央来源隔离、班组/项目/档案/在场/安全教育展示、筛选、安全回程与四档局部横滚回归 | 电话和身份证脱敏；浏览器无本地删除/快捷编辑；键盘链接按稳定 ID 进入详情 | C-DENSE |
 | `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-CONTRACT-DETAIL-LIVE | 当前已完成顶部摘要、合同阶段、金额、本地基本信息、真实关联单据、材料采购明细与合同文件；#282 补验确认施工、分包、材采详情分别有专属页签，当前通用四页签只能算数据闭环，尚未完成参考信息架构复刻 | 继续只按真实合同外键和文件引用下钻；补充协议无独立详情路由、施工/分包专属分组与返回筛选恢复列为待补齐，不补造审批人或关联记录 | C-BASE |
 | `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | #195 已按本地清单拆表蓝本完成三步导入、逐 sheet 映射、持久缺失字段错误与四档无整页横滚回归；无红圈安全直接证据，不宣称同屏复刻 | 未对参考站触发上传或导入；A–E 格式与人工确认口径以 `docs/rewrite/pages/boq-import.md` 为准 | C-TOOL |
 | `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | #195 已完成目录/密集表格/变更/月度报量三页签、完整合同编号、直接业务入口、金额完整显示、键盘与四档局部横滚回归；无红圈安全直接证据 | 原始金额不做 MoneyLink；清单手调/导出不推进甲方报量状态；布局权威见 `docs/rewrite/pages/boq-import.md` | C-DENSE |

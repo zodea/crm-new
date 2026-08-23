@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveEntityLink } from '~/lib/kit/entity-link'
-import { registeredTargetKeys } from '~/lib/nav/target-registry'
+import { registeredTargetKeys, resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不做死链）', () => {
   it('已实装类型 + id + label → 蓝链，路由按映射表', () => {
@@ -46,9 +46,56 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     })).toEqual({ state: 'resolved', to: '/base/customer/c-real?origin=real', label: '正式客户' })
   })
 
-  it('未实装类型（crew/worker）退化纯文本，不做死链', () => {
+  it('班组与工人使用稳定 ID 进入中央详情，并保留来源身份', () => {
     expect(resolveEntityLink({ type: 'crew', id: 'g1', label: '泥水一组' }))
-      .toEqual({ state: 'not-connected', label: '泥水一组', message: '详情待接入' })
+      .toEqual({ state: 'resolved', to: '/base/crew/g1', label: '泥水一组' })
+    expect(resolveEntityLink({ type: 'worker', id: 'w1', label: '张三', dataOrigin: 'demo' }))
+      .toEqual({ state: 'resolved', to: '/base/worker/w1?origin=demo', label: '张三' })
+  })
+
+  it('班组—工人业务事实使用稳定事实 ID 穿透到责任单元、工资单和扣罚单', () => {
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'quantity-unit', id: 'u1', label: '201户', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { projectId: 'p1', dataOrigin: 'real' },
+    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1', label: '201户' })
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1', label: '7月工资单' })
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'subcontract-document', id: 'f1', label: 'FK-1', no: null },
+      variant: 'penalty-detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    })).toEqual({ state: 'unverified-target', label: 'FK-1', message: '目标待核验' })
+    expect(registeredTargetKeys()).toEqual(expect.arrayContaining([
+      'quantity-unit:detail',
+      'wage-statement:detail',
+      'subcontract-document:penalty-detail',
+    ]))
+  })
+
+  it('中央班组工人事实链携带来源主体和经校验的返回上下文', () => {
+    const target = resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo', ownerKind: 'worker', ownerId: 'w1' },
+    }, { returnTo: '/base/worker/w1?origin=demo' })
+
+    expect(target).toEqual({
+      state: 'resolved',
+      label: '7月工资单',
+      to: '/subcontract/payroll/ws1?origin=demo&ownerKind=worker&ownerId=w1&returnTo=%2Fbase%2Fworker%2Fw1%3Forigin%3Ddemo',
+    })
   })
 
   it('有 label 无 id → 纯文本；label 解析为空 → 空态「—」', () => {
@@ -61,13 +108,18 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
   it('映射表只登记已实装详情页', () => {
     expect(registeredTargetKeys()).toEqual([
       'contract:detail',
+      'crew:detail',
       'customer:detail',
       'invoice:detail',
       'payment-application:detail',
       'project:detail',
       'project:supplier-workbench',
+      'quantity-unit:detail',
       'receipt:detail',
+      'subcontract-document:penalty-detail',
       'supplier:detail',
+      'wage-statement:detail',
+      'worker:detail',
     ])
   })
 })

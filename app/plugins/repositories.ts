@@ -1,3 +1,5 @@
+import type { CrewWorkerCommandRepository } from '~/lib/crew-worker/command-contract'
+import type { CrewWorkerReadRepository } from '~/lib/crew-worker/repository'
 import type { CustomerCommandRepository } from '~/lib/customer/command-contract'
 import type { CustomerReadRepository } from '~/lib/customer/repository'
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
@@ -5,6 +7,8 @@ import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
 import type { SupplierReadRepository } from '~/lib/supplier/repository'
+import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command-http-repository'
+import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
@@ -16,6 +20,8 @@ import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository
 export interface DomainRepositories {
   customerRead: CustomerReadRepository
   customerCommands: CustomerCommandRepository
+  crewWorkerRead: CrewWorkerReadRepository
+  crewWorkerCommands: CrewWorkerCommandRepository
   supplierRead: SupplierReadRepository
   supplierCommands: SupplierCommandRepository
   projectList: ProjectListRepository
@@ -29,6 +35,12 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     customerCommands: createHttpCustomerCommandRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    crewWorkerRead: createHttpCrewWorkerReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    crewWorkerCommands: createHttpCrewWorkerCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
     supplierRead: createHttpSupplierReadRepository({

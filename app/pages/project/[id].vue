@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import {
   loadProjectReturnOrigin,
   resolveProjectReturnContext,
@@ -20,8 +21,9 @@ const returnResolution = computed(() => resolveProjectReturnContext({
     ? null
     : loadProjectReturnOrigin(id),
 }))
-const returnTo = computed(() => returnResolution.value.to)
-const returnExpiresAt = computed(() => returnResolution.value.origin?.expiresAt)
+const crewWorkerReturnTo = computed(() => validateCrewWorkerReturnTo(route.query.returnTo))
+const returnTo = computed(() => crewWorkerReturnTo.value ?? returnResolution.value.to)
+const returnExpiresAt = computed(() => crewWorkerReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
 </script>
 
 <template>
@@ -31,5 +33,6 @@ const returnExpiresAt = computed(() => returnResolution.value.origin?.expiresAt)
     :include-demo="dataVisibilityStore.includeDemo"
     :return-to="returnTo"
     :return-expires-at="returnExpiresAt"
+    :return-label="crewWorkerReturnTo ? '返回来源详情' : undefined"
   />
 </template>

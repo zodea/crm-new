@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PendingMasterDataAttachment } from './MasterDataAttachmentSection.vue'
+import type { CrewFormReadDTO, WorkerFormReadDTO } from '~/lib/crew-worker/command-contract'
 import type { CustomerFormReadDTO } from '~/lib/customer/command-contract'
 import type {
   FormAttachment,
@@ -14,9 +15,9 @@ import type {
 } from '~/lib/master-data/page'
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
-import { isTauri } from '@tauri-apps/api/core'
 import { onActivated } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import {
   listFormAttachments,
   loadCrewForm,
@@ -31,10 +32,12 @@ import {
   formDefaults,
   formRequiredFields,
 } from '~/lib/master-data/page'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
+import { CrewWorkerCommandConflictError, useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
 import { CustomerCommandConflictError, useCustomerCommandStore } from '~/stores/customer-command'
 import {
   ProjectCommandConflictError,
@@ -60,6 +63,7 @@ const projectStore = useProjectStore()
 const projectCommandStore = useProjectCommandStore()
 const customerCommandStore = () => useCustomerCommandStore()
 const supplierCommandStore = () => useSupplierCommandStore()
+const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
@@ -113,13 +117,22 @@ function supplierCredentialPath(id: string): string {
     query.set('returnTo', returnTo)
   return `/base/supplier/credential/${encodeURIComponent(id)}?${query.toString()}`
 }
+function crewWorkerDetailPath(kind: 'crew' | 'worker', id: string): string {
+  const query = new URLSearchParams({ origin: 'real' })
+  const returnTo = validateCrewWorkerReturnTo(routeQueryText(route.query.returnTo))
+  if (returnTo)
+    query.set('returnTo', returnTo)
+  return `/base/${kind}/${encodeURIComponent(id)}?${query.toString()}`
+}
 const returnPath = computed(() =>
   props.returnToDetail && isEditing.value && meta.value.detailPath
     ? props.kind === 'customer'
       ? customerDetailPath(routeId.value ?? '')
       : props.kind === 'supplier'
         ? supplierDetailPath(routeId.value ?? '')
-        : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
+        : props.kind === 'crew' || props.kind === 'worker'
+          ? crewWorkerDetailPath(props.kind, routeId.value ?? '')
+          : `${meta.value.detailPath}/${routeId.value}${props.kind === 'project' ? '?origin=real' : ''}`
     : meta.value.listPath,
 )
 const backLabel = computed(() =>
@@ -145,7 +158,7 @@ const savedSnapshot = shallowRef('')
 const hydrated = shallowRef(false)
 const desktopAttachmentPicker = shallowRef(false)
 const localDraftNotice = shallowRef('')
-const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | null>(null)
+const conflictLatest = shallowRef<ProjectFormReadDTO | CustomerFormReadDTO | SupplierFormReadDTO | CrewFormReadDTO | WorkerFormReadDTO | null>(null)
 const formElement = useTemplateRef<HTMLFormElement>('formElement')
 let allowLeave = false
 let lastInitializedTarget = ''
@@ -160,6 +173,9 @@ const dirty = computed(() => hydrated.value && (
 const sections = computed(() => meta.value.sections)
 const usesSupplierCredentialFlow = computed(() =>
   meta.value.attachmentMode === 'supplierCredential',
+)
+const usesCentralCrewWorkerFlow = computed(() =>
+  !isDesktopRuntime() && (props.kind === 'crew' || props.kind === 'worker'),
 )
 const shellSections = computed(() =>
   props.hideSections || meta.value.hideSectionNav ? [] : sections.value,
@@ -182,8 +198,34 @@ const shellStateTitle = computed(() =>
 )
 
 const fetchCustomers = readStore.searchCustomers
-const fetchProjects = readStore.searchProjects
-const fetchCrews = readStore.searchCrews
+async function fetchProjects(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'worker')
+    return readStore.searchProjects(keyword)
+  const page = await useNuxtApp().$repositories.projectList.list({
+    includeDemo: false,
+    search: keyword,
+    status: null,
+    filters: { statuses: [], plannedEnds: [], managers: [], customerIds: [] },
+    sort: 'name-asc',
+    page: 1,
+    pageSize: 20,
+  })
+  return page.items.map(item => ({ id: item.project.id, label: item.project.label, hint: item.code }))
+}
+async function fetchCrews(keyword: string) {
+  if (isDesktopRuntime() || props.kind !== 'worker')
+    return readStore.searchCrews(keyword)
+  const page = await useNuxtApp().$repositories.crewWorkerRead.listCrews({
+    includeDemo: false,
+    search: keyword,
+    trade: null,
+    status: null,
+    sort: 'name-asc',
+    page: 1,
+    pageSize: 20,
+  })
+  return page.items.map(item => ({ id: item.crew.id, label: item.crew.label, hint: item.trade }))
+}
 
 async function loadRecord(id: string): Promise<MasterDataPageDraft | null> {
   switch (props.kind) {
@@ -221,12 +263,14 @@ async function initialize() {
   conflictLatest.value = null
   let shouldFocus = false
   try {
-    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier') && !isTauri()) {
+    if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
       const central = props.kind === 'project'
         ? await projectCommandStore.hydrate(routeId.value ?? null)
         : props.kind === 'customer'
           ? await customerCommandStore().hydrate(routeId.value ?? null)
-          : await supplierCommandStore().hydrate(routeId.value ?? null)
+          : props.kind === 'supplier'
+            ? await supplierCommandStore().hydrate(routeId.value ?? null)
+            : await crewWorkerCommandStore().hydrate(props.kind, routeId.value ?? null)
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -353,19 +397,23 @@ function attachmentChanges(): FormAttachmentChanges {
 async function saveThroughStore(action: MasterDataSaveAction) {
   switch (props.kind) {
     case 'supplier':
-      return isTauri()
+      return isDesktopRuntime()
         ? supplierStore.saveForm(draft.value, action, attachmentChanges())
         : supplierCommandStore().saveForm(draft.value, action, attachmentChanges())
     case 'customer':
-      return isTauri()
+      return isDesktopRuntime()
         ? customerStore.save(draft.value, action, attachmentChanges())
         : customerCommandStore().saveForm(draft.value, action, attachmentChanges())
     case 'crew':
-      return crewStore.save(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? crewStore.save(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveCrew(draft.value, action, attachmentChanges())
     case 'worker':
-      return workerStore.save(draft.value, action, attachmentChanges())
+      return isDesktopRuntime()
+        ? workerStore.save(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveWorker(draft.value, action, attachmentChanges())
     case 'project':
-      return isTauri()
+      return isDesktopRuntime()
         ? projectStore.saveForm(draft.value, action, attachmentChanges())
         : projectCommandStore.saveForm(draft.value, action, attachmentChanges())
     case 'target_cost':
@@ -400,12 +448,14 @@ async function handleFooterAction(action: FormFooterAction) {
     fieldErrors.value = {}
 
     if (action === 'saveNew') {
-      if (props.kind === 'project' && !isTauri())
+      if (props.kind === 'project' && !isDesktopRuntime())
         projectCommandStore.startNewProject()
-      if (props.kind === 'customer' && !isTauri())
+      if (props.kind === 'customer' && !isDesktopRuntime())
         customerCommandStore().startNewCustomer()
-      if (props.kind === 'supplier' && !isTauri())
+      if (props.kind === 'supplier' && !isDesktopRuntime())
         supplierCommandStore().startNewSupplier()
+      if ((props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime())
+        crewWorkerCommandStore().startNew(props.kind)
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -425,16 +475,18 @@ async function handleFooterAction(action: FormFooterAction) {
       const detailSuffix = meta.value.postSaveDetailTab
         ? `?tab=${encodeURIComponent(meta.value.postSaveDetailTab)}`
         : ''
-      const originSuffix = props.kind === 'project'
+      const originSuffix = props.kind === 'project' || props.kind === 'crew' || props.kind === 'worker'
         ? `${detailSuffix ? '&' : '?'}origin=real`
         : ''
       const closePath = props.kind === 'customer' && props.returnToDetail
         ? customerDetailPath(routeId.value ?? result.id)
         : props.kind === 'supplier' && props.returnToDetail
           ? supplierDetailPath(routeId.value ?? result.id)
-          : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
-              ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
-              : meta.value.listPath
+          : (props.kind === 'crew' || props.kind === 'worker') && props.returnToDetail
+              ? crewWorkerDetailPath(props.kind, routeId.value ?? result.id)
+              : (props.returnToDetail || meta.value.postSaveDetailTab) && meta.value.detailPath
+                  ? `${meta.value.detailPath}/${routeId.value ?? result.id}${detailSuffix}${originSuffix}`
+                  : meta.value.listPath
       if (meta.value.postSaveDetailTab) {
         await navigateTo(closePath)
         tabsStore.close(pageKey.value)
@@ -468,6 +520,10 @@ async function handleFooterAction(action: FormFooterAction) {
       conflictLatest.value = cause.latest
       warning(cause.message)
     }
+    else if (cause instanceof CrewWorkerCommandConflictError) {
+      conflictLatest.value = cause.latest
+      warning(cause.message)
+    }
     else if (cause instanceof ProjectLocalDraftOnlyError) {
       localDraftNotice.value = cause.message
       error(cause.message)
@@ -488,6 +544,8 @@ function keepLocalAgainstLatest() {
     customerCommandStore().rebase(conflictLatest.value.version)
   else if (props.kind === 'supplier')
     supplierCommandStore().rebase(conflictLatest.value.version)
+  else if (props.kind === 'crew' || props.kind === 'worker')
+    crewWorkerCommandStore().rebase(props.kind, conflictLatest.value.version)
   else
     projectCommandStore.rebase(conflictLatest.value.version)
   conflictLatest.value = null
@@ -502,6 +560,8 @@ async function useLatestServerVersion() {
     customerCommandStore().acceptLatest(latest as CustomerFormReadDTO)
   else if (props.kind === 'supplier')
     supplierCommandStore().acceptLatest(latest as SupplierFormReadDTO)
+  else if (props.kind === 'crew' || props.kind === 'worker')
+    crewWorkerCommandStore().acceptLatest(props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
   else
     projectCommandStore.acceptLatest(latest as ProjectFormReadDTO)
   draft.value = {
@@ -632,7 +692,7 @@ onBeforeRouteLeave(async () => {
 })
 
 onMounted(() => {
-  desktopAttachmentPicker.value = isTauri()
+  desktopAttachmentPicker.value = isDesktopRuntime()
   void initialize()
 })
 
@@ -720,7 +780,7 @@ watch(routeSupplierCategory, () => {
       />
 
       <MasterDataAttachmentSection
-        v-if="!usesSupplierCredentialFlow"
+        v-if="!usesSupplierCredentialFlow && !usesCentralCrewWorkerFlow"
         :title="attachmentTitle"
         :desktop-picker="desktopAttachmentPicker"
         :attachments="attachments"
@@ -735,7 +795,7 @@ watch(routeSupplierCategory, () => {
       />
 
       <section
-        v-else
+        v-else-if="usesSupplierCredentialFlow"
         id="section-attachments"
         data-ui="supplier-credential-guidance"
         class="panel scroll-mt-4 p-4"
@@ -757,6 +817,18 @@ watch(routeSupplierCategory, () => {
             前往证照附件
           </NuxtLink>
         </div>
+      </section>
+
+      <section
+        v-else
+        id="section-attachments"
+        data-ui="crew-worker-central-attachment-guidance"
+        class="panel scroll-mt-4 p-4"
+      >
+        <SectionHeader title="附件" subtitle="班组与工人正式主数据只通过中央命令保存。" />
+        <p class="mt-3 border border-line bg-surface-2 p-3 text-12px leading-5 text-ink-soft">
+          中央附件边界尚未接入；当前表单不会回退到本地附件，也不会生成并行正式来源。
+        </p>
       </section>
 
       <section id="section-note" class="panel scroll-mt-4 p-4">

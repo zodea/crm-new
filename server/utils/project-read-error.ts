@@ -1,4 +1,5 @@
 import type { ProblemDTO } from '../../app/types/read-model'
+import { CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/repository'
 import { CustomerRepositoryProblem } from '../../app/lib/customer/repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
@@ -17,7 +18,8 @@ const STATUS_BY_CODE: Partial<Record<ProblemDTO['code'], number>> = {
 export function throwProjectReadError(cause: unknown): never {
   if (!(cause instanceof ProjectRepositoryProblem)
     && !(cause instanceof CustomerRepositoryProblem)
-    && !(cause instanceof SupplierRepositoryProblem)) {
+    && !(cause instanceof SupplierRepositoryProblem)
+    && !(cause instanceof CrewWorkerRepositoryProblem)) {
     throw cause
   }
   throw createError({

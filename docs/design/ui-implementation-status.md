@@ -66,7 +66,7 @@
 | --- | ---: | --- |
 | 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
 | 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#316](https://github.com/zodea/crm-new/issues/316)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -86,14 +86,14 @@
 | 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
 <!-- implementation-frontier:end -->
 
-基础主数据仍由父规格统一承接；其中客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合。班组、工人及父规格其他范围仍未因此完成。
+基础主数据仍由父规格统一承接；其中客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合，班组—工人中央列表—详情—显式编辑及项目/责任/工资/扣罚稳定 ID 关系链已由 [#316](https://github.com/zodea/crm-new/issues/316) 闭合。父规格其他范围仍未因此完成。
 
 不占独立页面域的公共依赖仍按原生 blocking 关系推进：正式/演示隔离 [#279](https://github.com/zodea/crm-new/issues/279)、财务集成 [#286](https://github.com/zodea/crm-new/issues/286)、服务器事件通知 [#290](https://github.com/zodea/crm-new/issues/290)、页签恢复 [#306](https://github.com/zodea/crm-new/issues/306)，最终由浏览器生产接缝 [#278](https://github.com/zodea/crm-new/issues/278) 验收全域。OCR 设置继续由既有专项 [#204](https://github.com/zodea/crm-new/issues/204) 承接。
 
 ## 5. 证据状态边界
 
 - 历史关闭票只证明当前页面基础的来源，不推导 #292 的生产完成状态。
-- 36 条历史证据和 9 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
+- 34 条历史证据和 9 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
 - `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐端点记录在生成账本；叙述结论只留在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，生成 JSON 只保存结构化键与权威源引用。
 - 当前已实现数量不在本轮提前汇总；每张实施票关闭时按其真实路由范围更新，避免把“路由存在”再次统计成“业务闭环”。
 

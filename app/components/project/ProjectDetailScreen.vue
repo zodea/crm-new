@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
   includeDemo?: boolean
   returnTo?: string
   returnExpiresAt?: number
+  returnLabel?: string
 }>(), {
   originHint: 'real',
   includeDemo: false,
@@ -189,7 +190,7 @@ onActivated(() => {
             {{ item.code || '未登记项目编号' }} · {{ item.contractName || item.region || '未登记合同名称' }}
           </p>
         </div>
-        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" class="ml-auto" />
+        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" class="ml-auto" />
         <NuxtLink
           v-if="!isDemo && detail?.capabilities.includes('project:write')"
           :to="`/project/form/${encodeURIComponent(projectId)}?origin=real`"
@@ -270,7 +271,7 @@ onActivated(() => {
     title="正在从中央后台加载项目详情"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -280,7 +281,7 @@ onActivated(() => {
     :description="problem?.message"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -296,7 +297,7 @@ onActivated(() => {
         <button type="button" class="btn-primary" @click="loadProject">
           重新加载
         </button>
-        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
       </div>
     </template>
   </StatePanel>
@@ -307,7 +308,7 @@ onActivated(() => {
     :description="problem?.message"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -317,7 +318,7 @@ onActivated(() => {
     description="请确认测试数据开关与来源后返回项目列表重试。"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" />
+      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
     </template>
   </StatePanel>
 </template>

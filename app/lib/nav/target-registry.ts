@@ -3,6 +3,7 @@ import type {
   NavigationIntentDTO,
   NavigationUnavailableReasonDTO,
 } from '~/types/read-model'
+import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { isDataOriginDTO } from '~/types/read-model'
@@ -75,6 +76,26 @@ function supplierPath(intent: EntityTargetIntent): string {
   return `${path}?origin=${dataOrigin}`
 }
 
+function crewPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/base/crew', intent)
+  const dataOrigin = intent.filters.dataOrigin
+  if (dataOrigin == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid crew data origin')
+  return `${path}?origin=${dataOrigin}`
+}
+
+function workerPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/base/worker', intent)
+  const dataOrigin = intent.filters.dataOrigin
+  if (dataOrigin == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid worker data origin')
+  return `${path}?origin=${dataOrigin}`
+}
+
 function projectSupplierPath(intent: EntityTargetIntent): string {
   const supplierId = intent.filters.supplierId
   if (typeof supplierId !== 'string' || !supplierId)
@@ -91,15 +112,49 @@ function receiptPath(intent: EntityTargetIntent): string {
   return `${path}?origin=${dataOrigin}&customerId=${encodeURIComponent(customerId)}`
 }
 
+function quantityUnitPath(intent: EntityTargetIntent): string {
+  const projectId = intent.filters.projectId
+  if (typeof projectId !== 'string' || !projectId)
+    throw new Error('invalid quantity unit project context')
+  return withCrewWorkerFactContext(
+    `/subcontract/quantity/${encodeURIComponent(projectId)}/${encodeURIComponent(intent.subject.id)}`,
+    intent,
+  )
+}
+
+function withCrewWorkerFactContext(path: string, intent: EntityTargetIntent): string {
+  const dataOrigin = intent.filters.dataOrigin
+  const ownerKind = intent.filters.ownerKind
+  const ownerId = intent.filters.ownerId
+  if (ownerKind == null && ownerId == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin) || (ownerKind !== 'crew' && ownerKind !== 'worker') || typeof ownerId !== 'string' || !ownerId)
+    throw new Error('invalid crew-worker fact context')
+  const query = new URLSearchParams({ origin: dataOrigin, ownerKind, ownerId })
+  return `${path}?${query.toString()}`
+}
+
+function hasCrewWorkerFactContext(intent: EntityTargetIntent): boolean {
+  return isDataOriginDTO(intent.filters.dataOrigin)
+    && (intent.filters.ownerKind === 'crew' || intent.filters.ownerKind === 'worker')
+    && typeof intent.filters.ownerId === 'string'
+    && intent.filters.ownerId.length > 0
+}
+
 const TARGET_REGISTRY = {
   'project:detail': projectPath,
   'project:supplier-workbench': projectSupplierPath,
   'customer:detail': customerPath,
   'supplier:detail': supplierPath,
+  'crew:detail': crewPath,
+  'worker:detail': workerPath,
   'contract:detail': (intent: EntityTargetIntent) => entityPath('/contract', intent),
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
+  'quantity-unit:detail': quantityUnitPath,
+  'wage-statement:detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/subcontract/payroll', intent), intent),
+  'subcontract-document:penalty-detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/project/penalty', intent), intent),
 } satisfies Record<string, TargetBuilder>
 
 type RegisteredTargetKey = keyof typeof TARGET_REGISTRY
@@ -154,6 +209,8 @@ export function resolveNavigationTarget(
     return unavailable('unverified-target', intent.subject.label)
 
   const key = `${intent.subject.entity}:${intent.variant ?? ''}`
+  if (key === 'subcontract-document:penalty-detail' && !hasCrewWorkerFactContext(intent as EntityTargetIntent))
+    return unavailable('unverified-target', intent.subject.label)
   const builder = TARGET_REGISTRY[key as RegisteredTargetKey]
   if (!builder) {
     return unavailable(
@@ -175,6 +232,18 @@ export function resolveNavigationTarget(
       const returnTo = validateCustomerReturnTo(options.returnTo)
       if (returnTo && isCustomerReturnContextId(options.returnContextId))
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+    }
+    if (options.returnTo && (key === 'crew:detail'
+      || key === 'worker:detail'
+      || key === 'project:detail'
+      || key === 'quantity-unit:detail'
+      || key === 'wage-statement:detail'
+      || key === 'subcontract-document:penalty-detail')) {
+      const returnTo = validateCrewWorkerReturnTo(options.returnTo)
+      if (returnTo) {
+        const separator = to.includes('?') ? '&' : '?'
+        to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}`
+      }
     }
     return {
       state: 'resolved',

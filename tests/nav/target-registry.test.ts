@@ -234,15 +234,15 @@ describe('唯一 Target Registry', () => {
       kind: 'entity-detail',
       subject: {
         state: 'resolved',
-        entity: 'crew',
-        id: 'crew-1',
-        label: '一班组',
+        entity: 'warehouse',
+        id: 'warehouse-1',
+        label: '一号仓',
         no: null,
       },
       variant: 'detail',
       view: null,
       filters: {},
-    })).toEqual({ state: 'not-connected', label: '一班组', message: '详情待接入' })
+    })).toEqual({ state: 'not-connected', label: '一号仓', message: '详情待接入' })
 
     expect(resolveNavigationTarget(projectIntent({
       subject: {

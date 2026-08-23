@@ -1,14 +1,36 @@
 <script setup lang="ts">
+import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { quantityMatrixReturnPath } from '~/lib/quantity/navigation'
+import { isDataOriginDTO } from '~/types/read-model'
 
 // 薄路由（#103 切片 6A）：参数身份已冻结为 pid=项目 id、uid=户 id（见 ADR 0010 / handoff 决策门）。
 const route = useRoute()
 
 const projectId = computed(() => String(route.params.pid ?? ''))
 const unitId = computed(() => String(route.params.uid ?? ''))
-const returnTo = computed(() => quantityMatrixReturnPath(route.query))
+const visibility = useDataVisibilityStore()
+const centralContext = computed(() => {
+  const origin = isDataOriginDTO(route.query.origin) ? route.query.origin : null
+  const ownerKind: 'crew' | 'worker' | null = route.query.ownerKind === 'crew' || route.query.ownerKind === 'worker' ? route.query.ownerKind : null
+  const ownerId = typeof route.query.ownerId === 'string' && route.query.ownerId ? route.query.ownerId : null
+  return origin && ownerKind && ownerId ? { origin, ownerKind, ownerId } : null
+})
+const returnTo = computed(() => centralContext.value
+  ? validateCrewWorkerReturnTo(route.query.returnTo) ?? `/base/${centralContext.value.ownerKind}`
+  : quantityMatrixReturnPath(route.query))
 </script>
 
 <template>
-  <QuantityUnitDetailScreen :project-id="projectId" :unit-id="unitId" :return-to="returnTo" />
+  <CrewWorkerRelationFactDetailScreen
+    v-if="centralContext"
+    fact-kind="assignment"
+    :fact-id="unitId"
+    :project-id="projectId"
+    :owner-kind="centralContext.ownerKind"
+    :owner-id="centralContext.ownerId"
+    :origin="centralContext.origin"
+    :include-demo="visibility.includeDemo"
+    :return-to="returnTo"
+  />
+  <QuantityUnitDetailScreen v-else :project-id="projectId" :unit-id="unitId" :return-to="returnTo" />
 </template>
