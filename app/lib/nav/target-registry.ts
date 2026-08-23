@@ -3,6 +3,7 @@ import type {
   NavigationIntentDTO,
   NavigationUnavailableReasonDTO,
 } from '~/types/read-model'
+import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -54,12 +55,32 @@ function projectPath(intent: EntityTargetIntent): string {
   return `${path}?origin=${dataOrigin}`
 }
 
+function customerPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/base/customer', intent)
+  const dataOrigin = intent.filters.dataOrigin
+  if (dataOrigin == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid customer data origin')
+  return `${path}?origin=${dataOrigin}`
+}
+
+function receiptPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/finance/receipt', intent)
+  const dataOrigin = intent.filters.dataOrigin
+  const customerId = intent.filters.customerId
+  if (!isDataOriginDTO(dataOrigin) || typeof customerId !== 'string' || !customerId)
+    throw new Error('invalid receipt relation context')
+  return `${path}?origin=${dataOrigin}&customerId=${encodeURIComponent(customerId)}`
+}
+
 const TARGET_REGISTRY = {
   'project:detail': projectPath,
-  'customer:detail': (intent: EntityTargetIntent) => entityPath('/base/customer', intent),
+  'customer:detail': customerPath,
   'supplier:detail': (intent: EntityTargetIntent) => entityPath('/base/supplier', intent),
   'contract:detail': (intent: EntityTargetIntent) => entityPath('/contract', intent),
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
+  'receipt:detail': receiptPath,
 } satisfies Record<string, TargetBuilder>
 
 type RegisteredTargetKey = keyof typeof TARGET_REGISTRY
@@ -130,6 +151,11 @@ export function resolveNavigationTarget(
         throw new Error('invalid project return context')
       const separator = to.includes('?') ? '&' : '?'
       to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+    }
+    if (key === 'receipt:detail' && options.returnTo && options.returnContextId) {
+      const returnTo = validateCustomerReturnTo(options.returnTo)
+      if (returnTo && isCustomerReturnContextId(options.returnContextId))
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
     }
     return {
       state: 'resolved',

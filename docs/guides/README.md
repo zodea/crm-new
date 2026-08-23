@@ -4,6 +4,7 @@
 
 ## 当前指南
 
+- [客户档案与业务关系使用指南](./customer-records.md)
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)
 - [核心合同与工程量清单使用指南](./core-contract-and-boq.md)
 - [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
@@ -22,6 +23,9 @@
 
 ```powershell
 python scripts/generate-project-guide-pdf.py
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/customer-records.md `
+  --output output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/core-contract-and-boq.md `
   --output output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
@@ -58,6 +62,7 @@ python scripts/generate-project-guide-pdf.py `
 
 ```text
 output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
+output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
 output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
 output/pdf/瑞航CRM_项目分供方工作台与文件导入使用指南.pdf
 output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf

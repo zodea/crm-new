@@ -108,6 +108,7 @@ const REFERENCE_VIEW_BY_ROUTE = new Map([
   ['/finance/payment', { id: 'finance-payment-list', label: '资金管理 > 付款申请' }],
   ['/finance/payment-management', { id: 'finance-payment-management', label: '资金管理 > 付款管理' }],
   ['/finance/receipt', { id: 'finance-receipt-list', label: '资金管理 > 收款登记' }],
+  ['/finance/receipt/:id', { id: 'finance-receipt-detail', label: '资金管理 > 收款登记 > 收款编号 > 只读详情' }],
   ['/finance/records', { id: 'finance-payment-records', label: '资金管理 > 支付记录' }],
   ['/finance/reimbursement', { id: 'finance-reimbursement-list', label: '资金管理 > 费用报销' }],
 

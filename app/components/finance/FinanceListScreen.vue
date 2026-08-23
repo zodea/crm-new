@@ -3,7 +3,7 @@ import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
-import { F3_FORM_META, financeDetailPath, financeFormPath } from '~/lib/finance/page'
+import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
@@ -119,7 +119,17 @@ function openEdit(row: FinanceListRow) {
 }
 
 function openDetail(row: FinanceListRow) {
+  if (props.kind === 'receipt') {
+    if (!row.dataOrigin || !row.customerId)
+      return
+    void navigateTo(receiptDetailPath(row.id, { origin: row.dataOrigin, customerId: row.customerId }))
+    return
+  }
   void navigateTo(financeDetailPath(props.kind, row.id))
+}
+
+function canOpenDetail(row: FinanceListRow) {
+  return props.kind !== 'receipt' || Boolean(row.dataOrigin && row.customerId)
 }
 
 onMounted(() => {
@@ -168,9 +178,12 @@ onActivated(() => {
         @page-change="onPageChange"
       >
         <template #name="{ row }">
-          <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
+          <button v-if="canOpenDetail(row)" class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
             {{ row.name || (isReceipt ? '待补充甲方客户' : '未命名记录') }}
           </button>
+          <span v-else data-testid="non-central-receipt-name" class="text-ink">
+            {{ row.name || '待补充甲方客户' }}
+          </span>
         </template>
         <template #status="{ row }">
           <span class="chip" :class="['已确认', '已审批', '已支付'].includes(row.statusLabel) ? 'chip-ok' : 'chip-brand'">

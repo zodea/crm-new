@@ -10,6 +10,8 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
   capabilities: Object.freeze([
     'project:list:read',
     'project:write',
+    'customer:list:read',
+    'customer:write',
     'demo:read',
     'core:migration:write',
   ]),

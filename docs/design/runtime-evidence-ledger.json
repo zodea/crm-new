@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-15",
   "counts": {
-    "trackedPageFiles": 134,
+    "trackedPageFiles": 135,
     "devPageFiles": 5,
-    "productionRoutes": 129,
+    "productionRoutes": 130,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 129,
-    "referenceEndpoints": 129,
+    "evidenceEndpointRecords": 130,
+    "referenceEndpoints": 130,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
-    "directEvidenceRoutes": 48,
+    "directEvidenceRoutes": 49,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 18,
     "historicalEvidenceRoutes": 36,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 127,
+    "designCoveredRoutes": 128,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -145,7 +145,7 @@
     {
       "code": "finance-income",
       "domain": "收入财务",
-      "routeCount": 9,
+      "routeCount": 10,
       "implementationIssues": [
         302,
         289
@@ -1562,18 +1562,18 @@
       "page": "app/pages/finance/receipt/[id].vue",
       "localRoute": "/finance/receipt/:id",
       "domainCode": "finance-income",
-      "template": "整页表单",
+      "template": "详情",
       "implementationIssues": [
         302,
         289
       ],
-      "referenceProfile": "R-FORM-PRIOR",
-      "referenceEndpointId": "historical-036C08F07C62",
-      "referenceEndpointLabel": "历史整页表单目标未登记：/finance/receipt/:id",
-      "evidenceGrade": "historical",
-      "observationDate": null,
-      "observationDateStatus": "not-recorded-historical",
-      "permissionStatus": "unverified",
+      "referenceProfile": "R-FINANCE-FLOW-LIVE",
+      "referenceEndpointId": "finance-receipt-detail",
+      "referenceEndpointLabel": "资金管理 > 收款登记 > 收款编号 > 只读详情",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-08-13",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "read-only-observed",
       "layoutConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/finance/receipt/:id"
@@ -1581,6 +1581,33 @@
       "stateAndNavigationConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/finance/receipt/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-2EEFEB42C3DF",
+      "page": "app/pages/finance/receipt/form/[id].vue",
+      "localRoute": "/finance/receipt/form/:id",
+      "domainCode": "finance-income",
+      "template": "整页表单",
+      "implementationIssues": [
+        302,
+        289
+      ],
+      "referenceProfile": "R-FORM-PRIOR",
+      "referenceEndpointId": "historical-2EEFEB42C3DF",
+      "referenceEndpointLabel": "历史整页表单目标未登记：/finance/receipt/form/:id",
+      "evidenceGrade": "historical",
+      "observationDate": null,
+      "observationDateStatus": "not-recorded-historical",
+      "permissionStatus": "unverified",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/finance/receipt/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/finance/receipt/form/:id"
       },
       "constraints": "C-FORM"
     },

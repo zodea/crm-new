@@ -22,7 +22,7 @@ export function resolveEntityLink(input: {
   const text = input.label ?? null
   if (text == null || text === '')
     return { state: 'empty', label: null }
-  if (input.dataOrigin && input.type !== 'project')
+  if (input.dataOrigin && input.type !== 'project' && input.type !== 'customer')
     return { state: 'not-connected', label: text, message: '详情待接入' }
   if (input.id == null || input.id === '')
     return { state: 'missing', label: text, message: '未记录稳定身份' }

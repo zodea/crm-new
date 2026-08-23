@@ -147,7 +147,7 @@ interface NavigationOrigin {
 | 实体/视图 | canonical variant / view | 目标路由 | 当前状态 |
 | --- | --- | --- | --- |
 | 项目 | detail | `/project/:id` | 已闭合；唯一 Target Registry 生成来源感知路径 |
-| 客户 | detail | `/base/customer/:id` | 已闭合；参考权限不可见不影响本地路由 |
+| 客户 | detail | `/base/customer/:id?origin=:dataOrigin` | 已闭合；唯一 Target Registry 生成来源感知路径，测试来源只读 |
 | 分供方 | detail | `/base/supplier/:id` | 已闭合 |
 | 班组 | detail | `/base/crew/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
 | 工人 | detail | `/base/worker/:id` | 页面已闭合；公共 `EntityLink` 尚未登记 |
@@ -155,7 +155,7 @@ interface NavigationOrigin {
 | 项目×分供方 | overview / six tabs | `/project/:pid/supplier/:sid` | 已闭合；目标模块尚未统一消费来源 query |
 | 目标成本 | detail | `/project/target-cost/:id` | 已闭合；合同聚合区缺稳定锚点 |
 | 开票申请 | detail | `/finance/billing/:id` | 读写混用 |
-| 收款登记 | detail | `/finance/receipt/:id` | 读写混用 |
+| 收款登记 | detail | `/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId` | 已闭合；稳定来源与父客户成对校验，只读详情和显式编辑分路由 |
 | 往来收付 | receipt / payment | `/finance/current/:id` | 读写混用；参考往来付款目标待补证 |
 | 付款申请 | detail | `/finance/payment/:id/detail` | 已闭合 |
 | 支付记录 | detail | `/finance/records/:id` | 读写混用 |
@@ -187,8 +187,8 @@ interface NavigationOrigin {
 | `N-PROJECT-ROLE` | `project` `/project` | 项目经理/执行经理及角色 | 必须有人员实体 ID | 项目成员只读视图，路由待定 | 返回项目列表原上下文 | 缺身份；当前只有姓名文本，禁止造链接 |
 | `N-PROJECT-CUSTOMER` | `project` `/project` | 客户 | `customer.id` resolved | `/base/customer/:id` | 返回项目列表原上下文 | 闭合；参考权限拒绝记为 forbidden |
 | `N-PROJECT-METRICS` | `project` `/project/:id` | 合同/收付/票税/支付金额 | 明确 drilldown，不以非零判断 | 同一项目详情 `?tab=construction,fund,current,tax,payment`，进项票也可到 `/finance/ledger?project=:id` | 返回同一项目与页签/子表 | 闭合主链；0 金额公共组件规则待统一 |
-| `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id` | 返回列表筛选 | 闭合 |
-| `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id`、`/contract/:id`、`/finance/receipt/:id`；页签 `contracts,receipts` | 返回客户详情原页签 | 闭合主链；收款只读页仍读写混用 |
+| `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id?origin=:dataOrigin` | 返回原搜索、状态、排序、页码、每页条数、滚动与行焦点；详情再显式进入正式编辑 | 闭合；#314 以白名单 `returnTo` + 有时效会话上下文恢复，直达或伪造来源回退 canonical 列表 |
+| `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id?origin=:dataOrigin`、`/contract/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`；页签 `contracts,receipts` | 收款详情返回客户详情的收款页签，并透传已校验的客户列表返回上下文 | 闭合；三类关系均由 Target Registry 按稳定 ID 进入只读目标，missing 与 forbidden 不生成死链；收款编辑仅从列表显式动作进入 `/finance/receipt/form/:id` |
 | `N-CREW-WORKER` | `master-data` 班组/工人详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 返回来源详情区块 | 部分；页面可达，班组/工人未进公共解析，工资/罚扣返回不完整 |
 | `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id` resolved | `/base/supplier/:id` | 返回 742 条列表原搜索/页码 | 部分；基础详情闭合，列表上下文待统一 |
 | `N-SUPPLIER-PROJECT` | `supplier` `/base/supplier/:id` | 合作项目 | `project.id + supplier.id` resolved | `/project/:pid/supplier/:sid`，`?tab=projects` 为来源视图 | 返回分供方详情合作项目页签 | 闭合 |
@@ -210,7 +210,7 @@ interface NavigationOrigin {
 | `N-OWNER-MATERIAL` | `owner-material` 五类列表/项目物资页签 | 单据号、项目、供货单位、送货单、仓库、班组/班组合同 | ID + variant resolved | 对应五条已登记的甲供材表单路径，关系到项目/主数据/合同/归档详情 | 返回来源、页签、子表、筛选、页码、滚动 | 待只读页；供货身份/总计划头行/仓库等缺关系时不得链接 |
 | `N-DELIVERY-ARCHIVE` | `delivery` 归档库/项目归档 | 送货单号、项目、分供方 | ref resolved | `/material/delivery/archive/:id`、`/project/:id`、`/base/supplier/:id` | 返回项目—分供方树、搜索、日期和页码 | 部分；详情闭合，返回树上下文待统一 |
 | `N-MATERIAL-PRICE` | `material-price` 价格事实 | 来源送货单、相关厂家历史合同 | 价格行必须有 delivery record/line ID；合同有 contract ID | `/material/delivery/archive/:id`、`/contract/:id` | 返回材料/规格/供应商/时间筛选 | 闭合主链；历史合同不是单个价格点来源 |
-| `N-FINANCE-INCOME` | `finance-income` 开票/收款/往来列表 | 申请名称或编号 | ID + variant resolved | `/finance/billing/:id`、`/finance/receipt/:id`、`/finance/current/:id` | 返回分类、搜索、页码和滚动 | 待只读页；当前三类均读写混用，往来付款参考目标待补证 |
+| `N-FINANCE-INCOME` | `finance-income` 开票/收款/往来列表 | 申请名称或编号 | ID + variant resolved | `/finance/billing/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`、`/finance/current/:id` | 返回分类、搜索、页码和滚动 | 部分；中央收款关系已从客户详情进入只读详情，旧本地收款未携带中央来源时只显示普通文本，编辑走 `/finance/receipt/form/:id`；开票与往来仍读写混用，往来付款参考目标待补证 |
 | `N-FINANCE-INCOME-REL` | `finance-income` 详情/项目财务页签 | 项目、客户、合同、来源单据 | ref resolved | `/project/:id`、`/base/customer/:id`、`/contract/:id` 与源单路由 | 返回详情原区块或项目财务页签 | 部分；通用列表 DTO 必须补真实关系 ID |
 | `N-PAYMENT-APPLICATION` | `finance-expense` 付款申请/付款管理/分供方/项目×分供方 | 申请编号/名称 | payment application ref resolved | `/finance/payment/:id/detail`；来源可带 `projectId/supplierId` | 返回原列表分类/筛选/页码或来源工作台 | 部分；专属详情闭合，来源返回未统一 |
 | `N-PAYMENT-DETAIL-REL` | `finance-expense` 付款申请详情 | 项目、分供方、合同、发票、支付记录 | ref resolved | `/project/:id`、`/base/supplier/:id`、`/contract/:id`、`/finance/invoice/:id`、`/finance/records/:id` | 返回同一付款申请页签 | 闭合主链 |

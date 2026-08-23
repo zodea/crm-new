@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-08-15
+> 核对日期：2026-08-23
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -29,11 +29,11 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 134 |
+| 实现页面文件（含 dev） | 135 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 129 |
+| 实现生产路由（排除 dev） | 130 |
 | 实现侧栏叶子 | 51 |
-| 已覆盖 | 127 |
+| 已覆盖 | 128 |
 | 待补设计（实现有、设计稿没有） | 2 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
@@ -77,7 +77,7 @@
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 材料价格 | 1 | [#296](https://github.com/zodea/crm-new/issues/296)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 收入财务 | 9 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 收入财务 | 10 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 支出财务 | 11 | [#303](https://github.com/zodea/crm-new/issues/303)、[#305](https://github.com/zodea/crm-new/issues/305)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -85,6 +85,8 @@
 | 导入导出 | 3 | [#278](https://github.com/zodea/crm-new/issues/278)、[#294](https://github.com/zodea/crm-new/issues/294) |
 | 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
 <!-- implementation-frontier:end -->
+
+基础主数据仍由父规格统一承接；其中客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，不代表分供方等同域范围已经完成。
 
 不占独立页面域的公共依赖仍按原生 blocking 关系推进：正式/演示隔离 [#279](https://github.com/zodea/crm-new/issues/279)、财务集成 [#286](https://github.com/zodea/crm-new/issues/286)、服务器事件通知 [#290](https://github.com/zodea/crm-new/issues/290)、页签恢复 [#306](https://github.com/zodea/crm-new/issues/306)，最终由浏览器生产接缝 [#278](https://github.com/zodea/crm-new/issues/278) 验收全域。OCR 设置继续由既有专项 [#204](https://github.com/zodea/crm-new/issues/204) 承接。
 
