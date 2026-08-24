@@ -2,6 +2,8 @@ import type { CrewWorkerCommandRepository } from '~/lib/crew-worker/command-cont
 import type { CrewWorkerReadRepository } from '~/lib/crew-worker/repository'
 import type { CustomerCommandRepository } from '~/lib/customer/command-contract'
 import type { CustomerReadRepository } from '~/lib/customer/repository'
+import type { MaterialContractCommandRepository } from '~/lib/material-contract/command-contract'
+import type { MaterialContractReadRepository } from '~/lib/material-contract/repository'
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
 import type { ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
 import type { ProjectCommandRepository } from '~/lib/project/command-contract'
@@ -12,6 +14,8 @@ import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command
 import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
+import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
+import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
@@ -30,6 +34,8 @@ export interface DomainRepositories {
   projectSupplierRead: ProjectSupplierReadRepository
   projectCommands: ProjectCommandRepository
   coreMigration: CoreMigrationRepository
+  materialContractRead: MaterialContractReadRepository
+  materialContractCommands: MaterialContractCommandRepository
 }
 
 export default defineNuxtPlugin(() => {
@@ -62,6 +68,12 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     coreMigration: createHttpCoreMigrationRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    materialContractRead: createHttpMaterialContractReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    materialContractCommands: createHttpMaterialContractCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
   }

@@ -23,6 +23,26 @@ function projectIntent(overrides: Partial<NavigationIntentDTO> = {}): Navigation
 }
 
 describe('唯一 Target Registry', () => {
+  it('材料采购合同详情保留显式数据来源', () => {
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-318', label: '材料合同', no: 'HT-318' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo', contractKind: '材采' },
+    })).toEqual({ state: 'resolved', label: '材料合同', to: '/contract/contract-318?origin=demo&contractKind=material' })
+  })
+
+  it('未声明材采类型的合同意图继续沿用原详情，避免改写施工与分包链路', () => {
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-old', label: '既有合同', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    })).toEqual({ state: 'resolved', label: '既有合同', to: '/contract/contract-old' })
+  })
+
   it('分供方事实使用稳定 ID 解析项目分供方视图与付款申请详情', () => {
     expect(resolveNavigationTarget({
       kind: 'entity-subview',

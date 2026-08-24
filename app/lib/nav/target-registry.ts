@@ -115,6 +115,20 @@ function projectSupplierPath(intent: EntityTargetIntent): string {
   return `/project/${encodeURIComponent(intent.subject.id)}/supplier/${encodeURIComponent(supplierId)}?${query.toString()}`
 }
 
+function contractPath(intent: EntityTargetIntent): string {
+  const path = entityPath('/contract', intent)
+  if (intent.kind === 'source-record')
+    return path
+  if (intent.filters.contractKind !== '材采')
+    return path
+  const dataOrigin = intent.filters.dataOrigin
+  if (dataOrigin == null)
+    return path
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid contract data origin')
+  return `${path}?${new URLSearchParams({ origin: dataOrigin, contractKind: 'material' }).toString()}`
+}
+
 function receiptPath(intent: EntityTargetIntent): string {
   const path = entityPath('/finance/receipt', intent)
   const dataOrigin = intent.filters.dataOrigin
@@ -160,7 +174,7 @@ const TARGET_REGISTRY = {
   'supplier:detail': supplierPath,
   'crew:detail': crewPath,
   'worker:detail': workerPath,
-  'contract:detail': (intent: EntityTargetIntent) => entityPath('/contract', intent),
+  'contract:detail': contractPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
