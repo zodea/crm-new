@@ -5,6 +5,10 @@ import type {
 } from '~/types/read-model'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
+import {
+  validateMaterialContractDetailJourneyReturnTo,
+  validateProjectJourneyReturnTo,
+} from '~/lib/material-contract/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { appendProjectSupplierReturnContext, validateProjectSupplierReturnTo } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
@@ -35,6 +39,8 @@ type ResolvedEntityRef = Extract<EntityRefDTO, { state: 'resolved' }>
 type EntityTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-detail' | 'entity-subview' | 'source-record' }>
   & { subject: ResolvedEntityRef }
 type TargetBuilder = (intent: EntityTargetIntent) => string
+type ListTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-list' }>
+type ListTargetBuilder = (intent: ListTargetIntent) => string
 
 const STATE_MESSAGES: Record<Exclude<NavigationTargetState, 'resolved'>, string> = {
   'missing': '未记录稳定身份',
@@ -75,7 +81,14 @@ function supplierPath(intent: EntityTargetIntent): string {
     return path
   if (!isDataOriginDTO(dataOrigin))
     throw new Error('invalid supplier data origin')
-  return `${path}?origin=${dataOrigin}`
+  const query = new URLSearchParams({ origin: dataOrigin })
+  if (intent.view != null) {
+    if (!['projects', 'contracts', 'settlements', 'invoices', 'payments'].includes(intent.view))
+      throw new Error('invalid supplier detail view')
+    if (intent.view !== 'projects')
+      query.set('tab', intent.view)
+  }
+  return `${path}?${query.toString()}`
 }
 
 function crewPath(intent: EntityTargetIntent): string {
@@ -183,6 +196,16 @@ const TARGET_REGISTRY = {
   'subcontract-document:penalty-detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/project/penalty', intent), intent),
 } satisfies Record<string, TargetBuilder>
 
+const LIST_TARGET_REGISTRY = {
+  'contract:material': (intent: ListTargetIntent) => {
+    const projectId = intent.filters.projectId
+    const dataOrigin = intent.filters.dataOrigin
+    if (typeof projectId !== 'string' || !projectId || !isDataOriginDTO(dataOrigin))
+      throw new Error('invalid project material contract list context')
+    return `/contract/material?${new URLSearchParams({ projectId, origin: dataOrigin }).toString()}`
+  },
+} satisfies Record<string, ListTargetBuilder>
+
 type RegisteredTargetKey = keyof typeof TARGET_REGISTRY
 
 function unavailable(
@@ -194,7 +217,9 @@ function unavailable(
 
 function unavailableReasonState(
   reason: NavigationUnavailableReasonDTO,
-): Exclude<NavigationTargetState, 'resolved' | 'error'> {
+): Exclude<NavigationTargetState, 'resolved'> {
+  if (reason === 'error')
+    return 'error'
   if (reason === 'missing-id')
     return 'missing'
   if (reason === 'forbidden')
@@ -220,8 +245,22 @@ export function resolveNavigationTarget(
     const state = unavailableReasonState(intent.reason)
     return unavailable(state, state === 'forbidden' ? null : options.label ?? null)
   }
-  if (intent.kind === 'entity-list')
-    return unavailable('unverified-target', options.label ?? null)
+  if (intent.kind === 'entity-list') {
+    const key = `${intent.entity}:${intent.variant ?? ''}`
+    const builder = LIST_TARGET_REGISTRY[key as keyof typeof LIST_TARGET_REGISTRY]
+    if (!builder)
+      return unavailable('unverified-target', options.label ?? null)
+    try {
+      let to = builder(intent)
+      const returnTo = validateProjectJourneyReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (returnTo)
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
+      return { state: 'resolved', label: '材料采购合同', to }
+    }
+    catch {
+      return unavailable('error', options.label ?? null)
+    }
+  }
 
   if (intent.subject.state === 'missing')
     return unavailable('missing', null)
@@ -269,6 +308,11 @@ export function resolveNavigationTarget(
       const returnTo = validateCustomerReturnTo(options.returnTo)
       if (returnTo && isCustomerReturnContextId(options.returnContextId))
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}&returnContext=${encodeURIComponent(options.returnContextId)}`
+    }
+    if (key === 'supplier:detail' && options.returnTo) {
+      const returnTo = validateMaterialContractDetailJourneyReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (returnTo)
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
     }
     if (options.returnTo && (key === 'crew:detail'
       || key === 'worker:detail'

@@ -15,6 +15,7 @@ export type MaterialContractPageSize = typeof MATERIAL_CONTRACT_PAGE_SIZES[numbe
 
 export interface MaterialContractListQueryDTO {
   includeDemo: boolean
+  origin: DataOriginDTO | null
   search: string
   projectId: string | null
   supplierId: string | null

@@ -5,6 +5,16 @@ import type { ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
+import {
+  createMaterialContractReturnOrigin,
+  isMaterialContractReturnContextId,
+  loadMaterialContractReturnOrigin,
+  materialContractListNavigationStateFromQuery,
+  newMaterialContractReturnContextId,
+  resolveMaterialContractReturnContext,
+  saveMaterialContractReturnOrigin,
+  validateProjectJourneyReturnTo,
+} from '~/lib/material-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -45,6 +55,12 @@ const query = computed(() => parsedQuery.value.query ?? parseMaterialContractLis
 }))
 const queryProblem = computed(() => parsedQuery.value.problem)
 const search = ref(query.value.search)
+const rowNavigationPending = ref(false)
+const returnContextId = ref(isMaterialContractReturnContextId(route.query.nav)
+  ? route.query.nav
+  : newMaterialContractReturnContextId())
+let restoredRoute = ''
+const projectReturnTo = computed(() => validateProjectJourneyReturnTo(route.query.returnTo, query.value.origin))
 const canCreate = computed(() => page.value?.capabilities.includes('material-contract:write') ?? false)
 const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
@@ -70,20 +86,85 @@ function patchQuery(patch: Record<string, string | number | null | undefined>) {
   void router.replace({ query: next })
 }
 
-const commitSearch = useDebounceFn((value: string) => patchQuery({ search: value.trim(), page: 1 }), 250)
-watch(search, value => commitSearch(value))
+const commitSearch = useDebounceFn((value: string) => {
+  if (!rowNavigationPending.value)
+    patchQuery({ search: value.trim(), page: 1 })
+}, 250)
+watch(search, (value) => {
+  rowNavigationPending.value = false
+  void commitSearch(value)
+})
 watch(parsedQuery, (value) => {
   if (value.query)
     void store.loadList(value.query)
 }, { immediate: true })
 
+function workspaceScrollTop(): number {
+  return document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop ?? 0
+}
+
+function returnOrigin(row: MaterialContractListPageDTO['items'][number], scrollTop = 0) {
+  return createMaterialContractReturnOrigin({
+    contextId: returnContextId.value,
+    rowIdentity: row.rowKey,
+    scrollTop,
+    now: Date.now(),
+    state: {
+      ...materialContractListNavigationStateFromQuery(route.query),
+      search: search.value.trim(),
+    },
+  })
+}
+
 function link(row: MaterialContractListPageDTO['items'][number]) {
   const target = resolveNavigationTarget(row.navigation)
   if (target.state !== 'resolved')
     return null
+  const origin = returnOrigin(row)
   const separator = target.to.includes('?') ? '&' : '?'
-  return `${target.to}${separator}returnTo=${encodeURIComponent(route.fullPath)}`
+  return `${target.to}${separator}returnTo=${encodeURIComponent(origin.returnTo)}`
 }
+
+function captureReturnOrigin(row: MaterialContractListPageDTO['items'][number]) {
+  rowNavigationPending.value = true
+  try {
+    saveMaterialContractReturnOrigin(returnOrigin(row, workspaceScrollTop()))
+  }
+  catch {
+    // 导航不应因浏览器存储不可用而被拦截；无上下文时按安全列表地址降级。
+  }
+}
+
+async function restoreReturnOrigin() {
+  if (route.path !== '/contract/material' || restoredRoute === route.fullPath)
+    return
+  const result = resolveMaterialContractReturnContext({
+    returnTo: route.fullPath,
+    contextId: route.query.nav,
+    now: Date.now(),
+    load: loadMaterialContractReturnOrigin,
+  })
+  if (!result.origin)
+    return
+  let anchor: HTMLElement | null = null
+  for (let attempt = 0; attempt < 4 && !anchor; attempt += 1) {
+    await nextTick()
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    anchor = document.getElementById(result.origin.anchorId)
+  }
+  const focusTarget = anchor ?? document.getElementById('material-contract-list-heading')
+  if (!focusTarget)
+    return
+  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  if (workspace)
+    workspace.scrollTop = result.origin.scrollTop
+  focusTarget.focus({ preventScroll: true })
+  restoredRoute = route.fullPath
+}
+
+watch(() => [state.value.kind, page.value?.items.length, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
+onMounted(() => void restoreReturnOrigin())
+onActivated(() => void restoreReturnOrigin())
 
 useTabTitle('材料采购合同')
 </script>
@@ -93,11 +174,14 @@ useTabTitle('材料采购合同')
     <header class="panel px-4 py-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 class="text-18px font-850 text-ink">
+          <h1 id="material-contract-list-heading" tabindex="-1" class="text-18px font-850 text-ink outline-none">
             材料采购合同
           </h1><p class="mt-1 text-12px text-ink-soft">
             正式数据与已授权演示数据分源展示；演示数据只读。
           </p>
+          <NuxtLink v-if="projectReturnTo" :to="projectReturnTo" class="mt-2 inline-flex text-12px font-700 text-brand hover:underline">
+            返回项目详情
+          </NuxtLink>
         </div>
         <NuxtLink v-if="canCreate" to="/contract/material/form" class="btn-primary">
           新建材料采购合同
@@ -161,7 +245,13 @@ useTabTitle('材料采购合同')
           @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })"
         >
           <template #name="{ row }">
-            <NuxtLink v-if="link(row)" :to="link(row)!" class="font-700 text-brand hover:underline">
+            <NuxtLink
+              v-if="link(row)"
+              :id="`material-contract-row-${row.rowKey}`"
+              :to="link(row)!"
+              class="font-700 text-brand hover:underline"
+              @click="captureReturnOrigin(row)"
+            >
               {{ row.name }}
             </NuxtLink><span v-else>{{ row.name }}</span>
           </template>

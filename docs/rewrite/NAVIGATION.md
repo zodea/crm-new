@@ -37,7 +37,7 @@ type NavigationIntentDTO =
     }
   | {
       kind: 'unavailable'
-      reason: 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target'
+      reason: 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target' | 'error'
     }
 ```
 
@@ -47,7 +47,7 @@ type NavigationIntentDTO =
 2. `variant` 来自 canonical 业务类型，不等同于路由片段。前端注册表负责把它解析为站内路径。
 3. `view` 表示详情页签、区块或列表分类，不参与实体身份。
 4. `same-route-overlay` 不创建新路由。关闭后仍停留原记录，切换记录时必须以新的 `subject.id` 重算记录级数据。
-5. `unavailable` 渲染普通文本或明确“未接/无权限”状态，不伪装蓝链。
+5. `unavailable` 的缺关系、未接、无权限与未验证目标渲染普通文本或明确边界状态，不伪装蓝链；`error` 是可重试的读取失败，必须渲染错误状态，不能降级为其他 `reason` 或 `0`。
 
 ### 当前运行落点（#312）
 

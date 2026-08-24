@@ -2,6 +2,7 @@
 import type { MaterialContractDetailReadDTO, MaterialContractFactDTO } from '~/lib/material-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { computed, onActivated, watch } from 'vue'
+import { validateMaterialContractReturnTo } from '~/lib/material-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -37,9 +38,7 @@ const activeTab = computed({
   get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
   set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value } }),
 })
-const returnTo = computed(() => typeof route.query.returnTo === 'string' && route.query.returnTo.startsWith('/contract/material')
-  ? route.query.returnTo
-  : '/contract/material')
+const returnTo = computed(() => validateMaterialContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/material')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real'
   && detail.value.capabilities.includes('material-contract:write'))
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
@@ -62,6 +61,27 @@ function target(intent: NavigationIntentDTO): string | null {
   const result = resolveNavigationTarget(intent)
   return result.state === 'resolved' ? result.to : null
 }
+
+const supplierFactLinks = computed(() => {
+  const navigation = detail.value?.supplierNavigation
+  if (!navigation || (navigation.kind !== 'entity-detail' && navigation.kind !== 'entity-subview'))
+    return []
+  const rows = [
+    { view: 'contracts', label: '查看分供方合同事实' },
+    { view: 'settlements', label: '查看分供方结算事实' },
+    { view: 'invoices', label: '查看分供方收票事实' },
+    { view: 'payments', label: '查看分供方付款事实' },
+  ] as const
+  return rows.flatMap((row) => {
+    const result = resolveNavigationTarget({
+      ...navigation,
+      kind: 'entity-subview',
+      variant: 'detail',
+      view: row.view,
+    }, { returnTo: route.fullPath })
+    return result.state === 'resolved' ? [{ ...row, to: result.to }] : []
+  })
+})
 
 const metrics = computed(() => {
   const amounts = detail.value?.contract.amounts
@@ -160,6 +180,19 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
         <div class="panel min-w-0 overflow-hidden px-3">
           <SegTab v-model="activeTab" :tabs="tabs" />
         </div>
+
+        <section v-if="supplierFactLinks.length" class="panel flex min-w-0 flex-wrap items-center gap-2 p-3" aria-label="分供方关联事实">
+          <span class="mr-auto text-12px font-700 text-ink-soft">分供方关联事实</span>
+          <NuxtLink
+            v-for="link in supplierFactLinks"
+            :key="link.view"
+            :to="link.to"
+            class="btn-ghost"
+            :aria-label="link.label"
+          >
+            {{ link.label.replace('查看分供方', '') }}
+          </NuxtLink>
+        </section>
 
         <section v-if="activeTab === 'info'" class="panel p-4">
           <SectionHeader title="详细信息" subtitle="仅展示中央读模型已核验字段；敏感字段按权限脱敏" />

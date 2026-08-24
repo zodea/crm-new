@@ -50,6 +50,38 @@ function isMetric(value: unknown): value is MetricDTO {
         && isStringRecord(drilldown.filters)))
 }
 
+function isCountMetric(value: unknown): value is MetricDTO {
+  const drilldown = isObject(value) ? value.drilldown : undefined
+  return isObject(value)
+    && (value.value === null || (Number.isSafeInteger(value.value) && Number(value.value) >= 0))
+    && value.unit === 'count'
+    && METRIC_STATUSES.has(value.status as MetricDTO['status'])
+    && Array.isArray(value.missingSources)
+    && value.missingSources.every(item => typeof item === 'string')
+    && isISODateTimeDTO(value.asOf)
+    && (value.drilldown === null
+      || (isObject(drilldown)
+        && drilldown.entity === 'contract'
+        && isStringRecord(drilldown.filters)))
+}
+
+function isMaterialContractJourney(value: unknown, item: unknown): boolean {
+  if (!isObject(value) || !isCountMetric(value.count) || !isObject(item))
+    return false
+  const navigation = value.navigation
+  if (!isObject(navigation))
+    return false
+  if (navigation.kind === 'unavailable')
+    return ['forbidden', 'not-connected', 'missing-id', 'error'].includes(String(navigation.reason)) && value.count.value === null
+  return navigation.kind === 'entity-list'
+    && navigation.entity === 'contract'
+    && navigation.variant === 'material'
+    && navigation.view === null
+    && isObject(navigation.filters)
+    && navigation.filters.projectId === (isObject(item.project) ? item.project.id : undefined)
+    && navigation.filters.dataOrigin === item.dataOrigin
+}
+
 function isEntityRef(value: unknown, entity: 'project' | 'customer'): boolean {
   if (!isObject(value) || value.entity !== entity || typeof value.state !== 'string')
     return false
@@ -208,6 +240,7 @@ export function decodeProjectListPage(value: unknown): ProjectListPageDTO {
 export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
   const valid = isObject(value)
     && isProjectItem(value.item)
+    && isMaterialContractJourney(value.materialContracts, value.item)
     && isISODateTimeDTO(value.asOf)
     && (value.sourceVersion === null || typeof value.sourceVersion === 'string')
     && Array.isArray(value.capabilities)

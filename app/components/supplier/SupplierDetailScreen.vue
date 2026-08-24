@@ -2,6 +2,7 @@
 import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { yuan } from '~/lib/util/money'
 import { useSupplierReadStore } from '~/stores/supplier-read'
@@ -28,7 +29,9 @@ const detail = computed(() => {
   return null
 })
 const supplier = computed(() => detail.value?.supplier ?? null)
-const backTo = computed(() => validateSupplierReturnTo(props.returnTo) ?? '/base/supplier')
+const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
+const backTo = computed(() => validateSupplierReturnTo(props.returnTo) ?? materialContractReturnTo.value ?? '/base/supplier')
+const backLabel = computed(() => materialContractReturnTo.value ? '返回材料采购合同' : '返回分供方列表')
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -114,7 +117,7 @@ onActivated(() => void load())
     :title="supplier?.name ?? '分供方详情'"
     :subtitle="supplier ? [supplier.supplierCategory, supplier.taxNo, supplier.contact].filter(Boolean).join(' · ') : ''"
     :back-to="backTo"
-    back-label="返回分供方列表"
+    :back-label="backLabel"
     :state="shellState"
     :state-title="shellState === 'not-found' ? '分供方不存在或已删除' : shellState === 'forbidden' ? '无权查看该分供方' : shellState === 'loading' ? '正在加载分供方详情' : '分供方详情加载失败'"
     :state-description="problem?.message ?? ''"

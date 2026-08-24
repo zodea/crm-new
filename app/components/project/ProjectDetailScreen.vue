@@ -4,6 +4,7 @@ import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
+import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
@@ -15,10 +16,12 @@ const props = withDefaults(defineProps<{
   returnTo?: string
   returnExpiresAt?: number
   returnLabel?: string
+  currentRoute?: string
 }>(), {
   originHint: 'real',
   includeDemo: false,
   returnTo: '/project',
+  currentRoute: '',
 })
 
 const repository = useNuxtApp().$repositories.projectList
@@ -33,6 +36,8 @@ let hasActivated = false
 const item = computed(() => detail.value?.item ?? null)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
+const journeyReturnTo = computed(() => props.currentRoute
+  || `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`)
 
 useTabTitle(() => item.value?.project.label)
 
@@ -165,7 +170,7 @@ onActivated(() => {
 
 <template>
   <div
-    v-if="state === 'ready' && item && project"
+    v-if="state === 'ready' && detail && item && project"
     data-ui="project-detail-screen"
     class="project-detail flex min-w-0 flex-col gap-3"
   >
@@ -244,6 +249,13 @@ onActivated(() => {
         </div>
       </dl>
     </header>
+
+    <ProjectMaterialContractJourney
+      :count="detail.materialContracts.count"
+      :navigation="detail.materialContracts.navigation"
+      :return-to="journeyReturnTo"
+      @retry="loadProject"
+    />
 
     <section
       data-authoritative-readonly

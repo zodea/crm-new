@@ -92,9 +92,28 @@ vi.stubGlobal('navigateTo', vi.fn())
 describe('材料采购合同中央详情', () => {
   beforeEach(() => {
     route.query = {}
+    route.fullPath = '/contract/c1?origin=demo&contractKind=material'
     replace.mockReset()
     store.loadDetail.mockClear()
     store.detailState = { kind: 'ready', data: detail }
+  })
+
+  it('从合同按稳定分供方 ID 进入四类事实，并携带当前合同页签来源', () => {
+    const listReturnTo = '/contract/material?projectId=p1&origin=demo&nav=origin_319_contract#material-contract-row-demo%3Ac1'
+    route.query = { tab: 'invoices', returnTo: listReturnTo }
+    route.fullPath = `/contract/c1?origin=demo&contractKind=material&tab=invoices&returnTo=${encodeURIComponent(listReturnTo)}`
+    render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
+
+    for (const [label, tab] of [
+      ['查看分供方合同事实', 'contracts'],
+      ['查看分供方结算事实', 'settlements'],
+      ['查看分供方收票事实', 'invoices'],
+      ['查看分供方付款事实', 'payments'],
+    ] as const) {
+      const href = screen.getByRole('link', { name: label }).getAttribute('href') ?? ''
+      expect(href).toContain(`/base/supplier/s1?origin=demo&tab=${tab}`)
+      expect(href).toContain(`returnTo=${encodeURIComponent(route.fullPath)}`)
+    }
   })
 
   it('演示详情只读，七个页签写入 URL，并展示真实空态', async () => {

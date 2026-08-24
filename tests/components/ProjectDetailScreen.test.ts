@@ -1,5 +1,5 @@
 import type { ProjectDetailReadDTO } from '~/lib/project/repository'
-import { render, screen, within } from '@testing-library/vue'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
@@ -52,6 +52,23 @@ const detail: ProjectDetailReadDTO = {
     },
     updatedAt: '2026-07-30T00:00:00.000Z',
   },
+  materialContracts: {
+    count: {
+      value: 1,
+      unit: 'count',
+      status: 'complete',
+      missingSources: [],
+      asOf: '2026-08-15T00:00:00.000Z',
+      drilldown: { entity: 'contract', filters: { projectId: 'project-1', dataOrigin: 'demo', contractKind: '材采' } },
+    },
+    navigation: {
+      kind: 'entity-list',
+      entity: 'contract',
+      variant: 'material',
+      view: null,
+      filters: { projectId: 'project-1', dataOrigin: 'demo' },
+    },
+  },
   asOf: '2026-08-15T00:00:00.000Z',
   sourceVersion: 'detail-v1',
   capabilities: ['project:list:read', 'demo:read'],
@@ -69,8 +86,9 @@ const NuxtLinkStub = defineComponent({
 })
 
 const StatePanelStub = defineComponent({
-  props: ['kind', 'title', 'description'],
-  template: '<section role="status" :aria-label="title"><h2>{{ title }}</h2><p>{{ description }}</p><slot name="action" /></section>',
+  props: ['kind', 'title', 'description', 'actionLabel'],
+  emits: ['action'],
+  template: '<section :role="kind === \'error\' ? \'alert\' : \'status\'" :aria-label="title"><h2>{{ title }}</h2><p>{{ description }}</p><button v-if="actionLabel" type="button" @click="$emit(\'action\')">{{ actionLabel }}</button><slot name="action" /></section>',
 })
 
 function renderDetail(props: Record<string, unknown>) {
@@ -109,6 +127,51 @@ describe('项目详情中央来源边界', () => {
     expect(screen.queryByRole('link', { name: '编辑项目' })).toBeNull()
     expect(screen.queryByRole('button', { name: '导出项目档案包' })).toBeNull()
     expect(document.querySelector('[data-project-module]')).toBeNull()
+    expect(screen.getByRole('link', { name: '查看材料采购合同（1）' }).getAttribute('href'))
+      .toContain('/contract/material?projectId=project-1&origin=demo')
+  })
+
+  it('材采真实零值仍提供入口，未知与禁止状态不生成蓝链', async () => {
+    get.mockResolvedValue({
+      ...detail,
+      materialContracts: {
+        ...detail.materialContracts,
+        count: { ...detail.materialContracts.count, value: 0 },
+      },
+    })
+    const { unmount } = renderDetail({ originHint: 'demo', includeDemo: true })
+    expect(await screen.findByRole('link', { name: '查看材料采购合同（0）' })).not.toBeNull()
+    unmount()
+
+    get.mockResolvedValue({
+      ...detail,
+      materialContracts: {
+        count: { ...detail.materialContracts.count, value: null, status: 'pending', drilldown: null },
+        navigation: { kind: 'unavailable', reason: 'forbidden' },
+      },
+    })
+    renderDetail({ originHint: 'demo', includeDemo: true })
+    expect(await screen.findByText('无材料采购合同查看权限')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: /材料采购合同/ })).toBeNull()
+  })
+
+  it('材采聚合读取错误保持可重试，重试成功后恢复真实入口', async () => {
+    get
+      .mockResolvedValueOnce({
+        ...detail,
+        materialContracts: {
+          count: { ...detail.materialContracts.count, value: null, status: 'pending', drilldown: null },
+          navigation: { kind: 'unavailable', reason: 'error' },
+        },
+      })
+      .mockResolvedValueOnce(detail)
+    renderDetail({ originHint: 'demo', includeDemo: true })
+
+    const failure = await screen.findByRole('alert', { name: '材料采购合同读取失败' })
+    await fireEvent.click(within(failure).getByRole('button', { name: '重试' }))
+
+    expect(await screen.findByRole('link', { name: '查看材料采购合同（1）' })).not.toBeNull()
+    expect(get).toHaveBeenCalledTimes(2)
   })
 
   it('正式项目且有写权限时提供显式来源的编辑入口', async () => {
@@ -147,7 +210,7 @@ describe('项目详情中央来源边界', () => {
     expect(within(loading).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
 
     finishLoad(null as unknown as ProjectDetailReadDTO)
-    const failed = await screen.findByRole('status', { name: '项目详情加载失败' })
+    const failed = await screen.findByRole('alert', { name: '项目详情加载失败' })
     expect(within(failed).getByRole('link', { name: '返回项目列表' }).getAttribute('href')).toBe(returnTo)
   })
 
