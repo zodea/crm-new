@@ -34,5 +34,6 @@ const returnExpiresAt = computed(() => crewWorkerReturnTo.value ? undefined : re
     :return-to="returnTo"
     :return-expires-at="returnExpiresAt"
     :return-label="crewWorkerReturnTo ? '返回来源详情' : undefined"
+    :current-route="route.fullPath"
   />
 </template>

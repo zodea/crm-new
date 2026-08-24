@@ -1,6 +1,6 @@
 # 界面实现状态
 
-> 核对日期：2026-08-23
+> 核对日期：2026-08-24
 >
 > 视觉基准：`DC重构设计源码/app.dc.html`
 >
@@ -89,6 +89,8 @@
 基础主数据仍由父规格统一承接；其中客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合，班组—工人中央列表—详情—显式编辑及项目/责任/工资/扣罚稳定 ID 关系链已由 [#316](https://github.com/zodea/crm-new/issues/316) 闭合。父规格其他范围仍未因此完成。
 
 核心合同中的材料采购子链已由 [#318](https://github.com/zodea/crm-new/issues/318) 闭合中央列表、七页签只读详情、演示只读边界、正式整页新增/编辑与中央读回；施工、分包专属详情和其他核心合同范围仍未因此完成。
+
+跨页面的项目—材料采购合同—分供方旅程已由 [#319](https://github.com/zodea/crm-new/issues/319) 闭合：项目详情按稳定 ID 与来源进入材采列表，真实 `0`、缺失、暂不可用和无权限分开表达；材采合同按稳定分供方 ID 进入合同/结算/收票/付款事实，并逐级恢复页签、筛选、分页、滚动与焦点。该旅程不扩展为交付、库存或结算核心实现，也不代表父规格其他合同链已完成。
 
 不占独立页面域的公共依赖仍按原生 blocking 关系推进：正式/演示隔离 [#279](https://github.com/zodea/crm-new/issues/279)、财务集成 [#286](https://github.com/zodea/crm-new/issues/286)、服务器事件通知 [#290](https://github.com/zodea/crm-new/issues/290)、页签恢复 [#306](https://github.com/zodea/crm-new/issues/306)，最终由浏览器生产接缝 [#278](https://github.com/zodea/crm-new/issues/278) 验收全域。OCR 设置继续由既有专项 [#204](https://github.com/zodea/crm-new/issues/204) 承接。
 

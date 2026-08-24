@@ -23,6 +23,90 @@ function projectIntent(overrides: Partial<NavigationIntentDTO> = {}): Navigation
 }
 
 describe('唯一 Target Registry', () => {
+  it('项目材采聚合入口只按稳定项目 ID 与来源解析真实列表', () => {
+    const intent: NavigationIntentDTO = {
+      kind: 'entity-list',
+      entity: 'contract',
+      variant: 'material',
+      view: null,
+      filters: { projectId: 'project/central-001', dataOrigin: 'demo' },
+    }
+
+    expect(resolveNavigationTarget(intent, {
+      returnTo: '/project/project%2Fcentral-001?origin=demo&returnTo=%2Fproject%3Fnav%3Dorigin_319%23project-row-demo%253Aproject%252Fcentral-001&returnContext=origin_319',
+    })).toEqual({
+      state: 'resolved',
+      label: '材料采购合同',
+      to: '/contract/material?projectId=project%2Fcentral-001&origin=demo&returnTo=%2Fproject%2Fproject%252Fcentral-001%3Forigin%3Ddemo%26returnTo%3D%252Fproject%253Fnav%253Dorigin_319%2523project-row-demo%25253Aproject%25252Fcentral-001%26returnContext%3Dorigin_319',
+    })
+
+    expect(resolveNavigationTarget({
+      ...intent,
+      filters: { projectId: 'project-1', dataOrigin: 'real' },
+    }, { returnTo: '/project/project-1' })).toEqual({
+      state: 'resolved',
+      label: '材料采购合同',
+      to: '/contract/material?projectId=project-1&origin=real&returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal',
+    })
+  })
+
+  it('材采聚合入口缺少项目身份、来源或使用未知 variant 时不猜列表', () => {
+    const intent = (filters: Record<string, string | null>, variant = 'material'): NavigationIntentDTO => ({
+      kind: 'entity-list',
+      entity: 'contract',
+      variant,
+      view: null,
+      filters,
+    })
+
+    expect(resolveNavigationTarget(intent({ dataOrigin: 'real' }))).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget(intent({ projectId: 'project-1' }))).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget(intent({ projectId: 'project-1', dataOrigin: 'real' }, 'construction')))
+      .toMatchObject({ state: 'unverified-target' })
+  })
+
+  it('材料合同进入分供方事实页签时保留受限合同来源', () => {
+    const listReturnTo = '/contract/material?projectId=project-1&origin=demo&nav=origin_319_contract#material-contract-row-demo%3Acontract-318'
+    const returnTo = `/contract/contract-318?origin=demo&contractKind=material&tab=invoices&returnTo=${encodeURIComponent(listReturnTo)}`
+    expect(resolveNavigationTarget({
+      kind: 'entity-subview',
+      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '分供方一', no: null },
+      variant: 'detail',
+      view: 'invoices',
+      filters: { dataOrigin: 'demo' },
+    }, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '分供方一',
+      to: `/base/supplier/supplier-1?origin=demo&tab=invoices&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+  })
+
+  it('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {
+    const projectList = resolveNavigationTarget({
+      kind: 'entity-list',
+      entity: 'contract',
+      variant: 'material',
+      view: null,
+      filters: { projectId: 'project-1', dataOrigin: 'real' },
+    }, { returnTo: '/project/project-1?origin=demo' })
+    expect(projectList).toEqual({
+      state: 'resolved',
+      label: '材料采购合同',
+      to: '/contract/material?projectId=project-1&origin=real',
+    })
+
+    const listReturnTo = '/contract/material?origin=demo&nav=origin_319_contract#material-contract-row-demo%3Acontract-1'
+    const contractReturnTo = `/contract/contract-1?origin=demo&contractKind=material&returnTo=${encodeURIComponent(listReturnTo)}`
+    const supplier = resolveNavigationTarget({
+      kind: 'entity-subview',
+      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '分供方一', no: null },
+      variant: 'detail',
+      view: 'contracts',
+      filters: { dataOrigin: 'real' },
+    }, { returnTo: contractReturnTo })
+    expect(supplier).toEqual({ state: 'resolved', label: '分供方一', to: '/base/supplier/supplier-1?origin=real&tab=contracts' })
+  })
+
   it('材料采购合同详情保留显式数据来源', () => {
     expect(resolveNavigationTarget({
       kind: 'entity-detail',

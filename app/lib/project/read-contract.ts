@@ -133,6 +133,10 @@ export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryD
 
 export interface ProjectDetailReadDTO {
   item: ProjectListItemDTO
+  materialContracts: {
+    count: MetricDTO
+    navigation: NavigationIntentDTO
+  }
   asOf: ISODateTimeDTO
   sourceVersion: string | null
   capabilities: string[]

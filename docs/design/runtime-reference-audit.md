@@ -94,6 +94,8 @@
 
 2026-08-21 的本地视觉回归证据使用显式启用的 #279 测试数据工作区和固定业务时间，不采集外部参考站截图或真实业务数据。`e2e/runtime-visual-matrix.spec.ts` 在 390 / 768 / 1024 / 1440px 覆盖十四类共 56 张基线，并保留 3 条键盘、焦点、滚动与浮层行为测试；项目详情通过 `/project/proj_demo_001?origin=demo` 验证来源感知的中央只读详情，分供方压力态验证演示快照只读加载且不触发凭证状态写入。该本地回归只证明已登记的瑞航布局、状态和安全交互可重复，不提升任何外部参考证据等级。
 
+2026-08-24 的 #319 本地旅程证据使用可重置的中央证明实例，不采集外部参考站或真实业务数据。`e2e/issue-319-project-material-supplier-journey.spec.ts` 证明项目列表条件与项目焦点可经项目详情、按稳定项目 ID/来源筛选的材采列表、材采详情和分供方四类事实逐级恢复；真实 `0` 可进入专属空列表，无权限不伪装为 `0`；390 / 768 / 1024 / 1440px 全旅程无页面级横滚。该证据验证本地实现符合 `R-PROJECT-DETAIL-LIVE`、`R-MATERIAL-CONTRACT-LIVE`、`R-DETAIL-LIVE` 与 `R-SUPPLIER-DETAIL-LIVE` 的已确认关系入口和真实空态，不提升外部证据等级，也不覆盖交付、库存或结算核心。
+
 ## 4. 业务约束档案
 
 | 代码 | 必须保留的约束 |
@@ -152,7 +154,7 @@
 | `app/pages/base/customer/[id].vue` | `/base/customer/:id` | 基础主数据 | 详情 | #194 | R-DETAIL-PRIOR | #194 已完成客户主数据、名下项目、施工合同与收款台账的只读聚合、页签深链及四档回归 | 方向键切换页签；只按真实外键下钻，不从名称或合同金额推算收款 | C-DENSE |
 | `app/pages/base/customer/form/[[id]].vue` | `/base/customer/form/:id?` | 基础主数据 | 整页表单 | #194 | R-FORM-PRIOR | #194 已完成整页表单返回详情、联系人输入语义及统一社会信用代码冲突反馈 | 保存仍走客户领域 action；敏感字段只在编辑流程维护 | C-FORM |
 | `app/pages/base/customer/index.vue` | `/base/customer` | 基础主数据 | 列表 | #194 | R-CUSTOMER-LIST-LIVE | 参考已确认无空左树、单行工具栏、紧凑宽表和分页；当前账号无可见客户，字段仍按本地真实模型收敛为名称/简称/税号/联系人/状态，不复制参考私有列 | 名称进入本地真实详情；税号与电话脱敏；参考详情受权限限制，不能据此更改本地外键、删除或表单契约 | C-DENSE |
-| `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #193 已按统一详情壳完成长名称、脱敏摘要、6 页签、可追溯汇总、分类文件区与四档布局回归；参考补验确认详情双栏、六页签及合同/结算/收票/付款聚合下钻语义 | 蓝色聚合值必须按真实外键进入对应关联列表，目标无可见记录时显示真实空态；灰色值不伪装入口。参考审批、评论、供应商层级和写动作仍不推断，资料状态与文件动作由本地 #13 契约裁定 | C-BASE |
+| `app/pages/base/supplier/[id].vue` | `/base/supplier/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #193 已按统一详情壳完成长名称、脱敏摘要、6 页签、可追溯汇总、分类文件区与四档布局回归；#319 再按直接证据闭合材采合同到合同/结算/收票/付款事实页签及原合同返回 | 蓝色聚合值按真实外键进入对应事实；目标无记录显示真实空态，灰色值不伪装入口。材采来源只接受稳定分供方 ID、同来源与安全合同返回地址；参考审批、评论、供应商层级和写动作仍不推断 | C-BASE |
 | `app/pages/base/supplier/credential/[id].vue` | `/base/supplier/credential/:id` | 分供方 | 详情 | #193 | R-SUPPLIER-DETAIL-LIVE | #315 将既有证照文件、OCR、有效期、资料要求和人工核验从中央事实页签拆为无路由冲突的独立整页入口；复用参考详情文件管理区的构图证据，不外推参考站写动作 | 只接既有证照专用文件/审计边界；未接入时明确不可用，不写入第二套正式分供方；返回同一中央详情和来源 | C-BASE |
 | `app/pages/base/supplier/form/[[id]].vue` | `/base/supplier/form/:id?` | 分供方 | 整页表单 | #193 | R-FORM-LIVE | #193 已确认短表单无空左栏、两列字段网格、内容滚动、固定底部操作和统一七类选择；主数据保存后进入真实证照流程 | 普通附件不伪装证照；`approvalStatus` 不展示，证照原件、OCR 与人工核验统一在详情维护 | C-FORM |
 | `app/pages/base/supplier/index.vue` | `/base/supplier` | 分供方 | 列表 | #193 | R-SUPPLIER-LIST-LIVE | #193 已完成无空左树、单行工具栏、真实项目/欠款/资料筛选、聚合列、固定操作列、局部横滚和列表汇总回归 | 行级关联写入真实 ProjectSupplier；税号与电话脱敏；上级供应商和参考站未授权业务动作不引入 | C-DENSE |
@@ -170,7 +172,7 @@
 | `app/pages/contract/construction/index.vue` | `/contract/construction` | 核心合同 | 列表 | #195 | R-CONSTRUCTION-CONTRACT-LIVE | 当前项目/客户/状态/搜索、收入侧金额聚合、分页和局部横滚可用；#282 补验确认仍缺实际竣工日期、开票未回金额等施工专属列，以及从详情精确恢复列表筛选的返回语义 | 实际竣工日期没有 canonical 字段时保持空缺并登记数据迁移，不能从合同工期或状态猜测；金额继续只按真实外键派生 | C-DENSE |
 | `app/pages/contract/material/form/[id].vue` | `/contract/material/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | #318 保留左分区、两列字段、局部明细与固定底栏，并闭合中央表单预载、乐观锁冲突与保存后读回 | 只编辑正式来源；合同/明细 ID 由服务端分配，演示来源禁止进入写态 | C-FORM |
 | `app/pages/contract/material/form/index.vue` | `/contract/material/form` | 核心合同 | 整页表单 | #195 | R-FORM-LIVE | #318 按既有整页蓝本接入中央正式项目/分供方选项、明细复算和保存读回，并复核四档无整页横滚 | 新建只走中央命令；当前不实现导入、删除或本地生产旁路 | C-FORM |
-| `app/pages/contract/material/index.vue` | `/contract/material` | 核心合同 | 列表 | #195 | R-MATERIAL-CONTRACT-LIVE | #318 闭合中央正式/显式授权演示分源列表、URL 搜索/项目/分供方/状态/分页、紧凑宽表和 390/768/1024/1440px 局部横滚 | 名称携稳定 ID、来源与材采类型进入中央详情；演示只读，正式编辑只从详情显式进入 | C-DENSE |
+| `app/pages/contract/material/index.vue` | `/contract/material` | 核心合同 | 列表 | #195 | R-MATERIAL-CONTRACT-LIVE | #318 闭合中央正式/显式授权演示分源列表、URL 筛选与紧凑宽表；#319 增加项目稳定 ID/来源入口、项目返回和合同列表筛选/分页/滚动/焦点恢复，并复核四档视口 | 名称携稳定 ID、来源与材采类型进入中央详情；项目来源范围和嵌套返回地址均经白名单验证；演示只读，正式编辑只从详情显式进入 | C-DENSE |
 | `app/pages/contract/other-expense/form/[id].vue` | `/contract/other-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-CONTRACT-DC | 按 `otherExpForm` 直接源码呈现项目合同分区；外部运行态只佐证两列字段、内容滚动和固定底栏 | 回填真实项目与分供方 ID，编辑中不得跨业务类型迁移 | C-FORM |
 | `app/pages/contract/other-expense/form/index.vue` | `/contract/other-expense/form` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-CONTRACT-DC | 按 `otherExpForm` 直接源码呈现项目、类别、对方单位、金额、期限、条款和附件 | 项目与分供方 lookup 保存真实 ID；提交校验关联关系，不保存自由文本副本 | C-FORM |
 | `app/pages/contract/other-expense/index.vue` | `/contract/other-expense` | 辅助合同与结算 | 列表 | #196 | R-AUX-DOCUMENTS-LIVE | 参考确认专属列表含项目/乙方、合同金额链、累计结算/收票/支付、两档应付及合同/结算/结清状态；当前本地只有基础金额、日期和状态投影 | 聚合只读真实结算、发票和支付外键；没有完工/结清事实时显示未记录，不复制参考内部字段名；名称先进入只读详情并恢复来源筛选 | C-DENSE |
@@ -246,7 +248,7 @@
 | `app/pages/owner-material/use/[id].vue` | `/owner-material/use/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，详情不可观察；当前 `/:id` 直接进入编辑表单 | 增加只读详情，项目/分供方/班组/班组合同按真实 ID 下钻；编辑仍走现有库存与总控校验 | C-FORM |
 | `app/pages/owner-material/use/index.vue` | `/owner-material/use` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考专属列覆盖负责人/部门/创建人、项目/分供方/采购类型、日期/月、班组与班组合同；当前为通用材料列表 | 使用领用专属 DTO；负责人、创建人、班组和班组合同保持独立身份，无关系时显示未记录 | C-DENSE |
 | `app/pages/owner-material/use/new.vue` | `/owner-material/use/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/材料/数量/领用人/班组表单 | 写入继续校验甲供库存与总控余量；班组合同/来源批次先建真实关系再扩展 | C-FORM |
-| `app/pages/project/[id].vue` | `/project/:id` | 项目 | 详情 | #190 | R-PROJECT-DETAIL-LIVE | 参考已确认紧凑标题与元数据、三组经营摘要、左侧流程/阶段和右侧团队/文件的宽屏双栏；`R-OWNER-MATERIAL-LIVE` 又补验物资管理直接显示总计划、需用计划、入库单三组空表。当前瑞航十个真实页签可用，但物资页只有一张项目到货归档表 | 保留瑞航独有归档为独立来源视图，补三组项目读模型；到货—归档 canonical 关系闭合前不得合并。零值无真实下钻时显示文本，编辑进入独立整页表单 | C-DENSE |
+| `app/pages/project/[id].vue` | `/project/:id` | 项目 | 详情 | #190 | R-PROJECT-DETAIL-LIVE | 参考已确认紧凑标题与元数据、经营摘要和阶段计数；#319 按直接证据增加材料采购合同计数与关系入口，并以 390/768/1024/1440px 验证旅程布局 | 材采计数只读同项目稳定外键与来源；真实 `0` 仍可下钻，缺失、暂不可用和无权限分开表达。交付、库存、结算核心及项目物资其他范围不由本票扩展 | C-DENSE |
 | `app/pages/project/[pid]/supplier/[sid].vue` | `/project/:pid/supplier/:sid` | 项目分供方 | 详情 | #192 | R-PROJECT-DETAIL-LIVE | 没有项目×分供方目标页的安全直接证据；只借鉴邻近项目详情已确认的紧凑摘要、轻边界分区和局部横向滚动，采用六页签主区与下方合作文件，不把邻近页字段或动作写成目标页事实 | 中央 Repository 按同来源双 ID 返回合同、请款、收票、付款、支出结算与文件六类事实；仅演示合同/付款申请已有同来源只读目标并可返回，其他来源保持不可用；终态结算写入和文件正文能力明确未接入 | C-DENSE |
 | `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-FORM-LIVE | 没有文件导入目标页的安全直接证据，且严格只读协议禁止在参考站触发上传或导入；这里只借鉴邻近整页表单已确认的纵向分区、步骤信息和底部操作区，三步内容由本地蓝本裁定 | 当前只在本机按文件名匹配名称/别名与类别，所有结果可人工调整；不读取正文、不伪装 OCR、不上传云端，未确认候选不写分供方，文件只挂 ProjectSupplier | C-TOOL |
 | `app/pages/project/form/[[id]].vue` | `/project/form/:id?` | 项目 | 整页表单 | #190 | R-FORM-PRIOR | 项目目标页没有安全直接证据；仅借鉴 `R-FORM-LIVE` 的相邻短表单结构，并以项目蓝本、ADR 0014 和真实客户外键裁定字段与行为 | 保留草稿、保存、保存并新建、保存并提交；新建取消返回列表、保存进入新项目详情，编辑取消/保存返回原项目详情 | C-FORM |

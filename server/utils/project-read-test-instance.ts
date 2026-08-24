@@ -2,6 +2,7 @@ import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-cont
 import type { ProjectListSourceRow } from '../../app/lib/project/repository'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
+import { MaterialContractRepositoryProblem } from '../../app/lib/material-contract/repository'
 import {
   buildProjectDetailRead,
   buildProjectListPage,
@@ -13,6 +14,7 @@ import {
 import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { materialContractReadTestInstance } from './material-contract-read-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 
 export type ProjectReadTestScenario
@@ -138,6 +140,14 @@ export function createProjectReadTestInstance(
     = sessionId => projectCommandTestInstance.sourceVersion(sessionId),
   resolveMigrationSnapshot: (sessionId?: string | null) => CoreMigrationSnapshotDTO
     = () => EMPTY_MIGRATION_SNAPSHOT,
+  resolveMaterialContractCount: (projectId: string, origin: 'real' | 'demo', sessionId?: string | null) => Promise<number | null>
+    = async (projectId, origin, sessionId) => materialContractReadTestInstance.list({
+      includeDemo: String(origin === 'demo'),
+      origin,
+      projectId,
+      page: '1',
+      pageSize: '10',
+    }, sessionId).pagination.total,
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -206,12 +216,28 @@ export function createProjectReadTestInstance(
       const query = parseProjectDetailQuery(id, input)
       if (query.includeDemo && !context.capabilities.includes('demo:read'))
         throw repositoryProblem('forbidden', '无测试数据查看权限', false)
+      let materialContractCount: number | null = null
+      let materialContractAccess: 'allowed' | 'forbidden' | 'unknown' | 'error' = 'unknown'
+      try {
+        materialContractCount = await resolveMaterialContractCount(query.id, query.origin, sessionId)
+        materialContractAccess = materialContractCount === null ? 'unknown' : 'allowed'
+      }
+      catch (cause) {
+        materialContractAccess = (
+          cause instanceof MaterialContractRepositoryProblem
+          && cause.problem.code === 'forbidden'
+        )
+          ? 'forbidden'
+          : 'error'
+      }
       return buildProjectDetailRead({
         rows: context.rows,
         query,
         asOf: context.asOf,
         sourceVersion: context.sourceVersion,
         capabilities: context.capabilities,
+        materialContractCount,
+        materialContractAccess,
       })
     },
   }

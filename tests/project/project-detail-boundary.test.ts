@@ -28,7 +28,46 @@ describe('project detail data-origin boundary', () => {
         dataOrigin: 'demo',
         project: { id: 'proj_demo_001', label: '合和新城' },
       },
+      materialContracts: {
+        count: { value: 3, status: 'complete', unit: 'count' },
+        navigation: {
+          kind: 'entity-list',
+          entity: 'contract',
+          variant: 'material',
+          filters: { projectId: 'proj_demo_001', dataOrigin: 'demo' },
+        },
+      },
     })
+  })
+
+  it('真实零合同仍返回可达列表；未知或禁止不伪装为零', () => {
+    const demo = PROJECT_READ_FIXTURE[0]!
+    const read = (
+      materialContractCount: number | null,
+      materialContractAccess: 'allowed' | 'forbidden' | 'unknown' | 'missing' | 'error' = 'allowed',
+    ) => buildProjectDetailRead({
+      rows: [demo],
+      query: { id: demo.id, origin: 'demo', includeDemo: true },
+      asOf: '2026-08-15T00:00:00.000Z',
+      sourceVersion: 'journey-fixture-v1',
+      materialContractCount,
+      materialContractAccess,
+    })
+
+    expect(read(0).materialContracts).toMatchObject({
+      count: { value: 0, status: 'complete', drilldown: { entity: 'contract' } },
+      navigation: { kind: 'entity-list' },
+    })
+    expect(read(null).materialContracts).toMatchObject({
+      count: { value: null, status: 'pending', drilldown: null },
+      navigation: { kind: 'unavailable', reason: 'not-connected' },
+    })
+    expect(read(null, 'forbidden').materialContracts).toMatchObject({
+      count: { value: null, status: 'pending', drilldown: null },
+      navigation: { kind: 'unavailable', reason: 'forbidden' },
+    })
+    expect(read(null, 'missing').materialContracts.navigation).toEqual({ kind: 'unavailable', reason: 'missing-id' })
+    expect(read(null, 'error').materialContracts.navigation).toEqual({ kind: 'unavailable', reason: 'error' })
   })
 
   it('does not let a missing or forged origin relabel a demo record as production', async () => {

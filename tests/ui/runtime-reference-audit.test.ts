@@ -158,7 +158,7 @@ describe('runtime reference audit contract', () => {
     const coverage = JSON.parse(readFileSync(COVERAGE_PATH, 'utf8'))
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
-    expect(status).toContain('> 核对日期：2026-08-23')
+    expect(status).toContain('> 核对日期：2026-08-24')
     expect(status).toContain('| 实现页面文件（含 dev） | 136 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
     expect(status).toContain('| 实现生产路由（排除 dev） | 131 |')

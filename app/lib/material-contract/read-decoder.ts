@@ -215,6 +215,7 @@ export function decodeMaterialContractDetailRead(value: unknown): MaterialContra
 export function serializeMaterialContractListQuery(query: MaterialContractListQueryDTO): Record<string, string> {
   return {
     includeDemo: String(query.includeDemo),
+    origin: query.origin ?? '',
     search: query.search,
     projectId: query.projectId ?? '',
     supplierId: query.supplierId ?? '',

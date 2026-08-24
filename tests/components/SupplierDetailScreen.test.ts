@@ -46,8 +46,8 @@ const detail = {
 }
 
 const shell = defineComponent({
-  props: ['title'],
-  template: '<main><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><slot name="actions"/><slot name="summary"/><slot/></main>',
+  props: ['title', 'backTo', 'backLabel'],
+  template: '<main><a :href="backTo">{{ backLabel }}</a><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><slot name="actions"/><slot name="summary"/><slot/></main>',
 })
 const tabs = defineComponent({
   props: ['modelValue', 'tabs'],
@@ -125,5 +125,31 @@ describe('分供方中央详情', () => {
     expect(screen.getByTestId('fact-tab').textContent).toBe('payments')
     expect(screen.getByText('主档仍可见')).not.toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('中央服务暂时不可用')
+  })
+
+  it('从材采合同进入指定事实页签，并返回原合同页签', () => {
+    const listReturnTo = '/contract/material?projectId=project-1&origin=real&nav=origin_319_contract#material-contract-row-real%3Acontract-1'
+    const contractReturnTo = `/contract/contract-1?origin=real&contractKind=material&tab=payments&returnTo=${encodeURIComponent(listReturnTo)}`
+    route.query = { tab: 'contracts' }
+    render(SupplierDetailScreen, {
+      props: {
+        supplierId: 'supplier-1',
+        origin: 'real',
+        includeDemo: false,
+        returnTo: contractReturnTo,
+      },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        Metric: metricStub,
+        MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    expect(screen.getByTestId('fact-tab').textContent).toBe('contracts')
+    expect(screen.getByRole('link', { name: '返回材料采购合同' }).getAttribute('href')).toBe(contractReturnTo)
   })
 })

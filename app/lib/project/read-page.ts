@@ -389,6 +389,8 @@ export function buildProjectDetailRead(input: {
   asOf: string
   sourceVersion: string | null
   capabilities?: readonly string[]
+  materialContractCount?: number | null
+  materialContractAccess?: 'allowed' | 'forbidden' | 'unknown' | 'missing' | 'error'
 }): ProjectDetailReadDTO {
   validateProjectSourceRows(input.rows, input.asOf)
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
@@ -406,8 +408,46 @@ export function buildProjectDetailRead(input: {
       sameId ? '项目存在，但 URL 来源与中央身份不一致' : '项目不存在或当前来源不可见',
     ))
   }
+  const materialContractAccess = input.materialContractAccess ?? 'unknown'
+  const materialContractCount = input.materialContractCount ?? null
+  const materialContractReady = materialContractAccess === 'allowed'
+    && Number.isSafeInteger(materialContractCount)
+    && Number(materialContractCount) >= 0
+  const materialContractUnavailableReason = () => {
+    if (materialContractAccess === 'forbidden')
+      return 'forbidden' as const
+    if (materialContractAccess === 'missing')
+      return 'missing-id' as const
+    if (materialContractAccess === 'error')
+      return 'error' as const
+    return 'not-connected' as const
+  }
   return {
     item: buildProjectListItem(row, input.asOf),
+    materialContracts: {
+      count: {
+        value: materialContractReady ? materialContractCount : null,
+        unit: 'count',
+        status: materialContractReady ? 'complete' : 'pending',
+        missingSources: materialContractReady ? [] : ['material-contracts'],
+        asOf: input.asOf,
+        drilldown: materialContractReady
+          ? { entity: 'contract', filters: { projectId: row.id, dataOrigin: row.dataOrigin, contractKind: '材采' } }
+          : null,
+      },
+      navigation: materialContractReady
+        ? {
+            kind: 'entity-list',
+            entity: 'contract',
+            variant: 'material',
+            view: null,
+            filters: { projectId: row.id, dataOrigin: row.dataOrigin },
+          }
+        : {
+            kind: 'unavailable',
+            reason: materialContractUnavailableReason(),
+          },
+    },
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,
     capabilities: [...(input.capabilities ?? ['project:list:read'])],

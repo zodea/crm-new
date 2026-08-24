@@ -38,6 +38,14 @@ function bool(value: unknown): boolean {
   return value === true || value === 'true'
 }
 
+function dataOrigin(value: unknown) {
+  if (value == null || value === '')
+    return null
+  if (isDataOriginDTO(value))
+    return value
+  throw new MaterialContractRepositoryProblem(materialContractProblem('invalid-query', '材料采购合同列表来源无效'))
+}
+
 function positiveInteger(value: unknown, fallback: number): number {
   const parsed = Number(value)
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback
@@ -58,6 +66,7 @@ export function parseMaterialContractListQuery(
     : null
   return {
     includeDemo: bool(input?.includeDemo),
+    origin: dataOrigin(input?.origin),
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     supplierId: optional(input?.supplierId),
@@ -164,6 +173,7 @@ export function buildMaterialContractListPage(
   const search = input.query.search.toLocaleLowerCase('zh-CN')
   const filtered = input.contracts
     .filter(row => row.kind === '材采' && allowedOrigins.has(row.dataOrigin))
+    .filter(row => input.query.origin === null || row.dataOrigin === input.query.origin)
     .filter((row) => {
       if (input.query.projectId && row.projectId !== input.query.projectId)
         return false

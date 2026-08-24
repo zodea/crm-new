@@ -33,6 +33,7 @@ describe('材料采购合同中央 HTTP Repository', () => {
     expect(fetcher).toHaveBeenCalledWith('/api/read/material-contracts', {
       query: {
         includeDemo: 'true',
+        origin: '',
         search: '瓷砖',
         projectId: 'project-1',
         supplierId: 'supplier-1',

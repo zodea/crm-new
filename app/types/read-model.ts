@@ -100,7 +100,7 @@ export type EntityRefDTO
   }
 
 export type NavigationUnavailableReasonDTO
-  = 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target'
+  = 'missing-id' | 'missing-route' | 'not-connected' | 'forbidden' | 'unverified-target' | 'error'
 
 interface EntityNavigationIntentDTO<Kind extends 'entity-detail' | 'entity-subview' | 'source-record'> {
   kind: Kind
