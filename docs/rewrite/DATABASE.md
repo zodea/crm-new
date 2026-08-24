@@ -2,13 +2,15 @@
 
 > 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；后台物理库结构待迁移切片落地，不能把本文件中的本地 seed 策略解释为正式工作区初始化。
 
-当前落地事实（#279）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份的一次性分类、ID 映射、导入、对账和回滚由 #294 提供；其余领域仍由后续迁移票完成。
+当前落地事实（#279、#294、#320）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
 
 当前落地事实（#293）：浏览器的正式项目新增/编辑已改由中央命令分配不透明 `projects.id`、记录递增 `version` 并生成最终更新时间。网络失败时的 `project-draft-*` 只是浏览器暂存意图，不是 `projects.id`、不得作外键。详细信封、幂等与冲突语义见 [`COMMANDS.md`](./COMMANDS.md)。
 
-当前落地事实（#294、#315、#316、#317）：浏览器可把 `production` 快照中的客户、分供方、班组、项目、工人、项目分供方按此顺序迁入中央核心身份契约。确认切换后六类身份的旧库普通读写均阻断，旧库只作为受保护备份的恢复来源。#317 未改变 SQLite 物理 schema；项目分供方工作台经中央 Repository 以同来源项目 ID 与分供方 ID 验证关系，并聚合有效合同及补充协议、有效请款、已归档发票、已确认支付分摊、确认支出结算与文件元数据。不得读取 `contracts.settled/invoiced/paid` 旧累计列，不得把项目分供方名称或金额作为关系键，也不得为浏览器保留本地 SQL 工作台旁路。当前中央端仍是可重置测试实例，不得被描述为生产持久化业务库。
+当前落地事实（#294、#315、#316、#317、#320）：浏览器可把 `production` 快照中的客户、分供方、班组、项目、canonical 施工合同、工人、项目分供方按此顺序迁入中央契约。确认切换后六类身份与施工合同的旧库普通读写均阻断，旧库只作为受保护备份的恢复来源。#317 未改变 SQLite 物理 schema；项目分供方工作台经中央 Repository 以同来源项目 ID 与分供方 ID 验证关系，并聚合有效合同及补充协议、有效请款、已归档发票、已确认支付分摊、确认支出结算与文件元数据。不得读取 `contracts.settled/invoiced/paid` 旧累计列，不得把项目分供方名称或金额作为关系键，也不得为浏览器保留本地 SQL 工作台旁路。当前中央端仍是可重置测试实例，不得被描述为生产持久化业务库。
 
 当前落地事实（#318）：浏览器材料采购合同按 `(dataOrigin, contractId)` 从中央 Repository 读取，只有 `kind='材采'` 才进入该详情；项目、分供方、明细、发票、付款、结算、罚扣、下料、到货和文件均以稳定 ID/外键归属，零记录保持空集合。正式新增/编辑只走中央材料合同命令，服务端分配合同与明细 ID、执行幂等和乐观锁并复算明细金额；演示来源只读。该切片不改变 SQLite schema，也不授权按名称、项目或金额补关系。
+
+当前落地事实（#320）：浏览器施工合同按 `(dataOrigin, contractId, kind='施工')` 从中央 Repository 读取，补充合同、甲方变洽签、月报量/最终结算/罚扣、开票申请/登记、收款、验收/保修和合同文件均按稳定合同外键归属。正式新增/编辑只走中央施工合同命令并执行幂等、乐观锁与项目—客户关系校验；演示来源只读。SQLite 迁移 v42 为 canonical `contracts` 增加可空 `actual_completion_date`，既有记录不回填；缺失值保持 `null`，不得从计划结束、签约日或合同状态推断。
 
 ---
 
@@ -204,6 +206,7 @@ CREATE TABLE contracts (
   contact_phone TEXT DEFAULT '',              -- 合同联系人电话，按文本保存
   tax_rate    REAL,                           -- 合同税率；不据此推算发票金额
   sign_date   TEXT DEFAULT '',
+  actual_completion_date TEXT NULL,           -- v42，仅施工合同实际竣工事实；未知保持 NULL
   status      TEXT DEFAULT '履约中',          -- '履约中' | '已签订' | '已结算' | '已结清'
   note        TEXT DEFAULT '',
   created_at  TEXT, updated_at TEXT, deleted_at TEXT

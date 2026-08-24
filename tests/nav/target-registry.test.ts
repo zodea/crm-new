@@ -81,6 +81,33 @@ describe('唯一 Target Registry', () => {
     })
   })
 
+  it('甲方单据中央只读详情未闭合前不进入现有写态路由', () => {
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-1', label: '竣工结算一', no: 'JS-001' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real', documentKind: 'final-settlement' },
+    })).toMatchObject({ state: 'not-connected', label: '竣工结算一' })
+  })
+
+  it('施工合同 BOQ 只按正式项目与合同稳定 ID 进入专属工作台', () => {
+    const intent = {
+      kind: 'entity-subview' as const,
+      subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract-320', label: '施工合同', no: 'SG-320' },
+      variant: 'boq',
+      view: null,
+      filters: { dataOrigin: 'real', contractKind: '施工', projectId: 'project-320' },
+    }
+    expect(resolveNavigationTarget(intent)).toEqual({
+      state: 'resolved',
+      label: '施工合同',
+      to: '/contract/boq?project=project-320&contract=contract-320',
+    })
+    expect(resolveNavigationTarget({ ...intent, filters: { ...intent.filters, dataOrigin: 'demo' } }))
+      .toMatchObject({ state: 'error' })
+  })
+
   it('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {
     const projectList = resolveNavigationTarget({
       kind: 'entity-list',

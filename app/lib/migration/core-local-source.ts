@@ -88,6 +88,21 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     FROM projects
     ORDER BY id
   `,
+  construction_contracts: `
+    SELECT
+      c.id, c.no, c.name, c.project_id, p.customer_id,
+      c.content, c.invoice_type, c.contact_name, c.contact_phone,
+      c.tax_rate, c.sign_date, c.main_terms, c.payment_terms,
+      c.warranty_terms, c.retention_ratio, c.retention_amount,
+      c.retention_days, c.invoice_name, c.invoice_tax_no,
+      c.invoice_address_phone, c.invoice_bank, c.invoice_bank_account,
+      c.amount, c.status, c.note, c.actual_completion_date,
+      c.created_at, c.updated_at, c.deleted_at
+    FROM contracts c
+    LEFT JOIN projects p ON p.id = c.project_id
+    WHERE c.kind = '施工'
+    ORDER BY c.id
+  `,
   workers: `
     SELECT id, name, crew_id, current_project_id, deleted_at
     FROM workers
@@ -162,6 +177,41 @@ function sourceEntity(
       references: {
         crewId: nullableText(row.crew_id),
         projectId: nullableText(row.current_project_id),
+      },
+    }
+  }
+  if (entityType === 'construction_contracts') {
+    return {
+      ...entity,
+      references: {
+        projectId: nullableText(row.project_id),
+        customerId: nullableText(row.customer_id),
+      },
+      amount: nullableMoney(row.amount),
+      attributes: {
+        no: text(row.no),
+        content: text(row.content),
+        invoiceType: text(row.invoice_type),
+        contactName: text(row.contact_name),
+        contactPhone: text(row.contact_phone),
+        taxRate: nullableNumber(row.tax_rate),
+        signDate: nullableText(row.sign_date),
+        mainTerms: text(row.main_terms),
+        paymentTerms: text(row.payment_terms),
+        warrantyTerms: text(row.warranty_terms),
+        retentionRatio: nullableNumber(row.retention_ratio),
+        retentionAmount: nullableNumber(row.retention_amount),
+        retentionDays: nullableNumber(row.retention_days),
+        invoiceName: text(row.invoice_name),
+        invoiceTaxNo: text(row.invoice_tax_no),
+        invoiceAddressPhone: text(row.invoice_address_phone),
+        invoiceBank: text(row.invoice_bank),
+        invoiceBankAccount: text(row.invoice_bank_account),
+        status: text(row.status),
+        note: text(row.note),
+        actualCompletionDate: nullableText(row.actual_completion_date),
+        createdAt: text(row.created_at),
+        updatedAt: text(row.updated_at),
       },
     }
   }

@@ -107,7 +107,9 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
 
   it('映射表只登记已实装详情页', () => {
     expect(registeredTargetKeys()).toEqual([
+      'contract:boq',
       'contract:detail',
+      'contract:supplement',
       'crew:detail',
       'customer:detail',
       'invoice:detail',

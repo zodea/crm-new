@@ -17,7 +17,10 @@ import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
 const desktop = isDesktopRuntime()
-const centralOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
+const materialOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
+const constructionOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'construction' && isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : null)
 const contractStore = useContractStore()
@@ -146,7 +149,7 @@ function openEdit() {
 let loadRequest = 0
 
 async function load() {
-  if (centralOrigin.value)
+  if (materialOrigin.value || constructionOrigin.value)
     return
   const request = ++loadRequest
   const requestedId = contractId.value
@@ -180,9 +183,14 @@ watch(contractId, () => {
 
 <template>
   <MaterialContractDetailScreen
-    v-if="centralOrigin"
+    v-if="materialOrigin"
     :contract-id="contractId"
-    :origin="centralOrigin"
+    :origin="materialOrigin"
+  />
+  <ConstructionContractDetailScreen
+    v-else-if="constructionOrigin"
+    :contract-id="contractId"
+    :origin="constructionOrigin"
   />
   <div
     v-else-if="contract && !initializing && !contractStore.loading && !loadError"

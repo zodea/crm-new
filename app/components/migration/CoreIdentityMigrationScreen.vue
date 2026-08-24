@@ -27,6 +27,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   suppliers: '分供方',
   crews: '班组',
   projects: '项目',
+  construction_contracts: '施工合同',
   workers: '工人',
   project_suppliers: '项目分供方',
 }
@@ -67,7 +68,7 @@ const checks = computed(() => {
     id: 'supported-source',
     label: '来源版本与运行模式',
     conclusion: 'passed' as MigrationCheckConclusion,
-    detail: `已确认 ${store.preflightResult.sourceVersion}，共 ${store.preflightResult.entityCount ?? 0} 条核心身份记录。`,
+    detail: `已确认 ${store.preflightResult.sourceVersion}，共 ${store.preflightResult.entityCount ?? 0} 条受控迁移记录。`,
   }]
 })
 

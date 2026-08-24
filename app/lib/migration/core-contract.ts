@@ -3,12 +3,13 @@ import type { MoneyDTO } from '../../types/read-model'
 export const CORE_MIGRATION_CAPABILITY = 'core:migration:write' as const
 export const CORE_MIGRATION_CONTRACT_VERSION = 'core-migration.v1' as const
 export const CORE_MIGRATION_SOURCE_MODE = 'browser-production-snapshot' as const
-export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v41' as const
+export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v42' as const
 export const CORE_MIGRATION_TOPOLOGY = [
   'customers',
   'suppliers',
   'crews',
   'projects',
+  'construction_contracts',
   'workers',
   'project_suppliers',
 ] as const
@@ -27,6 +28,7 @@ export interface CoreMigrationSourceEntityDTO {
   references?: Partial<Record<CoreMigrationReferenceField, string | null>>
   quantity?: number | null
   amount?: MoneyDTO | null
+  attributes?: Record<string, string | number | null>
   deletedAt?: string | null
 }
 
@@ -236,6 +238,7 @@ export interface CoreMigrationServerEntityDTO {
   references: Partial<Record<CoreMigrationReferenceField, string | null>>
   quantity: number | null
   amount: MoneyDTO | null
+  attributes: Record<string, string | number | null>
   deletedAt: string | null
   batchId: string
 }

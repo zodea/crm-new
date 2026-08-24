@@ -103,16 +103,16 @@ DC重构设计源码/     # 当前设计运行态，不是生产源码
         │                         ▼
         └─ production 快照 ──► 不可变 IndexedDB 备份 ──► 拓扑映射/对账 ──► 用户确认
                                                                             │
-                                                                            ├─ 六类身份正式读写仅走中央
+                                                                            ├─ 六类身份与施工合同正式读写仅走中央
                                                                             └─ 回滚窗口内仅可由迁移适配器恢复备份
 ```
 
 - 领域共享数据归 store；页面局部 UI 状态留在组件树；只复用行为时用 composable。
 - 数据写入只有一条可追踪路径：组件事件 → store action → 领域/数据库层。
 - 项目列表、来源感知详情与正式项目表单已接中央 HTTP。新增/编辑由 `project:write`、`commandId` 和 `baseVersion` 保护；项目导入与删除仍禁用。详情 origin 由后台按 `(dataOrigin,id)` 校验，URL 参数不能重标来源；演示表单路由与本地数据库写接缝都会被只读边界拦截。
-- Issue #318 的材料采购合同浏览器链只经领域 Repository/Store 与中央 HTTP：列表和七页签详情按 `(dataOrigin,id,kind='材采')` 校验，演示来源还要同时通过用户可见性开关与服务端 `demo:read`；正式表单以 `material-contract:write`、`commandId`、`baseVersion` 和服务端明细复算保护，成功后回到同一中央详情重读。没有稳定外键的材料事实保持空集合，施工与分包合同不因本切片改道。
-- #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。导入顺序固定为客户、分供方、班组、项目、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
-- 当前项目正式读链会消费已确认迁移的项目实体。客户、分供方、班组、工人和项目分供方的普通页面 Repository/中央接线由 #281 完成，#294 不在迁移页外复制这些页面功能。
+- Issue #318 与 #320 的材料采购、施工合同浏览器链只经各自领域 Repository/Store 与中央 HTTP：列表和七分区详情按 `(dataOrigin,id,kind)` 校验，演示来源还要同时通过用户可见性开关与服务端 `demo:read`。正式表单分别以 `material-contract:write`、`construction-contract:write`、`commandId`、`baseVersion` 和服务端关系校验保护，成功后回到同一中央详情重读；#294 的受控核心迁移同时携带 canonical 施工合同并在确认后进入中央读链。没有稳定外键的事实保持空集合，实际竣工未知时保持 `null`；分包合同仍不因本切片改道。
+- #294 的核心身份迁移是另一条显式中央命令链：`preflight → immutable backup → dry-run → import → post-write reconciliation → confirm → rollback`。#320 将 canonical 施工合同纳入同一受控拓扑，导入顺序固定为客户、分供方、班组、项目、施工合同、工人、项目分供方；只接受稳定旧 ID 映射，不按名称、编号或金额猜关系。本地迁移适配器从快照字节重算摘要、来源哈希和版本并在恢复前再次核对；服务端重算 canonical 来源哈希、验证证明结构并将首份证明不可替换地绑定批次，但不上传或读取浏览器整库备份。服务端在实际写入后重新核对计数、金额、数量、关系、软删除与孤儿，客户端按钮状态不能替代后台门禁。确认后浏览器保存持久迁移标记并禁止六类身份与施工合同走旧 production 的普通读写，重载时必须校验标记和中央活动批次。迁移适配器可以读取不可变备份用于恢复，不能以此重新开放普通旧库查询。
+- 当前项目与施工合同正式读链会消费已确认迁移的对应实体。客户、分供方、班组、工人和项目分供方的普通页面 Repository/中央接线由 #281 完成，迁移页不复制这些页面功能。
 - `/api/testing/projects/reset` 仅在非生产环境接受带测试标头的确定性场景切换，用来证明 ready、empty、forbidden、demo-forbidden、unavailable 与 retry，不是业务 API。
 - `server/utils/business-session.ts` 是单公司、单操作人首版的服务端身份注入边界；客户端查询不能覆盖 `workspaceId` 或 `actorId`。正式登录接入时替换该边界，不改变领域 DTO。
 - 用户可编辑的实体字段和关系以 `DATABASE.md` 为契约；不要从表格列或 mock 对象反推 schema。
