@@ -3,6 +3,7 @@ import type { CrewWorkerReadRepository } from '~/lib/crew-worker/repository'
 import type { CustomerCommandRepository } from '~/lib/customer/command-contract'
 import type { CustomerReadRepository } from '~/lib/customer/repository'
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import type { ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
 import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
@@ -12,6 +13,7 @@ import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repos
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
@@ -25,6 +27,7 @@ export interface DomainRepositories {
   supplierRead: SupplierReadRepository
   supplierCommands: SupplierCommandRepository
   projectList: ProjectListRepository
+  projectSupplierRead: ProjectSupplierReadRepository
   projectCommands: ProjectCommandRepository
   coreMigration: CoreMigrationRepository
 }
@@ -50,6 +53,9 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     projectList: createHttpProjectListRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    projectSupplierRead: createHttpProjectSupplierReadRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
     projectCommands: createHttpProjectCommandRepository({

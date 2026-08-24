@@ -1,6 +1,7 @@
 import type { ProblemDTO } from '../../app/types/read-model'
 import { CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/repository'
 import { CustomerRepositoryProblem } from '../../app/lib/customer/repository'
+import { ProjectSupplierRepositoryProblem } from '../../app/lib/project-supplier/repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 
@@ -19,6 +20,7 @@ export function throwProjectReadError(cause: unknown): never {
   if (!(cause instanceof ProjectRepositoryProblem)
     && !(cause instanceof CustomerRepositoryProblem)
     && !(cause instanceof SupplierRepositoryProblem)
+    && !(cause instanceof ProjectSupplierRepositoryProblem)
     && !(cause instanceof CrewWorkerRepositoryProblem)) {
     throw cause
   }

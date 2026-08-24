@@ -6,6 +6,8 @@ import type {
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
+import { appendProjectSupplierReturnContext, validateProjectSupplierReturnTo } from '~/lib/project-supplier/return-context'
+import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export type NavigationTargetState
@@ -30,7 +32,7 @@ interface ResolveNavigationTargetOptions {
 }
 
 type ResolvedEntityRef = Extract<EntityRefDTO, { state: 'resolved' }>
-type EntityTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-detail' | 'entity-subview' }>
+type EntityTargetIntent = Extract<NavigationIntentDTO, { kind: 'entity-detail' | 'entity-subview' | 'source-record' }>
   & { subject: ResolvedEntityRef }
 type TargetBuilder = (intent: EntityTargetIntent) => string
 
@@ -100,7 +102,17 @@ function projectSupplierPath(intent: EntityTargetIntent): string {
   const supplierId = intent.filters.supplierId
   if (typeof supplierId !== 'string' || !supplierId)
     throw new Error('invalid supplier workbench context')
-  return `/project/${encodeURIComponent(intent.subject.id)}/supplier/${encodeURIComponent(supplierId)}`
+  const dataOrigin = intent.filters.dataOrigin
+  if (!isDataOriginDTO(dataOrigin))
+    throw new Error('invalid supplier workbench origin')
+  const view = intent.view ?? 'overview'
+  if (!['overview', 'contract', 'claim', 'ticket', 'payment', 'settlement'].includes(view))
+    throw new Error('invalid supplier workbench view')
+  const query = new URLSearchParams()
+  if (dataOrigin !== 'real')
+    query.set('origin', dataOrigin)
+  query.set('tab', view)
+  return `/project/${encodeURIComponent(intent.subject.id)}/supplier/${encodeURIComponent(supplierId)}?${query.toString()}`
 }
 
 function receiptPath(intent: EntityTargetIntent): string {
@@ -205,10 +217,19 @@ export function resolveNavigationTarget(
     return unavailable('missing', intent.subject.label)
   if (intent.kind === 'same-route-overlay')
     return unavailable('unverified-target', intent.subject.label)
-  if (intent.kind !== 'entity-detail' && intent.kind !== 'entity-subview')
-    return unavailable('unverified-target', intent.subject.label)
-
   const key = `${intent.subject.entity}:${intent.variant ?? ''}`
+  if (intent.kind === 'source-record') {
+    const dataOrigin = intent.filters.dataOrigin
+    const returnContext = validateProjectSupplierReturnTo(options.returnTo)
+    if (!isDataOriginDTO(dataOrigin) || returnContext?.origin !== dataOrigin
+      || !isVerifiedProjectSupplierSourceTarget({
+        dataOrigin,
+        entity: intent.subject.entity,
+        variant: intent.variant,
+      })) {
+      return unavailable('unverified-target', intent.subject.label)
+    }
+  }
   if (key === 'subcontract-document:penalty-detail' && !hasCrewWorkerFactContext(intent as EntityTargetIntent))
     return unavailable('unverified-target', intent.subject.label)
   const builder = TARGET_REGISTRY[key as RegisteredTargetKey]
@@ -221,6 +242,8 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
+    if (intent.kind === 'source-record' && options.returnTo)
+      to = appendProjectSupplierReturnContext(to, options.returnTo)
     if (key === 'project:detail' && options.returnTo && options.returnContextId) {
       const returnTo = validateProjectReturnTo(options.returnTo)
       if (!returnTo || !isProjectReturnContextId(options.returnContextId))

@@ -20,9 +20,9 @@
 | **ProjectSupplier** | **项目维度合作状态、真实事实汇总、源单穿透、合作文件** | **`/project/:pid/supplier/:sid`** |
 | 支出合同 | 分包、材采、其他支出合同及附件 | `/contract/:id` |
 | 付款申请 | 请款、结算/发票分摊和审批状态 | `/finance/payment/:id` |
-| 发票台账 | 收票原件、归档状态、含税金额和税额 | `/finance/invoice/:id` |
-| 支付记录 | 银行回单、人工确认和付款申请分摊 | `/finance/records/:id` |
-| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 见“来源穿透” |
+| 发票台账 | 收票原件、归档状态、含税金额和税额 | 事实可见；只读来源目标待接入 |
+| 支付记录 | 银行回单、人工确认和付款申请分摊 | 事实可见；只读来源目标待接入 |
+| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 事实可见；三类只读来源目标待接入 |
 
 项目详情右栏列出已有 ProjectSupplier 关系，并提供“从文件导入分供方”入口。工作台内的项目名和分供方名分别返回项目详情和分供方详情。
 
@@ -30,7 +30,7 @@
 
 ## 一、事实归属
 
-工作台是只读聚合层。除“项目×分供方合作终态结算确认”外，各业务对象仍由自己的模块维护。
+工作台是只读聚合层。#317 后浏览器页面只消费中央 `ProjectSupplierReadRepository`，各业务对象仍由自己的模块维护；合作终态结算写入规则未闭合，本页不提供写入口。
 
 | 工作台内容 | 唯一事实来源 | 汇总口径 |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ interface Settlement {
 }
 ```
 
-工作台必须把“支出结算单”列表和“合作终态结算确认”分区展示，禁止用一个“结算额”混合两者。
+工作台只展示“支出结算单”列表和汇总。合作终态结算仍保留为独立概念，但在多轮确认与写入规则闭合前不得显示可操作入口，禁止用一个“结算额”混合两者。
 
 ---
 
@@ -125,29 +125,29 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 请款 | 申请单号、名称、状态、申请金额、批复金额、申请日期、回票类型、附件数 | `payment_applications` |
 | 收票 | 发票号、日期、类型、含税金额、税额、归档状态 | `invoices` |
 | 付款 | 支付单号、日期、本关系分摊金额、方式、凭证、确认状态、关联请款 | 支付记录与有效分摊 |
-| 结算 | 支出结算单列表 + 合作终态结算确认 | `expenditure_settlements`、`settlements` |
+| 结算 | 支出结算单列表；终态结算写入明确待后续闭合 | `expenditure_settlements` |
 
 业务表格只在自身区域横向滚动。行级“查看源单”进入真实来源，不在工作台复制编辑表单。
 
 ### 来源穿透
 
-| 来源 | 当前可达路由 |
+| 来源 | 当前来源状态 |
 | --- | --- |
-| 合同 | `/contract/:id` |
-| 付款申请 | `/finance/payment/:id/detail` |
-| 发票 | `/finance/invoice/:id` |
-| 支付记录 | `/finance/records/:id` |
-| 分包结算 | `/subcontract/settlement/:id` |
-| 材料结算 | `/material/settlement/form/:id` |
-| 其他支出结算 | `/contract/other-settlement/form/:id` |
+| 合同 | 演示来源可进入 `/contract/:id` 只读详情并返回 |
+| 付款申请 | 演示来源可进入 `/finance/payment/:id/detail` 只读详情并返回 |
+| 发票 | 现有 `/finance/invoice/:id` 读写混用，工作台保持 `unverified-target` |
+| 支付记录 | 现有 `/finance/records/:id` 读写混用，工作台保持 `unverified-target` |
+| 分包结算 | 现有 `/subcontract/settlement/:id` 读写混用，工作台保持 `unverified-target` |
+| 材料结算 | 现有 `/material/settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
+| 其他支出结算 | 现有 `/contract/other-settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 
 工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`；导入向导取消或完成后回到 `/project/:pid?tab=expenditure`。
 
-工作台当前会向合同、付款申请、收票和支付入口附带 `projectId`、`supplierId`、`returnTo`，但目标页尚未统一消费这些参数：合同表单不读取；付款申请新建页不读取普通项目/分供方预填；收票工作台不按它们自动筛选；支付记录只有同时提供真实 `paymentApplicationId` 时才按付款申请预填。因此这些入口目前只承诺“进入对应模块”，不能宣称已带筛选、自动预填或自动返回。后续跨域链接实施必须让目标页验证并消费真实 ID，或删除无效参数；不得用名称匹配和 Mock 数据补齐。收票新增继续进入 `/finance/invoice` 的上传识别工作台，不虚构 `/finance/invoice/new`。
+在 #317 中，工作台只输出 `NavigationIntentDTO`，每个来源意图持续携带 `dataOrigin`。唯一 Target Registry 仅在目标已验证为同来源只读页、来源为 `demo`、返回上下文来源一致时解析合同与付款申请；正式中央来源以及仍读写混用的收票、支付记录和三种支出结算全部稳定退化为 `unverified-target`，不得回落本地编辑页。可达目标仅在 query 中的 `projectId`、`supplierId`、受限 `returnTo` 与实际源单身份三者一致时显示“返回项目分供方工作台”；外部地址、未知页签、额外 query 或身份错配均退回目标模块默认返回。工作台 tab 在 query 中持久化，刷新与往返恢复原页签。
 
 ### 文件区
 
-文件按“合作档案、合同、付款申请、发票原件、支付记录、支出结算、最终结算”等真实来源分组。每个文件保留文件名、类别、大小、上传人和时间；有源单的分组可以进入源单。预览或下载只读取现有文件内容，不改变业务状态。
+文件按真实 owner 分组。中央 DTO 保留文件稳定 ID、文件名、类别、大小、上传人、时间与来源意图；有源单的分组可以进入源单。#317 不授予文件正文预览或下载能力，页面不得从路径或文件名推断可读取性。
 
 通过导入向导进入的文件只属于 ProjectSupplier 合作档案，不回写为分供方证照，也不自动生成合同、请款、发票、支付或结算单。
 
