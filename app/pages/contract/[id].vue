@@ -23,6 +23,9 @@ const materialOrigin = computed<DataOriginDTO | null>(() => !desktop && route.qu
 const constructionOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'construction' && isDataOriginDTO(route.query.origin)
   ? route.query.origin
   : null)
+const subcontractOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'subcontract' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
 const contractStore = useContractStore()
 const detailStore = useContractDetailStore()
 
@@ -149,7 +152,7 @@ function openEdit() {
 let loadRequest = 0
 
 async function load() {
-  if (materialOrigin.value || constructionOrigin.value)
+  if (materialOrigin.value || constructionOrigin.value || subcontractOrigin.value)
     return
   const request = ++loadRequest
   const requestedId = contractId.value
@@ -191,6 +194,11 @@ watch(contractId, () => {
     v-else-if="constructionOrigin"
     :contract-id="contractId"
     :origin="constructionOrigin"
+  />
+  <SubcontractContractDetailScreen
+    v-else-if="subcontractOrigin"
+    :contract-id="contractId"
+    :origin="subcontractOrigin"
   />
   <div
     v-else-if="contract && !initializing && !contractStore.loading && !loadError"

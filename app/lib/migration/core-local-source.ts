@@ -103,6 +103,20 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     WHERE c.kind = '施工'
     ORDER BY c.id
   `,
+  subcontract_contracts: `
+    SELECT
+      c.id, c.no, c.name, c.sub_kind, c.project_id, c.supplier_id,
+      c.content, c.invoice_type, c.contact_name, c.contact_phone,
+      c.tax_rate, c.sign_date, c.main_terms, c.payment_terms,
+      c.warranty_terms, c.retention_ratio, c.retention_amount,
+      c.retention_days, c.invoice_name, c.invoice_tax_no,
+      c.invoice_address_phone, c.invoice_bank, c.invoice_bank_account,
+      c.amount, c.status, c.settlement_status, c.clearance_status,
+      c.note, c.created_at, c.updated_at, c.deleted_at
+    FROM contracts c
+    WHERE c.kind = '分包'
+    ORDER BY c.id
+  `,
   workers: `
     SELECT id, name, crew_id, current_project_id, deleted_at
     FROM workers
@@ -210,6 +224,43 @@ function sourceEntity(
         status: text(row.status),
         note: text(row.note),
         actualCompletionDate: nullableText(row.actual_completion_date),
+        createdAt: text(row.created_at),
+        updatedAt: text(row.updated_at),
+      },
+    }
+  }
+  if (entityType === 'subcontract_contracts') {
+    return {
+      ...entity,
+      references: {
+        projectId: nullableText(row.project_id),
+        supplierId: nullableText(row.supplier_id),
+      },
+      amount: nullableMoney(row.amount),
+      attributes: {
+        no: text(row.no),
+        subKind: text(row.sub_kind),
+        content: text(row.content),
+        invoiceType: text(row.invoice_type),
+        contactName: text(row.contact_name),
+        contactPhone: text(row.contact_phone),
+        taxRate: nullableNumber(row.tax_rate),
+        signDate: nullableText(row.sign_date),
+        mainTerms: text(row.main_terms),
+        paymentTerms: text(row.payment_terms),
+        warrantyTerms: text(row.warranty_terms),
+        retentionRatio: nullableNumber(row.retention_ratio),
+        retentionAmount: nullableNumber(row.retention_amount),
+        retentionDays: nullableNumber(row.retention_days),
+        invoiceName: text(row.invoice_name),
+        invoiceTaxNo: text(row.invoice_tax_no),
+        invoiceAddressPhone: text(row.invoice_address_phone),
+        invoiceBank: text(row.invoice_bank),
+        invoiceBankAccount: text(row.invoice_bank_account),
+        status: text(row.status),
+        settlementStatus: nullableText(row.settlement_status),
+        clearanceStatus: nullableText(row.clearance_status),
+        note: text(row.note),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
       },

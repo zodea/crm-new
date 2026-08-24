@@ -5591,6 +5591,18 @@ export const migrations: Migration[] = [
         await addColumnIfMissing(db, 'contracts', 'actual_completion_date', 'TEXT DEFAULT NULL')
     },
   },
+  {
+    version: 43,
+    name: 'subcontract-contract-independent-statuses',
+    async up(db) {
+      // 分包结算与清账是独立事实。存量合同未记录时保持 NULL，
+      // 不使用结算额、付款余额或合同状态推断回填。
+      if (await tableExists(db, 'contracts')) {
+        await addColumnIfMissing(db, 'contracts', 'settlement_status', 'TEXT DEFAULT NULL')
+        await addColumnIfMissing(db, 'contracts', 'clearance_status', 'TEXT DEFAULT NULL')
+      }
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

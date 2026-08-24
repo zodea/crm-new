@@ -10,6 +10,8 @@ import type { CoreMigrationRepository } from '~/lib/migration/core-http-reposito
 import type { ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
 import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
+import type { SubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-contract'
+import type { SubcontractContractReadRepository } from '~/lib/subcontract-contract/repository'
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
 import type { SupplierReadRepository } from '~/lib/supplier/repository'
 import { createHttpConstructionContractCommandRepository } from '~/lib/construction-contract/command-http-repository'
@@ -24,6 +26,8 @@ import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-rep
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
+import { createHttpSubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-http-repository'
+import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-contract/http-repository'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
@@ -32,6 +36,8 @@ export interface DomainRepositories {
   customerCommands: CustomerCommandRepository
   constructionContractRead: ConstructionContractReadRepository
   constructionContractCommands: ConstructionContractCommandRepository
+  subcontractContractRead: SubcontractContractReadRepository
+  subcontractContractCommands: SubcontractContractCommandRepository
   crewWorkerRead: CrewWorkerReadRepository
   crewWorkerCommands: CrewWorkerCommandRepository
   supplierRead: SupplierReadRepository
@@ -56,6 +62,12 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     constructionContractCommands: createHttpConstructionContractCommandRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    subcontractContractRead: createHttpSubcontractContractReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    subcontractContractCommands: createHttpSubcontractContractCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
     crewWorkerRead: createHttpCrewWorkerReadRepository({

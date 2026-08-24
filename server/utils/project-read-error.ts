@@ -4,6 +4,7 @@ import { CustomerRepositoryProblem } from '../../app/lib/customer/repository'
 import { MaterialContractRepositoryProblem } from '../../app/lib/material-contract/repository'
 import { ProjectSupplierRepositoryProblem } from '../../app/lib/project-supplier/repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { SubcontractContractRepositoryProblem } from '../../app/lib/subcontract-contract/repository'
 import { SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 
 const STATUS_BY_CODE: Partial<Record<ProblemDTO['code'], number>> = {
@@ -23,7 +24,8 @@ export function throwProjectReadError(cause: unknown): never {
     && !(cause instanceof SupplierRepositoryProblem)
     && !(cause instanceof ProjectSupplierRepositoryProblem)
     && !(cause instanceof CrewWorkerRepositoryProblem)
-    && !(cause instanceof MaterialContractRepositoryProblem)) {
+    && !(cause instanceof MaterialContractRepositoryProblem)
+    && !(cause instanceof SubcontractContractRepositoryProblem)) {
     throw cause
   }
   throw createError({

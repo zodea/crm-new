@@ -60,6 +60,7 @@ function source(overrides: Partial<Omit<CoreMigrationSourceDTO, 'sourceHash'>> =
         },
       ],
       construction_contracts: [],
+      subcontract_contracts: [],
       workers: [
         {
           legacyId: 'worker-old-1',

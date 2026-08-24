@@ -44,6 +44,7 @@ function source(): CoreMigrationSourceDTO {
           updatedAt: '2026-08-24T00:00:00.000Z',
         },
       }],
+      subcontract_contracts: [],
       workers: [],
       project_suppliers: [],
     },
