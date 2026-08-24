@@ -23,7 +23,8 @@ const REFERENCE_KEYS = new Set<CoreMigrationReferenceField>([
   'supplierId',
   'crewId',
 ])
-const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount', 'deletedAt'])
+const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount', 'attributes', 'deletedAt'])
+const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt'])
 const SOURCE_KEYS = new Set([
   'contractVersion',
   'mode',
@@ -139,6 +140,21 @@ function parseReferences(value: unknown, label: string): CoreMigrationSourceEnti
   return result
 }
 
+function parseAttributes(value: unknown, label: string): CoreMigrationSourceEntityDTO['attributes'] {
+  if (value === undefined)
+    return undefined
+  if (!isObject(value))
+    invalid(`${label}必须是对象`)
+  assertOnlyKeys(value, ATTRIBUTE_KEYS, label)
+  const result: Record<string, string | number | null> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry !== null && typeof entry !== 'string' && (typeof entry !== 'number' || !Number.isFinite(entry)))
+      invalid(`${label}.${key}必须是文本、有限数值或 null`)
+    result[key] = entry as string | number | null
+  }
+  return result
+}
+
 function parseEntity(value: unknown, entityType: CoreMigrationEntityType, index: number): CoreMigrationSourceEntityDTO {
   const label = `${entityType}[${index}]`
   if (!isObject(value))
@@ -152,6 +168,7 @@ function parseEntity(value: unknown, entityType: CoreMigrationEntityType, index:
       : {}),
     ...(value.quantity !== undefined ? { quantity: optionalFinite(value.quantity, `${label}.quantity`) } : {}),
     ...(value.amount !== undefined ? { amount: optionalMoney(value.amount, `${label}.amount`) } : {}),
+    ...(value.attributes !== undefined ? { attributes: parseAttributes(value.attributes, `${label}.attributes`) } : {}),
     ...(value.deletedAt !== undefined ? { deletedAt: optionalIso(value.deletedAt, `${label}.deletedAt`) } : {}),
   }
 }

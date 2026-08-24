@@ -284,7 +284,7 @@ describe('v41 发票导出设置', () => {
 
     const result = await runMigrations(db)
 
-    expect(result).toMatchObject({ from: 40, to: 41 })
+    expect(result).toMatchObject({ from: 40, to: LATEST_VERSION })
     expect(await listTables(db)).toContain('invoice_export_settings')
     expect(await columnNames(db, 'invoice_export_settings')).toEqual([
       'id',

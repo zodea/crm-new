@@ -32,6 +32,7 @@ const activeTab = shallowRef<BoqTab>('lines')
 const treeScope = shallowRef('all')
 const search = shallowRef('')
 const initialized = shallowRef(false)
+const requestedTargetUnavailable = shallowRef(false)
 
 const projectOptions = computed(() => store.catalog.map(project => ({
   id: project.id,
@@ -69,14 +70,28 @@ async function replaceQuery() {
 async function initialize() {
   initialized.value = false
   try {
+    const requestedProject = String(route.query.project ?? '')
+    const requestedContract = String(route.query.contract ?? '')
+    if (requestedProject && requestedContract
+      && (store.workspace?.projectId !== requestedProject || store.workspace.contractId !== requestedContract)) {
+      store.clearWorkspace()
+    }
     await store.loadCatalog()
     activeTab.value = queryTab(route.query.tab)
-    const requestedProject = String(route.query.project ?? '')
-    const preferredProject = store.catalog.find(project => project.id === requestedProject)
+    const exactProject = store.catalog.find(project => project.id === requestedProject)
+    const exactContract = exactProject?.contracts.find(contract => contract.id === requestedContract)
+    if (requestedProject && requestedContract && (!exactProject || !exactContract)) {
+      store.clearWorkspace()
+      projectId.value = requestedProject
+      contractId.value = requestedContract
+      requestedTargetUnavailable.value = true
+      return
+    }
+    requestedTargetUnavailable.value = false
+    const preferredProject = exactProject
       ?? store.catalog.find(project => project.contracts.some(contract => contract.lineCount > 0))
       ?? store.catalog[0]
     projectId.value = preferredProject?.id ?? ''
-    const requestedContract = String(route.query.contract ?? '')
     const preferredContract = preferredProject?.contracts.find(contract => contract.id === requestedContract)
       ?? preferredProject?.contracts.find(contract => contract.lineCount > 0)
       ?? preferredProject?.contracts[0]
@@ -91,6 +106,7 @@ async function initialize() {
     toastError(toErrorMessage(cause))
   }
   finally {
+    await nextTick()
     initialized.value = true
   }
 }
@@ -98,6 +114,7 @@ async function initialize() {
 watch(projectId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
+  requestedTargetUnavailable.value = false
   const project = store.catalog.find(candidate => candidate.id === next)
   contractId.value = project?.contracts.find(contract => contract.lineCount > 0)?.id
     ?? project?.contracts[0]?.id
@@ -111,6 +128,7 @@ watch(projectId, async (next, previous) => {
 watch(contractId, async (next, previous) => {
   if (!initialized.value || !next || next === previous)
     return
+  requestedTargetUnavailable.value = false
   treeScope.value = 'all'
   await store.loadWorkspace(projectId.value, next)
   await replaceQuery()
@@ -128,6 +146,13 @@ watch(() => route.query.tab, (value) => {
   const next = queryTab(value)
   if (next !== activeTab.value)
     activeTab.value = next
+})
+
+watch(() => [route.query.project, route.query.contract], ([project, contract]) => {
+  const requestedProject = String(project ?? '')
+  const requestedContract = String(contract ?? '')
+  if (requestedProject !== projectId.value || requestedContract !== contractId.value)
+    void initialize()
 })
 
 async function editLine(line: BoqLineView) {
@@ -466,6 +491,7 @@ onMounted(initialize)
             <span class="i-lucide-download mr-1" /> 导出台账
           </button>
           <NuxtLink
+            v-if="!requestedTargetUnavailable"
             :to="{ path: '/contract/boq/import', query: { project: projectId, contract: contractId } }"
             class="btn-accent"
           >
@@ -490,22 +516,32 @@ onMounted(initialize)
       <SegTab v-model="activeTab" :tabs="tabs" />
     </section>
 
-    <section v-if="(!initialized || store.loading) && !store.workspace" class="panel grid min-h-80 gap-3 p-4" role="status">
-      <span class="sr-only">正在读取工程量清单…</span>
-      <div class="h-8 w-56 animate-pulse rounded bg-surface-3" />
-      <div class="h-56 animate-pulse rounded-lg bg-surface-2" />
-    </section>
-    <section v-else-if="store.error && !store.workspace" class="panel grid min-h-80 place-items-center p-5 text-center text-12px text-danger" role="alert">
-      {{ store.error }}
-    </section>
-    <section v-else-if="!store.workspace" class="panel grid min-h-80 place-items-center p-6 text-center">
-      <div>
-        <span class="i-lucide-file-spreadsheet text-28px text-ink-faint" />
-        <p class="mt-2 text-14px font-800 text-ink">
-          当前没有可用施工合同
-        </p>
-      </div>
-    </section>
+    <StatePanel
+      v-if="(!initialized || store.loading) && !store.workspace"
+      kind="loading"
+      title="正在读取工程量清单"
+      description="正在校验项目、施工合同与清单目录。"
+    />
+    <StatePanel
+      v-else-if="store.error && !store.workspace"
+      kind="error"
+      title="工程量清单读取失败"
+      :description="store.error"
+      action-label="重新加载"
+      @action="initialize"
+    />
+    <StatePanel
+      v-else-if="requestedTargetUnavailable"
+      kind="empty"
+      title="指定的施工合同清单不可用"
+      description="当前本地 BOQ 目录中没有与 URL 项目和合同稳定 ID 完全一致的清单，未切换到其他合同。"
+    />
+    <StatePanel
+      v-else-if="!store.workspace"
+      kind="empty"
+      title="当前没有可用施工合同"
+      description="先创建施工合同，再进入工程量清单。"
+    />
 
     <section v-else-if="activeTab === 'lines'" class="boq-lines-layout grid min-w-0 grid-cols-[15rem_minmax(0,1fr)] gap-3">
       <aside class="min-w-0">

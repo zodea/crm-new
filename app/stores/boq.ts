@@ -81,6 +81,16 @@ export const useBoqStore = defineStore('boq', () => {
     }
   }
 
+  function clearWorkspace() {
+    latestWorkspaceRequest += 1
+    latestMonthlyRequest += 1
+    activeProjectId = ''
+    activeContractId = ''
+    workspace.value = null
+    monthlyStatement.value = null
+    error.value = ''
+  }
+
   async function loadWorkspace(projectId: string, contractId: string) {
     const request = ++latestWorkspaceRequest
     activeProjectId = projectId
@@ -356,6 +366,7 @@ export const useBoqStore = defineStore('boq', () => {
     saving: readonly(saving),
     error: readonly(error),
     loadCatalog,
+    clearWorkspace,
     loadWorkspace,
     loadStatement,
     updateLine,

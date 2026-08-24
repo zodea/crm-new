@@ -59,6 +59,7 @@ function source(overrides: Partial<Omit<CoreMigrationSourceDTO, 'sourceHash'>> =
           references: { customerId: 'customer-name-only' },
         },
       ],
+      construction_contracts: [],
       workers: [
         {
           legacyId: 'worker-old-1',

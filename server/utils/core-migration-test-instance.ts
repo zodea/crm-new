@@ -28,6 +28,7 @@ import {
   isCoreMigrationBlockingIssue,
 } from '../../app/lib/migration/core-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -69,6 +70,9 @@ export interface CoreMigrationTestInstanceOptions {
   rollbackWindowMs?: number
   beforeCommit?: (entity: CoreMigrationServerEntityDTO) => void | Promise<void>
   afterApply?: (entities: CoreMigrationServerEntityDTO[], batchId: string) => void | Promise<void>
+  afterConfirm?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
+  afterRollback?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
+  afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void
 }
 
 interface ReferenceRule {
@@ -81,6 +85,10 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
   projects: [
     { field: 'customerId', target: 'customers' },
     { field: 'secondaryCustomerId', target: 'customers' },
+  ],
+  construction_contracts: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'customerId', target: 'customers' },
   ],
   workers: [
     { field: 'crewId', target: 'crews' },
@@ -406,6 +414,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           references: resolvedReferences,
           quantity: row.quantity ?? null,
           amount: row.amount ?? null,
+          attributes: clone(row.attributes ?? {}),
           deletedAt: row.deletedAt ?? null,
           batchId,
         })
@@ -840,9 +849,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     if (batch.dto.issues.some(isCoreMigrationBlockingIssue))
       throw conflict('存在阻塞性对账问题，不能确认切换')
     const confirmedAt = now()
-    state.authority = 'central'
-    state.activeBatchId = command.batchId
-    batch.dto = {
+    const confirmedBatch: CoreMigrationBatchDTO = {
       ...batch.dto,
       status: 'confirmed',
       authority: 'central',
@@ -850,6 +857,14 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       confirmedAt,
       rollbackExpiresAt: new Date(Date.parse(confirmedAt) + rollbackWindowMs).toISOString(),
     }
+    await options.afterConfirm?.({
+      authority: 'central',
+      activeBatchId: command.batchId,
+      entities: clone(state.entities),
+    }, command.batchId)
+    state.authority = 'central'
+    state.activeBatchId = command.batchId
+    batch.dto = confirmedBatch
     remember(state, command.commandId, 'confirm', batch.dto)
     return clone(batch.dto)
   }
@@ -875,6 +890,11 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         || Date.parse(rolledBackAt) > Date.parse(batch.dto.rollbackExpiresAt))) {
       throw conflict('迁移回滚窗口已关闭')
     }
+    await options.afterRollback?.({
+      authority: batch.backup.authority,
+      activeBatchId: batch.backup.activeBatchId,
+      entities: clone(batch.backup.entities),
+    }, command.batchId)
     state.authority = batch.backup.authority
     state.activeBatchId = batch.backup.activeBatchId
     state.entities = clone(batch.backup.entities)
@@ -905,6 +925,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       workspaces.delete(workspaceId)
     else
       workspaces.clear()
+    options.afterReset?.({ authority: 'local', activeBatchId: null, entities: [] }, workspaceId)
   }
 
   return {
@@ -918,4 +939,14 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   }
 }
 
-export const coreMigrationTestInstance = createCoreMigrationTestInstance()
+export const coreMigrationTestInstance = createCoreMigrationTestInstance({
+  afterConfirm: (snapshot) => {
+    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+  },
+  afterRollback: (snapshot) => {
+    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+  },
+  afterReset: (snapshot) => {
+    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+  },
+})

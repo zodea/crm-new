@@ -7,6 +7,10 @@ const NuxtLink = defineComponent({
   props: ['to'],
   template: '<a :href="to"><slot/></a>',
 })
+const KitTable = defineComponent({
+  props: ['data', 'empty'],
+  template: '<div><div v-for="row in data" :key="row.id"><slot name="name" :row="row" /></div></div>',
+})
 
 describe('材料采购合同来源事实表', () => {
   it('目标未消费同一中央来源时保留稳定事实但不生成写态链接', () => {
@@ -34,7 +38,7 @@ describe('材料采购合同来源事实表', () => {
           },
         ],
       },
-      global: { components: { NuxtLink } },
+      global: { components: { NuxtLink }, stubs: { KitTable } },
     })
 
     expect(screen.queryByRole('link', { name: '已归档发票' })).toBeNull()

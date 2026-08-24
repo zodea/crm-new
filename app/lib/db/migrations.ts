@@ -66,6 +66,15 @@ async function columnExists(db: MigrationDb, table: string, column: string): Pro
   return columns.some(item => item.name === column)
 }
 
+async function tableExists(db: MigrationDb, table: string): Promise<boolean> {
+  assertIdentifier(table)
+  const rows = await db.select<{ name: string }>(
+    'SELECT name FROM sqlite_master WHERE type = \'table\' AND name = ?',
+    [table],
+  )
+  return rows.length > 0
+}
+
 async function dropColumnIfExists(
   db: MigrationDb,
   table: string,
@@ -5569,6 +5578,17 @@ export const migrations: Migration[] = [
           updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `)
+    },
+  },
+  {
+    version: 42,
+    name: 'construction-contract-actual-completion-date',
+    async up(db) {
+      // 存量施工合同没有可核验的实际竣工事实。只增加可空 canonical 字段，
+      // 不使用合同结束日期、状态或结算余额推断并回填实际竣工日期。
+      // 最小化测试/恢复库可能只持有后置设置表；此时保持迁移幂等，不创建残缺合同表。
+      if (await tableExists(db, 'contracts'))
+        await addColumnIfMissing(db, 'contracts', 'actual_completion_date', 'TEXT DEFAULT NULL')
     },
   },
 ]

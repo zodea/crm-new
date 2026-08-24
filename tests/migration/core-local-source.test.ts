@@ -31,6 +31,23 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       deleted_at: null,
     }]
   }
+  if (sql.includes('FROM contracts c')) {
+    return [{
+      id: 'construction-local-1',
+      no: 'SG-001',
+      name: '既有施工合同',
+      project_id: 'project-local-1',
+      customer_id: 'customer-local-1',
+      content: '存量正式合同',
+      amount: 320000,
+      status: '履约中',
+      sign_date: '2026-01-01',
+      actual_completion_date: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-08-24T00:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM workers')) {
     return [{
       id: 'worker-local-1',
@@ -107,12 +124,14 @@ describe('core migration local source', () => {
           suppliers: 1,
           crews: 1,
           projects: 1,
+          construction_contracts: 1,
           workers: 1,
           project_suppliers: 1,
         },
         totals: [
           { entityType: 'projects', metric: 'quantity', expected: 12.5 },
           { entityType: 'projects', metric: 'amount', expected: '100.00' },
+          { entityType: 'construction_contracts', metric: 'amount', expected: '320000.00' },
         ],
       },
     })
@@ -140,6 +159,12 @@ describe('core migration local source', () => {
         supplierId: 'supplier-local-1',
       },
       deletedAt: null,
+    })
+    expect(first.entities.construction_contracts[0]).toMatchObject({
+      legacyId: 'construction-local-1',
+      references: { projectId: 'project-local-1', customerId: 'customer-local-1' },
+      amount: '320000.00',
+      attributes: { no: 'SG-001', signDate: '2026-01-01', actualCompletionDate: null },
     })
     expect(Object.values(first.entities).flat().map(row => row.legacyId))
       .toContain('customer_demo_001')
@@ -314,6 +339,7 @@ describe('core migration local source', () => {
       'suppliers',
       'crews',
       'projects',
+      'construction_contracts',
       'workers',
       'project_suppliers',
     ])

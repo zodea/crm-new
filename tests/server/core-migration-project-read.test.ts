@@ -38,6 +38,7 @@ function migrationSource(): CoreMigrationSourceDTO {
         amount: '8800.00',
         references: { customerId: 'customer-local-1' },
       }],
+      construction_contracts: [],
       workers: [],
       project_suppliers: [],
     },

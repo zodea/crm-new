@@ -1,3 +1,5 @@
+import type { ConstructionContractCommandRepository } from '~/lib/construction-contract/command-contract'
+import type { ConstructionContractReadRepository } from '~/lib/construction-contract/repository'
 import type { CrewWorkerCommandRepository } from '~/lib/crew-worker/command-contract'
 import type { CrewWorkerReadRepository } from '~/lib/crew-worker/repository'
 import type { CustomerCommandRepository } from '~/lib/customer/command-contract'
@@ -10,6 +12,8 @@ import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
 import type { SupplierReadRepository } from '~/lib/supplier/repository'
+import { createHttpConstructionContractCommandRepository } from '~/lib/construction-contract/command-http-repository'
+import { createHttpConstructionContractReadRepository } from '~/lib/construction-contract/http-repository'
 import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command-http-repository'
 import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
@@ -26,6 +30,8 @@ import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository
 export interface DomainRepositories {
   customerRead: CustomerReadRepository
   customerCommands: CustomerCommandRepository
+  constructionContractRead: ConstructionContractReadRepository
+  constructionContractCommands: ConstructionContractCommandRepository
   crewWorkerRead: CrewWorkerReadRepository
   crewWorkerCommands: CrewWorkerCommandRepository
   supplierRead: SupplierReadRepository
@@ -44,6 +50,12 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     customerCommands: createHttpCustomerCommandRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    constructionContractRead: createHttpConstructionContractReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    constructionContractCommands: createHttpConstructionContractCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
     crewWorkerRead: createHttpCrewWorkerReadRepository({

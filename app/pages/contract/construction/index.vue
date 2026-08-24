@@ -1,7 +1,10 @@
 <script setup lang="ts">
-// 施工合同列表（收入侧，主合同管理组，#90）——共用屏 kind 一份生成整页。
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+
+const desktop = isDesktopRuntime()
 </script>
 
 <template>
-  <ContractListScreen kind="施工" />
+  <ContractListScreen v-if="desktop" kind="施工" />
+  <ConstructionContractListScreen v-else />
 </template>

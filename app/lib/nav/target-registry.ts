@@ -132,14 +132,34 @@ function contractPath(intent: EntityTargetIntent): string {
   const path = entityPath('/contract', intent)
   if (intent.kind === 'source-record')
     return path
-  if (intent.filters.contractKind !== '材采')
+  const kind = intent.filters.contractKind
+  if (kind !== '材采' && kind !== '施工')
     return path
   const dataOrigin = intent.filters.dataOrigin
   if (dataOrigin == null)
     return path
   if (!isDataOriginDTO(dataOrigin))
     throw new Error('invalid contract data origin')
-  return `${path}?${new URLSearchParams({ origin: dataOrigin, contractKind: 'material' }).toString()}`
+  const query = new URLSearchParams({
+    origin: dataOrigin,
+    contractKind: kind === '材采' ? 'material' : 'construction',
+  })
+  if (intent.variant === 'supplement') {
+    if (!intent.view)
+      throw new Error('invalid contract supplement focus')
+    query.set('tab', 'supplements')
+    query.set('focus', intent.view)
+  }
+  return `${path}?${query.toString()}`
+}
+
+function contractBoqPath(intent: EntityTargetIntent): string {
+  const projectId = intent.filters.projectId
+  const contractKind = intent.filters.contractKind
+  const dataOrigin = intent.filters.dataOrigin
+  if (typeof projectId !== 'string' || !projectId || contractKind !== '施工' || dataOrigin !== 'real')
+    throw new Error('invalid construction contract BOQ context')
+  return `/contract/boq?${new URLSearchParams({ project: projectId, contract: intent.subject.id }).toString()}`
 }
 
 function receiptPath(intent: EntityTargetIntent): string {
@@ -188,6 +208,8 @@ const TARGET_REGISTRY = {
   'crew:detail': crewPath,
   'worker:detail': workerPath,
   'contract:detail': contractPath,
+  'contract:supplement': contractPath,
+  'contract:boq': contractBoqPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,

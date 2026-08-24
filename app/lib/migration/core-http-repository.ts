@@ -225,6 +225,10 @@ function isReferences(value: unknown): boolean {
     && Object.values(value).every(isNullableString)
 }
 
+function isAttributes(value: unknown): boolean {
+  return isObject(value) && Object.values(value).every(entry => entry === null || typeof entry === 'string' || (typeof entry === 'number' && Number.isFinite(entry)))
+}
+
 function isServerEntity(value: unknown): value is CoreMigrationServerEntityDTO {
   return isObject(value)
     && isEntityType(value.entityType)
@@ -234,6 +238,7 @@ function isServerEntity(value: unknown): value is CoreMigrationServerEntityDTO {
     && isReferences(value.references)
     && isNullableNumber(value.quantity)
     && isNullableMoney(value.amount)
+    && isAttributes(value.attributes)
     && (value.deletedAt === null || isISODateTimeDTO(value.deletedAt))
     && isString(value.batchId)
 }
