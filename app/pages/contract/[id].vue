@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { F2FormKind } from '~/lib/contract/forms'
 import type { StatusTone } from '~/lib/project/status'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { contractStages } from '~/lib/contract/detail'
 import { formPath } from '~/lib/contract/page'
@@ -9,10 +10,16 @@ import {
   contractBalance,
   kindLabels,
 } from '~/lib/contract/status'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { yuan } from '~/lib/util/money'
 import { maskPhone } from '~/lib/util/privacy'
+import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
+const desktop = isDesktopRuntime()
+const centralOrigin = computed<DataOriginDTO | null>(() => !desktop && route.query.contractKind === 'material' && isDataOriginDTO(route.query.origin)
+  ? route.query.origin
+  : null)
 const contractStore = useContractStore()
 const detailStore = useContractDetailStore()
 
@@ -139,6 +146,8 @@ function openEdit() {
 let loadRequest = 0
 
 async function load() {
+  if (centralOrigin.value)
+    return
   const request = ++loadRequest
   const requestedId = contractId.value
   initializing.value = true
@@ -170,8 +179,13 @@ watch(contractId, () => {
 </script>
 
 <template>
+  <MaterialContractDetailScreen
+    v-if="centralOrigin"
+    :contract-id="contractId"
+    :origin="centralOrigin"
+  />
   <div
-    v-if="contract && !initializing && !contractStore.loading && !loadError"
+    v-else-if="contract && !initializing && !contractStore.loading && !loadError"
     class="contract-detail-screen min-w-0 space-y-3"
   >
     <header class="panel px-4 py-3" data-ui="contract-detail-header">

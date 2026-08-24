@@ -202,7 +202,7 @@ interface NavigationOrigin {
 | `N-SUPPLIER-NONACTION` | `supplier` 列表/详情 | 列表失效金额、应付金额 | 无可靠目标 | — | 不导航 | 非入口；不能复制“蓝色但无操作” |
 | `N-PROJECT-SUPPLIER-TABS` | `project-supplier` 工作台 | 项目/分供方名称与六页签 | 两个 ID resolved | `/project/:pid`、`/base/supplier/:sid`；`?tab=overview,contract,claim,ticket,payment,settlement` | 刷新/浏览器返回恢复页签 | 闭合 |
 | `N-PROJECT-SUPPLIER-SOURCES` | `project-supplier` 工作台 | 合同/请款/收票/支付/结算/文件来源 | 每行稳定源 ID + variant + `dataOrigin` | 演示合同 `/contract/:id`、演示付款申请 `/finance/payment/:id/detail`；其他来源保持 `unverified-target` | 已验证目标校验 `dataOrigin/projectId/supplierId/returnTo` 后返回原页签 | 部分；#317 统一语义意图与受限返回，正式中央来源及读写混用目标不回落本地编辑页；待各域只读页消费同一来源策略后开放 |
-| `N-CORE-CONTRACT` | `core-contract` 三类合同列表 | 合同名称、项目、客户/分供方 | 相应 ref resolved | `/contract/:id`、`/project/:id`、主数据详情 | 返回合同类别与列表筛选/页码/滚动 | 部分；详情返回仍多为静态根列表 |
+| `N-CORE-CONTRACT` | `core-contract` 三类合同列表 | 合同名称、项目、客户/分供方 | 相应 ref resolved；材采另带 `dataOrigin + contractKind='材采'` | `/contract/:id`、`/project/:id`、主数据详情 | 材采返回白名单 `returnTo` 中的搜索/项目/分供方/状态/页码；其余保持原合同类别上下文 | 部分；#318 已闭合材采中央列表—七页签详情—显式编辑—读回，演示只读；发票/付款等事实保留稳定 ID 但在目标页消费同一来源前为 `unverified-target`；施工/分包详情仍待后续票 |
 | `N-CONTRACT-SOURCE` | `core-contract` `/contract/:id` | 关联甲方/分包单据、BOQ 变更/月报量 | 源 ID + variant resolved | `/owner/:kind/:id`、`/subcontract/:kind/:id`、`/contract/boq?project=:pid&contract=:cid` | 返回合同原页签和行 | 部分；单据详情当前读写混用 |
 | `N-CONTRACT-SUPPLEMENT` | `core-contract` `/contract/:id` | 补充协议 | supplement ID resolved | `/contract/:id` 的补充协议聚焦视图 | 返回合同原区块 | 部分；尚无稳定 `focus` 深链，不保留无目标蓝字 |
 | `N-AUX-CONTRACT` | `aux-contract` 辅助合同/结算列表 | 名称、项目、分供方、来源合同 | ID + variant resolved | 当前进入各 variant 已登记的辅助合同/结算表单路径 | 返回原 `project/contract/supplier`、搜索/类型/状态/页码 | 待只读页；来源 query 可读但返回会丢失 |
