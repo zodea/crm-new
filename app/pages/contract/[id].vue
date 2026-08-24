@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { F2FormKind } from '~/lib/contract/forms'
 import type { StatusTone } from '~/lib/project/status'
+import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { contractStages } from '~/lib/contract/detail'
 import { formPath } from '~/lib/contract/page'
 import {
@@ -20,6 +21,10 @@ const contractId = computed(() => {
   return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
 })
 const contract = computed(() => contractStore.byId(contractId.value))
+const projectSupplierReturn = useProjectSupplierReturnContext(
+  () => contract.value?.projectId,
+  () => contract.value?.supplierId,
+)
 const detail = computed(() => detailStore.byContract(contractId.value))
 const initializing = shallowRef(true)
 const loadError = shallowRef('')
@@ -43,12 +48,15 @@ const kindLabel = computed(() => {
 })
 
 const backTo = computed(() => {
+  if (projectSupplierReturn.value)
+    return projectSupplierReturn.value.to
   switch (contract.value?.kind) {
     case '分包': return '/contract/subcontract'
     case '材采': return '/contract/material'
     default: return '/contract/construction'
   }
 })
+const backLabel = computed(() => projectSupplierReturn.value ? '返回项目分供方工作台' : `返回${kindLabel.value}列表`)
 
 const TONE_CHIP: Record<StatusTone, string> = {
   warn: 'chip-warn',
@@ -168,7 +176,7 @@ watch(contractId, () => {
   >
     <header class="panel px-4 py-3" data-ui="contract-detail-header">
       <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <NuxtLink :to="backTo" class="icon-btn" :aria-label="`返回${kindLabel}列表`" title="返回列表">
+        <NuxtLink :to="backTo" class="icon-btn" :aria-label="backLabel" :title="backLabel">
           <span class="i-lucide-arrow-left h-3.5 w-3.5" aria-hidden="true" />
         </NuxtLink>
         <div class="min-w-0 flex-[1_1_24rem]">

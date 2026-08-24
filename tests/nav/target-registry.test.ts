@@ -30,7 +30,7 @@ describe('唯一 Target Registry', () => {
       variant: 'supplier-workbench',
       view: 'overview',
       filters: { supplierId: 'supplier-1', dataOrigin: 'demo' },
-    })).toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1/supplier/supplier-1' })
+    })).toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1/supplier/supplier-1?origin=demo&tab=overview' })
 
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
@@ -39,6 +39,61 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: {},
     })).toEqual({ state: 'resolved', label: 'FK-001', to: '/finance/payment/payment-1/detail' })
+  })
+
+  it.each([
+    ['contract', 'detail', '/contract/source-1'],
+    ['payment-application', 'detail', '/finance/payment/source-1/detail'],
+  ] as const)('项目分供方来源记录 %s/%s 消费双父 ID 与受限返回页签', (entity, variant, path) => {
+    const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=settlement'
+    const intent: NavigationIntentDTO = {
+      kind: 'source-record',
+      subject: { state: 'resolved', entity, id: 'source-1', label: '来源单', no: 'NO-1' },
+      variant,
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    }
+
+    expect(resolveNavigationTarget(intent, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '来源单',
+      to: `${path}?projectId=project-1&supplierId=supplier-1&origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+  })
+
+  it.each([
+    ['invoice', 'detail'],
+    ['payment-record', 'detail'],
+    ['settlement', 'subcontract-settlement'],
+    ['settlement', 'material-settlement'],
+    ['settlement', 'other-settlement'],
+  ] as const)('编辑或未验证的来源记录 %s/%s 不生成假链接', (entity, variant) => {
+    expect(resolveNavigationTarget({
+      kind: 'source-record',
+      subject: { state: 'resolved', entity, id: 'source-1', label: '来源单', no: 'NO-1' },
+      variant,
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    }, { returnTo: '/project/project-1/supplier/supplier-1?origin=demo&tab=settlement' })).toEqual({
+      state: 'unverified-target',
+      label: '来源单',
+      message: '目标待核验',
+    })
+  })
+
+  it('来源记录只在演示来源与返回来源一致时解析', () => {
+    const intent: NavigationIntentDTO = {
+      kind: 'source-record',
+      subject: { state: 'resolved', entity: 'contract', id: 'source-1', label: '来源单', no: 'NO-1' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }
+    expect(resolveNavigationTarget(intent, { returnTo: '/project/project-1/supplier/supplier-1?tab=contract' }))
+      .toMatchObject({ state: 'unverified-target' })
+    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo' } }, {
+      returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
+    })).toMatchObject({ state: 'unverified-target' })
   })
 
   it('收款详情要求稳定来源与客户上下文', () => {

@@ -63,7 +63,8 @@
       "routeCount": 2,
       "implementationIssues": [
         281,
-        289
+        289,
+        317
       ]
     },
     {
@@ -3014,7 +3015,8 @@
       "template": "详情",
       "implementationIssues": [
         281,
-        289
+        289,
+        317
       ],
       "referenceProfile": "R-PROJECT-DETAIL-LIVE",
       "referenceEndpointId": "project-supplier-detail-unobserved",
@@ -3041,7 +3043,8 @@
       "template": "特殊工具",
       "implementationIssues": [
         281,
-        289
+        289,
+        317
       ],
       "referenceProfile": "R-FORM-LIVE",
       "referenceEndpointId": "project-supplier-import-unobserved",

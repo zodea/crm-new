@@ -2,6 +2,7 @@
 import type {
   PaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
+import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { loadPaymentApplicationDetail } from '~/lib/finance/payment-detail'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { toErrorMessage } from '~/lib/util/error'
@@ -14,6 +15,10 @@ const settledId = shallowRef('')
 let requestVersion = 0
 
 const applicationId = computed(() => String(route.params.id ?? ''))
+const projectSupplierReturn = useProjectSupplierReturnContext(
+  () => detail.value?.projectId,
+  () => detail.value?.supplierId,
+)
 const shellState = computed<'ready' | 'loading' | 'error' | 'not-found'>(() => {
   if (detail.value?.id === applicationId.value)
     return 'ready'
@@ -93,8 +98,8 @@ watch(applicationId, () => void load(), { immediate: true })
   <EntityDetailShell
     :title="detail?.name || '付款申请详情'"
     :subtitle="detail ? `${detail.no || '未编号'} · ${detail.projectName || '公司付款'} · ${detail.supplierName || detail.bizType}` : ''"
-    back-to="/finance/payment"
-    back-label="返回付款申请"
+    :back-to="projectSupplierReturn?.to || '/finance/payment'"
+    :back-label="projectSupplierReturn ? '返回项目分供方工作台' : '返回付款申请'"
     aside-label="智能业务洞察"
     :state="shellState"
     :state-title="shellState === 'not-found' ? '付款申请不存在或已删除' : '付款申请详情加载失败'"

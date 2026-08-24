@@ -39,7 +39,7 @@ python scripts/generate-project-guide-pdf.py `
   --output output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/project-supplier-workbench.md `
-  --output output/pdf/瑞航CRM_项目分供方工作台与文件导入使用指南.pdf
+  --output output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/supplier-credential-review.md `
   --output output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
@@ -74,7 +74,7 @@ output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
 output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
 output/pdf/瑞航CRM_班组与工人档案使用指南.pdf
 output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
-output/pdf/瑞航CRM_项目分供方工作台与文件导入使用指南.pdf
+output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
 output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
 output/pdf/瑞航CRM_材料单价分析使用说明.pdf
 output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf

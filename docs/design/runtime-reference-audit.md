@@ -126,7 +126,7 @@
 | 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#316](https://github.com/zodea/crm-new/issues/316)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲方单据 | 3 | [#283](https://github.com/zodea/crm-new/issues/283)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -247,7 +247,7 @@
 | `app/pages/owner-material/use/index.vue` | `/owner-material/use` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考专属列覆盖负责人/部门/创建人、项目/分供方/采购类型、日期/月、班组与班组合同；当前为通用材料列表 | 使用领用专属 DTO；负责人、创建人、班组和班组合同保持独立身份，无关系时显示未记录 | C-DENSE |
 | `app/pages/owner-material/use/new.vue` | `/owner-material/use/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/材料/数量/领用人/班组表单 | 写入继续校验甲供库存与总控余量；班组合同/来源批次先建真实关系再扩展 | C-FORM |
 | `app/pages/project/[id].vue` | `/project/:id` | 项目 | 详情 | #190 | R-PROJECT-DETAIL-LIVE | 参考已确认紧凑标题与元数据、三组经营摘要、左侧流程/阶段和右侧团队/文件的宽屏双栏；`R-OWNER-MATERIAL-LIVE` 又补验物资管理直接显示总计划、需用计划、入库单三组空表。当前瑞航十个真实页签可用，但物资页只有一张项目到货归档表 | 保留瑞航独有归档为独立来源视图，补三组项目读模型；到货—归档 canonical 关系闭合前不得合并。零值无真实下钻时显示文本，编辑进入独立整页表单 | C-DENSE |
-| `app/pages/project/[pid]/supplier/[sid].vue` | `/project/:pid/supplier/:sid` | 项目分供方 | 详情 | #192 | R-PROJECT-DETAIL-LIVE | 没有项目×分供方目标页的安全直接证据；这里只借鉴邻近项目详情已确认的紧凑摘要、轻边界分区和局部横向滚动，实际采用页签主区与下方合作文件，不把邻近页字段或动作写成目标页事实 | 合同、请款、收票、付款、支出结算及文件只读真实源表并穿透现有路由；合作终态结算沿用本地状态机与事务写入，不从参考页推断业务 | C-DENSE |
+| `app/pages/project/[pid]/supplier/[sid].vue` | `/project/:pid/supplier/:sid` | 项目分供方 | 详情 | #192 | R-PROJECT-DETAIL-LIVE | 没有项目×分供方目标页的安全直接证据；只借鉴邻近项目详情已确认的紧凑摘要、轻边界分区和局部横向滚动，采用六页签主区与下方合作文件，不把邻近页字段或动作写成目标页事实 | 中央 Repository 按同来源双 ID 返回合同、请款、收票、付款、支出结算与文件六类事实；仅演示合同/付款申请已有同来源只读目标并可返回，其他来源保持不可用；终态结算写入和文件正文能力明确未接入 | C-DENSE |
 | `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-FORM-LIVE | 没有文件导入目标页的安全直接证据，且严格只读协议禁止在参考站触发上传或导入；这里只借鉴邻近整页表单已确认的纵向分区、步骤信息和底部操作区，三步内容由本地蓝本裁定 | 当前只在本机按文件名匹配名称/别名与类别，所有结果可人工调整；不读取正文、不伪装 OCR、不上传云端，未确认候选不写分供方，文件只挂 ProjectSupplier | C-TOOL |
 | `app/pages/project/form/[[id]].vue` | `/project/form/:id?` | 项目 | 整页表单 | #190 | R-FORM-PRIOR | 项目目标页没有安全直接证据；仅借鉴 `R-FORM-LIVE` 的相邻短表单结构，并以项目蓝本、ADR 0014 和真实客户外键裁定字段与行为 | 保留草稿、保存、保存并新建、保存并提交；新建取消返回列表、保存进入新项目详情，编辑取消/保存返回原项目详情 | C-FORM |
 | `app/pages/project/index.vue` | `/project` | 项目 | 列表 | #190 | R-PROJECT-LIST-LIVE | 参考已确认左流程阶段、单行工具栏、紧凑表格和右下分页；本地新建能力继续按项目规格保留 | 未触发导入、筛选、设置或行级操作 | C-DENSE |
