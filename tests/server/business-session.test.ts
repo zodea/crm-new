@@ -13,6 +13,8 @@ describe('default business session boundary', () => {
         'customer:write',
         'supplier:list:read',
         'supplier:write',
+        'subcontract-contract:read',
+        'subcontract-contract:write',
         'construction-contract:read',
         'construction-contract:write',
         'material-contract:read',

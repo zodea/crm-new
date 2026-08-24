@@ -4,7 +4,7 @@
 
 ## 1. 当前落点
 
-Issue #293、#314、#315、#316、#318 与 #320 已完成正式项目、正式客户、正式分供方、班组、工人、材料采购合同和施工合同的新建、编辑和表单预载中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #293、#314、#315、#316、#318、#320 与 #321 已完成正式项目、正式客户、正式分供方、班组、工人、材料采购合同、施工合同和分包合同的新建、编辑和表单预载中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -23,6 +23,8 @@ Issue #293、#314、#315、#316、#318 与 #320 已完成正式项目、正式�
 - `POST /api/commands/material-contracts`、`PUT /api/commands/material-contracts/:id`：新建或按 `baseVersion` 编辑正式材料采购合同；合同与明细 ID 均由服务端分配，项目和分供方只接受中央正式稳定 ID。
 - `GET /api/read/construction-contracts/form-context`、`GET /api/read/construction-contracts/:id/form`：返回中央正式项目/甲方客户选项，或正式施工合同 draft、附件元数据、`version` 与更新时间。
 - `POST /api/commands/construction-contracts`、`PUT /api/commands/construction-contracts/:id`：新建或按 `baseVersion` 编辑正式施工合同；服务端重验项目—客户关系，施工合同不接受采购明细或分供方关系。
+- `GET /api/read/subcontract-contracts/form-context`、`GET /api/read/subcontract-contracts/:id/form`：返回正式项目/分供方选项，或正式分包合同 draft、附件、`version` 与更新时间。
+- `POST /api/commands/subcontract-contracts`、`PUT /api/commands/subcontract-contracts/:id`：新建或按 `baseVersion` 编辑正式分包合同；服务端重验项目、分供方、劳务/专业类别，并拒绝客户关系与采购明细。
 
 项目/客户/分供方/班组/工人/材料采购合同/施工合同删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。施工合同的既有正式记录只通过 #294 受控核心迁移进入中央，不另建平行导入源。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。浏览器中央列表不提供并行本地删除或快捷编辑；正式编辑必须从中央只读详情显式进入。
 

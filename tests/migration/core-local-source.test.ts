@@ -31,6 +31,25 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       deleted_at: null,
     }]
   }
+  if (sql.includes('WHERE c.kind = \'分包\'')) {
+    return [{
+      id: 'subcontract-local-1',
+      no: 'FB-001',
+      name: '既有分包合同',
+      sub_kind: '劳务',
+      project_id: 'project-local-1',
+      supplier_id: 'supplier-local-1',
+      content: '存量正式分包合同',
+      amount: 180000,
+      status: '履约中',
+      settlement_status: null,
+      clearance_status: null,
+      sign_date: '2026-02-01',
+      created_at: '2026-02-01T00:00:00.000Z',
+      updated_at: '2026-08-24T00:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM contracts c')) {
     return [{
       id: 'construction-local-1',
@@ -125,6 +144,7 @@ describe('core migration local source', () => {
           crews: 1,
           projects: 1,
           construction_contracts: 1,
+          subcontract_contracts: 1,
           workers: 1,
           project_suppliers: 1,
         },
@@ -132,6 +152,7 @@ describe('core migration local source', () => {
           { entityType: 'projects', metric: 'quantity', expected: 12.5 },
           { entityType: 'projects', metric: 'amount', expected: '100.00' },
           { entityType: 'construction_contracts', metric: 'amount', expected: '320000.00' },
+          { entityType: 'subcontract_contracts', metric: 'amount', expected: '180000.00' },
         ],
       },
     })
@@ -165,6 +186,12 @@ describe('core migration local source', () => {
       references: { projectId: 'project-local-1', customerId: 'customer-local-1' },
       amount: '320000.00',
       attributes: { no: 'SG-001', signDate: '2026-01-01', actualCompletionDate: null },
+    })
+    expect(first.entities.subcontract_contracts[0]).toMatchObject({
+      legacyId: 'subcontract-local-1',
+      references: { projectId: 'project-local-1', supplierId: 'supplier-local-1' },
+      amount: '180000.00',
+      attributes: { no: 'FB-001', subKind: '劳务', settlementStatus: null, clearanceStatus: null },
     })
     expect(Object.values(first.entities).flat().map(row => row.legacyId))
       .toContain('customer_demo_001')
@@ -340,6 +367,7 @@ describe('core migration local source', () => {
       'crews',
       'projects',
       'construction_contracts',
+      'subcontract_contracts',
       'workers',
       'project_suppliers',
     ])

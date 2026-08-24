@@ -39,6 +39,7 @@ function migrationSource(): CoreMigrationSourceDTO {
         references: { customerId: 'customer-local-1' },
       }],
       construction_contracts: [],
+      subcontract_contracts: [],
       workers: [],
       project_suppliers: [],
     },

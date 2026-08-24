@@ -133,7 +133,7 @@ function contractPath(intent: EntityTargetIntent): string {
   if (intent.kind === 'source-record')
     return path
   const kind = intent.filters.contractKind
-  if (kind !== '材采' && kind !== '施工')
+  if (kind !== '材采' && kind !== '施工' && kind !== '分包')
     return path
   const dataOrigin = intent.filters.dataOrigin
   if (dataOrigin == null)
@@ -142,12 +142,12 @@ function contractPath(intent: EntityTargetIntent): string {
     throw new Error('invalid contract data origin')
   const query = new URLSearchParams({
     origin: dataOrigin,
-    contractKind: kind === '材采' ? 'material' : 'construction',
+    contractKind: kind === '材采' ? 'material' : kind === '施工' ? 'construction' : 'subcontract',
   })
   if (intent.variant === 'supplement') {
     if (!intent.view)
       throw new Error('invalid contract supplement focus')
-    query.set('tab', 'supplements')
+    query.set('tab', kind === '分包' ? 'changes' : 'supplements')
     query.set('focus', intent.view)
   }
   return `${path}?${query.toString()}`
