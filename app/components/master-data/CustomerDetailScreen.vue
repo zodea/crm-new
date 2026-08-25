@@ -3,6 +3,7 @@ import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { loadCustomerReturnOrigin, resolveCustomerReturnContext } from '~/lib/customer/return-context'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
@@ -28,12 +29,14 @@ const detail = computed(() => {
   return null
 })
 const customer = computed(() => detail.value?.customer ?? null)
-const backTo = computed(() => resolveCustomerReturnContext({
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin))
+const backTo = computed(() => ownerDocumentReturnTo.value ?? resolveCustomerReturnContext({
   returnTo: props.returnTo,
   contextId: props.returnContext,
   now: Date.now(),
   load: loadCustomerReturnOrigin,
 }).to)
+const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回客户列表')
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   const kind = store.detailState.kind
   if (detail.value)
@@ -103,7 +106,7 @@ onActivated(() => void load())
     :title="customer?.name ?? '客户详情'"
     :subtitle="customer ? [customer.taxNo, customer.aliases.join('、')].filter(Boolean).join(' · ') : ''"
     :back-to="backTo"
-    back-label="返回客户列表"
+    :back-label="backLabel"
     :state="shellState"
     :state-title="shellState === 'not-found' ? '客户不存在或已删除' : shellState === 'forbidden' ? '无权查看该客户' : shellState === 'loading' ? '正在加载客户详情' : '客户详情加载失败'"
     :state-description="problem?.message ?? ''"

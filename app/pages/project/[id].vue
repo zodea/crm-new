@@ -5,6 +5,7 @@ import {
   loadProjectReturnOrigin,
   resolveProjectReturnContext,
 } from '~/lib/nav/return-to'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
@@ -22,8 +23,9 @@ const returnResolution = computed(() => resolveProjectReturnContext({
     : loadProjectReturnOrigin(id),
 }))
 const crewWorkerReturnTo = computed(() => validateCrewWorkerReturnTo(route.query.returnTo))
-const returnTo = computed(() => crewWorkerReturnTo.value ?? returnResolution.value.to)
-const returnExpiresAt = computed(() => crewWorkerReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, originHint.value))
+const returnTo = computed(() => ownerDocumentReturnTo.value ?? crewWorkerReturnTo.value ?? returnResolution.value.to)
+const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorkerReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
 </script>
 
 <template>
@@ -33,7 +35,7 @@ const returnExpiresAt = computed(() => crewWorkerReturnTo.value ? undefined : re
     :include-demo="dataVisibilityStore.includeDemo"
     :return-to="returnTo"
     :return-expires-at="returnExpiresAt"
-    :return-label="crewWorkerReturnTo ? '返回来源详情' : undefined"
+    :return-label="ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
     :current-route="route.fullPath"
   />
 </template>

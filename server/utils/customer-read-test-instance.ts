@@ -4,6 +4,7 @@ import type {
   CustomerProjectSourceRow,
   CustomerReceiptSourceRow,
 } from '../../app/lib/customer/repository'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import {
   buildCustomerDetailRead,
   buildCustomerListPage,
@@ -18,6 +19,8 @@ import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
+import { resolveBusinessSession } from './business-session'
+import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 
@@ -25,6 +28,54 @@ export type CustomerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavai
 
 const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'customer-read-fixture-v1'
+
+const CONSTRUCTION_CUSTOMER_FIXTURE: CustomerListSourceRow = {
+  dataOrigin: 'real',
+  id: 'customer-real-320',
+  name: '中央正式甲方客户',
+  aliases: [],
+  taxNo: 'CUSTOMER-CENTRAL-320',
+  legalRep: '',
+  registeredAddress: '',
+  invoiceName: '中央正式甲方客户',
+  bank: '',
+  bankAccount: '',
+  contact: '甲方联系人',
+  contactPhone: '',
+  status: 'active',
+  note: '',
+  updatedAt: FIXED_AS_OF,
+}
+
+const EMPTY_MIGRATION_SNAPSHOT: CoreMigrationSnapshotDTO = {
+  authority: 'local',
+  activeBatchId: null,
+  entities: [],
+}
+
+function customerRowsFromMigration(snapshot: CoreMigrationSnapshotDTO): CustomerListSourceRow[] {
+  if (snapshot.authority !== 'central')
+    return []
+  return snapshot.entities
+    .filter(entity => entity.entityType === 'customers' && entity.deletedAt === null)
+    .map(entity => ({
+      dataOrigin: 'real',
+      id: entity.id,
+      name: entity.name,
+      aliases: [],
+      taxNo: String(entity.attributes.taxNo ?? ''),
+      legalRep: String(entity.attributes.legalRep ?? ''),
+      registeredAddress: String(entity.attributes.registeredAddress ?? ''),
+      invoiceName: String(entity.attributes.invoiceName ?? entity.name),
+      bank: String(entity.attributes.bank ?? ''),
+      bankAccount: String(entity.attributes.bankAccount ?? ''),
+      contact: String(entity.attributes.contact ?? ''),
+      contactPhone: String(entity.attributes.contactPhone ?? ''),
+      status: String(entity.attributes.status ?? 'active'),
+      note: String(entity.attributes.note ?? ''),
+      updatedAt: FIXED_AS_OF,
+    }))
+}
 
 function jsonArray(value: unknown): string[] {
   if (Array.isArray(value))
@@ -135,6 +186,7 @@ export function createCustomerReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
   resolveFormalRows: (sessionId?: string | null) => readonly CustomerListSourceRow[] = id => customerCommandTestInstance.rows(id),
   resolveFormalSourceVersion: (sessionId?: string | null) => string = id => customerCommandTestInstance.sourceVersion(id),
+  resolveMigrationSnapshot: (sessionId?: string | null) => CoreMigrationSnapshotDTO = () => EMPTY_MIGRATION_SNAPSHOT,
 ) {
   const scenarios = new Map<string, CustomerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -148,8 +200,9 @@ export function createCustomerReadTestInstance(
     const capabilities = [...resolveCapabilities(sessionId)]
     if (!capabilities.includes('customer:list:read'))
       throw problem('forbidden', '无客户查看权限')
+    const migrationSnapshot = resolveMigrationSnapshot(sessionId)
     const customers = scenario === 'ready'
-      ? [...resolveFormalRows(sessionId), ...demoCustomers]
+      ? [...resolveFormalRows(sessionId), ...customerRowsFromMigration(migrationSnapshot), ...demoCustomers]
       : []
     return {
       capabilities,
@@ -157,7 +210,11 @@ export function createCustomerReadTestInstance(
       projects: scenario === 'ready' ? demoProjects : [],
       contracts: scenario === 'ready' ? demoContracts : [],
       receipts: scenario === 'ready' ? demoReceipts : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
+        migrationSnapshot.authority === 'central'
+          ? migrationSnapshot.activeBatchId ?? 'migration-central'
+          : 'migration-local'
+      }`,
     }
   }
 
@@ -246,4 +303,9 @@ export function createCustomerReadTestInstance(
   }
 }
 
-export const customerReadTestInstance = createCustomerReadTestInstance()
+export const customerReadTestInstance = createCustomerReadTestInstance(
+  sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
+  sessionId => [CONSTRUCTION_CUSTOMER_FIXTURE, ...customerCommandTestInstance.rows(sessionId)],
+  sessionId => customerCommandTestInstance.sourceVersion(sessionId),
+  () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
+)

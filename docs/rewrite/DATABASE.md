@@ -282,7 +282,19 @@ monthly_statement_lines(
 )
 ```
 
-变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。单明细已签证变更允许在明确的二次确认后受控更正，并在同一事务内同步变更明细、变更新增结果行和锁定台账且写操作日志；若同一目标清单行已有后续签证，或原签证含多明细/混合操作，则禁止原地改写，必须新增更正变更单以保持金额链可追溯。
+#323 的核心迁移拓扑使用逻辑实体名 `owner_documents`，它不是新 SQLite 表。本地 adapter 按以下规则只读投影现有权威表，并将行与附件作为同一 canonical 单据的嵌套属性受控导入：
+
+- `boq_change_orders` + `boq_change_lines`：量价变更头/行；已生成 `ledger_id` 的锁定 `owner_change_orders` 行不重复导入。
+- `owner_change_orders`：只投影手录纯金额签证或没有 BOQ 源的兼容记录。
+- `monthly_statements` + `monthly_statement_lines`：作为甲方报量的唯一头/行事实，保留自动量、申报量、审定量、单价与两档金额。
+- canonical 施工合同迁移嵌套快照：同步完整、未软删除的 `boq_lines` 目录，以及按期次与稳定 BOQ 行派生的 field 完成量事实。它们不另建业务表，但不得只从旧变洽签/旧月报量明细反推，否则从未成单的 BOQ 行和新期次事实会在切换后消失。历史单据行是冻结时点证据：同一稳定 BOQ ID 已在完整目录中时只校验项目—合同归属，不用历史名称、数量或单价覆盖当前 canonical 目录；只有目录缺行时才以历史行兜底。
+- `file_refs`：按真实 `owner_type + owner_id` 取有效文件引用，不复制文件正文。
+
+逻辑投影同时保留申报日期与签证日期，以及报量的 `quantity_basis` / `source_version` / `source_updated_at` / `operator_name` / `submitted_at`。SQLite `datetime('now')` 产生的 UTC 空格时间必须由本地 adapter 规范化为带 `Z` 的 ISO-8601 后才可进入中央契约；单据、报量取数事实和附件时间均适用。申报日期、签证日期、创建/更新时间和签证执行时间在迁移确认边界都作真实日历/ISO 校验，非法值必须阻断切换。中央签证 action 另写不可变 `approval_sequence_at` 作为同日量价链顺序事实，通用 `updated_at` 与附件维护不得改写它；历史迁移没有该字段时只在导入边界校验并以当时合法 `updated_at` 初始化一次。这些是同一 canonical 单据的审计证据，不能在中央读模型中丢弃或用其中一个字段覆盖另一个。
+
+迁移时 `project_id` 与 `contract_id` 必须唯一映射已导入项目和 canonical 施工合同；缺失、错配或指向其他合同类型均作为阻断孤儿。确认后中央命令源接管这两类日常读写；回滚按批次撤销接管并从不可变备份恢复原 SQLite 权威，不在两端同时提供正式写入。
+
+变更附件复用 `file_refs(owner_type='boq_change_order', owner_id, category)`；我方指令单、甲方指令单、报价、算量和施工照片的展示分类不改变 `boq_change_orders` 的状态职责。已签证时自动生成且锁定一条 `owner_change_orders` 来源行，来源键为 `source_type='boq_change_order' + source_id`（ADR-0002）。其中“新增”明细必须在签证后物化为带稳定 ID 的 `boq_lines` 结果行，后续变更和月度报量从结果行及时序量价链派生有效数据，不重放原始合同量价。单明细已签证变更允许在明确的二次确认后受控更正，并在同一事务内同步变更明细、变更新增结果行和锁定台账且写操作日志；若同一目标清单行已有后续签证，或原签证含多明细/混合操作，则禁止原地改写，必须新增更正变更单以保持金额链可追溯。
 
 ### 2.4 资金管理类
 

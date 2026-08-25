@@ -4,7 +4,7 @@
 
 ## 1. 当前落点
 
-Issue #293、#314、#315、#316、#318、#320 与 #321 已完成正式项目、正式客户、正式分供方、班组、工人、材料采购合同、施工合同和分包合同的新建、编辑和表单预载中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #293、#314、#315、#316、#318、#320、#321 与 #323 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签和甲方报量的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -25,8 +25,13 @@ Issue #293、#314、#315、#316、#318、#320 与 #321 已完成正式项目、�
 - `POST /api/commands/construction-contracts`、`PUT /api/commands/construction-contracts/:id`：新建或按 `baseVersion` 编辑正式施工合同；服务端重验项目—客户关系，施工合同不接受采购明细或分供方关系。
 - `GET /api/read/subcontract-contracts/form-context`、`GET /api/read/subcontract-contracts/:id/form`：返回正式项目/分供方选项，或正式分包合同 draft、附件、`version` 与更新时间。
 - `POST /api/commands/subcontract-contracts`、`PUT /api/commands/subcontract-contracts/:id`：新建或按 `baseVersion` 编辑正式分包合同；服务端重验项目、分供方、劳务/专业类别，并拒绝客户关系与采购明细。
+- `GET /api/commands/owner-documents/context`、`GET /api/commands/owner-documents/boq-lines`：返回中央正式项目/施工合同选项和当前合同 BOQ 明细；关系不匹配时拒绝。
+- `GET /api/commands/owner-documents/:kind/:id/form`：只对 `owner_change` / `owner_report` 返回可编辑 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
+- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新正式甲方变洽签/甲方报量，并承载草稿、提交、签证、审定、删除与独立附件变更 action。附件 action 不把已上报/已申报单据伪装成可编辑草稿；普通受保护状态仍可独立维护附件，只有冲突后“保留本页供复制”模式停用全部附件 mutation。服务端重验稳定关系、状态、版本和明细量价，不信任客户端合计。
 
-项目/客户/分供方/班组/工人/材料采购合同/施工合同删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。施工合同的既有正式记录只通过 #294 受控核心迁移进入中央，不另建平行导入源。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。浏览器中央列表不提供并行本地删除或快捷编辑；正式编辑必须从中央只读详情显式进入。
+甲方变洽签调量/调价命令使用 BOQ canonical 计算规则：调减可为负，但有效量不得为负；调价按签证时间稳定排序后的有效量价计算，缺失的新单价不按零价处理。签证 action 只写签证日期，不覆盖申报日期；日期必须是真实存在的日历日，且新签证不得早于同合同既有签证时序尾；同日签证再按签证 action 写入的不可变、单调执行时间排序，不使用通用 `updatedAt` 或无业务含义的单据 ID 打破并列，后续附件维护不得改变签证顺序。月度报量命令按 `periodNo` 取精确快照，只在申报时固化取数基准、来源版本/更新时间、经办人和系统提交时间，草稿不充当审计事实；受控迁移随施工合同同步完整 BOQ 目录和尚未成单的月度完成量事实，历史单据量价只在目录确实缺行时兜底，不得覆盖同稳定 ID 的当前 canonical 名称、数量或单价；无对应期次快照时拒绝借用其他月份的数量。
+
+项目/客户/分供方/班组/工人/核心合同删除、通用离线 outbox、自动合并、完整登录/RBAC 和其他实体的日常写命令不在当前落点。甲方变洽签与甲方报量的删除只是同一中央领域 action，必须服从受保护状态，不是列表快捷删除。已有正式记录只通过 #294 受控核心迁移进入中央，不另建平行导入源。Tauri 继续使用既有本地写路径，不消费浏览器中央命令。浏览器中央列表不提供并行本地删除或快捷编辑；正式编辑必须从中央只读详情显式进入。
 
 ## 2. 命令信封
 
@@ -114,19 +119,34 @@ interface ConstructionContractCommandRequestDTO {
   draft: ProjectContractFormDraft
   attachments: FormAttachmentChanges
 }
+
+interface OwnerCommercialDocumentCommandRequestDTO {
+  id?: string
+  kind: 'owner_change' | 'owner_report'
+  workspaceId: string
+  actorId: string
+  requiredCapability: 'owner-document:write'
+  commandId: string
+  baseVersion: string | null
+  action: 'save' | 'submit' | 'approve' | 'audit' | 'attachments' | 'delete'
+  draft?: OwnerDocumentDraft
+  attachments?: FormAttachmentChanges
+  approvedAt?: string
+  audit?: { lines: Array<{ boqLineId: string, auditedQty: number, auditedAmount: number }> }
+}
 ```
 
-- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write`；客户端字段不是授权证据。
+- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write` / `owner-document:write`；客户端字段不是授权证据。
 - 新建 ID 由服务端分配不透明值；页面不使用时间戳、名称或本地 `draftId` 作正式主键。
 - `version`、最终更新时间和命令结果由服务端生成。
 - `draft` 允许缺少业务必填项；`save` / `submit` 同时经页面和服务端执行领域必填校验。客户统一社会信用代码在正式客户间重复时返回字段错误；分供方公司全称、类别、主要联系人必填，统一社会信用代码和内部编码分别唯一。
 
 ## 3. 幂等、冲突与读回
 
-- 同一会话/工作区内按实体类型重放同一 `commandId` 返回第一次成功结果，不生成第二个项目、客户、分供方、班组、工人、材料采购合同或施工合同，也不重复递增版本。
-- 编辑命令的 `baseVersion` 与服务端当前版本不一致时返回 canonical `ProblemDTO(code='conflict')` 和 HTTP 409，禁止覆盖。
+- 同一会话/工作区内按实体类型重放同一 `commandId` 返回第一次成功结果，不生成第二个实体或重复递增版本。
+- 编辑命令的 `baseVersion` 与服务端当前版本不一致时返回 canonical `ProblemDTO(code='conflict')` 和 HTTP 409，禁止覆盖。界面允许用户选择保留本页内容或放弃本页内容后重读中央最新版，不自动前移其他页签的版本。
 - 表单收到冲突后立即重读服务器表单，保留当前本地内容，并让用户显式选择“保留我的内容”后基于新版重试，或“改用服务器最新版”。
-- 命令成功后使用返回的 ID/version 失效同实体详情缓存；列表和详情再从中央读模型取结果，不使用客户端 draft 伪造成功回显。客户、分供方、班组、工人、材料采购合同与施工合同保存后固定刷新同一实体 ID，并保留原列表、详情页签与合法聚焦上下文。
+- 命令成功后使用返回的 ID/version 失效同实体详情缓存；列表和详情再从中央读模型取结果，不使用客户端 draft 伪造成功回显。已接入的主数据、核心合同、甲方变洽签和甲方报量保存后固定刷新同一实体 ID，并保留原列表、详情页签与合法聚焦上下文。
 
 ## 4. 网络失败与本地草稿
 
@@ -141,6 +161,8 @@ interface ConstructionContractCommandRequestDTO {
 
 材料采购合同命令由 #318 的可重置非生产后台实例证明权限、幂等、乐观锁、读回和浏览器交互。提交态由服务端复算“数量 × 含税单价”的明细合计，拒绝客户端篡改金额；演示合同没有写命令入口。
 
-施工合同命令由 #320 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—客户关系校验、附件读回和浏览器交互。`actualCompletionDate` 不是日常表单可写字段；受控迁移没有 canonical 事实时保持 `null`。甲方单据和开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
+施工合同命令由 #320 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—客户关系校验、附件读回和浏览器交互。`actualCompletionDate` 不是日常表单可写字段；受控迁移没有 canonical 事实时保持 `null`。
+
+甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。其他四类甲方单据与开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
 
 当前中央项目、客户、分供方、班组和工人命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目、分供方、班组或工人的日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。

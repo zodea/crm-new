@@ -2,6 +2,7 @@ import type { BoqChangeLineDraft, BoqDirectiveType, BoqDocumentType } from '~/li
 import type { TransactionDb } from '~/lib/db/coordinator'
 import type { FileRefChanges, FileRefRecord } from '~/lib/forms/file-refs'
 import type { QuantityBasis } from '~/lib/quantity/basis'
+import type { NavigationIntentDTO } from '~/types/read-model'
 import {
   approveBoqChangeOrder,
   createBoqChangeOrder,
@@ -75,6 +76,7 @@ export interface OwnerDocumentListRecord {
   quantity: number | null
   date: string
   status: string
+  contractNavigation?: NavigationIntentDTO
 }
 
 export interface OwnerDocumentBoqLine {

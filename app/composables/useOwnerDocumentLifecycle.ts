@@ -6,6 +6,7 @@ import type {
   PenaltyDeductionView,
 } from '~/lib/owner-document/forms'
 import { computed, shallowRef, toValue } from 'vue'
+import { ownerDocumentLocalDate } from '~/lib/owner-document/page'
 import { toErrorMessage } from '~/lib/util/error'
 
 interface OwnerDocumentLifecycleOptions {
@@ -14,6 +15,8 @@ interface OwnerDocumentLifecycleOptions {
   routeId: ComputedRef<string | undefined>
   label: ComputedRef<string>
   refresh: () => Promise<void>
+  complete?: () => Promise<void>
+  recoverConflict?: (cause: unknown) => Promise<boolean>
 }
 
 export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions) {
@@ -116,12 +119,14 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
       return
     loading.value = true
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      await store.approveOwnerChange(id, today)
+      const today = ownerDocumentLocalDate()
+      await store.approveOwnerChange(id, today, options.draft.value)
       success('甲方签证已生效，收入变更台账已锁定')
-      await options.refresh()
+      await (options.complete?.() ?? options.refresh())
     }
     catch (cause) {
+      if (await options.recoverConflict?.(cause))
+        return
       error(`签证失败：${toErrorMessage(cause)}`)
     }
     finally {
@@ -160,7 +165,13 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
     const id = options.routeId.value
     if (!id)
       return
-    const lines = (options.draft.value.lines ?? []).map(line => ({
+    const sourceLines = options.draft.value.lines ?? []
+    if (sourceLines.some(line => line.auditedQty == null
+      || (typeof line.auditedQty === 'string' && !line.auditedQty.trim()))) {
+      warning('请为每条报量明细填写有效的审定量')
+      return
+    }
+    const lines = sourceLines.map(line => ({
       boqLineId: String(line.boqLineId ?? ''),
       auditedQty: Number(line.auditedQty),
       auditedAmount: (Number(line.auditedQty) || 0) * (Number(line.unitPrice) || 0),
@@ -184,11 +195,13 @@ export function useOwnerDocumentLifecycle(options: OwnerDocumentLifecycleOptions
       return
     loading.value = true
     try {
-      await store.auditOwnerReport(id, { auditedAmount, lines })
+      await store.auditOwnerReport(id, { auditedAmount, lines }, options.draft.value)
       success('甲方报量已审定')
-      await options.refresh()
+      await (options.complete?.() ?? options.refresh())
     }
     catch (cause) {
+      if (await options.recoverConflict?.(cause))
+        return
       error(`审定失败：${toErrorMessage(cause)}`)
     }
     finally {

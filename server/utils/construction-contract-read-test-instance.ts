@@ -16,6 +16,7 @@ import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 
 export type ConstructionContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -112,9 +113,12 @@ function problem(code: 'forbidden' | 'unavailable', message: string, retryable =
   })
 }
 
+type OwnerDocumentReadSource = Pick<typeof ownerCommercialDocumentCommandTestInstance, 'rows' | 'sourceVersion'>
+
 export function createConstructionContractReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
   commandInstance = constructionContractCommandTestInstance,
+  ownerDocumentCommandInstance: OwnerDocumentReadSource = ownerCommercialDocumentCommandTestInstance,
 ) {
   const scenarios = new Map<string, ConstructionContractReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -130,14 +134,45 @@ export function createConstructionContractReadTestInstance(
       throw problem('forbidden', '无施工合同查看权限')
     const formalRows = commandInstance.rows(sessionId)
     const formalFacts = commandInstance.facts(sessionId)
+    const ownerDocuments = ownerDocumentCommandInstance.rows(sessionId)
+    const ownerChanges = ownerDocuments
+      .filter(row => row.kind === 'owner_change')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.applicationDate,
+        status: row.status,
+        sourceId: row.sourceId,
+      }))
+    const ownerReports = ownerDocuments
+      .filter(row => row.kind === 'owner_report')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.applicationDate,
+        status: row.status,
+      }))
+    const synchronizedFacts = {
+      ...formalFacts,
+      changes: [...formalFacts.changes, ...ownerChanges],
+      monthlyStatements: [...formalFacts.monthlyStatements, ...ownerReports],
+    }
     return {
       contracts: scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts],
       facts: scenario === 'empty'
-        ? formalFacts
+        ? synchronizedFacts
         : {
             supplements: [...formalFacts.supplements, ...demoFacts.supplements],
-            changes: [...formalFacts.changes, ...demoFacts.changes],
-            monthlyStatements: [...formalFacts.monthlyStatements, ...demoFacts.monthlyStatements],
+            changes: [...synchronizedFacts.changes, ...demoFacts.changes],
+            monthlyStatements: [...synchronizedFacts.monthlyStatements, ...demoFacts.monthlyStatements],
             finalSettlements: [...formalFacts.finalSettlements, ...demoFacts.finalSettlements],
             penalties: [...formalFacts.penalties, ...demoFacts.penalties],
             invoiceApplications: [...formalFacts.invoiceApplications, ...demoFacts.invoiceApplications],
@@ -148,7 +183,7 @@ export function createConstructionContractReadTestInstance(
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,
-      sourceVersion: commandInstance.sourceVersion(sessionId),
+      sourceVersion: `${commandInstance.sourceVersion(sessionId)}+${ownerDocumentCommandInstance.sourceVersion(sessionId)}`,
     }
   }
 

@@ -103,6 +103,11 @@ function selectBoqLine(index: number, id: string) {
   })
 }
 
+function boqLineIsUsedByAnotherRow(id: string, rowIndex: number): boolean {
+  return props.kind === 'owner_report'
+    && props.lines.some((line, index) => index !== rowIndex && line.boqLineId === id)
+}
+
 /** 缺量事实挂在合同清单行上，明细草稿只存报量值，取用时按行回查。 */
 function missingQtyCount(row: GridLine): number {
   const boqLineId = String(row.boqLineId ?? '')
@@ -223,7 +228,12 @@ function remove(index: number) {
             <option value="">
               请选择清单项
             </option>
-            <option v-for="line in boqLines" :key="line.id" :value="line.id">
+            <option
+              v-for="line in boqLines"
+              :key="line.id"
+              :value="line.id"
+              :disabled="boqLineIsUsedByAnotherRow(line.id, rowIndex)"
+            >
               {{ line.itemName }} · {{ line.qty }} {{ line.unit }} × {{ line.unitPrice }}
             </option>
           </select>

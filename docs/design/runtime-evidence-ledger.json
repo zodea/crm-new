@@ -1,21 +1,21 @@
 {
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
-  "auditedAt": "2026-08-15",
+  "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 136,
+    "trackedPageFiles": 137,
     "devPageFiles": 5,
-    "productionRoutes": 131,
+    "productionRoutes": 132,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 131,
-    "referenceEndpoints": 131,
+    "evidenceEndpointRecords": 132,
+    "referenceEndpoints": 132,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
     "directEvidenceRoutes": 52,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 18,
+    "localAuthorityRoutes": 19,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 129,
+    "designCoveredRoutes": 130,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -90,9 +90,10 @@
     {
       "code": "owner-document",
       "domain": "甲方单据",
-      "routeCount": 3,
+      "routeCount": 4,
       "implementationIssues": [
         283,
+        323,
         289
       ]
     },
@@ -2497,9 +2498,10 @@
       "page": "app/pages/owner/[kind]/[id].vue",
       "localRoute": "/owner/:kind/:id",
       "domainCode": "owner-document",
-      "template": "整页表单",
+      "template": "详情",
       "implementationIssues": [
         283,
+        323,
         289
       ],
       "referenceProfile": "R-OWNER-DOCUMENTS-LIVE",
@@ -2520,6 +2522,34 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-09111981E2E0",
+      "page": "app/pages/owner/[kind]/form/[id].vue",
+      "localRoute": "/owner/:kind/form/:id",
+      "domainCode": "owner-document",
+      "template": "整页表单",
+      "implementationIssues": [
+        283,
+        323,
+        289
+      ],
+      "referenceProfile": "R-OWNER-DOC-DC",
+      "referenceEndpointId": "owner-document-edit-by-kind",
+      "referenceEndpointLabel": "甲方变洽签/报量专属整页编辑表单",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/owner/:kind/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/owner/:kind/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-5F4EBE92C768",
       "page": "app/pages/owner/[kind]/index.vue",
       "localRoute": "/owner/:kind",
@@ -2527,6 +2557,7 @@
       "template": "列表",
       "implementationIssues": [
         283,
+        323,
         289
       ],
       "referenceProfile": "R-OWNER-DOCUMENTS-LIVE",
@@ -2554,6 +2585,7 @@
       "template": "整页表单",
       "implementationIssues": [
         283,
+        323,
         289
       ],
       "referenceProfile": "R-OWNER-DOC-DC",

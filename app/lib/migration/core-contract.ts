@@ -12,6 +12,7 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'construction_contracts',
   'subcontract_contracts',
   'contract_supplements',
+  'owner_documents',
   'workers',
   'project_suppliers',
 ] as const

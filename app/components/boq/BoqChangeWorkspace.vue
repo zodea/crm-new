@@ -8,6 +8,7 @@ import type { FieldDef } from '~/lib/kit/form-modal'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { BoqAttachmentDraft } from '~/stores/boq'
 import { useFileDialog } from '@vueuse/core'
+import { nextTick, watch } from 'vue'
 import {
   BOQ_CHANGE_STATUS_LABEL,
   BOQ_CHANGE_TYPE_LABEL,
@@ -17,6 +18,7 @@ import { toLocalDateInputValue } from '~/lib/util/local-date'
 const props = defineProps<{
   workspace: BoqWorkspace
   busy?: boolean
+  focusId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +31,13 @@ const emit = defineEmits<{
   downloadAttachment: [attachment: BoqAttachmentView]
   removeAttachment: [attachment: BoqAttachmentView]
 }>()
+
+watch(() => props.focusId, async (focusId) => {
+  if (!focusId)
+    return
+  await nextTick()
+  document.getElementById(`boq-change-focus-${focusId}`)?.focus({ preventScroll: false })
+}, { immediate: true })
 
 const { formModal, warning } = useKitUI()
 const attachmentOrderId = shallowRef('')
@@ -357,13 +366,14 @@ onChange(async (files) => {
       <template #code="{ row }">
         <NuxtLink
           v-if="row.ledgerId"
+          :id="`boq-change-focus-${row.id}`"
           :to="`/owner/change/${row.id}`"
           class="font-mono text-11px font-700 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand"
           :title="`打开已签证业主变更单 ${row.code}`"
         >
           {{ row.code }}
         </NuxtLink>
-        <span v-else class="font-mono text-11px font-700 text-ink">
+        <span v-else :id="`boq-change-focus-${row.id}`" tabindex="-1" class="font-mono text-11px font-700 text-ink outline-none focus-visible:ring-2 focus-visible:ring-brand/35">
           {{ row.code }}
         </span>
       </template>

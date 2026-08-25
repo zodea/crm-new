@@ -97,6 +97,72 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
       c.retention_days, c.invoice_name, c.invoice_tax_no,
       c.invoice_address_phone, c.invoice_bank, c.invoice_bank_account,
       c.amount, c.status, c.note, c.actual_completion_date,
+      COALESCE((
+        SELECT json_group_array(json_object(
+          'id', boq_catalog.id,
+          'itemName', boq_catalog.item_name,
+          'unit', boq_catalog.unit,
+          'qty', boq_catalog.qty,
+          'unitPrice', boq_catalog.unit_price
+        ))
+        FROM (
+          SELECT boq_line.id,
+                 boq_line.item_name,
+                 boq_line.unit,
+                 COALESCE(boq_line.recognized_qty, boq_line.qty, 0) AS qty,
+                 COALESCE(boq_line.recognized_unit_price, boq_line.unit_price, 0) AS unit_price
+          FROM boq_lines boq_line
+          WHERE boq_line.contract_id = c.id
+            AND boq_line.project_id = c.project_id
+            AND boq_line.deleted_at IS NULL
+          ORDER BY boq_line.sort_order, boq_line.id
+        ) boq_catalog
+      ), '[]') AS boq_catalog_json,
+      COALESCE((
+        SELECT json_group_array(json_object(
+          'periodNo', quantity_fact.period_no,
+          'boqLineId', quantity_fact.boq_line_id,
+          'autoQty', quantity_fact.auto_qty,
+          'missingQtyCount', quantity_fact.missing_qty_count,
+          'quantityBasis', 'field',
+          'sourceVersion', quantity_fact.source_version,
+          'sourceUpdatedAt', quantity_fact.source_updated_at
+        ))
+        FROM (
+          SELECT substr(usc.completed_at, 1, 7) AS period_no,
+                 hti.boq_line_id,
+                 COALESCE(SUM(hti.field_qty), 0) AS auto_qty,
+                 SUM(CASE WHEN hti.field_qty IS NULL THEN 1 ELSE 0 END) AS missing_qty_count,
+                 'migration-field:' || substr(usc.completed_at, 1, 7) || ':'
+                   || COALESCE(MAX(MAX(COALESCE(hti.updated_at, ''), COALESCE(usc.updated_at, ''))), '') AS source_version,
+                 MAX(MAX(COALESCE(hti.updated_at, ''), COALESCE(usc.updated_at, ''))) AS source_updated_at
+          FROM unit_stage_completions usc
+          JOIN units unit_row ON unit_row.id = usc.unit_id
+          JOIN floors floor_row ON floor_row.id = unit_row.floor_id
+          JOIN buildings building ON building.id = floor_row.building_id
+          JOIN construction_stage_items csi
+            ON csi.stage_id = usc.stage_id
+           AND csi.is_reporting_stage = 1
+          JOIN house_type_template_items hti ON hti.item_id = csi.item_id
+          JOIN rooms room_row
+            ON room_row.id = hti.room_id
+           AND room_row.template_id = unit_row.house_type_template_id
+          JOIN boq_lines quantity_boq_line ON quantity_boq_line.id = hti.boq_line_id
+          WHERE usc.deleted_at IS NULL
+            AND unit_row.deleted_at IS NULL
+            AND floor_row.deleted_at IS NULL
+            AND building.deleted_at IS NULL
+            AND csi.deleted_at IS NULL
+            AND hti.deleted_at IS NULL
+            AND room_row.deleted_at IS NULL
+            AND quantity_boq_line.deleted_at IS NULL
+            AND usc.status = 'completed'
+            AND building.project_id = c.project_id
+            AND quantity_boq_line.contract_id = c.id
+          GROUP BY substr(usc.completed_at, 1, 7), hti.boq_line_id
+          ORDER BY period_no, MIN(quantity_boq_line.sort_order), hti.boq_line_id
+        ) quantity_fact
+      ), '[]') AS monthly_quantity_facts_json,
       c.created_at, c.updated_at, c.deleted_at
     FROM contracts c
     LEFT JOIN projects p ON p.id = c.project_id
@@ -124,6 +190,195 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     FROM contract_supplements
     ORDER BY id
   `,
+  owner_documents: `
+    SELECT * FROM (
+      SELECT
+        change_order.id,
+        change_order.name,
+        change_order.project_id,
+        change_order.contract_id,
+        COALESCE(change_order.approved_tax_inclusive_amount, change_order.total_amount, 0) AS amount,
+        NULL AS audited_amount,
+        change_order.approved_tax_exclusive_amount AS tax_exclusive_amount,
+        change_order.applied_tax_exclusive_amount AS applied_tax_exclusive_amount,
+        'owner_change' AS kind,
+        change_order.code AS no,
+        change_order.document_type,
+        'boq_change_order' AS source_type,
+        CASE WHEN change_order.status = 'approved' THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        change_order.application_date,
+        change_order.approved_at AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        change_order.status,
+        change_order.status_note,
+        change_order.note,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', change_line.id,
+            'boqLineId', COALESCE(change_line.result_boq_line_id, change_line.boq_line_id),
+            'operation', change_line.operation,
+            'itemName', change_line.item_name,
+            'unit', change_line.unit,
+            'contractQty', COALESCE(boq_line.recognized_qty, boq_line.qty),
+            'contractUnitPrice', COALESCE(boq_line.recognized_unit_price, boq_line.unit_price),
+            'deltaQty', change_line.delta_qty,
+            'newUnitPrice', change_line.new_unit_price,
+            'amount', change_line.amount,
+            'note', change_line.note
+          ))
+          FROM boq_change_lines change_line
+          LEFT JOIN boq_lines boq_line ON boq_line.id = COALESCE(change_line.result_boq_line_id, change_line.boq_line_id)
+          WHERE change_line.change_order_id = change_order.id
+            AND change_line.deleted_at IS NULL
+          ORDER BY change_line.sort_order, change_line.id
+        ), '[]') AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'boq_change_order'
+            AND file_ref.owner_id = change_order.id
+        ), '[]') AS files_json,
+        change_order.created_at,
+        change_order.updated_at,
+        change_order.deleted_at
+      FROM boq_change_orders change_order
+
+      UNION ALL
+
+      SELECT
+        ledger.id,
+        ledger.name,
+        ledger.project_id,
+        ledger.contract_id,
+        ledger.tax_inc_amount AS amount,
+        NULL AS audited_amount,
+        ledger.tax_exc_amount AS tax_exclusive_amount,
+        ledger.applied_amount AS applied_tax_exclusive_amount,
+        'owner_change' AS kind,
+        ledger.change_no AS no,
+        ledger.document_type,
+        'manual' AS source_type,
+        ledger.source_locked,
+        '' AS period_no,
+        ledger.application_date,
+        ledger.approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        ledger.status,
+        ledger.status_note,
+        ledger.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'owner_change_order'
+            AND file_ref.owner_id = ledger.id
+        ), '[]') AS files_json,
+        ledger.created_at,
+        ledger.updated_at,
+        ledger.deleted_at
+      FROM owner_change_orders ledger
+      WHERE ledger.source_type = 'manual'
+
+      UNION ALL
+
+      SELECT
+        statement.id,
+        COALESCE(NULLIF(statement.period_no, ''), statement.month) || '月度报量' AS name,
+        statement.project_id,
+        statement.contract_id,
+        COALESCE(statement.reported_amount, statement.total_amount, 0) AS amount,
+        statement.audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        'owner_report' AS kind,
+        statement.no,
+        'monthly_statement' AS document_type,
+        'monthly_statement' AS source_type,
+        CASE WHEN statement.status = 'exported' THEN 1 ELSE 0 END AS source_locked,
+        COALESCE(NULLIF(statement.period_no, ''), statement.month) AS period_no,
+        statement.application_date,
+        NULL AS approval_date,
+        statement.quantity_basis,
+        statement.source_version AS quantity_source_version,
+        statement.source_updated_at AS quantity_source_updated_at,
+        statement.operator_name,
+        statement.submitted_at,
+        statement.status,
+        CASE WHEN statement.status = 'exported' THEN '甲方已审定'
+             WHEN statement.status = 'adjusted' THEN '已申报甲方'
+             ELSE '' END AS status_note,
+        statement.note,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', report_line.id,
+            'boqLineId', report_line.boq_line_id,
+            'operation', NULL,
+            'itemName', report_line.item_name,
+            'unit', report_line.unit,
+            'contractQty', COALESCE(boq_line.recognized_qty, boq_line.qty),
+            'contractUnitPrice', report_line.unit_price,
+            'autoQty', report_line.auto_qty,
+            'reportedQty', COALESCE(report_line.reported_qty, report_line.adjusted_qty),
+            'auditedQty', report_line.audited_qty,
+            'amount', report_line.amount,
+            'auditedAmount', report_line.audited_amount,
+            'note', report_line.note
+          ))
+          FROM monthly_statement_lines report_line
+          LEFT JOIN boq_lines boq_line ON boq_line.id = report_line.boq_line_id
+          WHERE report_line.statement_id = statement.id
+            AND report_line.deleted_at IS NULL
+          ORDER BY report_line.sort_order, report_line.id
+        ), '[]') AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'monthly_statement'
+            AND file_ref.owner_id = statement.id
+        ), '[]') AS files_json,
+        statement.created_at,
+        statement.updated_at,
+        statement.deleted_at
+      FROM monthly_statements statement
+    ) owner_document
+    ORDER BY kind, id
+  `,
   workers: `
     SELECT id, name, crew_id, current_project_id, deleted_at
     FROM workers
@@ -149,6 +404,59 @@ function text(value: unknown): string {
 
 function nullableText(value: unknown): string | null {
   return text(value) || null
+}
+
+function isoDateTimeText(value: unknown): string | null {
+  const normalized = nullableText(value)
+  if (!normalized)
+    return null
+  const sqliteUtc = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?$/.exec(normalized)
+  if (!sqliteUtc)
+    return normalized
+  return `${sqliteUtc[1]}T${sqliteUtc[2]}.${(sqliteUtc[3] ?? '').padEnd(3, '0')}Z`
+}
+
+function normalizeFileRefsJson(value: unknown): string {
+  const serialized = text(value) || '[]'
+  try {
+    const parsed = JSON.parse(serialized)
+    if (!Array.isArray(parsed))
+      return serialized
+    return JSON.stringify(parsed.map((file) => {
+      if (!file || typeof file !== 'object' || Array.isArray(file))
+        return file
+      const record = file as Record<string, unknown>
+      return {
+        ...record,
+        uploadedAt: isoDateTimeText(record.uploadedAt),
+        deletedAt: isoDateTimeText(record.deletedAt),
+      }
+    }))
+  }
+  catch {
+    return serialized
+  }
+}
+
+function normalizeMonthlyQuantityFactsJson(value: unknown): string {
+  const serialized = text(value) || '[]'
+  try {
+    const parsed = JSON.parse(serialized)
+    if (!Array.isArray(parsed))
+      return serialized
+    return JSON.stringify(parsed.map((fact) => {
+      if (!fact || typeof fact !== 'object' || Array.isArray(fact))
+        return fact
+      const record = fact as Record<string, unknown>
+      return {
+        ...record,
+        sourceUpdatedAt: isoDateTimeText(record.sourceUpdatedAt),
+      }
+    }))
+  }
+  catch {
+    return serialized
+  }
 }
 
 function nullableNumber(value: unknown): number | null {
@@ -231,6 +539,8 @@ function sourceEntity(
         status: text(row.status),
         note: text(row.note),
         actualCompletionDate: nullableText(row.actual_completion_date),
+        boqCatalogJson: text(row.boq_catalog_json) || '[]',
+        monthlyQuantityFactsJson: normalizeMonthlyQuantityFactsJson(row.monthly_quantity_facts_json),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
       },
@@ -289,6 +599,41 @@ function sourceEntity(
         note: text(row.note),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
+      },
+    }
+  }
+  if (entityType === 'owner_documents') {
+    return {
+      ...entity,
+      references: {
+        projectId: nullableText(row.project_id),
+        contractId: nullableText(row.contract_id),
+      },
+      amount: nullableMoney(row.amount),
+      attributes: {
+        kind: text(row.kind),
+        no: text(row.no),
+        documentType: text(row.document_type),
+        sourceType: text(row.source_type),
+        sourceLocked: nullableNumber(row.source_locked),
+        periodNo: text(row.period_no),
+        applicationDate: nullableText(row.application_date),
+        approvalDate: nullableText(row.approval_date),
+        quantityBasis: nullableText(row.quantity_basis),
+        quantitySourceVersion: nullableText(row.quantity_source_version),
+        quantitySourceUpdatedAt: isoDateTimeText(row.quantity_source_updated_at),
+        operatorName: text(row.operator_name),
+        submittedAt: isoDateTimeText(row.submitted_at),
+        status: text(row.status),
+        statusNote: text(row.status_note),
+        auditedAmount: nullableNumber(row.audited_amount),
+        taxExclusiveAmount: nullableNumber(row.tax_exclusive_amount),
+        appliedTaxExclusiveAmount: nullableNumber(row.applied_tax_exclusive_amount),
+        note: text(row.note),
+        linesJson: text(row.lines_json) || '[]',
+        filesJson: normalizeFileRefsJson(row.files_json),
+        createdAt: isoDateTimeText(row.created_at) ?? '',
+        updatedAt: isoDateTimeText(row.updated_at) ?? '',
       },
     }
   }
