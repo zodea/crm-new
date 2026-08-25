@@ -45,6 +45,18 @@ function source(): CoreMigrationSourceDTO {
         },
       }],
       subcontract_contracts: [],
+      contract_supplements: [{
+        legacyId: 'supplement-legacy',
+        name: '既有材料调价补充协议',
+        references: { contractId: 'contract-legacy' },
+        amount: '8000.00' as const,
+        deletedAt: null,
+        attributes: {
+          no: 'SG-LEGACY-320-BC01',
+          signDate: '2026-02-08',
+          status: '有效',
+        },
+      }],
       workers: [],
       project_suppliers: [],
     },
@@ -97,7 +109,8 @@ describe('施工合同受控中央迁移', () => {
       commands,
     )
     const id = 'central-construction_contracts-contract-legacy'
-    const detail = read.detail(id, { origin: 'real' })
+    const supplementId = 'central-contract_supplements-supplement-legacy'
+    const detail = read.detail(id, { origin: 'real', focusId: supplementId })
 
     expect(detail.contract).toMatchObject({
       id,
@@ -107,6 +120,15 @@ describe('施工合同受控中央迁移', () => {
       project: { state: 'resolved', label: '既有项目' },
       customer: { state: 'resolved', label: '既有甲方' },
     })
+    expect(detail.sections.supplements).toContainEqual(expect.objectContaining({
+      id: supplementId,
+      no: 'SG-LEGACY-320-BC01',
+      name: '既有材料调价补充协议',
+      navigation: expect.objectContaining({
+        subject: expect.objectContaining({ entity: 'contract', id }),
+        view: supplementId,
+      }),
+    }))
 
     const form = commands.form(id, session)
     expect(form.draft).toMatchObject({

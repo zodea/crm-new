@@ -3,6 +3,7 @@ import type {
   NavigationIntentDTO,
   NavigationUnavailableReasonDTO,
 } from '~/types/read-model'
+import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import {
@@ -12,6 +13,8 @@ import {
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { appendProjectSupplierReturnContext, validateProjectSupplierReturnTo } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
+import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
+import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export type NavigationTargetState
@@ -133,9 +136,23 @@ function contractPath(intent: EntityTargetIntent): string {
   if (intent.kind === 'source-record')
     return path
   const kind = intent.filters.contractKind
+  const dataOrigin = intent.filters.dataOrigin
+  if (intent.variant === 'supplement') {
+    if ((kind !== '施工' && kind !== '分包')
+      || !isDataOriginDTO(dataOrigin)
+      || !isStableRouteIdentity(intent.view)) {
+      throw new Error('invalid contract supplement focus')
+    }
+    const query = new URLSearchParams({
+      origin: dataOrigin,
+      contractKind: kind === '施工' ? 'construction' : 'subcontract',
+      tab: kind === '分包' ? 'changes' : 'supplements',
+      focus: intent.view,
+    })
+    return `${path}?${query.toString()}`
+  }
   if (kind !== '材采' && kind !== '施工' && kind !== '分包')
     return path
-  const dataOrigin = intent.filters.dataOrigin
   if (dataOrigin == null)
     return path
   if (!isDataOriginDTO(dataOrigin))
@@ -144,12 +161,6 @@ function contractPath(intent: EntityTargetIntent): string {
     origin: dataOrigin,
     contractKind: kind === '材采' ? 'material' : kind === '施工' ? 'construction' : 'subcontract',
   })
-  if (intent.variant === 'supplement') {
-    if (!intent.view)
-      throw new Error('invalid contract supplement focus')
-    query.set('tab', kind === '分包' ? 'changes' : 'supplements')
-    query.set('focus', intent.view)
-  }
   return `${path}?${query.toString()}`
 }
 
@@ -317,6 +328,18 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
+    if (key === 'contract:supplement' && options.returnTo) {
+      const entityIntent = intent as EntityTargetIntent
+      const dataOrigin = entityIntent.filters.dataOrigin
+      const contractKind = entityIntent.filters.contractKind
+      const returnTo = contractKind === '施工'
+        ? validateConstructionContractReturnTo(options.returnTo, dataOrigin)
+        : contractKind === '分包'
+          ? validateSubcontractContractReturnTo(options.returnTo, dataOrigin)
+          : null
+      if (returnTo)
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
+    }
     if (intent.kind === 'source-record' && options.returnTo)
       to = appendProjectSupplierReturnContext(to, options.returnTo)
     if (key === 'project:detail' && options.returnTo && options.returnContextId) {

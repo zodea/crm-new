@@ -1,4 +1,5 @@
 import type { DataOriginDTO } from '~/types/read-model'
+import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export interface SubcontractContractListNavigationState {
@@ -111,10 +112,21 @@ export function validateSubcontractContractDetailReturnTo(input: unknown, expect
     const tab = url.searchParams.get('tab')
     if (tab && !['info', 'supplements', 'changes', 'invoices', 'payments', 'settlements', 'penalties', 'material-uses'].includes(tab))
       return null
-    const returnTo = url.searchParams.get('returnTo')
-    if (returnTo && !validateSubcontractContractReturnTo(returnTo, origin))
+    const focus = url.searchParams.get('focus')
+    if (focus && (tab !== 'changes' || !isStableRouteIdentity(focus)))
       return null
-    return `${url.pathname}${url.search}`
+    const returnTo = url.searchParams.get('returnTo')
+    const validatedListReturnTo = returnTo ? validateSubcontractContractReturnTo(returnTo, origin) : null
+    if (returnTo && !validatedListReturnTo)
+      return null
+    const query = new URLSearchParams({ origin, contractKind: 'subcontract' })
+    if (tab && tab !== 'info')
+      query.set('tab', tab)
+    if (focus)
+      query.set('focus', focus)
+    if (validatedListReturnTo)
+      query.set('returnTo', validatedListReturnTo)
+    return `${url.pathname}?${query.toString()}`
   }
   catch {
     return null

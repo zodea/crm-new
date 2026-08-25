@@ -14,6 +14,7 @@ import type {
 import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { maskPhone } from '../util/privacy'
+import { isStableRouteIdentity } from '../util/stable-route-identity'
 import {
   SUBCONTRACT_CONTRACT_PAGE_SIZES,
   subcontractContractProblem,
@@ -85,7 +86,12 @@ export function parseSubcontractContractDetailQuery(
   const dataOrigin = input?.origin ?? 'real'
   if (!id.trim() || !isDataOriginDTO(dataOrigin))
     throw new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '分包合同详情查询参数无效'))
-  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo) }
+  const rawFocusId = input?.focusId
+  if (rawFocusId != null && rawFocusId !== '' && !isStableRouteIdentity(rawFocusId)) {
+    throw new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '分包合同详情查询参数无效'))
+  }
+  const focusId = isStableRouteIdentity(rawFocusId) ? rawFocusId : null
+  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focusId }
 }
 
 function money(value: number): string {
@@ -290,6 +296,13 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
   }
   if (source.kind !== '分包')
     throw new SubcontractContractRepositoryProblem(subcontractContractProblem('relationship-mismatch', '合同类型与分包合同详情不一致'))
+  if (input.query.focusId) {
+    const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
+    if (!supplement)
+      throw new SubcontractContractRepositoryProblem(subcontractContractProblem('not-found', '补充协议不存在或已删除'))
+    if (supplement.contractId !== source.id)
+      throw new SubcontractContractRepositoryProblem(subcontractContractProblem('relationship-mismatch', '补充协议与分包合同不匹配'))
+  }
   const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
   const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierPermission)
   return {

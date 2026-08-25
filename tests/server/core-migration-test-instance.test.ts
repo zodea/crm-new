@@ -61,6 +61,7 @@ function source(overrides: Partial<Omit<CoreMigrationSourceDTO, 'sourceHash'>> =
       ],
       construction_contracts: [],
       subcontract_contracts: [],
+      contract_supplements: [],
       workers: [
         {
           legacyId: 'worker-old-1',
@@ -404,6 +405,80 @@ describe('core migration test instance', () => {
       ...sourceCommand('forged-workspace'),
       workspaceId: 'forged-workspace',
     }, SESSION)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+  })
+
+  it('补充协议取得稳定服务端 ID，并把显式旧主合同 ID 映射为唯一中央父引用', async () => {
+    const baseline = cleanSource()
+    const migrationSource = cleanSource({
+      entities: {
+        ...baseline.entities,
+        construction_contracts: [{
+          legacyId: 'contract-old-1',
+          name: '既有施工合同',
+          references: { projectId: 'project-old-1', customerId: 'customer-old-1' },
+        }],
+        contract_supplements: [{
+          legacyId: 'supplement-old-1',
+          name: '既有补充协议',
+          references: { contractId: 'contract-old-1' },
+          amount: '8000.00',
+        }],
+      },
+    })
+    const instance = createCoreMigrationTestInstance({
+      createServerId: ({ entityType, legacyId }) => `server:${entityType}:${legacyId}`,
+    })
+
+    const batch = await dryRunWithAttestation(instance, 'supplement-parent', migrationSource)
+    await instance.importBatch(batchCommand('supplement-parent-import', batch.batchId), SESSION)
+
+    expect(batch.mappings).toContainEqual({
+      entityType: 'contract_supplements',
+      legacyId: 'supplement-old-1',
+      serverId: 'server:contract_supplements:supplement-old-1',
+    })
+    expect(instance.snapshot(SESSION).entities).toContainEqual(expect.objectContaining({
+      entityType: 'contract_supplements',
+      id: 'server:contract_supplements:supplement-old-1',
+      references: { contractId: 'server:construction_contracts:contract-old-1' },
+    }))
+  })
+
+  it('补充协议旧父 ID 同时命中施工和分包主合同时阻断，不猜父类型', async () => {
+    const baseline = cleanSource()
+    const migrationSource = cleanSource({
+      entities: {
+        ...baseline.entities,
+        construction_contracts: [{
+          legacyId: 'contract-collision',
+          name: '同 ID 施工合同',
+          references: { projectId: 'project-old-1', customerId: 'customer-old-1' },
+        }],
+        subcontract_contracts: [{
+          legacyId: 'contract-collision',
+          name: '同 ID 分包合同',
+          references: { projectId: 'project-old-1', supplierId: 'supplier-old-1' },
+        }],
+        contract_supplements: [{
+          legacyId: 'supplement-ambiguous',
+          name: '父类型歧义补充协议',
+          references: { contractId: 'contract-collision' },
+        }],
+      },
+    })
+    const batch = await dryRunWithAttestation(createCoreMigrationTestInstance(), 'supplement-ambiguous', migrationSource)
+
+    expect(batch.mappings).not.toContainEqual(expect.objectContaining({
+      entityType: 'contract_supplements',
+      legacyId: 'supplement-ambiguous',
+    }))
+    expect(batch.issues).toContainEqual(expect.objectContaining({
+      entityType: 'contract_supplements',
+      legacyId: 'supplement-ambiguous',
+      field: 'contractId',
+      metricKey: 'orphan',
+      reason: expect.stringContaining('拒绝猜测父类型'),
+    }))
   })
 
   it('按 command、source 和 batch 幂等，导入显式映射并保留软删除与可定位对账', async () => {

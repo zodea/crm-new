@@ -230,4 +230,42 @@ describe('施工合同中央 Repository contract', () => {
       capabilities: ['construction-contract:read', 'demo:read'],
     })).toThrowError(/来源/)
   })
+
+  it('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
+    const contracts = [
+      source(),
+      source({ id: 'construction-contract-2', no: 'SG-002', name: '其他施工合同' }),
+    ]
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      supplements: [{
+        dataOrigin: 'real',
+        id: 'supplement-other-contract',
+        contractId: 'construction-contract-2',
+        no: 'BC-002',
+        name: '其他合同补充协议',
+        amount: 80,
+        date: '2026-08-12',
+        status: '有效',
+      }],
+    }
+    const build = (focusId: string) => buildConstructionContractDetail({
+      contracts,
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', { origin: 'real', focusId }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(() => build('supplement-other-contract')).toThrowError(/补充协议与施工合同不匹配/)
+    expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
+  })
+
+  it('拒绝不能形成 canonical focus 的补充协议 ID', () => {
+    expect(() => parseConstructionContractDetailQuery('construction-contract-1', {
+      origin: 'real',
+      focusId: '\0',
+    })).toThrowError(/查询参数无效/)
+  })
 })

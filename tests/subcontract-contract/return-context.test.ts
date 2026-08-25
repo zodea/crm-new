@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSubcontractContractReturnContext, validateSubcontractContractReturnTo } from '../../app/lib/subcontract-contract/return-context'
+import { resolveSubcontractContractReturnContext, validateSubcontractContractDetailReturnTo, validateSubcontractContractReturnTo } from '../../app/lib/subcontract-contract/return-context'
 
 describe('subcontract contract return context', () => {
   it('allows a mixed-origin list return while rejecting an explicit different origin', () => {
@@ -20,5 +20,16 @@ describe('subcontract contract return context', () => {
       now: 1_000,
       load: () => origin,
     })).toEqual({ to: returnTo.split('#')[0], origin })
+  })
+
+  it('只接受变更页签上的稳定补充协议聚焦，并将详情 URL 收敛为白名单字段', () => {
+    const list = '/contract/subcontract?origin=real&noise=ignored&nav=origin_322_detail#subcontract-contract-row-real%3Acontract-1'
+    const canonicalList = '/contract/subcontract?origin=real&nav=origin_322_detail#subcontract-contract-row-real%3Acontract-1'
+    const input = `/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1&noise=ignored&returnTo=${encodeURIComponent(list)}`
+    const expected = `/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1&returnTo=${encodeURIComponent(canonicalList)}`
+
+    expect(validateSubcontractContractDetailReturnTo(input, 'real')).toBe(expected)
+    expect(validateSubcontractContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=subcontract&tab=payments&focus=supplement-1', 'real')).toBeNull()
+    expect(validateSubcontractContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=%00', 'real')).toBeNull()
   })
 })

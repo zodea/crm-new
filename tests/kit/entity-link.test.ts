@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { resolveEntityLink } from '~/lib/kit/entity-link'
 import { registeredTargetKeys, resolveNavigationTarget } from '~/lib/nav/target-registry'
 
@@ -95,6 +96,56 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       state: 'resolved',
       label: '7月工资单',
       to: '/subcontract/payroll/ws1?origin=demo&ownerKind=worker&ownerId=w1&returnTo=%2Fbase%2Fworker%2Fw1%3Forigin%3Ddemo',
+    })
+  })
+
+  it('补充协议只用稳定事实 ID 生成合同类别对应的 canonical 聚焦地址', () => {
+    const intent = (contractKind: '施工' | '分包', view: string | null) => ({
+      kind: 'entity-subview' as const,
+      subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract-1', label: '主合同', no: 'HT-1' },
+      variant: 'supplement' as const,
+      view,
+      filters: { dataOrigin: 'real' as const, contractKind },
+    })
+
+    expect(resolveNavigationTarget(intent('施工', 'supplement-1'))).toMatchObject({
+      state: 'resolved',
+      to: '/contract/contract-1?origin=real&contractKind=construction&tab=supplements&focus=supplement-1',
+    })
+    expect(resolveNavigationTarget(intent('分包', 'supplement-1'))).toMatchObject({
+      state: 'resolved',
+      to: '/contract/contract-1?origin=real&contractKind=subcontract&tab=changes&focus=supplement-1',
+    })
+    expect(resolveNavigationTarget(intent('施工', null))).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget(intent('施工', 'targetless focus'))).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget({
+      ...intent('施工', 'supplement-1'),
+      filters: { dataOrigin: 'real' },
+    })).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget({
+      ...intent('施工', 'supplement-1'),
+      filters: { contractKind: '施工' },
+    })).toMatchObject({ state: 'error' })
+    expect(resolveNavigationTarget({
+      ...intent('施工', 'supplement-1'),
+      filters: { dataOrigin: 'real', contractKind: '材采' },
+    })).toMatchObject({ state: 'error' })
+  })
+
+  it('补充协议 canonical 目标仅携带经来源校验的合同列表返回上下文', () => {
+    const returnTo = '/contract/construction?origin=real&search=主合同&nav=origin_322_focus#construction-contract-row-real%3Acontract-1'
+    const target = resolveNavigationTarget({
+      kind: 'entity-subview',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-1', label: '主合同', no: 'HT-1' },
+      variant: 'supplement',
+      view: 'supplement-1',
+      filters: { dataOrigin: 'real', contractKind: '施工' },
+    }, { returnTo })
+    const canonicalReturnTo = validateConstructionContractReturnTo(returnTo, 'real')!
+
+    expect(target).toMatchObject({
+      state: 'resolved',
+      to: `/contract/contract-1?origin=real&contractKind=construction&tab=supplements&focus=supplement-1&returnTo=${encodeURIComponent(canonicalReturnTo)}`,
     })
   })
 

@@ -29,6 +29,7 @@ export interface SubcontractContractDetailQueryDTO {
   id: string
   origin: DataOriginDTO
   includeDemo: boolean
+  focusId: string | null
 }
 
 export interface SubcontractContractDetailSource {
