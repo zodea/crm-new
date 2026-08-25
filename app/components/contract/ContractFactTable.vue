@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { Directive } from 'vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { NavigationIntentDTO } from '~/types/read-model'
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import KitTable from '~/components/ui/KitTable.vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
@@ -23,6 +24,7 @@ const props = defineProps<{
   paidColumn?: boolean
   focusId?: string | null
   anchorPrefix?: string
+  returnTo?: string | null
 }>()
 
 const columns = computed<KitTableColumn[]>(() => [
@@ -35,12 +37,29 @@ const columns = computed<KitTableColumn[]>(() => [
 ])
 
 function target(row: ContractFactRow) {
-  const result = resolveNavigationTarget(row.navigation)
+  const result = resolveNavigationTarget(row.navigation, {
+    returnTo: props.returnTo ?? undefined,
+  })
   return result.state === 'resolved' ? result.to : null
 }
 
 function anchorId(row: ContractFactRow) {
   return props.anchorPrefix ? `${props.anchorPrefix}-${row.id}` : undefined
+}
+
+function focusElement(element: HTMLElement) {
+  void nextTick(() => element.focus({ preventScroll: false }))
+}
+
+const vFocusTarget: Directive<HTMLElement, boolean> = {
+  mounted(element, binding) {
+    if (binding.value)
+      focusElement(element)
+  },
+  updated(element, binding) {
+    if (binding.value && !binding.oldValue)
+      focusElement(element)
+  },
 }
 </script>
 
@@ -59,6 +78,7 @@ function anchorId(row: ContractFactRow) {
       <NuxtLink
         v-if="target(row)"
         :id="anchorId(row)"
+        v-focus-target="focusId === row.id"
         :to="target(row)!"
         :tabindex="focusId === row.id ? -1 : undefined"
         class="font-700 text-brand hover:underline"
@@ -66,7 +86,7 @@ function anchorId(row: ContractFactRow) {
       >
         {{ row.name || row.no || '查看来源' }}
       </NuxtLink>
-      <span v-else :id="anchorId(row)" :tabindex="focusId === row.id ? -1 : undefined">{{ row.name || '—' }}</span>
+      <span v-else :id="anchorId(row)" v-focus-target="focusId === row.id" :tabindex="focusId === row.id ? -1 : undefined">{{ row.name || '—' }}</span>
     </template>
     <template #date="{ row }">
       <span class="font-mono">{{ row.date || '—' }}</span>

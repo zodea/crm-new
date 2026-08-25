@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { CORE_MIGRATION_CAPABILITY, CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRATION_SOURCE_MODE, CORE_MIGRATION_SOURCE_VERSION, coreMigrationSourceHashInput } from '~/lib/migration/core-contract'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createSubcontractContractCommandTestInstance } from '../../server/utils/subcontract-contract-command-test-instance'
+import { createSubcontractContractReadTestInstance } from '../../server/utils/subcontract-contract-read-test-instance'
 
 const session = { workspaceId: 'workspace-321', actorId: 'actor-321', capabilities: [CORE_MIGRATION_CAPABILITY, 'subcontract-contract:read', 'subcontract-contract:write'] }
 
@@ -25,6 +26,14 @@ function source(): CoreMigrationSourceDTO {
         deletedAt: null,
         references: { projectId: 'project-old', supplierId: 'supplier-old' },
         attributes: { no: 'FB-LEGACY-321', subKind: '劳务', content: '受控迁移分包合同', signDate: '2026-01-08', status: '履约中', settlementStatus: null, clearanceStatus: null, createdAt: '2026-01-08T00:00:00.000Z', updatedAt: '2026-08-25T00:00:00.000Z' },
+      }],
+      contract_supplements: [{
+        legacyId: 'subcontract-supplement-old',
+        name: '既有劳务范围补充协议',
+        amount: '18000.00' as const,
+        deletedAt: null,
+        references: { contractId: 'subcontract-old' },
+        attributes: { no: 'FB-LEGACY-321-BC01', signDate: '2026-02-08', status: '生效' },
       }],
       workers: [],
       project_suppliers: [],
@@ -51,7 +60,18 @@ describe('分包合同受控中央迁移', () => {
     await core.confirm({ ...envelope('confirm-321'), batchId: batch.batchId }, session)
 
     const id = 'central-subcontract_contracts-subcontract-old'
+    const supplementId = 'central-contract_supplements-subcontract-supplement-old'
     expect(commands.form(id, session).draft).toMatchObject({ id, name: '既有劳务分包', projectId: 'central-projects-project-old', supplierId: 'central-suppliers-supplier-old', subKind: '劳务' })
+    const read = createSubcontractContractReadTestInstance(() => ['subcontract-contract:read'], commands)
+    expect(read.detail(id, { origin: 'real', focusId: supplementId }).sections.supplements)
+      .toContainEqual(expect.objectContaining({
+        id: supplementId,
+        no: 'FB-LEGACY-321-BC01',
+        navigation: expect.objectContaining({
+          subject: expect.objectContaining({ entity: 'contract', id }),
+          view: supplementId,
+        }),
+      }))
     await core.rollback({ ...envelope('rollback-321'), batchId: batch.batchId }, session)
     expect(() => commands.form(id, session)).toThrow('未找到分包合同')
   })

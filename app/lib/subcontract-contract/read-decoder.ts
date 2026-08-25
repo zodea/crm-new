@@ -116,7 +116,7 @@ export function serializeSubcontractContractListQuery(query: SubcontractContract
 }
 
 export function serializeSubcontractContractDetailQuery(query: SubcontractContractDetailQueryDTO): Record<string, string> {
-  return { origin: query.origin, includeDemo: String(query.includeDemo) }
+  return { origin: query.origin, includeDemo: String(query.includeDemo), focusId: query.focusId ?? '' }
 }
 
 export function subcontractContractUnavailable(cause: unknown): SubcontractContractRepositoryProblem {

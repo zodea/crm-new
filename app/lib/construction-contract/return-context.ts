@@ -1,4 +1,5 @@
 import type { DataOriginDTO } from '~/types/read-model'
+import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export interface ConstructionContractListNavigationState {
@@ -98,7 +99,7 @@ export function validateConstructionContractReturnTo(input: unknown, expectedOri
     if (!/^construction-contract-row-[\w.~:/-]+$/.test(anchorId))
       return null
     const state = constructionContractListNavigationStateFromQuery(Object.fromEntries(url.searchParams))
-    if (isDataOriginDTO(expectedOrigin) && state.origin !== expectedOrigin)
+    if (isDataOriginDTO(expectedOrigin) && state.origin !== null && state.origin !== expectedOrigin)
       return null
     const contextId = url.searchParams.get('nav')
     if (!contextId || !CONTEXT_ID.test(contextId))
@@ -126,7 +127,7 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (tab && !['info', 'supplements', 'changes', 'settlements', 'invoices', 'receipts', 'acceptance'].includes(tab))
       return null
     const focus = url.searchParams.get('focus')
-    if (focus && (tab !== 'supplements' || !/^[\w.~:/-]+$/.test(focus)))
+    if (focus && (tab !== 'supplements' || !isStableRouteIdentity(focus)))
       return null
     const returnTo = url.searchParams.get('returnTo')
     const validatedListReturnTo = returnTo ? validateConstructionContractReturnTo(returnTo) : null
@@ -142,8 +143,8 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
       query.set('tab', tab)
     if (focus)
       query.set('focus', focus)
-    if (validatedListReturnTo && returnTo)
-      query.set('returnTo', returnTo)
+    if (validatedListReturnTo)
+      query.set('returnTo', validatedListReturnTo)
     return `${url.pathname}?${query.toString()}`
   }
   catch {

@@ -117,6 +117,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     WHERE c.kind = '分包'
     ORDER BY c.id
   `,
+  contract_supplements: `
+    SELECT
+      id, contract_id, no, name, content, amount, sign_date, status,
+      external_ref, note, created_at, updated_at, deleted_at
+    FROM contract_supplements
+    ORDER BY id
+  `,
   workers: `
     SELECT id, name, crew_id, current_project_id, deleted_at
     FROM workers
@@ -260,6 +267,25 @@ function sourceEntity(
         status: text(row.status),
         settlementStatus: nullableText(row.settlement_status),
         clearanceStatus: nullableText(row.clearance_status),
+        note: text(row.note),
+        createdAt: text(row.created_at),
+        updatedAt: text(row.updated_at),
+      },
+    }
+  }
+  if (entityType === 'contract_supplements') {
+    return {
+      ...entity,
+      references: {
+        contractId: nullableText(row.contract_id),
+      },
+      amount: nullableMoney(row.amount),
+      attributes: {
+        no: text(row.no),
+        content: text(row.content),
+        signDate: nullableText(row.sign_date),
+        status: text(row.status),
+        externalRef: nullableText(row.external_ref),
         note: text(row.note),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),

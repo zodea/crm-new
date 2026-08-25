@@ -35,8 +35,11 @@ const activeTab = computed({
   get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
   set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value, focus: undefined } }),
 })
-const focusId = computed(() => typeof route.query.focus === 'string' ? route.query.focus : null)
-const returnTo = computed(() => (validateSubcontractContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/subcontract').split('#')[0] ?? '/contract/subcontract')
+const focusId = computed(() => route.query.tab === 'changes'
+  && typeof route.query.focus === 'string'
+  ? route.query.focus
+  : null)
+const returnTo = computed(() => validateSubcontractContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/subcontract')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('subcontract-contract:write'))
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -74,20 +77,14 @@ function target(intent: NavigationIntentDTO): string | null {
 }
 
 function load() {
-  return store.loadDetail({ id: props.contractId, origin: props.origin, includeDemo: props.origin === 'demo' && visibilityStore.includeDemo })
+  return store.loadDetail({ id: props.contractId, origin: props.origin, includeDemo: props.origin === 'demo' && visibilityStore.includeDemo, focusId: focusId.value })
 }
 
 function edit() {
   void navigateTo({ path: `/contract/subcontract/form/${encodeURIComponent(props.contractId)}`, query: { origin: 'real', contractKind: 'subcontract', returnTo: route.fullPath } })
 }
 
-watch(() => [props.contractId, props.origin], () => void load(), { immediate: true })
-watch(() => [detail.value?.contract.id, focusId.value, activeTab.value], async () => {
-  if (!focusId.value)
-    return
-  await nextTick()
-  document.getElementById(`subcontract-contract-fact-${focusId.value}`)?.focus({ preventScroll: false })
-}, { flush: 'post' })
+watch(() => [props.contractId, props.origin, focusId.value], () => void load(), { immediate: true })
 onActivated(() => void load())
 useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
 </script>
@@ -159,7 +156,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
         </section>
         <section v-else-if="activeTab === 'changes'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="补充合同" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" />
+            <SectionHeader title="补充合同" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
           </div><div class="panel min-w-0 overflow-hidden p-4">
             <SectionHeader title="分包变更" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无分包变更" />
           </div>

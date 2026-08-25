@@ -61,6 +61,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   const replay = new Map<string, SubcontractContractCommandResultDTO>()
   let migratedProjects = new Map<string, Option>()
   let migratedSuppliers = new Map<string, Option>()
+  let migratedSupplements: SubcontractContractFactSources['supplements'] = []
   let sourceVersion = 0
 
   function authorize(session: BusinessSession) {
@@ -158,6 +159,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       replay.clear()
       migratedProjects = new Map()
       migratedSuppliers = new Map()
+      migratedSupplements = []
       sourceVersion += 1
     },
     context(session: BusinessSession) {
@@ -175,7 +177,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     },
     facts(): SubcontractContractFactSources {
       return {
-        supplements: [],
+        supplements: structuredClone(migratedSupplements),
         changes: [],
         invoices: [],
         paymentApplications: [],
@@ -213,6 +215,23 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       migratedSuppliers = new Map(entities.filter(entity => entity.entityType === 'suppliers' && entity.deletedAt === null).map(entity => [entity.id, { id: entity.id, name: entity.name }]))
       const attribute = (entity: CoreMigrationServerEntityDTO, key: string) => entity.attributes[key] == null ? '' : String(entity.attributes[key])
       const numeric = (entity: CoreMigrationServerEntityDTO, key: string) => typeof entity.attributes[key] === 'number' ? entity.attributes[key] as number : null
+      const subcontractContractIds = new Set(entities
+        .filter(entity => entity.entityType === 'subcontract_contracts' && entity.deletedAt === null)
+        .map(entity => entity.id))
+      migratedSupplements = entities
+        .filter(entity => entity.entityType === 'contract_supplements'
+          && entity.deletedAt === null
+          && subcontractContractIds.has(entity.references.contractId ?? ''))
+        .map(entity => ({
+          dataOrigin: 'real' as const,
+          id: entity.id,
+          contractId: entity.references.contractId ?? null,
+          no: attribute(entity, 'no'),
+          name: entity.name,
+          amount: entity.amount == null ? null : Number(entity.amount),
+          date: attribute(entity, 'signDate') || null,
+          status: attribute(entity, 'status'),
+        }))
       for (const entity of entities) {
         if (entity.entityType !== 'subcontract_contracts' || entity.deletedAt !== null || contracts.has(entity.id))
           continue

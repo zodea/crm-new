@@ -50,6 +50,23 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       deleted_at: null,
     }]
   }
+  if (sql.includes('FROM contract_supplements')) {
+    return [{
+      id: 'supplement-local-1',
+      contract_id: 'construction-local-1',
+      no: 'BC-001',
+      name: '既有补充协议',
+      content: '补充施工范围',
+      amount: 8000,
+      sign_date: '2026-03-01',
+      status: '有效',
+      external_ref: 'legacy-bc-001',
+      note: '',
+      created_at: '2026-03-01T00:00:00.000Z',
+      updated_at: '2026-08-24T00:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM contracts c')) {
     return [{
       id: 'construction-local-1',
@@ -145,6 +162,7 @@ describe('core migration local source', () => {
           projects: 1,
           construction_contracts: 1,
           subcontract_contracts: 1,
+          contract_supplements: 1,
           workers: 1,
           project_suppliers: 1,
         },
@@ -153,6 +171,7 @@ describe('core migration local source', () => {
           { entityType: 'projects', metric: 'amount', expected: '100.00' },
           { entityType: 'construction_contracts', metric: 'amount', expected: '320000.00' },
           { entityType: 'subcontract_contracts', metric: 'amount', expected: '180000.00' },
+          { entityType: 'contract_supplements', metric: 'amount', expected: '8000.00' },
         ],
       },
     })
@@ -192,6 +211,12 @@ describe('core migration local source', () => {
       references: { projectId: 'project-local-1', supplierId: 'supplier-local-1' },
       amount: '180000.00',
       attributes: { no: 'FB-001', subKind: '劳务', settlementStatus: null, clearanceStatus: null },
+    })
+    expect(first.entities.contract_supplements[0]).toMatchObject({
+      legacyId: 'supplement-local-1',
+      references: { contractId: 'construction-local-1' },
+      amount: '8000.00',
+      attributes: { no: 'BC-001', signDate: '2026-03-01', status: '有效' },
     })
     expect(Object.values(first.entities).flat().map(row => row.legacyId))
       .toContain('customer_demo_001')
@@ -368,6 +393,7 @@ describe('core migration local source', () => {
       'projects',
       'construction_contracts',
       'subcontract_contracts',
+      'contract_supplements',
       'workers',
       'project_suppliers',
     ])

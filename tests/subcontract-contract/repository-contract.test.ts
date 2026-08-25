@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSubcontractContractDetail,
   buildSubcontractContractListPage,
+  parseSubcontractContractDetailQuery,
   parseSubcontractContractListQuery,
 } from '../../app/lib/subcontract-contract/repository'
 
@@ -111,5 +112,40 @@ describe('分包合同中央 Repository 契约', () => {
       legacy: [],
       emptyReason: 'missing-relation',
     })
+  })
+
+  it('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
+    const otherContract = { ...contract, id: 'subcontract-322', no: 'FB-2026-0322', name: '其他分包合同' }
+    const focusFacts: SubcontractContractFactSources = {
+      ...facts,
+      supplements: [{
+        dataOrigin: 'real',
+        id: 'supplement-other-contract',
+        contractId: otherContract.id,
+        no: 'BC-2',
+        name: '其他分包补充协议',
+        amount: 120,
+        date: '2026-08-03',
+        status: '生效',
+      }],
+    }
+    const build = (focusId: string) => buildSubcontractContractDetail({
+      contracts: [contract, otherContract],
+      facts: focusFacts,
+      query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real', focusId }),
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: 'subcontract-contract-v2',
+      capabilities: ['subcontract-contract:read'],
+    })
+
+    expect(() => build('supplement-other-contract')).toThrowError(/补充协议与分包合同不匹配/)
+    expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
+  })
+
+  it('拒绝不能形成 canonical focus 的补充协议 ID', () => {
+    expect(() => parseSubcontractContractDetailQuery(contract.id, {
+      origin: 'real',
+      focusId: '\0',
+    })).toThrowError(/查询参数无效/)
   })
 })

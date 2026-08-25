@@ -78,7 +78,7 @@ export interface CoreMigrationTestInstanceOptions {
 
 interface ReferenceRule {
   field: CoreMigrationReferenceField
-  target: CoreMigrationEntityType
+  target: CoreMigrationEntityType | readonly CoreMigrationEntityType[]
   orphanWhenMissing?: boolean
 }
 
@@ -94,6 +94,13 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
   subcontract_contracts: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
+  ],
+  contract_supplements: [
+    {
+      field: 'contractId',
+      target: ['construction_contracts', 'subcontract_contracts'],
+      orphanWhenMissing: true,
+    },
   ],
   workers: [
     { field: 'crewId', target: 'crews' },
@@ -160,6 +167,10 @@ function freshWorkspace(): WorkspaceState {
 
 function entityKey(entityType: CoreMigrationEntityType, legacyId: string): string {
   return `${entityType}\u001F${legacyId}`
+}
+
+function referenceTargets(rule: ReferenceRule): readonly CoreMigrationEntityType[] {
+  return typeof rule.target === 'string' ? [rule.target] : rule.target
 }
 
 function hasSameAttestation(
@@ -362,9 +373,11 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
             resolvedReferences[rule.field] = legacyReference ?? null
             continue
           }
-          const targetId = mappingByLegacy.get(entityKey(rule.target, legacyReference))
-          if (targetId) {
-            resolvedReferences[rule.field] = targetId
+          const targetIds = referenceTargets(rule)
+            .map(target => mappingByLegacy.get(entityKey(target, legacyReference)))
+            .filter((targetId): targetId is string => Boolean(targetId))
+          if (targetIds.length === 1) {
+            resolvedReferences[rule.field] = targetIds[0]
             continue
           }
           if (rule.orphanWhenMissing)
@@ -381,7 +394,9 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
             actualValue: null,
             difference: null,
             attribution: 'missing-source',
-            reason: `找不到显式旧 ID 对应的 ${rule.target}，未按名称猜测`,
+            reason: targetIds.length > 1
+              ? `显式旧 ID 同时命中多个 ${referenceTargets(rule).join(' / ')}，拒绝猜测父类型`
+              : `找不到显式旧 ID 对应的 ${referenceTargets(rule).join(' / ')}，未按名称猜测`,
           }))
         }
 
@@ -651,7 +666,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
             reason: '写后对账：中央关系与计划映射不一致',
           })
         }
-        if (observed && !state.entities.some(entity => entity.id === observed && entity.entityType === rule.target)) {
+        if (observed && !state.entities.some(entity => entity.id === observed && referenceTargets(rule).includes(entity.entityType))) {
           append({
             entityType: planned.entityType,
             legacyId: planned.legacyId,

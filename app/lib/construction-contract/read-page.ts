@@ -13,6 +13,7 @@ import type {
 import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
+import { isStableRouteIdentity } from '../util/stable-route-identity'
 import {
   CONSTRUCTION_CONTRACT_PAGE_SIZES,
   constructionContractProblem,
@@ -82,7 +83,12 @@ export function parseConstructionContractDetailQuery(
   if (!id.trim() || !isDataOriginDTO(dataOrigin)) {
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
   }
-  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo) }
+  const rawFocusId = input?.focusId
+  if (rawFocusId != null && rawFocusId !== '' && !isStableRouteIdentity(rawFocusId)) {
+    throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
+  }
+  const focusId = isStableRouteIdentity(rawFocusId) ? rawFocusId : null
+  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focusId }
 }
 
 function money(value: number): string {
@@ -303,6 +309,15 @@ export function buildConstructionContractDetail(
   }
   if (source.kind !== '施工') {
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '该合同不是施工合同'))
+  }
+  if (input.query.focusId) {
+    const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
+    if (!supplement) {
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('not-found', '补充协议不存在或已删除'))
+    }
+    if (supplement.contractId !== source.id) {
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '补充协议与施工合同不匹配'))
+    }
   }
   const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
   const customer = entityRef('customer', source.customerId, source.customerName, source.customerPermission)

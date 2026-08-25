@@ -85,14 +85,14 @@
 | 合同类型 | 详情分组 | 本地真实来源与下钻 |
 | --- | --- | --- |
 | 施工 | 详细资料 | `contracts`、合同附件；项目、客户走真实详情路由 |
-| 施工 | 补充合同 | `contract_supplements`；当前无独立详情路由，先深链到 `/contract/:id?tab=supplements&focus=:supplementId`，不能保留不可点击的蓝字 |
+| 施工 | 补充合同 | `contract_supplements`；无独立详情路由，由 Target Registry 深链到 `/contract/:id?tab=supplements&focus=:supplementId`；读取时验证补充协议存在且属于当前主合同，不能保留不可点击的蓝字 |
 | 施工 | 甲方变洽签 | `owner_change_orders.contract_id` → `/owner/change/:sourceId` |
 | 施工 | 验收结算 | `owner_final_settlements`、`owner_penalties`；按来源单据分别下钻，不合并成无类型通用行 |
 | 施工 | 票税管理 | `invoice_applications` 与销项开票事实；开票申请已有路由，开票登记缺失部分由财务链路票补齐，当前不能用申请状态冒充已开票登记 |
 | 施工 | 收款登记 | `receipt_registrations.contract_id` → `/finance/receipt/:id` |
 | 施工 | 竣工验收及保修 | `project_acceptances.contract_id`；竣工验收与保修到期为同一页签内两个分组 |
-| 分包 | 详细资料 | `contracts`、`contract_supplements`、合同附件；项目、分供方走真实详情路由 |
-| 分包 | 分包变洽签 | `subcontract_change_orders.contract_id` → `/subcontract/change/:id` |
+| 分包 | 详细资料 | `contracts`、合同附件；项目、分供方走真实详情路由 |
+| 分包 | 分包变洽签 | `contract_supplements` 由 Target Registry 深链到 `/contract/:id?tab=changes&focus=:supplementId`；与 `subcontract_change_orders.contract_id` 分区展示，后者按已核验目标下钻 |
 | 分包 | 收票登记 | `invoices.contract_id` → `/finance/invoice/:id` |
 | 分包 | 付款信息 | `payment_applications.contract_id` 与已确认 `payment_records` 分摊；付款申请和支付明细分区展示 |
 | 分包 | 支出结算 | `expenditure_settlements.contract_id`，按过程结算/完工结算分区 → `/subcontract/settlement/:id` |
@@ -100,9 +100,9 @@
 | 分包 | 材料领用情况 | 参考页分新仓/历史领用；当前 `material_uses` 没有合同或分供方外键，先保留空页签和字段规格，不按项目/班组猜合同归属 |
 | 材料采购 | 详细资料、采购合同明细、物资管理、收票登记、付款信息、支出结算、项目罚扣 | 各分组复用同一来源 DTO，不复制静态金额；合同分供方可进入同来源合同/结算/收票/付款事实页签，其他尚未消费同一中央来源的行目标保持 `unverified-target` 普通文本 |
 
-施工七组在 URL 中以 `tab=info|supplements|changes|settlements|invoices|receipts|acceptance` 恢复；补充合同使用同一详情的 `focus` 深链，甲方变洽签、月报量、最终结算、开票申请、收款、验收与保修只按稳定来源 ID 生成目标。详情显式编辑进入独立整页表单，保存后回到同一详情并保留嵌套列表返回上下文。刷新失败时保留上一版成功详情并提示重试；实际竣工日期为 `null` 时显示“未记录”。
+施工七组在 URL 中以 `tab=info|supplements|changes|settlements|invoices|receipts|acceptance` 恢复；补充合同使用同一详情的稳定 `focus` 深链，目标不存在与父子错配分别显示，返回时恢复原施工合同列表筛选、分页、滚动和合同焦点。甲方变洽签、月报量、最终结算、开票申请、收款、验收与保修只按稳定来源 ID 生成目标。详情显式编辑进入独立整页表单，保存后回到同一详情并保留嵌套列表返回上下文。刷新失败时保留上一版成功详情并提示重试；实际竣工日期为 `null` 时显示“未记录”。
 
-分包七组在 URL 中以 `tab=info|changes|invoices|payments|settlements|penalties|material-uses` 恢复；补充合同在“分包变更”中按 `focus` 深链。付款申请与付款登记、过程结算与完工结算分区展示。`material_uses` 缺少合同/分供方外键时返回 `missing-relation` 空态，不按项目、班组或名称猜测。
+分包七组在 URL 中以 `tab=info|changes|invoices|payments|settlements|penalties|material-uses` 恢复；补充合同在“分包变洽签”中按稳定 `focus` 深链并验证父合同，返回时恢复原分包合同列表筛选、分页、滚动和合同焦点。付款申请与付款登记、过程结算与完工结算分区展示。`material_uses` 缺少合同/分供方外键时返回 `missing-relation` 空态，不按项目、班组或名称猜测。
 
 材料采购七组在 URL 中以 `tab=info|lines|materials|invoices|payments|settlements|penalties` 恢复；物资管理内部只展示已核验的下料、到货事实，直调、出库及其他缺稳定外键集合返回真实空态。合同到分供方事实的 `tab=contracts|settlements|invoices|payments` 只接受白名单值，返回时保留原合同页签及材采列表上下文。正式详情才显示显式编辑入口，演示详情即使有相同字段也始终只读。
 

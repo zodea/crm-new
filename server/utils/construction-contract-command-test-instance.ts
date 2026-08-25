@@ -48,6 +48,7 @@ interface SessionState {
   sourceVersion: number
   migratedProjects: Map<string, ProjectOption>
   migratedCustomers: Map<string, CustomerOption>
+  migratedSupplements: ConstructionContractFactSources['supplements']
 }
 
 interface Options {
@@ -119,6 +120,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
         sourceVersion: 0,
         migratedProjects: new Map(),
         migratedCustomers: new Map(),
+        migratedSupplements: [],
       }
       states.set(key, state)
     }
@@ -278,7 +280,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
     facts(sessionId?: string | null): ConstructionContractFactSources {
       const state = stateFor(sessionId)
       return {
-        supplements: [],
+        supplements: structuredClone(state.migratedSupplements),
         changes: [],
         monthlyStatements: [],
         finalSettlements: [],
@@ -361,6 +363,23 @@ export function createConstructionContractCommandTestInstance(options: Options =
       state.migratedCustomers = new Map(entities
         .filter(entity => entity.entityType === 'customers' && entity.deletedAt === null)
         .map(entity => [entity.id, { id: entity.id, name: entity.name }]))
+      const constructionContractIds = new Set(entities
+        .filter(entity => entity.entityType === 'construction_contracts' && entity.deletedAt === null)
+        .map(entity => entity.id))
+      state.migratedSupplements = entities
+        .filter(entity => entity.entityType === 'contract_supplements'
+          && entity.deletedAt === null
+          && constructionContractIds.has(entity.references.contractId ?? ''))
+        .map(entity => ({
+          dataOrigin: 'real' as const,
+          id: entity.id,
+          contractId: entity.references.contractId ?? null,
+          no: attribute(entity, 'no'),
+          name: entity.name,
+          amount: entity.amount == null ? null : Number(entity.amount),
+          date: attribute(entity, 'signDate') || null,
+          status: attribute(entity, 'status'),
+        }))
 
       for (const entity of entities) {
         if (entity.entityType !== 'construction_contracts' || entity.deletedAt !== null)

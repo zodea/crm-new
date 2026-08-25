@@ -11,6 +11,7 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'projects',
   'construction_contracts',
   'subcontract_contracts',
+  'contract_supplements',
   'workers',
   'project_suppliers',
 ] as const
@@ -20,6 +21,7 @@ export type CoreMigrationReferenceField
   = | 'customerId'
     | 'secondaryCustomerId'
     | 'projectId'
+    | 'contractId'
     | 'supplierId'
     | 'crewId'
 

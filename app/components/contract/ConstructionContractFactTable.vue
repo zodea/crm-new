@@ -6,6 +6,7 @@ defineProps<{
   rows: readonly ConstructionContractFactDTO[]
   emptyLabel: string
   focusId?: string | null
+  returnTo?: string | null
 }>()
 </script>
 
@@ -15,6 +16,7 @@ defineProps<{
     :rows="rows"
     :empty-label="emptyLabel"
     :focus-id="focusId"
+    :return-to="returnTo"
     anchor-prefix="construction-contract-fact"
   />
 </template>

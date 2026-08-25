@@ -29,7 +29,7 @@ function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
 }
 
 function sameDetail(left: SubcontractContractDetailQueryDTO | null, right: SubcontractContractDetailQueryDTO) {
-  return left?.id === right.id && left.origin === right.origin && left.includeDemo === right.includeDemo
+  return left?.id === right.id && left.origin === right.origin && left.includeDemo === right.includeDemo && left.focusId === right.focusId
 }
 
 export const useSubcontractContractReadStore = defineStore('subcontract-contract-read', () => {

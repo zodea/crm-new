@@ -28,6 +28,7 @@ export interface ConstructionContractDetailQueryDTO {
   id: string
   origin: DataOriginDTO
   includeDemo: boolean
+  focusId: string | null
 }
 
 export interface ConstructionContractDetailSource {

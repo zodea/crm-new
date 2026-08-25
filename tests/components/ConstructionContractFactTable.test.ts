@@ -36,4 +36,39 @@ describe('constructionContractFactTable', () => {
     const empty = mount(ConstructionContractFactTable, { props: { emptyLabel: '暂无事实', rows: [] }, global: { stubs: { KitTable: KitTableStub } } })
     expect(empty.text()).toContain('暂无事实')
   })
+
+  it('补充协议聚焦行保留稳定 DOM 锚点、程序化焦点与 canonical 目标', async () => {
+    const wrapper = mount(ConstructionContractFactTable, {
+      attachTo: document.body,
+      props: {
+        emptyLabel: '暂无事实',
+        focusId: 'supplement-1',
+        rows: [{
+          id: 'supplement-1',
+          no: 'BC-001',
+          name: '补充协议一',
+          amount: '50.00',
+          date: '2026-08-25',
+          status: '有效',
+          navigation: {
+            kind: 'entity-subview',
+            subject: { state: 'resolved', entity: 'contract', id: 'contract-1', label: '主合同', no: 'HT-1' },
+            variant: 'supplement',
+            view: 'supplement-1',
+            filters: { dataOrigin: 'real', contractKind: '施工' },
+          },
+        }],
+      },
+      global: { stubs: { KitTable: KitTableStub, NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+    })
+
+    const target = wrapper.get('#construction-contract-fact-supplement-1')
+    await wrapper.vm.$nextTick()
+    expect(target.attributes()).toMatchObject({
+      tabindex: '-1',
+      href: '/contract/contract-1?origin=real&contractKind=construction&tab=supplements&focus=supplement-1',
+    })
+    expect(target.element).toBe(document.activeElement)
+    wrapper.unmount()
+  })
 })
