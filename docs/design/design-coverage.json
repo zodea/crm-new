@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 136,
+    "trackedPageFiles": 137,
     "devPageFiles": 5,
-    "appPageFiles": 131,
+    "appPageFiles": 132,
     "appNavLeaves": 51,
-    "covered": 129,
+    "covered": 130,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -522,6 +522,14 @@
         "acceptanceForm",
         "finalSettleForm",
         "ownerPenaltyForm"
+      ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/owner/:kind/form/:id",
+      "designRoute": [
+        "ownerChangeForm",
+        "ownerReportForm"
       ],
       "status": "covered"
     },

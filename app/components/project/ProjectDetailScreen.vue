@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { OwnerCommercialDocumentListPageDTO } from '~/lib/owner-document/central-repository'
 import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
@@ -8,6 +9,7 @@ import ProjectMaterialContractJourney from '~/components/project/ProjectMaterial
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
+import { yuan } from '~/lib/util/money'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -25,19 +27,76 @@ const props = withDefaults(defineProps<{
 })
 
 const repository = useNuxtApp().$repositories.projectList
+const ownerDocumentRepository = useNuxtApp().$repositories.ownerCommercialDocumentRead
 const commandStore = useProjectCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
 const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'mismatch' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
 let latestLoad = 0
+let latestOwnerJourneyLoad = 0
 let hasActivated = false
+const ownerJourneys = shallowRef<{
+  change: OwnerCommercialDocumentListPageDTO
+  report: OwnerCommercialDocumentListPageDTO
+} | null>(null)
+const ownerJourneysError = shallowRef('')
 
 const item = computed(() => detail.value?.item ?? null)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
 const journeyReturnTo = computed(() => props.currentRoute
   || `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`)
+const ownerJourneyCards = computed(() => {
+  const current = ownerJourneys.value
+  if (!current)
+    return []
+  return [
+    { kind: 'change' as const, label: '甲方变洽签', page: current.change },
+    { kind: 'report' as const, label: '月度报量', page: current.report },
+  ]
+})
+
+function ownerJourneyTo(kind: 'change' | 'report') {
+  const query = new URLSearchParams({
+    projectId: props.projectId,
+    origin: 'real',
+    returnTo: journeyReturnTo.value,
+  })
+  return `/owner/${kind}?${query.toString()}`
+}
+
+async function loadOwnerJourneys() {
+  const request = ++latestOwnerJourneyLoad
+  const projectId = props.projectId
+  ownerJourneys.value = null
+  ownerJourneysError.value = ''
+  if (props.originHint !== 'real')
+    return
+  const base = {
+    includeDemo: false,
+    origin: 'real' as const,
+    search: '',
+    projectId,
+    contractId: null,
+    status: null,
+    documentType: null,
+    page: 1,
+    pageSize: 10 as const,
+  }
+  try {
+    const [change, report] = await Promise.all([
+      ownerDocumentRepository.list({ ...base, kind: 'owner_change' }),
+      ownerDocumentRepository.list({ ...base, kind: 'owner_report' }),
+    ])
+    if (request === latestOwnerJourneyLoad && projectId === props.projectId)
+      ownerJourneys.value = { change, report }
+  }
+  catch (cause) {
+    if (request === latestOwnerJourneyLoad && projectId === props.projectId)
+      ownerJourneysError.value = cause instanceof Error ? cause.message : '甲方商务单据读取失败'
+  }
+}
 
 useTabTitle(() => item.value?.project.label)
 
@@ -127,6 +186,7 @@ async function loadProject() {
     }
     detail.value = result
     state.value = 'ready'
+    void loadOwnerJourneys()
     await nextTick()
     if (loadId === latestLoad)
       titleRef.value?.focus()
@@ -256,6 +316,20 @@ onActivated(() => {
       :return-to="journeyReturnTo"
       @retry="loadProject"
     />
+
+    <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
+      <SectionHeader id="project-owner-document-title" title="甲方变洽签与月度报量" subtitle="按当前项目稳定 ID 进入中央正式单据，返回时保留项目上下文" />
+      <StatePanel v-if="ownerJourneysError" class="mt-3" kind="error" title="甲方商务单据读取失败" :description="ownerJourneysError" action-label="重新读取" compact @action="loadOwnerJourneys" />
+      <div v-else-if="ownerJourneys" class="mt-3 grid gap-3 sm:grid-cols-2">
+        <NuxtLink v-for="card in ownerJourneyCards" :key="card.kind" :to="ownerJourneyTo(card.kind)" class="block border border-line bg-surface-1 p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/35">
+          <span class="text-13px font-700 text-ink">{{ card.label }}</span>
+          <span class="mt-1 block font-mono text-20px font-800 text-brand-deep">{{ card.page.pagination.total }}</span>
+          <span class="mt-1 block text-11px text-ink-soft">合计 {{ yuan(Number(card.page.summary.origins.real.reportedAmount)) }}</span>
+        </NuxtLink>
+      </div>
+      <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式甲方商务单据" description="切换到正式项目后可查看甲方变洽签与月度报量主链。" compact />
+      <StatePanel v-else class="mt-3" kind="loading" title="正在读取甲方商务单据" compact />
+    </section>
 
     <section
       data-authoritative-readonly

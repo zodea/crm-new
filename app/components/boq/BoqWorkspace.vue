@@ -33,6 +33,7 @@ const treeScope = shallowRef('all')
 const search = shallowRef('')
 const initialized = shallowRef(false)
 const requestedTargetUnavailable = shallowRef(false)
+const focusId = computed(() => typeof route.query.focus === 'string' ? route.query.focus : null)
 
 const projectOptions = computed(() => store.catalog.map(project => ({
   id: project.id,
@@ -99,8 +100,11 @@ async function initialize() {
     if (projectId.value && contractId.value)
       await store.loadWorkspace(projectId.value, contractId.value)
     await replaceQuery()
-    if (activeTab.value === 'monthly' && store.workspace?.monthlyStatements[0])
-      await store.loadStatement(store.workspace.monthlyStatements[0].id)
+    if (activeTab.value === 'monthly' && store.workspace?.monthlyStatements[0]) {
+      const statement = store.workspace.monthlyStatements.find(item => item.id === focusId.value)
+        ?? store.workspace.monthlyStatements[0]
+      await store.loadStatement(statement.id)
+    }
   }
   catch (cause) {
     toastError(toErrorMessage(cause))
@@ -583,6 +587,7 @@ onMounted(initialize)
       v-else-if="activeTab === 'changes'"
       :workspace="store.workspace"
       :busy="store.saving"
+      :focus-id="focusId"
       @create="createChange"
       @transition="transitionChange"
       @approve="approveChange"
@@ -598,6 +603,7 @@ onMounted(initialize)
       :workspace="store.workspace"
       :statement="store.monthlyStatement"
       :busy="store.saving"
+      :focus-id="focusId"
       @select="store.loadStatement"
       @generate="generateMonthly"
       @regenerate="regenerateMonthly"

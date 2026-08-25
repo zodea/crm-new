@@ -30,7 +30,7 @@ const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['project-supplier', [281, 289, 317]],
   ['core-contract', [277, 282, 289]],
   ['aux-contract', [295, 298, 289]],
-  ['owner-document', [283, 289]],
+  ['owner-document', [283, 323, 289]],
   ['subcontract-document', [295, 289]],
   ['material', [296, 297, 298, 289]],
   ['owner-material', [299, 289]],
@@ -123,6 +123,7 @@ const REFERENCE_VIEW_BY_ROUTE = new Map([
 
   ['/owner/:kind', { id: 'owner-document-list-by-kind', label: '主合同管理 > 六类甲方单据列表（按 kind）' }],
   ['/owner/:kind/:id', { id: 'owner-document-detail-by-kind', label: '甲方报量编号 > 详情-收入结算；其余 kind 详情未观察', gradeOverride: 'adjacent' }],
+  ['/owner/:kind/form/:id', { id: 'owner-document-edit-by-kind', label: '甲方变洽签/报量专属整页编辑表单' }],
   ['/subcontract/:kind', { id: 'subcontract-document-list-by-kind', label: '分包及人工 > 分包变洽签 / 分包结算（按 kind）' }],
   ['/project/penalty', { id: 'project-penalty-list', label: '分包及人工 > 项目罚扣' }],
 

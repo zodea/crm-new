@@ -62,6 +62,39 @@ export const PROJECT_READ_FIXTURE: readonly ProjectListSourceRow[] = projectsSee
   updatedAt: project.updated_at,
 } satisfies ProjectListSourceRow))
 
+// 施工合同、甲方变洽签与月度报量的中央测试实例共用这一正式项目身份。
+// 只读实例必须能按同一稳定 ID 打开项目详情，不能让跨域关系成为死链。
+const CONSTRUCTION_PROJECT_FIXTURE: ProjectListSourceRow = {
+  dataOrigin: 'real',
+  id: 'project-real-320',
+  name: '中央正式施工项目',
+  code: 'PROJECT-CENTRAL-320',
+  status: '施工中',
+  contractAmount: 5200000,
+  operationType: '施工总承包',
+  startDate: '2026-01-01',
+  plannedEnd: '2026-12-31',
+  actualEnd: null,
+  plannedDuration: 365,
+  manager: '项目经理',
+  execManager: '',
+  builder: '',
+  customerId: 'customer-real-320',
+  customerName: '中央正式甲方客户',
+  customerPermission: 'allowed',
+  secondaryCustomerId: null,
+  secondaryCustomerName: null,
+  secondaryCustomerPermission: 'allowed',
+  contractName: '既有中央施工合同',
+  contractor: '瑞航工程',
+  region: '',
+  riskLevel: '',
+  address: '',
+  income: null,
+  budget: null,
+  updatedAt: FIXED_AS_OF,
+}
+
 function repositoryProblem(
   code: 'forbidden' | 'unavailable',
   message: string,
@@ -245,7 +278,7 @@ export function createProjectReadTestInstance(
 
 export const projectReadTestInstance = createProjectReadTestInstance(
   sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
-  sessionId => projectCommandTestInstance.rows(sessionId),
+  sessionId => [CONSTRUCTION_PROJECT_FIXTURE, ...projectCommandTestInstance.rows(sessionId)],
   sessionId => projectCommandTestInstance.sourceVersion(sessionId),
   () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
 )

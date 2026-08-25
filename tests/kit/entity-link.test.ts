@@ -160,10 +160,13 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
     expect(registeredTargetKeys()).toEqual([
       'contract:boq',
       'contract:detail',
+      'contract:owner-document-source',
       'contract:supplement',
       'crew:detail',
       'customer:detail',
       'invoice:detail',
+      'owner-document:change',
+      'owner-document:report',
       'payment-application:detail',
       'project:detail',
       'project:supplier-workbench',

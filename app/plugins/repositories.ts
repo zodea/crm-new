@@ -7,6 +7,8 @@ import type { CustomerReadRepository } from '~/lib/customer/repository'
 import type { MaterialContractCommandRepository } from '~/lib/material-contract/command-contract'
 import type { MaterialContractReadRepository } from '~/lib/material-contract/repository'
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import type { OwnerCommercialDocumentCommandRepository } from '~/lib/owner-document/central-command-contract'
+import type { OwnerCommercialDocumentReadRepository } from '~/lib/owner-document/central-repository'
 import type { ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
 import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
@@ -23,6 +25,10 @@ import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository
 import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import {
+  createHttpOwnerCommercialDocumentCommandRepository,
+  createHttpOwnerCommercialDocumentReadRepository,
+} from '~/lib/owner-document/central-http-repository'
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
@@ -48,6 +54,8 @@ export interface DomainRepositories {
   coreMigration: CoreMigrationRepository
   materialContractRead: MaterialContractReadRepository
   materialContractCommands: MaterialContractCommandRepository
+  ownerCommercialDocumentRead: OwnerCommercialDocumentReadRepository
+  ownerCommercialDocumentCommands: OwnerCommercialDocumentCommandRepository
 }
 
 export default defineNuxtPlugin(() => {
@@ -98,6 +106,12 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     materialContractCommands: createHttpMaterialContractCommandRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    ownerCommercialDocumentRead: createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    ownerCommercialDocumentCommands: createHttpOwnerCommercialDocumentCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
   }

@@ -75,6 +75,15 @@ const detail: ProjectDetailReadDTO = {
 }
 
 const get = vi.fn()
+const ownerList = vi.fn()
+
+function ownerPage(total = 0) {
+  return {
+    items: [],
+    pagination: { page: 1, pageSize: 10, total },
+    summary: { origins: { real: { reportedAmount: `${total}.00` } } },
+  }
+}
 
 const NuxtLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
@@ -108,13 +117,20 @@ function renderDetail(props: Record<string, unknown>) {
 }
 
 vi.stubGlobal('useNuxtApp', () => ({
-  $repositories: { projectList: { get, list: vi.fn() } },
+  $repositories: {
+    projectList: { get, list: vi.fn() },
+    ownerCommercialDocumentRead: { list: ownerList },
+  },
 }))
 vi.stubGlobal('useProjectCommandStore', () => ({ latestWrite: null }))
 vi.stubGlobal('useTabTitle', () => {})
 
 describe('项目详情中央来源边界', () => {
-  beforeEach(() => get.mockReset())
+  beforeEach(() => {
+    get.mockReset()
+    ownerList.mockReset()
+    ownerList.mockResolvedValue(ownerPage())
+  })
 
   it('由 Repository 返回权威来源，并只呈现演示只读详情', async () => {
     get.mockResolvedValue(detail)
@@ -129,6 +145,8 @@ describe('项目详情中央来源边界', () => {
     expect(document.querySelector('[data-project-module]')).toBeNull()
     expect(screen.getByRole('link', { name: '查看材料采购合同（1）' }).getAttribute('href'))
       .toContain('/contract/material?projectId=project-1&origin=demo')
+    expect(screen.getByRole('status', { name: '演示项目不提供正式甲方商务单据' })).not.toBeNull()
+    expect(screen.queryByRole('status', { name: '正在读取甲方商务单据' })).toBeNull()
   })
 
   it('材采真实零值仍提供入口，未知与禁止状态不生成蓝链', async () => {
@@ -184,6 +202,36 @@ describe('项目详情中央来源边界', () => {
 
     const link = await screen.findByRole('link', { name: '编辑项目' })
     expect(link.getAttribute('href')).toBe('/project/form/project-1?origin=real')
+  })
+
+  it('快速切换项目时忽略较晚返回的旧项目甲方商务聚合', async () => {
+    const detailFor = (id: string): ProjectDetailReadDTO => ({
+      ...detail,
+      item: {
+        ...detail.item,
+        dataOrigin: 'real',
+        project: { ...detail.item.project, id, label: id },
+      },
+    })
+    get.mockImplementation(({ id }: { id: string }) => Promise.resolve(detailFor(id)))
+    const pending: Array<{ projectId: string, resolve: (value: ReturnType<typeof ownerPage>) => void }> = []
+    ownerList.mockImplementation(({ projectId }: { projectId: string }) => new Promise((resolve) => {
+      pending.push({ projectId, resolve })
+    }))
+    const rendered = renderDetail({ originHint: 'real', includeDemo: false })
+    await screen.findByRole('heading', { name: 'project-1' })
+    await rendered.rerender({ projectId: 'project-2', originHint: 'real', includeDemo: false })
+    await screen.findByRole('heading', { name: 'project-2' })
+
+    for (const request of pending.filter(entry => entry.projectId === 'project-2'))
+      request.resolve(ownerPage(2))
+    await screen.findAllByText('2')
+    for (const request of pending.filter(entry => entry.projectId === 'project-1'))
+      request.resolve(ownerPage(9))
+    await Promise.resolve()
+
+    expect(screen.queryByText('9')).toBeNull()
+    expect(screen.getAllByText('2')).toHaveLength(2)
   })
 
   it('稳定区分来源错配，不按项目名称回退到其他来源', async () => {

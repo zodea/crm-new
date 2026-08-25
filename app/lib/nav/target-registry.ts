@@ -11,6 +11,11 @@ import {
   validateProjectJourneyReturnTo,
 } from '~/lib/material-contract/return-context'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
+import {
+  isOwnerDocumentReturnContextId,
+  validateOwnerDocumentDetailReturnTo,
+  validateOwnerDocumentJourneyReturnTo,
+} from '~/lib/owner-document/return-context'
 import { appendProjectSupplierReturnContext, validateProjectSupplierReturnTo } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
@@ -137,6 +142,19 @@ function contractPath(intent: EntityTargetIntent): string {
     return path
   const kind = intent.filters.contractKind
   const dataOrigin = intent.filters.dataOrigin
+  if (intent.variant === 'owner-document-source') {
+    if (kind !== '施工' || dataOrigin !== 'real' || !isStableRouteIdentity(intent.view))
+      throw new Error('invalid owner document source focus')
+    const ownerTab = intent.filters.ownerTab
+    if (ownerTab !== 'changes' && ownerTab !== 'settlements')
+      throw new Error('invalid owner document source tab')
+    return `${path}?${new URLSearchParams({
+      origin: 'real',
+      contractKind: 'construction',
+      tab: ownerTab,
+      focus: intent.view,
+    }).toString()}`
+  }
   if (intent.variant === 'supplement') {
     if ((kind !== '施工' && kind !== '分包')
       || !isDataOriginDTO(dataOrigin)
@@ -170,7 +188,15 @@ function contractBoqPath(intent: EntityTargetIntent): string {
   const dataOrigin = intent.filters.dataOrigin
   if (typeof projectId !== 'string' || !projectId || contractKind !== '施工' || dataOrigin !== 'real')
     throw new Error('invalid construction contract BOQ context')
-  return `/contract/boq?${new URLSearchParams({ project: projectId, contract: intent.subject.id }).toString()}`
+  const tab = intent.filters.boqTab
+  if (tab != null && tab !== 'lines' && tab !== 'changes' && tab !== 'monthly')
+    throw new Error('invalid construction contract BOQ tab')
+  const query = new URLSearchParams({ project: projectId, contract: intent.subject.id })
+  if (typeof tab === 'string' && tab !== 'lines')
+    query.set('tab', tab)
+  if (intent.view)
+    query.set('focus', intent.view)
+  return `/contract/boq?${query.toString()}`
 }
 
 function receiptPath(intent: EntityTargetIntent): string {
@@ -180,6 +206,14 @@ function receiptPath(intent: EntityTargetIntent): string {
   if (!isDataOriginDTO(dataOrigin) || typeof customerId !== 'string' || !customerId)
     throw new Error('invalid receipt relation context')
   return `${path}?origin=${dataOrigin}&customerId=${encodeURIComponent(customerId)}`
+}
+
+function ownerDocumentPath(intent: EntityTargetIntent): string {
+  const dataOrigin = intent.filters.dataOrigin
+  if (!isDataOriginDTO(dataOrigin) || (intent.variant !== 'change' && intent.variant !== 'report'))
+    throw new Error('invalid owner document detail context')
+  const path = entityPath(`/owner/${intent.variant}`, intent)
+  return `${path}?origin=${dataOrigin}`
 }
 
 function quantityUnitPath(intent: EntityTargetIntent): string {
@@ -220,7 +254,10 @@ const TARGET_REGISTRY = {
   'worker:detail': workerPath,
   'contract:detail': contractPath,
   'contract:supplement': contractPath,
+  'contract:owner-document-source': contractPath,
   'contract:boq': contractBoqPath,
+  'owner-document:change': ownerDocumentPath,
+  'owner-document:report': ownerDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
@@ -328,6 +365,14 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
+    if (options.returnTo && (key === 'project:detail' || key === 'customer:detail'
+      || key === 'contract:detail' || key === 'contract:owner-document-source')) {
+      const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (ownerReturnTo) {
+        const separator = to.includes('?') ? '&' : '?'
+        to = `${to}${separator}returnTo=${encodeURIComponent(ownerReturnTo)}`
+      }
+    }
     if (key === 'contract:supplement' && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
       const dataOrigin = entityIntent.filters.dataOrigin
@@ -358,6 +403,16 @@ export function resolveNavigationTarget(
       const returnTo = validateMaterialContractDetailJourneyReturnTo(options.returnTo, intent.filters.dataOrigin)
       if (returnTo)
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
+    }
+    if ((key === 'owner-document:change' || key === 'owner-document:report') && options.returnTo) {
+      const entityIntent = intent as EntityTargetIntent
+      const kind = key === 'owner-document:change' ? 'owner_change' : 'owner_report'
+      const returnTo = validateOwnerDocumentJourneyReturnTo(options.returnTo, kind, entityIntent.filters.dataOrigin)
+      if (returnTo) {
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
+        if (isOwnerDocumentReturnContextId(options.returnContextId))
+          to = `${to}&returnContext=${encodeURIComponent(options.returnContextId)}`
+      }
     }
     if (options.returnTo && (key === 'crew:detail'
       || key === 'worker:detail'

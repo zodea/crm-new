@@ -81,14 +81,27 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it('甲方单据中央只读详情未闭合前不进入现有写态路由', () => {
+  it('仅为 DOC01 两类甲方单据按稳定 ID 进入中央只读详情，其他种类仍不猜路由', () => {
+    const returnTo = '/owner/change?search=%E6%A1%A5%E6%9E%B6&origin=real&nav=origin_323#owner-document-row-real%3Aowner_change%3Achange-1'
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'owner-document', id: 'change-1', label: '变更一', no: 'BG-001' },
+      variant: 'change',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, { returnTo, returnContextId: 'origin_323' })).toEqual({
+      state: 'resolved',
+      label: '变更一',
+      to: `/owner/change/change-1?origin=real&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_323`,
+    })
+
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
       subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-1', label: '竣工结算一', no: 'JS-001' },
       variant: 'detail',
       view: null,
       filters: { dataOrigin: 'real', documentKind: 'final-settlement' },
-    })).toMatchObject({ state: 'not-connected', label: '竣工结算一' })
+    })).toMatchObject({ state: 'unverified-target', label: '竣工结算一' })
   })
 
   it('施工合同 BOQ 只按正式项目与合同稳定 ID 进入专属工作台', () => {
@@ -106,6 +119,46 @@ describe('唯一 Target Registry', () => {
     })
     expect(resolveNavigationTarget({ ...intent, filters: { ...intent.filters, dataOrigin: 'demo' } }))
       .toMatchObject({ state: 'error' })
+
+    expect(resolveNavigationTarget({
+      ...intent,
+      view: 'change-source-323',
+      filters: { ...intent.filters, boqTab: 'changes' },
+    })).toMatchObject({
+      state: 'resolved',
+      to: '/contract/boq?project=project-320&contract=contract-320&tab=changes&focus=change-source-323',
+    })
+  })
+
+  it('从甲方商务单据下钻项目、客户或合同时保留原详情返回链', () => {
+    const returnTo = '/owner/report/report-323?origin=real&returnTo=%2Fproject%2Fproject-323%3Forigin%3Dreal'
+    const resolved = resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'customer', id: 'customer-323', label: '甲方客户', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, { returnTo })
+    expect(resolved).toEqual({
+      state: 'resolved',
+      label: '甲方客户',
+      to: `/base/customer/customer-323?origin=real&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+  })
+
+  it('甲方单据来源进入中央施工合同事实行，并保留原详情返回链', () => {
+    const returnTo = '/owner/report/report-323?origin=real'
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
+      variant: 'owner-document-source',
+      view: 'report-323',
+      filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'settlements' },
+    }, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '施工合同',
+      to: `/contract/contract-323?origin=real&contractKind=construction&tab=settlements&focus=report-323&returnTo=${encodeURIComponent(returnTo)}`,
+    })
   })
 
   it('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {

@@ -7,7 +7,7 @@ interface FilterOption {
   count?: number
 }
 
-defineProps<{
+withDefaults(defineProps<{
   title: string
   subtitle: string
   createLabel: string
@@ -18,7 +18,10 @@ defineProps<{
   projectOptions: FilterOption[]
   typeOptions: FilterOption[]
   views: FilterOption[]
-}>()
+  canCreate?: boolean
+}>(), {
+  canCreate: true,
+})
 
 const emit = defineEmits<{
   create: []
@@ -82,7 +85,7 @@ const view = defineModel<string>('view', { required: true })
             aria-hidden="true"
           />
         </Button>
-        <Button variant="accent" @click="emit('create')">
+        <Button v-if="canCreate" variant="accent" @click="emit('create')">
           <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
           {{ createLabel }}
         </Button>

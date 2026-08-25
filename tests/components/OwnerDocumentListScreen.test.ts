@@ -12,6 +12,9 @@ import {
 } from 'vue'
 import OwnerDocumentListScreen from '~/components/owner-document/OwnerDocumentListScreen.vue'
 
+const runtime = vi.hoisted(() => ({ desktop: true }))
+vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
+
 const listRows: OwnerDocumentListRecord[] = [
   {
     id: 'change-1',
@@ -21,6 +24,13 @@ const listRows: OwnerDocumentListRecord[] = [
     projectName: '合和新城',
     contractId: 'contract-1',
     contractName: '合和新城施工合同',
+    contractNavigation: {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-1', label: '合和新城施工合同', no: 'SG-001' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real', contractKind: '施工' },
+    },
     supplierId: null,
     supplierName: '',
     crewId: null,
@@ -47,7 +57,10 @@ const ToolbarStub = defineComponent({
         'onChange': (input: Event) =>
           emit(event, (input.target as HTMLSelectElement).value),
       }, options.map(option => h('option', { value: option.key }, option.label)))
-    return () => h('section', { 'data-ui': 'owner-document-list-toolbar' }, [
+    return () => h('section', {
+      'data-ui': 'owner-document-list-toolbar',
+      'data-views': JSON.stringify(props.views),
+    }, [
       h('h1', props.title),
       select('项目', props.project, props.projectOptions, 'update:project'),
       select('类型', props.type, props.typeOptions, 'update:type'),
@@ -60,7 +73,7 @@ const KitTableStub = defineComponent({
   inheritAttrs: false,
   props: ['columns', 'data', 'empty', 'page'],
   emits: ['emptyAction'],
-  setup(props, { attrs, emit }) {
+  setup(props, { attrs, emit, slots }) {
     return () => h('section', {
       ...attrs,
       'aria-label': '业务单据宽表',
@@ -71,7 +84,10 @@ const KitTableStub = defineComponent({
     }, [
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
         h('span', { role: 'columnheader' }, column.title))),
-      ...(props.data as any[]).map(row => h('div', { role: 'row' }, `${row.no} ${row.name}`)),
+      ...(props.data as any[]).map(row => h('div', { role: 'row' }, [
+        `${row.no} ${row.name}`,
+        slots.contract?.({ row }),
+      ])),
       ...(props.data as any[]).length === 0
         ? [h('div', { 'role': 'status', 'aria-label': props.empty.title }, [
             props.empty.title,
@@ -88,6 +104,9 @@ const route = {
 }
 const navigateTo = vi.fn()
 const loadKind = vi.fn(async () => listRows)
+let activeRows = listRows
+let centralEmptyReason: 'no-records' | 'no-filter-match' | 'missing-relation' | null = null
+let centralSummary: any = null
 
 const global = {
   components: {
@@ -106,6 +125,10 @@ const global = {
 
 describe('owner document list screen', () => {
   beforeEach(() => {
+    runtime.desktop = true
+    activeRows = listRows
+    centralEmptyReason = null
+    centralSummary = null
     navigateTo.mockReset()
     loadKind.mockClear()
     route.query = { project: 'project-1' }
@@ -120,14 +143,19 @@ describe('owner document list screen', () => {
       error: vi.fn(),
     }))
     vi.stubGlobal('useOwnerDocumentStore', () => ({
-      recordsFor: () => listRows,
+      recordsFor: () => activeRows,
       listLoadingFor: () => false,
       listError: () => '',
       loadKind,
+      centralPageFor: () => ({ page: 1, pageSize: 10, total: 25 }),
+      centralSummaryFor: () => centralSummary,
+      centralCapabilitiesFor: () => ['owner-document:write'],
+      centralEmptyReasonFor: () => centralEmptyReason,
       removeForm: vi.fn(),
       restoreForm: vi.fn(),
     }))
     vi.stubGlobal('useRoute', () => route)
+    vi.stubGlobal('useRouter', () => ({ replace: vi.fn() }))
     vi.stubGlobal('watch', watch)
   })
 
@@ -167,5 +195,79 @@ describe('owner document list screen', () => {
     await fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
     expect((screen.getByRole('combobox', { name: '状态' }) as HTMLSelectElement).value)
       .toBe('approved')
+  })
+
+  it('中央列表把默认状态作为真实查询条件，并以中央总数展示汇总', async () => {
+    runtime.desktop = false
+    route.query = {}
+    render(OwnerDocumentListScreen, {
+      props: { kind: 'owner_change' },
+      global,
+    })
+
+    await vi.waitFor(() => expect(loadKind).toHaveBeenCalledWith('owner_change', expect.objectContaining({
+      status: 'approved',
+      page: 1,
+      pageSize: 20,
+    })))
+    expect(screen.getByRole('status', { name: '甲方变洽签列表汇总' }).textContent).toContain('变更单数：25')
+    expect(screen.getByRole('link', { name: '合和新城施工合同' }).getAttribute('href'))
+      .toBe('/contract/contract-1?origin=real&contractKind=construction')
+  })
+
+  it('中央列表的全部状态计数来自状态分面总和，而非当前状态筛选结果数', () => {
+    runtime.desktop = false
+    route.query = {}
+    centralSummary = {
+      projects: [],
+      contracts: [],
+      statuses: [
+        { value: 'approved', label: '已审定', count: 7 },
+        { value: 'submitted', label: '待核价', count: 2 },
+      ],
+      documentTypes: [],
+      origins: {
+        real: {
+          count: 7,
+          reportedAmount: '0.00',
+          auditedAmount: '0.00',
+          taxInclusiveAmount: '0.00',
+          taxExclusiveAmount: '0.00',
+          appliedTaxExclusiveAmount: '0.00',
+        },
+        demo: {
+          count: 0,
+          reportedAmount: '0.00',
+          auditedAmount: '0.00',
+          taxInclusiveAmount: '0.00',
+          taxExclusiveAmount: '0.00',
+          appliedTaxExclusiveAmount: '0.00',
+        },
+      },
+    }
+
+    render(OwnerDocumentListScreen, {
+      props: { kind: 'owner_change' },
+      global,
+    })
+
+    const views = JSON.parse(document.querySelector('[data-ui="owner-document-list-toolbar"]')?.getAttribute('data-views') ?? '[]')
+    expect(views.find((view: { key: string }) => view.key === 'all')?.count).toBe(9)
+  })
+
+  it('中央默认状态零命中时清除为全部状态，不重复查询同一默认状态', async () => {
+    runtime.desktop = false
+    activeRows = []
+    centralEmptyReason = 'no-filter-match'
+    route.query = {}
+    render(OwnerDocumentListScreen, {
+      props: { kind: 'owner_change' },
+      global,
+    })
+
+    await fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
+    await vi.waitFor(() => expect(loadKind).toHaveBeenLastCalledWith('owner_change', expect.objectContaining({
+      status: null,
+    })))
   })
 })

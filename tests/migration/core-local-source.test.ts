@@ -1,13 +1,18 @@
 import type { CoreMigrationLocalSourceDependencies } from '~/lib/migration/core-local-source'
 import { describe, expect, it, vi } from 'vitest'
-import { LATEST_VERSION } from '~/lib/db/migrations'
+import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { seedIfEmpty } from '~/lib/db/seed'
 import {
+  CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_CONTRACT_VERSION,
   CORE_MIGRATION_SOURCE_MODE,
   CORE_MIGRATION_SOURCE_VERSION,
   CORE_MIGRATION_TOPOLOGY,
 } from '~/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
+import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
+import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
+import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
   if (sql.includes('FROM customers')) {
@@ -67,6 +72,58 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       deleted_at: null,
     }]
   }
+  if (sql.includes('FROM boq_change_orders change_order')) {
+    return [
+      {
+        id: 'change-local-1',
+        name: '既有甲方变更',
+        project_id: 'project-local-1',
+        contract_id: 'construction-local-1',
+        amount: 520,
+        audited_amount: null,
+        tax_exclusive_amount: 480,
+        applied_tax_exclusive_amount: 500,
+        kind: 'owner_change',
+        no: 'BG-LOCAL-001',
+        document_type: 'change_negotiation',
+        source_type: 'boq_change_order',
+        source_locked: 1,
+        period_no: '',
+        application_date: '2026-04-02',
+        status: 'approved',
+        status_note: '甲方已签证',
+        note: '',
+        lines_json: '[{"id":"change-line-local-1","boqLineId":"boq-line-local-1","operation":"qty","itemName":"桥架安装","unit":"m","contractQty":100,"contractUnitPrice":52,"deltaQty":10,"amount":520}]',
+        files_json: '[]',
+        created_at: '2026-04-01T00:00:00.000Z',
+        updated_at: '2026-04-02T00:00:00.000Z',
+        deleted_at: null,
+      },
+      {
+        id: 'report-local-1',
+        name: '2026-06月度报量',
+        project_id: 'project-local-1',
+        contract_id: 'construction-local-1',
+        amount: 4960,
+        audited_amount: 4680,
+        kind: 'owner_report',
+        no: 'BL-LOCAL-001',
+        document_type: 'monthly_statement',
+        source_type: 'monthly_statement',
+        source_locked: 1,
+        period_no: '2026-06',
+        application_date: '2026-07-01',
+        status: 'exported',
+        status_note: '甲方已审定',
+        note: '',
+        lines_json: '[]',
+        files_json: '[]',
+        created_at: '2026-07-01T00:00:00.000Z',
+        updated_at: '2026-07-03T00:00:00.000Z',
+        deleted_at: null,
+      },
+    ]
+  }
   if (sql.includes('FROM contracts c')) {
     return [{
       id: 'construction-local-1',
@@ -79,6 +136,8 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       status: '履约中',
       sign_date: '2026-01-01',
       actual_completion_date: null,
+      boq_catalog_json: '[{"id":"boq-line-without-history","itemName":"未变更管线","unit":"m","qty":40,"unitPrice":30}]',
+      monthly_quantity_facts_json: '[{"periodNo":"2026-09","boqLineId":"boq-line-without-history","autoQty":12,"missingQtyCount":0,"quantityBasis":"field","sourceVersion":"migration-field-2026-09-v1","sourceUpdatedAt":"2026-09-20T08:00:00.000Z"}]',
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-08-24T00:00:00.000Z',
       deleted_at: null,
@@ -163,6 +222,7 @@ describe('core migration local source', () => {
           construction_contracts: 1,
           subcontract_contracts: 1,
           contract_supplements: 1,
+          owner_documents: 2,
           workers: 1,
           project_suppliers: 1,
         },
@@ -172,6 +232,7 @@ describe('core migration local source', () => {
           { entityType: 'construction_contracts', metric: 'amount', expected: '320000.00' },
           { entityType: 'subcontract_contracts', metric: 'amount', expected: '180000.00' },
           { entityType: 'contract_supplements', metric: 'amount', expected: '8000.00' },
+          { entityType: 'owner_documents', metric: 'amount', expected: '5480.00' },
         ],
       },
     })
@@ -204,7 +265,13 @@ describe('core migration local source', () => {
       legacyId: 'construction-local-1',
       references: { projectId: 'project-local-1', customerId: 'customer-local-1' },
       amount: '320000.00',
-      attributes: { no: 'SG-001', signDate: '2026-01-01', actualCompletionDate: null },
+      attributes: {
+        no: 'SG-001',
+        signDate: '2026-01-01',
+        actualCompletionDate: null,
+        boqCatalogJson: '[{"id":"boq-line-without-history","itemName":"未变更管线","unit":"m","qty":40,"unitPrice":30}]',
+        monthlyQuantityFactsJson: '[{"periodNo":"2026-09","boqLineId":"boq-line-without-history","autoQty":12,"missingQtyCount":0,"quantityBasis":"field","sourceVersion":"migration-field-2026-09-v1","sourceUpdatedAt":"2026-09-20T08:00:00.000Z"}]',
+      },
     })
     expect(first.entities.subcontract_contracts[0]).toMatchObject({
       legacyId: 'subcontract-local-1',
@@ -218,8 +285,247 @@ describe('core migration local source', () => {
       amount: '8000.00',
       attributes: { no: 'BC-001', signDate: '2026-03-01', status: '有效' },
     })
+    expect(first.entities.owner_documents).toEqual([
+      expect.objectContaining({
+        legacyId: 'change-local-1',
+        references: { projectId: 'project-local-1', contractId: 'construction-local-1' },
+        amount: '520.00',
+        attributes: expect.objectContaining({
+          kind: 'owner_change',
+          sourceType: 'boq_change_order',
+          sourceLocked: 1,
+          taxExclusiveAmount: 480,
+          appliedTaxExclusiveAmount: 500,
+        }),
+      }),
+      expect.objectContaining({
+        legacyId: 'report-local-1',
+        amount: '4960.00',
+        attributes: expect.objectContaining({
+          kind: 'owner_report',
+          auditedAmount: 4680,
+        }),
+      }),
+    ])
     expect(Object.values(first.entities).flat().map(row => row.legacyId))
       .toContain('customer_demo_001')
+  })
+
+  it('迁移已签证新增项时优先导出结果 BOQ 稳定 ID 与结果量价', async () => {
+    const deps = dependencies()
+    const source = createCoreMigrationLocalSource(deps)
+
+    await source.readSource()
+
+    const ownerQuery = vi.mocked(deps.select).mock.calls.map(([sql]) => sql).find(sql => sql.includes('FROM boq_change_orders change_order'))
+    expect(ownerQuery).toContain('\'boqLineId\', COALESCE(change_line.result_boq_line_id, change_line.boq_line_id)')
+    expect(ownerQuery).toContain('LEFT JOIN boq_lines boq_line ON boq_line.id = COALESCE(change_line.result_boq_line_id, change_line.boq_line_id)')
+  })
+
+  it('施工合同快照同时导出完整 BOQ 目录与无单据新期次完成量事实', async () => {
+    const deps = dependencies()
+    await createCoreMigrationLocalSource(deps).readSource()
+
+    const contractQuery = vi.mocked(deps.select).mock.calls.map(([sql]) => sql).find(sql => sql.includes('WHERE c.kind = \'施工\''))
+    expect(contractQuery).toContain('boq_catalog_json')
+    expect(contractQuery).toContain('monthly_quantity_facts_json')
+    expect(contractQuery).toContain('FROM unit_stage_completions usc')
+    expect(contractQuery).toContain('substr(usc.completed_at, 1, 7)')
+  })
+
+  it('完整 BOQ 与月度事实查询可在最新 SQLite schema 上执行', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await seedIfEmpty(db)
+
+      const result = await createCoreMigrationLocalSource(dependencies({
+        select: async sql => sql.includes('FROM boq_change_orders change_order')
+          ? []
+          : db.select(sql),
+      })).readSource()
+      const constructionContract = result.entities.construction_contracts
+        .find(row => row.legacyId === 'con_demo_sg01')
+
+      expect(constructionContract).toBeDefined()
+      expect(JSON.parse(String(constructionContract?.attributes?.boqCatalogJson)))
+        .toEqual(expect.arrayContaining([
+          expect.objectContaining({ id: 'boq_line_demo_a_pipe', itemName: '给排水管安装' }),
+        ]))
+      expect(JSON.parse(String(constructionContract?.attributes?.monthlyQuantityFactsJson)))
+        .toEqual(expect.any(Array))
+    }
+    finally {
+      db.close()
+    }
+  })
+
+  it('sqlite 本地写入时间经 ISO 规范化后可完成甲方单据受控迁移', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-local-323', '迁移甲方')`)
+      await db.execute(`
+        INSERT INTO projects (id, name, customer_id)
+        VALUES ('project-local-323', '迁移项目', 'customer-local-323')
+      `)
+      await db.execute(`
+        INSERT INTO contracts (id, no, name, kind, project_id, customer_id, status)
+        VALUES (
+          'contract-local-323', 'SG-LOCAL-323', '迁移施工合同', '施工',
+          'project-local-323', 'customer-local-323', '履约中'
+        )
+      `)
+      await db.execute(`
+        INSERT INTO boq_files (id, contract_id, file_name, parse_status)
+        VALUES ('boq-file-local-323', 'contract-local-323', '迁移清单.xlsx', 'parsed')
+      `)
+      await db.execute(`
+        INSERT INTO boq_lines (
+          id, boq_file_id, project_id, contract_id, item_name, unit, qty, unit_price, sort_order
+        )
+        VALUES (
+          'boq-line-local-323', 'boq-file-local-323', 'project-local-323', 'contract-local-323',
+          '给排水管安装', 'm', 100, 52, 1
+        )
+      `)
+      await db.execute(`INSERT INTO crews (id, name) VALUES ('crew-local-323', '迁移班组')`)
+      await db.execute(`
+        INSERT INTO buildings (id, project_id, code, name)
+        VALUES ('building-local-323', 'project-local-323', '1', '1栋')
+      `)
+      await db.execute(`
+        INSERT INTO floors (id, building_id, code, name)
+        VALUES ('floor-local-323', 'building-local-323', '1', '1层')
+      `)
+      await db.execute(`
+        INSERT INTO house_type_templates (id, project_id, code, name)
+        VALUES ('template-local-323', 'project-local-323', 'A', 'A户型')
+      `)
+      await db.execute(`
+        INSERT INTO units (id, floor_id, house_type_template_id, code, name)
+        VALUES ('unit-local-323', 'floor-local-323', 'template-local-323', '101', '101户')
+      `)
+      await db.execute(`
+        INSERT INTO rooms (id, template_id, code, name)
+        VALUES ('room-local-323', 'template-local-323', 'kitchen', '厨房')
+      `)
+      await db.execute(`
+        INSERT INTO items (id, project_id, code, name, trade, unit)
+        VALUES ('item-local-323', 'project-local-323', 'W001', '给排水管安装', '给排水', 'm')
+      `)
+      await db.execute(`
+        INSERT INTO house_type_template_items (
+          id, room_id, item_id, field_qty, boq_line_id, sort_order
+        )
+        VALUES (
+          'template-item-local-323', 'room-local-323', 'item-local-323',
+          12, 'boq-line-local-323', 1
+        )
+      `)
+      await db.execute(`
+        INSERT INTO construction_stages (id, project_id, code, name, trade)
+        VALUES ('stage-local-323', 'project-local-323', 'water', '给排水安装', '给排水')
+      `)
+      await db.execute(`
+        INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage)
+        VALUES ('stage-item-local-323', 'stage-local-323', 'item-local-323', 1)
+      `)
+      await db.execute(`
+        INSERT INTO unit_assignments (id, unit_id, trade, crew_id)
+        VALUES ('assignment-local-323', 'unit-local-323', '给排水', 'crew-local-323')
+      `)
+      await db.execute(`
+        INSERT INTO unit_stage_completions (
+          id, unit_id, stage_id, assignment_id, status, completed_at
+        )
+        VALUES (
+          'completion-local-323', 'unit-local-323', 'stage-local-323',
+          'assignment-local-323', 'completed', '2026-08-24'
+        )
+      `)
+      await db.execute(`
+        INSERT INTO owner_change_orders (
+          id, project_id, contract_id, change_no, name, document_type,
+          application_date, approval_date, status, source_type, source_locked,
+          tax_inc_amount, tax_exc_amount, applied_amount
+        )
+        VALUES (
+          'owner-change-local-323', 'project-local-323', 'contract-local-323',
+          'BG-LOCAL-323', '真实 SQLite 变洽签', 'change_negotiation',
+          '2026-08-24', '2026-08-25', 'approved', 'manual', 0,
+          520, 480, 500
+        )
+      `)
+      const [stored] = await db.select<{ created_at: string, updated_at: string }>(`
+        SELECT created_at, updated_at
+        FROM owner_change_orders
+        WHERE id = 'owner-change-local-323'
+      `)
+      expect(stored?.created_at).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)
+
+      const migrationSource = await createCoreMigrationLocalSource(dependencies({
+        select: sql => db.select(sql),
+      })).readSource()
+      const ownerDocument = migrationSource.entities.owner_documents[0]
+      expect(ownerDocument?.attributes).toMatchObject({
+        createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
+        updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
+      })
+      const constructionContract = migrationSource.entities.construction_contracts[0]
+      expect(JSON.parse(String(constructionContract?.attributes?.monthlyQuantityFactsJson)))
+        .toContainEqual(expect.objectContaining({
+          periodNo: '2026-08',
+          boqLineId: 'boq-line-local-323',
+          sourceUpdatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
+        }))
+
+      const commands = createOwnerCommercialDocumentCommandTestInstance()
+      const core = createCoreMigrationTestInstance({
+        createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+        now: () => '2026-08-25T12:00:00.000Z',
+        afterConfirm: snapshot => commands.synchronizeMigrationSnapshot(snapshot),
+      })
+      const migrationSession = {
+        workspaceId: 'workspace-local-source-323',
+        actorId: 'actor-local-source-323',
+        capabilities: [CORE_MIGRATION_CAPABILITY, 'owner-document:read', 'owner-document:write'],
+      }
+      const envelope = (commandId: string) => ({
+        workspaceId: migrationSession.workspaceId,
+        actorId: migrationSession.actorId,
+        requiredCapability: CORE_MIGRATION_CAPABILITY,
+        commandId,
+      })
+      await core.preflight({ ...envelope('preflight-local-source-323'), source: migrationSource, backup: null }, migrationSession)
+      const snapshotSha256 = 'e'.repeat(64)
+      const dryRun = await core.dryRun({
+        ...envelope('dry-run-local-source-323'),
+        source: migrationSource,
+        backup: {
+          backupId: `core-migration-${migrationSource.sourceHash}-${snapshotSha256}`,
+          sourceHash: migrationSource.sourceHash,
+          sourceVersion: migrationSource.sourceVersion,
+          snapshotSha256,
+          byteLength: 323,
+          createdAt: '2026-08-25T12:00:00.000Z',
+          immutable: true,
+        },
+      }, migrationSession)
+      await core.importBatch({ ...envelope('import-local-source-323'), batchId: dryRun.batchId }, migrationSession)
+      await expect(core.confirm({
+        ...envelope('confirm-local-source-323'),
+        batchId: dryRun.batchId,
+      }, migrationSession)).resolves.toMatchObject({ status: 'confirmed' })
+      expect(commands.rows()).toContainEqual(expect.objectContaining({
+        kind: 'owner_change',
+        no: 'BG-LOCAL-323',
+        name: '真实 SQLite 变洽签',
+      }))
+    }
+    finally {
+      db.close()
+    }
   })
 
   it('遇到无法定位的正式行时显式阻断，不静默丢弃', async () => {
@@ -394,6 +700,7 @@ describe('core migration local source', () => {
       'construction_contracts',
       'subcontract_contracts',
       'contract_supplements',
+      'owner_documents',
       'workers',
       'project_suppliers',
     ])

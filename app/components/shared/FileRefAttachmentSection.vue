@@ -17,6 +17,7 @@ defineProps<{
   title?: string
   note: string
   noteReadonly?: boolean
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -43,7 +44,7 @@ function inputValue(event: Event): string {
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title ?? '附件与备注'" />
     <button
-      v-if="desktopPicker"
+      v-if="!readonly && desktopPicker"
       type="button"
       class="mt-3 flex min-h-24 w-full cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
       data-testid="finance-attachment-picker"
@@ -54,7 +55,7 @@ function inputValue(event: Event): string {
       <span class="mt-0.5 text-11px text-ink-faint">桌面端保存可重新打开的本机路径</span>
     </button>
     <label
-      v-else
+      v-else-if="!readonly"
       class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
     >
       <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
@@ -85,6 +86,7 @@ function inputValue(event: Event): string {
         <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
         <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
         <button
+          v-if="!readonly"
           type="button"
           class="text-11px"
           :class="file.deletedAt ? 'text-brand' : 'text-danger'"
@@ -105,11 +107,13 @@ function inputValue(event: Event): string {
         <span class="min-w-36 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
         <input
           :value="file.category"
+          :disabled="readonly"
           class="field-input h-7 w-36 text-11px"
           aria-label="附件分类"
           @input="emit('patchPending', file.localId, { category: inputValue($event) })"
         >
         <button
+          v-if="!readonly"
           type="button"
           class="text-11px text-danger"
           @click="emit('removePending', file.localId)"
@@ -124,7 +128,7 @@ function inputValue(event: Event): string {
       <textarea
         :value="note"
         rows="4"
-        :disabled="noteReadonly"
+        :disabled="readonly || noteReadonly"
         class="field-input w-full"
         placeholder="补充说明"
         @input="emit('updateNote', inputValue($event))"

@@ -6,7 +6,7 @@
 >
 > 历史来源：[#181](https://github.com/zodea/crm-new/issues/181)、[#182](https://github.com/zodea/crm-new/issues/182)
 >
-> 核对日期：2026-08-15
+> 核对日期：2026-08-25
 
 本文是全部生产 Nuxt 路由的运行态参考证据登记册，不是第二份页面规格。字段、业务规则和数据关系仍以 `docs/rewrite/pages/`、`DATABASE.md`、`CONTEXT.md` 为准；实际实现状态仍看 `ui-implementation-status.md`。
 
@@ -114,13 +114,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 136 / 5 / 131 |
+| 跟踪页面文件 / dev / 生产路由 | 137 / 5 / 132 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 131 / 131 |
+| 证据行 / 唯一参考端点 | 132 / 132 |
 | 参考证据档案 / 被路由使用 | 37 / 32 |
-| 直接 / 邻近 / 本地权威 | 52 / 18 / 18 |
+| 直接 / 邻近 / 本地权威 | 52 / 18 / 19 |
 | 历史证据 / 未验证目标 | 34 / 9 |
-| 设计已覆盖 / 待补设计 | 129 / 2 |
+| 设计已覆盖 / 待补设计 | 130 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
@@ -131,7 +131,7 @@
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲方单据 | 3 | [#283](https://github.com/zodea/crm-new/issues/283)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分包单据 | 6 | [#295](https://github.com/zodea/crm-new/issues/295)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -230,7 +230,8 @@
 | `app/pages/material/use/[id].vue` | `/material/use/:id` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/material/use/index.vue` | `/material/use` | 自购材 | 列表 | #199 | R-MATERIAL-FLOW-LIVE | 参考领用专属列含类型、项目、出库日、分供方、仓库、领料人、班组/班组合同、出库金额和非班组说明；当前通用列表只有材料/对象、编号、项目、数量、日期、状态 | 编号应先进入只读详情，项目/仓库/班组/班组合同和采购来源按真实 ID 下钻；当前直接进入编辑态，仓库仍是文本，也没有合同或入库批次来源 | C-DENSE |
 | `app/pages/material/use/new.vue` | `/material/use/new` | 自购材 | 整页表单 | #199 | R-FORM-PRIOR | 待 #199 同屏测量 | 写入路径保持现有契约 | C-FORM |
-| `app/pages/owner/[kind]/[id].vue` | `/owner/:kind/:id` | 甲方单据 | 整页表单 | #197 | R-OWNER-DOCUMENTS-LIVE | 参考甲方报量编号先进入只读详情，详情有摘要、审批轨迹、五个业务页签、分段资料、附件以及项目/合同/甲方蓝链；当前本地 `/:id` 直接进入编辑表单，其余类型详情尚无直接证据 | 需要把查看态与编辑动作显式分开；写入仍沿本地状态机，详情关系下钻和返回使用受限来源上下文，不能丢列表筛选或从参考推断审批写动作 | C-FORM |
+| `app/pages/owner/[kind]/[id].vue` | `/owner/:kind/:id` | 甲方单据 | 详情 | #323 | R-OWNER-DOCUMENTS-LIVE | 参考甲方报量编号先进入只读详情，详情有摘要、审批轨迹、分段资料、附件以及项目/合同/甲方蓝链；#323 按已持久化事实收口变洽签/月度报量 | change/report 使用中央只读详情，量价、审批摘要、附件和关系只按稳定 ID 读取；其他甲方类型不因此冒充闭合 | C-FORM |
+| `app/pages/owner/[kind]/form/[id].vue` | `/owner/:kind/form/:id` | 甲方单据 | 整页表单 | #323 | R-OWNER-DOC-DC | DC 的 `OwnerChangeForm` / `OwnerReportForm` 规定两类专属字段、量价明细、附件与固定底栏 | 正式编辑与只读详情分路由；保存只经中央 command，演示及受保护状态不显示写入口 | C-FORM |
 | `app/pages/owner/[kind]/index.vue` | `/owner/:kind` | 甲方单据 | 列表 | #197 | R-OWNER-DOCUMENTS-LIVE | 参考六类入口分别保留专属金额链、日期、甲方/合同、附件、审批列及汇总；当前本地五类路由已有真实实体筛选和局部横滚，但列投影较窄，验收/保修合并为同实体单路由 | 保持 `project_acceptances` 连续生命周期不复制数据；实施票再裁定同路由双视图或别名路由。编号进入只读详情，来源/搜索/类型/状态/页码往返可恢复 | C-DENSE |
 | `app/pages/owner/[kind]/new.vue` | `/owner/:kind/new` | 甲方单据 | 整页表单 | #197 | R-OWNER-DOC-DC | 新建页按动态类型显示真实标题、字段分区、金额摘要、必要明细和附件区，不使用通用占位标题 | 项目与施工合同只选择真实关联记录；草稿和提交分别执行本地校验与保存语义 | C-FORM |
 | `app/pages/owner-material/arrival/[id].vue` | `/owner-material/arrival/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，未能安全观察详情；当前 `/:id` 直接进入编辑表单 | 增加独立只读详情，源单/项目/分供方/送货单/仓库只按真实 ID 下钻；编辑仍由明确动作进入现有整页表单 | C-FORM |

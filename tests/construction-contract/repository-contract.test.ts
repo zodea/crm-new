@@ -201,11 +201,21 @@ describe('施工合同中央 Repository contract', () => {
       variant: 'supplement',
       view: 'supplement-1',
     })
-    expect(detail.sections.changes[0]?.navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
+    expect(detail.sections.changes[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { entity: 'owner-document', id: 'change-1' },
+      variant: 'change',
+      filters: { dataOrigin: 'real' },
+    })
     expect(detail.sections.settlements).toEqual({
       monthlyStatements: [expect.objectContaining({ id: 'statement-1' })],
       finalSettlements: [],
       penalties: [],
+    })
+    expect(detail.sections.settlements.monthlyStatements[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { entity: 'owner-document', id: 'statement-1' },
+      variant: 'report',
     })
     expect(detail.sections.invoices).toEqual({
       applications: [expect.objectContaining({ id: 'invoice-app-1' })],
@@ -257,7 +267,6 @@ describe('施工合同中央 Repository contract', () => {
       sourceVersion: 'construction-contract-v3',
       capabilities: ['construction-contract:read'],
     })
-
     expect(() => build('supplement-other-contract')).toThrowError(/补充协议与施工合同不匹配/)
     expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
   })
@@ -267,5 +276,42 @@ describe('施工合同中央 Repository contract', () => {
       origin: 'real',
       focusId: '\0',
     })).toThrowError(/查询参数无效/)
+  })
+
+  it('允许按稳定业务单据 ID 聚焦合同内的变洽签与月度报量', () => {
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      changes: [{
+        dataOrigin: 'real',
+        id: 'change-323',
+        contractId: 'construction-contract-1',
+        no: 'BG-323',
+        name: '甲方变洽签',
+        amount: 323,
+        date: '2026-08-25',
+        status: '已上报',
+      }],
+      monthlyStatements: [{
+        dataOrigin: 'real',
+        id: 'report-323',
+        contractId: 'construction-contract-1',
+        no: 'BL-323',
+        name: '月度报量',
+        amount: 292,
+        date: '2026-08-25',
+        status: '已申报',
+      }],
+    }
+    const build = (focusId: string) => buildConstructionContractDetail({
+      contracts: [source()],
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', { origin: 'real', focusId }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(build('change-323').sections.changes[0]?.id).toBe('change-323')
+    expect(build('report-323').sections.settlements.monthlyStatements[0]?.id).toBe('report-323')
   })
 })

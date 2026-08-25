@@ -3,6 +3,7 @@ import type { ConstructionContractDetailReadDTO } from '~/lib/construction-contr
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -36,11 +37,15 @@ const activeTab = computed({
   get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
   set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value, focus: undefined } }),
 })
-const focusId = computed(() => route.query.tab === 'supplements'
+const focusId = computed(() => ['supplements', 'changes', 'settlements'].includes(String(route.query.tab ?? ''))
   && typeof route.query.focus === 'string'
   ? route.query.focus
   : null)
-const returnTo = computed(() => validateConstructionContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/construction')
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
+const returnTo = computed(() => ownerDocumentReturnTo.value
+  ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
+  ?? '/contract/construction')
+const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
 const boqTo = computed(() => {
   const current = detail.value
@@ -117,7 +122,7 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
       :title="detail?.contract.name ?? '施工合同详情'"
       :subtitle="detail?.contract.no || '编号未填写'"
       :back-to="returnTo"
-      back-label="返回施工合同列表"
+      :back-label="backLabel"
       :state="shellState"
       :state-title="stateTitle"
       :state-description="problem?.message ?? ''"
@@ -211,11 +216,11 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
           <SectionHeader title="补充合同" subtitle="深链聚焦真实补充协议，不保留无目标蓝字" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
         </section>
         <section v-else-if="activeTab === 'changes'" class="panel min-w-0 overflow-hidden p-4">
-          <SectionHeader title="甲方变洽签" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" />
+          <SectionHeader title="甲方变洽签" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" :focus-id="focusId" :return-to="route.fullPath" />
         </section>
         <section v-else-if="activeTab === 'settlements'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="月度报量" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" />
+            <SectionHeader title="月度报量" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
             <SectionHeader title="验收与最终结算" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无验收或最终结算" />

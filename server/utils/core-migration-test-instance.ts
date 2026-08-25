@@ -29,6 +29,7 @@ import {
 } from '../../app/lib/migration/core-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -101,6 +102,10 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
       target: ['construction_contracts', 'subcontract_contracts'],
       orphanWhenMissing: true,
     },
+  ],
+  owner_documents: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'contractId', target: 'construction_contracts', orphanWhenMissing: true },
   ],
   workers: [
     { field: 'crewId', target: 'crews' },
@@ -963,13 +968,16 @@ export const coreMigrationTestInstance = createCoreMigrationTestInstance({
   afterConfirm: (snapshot) => {
     constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
     subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
   },
   afterRollback: (snapshot) => {
     constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
     subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
   },
   afterReset: (snapshot) => {
     constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
     subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
+    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
   },
 })

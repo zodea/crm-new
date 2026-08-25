@@ -273,7 +273,16 @@ function factNavigation(
       filters: { dataOrigin: source.dataOrigin, customerId },
     }
   }
-  // 甲方单据和开票申请当前只有写态页面；中央只读目标未闭合前保留事实文本，禁止借编辑表单冒充详情。
+  if (kind === 'change' || kind === 'report') {
+    return {
+      kind: 'entity-detail',
+      subject: resolvedRef('owner-document', row.id, row.name, row.no || null),
+      variant: kind,
+      view: null,
+      filters: { dataOrigin: source.dataOrigin },
+    }
+  }
+  // 其他甲方单据和开票申请当前只有写态页面；中央只读目标未闭合前保留事实文本。
   return { kind: 'unavailable', reason: 'unverified-target' }
 }
 
@@ -311,12 +320,23 @@ export function buildConstructionContractDetail(
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '该合同不是施工合同'))
   }
   if (input.query.focusId) {
-    const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
-    if (!supplement) {
-      throw new ConstructionContractRepositoryProblem(constructionContractProblem('not-found', '补充协议不存在或已删除'))
+    const focusFact = [
+      input.facts.supplements,
+      input.facts.changes,
+      input.facts.monthlyStatements,
+      input.facts.finalSettlements,
+      input.facts.penalties,
+      input.facts.invoiceApplications,
+      input.facts.invoiceRegistrations,
+      input.facts.receipts,
+      input.facts.acceptances,
+      input.facts.warranties,
+    ].flat().find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
+    if (!focusFact) {
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('not-found', '补充协议不存在或聚焦业务单据已删除'))
     }
-    if (supplement.contractId !== source.id) {
-      throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '补充协议与施工合同不匹配'))
+    if (focusFact.contractId !== source.id) {
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '补充协议与施工合同不匹配，或聚焦业务单据不属于当前合同'))
     }
   }
   const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)

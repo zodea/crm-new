@@ -1,4 +1,10 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
+import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
+import type {
+  OwnerCommercialDocumentListItemDTO,
+  OwnerCommercialDocumentListQueryDTO,
+  OwnerCommercialDocumentListSummaryDTO,
+} from '~/lib/owner-document/central-repository'
 import type {
   AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
@@ -7,8 +13,19 @@ import type {
   OwnerDocumentSaveAction,
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
+import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
+import {
+  completeOwnerDocumentCommandIntent,
+  ownerDocumentCommandId,
+} from '~/lib/owner-document/command-intent'
+import {
+  advanceOwnerDocumentFormVersion,
+  initializeOwnerDocumentFormVersion,
+  requireOwnerDocumentFormVersion,
+  withOwnerDocumentFormVersion,
+} from '~/lib/owner-document/form-version'
 import {
   approveOwnerChange,
   auditOwnerReport,
@@ -30,19 +47,124 @@ import {
 } from '~/lib/owner-document/forms'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
+  const usesCentralBrowser = import.meta.client && !isTauri()
+  const isCentralKind = (kind: OwnerDocumentKind): kind is 'owner_change' | 'owner_report' =>
+    kind === 'owner_change' || kind === 'owner_report'
+  function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
+    return withOwnerDocumentFormVersion(form.draft, form.version)
+  }
+
+  function centralBaseVersion(draft: OwnerDocumentDraft): string {
+    return requireOwnerDocumentFormVersion(draft)
+  }
+
+  function centralRepositories() {
+    return useNuxtApp().$repositories
+  }
+
+  async function centralContext() {
+    return centralRepositories().ownerCommercialDocumentCommands.context()
+  }
+
+  async function centralForm(kind: 'owner_change' | 'owner_report', id: string) {
+    return centralRepositories().ownerCommercialDocumentCommands.loadForm(kind, id)
+  }
+
+  async function centralCommand(
+    kind: 'owner_change' | 'owner_report',
+    id: string | null,
+    baseVersion: string | null,
+    values: Record<string, unknown>,
+    commandId = `owner-document-${crypto.randomUUID()}`,
+  ) {
+    const context = await centralContext()
+    return centralRepositories().ownerCommercialDocumentCommands.execute({
+      workspaceId: context.workspaceId,
+      actorId: context.actorId,
+      requiredCapability: 'owner-document:write',
+      commandId,
+      kind,
+      id,
+      baseVersion,
+      ...values,
+    } as OwnerCommercialDocumentCommandRequestDTO)
+  }
+
+  function centralListRecord(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
+    const itemAmounts = item.amounts.kind === 'owner_change'
+      ? {
+          amount: Number(item.amounts.taxInclusive),
+          secondaryAmount: Number(item.amounts.taxExclusive),
+          tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
+        }
+      : {
+          amount: Number(item.amounts.reported),
+          secondaryAmount: Number(item.amounts.audited ?? 0),
+          tertiaryAmount: Number(item.amounts.difference ?? 0),
+        }
+    return {
+      id: item.id,
+      no: item.no,
+      name: item.name,
+      projectId: item.project.state === 'resolved' ? item.project.id : null,
+      projectName: item.project.state === 'resolved' ? item.project.label : '',
+      contractId: item.contract.state === 'resolved' ? item.contract.id : null,
+      contractName: item.contract.state === 'resolved' ? item.contract.label : '',
+      supplierId: null,
+      supplierName: '',
+      crewId: null,
+      crewName: '',
+      type: item.documentType,
+      period: item.periodNo,
+      ...itemAmounts,
+      contractNavigation: item.contractNavigation,
+      quantity: null,
+      date: item.applicationDate ?? '',
+      status: item.status,
+    }
+  }
   const records = shallowRef<Partial<Record<OwnerDocumentKind, OwnerDocumentListRecord[]>>>({})
   const listLoading = shallowRef<Partial<Record<OwnerDocumentKind, boolean>>>({})
   const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
+  const centralPagination = shallowRef<Partial<Record<'owner_change' | 'owner_report', { page: number, pageSize: number, total: number }>>>({})
+  const centralSummaries = shallowRef<Partial<Record<'owner_change' | 'owner_report', OwnerCommercialDocumentListSummaryDTO>>>({})
+  const centralCapabilities = shallowRef<Partial<Record<'owner_change' | 'owner_report', string[]>>>({})
+  const centralEmptyReasons = shallowRef<Partial<Record<'owner_change' | 'owner_report', 'no-records' | 'no-filter-match' | 'missing-relation' | null>>>({})
   const loading = shallowRef(false)
 
-  async function loadKind(kind: OwnerDocumentKind) {
+  async function loadKind(
+    kind: OwnerDocumentKind,
+    centralQuery?: Omit<OwnerCommercialDocumentListQueryDTO, 'kind' | 'includeDemo' | 'origin'>,
+  ) {
     const sequence = (listLoadSequence[kind] ?? 0) + 1
     listLoadSequence[kind] = sequence
     listLoading.value = { ...listLoading.value, [kind]: true }
     listErrors.value = { ...listErrors.value, [kind]: '' }
     try {
-      const rows = await listOwnerDocumentForms(kind)
+      const centralPage = usesCentralBrowser && isCentralKind(kind)
+        ? await centralRepositories().ownerCommercialDocumentRead.list({
+            kind,
+            includeDemo: false,
+            origin: 'real',
+            search: centralQuery?.search ?? '',
+            projectId: centralQuery?.projectId ?? null,
+            contractId: centralQuery?.contractId ?? null,
+            status: centralQuery?.status ?? null,
+            documentType: centralQuery?.documentType ?? null,
+            page: centralQuery?.page ?? 1,
+            pageSize: centralQuery?.pageSize ?? 20,
+          })
+        : null
+      const rows = centralPage
+        ? centralPage.items.map(centralListRecord)
+        : await listOwnerDocumentForms(kind)
+      if (centralPage && isCentralKind(kind) && listLoadSequence[kind] === sequence) {
+        centralPagination.value = { ...centralPagination.value, [kind]: centralPage.pagination }
+        centralSummaries.value = { ...centralSummaries.value, [kind]: centralPage.summary }
+        centralCapabilities.value = { ...centralCapabilities.value, [kind]: [...centralPage.capabilities] }
+        centralEmptyReasons.value = { ...centralEmptyReasons.value, [kind]: centralPage.empty?.reason ?? null }
+      }
       if (listLoadSequence[kind] === sequence)
         records.value = { ...records.value, [kind]: rows }
       return rows
@@ -74,6 +196,22 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return listErrors.value[kind] ?? ''
   }
 
+  function centralPageFor(kind: 'owner_change' | 'owner_report') {
+    return centralPagination.value[kind] ?? { page: 1, pageSize: 20, total: 0 }
+  }
+
+  function centralSummaryFor(kind: 'owner_change' | 'owner_report') {
+    return centralSummaries.value[kind] ?? null
+  }
+
+  function centralCapabilitiesFor(kind: 'owner_change' | 'owner_report') {
+    return centralCapabilities.value[kind] ?? []
+  }
+
+  function centralEmptyReasonFor(kind: 'owner_change' | 'owner_report') {
+    return centralEmptyReasons.value[kind] ?? null
+  }
+
   async function refreshAfterMutation(kind: OwnerDocumentKind) {
     await loadKind(kind).catch(() => undefined)
   }
@@ -81,7 +219,9 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   async function loadOne(kind: OwnerDocumentKind, id: string) {
     loading.value = true
     try {
-      return await loadOwnerDocumentForm(kind, id)
+      return usesCentralBrowser && isCentralKind(kind)
+        ? rememberCentralForm(await centralForm(kind, id))
+        : await loadOwnerDocumentForm(kind, id)
     }
     finally {
       loading.value = false
@@ -89,6 +229,11 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   async function loadAttachments(kind: OwnerDocumentKind, id: string, includeDeleted = false) {
+    if (usesCentralBrowser && isCentralKind(kind)) {
+      const form = await centralForm(kind, id)
+      const files = form.attachments
+      return includeDeleted ? files : files.filter(file => file.deletedAt === null)
+    }
     return listOwnerDocumentAttachments(kind, id, includeDeleted)
   }
 
@@ -97,6 +242,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     contractId: string,
     periodNo = '',
   ) {
+    if (usesCentralBrowser)
+      return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo)
     return listOwnerDocumentBoqLines(projectId, contractId, periodNo)
   }
 
@@ -112,6 +259,13 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     kind: 'crew' | 'project' | 'supplier',
     keyword: string,
   ) {
+    if (usesCentralBrowser && kind === 'project') {
+      const context = await centralContext()
+      const search = keyword.trim().toLocaleLowerCase('zh-CN')
+      return context.projects
+        .filter(option => !search || option.label.toLocaleLowerCase('zh-CN').includes(search))
+        .map(option => ({ id: option.id, label: option.label }))
+    }
     return listOwnerDocumentBasicOptions(kind, keyword)
   }
 
@@ -121,6 +275,14 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     supplierId: string,
     keyword: string,
   ) {
+    if (usesCentralBrowser && side === 'owner') {
+      const context = await centralContext()
+      const search = keyword.trim().toLocaleLowerCase('zh-CN')
+      return context.contracts
+        .filter(option => option.projectId === projectId)
+        .filter(option => !search || [option.label, option.hint ?? ''].some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
+        .map(option => ({ id: option.id, label: option.label, hint: option.hint }))
+    }
     return listOwnerDocumentContractOptions(projectId, side, supplierId, keyword)
   }
 
@@ -146,7 +308,26 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   ) {
     loading.value = true
     try {
-      const result = await saveOwnerDocumentForm(kind, draft, action, attachments)
+      const result = usesCentralBrowser && isCentralKind(kind)
+        ? await (async () => {
+            const currentId = draft.id ?? null
+            const baseVersion = currentId ? centralBaseVersion(draft) : null
+            const values = {
+              action: action === 'submit' ? 'submit' : 'save',
+              draft,
+              attachments,
+            }
+            const commandId = ownerDocumentCommandId(draft, { kind, id: currentId, baseVersion, ...values })
+            const command = await centralCommand(kind, currentId, baseVersion, values, commandId)
+            draft.id = command.id
+            if (currentId)
+              advanceOwnerDocumentFormVersion(draft, command.version)
+            else
+              initializeOwnerDocumentFormVersion(draft, command.version)
+            completeOwnerDocumentCommandIntent(draft, commandId)
+            return { id: command.id, logIds: [command.commandId] }
+          })()
+        : await saveOwnerDocumentForm(kind, draft, action, attachments)
       await refreshAfterMutation(kind)
       return result
     }
@@ -155,10 +336,22 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
-  async function approveChange(id: string, approvedAt: string) {
+  async function approveChange(id: string, approvedAt: string, draft?: OwnerDocumentDraft) {
     loading.value = true
     try {
-      await approveOwnerChange(id, approvedAt)
+      if (usesCentralBrowser) {
+        if (!draft)
+          throw new Error('签证页版本已丢失，请重新读取后再操作')
+        const baseVersion = centralBaseVersion(draft)
+        const values = { action: 'approve', approvedAt }
+        const commandId = ownerDocumentCommandId(draft, { kind: 'owner_change', id, baseVersion, ...values })
+        const result = await centralCommand('owner_change', id, baseVersion, values, commandId)
+        advanceOwnerDocumentFormVersion(draft, result.version)
+        completeOwnerDocumentCommandIntent(draft, commandId)
+      }
+      else {
+        await approveOwnerChange(id, approvedAt)
+      }
       await refreshAfterMutation('owner_change')
     }
     finally {
@@ -166,10 +359,22 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
-  async function auditReport(id: string, draft: OwnerReportAuditDraft) {
+  async function auditReport(id: string, auditDraft: OwnerReportAuditDraft, formDraft?: OwnerDocumentDraft) {
     loading.value = true
     try {
-      await auditOwnerReport(id, draft)
+      if (usesCentralBrowser) {
+        if (!formDraft)
+          throw new Error('审定页版本已丢失，请重新读取后再操作')
+        const baseVersion = centralBaseVersion(formDraft)
+        const values = { action: 'audit', audit: { lines: auditDraft.lines } }
+        const commandId = ownerDocumentCommandId(formDraft, { kind: 'owner_report', id, baseVersion, ...values })
+        const result = await centralCommand('owner_report', id, baseVersion, values, commandId)
+        advanceOwnerDocumentFormVersion(formDraft, result.version)
+        completeOwnerDocumentCommandIntent(formDraft, commandId)
+      }
+      else {
+        await auditOwnerReport(id, auditDraft)
+      }
       await refreshAfterMutation('owner_report')
     }
     finally {
@@ -205,6 +410,12 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   async function removeForm(kind: OwnerDocumentKind, id: string) {
+    if (usesCentralBrowser && isCentralKind(kind)) {
+      const form = await centralForm(kind, id)
+      const result = await centralCommand(kind, id, form.version, { action: 'delete' })
+      await refreshAfterMutation(kind)
+      return result.commandId
+    }
     const logId = await deleteOwnerDocumentForm(kind, id)
     if (logId)
       await refreshAfterMutation(kind)
@@ -212,6 +423,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   async function restoreForm(kind: OwnerDocumentKind, id: string) {
+    if (usesCentralBrowser && isCentralKind(kind))
+      throw new Error('中央正式单据删除不提供本地恢复入口')
     const logId = await restoreOwnerDocumentForm(kind, id)
     if (logId)
       await refreshAfterMutation(kind)
@@ -222,9 +435,24 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     kind: OwnerDocumentKind,
     id: string,
     changes: FileRefChanges,
+    draft?: OwnerDocumentDraft,
   ) {
     loading.value = true
     try {
+      if (usesCentralBrowser && isCentralKind(kind)) {
+        if (!draft)
+          throw new Error('附件页版本已丢失，请重新读取后再操作')
+        const baseVersion = centralBaseVersion(draft)
+        const values = {
+          action: 'attachments',
+          attachments: changes,
+        }
+        const commandId = ownerDocumentCommandId(draft, { kind, id, baseVersion, ...values })
+        const result = await centralCommand(kind, id, baseVersion, values, commandId)
+        advanceOwnerDocumentFormVersion(draft, result.version)
+        completeOwnerDocumentCommandIntent(draft, commandId)
+        return result.attachmentIds
+      }
       return await updateOwnerDocumentAttachments(kind, id, changes)
     }
     finally {
@@ -241,6 +469,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     recordsFor,
     listLoadingFor,
     listError,
+    centralPageFor,
+    centralSummaryFor,
+    centralCapabilitiesFor,
+    centralEmptyReasonFor,
     loadOne,
     loadAttachments,
     loadBoqLines,
