@@ -248,7 +248,7 @@ export function buildConstructionContractListPage(
 function factNavigation(
   row: ConstructionContractFactSource,
   source: ConstructionContractDetailSource,
-  kind: 'supplement' | 'change' | 'report' | 'final-settlement' | 'invoice-application' | 'receipt' | 'acceptance' | 'warranty' | 'unverified',
+  kind: 'supplement' | 'change' | 'report' | 'final-settlement' | 'penalty' | 'invoice-application' | 'receipt' | 'acceptance' | 'warranty' | 'unverified',
 ): NavigationIntentDTO {
   if (kind === 'unverified')
     return { kind: 'unavailable', reason: 'unverified-target' }
@@ -274,7 +274,7 @@ function factNavigation(
     }
   }
   if (kind === 'change' || kind === 'report' || kind === 'final-settlement'
-    || kind === 'acceptance' || kind === 'warranty') {
+    || kind === 'penalty' || kind === 'acceptance' || kind === 'warranty') {
     return {
       kind: 'entity-detail',
       subject: resolvedRef('owner-document', row.id, row.name, row.no || null),
@@ -384,7 +384,7 @@ export function buildConstructionContractDetail(
       settlements: {
         monthlyStatements: mapFacts(input.facts.monthlyStatements, source, 'report'),
         finalSettlements: mapFacts(input.facts.finalSettlements, source, 'final-settlement'),
-        penalties: mapFacts(input.facts.penalties, source, 'unverified'),
+        penalties: mapFacts(input.facts.penalties, source, 'penalty'),
       },
       invoices: {
         applications: mapFacts(input.facts.invoiceApplications, source, 'invoice-application'),

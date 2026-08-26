@@ -271,6 +271,41 @@ function source(): CoreMigrationSourceDTO {
             updatedAt: '2026-08-23T00:00:00.000Z',
           },
         },
+        {
+          legacyId: 'owner-penalty-legacy-326',
+          name: '施工进度延误',
+          references: { projectId: 'project-legacy-323', contractId: 'contract-legacy-323' },
+          amount: '36000.00' as const,
+          deletedAt: null,
+          attributes: {
+            kind: 'owner_penalty',
+            no: 'FK-LEGACY-326',
+            documentType: 'owner_penalty',
+            sourceType: 'owner_penalty',
+            sourceLocked: 1,
+            periodNo: '',
+            applicationDate: '2026-08-24',
+            status: 'submitted',
+            statusNote: '已提交甲方罚扣事实',
+            noticeNo: 'LX-LEGACY-326',
+            penaltyReason: '施工进度延误',
+            appealNote: '已提交工期顺延说明',
+            note: '项目部已核对',
+            linesJson: '[]',
+            filesJson: JSON.stringify([{
+              id: 'file-owner-penalty-legacy-326',
+              fileName: '甲方联系单.pdf',
+              fileSize: 326,
+              mimeType: 'application/pdf',
+              category: 'contact-letter',
+              uploader: '周经办',
+              uploadedAt: '2026-08-24T10:00:00.000Z',
+              deletedAt: null,
+            }]),
+            createdAt: '2026-08-24T00:00:00.000Z',
+            updatedAt: '2026-08-24T10:00:00.000Z',
+          },
+        },
       ],
       workers: [],
       project_suppliers: [],
@@ -321,6 +356,10 @@ describe('甲方商务单据受控中央迁移', () => {
       occurredAt: '2026-07-18T09:01:00.000Z',
       note: '',
     }]), '验收生命周期审计重复'],
+    [4, 'amount', '0.00', '罚扣金额必须大于 0'],
+    [4, 'applicationDate', '', '迁移甲方罚扣日期必填'],
+    [4, 'penaltyReason', '', '迁移甲方罚扣事由必填'],
+    [4, 'sourceType', 'manual', '迁移甲方罚扣来源类型无效'],
   ] as const)('拒绝非法的迁移审计字段 #%s.%s', async (documentIndex, field, invalidValue, expectedMessage) => {
     const commands = createOwnerCommercialDocumentCommandTestInstance()
     const core = createCoreMigrationTestInstance({
@@ -329,7 +368,13 @@ describe('甲方商务单据受控中央迁移', () => {
       afterConfirm: snapshot => commands.synchronizeMigrationSnapshot(snapshot),
     })
     const invalidSource = structuredClone(source())
-    invalidSource.entities.owner_documents[documentIndex]!.attributes![field] = invalidValue
+    const invalidDocument = invalidSource.entities.owner_documents[documentIndex]!
+    if (field === 'amount')
+      invalidDocument.amount = invalidValue
+    else
+      invalidDocument.attributes![field] = invalidValue
+    if (field === 'penaltyReason')
+      invalidDocument.name = ''
     const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
     invalidSource.sourceHash = createHash('sha256')
       .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
@@ -596,7 +641,7 @@ describe('甲方商务单据受控中央迁移', () => {
       .toEqual(['central-contract_supplements-supplement-legacy-325'])
   })
 
-  it('确认后将两类既有单据同步到同一正式命令源，回滚后撤销切换', async () => {
+  it('确认后将既有甲方单据同步到同一正式命令源，回滚后撤销切换', async () => {
     const commands = createOwnerCommercialDocumentCommandTestInstance()
     const core = createCoreMigrationTestInstance({
       createServerId: input => `central-${input.entityType}-${input.legacyId}`,
@@ -630,15 +675,21 @@ describe('甲方商务单据受控中央迁移', () => {
 
     expect(dryRun.steps).toContainEqual({
       entityType: 'owner_documents',
-      sourceCount: 4,
-      importableCount: 4,
+      sourceCount: 5,
+      importableCount: 5,
       skippedCount: 0,
     })
     await core.importBatch({ ...envelope('import-323'), batchId: dryRun.batchId }, session)
     await core.confirm({ ...envelope('confirm-323'), batchId: dryRun.batchId }, session)
 
     const rows = commands.rows()
-    expect(rows.map(row => row.kind)).toEqual(['owner_change', 'owner_report', 'acceptance', 'final_settlement'])
+    expect(rows.map(row => row.kind)).toEqual([
+      'owner_change',
+      'owner_report',
+      'acceptance',
+      'final_settlement',
+      'owner_penalty',
+    ])
     expect(rows.filter(row => row.kind === 'owner_change')).toHaveLength(1)
     const changeId = 'central-owner_documents-change-legacy-323'
     const detail = buildOwnerCommercialDocumentDetail({
@@ -710,6 +761,28 @@ describe('甲方商务单据受控中央迁移', () => {
           { kind: 'receipt', id: 'central-receipt_registrations-receipt-legacy-325' },
         ],
       },
+    })
+    const ownerPenaltyId = 'central-owner_documents-owner-penalty-legacy-326'
+    const ownerPenaltyDetail = buildOwnerCommercialDocumentDetail({
+      documents: rows,
+      query: parseOwnerCommercialDocumentDetailQuery('owner_penalty', ownerPenaltyId, { origin: 'real' }),
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: commands.sourceVersion(),
+      capabilities: session.capabilities,
+    })
+    expect(ownerPenaltyDetail).toMatchObject({
+      document: {
+        id: ownerPenaltyId,
+        kind: 'owner_penalty',
+        amounts: { kind: 'owner_penalty', amount: '36000.00' },
+      },
+      ownerPenaltyFacts: {
+        noticeNo: 'LX-LEGACY-326',
+        penaltyDate: '2026-08-24',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+      },
+      files: [{ id: 'file-owner-penalty-legacy-326', category: 'contact-letter' }],
     })
     expect(commands.boqLinesFor(
       'central-projects-project-legacy-323',
@@ -821,6 +894,6 @@ describe('甲方商务单据受控中央迁移', () => {
       firstChange.id,
       nextPeriodReport.id,
     ]))
-    expect(commands.rows().some(row => row.id === changeId || row.id === reportId || row.id === acceptanceId)).toBe(false)
+    expect(commands.rows().some(row => [changeId, reportId, acceptanceId, ownerPenaltyId].includes(row.id))).toBe(false)
   })
 })

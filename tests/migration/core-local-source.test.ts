@@ -141,6 +141,34 @@ function sourceRows(sql: string): Record<string, unknown>[] {
         updated_at: '2026-07-03T00:00:00.000Z',
         deleted_at: null,
       },
+      {
+        id: 'owner-penalty-local-1',
+        name: '施工进度延误',
+        project_id: 'project-local-1',
+        contract_id: 'construction-local-1',
+        amount: 36000,
+        audited_amount: null,
+        tax_exclusive_amount: null,
+        applied_tax_exclusive_amount: null,
+        kind: 'owner_penalty',
+        no: 'FK-LOCAL-001',
+        document_type: 'owner_penalty',
+        source_type: 'owner_penalty',
+        source_locked: 1,
+        period_no: '',
+        application_date: '2026-08-24',
+        status: 'submitted',
+        status_note: '已提交甲方罚扣事实',
+        note: '项目部已核对',
+        lines_json: '[]',
+        files_json: '[{"id":"file-owner-penalty-local-1","fileName":"甲方联系单.pdf","fileSize":326,"mimeType":"application/pdf","category":"contact-letter","uploader":"周经办","uploadedAt":"2026-08-24T10:00:00.000Z","deletedAt":null}]',
+        notice_no: 'LX-LOCAL-001',
+        penalty_reason: '施工进度延误',
+        appeal_note: '已提交工期顺延说明',
+        created_at: '2026-08-24T00:00:00.000Z',
+        updated_at: '2026-08-24T10:00:00.000Z',
+        deleted_at: null,
+      },
     ]
   }
   if (sql.includes('FROM contracts c')) {
@@ -242,7 +270,7 @@ describe('core migration local source', () => {
           subcontract_contracts: 1,
           contract_supplements: 1,
           receipt_registrations: 1,
-          owner_documents: 2,
+          owner_documents: 3,
           workers: 1,
           project_suppliers: 1,
         },
@@ -253,7 +281,7 @@ describe('core migration local source', () => {
           { entityType: 'subcontract_contracts', metric: 'amount', expected: '180000.00' },
           { entityType: 'contract_supplements', metric: 'amount', expected: '8000.00' },
           { entityType: 'receipt_registrations', metric: 'amount', expected: '90000.00' },
-          { entityType: 'owner_documents', metric: 'amount', expected: '5480.00' },
+          { entityType: 'owner_documents', metric: 'amount', expected: '41480.00' },
         ],
       },
     })
@@ -330,6 +358,19 @@ describe('core migration local source', () => {
         }),
       }),
       expect.objectContaining({
+        legacyId: 'owner-penalty-local-1',
+        name: '施工进度延误',
+        amount: '36000.00',
+        attributes: expect.objectContaining({
+          kind: 'owner_penalty',
+          sourceType: 'owner_penalty',
+          noticeNo: 'LX-LOCAL-001',
+          penaltyReason: '施工进度延误',
+          appealNote: '已提交工期顺延说明',
+          filesJson: expect.stringContaining('甲方联系单.pdf'),
+        }),
+      }),
+      expect.objectContaining({
         legacyId: 'report-local-1',
         amount: '4960.00',
         attributes: expect.objectContaining({
@@ -351,6 +392,7 @@ describe('core migration local source', () => {
     const ownerQuery = vi.mocked(deps.select).mock.calls.map(([sql]) => sql).find(sql => sql.includes('FROM boq_change_orders change_order'))
     expect(ownerQuery).toContain('\'boqLineId\', COALESCE(change_line.result_boq_line_id, change_line.boq_line_id)')
     expect(ownerQuery).toContain('LEFT JOIN boq_lines boq_line ON boq_line.id = COALESCE(change_line.result_boq_line_id, change_line.boq_line_id)')
+    expect(ownerQuery).toContain('FROM owner_penalties penalty')
   })
 
   it('施工合同快照同时导出完整 BOQ 目录与无单据新期次完成量事实', async () => {
@@ -488,6 +530,28 @@ describe('core migration local source', () => {
           520, 480, 500
         )
       `)
+      await db.execute(`
+        INSERT INTO owner_penalties (
+          id, no, project_id, contract_id, notice_no, amount,
+          penalty_date, reason, appeal_note, status, note
+        )
+        VALUES (
+          'owner-penalty-local-326', 'FK-LOCAL-326', 'project-local-323', 'contract-local-323',
+          'LX-LOCAL-326', 36000, '2026-08-24', '施工进度延误',
+          '已提交工期顺延说明', 'submitted', '项目部已核对'
+        )
+      `)
+      await db.execute(`
+        INSERT INTO file_refs (
+          id, owner_type, owner_id, file_name, file_path, file_size,
+          mime_type, category, uploader, uploaded_at
+        )
+        VALUES (
+          'file-owner-penalty-local-326', 'owner_penalty', 'owner-penalty-local-326',
+          '甲方联系单.pdf', '', 326, 'application/pdf', 'contact-letter', '周经办',
+          '2026-08-24T10:00:00.000Z'
+        )
+      `)
       const [stored] = await db.select<{ created_at: string, updated_at: string }>(`
         SELECT created_at, updated_at
         FROM owner_change_orders
@@ -503,6 +567,20 @@ describe('core migration local source', () => {
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
         updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/),
       })
+      expect(migrationSource.entities.owner_documents.find(row => row.legacyId === 'owner-penalty-local-326'))
+        .toMatchObject({
+          name: '施工进度延误',
+          references: { projectId: 'project-local-323', contractId: 'contract-local-323' },
+          amount: '36000.00',
+          attributes: {
+            kind: 'owner_penalty',
+            sourceType: 'owner_penalty',
+            noticeNo: 'LX-LOCAL-326',
+            penaltyReason: '施工进度延误',
+            appealNote: '已提交工期顺延说明',
+            filesJson: expect.stringContaining('甲方联系单.pdf'),
+          },
+        })
       const constructionContract = migrationSource.entities.construction_contracts[0]
       expect(JSON.parse(String(constructionContract?.attributes?.monthlyQuantityFactsJson)))
         .toContainEqual(expect.objectContaining({
@@ -552,6 +630,17 @@ describe('core migration local source', () => {
         kind: 'owner_change',
         no: 'BG-LOCAL-323',
         name: '真实 SQLite 变洽签',
+      }))
+      expect(commands.rows()).toContainEqual(expect.objectContaining({
+        kind: 'owner_penalty',
+        no: 'FK-LOCAL-326',
+        noticeNo: 'LX-LOCAL-326',
+        penaltyReason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+        files: [expect.objectContaining({
+          id: 'file-owner-penalty-local-326',
+          category: 'contact-letter',
+        })],
       }))
     }
     finally {

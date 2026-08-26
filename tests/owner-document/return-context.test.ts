@@ -59,6 +59,14 @@ describe('甲方商务单据返回上下文', () => {
     expect(validateOwnerDocumentListReturnTo('/owner/report?nav=origin_323#owner-document-row-real%3Areport-1', 'owner_change', 'real')).toBeNull()
   })
 
+  it('白名单化甲方罚扣列表与详情返回链', () => {
+    const list = '/owner/penalty?origin=real&nav=origin_326#owner-document-row-real%3Aowner_penalty%3Aowner-penalty-326'
+    const detail = `/owner/penalty/owner-penalty-326?origin=real&returnTo=${encodeURIComponent(list)}&returnContext=origin_326`
+    expect(validateOwnerDocumentListReturnTo(list, 'owner_penalty', 'real')).toBe(list)
+    expect(validateOwnerDocumentDetailReturnTo(detail, 'real')).toBe(detail)
+    expect(validateOwnerDocumentDetailReturnTo(detail.replace('/owner/penalty/', '/project/penalty/'), 'real')).toBeNull()
+  })
+
   it('缺失、过期或篡改的会话上下文安全回退 canonical 列表', () => {
     expect(resolveOwnerDocumentReturnContext({
       kind: 'owner_report',

@@ -234,10 +234,10 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     showTypeFilter: false,
     views: [
       { key: 'all', label: '全部' },
-      { key: 'appealing', label: '申诉中' },
-      { key: 'confirmed', label: '已确认' },
+      { key: 'draft', label: '草稿' },
+      { key: 'submitted', label: '已提交' },
     ],
-    defaultView: 'appealing',
+    defaultView: 'all',
     countLabel: '罚扣单数',
     amountSummaries: [{ field: 'amount', label: '罚扣金额总和' }],
   },
@@ -353,12 +353,6 @@ export function ownerDocumentStatusViewKey(
   }
   if (kind === 'final_settlement')
     return ['audited', 'approved', 'confirmed'].includes(value) ? 'done' : 'doing'
-  if (kind === 'owner_penalty') {
-    if (value === 'confirmed')
-      return 'confirmed'
-    if (['submitted', 'rejected'].includes(value))
-      return 'appealing'
-  }
   if (kind === 'sub_settlement') {
     if (['confirmed', '已确认'].includes(value))
       return 'confirmed'
@@ -429,8 +423,7 @@ export function ownerDocumentStatusLabelForList(
     },
     owner_penalty: {
       draft: '草稿',
-      appealing: '申诉中',
-      confirmed: '已确认',
+      submitted: '已提交',
     },
     sub_change: {
       draft: '草稿',

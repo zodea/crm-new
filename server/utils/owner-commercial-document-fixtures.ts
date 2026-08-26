@@ -51,6 +51,33 @@ function source(
 }
 
 export const OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS: OwnerCommercialDocumentSource[] = [
+  source('owner_penalty', {
+    id: 'owner-penalty-real-326',
+    no: 'FK-2026-326',
+    name: '施工进度延误',
+    documentType: 'owner_penalty',
+    sourceType: 'owner_penalty',
+    sourceLocked: true,
+    applicationDate: '2026-08-24',
+    status: 'submitted',
+    statusNote: '已提交甲方罚扣事实',
+    amount: 36000,
+    noticeNo: 'LX-2026-326',
+    penaltyReason: '施工进度延误',
+    appealNote: '已提交工期顺延说明',
+    note: '项目部已核对',
+    updatedAt: '2026-08-24T10:00:00.000Z',
+    files: [{
+      id: 'file-owner-penalty-real-326',
+      fileName: '甲方联系单.pdf',
+      fileSize: 3260,
+      mimeType: 'application/pdf',
+      category: 'contact-letter',
+      uploader: '周经办',
+      uploadedAt: '2026-08-24T10:00:00.000Z',
+      deletedAt: null,
+    }],
+  }),
   source('final_settlement', {
     id: 'final-settlement-real-325',
     no: 'JS-2026-325',

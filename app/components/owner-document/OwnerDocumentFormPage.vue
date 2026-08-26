@@ -51,8 +51,10 @@ const routeId = computed(() => {
 const isEditing = computed(() => Boolean(routeId.value))
 const hasReturnTarget = computed(() => Boolean(route.query?.returnTo))
 const returnTarget = computed(() => {
-  if (props.kind !== 'owner_change' && props.kind !== 'owner_report' && props.kind !== 'acceptance')
+  if (props.kind !== 'owner_change' && props.kind !== 'owner_report'
+    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty') {
     return meta.value.listPath
+  }
   return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real')
     ?? validateOwnerDocumentJourneyReturnTo(route.query?.returnTo, props.kind, 'real')
     ?? meta.value.listPath

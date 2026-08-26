@@ -127,7 +127,7 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (tab && !['info', 'supplements', 'changes', 'settlements', 'invoices', 'receipts', 'acceptance'].includes(tab))
       return null
     const focus = url.searchParams.get('focus')
-    if (focus && (!['supplements', 'acceptance'].includes(tab ?? '') || !isStableRouteIdentity(focus)))
+    if (focus && (!['supplements', 'settlements', 'acceptance'].includes(tab ?? '') || !isStableRouteIdentity(focus)))
       return null
     const focusView = url.searchParams.get('focusView')
     if (focusView && (tab !== 'acceptance' || !focus || (focusView !== 'acceptance' && focusView !== 'warranty')))

@@ -118,7 +118,7 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
   owner_penalty: [
     { key: 'no', label: '罚扣编号', placeholder: '留空自动生成' },
     { key: 'projectId', label: '项目', type: 'lookup', required: true },
-    { key: 'contractId', label: '施工合同', type: 'lookup' },
+    { key: 'contractId', label: '施工合同', type: 'lookup', required: true },
     { key: 'noticeNo', label: '甲方通知编号' },
     { key: 'amount', label: '罚扣金额', type: 'number', step: '0.01', required: true },
     { key: 'penaltyDate', label: '罚扣日期', type: 'date', required: true },

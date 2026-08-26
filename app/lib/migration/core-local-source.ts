@@ -266,7 +266,10 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         change_order.updated_at,
         change_order.deleted_at,
         '' AS settlement_basis,
-        '' AS settlement_difference_note
+        '' AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
       FROM boq_change_orders change_order
 
       UNION ALL
@@ -318,7 +321,10 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         ledger.updated_at,
         ledger.deleted_at,
         '' AS settlement_basis,
-        '' AS settlement_difference_note
+        '' AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
       FROM owner_change_orders ledger
       WHERE ledger.source_type = 'manual'
 
@@ -394,7 +400,10 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         statement.updated_at,
         statement.deleted_at,
         '' AS settlement_basis,
-        '' AS settlement_difference_note
+        '' AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
       FROM monthly_statements statement
 
       UNION ALL
@@ -481,7 +490,10 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         acceptance.updated_at,
         acceptance.deleted_at,
         '' AS settlement_basis,
-        '' AS settlement_difference_note
+        '' AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
       FROM project_acceptances acceptance
 
       UNION ALL
@@ -537,8 +549,66 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         settlement.updated_at,
         settlement.deleted_at,
         settlement.basis AS settlement_basis,
-        settlement.difference_note AS settlement_difference_note
+        settlement.difference_note AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
       FROM owner_final_settlements settlement
+
+      UNION ALL
+
+      SELECT
+        penalty.id,
+        penalty.reason AS name,
+        penalty.project_id,
+        penalty.contract_id,
+        penalty.amount,
+        NULL AS audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        'owner_penalty' AS kind,
+        penalty.no,
+        'owner_penalty' AS document_type,
+        'owner_penalty' AS source_type,
+        CASE WHEN penalty.status <> 'draft' THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        penalty.penalty_date AS application_date,
+        NULL AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        penalty.status,
+        CASE WHEN penalty.status = 'submitted' THEN '已提交甲方罚扣事实' ELSE '' END AS status_note,
+        penalty.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'owner_penalty'
+            AND file_ref.owner_id = penalty.id
+        ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
+        penalty.created_at,
+        penalty.updated_at,
+        penalty.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note,
+        penalty.notice_no,
+        penalty.reason AS penalty_reason,
+        penalty.appeal_note
+      FROM owner_penalties penalty
     ) owner_document
     ORDER BY kind, id
   `,
@@ -822,6 +892,9 @@ function sourceEntity(
         lifecycleEventsJson: text(row.lifecycle_events_json) || '[]',
         settlementBasis: text(row.settlement_basis),
         settlementDifferenceNote: text(row.settlement_difference_note),
+        noticeNo: text(row.notice_no),
+        penaltyReason: text(row.penalty_reason),
+        appealNote: text(row.appeal_note),
         createdAt: isoDateTimeText(row.created_at) ?? '',
         updatedAt: isoDateTimeText(row.updated_at) ?? '',
       },

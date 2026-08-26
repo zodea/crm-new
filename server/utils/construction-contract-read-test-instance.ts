@@ -176,6 +176,18 @@ export function createConstructionContractReadTestInstance(
         date: row.applicationDate,
         status: row.status,
       }))
+    const ownerPenalties = ownerDocuments
+      .filter(row => row.kind === 'owner_penalty')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.penaltyReason ?? row.name,
+        amount: row.amount,
+        date: row.applicationDate,
+        status: row.status,
+      }))
     const ownerSettlementSupplements = ownerDocuments
       .filter(row => row.kind === 'final_settlement' && row.contractId)
       .flatMap(row => (row.finalSettlementEvidence?.supplements ?? [])
@@ -236,6 +248,7 @@ export function createConstructionContractReadTestInstance(
       changes: [...formalFacts.changes, ...ownerChanges],
       monthlyStatements: [...formalFacts.monthlyStatements, ...ownerReports],
       finalSettlements: mergeFacts(formalFacts.finalSettlements, ownerFinalSettlements),
+      penalties: mergeFacts(formalFacts.penalties, ownerPenalties),
       supplements: mergeFacts(formalFacts.supplements, ownerSettlementSupplements),
       receipts: mergeFacts(formalFacts.receipts, ownerSettlementReceipts),
       acceptances: [...formalFacts.acceptances, ...ownerAcceptances],
@@ -250,7 +263,7 @@ export function createConstructionContractReadTestInstance(
             changes: [...synchronizedFacts.changes, ...demoFacts.changes],
             monthlyStatements: [...synchronizedFacts.monthlyStatements, ...demoFacts.monthlyStatements],
             finalSettlements: [...synchronizedFacts.finalSettlements, ...demoFacts.finalSettlements],
-            penalties: [...formalFacts.penalties, ...demoFacts.penalties],
+            penalties: [...synchronizedFacts.penalties, ...demoFacts.penalties],
             invoiceApplications: [...formalFacts.invoiceApplications, ...demoFacts.invoiceApplications],
             invoiceRegistrations: [...formalFacts.invoiceRegistrations, ...demoFacts.invoiceRegistrations],
             receipts: [...synchronizedFacts.receipts, ...demoFacts.receipts],

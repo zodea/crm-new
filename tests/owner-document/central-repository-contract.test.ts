@@ -246,6 +246,38 @@ const finalSettlement: OwnerCommercialDocumentSource = {
   },
 }
 
+const ownerPenalty = {
+  ...change,
+  kind: 'owner_penalty',
+  id: 'owner-penalty-real-326',
+  no: 'FK-2026-326',
+  name: '施工进度延误罚扣',
+  documentType: 'owner_penalty',
+  sourceType: 'owner_penalty',
+  sourceId: 'owner-penalty-real-326',
+  sourceLocked: true,
+  applicationDate: '2026-08-24',
+  status: 'submitted',
+  statusNote: '已提交甲方罚扣事实',
+  amount: 36000,
+  auditedAmount: null,
+  note: '项目部已核对联系单',
+  updatedAt: '2026-08-24T09:00:00.000Z',
+  noticeNo: 'LX-2026-326',
+  penaltyReason: '施工进度延误',
+  appealNote: '已向甲方提交工期顺延说明',
+  files: [{
+    id: 'file-owner-penalty-real-326',
+    fileName: '甲方罚扣联系单.pdf',
+    fileSize: 3260,
+    mimeType: 'application/pdf',
+    category: 'contact-letter',
+    uploader: '商务经理',
+    uploadedAt: '2026-08-24T09:00:00.000Z',
+    deletedAt: null,
+  }],
+} as unknown as OwnerCommercialDocumentSource
+
 const base = {
   documents: [change, report],
   asOf: '2026-08-25T00:00:00.000Z',
@@ -254,6 +286,52 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it('甲方罚扣按专属事实读取，并可按联系单搜索后返回施工合同来源', () => {
+    const page = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents: [ownerPenalty],
+      query: parseOwnerCommercialDocumentListQuery('owner_penalty', {
+        origin: 'real',
+        search: 'LX-2026-326',
+        page: 1,
+        pageSize: 20,
+      }),
+    })
+
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        id: 'owner-penalty-real-326',
+        kind: 'owner_penalty',
+        name: '施工进度延误罚扣',
+        amounts: { kind: 'owner_penalty', amount: '36000.00' },
+        attachmentCount: 1,
+        navigation: expect.objectContaining({ variant: 'penalty' }),
+      }),
+    ])
+
+    const detail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [ownerPenalty],
+      query: parseOwnerCommercialDocumentDetailQuery('owner_penalty', ownerPenalty.id, { origin: 'real' }),
+    })
+
+    expect(detail.ownerPenaltyFacts).toEqual({
+      noticeNo: 'LX-2026-326',
+      penaltyDate: '2026-08-24',
+      reason: '施工进度延误',
+      appealNote: '已向甲方提交工期顺延说明',
+    })
+    expect(detail.sourceNavigation).toMatchObject({
+      kind: 'entity-detail',
+      variant: 'owner-document-source',
+      view: 'owner-penalty-real-326',
+      filters: { ownerTab: 'settlements' },
+    })
+    expect(detail.files).toEqual([
+      expect.objectContaining({ id: 'file-owner-penalty-real-326', category: 'contact-letter' }),
+    ])
+  })
+
   it('最终结算只从真实合同、补充协议与收款事实聚合金额，并保留未知审定额', () => {
     const detail = buildOwnerCommercialDocumentDetail({
       ...base,

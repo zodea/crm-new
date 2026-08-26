@@ -13,7 +13,7 @@ import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 
-export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement'] as const
+export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'] as const
 export type OwnerCommercialDocumentKind = typeof OWNER_COMMERCIAL_DOCUMENT_KINDS[number]
 export const OWNER_ACCEPTANCE_VIEW_VARIANTS = ['acceptance', 'warranty'] as const
 export type OwnerAcceptanceViewVariant = typeof OWNER_ACCEPTANCE_VIEW_VARIANTS[number]
@@ -115,7 +115,7 @@ export interface OwnerCommercialDocumentSource {
   contractNo: string
   contractName: string
   contractPermission: 'allowed' | 'forbidden'
-  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement'
+  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement' | 'owner_penalty'
   sourceId: string
   sourceLocked: boolean
   periodNo: string
@@ -144,6 +144,9 @@ export interface OwnerCommercialDocumentSource {
   settlementBasis?: string
   settlementDifferenceNote?: string
   finalSettlementEvidence?: OwnerFinalSettlementEvidenceSource
+  noticeNo?: string
+  penaltyReason?: string
+  appealNote?: string
 }
 
 export interface OwnerCommercialDocumentListQueryDTO {
@@ -194,6 +197,10 @@ export type OwnerCommercialDocumentAmountsDTO
     cumulativeReceipts: MoneyDTO | null
     receiptDifference: MoneyDTO | null
   }
+  | {
+    kind: 'owner_penalty'
+    amount: MoneyDTO
+  }
 
 export type OwnerAcceptanceViewDTO
   = {
@@ -234,6 +241,10 @@ export interface OwnerCommercialDocumentListItemDTO {
   contractNavigation: NavigationIntentDTO
   navigation: NavigationIntentDTO
   acceptanceView: OwnerAcceptanceViewDTO | null
+  ownerPenaltyFacts: {
+    noticeNo: string
+    reason: string
+  } | null
   attachmentCount?: number
   updatedAt: ISODateTimeDTO
 }
@@ -344,6 +355,12 @@ export interface OwnerCommercialDocumentDetailReadDTO {
       date: ISODateDTO | null
       navigation: NavigationIntentDTO
     }> | null
+  } | null
+  ownerPenaltyFacts: {
+    noticeNo: string
+    penaltyDate: ISODateDTO | null
+    reason: string
+    appealNote: string
   } | null
   asOf: ISODateTimeDTO
   sourceVersion: string | null
@@ -545,6 +562,8 @@ function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocument
       receiptDifference: cumulativeReceipts == null ? null : money(source.amount - cumulativeReceipts),
     }
   }
+  if (source.kind === 'owner_penalty')
+    return { kind: 'owner_penalty', amount: money(source.amount) }
   return { kind: 'acceptance', contractEstimate: money(source.amount) }
 }
 
@@ -555,7 +574,9 @@ function statusLabel(kind: OwnerCommercialDocumentKind, status: string): string 
       ? { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
       : kind === 'acceptance'
         ? { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
-        : { draft: '草稿', submitted: '已提交', audited: '已审定' }
+        : kind === 'final_settlement'
+          ? { draft: '草稿', submitted: '已提交', audited: '已审定' }
+          : { draft: '草稿', submitted: '已提交' }
   return labels[status] ?? status
 }
 
@@ -608,7 +629,9 @@ function documentNavigation(
         ? 'report'
         : source.kind === 'final_settlement'
           ? 'final-settlement'
-          : acceptanceVariant ?? 'acceptance',
+          : source.kind === 'owner_penalty'
+            ? 'penalty'
+            : acceptanceVariant ?? 'acceptance',
     view: null,
     filters: { dataOrigin: source.dataOrigin },
   }
@@ -701,7 +724,16 @@ export function buildOwnerCommercialDocumentListPage(
     .filter(row => !input.query.contractId || row.contractId === input.query.contractId)
     .filter(row => statusMatches(row, input.query.status))
     .filter(row => !input.query.documentType || row.documentType === input.query.documentType)
-    .filter(row => !search || [row.no, row.name, row.projectName, row.contractName, row.periodNo]
+    .filter(row => !search || [
+      row.no,
+      row.name,
+      row.projectName,
+      row.contractName,
+      row.periodNo,
+      row.noticeNo ?? '',
+      row.penaltyReason ?? '',
+      row.appealNote ?? '',
+    ]
       .some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
   const start = (input.query.page - 1) * input.query.pageSize
@@ -728,6 +760,9 @@ export function buildOwnerCommercialDocumentListPage(
       contractNavigation: relationNavigation(contract, source.dataOrigin),
       navigation: documentNavigation(source, input.query.variant ?? null),
       acceptanceView: acceptanceView(source, input.query.variant ?? null),
+      ownerPenaltyFacts: source.kind === 'owner_penalty'
+        ? { noticeNo: source.noticeNo ?? '', reason: source.penaltyReason ?? source.name }
+        : null,
       attachmentCount: visibleFiles(source, input.query.variant ?? null).length,
       updatedAt: source.updatedAt,
     }
@@ -940,6 +975,7 @@ export function buildOwnerCommercialDocumentDetail(
                 ownerTab: source.kind === 'acceptance'
                   ? 'acceptance'
                   : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
+                    || source.kind === 'owner_penalty'
                     ? 'settlements'
                     : 'changes',
                 ...(source.kind === 'acceptance'
@@ -953,6 +989,14 @@ export function buildOwnerCommercialDocumentDetail(
     acceptanceView: acceptanceView(source, input.query.variant ?? null),
     lifecycleEvents: source.acceptanceLifecycle?.events.map(event => ({ ...event })) ?? [],
     finalSettlementEvidence,
+    ownerPenaltyFacts: source.kind === 'owner_penalty'
+      ? {
+          noticeNo: source.noticeNo ?? '',
+          penaltyDate: source.applicationDate,
+          reason: source.penaltyReason ?? source.name,
+          appealNote: source.appealNote ?? '',
+        }
+      : null,
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,
     capabilities: [...input.capabilities],

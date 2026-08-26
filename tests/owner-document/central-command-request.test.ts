@@ -12,6 +12,30 @@ const envelope = {
 }
 
 describe('甲方商务单据 HTTP 命令解析', () => {
+  it('接受甲方罚扣保存命令并保留专属有限字段', () => {
+    const request = parseOwnerCommercialDocumentCommandRequest({
+      ...envelope,
+      kind: 'owner_penalty',
+      action: 'submit',
+      draft: {
+        projectId: 'project-real-320',
+        contractId: 'construction-contract-existing-320',
+        noticeNo: 'LX-2026-326',
+        amount: 36000,
+        penaltyDate: '2026-08-26',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+      },
+      attachments: { add: [], removeIds: [], restoreIds: [] },
+    })
+
+    expect(request).toMatchObject({
+      kind: 'owner_penalty',
+      action: 'submit',
+      draft: { noticeNo: 'LX-2026-326', amount: 36000, reason: '施工进度延误' },
+    })
+  })
+
   it('接受最终结算保存命令的有限字段', () => {
     const request = parseOwnerCommercialDocumentCommandRequest({
       ...envelope,

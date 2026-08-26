@@ -85,7 +85,8 @@ const KitTableStub = defineComponent({
       h('div', { role: 'row' }, (props.columns as any[]).map(column =>
         h('span', { role: 'columnheader' }, column.title))),
       ...(props.data as any[]).map(row => h('div', { role: 'row' }, [
-        `${row.no} ${row.name}`,
+        slots.document?.({ row }),
+        ` ${row.name} `,
         slots.contract?.({ row }),
       ])),
       ...(props.data as any[]).length === 0
@@ -131,6 +132,7 @@ describe('owner document list screen', () => {
     centralSummary = null
     navigateTo.mockReset()
     loadKind.mockClear()
+    route.path = '/owner/change'
     route.query = { project: 'project-1' }
     vi.stubGlobal('computed', computed)
     vi.stubGlobal('navigateTo', navigateTo)
@@ -325,5 +327,38 @@ describe('owner document list screen', () => {
       variant: 'warranty',
       status: null,
     })))
+  })
+
+  it('甲方罚扣主编号链接进入专属只读详情并保留列表返回上下文', async () => {
+    runtime.desktop = false
+    route.path = '/owner/penalty'
+    route.query = {}
+    activeRows = [{
+      ...listRows[0]!,
+      id: 'owner-penalty-real-326',
+      no: 'FK-2026-326',
+      name: '施工进度延误',
+      type: 'owner_penalty',
+      noticeNo: 'LX-2026-326',
+      amount: 36000,
+      status: 'submitted',
+    }]
+
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_penalty' }, global })
+
+    await vi.waitFor(() => expect(loadKind).toHaveBeenCalledWith('owner_penalty', expect.objectContaining({
+      status: null,
+      variant: null,
+    })))
+    const link = screen.getByRole('link', { name: 'FK-2026-326' })
+    expect(link.getAttribute('href')).toBe('/owner/penalty/owner-penalty-real-326?origin=real')
+    await fireEvent.click(link)
+    expect(navigateTo).toHaveBeenCalledWith(expect.objectContaining({
+      path: '/owner/penalty/owner-penalty-real-326',
+      query: expect.objectContaining({
+        origin: 'real',
+        returnTo: expect.stringContaining('/owner/penalty'),
+      }),
+    }))
   })
 })

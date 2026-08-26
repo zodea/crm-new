@@ -71,7 +71,7 @@
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分包单据 | 6 | [#295](https://github.com/zodea/crm-new/issues/295)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -90,7 +90,7 @@
 
 核心合同中的材料采购子链已由 [#318](https://github.com/zodea/crm-new/issues/318) 闭合；施工合同子链由 [#320](https://github.com/zodea/crm-new/issues/320) 闭合；分包合同子链由 [#321](https://github.com/zodea/crm-new/issues/321) 闭合中央列表、七分区只读详情、演示只读边界、正式整页新增/编辑与中央读回。[#322](https://github.com/zodea/crm-new/issues/322) 进一步闭合两类补充协议的稳定 ID 聚焦、父子归属校验、正式迁移与列表来源恢复。未知实际竣工、结算/结清状态保持 `null`，材料领用缺少稳定外键时保留明确空态。
 
-甲方单据中的变洽签/月度报量子链已由 [#323](https://github.com/zodea/crm-new/issues/323) 闭合；[#324](https://github.com/zodea/crm-new/issues/324) 进一步闭合验收/保修 canonical 双视图。[#325](https://github.com/zodea/crm-new/issues/325) 现已闭合最终结算专属只读链：列表与中央整页表单分路，详情只展示真实申报/审定事实，变更后合同金额与累计收款在查询时从合同、非草稿补充协议和活跃收款聚合；项目、甲方、施工合同、结算源单、补充协议和收款均按稳定 ID 往返。未记录的审定值保持 `null`，不创建假审定 action。甲方罚扣未因此扩大，仍由父规格下后续票闭合。
+甲方单据中的变洽签/月度报量子链已由 [#323](https://github.com/zodea/crm-new/issues/323) 闭合；[#324](https://github.com/zodea/crm-new/issues/324) 进一步闭合验收/保修 canonical 双视图；[#325](https://github.com/zodea/crm-new/issues/325) 闭合最终结算；[#326](https://github.com/zodea/crm-new/issues/326) 现已闭合甲方罚扣专属只读链。罚扣编号从全局列表与施工合同事实行进入同一中央详情，独立展示金额、联系单、日期、事由、申诉、状态、项目/甲方/合同关系和真实附件；来源返回恢复原列表或合同分区与焦点。正式保存、提交、迁移和读回只走中央源，申诉说明不扩展为审批流，也不混入项目罚扣或分包结算抵扣。
 
 跨页面的项目—材料采购合同—分供方旅程已由 [#319](https://github.com/zodea/crm-new/issues/319) 闭合：项目详情按稳定 ID 与来源进入材采列表，真实 `0`、缺失、暂不可用和无权限分开表达；材采合同按稳定分供方 ID 进入合同/结算/收票/付款事实，并逐级恢复页签、筛选、分页、滚动与焦点。该旅程不扩展为交付、库存或结算核心实现，也不代表父规格其他合同链已完成。
 

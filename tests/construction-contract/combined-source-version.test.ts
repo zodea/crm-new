@@ -110,4 +110,41 @@ describe('施工合同聚合读取版本', () => {
       constructionContractCommandTestInstance.reset(sessionId)
     }
   })
+
+  it('把 canonical 甲方罚扣同步为施工合同中的专属只读入口', () => {
+    const sessionId = 'construction-owner-penalty-326'
+    constructionContractCommandTestInstance.reset(sessionId)
+    constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)
+    try {
+      const read = createConstructionContractReadTestInstance(
+        () => ['construction-contract:read'],
+        constructionContractCommandTestInstance,
+        {
+          rows: () => structuredClone(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS),
+          sourceVersion: () => 'owner-penalty-326',
+        },
+      )
+      const detail = read.detail(CONSTRUCTION_CONTRACT_EXISTING_ID, { origin: 'real' }, sessionId)
+
+      expect(detail.sections.settlements.penalties).toEqual([
+        expect.objectContaining({
+          id: 'owner-penalty-real-326',
+          no: 'FK-2026-326',
+          navigation: expect.objectContaining({
+            subject: {
+              state: 'resolved',
+              entity: 'owner-document',
+              id: 'owner-penalty-real-326',
+              label: '施工进度延误',
+              no: 'FK-2026-326',
+            },
+            variant: 'penalty',
+          }),
+        }),
+      ])
+    }
+    finally {
+      constructionContractCommandTestInstance.reset(sessionId)
+    }
+  })
 })

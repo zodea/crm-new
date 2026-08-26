@@ -51,7 +51,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const usesCentralBrowser = import.meta.client && !isTauri()
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
-    || kind === 'acceptance' || kind === 'final_settlement'
+    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -111,11 +111,17 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
               secondaryAmount: Number(item.amounts.audited ?? 0),
               tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
             }
-          : {
-              amount: Number(item.amounts.contractEstimate),
-              secondaryAmount: 0,
-              tertiaryAmount: 0,
-            }
+          : item.amounts.kind === 'owner_penalty'
+            ? {
+                amount: Number(item.amounts.amount),
+                secondaryAmount: 0,
+                tertiaryAmount: 0,
+              }
+            : {
+                amount: Number(item.amounts.contractEstimate),
+                secondaryAmount: 0,
+                tertiaryAmount: 0,
+              }
     const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
       ? {
           viewVariant: 'acceptance' as const,
@@ -138,6 +144,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
       id: item.id,
       no: item.no,
       name: item.name,
+      noticeNo: item.ownerPenaltyFacts?.noticeNo,
       projectId: item.project.state === 'resolved' ? item.project.id : null,
       projectName: item.project.state === 'resolved' ? item.project.label : '',
       contractId: item.contract.state === 'resolved' ? item.contract.id : null,
