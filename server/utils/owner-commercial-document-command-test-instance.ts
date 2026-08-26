@@ -24,6 +24,8 @@ import {
 import {
   ownerCommercialDocumentProblem,
   OwnerCommercialDocumentRepositoryProblem,
+  ownerFinalSettlementReceiptIsActive,
+  ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
 
@@ -44,6 +46,7 @@ interface ContractSeed {
   name: string
   projectId: string
   customerId: string | null
+  amount?: number | null
 }
 
 interface BoqLineSeed extends OwnerDocumentBoqLine {
@@ -63,6 +66,28 @@ interface MonthlyQuantityFactSeed {
   sourceUpdatedAt: string | null
 }
 
+interface FinalSettlementSupplementSeed {
+  contractId: string
+  id: string
+  no: string
+  name: string
+  status: string
+  amount: number
+  date: string | null
+}
+
+interface FinalSettlementReceiptSeed {
+  contractId: string
+  projectId: string
+  customerId: string
+  id: string
+  no: string
+  name: string
+  status: string
+  amount: number
+  date: string | null
+}
+
 export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   now?: () => string
   createId?: (kind: OwnerCommercialDocumentKind) => string
@@ -73,6 +98,8 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   contracts?: readonly ContractSeed[]
   boqLines?: readonly BoqLineSeed[]
   monthlyQuantityFacts?: readonly MonthlyQuantityFactSeed[]
+  finalSettlementSupplements?: readonly FinalSettlementSupplementSeed[]
+  finalSettlementReceipts?: readonly FinalSettlementReceiptSeed[]
   documents?: readonly OwnerCommercialDocumentSource[]
 }
 
@@ -80,8 +107,15 @@ interface WorkspaceState {
   documents: Map<string, OwnerCommercialDocumentSource>
   commands: Map<string, OwnerCommercialDocumentCommandResultDTO>
   migrationKeys: Set<string>
+  projects: Map<string, ProjectSeed>
+  customers: Map<string, CustomerSeed>
+  contracts: Map<string, ContractSeed>
   boqLines: Map<string, BoqLineSeed>
   monthlyQuantityFacts: MonthlyQuantityFactSeed[]
+  finalSettlementSupplements: Map<string, FinalSettlementSupplementSeed>
+  finalSettlementReceipts: Map<string, FinalSettlementReceiptSeed>
+  finalSettlementSupplementsKnownContractIds: Set<string>
+  finalSettlementReceiptsKnownContractIds: Set<string>
   sourceVersion: number
 }
 
@@ -146,7 +180,9 @@ function approvalBusinessDate(source: OwnerCommercialDocumentSource): string {
 function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
   if (kind === 'owner_change')
     return 'owner_change_order'
-  return kind === 'owner_report' ? 'monthly_statement' : 'project_acceptance'
+  if (kind === 'owner_report')
+    return 'monthly_statement'
+  return kind === 'final_settlement' ? 'owner_final_settlement' : 'project_acceptance'
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
@@ -209,6 +245,39 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
       warrantyConfirmationDate: lifecycle?.warrantyConfirmationDate ?? null,
       warrantyConfirmationNote: lifecycle?.warrantyConfirmationNote ?? '',
       lifecycleEvents: lifecycle?.events.map(clone) ?? [],
+      status: source.status,
+      statusNote: source.statusNote,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+      sourceLocked: source.sourceLocked,
+      note: source.note,
+      lines: [],
+    }
+  }
+  if (source.kind === 'final_settlement') {
+    const amounts = source.finalSettlementEvidence
+    const activeSupplements = amounts?.supplements?.filter(item => ownerFinalSettlementSupplementIsActive(item.status)) ?? null
+    const activeReceipts = amounts?.receipts?.filter(item => ownerFinalSettlementReceiptIsActive(item.status)) ?? null
+    const changedContractAmount = amounts?.originalContractAmount == null || activeSupplements == null
+      ? null
+      : round(amounts.originalContractAmount + activeSupplements.reduce((sum, item) => sum + item.amount, 0))
+    const receivedAmount = activeReceipts == null
+      ? null
+      : round(activeReceipts.reduce((sum, item) => sum + item.amount, 0))
+    return {
+      id: source.id,
+      no: source.no,
+      name: source.name,
+      projectId: source.projectId,
+      contractId: source.contractId,
+      settlementAmount: source.amount,
+      auditedAmount: source.auditedAmount,
+      submissionDate: source.applicationDate ?? '',
+      changedContractAmount,
+      receivedAmount,
+      settlementReceiptGap: receivedAmount == null ? null : round(source.amount - receivedAmount),
+      basis: source.settlementBasis ?? '',
+      differenceNote: source.settlementDifferenceNote ?? '',
       status: source.status,
       statusNote: source.statusNote,
       sourceType: source.sourceType,
@@ -328,30 +397,142 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   const baseContracts = (options.contracts ?? []).map(clone)
   const baseBoqLines = (options.boqLines ?? []).map(clone)
   const baseMonthlyQuantityFacts = (options.monthlyQuantityFacts ?? []).map(clone)
-  const projects = new Map(baseProjects.map(row => [row.id, clone(row)]))
-  const customers = new Map(baseCustomers.map(row => [row.id, clone(row)]))
-  const contracts = new Map(baseContracts.map(row => [row.id, clone(row)]))
+  const baseDocuments = (options.documents ?? []).map(clone)
+  const embeddedFinalSettlements = baseDocuments.filter(row => row.kind === 'final_settlement')
+  const baseFinalSettlementSupplements = options.finalSettlementSupplements !== undefined
+    ? options.finalSettlementSupplements.map(clone)
+    : embeddedFinalSettlements.flatMap(row => (row.finalSettlementEvidence?.supplements ?? []).map(source => ({
+        contractId: row.contractId ?? '',
+        ...clone(source),
+      }))).filter(source => Boolean(source.contractId))
+  const baseFinalSettlementReceipts = options.finalSettlementReceipts !== undefined
+    ? options.finalSettlementReceipts.map(clone)
+    : embeddedFinalSettlements.flatMap(row => (row.finalSettlementEvidence?.receipts ?? []).map(source => ({
+        contractId: row.contractId ?? '',
+        projectId: row.projectId ?? '',
+        customerId: row.customerId ?? '',
+        ...clone(source),
+      }))).filter(source => Boolean(source.contractId && source.projectId && source.customerId))
+  const projectIds = new Set(baseProjects.map(row => row.id))
+  const customerIds = new Set(baseCustomers.map(row => row.id))
+  const contractIds = new Set(baseContracts.map(row => row.id))
+  for (const row of baseDocuments) {
+    if (row.projectId && !projectIds.has(row.projectId)) {
+      const project = {
+        id: row.projectId,
+        name: row.projectName,
+        customerId: row.customerId,
+      }
+      baseProjects.push(clone(project))
+      projectIds.add(row.projectId)
+    }
+    if (row.customerId && !customerIds.has(row.customerId)) {
+      const customer = { id: row.customerId, name: row.customerName }
+      baseCustomers.push(clone(customer))
+      customerIds.add(row.customerId)
+    }
+    if (row.kind === 'final_settlement' && row.contractId && row.projectId && !contractIds.has(row.contractId)) {
+      const contract = {
+        id: row.contractId,
+        no: row.contractNo,
+        name: row.contractName,
+        projectId: row.projectId,
+        customerId: row.customerId,
+        amount: row.finalSettlementEvidence?.originalContractAmount ?? null,
+      }
+      baseContracts.push(clone(contract))
+      contractIds.add(row.contractId)
+    }
+  }
+  const baseFinalSettlementSupplementsKnownContractIds = options.finalSettlementSupplements !== undefined
+    ? new Set(baseContracts.map(row => row.id))
+    : new Set(embeddedFinalSettlements
+        .filter(row => row.contractId && row.finalSettlementEvidence?.supplements != null)
+        .map(row => row.contractId!))
+  const baseFinalSettlementReceiptsKnownContractIds = options.finalSettlementReceipts !== undefined
+    ? new Set(baseContracts.map(row => row.id))
+    : new Set(embeddedFinalSettlements
+        .filter(row => row.contractId && row.finalSettlementEvidence?.receipts != null)
+        .map(row => row.contractId!))
   const workspaces = new Map<string, WorkspaceState>()
 
   function freshState(): WorkspaceState {
     return {
-      documents: new Map((options.documents ?? []).map(row => [key(row.kind, row.id), clone(row)])),
+      documents: new Map(baseDocuments.map(row => [key(row.kind, row.id), clone(row)])),
       commands: new Map(),
       migrationKeys: new Set(),
+      projects: new Map(baseProjects.map(row => [row.id, clone(row)])),
+      customers: new Map(baseCustomers.map(row => [row.id, clone(row)])),
+      contracts: new Map(baseContracts.map(row => [row.id, clone(row)])),
       boqLines: new Map(baseBoqLines.map(row => [row.id, clone(row)])),
       monthlyQuantityFacts: baseMonthlyQuantityFacts.map(clone),
+      finalSettlementSupplements: new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)])),
+      finalSettlementReceipts: new Map(baseFinalSettlementReceipts.map(row => [row.id, clone(row)])),
+      finalSettlementSupplementsKnownContractIds: new Set(baseFinalSettlementSupplementsKnownContractIds),
+      finalSettlementReceiptsKnownContractIds: new Set(baseFinalSettlementReceiptsKnownContractIds),
       sourceVersion: 1,
     }
   }
 
+  function workspaceKey(sessionId?: string | null): string {
+    return sessionId || 'default'
+  }
+
   function stateFor(sessionId?: string | null): WorkspaceState {
-    const workspaceKey = sessionId || 'default'
-    let state = workspaces.get(workspaceKey)
+    const key = workspaceKey(sessionId)
+    let state = workspaces.get(key)
     if (!state) {
       state = freshState()
-      workspaces.set(workspaceKey, state)
+      workspaces.set(key, state)
     }
     return state
+  }
+
+  function finalSettlementEvidenceForContract(state: WorkspaceState, contractId: string | null) {
+    const contract = contractId ? state.contracts.get(contractId) ?? null : null
+    if (!contract)
+      return undefined
+    const project = state.projects.get(contract.projectId) ?? null
+    const customerId = contract.customerId ?? project?.customerId ?? null
+    return {
+      originalContractAmount: contract.amount ?? null,
+      supplements: state.finalSettlementSupplementsKnownContractIds.has(contract.id)
+        ? [...state.finalSettlementSupplements.values()]
+            .filter(source => source.contractId === contract.id)
+            .map(({ contractId: _contractId, ...source }) => clone(source))
+        : null,
+      receipts: state.finalSettlementReceiptsKnownContractIds.has(contract.id)
+        ? [...state.finalSettlementReceipts.values()]
+            .filter(source => source.contractId === contract.id
+              && source.projectId === contract.projectId
+              && source.customerId === customerId)
+            .map(({ contractId: _contractId, projectId: _projectId, customerId: _customerId, ...source }) => clone(source))
+        : null,
+    }
+  }
+
+  function withFinalSettlementEvidence(
+    state: WorkspaceState,
+    source: OwnerCommercialDocumentSource,
+  ): OwnerCommercialDocumentSource {
+    const hydrated = clone(source)
+    if (hydrated.kind === 'final_settlement')
+      hydrated.finalSettlementEvidence = finalSettlementEvidenceForContract(state, hydrated.contractId)
+    return hydrated
+  }
+
+  function contractSummary(state: WorkspaceState, contract: ContractSeed) {
+    const evidence = finalSettlementEvidenceForContract(state, contract.id)
+    const activeSupplements = evidence?.supplements?.filter(source => ownerFinalSettlementSupplementIsActive(source.status)) ?? null
+    const activeReceipts = evidence?.receipts?.filter(source => ownerFinalSettlementReceiptIsActive(source.status)) ?? null
+    return {
+      changedContractAmount: evidence?.originalContractAmount == null || activeSupplements == null
+        ? null
+        : round(evidence.originalContractAmount + activeSupplements.reduce((sum, source) => sum + source.amount, 0)),
+      receivedAmount: activeReceipts == null
+        ? null
+        : round(activeReceipts.reduce((sum, source) => sum + source.amount, 0)),
+    }
   }
 
   function authorize(session: BusinessSession): void {
@@ -386,19 +567,19 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       throw failure('conflict', '甲方商务单据已被其他操作更新，请先处理最新版本')
   }
 
-  function relations(draft: OwnerDocumentDraft, complete: boolean) {
+  function relations(state: WorkspaceState, draft: OwnerDocumentDraft, complete: boolean) {
     const projectId = complete ? required(draft.projectId, '项目') : text(draft.projectId)
     const contractId = complete ? required(draft.contractId, '施工合同') : text(draft.contractId)
     if (contractId && !projectId)
       throw failure('relationship-mismatch', '选择施工合同前必须先选择项目')
-    const project = projectId ? projects.get(projectId) ?? null : null
-    const contract = contractId ? contracts.get(contractId) ?? null : null
+    const project = projectId ? state.projects.get(projectId) ?? null : null
+    const contract = contractId ? state.contracts.get(contractId) ?? null : null
     if (projectId && !project)
       throw failure('relationship-mismatch', '项目不存在或已删除')
     if (contractId && (!contract || contract.projectId !== projectId))
       throw failure('relationship-mismatch', '施工合同不存在、已删除或不属于所选项目')
     const customerId = contract?.customerId ?? project?.customerId ?? null
-    const customer = customerId ? customers.get(customerId) ?? null : null
+    const customer = customerId ? state.customers.get(customerId) ?? null : null
     return { project, contract, customerId, customer }
   }
 
@@ -660,12 +841,60 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const timestamp = now()
     const id = current?.id ?? createId(request.kind)
     const isSubmit = request.action === 'submit'
-    const relation = relations(request.draft, isSubmit)
-    const applicationDate = text(request.draft.applicationDate)
+    const relation = relations(state, request.draft, isSubmit)
+    const applicationDate = request.kind === 'final_settlement'
+      ? text(request.draft.submissionDate)
+      : text(request.draft.applicationDate)
     if (applicationDate && !isIsoDate(applicationDate))
       throw failure('validation-failed', '申报日期格式必须为 yyyy-mm-dd')
     if (isSubmit && !applicationDate)
       throw failure('validation-failed', '申报日期必填')
+    if (request.kind === 'final_settlement') {
+      const name = isSubmit ? required(request.draft.name, '结算名称') : text(request.draft.name)
+      const settlementAmount = nullableNumber(request.draft.settlementAmount)
+      if (isSubmit && (settlementAmount == null || settlementAmount <= 0))
+        throw failure('validation-failed', '结算金额必须大于 0')
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'final_settlement',
+        id,
+        no: text(request.draft.no) || `JS-${id}`,
+        name,
+        documentType: 'final_settlement',
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: relation.customerId,
+        customerName: relation.customer?.name ?? '',
+        customerPermission: 'allowed',
+        contractId: relation.contract?.id ?? null,
+        contractNo: relation.contract?.no ?? '',
+        contractName: relation.contract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'owner_final_settlement',
+        sourceId: id,
+        sourceLocked: isSubmit,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: current?.approvalDate ?? null,
+        status: isSubmit ? 'submitted' : 'draft',
+        statusNote: isSubmit ? '已提交甲方结算资料' : '',
+        amount: round(settlementAmount ?? 0),
+        auditedAmount: current?.auditedAmount ?? null,
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+        settlementBasis: text(request.draft.basis),
+        settlementDifferenceNote: text(request.draft.differenceNote),
+        finalSettlementEvidence: undefined,
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
     if (request.kind === 'acceptance') {
       assertAcceptanceAttachmentCategories(request.attachments, 'acceptance-report', current?.files)
       const name = isSubmit ? required(request.draft.name, '验收名称') : text(request.draft.name)
@@ -1135,26 +1364,30 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     }
   }
 
-  function synchronizeMigrationSnapshot(
+  function prepareMigrationSnapshot(
     snapshot: CoreMigrationSnapshotDTO,
     sessionId?: string | null,
-  ): void {
-    const state = stateFor(sessionId)
+  ): () => void {
+    const state = clone(stateFor(sessionId))
     for (const migratedKey of state.migrationKeys)
       state.documents.delete(migratedKey)
     state.migrationKeys.clear()
     state.monthlyQuantityFacts = baseMonthlyQuantityFacts.map(clone)
+    state.finalSettlementSupplements = new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)]))
+    state.finalSettlementReceipts = new Map(baseFinalSettlementReceipts.map(row => [row.id, clone(row)]))
+    state.finalSettlementSupplementsKnownContractIds = new Set(baseFinalSettlementSupplementsKnownContractIds)
+    state.finalSettlementReceiptsKnownContractIds = new Set(baseFinalSettlementReceiptsKnownContractIds)
 
-    projects.clear()
-    customers.clear()
-    contracts.clear()
+    state.projects.clear()
+    state.customers.clear()
+    state.contracts.clear()
     state.boqLines.clear()
     for (const row of baseProjects)
-      projects.set(row.id, clone(row))
+      state.projects.set(row.id, clone(row))
     for (const row of baseCustomers)
-      customers.set(row.id, clone(row))
+      state.customers.set(row.id, clone(row))
     for (const row of baseContracts)
-      contracts.set(row.id, clone(row))
+      state.contracts.set(row.id, clone(row))
     for (const row of baseBoqLines)
       state.boqLines.set(row.id, clone(row))
 
@@ -1163,29 +1396,85 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (entity.deletedAt !== null)
         continue
       if (entity.entityType === 'customers')
-        customers.set(entity.id, { id: entity.id, name: entity.name })
+        state.customers.set(entity.id, { id: entity.id, name: entity.name })
       if (entity.entityType === 'projects') {
-        projects.set(entity.id, {
+        state.projects.set(entity.id, {
           id: entity.id,
           name: entity.name,
           customerId: entity.references.customerId ?? null,
         })
       }
       if (entity.entityType === 'construction_contracts') {
-        contracts.set(entity.id, {
+        state.contracts.set(entity.id, {
           id: entity.id,
           no: entityAttribute(entity, 'no'),
           name: entity.name,
           projectId: entity.references.projectId ?? '',
           customerId: entity.references.customerId ?? null,
+          amount: entityNumberAttribute(entity, 'amount') ?? (entity.amount == null ? null : number(entity.amount)),
         })
+      }
+    }
+
+    if (snapshot.authority === 'central') {
+      const subcontractContractIds = new Set(entities
+        .filter(entity => entity.entityType === 'subcontract_contracts' && entity.deletedAt === null)
+        .map(entity => entity.id))
+      state.finalSettlementSupplementsKnownContractIds = new Set(state.contracts.keys())
+      state.finalSettlementReceiptsKnownContractIds = new Set(state.contracts.keys())
+      for (const entity of entities) {
+        if (entity.deletedAt !== null)
+          continue
+        if (entity.entityType === 'contract_supplements') {
+          const contractId = entity.references.contractId ?? ''
+          if (subcontractContractIds.has(contractId))
+            continue
+          if (!state.contracts.has(contractId))
+            throw failure('relationship-mismatch', '迁移补充协议的施工合同关系无效')
+          if (entity.amount === null)
+            throw failure('validation-failed', '迁移补充协议金额缺失')
+          state.finalSettlementSupplements.set(entity.id, {
+            contractId,
+            id: entity.id,
+            no: entityAttribute(entity, 'no'),
+            name: entity.name,
+            status: entityAttribute(entity, 'status'),
+            amount: number(entity.amount),
+            date: entityAttribute(entity, 'signDate') || null,
+          })
+        }
+        if (entity.entityType === 'receipt_registrations') {
+          const contractId = entity.references.contractId ?? ''
+          const projectId = entity.references.projectId ?? ''
+          const customerId = entity.references.customerId ?? ''
+          const contract = state.contracts.get(contractId) ?? null
+          const project = state.projects.get(projectId) ?? null
+          const expectedCustomerId = contract?.customerId ?? project?.customerId ?? null
+          if (!contract || !project || contract.projectId !== project.id
+            || !customerId || customerId !== expectedCustomerId || !state.customers.has(customerId)) {
+            throw failure('relationship-mismatch', '迁移收款登记的项目、施工合同与客户关系无效')
+          }
+          if (entity.amount === null)
+            throw failure('validation-failed', '迁移收款登记金额缺失')
+          state.finalSettlementReceipts.set(entity.id, {
+            contractId,
+            projectId,
+            customerId,
+            id: entity.id,
+            no: entityAttribute(entity, 'no'),
+            name: entity.name,
+            status: entityAttribute(entity, 'status'),
+            amount: number(entity.amount),
+            date: entityAttribute(entity, 'receiptDate') || null,
+          })
+        }
       }
     }
 
     for (const entity of entities) {
       if (entity.entityType !== 'construction_contracts' || entity.deletedAt !== null)
         continue
-      const contract = contracts.get(entity.id)
+      const contract = state.contracts.get(entity.id)
       const projectId = entity.references.projectId ?? ''
       if (!contract || !projectId || contract.projectId !== projectId)
         throw failure('relationship-mismatch', '迁移 BOQ 目录的项目与施工合同关系无效')
@@ -1236,18 +1525,20 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (entity.entityType !== 'owner_documents' || entity.deletedAt !== null)
         continue
       const kind = entityAttribute(entity, 'kind')
-      if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance')
+      if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance' && kind !== 'final_settlement')
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
       const projectId = entity.references.projectId ?? null
       const contractId = entity.references.contractId ?? null
-      const project = projectId ? projects.get(projectId) ?? null : null
-      const contract = contractId ? contracts.get(contractId) ?? null : null
+      const project = projectId ? state.projects.get(projectId) ?? null : null
+      const contract = contractId ? state.contracts.get(contractId) ?? null : null
       if (!project || !contract || contract.projectId !== project.id)
         throw failure('relationship-mismatch', '迁移甲方商务单据的项目与施工合同关系无效')
       const customerId = contract.customerId ?? project.customerId
-      const customer = customerId ? customers.get(customerId) ?? null : null
+      const customer = customerId ? state.customers.get(customerId) ?? null : null
       const sourceTypeRaw = entityAttribute(entity, 'sourceType')
-      const sourceType = sourceTypeRaw === 'manual' || sourceTypeRaw === 'monthly_statement'
+      const sourceType = sourceTypeRaw === 'manual'
+        || sourceTypeRaw === 'monthly_statement'
+        || sourceTypeRaw === 'owner_final_settlement'
         ? sourceTypeRaw
         : 'boq_change_order'
       const rawLines = jsonRecords(entityAttribute(entity, 'linesJson'))
@@ -1324,6 +1615,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         owner_change: ['draft', 'rejected', 'submitted', 'approved'],
         owner_report: ['draft', 'reported', 'audited'],
         acceptance: ['draft', 'submitted', 'accepted', 'warranty', 'expired'],
+        final_settlement: ['draft', 'submitted', 'audited'],
       }
       if (!statusesByKind[kind].includes(status)) {
         throw failure(
@@ -1463,6 +1755,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
               events: lifecycleEvents,
             }
           : undefined,
+        settlementBasis: kind === 'final_settlement'
+          ? entityAttribute(entity, 'settlementBasis')
+          : undefined,
+        settlementDifferenceNote: kind === 'final_settlement'
+          ? entityAttribute(entity, 'settlementDifferenceNote')
+          : undefined,
+        finalSettlementEvidence: undefined,
       }
       const documentKey = key(kind, source.id)
       if (state.documents.has(documentKey))
@@ -1488,6 +1787,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       }
     }
     state.sourceVersion += 1
+    return () => workspaces.set(workspaceKey(sessionId), state)
+  }
+
+  function synchronizeMigrationSnapshot(
+    snapshot: CoreMigrationSnapshotDTO,
+    sessionId?: string | null,
+  ): void {
+    prepareMigrationSnapshot(snapshot, sessionId)()
   }
 
   return {
@@ -1498,7 +1805,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         workspaces.clear()
     },
     rows(sessionId?: string | null) {
-      return [...stateFor(sessionId).documents.values()].map(clone)
+      const state = stateFor(sessionId)
+      return [...state.documents.values()].map(source => withFinalSettlementEvidence(state, source))
     },
     sourceVersion(sessionId?: string | null) {
       return `owner-document-command-${stateFor(sessionId).sourceVersion}`
@@ -1524,21 +1832,24 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         state.sourceVersion += 1
       return imported
     },
+    prepareMigrationSnapshot,
     synchronizeMigrationSnapshot,
-    context(session: BusinessSession): OwnerCommercialDocumentCommandContextDTO {
+    context(session: BusinessSession, sessionId?: string | null): OwnerCommercialDocumentCommandContextDTO {
       authorize(session)
+      const state = stateFor(sessionId)
       return {
         workspaceId: session.workspaceId,
         actorId: session.actorId,
         capabilities: [...session.capabilities],
-        projects: [...projects.values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
-        customers: [...customers.values()].map(row => ({ id: row.id, label: row.name })),
-        contracts: [...contracts.values()].map(row => ({
+        projects: [...state.projects.values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
+        customers: [...state.customers.values()].map(row => ({ id: row.id, label: row.name })),
+        contracts: [...state.contracts.values()].map(row => ({
           id: row.id,
           label: row.name,
           hint: row.no,
           projectId: row.projectId,
           customerId: row.customerId,
+          ...contractSummary(state, row),
         })),
       }
     },
@@ -1574,7 +1885,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       sessionId?: string | null,
     ): OwnerCommercialDocumentFormReadDTO {
       authorize(session)
-      const source = document(stateFor(sessionId), kind, id)
+      const state = stateFor(sessionId)
+      const stored = document(state, kind, id)
+      const source = stored ? withFinalSettlementEvidence(state, stored) : null
       if (!source)
         throw failure('not-found', '甲方商务单据不存在或已删除')
       return {
@@ -1635,6 +1948,27 @@ export const ownerCommercialDocumentCommandTestInstance
       name: '既有中央施工合同',
       projectId: 'project-real-320',
       customerId: 'customer-real-320',
+      amount: 1200000,
+    }],
+    finalSettlementSupplements: [{
+      contractId: 'construction-contract-existing-320',
+      id: 'supplement-real-325',
+      no: 'BC-2026-325',
+      name: '结算范围补充协议',
+      status: 'approved',
+      amount: 80000,
+      date: '2026-08-12',
+    }],
+    finalSettlementReceipts: [{
+      contractId: 'construction-contract-existing-320',
+      projectId: 'project-real-320',
+      customerId: 'customer-real-320',
+      id: 'receipt-real-325',
+      no: 'SK-2026-325',
+      name: '甲方工程款收款',
+      status: 'submitted',
+      amount: 900000,
+      date: '2026-08-15',
     }],
     boqLines: [{
       id: 'boq-line-real-323',

@@ -5640,6 +5640,23 @@ export const migrations: Migration[] = [
       `)
     },
   },
+  {
+    version: 45,
+    name: 'owner-final-settlement-audit-facts',
+    async up(db) {
+      // 既有最终结算没有可核验的审定金额与日期。只增加可空事实列，
+      // 不根据申报金额、状态或收款差额推断历史审定结果。
+      if (!(await tableExists(db, 'owner_final_settlements')))
+        return
+      await addColumnIfMissing(
+        db,
+        'owner_final_settlements',
+        'audited_amount',
+        'REAL DEFAULT NULL CHECK (audited_amount IS NULL OR audited_amount >= 0)',
+      )
+      await addColumnIfMissing(db, 'owner_final_settlements', 'audited_date', 'TEXT DEFAULT NULL')
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

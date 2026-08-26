@@ -10,7 +10,7 @@
 
 当前落地事实（#318）：浏览器材料采购合同按 `(dataOrigin, contractId)` 从中央 Repository 读取，只有 `kind='材采'` 才进入该详情；项目、分供方、明细、发票、付款、结算、罚扣、下料、到货和文件均以稳定 ID/外键归属，零记录保持空集合。正式新增/编辑只走中央材料合同命令，服务端分配合同与明细 ID、执行幂等和乐观锁并复算明细金额；演示来源只读。该切片不改变 SQLite schema，也不授权按名称、项目或金额补关系。
 
-当前落地事实（#320、#321、#324）：浏览器施工/分包合同都按 `(dataOrigin, contractId, kind)` 从各自中央 Repository 读取，关联事实只按稳定合同外键归属。正式新增/编辑只走对应中央命令；演示来源只读。SQLite v42 增加可空 `actual_completion_date`；v43 增加可空 `settlement_status` 与 `clearance_status`；v44 为同一 `project_acceptances` 记录增加验收/保修专属事实与追加式生命周期事件表。迁移不猜测存量的日期、状态、结论或审计历史。
+当前落地事实（#320、#321、#324、#325）：浏览器施工/分包合同都按 `(dataOrigin, contractId, kind)` 从各自中央 Repository 读取，关联事实只按稳定合同外键归属。正式新增/编辑只走对应中央命令；演示来源只读。SQLite v42 增加可空 `actual_completion_date`；v43 增加可空 `settlement_status` 与 `clearance_status`；v44 为同一 `project_acceptances` 记录增加验收/保修专属事实与追加式生命周期事件表；v45 为 `owner_final_settlements` 增加可空 `audited_amount` 和 `audited_date`。迁移不猜测存量的日期、金额、状态、结论或审计历史。
 
 当前落地事实（#322）：受控迁移拓扑在 canonical 施工合同、canonical 分包合同之后追加 `contract_supplements`，再迁移工人和项目分供方。补充协议的旧 `contract_id` 必须唯一映射到施工或分包主合同的中央 ID；缺失或跨类型歧义均阻断，不猜父合同。详情按服务端稳定补充协议 ID 聚焦，并在读取层验证该记录存在且 `contractId` 与当前主合同一致；不存在与父子错配使用不同问题语义。正式迁移确认后，两类详情从同一中央命令事实源读取补充协议；本切片不改变 SQLite 物理 schema。
 
@@ -282,11 +282,14 @@ monthly_statement_lines(
 )
 ```
 
-#323 的核心迁移拓扑使用逻辑实体名 `owner_documents`，它不是新 SQLite 表。本地 adapter 按以下规则只读投影现有权威表，并将行与附件作为同一 canonical 单据的嵌套属性受控导入：
+#323/#324/#325 的核心迁移拓扑使用逻辑实体名 `owner_documents`，它不是新 SQLite 表。本地 adapter 按以下规则只读投影现有权威表，并将行与附件作为同一 canonical 单据的嵌套属性受控导入：
 
 - `boq_change_orders` + `boq_change_lines`：量价变更头/行；已生成 `ledger_id` 的锁定 `owner_change_orders` 行不重复导入。
 - `owner_change_orders`：只投影手录纯金额签证或没有 BOQ 源的兼容记录。
 - `monthly_statements` + `monthly_statement_lines`：作为甲方报量的唯一头/行事实，保留自动量、申报量、审定量、单价与两档金额。
+- `project_acceptances` + `project_acceptance_lifecycle_events`：作为验收—保修同 ID 生命周期的唯一主记录与追加事件。
+- `owner_final_settlements`：作为甲方最终结算唯一头事实；报审/审定金额分字段读取，审定事实缺失保持 `null`。
+- `receipt_registrations`：在 `owner_documents` 之前作为一等迁移实体，按稳定项目/合同/客户外键归属，供最终结算查询时聚合与收款详情下钻。
 - canonical 施工合同迁移嵌套快照：同步完整、未软删除的 `boq_lines` 目录，以及按期次与稳定 BOQ 行派生的 field 完成量事实。它们不另建业务表，但不得只从旧变洽签/旧月报量明细反推，否则从未成单的 BOQ 行和新期次事实会在切换后消失。历史单据行是冻结时点证据：同一稳定 BOQ ID 已在完整目录中时只校验项目—合同归属，不用历史名称、数量或单价覆盖当前 canonical 目录；只有目录缺行时才以历史行兜底。
 - `file_refs`：按真实 `owner_type + owner_id` 取有效文件引用，不复制文件正文。
 
@@ -1169,6 +1172,8 @@ owner_final_settlements(
   id, no TEXT DEFAULT '', name TEXT NOT NULL,
   project_id TEXT REFERENCES projects(id), contract_id TEXT REFERENCES contracts(id),
   settlement_amount REAL DEFAULT 0 CHECK (settlement_amount >= 0),
+  audited_amount REAL NULL CHECK (audited_amount IS NULL OR audited_amount >= 0),
+  audited_date TEXT NULL,
   submission_date TEXT DEFAULT '', basis TEXT DEFAULT '',
   difference_note TEXT DEFAULT '',
   status, note, created_at, updated_at, deleted_at
@@ -1217,7 +1222,7 @@ penalty_settlement_deductions(
 
 最终结算只读口径不读 `contracts.changed/paid`：变更后合同金额取
 `contracts.amount + Σ非草稿 contract_supplements.amount`，累计收款取同合同的活跃
-`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。
+`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。结算申报金额取 `settlement_amount`；审定金额/日期只取 `audited_amount` / `audited_date`，任一未记录都返回 `null`，不用申报值、状态或 `0` 代填。
 
 > v24 实装核对：v1-v23 物理库并未创建蓝本已声明的 `penalty_records`，因此 F5 迁移按本节与 `pages/base-crew.md` 的既有字段一次性建表，并同时加入 F5 外键和软删除列；不另建项目罚扣头表。
 

@@ -12,6 +12,28 @@ const envelope = {
 }
 
 describe('甲方商务单据 HTTP 命令解析', () => {
+  it('接受最终结算保存命令的有限字段', () => {
+    const request = parseOwnerCommercialDocumentCommandRequest({
+      ...envelope,
+      kind: 'final_settlement',
+      action: 'save',
+      draft: {
+        projectId: 'project-real-320',
+        contractId: 'construction-contract-existing-320',
+        settlementAmount: 1280000,
+        auditedAmount: null,
+        settlementBasis: '施工合同与已确认补充协议',
+      },
+      attachments: { add: [], removeIds: [], restoreIds: [] },
+    })
+
+    expect(request).toMatchObject({
+      kind: 'final_settlement',
+      action: 'save',
+      draft: { settlementAmount: 1280000, auditedAmount: null },
+    })
+  })
+
   it('拒绝畸形 draft 行和附件嵌套对象', () => {
     expect(() => parseOwnerCommercialDocumentCommandRequest({
       ...envelope,

@@ -51,6 +51,52 @@ function source(
 }
 
 export const OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS: OwnerCommercialDocumentSource[] = [
+  source('final_settlement', {
+    id: 'final-settlement-real-325',
+    no: 'JS-2026-325',
+    name: '中央正式施工项目甲方最终结算',
+    documentType: 'final_settlement',
+    sourceType: 'owner_final_settlement',
+    sourceLocked: true,
+    applicationDate: '2026-08-23',
+    status: 'submitted',
+    statusNote: '已提交甲方结算资料',
+    amount: 1280000,
+    auditedAmount: null,
+    note: '等待甲方审定',
+    updatedAt: '2026-08-23T00:00:00.000Z',
+    settlementBasis: '施工合同、已确认补充协议及最终结算书',
+    settlementDifferenceNote: '审定金额尚未回传',
+    finalSettlementEvidence: {
+      originalContractAmount: 1200000,
+      supplements: [{
+        id: 'supplement-real-325',
+        no: 'BC-2026-325',
+        name: '结算范围补充协议',
+        status: 'approved',
+        amount: 80000,
+        date: '2026-08-12',
+      }],
+      receipts: [{
+        id: 'receipt-real-325',
+        no: 'SK-2026-325',
+        name: '甲方工程款收款',
+        status: 'submitted',
+        amount: 900000,
+        date: '2026-08-15',
+      }],
+    },
+    files: [{
+      id: 'file-final-settlement-real-325',
+      fileName: '甲方最终结算书.pdf',
+      fileSize: 8192,
+      mimeType: 'application/pdf',
+      category: 'settlement-book',
+      uploader: '商务经理',
+      uploadedAt: '2026-08-23T10:00:00.000Z',
+      deletedAt: null,
+    }],
+  }),
   source('acceptance', {
     id: 'acceptance-real-324',
     no: 'YS-2026-324',

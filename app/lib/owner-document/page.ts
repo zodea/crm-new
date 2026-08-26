@@ -254,7 +254,8 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
 
 export function ownerDocumentFormPath(kind: OwnerDocumentKind, id?: string): string {
   const listPath = OWNER_DOCUMENT_META[kind].listPath
-  const centralReadOnly = kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
+  const centralReadOnly = kind === 'owner_change' || kind === 'owner_report'
+    || kind === 'acceptance' || kind === 'final_settlement'
   return id && centralReadOnly ? `${listPath}/form/${id}` : id ? `${listPath}/${id}` : `${listPath}/new`
 }
 
@@ -264,8 +265,10 @@ export function ownerDocumentDetailPath(
   origin: 'real' | 'demo' = 'real',
   variant?: 'acceptance' | 'warranty',
 ): string {
-  if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance')
+  if (kind !== 'owner_change' && kind !== 'owner_report'
+    && kind !== 'acceptance' && kind !== 'final_settlement') {
     throw new Error('该甲方单据类型尚无中央只读详情')
+  }
   const query = new URLSearchParams({ origin })
   if (kind === 'acceptance')
     query.set('variant', variant ?? 'acceptance')
@@ -397,6 +400,7 @@ export function validateOwnerDocumentForm(
     case 'final_settlement':
       require('name', '结算名称')
       require('projectId', '项目')
+      require('contractId', '施工合同')
       require('settlementAmount', '结算金额', true)
       require('submissionDate', '报审日期')
       break

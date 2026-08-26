@@ -103,6 +103,11 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
       orphanWhenMissing: true,
     },
   ],
+  receipt_registrations: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'contractId', target: 'construction_contracts', orphanWhenMissing: true },
+    { field: 'customerId', target: 'customers', orphanWhenMissing: true },
+  ],
   owner_documents: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'contractId', target: 'construction_contracts', orphanWhenMissing: true },
@@ -964,20 +969,27 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   }
 }
 
+export interface CoreMigrationCommandSource {
+  prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => () => void
+}
+
+export function synchronizeCoreMigrationCommandSources(
+  snapshot: CoreMigrationSnapshotDTO,
+  sources: readonly CoreMigrationCommandSource[],
+): void {
+  const commits = sources.map(source => source.prepareMigrationSnapshot(snapshot))
+  for (const commit of commits)
+    commit()
+}
+
+const commandSources = [
+  constructionContractCommandTestInstance,
+  subcontractContractCommandTestInstance,
+  ownerCommercialDocumentCommandTestInstance,
+] as const
+
 export const coreMigrationTestInstance = createCoreMigrationTestInstance({
-  afterConfirm: (snapshot) => {
-    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-  },
-  afterRollback: (snapshot) => {
-    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-  },
-  afterReset: (snapshot) => {
-    constructionContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    subcontractContractCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-    ownerCommercialDocumentCommandTestInstance.synchronizeMigrationSnapshot(snapshot)
-  },
+  afterConfirm: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
+  afterRollback: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
+  afterReset: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
 })

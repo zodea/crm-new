@@ -17,20 +17,22 @@ describe('f5 单据页面模型', () => {
       expect(ownerDocumentKindFromRoute(meta.routeScope, meta.routeKind)).toBe(kind)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META)).toBe(`${meta.listPath}/new`)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(
-        kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
+        kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance' || kind === 'final_settlement'
           ? `${meta.listPath}/form/f5_1`
           : `${meta.listPath}/f5_1`,
       )
     }
   })
 
-  it('dOC01/DOC02 三类单据用独立只读详情地址，并显式保留来源和验收视图', () => {
+  it('doc01-doc03 四类单据用独立只读详情地址，并显式保留来源和验收视图', () => {
     expect(ownerDocumentDetailPath('owner_change', 'change/323', 'real'))
       .toBe('/owner/change/change%2F323?origin=real')
     expect(ownerDocumentDetailPath('owner_report', 'report-323', 'demo'))
       .toBe('/owner/report/report-323?origin=demo')
     expect(ownerDocumentDetailPath('acceptance', 'acceptance-324', 'real', 'warranty'))
       .toBe('/owner/acceptance/acceptance-324?origin=real&variant=warranty')
+    expect(ownerDocumentDetailPath('final_settlement', 'final-settlement/325', 'real'))
+      .toBe('/owner/final-settlement/final-settlement%2F325?origin=real')
   })
 
   it('八类表单提供准确分区和对应合同入口', () => {
@@ -108,6 +110,13 @@ describe('f5 单据页面模型', () => {
     })).toEqual({
       lines: '至少填写一条量价变更，或填写纯金额签证金额',
     })
+
+    expect(validateOwnerDocumentForm('final_settlement', {
+      name: '最终结算',
+      projectId: 'project-1',
+      settlementAmount: 100,
+      submissionDate: '2026-08-25',
+    })).toMatchObject({ contractId: '施工合同为必填项' })
   })
 
   it('在页面命令前拦截空变更行、越界调量和无效报量行', () => {

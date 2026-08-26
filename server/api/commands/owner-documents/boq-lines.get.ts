@@ -4,7 +4,10 @@ import { throwProjectReadError } from '../../../utils/project-read-error'
 
 export default defineEventHandler((event) => {
   try {
-    ownerCommercialDocumentCommandTestInstance.context(resolveBusinessSession())
+    ownerCommercialDocumentCommandTestInstance.context(
+      resolveBusinessSession(),
+      getHeader(event, 'x-ruihang-test-session'),
+    )
     const query = getQuery(event)
     return ownerCommercialDocumentCommandTestInstance.boqLinesFor(
       String(query.projectId ?? ''),

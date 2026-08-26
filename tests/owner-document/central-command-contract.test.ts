@@ -1,3 +1,4 @@
+import type { CoreMigrationSnapshotDTO } from '~/lib/migration/core-contract'
 import type { OwnerCommercialDocumentSource } from '~/lib/owner-document/central-repository'
 import { describe, expect, it } from 'vitest'
 import {
@@ -165,6 +166,254 @@ function instance(
 }
 
 describe('甲方商务单据中央命令契约', () => {
+  it('最终结算通过中央命令保存并在提交后锁定正文编辑', async () => {
+    const commands = instance(kind => `${kind}-created-325`, () => '2026-08-25T02:00:00.000Z', [])
+    const saved = await commands.execute({
+      ...commandEnvelope('submit-final-settlement-325'),
+      action: 'submit',
+      kind: 'final_settlement',
+      id: null,
+      baseVersion: null,
+      draft: {
+        name: '中央施工项目甲方最终结算',
+        projectId: 'project-command-323',
+        contractId: 'contract-command-323',
+        settlementAmount: 1280000,
+        submissionDate: '2026-08-25',
+        basis: '施工合同与最终结算书',
+        differenceNote: '审定金额尚未回传',
+        note: '等待甲方审定',
+      },
+      attachments: {
+        add: [{ fileName: '最终结算书.pdf', category: 'settlement-book' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }, session)
+
+    expect(saved).toMatchObject({ id: 'final_settlement-created-325', version: '1' })
+    expect(commands.form('final_settlement', saved.id, session)).toMatchObject({
+      kind: 'final_settlement',
+      draft: {
+        id: saved.id,
+        name: '中央施工项目甲方最终结算',
+        settlementAmount: 1280000,
+        submissionDate: '2026-08-25',
+        basis: '施工合同与最终结算书',
+        differenceNote: '审定金额尚未回传',
+        status: 'submitted',
+      },
+      attachments: [{ ownerType: 'owner_final_settlement', category: 'settlement-book' }],
+    })
+    await expect(commands.execute({
+      ...commandEnvelope('overwrite-final-settlement-325'),
+      action: 'save',
+      kind: 'final_settlement',
+      id: saved.id,
+      baseVersion: '1',
+      draft: {
+        ...commands.form('final_settlement', saved.id, session).draft,
+        settlementAmount: 1300000,
+      },
+      attachments: {},
+    }, session)).rejects.toThrow('只有草稿或已退回')
+  })
+
+  it('最终结算草稿切换合同时实时重算来源，并排除中英文草稿补充协议', async () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance({
+      now: () => '2026-08-25T02:00:00.000Z',
+      createId: () => 'final-settlement-switch-contract-325',
+      projects: [{ id: 'project-switch-325', name: '切换合同项目', customerId: 'customer-switch-325' }],
+      customers: [{ id: 'customer-switch-325', name: '切换合同甲方' }],
+      contracts: [{
+        id: 'contract-switch-a-325',
+        no: 'SG-A-325',
+        name: '施工合同 A',
+        projectId: 'project-switch-325',
+        customerId: 'customer-switch-325',
+        amount: 1000000,
+      }, {
+        id: 'contract-switch-b-325',
+        no: 'SG-B-325',
+        name: '施工合同 B',
+        projectId: 'project-switch-325',
+        customerId: 'customer-switch-325',
+        amount: 2000000,
+      }],
+      finalSettlementSupplements: [{
+        contractId: 'contract-switch-a-325',
+        id: 'supplement-switch-a-draft-325',
+        no: 'BC-A-DRAFT-325',
+        name: '施工合同 A 草稿补充协议',
+        status: '草稿',
+        amount: 500000,
+        date: '2026-08-20',
+      }, {
+        contractId: 'contract-switch-a-325',
+        id: 'supplement-switch-a-approved-325',
+        no: 'BC-A-325',
+        name: '施工合同 A 正式补充协议',
+        status: 'approved',
+        amount: 100000,
+        date: '2026-08-21',
+      }, {
+        contractId: 'contract-switch-b-325',
+        id: 'supplement-switch-b-approved-325',
+        no: 'BC-B-325',
+        name: '施工合同 B 正式补充协议',
+        status: 'approved',
+        amount: 200000,
+        date: '2026-08-22',
+      }],
+      finalSettlementReceipts: [{
+        contractId: 'contract-switch-a-325',
+        projectId: 'project-switch-325',
+        customerId: 'customer-switch-325',
+        id: 'receipt-switch-a-325',
+        no: 'SK-A-325',
+        name: '施工合同 A 收款',
+        status: 'submitted',
+        amount: 300000,
+        date: '2026-08-21',
+      }, {
+        contractId: 'contract-switch-b-325',
+        projectId: 'project-switch-325',
+        customerId: 'customer-switch-325',
+        id: 'receipt-switch-b-325',
+        no: 'SK-B-325',
+        name: '施工合同 B 收款',
+        status: 'submitted',
+        amount: 400000,
+        date: '2026-08-22',
+      }],
+    })
+    const saved = await commands.execute({
+      ...commandEnvelope('save-final-settlement-contract-a-325'),
+      action: 'save',
+      kind: 'final_settlement',
+      id: null,
+      baseVersion: null,
+      draft: {
+        name: '合同切换最终结算',
+        projectId: 'project-switch-325',
+        contractId: 'contract-switch-a-325',
+        settlementAmount: 1200000,
+        submissionDate: '2026-08-25',
+      },
+      attachments: {},
+    }, session)
+    expect(commands.form('final_settlement', saved.id, session).draft).toMatchObject({
+      changedContractAmount: 1100000,
+      receivedAmount: 300000,
+    })
+
+    const switched = await commands.execute({
+      ...commandEnvelope('save-final-settlement-contract-b-325'),
+      action: 'save',
+      kind: 'final_settlement',
+      id: saved.id,
+      baseVersion: saved.version,
+      draft: {
+        ...commands.form('final_settlement', saved.id, session).draft,
+        contractId: 'contract-switch-b-325',
+      },
+      attachments: {},
+    }, session)
+    expect(commands.form('final_settlement', switched.id, session).draft).toMatchObject({
+      contractId: 'contract-switch-b-325',
+      changedContractAmount: 2200000,
+      receivedAmount: 400000,
+    })
+  })
+
+  it('按合同保留来源完整性，不因其他合同已知而伪造空集合', () => {
+    const known: OwnerCommercialDocumentSource = {
+      ...change,
+      kind: 'final_settlement',
+      id: 'settlement-known-325',
+      no: 'JS-KNOWN-325',
+      name: '已读取来源的结算',
+      documentType: 'final_settlement',
+      contractId: 'contract-known-325',
+      contractNo: 'SG-KNOWN-325',
+      contractName: '已知合同',
+      sourceType: 'owner_final_settlement',
+      sourceId: 'settlement-known-325',
+      finalSettlementEvidence: { originalContractAmount: 100, supplements: [], receipts: [] },
+    }
+    const unknown: OwnerCommercialDocumentSource = {
+      ...known,
+      id: 'settlement-unknown-325',
+      no: 'JS-UNKNOWN-325',
+      name: '未读取来源的结算',
+      contractId: 'contract-unknown-325',
+      contractNo: 'SG-UNKNOWN-325',
+      contractName: '未知合同',
+      sourceId: 'settlement-unknown-325',
+      finalSettlementEvidence: undefined,
+    }
+    const commands = createOwnerCommercialDocumentCommandTestInstance({ documents: [known, unknown] })
+
+    expect(commands.rows().find(row => row.id === known.id)?.finalSettlementEvidence).toMatchObject({
+      supplements: [],
+      receipts: [],
+    })
+    expect(commands.rows().find(row => row.id === unknown.id)?.finalSettlementEvidence).toMatchObject({
+      supplements: null,
+      receipts: null,
+    })
+  })
+
+  it('合同、项目与客户身份按会话隔离', () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance({
+      projects: [{ id: 'project-base-325', name: '基础项目', customerId: 'customer-base-325' }],
+      customers: [{ id: 'customer-base-325', name: '基础客户' }],
+      contracts: [{
+        id: 'contract-base-325',
+        no: 'SG-BASE-325',
+        name: '基础合同',
+        projectId: 'project-base-325',
+        customerId: 'customer-base-325',
+        amount: 100,
+      }],
+      finalSettlementSupplements: [],
+      finalSettlementReceipts: [],
+    })
+    const entity = (
+      entityType: CoreMigrationSnapshotDTO['entities'][number]['entityType'],
+      id: string,
+      name: string,
+      references: CoreMigrationSnapshotDTO['entities'][number]['references'],
+    ): CoreMigrationSnapshotDTO['entities'][number] => ({
+      entityType,
+      id,
+      legacyId: id,
+      name,
+      references,
+      quantity: null,
+      amount: entityType === 'construction_contracts' ? '200.00' : null,
+      attributes: entityType === 'construction_contracts' ? { no: 'SG-A-325' } : {},
+      deletedAt: null,
+      batchId: 'batch-session-a-325',
+    })
+    commands.synchronizeMigrationSnapshot({
+      authority: 'central',
+      activeBatchId: 'batch-session-a-325',
+      entities: [
+        entity('customers', 'customer-session-a-325', '会话 A 客户', {}),
+        entity('projects', 'project-session-a-325', '会话 A 项目', { customerId: 'customer-session-a-325' }),
+        entity('construction_contracts', 'contract-session-a-325', '会话 A 合同', {
+          projectId: 'project-session-a-325',
+          customerId: 'customer-session-a-325',
+        }),
+      ],
+    }, 'session-a-325')
+
+    expect(commands.context(session, 'session-a-325').contracts.map(row => row.id)).toContain('contract-session-a-325')
+    expect(commands.context(session, 'session-b-325').contracts.map(row => row.id)).not.toContain('contract-session-a-325')
+    expect(commands.context(session, 'session-b-325').contracts.map(row => row.id)).toContain('contract-base-325')
+  })
+
   it('验收、进入保修和到期确认按唯一顺序更新同一记录并留下服务端审计', async () => {
     const commands = instance(() => 'acceptance-event-created-324', () => '2026-08-25T02:00:00.000Z', [acceptance])
     const accepted = await commands.execute({

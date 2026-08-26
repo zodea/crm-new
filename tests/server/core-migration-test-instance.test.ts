@@ -62,6 +62,7 @@ function source(overrides: Partial<Omit<CoreMigrationSourceDTO, 'sourceHash'>> =
       construction_contracts: [],
       subcontract_contracts: [],
       contract_supplements: [],
+      receipt_registrations: [],
       owner_documents: [],
       workers: [
         {

@@ -50,7 +50,8 @@ import {
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const usesCentralBrowser = import.meta.client && !isTauri()
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
-    kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
+    kind === 'owner_change' || kind === 'owner_report'
+    || kind === 'acceptance' || kind === 'final_settlement'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -104,11 +105,17 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
             secondaryAmount: Number(item.amounts.audited ?? 0),
             tertiaryAmount: Number(item.amounts.difference ?? 0),
           }
-        : {
-            amount: Number(item.amounts.contractEstimate),
-            secondaryAmount: 0,
-            tertiaryAmount: 0,
-          }
+        : item.amounts.kind === 'final_settlement'
+          ? {
+              amount: Number(item.amounts.declared),
+              secondaryAmount: Number(item.amounts.audited ?? 0),
+              tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
+            }
+          : {
+              amount: Number(item.amounts.contractEstimate),
+              secondaryAmount: 0,
+              tertiaryAmount: 0,
+            }
     const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
       ? {
           viewVariant: 'acceptance' as const,
@@ -283,7 +290,22 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return loadPenaltyDeductions(penaltyId)
   }
 
-  async function loadContractSummary(contractId: string, excludeSettlementId = '') {
+  async function loadContractSummary(
+    contractId: string,
+    excludeSettlementId = '',
+    source: 'local' | 'central-owner' = 'local',
+  ) {
+    if (usesCentralBrowser && source === 'central-owner') {
+      const context = await centralContext()
+      const contract = context.contracts.find(option => option.id === contractId)
+      return contract
+        ? {
+            contractAmount: contract.changedContractAmount,
+            receivedAmount: contract.receivedAmount,
+            priorSettlementAmount: null,
+          }
+        : null
+    }
     return loadOwnerDocumentContractSummary(contractId, excludeSettlementId)
   }
 

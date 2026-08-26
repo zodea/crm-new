@@ -2,6 +2,7 @@
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, watch } from 'vue'
 import { loadCustomerReturnOrigin, resolveCustomerReturnContext } from '~/lib/customer/return-context'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
@@ -41,7 +42,11 @@ const validatedReturn = computed(() => resolveCustomerReturnContext({
   now: Date.now(),
   load: loadCustomerReturnOrigin,
 }))
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin))
+const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回客户收款明细')
 const backTo = computed(() => {
+  if (ownerDocumentReturnTo.value)
+    return ownerDocumentReturnTo.value
   if (!detail.value)
     return '/finance/receipt'
   const query = new URLSearchParams({ origin: detail.value.dataOrigin, tab: 'receipts' })
@@ -73,7 +78,7 @@ watch(() => [props.receiptId, props.customerId, props.origin, props.includeDemo]
     :title="detail?.receipt.receipt.label ?? '收款详情'"
     subtitle="收款事实 · 只读"
     :back-to="backTo"
-    back-label="返回客户收款明细"
+    :back-label="backLabel"
     :state="shellState"
     :state-title="shellState === 'not-found' ? '收款记录不存在或已删除' : shellState === 'forbidden' ? '无权查看该收款记录' : shellState === 'loading' ? '正在加载收款详情' : '收款详情加载失败'"
     :state-description="problem?.message ?? ''"

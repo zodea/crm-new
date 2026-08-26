@@ -174,6 +174,44 @@ describe('唯一 Target Registry', () => {
     })
   })
 
+  it('最终结算详情及其补充协议、收款来源均保留专属详情返回链', () => {
+    const returnTo = '/owner/final-settlement/final-settlement-325?origin=real'
+    const document = resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'owner-document', id: 'final-settlement-325', label: '最终结算', no: 'JS-325' },
+      variant: 'final-settlement',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    })
+    expect(document).toEqual({
+      state: 'resolved',
+      label: '最终结算',
+      to: '/owner/final-settlement/final-settlement-325?origin=real',
+    })
+
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-325', label: '施工合同', no: 'SG-325' },
+      variant: 'supplement',
+      view: 'supplement-325',
+      filters: { dataOrigin: 'real', contractKind: '施工' },
+    }, { returnTo })).toMatchObject({
+      state: 'resolved',
+      to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
+    })
+
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'receipt', id: 'receipt-325', label: '一期工程款', no: 'SK-325' },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real', customerId: 'customer-325' },
+    }, { returnTo })).toMatchObject({
+      state: 'resolved',
+      to: expect.stringContaining(`returnTo=${encodeURIComponent(returnTo)}`),
+    })
+  })
+
   it.each(['acceptance', 'warranty'] as const)('验收 canonical ID 可解析到 %s 双视图并保留来源返回链', (variant) => {
     const returnTo = `/owner/acceptance?variant=${variant}&origin=real&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`
     const normalizedReturnTo = `/owner/acceptance?origin=real&variant=${variant}&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`

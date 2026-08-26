@@ -72,6 +72,25 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       deleted_at: null,
     }]
   }
+  if (sql.includes('FROM receipt_registrations')) {
+    return [{
+      id: 'receipt-local-1',
+      no: 'SK-LOCAL-001',
+      receipt_date: '2026-05-01',
+      project_id: 'project-local-1',
+      contract_id: 'construction-local-1',
+      customer_id: 'customer-local-1',
+      payer_account: '本地客户',
+      amount: 90000,
+      payment_method: '银行转账',
+      review_status: 'approved',
+      status: 'submitted',
+      note: '',
+      created_at: '2026-05-01T00:00:00.000Z',
+      updated_at: '2026-05-01T00:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM boq_change_orders change_order')) {
     return [
       {
@@ -222,6 +241,7 @@ describe('core migration local source', () => {
           construction_contracts: 1,
           subcontract_contracts: 1,
           contract_supplements: 1,
+          receipt_registrations: 1,
           owner_documents: 2,
           workers: 1,
           project_suppliers: 1,
@@ -232,6 +252,7 @@ describe('core migration local source', () => {
           { entityType: 'construction_contracts', metric: 'amount', expected: '320000.00' },
           { entityType: 'subcontract_contracts', metric: 'amount', expected: '180000.00' },
           { entityType: 'contract_supplements', metric: 'amount', expected: '8000.00' },
+          { entityType: 'receipt_registrations', metric: 'amount', expected: '90000.00' },
           { entityType: 'owner_documents', metric: 'amount', expected: '5480.00' },
         ],
       },
@@ -284,6 +305,16 @@ describe('core migration local source', () => {
       references: { contractId: 'construction-local-1' },
       amount: '8000.00',
       attributes: { no: 'BC-001', signDate: '2026-03-01', status: '有效' },
+    })
+    expect(first.entities.receipt_registrations[0]).toMatchObject({
+      legacyId: 'receipt-local-1',
+      references: {
+        projectId: 'project-local-1',
+        contractId: 'construction-local-1',
+        customerId: 'customer-local-1',
+      },
+      amount: '90000.00',
+      attributes: { no: 'SK-LOCAL-001', receiptDate: '2026-05-01', status: 'submitted' },
     })
     expect(first.entities.owner_documents).toEqual([
       expect.objectContaining({
@@ -700,6 +731,7 @@ describe('core migration local source', () => {
       'construction_contracts',
       'subcontract_contracts',
       'contract_supplements',
+      'receipt_registrations',
       'owner_documents',
       'workers',
       'project_suppliers',

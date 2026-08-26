@@ -273,7 +273,8 @@ function factNavigation(
       filters: { dataOrigin: source.dataOrigin, customerId },
     }
   }
-  if (kind === 'change' || kind === 'report' || kind === 'acceptance' || kind === 'warranty') {
+  if (kind === 'change' || kind === 'report' || kind === 'final-settlement'
+    || kind === 'acceptance' || kind === 'warranty') {
     return {
       kind: 'entity-detail',
       subject: resolvedRef('owner-document', row.id, row.name, row.no || null),
@@ -282,7 +283,7 @@ function factNavigation(
       filters: { dataOrigin: source.dataOrigin },
     }
   }
-  // 其他甲方单据和开票申请当前只有写态页面；中央只读目标未闭合前保留事实文本。
+  // 开票申请当前只有写态页面；中央只读目标未闭合前保留事实文本。
   return { kind: 'unavailable', reason: 'unverified-target' }
 }
 

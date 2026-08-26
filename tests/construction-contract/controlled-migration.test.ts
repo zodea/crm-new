@@ -57,6 +57,7 @@ function source(): CoreMigrationSourceDTO {
           status: '有效',
         },
       }],
+      receipt_registrations: [],
       owner_documents: [],
       workers: [],
       project_suppliers: [],

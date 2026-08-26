@@ -35,7 +35,9 @@ function route(kind: OwnerCommercialDocumentKind): string {
     ? '/owner/change'
     : kind === 'owner_report'
       ? '/owner/report'
-      : '/owner/acceptance'
+      : kind === 'acceptance'
+        ? '/owner/acceptance'
+        : '/owner/final-settlement'
 }
 
 function value(input: unknown): string | undefined {
@@ -157,7 +159,7 @@ export function validateOwnerDocumentDetailReturnTo(
     return null
   try {
     const url = new URL(input, 'https://ruihang.invalid')
-    const match = url.pathname.match(/^\/owner\/(change|report|acceptance)\/([^/]+)$/)
+    const match = url.pathname.match(/^\/owner\/(change|report|acceptance|final-settlement)\/([^/]+)$/)
     if (url.origin !== 'https://ruihang.invalid' || !match)
       return null
     const id = decodeURIComponent(match[2]!)
@@ -170,7 +172,9 @@ export function validateOwnerDocumentDetailReturnTo(
       ? 'owner_change'
       : match[1] === 'report'
         ? 'owner_report'
-        : 'acceptance'
+        : match[1] === 'acceptance'
+          ? 'acceptance'
+          : 'final_settlement'
     const nested = url.searchParams.get('returnTo')
     const validatedNested = nested ? validateOwnerDocumentJourneyReturnTo(nested, kind, origin) : null
     if (nested && !validatedNested)

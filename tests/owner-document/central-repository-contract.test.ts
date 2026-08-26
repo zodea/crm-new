@@ -186,6 +186,66 @@ const acceptance: OwnerCommercialDocumentSource = {
   ],
 }
 
+const finalSettlement: OwnerCommercialDocumentSource = {
+  ...change,
+  kind: 'final_settlement',
+  id: 'final-settlement-real-325',
+  no: 'JS-2026-325',
+  name: '瑞航商务中心项目甲方最终结算',
+  documentType: 'final_settlement',
+  sourceType: 'owner_final_settlement',
+  sourceId: 'final-settlement-real-325',
+  sourceLocked: true,
+  applicationDate: '2026-08-23',
+  status: 'submitted',
+  statusNote: '已提交甲方结算资料',
+  amount: 1280000,
+  auditedAmount: null,
+  note: '等待甲方审定',
+  updatedAt: '2026-08-23T00:00:00.000Z',
+  settlementBasis: '施工合同、已确认补充协议及最终结算书',
+  settlementDifferenceNote: '审定金额尚未回传',
+  finalSettlementEvidence: {
+    originalContractAmount: 1200000,
+    supplements: [
+      {
+        id: 'supplement-real-325-draft',
+        no: 'BC-2026-DRAFT',
+        name: '未提交补充协议',
+        status: 'draft',
+        amount: 50000,
+        date: '2026-08-01',
+      },
+      {
+        id: 'supplement-real-325-approved',
+        no: 'BC-2026-01',
+        name: '已确认补充协议',
+        status: 'approved',
+        amount: 80000,
+        date: '2026-08-12',
+      },
+    ],
+    receipts: [
+      {
+        id: 'receipt-real-325-active',
+        no: 'SK-2026-01',
+        name: '一期工程款',
+        status: 'confirmed',
+        amount: 900000,
+        date: '2026-08-15',
+      },
+      {
+        id: 'receipt-real-325-void',
+        no: 'SK-2026-VOID',
+        name: '已作废收款',
+        status: 'void',
+        amount: 100000,
+        date: '2026-08-16',
+      },
+    ],
+  },
+}
+
 const base = {
   documents: [change, report],
   asOf: '2026-08-25T00:00:00.000Z',
@@ -194,6 +254,77 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it('最终结算只从真实合同、补充协议与收款事实聚合金额，并保留未知审定额', () => {
+    const detail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [finalSettlement],
+      query: parseOwnerCommercialDocumentDetailQuery('final_settlement', finalSettlement.id, { origin: 'real' }),
+    })
+
+    expect(detail.document).toMatchObject({
+      id: 'final-settlement-real-325',
+      kind: 'final_settlement',
+      source: { type: 'owner_final_settlement', id: 'final-settlement-real-325', locked: true },
+      amounts: {
+        kind: 'final_settlement',
+        declared: '1280000.00',
+        audited: null,
+        changedContract: '1280000.00',
+        cumulativeReceipts: '900000.00',
+        receiptDifference: '380000.00',
+      },
+    })
+    expect(detail.finalSettlementEvidence).toMatchObject({
+      basis: '施工合同、已确认补充协议及最终结算书',
+      differenceNote: '审定金额尚未回传',
+    })
+    expect(detail.finalSettlementEvidence?.sources).toEqual([
+      expect.objectContaining({
+        kind: 'contract-supplement',
+        id: 'supplement-real-325-approved',
+        amount: '80000.00',
+        navigation: expect.objectContaining({ variant: 'supplement', view: 'supplement-real-325-approved' }),
+      }),
+      expect.objectContaining({
+        kind: 'receipt',
+        id: 'receipt-real-325-active',
+        amount: '900000.00',
+        navigation: expect.objectContaining({ variant: 'detail', filters: expect.objectContaining({ customerId: 'customer-real-323' }) }),
+      }),
+    ])
+    expect(detail.sourceNavigation).toMatchObject({
+      kind: 'entity-detail',
+      variant: 'owner-document-source',
+      view: 'final-settlement-real-325',
+      filters: { ownerTab: 'settlements' },
+    })
+  })
+
+  it('最终结算证据源缺失时不把未知金额伪装成零', () => {
+    const detail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [{
+        ...finalSettlement,
+        finalSettlementEvidence: {
+          originalContractAmount: null,
+          supplements: null,
+          receipts: null,
+        },
+      }],
+      query: parseOwnerCommercialDocumentDetailQuery('final_settlement', finalSettlement.id, { origin: 'real' }),
+    })
+
+    expect(detail.document.amounts).toEqual({
+      kind: 'final_settlement',
+      declared: '1280000.00',
+      audited: null,
+      changedContract: null,
+      cumulativeReceipts: null,
+      receiptDifference: null,
+    })
+    expect(detail.finalSettlementEvidence?.sources).toBeNull()
+  })
+
   it('验收与保修按同一稳定 ID 生成双视图，并只暴露各自字段和附件', () => {
     const documents = [acceptance]
     const acceptanceDetail = buildOwnerCommercialDocumentDetail({

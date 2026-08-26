@@ -17,7 +17,12 @@ export interface OwnerCommercialDocumentCommandContextDTO {
   capabilities: string[]
   projects: Array<{ id: string, label: string, customerId: string | null }>
   customers: OwnerDocumentLookupOption[]
-  contracts: Array<OwnerDocumentLookupOption & { projectId: string, customerId: string | null }>
+  contracts: Array<OwnerDocumentLookupOption & {
+    projectId: string
+    customerId: string | null
+    changedContractAmount: number | null
+    receivedAmount: number | null
+  }>
 }
 
 interface OwnerCommercialDocumentCommandEnvelopeDTO {

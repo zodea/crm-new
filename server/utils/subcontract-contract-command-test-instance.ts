@@ -57,7 +57,7 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   const now = options.now ?? (() => new Date().toISOString())
   const projects = new Map((options.projects ?? []).map(row => [row.id, row]))
   const suppliers = new Map((options.suppliers ?? []).map(row => [row.id, row]))
-  const contracts = new Map<string, StoredContract>()
+  let contracts = new Map<string, StoredContract>()
   const replay = new Map<string, SubcontractContractCommandResultDTO>()
   let migratedProjects = new Map<string, Option>()
   let migratedSuppliers = new Map<string, Option>()
@@ -153,7 +153,47 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     }
   }
 
-  return {
+  let applyMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => void
+
+  function prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO): () => void {
+    const current = {
+      contracts,
+      migratedProjects,
+      migratedSuppliers,
+      migratedSupplements,
+      sourceVersion,
+    }
+    contracts = structuredClone(contracts)
+    migratedProjects = structuredClone(migratedProjects)
+    migratedSuppliers = structuredClone(migratedSuppliers)
+    migratedSupplements = structuredClone(migratedSupplements)
+    try {
+      applyMigrationSnapshot(snapshot)
+      const candidate = {
+        contracts,
+        migratedProjects,
+        migratedSuppliers,
+        migratedSupplements,
+        sourceVersion,
+      }
+      return () => {
+        contracts = candidate.contracts
+        migratedProjects = candidate.migratedProjects
+        migratedSuppliers = candidate.migratedSuppliers
+        migratedSupplements = candidate.migratedSupplements
+        sourceVersion = candidate.sourceVersion
+      }
+    }
+    finally {
+      contracts = current.contracts
+      migratedProjects = current.migratedProjects
+      migratedSuppliers = current.migratedSuppliers
+      migratedSupplements = current.migratedSupplements
+      sourceVersion = current.sourceVersion
+    }
+  }
+
+  const instance = {
     reset() {
       contracts.clear()
       replay.clear()
@@ -201,7 +241,11 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
     sourceVersion() {
       return `subcontract-contract-command-${sourceVersion}`
     },
+    prepareMigrationSnapshot,
     synchronizeMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
+      prepareMigrationSnapshot(snapshot)()
+    },
+    applyMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
       const activeBatchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
       const entities = activeBatchId ? snapshot.entities : []
       const migratedIds = new Set(entities.filter(entity => entity.entityType === 'subcontract_contracts' && entity.deletedAt === null).map(entity => entity.id))
@@ -342,6 +386,8 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       return result
     },
   }
+  applyMigrationSnapshot = instance.applyMigrationSnapshot
+  return instance
 }
 
 export const SUBCONTRACT_CONTRACT_FORM_PROJECTS = projectsSeed.map(row => ({ id: row.id, name: row.name }))

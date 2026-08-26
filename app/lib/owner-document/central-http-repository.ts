@@ -122,6 +122,11 @@ function amounts(value: unknown): boolean {
     return money(value.reported)
       && nullableMoney(value.audited) && nullableMoney(value.difference)
   }
+  if (value.kind === 'final_settlement') {
+    return money(value.declared) && nullableMoney(value.audited)
+      && nullableMoney(value.changedContract) && nullableMoney(value.cumulativeReceipts)
+      && nullableMoney(value.receiptDifference)
+  }
   return value.kind === 'acceptance' && money(value.contractEstimate)
 }
 
@@ -152,7 +157,7 @@ function lifecycleEvent(value: unknown): boolean {
 function listItem(value: unknown): boolean {
   return object(value) && typeof value.rowKey === 'string'
     && isDataOriginDTO(value.dataOrigin)
-    && ['owner_change', 'owner_report', 'acceptance'].includes(String(value.kind))
+    && ['owner_change', 'owner_report', 'acceptance', 'final_settlement'].includes(String(value.kind))
     && ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'statusLabel', 'updatedAt']
       .every(key => typeof value[key] === 'string')
       && value.rowKey === `${value.dataOrigin}:${value.kind}:${value.id}`
@@ -203,7 +208,7 @@ function detailFile(value: unknown): boolean {
 }
 
 function detailDocument(value: unknown): boolean {
-  if (!object(value) || !['owner_change', 'owner_report', 'acceptance'].includes(String(value.kind)))
+  if (!object(value) || !['owner_change', 'owner_report', 'acceptance', 'final_settlement'].includes(String(value.kind)))
     return false
   return ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'note', 'version', 'updatedAt']
     .every(key => typeof value[key] === 'string')
@@ -220,9 +225,26 @@ function detailDocument(value: unknown): boolean {
     && isISODateTimeDTO(value.updatedAt)
 }
 
+function finalSettlementEvidence(value: unknown): boolean {
+  if (value === null)
+    return true
+  return object(value) && typeof value.basis === 'string' && typeof value.differenceNote === 'string'
+    && (value.sources === null || (Array.isArray(value.sources) && value.sources.every(source => object(source)
+      && ['contract-supplement', 'receipt'].includes(String(source.kind))
+      && ['id', 'no', 'name', 'status', 'statusLabel'].every(key => typeof source[key] === 'string')
+      && money(source.amount) && nullableDate(source.date) && navigation(source.navigation))))
+}
+
 function lookup(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.label === 'string'
     && (value.hint === undefined || typeof value.hint === 'string')
+}
+
+function contractLookup(value: unknown): boolean {
+  return lookup(value) && object(value) && typeof value.projectId === 'string'
+    && nullableString(value.customerId)
+    && (value.changedContractAmount === null || finite(value.changedContractAmount))
+    && (value.receivedAmount === null || finite(value.receivedAmount))
 }
 
 function fileRecord(value: unknown, ownerType?: string, ownerId?: string): boolean {
@@ -292,6 +314,7 @@ function decodeDetail(value: unknown): OwnerCommercialDocumentDetailReadDTO {
     || !navigation(value.contractNavigation) || !navigation(value.sourceNavigation)
     || !navigation(value.documentNavigation) || !acceptanceView(value.acceptanceView)
     || !Array.isArray(value.lifecycleEvents) || !value.lifecycleEvents.every(lifecycleEvent)
+    || !finalSettlementEvidence(value.finalSettlementEvidence)
     || !strings(value.capabilities) || !isISODateTimeDTO(value.asOf)
     || !nullableString(value.sourceVersion)) {
     return malformed('甲方商务单据详情')
@@ -305,8 +328,7 @@ function decodeContext(value: unknown): OwnerCommercialDocumentCommandContextDTO
     || !value.capabilities.every(entry => typeof entry === 'string')
     || !value.projects.every(entry => lookup(entry) && object(entry) && nullableString(entry.customerId))
     || !Array.isArray(value.customers) || !value.customers.every(lookup)
-    || !Array.isArray(value.contracts) || !value.contracts.every(entry => lookup(entry)
-      && object(entry) && typeof entry.projectId === 'string' && nullableString(entry.customerId))) {
+    || !Array.isArray(value.contracts) || !value.contracts.every(contractLookup)) {
     return malformed('甲方商务单据命令上下文')
   }
   return value as unknown as OwnerCommercialDocumentCommandContextDTO
@@ -337,16 +359,29 @@ function draftLine(value: unknown, kind: 'owner_change' | 'owner_report'): boole
     : value.operation === undefined || value.operation === null
 }
 
-function formDraft(value: unknown, kind: 'owner_change' | 'owner_report' | 'acceptance', expectedId: string): boolean {
+function formDraft(value: unknown, kind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement', expectedId: string): boolean {
   if (!object(value) || value.id !== expectedId || typeof value.no !== 'string'
     || !nullableString(value.projectId) || !nullableString(value.contractId)
-    || typeof value.applicationDate !== 'string'
-    || !(value.applicationDate === '' || isISODateDTO(value.applicationDate))
     || typeof value.status !== 'string' || typeof value.statusNote !== 'string'
     || typeof value.sourceType !== 'string' || typeof value.sourceId !== 'string'
     || typeof value.sourceLocked !== 'boolean' || typeof value.note !== 'string'
     || !Array.isArray(value.lines)
-    || (kind !== 'acceptance' && !value.lines.every(line => draftLine(line, kind)))) {
+    || (kind !== 'acceptance' && kind !== 'final_settlement' && !value.lines.every(line => draftLine(line, kind)))) {
+    return false
+  }
+  if (kind === 'final_settlement') {
+    return typeof value.name === 'string' && typeof value.submissionDate === 'string'
+      && (value.submissionDate === '' || isISODateDTO(value.submissionDate))
+      && finite(value.settlementAmount)
+      && (value.auditedAmount === null || finite(value.auditedAmount))
+      && (value.changedContractAmount === null || finite(value.changedContractAmount))
+      && (value.receivedAmount === null || finite(value.receivedAmount))
+      && (value.settlementReceiptGap === null || finite(value.settlementReceiptGap))
+      && typeof value.basis === 'string' && typeof value.differenceNote === 'string'
+      && value.lines.length === 0
+  }
+  if (typeof value.applicationDate !== 'string'
+    || !(value.applicationDate === '' || isISODateDTO(value.applicationDate))) {
     return false
   }
   if (kind === 'owner_change') {
@@ -379,14 +414,16 @@ function formDraft(value: unknown, kind: 'owner_change' | 'owner_report' | 'acce
 
 function decodeForm(
   value: unknown,
-  expectedKind: 'owner_change' | 'owner_report' | 'acceptance',
+  expectedKind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement',
   expectedId: string,
 ): OwnerCommercialDocumentFormReadDTO {
   const expectedOwnerType = expectedKind === 'owner_change'
     ? 'owner_change_order'
     : expectedKind === 'owner_report'
       ? 'monthly_statement'
-      : 'project_acceptance'
+      : expectedKind === 'final_settlement'
+        ? 'owner_final_settlement'
+        : 'project_acceptance'
   if (!object(value) || value.kind !== expectedKind || value.id !== expectedId
     || !formDraft(value.draft, expectedKind, expectedId)
     || !Array.isArray(value.attachments)

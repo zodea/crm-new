@@ -13,7 +13,7 @@ import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 
-export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance'] as const
+export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement'] as const
 export type OwnerCommercialDocumentKind = typeof OWNER_COMMERCIAL_DOCUMENT_KINDS[number]
 export const OWNER_ACCEPTANCE_VIEW_VARIANTS = ['acceptance', 'warranty'] as const
 export type OwnerAcceptanceViewVariant = typeof OWNER_ACCEPTANCE_VIEW_VARIANTS[number]
@@ -74,6 +74,30 @@ export interface OwnerAcceptanceLifecycleSource {
   events: OwnerAcceptanceLifecycleEventSource[]
 }
 
+export interface OwnerFinalSettlementSupplementSource {
+  id: string
+  no: string
+  name: string
+  status: string
+  amount: number
+  date: ISODateDTO | null
+}
+
+export interface OwnerFinalSettlementReceiptSource {
+  id: string
+  no: string
+  name: string
+  status: string
+  amount: number
+  date: ISODateDTO | null
+}
+
+export interface OwnerFinalSettlementEvidenceSource {
+  originalContractAmount: number | null
+  supplements: OwnerFinalSettlementSupplementSource[] | null
+  receipts: OwnerFinalSettlementReceiptSource[] | null
+}
+
 export interface OwnerCommercialDocumentSource {
   dataOrigin: DataOriginDTO
   kind: OwnerCommercialDocumentKind
@@ -91,7 +115,7 @@ export interface OwnerCommercialDocumentSource {
   contractNo: string
   contractName: string
   contractPermission: 'allowed' | 'forbidden'
-  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement'
+  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement'
   sourceId: string
   sourceLocked: boolean
   periodNo: string
@@ -117,6 +141,9 @@ export interface OwnerCommercialDocumentSource {
   lines: OwnerCommercialDocumentLineSource[]
   files: OwnerCommercialDocumentFileSource[]
   acceptanceLifecycle?: OwnerAcceptanceLifecycleSource
+  settlementBasis?: string
+  settlementDifferenceNote?: string
+  finalSettlementEvidence?: OwnerFinalSettlementEvidenceSource
 }
 
 export interface OwnerCommercialDocumentListQueryDTO {
@@ -158,6 +185,14 @@ export type OwnerCommercialDocumentAmountsDTO
   | {
     kind: 'acceptance'
     contractEstimate: MoneyDTO
+  }
+  | {
+    kind: 'final_settlement'
+    declared: MoneyDTO
+    audited: MoneyDTO | null
+    changedContract: MoneyDTO | null
+    cumulativeReceipts: MoneyDTO | null
+    receiptDifference: MoneyDTO | null
   }
 
 export type OwnerAcceptanceViewDTO
@@ -295,6 +330,21 @@ export interface OwnerCommercialDocumentDetailReadDTO {
   documentNavigation: NavigationIntentDTO
   acceptanceView: OwnerAcceptanceViewDTO | null
   lifecycleEvents: OwnerAcceptanceLifecycleEventSource[]
+  finalSettlementEvidence: {
+    basis: string
+    differenceNote: string
+    sources: Array<{
+      kind: 'contract-supplement' | 'receipt'
+      id: string
+      no: string
+      name: string
+      status: string
+      statusLabel: string
+      amount: MoneyDTO
+      date: ISODateDTO | null
+      navigation: NavigationIntentDTO
+    }> | null
+  } | null
   asOf: ISODateTimeDTO
   sourceVersion: string | null
   capabilities: string[]
@@ -434,6 +484,30 @@ function quantity(value: number | null): QuantityDTO | null {
   return value == null ? null : String(round2(value))
 }
 
+export function ownerFinalSettlementSupplementIsActive(status: string): boolean {
+  return !['draft', '草稿'].includes(status)
+}
+
+export function ownerFinalSettlementReceiptIsActive(status: string): boolean {
+  return !['draft', '草稿', 'void', '作废'].includes(status)
+}
+
+function finalSettlementSourceStatusLabel(kind: 'contract-supplement' | 'receipt', status: string): string {
+  const common: Record<string, string> = {
+    draft: '草稿',
+    草稿: '草稿',
+    submitted: '已提交',
+    confirmed: '已确认',
+    void: '已作废',
+    作废: '已作废',
+  }
+  if (kind === 'contract-supplement' && status === 'approved')
+    return '已生效'
+  if (kind === 'receipt' && status === 'approved')
+    return '已确认'
+  return common[status] ?? status
+}
+
 function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocumentAmountsDTO {
   if (source.kind === 'owner_change') {
     return {
@@ -452,6 +526,25 @@ function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocument
       difference: source.auditedAmount == null ? null : money(source.auditedAmount - source.amount),
     }
   }
+  if (source.kind === 'final_settlement') {
+    const evidence = source.finalSettlementEvidence
+    const activeSupplements = evidence?.supplements?.filter(item => ownerFinalSettlementSupplementIsActive(item.status)) ?? null
+    const activeReceipts = evidence?.receipts?.filter(item => ownerFinalSettlementReceiptIsActive(item.status)) ?? null
+    const changedContract = evidence?.originalContractAmount == null || activeSupplements == null
+      ? null
+      : evidence.originalContractAmount + activeSupplements.reduce((total, item) => total + item.amount, 0)
+    const cumulativeReceipts = activeReceipts == null
+      ? null
+      : activeReceipts.reduce((total, item) => total + item.amount, 0)
+    return {
+      kind: 'final_settlement',
+      declared: money(source.amount),
+      audited: nullableMoney(source.auditedAmount),
+      changedContract: nullableMoney(changedContract),
+      cumulativeReceipts: nullableMoney(cumulativeReceipts),
+      receiptDifference: cumulativeReceipts == null ? null : money(source.amount - cumulativeReceipts),
+    }
+  }
   return { kind: 'acceptance', contractEstimate: money(source.amount) }
 }
 
@@ -460,7 +553,9 @@ function statusLabel(kind: OwnerCommercialDocumentKind, status: string): string 
     ? { draft: '草稿', submitted: '已上报', rejected: '已退回', approved: '已签证' }
     : kind === 'owner_report'
       ? { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
-      : { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
+      : kind === 'acceptance'
+        ? { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
+        : { draft: '草稿', submitted: '已提交', audited: '已审定' }
   return labels[status] ?? status
 }
 
@@ -511,7 +606,9 @@ function documentNavigation(
       ? 'change'
       : source.kind === 'owner_report'
         ? 'report'
-        : acceptanceVariant ?? 'acceptance',
+        : source.kind === 'final_settlement'
+          ? 'final-settlement'
+          : acceptanceVariant ?? 'acceptance',
     view: null,
     filters: { dataOrigin: source.dataOrigin },
   }
@@ -564,6 +661,12 @@ function relations(source: OwnerCommercialDocumentSource) {
 function statusMatches(source: OwnerCommercialDocumentSource, requested: string | null): boolean {
   if (!requested)
     return true
+  if (source.kind === 'final_settlement') {
+    if (requested === 'doing')
+      return source.status !== 'audited'
+    if (requested === 'done')
+      return source.status === 'audited'
+  }
   if (source.kind !== 'acceptance')
     return source.status === requested
   if (requested === 'checking')
@@ -696,6 +799,67 @@ export function buildOwnerCommercialDocumentDetail(
     fail(sameId ? 'relationship-mismatch' : 'not-found', sameId ? '甲方商务单据类型与地址不匹配' : '甲方商务单据不存在或已删除')
   }
   const { project, customer, contract } = relations(source)
+  const settlementSources = source.kind === 'final_settlement'
+    && source.finalSettlementEvidence?.supplements != null
+    && source.finalSettlementEvidence.receipts != null
+    ? [
+        ...source.finalSettlementEvidence.supplements
+          .filter(item => ownerFinalSettlementSupplementIsActive(item.status))
+          .map(item => ({
+            kind: 'contract-supplement' as const,
+            id: item.id,
+            no: item.no,
+            name: item.name,
+            status: item.status,
+            statusLabel: finalSettlementSourceStatusLabel('contract-supplement', item.status),
+            amount: money(item.amount),
+            date: item.date,
+            navigation: contract.state === 'resolved'
+              ? {
+                  kind: 'entity-detail' as const,
+                  subject: contract,
+                  variant: 'supplement',
+                  view: item.id,
+                  filters: { dataOrigin: source.dataOrigin, contractKind: '施工' },
+                }
+              : { kind: 'unavailable' as const, reason: 'missing-id' as const },
+          })),
+        ...source.finalSettlementEvidence.receipts
+          .filter(item => ownerFinalSettlementReceiptIsActive(item.status))
+          .map(item => ({
+            kind: 'receipt' as const,
+            id: item.id,
+            no: item.no,
+            name: item.name,
+            status: item.status,
+            statusLabel: finalSettlementSourceStatusLabel('receipt', item.status),
+            amount: money(item.amount),
+            date: item.date,
+            navigation: customer.state === 'resolved'
+              ? {
+                  kind: 'entity-detail' as const,
+                  subject: {
+                    state: 'resolved' as const,
+                    entity: 'receipt' as const,
+                    id: item.id,
+                    label: item.name,
+                    no: item.no || null,
+                  },
+                  variant: 'detail',
+                  view: null,
+                  filters: { dataOrigin: source.dataOrigin, customerId: customer.id },
+                }
+              : { kind: 'unavailable' as const, reason: 'missing-id' as const },
+          })),
+      ]
+    : null
+  const finalSettlementEvidence = source.kind === 'final_settlement'
+    ? {
+        basis: source.settlementBasis ?? '',
+        differenceNote: source.settlementDifferenceNote ?? '',
+        sources: settlementSources,
+      }
+    : null
   return {
     dataOrigin: source.dataOrigin,
     document: {
@@ -775,7 +939,7 @@ export function buildOwnerCommercialDocumentDetail(
                 contractKind: '施工',
                 ownerTab: source.kind === 'acceptance'
                   ? 'acceptance'
-                  : source.sourceType === 'monthly_statement'
+                  : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
                     ? 'settlements'
                     : 'changes',
                 ...(source.kind === 'acceptance'
@@ -788,6 +952,7 @@ export function buildOwnerCommercialDocumentDetail(
     documentNavigation: documentNavigation(source, input.query.variant ?? null),
     acceptanceView: acceptanceView(source, input.query.variant ?? null),
     lifecycleEvents: source.acceptanceLifecycle?.events.map(event => ({ ...event })) ?? [],
+    finalSettlementEvidence,
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,
     capabilities: [...input.capabilities],

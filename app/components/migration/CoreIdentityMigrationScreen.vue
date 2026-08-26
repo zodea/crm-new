@@ -30,7 +30,8 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   construction_contracts: '施工合同',
   subcontract_contracts: '分包合同',
   contract_supplements: '补充协议',
-  owner_documents: '甲方变洽签与月度报量',
+  receipt_registrations: '收款登记',
+  owner_documents: '甲方变洽签、月度报量、验收保修与最终结算',
   workers: '工人',
   project_suppliers: '项目分供方',
 }
