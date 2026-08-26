@@ -218,7 +218,7 @@ function receiptPath(intent: EntityTargetIntent): string {
 function ownerDocumentPath(intent: EntityTargetIntent): string {
   const dataOrigin = intent.filters.dataOrigin
   if (!isDataOriginDTO(dataOrigin)
-    || !['change', 'report', 'acceptance', 'warranty'].includes(intent.variant ?? '')) {
+    || !['change', 'report', 'acceptance', 'warranty', 'final-settlement'].includes(intent.variant ?? '')) {
     throw new Error('invalid owner document detail context')
   }
   const acceptance = intent.variant === 'acceptance' || intent.variant === 'warranty'
@@ -273,6 +273,7 @@ const TARGET_REGISTRY = {
   'owner-document:report': ownerDocumentPath,
   'owner-document:acceptance': ownerDocumentPath,
   'owner-document:warranty': ownerDocumentPath,
+  'owner-document:final-settlement': ownerDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
@@ -397,8 +398,11 @@ export function resolveNavigationTarget(
         : contractKind === '分包'
           ? validateSubcontractContractReturnTo(options.returnTo, dataOrigin)
           : null
+      const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, dataOrigin)
       if (returnTo)
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
+      else if (ownerReturnTo)
+        to = `${to}&returnTo=${encodeURIComponent(ownerReturnTo)}`
     }
     if (intent.kind === 'source-record' && options.returnTo)
       to = appendProjectSupplierReturnContext(to, options.returnTo)
@@ -419,14 +423,23 @@ export function resolveNavigationTarget(
       if (returnTo)
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
     }
+    if (key === 'receipt:detail' && options.returnTo) {
+      const entityIntent = intent as EntityTargetIntent
+      const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, entityIntent.filters.dataOrigin)
+      if (ownerReturnTo && !to.includes('returnTo='))
+        to = `${to}&returnTo=${encodeURIComponent(ownerReturnTo)}`
+    }
     if ((key === 'owner-document:change' || key === 'owner-document:report'
-      || key === 'owner-document:acceptance' || key === 'owner-document:warranty') && options.returnTo) {
+      || key === 'owner-document:acceptance' || key === 'owner-document:warranty'
+      || key === 'owner-document:final-settlement') && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
       const kind = key === 'owner-document:change'
         ? 'owner_change'
         : key === 'owner-document:report'
           ? 'owner_report'
-          : 'acceptance'
+          : key === 'owner-document:final-settlement'
+            ? 'final_settlement'
+            : 'acceptance'
       const returnTo = validateOwnerDocumentJourneyReturnTo(options.returnTo, kind, entityIntent.filters.dataOrigin)
       if (returnTo) {
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`

@@ -190,6 +190,14 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     FROM contract_supplements
     ORDER BY id
   `,
+  receipt_registrations: `
+    SELECT
+      id, no, receipt_date, project_id, contract_id, customer_id,
+      payer_account, amount, payment_method, review_status, status, note,
+      created_at, updated_at, deleted_at
+    FROM receipt_registrations
+    ORDER BY id
+  `,
   owner_documents: `
     SELECT * FROM (
       SELECT
@@ -256,7 +264,9 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         '[]' AS lifecycle_events_json,
         change_order.created_at,
         change_order.updated_at,
-        change_order.deleted_at
+        change_order.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note
       FROM boq_change_orders change_order
 
       UNION ALL
@@ -306,7 +316,9 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         '[]' AS lifecycle_events_json,
         ledger.created_at,
         ledger.updated_at,
-        ledger.deleted_at
+        ledger.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note
       FROM owner_change_orders ledger
       WHERE ledger.source_type = 'manual'
 
@@ -380,7 +392,9 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         '[]' AS lifecycle_events_json,
         statement.created_at,
         statement.updated_at,
-        statement.deleted_at
+        statement.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note
       FROM monthly_statements statement
 
       UNION ALL
@@ -465,8 +479,66 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         ), '[]') AS lifecycle_events_json,
         acceptance.created_at,
         acceptance.updated_at,
-        acceptance.deleted_at
+        acceptance.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note
       FROM project_acceptances acceptance
+
+      UNION ALL
+
+      SELECT
+        settlement.id,
+        settlement.name,
+        settlement.project_id,
+        settlement.contract_id,
+        settlement.settlement_amount AS amount,
+        settlement.audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        'final_settlement' AS kind,
+        settlement.no,
+        'final_settlement' AS document_type,
+        'owner_final_settlement' AS source_type,
+        CASE WHEN settlement.status <> 'draft' THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        settlement.submission_date AS application_date,
+        settlement.audited_date AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        settlement.status,
+        CASE settlement.status
+          WHEN 'submitted' THEN '已提交甲方结算资料'
+          WHEN 'audited' THEN '甲方已审定'
+          ELSE ''
+        END AS status_note,
+        settlement.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'owner_final_settlement'
+            AND file_ref.owner_id = settlement.id
+        ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
+        settlement.created_at,
+        settlement.updated_at,
+        settlement.deleted_at,
+        settlement.basis AS settlement_basis,
+        settlement.difference_note AS settlement_difference_note
+      FROM owner_final_settlements settlement
     ) owner_document
     ORDER BY kind, id
   `,
@@ -693,6 +765,29 @@ function sourceEntity(
       },
     }
   }
+  if (entityType === 'receipt_registrations') {
+    return {
+      ...entity,
+      name: text(row.no) || `收款登记 ${text(row.id)}`,
+      references: {
+        projectId: nullableText(row.project_id),
+        contractId: nullableText(row.contract_id),
+        customerId: nullableText(row.customer_id),
+      },
+      amount: nullableMoney(row.amount),
+      attributes: {
+        no: text(row.no),
+        receiptDate: nullableText(row.receipt_date),
+        payerAccount: text(row.payer_account),
+        paymentMethod: text(row.payment_method),
+        reviewStatus: text(row.review_status),
+        status: text(row.status),
+        note: text(row.note),
+        createdAt: isoDateTimeText(row.created_at) ?? '',
+        updatedAt: isoDateTimeText(row.updated_at) ?? '',
+      },
+    }
+  }
   if (entityType === 'owner_documents') {
     return {
       ...entity,
@@ -725,6 +820,8 @@ function sourceEntity(
         filesJson: normalizeFileRefsJson(row.files_json),
         acceptanceLifecycleJson: text(row.acceptance_lifecycle_json) || '{}',
         lifecycleEventsJson: text(row.lifecycle_events_json) || '[]',
+        settlementBasis: text(row.settlement_basis),
+        settlementDifferenceNote: text(row.settlement_difference_note),
         createdAt: isoDateTimeText(row.created_at) ?? '',
         updatedAt: isoDateTimeText(row.updated_at) ?? '',
       },

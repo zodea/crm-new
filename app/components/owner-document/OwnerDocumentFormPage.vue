@@ -346,7 +346,7 @@ const refreshContractSummary = useDebounceFn(async () => {
     return
   }
   if (props.kind === 'final_settlement') {
-    const summary = await store.loadContractSummary(contractId)
+    const summary = await store.loadContractSummary(contractId, '', 'central-owner')
     if (!summary)
       return
     const settlementAmount = Number(draft.value.settlementAmount) || 0
@@ -354,22 +354,23 @@ const refreshContractSummary = useDebounceFn(async () => {
       ...draft.value,
       changedContractAmount: summary.contractAmount,
       receivedAmount: summary.receivedAmount,
-      settlementReceiptGap: Math.round(
-        (settlementAmount - summary.receivedAmount) * 100,
-      ) / 100,
+      settlementReceiptGap: summary.receivedAmount == null
+        ? null
+        : Math.round((settlementAmount - summary.receivedAmount) * 100) / 100,
     }
   }
   if (props.kind === 'sub_settlement') {
     const summary = await store.loadContractSummary(contractId, routeId.value ?? '')
     if (!summary)
       return
+    const contractAmount = summary.contractAmount ?? 0
     const totalAmount = Number(draft.value.totalAmount) || 0
     draft.value = {
       ...draft.value,
-      contractAmount: summary.contractAmount,
+      contractAmount,
       priorSettlementAmount: summary.priorSettlementAmount,
-      settlementRatio: summary.contractAmount > 0
-        ? `${(totalAmount / summary.contractAmount * 100).toFixed(2)}%`
+      settlementRatio: contractAmount > 0
+        ? `${(totalAmount / contractAmount * 100).toFixed(2)}%`
         : '—',
     }
   }

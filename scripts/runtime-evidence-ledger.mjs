@@ -30,7 +30,7 @@ const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['project-supplier', [281, 289, 317]],
   ['core-contract', [277, 282, 289]],
   ['aux-contract', [295, 298, 289]],
-  ['owner-document', [283, 323, 289]],
+  ['owner-document', [283, 323, 324, 325, 289]],
   ['subcontract-document', [295, 289]],
   ['material', [296, 297, 298, 289]],
   ['owner-material', [299, 289]],

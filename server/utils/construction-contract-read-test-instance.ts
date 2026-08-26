@@ -14,6 +14,10 @@ import {
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
+import {
+  ownerFinalSettlementReceiptIsActive,
+  ownerFinalSettlementSupplementIsActive,
+} from '../../app/lib/owner-document/central-repository'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
@@ -160,6 +164,49 @@ export function createConstructionContractReadTestInstance(
         date: row.applicationDate,
         status: row.status,
       }))
+    const ownerFinalSettlements = ownerDocuments
+      .filter(row => row.kind === 'final_settlement')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.applicationDate,
+        status: row.status,
+      }))
+    const ownerSettlementSupplements = ownerDocuments
+      .filter(row => row.kind === 'final_settlement' && row.contractId)
+      .flatMap(row => (row.finalSettlementEvidence?.supplements ?? [])
+        .filter(source => ownerFinalSettlementSupplementIsActive(source.status))
+        .map(source => ({
+          dataOrigin: row.dataOrigin,
+          id: source.id,
+          contractId: row.contractId,
+          no: source.no,
+          name: source.name,
+          amount: source.amount,
+          date: source.date,
+          status: source.status,
+        })))
+    const ownerSettlementReceipts = ownerDocuments
+      .filter(row => row.kind === 'final_settlement' && row.contractId)
+      .flatMap(row => (row.finalSettlementEvidence?.receipts ?? [])
+        .filter(source => ownerFinalSettlementReceiptIsActive(source.status))
+        .map(source => ({
+          dataOrigin: row.dataOrigin,
+          id: source.id,
+          contractId: row.contractId,
+          customerId: row.customerId,
+          no: source.no,
+          name: source.name,
+          amount: source.amount,
+          date: source.date,
+          status: source.status,
+        })))
+    const mergeFacts = <T extends { id: string }>(left: readonly T[], right: readonly T[]): T[] =>
+      [...new Map([...left, ...right].map(row => [row.id, row])).values()]
     const ownerAcceptances = ownerDocuments
       .filter(row => row.kind === 'acceptance')
       .map(row => ({
@@ -188,6 +235,9 @@ export function createConstructionContractReadTestInstance(
       ...formalFacts,
       changes: [...formalFacts.changes, ...ownerChanges],
       monthlyStatements: [...formalFacts.monthlyStatements, ...ownerReports],
+      finalSettlements: mergeFacts(formalFacts.finalSettlements, ownerFinalSettlements),
+      supplements: mergeFacts(formalFacts.supplements, ownerSettlementSupplements),
+      receipts: mergeFacts(formalFacts.receipts, ownerSettlementReceipts),
       acceptances: [...formalFacts.acceptances, ...ownerAcceptances],
       warranties: [...formalFacts.warranties, ...ownerWarranties],
     }
@@ -196,14 +246,14 @@ export function createConstructionContractReadTestInstance(
       facts: scenario === 'empty'
         ? synchronizedFacts
         : {
-            supplements: [...formalFacts.supplements, ...demoFacts.supplements],
+            supplements: [...synchronizedFacts.supplements, ...demoFacts.supplements],
             changes: [...synchronizedFacts.changes, ...demoFacts.changes],
             monthlyStatements: [...synchronizedFacts.monthlyStatements, ...demoFacts.monthlyStatements],
-            finalSettlements: [...formalFacts.finalSettlements, ...demoFacts.finalSettlements],
+            finalSettlements: [...synchronizedFacts.finalSettlements, ...demoFacts.finalSettlements],
             penalties: [...formalFacts.penalties, ...demoFacts.penalties],
             invoiceApplications: [...formalFacts.invoiceApplications, ...demoFacts.invoiceApplications],
             invoiceRegistrations: [...formalFacts.invoiceRegistrations, ...demoFacts.invoiceRegistrations],
-            receipts: [...formalFacts.receipts, ...demoFacts.receipts],
+            receipts: [...synchronizedFacts.receipts, ...demoFacts.receipts],
             acceptances: [...synchronizedFacts.acceptances, ...demoFacts.acceptances],
             warranties: [...synchronizedFacts.warranties, ...demoFacts.warranties],
             files: [...formalFacts.files, ...demoFacts.files],

@@ -4,7 +4,7 @@
 
 ## 1. 当前落点
 
-Issue #293、#314、#315、#316、#318、#320、#321、#323 与 #324 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签、甲方报量和验收—保修的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #293、#314、#315、#316、#318、#320、#321、#323、#324 与 #325 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签、甲方报量、验收—保修和最终结算的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -26,8 +26,8 @@ Issue #293、#314、#315、#316、#318、#320、#321、#323 与 #324 已完成�
 - `GET /api/read/subcontract-contracts/form-context`、`GET /api/read/subcontract-contracts/:id/form`：返回正式项目/分供方选项，或正式分包合同 draft、附件、`version` 与更新时间。
 - `POST /api/commands/subcontract-contracts`、`PUT /api/commands/subcontract-contracts/:id`：新建或按 `baseVersion` 编辑正式分包合同；服务端重验项目、分供方、劳务/专业类别，并拒绝客户关系与采购明细。
 - `GET /api/commands/owner-documents/context`、`GET /api/commands/owner-documents/boq-lines`：返回中央正式项目/施工合同选项和当前合同 BOQ 明细；关系不匹配时拒绝。
-- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
-- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新三类正式甲方商务单据，并承载草稿、提交、签证、审定、验收生命周期流转、删除与附件变更 action。验收流转命令原子提交当前阶段事实与 canonical 分类附件，服务端验证单向状态链并追加审计事件；到期终态不再接受附件写入。附件 action 不把已上报/已申报单据伪装成可编辑草稿；服务端重验稳定关系、状态、版本和明细量价，不信任客户端合计。
+- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` / `final_settlement` 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
+- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新四类正式甲方 canonical 单据，并承载草稿、提交、签证、审定、验收生命周期流转、删除与附件变更 action。最终结算当前只提供草稿保存和提交，合同变更后金额/累计收款只从服务端 canonical 关系取数，不接受客户端写入；未实现审定 action 前不展示假审定按钮。验收流转命令原子提交当前阶段事实与 canonical 分类附件，服务端验证单向状态链并追加审计事件。附件 action 不把已上报/已申报单据伪装成可编辑草稿；服务端重验稳定关系、状态、版本和明细量价，不信任客户端合计。
 
 甲方变洽签调量/调价命令使用 BOQ canonical 计算规则：调减可为负，但有效量不得为负；调价按签证时间稳定排序后的有效量价计算，缺失的新单价不按零价处理。签证 action 只写签证日期，不覆盖申报日期；日期必须是真实存在的日历日，且新签证不得早于同合同既有签证时序尾；同日签证再按签证 action 写入的不可变、单调执行时间排序，不使用通用 `updatedAt` 或无业务含义的单据 ID 打破并列，后续附件维护不得改变签证顺序。月度报量命令按 `periodNo` 取精确快照，只在申报时固化取数基准、来源版本/更新时间、经办人和系统提交时间，草稿不充当审计事实；受控迁移随施工合同同步完整 BOQ 目录和尚未成单的月度完成量事实，历史单据量价只在目录确实缺行时兜底，不得覆盖同稳定 ID 的当前 canonical 名称、数量或单价；无对应期次快照时拒绝借用其他月份的数量。
 
@@ -165,6 +165,6 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 
 施工合同命令由 #320 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—客户关系校验、附件读回和浏览器交互。`actualCompletionDate` 不是日常表单可写字段；受控迁移没有 canonical 事实时保持 `null`。
 
-甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。验收—保修命令由 #324 在同一 `acceptance` ID 上证明 `draft → submitted → accepted → warranty → expired` 单向状态链、阶段事实与附件的原子提交、追加审计、迁移事实重验和终态锁定。最终结算、甲方罚扣、分包变更、分包结算、项目罚扣与开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
+甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。验收—保修命令由 #324 在同一 `acceptance` ID 上证明单向状态链、追加审计和终态锁定。最终结算命令由 #325 在同一中央契约中证明草稿保存、提交、附件 owner 身份、关系重验与迁移读回；已提交记录的业务字段锁定。审定金额/日期只能来自已有持久化事实，当前未新增审定 action。甲方罚扣、分包变更、分包结算、项目罚扣与开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
 
 当前中央项目、客户、分供方、班组和工人命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目、分供方、班组或工人的日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。

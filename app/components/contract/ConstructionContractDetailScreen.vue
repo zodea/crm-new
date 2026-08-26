@@ -234,7 +234,7 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
             <SectionHeader title="月度报量" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="验收与最终结算" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无验收或最终结算" />
+            <SectionHeader title="最终结算" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无最终结算" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
             <SectionHeader title="甲方罚扣" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.settlements.penalties" empty-label="暂无甲方罚扣" />

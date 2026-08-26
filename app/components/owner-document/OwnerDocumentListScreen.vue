@@ -58,7 +58,8 @@ const rows = computed(() => store.recordsFor(props.kind))
 const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
-  && (props.kind === 'owner_change' || props.kind === 'owner_report' || props.kind === 'acceptance'))
+  && (props.kind === 'owner_change' || props.kind === 'owner_report'
+    || props.kind === 'acceptance' || props.kind === 'final_settlement'))
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
 const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query)
 
@@ -219,11 +220,13 @@ const summaries = computed(() =>
           : summary.field === 'secondaryAmount'
             ? Number(centralSummary.value.origins.real.taxExclusiveAmount)
             : Number(centralSummary.value.origins.real.appliedTaxExclusiveAmount)
-        : summary.field === 'amount'
-          ? Number(centralSummary.value.origins.real.reportedAmount)
-          : summary.field === 'secondaryAmount'
-            ? Number(centralSummary.value.origins.real.auditedAmount)
-            : Number(centralSummary.value.origins.real.auditedAmount) - Number(centralSummary.value.origins.real.reportedAmount)
+        : props.kind === 'owner_report'
+          ? summary.field === 'amount'
+            ? Number(centralSummary.value.origins.real.reportedAmount)
+            : summary.field === 'secondaryAmount'
+              ? Number(centralSummary.value.origins.real.auditedAmount)
+              : Number(centralSummary.value.origins.real.auditedAmount) - Number(centralSummary.value.origins.real.reportedAmount)
+          : Number(centralSummary.value.origins.real.reportedAmount)
       : filtered.value.reduce((total, row) => total + Number(row[summary.field] || 0), 0),
   })),
 )

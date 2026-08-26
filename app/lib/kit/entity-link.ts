@@ -12,6 +12,7 @@ export type EntityLinkType
     | 'worker'
     | 'quantity-unit'
     | 'wage-statement'
+    | 'receipt'
     | 'subcontract-document'
 
 export type EntityLinkResolution = NavigationTargetResolution | { state: 'empty', label: null }

@@ -35,6 +35,7 @@ function source(): CoreMigrationSourceDTO {
         references: { contractId: 'subcontract-old' },
         attributes: { no: 'FB-LEGACY-321-BC01', signDate: '2026-02-08', status: '生效' },
       }],
+      receipt_registrations: [],
       owner_documents: [],
       workers: [],
       project_suppliers: [],

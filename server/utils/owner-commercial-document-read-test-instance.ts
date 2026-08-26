@@ -1,3 +1,4 @@
+import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document/central-repository'
 import {
   buildOwnerCommercialDocumentDetail,
   buildOwnerCommercialDocumentListPage,
@@ -13,13 +14,27 @@ import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from './owner-commercial-docu
 export type OwnerCommercialDocumentReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
 const FIXED_AS_OF = '2026-08-25T00:00:00.000Z'
-const demoDocuments = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.map((row, index) => ({
-  ...structuredClone(row),
-  dataOrigin: 'demo' as const,
-  id: `${row.id}-demo-${index + 1}`,
-  sourceId: `${row.id}-demo-${index + 1}`,
-  no: `DEMO-${row.no}`,
-}))
+const demoDocuments: OwnerCommercialDocumentSource[] = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.map((row, index) => {
+  const suffix = `-demo-${index + 1}`
+  return {
+    ...structuredClone(row),
+    dataOrigin: 'demo' as const,
+    id: `${row.id}${suffix}`,
+    sourceId: `${row.id}${suffix}`,
+    no: `DEMO-${row.no}`,
+    finalSettlementEvidence: row.finalSettlementEvidence
+      ? {
+          ...structuredClone(row.finalSettlementEvidence),
+          supplements: row.finalSettlementEvidence.supplements == null
+            ? null
+            : row.finalSettlementEvidence.supplements.map(source => ({ ...source, id: `${source.id}${suffix}` })),
+          receipts: row.finalSettlementEvidence.receipts == null
+            ? null
+            : row.finalSettlementEvidence.receipts.map(source => ({ ...source, id: `${source.id}${suffix}` })),
+        }
+      : undefined,
+  }
+})
 
 function problem(code: 'forbidden' | 'unavailable', message: string, retryable = false) {
   return new OwnerCommercialDocumentRepositoryProblem({

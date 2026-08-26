@@ -19,10 +19,12 @@ import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
+import { ownerFinalSettlementReceiptIsActive } from '../../app/lib/owner-document/central-repository'
 import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from './owner-commercial-document-fixtures'
 
 export type CustomerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -174,6 +176,23 @@ const demoReceipts: CustomerReceiptSourceRow[] = receiptsSeed.map(receipt => ({
   receiptDate: receipt.receipt_date || null,
   status: receipt.status,
 }))
+const formalFinalSettlementReceipts: CustomerReceiptSourceRow[] = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS
+  .filter(document => document.kind === 'final_settlement' && document.customerId)
+  .flatMap(document => (document.finalSettlementEvidence?.receipts ?? [])
+    .filter(receipt => ownerFinalSettlementReceiptIsActive(receipt.status))
+    .map(receipt => ({
+      dataOrigin: 'real' as const,
+      id: receipt.id,
+      no: receipt.no,
+      customerId: document.customerId!,
+      projectId: document.projectId,
+      contractId: document.contractId,
+      payerAccount: document.customerName,
+      amount: receipt.amount,
+      paymentMethod: '',
+      receiptDate: receipt.date,
+      status: receipt.status,
+    })))
 
 function problem(code: 'forbidden' | 'unavailable', message: string, retryable = false) {
   return new CustomerRepositoryProblem({
@@ -209,7 +228,7 @@ export function createCustomerReadTestInstance(
       customers,
       projects: scenario === 'ready' ? demoProjects : [],
       contracts: scenario === 'ready' ? demoContracts : [],
-      receipts: scenario === 'ready' ? demoReceipts : [],
+      receipts: scenario === 'ready' ? [...formalFinalSettlementReceipts, ...demoReceipts] : [],
       sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
         migrationSnapshot.authority === 'central'
           ? migrationSnapshot.activeBatchId ?? 'migration-central'

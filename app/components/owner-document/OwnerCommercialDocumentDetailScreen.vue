@@ -95,6 +95,8 @@ const metrics = computed(() => {
       { label: '审批状态', value: detail.value?.document.approval.label ?? '—' },
     ]
   }
+  if (current.kind === 'final_settlement')
+    return []
   return [
     { label: '合同估算金额', value: yuan(Number(current.contractEstimate)) },
     { label: '生命周期状态', value: detail.value?.document.approval.label ?? '—' },

@@ -269,7 +269,23 @@ export function createConstructionContractCommandTestInstance(options: Options =
     }
   }
 
-  return {
+  let applyMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) => void
+
+  function prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null): () => void {
+    const stateKey = keyFor(sessionId)
+    const current = stateFor(sessionId)
+    const candidate = structuredClone(current)
+    states.set(stateKey, candidate)
+    try {
+      applyMigrationSnapshot(snapshot, sessionId)
+    }
+    finally {
+      states.set(stateKey, current)
+    }
+    return () => states.set(stateKey, candidate)
+  }
+
+  const instance = {
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
@@ -337,7 +353,11 @@ export function createConstructionContractCommandTestInstance(options: Options =
       }
       return imported
     },
+    prepareMigrationSnapshot,
     synchronizeMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      prepareMigrationSnapshot(snapshot, sessionId)()
+    },
+    applyMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
       const state = stateFor(sessionId)
       const activeBatchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
       const entities = activeBatchId ? snapshot.entities : []
@@ -508,6 +528,8 @@ export function createConstructionContractCommandTestInstance(options: Options =
       return structuredClone(result)
     },
   }
+  applyMigrationSnapshot = instance.applyMigrationSnapshot
+  return instance
 }
 
 export const CONSTRUCTION_CONTRACT_FORM_CUSTOMERS = [

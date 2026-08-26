@@ -41,6 +41,7 @@ function migrationSource(): CoreMigrationSourceDTO {
       construction_contracts: [],
       subcontract_contracts: [],
       contract_supplements: [],
+      receipt_registrations: [],
       owner_documents: [],
       workers: [],
       project_suppliers: [],

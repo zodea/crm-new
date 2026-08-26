@@ -55,4 +55,59 @@ describe('施工合同聚合读取版本', () => {
       constructionContractCommandTestInstance.reset(sessionId)
     }
   })
+
+  it('把 canonical 最终结算及其补充协议、收款事实同步回施工合同来源链', () => {
+    const sessionId = 'construction-owner-final-settlement-325'
+    constructionContractCommandTestInstance.reset(sessionId)
+    constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)
+    try {
+      const read = createConstructionContractReadTestInstance(
+        () => ['construction-contract:read'],
+        constructionContractCommandTestInstance,
+        {
+          rows: () => structuredClone(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS),
+          sourceVersion: () => 'owner-final-settlement-325',
+        },
+      )
+      const rows = structuredClone(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS)
+      const settlement = rows.find(row => row.kind === 'final_settlement')!
+      settlement.finalSettlementEvidence?.supplements?.push({
+        id: 'supplement-draft-cn-325',
+        no: 'BC-DRAFT-CN-325',
+        name: '中文草稿补充协议',
+        status: '草稿',
+        amount: 200000,
+        date: '2026-08-20',
+      })
+      const filteredRead = createConstructionContractReadTestInstance(
+        () => ['construction-contract:read'],
+        constructionContractCommandTestInstance,
+        {
+          rows: () => rows,
+          sourceVersion: () => 'owner-final-settlement-filter-325',
+        },
+      )
+      const filteredDetail = filteredRead.detail(CONSTRUCTION_CONTRACT_EXISTING_ID, { origin: 'real' }, sessionId)
+      const detail = read.detail(CONSTRUCTION_CONTRACT_EXISTING_ID, { origin: 'real' }, sessionId)
+
+      expect(detail.sections.settlements.finalSettlements[0]?.navigation).toMatchObject({
+        subject: { entity: 'owner-document', id: 'final-settlement-real-325' },
+        variant: 'final-settlement',
+      })
+      expect(detail.sections.supplements).toContainEqual(expect.objectContaining({
+        id: 'supplement-real-325',
+        navigation: expect.objectContaining({ variant: 'supplement', view: 'supplement-real-325' }),
+      }))
+      expect(detail.sections.receipts).toContainEqual(expect.objectContaining({
+        id: 'receipt-real-325',
+        navigation: expect.objectContaining({
+          subject: expect.objectContaining({ entity: 'receipt', id: 'receipt-real-325' }),
+        }),
+      }))
+      expect(filteredDetail.sections.supplements.map(row => row.id)).not.toContain('supplement-draft-cn-325')
+    }
+    finally {
+      constructionContractCommandTestInstance.reset(sessionId)
+    }
+  })
 })
