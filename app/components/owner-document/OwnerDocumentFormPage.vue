@@ -51,7 +51,7 @@ const routeId = computed(() => {
 const isEditing = computed(() => Boolean(routeId.value))
 const hasReturnTarget = computed(() => Boolean(route.query?.returnTo))
 const returnTarget = computed(() => {
-  if (props.kind !== 'owner_change' && props.kind !== 'owner_report')
+  if (props.kind !== 'owner_change' && props.kind !== 'owner_report' && props.kind !== 'acceptance')
     return meta.value.listPath
   return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real')
     ?? validateOwnerDocumentJourneyReturnTo(route.query?.returnTo, props.kind, 'real')
@@ -77,7 +77,13 @@ const {
   toggleExisting: toggleExistingAttachment,
   removePending,
   patchPending,
-} = useOwnerDocumentFormAttachments()
+} = useOwnerDocumentFormAttachments({
+  defaultCategory: () => props.kind === 'acceptance'
+    ? ['accepted', 'warranty', 'expired'].includes(String(draft.value.status ?? ''))
+        ? 'warranty-confirmation'
+        : 'acceptance-report'
+    : '业务附件',
+})
 const fieldErrors = shallowRef<Record<string, string>>({})
 const loading = shallowRef(false)
 const loadError = shallowRef('')
@@ -133,6 +139,12 @@ async function recoverCentralConflict(cause: unknown): Promise<boolean> {
 }
 
 const status = computed(() => String(draft.value.status ?? 'draft'))
+const acceptanceAttachmentCategory = computed(() => ['accepted', 'warranty', 'expired'].includes(status.value)
+  ? 'warranty-confirmation'
+  : 'acceptance-report')
+const visibleAttachments = computed(() => props.kind === 'acceptance'
+  ? attachments.value.filter(file => file.category === acceptanceAttachmentCategory.value)
+  : attachments.value)
 const editable = computed(() => !conflictReadOnly.value && ownerDocumentStatusIsEditable(status.value))
 const title = computed(() =>
   `${isEditing.value ? (editable.value ? '编辑' : '查看') : '新建'} · ${meta.value.label}`,
@@ -162,6 +174,8 @@ const {
   refresh: initialize,
   complete: completeCentralLifecycle,
   recoverConflict: recoverCentralConflict,
+  acceptanceAttachments: attachmentChanges,
+  clearAcceptanceAttachments: clearPendingAttachments,
 })
 const dirty = computed(() =>
   JSON.stringify(draft.value) !== savedSnapshot.value
@@ -172,8 +186,12 @@ const footerActions = computed<FormFooterAction[]>(() =>
     ? ['cancel']
     : editable.value
       ? ['cancel', 'draft', 'saveSubmit']
-      : ['cancel', 'save'],
+      : props.kind === 'acceptance'
+        ? ['cancel']
+        : ['cancel', 'save'],
 )
+const attachmentsReadonly = computed(() => conflictReadOnly.value
+  || (props.kind === 'acceptance' && status.value === 'expired'))
 const footerLabels = computed(() => ({
   saveSubmit: meta.value.postLabel,
   save: '保存附件',
@@ -740,14 +758,15 @@ onMounted(() => void initialize())
       </section>
 
       <FileRefAttachmentSection
-        :attachments="attachments"
+        :attachments="visibleAttachments"
         :pending-attachments="pendingAttachments"
         :pending-remove-ids="pendingRemoveIds"
         :pending-restore-ids="pendingRestoreIds"
         :desktop-picker="desktopAttachmentPicker"
         :note="String(draft.note ?? '')"
         :note-readonly="!editable"
-        :readonly="conflictReadOnly"
+        :category-readonly="kind === 'acceptance'"
+        :readonly="attachmentsReadonly"
         @pick-native="pickNativeFiles"
         @files="handleFiles"
         @toggle-existing="toggleExistingAttachment"

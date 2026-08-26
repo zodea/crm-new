@@ -10,7 +10,7 @@
 
 当前落地事实（#318）：浏览器材料采购合同按 `(dataOrigin, contractId)` 从中央 Repository 读取，只有 `kind='材采'` 才进入该详情；项目、分供方、明细、发票、付款、结算、罚扣、下料、到货和文件均以稳定 ID/外键归属，零记录保持空集合。正式新增/编辑只走中央材料合同命令，服务端分配合同与明细 ID、执行幂等和乐观锁并复算明细金额；演示来源只读。该切片不改变 SQLite schema，也不授权按名称、项目或金额补关系。
 
-当前落地事实（#320、#321）：浏览器施工/分包合同都按 `(dataOrigin, contractId, kind)` 从各自中央 Repository 读取，关联事实只按稳定合同外键归属。正式新增/编辑只走对应中央命令；演示来源只读。SQLite v42 增加可空 `actual_completion_date`；v43 增加可空 `settlement_status` 与 `clearance_status`。存量值均保持 `null`，不得从日期、合同状态、结算金额或付款余额推断。
+当前落地事实（#320、#321、#324）：浏览器施工/分包合同都按 `(dataOrigin, contractId, kind)` 从各自中央 Repository 读取，关联事实只按稳定合同外键归属。正式新增/编辑只走对应中央命令；演示来源只读。SQLite v42 增加可空 `actual_completion_date`；v43 增加可空 `settlement_status` 与 `clearance_status`；v44 为同一 `project_acceptances` 记录增加验收/保修专属事实与追加式生命周期事件表。迁移不猜测存量的日期、状态、结论或审计历史。
 
 当前落地事实（#322）：受控迁移拓扑在 canonical 施工合同、canonical 分包合同之后追加 `contract_supplements`，再迁移工人和项目分供方。补充协议的旧 `contract_id` 必须唯一映射到施工或分包主合同的中央 ID；缺失或跨类型歧义均阻断，不猜父合同。详情按服务端稳定补充协议 ID 聚焦，并在读取层验证该记录存在且 `contractId` 与当前主合同一致；不存在与父子错配使用不同问题语义。正式迁移确认后，两类详情从同一中央命令事实源读取补充协议；本切片不改变 SQLite 物理 schema。
 
@@ -1137,14 +1137,33 @@ project_acceptances(
   contract_id TEXT REFERENCES contracts(id), document_date TEXT DEFAULT '',
   contract_estimate REAL, acceptor TEXT DEFAULT '',
   warranty_owner TEXT DEFAULT '', conclusion TEXT DEFAULT '',
+  acceptance_organization TEXT NOT NULL DEFAULT '',
+  acceptance_date TEXT NULL,
+  acceptance_conclusion TEXT NOT NULL DEFAULT '',
+  warranty_start_date TEXT NULL, warranty_end_date TEXT NULL,
+  warranty_confirmation_organization TEXT NULL,
+  warranty_confirmation_date TEXT NULL,
+  warranty_confirmation_note TEXT NOT NULL DEFAULT '',
   status TEXT DEFAULT 'draft'
     CHECK (status IN ('draft', 'submitted', 'accepted', 'warranty', 'expired')),
   note, created_at, updated_at, deleted_at
 )
--- 生命周期：draft -> submitted -> accepted -> warranty -> expired；
--- 进入 warranty 时同一记录 type 切为 warranty，不复制保修单据。
--- 项目详情原样读取上述状态，不按日期或 type 推导跳级；附件继续使用
--- file_refs(owner_type='project_acceptance', owner_id=project_acceptances.id)。
+project_acceptance_lifecycle_events(
+  id TEXT PRIMARY KEY,
+  acceptance_id TEXT NOT NULL REFERENCES project_acceptances(id) ON DELETE RESTRICT,
+  action TEXT NOT NULL CHECK (action IN ('submit', 'accept', 'start-warranty', 'confirm-expiry')),
+  from_status TEXT NOT NULL, to_status TEXT NOT NULL,
+  actor_id TEXT NOT NULL, actor_name TEXT NOT NULL DEFAULT '',
+  occurred_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
+  UNIQUE (acceptance_id, to_status)
+)
+-- 生命周期：draft -> submitted -> accepted -> warranty -> expired；同一 acceptance ID
+-- 同时支撑 acceptance / warranty 两个 canonical 投影，不复制保修单据。
+-- 状态只能由 submit / accept / start-warranty / confirm-expiry command 单向推进，
+-- 每次转换追加事件；迁移不根据 type/status 伪造历史日期或事件。
+-- 项目、合同和中央详情原样读取持久化状态与事件；附件继续使用
+-- file_refs(owner_type='project_acceptance', owner_id=project_acceptances.id)，并按
+-- acceptance-report / warranty-confirmation 分类进入对应视图。
 
 owner_final_settlements(
   id, no TEXT DEFAULT '', name TEXT NOT NULL,

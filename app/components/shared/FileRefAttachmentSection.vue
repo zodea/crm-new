@@ -17,6 +17,7 @@ defineProps<{
   title?: string
   note: string
   noteReadonly?: boolean
+  categoryReadonly?: boolean
   readonly?: boolean
 }>()
 
@@ -108,6 +109,7 @@ function inputValue(event: Event): string {
         <input
           :value="file.category"
           :disabled="readonly"
+          :readonly="categoryReadonly"
           class="field-input h-7 w-36 text-11px"
           aria-label="附件分类"
           @input="emit('patchPending', file.localId, { category: inputValue($event) })"

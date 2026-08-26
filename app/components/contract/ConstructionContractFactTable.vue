@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import type { ConstructionContractFactDTO } from '~/lib/construction-contract/repository'
+import { computed } from 'vue'
 import ContractFactTable from './ContractFactTable.vue'
 
-defineProps<{
+const props = defineProps<{
   rows: readonly ConstructionContractFactDTO[]
   emptyLabel: string
   focusId?: string | null
   returnTo?: string | null
+  anchorScope?: 'acceptance' | 'warranty'
+  returnFocusView?: 'acceptance' | 'warranty'
 }>()
+
+const anchorPrefix = computed(() => props.anchorScope
+  ? `construction-contract-fact-${props.anchorScope}`
+  : 'construction-contract-fact')
 </script>
 
 <template>
@@ -17,6 +24,7 @@ defineProps<{
     :empty-label="emptyLabel"
     :focus-id="focusId"
     :return-to="returnTo"
-    anchor-prefix="construction-contract-fact"
+    :return-focus-view="returnFocusView"
+    :anchor-prefix="anchorPrefix"
   />
 </template>

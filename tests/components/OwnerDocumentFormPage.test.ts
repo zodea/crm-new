@@ -462,4 +462,27 @@ describe('甲方与分包单据整页表单状态', () => {
     expect(screen.queryByText(/仅供核对和复制/)).toBeNull()
     expect(screen.getByRole('button', { name: '保存附件' })).not.toBeNull()
   })
+
+  it('保修到期终态隐藏附件写入和虚假保存入口', async () => {
+    route.fullPath = '/owner/acceptance/form/acceptance-expired-324?origin=real'
+    route.params = { id: 'acceptance-expired-324' }
+    route.query = { origin: 'real' }
+    loadOne.mockResolvedValue({
+      id: 'acceptance-expired-324',
+      status: 'expired',
+      name: '已到期验收记录',
+      projectId: 'project-owner',
+      contractId: 'contract-owner',
+      lines: [],
+    })
+
+    render(OwnerDocumentFormPage, {
+      props: { kind: 'acceptance' },
+      global: { components: globalComponents },
+    })
+    await flushPromises()
+
+    expect(screen.queryByRole('button', { name: '保存附件' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '选择附件' })).toBeNull()
+  })
 })

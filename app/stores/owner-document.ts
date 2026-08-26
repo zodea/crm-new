@@ -1,6 +1,7 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
 import type {
+  OwnerCommercialDocumentKind,
   OwnerCommercialDocumentListItemDTO,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
@@ -48,8 +49,8 @@ import {
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const usesCentralBrowser = import.meta.client && !isTauri()
-  const isCentralKind = (kind: OwnerDocumentKind): kind is 'owner_change' | 'owner_report' =>
-    kind === 'owner_change' || kind === 'owner_report'
+  const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
+    kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -66,12 +67,12 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return centralRepositories().ownerCommercialDocumentCommands.context()
   }
 
-  async function centralForm(kind: 'owner_change' | 'owner_report', id: string) {
+  async function centralForm(kind: OwnerCommercialDocumentKind, id: string) {
     return centralRepositories().ownerCommercialDocumentCommands.loadForm(kind, id)
   }
 
   async function centralCommand(
-    kind: 'owner_change' | 'owner_report',
+    kind: OwnerCommercialDocumentKind,
     id: string | null,
     baseVersion: string | null,
     values: Record<string, unknown>,
@@ -97,11 +98,35 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           secondaryAmount: Number(item.amounts.taxExclusive),
           tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
         }
-      : {
-          amount: Number(item.amounts.reported),
-          secondaryAmount: Number(item.amounts.audited ?? 0),
-          tertiaryAmount: Number(item.amounts.difference ?? 0),
+      : item.amounts.kind === 'owner_report'
+        ? {
+            amount: Number(item.amounts.reported),
+            secondaryAmount: Number(item.amounts.audited ?? 0),
+            tertiaryAmount: Number(item.amounts.difference ?? 0),
+          }
+        : {
+            amount: Number(item.amounts.contractEstimate),
+            secondaryAmount: 0,
+            tertiaryAmount: 0,
+          }
+    const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
+      ? {
+          viewVariant: 'acceptance' as const,
+          acceptanceOrganization: item.acceptanceView.organization,
+          acceptancePerson: item.acceptanceView.person,
+          acceptanceConclusion: item.acceptanceView.conclusion,
         }
+      : item.acceptanceView?.variant === 'warranty'
+        ? {
+            viewVariant: 'warranty' as const,
+            warrantyOwner: item.acceptanceView.owner,
+            warrantyStartDate: item.acceptanceView.startDate ?? '',
+            warrantyEndDate: item.acceptanceView.endDate ?? '',
+            warrantyConfirmationOrganization: item.acceptanceView.confirmationOrganization ?? '',
+            warrantyConfirmationDate: item.acceptanceView.confirmationDate ?? '',
+            warrantyConfirmationNote: item.acceptanceView.confirmationNote,
+          }
+        : {}
     return {
       id: item.id,
       no: item.no,
@@ -119,18 +144,24 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
       ...itemAmounts,
       contractNavigation: item.contractNavigation,
       quantity: null,
-      date: item.applicationDate ?? '',
+      date: item.acceptanceView?.variant === 'acceptance'
+        ? item.acceptanceView.date ?? ''
+        : item.acceptanceView?.variant === 'warranty'
+          ? item.acceptanceView.confirmationDate ?? item.acceptanceView.endDate ?? item.acceptanceView.startDate ?? ''
+          : item.applicationDate ?? '',
       status: item.status,
+      attachmentCount: item.attachmentCount ?? 0,
+      ...acceptanceFields,
     }
   }
   const records = shallowRef<Partial<Record<OwnerDocumentKind, OwnerDocumentListRecord[]>>>({})
   const listLoading = shallowRef<Partial<Record<OwnerDocumentKind, boolean>>>({})
   const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
   const listLoadSequence: Partial<Record<OwnerDocumentKind, number>> = {}
-  const centralPagination = shallowRef<Partial<Record<'owner_change' | 'owner_report', { page: number, pageSize: number, total: number }>>>({})
-  const centralSummaries = shallowRef<Partial<Record<'owner_change' | 'owner_report', OwnerCommercialDocumentListSummaryDTO>>>({})
-  const centralCapabilities = shallowRef<Partial<Record<'owner_change' | 'owner_report', string[]>>>({})
-  const centralEmptyReasons = shallowRef<Partial<Record<'owner_change' | 'owner_report', 'no-records' | 'no-filter-match' | 'missing-relation' | null>>>({})
+  const centralPagination = shallowRef<Partial<Record<OwnerCommercialDocumentKind, { page: number, pageSize: number, total: number }>>>({})
+  const centralSummaries = shallowRef<Partial<Record<OwnerCommercialDocumentKind, OwnerCommercialDocumentListSummaryDTO>>>({})
+  const centralCapabilities = shallowRef<Partial<Record<OwnerCommercialDocumentKind, string[]>>>({})
+  const centralEmptyReasons = shallowRef<Partial<Record<OwnerCommercialDocumentKind, 'no-records' | 'no-filter-match' | 'missing-relation' | null>>>({})
   const loading = shallowRef(false)
 
   async function loadKind(
@@ -152,6 +183,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
             contractId: centralQuery?.contractId ?? null,
             status: centralQuery?.status ?? null,
             documentType: centralQuery?.documentType ?? null,
+            variant: centralQuery?.variant ?? null,
             page: centralQuery?.page ?? 1,
             pageSize: centralQuery?.pageSize ?? 20,
           })
@@ -196,19 +228,19 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return listErrors.value[kind] ?? ''
   }
 
-  function centralPageFor(kind: 'owner_change' | 'owner_report') {
+  function centralPageFor(kind: OwnerCommercialDocumentKind) {
     return centralPagination.value[kind] ?? { page: 1, pageSize: 20, total: 0 }
   }
 
-  function centralSummaryFor(kind: 'owner_change' | 'owner_report') {
+  function centralSummaryFor(kind: OwnerCommercialDocumentKind) {
     return centralSummaries.value[kind] ?? null
   }
 
-  function centralCapabilitiesFor(kind: 'owner_change' | 'owner_report') {
+  function centralCapabilitiesFor(kind: OwnerCommercialDocumentKind) {
     return centralCapabilities.value[kind] ?? []
   }
 
-  function centralEmptyReasonFor(kind: 'owner_change' | 'owner_report') {
+  function centralEmptyReasonFor(kind: OwnerCommercialDocumentKind) {
     return centralEmptyReasons.value[kind] ?? null
   }
 
@@ -382,10 +414,44 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
-  async function moveAcceptance(id: string, target: AcceptanceLifecycleTarget) {
+  async function moveAcceptance(
+    id: string,
+    target: AcceptanceLifecycleTarget,
+    draft?: OwnerDocumentDraft,
+    attachments: FileRefChanges = {},
+  ) {
     loading.value = true
     try {
-      await transitionAcceptance(id, target)
+      if (usesCentralBrowser) {
+        if (!draft)
+          throw new Error('验收生命周期版本已丢失，请重新读取后再操作')
+        const baseVersion = centralBaseVersion(draft)
+        const values = {
+          action: 'transition-acceptance',
+          target,
+          facts: {
+            acceptanceOrganization: draft.acceptanceOrganization,
+            acceptancePerson: draft.acceptancePerson,
+            acceptanceDate: draft.acceptanceDate,
+            acceptanceConclusion: draft.acceptanceConclusion,
+            warrantyOwner: draft.warrantyOwner,
+            warrantyStartDate: draft.warrantyStartDate,
+            warrantyEndDate: draft.warrantyEndDate,
+            warrantyConfirmationOrganization: draft.warrantyConfirmationOrganization,
+            warrantyConfirmationDate: draft.warrantyConfirmationDate,
+            warrantyConfirmationNote: draft.warrantyConfirmationNote,
+            note: draft.note,
+          },
+          attachments,
+        }
+        const commandId = ownerDocumentCommandId(draft, { kind: 'acceptance', id, baseVersion, ...values })
+        const result = await centralCommand('acceptance', id, baseVersion, values, commandId)
+        advanceOwnerDocumentFormVersion(draft, result.version)
+        completeOwnerDocumentCommandIntent(draft, commandId)
+      }
+      else {
+        await transitionAcceptance(id, target, draft, attachments)
+      }
       await refreshAfterMutation('acceptance')
     }
     finally {

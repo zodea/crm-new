@@ -17,18 +17,20 @@ describe('f5 单据页面模型', () => {
       expect(ownerDocumentKindFromRoute(meta.routeScope, meta.routeKind)).toBe(kind)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META)).toBe(`${meta.listPath}/new`)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(
-        kind === 'owner_change' || kind === 'owner_report'
+        kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
           ? `${meta.listPath}/form/f5_1`
           : `${meta.listPath}/f5_1`,
       )
     }
   })
 
-  it('dOC01 两类单据用独立只读详情地址，并显式保留来源', () => {
+  it('dOC01/DOC02 三类单据用独立只读详情地址，并显式保留来源和验收视图', () => {
     expect(ownerDocumentDetailPath('owner_change', 'change/323', 'real'))
       .toBe('/owner/change/change%2F323?origin=real')
     expect(ownerDocumentDetailPath('owner_report', 'report-323', 'demo'))
       .toBe('/owner/report/report-323?origin=demo')
+    expect(ownerDocumentDetailPath('acceptance', 'acceptance-324', 'real', 'warranty'))
+      .toBe('/owner/acceptance/acceptance-324?origin=real&variant=warranty')
   })
 
   it('八类表单提供准确分区和对应合同入口', () => {

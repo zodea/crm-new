@@ -231,7 +231,31 @@ describe('项目详情中央来源边界', () => {
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(2)
+    expect(screen.getAllByText('2')).toHaveLength(4)
+  })
+
+  it('正式项目按同一 canonical 来源提供验收与保修双视图入口', async () => {
+    get.mockResolvedValue({
+      ...detail,
+      item: { ...detail.item, dataOrigin: 'real' },
+    })
+    ownerList.mockResolvedValue(ownerPage(1))
+    renderDetail({
+      originHint: 'real',
+      includeDemo: false,
+      currentRoute: '/project/project-1?origin=real',
+    })
+
+    const acceptance = await screen.findByRole('link', { name: /竣工验收/ })
+    const warranty = screen.getByRole('link', { name: /保修管理/ })
+    expect(acceptance.getAttribute('href')).toContain('/owner/acceptance?')
+    expect(acceptance.getAttribute('href')).toContain('variant=acceptance')
+    expect(warranty.getAttribute('href')).toContain('/owner/acceptance?')
+    expect(warranty.getAttribute('href')).toContain('variant=warranty')
+    expect(acceptance.getAttribute('href')).toContain('returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal%23project-owner-document-card-acceptance')
+    expect(warranty.getAttribute('href')).toContain('returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal%23project-owner-document-card-warranty')
+    expect(acceptance.getAttribute('id')).toBe('project-owner-document-card-acceptance')
+    expect(warranty.getAttribute('id')).toBe('project-owner-document-card-warranty')
   })
 
   it('稳定区分来源错配，不按项目名称回退到其他来源', async () => {

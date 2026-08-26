@@ -322,6 +322,7 @@ export const INFRA_TABLES = [
   'ocr_settings',
   'supplier_credential_audits',
   'supplier_audits',
+  'project_acceptance_lifecycle_events',
 ]
 
 function assertBusinessTable(table: string): void {

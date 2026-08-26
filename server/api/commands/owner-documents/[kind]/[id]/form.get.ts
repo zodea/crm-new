@@ -5,7 +5,7 @@ import { throwProjectReadError } from '../../../../../utils/project-read-error'
 export default defineEventHandler((event) => {
   try {
     const kind = getRouterParam(event, 'kind')
-    if (kind !== 'owner_change' && kind !== 'owner_report')
+    if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance')
       throw new Error('甲方商务单据类型无效')
     return ownerCommercialDocumentCommandTestInstance.form(
       kind,

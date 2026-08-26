@@ -1,6 +1,7 @@
 import type { FileRefChanges, FileRefRecord } from '../forms/file-refs'
 import type { OwnerCommercialDocumentKind } from './central-repository'
 import type {
+  AcceptanceLifecycleTarget,
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
   OwnerDocumentLookupOption,
@@ -49,6 +50,27 @@ export interface OwnerCommercialDocumentAuditCommandDTO extends OwnerCommercialD
   audit: Pick<OwnerReportAuditDraft, 'lines'>
 }
 
+export interface OwnerAcceptanceTransitionCommandDTO extends OwnerCommercialDocumentCommandEnvelopeDTO {
+  action: 'transition-acceptance'
+  kind: 'acceptance'
+  id: string
+  target: AcceptanceLifecycleTarget
+  facts: {
+    acceptanceOrganization?: string
+    acceptancePerson?: string
+    acceptanceDate?: string
+    acceptanceConclusion?: string
+    warrantyOwner?: string
+    warrantyStartDate?: string
+    warrantyEndDate?: string
+    warrantyConfirmationOrganization?: string
+    warrantyConfirmationDate?: string
+    warrantyConfirmationNote?: string
+    note?: string
+  }
+  attachments: FileRefChanges
+}
+
 export interface OwnerCommercialDocumentAttachmentsCommandDTO extends OwnerCommercialDocumentCommandEnvelopeDTO {
   action: 'attachments'
   id: string
@@ -64,6 +86,7 @@ export type OwnerCommercialDocumentCommandRequestDTO
   = | OwnerCommercialDocumentSaveCommandDTO
     | OwnerCommercialDocumentApproveCommandDTO
     | OwnerCommercialDocumentAuditCommandDTO
+    | OwnerAcceptanceTransitionCommandDTO
     | OwnerCommercialDocumentAttachmentsCommandDTO
     | OwnerCommercialDocumentDeleteCommandDTO
 

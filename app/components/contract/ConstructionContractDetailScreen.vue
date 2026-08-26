@@ -35,11 +35,22 @@ const tabs = computed(() => [
 const tabKeys = new Set(tabs.value.map(tab => tab.key))
 const activeTab = computed({
   get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
-  set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value, focus: undefined } }),
+  set: value => void router.replace({
+    query: {
+      ...route.query,
+      tab: value === 'info' ? undefined : value,
+      focus: undefined,
+      focusView: undefined,
+    },
+    hash: '',
+  }),
 })
-const focusId = computed(() => ['supplements', 'changes', 'settlements'].includes(String(route.query.tab ?? ''))
+const focusId = computed(() => ['supplements', 'changes', 'settlements', 'acceptance'].includes(String(route.query.tab ?? ''))
   && typeof route.query.focus === 'string'
   ? route.query.focus
+  : null)
+const focusView = computed(() => route.query.focusView === 'acceptance' || route.query.focusView === 'warranty'
+  ? route.query.focusView
   : null)
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
 const returnTo = computed(() => ownerDocumentReturnTo.value
@@ -242,10 +253,10 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
         </section>
         <section v-else class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="竣工验收" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.acceptances" empty-label="暂无竣工验收记录" />
+            <SectionHeader title="竣工验收" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.acceptances" empty-label="暂无竣工验收记录" :focus-id="focusView === null || focusView === 'acceptance' ? focusId : null" :return-to="route.fullPath" anchor-scope="acceptance" return-focus-view="acceptance" />
           </div>
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="保修到期" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.warranties" empty-label="暂无保修到期记录" />
+            <SectionHeader title="保修到期" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.acceptance.warranties" empty-label="暂无保修到期记录" :focus-id="focusView === 'warranty' ? focusId : null" :return-to="route.fullPath" anchor-scope="warranty" return-focus-view="warranty" />
           </div>
         </section>
       </div>

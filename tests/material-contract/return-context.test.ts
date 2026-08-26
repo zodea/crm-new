@@ -74,4 +74,15 @@ describe('材料采购合同列表返回上下文', () => {
       .toBe('/project/project-1?origin=real')
     expect(validateProjectJourneyReturnTo('/project/project-1', 'demo')).toBeNull()
   })
+
+  it('保留项目甲方商务卡片的稳定返回锚点', () => {
+    expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real#project-owner-document-card-warranty',
+      'real',
+    )).toBe('/project/project-1?origin=real#project-owner-document-card-warranty')
+    expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real#project-owner-document-card-forged',
+      'real',
+    )).toBeNull()
+  })
 })

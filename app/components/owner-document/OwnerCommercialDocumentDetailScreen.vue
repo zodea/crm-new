@@ -87,11 +87,17 @@ const metrics = computed(() => {
       { label: '审批状态', value: detail.value?.document.approval.label ?? '—' },
     ]
   }
+  if (current.kind === 'owner_report') {
+    return [
+      { label: '申报金额', value: yuan(Number(current.reported)) },
+      { label: '审定金额', value: current.audited == null ? '未审定' : yuan(Number(current.audited)) },
+      { label: '审定差额', value: current.difference == null ? '—' : yuan(Number(current.difference)) },
+      { label: '审批状态', value: detail.value?.document.approval.label ?? '—' },
+    ]
+  }
   return [
-    { label: '申报金额', value: yuan(Number(current.reported)) },
-    { label: '审定金额', value: current.audited == null ? '未审定' : yuan(Number(current.audited)) },
-    { label: '审定差额', value: current.difference == null ? '—' : yuan(Number(current.difference)) },
-    { label: '审批状态', value: detail.value?.document.approval.label ?? '—' },
+    { label: '合同估算金额', value: yuan(Number(current.contractEstimate)) },
+    { label: '生命周期状态', value: detail.value?.document.approval.label ?? '—' },
   ]
 })
 
@@ -101,6 +107,7 @@ function load() {
     id: props.documentId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
+    variant: null,
   })
 }
 

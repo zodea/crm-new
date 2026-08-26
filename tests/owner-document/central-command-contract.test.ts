@@ -61,6 +61,45 @@ const change: OwnerCommercialDocumentSource = {
   files: [],
 }
 
+const acceptance: OwnerCommercialDocumentSource = {
+  ...change,
+  kind: 'acceptance',
+  id: 'acceptance-command-324',
+  no: 'YS-2026-324',
+  name: '中央施工项目竣工验收',
+  documentType: 'acceptance_lifecycle',
+  sourceType: 'manual',
+  sourceId: 'acceptance-command-324',
+  applicationDate: '2026-07-18',
+  status: 'submitted',
+  statusNote: '验收中',
+  amount: 1200000,
+  auditedAmount: null,
+  acceptanceLifecycle: {
+    acceptanceOrganization: '',
+    acceptancePerson: '',
+    acceptanceDate: null,
+    acceptanceConclusion: '',
+    warrantyOwner: '',
+    warrantyStartDate: null,
+    warrantyEndDate: null,
+    warrantyConfirmationOrganization: null,
+    warrantyConfirmationDate: null,
+    warrantyConfirmationNote: '',
+    events: [{
+      id: 'acceptance-submit-event-324',
+      action: 'submit',
+      fromStatus: 'draft',
+      toStatus: 'submitted',
+      actorId: session.actorId,
+      actorName: '周经办',
+      occurredAt: '2026-07-18T02:00:00.000Z',
+      note: '',
+    }],
+  },
+  files: [],
+}
+
 function commandEnvelope(commandId: string) {
   return {
     workspaceId: session.workspaceId,
@@ -71,7 +110,7 @@ function commandEnvelope(commandId: string) {
 }
 
 function instance(
-  createId: (kind: 'owner_change' | 'owner_report') => string = kind => `${kind}-created-323`,
+  createId: (kind: OwnerCommercialDocumentSource['kind']) => string = kind => `${kind}-created-323`,
   now: () => string = () => '2026-08-25T02:00:00.000Z',
   documents: readonly OwnerCommercialDocumentSource[] = [change],
 ) {
@@ -126,6 +165,168 @@ function instance(
 }
 
 describe('甲方商务单据中央命令契约', () => {
+  it('验收、进入保修和到期确认按唯一顺序更新同一记录并留下服务端审计', async () => {
+    const commands = instance(() => 'acceptance-event-created-324', () => '2026-08-25T02:00:00.000Z', [acceptance])
+    const accepted = await commands.execute({
+      ...commandEnvelope('accept-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: '1',
+      target: 'accepted',
+      facts: {
+        acceptanceOrganization: '建设、监理、施工联合验收组',
+        acceptancePerson: '周验收',
+        acceptanceDate: '2026-07-18',
+        acceptanceConclusion: '验收合格',
+        note: '联合验收通过',
+      },
+      attachments: {
+        add: [{ fileName: '竣工验收报告.pdf', category: 'acceptance-report' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }, session)
+    const warranty = await commands.execute({
+      ...commandEnvelope('start-warranty-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: accepted.version,
+      target: 'warranty',
+      facts: {
+        warrantyOwner: '瑞航建设工程有限公司',
+        warrantyStartDate: '2026-07-19',
+        warrantyEndDate: '2028-07-18',
+        note: '进入保修跟踪',
+      },
+      attachments: {
+        add: [{ fileName: '保修跟踪清单.pdf', category: 'warranty-confirmation' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }, session)
+    const expired = await commands.execute({
+      ...commandEnvelope('confirm-expiry-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: warranty.version,
+      target: 'expired',
+      facts: {
+        warrantyConfirmationOrganization: '建设单位保修验收组',
+        warrantyConfirmationDate: '2028-07-18',
+        warrantyConfirmationNote: '保修责任履行完毕',
+      },
+      attachments: { add: [], removeIds: [], restoreIds: [] },
+    }, session)
+
+    expect(expired).toMatchObject({ id: acceptance.id, version: '4' })
+    expect(commands.rows().find(row => row.id === acceptance.id)).toMatchObject({
+      id: acceptance.id,
+      status: 'expired',
+      acceptanceLifecycle: {
+        acceptanceOrganization: '建设、监理、施工联合验收组',
+        acceptanceConclusion: '验收合格',
+        warrantyOwner: '瑞航建设工程有限公司',
+        warrantyEndDate: '2028-07-18',
+        warrantyConfirmationOrganization: '建设单位保修验收组',
+        warrantyConfirmationDate: '2028-07-18',
+        warrantyConfirmationNote: '保修责任履行完毕',
+        events: [
+          { action: 'submit', fromStatus: 'draft', toStatus: 'submitted' },
+          { action: 'accept', fromStatus: 'submitted', toStatus: 'accepted', actorId: session.actorId },
+          { action: 'start-warranty', fromStatus: 'accepted', toStatus: 'warranty', actorId: session.actorId },
+          { action: 'confirm-expiry', fromStatus: 'warranty', toStatus: 'expired', actorId: session.actorId },
+        ],
+      },
+      files: [
+        { fileName: '竣工验收报告.pdf', category: 'acceptance-report', deletedAt: null },
+        { fileName: '保修跟踪清单.pdf', category: 'warranty-confirmation', deletedAt: null },
+      ],
+    })
+  })
+
+  it('拒绝会从双视图消失的验收附件分类', async () => {
+    const commands = instance(() => 'acceptance-event-created-324', () => '2026-08-25T02:00:00.000Z', [acceptance])
+    await expect(commands.execute({
+      ...commandEnvelope('accept-invalid-category-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: '1',
+      target: 'accepted',
+      facts: {
+        acceptanceOrganization: '联合验收组',
+        acceptancePerson: '周验收',
+        acceptanceDate: '2026-07-18',
+        acceptanceConclusion: '合格',
+      },
+      attachments: {
+        add: [{ fileName: '验收报告.pdf', category: '自定义分类' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }, session)).rejects.toThrow('附件分类')
+  })
+
+  it('拒绝生命周期命令跨视图删除其他阶段附件', async () => {
+    const commands = instance(
+      () => 'acceptance-event-created-324',
+      () => '2026-08-25T02:00:00.000Z',
+      [{
+        ...acceptance,
+        files: [{
+          id: 'warranty-file-before-accepted-324',
+          fileName: '保修确认单.pdf',
+          fileSize: 324,
+          mimeType: 'application/pdf',
+          category: 'warranty-confirmation',
+          uploader: '周经办',
+          uploadedAt: '2026-07-18T02:00:00.000Z',
+          deletedAt: null,
+        }],
+      }],
+    )
+    await expect(commands.execute({
+      ...commandEnvelope('accept-cross-view-remove-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: '1',
+      target: 'accepted',
+      facts: {
+        acceptanceOrganization: '联合验收组',
+        acceptancePerson: '周验收',
+        acceptanceDate: '2026-07-18',
+        acceptanceConclusion: '合格',
+      },
+      attachments: {
+        add: [],
+        removeIds: ['warranty-file-before-accepted-324'],
+        restoreIds: [],
+      },
+    }, session)).rejects.toThrow('不属于当前验收视图')
+  })
+
+  it('拒绝跳过验收直接进入保修，并禁止终态再次编辑', async () => {
+    const commands = instance(() => 'acceptance-event-created-324', () => '2026-08-25T02:00:00.000Z', [acceptance])
+    await expect(commands.execute({
+      ...commandEnvelope('skip-acceptance-324'),
+      action: 'transition-acceptance',
+      kind: 'acceptance',
+      id: acceptance.id,
+      baseVersion: '1',
+      target: 'warranty',
+      facts: {
+        warrantyOwner: '瑞航建设工程有限公司',
+        warrantyStartDate: '2026-07-19',
+        warrantyEndDate: '2028-07-18',
+      },
+      attachments: { add: [], removeIds: [], restoreIds: [] },
+    }, session)).rejects.toThrow('当前状态不能进入保修')
+  })
+
   it('通过显式版本和 commandId 更新草稿，附件与单据在同一结果中返回', async () => {
     const commands = instance()
     const form = commands.form('owner_change', change.id, session)

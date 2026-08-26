@@ -273,7 +273,7 @@ function factNavigation(
       filters: { dataOrigin: source.dataOrigin, customerId },
     }
   }
-  if (kind === 'change' || kind === 'report') {
+  if (kind === 'change' || kind === 'report' || kind === 'acceptance' || kind === 'warranty') {
     return {
       kind: 'entity-detail',
       subject: resolvedRef('owner-document', row.id, row.name, row.no || null),

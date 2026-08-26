@@ -184,6 +184,26 @@ describe('施工合同中央 Repository contract', () => {
         date: '2026-08-22',
         status: 'submitted',
       }],
+      acceptances: [{
+        dataOrigin: 'real',
+        id: 'acceptance-324',
+        contractId: 'construction-contract-1',
+        no: 'YS-324',
+        name: '项目竣工验收',
+        amount: 1000,
+        date: '2026-07-18',
+        status: 'warranty',
+      }],
+      warranties: [{
+        dataOrigin: 'real',
+        id: 'acceptance-324',
+        contractId: 'construction-contract-1',
+        no: 'YS-324',
+        name: '项目竣工验收',
+        amount: 1000,
+        date: '2028-07-18',
+        status: 'warranty',
+      }],
     }
     const detail = buildConstructionContractDetail({
       contracts: [source()],
@@ -226,7 +246,18 @@ describe('施工合同中央 Repository contract', () => {
       subject: { entity: 'receipt', id: 'receipt-1' },
       filters: { customerId: 'customer-1', dataOrigin: 'real' },
     })
-    expect(detail.sections.acceptance).toEqual({ acceptances: [], warranties: [] })
+    expect(detail.sections.acceptance.acceptances[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { entity: 'owner-document', id: 'acceptance-324' },
+      variant: 'acceptance',
+      filters: { dataOrigin: 'real' },
+    })
+    expect(detail.sections.acceptance.warranties[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { entity: 'owner-document', id: 'acceptance-324' },
+      variant: 'warranty',
+      filters: { dataOrigin: 'real' },
+    })
     expect(detail.capabilities).toContain('construction-contract:write')
   })
 

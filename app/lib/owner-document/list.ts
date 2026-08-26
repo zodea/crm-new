@@ -66,6 +66,56 @@ const STATUS_COLUMN: KitTableColumn = {
   slot: 'status',
 }
 
+export const OWNER_ACCEPTANCE_LIST_COLUMNS: Record<'acceptance' | 'warranty', KitTableColumn[]> = {
+  acceptance: [
+    SEQ_COLUMN,
+    { field: 'no', title: '验收编号', width: 150, fixed: 'left', slot: 'document' },
+    { field: 'name', title: '验收项目', minWidth: 210 },
+    PROJECT_COLUMN,
+    { ...CONTRACT_COLUMN, title: '施工合同' },
+    { field: 'acceptanceOrganization', title: '验收单位', minWidth: 200 },
+    { field: 'acceptancePerson', title: '验收人', width: 120 },
+    { field: 'date', title: '验收日期', type: 'date', width: 116 },
+    { field: 'amount', title: '合同估算', type: 'money', width: 142 },
+    { field: 'acceptanceConclusion', title: '验收结论', minWidth: 180 },
+    { field: 'attachmentCount', title: '附件', width: 82, align: 'right' },
+    STATUS_COLUMN,
+    ACTION_COLUMN,
+  ],
+  warranty: [
+    SEQ_COLUMN,
+    { field: 'no', title: '验收编号', width: 150, fixed: 'left', slot: 'document' },
+    { field: 'name', title: '保修项目', minWidth: 210 },
+    PROJECT_COLUMN,
+    { ...CONTRACT_COLUMN, title: '施工合同' },
+    { field: 'warrantyOwner', title: '保修责任单位', minWidth: 190 },
+    { field: 'warrantyStartDate', title: '保修开始', type: 'date', width: 116 },
+    { field: 'warrantyEndDate', title: '保修结束', type: 'date', width: 116 },
+    { field: 'warrantyConfirmationOrganization', title: '到期验收单位', minWidth: 180 },
+    { field: 'warrantyConfirmationDate', title: '确认日期', type: 'date', width: 116 },
+    { field: 'amount', title: '合同估算', type: 'money', width: 142 },
+    { field: 'warrantyConfirmationNote', title: '到期确认说明', minWidth: 190 },
+    { field: 'attachmentCount', title: '附件', width: 82, align: 'right' },
+    STATUS_COLUMN,
+    ACTION_COLUMN,
+  ],
+}
+
+export const OWNER_ACCEPTANCE_LIST_VIEWS: Record<'acceptance' | 'warranty', OwnerDocumentListView[]> = {
+  acceptance: [
+    { key: 'all', label: '全部' },
+    { key: 'checking', label: '验收中' },
+    { key: 'accepted', label: '已验收' },
+    { key: 'warranty', label: '保修中' },
+    { key: 'expired', label: '已到期' },
+  ],
+  warranty: [
+    { key: 'all', label: '全部' },
+    { key: 'warranty', label: '保修中' },
+    { key: 'expired', label: '已到期' },
+  ],
+}
+
 export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocumentListConfig> = {
   owner_change: {
     columns: [
@@ -82,7 +132,7 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       STATUS_COLUMN,
       ACTION_COLUMN,
     ],
-    searchFields: ['no', 'name', 'projectName', 'contractName'],
+    searchFields: ['no', 'name', 'projectName', 'contractName', 'acceptanceConclusion', 'warrantyConfirmationNote'],
     searchPlaceholder: '搜索变更编号 / 名称 / 施工合同',
     typeLabel: '类型',
     showTypeFilter: true,
@@ -131,31 +181,15 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     ],
   },
   acceptance: {
-    columns: [
-      SEQ_COLUMN,
-      { field: 'no', title: '单据编号', width: 150, fixed: 'left', slot: 'document' },
-      { field: 'type', title: '类型', width: 116, slot: 'type' },
-      { field: 'name', title: '名称', minWidth: 220 },
-      PROJECT_COLUMN,
-      { ...CONTRACT_COLUMN, title: '施工合同' },
-      { field: 'date', title: '日期', type: 'date', width: 116 },
-      STATUS_COLUMN,
-      { field: 'amount', title: '涉及金额', type: 'money', width: 142 },
-      ACTION_COLUMN,
-    ],
+    columns: OWNER_ACCEPTANCE_LIST_COLUMNS.acceptance,
     searchFields: ['no', 'name', 'projectName', 'contractName'],
     searchPlaceholder: '搜索单据编号 / 名称 / 项目',
     typeLabel: '类型',
-    showTypeFilter: true,
-    views: [
-      { key: 'all', label: '全部' },
-      { key: 'checking', label: '验收中' },
-      { key: 'warranty', label: '保修中' },
-      { key: 'done', label: '已验收' },
-    ],
-    defaultView: 'checking',
-    countLabel: '验收单数',
-    amountSummaries: [{ field: 'amount', label: '涉及金额总和' }],
+    showTypeFilter: false,
+    views: OWNER_ACCEPTANCE_LIST_VIEWS.acceptance,
+    defaultView: 'all',
+    countLabel: '生命周期记录数',
+    amountSummaries: [{ field: 'amount', label: '合同估算金额总和' }],
   },
   final_settlement: {
     columns: [
@@ -314,10 +348,8 @@ export function ownerDocumentStatusViewKey(
   if (kind === 'acceptance') {
     if (value === 'submitted')
       return 'checking'
-    if (value === 'warranty')
-      return 'warranty'
-    if (['accepted', 'expired'].includes(value))
-      return 'done'
+    if (['accepted', 'warranty', 'expired'].includes(value))
+      return value
   }
   if (kind === 'final_settlement')
     return ['audited', 'approved', 'confirmed'].includes(value) ? 'done' : 'doing'
@@ -387,8 +419,9 @@ export function ownerDocumentStatusLabelForList(
     acceptance: {
       draft: '草稿',
       checking: '验收中',
-      done: normalized(status) === 'expired' ? '已到期' : '已验收',
+      accepted: '已验收',
       warranty: '保修中',
+      expired: '已到期',
     },
     final_settlement: {
       doing: normalized(status) === 'draft' ? '编制中' : '已报审',
@@ -431,7 +464,7 @@ export function ownerDocumentStatusClass(
     return 'chip-danger'
   if (['submitted', 'reported', 'checking', 'appealing', 'pending'].includes(view))
     return 'chip-warn'
-  if (['approved', 'audited', 'done', 'confirmed'].includes(view))
+  if (['approved', 'audited', 'done', 'confirmed', 'accepted', 'expired'].includes(view))
     return 'chip-ok'
   if (view === 'warranty')
     return 'chip-brand'

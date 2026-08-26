@@ -144,7 +144,9 @@ function approvalBusinessDate(source: OwnerCommercialDocumentSource): string {
 }
 
 function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
-  return kind === 'owner_change' ? 'owner_change_order' : 'monthly_statement'
+  if (kind === 'owner_change')
+    return 'owner_change_order'
+  return kind === 'owner_report' ? 'monthly_statement' : 'project_acceptance'
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
@@ -184,6 +186,36 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
         amount: line.amount,
         note: line.note,
       })),
+    }
+  }
+  if (source.kind === 'acceptance') {
+    const lifecycle = source.acceptanceLifecycle
+    return {
+      id: source.id,
+      no: source.no,
+      name: source.name,
+      projectId: source.projectId,
+      contractId: source.contractId,
+      applicationDate: source.applicationDate ?? '',
+      contractEstimate: source.amount,
+      acceptanceOrganization: lifecycle?.acceptanceOrganization ?? '',
+      acceptancePerson: lifecycle?.acceptancePerson ?? '',
+      acceptanceDate: lifecycle?.acceptanceDate ?? null,
+      acceptanceConclusion: lifecycle?.acceptanceConclusion ?? '',
+      warrantyOwner: lifecycle?.warrantyOwner ?? '',
+      warrantyStartDate: lifecycle?.warrantyStartDate ?? null,
+      warrantyEndDate: lifecycle?.warrantyEndDate ?? null,
+      warrantyConfirmationOrganization: lifecycle?.warrantyConfirmationOrganization ?? null,
+      warrantyConfirmationDate: lifecycle?.warrantyConfirmationDate ?? null,
+      warrantyConfirmationNote: lifecycle?.warrantyConfirmationNote ?? '',
+      lifecycleEvents: lifecycle?.events.map(clone) ?? [],
+      status: source.status,
+      statusNote: source.statusNote,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+      sourceLocked: source.sourceLocked,
+      note: source.note,
+      lines: [],
     }
   }
   return {
@@ -269,6 +301,18 @@ function jsonRecords(value: string): Array<Record<string, unknown>> {
   }
   catch {
     throw failure('validation-failed', '甲方商务单据迁移明细 JSON 无效')
+  }
+}
+
+function jsonObject(value: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(value || '{}')
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  }
+  catch {
+    throw failure('validation-failed', '甲方商务单据迁移生命周期 JSON 无效')
   }
 }
 
@@ -591,6 +635,20 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     return files
   }
 
+  function assertAcceptanceAttachmentCategories(
+    changes: FileRefChanges,
+    expected: 'acceptance-report' | 'warranty-confirmation',
+    existing: OwnerCommercialDocumentSource['files'] = [],
+  ) {
+    for (const file of changes.add ?? []) {
+      if (text(file.category) !== expected)
+        throw failure('validation-failed', `验收附件分类必须为 ${expected}`)
+    }
+    const changedIds = new Set([...(changes.removeIds ?? []), ...(changes.restoreIds ?? [])])
+    if (existing.some(file => changedIds.has(file.id) && file.category !== expected))
+      throw failure('validation-failed', '附件不属于当前验收视图')
+  }
+
   function save(
     request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'save' | 'submit' }>,
     state: WorkspaceState,
@@ -608,6 +666,74 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       throw failure('validation-failed', '申报日期格式必须为 yyyy-mm-dd')
     if (isSubmit && !applicationDate)
       throw failure('validation-failed', '申报日期必填')
+    if (request.kind === 'acceptance') {
+      assertAcceptanceAttachmentCategories(request.attachments, 'acceptance-report', current?.files)
+      const name = isSubmit ? required(request.draft.name, '验收名称') : text(request.draft.name)
+      const lifecycle = current?.acceptanceLifecycle ?? {
+        acceptanceOrganization: '',
+        acceptancePerson: '',
+        acceptanceDate: null,
+        acceptanceConclusion: '',
+        warrantyOwner: '',
+        warrantyStartDate: null,
+        warrantyEndDate: null,
+        warrantyConfirmationOrganization: null,
+        warrantyConfirmationDate: null,
+        warrantyConfirmationNote: '',
+        events: [],
+      }
+      const events = lifecycle.events.map(clone)
+      if (isSubmit) {
+        events.push({
+          id: `acceptance-event-${crypto.randomUUID()}`,
+          action: 'submit',
+          fromStatus: 'draft',
+          toStatus: 'submitted',
+          actorId: request.actorId,
+          actorName: request.actorId,
+          occurredAt: timestamp,
+          note: text(request.draft.note),
+        })
+      }
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'acceptance',
+        id,
+        no: text(request.draft.no) || `YS-${id}`,
+        name,
+        documentType: 'acceptance_lifecycle',
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: relation.customerId,
+        customerName: relation.customer?.name ?? '',
+        customerPermission: 'allowed',
+        contractId: relation.contract?.id ?? null,
+        contractNo: relation.contract?.no ?? '',
+        contractName: relation.contract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'manual',
+        sourceId: id,
+        sourceLocked: false,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: null,
+        status: isSubmit ? 'submitted' : 'draft',
+        statusNote: isSubmit ? '验收中' : '',
+        amount: number(request.draft.contractEstimate),
+        auditedAmount: null,
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+        acceptanceLifecycle: { ...lifecycle, events },
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
     let report: ReturnType<typeof reportSnapshot> | null = null
     let lines: OwnerCommercialDocumentLineSource[]
     if (isSubmit) {
@@ -708,10 +834,122 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     if (!current)
       throw failure('not-found', '甲方商务单据不存在或已删除')
     assertVersion(current, request.baseVersion)
+    if (current.kind === 'acceptance' && current.status === 'expired')
+      throw failure('conflict', '保修到期确认后单据只读')
+    if (current.kind === 'acceptance') {
+      assertAcceptanceAttachmentCategories(
+        request.attachments,
+        ['draft', 'rejected', 'submitted'].includes(current.status)
+          ? 'acceptance-report'
+          : 'warranty-confirmation',
+        current.files,
+      )
+    }
     const timestamp = now()
     const next = {
       ...current,
       files: filesAfterChanges(request.kind, request.id, current.files, request.attachments, timestamp),
+      version: current.version + 1,
+      updatedAt: timestamp,
+    }
+    state.documents.set(key(next.kind, next.id), next)
+    state.sourceVersion += 1
+    return next
+  }
+
+  function transitionAcceptance(
+    request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'transition-acceptance' }>,
+    state: WorkspaceState,
+  ): OwnerCommercialDocumentSource {
+    const current = document(state, 'acceptance', request.id)
+    if (!current)
+      throw failure('not-found', '验收记录不存在或已删除')
+    assertVersion(current, request.baseVersion)
+    const expectedStatus = {
+      accepted: 'submitted',
+      warranty: 'accepted',
+      expired: 'warranty',
+    }[request.target]
+    const targetLabel = {
+      accepted: '确认验收',
+      warranty: '进入保修',
+      expired: '确认保修到期',
+    }[request.target]
+    if (current.status !== expectedStatus)
+      throw failure('conflict', `当前状态不能${targetLabel}`)
+
+    const timestamp = now()
+    const facts = request.facts
+    assertAcceptanceAttachmentCategories(
+      request.attachments,
+      request.target === 'accepted' ? 'acceptance-report' : 'warranty-confirmation',
+      current.files,
+    )
+    const lifecycle = clone(current.acceptanceLifecycle ?? {
+      acceptanceOrganization: '',
+      acceptancePerson: '',
+      acceptanceDate: null,
+      acceptanceConclusion: '',
+      warrantyOwner: '',
+      warrantyStartDate: null,
+      warrantyEndDate: null,
+      warrantyConfirmationOrganization: null,
+      warrantyConfirmationDate: null,
+      warrantyConfirmationNote: '',
+      events: [],
+    })
+    if (request.target === 'accepted') {
+      lifecycle.acceptanceOrganization = required(facts.acceptanceOrganization, '验收单位')
+      lifecycle.acceptancePerson = required(facts.acceptancePerson, '验收人')
+      lifecycle.acceptanceDate = required(facts.acceptanceDate, '验收日期')
+      lifecycle.acceptanceConclusion = required(facts.acceptanceConclusion, '验收结论')
+      if (!isIsoDate(lifecycle.acceptanceDate))
+        throw failure('validation-failed', '验收日期格式必须为 yyyy-mm-dd')
+    }
+    if (request.target === 'warranty') {
+      lifecycle.warrantyOwner = required(facts.warrantyOwner, '保修责任单位')
+      lifecycle.warrantyStartDate = required(facts.warrantyStartDate, '保修开始日期')
+      lifecycle.warrantyEndDate = required(facts.warrantyEndDate, '保修结束日期')
+      if (!isIsoDate(lifecycle.warrantyStartDate) || !isIsoDate(lifecycle.warrantyEndDate))
+        throw failure('validation-failed', '保修日期格式必须为 yyyy-mm-dd')
+      if (lifecycle.warrantyEndDate < lifecycle.warrantyStartDate)
+        throw failure('validation-failed', '保修结束日期不能早于开始日期')
+    }
+    if (request.target === 'expired') {
+      lifecycle.warrantyConfirmationOrganization = required(facts.warrantyConfirmationOrganization, '到期验收单位')
+      lifecycle.warrantyConfirmationDate = required(facts.warrantyConfirmationDate, '到期确认日期')
+      lifecycle.warrantyConfirmationNote = required(facts.warrantyConfirmationNote, '到期确认结论')
+      if (!isIsoDate(lifecycle.warrantyConfirmationDate))
+        throw failure('validation-failed', '到期确认日期格式必须为 yyyy-mm-dd')
+      if (lifecycle.warrantyEndDate && lifecycle.warrantyConfirmationDate < lifecycle.warrantyEndDate)
+        throw failure('validation-failed', '到期确认日期不能早于保修结束日期')
+    }
+    const eventByTarget = {
+      accepted: { action: 'accept', fromStatus: 'submitted', toStatus: 'accepted' },
+      warranty: { action: 'start-warranty', fromStatus: 'accepted', toStatus: 'warranty' },
+      expired: { action: 'confirm-expiry', fromStatus: 'warranty', toStatus: 'expired' },
+    } as const
+    const event = eventByTarget[request.target]
+    lifecycle.events.push({
+      id: `acceptance-event-${crypto.randomUUID()}`,
+      ...event,
+      actorId: request.actorId,
+      actorName: request.actorId,
+      occurredAt: timestamp,
+      note: text(facts.note),
+    })
+    const statusNote = {
+      accepted: '验收合格',
+      warranty: '保修中',
+      expired: '保修到期已确认',
+    }[request.target]
+    const next: OwnerCommercialDocumentSource = {
+      ...current,
+      status: request.target,
+      statusNote,
+      sourceLocked: true,
+      files: filesAfterChanges('acceptance', current.id, current.files, request.attachments, timestamp),
+      acceptanceLifecycle: lifecycle,
       version: current.version + 1,
       updatedAt: timestamp,
     }
@@ -998,7 +1236,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (entity.entityType !== 'owner_documents' || entity.deletedAt !== null)
         continue
       const kind = entityAttribute(entity, 'kind')
-      if (kind !== 'owner_change' && kind !== 'owner_report')
+      if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance')
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
       const projectId = entity.references.projectId ?? null
       const contractId = entity.references.contractId ?? null
@@ -1073,11 +1311,26 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '迁移甲方商务单据附件上传时间无效')
         if (file.deletedAt && !isISODateTimeDTO(file.deletedAt))
           throw failure('validation-failed', '迁移甲方商务单据附件删除时间无效')
+        if (kind === 'acceptance'
+          && !['acceptance-report', 'warranty-confirmation'].includes(file.category)) {
+          throw failure('validation-failed', '迁移甲方验收附件分类无效')
+        }
       }
       const rawStatus = entityAttribute(entity, 'status')
       const status = kind === 'owner_report'
         ? rawStatus === 'exported' ? 'audited' : rawStatus === 'adjusted' ? 'reported' : rawStatus
         : rawStatus
+      const statusesByKind: Record<OwnerCommercialDocumentKind, readonly string[]> = {
+        owner_change: ['draft', 'rejected', 'submitted', 'approved'],
+        owner_report: ['draft', 'reported', 'audited'],
+        acceptance: ['draft', 'submitted', 'accepted', 'warranty', 'expired'],
+      }
+      if (!statusesByKind[kind].includes(status)) {
+        throw failure(
+          'validation-failed',
+          kind === 'acceptance' ? '迁移甲方验收状态无效' : '迁移甲方商务单据状态无效',
+        )
+      }
       const createdAt = entityAttribute(entity, 'createdAt') || '1970-01-01T00:00:00.000Z'
       if (!isISODateTimeDTO(createdAt))
         throw failure('validation-failed', '迁移甲方商务单据创建时间无效')
@@ -1101,6 +1354,58 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const submittedAt = entityAttribute(entity, 'submittedAt') || null
       if (submittedAt && !isISODateTimeDTO(submittedAt))
         throw failure('validation-failed', '迁移甲方报量提交时间无效')
+      const acceptanceLifecycleRaw = jsonObject(entityAttribute(entity, 'acceptanceLifecycleJson'))
+      const acceptanceDate = text(acceptanceLifecycleRaw.acceptanceDate) || null
+      const warrantyStartDate = text(acceptanceLifecycleRaw.warrantyStartDate) || null
+      const warrantyEndDate = text(acceptanceLifecycleRaw.warrantyEndDate) || null
+      const warrantyConfirmationDate = text(acceptanceLifecycleRaw.warrantyConfirmationDate) || null
+      for (const [date, label] of [
+        [acceptanceDate, '验收日期'],
+        [warrantyStartDate, '保修开始日期'],
+        [warrantyEndDate, '保修结束日期'],
+        [warrantyConfirmationDate, '到期确认日期'],
+      ] as const) {
+        if (date && !isISODateDTO(date))
+          throw failure('validation-failed', `迁移甲方验收${label}无效`)
+      }
+      const lifecycleEventIds = new Set<string>()
+      const lifecycleEventTargets = new Set<string>()
+      const lifecycleEventTransitions = {
+        'submit': ['draft', 'submitted'],
+        'accept': ['submitted', 'accepted'],
+        'start-warranty': ['accepted', 'warranty'],
+        'confirm-expiry': ['warranty', 'expired'],
+      } as const
+      const lifecycleEvents = jsonRecords(entityAttribute(entity, 'lifecycleEventsJson')).map((raw, index) => {
+        const action = text(raw.action)
+        const fromStatus = text(raw.fromStatus)
+        const toStatus = text(raw.toStatus)
+        const occurredAt = text(raw.occurredAt)
+        const id = text(raw.id) || `${entity.id}-event-${index + 1}`
+        const expected = lifecycleEventTransitions[action as keyof typeof lifecycleEventTransitions]
+        if (!['submit', 'accept', 'start-warranty', 'confirm-expiry'].includes(action)
+          || !['draft', 'submitted', 'accepted', 'warranty'].includes(fromStatus)
+          || !['submitted', 'accepted', 'warranty', 'expired'].includes(toStatus)
+          || !isISODateTimeDTO(occurredAt)) {
+          throw failure('validation-failed', '迁移甲方验收生命周期审计无效')
+        }
+        if (!expected || expected[0] !== fromStatus || expected[1] !== toStatus)
+          throw failure('validation-failed', '迁移甲方验收生命周期审计转换无效')
+        if (lifecycleEventIds.has(id) || lifecycleEventTargets.has(toStatus))
+          throw failure('validation-failed', '迁移甲方验收生命周期审计重复')
+        lifecycleEventIds.add(id)
+        lifecycleEventTargets.add(toStatus)
+        return {
+          id,
+          action: action as 'submit' | 'accept' | 'start-warranty' | 'confirm-expiry',
+          fromStatus: fromStatus as 'draft' | 'submitted' | 'accepted' | 'warranty',
+          toStatus: toStatus as 'submitted' | 'accepted' | 'warranty' | 'expired',
+          actorId: text(raw.actorId),
+          actorName: text(raw.actorName),
+          occurredAt,
+          note: text(raw.note),
+        }
+      })
       const source: OwnerCommercialDocumentSource = {
         dataOrigin: 'real',
         kind,
@@ -1143,6 +1448,21 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         updatedAt,
         lines,
         files,
+        acceptanceLifecycle: kind === 'acceptance'
+          ? {
+              acceptanceOrganization: text(acceptanceLifecycleRaw.acceptanceOrganization),
+              acceptancePerson: text(acceptanceLifecycleRaw.acceptancePerson),
+              acceptanceDate,
+              acceptanceConclusion: text(acceptanceLifecycleRaw.acceptanceConclusion),
+              warrantyOwner: text(acceptanceLifecycleRaw.warrantyOwner),
+              warrantyStartDate,
+              warrantyEndDate,
+              warrantyConfirmationOrganization: text(acceptanceLifecycleRaw.warrantyConfirmationOrganization) || null,
+              warrantyConfirmationDate,
+              warrantyConfirmationNote: text(acceptanceLifecycleRaw.warrantyConfirmationNote),
+              events: lifecycleEvents,
+            }
+          : undefined,
       }
       const documentKey = key(kind, source.id)
       if (state.documents.has(documentKey))
@@ -1287,6 +1607,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           break
         case 'audit':
           source = audit(request, state)
+          break
+        case 'transition-acceptance':
+          source = transitionAcceptance(request, state)
           break
         case 'attachments':
           source = updateAttachments(request, state)

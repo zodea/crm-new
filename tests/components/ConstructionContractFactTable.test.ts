@@ -71,4 +71,35 @@ describe('constructionContractFactTable', () => {
     expect(target.element).toBe(document.activeElement)
     wrapper.unmount()
   })
+
+  it('验收与保修同 ID 生成各自唯一锚点，并把当前事实写入返回上下文', () => {
+    const wrapper = mount(ConstructionContractFactTable, {
+      props: {
+        emptyLabel: '暂无事实',
+        anchorScope: 'warranty',
+        returnFocusView: 'warranty',
+        returnTo: '/contract/contract-1?origin=real&contractKind=construction&tab=acceptance',
+        rows: [{
+          id: 'acceptance-324',
+          no: 'YS-324',
+          name: '项目竣工验收',
+          amount: '1000.00',
+          date: '2028-07-18',
+          status: 'warranty',
+          navigation: {
+            kind: 'entity-detail',
+            subject: { state: 'resolved', entity: 'owner-document', id: 'acceptance-324', label: '项目竣工验收', no: 'YS-324' },
+            variant: 'warranty',
+            view: null,
+            filters: { dataOrigin: 'real' },
+          },
+        }],
+      },
+      global: { stubs: { KitTable: KitTableStub, NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+    })
+
+    expect(wrapper.get('#construction-contract-fact-warranty-acceptance-324').attributes('href')).toContain(
+      `returnTo=${encodeURIComponent('/contract/contract-1?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=warranty#construction-contract-fact-warranty-acceptance-324')}`,
+    )
+  })
 })

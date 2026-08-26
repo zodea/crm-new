@@ -95,6 +95,9 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
       return null
     if (returnTo !== null && (!validateProjectReturnTo(returnTo) || !isProjectReturnContextId(returnContext)))
       return null
+    const anchor = decodeURIComponent(url.hash.slice(1))
+    if (anchor && !/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor))
+      return null
     const query = new URLSearchParams()
     if (origin)
       query.set('origin', origin)
@@ -102,7 +105,7 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
       query.set('returnTo', returnTo)
       query.set('returnContext', returnContext)
     }
-    return `${url.pathname}${query.size ? `?${query.toString()}` : ''}`
+    return `${url.pathname}${query.size ? `?${query.toString()}` : ''}${anchor ? `#${anchor}` : ''}`
   }
   catch {
     return null

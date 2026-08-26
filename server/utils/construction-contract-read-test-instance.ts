@@ -160,10 +160,36 @@ export function createConstructionContractReadTestInstance(
         date: row.applicationDate,
         status: row.status,
       }))
+    const ownerAcceptances = ownerDocuments
+      .filter(row => row.kind === 'acceptance')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.acceptanceLifecycle?.acceptanceDate ?? row.applicationDate,
+        status: row.status,
+      }))
+    const ownerWarranties = ownerDocuments
+      .filter(row => row.kind === 'acceptance' && (row.status === 'warranty' || row.status === 'expired'))
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.acceptanceLifecycle?.warrantyEndDate ?? null,
+        status: row.status,
+      }))
     const synchronizedFacts = {
       ...formalFacts,
       changes: [...formalFacts.changes, ...ownerChanges],
       monthlyStatements: [...formalFacts.monthlyStatements, ...ownerReports],
+      acceptances: [...formalFacts.acceptances, ...ownerAcceptances],
+      warranties: [...formalFacts.warranties, ...ownerWarranties],
     }
     return {
       contracts: scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts],
@@ -178,8 +204,8 @@ export function createConstructionContractReadTestInstance(
             invoiceApplications: [...formalFacts.invoiceApplications, ...demoFacts.invoiceApplications],
             invoiceRegistrations: [...formalFacts.invoiceRegistrations, ...demoFacts.invoiceRegistrations],
             receipts: [...formalFacts.receipts, ...demoFacts.receipts],
-            acceptances: [...formalFacts.acceptances, ...demoFacts.acceptances],
-            warranties: [...formalFacts.warranties, ...demoFacts.warranties],
+            acceptances: [...synchronizedFacts.acceptances, ...demoFacts.acceptances],
+            warranties: [...synchronizedFacts.warranties, ...demoFacts.warranties],
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,

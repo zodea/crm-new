@@ -69,6 +69,10 @@ describe('owner document list configuration', () => {
       .toEqual(expect.arrayContaining(['乙方（分供方）', '变更面积', '实际审定价']))
     expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.title))
       .toContain('结算类型')
+    expect(OWNER_DOCUMENT_LIST_CONFIG.acceptance.amountSummaries)
+      .toEqual([{ field: 'amount', label: '合同估算金额总和' }])
+    expect(OWNER_DOCUMENT_LIST_CONFIG.acceptance.columns.map(column => column.title))
+      .toEqual(expect.arrayContaining(['合同估算', '验收结论', '附件']))
   })
 
   it('按搜索、项目、类型、状态与来源 query 共同收窄真实 ID', () => {
@@ -101,6 +105,26 @@ describe('owner document list configuration', () => {
     expect(ownerDocumentStatusLabelForList('project_penalty', 'repaired_self')).toBe('自行整改')
     expect(ownerDocumentStatusClass('sub_change', 'rejected')).toBe('chip-danger')
     expect(ownerDocumentTypeLabel('owner_change', 'site_visa')).toBe('现场签证')
+  })
+
+  it('验收列表按 canonical 状态区分已验收与已到期', () => {
+    const accepted = { ...rows[0], id: 'acceptance-accepted', status: 'accepted' }
+    const expired = { ...rows[0], id: 'acceptance-expired', status: 'expired' }
+
+    expect(ownerDocumentStatusViewKey('acceptance', accepted.status)).toBe('accepted')
+    expect(ownerDocumentStatusViewKey('acceptance', expired.status)).toBe('expired')
+    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
+      search: '',
+      project: 'all',
+      type: 'all',
+      statusView: 'accepted',
+    })).toEqual([accepted])
+    expect(filterOwnerDocumentRows('acceptance', [accepted, expired], {
+      search: '',
+      project: 'all',
+      type: 'all',
+      statusView: 'expired',
+    })).toEqual([expired])
   })
 
   it('甲方罚扣可按联系单编号搜索', () => {

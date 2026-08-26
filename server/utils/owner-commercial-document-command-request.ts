@@ -29,7 +29,7 @@ function scalar(value: unknown): boolean {
 function draftPayload(value: unknown): value is Record<string, unknown> {
   if (!object(value))
     return false
-  return Object.entries(value).every(([key, entry]) => key === 'lines'
+  return Object.entries(value).every(([key, entry]) => key === 'lines' || key === 'lifecycleEvents'
     ? Array.isArray(entry) && entry.every(line => object(line) && Object.values(line).every(scalar))
     : scalar(entry))
 }
@@ -60,10 +60,10 @@ export function parseOwnerCommercialDocumentCommandRequest(
     || typeof value.actorId !== 'string' || !value.actorId
     || value.requiredCapability !== OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
     || typeof value.commandId !== 'string' || !value.commandId
-    || !['owner_change', 'owner_report'].includes(String(value.kind))
+    || !['owner_change', 'owner_report', 'acceptance'].includes(String(value.kind))
     || !(value.id === null || typeof value.id === 'string')
     || !(value.baseVersion === null || typeof value.baseVersion === 'string')
-    || !['save', 'submit', 'approve', 'audit', 'attachments', 'delete'].includes(String(value.action))) {
+    || !['save', 'submit', 'approve', 'audit', 'transition-acceptance', 'attachments', 'delete'].includes(String(value.action))) {
     return invalid('甲方商务单据命令请求无效')
   }
   const base = {
@@ -71,7 +71,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
     actorId: value.actorId,
     requiredCapability: OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
     commandId: value.commandId,
-    kind: value.kind as 'owner_change' | 'owner_report',
+    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance',
     id: value.id,
     baseVersion: value.baseVersion,
   }
@@ -106,6 +106,24 @@ export function parseOwnerCommercialDocumentCommandRequest(
       kind: 'owner_report',
       action: 'audit',
       audit: { lines: value.audit.lines.map(line => ({ boqLineId: line.boqLineId, auditedQty: line.auditedQty })) },
+    }
+  }
+  if (value.action === 'transition-acceptance') {
+    if (value.kind !== 'acceptance'
+      || !['accepted', 'warranty', 'expired'].includes(String(value.target))
+      || !object(value.facts)
+      || !Object.values(value.facts).every(scalar)
+      || !attachmentChanges(value.attachments)) {
+      return invalid('验收生命周期命令无效')
+    }
+    return {
+      ...base,
+      id: value.id,
+      kind: 'acceptance',
+      action: 'transition-acceptance',
+      target: value.target as 'accepted' | 'warranty' | 'expired',
+      facts: structuredClone(value.facts),
+      attachments: structuredClone(value.attachments),
     }
   }
   return { ...base, id: value.id, action: 'delete' }

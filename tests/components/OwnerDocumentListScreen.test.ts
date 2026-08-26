@@ -270,4 +270,60 @@ describe('owner document list screen', () => {
       status: null,
     })))
   })
+
+  it('验收与保修列表从同一 canonical 查询切换专属列和 variant', async () => {
+    runtime.desktop = false
+    route.path = '/owner/acceptance'
+    route.query = { variant: 'warranty' }
+    activeRows = [{
+      ...listRows[0]!,
+      id: 'acceptance-real-324',
+      no: 'YS-2026-324',
+      name: '瑞航商务中心项目竣工验收',
+      type: 'acceptance_lifecycle',
+      viewVariant: 'warranty',
+      warrantyOwner: '瑞航建设工程有限公司',
+      warrantyStartDate: '2026-07-19',
+      warrantyEndDate: '2028-07-18',
+      warrantyConfirmationOrganization: '',
+      warrantyConfirmationDate: '',
+      status: 'warranty',
+    }]
+    centralSummary = {
+      projects: [],
+      contracts: [],
+      statuses: [
+        { value: 'accepted', label: '已验收', count: 2 },
+        { value: 'warranty', label: '保修中', count: 3 },
+        { value: 'expired', label: '已到期', count: 4 },
+      ],
+      documentTypes: [],
+      origins: {
+        real: { count: 9 },
+        demo: { count: 0 },
+      },
+    }
+
+    render(OwnerDocumentListScreen, { props: { kind: 'acceptance' }, global })
+
+    expect(screen.getByRole('navigation', { name: '验收保修列表视图' })).not.toBeNull()
+    const table = screen.getByRole('region', { name: '业务单据宽表' })
+    const headings = within(table).getAllByRole('columnheader').map(item => item.textContent)
+    expect(headings).toEqual(expect.arrayContaining([
+      '验收编号',
+      '保修责任单位',
+      '保修开始',
+      '保修结束',
+      '到期验收单位',
+      '确认日期',
+    ]))
+    expect(headings).not.toContain('验收单位')
+    const views = JSON.parse(document.querySelector('[data-ui="owner-document-list-toolbar"]')?.getAttribute('data-views') ?? '[]')
+    expect(views.find((view: { key: string }) => view.key === 'warranty')?.count).toBe(3)
+    expect(views.find((view: { key: string }) => view.key === 'expired')?.count).toBe(4)
+    await vi.waitFor(() => expect(loadKind).toHaveBeenCalledWith('acceptance', expect.objectContaining({
+      variant: 'warranty',
+      status: null,
+    })))
+  })
 })
