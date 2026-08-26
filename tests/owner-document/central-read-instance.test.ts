@@ -4,7 +4,7 @@ import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../server/utils/owne
 import { createOwnerCommercialDocumentReadTestInstance } from '../../server/utils/owner-commercial-document-read-test-instance'
 
 describe('甲方商务单据中央读取实例', () => {
-  it('ready 场景隔离各类正式记录并返回最终结算真实事实', () => {
+  it('ready 场景隔离各类正式记录并返回结算与罚扣真实事实', () => {
     const commands = createOwnerCommercialDocumentCommandTestInstance({ documents: OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS })
     const read = createOwnerCommercialDocumentReadTestInstance(
       () => ['owner-document:read', 'owner-document:write'],
@@ -14,9 +14,18 @@ describe('甲方商务单据中央读取实例', () => {
     const changes = read.list('owner_change', { origin: 'real', pageSize: 20 })
     const reports = read.list('owner_report', { origin: 'real', pageSize: 20 })
     const settlements = read.list('final_settlement', { origin: 'real', status: 'doing', pageSize: 20 })
+    const penalties = read.list('owner_penalty', { origin: 'real', search: 'LX-2026-326', pageSize: 20 })
     expect(changes.items).toHaveLength(2)
     expect(reports.items).toHaveLength(1)
     expect(settlements.items).toHaveLength(1)
+    expect(penalties.items).toEqual([
+      expect.objectContaining({
+        id: 'owner-penalty-real-326',
+        kind: 'owner_penalty',
+        amounts: { kind: 'owner_penalty', amount: '36000.00' },
+        attachmentCount: 1,
+      }),
+    ])
     expect(settlements.items[0]?.amounts).toEqual({
       kind: 'final_settlement',
       declared: '1280000.00',
@@ -32,6 +41,16 @@ describe('甲方商务单据中央读取实例', () => {
       expect.objectContaining({ kind: 'receipt', id: 'receipt-real-325' }),
     ])
     expect(settlement.files).toContainEqual(expect.objectContaining({ fileName: '甲方最终结算书.pdf' }))
+    expect(read.detail('owner_penalty', 'owner-penalty-real-326', { origin: 'real' })).toMatchObject({
+      ownerPenaltyFacts: {
+        noticeNo: 'LX-2026-326',
+        penaltyDate: '2026-08-24',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+      },
+      files: [{ fileName: '甲方联系单.pdf', category: 'contact-letter' }],
+      sourceNavigation: { filters: { ownerTab: 'settlements' } },
+    })
     expect(read.detail('owner_report', 'report-real-323', { origin: 'real' }).files).toEqual([])
   })
 

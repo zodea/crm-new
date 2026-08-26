@@ -11,6 +11,11 @@ describe('施工合同详情返回上下文', () => {
     expect(validateConstructionContractDetailReturnTo(target, 'real')).toBe(expected)
   })
 
+  it('甲方罚扣详情往返保留结算页签与稳定罚扣聚焦', () => {
+    const target = '/contract/contract-326?origin=real&contractKind=construction&tab=settlements&focus=owner_penalty-326'
+    expect(validateConstructionContractDetailReturnTo(target, 'real')).toBe(target)
+  })
+
   it('拒绝在非补充协议页签注入聚焦目标', () => {
     expect(validateConstructionContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=construction&tab=changes&focus=change-1', 'real')).toBeNull()
   })

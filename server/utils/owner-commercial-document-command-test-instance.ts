@@ -182,7 +182,9 @@ function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
     return 'owner_change_order'
   if (kind === 'owner_report')
     return 'monthly_statement'
-  return kind === 'final_settlement' ? 'owner_final_settlement' : 'project_acceptance'
+  if (kind === 'final_settlement')
+    return 'owner_final_settlement'
+  return kind === 'owner_penalty' ? 'owner_penalty' : 'project_acceptance'
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
@@ -278,6 +280,27 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
       settlementReceiptGap: receivedAmount == null ? null : round(source.amount - receivedAmount),
       basis: source.settlementBasis ?? '',
       differenceNote: source.settlementDifferenceNote ?? '',
+      status: source.status,
+      statusNote: source.statusNote,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+      sourceLocked: source.sourceLocked,
+      note: source.note,
+      lines: [],
+    }
+  }
+  if (source.kind === 'owner_penalty') {
+    return {
+      id: source.id,
+      no: source.no,
+      name: source.name,
+      projectId: source.projectId,
+      contractId: source.contractId,
+      noticeNo: source.noticeNo ?? '',
+      amount: source.amount,
+      penaltyDate: source.applicationDate ?? '',
+      reason: source.penaltyReason ?? source.name,
+      appealNote: source.appealNote ?? '',
       status: source.status,
       statusNote: source.statusNote,
       sourceType: source.sourceType,
@@ -844,11 +867,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const relation = relations(state, request.draft, isSubmit)
     const applicationDate = request.kind === 'final_settlement'
       ? text(request.draft.submissionDate)
-      : text(request.draft.applicationDate)
+      : request.kind === 'owner_penalty'
+        ? text(request.draft.penaltyDate)
+        : text(request.draft.applicationDate)
     if (applicationDate && !isIsoDate(applicationDate))
-      throw failure('validation-failed', '申报日期格式必须为 yyyy-mm-dd')
+      throw failure('validation-failed', `${request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期格式必须为 yyyy-mm-dd`)
     if (isSubmit && !applicationDate)
-      throw failure('validation-failed', '申报日期必填')
+      throw failure('validation-failed', `${request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期必填`)
     if (request.kind === 'final_settlement') {
       const name = isSubmit ? required(request.draft.name, '结算名称') : text(request.draft.name)
       const settlementAmount = nullableNumber(request.draft.settlementAmount)
@@ -890,6 +915,52 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         settlementBasis: text(request.draft.basis),
         settlementDifferenceNote: text(request.draft.differenceNote),
         finalSettlementEvidence: undefined,
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
+    if (request.kind === 'owner_penalty') {
+      const reason = isSubmit ? required(request.draft.reason, '罚扣事由') : text(request.draft.reason)
+      const penaltyAmount = nullableNumber(request.draft.amount)
+      if (isSubmit && (penaltyAmount == null || penaltyAmount <= 0))
+        throw failure('validation-failed', '罚扣金额必须大于 0')
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'owner_penalty',
+        id,
+        no: text(request.draft.no) || `FK-${id}`,
+        name: reason || '未填写罚扣事由',
+        documentType: 'owner_penalty',
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: relation.customerId,
+        customerName: relation.customer?.name ?? '',
+        customerPermission: 'allowed',
+        contractId: relation.contract?.id ?? null,
+        contractNo: relation.contract?.no ?? '',
+        contractName: relation.contract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'owner_penalty',
+        sourceId: id,
+        sourceLocked: isSubmit,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: null,
+        status: isSubmit ? 'submitted' : 'draft',
+        statusNote: isSubmit ? '已提交甲方罚扣事实' : '',
+        amount: round(penaltyAmount ?? 0),
+        auditedAmount: null,
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+        noticeNo: text(request.draft.noticeNo),
+        penaltyReason: reason,
+        appealNote: text(request.draft.appealNote),
       }
       state.documents.set(key(request.kind, id), source)
       state.sourceVersion += 1
@@ -1525,8 +1596,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (entity.entityType !== 'owner_documents' || entity.deletedAt !== null)
         continue
       const kind = entityAttribute(entity, 'kind')
-      if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance' && kind !== 'final_settlement')
+      if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance'
+        && kind !== 'final_settlement' && kind !== 'owner_penalty') {
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
+      }
       const projectId = entity.references.projectId ?? null
       const contractId = entity.references.contractId ?? null
       const project = projectId ? state.projects.get(projectId) ?? null : null
@@ -1536,9 +1609,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const customerId = contract.customerId ?? project.customerId
       const customer = customerId ? state.customers.get(customerId) ?? null : null
       const sourceTypeRaw = entityAttribute(entity, 'sourceType')
+      if (kind === 'owner_penalty' && sourceTypeRaw !== 'owner_penalty')
+        throw failure('validation-failed', '迁移甲方罚扣来源类型无效')
       const sourceType = sourceTypeRaw === 'manual'
         || sourceTypeRaw === 'monthly_statement'
         || sourceTypeRaw === 'owner_final_settlement'
+        || sourceTypeRaw === 'owner_penalty'
         ? sourceTypeRaw
         : 'boq_change_order'
       const rawLines = jsonRecords(entityAttribute(entity, 'linesJson'))
@@ -1616,6 +1692,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         owner_report: ['draft', 'reported', 'audited'],
         acceptance: ['draft', 'submitted', 'accepted', 'warranty', 'expired'],
         final_settlement: ['draft', 'submitted', 'audited'],
+        owner_penalty: ['draft', 'submitted'],
       }
       if (!statusesByKind[kind].includes(status)) {
         throw failure(
@@ -1637,6 +1714,18 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const applicationDate = entityAttribute(entity, 'applicationDate') || null
       if (applicationDate && !isISODateDTO(applicationDate))
         throw failure('validation-failed', '迁移甲方商务单据申报日期无效')
+      const ownerPenaltyAmount = kind === 'owner_penalty' ? number(entity.amount) : null
+      const ownerPenaltyReason = kind === 'owner_penalty'
+        ? entityAttribute(entity, 'penaltyReason') || entity.name
+        : null
+      if (kind === 'owner_penalty' && status === 'submitted') {
+        if (!applicationDate)
+          throw failure('validation-failed', '迁移甲方罚扣日期必填')
+        if (ownerPenaltyAmount == null || ownerPenaltyAmount <= 0)
+          throw failure('validation-failed', '罚扣金额必须大于 0')
+        if (!ownerPenaltyReason)
+          throw failure('validation-failed', '迁移甲方罚扣事由必填')
+      }
       const approvalDate = entityAttribute(entity, 'approvalDate') || null
       if (approvalDate && !isISODateDTO(approvalDate))
         throw failure('validation-failed', '迁移甲方变洽签签证日期无效')
@@ -1729,7 +1818,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         submittedAt,
         status,
         statusNote: entityAttribute(entity, 'statusNote'),
-        amount: number(entity.amount),
+        amount: ownerPenaltyAmount ?? number(entity.amount),
         boqAmount: kind === 'owner_change' ? round(lines.reduce((sum, line) => sum + line.amount, 0)) : null,
         taxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'taxExclusiveAmount') ?? 0 : null,
         appliedTaxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'appliedTaxExclusiveAmount') ?? 0 : null,
@@ -1762,6 +1851,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           ? entityAttribute(entity, 'settlementDifferenceNote')
           : undefined,
         finalSettlementEvidence: undefined,
+        noticeNo: kind === 'owner_penalty' ? entityAttribute(entity, 'noticeNo') : undefined,
+        penaltyReason: kind === 'owner_penalty' ? ownerPenaltyReason ?? '' : undefined,
+        appealNote: kind === 'owner_penalty' ? entityAttribute(entity, 'appealNote') : undefined,
       }
       const documentKey = key(kind, source.id)
       if (state.documents.has(documentKey))

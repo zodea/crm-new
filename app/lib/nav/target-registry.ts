@@ -218,7 +218,7 @@ function receiptPath(intent: EntityTargetIntent): string {
 function ownerDocumentPath(intent: EntityTargetIntent): string {
   const dataOrigin = intent.filters.dataOrigin
   if (!isDataOriginDTO(dataOrigin)
-    || !['change', 'report', 'acceptance', 'warranty', 'final-settlement'].includes(intent.variant ?? '')) {
+    || !['change', 'report', 'acceptance', 'warranty', 'final-settlement', 'penalty'].includes(intent.variant ?? '')) {
     throw new Error('invalid owner document detail context')
   }
   const acceptance = intent.variant === 'acceptance' || intent.variant === 'warranty'
@@ -274,6 +274,7 @@ const TARGET_REGISTRY = {
   'owner-document:acceptance': ownerDocumentPath,
   'owner-document:warranty': ownerDocumentPath,
   'owner-document:final-settlement': ownerDocumentPath,
+  'owner-document:penalty': ownerDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
@@ -431,7 +432,7 @@ export function resolveNavigationTarget(
     }
     if ((key === 'owner-document:change' || key === 'owner-document:report'
       || key === 'owner-document:acceptance' || key === 'owner-document:warranty'
-      || key === 'owner-document:final-settlement') && options.returnTo) {
+      || key === 'owner-document:final-settlement' || key === 'owner-document:penalty') && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
       const kind = key === 'owner-document:change'
         ? 'owner_change'
@@ -439,7 +440,9 @@ export function resolveNavigationTarget(
           ? 'owner_report'
           : key === 'owner-document:final-settlement'
             ? 'final_settlement'
-            : 'acceptance'
+            : key === 'owner-document:penalty'
+              ? 'owner_penalty'
+              : 'acceptance'
       const returnTo = validateOwnerDocumentJourneyReturnTo(options.returnTo, kind, entityIntent.filters.dataOrigin)
       if (returnTo) {
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`

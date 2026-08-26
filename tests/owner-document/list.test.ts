@@ -97,7 +97,13 @@ describe('owner document list configuration', () => {
   it('按单据类型解释本地状态与类型，而不把英文存储值暴露给用户', () => {
     expect(ownerDocumentStatusViewKey('owner_report', 'adjusted')).toBe('reported')
     expect(ownerDocumentStatusLabelForList('owner_change', 'submitted')).toBe('已上报')
-    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('申诉中')
+    expect(OWNER_DOCUMENT_LIST_CONFIG.owner_penalty.views).toEqual([
+      { key: 'all', label: '全部' },
+      { key: 'draft', label: '草稿' },
+      { key: 'submitted', label: '已提交' },
+    ])
+    expect(ownerDocumentStatusViewKey('owner_penalty', 'submitted')).toBe('submitted')
+    expect(ownerDocumentStatusLabelForList('owner_penalty', 'submitted')).toBe('已提交')
     expect(ownerDocumentStatusLabelForList('acceptance', 'expired')).toBe('已到期')
     expect(ownerDocumentStatusViewKey('project_penalty', 'draft')).toBe('draft')
     expect(ownerDocumentStatusLabelForList('project_penalty', 'draft')).toBe('草稿')

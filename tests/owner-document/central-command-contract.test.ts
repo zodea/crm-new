@@ -166,6 +166,58 @@ function instance(
 }
 
 describe('甲方商务单据中央命令契约', () => {
+  it('甲方罚扣只经中央命令提交，幂等保存专属事实和联系单附件', async () => {
+    const commands = instance(kind => `${kind}-created-326`, () => '2026-08-26T02:00:00.000Z', [])
+    const request = {
+      ...commandEnvelope('submit-owner-penalty-326'),
+      action: 'submit' as const,
+      kind: 'owner_penalty' as const,
+      id: null,
+      baseVersion: null,
+      draft: {
+        no: 'FK-2026-326',
+        projectId: 'project-command-323',
+        contractId: 'contract-command-323',
+        noticeNo: 'LX-2026-326',
+        amount: 36000,
+        penaltyDate: '2026-08-26',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+        note: '项目部已核对',
+      },
+      attachments: {
+        add: [{ fileName: '甲方罚扣联系单.pdf', category: 'contact-letter' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }
+
+    const saved = await commands.execute(request, session)
+    await expect(commands.execute(request, session)).resolves.toEqual(saved)
+    expect(commands.rows().filter(row => row.kind === 'owner_penalty')).toHaveLength(1)
+    expect(commands.form('owner_penalty', saved.id, session)).toMatchObject({
+      kind: 'owner_penalty',
+      draft: {
+        id: 'owner_penalty-created-326',
+        no: 'FK-2026-326',
+        name: '施工进度延误',
+        noticeNo: 'LX-2026-326',
+        amount: 36000,
+        penaltyDate: '2026-08-26',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+        status: 'submitted',
+      },
+      attachments: [{ ownerType: 'owner_penalty', category: 'contact-letter' }],
+    })
+    await expect(commands.execute({
+      ...request,
+      commandId: 'overwrite-owner-penalty-326',
+      id: saved.id,
+      baseVersion: '1',
+    }, session)).rejects.toThrow('只有草稿或已退回')
+  })
+
   it('最终结算通过中央命令保存并在提交后锁定正文编辑', async () => {
     const commands = instance(kind => `${kind}-created-325`, () => '2026-08-25T02:00:00.000Z', [])
     const saved = await commands.execute({

@@ -212,6 +212,21 @@ describe('唯一 Target Registry', () => {
     })
   })
 
+  it('甲方罚扣只按 penalty 变体进入专属详情并保留返回链', () => {
+    const returnTo = '/owner/penalty?origin=real&nav=origin_326#owner-document-row-real%3Aowner_penalty%3Aowner-penalty-326'
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'owner-document', id: 'owner-penalty-326', label: '施工进度延误', no: 'FK-326' },
+      variant: 'penalty',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, { returnTo, returnContextId: 'origin_326' })).toEqual({
+      state: 'resolved',
+      label: '施工进度延误',
+      to: `/owner/penalty/owner-penalty-326?origin=real&returnTo=${encodeURIComponent(returnTo)}&returnContext=origin_326`,
+    })
+  })
+
   it.each(['acceptance', 'warranty'] as const)('验收 canonical ID 可解析到 %s 双视图并保留来源返回链', (variant) => {
     const returnTo = `/owner/acceptance?variant=${variant}&origin=real&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`
     const normalizedReturnTo = `/owner/acceptance?origin=real&variant=${variant}&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`

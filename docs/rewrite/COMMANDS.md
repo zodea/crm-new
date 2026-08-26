@@ -4,7 +4,7 @@
 
 ## 1. 当前落点
 
-Issue #293、#314、#315、#316、#318、#320、#321、#323、#324 与 #325 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签、甲方报量、验收—保修和最终结算的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #293、#314、#315、#316、#318、#320、#321、#323、#324、#325 与 #326 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签、甲方报量、验收—保修、最终结算和甲方罚扣的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -26,8 +26,8 @@ Issue #293、#314、#315、#316、#318、#320、#321、#323、#324 与 #325 已�
 - `GET /api/read/subcontract-contracts/form-context`、`GET /api/read/subcontract-contracts/:id/form`：返回正式项目/分供方选项，或正式分包合同 draft、附件、`version` 与更新时间。
 - `POST /api/commands/subcontract-contracts`、`PUT /api/commands/subcontract-contracts/:id`：新建或按 `baseVersion` 编辑正式分包合同；服务端重验项目、分供方、劳务/专业类别，并拒绝客户关系与采购明细。
 - `GET /api/commands/owner-documents/context`、`GET /api/commands/owner-documents/boq-lines`：返回中央正式项目/施工合同选项和当前合同 BOQ 明细；关系不匹配时拒绝。
-- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` / `final_settlement` 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
-- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新四类正式甲方 canonical 单据，并承载草稿、提交、签证、审定、验收生命周期流转、删除与附件变更 action。最终结算当前只提供草稿保存和提交，合同变更后金额/累计收款只从服务端 canonical 关系取数，不接受客户端写入；未实现审定 action 前不展示假审定按钮。验收流转命令原子提交当前阶段事实与 canonical 分类附件，服务端验证单向状态链并追加审计事件。附件 action 不把已上报/已申报单据伪装成可编辑草稿；服务端重验稳定关系、状态、版本和明细量价，不信任客户端合计。
+- `GET /api/commands/owner-documents/:kind/:id/form`：对 `owner_change` / `owner_report` / `acceptance` / `final_settlement` / `owner_penalty` 返回受控 draft、附件、`version` 与服务端更新时间；响应顶层 `kind + id`、draft ID 和每个附件的 `ownerType + ownerId` 必须与请求目标完全一致，HTTP adapter 拒绝身份错配或非法日期。
+- `POST /api/commands/owner-documents`：新建或按每个表单页实例持有的 `baseVersion` 更新五类正式甲方 canonical 单据，并承载草稿、提交、签证、审定、验收生命周期流转、删除与附件变更 action。甲方罚扣提交时必须有项目、施工合同、正数罚扣金额、合法日期与事由，联系单号和申诉说明作为同一事实保存，附件 owner 类型固定为 `owner_penalty`；不创建申诉审批 action，也不借项目罚扣或分包抵扣写链。最终结算当前只提供草稿保存和提交，合同变更后金额/累计收款只从服务端 canonical 关系取数，不接受客户端写入；未实现审定 action 前不展示假审定按钮。验收流转命令原子提交当前阶段事实与 canonical 分类附件，服务端验证单向状态链并追加审计事件。附件 action 不把已上报/已申报单据伪装成可编辑草稿；服务端重验稳定关系、状态、版本和明细量价，不信任客户端合计。
 
 甲方变洽签调量/调价命令使用 BOQ canonical 计算规则：调减可为负，但有效量不得为负；调价按签证时间稳定排序后的有效量价计算，缺失的新单价不按零价处理。签证 action 只写签证日期，不覆盖申报日期；日期必须是真实存在的日历日，且新签证不得早于同合同既有签证时序尾；同日签证再按签证 action 写入的不可变、单调执行时间排序，不使用通用 `updatedAt` 或无业务含义的单据 ID 打破并列，后续附件维护不得改变签证顺序。月度报量命令按 `periodNo` 取精确快照，只在申报时固化取数基准、来源版本/更新时间、经办人和系统提交时间，草稿不充当审计事实；受控迁移随施工合同同步完整 BOQ 目录和尚未成单的月度完成量事实，历史单据量价只在目录确实缺行时兜底，不得覆盖同稳定 ID 的当前 canonical 名称、数量或单价；无对应期次快照时拒绝借用其他月份的数量。
 

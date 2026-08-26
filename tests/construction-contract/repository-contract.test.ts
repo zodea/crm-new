@@ -163,6 +163,16 @@ describe('施工合同中央 Repository contract', () => {
         date: '2026-08-20',
         status: 'submitted',
       }],
+      penalties: [{
+        dataOrigin: 'real',
+        id: 'owner-penalty-326',
+        contractId: 'construction-contract-1',
+        no: 'FK-326',
+        name: '施工进度延误',
+        amount: 36000,
+        date: '2026-08-24',
+        status: 'submitted',
+      }],
       invoiceApplications: [{
         dataOrigin: 'real',
         id: 'invoice-app-1',
@@ -230,12 +240,18 @@ describe('施工合同中央 Repository contract', () => {
     expect(detail.sections.settlements).toEqual({
       monthlyStatements: [expect.objectContaining({ id: 'statement-1' })],
       finalSettlements: [],
-      penalties: [],
+      penalties: [expect.objectContaining({ id: 'owner-penalty-326' })],
     })
     expect(detail.sections.settlements.monthlyStatements[0]?.navigation).toMatchObject({
       kind: 'entity-detail',
       subject: { entity: 'owner-document', id: 'statement-1' },
       variant: 'report',
+    })
+    expect(detail.sections.settlements.penalties[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { entity: 'owner-document', id: 'owner-penalty-326' },
+      variant: 'penalty',
+      filters: { dataOrigin: 'real' },
     })
     expect(detail.sections.invoices).toEqual({
       applications: [expect.objectContaining({ id: 'invoice-app-1' })],

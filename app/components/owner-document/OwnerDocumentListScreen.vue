@@ -59,7 +59,7 @@ const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
   && (props.kind === 'owner_change' || props.kind === 'owner_report'
-    || props.kind === 'acceptance' || props.kind === 'final_settlement'))
+    || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'))
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
 const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query)
 

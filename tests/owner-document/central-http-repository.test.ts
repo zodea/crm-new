@@ -3,7 +3,11 @@ import {
   createHttpOwnerCommercialDocumentCommandRepository,
   createHttpOwnerCommercialDocumentReadRepository,
 } from '~/lib/owner-document/central-http-repository'
-import { parseOwnerCommercialDocumentListQuery } from '~/lib/owner-document/central-repository'
+import {
+  buildOwnerCommercialDocumentDetail,
+  parseOwnerCommercialDocumentDetailQuery,
+  parseOwnerCommercialDocumentListQuery,
+} from '~/lib/owner-document/central-repository'
 
 const project = { state: 'resolved', entity: 'project', id: 'project-323', label: '中央项目', no: null }
 const customer = { state: 'resolved', entity: 'customer', id: 'customer-323', label: '中央客户', no: null }
@@ -41,6 +45,7 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       contractNavigation: navigation(contract),
       navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'owner-document', id: 'change-323', label: '中央变洽签', no: 'BG-323' }, variant: 'owner-change', view: null, filters: { dataOrigin: 'real' } },
       acceptanceView: null,
+      ownerPenaltyFacts: null,
       updatedAt: '2026-08-25T00:00:00.000Z',
       ...itemOverrides,
     }],
@@ -121,6 +126,102 @@ function validForm(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function validPenaltyDetail() {
+  return buildOwnerCommercialDocumentDetail({
+    documents: [{
+      dataOrigin: 'real',
+      kind: 'owner_penalty',
+      id: 'owner-penalty-326',
+      no: 'FK-2026-326',
+      name: '施工进度延误',
+      documentType: 'owner_penalty',
+      projectId: 'project-323',
+      projectName: '中央项目',
+      projectPermission: 'allowed',
+      customerId: 'customer-323',
+      customerName: '中央客户',
+      customerPermission: 'allowed',
+      contractId: 'contract-323',
+      contractNo: 'SG-323',
+      contractName: '中央施工合同',
+      contractPermission: 'allowed',
+      sourceType: 'owner_penalty',
+      sourceId: 'owner-penalty-326',
+      sourceLocked: true,
+      periodNo: '',
+      applicationDate: '2026-08-26',
+      status: 'submitted',
+      statusNote: '已提交',
+      amount: 36000,
+      auditedAmount: null,
+      note: '项目部已核对',
+      version: 1,
+      createdAt: '2026-08-26T00:00:00.000Z',
+      updatedAt: '2026-08-26T00:00:00.000Z',
+      lines: [],
+      files: [{
+        id: 'penalty-file-326',
+        fileName: '甲方联系单.pdf',
+        fileSize: 326,
+        mimeType: 'application/pdf',
+        category: 'contact-letter',
+        uploader: '周经办',
+        uploadedAt: '2026-08-26T00:00:00.000Z',
+        deletedAt: null,
+      }],
+      noticeNo: 'LX-2026-326',
+      penaltyReason: '施工进度延误',
+      appealNote: '已提交工期顺延说明',
+    }],
+    query: parseOwnerCommercialDocumentDetailQuery('owner_penalty', 'owner-penalty-326', { origin: 'real' }),
+    asOf: '2026-08-26T00:00:00.000Z',
+    sourceVersion: 'penalty-v1',
+    capabilities: ['owner-document:read'],
+  })
+}
+
+function validPenaltyForm(overrides: Record<string, unknown> = {}) {
+  return {
+    kind: 'owner_penalty',
+    id: 'owner-penalty-326',
+    draft: {
+      id: 'owner-penalty-326',
+      no: 'FK-2026-326',
+      name: '',
+      projectId: 'project-323',
+      contractId: 'contract-323',
+      noticeNo: 'LX-2026-326',
+      amount: 36000,
+      penaltyDate: '2026-08-26',
+      reason: '施工进度延误',
+      appealNote: '已提交工期顺延说明',
+      status: 'submitted',
+      statusNote: '已提交',
+      sourceType: 'owner_penalty',
+      sourceId: 'owner-penalty-326',
+      sourceLocked: true,
+      note: '项目部已核对',
+      lines: [],
+    },
+    attachments: [{
+      id: 'penalty-file-326',
+      ownerType: 'owner_penalty',
+      ownerId: 'owner-penalty-326',
+      fileName: '甲方联系单.pdf',
+      filePath: '',
+      fileSize: 326,
+      mimeType: 'application/pdf',
+      category: 'contact-letter',
+      uploader: '周经办',
+      uploadedAt: '2026-08-26T00:00:00.000Z',
+      deletedAt: null,
+    }],
+    version: '1',
+    updatedAt: '2026-08-26T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 describe('甲方商务单据中央 HTTP Repository', () => {
   it('只按类型与稳定 ID 访问中央读取地址', async () => {
     const fetcher = vi.fn().mockResolvedValue(validListPage())
@@ -167,6 +268,58 @@ describe('甲方商务单据中央 HTTP Repository', () => {
     await expect(repository.list(parseOwnerCommercialDocumentListQuery('owner_report', {})))
       .rejects
       .toMatchObject({ problem: { code: 'forbidden', traceId: 'trace-323' } })
+  })
+
+  it('解码甲方罚扣的专属事实、来源返回与联系单附件', async () => {
+    const detail = validPenaltyDetail()
+    const readRepository = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue(detail),
+    })
+    const commandRepository = createHttpOwnerCommercialDocumentCommandRepository({
+      fetcher: vi.fn().mockResolvedValue(validPenaltyForm()),
+    })
+
+    await expect(readRepository.get(parseOwnerCommercialDocumentDetailQuery(
+      'owner_penalty',
+      'owner-penalty-326',
+      { origin: 'real' },
+    ))).resolves.toMatchObject({
+      document: { kind: 'owner_penalty', amounts: { kind: 'owner_penalty', amount: '36000.00' } },
+      ownerPenaltyFacts: {
+        noticeNo: 'LX-2026-326',
+        penaltyDate: '2026-08-26',
+        reason: '施工进度延误',
+        appealNote: '已提交工期顺延说明',
+      },
+      files: [{ category: 'contact-letter' }],
+      sourceNavigation: { filters: { ownerTab: 'settlements' } },
+    })
+    await expect(commandRepository.loadForm('owner_penalty', 'owner-penalty-326')).resolves.toMatchObject({
+      kind: 'owner_penalty',
+      draft: { noticeNo: 'LX-2026-326', amount: 36000, reason: '施工进度延误' },
+      attachments: [{ ownerType: 'owner_penalty' }],
+    })
+  })
+
+  it('拒绝缺少罚扣专属事实或联系单归属错误的响应', async () => {
+    const detail = validPenaltyDetail()
+    const malformedDetail = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue({ ...detail, ownerPenaltyFacts: null }),
+    })
+    await expect(malformedDetail.get(parseOwnerCommercialDocumentDetailQuery(
+      'owner_penalty',
+      'owner-penalty-326',
+      { origin: 'real' },
+    ))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+
+    const malformedForm = createHttpOwnerCommercialDocumentCommandRepository({
+      fetcher: vi.fn().mockResolvedValue(validPenaltyForm({
+        attachments: [{ ...validPenaltyForm().attachments[0], ownerType: 'project_penalty' }],
+      })),
+    })
+    await expect(malformedForm.loadForm('owner_penalty', 'owner-penalty-326'))
+      .rejects
+      .toMatchObject({ problem: { code: 'internal-error' } })
   })
 
   it('拒绝顶层看似正确但嵌套列表项、命令上下文或附件畸形的响应', async () => {
