@@ -252,6 +252,8 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
           WHERE file_ref.owner_type = 'boq_change_order'
             AND file_ref.owner_id = change_order.id
         ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
         change_order.created_at,
         change_order.updated_at,
         change_order.deleted_at
@@ -300,6 +302,8 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
           WHERE file_ref.owner_type = 'owner_change_order'
             AND file_ref.owner_id = ledger.id
         ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
         ledger.created_at,
         ledger.updated_at,
         ledger.deleted_at
@@ -372,10 +376,97 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
           WHERE file_ref.owner_type = 'monthly_statement'
             AND file_ref.owner_id = statement.id
         ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
         statement.created_at,
         statement.updated_at,
         statement.deleted_at
       FROM monthly_statements statement
+
+      UNION ALL
+
+      SELECT
+        acceptance.id,
+        acceptance.name,
+        acceptance.project_id,
+        acceptance.contract_id,
+        acceptance.contract_estimate AS amount,
+        NULL AS audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        'acceptance' AS kind,
+        acceptance.no,
+        'acceptance_lifecycle' AS document_type,
+        'manual' AS source_type,
+        CASE WHEN acceptance.status IN ('accepted', 'warranty', 'expired') THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        acceptance.document_date AS application_date,
+        NULL AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        acceptance.acceptor AS operator_name,
+        NULL AS submitted_at,
+        acceptance.status,
+        CASE acceptance.status
+          WHEN 'submitted' THEN '验收中'
+          WHEN 'accepted' THEN '验收合格'
+          WHEN 'warranty' THEN '保修中'
+          WHEN 'expired' THEN '保修到期已确认'
+          ELSE ''
+        END AS status_note,
+        acceptance.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', CASE
+              WHEN file_ref.category IN ('acceptance-report', 'warranty-confirmation') THEN file_ref.category
+              WHEN acceptance.type = 'warranty' THEN 'warranty-confirmation'
+              ELSE 'acceptance-report'
+            END,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'project_acceptance'
+            AND file_ref.owner_id = acceptance.id
+        ), '[]') AS files_json,
+        json_object(
+          'acceptanceOrganization', acceptance.acceptance_organization,
+          'acceptancePerson', acceptance.acceptor,
+          'acceptanceDate', acceptance.acceptance_date,
+          'acceptanceConclusion', acceptance.acceptance_conclusion,
+          'warrantyOwner', acceptance.warranty_owner,
+          'warrantyStartDate', acceptance.warranty_start_date,
+          'warrantyEndDate', acceptance.warranty_end_date,
+          'warrantyConfirmationOrganization', acceptance.warranty_confirmation_organization,
+          'warrantyConfirmationDate', acceptance.warranty_confirmation_date,
+          'warrantyConfirmationNote', acceptance.warranty_confirmation_note
+        ) AS acceptance_lifecycle_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', lifecycle_event.id,
+            'action', lifecycle_event.action,
+            'fromStatus', lifecycle_event.from_status,
+            'toStatus', lifecycle_event.to_status,
+            'actorId', lifecycle_event.actor_id,
+            'actorName', lifecycle_event.actor_name,
+            'occurredAt', lifecycle_event.occurred_at,
+            'note', lifecycle_event.note
+          ))
+          FROM project_acceptance_lifecycle_events lifecycle_event
+          WHERE lifecycle_event.acceptance_id = acceptance.id
+          ORDER BY lifecycle_event.occurred_at, lifecycle_event.id
+        ), '[]') AS lifecycle_events_json,
+        acceptance.created_at,
+        acceptance.updated_at,
+        acceptance.deleted_at
+      FROM project_acceptances acceptance
     ) owner_document
     ORDER BY kind, id
   `,
@@ -632,6 +723,8 @@ function sourceEntity(
         note: text(row.note),
         linesJson: text(row.lines_json) || '[]',
         filesJson: normalizeFileRefsJson(row.files_json),
+        acceptanceLifecycleJson: text(row.acceptance_lifecycle_json) || '{}',
+        lifecycleEventsJson: text(row.lifecycle_events_json) || '[]',
         createdAt: isoDateTimeText(row.created_at) ?? '',
         updatedAt: isoDateTimeText(row.updated_at) ?? '',
       },

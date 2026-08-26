@@ -86,24 +86,21 @@ const FIELDS: Record<OwnerDocumentKind, FieldDef[]> = {
   ],
   acceptance: [
     { key: 'no', label: '单据编号', placeholder: '留空自动生成' },
-    {
-      key: 'type',
-      label: '业务类型',
-      type: 'select',
-      options: [
-        { key: 'acceptance', label: '竣工验收' },
-        { key: 'warranty', label: '保修移交' },
-      ],
-      required: true,
-    },
     { key: 'name', label: '名称', required: true },
     { key: 'projectId', label: '项目', type: 'lookup', required: true },
-    { key: 'contractId', label: '施工合同', type: 'lookup' },
-    { key: 'documentDate', label: '验收/移交日期', type: 'date', required: true },
+    { key: 'contractId', label: '施工合同', type: 'lookup', required: true },
+    { key: 'applicationDate', label: '申报日期', type: 'date', required: true },
     { key: 'contractEstimate', label: '合同估算金额', type: 'number', step: '0.01' },
-    { key: 'acceptor', label: '验收人' },
-    { key: 'warrantyOwner', label: '保修责任人' },
-    { key: 'conclusion', label: '验收结论', type: 'textarea' },
+    { key: 'acceptanceOrganization', label: '验收单位', hint: '确认验收时必填' },
+    { key: 'acceptancePerson', label: '验收人', hint: '确认验收时必填' },
+    { key: 'acceptanceDate', label: '验收日期', type: 'date', hint: '确认验收时必填' },
+    { key: 'acceptanceConclusion', label: '验收结论', type: 'textarea', hint: '确认验收时必填' },
+    { key: 'warrantyOwner', label: '保修责任单位', hint: '进入保修时必填' },
+    { key: 'warrantyStartDate', label: '保修开始日期', type: 'date', hint: '进入保修时必填' },
+    { key: 'warrantyEndDate', label: '保修结束日期', type: 'date', hint: '进入保修时必填' },
+    { key: 'warrantyConfirmationOrganization', label: '到期验收单位', hint: '确认保修到期时必填' },
+    { key: 'warrantyConfirmationDate', label: '到期确认日期', type: 'date', hint: '确认保修到期时必填' },
+    { key: 'warrantyConfirmationNote', label: '到期确认结论', type: 'textarea', hint: '确认保修到期时必填' },
   ],
   final_settlement: [
     { key: 'no', label: '结算编号', placeholder: '留空自动生成' },
@@ -250,8 +247,43 @@ function lookupFor(key: string) {
   }[key as LookupKey]
 }
 
+const ACCEPTANCE_LIFECYCLE_FIELDS = new Set([
+  'acceptanceOrganization',
+  'acceptancePerson',
+  'acceptanceDate',
+  'acceptanceConclusion',
+  'warrantyOwner',
+  'warrantyStartDate',
+  'warrantyEndDate',
+  'warrantyConfirmationOrganization',
+  'warrantyConfirmationDate',
+  'warrantyConfirmationNote',
+])
+
+function acceptanceLifecycleFieldIsEditable(key: string): boolean {
+  if (props.kind !== 'acceptance')
+    return false
+  const status = String(props.draft.status ?? '')
+  if (status === 'submitted')
+    return ['acceptanceOrganization', 'acceptancePerson', 'acceptanceDate', 'acceptanceConclusion'].includes(key)
+  if (status === 'accepted')
+    return ['warrantyOwner', 'warrantyStartDate', 'warrantyEndDate'].includes(key)
+  if (status === 'warranty') {
+    return ['warrantyConfirmationOrganization', 'warrantyConfirmationDate', 'warrantyConfirmationNote'].includes(key)
+  }
+  return false
+}
+
+function fieldIsReadonly(key: string): boolean {
+  if (props.kind === 'acceptance' && ACCEPTANCE_LIFECYCLE_FIELDS.has(key))
+    return !acceptanceLifecycleFieldIsEditable(key)
+  return Boolean(props.readonly)
+}
+
 function disabledReason(key: string): string | undefined {
-  if (props.readonly)
+  if (props.kind === 'acceptance' && ACCEPTANCE_LIFECYCLE_FIELDS.has(key) && fieldIsReadonly(key))
+    return '该事实只能在对应生命周期命令中填写'
+  if (fieldIsReadonly(key))
     return '已生效单据不可修改'
   if (key === 'contractId')
     return props.draft.projectId ? undefined : '请先选择项目'
@@ -306,7 +338,7 @@ function readonlyValue(field: FieldDef): string {
             :data-testid="`owner-document-${field.key}`"
             :model-value="String(draft[field.key] ?? '')"
             :options="field.options ?? []"
-            :disabled="readonly"
+            :disabled="fieldIsReadonly(field.key)"
             full-width
             :aria-label="field.label"
             :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
@@ -340,7 +372,7 @@ function readonlyValue(field: FieldDef): string {
             :value="String(draft[field.key] ?? '')"
             rows="3"
             class="field-input w-full"
-            :disabled="readonly"
+            :disabled="fieldIsReadonly(field.key)"
             :placeholder="field.placeholder"
             :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
             :aria-describedby="errorDescriptionId(field.key)"
@@ -356,7 +388,7 @@ function readonlyValue(field: FieldDef): string {
             :min="field.type === 'number' ? '0' : undefined"
             class="field-input w-full"
             :class="{ 'font-mono': field.type === 'number' || field.type === 'date' || field.type === 'month' || field.key === 'no' }"
-            :disabled="readonly"
+            :disabled="fieldIsReadonly(field.key)"
             :placeholder="field.placeholder"
             :aria-invalid="Boolean(fieldErrors[field.key]) || undefined"
             :aria-describedby="errorDescriptionId(field.key)"
@@ -364,6 +396,7 @@ function readonlyValue(field: FieldDef): string {
             @input="patch(field.key, field.type === 'number' ? inputNumber($event) : inputValue($event))"
           >
           <span v-if="fieldErrors[field.key]" :id="errorId(field.key)" class="field-error">{{ fieldErrors[field.key] }}</span>
+          <span v-else-if="field.hint" class="field-hint">{{ field.hint }}</span>
         </label>
       </template>
     </div>

@@ -93,4 +93,29 @@ describe('fileRefAttachmentSection restore flow', () => {
     expect(wrapper.get('input[aria-label="附件分类"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('textarea').attributes('disabled')).toBeDefined()
   })
+
+  it('受控分类模式显示 canonical 分类但不允许改写', () => {
+    const wrapper = mount(FileRefAttachmentSection, {
+      props: {
+        attachments: [],
+        pendingAttachments: [{
+          localId: 'pending-acceptance-324',
+          fileName: '验收报告.pdf',
+          filePath: '',
+          fileSize: 324,
+          mimeType: 'application/pdf',
+          category: 'acceptance-report',
+          uploader: '',
+        }],
+        pendingRemoveIds: [],
+        pendingRestoreIds: [],
+        desktopPicker: false,
+        note: '',
+        categoryReadonly: true,
+      },
+      global: { components: { SectionHeader } },
+    })
+
+    expect(wrapper.get('input[aria-label="附件分类"]').attributes('readonly')).toBeDefined()
+  })
 })

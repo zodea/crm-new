@@ -40,6 +40,7 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       contract,
       contractNavigation: navigation(contract),
       navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'owner-document', id: 'change-323', label: '中央变洽签', no: 'BG-323' }, variant: 'owner-change', view: null, filters: { dataOrigin: 'real' } },
+      acceptanceView: null,
       updatedAt: '2026-08-25T00:00:00.000Z',
       ...itemOverrides,
     }],

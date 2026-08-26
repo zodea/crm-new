@@ -39,6 +39,8 @@ let hasActivated = false
 const ownerJourneys = shallowRef<{
   change: OwnerCommercialDocumentListPageDTO
   report: OwnerCommercialDocumentListPageDTO
+  acceptance: OwnerCommercialDocumentListPageDTO
+  warranty: OwnerCommercialDocumentListPageDTO
 } | null>(null)
 const ownerJourneysError = shallowRef('')
 
@@ -54,16 +56,41 @@ const ownerJourneyCards = computed(() => {
   return [
     { kind: 'change' as const, label: '甲方变洽签', page: current.change },
     { kind: 'report' as const, label: '月度报量', page: current.report },
+    { kind: 'acceptance' as const, label: '竣工验收', page: current.acceptance },
+    { kind: 'warranty' as const, label: '保修管理', page: current.warranty },
   ]
 })
 
-function ownerJourneyTo(kind: 'change' | 'report') {
+function ownerJourneyReturnTo(kind: 'change' | 'report' | 'acceptance' | 'warranty'): string {
+  const url = new URL(journeyReturnTo.value, 'https://ruihang.invalid')
+  url.hash = `project-owner-document-card-${kind}`
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+function ownerJourneyTo(kind: 'change' | 'report' | 'acceptance' | 'warranty') {
   const query = new URLSearchParams({
     projectId: props.projectId,
     origin: 'real',
-    returnTo: journeyReturnTo.value,
+    returnTo: ownerJourneyReturnTo(kind),
   })
-  return `/owner/${kind}?${query.toString()}`
+  if (kind === 'acceptance' || kind === 'warranty')
+    query.set('variant', kind)
+  return `/owner/${kind === 'warranty' ? 'acceptance' : kind}?${query.toString()}`
+}
+
+async function restoreOwnerJourneyContext() {
+  if (!import.meta.client || !ownerJourneys.value)
+    return
+  const currentRoute = props.currentRoute || `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const anchor = new URL(currentRoute, 'https://ruihang.invalid').hash.slice(1)
+  if (!/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor))
+    return
+  await nextTick()
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  const target = document.getElementById(anchor)
+  target?.scrollIntoView?.({ block: 'center' })
+  target?.focus({ preventScroll: true })
 }
 
 async function loadOwnerJourneys() {
@@ -85,12 +112,16 @@ async function loadOwnerJourneys() {
     pageSize: 10 as const,
   }
   try {
-    const [change, report] = await Promise.all([
+    const [change, report, acceptance, warranty] = await Promise.all([
       ownerDocumentRepository.list({ ...base, kind: 'owner_change' }),
       ownerDocumentRepository.list({ ...base, kind: 'owner_report' }),
+      ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'acceptance' }),
+      ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'warranty' }),
     ])
-    if (request === latestOwnerJourneyLoad && projectId === props.projectId)
-      ownerJourneys.value = { change, report }
+    if (request === latestOwnerJourneyLoad && projectId === props.projectId) {
+      ownerJourneys.value = { change, report, acceptance, warranty }
+      await restoreOwnerJourneyContext()
+    }
   }
   catch (cause) {
     if (request === latestOwnerJourneyLoad && projectId === props.projectId)
@@ -214,6 +245,12 @@ watch(
 )
 
 watch(
+  () => props.currentRoute,
+  () => void restoreOwnerJourneyContext(),
+  { flush: 'post' },
+)
+
+watch(
   () => commandStore.latestWrite,
   (write) => {
     if (write?.id === props.projectId)
@@ -318,16 +355,22 @@ onActivated(() => {
     />
 
     <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
-      <SectionHeader id="project-owner-document-title" title="甲方变洽签与月度报量" subtitle="按当前项目稳定 ID 进入中央正式单据，返回时保留项目上下文" />
+      <SectionHeader id="project-owner-document-title" title="甲方商务单据" subtitle="按当前项目稳定 ID 进入变洽签、报量、验收与保修中央正式单据，返回时保留项目上下文" />
       <StatePanel v-if="ownerJourneysError" class="mt-3" kind="error" title="甲方商务单据读取失败" :description="ownerJourneysError" action-label="重新读取" compact @action="loadOwnerJourneys" />
-      <div v-else-if="ownerJourneys" class="mt-3 grid gap-3 sm:grid-cols-2">
-        <NuxtLink v-for="card in ownerJourneyCards" :key="card.kind" :to="ownerJourneyTo(card.kind)" class="block border border-line bg-surface-1 p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/35">
+      <div v-else-if="ownerJourneys" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <NuxtLink
+          v-for="card in ownerJourneyCards"
+          :id="`project-owner-document-card-${card.kind}`"
+          :key="card.kind"
+          :to="ownerJourneyTo(card.kind)"
+          class="block scroll-mt-4 border border-line bg-surface-1 p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/35"
+        >
           <span class="text-13px font-700 text-ink">{{ card.label }}</span>
           <span class="mt-1 block font-mono text-20px font-800 text-brand-deep">{{ card.page.pagination.total }}</span>
           <span class="mt-1 block text-11px text-ink-soft">合计 {{ yuan(Number(card.page.summary.origins.real.reportedAmount)) }}</span>
         </NuxtLink>
       </div>
-      <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式甲方商务单据" description="切换到正式项目后可查看甲方变洽签与月度报量主链。" compact />
+      <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式甲方商务单据" description="切换到正式项目后可查看甲方变洽签、月度报量、竣工验收与保修管理主链。" compact />
       <StatePanel v-else class="mt-3" kind="loading" title="正在读取甲方商务单据" compact />
     </section>
 

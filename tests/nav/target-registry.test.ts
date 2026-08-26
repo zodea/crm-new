@@ -159,6 +159,35 @@ describe('唯一 Target Registry', () => {
       label: '施工合同',
       to: `/contract/contract-323?origin=real&contractKind=construction&tab=settlements&focus=report-323&returnTo=${encodeURIComponent(returnTo)}`,
     })
+
+    const acceptanceReturnTo = '/owner/acceptance/acceptance-324?origin=real&variant=warranty'
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'contract-323', label: '施工合同', no: 'SG-323' },
+      variant: 'owner-document-source',
+      view: 'acceptance-324',
+      filters: { dataOrigin: 'real', contractKind: '施工', ownerTab: 'acceptance', ownerView: 'warranty' },
+    }, { returnTo: acceptanceReturnTo })).toEqual({
+      state: 'resolved',
+      label: '施工合同',
+      to: `/contract/contract-323?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=warranty&returnTo=${encodeURIComponent(acceptanceReturnTo)}`,
+    })
+  })
+
+  it.each(['acceptance', 'warranty'] as const)('验收 canonical ID 可解析到 %s 双视图并保留来源返回链', (variant) => {
+    const returnTo = `/owner/acceptance?variant=${variant}&origin=real&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`
+    const normalizedReturnTo = `/owner/acceptance?origin=real&variant=${variant}&nav=origin_324#owner-document-row-real%3Aacceptance%3Aacceptance-324`
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'owner-document', id: 'acceptance-324', label: '项目竣工验收', no: 'YS-324' },
+      variant,
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, { returnTo, returnContextId: 'origin_324' })).toEqual({
+      state: 'resolved',
+      label: '项目竣工验收',
+      to: `/owner/acceptance/acceptance-324?origin=real&variant=${variant}&returnTo=${encodeURIComponent(normalizedReturnTo)}&returnContext=origin_324`,
+    })
   })
 
   it('项目与分供方目标拒绝跨来源 returnTo，而不是保留错配链', () => {

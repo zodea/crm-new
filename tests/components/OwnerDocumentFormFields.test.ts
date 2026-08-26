@@ -160,4 +160,13 @@ describe('ownerDocumentFormFields data flow', () => {
     expect(wrapper.get('[role="status"]').text()).toContain('当前项目暂无可选的分包合同')
     expect(wrapper.get('a').attributes('href')).toBe('/contract/subcontract')
   })
+
+  it('草稿仅允许编辑基本信息，未来验收和保修事实保持禁用', () => {
+    const wrapper = mountFields('acceptance')
+
+    expect(wrapper.get('[data-testid="owner-document-name"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="owner-document-acceptanceOrganization"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="owner-document-warrantyOwner"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="owner-document-warrantyConfirmationOrganization"]').attributes('disabled')).toBeDefined()
+  })
 })

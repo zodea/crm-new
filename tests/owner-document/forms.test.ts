@@ -424,6 +424,14 @@ describe('f5 甲方/分包单据领域事务', () => {
         'contract-owner', 'customer-owner', 320
       )
     `)
+    await expect(store.saveForm('acceptance', {
+      no: 'YS-MISSING-CONTRACT',
+      name: '未关联施工合同的验收',
+      projectId: 'project-owner',
+      applicationDate: '2026-07-20',
+      contractEstimate: 1200,
+    }, 'submit')).rejects.toThrow('施工合同')
+
     const acceptance = await store.saveForm('acceptance', {
       no: 'YS-001',
       type: 'acceptance',
@@ -509,21 +517,61 @@ describe('f5 甲方/分包单据领域事务', () => {
       contractId: 'contract-owner',
       status: 'submitted',
     })
-    await store.transitionAcceptance(acceptance.id, 'accepted')
+    await expect(store.transitionAcceptance(acceptance.id, 'accepted', {
+      acceptanceOrganization: '建设、监理、施工联合验收组',
+      acceptancePerson: '张工',
+      acceptanceDate: '2026-02-30',
+      acceptanceConclusion: '合格',
+    })).rejects.toThrow('验收日期格式')
+    await store.transitionAcceptance(acceptance.id, 'accepted', {
+      acceptanceOrganization: '建设、监理、施工联合验收组',
+      acceptancePerson: '张工',
+      acceptanceDate: '2026-07-20',
+      acceptanceConclusion: '合格',
+    }, {
+      add: [{ fileName: '竣工验收报告.pdf', category: 'acceptance-report' }],
+    })
     expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
       type: 'acceptance',
       status: 'accepted',
     })
-    await store.transitionAcceptance(acceptance.id, 'warranty')
+    const [acceptanceReport] = await listOwnerDocumentAttachments('acceptance', acceptance.id)
+    await expect(store.transitionAcceptance(acceptance.id, 'warranty', {
+      warrantyOwner: '李工',
+      warrantyStartDate: '2026-07-21',
+      warrantyEndDate: '2028-07-20',
+    }, {
+      removeIds: [acceptanceReport!.id],
+    })).rejects.toThrow('不属于当前验收视图')
+    await store.transitionAcceptance(acceptance.id, 'warranty', {
+      warrantyOwner: '李工',
+      warrantyStartDate: '2026-07-21',
+      warrantyEndDate: '2028-07-20',
+    })
     expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
       type: 'warranty',
       status: 'warranty',
     })
-    await store.transitionAcceptance(acceptance.id, 'expired')
+    await expect(store.transitionAcceptance(acceptance.id, 'expired', {
+      warrantyConfirmationOrganization: '建设单位保修验收组',
+      warrantyConfirmationDate: '2028-07-19',
+      warrantyConfirmationNote: '保修责任履行完毕',
+    })).rejects.toThrow('不能早于保修结束日期')
+    await store.transitionAcceptance(acceptance.id, 'expired', {
+      warrantyConfirmationOrganization: '建设单位保修验收组',
+      warrantyConfirmationDate: '2028-07-20',
+      warrantyConfirmationNote: '保修责任履行完毕',
+    }, {
+      add: [{ fileName: '保修到期确认单.pdf', category: 'warranty-confirmation' }],
+    })
     expect(await loadOwnerDocumentForm('acceptance', acceptance.id)).toMatchObject({
       type: 'warranty',
       status: 'expired',
     })
+    expect(await listOwnerDocumentAttachments('acceptance', acceptance.id)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ fileName: '竣工验收报告.pdf', category: 'acceptance-report' }),
+      expect.objectContaining({ fileName: '保修到期确认单.pdf', category: 'warranty-confirmation' }),
+    ]))
     expect(await loadOwnerDocumentForm('final_settlement', finalSettlement.id)).toMatchObject({
       settlementAmount: 1180,
       changedContractAmount: 1250,
@@ -613,7 +661,7 @@ describe('f5 甲方/分包单据领域事务', () => {
 
     expect(updated.id).toBe(created.id)
     expect(await loadOwnerDocumentForm('acceptance', created.id)).toMatchObject({
-      type: 'warranty',
+      type: 'acceptance',
       name: '保修移交',
       status: 'draft',
       warrantyOwner: '王工',

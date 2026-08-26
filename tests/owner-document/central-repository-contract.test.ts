@@ -112,6 +112,80 @@ const report: OwnerCommercialDocumentSource = {
   files: [],
 }
 
+const acceptance: OwnerCommercialDocumentSource = {
+  ...change,
+  kind: 'acceptance',
+  id: 'acceptance-real-324',
+  no: 'YS-2026-324',
+  name: '瑞航商务中心项目竣工验收',
+  documentType: 'acceptance_lifecycle',
+  sourceType: 'manual',
+  sourceId: 'acceptance-real-324',
+  sourceLocked: true,
+  applicationDate: '2026-07-18',
+  status: 'warranty',
+  statusNote: '已验收，当前处于保修期',
+  amount: 1200000,
+  auditedAmount: null,
+  updatedAt: '2026-08-24T00:00:00.000Z',
+  acceptanceLifecycle: {
+    acceptanceOrganization: '建设、监理、施工联合验收组',
+    acceptancePerson: '周验收',
+    acceptanceDate: '2026-07-18',
+    acceptanceConclusion: '验收合格',
+    warrantyOwner: '瑞航建设工程有限公司',
+    warrantyStartDate: '2026-07-19',
+    warrantyEndDate: '2028-07-18',
+    warrantyConfirmationOrganization: null,
+    warrantyConfirmationDate: null,
+    warrantyConfirmationNote: '',
+    events: [
+      {
+        id: 'acceptance-event-submitted-324',
+        action: 'submit',
+        fromStatus: 'draft',
+        toStatus: 'submitted',
+        actorId: 'actor-owner-document-324',
+        actorName: '周经办',
+        occurredAt: '2026-07-17T09:00:00.000Z',
+        note: '',
+      },
+      {
+        id: 'acceptance-event-warranty-324',
+        action: 'start-warranty',
+        fromStatus: 'accepted',
+        toStatus: 'warranty',
+        actorId: 'actor-owner-document-324',
+        actorName: '周经办',
+        occurredAt: '2026-07-19T09:00:00.000Z',
+        note: '进入保修跟踪',
+      },
+    ],
+  },
+  files: [
+    {
+      id: 'file-acceptance-report-324',
+      fileName: '竣工验收报告.pdf',
+      fileSize: 4096,
+      mimeType: 'application/pdf',
+      category: 'acceptance-report',
+      uploader: '周经办',
+      uploadedAt: '2026-07-18T10:00:00.000Z',
+      deletedAt: null,
+    },
+    {
+      id: 'file-warranty-confirmation-324',
+      fileName: '保修跟踪清单.pdf',
+      fileSize: 2048,
+      mimeType: 'application/pdf',
+      category: 'warranty-confirmation',
+      uploader: '周经办',
+      uploadedAt: '2026-07-19T10:00:00.000Z',
+      deletedAt: null,
+    },
+  ],
+}
+
 const base = {
   documents: [change, report],
   asOf: '2026-08-25T00:00:00.000Z',
@@ -120,6 +194,101 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it('验收与保修按同一稳定 ID 生成双视图，并只暴露各自字段和附件', () => {
+    const documents = [acceptance]
+    const acceptanceDetail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents,
+      query: parseOwnerCommercialDocumentDetailQuery('acceptance', acceptance.id, {
+        origin: 'real',
+        variant: 'acceptance',
+      }),
+    })
+    const warrantyDetail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents,
+      query: parseOwnerCommercialDocumentDetailQuery('acceptance', acceptance.id, {
+        origin: 'real',
+        variant: 'warranty',
+      }),
+    })
+
+    expect(acceptanceDetail.document.id).toBe(warrantyDetail.document.id)
+    expect(acceptanceDetail.acceptanceView).toEqual({
+      variant: 'acceptance',
+      organization: '建设、监理、施工联合验收组',
+      person: '周验收',
+      date: '2026-07-18',
+      conclusion: '验收合格',
+    })
+    expect(acceptanceDetail.files.map(file => file.id)).toEqual(['file-acceptance-report-324'])
+    expect(warrantyDetail.acceptanceView).toEqual({
+      variant: 'warranty',
+      owner: '瑞航建设工程有限公司',
+      startDate: '2026-07-19',
+      endDate: '2028-07-18',
+      confirmationOrganization: null,
+      confirmationDate: null,
+      confirmationNote: '',
+    })
+    expect(warrantyDetail.files.map(file => file.id)).toEqual(['file-warranty-confirmation-324'])
+    expect(warrantyDetail.lifecycleEvents).toHaveLength(2)
+    expect(warrantyDetail.documentNavigation).toMatchObject({
+      kind: 'entity-detail',
+      subject: { id: acceptance.id },
+      variant: 'warranty',
+    })
+    expect(warrantyDetail.sourceNavigation).toMatchObject({
+      kind: 'entity-detail',
+      variant: 'owner-document-source',
+      view: acceptance.id,
+      filters: { ownerTab: 'acceptance' },
+    })
+  })
+
+  it('验收与保修列表使用同一 canonical 行，但输出各自专属列', () => {
+    const documents = [acceptance]
+    const acceptancePage = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents,
+      query: parseOwnerCommercialDocumentListQuery('acceptance', {
+        origin: 'real',
+        variant: 'acceptance',
+        page: 1,
+        pageSize: 20,
+      }),
+    })
+    const warrantyPage = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents,
+      query: parseOwnerCommercialDocumentListQuery('acceptance', {
+        origin: 'real',
+        variant: 'warranty',
+        page: 1,
+        pageSize: 20,
+      }),
+    })
+
+    expect(acceptancePage.items[0]).toMatchObject({
+      id: acceptance.id,
+      acceptanceView: {
+        variant: 'acceptance',
+        organization: '建设、监理、施工联合验收组',
+        date: '2026-07-18',
+      },
+      navigation: { variant: 'acceptance' },
+    })
+    expect(warrantyPage.items[0]).toMatchObject({
+      id: acceptance.id,
+      acceptanceView: {
+        variant: 'warranty',
+        owner: '瑞航建设工程有限公司',
+        endDate: '2028-07-18',
+      },
+      navigation: { variant: 'warranty' },
+    })
+  })
+
   it('列表按类型隔离，并用稳定 ID 暴露项目、客户、合同与只读详情导航', () => {
     const page = buildOwnerCommercialDocumentListPage({
       ...base,

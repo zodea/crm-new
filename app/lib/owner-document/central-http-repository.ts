@@ -118,14 +118,41 @@ function amounts(value: unknown): boolean {
     return money(value.boqChange) && money(value.taxInclusive) && money(value.taxExclusive)
       && money(value.appliedTaxExclusive)
   }
-  return value.kind === 'owner_report' && money(value.reported)
-    && nullableMoney(value.audited) && nullableMoney(value.difference)
+  if (value.kind === 'owner_report') {
+    return money(value.reported)
+      && nullableMoney(value.audited) && nullableMoney(value.difference)
+  }
+  return value.kind === 'acceptance' && money(value.contractEstimate)
+}
+
+function acceptanceView(value: unknown): boolean {
+  if (value === null)
+    return true
+  if (!object(value))
+    return false
+  if (value.variant === 'acceptance') {
+    return typeof value.organization === 'string' && typeof value.person === 'string'
+      && nullableDate(value.date) && typeof value.conclusion === 'string'
+  }
+  return value.variant === 'warranty' && typeof value.owner === 'string'
+    && nullableDate(value.startDate) && nullableDate(value.endDate)
+    && nullableString(value.confirmationOrganization) && nullableDate(value.confirmationDate)
+    && typeof value.confirmationNote === 'string'
+}
+
+function lifecycleEvent(value: unknown): boolean {
+  return object(value) && typeof value.id === 'string'
+    && ['submit', 'accept', 'start-warranty', 'confirm-expiry'].includes(String(value.action))
+    && ['draft', 'submitted', 'accepted', 'warranty'].includes(String(value.fromStatus))
+    && ['submitted', 'accepted', 'warranty', 'expired'].includes(String(value.toStatus))
+    && typeof value.actorId === 'string' && typeof value.actorName === 'string'
+    && isISODateTimeDTO(value.occurredAt) && typeof value.note === 'string'
 }
 
 function listItem(value: unknown): boolean {
   return object(value) && typeof value.rowKey === 'string'
     && isDataOriginDTO(value.dataOrigin)
-    && ['owner_change', 'owner_report'].includes(String(value.kind))
+    && ['owner_change', 'owner_report', 'acceptance'].includes(String(value.kind))
     && ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'statusLabel', 'updatedAt']
       .every(key => typeof value[key] === 'string')
       && value.rowKey === `${value.dataOrigin}:${value.kind}:${value.id}`
@@ -133,6 +160,8 @@ function listItem(value: unknown): boolean {
       && entityRef(value.project) && entityRef(value.customer) && entityRef(value.contract)
       && navigation(value.projectNavigation) && navigation(value.customerNavigation)
       && navigation(value.contractNavigation) && navigation(value.navigation)
+      && acceptanceView(value.acceptanceView)
+      && (value.attachmentCount === undefined || count(value.attachmentCount))
 }
 
 function summaryOption(value: unknown): boolean {
@@ -174,7 +203,7 @@ function detailFile(value: unknown): boolean {
 }
 
 function detailDocument(value: unknown): boolean {
-  if (!object(value) || !['owner_change', 'owner_report'].includes(String(value.kind)))
+  if (!object(value) || !['owner_change', 'owner_report', 'acceptance'].includes(String(value.kind)))
     return false
   return ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'note', 'version', 'updatedAt']
     .every(key => typeof value[key] === 'string')
@@ -261,6 +290,8 @@ function decodeDetail(value: unknown): OwnerCommercialDocumentDetailReadDTO {
     || !Array.isArray(value.files) || !value.files.every(detailFile)
     || !navigation(value.projectNavigation) || !navigation(value.customerNavigation)
     || !navigation(value.contractNavigation) || !navigation(value.sourceNavigation)
+    || !navigation(value.documentNavigation) || !acceptanceView(value.acceptanceView)
+    || !Array.isArray(value.lifecycleEvents) || !value.lifecycleEvents.every(lifecycleEvent)
     || !strings(value.capabilities) || !isISODateTimeDTO(value.asOf)
     || !nullableString(value.sourceVersion)) {
     return malformed('甲方商务单据详情')
@@ -306,7 +337,7 @@ function draftLine(value: unknown, kind: 'owner_change' | 'owner_report'): boole
     : value.operation === undefined || value.operation === null
 }
 
-function formDraft(value: unknown, kind: 'owner_change' | 'owner_report', expectedId: string): boolean {
+function formDraft(value: unknown, kind: 'owner_change' | 'owner_report' | 'acceptance', expectedId: string): boolean {
   if (!object(value) || value.id !== expectedId || typeof value.no !== 'string'
     || !nullableString(value.projectId) || !nullableString(value.contractId)
     || typeof value.applicationDate !== 'string'
@@ -314,7 +345,8 @@ function formDraft(value: unknown, kind: 'owner_change' | 'owner_report', expect
     || typeof value.status !== 'string' || typeof value.statusNote !== 'string'
     || typeof value.sourceType !== 'string' || typeof value.sourceId !== 'string'
     || typeof value.sourceLocked !== 'boolean' || typeof value.note !== 'string'
-    || !Array.isArray(value.lines) || !value.lines.every(line => draftLine(line, kind))) {
+    || !Array.isArray(value.lines)
+    || (kind !== 'acceptance' && !value.lines.every(line => draftLine(line, kind)))) {
     return false
   }
   if (kind === 'owner_change') {
@@ -322,6 +354,19 @@ function formDraft(value: unknown, kind: 'owner_change' | 'owner_report', expect
       && nullableDate(value.approvalDate) && typeof value.reason === 'string'
       && finite(value.approvedTaxInclusiveAmount) && finite(value.approvedTaxExclusiveAmount)
       && finite(value.appliedTaxExclusiveAmount) && finite(value.totalAmount)
+  }
+  if (kind === 'acceptance') {
+    return typeof value.name === 'string' && finite(value.contractEstimate)
+      && typeof value.acceptanceOrganization === 'string'
+      && typeof value.acceptancePerson === 'string'
+      && nullableDate(value.acceptanceDate)
+      && typeof value.acceptanceConclusion === 'string'
+      && typeof value.warrantyOwner === 'string'
+      && nullableDate(value.warrantyStartDate) && nullableDate(value.warrantyEndDate)
+      && nullableString(value.warrantyConfirmationOrganization)
+      && nullableDate(value.warrantyConfirmationDate)
+      && typeof value.warrantyConfirmationNote === 'string'
+      && Array.isArray(value.lifecycleEvents) && value.lifecycleEvents.every(lifecycleEvent)
   }
   return typeof value.periodNo === 'string'
     && (value.periodNo === '' || /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value.periodNo))
@@ -334,10 +379,14 @@ function formDraft(value: unknown, kind: 'owner_change' | 'owner_report', expect
 
 function decodeForm(
   value: unknown,
-  expectedKind: 'owner_change' | 'owner_report',
+  expectedKind: 'owner_change' | 'owner_report' | 'acceptance',
   expectedId: string,
 ): OwnerCommercialDocumentFormReadDTO {
-  const expectedOwnerType = expectedKind === 'owner_change' ? 'owner_change_order' : 'monthly_statement'
+  const expectedOwnerType = expectedKind === 'owner_change'
+    ? 'owner_change_order'
+    : expectedKind === 'owner_report'
+      ? 'monthly_statement'
+      : 'project_acceptance'
   if (!object(value) || value.kind !== expectedKind || value.id !== expectedId
     || !formDraft(value.draft, expectedKind, expectedId)
     || !Array.isArray(value.attachments)

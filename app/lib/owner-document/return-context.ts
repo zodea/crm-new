@@ -14,6 +14,8 @@ export interface OwnerDocumentListNavigationState {
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
+  variant?: 'acceptance' | 'warranty' | null
+  returnTo?: string | null
 }
 
 export interface OwnerDocumentReturnOrigin {
@@ -29,7 +31,11 @@ const STORAGE_PREFIX = 'ruihang:owner-document-return:'
 const TTL = 30 * 60_000
 
 function route(kind: OwnerCommercialDocumentKind): string {
-  return kind === 'owner_change' ? '/owner/change' : '/owner/report'
+  return kind === 'owner_change'
+    ? '/owner/change'
+    : kind === 'owner_report'
+      ? '/owner/report'
+      : '/owner/acceptance'
 }
 
 function value(input: unknown): string | undefined {
@@ -74,6 +80,9 @@ export function ownerDocumentListNavigationStateFromQuery(
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 20,
+    variant: value(query.variant) === 'warranty' ? 'warranty' : value(query.variant) === 'acceptance' ? 'acceptance' : null,
+    returnTo: validateConstructionContractDetailReturnTo(value(query.returnTo))
+      ?? validateProjectJourneyReturnTo(value(query.returnTo)),
   }
 }
 
@@ -95,6 +104,10 @@ function params(state: OwnerDocumentListNavigationState, contextId: string): URL
     query.set('page', String(state.page))
   if (state.pageSize !== 20)
     query.set('pageSize', String(state.pageSize))
+  if (state.variant)
+    query.set('variant', state.variant)
+  if (state.returnTo)
+    query.set('returnTo', state.returnTo)
   query.set('nav', contextId)
   return query
 }
@@ -144,7 +157,7 @@ export function validateOwnerDocumentDetailReturnTo(
     return null
   try {
     const url = new URL(input, 'https://ruihang.invalid')
-    const match = url.pathname.match(/^\/owner\/(change|report)\/([^/]+)$/)
+    const match = url.pathname.match(/^\/owner\/(change|report|acceptance)\/([^/]+)$/)
     if (url.origin !== 'https://ruihang.invalid' || !match)
       return null
     const id = decodeURIComponent(match[2]!)
@@ -153,7 +166,11 @@ export function validateOwnerDocumentDetailReturnTo(
     const origin = url.searchParams.get('origin') ?? 'real'
     if (!isDataOriginDTO(origin) || (isDataOriginDTO(expectedOrigin) && origin !== expectedOrigin))
       return null
-    const kind: OwnerCommercialDocumentKind = match[1] === 'change' ? 'owner_change' : 'owner_report'
+    const kind: OwnerCommercialDocumentKind = match[1] === 'change'
+      ? 'owner_change'
+      : match[1] === 'report'
+        ? 'owner_report'
+        : 'acceptance'
     const nested = url.searchParams.get('returnTo')
     const validatedNested = nested ? validateOwnerDocumentJourneyReturnTo(nested, kind, origin) : null
     if (nested && !validatedNested)
@@ -162,6 +179,12 @@ export function validateOwnerDocumentDetailReturnTo(
     if (contextId && (!validatedNested || !isOwnerDocumentReturnContextId(contextId)))
       return null
     const query = new URLSearchParams({ origin })
+    if (kind === 'acceptance') {
+      const variant = url.searchParams.get('variant') ?? 'acceptance'
+      if (variant !== 'acceptance' && variant !== 'warranty')
+        return null
+      query.set('variant', variant)
+    }
     if (validatedNested)
       query.set('returnTo', validatedNested)
     if (contextId)

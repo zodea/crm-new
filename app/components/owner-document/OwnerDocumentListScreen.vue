@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import type { RowActionItem } from '~/components/ui/RowActionMenu.vue'
+import type { OwnerCommercialDocumentKind } from '~/lib/owner-document/central-repository'
 import type { OwnerDocumentKind, OwnerDocumentListRecord } from '~/lib/owner-document/forms'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
 import {
   filterOwnerDocumentRows,
+  OWNER_ACCEPTANCE_LIST_COLUMNS,
+  OWNER_ACCEPTANCE_LIST_VIEWS,
   OWNER_DOCUMENT_LIST_CONFIG,
   ownerDocumentStatusClass,
   ownerDocumentStatusLabelForList,
@@ -40,13 +43,23 @@ const store = useOwnerDocumentStore()
 const { confirm, undoToast, error } = useKitUI()
 
 const meta = computed(() => OWNER_DOCUMENT_META[props.kind])
-const config = computed(() => OWNER_DOCUMENT_LIST_CONFIG[props.kind])
+const acceptanceVariant = computed(() => route.query.variant === 'warranty' ? 'warranty' : 'acceptance')
+const config = computed(() => {
+  const base = OWNER_DOCUMENT_LIST_CONFIG[props.kind]
+  return props.kind === 'acceptance'
+    ? {
+        ...base,
+        columns: OWNER_ACCEPTANCE_LIST_COLUMNS[acceptanceVariant.value],
+        views: OWNER_ACCEPTANCE_LIST_VIEWS[acceptanceVariant.value],
+      }
+    : base
+})
 const rows = computed(() => store.recordsFor(props.kind))
 const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
-  && (props.kind === 'owner_change' || props.kind === 'owner_report'))
-const centralKind = computed(() => props.kind as 'owner_change' | 'owner_report')
+  && (props.kind === 'owner_change' || props.kind === 'owner_report' || props.kind === 'acceptance'))
+const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
 const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query)
 
 const search = shallowRef(centralReadOnly.value ? initialNavigation.search : '')
@@ -143,7 +156,10 @@ const statusOptions = computed(() =>
     count: centralSummary.value
       ? view.key === 'all'
         ? centralSummary.value.statuses.reduce((total, option) => total + option.count, 0)
-        : centralSummary.value.statuses.find(option => option.value === view.key)?.count ?? 0
+        : centralSummary.value.statuses.reduce(
+            (total, option) => total + (ownerDocumentStatusViewKey(props.kind, option.value) === view.key ? option.count : 0),
+            0,
+          )
       : rows.value.filter(row => view.key === 'all' || ownerDocumentStatusViewKey(props.kind, row.status) === view.key).length,
   })),
 )
@@ -250,6 +266,7 @@ async function load() {
           contractId: routeContract.value || null,
           status: statusView.value === 'all' ? null : statusView.value,
           documentType: typeFilter.value === 'all' ? null : typeFilter.value,
+          variant: props.kind === 'acceptance' ? acceptanceVariant.value : null,
           page: page.value,
           pageSize: pageSize.value as 10 | 20 | 50 | 100,
         }
@@ -269,13 +286,15 @@ async function openEdit(row: OwnerDocumentListRecord) {
     await navigateTo(ownerDocumentFormPath(props.kind, row.id))
     return
   }
-  const kind = props.kind as 'owner_change' | 'owner_report'
+  const kind = props.kind as OwnerCommercialDocumentKind
   const contextId = newOwnerDocumentReturnContextId()
   const origin = createOwnerDocumentReturnOrigin({
     kind,
     contextId,
     rowIdentity: `real:${kind}:${row.id}`,
-    scrollTop: document.scrollingElement?.scrollTop ?? window.scrollY,
+    scrollTop: document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop
+      ?? document.scrollingElement?.scrollTop
+      ?? window.scrollY,
     now: Date.now(),
     state: {
       search: search.value,
@@ -286,12 +305,19 @@ async function openEdit(row: OwnerDocumentListRecord) {
       origin: 'real',
       page: currentPage.value,
       pageSize: pageSize.value as 10 | 20 | 50 | 100,
+      variant: kind === 'acceptance' ? acceptanceVariant.value : null,
+      returnTo: journeyReturnTo.value,
     },
   })
   saveOwnerDocumentReturnOrigin(origin)
   await navigateTo({
-    path: ownerDocumentDetailPath(kind, row.id, 'real').split('?')[0],
-    query: { origin: 'real', returnTo: origin.returnTo, returnContext: contextId },
+    path: ownerDocumentDetailPath(kind, row.id, 'real', row.viewVariant ?? acceptanceVariant.value).split('?')[0],
+    query: {
+      origin: 'real',
+      ...(kind === 'acceptance' ? { variant: row.viewVariant ?? acceptanceVariant.value } : {}),
+      returnTo: origin.returnTo,
+      returnContext: contextId,
+    },
   })
 }
 
@@ -394,6 +420,12 @@ watch([search, projectFilter, typeFilter, statusView, routeProject, routeContrac
   if (centralReadOnly.value)
     void load()
 })
+watch(acceptanceVariant, () => {
+  page.value = 1
+  statusView.value = 'all'
+  if (centralReadOnly.value)
+    void load()
+})
 watch([page, pageSize], () => {
   if (centralReadOnly.value)
     void load()
@@ -410,6 +442,7 @@ watch(
 )
 
 let hasActivated = false
+let restoredRoute = ''
 watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
   if (!centralReadOnly.value)
     return
@@ -442,28 +475,46 @@ watch([search, projectFilter, typeFilter, statusView, page, pageSize], () => {
 })
 
 async function restoreReturnOrigin() {
-  if (!centralReadOnly.value || !isOwnerDocumentReturnContextId(route.query.nav))
+  if (!centralReadOnly.value || restoredRoute === route.fullPath || !isOwnerDocumentReturnContextId(route.query.nav))
     return
-  const kind = props.kind as 'owner_change' | 'owner_report'
+  const kind = props.kind as OwnerCommercialDocumentKind
   const validated = validateOwnerDocumentListReturnTo(route.fullPath, kind, 'real')
   const origin = loadOwnerDocumentReturnOrigin(route.query.nav)
   if (!validated || !origin || origin.returnTo !== validated || origin.expiresAt <= Date.now())
     return
-  await nextTick()
-  window.scrollTo({ top: origin.scrollTop })
-  document.getElementById(origin.anchorId)?.focus({ preventScroll: true })
+  let anchor: HTMLElement | null = null
+  for (let attempt = 0; attempt < 4 && !anchor; attempt += 1) {
+    await nextTick()
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    anchor = document.getElementById(origin.anchorId)
+  }
+  if (!anchor)
+    return
+  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  if (workspace)
+    workspace.scrollTop = origin.scrollTop
+  else
+    window.scrollTo({ top: origin.scrollTop })
+  anchor.focus({ preventScroll: true })
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  if (workspace)
+    workspace.scrollTop = origin.scrollTop
+  restoredRoute = route.fullPath
 }
+
+watch(() => [loading.value, rows.value.length, route.fullPath], () => void restoreReturnOrigin(), { flush: 'post' })
 
 onMounted(async () => {
   await load()
   await restoreReturnOrigin()
 })
-onActivated(() => {
+onActivated(async () => {
   if (!hasActivated) {
     hasActivated = true
     return
   }
-  void load()
+  await load()
+  await restoreReturnOrigin()
 })
 </script>
 
@@ -474,6 +525,18 @@ onActivated(() => {
         <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回来源详情
       </NuxtLink>
     </div>
+    <nav v-if="kind === 'acceptance'" class="panel flex flex-wrap gap-2 p-2" aria-label="验收保修列表视图">
+      <NuxtLink
+        v-for="item in [{ key: 'acceptance', label: '竣工验收' }, { key: 'warranty', label: '保修到期确认' }]"
+        :key="item.key"
+        :to="{ path: route.path, query: { ...route.query, variant: item.key, page: undefined } }"
+        class="btn-ghost min-h-9"
+        :class="{ 'bg-brand-soft text-brand-deep': acceptanceVariant === item.key }"
+        :aria-current="acceptanceVariant === item.key ? 'page' : undefined"
+      >
+        {{ item.label }}
+      </NuxtLink>
+    </nav>
     <OwnerDocumentListToolbar
       v-model:search="search"
       v-model:project="projectFilter"
@@ -545,7 +608,7 @@ onActivated(() => {
             <NuxtLink
               v-if="centralReadOnly"
               :id="`owner-document-row-real:${kind}:${row.id}`"
-              :to="ownerDocumentDetailPath(kind, row.id, 'real')"
+              :to="ownerDocumentDetailPath(kind, row.id, 'real', row.viewVariant ?? acceptanceVariant)"
               class="cell--link whitespace-nowrap font-mono"
               :title="row.no || row.name"
               @click.prevent="openEdit(row)"

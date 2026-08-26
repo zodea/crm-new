@@ -27,7 +27,8 @@ function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
 }
 
 function sameQuery(left: OwnerCommercialDocumentDetailQueryDTO | null, right: OwnerCommercialDocumentDetailQueryDTO) {
-  return left?.kind === right.kind && left.id === right.id && left.origin === right.origin && left.includeDemo === right.includeDemo
+  return left?.kind === right.kind && left.id === right.id && left.origin === right.origin
+    && left.includeDemo === right.includeDemo && left.variant === right.variant
 }
 
 export const useOwnerCommercialDocumentReadStore = defineStore('owner-commercial-document-read', () => {

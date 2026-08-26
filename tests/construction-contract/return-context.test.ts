@@ -15,6 +15,15 @@ describe('施工合同详情返回上下文', () => {
     expect(validateConstructionContractDetailReturnTo('/contract/contract-1?origin=real&contractKind=construction&tab=changes&focus=change-1', 'real')).toBeNull()
   })
 
+  it('验收双事实返回时保留视图区分、稳定锚点与聚焦目标', () => {
+    const target = '/contract/contract-1?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=warranty#construction-contract-fact-warranty-acceptance-324'
+    expect(validateConstructionContractDetailReturnTo(target, 'real')).toBe(target)
+    expect(validateConstructionContractDetailReturnTo(
+      '/contract/contract-1?origin=real&contractKind=construction&tab=acceptance&focus=acceptance-324&focusView=other#construction-contract-fact-other-acceptance-324',
+      'real',
+    )).toBeNull()
+  })
+
   it('允许正式详情返回未限定来源的混合列表，但拒绝明确的跨来源列表', () => {
     const mixed = '/contract/construction?search=既有中央&nav=origin_320_mixed#construction-contract-row-real%3Acontract-1'
     const canonicalMixed = validateConstructionContractReturnTo(mixed, 'real')!

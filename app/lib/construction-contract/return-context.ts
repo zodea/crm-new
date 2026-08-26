@@ -127,7 +127,13 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (tab && !['info', 'supplements', 'changes', 'settlements', 'invoices', 'receipts', 'acceptance'].includes(tab))
       return null
     const focus = url.searchParams.get('focus')
-    if (focus && (tab !== 'supplements' || !isStableRouteIdentity(focus)))
+    if (focus && (!['supplements', 'acceptance'].includes(tab ?? '') || !isStableRouteIdentity(focus)))
+      return null
+    const focusView = url.searchParams.get('focusView')
+    if (focusView && (tab !== 'acceptance' || !focus || (focusView !== 'acceptance' && focusView !== 'warranty')))
+      return null
+    const anchorId = decodeURIComponent(url.hash.slice(1))
+    if (anchorId && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
       return null
     const returnTo = url.searchParams.get('returnTo')
     const validatedListReturnTo = returnTo ? validateConstructionContractReturnTo(returnTo) : null
@@ -143,9 +149,11 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
       query.set('tab', tab)
     if (focus)
       query.set('focus', focus)
+    if (focusView)
+      query.set('focusView', focusView)
     if (validatedListReturnTo)
       query.set('returnTo', validatedListReturnTo)
-    return `${url.pathname}?${query.toString()}`
+    return `${url.pathname}?${query.toString()}${anchorId ? `#${encodeURIComponent(anchorId)}` : ''}`
   }
   catch {
     return null

@@ -146,14 +146,21 @@ function contractPath(intent: EntityTargetIntent): string {
     if (kind !== '施工' || dataOrigin !== 'real' || !isStableRouteIdentity(intent.view))
       throw new Error('invalid owner document source focus')
     const ownerTab = intent.filters.ownerTab
-    if (ownerTab !== 'changes' && ownerTab !== 'settlements')
+    if (ownerTab !== 'changes' && ownerTab !== 'settlements' && ownerTab !== 'acceptance')
       throw new Error('invalid owner document source tab')
-    return `${path}?${new URLSearchParams({
+    const query = new URLSearchParams({
       origin: 'real',
       contractKind: 'construction',
       tab: ownerTab,
       focus: intent.view,
-    }).toString()}`
+    })
+    const ownerView = intent.filters.ownerView
+    if (ownerTab === 'acceptance') {
+      if (ownerView !== 'acceptance' && ownerView !== 'warranty')
+        throw new Error('invalid owner document source view')
+      query.set('focusView', ownerView)
+    }
+    return `${path}?${query.toString()}`
   }
   if (intent.variant === 'supplement') {
     if ((kind !== '施工' && kind !== '分包')
@@ -210,10 +217,16 @@ function receiptPath(intent: EntityTargetIntent): string {
 
 function ownerDocumentPath(intent: EntityTargetIntent): string {
   const dataOrigin = intent.filters.dataOrigin
-  if (!isDataOriginDTO(dataOrigin) || (intent.variant !== 'change' && intent.variant !== 'report'))
+  if (!isDataOriginDTO(dataOrigin)
+    || !['change', 'report', 'acceptance', 'warranty'].includes(intent.variant ?? '')) {
     throw new Error('invalid owner document detail context')
-  const path = entityPath(`/owner/${intent.variant}`, intent)
-  return `${path}?origin=${dataOrigin}`
+  }
+  const acceptance = intent.variant === 'acceptance' || intent.variant === 'warranty'
+  const path = entityPath(acceptance ? '/owner/acceptance' : `/owner/${intent.variant}`, intent)
+  const query = new URLSearchParams({ origin: dataOrigin })
+  if (acceptance)
+    query.set('variant', intent.variant!)
+  return `${path}?${query.toString()}`
 }
 
 function quantityUnitPath(intent: EntityTargetIntent): string {
@@ -258,6 +271,8 @@ const TARGET_REGISTRY = {
   'contract:boq': contractBoqPath,
   'owner-document:change': ownerDocumentPath,
   'owner-document:report': ownerDocumentPath,
+  'owner-document:acceptance': ownerDocumentPath,
+  'owner-document:warranty': ownerDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
@@ -404,9 +419,14 @@ export function resolveNavigationTarget(
       if (returnTo)
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
     }
-    if ((key === 'owner-document:change' || key === 'owner-document:report') && options.returnTo) {
+    if ((key === 'owner-document:change' || key === 'owner-document:report'
+      || key === 'owner-document:acceptance' || key === 'owner-document:warranty') && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
-      const kind = key === 'owner-document:change' ? 'owner_change' : 'owner_report'
+      const kind = key === 'owner-document:change'
+        ? 'owner_change'
+        : key === 'owner-document:report'
+          ? 'owner_report'
+          : 'acceptance'
       const returnTo = validateOwnerDocumentJourneyReturnTo(options.returnTo, kind, entityIntent.filters.dataOrigin)
       if (returnTo) {
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`

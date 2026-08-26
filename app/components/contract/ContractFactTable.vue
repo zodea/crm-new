@@ -25,6 +25,7 @@ const props = defineProps<{
   focusId?: string | null
   anchorPrefix?: string
   returnTo?: string | null
+  returnFocusView?: 'acceptance' | 'warranty'
 }>()
 
 const columns = computed<KitTableColumn[]>(() => [
@@ -38,9 +39,28 @@ const columns = computed<KitTableColumn[]>(() => [
 
 function target(row: ContractFactRow) {
   const result = resolveNavigationTarget(row.navigation, {
-    returnTo: props.returnTo ?? undefined,
+    returnTo: rowReturnTo(row) ?? undefined,
   })
   return result.state === 'resolved' ? result.to : null
+}
+
+function rowReturnTo(row: ContractFactRow): string | null {
+  if (!props.returnTo)
+    return null
+  if (!props.returnFocusView)
+    return props.returnTo
+  try {
+    const url = new URL(props.returnTo, 'https://ruihang.invalid')
+    if (url.origin !== 'https://ruihang.invalid')
+      return props.returnTo
+    url.searchParams.set('focus', row.id)
+    url.searchParams.set('focusView', props.returnFocusView)
+    url.hash = anchorId(row) ?? ''
+    return `${url.pathname}?${url.searchParams.toString()}${url.hash}`
+  }
+  catch {
+    return props.returnTo
+  }
 }
 
 function anchorId(row: ContractFactRow) {

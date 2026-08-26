@@ -153,6 +153,60 @@ function source(): CoreMigrationSourceDTO {
             updatedAt: '2026-08-22T00:00:00.000Z',
           },
         },
+        {
+          legacyId: 'acceptance-legacy-324',
+          name: '既有竣工验收记录',
+          references: { projectId: 'project-legacy-323', contractId: 'contract-legacy-323' },
+          amount: '960000.00' as const,
+          deletedAt: null,
+          attributes: {
+            kind: 'acceptance',
+            no: 'YS-LEGACY-324',
+            documentType: 'acceptance_lifecycle',
+            sourceType: 'manual',
+            sourceLocked: 1,
+            periodNo: '',
+            applicationDate: '2026-07-18',
+            status: 'warranty',
+            statusNote: '保修中',
+            note: '同一验收记录进入保修',
+            acceptanceLifecycleJson: JSON.stringify({
+              acceptanceOrganization: '建设、监理、施工联合验收组',
+              acceptancePerson: '周验收',
+              acceptanceDate: '2026-07-18',
+              acceptanceConclusion: '验收合格',
+              warrantyOwner: '瑞航建设工程有限公司',
+              warrantyStartDate: '2026-07-19',
+              warrantyEndDate: '2028-07-18',
+              warrantyConfirmationOrganization: null,
+              warrantyConfirmationDate: null,
+              warrantyConfirmationNote: '',
+            }),
+            lifecycleEventsJson: JSON.stringify([{
+              id: 'event-warranty-legacy-324',
+              action: 'start-warranty',
+              fromStatus: 'accepted',
+              toStatus: 'warranty',
+              actorId: 'actor-legacy-324',
+              actorName: '周经办',
+              occurredAt: '2026-07-19T09:00:00.000Z',
+              note: '',
+            }]),
+            linesJson: '[]',
+            filesJson: JSON.stringify([{
+              id: 'file-acceptance-legacy-324',
+              fileName: '验收报告.pdf',
+              fileSize: 324,
+              mimeType: 'application/pdf',
+              category: 'warranty-confirmation',
+              uploader: '周经办',
+              uploadedAt: '2026-07-18T10:00:00.000Z',
+              deletedAt: null,
+            }]),
+            createdAt: '2026-07-17T00:00:00.000Z',
+            updatedAt: '2026-07-19T09:00:00.000Z',
+          },
+        },
       ],
       workers: [],
       project_suppliers: [],
@@ -173,6 +227,36 @@ describe('甲方商务单据受控中央迁移', () => {
     [1, 'submittedAt', 'invalid-time', '报量提交时间无效'],
     [0, 'filesJson', JSON.stringify([{ id: 'file-invalid-uploaded', uploadedAt: 'invalid-time' }]), '附件上传时间无效'],
     [0, 'filesJson', JSON.stringify([{ id: 'file-invalid-deleted', deletedAt: 'invalid-time' }]), '附件删除时间无效'],
+    [2, 'status', 'anything', '验收状态无效'],
+    [2, 'lifecycleEventsJson', JSON.stringify([{
+      id: 'event-invalid-transition-324',
+      action: 'submit',
+      fromStatus: 'warranty',
+      toStatus: 'expired',
+      actorId: 'actor-invalid-324',
+      actorName: '伪造经办',
+      occurredAt: '2026-07-19T09:00:00.000Z',
+      note: '',
+    }]), '验收生命周期审计转换无效'],
+    [2, 'lifecycleEventsJson', JSON.stringify([{
+      id: 'event-submit-first-324',
+      action: 'submit',
+      fromStatus: 'draft',
+      toStatus: 'submitted',
+      actorId: 'actor-324',
+      actorName: '经办人',
+      occurredAt: '2026-07-18T09:00:00.000Z',
+      note: '',
+    }, {
+      id: 'event-submit-second-324',
+      action: 'submit',
+      fromStatus: 'draft',
+      toStatus: 'submitted',
+      actorId: 'actor-324',
+      actorName: '经办人',
+      occurredAt: '2026-07-18T09:01:00.000Z',
+      note: '',
+    }]), '验收生命周期审计重复'],
   ] as const)('拒绝非法的迁移审计字段 #%s.%s', async (documentIndex, field, invalidValue, expectedMessage) => {
     const commands = createOwnerCommercialDocumentCommandTestInstance()
     const core = createCoreMigrationTestInstance({
@@ -249,15 +333,15 @@ describe('甲方商务单据受控中央迁移', () => {
 
     expect(dryRun.steps).toContainEqual({
       entityType: 'owner_documents',
-      sourceCount: 2,
-      importableCount: 2,
+      sourceCount: 3,
+      importableCount: 3,
       skippedCount: 0,
     })
     await core.importBatch({ ...envelope('import-323'), batchId: dryRun.batchId }, session)
     await core.confirm({ ...envelope('confirm-323'), batchId: dryRun.batchId }, session)
 
     const rows = commands.rows()
-    expect(rows.map(row => row.kind)).toEqual(['owner_change', 'owner_report'])
+    expect(rows.map(row => row.kind)).toEqual(['owner_change', 'owner_report', 'acceptance'])
     expect(rows.filter(row => row.kind === 'owner_change')).toHaveLength(1)
     const changeId = 'central-owner_documents-change-legacy-323'
     const detail = buildOwnerCommercialDocumentDetail({
@@ -278,6 +362,28 @@ describe('甲方商务单据受控中央迁移', () => {
       boqLineId: 'boq-line-legacy-323',
       contractQty: '100',
       contractUnitPrice: '52.00',
+    })
+    const acceptanceId = 'central-owner_documents-acceptance-legacy-324'
+    const acceptanceDetail = buildOwnerCommercialDocumentDetail({
+      documents: rows,
+      query: parseOwnerCommercialDocumentDetailQuery('acceptance', acceptanceId, {
+        origin: 'real',
+        variant: 'warranty',
+      }),
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: commands.sourceVersion(),
+      capabilities: session.capabilities,
+    })
+    expect(acceptanceDetail).toMatchObject({
+      document: { id: acceptanceId, kind: 'acceptance', status: 'warranty' },
+      acceptanceView: {
+        variant: 'warranty',
+        owner: '瑞航建设工程有限公司',
+        startDate: '2026-07-19',
+        endDate: '2028-07-18',
+      },
+      lifecycleEvents: [{ action: 'start-warranty', toStatus: 'warranty' }],
+      files: [{ id: 'file-acceptance-legacy-324', category: 'warranty-confirmation' }],
     })
     expect(commands.boqLinesFor(
       'central-projects-project-legacy-323',
@@ -389,6 +495,6 @@ describe('甲方商务单据受控中央迁移', () => {
       firstChange.id,
       nextPeriodReport.id,
     ]))
-    expect(commands.rows().some(row => row.id === changeId || row.id === reportId)).toBe(false)
+    expect(commands.rows().some(row => row.id === changeId || row.id === reportId || row.id === acceptanceId)).toBe(false)
   })
 })

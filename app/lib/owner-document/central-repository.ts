@@ -13,8 +13,10 @@ import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 
-export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report'] as const
+export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance'] as const
 export type OwnerCommercialDocumentKind = typeof OWNER_COMMERCIAL_DOCUMENT_KINDS[number]
+export const OWNER_ACCEPTANCE_VIEW_VARIANTS = ['acceptance', 'warranty'] as const
+export type OwnerAcceptanceViewVariant = typeof OWNER_ACCEPTANCE_VIEW_VARIANTS[number]
 export const OWNER_COMMERCIAL_DOCUMENT_PAGE_SIZES = [10, 20, 50, 100] as const
 export type OwnerCommercialDocumentPageSize = typeof OWNER_COMMERCIAL_DOCUMENT_PAGE_SIZES[number]
 
@@ -45,6 +47,31 @@ export interface OwnerCommercialDocumentFileSource {
   uploader: string
   uploadedAt: ISODateTimeDTO | null
   deletedAt: ISODateTimeDTO | null
+}
+
+export interface OwnerAcceptanceLifecycleEventSource {
+  id: string
+  action: 'submit' | 'accept' | 'start-warranty' | 'confirm-expiry'
+  fromStatus: 'draft' | 'submitted' | 'accepted' | 'warranty'
+  toStatus: 'submitted' | 'accepted' | 'warranty' | 'expired'
+  actorId: string
+  actorName: string
+  occurredAt: ISODateTimeDTO
+  note: string
+}
+
+export interface OwnerAcceptanceLifecycleSource {
+  acceptanceOrganization: string
+  acceptancePerson: string
+  acceptanceDate: ISODateDTO | null
+  acceptanceConclusion: string
+  warrantyOwner: string
+  warrantyStartDate: ISODateDTO | null
+  warrantyEndDate: ISODateDTO | null
+  warrantyConfirmationOrganization: string | null
+  warrantyConfirmationDate: ISODateDTO | null
+  warrantyConfirmationNote: string
+  events: OwnerAcceptanceLifecycleEventSource[]
 }
 
 export interface OwnerCommercialDocumentSource {
@@ -89,6 +116,7 @@ export interface OwnerCommercialDocumentSource {
   updatedAt: ISODateTimeDTO
   lines: OwnerCommercialDocumentLineSource[]
   files: OwnerCommercialDocumentFileSource[]
+  acceptanceLifecycle?: OwnerAcceptanceLifecycleSource
 }
 
 export interface OwnerCommercialDocumentListQueryDTO {
@@ -100,6 +128,7 @@ export interface OwnerCommercialDocumentListQueryDTO {
   contractId: string | null
   status: string | null
   documentType: string | null
+  variant?: OwnerAcceptanceViewVariant | null
   page: number
   pageSize: OwnerCommercialDocumentPageSize
 }
@@ -109,6 +138,7 @@ export interface OwnerCommercialDocumentDetailQueryDTO {
   id: string
   origin: DataOriginDTO
   includeDemo: boolean
+  variant?: OwnerAcceptanceViewVariant | null
 }
 
 export type OwnerCommercialDocumentAmountsDTO
@@ -124,6 +154,28 @@ export type OwnerCommercialDocumentAmountsDTO
     reported: MoneyDTO
     audited: MoneyDTO | null
     difference: MoneyDTO | null
+  }
+  | {
+    kind: 'acceptance'
+    contractEstimate: MoneyDTO
+  }
+
+export type OwnerAcceptanceViewDTO
+  = {
+    variant: 'acceptance'
+    organization: string
+    person: string
+    date: ISODateDTO | null
+    conclusion: string
+  }
+  | {
+    variant: 'warranty'
+    owner: string
+    startDate: ISODateDTO | null
+    endDate: ISODateDTO | null
+    confirmationOrganization: string | null
+    confirmationDate: ISODateDTO | null
+    confirmationNote: string
   }
 
 export interface OwnerCommercialDocumentListItemDTO {
@@ -146,6 +198,8 @@ export interface OwnerCommercialDocumentListItemDTO {
   contract: EntityRefDTO & { entity: 'contract' }
   contractNavigation: NavigationIntentDTO
   navigation: NavigationIntentDTO
+  acceptanceView: OwnerAcceptanceViewDTO | null
+  attachmentCount?: number
   updatedAt: ISODateTimeDTO
 }
 
@@ -238,6 +292,9 @@ export interface OwnerCommercialDocumentDetailReadDTO {
   customerNavigation: NavigationIntentDTO
   contractNavigation: NavigationIntentDTO
   sourceNavigation: NavigationIntentDTO
+  documentNavigation: NavigationIntentDTO
+  acceptanceView: OwnerAcceptanceViewDTO | null
+  lifecycleEvents: OwnerAcceptanceLifecycleEventSource[]
   asOf: ISODateTimeDTO
   sourceVersion: string | null
   capabilities: string[]
@@ -309,6 +366,22 @@ function parseOrigin(value: unknown, nullable: boolean): DataOriginDTO | null {
   return fail('invalid-query', '甲方商务单据来源无效')
 }
 
+function parseVariant(
+  kind: OwnerCommercialDocumentKind,
+  value: unknown,
+): OwnerAcceptanceViewVariant | null {
+  if (kind !== 'acceptance') {
+    if (value == null || value === '')
+      return null
+    return fail('invalid-query', '该甲方商务单据不支持验收视图参数')
+  }
+  if (value == null || value === '')
+    return 'acceptance'
+  if (OWNER_ACCEPTANCE_VIEW_VARIANTS.includes(value as OwnerAcceptanceViewVariant))
+    return value as OwnerAcceptanceViewVariant
+  return fail('invalid-query', '验收视图参数无效')
+}
+
 export function parseOwnerCommercialDocumentListQuery(
   kind: unknown,
   input: Record<string, unknown> | undefined,
@@ -316,8 +389,9 @@ export function parseOwnerCommercialDocumentListQuery(
   const pageSize = positiveInteger(input?.pageSize, 20)
   if (!OWNER_COMMERCIAL_DOCUMENT_PAGE_SIZES.includes(pageSize as OwnerCommercialDocumentPageSize))
     fail('invalid-query', '甲方商务单据列表查询参数无效')
+  const parsedKind = parseKind(kind)
   return {
-    kind: parseKind(kind),
+    kind: parsedKind,
     includeDemo: bool(input?.includeDemo),
     origin: parseOrigin(input?.origin, true),
     search: typeof input?.search === 'string' ? input.search.trim() : '',
@@ -325,6 +399,7 @@ export function parseOwnerCommercialDocumentListQuery(
     contractId: optional(input?.contractId),
     status: optional(input?.status),
     documentType: optional(input?.documentType),
+    variant: parseVariant(parsedKind, input?.variant),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as OwnerCommercialDocumentPageSize,
   }
@@ -337,11 +412,13 @@ export function parseOwnerCommercialDocumentDetailQuery(
 ): OwnerCommercialDocumentDetailQueryDTO {
   if (!isStableRouteIdentity(id))
     fail('invalid-query', '甲方商务单据详情查询参数无效')
+  const parsedKind = parseKind(kind)
   return {
-    kind: parseKind(kind),
+    kind: parsedKind,
     id,
     origin: parseOrigin(input?.origin ?? 'real', false) as DataOriginDTO,
     includeDemo: bool(input?.includeDemo),
+    variant: parseVariant(parsedKind, input?.variant),
   }
 }
 
@@ -358,26 +435,32 @@ function quantity(value: number | null): QuantityDTO | null {
 }
 
 function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocumentAmountsDTO {
-  return source.kind === 'owner_change'
-    ? {
-        kind: 'owner_change',
-        boqChange: money(source.boqAmount ?? source.lines.reduce((sum, line) => sum + line.amount, 0)),
-        taxInclusive: money(source.amount),
-        taxExclusive: money(source.taxExclusiveAmount ?? 0),
-        appliedTaxExclusive: money(source.appliedTaxExclusiveAmount ?? 0),
-      }
-    : {
-        kind: 'owner_report',
-        reported: money(source.amount),
-        audited: nullableMoney(source.auditedAmount),
-        difference: source.auditedAmount == null ? null : money(source.auditedAmount - source.amount),
-      }
+  if (source.kind === 'owner_change') {
+    return {
+      kind: 'owner_change',
+      boqChange: money(source.boqAmount ?? source.lines.reduce((sum, line) => sum + line.amount, 0)),
+      taxInclusive: money(source.amount),
+      taxExclusive: money(source.taxExclusiveAmount ?? 0),
+      appliedTaxExclusive: money(source.appliedTaxExclusiveAmount ?? 0),
+    }
+  }
+  if (source.kind === 'owner_report') {
+    return {
+      kind: 'owner_report',
+      reported: money(source.amount),
+      audited: nullableMoney(source.auditedAmount),
+      difference: source.auditedAmount == null ? null : money(source.auditedAmount - source.amount),
+    }
+  }
+  return { kind: 'acceptance', contractEstimate: money(source.amount) }
 }
 
 function statusLabel(kind: OwnerCommercialDocumentKind, status: string): string {
   const labels: Record<string, string> = kind === 'owner_change'
     ? { draft: '草稿', submitted: '已上报', rejected: '已退回', approved: '已签证' }
-    : { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
+    : kind === 'owner_report'
+      ? { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
+      : { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
   return labels[status] ?? status
 }
 
@@ -411,7 +494,10 @@ function relationNavigation(reference: EntityRefDTO, origin: DataOriginDTO): Nav
   }
 }
 
-function documentNavigation(source: OwnerCommercialDocumentSource): NavigationIntentDTO {
+function documentNavigation(
+  source: OwnerCommercialDocumentSource,
+  acceptanceVariant: OwnerAcceptanceViewVariant | null,
+): NavigationIntentDTO {
   return {
     kind: 'entity-detail',
     subject: {
@@ -421,10 +507,51 @@ function documentNavigation(source: OwnerCommercialDocumentSource): NavigationIn
       label: source.name,
       no: source.no || null,
     },
-    variant: source.kind === 'owner_change' ? 'change' : 'report',
+    variant: source.kind === 'owner_change'
+      ? 'change'
+      : source.kind === 'owner_report'
+        ? 'report'
+        : acceptanceVariant ?? 'acceptance',
     view: null,
     filters: { dataOrigin: source.dataOrigin },
   }
+}
+
+function acceptanceView(
+  source: OwnerCommercialDocumentSource,
+  variant: OwnerAcceptanceViewVariant | null,
+): OwnerAcceptanceViewDTO | null {
+  if (source.kind !== 'acceptance' || !source.acceptanceLifecycle)
+    return null
+  const lifecycle = source.acceptanceLifecycle
+  return variant === 'warranty'
+    ? {
+        variant: 'warranty',
+        owner: lifecycle.warrantyOwner,
+        startDate: lifecycle.warrantyStartDate,
+        endDate: lifecycle.warrantyEndDate,
+        confirmationOrganization: lifecycle.warrantyConfirmationOrganization,
+        confirmationDate: lifecycle.warrantyConfirmationDate,
+        confirmationNote: lifecycle.warrantyConfirmationNote,
+      }
+    : {
+        variant: 'acceptance',
+        organization: lifecycle.acceptanceOrganization,
+        person: lifecycle.acceptancePerson,
+        date: lifecycle.acceptanceDate,
+        conclusion: lifecycle.acceptanceConclusion,
+      }
+}
+
+function visibleFiles(
+  source: OwnerCommercialDocumentSource,
+  variant: OwnerAcceptanceViewVariant | null,
+): OwnerCommercialDocumentFileSource[] {
+  const files = source.files.filter(file => file.deletedAt === null)
+  if (source.kind !== 'acceptance')
+    return files
+  const category = variant === 'warranty' ? 'warranty-confirmation' : 'acceptance-report'
+  return files.filter(file => file.category === category)
 }
 
 function relations(source: OwnerCommercialDocumentSource) {
@@ -432,6 +559,18 @@ function relations(source: OwnerCommercialDocumentSource) {
   const customer = entityRef('customer', source.customerId, source.customerName, null, source.customerPermission)
   const contract = entityRef('contract', source.contractId, source.contractName, source.contractNo || null, source.contractPermission)
   return { project, customer, contract }
+}
+
+function statusMatches(source: OwnerCommercialDocumentSource, requested: string | null): boolean {
+  if (!requested)
+    return true
+  if (source.kind !== 'acceptance')
+    return source.status === requested
+  if (requested === 'checking')
+    return source.status === 'submitted'
+  if (requested === 'done')
+    return source.status === 'accepted' || source.status === 'expired'
+  return source.status === requested
 }
 
 interface BuildListInput {
@@ -447,12 +586,17 @@ export function buildOwnerCommercialDocumentListPage(
 ): OwnerCommercialDocumentListPageDTO {
   const allowedOrigins = input.query.includeDemo ? new Set<DataOriginDTO>(['real', 'demo']) : new Set<DataOriginDTO>(['real'])
   const search = input.query.search.toLocaleLowerCase('zh-CN')
-  const candidates = input.documents.filter(row => row.kind === input.query.kind && allowedOrigins.has(row.dataOrigin))
+  const candidates = input.documents
+    .filter(row => row.kind === input.query.kind && allowedOrigins.has(row.dataOrigin))
+    .filter(row => input.query.kind !== 'acceptance'
+      || input.query.variant !== 'warranty'
+      || row.status === 'warranty'
+      || row.status === 'expired')
   const filtered = candidates
     .filter(row => input.query.origin === null || row.dataOrigin === input.query.origin)
     .filter(row => !input.query.projectId || row.projectId === input.query.projectId)
     .filter(row => !input.query.contractId || row.contractId === input.query.contractId)
-    .filter(row => !input.query.status || row.status === input.query.status)
+    .filter(row => statusMatches(row, input.query.status))
     .filter(row => !input.query.documentType || row.documentType === input.query.documentType)
     .filter(row => !search || [row.no, row.name, row.projectName, row.contractName, row.periodNo]
       .some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
@@ -479,7 +623,9 @@ export function buildOwnerCommercialDocumentListPage(
       customerNavigation: relationNavigation(customer, source.dataOrigin),
       contract,
       contractNavigation: relationNavigation(contract, source.dataOrigin),
-      navigation: documentNavigation(source),
+      navigation: documentNavigation(source, input.query.variant ?? null),
+      acceptanceView: acceptanceView(source, input.query.variant ?? null),
+      attachmentCount: visibleFiles(source, input.query.variant ?? null).length,
       updatedAt: source.updatedAt,
     }
   })
@@ -602,8 +748,7 @@ export function buildOwnerCommercialDocumentDetail(
       auditedAmount: nullableMoney(line.auditedAmount),
       note: line.note,
     })),
-    files: source.files
-      .filter(file => file.deletedAt === null)
+    files: visibleFiles(source, input.query.variant ?? null)
       .map(file => ({
         id: file.id,
         fileName: file.fileName,
@@ -617,7 +762,7 @@ export function buildOwnerCommercialDocumentDetail(
     customerNavigation: relationNavigation(customer, source.dataOrigin),
     contractNavigation: relationNavigation(contract, source.dataOrigin),
     sourceNavigation: source.sourceId
-      ? source.sourceType === 'manual'
+      ? source.sourceType === 'manual' && source.kind !== 'acceptance'
         ? { kind: 'unavailable', reason: 'not-connected' }
         : contract.state === 'resolved' && project.state === 'resolved'
           ? {
@@ -628,11 +773,21 @@ export function buildOwnerCommercialDocumentDetail(
               filters: {
                 dataOrigin: source.dataOrigin,
                 contractKind: '施工',
-                ownerTab: source.sourceType === 'monthly_statement' ? 'settlements' : 'changes',
+                ownerTab: source.kind === 'acceptance'
+                  ? 'acceptance'
+                  : source.sourceType === 'monthly_statement'
+                    ? 'settlements'
+                    : 'changes',
+                ...(source.kind === 'acceptance'
+                  ? { ownerView: input.query.variant ?? 'acceptance' }
+                  : {}),
               },
             }
           : { kind: 'unavailable', reason: 'missing-id' }
       : { kind: 'unavailable', reason: 'missing-id' },
+    documentNavigation: documentNavigation(source, input.query.variant ?? null),
+    acceptanceView: acceptanceView(source, input.query.variant ?? null),
+    lifecycleEvents: source.acceptanceLifecycle?.events.map(event => ({ ...event })) ?? [],
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,
     capabilities: [...input.capabilities],

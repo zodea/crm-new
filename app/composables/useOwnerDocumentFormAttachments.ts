@@ -9,7 +9,7 @@ import { toErrorMessage } from '~/lib/util/error'
 
 export type PendingOwnerDocumentAttachment = FileRefDraft & { localId: string }
 
-export function useOwnerDocumentFormAttachments() {
+export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () => string } = {}) {
   const { warning, error } = useKitUI()
   const attachments = shallowRef<FileRefRecord[]>([])
   const pendingAttachments = shallowRef<PendingOwnerDocumentAttachment[]>([])
@@ -54,7 +54,7 @@ export function useOwnerDocumentFormAttachments() {
       ...files.slice(0, available).map((file, index) => ({
         ...file,
         localId: `${file.filePath || file.fileName}-${Date.now()}-${index}`,
-        category: file.category || '业务附件',
+        category: file.category || options.defaultCategory?.() || '业务附件',
       })),
     ]
   }

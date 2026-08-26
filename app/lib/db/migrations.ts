@@ -5603,6 +5603,43 @@ export const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 44,
+    name: 'acceptance-warranty-canonical-lifecycle',
+    async up(db) {
+      // 验收与保修是同一 project_acceptances 记录的两个生命周期视图。
+      // 存量 generic 字段含义不够精确，故保留原值并让新增 canonical 字段为空，
+      // 由后续真实命令填写；禁止根据 type/status 伪造历史日期或结论。
+      if (!(await tableExists(db, 'project_acceptances')))
+        return
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_organization', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'acceptance_conclusion', `TEXT NOT NULL DEFAULT ''`)
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_start_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_end_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_organization', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_date', 'TEXT DEFAULT NULL')
+      await addColumnIfMissing(db, 'project_acceptances', 'warranty_confirmation_note', `TEXT NOT NULL DEFAULT ''`)
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS project_acceptance_lifecycle_events (
+          id            TEXT PRIMARY KEY,
+          acceptance_id TEXT NOT NULL REFERENCES project_acceptances(id) ON DELETE RESTRICT,
+          action        TEXT NOT NULL CHECK (action IN ('submit', 'accept', 'start-warranty', 'confirm-expiry')),
+          from_status   TEXT NOT NULL CHECK (from_status IN ('draft', 'submitted', 'accepted', 'warranty')),
+          to_status     TEXT NOT NULL CHECK (to_status IN ('submitted', 'accepted', 'warranty', 'expired')),
+          actor_id      TEXT NOT NULL,
+          actor_name    TEXT NOT NULL DEFAULT '',
+          occurred_at   TEXT NOT NULL,
+          note          TEXT NOT NULL DEFAULT '',
+          UNIQUE (acceptance_id, to_status)
+        )
+      `)
+      await db.execute(`
+        CREATE INDEX IF NOT EXISTS idx_project_acceptance_events_acceptance
+          ON project_acceptance_lifecycle_events(acceptance_id, occurred_at, id)
+      `)
+    },
+  },
 ]
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

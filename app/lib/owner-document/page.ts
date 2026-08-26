@@ -56,14 +56,14 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
   },
   acceptance: {
     label: '竣工验收·保修',
-    subtitle: '验收、移交与保修责任归档',
+    subtitle: '同一验收记录的竣工验收与保修到期双视图',
     listPath: '/owner/acceptance',
     contractListPath: '/contract/construction',
     contractListLabel: '施工合同列表',
     routeScope: 'owner',
     routeKind: 'acceptance',
     postLabel: '保存并提交',
-    postMessage: '提交后该验收或保修记录进入正式归档。',
+    postMessage: '提交后进入验收流程；验收、保修和到期确认均通过独立命令留痕。',
     sections: [
       { key: 'basic', label: '验收信息' },
       { key: 'attachments', label: '附件与备注' },
@@ -184,12 +184,19 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
     case 'acceptance':
       return {
         ...base,
-        type: 'acceptance',
         name: '',
-        documentDate: ownerDocumentLocalDate(),
-        acceptor: '',
+        applicationDate: ownerDocumentLocalDate(),
+        acceptanceOrganization: '',
+        acceptancePerson: '',
+        acceptanceDate: null,
+        acceptanceConclusion: '',
         warrantyOwner: '',
-        conclusion: '',
+        warrantyStartDate: null,
+        warrantyEndDate: null,
+        warrantyConfirmationOrganization: null,
+        warrantyConfirmationDate: null,
+        warrantyConfirmationNote: '',
+        lifecycleEvents: [],
       }
     case 'final_settlement':
       return {
@@ -247,7 +254,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
 
 export function ownerDocumentFormPath(kind: OwnerDocumentKind, id?: string): string {
   const listPath = OWNER_DOCUMENT_META[kind].listPath
-  const centralReadOnly = kind === 'owner_change' || kind === 'owner_report'
+  const centralReadOnly = kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance'
   return id && centralReadOnly ? `${listPath}/form/${id}` : id ? `${listPath}/${id}` : `${listPath}/new`
 }
 
@@ -255,10 +262,14 @@ export function ownerDocumentDetailPath(
   kind: OwnerDocumentKind,
   id: string,
   origin: 'real' | 'demo' = 'real',
+  variant?: 'acceptance' | 'warranty',
 ): string {
-  if (kind !== 'owner_change' && kind !== 'owner_report')
+  if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance')
     throw new Error('该甲方单据类型尚无中央只读详情')
-  return `${OWNER_DOCUMENT_META[kind].listPath}/${encodeURIComponent(id)}?origin=${origin}`
+  const query = new URLSearchParams({ origin })
+  if (kind === 'acceptance')
+    query.set('variant', variant ?? 'acceptance')
+  return `${OWNER_DOCUMENT_META[kind].listPath}/${encodeURIComponent(id)}?${query.toString()}`
 }
 
 export function ownerDocumentKindFromRoute(
@@ -380,7 +391,8 @@ export function validateOwnerDocumentForm(
     case 'acceptance':
       require('name', '名称')
       require('projectId', '项目')
-      require('documentDate', '日期')
+      require('contractId', '施工合同')
+      require('applicationDate', '申报日期')
       break
     case 'final_settlement':
       require('name', '结算名称')

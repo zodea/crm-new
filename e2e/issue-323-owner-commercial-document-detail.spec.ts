@@ -72,7 +72,7 @@ test.describe('Issue #323：甲方变洽签与月度报量专属中央详情', (
   test('项目详情提供变洽签与报量主链，关系下钻可返回原单据', async ({ page }) => {
     await page.goto('/project/project-real-320?origin=real')
     await expect(page.getByRole('heading', { name: '中央正式施工项目' })).toBeVisible({ timeout: 20_000 })
-    const ownerJourney = page.getByRole('region', { name: '甲方变洽签与月度报量' })
+    const ownerJourney = page.getByRole('region', { name: '甲方商务单据' })
     await expect(ownerJourney.getByRole('link', { name: /甲方变洽签/ })).toBeVisible()
     await ownerJourney.getByRole('link', { name: /月度报量/ }).click()
     await expect(page).toHaveURL(/\/owner\/report\?.*projectId=project-real-320/)

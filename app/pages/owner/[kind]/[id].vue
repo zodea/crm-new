@@ -15,15 +15,22 @@ const documentId = computed(() => {
 })
 const centralKind = computed(() => !desktop
   && documentId.value !== 'new'
-  && (kind === 'owner_change' || kind === 'owner_report')
+  && (kind === 'owner_change' || kind === 'owner_report' || kind === 'acceptance')
   ? kind
   : null)
 const origin = computed(() => isDataOriginDTO(route.query.origin) ? route.query.origin : 'real')
+const acceptanceVariant = computed(() => route.query.variant === 'warranty' ? 'warranty' : 'acceptance')
 </script>
 
 <template>
+  <OwnerAcceptanceDetailScreen
+    v-if="centralKind === 'acceptance'"
+    :document-id="documentId"
+    :origin="origin"
+    :variant="acceptanceVariant"
+  />
   <OwnerCommercialDocumentDetailScreen
-    v-if="centralKind"
+    v-else-if="centralKind"
     :kind="centralKind"
     :document-id="documentId"
     :origin="origin"
