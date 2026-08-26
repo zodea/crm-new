@@ -57,19 +57,22 @@ test.describe('Issue #313：项目列表完整来源上下文', () => {
     const projectLink = page.getByRole('link', { name: '合和新城', exact: true }).first()
     const workspace = page.locator('[data-shell-workspace]')
     await expect(projectLink).toBeVisible()
+    await projectLink.focus()
     const capturedScroll = await workspace.evaluate((element) => {
       element.scrollTop = Math.min(120, element.scrollHeight - element.clientHeight)
       return element.scrollTop
     })
     expect(capturedScroll).toBeGreaterThan(0)
-    await projectLink.focus()
-    await projectLink.click()
+    await projectLink.press('Enter')
 
     await expect(page).toHaveURL(/\/project\/proj_demo_001\?origin=demo&returnTo=.*&returnContext=/)
     await expect(page.getByRole('heading', { name: '合和新城', exact: true })).toBeVisible()
     await page.reload()
-    await expect(page.getByRole('link', { name: '返回项目列表' })).toBeVisible()
-    await page.getByRole('link', { name: '返回项目列表' }).click()
+    const returnLink = page.getByRole('link', { name: '返回项目列表' })
+    await expect(returnLink).toBeVisible()
+    await returnLink.focus()
+    await expect(returnLink).toBeFocused()
+    await returnLink.press('Enter')
 
     await expect(page).toHaveURL(/\/project\?.*search=%E5%90%88%E5%92%8C.*phase=%E6%96%BD%E5%B7%A5%E4%B8%AD.*sort=name-asc.*#project-row-demo%3Aproj_demo_001$/)
     await expect(page.getByRole('searchbox', { name: '搜索项目、客户、经理…' })).toHaveValue('合和')
