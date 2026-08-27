@@ -6,7 +6,7 @@
 >
 > 关联：[`base-supplier.md`](./base-supplier.md) · [`contract-forms.md`](./contract-forms.md) · [`finance-payment.md`](./finance-payment.md) · [`finance-invoice.md`](./finance-invoice.md)
 >
-> 数据权威：[`DATABASE.md`](../DATABASE.md) · [`CONTEXT.md`](../../../CONTEXT.md) · [ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md)
+> 数据权威：[`DATABASE.md`](../DATABASE.md) · [`COMMANDS.md`](../COMMANDS.md) · [`CONTEXT.md`](../../../CONTEXT.md) · [ADR 0015](../../adr/0015-form-persistence-and-payment-reconciliation.md) · [ADR 0020](../../adr/0020-browser-authority-and-demo-workspace-boundary.md)
 
 ---
 
@@ -24,7 +24,7 @@
 | 支付记录 | 银行回单、人工确认和付款申请分摊 | 事实可见；只读来源目标待接入 |
 | 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 事实可见；三类只读来源目标待接入 |
 
-项目详情右栏列出已有 ProjectSupplier 关系，并提供“从文件导入分供方”入口。工作台内的项目名和分供方名分别返回项目详情和分供方详情。
+项目详情右栏直接消费中央项目详情 DTO 中的 ProjectSupplier 反向关系，列出已有合作身份并提供“从文件导入分供方”入口，不从本地 store 拼关系。工作台内的项目名和分供方名分别进入项目详情和分供方详情；目标刷新后仍可显式返回原工作台页签。
 
 ---
 
@@ -141,7 +141,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 材料结算 | 现有 `/material/settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 | 其他支出结算 | 现有 `/contract/other-settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 
-工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`；导入向导取消或完成后回到 `/project/:pid?tab=expenditure`。
+工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`，并携带由双父 ID、`dataOrigin` 和当前页签组成的受限 `returnTo`；目标 ID 或来源错配时丢弃返回链。导入向导只允许正式项目，取消或完成后回到 canonical `/project/:pid?origin=real`。
 
 在 #317 中，工作台只输出 `NavigationIntentDTO`，每个来源意图持续携带 `dataOrigin`。唯一 Target Registry 仅在目标已验证为同来源只读页、来源为 `demo`、返回上下文来源一致时解析合同与付款申请；正式中央来源以及仍读写混用的收票、支付记录和三种支出结算全部稳定退化为 `unverified-target`，不得回落本地编辑页。可达目标仅在 query 中的 `projectId`、`supplierId`、受限 `returnTo` 与实际源单身份三者一致时显示“返回项目分供方工作台”；外部地址、未知页签、额外 query 或身份错配均退回目标模块默认返回。工作台 tab 在 query 中持久化，刷新与往返恢复原页签。
 
@@ -210,7 +210,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 - 复用已有项目关系；
 - 每个关系下将归档的文件和类别。
 
-提交后，新分供方、ProjectSupplier 关系、文件元数据与浏览器文件正文在同一事务中保存；任一写入失败则整批回滚。成功后返回当前项目详情的支出业务页签。
+提交后，页面以 `project-supplier:write + commandId + baseVersion` 调用中央导入命令，新分供方、ProjectSupplier 关系、文件元数据与文件正文一次性保存；任一身份、版本、文件或分供方中央接管失败都回滚全部事实与版本，不留半成品，同一 `baseVersion` 可直接重试。服务端从不可降级的 canonical 关系读面重验已有合作关系，关系禁止或暂不可读时拒绝写入；同时按工作区内完整、未分页的正式分供方稳定 ID 集合重验复用身份，拒绝七项正式分类以外的文件类别，并验证 Base64 正文的实际字节数与 `fileSize` 完全一致。上传人取服务端会话 `actorId`，不接受浏览器自报。重放同一 `commandId` 只返回首次结果，不重复创建身份或附件。成功后返回 canonical 正式项目详情并重读关系；新分供方立即可进入通用详情和中央编辑链，后续主档编辑也从同一事实源反映到项目合作身份。
 
 ### 生成规则
 
@@ -218,7 +218,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 2. 只有软删除关系时恢复原关系，并以 `collecting` 重新开始合作。
 3. 同一候选名称的多个文件合并到一个新分供方和一个 ProjectSupplier 关系。
 4. 未经用户确认的候选分供方不写入主数据。
-5. 文件固定写入 `file_refs(owner_type='project_supplier', owner_id=ProjectSupplier.id)`。
+5. 文件元数据固定携带 `ownerType='project_supplier'` 与 `ownerId=ProjectSupplier.id`，由中央命令保证归属；浏览器不直写本地 `file_refs`。
 6. 导入不创建或修改合同、付款申请、发票、支付记录、支出结算单或分供方证照。
 
 ---

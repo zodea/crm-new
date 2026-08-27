@@ -1,8 +1,10 @@
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
-import type { ProjectListSourceRow } from '../../app/lib/project/repository'
+import type { ProjectListSourceRow, ProjectSupplierReferenceSourceRow } from '../../app/lib/project/repository'
+import type { DataOriginDTO } from '../../app/types/read-model'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import { MaterialContractRepositoryProblem } from '../../app/lib/material-contract/repository'
+import { ProjectSupplierRepositoryProblem } from '../../app/lib/project-supplier/repository'
 import {
   buildProjectDetailRead,
   buildProjectListPage,
@@ -16,6 +18,7 @@ import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { materialContractReadTestInstance } from './material-contract-read-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
+import { projectSupplierReadTestInstance } from './project-supplier-read-test-instance'
 
 export type ProjectReadTestScenario
   = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -181,6 +184,8 @@ export function createProjectReadTestInstance(
       page: '1',
       pageSize: '10',
     }, sessionId).pagination.total,
+  resolveProjectSupplierRelations: (projectId: string, origin: DataOriginDTO, sessionId?: string | null) => Promise<readonly ProjectSupplierReferenceSourceRow[]>
+    = async (projectId, origin, sessionId) => projectSupplierReadTestInstance.references(projectId, origin, sessionId),
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -251,6 +256,8 @@ export function createProjectReadTestInstance(
         throw repositoryProblem('forbidden', '无测试数据查看权限', false)
       let materialContractCount: number | null = null
       let materialContractAccess: 'allowed' | 'forbidden' | 'unknown' | 'error' = 'unknown'
+      let projectSupplierRelations: readonly ProjectSupplierReferenceSourceRow[] = []
+      let projectSupplierAccess: 'allowed' | 'forbidden' | 'error' = 'allowed'
       try {
         materialContractCount = await resolveMaterialContractCount(query.id, query.origin, sessionId)
         materialContractAccess = materialContractCount === null ? 'unknown' : 'allowed'
@@ -258,6 +265,17 @@ export function createProjectReadTestInstance(
       catch (cause) {
         materialContractAccess = (
           cause instanceof MaterialContractRepositoryProblem
+          && cause.problem.code === 'forbidden'
+        )
+          ? 'forbidden'
+          : 'error'
+      }
+      try {
+        projectSupplierRelations = await resolveProjectSupplierRelations(query.id, query.origin, sessionId)
+      }
+      catch (cause) {
+        projectSupplierAccess = (
+          cause instanceof ProjectSupplierRepositoryProblem
           && cause.problem.code === 'forbidden'
         )
           ? 'forbidden'
@@ -271,6 +289,8 @@ export function createProjectReadTestInstance(
         capabilities: context.capabilities,
         materialContractCount,
         materialContractAccess,
+        projectSupplierRelations,
+        projectSupplierAccess,
       })
     },
   }

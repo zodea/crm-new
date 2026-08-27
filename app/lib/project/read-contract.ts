@@ -1,5 +1,6 @@
 import type {
   DataOriginDTO,
+  EmptyDTO,
   EntityRefDTO,
   ISODateDTO,
   ISODateTimeDTO,
@@ -71,6 +72,21 @@ export interface ProjectListSourceRow {
   updatedAt: string
 }
 
+export interface ProjectSupplierReferenceSourceRow {
+  dataOrigin: DataOriginDTO
+  relationId: OpaqueIdDTO
+  projectId: OpaqueIdDTO
+  supplierId: OpaqueIdDTO | null
+  supplierName: string | null
+  permission: 'allowed' | 'forbidden'
+}
+
+export interface ProjectSupplierReferenceDTO {
+  relationId: OpaqueIdDTO
+  supplier: EntityRefDTO & { entity: 'supplier' }
+  navigation: NavigationIntentDTO
+}
+
 export interface ProjectListItemDTO {
   dataOrigin: DataOriginDTO
   project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
@@ -136,6 +152,11 @@ export interface ProjectDetailReadDTO {
   materialContracts: {
     count: MetricDTO
     navigation: NavigationIntentDTO
+  }
+  projectSuppliers: {
+    access: 'allowed' | 'forbidden' | 'error'
+    items: ProjectSupplierReferenceDTO[]
+    empty: EmptyDTO | null
   }
   asOf: ISODateTimeDTO
   sourceVersion: string | null

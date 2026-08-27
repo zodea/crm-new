@@ -10,6 +10,13 @@ import type {
 
 export const PROJECT_SUPPLIER_READ_CAPABILITY = 'project-supplier:read' as const
 
+export interface ProjectSupplierImportResult {
+  relationshipCount: number
+  fileCount: number
+  createdSupplierCount: number
+  reusedRelationshipCount: number
+}
+
 export interface ProjectSupplierWorkbenchQueryDTO {
   projectId: string
   supplierId: string

@@ -7,6 +7,7 @@ import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
+import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 import { yuan } from '~/lib/util/money'
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
   returnTo?: string
   returnExpiresAt?: number
   returnLabel?: string
+  customerReturnTo?: string
   currentRoute?: string
 }>(), {
   originHint: 'real',
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<{
 const repository = useNuxtApp().$repositories.projectList
 const ownerDocumentRepository = useNuxtApp().$repositories.ownerCommercialDocumentRead
 const commandStore = useProjectCommandStore()
+const projectSupplierCommandStore = useProjectSupplierCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
 const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'mismatch' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
@@ -45,6 +48,19 @@ const ownerJourneys = shallowRef<{
 const ownerJourneysError = shallowRef('')
 
 const item = computed(() => detail.value?.item ?? null)
+const verifiedCustomerReturnTo = computed(() => {
+  if (!item.value || !props.customerReturnTo)
+    return null
+  const customerIds = [item.value.customer, item.value.secondaryCustomer]
+    .filter(reference => reference.state === 'resolved')
+    .map(reference => reference.id)
+  return customerIds
+    .map(customerId => validateCustomerDetailReturnTo(props.customerReturnTo, item.value?.dataOrigin, customerId))
+    .find(Boolean) ?? null
+})
+const effectiveReturnTo = computed(() => verifiedCustomerReturnTo.value ?? props.returnTo)
+const effectiveReturnLabel = computed(() => verifiedCustomerReturnTo.value ? '返回客户详情' : props.returnLabel)
+const effectiveReturnExpiresAt = computed(() => verifiedCustomerReturnTo.value ? undefined : props.returnExpiresAt)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
 const journeyReturnTo = computed(() => props.currentRoute
@@ -258,6 +274,14 @@ watch(
   },
 )
 
+watch(
+  () => projectSupplierCommandStore.latestWrite,
+  (write) => {
+    if (write?.projectId === props.projectId)
+      void loadProject()
+  },
+)
+
 onActivated(() => {
   if (hasActivated)
     void loadProject()
@@ -292,7 +316,7 @@ onActivated(() => {
             {{ item.code || '未登记项目编号' }} · {{ item.contractName || item.region || '未登记合同名称' }}
           </p>
         </div>
-        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" class="ml-auto" />
+        <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" class="ml-auto" />
         <NuxtLink
           v-if="!isDemo && detail?.capabilities.includes('project:write')"
           :to="`/project/form/${encodeURIComponent(projectId)}?origin=real`"
@@ -388,8 +412,17 @@ onActivated(() => {
         <b class="text-warn">测试数据仅供查看。</b>
         正式新增、编辑、审批、付款、归档和删除入口不会作用于这条记录；修改测试数据需进入独立演示工作区。
       </div>
-      <div class="min-w-0 overflow-x-auto p-3">
-        <ProjectDetailTab :project="project" />
+      <div class="grid min-w-0 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div class="min-w-0 overflow-x-auto">
+          <ProjectDetailTab :project="project" />
+        </div>
+        <ProjectSupplierLinksPanel
+          :project-id="projectId"
+          :origin="item.dataOrigin"
+          :access="detail.projectSuppliers.access"
+          :relationships="detail.projectSuppliers.items"
+          :can-import="!isDemo && detail.capabilities.includes('project-supplier:write')"
+        />
       </div>
     </section>
   </div>
@@ -400,7 +433,7 @@ onActivated(() => {
     title="正在从中央后台加载项目详情"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
+      <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -410,7 +443,7 @@ onActivated(() => {
     :description="problem?.message"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
+      <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -426,7 +459,7 @@ onActivated(() => {
         <button type="button" class="btn-primary" @click="loadProject">
           重新加载
         </button>
-        <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
+        <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" />
       </div>
     </template>
   </StatePanel>
@@ -437,7 +470,7 @@ onActivated(() => {
     :description="problem?.message"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
+      <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" />
     </template>
   </StatePanel>
   <StatePanel
@@ -447,7 +480,7 @@ onActivated(() => {
     description="请确认测试数据开关与来源后返回项目列表重试。"
   >
     <template #action>
-      <ProjectReturnLink :to="returnTo" :expires-at="returnExpiresAt" :label="returnLabel" />
+      <ProjectReturnLink :to="effectiveReturnTo" :expires-at="effectiveReturnExpiresAt" :label="effectiveReturnLabel" />
     </template>
   </StatePanel>
 </template>

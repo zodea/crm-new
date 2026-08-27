@@ -9,7 +9,7 @@ import type { MaterialContractReadRepository } from '~/lib/material-contract/rep
 import type { CoreMigrationRepository } from '~/lib/migration/core-http-repository'
 import type { OwnerCommercialDocumentCommandRepository } from '~/lib/owner-document/central-command-contract'
 import type { OwnerCommercialDocumentReadRepository } from '~/lib/owner-document/central-repository'
-import type { ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
+import type { ProjectSupplierCommandRepository, ProjectSupplierReadRepository } from '~/lib/project-supplier/repository'
 import type { ProjectCommandRepository } from '~/lib/project/command-contract'
 import type { ProjectListRepository } from '~/lib/project/repository'
 import type { SubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-contract'
@@ -29,6 +29,7 @@ import {
   createHttpOwnerCommercialDocumentCommandRepository,
   createHttpOwnerCommercialDocumentReadRepository,
 } from '~/lib/owner-document/central-http-repository'
+import { createHttpProjectSupplierCommandRepository } from '~/lib/project-supplier/command-http-repository'
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
@@ -50,6 +51,7 @@ export interface DomainRepositories {
   supplierCommands: SupplierCommandRepository
   projectList: ProjectListRepository
   projectSupplierRead: ProjectSupplierReadRepository
+  projectSupplierCommands: ProjectSupplierCommandRepository
   projectCommands: ProjectCommandRepository
   coreMigration: CoreMigrationRepository
   materialContractRead: MaterialContractReadRepository
@@ -94,6 +96,9 @@ export default defineNuxtPlugin(() => {
       fetcher: (url, options) => $fetch(url, options),
     }),
     projectSupplierRead: createHttpProjectSupplierReadRepository({
+      fetcher: (url, options) => $fetch(url, options),
+    }),
+    projectSupplierCommands: createHttpProjectSupplierCommandRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),
     projectCommands: createHttpProjectCommandRepository({

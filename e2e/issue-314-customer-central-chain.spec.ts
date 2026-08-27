@@ -105,10 +105,13 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('heading', { name: '合和地产集团' })).toBeVisible({ timeout: 20_000 })
 
     const project = page.getByRole('link', { name: '合和新城' })
-    await expect(project).toHaveAttribute('href', '/project/proj_demo_001?origin=demo')
+    await expect(project).toHaveAttribute('href', /\/project\/proj_demo_001\?origin=demo&returnTo=/)
     await project.click()
     await expect(page).toHaveURL(/\/project\/proj_demo_001\?origin=demo/)
-    await page.goBack()
+    await page.reload()
+    await page.getByRole('link', { name: '返回客户详情' }).click()
+    await expect(page.getByRole('heading', { name: '合和地产集团' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /名下项目/ })).toHaveAttribute('aria-selected', 'true')
 
     await page.getByRole('tab', { name: /施工合同/ }).click()
     const contract = page.getByRole('link', { name: '合和新城施工总承包合同' })

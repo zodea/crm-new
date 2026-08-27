@@ -33,6 +33,28 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     for (const tab of ['合作概览', '合同', '请款', '收票', '付款', '结算'])
       await expect(page.getByRole('tab', { name: new RegExp(tab) })).toBeVisible()
 
+    const projectIdentity = page.getByRole('link', { name: '锦绣华庭', exact: true })
+    await expect(projectIdentity).toHaveAttribute('href', /\/project\/proj_demo_002\?origin=demo&returnTo=/)
+    await projectIdentity.click()
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\?origin=demo&returnTo=/)
+    await expect(page.getByRole('heading', { name: '锦绣华庭' })).toBeVisible()
+    await page.reload()
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\?origin=demo&returnTo=/)
+    await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=overview$/)
+    await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible()
+
+    const supplierIdentity = page.getByRole('link', { name: '穗建五金机电经营部', exact: true })
+    await expect(supplierIdentity).toHaveAttribute('href', /\/base\/supplier\/sup_demo_004\?origin=demo&returnTo=/)
+    await supplierIdentity.click()
+    await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004\?origin=demo&returnTo=/)
+    await expect(page.getByRole('heading', { name: '穗建五金机电经营部' })).toBeVisible()
+    await page.reload()
+    await expect(page).toHaveURL(/\/base\/supplier\/sup_demo_004\?origin=demo&returnTo=/)
+    await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=overview$/)
+    await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible()
+
     await page.getByRole('tab', { name: /^合同/ }).click()
     await expect(page).toHaveURL(/tab=contract/)
     const contractSource = page.getByRole('link', { name: '查看源单' }).first()
@@ -40,7 +62,7 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await contractSource.click()
     await expect(page.getByRole('heading', { name: /五金机电/ })).toBeVisible()
     await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
-    await expect(page).toHaveURL(/tab=contract/)
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=contract$/)
     await expect(page.getByRole('tab', { name: /^合同/ })).toHaveAttribute('aria-selected', 'true')
     await page.reload()
     await expect(page.getByRole('tab', { name: /^合同/ })).toHaveAttribute('aria-selected', 'true')
@@ -51,7 +73,7 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await claimSource.click()
     await expect(page.getByRole('heading', { name: /付款申请/ })).toBeVisible()
     await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
-    await expect(page).toHaveURL(/tab=claim/)
+    await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=claim$/)
     await expect(page.getByRole('tab', { name: /^请款/ })).toHaveAttribute('aria-selected', 'true')
     await page.reload()
     await expect(page.getByRole('tab', { name: /^请款/ })).toHaveAttribute('aria-selected', 'true')
@@ -73,6 +95,62 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await page.getByRole('tab', { name: '合同1' }).click()
     await expect(page.getByLabel('合同事实').getByText('目标待核验')).toBeVisible()
     await expect(page.getByRole('link', { name: '查看源单' })).toHaveCount(0)
+  })
+
+  test('正式项目导入只在确认时原子提交中央身份、关系与文件元数据，刷新仍可读取', async ({ page }) => {
+    test.setTimeout(60_000)
+    const projectPath = '/project/project-real-320?origin=real'
+    const suffix = Date.now().toString(36)
+    const fileName = `中央新候选分供方${suffix}-合同.pdf`
+    const supplierName = `中央新候选分供方 ${suffix}`
+
+    await page.goto(projectPath)
+    await expect(page.getByRole('heading', { name: '中央正式施工项目' })).toBeVisible({ timeout: 20_000 })
+    const projectSuppliers = page.getByRole('region', { name: '项目分供方' })
+    await projectSuppliers.getByRole('link', { name: '从文件导入分供方' }).click()
+    await expect(page).toHaveURL('/project/project-real-320/supplier/import?origin=real')
+
+    const chooserPromise = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: '选择文件', exact: true }).click()
+    const chooser = await chooserPromise
+    await chooser.setFiles({
+      name: fileName,
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 central project supplier import'),
+    })
+    await page.getByRole('button', { name: '下一步：自动分类' }).click()
+    const candidate = page.locator('article').filter({ hasText: fileName })
+    await candidate.getByRole('textbox', { name: /新分供方名称/ }).fill(supplierName)
+    await candidate.getByRole('checkbox').check()
+    await page.getByRole('button', { name: '下一步：确认生成' }).click()
+    await page.getByRole('button', { name: '确认生成并返回项目' }).click()
+
+    await expect(page).toHaveURL(projectPath)
+    const imported = page.getByRole('region', { name: '项目分供方' }).getByRole('link', { name: supplierName })
+    await expect(imported).toBeVisible({ timeout: 20_000 })
+    await imported.click()
+    await expect(page.getByRole('heading', { name: `中央正式施工项目 × ${supplierName}` })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText(fileName, { exact: true })).toBeVisible()
+    await page.reload()
+    await expect(page.getByText(fileName, { exact: true })).toBeVisible({ timeout: 20_000 })
+
+    await page.getByRole('link', { name: supplierName, exact: true }).click()
+    await expect(page.getByRole('heading', { name: supplierName })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('link', { name: '中央正式施工项目' })).toBeVisible()
+    await page.getByRole('link', { name: '编辑分供方' }).click()
+    await expect(page.getByRole('heading', { name: '编辑 · 分供方' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByLabel('公司全称')).toHaveValue(supplierName)
+    const renamedSupplierName = `${supplierName}（已补档）`
+    await page.getByLabel('公司全称').fill(renamedSupplierName)
+    await page.getByLabel('主要联系人').fill('陈经理')
+    await page.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(page.getByRole('heading', { name: renamedSupplierName })).toBeVisible({ timeout: 20_000 })
+
+    await page.goto(projectPath)
+    const renamed = page.getByRole('region', { name: '项目分供方' }).getByRole('link', { name: renamedSupplierName })
+    await expect(renamed).toBeVisible({ timeout: 20_000 })
+    await renamed.click()
+    await expect(page.getByRole('heading', { name: `中央正式施工项目 × ${renamedSupplierName}` })).toBeVisible({ timeout: 20_000 })
   })
 
   test('真实零关系保留六类表头和空态，不把零记录误报为不存在', async ({ page }, testInfo) => {

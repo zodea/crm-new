@@ -158,6 +158,10 @@ describe('客户中央 Repository contract', () => {
       id: 'project-1',
       label: '合和新城',
     })
+    expect(detail.projects[0]?.navigation).toMatchObject({
+      kind: 'entity-detail',
+      filters: { dataOrigin: 'real', customerId: 'customer-1' },
+    })
     expect(detail.projects[1]?.project).toEqual({
       state: 'forbidden',
       entity: 'project',

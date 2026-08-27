@@ -2,7 +2,13 @@
 import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
-import { loadCustomerReturnOrigin, resolveCustomerReturnContext } from '~/lib/customer/return-context'
+import {
+  createCustomerDetailReturnTo,
+  isCustomerReturnContextId,
+  loadCustomerReturnOrigin,
+  resolveCustomerReturnContext,
+  validateCustomerReturnTo,
+} from '~/lib/customer/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
@@ -37,6 +43,17 @@ const backTo = computed(() => ownerDocumentReturnTo.value ?? resolveCustomerRetu
   load: loadCustomerReturnOrigin,
 }).to)
 const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回客户列表')
+const relationshipReturnTo = computed(() => {
+  const listReturnTo = validateCustomerReturnTo(props.returnTo)
+  const hasListContext = listReturnTo && isCustomerReturnContextId(props.returnContext)
+  return createCustomerDetailReturnTo({
+    customerId: props.customerId,
+    origin: props.origin,
+    tab: activeTab.value,
+    returnTo: hasListContext ? listReturnTo : undefined,
+    returnContext: hasListContext ? props.returnContext : undefined,
+  })
+})
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   const kind = store.detailState.kind
   if (detail.value)
@@ -165,6 +182,7 @@ onActivated(() => void load())
             :projects="detail.projects"
             :contracts="detail.contracts"
             :receipts="detail.receipts"
+            :relationship-return-to="relationshipReturnTo"
             :return-to="returnTo"
             :return-context="returnContext"
           />

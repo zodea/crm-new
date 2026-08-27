@@ -14,6 +14,7 @@ defineProps<{
   projects: readonly CustomerProjectDTO[]
   contracts: readonly CustomerContractDTO[]
   receipts: readonly CustomerReceiptDTO[]
+  relationshipReturnTo?: string
   returnTo?: string
   returnContext?: string
 }>()
@@ -71,7 +72,7 @@ const receiptColumns: KitTableColumn[] = [
       :empty="{ title: '暂无名下项目', description: '当前客户尚未通过主客户或次客户字段关联项目。' }"
     >
       <template #project="{ row }">
-        <CustomerRelationLink :reference="row.project" :navigation="row.navigation" />
+        <CustomerRelationLink :reference="row.project" :navigation="row.navigation" :return-to="relationshipReturnTo" />
       </template>
       <template #relation="{ row }">
         <span :class="row.relationRole === '主客户' ? 'chip chip-brand' : 'chip'">{{ row.relationRole }}</span>
@@ -89,7 +90,7 @@ const receiptColumns: KitTableColumn[] = [
         <CustomerRelationLink :reference="row.contract" :navigation="row.navigation" />
       </template>
       <template #project="{ row }">
-        <CustomerRelationLink :reference="row.project" :navigation="row.projectNavigation" />
+        <CustomerRelationLink :reference="row.project" :navigation="row.projectNavigation" :return-to="relationshipReturnTo" />
       </template>
       <template #status="{ row }">
         <span :class="row.isDraft ? 'chip chip-warn' : 'chip chip-brand'">{{ row.status || '—' }}</span>
@@ -112,7 +113,7 @@ const receiptColumns: KitTableColumn[] = [
         />
       </template>
       <template #project="{ row }">
-        <CustomerRelationLink :reference="row.project" :navigation="row.projectNavigation" />
+        <CustomerRelationLink :reference="row.project" :navigation="row.projectNavigation" :return-to="relationshipReturnTo" />
       </template>
       <template #contract="{ row }">
         <CustomerRelationLink :reference="row.contract" :navigation="row.contractNavigation" />

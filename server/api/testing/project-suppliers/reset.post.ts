@@ -1,6 +1,7 @@
 import type { ProjectSupplierReadTestScenario } from '../../../utils/project-supplier-read-test-instance'
 import process from 'node:process'
 import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
+import { projectSupplierCommandTestInstance } from '../../../utils/project-supplier-command-test-instance'
 import { projectSupplierReadTestInstance } from '../../../utils/project-supplier-read-test-instance'
 
 type Scenario = ProjectSupplierReadTestScenario | 'demo-forbidden'
@@ -15,6 +16,7 @@ export default defineEventHandler(async (event) => {
   if (!body?.scenario || !SCENARIOS.has(body.scenario))
     throw createError({ statusCode: 400, statusMessage: 'Unknown project-supplier test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
+  projectSupplierCommandTestInstance.reset(sessionId)
   if (body.scenario === 'demo-forbidden') {
     projectSupplierReadTestInstance.reset('ready', sessionId)
     demoWorkspaceTestInstance.reset('forbidden', sessionId)

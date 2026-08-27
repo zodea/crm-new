@@ -3,6 +3,7 @@ import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
+import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { yuan } from '~/lib/util/money'
 import { useSupplierReadStore } from '~/stores/supplier-read'
@@ -30,8 +31,17 @@ const detail = computed(() => {
 })
 const supplier = computed(() => detail.value?.supplier ?? null)
 const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
-const backTo = computed(() => validateSupplierReturnTo(props.returnTo) ?? materialContractReturnTo.value ?? '/base/supplier')
-const backLabel = computed(() => materialContractReturnTo.value ? '返回材料采购合同' : '返回分供方列表')
+const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityReturnTo(props.returnTo, {
+  entity: 'supplier',
+  id: props.supplierId,
+  origin: props.origin,
+}))
+const backTo = computed(() => validateSupplierReturnTo(props.returnTo) ?? materialContractReturnTo.value ?? projectSupplierReturnTo.value ?? '/base/supplier')
+const backLabel = computed(() => materialContractReturnTo.value
+  ? '返回材料采购合同'
+  : projectSupplierReturnTo.value
+    ? '返回项目分供方工作台'
+    : '返回分供方列表')
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)

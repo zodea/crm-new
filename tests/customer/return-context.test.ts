@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createCustomerDetailReturnTo,
   createCustomerReturnOrigin,
   resolveCustomerReturnContext,
+  validateCustomerDetailReturnTo,
   validateCustomerReturnTo,
 } from '~/lib/customer/return-context'
 
@@ -32,5 +34,26 @@ describe('客户列表返回上下文', () => {
     '/base/customer?nav=origin_customer_1234#other-row',
   ])('拒绝不安全或不完整的返回地址：%s', (value) => {
     expect(validateCustomerReturnTo(value)).toBeNull()
+  })
+
+  it('客户详情来源只保留稳定 ID、来源、页签与已验证列表上下文', () => {
+    const listReturnTo = '/base/customer?search=%E5%90%88%E5%92%8C&page=2&nav=origin_customer_1234#customer-row-demo%3Acustomer%252F1'
+    const detailReturnTo = createCustomerDetailReturnTo({
+      customerId: 'customer/1',
+      origin: 'demo',
+      tab: 'receipts',
+      returnTo: listReturnTo,
+      returnContext: 'origin_customer_1234',
+    })
+
+    expect(detailReturnTo).toBe(
+      `/base/customer/customer%2F1?origin=demo&tab=receipts&returnTo=${encodeURIComponent(listReturnTo)}&returnContext=origin_customer_1234`,
+    )
+    expect(validateCustomerDetailReturnTo(detailReturnTo, 'demo')).toBe(detailReturnTo)
+    expect(validateCustomerDetailReturnTo(detailReturnTo, 'demo', 'customer/1')).toBe(detailReturnTo)
+    expect(validateCustomerDetailReturnTo(detailReturnTo, 'demo', 'customer-2')).toBeNull()
+    expect(validateCustomerDetailReturnTo(detailReturnTo, 'real')).toBeNull()
+    expect(validateCustomerDetailReturnTo(`${detailReturnTo}&redirect=https://evil.example`, 'demo')).toBeNull()
+    expect(validateCustomerDetailReturnTo('/base/customer/customer-1?origin=demo&tab=unknown', 'demo')).toBeNull()
   })
 })

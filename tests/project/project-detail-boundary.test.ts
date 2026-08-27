@@ -6,6 +6,7 @@ import {
   createProjectReadTestInstance,
   PROJECT_READ_FIXTURE,
 } from '../../server/utils/project-read-test-instance'
+import { createProjectSupplierReadTestInstance } from '../../server/utils/project-supplier-read-test-instance'
 
 describe('project detail data-origin boundary', () => {
   const instance = createProjectReadTestInstance()
@@ -19,11 +20,12 @@ describe('project detail data-origin boundary', () => {
   beforeEach(() => instance.reset('ready'))
 
   it('returns server-verified demo origin only when the preference and capability allow it', async () => {
-    await expect(repository.get({
+    const detail = await repository.get({
       id: 'proj_demo_001',
       origin: 'demo',
       includeDemo: true,
-    })).resolves.toMatchObject({
+    })
+    expect(detail).toMatchObject({
       item: {
         dataOrigin: 'demo',
         project: { id: 'proj_demo_001', label: '合和新城' },
@@ -36,6 +38,15 @@ describe('project detail data-origin boundary', () => {
           variant: 'material',
           filters: { projectId: 'proj_demo_001', dataOrigin: 'demo' },
         },
+      },
+    })
+    expect(detail.projectSuppliers.empty).toBeNull()
+    expect(detail.projectSuppliers.items.find(row => row.relationId === 'ps_demo_001')).toMatchObject({
+      supplier: { id: 'sup_demo_001', label: '广州市大板东建材有限公司' },
+      navigation: {
+        kind: 'entity-subview',
+        variant: 'supplier-workbench',
+        filters: { dataOrigin: 'demo', supplierId: 'sup_demo_001' },
       },
     })
   })
@@ -101,6 +112,30 @@ describe('project detail data-origin boundary', () => {
       origin: 'demo',
       includeDemo: true,
     })).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+  })
+
+  it('只有项目读取权限时不泄露项目分供方反向身份', async () => {
+    const projectOnlyCapabilities = ['project:list:read']
+    const projectSupplierReads = createProjectSupplierReadTestInstance(() => projectOnlyCapabilities)
+    const row = {
+      ...PROJECT_READ_FIXTURE[0]!,
+      dataOrigin: 'real' as const,
+      id: 'project-only',
+      name: '仅项目可见',
+    }
+    const instance = createProjectReadTestInstance(
+      () => projectOnlyCapabilities,
+      () => [row],
+      () => 'project-only-v1',
+      undefined,
+      async () => 0,
+      async (projectId, origin, sessionId) => projectSupplierReads.references(projectId, origin, sessionId),
+    )
+
+    const detail = await instance.detail(row.id, { origin: 'real', includeDemo: 'false' })
+
+    expect(detail.projectSuppliers).toMatchObject({ access: 'forbidden', items: [] })
+    expect(JSON.stringify(detail.projectSuppliers)).not.toContain('sup_demo_')
   })
 
   it('同一 ID 的正式与演示项目按复合身份分别读取', () => {

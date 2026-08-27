@@ -69,6 +69,21 @@ const detail: ProjectDetailReadDTO = {
       filters: { projectId: 'project-1', dataOrigin: 'demo' },
     },
   },
+  projectSuppliers: {
+    access: 'allowed',
+    items: [{
+      relationId: 'ps-1',
+      supplier: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '华东建材', no: null },
+      navigation: {
+        kind: 'entity-subview',
+        subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '合和新城', no: 'HHXC-01' },
+        variant: 'supplier-workbench',
+        view: 'overview',
+        filters: { supplierId: 'supplier-1', dataOrigin: 'demo' },
+      },
+    }],
+    empty: null,
+  },
   asOf: '2026-08-15T00:00:00.000Z',
   sourceVersion: 'detail-v1',
   capabilities: ['project:list:read', 'demo:read'],
@@ -110,6 +125,10 @@ function renderDetail(props: Record<string, unknown>) {
           props: ['project'],
           template: '<section aria-label="中央详情字段">{{ project.name }}</section>',
         }),
+        ProjectSupplierLinksPanel: defineComponent({
+          props: ['relationships'],
+          template: '<aside aria-label="中央项目分供方">{{ relationships.length }} 家</aside>',
+        }),
         StatePanel: StatePanelStub,
       },
     },
@@ -123,6 +142,7 @@ vi.stubGlobal('useNuxtApp', () => ({
   },
 }))
 vi.stubGlobal('useProjectCommandStore', () => ({ latestWrite: null }))
+vi.stubGlobal('useProjectSupplierCommandStore', () => ({ latestWrite: null }))
 vi.stubGlobal('useTabTitle', () => {})
 
 describe('项目详情中央来源边界', () => {
@@ -140,6 +160,7 @@ describe('项目详情中央来源边界', () => {
     expect(document.activeElement).toBe(heading)
     expect(get).toHaveBeenCalledWith({ id: 'project-1', origin: 'demo', includeDemo: true })
     expect(screen.getByRole('status', { name: '测试数据只读详情' }).textContent).toContain('测试数据仅供查看')
+    expect(screen.getByRole('complementary', { name: '中央项目分供方' }).textContent).toContain('1 家')
     expect(screen.queryByRole('link', { name: '编辑项目' })).toBeNull()
     expect(screen.queryByRole('button', { name: '导出项目档案包' })).toBeNull()
     expect(document.querySelector('[data-project-module]')).toBeNull()
@@ -147,6 +168,29 @@ describe('项目详情中央来源边界', () => {
       .toContain('/contract/material?projectId=project-1&origin=demo')
     expect(screen.getByRole('status', { name: '演示项目不提供正式甲方商务单据' })).not.toBeNull()
     expect(screen.queryByRole('status', { name: '正在读取甲方商务单据' })).toBeNull()
+  })
+
+  it('客户返回链必须同时匹配中央项目的父客户 ID', async () => {
+    get.mockResolvedValue(detail)
+    const validReturnTo = '/base/customer/customer-1?origin=demo&tab=receipts'
+    const valid = renderDetail({
+      originHint: 'demo',
+      includeDemo: true,
+      returnTo: '/project',
+      customerReturnTo: validReturnTo,
+    })
+    expect((await screen.findByRole('link', { name: '返回客户详情' })).getAttribute('href')).toBe(validReturnTo)
+    valid.unmount()
+
+    get.mockResolvedValue(detail)
+    renderDetail({
+      originHint: 'demo',
+      includeDemo: true,
+      returnTo: '/project',
+      customerReturnTo: '/base/customer/customer-2?origin=demo&tab=receipts',
+    })
+    expect((await screen.findByRole('link', { name: '返回项目列表' })).getAttribute('href')).toBe('/project')
+    expect(screen.queryByRole('link', { name: '返回客户详情' })).toBeNull()
   })
 
   it('材采真实零值仍提供入口，未知与禁止状态不生成蓝链', async () => {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
+import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   loadProjectReturnOrigin,
   resolveProjectReturnContext,
 } from '~/lib/nav/return-to'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()
@@ -24,8 +26,14 @@ const returnResolution = computed(() => resolveProjectReturnContext({
 }))
 const crewWorkerReturnTo = computed(() => validateCrewWorkerReturnTo(route.query.returnTo))
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, originHint.value))
-const returnTo = computed(() => ownerDocumentReturnTo.value ?? crewWorkerReturnTo.value ?? returnResolution.value.to)
-const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorkerReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
+const customerReturnTo = computed(() => validateCustomerDetailReturnTo(route.query.returnTo, originHint.value))
+const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityReturnTo(route.query.returnTo, {
+  entity: 'project',
+  id: projectId.value,
+  origin: originHint.value,
+}))
+const returnTo = computed(() => ownerDocumentReturnTo.value ?? crewWorkerReturnTo.value ?? projectSupplierReturnTo.value ?? returnResolution.value.to)
+const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorkerReturnTo.value || projectSupplierReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
 </script>
 
 <template>
@@ -34,8 +42,9 @@ const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorker
     :origin-hint="originHint"
     :include-demo="dataVisibilityStore.includeDemo"
     :return-to="returnTo"
+    :customer-return-to="customerReturnTo || undefined"
     :return-expires-at="returnExpiresAt"
-    :return-label="ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
+    :return-label="projectSupplierReturnTo ? '返回项目分供方工作台' : ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
     :current-route="route.fullPath"
   />
 </template>

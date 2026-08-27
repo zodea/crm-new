@@ -121,7 +121,7 @@ watch(() => [props.projectId, props.supplierId, origin.value, route.query.tab, v
           </button>
         </div>
       </nav>
-      <ProjectSupplierOverview v-if="activeTab === 'overview'" :data="data" />
+      <ProjectSupplierOverview v-if="activeTab === 'overview'" :data="data" :return-to="returnTo" />
       <section v-else class="panel min-w-0 overflow-hidden" :aria-label="`${tabs.find(tab => tab.key === activeTab)?.label}事实`">
         <ProjectSupplierFactTable v-if="activeTab === 'contract'" :columns="['合同编号', '合同名称', '类型', '合同额', '变更后合同额', '签订日期', '附件', '状态']" :rows="contractRows" empty="暂无合同事实" :return-to="returnTo" />
         <ProjectSupplierFactTable v-else-if="activeTab === 'claim'" :columns="['请款编号', '请款名称', '申请金额', '审批金额', '申请日期', '发票状态', '附件', '状态']" :rows="claimRows" empty="暂无请款事实" :return-to="returnTo" />

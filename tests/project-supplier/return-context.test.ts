@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   appendProjectSupplierReturnContext,
   resolveProjectSupplierReturnContext,
+  validateProjectSupplierIdentityReturnTo,
   validateProjectSupplierReturnTo,
 } from '~/lib/project-supplier/return-context'
 
@@ -59,6 +60,29 @@ describe('项目×分供方受限来源上下文', () => {
       supplierId: 'supplier/other',
       actualProjectId: 'project/1',
       actualSupplierId: 'supplier/1',
+    })).toBeNull()
+  })
+
+  it('身份目标只恢复与双父 ID、来源一致的工作台', () => {
+    expect(validateProjectSupplierIdentityReturnTo(returnTo, {
+      entity: 'project',
+      id: 'project/1',
+      origin: 'demo',
+    })).toBe(returnTo)
+    expect(validateProjectSupplierIdentityReturnTo(returnTo, {
+      entity: 'supplier',
+      id: 'supplier/1',
+      origin: 'demo',
+    })).toBe(returnTo)
+    expect(validateProjectSupplierIdentityReturnTo(returnTo, {
+      entity: 'project',
+      id: 'project/other',
+      origin: 'demo',
+    })).toBeNull()
+    expect(validateProjectSupplierIdentityReturnTo(returnTo, {
+      entity: 'supplier',
+      id: 'supplier/1',
+      origin: 'real',
     })).toBeNull()
   })
 })

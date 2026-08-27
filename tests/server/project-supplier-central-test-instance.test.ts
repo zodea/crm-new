@@ -85,4 +85,16 @@ describe('项目×分供方中央读取测试实例', () => {
       .rejects
       .toMatchObject<ProjectSupplierRepositoryProblem>({ problem: { code: 'unavailable', retryable: true } })
   })
+
+  it('项目反向引用要求项目分供方读权限，命令关系读取失败时不降级为空集合', () => {
+    const projectOnly = createProjectSupplierReadTestInstance(() => ['project:list:read'])
+
+    expect(() => projectOnly.references('proj_demo_002', 'demo'))
+      .toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'forbidden' }) }))
+
+    const unavailable = createProjectSupplierReadTestInstance(() => capabilities)
+    unavailable.reset('unavailable')
+    expect(() => unavailable.commandRelationships('project-real-320', 'real'))
+      .toThrowError(expect.objectContaining({ problem: expect.objectContaining({ code: 'unavailable', retryable: true }) }))
+  })
 })
