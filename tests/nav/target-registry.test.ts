@@ -269,6 +269,30 @@ describe('唯一 Target Registry', () => {
     expect(supplier).toEqual({ state: 'resolved', label: '分供方一', to: '/base/supplier/supplier-1?origin=real&tab=contracts' })
   })
 
+  it('客户事实穿透项目时只保留同来源的受限详情返回链', () => {
+    const returnTo = '/base/customer/customer-1?origin=demo&tab=receipts'
+    const intent = projectIntent({
+      subject: {
+        state: 'resolved',
+        entity: 'project',
+        id: 'project-1',
+        label: '项目一',
+        no: null,
+      },
+      filters: { dataOrigin: 'demo', customerId: 'customer-1' },
+    })
+
+    expect(resolveNavigationTarget(intent, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '项目一',
+      to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'real' } }, { returnTo }))
+      .toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1?origin=real' })
+    expect(resolveNavigationTarget({ ...intent, filters: { dataOrigin: 'demo', customerId: 'customer-2' } }, { returnTo }))
+      .toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1?origin=demo' })
+  })
+
   it('材料采购合同详情保留显式数据来源', () => {
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
@@ -305,6 +329,40 @@ describe('唯一 Target Registry', () => {
       view: null,
       filters: {},
     })).toEqual({ state: 'resolved', label: 'FK-001', to: '/finance/payment/payment-1/detail' })
+  })
+
+  it('项目分供方身份卡仅向匹配的项目与分供方详情附加工作台返回链', () => {
+    const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=overview'
+    const project = projectIntent({
+      subject: { state: 'resolved', entity: 'project', id: 'project-1', label: '项目一', no: null },
+      filters: { dataOrigin: 'demo' },
+    })
+    const supplier: NavigationIntentDTO = {
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-1', label: '分供方一', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'demo' },
+    }
+
+    expect(resolveNavigationTarget(project, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '项目一',
+      to: `/project/project-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+    expect(resolveNavigationTarget(supplier, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '分供方一',
+      to: `/base/supplier/supplier-1?origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+    })
+    expect(resolveNavigationTarget({
+      ...project,
+      subject: { ...project.subject, id: 'project-other' },
+    }, { returnTo })).toEqual({
+      state: 'resolved',
+      label: '项目一',
+      to: '/project/project-other?origin=demo',
+    })
   })
 
   it.each([

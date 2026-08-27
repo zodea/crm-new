@@ -240,13 +240,14 @@ function unavailable(reason: 'missing-id' | 'forbidden'): NavigationIntentDTO {
 function detailIntent(
   subject: Extract<EntityRefDTO, { state: 'resolved' }>,
   dataOrigin?: DataOriginDTO,
+  filters: Record<string, string> = {},
 ): NavigationIntentDTO {
   return {
     kind: 'entity-detail',
     subject,
     variant: 'detail',
     view: null,
-    filters: dataOrigin ? { dataOrigin } : {},
+    filters: dataOrigin ? { dataOrigin, ...filters } : filters,
   }
 }
 
@@ -256,6 +257,7 @@ function refAndNavigation(
   labels: ReadonlyMap<string, string>,
   forbiddenIds: ReadonlySet<string>,
   dataOrigin: DataOriginDTO,
+  filters: Record<string, string> = {},
 ): { ref: EntityRefDTO, navigation: NavigationIntentDTO } {
   if (!id)
     return { ref: missingRef(entity), navigation: unavailable('missing-id') }
@@ -267,7 +269,7 @@ function refAndNavigation(
   const ref = resolvedRef(entity, id, label)
   return {
     ref,
-    navigation: detailIntent(ref, entity === 'project' ? dataOrigin : undefined),
+    navigation: detailIntent(ref, entity === 'project' ? dataOrigin : undefined, filters),
   }
 }
 
@@ -340,7 +342,7 @@ export function buildCustomerDetailRead(
       ? { ref: forbiddenRef('project', row.id), navigation: unavailable('forbidden') }
       : (() => {
           const ref = resolvedRef('project', row.id, row.name, row.code || null)
-          return { ref, navigation: detailIntent(ref, row.dataOrigin) }
+          return { ref, navigation: detailIntent(ref, row.dataOrigin, { customerId: customer.id }) }
         })()
     return {
       project: target.ref as CustomerProjectDTO['project'],
@@ -365,6 +367,7 @@ export function buildCustomerDetailRead(
       projectLabels,
       forbiddenProjects,
       row.dataOrigin,
+      { customerId: customer.id },
     )
     const contractRef = resolvedRef('contract', row.id, row.name, row.no || null)
     const effectiveAmount = isDraft(row.status) ? 0 : row.amount + row.supplementAmount
@@ -389,6 +392,7 @@ export function buildCustomerDetailRead(
       projectLabels,
       forbiddenProjects,
       row.dataOrigin,
+      { customerId: customer.id },
     )
     const contract = refAndNavigation(
       'contract',

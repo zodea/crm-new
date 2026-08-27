@@ -4,7 +4,7 @@
 
 ## 1. 当前落点
 
-Issue #293、#314、#315、#316、#318、#320、#321、#323、#324、#325 与 #326 已完成正式项目、正式客户、正式分供方、班组、工人、三类核心合同、甲方变洽签、甲方报量、验收—保修、最终结算和甲方罚扣的中央写链。浏览器不再直接将这些表单写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
+Issue #281、#293、#314、#315、#316、#318、#320、#321、#323、#324、#325 与 #326 已完成正式项目、正式客户、正式分供方、班组、工人、项目分供方导入、三类核心合同、甲方变洽签、甲方报量、验收—保修、最终结算和甲方罚扣的中央写链。浏览器不再直接将这些正式事实写入本地 SQLite；页面只经领域 CommandStore、CommandRepository 和 HTTP adapter 调用。
 
 - `GET /api/read/business-session`：取得当前服务端会话的 `workspaceId`、`actorId` 和 capability。
 - `GET /api/read/projects/:id/form`：返回可编辑 draft、附件元数据、`version` 和服务端更新时间。
@@ -16,6 +16,8 @@ Issue #293、#314、#315、#316、#318、#320、#321、#323、#324、#325 与 #3
 - `GET /api/read/suppliers/:id/form`：返回正式分供方可编辑主档、`version` 和服务端更新时间；普通附件恒为空，证照仍走证照专用边界。
 - `POST /api/commands/suppliers`：新建正式分供方。
 - `PUT /api/commands/suppliers/:id`：用当前 `baseVersion` 编辑正式分供方。
+- `GET /api/read/project-suppliers/:projectId/import-context`：返回当前正式项目、可选正式分供方、已有合作关系和 `version`；路径项目 ID 与中央身份不一致时拒绝。
+- `POST /api/commands/project-suppliers/import`：确认后原子新建或复用正式分供方与 ProjectSupplier，并写入该关系的文件元数据与正文；不创建合同、请款、发票、支付或结算单。
 - `GET /api/read/crews/:id/form`、`GET /api/read/workers/:id/form`：返回正式班组/工人可编辑主档、`version` 和服务端更新时间；中央附件边界未接入时附件恒为空。
 - `POST /api/commands/crews`、`POST /api/commands/workers`：新建正式班组/工人。
 - `PUT /api/commands/crews/:id`、`PUT /api/commands/workers/:id`：用当前 `baseVersion` 编辑正式班组/工人；工人的 `crewId` 只接受同一正式来源中已存在的稳定 ID。
@@ -70,6 +72,26 @@ interface SupplierCommandRequestDTO {
   action: 'draft' | 'save' | 'submit'
   draft: SupplierFormDraft
   attachments: FormAttachmentChanges // 当前主档命令只接受空变更
+}
+
+interface ProjectSupplierImportCommandRequestDTO {
+  projectId: string
+  workspaceId: string
+  actorId: string
+  requiredCapability: 'project-supplier:write'
+  commandId: string
+  baseVersion: string
+  groups: Array<{
+    supplierId: string | null
+    supplierName: string
+    files: Array<{
+      fileName: string
+      fileSize: number
+      mimeType: string
+      category: string
+      payloadBase64: string
+    }>
+  }>
 }
 
 interface CrewCommandRequestDTO {
@@ -138,7 +160,7 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 }
 ```
 
-- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write` / `owner-document:write`；客户端字段不是授权证据。
+- 服务端重新解析会话并校验工作区、操作人及对应的 `project:write` / `customer:write` / `supplier:write` / `project-supplier:write` / `crew:write` / `worker:write` / `material-contract:write` / `construction-contract:write` / `owner-document:write`；客户端字段不是授权证据。项目分供方文件的上传人固定取本次服务端会话 `actorId`，命令体不接受客户端自报上传人。
 - 新建 ID 由服务端分配不透明值；页面不使用时间戳、名称或本地 `draftId` 作正式主键。
 - `version`、最终更新时间和命令结果由服务端生成。
 - `draft` 允许缺少业务必填项；`save` / `submit` 同时经页面和服务端执行领域必填校验。客户统一社会信用代码在正式客户间重复时返回字段错误；分供方公司全称、类别、主要联系人必填，统一社会信用代码和内部编码分别唯一。
@@ -149,6 +171,10 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 - 编辑命令的 `baseVersion` 与服务端当前版本不一致时返回 canonical `ProblemDTO(code='conflict')` 和 HTTP 409，禁止覆盖。界面允许用户选择保留本页内容或放弃本页内容后重读中央最新版，不自动前移其他页签的版本。
 - 表单收到冲突后立即重读服务器表单，保留当前本地内容，并让用户显式选择“保留我的内容”后基于新版重试，或“改用服务器最新版”。
 - 命令成功后使用返回的 ID/version 失效同实体详情缓存；列表和详情再从中央读模型取结果，不使用客户端 draft 伪造成功回显。已接入的主数据、核心合同、甲方变洽签和甲方报量保存后固定刷新同一实体 ID，并保留原列表、详情页签与合法聚焦上下文。
+- 项目分供方导入成功后返回同一正式项目详情并重读中央反向关系；新建的分供方同时进入通用中央分供方详情和编辑链，不维护只能从导入页读到的平行主档。
+- 项目分供方导入上下文返回工作区内完整、未分页的正式分供方稳定 ID 候选；服务端按该完整集合重验复用身份，不以列表页的前 100 条代替授权或身份校验。
+- 项目分供方导入从不可降级的 canonical 关系读面重验已有 ProjectSupplier；关系读取为 `forbidden` / `unavailable` 时整条写命令失败，不把不可见或暂不可读误判为零关系。
+- 项目分供方导入先校验文件分类属于“合同、请款、收票、付款、结算、资质、其他”，并要求每个 Base64 正文可解码且实际字节数与 `fileSize` 完全一致，再把新分供方主档、ProjectSupplier 关系、文件元数据与正文作为一个提交单元写入；任一中央接管失败时回滚全部事实与版本，同一 `baseVersion` 可直接重试。
 
 ## 4. 网络失败与本地草稿
 
@@ -167,4 +193,4 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 
 甲方变洽签与甲方报量命令由 #323 的可重置非生产后台实例证明权限、幂等、乐观锁、项目—施工合同关系、附件读回、受保护状态和量价重算。甲方变洽签的量价变更合计与审定含税金额分字段存储；纯金额签证提交可由审定含税或不含税任一正金额成立。提交只保留当时预览；签证命令必须基于当前已签证时序链再次校验并重算有效量价，防止并行待签单据将合同量降为负数或锁定过期金额。“新增”操作物化为稳定 BOQ 行，后续变更与报量均使用该结果；纯金额签证不改写 BOQ 或月度工程量快照版本。系统锁定台账与手录纯金额签证仍是同一 canonical 读面。甲方报量直接消费 `monthly_statements` 的自动/申报/审定事实，审定命令要求每行显式给出审定量（包括显式的 `0`）。验收—保修命令由 #324 在同一 `acceptance` ID 上证明单向状态链、追加审计和终态锁定。最终结算命令由 #325 在同一中央契约中证明草稿保存、提交、附件 owner 身份、关系重验与迁移读回；已提交记录的业务字段锁定。审定金额/日期只能来自已有持久化事实，当前未新增审定 action。甲方罚扣、分包变更、分包结算、项目罚扣与开票申请尚无中央只读目标时只展示事实文本，不借现有编辑表单冒充详情。
 
-当前中央项目、客户、分供方、班组和工人命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目、分供方、班组或工人的日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。
+当前中央项目、客户、分供方、班组、工人和项目分供方导入命令由可重置的非生产后台实例证明信封、权限、幂等、乐观锁、读回和浏览器交互。项目分供方命令还证明完整正式候选集、服务端上传人、正文实际字节长度和跨分供方主档/合作关系的原子提交；文件、版本或中央接管无效时不留分供方、关系、文件或版本半成品，重放同一 `commandId` 不重复写入。#294 在相同的 HTTP/Repository 边界补充核心身份迁移命令：`POST /api/migrations/core/preflight`、`POST /api/migrations/core/dry-run`、`POST /api/migrations/core/:batchId/import|confirm|rollback`，并以 `GET /api/migrations/core/snapshot` 读取中央权威快照。迁移命令要求 `core:migration:write`、稳定 `commandId`、服务端会话身份和批次状态机；后台会重算 canonical 来源哈希、校验备份证明结构与确定性 ID、按实际写入结果重新对账，并在确认时再次拒绝阻塞差异。本地适配器负责从不上传中央的 IndexedDB 备份字节重算摘要和来源，创建与恢复两端都拒绝篡改。它们只服务于显式迁移，不是客户、项目、分供方、班组或工人的日常保存接口。迁移端同样是可重置测试实例，不能把它或 `/api/testing/core-migration/reset` 描述为生产持久化业务库或业务命令。

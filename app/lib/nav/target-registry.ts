@@ -5,7 +5,7 @@ import type {
 } from '~/types/read-model'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
-import { isCustomerReturnContextId, validateCustomerReturnTo } from '~/lib/customer/return-context'
+import { isCustomerReturnContextId, validateCustomerDetailReturnTo, validateCustomerReturnTo } from '~/lib/customer/return-context'
 import {
   validateMaterialContractDetailJourneyReturnTo,
   validateProjectJourneyReturnTo,
@@ -16,7 +16,11 @@ import {
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
-import { appendProjectSupplierReturnContext, validateProjectSupplierReturnTo } from '~/lib/project-supplier/return-context'
+import {
+  appendProjectSupplierReturnContext,
+  validateProjectSupplierIdentityReturnTo,
+  validateProjectSupplierReturnTo,
+} from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
@@ -388,6 +392,31 @@ export function resolveNavigationTarget(
       if (ownerReturnTo) {
         const separator = to.includes('?') ? '&' : '?'
         to = `${to}${separator}returnTo=${encodeURIComponent(ownerReturnTo)}`
+      }
+    }
+    if (key === 'project:detail' && options.returnTo) {
+      const customerId = intent.filters.customerId
+      const customerReturnTo = typeof customerId === 'string'
+        ? validateCustomerDetailReturnTo(options.returnTo, intent.filters.dataOrigin, customerId)
+        : null
+      if (customerReturnTo) {
+        const separator = to.includes('?') ? '&' : '?'
+        to = `${to}${separator}returnTo=${encodeURIComponent(customerReturnTo)}`
+      }
+    }
+    if ((key === 'project:detail' || key === 'supplier:detail') && options.returnTo) {
+      const entityIntent = intent as EntityTargetIntent
+      const dataOrigin = entityIntent.filters.dataOrigin
+      const projectSupplierReturnTo = isDataOriginDTO(dataOrigin)
+        ? validateProjectSupplierIdentityReturnTo(options.returnTo, {
+            entity: key === 'project:detail' ? 'project' : 'supplier',
+            id: entityIntent.subject.id,
+            origin: dataOrigin,
+          })
+        : null
+      if (projectSupplierReturnTo) {
+        const separator = to.includes('?') ? '&' : '?'
+        to = `${to}${separator}returnTo=${encodeURIComponent(projectSupplierReturnTo)}`
       }
     }
     if (key === 'contract:supplement' && options.returnTo) {

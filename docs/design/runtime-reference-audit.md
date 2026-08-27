@@ -98,6 +98,8 @@
 
 2026-08-26 的 #289 父级本地集成证据联合运行 `e2e/issue-312-project-target-registry.spec.ts` 与 `e2e/issue-313-project-return-context.spec.ts`，13 个场景全部通过：项目名称链接同时保留稳定项目 ID、`dataOrigin`、受限 `returnTo` 与短期来源上下文；详情刷新后仍能用键盘返回并精确恢复搜索、阶段、排序、列筛选、页码、每页条数、应用页签、滚动和焦点；伪造外部来源及直达深链降级到规范列表；390 / 768 / 1024 / 1440px 均无页面级横滚。该证据使用可重置的中央证明实例，不采集外部参考站或真实业务数据，也不提升 `R-PROJECT-LIST-LIVE` / `R-PROJECT-DETAIL-LIVE` 的外部证据等级。
 
+2026-08-27 的 #281 父级本地集成证据联合运行 `e2e/issue-314-customer-central-chain.spec.ts`、`e2e/issue-315-supplier-central-facts.spec.ts`、`e2e/issue-316-crew-worker-central-chain.spec.ts` 与 `e2e/issue-317-project-supplier-facts.spec.ts`：客户、分供方、班组、工人、项目和 ProjectSupplier 只按稳定 ID、`dataOrigin` 与唯一 Target Registry 往返；客户→项目以及工作台→项目/分供方在目标刷新后仍显式恢复原客户页签或工作台页签，目标 ID、来源或额外 query 错配时不保留返回链；六类工作台事实继续区分真实 `0`、缺失、禁止、暂不可用、关系错配与未核验目标。四条浏览器链沿用 390 / 768 / 1024 / 1440px 验证，密集表格只在自身区域横向滚动。证据来自可重置中央证明实例，不采集外部参考站或真实业务数据，也不把客户受限参考详情或未核验来源升级为已确认目标。
+
 ## 4. 业务约束档案
 
 | 代码 | 必须保留的约束 |
@@ -251,9 +253,9 @@
 | `app/pages/owner-material/use/[id].vue` | `/owner-material/use/:id` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 参考列表 0 条，详情不可观察；当前 `/:id` 直接进入编辑表单 | 增加只读详情，项目/分供方/班组/班组合同按真实 ID 下钻；编辑仍走现有库存与总控校验 | C-FORM |
 | `app/pages/owner-material/use/index.vue` | `/owner-material/use` | 甲供材 | 列表 | #200 | R-OWNER-MATERIAL-LIVE | 参考专属列覆盖负责人/部门/创建人、项目/分供方/采购类型、日期/月、班组与班组合同；当前为通用材料列表 | 使用领用专属 DTO；负责人、创建人、班组和班组合同保持独立身份，无关系时显示未记录 | C-DENSE |
 | `app/pages/owner-material/use/new.vue` | `/owner-material/use/new` | 甲供材 | 整页表单 | #200 | R-OWNER-MATERIAL-LIVE | 本轮未点击参考新建；本地已有项目/材料/数量/领用人/班组表单 | 写入继续校验甲供库存与总控余量；班组合同/来源批次先建真实关系再扩展 | C-FORM |
-| `app/pages/project/[id].vue` | `/project/:id` | 项目 | 详情 | #190 | R-PROJECT-DETAIL-LIVE | 参考已确认紧凑标题与元数据、经营摘要和阶段计数；#319 按直接证据增加材料采购合同计数与关系入口，并以 390/768/1024/1440px 验证旅程布局 | 材采计数只读同项目稳定外键与来源；真实 `0` 仍可下钻，缺失、暂不可用和无权限分开表达。交付、库存、结算核心及项目物资其他范围不由本票扩展 | C-DENSE |
+| `app/pages/project/[id].vue` | `/project/:id` | 项目 | 详情 | #190 | R-PROJECT-DETAIL-LIVE | 参考已确认紧凑标题与元数据、经营摘要和阶段计数；#319 按直接证据增加材料采购合同计数与关系入口；#281 按本地蓝本补齐右栏中央 ProjectSupplier 反向关系，并以 390/768/1024/1440px 验证布局 | 材采计数和项目分供方只读同项目稳定外键与来源；真实空态、暂不可用和无权限分开表达。交付、库存、结算核心及项目物资其他范围不由本票扩展 | C-DENSE |
 | `app/pages/project/[pid]/supplier/[sid].vue` | `/project/:pid/supplier/:sid` | 项目分供方 | 详情 | #192 | R-PROJECT-DETAIL-LIVE | 没有项目×分供方目标页的安全直接证据；只借鉴邻近项目详情已确认的紧凑摘要、轻边界分区和局部横向滚动，采用六页签主区与下方合作文件，不把邻近页字段或动作写成目标页事实 | 中央 Repository 按同来源双 ID 返回合同、请款、收票、付款、支出结算与文件六类事实；仅演示合同/付款申请已有同来源只读目标并可返回，其他来源保持不可用；终态结算写入和文件正文能力明确未接入 | C-DENSE |
-| `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-FORM-LIVE | 没有文件导入目标页的安全直接证据，且严格只读协议禁止在参考站触发上传或导入；这里只借鉴邻近整页表单已确认的纵向分区、步骤信息和底部操作区，三步内容由本地蓝本裁定 | 当前只在本机按文件名匹配名称/别名与类别，所有结果可人工调整；不读取正文、不伪装 OCR、不上传云端，未确认候选不写分供方，文件只挂 ProjectSupplier | C-TOOL |
+| `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-FORM-LIVE | 没有文件导入目标页的安全直接证据，且严格只读协议禁止在参考站触发上传或导入；这里只借鉴邻近整页表单已确认的纵向分区、步骤信息和底部操作区，三步内容由本地蓝本裁定 | 文件名匹配、类别推荐和人工调整保留本机；不读正文做分类、不伪装 OCR。只有最终确认才经专用中央命令提交正文及分供方/ProjectSupplier/文件元数据；未确认候选不写入，失败不留半成品 | C-TOOL |
 | `app/pages/project/form/[[id]].vue` | `/project/form/:id?` | 项目 | 整页表单 | #190 | R-FORM-PRIOR | 项目目标页没有安全直接证据；仅借鉴 `R-FORM-LIVE` 的相邻短表单结构，并以项目蓝本、ADR 0014 和真实客户外键裁定字段与行为 | 保留草稿、保存、保存并新建、保存并提交；新建取消返回列表、保存进入新项目详情，编辑取消/保存返回原项目详情 | C-FORM |
 | `app/pages/project/index.vue` | `/project` | 项目 | 列表 | #190 | R-PROJECT-LIST-LIVE | 参考已确认左流程阶段、单行工具栏、紧凑表格和右下分页；本地新建能力继续按项目规格保留 | 未触发导入、筛选、设置或行级操作 | C-DENSE |
 | `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 项目罚扣使用独立标题、项目/分供方/合同/班组来源、罚扣与整改分区及真实状态动作 | 抵扣必须引用真实已确认分包结算；附件归当前罚扣，错误定位首个无效字段 | C-FORM |

@@ -1,3 +1,6 @@
+import type { DataOriginDTO } from '~/types/read-model'
+import { isDataOriginDTO } from '~/types/read-model'
+
 export interface CustomerListNavigationState {
   search: string
   status: string
@@ -16,6 +19,9 @@ export interface CustomerReturnOrigin {
 }
 
 const ROUTE = '/base/customer'
+const DETAIL_ROUTE = /^\/base\/customer\/([^/]+)$/
+const DETAIL_QUERY = new Set(['origin', 'tab', 'returnTo', 'returnContext'])
+const DETAIL_TABS = new Set(['projects', 'contracts', 'receipts'])
 const ID = /^[\w-]{8,64}$/
 const ANCHOR = /^customer-row-[\w%.~-]+$/
 const PREFIX = 'ruihang:customer-return:'
@@ -27,6 +33,83 @@ export function isCustomerReturnContextId(value: unknown): value is string {
 
 function control(value: string): boolean {
   return [...value].some(char => char.charCodeAt(0) <= 31 || char.charCodeAt(0) === 127)
+}
+
+function decodeDetailIdentity(value: string): string | null {
+  try {
+    const identity = decodeURIComponent(value)
+    return identity.trim() && identity !== '.' && identity !== '..' && !control(identity)
+      ? identity
+      : null
+  }
+  catch {
+    return null
+  }
+}
+
+export function createCustomerDetailReturnTo(options: {
+  customerId: string
+  origin: DataOriginDTO
+  tab: 'projects' | 'contracts' | 'receipts'
+  returnTo?: string
+  returnContext?: string
+}): string {
+  const customerId = decodeDetailIdentity(encodeURIComponent(options.customerId))
+  if (!customerId || !isDataOriginDTO(options.origin) || !DETAIL_TABS.has(options.tab))
+    throw new Error('invalid customer detail return target')
+  const query = new URLSearchParams({ origin: options.origin })
+  if (options.tab !== 'projects')
+    query.set('tab', options.tab)
+  if (options.returnTo != null || options.returnContext != null) {
+    const returnTo = validateCustomerReturnTo(options.returnTo)
+    if (!returnTo || !isCustomerReturnContextId(options.returnContext))
+      throw new Error('invalid customer list return context')
+    query.set('returnTo', returnTo)
+    query.set('returnContext', options.returnContext)
+  }
+  return `${ROUTE}/${encodeURIComponent(customerId)}?${query.toString()}`
+}
+
+export function validateCustomerDetailReturnTo(
+  input: unknown,
+  expectedOrigin?: unknown,
+  expectedCustomerId?: unknown,
+): string | null {
+  if (typeof input !== 'string' || input.length === 0 || input.length > 4096
+    || !input.startsWith('/') || input.startsWith('//') || input.includes('\\') || control(input)) {
+    return null
+  }
+  let url: URL
+  try {
+    url = new URL(input, 'https://ruihang.invalid')
+  }
+  catch {
+    return null
+  }
+  const match = DETAIL_ROUTE.exec(url.pathname)
+  const customerId = match ? decodeDetailIdentity(match[1] ?? '') : null
+  const origin = url.searchParams.get('origin')
+  const tab = url.searchParams.get('tab') ?? 'projects'
+  if (url.origin !== 'https://ruihang.invalid' || url.hash || !customerId
+    || [...url.searchParams.keys()].some(key => !DETAIL_QUERY.has(key))
+    || [...DETAIL_QUERY].some(key => url.searchParams.getAll(key).length > 1)
+    || !isDataOriginDTO(origin) || (expectedOrigin != null && origin !== expectedOrigin)
+    || (expectedCustomerId != null && customerId !== expectedCustomerId)
+    || !DETAIL_TABS.has(tab)) {
+    return null
+  }
+  try {
+    return createCustomerDetailReturnTo({
+      customerId,
+      origin,
+      tab: tab as 'projects' | 'contracts' | 'receipts',
+      returnTo: url.searchParams.get('returnTo') ?? undefined,
+      returnContext: url.searchParams.get('returnContext') ?? undefined,
+    })
+  }
+  catch {
+    return null
+  }
 }
 
 export function createCustomerReturnOrigin(options: {

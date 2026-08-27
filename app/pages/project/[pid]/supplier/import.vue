@@ -8,26 +8,23 @@ import { toErrorMessage } from '~/lib/util/error'
 const route = useRoute()
 const router = useRouter()
 const pid = computed(() => String(route.params.pid ?? ''))
-const projStore = useProjectStore()
-const supStore = useSupplierStore()
-const psStore = useProjectSupplierStore()
+const commandStore = useProjectSupplierCommandStore()
 const { error, success } = useKitUI()
 const busy = shallowRef(false)
 const initialized = shallowRef(false)
 
-const project = computed(() => projStore.byId(pid.value))
-const suppliers = computed(() => supStore.list.map(supplier => ({
-  id: supplier.id,
-  name: supplier.name,
-  aliases: supplier.aliases,
-})))
-const existingSupplierIds = computed(() =>
-  new Set(psStore.byProject(pid.value).map(relationship => relationship.supplierId)),
-)
+const project = shallowRef<{ id: string, name: string } | null>(null)
+const suppliers = shallowRef<Array<{ id: string, name: string, aliases: string[] }>>([])
+const existingSupplierIds = shallowRef(new Set<string>())
 
 async function initialize() {
   try {
-    await Promise.all([projStore.load(), supStore.load(), psStore.load()])
+    if (route.query.origin !== 'real')
+      throw new Error('项目分供方导入只用于中央正式项目')
+    const context = await commandStore.hydrate(pid.value)
+    project.value = context.project
+    suppliers.value = context.suppliers
+    existingSupplierIds.value = new Set(context.existingSupplierIds)
   }
   catch (cause) {
     error('导入向导加载失败', toErrorMessage(cause))
@@ -59,8 +56,7 @@ async function confirmImport(items: readonly ProjectSupplierImportItem[]) {
       groups.set(key, group)
     }
 
-    const result = await psStore.importFiles(pid.value, [...groups.values()])
-    await supStore.load()
+    const result = await commandStore.importFiles(pid.value, [...groups.values()])
 
     success(
       `已归档 ${result.fileCount} 个文件，关联 ${result.relationshipCount} 家分供方`,
@@ -71,7 +67,7 @@ async function confirmImport(items: readonly ProjectSupplierImportItem[]) {
     )
     await router.push({
       path: `/project/${pid.value}`,
-      query: { tab: 'expenditure' },
+      query: { origin: 'real' },
     })
   }
   catch (cause) {
@@ -89,7 +85,7 @@ onMounted(initialize)
   <div class="min-w-0 space-y-4">
     <section class="panel p-4">
       <NuxtLink
-        :to="{ path: `/project/${pid}`, query: { tab: 'expenditure' } }"
+        :to="{ path: `/project/${pid}`, query: { origin: 'real' } }"
         class="inline-flex items-center gap-1 text-11px font-700 text-brand"
       >
         <span class="i-lucide-arrow-left" aria-hidden="true" />

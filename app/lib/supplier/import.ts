@@ -1,16 +1,9 @@
 import type { Supplier } from '~/stores/supplier'
+import { PROJECT_SUPPLIER_FILE_CATEGORIES } from '~/lib/project-supplier/command-contract'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { toNum } from '~/lib/util/number'
 
-export const PROJECT_SUPPLIER_FILE_CATEGORIES = [
-  '合同',
-  '请款',
-  '收票',
-  '付款',
-  '结算',
-  '资质',
-  '其他',
-] as const
+export { PROJECT_SUPPLIER_FILE_CATEGORIES } from '~/lib/project-supplier/command-contract'
 
 export type ProjectSupplierFileCategory = (typeof PROJECT_SUPPLIER_FILE_CATEGORIES)[number]
 export type ProjectSupplierMatchSource = 'name' | 'alias' | 'unmatched'

@@ -152,4 +152,27 @@ describe('分供方中央详情', () => {
     expect(screen.getByTestId('fact-tab').textContent).toBe('contracts')
     expect(screen.getByRole('link', { name: '返回材料采购合同' }).getAttribute('href')).toBe(contractReturnTo)
   })
+
+  it('从匹配的项目分供方工作台进入时显式返回原页签', () => {
+    const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=overview'
+    render(SupplierDetailScreen, {
+      props: {
+        supplierId: 'supplier-1',
+        origin: 'demo',
+        includeDemo: true,
+        returnTo,
+      },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        Metric: metricStub,
+        MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    expect(screen.getByRole('link', { name: '返回项目分供方工作台' }).getAttribute('href')).toBe(returnTo)
+  })
 })

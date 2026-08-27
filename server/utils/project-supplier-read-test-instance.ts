@@ -11,6 +11,8 @@ import type {
   ProjectSupplierSettlementSourceRow,
   ProjectSupplierSupplierSourceRow,
 } from '../../app/lib/project-supplier/repository'
+import type { ProjectSupplierReferenceSourceRow } from '../../app/lib/project/repository'
+import type { DataOriginDTO } from '../../app/types/read-model'
 import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import invoicesSeed from '../../app/lib/db/seed/invoices.json'
@@ -23,12 +25,14 @@ import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
 import {
   buildProjectSupplierWorkbenchRead,
   parseProjectSupplierWorkbenchQuery,
+  PROJECT_SUPPLIER_READ_CAPABILITY,
   projectSupplierProblem,
   ProjectSupplierRepositoryProblem,
 } from '../../app/lib/project-supplier/repository'
 import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 
 export type ProjectSupplierReadTestScenario = 'ready' | 'formal-ready' | 'zero' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -343,30 +347,57 @@ export function createProjectSupplierReadTestInstance(
       throw problem('unavailable', '项目分供方中央读取服务暂时不可用', true)
     const migration = resolveMigrationSnapshot(sessionId)
     const formal = formalRows(migration)
+    const imported = projectSupplierCommandTestInstance.rows(sessionId)
     const ready = scenario === 'ready'
     const formalReady = scenario === 'formal-ready'
     const zero = scenario === 'zero'
     return {
-      projects: formalReady || zero ? formalFixture.projects : ready ? [...formal.projects, ...demoProjects] : [],
-      suppliers: formalReady || zero ? formalFixture.suppliers : ready ? [...formal.suppliers, ...demoSuppliers] : [],
-      relations: formalReady || zero ? formalFixture.relations : ready ? [...formal.relations, ...demoRelations] : [],
+      projects: zero ? formalFixture.projects : formalReady ? [...formalFixture.projects, ...imported.projects] : ready ? [...formal.projects, ...imported.projects, ...demoProjects] : [],
+      suppliers: zero ? formalFixture.suppliers : formalReady ? [...formalFixture.suppliers, ...imported.suppliers] : ready ? [...formal.suppliers, ...imported.suppliers, ...demoSuppliers] : [],
+      relations: zero ? formalFixture.relations : formalReady ? [...formalFixture.relations, ...imported.relations] : ready ? [...formal.relations, ...imported.relations, ...demoRelations] : [],
       contracts: formalReady ? formalFixture.contracts : ready ? demoContracts : [],
       claims: formalReady ? formalFixture.claims : ready ? demoClaims : [],
       invoices: formalReady ? formalFixture.invoices : ready ? demoInvoices : [],
       paymentRecords: formalReady ? formalFixture.paymentRecords : ready ? demoPaymentRecords : [],
       paymentAllocations: formalReady ? formalFixture.paymentAllocations : ready ? demoPaymentAllocations : [],
       settlements: formalReady ? formalFixture.settlements : ready ? demoSettlements : [],
-      files: formalReady ? formalFixture.files : ready ? demoFiles : [],
+      files: zero ? [] : formalReady ? [...formalFixture.files, ...imported.files] : ready ? [...imported.files, ...demoFiles] : [],
       capabilities: [...resolveCapabilities(sessionId)],
       sourceVersion: formalReady
-        ? `${SOURCE_VERSION}:explicit-formal`
+        ? `${SOURCE_VERSION}:explicit-formal:command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`
         : zero
           ? `${SOURCE_VERSION}:explicit-zero`
-          : `${SOURCE_VERSION}:${migration.authority === 'central' ? migration.activeBatchId ?? 'migration-central' : 'migration-local'}`,
+          : `${SOURCE_VERSION}:${migration.authority === 'central' ? migration.activeBatchId ?? 'migration-central' : 'migration-local'}:command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 
+  function relationshipReferences(
+    projectId: string,
+    origin: DataOriginDTO,
+    sessionId?: string | null,
+  ): ProjectSupplierReferenceSourceRow[] {
+    const data = context(sessionId)
+    const suppliers = new Map(
+      data.suppliers
+        .filter(supplier => supplier.dataOrigin === origin)
+        .map(supplier => [supplier.id, supplier]),
+    )
+    return data.relations
+      .filter(relation => relation.projectId === projectId && relation.dataOrigin === origin)
+      .map(relation => ({
+        dataOrigin: relation.dataOrigin,
+        relationId: relation.id,
+        projectId: relation.projectId,
+        supplierId: relation.supplierId || null,
+        supplierName: suppliers.get(relation.supplierId)?.name ?? null,
+        permission: 'allowed',
+      }))
+  }
+
   return {
+    sourceVersion(sessionId?: string | null) {
+      return projectSupplierCommandTestInstance.sourceVersion(sessionId)
+    },
     reset(next: ProjectSupplierReadTestScenario, sessionId?: string | null) {
       if (next === 'ready')
         scenarios.delete(keyFor(sessionId))
@@ -385,6 +416,22 @@ export function createProjectSupplierReadTestInstance(
         query: parseProjectSupplierWorkbenchQuery(projectId, supplierId, input),
         asOf: FIXED_AS_OF,
       })
+    },
+    references(
+      projectId: string,
+      origin: DataOriginDTO,
+      sessionId?: string | null,
+    ): ProjectSupplierReferenceSourceRow[] {
+      if (!resolveCapabilities(sessionId).includes(PROJECT_SUPPLIER_READ_CAPABILITY))
+        throw problem('forbidden', '无项目分供方反向关系查看权限')
+      return relationshipReferences(projectId, origin, sessionId)
+    },
+    commandRelationships(
+      projectId: string,
+      origin: DataOriginDTO,
+      sessionId?: string | null,
+    ): ProjectSupplierReferenceSourceRow[] {
+      return relationshipReferences(projectId, origin, sessionId)
     },
   }
 }

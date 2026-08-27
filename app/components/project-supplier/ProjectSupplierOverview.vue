@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/repository'
 
-defineProps<{ data: ProjectSupplierWorkbenchReadDTO }>()
+defineProps<{ data: ProjectSupplierWorkbenchReadDTO, returnTo: string }>()
 </script>
 
 <template>
@@ -10,7 +10,7 @@ defineProps<{ data: ProjectSupplierWorkbenchReadDTO }>()
       <h2 id="project-profile-title" class="m-0 text-13px font-800 text-ink">
         项目身份
       </h2>
-      <EntityLink class="mt-3 block text-15px" type="project" :intent="data.projectNavigation" :label="data.project.label" />
+      <EntityLink class="mt-3 block text-15px" type="project" :intent="data.projectNavigation" :label="data.project.label" :return-to="returnTo" />
       <dl class="mt-4 grid grid-cols-2 gap-3 text-11px">
         <div>
           <dt class="text-ink-faint">
@@ -39,7 +39,7 @@ defineProps<{ data: ProjectSupplierWorkbenchReadDTO }>()
       <h2 id="supplier-profile-title" class="m-0 text-13px font-800 text-ink">
         分供方身份
       </h2>
-      <EntityLink class="mt-3 block text-15px" type="supplier" :intent="data.supplierNavigation" :label="data.supplier.label" />
+      <EntityLink class="mt-3 block text-15px" type="supplier" :intent="data.supplierNavigation" :label="data.supplier.label" :return-to="returnTo" />
       <dl class="mt-4 grid grid-cols-2 gap-3 text-11px">
         <div>
           <dt class="text-ink-faint">

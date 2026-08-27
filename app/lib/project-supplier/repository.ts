@@ -1,3 +1,4 @@
+export * from './command-contract'
 export * from './http-repository'
 export * from './read-contract'
 export * from './read-decoder'

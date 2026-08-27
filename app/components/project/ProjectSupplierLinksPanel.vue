@@ -1,27 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import type { ProjectSupplierReferenceDTO } from '~/lib/project/repository'
+import type { DataOriginDTO } from '~/types/read-model'
+import { computed } from 'vue'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{
   projectId: string
+  origin: DataOriginDTO
+  access: 'allowed' | 'forbidden' | 'error'
+  relationships: readonly ProjectSupplierReferenceDTO[]
+  canImport?: boolean
 }>()
 
-const store = useProjectSupplierStore()
-const relationships = computed(() => store.byProject(props.projectId))
-const loadError = shallowRef('')
-
-async function loadRelationships() {
-  loadError.value = ''
-  try {
-    await store.load()
-  }
-  catch (cause) {
-    loadError.value = cause instanceof Error ? cause.message : '合作关系读取失败'
-  }
-}
-
-onMounted(() => {
-  void loadRelationships()
-})
+const relationships = computed(() => props.relationships.map(relationship => ({
+  ...relationship,
+  target: resolveNavigationTarget(relationship.navigation),
+})))
 </script>
 
 <template>
@@ -34,41 +28,47 @@ onMounted(() => {
     </SectionHeader>
 
     <StatePanel
-      v-if="loadError"
+      v-if="access === 'error'"
       kind="error"
-      title="合作关系读取失败"
-      :description="loadError"
-      action-label="重试"
+      title="项目分供方读取失败"
+      description="中央关系暂不可用，请刷新项目详情重试。"
       compact
-      @action="loadRelationships"
     />
     <StatePanel
-      v-else-if="store.loading && relationships.length === 0"
-      kind="loading"
-      title="正在读取合作关系"
+      v-else-if="access === 'forbidden'"
+      kind="forbidden"
+      title="无权查看项目分供方"
       compact
     />
     <div v-else-if="relationships.length" class="divide-y divide-line">
       <NuxtLink
-        v-for="relationship in relationships"
-        :key="relationship.id"
-        :to="`/project/${projectId}/supplier/${relationship.supplierId}`"
+        v-for="relationship in relationships.filter(item => item.target.state === 'resolved')"
+        :key="relationship.relationId"
+        :to="relationship.target.state === 'resolved' ? relationship.target.to : ''"
         class="flex min-w-0 items-center gap-2 px-3 py-2 text-12px hover:bg-surface-2"
       >
         <span class="i-lucide-building-2 shrink-0 text-brand" aria-hidden="true" />
         <span class="min-w-0 flex-1 truncate font-600 text-brand">
-          {{ relationship.supplierName || relationship.supplierId }}
+          {{ relationship.supplier.state === 'resolved' ? relationship.supplier.label : '分供方身份不可用' }}
         </span>
         <span class="i-lucide-chevron-right shrink-0 text-ink-faint" aria-hidden="true" />
       </NuxtLink>
+      <div
+        v-for="relationship in relationships.filter(item => item.target.state !== 'resolved')"
+        :key="relationship.relationId"
+        class="flex min-w-0 items-center gap-2 px-3 py-2 text-12px text-ink-faint"
+      >
+        <span class="i-lucide-lock-keyhole shrink-0" aria-hidden="true" />
+        <span>{{ relationship.supplier.state === 'forbidden' ? '无权查看分供方' : '分供方身份未记录' }}</span>
+      </div>
     </div>
     <p v-else class="m-0 px-3 py-4 text-center text-11px text-ink-faint">
       当前项目尚未关联分供方
     </p>
 
-    <div class="border-t border-line px-3 py-2">
+    <div v-if="canImport && origin === 'real'" class="border-t border-line px-3 py-2">
       <NuxtLink
-        :to="`/project/${projectId}/supplier/import`"
+        :to="`/project/${projectId}/supplier/import?origin=real`"
         class="btn-secondary w-full justify-center"
       >
         <span class="i-lucide-file-up mr-1" aria-hidden="true" />

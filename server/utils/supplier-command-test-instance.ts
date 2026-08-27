@@ -19,6 +19,7 @@ interface StoredSupplier {
 
 interface SessionState {
   commands: Map<string, SupplierCommandResultDTO>
+  importedIds: Set<string>
   suppliers: Map<string, StoredSupplier>
   sourceVersion: number
 }
@@ -26,6 +27,11 @@ interface SessionState {
 interface Options {
   createId?: () => string
   now?: () => string
+}
+
+export interface SupplierImportAdoptionTransaction {
+  commit: () => void
+  rollback: () => void
 }
 
 function text(value: unknown): string {
@@ -103,6 +109,57 @@ function toRow(stored: StoredSupplier): SupplierListSourceRow {
   }
 }
 
+function importedStoredSupplier(row: SupplierListSourceRow): StoredSupplier {
+  return {
+    id: row.id,
+    draft: cleanDraft({
+      id: row.id,
+      name: row.name,
+      aliases: row.aliases,
+      externalRef: row.externalRef,
+      uniqueCode: row.uniqueCode,
+      taxNo: row.taxNo,
+      businessType: row.businessType,
+      supplierCategory: row.supplierCategory,
+      rating: row.rating,
+      legalRep: row.legalRep,
+      registeredCapital: row.registeredCapital,
+      registeredDate: row.registeredDate ?? '',
+      address: row.address,
+      taxpayerType: row.taxpayerType,
+      taxpayerVerificationStatus: '',
+      taxpayerVerificationSource: '',
+      taxpayerVerifiedAt: null,
+      taxpayerVerificationNote: '',
+      mainBusiness: row.mainBusiness,
+      invoiceName: row.invoiceName,
+      invoiceAddress: row.invoiceAddress,
+      bank: row.bank,
+      bankAccount: row.bankAccount,
+      phone: row.phone,
+      contact: row.contact,
+      contactPhone: row.contactPhone,
+      contactTitle: row.contactTitle,
+      note: row.note,
+      approvalStatus: 'draft',
+    }),
+    version: 1,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function cloneState(state: SessionState): SessionState {
+  return {
+    commands: new Map(state.commands),
+    importedIds: new Set(state.importedIds),
+    suppliers: new Map([...state.suppliers].map(([id, stored]) => [id, {
+      ...stored,
+      draft: { ...stored.draft, aliases: [...(stored.draft.aliases ?? [])] },
+    }])),
+    sourceVersion: state.sourceVersion,
+  }
+}
+
 export function createSupplierCommandTestInstance(options: Options = {}) {
   const states = new Map<string, SessionState>()
   const createId = options.createId ?? (() => randomUUID())
@@ -112,7 +169,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
-      state = { commands: new Map(), suppliers: new Map(), sourceVersion: 0 }
+      state = { commands: new Map(), importedIds: new Set(), suppliers: new Map(), sourceVersion: 0 }
       states.set(key, state)
     }
     return state
@@ -130,6 +187,51 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
   return {
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
+    },
+    prepareImportedSuppliers(rows: readonly SupplierListSourceRow[], sessionId?: string | null): SupplierImportAdoptionTransaction {
+      const key = keyFor(sessionId)
+      const previous = states.get(key)
+      const snapshot = previous ? cloneState(previous) : null
+      let committed = false
+      return {
+        commit() {
+          committed = true
+          const state = stateFor(sessionId)
+          let changed = false
+          for (const row of rows) {
+            if (state.suppliers.has(row.id))
+              continue
+            state.suppliers.set(row.id, importedStoredSupplier(row))
+            state.importedIds.add(row.id)
+            changed = true
+          }
+          if (changed)
+            state.sourceVersion += 1
+        },
+        rollback() {
+          if (!committed)
+            return
+          if (snapshot)
+            states.set(key, cloneState(snapshot))
+          else
+            states.delete(key)
+          committed = false
+        },
+      }
+    },
+    removeImportedSuppliers(ids: readonly string[], sessionId?: string | null) {
+      const state = states.get(keyFor(sessionId))
+      if (!state)
+        return
+      let removed = false
+      for (const id of ids) {
+        if (!state.importedIds.delete(id))
+          continue
+        state.suppliers.delete(id)
+        removed = true
+      }
+      if (removed)
+        state.sourceVersion += 1
     },
     rows(sessionId?: string | null): SupplierListSourceRow[] {
       return [...stateFor(sessionId).suppliers.values()].map(toRow)

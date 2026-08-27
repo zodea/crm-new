@@ -13,6 +13,8 @@ import {
 
 export interface ProjectSupplierHttpFetchOptions {
   query?: Record<string, unknown>
+  method?: 'GET' | 'POST'
+  body?: Record<string, unknown>
 }
 
 export type ProjectSupplierHttpFetcher = (url: string, options?: ProjectSupplierHttpFetchOptions) => Promise<unknown>

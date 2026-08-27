@@ -26,6 +26,7 @@ import {
   SupplierRepositoryProblem,
 } from '../../app/lib/supplier/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -173,6 +174,10 @@ export function createSupplierReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
   resolveFormalRows: (sessionId?: string | null) => readonly SupplierListSourceRow[] = id => supplierCommandTestInstance.rows(id),
   resolveFormalSourceVersion: (sessionId?: string | null) => string = id => supplierCommandTestInstance.sourceVersion(id),
+  resolveImportedRelations: (sessionId?: string | null) => {
+    projects: readonly SupplierProjectSourceRow[]
+    relations: readonly SupplierProjectRelationSourceRow[]
+  } = id => projectSupplierCommandTestInstance.supplierProjectRows(id),
 ) {
   const scenarios = new Map<string, SupplierReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -187,18 +192,19 @@ export function createSupplierReadTestInstance(
     if (!capabilities.includes('supplier:list:read'))
       throw problem('forbidden', '无分供方查看权限')
     const ready = scenario === 'ready'
+    const imported = resolveImportedRelations(sessionId)
     return {
       capabilities,
       suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers] : [],
-      projects: ready ? demoProjects : [],
-      projectSuppliers: ready ? demoProjectSuppliers : [],
+      projects: ready ? [...imported.projects, ...demoProjects] : [],
+      projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
       contracts: ready ? demoContracts : [],
       settlements: [],
       invoices: ready ? demoInvoices : [],
       paymentApplications: ready ? demoPaymentApplications : [],
       paymentRecords: ready ? demoPaymentRecords : [],
       paymentAllocations: ready ? demoPaymentAllocations : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 
@@ -208,6 +214,9 @@ export function createSupplierReadTestInstance(
         scenarios.delete(keyFor(sessionId))
       else
         scenarios.set(keyFor(sessionId), next)
+    },
+    async formalOptions(sessionId?: string | null) {
+      return context(sessionId).suppliers.filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name, aliases: [...row.aliases] }))
     },
     async list(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)

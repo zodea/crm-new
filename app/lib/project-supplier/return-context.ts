@@ -74,6 +74,17 @@ export function validateProjectSupplierReturnTo(input: unknown): ProjectSupplier
   }
 }
 
+export function validateProjectSupplierIdentityReturnTo(
+  input: unknown,
+  target: { entity: 'project' | 'supplier', id: string, origin: DataOriginDTO },
+): string | null {
+  const context = validateProjectSupplierReturnTo(input)
+  if (!context || context.origin !== target.origin)
+    return null
+  const expectedId = target.entity === 'project' ? context.projectId : context.supplierId
+  return expectedId === target.id ? context.to : null
+}
+
 export function appendProjectSupplierReturnContext(path: string, returnTo: unknown): string {
   const context = validateProjectSupplierReturnTo(returnTo)
   if (!context)

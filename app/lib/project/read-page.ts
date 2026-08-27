@@ -9,6 +9,8 @@ import type {
   ProjectListSourceRow,
   ProjectListStatusFacetDTO,
   ProjectPageSize,
+  ProjectSupplierReferenceDTO,
+  ProjectSupplierReferenceSourceRow,
 } from './read-contract'
 import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import {
@@ -391,6 +393,8 @@ export function buildProjectDetailRead(input: {
   capabilities?: readonly string[]
   materialContractCount?: number | null
   materialContractAccess?: 'allowed' | 'forbidden' | 'unknown' | 'missing' | 'error'
+  projectSupplierRelations?: readonly ProjectSupplierReferenceSourceRow[]
+  projectSupplierAccess?: 'allowed' | 'forbidden' | 'error'
 }): ProjectDetailReadDTO {
   validateProjectSourceRows(input.rows, input.asOf)
   if (input.query.origin === 'demo' && !input.query.includeDemo) {
@@ -422,8 +426,59 @@ export function buildProjectDetailRead(input: {
       return 'error' as const
     return 'not-connected' as const
   }
+  const item = buildProjectListItem(row, input.asOf)
+  const projectSupplierAccess = input.projectSupplierAccess ?? 'allowed'
+  const projectSupplierItems: ProjectSupplierReferenceDTO[] = projectSupplierAccess === 'allowed'
+    ? (input.projectSupplierRelations ?? [])
+        .filter(relation => relation.projectId === row.id && relation.dataOrigin === row.dataOrigin)
+        .map((relation) => {
+          if (relation.permission === 'forbidden') {
+            return {
+              relationId: relation.relationId,
+              supplier: {
+                state: 'forbidden',
+                entity: 'supplier',
+                id: relation.supplierId,
+                label: null,
+                reason: 'permission-denied',
+              },
+              navigation: { kind: 'unavailable', reason: 'forbidden' },
+            }
+          }
+          if (!relation.supplierId || !relation.supplierName) {
+            return {
+              relationId: relation.relationId,
+              supplier: {
+                state: 'missing',
+                entity: 'supplier',
+                id: null,
+                label: null,
+                reason: 'not-recorded',
+              },
+              navigation: { kind: 'unavailable', reason: 'missing-id' },
+            }
+          }
+          return {
+            relationId: relation.relationId,
+            supplier: {
+              state: 'resolved',
+              entity: 'supplier',
+              id: relation.supplierId,
+              label: relation.supplierName,
+              no: null,
+            },
+            navigation: {
+              kind: 'entity-subview',
+              subject: item.project,
+              variant: 'supplier-workbench',
+              view: 'overview',
+              filters: { supplierId: relation.supplierId, dataOrigin: relation.dataOrigin },
+            },
+          }
+        })
+    : []
   return {
-    item: buildProjectListItem(row, input.asOf),
+    item,
     materialContracts: {
       count: {
         value: materialContractReady ? materialContractCount : null,
@@ -447,6 +502,13 @@ export function buildProjectDetailRead(input: {
             kind: 'unavailable',
             reason: materialContractUnavailableReason(),
           },
+    },
+    projectSuppliers: {
+      access: projectSupplierAccess,
+      items: projectSupplierItems,
+      empty: projectSupplierAccess === 'allowed' && projectSupplierItems.length === 0
+        ? { reason: 'no-records', missingRelations: [] }
+        : null,
     },
     asOf: input.asOf,
     sourceVersion: input.sourceVersion,

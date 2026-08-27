@@ -82,7 +82,7 @@ function isMaterialContractJourney(value: unknown, item: unknown): boolean {
     && navigation.filters.dataOrigin === item.dataOrigin
 }
 
-function isEntityRef(value: unknown, entity: 'project' | 'customer'): boolean {
+function isEntityRef(value: unknown, entity: 'project' | 'customer' | 'supplier'): boolean {
   if (!isObject(value) || value.entity !== entity || typeof value.state !== 'string')
     return false
   if (value.state === 'resolved') {
@@ -102,6 +102,44 @@ function isEntityRef(value: unknown, entity: 'project' | 'customer'): boolean {
       && value.reason === 'permission-denied'
   }
   return false
+}
+
+function isProjectSupplierReference(value: unknown, item: unknown): boolean {
+  const supplier = isObject(value) ? value.supplier : null
+  if (!isObject(value) || typeof value.relationId !== 'string'
+    || !isObject(supplier) || !isEntityRef(supplier, 'supplier') || !isObject(value.navigation)) {
+    return false
+  }
+  if (supplier.state !== 'resolved') {
+    return value.navigation.kind === 'unavailable'
+      && ['forbidden', 'missing-id'].includes(String(value.navigation.reason))
+  }
+  if (!isObject(item) || !isObject(item.project))
+    return false
+  return value.navigation.kind === 'entity-subview'
+    && value.navigation.variant === 'supplier-workbench'
+    && value.navigation.view === 'overview'
+    && isObject(value.navigation.subject)
+    && value.navigation.subject.id === item.project.id
+    && value.navigation.subject.entity === 'project'
+    && isObject(value.navigation.filters)
+    && Object.keys(value.navigation.filters).length === 2
+    && value.navigation.filters.supplierId === supplier.id
+    && value.navigation.filters.dataOrigin === item.dataOrigin
+}
+
+function isProjectSupplierJourney(value: unknown, item: unknown): boolean {
+  if (!isObject(value)
+    || !['allowed', 'forbidden', 'error'].includes(String(value.access))
+    || !Array.isArray(value.items)
+    || !value.items.every(reference => isProjectSupplierReference(reference, item))) {
+    return false
+  }
+  if (value.access !== 'allowed')
+    return value.items.length === 0 && value.empty === null
+  if (value.items.length > 0)
+    return value.empty === null
+  return isObject(value.empty) && isEmpty(value.empty) && value.empty.reason === 'no-records'
 }
 
 function isProjectNavigation(
@@ -241,6 +279,7 @@ export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
   const valid = isObject(value)
     && isProjectItem(value.item)
     && isMaterialContractJourney(value.materialContracts, value.item)
+    && isProjectSupplierJourney(value.projectSuppliers, value.item)
     && isISODateTimeDTO(value.asOf)
     && (value.sourceVersion === null || typeof value.sourceVersion === 'string')
     && Array.isArray(value.capabilities)

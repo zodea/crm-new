@@ -1,4 +1,5 @@
 import type { BusinessSession } from '../../server/utils/business-session'
+import type { SupplierListSourceRow } from '~/lib/supplier/repository'
 import { describe, expect, it } from 'vitest'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
 import { SupplierRepositoryProblem } from '~/lib/supplier/repository'
@@ -172,5 +173,46 @@ describe('分供方中央写入测试实例', () => {
 
     expect(updated).toMatchObject({ id: created.id, version: '2' })
     expect(commands.form(created.id, session).draft.name).toBe('已编辑分供方')
+  })
+
+  it('导入 lookup 返回完整正式身份集合，不被列表 100 条分页截断', async () => {
+    const rows = Array.from({ length: 101 }, (_, index): SupplierListSourceRow => ({
+      dataOrigin: 'real',
+      id: `supplier-${index + 1}`,
+      name: `正式分供方 ${index + 1}`,
+      aliases: [],
+      externalRef: '',
+      uniqueCode: '',
+      taxNo: '',
+      businessType: '',
+      supplierCategory: '其他',
+      rating: '',
+      legalRep: '',
+      registeredCapital: null,
+      registeredDate: null,
+      address: '',
+      taxpayerType: '',
+      mainBusiness: '',
+      invoiceName: '',
+      invoiceAddress: '',
+      bank: '',
+      bankAccount: '',
+      phone: '',
+      contact: '',
+      contactPhone: '',
+      contactTitle: '',
+      credentialStatus: 'incomplete',
+      note: '',
+      updatedAt: '2026-08-27T00:00:00.000Z',
+    }))
+    const reads = createSupplierReadTestInstance(
+      () => session.capabilities,
+      () => rows,
+      () => 'supplier-command-101',
+    )
+
+    const options = await reads.formalOptions('session-many')
+    expect(options).toHaveLength(101)
+    expect(options.at(-1)).toEqual({ id: 'supplier-101', name: '正式分供方 101', aliases: [] })
   })
 })

@@ -56,10 +56,13 @@ describe('客户详情展示', () => {
   })
 
   it('项目、合同和收款都下钻各自只读详情', () => {
+    const relationshipReturnTo = '/base/customer/customer_1?origin=real&tab=receipts'
+    const projectHref = `/project/project_1?origin=real&returnTo=${encodeURIComponent(relationshipReturnTo)}`
     const baseProps = {
+      relationshipReturnTo,
       projects: [{
         project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: 'HHXC-01' },
-        navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: 'HHXC-01' }, variant: 'detail', view: null, filters: { dataOrigin: 'real' } },
+        navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: 'HHXC-01' }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         code: 'HHXC-01',
         relationRole: '主客户' as const,
         status: '施工中',
@@ -75,7 +78,7 @@ describe('客户详情展示', () => {
         contract: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' },
         navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' }, variant: 'detail', view: null, filters: {} },
         project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null },
-        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real' } },
+        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         effectiveAmount: '1000000.00',
         receiptAmount: '320000.00',
         outstandingAmount: '680000.00',
@@ -88,7 +91,7 @@ describe('客户详情展示', () => {
         navigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'receipt' as const, id: 'receipt_1', label: 'SK-001', no: 'SK-001' }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         receiptDate: '2026-05-01',
         project: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null },
-        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real' } },
+        projectNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'project' as const, id: 'project_1', label: '合和新城', no: null }, variant: 'detail', view: null, filters: { dataOrigin: 'real', customerId: 'customer_1' } },
         contract: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' },
         contractNavigation: { kind: 'entity-detail' as const, subject: { state: 'resolved' as const, entity: 'contract' as const, id: 'contract_1', label: '施工合同', no: 'SG-001' }, variant: 'detail', view: null, filters: {} },
         payerAccount: '合和地产集团',
@@ -105,14 +108,14 @@ describe('客户详情展示', () => {
       props: { ...baseProps, tab: 'projects' },
       global,
     })
-    expect(projectView.get('a').attributes('href')).toBe('/project/project_1?origin=real')
+    expect(projectView.get('a').attributes('href')).toBe(projectHref)
 
     const contractView = mount(CustomerDetailRelations, {
       props: { ...baseProps, tab: 'contracts' },
       global,
     })
     expect(contractView.findAll('a').map(link => link.attributes('href'))).toEqual([
-      '/project/project_1?origin=real',
+      projectHref,
       '/contract/contract_1',
     ])
 
@@ -121,7 +124,7 @@ describe('客户详情展示', () => {
       global,
     })
     expect(receiptView.findAll('a').map(link => link.attributes('href'))).toEqual([
-      '/project/project_1?origin=real',
+      projectHref,
       '/contract/contract_1',
       '/finance/receipt/receipt_1?origin=real&customerId=customer_1',
     ])
