@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createMaterialContractJourneyReturnOrigin,
   createMaterialContractReturnOrigin,
+  loadMaterialContractJourneyReturnOrigin,
   materialContractListNavigationStateFromQuery,
+  resolveMaterialContractJourneyReturnOrigin,
   resolveMaterialContractReturnContext,
+  saveMaterialContractJourneyReturnOrigin,
   validateMaterialContractDetailJourneyReturnTo,
   validateMaterialContractReturnTo,
   validateProjectJourneyReturnTo,
@@ -75,13 +79,49 @@ describe('材料采购合同列表返回上下文', () => {
     expect(validateProjectJourneyReturnTo('/project/project-1', 'demo')).toBeNull()
   })
 
-  it('保留项目甲方商务卡片的稳定返回锚点', () => {
+  it('保留项目材采操作与甲方商务卡片的稳定返回锚点', () => {
+    expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link',
+      'real',
+    )).toBe('/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link')
     expect(validateProjectJourneyReturnTo(
       '/project/project-1?origin=real#project-owner-document-card-warranty',
       'real',
     )).toBe('/project/project-1?origin=real#project-owner-document-card-warranty')
     expect(validateProjectJourneyReturnTo(
       '/project/project-1?origin=real#project-owner-document-card-forged',
+      'real',
+    )).toBeNull()
+  })
+
+  it('用短期会话上下文恢复项目入口和合同分供方入口的滚动与焦点锚点', () => {
+    const projectReturnTo = '/project/project-1?origin=real&materialJourney=origin_277_project#project-material-contract-link'
+    const origin = createMaterialContractJourneyReturnOrigin({
+      contextId: 'origin_277_project',
+      returnTo: projectReturnTo,
+      anchorId: 'project-material-contract-link',
+      scrollTop: 432,
+      now: 1_000,
+    })
+    const storage = new Map<string, string>()
+    const session = {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    } as Storage
+    saveMaterialContractJourneyReturnOrigin(origin, session)
+
+    expect(loadMaterialContractJourneyReturnOrigin(origin.id, session)).toEqual(origin)
+    expect(resolveMaterialContractJourneyReturnOrigin({
+      returnTo: projectReturnTo,
+      contextId: origin.id,
+      now: 1_001,
+      load: id => loadMaterialContractJourneyReturnOrigin(id, session),
+    })).toEqual(origin)
+
+    const factReturnTo = '/contract/contract-1?origin=real&contractKind=material&supplierFactJourney=origin_277_fact#material-contract-supplier-fact-settlements'
+    expect(validateMaterialContractDetailJourneyReturnTo(factReturnTo, 'real')).toBe(factReturnTo)
+    expect(validateMaterialContractDetailJourneyReturnTo(
+      '/contract/contract-1?origin=real&contractKind=material&supplierFactJourney=forged#material-contract-supplier-fact-settlements',
       'real',
     )).toBeNull()
   })

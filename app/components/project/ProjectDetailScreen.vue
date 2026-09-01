@@ -4,10 +4,18 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import type { StatusTone } from '~/lib/project/status'
 import type { Project } from '~/stores/project'
 import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
-import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
+import {
+  createMaterialContractJourneyReturnOrigin,
+  loadMaterialContractJourneyReturnOrigin,
+  newMaterialContractReturnContextId,
+  resolveMaterialContractJourneyReturnOrigin,
+  saveMaterialContractJourneyReturnOrigin,
+  validateProjectJourneyReturnTo,
+} from '~/lib/material-contract/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 import { yuan } from '~/lib/util/money'
@@ -36,6 +44,7 @@ const detail = shallowRef<ProjectDetailReadDTO | null>(null)
 const state = shallowRef<'loading' | 'ready' | 'forbidden' | 'not-found' | 'mismatch' | 'error'>('loading')
 const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
+const materialJourneyContextId = ref(newMaterialContractReturnContextId())
 let latestLoad = 0
 let latestOwnerJourneyLoad = 0
 let hasActivated = false
@@ -65,6 +74,13 @@ const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
 const journeyReturnTo = computed(() => props.currentRoute
   || `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`)
+const materialJourneyReturnTo = computed(() => {
+  const url = new URL(journeyReturnTo.value, 'https://ruihang.invalid')
+  url.searchParams.set('materialJourney', materialJourneyContextId.value)
+  url.hash = 'project-material-contract-link'
+  return validateProjectJourneyReturnTo(`${url.pathname}${url.search}${url.hash}`, props.originHint)
+    ?? `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`
+})
 const ownerJourneyCards = computed(() => {
   const current = ownerJourneys.value
   if (!current)
@@ -94,19 +110,61 @@ function ownerJourneyTo(kind: 'change' | 'report' | 'acceptance' | 'warranty') {
   return `/owner/${kind === 'warranty' ? 'acceptance' : kind}?${query.toString()}`
 }
 
-async function restoreOwnerJourneyContext() {
-  if (!import.meta.client || !ownerJourneys.value)
-    return
+function workspaceScrollTop(): number {
+  return document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop ?? 0
+}
+
+function captureMaterialJourneyOrigin() {
+  try {
+    saveMaterialContractJourneyReturnOrigin(createMaterialContractJourneyReturnOrigin({
+      contextId: materialJourneyContextId.value,
+      returnTo: materialJourneyReturnTo.value,
+      anchorId: 'project-material-contract-link',
+      scrollTop: workspaceScrollTop(),
+      now: Date.now(),
+    }))
+  }
+  catch {
+    // 浏览器存储不可用时仍允许导航，返回时按安全锚点降级。
+  }
+}
+
+async function restoreProjectAnchorContext(): Promise<boolean> {
+  if (!import.meta.client)
+    return false
   const currentRoute = props.currentRoute || `${window.location.pathname}${window.location.search}${window.location.hash}`
-  const anchor = new URL(currentRoute, 'https://ruihang.invalid').hash.slice(1)
-  if (!/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor))
-    return
+  const validatedRoute = validateProjectJourneyReturnTo(currentRoute, props.originHint)
+  if (!validatedRoute)
+    return false
+  const url = new URL(validatedRoute, 'https://ruihang.invalid')
+  const anchor = decodeURIComponent(url.hash.slice(1))
+  const ownerJourneyAnchor = /^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor)
+  const materialJourneyAnchor = anchor === 'project-material-contract-link'
+  if (anchor !== 'project-detail-title' && !ownerJourneyAnchor && !materialJourneyAnchor)
+    return false
+  if (ownerJourneyAnchor && !ownerJourneys.value)
+    return false
   await nextTick()
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
   await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
   const target = document.getElementById(anchor)
-  target?.scrollIntoView?.({ block: 'center' })
-  target?.focus({ preventScroll: true })
+  if (!target)
+    return false
+  const origin = materialJourneyAnchor
+    ? resolveMaterialContractJourneyReturnOrigin({
+        returnTo: validatedRoute,
+        contextId: url.searchParams.get('materialJourney'),
+        now: Date.now(),
+        load: id => loadMaterialContractJourneyReturnOrigin(id),
+      })
+    : null
+  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  if (origin && workspace)
+    workspace.scrollTop = origin.scrollTop
+  else
+    target.scrollIntoView?.({ block: 'center' })
+  target.focus({ preventScroll: true })
+  return true
 }
 
 async function loadOwnerJourneys() {
@@ -136,7 +194,7 @@ async function loadOwnerJourneys() {
     ])
     if (request === latestOwnerJourneyLoad && projectId === props.projectId) {
       ownerJourneys.value = { change, report, acceptance, warranty }
-      await restoreOwnerJourneyContext()
+      await restoreProjectAnchorContext()
     }
   }
   catch (cause) {
@@ -235,7 +293,8 @@ async function loadProject() {
     state.value = 'ready'
     void loadOwnerJourneys()
     await nextTick()
-    if (loadId === latestLoad)
+    const restored = await restoreProjectAnchorContext()
+    if (loadId === latestLoad && !restored)
       titleRef.value?.focus()
   }
   catch (cause) {
@@ -262,7 +321,7 @@ watch(
 
 watch(
   () => props.currentRoute,
-  () => void restoreOwnerJourneyContext(),
+  () => void restoreProjectAnchorContext(),
   { flush: 'post' },
 )
 
@@ -374,7 +433,8 @@ onActivated(() => {
     <ProjectMaterialContractJourney
       :count="detail.materialContracts.count"
       :navigation="detail.materialContracts.navigation"
-      :return-to="journeyReturnTo"
+      :return-to="materialJourneyReturnTo"
+      @navigate="captureMaterialJourneyOrigin"
       @retry="loadProject"
     />
 

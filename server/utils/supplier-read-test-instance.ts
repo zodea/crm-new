@@ -26,6 +26,8 @@ import {
   SupplierRepositoryProblem,
 } from '../../app/lib/supplier/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { materialContractCommandTestInstance } from './material-contract-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
@@ -178,6 +180,14 @@ export function createSupplierReadTestInstance(
     projects: readonly SupplierProjectSourceRow[]
     relations: readonly SupplierProjectRelationSourceRow[]
   } = id => projectSupplierCommandTestInstance.supplierProjectRows(id),
+  resolveFormalContractSource: (sessionId?: string | null) => {
+    rows: readonly SupplierContractSourceRow[]
+    sourceVersion: string
+  } = () => ({ rows: [], sourceVersion: 'material-contract-command-0' }),
+  resolveFormalProjectSource: (sessionId?: string | null) => {
+    rows: readonly SupplierProjectSourceRow[]
+    sourceVersion: string
+  } = () => ({ rows: [], sourceVersion: 'project-command-0' }),
 ) {
   const scenarios = new Map<string, SupplierReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -193,18 +203,20 @@ export function createSupplierReadTestInstance(
       throw problem('forbidden', '无分供方查看权限')
     const ready = scenario === 'ready'
     const imported = resolveImportedRelations(sessionId)
+    const formalContracts = resolveFormalContractSource(sessionId)
+    const formalProjects = resolveFormalProjectSource(sessionId)
     return {
       capabilities,
       suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers] : [],
-      projects: ready ? [...imported.projects, ...demoProjects] : [],
+      projects: ready ? [...formalProjects.rows, ...imported.projects, ...demoProjects] : [],
       projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
-      contracts: ready ? demoContracts : [],
+      contracts: ready ? [...formalContracts.rows, ...demoContracts] : [],
       settlements: [],
       invoices: ready ? demoInvoices : [],
       paymentApplications: ready ? demoPaymentApplications : [],
       paymentRecords: ready ? demoPaymentRecords : [],
       paymentAllocations: ready ? demoPaymentAllocations : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 
@@ -235,4 +247,37 @@ export function createSupplierReadTestInstance(
   }
 }
 
-export const supplierReadTestInstance = createSupplierReadTestInstance()
+export const supplierReadTestInstance = createSupplierReadTestInstance(
+  id => demoWorkspaceTestInstance.capabilities(id),
+  id => supplierCommandTestInstance.rows(id),
+  id => supplierCommandTestInstance.sourceVersion(id),
+  id => projectSupplierCommandTestInstance.supplierProjectRows(id),
+  id => ({
+    rows: materialContractCommandTestInstance.rows(id)
+      .filter(row => row.supplierId)
+      .map(row => ({
+        dataOrigin: 'real' as const,
+        id: row.id,
+        supplierId: row.supplierId!,
+        projectId: row.projectId,
+        no: row.no,
+        name: row.name,
+        kind: row.kind,
+        amount: row.amount,
+        supplementAmount: row.supplementAmount,
+        signDate: row.signDate,
+        status: row.status,
+      })),
+    sourceVersion: materialContractCommandTestInstance.sourceVersion(id),
+  }),
+  id => ({
+    rows: projectCommandTestInstance.rows(id).map(row => ({
+      dataOrigin: 'real' as const,
+      id: row.id,
+      name: row.name,
+      status: row.status,
+      permission: 'allowed' as const,
+    })),
+    sourceVersion: projectCommandTestInstance.sourceVersion(id),
+  }),
+)

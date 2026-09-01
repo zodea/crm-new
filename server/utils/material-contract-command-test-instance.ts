@@ -19,6 +19,8 @@ import {
   materialContractProblem,
   MaterialContractRepositoryProblem,
 } from '../../app/lib/material-contract/repository'
+import { projectCommandTestInstance } from './project-command-test-instance'
+import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 interface ReferenceOption {
   id: string
@@ -54,8 +56,10 @@ interface Options {
   createLineId?: () => string
   createAttachmentId?: () => string
   now?: () => string
-  projects?: ReferenceOption[]
-  suppliers?: ReferenceOption[]
+  projects?: readonly ReferenceOption[]
+  suppliers?: readonly ReferenceOption[]
+  resolveProjects?: (sessionId?: string | null) => readonly ReferenceOption[]
+  resolveSuppliers?: (sessionId?: string | null) => readonly ReferenceOption[]
 }
 
 function text(value: unknown): string {
@@ -86,8 +90,10 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
   const createLineId = options.createLineId ?? (() => randomUUID())
   const createAttachmentId = options.createAttachmentId ?? (() => randomUUID())
   const now = options.now ?? (() => new Date().toISOString())
-  const projects = new Map((options.projects ?? []).map(row => [row.id, row.name]))
-  const suppliers = new Map((options.suppliers ?? []).map(row => [row.id, row.name]))
+  const legacyProjects = new Map((options.projects ?? []).map(row => [row.id, row.name]))
+  const legacySuppliers = new Map((options.suppliers ?? []).map(row => [row.id, row.name]))
+  const resolveProjects = options.resolveProjects ?? (() => [...legacyProjects].map(([id, name]) => ({ id, name })))
+  const resolveSuppliers = options.resolveSuppliers ?? (() => [...legacySuppliers].map(([id, name]) => ({ id, name })))
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
   const stateFor = (sessionId?: string | null) => {
     const key = keyFor(sessionId)
@@ -161,7 +167,19 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
     }
   }
 
-  function validate(draft: ProjectContractFormDraft, action: MaterialContractCommandRequestDTO['action']) {
+  function referenceMaps(sessionId?: string | null) {
+    return {
+      projects: new Map(resolveProjects(sessionId).map(row => [row.id, row.name])),
+      suppliers: new Map(resolveSuppliers(sessionId).map(row => [row.id, row.name])),
+    }
+  }
+
+  function validate(
+    draft: ProjectContractFormDraft,
+    action: MaterialContractCommandRequestDTO['action'],
+    sessionId?: string | null,
+  ) {
+    const { projects, suppliers } = referenceMaps(sessionId)
     const fieldErrors: Record<string, string[]> = {}
     if (action !== 'draft') {
       if (!text(draft.name))
@@ -226,20 +244,25 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
       throw failure('validation-failed', 'commandId 必填')
   }
 
-  function toRow(stored: StoredContract): MaterialContractDetailSource {
+  function toRow(stored: StoredContract, sessionId?: string | null): MaterialContractDetailSource {
     const draft = stored.draft
+    const { projects, suppliers } = referenceMaps(sessionId)
+    const projectId = text(draft.projectId)
+    const supplierId = text(draft.supplierId)
+    const hasProject = Boolean(projectId && projects.has(projectId))
+    const hasSupplier = Boolean(supplierId && suppliers.has(supplierId))
     return {
       dataOrigin: 'real',
       id: stored.id,
       no: text(draft.no),
       name: text(draft.name),
       kind: '材采',
-      projectId: text(draft.projectId) || null,
-      projectName: projects.get(text(draft.projectId)) ?? '',
-      projectPermission: 'allowed',
-      supplierId: text(draft.supplierId) || null,
-      supplierName: suppliers.get(text(draft.supplierId)) ?? '',
-      supplierPermission: 'allowed',
+      projectId: projectId || null,
+      projectName: hasProject ? projects.get(projectId) ?? '' : '',
+      projectReferenceState: !projectId || hasProject ? 'resolved' : 'missing-target',
+      supplierId: supplierId || null,
+      supplierName: hasSupplier ? suppliers.get(supplierId) ?? '' : '',
+      supplierReferenceState: !supplierId || hasSupplier ? 'resolved' : 'missing-target',
       amount: number(draft.amount) ?? 0,
       supplementAmount: 0,
       settledAmount: 0,
@@ -289,12 +312,26 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
     })))
   }
 
+  function cloneSessionState(state: SessionState): SessionState {
+    return {
+      commands: new Map([...state.commands].map(([id, result]) => [id, structuredClone(result)])),
+      contracts: new Map([...state.contracts].map(([id, contract]) => [id, structuredClone(contract)])),
+      sourceVersion: state.sourceVersion,
+    }
+  }
+
   return {
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
+    formContext(sessionId?: string | null) {
+      return {
+        projects: resolveProjects(sessionId).map(row => ({ ...row })),
+        suppliers: resolveSuppliers(sessionId).map(row => ({ ...row })),
+      }
+    },
     rows(sessionId?: string | null) {
-      return [...stateFor(sessionId).contracts.values()].map(toRow)
+      return [...stateFor(sessionId).contracts.values()].map(row => toRow(row, sessionId))
     },
     facts(sessionId?: string | null): MaterialContractFactSources {
       const state = stateFor(sessionId)
@@ -328,33 +365,40 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
     },
     importExisting(records: readonly MaterialContractMigrationRecord[], sessionId?: string | null) {
       const state = stateFor(sessionId)
+      const snapshot = cloneSessionState(state)
       const imported: string[] = []
-      for (const record of records) {
-        const id = text(record.id)
-        if (!id || (record.draft.id && text(record.draft.id) !== id))
-          throw failure('validation-failed', '迁移合同 ID 无效或不一致')
-        const lineIds = (record.draft.lineItems ?? []).map(row => text(row.id))
-        if (lineIds.some(lineId => !lineId) || new Set(lineIds).size !== lineIds.length)
-          throw failure('validation-failed', '迁移采购明细必须携带唯一稳定 ID')
-        validate(record.draft, 'save')
-        const current = state.contracts.get(id)
-        if (current) {
-          if (JSON.stringify(current.draft) === JSON.stringify(cleanDraft(record.draft, id, current, true)))
-            continue
-          throw failure('conflict', '迁移合同 ID 已存在且内容不一致')
+      try {
+        for (const record of records) {
+          const id = text(record.id)
+          if (!id || (record.draft.id && text(record.draft.id) !== id))
+            throw failure('validation-failed', '迁移合同 ID 无效或不一致')
+          const lineIds = (record.draft.lineItems ?? []).map(row => text(row.id))
+          if (lineIds.some(lineId => !lineId) || new Set(lineIds).size !== lineIds.length)
+            throw failure('validation-failed', '迁移采购明细必须携带唯一稳定 ID')
+          validate(record.draft, 'save', sessionId)
+          const current = state.contracts.get(id)
+          if (current) {
+            if (JSON.stringify(current.draft) === JSON.stringify(cleanDraft(record.draft, id, current, true)))
+              continue
+            throw failure('conflict', '迁移合同 ID 已存在且内容不一致')
+          }
+          state.contracts.set(id, {
+            id,
+            draft: cleanDraft(record.draft, id, null, true),
+            attachments: structuredClone(record.attachments ?? []),
+            version: record.version ?? 1,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+          })
+          state.sourceVersion += 1
+          imported.push(id)
         }
-        state.contracts.set(id, {
-          id,
-          draft: cleanDraft(record.draft, id, null, true),
-          attachments: structuredClone(record.attachments ?? []),
-          version: record.version ?? 1,
-          createdAt: record.createdAt,
-          updatedAt: record.updatedAt,
-        })
-        state.sourceVersion += 1
-        imported.push(id)
+        return imported
       }
-      return imported
+      catch (cause) {
+        states.set(keyFor(sessionId), snapshot)
+        throw cause
+      }
     },
     form(id: string, session: BusinessSession, sessionId?: string | null): MaterialContractFormReadDTO {
       if (!session.capabilities.includes(MATERIAL_CONTRACT_WRITE_CAPABILITY))
@@ -386,7 +430,7 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
         throw failure('validation-failed', '新建合同不能带 baseVersion')
       if (existing && request.baseVersion !== String(existing.version))
         throw failure('conflict', '合同已被其他操作更新，请先处理最新版本')
-      validate(request.draft, request.action)
+      validate(request.draft, request.action, sessionId)
       const timestamp = now()
       const id = existing?.id ?? createId()
       const draft = cleanDraft(request.draft, id, existing)
@@ -435,14 +479,6 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
   }
 }
 
-export const MATERIAL_CONTRACT_FORM_PROJECTS = [
-  { id: 'project-real-318', name: '中央正式材料项目' },
-]
-
-export const MATERIAL_CONTRACT_FORM_SUPPLIERS = [
-  { id: 'supplier-real-318', name: '中央正式材料供应商' },
-]
-
 export const MATERIAL_CONTRACT_EXISTING_ID = 'contract-existing-318'
 
 export const MATERIAL_CONTRACT_EXISTING_RECORD: MaterialContractMigrationRecord = {
@@ -472,6 +508,6 @@ export const MATERIAL_CONTRACT_EXISTING_RECORD: MaterialContractMigrationRecord 
 }
 
 export const materialContractCommandTestInstance = createMaterialContractCommandTestInstance({
-  projects: MATERIAL_CONTRACT_FORM_PROJECTS,
-  suppliers: MATERIAL_CONTRACT_FORM_SUPPLIERS,
+  resolveProjects: sessionId => projectCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name })),
+  resolveSuppliers: sessionId => supplierCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name })),
 })

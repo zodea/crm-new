@@ -21,6 +21,29 @@ export interface MaterialContractReturnOrigin {
   expiresAt: number
 }
 
+export interface MaterialContractJourneyReturnOrigin {
+  id: string
+  returnTo: string
+  anchorId: string
+  scrollTop: number
+  expiresAt: number
+}
+
+interface CreateMaterialContractJourneyReturnOriginOptions {
+  contextId: string
+  returnTo: string
+  anchorId: string
+  scrollTop: number
+  now: number
+}
+
+interface ResolveMaterialContractJourneyReturnOriginOptions {
+  returnTo: unknown
+  contextId: unknown
+  now: number
+  load: (id: string) => MaterialContractJourneyReturnOrigin | null
+}
+
 interface CreateMaterialContractReturnOriginOptions {
   contextId: string
   rowIdentity: string
@@ -40,6 +63,9 @@ const ROUTE = '/contract/material'
 const CONTEXT_ID = /^[\w-]{8,64}$/
 const ROW_ANCHOR = /^#material-contract-row-[\w%.~:/-]+$/
 const STORAGE_PREFIX = 'ruihang:material-contract-return:'
+const JOURNEY_STORAGE_PREFIX = 'ruihang:material-contract-journey-return:'
+const PROJECT_MATERIAL_ANCHOR = 'project-material-contract-link'
+const SUPPLIER_FACT_ANCHOR = /^material-contract-supplier-fact-(?:contracts|settlements|invoices|payments)$/
 const TTL = 30 * 60_000
 
 export function isMaterialContractReturnContextId(input: unknown): input is string {
@@ -91,13 +117,20 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
       return null
     const returnTo = url.searchParams.get('returnTo')
     const returnContext = url.searchParams.get('returnContext')
+    const materialJourney = url.searchParams.get('materialJourney')
     if ((returnTo === null) !== (returnContext === null))
       return null
     if (returnTo !== null && (!validateProjectReturnTo(returnTo) || !isProjectReturnContextId(returnContext)))
       return null
     const anchor = decodeURIComponent(url.hash.slice(1))
-    if (anchor && !/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor))
+    if (materialJourney !== null && (!CONTEXT_ID.test(materialJourney) || anchor !== PROJECT_MATERIAL_ANCHOR))
       return null
+    if (anchor
+      && anchor !== 'project-detail-title'
+      && anchor !== PROJECT_MATERIAL_ANCHOR
+      && !/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor)) {
+      return null
+    }
     const query = new URLSearchParams()
     if (origin)
       query.set('origin', origin)
@@ -105,6 +138,8 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
       query.set('returnTo', returnTo)
       query.set('returnContext', returnContext)
     }
+    if (materialJourney)
+      query.set('materialJourney', materialJourney)
     return `${url.pathname}${query.size ? `?${query.toString()}` : ''}${anchor ? `#${anchor}` : ''}`
   }
   catch {
@@ -132,6 +167,12 @@ export function validateMaterialContractDetailJourneyReturnTo(input: unknown, ex
     const returnTo = url.searchParams.get('returnTo')
     if (returnTo && !validateMaterialContractReturnTo(returnTo, origin))
       return null
+    const supplierFactJourney = url.searchParams.get('supplierFactJourney')
+    const anchor = decodeURIComponent(url.hash.slice(1))
+    if (supplierFactJourney !== null && (!CONTEXT_ID.test(supplierFactJourney) || !SUPPLIER_FACT_ANCHOR.test(anchor)))
+      return null
+    if (anchor && !SUPPLIER_FACT_ANCHOR.test(anchor))
+      return null
     const query = new URLSearchParams({
       origin,
       contractKind: 'material',
@@ -140,7 +181,9 @@ export function validateMaterialContractDetailJourneyReturnTo(input: unknown, ex
       query.set('tab', tab)
     if (returnTo)
       query.set('returnTo', returnTo)
-    return `${url.pathname}?${query.toString()}`
+    if (supplierFactJourney)
+      query.set('supplierFactJourney', supplierFactJourney)
+    return `${url.pathname}?${query.toString()}${anchor ? `#${anchor}` : ''}`
   }
   catch {
     return null
@@ -236,6 +279,72 @@ export function validateMaterialContractReturnTo(input: unknown, expectedOrigin?
   catch {
     return null
   }
+}
+
+export function createMaterialContractJourneyReturnOrigin(
+  options: CreateMaterialContractJourneyReturnOriginOptions,
+): MaterialContractJourneyReturnOrigin {
+  if (!CONTEXT_ID.test(options.contextId))
+    throw new Error('invalid material contract journey context id')
+  if (options.anchorId !== PROJECT_MATERIAL_ANCHOR && !SUPPLIER_FACT_ANCHOR.test(options.anchorId))
+    throw new Error('invalid material contract journey anchor')
+  if (!Number.isFinite(options.scrollTop) || options.scrollTop < 0)
+    throw new Error('invalid material contract journey scroll position')
+  const url = new URL(options.returnTo, 'https://ruihang.invalid')
+  const origin = url.searchParams.get('origin')
+  const validated = validateProjectJourneyReturnTo(options.returnTo, origin)
+    ?? validateMaterialContractDetailJourneyReturnTo(options.returnTo, origin)
+  if (!validated || decodeURIComponent(new URL(validated, 'https://ruihang.invalid').hash.slice(1)) !== options.anchorId)
+    throw new Error('invalid material contract journey return target')
+  return {
+    id: options.contextId,
+    returnTo: validated,
+    anchorId: options.anchorId,
+    scrollTop: options.scrollTop,
+    expiresAt: options.now + TTL,
+  }
+}
+
+export function saveMaterialContractJourneyReturnOrigin(
+  origin: MaterialContractJourneyReturnOrigin,
+  storage: Storage = sessionStorage,
+): void {
+  storage.setItem(`${JOURNEY_STORAGE_PREFIX}${origin.id}`, JSON.stringify(origin))
+}
+
+export function loadMaterialContractJourneyReturnOrigin(
+  id: string,
+  storage: Storage = sessionStorage,
+): MaterialContractJourneyReturnOrigin | null {
+  const raw = storage.getItem(`${JOURNEY_STORAGE_PREFIX}${id}`)
+  if (!raw)
+    return null
+  try {
+    const value = JSON.parse(raw) as Partial<MaterialContractJourneyReturnOrigin>
+    return value.id === id
+      && CONTEXT_ID.test(id)
+      && typeof value.returnTo === 'string'
+      && typeof value.anchorId === 'string'
+      && (value.anchorId === PROJECT_MATERIAL_ANCHOR || SUPPLIER_FACT_ANCHOR.test(value.anchorId))
+      && typeof value.scrollTop === 'number'
+      && typeof value.expiresAt === 'number'
+      ? value as MaterialContractJourneyReturnOrigin
+      : null
+  }
+  catch {
+    return null
+  }
+}
+
+export function resolveMaterialContractJourneyReturnOrigin(
+  options: ResolveMaterialContractJourneyReturnOriginOptions,
+): MaterialContractJourneyReturnOrigin | null {
+  if (typeof options.returnTo !== 'string' || !CONTEXT_ID.test(String(options.contextId ?? '')))
+    return null
+  const origin = options.load(String(options.contextId))
+  if (!origin || origin.returnTo !== options.returnTo || origin.expiresAt <= options.now || origin.scrollTop < 0)
+    return null
+  return origin
 }
 
 export function saveMaterialContractReturnOrigin(

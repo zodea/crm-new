@@ -165,6 +165,28 @@ describe('材料采购合同列表返回上下文', () => {
     }))
   })
 
+  it('混合来源列表按所点击行记录真实来源，不从缺省查询猜测', async () => {
+    const demoContract = {
+      ...contract,
+      rowKey: 'demo:contract-material-1',
+      dataOrigin: 'demo',
+      navigation: {
+        ...contract.navigation,
+        filters: { dataOrigin: 'demo', contractKind: '材采' },
+      },
+    } as const
+    mocks.store.listState = { kind: 'ready', data: page([demoContract as any]) }
+    setRoute('/contract/material?search=%E7%93%B7%E7%A0%96')
+
+    render(MaterialContractListScreen, { global })
+    const link = await screen.findByRole('link', { name: '瓷砖采购合同' })
+    const returnTo = new URL(link.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+
+    expect(returnTo).toContain('search=%E7%93%B7%E7%A0%96')
+    expect(returnTo).toContain('origin=demo')
+    expect(returnTo).toContain('#material-contract-row-demo%3Acontract-material-1')
+  })
+
   it('原合同行消失时恢复滚动位置并把焦点降级到列表标题', async () => {
     const contextId = 'origin_missing_contract'
     const returnTo = `/contract/material?origin=real&page=2&pageSize=20&nav=${contextId}#material-contract-row-real%3Amissing`

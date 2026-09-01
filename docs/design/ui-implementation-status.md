@@ -94,7 +94,7 @@
 
 项目导航公共依赖 [#289](https://github.com/zodea/crm-new/issues/289) 已由 [#312](https://github.com/zodea/crm-new/issues/312) 与 [#313](https://github.com/zodea/crm-new/issues/313) 闭合并完成父级联合验收：项目名称只按稳定 ID、canonical variant、来源与 capability 经唯一 Target Registry 进入只读详情；合法 `returnTo` 恢复搜索、阶段、排序、列筛选、分页、应用页签、滚动与焦点，非法、过期或直达来源降级到规范项目列表。该闭合只确认项目往返基线，不把其他页面域尚未接入的关系入口提前标为完成。
 
-跨页面的项目—材料采购合同—分供方旅程已由 [#319](https://github.com/zodea/crm-new/issues/319) 闭合：项目详情按稳定 ID 与来源进入材采列表，真实 `0`、缺失、暂不可用和无权限分开表达；材采合同按稳定分供方 ID 进入合同/结算/收票/付款事实，并逐级恢复页签、筛选、分页、滚动与焦点。该旅程不扩展为交付、库存或结算核心实现，也不代表父规格其他合同链已完成。
+跨页面的项目—材料采购合同—分供方旅程先由 [#319](https://github.com/zodea/crm-new/issues/319) 闭合子切片，并由 [#277](https://github.com/zodea/crm-new/issues/277) 完成父级联合验收：项目与分供方正式身份仍只由各自主档及 #294 核心迁移边界建立，材采合同迁入仅校验已存在的稳定 ID；合同表单候选、校验和只读投影不再使用平行静态身份。正式合同按同一 `supplier_id` 回流分供方合同事实，且能继续穿透同一中央项目；中央目标消失时不保留空标签死链，真实 `0` 结算仍进入专属空表。项目详情按稳定 ID 与来源进入材采列表，真实 `0`、缺失、暂不可用和无权限分开表达；混合来源列表按所点击行记录 `dataOrigin`，并逐级恢复页签、筛选、分页、操作锚点、滚动与焦点。该旅程不扩展为交付、库存或结算核心实现，也不代表父规格其他合同链已完成。
 
 不占独立页面域的公共依赖仍按原生 blocking 关系推进：正式/演示隔离 [#279](https://github.com/zodea/crm-new/issues/279)、财务集成 [#286](https://github.com/zodea/crm-new/issues/286)、服务器事件通知 [#290](https://github.com/zodea/crm-new/issues/290)、页签恢复 [#306](https://github.com/zodea/crm-new/issues/306)，最终由浏览器生产接缝 [#278](https://github.com/zodea/crm-new/issues/278) 验收全域。OCR 设置继续由既有专项 [#204](https://github.com/zodea/crm-new/issues/204) 承接。
 
