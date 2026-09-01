@@ -8,7 +8,7 @@ const props = defineProps<{
   navigation: NavigationIntentDTO
   returnTo: string
 }>()
-const emit = defineEmits<{ retry: [] }>()
+const emit = defineEmits<{ retry: [], navigate: [] }>()
 
 const resolution = computed(() => resolveNavigationTarget(props.navigation, {
   label: '材料采购合同',
@@ -38,9 +38,11 @@ const unavailableLabel = computed(() => resolution.value.state === 'forbidden'
       </div>
       <NuxtLink
         v-if="resolution.state === 'resolved'"
+        id="project-material-contract-link"
         :to="resolution.to"
         class="btn-secondary"
         :aria-label="`查看材料采购合同（${countLabel}）`"
+        @click="emit('navigate')"
       >
         查看合同 <span class="ml-1 chip chip-brand">{{ countLabel }}</span>
       </NuxtLink>

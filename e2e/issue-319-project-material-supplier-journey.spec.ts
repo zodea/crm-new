@@ -67,7 +67,7 @@ test.describe('Issue #319：项目—材采合同—分供方旅程', () => {
     await expect(page.getByRole('link', { name: '瓷砖采购合同', exact: true })).toBeFocused()
 
     await page.getByRole('link', { name: '返回项目详情' }).click()
-    await expect(page.getByRole('heading', { name: '合和新城' })).toBeFocused()
+    await expect(page.getByRole('link', { name: '查看材料采购合同（3）' })).toBeFocused()
     await page.getByRole('link', { name: '返回项目列表' }).click()
     await expect(page.getByRole('searchbox', { name: '搜索项目、客户、经理…' })).toHaveValue('合和')
     await expect(page.getByRole('link', { name: '合和新城', exact: true })).toBeFocused()

@@ -4,6 +4,7 @@ import type { MaterialContractListPageDTO } from '~/lib/material-contract/reposi
 import type { ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
+import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
 import {
   createMaterialContractReturnOrigin,
@@ -112,6 +113,7 @@ function returnOrigin(row: MaterialContractListPageDTO['items'][number], scrollT
     state: {
       ...materialContractListNavigationStateFromQuery(route.query),
       search: search.value.trim(),
+      origin: row.dataOrigin,
     },
   })
 }
@@ -259,10 +261,10 @@ useTabTitle('材料采购合同')
             <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
           </template>
           <template #project="{ row }">
-            {{ row.project.state === 'resolved' ? row.project.label : '不可用' }}
+            {{ materialContractReferenceLabel(row.project) }}
           </template>
           <template #supplier="{ row }">
-            {{ row.supplier.state === 'resolved' ? row.supplier.label : '不可用' }}
+            {{ materialContractReferenceLabel(row.supplier) }}
           </template>
           <template #changed="{ row }">
             {{ yuan(Number(row.amounts.changed)) }}

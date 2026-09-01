@@ -38,10 +38,10 @@ export interface MaterialContractDetailSource {
   kind: string
   projectId: string | null
   projectName: string
-  projectPermission: 'allowed' | 'forbidden'
+  projectReferenceState: 'resolved' | 'forbidden' | 'missing-target'
   supplierId: string | null
   supplierName: string
-  supplierPermission: 'allowed' | 'forbidden'
+  supplierReferenceState: 'resolved' | 'forbidden' | 'missing-target'
   amount: number
   supplementAmount: number
   settledAmount: number

@@ -124,6 +124,45 @@ describe('材料采购合同中央详情', () => {
     expect(replace).toHaveBeenCalledWith({ query: { tab: 'invoices' } })
   })
 
+  it('分别呈现未记录关系、目标消失与无权关系，且不提供链接', () => {
+    const missing = (entity: 'project' | 'supplier', reason: 'not-recorded' | 'not-configured') => ({
+      state: 'missing',
+      entity,
+      id: null,
+      label: null,
+      reason,
+    })
+    store.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        contract: {
+          ...detail.contract,
+          project: missing('project', 'not-configured'),
+          supplier: { state: 'forbidden', entity: 'supplier', id: 's1', label: null, reason: 'permission-denied' },
+        },
+        projectNavigation: { kind: 'unavailable', reason: 'unverified-target' },
+        supplierNavigation: { kind: 'unavailable', reason: 'forbidden' },
+      },
+    }
+    const first = render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
+    expect(screen.getByText('目标已不存在')).not.toBeNull()
+    expect(screen.getByText('无权查看')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: '目标已不存在' })).toBeNull()
+    first.unmount()
+
+    store.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        contract: { ...detail.contract, project: missing('project', 'not-recorded') },
+        projectNavigation: { kind: 'unavailable', reason: 'missing-id' },
+      },
+    }
+    render(MaterialContractDetailScreen, { props: { contractId: 'c1', origin: 'demo' }, ...common })
+    expect(screen.getByText('未记录')).not.toBeNull()
+  })
+
   it('刷新失败时保留上一版中央详情并提供重试', () => {
     store.detailState = {
       kind: 'error',

@@ -1,6 +1,7 @@
 import type { MaterialContractReadTestScenario } from '../../../utils/material-contract-read-test-instance'
 import process from 'node:process'
 import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
+import { prepareMaterialContractChainIdentityFixtures } from '../../../utils/material-contract-chain-test-fixture'
 import {
   MATERIAL_CONTRACT_EXISTING_RECORD,
   materialContractCommandTestInstance,
@@ -20,8 +21,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Unknown material contract test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
   materialContractCommandTestInstance.reset(sessionId)
-  if (body.scenario === 'ready')
+  if (body.scenario === 'ready') {
+    prepareMaterialContractChainIdentityFixtures(sessionId)
     materialContractCommandTestInstance.importExisting([MATERIAL_CONTRACT_EXISTING_RECORD], sessionId)
+  }
   if (body.scenario === 'demo-forbidden') {
     materialContractReadTestInstance.reset('ready', sessionId)
     demoWorkspaceTestInstance.reset('forbidden', sessionId)

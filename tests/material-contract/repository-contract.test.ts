@@ -23,10 +23,10 @@ function detailSource(
     kind: '材采',
     projectId: 'project-1',
     projectName: '中央项目',
-    projectPermission: 'allowed',
+    projectReferenceState: 'resolved',
     supplierId: 'supplier-1',
     supplierName: '中央分供方',
-    supplierPermission: 'allowed',
+    supplierReferenceState: 'resolved',
     amount: 1000,
     supplementAmount: 100,
     settledAmount: 0,
@@ -130,6 +130,33 @@ describe('材料采购合同中央 Repository contract', () => {
       files: [],
     })
     expect(detail.capabilities).toContain('material-contract:write')
+  })
+
+  it('分别表达未记录外键、中央目标消失与无权查看，不生成假链接', () => {
+    const read = (source: MaterialContractDetailSource) => buildMaterialContractDetail({
+      contracts: [source],
+      facts: emptyFacts(),
+      query: parseMaterialContractDetailQuery(source.id, { origin: source.dataOrigin }),
+      asOf: AS_OF,
+      sourceVersion: 'material-contract-reference-states-v1',
+      capabilities: ['material-contract:read'],
+    })
+
+    const missingId = read(detailSource({ projectId: null, projectName: '' }))
+    expect(missingId.contract.project).toMatchObject({ state: 'missing', reason: 'not-recorded' })
+    expect(missingId.projectNavigation).toEqual({ kind: 'unavailable', reason: 'missing-id' })
+
+    const missingTarget = read(detailSource({
+      projectId: 'project-removed',
+      projectName: '',
+      projectReferenceState: 'missing-target',
+    }))
+    expect(missingTarget.contract.project).toMatchObject({ state: 'missing', reason: 'not-configured' })
+    expect(missingTarget.projectNavigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
+
+    const forbidden = read(detailSource({ supplierReferenceState: 'forbidden' }))
+    expect(forbidden.contract.supplier).toMatchObject({ state: 'forbidden', id: 'supplier-1' })
+    expect(forbidden.supplierNavigation).toEqual({ kind: 'unavailable', reason: 'forbidden' })
   })
 
   it('只按合同稳定 ID 汇总采购明细、物资、票款、结算、罚扣和文件', () => {

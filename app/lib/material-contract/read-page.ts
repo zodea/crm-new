@@ -106,12 +106,14 @@ function entityRef<T extends 'project' | 'supplier'>(
   entity: T,
   id: string | null,
   label: string,
-  permission: 'allowed' | 'forbidden',
+  referenceState: 'resolved' | 'forbidden' | 'missing-target',
 ): EntityRefDTO & { entity: T } {
   if (!id)
     return { state: 'missing', entity, id: null, label: null, reason: 'not-recorded' } as EntityRefDTO & { entity: T }
-  if (permission === 'forbidden')
+  if (referenceState === 'forbidden')
     return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' } as EntityRefDTO & { entity: T }
+  if (referenceState === 'missing-target')
+    return { state: 'missing', entity, id: null, label: null, reason: 'not-configured' } as EntityRefDTO & { entity: T }
   return { state: 'resolved', entity, id, label, no: null } as EntityRefDTO & { entity: T }
 }
 
@@ -121,6 +123,8 @@ function detailNavigation(
 ): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
+  if (reference.state === 'missing' && reference.reason === 'not-configured')
+    return { kind: 'unavailable', reason: 'unverified-target' }
   if (reference.state !== 'resolved')
     return { kind: 'unavailable', reason: 'missing-id' }
   return {
@@ -186,8 +190,8 @@ export function buildMaterialContractListPage(
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
   const start = (input.query.page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
-    const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
-    const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierPermission)
+    const project = entityRef('project', source.projectId, source.projectName, source.projectReferenceState)
+    const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierReferenceState)
     return {
       rowKey: `${source.dataOrigin}:${source.id}`,
       dataOrigin: source.dataOrigin,
@@ -268,8 +272,8 @@ export function buildMaterialContractDetail(
     ))
   }
 
-  const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
-  const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierPermission)
+  const project = entityRef('project', source.projectId, source.projectName, source.projectReferenceState)
+  const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierReferenceState)
   const canReadSensitive = input.capabilities.includes('material-contract:sensitive:read')
   const sameContract = <T extends { dataOrigin: string, contractId: string | null }>(rows: readonly T[]) => rows
     .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)

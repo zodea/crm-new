@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { f2FormDefaults } from '~/lib/contract/page'
 import { MATERIAL_CONTRACT_WRITE_CAPABILITY } from '~/lib/material-contract/command-contract'
-import { createMaterialContractCommandTestInstance } from '../../server/utils/material-contract-command-test-instance'
+import { prepareMaterialContractChainIdentityFixtures } from '../../server/utils/material-contract-chain-test-fixture'
+import {
+  createMaterialContractCommandTestInstance,
+  MATERIAL_CONTRACT_EXISTING_RECORD,
+  materialContractCommandTestInstance,
+} from '../../server/utils/material-contract-command-test-instance'
 import { createMaterialContractReadTestInstance } from '../../server/utils/material-contract-read-test-instance'
+import { projectCommandTestInstance } from '../../server/utils/project-command-test-instance'
+import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
+import { supplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
 
 describe('材料采购合同中央测试实例', () => {
   it('正式命令写入后可经中央列表和详情刷新读取', async () => {
@@ -50,5 +58,66 @@ describe('材料采购合同中央测试实例', () => {
     expect(read.list({ includeDemo: 'true' }).items.some(row => row.dataOrigin === 'demo')).toBe(true)
     expect(() => read.detail('con_demo_cg01', { origin: 'real', includeDemo: 'true' }))
       .toThrowError(/来源与地址不匹配/)
+  })
+
+  it('合同迁入只接受已存在的中央身份，并向分供方事实回流正式合同与项目', async () => {
+    const sessionId = 'issue-277-central-chain'
+    projectCommandTestInstance.reset(sessionId)
+    supplierCommandTestInstance.reset(sessionId)
+    materialContractCommandTestInstance.reset(sessionId)
+    supplierReadTestInstance.reset('ready', sessionId)
+
+    try {
+      expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({ projects: [], suppliers: [] })
+      expect(() => materialContractCommandTestInstance.importExisting([MATERIAL_CONTRACT_EXISTING_RECORD], sessionId))
+        .toThrowError(/项目不存在/)
+      expect(projectCommandTestInstance.rows(sessionId)).toEqual([])
+      expect(supplierCommandTestInstance.rows(sessionId)).toEqual([])
+
+      prepareMaterialContractChainIdentityFixtures(sessionId)
+      materialContractCommandTestInstance.importExisting([MATERIAL_CONTRACT_EXISTING_RECORD], sessionId)
+
+      expect(projectCommandTestInstance.rows(sessionId)).toEqual([
+        expect.objectContaining({ id: 'project-real-318', name: '中央正式材料项目', dataOrigin: 'real' }),
+      ])
+      expect(supplierCommandTestInstance.rows(sessionId)).toEqual([
+        expect.objectContaining({ id: 'supplier-real-318', name: '中央正式材料供应商', dataOrigin: 'real' }),
+      ])
+      expect(materialContractCommandTestInstance.formContext(sessionId)).toEqual({
+        projects: [{ id: 'project-real-318', name: '中央正式材料项目' }],
+        suppliers: [{ id: 'supplier-real-318', name: '中央正式材料供应商' }],
+      })
+
+      const supplier = await supplierReadTestInstance.detail('supplier-real-318', { origin: 'real' }, sessionId)
+      expect(supplier).toMatchObject({
+        supplier: { id: 'supplier-real-318', name: '中央正式材料供应商' },
+        contracts: [{
+          contract: { id: 'contract-existing-318', label: '既有中央材料采购合同' },
+          project: { state: 'resolved', id: 'project-real-318', label: '中央正式材料项目' },
+        }],
+        summary: {
+          contractAmount: { value: '9600.00', drilldown: { entity: 'contract' } },
+          settlementAmount: { value: '0.00', drilldown: { entity: 'settlement' } },
+        },
+      })
+
+      projectCommandTestInstance.reset(sessionId)
+      supplierCommandTestInstance.reset(sessionId)
+      expect(materialContractCommandTestInstance.rows(sessionId)).toEqual([
+        expect.objectContaining({
+          projectId: 'project-real-318',
+          projectName: '',
+          projectReferenceState: 'missing-target',
+          supplierId: 'supplier-real-318',
+          supplierName: '',
+          supplierReferenceState: 'missing-target',
+        }),
+      ])
+    }
+    finally {
+      materialContractCommandTestInstance.reset(sessionId)
+      supplierCommandTestInstance.reset(sessionId)
+      projectCommandTestInstance.reset(sessionId)
+    }
   })
 })

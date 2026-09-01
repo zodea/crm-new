@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import type { MaterialContractDetailReadDTO, MaterialContractFactDTO } from '~/lib/material-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
-import { computed, onActivated, watch } from 'vue'
-import { validateMaterialContractReturnTo } from '~/lib/material-contract/return-context'
+import { computed, nextTick, onActivated, ref, watch } from 'vue'
+import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
+import {
+  createMaterialContractJourneyReturnOrigin,
+  loadMaterialContractJourneyReturnOrigin,
+  newMaterialContractReturnContextId,
+  resolveMaterialContractJourneyReturnOrigin,
+  saveMaterialContractJourneyReturnOrigin,
+  validateMaterialContractDetailJourneyReturnTo,
+  validateMaterialContractReturnTo,
+} from '~/lib/material-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -13,6 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useMaterialContractReadStore()
 const visibilityStore = useDataVisibilityStore()
+const supplierFactContextId = ref(newMaterialContractReturnContextId())
 
 const state = computed(() => store.detailState as ReadState<MaterialContractDetailReadDTO>)
 const detail = computed(() => {
@@ -73,15 +83,72 @@ const supplierFactLinks = computed(() => {
     { view: 'payments', label: '查看分供方付款事实' },
   ] as const
   return rows.flatMap((row) => {
+    const anchorId = `material-contract-supplier-fact-${row.view}`
+    const url = new URL(route.fullPath, 'https://ruihang.invalid')
+    url.searchParams.set('supplierFactJourney', supplierFactContextId.value)
+    url.hash = anchorId
+    const returnTo = validateMaterialContractDetailJourneyReturnTo(
+      `${url.pathname}${url.search}${url.hash}`,
+      props.origin,
+    )
+    if (!returnTo)
+      return []
     const result = resolveNavigationTarget({
       ...navigation,
       kind: 'entity-subview',
       variant: 'detail',
       view: row.view,
-    }, { returnTo: route.fullPath })
-    return result.state === 'resolved' ? [{ ...row, to: result.to }] : []
+    }, { returnTo })
+    return result.state === 'resolved' ? [{ ...row, to: result.to, returnTo, anchorId }] : []
   })
 })
+
+function workspaceScrollTop(): number {
+  return document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop ?? 0
+}
+
+function captureSupplierFactOrigin(link: typeof supplierFactLinks.value[number]) {
+  try {
+    saveMaterialContractJourneyReturnOrigin(createMaterialContractJourneyReturnOrigin({
+      contextId: supplierFactContextId.value,
+      returnTo: link.returnTo,
+      anchorId: link.anchorId,
+      scrollTop: workspaceScrollTop(),
+      now: Date.now(),
+    }))
+  }
+  catch {
+    // 浏览器存储不可用时仍允许导航，返回时按安全锚点降级。
+  }
+}
+
+async function restoreSupplierFactOrigin(): Promise<boolean> {
+  const returnTo = validateMaterialContractDetailJourneyReturnTo(route.fullPath, props.origin)
+  if (!returnTo)
+    return false
+  const url = new URL(returnTo, 'https://ruihang.invalid')
+  const anchorId = decodeURIComponent(url.hash.slice(1))
+  if (!/^material-contract-supplier-fact-(?:contracts|settlements|invoices|payments)$/.test(anchorId))
+    return false
+  await nextTick()
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  const target = document.getElementById(anchorId)
+  if (!target)
+    return false
+  const origin = resolveMaterialContractJourneyReturnOrigin({
+    returnTo,
+    contextId: url.searchParams.get('supplierFactJourney'),
+    now: Date.now(),
+    load: id => loadMaterialContractJourneyReturnOrigin(id),
+  })
+  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  if (origin && workspace)
+    workspace.scrollTop = origin.scrollTop
+  else
+    target.scrollIntoView?.({ block: 'center' })
+  target.focus({ preventScroll: true })
+  return true
+}
 
 const metrics = computed(() => {
   const amounts = detail.value?.contract.amounts
@@ -98,12 +165,19 @@ const metrics = computed(() => {
   return rows.map(([label, value]) => ({ label, value: yuan(Number(value)) }))
 })
 
-function load() {
-  return store.loadDetail({
+async function load() {
+  await store.loadDetail({
     id: props.contractId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
   })
+  if (store.detailState.kind === 'ready') {
+    const restored = await restoreSupplierFactOrigin()
+    if (!restored) {
+      await nextTick()
+      document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
+    }
+  }
 }
 
 function edit() {
@@ -185,10 +259,12 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
           <span class="mr-auto text-12px font-700 text-ink-soft">分供方关联事实</span>
           <NuxtLink
             v-for="link in supplierFactLinks"
+            :id="link.anchorId"
             :key="link.view"
             :to="link.to"
             class="btn-ghost"
             :aria-label="link.label"
+            @click="captureSupplierFactOrigin(link)"
           >
             {{ link.label.replace('查看分供方', '') }}
           </NuxtLink>
@@ -199,13 +275,13 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
           <div class="material-contract-grid mt-3">
             <div class="detail-row">
               <span>所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="text-brand hover:underline">
-                {{ detail.contract.project.state === 'resolved' ? detail.contract.project.label : '不可用' }}
-              </NuxtLink><strong v-else>不可用</strong>
+                {{ materialContractReferenceLabel(detail.contract.project) }}
+              </NuxtLink><strong v-else>{{ materialContractReferenceLabel(detail.contract.project) }}</strong>
             </div>
             <div class="detail-row">
               <span>分供方</span><NuxtLink v-if="target(detail.supplierNavigation)" :to="target(detail.supplierNavigation)!" class="text-brand hover:underline">
-                {{ detail.contract.supplier.state === 'resolved' ? detail.contract.supplier.label : '不可用' }}
-              </NuxtLink><strong v-else>不可用</strong>
+                {{ materialContractReferenceLabel(detail.contract.supplier) }}
+              </NuxtLink><strong v-else>{{ materialContractReferenceLabel(detail.contract.supplier) }}</strong>
             </div>
             <div class="detail-row">
               <span>签约日期</span><strong>{{ detail.contract.signDate || '—' }}</strong>

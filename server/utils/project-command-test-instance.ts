@@ -44,6 +44,11 @@ interface ProjectCommandTestInstanceOptions {
   now?: () => string
 }
 
+export interface ProjectImportAdoptionTransaction {
+  commit: () => void
+  rollback: () => void
+}
+
 function forbidden(message: string): ProjectRepositoryProblem {
   return new ProjectRepositoryProblem(projectProblem('forbidden', message))
 }
@@ -133,6 +138,50 @@ function toSourceRow(project: StoredProject): ProjectListSourceRow {
   }
 }
 
+function importedStoredProject(row: ProjectListSourceRow): StoredProject {
+  return {
+    id: row.id,
+    draft: {
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      status: row.status,
+      contractAmount: row.contractAmount,
+      operationType: row.operationType,
+      startDate: row.startDate ?? '',
+      plannedEnd: row.plannedEnd ?? '',
+      actualEnd: row.actualEnd ?? '',
+      plannedDuration: row.plannedDuration,
+      manager: row.manager,
+      execManager: row.execManager,
+      builder: row.builder,
+      customerId: row.customerId,
+      secondaryCustomerId: row.secondaryCustomerId,
+      contractName: row.contractName,
+      contractor: row.contractor,
+      region: row.region,
+      riskLevel: row.riskLevel,
+      address: row.address,
+      approvalStatus: 'draft',
+    },
+    attachments: [],
+    version: 1,
+    updatedAt: row.updatedAt,
+  }
+}
+
+function cloneState(state: SessionState): SessionState {
+  return {
+    commands: new Map(state.commands),
+    projects: new Map([...state.projects].map(([id, project]) => [id, {
+      ...project,
+      draft: { ...project.draft },
+      attachments: project.attachments.map(attachment => ({ ...attachment })),
+    }])),
+    sourceVersion: state.sourceVersion,
+  }
+}
+
 export function createProjectCommandTestInstance(
   options: ProjectCommandTestInstanceOptions = {},
 ) {
@@ -167,6 +216,36 @@ export function createProjectCommandTestInstance(
   return {
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
+    },
+    prepareImportedProjects(rows: readonly ProjectListSourceRow[], sessionId?: string | null): ProjectImportAdoptionTransaction {
+      const key = keyFor(sessionId)
+      const previous = states.get(key)
+      const snapshot = previous ? cloneState(previous) : null
+      let committed = false
+      return {
+        commit() {
+          committed = true
+          const state = stateFor(sessionId)
+          let changed = false
+          for (const row of rows) {
+            if (state.projects.has(row.id))
+              continue
+            state.projects.set(row.id, importedStoredProject(row))
+            changed = true
+          }
+          if (changed)
+            state.sourceVersion += 1
+        },
+        rollback() {
+          if (!committed)
+            return
+          if (snapshot)
+            states.set(key, cloneState(snapshot))
+          else
+            states.delete(key)
+          committed = false
+        },
+      }
     },
     rows(sessionId?: string | null): ProjectListSourceRow[] {
       return [...stateFor(sessionId).projects.values()].map(toSourceRow)
