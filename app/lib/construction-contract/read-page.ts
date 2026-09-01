@@ -1,5 +1,8 @@
 import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
 import type {
+  ConstructionContractDetailFocusDTO,
+  ConstructionContractDetailFocusScope,
+  ConstructionContractDetailFocusView,
   ConstructionContractDetailQueryDTO,
   ConstructionContractDetailReadDTO,
   ConstructionContractDetailSource,
@@ -15,6 +18,7 @@ import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import {
+  CONSTRUCTION_CONTRACT_DETAIL_FOCUS_SCOPES,
   CONSTRUCTION_CONTRACT_PAGE_SIZES,
   constructionContractProblem,
   ConstructionContractRepositoryProblem,
@@ -88,7 +92,30 @@ export function parseConstructionContractDetailQuery(
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
   }
   const focusId = isStableRouteIdentity(rawFocusId) ? rawFocusId : null
-  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focusId }
+  const rawFocusScope = input?.focusScope
+  const focusScope = typeof rawFocusScope === 'string'
+    && CONSTRUCTION_CONTRACT_DETAIL_FOCUS_SCOPES.includes(rawFocusScope as ConstructionContractDetailFocusScope)
+    ? rawFocusScope as ConstructionContractDetailFocusScope
+    : null
+  if (rawFocusScope != null && rawFocusScope !== '' && focusScope === null) {
+    throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
+  }
+  if (focusScope && !focusId) {
+    throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
+  }
+  const rawFocusView = input?.focusView
+  const focusView = rawFocusView === 'acceptance' || rawFocusView === 'warranty' ? rawFocusView : null
+  if ((rawFocusView != null && rawFocusView !== '' && focusView === null)
+    || (focusView && (focusScope !== 'acceptance' || !focusId))) {
+    throw new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '施工合同详情查询参数无效'))
+  }
+  let focus: ConstructionContractDetailFocusDTO | null = null
+  if (focusId) {
+    focus = focusScope === 'acceptance'
+      ? { id: focusId, scope: focusScope, view: focusView }
+      : { id: focusId, scope: focusScope }
+  }
+  return { id, origin: dataOrigin, includeDemo: bool(input?.includeDemo), focus }
 }
 
 function money(value: number): string {
@@ -275,9 +302,11 @@ function factNavigation(
   }
   if (kind === 'change' || kind === 'report' || kind === 'final-settlement'
     || kind === 'penalty' || kind === 'acceptance' || kind === 'warranty') {
+    if (!isStableRouteIdentity(row.ownerDocumentId) || row.ownerDocumentId !== row.id)
+      return { kind: 'unavailable', reason: 'unverified-target' }
     return {
       kind: 'entity-detail',
-      subject: resolvedRef('owner-document', row.id, row.name, row.no || null),
+      subject: resolvedRef('owner-document', row.ownerDocumentId, row.name, row.no || null),
       variant: kind,
       view: null,
       filters: { dataOrigin: source.dataOrigin },
@@ -320,24 +349,75 @@ export function buildConstructionContractDetail(
   if (source.kind !== '施工') {
     throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '该合同不是施工合同'))
   }
-  if (input.query.focusId) {
-    const focusFact = [
-      input.facts.supplements,
-      input.facts.changes,
-      input.facts.monthlyStatements,
-      input.facts.finalSettlements,
-      input.facts.penalties,
-      input.facts.invoiceApplications,
-      input.facts.invoiceRegistrations,
-      input.facts.receipts,
-      input.facts.acceptances,
-      input.facts.warranties,
-    ].flat().find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
+  if (input.query.focus) {
+    const focus = input.query.focus
+    const focusScope = focus.scope
+    const focusView = focus.scope === 'acceptance' ? focus.view : null
+    const canonicalOwnerFacts = (rows: readonly ConstructionContractFactSource[]) => rows.filter(row => (
+      isStableRouteIdentity(row.ownerDocumentId) && row.ownerDocumentId === row.id
+    ))
+    const rawFactsByScope: Record<ConstructionContractDetailFocusScope, readonly ConstructionContractFactSource[]> = {
+      supplement: input.facts.supplements,
+      change: input.facts.changes,
+      settlement: [
+        ...input.facts.monthlyStatements,
+        ...input.facts.finalSettlements,
+        ...input.facts.penalties,
+      ],
+      acceptance: [...input.facts.acceptances, ...input.facts.warranties],
+    }
+    const canonicalFactsByScope = Object.fromEntries(
+      Object.entries(rawFactsByScope).map(([scope, rows]) => [
+        scope,
+        scope === 'supplement' ? rows : canonicalOwnerFacts(rows),
+      ]),
+    ) as Record<ConstructionContractDetailFocusScope, readonly ConstructionContractFactSource[]>
+    const acceptanceViewFacts: Record<ConstructionContractDetailFocusView, readonly ConstructionContractFactSource[]> = {
+      acceptance: canonicalOwnerFacts(input.facts.acceptances),
+      warranty: canonicalOwnerFacts(input.facts.warranties),
+    }
+    const focusFacts = focusScope
+      ? focusScope === 'acceptance' && focusView
+        ? acceptanceViewFacts[focusView]
+        : canonicalFactsByScope[focusScope]
+      : Object.values(rawFactsByScope).flat()
+    const focusFact = focusFacts.find(row => row.dataOrigin === source.dataOrigin && row.id === focus.id)
+    const parentMismatchMessage = focusScope === 'supplement'
+      ? '补充协议与施工合同不匹配'
+      : focusScope
+        ? '聚焦业务单据与施工合同不匹配'
+        : '补充协议与施工合同不匹配，或聚焦业务单据不属于当前合同'
     if (!focusFact) {
-      throw new ConstructionContractRepositoryProblem(constructionContractProblem('not-found', '补充协议不存在或聚焦业务单据已删除'))
+      const offScopeFact = focusScope
+        ? Object.values(canonicalFactsByScope).flat().find(
+            row => row.dataOrigin === source.dataOrigin && row.id === focus.id,
+          )
+        : null
+      if (offScopeFact && focusScope) {
+        if (offScopeFact.contractId !== source.id) {
+          throw new ConstructionContractRepositoryProblem(constructionContractProblem(
+            'relationship-mismatch',
+            parentMismatchMessage,
+          ))
+        }
+        const sameScopeFact = canonicalFactsByScope[focusScope]
+          .some(row => row.dataOrigin === source.dataOrigin && row.id === focus.id)
+        throw new ConstructionContractRepositoryProblem(constructionContractProblem(
+          'relationship-mismatch',
+          focusScope === 'acceptance' && focusView && sameScopeFact
+            ? '聚焦目标与当前验收/保修分组不匹配'
+            : '聚焦目标与当前合同分区不匹配',
+        ))
+      }
+      const message = focusScope === 'supplement'
+        ? '补充协议不存在或已删除'
+        : focusScope
+          ? '聚焦业务单据不存在或已删除'
+          : '补充协议不存在或聚焦业务单据已删除'
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('not-found', message))
     }
     if (focusFact.contractId !== source.id) {
-      throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', '补充协议与施工合同不匹配，或聚焦业务单据不属于当前合同'))
+      throw new ConstructionContractRepositoryProblem(constructionContractProblem('relationship-mismatch', parentMismatchMessage))
     }
   }
   const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)

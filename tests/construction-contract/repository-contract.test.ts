@@ -152,6 +152,7 @@ describe('施工合同中央 Repository contract', () => {
         date: '2026-08-11',
         status: 'approved',
         sourceId: 'owner-change-1',
+        ownerDocumentId: 'change-1',
       }],
       monthlyStatements: [{
         dataOrigin: 'real',
@@ -162,6 +163,7 @@ describe('施工合同中央 Repository contract', () => {
         amount: 600,
         date: '2026-08-20',
         status: 'submitted',
+        ownerDocumentId: 'statement-1',
       }],
       penalties: [{
         dataOrigin: 'real',
@@ -172,6 +174,7 @@ describe('施工合同中央 Repository contract', () => {
         amount: 36000,
         date: '2026-08-24',
         status: 'submitted',
+        ownerDocumentId: 'owner-penalty-326',
       }],
       invoiceApplications: [{
         dataOrigin: 'real',
@@ -203,6 +206,7 @@ describe('施工合同中央 Repository contract', () => {
         amount: 1000,
         date: '2026-07-18',
         status: 'warranty',
+        ownerDocumentId: 'acceptance-324',
       }],
       warranties: [{
         dataOrigin: 'real',
@@ -213,6 +217,7 @@ describe('施工合同中央 Repository contract', () => {
         amount: 1000,
         date: '2028-07-18',
         status: 'warranty',
+        ownerDocumentId: 'acceptance-324',
       }],
     }
     const detail = buildConstructionContractDetail({
@@ -309,7 +314,7 @@ describe('施工合同中央 Repository contract', () => {
     const build = (focusId: string) => buildConstructionContractDetail({
       contracts,
       facts,
-      query: parseConstructionContractDetailQuery('construction-contract-1', { origin: 'real', focusId }),
+      query: parseConstructionContractDetailQuery('construction-contract-1', { origin: 'real', focusId, focusScope: 'supplement' }),
       asOf: AS_OF,
       sourceVersion: 'construction-contract-v3',
       capabilities: ['construction-contract:read'],
@@ -318,11 +323,172 @@ describe('施工合同中央 Repository contract', () => {
     expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
   })
 
+  it('按聚焦范围区分补充协议与甲方业务单据的缺失状态', () => {
+    const build = (focusScope: 'supplement' | 'change') => buildConstructionContractDetail({
+      contracts: [source()],
+      facts: emptyFacts(),
+      query: parseConstructionContractDetailQuery('construction-contract-1', {
+        origin: 'real',
+        focusId: 'missing-focus',
+        focusScope,
+      }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(() => build('supplement')).toThrowError(/^补充协议不存在或已删除$/)
+    expect(() => build('change')).toThrowError(/^聚焦业务单据不存在或已删除$/)
+  })
+
+  it('拒绝把其他详情分区的 canonical 单据当作当前聚焦目标', () => {
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      changes: [{
+        dataOrigin: 'real',
+        id: 'change-323',
+        ownerDocumentId: 'change-323',
+        contractId: 'construction-contract-1',
+        no: 'BG-323',
+        name: '甲方变洽签',
+        amount: 323,
+        date: '2026-08-25',
+        status: '已上报',
+      }],
+      monthlyStatements: [{
+        dataOrigin: 'real',
+        id: 'report-323',
+        ownerDocumentId: 'report-323',
+        contractId: 'construction-contract-1',
+        no: 'BL-323',
+        name: '月度报量',
+        amount: 292,
+        date: '2026-08-25',
+        status: '已申报',
+      }],
+    }
+    const build = (focusScope: 'change' | 'settlement') => buildConstructionContractDetail({
+      contracts: [source()],
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', {
+        origin: 'real',
+        focusId: 'report-323',
+        focusScope,
+      }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(() => build('change')).toThrowError(/聚焦目标与当前合同分区不匹配/)
+    expect(build('settlement').sections.settlements.monthlyStatements[0]?.id).toBe('report-323')
+  })
+
+  it('跨合同且跨分区时优先报告父合同错配', () => {
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      monthlyStatements: [{
+        dataOrigin: 'real',
+        id: 'report-other-contract',
+        ownerDocumentId: 'report-other-contract',
+        contractId: 'construction-contract-2',
+        no: 'BL-OTHER',
+        name: '其他合同月度报量',
+        amount: 292,
+        date: '2026-08-25',
+        status: '已申报',
+      }],
+    }
+
+    expect(() => buildConstructionContractDetail({
+      contracts: [source(), source({ id: 'construction-contract-2', no: 'SG-002' })],
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', {
+        origin: 'real',
+        focusId: 'report-other-contract',
+        focusScope: 'change',
+      }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })).toThrowError(/聚焦业务单据与施工合同不匹配/)
+  })
+
+  it('验收与保修按 focusView 拒绝跨分组聚焦', () => {
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      acceptances: [{
+        dataOrigin: 'real',
+        id: 'acceptance-only',
+        ownerDocumentId: 'acceptance-only',
+        contractId: 'construction-contract-1',
+        no: 'YS-ONLY',
+        name: '仅验收记录',
+        amount: 1000,
+        date: '2026-08-25',
+        status: 'accepted',
+      }],
+    }
+    const build = (focusView: 'acceptance' | 'warranty') => buildConstructionContractDetail({
+      contracts: [source()],
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', {
+        origin: 'real',
+        focusId: 'acceptance-only',
+        focusScope: 'acceptance',
+        focusView,
+      }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(build('acceptance').sections.acceptance.acceptances[0]?.id).toBe('acceptance-only')
+    expect(() => build('warranty')).toThrowError(/聚焦目标与当前验收\/保修分组不匹配/)
+  })
+
+  it('没有 canonical 甲方单据目标时不生成详情下钻', () => {
+    const facts: ConstructionContractFactSources = {
+      ...emptyFacts(),
+      changes: [{
+        dataOrigin: 'real',
+        id: 'legacy-change-row',
+        contractId: 'construction-contract-1',
+        no: 'BG-LEGACY',
+        name: '旧变洽签事实',
+        amount: 100,
+        date: '2026-08-20',
+        status: 'approved',
+      }],
+    }
+    const detail = buildConstructionContractDetail({
+      contracts: [source()],
+      facts,
+      query: parseConstructionContractDetailQuery('construction-contract-1', { origin: 'real' }),
+      asOf: AS_OF,
+      sourceVersion: 'construction-contract-v3',
+      capabilities: ['construction-contract:read'],
+    })
+
+    expect(detail.sections.changes[0]?.navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
+  })
+
   it('拒绝不能形成 canonical focus 的补充协议 ID', () => {
     expect(() => parseConstructionContractDetailQuery('construction-contract-1', {
       origin: 'real',
       focusId: '\0',
     })).toThrowError(/查询参数无效/)
+  })
+
+  it('将合法聚焦参数解析为单个判别联合，避免内部传播非法组合', () => {
+    expect(parseConstructionContractDetailQuery('construction-contract-1', {
+      origin: 'real',
+      focusId: 'acceptance-324',
+      focusScope: 'acceptance',
+      focusView: 'warranty',
+    })).toMatchObject({
+      focus: { id: 'acceptance-324', scope: 'acceptance', view: 'warranty' },
+    })
   })
 
   it('允许按稳定业务单据 ID 聚焦合同内的变洽签与月度报量', () => {

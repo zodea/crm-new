@@ -112,7 +112,13 @@ export function serializeConstructionContractListQuery(query: ConstructionContra
 }
 
 export function serializeConstructionContractDetailQuery(query: ConstructionContractDetailQueryDTO): Record<string, string> {
-  return { origin: query.origin, includeDemo: String(query.includeDemo), focusId: query.focusId ?? '' }
+  return {
+    origin: query.origin,
+    includeDemo: String(query.includeDemo),
+    focusId: query.focus?.id ?? '',
+    focusScope: query.focus?.scope ?? '',
+    focusView: query.focus?.scope === 'acceptance' ? query.focus.view ?? '' : '',
+  }
 }
 
 export function constructionContractProblemFromUnknown(cause: unknown): ConstructionContractRepositoryProblem {

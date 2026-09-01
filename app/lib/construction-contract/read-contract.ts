@@ -12,6 +12,13 @@ import type {
 
 export const CONSTRUCTION_CONTRACT_PAGE_SIZES = [10, 20, 50, 100] as const
 export type ConstructionContractPageSize = typeof CONSTRUCTION_CONTRACT_PAGE_SIZES[number]
+export const CONSTRUCTION_CONTRACT_DETAIL_FOCUS_SCOPES = ['supplement', 'change', 'settlement', 'acceptance'] as const
+export type ConstructionContractDetailFocusScope = typeof CONSTRUCTION_CONTRACT_DETAIL_FOCUS_SCOPES[number]
+export type ConstructionContractDetailFocusView = 'acceptance' | 'warranty'
+export type ConstructionContractDetailFocusDTO
+  = | { id: string, scope: null }
+    | { id: string, scope: Exclude<ConstructionContractDetailFocusScope, 'acceptance'> }
+    | { id: string, scope: 'acceptance', view: ConstructionContractDetailFocusView | null }
 
 export interface ConstructionContractListQueryDTO {
   includeDemo: boolean
@@ -28,7 +35,7 @@ export interface ConstructionContractDetailQueryDTO {
   id: string
   origin: DataOriginDTO
   includeDemo: boolean
-  focusId: string | null
+  focus: ConstructionContractDetailFocusDTO | null
 }
 
 export interface ConstructionContractDetailSource {
@@ -81,6 +88,7 @@ export interface ConstructionContractFactSource {
   date: ISODateDTO | null
   status: string
   sourceId?: string | null
+  ownerDocumentId?: string | null
   customerId?: string | null
 }
 

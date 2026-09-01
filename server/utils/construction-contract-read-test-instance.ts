@@ -151,6 +151,7 @@ export function createConstructionContractReadTestInstance(
         date: row.applicationDate,
         status: row.status,
         sourceId: row.sourceId,
+        ownerDocumentId: row.id,
       }))
     const ownerReports = ownerDocuments
       .filter(row => row.kind === 'owner_report')
@@ -163,6 +164,7 @@ export function createConstructionContractReadTestInstance(
         amount: row.amount,
         date: row.applicationDate,
         status: row.status,
+        ownerDocumentId: row.id,
       }))
     const ownerFinalSettlements = ownerDocuments
       .filter(row => row.kind === 'final_settlement')
@@ -175,6 +177,7 @@ export function createConstructionContractReadTestInstance(
         amount: row.amount,
         date: row.applicationDate,
         status: row.status,
+        ownerDocumentId: row.id,
       }))
     const ownerPenalties = ownerDocuments
       .filter(row => row.kind === 'owner_penalty')
@@ -187,6 +190,7 @@ export function createConstructionContractReadTestInstance(
         amount: row.amount,
         date: row.applicationDate,
         status: row.status,
+        ownerDocumentId: row.id,
       }))
     const ownerSettlementSupplements = ownerDocuments
       .filter(row => row.kind === 'final_settlement' && row.contractId)
@@ -230,6 +234,7 @@ export function createConstructionContractReadTestInstance(
         amount: row.amount,
         date: row.acceptanceLifecycle?.acceptanceDate ?? row.applicationDate,
         status: row.status,
+        ownerDocumentId: row.id,
       }))
     const ownerWarranties = ownerDocuments
       .filter(row => row.kind === 'acceptance' && (row.status === 'warranty' || row.status === 'expired'))
@@ -242,6 +247,7 @@ export function createConstructionContractReadTestInstance(
         amount: row.amount,
         date: row.acceptanceLifecycle?.warrantyEndDate ?? null,
         status: row.status,
+        ownerDocumentId: row.id,
       }))
     const synchronizedFacts = {
       ...formalFacts,
