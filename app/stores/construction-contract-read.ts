@@ -28,8 +28,20 @@ function failureState<T>(cause: unknown, prior: T | null): ReadState<T> {
   return { kind: 'error', problem, previous: prior }
 }
 
+function sameFocus(
+  left: ConstructionContractDetailQueryDTO['focus'],
+  right: ConstructionContractDetailQueryDTO['focus'],
+) {
+  if (!left || !right)
+    return left === right
+  if (left.id !== right.id || left.scope !== right.scope)
+    return false
+  return left.scope !== 'acceptance' || right.scope !== 'acceptance' || left.view === right.view
+}
+
 function sameDetail(left: ConstructionContractDetailQueryDTO | null, right: ConstructionContractDetailQueryDTO) {
-  return left?.id === right.id && left.origin === right.origin && left.includeDemo === right.includeDemo && left.focusId === right.focusId
+  return left?.id === right.id && left.origin === right.origin && left.includeDemo === right.includeDemo
+    && sameFocus(left.focus, right.focus)
 }
 
 export const useConstructionContractReadStore = defineStore('construction-contract-read', () => {
@@ -60,7 +72,7 @@ export const useConstructionContractReadStore = defineStore('construction-contra
   async function loadDetail(query: ConstructionContractDetailQueryDTO) {
     const request = ++latestDetail
     const prior = sameDetail(detailQuery.value, query) ? previous(detailState.value) : null
-    detailQuery.value = { ...query }
+    detailQuery.value = { ...query, focus: query.focus ? { ...query.focus } : null }
     detailState.value = { kind: 'loading', previous: prior }
     try {
       const detail = await repository.get(query)

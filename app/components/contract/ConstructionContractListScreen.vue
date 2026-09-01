@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ConstructionContractListPageDTO } from '~/lib/construction-contract/repository'
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { ReadState } from '~/types/read-model'
+import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import {
   constructionContractProblemFromUnknown,
@@ -111,6 +111,11 @@ function link(row: ConstructionContractListPageDTO['items'][number]) {
   return `${target.to}${target.to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(origin.returnTo)}`
 }
 
+function relationshipTarget(intent: NavigationIntentDTO) {
+  const target = resolveNavigationTarget(intent)
+  return target.state === 'resolved' ? target.to : null
+}
+
 function captureReturnOrigin(row: ConstructionContractListPageDTO['items'][number]) {
   rowNavigationPending.value = true
   try {
@@ -217,10 +222,14 @@ useTabTitle('施工合同')
             <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
           </template>
           <template #project="{ row }">
-            {{ row.project.state === 'resolved' ? row.project.label : '不可用' }}
+            <NuxtLink v-if="relationshipTarget(row.projectNavigation)" :to="relationshipTarget(row.projectNavigation)!" class="text-brand hover:underline">
+              {{ row.project.state === 'resolved' ? row.project.label : '不可用' }}
+            </NuxtLink><span v-else>{{ row.project.state === 'resolved' ? row.project.label : '不可用' }}</span>
           </template>
           <template #customer="{ row }">
-            {{ row.customer.state === 'resolved' ? row.customer.label : '不可用' }}
+            <NuxtLink v-if="relationshipTarget(row.customerNavigation)" :to="relationshipTarget(row.customerNavigation)!" class="text-brand hover:underline">
+              {{ row.customer.state === 'resolved' ? row.customer.label : '不可用' }}
+            </NuxtLink><span v-else>{{ row.customer.state === 'resolved' ? row.customer.label : '不可用' }}</span>
           </template>
           <template #actualCompletionDate="{ row }">
             {{ row.actualCompletionDate || '未记录' }}

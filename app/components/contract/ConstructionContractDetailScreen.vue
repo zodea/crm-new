@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
+import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
@@ -49,9 +49,27 @@ const focusId = computed(() => ['supplements', 'changes', 'settlements', 'accept
   && typeof route.query.focus === 'string'
   ? route.query.focus
   : null)
+const focusScope = computed(() => {
+  if (focusId.value === null)
+    return null
+  const scopes = {
+    supplements: 'supplement',
+    changes: 'change',
+    settlements: 'settlement',
+    acceptance: 'acceptance',
+  } as const
+  return scopes[route.query.tab as keyof typeof scopes] ?? null
+})
 const focusView = computed(() => route.query.focusView === 'acceptance' || route.query.focusView === 'warranty'
   ? route.query.focusView
   : null)
+const focus = computed<ConstructionContractDetailFocusDTO | null>(() => {
+  if (!focusId.value)
+    return null
+  if (focusScope.value === 'acceptance')
+    return { id: focusId.value, scope: 'acceptance', view: focusView.value }
+  return { id: focusId.value, scope: focusScope.value }
+})
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
 const returnTo = computed(() => ownerDocumentReturnTo.value
   ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
@@ -111,7 +129,7 @@ function load() {
     id: props.contractId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
-    focusId: focusId.value,
+    focus: focus.value,
   })
 }
 
@@ -122,7 +140,7 @@ function edit() {
   })
 }
 
-watch(() => [props.contractId, props.origin, focusId.value], () => void load(), { immediate: true })
+watch(() => [props.contractId, props.origin, focus.value], () => void load(), { immediate: true })
 onActivated(() => void load())
 useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
 </script>
