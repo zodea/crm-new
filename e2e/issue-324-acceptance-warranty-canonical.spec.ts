@@ -43,7 +43,7 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
     await page.getByRole('link', { name: '返回验收·保修列表' }).click()
     await expect(page.getByRole('link', { name: '返回来源详情' })).toBeVisible()
     await page.getByRole('link', { name: '返回来源详情' }).click()
-    await expect(page).toHaveURL(/\/project\/project-real-320\?origin=real#project-owner-document-card-warranty/)
+    await expect(page).toHaveURL(/\/project\/project-real-320\?origin=real&ownerJourney=origin_[^#]+#project-owner-document-card-warranty/)
     await expect(projectJourney.getByRole('link', { name: /保修管理/ })).toBeFocused()
 
     const browserContractResponse = page.waitForResponse(response => response.url().includes('/api/read/construction-contracts/construction-contract-existing-320'))

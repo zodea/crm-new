@@ -1,7 +1,7 @@
 import type { OwnerCommercialDocumentKind } from './central-repository'
 import type { DataOriginDTO } from '~/types/read-model'
 import { validateConstructionContractDetailReturnTo } from '~/lib/construction-contract/return-context'
-import { validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
+import { isProjectOwnerDocumentCardAnchor, validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -68,6 +68,54 @@ export function isOwnerDocumentReturnContextId(input: unknown): input is string 
 
 export function newOwnerDocumentReturnContextId(): string {
   return `origin_${crypto.randomUUID().replaceAll('-', '')}`
+}
+
+export function createOwnerDocumentProjectReturnOrigin(options: {
+  contextId: string
+  returnTo: string
+  anchorId: string
+  scrollTop: number
+  now: number
+}): OwnerDocumentReturnOrigin {
+  if (!isOwnerDocumentReturnContextId(options.contextId)
+    || !isProjectOwnerDocumentCardAnchor(options.anchorId)
+    || !Number.isFinite(options.scrollTop)
+    || options.scrollTop < 0) {
+    throw new Error('invalid owner document project return context')
+  }
+  const validated = validateProjectJourneyReturnTo(options.returnTo)
+  if (!validated)
+    throw new Error('invalid owner document project return target')
+  const url = new URL(validated, 'https://ruihang.invalid')
+  if (url.searchParams.get('ownerJourney') !== options.contextId
+    || decodeURIComponent(url.hash.slice(1)) !== options.anchorId) {
+    throw new Error('owner document project return target mismatch')
+  }
+  return {
+    id: options.contextId,
+    returnTo: validated,
+    anchorId: options.anchorId,
+    scrollTop: options.scrollTop,
+    expiresAt: options.now + TTL,
+  }
+}
+
+export function resolveOwnerDocumentProjectReturnOrigin(options: {
+  returnTo: unknown
+  contextId: unknown
+  now: number
+  load: (id: string) => OwnerDocumentReturnOrigin | null
+}): OwnerDocumentReturnOrigin | null {
+  if (!isOwnerDocumentReturnContextId(options.contextId))
+    return null
+  const validated = validateProjectJourneyReturnTo(options.returnTo)
+  const stored = options.load(options.contextId)
+  if (!validated || !stored || stored.returnTo !== validated
+    || !isProjectOwnerDocumentCardAnchor(stored.anchorId)
+    || stored.expiresAt <= options.now || stored.scrollTop < 0) {
+    return null
+  }
+  return stored
 }
 
 export function ownerDocumentListNavigationStateFromQuery(

@@ -65,6 +65,7 @@ const ROW_ANCHOR = /^#material-contract-row-[\w%.~:/-]+$/
 const STORAGE_PREFIX = 'ruihang:material-contract-return:'
 const JOURNEY_STORAGE_PREFIX = 'ruihang:material-contract-journey-return:'
 const PROJECT_MATERIAL_ANCHOR = 'project-material-contract-link'
+const PROJECT_OWNER_DOCUMENT_CARD_ANCHOR = /^project-owner-document-card-(?:change|report|acceptance|warranty|final-settlement|penalty)$/
 const SUPPLIER_FACT_ANCHOR = /^material-contract-supplier-fact-(?:contracts|settlements|invoices|payments)$/
 const TTL = 30 * 60_000
 
@@ -74,6 +75,10 @@ export function isMaterialContractReturnContextId(input: unknown): input is stri
 
 export function newMaterialContractReturnContextId(): string {
   return `origin_${crypto.randomUUID().replaceAll('-', '')}`
+}
+
+export function isProjectOwnerDocumentCardAnchor(input: string): boolean {
+  return PROJECT_OWNER_DOCUMENT_CARD_ANCHOR.test(input)
 }
 
 function value(input: unknown): string | undefined {
@@ -118,17 +123,22 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
     const returnTo = url.searchParams.get('returnTo')
     const returnContext = url.searchParams.get('returnContext')
     const materialJourney = url.searchParams.get('materialJourney')
+    const ownerJourney = url.searchParams.get('ownerJourney')
     if ((returnTo === null) !== (returnContext === null))
       return null
     if (returnTo !== null && (!validateProjectReturnTo(returnTo) || !isProjectReturnContextId(returnContext)))
       return null
     const anchor = decodeURIComponent(url.hash.slice(1))
+    if (materialJourney !== null && ownerJourney !== null)
+      return null
     if (materialJourney !== null && (!CONTEXT_ID.test(materialJourney) || anchor !== PROJECT_MATERIAL_ANCHOR))
+      return null
+    if (ownerJourney !== null && (!CONTEXT_ID.test(ownerJourney) || !isProjectOwnerDocumentCardAnchor(anchor)))
       return null
     if (anchor
       && anchor !== 'project-detail-title'
       && anchor !== PROJECT_MATERIAL_ANCHOR
-      && !/^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor)) {
+      && !isProjectOwnerDocumentCardAnchor(anchor)) {
       return null
     }
     const query = new URLSearchParams()
@@ -140,6 +150,8 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
     }
     if (materialJourney)
       query.set('materialJourney', materialJourney)
+    if (ownerJourney)
+      query.set('ownerJourney', ownerJourney)
     return `${url.pathname}${query.size ? `?${query.toString()}` : ''}${anchor ? `#${anchor}` : ''}`
   }
   catch {
