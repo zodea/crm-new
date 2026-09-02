@@ -10,12 +10,20 @@ import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
+  isProjectOwnerDocumentCardAnchor,
   loadMaterialContractJourneyReturnOrigin,
   newMaterialContractReturnContextId,
   resolveMaterialContractJourneyReturnOrigin,
   saveMaterialContractJourneyReturnOrigin,
   validateProjectJourneyReturnTo,
 } from '~/lib/material-contract/return-context'
+import {
+  createOwnerDocumentProjectReturnOrigin,
+  loadOwnerDocumentReturnOrigin,
+  newOwnerDocumentReturnContextId,
+  resolveOwnerDocumentProjectReturnOrigin,
+  saveOwnerDocumentReturnOrigin,
+} from '~/lib/owner-document/return-context'
 import { projectProblem, projectProblemFromUnknown } from '~/lib/project/repository'
 import { PROJECT_STATUS_TONE } from '~/lib/project/status'
 import { yuan } from '~/lib/util/money'
@@ -53,6 +61,8 @@ const ownerJourneys = shallowRef<{
   report: OwnerCommercialDocumentListPageDTO
   acceptance: OwnerCommercialDocumentListPageDTO
   warranty: OwnerCommercialDocumentListPageDTO
+  finalSettlement: OwnerCommercialDocumentListPageDTO
+  penalty: OwnerCommercialDocumentListPageDTO
 } | null>(null)
 const ownerJourneysError = shallowRef('')
 
@@ -90,16 +100,31 @@ const ownerJourneyCards = computed(() => {
     { kind: 'report' as const, label: '月度报量', page: current.report },
     { kind: 'acceptance' as const, label: '竣工验收', page: current.acceptance },
     { kind: 'warranty' as const, label: '保修管理', page: current.warranty },
+    { kind: 'final-settlement' as const, label: '最终结算', page: current.finalSettlement },
+    { kind: 'penalty' as const, label: '甲方罚扣', page: current.penalty },
   ]
 })
 
-function ownerJourneyReturnTo(kind: 'change' | 'report' | 'acceptance' | 'warranty'): string {
-  const url = new URL(journeyReturnTo.value, 'https://ruihang.invalid')
-  url.hash = `project-owner-document-card-${kind}`
-  return `${url.pathname}${url.search}${url.hash}`
+type OwnerJourneyKind = 'change' | 'report' | 'acceptance' | 'warranty' | 'final-settlement' | 'penalty'
+
+const ownerJourneyContextIds: Record<OwnerJourneyKind, string> = {
+  'change': newOwnerDocumentReturnContextId(),
+  'report': newOwnerDocumentReturnContextId(),
+  'acceptance': newOwnerDocumentReturnContextId(),
+  'warranty': newOwnerDocumentReturnContextId(),
+  'final-settlement': newOwnerDocumentReturnContextId(),
+  'penalty': newOwnerDocumentReturnContextId(),
 }
 
-function ownerJourneyTo(kind: 'change' | 'report' | 'acceptance' | 'warranty') {
+function ownerJourneyReturnTo(kind: OwnerJourneyKind): string {
+  const url = new URL(journeyReturnTo.value, 'https://ruihang.invalid')
+  url.searchParams.set('ownerJourney', ownerJourneyContextIds[kind])
+  url.hash = `project-owner-document-card-${kind}`
+  return validateProjectJourneyReturnTo(`${url.pathname}${url.search}${url.hash}`, props.originHint)
+    ?? `/project/${encodeURIComponent(props.projectId)}?origin=${props.originHint}`
+}
+
+function ownerJourneyTo(kind: OwnerJourneyKind) {
   const query = new URLSearchParams({
     projectId: props.projectId,
     origin: 'real',
@@ -129,6 +154,22 @@ function captureMaterialJourneyOrigin() {
   }
 }
 
+function captureOwnerJourneyOrigin(kind: OwnerJourneyKind) {
+  const anchorId = `project-owner-document-card-${kind}`
+  try {
+    saveOwnerDocumentReturnOrigin(createOwnerDocumentProjectReturnOrigin({
+      contextId: ownerJourneyContextIds[kind],
+      returnTo: ownerJourneyReturnTo(kind),
+      anchorId,
+      scrollTop: workspaceScrollTop(),
+      now: Date.now(),
+    }))
+  }
+  catch {
+    // 浏览器存储不可用时仍允许导航，返回时按安全锚点降级。
+  }
+}
+
 async function restoreProjectAnchorContext(): Promise<boolean> {
   if (!import.meta.client)
     return false
@@ -138,7 +179,7 @@ async function restoreProjectAnchorContext(): Promise<boolean> {
     return false
   const url = new URL(validatedRoute, 'https://ruihang.invalid')
   const anchor = decodeURIComponent(url.hash.slice(1))
-  const ownerJourneyAnchor = /^project-owner-document-card-(?:change|report|acceptance|warranty)$/.test(anchor)
+  const ownerJourneyAnchor = isProjectOwnerDocumentCardAnchor(anchor)
   const materialJourneyAnchor = anchor === 'project-material-contract-link'
   if (anchor !== 'project-detail-title' && !ownerJourneyAnchor && !materialJourneyAnchor)
     return false
@@ -157,7 +198,14 @@ async function restoreProjectAnchorContext(): Promise<boolean> {
         now: Date.now(),
         load: id => loadMaterialContractJourneyReturnOrigin(id),
       })
-    : null
+    : ownerJourneyAnchor
+      ? resolveOwnerDocumentProjectReturnOrigin({
+          returnTo: validatedRoute,
+          contextId: url.searchParams.get('ownerJourney'),
+          now: Date.now(),
+          load: id => loadOwnerDocumentReturnOrigin(id),
+        })
+      : null
   const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
   if (origin && workspace)
     workspace.scrollTop = origin.scrollTop
@@ -186,14 +234,16 @@ async function loadOwnerJourneys() {
     pageSize: 10 as const,
   }
   try {
-    const [change, report, acceptance, warranty] = await Promise.all([
+    const [change, report, acceptance, warranty, finalSettlement, penalty] = await Promise.all([
       ownerDocumentRepository.list({ ...base, kind: 'owner_change' }),
       ownerDocumentRepository.list({ ...base, kind: 'owner_report' }),
       ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'acceptance' }),
       ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'warranty' }),
+      ownerDocumentRepository.list({ ...base, kind: 'final_settlement' }),
+      ownerDocumentRepository.list({ ...base, kind: 'owner_penalty' }),
     ])
     if (request === latestOwnerJourneyLoad && projectId === props.projectId) {
-      ownerJourneys.value = { change, report, acceptance, warranty }
+      ownerJourneys.value = { change, report, acceptance, warranty, finalSettlement, penalty }
       await restoreProjectAnchorContext()
     }
   }
@@ -439,22 +489,23 @@ onActivated(() => {
     />
 
     <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
-      <SectionHeader id="project-owner-document-title" title="甲方商务单据" subtitle="按当前项目稳定 ID 进入变洽签、报量、验收与保修中央正式单据，返回时保留项目上下文" />
+      <SectionHeader id="project-owner-document-title" title="甲方商务单据" subtitle="按当前项目稳定 ID 进入变洽签、报量、验收、保修、最终结算与罚扣中央正式单据，返回时保留项目上下文" />
       <StatePanel v-if="ownerJourneysError" class="mt-3" kind="error" title="甲方商务单据读取失败" :description="ownerJourneysError" action-label="重新读取" compact @action="loadOwnerJourneys" />
-      <div v-else-if="ownerJourneys" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div v-else-if="ownerJourneys" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <NuxtLink
           v-for="card in ownerJourneyCards"
           :id="`project-owner-document-card-${card.kind}`"
           :key="card.kind"
           :to="ownerJourneyTo(card.kind)"
           class="block scroll-mt-4 border border-line bg-surface-1 p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/35"
+          @click="captureOwnerJourneyOrigin(card.kind)"
         >
           <span class="text-13px font-700 text-ink">{{ card.label }}</span>
           <span class="mt-1 block font-mono text-20px font-800 text-brand-deep">{{ card.page.pagination.total }}</span>
           <span class="mt-1 block text-11px text-ink-soft">合计 {{ yuan(Number(card.page.summary.origins.real.reportedAmount)) }}</span>
         </NuxtLink>
       </div>
-      <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式甲方商务单据" description="切换到正式项目后可查看甲方变洽签、月度报量、竣工验收与保修管理主链。" compact />
+      <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式甲方商务单据" description="切换到正式项目后可查看甲方变洽签、月度报量、竣工验收、保修、最终结算与甲方罚扣主链。" compact />
       <StatePanel v-else class="mt-3" kind="loading" title="正在读取甲方商务单据" compact />
     </section>
 

@@ -278,10 +278,10 @@ describe('项目详情中央来源边界', () => {
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(4)
+    expect(screen.getAllByText('2')).toHaveLength(6)
   })
 
-  it('正式项目按同一 canonical 来源提供验收与保修双视图入口', async () => {
+  it('正式项目按同一 canonical 来源提供甲方六类单据入口', async () => {
     get.mockResolvedValue({
       ...detail,
       item: { ...detail.item, dataOrigin: 'real' },
@@ -295,14 +295,32 @@ describe('项目详情中央来源边界', () => {
 
     const acceptance = await screen.findByRole('link', { name: /竣工验收/ })
     const warranty = screen.getByRole('link', { name: /保修管理/ })
+    const finalSettlement = screen.getByRole('link', { name: /最终结算/ })
+    const penalty = screen.getByRole('link', { name: /甲方罚扣/ })
     expect(acceptance.getAttribute('href')).toContain('/owner/acceptance?')
     expect(acceptance.getAttribute('href')).toContain('variant=acceptance')
     expect(warranty.getAttribute('href')).toContain('/owner/acceptance?')
     expect(warranty.getAttribute('href')).toContain('variant=warranty')
-    expect(acceptance.getAttribute('href')).toContain('returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal%23project-owner-document-card-acceptance')
-    expect(warranty.getAttribute('href')).toContain('returnTo=%2Fproject%2Fproject-1%3Forigin%3Dreal%23project-owner-document-card-warranty')
+    const acceptanceReturnTo = new URL(acceptance.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+    const warrantyReturnTo = new URL(warranty.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+    expect(acceptanceReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
+    expect(acceptanceReturnTo).toMatch(/#project-owner-document-card-acceptance$/)
+    expect(warrantyReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
+    expect(warrantyReturnTo).toMatch(/#project-owner-document-card-warranty$/)
     expect(acceptance.getAttribute('id')).toBe('project-owner-document-card-acceptance')
     expect(warranty.getAttribute('id')).toBe('project-owner-document-card-warranty')
+    expect(finalSettlement.getAttribute('href')).toContain('/owner/final-settlement?')
+    expect(finalSettlement.getAttribute('href')).toContain('projectId=project-1')
+    const finalSettlementReturnTo = new URL(finalSettlement.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+    expect(finalSettlementReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
+    expect(finalSettlementReturnTo).toMatch(/#project-owner-document-card-final-settlement$/)
+    expect(finalSettlement.getAttribute('id')).toBe('project-owner-document-card-final-settlement')
+    expect(penalty.getAttribute('href')).toContain('/owner/penalty?')
+    expect(penalty.getAttribute('href')).toContain('projectId=project-1')
+    const penaltyReturnTo = new URL(penalty.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+    expect(penaltyReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
+    expect(penaltyReturnTo).toMatch(/#project-owner-document-card-penalty$/)
+    expect(penalty.getAttribute('id')).toBe('project-owner-document-card-penalty')
   })
 
   it('稳定区分来源错配，不按项目名称回退到其他来源', async () => {

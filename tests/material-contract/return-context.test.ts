@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createMaterialContractJourneyReturnOrigin,
   createMaterialContractReturnOrigin,
+  isProjectOwnerDocumentCardAnchor,
   loadMaterialContractJourneyReturnOrigin,
   materialContractListNavigationStateFromQuery,
   resolveMaterialContractJourneyReturnOrigin,
@@ -13,6 +14,12 @@ import {
 } from '~/lib/material-contract/return-context'
 
 describe('材料采购合同列表返回上下文', () => {
+  it('以共享白名单识别项目甲方六类卡片锚点', () => {
+    for (const kind of ['change', 'report', 'acceptance', 'warranty', 'final-settlement', 'penalty'])
+      expect(isProjectOwnerDocumentCardAnchor(`project-owner-document-card-${kind}`)).toBe(true)
+    expect(isProjectOwnerDocumentCardAnchor('project-owner-document-card-forged')).toBe(false)
+  })
+
   it('保留来源、筛选、分页、行锚点与滚动位置', () => {
     const state = materialContractListNavigationStateFromQuery({
       search: '瓷砖',
@@ -89,7 +96,19 @@ describe('材料采购合同列表返回上下文', () => {
       'real',
     )).toBe('/project/project-1?origin=real#project-owner-document-card-warranty')
     expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement',
+      'real',
+    )).toBe('/project/project-1?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement')
+    expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real#project-owner-document-card-penalty',
+      'real',
+    )).toBe('/project/project-1?origin=real#project-owner-document-card-penalty')
+    expect(validateProjectJourneyReturnTo(
       '/project/project-1?origin=real#project-owner-document-card-forged',
+      'real',
+    )).toBeNull()
+    expect(validateProjectJourneyReturnTo(
+      '/project/project-1?origin=real&ownerJourney=bad#project-owner-document-card-penalty',
       'real',
     )).toBeNull()
   })

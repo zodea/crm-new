@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createOwnerDocumentProjectReturnOrigin,
   createOwnerDocumentReturnOrigin,
+  resolveOwnerDocumentProjectReturnOrigin,
   resolveOwnerDocumentReturnContext,
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
@@ -8,6 +10,30 @@ import {
 } from '~/lib/owner-document/return-context'
 
 describe('甲方商务单据返回上下文', () => {
+  it('项目六类卡片来源按受限上下文恢复精确滚动位置', () => {
+    const returnTo = '/project/project-283?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement'
+    const origin = createOwnerDocumentProjectReturnOrigin({
+      contextId: 'origin_283_final',
+      returnTo,
+      anchorId: 'project-owner-document-card-final-settlement',
+      scrollTop: 512,
+      now: 1000,
+    })
+
+    expect(resolveOwnerDocumentProjectReturnOrigin({
+      returnTo,
+      contextId: 'origin_283_final',
+      now: 1500,
+      load: () => origin,
+    })).toEqual(origin)
+    expect(resolveOwnerDocumentProjectReturnOrigin({
+      returnTo: returnTo.replace('final-settlement', 'penalty'),
+      contextId: 'origin_283_final',
+      now: 1500,
+      load: () => origin,
+    })).toBeNull()
+  })
+
   it('白名单化列表筛选、分页、行锚点与滚动位置', () => {
     const origin = createOwnerDocumentReturnOrigin({
       kind: 'owner_change',
