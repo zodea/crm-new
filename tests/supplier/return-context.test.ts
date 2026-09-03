@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createSupplierDetailJourneyReturnOrigin,
   createSupplierReturnTo,
+  resolveSupplierDetailJourneyReturnOrigin,
+  validateSupplierDetailReturnTo,
   validateSupplierReturnTo,
 } from '~/lib/supplier/return-context'
 
@@ -17,5 +20,30 @@ describe('分供方列表返回上下文', () => {
 
     expect(validateSupplierReturnTo(returnTo)).toBe(returnTo)
     expect(validateSupplierReturnTo(validateSupplierReturnTo(returnTo))).toBe(returnTo)
+  })
+
+  it('分包变洽签来源只接受匹配上下文，并保留分供方入口锚点与滚动位置', () => {
+    const returnTo = '/base/supplier/supplier-1?origin=real&subChangeJourney=origin_327_supplier#supplier-subcontract-change-link'
+    const origin = createSupplierDetailJourneyReturnOrigin({
+      contextId: 'origin_327_supplier',
+      returnTo,
+      anchorId: 'supplier-subcontract-change-link',
+      scrollTop: 480,
+      now: 1000,
+    })
+
+    expect(validateSupplierDetailReturnTo(returnTo, 'real', 'supplier-1')).toBe(returnTo)
+    expect(resolveSupplierDetailJourneyReturnOrigin({
+      returnTo,
+      contextId: 'origin_327_supplier',
+      now: 1500,
+      load: () => origin,
+    })).toEqual(origin)
+    expect(resolveSupplierDetailJourneyReturnOrigin({
+      returnTo,
+      contextId: 'origin_tampered',
+      now: 1500,
+      load: () => origin,
+    })).toBeNull()
   })
 })

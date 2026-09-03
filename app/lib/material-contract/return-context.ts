@@ -65,7 +65,7 @@ const ROW_ANCHOR = /^#material-contract-row-[\w%.~:/-]+$/
 const STORAGE_PREFIX = 'ruihang:material-contract-return:'
 const JOURNEY_STORAGE_PREFIX = 'ruihang:material-contract-journey-return:'
 const PROJECT_MATERIAL_ANCHOR = 'project-material-contract-link'
-const PROJECT_OWNER_DOCUMENT_CARD_ANCHOR = /^project-owner-document-card-(?:change|report|acceptance|warranty|final-settlement|penalty)$/
+const PROJECT_OWNER_DOCUMENT_CARD_ANCHOR = /^project-owner-document-card-(?:change|report|acceptance|warranty|final-settlement|penalty|sub-change)$/
 const SUPPLIER_FACT_ANCHOR = /^material-contract-supplier-fact-(?:contracts|settlements|invoices|payments)$/
 const TTL = 30 * 60_000
 

@@ -11,8 +11,9 @@ import {
 
 const project = { state: 'resolved', entity: 'project', id: 'project-323', label: '中央项目', no: null }
 const customer = { state: 'resolved', entity: 'customer', id: 'customer-323', label: '中央客户', no: null }
+const supplier = { state: 'missing', entity: 'supplier', id: null, label: null, reason: 'not-recorded' }
 const contract = { state: 'resolved', entity: 'contract', id: 'contract-323', label: '中央施工合同', no: 'SG-323' }
-function navigation(subject: typeof project | typeof customer | typeof contract) {
+function navigation(subject: typeof project | typeof customer | typeof supplier | typeof contract) {
   return {
     kind: 'entity-detail',
     subject,
@@ -41,6 +42,8 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       projectNavigation: navigation(project),
       customer,
       customerNavigation: navigation(customer),
+      supplier,
+      supplierNavigation: { kind: 'unavailable', reason: 'missing-id' },
       contract,
       contractNavigation: navigation(contract),
       navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'owner-document', id: 'change-323', label: '中央变洽签', no: 'BG-323' }, variant: 'owner-change', view: null, filters: { dataOrigin: 'real' } },
@@ -56,8 +59,8 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       statuses: [],
       documentTypes: [],
       origins: {
-        real: { count: 1, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '323.00', taxExclusiveAmount: '300.00', appliedTaxExclusiveAmount: '301.00' },
-        demo: { count: 0, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '0.00', taxExclusiveAmount: '0.00', appliedTaxExclusiveAmount: '0.00' },
+        real: { count: 1, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '323.00', taxExclusiveAmount: '300.00', appliedTaxExclusiveAmount: '301.00', subcontractApprovedAmount: '0.00', subcontractActualApproved: { value: null, status: 'missing' } },
+        demo: { count: 0, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '0.00', taxExclusiveAmount: '0.00', appliedTaxExclusiveAmount: '0.00', subcontractApprovedAmount: '0.00', subcontractActualApproved: { value: null, status: 'missing' } },
       },
     },
     empty: null,
@@ -222,7 +225,111 @@ function validPenaltyForm(overrides: Record<string, unknown> = {}) {
   }
 }
 
+function validSubcontractChangeDetail() {
+  return buildOwnerCommercialDocumentDetail({
+    documents: [{
+      dataOrigin: 'real',
+      kind: 'sub_change',
+      id: 'sub-change-327',
+      no: 'FB-BG-2026-327',
+      name: '样板层劳务范围调整',
+      documentType: '增项',
+      projectId: 'project-323',
+      projectName: '中央项目',
+      projectPermission: 'allowed',
+      customerId: null,
+      customerName: '',
+      customerPermission: 'allowed',
+      supplierId: 'supplier-327',
+      supplierName: '中央劳务分供方',
+      supplierPermission: 'allowed',
+      contractId: 'subcontract-327',
+      contractNo: 'FB-327',
+      contractName: '中央劳务分包合同',
+      contractPermission: 'allowed',
+      sourceType: 'subcontract_change_order',
+      sourceId: 'sub-change-327',
+      sourceLocked: true,
+      periodNo: '',
+      applicationDate: '2026-08-27',
+      status: 'submitted',
+      statusNote: '已提交分包变洽签',
+      amount: 38000,
+      changedArea: 120,
+      actualApprovedPrice: 36000,
+      auditedAmount: null,
+      note: '按现场确认范围执行',
+      version: 1,
+      createdAt: '2026-08-27T00:00:00.000Z',
+      updatedAt: '2026-08-27T00:00:00.000Z',
+      lines: [],
+      files: [],
+    }],
+    query: parseOwnerCommercialDocumentDetailQuery('sub_change', 'sub-change-327', { origin: 'real' }),
+    asOf: '2026-08-27T00:00:00.000Z',
+    sourceVersion: 'sub-change-v1',
+    capabilities: ['subcontract-document:read'],
+  })
+}
+
+function validSubcontractChangeForm() {
+  return {
+    kind: 'sub_change',
+    id: 'sub-change-327',
+    draft: {
+      id: 'sub-change-327',
+      no: 'FB-BG-2026-327',
+      projectId: 'project-323',
+      supplierId: 'supplier-327',
+      contractId: 'subcontract-327',
+      changeType: '增项',
+      changeDate: '2026-08-27',
+      approvedAmount: 38000,
+      changedArea: 120,
+      actualApprovedPrice: 36000,
+      reason: '样板层劳务范围调整',
+      status: 'submitted',
+      statusNote: '已提交分包变洽签',
+      sourceType: 'subcontract_change_order',
+      sourceId: 'sub-change-327',
+      sourceLocked: true,
+      note: '按现场确认范围执行',
+      lines: [],
+    },
+    attachments: [],
+    version: '1',
+    updatedAt: '2026-08-27T00:00:00.000Z',
+  }
+}
+
 describe('甲方商务单据中央 HTTP Repository', () => {
+  it('解码分包变洽签专属关系、金额和正式编辑表单', async () => {
+    const readRepository = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue(validSubcontractChangeDetail()),
+    })
+    const commandRepository = createHttpOwnerCommercialDocumentCommandRepository({
+      fetcher: vi.fn().mockResolvedValue(validSubcontractChangeForm()),
+    })
+
+    await expect(readRepository.get(parseOwnerCommercialDocumentDetailQuery(
+      'sub_change',
+      'sub-change-327',
+      { origin: 'real' },
+    ))).resolves.toMatchObject({
+      document: {
+        kind: 'sub_change',
+        supplier: { state: 'resolved', id: 'supplier-327' },
+        amounts: { kind: 'sub_change', approved: '38000.00', changedArea: '120', actualApproved: '36000.00' },
+      },
+      supplierNavigation: { kind: 'entity-detail' },
+      contractNavigation: { filters: { contractKind: '分包' } },
+    })
+    await expect(commandRepository.loadForm('sub_change', 'sub-change-327')).resolves.toMatchObject({
+      kind: 'sub_change',
+      draft: { supplierId: 'supplier-327', changeType: '增项', approvedAmount: 38000 },
+    })
+  })
+
   it('只按类型与稳定 ID 访问中央读取地址', async () => {
     const fetcher = vi.fn().mockResolvedValue(validListPage())
     const repository = createHttpOwnerCommercialDocumentReadRepository({ fetcher })
@@ -230,6 +337,51 @@ describe('甲方商务单据中央 HTTP Repository', () => {
 
     await repository.list(query)
     expect(fetcher).toHaveBeenCalledWith('/api/read/owner-documents/owner_change', { query: { ...query } })
+  })
+
+  it('拒绝与请求 kind、ID 或来源不一致的列表和详情响应', async () => {
+    const ownerListAsSubcontract = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue(validListPage()),
+    })
+    await expect(ownerListAsSubcontract.list(parseOwnerCommercialDocumentListQuery('sub_change', {})))
+      .rejects
+      .toMatchObject({ problem: { code: 'internal-error' } })
+
+    const subcontractDetailAsOwner = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue(validSubcontractChangeDetail()),
+    })
+    await expect(subcontractDetailAsOwner.get(parseOwnerCommercialDocumentDetailQuery(
+      'owner_change',
+      'sub-change-327',
+      { origin: 'real' },
+    ))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+
+    await expect(subcontractDetailAsOwner.get(parseOwnerCommercialDocumentDetailQuery(
+      'sub_change',
+      'different-sub-change-327',
+      { origin: 'real' },
+    ))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+
+    await expect(subcontractDetailAsOwner.get(parseOwnerCommercialDocumentDetailQuery(
+      'sub_change',
+      'sub-change-327',
+      { origin: 'demo', includeDemo: true },
+    ))).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+  })
+
+  it.each([
+    ['null complete', { value: null, status: 'complete' }],
+    ['value missing', { value: '0.00', status: 'missing' }],
+  ])('拒绝实际审定价汇总完整度畸形组合：%s', async (_label, subcontractActualApproved) => {
+    const response = validListPage()
+    response.summary.origins.real.subcontractActualApproved = subcontractActualApproved
+    const repository = createHttpOwnerCommercialDocumentReadRepository({
+      fetcher: vi.fn().mockResolvedValue(response),
+    })
+
+    await expect(repository.list(parseOwnerCommercialDocumentListQuery('owner_change', {})))
+      .rejects
+      .toMatchObject({ problem: { code: 'internal-error' } })
   })
 
   it('正式保存只向命令端点发送显式命令信封', async () => {

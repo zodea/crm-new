@@ -383,6 +383,40 @@ describe('core migration local source', () => {
       .toContain('customer_demo_001')
   })
 
+  it('保留分包变洽签缺失分供方的显式空关系供 dry-run 阻断', async () => {
+    const deps = dependencies({
+      select: vi.fn(async (sql: string) => {
+        if (sql.includes('FROM boq_change_orders change_order')) {
+          return [{
+            id: 'sub-change-missing-supplier-327',
+            name: '缺失分供方的分包变洽签',
+            project_id: 'project-local-1',
+            contract_id: 'subcontract-local-1',
+            supplier_id: null,
+            amount: 38000,
+            kind: 'sub_change',
+            no: 'FB-MISSING-327',
+            document_type: '增项',
+            source_type: 'subcontract_change_order',
+            status: 'submitted',
+            lines_json: '[]',
+            files_json: '[]',
+            deleted_at: null,
+          }]
+        }
+        return sourceRows(sql)
+      }),
+    })
+
+    const migrationSource = await createCoreMigrationLocalSource(deps).readSource()
+
+    expect(migrationSource.entities.owner_documents[0]?.references).toEqual({
+      projectId: 'project-local-1',
+      contractId: 'subcontract-local-1',
+      supplierId: null,
+    })
+  })
+
   it('迁移已签证新增项时优先导出结果 BOQ 稳定 ID 与结果量价', async () => {
     const deps = dependencies()
     const source = createCoreMigrationLocalSource(deps)
@@ -530,6 +564,14 @@ describe('core migration local source', () => {
           520, 480, 500
         )
       `)
+      await db.execute(`INSERT INTO suppliers (id, name) VALUES ('supplier-local-327', '迁移劳务分供方')`)
+      await db.execute(`
+        INSERT INTO contracts (id, no, name, kind, sub_kind, project_id, supplier_id, status)
+        VALUES (
+          'subcontract-local-327', 'FB-LOCAL-327', '迁移劳务分包合同', '分包', '劳务',
+          'project-local-323', 'supplier-local-327', '履约中'
+        )
+      `)
       await db.execute(`
         INSERT INTO owner_penalties (
           id, no, project_id, contract_id, notice_no, amount,
@@ -539,6 +581,18 @@ describe('core migration local source', () => {
           'owner-penalty-local-326', 'FK-LOCAL-326', 'project-local-323', 'contract-local-323',
           'LX-LOCAL-326', 36000, '2026-08-24', '施工进度延误',
           '已提交工期顺延说明', 'submitted', '项目部已核对'
+        )
+      `)
+      await db.execute(`
+        INSERT INTO subcontract_change_orders (
+          id, no, change_type, project_id, supplier_id, contract_id,
+          change_date, approved_amount, changed_area, actual_approved_price,
+          reason, status, note
+        )
+        VALUES (
+          'sub-change-local-327', 'FB-BG-LOCAL-327', '增项', 'project-local-323',
+          'supplier-local-327', 'subcontract-local-327', '2026-08-27', 38000,
+          120, 36000, '样板层劳务范围调整', 'submitted', '按现场确认范围执行'
         )
       `)
       await db.execute(`
@@ -579,6 +633,23 @@ describe('core migration local source', () => {
             penaltyReason: '施工进度延误',
             appealNote: '已提交工期顺延说明',
             filesJson: expect.stringContaining('甲方联系单.pdf'),
+          },
+        })
+      expect(migrationSource.entities.owner_documents.find(row => row.legacyId === 'sub-change-local-327'))
+        .toMatchObject({
+          name: '样板层劳务范围调整',
+          references: {
+            projectId: 'project-local-323',
+            supplierId: 'supplier-local-327',
+            contractId: 'subcontract-local-327',
+          },
+          amount: '38000.00',
+          attributes: {
+            kind: 'sub_change',
+            sourceType: 'subcontract_change_order',
+            documentType: '增项',
+            changedArea: 120,
+            actualApprovedPrice: 36000,
           },
         })
       const constructionContract = migrationSource.entities.construction_contracts[0]
@@ -641,6 +712,15 @@ describe('core migration local source', () => {
           id: 'file-owner-penalty-local-326',
           category: 'contact-letter',
         })],
+      }))
+      expect(commands.rows()).toContainEqual(expect.objectContaining({
+        kind: 'sub_change',
+        no: 'FB-BG-LOCAL-327',
+        supplierId: expect.stringContaining('supplier-local-327'),
+        contractId: expect.stringContaining('subcontract-local-327'),
+        amount: 38000,
+        changedArea: 120,
+        actualApprovedPrice: 36000,
       }))
     }
     finally {

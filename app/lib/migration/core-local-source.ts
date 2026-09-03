@@ -205,10 +205,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         change_order.name,
         change_order.project_id,
         change_order.contract_id,
+        NULL AS supplier_id,
         COALESCE(change_order.approved_tax_inclusive_amount, change_order.total_amount, 0) AS amount,
         NULL AS audited_amount,
         change_order.approved_tax_exclusive_amount AS tax_exclusive_amount,
         change_order.applied_tax_exclusive_amount AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'owner_change' AS kind,
         change_order.code AS no,
         change_order.document_type,
@@ -279,10 +282,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         ledger.name,
         ledger.project_id,
         ledger.contract_id,
+        NULL AS supplier_id,
         ledger.tax_inc_amount AS amount,
         NULL AS audited_amount,
         ledger.tax_exc_amount AS tax_exclusive_amount,
         ledger.applied_amount AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'owner_change' AS kind,
         ledger.change_no AS no,
         ledger.document_type,
@@ -335,10 +341,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         COALESCE(NULLIF(statement.period_no, ''), statement.month) || '月度报量' AS name,
         statement.project_id,
         statement.contract_id,
+        NULL AS supplier_id,
         COALESCE(statement.reported_amount, statement.total_amount, 0) AS amount,
         statement.audited_amount,
         NULL AS tax_exclusive_amount,
         NULL AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'owner_report' AS kind,
         statement.no,
         'monthly_statement' AS document_type,
@@ -413,10 +422,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         acceptance.name,
         acceptance.project_id,
         acceptance.contract_id,
+        NULL AS supplier_id,
         acceptance.contract_estimate AS amount,
         NULL AS audited_amount,
         NULL AS tax_exclusive_amount,
         NULL AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'acceptance' AS kind,
         acceptance.no,
         'acceptance_lifecycle' AS document_type,
@@ -503,10 +515,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         settlement.name,
         settlement.project_id,
         settlement.contract_id,
+        NULL AS supplier_id,
         settlement.settlement_amount AS amount,
         settlement.audited_amount,
         NULL AS tax_exclusive_amount,
         NULL AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'final_settlement' AS kind,
         settlement.no,
         'final_settlement' AS document_type,
@@ -562,10 +577,13 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         penalty.reason AS name,
         penalty.project_id,
         penalty.contract_id,
+        NULL AS supplier_id,
         penalty.amount,
         NULL AS audited_amount,
         NULL AS tax_exclusive_amount,
         NULL AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
         'owner_penalty' AS kind,
         penalty.no,
         'owner_penalty' AS document_type,
@@ -609,6 +627,66 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         penalty.reason AS penalty_reason,
         penalty.appeal_note
       FROM owner_penalties penalty
+
+      UNION ALL
+
+      SELECT
+        subcontract_change.id,
+        subcontract_change.reason AS name,
+        subcontract_change.project_id,
+        subcontract_change.contract_id,
+        subcontract_change.supplier_id,
+        subcontract_change.approved_amount AS amount,
+        NULL AS audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        subcontract_change.changed_area,
+        subcontract_change.actual_approved_price,
+        'sub_change' AS kind,
+        subcontract_change.no,
+        subcontract_change.change_type AS document_type,
+        'subcontract_change_order' AS source_type,
+        CASE WHEN subcontract_change.status NOT IN ('draft', 'rejected') THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        subcontract_change.change_date AS application_date,
+        NULL AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        subcontract_change.status,
+        CASE WHEN subcontract_change.status = 'submitted' THEN '已提交分包变洽签'
+             WHEN subcontract_change.status = 'approved' THEN '分包变洽签已审批'
+             ELSE '' END AS status_note,
+        subcontract_change.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'subcontract_change_order'
+            AND file_ref.owner_id = subcontract_change.id
+        ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
+        subcontract_change.created_at,
+        subcontract_change.updated_at,
+        subcontract_change.deleted_at,
+        '' AS settlement_basis,
+        '' AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
+      FROM subcontract_change_orders subcontract_change
     ) owner_document
     ORDER BY kind, id
   `,
@@ -859,11 +937,13 @@ function sourceEntity(
     }
   }
   if (entityType === 'owner_documents') {
+    const supplierId = nullableText(row.supplier_id)
     return {
       ...entity,
       references: {
         projectId: nullableText(row.project_id),
         contractId: nullableText(row.contract_id),
+        ...(text(row.kind) === 'sub_change' || supplierId ? { supplierId } : {}),
       },
       amount: nullableMoney(row.amount),
       attributes: {
@@ -885,6 +965,8 @@ function sourceEntity(
         auditedAmount: nullableNumber(row.audited_amount),
         taxExclusiveAmount: nullableNumber(row.tax_exclusive_amount),
         appliedTaxExclusiveAmount: nullableNumber(row.applied_tax_exclusive_amount),
+        changedArea: nullableNumber(row.changed_area),
+        actualApprovedPrice: nullableNumber(row.actual_approved_price),
         note: text(row.note),
         linesJson: text(row.lines_json) || '[]',
         filesJson: normalizeFileRefsJson(row.files_json),

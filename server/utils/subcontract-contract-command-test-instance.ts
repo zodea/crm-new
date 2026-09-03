@@ -390,8 +390,14 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
   return instance
 }
 
-export const SUBCONTRACT_CONTRACT_FORM_PROJECTS = projectsSeed.map(row => ({ id: row.id, name: row.name }))
-export const SUBCONTRACT_CONTRACT_FORM_SUPPLIERS = suppliersSeed.map(row => ({ id: row.id, name: row.name }))
+export const SUBCONTRACT_CONTRACT_FORM_PROJECTS = [
+  { id: 'project-real-320', name: '中央正式施工项目' },
+  ...projectsSeed.map(row => ({ id: row.id, name: row.name })),
+]
+export const SUBCONTRACT_CONTRACT_FORM_SUPPLIERS = [
+  { id: 'supplier-real-327', name: '中央正式劳务分供方' },
+  ...suppliersSeed.map(row => ({ id: row.id, name: row.name })),
+]
 
 export const subcontractContractCommandTestInstance = createSubcontractContractCommandTestInstance({
   projects: SUBCONTRACT_CONTRACT_FORM_PROJECTS,

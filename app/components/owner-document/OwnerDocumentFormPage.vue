@@ -52,10 +52,10 @@ const isEditing = computed(() => Boolean(routeId.value))
 const hasReturnTarget = computed(() => Boolean(route.query?.returnTo))
 const returnTarget = computed(() => {
   if (props.kind !== 'owner_change' && props.kind !== 'owner_report'
-    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty') {
+    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty' && props.kind !== 'sub_change') {
     return meta.value.listPath
   }
-  return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real')
+  return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real', props.kind)
     ?? validateOwnerDocumentJourneyReturnTo(route.query?.returnTo, props.kind, 'real')
     ?? meta.value.listPath
 })
@@ -222,7 +222,7 @@ async function basicLookup(
   kind: 'crew' | 'project' | 'supplier',
   keyword: string,
 ): Promise<LookupOption[]> {
-  return store.loadBasicOptions(kind, keyword)
+  return store.loadBasicOptions(kind, keyword, props.kind)
 }
 
 const fetchProjects = (keyword: string) => basicLookup('project', keyword)

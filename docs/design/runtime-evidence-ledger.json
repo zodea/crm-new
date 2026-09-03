@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 137,
+    "trackedPageFiles": 138,
     "devPageFiles": 5,
-    "productionRoutes": 132,
+    "productionRoutes": 133,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 132,
-    "referenceEndpoints": 132,
+    "evidenceEndpointRecords": 133,
+    "referenceEndpoints": 133,
     "referenceProfiles": 37,
     "usedReferenceProfiles": 32,
     "directEvidenceRoutes": 52,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 19,
+    "localAuthorityRoutes": 20,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 130,
+    "designCoveredRoutes": 131,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -103,9 +103,10 @@
     {
       "code": "subcontract-document",
       "domain": "分包单据",
-      "routeCount": 6,
+      "routeCount": 7,
       "implementationIssues": [
         295,
+        327,
         289
       ]
     },
@@ -3176,6 +3177,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOC-DC",
@@ -3203,6 +3205,7 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOCUMENTS-LIVE",
@@ -3230,6 +3233,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOC-DC",
@@ -3550,14 +3554,15 @@
       "page": "app/pages/subcontract/[kind]/[id].vue",
       "localRoute": "/subcontract/:kind/:id",
       "domainCode": "subcontract-document",
-      "template": "整页表单",
+      "template": "详情",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOC-DC",
-      "referenceEndpointId": "local-24CA5AA35676",
-      "referenceEndpointLabel": "本地权威端点：/subcontract/:kind/:id",
+      "referenceEndpointId": "subcontract-document-detail-by-kind",
+      "referenceEndpointLabel": "分包变洽签编号 > 专属只读详情（参考非空详情未观察）",
       "evidenceGrade": "local-authority",
       "observationDate": null,
       "observationDateStatus": "not-applicable-local-authority",
@@ -3573,6 +3578,34 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-D31B60846313",
+      "page": "app/pages/subcontract/[kind]/form/[id].vue",
+      "localRoute": "/subcontract/:kind/form/:id",
+      "domainCode": "subcontract-document",
+      "template": "整页表单",
+      "implementationIssues": [
+        295,
+        327,
+        289
+      ],
+      "referenceProfile": "R-SUB-DOC-DC",
+      "referenceEndpointId": "subcontract-document-edit-by-kind",
+      "referenceEndpointLabel": "分包变洽签专属整页编辑表单",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/:kind/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/:kind/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-12ABF110688C",
       "page": "app/pages/subcontract/[kind]/index.vue",
       "localRoute": "/subcontract/:kind",
@@ -3580,6 +3613,7 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOCUMENTS-LIVE",
@@ -3607,6 +3641,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        327,
         289
       ],
       "referenceProfile": "R-SUB-DOC-DC",

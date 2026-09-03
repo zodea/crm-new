@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 137,
+    "trackedPageFiles": 138,
     "devPageFiles": 5,
-    "appPageFiles": 132,
+    "appPageFiles": 133,
     "appNavLeaves": 51,
-    "covered": 130,
+    "covered": 131,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -655,6 +655,11 @@
         "subChangeForm",
         "subSettleForm"
       ],
+      "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/:kind/form/:id",
+      "designRoute": "subChangeForm",
       "status": "covered"
     },
     {

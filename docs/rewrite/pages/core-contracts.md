@@ -102,11 +102,13 @@
 
 施工七组在 URL 中以 `tab=info|supplements|changes|settlements|invoices|receipts|acceptance` 恢复；补充合同使用同一详情的稳定 `focus` 深链，验收/保修再以 `focusView` 区分同 ID 的两个分组。读取请求同时携带 `supplement|change|settlement|acceptance` 聚焦范围，并在验收范围继续校验 `focusView=acceptance|warranty`，使目标不存在、父子错配、跨分区错配和验收/保修跨分组错配保持精确状态；返回时恢复原施工合同列表筛选、分页、滚动、合同焦点以及验收/保修分组。甲方变洽签、月报量、最终结算、甲方罚扣、验收与保修只有在聚合层给出与事实行一致的 canonical owner-document ID 时生成目标；未核验的 demo/旧事实保持普通文本。详情显式编辑进入独立整页表单，保存或生命周期动作后回到同一详情并保留嵌套列表返回上下文。刷新失败时保留上一版成功详情并提示重试；实际竣工日期为 `null` 时显示“未记录”。
 
-分包七组在 URL 中以 `tab=info|changes|invoices|payments|settlements|penalties|material-uses` 恢复；补充合同在“分包变洽签”中按稳定 `focus` 深链并验证父合同，返回时恢复原分包合同列表筛选、分页、滚动和合同焦点。付款申请与付款登记、过程结算与完工结算分区展示。`material_uses` 缺少合同/分供方外键时返回 `missing-relation` 空态，不按项目、班组或名称猜测。
+分包七组在 URL 中以 `tab=info|changes|invoices|payments|settlements|penalties|material-uses` 恢复；补充合同与分包变洽签在“分包变洽签”中按各自 canonical variant 和稳定 `focus` 深链并验证父合同。#327 的分包变洽签事实行进入 `/subcontract/change/:id` 专属只读详情，返回恢复原合同分区、行和焦点；详情内打开合同后仍可显式返回原单据。目标不存在与父子关系错配使用不同问题语义，不按编号或名称回退。付款申请与付款登记、过程结算与完工结算分区展示。`material_uses` 缺少合同/分供方外键时返回 `missing-relation` 空态，不按项目、班组或名称猜测。
 
 材料采购七组在 URL 中以 `tab=info|lines|materials|invoices|payments|settlements|penalties` 恢复；物资管理内部只展示已核验的下料、到货事实，直调、出库及其他缺稳定外键集合返回真实空态。合同到分供方事实的 `tab=contracts|settlements|invoices|payments` 只接受白名单值，返回时保留原合同页签及材采列表上下文。#277 的父级联合验收进一步固定：既有正式合同受控迁入时，所引用项目与分供方必须先进入各自中央主档，表单候选与合同校验只读该中央集合；正式合同再按同一 `supplier_id` 回流分供方合同事实。结算金额为 `0` 仍进入真实空表，混合来源列表的返回快照以所点击行的 `dataOrigin` 为准。正式详情才显示显式编辑入口，演示详情即使有相同字段也始终只读。
 
 审批历史和完整流程只在本地存在真实审批事件时显示；没有审批事件表时保留合同阶段，不用人员种子拼出参考审批流。参考站的打印、下载、评论、文件操作、转需用计划均未获写入验证，不纳入本轮复刻范围。
+
+分包合同中的分包变洽签事实行只有在服务端同时返回 `subcontract-document:read` 时才生成详情目标；缺少专属权限时保持不可用意图，不因已有分包合同读取权限而越权。分供方来源链使用受限上下文恢复入口锚点、滚动和焦点。
 
 ## 三、工程量清单关联闭环
 

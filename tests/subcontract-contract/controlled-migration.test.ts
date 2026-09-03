@@ -77,4 +77,69 @@ describe('分包合同受控中央迁移', () => {
     await core.rollback({ ...envelope('rollback-321'), batchId: batch.batchId }, session)
     expect(() => commands.form(id, session)).toThrow('未找到分包合同')
   })
+
+  it('将同一中央命令源中的分包变洽签并入合同事实并生成专属导航', async () => {
+    const commands = createSubcontractContractCommandTestInstance({
+      createId: () => 'subcontract-central-327',
+      projects: [{ id: 'project-central-327', name: '中央项目' }],
+      suppliers: [{ id: 'supplier-central-327', name: '中央分供方' }],
+    })
+    const ownerDocuments = {
+      rows: () => [{
+        dataOrigin: 'real' as const,
+        kind: 'sub_change' as const,
+        id: 'sub-change-central-327',
+        contractId: 'subcontract-central-327',
+        no: 'FB-BQ-327',
+        name: '样板层分包范围调整',
+        amount: 32000,
+        applicationDate: '2026-08-26' as const,
+        status: 'submitted',
+      }],
+      sourceVersion: () => 'owner-document-command-7',
+    }
+    const read = createSubcontractContractReadTestInstance(
+      () => ['subcontract-contract:read', 'subcontract-document:read'],
+      commands,
+      ownerDocuments,
+    )
+
+    await commands.execute({
+      workspaceId: 'workspace-327',
+      actorId: 'actor-327',
+      requiredCapability: 'subcontract-contract:write',
+      commandId: 'create-subcontract-327',
+      baseVersion: null,
+      action: 'submit',
+      draft: {
+        no: 'FB-327',
+        name: '中央分包合同',
+        projectId: 'project-central-327',
+        supplierId: 'supplier-central-327',
+        subKind: '劳务',
+        content: '劳务分包',
+        signDate: '2026-08-01',
+        amount: 800000,
+        status: '履约中',
+      },
+      attachments: {},
+    }, {
+      workspaceId: 'workspace-327',
+      actorId: 'actor-327',
+      capabilities: ['subcontract-contract:read', 'subcontract-contract:write'],
+    })
+
+    const detail = read.detail('subcontract-central-327', { origin: 'real' })
+    expect(detail.sourceVersion).toContain('owner-document-command-7')
+    expect(detail.sections.changes).toContainEqual(expect.objectContaining({
+      id: 'sub-change-central-327',
+      no: 'FB-BQ-327',
+      amount: '32000.00',
+      status: '已提交',
+      navigation: expect.objectContaining({
+        subject: expect.objectContaining({ entity: 'subcontract-document', id: 'sub-change-central-327' }),
+        variant: 'change',
+      }),
+    }))
+  })
 })

@@ -68,4 +68,15 @@ describe('甲方商务单据中央读取实例', () => {
     expect(() => read.detail('owner_change', 'change-real-323', { origin: 'demo', includeDemo: true }))
       .toThrow('来源与地址不匹配')
   })
+
+  it('甲方与分包读取权限不能跨 capability 家族复用', () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance({ documents: OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS })
+    const ownerOnly = createOwnerCommercialDocumentReadTestInstance(() => ['owner-document:read'], commands)
+    expect(() => ownerOnly.list('sub_change', { origin: 'real' })).toThrow('无分包变洽签查看权限')
+
+    const subcontractOnly = createOwnerCommercialDocumentReadTestInstance(() => ['subcontract-document:read'], commands)
+    expect(subcontractOnly.list('sub_change', { origin: 'real' }).capabilities)
+      .toContain('subcontract-document:read')
+    expect(() => subcontractOnly.list('owner_change', { origin: 'real' })).toThrow('无甲方商务单据查看权限')
+  })
 })

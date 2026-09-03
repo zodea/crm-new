@@ -17,14 +17,14 @@ describe('f5 单据页面模型', () => {
       expect(ownerDocumentKindFromRoute(meta.routeScope, meta.routeKind)).toBe(kind)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META)).toBe(`${meta.listPath}/new`)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(
-        ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'].includes(kind)
+        ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(kind)
           ? `${meta.listPath}/form/f5_1`
           : `${meta.listPath}/f5_1`,
       )
     }
   })
 
-  it('doc01-doc04 五类单据用独立只读详情地址，并显式保留来源和验收视图', () => {
+  it('五类甲方单据与分包变洽签用独立只读详情地址，并显式保留来源和验收视图', () => {
     expect(ownerDocumentDetailPath('owner_change', 'change/323', 'real'))
       .toBe('/owner/change/change%2F323?origin=real')
     expect(ownerDocumentDetailPath('owner_report', 'report-323', 'demo'))
@@ -35,6 +35,8 @@ describe('f5 单据页面模型', () => {
       .toBe('/owner/final-settlement/final-settlement%2F325?origin=real')
     expect(ownerDocumentDetailPath('owner_penalty', 'owner-penalty/326', 'real'))
       .toBe('/owner/penalty/owner-penalty%2F326?origin=real')
+    expect(ownerDocumentDetailPath('sub_change', 'sub-change/327', 'real'))
+      .toBe('/subcontract/change/sub-change%2F327?origin=real')
   })
 
   it('八类表单提供准确分区和对应合同入口', () => {

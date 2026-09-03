@@ -1,8 +1,96 @@
 import type { KitTableColumn } from '~/lib/kit/table'
+import type { OwnerCommercialDocumentListItemDTO } from '~/lib/owner-document/central-repository'
 import type {
   OwnerDocumentKind,
   OwnerDocumentListRecord,
 } from '~/lib/owner-document/forms'
+
+export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
+  const itemAmounts = item.amounts.kind === 'owner_change'
+    ? {
+        amount: Number(item.amounts.taxInclusive),
+        secondaryAmount: Number(item.amounts.taxExclusive),
+        tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
+      }
+    : item.amounts.kind === 'sub_change'
+      ? {
+          amount: Number(item.amounts.approved),
+          secondaryAmount: item.amounts.actualApproved === null ? null : Number(item.amounts.actualApproved),
+          tertiaryAmount: 0,
+        }
+      : item.amounts.kind === 'owner_report'
+        ? {
+            amount: Number(item.amounts.reported),
+            secondaryAmount: Number(item.amounts.audited ?? 0),
+            tertiaryAmount: Number(item.amounts.difference ?? 0),
+          }
+        : item.amounts.kind === 'final_settlement'
+          ? {
+              amount: Number(item.amounts.declared),
+              secondaryAmount: Number(item.amounts.audited ?? 0),
+              tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
+            }
+          : item.amounts.kind === 'owner_penalty'
+            ? {
+                amount: Number(item.amounts.amount),
+                secondaryAmount: 0,
+                tertiaryAmount: 0,
+              }
+            : {
+                amount: Number(item.amounts.contractEstimate),
+                secondaryAmount: 0,
+                tertiaryAmount: 0,
+              }
+  const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
+    ? {
+        viewVariant: 'acceptance' as const,
+        acceptanceOrganization: item.acceptanceView.organization,
+        acceptancePerson: item.acceptanceView.person,
+        acceptanceConclusion: item.acceptanceView.conclusion,
+      }
+    : item.acceptanceView?.variant === 'warranty'
+      ? {
+          viewVariant: 'warranty' as const,
+          warrantyOwner: item.acceptanceView.owner,
+          warrantyStartDate: item.acceptanceView.startDate ?? '',
+          warrantyEndDate: item.acceptanceView.endDate ?? '',
+          warrantyConfirmationOrganization: item.acceptanceView.confirmationOrganization ?? '',
+          warrantyConfirmationDate: item.acceptanceView.confirmationDate ?? '',
+          warrantyConfirmationNote: item.acceptanceView.confirmationNote,
+        }
+      : {}
+  return {
+    id: item.id,
+    no: item.no,
+    name: item.name,
+    noticeNo: item.ownerPenaltyFacts?.noticeNo,
+    projectId: item.project.state === 'resolved' ? item.project.id : null,
+    projectName: item.project.state === 'resolved' ? item.project.label : '',
+    contractId: item.contract.state === 'resolved' ? item.contract.id : null,
+    contractName: item.contract.state === 'resolved' ? item.contract.label : '',
+    supplierId: item.supplier.state === 'resolved' ? item.supplier.id : null,
+    supplierName: item.supplier.state === 'resolved' ? item.supplier.label : '',
+    crewId: null,
+    crewName: '',
+    type: item.documentType,
+    period: item.periodNo,
+    ...itemAmounts,
+    projectNavigation: item.projectNavigation,
+    contractNavigation: item.contractNavigation,
+    supplierNavigation: item.supplierNavigation,
+    quantity: item.amounts.kind === 'sub_change' && item.amounts.changedArea != null
+      ? Number(item.amounts.changedArea)
+      : null,
+    date: item.acceptanceView?.variant === 'acceptance'
+      ? item.acceptanceView.date ?? ''
+      : item.acceptanceView?.variant === 'warranty'
+        ? item.acceptanceView.confirmationDate ?? item.acceptanceView.endDate ?? item.acceptanceView.startDate ?? ''
+        : item.applicationDate ?? '',
+    status: item.status,
+    attachmentCount: item.attachmentCount ?? 0,
+    ...acceptanceFields,
+  }
+}
 
 export interface OwnerDocumentListFilters {
   search: string
@@ -262,12 +350,12 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
     showTypeFilter: true,
     views: [
       { key: 'all', label: '全部' },
-      { key: 'approved', label: '已签证' },
-      { key: 'submitted', label: '已上报' },
+      { key: 'approved', label: '已审批' },
+      { key: 'submitted', label: '已提交' },
       { key: 'draft', label: '草稿' },
-      { key: 'rejected', label: '已打回' },
+      { key: 'rejected', label: '已退回' },
     ],
-    defaultView: 'approved',
+    defaultView: 'all',
     countLabel: '变更单数',
     amountSummaries: [
       { field: 'amount', label: '审批金额总和' },
@@ -427,9 +515,9 @@ export function ownerDocumentStatusLabelForList(
     },
     sub_change: {
       draft: '草稿',
-      submitted: '已上报',
-      rejected: '已打回',
-      approved: '已签证',
+      submitted: '已提交',
+      rejected: '已退回',
+      approved: '已审批',
     },
     sub_settlement: {
       pending: ['draft', '草稿'].includes(normalized(status)) ? '草稿' : '待确认',

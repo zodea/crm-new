@@ -6,6 +6,7 @@ import {
   parseOwnerCommercialDocumentDetailQuery,
   parseOwnerCommercialDocumentListQuery,
 } from '~/lib/owner-document/central-repository'
+import { ownerDocumentListRecordFromCentral } from '~/lib/owner-document/list'
 
 const change: OwnerCommercialDocumentSource = {
   dataOrigin: 'real',
@@ -278,6 +279,47 @@ const ownerPenalty = {
   }],
 } as unknown as OwnerCommercialDocumentSource
 
+const subcontractChange = {
+  ...change,
+  kind: 'sub_change',
+  id: 'sub-change-real-327',
+  no: 'FB-BG-2026-327',
+  name: '样板层劳务范围调整',
+  documentType: '增项',
+  customerId: null,
+  customerName: '',
+  customerPermission: 'allowed',
+  supplierId: 'supplier-real-327',
+  supplierName: '中央正式劳务分供方',
+  supplierPermission: 'allowed',
+  contractId: 'subcontract-real-327',
+  contractNo: 'FB-CENTRAL-327',
+  contractName: '中央正式劳务分包合同',
+  sourceType: 'subcontract_change_order',
+  sourceId: 'sub-change-real-327',
+  sourceLocked: false,
+  applicationDate: '2026-08-26',
+  status: 'submitted',
+  statusNote: '已提交分包变洽签',
+  amount: 38000,
+  changedArea: 120,
+  actualApprovedPrice: 36000,
+  auditedAmount: null,
+  note: '按现场确认范围执行',
+  updatedAt: '2026-08-26T10:00:00.000Z',
+  lines: [],
+  files: [{
+    id: 'file-sub-change-real-327',
+    fileName: '分包变洽签确认单.pdf',
+    fileSize: 3270,
+    mimeType: 'application/pdf',
+    category: '业务附件',
+    uploader: '项目商务经理',
+    uploadedAt: '2026-08-26T10:00:00.000Z',
+    deletedAt: null,
+  }],
+} as unknown as OwnerCommercialDocumentSource
+
 const base = {
   documents: [change, report],
   asOf: '2026-08-25T00:00:00.000Z',
@@ -286,6 +328,145 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it('分包变洽签按稳定项目、分供方与分包合同关系输出专属只读事实', () => {
+    const page = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents: [subcontractChange],
+      query: parseOwnerCommercialDocumentListQuery('sub_change', {
+        origin: 'real',
+        projectId: 'project-real-323',
+        contractId: 'subcontract-real-327',
+        page: 1,
+        pageSize: 20,
+      }),
+    })
+
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        rowKey: 'real:sub_change:sub-change-real-327',
+        kind: 'sub_change',
+        amounts: {
+          kind: 'sub_change',
+          approved: '38000.00',
+          changedArea: '120',
+          actualApproved: '36000.00',
+        },
+        project: expect.objectContaining({ state: 'resolved', entity: 'project', id: 'project-real-323' }),
+        supplier: expect.objectContaining({ state: 'resolved', entity: 'supplier', id: 'supplier-real-327' }),
+        contract: expect.objectContaining({ state: 'resolved', entity: 'contract', id: 'subcontract-real-327' }),
+        attachmentCount: 1,
+        navigation: expect.objectContaining({
+          subject: expect.objectContaining({ entity: 'subcontract-document', id: 'sub-change-real-327' }),
+          variant: 'change',
+        }),
+      }),
+    ])
+    expect(page.summary.origins.real).toMatchObject({
+      reportedAmount: '0.00',
+      taxInclusiveAmount: '0.00',
+      subcontractApprovedAmount: '38000.00',
+      subcontractActualApproved: { value: '36000.00', status: 'complete' },
+    })
+
+    const detail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [subcontractChange],
+      query: parseOwnerCommercialDocumentDetailQuery('sub_change', 'sub-change-real-327', { origin: 'real' }),
+    })
+
+    expect(detail.document).toMatchObject({
+      id: 'sub-change-real-327',
+      kind: 'sub_change',
+      applicationDate: '2026-08-26',
+      amounts: {
+        kind: 'sub_change',
+        approved: '38000.00',
+        changedArea: '120',
+        actualApproved: '36000.00',
+      },
+      supplier: { state: 'resolved', entity: 'supplier', id: 'supplier-real-327' },
+      contract: { state: 'resolved', entity: 'contract', id: 'subcontract-real-327' },
+    })
+    expect(detail.supplierNavigation).toMatchObject({ kind: 'entity-detail', subject: { id: 'supplier-real-327' } })
+    expect(detail.contractNavigation).toMatchObject({
+      kind: 'entity-detail',
+      filters: { dataOrigin: 'real', contractKind: '分包' },
+    })
+    expect(detail.sourceNavigation).toMatchObject({
+      kind: 'entity-detail',
+      variant: 'subcontract-document-source',
+      view: 'sub-change-real-327',
+      filters: { subcontractTab: 'changes' },
+    })
+    expect(detail.files).toEqual([
+      expect.objectContaining({ id: 'file-sub-change-real-327', fileName: '分包变洽签确认单.pdf' }),
+    ])
+  })
+
+  it('分包变洽签详情不在来源错配时回退到同 ID 的其他来源', () => {
+    expect(() => buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [subcontractChange],
+      query: parseOwnerCommercialDocumentDetailQuery('sub_change', 'sub-change-real-327', { origin: 'demo', includeDemo: true }),
+    })).toThrowError(/来源与地址不匹配/)
+  })
+
+  it('分包变洽签按分供方稳定 ID 收窄，并可搜索类型与分供方名称', () => {
+    const otherSupplier = {
+      ...subcontractChange,
+      id: 'sub-change-other-supplier-327',
+      supplierId: 'supplier-other-327',
+      supplierName: '另一家分供方',
+    }
+    const documents = [subcontractChange, otherSupplier]
+    const list = (input: Record<string, unknown>) => buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents,
+      query: parseOwnerCommercialDocumentListQuery('sub_change', input),
+    })
+
+    expect(list({ supplierId: 'supplier-real-327' }).items.map(row => row.id))
+      .toEqual(['sub-change-real-327'])
+    expect(list({ supplierId: 'supplier-missing-327' }).items).toEqual([])
+    expect(list({ search: '增项' }).items.map(row => row.id)).toContain('sub-change-real-327')
+    expect(list({ search: '中央正式劳务分供方' }).items.map(row => row.id)).toContain('sub-change-real-327')
+  })
+
+  it('分包变洽签实际审定价保持 null 与零值的业务差异', () => {
+    const page = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents: [
+        { ...subcontractChange, id: 'sub-change-null-327', actualApprovedPrice: null },
+        { ...subcontractChange, id: 'sub-change-zero-327', actualApprovedPrice: 0 },
+      ],
+      query: parseOwnerCommercialDocumentListQuery('sub_change', {}),
+    })
+
+    expect(page.items.map(row => row.amounts)).toEqual([
+      expect.objectContaining({ actualApproved: null }),
+      expect.objectContaining({ actualApproved: '0.00' }),
+    ])
+    expect(page.items.map(ownerDocumentListRecordFromCentral).map(row => row.secondaryAmount))
+      .toEqual([null, 0])
+    expect(page.summary.origins.real.subcontractActualApproved).toEqual({
+      value: '0.00',
+      status: 'partial',
+    })
+
+    const missing = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents: [
+        { ...subcontractChange, id: 'sub-change-null-a-327', actualApprovedPrice: null },
+        { ...subcontractChange, id: 'sub-change-null-b-327', actualApprovedPrice: null },
+      ],
+      query: parseOwnerCommercialDocumentListQuery('sub_change', {}),
+    })
+    expect(missing.summary.origins.real.subcontractActualApproved).toEqual({
+      value: null,
+      status: 'missing',
+    })
+  })
+
   it('甲方罚扣按专属事实读取，并可按联系单搜索后返回施工合同来源', () => {
     const page = buildOwnerCommercialDocumentListPage({
       ...base,
@@ -532,6 +713,8 @@ describe('甲方商务单据中央读取契约', () => {
       taxInclusiveAmount: '520.00',
       taxExclusiveAmount: '480.00',
       appliedTaxExclusiveAmount: '500.00',
+      subcontractApprovedAmount: '0.00',
+      subcontractActualApproved: { value: null, status: 'missing' },
     })
   })
 

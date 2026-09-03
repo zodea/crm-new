@@ -65,4 +65,33 @@ describe('subcontractContractFactTable', () => {
     expect(target.element).toBe(document.activeElement)
     wrapper.unmount()
   })
+
+  it('分包变洽签事实行进入专属详情并保留合同页签与焦点返回链', () => {
+    const returnTo = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327'
+    const wrapper = mount(SubcontractContractFactTable, {
+      props: {
+        emptyLabel: '暂无分包变更',
+        focusId: 'sub-change-327',
+        returnTo,
+        rows: [{
+          id: 'sub-change-327',
+          no: 'FB-BQ-327',
+          name: '样板层范围调整',
+          amount: '32000.00',
+          date: '2026-08-26',
+          status: '已提交',
+          navigation: {
+            kind: 'entity-detail',
+            subject: { state: 'resolved', entity: 'subcontract-document', id: 'sub-change-327', label: '样板层范围调整', no: 'FB-BQ-327' },
+            variant: 'change',
+            view: null,
+            filters: { dataOrigin: 'real', projectId: 'project-327', supplierId: 'supplier-327', contractId: 'subcontract-327' },
+          },
+        }],
+      },
+      global: { stubs: { KitTable: KitTableStub, NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } },
+    })
+
+    expect(wrapper.get('a').attributes('href')).toBe(`/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(returnTo)}`)
+  })
 })

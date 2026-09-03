@@ -2,7 +2,6 @@ import type { FileRefChanges } from '~/lib/forms/file-refs'
 import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
 import type {
   OwnerCommercialDocumentKind,
-  OwnerCommercialDocumentListItemDTO,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
 } from '~/lib/owner-document/central-repository'
@@ -17,6 +16,7 @@ import type {
 import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
+import { SUBCONTRACT_CHANGE_WRITE_CAPABILITY } from '~/lib/owner-document/central-command-contract'
 import {
   completeOwnerDocumentCommandIntent,
   ownerDocumentCommandId,
@@ -46,12 +46,14 @@ import {
   transitionAcceptance,
   updateOwnerDocumentAttachments,
 } from '~/lib/owner-document/forms'
+import { ownerDocumentListRecordFromCentral } from '~/lib/owner-document/list'
 
 export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const usesCentralBrowser = import.meta.client && !isTauri()
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
     || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
+    || kind === 'sub_change'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -64,8 +66,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return useNuxtApp().$repositories
   }
 
-  async function centralContext() {
-    return centralRepositories().ownerCommercialDocumentCommands.context()
+  async function centralContext(kind: OwnerCommercialDocumentKind) {
+    return centralRepositories().ownerCommercialDocumentCommands.context(kind)
   }
 
   async function centralForm(kind: OwnerCommercialDocumentKind, id: string) {
@@ -79,11 +81,11 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     values: Record<string, unknown>,
     commandId = `owner-document-${crypto.randomUUID()}`,
   ) {
-    const context = await centralContext()
+    const context = await centralContext(kind)
     return centralRepositories().ownerCommercialDocumentCommands.execute({
       workspaceId: context.workspaceId,
       actorId: context.actorId,
-      requiredCapability: 'owner-document:write',
+      requiredCapability: kind === 'sub_change' ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
       commandId,
       kind,
       id,
@@ -92,82 +94,6 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     } as OwnerCommercialDocumentCommandRequestDTO)
   }
 
-  function centralListRecord(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
-    const itemAmounts = item.amounts.kind === 'owner_change'
-      ? {
-          amount: Number(item.amounts.taxInclusive),
-          secondaryAmount: Number(item.amounts.taxExclusive),
-          tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
-        }
-      : item.amounts.kind === 'owner_report'
-        ? {
-            amount: Number(item.amounts.reported),
-            secondaryAmount: Number(item.amounts.audited ?? 0),
-            tertiaryAmount: Number(item.amounts.difference ?? 0),
-          }
-        : item.amounts.kind === 'final_settlement'
-          ? {
-              amount: Number(item.amounts.declared),
-              secondaryAmount: Number(item.amounts.audited ?? 0),
-              tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
-            }
-          : item.amounts.kind === 'owner_penalty'
-            ? {
-                amount: Number(item.amounts.amount),
-                secondaryAmount: 0,
-                tertiaryAmount: 0,
-              }
-            : {
-                amount: Number(item.amounts.contractEstimate),
-                secondaryAmount: 0,
-                tertiaryAmount: 0,
-              }
-    const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
-      ? {
-          viewVariant: 'acceptance' as const,
-          acceptanceOrganization: item.acceptanceView.organization,
-          acceptancePerson: item.acceptanceView.person,
-          acceptanceConclusion: item.acceptanceView.conclusion,
-        }
-      : item.acceptanceView?.variant === 'warranty'
-        ? {
-            viewVariant: 'warranty' as const,
-            warrantyOwner: item.acceptanceView.owner,
-            warrantyStartDate: item.acceptanceView.startDate ?? '',
-            warrantyEndDate: item.acceptanceView.endDate ?? '',
-            warrantyConfirmationOrganization: item.acceptanceView.confirmationOrganization ?? '',
-            warrantyConfirmationDate: item.acceptanceView.confirmationDate ?? '',
-            warrantyConfirmationNote: item.acceptanceView.confirmationNote,
-          }
-        : {}
-    return {
-      id: item.id,
-      no: item.no,
-      name: item.name,
-      noticeNo: item.ownerPenaltyFacts?.noticeNo,
-      projectId: item.project.state === 'resolved' ? item.project.id : null,
-      projectName: item.project.state === 'resolved' ? item.project.label : '',
-      contractId: item.contract.state === 'resolved' ? item.contract.id : null,
-      contractName: item.contract.state === 'resolved' ? item.contract.label : '',
-      supplierId: null,
-      supplierName: '',
-      crewId: null,
-      crewName: '',
-      type: item.documentType,
-      period: item.periodNo,
-      ...itemAmounts,
-      contractNavigation: item.contractNavigation,
-      quantity: null,
-      date: item.acceptanceView?.variant === 'acceptance'
-        ? item.acceptanceView.date ?? ''
-        : item.acceptanceView?.variant === 'warranty'
-          ? item.acceptanceView.confirmationDate ?? item.acceptanceView.endDate ?? item.acceptanceView.startDate ?? ''
-          : item.applicationDate ?? '',
-      status: item.status,
-      attachmentCount: item.attachmentCount ?? 0,
-      ...acceptanceFields,
-    }
-  }
   const records = shallowRef<Partial<Record<OwnerDocumentKind, OwnerDocumentListRecord[]>>>({})
   const listLoading = shallowRef<Partial<Record<OwnerDocumentKind, boolean>>>({})
   const listErrors = shallowRef<Partial<Record<OwnerDocumentKind, string>>>({})
@@ -195,6 +121,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
             search: centralQuery?.search ?? '',
             projectId: centralQuery?.projectId ?? null,
             contractId: centralQuery?.contractId ?? null,
+            supplierId: centralQuery?.supplierId ?? null,
             status: centralQuery?.status ?? null,
             documentType: centralQuery?.documentType ?? null,
             variant: centralQuery?.variant ?? null,
@@ -203,7 +130,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           })
         : null
       const rows = centralPage
-        ? centralPage.items.map(centralListRecord)
+        ? centralPage.items.map(ownerDocumentListRecordFromCentral)
         : await listOwnerDocumentForms(kind)
       if (centralPage && isCentralKind(kind) && listLoadSequence[kind] === sequence) {
         centralPagination.value = { ...centralPagination.value, [kind]: centralPage.pagination }
@@ -303,7 +230,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     source: 'local' | 'central-owner' = 'local',
   ) {
     if (usesCentralBrowser && source === 'central-owner') {
-      const context = await centralContext()
+      const context = await centralContext('final_settlement')
       const contract = context.contracts.find(option => option.id === contractId)
       return contract
         ? {
@@ -319,11 +246,13 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   async function loadBasicOptions(
     kind: 'crew' | 'project' | 'supplier',
     keyword: string,
+    documentKind: OwnerDocumentKind = kind === 'supplier' ? 'sub_change' : 'owner_change',
   ) {
-    if (usesCentralBrowser && kind === 'project') {
-      const context = await centralContext()
+    if (usesCentralBrowser && (kind === 'project' || kind === 'supplier')) {
+      const context = await centralContext(isCentralKind(documentKind) ? documentKind : 'owner_change')
       const search = keyword.trim().toLocaleLowerCase('zh-CN')
-      return context.projects
+      const options = kind === 'project' ? context.projects : context.suppliers
+      return options
         .filter(option => !search || option.label.toLocaleLowerCase('zh-CN').includes(search))
         .map(option => ({ id: option.id, label: option.label }))
     }
@@ -336,11 +265,14 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     supplierId: string,
     keyword: string,
   ) {
-    if (usesCentralBrowser && side === 'owner') {
-      const context = await centralContext()
+    if (usesCentralBrowser) {
+      const context = await centralContext(side === 'owner' ? 'owner_change' : 'sub_change')
       const search = keyword.trim().toLocaleLowerCase('zh-CN')
       return context.contracts
         .filter(option => option.projectId === projectId)
+        .filter(option => side === 'owner'
+          ? option.kind === 'construction'
+          : option.kind === 'subcontract' && option.supplierId === supplierId)
         .filter(option => !search || [option.label, option.hint ?? ''].some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
         .map(option => ({ id: option.id, label: option.label, hint: option.hint }))
     }

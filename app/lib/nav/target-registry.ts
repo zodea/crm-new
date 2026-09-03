@@ -166,6 +166,18 @@ function contractPath(intent: EntityTargetIntent): string {
     }
     return `${path}?${query.toString()}`
   }
+  if (intent.variant === 'subcontract-document-source') {
+    if (kind !== '分包' || dataOrigin !== 'real' || !isStableRouteIdentity(intent.view)
+      || intent.filters.subcontractTab !== 'changes') {
+      throw new Error('invalid subcontract document source focus')
+    }
+    return `${path}?${new URLSearchParams({
+      origin: 'real',
+      contractKind: 'subcontract',
+      tab: 'changes',
+      focus: intent.view,
+    }).toString()}`
+  }
   if (intent.variant === 'supplement') {
     if ((kind !== '施工' && kind !== '分包')
       || !isDataOriginDTO(dataOrigin)
@@ -233,6 +245,13 @@ function ownerDocumentPath(intent: EntityTargetIntent): string {
   return `${path}?${query.toString()}`
 }
 
+function subcontractDocumentPath(intent: EntityTargetIntent): string {
+  const dataOrigin = intent.filters.dataOrigin
+  if (!isDataOriginDTO(dataOrigin) || intent.variant !== 'change')
+    throw new Error('invalid subcontract document detail context')
+  return `${entityPath('/subcontract/change', intent)}?origin=${dataOrigin}`
+}
+
 function quantityUnitPath(intent: EntityTargetIntent): string {
   const projectId = intent.filters.projectId
   if (typeof projectId !== 'string' || !projectId)
@@ -272,6 +291,7 @@ const TARGET_REGISTRY = {
   'contract:detail': contractPath,
   'contract:supplement': contractPath,
   'contract:owner-document-source': contractPath,
+  'contract:subcontract-document-source': contractPath,
   'contract:boq': contractBoqPath,
   'owner-document:change': ownerDocumentPath,
   'owner-document:report': ownerDocumentPath,
@@ -279,6 +299,7 @@ const TARGET_REGISTRY = {
   'owner-document:warranty': ownerDocumentPath,
   'owner-document:final-settlement': ownerDocumentPath,
   'owner-document:penalty': ownerDocumentPath,
+  'subcontract-document:change': subcontractDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
@@ -386,8 +407,8 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
-    if (options.returnTo && (key === 'project:detail' || key === 'customer:detail'
-      || key === 'contract:detail' || key === 'contract:owner-document-source')) {
+    if (options.returnTo && (key === 'project:detail' || key === 'customer:detail' || key === 'supplier:detail'
+      || key === 'contract:detail' || key === 'contract:owner-document-source' || key === 'contract:subcontract-document-source')) {
       const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
       if (ownerReturnTo) {
         const separator = to.includes('?') ? '&' : '?'
@@ -461,17 +482,20 @@ export function resolveNavigationTarget(
     }
     if ((key === 'owner-document:change' || key === 'owner-document:report'
       || key === 'owner-document:acceptance' || key === 'owner-document:warranty'
-      || key === 'owner-document:final-settlement' || key === 'owner-document:penalty') && options.returnTo) {
+      || key === 'owner-document:final-settlement' || key === 'owner-document:penalty'
+      || key === 'subcontract-document:change') && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
-      const kind = key === 'owner-document:change'
-        ? 'owner_change'
-        : key === 'owner-document:report'
-          ? 'owner_report'
-          : key === 'owner-document:final-settlement'
-            ? 'final_settlement'
-            : key === 'owner-document:penalty'
-              ? 'owner_penalty'
-              : 'acceptance'
+      const kind = key === 'subcontract-document:change'
+        ? 'sub_change'
+        : key === 'owner-document:change'
+          ? 'owner_change'
+          : key === 'owner-document:report'
+            ? 'owner_report'
+            : key === 'owner-document:final-settlement'
+              ? 'final_settlement'
+              : key === 'owner-document:penalty'
+                ? 'owner_penalty'
+                : 'acceptance'
       const returnTo = validateOwnerDocumentJourneyReturnTo(options.returnTo, kind, entityIntent.filters.dataOrigin)
       if (returnTo) {
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`

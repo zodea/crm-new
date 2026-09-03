@@ -12,6 +12,35 @@ const envelope = {
 }
 
 describe('甲方商务单据 HTTP 命令解析', () => {
+  it('只接受带分包单据权限的分包变洽签保存命令', () => {
+    const request = parseOwnerCommercialDocumentCommandRequest({
+      ...envelope,
+      requiredCapability: 'subcontract-document:write',
+      kind: 'sub_change',
+      action: 'submit',
+      draft: {
+        projectId: 'project-327',
+        supplierId: 'supplier-327',
+        contractId: 'subcontract-327',
+        changeDate: '2026-08-27',
+        approvedAmount: 38000,
+        reason: '样板层劳务范围调整',
+      },
+      attachments: { add: [], removeIds: [], restoreIds: [] },
+    })
+
+    expect(request).toMatchObject({
+      requiredCapability: 'subcontract-document:write',
+      kind: 'sub_change',
+      action: 'submit',
+      draft: { supplierId: 'supplier-327', contractId: 'subcontract-327' },
+    })
+    expect(() => parseOwnerCommercialDocumentCommandRequest({
+      ...request,
+      requiredCapability: 'owner-document:write',
+    })).toThrow('命令请求无效')
+  })
+
   it('接受甲方罚扣保存命令并保留专属有限字段', () => {
     const request = parseOwnerCommercialDocumentCommandRequest({
       ...envelope,

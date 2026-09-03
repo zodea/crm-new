@@ -16,10 +16,12 @@ import type {
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
 } from '../../app/lib/owner-document/forms'
+import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
 import type { BusinessSession } from './business-session'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
 import {
   OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
+  SUBCONTRACT_CHANGE_WRITE_CAPABILITY,
 } from '../../app/lib/owner-document/central-command-contract'
 import {
   ownerCommercialDocumentProblem,
@@ -28,6 +30,7 @@ import {
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
+import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 interface ProjectSeed {
   id: string
@@ -40,6 +43,11 @@ interface CustomerSeed {
   name: string
 }
 
+interface SupplierSeed {
+  id: string
+  name: string
+}
+
 interface ContractSeed {
   id: string
   no: string
@@ -47,6 +55,14 @@ interface ContractSeed {
   projectId: string
   customerId: string | null
   amount?: number | null
+}
+
+interface SubcontractSeed {
+  id: string
+  no: string
+  name: string
+  projectId: string
+  supplierId: string
 }
 
 interface BoqLineSeed extends OwnerDocumentBoqLine {
@@ -95,7 +111,10 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   createAttachmentId?: () => string
   projects?: readonly ProjectSeed[]
   customers?: readonly CustomerSeed[]
+  suppliers?: readonly SupplierSeed[]
   contracts?: readonly ContractSeed[]
+  subcontractContracts?: readonly SubcontractSeed[]
+  subcontractContractSource?: Pick<typeof subcontractContractCommandTestInstance, 'rows'>
   boqLines?: readonly BoqLineSeed[]
   monthlyQuantityFacts?: readonly MonthlyQuantityFactSeed[]
   finalSettlementSupplements?: readonly FinalSettlementSupplementSeed[]
@@ -109,7 +128,9 @@ interface WorkspaceState {
   migrationKeys: Set<string>
   projects: Map<string, ProjectSeed>
   customers: Map<string, CustomerSeed>
+  suppliers: Map<string, SupplierSeed>
   contracts: Map<string, ContractSeed>
+  subcontractContracts: Map<string, SubcontractSeed>
   boqLines: Map<string, BoqLineSeed>
   monthlyQuantityFacts: MonthlyQuantityFactSeed[]
   finalSettlementSupplements: Map<string, FinalSettlementSupplementSeed>
@@ -178,6 +199,8 @@ function approvalBusinessDate(source: OwnerCommercialDocumentSource): string {
 }
 
 function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
+  if (kind === 'sub_change')
+    return 'subcontract_change_order'
   if (kind === 'owner_change')
     return 'owner_change_order'
   if (kind === 'owner_report')
@@ -188,6 +211,28 @@ function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
+  if (source.kind === 'sub_change') {
+    return {
+      id: source.id,
+      no: source.no,
+      projectId: source.projectId,
+      supplierId: source.supplierId ?? null,
+      contractId: source.contractId,
+      changeType: source.documentType,
+      changeDate: source.applicationDate ?? '',
+      approvedAmount: source.amount,
+      changedArea: source.changedArea ?? null,
+      actualApprovedPrice: source.actualApprovedPrice ?? null,
+      reason: source.name,
+      status: source.status,
+      statusNote: source.statusNote,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+      sourceLocked: source.sourceLocked,
+      note: source.note,
+      lines: [],
+    }
+  }
   if (source.kind === 'owner_change') {
     return {
       id: source.id,
@@ -417,7 +462,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   const createAttachmentId = options.createAttachmentId ?? (() => `owner-file-${crypto.randomUUID()}`)
   const baseProjects = (options.projects ?? []).map(clone)
   const baseCustomers = (options.customers ?? []).map(clone)
+  const baseSuppliers = (options.suppliers ?? []).map(clone)
   const baseContracts = (options.contracts ?? []).map(clone)
+  const baseSubcontractContracts = (options.subcontractContracts ?? []).map(clone)
+  const linkedSubcontractContractSource = options.subcontractContractSource
   const baseBoqLines = (options.boqLines ?? []).map(clone)
   const baseMonthlyQuantityFacts = (options.monthlyQuantityFacts ?? []).map(clone)
   const baseDocuments = (options.documents ?? []).map(clone)
@@ -486,7 +534,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       migrationKeys: new Set(),
       projects: new Map(baseProjects.map(row => [row.id, clone(row)])),
       customers: new Map(baseCustomers.map(row => [row.id, clone(row)])),
+      suppliers: new Map(baseSuppliers.map(row => [row.id, clone(row)])),
       contracts: new Map(baseContracts.map(row => [row.id, clone(row)])),
+      subcontractContracts: new Map(baseSubcontractContracts.map(row => [row.id, clone(row)])),
       boqLines: new Map(baseBoqLines.map(row => [row.id, clone(row)])),
       monthlyQuantityFacts: baseMonthlyQuantityFacts.map(clone),
       finalSettlementSupplements: new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)])),
@@ -509,6 +559,41 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       workspaces.set(key, state)
     }
     return state
+  }
+
+  function linkedSubcontractRows(): SubcontractContractDetailSource[] {
+    return linkedSubcontractContractSource?.rows().map(clone) ?? []
+  }
+
+  function effectiveSubcontractContracts(state: WorkspaceState): Map<string, SubcontractSeed> {
+    return new Map([
+      ...linkedSubcontractRows().map(row => [row.id, {
+        id: row.id,
+        no: row.no,
+        name: row.name,
+        projectId: row.projectId ?? '',
+        supplierId: row.supplierId ?? '',
+      }] as const),
+      ...state.subcontractContracts.entries(),
+    ])
+  }
+
+  function effectiveProjects(state: WorkspaceState): Map<string, ProjectSeed> {
+    return new Map([
+      ...linkedSubcontractRows()
+        .filter(row => row.projectId)
+        .map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, customerId: null }] as const),
+      ...state.projects.entries(),
+    ])
+  }
+
+  function effectiveSuppliers(state: WorkspaceState): Map<string, SupplierSeed> {
+    return new Map([
+      ...linkedSubcontractRows()
+        .filter(row => row.supplierId)
+        .map(row => [row.supplierId!, { id: row.supplierId!, name: row.supplierName }] as const),
+      ...state.suppliers.entries(),
+    ])
   }
 
   function finalSettlementEvidenceForContract(state: WorkspaceState, contractId: string | null) {
@@ -558,17 +643,28 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     }
   }
 
-  function authorize(session: BusinessSession): void {
-    if (!session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY))
-      throw failure('forbidden', '无甲方商务单据写入权限')
+  function writeCapability(kind: OwnerCommercialDocumentKind) {
+    return kind === 'sub_change'
+      ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
+      : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
+  }
+
+  function authorize(session: BusinessSession, kind?: OwnerCommercialDocumentKind): void {
+    const allowed = kind
+      ? session.capabilities.includes(writeCapability(kind))
+      : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
+        || session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
+    if (!allowed)
+      throw failure('forbidden', kind === 'sub_change' ? '无分包变洽签写入权限' : '无甲方商务单据写入权限')
   }
 
   function authorizeCommand(request: OwnerCommercialDocumentCommandRequestDTO, session: BusinessSession): void {
-    authorize(session)
+    const requiredCapability = writeCapability(request.kind)
+    authorize(session, request.kind)
     if (request.workspaceId !== session.workspaceId
       || request.actorId !== session.actorId
-      || request.requiredCapability !== OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY) {
-      throw failure('forbidden', '无甲方商务单据写入权限')
+      || request.requiredCapability !== requiredCapability) {
+      throw failure('forbidden', request.kind === 'sub_change' ? '无分包变洽签写入权限' : '无甲方商务单据写入权限')
     }
   }
 
@@ -590,8 +686,37 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       throw failure('conflict', '甲方商务单据已被其他操作更新，请先处理最新版本')
   }
 
-  function relations(state: WorkspaceState, draft: OwnerDocumentDraft, complete: boolean) {
+  function relations(
+    state: WorkspaceState,
+    kind: OwnerCommercialDocumentKind,
+    draft: OwnerDocumentDraft,
+    complete: boolean,
+  ) {
     const projectId = complete ? required(draft.projectId, '项目') : text(draft.projectId)
+    if (kind === 'sub_change') {
+      const supplierId = complete ? required(draft.supplierId, '分供方') : text(draft.supplierId)
+      const contractId = complete ? required(draft.contractId, '分包合同') : text(draft.contractId)
+      if (contractId && (!projectId || !supplierId))
+        throw failure('relationship-mismatch', '选择分包合同前必须先选择项目与分供方')
+      const project = projectId ? effectiveProjects(state).get(projectId) ?? null : null
+      const supplier = supplierId ? effectiveSuppliers(state).get(supplierId) ?? null : null
+      const subcontract = contractId ? effectiveSubcontractContracts(state).get(contractId) ?? null : null
+      if (projectId && !project)
+        throw failure('relationship-mismatch', '项目不存在或已删除')
+      if (supplierId && !supplier)
+        throw failure('relationship-mismatch', '分供方不存在或已删除')
+      if (contractId && (!subcontract || subcontract.projectId !== projectId || subcontract.supplierId !== supplierId))
+        throw failure('relationship-mismatch', '分包合同不存在、已删除或不属于所选项目与分供方')
+      return {
+        project,
+        contract: null,
+        subcontract,
+        customerId: null,
+        customer: null,
+        supplierId,
+        supplier,
+      }
+    }
     const contractId = complete ? required(draft.contractId, '施工合同') : text(draft.contractId)
     if (contractId && !projectId)
       throw failure('relationship-mismatch', '选择施工合同前必须先选择项目')
@@ -603,7 +728,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       throw failure('relationship-mismatch', '施工合同不存在、已删除或不属于所选项目')
     const customerId = contract?.customerId ?? project?.customerId ?? null
     const customer = customerId ? state.customers.get(customerId) ?? null : null
-    return { project, contract, customerId, customer }
+    return { project, contract, subcontract: null, customerId, customer, supplierId: null, supplier: null }
   }
 
   function lineFor(
@@ -864,16 +989,66 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const timestamp = now()
     const id = current?.id ?? createId(request.kind)
     const isSubmit = request.action === 'submit'
-    const relation = relations(state, request.draft, isSubmit)
-    const applicationDate = request.kind === 'final_settlement'
-      ? text(request.draft.submissionDate)
-      : request.kind === 'owner_penalty'
-        ? text(request.draft.penaltyDate)
-        : text(request.draft.applicationDate)
+    const relation = relations(state, request.kind, request.draft, isSubmit)
+    const applicationDate = request.kind === 'sub_change'
+      ? text(request.draft.changeDate)
+      : request.kind === 'final_settlement'
+        ? text(request.draft.submissionDate)
+        : request.kind === 'owner_penalty'
+          ? text(request.draft.penaltyDate)
+          : text(request.draft.applicationDate)
     if (applicationDate && !isIsoDate(applicationDate))
-      throw failure('validation-failed', `${request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期格式必须为 yyyy-mm-dd`)
+      throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期格式必须为 yyyy-mm-dd`)
     if (isSubmit && !applicationDate)
-      throw failure('validation-failed', `${request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期必填`)
+      throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期必填`)
+    if (request.kind === 'sub_change') {
+      const reason = isSubmit ? required(request.draft.reason, '变更事由') : text(request.draft.reason)
+      const approvedAmount = nullableNumber(request.draft.approvedAmount)
+      if (isSubmit && (approvedAmount == null || approvedAmount <= 0))
+        throw failure('validation-failed', '审批金额必须大于 0')
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'sub_change',
+        id,
+        no: text(request.draft.no) || `FB-BG-${id}`,
+        name: reason || '未填写变更事由',
+        documentType: text(request.draft.changeType) || '增项',
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: null,
+        customerName: '',
+        customerPermission: 'allowed',
+        supplierId: relation.supplier?.id ?? null,
+        supplierName: relation.supplier?.name ?? '',
+        supplierPermission: 'allowed',
+        contractId: relation.subcontract?.id ?? null,
+        contractNo: relation.subcontract?.no ?? '',
+        contractName: relation.subcontract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'subcontract_change_order',
+        sourceId: id,
+        sourceLocked: isSubmit,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: null,
+        status: isSubmit ? 'submitted' : 'draft',
+        statusNote: isSubmit ? '已提交分包变洽签' : '',
+        amount: round(approvedAmount ?? 0),
+        auditedAmount: null,
+        changedArea: nullableNumber(request.draft.changedArea),
+        actualApprovedPrice: nullableNumber(request.draft.actualApprovedPrice),
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
     if (request.kind === 'final_settlement') {
       const name = isSubmit ? required(request.draft.name, '结算名称') : text(request.draft.name)
       const settlementAmount = nullableNumber(request.draft.settlementAmount)
@@ -1451,14 +1626,20 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
     state.projects.clear()
     state.customers.clear()
+    state.suppliers.clear()
     state.contracts.clear()
+    state.subcontractContracts.clear()
     state.boqLines.clear()
     for (const row of baseProjects)
       state.projects.set(row.id, clone(row))
     for (const row of baseCustomers)
       state.customers.set(row.id, clone(row))
+    for (const row of baseSuppliers)
+      state.suppliers.set(row.id, clone(row))
     for (const row of baseContracts)
       state.contracts.set(row.id, clone(row))
+    for (const row of baseSubcontractContracts)
+      state.subcontractContracts.set(row.id, clone(row))
     for (const row of baseBoqLines)
       state.boqLines.set(row.id, clone(row))
 
@@ -1468,6 +1649,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         continue
       if (entity.entityType === 'customers')
         state.customers.set(entity.id, { id: entity.id, name: entity.name })
+      if (entity.entityType === 'suppliers')
+        state.suppliers.set(entity.id, { id: entity.id, name: entity.name })
       if (entity.entityType === 'projects') {
         state.projects.set(entity.id, {
           id: entity.id,
@@ -1483,6 +1666,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           projectId: entity.references.projectId ?? '',
           customerId: entity.references.customerId ?? null,
           amount: entityNumberAttribute(entity, 'amount') ?? (entity.amount == null ? null : number(entity.amount)),
+        })
+      }
+      if (entity.entityType === 'subcontract_contracts') {
+        state.subcontractContracts.set(entity.id, {
+          id: entity.id,
+          no: entityAttribute(entity, 'no'),
+          name: entity.name,
+          projectId: entity.references.projectId ?? '',
+          supplierId: entity.references.supplierId ?? '',
         })
       }
     }
@@ -1597,24 +1789,40 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         continue
       const kind = entityAttribute(entity, 'kind')
       if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance'
-        && kind !== 'final_settlement' && kind !== 'owner_penalty') {
+        && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change') {
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
       }
       const projectId = entity.references.projectId ?? null
       const contractId = entity.references.contractId ?? null
       const project = projectId ? state.projects.get(projectId) ?? null : null
-      const contract = contractId ? state.contracts.get(contractId) ?? null : null
-      if (!project || !contract || contract.projectId !== project.id)
-        throw failure('relationship-mismatch', '迁移甲方商务单据的项目与施工合同关系无效')
+      const constructionContract = contractId ? state.contracts.get(contractId) ?? null : null
+      const subcontract = contractId ? state.subcontractContracts.get(contractId) ?? null : null
+      const contract = kind === 'sub_change'
+        ? subcontract && { ...subcontract, customerId: null }
+        : constructionContract
+      const supplierId = kind === 'sub_change' ? entity.references.supplierId ?? null : null
+      const supplier = supplierId ? state.suppliers.get(supplierId) ?? null : null
+      if (!project || !contract || contract.projectId !== project.id
+        || (kind === 'sub_change' && (!supplier || subcontract?.supplierId !== supplier.id))) {
+        throw failure(
+          'relationship-mismatch',
+          kind === 'sub_change'
+            ? '迁移分包变洽签的项目、分供方与分包合同关系无效'
+            : '迁移甲方商务单据的项目与施工合同关系无效',
+        )
+      }
       const customerId = contract.customerId ?? project.customerId
       const customer = customerId ? state.customers.get(customerId) ?? null : null
       const sourceTypeRaw = entityAttribute(entity, 'sourceType')
       if (kind === 'owner_penalty' && sourceTypeRaw !== 'owner_penalty')
         throw failure('validation-failed', '迁移甲方罚扣来源类型无效')
+      if (kind === 'sub_change' && sourceTypeRaw !== 'subcontract_change_order')
+        throw failure('validation-failed', '迁移分包变洽签来源类型无效')
       const sourceType = sourceTypeRaw === 'manual'
         || sourceTypeRaw === 'monthly_statement'
         || sourceTypeRaw === 'owner_final_settlement'
         || sourceTypeRaw === 'owner_penalty'
+        || sourceTypeRaw === 'subcontract_change_order'
         ? sourceTypeRaw
         : 'boq_change_order'
       const rawLines = jsonRecords(entityAttribute(entity, 'linesJson'))
@@ -1693,6 +1901,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         acceptance: ['draft', 'submitted', 'accepted', 'warranty', 'expired'],
         final_settlement: ['draft', 'submitted', 'audited'],
         owner_penalty: ['draft', 'submitted'],
+        sub_change: ['draft', 'rejected', 'submitted', 'approved'],
       }
       if (!statusesByKind[kind].includes(status)) {
         throw failure(
@@ -1725,6 +1934,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '罚扣金额必须大于 0')
         if (!ownerPenaltyReason)
           throw failure('validation-failed', '迁移甲方罚扣事由必填')
+      }
+      if (kind === 'sub_change' && status === 'submitted') {
+        if (!applicationDate)
+          throw failure('validation-failed', '迁移分包变洽签日期必填')
+        if (entity.amount === null || number(entity.amount) <= 0)
+          throw failure('validation-failed', '迁移分包变洽签审批金额必须大于 0')
+        if (!entity.name.trim())
+          throw failure('validation-failed', '迁移分包变洽签事由必填')
       }
       const approvalDate = entityAttribute(entity, 'approvalDate') || null
       if (approvalDate && !isISODateDTO(approvalDate))
@@ -1800,6 +2017,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         customerId,
         customerName: customer?.name ?? '',
         customerPermission: 'allowed',
+        supplierId,
+        supplierName: supplier?.name ?? '',
+        supplierPermission: 'allowed',
         contractId: contract.id,
         contractNo: contract.no,
         contractName: contract.name,
@@ -1822,7 +2042,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         boqAmount: kind === 'owner_change' ? round(lines.reduce((sum, line) => sum + line.amount, 0)) : null,
         taxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'taxExclusiveAmount') ?? 0 : null,
         appliedTaxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'appliedTaxExclusiveAmount') ?? 0 : null,
-        auditedAmount: entityNumberAttribute(entity, 'auditedAmount'),
+        auditedAmount: kind === 'sub_change' ? null : entityNumberAttribute(entity, 'auditedAmount'),
+        changedArea: kind === 'sub_change' ? entityNumberAttribute(entity, 'changedArea') : null,
+        actualApprovedPrice: kind === 'sub_change' ? entityNumberAttribute(entity, 'actualApprovedPrice') : null,
         note: entityAttribute(entity, 'note'),
         version: 1,
         createdAt,
@@ -1926,23 +2148,49 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     },
     prepareMigrationSnapshot,
     synchronizeMigrationSnapshot,
-    context(session: BusinessSession, sessionId?: string | null): OwnerCommercialDocumentCommandContextDTO {
-      authorize(session)
+    context(
+      session: BusinessSession,
+      sessionId?: string | null,
+      kind?: OwnerCommercialDocumentKind,
+    ): OwnerCommercialDocumentCommandContextDTO {
+      authorize(session, kind)
       const state = stateFor(sessionId)
+      const includeOwner = kind ? kind !== 'sub_change' : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
+      const includeSubcontract = kind ? kind === 'sub_change' : session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
       return {
         workspaceId: session.workspaceId,
         actorId: session.actorId,
         capabilities: [...session.capabilities],
-        projects: [...state.projects.values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
-        customers: [...state.customers.values()].map(row => ({ id: row.id, label: row.name })),
-        contracts: [...state.contracts.values()].map(row => ({
-          id: row.id,
-          label: row.name,
-          hint: row.no,
-          projectId: row.projectId,
-          customerId: row.customerId,
-          ...contractSummary(state, row),
-        })),
+        projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
+        customers: includeOwner ? [...state.customers.values()].map(row => ({ id: row.id, label: row.name })) : [],
+        suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
+        contracts: [
+          ...(includeOwner
+            ? [...state.contracts.values()].map(row => ({
+                id: row.id,
+                label: row.name,
+                hint: row.no,
+                projectId: row.projectId,
+                customerId: row.customerId,
+                supplierId: null,
+                kind: 'construction' as const,
+                ...contractSummary(state, row),
+              }))
+            : []),
+          ...(includeSubcontract
+            ? [...effectiveSubcontractContracts(state).values()].map(row => ({
+                id: row.id,
+                label: row.name,
+                hint: row.no,
+                projectId: row.projectId,
+                customerId: null,
+                supplierId: row.supplierId,
+                kind: 'subcontract' as const,
+                changedContractAmount: null,
+                receivedAmount: null,
+              }))
+            : []),
+        ],
       }
     },
     boqLinesFor(projectId: string, contractId: string, periodNo = '', sessionId?: string | null): OwnerDocumentBoqLine[] {
@@ -1976,7 +2224,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       session: BusinessSession,
       sessionId?: string | null,
     ): OwnerCommercialDocumentFormReadDTO {
-      authorize(session)
+      authorize(session, kind)
       const state = stateFor(sessionId)
       const stored = document(state, kind, id)
       const source = stored ? withFinalSettlementEvidence(state, stored) : null
@@ -2032,6 +2280,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
 export const ownerCommercialDocumentCommandTestInstance
   = createOwnerCommercialDocumentCommandTestInstance({
+    subcontractContractSource: subcontractContractCommandTestInstance,
     projects: [{ id: 'project-real-320', name: '中央正式施工项目', customerId: 'customer-real-320' }],
     customers: [{ id: 'customer-real-320', name: '中央正式甲方客户' }],
     contracts: [{

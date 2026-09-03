@@ -2,6 +2,8 @@ import type { OwnerCommercialDocumentKind } from './central-repository'
 import type { DataOriginDTO } from '~/types/read-model'
 import { validateConstructionContractDetailReturnTo } from '~/lib/construction-contract/return-context'
 import { isProjectOwnerDocumentCardAnchor, validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
+import { validateSubcontractContractDetailReturnTo } from '~/lib/subcontract-contract/return-context'
+import { validateSupplierDetailReturnTo } from '~/lib/supplier/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -9,6 +11,7 @@ export interface OwnerDocumentListNavigationState {
   search: string
   projectId: string | null
   contractId: string | null
+  supplierId?: string | null
   status: string | null
   documentType: string | null
   origin: DataOriginDTO | null
@@ -31,15 +34,17 @@ const STORAGE_PREFIX = 'ruihang:owner-document-return:'
 const TTL = 30 * 60_000
 
 function route(kind: OwnerCommercialDocumentKind): string {
-  return kind === 'owner_change'
-    ? '/owner/change'
-    : kind === 'owner_report'
-      ? '/owner/report'
-      : kind === 'acceptance'
-        ? '/owner/acceptance'
-        : kind === 'final_settlement'
-          ? '/owner/final-settlement'
-          : '/owner/penalty'
+  return kind === 'sub_change'
+    ? '/subcontract/change'
+    : kind === 'owner_change'
+      ? '/owner/change'
+      : kind === 'owner_report'
+        ? '/owner/report'
+        : kind === 'acceptance'
+          ? '/owner/acceptance'
+          : kind === 'final_settlement'
+            ? '/owner/final-settlement'
+            : '/owner/penalty'
 }
 
 function value(input: unknown): string | undefined {
@@ -120,21 +125,34 @@ export function resolveOwnerDocumentProjectReturnOrigin(options: {
 
 export function ownerDocumentListNavigationStateFromQuery(
   query: Record<string, unknown>,
+  kind?: OwnerCommercialDocumentKind,
 ): OwnerDocumentListNavigationState {
   const pageSize = positiveInteger(query.pageSize, 20)
   const origin = value(query.origin)
+  const rawReturnTo = value(query.returnTo)
+  const returnTo = kind === 'sub_change'
+    ? validateSubcontractContractDetailReturnTo(rawReturnTo)
+    ?? validateSupplierDetailReturnTo(rawReturnTo)
+    ?? validateProjectJourneyReturnTo(rawReturnTo)
+    : kind
+      ? validateConstructionContractDetailReturnTo(rawReturnTo)
+      ?? validateProjectJourneyReturnTo(rawReturnTo)
+      : validateConstructionContractDetailReturnTo(rawReturnTo)
+        ?? validateSubcontractContractDetailReturnTo(rawReturnTo)
+        ?? validateSupplierDetailReturnTo(rawReturnTo)
+        ?? validateProjectJourneyReturnTo(rawReturnTo)
   return {
     search: optionalText(query.search, 120) ?? '',
     projectId: optionalText(query.projectId, 240),
     contractId: optionalText(query.contractId, 240),
+    supplierId: optionalText(query.supplierId ?? query.supplier, 240),
     status: optionalText(query.status, 80),
     documentType: optionalText(query.documentType, 120),
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 20,
     variant: value(query.variant) === 'warranty' ? 'warranty' : value(query.variant) === 'acceptance' ? 'acceptance' : null,
-    returnTo: validateConstructionContractDetailReturnTo(value(query.returnTo))
-      ?? validateProjectJourneyReturnTo(value(query.returnTo)),
+    returnTo,
   }
 }
 
@@ -146,6 +164,8 @@ function params(state: OwnerDocumentListNavigationState, contextId: string): URL
     query.set('projectId', state.projectId)
   if (state.contractId)
     query.set('contractId', state.contractId)
+  if (state.supplierId)
+    query.set('supplier', state.supplierId)
   if (state.status)
     query.set('status', state.status)
   if (state.documentType)
@@ -178,7 +198,7 @@ export function validateOwnerDocumentListReturnTo(
     const anchorId = decodeURIComponent(url.hash.slice(1))
     if (!/^owner-document-row-[\w.~:/-]+$/.test(anchorId))
       return null
-    const state = ownerDocumentListNavigationStateFromQuery(Object.fromEntries(url.searchParams))
+    const state = ownerDocumentListNavigationStateFromQuery(Object.fromEntries(url.searchParams), kind)
     if (isDataOriginDTO(expectedOrigin) && state.origin !== null && state.origin !== expectedOrigin)
       return null
     const contextId = url.searchParams.get('nav')
@@ -197,19 +217,25 @@ export function validateOwnerDocumentJourneyReturnTo(
   expectedOrigin: unknown,
 ): string | null {
   return validateOwnerDocumentListReturnTo(input, kind, expectedOrigin)
-    ?? validateConstructionContractDetailReturnTo(input, expectedOrigin)
+    ?? (kind === 'sub_change'
+      ? validateSubcontractContractDetailReturnTo(input, expectedOrigin)
+      ?? validateSupplierDetailReturnTo(input, expectedOrigin)
+      : validateConstructionContractDetailReturnTo(input, expectedOrigin))
     ?? validateProjectJourneyReturnTo(input, expectedOrigin)
 }
 
 export function validateOwnerDocumentDetailReturnTo(
   input: unknown,
   expectedOrigin: unknown,
+  expectedKind?: OwnerCommercialDocumentKind,
 ): string | null {
   if (typeof input !== 'string' || input.length > 131_072 || !input.startsWith('/') || input.startsWith('//') || input.includes('\\'))
     return null
   try {
     const url = new URL(input, 'https://ruihang.invalid')
-    const match = url.pathname.match(/^\/owner\/(change|report|acceptance|final-settlement|penalty)\/([^/]+)$/)
+    const ownerMatch = url.pathname.match(/^\/owner\/(change|report|acceptance|final-settlement|penalty)\/([^/]+)$/)
+    const subcontractMatch = url.pathname.match(/^\/subcontract\/(change)\/([^/]+)$/)
+    const match = ownerMatch ?? subcontractMatch
     if (url.origin !== 'https://ruihang.invalid' || !match)
       return null
     const id = decodeURIComponent(match[2]!)
@@ -218,15 +244,19 @@ export function validateOwnerDocumentDetailReturnTo(
     const origin = url.searchParams.get('origin') ?? 'real'
     if (!isDataOriginDTO(origin) || (isDataOriginDTO(expectedOrigin) && origin !== expectedOrigin))
       return null
-    const kind: OwnerCommercialDocumentKind = match[1] === 'change'
-      ? 'owner_change'
-      : match[1] === 'report'
-        ? 'owner_report'
-        : match[1] === 'acceptance'
-          ? 'acceptance'
-          : match[1] === 'final-settlement'
-            ? 'final_settlement'
-            : 'owner_penalty'
+    const kind: OwnerCommercialDocumentKind = subcontractMatch
+      ? 'sub_change'
+      : match[1] === 'change'
+        ? 'owner_change'
+        : match[1] === 'report'
+          ? 'owner_report'
+          : match[1] === 'acceptance'
+            ? 'acceptance'
+            : match[1] === 'final-settlement'
+              ? 'final_settlement'
+              : 'owner_penalty'
+    if (expectedKind && kind !== expectedKind)
+      return null
     const nested = url.searchParams.get('returnTo')
     const validatedNested = nested ? validateOwnerDocumentJourneyReturnTo(nested, kind, origin) : null
     if (nested && !validatedNested)

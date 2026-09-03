@@ -1,4 +1,5 @@
 import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document/central-repository'
+import { SUBCONTRACT_CHANGE_READ_CAPABILITY } from '../../app/lib/owner-document/central-command-contract'
 import {
   buildOwnerCommercialDocumentDetail,
   buildOwnerCommercialDocumentListPage,
@@ -50,15 +51,16 @@ export function createOwnerCommercialDocumentReadTestInstance(
   const scenarios = new Map<string, OwnerCommercialDocumentReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
 
-  function context(sessionId?: string | null) {
+  function context(kind: string, sessionId?: string | null) {
     const scenario = scenarios.get(keyFor(sessionId)) ?? 'ready'
     if (scenario === 'forbidden')
       throw problem('forbidden', '无甲方商务单据查看权限')
     if (scenario === 'unavailable')
       throw problem('unavailable', '甲方商务单据中央读取服务暂时不可用', true)
     const capabilities = [...resolveCapabilities(sessionId)]
-    if (!capabilities.includes('owner-document:read'))
-      throw problem('forbidden', '无甲方商务单据查看权限')
+    const requiredCapability = kind === 'sub_change' ? SUBCONTRACT_CHANGE_READ_CAPABILITY : 'owner-document:read'
+    if (!capabilities.includes(requiredCapability))
+      throw problem('forbidden', kind === 'sub_change' ? '无分包变洽签查看权限' : '无甲方商务单据查看权限')
     const formal = commandInstance.rows(sessionId)
     return {
       documents: scenario === 'empty' ? formal : [...formal, ...demoDocuments],
@@ -75,8 +77,8 @@ export function createOwnerCommercialDocumentReadTestInstance(
         scenarios.set(keyFor(sessionId), scenario)
     },
     list(kind: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
       const parsed = parseOwnerCommercialDocumentListQuery(kind, input)
+      const data = context(parsed.kind, sessionId)
       return buildOwnerCommercialDocumentListPage({
         ...data,
         query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },
@@ -84,8 +86,8 @@ export function createOwnerCommercialDocumentReadTestInstance(
       })
     },
     detail(kind: string, id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
       const parsed = parseOwnerCommercialDocumentDetailQuery(kind, id, input)
+      const data = context(parsed.kind, sessionId)
       return buildOwnerCommercialDocumentDetail({
         ...data,
         query: { ...parsed, includeDemo: parsed.includeDemo && data.capabilities.includes('demo:read') },

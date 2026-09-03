@@ -1,6 +1,7 @@
 import type { OwnerCommercialDocumentCommandRequestDTO } from '../../app/lib/owner-document/central-command-contract'
 import {
   OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
+  SUBCONTRACT_CHANGE_WRITE_CAPABILITY,
 } from '../../app/lib/owner-document/central-command-contract'
 import {
   ownerCommercialDocumentProblem,
@@ -55,12 +56,16 @@ function auditLines(value: unknown): value is Array<{ boqLineId: string, audited
 export function parseOwnerCommercialDocumentCommandRequest(
   value: unknown,
 ): OwnerCommercialDocumentCommandRequestDTO {
+  const kind = object(value) ? String(value.kind) : ''
+  const requiredCapability = kind === 'sub_change'
+    ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
+    : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
   if (!object(value)
     || typeof value.workspaceId !== 'string' || !value.workspaceId
     || typeof value.actorId !== 'string' || !value.actorId
-    || value.requiredCapability !== OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
+    || value.requiredCapability !== requiredCapability
     || typeof value.commandId !== 'string' || !value.commandId
-    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'].includes(String(value.kind))
+    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(String(value.kind))
     || !(value.id === null || typeof value.id === 'string')
     || !(value.baseVersion === null || typeof value.baseVersion === 'string')
     || !['save', 'submit', 'approve', 'audit', 'transition-acceptance', 'attachments', 'delete'].includes(String(value.action))) {
@@ -69,9 +74,9 @@ export function parseOwnerCommercialDocumentCommandRequest(
   const base = {
     workspaceId: value.workspaceId,
     actorId: value.actorId,
-    requiredCapability: OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
+    requiredCapability,
     commandId: value.commandId,
-    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty',
+    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change',
     id: value.id,
     baseVersion: value.baseVersion,
   }

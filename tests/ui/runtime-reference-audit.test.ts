@@ -58,21 +58,21 @@ describe('runtime reference audit contract', () => {
 
     expect(committed).toEqual(ledger)
     expect(ledger.counts).toMatchObject({
-      trackedPageFiles: 137,
+      trackedPageFiles: 138,
       devPageFiles: 5,
-      productionRoutes: 132,
+      productionRoutes: 133,
       pageDomains: 20,
-      evidenceEndpointRecords: 132,
-      referenceEndpoints: 132,
+      evidenceEndpointRecords: 133,
+      referenceEndpoints: 133,
       referenceProfiles: 37,
       usedReferenceProfiles: 32,
       directEvidenceRoutes: 52,
       adjacentEvidenceRoutes: 18,
-      localAuthorityRoutes: 19,
+      localAuthorityRoutes: 20,
       historicalEvidenceRoutes: 34,
       unverifiedTargetRoutes: 9,
     })
-    expect(ledger.endpoints).toHaveLength(132)
+    expect(ledger.endpoints).toHaveLength(133)
     expect(ledger.domains).toHaveLength(20)
 
     for (const endpoint of ledger.endpoints) {
@@ -159,9 +159,9 @@ describe('runtime reference audit contract', () => {
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
     expect(status).toContain('> 核对日期：2026-08-25')
-    expect(status).toContain('| 实现页面文件（含 dev） | 137 |')
+    expect(status).toContain('| 实现页面文件（含 dev） | 138 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
-    expect(status).toContain('| 实现生产路由（排除 dev） | 132 |')
+    expect(status).toContain('| 实现生产路由（排除 dev） | 133 |')
     expect(status).toContain('**当前为 2。**')
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
@@ -197,10 +197,10 @@ describe('runtime reference audit contract', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
     const endpoints = buildRuntimeEvidenceLedger().endpoints
-    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(132)
-    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(132)
-    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(132)
-    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(132)
+    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(133)
+    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(133)
+    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(133)
+    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(133)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {
