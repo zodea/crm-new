@@ -79,6 +79,10 @@ export const useTabsStore = defineStore('tabs', () => {
   function acknowledgeInvalidations(keys: string[]) {
     const completed = new Set(keys)
     invalidatedKeys.value = invalidatedKeys.value.filter(key => !completed.has(key))
+    // 旧实例已卸载后不再保存历史路径；卸载前快速重开的页签仍需保留新版本。
+    const retained = new Set(tabs.value.map(tab => tab.key))
+    cacheVersions.value = Object.fromEntries(Object.entries(cacheVersions.value)
+      .filter(([key]) => retained.has(key) || !completed.has(key)))
   }
 
   function pageCacheKey(fullPath: string): string {

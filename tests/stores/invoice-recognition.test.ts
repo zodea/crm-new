@@ -67,11 +67,34 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   mem.close()
 })
 
 describe('invoice store 真实识别管线', () => {
+  it('删除撤回窗口保留原文件，窗口结束释放文件且恢复记录不伪装仍有原件', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async () => ocrResponse(MARKDOWN))
+    vi.stubGlobal('fetch', fetchMock)
+    const store = useInvoiceStore()
+    const [first, second] = await store.uploadInvoices([
+      new File(['first'], '撤回窗口.pdf'),
+      new File(['second'], '超过窗口.pdf'),
+    ])
+    const logId = await store.remove(first!)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(await store.undo(logId!)).toBe(true)
+    expect(await store.startRecognition(first!)).toBe(true)
+
+    await store.remove(second!)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await store.restore(second!)
+    expect(await store.startRecognition(second!)).toBe(false)
+    expect(store.recognitionError(second!)).toContain('原文件')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('上传保留实际 File，识别完成后把解析字段一次性写入数据库', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(MARKDOWN))
     vi.stubGlobal('fetch', fetchMock)

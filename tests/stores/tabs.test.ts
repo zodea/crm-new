@@ -56,6 +56,25 @@ describe('页签缓存失效', () => {
     store.acknowledgeInvalidations(['/project'])
     expect(store.invalidatedKeys).toEqual(['/base/supplier'])
   })
+
+  it('完成卸载后释放历史路径版本，快速重开仍保留新实例身份', () => {
+    const store = useTabsStore()
+    for (let index = 0; index < 100; index++) {
+      const path = `/project/closed-${index}`
+      const initial = store.pageCacheKey(path)
+      store.open({ fullPath: path, title: '临时详情' })
+      store.close(path)
+      store.acknowledgeInvalidations([path])
+      expect(store.pageCacheKey(path)).toBe(initial)
+    }
+
+    store.open({ fullPath: '/project/reopened', title: '重新打开' })
+    const before = store.pageCacheKey('/project/reopened')
+    store.close('/project/reopened')
+    store.open({ fullPath: '/project/reopened', title: '重新打开' })
+    store.acknowledgeInvalidations(['/project/reopened'])
+    expect(store.pageCacheKey('/project/reopened')).not.toBe(before)
+  })
 })
 
 describe('动态标题保持（#98）', () => {

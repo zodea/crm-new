@@ -10,6 +10,7 @@ import type { InvoiceItem } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
 import { computed, readonly, ref, shallowRef } from 'vue'
+import { useSessionFileCache } from '~/composables/useSessionFileCache'
 import { db } from '~/lib/db/client'
 import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, logOperation, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
@@ -246,9 +247,9 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const invoiceExportStyleLoaded = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
-  /** 原文件仅保留在当前应用会话，不写入 SQLite，也不进入 Vue 响应式代理。 */
-  const recognitionFiles = new Map<string, File>()
   const recognitionErrors = ref<Record<string, string>>({})
+  /** 原文件不进入响应式代理；删除或归档后仅保留 10 秒撤回窗口。 */
+  const recognitionFiles = useSessionFileCache(10_000, clearRecognitionError)
 
   function recognitionError(id: string): string {
     return recognitionErrors.value[id] ?? ''
@@ -364,6 +365,12 @@ export const useInvoiceStore = defineStore('invoice', () => {
       ])
       list.value = rows.map(rowToInvoice)
       archivedAggregateRows.value = aggregates
+      const activeIds = new Set(list.value.filter(invoice => invoice.accountStatus !== 'archived').map(invoice => invoice.id))
+      recognitionFiles.sync(activeIds)
+      for (const id of Object.keys(recognitionErrors.value)) {
+        if (!activeIds.has(id))
+          clearRecognitionError(id)
+      }
     }
     finally {
       loading.value = false
@@ -522,10 +529,11 @@ export const useInvoiceStore = defineStore('invoice', () => {
       return logId != null
     }
     catch (error) {
-      recognitionErrors.value[id] = error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试'
       const current = byId(id)
-      if (current)
+      if (current) {
+        recognitionErrors.value[id] = error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试'
         await markRecognitionFailed(current)
+      }
       return false
     }
     finally {
