@@ -1,88 +1,27 @@
 # 用户使用指南
 
-本目录保存面向最终用户的操作说明 Markdown 权威源。功能规格、数据字段和架构原因仍分别以 `docs/rewrite/pages/`、`docs/rewrite/DATABASE.md` 和 `docs/adr/` 为准；指南只负责把这些规则组织成可执行的用户流程。
+先查[功能与路由索引](./routes.md)定位页面，再按下表进入操作说明。[本轮审计与复现步骤](../research/browser-audit-2026-09-05.md)列出已确认问题；功能完整度仍以[实现状态](../design/ui-implementation-status.md)和当前 Issue 为准。
 
-## 当前指南
+| 功能 | 常用入口 | 操作说明 |
+| --- | --- | --- |
+| 客户档案与业务关系 | `/base/customer` | [查看](./customer-records.md) |
+| 分供方档案与真实事实 | `/base/supplier` | [查看](./supplier-records.md) |
+| 班组与工人档案 | `/base/crew`、`/base/worker` | [查看](./crew-worker-records.md) |
+| 新项目与施工排程 | `/project`、`/schedule` | [查看](./project-start-and-schedule.md) |
+| 核心合同与工程量清单 | `/contract/construction`、`/contract/subcontract`、`/contract/material`、`/contract/boq` | [查看](./core-contract-and-boq.md) |
+| 项目分供方工作台与导入 | `/project/:pid/supplier/:sid` | [查看](./project-supplier-workbench.md) |
+| 分供方证照 | `/base/supplier/credential/:id` | [查看](./supplier-credential-review.md) |
+| 材料单价分析 | `/material/price` | [查看](./material-price-analysis.md) |
+| 工资与考勤 | `/subcontract/payroll`、`/subcontract/attendance`、`/subcontract/daywork` | [查看](./payroll-attendance.md) |
+| OCR 设置 | `/settings/ocr` | [查看](./ocr-settings.md) |
+| 发票识别、台账与导入导出 | `/finance/invoice`、`/finance/ledger` | [查看](./finance-invoice.md) |
+| 付款申请与登记支付 | `/finance/payment`、`/finance/records`、`/finance/payment-management` | [查看](./finance-payment.md) |
+| 送货单识别、归档与原件导出 | `/material/delivery`、`/material/delivery/archive` | [查看](./material-delivery.md) |
+| 本地核心身份迁移 | `/settings/data-migration` | [查看](./local-data-migration.md) |
 
-- [客户档案与业务关系使用指南](./customer-records.md)
-- [分供方档案与真实事实使用指南](./supplier-records.md)
-- [班组与工人档案使用指南](./crew-worker-records.md)
-- [新项目启动与施工排程使用指南](./project-start-and-schedule.md)
-- [核心合同与工程量清单使用指南](./core-contract-and-boq.md)
-- [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
-- [分供方证照与资料核验使用指南](./supplier-credential-review.md)
-- [材料单价分析使用说明](./material-price-analysis.md)
-- [工资与考勤工作台使用说明](./payroll-attendance.md)
-- [OCR 设置使用说明](./ocr-settings.md)
-- [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
-- [付款申请与登记支付使用说明](./finance-payment.md)
-- [送货单归档与原件包导出使用说明](./material-delivery.md)
-- [本地核心身份数据迁移使用指南](./local-data-migration.md)
+## 编写规范
 
-## PDF 生成
-
-运行：
-
-```powershell
-python scripts/generate-project-guide-pdf.py
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/customer-records.md `
-  --output output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/supplier-records.md `
-  --output output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/crew-worker-records.md `
-  --output output/pdf/瑞航CRM_班组与工人档案使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/core-contract-and-boq.md `
-  --output output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/project-supplier-workbench.md `
-  --output output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/supplier-credential-review.md `
-  --output output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/material-price-analysis.md `
-  --output output/pdf/瑞航CRM_材料单价分析使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/payroll-attendance.md `
-  --output output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/ocr-settings.md `
-  --output output/pdf/瑞航CRM_OCR设置使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/finance-invoice.md `
-  --output output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/finance-payment.md `
-  --output output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/material-delivery.md `
-  --output output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
-python scripts/generate-project-guide-pdf.py `
-  --source docs/guides/local-data-migration.md `
-  --output output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
-```
-
-生成文件：
-
-```text
-output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
-output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
-output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
-output/pdf/瑞航CRM_班组与工人档案使用指南.pdf
-output/pdf/瑞航CRM_核心合同与工程量清单使用指南.pdf
-output/pdf/瑞航CRM_项目分供方工作台与文件导入使用说明.pdf
-output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
-output/pdf/瑞航CRM_材料单价分析使用说明.pdf
-output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
-output/pdf/瑞航CRM_OCR设置使用说明.pdf
-output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
-output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
-output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
-output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
-```
-
-每次改变最终用户可见流程时，先更新 Markdown，再重新生成并逐页渲染检查 PDF。指南必须明确区分“当前已可用”和“已定稿待开发”，不能把目标规格写成已经上线。
+- 每份指南只写适用范围、入口路由、必要前置条件、操作步骤和已知限制。
+- 区分已可用与待开发；本轮发现的回归通过审计链接说明，不把页面能打开写成流程完成。
+- 字段、状态机和架构依据链接到权威规格，不重复复制。
+- 默认只维护 Markdown。原有 14 份生成 PDF 均有上述同源指南，本轮按用户要求清理；后续仅在用户明确需要时用现有 PDF 生成脚本导出。

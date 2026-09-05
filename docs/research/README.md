@@ -6,6 +6,7 @@
 
 | 文档 | 用途 | 现行权威 |
 | --- | --- | --- |
+| [`browser-audit-2026-09-05.md`](./browser-audit-2026-09-05.md) | 浏览器功能、数据边界、页签与内存审计及复现入口 | 当前 Issue、实现状态与对应领域规格 |
 | [`red-circle-ui-gap-2026-07-11.md`](./red-circle-ui-gap-2026-07-11.md) | 红圈系统结构与交互差距走查，保留来源证据 | ADR 0013–0015、界面状态页、open Issues |
 | [`architecture-review-2026-07-05.html`](./architecture-review-2026-07-05.html) | 早期架构扫描报告 | `docs/rewrite/ARCHITECTURE.md`、ADR |
 | [`invoice-recognition-app-port-plan.md`](./invoice-recognition-app-port-plan.md) | 旧识别应用可迁移能力调查 | ADR 0006、当前 `app/lib/recognize/` |
