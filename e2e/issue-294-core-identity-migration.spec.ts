@@ -1,12 +1,8 @@
 import type { APIRequestContext, Page } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
 import { expect, test } from '@playwright/test'
-import initSqlJs from 'sql.js'
+import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
+import { createMemoryDb } from '../tests/helpers/memory-db'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
-
-const require = createRequire(import.meta.url)
 
 async function resetMigrationBackend(request: APIRequestContext) {
   const response = await request.post('/api/testing/core-migration/reset', {
@@ -16,43 +12,9 @@ async function resetMigrationBackend(request: APIRequestContext) {
 }
 
 async function legacyProductionSnapshot(options: { withSoftDeletedSupplier?: boolean } = {}): Promise<Uint8Array> {
-  const wasmPath = join(dirname(require.resolve('sql.js')), 'sql-wasm.wasm')
-  const SQL = await initSqlJs({ wasmBinary: await readFile(wasmPath) })
-  const database = new SQL.Database()
-  database.run(`
-    CREATE TABLE schema_migrations (
-      version INTEGER PRIMARY KEY,
-      name TEXT NOT NULL,
-      applied_at TEXT
-    );
-    INSERT INTO schema_migrations (version, name, applied_at)
-      VALUES (40, 'legacy-fixture', '2026-08-15T08:00:00.000Z');
-    CREATE TABLE customers (id TEXT PRIMARY KEY, name TEXT NOT NULL, deleted_at TEXT);
-    CREATE TABLE suppliers (id TEXT PRIMARY KEY, name TEXT NOT NULL, deleted_at TEXT);
-    CREATE TABLE crews (id TEXT PRIMARY KEY, name TEXT NOT NULL, deleted_at TEXT);
-    CREATE TABLE projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      customer_id TEXT,
-      secondary_customer_id TEXT,
-      area REAL,
-      contract_amount REAL,
-      deleted_at TEXT
-    );
-    CREATE TABLE workers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      crew_id TEXT,
-      current_project_id TEXT,
-      deleted_at TEXT
-    );
-    CREATE TABLE project_suppliers (
-      id TEXT PRIMARY KEY,
-      project_id TEXT,
-      supplier_id TEXT,
-      deleted_at TEXT
-    );
-  `)
+  const db = await createMemoryDb()
+  await runMigrations(db, migrations.filter(migration => migration.version <= 40))
+  const database = db.raw
   database.run(
     'INSERT INTO customers (id, name) VALUES (?, ?)',
     ['customer-local-294', '迁移验收客户'],
@@ -201,7 +163,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     )
     await page.getByRole('button', { name: '运行预检' }).click()
     expect((await preflightResponse).ok()).toBe(true)
-    await expect(page.getByText('sqlite-v41', { exact: true })).toBeVisible()
+    await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: '创建不可变备份' }).click()
     await expect(page.getByText('不可变备份', { exact: true })).toBeVisible()
@@ -309,7 +271,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       await installProductionSnapshot(page, await legacyProductionSnapshot({ withSoftDeletedSupplier: true }))
       await page.reload()
       await page.getByRole('button', { name: '运行预检' }).click()
-      await expect(page.getByText('sqlite-v41', { exact: true })).toBeVisible()
+      await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
       await page.getByRole('button', { name: '创建不可变备份' }).click()
       await page.getByRole('button', { name: '执行 dry-run' }).click()
       await expect(page.getByText('已保留软删除')).toBeVisible()

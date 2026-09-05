@@ -1,5 +1,6 @@
 import type { SubcontractContractReadTestScenario } from '../../../utils/subcontract-contract-read-test-instance'
 import process from 'node:process'
+import { prepareConstructionContractChainIdentityFixtures } from '../../../utils/construction-contract-chain-test-fixture'
 import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
 import { subcontractContractCommandTestInstance } from '../../../utils/subcontract-contract-command-test-instance'
 import { subcontractContractReadTestInstance } from '../../../utils/subcontract-contract-read-test-instance'
@@ -16,6 +17,8 @@ export default defineEventHandler(async (event) => {
   if (!body?.scenario || !scenarios.has(body.scenario))
     throw createError({ statusCode: 400, statusMessage: 'Unknown subcontract contract test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
+  if (body.scenario === 'ready')
+    prepareConstructionContractChainIdentityFixtures(sessionId)
   subcontractContractCommandTestInstance.reset()
   if (body.scenario === 'demo-forbidden') {
     subcontractContractReadTestInstance.reset('ready', sessionId)

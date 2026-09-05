@@ -1,5 +1,6 @@
 import type { OwnerCommercialDocumentReadTestScenario } from '../../../utils/owner-commercial-document-read-test-instance'
 import process from 'node:process'
+import { prepareConstructionContractChainIdentityFixtures } from '../../../utils/construction-contract-chain-test-fixture'
 import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from '../../../utils/owner-commercial-document-command-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../../utils/owner-commercial-document-fixtures'
@@ -17,6 +18,8 @@ export default defineEventHandler(async (event) => {
   if (!body?.scenario || !scenarios.has(body.scenario))
     throw createError({ statusCode: 400, statusMessage: 'Unknown owner document test scenario' })
   const sessionId = getHeader(event, 'x-ruihang-test-session')
+  if (body.scenario === 'ready')
+    prepareConstructionContractChainIdentityFixtures(sessionId)
   ownerCommercialDocumentCommandTestInstance.reset(sessionId)
   if (body.scenario === 'ready')
     ownerCommercialDocumentCommandTestInstance.importExisting(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS, sessionId)

@@ -30,8 +30,12 @@ import {
 } from '../../app/lib/migration/core-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
+import { customerCommandTestInstance } from './customer-command-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
+import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -1059,6 +1063,10 @@ export function synchronizeCoreMigrationCommandSources(
 }
 
 const commandSources = [
+  projectCommandTestInstance,
+  customerCommandTestInstance,
+  supplierCommandTestInstance,
+  crewWorkerCommandTestInstance,
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,

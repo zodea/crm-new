@@ -7,6 +7,7 @@ import type {
 } from '../../app/lib/crew-worker/command-contract'
 import type { CrewSourceRow, WorkerSourceRow } from '../../app/lib/crew-worker/read-contract'
 import type { CrewFormDraft, WorkerFormDraft } from '../../app/lib/master-data/forms'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
 import { randomUUID } from 'node:crypto'
 import {
@@ -14,8 +15,10 @@ import {
   WORKER_WRITE_CAPABILITY,
 } from '../../app/lib/crew-worker/command-contract'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/read-contract'
+import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 interface Stored<TDraft> {
+  migrationBatchId?: string | null
   id: string
   draft: TDraft
   version: number
@@ -195,7 +198,7 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
     }
     const id = existing?.id ?? createId(input.kind)
     const timestamp = now()
-    const stored: Stored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp }
+    const stored: Stored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp, migrationBatchId: existing?.migrationBatchId ?? null }
     records.set(id, stored)
     state.sourceVersion += 1
     const result = { id, commandId: input.request.commandId, version: String(stored.version), updatedAt: timestamp, attachmentIds: [] }
@@ -204,6 +207,13 @@ export function createCrewWorkerCommandTestInstance(options: Options = {}) {
   }
 
   return {
+    prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      const current = stateFor(sessionId)
+      const crews = migratedIdentityRecords(current.crews, snapshot, 'crews', entity => ({ id: entity.id, draft: migratedIdentityDraft<CrewFormDraft>('crew', entity), version: 1, updatedAt: migratedIdentityTimestamp(entity) }))
+      const workers = migratedIdentityRecords(current.workers, snapshot, 'workers', entity => ({ id: entity.id, draft: migratedIdentityDraft<WorkerFormDraft>('worker', entity), version: 1, updatedAt: migratedIdentityTimestamp(entity) }))
+      const candidate = { ...current, crews, workers, sourceVersion: current.sourceVersion + (crews === current.crews && workers === current.workers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => crews.has(result.id) || workers.has(result.id))) }
+      return () => states.set(keyFor(sessionId), candidate)
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },

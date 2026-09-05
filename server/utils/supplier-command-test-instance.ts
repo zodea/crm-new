@@ -1,4 +1,5 @@
 import type { SupplierFormDraft } from '../../app/lib/master-data/forms'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type {
   SupplierCommandRequestDTO,
   SupplierCommandResultDTO,
@@ -9,8 +10,10 @@ import type { BusinessSession } from './business-session'
 import { randomUUID } from 'node:crypto'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
+import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 interface StoredSupplier {
+  migrationBatchId?: string | null
   id: string
   draft: SupplierFormDraft
   version: number
@@ -185,6 +188,17 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
   }
 
   return {
+    prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      const current = stateFor(sessionId)
+      const records = migratedIdentityRecords(current.suppliers, snapshot, 'suppliers', entity => ({
+        id: entity.id,
+        draft: migratedIdentityDraft<SupplierFormDraft>('supplier', entity),
+        version: 1,
+        updatedAt: migratedIdentityTimestamp(entity),
+      }))
+      const candidate = { ...current, suppliers: records, sourceVersion: current.sourceVersion + (records === current.suppliers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      return () => states.set(keyFor(sessionId), candidate)
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
@@ -290,6 +304,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         draft: { ...draft, id },
         version: (existing?.version ?? 0) + 1,
         updatedAt: timestamp,
+        migrationBatchId: existing?.migrationBatchId ?? null,
       }
       state.suppliers.set(id, stored)
       state.sourceVersion += 1

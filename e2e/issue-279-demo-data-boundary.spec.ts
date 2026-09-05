@@ -74,12 +74,12 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), DATA_VISIBILITY_STORAGE_KEY)).toBe('true')
 
     await page.getByRole('link', { name: '合和新城', exact: true }).first().click()
-    await expect(page).toHaveURL(/\/project\/proj_demo_001\?origin=demo$/)
+    await expect(page).toHaveURL(/\/project\/proj_demo_001\?origin=demo(?:&|$)/)
     await expect(page.getByRole('status', { name: '测试数据只读详情' })).toContainText('测试数据仅供查看')
     await expect(page.getByRole('heading', { name: '合和新城' })).toBeFocused()
     await expect(page.getByRole('link', { name: '编辑项目' })).toHaveCount(0)
 
-    await page.getByRole('link', { name: '关闭项目详情' }).click()
+    await page.getByRole('link', { name: '返回项目列表' }).click()
     await expect(page.getByRole('button', { name: '关闭测试数据' })).toHaveAttribute('aria-pressed', 'true')
     const response = page.waitForResponse(candidate =>
       candidate.url().includes('/api/read/projects')
@@ -124,12 +124,12 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     await page.goto('/base/customer')
     await page.waitForTimeout(500)
     expect(pageErrors).toEqual([])
-    await expect(page.getByText('暂无客户数据', { exact: true }).last()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('status', { name: '还没有客户档案' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('button', { name: '打开通知中心，没有未读消息' })).toBeVisible()
 
     await page.getByRole('button', { name: '包含测试数据' }).click()
     await page.getByRole('button', { name: '取消' }).click()
-    await expect(page.getByText('暂无客户数据', { exact: true }).last()).toBeVisible()
+    await expect(page.getByRole('status', { name: '还没有客户档案' })).toBeVisible()
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), DATA_VISIBILITY_STORAGE_KEY)).not.toBe('true')
 
     await page.getByRole('button', { name: '包含测试数据' }).click()
@@ -145,7 +145,7 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     await page.getByRole('button', { name: '关闭测试数据' }).click()
     await page.getByRole('button', { name: '确认切换' }).click()
     await page.goto('/base/customer')
-    await expect(page.getByText('暂无客户数据', { exact: true }).last()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('status', { name: '还没有客户档案' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('link', { name: '广州市政集团', exact: true })).toHaveCount(0)
   })
 
@@ -159,7 +159,7 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     await page.goto('/base/customer')
     expect(await (await authorization).json()).toEqual({ allowed: false })
     await expect(page.getByRole('button', { name: '包含测试数据' })).toHaveAttribute('aria-pressed', 'false')
-    await expect(page.getByText('暂无客户数据', { exact: true }).last()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('status', { name: '还没有客户档案' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole('button', { name: '打开通知中心，没有未读消息' })).toBeVisible()
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), DATA_VISIBILITY_STORAGE_KEY)).toBe('false')
 

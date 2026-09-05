@@ -10,12 +10,15 @@ import type {
   FormAttachmentChanges,
   FormAttachmentDraft,
 } from '../../app/lib/master-data/forms'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
 import { randomUUID } from 'node:crypto'
 import { CUSTOMER_WRITE_CAPABILITY } from '../../app/lib/customer/command-contract'
 import { customerProblem, CustomerRepositoryProblem } from '../../app/lib/customer/repository'
+import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 
 interface StoredCustomer {
+  migrationBatchId?: string | null
   id: string
   draft: CustomerFormDraft
   attachments: FormAttachment[]
@@ -134,6 +137,18 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
   }
 
   return {
+    prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      const current = stateFor(sessionId)
+      const records = migratedIdentityRecords(current.customers, snapshot, 'customers', entity => ({
+        id: entity.id,
+        draft: migratedIdentityDraft<CustomerFormDraft>('customer', entity),
+        attachments: [],
+        version: 1,
+        updatedAt: migratedIdentityTimestamp(entity),
+      }))
+      const candidate = { ...current, customers: records, sourceVersion: current.sourceVersion + (records === current.customers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      return () => states.set(keyFor(sessionId), candidate)
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
@@ -198,6 +213,7 @@ export function createCustomerCommandTestInstance(options: Options = {}) {
         attachments,
         version: (existing?.version ?? 0) + 1,
         updatedAt: timestamp,
+        migrationBatchId: existing?.migrationBatchId ?? null,
       }
       state.customers.set(id, stored)
       state.sourceVersion += 1

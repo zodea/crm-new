@@ -31,7 +31,7 @@ test('取消关闭和刷新保留草稿，后台页签也先确认再卸载', as
   await expect(tab).toHaveCount(0)
 })
 
-for (const kind of ['construction', 'material'] as const) {
+for (const kind of ['construction', 'material', 'subcontract'] as const) {
   test(`${kind} 保存并新建连续两次创建独立合同并清空表单`, async ({ page }, testInfo) => {
     const id = `audit-new-${kind}-${testInfo.workerIndex}`
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
@@ -47,9 +47,9 @@ for (const kind of ['construction', 'material'] as const) {
       await expect(name).toHaveValue('', { timeout: 20_000 })
       await name.fill(`连续新增合同 ${index + 1}`)
       await page.getByRole('combobox', { name: '检索项目' }).click()
-      await page.getByText(kind === 'construction' ? '中央正式施工项目' : '中央正式材料项目', { exact: true }).click()
+      await page.getByText(kind === 'material' ? '中央正式材料项目' : '中央正式施工项目', { exact: true }).click()
       await page.getByRole('combobox', { name: kind === 'construction' ? '检索客户' : '检索分供方' }).click()
-      await page.getByText(kind === 'construction' ? '中央正式甲方客户' : '中央正式材料供应商', { exact: true }).click()
+      await page.getByText(kind === 'construction' ? '中央正式甲方客户' : kind === 'material' ? '中央正式材料供应商' : '中央正式劳务分供方', { exact: true }).click()
       await page.getByLabel('合同内容简述 *').fill('保存并新建回归')
       await page.getByLabel('签约日期 *').fill('2026-09-05')
       const response = page.waitForResponse(response => response.url().endsWith(`/api/commands/${kind}-contracts`) && response.request().method() === 'POST')

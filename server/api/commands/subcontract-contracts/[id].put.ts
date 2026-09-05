@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
     return await subcontractContractCommandTestInstance.execute(
       parseSubcontractContractCommandRequest(await readBody(event), { kind: 'update', routeId: id }),
       resolveBusinessSession(),
+      getHeader(event, 'x-ruihang-test-session'),
     )
   }
   catch (cause) {

@@ -123,6 +123,7 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
 }
 
 interface WorkspaceState {
+  sessionId?: string | null
   documents: Map<string, OwnerCommercialDocumentSource>
   commands: Map<string, OwnerCommercialDocumentCommandResultDTO>
   migrationKeys: Set<string>
@@ -558,16 +559,17 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       state = freshState()
       workspaces.set(key, state)
     }
+    state.sessionId = sessionId
     return state
   }
 
-  function linkedSubcontractRows(): SubcontractContractDetailSource[] {
-    return linkedSubcontractContractSource?.rows().map(clone) ?? []
+  function linkedSubcontractRows(state: WorkspaceState): SubcontractContractDetailSource[] {
+    return linkedSubcontractContractSource?.rows(state.sessionId).map(clone) ?? []
   }
 
   function effectiveSubcontractContracts(state: WorkspaceState): Map<string, SubcontractSeed> {
     return new Map([
-      ...linkedSubcontractRows().map(row => [row.id, {
+      ...linkedSubcontractRows(state).map(row => [row.id, {
         id: row.id,
         no: row.no,
         name: row.name,
@@ -580,7 +582,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
   function effectiveProjects(state: WorkspaceState): Map<string, ProjectSeed> {
     return new Map([
-      ...linkedSubcontractRows()
+      ...linkedSubcontractRows(state)
         .filter(row => row.projectId)
         .map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, customerId: null }] as const),
       ...state.projects.entries(),
@@ -589,7 +591,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
   function effectiveSuppliers(state: WorkspaceState): Map<string, SupplierSeed> {
     return new Map([
-      ...linkedSubcontractRows()
+      ...linkedSubcontractRows(state)
         .filter(row => row.supplierId)
         .map(row => [row.supplierId!, { id: row.supplierId!, name: row.supplierName }] as const),
       ...state.suppliers.entries(),

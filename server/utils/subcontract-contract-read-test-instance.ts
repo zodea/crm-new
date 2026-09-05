@@ -118,7 +118,7 @@ export function createSubcontractContractReadTestInstance(
     const capabilities = [...resolveCapabilities(sessionId)]
     if (!capabilities.includes('subcontract-contract:read'))
       throw problem('forbidden', '无分包合同查看权限')
-    const formalRows = commandInstance.rows()
+    const formalRows = commandInstance.rows(sessionId)
     const formalFacts = commandInstance.facts()
     const formalChanges: SubcontractContractFactSource[] = ownerDocumentSource.rows(sessionId)
       .filter(row => row.dataOrigin === 'real' && row.kind === 'sub_change')

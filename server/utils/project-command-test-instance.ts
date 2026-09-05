@@ -4,6 +4,7 @@ import type {
   FormAttachmentDraft,
   ProjectFormDraft,
 } from '../../app/lib/master-data/forms'
+import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type {
   ProjectCommandRequestDTO,
   ProjectCommandResultDTO,
@@ -19,6 +20,7 @@ import {
   projectProblem,
   ProjectRepositoryProblem,
 } from '../../app/lib/project/repository'
+import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 import {
   assertProjectCommandBusinessRules,
   decodeProjectCommandContent,
@@ -26,6 +28,7 @@ import {
 } from './project-command-domain'
 
 interface StoredProject {
+  migrationBatchId?: string | null
   id: string
   draft: ProjectFormDraft
   attachments: FormAttachment[]
@@ -214,6 +217,18 @@ export function createProjectCommandTestInstance(
   }
 
   return {
+    prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
+      const current = stateFor(sessionId)
+      const records = migratedIdentityRecords(current.projects, snapshot, 'projects', entity => ({
+        id: entity.id,
+        draft: migratedIdentityDraft<ProjectFormDraft>('project', entity),
+        attachments: [],
+        version: 1,
+        updatedAt: migratedIdentityTimestamp(entity),
+      }))
+      const candidate = { ...current, projects: records, sourceVersion: current.sourceVersion + (records === current.projects ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      return () => states.set(keyFor(sessionId), candidate)
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
@@ -316,6 +331,7 @@ export function createProjectCommandTestInstance(
         attachments: applyAttachments(id, existing?.attachments ?? [], content.attachments, timestamp),
         version,
         updatedAt: timestamp,
+        migrationBatchId: existing?.migrationBatchId ?? null,
       }
       state.projects.set(id, project)
       state.sourceVersion += 1
