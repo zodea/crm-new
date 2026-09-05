@@ -2,7 +2,6 @@
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isDataOriginDTO } from '~/types/read-model'
 
-const kind = 'project_penalty' as const
 const route = useRoute()
 const visibility = useDataVisibilityStore()
 const centralContext = computed(() => {
@@ -26,5 +25,5 @@ const returnTo = computed(() => validateCrewWorkerReturnTo(route.query.returnTo)
     :include-demo="visibility.includeDemo"
     :return-to="returnTo"
   />
-  <OwnerDocumentFormPage v-else :kind="kind" />
+  <ProjectPenaltyDetailScreen v-else :document-id="penaltyId" :origin="isDataOriginDTO(route.query.origin) ? route.query.origin : 'real'" />
 </template>

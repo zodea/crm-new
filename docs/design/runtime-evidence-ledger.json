@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 138,
+    "trackedPageFiles": 139,
     "devPageFiles": 5,
-    "productionRoutes": 133,
+    "productionRoutes": 134,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 133,
-    "referenceEndpoints": 133,
-    "referenceProfiles": 38,
-    "usedReferenceProfiles": 33,
+    "evidenceEndpointRecords": 134,
+    "referenceEndpoints": 134,
+    "referenceProfiles": 39,
+    "usedReferenceProfiles": 34,
     "directEvidenceRoutes": 52,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 20,
+    "localAuthorityRoutes": 21,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 131,
+    "designCoveredRoutes": 132,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -103,7 +103,7 @@
     {
       "code": "subcontract-document",
       "domain": "分包单据",
-      "routeCount": 7,
+      "routeCount": 8,
       "implementationIssues": [
         295,
         327,
@@ -3174,7 +3174,7 @@
       "page": "app/pages/project/penalty/[id].vue",
       "localRoute": "/project/penalty/:id",
       "domainCode": "subcontract-document",
-      "template": "整页表单",
+      "template": "详情",
       "implementationIssues": [
         295,
         327,
@@ -3198,6 +3198,34 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-190732545BE4",
+      "page": "app/pages/project/penalty/form/[id].vue",
+      "localRoute": "/project/penalty/form/:id",
+      "domainCode": "subcontract-document",
+      "template": "整页表单",
+      "implementationIssues": [
+        295,
+        327,
+        289
+      ],
+      "referenceProfile": "R-SUB-DOC-DC",
+      "referenceEndpointId": "local-190732545BE4",
+      "referenceEndpointLabel": "本地权威端点：/project/penalty/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/project/penalty/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/project/penalty/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
       "evidenceRecordId": "E-9E4E158CB66F",
       "page": "app/pages/project/penalty/index.vue",
       "localRoute": "/project/penalty",
@@ -3208,11 +3236,11 @@
         327,
         289
       ],
-      "referenceProfile": "R-SUB-DOCUMENTS-LIVE",
+      "referenceProfile": "R-PROJECT-PENALTY-LIVE-329",
       "referenceEndpointId": "project-penalty-list",
       "referenceEndpointLabel": "分包及人工 > 项目罚扣",
       "evidenceGrade": "direct",
-      "observationDate": "2026-08-13",
+      "observationDate": "2026-09-05",
       "observationDateStatus": "recorded",
       "permissionStatus": "read-only-observed",
       "layoutConclusion": {

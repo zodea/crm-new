@@ -30,6 +30,7 @@ import {
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -52,7 +53,7 @@ const isEditing = computed(() => Boolean(routeId.value))
 const hasReturnTarget = computed(() => Boolean(route.query?.returnTo))
 const returnTarget = computed(() => {
   if (props.kind !== 'owner_change' && props.kind !== 'owner_report'
-    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty' && props.kind !== 'sub_change' && props.kind !== 'sub_settlement') {
+    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty' && props.kind !== 'sub_change' && props.kind !== 'sub_settlement' && props.kind !== 'project_penalty') {
     return meta.value.listPath
   }
   return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real', props.kind)
@@ -198,9 +199,11 @@ const footerLabels = computed(() => ({
   saveSubmit: meta.value.postLabel,
   save: '保存附件',
 }))
+const desktopPenaltyActions = isDesktopRuntime()
 const sections = computed(() => {
   if (
     props.kind !== 'project_penalty'
+    || !desktopPenaltyActions
     || (!canDeductPenalty.value && penaltyDeductions.value.length === 0)
   ) {
     return meta.value.sections
@@ -717,7 +720,7 @@ onMounted(() => void initialize())
       />
 
       <section
-        v-if="kind === 'project_penalty' && (canDeductPenalty || penaltyDeductions.length)"
+        v-if="desktopPenaltyActions && kind === 'project_penalty' && (canDeductPenalty || penaltyDeductions.length)"
         id="section-deduction"
         class="panel scroll-mt-4 p-4"
       >

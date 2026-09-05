@@ -56,7 +56,7 @@ const materialJourneyContextId = ref(newMaterialContractReturnContextId())
 let latestLoad = 0
 let latestOwnerJourneyLoad = 0
 let hasActivated = false
-type OwnerJourneyKind = 'change' | 'report' | 'acceptance' | 'warranty' | 'final-settlement' | 'penalty' | 'sub-change' | 'sub-settlement'
+type OwnerJourneyKind = 'change' | 'report' | 'acceptance' | 'warranty' | 'final-settlement' | 'penalty' | 'sub-change' | 'sub-settlement' | 'project-penalty'
 type OwnerJourneyPages = Partial<{
   change: OwnerCommercialDocumentListPageDTO
   report: OwnerCommercialDocumentListPageDTO
@@ -66,6 +66,7 @@ type OwnerJourneyPages = Partial<{
   penalty: OwnerCommercialDocumentListPageDTO
   subChange: OwnerCommercialDocumentListPageDTO
   subSettlement: OwnerCommercialDocumentListPageDTO
+  projectPenalty: OwnerCommercialDocumentListPageDTO
 }>
 interface OwnerJourneyCard { kind: OwnerJourneyKind, label: string, page: OwnerCommercialDocumentListPageDTO }
 const ownerJourneys = shallowRef<OwnerJourneyPages | null>(null)
@@ -107,6 +108,7 @@ const ownerJourneyCards = computed(() => {
     { kind: 'warranty' as const, label: '保修管理', page: current.warranty },
     { kind: 'final-settlement' as const, label: '最终结算', page: current.finalSettlement },
     { kind: 'penalty' as const, label: '甲方罚扣', page: current.penalty },
+    { kind: 'project-penalty' as const, label: '项目罚扣', page: current.projectPenalty },
     { kind: 'sub-settlement' as const, label: '分包结算', page: current.subSettlement },
     { kind: 'sub-change' as const, label: '分包变洽签', page: current.subChange },
   ]).filter(card => card.page) as OwnerJourneyCard[]
@@ -133,6 +135,7 @@ const ownerJourneyContextIds: Record<OwnerJourneyKind, string> = {
   'penalty': newOwnerDocumentReturnContextId(),
   'sub-change': newOwnerDocumentReturnContextId(),
   'sub-settlement': newOwnerDocumentReturnContextId(),
+  'project-penalty': newOwnerDocumentReturnContextId(),
 }
 
 function ownerJourneyReturnTo(kind: OwnerJourneyKind): string {
@@ -151,11 +154,13 @@ function ownerJourneyTo(kind: OwnerJourneyKind) {
   })
   if (kind === 'acceptance' || kind === 'warranty')
     query.set('variant', kind)
-  const path = kind === 'sub-settlement'
-    ? '/subcontract/settlement'
-    : kind === 'sub-change'
-      ? '/subcontract/change'
-      : `/owner/${kind === 'warranty' ? 'acceptance' : kind}`
+  const path = kind === 'project-penalty'
+    ? '/project/penalty'
+    : kind === 'sub-settlement'
+      ? '/subcontract/settlement'
+      : kind === 'sub-change'
+        ? '/subcontract/change'
+        : `/owner/${kind === 'warranty' ? 'acceptance' : kind}`
   return `${path}?${query.toString()}`
 }
 
@@ -268,6 +273,7 @@ async function loadOwnerJourneys() {
       ['penalty', ownerDocumentRepository.list({ ...base, kind: 'owner_penalty' })],
       ['subChange', ownerDocumentRepository.list({ ...base, kind: 'sub_change' })],
       ['subSettlement', ownerDocumentRepository.list({ ...base, kind: 'sub_settlement' })],
+      ['projectPenalty', ownerDocumentRepository.list({ ...base, kind: 'project_penalty' })],
     ] as const
     const results = await Promise.allSettled(entries.map(([, promise]) => promise))
     const pages: OwnerJourneyPages = {}

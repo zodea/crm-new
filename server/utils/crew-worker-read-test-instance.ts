@@ -23,6 +23,7 @@ import projectsSeed from '../../app/lib/db/seed/projects.json'
 import workersSeed from '../../app/lib/db/seed/workers.json'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 
 export type CrewWorkerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -170,15 +171,17 @@ export function createCrewWorkerReadTestInstance(
     if (!capabilities.includes('crew:list:read') || !capabilities.includes('worker:list:read'))
       throw problem('forbidden', '无班组或工人查看权限')
     const ready = scenario === 'ready'
+    const documents = ownerCommercialDocumentCommandTestInstance.rows(sessionId).filter(row => row.kind === 'project_penalty')
+    const projectPenalties: CrewWorkerPenaltySourceRow[] = documents.map(row => ({ dataOrigin: row.dataOrigin, id: row.id, no: row.no, crewId: row.crewId ?? null, workerId: null, responsibleWorkerId: null, projectId: row.projectId, source: 'project', location: '', reason: row.name, amount: row.amount, penaltyDate: row.applicationDate, status: row.status }))
     return {
       capabilities,
       crews: ready ? [...resolveFormalCrews(sessionId), ...demoCrews] : [],
       workers: ready ? [...resolveFormalWorkers(sessionId), ...demoWorkers] : [],
-      projects: ready ? demoProjects : [],
+      projects: ready ? [...new Map(documents.filter(row => row.projectId).map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, code: '', status: '', permission: 'allowed' as const, dataOrigin: row.dataOrigin }])).values(), ...demoProjects] : [],
       assignments: ready ? demoAssignments : [],
       wages: ready ? demoWages : [],
-      penalties: ready ? demoPenalties : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}`,
+      penalties: ready ? [...projectPenalties, ...demoPenalties] : [],
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${ownerCommercialDocumentCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 

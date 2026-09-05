@@ -1003,10 +1003,12 @@ function sourceEntity(
       references: {
         projectId: nullableText(row.project_id),
         contractId: nullableText(row.contract_id),
-        ...(text(row.kind) === 'sub_change' || text(row.kind) === 'sub_settlement' || supplierId ? { supplierId } : {}),
+        ...(text(row.kind) === 'project_penalty' ? { crewId: nullableText(row.crew_id) } : {}),
+        ...(text(row.kind) === 'project_penalty' || text(row.kind) === 'sub_change' || text(row.kind) === 'sub_settlement' || supplierId ? { supplierId } : {}),
       },
       amount: nullableMoney(row.amount),
       attributes: {
+        ...(text(row.kind) === 'project_penalty' ? { deadline: nullableText(row.deadline), rectificationNote: text(row.rectification_note), deductionMethod: text(row.deduction_method), penaltyDeductionsJson: text(row.penalty_deductions_json) || '[]' } : {}),
         kind: text(row.kind),
         no: text(row.no),
         documentType: text(row.document_type),
@@ -1115,6 +1117,28 @@ async function sha256Bytes(value: Uint8Array): Promise<string> {
     .join('')
 }
 
+const PROJECT_PENALTY_SOURCE_SQL = `
+  SELECT penalty.id, penalty.reason AS name, penalty.no,
+    penalty.projectId AS project_id, penalty.crewId AS crew_id,
+    penalty.supplier_id, penalty.contract_id, penalty.amount,
+    'project_penalty' AS kind, 'penalty_record' AS source_type,
+    CASE WHEN penalty.status <> 'draft' THEN 1 ELSE 0 END AS source_locked,
+    penalty.penaltyDate AS application_date, penalty.status,
+    penalty.deduction_method AS document_type, penalty.deduction_method,
+    penalty.deadline, penalty.rectification_note, penalty.note,
+    penalty.createdAt AS created_at, penalty.updated_at, penalty.deleted_at,
+    (SELECT json_group_array(json_object(
+      'id', d.id, 'settlementId', d.settlement_id, 'amount', d.amount,
+      'occurredAt', strftime('%Y-%m-%dT%H:%M:%fZ', d.created_at),
+      'actorId', '', 'commandId', '', 'note', d.note))
+      FROM penalty_settlement_deductions d WHERE d.penalty_id = penalty.id AND d.deleted_at IS NULL) AS penalty_deductions_json,
+    (SELECT json_group_array(json_object(
+      'id', f.id, 'fileName', f.file_name, 'fileSize', f.file_size, 'mimeType', f.mime_type,
+      'category', f.category, 'uploader', f.uploader, 'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at))
+      FROM file_refs f WHERE f.owner_type = 'penalty_record' AND f.owner_id = penalty.id) AS files_json
+  FROM penalty_records penalty WHERE penalty.source = 'project'
+`
+
 type SourceSelect = <T extends Record<string, unknown>>(sql: string) => Promise<T[]>
 
 async function buildSource(
@@ -1123,6 +1147,8 @@ async function buildSource(
 ): Promise<CoreMigrationSourceDTO> {
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
     const rows = await selectSource<Record<string, unknown>>(ENTITY_SQL[entityType])
+    if (entityType === 'owner_documents')
+      rows.push(...await selectSource<Record<string, unknown>>(PROJECT_PENALTY_SOURCE_SQL))
     const entities = rows
       .map(row => sourceEntity(entityType, row))
       .sort((left, right) => compareCanonicalText(left.legacyId, right.legacyId))

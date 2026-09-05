@@ -462,10 +462,12 @@ export function buildWorkerDetailRead(input: BuildWorkerDetailReadInput): Worker
       const project = projectReference(row.projectId, input.projects, origin)
       return {
         penalty,
-        navigation: detailNavigation(penalty, origin, 'penalty-detail', {
-          ownerKind: 'worker',
-          ownerId: source.id,
-        }),
+        navigation: origin === 'real' && row.source === 'project'
+          ? detailNavigation(penalty, origin, 'penalty')
+          : detailNavigation(penalty, origin, 'penalty-detail', {
+              ownerKind: 'worker',
+              ownerId: source.id,
+            }),
         project,
         projectNavigation: detailNavigation(project, origin),
         source: row.source,
@@ -639,10 +641,12 @@ export function buildCrewDetailRead(input: BuildCrewDetailReadInput): CrewDetail
       const project = projectReference(row.projectId, input.projects, origin)
       return {
         penalty,
-        navigation: detailNavigation(penalty, origin, 'penalty-detail', {
-          ownerKind: 'crew',
-          ownerId: source.id,
-        }),
+        navigation: origin === 'real' && row.source === 'project'
+          ? detailNavigation(penalty, origin, 'penalty')
+          : detailNavigation(penalty, origin, 'penalty-detail', {
+              ownerKind: 'crew',
+              ownerId: source.id,
+            }),
         project,
         projectNavigation: detailNavigation(project, origin),
         source: row.source,

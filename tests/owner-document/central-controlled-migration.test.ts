@@ -362,6 +362,51 @@ function source(): CoreMigrationSourceDTO {
 }
 
 describe('甲方商务单据受控中央迁移', () => {
+  it('aX03 迁移罚扣、班组及独立抵扣事实并映射真实结算身份', async () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance()
+    const core = createCoreMigrationTestInstance({
+      createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+      now: () => '2026-09-05T00:00:00.000Z',
+      afterConfirm: snapshot => commands.synchronizeMigrationSnapshot(snapshot),
+    })
+    const migrationSource = source()
+    const template = migrationSource.entities.owner_documents.find(row => row.attributes?.kind === 'sub_change')!
+    migrationSource.entities.owner_documents = [{
+      ...structuredClone(template),
+      legacyId: 'settlement-legacy-328',
+      name: '八月劳务结算',
+      amount: '28000.00',
+      attributes: { ...template.attributes, kind: 'sub_settlement', no: 'FBJS-328', documentType: '过程结算', sourceType: 'expenditure_settlement', status: 'confirmed', settlementDifferenceNote: '按合同扣款', filesJson: JSON.stringify([{ id: 'file-328', fileName: '结算单.pdf', fileSize: 328, mimeType: 'application/pdf', category: '结算单', uploader: '经办', uploadedAt: null, deletedAt: null }]) },
+    }]
+    migrationSource.entities.crews = [{ legacyId: 'crew329', name: '责任班组', deletedAt: null }]
+    migrationSource.entities.owner_documents.push({
+      ...structuredClone(template),
+      legacyId: 'penalty329',
+      name: '历史罚扣',
+      amount: '1000.00',
+      references: { ...template.references, crewId: 'crew329' },
+      attributes: { ...template.attributes, kind: 'project_penalty', sourceType: 'penalty_record', status: 'pending', deadline: '2026-09-10', rectificationNote: '历史整改', filesJson: '[]', penaltyDeductionsJson: JSON.stringify([{ id: 'deduction329', settlementId: 'settlement-legacy-328', amount: 400, actorId: 'legacy-actor', occurredAt: '2026-09-01T00:00:00.000Z', commandId: 'legacy-command', note: '历史抵扣' }]) },
+    })
+    migrationSource.sourceHash = createHash('sha256').update(coreMigrationSourceHashInput(migrationSource)).digest('hex')
+    const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
+    await core.preflight({ ...envelope('preflight-328'), source: migrationSource, backup: null }, session)
+    const snapshotSha256 = 'a'.repeat(64)
+    const dryRun = await core.dryRun({ ...envelope('dry-328'), source: migrationSource, backup: {
+      backupId: `core-migration-${migrationSource.sourceHash}-${snapshotSha256}`,
+      sourceHash: migrationSource.sourceHash,
+      sourceVersion: migrationSource.sourceVersion,
+      snapshotSha256,
+      byteLength: 328,
+      createdAt: '2026-09-05T00:00:00.000Z',
+      immutable: true,
+    } }, session)
+    await core.importBatch({ ...envelope('import-328'), batchId: dryRun.batchId }, session)
+    await core.confirm({ ...envelope('confirm-328'), batchId: dryRun.batchId }, session)
+    const form = commands.form('project_penalty', 'central-owner_documents-penalty329', session)
+    expect(form.draft).toMatchObject({ amount: 1000, status: 'pending', crewId: 'central-crews-crew329', rectificationNote: '历史整改' })
+    const row = commands.rows().find(row => row.id === form.id)!
+    expect(row.penaltyDeductions).toEqual([expect.objectContaining({ settlementId: 'central-owner_documents-settlement-legacy-328', amount: 400, actorId: 'legacy-actor' })])
+  })
   it('aX02 将统一支出结算按分包合同外键迁入，保留确认、金额和附件身份', async () => {
     const commands = createOwnerCommercialDocumentCommandTestInstance()
     const core = createCoreMigrationTestInstance({

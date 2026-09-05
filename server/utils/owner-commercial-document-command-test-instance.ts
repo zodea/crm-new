@@ -16,6 +16,7 @@ import type {
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
 } from '../../app/lib/owner-document/forms'
+import type { PenaltyDeductionSource, PenaltyRectificationEvent } from '../../app/lib/owner-document/project-penalty'
 import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
 import type { BusinessSession } from './business-session'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
@@ -29,7 +30,9 @@ import {
   ownerFinalSettlementReceiptIsActive,
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
+import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-penalty'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
+import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 interface ProjectSeed {
@@ -110,6 +113,8 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   createId?: (kind: OwnerCommercialDocumentKind) => string
   createBoqLineId?: (changeId: string, changeLineId: string) => string
   createAttachmentId?: () => string
+  crews?: readonly SupplierSeed[]
+  crewSource?: Pick<typeof crewWorkerCommandTestInstance, 'crewRows'>
   projects?: readonly ProjectSeed[]
   customers?: readonly CustomerSeed[]
   suppliers?: readonly SupplierSeed[]
@@ -124,6 +129,10 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
 }
 
 interface WorkspaceState {
+  linkedCrewIds: Set<string>
+  crews: Map<string, SupplierSeed>
+  penaltyDeductions: Map<string, PenaltyDeductionSource>
+  penaltyRectifications: Map<string, PenaltyRectificationEvent & { penaltyId: string }>
   documents: Map<string, OwnerCommercialDocumentSource>
   commands: Map<string, OwnerCommercialDocumentCommandResultDTO>
   migrationKeys: Set<string>
@@ -200,6 +209,8 @@ function approvalBusinessDate(source: OwnerCommercialDocumentSource): string {
 }
 
 function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
+  if (kind === 'project_penalty')
+    return 'penalty_record'
   if (kind === 'sub_settlement')
     return 'expenditure_settlement'
   if (kind === 'sub_change')
@@ -214,6 +225,9 @@ function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
+  if (source.kind === 'project_penalty') {
+    return { id: source.id, no: source.no, name: source.name, reason: source.name, projectId: source.projectId, supplierId: source.supplierId ?? null, contractId: source.contractId, crewId: source.crewId ?? null, amount: source.amount, penaltyDate: source.applicationDate ?? '', status: source.status, statusNote: source.statusNote, sourceType: source.sourceType, sourceId: source.sourceId, sourceLocked: source.sourceLocked, lines: [], note: source.note, deadline: source.penaltyFacts?.deadline ?? '', rectificationNote: source.penaltyFacts?.rectificationNote ?? '', deductionMethod: source.penaltyFacts?.deductionMethod ?? '' }
+  }
   if (source.kind === 'sub_settlement') {
     return { id: source.id, no: source.no, name: source.name, projectId: source.projectId, supplierId: source.supplierId ?? null, contractId: source.contractId, settlementType: source.documentType, settlementDate: source.applicationDate ?? '', sourceType: source.sourceType, sourceId: source.sourceId, sourceLocked: source.sourceLocked, statusNote: source.statusNote, lines: [], totalAmount: source.amount, deductionNote: source.deductionNote ?? '', note: source.note, status: source.status }
   }
@@ -535,6 +549,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
   function freshState(): WorkspaceState {
     return {
+      linkedCrewIds: new Set(),
+      crews: new Map((options.crews ?? []).map(row => [row.id, clone(row)])),
+      penaltyDeductions: new Map(),
+      penaltyRectifications: new Map(),
       documents: new Map(baseDocuments.map(row => [key(row.kind, row.id), clone(row)])),
       commands: new Map(),
       migrationKeys: new Set(),
@@ -563,6 +581,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     if (!state) {
       state = freshState()
       workspaces.set(key, state)
+    }
+    if (options.crewSource) {
+      for (const id of state.linkedCrewIds) state.crews.delete(id)
+      state.linkedCrewIds.clear()
+      for (const crew of options.crewSource.crewRows(sessionId)) {
+        state.crews.set(crew.id, { id: crew.id, name: crew.name })
+        state.linkedCrewIds.add(crew.id)
+      }
     }
     return state
   }
@@ -631,11 +657,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     source: OwnerCommercialDocumentSource,
   ): OwnerCommercialDocumentSource {
     const hydrated = clone(source)
+    if (hydrated.kind === 'project_penalty') {
+      hydrated.penaltyDeductions = [...state.penaltyDeductions.values()].filter(row => row.penaltyId === source.id).map(clone)
+      hydrated.penaltyRectifications = [...state.penaltyRectifications.values()].filter(row => row.penaltyId === source.id).map(clone)
+    }
     if (hydrated.kind === 'sub_settlement') {
       hydrated.subcontractSettlementEvidence = {
         contractAmount: effectiveSubcontractContracts(state).get(hydrated.contractId ?? '')?.amount ?? null,
         settlements: [...state.documents.values()].filter(row => row.kind === 'sub_settlement').map(row => ({ id: row.id, projectId: row.projectId, supplierId: row.supplierId, contractId: row.contractId, amount: row.amount, status: row.status })),
-        deductions: null,
+        deductions: [...state.penaltyDeductions.values()].map(row => ({ ...row, active: true })),
         applications: null,
       }
     }
@@ -659,7 +689,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   function writeCapability(kind: OwnerCommercialDocumentKind) {
-    return (kind === 'sub_change' || kind === 'sub_settlement')
+    return (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty')
       ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
       : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
   }
@@ -708,9 +738,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     complete: boolean,
   ) {
     const projectId = complete ? required(draft.projectId, '项目') : text(draft.projectId)
-    if (kind === 'sub_change' || kind === 'sub_settlement') {
-      const supplierId = complete ? required(draft.supplierId, '分供方') : text(draft.supplierId)
-      const contractId = complete ? required(draft.contractId, '分包合同') : text(draft.contractId)
+    if (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty') {
+      const supplierId = complete && kind !== 'project_penalty' ? required(draft.supplierId, '分供方') : text(draft.supplierId)
+      const contractId = complete && kind !== 'project_penalty' ? required(draft.contractId, '分包合同') : text(draft.contractId)
       if (contractId && (!projectId || !supplierId))
         throw failure('relationship-mismatch', '选择分包合同前必须先选择项目与分供方')
       const project = projectId ? effectiveProjects(state).get(projectId) ?? null : null
@@ -1011,13 +1041,67 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         ? text(request.draft.changeDate)
         : request.kind === 'final_settlement'
           ? text(request.draft.submissionDate)
-          : request.kind === 'owner_penalty'
-            ? text(request.draft.penaltyDate)
-            : text(request.draft.applicationDate)
+          : (request.kind === 'owner_penalty' || request.kind === 'project_penalty')
+              ? text(request.draft.penaltyDate)
+              : text(request.draft.applicationDate)
     if (applicationDate && !isIsoDate(applicationDate))
       throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期格式必须为 yyyy-mm-dd`)
     if (isSubmit && !applicationDate)
       throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期必填`)
+    if (request.kind === 'project_penalty') {
+      if (text(request.draft.deadline) && !isIsoDate(text(request.draft.deadline)))
+        throw failure('validation-failed', '整改期限格式无效')
+      const name = isSubmit ? required(request.draft.reason, '罚扣事由') : text(request.draft.reason)
+      const crewId = text(request.draft.crewId) || null
+      if (crewId && !state.crews.has(crewId))
+        throw failure('relationship-mismatch', '责任班组不存在或已删除')
+      const totalAmount = nullableNumber(request.draft.amount)
+      if (isSubmit && (totalAmount == null || totalAmount <= 0))
+        throw failure('validation-failed', '罚扣金额必须大于 0')
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'project_penalty',
+        crewId,
+        crewName: state.crews.get(crewId ?? '')?.name ?? '',
+        id,
+        no: text(request.draft.no) || `XMFK-${id}`,
+        name,
+        documentType: text(request.draft.deductionMethod),
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: null,
+        customerName: '',
+        customerPermission: 'allowed',
+        supplierId: relation.supplier?.id ?? null,
+        supplierName: relation.supplier?.name ?? '',
+        supplierPermission: 'allowed',
+        contractId: relation.subcontract?.id ?? null,
+        contractNo: relation.subcontract?.no ?? '',
+        contractName: relation.subcontract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'penalty_record',
+        sourceId: id,
+        sourceLocked: isSubmit,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: null,
+        status: isSubmit ? 'pending' : 'draft',
+        statusNote: isSubmit ? '待结算抵扣' : '',
+        amount: round(totalAmount ?? 0),
+        auditedAmount: null,
+        penaltyFacts: { deadline: text(request.draft.deadline) || null, rectificationNote: text(request.draft.rectificationNote), deductionMethod: text(request.draft.deductionMethod) },
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
     if (request.kind === 'sub_settlement') {
       const name = isSubmit ? required(request.draft.name, '结算名称') : text(request.draft.name)
       const totalAmount = nullableNumber(request.draft.totalAmount)
@@ -1645,6 +1729,54 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     return next
   }
 
+  function penaltyAction(
+    request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'deduct-penalty' | 'rectify-penalty' }>,
+    state: WorkspaceState,
+  ): OwnerCommercialDocumentSource {
+    const current = document(state, 'project_penalty', request.id)
+    if (!current)
+      throw failure('not-found', '项目罚扣不存在或已删除')
+    assertVersion(current, request.baseVersion)
+    const timestamp = now()
+    const next = clone(current)
+    if (request.action === 'deduct-penalty') {
+      if (!['pending', 'repairing', 'repaired_self', 'repaired_other'].includes(current.status))
+        throw failure('conflict', '仅待抵扣罚扣可以执行结算抵扣')
+      const settlement = document(state, 'sub_settlement', request.settlementId)
+      if (!settlement || !matchesPenaltySettlement(current, settlement))
+        throw failure('relationship-mismatch', '必须选择真实、已确认且来源合同或分供方一致的分包结算')
+      assertVersion(settlement, request.settlementVersion)
+      const amount = round(request.amount)
+      if (amount <= 0 || amount !== request.amount)
+        throw failure('validation-failed', '抵扣金额须大于 0 且最多两位小数')
+      const all = [...state.penaltyDeductions.values()]
+      const deducted = round(all.filter(row => row.penaltyId === current.id).reduce((sum, row) => sum + row.amount, 0))
+      const settlementDeducted = round(all.filter(row => row.settlementId === settlement.id).reduce((sum, row) => sum + row.amount, 0))
+      if (amount > round(current.amount - deducted))
+        throw failure('validation-failed', '抵扣金额超过罚扣剩余金额')
+      if (amount > round(settlement.amount - settlementDeducted))
+        throw failure('validation-failed', '抵扣金额超过结算剩余可抵扣金额')
+      const id = crypto.randomUUID()
+      state.penaltyDeductions.set(id, { id, penaltyId: current.id, settlementId: settlement.id, amount, actorId: request.actorId, occurredAt: timestamp, commandId: request.commandId, note: request.note.trim() })
+      next.status = round(deducted + amount) === current.amount ? 'deducted' : 'pending'
+      next.statusNote = next.status === 'deducted' ? '已全部抵扣' : '部分抵扣，仍有剩余金额'
+      state.documents.set(key('sub_settlement', settlement.id), { ...settlement, version: settlement.version + 1, updatedAt: timestamp })
+    }
+    else {
+      if (request.deadline && !isIsoDate(request.deadline))
+        throw failure('validation-failed', '整改期限格式无效')
+      const note = required(request.note, '整改说明')
+      const id = crypto.randomUUID()
+      state.penaltyRectifications.set(id, { id, penaltyId: current.id, actorId: request.actorId, occurredAt: timestamp, deadline: request.deadline, note })
+      next.penaltyFacts = { deductionMethod: current.penaltyFacts?.deductionMethod ?? '', deadline: request.deadline, rectificationNote: note }
+    }
+    next.version += 1
+    next.updatedAt = timestamp
+    state.documents.set(key('project_penalty', next.id), next)
+    state.sourceVersion += 1
+    return next
+  }
+
   function remove(
     request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'delete' }>,
     state: WorkspaceState,
@@ -1681,6 +1813,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const state = clone(stateFor(sessionId))
     for (const migratedKey of state.migrationKeys)
       state.documents.delete(migratedKey)
+    const previousMigrationKeys = new Set(state.migrationKeys)
     state.migrationKeys.clear()
     state.monthlyQuantityFacts = baseMonthlyQuantityFacts.map(clone)
     state.finalSettlementSupplements = new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)]))
@@ -1707,10 +1840,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     for (const row of baseBoqLines)
       state.boqLines.set(row.id, clone(row))
 
+    state.penaltyDeductions = new Map([...state.penaltyDeductions].filter(([, row]) => !previousMigrationKeys.has(key('project_penalty', row.penaltyId))))
+    state.penaltyRectifications = new Map([...state.penaltyRectifications].filter(([, row]) => !previousMigrationKeys.has(key('project_penalty', row.penaltyId))))
+    state.crews = new Map((options.crews ?? []).map(row => [row.id, clone(row)]))
     const entities = snapshot.authority === 'central' ? snapshot.entities : []
     for (const entity of entities) {
       if (entity.deletedAt !== null)
         continue
+      if (entity.entityType === 'crews')
+        state.crews.set(entity.id, { id: entity.id, name: entity.name })
       if (entity.entityType === 'customers')
         state.customers.set(entity.id, { id: entity.id, name: entity.name })
       if (entity.entityType === 'suppliers')
@@ -1811,7 +1949,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         const candidate: BoqLineSeed = {
           id,
           projectId,
-          contractId: contract.id,
+          contractId: required(contract?.id, '合同'),
           itemName: required(raw.itemName, 'BOQ 名称'),
           unit: text(raw.unit),
           qty: number(raw.qty),
@@ -1837,7 +1975,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '迁移月度工程量更新时间无效')
         state.monthlyQuantityFacts.push({
           projectId,
-          contractId: contract.id,
+          contractId: required(contract?.id, '合同'),
           periodNo,
           boqLineId,
           autoQty: number(raw.autoQty),
@@ -1854,7 +1992,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         continue
       const kind = entityAttribute(entity, 'kind')
       if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance'
-        && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change' && kind !== 'sub_settlement') {
+        && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change' && kind !== 'sub_settlement' && kind !== 'project_penalty') {
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
       }
       const projectId = entity.references.projectId ?? null
@@ -1862,13 +2000,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const project = projectId ? state.projects.get(projectId) ?? null : null
       const constructionContract = contractId ? state.contracts.get(contractId) ?? null : null
       const subcontract = contractId ? state.subcontractContracts.get(contractId) ?? null : null
-      const contract = (kind === 'sub_change' || kind === 'sub_settlement')
+      const contract = (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty')
         ? subcontract && { ...subcontract, customerId: null }
         : constructionContract
-      const supplierId = (kind === 'sub_change' || kind === 'sub_settlement') ? entity.references.supplierId ?? null : null
+      const supplierId = (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty') ? entity.references.supplierId ?? null : null
       const supplier = supplierId ? state.suppliers.get(supplierId) ?? null : null
-      if (!project || !contract || contract.projectId !== project.id
-        || ((kind === 'sub_change' || kind === 'sub_settlement') && (!supplier || subcontract?.supplierId !== supplier.id))) {
+      if (!project || (kind !== 'project_penalty' && !contract) || (contractId && (!contract || contract.projectId !== project.id))
+        || (kind === 'project_penalty' && supplierId && !supplier)
+        || ((kind === 'sub_change' || kind === 'sub_settlement' || (kind === 'project_penalty' && contractId)) && (!supplier || subcontract?.supplierId !== supplier.id))) {
         throw failure(
           'relationship-mismatch',
           kind === 'sub_change'
@@ -1876,7 +2015,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
             : '迁移甲方商务单据的项目与施工合同关系无效',
         )
       }
-      const customerId = contract.customerId ?? project.customerId
+      const customerId = kind === 'project_penalty' ? null : contract?.customerId ?? project!.customerId
       const customer = customerId ? state.customers.get(customerId) ?? null : null
       const sourceTypeRaw = entityAttribute(entity, 'sourceType')
       if (kind === 'sub_settlement' && sourceTypeRaw !== 'expenditure_settlement')
@@ -1891,6 +2030,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         || sourceTypeRaw === 'owner_penalty'
         || sourceTypeRaw === 'subcontract_change_order'
         || sourceTypeRaw === 'expenditure_settlement'
+        || sourceTypeRaw === 'penalty_record'
         ? sourceTypeRaw
         : 'boq_change_order'
       const rawLines = jsonRecords(entityAttribute(entity, 'linesJson'))
@@ -1924,7 +2064,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         const candidate: BoqLineSeed = {
           id: line.boqLineId,
           projectId: project.id,
-          contractId: contract.id,
+          contractId: required(contract?.id, '合同'),
           itemName: line.itemName,
           unit: line.unit,
           qty: line.contractQty ?? 0,
@@ -1971,6 +2111,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         owner_penalty: ['draft', 'submitted'],
         sub_change: ['draft', 'rejected', 'submitted', 'approved'],
         sub_settlement: ['draft', 'confirmed'],
+        project_penalty: ['draft', 'pending', 'repairing', 'repaired_self', 'repaired_other', 'deducted'],
       }
       if (!statusesByKind[kind].includes(status)) {
         throw failure(
@@ -2091,9 +2232,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         supplierId,
         supplierName: supplier?.name ?? '',
         supplierPermission: 'allowed',
-        contractId: contract.id,
-        contractNo: contract.no,
-        contractName: contract.name,
+        contractId: contract?.id ?? null,
+        contractNo: contract?.no ?? '',
+        contractName: contract?.name ?? '',
         contractPermission: 'allowed',
         sourceType,
         sourceId: entity.id,
@@ -2140,6 +2281,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         settlementBasis: kind === 'final_settlement'
           ? entityAttribute(entity, 'settlementBasis')
           : undefined,
+        crewId: kind === 'project_penalty' ? entity.references.crewId ?? null : undefined,
+        crewName: kind === 'project_penalty' ? state.crews.get(entity.references.crewId ?? '')?.name ?? '' : undefined,
+        penaltyFacts: kind === 'project_penalty' ? { deadline: entityAttribute(entity, 'deadline') || null, rectificationNote: entityAttribute(entity, 'rectificationNote'), deductionMethod: entityAttribute(entity, 'deductionMethod') } : undefined,
         deductionNote: kind === 'sub_settlement' ? entityAttribute(entity, 'settlementDifferenceNote') : undefined,
         settlementDifferenceNote: kind === 'final_settlement'
           ? entityAttribute(entity, 'settlementDifferenceNote')
@@ -2160,7 +2304,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
             continue
           state.monthlyQuantityFacts.push({
             projectId: project.id,
-            contractId: contract.id,
+            contractId: required(contract?.id, '合同'),
             periodNo: source.periodNo,
             boqLineId: line.boqLineId,
             autoQty: line.autoQty ?? line.reportedQty ?? 0,
@@ -2170,6 +2314,32 @@ export function createOwnerCommercialDocumentCommandTestInstance(
             sourceUpdatedAt: source.quantitySourceUpdatedAt ?? source.updatedAt,
           })
         }
+      }
+    }
+    const migratedDocuments = entities.filter(row => row.entityType === 'owner_documents' && row.deletedAt === null)
+    for (const entity of migratedDocuments.filter(row => row.attributes.kind === 'project_penalty')) {
+      const penalty = state.documents.get(key('project_penalty', entity.id))!
+      if (penalty.crewId && !state.crews.has(penalty.crewId))
+        throw failure('relationship-mismatch', '迁移罚扣班组身份无效')
+      if (penalty.penaltyFacts?.deadline && !isIsoDate(penalty.penaltyFacts.deadline))
+        throw failure('validation-failed', '迁移罚扣整改期限无效')
+      for (const raw of jsonRecords(entityAttribute(entity, 'penaltyDeductionsJson'))) {
+        const target = migratedDocuments.find(row => row.legacyId === raw.settlementId && row.attributes.kind === 'sub_settlement')
+        const settlement = target ? state.documents.get(key('sub_settlement', target.id)) : null
+        const amount = Number(raw.amount)
+        if (!settlement || !matchesPenaltySettlement(penalty, settlement) || !Number.isFinite(amount) || amount <= 0 || round(amount) !== amount || !isISODateTimeDTO(raw.occurredAt))
+          throw failure('relationship-mismatch', '迁移抵扣缺少真实一致结算、有效金额或发生时间')
+        const id = required(raw.id, '抵扣旧 ID')
+        if (state.penaltyDeductions.has(id))
+          throw failure('conflict', '迁移抵扣 ID 重复')
+        state.penaltyDeductions.set(id, { id, penaltyId: penalty.id, settlementId: settlement.id, amount, actorId: text(raw.actorId), occurredAt: text(raw.occurredAt), commandId: text(raw.commandId), note: text(raw.note) })
+      }
+      const total = round([...state.penaltyDeductions.values()].filter(row => row.penaltyId === penalty.id).reduce((sum, row) => sum + row.amount, 0))
+      if (total > penalty.amount || (penalty.amount > 0 && total === penalty.amount && penalty.status !== 'deducted') || (penalty.status === 'draft' && total > 0) || (penalty.status === 'deducted' && total !== penalty.amount))
+        throw failure('validation-failed', '迁移罚扣金额、状态与抵扣事实不一致')
+      for (const settlement of [...state.documents.values()].filter(row => row.kind === 'sub_settlement')) {
+        if (round([...state.penaltyDeductions.values()].filter(row => row.settlementId === settlement.id).reduce((sum, row) => sum + row.amount, 0)) > settlement.amount)
+          throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
     }
     state.sourceVersion += 1
@@ -2227,13 +2397,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     ): OwnerCommercialDocumentCommandContextDTO {
       authorize(session, kind)
       const state = stateFor(sessionId)
-      const includeOwner = kind ? kind !== 'sub_change' && kind !== 'sub_settlement' : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
-      const includeSubcontract = kind ? (kind === 'sub_change' || kind === 'sub_settlement') : session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
+      const includeOwner = kind ? kind !== 'sub_change' && kind !== 'sub_settlement' && kind !== 'project_penalty' : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
+      const includeSubcontract = kind ? (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty') : session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
       return {
         workspaceId: session.workspaceId,
         actorId: session.actorId,
         capabilities: [...session.capabilities],
-        settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount })) : [],
+        crews: includeSubcontract ? [...state.crews.values()].map(row => ({ id: row.id, label: row.name })) : [],
+        settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount, version: String(row.version), remainingAmount: round(row.amount - [...state.penaltyDeductions.values()].filter(d => d.settlementId === row.id).reduce((sum, d) => sum + d.amount, 0)) })) : [],
         projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
         customers: includeOwner ? [...state.customers.values()].map(row => ({ id: row.id, label: row.name })) : [],
         suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
@@ -2328,6 +2499,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         case 'submit':
           source = save(request, state)
           break
+        case 'deduct-penalty':
+        case 'rectify-penalty':
+          source = penaltyAction(request, state)
+          break
         case 'approve':
           source = approve(request, state)
           break
@@ -2354,6 +2529,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 export const ownerCommercialDocumentCommandTestInstance
   = createOwnerCommercialDocumentCommandTestInstance({
     subcontractContractSource: subcontractContractCommandTestInstance,
+    crewSource: crewWorkerCommandTestInstance,
     projects: [{ id: 'project-real-320', name: '中央正式施工项目', customerId: 'customer-real-320' }],
     customers: [{ id: 'customer-real-320', name: '中央正式甲方客户' }],
     contracts: [{

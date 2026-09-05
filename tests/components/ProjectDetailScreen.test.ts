@@ -286,7 +286,7 @@ describe('项目详情中央来源边界', () => {
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(8)
+    expect(screen.getAllByText('2')).toHaveLength(9)
   })
 
   it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签、结算入口', async () => {
@@ -306,6 +306,9 @@ describe('项目详情中央来源边界', () => {
     const finalSettlement = screen.getByRole('link', { name: /最终结算/ })
     const penalty = screen.getByRole('link', { name: /甲方罚扣/ })
     const subcontractChange = screen.getByRole('link', { name: /分包变洽签/ })
+    const projectPenalty = screen.getByRole('link', { name: /项目罚扣/ })
+    expect(projectPenalty.getAttribute('href')).toContain('/project/penalty?')
+    expect(projectPenalty.getAttribute('href')).toContain('projectId=project-1')
     const subcontractSettlement = screen.getByRole('link', { name: /分包结算/ })
     expect(subcontractSettlement.getAttribute('href')).toContain('/subcontract/settlement?')
     expect(subcontractSettlement.getAttribute('href')).toContain('projectId=project-1')

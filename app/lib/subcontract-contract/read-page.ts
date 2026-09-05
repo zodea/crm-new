@@ -249,7 +249,7 @@ function factNavigation(
   kind: SubcontractContractFactKind,
   capabilities: readonly string[],
 ): NavigationIntentDTO {
-  if (kind === 'change' || kind === 'settlement') {
+  if (kind === 'change' || kind === 'settlement' || kind === 'penalty') {
     if (source.dataOrigin !== 'real' || row.dataOrigin !== 'real')
       return { kind: 'unavailable', reason: 'unverified-target' }
     if (!capabilities.includes('subcontract-document:read'))
@@ -257,7 +257,7 @@ function factNavigation(
     return {
       kind: 'entity-detail',
       subject: resolvedRef('subcontract-document', row.id, row.name, row.no || null),
-      variant: kind === 'settlement' ? 'settlement' : 'change',
+      variant: kind === 'penalty' ? 'penalty' : kind === 'settlement' ? 'settlement' : 'change',
       view: null,
       filters: {
         dataOrigin: source.dataOrigin,

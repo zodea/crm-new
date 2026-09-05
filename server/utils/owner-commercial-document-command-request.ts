@@ -57,7 +57,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
   value: unknown,
 ): OwnerCommercialDocumentCommandRequestDTO {
   const kind = object(value) ? String(value.kind) : ''
-  const requiredCapability = (kind === 'sub_change' || kind === 'sub_settlement')
+  const requiredCapability = (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty')
     ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
     : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
   if (!object(value)
@@ -65,10 +65,10 @@ export function parseOwnerCommercialDocumentCommandRequest(
     || typeof value.actorId !== 'string' || !value.actorId
     || value.requiredCapability !== requiredCapability
     || typeof value.commandId !== 'string' || !value.commandId
-    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement'].includes(String(value.kind))
+    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement', 'project_penalty'].includes(String(value.kind))
     || !(value.id === null || typeof value.id === 'string')
     || !(value.baseVersion === null || typeof value.baseVersion === 'string')
-    || !['save', 'submit', 'approve', 'audit', 'transition-acceptance', 'attachments', 'delete'].includes(String(value.action))) {
+    || !['save', 'submit', 'approve', 'audit', 'transition-acceptance', 'deduct-penalty', 'rectify-penalty', 'attachments', 'delete'].includes(String(value.action))) {
     return invalid('甲方商务单据命令请求无效')
   }
   const base = {
@@ -76,7 +76,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
     actorId: value.actorId,
     requiredCapability,
     commandId: value.commandId,
-    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change' | 'sub_settlement',
+    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change' | 'sub_settlement' | 'project_penalty',
     id: value.id,
     baseVersion: value.baseVersion,
   }
@@ -92,6 +92,19 @@ export function parseOwnerCommercialDocumentCommandRequest(
   }
   if (!value.id)
     return invalid('甲方商务单据生命周期命令必须携带稳定 ID')
+  if (value.action === 'deduct-penalty') {
+    if (value.kind !== 'project_penalty' || typeof value.settlementId !== 'string' || !value.settlementId
+      || typeof value.settlementVersion !== 'string' || !value.settlementVersion
+      || typeof value.amount !== 'number' || !Number.isFinite(value.amount) || typeof value.note !== 'string') {
+      return invalid('项目罚扣抵扣命令无效')
+    }
+    return { ...base, kind: 'project_penalty', action: 'deduct-penalty', id: value.id, settlementId: value.settlementId, settlementVersion: value.settlementVersion, amount: value.amount, note: value.note }
+  }
+  if (value.action === 'rectify-penalty') {
+    if (value.kind !== 'project_penalty' || !(value.deadline === null || typeof value.deadline === 'string') || typeof value.note !== 'string')
+      return invalid('项目罚扣整改命令无效')
+    return { ...base, kind: 'project_penalty', action: 'rectify-penalty', id: value.id, deadline: value.deadline, note: value.note }
+  }
   if (value.action === 'attachments') {
     if (!attachmentChanges(value.attachments))
       return invalid('甲方商务单据附件命令无效')
