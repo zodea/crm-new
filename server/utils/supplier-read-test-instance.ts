@@ -35,6 +35,35 @@ export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavai
 
 const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'supplier-read-fixture-v1'
+const linkedSubcontractSupplier: SupplierListSourceRow = {
+  dataOrigin: 'real',
+  id: 'supplier-real-327',
+  name: '中央正式劳务分供方',
+  aliases: [],
+  externalRef: '',
+  uniqueCode: 'SUP-REAL-327',
+  taxNo: '',
+  businessType: '劳务分包',
+  supplierCategory: '劳务分包商',
+  rating: '',
+  legalRep: '',
+  registeredCapital: null,
+  registeredDate: null,
+  address: '',
+  taxpayerType: '',
+  mainBusiness: '中央正式分包合同与变洽签关联分供方',
+  invoiceName: '中央正式劳务分供方',
+  invoiceAddress: '',
+  bank: '',
+  bankAccount: '',
+  phone: '',
+  contact: '项目商务联系人',
+  contactPhone: '',
+  contactTitle: '',
+  credentialStatus: 'incomplete',
+  note: '',
+  updatedAt: '2026-08-26T00:00:00.000Z',
+}
 
 function jsonArray(value: unknown): string[] {
   if (Array.isArray(value))
@@ -249,8 +278,8 @@ export function createSupplierReadTestInstance(
 
 export const supplierReadTestInstance = createSupplierReadTestInstance(
   id => demoWorkspaceTestInstance.capabilities(id),
-  id => supplierCommandTestInstance.rows(id),
-  id => supplierCommandTestInstance.sourceVersion(id),
+  id => [linkedSubcontractSupplier, ...supplierCommandTestInstance.rows(id)],
+  id => `${supplierCommandTestInstance.sourceVersion(id)}+linked-subcontract-supplier-327`,
   id => projectSupplierCommandTestInstance.supplierProjectRows(id),
   id => ({
     rows: materialContractCommandTestInstance.rows(id)

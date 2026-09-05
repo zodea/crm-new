@@ -6,7 +6,7 @@ export default defineEventHandler((event) => {
   try {
     const kind = getRouterParam(event, 'kind')
     if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance'
-      && kind !== 'final_settlement' && kind !== 'owner_penalty') {
+      && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change') {
       throw new Error('甲方商务单据类型无效')
     }
     return ownerCommercialDocumentCommandTestInstance.form(

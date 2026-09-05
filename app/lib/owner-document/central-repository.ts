@@ -13,7 +13,7 @@ import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 
-export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'] as const
+export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'] as const
 export type OwnerCommercialDocumentKind = typeof OWNER_COMMERCIAL_DOCUMENT_KINDS[number]
 export const OWNER_ACCEPTANCE_VIEW_VARIANTS = ['acceptance', 'warranty'] as const
 export type OwnerAcceptanceViewVariant = typeof OWNER_ACCEPTANCE_VIEW_VARIANTS[number]
@@ -111,11 +111,14 @@ export interface OwnerCommercialDocumentSource {
   customerId: string | null
   customerName: string
   customerPermission: 'allowed' | 'forbidden'
+  supplierId?: string | null
+  supplierName?: string
+  supplierPermission?: 'allowed' | 'forbidden'
   contractId: string | null
   contractNo: string
   contractName: string
   contractPermission: 'allowed' | 'forbidden'
-  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement' | 'owner_penalty'
+  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement' | 'owner_penalty' | 'subcontract_change_order'
   sourceId: string
   sourceLocked: boolean
   periodNo: string
@@ -134,6 +137,8 @@ export interface OwnerCommercialDocumentSource {
   taxExclusiveAmount?: number | null
   appliedTaxExclusiveAmount?: number | null
   auditedAmount: number | null
+  changedArea?: number | null
+  actualApprovedPrice?: number | null
   note: string
   version: number
   createdAt: ISODateTimeDTO
@@ -156,6 +161,7 @@ export interface OwnerCommercialDocumentListQueryDTO {
   search: string
   projectId: string | null
   contractId: string | null
+  supplierId: string | null
   status: string | null
   documentType: string | null
   variant?: OwnerAcceptanceViewVariant | null
@@ -201,6 +207,12 @@ export type OwnerCommercialDocumentAmountsDTO
     kind: 'owner_penalty'
     amount: MoneyDTO
   }
+  | {
+    kind: 'sub_change'
+    approved: MoneyDTO
+    changedArea: QuantityDTO | null
+    actualApproved: MoneyDTO | null
+  }
 
 export type OwnerAcceptanceViewDTO
   = {
@@ -237,6 +249,8 @@ export interface OwnerCommercialDocumentListItemDTO {
   projectNavigation: NavigationIntentDTO
   customer: EntityRefDTO & { entity: 'customer' }
   customerNavigation: NavigationIntentDTO
+  supplier: EntityRefDTO & { entity: 'supplier' }
+  supplierNavigation: NavigationIntentDTO
   contract: EntityRefDTO & { entity: 'contract' }
   contractNavigation: NavigationIntentDTO
   navigation: NavigationIntentDTO
@@ -261,6 +275,11 @@ export interface OwnerCommercialDocumentListSummaryDTO {
     taxInclusiveAmount: MoneyDTO
     taxExclusiveAmount: MoneyDTO
     appliedTaxExclusiveAmount: MoneyDTO
+    subcontractApprovedAmount: MoneyDTO
+    subcontractActualApproved: {
+      value: MoneyDTO | null
+      status: 'complete' | 'partial' | 'missing'
+    }
   }>
 }
 
@@ -319,6 +338,7 @@ export interface OwnerCommercialDocumentDetailReadDTO {
     amounts: OwnerCommercialDocumentAmountsDTO
     project: EntityRefDTO & { entity: 'project' }
     customer: EntityRefDTO & { entity: 'customer' }
+    supplier: EntityRefDTO & { entity: 'supplier' }
     contract: EntityRefDTO & { entity: 'contract' }
     note: string
     version: string
@@ -336,6 +356,7 @@ export interface OwnerCommercialDocumentDetailReadDTO {
   }>
   projectNavigation: NavigationIntentDTO
   customerNavigation: NavigationIntentDTO
+  supplierNavigation: NavigationIntentDTO
   contractNavigation: NavigationIntentDTO
   sourceNavigation: NavigationIntentDTO
   documentNavigation: NavigationIntentDTO
@@ -464,6 +485,7 @@ export function parseOwnerCommercialDocumentListQuery(
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     contractId: optional(input?.contractId),
+    supplierId: optional(input?.supplierId ?? input?.supplier),
     status: optional(input?.status),
     documentType: optional(input?.documentType),
     variant: parseVariant(parsedKind, input?.variant),
@@ -526,6 +548,14 @@ function finalSettlementSourceStatusLabel(kind: 'contract-supplement' | 'receipt
 }
 
 function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocumentAmountsDTO {
+  if (source.kind === 'sub_change') {
+    return {
+      kind: 'sub_change',
+      approved: money(source.amount),
+      changedArea: quantity(source.changedArea ?? null),
+      actualApproved: nullableMoney(source.actualApprovedPrice ?? null),
+    }
+  }
   if (source.kind === 'owner_change') {
     return {
       kind: 'owner_change',
@@ -568,19 +598,21 @@ function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocument
 }
 
 function statusLabel(kind: OwnerCommercialDocumentKind, status: string): string {
-  const labels: Record<string, string> = kind === 'owner_change'
-    ? { draft: '草稿', submitted: '已上报', rejected: '已退回', approved: '已签证' }
-    : kind === 'owner_report'
-      ? { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
-      : kind === 'acceptance'
-        ? { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
-        : kind === 'final_settlement'
-          ? { draft: '草稿', submitted: '已提交', audited: '已审定' }
-          : { draft: '草稿', submitted: '已提交' }
+  const labels: Record<string, string> = kind === 'sub_change'
+    ? { draft: '草稿', submitted: '已提交', rejected: '已退回', approved: '已审批' }
+    : kind === 'owner_change'
+      ? { draft: '草稿', submitted: '已上报', rejected: '已退回', approved: '已签证' }
+      : kind === 'owner_report'
+        ? { draft: '草稿', adjusted: '已申报', reported: '已申报', exported: '已审定', audited: '已审定' }
+        : kind === 'acceptance'
+          ? { draft: '草稿', submitted: '验收中', accepted: '已验收', warranty: '保修中', expired: '已到期' }
+          : kind === 'final_settlement'
+            ? { draft: '草稿', submitted: '已提交', audited: '已审定' }
+            : { draft: '草稿', submitted: '已提交' }
   return labels[status] ?? status
 }
 
-function entityRef<T extends 'project' | 'customer' | 'contract'>(
+function entityRef<T extends 'project' | 'customer' | 'supplier' | 'contract'>(
   entity: T,
   id: string | null,
   label: string,
@@ -594,7 +626,11 @@ function entityRef<T extends 'project' | 'customer' | 'contract'>(
   return { state: 'resolved', entity, id, label, no } as EntityRefDTO & { entity: T }
 }
 
-function relationNavigation(reference: EntityRefDTO, origin: DataOriginDTO): NavigationIntentDTO {
+function relationNavigation(
+  reference: EntityRefDTO,
+  origin: DataOriginDTO,
+  contractKind: '施工' | '分包' = '施工',
+): NavigationIntentDTO {
   if (reference.state === 'forbidden')
     return { kind: 'unavailable', reason: 'forbidden' }
   if (reference.state !== 'resolved')
@@ -605,7 +641,7 @@ function relationNavigation(reference: EntityRefDTO, origin: DataOriginDTO): Nav
     variant: 'detail',
     view: null,
     filters: reference.entity === 'contract'
-      ? { dataOrigin: origin, contractKind: '施工' }
+      ? { dataOrigin: origin, contractKind }
       : { dataOrigin: origin },
   }
 }
@@ -618,20 +654,22 @@ function documentNavigation(
     kind: 'entity-detail',
     subject: {
       state: 'resolved',
-      entity: 'owner-document',
+      entity: source.kind === 'sub_change' ? 'subcontract-document' : 'owner-document',
       id: source.id,
       label: source.name,
       no: source.no || null,
     },
     variant: source.kind === 'owner_change'
       ? 'change'
-      : source.kind === 'owner_report'
-        ? 'report'
-        : source.kind === 'final_settlement'
-          ? 'final-settlement'
-          : source.kind === 'owner_penalty'
-            ? 'penalty'
-            : acceptanceVariant ?? 'acceptance',
+      : source.kind === 'sub_change'
+        ? 'change'
+        : source.kind === 'owner_report'
+          ? 'report'
+          : source.kind === 'final_settlement'
+            ? 'final-settlement'
+            : source.kind === 'owner_penalty'
+              ? 'penalty'
+              : acceptanceVariant ?? 'acceptance',
     view: null,
     filters: { dataOrigin: source.dataOrigin },
   }
@@ -677,8 +715,15 @@ function visibleFiles(
 function relations(source: OwnerCommercialDocumentSource) {
   const project = entityRef('project', source.projectId, source.projectName, null, source.projectPermission)
   const customer = entityRef('customer', source.customerId, source.customerName, null, source.customerPermission)
+  const supplier = entityRef(
+    'supplier',
+    source.supplierId ?? null,
+    source.supplierName ?? '',
+    null,
+    source.supplierPermission ?? 'allowed',
+  )
   const contract = entityRef('contract', source.contractId, source.contractName, source.contractNo || null, source.contractPermission)
-  return { project, customer, contract }
+  return { project, customer, supplier, contract }
 }
 
 function statusMatches(source: OwnerCommercialDocumentSource, requested: string | null): boolean {
@@ -722,6 +767,7 @@ export function buildOwnerCommercialDocumentListPage(
     .filter(row => input.query.origin === null || row.dataOrigin === input.query.origin)
     .filter(row => !input.query.projectId || row.projectId === input.query.projectId)
     .filter(row => !input.query.contractId || row.contractId === input.query.contractId)
+    .filter(row => !input.query.supplierId || row.supplierId === input.query.supplierId)
     .filter(row => statusMatches(row, input.query.status))
     .filter(row => !input.query.documentType || row.documentType === input.query.documentType)
     .filter(row => !search || [
@@ -729,6 +775,8 @@ export function buildOwnerCommercialDocumentListPage(
       row.name,
       row.projectName,
       row.contractName,
+      row.documentType,
+      row.supplierName ?? '',
       row.periodNo,
       row.noticeNo ?? '',
       row.penaltyReason ?? '',
@@ -738,7 +786,7 @@ export function buildOwnerCommercialDocumentListPage(
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
   const start = (input.query.page - 1) * input.query.pageSize
   const items = filtered.slice(start, start + input.query.pageSize).map((source) => {
-    const { project, customer, contract } = relations(source)
+    const { project, customer, supplier, contract } = relations(source)
     return {
       rowKey: `${source.dataOrigin}:${source.kind}:${source.id}`,
       dataOrigin: source.dataOrigin,
@@ -756,8 +804,10 @@ export function buildOwnerCommercialDocumentListPage(
       projectNavigation: relationNavigation(project, source.dataOrigin),
       customer,
       customerNavigation: relationNavigation(customer, source.dataOrigin),
+      supplier,
+      supplierNavigation: relationNavigation(supplier, source.dataOrigin),
       contract,
-      contractNavigation: relationNavigation(contract, source.dataOrigin),
+      contractNavigation: relationNavigation(contract, source.dataOrigin, source.kind === 'sub_change' ? '分包' : '施工'),
       navigation: documentNavigation(source, input.query.variant ?? null),
       acceptanceView: acceptanceView(source, input.query.variant ?? null),
       ownerPenaltyFacts: source.kind === 'owner_penalty'
@@ -782,13 +832,27 @@ export function buildOwnerCommercialDocumentListPage(
     }))
   const originSummary = (origin: DataOriginDTO) => {
     const rows = filtered.filter(row => row.dataOrigin === origin)
+    const ownerRows = rows.filter(row => row.kind !== 'sub_change')
+    const subcontractActualApprovedRows = rows.filter(row => row.kind === 'sub_change' && row.actualApprovedPrice != null)
+    const subcontractRowCount = rows.filter(row => row.kind === 'sub_change').length
     return {
       count: rows.length,
-      reportedAmount: money(rows.reduce((total, row) => total + row.amount, 0)),
-      auditedAmount: money(rows.reduce((total, row) => total + (row.auditedAmount ?? 0), 0)),
-      taxInclusiveAmount: money(rows.reduce((total, row) => total + row.amount, 0)),
-      taxExclusiveAmount: money(rows.reduce((total, row) => total + (row.taxExclusiveAmount ?? 0), 0)),
-      appliedTaxExclusiveAmount: money(rows.reduce((total, row) => total + (row.appliedTaxExclusiveAmount ?? 0), 0)),
+      reportedAmount: money(ownerRows.reduce((total, row) => total + row.amount, 0)),
+      auditedAmount: money(ownerRows.reduce((total, row) => total + (row.auditedAmount ?? 0), 0)),
+      taxInclusiveAmount: money(ownerRows.reduce((total, row) => total + row.amount, 0)),
+      taxExclusiveAmount: money(ownerRows.reduce((total, row) => total + (row.taxExclusiveAmount ?? 0), 0)),
+      appliedTaxExclusiveAmount: money(ownerRows.reduce((total, row) => total + (row.appliedTaxExclusiveAmount ?? 0), 0)),
+      subcontractApprovedAmount: money(rows.reduce((total, row) => total + (row.kind === 'sub_change' ? row.amount : 0), 0)),
+      subcontractActualApproved: {
+        value: subcontractActualApprovedRows.length
+          ? money(subcontractActualApprovedRows.reduce((total, row) => total + row.actualApprovedPrice!, 0))
+          : null,
+        status: subcontractActualApprovedRows.length === 0
+          ? 'missing' as const
+          : subcontractActualApprovedRows.length === subcontractRowCount
+            ? 'complete' as const
+            : 'partial' as const,
+      },
     }
   }
   return {
@@ -833,7 +897,7 @@ export function buildOwnerCommercialDocumentDetail(
     const sameId = input.documents.some(row => row.id === input.query.id)
     fail(sameId ? 'relationship-mismatch' : 'not-found', sameId ? '甲方商务单据类型与地址不匹配' : '甲方商务单据不存在或已删除')
   }
-  const { project, customer, contract } = relations(source)
+  const { project, customer, supplier, contract } = relations(source)
   const settlementSources = source.kind === 'final_settlement'
     && source.finalSettlementEvidence?.supplements != null
     && source.finalSettlementEvidence.receipts != null
@@ -925,6 +989,7 @@ export function buildOwnerCommercialDocumentDetail(
       amounts: amounts(source),
       project,
       customer,
+      supplier,
       contract,
       note: source.note,
       version: String(source.version),
@@ -959,31 +1024,46 @@ export function buildOwnerCommercialDocumentDetail(
       })),
     projectNavigation: relationNavigation(project, source.dataOrigin),
     customerNavigation: relationNavigation(customer, source.dataOrigin),
-    contractNavigation: relationNavigation(contract, source.dataOrigin),
+    supplierNavigation: relationNavigation(supplier, source.dataOrigin),
+    contractNavigation: relationNavigation(contract, source.dataOrigin, source.kind === 'sub_change' ? '分包' : '施工'),
     sourceNavigation: source.sourceId
-      ? source.sourceType === 'manual' && source.kind !== 'acceptance'
-        ? { kind: 'unavailable', reason: 'not-connected' }
-        : contract.state === 'resolved' && project.state === 'resolved'
+      ? source.kind === 'sub_change'
+        ? contract.state === 'resolved' && project.state === 'resolved' && supplier.state === 'resolved'
           ? {
               kind: 'entity-detail',
               subject: contract,
-              variant: 'owner-document-source',
+              variant: 'subcontract-document-source',
               view: source.sourceId,
               filters: {
                 dataOrigin: source.dataOrigin,
-                contractKind: '施工',
-                ownerTab: source.kind === 'acceptance'
-                  ? 'acceptance'
-                  : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
-                    || source.kind === 'owner_penalty'
-                    ? 'settlements'
-                    : 'changes',
-                ...(source.kind === 'acceptance'
-                  ? { ownerView: input.query.variant ?? 'acceptance' }
-                  : {}),
+                contractKind: '分包',
+                subcontractTab: 'changes',
               },
             }
           : { kind: 'unavailable', reason: 'missing-id' }
+        : source.sourceType === 'manual' && source.kind !== 'acceptance'
+          ? { kind: 'unavailable', reason: 'not-connected' }
+          : contract.state === 'resolved' && project.state === 'resolved'
+            ? {
+                kind: 'entity-detail',
+                subject: contract,
+                variant: 'owner-document-source',
+                view: source.sourceId,
+                filters: {
+                  dataOrigin: source.dataOrigin,
+                  contractKind: '施工',
+                  ownerTab: source.kind === 'acceptance'
+                    ? 'acceptance'
+                    : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
+                      || source.kind === 'owner_penalty'
+                      ? 'settlements'
+                      : 'changes',
+                  ...(source.kind === 'acceptance'
+                    ? { ownerView: input.query.variant ?? 'acceptance' }
+                    : {}),
+                },
+              }
+            : { kind: 'unavailable', reason: 'missing-id' }
       : { kind: 'unavailable', reason: 'missing-id' },
     documentNavigation: documentNavigation(source, input.query.variant ?? null),
     acceptanceView: acceptanceView(source, input.query.variant ?? null),

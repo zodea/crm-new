@@ -12,6 +12,7 @@ import type {
   CoreMigrationSnapshotDTO,
   CoreMigrationSourceCommandDTO,
   CoreMigrationSourceDTO,
+  CoreMigrationSourceEntityDTO,
   CoreMigrationSourceRefDTO,
 } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
@@ -81,6 +82,7 @@ interface ReferenceRule {
   field: CoreMigrationReferenceField
   target: CoreMigrationEntityType | readonly CoreMigrationEntityType[]
   orphanWhenMissing?: boolean
+  requiredSourceValue?: boolean
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
@@ -111,6 +113,7 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
   owner_documents: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'contractId', target: 'construction_contracts', orphanWhenMissing: true },
+    { field: 'supplierId', target: 'suppliers' },
   ],
   workers: [
     { field: 'crewId', target: 'crews' },
@@ -181,6 +184,26 @@ function entityKey(entityType: CoreMigrationEntityType, legacyId: string): strin
 
 function referenceTargets(rule: ReferenceRule): readonly CoreMigrationEntityType[] {
   return typeof rule.target === 'string' ? [rule.target] : rule.target
+}
+
+function isOwnerDocumentDryRunRelationshipBlock(issue: CoreMigrationIssueDTO): boolean {
+  return issue.entityType === 'owner_documents'
+    && (issue.metricKey === 'orphan' || issue.metricKey === 'missing-relation')
+    && ['projectId', 'contractId', 'supplierId'].includes(issue.field)
+}
+
+function referenceRulesFor(
+  entityType: CoreMigrationEntityType,
+  attributes: CoreMigrationSourceEntityDTO['attributes'],
+): readonly ReferenceRule[] {
+  if (entityType === 'owner_documents' && attributes?.kind === 'sub_change') {
+    return [
+      { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+      { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
+      { field: 'contractId', target: 'subcontract_contracts', orphanWhenMissing: true, requiredSourceValue: true },
+    ]
+  }
+  return REFERENCE_RULES[entityType] ?? []
 }
 
 function hasSameAttestation(
@@ -377,10 +400,26 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         }
 
         const resolvedReferences: CoreMigrationServerEntityDTO['references'] = {}
-        for (const rule of REFERENCE_RULES[entityType] ?? []) {
+        for (const rule of referenceRulesFor(entityType, row.attributes)) {
           const legacyReference = row.references?.[rule.field]
           if (legacyReference === undefined || legacyReference === null) {
             resolvedReferences[rule.field] = legacyReference ?? null
+            if (rule.requiredSourceValue) {
+              skipped = true
+              issues.push(issue(batchId, command.commandId, issueSequence++, {
+                entityType,
+                legacyId: row.legacyId,
+                serverId: null,
+                field: rule.field,
+                metricKey: 'orphan',
+                sourceValue: '',
+                expectedValue: null,
+                actualValue: null,
+                difference: null,
+                attribution: 'missing-source',
+                reason: `缺少必需的 ${rule.field} 显式旧 ID，拒绝导入`,
+              }))
+            }
             continue
           }
           const targetIds = referenceTargets(rule)
@@ -408,6 +447,41 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
               ? `显式旧 ID 同时命中多个 ${referenceTargets(rule).join(' / ')}，拒绝猜测父类型`
               : `找不到显式旧 ID 对应的 ${referenceTargets(rule).join(' / ')}，未按名称猜测`,
           }))
+        }
+
+        if (
+          entityType === 'owner_documents'
+          && row.attributes?.kind === 'sub_change'
+          && resolvedReferences.contractId
+          && resolvedReferences.projectId
+          && resolvedReferences.supplierId
+        ) {
+          const contract = plannedEntities.find(entity =>
+            entity.entityType === 'subcontract_contracts'
+            && entity.id === resolvedReferences.contractId,
+          )
+          if (
+            contract
+            && (
+              contract.references.projectId !== resolvedReferences.projectId
+              || contract.references.supplierId !== resolvedReferences.supplierId
+            )
+          ) {
+            skipped = true
+            issues.push(issue(batchId, command.commandId, issueSequence++, {
+              entityType,
+              legacyId: row.legacyId,
+              serverId: null,
+              field: 'contractId',
+              metricKey: 'missing-relation',
+              sourceValue: row.references?.contractId ?? '',
+              expectedValue: null,
+              actualValue: null,
+              difference: null,
+              attribution: 'missing-source',
+              reason: '分包变洽签与分包合同的项目或分供方关系不一致，拒绝导入',
+            }))
+          }
         }
 
         if (skipped) {
@@ -658,7 +732,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           reason: '写后对账：中央软删除状态与计划不一致',
         })
       }
-      for (const rule of REFERENCE_RULES[planned.entityType] ?? []) {
+      for (const rule of referenceRulesFor(planned.entityType, planned.attributes)) {
         const expected = planned.references[rule.field] ?? null
         const observed = actual.references[rule.field] ?? null
         if (expected !== observed) {
@@ -792,6 +866,8 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
+    if (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))
+      throw conflict('dry-run 存在阻断问题，不能导入')
     if (state.activeBatchId && state.activeBatchId !== command.batchId)
       throw conflict('已有另一迁移批次等待确认或回滚')
 

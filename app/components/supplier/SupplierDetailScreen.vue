@@ -3,8 +3,17 @@ import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
-import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
+import {
+  createSupplierDetailJourneyReturnOrigin,
+  loadSupplierDetailJourneyReturnOrigin,
+  newSupplierDetailJourneyReturnContextId,
+  resolveSupplierDetailJourneyReturnOrigin,
+  saveSupplierDetailJourneyReturnOrigin,
+  validateSupplierDetailReturnTo,
+  validateSupplierReturnTo,
+} from '~/lib/supplier/return-context'
 import { yuan } from '~/lib/util/money'
 import { useSupplierReadStore } from '~/stores/supplier-read'
 
@@ -20,6 +29,8 @@ const router = useRouter()
 const store = useSupplierReadStore()
 const factTabs = new Set<SupplierFactTab>(['projects', 'contracts', 'settlements', 'invoices', 'payments'])
 const activeTab = shallowRef<SupplierFactTab>(validTab(route.query.tab))
+const subcontractChangeContextId = shallowRef(newSupplierDetailJourneyReturnContextId())
+const subcontractChangeAnchorId = 'supplier-subcontract-change-link'
 
 const detail = computed(() => {
   const state = store.detailState
@@ -31,17 +42,24 @@ const detail = computed(() => {
 })
 const supplier = computed(() => detail.value?.supplier ?? null)
 const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
+const subcontractChangeReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_change'))
 const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityReturnTo(props.returnTo, {
   entity: 'supplier',
   id: props.supplierId,
   origin: props.origin,
 }))
-const backTo = computed(() => validateSupplierReturnTo(props.returnTo) ?? materialContractReturnTo.value ?? projectSupplierReturnTo.value ?? '/base/supplier')
+const backTo = computed(() => validateSupplierReturnTo(props.returnTo)
+  ?? materialContractReturnTo.value
+  ?? subcontractChangeReturnTo.value
+  ?? projectSupplierReturnTo.value
+  ?? '/base/supplier')
 const backLabel = computed(() => materialContractReturnTo.value
   ? '返回材料采购合同'
-  : projectSupplierReturnTo.value
-    ? '返回项目分供方工作台'
-    : '返回分供方列表')
+  : subcontractChangeReturnTo.value
+    ? '返回分包变洽签'
+    : projectSupplierReturnTo.value
+      ? '返回项目分供方工作台'
+      : '返回分供方列表')
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -55,6 +73,8 @@ const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-f
   return 'error'
 })
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('supplier:write'))
+const canReadSubcontractChanges = computed(() => detail.value?.dataOrigin === 'real'
+  && detail.value.capabilities.includes('subcontract-document:read'))
 const editTo = computed(() => {
   const query = new URLSearchParams({ origin: 'real' })
   const returnTo = validateSupplierReturnTo(props.returnTo)
@@ -68,6 +88,27 @@ const credentialTo = computed(() => {
   if (returnTo)
     query.set('returnTo', returnTo)
   return `/base/supplier/credential/${encodeURIComponent(props.supplierId)}?${query.toString()}`
+})
+const subcontractChangesReturnTo = computed(() => {
+  const supplierQuery = new URLSearchParams({ origin: props.origin })
+  const supplierListReturnTo = validateSupplierReturnTo(props.returnTo)
+  if (supplierListReturnTo)
+    supplierQuery.set('returnTo', supplierListReturnTo)
+  supplierQuery.set('subChangeJourney', subcontractChangeContextId.value)
+  return validateSupplierDetailReturnTo(
+    `/base/supplier/${encodeURIComponent(props.supplierId)}?${supplierQuery.toString()}#${subcontractChangeAnchorId}`,
+    props.origin,
+    props.supplierId,
+  )
+})
+const subcontractChangesTo = computed(() => {
+  const query = new URLSearchParams({
+    supplier: props.supplierId,
+    origin: props.origin,
+  })
+  if (subcontractChangesReturnTo.value)
+    query.set('returnTo', subcontractChangesReturnTo.value)
+  return `/subcontract/change?${query.toString()}`
 })
 const tabs = computed(() => [
   { key: 'projects', label: '合作项目', count: detail.value?.projects.length ?? 0 },
@@ -109,11 +150,69 @@ function summaryClickable(row: { tab: SupplierFactTab | null, metric: MetricDTO 
   return Boolean(row.tab && (row.metric === null || row.metric.drilldown))
 }
 
+function workspaceScrollTop(): number {
+  return document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop
+    ?? document.scrollingElement?.scrollTop
+    ?? window.scrollY
+}
+
+function captureSubcontractChangeOrigin() {
+  if (!subcontractChangesReturnTo.value)
+    return
+  try {
+    saveSupplierDetailJourneyReturnOrigin(createSupplierDetailJourneyReturnOrigin({
+      contextId: subcontractChangeContextId.value,
+      returnTo: subcontractChangesReturnTo.value,
+      anchorId: subcontractChangeAnchorId,
+      scrollTop: workspaceScrollTop(),
+      now: Date.now(),
+    }))
+  }
+  catch {
+    // 浏览器存储不可用时仍允许导航，返回时按受限锚点降级。
+  }
+}
+
+async function restoreSubcontractChangeOrigin(): Promise<boolean> {
+  const returnTo = validateSupplierDetailReturnTo(route.fullPath, props.origin, props.supplierId)
+  if (!returnTo)
+    return false
+  const url = new URL(returnTo, 'https://ruihang.invalid')
+  const anchorId = decodeURIComponent(url.hash.slice(1))
+  if (anchorId !== subcontractChangeAnchorId)
+    return false
+  await nextTick()
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  const target = document.getElementById(anchorId)
+  if (!target)
+    return false
+  const origin = resolveSupplierDetailJourneyReturnOrigin({
+    returnTo,
+    contextId: url.searchParams.get('subChangeJourney'),
+    now: Date.now(),
+    load: id => loadSupplierDetailJourneyReturnOrigin(id),
+  })
+  const workspace = document.querySelector<HTMLElement>('[data-shell-workspace]')
+  if (origin && workspace)
+    workspace.scrollTop = origin.scrollTop
+  else
+    target.scrollIntoView?.({ block: 'center' })
+  target.focus({ preventScroll: true })
+  if (origin && workspace) {
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    workspace.scrollTop = origin.scrollTop
+  }
+  return true
+}
+
 async function load() {
   await store.loadDetail({ id: props.supplierId, origin: props.origin, includeDemo: props.includeDemo })
   if (store.detailState.kind === 'ready') {
-    await nextTick()
-    document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
+    const restored = await restoreSubcontractChangeOrigin()
+    if (!restored) {
+      await nextTick()
+      document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
+    }
   }
 }
 
@@ -144,6 +243,16 @@ onActivated(() => void load())
       <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
     </template>
     <template #actions>
+      <NuxtLink
+        v-if="canReadSubcontractChanges"
+        :id="subcontractChangeAnchorId"
+        :to="subcontractChangesTo"
+        class="btn-secondary"
+        aria-label="查看分包变洽签"
+        @click="captureSubcontractChangeOrigin"
+      >
+        <span class="i-lucide-file-search mr-1" aria-hidden="true" />分包变洽签
+      </NuxtLink>
       <NuxtLink :to="credentialTo" class="btn-secondary" aria-label="证照附件" data-ui="supplier-credential-link">
         <span class="i-lucide-folder-lock mr-1" aria-hidden="true" />证照附件
       </NuxtLink>

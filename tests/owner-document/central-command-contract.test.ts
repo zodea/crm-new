@@ -12,6 +12,12 @@ const session = {
   capabilities: ['owner-document:read', OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY],
 }
 
+const subcontractSession = {
+  workspaceId: 'workspace-subcontract-change-327',
+  actorId: 'actor-subcontract-change-327',
+  capabilities: ['subcontract-document:read', 'subcontract-document:write'],
+}
+
 const change: OwnerCommercialDocumentSource = {
   dataOrigin: 'real',
   kind: 'owner_change',
@@ -166,6 +172,84 @@ function instance(
 }
 
 describe('甲方商务单据中央命令契约', () => {
+  it('分包变洽签经中央命令按稳定分供方合同提交，并保持 commandId 幂等', async () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance({
+      now: () => '2026-08-27T02:00:00.000Z',
+      createId: () => 'sub-change-created-327',
+      createAttachmentId: () => 'sub-change-file-created-327',
+      projects: [{ id: 'project-sub-change-327', name: '中央分包项目', customerId: null }],
+      suppliers: [
+        { id: 'supplier-sub-change-327', name: '中央劳务分供方' },
+        { id: 'supplier-other-327', name: '其他分供方' },
+      ],
+      subcontractContracts: [{
+        id: 'subcontract-sub-change-327',
+        no: 'FB-CENTRAL-327',
+        name: '中央劳务分包合同',
+        projectId: 'project-sub-change-327',
+        supplierId: 'supplier-sub-change-327',
+      }],
+      documents: [],
+    })
+    const request = {
+      workspaceId: subcontractSession.workspaceId,
+      actorId: subcontractSession.actorId,
+      requiredCapability: 'subcontract-document:write' as const,
+      commandId: 'submit-sub-change-327',
+      action: 'submit' as const,
+      kind: 'sub_change' as const,
+      id: null,
+      baseVersion: null,
+      draft: {
+        no: 'FB-BG-2026-327',
+        projectId: 'project-sub-change-327',
+        supplierId: 'supplier-sub-change-327',
+        contractId: 'subcontract-sub-change-327',
+        changeType: '增项',
+        changeDate: '2026-08-27',
+        approvedAmount: 38000,
+        changedArea: 120,
+        actualApprovedPrice: 36000,
+        reason: '样板层劳务范围调整',
+        note: '按现场确认范围执行',
+      },
+      attachments: {
+        add: [{ fileName: '分包变洽签确认单.pdf', category: '业务附件' }],
+        removeIds: [],
+        restoreIds: [],
+      },
+    }
+
+    const saved = await commands.execute(request, subcontractSession)
+    await expect(commands.execute(request, subcontractSession)).resolves.toEqual(saved)
+    expect(commands.rows().filter(row => row.kind === 'sub_change')).toHaveLength(1)
+    expect(commands.form('sub_change', saved.id, subcontractSession)).toMatchObject({
+      kind: 'sub_change',
+      draft: {
+        id: 'sub-change-created-327',
+        no: 'FB-BG-2026-327',
+        projectId: 'project-sub-change-327',
+        supplierId: 'supplier-sub-change-327',
+        contractId: 'subcontract-sub-change-327',
+        changeType: '增项',
+        changeDate: '2026-08-27',
+        approvedAmount: 38000,
+        changedArea: 120,
+        actualApprovedPrice: 36000,
+        reason: '样板层劳务范围调整',
+        status: 'submitted',
+      },
+      attachments: [{ ownerType: 'subcontract_change_order', id: 'sub-change-file-created-327' }],
+    })
+
+    await expect(commands.execute({
+      ...request,
+      commandId: 'submit-sub-change-mismatched-supplier-327',
+      id: null,
+      draft: { ...request.draft, supplierId: 'supplier-other-327' },
+    }, subcontractSession)).rejects.toThrow(/分供方|不属于/)
+  })
+
   it('甲方罚扣只经中央命令提交，幂等保存专属事实和联系单附件', async () => {
     const commands = instance(kind => `${kind}-created-326`, () => '2026-08-26T02:00:00.000Z', [])
     const request = {
@@ -464,6 +548,40 @@ describe('甲方商务单据中央命令契约', () => {
     expect(commands.context(session, 'session-a-325').contracts.map(row => row.id)).toContain('contract-session-a-325')
     expect(commands.context(session, 'session-b-325').contracts.map(row => row.id)).not.toContain('contract-session-a-325')
     expect(commands.context(session, 'session-b-325').contracts.map(row => row.id)).toContain('contract-base-325')
+  })
+
+  it('甲方与分包命令上下文按 capability 隔离且分包权限不能读取 BOQ 上下文', () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance({
+      projects: [{ id: 'project-auth-327', name: '权限项目', customerId: 'customer-auth-327' }],
+      customers: [{ id: 'customer-auth-327', name: '权限客户' }],
+      suppliers: [{ id: 'supplier-auth-327', name: '权限分供方' }],
+      contracts: [{
+        id: 'contract-auth-327',
+        no: 'SG-AUTH-327',
+        name: '权限施工合同',
+        projectId: 'project-auth-327',
+        customerId: 'customer-auth-327',
+      }],
+      subcontractContracts: [{
+        id: 'subcontract-auth-327',
+        no: 'FB-AUTH-327',
+        name: '权限分包合同',
+        projectId: 'project-auth-327',
+        supplierId: 'supplier-auth-327',
+      }],
+    })
+
+    const ownerContext = commands.context(session, undefined, 'owner_change')
+    expect(ownerContext.customers.map(row => row.id)).toEqual(['customer-auth-327'])
+    expect(ownerContext.suppliers).toEqual([])
+    expect(ownerContext.contracts.map(row => row.id)).toEqual(['contract-auth-327'])
+
+    const subcontractContext = commands.context(subcontractSession, undefined, 'sub_change')
+    expect(subcontractContext.customers).toEqual([])
+    expect(subcontractContext.suppliers.map(row => row.id)).toEqual(['supplier-auth-327'])
+    expect(subcontractContext.contracts.map(row => row.id)).toEqual(['subcontract-auth-327'])
+    expect(() => commands.context(subcontractSession, undefined, 'owner_change'))
+      .toThrowError(/无甲方商务单据写入权限/)
   })
 
   it('验收、进入保修和到期确认按唯一顺序更新同一记录并留下服务端审计', async () => {

@@ -255,7 +255,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
 export function ownerDocumentFormPath(kind: OwnerDocumentKind, id?: string): string {
   const listPath = OWNER_DOCUMENT_META[kind].listPath
   const centralReadOnly = kind === 'owner_change' || kind === 'owner_report'
-    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
+    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty' || kind === 'sub_change'
   return id && centralReadOnly ? `${listPath}/form/${id}` : id ? `${listPath}/${id}` : `${listPath}/new`
 }
 
@@ -266,7 +266,7 @@ export function ownerDocumentDetailPath(
   variant?: 'acceptance' | 'warranty',
 ): string {
   if (kind !== 'owner_change' && kind !== 'owner_report'
-    && kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty') {
+    && kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change') {
     throw new Error('该甲方单据类型尚无中央只读详情')
   }
   const query = new URLSearchParams({ origin })

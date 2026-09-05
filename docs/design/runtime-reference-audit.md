@@ -118,13 +118,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 137 / 5 / 132 |
+| 跟踪页面文件 / dev / 生产路由 | 138 / 5 / 133 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 132 / 132 |
+| 证据行 / 唯一参考端点 | 133 / 133 |
 | 参考证据档案 / 被路由使用 | 37 / 32 |
-| 直接 / 邻近 / 本地权威 | 52 / 18 / 19 |
+| 直接 / 邻近 / 本地权威 | 52 / 18 / 20 |
 | 历史证据 / 未验证目标 | 34 / 9 |
-| 设计已覆盖 / 待补设计 | 130 / 2 |
+| 设计已覆盖 / 待补设计 | 131 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
@@ -136,7 +136,7 @@
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分包单据 | 6 | [#295](https://github.com/zodea/crm-new/issues/295)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 分包单据 | 7 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -272,7 +272,8 @@
 | `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `ScheduleProcessLibraryScreen.jsx`、本地紧凑列表模板与局部横向滚动 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/settings/data-migration.vue` | `/settings/data-migration` | 导入导出 | 工作台 | #294 | R-TOOL-PENDING | 按本地迁移契约使用纵向步骤、预检/备份/对账/切换分区和表内横向滚动；外部参考站没有可安全观察的一一对应迁移页 | 仅浏览器正式工作区可执行；后台权威校验拓扑、整库摘要、映射、实际写入对账和回滚窗口，Tauri 明确不可用；备份字节不上传 | C-TOOL |
-| `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 动态类型映射到分包变洽签或分包结算的真实标题、字段分区和状态动作；两类均不补造无持久化实体支撑的明细网格 | 编辑返回原类型列表；分供方、合同、附件和结算只走真实外键，错误定位首个无效字段 | C-FORM |
+| `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 详情 | #197 | R-SUB-DOC-DC | #327 按 DC 分包变洽签字段与本地只读详情蓝本交付 change 专属详情；分包结算仍沿既有整页表单 | 分包变洽签展示真实项目/分供方/合同、三档金额、状态与附件，列表/项目/合同来源可恢复；缺失、无权、错配与重试分态，不补造审批流 | C-FORM |
+| `app/pages/subcontract/[kind]/form/[id].vue` | `/subcontract/:kind/form/:id` | 分包单据 | 整页表单 | #327 | R-SUB-DOC-DC | 分包变洽签只读详情的显式编辑路由复用 DC 专属字段分区和固定底栏 | 只允许正式可编辑状态进入；保存、提交和取消返回原详情，项目、分供方、分包合同与附件只走中央命令 | C-FORM |
 | `app/pages/subcontract/[kind]/index.vue` | `/subcontract/:kind` | 分包单据 | 列表 | #197 | R-SUB-DOCUMENTS-LIVE | 参考分包变洽签与分包结算分别保留合同金额/申报审定链和奖罚/申请支付余额链；当前本地真实项目/合同/分供方来源正确但列表投影较窄 | 金额与余额只做真实聚合，不保存副本；空列表仍保留专属列，编号/名称先进入只读详情并恢复项目/合同/分供方及本地筛选 | C-DENSE |
 | `app/pages/subcontract/[kind]/new.vue` | `/subcontract/:kind/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页按动态类型显示真实标题、来源、金额、备注和附件分区，不使用通用占位标题或虚构明细 | 项目、合同和分供方只选择真实关联记录；草稿、上报和确认沿用本地状态校验 | C-FORM |
 | `app/pages/subcontract/attendance.vue` | `/subcontract/attendance` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 项目/月/班组 query 可恢复真实名册，当前无考勤时仍展示 0 人日/0 工时和当月实际天数矩阵；390–1440px 根无横滚、矩阵局部横滚 | 返回工资和进入 C2 可保留项目/月/班组/工资状态；只写 `attendance_records`，C2 人员与 C1 已发月份锁定 | C-DENSE |

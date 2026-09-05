@@ -72,12 +72,14 @@ export interface OwnerDocumentListRecord {
   type: string
   period: string
   amount: number
-  secondaryAmount: number
+  secondaryAmount: number | null
   tertiaryAmount: number
   quantity: number | null
   date: string
   status: string
   contractNavigation?: NavigationIntentDTO
+  projectNavigation?: NavigationIntentDTO
+  supplierNavigation?: NavigationIntentDTO
   viewVariant?: 'acceptance' | 'warranty'
   acceptanceOrganization?: string
   acceptancePerson?: string

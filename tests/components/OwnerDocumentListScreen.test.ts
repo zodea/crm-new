@@ -47,7 +47,7 @@ const listRows: OwnerDocumentListRecord[] = [
 ]
 
 const ToolbarStub = defineComponent({
-  props: ['title', 'project', 'type', 'view', 'projectOptions', 'typeOptions', 'views'],
+  props: ['title', 'project', 'type', 'view', 'projectOptions', 'typeOptions', 'views', 'canCreate', 'createLabel'],
   emits: ['update:project', 'update:type', 'update:view', 'create', 'refresh'],
   setup(props, { emit }) {
     const select = (label: string, value: unknown, options: any[], event: string) =>
@@ -62,6 +62,7 @@ const ToolbarStub = defineComponent({
       'data-views': JSON.stringify(props.views),
     }, [
       h('h1', props.title),
+      props.canCreate ? h('button', { onClick: () => emit('create') }, props.createLabel) : null,
       select('项目', props.project, props.projectOptions, 'update:project'),
       select('类型', props.type, props.typeOptions, 'update:type'),
       select('状态', props.view, props.views, 'update:view'),
@@ -88,6 +89,7 @@ const KitTableStub = defineComponent({
         slots.document?.({ row }),
         ` ${row.name} `,
         slots.contract?.({ row }),
+        slots.supplier?.({ row }),
       ])),
       ...(props.data as any[]).length === 0
         ? [h('div', { 'role': 'status', 'aria-label': props.empty.title }, [
@@ -108,10 +110,11 @@ const loadKind = vi.fn(async () => listRows)
 let activeRows = listRows
 let centralEmptyReason: 'no-records' | 'no-filter-match' | 'missing-relation' | null = null
 let centralSummary: any = null
+let centralCapabilities: string[] = ['owner-document:write']
 
 const global = {
   components: {
-    EntityLink: defineComponent({ props: ['label'], template: '<span>{{ label }}</span>' }),
+    EntityLink: defineComponent({ props: ['label', 'intent'], template: '<a href="#" :data-entity="intent?.subject?.entity">{{ label }}</a>' }),
     KitTable: KitTableStub,
     NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' }),
     OwnerDocumentListToolbar: ToolbarStub,
@@ -130,6 +133,7 @@ describe('owner document list screen', () => {
     activeRows = listRows
     centralEmptyReason = null
     centralSummary = null
+    centralCapabilities = ['owner-document:write']
     navigateTo.mockReset()
     loadKind.mockClear()
     route.path = '/owner/change'
@@ -151,7 +155,7 @@ describe('owner document list screen', () => {
       loadKind,
       centralPageFor: () => ({ page: 1, pageSize: 10, total: 25 }),
       centralSummaryFor: () => centralSummary,
-      centralCapabilitiesFor: () => ['owner-document:write'],
+      centralCapabilitiesFor: () => centralCapabilities,
       centralEmptyReasonFor: () => centralEmptyReason,
       removeForm: vi.fn(),
       restoreForm: vi.fn(),
@@ -236,6 +240,8 @@ describe('owner document list screen', () => {
           taxInclusiveAmount: '0.00',
           taxExclusiveAmount: '0.00',
           appliedTaxExclusiveAmount: '0.00',
+          subcontractApprovedAmount: '0.00',
+          subcontractActualApproved: { value: null, status: 'missing' },
         },
         demo: {
           count: 0,
@@ -244,6 +250,8 @@ describe('owner document list screen', () => {
           taxInclusiveAmount: '0.00',
           taxExclusiveAmount: '0.00',
           appliedTaxExclusiveAmount: '0.00',
+          subcontractApprovedAmount: '0.00',
+          subcontractActualApproved: { value: null, status: 'missing' },
         },
       },
     }
@@ -360,5 +368,86 @@ describe('owner document list screen', () => {
         returnTo: expect.stringContaining('/owner/penalty'),
       }),
     }))
+  })
+
+  it('分包变洽签全局列表使用中央只读链、专属权限与稳定关系', async () => {
+    runtime.desktop = false
+    route.path = '/subcontract/change'
+    route.query = { supplier: 'supplier-327' }
+    centralCapabilities = ['subcontract-document:read', 'subcontract-document:write']
+    centralSummary = {
+      projects: [],
+      contracts: [],
+      statuses: [{ value: 'submitted', label: '已提交', count: 1 }],
+      documentTypes: [],
+      origins: {
+        real: {
+          count: 1,
+          reportedAmount: '0.00',
+          auditedAmount: '0.00',
+          taxInclusiveAmount: '0.00',
+          taxExclusiveAmount: '0.00',
+          appliedTaxExclusiveAmount: '0.00',
+          subcontractApprovedAmount: '32000.00',
+          subcontractActualApproved: { value: '0.00', status: 'partial' },
+        },
+        demo: {
+          count: 0,
+          reportedAmount: '0.00',
+          auditedAmount: '0.00',
+          taxInclusiveAmount: '0.00',
+          taxExclusiveAmount: '0.00',
+          appliedTaxExclusiveAmount: '0.00',
+          subcontractApprovedAmount: '0.00',
+          subcontractActualApproved: { value: null, status: 'missing' },
+        },
+      },
+    }
+    activeRows = [{
+      ...listRows[0]!,
+      id: 'sub-change-327',
+      no: 'FB-BQ-327',
+      name: '样板层范围调整',
+      projectId: 'project-327',
+      projectName: '瑞航商务中心项目',
+      contractId: 'subcontract-327',
+      contractName: '主体劳务分包合同',
+      supplierId: 'supplier-327',
+      supplierName: '联创建筑劳务',
+      type: '增项',
+      amount: 32000,
+      secondaryAmount: 30000,
+      quantity: 128.5,
+      status: 'submitted',
+      contractNavigation: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'contract', id: 'subcontract-327', label: '主体劳务分包合同', no: 'FB-327' },
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'real', contractKind: '分包' },
+      },
+      supplierNavigation: {
+        kind: 'entity-detail',
+        subject: { state: 'resolved', entity: 'supplier', id: 'supplier-327', label: '联创建筑劳务', no: null },
+        variant: 'detail',
+        view: null,
+        filters: { dataOrigin: 'real' },
+      },
+    }]
+
+    render(OwnerDocumentListScreen, { props: { kind: 'sub_change' }, global })
+
+    await vi.waitFor(() => expect(loadKind).toHaveBeenCalledWith('sub_change', expect.objectContaining({
+      status: null,
+      supplierId: 'supplier-327',
+    })))
+    expect(screen.getByLabelText('来源筛选').textContent).toContain('分供方：联创建筑劳务')
+    expect(screen.getByRole('button', { name: '新建分包变洽签' })).not.toBeNull()
+    expect(screen.getByRole('link', { name: 'FB-BQ-327' }).getAttribute('href')).toBe('/subcontract/change/sub-change-327?origin=real')
+    expect(screen.getByRole('link', { name: '主体劳务分包合同' }).getAttribute('href')).toBe('/contract/subcontract-327?origin=real&contractKind=subcontract')
+    expect(screen.getByRole('link', { name: '联创建筑劳务' }).getAttribute('data-entity')).toBe('supplier')
+    const summary = screen.getByRole('status', { name: '分包变洽签列表汇总' }).textContent
+    expect(summary).toMatch(/审批金额总和：\s*¥32,000\.00/)
+    expect(summary).toMatch(/实际审定价总和（部分记录）：\s*¥0\.00/)
   })
 })

@@ -96,7 +96,15 @@ function ownerPage(total = 0) {
   return {
     items: [],
     pagination: { page: 1, pageSize: 10, total },
-    summary: { origins: { real: { reportedAmount: `${total}.00` } } },
+    summary: {
+      origins: {
+        real: {
+          reportedAmount: `${total}.00`,
+          subcontractApprovedAmount: `${total}.00`,
+          subcontractActualApproved: { value: `${total * 10}.00`, status: 'complete' },
+        },
+      },
+    },
   }
 }
 
@@ -169,8 +177,8 @@ describe('项目详情中央来源边界', () => {
     expect(materialJourney).toContain('/contract/material?projectId=project-1&origin=demo')
     expect(materialJourney).toContain('materialJourney%3Dorigin_')
     expect(materialJourney).toContain('%23project-material-contract-link')
-    expect(screen.getByRole('status', { name: '演示项目不提供正式甲方商务单据' })).not.toBeNull()
-    expect(screen.queryByRole('status', { name: '正在读取甲方商务单据' })).toBeNull()
+    expect(screen.getByRole('status', { name: '演示项目不提供正式项目商务单据' })).not.toBeNull()
+    expect(screen.queryByRole('status', { name: '正在读取项目商务单据' })).toBeNull()
   })
 
   it('客户返回链必须同时匹配中央项目的父客户 ID', async () => {
@@ -278,10 +286,10 @@ describe('项目详情中央来源边界', () => {
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(6)
+    expect(screen.getAllByText('2')).toHaveLength(7)
   })
 
-  it('正式项目按同一 canonical 来源提供甲方六类单据入口', async () => {
+  it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签入口', async () => {
     get.mockResolvedValue({
       ...detail,
       item: { ...detail.item, dataOrigin: 'real' },
@@ -297,6 +305,7 @@ describe('项目详情中央来源边界', () => {
     const warranty = screen.getByRole('link', { name: /保修管理/ })
     const finalSettlement = screen.getByRole('link', { name: /最终结算/ })
     const penalty = screen.getByRole('link', { name: /甲方罚扣/ })
+    const subcontractChange = screen.getByRole('link', { name: /分包变洽签/ })
     expect(acceptance.getAttribute('href')).toContain('/owner/acceptance?')
     expect(acceptance.getAttribute('href')).toContain('variant=acceptance')
     expect(warranty.getAttribute('href')).toContain('/owner/acceptance?')
@@ -321,6 +330,31 @@ describe('项目详情中央来源边界', () => {
     expect(penaltyReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
     expect(penaltyReturnTo).toMatch(/#project-owner-document-card-penalty$/)
     expect(penalty.getAttribute('id')).toBe('project-owner-document-card-penalty')
+    expect(subcontractChange.getAttribute('href')).toContain('/subcontract/change?')
+    expect(subcontractChange.getAttribute('href')).toContain('projectId=project-1')
+    const subcontractReturnTo = new URL(subcontractChange.getAttribute('href')!, 'https://ruihang.invalid').searchParams.get('returnTo')
+    expect(subcontractReturnTo).toContain('/project/project-1?origin=real&ownerJourney=origin_')
+    expect(subcontractReturnTo).toMatch(/#project-owner-document-card-sub-change$/)
+    expect(subcontractChange.getAttribute('id')).toBe('project-owner-document-card-sub-change')
+    expect(subcontractChange.textContent).toContain('实际审定价 ¥10.00')
+    expect(ownerList).toHaveBeenCalledWith(expect.objectContaining({ kind: 'sub_change', projectId: 'project-1' }))
+  })
+
+  it('缺少分包单据权限时仍保留已授权的六张甲方单据卡片', async () => {
+    get.mockResolvedValue({
+      ...detail,
+      item: { ...detail.item, dataOrigin: 'real' },
+    })
+    ownerList.mockImplementation(({ kind }: { kind: string }) => kind === 'sub_change'
+      ? Promise.reject(new Error('无分包变洽签读取权限'))
+      : Promise.resolve(ownerPage(1)))
+
+    renderDetail({ originHint: 'real', includeDemo: false })
+
+    expect(await screen.findByRole('link', { name: /甲方变洽签/ })).not.toBeNull()
+    expect(screen.getByRole('link', { name: /甲方罚扣/ })).not.toBeNull()
+    expect(screen.queryByRole('link', { name: /分包变洽签/ })).toBeNull()
+    expect(screen.getByRole('heading', { name: '部分项目商务单据暂不可用' })).not.toBeNull()
   })
 
   it('稳定区分来源错配，不按项目名称回退到其他来源', async () => {

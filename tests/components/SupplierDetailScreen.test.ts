@@ -24,7 +24,7 @@ function metric(value: string, entity: string, clickable = true) {
 }
 const detail = {
   dataOrigin: 'real' as const,
-  capabilities: ['supplier:list:read', 'supplier:write'],
+  capabilities: ['supplier:list:read', 'supplier:write', 'subcontract-document:read'],
   supplier: { id: 'supplier-1', name: '中央分供方', aliases: [], taxNo: '9144 **** 0001', supplierCategory: '材料供应商', credentialStatus: 'incomplete' },
   projects: [],
   contracts: [],
@@ -90,6 +90,20 @@ describe('分供方中央详情', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: '中央分供方' })).toBe(document.activeElement))
     expect(screen.getByRole('link', { name: '证照附件' }).getAttribute('href'))
       .toBe('/base/supplier/credential/supplier-1?origin=real&returnTo=%2Fbase%2Fsupplier%3Fsearch%3D%25E4%25B8%25AD%25E5%25A4%25AE%23supplier-row-real%25253Asupplier-1')
+    const subcontractChanges = new URL(
+      screen.getByRole('link', { name: '查看分包变洽签' }).getAttribute('href')!,
+      'https://ruihang.invalid',
+    )
+    expect(subcontractChanges.pathname).toBe('/subcontract/change')
+    expect(subcontractChanges.searchParams.get('supplier')).toBe('supplier-1')
+    expect(subcontractChanges.searchParams.get('origin')).toBe('real')
+    const supplierReturn = new URL(subcontractChanges.searchParams.get('returnTo')!, 'https://ruihang.invalid')
+    expect(supplierReturn.pathname).toBe('/base/supplier/supplier-1')
+    expect(supplierReturn.searchParams.get('origin')).toBe('real')
+    expect(supplierReturn.searchParams.get('returnTo'))
+      .toBe('/base/supplier?search=%E4%B8%AD%E5%A4%AE#supplier-row-real%253Asupplier-1')
+    expect(supplierReturn.searchParams.get('subChangeJourney')).toMatch(/^origin_[\w-]+$/)
+    expect(supplierReturn.hash).toBe('#supplier-subcontract-change-link')
     expect(screen.getByRole('button', { name: '查看累计合同金额明细' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '查看累计结算金额明细' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '查看累计收票金额明细' })).not.toBeNull()
@@ -125,6 +139,27 @@ describe('分供方中央详情', () => {
     expect(screen.getByTestId('fact-tab').textContent).toBe('payments')
     expect(screen.getByText('主档仍可见')).not.toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('中央服务暂时不可用')
+  })
+
+  it('缺少分包变洽签读取权限时不显示跨领域入口', () => {
+    supplierStoreMock.detailState = {
+      kind: 'ready',
+      data: { ...detail, capabilities: ['supplier:list:read'] },
+    }
+    render(SupplierDetailScreen, {
+      props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        Metric: metricStub,
+        MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    expect(screen.queryByRole('link', { name: '查看分包变洽签' })).toBeNull()
   })
 
   it('从材采合同进入指定事实页签，并返回原合同页签', () => {
@@ -174,5 +209,28 @@ describe('分供方中央详情', () => {
     })
 
     expect(screen.getByRole('link', { name: '返回项目分供方工作台' }).getAttribute('href')).toBe(returnTo)
+  })
+
+  it('从分包变洽签详情进入时显式返回原单据，不退回分供方列表', () => {
+    const returnTo = '/subcontract/change/sub-change-real-327?origin=real'
+    render(SupplierDetailScreen, {
+      props: {
+        supplierId: 'supplier-1',
+        origin: 'real',
+        includeDemo: false,
+        returnTo,
+      },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        Metric: metricStub,
+        MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    expect(screen.getByRole('link', { name: '返回分包变洽签' }).getAttribute('href')).toBe(returnTo)
   })
 })

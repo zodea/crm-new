@@ -10,6 +10,8 @@ import type {
 
 export const OWNER_COMMERCIAL_DOCUMENT_READ_CAPABILITY = 'owner-document:read' as const
 export const OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY = 'owner-document:write' as const
+export const SUBCONTRACT_CHANGE_READ_CAPABILITY = 'subcontract-document:read' as const
+export const SUBCONTRACT_CHANGE_WRITE_CAPABILITY = 'subcontract-document:write' as const
 
 export interface OwnerCommercialDocumentCommandContextDTO {
   workspaceId: string
@@ -17,9 +19,12 @@ export interface OwnerCommercialDocumentCommandContextDTO {
   capabilities: string[]
   projects: Array<{ id: string, label: string, customerId: string | null }>
   customers: OwnerDocumentLookupOption[]
+  suppliers: OwnerDocumentLookupOption[]
   contracts: Array<OwnerDocumentLookupOption & {
     projectId: string
     customerId: string | null
+    supplierId: string | null
+    kind: 'construction' | 'subcontract'
     changedContractAmount: number | null
     receivedAmount: number | null
   }>
@@ -28,7 +33,7 @@ export interface OwnerCommercialDocumentCommandContextDTO {
 interface OwnerCommercialDocumentCommandEnvelopeDTO {
   workspaceId: string
   actorId: string
-  requiredCapability: typeof OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
+  requiredCapability: typeof OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY | typeof SUBCONTRACT_CHANGE_WRITE_CAPABILITY
   commandId: string
   kind: OwnerCommercialDocumentKind
   id: string | null
@@ -114,7 +119,7 @@ export interface OwnerCommercialDocumentFormReadDTO {
 }
 
 export interface OwnerCommercialDocumentCommandRepository {
-  context: () => Promise<OwnerCommercialDocumentCommandContextDTO>
+  context: (kind?: OwnerCommercialDocumentKind) => Promise<OwnerCommercialDocumentCommandContextDTO>
   loadForm: (kind: OwnerCommercialDocumentKind, id: string) => Promise<OwnerCommercialDocumentFormReadDTO>
   boqLines: (projectId: string, contractId: string, periodNo?: string) => Promise<OwnerDocumentBoqLine[]>
   execute: (request: OwnerCommercialDocumentCommandRequestDTO) => Promise<OwnerCommercialDocumentCommandResultDTO>

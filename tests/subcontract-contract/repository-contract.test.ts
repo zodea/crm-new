@@ -48,7 +48,9 @@ const facts: SubcontractContractFactSources = {
   supplements: [
     { dataOrigin: 'real', id: 'supplement-1', contractId: contract.id, no: 'BC-1', name: '补充协议', amount: 100, date: '2026-08-02', status: '生效' },
   ],
-  changes: [],
+  changes: [
+    { dataOrigin: 'real', id: 'sub-change-327', contractId: contract.id, no: 'FB-BG-327', name: '样板层劳务范围调整', amount: 38000, date: '2026-08-27', status: '已提交' },
+  ],
   invoices: [
     { dataOrigin: 'real', id: 'invoice-1', contractId: contract.id, no: 'FP-1', name: '劳务发票', amount: 600, date: '2026-08-10', status: '已归档' },
   ],
@@ -100,18 +102,48 @@ describe('分包合同中央 Repository 契约', () => {
       query: { id: contract.id, origin: 'real', includeDemo: false },
       asOf: '2026-08-25T00:00:00.000Z',
       sourceVersion: 'subcontract-contract-v1',
-      capabilities: ['subcontract-contract:read', 'subcontract-contract:write'],
+      capabilities: ['subcontract-contract:read', 'subcontract-contract:write', 'subcontract-document:read'],
     })
 
     expect(detail.sections.payments.applications).toHaveLength(1)
     expect(detail.sections.payments.records).toHaveLength(1)
     expect(detail.sections.settlements.progress).toHaveLength(1)
     expect(detail.sections.settlements.completion).toHaveLength(1)
+    expect(detail.sections.changes).toEqual([
+      expect.objectContaining({
+        id: 'sub-change-327',
+        navigation: expect.objectContaining({
+          kind: 'entity-detail',
+          subject: expect.objectContaining({ entity: 'subcontract-document', id: 'sub-change-327' }),
+          variant: 'change',
+          filters: {
+            dataOrigin: 'real',
+            projectId: 'project-321',
+            supplierId: 'supplier-321',
+            contractId: 'subcontract-321',
+          },
+        }),
+      }),
+    ])
     expect(detail.sections.materialUses).toEqual({
       currentWarehouse: [],
       legacy: [],
       emptyReason: 'missing-relation',
     })
+  })
+
+  it('缺少分包变洽签读取权限时，合同事实不生成假可点击目标', () => {
+    const detail = buildSubcontractContractDetail({
+      contracts: [contract],
+      facts,
+      query: { id: contract.id, origin: 'real', includeDemo: false, focusId: null },
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: 'subcontract-contract-v1',
+      capabilities: ['subcontract-contract:read'],
+    })
+
+    expect(detail.sections.changes[0]?.navigation)
+      .toEqual({ kind: 'unavailable', reason: 'forbidden' })
   })
 
   it('直接深链按稳定补充协议 ID 区分父合同错配与目标不存在', () => {
@@ -139,7 +171,37 @@ describe('分包合同中央 Repository 契约', () => {
     })
 
     expect(() => build('supplement-other-contract')).toThrowError(/补充协议与分包合同不匹配/)
-    expect(() => build('missing-supplement')).toThrowError(/补充协议不存在/)
+    expect(() => build('missing-supplement')).toThrowError(/聚焦的分包合同事实不存在/)
+  })
+
+  it('合同变洽签页签可按稳定变洽签 ID 聚焦同一合同事实', () => {
+    const detail = buildSubcontractContractDetail({
+      contracts: [contract],
+      facts,
+      query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real', focusId: 'sub-change-327' }),
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: 'subcontract-contract-v3',
+      capabilities: ['subcontract-contract:read'],
+    })
+
+    expect(detail.sections.changes).toContainEqual(expect.objectContaining({ id: 'sub-change-327' }))
+  })
+
+  it('演示合同中的未核验变洽签事实不生成可点击的正式详情目标', () => {
+    const detail = buildSubcontractContractDetail({
+      contracts: [{ ...contract, dataOrigin: 'demo' }],
+      facts: {
+        ...facts,
+        changes: [{ ...facts.changes[0]!, dataOrigin: 'demo', id: 'sub-change-1' }],
+      },
+      query: parseSubcontractContractDetailQuery(contract.id, { origin: 'demo', includeDemo: true }),
+      asOf: '2026-08-25T00:00:00.000Z',
+      sourceVersion: 'subcontract-contract-demo-v1',
+      capabilities: ['subcontract-contract:read', 'demo:read'],
+    })
+
+    expect(detail.sections.changes[0]?.navigation)
+      .toEqual({ kind: 'unavailable', reason: 'unverified-target' })
   })
 
   it('拒绝不能形成 canonical focus 的补充协议 ID', () => {

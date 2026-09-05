@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { SubcontractContractDetailReadDTO } from '~/lib/subcontract-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
+import { computed, onActivated, watch } from 'vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { yuan } from '~/lib/util/money'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
@@ -39,7 +41,11 @@ const focusId = computed(() => route.query.tab === 'changes'
   && typeof route.query.focus === 'string'
   ? route.query.focus
   : null)
-const returnTo = computed(() => validateSubcontractContractReturnTo(route.query.returnTo, props.origin) ?? '/contract/subcontract')
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_change'))
+const returnTo = computed(() => ownerDocumentReturnTo.value
+  ?? validateSubcontractContractReturnTo(route.query.returnTo, props.origin)
+  ?? '/contract/subcontract')
+const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回分包合同列表')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('subcontract-contract:write'))
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -91,7 +97,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
 
 <template>
   <div class="subcontract-contract-detail min-w-0" data-testid="subcontract-contract-detail">
-    <EntityDetailShell :title="detail?.contract.name ?? '分包合同详情'" :subtitle="detail?.contract.no || '编号未填写'" :back-to="returnTo" back-label="返回分包合同列表" :state="shellState" :state-title="stateTitle" :state-description="problem?.message ?? ''" :state-action-label="problem?.retryable ? '重新加载' : ''" @state-action="load">
+    <EntityDetailShell :title="detail?.contract.name ?? '分包合同详情'" :subtitle="detail?.contract.no || '编号未填写'" :back-to="returnTo" :back-label="backLabel" :state="shellState" :state-title="stateTitle" :state-description="problem?.message ?? ''" :state-action-label="problem?.retryable ? '重新加载' : ''" @state-action="load">
       <template #status>
         <template v-if="detail">
           <span class="chip" :class="detail.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ detail.dataOrigin === 'demo' ? '演示只读' : '正式数据' }}</span><span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.subKind }}</span><span class="chip bg-surface-3 text-ink-soft">{{ detail.contract.status }}</span>
@@ -158,7 +164,7 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
           <div class="panel min-w-0 overflow-hidden p-4">
             <SectionHeader title="补充合同" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
           </div><div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="分包变更" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无分包变更" />
+            <SectionHeader title="分包变洽签" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.changes" empty-label="暂无分包变洽签" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
         </section>
         <section v-else-if="activeTab === 'invoices'" class="panel min-w-0 overflow-hidden p-4">

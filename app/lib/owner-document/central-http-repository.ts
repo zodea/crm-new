@@ -7,8 +7,10 @@ import type {
   OwnerCommercialDocumentFormReadDTO,
 } from './central-command-contract'
 import type {
+  OwnerCommercialDocumentDetailQueryDTO,
   OwnerCommercialDocumentDetailReadDTO,
   OwnerCommercialDocumentListPageDTO,
+  OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentReadRepository,
 } from './central-repository'
 import {
@@ -129,6 +131,10 @@ function amounts(value: unknown): boolean {
   }
   if (value.kind === 'owner_penalty')
     return money(value.amount)
+  if (value.kind === 'sub_change') {
+    return money(value.approved) && nullableQuantity(value.changedArea)
+      && nullableMoney(value.actualApproved)
+  }
   return value.kind === 'acceptance' && money(value.contractEstimate)
 }
 
@@ -159,14 +165,14 @@ function lifecycleEvent(value: unknown): boolean {
 function listItem(value: unknown): boolean {
   return object(value) && typeof value.rowKey === 'string'
     && isDataOriginDTO(value.dataOrigin)
-    && ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'].includes(String(value.kind))
+    && ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(String(value.kind))
     && ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'statusLabel', 'updatedAt']
       .every(key => typeof value[key] === 'string')
       && value.rowKey === `${value.dataOrigin}:${value.kind}:${value.id}`
       && nullableDate(value.applicationDate) && isISODateTimeDTO(value.updatedAt) && amounts(value.amounts)
-      && entityRef(value.project) && entityRef(value.customer) && entityRef(value.contract)
+      && entityRef(value.project) && entityRef(value.customer) && entityRef(value.supplier) && entityRef(value.contract)
       && navigation(value.projectNavigation) && navigation(value.customerNavigation)
-      && navigation(value.contractNavigation) && navigation(value.navigation)
+      && navigation(value.supplierNavigation) && navigation(value.contractNavigation) && navigation(value.navigation)
       && acceptanceView(value.acceptanceView)
       && ownerPenaltyListFacts(value.ownerPenaltyFacts)
       && (value.kind === 'owner_penalty' ? value.ownerPenaltyFacts !== null : value.ownerPenaltyFacts === null)
@@ -187,10 +193,19 @@ function summaryFacet(value: unknown): boolean {
   return object(value) && typeof value.value === 'string' && typeof value.label === 'string' && count(value.count)
 }
 
+function subcontractActualApprovedSummary(value: unknown): boolean {
+  if (!object(value))
+    return false
+  if (value.status === 'missing')
+    return value.value === null
+  return (value.status === 'complete' || value.status === 'partial') && money(value.value)
+}
+
 function originSummary(value: unknown): boolean {
   return object(value) && count(value.count)
-    && ['reportedAmount', 'auditedAmount', 'taxInclusiveAmount', 'taxExclusiveAmount', 'appliedTaxExclusiveAmount']
+    && ['reportedAmount', 'auditedAmount', 'taxInclusiveAmount', 'taxExclusiveAmount', 'appliedTaxExclusiveAmount', 'subcontractApprovedAmount']
       .every(key => money(value[key]))
+      && subcontractActualApprovedSummary(value.subcontractActualApproved)
 }
 
 function listSummary(value: unknown): boolean {
@@ -218,7 +233,7 @@ function detailFile(value: unknown): boolean {
 }
 
 function detailDocument(value: unknown): boolean {
-  if (!object(value) || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty'].includes(String(value.kind)))
+  if (!object(value) || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(String(value.kind)))
     return false
   return ['id', 'no', 'name', 'documentType', 'periodNo', 'status', 'note', 'version', 'updatedAt']
     .every(key => typeof value[key] === 'string')
@@ -231,7 +246,8 @@ function detailDocument(value: unknown): boolean {
       && nullableString(value.quantityEvidence.basis) && nullableString(value.quantityEvidence.sourceVersion)
       && nullableDateTime(value.quantityEvidence.sourceUpdatedAt) && typeof value.quantityEvidence.operatorName === 'string'
       && nullableDateTime(value.quantityEvidence.submittedAt)))
-    && amounts(value.amounts) && entityRef(value.project) && entityRef(value.customer) && entityRef(value.contract)
+    && amounts(value.amounts) && entityRef(value.project) && entityRef(value.customer)
+    && entityRef(value.supplier) && entityRef(value.contract)
     && isISODateTimeDTO(value.updatedAt)
 }
 
@@ -261,7 +277,8 @@ function lookup(value: unknown): boolean {
 
 function contractLookup(value: unknown): boolean {
   return lookup(value) && object(value) && typeof value.projectId === 'string'
-    && nullableString(value.customerId)
+    && nullableString(value.customerId) && nullableString(value.supplierId)
+    && ['construction', 'subcontract'].includes(String(value.kind))
     && (value.changedContractAmount === null || finite(value.changedContractAmount))
     && (value.receivedAmount === null || finite(value.receivedAmount))
 }
@@ -312,24 +329,32 @@ async function read<T>(request: () => Promise<unknown>, decode: (value: unknown)
   }
 }
 
-function decodeList(value: unknown): OwnerCommercialDocumentListPageDTO {
+function decodeList(value: unknown, expected: OwnerCommercialDocumentListQueryDTO): OwnerCommercialDocumentListPageDTO {
+  const requiredCapability = expected.kind === 'sub_change' ? 'subcontract-document:read' : 'owner-document:read'
   if (!object(value) || !Array.isArray(value.items) || !value.items.every(listItem)
     || !object(value.pagination) || !count(value.pagination.page, 1)
     || !count(value.pagination.pageSize, 1) || !count(value.pagination.total)
     || !listSummary(value.summary) || !strings(value.capabilities)
     || !isISODateTimeDTO(value.asOf) || !nullableString(value.sourceVersion)
     || !(value.empty === null || (object(value.empty) && typeof value.empty.reason === 'string'
-      && strings(value.empty.missingRelations)))) {
+      && strings(value.empty.missingRelations)))
+    || value.pagination.page !== expected.page || value.pagination.pageSize !== expected.pageSize
+    || !value.capabilities.includes(requiredCapability)
+    || !value.items.every(item => object(item)
+      && item.kind === expected.kind
+      && (expected.origin ? item.dataOrigin === expected.origin : expected.includeDemo || item.dataOrigin === 'real'))) {
     return malformed('甲方商务单据列表')
   }
   return value as unknown as OwnerCommercialDocumentListPageDTO
 }
 
-function decodeDetail(value: unknown): OwnerCommercialDocumentDetailReadDTO {
+function decodeDetail(value: unknown, expected: OwnerCommercialDocumentDetailQueryDTO): OwnerCommercialDocumentDetailReadDTO {
+  const requiredCapability = expected.kind === 'sub_change' ? 'subcontract-document:read' : 'owner-document:read'
   if (!object(value) || !isDataOriginDTO(value.dataOrigin) || !detailDocument(value.document)
     || !Array.isArray(value.lines) || !value.lines.every(documentLine)
     || !Array.isArray(value.files) || !value.files.every(detailFile)
     || !navigation(value.projectNavigation) || !navigation(value.customerNavigation)
+    || !navigation(value.supplierNavigation)
     || !navigation(value.contractNavigation) || !navigation(value.sourceNavigation)
     || !navigation(value.documentNavigation) || !acceptanceView(value.acceptanceView)
     || !Array.isArray(value.lifecycleEvents) || !value.lifecycleEvents.every(lifecycleEvent)
@@ -338,7 +363,10 @@ function decodeDetail(value: unknown): OwnerCommercialDocumentDetailReadDTO {
     || !object(value.document)
     || (value.document.kind === 'owner_penalty' ? value.ownerPenaltyFacts === null : value.ownerPenaltyFacts !== null)
     || !strings(value.capabilities) || !isISODateTimeDTO(value.asOf)
-    || !nullableString(value.sourceVersion)) {
+    || !nullableString(value.sourceVersion)
+    || value.dataOrigin !== expected.origin
+    || !object(value.document) || value.document.kind !== expected.kind || value.document.id !== expected.id
+    || !value.capabilities.includes(requiredCapability)) {
     return malformed('甲方商务单据详情')
   }
   return value as unknown as OwnerCommercialDocumentDetailReadDTO
@@ -350,6 +378,7 @@ function decodeContext(value: unknown): OwnerCommercialDocumentCommandContextDTO
     || !value.capabilities.every(entry => typeof entry === 'string')
     || !value.projects.every(entry => lookup(entry) && object(entry) && nullableString(entry.customerId))
     || !Array.isArray(value.customers) || !value.customers.every(lookup)
+    || !Array.isArray(value.suppliers) || !value.suppliers.every(lookup)
     || !Array.isArray(value.contracts) || !value.contracts.every(contractLookup)) {
     return malformed('甲方商务单据命令上下文')
   }
@@ -383,7 +412,7 @@ function draftLine(value: unknown, kind: 'owner_change' | 'owner_report'): boole
 
 function formDraft(
   value: unknown,
-  kind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty',
+  kind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change',
   expectedId: string,
 ): boolean {
   if (!object(value) || value.id !== expectedId || typeof value.no !== 'string'
@@ -392,7 +421,7 @@ function formDraft(
     || typeof value.sourceType !== 'string' || typeof value.sourceId !== 'string'
     || typeof value.sourceLocked !== 'boolean' || typeof value.note !== 'string'
     || !Array.isArray(value.lines)
-    || (kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty'
+    || (kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change'
       && !value.lines.every(line => draftLine(line, kind)))) {
     return false
   }
@@ -413,6 +442,14 @@ function formDraft(
       && (value.penaltyDate === '' || isISODateDTO(value.penaltyDate))
       && typeof value.reason === 'string' && typeof value.appealNote === 'string'
       && value.lines.length === 0
+  }
+  if (kind === 'sub_change') {
+    return nullableString(value.supplierId) && typeof value.changeType === 'string'
+      && typeof value.changeDate === 'string' && (value.changeDate === '' || isISODateDTO(value.changeDate))
+      && finite(value.approvedAmount)
+      && (value.changedArea === null || finite(value.changedArea))
+      && (value.actualApprovedPrice === null || finite(value.actualApprovedPrice))
+      && typeof value.reason === 'string' && value.lines.length === 0
   }
   if (typeof value.applicationDate !== 'string'
     || !(value.applicationDate === '' || isISODateDTO(value.applicationDate))) {
@@ -448,7 +485,7 @@ function formDraft(
 
 function decodeForm(
   value: unknown,
-  expectedKind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty',
+  expectedKind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change',
   expectedId: string,
 ): OwnerCommercialDocumentFormReadDTO {
   const expectedOwnerType = expectedKind === 'owner_change'
@@ -459,7 +496,9 @@ function decodeForm(
         ? 'owner_final_settlement'
         : expectedKind === 'owner_penalty'
           ? 'owner_penalty'
-          : 'project_acceptance'
+          : expectedKind === 'sub_change'
+            ? 'subcontract_change_order'
+            : 'project_acceptance'
   if (!object(value) || value.kind !== expectedKind || value.id !== expectedId
     || !formDraft(value.draft, expectedKind, expectedId)
     || !Array.isArray(value.attachments)
@@ -491,11 +530,11 @@ export function createHttpOwnerCommercialDocumentReadRepository(
   return {
     list: query => read(
       () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query } }),
-      decodeList,
+      value => decodeList(value, query),
     ),
     get: query => read(
       () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}/${encodeURIComponent(query.id)}`, { query: { ...query } }),
-      decodeDetail,
+      value => decodeDetail(value, query),
     ),
   }
 }
@@ -504,8 +543,8 @@ export function createHttpOwnerCommercialDocumentCommandRepository(
   options: { fetcher: OwnerCommercialDocumentHttpFetcher },
 ): OwnerCommercialDocumentCommandRepository {
   return {
-    context: () => read(
-      () => options.fetcher('/api/commands/owner-documents/context'),
+    context: kind => read(
+      () => options.fetcher('/api/commands/owner-documents/context', { query: kind ? { kind } : {} }),
       decodeContext,
     ),
     loadForm: (kind, id) => read(

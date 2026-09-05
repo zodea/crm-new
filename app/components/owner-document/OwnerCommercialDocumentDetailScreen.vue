@@ -99,6 +99,8 @@ const metrics = computed(() => {
     return []
   if (current.kind === 'owner_penalty')
     return [{ label: '罚扣金额', value: `-${yuan(Number(current.amount))}` }]
+  if (current.kind === 'sub_change')
+    return []
   return [
     { label: '合同估算金额', value: yuan(Number(current.contractEstimate)) },
     { label: '生命周期状态', value: detail.value?.document.approval.label ?? '—' },

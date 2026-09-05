@@ -59,9 +59,10 @@ const loading = computed(() => store.listLoadingFor(props.kind))
 const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
   && (props.kind === 'owner_change' || props.kind === 'owner_report'
-    || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'))
+    || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'
+    || props.kind === 'sub_change'))
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
-const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query)
+const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query, centralKind.value)
 
 const search = shallowRef(centralReadOnly.value ? initialNavigation.search : '')
 const projectFilter = shallowRef(centralReadOnly.value ? initialNavigation.projectId ?? 'all' : 'all')
@@ -85,7 +86,9 @@ const routeProject = computed(() => centralReadOnly.value
 const routeContract = computed(() => centralReadOnly.value
   ? String(route.query.contractId ?? '')
   : queryText('contract'))
-const routeSupplier = computed(() => queryText('supplier'))
+const routeSupplier = computed(() => centralReadOnly.value
+  ? String(route.query.supplierId ?? route.query.supplier ?? '')
+  : queryText('supplier'))
 
 const filtered = computed(() => centralReadOnly.value
   ? rows.value
@@ -109,7 +112,9 @@ const totalRows = computed(() => centralReadOnly.value
   : filtered.value.length)
 const centralSummary = computed(() => centralReadOnly.value ? store.centralSummaryFor(centralKind.value) : null)
 const canCreate = computed(() => !centralReadOnly.value
-  || store.centralCapabilitiesFor(centralKind.value).includes('owner-document:write'))
+  || store.centralCapabilitiesFor(centralKind.value).includes(
+    props.kind === 'sub_change' ? 'subcontract-document:write' : 'owner-document:write',
+  ))
 const journeyReturnTo = computed(() => centralReadOnly.value
   ? validateOwnerDocumentJourneyReturnTo(route.query.returnTo, centralKind.value, 'real')
   : null)
@@ -211,24 +216,36 @@ const emptyState = computed(() => {
   }
 })
 const summaries = computed(() =>
-  config.value.amountSummaries.map(summary => ({
-    label: summary.label,
-    value: centralSummary.value
-      ? props.kind === 'owner_change'
-        ? summary.field === 'amount'
-          ? Number(centralSummary.value.origins.real.taxInclusiveAmount)
-          : summary.field === 'secondaryAmount'
-            ? Number(centralSummary.value.origins.real.taxExclusiveAmount)
-            : Number(centralSummary.value.origins.real.appliedTaxExclusiveAmount)
-        : props.kind === 'owner_report'
+  config.value.amountSummaries.map((summary) => {
+    const subcontractActualApproved = centralSummary.value?.origins.real.subcontractActualApproved
+    return {
+      label: props.kind === 'sub_change' && summary.field !== 'amount' && subcontractActualApproved?.status === 'partial'
+        ? `${summary.label}（部分记录）`
+        : summary.label,
+      completeness: props.kind === 'sub_change' && summary.field !== 'amount'
+        ? subcontractActualApproved?.status ?? null
+        : null,
+      value: centralSummary.value
+        ? props.kind === 'sub_change'
           ? summary.field === 'amount'
-            ? Number(centralSummary.value.origins.real.reportedAmount)
-            : summary.field === 'secondaryAmount'
-              ? Number(centralSummary.value.origins.real.auditedAmount)
-              : Number(centralSummary.value.origins.real.auditedAmount) - Number(centralSummary.value.origins.real.reportedAmount)
-          : Number(centralSummary.value.origins.real.reportedAmount)
-      : filtered.value.reduce((total, row) => total + Number(row[summary.field] || 0), 0),
-  })),
+            ? Number(centralSummary.value.origins.real.subcontractApprovedAmount)
+            : subcontractActualApproved?.value == null ? null : Number(subcontractActualApproved.value)
+          : props.kind === 'owner_change'
+            ? summary.field === 'amount'
+              ? Number(centralSummary.value.origins.real.taxInclusiveAmount)
+              : summary.field === 'secondaryAmount'
+                ? Number(centralSummary.value.origins.real.taxExclusiveAmount)
+                : Number(centralSummary.value.origins.real.appliedTaxExclusiveAmount)
+            : props.kind === 'owner_report'
+              ? summary.field === 'amount'
+                ? Number(centralSummary.value.origins.real.reportedAmount)
+                : summary.field === 'secondaryAmount'
+                  ? Number(centralSummary.value.origins.real.auditedAmount)
+                  : Number(centralSummary.value.origins.real.auditedAmount) - Number(centralSummary.value.origins.real.reportedAmount)
+              : Number(centralSummary.value.origins.real.reportedAmount)
+        : filtered.value.reduce((total, row) => total + Number(row[summary.field] || 0), 0),
+    }
+  }),
 )
 
 function centralContractTarget(row: OwnerDocumentListRecord): string | null {
@@ -267,6 +284,7 @@ async function load() {
           search: search.value,
           projectId: projectFilter.value === 'all' ? null : projectFilter.value,
           contractId: routeContract.value || null,
+          supplierId: routeSupplier.value || null,
           status: statusView.value === 'all' ? null : statusView.value,
           documentType: typeFilter.value === 'all' ? null : typeFilter.value,
           variant: props.kind === 'acceptance' ? acceptanceVariant.value : null,
@@ -303,6 +321,7 @@ async function openEdit(row: OwnerDocumentListRecord) {
       search: search.value,
       projectId: projectFilter.value === 'all' ? null : projectFilter.value,
       contractId: routeContract.value || null,
+      supplierId: routeSupplier.value || null,
       status: statusView.value === config.value.defaultView ? null : statusView.value,
       documentType: typeFilter.value === 'all' ? null : typeFilter.value,
       origin: 'real',
@@ -334,6 +353,8 @@ async function clearRouteFilter(key: 'project' | 'contract' | 'supplier') {
     }
     if (key === 'contract')
       delete query.contractId
+    if (key === 'supplier')
+      delete query.supplierId
   }
   await navigateTo({ path: route.path, query }, { replace: true })
 }
@@ -350,6 +371,7 @@ async function resetFilters(showAllStatuses = false) {
     delete query.supplier
     delete query.projectId
     delete query.contractId
+    delete query.supplierId
     await navigateTo({ path: route.path, query }, { replace: true })
   }
 }
@@ -628,7 +650,7 @@ onActivated(async () => {
             </NuxtLink>
           </template>
           <template #project="{ row }">
-            <EntityLink :id="row.projectId" type="project" :label="row.projectName" />
+            <EntityLink :id="row.projectId" type="project" :label="row.projectName" :intent="row.projectNavigation" />
           </template>
           <template #contract="{ row }">
             <NuxtLink v-if="centralContractTarget(row)" :to="centralContractTarget(row)!" class="cell--link">
@@ -641,6 +663,7 @@ onActivated(async () => {
               :id="row.supplierId"
               type="supplier"
               :label="row.supplierName || row.crewName"
+              :intent="row.supplierNavigation"
             />
           </template>
           <template #type="{ row }">
@@ -676,6 +699,7 @@ onActivated(async () => {
         <span v-for="summary in summaries" :key="summary.label">
           {{ summary.label }}：
           <strong class="whitespace-nowrap font-mono text-ink">{{ yuan(summary.value) }}</strong>
+          <span v-if="summary.completeness === 'missing'" class="ml-1 text-ink-faint">尚未回填</span>
         </span>
         <button
           v-if="totalRows > 0 && (hasLocalFilters || contextFilters.length)"

@@ -15,6 +15,7 @@ import {
   SubcontractContractRepositoryProblem,
 } from '../../app/lib/subcontract-contract/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
+import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 export type SubcontractContractReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -81,9 +82,29 @@ function problem(code: 'forbidden' | 'unavailable', message: string, retryable =
   return new SubcontractContractRepositoryProblem({ ...subcontractContractProblem(code, message, retryable), traceId: `subcontract-contract-test-${code}` })
 }
 
+interface SubcontractChangeFactSource {
+  rows: (sessionId?: string | null) => readonly {
+    dataOrigin: 'demo' | 'real'
+    kind: string
+    id: string
+    contractId: string | null
+    no: string
+    name: string
+    amount: number
+    applicationDate: string | null
+    status: string
+  }[]
+  sourceVersion: (sessionId?: string | null) => string
+}
+
+function subcontractChangeStatusLabel(status: string): string {
+  return ({ draft: '草稿', submitted: '已提交', rejected: '已退回', approved: '已审批' } as Record<string, string>)[status] ?? status
+}
+
 export function createSubcontractContractReadTestInstance(
   resolveCapabilities: (sessionId?: string | null) => readonly string[] = id => demoWorkspaceTestInstance.capabilities(id),
   commandInstance = subcontractContractCommandTestInstance,
+  ownerDocumentSource: SubcontractChangeFactSource = ownerCommercialDocumentCommandTestInstance,
 ) {
   const scenarios = new Map<string, SubcontractContractReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -99,13 +120,29 @@ export function createSubcontractContractReadTestInstance(
       throw problem('forbidden', '无分包合同查看权限')
     const formalRows = commandInstance.rows()
     const formalFacts = commandInstance.facts()
+    const formalChanges: SubcontractContractFactSource[] = ownerDocumentSource.rows(sessionId)
+      .filter(row => row.dataOrigin === 'real' && row.kind === 'sub_change')
+      .map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        contractId: row.contractId,
+        no: row.no,
+        name: row.name,
+        amount: row.amount,
+        date: row.applicationDate,
+        status: subcontractChangeStatusLabel(row.status),
+      }))
+    const combinedFacts = {
+      ...formalFacts,
+      changes: [...formalFacts.changes, ...formalChanges],
+    }
     return {
       contracts: scenario === 'empty' ? formalRows : [...formalRows, ...demoContracts],
       facts: scenario === 'empty'
-        ? formalFacts
+        ? combinedFacts
         : {
             supplements: [...formalFacts.supplements, ...demoFacts.supplements],
-            changes: [...formalFacts.changes, ...demoFacts.changes],
+            changes: [...combinedFacts.changes, ...demoFacts.changes],
             invoices: [...formalFacts.invoices, ...demoFacts.invoices],
             paymentApplications: [...formalFacts.paymentApplications, ...demoFacts.paymentApplications],
             paymentRecords: [...formalFacts.paymentRecords, ...demoFacts.paymentRecords],
@@ -114,7 +151,7 @@ export function createSubcontractContractReadTestInstance(
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,
-      sourceVersion: commandInstance.sourceVersion(),
+      sourceVersion: `${commandInstance.sourceVersion()}+${ownerDocumentSource.sourceVersion(sessionId)}`,
     }
   }
 

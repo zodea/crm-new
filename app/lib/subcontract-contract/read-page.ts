@@ -243,7 +243,30 @@ export function buildSubcontractContractListPage(input: BuildListInput): Subcont
   }
 }
 
-function factNavigation(row: SubcontractContractFactSource, source: SubcontractContractDetailSource, kind: SubcontractContractFactKind): NavigationIntentDTO {
+function factNavigation(
+  row: SubcontractContractFactSource,
+  source: SubcontractContractDetailSource,
+  kind: SubcontractContractFactKind,
+  capabilities: readonly string[],
+): NavigationIntentDTO {
+  if (kind === 'change') {
+    if (source.dataOrigin !== 'real' || row.dataOrigin !== 'real')
+      return { kind: 'unavailable', reason: 'unverified-target' }
+    if (!capabilities.includes('subcontract-document:read'))
+      return { kind: 'unavailable', reason: 'forbidden' }
+    return {
+      kind: 'entity-detail',
+      subject: resolvedRef('subcontract-document', row.id, row.name, row.no || null),
+      variant: 'change',
+      view: null,
+      filters: {
+        dataOrigin: source.dataOrigin,
+        projectId: source.projectId,
+        supplierId: source.supplierId,
+        contractId: source.id,
+      },
+    }
+  }
   if (kind === 'supplement') {
     return {
       kind: 'entity-subview',
@@ -274,7 +297,12 @@ function factNavigation(row: SubcontractContractFactSource, source: SubcontractC
   return { kind: 'unavailable', reason: 'unverified-target' }
 }
 
-function mapFacts(rows: readonly SubcontractContractFactSource[], source: SubcontractContractDetailSource, kind: SubcontractContractFactKind): SubcontractContractFactDTO[] {
+function mapFacts(
+  rows: readonly SubcontractContractFactSource[],
+  source: SubcontractContractDetailSource,
+  kind: SubcontractContractFactKind,
+  capabilities: readonly string[],
+): SubcontractContractFactDTO[] {
   return sameContract(rows, source).map(row => ({
     id: row.id,
     no: row.no,
@@ -282,7 +310,7 @@ function mapFacts(rows: readonly SubcontractContractFactSource[], source: Subcon
     amount: row.amount == null ? null : money(row.amount),
     date: row.date,
     status: row.status,
-    navigation: factNavigation(row, source, kind),
+    navigation: factNavigation(row, source, kind, capabilities),
   }))
 }
 
@@ -298,10 +326,16 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
     throw new SubcontractContractRepositoryProblem(subcontractContractProblem('relationship-mismatch', '合同类型与分包合同详情不一致'))
   if (input.query.focusId) {
     const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
-    if (!supplement)
-      throw new SubcontractContractRepositoryProblem(subcontractContractProblem('not-found', '补充协议不存在或已删除'))
-    if (supplement.contractId !== source.id)
-      throw new SubcontractContractRepositoryProblem(subcontractContractProblem('relationship-mismatch', '补充协议与分包合同不匹配'))
+    const change = input.facts.changes.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
+    const focus = supplement ?? change
+    if (!focus)
+      throw new SubcontractContractRepositoryProblem(subcontractContractProblem('not-found', '聚焦的分包合同事实不存在或已删除'))
+    if (focus.contractId !== source.id) {
+      throw new SubcontractContractRepositoryProblem(subcontractContractProblem(
+        'relationship-mismatch',
+        change ? '分包变洽签与分包合同不匹配' : '补充协议与分包合同不匹配',
+      ))
+    }
   }
   const project = entityRef('project', source.projectId, source.projectName, source.projectPermission)
   const supplier = entityRef('supplier', source.supplierId, source.supplierName, source.supplierPermission)
@@ -338,18 +372,18 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
     projectNavigation: detailNavigation(project, source.dataOrigin),
     supplierNavigation: detailNavigation(supplier, source.dataOrigin),
     sections: {
-      supplements: mapFacts(input.facts.supplements, source, 'supplement'),
-      changes: mapFacts(input.facts.changes, source, 'change'),
-      invoices: mapFacts(input.facts.invoices, source, 'invoice'),
+      supplements: mapFacts(input.facts.supplements, source, 'supplement', input.capabilities),
+      changes: mapFacts(input.facts.changes, source, 'change', input.capabilities),
+      invoices: mapFacts(input.facts.invoices, source, 'invoice', input.capabilities),
       payments: {
-        applications: mapFacts(input.facts.paymentApplications, source, 'payment-application'),
-        records: mapFacts(input.facts.paymentRecords, source, 'payment-record'),
+        applications: mapFacts(input.facts.paymentApplications, source, 'payment-application', input.capabilities),
+        records: mapFacts(input.facts.paymentRecords, source, 'payment-record', input.capabilities),
       },
       settlements: {
-        progress: mapFacts(input.facts.settlements.filter(row => row.settlementKind === 'progress'), source, 'settlement'),
-        completion: mapFacts(input.facts.settlements.filter(row => row.settlementKind === 'completion'), source, 'settlement'),
+        progress: mapFacts(input.facts.settlements.filter(row => row.settlementKind === 'progress'), source, 'settlement', input.capabilities),
+        completion: mapFacts(input.facts.settlements.filter(row => row.settlementKind === 'completion'), source, 'settlement', input.capabilities),
       },
-      penalties: mapFacts(input.facts.penalties, source, 'penalty'),
+      penalties: mapFacts(input.facts.penalties, source, 'penalty', input.capabilities),
       materialUses: { currentWarehouse: [], legacy: [], emptyReason: 'missing-relation' },
       files: input.facts.files
         .filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)

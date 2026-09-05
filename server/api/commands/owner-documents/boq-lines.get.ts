@@ -7,6 +7,7 @@ export default defineEventHandler((event) => {
     ownerCommercialDocumentCommandTestInstance.context(
       resolveBusinessSession(),
       getHeader(event, 'x-ruihang-test-session'),
+      'owner_change',
     )
     const query = getQuery(event)
     return ownerCommercialDocumentCommandTestInstance.boqLinesFor(

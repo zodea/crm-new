@@ -26,6 +26,8 @@ const session = {
     'subcontract-contract:write',
     'owner-document:read',
     'owner-document:write',
+    'subcontract-document:read',
+    'subcontract-document:write',
   ],
 }
 
@@ -36,7 +38,7 @@ function source(): CoreMigrationSourceDTO {
     sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
     entities: {
       customers: [{ legacyId: 'customer-legacy-323', name: '既有甲方', deletedAt: null }],
-      suppliers: [],
+      suppliers: [{ legacyId: 'supplier-legacy-327', name: '既有劳务分供方', deletedAt: null }],
       crews: [],
       projects: [{
         legacyId: 'project-legacy-323',
@@ -77,7 +79,20 @@ function source(): CoreMigrationSourceDTO {
           }]),
         },
       }],
-      subcontract_contracts: [],
+      subcontract_contracts: [{
+        legacyId: 'subcontract-legacy-327',
+        name: '既有劳务分包合同',
+        references: { projectId: 'project-legacy-323', supplierId: 'supplier-legacy-327' },
+        amount: '680000.00' as const,
+        deletedAt: null,
+        attributes: {
+          no: 'FB-LEGACY-327',
+          status: '履约中',
+          subKind: '劳务',
+          content: '样板层劳务分包',
+          signDate: '2026-08-01',
+        },
+      }],
       contract_supplements: [{
         legacyId: 'supplement-legacy-325',
         name: '既有正式补充协议',
@@ -306,6 +321,35 @@ function source(): CoreMigrationSourceDTO {
             updatedAt: '2026-08-24T10:00:00.000Z',
           },
         },
+        {
+          legacyId: 'sub-change-legacy-327',
+          name: '样板层劳务范围调整',
+          references: {
+            projectId: 'project-legacy-323',
+            supplierId: 'supplier-legacy-327',
+            contractId: 'subcontract-legacy-327',
+          },
+          amount: '38000.00' as const,
+          deletedAt: null,
+          attributes: {
+            kind: 'sub_change',
+            no: 'FB-BG-LEGACY-327',
+            documentType: '增项',
+            sourceType: 'subcontract_change_order',
+            sourceLocked: 1,
+            periodNo: '',
+            applicationDate: '2026-08-27',
+            status: 'submitted',
+            statusNote: '已提交分包变洽签',
+            changedArea: 120,
+            actualApprovedPrice: 36000,
+            note: '按现场确认范围执行',
+            linesJson: '[]',
+            filesJson: '[]',
+            createdAt: '2026-08-27T00:00:00.000Z',
+            updatedAt: '2026-08-27T10:00:00.000Z',
+          },
+        },
       ],
       workers: [],
       project_suppliers: [],
@@ -318,6 +362,119 @@ function source(): CoreMigrationSourceDTO {
 }
 
 describe('甲方商务单据受控中央迁移', () => {
+  it('dry-run 阻断甲方与分包商务单据缺失或错配的专属关系', async () => {
+    const scenarios = [
+      {
+        suffix: 'missing-supplier',
+        documentLegacyId: 'sub-change-legacy-327',
+        field: 'supplierId',
+        metricKey: 'orphan',
+        mutate: (invalidSource: CoreMigrationSourceDTO) => {
+          const document = invalidSource.entities.owner_documents
+            .find(row => row.legacyId === 'sub-change-legacy-327')!
+          document.references!.supplierId = null
+        },
+      },
+      {
+        suffix: 'construction-contract',
+        documentLegacyId: 'sub-change-legacy-327',
+        field: 'contractId',
+        metricKey: 'orphan',
+        mutate: (invalidSource: CoreMigrationSourceDTO) => {
+          const document = invalidSource.entities.owner_documents
+            .find(row => row.legacyId === 'sub-change-legacy-327')!
+          document.references!.contractId = 'contract-legacy-323'
+        },
+      },
+      {
+        suffix: 'supplier-mismatch',
+        documentLegacyId: 'sub-change-legacy-327',
+        field: 'contractId',
+        metricKey: 'missing-relation',
+        mutate: (invalidSource: CoreMigrationSourceDTO) => {
+          invalidSource.entities.suppliers.push({
+            legacyId: 'supplier-other-327',
+            name: '另一劳务分供方',
+            deletedAt: null,
+          })
+          const document = invalidSource.entities.owner_documents
+            .find(row => row.legacyId === 'sub-change-legacy-327')!
+          document.references!.supplierId = 'supplier-other-327'
+        },
+      },
+      {
+        suffix: 'owner-to-subcontract',
+        documentLegacyId: 'change-legacy-323',
+        field: 'contractId',
+        metricKey: 'orphan',
+        mutate: (invalidSource: CoreMigrationSourceDTO) => {
+          const document = invalidSource.entities.owner_documents
+            .find(row => row.legacyId === 'change-legacy-323')!
+          document.references!.contractId = 'subcontract-legacy-327'
+        },
+      },
+    ] as const
+
+    for (const scenario of scenarios) {
+      const core = createCoreMigrationTestInstance({
+        createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+        now: () => '2026-08-27T10:00:00.000Z',
+      })
+      const invalidSource = structuredClone(source())
+      scenario.mutate(invalidSource)
+      const { sourceHash: _sourceHash, ...withoutHash } = invalidSource
+      invalidSource.sourceHash = createHash('sha256')
+        .update(coreMigrationSourceHashInput(withoutHash as CoreMigrationSourceDTO))
+        .digest('hex')
+      const envelope = (commandId: string) => ({
+        workspaceId: session.workspaceId,
+        actorId: session.actorId,
+        requiredCapability: CORE_MIGRATION_CAPABILITY,
+        commandId,
+      })
+      await core.preflight({
+        ...envelope(`preflight-sub-change-${scenario.suffix}-327`),
+        source: invalidSource,
+        backup: null,
+      }, session)
+      const snapshotSha256 = createHash('sha256').update(scenario.suffix).digest('hex')
+      const dryRun = await core.dryRun({
+        ...envelope(`dry-run-sub-change-${scenario.suffix}-327`),
+        source: invalidSource,
+        backup: {
+          backupId: `core-migration-${invalidSource.sourceHash}-${snapshotSha256}`,
+          sourceHash: invalidSource.sourceHash,
+          sourceVersion: invalidSource.sourceVersion,
+          snapshotSha256,
+          byteLength: 327,
+          createdAt: '2026-08-27T10:00:00.000Z',
+          immutable: true,
+        },
+      }, session)
+
+      expect(dryRun.steps.find(step => step.entityType === 'owner_documents')).toMatchObject({
+        sourceCount: invalidSource.entities.owner_documents.length,
+        importableCount: invalidSource.entities.owner_documents.length - 1,
+        skippedCount: 1,
+      })
+      expect(dryRun.mappings).not.toContainEqual(expect.objectContaining({
+        entityType: 'owner_documents',
+        legacyId: scenario.documentLegacyId,
+      }))
+      expect(dryRun.issues).toContainEqual(expect.objectContaining({
+        entityType: 'owner_documents',
+        legacyId: scenario.documentLegacyId,
+        field: scenario.field,
+        metricKey: scenario.metricKey,
+        attribution: 'missing-source',
+      }))
+      await expect(core.importBatch({
+        ...envelope(`import-sub-change-${scenario.suffix}-327`),
+        batchId: dryRun.batchId,
+      }, session)).rejects.toThrow('dry-run 存在阻断问题')
+    }
+  })
+
   it.each([
     [0, 'approvalSequenceAt', 'invalid-time', '签证执行时间无效'],
     [0, 'applicationDate', '2026-02-30', '申报日期无效'],
@@ -675,8 +832,8 @@ describe('甲方商务单据受控中央迁移', () => {
 
     expect(dryRun.steps).toContainEqual({
       entityType: 'owner_documents',
-      sourceCount: 5,
-      importableCount: 5,
+      sourceCount: 6,
+      importableCount: 6,
       skippedCount: 0,
     })
     await core.importBatch({ ...envelope('import-323'), batchId: dryRun.batchId }, session)
@@ -689,6 +846,7 @@ describe('甲方商务单据受控中央迁移', () => {
       'acceptance',
       'final_settlement',
       'owner_penalty',
+      'sub_change',
     ])
     expect(rows.filter(row => row.kind === 'owner_change')).toHaveLength(1)
     const changeId = 'central-owner_documents-change-legacy-323'
@@ -784,6 +942,25 @@ describe('甲方商务单据受控中央迁移', () => {
       },
       files: [{ id: 'file-owner-penalty-legacy-326', category: 'contact-letter' }],
     })
+    const subcontractChangeId = 'central-owner_documents-sub-change-legacy-327'
+    const subcontractChangeDetail = buildOwnerCommercialDocumentDetail({
+      documents: rows,
+      query: parseOwnerCommercialDocumentDetailQuery('sub_change', subcontractChangeId, { origin: 'real' }),
+      asOf: '2026-08-27T10:00:00.000Z',
+      sourceVersion: commands.sourceVersion(),
+      capabilities: session.capabilities,
+    })
+    expect(subcontractChangeDetail).toMatchObject({
+      document: {
+        id: subcontractChangeId,
+        kind: 'sub_change',
+        project: { state: 'resolved', id: 'central-projects-project-legacy-323' },
+        supplier: { state: 'resolved', id: 'central-suppliers-supplier-legacy-327' },
+        contract: { state: 'resolved', id: 'central-subcontract_contracts-subcontract-legacy-327' },
+        amounts: { kind: 'sub_change', approved: '38000.00', changedArea: '120', actualApproved: '36000.00' },
+      },
+    })
+    expect(rows.find(row => row.id === subcontractChangeId)?.auditedAmount).toBeNull()
     expect(commands.boqLinesFor(
       'central-projects-project-legacy-323',
       'central-construction_contracts-contract-legacy-323',

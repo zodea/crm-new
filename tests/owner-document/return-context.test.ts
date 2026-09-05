@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createOwnerDocumentProjectReturnOrigin,
   createOwnerDocumentReturnOrigin,
+  ownerDocumentListNavigationStateFromQuery,
   resolveOwnerDocumentProjectReturnOrigin,
   resolveOwnerDocumentReturnContext,
   validateOwnerDocumentDetailReturnTo,
@@ -32,6 +33,39 @@ describe('甲方商务单据返回上下文', () => {
       now: 1500,
       load: () => origin,
     })).toBeNull()
+  })
+
+  it('分包变洽签沿用受限列表、项目卡片与分包合同返回链', () => {
+    const projectReturnTo = '/project/project-327?origin=real&ownerJourney=origin_327_sub#project-owner-document-card-sub-change'
+    expect(createOwnerDocumentProjectReturnOrigin({
+      contextId: 'origin_327_sub',
+      returnTo: projectReturnTo,
+      anchorId: 'project-owner-document-card-sub-change',
+      scrollTop: 327,
+      now: 1000,
+    }).returnTo).toBe(projectReturnTo)
+
+    const list = '/subcontract/change?origin=real&nav=origin_327_list#owner-document-row-real%3Asub_change%3Asub-change-327'
+    const contract = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327'
+    const detail = `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contract)}`
+    expect(validateOwnerDocumentListReturnTo(list, 'sub_change', 'real')).toBe(list)
+    expect(validateOwnerDocumentJourneyReturnTo(contract, 'sub_change', 'real')).toBe(contract)
+    expect(validateOwnerDocumentJourneyReturnTo(projectReturnTo, 'sub_change', 'real')).toBe(projectReturnTo)
+    expect(validateOwnerDocumentDetailReturnTo(detail, 'real')).toBe(detail)
+    expect(validateOwnerDocumentJourneyReturnTo(contract.replace('origin=real', 'origin=demo'), 'sub_change', 'real')).toBeNull()
+  })
+
+  it('按单据领域隔离合同来源，并允许分包变洽签返回匹配分供方详情', () => {
+    const construction = '/contract/construction-327?origin=real&contractKind=construction&tab=changes'
+    const subcontract = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes'
+    const supplier = '/base/supplier/supplier-327?origin=real'
+
+    expect(validateOwnerDocumentJourneyReturnTo(subcontract, 'owner_change', 'real')).toBeNull()
+    expect(validateOwnerDocumentJourneyReturnTo(construction, 'sub_change', 'real')).toBeNull()
+    expect(validateOwnerDocumentJourneyReturnTo(supplier, 'sub_change', 'real')).toBe(supplier)
+    expect(validateOwnerDocumentJourneyReturnTo(supplier, 'owner_change', 'real')).toBeNull()
+    expect(ownerDocumentListNavigationStateFromQuery({ returnTo: subcontract }, 'owner_change').returnTo).toBeNull()
+    expect(ownerDocumentListNavigationStateFromQuery({ returnTo: construction }, 'sub_change').returnTo).toBeNull()
   })
 
   it('白名单化列表筛选、分页、行锚点与滚动位置', () => {
@@ -71,6 +105,8 @@ describe('甲方商务单据返回上下文', () => {
   it('表单和关系下钻只接受同来源的稳定单据详情返回链', () => {
     const detail = '/owner/report/report-323?origin=real&returnTo=%2Fproject%2Fproject-323%3Forigin%3Dreal'
     expect(validateOwnerDocumentDetailReturnTo(detail, 'real')).toBe(detail)
+    expect(validateOwnerDocumentDetailReturnTo(detail, 'real', 'sub_change')).toBeNull()
+    expect(validateOwnerDocumentDetailReturnTo('/subcontract/change/sub-change-327?origin=real', 'real', 'owner_report')).toBeNull()
     expect(validateOwnerDocumentDetailReturnTo(detail, 'demo')).toBeNull()
     expect(validateOwnerDocumentDetailReturnTo('/owner/report/%2F?origin=real', 'real')).toBeNull()
   })

@@ -293,6 +293,46 @@ describe('唯一 Target Registry', () => {
       .toEqual({ state: 'resolved', label: '项目一', to: '/project/project-1?origin=demo' })
   })
 
+  it('分包变洽签专属详情、关系下钻与合同事实来源形成受限返回链', () => {
+    const contractReturnTo = '/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327'
+    const detailReturnTo = `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contractReturnTo)}`
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'subcontract-document', id: 'sub-change-327', label: '样板层范围调整', no: 'FB-BQ-327' },
+      variant: 'change',
+      view: null,
+      filters: { dataOrigin: 'real', projectId: 'project-327', supplierId: 'supplier-327', contractId: 'subcontract-327' },
+    }, { returnTo: contractReturnTo, returnContextId: 'origin_327_sub' })).toEqual({
+      state: 'resolved',
+      label: '样板层范围调整',
+      to: `/subcontract/change/sub-change-327?origin=real&returnTo=${encodeURIComponent(contractReturnTo)}&returnContext=origin_327_sub`,
+    })
+
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'supplier', id: 'supplier-327', label: '中央分供方', no: null },
+      variant: 'detail',
+      view: null,
+      filters: { dataOrigin: 'real' },
+    }, { returnTo: detailReturnTo })).toEqual({
+      state: 'resolved',
+      label: '中央分供方',
+      to: `/base/supplier/supplier-327?origin=real&returnTo=${encodeURIComponent(detailReturnTo)}`,
+    })
+
+    expect(resolveNavigationTarget({
+      kind: 'entity-detail',
+      subject: { state: 'resolved', entity: 'contract', id: 'subcontract-327', label: '中央分包合同', no: 'FB-327' },
+      variant: 'subcontract-document-source',
+      view: 'sub-change-327',
+      filters: { dataOrigin: 'real', contractKind: '分包', subcontractTab: 'changes' },
+    }, { returnTo: detailReturnTo })).toEqual({
+      state: 'resolved',
+      label: '中央分包合同',
+      to: `/contract/subcontract-327?origin=real&contractKind=subcontract&tab=changes&focus=sub-change-327&returnTo=${encodeURIComponent(detailReturnTo)}`,
+    })
+  })
+
   it('材料采购合同详情保留显式数据来源', () => {
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
