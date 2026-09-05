@@ -17,7 +17,7 @@ describe('f5 单据页面模型', () => {
       expect(ownerDocumentKindFromRoute(meta.routeScope, meta.routeKind)).toBe(kind)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META)).toBe(`${meta.listPath}/new`)
       expect(ownerDocumentFormPath(kind as keyof typeof OWNER_DOCUMENT_META, 'f5_1')).toBe(
-        ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(kind)
+        ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement'].includes(kind)
           ? `${meta.listPath}/form/f5_1`
           : `${meta.listPath}/f5_1`,
       )

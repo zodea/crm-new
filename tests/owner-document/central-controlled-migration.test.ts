@@ -362,6 +362,41 @@ function source(): CoreMigrationSourceDTO {
 }
 
 describe('甲方商务单据受控中央迁移', () => {
+  it('aX02 将统一支出结算按分包合同外键迁入，保留确认、金额和附件身份', async () => {
+    const commands = createOwnerCommercialDocumentCommandTestInstance()
+    const core = createCoreMigrationTestInstance({
+      createServerId: input => `central-${input.entityType}-${input.legacyId}`,
+      now: () => '2026-09-05T00:00:00.000Z',
+      afterConfirm: snapshot => commands.synchronizeMigrationSnapshot(snapshot),
+    })
+    const migrationSource = source()
+    const template = migrationSource.entities.owner_documents.find(row => row.attributes?.kind === 'sub_change')!
+    migrationSource.entities.owner_documents = [{
+      ...structuredClone(template),
+      legacyId: 'settlement-legacy-328',
+      name: '八月劳务结算',
+      amount: '28000.00',
+      attributes: { ...template.attributes, kind: 'sub_settlement', no: 'FBJS-328', documentType: '过程结算', sourceType: 'expenditure_settlement', status: 'confirmed', settlementDifferenceNote: '按合同扣款', filesJson: JSON.stringify([{ id: 'file-328', fileName: '结算单.pdf', fileSize: 328, mimeType: 'application/pdf', category: '结算单', uploader: '经办', uploadedAt: null, deletedAt: null }]) },
+    }]
+    migrationSource.sourceHash = createHash('sha256').update(coreMigrationSourceHashInput(migrationSource)).digest('hex')
+    const envelope = (commandId: string) => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, commandId })
+    await core.preflight({ ...envelope('preflight-328'), source: migrationSource, backup: null }, session)
+    const snapshotSha256 = 'a'.repeat(64)
+    const dryRun = await core.dryRun({ ...envelope('dry-328'), source: migrationSource, backup: {
+      backupId: `core-migration-${migrationSource.sourceHash}-${snapshotSha256}`,
+      sourceHash: migrationSource.sourceHash,
+      sourceVersion: migrationSource.sourceVersion,
+      snapshotSha256,
+      byteLength: 328,
+      createdAt: '2026-09-05T00:00:00.000Z',
+      immutable: true,
+    } }, session)
+    await core.importBatch({ ...envelope('import-328'), batchId: dryRun.batchId }, session)
+    await core.confirm({ ...envelope('confirm-328'), batchId: dryRun.batchId }, session)
+    const form = commands.form('sub_settlement', 'central-owner_documents-settlement-legacy-328', session)
+    expect(form.draft).toMatchObject({ totalAmount: 28000, status: 'confirmed', deductionNote: '按合同扣款', contractId: 'central-subcontract_contracts-subcontract-legacy-327', supplierId: 'central-suppliers-supplier-legacy-327' })
+    expect(form.attachments[0]).toMatchObject({ ownerType: 'expenditure_settlement', fileName: '结算单.pdf' })
+  })
   it('dry-run 阻断甲方与分包商务单据缺失或错配的专属关系', async () => {
     const scenarios = [
       {

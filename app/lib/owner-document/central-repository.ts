@@ -9,11 +9,13 @@ import type {
   ProblemDTO,
   QuantityDTO,
 } from '../../types/read-model'
+import type { SubcontractSettlementAmounts, SubcontractSettlementEvidence } from './subcontract-settlement'
 import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
+import { subcontractSettlementAmounts } from './subcontract-settlement'
 
-export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'] as const
+export const OWNER_COMMERCIAL_DOCUMENT_KINDS = ['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement'] as const
 export type OwnerCommercialDocumentKind = typeof OWNER_COMMERCIAL_DOCUMENT_KINDS[number]
 export const OWNER_ACCEPTANCE_VIEW_VARIANTS = ['acceptance', 'warranty'] as const
 export type OwnerAcceptanceViewVariant = typeof OWNER_ACCEPTANCE_VIEW_VARIANTS[number]
@@ -118,7 +120,7 @@ export interface OwnerCommercialDocumentSource {
   contractNo: string
   contractName: string
   contractPermission: 'allowed' | 'forbidden'
-  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement' | 'owner_penalty' | 'subcontract_change_order'
+  sourceType: 'boq_change_order' | 'manual' | 'monthly_statement' | 'owner_final_settlement' | 'owner_penalty' | 'subcontract_change_order' | 'expenditure_settlement'
   sourceId: string
   sourceLocked: boolean
   periodNo: string
@@ -152,6 +154,8 @@ export interface OwnerCommercialDocumentSource {
   noticeNo?: string
   penaltyReason?: string
   appealNote?: string
+  deductionNote?: string
+  subcontractSettlementEvidence?: SubcontractSettlementEvidence
 }
 
 export interface OwnerCommercialDocumentListQueryDTO {
@@ -178,41 +182,42 @@ export interface OwnerCommercialDocumentDetailQueryDTO {
 }
 
 export type OwnerCommercialDocumentAmountsDTO
-  = | {
-    kind: 'owner_change'
-    boqChange: MoneyDTO
-    taxInclusive: MoneyDTO
-    taxExclusive: MoneyDTO
-    appliedTaxExclusive: MoneyDTO
-  }
-  | {
-    kind: 'owner_report'
-    reported: MoneyDTO
-    audited: MoneyDTO | null
-    difference: MoneyDTO | null
-  }
-  | {
-    kind: 'acceptance'
-    contractEstimate: MoneyDTO
-  }
-  | {
-    kind: 'final_settlement'
-    declared: MoneyDTO
-    audited: MoneyDTO | null
-    changedContract: MoneyDTO | null
-    cumulativeReceipts: MoneyDTO | null
-    receiptDifference: MoneyDTO | null
-  }
-  | {
-    kind: 'owner_penalty'
-    amount: MoneyDTO
-  }
-  | {
-    kind: 'sub_change'
-    approved: MoneyDTO
-    changedArea: QuantityDTO | null
-    actualApproved: MoneyDTO | null
-  }
+  = | SubcontractSettlementAmounts
+    | {
+      kind: 'owner_change'
+      boqChange: MoneyDTO
+      taxInclusive: MoneyDTO
+      taxExclusive: MoneyDTO
+      appliedTaxExclusive: MoneyDTO
+    }
+    | {
+      kind: 'owner_report'
+      reported: MoneyDTO
+      audited: MoneyDTO | null
+      difference: MoneyDTO | null
+    }
+    | {
+      kind: 'acceptance'
+      contractEstimate: MoneyDTO
+    }
+    | {
+      kind: 'final_settlement'
+      declared: MoneyDTO
+      audited: MoneyDTO | null
+      changedContract: MoneyDTO | null
+      cumulativeReceipts: MoneyDTO | null
+      receiptDifference: MoneyDTO | null
+    }
+    | {
+      kind: 'owner_penalty'
+      amount: MoneyDTO
+    }
+    | {
+      kind: 'sub_change'
+      approved: MoneyDTO
+      changedArea: QuantityDTO | null
+      actualApproved: MoneyDTO | null
+    }
 
 export type OwnerAcceptanceViewDTO
   = {
@@ -341,6 +346,7 @@ export interface OwnerCommercialDocumentDetailReadDTO {
     supplier: EntityRefDTO & { entity: 'supplier' }
     contract: EntityRefDTO & { entity: 'contract' }
     note: string
+    deductionNote?: string
     version: string
     updatedAt: ISODateTimeDTO
   }
@@ -548,6 +554,8 @@ function finalSettlementSourceStatusLabel(kind: 'contract-supplement' | 'receipt
 }
 
 function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocumentAmountsDTO {
+  if (source.kind === 'sub_settlement')
+    return subcontractSettlementAmounts(source, source.subcontractSettlementEvidence)
   if (source.kind === 'sub_change') {
     return {
       kind: 'sub_change',
@@ -598,6 +606,8 @@ function amounts(source: OwnerCommercialDocumentSource): OwnerCommercialDocument
 }
 
 function statusLabel(kind: OwnerCommercialDocumentKind, status: string): string {
+  if (kind === 'sub_settlement')
+    return ({ draft: '草稿', confirmed: '已确认' } as Record<string, string>)[status] ?? status
   const labels: Record<string, string> = kind === 'sub_change'
     ? { draft: '草稿', submitted: '已提交', rejected: '已退回', approved: '已审批' }
     : kind === 'owner_change'
@@ -654,22 +664,24 @@ function documentNavigation(
     kind: 'entity-detail',
     subject: {
       state: 'resolved',
-      entity: source.kind === 'sub_change' ? 'subcontract-document' : 'owner-document',
+      entity: source.kind === 'sub_change' || source.kind === 'sub_settlement' ? 'subcontract-document' : 'owner-document',
       id: source.id,
       label: source.name,
       no: source.no || null,
     },
-    variant: source.kind === 'owner_change'
-      ? 'change'
-      : source.kind === 'sub_change'
+    variant: source.kind === 'sub_settlement'
+      ? 'settlement'
+      : source.kind === 'owner_change'
         ? 'change'
-        : source.kind === 'owner_report'
-          ? 'report'
-          : source.kind === 'final_settlement'
-            ? 'final-settlement'
-            : source.kind === 'owner_penalty'
-              ? 'penalty'
-              : acceptanceVariant ?? 'acceptance',
+        : source.kind === 'sub_change'
+          ? 'change'
+          : source.kind === 'owner_report'
+            ? 'report'
+            : source.kind === 'final_settlement'
+              ? 'final-settlement'
+              : source.kind === 'owner_penalty'
+                ? 'penalty'
+                : acceptanceVariant ?? 'acceptance',
     view: null,
     filters: { dataOrigin: source.dataOrigin },
   }
@@ -727,6 +739,8 @@ function relations(source: OwnerCommercialDocumentSource) {
 }
 
 function statusMatches(source: OwnerCommercialDocumentSource, requested: string | null): boolean {
+  if (source.kind === 'sub_settlement' && requested === 'pending')
+    return source.status === 'draft'
   if (!requested)
     return true
   if (source.kind === 'final_settlement') {
@@ -807,7 +821,7 @@ export function buildOwnerCommercialDocumentListPage(
       supplier,
       supplierNavigation: relationNavigation(supplier, source.dataOrigin),
       contract,
-      contractNavigation: relationNavigation(contract, source.dataOrigin, source.kind === 'sub_change' ? '分包' : '施工'),
+      contractNavigation: relationNavigation(contract, source.dataOrigin, (source.kind === 'sub_change' || source.kind === 'sub_settlement') ? '分包' : '施工'),
       navigation: documentNavigation(source, input.query.variant ?? null),
       acceptanceView: acceptanceView(source, input.query.variant ?? null),
       ownerPenaltyFacts: source.kind === 'owner_penalty'
@@ -992,6 +1006,7 @@ export function buildOwnerCommercialDocumentDetail(
       supplier,
       contract,
       note: source.note,
+      ...(source.kind === 'sub_settlement' ? { deductionNote: source.deductionNote ?? '' } : {}),
       version: String(source.version),
       updatedAt: source.updatedAt,
     },
@@ -1025,45 +1040,45 @@ export function buildOwnerCommercialDocumentDetail(
     projectNavigation: relationNavigation(project, source.dataOrigin),
     customerNavigation: relationNavigation(customer, source.dataOrigin),
     supplierNavigation: relationNavigation(supplier, source.dataOrigin),
-    contractNavigation: relationNavigation(contract, source.dataOrigin, source.kind === 'sub_change' ? '分包' : '施工'),
+    contractNavigation: relationNavigation(contract, source.dataOrigin, (source.kind === 'sub_change' || source.kind === 'sub_settlement') ? '分包' : '施工'),
     sourceNavigation: source.sourceId
-      ? source.kind === 'sub_change'
-        ? contract.state === 'resolved' && project.state === 'resolved' && supplier.state === 'resolved'
-          ? {
-              kind: 'entity-detail',
-              subject: contract,
-              variant: 'subcontract-document-source',
-              view: source.sourceId,
-              filters: {
-                dataOrigin: source.dataOrigin,
-                contractKind: '分包',
-                subcontractTab: 'changes',
-              },
-            }
-          : { kind: 'unavailable', reason: 'missing-id' }
-        : source.sourceType === 'manual' && source.kind !== 'acceptance'
-          ? { kind: 'unavailable', reason: 'not-connected' }
-          : contract.state === 'resolved' && project.state === 'resolved'
+      ? (source.kind === 'sub_change' || source.kind === 'sub_settlement')
+          ? contract.state === 'resolved' && project.state === 'resolved' && supplier.state === 'resolved'
             ? {
                 kind: 'entity-detail',
                 subject: contract,
-                variant: 'owner-document-source',
+                variant: 'subcontract-document-source',
                 view: source.sourceId,
                 filters: {
                   dataOrigin: source.dataOrigin,
-                  contractKind: '施工',
-                  ownerTab: source.kind === 'acceptance'
-                    ? 'acceptance'
-                    : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
-                      || source.kind === 'owner_penalty'
-                      ? 'settlements'
-                      : 'changes',
-                  ...(source.kind === 'acceptance'
-                    ? { ownerView: input.query.variant ?? 'acceptance' }
-                    : {}),
+                  contractKind: '分包',
+                  subcontractTab: source.kind === 'sub_settlement' ? 'settlements' : 'changes',
                 },
               }
             : { kind: 'unavailable', reason: 'missing-id' }
+          : source.sourceType === 'manual' && source.kind !== 'acceptance'
+            ? { kind: 'unavailable', reason: 'not-connected' }
+            : contract.state === 'resolved' && project.state === 'resolved'
+              ? {
+                  kind: 'entity-detail',
+                  subject: contract,
+                  variant: 'owner-document-source',
+                  view: source.sourceId,
+                  filters: {
+                    dataOrigin: source.dataOrigin,
+                    contractKind: '施工',
+                    ownerTab: source.kind === 'acceptance'
+                      ? 'acceptance'
+                      : source.sourceType === 'monthly_statement' || source.kind === 'final_settlement'
+                        || source.kind === 'owner_penalty'
+                        ? 'settlements'
+                        : 'changes',
+                    ...(source.kind === 'acceptance'
+                      ? { ownerView: input.query.variant ?? 'acceptance' }
+                      : {}),
+                  },
+                }
+              : { kind: 'unavailable', reason: 'missing-id' }
       : { kind: 'unavailable', reason: 'missing-id' },
     documentNavigation: documentNavigation(source, input.query.variant ?? null),
     acceptanceView: acceptanceView(source, input.query.variant ?? null),

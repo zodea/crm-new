@@ -196,7 +196,7 @@ function referenceRulesFor(
   entityType: CoreMigrationEntityType,
   attributes: CoreMigrationSourceEntityDTO['attributes'],
 ): readonly ReferenceRule[] {
-  if (entityType === 'owner_documents' && attributes?.kind === 'sub_change') {
+  if (entityType === 'owner_documents' && (attributes?.kind === 'sub_change' || attributes?.kind === 'sub_settlement')) {
     return [
       { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
       { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
@@ -451,7 +451,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
 
         if (
           entityType === 'owner_documents'
-          && row.attributes?.kind === 'sub_change'
+          && (row.attributes?.kind === 'sub_change' || row.attributes?.kind === 'sub_settlement')
           && resolvedReferences.contractId
           && resolvedReferences.projectId
           && resolvedReferences.supplierId

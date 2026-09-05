@@ -687,6 +687,66 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
         '' AS penalty_reason,
         '' AS appeal_note
       FROM subcontract_change_orders subcontract_change
+
+      UNION ALL
+
+      SELECT
+        settlement.id,
+        settlement.name,
+        settlement.project_id,
+        settlement.contract_id,
+        settlement.supplier_id,
+        settlement.total_amount AS amount,
+        NULL AS audited_amount,
+        NULL AS tax_exclusive_amount,
+        NULL AS applied_tax_exclusive_amount,
+        NULL AS changed_area,
+        NULL AS actual_approved_price,
+        'sub_settlement' AS kind,
+        settlement.no,
+        settlement.settlement_type AS document_type,
+        'expenditure_settlement' AS source_type,
+        CASE WHEN settlement.status NOT IN ('draft') THEN 1 ELSE 0 END AS source_locked,
+        '' AS period_no,
+        settlement.settlement_date AS application_date,
+        NULL AS approval_date,
+        NULL AS quantity_basis,
+        NULL AS quantity_source_version,
+        NULL AS quantity_source_updated_at,
+        '' AS operator_name,
+        NULL AS submitted_at,
+        settlement.status,
+        CASE WHEN settlement.status = 'confirmed' THEN '已确认分包结算'
+             ELSE '' END AS status_note,
+        settlement.note,
+        '[]' AS lines_json,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'id', file_ref.id,
+            'fileName', file_ref.file_name,
+            'fileSize', file_ref.file_size,
+            'mimeType', file_ref.mime_type,
+            'category', file_ref.category,
+            'uploader', file_ref.uploader,
+            'uploadedAt', file_ref.uploaded_at,
+            'deletedAt', file_ref.deleted_at
+          ))
+          FROM file_refs file_ref
+          WHERE file_ref.owner_type = 'expenditure_settlement'
+            AND file_ref.owner_id = settlement.id
+        ), '[]') AS files_json,
+        '{}' AS acceptance_lifecycle_json,
+        '[]' AS lifecycle_events_json,
+        settlement.created_at,
+        settlement.updated_at,
+        settlement.deleted_at,
+        '' AS settlement_basis,
+        settlement.deduction_note AS settlement_difference_note,
+        '' AS notice_no,
+        '' AS penalty_reason,
+        '' AS appeal_note
+      FROM expenditure_settlements settlement
+      WHERE settlement.biz_type IN ('分包', '专业分包', '合同劳务')
     ) owner_document
     ORDER BY kind, id
   `,
@@ -943,7 +1003,7 @@ function sourceEntity(
       references: {
         projectId: nullableText(row.project_id),
         contractId: nullableText(row.contract_id),
-        ...(text(row.kind) === 'sub_change' || supplierId ? { supplierId } : {}),
+        ...(text(row.kind) === 'sub_change' || text(row.kind) === 'sub_settlement' || supplierId ? { supplierId } : {}),
       },
       amount: nullableMoney(row.amount),
       attributes: {

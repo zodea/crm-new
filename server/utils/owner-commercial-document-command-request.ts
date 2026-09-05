@@ -57,7 +57,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
   value: unknown,
 ): OwnerCommercialDocumentCommandRequestDTO {
   const kind = object(value) ? String(value.kind) : ''
-  const requiredCapability = kind === 'sub_change'
+  const requiredCapability = (kind === 'sub_change' || kind === 'sub_settlement')
     ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
     : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
   if (!object(value)
@@ -65,7 +65,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
     || typeof value.actorId !== 'string' || !value.actorId
     || value.requiredCapability !== requiredCapability
     || typeof value.commandId !== 'string' || !value.commandId
-    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change'].includes(String(value.kind))
+    || !['owner_change', 'owner_report', 'acceptance', 'final_settlement', 'owner_penalty', 'sub_change', 'sub_settlement'].includes(String(value.kind))
     || !(value.id === null || typeof value.id === 'string')
     || !(value.baseVersion === null || typeof value.baseVersion === 'string')
     || !['save', 'submit', 'approve', 'audit', 'transition-acceptance', 'attachments', 'delete'].includes(String(value.action))) {
@@ -76,7 +76,7 @@ export function parseOwnerCommercialDocumentCommandRequest(
     actorId: value.actorId,
     requiredCapability,
     commandId: value.commandId,
-    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change',
+    kind: value.kind as 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change' | 'sub_settlement',
     id: value.id,
     baseVersion: value.baseVersion,
   }

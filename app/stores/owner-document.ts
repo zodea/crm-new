@@ -53,7 +53,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
     || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
-    || kind === 'sub_change'
+    || kind === 'sub_change' || kind === 'sub_settlement'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -85,7 +85,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return centralRepositories().ownerCommercialDocumentCommands.execute({
       workspaceId: context.workspaceId,
       actorId: context.actorId,
-      requiredCapability: kind === 'sub_change' ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
+      requiredCapability: (kind === 'sub_change' || kind === 'sub_settlement') ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
       commandId,
       kind,
       id,
@@ -227,8 +227,15 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   async function loadContractSummary(
     contractId: string,
     excludeSettlementId = '',
-    source: 'local' | 'central-owner' = 'local',
+    source: 'local' | 'central-owner' | 'central-subcontract' = 'local',
   ) {
+    if (usesCentralBrowser && source === 'central-subcontract') {
+      const context = await centralContext('sub_settlement')
+      const contract = context.contracts.find(option => option.id === contractId)
+      return contract
+        ? { contractAmount: contract.changedContractAmount, receivedAmount: null, priorSettlementAmount: (context.settlements ?? []).filter(row => row.contractId === contractId && row.id !== excludeSettlementId).reduce((sum, row) => sum + row.amount, 0) }
+        : null
+    }
     if (usesCentralBrowser && source === 'central-owner') {
       const context = await centralContext('final_settlement')
       const contract = context.contracts.find(option => option.id === contractId)
@@ -285,6 +292,12 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     contractId: string,
     keyword: string,
   ) {
+    if (usesCentralBrowser) {
+      const context = await centralContext('sub_settlement')
+      return (context.settlements ?? []).filter(row => row.projectId === projectId
+        && (!supplierId || row.supplierId === supplierId) && (!contractId || row.contractId === contractId)
+        && (!keyword || row.label.includes(keyword))).map(row => ({ id: row.id, label: row.label }))
+    }
     return listOwnerDocumentSettlementOptions(
       projectId,
       supplierId,

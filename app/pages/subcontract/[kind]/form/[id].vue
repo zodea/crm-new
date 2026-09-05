@@ -4,7 +4,7 @@ import { ownerDocumentKindFromRoute } from '~/lib/owner-document/page'
 const route = useRoute()
 const routeKind = Array.isArray(route.params.kind) ? route.params.kind[0] : route.params.kind
 const kind = ownerDocumentKindFromRoute('subcontract', routeKind ?? '')
-if (kind !== 'sub_change')
+if (kind !== 'sub_change' && kind !== 'sub_settlement')
   throw createError({ statusCode: 404, statusMessage: '未知分包商务单据类型' })
 </script>
 

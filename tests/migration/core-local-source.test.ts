@@ -606,6 +606,8 @@ describe('core migration local source', () => {
           '2026-08-24T10:00:00.000Z'
         )
       `)
+      await db.execute(`INSERT INTO expenditure_settlements (id, no, name, biz_type, project_id, supplier_id, contract_id, settlement_type, total_amount, settlement_date, deduction_note, status)
+        VALUES ('settlement-local-328', 'FBJS-328', '八月分包结算', '分包', 'project-local-323', 'supplier-local-327', 'subcontract-local-327', '过程结算', 28000, '2026-08-31', '合同扣款', 'confirmed')`)
       const [stored] = await db.select<{ created_at: string, updated_at: string }>(`
         SELECT created_at, updated_at
         FROM owner_change_orders
@@ -713,6 +715,7 @@ describe('core migration local source', () => {
           category: 'contact-letter',
         })],
       }))
+      expect(commands.rows()).toContainEqual(expect.objectContaining({ kind: 'sub_settlement', amount: 28000, status: 'confirmed', deductionNote: '合同扣款', contractId: expect.stringContaining('subcontract-local-327') }))
       expect(commands.rows()).toContainEqual(expect.objectContaining({
         kind: 'sub_change',
         no: 'FB-BG-LOCAL-327',

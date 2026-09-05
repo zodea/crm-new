@@ -113,7 +113,7 @@ export function validateSubcontractContractDetailReturnTo(input: unknown, expect
     if (tab && !['info', 'supplements', 'changes', 'invoices', 'payments', 'settlements', 'penalties', 'material-uses'].includes(tab))
       return null
     const focus = url.searchParams.get('focus')
-    if (focus && (tab !== 'changes' || !isStableRouteIdentity(focus)))
+    if (focus && (!['changes', 'settlements'].includes(tab ?? '') || !isStableRouteIdentity(focus)))
       return null
     const returnTo = url.searchParams.get('returnTo')
     const validatedListReturnTo = returnTo ? validateSubcontractContractReturnTo(returnTo, origin) : null

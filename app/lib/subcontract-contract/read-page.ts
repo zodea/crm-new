@@ -249,7 +249,7 @@ function factNavigation(
   kind: SubcontractContractFactKind,
   capabilities: readonly string[],
 ): NavigationIntentDTO {
-  if (kind === 'change') {
+  if (kind === 'change' || kind === 'settlement') {
     if (source.dataOrigin !== 'real' || row.dataOrigin !== 'real')
       return { kind: 'unavailable', reason: 'unverified-target' }
     if (!capabilities.includes('subcontract-document:read'))
@@ -257,7 +257,7 @@ function factNavigation(
     return {
       kind: 'entity-detail',
       subject: resolvedRef('subcontract-document', row.id, row.name, row.no || null),
-      variant: 'change',
+      variant: kind === 'settlement' ? 'settlement' : 'change',
       view: null,
       filters: {
         dataOrigin: source.dataOrigin,
@@ -327,13 +327,14 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): Subcont
   if (input.query.focusId) {
     const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
     const change = input.facts.changes.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
-    const focus = supplement ?? change
+    const settlement = input.facts.settlements.find(row => row.id === input.query.focusId && row.dataOrigin === source.dataOrigin)
+    const focus = supplement ?? change ?? settlement
     if (!focus)
       throw new SubcontractContractRepositoryProblem(subcontractContractProblem('not-found', '聚焦的分包合同事实不存在或已删除'))
     if (focus.contractId !== source.id) {
       throw new SubcontractContractRepositoryProblem(subcontractContractProblem(
         'relationship-mismatch',
-        change ? '分包变洽签与分包合同不匹配' : '补充协议与分包合同不匹配',
+        settlement ? '分包结算与分包合同不匹配' : change ? '分包变洽签与分包合同不匹配' : '补充协议与分包合同不匹配',
       ))
     }
   }

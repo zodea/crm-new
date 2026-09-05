@@ -286,10 +286,10 @@ describe('项目详情中央来源边界', () => {
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
-    expect(screen.getAllByText('2')).toHaveLength(7)
+    expect(screen.getAllByText('2')).toHaveLength(8)
   })
 
-  it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签入口', async () => {
+  it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签、结算入口', async () => {
     get.mockResolvedValue({
       ...detail,
       item: { ...detail.item, dataOrigin: 'real' },
@@ -306,6 +306,10 @@ describe('项目详情中央来源边界', () => {
     const finalSettlement = screen.getByRole('link', { name: /最终结算/ })
     const penalty = screen.getByRole('link', { name: /甲方罚扣/ })
     const subcontractChange = screen.getByRole('link', { name: /分包变洽签/ })
+    const subcontractSettlement = screen.getByRole('link', { name: /分包结算/ })
+    expect(subcontractSettlement.getAttribute('href')).toContain('/subcontract/settlement?')
+    expect(subcontractSettlement.getAttribute('href')).toContain('projectId=project-1')
+    expect(subcontractSettlement.id).toBe('project-owner-document-card-sub-settlement')
     expect(acceptance.getAttribute('href')).toContain('/owner/acceptance?')
     expect(acceptance.getAttribute('href')).toContain('variant=acceptance')
     expect(warranty.getAttribute('href')).toContain('/owner/acceptance?')

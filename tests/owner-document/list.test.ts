@@ -55,6 +55,16 @@ const rows: OwnerDocumentListRecord[] = [
 ]
 
 describe('owner document list configuration', () => {
+  it('分包付款余额只出现在分包结算列表，甲方最终结算保持原业务列', () => {
+    const paymentFields = ['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid']
+    expect(OWNER_DOCUMENT_LIST_CONFIG.sub_settlement.columns.map(column => column.field))
+      .toEqual(expect.arrayContaining(paymentFields))
+    expect(OWNER_DOCUMENT_LIST_CONFIG.final_settlement.columns.filter(column => paymentFields.includes(column.field ?? '')))
+      .toEqual([])
+    expect(OWNER_DOCUMENT_LIST_CONFIG.final_settlement.columns.find(column => column.field === 'amount')?.title)
+      .toBe('结算金额')
+  })
+
   it('八类列表保留各自真实业务列与金额汇总口径', () => {
     expect(Object.keys(OWNER_DOCUMENT_LIST_CONFIG)).toHaveLength(8)
     expect(OWNER_DOCUMENT_LIST_CONFIG.owner_change.columns.map(column => column.title))

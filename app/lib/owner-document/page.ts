@@ -116,7 +116,7 @@ export const OWNER_DOCUMENT_META: Record<OwnerDocumentKind, OwnerDocumentMeta> =
   },
   sub_settlement: {
     label: '分包结算',
-    subtitle: '复用支出结算事实的分包结算单',
+    subtitle: '结算记录 · 累计金额 · 付款余额',
     listPath: '/subcontract/settlement',
     contractListPath: '/contract/subcontract',
     contractListLabel: '分包合同列表',
@@ -255,7 +255,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
 export function ownerDocumentFormPath(kind: OwnerDocumentKind, id?: string): string {
   const listPath = OWNER_DOCUMENT_META[kind].listPath
   const centralReadOnly = kind === 'owner_change' || kind === 'owner_report'
-    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty' || kind === 'sub_change'
+    || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty' || kind === 'sub_change' || kind === 'sub_settlement'
   return id && centralReadOnly ? `${listPath}/form/${id}` : id ? `${listPath}/${id}` : `${listPath}/new`
 }
 
@@ -266,7 +266,7 @@ export function ownerDocumentDetailPath(
   variant?: 'acceptance' | 'warranty',
 ): string {
   if (kind !== 'owner_change' && kind !== 'owner_report'
-    && kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change') {
+    && kind !== 'acceptance' && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change' && kind !== 'sub_settlement') {
     throw new Error('该甲方单据类型尚无中央只读详情')
   }
   const query = new URLSearchParams({ origin })

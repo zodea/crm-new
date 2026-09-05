@@ -2,6 +2,8 @@
 
 本目录保存面向最终用户的操作说明 Markdown 权威源。功能规格、数据字段和架构原因仍分别以 `docs/rewrite/pages/`、`docs/rewrite/DATABASE.md` 和 `docs/adr/` 为准；指南只负责把这些规则组织成可执行的用户流程。
 
+新增功能入口见[功能路由索引](./routes.md)。
+
 ## 当前指南
 
 - [客户档案与业务关系使用指南](./customer-records.md)
