@@ -16,9 +16,67 @@ export const useTabsStore = defineStore('tabs', () => {
   const state = shallowRef(initialTabsState())
   const cacheVersions = shallowRef<Record<string, number>>({})
   const invalidatedKeys = shallowRef<string[]>([])
-
+  const closeGuards = new Map<string, () => boolean | Promise<boolean>>()
+  let requestingClose = false
   const tabs = computed(() => state.value.tabs)
   const activeKey = computed(() => state.value.activeKey)
+
+  function registerCloseGuard(key: string, guard: () => boolean | Promise<boolean>) {
+    closeGuards.set(key, guard)
+    return () => {
+      if (closeGuards.get(key) === guard)
+        closeGuards.delete(key)
+    }
+  }
+
+  /** 先确认全部目标，再统一卸载；取消时不能使任何页面缓存失效。 */
+  async function requestChange(keys: string[], refresh = false) {
+    if (requestingClose)
+      return false
+    requestingClose = true
+    const guards = keys.map(key => [key, closeGuards.get(key)] as const)
+    try {
+      for (const [, guard] of guards) {
+        if (guard && !await guard())
+          return false
+      }
+      // 等待确认期间页面若被替换，旧确认不能授权丢弃新草稿。
+      if (guards.some(([key, guard]) => closeGuards.get(key) !== guard))
+        return false
+      if (refresh)
+        invalidate(keys)
+      else
+        applyClose(() => keys.reduce((next, key) => closeTab(next, key), state.value))
+      for (const key of keys)
+        closeGuards.delete(key)
+      return true
+    }
+    finally {
+      requestingClose = false
+    }
+  }
+
+  function requestClose(key: string) {
+    return requestChange(tabs.value.filter(tab => tab.closable && tab.key === key).map(tab => tab.key))
+  }
+
+  function requestCloseOther(key: string) {
+    return requestChange(tabs.value.filter(tab => tab.closable && tab.key !== key).map(tab => tab.key))
+  }
+
+  function requestCloseToRight(key: string) {
+    const index = tabs.value.findIndex(tab => tab.key === key)
+    return requestChange(index < 0 ? [] : tabs.value.slice(index + 1).filter(tab => tab.closable).map(tab => tab.key))
+  }
+
+  function requestCloseEvery() {
+    return requestChange(tabs.value.filter(tab => tab.closable).map(tab => tab.key))
+  }
+
+  function requestRefresh() {
+    return requestChange([activeKey.value], true)
+  }
+
   /** 当前激活页签的 fullPath（关闭后据此导航）。 */
   const activeFullPath = computed(
     () => tabs.value.find(t => t.key === activeKey.value)?.fullPath ?? '/',
@@ -111,6 +169,12 @@ export const useTabsStore = defineStore('tabs', () => {
     closeToRight,
     closeEvery,
     refreshActive,
+    registerCloseGuard,
+    requestClose,
+    requestCloseOther,
+    requestCloseToRight,
+    requestCloseEvery,
+    requestRefresh,
     acknowledgeInvalidations,
     pageCacheKey,
     setTitle,

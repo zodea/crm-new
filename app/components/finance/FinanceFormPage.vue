@@ -7,7 +7,7 @@ import type { FinancePageDraft } from '~/lib/finance/page'
 import type {
   FormFooterAction,
 } from '~/lib/master-data/page'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import {
   listFinanceFormAttachments,
   loadFinanceForm,
@@ -361,10 +361,8 @@ async function leaveToList() {
   await navigateTo(meta.value.listPath)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
     return true
   const accepted = await confirm({
     variant: 'simple',

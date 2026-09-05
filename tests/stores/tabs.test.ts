@@ -1,8 +1,47 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTabsStore } from '~/stores/tabs'
 
 describe('页签缓存失效', () => {
+  it('取消关闭、批量关闭和刷新时，页签及缓存都保持原样', async () => {
+    setActivePinia(createPinia())
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '表单 A' })
+    store.open({ fullPath: '/b', title: '表单 B' })
+    store.registerCloseGuard('/a', () => true)
+    store.registerCloseGuard('/b', () => false)
+    const before = [...store.tabs]
+    expect(await store.requestClose('/b')).toBe(false)
+    expect(await store.requestCloseEvery()).toBe(false)
+    expect(await store.requestCloseOther('/a')).toBe(false)
+    expect(await store.requestCloseToRight('/a')).toBe(false)
+    expect(await store.requestRefresh()).toBe(false)
+    expect(store.tabs).toEqual(before)
+    expect(store.invalidatedKeys).toEqual([])
+  })
+
+  it('确认期间新打开的页面不被批量关闭，旧实例释放不会移除新实例的守卫', async () => {
+    setActivePinia(createPinia())
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '表单 A' })
+    let approve!: (value: boolean) => void
+    const dispose = store.registerCloseGuard('/a', () => new Promise<boolean>((resolve) => {
+      approve = resolve
+    }))
+    const request = store.requestCloseEvery()
+    store.open({ fullPath: '/b', title: '表单 B' })
+    expect(await store.requestCloseEvery()).toBe(false)
+    approve(true)
+    expect(await request).toBe(true)
+    expect(store.tabs.some(tab => tab.key === '/b')).toBe(true)
+    store.open({ fullPath: '/a', title: '新表单 A' })
+    const newGuard = vi.fn(() => false)
+    store.registerCloseGuard('/a', newGuard)
+    dispose()
+    expect(await store.requestClose('/a')).toBe(false)
+    expect(newGuard).toHaveBeenCalledOnce()
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
   })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { PayrollDraftCreateInput } from '~/stores/payroll'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import {
   payrollFiltersFromQuery,
   payrollListLocation,
@@ -90,7 +90,7 @@ async function submit(input: PayrollDraftCreateInput) {
   }
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
     return true
   return kit.confirm({

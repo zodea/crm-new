@@ -160,11 +160,7 @@ describe('甲方与分包单据整页表单状态', () => {
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
-    vi.stubGlobal('useTabsStore', () => ({
-      tabs: [],
-      close: vi.fn(),
-      open: vi.fn(),
-    }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
     vi.stubGlobal('useOwnerDocumentStore', () => ({
       loadOne,
       loadAttachments,

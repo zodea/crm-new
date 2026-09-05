@@ -16,7 +16,7 @@ import type {
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
 import { onActivated } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import {
   listFormAttachments,
@@ -672,12 +672,8 @@ async function leaveForm() {
   await navigateTo(returnPath.value)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-
-  // 普通页签切换保留 KeepAlive 草稿；只有当前表单页签已被关闭时才拦截。
-  if (tabsStore.tabs.some(tab => tab.key === pageKey.value))
     return true
 
   const leave = await confirm({
@@ -686,8 +682,6 @@ onBeforeRouteLeave(async () => {
     message: '当前表单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath.value, title: title.value })
   return leave
 })
 

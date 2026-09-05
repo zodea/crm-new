@@ -121,7 +121,7 @@ describe('送货单手工归档确认门禁', () => {
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
-    vi.stubGlobal('useTabsStore', () => ({ tabs: [], close: vi.fn(), open: vi.fn() }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
     vi.stubGlobal('useMaterialStore', () => ({
       searchProjects: vi.fn().mockResolvedValue([]),
       searchSuppliers: vi.fn().mockResolvedValue([]),

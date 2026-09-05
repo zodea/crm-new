@@ -88,6 +88,19 @@ vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
 vi.stubGlobal('useTabTitle', () => {})
 
 describe('客户详情业务页签', () => {
+  it('其他客户刷新共享状态时，不把其姓名写入当前详情或页签', () => {
+    customerStoreMock.detailState = { kind: 'ready', data: { ...detail, customer: { ...detail.customer, id: 'customer-2', name: '另一客户' } } }
+    const titles: Array<() => string | undefined> = []
+    vi.stubGlobal('useTabTitle', (title: () => string | undefined) => titles.push(title))
+    const view = render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: { EntityDetailShell: EntityDetailShellStub, SegTab: SegTabStub }, stubs: ['CustomerDetailOverview', 'CustomerDetailRelations', 'MetricGrid', 'Metric', 'NuxtLink'] },
+    })
+    expect(view.queryByRole('heading', { name: '另一客户' })).toBeNull()
+    expect(titles[0]?.()).toBeUndefined()
+    vi.stubGlobal('useTabTitle', () => {})
+  })
+
   beforeEach(() => {
     route.query = {}
     routerReplace.mockReset()

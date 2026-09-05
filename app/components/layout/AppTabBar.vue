@@ -72,14 +72,15 @@ function goTab(fullPath: string, key: string) {
     router.push(fullPath)
 }
 
-function closeAndFollow(key: string) {
-  tabsStore.close(key)
+async function closeAndFollow(key: string) {
+  if (!await tabsStore.requestClose(key))
+    return
   if (tabsStore.activeFullPath !== route.fullPath)
     router.push(tabsStore.activeFullPath)
 }
 
 function refreshCurrent() {
-  tabsStore.refreshActive()
+  void tabsStore.requestRefresh()
 }
 
 useEventListener(tabListEl, 'wheel', (event) => {
@@ -180,9 +181,11 @@ const menuIndex = computed(() => tabsStore.tabs.findIndex(tab => tab.key === men
 const hasRight = computed(() => tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.key !== HOME_KEY))
 const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.key !== HOME_KEY && tab.key !== menu.value.key))
 
-function act(action: () => void) {
-  action()
+async function act(action: () => Promise<boolean>) {
+  const pending = action()
   closeMenu()
+  if (!await pending)
+    return
   if (tabsStore.activeFullPath !== route.fullPath)
     router.push(tabsStore.activeFullPath)
 }
@@ -299,7 +302,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!menuTab?.closable"
-        @click="act(() => tabsStore.close(menu.key))"
+        @click="act(() => tabsStore.requestClose(menu.key))"
       >
         关闭当前
       </button>
@@ -309,7 +312,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasOthers"
-        @click="act(() => tabsStore.closeOther(menu.key))"
+        @click="act(() => tabsStore.requestCloseOther(menu.key))"
       >
         关闭其他
       </button>
@@ -319,7 +322,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasRight"
-        @click="act(() => tabsStore.closeToRight(menu.key))"
+        @click="act(() => tabsStore.requestCloseToRight(menu.key))"
       >
         关闭右侧
       </button>
@@ -330,7 +333,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         tabindex="-1"
         class="tab-menu-item"
         :disabled="!hasOthers"
-        @click="act(() => tabsStore.closeEvery())"
+        @click="act(() => tabsStore.requestCloseEvery())"
       >
         关闭全部
       </button>

@@ -205,11 +205,7 @@ describe('项目整页表单', () => {
     vi.stubGlobal('useMasterDataReadStore', () => ({
       searchCustomers: vi.fn().mockResolvedValue([]),
     }))
-    vi.stubGlobal('useTabsStore', () => ({
-      tabs: [],
-      close: closeTab,
-      open: vi.fn(),
-    }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: closeTab, open: vi.fn() }))
     vi.stubGlobal('useKitUI', () => ({
       confirm,
       success: vi.fn(),
