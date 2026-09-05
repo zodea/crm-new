@@ -53,11 +53,12 @@ describe('分供方中央 stores', () => {
       .mockRejectedValueOnce(new SupplierRepositoryProblem(supplierProblem('unavailable', '响应丢失', true)))
       .mockResolvedValueOnce({ id: 'supplier-1', commandId: 'supplier-command-1', version: '4', updatedAt: '2026-08-23T01:00:00.000Z', attachmentIds: [] })
     const store = useSupplierCommandStore()
-    await store.hydrate('supplier-1')
+    const session = store.createSession()
+    await store.hydrate(session, 'supplier-1')
 
     const draft = { id: 'supplier-1', name: '新分供方', supplierCategory: '材料供应商', contact: '陈经理' }
-    await expect(store.saveForm(draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
-    await store.saveForm(draft, 'save')
+    await expect(store.saveForm(session, draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
+    await store.saveForm(session, draft, 'save')
 
     expect(repositories.supplierCommands.execute.mock.calls[0]?.[0]).toMatchObject({
       id: 'supplier-1',

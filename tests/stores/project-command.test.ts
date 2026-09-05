@@ -59,9 +59,10 @@ describe('project command store', () => {
       attachmentIds: [],
     })
     const store = useProjectCommandStore()
-    await store.hydrate(null)
+    const session = store.createSession()
+    await store.hydrate(session, null)
 
-    await expect(store.saveForm({ name: '新项目' }, 'draft')).resolves.toMatchObject({
+    await expect(store.saveForm(session, { name: '新项目' }, 'draft')).resolves.toMatchObject({
       id: 'opaque-1',
     })
     expect(repository.execute).toHaveBeenCalledWith(expect.objectContaining({
@@ -89,11 +90,12 @@ describe('project command store', () => {
         attachmentIds: [],
       })
     const store = useProjectCommandStore()
-    await store.hydrate(null)
+    const session = store.createSession()
+    await store.hydrate(session, null)
 
-    await store.saveForm({ name: '第一个项目' }, 'save')
-    store.startNewProject()
-    await store.saveForm({ name: '第二个项目' }, 'save')
+    await store.saveForm(session, { name: '第一个项目' }, 'save')
+    store.startNewProject(session)
+    await store.saveForm(session, { name: '第二个项目' }, 'save')
 
     expect(repository.execute).toHaveBeenCalledTimes(2)
     for (const [request] of repository.execute.mock.calls) {
@@ -110,9 +112,10 @@ describe('project command store', () => {
       projectProblem('unavailable', '网络不可用', true),
     ))
     const store = useProjectCommandStore()
-    await store.hydrate(null)
+    const session = store.createSession()
+    await store.hydrate(session, null)
 
-    await expect(store.saveForm({ name: '断网项目' }, 'draft'))
+    await expect(store.saveForm(session, { name: '断网项目' }, 'draft'))
       .rejects
       .toBeInstanceOf(ProjectLocalDraftOnlyError)
     expect([...values.values()].join('')).toContain('断网项目')
@@ -126,8 +129,9 @@ describe('project command store', () => {
       projectProblem('unavailable', '网络不可用', true),
     ))
     const firstStore = useProjectCommandStore()
-    await firstStore.hydrate('project-1')
-    await expect(firstStore.saveForm({ id: 'project-1', name: '断网编辑内容' }, 'draft'))
+    const session = firstStore.createSession()
+    await firstStore.hydrate(session, 'project-1')
+    await expect(firstStore.saveForm(session, { id: 'project-1', name: '断网编辑内容' }, 'draft'))
       .rejects
       .toBeInstanceOf(ProjectLocalDraftOnlyError)
 
@@ -135,7 +139,8 @@ describe('project command store', () => {
       projectProblem('unavailable', '后台不可达', true),
     ))
     setActivePinia(createPinia())
-    const restored = await useProjectCommandStore().hydrate('project-1')
+    const restoredStore = useProjectCommandStore()
+    const restored = await restoredStore.hydrate(restoredStore.createSession(), 'project-1')
 
     expect(restored.restoredLocalDraft).toMatchObject({
       targetProjectId: 'project-1',
@@ -161,15 +166,16 @@ describe('project command store', () => {
         attachmentIds: [],
       })
     const store = useProjectCommandStore()
-    await store.hydrate('project-1')
+    const session = store.createSession()
+    await store.hydrate(session, 'project-1')
 
-    const first = store.saveForm({ id: 'project-1', name: '我的修改' }, 'draft')
+    const first = store.saveForm(session, { id: 'project-1', name: '我的修改' }, 'draft')
     const conflict = await first.catch(cause => cause)
     expect(conflict).toBeInstanceOf(ProjectCommandConflictError)
     expect(conflict.latest).toMatchObject({ version: '2', draft: { name: '服务器最新项目' } })
 
-    store.rebase('2')
-    await store.saveForm({ id: 'project-1', name: '我的修改' }, 'draft')
+    store.rebase(session, '2')
+    await store.saveForm(session, { id: 'project-1', name: '我的修改' }, 'draft')
     expect(repository.execute).toHaveBeenLastCalledWith(expect.objectContaining({
       baseVersion: '2',
       draft: expect.objectContaining({ name: '我的修改' }),

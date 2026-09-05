@@ -21,19 +21,20 @@ function emptyChanges(changes: FormAttachmentChanges): FormAttachmentChanges {
 }
 
 export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () => {
-  const targets = shallowRef<Record<'crew' | 'worker', string | null>>({ crew: null, worker: null })
-  const versions = shallowRef<Record<'crew' | 'worker', string | null>>({ crew: null, worker: null })
+  function createSession() {
+    return { targets: { crew: null, worker: null } as Record<'crew' | 'worker', string | null>, versions: { crew: null, worker: null } as Record<'crew' | 'worker', string | null>, pending: new Map<'crew' | 'worker', { id: string, fingerprint: string }>() }
+  }
+  type CommandSession = ReturnType<typeof createSession>
   const latestWrite = shallowRef<{ kind: 'crew' | 'worker', id: string, version: string } | null>(null)
-  const pending = new Map<'crew' | 'worker', { id: string, fingerprint: string }>()
   const repository = () => useNuxtApp().$repositories.crewWorkerCommands
 
-  async function hydrate(kind: 'crew' | 'worker', id: string | null) {
-    targets.value = { ...targets.value, [kind]: id }
-    pending.delete(kind)
+  async function hydrate(session: CommandSession, kind: 'crew' | 'worker', id: string | null) {
+    session.targets = { ...session.targets, [kind]: id }
+    session.pending.delete(kind)
     const form = id
       ? kind === 'crew' ? await repository().loadCrewForm(id) : await repository().loadWorkerForm(id)
       : null
-    versions.value = { ...versions.value, [kind]: form?.version ?? null }
+    session.versions = { ...session.versions, [kind]: form?.version ?? null }
     return {
       draft: form?.draft ?? null,
       attachments: [],
@@ -44,40 +45,40 @@ export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () =
     }
   }
 
-  function startNew(kind: 'crew' | 'worker') {
-    targets.value = { ...targets.value, [kind]: null }
-    versions.value = { ...versions.value, [kind]: null }
-    pending.delete(kind)
+  function startNew(session: CommandSession, kind: 'crew' | 'worker') {
+    session.targets = { ...session.targets, [kind]: null }
+    session.versions = { ...session.versions, [kind]: null }
+    session.pending.delete(kind)
   }
 
-  function rebase(kind: 'crew' | 'worker', version: string) {
-    versions.value = { ...versions.value, [kind]: version }
+  function rebase(session: CommandSession, kind: 'crew' | 'worker', version: string) {
+    session.versions = { ...session.versions, [kind]: version }
   }
 
-  function acceptLatest(kind: 'crew' | 'worker', latest: CrewFormReadDTO | WorkerFormReadDTO) {
-    targets.value = { ...targets.value, [kind]: latest.draft.id }
-    versions.value = { ...versions.value, [kind]: latest.version }
+  function acceptLatest(session: CommandSession, kind: 'crew' | 'worker', latest: CrewFormReadDTO | WorkerFormReadDTO) {
+    session.targets = { ...session.targets, [kind]: latest.draft.id }
+    session.versions = { ...session.versions, [kind]: latest.version }
   }
 
-  async function saveCrew(draft: CrewFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
-    return save('crew', draft, action, attachments)
+  async function saveCrew(session: CommandSession, draft: CrewFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    return save(session, 'crew', draft, action, attachments)
   }
 
-  async function saveWorker(draft: WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
-    return save('worker', draft, action, attachments)
+  async function saveWorker(session: CommandSession, draft: WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    return save(session, 'worker', draft, action, attachments)
   }
 
-  async function save(kind: 'crew', draft: CrewFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
-  async function save(kind: 'worker', draft: WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
-  async function save(kind: 'crew' | 'worker', draft: CrewFormDraft | WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges) {
-    const id = targets.value[kind] ?? draft.id ?? null
+  async function save(session: CommandSession, kind: 'crew', draft: CrewFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
+  async function save(session: CommandSession, kind: 'worker', draft: WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
+  async function save(session: CommandSession, kind: 'crew' | 'worker', draft: CrewFormDraft | WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges) {
+    const id = session.targets[kind] ?? draft.id ?? null
     const changes = emptyChanges(attachments)
-    const content = { id, baseVersion: versions.value[kind], action, draft: { ...draft, ...(id ? { id } : {}) }, attachments: changes }
+    const content = { id, baseVersion: session.versions[kind], action, draft: { ...draft, ...(id ? { id } : {}) }, attachments: changes }
     const fingerprint = JSON.stringify(content)
-    let command = pending.get(kind)
+    let command = session.pending.get(kind)
     if (!command || command.fingerprint !== fingerprint) {
       command = { id: crypto.randomUUID(), fingerprint }
-      pending.set(kind, command)
+      session.pending.set(kind, command)
     }
     try {
       const context = await repository().context()
@@ -86,16 +87,16 @@ export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () =
         workspaceId: context.workspaceId,
         actorId: context.actorId,
         commandId: command.id,
-        baseVersion: versions.value[kind],
+        baseVersion: session.versions[kind],
         action,
         attachments: changes,
       }
       const result = kind === 'crew'
         ? await repository().executeCrew({ ...common, requiredCapability: CREW_WRITE_CAPABILITY, draft: content.draft as CrewFormDraft })
         : await repository().executeWorker({ ...common, requiredCapability: WORKER_WRITE_CAPABILITY, draft: content.draft as WorkerFormDraft })
-      pending.delete(kind)
-      targets.value = { ...targets.value, [kind]: result.id }
-      versions.value = { ...versions.value, [kind]: result.version }
+      session.pending.delete(kind)
+      session.targets = { ...session.targets, [kind]: result.id }
+      session.versions = { ...session.versions, [kind]: result.version }
       latestWrite.value = { kind, id: result.id, version: result.version }
       return { id: result.id, logId: null, attachmentIds: result.attachmentIds }
     }
@@ -109,5 +110,5 @@ export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () =
     }
   }
 
-  return { latestWrite: readonly(latestWrite), hydrate, saveCrew, saveWorker, startNew, rebase, acceptLatest }
+  return { latestWrite: readonly(latestWrite), createSession, hydrate, saveCrew, saveWorker, startNew, rebase, acceptLatest }
 })

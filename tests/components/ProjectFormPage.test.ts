@@ -41,6 +41,7 @@ const route = {
   query: {} as Record<string, string>,
 }
 const navigateTo = vi.fn()
+const commandSession = {}
 const saveForm = vi.fn()
 const closeTab = vi.fn()
 const confirm = vi.fn()
@@ -191,6 +192,7 @@ describe('项目整页表单', () => {
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useProjectStore', () => ({ saveForm }))
     vi.stubGlobal('useProjectCommandStore', () => ({
+      createSession: () => commandSession,
       hydrate: hydrateCommandForm,
       saveForm,
       startNewProject,
@@ -260,6 +262,7 @@ describe('项目整页表单', () => {
     await flushPromises()
 
     expect(saveForm).toHaveBeenCalledWith(
+      commandSession,
       expect.objectContaining({
         id: 'project-42',
         customerId: 'customer-primary-id',
@@ -290,6 +293,7 @@ describe('项目整页表单', () => {
     await flushPromises()
 
     expect(saveForm).toHaveBeenCalledWith(
+      commandSession,
       expect.objectContaining({
         name: '新项目',
         manager: '新经理',
@@ -403,7 +407,7 @@ describe('项目整页表单', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('服务器最新版本为 2')
     expect(screen.getByRole('button', { name: '改用服务器最新版' })).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '保留我的内容' }))
-    expect(rebaseCommandForm).toHaveBeenCalledWith('2')
+    expect(rebaseCommandForm).toHaveBeenCalledWith(commandSession, '2')
     expect(screen.getByRole('status').textContent).toContain('请再次保存')
   })
 

@@ -43,19 +43,21 @@ export class ProjectLocalDraftOnlyError extends Error {
 }
 
 export const useProjectCommandStore = defineStore('project-command', () => {
-  const targetProjectId = shallowRef<string | null>(null)
-  const baseVersion = shallowRef<string | null>(null)
-  const activeLocalDraft = shallowRef<ProjectLocalDraft | null>(null)
+  function createSession() {
+    return { targetProjectId: null as string | null, baseVersion: null as string | null, activeLocalDraft: null as ProjectLocalDraft | null }
+  }
+  type CommandSession = ReturnType<typeof createSession>
+
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
 
   function repository() {
     return useNuxtApp().$repositories.projectCommands
   }
 
-  async function hydrate(id: string | null): Promise<HydratedProjectCommandForm> {
-    targetProjectId.value = id
+  async function hydrate(session: CommandSession, id: string | null): Promise<HydratedProjectCommandForm> {
+    session.targetProjectId = id
     const local = loadProjectLocalDraft(id)
-    activeLocalDraft.value = local
+    session.activeLocalDraft = local
     let latest: ProjectFormReadDTO | null = null
     try {
       latest = id ? await repository().loadForm(id) : null
@@ -64,7 +66,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
       const problem = projectProblemFromUnknown(cause)
       if (!local || problem.problem.code !== 'unavailable')
         throw problem
-      baseVersion.value = local.baseVersion
+      session.baseVersion = local.baseVersion
       return {
         draft: local.draft,
         attachments: [],
@@ -74,9 +76,9 @@ export const useProjectCommandStore = defineStore('project-command', () => {
         restoredLocalDraft: local,
       }
     }
-    baseVersion.value = latest?.version ?? null
+    session.baseVersion = latest?.version ?? null
     if (local)
-      baseVersion.value = local.baseVersion
+      session.baseVersion = local.baseVersion
     return {
       draft: local?.draft ?? latest?.draft ?? null,
       attachments: latest?.attachments ?? [],
@@ -87,47 +89,43 @@ export const useProjectCommandStore = defineStore('project-command', () => {
     }
   }
 
-  function startNewProject(): void {
-    if (activeLocalDraft.value)
-      clearProjectLocalDraft(activeLocalDraft.value.draftId)
-    targetProjectId.value = null
-    baseVersion.value = null
-    activeLocalDraft.value = null
+  function startNewProject(session: CommandSession): void {
+    if (session.activeLocalDraft)
+      clearProjectLocalDraft(session.activeLocalDraft.draftId)
+    session.targetProjectId = null
+    session.baseVersion = null
+    session.activeLocalDraft = null
   }
 
-  function rebase(version: string): void {
-    baseVersion.value = version
-    if (activeLocalDraft.value) {
-      activeLocalDraft.value = saveProjectLocalDraft({
-        ...activeLocalDraft.value,
+  function rebase(session: CommandSession, version: string): void {
+    session.baseVersion = version
+    if (session.activeLocalDraft) {
+      session.activeLocalDraft = saveProjectLocalDraft({
+        ...session.activeLocalDraft,
         baseVersion: version,
-        targetProjectId: targetProjectId.value,
+        targetProjectId: session.targetProjectId,
       })
     }
   }
 
-  function acceptLatest(latest: ProjectFormReadDTO): void {
-    if (activeLocalDraft.value)
-      clearProjectLocalDraft(activeLocalDraft.value.draftId)
-    activeLocalDraft.value = null
-    baseVersion.value = latest.version
+  function acceptLatest(session: CommandSession, latest: ProjectFormReadDTO): void {
+    if (session.activeLocalDraft)
+      clearProjectLocalDraft(session.activeLocalDraft.draftId)
+    session.activeLocalDraft = null
+    session.baseVersion = latest.version
   }
 
-  async function saveForm(
-    draft: ProjectFormDraft,
-    action: MasterDataSaveAction,
-    attachments: FormAttachmentChanges = {},
-  ) {
-    const id = targetProjectId.value ?? draft.id ?? null
+  async function saveForm(session: CommandSession, draft: ProjectFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    const id = session.targetProjectId ?? draft.id ?? null
     const local = saveProjectLocalDraft({
       targetProjectId: id,
-      commandId: activeLocalDraft.value?.commandId ?? crypto.randomUUID(),
-      baseVersion: baseVersion.value,
+      commandId: session.activeLocalDraft?.commandId ?? crypto.randomUUID(),
+      baseVersion: session.baseVersion,
       action,
       draft: { ...draft, ...(id ? { id } : {}) },
       attachments,
     })
-    activeLocalDraft.value = local
+    session.activeLocalDraft = local
     try {
       const context = await repository().context()
       const result = await repository().execute({
@@ -142,9 +140,9 @@ export const useProjectCommandStore = defineStore('project-command', () => {
         attachments: local.attachments,
       })
       clearProjectLocalDraft(local.draftId)
-      activeLocalDraft.value = null
-      targetProjectId.value = result.id
-      baseVersion.value = result.version
+      session.activeLocalDraft = null
+      session.targetProjectId = result.id
+      session.baseVersion = result.version
       latestWrite.value = { id: result.id, version: result.version }
       return {
         id: result.id,
@@ -166,6 +164,7 @@ export const useProjectCommandStore = defineStore('project-command', () => {
 
   return {
     latestWrite: readonly(latestWrite),
+    createSession,
     hydrate,
     saveForm,
     startNewProject,

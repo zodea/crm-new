@@ -64,6 +64,10 @@ const projectCommandStore = useProjectCommandStore()
 const customerCommandStore = () => useCustomerCommandStore()
 const supplierCommandStore = () => useSupplierCommandStore()
 const crewWorkerCommandStore = () => useCrewWorkerCommandStore()
+const projectSession = projectCommandStore.createSession()
+const customerSession = props.kind === 'customer' ? customerCommandStore().createSession() : null
+const supplierSession = props.kind === 'supplier' ? supplierCommandStore().createSession() : null
+const crewWorkerSession = props.kind === 'crew' || props.kind === 'worker' ? crewWorkerCommandStore().createSession() : null
 const targetCostStore = useTargetCostStore()
 const readStore = useMasterDataReadStore()
 const tabsStore = useTabsStore()
@@ -265,12 +269,12 @@ async function initialize() {
   try {
     if ((props.kind === 'project' || props.kind === 'customer' || props.kind === 'supplier' || props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime()) {
       const central = props.kind === 'project'
-        ? await projectCommandStore.hydrate(routeId.value ?? null)
+        ? await projectCommandStore.hydrate(projectSession, routeId.value ?? null)
         : props.kind === 'customer'
-          ? await customerCommandStore().hydrate(routeId.value ?? null)
+          ? await customerCommandStore().hydrate(customerSession!, routeId.value ?? null)
           : props.kind === 'supplier'
-            ? await supplierCommandStore().hydrate(routeId.value ?? null)
-            : await crewWorkerCommandStore().hydrate(props.kind, routeId.value ?? null)
+            ? await supplierCommandStore().hydrate(supplierSession!, routeId.value ?? null)
+            : await crewWorkerCommandStore().hydrate(crewWorkerSession!, props.kind, routeId.value ?? null)
       draft.value = {
         ...formDefaults(props.kind),
         ...(central.draft ?? createDefaultDraft()),
@@ -399,23 +403,23 @@ async function saveThroughStore(action: MasterDataSaveAction) {
     case 'supplier':
       return isDesktopRuntime()
         ? supplierStore.saveForm(draft.value, action, attachmentChanges())
-        : supplierCommandStore().saveForm(draft.value, action, attachmentChanges())
+        : supplierCommandStore().saveForm(supplierSession!, draft.value, action, attachmentChanges())
     case 'customer':
       return isDesktopRuntime()
         ? customerStore.save(draft.value, action, attachmentChanges())
-        : customerCommandStore().saveForm(draft.value, action, attachmentChanges())
+        : customerCommandStore().saveForm(customerSession!, draft.value, action, attachmentChanges())
     case 'crew':
       return isDesktopRuntime()
         ? crewStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveCrew(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveCrew(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'worker':
       return isDesktopRuntime()
         ? workerStore.save(draft.value, action, attachmentChanges())
-        : crewWorkerCommandStore().saveWorker(draft.value, action, attachmentChanges())
+        : crewWorkerCommandStore().saveWorker(crewWorkerSession!, draft.value, action, attachmentChanges())
     case 'project':
       return isDesktopRuntime()
         ? projectStore.saveForm(draft.value, action, attachmentChanges())
-        : projectCommandStore.saveForm(draft.value, action, attachmentChanges())
+        : projectCommandStore.saveForm(projectSession, draft.value, action, attachmentChanges())
     case 'target_cost':
       return targetCostStore.save(draft.value, action, attachmentChanges())
   }
@@ -449,13 +453,13 @@ async function handleFooterAction(action: FormFooterAction) {
 
     if (action === 'saveNew') {
       if (props.kind === 'project' && !isDesktopRuntime())
-        projectCommandStore.startNewProject()
+        projectCommandStore.startNewProject(projectSession)
       if (props.kind === 'customer' && !isDesktopRuntime())
-        customerCommandStore().startNewCustomer()
+        customerCommandStore().startNewCustomer(customerSession!)
       if (props.kind === 'supplier' && !isDesktopRuntime())
-        supplierCommandStore().startNewSupplier()
+        supplierCommandStore().startNewSupplier(supplierSession!)
       if ((props.kind === 'crew' || props.kind === 'worker') && !isDesktopRuntime())
-        crewWorkerCommandStore().startNew(props.kind)
+        crewWorkerCommandStore().startNew(crewWorkerSession!, props.kind)
       allowLeave = true
       if (route.path === meta.value.newPath) {
         draft.value = createDefaultDraft()
@@ -541,13 +545,13 @@ function keepLocalAgainstLatest() {
   if (!conflictLatest.value)
     return
   if (props.kind === 'customer')
-    customerCommandStore().rebase(conflictLatest.value.version)
+    customerCommandStore().rebase(customerSession!, conflictLatest.value.version)
   else if (props.kind === 'supplier')
-    supplierCommandStore().rebase(conflictLatest.value.version)
+    supplierCommandStore().rebase(supplierSession!, conflictLatest.value.version)
   else if (props.kind === 'crew' || props.kind === 'worker')
-    crewWorkerCommandStore().rebase(props.kind, conflictLatest.value.version)
+    crewWorkerCommandStore().rebase(crewWorkerSession!, props.kind, conflictLatest.value.version)
   else
-    projectCommandStore.rebase(conflictLatest.value.version)
+    projectCommandStore.rebase(projectSession, conflictLatest.value.version)
   conflictLatest.value = null
   localDraftNotice.value = '已保留你的内容并基于服务器最新版本；请再次保存以提交。'
 }
@@ -557,13 +561,13 @@ async function useLatestServerVersion() {
   if (!latest)
     return
   if (props.kind === 'customer')
-    customerCommandStore().acceptLatest(latest as CustomerFormReadDTO)
+    customerCommandStore().acceptLatest(customerSession!, latest as CustomerFormReadDTO)
   else if (props.kind === 'supplier')
-    supplierCommandStore().acceptLatest(latest as SupplierFormReadDTO)
+    supplierCommandStore().acceptLatest(supplierSession!, latest as SupplierFormReadDTO)
   else if (props.kind === 'crew' || props.kind === 'worker')
-    crewWorkerCommandStore().acceptLatest(props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
+    crewWorkerCommandStore().acceptLatest(crewWorkerSession!, props.kind, latest as CrewFormReadDTO | WorkerFormReadDTO)
   else
-    projectCommandStore.acceptLatest(latest as ProjectFormReadDTO)
+    projectCommandStore.acceptLatest(projectSession, latest as ProjectFormReadDTO)
   draft.value = {
     ...formDefaults(props.kind),
     ...latest.draft,
