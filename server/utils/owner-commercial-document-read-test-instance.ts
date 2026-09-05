@@ -58,9 +58,9 @@ export function createOwnerCommercialDocumentReadTestInstance(
     if (scenario === 'unavailable')
       throw problem('unavailable', '甲方商务单据中央读取服务暂时不可用', true)
     const capabilities = [...resolveCapabilities(sessionId)]
-    const requiredCapability = kind === 'sub_change' ? SUBCONTRACT_CHANGE_READ_CAPABILITY : 'owner-document:read'
+    const requiredCapability = (kind === 'sub_change' || kind === 'sub_settlement') ? SUBCONTRACT_CHANGE_READ_CAPABILITY : 'owner-document:read'
     if (!capabilities.includes(requiredCapability))
-      throw problem('forbidden', kind === 'sub_change' ? '无分包变洽签查看权限' : '无甲方商务单据查看权限')
+      throw problem('forbidden', kind === 'sub_settlement' ? '无分包结算查看权限' : kind === 'sub_change' ? '无分包变洽签查看权限' : '无甲方商务单据查看权限')
     const formal = commandInstance.rows(sessionId)
     return {
       documents: scenario === 'empty' ? formal : [...formal, ...demoDocuments],

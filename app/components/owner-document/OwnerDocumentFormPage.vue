@@ -52,7 +52,7 @@ const isEditing = computed(() => Boolean(routeId.value))
 const hasReturnTarget = computed(() => Boolean(route.query?.returnTo))
 const returnTarget = computed(() => {
   if (props.kind !== 'owner_change' && props.kind !== 'owner_report'
-    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty' && props.kind !== 'sub_change') {
+    && props.kind !== 'acceptance' && props.kind !== 'owner_penalty' && props.kind !== 'sub_change' && props.kind !== 'sub_settlement') {
     return meta.value.listPath
   }
   return validateOwnerDocumentDetailReturnTo(route.query?.returnTo, 'real', props.kind)
@@ -362,16 +362,16 @@ const refreshContractSummary = useDebounceFn(async () => {
     }
   }
   if (props.kind === 'sub_settlement') {
-    const summary = await store.loadContractSummary(contractId, routeId.value ?? '')
+    const summary = await store.loadContractSummary(contractId, routeId.value ?? '', 'central-subcontract')
     if (!summary)
       return
-    const contractAmount = summary.contractAmount ?? 0
+    const contractAmount = summary.contractAmount
     const totalAmount = Number(draft.value.totalAmount) || 0
     draft.value = {
       ...draft.value,
       contractAmount,
       priorSettlementAmount: summary.priorSettlementAmount,
-      settlementRatio: contractAmount > 0
+      settlementRatio: contractAmount != null && contractAmount > 0
         ? `${(totalAmount / contractAmount * 100).toFixed(2)}%`
         : '—',
     }
@@ -638,7 +638,7 @@ onMounted(() => void initialize())
 <template>
   <EntityFormShell
     :title="title"
-    :subtitle="`${meta.subtitle}；关联对象均保存真实 ID，附件与业务单据同事务提交。`"
+    :subtitle="kind === 'sub_settlement' ? '登记分包结算，核对合同、金额和附件后确认。' : `${meta.subtitle}；关联对象均保存真实 ID，附件与业务单据同事务提交。`"
     :back-label="hasReturnTarget ? '返回来源' : `返回${meta.label}`"
     :sections="sections"
     :state="pageState"

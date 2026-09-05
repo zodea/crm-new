@@ -179,6 +179,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'receipt:detail',
       'subcontract-document:change',
       'subcontract-document:penalty-detail',
+      'subcontract-document:settlement',
       'supplier:detail',
       'wage-statement:detail',
       'worker:detail',

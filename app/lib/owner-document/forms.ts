@@ -91,6 +91,12 @@ export interface OwnerDocumentListRecord {
   warrantyConfirmationDate?: string
   warrantyConfirmationNote?: string
   attachmentCount?: number
+  deductions?: number | null
+  netSettlement?: number | null
+  cumulativeApplied?: number | null
+  remainingApplicable?: number | null
+  cumulativePaid?: number | null
+  remainingUnpaid?: number | null
 }
 
 export interface OwnerDocumentBoqLine {

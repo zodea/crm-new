@@ -20,6 +20,7 @@ export interface OwnerCommercialDocumentCommandContextDTO {
   projects: Array<{ id: string, label: string, customerId: string | null }>
   customers: OwnerDocumentLookupOption[]
   suppliers: OwnerDocumentLookupOption[]
+  settlements?: Array<{ id: string, label: string, projectId: string | null, supplierId: string | null, contractId: string | null, amount: number }>
   contracts: Array<OwnerDocumentLookupOption & {
     projectId: string
     customerId: string | null

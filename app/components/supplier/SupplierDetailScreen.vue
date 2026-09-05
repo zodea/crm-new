@@ -43,6 +43,7 @@ const detail = computed(() => {
 const supplier = computed(() => detail.value?.supplier ?? null)
 const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
 const subcontractChangeReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_change'))
+const subcontractSettlementReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_settlement'))
 const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityReturnTo(props.returnTo, {
   entity: 'supplier',
   id: props.supplierId,
@@ -51,15 +52,18 @@ const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityRe
 const backTo = computed(() => validateSupplierReturnTo(props.returnTo)
   ?? materialContractReturnTo.value
   ?? subcontractChangeReturnTo.value
+  ?? subcontractSettlementReturnTo.value
   ?? projectSupplierReturnTo.value
   ?? '/base/supplier')
 const backLabel = computed(() => materialContractReturnTo.value
   ? '返回材料采购合同'
-  : subcontractChangeReturnTo.value
-    ? '返回分包变洽签'
-    : projectSupplierReturnTo.value
-      ? '返回项目分供方工作台'
-      : '返回分供方列表')
+  : subcontractSettlementReturnTo.value
+    ? '返回分包结算'
+    : subcontractChangeReturnTo.value
+      ? '返回分包变洽签'
+      : projectSupplierReturnTo.value
+        ? '返回项目分供方工作台'
+        : '返回分供方列表')
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)

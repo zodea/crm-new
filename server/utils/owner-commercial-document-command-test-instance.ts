@@ -63,6 +63,7 @@ interface SubcontractSeed {
   name: string
   projectId: string
   supplierId: string
+  amount?: number | null
 }
 
 interface BoqLineSeed extends OwnerDocumentBoqLine {
@@ -199,6 +200,8 @@ function approvalBusinessDate(source: OwnerCommercialDocumentSource): string {
 }
 
 function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
+  if (kind === 'sub_settlement')
+    return 'expenditure_settlement'
   if (kind === 'sub_change')
     return 'subcontract_change_order'
   if (kind === 'owner_change')
@@ -211,6 +214,9 @@ function fileOwnerType(kind: OwnerCommercialDocumentKind): string {
 }
 
 function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & { id: string } {
+  if (source.kind === 'sub_settlement') {
+    return { id: source.id, no: source.no, name: source.name, projectId: source.projectId, supplierId: source.supplierId ?? null, contractId: source.contractId, settlementType: source.documentType, settlementDate: source.applicationDate ?? '', sourceType: source.sourceType, sourceId: source.sourceId, sourceLocked: source.sourceLocked, statusNote: source.statusNote, lines: [], totalAmount: source.amount, deductionNote: source.deductionNote ?? '', note: source.note, status: source.status }
+  }
   if (source.kind === 'sub_change') {
     return {
       id: source.id,
@@ -573,6 +579,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         name: row.name,
         projectId: row.projectId ?? '',
         supplierId: row.supplierId ?? '',
+        amount: row.amount,
       }] as const),
       ...state.subcontractContracts.entries(),
     ])
@@ -624,6 +631,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     source: OwnerCommercialDocumentSource,
   ): OwnerCommercialDocumentSource {
     const hydrated = clone(source)
+    if (hydrated.kind === 'sub_settlement') {
+      hydrated.subcontractSettlementEvidence = {
+        contractAmount: effectiveSubcontractContracts(state).get(hydrated.contractId ?? '')?.amount ?? null,
+        settlements: [...state.documents.values()].filter(row => row.kind === 'sub_settlement').map(row => ({ id: row.id, projectId: row.projectId, supplierId: row.supplierId, contractId: row.contractId, amount: row.amount, status: row.status })),
+        deductions: null,
+        applications: null,
+      }
+    }
     if (hydrated.kind === 'final_settlement')
       hydrated.finalSettlementEvidence = finalSettlementEvidenceForContract(state, hydrated.contractId)
     return hydrated
@@ -644,7 +659,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   function writeCapability(kind: OwnerCommercialDocumentKind) {
-    return kind === 'sub_change'
+    return (kind === 'sub_change' || kind === 'sub_settlement')
       ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY
       : OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY
   }
@@ -693,7 +708,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     complete: boolean,
   ) {
     const projectId = complete ? required(draft.projectId, '项目') : text(draft.projectId)
-    if (kind === 'sub_change') {
+    if (kind === 'sub_change' || kind === 'sub_settlement') {
       const supplierId = complete ? required(draft.supplierId, '分供方') : text(draft.supplierId)
       const contractId = complete ? required(draft.contractId, '分包合同') : text(draft.contractId)
       if (contractId && (!projectId || !supplierId))
@@ -990,17 +1005,66 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const id = current?.id ?? createId(request.kind)
     const isSubmit = request.action === 'submit'
     const relation = relations(state, request.kind, request.draft, isSubmit)
-    const applicationDate = request.kind === 'sub_change'
-      ? text(request.draft.changeDate)
-      : request.kind === 'final_settlement'
-        ? text(request.draft.submissionDate)
-        : request.kind === 'owner_penalty'
-          ? text(request.draft.penaltyDate)
-          : text(request.draft.applicationDate)
+    const applicationDate = request.kind === 'sub_settlement'
+      ? text(request.draft.settlementDate)
+      : request.kind === 'sub_change'
+        ? text(request.draft.changeDate)
+        : request.kind === 'final_settlement'
+          ? text(request.draft.submissionDate)
+          : request.kind === 'owner_penalty'
+            ? text(request.draft.penaltyDate)
+            : text(request.draft.applicationDate)
     if (applicationDate && !isIsoDate(applicationDate))
       throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期格式必须为 yyyy-mm-dd`)
     if (isSubmit && !applicationDate)
       throw failure('validation-failed', `${request.kind === 'sub_change' ? '变更' : request.kind === 'owner_penalty' ? '罚扣' : '申报'}日期必填`)
+    if (request.kind === 'sub_settlement') {
+      const name = isSubmit ? required(request.draft.name, '结算名称') : text(request.draft.name)
+      const totalAmount = nullableNumber(request.draft.totalAmount)
+      if (isSubmit && (totalAmount == null || totalAmount <= 0))
+        throw failure('validation-failed', '结算金额必须大于 0')
+      const source: OwnerCommercialDocumentSource = {
+        dataOrigin: 'real',
+        kind: 'sub_settlement',
+        id,
+        no: text(request.draft.no) || `FBJS-${id}`,
+        name,
+        documentType: text(request.draft.settlementType),
+        projectId: relation.project?.id ?? null,
+        projectName: relation.project?.name ?? '',
+        projectPermission: 'allowed',
+        customerId: null,
+        customerName: '',
+        customerPermission: 'allowed',
+        supplierId: relation.supplier?.id ?? null,
+        supplierName: relation.supplier?.name ?? '',
+        supplierPermission: 'allowed',
+        contractId: relation.subcontract?.id ?? null,
+        contractNo: relation.subcontract?.no ?? '',
+        contractName: relation.subcontract?.name ?? '',
+        contractPermission: 'allowed',
+        sourceType: 'expenditure_settlement',
+        sourceId: id,
+        sourceLocked: isSubmit,
+        periodNo: '',
+        applicationDate: applicationDate || null,
+        approvalDate: null,
+        status: isSubmit ? 'confirmed' : 'draft',
+        statusNote: isSubmit ? '已确认分包结算' : '',
+        amount: round(totalAmount ?? 0),
+        auditedAmount: null,
+        deductionNote: text(request.draft.deductionNote),
+        note: text(request.draft.note),
+        version: (current?.version ?? 0) + 1,
+        createdAt: current?.createdAt ?? timestamp,
+        updatedAt: timestamp,
+        lines: [],
+        files: filesAfterChanges(request.kind, id, current?.files ?? [], request.attachments, timestamp),
+      }
+      state.documents.set(key(request.kind, id), source)
+      state.sourceVersion += 1
+      return source
+    }
     if (request.kind === 'sub_change') {
       const reason = isSubmit ? required(request.draft.reason, '变更事由') : text(request.draft.reason)
       const approvedAmount = nullableNumber(request.draft.approvedAmount)
@@ -1675,6 +1739,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           name: entity.name,
           projectId: entity.references.projectId ?? '',
           supplierId: entity.references.supplierId ?? '',
+          amount: entity.amount == null ? null : number(entity.amount),
         })
       }
     }
@@ -1789,7 +1854,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         continue
       const kind = entityAttribute(entity, 'kind')
       if (kind !== 'owner_change' && kind !== 'owner_report' && kind !== 'acceptance'
-        && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change') {
+        && kind !== 'final_settlement' && kind !== 'owner_penalty' && kind !== 'sub_change' && kind !== 'sub_settlement') {
         throw failure('validation-failed', '甲方商务单据迁移类型无效')
       }
       const projectId = entity.references.projectId ?? null
@@ -1797,13 +1862,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const project = projectId ? state.projects.get(projectId) ?? null : null
       const constructionContract = contractId ? state.contracts.get(contractId) ?? null : null
       const subcontract = contractId ? state.subcontractContracts.get(contractId) ?? null : null
-      const contract = kind === 'sub_change'
+      const contract = (kind === 'sub_change' || kind === 'sub_settlement')
         ? subcontract && { ...subcontract, customerId: null }
         : constructionContract
-      const supplierId = kind === 'sub_change' ? entity.references.supplierId ?? null : null
+      const supplierId = (kind === 'sub_change' || kind === 'sub_settlement') ? entity.references.supplierId ?? null : null
       const supplier = supplierId ? state.suppliers.get(supplierId) ?? null : null
       if (!project || !contract || contract.projectId !== project.id
-        || (kind === 'sub_change' && (!supplier || subcontract?.supplierId !== supplier.id))) {
+        || ((kind === 'sub_change' || kind === 'sub_settlement') && (!supplier || subcontract?.supplierId !== supplier.id))) {
         throw failure(
           'relationship-mismatch',
           kind === 'sub_change'
@@ -1814,6 +1879,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const customerId = contract.customerId ?? project.customerId
       const customer = customerId ? state.customers.get(customerId) ?? null : null
       const sourceTypeRaw = entityAttribute(entity, 'sourceType')
+      if (kind === 'sub_settlement' && sourceTypeRaw !== 'expenditure_settlement')
+        throw failure('validation-failed', '迁移分包结算来源类型无效')
       if (kind === 'owner_penalty' && sourceTypeRaw !== 'owner_penalty')
         throw failure('validation-failed', '迁移甲方罚扣来源类型无效')
       if (kind === 'sub_change' && sourceTypeRaw !== 'subcontract_change_order')
@@ -1823,6 +1890,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         || sourceTypeRaw === 'owner_final_settlement'
         || sourceTypeRaw === 'owner_penalty'
         || sourceTypeRaw === 'subcontract_change_order'
+        || sourceTypeRaw === 'expenditure_settlement'
         ? sourceTypeRaw
         : 'boq_change_order'
       const rawLines = jsonRecords(entityAttribute(entity, 'linesJson'))
@@ -1902,6 +1970,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         final_settlement: ['draft', 'submitted', 'audited'],
         owner_penalty: ['draft', 'submitted'],
         sub_change: ['draft', 'rejected', 'submitted', 'approved'],
+        sub_settlement: ['draft', 'confirmed'],
       }
       if (!statusesByKind[kind].includes(status)) {
         throw failure(
@@ -1935,6 +2004,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         if (!ownerPenaltyReason)
           throw failure('validation-failed', '迁移甲方罚扣事由必填')
       }
+      if (kind === 'sub_settlement' && status === 'confirmed' && (Number(entity.amount) <= 0 || !entity.name || !applicationDate))
+        throw failure('validation-failed', '迁移已确认分包结算必须有正金额、名称和日期')
       if (kind === 'sub_change' && status === 'submitted') {
         if (!applicationDate)
           throw failure('validation-failed', '迁移分包变洽签日期必填')
@@ -2069,6 +2140,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         settlementBasis: kind === 'final_settlement'
           ? entityAttribute(entity, 'settlementBasis')
           : undefined,
+        deductionNote: kind === 'sub_settlement' ? entityAttribute(entity, 'settlementDifferenceNote') : undefined,
         settlementDifferenceNote: kind === 'final_settlement'
           ? entityAttribute(entity, 'settlementDifferenceNote')
           : undefined,
@@ -2155,12 +2227,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     ): OwnerCommercialDocumentCommandContextDTO {
       authorize(session, kind)
       const state = stateFor(sessionId)
-      const includeOwner = kind ? kind !== 'sub_change' : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
-      const includeSubcontract = kind ? kind === 'sub_change' : session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
+      const includeOwner = kind ? kind !== 'sub_change' && kind !== 'sub_settlement' : session.capabilities.includes(OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY)
+      const includeSubcontract = kind ? (kind === 'sub_change' || kind === 'sub_settlement') : session.capabilities.includes(SUBCONTRACT_CHANGE_WRITE_CAPABILITY)
       return {
         workspaceId: session.workspaceId,
         actorId: session.actorId,
         capabilities: [...session.capabilities],
+        settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount })) : [],
         projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
         customers: includeOwner ? [...state.customers.values()].map(row => ({ id: row.id, label: row.name })) : [],
         suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
@@ -2186,7 +2259,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
                 customerId: null,
                 supplierId: row.supplierId,
                 kind: 'subcontract' as const,
-                changedContractAmount: null,
+                changedContractAmount: row.amount ?? null,
                 receivedAmount: null,
               }))
             : []),

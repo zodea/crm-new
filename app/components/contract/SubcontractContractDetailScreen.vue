@@ -37,11 +37,11 @@ const activeTab = computed({
   get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
   set: value => void router.replace({ query: { ...route.query, tab: value === 'info' ? undefined : value, focus: undefined } }),
 })
-const focusId = computed(() => route.query.tab === 'changes'
+const focusId = computed(() => (route.query.tab === 'changes' || route.query.tab === 'settlements')
   && typeof route.query.focus === 'string'
   ? route.query.focus
   : null)
-const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_change'))
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_change') ?? validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_settlement'))
 const returnTo = computed(() => ownerDocumentReturnTo.value
   ?? validateSubcontractContractReturnTo(route.query.returnTo, props.origin)
   ?? '/contract/subcontract')
@@ -179,9 +179,9 @@ useTabTitle(() => detail.value?.contract.name ?? '分包合同详情')
         </section>
         <section v-else-if="activeTab === 'settlements'" class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="进度结算" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.settlements.progress" empty-label="暂无进度结算" />
+            <SectionHeader title="进度结算" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.settlements.progress" empty-label="暂无进度结算" :focus-id="focusId" :return-to="route.fullPath" />
           </div><div class="panel min-w-0 overflow-hidden p-4">
-            <SectionHeader title="完工结算" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.settlements.completion" empty-label="暂无完工结算" />
+            <SectionHeader title="完工结算" /><SubcontractContractFactTable class="mt-3" :rows="detail.sections.settlements.completion" empty-label="暂无完工结算" :focus-id="focusId" :return-to="route.fullPath" />
           </div>
         </section>
         <section v-else-if="activeTab === 'penalties'" class="panel min-w-0 overflow-hidden p-4">

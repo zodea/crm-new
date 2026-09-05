@@ -81,6 +81,7 @@ const DIRECT_PROFILES = new Set([
   'R-TARGET-COST-LIVE',
   'R-OWNER-DOCUMENTS-LIVE',
   'R-SUB-DOCUMENTS-LIVE',
+  'R-SUB-SETTLEMENT-LIVE-328',
   'R-AUX-DOCUMENTS-LIVE',
   'R-MATERIAL-SETTLEMENT-LIVE',
   'R-MATERIAL-FLOW-LIVE',
@@ -125,7 +126,7 @@ const REFERENCE_VIEW_BY_ROUTE = new Map([
   ['/owner/:kind/:id', { id: 'owner-document-detail-by-kind', label: '甲方报量编号 > 详情-收入结算；其余 kind 详情未观察', gradeOverride: 'adjacent' }],
   ['/owner/:kind/form/:id', { id: 'owner-document-edit-by-kind', label: '甲方变洽签/报量专属整页编辑表单' }],
   ['/subcontract/:kind', { id: 'subcontract-document-list-by-kind', label: '分包及人工 > 分包变洽签 / 分包结算（按 kind）' }],
-  ['/subcontract/:kind/:id', { id: 'subcontract-document-detail-by-kind', label: '分包变洽签编号 > 专属只读详情（参考非空详情未观察）', gradeOverride: 'local-authority' }],
+  ['/subcontract/:kind/:id', { id: 'subcontract-document-detail-by-kind', label: '分包结算名称 > 详情-支出结算；同一路由 change 分支仍以本地 DC 为准', gradeOverride: 'local-authority' }],
   ['/subcontract/:kind/form/:id', { id: 'subcontract-document-edit-by-kind', label: '分包变洽签专属整页编辑表单' }],
   ['/project/penalty', { id: 'project-penalty-list', label: '分包及人工 > 项目罚扣' }],
 

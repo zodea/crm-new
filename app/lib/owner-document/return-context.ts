@@ -34,17 +34,19 @@ const STORAGE_PREFIX = 'ruihang:owner-document-return:'
 const TTL = 30 * 60_000
 
 function route(kind: OwnerCommercialDocumentKind): string {
-  return kind === 'sub_change'
-    ? '/subcontract/change'
-    : kind === 'owner_change'
-      ? '/owner/change'
-      : kind === 'owner_report'
-        ? '/owner/report'
-        : kind === 'acceptance'
-          ? '/owner/acceptance'
-          : kind === 'final_settlement'
-            ? '/owner/final-settlement'
-            : '/owner/penalty'
+  return kind === 'sub_settlement'
+    ? '/subcontract/settlement'
+    : kind === 'sub_change'
+      ? '/subcontract/change'
+      : kind === 'owner_change'
+        ? '/owner/change'
+        : kind === 'owner_report'
+          ? '/owner/report'
+          : kind === 'acceptance'
+            ? '/owner/acceptance'
+            : kind === 'final_settlement'
+              ? '/owner/final-settlement'
+              : '/owner/penalty'
 }
 
 function value(input: unknown): string | undefined {
@@ -130,7 +132,7 @@ export function ownerDocumentListNavigationStateFromQuery(
   const pageSize = positiveInteger(query.pageSize, 20)
   const origin = value(query.origin)
   const rawReturnTo = value(query.returnTo)
-  const returnTo = kind === 'sub_change'
+  const returnTo = (kind === 'sub_change' || kind === 'sub_settlement')
     ? validateSubcontractContractDetailReturnTo(rawReturnTo)
     ?? validateSupplierDetailReturnTo(rawReturnTo)
     ?? validateProjectJourneyReturnTo(rawReturnTo)
@@ -217,7 +219,7 @@ export function validateOwnerDocumentJourneyReturnTo(
   expectedOrigin: unknown,
 ): string | null {
   return validateOwnerDocumentListReturnTo(input, kind, expectedOrigin)
-    ?? (kind === 'sub_change'
+    ?? ((kind === 'sub_change' || kind === 'sub_settlement')
       ? validateSubcontractContractDetailReturnTo(input, expectedOrigin)
       ?? validateSupplierDetailReturnTo(input, expectedOrigin)
       : validateConstructionContractDetailReturnTo(input, expectedOrigin))
@@ -234,7 +236,7 @@ export function validateOwnerDocumentDetailReturnTo(
   try {
     const url = new URL(input, 'https://ruihang.invalid')
     const ownerMatch = url.pathname.match(/^\/owner\/(change|report|acceptance|final-settlement|penalty)\/([^/]+)$/)
-    const subcontractMatch = url.pathname.match(/^\/subcontract\/(change)\/([^/]+)$/)
+    const subcontractMatch = url.pathname.match(/^\/subcontract\/(change|settlement)\/([^/]+)$/)
     const match = ownerMatch ?? subcontractMatch
     if (url.origin !== 'https://ruihang.invalid' || !match)
       return null
@@ -245,7 +247,7 @@ export function validateOwnerDocumentDetailReturnTo(
     if (!isDataOriginDTO(origin) || (isDataOriginDTO(expectedOrigin) && origin !== expectedOrigin))
       return null
     const kind: OwnerCommercialDocumentKind = subcontractMatch
-      ? 'sub_change'
+      ? match[1] === 'settlement' ? 'sub_settlement' : 'sub_change'
       : match[1] === 'change'
         ? 'owner_change'
         : match[1] === 'report'

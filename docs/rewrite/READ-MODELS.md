@@ -387,3 +387,7 @@ interface NotificationOpenResultDTO {
 - 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
 - 当前无实体数据的页面保持真实空态；项目列表、语义目标、来源感知基础详情与新增/编辑命令，以及受控迁移的批次快照，由可重置中央实例证明 HTTP 链。其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS；已确认切换的六类核心身份与施工/分包合同除外，不能以 SQLite adapter 作为正式回退路径。
 - 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。
+
+### AX02 分包结算
+
+`ownerCommercialDocumentRead` 的 `sub_settlement` 列表/详情使用专属 `SubcontractSettlementAmounts`，项目/合同/分供方与附件按真实 ID 读取。金额和空错权限语义见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)，累计事实不复制到头记录。

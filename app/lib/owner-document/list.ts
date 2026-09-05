@@ -6,41 +6,44 @@ import type {
 } from '~/lib/owner-document/forms'
 
 export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
-  const itemAmounts = item.amounts.kind === 'owner_change'
-    ? {
-        amount: Number(item.amounts.taxInclusive),
-        secondaryAmount: Number(item.amounts.taxExclusive),
-        tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
-      }
-    : item.amounts.kind === 'sub_change'
+  const settlementAmounts = item.amounts.kind === 'sub_settlement' ? item.amounts : null
+  const itemAmounts = item.amounts.kind === 'sub_settlement'
+    ? { amount: Number(item.amounts.total), secondaryAmount: 0, tertiaryAmount: 0 }
+    : item.amounts.kind === 'owner_change'
       ? {
-          amount: Number(item.amounts.approved),
-          secondaryAmount: item.amounts.actualApproved === null ? null : Number(item.amounts.actualApproved),
-          tertiaryAmount: 0,
+          amount: Number(item.amounts.taxInclusive),
+          secondaryAmount: Number(item.amounts.taxExclusive),
+          tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
         }
-      : item.amounts.kind === 'owner_report'
+      : item.amounts.kind === 'sub_change'
         ? {
-            amount: Number(item.amounts.reported),
-            secondaryAmount: Number(item.amounts.audited ?? 0),
-            tertiaryAmount: Number(item.amounts.difference ?? 0),
+            amount: Number(item.amounts.approved),
+            secondaryAmount: item.amounts.actualApproved === null ? null : Number(item.amounts.actualApproved),
+            tertiaryAmount: 0,
           }
-        : item.amounts.kind === 'final_settlement'
+        : item.amounts.kind === 'owner_report'
           ? {
-              amount: Number(item.amounts.declared),
+              amount: Number(item.amounts.reported),
               secondaryAmount: Number(item.amounts.audited ?? 0),
-              tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
+              tertiaryAmount: Number(item.amounts.difference ?? 0),
             }
-          : item.amounts.kind === 'owner_penalty'
+          : item.amounts.kind === 'final_settlement'
             ? {
-                amount: Number(item.amounts.amount),
-                secondaryAmount: 0,
-                tertiaryAmount: 0,
+                amount: Number(item.amounts.declared),
+                secondaryAmount: Number(item.amounts.audited ?? 0),
+                tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
               }
-            : {
-                amount: Number(item.amounts.contractEstimate),
-                secondaryAmount: 0,
-                tertiaryAmount: 0,
-              }
+            : item.amounts.kind === 'owner_penalty'
+              ? {
+                  amount: Number(item.amounts.amount),
+                  secondaryAmount: 0,
+                  tertiaryAmount: 0,
+                }
+              : {
+                  amount: Number(item.amounts.contractEstimate),
+                  secondaryAmount: 0,
+                  tertiaryAmount: 0,
+                }
   const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
     ? {
         viewVariant: 'acceptance' as const,
@@ -75,6 +78,12 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
     type: item.documentType,
     period: item.periodNo,
     ...itemAmounts,
+    ...(settlementAmounts
+      ? Object.fromEntries((['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'] as const).map((key) => {
+          const value = settlementAmounts[key]
+          return [key, value == null ? null : Number(value)]
+        }))
+      : {}),
     projectNavigation: item.projectNavigation,
     contractNavigation: item.contractNavigation,
     supplierNavigation: item.supplierNavigation,
@@ -371,7 +380,13 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       CONTRACT_COLUMN,
       { field: 'supplierName', title: '乙方（分供方）', minWidth: 180, slot: 'supplier' },
       { field: 'type', title: '结算类型', width: 112, slot: 'type' },
-      { field: 'amount', title: '结算金额', type: 'money', width: 142 },
+      { field: 'amount', title: '含税结算额', type: 'money', width: 142 },
+      { field: 'deductions', title: '奖罚抵扣', type: 'money', width: 142 },
+      { field: 'netSettlement', title: '本次结算净额', type: 'money', width: 142 },
+      { field: 'cumulativeApplied', title: '累计申请付款', type: 'money', width: 142 },
+      { field: 'remainingApplicable', title: '剩余可申请', type: 'money', width: 142 },
+      { field: 'cumulativePaid', title: '累计已付', type: 'money', width: 142 },
+      { field: 'remainingUnpaid', title: '剩余未付', type: 'money', width: 142 },
       { field: 'date', title: '结算日期', type: 'date', width: 116 },
       STATUS_COLUMN,
       ACTION_COLUMN,

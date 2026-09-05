@@ -17,6 +17,7 @@ const origin = computed(() => isDataOriginDTO(route.query.origin) ? route.query.
 </script>
 
 <template>
-  <SubcontractChangeDetailScreen v-if="centralChange" :document-id="documentId" :origin="origin" />
+  <SubcontractSettlementDetailScreen v-if="!isDesktopRuntime() && kind === 'sub_settlement' && documentId !== 'new'" :document-id="documentId" :origin="origin" />
+  <SubcontractChangeDetailScreen v-else-if="centralChange" :document-id="documentId" :origin="origin" />
   <OwnerDocumentFormPage v-else :kind="kind" />
 </template>

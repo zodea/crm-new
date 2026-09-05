@@ -342,6 +342,8 @@ Issue #323—#327 的核心迁移拓扑使用逻辑实体名 `owner_documents`�
 
 `invoice_export_settings` 是发票领域的本机单例配置表（迁移 v41），`settings_json` 保存发票台账 XLSX 的行列尺寸、字体、边框、格式、冻结与合并默认值。业务预览只保留本次草稿；保存和加载必须经 invoice store action 进入 SQLite，浏览器开发态随数据库 snapshot fallback 持久化，不再另写 `localStorage`，也不得复用只属于 OCR 的 `ocr_settings`。
 
+Issue #328 将分包 `expenditure_settlements` 作为逻辑 `owner_documents` 迁移节点的 `sub_settlement` kind 接管，正式 ID 由中央分配，不新增分包结算主表；兼容旧 `biz_type=分包` 及专业分包/合同劳务分类。项目、分供方与 canonical 分包合同必须唯一映射且一致。附件继续使用 `owner_type=expenditure_settlement`。金额与扣款说明来自原结算；确认状态只有 `draft → confirmed`。累计金额只在查询时派生，项目分供方终态 `settlements` 和材料冲销不在本票范围。
+
 ```sql
 -- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。
 -- project_suppliers 的 1:1 `settlements` 只表示合作关系终态关闭，不得作为付款勾稽源单。
