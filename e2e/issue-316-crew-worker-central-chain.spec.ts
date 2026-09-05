@@ -32,17 +32,17 @@ async function createFormalCrew(request: APIRequestContext, sessionId: string, s
   return (await response.json() as { id: string }).id
 }
 
-async function createFormalWorker(request: APIRequestContext, sessionId: string, crewId: string) {
+async function createFormalWorker(request: APIRequestContext, sessionId: string, crewId: string | null, suffix = '') {
   const response = await request.post('/api/commands/workers', {
     headers: { 'x-ruihang-test-session': sessionId },
     data: {
       workspaceId: 'workspace-default',
       actorId: 'actor-default',
       requiredCapability: 'worker:write',
-      commandId: 'worker-command-main',
+      commandId: `worker-command-${suffix || 'main'}`,
       baseVersion: null,
       action: 'save',
-      draft: { name: '中央链路工人', phone: '13800000002', idCard: '440101199001011234', trade: '泥工', bankName: '示例银行', bankAccount: '6222000000001234', crewId, safetyEducation: true, projectStatus: '在场', capabilityTrades: ['泥工'], capabilityItems: ['墙砖'], note: '', status: '' },
+      draft: { name: `中央链路工人${suffix}`, phone: '13800000002', idCard: '440101199001011234', trade: '泥工', bankName: '示例银行', bankAccount: '6222000000001234', crewId, safetyEducation: true, projectStatus: '在场', capabilityTrades: ['泥工'], capabilityItems: ['墙砖'], note: '', status: '' },
       attachments: {},
     },
   })
@@ -88,6 +88,44 @@ test.describe('Issue #316：班组—工人中央关系链', () => {
     await page.getByRole('link', { name: '返回工人列表' }).click()
     await expect(page).toHaveURL(/\/base\/worker\?search=%E4%B8%AD%E5%A4%AE%E9%93%BE%E8%B7%AF/)
     await expect(page.getByPlaceholder('搜索姓名、手机号、证件号…')).toHaveValue('中央链路')
+  })
+
+  test('班组详情直接添加和移出成员，只更新工人班组归属', async ({ page }, testInfo) => {
+    const sessionId = testSession(testInfo)
+    const crewId = await createFormalCrew(page.context().request, sessionId, '-成员管理')
+    const sourceCrewId = await createFormalCrew(page.context().request, sessionId, '-原班组')
+    await createFormalWorker(page.context().request, sessionId, crewId, '-原成员')
+    const candidateId = await createFormalWorker(page.context().request, sessionId, sourceCrewId, '-待转入')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`/base/crew/${crewId}?origin=real`)
+    await expect(page.getByRole('heading', { name: '中央泥水班组-成员管理' })).toBeVisible({ timeout: 20_000 })
+    await expectNoPageOverflow(page, '#316 班组成员管理 @ 390px')
+
+    await page.getByRole('button', { name: '添加成员' }).click()
+    const addDialog = page.getByRole('dialog', { name: /添加成员/ })
+    await addDialog.getByLabel('工人').selectOption({ label: '中央链路工人-待转入 · 泥工 · 中央泥水班组-原班组' })
+    const addRequest = page.waitForResponse(response => response.url().includes(`/api/commands/workers/${candidateId}`) && response.request().method() === 'PUT')
+    await addDialog.getByRole('button', { name: '加入班组' }).click()
+    const transferDialog = page.getByRole('dialog', { name: '确认转组' })
+    await expect(transferDialog).toContainText('中央泥水班组-原班组')
+    await expect(transferDialog).toContainText('中央泥水班组-成员管理')
+    await transferDialog.getByRole('button', { name: '确认转组' }).click()
+    expect((await addRequest).ok()).toBe(true)
+    const memberRow = page.getByRole('row').filter({ hasText: '中央链路工人-待转入' })
+    await expect(memberRow).toBeVisible()
+
+    const removeRequest = page.waitForResponse(response => response.url().includes(`/api/commands/workers/${candidateId}`) && response.request().method() === 'PUT')
+    await memberRow.getByRole('button', { name: '移出班组' }).click()
+    const removeDialog = page.getByRole('dialog', { name: '移出班组' })
+    await expect(removeDialog).toContainText('不会删除工人、工资或历史记录')
+    await removeDialog.getByRole('button', { name: '移出班组' }).click()
+    expect((await removeRequest).ok()).toBe(true)
+    await expect(memberRow).toBeHidden()
+
+    await page.goto(`/base/worker/${candidateId}?origin=real`)
+    await expect(page.getByRole('heading', { name: '中央链路工人-待转入' })).toBeVisible()
+    await expect(page.getByText('所属班组').locator('..')).toContainText('—')
   })
 
   test('测试工人详情闭合项目、责任单元、工资单与扣罚单穿透，不反推未知工资分配', async ({ page }) => {

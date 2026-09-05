@@ -86,7 +86,7 @@
 | 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
 <!-- implementation-frontier:end -->
 
-基础主数据仍由父规格统一承接；客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合，班组—工人中央列表—详情—显式编辑及项目/责任/工资/扣罚稳定 ID 关系链已由 [#316](https://github.com/zodea/crm-new/issues/316) 闭合，项目×分供方六类事实工作台已由 [#317](https://github.com/zodea/crm-new/issues/317) 闭合。[#281](https://github.com/zodea/crm-new/issues/281) 已完成四条子链的父级联合验收，补齐客户→项目和工作台→项目/分供方的同源受限返回，并将项目详情反向关系、导入确认、导入后工作台与分供方编辑读回收敛到同一中央身份链；父规格其他页面域不因此提前标为完成。
+基础主数据仍由父规格统一承接；客户列表—只读详情—显式编辑子链已由 [#314](https://github.com/zodea/crm-new/issues/314) 闭合，分供方中央列表—详情—显式编辑及合同/结算/归档发票/确认付款四类事实子链已由 [#315](https://github.com/zodea/crm-new/issues/315) 闭合，班组—工人中央列表—详情—显式编辑及项目/责任/工资/扣罚稳定 ID 关系链已由 [#316](https://github.com/zodea/crm-new/issues/316) 闭合，班组详情现支持添加既有正式工人、确认转组和移出成员，只更新当前班组归属；操作说明见 [班组与工人指南](../guides/crew-worker-records.md)。项目×分供方六类事实工作台已由 [#317](https://github.com/zodea/crm-new/issues/317) 闭合。[#281](https://github.com/zodea/crm-new/issues/281) 已完成四条子链的父级联合验收，补齐客户→项目和工作台→项目/分供方的同源受限返回，并将项目详情反向关系、导入确认、导入后工作台与分供方编辑读回收敛到同一中央身份链；父规格其他页面域不因此提前标为完成。
 
 核心合同中的材料采购子链已由 [#318](https://github.com/zodea/crm-new/issues/318) 闭合；施工合同子链由 [#320](https://github.com/zodea/crm-new/issues/320) 闭合；分包合同子链由 [#321](https://github.com/zodea/crm-new/issues/321) 闭合中央列表、七分区只读详情、演示只读边界、正式整页新增/编辑与中央读回。[#322](https://github.com/zodea/crm-new/issues/322) 进一步闭合两类补充协议的稳定 ID 聚焦、父子归属校验、正式迁移与列表来源恢复。[#282](https://github.com/zodea/crm-new/issues/282) 已完成施工/分包父级联合验收：列表项目与客户/分供方只在稳定 ID 和同源目标成立时下钻，补充协议与甲方业务单据按各自聚焦范围返回精确错误，未核验来源事实不生成死链接。未知实际竣工、结算/结清状态保持 `null`，材料领用缺少稳定外键时保留明确空态。
 

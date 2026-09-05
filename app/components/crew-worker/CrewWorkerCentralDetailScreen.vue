@@ -50,6 +50,7 @@ const subtitle = computed(() => props.kind === 'crew'
   ? [crewDetail.value?.crew.trade, crewDetail.value?.crew.contactName, crewDetail.value?.crew.contactPhone].filter(Boolean).join(' · ')
   : [workerDetail.value?.worker.trade, workerDetail.value?.worker.phone, workerDetail.value?.worker.projectStatus].filter(Boolean).join(' · '))
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes(`${props.kind}:write`))
+const canManageMembers = computed(() => crewDetail.value?.dataOrigin === 'real' && crewDetail.value.capabilities.includes('worker:write'))
 const editTo = computed(() => {
   const query = new URLSearchParams({ origin: 'real' })
   const returnTo = validateCrewWorkerReturnTo(props.returnTo)
@@ -141,49 +142,7 @@ onActivated(() => void load())
           </div>
         </dl>
       </section>
-      <section class="panel min-w-0 overflow-hidden">
-        <SectionHeader class="p-4 pb-2" title="成员" :subtitle="`${crewDetail.members.length} 人，按稳定工人 ID 关联`" /><div class="max-w-full overflow-x-auto">
-          <table class="w-full min-w-760px text-left text-12px">
-            <thead class="bg-surface-2 text-ink-soft">
-              <tr>
-                <th class="p-3">
-                  工人
-                </th><th class="p-3">
-                  工种
-                </th><th class="p-3">
-                  联系电话
-                </th><th class="p-3">
-                  当前项目
-                </th><th class="p-3">
-                  项目状态
-                </th><th class="p-3">
-                  日工资
-                </th>
-              </tr>
-            </thead><tbody>
-              <tr v-for="row in crewDetail.members" :key="row.worker.id" class="border-t border-line">
-                <td class="p-3">
-                  <EntityLink :id="row.worker.id" type="worker" :label="row.worker.label" :intent="row.navigation" :return-to="route.fullPath" />
-                </td><td class="p-3">
-                  {{ row.trade || '—' }}
-                </td><td class="p-3">
-                  {{ row.phone || '—' }}
-                </td><td class="p-3">
-                  <EntityLink :id="row.currentProject.state === 'resolved' ? row.currentProject.id : null" type="project" :label="row.currentProject.state === 'resolved' ? row.currentProject.label : null" :intent="row.currentProjectNavigation" :return-to="route.fullPath" />
-                </td><td class="p-3">
-                  {{ row.projectStatus || '—' }}
-                </td><td class="p-3">
-                  {{ row.dailyWage == null ? '历史未记录' : `¥${row.dailyWage}` }}
-                </td>
-              </tr><tr v-if="!crewDetail.members.length">
-                <td colspan="6" class="p-6 text-center text-ink-faint">
-                  暂无成员关系
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <CrewMemberSection :detail="crewDetail" :can-manage="canManageMembers" :return-to="route.fullPath" @changed="load" />
       <section class="panel min-w-0 overflow-hidden">
         <SectionHeader class="p-4 pb-2" title="项目与工资事实" subtitle="在场成员、工程量责任和工资单按项目稳定 ID 聚合" /><div class="max-w-full overflow-x-auto">
           <table class="w-full min-w-860px text-left text-12px">

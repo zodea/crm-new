@@ -1,4 +1,4 @@
-import type { CrewFormReadDTO, WorkerFormReadDTO } from '~/lib/crew-worker/command-contract'
+import type { CrewFormReadDTO, WorkerCommandRequestDTO, WorkerFormReadDTO } from '~/lib/crew-worker/command-contract'
 import type { CrewFormDraft, FormAttachmentChanges, MasterDataSaveAction, WorkerFormDraft } from '~/lib/master-data/forms'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
@@ -12,6 +12,17 @@ export class CrewWorkerCommandConflictError extends Error {
   }
 }
 
+export class CrewWorkerMembershipConflictError extends Error {
+  constructor(
+    public readonly workerId: string,
+    public readonly expectedCrewId: string | null,
+    public readonly latestCrewId: string | null,
+  ) {
+    super('工人档案或班组归属已变化，已刷新最新成员关系，请重新选择')
+    this.name = 'CrewWorkerMembershipConflictError'
+  }
+}
+
 function emptyChanges(changes: FormAttachmentChanges): FormAttachmentChanges {
   return {
     ...(changes.add?.length ? { add: changes.add } : {}),
@@ -21,6 +32,11 @@ function emptyChanges(changes: FormAttachmentChanges): FormAttachmentChanges {
 }
 
 export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () => {
+  function createMembershipSession() {
+    return { pending: null as { fingerprint: string, request: WorkerCommandRequestDTO } | null }
+  }
+  type MembershipSession = ReturnType<typeof createMembershipSession>
+
   function createSession() {
     return { targets: { crew: null, worker: null } as Record<'crew' | 'worker', string | null>, versions: { crew: null, worker: null } as Record<'crew' | 'worker', string | null>, pending: new Map<'crew' | 'worker', { id: string, fingerprint: string }>() }
   }
@@ -68,6 +84,63 @@ export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () =
     return save(session, 'worker', draft, action, attachments)
   }
 
+  async function setWorkerCrewMembership(session: MembershipSession, input: {
+    workerId: string
+    expectedCrewId: string | null
+    crewId: string | null
+  }) {
+    const fingerprint = JSON.stringify(input)
+    let pendingCommand = session.pending
+    if (!pendingCommand || pendingCommand.fingerprint !== fingerprint) {
+      const [context, form] = await Promise.all([
+        repository().context(),
+        repository().loadWorkerForm(input.workerId),
+      ])
+      const latestCrewId = form.draft.crewId || null
+      if (latestCrewId !== input.expectedCrewId) {
+        throw new CrewWorkerMembershipConflictError(
+          input.workerId,
+          input.expectedCrewId,
+          latestCrewId,
+        )
+      }
+      pendingCommand = {
+        fingerprint,
+        request: {
+          id: input.workerId,
+          workspaceId: context.workspaceId,
+          actorId: context.actorId,
+          requiredCapability: WORKER_WRITE_CAPABILITY,
+          commandId: crypto.randomUUID(),
+          baseVersion: form.version,
+          action: form.draft.status === 'draft' ? 'draft' : 'save',
+          draft: { ...form.draft, crewId: input.crewId },
+          attachments: {},
+        },
+      }
+      session.pending = pendingCommand
+    }
+    try {
+      const result = await repository().executeWorker(pendingCommand.request)
+      session.pending = null
+      latestWrite.value = { kind: 'worker', id: result.id, version: result.version }
+      return result
+    }
+    catch (cause) {
+      const problem = crewWorkerProblemFromUnknown(cause)
+      if (problem.problem.code === 'conflict') {
+        session.pending = null
+        const latest = await repository().loadWorkerForm(input.workerId)
+        throw new CrewWorkerMembershipConflictError(
+          input.workerId,
+          input.expectedCrewId,
+          latest.draft.crewId || null,
+        )
+      }
+      throw problem
+    }
+  }
+
   async function save(session: CommandSession, kind: 'crew', draft: CrewFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
   async function save(session: CommandSession, kind: 'worker', draft: WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges): Promise<{ id: string, logId: null, attachmentIds: string[] }>
   async function save(session: CommandSession, kind: 'crew' | 'worker', draft: CrewFormDraft | WorkerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges) {
@@ -110,5 +183,5 @@ export const useCrewWorkerCommandStore = defineStore('crew-worker-command', () =
     }
   }
 
-  return { latestWrite: readonly(latestWrite), createSession, hydrate, saveCrew, saveWorker, startNew, rebase, acceptLatest }
+  return { latestWrite: readonly(latestWrite), createSession, createMembershipSession, setWorkerCrewMembership, hydrate, saveCrew, saveWorker, startNew, rebase, acceptLatest }
 })
