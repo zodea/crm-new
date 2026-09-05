@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 发票编辑页签（#71）：左原图 + 右完整字段集（与识别校对一致）+ 货物明细 +
-// 重新识别（桩）+ 删除（软删 + 10 秒撤回 + 关页签）/ 保存（关页签回台账）。
+// 重新识别 + 删除（软删 + 10 秒撤回 + 关页签）/ 保存（关页签回台账）。
 // 字段走本地缓冲、保存一次提交（区别于工作台 correctField 即时落库）——
 // 归档后保存前的 simple 二次确认（ADR 0003）在提交口拦截。
 // 同票复用页签由 tab-machine 同路由同参数复用保证；页签标题「发票·尾8位」useTabTitle 回填。
@@ -72,13 +72,7 @@ function resetForm() {
   }
 }
 
-// 重新识别完成（processing → done）后刷新缓冲区；不在用户编辑中途随意重置
-watch(() => invoice.value?.ocrStatus, (next, prev) => {
-  if (prev === 'processing' && next === 'done') {
-    resetForm()
-    success('识别完成，字段已刷新')
-  }
-})
+const isRecognizing = computed(() => store.recognitionProgress[id.value] != null)
 
 const isArchived = computed(() => invoice.value?.accountStatus === 'archived')
 
@@ -108,7 +102,7 @@ function closeTabToLedger() {
 // ── 保存：diff 缓冲 → 一次提交；归档后先 simple 二次确认 ──
 async function save() {
   const inv = invoice.value
-  if (!inv)
+  if (!inv || isRecognizing.value)
     return
 
   const total = Number(form.value.totalAmount)
@@ -163,9 +157,18 @@ async function save() {
   }
 
   // store.update 是全列覆写：必须以最新行为底合并 patch，否则未编辑列（accountStatus 等）会被冲掉
-  await store.update(inv.id, { ...inv, ...patch })
-  success('已保存修改')
-  closeTabToLedger()
+  try {
+    const saved = await store.update(inv.id, { ...store.byId(inv.id), ...patch })
+    if (!saved) {
+      error('保存失败：发票不存在或已删除')
+      return
+    }
+    success('已保存修改')
+    closeTabToLedger()
+  }
+  catch (cause) {
+    error(cause instanceof Error ? cause.message : '保存失败，请重试')
+  }
 }
 
 // ── 删除：软删 + 10 秒撤回 + 自动关页签 ──
@@ -190,13 +193,20 @@ async function del() {
   closeTabToLedger()
 }
 
-// ── 重新识别（桩识别引擎，#60 缝）──
 async function rerecognize() {
   const inv = invoice.value
   if (!inv)
     return
-  success('已重新排队 OCR 识别')
-  await store.startRecognition(inv.id)
+  const succeeded = await store.startRecognition(inv.id)
+  if (inv.id !== id.value)
+    return
+  if (succeeded) {
+    resetForm()
+    success('识别完成，字段已刷新')
+  }
+  else {
+    error(store.recognitionError(inv.id) || '未完成重新识别，已保留当前输入')
+  }
 }
 
 onMounted(() => {
@@ -270,10 +280,12 @@ onMounted(() => {
 
         <div class="invoice-edit-fields grid gap-x-3 gap-y-2.5">
           <div v-for="d in FIELDS" :key="d.key" :class="{ 'invoice-edit-fields__full': d.full }">
-            <label class="field-label">{{ d.label }}</label>
+            <label class="field-label" :for="`invoice-${id}-${d.key}`">{{ d.label }}</label>
             <select
               v-if="d.type === 'select'"
+              :id="`invoice-${id}-${d.key}`"
               v-model="form[d.key]"
+              :disabled="isRecognizing"
               class="field-input w-full"
             >
               <option v-for="o in d.options" :key="o" :value="o">
@@ -282,11 +294,12 @@ onMounted(() => {
             </select>
             <template v-else-if="d.projectList">
               <input
+                :id="`invoice-${id}-${d.key}`"
                 v-model="form[d.key]"
                 class="field-input w-full"
                 list="edit-project-options"
                 placeholder="从项目主数据选择…"
-                :disabled="ownerKind === 'personal'"
+                :disabled="ownerKind === 'personal' || isRecognizing"
               >
               <datalist id="edit-project-options">
                 <option v-for="p in projectStore.list" :key="p.id" :value="p.name" />
@@ -294,7 +307,9 @@ onMounted(() => {
             </template>
             <input
               v-else
+              :id="`invoice-${id}-${d.key}`"
               v-model="form[d.key]"
+              :disabled="isRecognizing"
               class="field-input w-full"
               :class="d.mono ? 'font-mono' : ''"
               :type="d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text'"
@@ -375,11 +390,11 @@ onMounted(() => {
             <span class="i-lucide-trash-2 mr-1 text-13px" aria-hidden="true" />删除
           </button>
           <div class="flex flex-wrap items-center justify-end gap-2">
-            <button class="btn-secondary" :disabled="invoice.ocrStatus === 'processing'" @click="rerecognize">
+            <button class="btn-secondary" :disabled="isRecognizing || isArchived" @click="rerecognize">
               <span class="i-lucide-refresh-cw mr-1 text-13px" aria-hidden="true" />
-              {{ invoice.ocrStatus === 'processing' ? '识别中…' : '重新识别' }}
+              {{ isRecognizing ? '识别中…' : '重新识别' }}
             </button>
-            <button class="btn-accent" @click="save">
+            <button class="btn-accent" :disabled="isRecognizing" @click="save">
               <span class="i-lucide-save mr-1 text-13px" aria-hidden="true" />保存
             </button>
           </div>
