@@ -138,6 +138,7 @@ export function createSubcontractContractReadTestInstance(
       .map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.applicationDate, status: row.status === 'confirmed' ? '已确认' : '草稿', settlementKind: row.documentType === '最终结算' || row.documentType === '完工结算' ? 'completion' : 'progress' }))
     const combinedFacts = {
       ...formalFacts,
+      penalties: ownerDocumentSource.rows(sessionId).filter(row => row.kind === 'project_penalty' && row.dataOrigin === 'real').map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.applicationDate, status: row.status === 'deducted' ? '已抵扣' : row.status === 'draft' ? '草稿' : '待抵扣' })),
       settlements: formalSettlements,
       changes: [...formalFacts.changes, ...formalChanges],
     }
@@ -152,7 +153,7 @@ export function createSubcontractContractReadTestInstance(
             paymentApplications: [...formalFacts.paymentApplications, ...demoFacts.paymentApplications],
             paymentRecords: [...formalFacts.paymentRecords, ...demoFacts.paymentRecords],
             settlements: [...combinedFacts.settlements, ...demoFacts.settlements],
-            penalties: [...formalFacts.penalties, ...demoFacts.penalties],
+            penalties: [...combinedFacts.penalties, ...demoFacts.penalties],
             files: [...formalFacts.files, ...demoFacts.files],
           },
       capabilities,

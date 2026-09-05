@@ -8,4 +8,7 @@
 | 分包结算只读详情 | `/subcontract/settlement/:id` | 当前已可用，支持全局/项目/合同来源返回 |
 | 分包结算新增 | `/subcontract/settlement/new` | 当前已可用，草稿保存或确认 |
 | 分包结算显式编辑 | `/subcontract/settlement/form/:id` | 当前已可用，仅正式草稿 |
-| 项目罚扣中央执行与审计 | `/project/penalty/:id` | 已定稿待 #329 开发；本票仅提供中央结算候选 |
+| 项目罚扣列表 | `/project/penalty` | 当前已可用；[操作指南](./core-contract-and-boq.md#项目罚扣整改与结算抵扣) |
+| 项目罚扣只读详情、整改与抵扣历史 | `/project/penalty/:id` | 当前已可用，来源返回及部分抵扣 |
+| 项目罚扣新增 | `/project/penalty/new` | 当前已可用，保存草稿或提交 |
+| 项目罚扣显式编辑 | `/project/penalty/form/:id` | 当前已可用，仅正式草稿 |

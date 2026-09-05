@@ -2,6 +2,7 @@
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { useCrewWorkerReadStore } from '~/stores/crew-worker-read'
 
 const props = defineProps<{ kind: 'crew' | 'worker', id: string, origin: DataOriginDTO, includeDemo: boolean, returnTo?: string }>()
@@ -57,7 +58,8 @@ const editTo = computed(() => {
     query.set('returnTo', returnTo)
   return `/base/${props.kind}/form/${encodeURIComponent(props.id)}?${query.toString()}`
 })
-const backTo = computed(() => validateCrewWorkerReturnTo(props.returnTo) ?? `/base/${props.kind}`)
+const penaltyReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'project_penalty'))
+const backTo = computed(() => penaltyReturnTo.value ?? validateCrewWorkerReturnTo(props.returnTo) ?? `/base/${props.kind}`)
 useTabTitle(() => title.value)
 
 async function load() {
@@ -81,7 +83,7 @@ onActivated(() => void load())
     :title="title ?? (kind === 'crew' ? '班组详情' : '工人详情')"
     :subtitle="subtitle"
     :back-to="backTo"
-    :back-label="`返回${kind === 'crew' ? '班组' : '工人'}列表`"
+    :back-label="penaltyReturnTo ? '返回项目罚扣' : `返回${kind === 'crew' ? '班组' : '工人'}列表`"
     :state="shellState"
     :state-title="shellState === 'not-found' ? `${kind === 'crew' ? '班组' : '工人'}不存在或来源不匹配` : shellState === 'forbidden' ? '无权查看该档案' : shellState === 'loading' ? '正在加载中央详情' : '中央详情加载失败'"
     :state-description="problem?.message ?? ''"

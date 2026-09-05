@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql.includes('FROM penalty_records penalty'))
+    return []
   if (sql.includes('FROM customers')) {
     return [
       { id: 'customer-local-1', name: '本地客户' },
@@ -245,6 +247,15 @@ function dependencies(
 }
 
 describe('core migration local source', () => {
+  it('aX03 从受保护旧库读取项目罚扣及独立抵扣，保留原始身份', async () => {
+    const deps = dependencies({ select: async (sql: string) => {
+      if (sql.includes('FROM penalty_records penalty'))
+        return [{ id: 'p329', name: '历史罚扣', project_id: 'project-local-1', contract_id: 'subcontract-local-1', supplier_id: 'supplier-local-1', crew_id: 'crew-local-1', kind: 'project_penalty', source_type: 'penalty_record', amount: 1000, status: 'pending', rectification_note: '已安排整改', deadline: '2026-09-10', penalty_deductions_json: '[{"id":"d329","settlementId":"s329","amount":400,"occurredAt":"2026-09-01T00:00:00.000Z"}]' }] as any
+      return sourceRows(sql) as any
+    } })
+    const result = await createCoreMigrationLocalSource(deps).readSource()
+    expect(result.entities.owner_documents).toContainEqual(expect.objectContaining({ legacyId: 'p329', references: { projectId: 'project-local-1', contractId: 'subcontract-local-1', supplierId: 'supplier-local-1', crewId: 'crew-local-1' }, attributes: expect.objectContaining({ rectificationNote: '已安排整改', penaltyDeductionsJson: expect.stringContaining('s329') }) }))
+  })
   it('与当前本地库最新 schema 版本保持同步', () => {
     expect(CORE_MIGRATION_SOURCE_VERSION).toBe(`sqlite-v${LATEST_VERSION}`)
   })

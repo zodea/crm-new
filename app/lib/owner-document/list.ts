@@ -33,17 +33,17 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
                 secondaryAmount: Number(item.amounts.audited ?? 0),
                 tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
               }
-            : item.amounts.kind === 'owner_penalty'
-              ? {
-                  amount: Number(item.amounts.amount),
-                  secondaryAmount: 0,
-                  tertiaryAmount: 0,
-                }
-              : {
-                  amount: Number(item.amounts.contractEstimate),
-                  secondaryAmount: 0,
-                  tertiaryAmount: 0,
-                }
+            : (item.amounts.kind === 'owner_penalty' || item.amounts.kind === 'project_penalty')
+                ? {
+                    amount: Number(item.amounts.amount),
+                    secondaryAmount: 0,
+                    tertiaryAmount: 0,
+                  }
+                : {
+                    amount: Number(item.amounts.contractEstimate),
+                    secondaryAmount: 0,
+                    tertiaryAmount: 0,
+                  }
   const acceptanceFields = item.acceptanceView?.variant === 'acceptance'
     ? {
         viewVariant: 'acceptance' as const,
@@ -73,11 +73,12 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
     contractName: item.contract.state === 'resolved' ? item.contract.label : '',
     supplierId: item.supplier.state === 'resolved' ? item.supplier.id : null,
     supplierName: item.supplier.state === 'resolved' ? item.supplier.label : '',
-    crewId: null,
-    crewName: '',
+    crewId: item.crew?.state === 'resolved' ? item.crew.id : null,
+    crewName: item.crew?.state === 'resolved' ? item.crew.label : '',
     type: item.documentType,
     period: item.periodNo,
     ...itemAmounts,
+    ...(item.amounts.kind === 'project_penalty' ? { secondaryAmount: Number(item.amounts.deducted), tertiaryAmount: Number(item.amounts.remaining) } : {}),
     ...(settlementAmounts
       ? Object.fromEntries((['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'] as const).map((key) => {
           const value = settlementAmounts[key]
@@ -413,6 +414,9 @@ export const OWNER_DOCUMENT_LIST_CONFIG: Record<OwnerDocumentKind, OwnerDocument
       CONTRACT_COLUMN,
       { field: 'supplierName', title: '乙方', minWidth: 180, slot: 'supplier' },
       { field: 'amount', title: '罚扣金额', type: 'money', width: 142 },
+      { field: 'secondaryAmount', title: '累计已抵扣', type: 'money', width: 142 },
+      { field: 'tertiaryAmount', title: '剩余可抵扣', type: 'money', width: 142 },
+      { field: 'type', title: '抵扣方式', width: 120 },
       { field: 'date', title: '日期', type: 'date', width: 116 },
       STATUS_COLUMN,
       ACTION_COLUMN,

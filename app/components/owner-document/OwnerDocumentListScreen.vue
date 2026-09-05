@@ -60,7 +60,7 @@ const loadError = computed(() => store.listError(props.kind))
 const centralReadOnly = computed(() => !isDesktopRuntime()
   && (props.kind === 'owner_change' || props.kind === 'owner_report'
     || props.kind === 'acceptance' || props.kind === 'final_settlement' || props.kind === 'owner_penalty'
-    || props.kind === 'sub_change' || props.kind === 'sub_settlement'))
+    || props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty'))
 const centralKind = computed(() => props.kind as OwnerCommercialDocumentKind)
 const initialNavigation = ownerDocumentListNavigationStateFromQuery(route.query, centralKind.value)
 
@@ -113,7 +113,7 @@ const totalRows = computed(() => centralReadOnly.value
 const centralSummary = computed(() => centralReadOnly.value ? store.centralSummaryFor(centralKind.value) : null)
 const canCreate = computed(() => !centralReadOnly.value
   || store.centralCapabilitiesFor(centralKind.value).includes(
-    (props.kind === 'sub_change' || props.kind === 'sub_settlement') ? 'subcontract-document:write' : 'owner-document:write',
+    (props.kind === 'sub_change' || props.kind === 'sub_settlement' || props.kind === 'project_penalty') ? 'subcontract-document:write' : 'owner-document:write',
   ))
 const journeyReturnTo = computed(() => centralReadOnly.value
   ? validateOwnerDocumentJourneyReturnTo(route.query.returnTo, centralKind.value, 'real')

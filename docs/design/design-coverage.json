@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 138,
+    "trackedPageFiles": 139,
     "devPageFiles": 5,
-    "appPageFiles": 133,
+    "appPageFiles": 134,
     "appNavLeaves": 51,
-    "covered": 131,
+    "covered": 132,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -576,6 +576,11 @@
     },
     {
       "appRoute": "/project/penalty/:id",
+      "designRoute": "projPenaltyForm",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/project/penalty/form/:id",
       "designRoute": "projPenaltyForm",
       "status": "covered"
     },

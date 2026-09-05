@@ -53,7 +53,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   const isCentralKind = (kind: OwnerDocumentKind): kind is OwnerCommercialDocumentKind =>
     kind === 'owner_change' || kind === 'owner_report'
     || kind === 'acceptance' || kind === 'final_settlement' || kind === 'owner_penalty'
-    || kind === 'sub_change' || kind === 'sub_settlement'
+    || kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty'
   function rememberCentralForm(form: Awaited<ReturnType<typeof centralForm>>) {
     return withOwnerDocumentFormVersion(form.draft, form.version)
   }
@@ -85,7 +85,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return centralRepositories().ownerCommercialDocumentCommands.execute({
       workspaceId: context.workspaceId,
       actorId: context.actorId,
-      requiredCapability: (kind === 'sub_change' || kind === 'sub_settlement') ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
+      requiredCapability: (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty') ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
       commandId,
       kind,
       id,
@@ -221,6 +221,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   async function loadDeductions(penaltyId: string) {
+    if (usesCentralBrowser) {
+      const detail = await centralRepositories().ownerCommercialDocumentRead.get({ kind: 'project_penalty', id: penaltyId, origin: 'real', includeDemo: false })
+      return (detail.penaltyDeductions ?? []).map(row => ({ ...row, amount: Number(row.amount), settlementNo: '', createdAt: row.occurredAt }))
+    }
     return loadPenaltyDeductions(penaltyId)
   }
 
@@ -255,10 +259,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     keyword: string,
     documentKind: OwnerDocumentKind = kind === 'supplier' ? 'sub_change' : 'owner_change',
   ) {
-    if (usesCentralBrowser && (kind === 'project' || kind === 'supplier')) {
+    if (usesCentralBrowser && (kind === 'project' || kind === 'supplier' || (kind === 'crew' && documentKind === 'project_penalty'))) {
       const context = await centralContext(isCentralKind(documentKind) ? documentKind : 'owner_change')
       const search = keyword.trim().toLocaleLowerCase('zh-CN')
-      const options = kind === 'project' ? context.projects : context.suppliers
+      const options = kind === 'project' ? context.projects : kind === 'crew' ? context.crews ?? [] : context.suppliers
       return options
         .filter(option => !search || option.label.toLocaleLowerCase('zh-CN').includes(search))
         .map(option => ({ id: option.id, label: option.label }))
@@ -294,7 +298,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   ) {
     if (usesCentralBrowser) {
       const context = await centralContext('sub_settlement')
-      return (context.settlements ?? []).filter(row => row.projectId === projectId
+      return (context.settlements ?? []).filter(row => Boolean(contractId || supplierId) && row.projectId === projectId
         && (!supplierId || row.supplierId === supplierId) && (!contractId || row.contractId === contractId)
         && (!keyword || row.label.includes(keyword))).map(row => ({ id: row.id, label: row.label }))
     }
@@ -433,15 +437,35 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
+  async function executePenaltyAction(request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'deduct-penalty' | 'rectify-penalty' }>) {
+    const result = await centralRepositories().ownerCommercialDocumentCommands.execute(request)
+    await refreshAfterMutation('project_penalty')
+    return result
+  }
+
   async function deductPenalty(
     penaltyId: string,
     settlementId: string,
     amount: number,
     note = '',
+    draft?: OwnerDocumentDraft,
   ) {
     loading.value = true
     try {
-      await deductProjectPenalty(penaltyId, settlementId, amount, note)
+      if (usesCentralBrowser) {
+        if (!draft)
+          throw new Error('罚扣版本已丢失，请重新读取')
+        const settlement = await centralRepositories().ownerCommercialDocumentRead.get({ kind: 'sub_settlement', id: settlementId, origin: 'real', includeDemo: false })
+        const baseVersion = centralBaseVersion(draft)
+        const values = { action: 'deduct-penalty', settlementId, settlementVersion: settlement.document.version, amount, note }
+        const commandId = ownerDocumentCommandId(draft, { kind: 'project_penalty', id: penaltyId, baseVersion, ...values })
+        const result = await centralCommand('project_penalty', penaltyId, baseVersion, values, commandId)
+        advanceOwnerDocumentFormVersion(draft, result.version)
+        completeOwnerDocumentCommandIntent(draft, commandId)
+      }
+      else {
+        await deductProjectPenalty(penaltyId, settlementId, amount, note)
+      }
       await refreshAfterMutation('project_penalty')
     }
     finally {
@@ -501,6 +525,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   return {
+    executePenaltyAction,
     records: readonly(records),
     listLoading: readonly(listLoading),
     listErrors: readonly(listErrors),

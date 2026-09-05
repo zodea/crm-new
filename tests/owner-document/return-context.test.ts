@@ -11,6 +11,11 @@ import {
 } from '~/lib/owner-document/return-context'
 
 describe('甲方商务单据返回上下文', () => {
+  it('项目罚扣拒绝同 ID 的跨来源班组返回', () => {
+    expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=demo', 'project_penalty', 'real')).toBeNull()
+    expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=real', 'project_penalty', 'demo')).toBeNull()
+    expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=real', 'project_penalty', 'real')).toBe('/base/crew/shared-id?origin=real')
+  })
   it('项目六类卡片来源按受限上下文恢复精确滚动位置', () => {
     const returnTo = '/project/project-283?origin=real&ownerJourney=origin_283_final#project-owner-document-card-final-settlement'
     const origin = createOwnerDocumentProjectReturnOrigin({

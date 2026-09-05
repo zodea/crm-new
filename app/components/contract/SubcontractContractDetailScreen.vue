@@ -41,7 +41,7 @@ const focusId = computed(() => (route.query.tab === 'changes' || route.query.tab
   && typeof route.query.focus === 'string'
   ? route.query.focus
   : null)
-const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_change') ?? validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_settlement'))
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_change') ?? validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'sub_settlement') ?? validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin, 'project_penalty'))
 const returnTo = computed(() => ownerDocumentReturnTo.value
   ?? validateSubcontractContractReturnTo(route.query.returnTo, props.origin)
   ?? '/contract/subcontract')

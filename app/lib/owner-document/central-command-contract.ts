@@ -20,7 +20,8 @@ export interface OwnerCommercialDocumentCommandContextDTO {
   projects: Array<{ id: string, label: string, customerId: string | null }>
   customers: OwnerDocumentLookupOption[]
   suppliers: OwnerDocumentLookupOption[]
-  settlements?: Array<{ id: string, label: string, projectId: string | null, supplierId: string | null, contractId: string | null, amount: number }>
+  crews?: OwnerDocumentLookupOption[]
+  settlements?: Array<{ id: string, label: string, projectId: string | null, supplierId: string | null, contractId: string | null, amount: number, version?: string, remainingAmount?: number }>
   contracts: Array<OwnerDocumentLookupOption & {
     projectId: string
     customerId: string | null
@@ -93,8 +94,28 @@ export interface OwnerCommercialDocumentDeleteCommandDTO extends OwnerCommercial
   id: string
 }
 
+export interface ProjectPenaltyDeductCommandDTO extends OwnerCommercialDocumentCommandEnvelopeDTO {
+  action: 'deduct-penalty'
+  kind: 'project_penalty'
+  id: string
+  settlementId: string
+  settlementVersion: string
+  amount: number
+  note: string
+}
+
+export interface ProjectPenaltyRectifyCommandDTO extends OwnerCommercialDocumentCommandEnvelopeDTO {
+  action: 'rectify-penalty'
+  kind: 'project_penalty'
+  id: string
+  deadline: string | null
+  note: string
+}
+
 export type OwnerCommercialDocumentCommandRequestDTO
   = | OwnerCommercialDocumentSaveCommandDTO
+    | ProjectPenaltyDeductCommandDTO
+    | ProjectPenaltyRectifyCommandDTO
     | OwnerCommercialDocumentApproveCommandDTO
     | OwnerCommercialDocumentAuditCommandDTO
     | OwnerAcceptanceTransitionCommandDTO

@@ -87,6 +87,7 @@
 | `R-AUX-SETTLEMENT-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/OtherSettleScreen.jsx`、`MatSettleScreen.jsx`、`forms/ContractForms.jsx`、`forms/MaterialForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码规定其他支出结算与材料采购结算的项目、真实源合同、分供方、金额、日期、状态、筛选、汇总、分页和整页表单分区。两类结算均没有持久化业务明细实体，不能套用材料采购合同的 `KitEditGrid`；外部运行态只作为表格和表单几何佐证。 |
 | `R-OWNER-DOC-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/OwnerChangeScreen.jsx`、`OwnerReportScreen.jsx`、`AcceptanceScreen.jsx`、`FinalSettleScreen.jsx`、`OwnerPenaltyScreen.jsx`、`forms/OwnerDocForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码分别规定五类甲方单据的真实标题、列表列、搜索/项目/类型/状态筛选、金额汇总、分页和整页表单分区，不能退化为同一套通用占位界面。外部 `R-TABLE-LIVE`、`R-FORM-LIVE` 只佐证紧凑表格、局部横滚、两列字段与固定底栏等几何；状态名称、来源关系、附件归属及写入动作仍由本地数据库和页面规格裁定。 |
 | `R-SUB-SETTLEMENT-LIVE-328` | 当前直接证据 | 红圈：分包及人工 → 分包结算 → 结算名称 → 详情-支出结算；关联支出合同 → 支出结算 | Chrome 内容视口 1293×1107，2026-09-05 | 列表现有数据，左侧业务类型、紧凑搜索工具栏、细线表头、金额余额链和表内横滚。详情顶部一行关系/金额/日期/类型摘要，正文浅灰标签、三列资料，前期/本次/累计分段，侧边审批轨迹独立。分包清单页签为空仍有完整表头；合同结算页签分过程/完工两区。仅只读菜单、名称和页签导航；未触发增删改、审批、配置保存或文件动作，未保存真实数据/原始截图。瑞航按真实字段重排紧凑摘要、三列资料、独立付款抵扣与附件区；本地无独立结算清单/审批轨迹事实，不复制伪造。 |
+| `R-PROJECT-PENALTY-LIVE-329` | 当前直接证据 | 红圈：分包及人工 → 项目罚扣 | Chrome 1293×1051，2026-09-05 | 只读空列表保留紧凑搜索/筛选、罚扣金额和来源列、局部横滚与 20 条分页。无可安全打开的详情样本，详情按 DC 罚扣字段与瑞航原语设计；未触发业务/审批/文件动作，未保留真实业务数据。匿名结构及本地截图见 [AX03 证据](./evidence/issue-329/README.md)。 |
 | `R-SUB-DOC-DC` | 本地 DC 直接目标源码，非外部业务运行态 | `DC重构设计源码/kit/SubChangeScreen.jsx`、`SubSettleScreen.jsx`、`ProjPenaltyScreen.jsx`、`forms/OwnerDocForms.jsx` | 固定源码桌面构图；生产实现仍复核 390、768、1024、1280–1440px | 直接源码分别规定分包变洽签、分包结算和项目罚扣的真实标题、列表列、搜索/项目/类型/状态筛选、金额汇总、分页和整页表单分区。外部运行态仅提供共性几何证据；分供方、合同、班组、结算抵扣、附件与状态动作必须沿用本地真实外键和事务契约，不从示例数据反推。 |
 | `R-SCHEDULE-LOCAL` | DC 独有能力的固定本地蓝本，非红圈目标页运行态 | `docs/合和新城7期施工进度计划表 （户内）2026.04.22.pdf`、`DC重构设计源码/kit/SchedulePlanScreen.jsx`、`ScheduleGroupNewScreen.jsx`、`ScheduleBindScreen.jsx`、`ScheduleProcessLibraryScreen.jsx`、`forms/ScheduleForms.jsx`、ADR 0017 / 0018 | 固定源码桌面构图与本地生产四档验证 | 本地脱敏红圈资料未登记施工排程对象；`红圈系统/业务流转.md` 仅能提供成本、合同和结算来源关系。因此 WBS、甘特、内部暂估、标准工序库和合同后绑定均按瑞航本地蓝本裁定，不宣称复制红圈目标页。[#244](https://github.com/zodea/crm-new/issues/244) 已关闭并合入工序库、合同绑定和整页表单的设计源码落点；它只作为本地蓝本来源，不代表 #292 当前实施状态。 |
 | `R-ENGINEERING-FLOW-LOCAL` | 当前本地生产运行态直接证据；参考站无同构页面 | `/schedule`、`/schedule/:pid`、`/subcontract/quantity`、`/subcontract/quantity/:pid/:uid`、`/subcontract/quantity/region`、`/subcontract/quantity/template`、`/subcontract/payroll`、`/subcontract/payroll/new`、`/subcontract/payroll/:id`、`/subcontract/attendance`、`/subcontract/daywork`、班组/工人详情反向入口 | 390 / 768 / 1024 / 1440px，2026-08-13 | [#287](https://github.com/zodea/crm-new/issues/287) 仅执行本地只读导航、任务详情展开和多视口测量，未触发登记、保存、删除、导入、导出、打印或发放。合和新城种子可见 8 户、13 条当前责任和 12 条阶段完成/草稿事实；工资、考勤、签工没有运行种子，保持真实空台账。排程工序可携项目/分组/楼栋/任务/阶段/分项/计划区间进入工程量矩阵，返回后恢复同一任务详情；工程量户详情保留项目、楼栋、月份、视角、工种、责任人六项筛选，错误 pid/uid 显式失败。工资列表→建单→列表和工资列表↔考勤能恢复项目/月/班组/状态；独立工资详情返回、零星签工入参及其返回仍会丢失上下文。户详情明细保留 `null` 为“—”，但阶段小计和全户合计仍以 `?? 0` 汇总，存在把缺现场量误表为 0 的断点。施工合同/分包合同没有到工资责任的显式外键，B 类继续禁用；班组、工人和扣罚只按现有项目/责任/工资/罚扣事实反向聚合。四档下页面根均无横向溢出，工程量矩阵、考勤月表和 WBS 甘特只在各自容器滚动。 |
@@ -119,13 +120,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 138 / 5 / 133 |
+| 跟踪页面文件 / dev / 生产路由 | 139 / 5 / 134 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 133 / 133 |
-| 参考证据档案 / 被路由使用 | 38 / 33 |
-| 直接 / 邻近 / 本地权威 | 52 / 18 / 20 |
+| 证据行 / 唯一参考端点 | 134 / 134 |
+| 参考证据档案 / 被路由使用 | 39 / 34 |
+| 直接 / 邻近 / 本地权威 | 52 / 18 / 21 |
 | 历史证据 / 未验证目标 | 34 / 9 |
-| 设计已覆盖 / 待补设计 | 131 / 2 |
+| 设计已覆盖 / 待补设计 | 132 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
@@ -137,7 +138,7 @@
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 辅助合同与结算 | 12 | [#295](https://github.com/zodea/crm-new/issues/295)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分包单据 | 7 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 分包单据 | 8 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -259,8 +260,9 @@
 | `app/pages/project/[pid]/supplier/import.vue` | `/project/:pid/supplier/import` | 项目分供方 | 特殊工具 | #192 | R-FORM-LIVE | 没有文件导入目标页的安全直接证据，且严格只读协议禁止在参考站触发上传或导入；这里只借鉴邻近整页表单已确认的纵向分区、步骤信息和底部操作区，三步内容由本地蓝本裁定 | 文件名匹配、类别推荐和人工调整保留本机；不读正文做分类、不伪装 OCR。只有最终确认才经专用中央命令提交正文及分供方/ProjectSupplier/文件元数据；未确认候选不写入，失败不留半成品 | C-TOOL |
 | `app/pages/project/form/[[id]].vue` | `/project/form/:id?` | 项目 | 整页表单 | #190 | R-FORM-PRIOR | 项目目标页没有安全直接证据；仅借鉴 `R-FORM-LIVE` 的相邻短表单结构，并以项目蓝本、ADR 0014 和真实客户外键裁定字段与行为 | 保留草稿、保存、保存并新建、保存并提交；新建取消返回列表、保存进入新项目详情，编辑取消/保存返回原项目详情 | C-FORM |
 | `app/pages/project/index.vue` | `/project` | 项目 | 列表 | #190 | R-PROJECT-LIST-LIVE | 参考已确认左流程阶段、单行工具栏、紧凑表格和右下分页；本地新建能力继续按项目规格保留 | 未触发导入、筛选、设置或行级操作 | C-DENSE |
-| `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 项目罚扣使用独立标题、项目/分供方/合同/班组来源、罚扣与整改分区及真实状态动作 | 抵扣必须引用真实已确认分包结算；附件归当前罚扣，错误定位首个无效字段 | C-FORM |
-| `app/pages/project/penalty/index.vue` | `/project/penalty` | 分包单据 | 列表 | #197 | R-SUB-DOCUMENTS-LIVE | 参考专属列覆盖审批、罚扣类型、转扣合同/乙方、罚扣与签认金额、附件及甲方结算转扣记录；分包合同详情再按四组审批状态保留相同表头 | 不展示参考内部“是否删除”列；签认和转扣只读真实抵扣关系，编号先进入只读详情，来源 query 和列表状态往返可恢复 | C-DENSE |
+| `app/pages/project/penalty/[id].vue` | `/project/penalty/:id` | 分包单据 | 详情 | #329 | R-SUB-DOC-DC | 项目罚扣使用独立标题、项目/分供方/合同/班组来源、罚扣与整改分区及真实状态动作 | 抵扣必须引用真实已确认分包结算；附件归当前罚扣，错误定位首个无效字段 | C-FORM |
+| `app/pages/project/penalty/form/[id].vue` | `/project/penalty/form/:id` | 分包单据 | 整页表单 | #329 | R-SUB-DOC-DC | 正式草稿编辑独立路由，罚扣与整改字段分区 | 保存经中央 command，提交后不普通修改金额；返回只读详情 | C-FORM |
+| `app/pages/project/penalty/index.vue` | `/project/penalty` | 分包单据 | 列表 | #197 | R-PROJECT-PENALTY-LIVE-329 | 参考专属列覆盖审批、罚扣类型、转扣合同/乙方、罚扣与签认金额、附件及甲方结算转扣记录；分包合同详情再按四组审批状态保留相同表头 | 不展示参考内部“是否删除”列；签认和转扣只读真实抵扣关系，编号先进入只读详情，来源 query 和列表状态往返可恢复 | C-DENSE |
 | `app/pages/project/penalty/new.vue` | `/project/penalty/new` | 分包单据 | 整页表单 | #197 | R-SUB-DOC-DC | 新建页使用项目罚扣专属字段和附件区，项目、合同、分供方或班组只选择真实关联记录 | 草稿不伪造抵扣结果；状态推进和结算抵扣保持本地事务契约 | C-FORM |
 | `app/pages/project/target-cost/[id].vue` | `/project/target-cost/:id` | 项目进度成本 | 详情 | #191 | R-TARGET-COST-LIVE | 参考详情已确认独立页签、白底平铺资料、明确关闭返回和预算/已签/实际/申请四轨摘要；本地继续保留版本摘要、科目清单与正式成本对比，不复制参考审批栏或示例值 | 科目明细只写当前版本；成本对比只读正式源单并穿透现有路由，不从名称或录入汇总值反推 | C-DENSE |
 | `app/pages/project/target-cost/form/[[id]].vue` | `/project/target-cost/form/:id?` | 项目进度成本 | 整页表单 | #191 | R-TARGET-COST-LOCAL | DC 有目标成本版本头整页表单源码；现有参考运行证据只支持邻近短表单的两列字段网格、纵向滚动和固定底部动作，不把材料合同或分供方字段外推到目标成本 | 版本头与科目明细分开保存；草稿、提交、项目 lookup 和基线切换继续按本地事务契约 | C-FORM |
