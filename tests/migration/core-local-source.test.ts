@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql.includes('\'other_expense\' auxiliary_kind') || sql.includes('\'company_expense\' auxiliary_kind'))
+    return []
   if (sql.includes('FROM penalty_records penalty'))
     return []
   if (sql.includes('FROM customers')) {
@@ -913,6 +915,7 @@ describe('core migration local source', () => {
       'projects',
       'construction_contracts',
       'subcontract_contracts',
+      'auxiliary_contracts',
       'contract_supplements',
       'receipt_registrations',
       'owner_documents',

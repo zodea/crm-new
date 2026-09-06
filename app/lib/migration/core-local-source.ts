@@ -25,6 +25,7 @@ import {
 import { closeDb, getDb } from '../db/connection'
 import { getCurrentVersion } from '../db/migrations'
 import { openBrowserSqlite } from '../db/sqljs'
+import { AUXILIARY_CONTRACT_SOURCE_SQL, auxiliaryContractSourceEntity, COMPANY_CONTRACT_SOURCE_SQL } from './auxiliary-contract-source'
 import {
   compareCanonicalText,
   CORE_MIGRATION_CONTRACT_VERSION,
@@ -169,6 +170,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     WHERE c.kind = '施工'
     ORDER BY c.id
   `,
+  auxiliary_contracts: AUXILIARY_CONTRACT_SOURCE_SQL,
   subcontract_contracts: `
     SELECT
       c.id, c.no, c.name, c.sub_kind, c.project_id, c.supplier_id,
@@ -188,6 +190,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
       id, contract_id, no, name, content, amount, sign_date, status,
       external_ref, note, created_at, updated_at, deleted_at
     FROM contract_supplements
+    WHERE contract_id NOT IN (SELECT id FROM contracts WHERE kind = '其他支出')
     ORDER BY id
   `,
   receipt_registrations: `
@@ -1060,7 +1063,7 @@ function countExpectations(
   entities: CoreMigrationSourceEntitiesDTO,
 ): Partial<Record<CoreMigrationEntityType, number>> {
   return Object.fromEntries(
-    CORE_MIGRATION_TOPOLOGY.map(entityType => [entityType, entities[entityType].length]),
+    CORE_MIGRATION_TOPOLOGY.map(entityType => [entityType, entities[entityType]?.length ?? 0]),
   )
 }
 
@@ -1069,7 +1072,7 @@ function totalExpectations(
 ): CoreMigrationTotalExpectationDTO[] {
   const totals: CoreMigrationTotalExpectationDTO[] = []
   for (const entityType of CORE_MIGRATION_TOPOLOGY) {
-    const quantities = entities[entityType]
+    const quantities = (entities[entityType] ?? [])
       .map(entity => entity.quantity)
       .filter((value): value is number => value != null)
     if (quantities.length) {
@@ -1079,7 +1082,7 @@ function totalExpectations(
         expected: quantities.reduce((sum, value) => sum + value, 0),
       })
     }
-    const amounts = entities[entityType]
+    const amounts = (entities[entityType] ?? [])
       .map(entity => entity.amount)
       .filter((value): value is string => value != null)
     if (amounts.length) {
@@ -1149,8 +1152,10 @@ async function buildSource(
     const rows = await selectSource<Record<string, unknown>>(ENTITY_SQL[entityType])
     if (entityType === 'owner_documents')
       rows.push(...await selectSource<Record<string, unknown>>(PROJECT_PENALTY_SOURCE_SQL))
+    if (entityType === 'auxiliary_contracts')
+      rows.push(...await selectSource<Record<string, unknown>>(COMPANY_CONTRACT_SOURCE_SQL))
     const entities = rows
-      .map(row => sourceEntity(entityType, row))
+      .map(row => entityType === 'auxiliary_contracts' ? auxiliaryContractSourceEntity(row) : sourceEntity(entityType, row))
       .sort((left, right) => compareCanonicalText(left.legacyId, right.legacyId))
     const invalid = entities.find(entity => !entity.legacyId || !entity.name)
     if (invalid) {

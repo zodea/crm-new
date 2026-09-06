@@ -5659,6 +5659,35 @@ export const migrations: Migration[] = [
   },
 ]
 
+migrations.push({
+  version: 46,
+  name: 'auxiliary-contract-tax-audit-and-explicit-finance-links',
+  async up(db) {
+    for (const table of ['contracts', 'company_expense_contracts']) {
+      if (!await tableExists(db, table))
+        continue
+      for (const field of ['party_a', 'created_by', 'updated_by', 'responsible', 'department'])
+        await addColumnIfMissing(db, table, field, 'TEXT DEFAULT NULL')
+    }
+    if (await tableExists(db, 'company_expense_contracts')) {
+      await addColumnIfMissing(db, 'company_expense_contracts', 'tax_rate', 'REAL DEFAULT NULL CHECK (tax_rate IS NULL OR (tax_rate >= 0 AND tax_rate <= 100))')
+      await addColumnIfMissing(db, 'company_expense_contracts', 'invoice_type', 'TEXT DEFAULT NULL')
+    }
+    // 新外键不回填；名称、金额或个人开支归属都不是合同身份。
+    for (const table of ['invoices', 'payment_applications']) {
+      if (!await tableExists(db, table))
+        continue
+      await addColumnIfMissing(db, table, 'company_expense_contract_id', 'TEXT DEFAULT NULL REFERENCES company_expense_contracts(id)')
+      for (const operation of ['INSERT', 'UPDATE']) {
+        await db.execute(`CREATE TRIGGER IF NOT EXISTS ${table}_company_contract_${operation.toLowerCase()}
+          BEFORE ${operation} ON ${table}
+          WHEN NEW.company_expense_contract_id IS NOT NULL AND (NEW.contract_id IS NOT NULL OR NEW.project_id IS NOT NULL)
+          BEGIN SELECT RAISE(ABORT, 'company contract must not reference a project contract or project'); END`)
+      }
+    }
+  },
+})
+
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)
 
 const MIGRATIONS_TABLE = `

@@ -2,6 +2,7 @@
 import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
@@ -50,24 +51,28 @@ const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityRe
   origin: props.origin,
 }))
 const projectPenaltyReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'project_penalty'))
+const auxiliaryReturnTo = computed(() => validateAuxiliaryDetailReturnTo(props.returnTo, props.origin))
 const backTo = computed(() => validateSupplierReturnTo(props.returnTo)
   ?? materialContractReturnTo.value
   ?? subcontractChangeReturnTo.value
   ?? subcontractSettlementReturnTo.value
   ?? projectPenaltyReturnTo.value
   ?? projectSupplierReturnTo.value
+  ?? auxiliaryReturnTo.value
   ?? '/base/supplier')
-const backLabel = computed(() => projectPenaltyReturnTo.value
-  ? '返回项目罚扣'
-  : materialContractReturnTo.value
-    ? '返回材料采购合同'
-    : subcontractSettlementReturnTo.value
-      ? '返回分包结算'
-      : subcontractChangeReturnTo.value
-        ? '返回分包变洽签'
-        : projectSupplierReturnTo.value
-          ? '返回项目分供方工作台'
-          : '返回分供方列表')
+const backLabel = computed(() => auxiliaryReturnTo.value
+  ? '返回其他支出合同'
+  : projectPenaltyReturnTo.value
+    ? '返回项目罚扣'
+    : materialContractReturnTo.value
+      ? '返回材料采购合同'
+      : subcontractSettlementReturnTo.value
+        ? '返回分包结算'
+        : subcontractChangeReturnTo.value
+          ? '返回分包变洽签'
+          : projectSupplierReturnTo.value
+            ? '返回项目分供方工作台'
+            : '返回分供方列表')
 const problem = computed(() => 'problem' in store.detailState ? store.detailState.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (detail.value)
@@ -217,7 +222,7 @@ async function load() {
   await store.loadDetail({ id: props.supplierId, origin: props.origin, includeDemo: props.includeDemo })
   if (store.detailState.kind === 'ready') {
     const restored = await restoreSubcontractChangeOrigin()
-    if (!restored) {
+    if (!restored && route.hash !== '#auxiliary-contract-journey') {
       await nextTick()
       document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
     }
@@ -284,6 +289,7 @@ onActivated(() => void load())
     <div v-if="supplier && detail" class="flex min-w-0 flex-col gap-4">
       <StatePanel v-if="store.detailState.kind === 'error'" kind="error" title="刷新分供方详情失败" :description="store.detailState.problem.message" :action-label="store.detailState.problem.retryable ? '重新加载' : ''" compact @action="load" />
       <SupplierDetailOverview :supplier="supplier" />
+      <AuxiliaryContractJourney v-if="detail.dataOrigin === 'real'" :supplier-id="supplierId" />
       <section class="panel min-w-0 overflow-hidden" aria-labelledby="supplier-facts-heading">
         <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-3 py-2">
           <h3 id="supplier-facts-heading" class="m-0 mr-auto text-14px font-800 text-ink">
