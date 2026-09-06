@@ -536,6 +536,8 @@ onActivated(() => {
       @retry="loadProject"
     />
 
+    <AuxiliaryContractJourney v-if="item.dataOrigin === 'real'" :project-id="projectId" />
+
     <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
       <SectionHeader id="project-owner-document-title" title="项目商务单据" subtitle="按当前项目稳定 ID 进入收入侧单据与分包变洽签中央正式链，返回时保留项目上下文" />
       <div v-if="ownerJourneys" class="mt-3">

@@ -29,6 +29,7 @@ import {
   isCoreMigrationBlockingIssue,
 } from '../../app/lib/migration/core-contract'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
@@ -95,6 +96,10 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
     { field: 'customerId', target: 'customers' },
   ],
   subcontract_contracts: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
+  ],
+  auxiliary_contracts: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
   ],
@@ -350,7 +355,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     let issueSequence = 0
 
     for (const entityType of CORE_MIGRATION_TOPOLOGY) {
-      const rows = command.source.entities[entityType]
+      const rows = command.source.entities[entityType] ?? []
       const seenLegacyIds = new Set<string>()
       let imported = 0
 
@@ -812,7 +817,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       sourceVersion: command.source.sourceVersion,
       sourceHash: command.source.sourceHash,
       entityCount: CORE_MIGRATION_TOPOLOGY.reduce(
-        (count, entityType) => count + command.source.entities[entityType].length,
+        (count, entityType) => count + (command.source.entities[entityType]?.length ?? 0),
         0,
       ),
     }
@@ -1067,6 +1072,7 @@ export function synchronizeCoreMigrationCommandSources(
 }
 
 const commandSources = [
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,

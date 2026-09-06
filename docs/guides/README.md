@@ -6,6 +6,7 @@
 
 ## 当前指南
 
+- [其他支出与公司支出合同使用指南](./auxiliary-contracts.md)
 - [客户档案与业务关系使用指南](./customer-records.md)
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)

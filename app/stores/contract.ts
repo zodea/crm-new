@@ -21,6 +21,7 @@ import {
   undoOperation,
   visibleCond,
 } from '~/lib/db/soft-delete'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 
 export interface Contract {
   id: string
@@ -371,6 +372,8 @@ export const useContractStore = defineStore('contract', () => {
     auxErrors.value = { ...auxErrors.value, [kind]: '' }
     try {
       let rows: ContractAuxRow[]
+      if ((kind === 'other_expense' || kind === 'company_expense') && typeof window !== 'undefined' && !isDesktopRuntime())
+        throw new Error('浏览器辅助合同只从中央 Repository 读取')
       if (kind === 'other_expense') {
         rows = await select<ContractAuxRow>(`
         ${hiddenCtesFor('contracts')}

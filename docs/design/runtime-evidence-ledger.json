@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 139,
+    "trackedPageFiles": 141,
     "devPageFiles": 5,
-    "productionRoutes": 134,
+    "productionRoutes": 136,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 134,
-    "referenceEndpoints": 134,
-    "referenceProfiles": 39,
-    "usedReferenceProfiles": 34,
-    "directEvidenceRoutes": 52,
+    "evidenceEndpointRecords": 136,
+    "referenceEndpoints": 136,
+    "referenceProfiles": 40,
+    "usedReferenceProfiles": 35,
+    "directEvidenceRoutes": 53,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 21,
+    "localAuthorityRoutes": 22,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 132,
+    "designCoveredRoutes": 134,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -80,9 +80,10 @@
     {
       "code": "aux-contract",
       "domain": "辅助合同与结算",
-      "routeCount": 12,
+      "routeCount": 14,
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ]
@@ -215,6 +216,64 @@
     }
   ],
   "endpoints": [
+    {
+      "evidenceRecordId": "E-8B2AB9C45FBB",
+      "page": "app/pages/contract/other-expense/[id].vue",
+      "localRoute": "/contract/other-expense/:id",
+      "domainCode": "aux-contract",
+      "template": "详情",
+      "implementationIssues": [
+        295,
+        330,
+        298,
+        289
+      ],
+      "referenceProfile": "R-AUX-CONTRACT-LIVE-330",
+      "referenceEndpointId": "other-expense-detail",
+      "referenceEndpointLabel": "项目其他合同 > 其他支出合同 > 合同名称 > 只读详情",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-09-06",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "read-only-observed",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-expense/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-expense/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-03C33AE3E52A",
+      "page": "app/pages/contract/company-expense/[id].vue",
+      "localRoute": "/contract/company-expense/:id",
+      "domainCode": "aux-contract",
+      "template": "详情",
+      "implementationIssues": [
+        295,
+        330,
+        298,
+        289
+      ],
+      "referenceProfile": "R-AUX-CONTRACT-DC",
+      "referenceEndpointId": "company-expense-detail-local",
+      "referenceEndpointLabel": "公司支出合同专属列表证据与瑞航详情原语；未观察外部详情",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/company-expense/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/company-expense/:id"
+      },
+      "constraints": "C-DENSE"
+    },
     {
       "evidenceRecordId": "E-0D4D144FF492",
       "page": "app/pages/base/crew/[id].vue",
@@ -667,6 +726,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -695,6 +755,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -723,14 +784,15 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
-      "referenceProfile": "R-AUX-DOCUMENTS-LIVE",
+      "referenceProfile": "R-AUX-CONTRACT-LIVE-330",
       "referenceEndpointId": "company-expense-list",
       "referenceEndpointLabel": "项目其他合同 > 公司支出合同",
       "evidenceGrade": "direct",
-      "observationDate": "2026-08-13",
+      "observationDate": "2026-09-06",
       "observationDateStatus": "recorded",
       "permissionStatus": "read-only-observed",
       "layoutConclusion": {
@@ -919,6 +981,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -947,6 +1010,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -975,14 +1039,15 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
-      "referenceProfile": "R-AUX-DOCUMENTS-LIVE",
+      "referenceProfile": "R-AUX-CONTRACT-LIVE-330",
       "referenceEndpointId": "other-expense-list",
       "referenceEndpointLabel": "项目其他合同 > 其他支出合同",
       "evidenceGrade": "direct",
-      "observationDate": "2026-08-13",
+      "observationDate": "2026-09-06",
       "observationDateStatus": "recorded",
       "permissionStatus": "read-only-observed",
       "layoutConclusion": {
@@ -1003,6 +1068,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -1031,6 +1097,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -1059,6 +1126,7 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -2247,6 +2315,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -2275,6 +2344,7 @@
       "template": "整页表单",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],
@@ -2303,6 +2373,7 @@
       "template": "列表",
       "implementationIssues": [
         295,
+        330,
         298,
         289
       ],

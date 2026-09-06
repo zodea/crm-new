@@ -198,3 +198,7 @@ interface OwnerCommercialDocumentCommandRequestDTO {
 ### AX02 分包结算
 
 `POST /api/commands/owner-documents` 接受 `kind=sub_settlement`，使用 `subcontract-document:write`、commandId、baseVersion；save 保存草稿，submit 确认同一支出结算并锁定。服务器重验项目/分供方/分包合同 ID、正金额、名称及日期，附件 owner 固定为 expenditure_settlement。候选只包含正式已确认结算，并按项目/分供方/合同过滤。边界与未接入的付款/抵扣读状态见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)。
+
+## AX04 辅助合同命令
+
+#330 浏览器正式写入经辅助合同 command store 与 HTTP，执行会话身份、能力、幂等命令及基版本检查。两类合同共享原子头资料与附件元数据写入，保留专属关系边界；读面与命令同源。业务字段、状态和聚合不在此复制，见 [DATABASE](./DATABASE.md#ax04-辅助合同中央事实) 与 [页面蓝本](./pages/contract-forms.md#ax04-当前浏览器实现330)。旧浏览器本地写入口拒绝两类合同写入，Tauri 原路径保留。

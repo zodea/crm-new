@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 139,
+    "trackedPageFiles": 141,
     "devPageFiles": 5,
-    "appPageFiles": 134,
+    "appPageFiles": 136,
     "appNavLeaves": 51,
-    "covered": 132,
+    "covered": 134,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -107,6 +107,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/contract/company-expense/:id",
+      "designRoute": "contractDetail",
+      "status": "covered",
+      "reason": "AX04 复用瑞航详情原语；专属字段与证据等级见 contract-forms.md 和 runtime-reference-audit.md",
+      "issue": 330
+    },
+    {
       "appRoute": "/contract/company-expense/form",
       "designRoute": "companyExpForm",
       "status": "covered"
@@ -150,6 +157,13 @@
       "appRoute": "/contract/other-expense",
       "designRoute": "otherExp",
       "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-expense/:id",
+      "designRoute": "contractDetail",
+      "status": "covered",
+      "reason": "AX04 复用瑞航详情原语；专属字段与证据等级见 contract-forms.md 和 runtime-reference-audit.md",
+      "issue": 330
     },
     {
       "appRoute": "/contract/other-expense/form",

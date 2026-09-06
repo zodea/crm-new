@@ -3,6 +3,8 @@ import type {
   NavigationIntentDTO,
   NavigationUnavailableReasonDTO,
 } from '~/types/read-model'
+import { auxiliaryDetailPath } from '~/lib/auxiliary-contract/contract'
+import { validateAuxiliaryDetailReturnTo, validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isCustomerReturnContextId, validateCustomerDetailReturnTo, validateCustomerReturnTo } from '~/lib/customer/return-context'
@@ -141,6 +143,11 @@ function projectSupplierPath(intent: EntityTargetIntent): string {
 }
 
 function contractPath(intent: EntityTargetIntent): string {
+  if (intent.variant === 'other_expense' || intent.variant === 'company_expense') {
+    if (!isDataOriginDTO(intent.filters.dataOrigin) || intent.filters.contractKind !== intent.variant)
+      throw new Error('invalid auxiliary contract source')
+    return auxiliaryDetailPath(intent.variant, intent.subject.id, intent.filters.dataOrigin)
+  }
   const path = entityPath('/contract', intent)
   if (intent.kind === 'source-record')
     return path
@@ -289,6 +296,8 @@ const TARGET_REGISTRY = {
   'crew:detail': crewPath,
   'worker:detail': workerPath,
   'contract:detail': contractPath,
+  'contract:other_expense': contractPath,
+  'contract:company_expense': contractPath,
   'contract:supplement': contractPath,
   'contract:owner-document-source': contractPath,
   'contract:subcontract-document-source': contractPath,
@@ -456,6 +465,11 @@ export function resolveNavigationTarget(
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
       else if (ownerReturnTo)
         to = `${to}&returnTo=${encodeURIComponent(ownerReturnTo)}`
+    }
+    if (options.returnTo && (key === 'contract:other_expense' || key === 'contract:company_expense' || key === 'project:detail' || key === 'supplier:detail')) {
+      const validated = key.startsWith('contract:') ? validateAuxiliaryReturnTo(options.returnTo, intent.filters.dataOrigin) : validateAuxiliaryDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (validated && !to.includes('returnTo='))
+        to += `${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(validated)}`
     }
     if (intent.kind === 'source-record' && options.returnTo)
       to = appendProjectSupplierReturnContext(to, options.returnTo)

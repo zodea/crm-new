@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
@@ -32,8 +33,9 @@ const projectSupplierReturnTo = computed(() => validateProjectSupplierIdentityRe
   id: projectId.value,
   origin: originHint.value,
 }))
-const returnTo = computed(() => ownerDocumentReturnTo.value ?? crewWorkerReturnTo.value ?? projectSupplierReturnTo.value ?? returnResolution.value.to)
-const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorkerReturnTo.value || projectSupplierReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
+const auxiliaryReturnTo = computed(() => validateAuxiliaryDetailReturnTo(route.query.returnTo, originHint.value))
+const returnTo = computed(() => auxiliaryReturnTo.value ?? ownerDocumentReturnTo.value ?? crewWorkerReturnTo.value ?? projectSupplierReturnTo.value ?? returnResolution.value.to)
+const returnExpiresAt = computed(() => auxiliaryReturnTo.value || ownerDocumentReturnTo.value || crewWorkerReturnTo.value || projectSupplierReturnTo.value ? undefined : returnResolution.value.origin?.expiresAt)
 </script>
 
 <template>
@@ -44,7 +46,7 @@ const returnExpiresAt = computed(() => ownerDocumentReturnTo.value || crewWorker
     :return-to="returnTo"
     :customer-return-to="customerReturnTo || undefined"
     :return-expires-at="returnExpiresAt"
-    :return-label="projectSupplierReturnTo ? '返回项目分供方工作台' : ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
+    :return-label="projectSupplierReturnTo ? '返回项目分供方工作台' : auxiliaryReturnTo || ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
     :current-route="route.fullPath"
   />
 </template>

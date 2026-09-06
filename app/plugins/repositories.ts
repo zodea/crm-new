@@ -16,6 +16,7 @@ import type { SubcontractContractCommandRepository } from '~/lib/subcontract-con
 import type { SubcontractContractReadRepository } from '~/lib/subcontract-contract/repository'
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
 import type { SupplierReadRepository } from '~/lib/supplier/repository'
+import { createAuxiliaryContractRepository } from '~/lib/auxiliary-contract/repository'
 import { createHttpConstructionContractCommandRepository } from '~/lib/construction-contract/command-http-repository'
 import { createHttpConstructionContractReadRepository } from '~/lib/construction-contract/http-repository'
 import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command-http-repository'
@@ -39,6 +40,7 @@ import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  auxiliaryContracts: ReturnType<typeof createAuxiliaryContractRepository>
   customerRead: CustomerReadRepository
   customerCommands: CustomerCommandRepository
   constructionContractRead: ConstructionContractReadRepository
@@ -62,6 +64,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin(() => {
   const repositories: DomainRepositories = {
+    auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),
     customerRead: createHttpCustomerReadRepository({
       fetcher: (url, options) => $fetch(url, options),
     }),

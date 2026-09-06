@@ -59,7 +59,7 @@ describe('read model contract coverage', () => {
     expect(new Set(rows.map(row => row.code)).size).toBe(rows.length)
     expect(new Set(rows.map(row => row.domain)).size).toBe(rows.length)
     expect(mapped).toEqual(audit)
-    expect(rows.reduce((sum, row) => sum + row.routeCount, 0)).toBe(134)
+    expect(rows.reduce((sum, row) => sum + row.routeCount, 0)).toBe(136)
     for (const row of rows)
       expect(row.classification, row.domain).toMatch(/`[ABC](?:\+[ABC])?`/)
   })
