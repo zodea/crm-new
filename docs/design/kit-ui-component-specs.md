@@ -1,8 +1,8 @@
 # KitUI 交互原语组件规格（可落地模板）
 
-> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文的**结构锚点、变体/状态、配色令牌、行为规则、调用签名仍然有效**（那是设计语言，与实现无关）。迁移映射见 [kitui-to-shadcn-migration.md](./kitui-to-shadcn-migration.md)。
+> **底座已改（[ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)）**：confirm/formModal/typeSelect 基于 **shadcn-vue Dialog（reka-ui）**，toast 基于 **vue-sonner 双 Toaster**——焦点陷阱/Esc/遮罩/焦点返回/堆叠/hover 暂停等交给底座，不再手写。本文定义现行结构、状态与行为；具体调用签名须与公共 API 一致，发现差异在 [#404](https://github.com/zodea/crm-new/issues/404) 记录并同轮纠正。历史迁移映射见 [KitUI → shadcn-vue](../research/kitui-to-shadcn-migration.md)。
 
-把每类交互敲定的方向翻译成**照着就能写组件**的规格:结构锚点、变体/状态、配色令牌、行为规则、调用签名。与另外两份分工:方向从 [interaction-style-references.md](./interaction-style-references.md) 挑,为什么这么定见 `docs/adr/`,本文只答「照着怎么写」。
+把已定交互方向转成组件规格：结构锚点、变体/状态、配色令牌、行为规则和调用签名。设计优先级见[设计入口](./README.md)，决定依据见 `docs/adr/`；[交互参考目录](./interaction-style-references.md) 只保留来源，不要求对已经采纳的方向重新选型。
 
 - 技术栈:Nuxt 4 + Vue 3 + UnoCSS,SSR 关闭;交互底座 shadcn-vue(reka-ui)+vue-sonner。统一入口 `app/composables/useKitUI.ts`,单宿主 `app/components/shared/KitUIHost.vue`。
 - dev 验证载体:`/dev/kit-ui`。令牌见 `app/assets/css/tokens.css`。
@@ -64,7 +64,7 @@ await confirm({
 
 ## 02 · 表单弹窗 `form-modal` ✅ 已定案
 
-**用途**:新增/编辑单条记录的字段录入。低方差原语——各处表单结构基本一致,沿用现有 `KitFormModal`(字段配置驱动 + 必填校验,纯校验在 `app/lib/kit/form-modal.ts`),**不换骨架,只做四处增强**。
+**用途**：行级小对象、改归属等已明确的轻量字段任务。客户、项目、合同、结算、付款等业务实体的新增/编辑使用 [ADR 0014](../adr/0014-full-page-entity-forms.md) 的独立整页表单，不以记录只有一条或字段较少为理由改用弹窗。此原语沿用 `KitFormModal` 的字段配置与必填校验，纯校验位于 `app/lib/kit/form-modal.ts`。
 
 **结构锚点**:标题(动词+名词,与主按钮动词一致)→ 字段区(可分组、可滚动)→ 吸底 footer(取消 ghost 左 · 主按钮 `--brand` 右)。
 
@@ -79,7 +79,7 @@ await confirm({
 
 **未保存内容拦截**:仅当表单**已被改动(dirty)** 时,点遮罩/Esc 关闭要弹一道 `confirm`(`simple` 变体,确认按钮文案「放弃修改」);未动过的表单直接关、不打扰。
 
-**配色 & 令牌**:主按钮 `--brand`(建设性操作,品牌蓝当主角,与 confirm 的 danger 相反);聚焦态品牌蓝描边;校验错误 `--danger` 贴字段下;圆角/留白往 Flowbite 靠一档,别太企业风。
+**配色与令牌**：主按钮和聚焦态使用 `--brand`，校验错误使用 `--danger` 并贴字段显示；圆角、留白和密度遵守本文件全局约定与 ADR 0013，不从参考网站另引一套尺寸。
 
 **调用签名**(沿用现有,字段配置驱动):
 
@@ -401,9 +401,9 @@ openDrawer({
 | 模块顺序 | 参考壳展示指标、页签、内容，但不同实体可缺省 | 各详情自行排列流程、指标、页签 | 默认插槽完全由业务页编排；壳不把流程、指标、页签写死 |
 | 辅助右栏 | 参考壳按文书/文件是否存在决定右栏 | 分供方有右栏，项目/合同结构不一致 | `aside` 存在才启用；容器不足时堆到主内容下方，主内容始终 `min-width:0` |
 | 页面状态 | 参考设计稿只有不存在的简略落点 | 各页散落文字 loading/不存在 | 复用 `StatePanel`：loading、empty、error、forbidden、not-found；页面仍持有领域加载与权限判断 |
-| 代表详情 | 参考详情数据不可写入仓库；当前直接证据仍不足 | 分供方已有真实 6 页签、跨项目汇总和文件栏 | 迁移 `/base/supplier/:id`；保留真实 store/动作/页签，仅更换页面组织壳与状态呈现 |
+| 代表详情 | 分供方详情已有 `R-SUPPLIER-DETAIL-LIVE` 直接结构证据；参考业务数据不可写入仓库 | 分供方六页签及合同、结算、收票、付款事实按稳定身份与实际可用性展示 | `/base/supplier/:id` 沿既有领域事实和来源边界使用详情壳；不能只换壳就认定全部关系已闭环 |
 
-线上参考站当前只有 `R-DETAIL-PRIOR` 历史结构线索；#186 不把邻近模板写成目标页事实。分供方字段、动作和同屏差异继续由 #193 按严格只读协议核对，#186 只裁定跨实体稳定层级。
+#186 实施时只取得 `R-DETAIL-PRIOR` 历史结构线索，因此当时没有把邻近模板写成目标页事实。后续分供方直接证据已登记为 `R-SUPPLIER-DETAIL-LIVE`；本轮按 [#407](https://github.com/zodea/crm-new/issues/407) 核对领域字段与关系，跨实体稳定层级由 [#404](https://github.com/zodea/crm-new/issues/404) 复核，旧 #186/#193 仅保留来源含义。
 
 **插槽与编排边界**：
 

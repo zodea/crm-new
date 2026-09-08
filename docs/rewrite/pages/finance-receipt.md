@@ -5,7 +5,7 @@
 
 ## 一、收款登记
 
-生产查看路由 `/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId` 为中央只读详情，只按收款稳定 ID 与来源读取；从客户详情进入时返回该客户的收款页签。编辑路由为 `/finance/receipt/form/:id`，只由列表中的显式编辑动作进入，查看不得复用表单壳。
+生产查看路由 `/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId` 为中央只读详情，只按收款稳定 ID 与来源读取；从客户详情进入时返回该客户的收款页签。编辑路由为 `/finance/receipt/form/:id`，只由授权的显式编辑动作进入，查看不得复用表单壳。
 
 | 分区 | 字段与规则 |
 |---|---|
@@ -39,6 +39,6 @@
 
 - 收款登记专属列表包含收款编号、项目、收款分类、付款单位、合同、日期、金额、支付方式、收款类型和累计合同收款；编号进入只读详情，详情继续展示合同原额/变更额、含/不含本次的累计收款、质保/变现口径、凭证和系统信息。列表读模型至少返回 `id/no/project/customer/contract/category/receiptDate/amount/paymentMethod/receiptType/cumulativeContractReceipt`。
 - 往来收款与往来付款在参考界面拆成两张列表：收款侧包含款项类型、付款单位和创建审计；付款侧包含审批、业务类型、收款单位、申请人/日期/金额、生效、支付、实付和余额。本地可继续共享 `current_transactions`，但读模型必须按 `direction` 投影不同字段，而不是用一套“关联方/类型”列吞掉语义。
-- 往来收款编号已确认进入只读详情；本轮未从往来付款编号形成可靠详情，因此不把未知详情结构写成目标事实。项目与已主数据化的往来方返回 `{ id, name }`；当前 `counterparty` 仍为自由文本时只能显示，不得渲染失效蓝链。
+- 往来收款编号已确认进入只读详情；本轮未从往来付款编号形成可靠详情，因此不把未知详情结构写成目标事实。项目与已主数据化的往来方按 [READ-MODELS.md](../READ-MODELS.md) 返回来源感知实体引用；当前 `counterparty` 仍为自由文本时只能显示，不得渲染失效蓝链。
 
-当前本地运行数据为收款 1 条、往来收/付合计 2 条；这属于小规模真实 SQLite 演示数据，不是 MockJS。列表仍需补专属列、只读详情入口和返回筛选恢复。
+2026-08-13 的 SQLite 演示样本只证明当时的数据路径。收款已有中央专属只读详情；[#413](https://github.com/zodea/crm-new/issues/413) 分别复核收款与往来收/付的专属列、来源与返回，不把旧列表缺口套回已接管领域。

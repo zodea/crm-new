@@ -22,7 +22,7 @@
 | 付款申请 | 请款、结算/发票分摊和审批状态 | `/finance/payment/:id` |
 | 发票台账 | 收票原件、归档状态、含税金额和税额 | 事实可见；只读来源目标待接入 |
 | 支付记录 | 银行回单、人工确认和付款申请分摊 | 事实可见；只读来源目标待接入 |
-| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 事实可见；三类只读来源目标待接入 |
+| 支出结算单 | 分包、材料或其他支出合同的过程/完工结算 | 分包已有专属只读目标；各来源接线按 #408 / #409 / #410 逐类型核实 |
 
 项目详情右栏直接消费中央项目详情 DTO 中的 ProjectSupplier 反向关系，列出已有合作身份并提供“从文件导入分供方”入口，不从本地 store 拼关系。工作台内的项目名和分供方名分别进入项目详情和分供方详情；目标刷新后仍可显式返回原工作台页签。
 
@@ -43,17 +43,7 @@
 
 ### 实时摘要
 
-```ts
-interface ProjectSupplierWorkbenchSummary {
-  contractTotal: number // 有效合同额
-  claimedTotal: number // 有效审批态的批复金额
-  invoiceTotal: number // 已归档进项票含税金额
-  taxTotal: number // 已归档进项票税额
-  paidTotal: number // 已确认支付对当前关系的有效分摊
-  settlementTotal: number // 已确认支出结算单金额
-  balance: number // contractTotal - paidTotal
-}
-```
+摘要字段与定点金额类型以 [READ-MODELS.md](../READ-MODELS.md) 为准；本页不复制数值 DTO。
 
 这些字段是查询时聚合，不回写 ProjectSupplier，也不作为可编辑金额。
 
@@ -67,26 +57,17 @@ interface ProjectSupplierWorkbenchSummary {
 
 来源路由按单据类型区分：
 
-| 类型 | 详情/编辑路由 |
+| 类型 | 查看与编辑边界 |
 | --- | --- |
-| 分包结算 | `/subcontract/settlement/:id` |
-| 材料结算 | `/material/settlement/form/:id` |
-| 其他支出结算 | `/contract/other-settlement/form/:id` |
+| 分包结算 | `/subcontract/settlement/:id` 为专属只读详情；显式编辑另走表单 |
+| 材料结算 | `/material/settlement/form/:id` 是编辑页，不能当工作台只读来源目标；#409 核实详情接线 |
+| 其他支出结算 | `/contract/other-settlement/form/:id` 是编辑页；#331 原工作项与 #409 核实只读目标，不重复建设 |
 
 ### 合作终态结算确认
 
 `settlements` 与 ProjectSupplier 1:1，只表示该合作关系最终关闭。它不参与付款申请—结算分摊，也不能替代 `expenditure_settlements`。
 
-```ts
-interface Settlement {
-  id: string
-  projectSupplierId: string
-  date: string
-  finalAmount: number
-  pdfFile: FileRef | null
-  note: string
-}
-```
+合作终态的字段与关系只在 [DATABASE.md](../DATABASE.md) 维护；多轮请款回退、终态金额与负尾差、未付款及确认 PDF 由 [#408](https://github.com/zodea/crm-new/issues/408) 承接尚未闭合的业务细节，旧补图不等于用户已确认。
 
 工作台只展示“支出结算单”列表和汇总。合作终态结算仍保留为独立概念，但在多轮确认与写入规则闭合前不得显示可操作入口，禁止用一个“结算额”混合两者。
 
@@ -114,7 +95,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 
 ### 顶部摘要
 
-顶部显示返回项目、项目名、分供方名、合作状态，以及有效合同额、已批请款、已归档收票、已确认付款、支出结算额和应付余额。金额为零时显示数值但不伪造下钻；加载失败时显示错误和重试入口。
+顶部显示返回项目、项目名、分供方名、合作状态，以及有效合同额、已批请款、已归档收票、已确认付款、支出结算额和应付余额。真实零值正常显示，是否可下钻由同来源目标能力决定；已验证空集合可以进入，不能只按金额禁用或生成链接；加载失败时显示错误和重试入口。
 
 ### 业务页签
 
@@ -137,13 +118,13 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 付款申请 | 演示来源可进入 `/finance/payment/:id/detail` 只读详情并返回 |
 | 发票 | 现有 `/finance/invoice/:id` 读写混用，工作台保持 `unverified-target` |
 | 支付记录 | 现有 `/finance/records/:id` 读写混用，工作台保持 `unverified-target` |
-| 分包结算 | 现有 `/subcontract/settlement/:id` 读写混用，工作台保持 `unverified-target` |
+| 分包结算 | #328 已有专属中央只读详情；工作台的同来源能力、父关系与返回链仍须 #408 / #410 联验 |
 | 材料结算 | 现有 `/material/settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 | 其他支出结算 | 现有 `/contract/other-settlement/form/:id` 为编辑页，工作台保持 `unverified-target` |
 
 工作台页签使用 `?tab=overview|contract|claim|ticket|payment|settlement`，刷新与浏览器返回后恢复原页签。项目和分供方名称分别使用真实 ID 进入 `/project/:pid` 与 `/base/supplier/:sid`，并携带由双父 ID、`dataOrigin` 和当前页签组成的受限 `returnTo`；目标 ID 或来源错配时丢弃返回链。导入向导只允许正式项目，取消或完成后回到 canonical `/project/:pid?origin=real`。
 
-在 #317 中，工作台只输出 `NavigationIntentDTO`，每个来源意图持续携带 `dataOrigin`。唯一 Target Registry 仅在目标已验证为同来源只读页、来源为 `demo`、返回上下文来源一致时解析合同与付款申请；正式中央来源以及仍读写混用的收票、支付记录和三种支出结算全部稳定退化为 `unverified-target`，不得回落本地编辑页。可达目标仅在 query 中的 `projectId`、`supplierId`、受限 `returnTo` 与实际源单身份三者一致时显示“返回项目分供方工作台”；外部地址、未知页签、额外 query 或身份错配均退回目标模块默认返回。工作台 tab 在 query 中持久化，刷新与往返恢复原页签。
+工作台只输出携带 `dataOrigin` 的 `NavigationIntentDTO`，唯一 Target Registry 验证稳定 ID、同来源只读目标与受限返回上下文。#317 的“仅演示合同/付款申请可达”是历史范围，不能据此把后来接入的中央目标一律禁用；#408 按当前目标能力逐类型核验。未通过者继续显示 `unverified-target`，不得回落编辑页或本地库。合法返回必须匹配项目、分供方、来源与页签，外部地址或身份错配丢弃。
 
 ### 文件区
 

@@ -1,8 +1,8 @@
 # 交互原语改版 · 多风格参考站
 
-配合已定的 **Sonner 风格 toast** 使用。收录各类交互「能直接点开、看到实际效果」的真实网站，逐类挑方向。所有链接经实测可打开且内容相关。品牌基调：蓝 `#3976C6` + 白面板 `#fff`。
+收录早期交互选型使用的公开网站与采纳记录，作为设计来源索引。链接可用性只代表当时的核对结果；当前设计优先级见[设计入口](./README.md)，组件合同见 [KitUI 组件规格](./kit-ui-component-specs.md)，品牌值以令牌文件为准。
 
-> **改版工作约定**：每类交互改版前，先出这样一份多风格参考站菜单（能直接点开看效果）供挑方向，挑定再实装。dev 验证载体：`/dev/kit-ui`。
+> **当前使用方式**：沿用已采纳方向，不重新要求用户挑选整套风格。只有当前 Issue 需要且现有规则不能解决的取舍才补充方案；通用能力在 `/dev/kit-ui` 验证，业务页面仍逐屏对照红圈直接证据和瑞航设计基准。
 
 在线可视版（本会话生成的 Artifact，含卡片式排版）：
 - toast 五风格菜单 · <https://claude.ai/code/artifact/2d65b7a8-ab04-4634-8d69-0d89b481c4de>（六类交互版）
@@ -11,7 +11,7 @@
 
 ## 应用路由页签与控件形状 —— ⛔ 视觉结论已废弃（2026-07-17，见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)）
 
-> 页签视觉改为设计稿 40px 红圈式页签栏（`--surface-2` 底，active = 白底 + brand 字 + inset -2px 下划线）；控件圆角以镜像令牌实值为准（`--radius-btn` 实为 8px，非 10px）。原关闭/右键菜单/滚动/缓存**行为**继续有效（ADR 0011）。以下原文留档。
+> 页签视觉与控件形状采用 ADR 0013 及现行令牌；2026-07-27 已将表面/按钮/小控件圆角收敛为 4/4/3px。原关闭、右键菜单、滚动与缓存行为按现行公共表面合同继续维护。以下 36px、8/10/12px 等旧方案只作未采用来源留档。
 
 - **决策（2026-07-13，Issue #82）**：路由页签采用 Chrome 式连接造型。激活页签顶部圆弧、底部与工作区连成一体，两侧以内凹肩线自然过渡；保留 36px 页签栏与既有关闭、右键菜单、滚动和缓存行为。
 - **控件形状**：按钮/输入/选择器统一 10px，小型图标与分页控件 8px，卡片 12px，chip 保持 pill；不再使用 3px 的硬方角。
@@ -41,7 +41,7 @@
 
 ---
 
-## 其余交互（待挑方向）
+## 其余交互的来源与采纳边界
 
 ### 00 · 项目切换器 `project-switcher` —— 已定：统一触发器 + 可搜索 SelectPanel
 
@@ -56,7 +56,7 @@
 **决策（2026-07-28 用户复核）**：统一采用 GitHub 型「当前项目触发器 + 可搜索 SelectPanel」，但不引入“最近使用”分组和访问历史持久化。桌面为锚定弹层，窄屏仅把同一内容容器全屏化；搜索、选中状态和键盘逻辑完全同源。明确不保留“三个以内按钮平铺”、不做项目按钮横向滚动、不按数量切换样式。落地规格见 [KitUI 组件规格 §08](./kit-ui-component-specs.md#08--项目切换器-project-switcher--已定案2026-07-22)。
 
 ### 01 · 确认弹窗 `confirm-dialog`
-**要点**：破坏性操作要让人「停顿」—— 遮罩 + 焦点锁定 + Esc/取消有退路；取消走中性、确认走 danger 红并写明「不可撤销」；高危场景加 type-to-confirm（打字确认）。
+**要点**：确认使用遮罩、焦点锁定与 Esc/取消退路；取消走中性、确认走 danger 红，说明真实影响和是否可撤回，不能把支持 10 秒撤回的软删除写成“不可撤销”。打字确认与预提交挂起只按 ADR 0003 的适用变体使用。
 
 - [DesignRevision · Alert Dialog](https://designrevision.com/components/alert-dialog) · 可交互 — 一页 5 个 demo：基础→红色破坏性→Async(点确认转 spinner 不关弹窗)→GitHub 式打字确认
 - [shadcn/ui · Alert Dialog](https://ui.shadcn.com/docs/components/radix/alert-dialog) · 可交互 — 最贴现有克制风，Delete Chat 红色破坏性范式
@@ -65,15 +65,15 @@
 
 **推荐**：骨架用 shadcn/DesignRevision 克制结构，高危项叠 type-to-confirm + Async spinner。**落到瑞航**：确认按钮绑 `--danger`、取消用 ghost 灰，品牌蓝不当主角；不用毛玻璃，`rgba(0,0,0,.28)` 轻遮罩即可。
 
-### 02 · 表单弹窗 `form-modal`
-**要点**：标题「动词+名词」；字段分组、失焦即时校验、错误贴字段下方；主按钮放右下 footer、动词与标题一致；打开聚焦第一个输入框；有未保存内容要拦。
+### 02 · 轻量表单弹窗 `form-modal`
+**适用边界**：仅用于行级小对象和明确的轻量任务；业务实体新增/编辑遵守 ADR 0014 的整页表单。标题「动词+名词」；字段分组、失焦即时校验、错误贴字段下方；主按钮放右下 footer、动词与标题一致；打开聚焦第一个输入框；有未保存内容要拦。
 
 - [Mantine · Modal](https://mantine.dev/core/modal/) · 可交互 — 最贴现基准，Focus on inner element / size / centered
 - [shadcn/ui · Dialog](https://ui.shadcn.com/docs/components/dialog) · 可交互 — Sticky Footer / Scrollable（长表单吸底）
 - [Vercel Geist · Modal](https://vercel.com/geist/modal) · 可交互 — 打开自动聚焦 + 提交 loading/disabled
 - [Flowbite · Modal](https://flowbite.com/docs/components/modal/) · 可交互 — Create new product 标准 CRUD 表单样板
 
-**推荐**：Mantine/shadcn 克制骨架（白面板、footer 右下主按钮、长表单吸底），主按钮与聚焦态换品牌蓝。**落到瑞航**：白面板、圆角 8-12px、主按钮 `--brand`、校验红提示 `--danger` 贴字段下方；别整体太企业风，圆角/留白可往 Flowbite 靠一档。
+**采纳范围**：借鉴白面板、右下主操作、字段滚动与焦点反馈；主按钮使用 `--brand`，校验错误使用 `--danger`。控件形状与间距采用现行令牌，不能把公开产品的 8–12px 圆角或 CRUD 弹窗示例当作瑞航业务实体形态。
 
 ### 03 · 导出进度 `export-progress`
 **要点**：架构与降级策略以 [ADR 0004](../adr/0004-export-interaction-model.md) 为唯一权威。直接保存写盘时立即显示 process loading，成功后 dismiss；最终只显示 system 成功 toast「已导出到 X 文件夹」，不重复 process success。需要目录分类的多阶段导出用页签内步骤条，失败在原载体转 error。

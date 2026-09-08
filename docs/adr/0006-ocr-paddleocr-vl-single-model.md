@@ -4,6 +4,8 @@
 > 详细论证见 `docs/research/ocr-recognition-strategy.md`；工程移植见 `docs/research/invoice-recognition-app-port-plan.md`。
 > 本版**取代**初版的"三层多引擎（PP-OCRv6 + 本地文本LLM + 独立视觉LLM）"方案——收敛为单一 PaddleOCR-VL。
 
+> 后续边界：本文保留当时的引擎选择、硬件与样本评估，版本“最新”、性能比较和本地后端设想均按该时点阅读，不作为当前运行可用性证明。本文只裁定 OCR 路径，不能用其中“财务数据默认全本地”的历史描述覆盖后来 [ADR 0020](./0020-browser-authority-and-demo-workspace-boundary.md)的浏览器中央业务权威。当前 OCR/文件能力按[文件流程复核](https://github.com/zodea/crm-new/issues/406)验证，实际部署由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接；既有云端显式启用、凭证只留服务端和人工核对边界继续有效。
+
 用户是工程财务管理员，处理真实发票/送货单（含税号/金额/公司名），三诉求叠加：**成本敏感**、**隐私敏感**（数据不愿外传）、**要打磨质量**；环境 **Windows 为主**（主力机 Ryzen 5 5600 / 16GB / RTX 4060，2026-07-06 实测确认），**Mac 需可用**（初版调研误设 macOS 为唯一环境，已更正）。已有一套跑通的实现（`invoice-recognition-app`），其 `ocr-vl.js` 已集成 aistudio 的 PaddleOCR-VL 云端异步 job API（模型名 `PaddleOCR-VL-1.6`）。初版曾设计"本地 PP-OCRv6 + Ollama 文本 LLM + 独立本地视觉 LLM"的三层多引擎方案，但多模型在一台 Mac 上争内存、需切换/加载卸载调度（keep_alive、OLLAMA_MAX_LOADED_MODELS），复杂且易互相干扰。
 
 **决策**：OCR 识别用**单一 PaddleOCR-VL（0.9B 多模态模型）**做引擎，一个模型完成 OCR + 表格 + 公式 + 手写 + 版面结构，图 → 结构化 Markdown + 版面区域；再由**规则正则**（现成 `vl-parse.js`/`invoice-parse.js`）在 Markdown 上抽出发票/送货单字段。

@@ -1,5 +1,7 @@
 # PRD：KitUI 交互原语第二波（红圈对标）
 
+> **非权威历史 PRD。** 以下 API、组件命名、验收勾选和实施顺序是 2026-07 的提案快照，不是当前实现合同。现行结构与 API 见 [KitUI 组件规格](../design/kit-ui-component-specs.md)，整页实体表单见 [ADR 0014](../adr/0014-full-page-entity-forms.md)，数据来源边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)；本轮复核进入 [#404](https://github.com/zodea/crm-new/issues/404)。其中 Lookup 最近选择不能按下文旧 `localStorage` 示例新增平行持久化路径，也不能跨正式/演示来源复用。
+
 > 依据：2026-07-11 红圈线上走查，[非权威差距证据](../research/red-circle-ui-gap-2026-07-11.md) §1/§2/§6；当前范围与状态以 GitHub Issues 和 ADR 0014 / 0015 为准。
 > 第一波（确认/表单/导出/导入/抽屉/按钮）见 #74 与 #75–#81，本文**不重复**其范围。
 > 底座约束：ADR 0008——交互型组件基于 **reka-ui**，样式 **UnoCSS**（零 Tailwind 引擎），toast 走 **vue-sonner** 双泳道；`useKitUI()` 调用签名向后兼容（只增不改）。

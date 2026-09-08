@@ -1,6 +1,6 @@
 # 瑞航 CRM
 
-Nuxt 4 + Vue 3.5 + SQLite/Tauri 的工程项目管理应用。
+基于 Nuxt 4 + Vue 3.5 的工程项目管理应用，当前交付方向为浏览器版。已接管实体采用中央读写，过渡本地适配与桌面壳边界见 [ADR 0020](docs/adr/0020-browser-authority-and-demo-workspace-boundary.md)；正式持久化、备份恢复与部署仍需独立验收。
 
 ## 文档入口
 

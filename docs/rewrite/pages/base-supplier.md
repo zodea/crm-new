@@ -17,138 +17,30 @@
 
 | 在本页面做 | 不在本页面做 |
 |---|---|
-| 新增/编辑分供方主数据 | 新建采购合同（→ `material-contract`） |
-| 上传、识别、审核证照 | 发起请款审批（→ `finance-payment`） |
-| 查看跨项目汇总，跳转源单据 | 登记收票（→ `finance-ticket`） |
-| 管理文件结构（上传/下载/浏览） | 录入付款流水（→ `finance-payment`） |
+| 新增/编辑分供方主数据 | 新建采购合同（见[核心合同](./core-contracts.md)） |
+| 上传、识别、审核证照 | 填写付款申请（见[付款申请](./finance-payment.md)） |
+| 查看跨项目汇总，跳转源单据 | 登记发票（见[发票台账](./finance-invoice.md)） |
+| 管理文件结构（上传/下载/浏览） | 录入实际支付（见[支付记录](./finance-records.md)） |
 
 ---
 
 ## 一、业务流程
 
 ```
-① 新增分供方 ──→ ② 证照管理 ──→ ③ 资料审核 ──→ ④ 合格入库
-   手动/发票收集/      上传/OCR识别/     提交审核/        可关联项目
-   Excel导入           自动归类/回填     通过/退回补充     生成ProjectSupplier
-                           ↑                │
-                           └── 退回补充 ─────┘
-
-④ 合格入库 ──→ 跨项目只读汇总（合同数/合同额/请款/收票/已付/应付）
-                    │
-                    └──→ 点击跳转源单据（采购合同 / 付款申请 / 收票登记）
+主档与合作身份建档 ──→ 合作文件与真实源单汇总 ──→ 下钻合同、申请、发票与支付
+       │
+       └──→ 证照管理 ──→ 资料齐全待核验 ──→ 人工核验合格或退回
+                ↑                              │
+                └──────── 退回补充 ────────────┘
 ```
+
+合作身份建档和证照核验是两条关联流程。依 [#281 最终交付](https://github.com/zodea/crm-new/issues/281#issuecomment-5434305726) 与 [COMMANDS.md](../COMMANDS.md)，从合作文件导入可在人工确认后原子创建资料状态为 `incomplete` 的最小分供方及合作关系；导入文件不自动成为证照。合作建档不代表证照合格，也不代替合同、付款等源模块的准入校验；`qualified/rejected` 仍只由既定人工核验产生。
 
 ---
 
-## 二、旧字段快照（已废弃）
+## 二、数据与接口权威
 
-> ⛔ 本节只保留早期界面类型作历史对照，不是 schema 来源。现行列、约束、核验状态与迁移批次统一见 [`DATABASE.md` §2.1、§2.10](../DATABASE.md)；新增实现不得从下列 TypeScript 接口反推表结构。
-
-### Supplier
-
-```ts
-interface Supplier {
-  id: string
-  name: string                    // 公司全称 *必填
-  aliases: string[]               // 简称/别名，用于文件夹名对应
-  uniqueCode: string              // 唯一识别码
-  taxNo: string                   // 统一社会信用代码
-
-  // 分类
-  businessType: string            // 业务类型
-  supplierCategory: string        // ⛔ 历史 4 类快照；现行 7 类以 CONTEXT.md「分供方」为准
-  rating: string                  // 评价等级
-  parentSupplierId: string | null // ⛔ 已废弃：分供方是终端签约对象、无母子挂靠；见 DATABASE.md §2.10.2
-
-  // 工商信息
-  legalRep: string                // 法定代表人
-  registeredCapital: number | null // 注册资金
-  registeredDate: string          // 注册日期
-  address: string                 // 营业执照住所/注册地址
-  taxpayerType: string            // 纳税人类型（选填，默认未核验）
-  mainBusiness: string            // 主营业务
-
-  // 开票/银行信息
-  invoiceName: string             // 开票名称
-  invoiceAddress: string          // 开票资料地址（选填，与注册地址独立）
-  bank: string                    // 开户行
-  bankAccount: string             // 银行账号
-  phone: string                   // 公司电话/开票资料电话（选填）
-
-  // 联系人
-  contact: string                 // 主要联系人(签约代表)
-  contactPhone: string            // 联系方式
-
-  // 状态（两个独立维度）
-  credentialStatus: 'incomplete' | 'reviewing' | 'qualified' | 'rejected'
-    // 资料维度: 必需资料齐全度 + 人工核验结论
-  approvalStatus: 'draft' | 'submitted' | 'approved' | 'rejected'
-    // 入库维度: 分供方整体是否通过审批
-    // V1: 默认 'draft'，无流转操作入口，预留字段
-
-  source: 'manual' | 'invoice' | 'excel' | 'delivery'
-  note: string
-  createdAt: string
-  updatedAt: string
-}
-```
-
-### SupplierCredential
-
-```ts
-type CredentialCategory =
-  | '营业执照'
-  | '法人身份证'
-  | '银行开户许可证'
-  | '签约代表身份证'
-  | '品牌授权证明'
-  | '合同模板'
-  | '完税证明'
-  | '过往业绩合同'
-  | '施工照片'
-  | '其他'
-
-interface SupplierCredential {
-  id: string
-  supplierId: string              // → Supplier.id
-  category: CredentialCategory
-  fileName: string
-  filePath: string                // legacy 迁移路径留痕（证照域不读取）
-  fileRefId: string | null
-  fileSize: number
-  mimeType: string
-  hasAccessibleFile: boolean      // 已持久化 payload；路径本身不算可访问
-  validFrom: string
-  expiresAt: string
-  longTerm: boolean
-  ocrResult: Record<string, unknown>  // OCR 识别回填字段
-  ocrConfidence: number | null    // 识别置信度
-  ocrConfirmedResult: Record<string, unknown>
-  ocrConfirmedAt: string | null
-  verifiedAt: string | null       // 审核通过时间
-  addedAt: string
-}
-```
-
-### SupplierReadonlySummary（实时计算，不存储）
-
-```ts
-interface SupplierReadonlySummary {
-  projectCount: number            // 关联项目数
-  contractCount: number           // 合同总数
-  contractTotal: number           // 合同总额
-  settledTotal: number            // 累计结算金额
-  claimedTotal: number            // 累计已审批请款
-  invoiceTotal: number            // 累计收票金额
-  invoiceTaxTotal: number         // 累计收票税额
-  paidTotal: number               // 累计付款金额
-  payableBalance: number          // 应付金额 = contractTotal - paidTotal
-}
-```
-
-> 完整实体关系和外键索引见 → `DATABASE.md`
-
----
+字段、银行账户、附件和项目关系见 [DATABASE.md](../DATABASE.md)；中央列表、详情及关系投影见 [READ-MODELS.md](../READ-MODELS.md)，写入见 [COMMANDS.md](../COMMANDS.md)。本页不保留已废弃字段快照；[#407](https://github.com/zodea/crm-new/issues/407) 按现行契约核实主档、关系与回读。
 
 ## 三、列表页 `/base/supplier`
 

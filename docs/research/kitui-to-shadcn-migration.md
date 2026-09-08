@@ -1,6 +1,8 @@
-# KitUI → shadcn-vue 迁移映射
+# KitUI → shadcn-vue 历史迁移映射
 
-决策见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)。本文是逐件迁移的**映射表 + 进度**，落地时对照勾选。
+> **非权威历史参考。** 本文保留早期组件迁移映射和当时验证结果；勾选、依赖版本、测试数量与待办均不代表当前状态。现行组件契约见 [KitUI 组件规格](../design/kit-ui-component-specs.md)，实施与复核进入 [#404](https://github.com/zodea/crm-new/issues/404)。
+
+迁移决定见 [ADR 0008](../adr/0008-adopt-shadcn-vue-on-unocss.md)。业务实体新增/编辑已按 [ADR 0014](../adr/0014-full-page-entity-forms.md) 使用独立整页表单；下文 `formModal` 映射只说明原语底座，不授权恢复实体弹窗。
 
 ## 底座（已完成）
 

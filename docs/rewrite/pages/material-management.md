@@ -4,9 +4,9 @@
 > 持久化权威：`DATABASE.md` §2.5
 > 视觉参考：[ADR 0013](../../adr/0013-align-all-ui-to-online-design.md) · [运行态参考审计](../../design/runtime-reference-audit.md)
 
-## 运行态参考与当前边界（2026-08-13）
+## 2026-08-13 参考证据与页面差异
 
-本轮以“车陂商业大楼项目”为主样本，按严格只读协议查看参考站的仓库档案、下料单、材料到货、材料领用、乙供材直入直出、批量调拨、库存盘点、材料采购合同及合同内“物资管理”页签；随后补验甲供材总控量、甲供材下料单、甲供材到货、甲供材领用、甲供材直入直出五类全局列表，以及项目详情内“物资管理”、阶段资料、项目成员与文件区。材料采购结算沿用 [`contract-forms.md`](./contract-forms.md) 的同轮直接证据。未点击新建、编辑、删除、上传、下载、导入、导出、审批、打印、评论、文件或行级操作。
+2026-08-13 调查以“车陂商业大楼项目”为主样本，按严格只读协议查看参考站的仓库档案、下料单、材料到货、材料领用、乙供材直入直出、批量调拨、库存盘点、材料采购合同及合同内“物资管理”页签；随后补验甲供材总控量、甲供材下料单、甲供材到货、甲供材领用、甲供材直入直出五类全局列表，以及项目详情内“物资管理”、阶段资料、项目成员与文件区。材料采购结算沿用 [`contract-forms.md`](./contract-forms.md) 的同轮直接证据。未点击新建、编辑、删除、上传、下载、导入、导出、审批、打印、评论、文件或行级操作。
 
 ### 乙供材参考列表与详情构图
 
@@ -35,7 +35,7 @@
 | 甲供材领用 | 全部类型 / 直出出库 / 甲供材出库；全部出库单【新】 | 单据编号、类型、负责人、所属部门、创建人/时间、项目、分供方、采购类型、出库日期、领用月份、领用班组、班组合同、操作 | 0 条；班组与班组合同是两个关系，负责人/创建人也不能共用一个自由文本字段 |
 | 甲供材直入直出 | 全部直入直出 | 单据编号、业务类型、负责人、项目、仓库、入出日期、采购类型、分供方、送货单照片、送货单编号、操作 | 0 条；照片和单号只登记附件/来源语义，本轮未点击；直入直出仍按本地规则同时形成到货与领用事实但不入仓 |
 
-五类列表共用一套外壳密度，不共用一套业务列。目标布局为“单一白色工作区 + 一行搜索/刷新/排序/筛选/设置/登记型动作 + 专属紧凑宽表 + 右下分页”；分类只有确有业务意义时才占左侧窄栏或行内选择器。当前本地五页虽然已经没有大流程卡，但仍把标题、筛选和表格分成多层带底色 panel，且五页都只有“材料/对象、编号、项目、数量、日期、状态、操作”。实施时应减去多余底色与卡片边界，用留白和细分隔线分区，表格只在自身区域横向滚动。
+五类列表共用一套外壳密度，不共用一套业务列。目标布局为“单一白色工作区 + 一行搜索/刷新/排序/筛选/设置/登记型动作 + 专属紧凑宽表 + 右下分页”；分类只有确有业务意义时才占左侧窄栏或行内选择器。该次本地走查中，五页虽然已经没有大流程卡，但仍把标题、筛选和表格分成多层带底色 panel，且五页都只有“材料/对象、编号、项目、数量、日期、状态、操作”。实施时应减去多余底色与卡片边界，用留白和细分隔线分区，表格只在自身区域横向滚动。
 
 车陂商业大楼项目详情继续采用紧凑摘要、三组经营数据、小型阶段节点和“左主区 + 右成员/文件”的宽屏双栏；阶段资料直接显示任务名称与归档说明，项目文件只使用文件表格，不给字段加灰色背景。该项目“物资管理”页签当前保留三组独立空表：
 
@@ -45,173 +45,37 @@
 | 物资需用计划 | 单据名称、审批状态、计划日期、要求到货日期、负责人、创建时间、操作 | 投影真实项目下甲供/乙供下料事实，类型差异由来源引用保留 |
 | 入库单 | 单据编号、类型、分供方、入库日期、入库仓库、材料采购合同、生效状态、操作 | 甲供到货、乙供到货与送货归档在 canonical 关系闭合前分源展示；不得把本地送货归档直接冒充已入库单 |
 
-本地主项目详情当前“物资管理”只有一张“项目到货归档”表，能真实展示 2 个已归档送货单并下钻详情，但缺少上述三组项目级计划/入库读模型。该归档表属于瑞航已闭环的独有来源视图，应保留为独立组；在到货 ↔ 送货归档关系裁定前不能并入参考“入库单”。参考文件区当前有记录，但本轮未点击文件名、加号或操作列；本地项目档案包仍按 [`project-info.md`](./project-info.md) 的真实 `file_refs` 与 owner 目录规则实现，不复制参考文件正文。
+该次本地主项目详情“物资管理”只有一张“项目到货归档”表，能真实展示 2 个已归档送货单并下钻详情，但缺少上述三组项目级计划/入库读模型。该归档表属于瑞航已闭环的独有来源视图，应保留为独立组；有效到货关系虽已定，接线闭合前仍不能并入参考“入库单”。参考文件区当前有记录，但本轮未点击文件名、加号或操作列；本地项目档案包仍按 [`project-info.md`](./project-info.md) 的真实 `file_refs` 与 owner 目录规则实现，不复制参考文件正文。
 
 ### 只读跳转合同
 
-1. 列表的蓝色单据名称或编号先进入独立只读详情；编辑只由明确的“编辑”动作进入整页表单。当前四类材料列表把名称和“查看/编辑”都直接送进编辑表单，不符合该边界。
+1. 列表的蓝色单据名称或编号先进入独立只读详情；编辑只由明确的“编辑”动作进入整页表单。该次四类材料列表把名称和“查看/编辑”都直接送进编辑表单，不符合该边界。
 2. 项目、分供方、材料采购合同、源单据、送货单、仓库、班组合同和结算名称都是关系入口；目标存在时按真实 ID 下钻，目标为空时展示“未记录”，不得用名称搜索猜 ID。
 3. 材料采购合同详情的“物资管理”汇总该合同下的新/历史入库、直入直出和新/历史出库；本地已有 `contract_id → material_requisitions/material_arrivals` 查询基础，但当前下钻仍进入编辑表单，且没有送货归档、出库批次和结算分摊关系。
 4. 送货单号进入 `/material/delivery/archive/:id`；归档详情中的项目、分供方继续进入各自详情。材料价格来源使用 `deliveryRecordId + deliveryLineId` 回到同一送货单，合作合同使用 `contractId` 回到合同详情。
 5. 任一详情返回列表时必须恢复来源路由、项目/状态/分类筛选、搜索、分页和滚动位置；不得只写死返回域首页。建议统一携带 `from` 或可序列化的列表 query，不把展示名称当返回键。
-6. 甲供材五类列表的单据编号/名称同样先进入独立只读详情；当前本地 `/owner-material/*/:id` 全部直接复用编辑表单，必须把“查看”与明确的“编辑”动作分开。参考列表没有记录，因此本轮只锁定入口边界，不外推未知详情页签或审批动作。
+6. 甲供材五类列表的单据编号/名称同样先进入独立只读详情；该次本地 `/owner-material/*/:id` 全部直接复用编辑表单，必须把“查看”与明确的“编辑”动作分开。参考列表没有记录，因此本轮只锁定入口边界，不外推未知详情页签或审批动作。
 7. 甲供材到货的源单据、项目、分供方、送货单和仓库，甲供材领用的项目、分供方、班组与班组合同，以及直入直出的项目、仓库、分供方和送货单都是候选关系字段；只有后端返回稳定 ID 时才渲染蓝链，缺 ID 时显示“未记录”而不是名称搜索结果。
 8. 项目详情“物资总计划 / 物资需用计划 / 入库单”使用 `projectId` 作为受限来源上下文；单据下钻后返回原项目、原页签、原子表、筛选、页码和滚动位置。全局列表下钻则返回原全局列表，两个来源不能共用写死返回地址。
 9. 参考项目右侧成员编号为可见关系入口，文件名、附件、送货单照片和加号/操作列属于文件或写动作；本轮只登记其位置与字段，不点击、不下载。本地文件继续只读 `file_refs(owner_type, owner_id, category)`，没有正文时展示缺失原因，不生成替代文件。
 
-### 当前本地完成度与实体数据
+### 历史运行缺口的承接
 
-| 本地范围 | 运行态数据 | 已有能力 | 待补缺口 |
-| --- | ---: | --- | --- |
-| `/material/requisition` | 0 条种子 | SQLite 头表、项目/材采合同 ID、到货派生量、整页表单 | 专属列表列、只读详情、到货进度计数、供应关系投影、返回上下文 |
-| `/material/arrival` | 0 条种子 | 头/明细事务、项目/分供方/合同/下料单 ID、库存派生 | 专属列表列、只读详情、仓库 ID、送货归档 ID、结算/付款快照 |
-| `/material/use` | 0 条种子 | 项目/班组 ID、仓库文本、实时库存校验 | 专属列表列、只读详情、仓库 ID、分供方/合同或来源批次、班组合同关系 |
-| `/material/stock-check` | 0 条种子 | 头/明细事务、账面量/实盘量/盈亏和生效库存 | 当前没有项目 ID、仓库 ID；通用列表仍显示无来源的“项目”筛选 |
-| 仓库档案 / 乙供材直入直出 / 批量调拨 | 无实体、无生产路由 | 无 | 先完成领域实体与迁移裁定，再实现列表/详情/整页表单；不得借用甲供材直入直出 |
-| `/material/settlement` | 0 条种子 | 复用真实 `expenditure_settlements` 与材采合同 | 只读详情、到货/送货分摊实体及付款余额读模型见 `contract-forms.md` |
-| `/material/delivery/archive` | 3 个归档头、4 条材料明细 | 项目→分供方树、列表、只读详情、项目/分供方下钻、原件缺失态 | 尚未与 `material_arrivals` 建立 canonical 关系；详情返回未保留树节点/筛选上下文 |
-| `/material/price` | 现有归档事实被过滤后为 0 个可分析材料 | 来源送货单和历史材采合同下钻均已实现 | `delivery_records.ocr_status='reviewed'` 与分析器要求 `ocrStatus='done'` 的词汇冲突会把 3 个归档头/4 条明细全部过滤，须在读边界统一状态而非补 Mock 数据 |
-| `/owner-material/control` | 0 条种子 | 项目/客户 ID、材料维度总控和五项派生量、真实事务约束 | 专属总计划列表、只读详情、计划/盖章/说明/附件读模型；参考空表显示二级展开但明细身份尚不能外推 |
-| `/owner-material/requisition` | 0 条种子 | 项目 ID、申请/需用日期、材料计划量、状态事务 | 专属需用计划列表、只读详情、业务类型/审批/金额/创建人与到货进度投影 |
-| `/owner-material/arrival` | 0 条种子 | 项目 ID、仓库文本、日期/收货/材料/质检/入库状态、总控校验 | 专属到货列表、只读详情、源单/分供方/送货单/仓库 ID、采购类型和结算付款快照；当前没有单价/金额事实 |
-| `/owner-material/use` | 0 条种子 | 项目/班组 ID、领用事实与总控/库存校验 | 专属领用列表、只读详情、负责人/部门/分供方/采购类型/仓库或来源批次/班组合同 ID |
-| `/owner-material/direct` | 0 条种子 | 项目/客户 ID、不入库的到货与领用双计事实 | 专属直入直出列表、只读详情、仓库/分供方/采购类型/负责人/送货单号与照片关系 |
-| 项目详情 · 物资管理 | 2 个已归档送货单 | 真实项目到货归档、送货单详情及分供方下钻 | 缺参考三组项目读模型；保留归档独立组，不能在到货 canonical 关系建立前冒充“入库单” |
+2026-08-13 小规模测试库曾暴露：材料与甲供材列表缺专属列、名称进入编辑、返回丢上下文、仓库/计划/到货来源缺稳定关系，以及 `reviewed` 与 `done` 混用导致价格分析漏数。这些是该次观测，不能判为当前状态；[#411](https://github.com/zodea/crm-new/issues/411) 先核实当前提交和迁移，再实施仍存在的差异。
 
-现有实体数据不多：核心乙供材和甲供材 9 张单据头/明细表都没有 JSON 种子记录；甲供材单测和 E2E 会在隔离数据库创建真实关系，但不能作为运行页演示数据。可直接复用的是送货归档的 3 个头和 4 条材料明细，其中 2 个归档头已绑定分供方并含有效单价，足以先修通真实价格读链和跳转，之后再补充业务数据。界面必须把“真实 0 条”与“接口失败/权限不可见”分开，不用 MockJS 或随机行填满空表。
+历史 seed 不含真实原件的样本只覆盖缺源场景；非空验收需隔离确定性数据覆盖有效到货、库存、价格和来源往返。正式源不自动灌样本，已迁移浏览器领域不绕中央回退 SQLite。仓库、供货方、总计划头/行及有效到货关系已定，不因旧测试库缺表重新裁定。
 
-### ID 链、断点与读接口契约
+### 已定身份链与本轮验证
 
-当前可追溯主链为：
+[#411](https://github.com/zodea/crm-new/issues/411) 继承已采纳的身份决议，逐项验落实，不重新选择模型：
 
-```text
-project.id / supplier.id / contract.id
-  → material_requisitions.contract_id
-  → material_arrivals.requisition_id + contract_id + supplier_id
-  → 库存派生（warehouse 目前仍是文本）
+- 物理原件与逻辑送货单分开，一份原件可含多张逻辑单据；有效态逻辑送货单与到货头 1:1，材料明细只保留一份事实。
+- 缺原件或偏差未闭合的记录标为未闭合；归档持久化不等于仓库入库，不能仅凭 `archived=1` 生成库存或有效到货资格。
+- 仓库使用稳定 ID；领用、直入直出、盘点与调拨按真实来源和仓库关系复核，不按名称或金额近似配对。
+- 甲供材供货方已定为 Party 的甲方指定供货角色；项目客户不自动成为供货方。总计划有独立头和明细，后续单据引用稳定 `planLineId`；三量按计划行归集，不用“项目 + 材料名 + 单位”拼身份。
+- 材料结算唯一归 [#409](https://github.com/zodea/crm-new/issues/409)；本模块提供有效到货来源，联验到货不重复纳入、后续批次及结算更正后的回读。
 
-delivery_records.id
-  → delivery_lines.delivery_record_id
-  → 材料价格事实（deliveryRecordId + deliveryLineId）
-  → 送货单详情
-
-expenditure_settlements.contract_id
-  → payment/invoice allocations
-
-project.id
-  → owner_material_controls.project_id + customer_id
-  → owner_material_requisitions.project_id
-  → owner_material_arrivals.project_id
-  → owner_material_uses.project_id + crew_id
-  → owner_material_directs.project_id + customer_id
-  → 甲供三量派生（project_id + material_name + unit）
-```
-
-尚未闭合的连接是 `warehouse.id`、到货 ↔ 送货归档、到货 ↔ 材料结算分摊、领用 ↔ 入库批次/采购来源，以及调拨两端。甲供材还缺总计划头 ↔ 材料明细边界、下料 ↔ 到货、到货/领用/直入直出 ↔ 供货单位、送货单、仓库和班组合同的稳定 ID。当前 `customer_id` 只证明项目甲方关系，不能自动解释成参考列表中的“分供方”；项目档案包因此继续使用“甲供材供货单位待配置”，不冒用客户名。没有这些 ID 前，不能靠仓库名、送货单号、材料名或金额近似匹配。到货与送货归档究竟采用单一 `delivery_record_id` 还是分配桥表，必须在数据迁移票中根据“一张原件拆多单/多次入库”的实际口径裁定；甲供材供货单位身份和总计划头/行身份交由后续 DTO/迁移票集中裁定，不在空表走查中猜定。
-
-后端读接口统一使用 [`READ-MODELS.md`](../READ-MODELS.md) 的分页、关系、金额、空态与权限语义；名称只作快照展示，写入仍保存 ID。下列领域结构中的 `MoneyDTO` 均为固定两位十进制定点字符串：
-
-```ts
-type EntityRef = EntityRefDTO
-type PageResult<T, S = null> = PageDTO<T, S>
-
-interface MaterialDocumentRef {
-  id: string
-  no: string
-  type: 'requisition' | 'arrival' | 'delivery' | 'use' | 'direct' | 'transfer' | 'stock-check' | 'settlement'
-}
-
-interface SettlementPaymentSnapshot {
-  settlementStatus: string | null
-  settledAmount: MoneyDTO | null
-  remainingSettleAmount: MoneyDTO | null
-  paymentStatus: string | null
-  paidAmount: MoneyDTO | null
-}
-
-interface OwnerMaterialControlListItem {
-  id: string
-  no: string
-  project: EntityRef
-  planDate: string | null
-  note: string | null
-  requiresSeal: boolean | null
-  description: string | null
-  attachmentCount: number
-  lineCount: number | null
-  status: string | null
-}
-
-interface OwnerMaterialRequisitionListItem {
-  id: string
-  no: string
-  businessType: string | null
-  approvalStatus: string | null
-  project: EntityRef
-  planDate: string | null
-  requiredArrivalDate: string | null
-  totalAmount: MoneyDTO | null
-  creator: EntityRef | null
-  note: string | null
-  arrivalProgress: {
-    completed: number
-    partial: number
-    pending: number
-  } | null
-}
-
-interface OwnerMaterialArrivalListItem {
-  id: string
-  no: string
-  fillDelayDays: number | null
-  sourceDocument: MaterialDocumentRef | null
-  type: string | null
-  project: EntityRef
-  supplier: EntityRef | null
-  deliveryDocument: MaterialDocumentRef | null
-  arrivalDate: string | null
-  warehouse: EntityRef | null
-  purchaseType: string | null
-  effectiveStatus: string | null
-  issueStatus: string | null
-  totalAmount: MoneyDTO | null
-  settlementPayment: SettlementPaymentSnapshot
-  note: string | null
-}
-
-interface OwnerMaterialUseListItem {
-  id: string
-  no: string
-  type: string | null
-  owner: EntityRef | null
-  department: EntityRef | null
-  creator: EntityRef | null
-  createdAt: string
-  project: EntityRef
-  supplier: EntityRef | null
-  purchaseType: string | null
-  useDate: string | null
-  useMonth: string | null
-  crew: EntityRef | null
-  crewContract: EntityRef | null
-}
-
-interface OwnerMaterialDirectListItem {
-  id: string
-  no: string
-  businessType: string | null
-  owner: EntityRef | null
-  project: EntityRef
-  warehouse: EntityRef | null
-  transactionDate: string | null
-  purchaseType: string | null
-  supplier: EntityRef | null
-  deliveryPhotoCount: number
-  deliveryNo: string | null
-}
-```
-
-各列表 DTO 至少包含 `id/no/status/createdAt/updatedAt`，再按领域追加：下料单带 `project/contract/supplier` 与完成/部分/剩余入库计数；到货带 `sourceDocument/project/supplier/contract/deliveryRecord/warehouse` 及结算付款快照；领用带 `project/warehouse/receiver/crew/crewContract/sourceLots`；盘点带 `project/warehouse/checker/date`；调拨带调出/调入两端引用。甲供材五类使用上面的可空读模型，金额按 `MoneyDTO` 传输，日期传 ISO 值，状态传本地稳定 code 并由前端显示中文；权限不可见、关系未配置和真实空值必须是三个可区分状态。上述是瑞航所需的 canonical 读模型，不是对参考站接口名或内部字段的复制；参考空表没有证明的字段只能保持 nullable，不得反向成为必填写模型。
+表、外键、状态与迁移只在 [DATABASE.md](../DATABASE.md) 维护；关系、金额、来源、空态和权限语义见 [READ-MODELS.md](../READ-MODELS.md)，写入见 [COMMANDS.md](../COMMANDS.md)。本页不保留独立 DTO 副本。参考空表未证明的红圈明细仍属未观察，不影响瑞航已定身份规则。
 
 ## 一、乙供材
 
@@ -237,9 +101,9 @@ interface OwnerMaterialDirectListItem {
 
 基本信息：领用单号、项目*、领用仓库、领用日期*。材料与领用：材料名称*、规格、单位、领用数量*、领用人*、领用班组 lookup、用途。备注区包含备注和领料单。
 
-### 材料采购结算 `matSettleForm`
+### 材料采购结算的模块归属
 
-结算单号、结算名称*、项目*、分供方*、采购合同*、结算日期*、结算期间、结算金额*、扣款说明、状态、备注、对账单。合同金额和累计支付只读带出。该表单写入统一支出结算，不建立材料专属结算副本。
+结算表单、有效到货纳入及整张冲销/替代统一见 [合同与材料结算蓝本](./contract-forms.md) 和 [#409](https://github.com/zodea/crm-new/issues/409)。本页只维护到货来源与跨模块回读，不复制结算字段或另建材料结算副本。
 
 ### 库存盘点 `stockCheckForm`
 
@@ -255,13 +119,13 @@ interface OwnerMaterialDirectListItem {
 
 | 表单 | 字段与规则 |
 |---|---|
-| 总控量 `omTotalForm` | 总控编号、项目*、甲供单位客户*、材料*、规格、单位、总控量*、累计到货、累计领用、剩余可用只读、备注 |
+| 总计划 `omTotalForm` | 维护总计划头及材料行；选择真实 Party 供货方，按计划行查看累计到货、累计领用与剩余可用；字段见数据库权威 |
 | 下料单 `omRequisitionForm` | 下料单编号、项目*、申请人、申请日期*、需用日期、材料*、规格、单位、计划量*、状态、备注、下料计划表 |
 | 到货 `omArrivalForm` | 到货单号、项目*、仓库、到货日期*、收货人、材料*、规格、单位、数量*、质检结论、入库状态、备注、送货单 |
 | 领用 `omUseForm` | 领用单号、项目*、领用日期*、材料*、单位、数量*、领用人*、班组 lookup、用途、备注 |
-| 直入直出 `omDirectForm` | 单据编号、项目*、甲供单位客户、日期*、材料*、单位、数量*、用途、使用部位、备注、签收单 |
+| 直入直出 `omDirectForm` | 单据编号、项目*、Party 供货方、日期*、材料*、单位、数量*、用途、使用部位、备注、签收单 |
 
-累计到货、累计领用和剩余可用均从明细事实派生；表单不得手工覆盖累计值。甲供材不进入乙供材采购合同和材料成本。
+甲供后续单据均校验稳定计划行引用。累计到货、累计领用和剩余可用均从明细事实派生；表单不得手工覆盖累计值。甲供材不进入乙供材采购合同和材料成本。
 
 ## 三、材料单价分析
 
@@ -282,13 +146,13 @@ interface OwnerMaterialDirectListItem {
 
 ## 四、共同规则
 
-- 项目、合同、分供方、客户、班组、下料单均保存真实 ID。
+- 项目、合同、分供方、Party 供货方、班组、仓库、下料单及计划行均保存真实 ID，缺失关系明确显示待配置。
 - 明细网格落子表；附件走 `file_refs`。
 - 单据头和明细由同一个事务保存；删除使用软删除并同步重算派生量。
 - 草稿允许不完整；入库、生效或确认动作校验必填、正数量及上游关系。
 
-## 四、验收
+## 五、验收
 
 1. 10 条整页表单刷新后字段、明细和附件保持。
 2. 到货—下料、领用—库存、甲供三量均可追溯，不用头字段手工补累计。
-3. 材料采购结算可被付款申请作为真实支出结算选择。
+3. 与 #409 联验有效到货的结算纳入、更正回读，再与 #413 联验付款申请来源。

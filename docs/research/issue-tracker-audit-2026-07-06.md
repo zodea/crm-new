@@ -1,5 +1,7 @@
 # Issue 追踪一致性排查（2026-07-06）
 
+> **非权威历史审计。** 下文的开放状态、下一步顺序、并行会话与 handoff 均是 2026-07-06 快照；不得据此关闭 Issue、重做已交付功能或恢复旧执行队列。本轮统一使用 [#402](https://github.com/zodea/crm-new/issues/402) 与其当前子票，旧决定仅按现行 ADR 和领域文档追溯。
+
 > 缘起：用户要求核对最新几个 issue 及评论是否与之前的存在冲突。排查过程中发现的是**三类不同性质的问题**——issue 元数据（标签/开关状态）滞后于实际代码进度、issue 正文内容本身过期、以及**跨文档的优先级顺序冲突**。本文档只记结论与待执行动作，不复制 issue 正文（见 GitHub 原文）。
 >
 > **执行状态：✅ 第六节写操作已于 2026-07-06 当日执行完毕**（用户授权后）：#50 已关、#54 核实时已被并行会话先行关闭（免执行）、#56 已评论收窄、#82 已补标签+Playwright 条目、#78 正文遮罩色已更正。第四节顺序冲突已由用户裁定（见该节内注）。
@@ -73,6 +75,6 @@
 ## 参照
 
 - 本次排查范围：`gh issue view` 核实 #47-84 全部 25+12 片 + 全量 git log 关键词排查（软删除/seed/KitTable/发票数据层/导出导入/Playwright）+ 相关源码文件是否存在。
-- 已有 handoff（仍有效，未被本文件取代）：`handoff-wave1-queue-after-50.md`、`handoff-wave1-queue-after-51.md`。
+- 当时使用的 handoff：`handoff-wave1-queue-after-50.md`、`handoff-wave1-queue-after-51.md`；已完成过程只从 Git 历史追溯，不再作为当前执行入口。
 - 第四节冲突涉及的文档：`docs/research/README.md`。
 - Issue 流程与标签约定：`docs/agents/issue-tracker.md`、`docs/agents/triage-labels.md`。

@@ -16,3 +16,4 @@
 - [`triage-labels.md`](./triage-labels.md)：分诊状态、类别和附加标签。
 - [`domain.md`](./domain.md)：如何消费和维护术语、ADR 与数据模型。
 - [`skills-cheatsheet.md`](./skills-cheatsheet.md)：本仓库稳定的技能路由原则；不再维护易失效的全局技能全集。
+- [`module-review.md`](./module-review.md)：逐模块复核、依据证据直接判断、必要业务访谈、详细规格与实施验收的门槛。

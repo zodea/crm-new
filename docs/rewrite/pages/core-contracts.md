@@ -97,7 +97,7 @@
 | 分包 | 付款信息 | `payment_applications.contract_id` 与已确认 `payment_records` 分摊；付款申请和支付明细分区展示 |
 | 分包 | 支出结算 | `expenditure_settlements.contract_id`，按过程结算/完工结算分区 → `/subcontract/settlement/:id` |
 | 分包 | 项目罚扣 | `penalty_records.contract_id` 及 `penalty_settlement_deductions` → `/subcontract/penalty/:id` |
-| 分包 | 材料领用情况 | 参考页分新仓/历史领用；当前 `material_uses` 没有合同或分供方外键，先保留空页签和字段规格，不按项目/班组猜合同归属 |
+| 分包 | 材料领用情况 | 参考页分新仓/历史领用；旧接线缺合同/分供方外键时返回缺关系；真实来源关系由 #411 继承已定材料身份落实，#409 联验，不按项目/班组猜合同归属 |
 | 材料采购 | 详细资料、采购合同明细、物资管理、收票登记、付款信息、支出结算、项目罚扣 | 各分组复用同一来源 DTO，不复制静态金额；合同分供方可进入同来源合同/结算/收票/付款事实页签，其他尚未消费同一中央来源的行目标保持 `unverified-target` 普通文本 |
 
 施工七组在 URL 中以 `tab=info|supplements|changes|settlements|invoices|receipts|acceptance` 恢复；补充合同使用同一详情的稳定 `focus` 深链，验收/保修再以 `focusView` 区分同 ID 的两个分组。读取请求同时携带 `supplement|change|settlement|acceptance` 聚焦范围，并在验收范围继续校验 `focusView=acceptance|warranty`，使目标不存在、父子错配、跨分区错配和验收/保修跨分组错配保持精确状态；返回时恢复原施工合同列表筛选、分页、滚动、合同焦点以及验收/保修分组。甲方变洽签、月报量、最终结算、甲方罚扣、验收与保修只有在聚合层给出与事实行一致的 canonical owner-document ID 时生成目标；未核验的 demo/旧事实保持普通文本。详情显式编辑进入独立整页表单，保存或生命周期动作后回到同一详情并保留嵌套列表返回上下文。刷新失败时保留上一版成功详情并提示重试；实际竣工日期为 `null` 时显示“未记录”。
@@ -118,7 +118,7 @@
 - 合同清单读取 `boq_files`、`boq_lines`，保留文件、sheet、行号来源追溯键；清单行可沿稳定 `boqLine` 进入现场工程量和排程。
 - 变更读取 `boq_change_orders`、`boq_change_lines`；只有已签证且存在 `ledger_id` 的编号可进入对应甲方变洽签，其他状态显示纯文本。
 - 月度报量读取 `monthly_statements`、`monthly_statement_lines`；同一记录进入 `/owner/report/:id`，草稿调整不推进申报/审定状态。
-- 当前脱敏种子含施工 12、分包 9、材采 10 份合同，但下游样本稀疏：补充协议、BOQ 文件、变更和月报量各只有少量样本。空态用于验证布局，不能伪造更多合作、票款或结算记录。
+- 既有脱敏种子只覆盖部分合同与下游样本；#409 按当前提交和隔离数据补齐非空链路验收。种子数量不是正式数据或当前完成证明，不能伪造更多合作、票款或结算记录。
 - 参考站没有安全直接证据的导入、编辑、生成、导出与附件动作继续由 [`boq-import.md`](./boq-import.md)、ADR 0002 和本地事务测试裁定，不因只读走查改变。
 
 ## 四、后台接口投影
