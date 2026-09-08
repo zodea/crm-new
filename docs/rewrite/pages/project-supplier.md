@@ -61,7 +61,7 @@
 | --- | --- |
 | 分包结算 | `/subcontract/settlement/:id` 为专属只读详情；显式编辑另走表单 |
 | 材料结算 | `/material/settlement/form/:id` 是编辑页，不能当工作台只读来源目标；#409 核实详情接线 |
-| 其他支出结算 | `/contract/other-settlement/form/:id` 是编辑页；#331 原工作项与 #409 核实只读目标，不重复建设 |
+| 其他支出结算 | `/contract/other-settlement/form/:id` 是编辑页；只读目标继承 #331 / [PR #417](https://github.com/zodea/crm-new/pull/417) 的已合并成果，由 #409 按选定基线核验，不以编辑页代替详情或重复建设 |
 
 ### 合作终态结算确认
 
