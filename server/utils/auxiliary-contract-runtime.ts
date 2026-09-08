@@ -2,6 +2,7 @@ import type { AuxiliaryContractDraft } from '../../app/lib/auxiliary-contract/co
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { createAuxiliaryContractTestInstance } from './auxiliary-contract-test-instance'
 import { resolveBusinessSession } from './business-session'
+import { otherSettlementInstance } from './other-settlement-runtime'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
@@ -11,6 +12,7 @@ export function auxiliaryContractInstance(sessionId?: string | null) {
   const key = sessionId || 'default'
   if (!instances.has(key)) {
     instances.set(key, createAuxiliaryContractTestInstance({
+      settlements: contractId => otherSettlementInstance(sessionId).contractFacts(contractId),
       identities: () => ({ projects: projectCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name })), suppliers: supplierCommandTestInstance.rows(sessionId).filter(row => row.dataOrigin === 'real').map(row => ({ id: row.id, name: row.name })) }),
     }))
   }
@@ -28,6 +30,7 @@ export async function resetAuxiliaryContractInstance(sessionId: string, scenario
   instances.delete(sessionId)
   if (scenario === 'ready') {
     const instance = createAuxiliaryContractTestInstance({
+      settlements: contractId => otherSettlementInstance(sessionId).contractFacts(contractId),
       projects: [{ id: 'project-real-320', name: '中央正式施工项目' }],
       suppliers: [{ id: 'supplier-real-327', name: '中央正式劳务分供方' }],
     })

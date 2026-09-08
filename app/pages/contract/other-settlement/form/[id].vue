@@ -1,9 +1,11 @@
 <script setup lang="ts">
-definePageMeta({
-  name: 'otherSettleFormEdit',
-})
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+
+const desktop = isDesktopRuntime()
+definePageMeta({ name: 'otherSettleFormEdit' })
 </script>
 
 <template>
-  <ContractFormPage kind="other_settlement" />
+  <ContractFormPage v-if="desktop" kind="other_settlement" />
+  <OtherSettlementFormPage v-else />
 </template>

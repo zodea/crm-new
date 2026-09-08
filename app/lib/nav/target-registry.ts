@@ -289,6 +289,11 @@ function hasCrewWorkerFactContext(intent: EntityTargetIntent): boolean {
 }
 
 const TARGET_REGISTRY = {
+  'settlement:other_settlement': (intent: EntityTargetIntent) => {
+    if (intent.filters.dataOrigin !== 'real')
+      throw new Error('invalid settlement origin')
+    return `${entityPath('/contract/other-settlement', intent)}?origin=real`
+  },
   'project:detail': projectPath,
   'project:supplier-workbench': projectSupplierPath,
   'customer:detail': customerPath,
@@ -466,8 +471,8 @@ export function resolveNavigationTarget(
       else if (ownerReturnTo)
         to = `${to}&returnTo=${encodeURIComponent(ownerReturnTo)}`
     }
-    if (options.returnTo && (key === 'contract:other_expense' || key === 'contract:company_expense' || key === 'project:detail' || key === 'supplier:detail')) {
-      const validated = key.startsWith('contract:') ? validateAuxiliaryReturnTo(options.returnTo, intent.filters.dataOrigin) : validateAuxiliaryDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
+    if (options.returnTo && (key === 'settlement:other_settlement' || key === 'contract:other_expense' || key === 'contract:company_expense' || key === 'project:detail' || key === 'supplier:detail')) {
+      const validated = key.startsWith('contract:') || key === 'settlement:other_settlement' ? validateAuxiliaryReturnTo(options.returnTo, intent.filters.dataOrigin) : validateAuxiliaryDetailReturnTo(options.returnTo, intent.filters.dataOrigin)
       if (validated && !to.includes('returnTo='))
         to += `${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(validated)}`
     }

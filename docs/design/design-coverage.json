@@ -6,11 +6,11 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 141,
+    "trackedPageFiles": 142,
     "devPageFiles": 5,
-    "appPageFiles": 136,
+    "appPageFiles": 137,
     "appNavLeaves": 51,
-    "covered": 134,
+    "covered": 135,
     "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
@@ -178,6 +178,11 @@
     {
       "appRoute": "/contract/other-settlement",
       "designRoute": "otherSettle",
+      "status": "covered"
+    },
+    {
+      "appRoute": "/contract/other-settlement/:id",
+      "designRoute": "contractDetail",
       "status": "covered"
     },
     {

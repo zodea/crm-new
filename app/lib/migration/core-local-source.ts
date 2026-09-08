@@ -36,6 +36,7 @@ import {
   coreMigrationSourceHashInput,
   isCoreMigrationMoney,
 } from './core-contract'
+import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -171,6 +172,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
     ORDER BY c.id
   `,
   auxiliary_contracts: AUXILIARY_CONTRACT_SOURCE_SQL,
+  other_settlements: OTHER_SETTLEMENT_SOURCE_SQL,
   subcontract_contracts: `
     SELECT
       c.id, c.no, c.name, c.sub_kind, c.project_id, c.supplier_id,
@@ -1155,7 +1157,7 @@ async function buildSource(
     if (entityType === 'auxiliary_contracts')
       rows.push(...await selectSource<Record<string, unknown>>(COMPANY_CONTRACT_SOURCE_SQL))
     const entities = rows
-      .map(row => entityType === 'auxiliary_contracts' ? auxiliaryContractSourceEntity(row) : sourceEntity(entityType, row))
+      .map(row => entityType === 'other_settlements' ? otherSettlementSourceEntity(row) : entityType === 'auxiliary_contracts' ? auxiliaryContractSourceEntity(row) : sourceEntity(entityType, row))
       .sort((left, right) => compareCanonicalText(left.legacyId, right.legacyId))
     const invalid = entities.find(entity => !entity.legacyId || !entity.name)
     if (invalid) {

@@ -20,7 +20,7 @@ export interface AuxiliaryStoredContract {
   clearanceStatus: string | null
 }
 interface Option { id: string, name: string }
-interface Options { createId?: () => string, now?: () => string, projects?: Option[], suppliers?: Option[], facts?: AuxiliaryContractFact[], identities?: () => { projects: Option[], suppliers: Option[] } }
+interface Options { createId?: () => string, now?: () => string, projects?: Option[], suppliers?: Option[], facts?: AuxiliaryContractFact[], identities?: () => { projects: Option[], suppliers: Option[] }, settlements?: (contractId: string) => AuxiliaryContractFact[] }
 
 export function createAuxiliaryContractTestInstance(options: Options = {}) {
   let records = new Map<string, AuxiliaryStoredContract>()
@@ -47,7 +47,8 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
     return stored
   }
   function relatedFacts(stored: AuxiliaryStoredContract) {
-    return [...facts, ...stored.facts].filter(row => row.contractId === stored.draft.id && row.contractKind === stored.draft.kind && row.dataOrigin === 'real')
+    const related = [...facts, ...stored.facts].filter(row => row.contractId === stored.draft.id && row.contractKind === stored.draft.kind && row.dataOrigin === 'real')
+    return options.settlements && stored.draft.kind === 'other_expense' ? [...related.filter(row => row.kind !== 'settlement'), ...options.settlements(stored.draft.id)] : related
   }
   function dto(stored: AuxiliaryStoredContract): AuxiliaryContractDTO {
     const d = stored.draft
@@ -81,6 +82,10 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
     }
   }
   return {
+    otherSettlementContext(session: BusinessSession) {
+      authorize(session, 'read')
+      return { projects: [...projects].map(([id, label]) => ({ id, label })), suppliers: [...suppliers].map(([id, label]) => ({ id, label })), contracts: [...records.values()].filter(row => row.workspaceId === session.workspaceId).map(row => ({ id: row.draft.id, kind: row.draft.kind, name: row.draft.name || '未命名合同', projectId: row.draft.projectId ?? null, supplierId: row.draft.supplierId ?? null, status: row.draft.status || '草稿', amount: row.draft.amount?.toFixed(2) ?? null, changedAmount: sumAuxiliaryMoney([row.draft.amount?.toFixed(2) ?? null, sumAuxiliaryFacts(relatedFacts(row), 'supplement')]) })) }
+    },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
       const batchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
       const entities = batchId ? snapshot.entities.filter(row => !row.deletedAt) : []

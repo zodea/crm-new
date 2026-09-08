@@ -29,11 +29,11 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 141 |
+| 实现页面文件（含 dev） | 142 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 136 |
+| 实现生产路由（排除 dev） | 137 |
 | 实现侧栏叶子 | 51 |
-| 已覆盖 | 134 |
+| 已覆盖 | 135 |
 | 待补设计（实现有、设计稿没有） | 2 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
@@ -70,7 +70,7 @@
 | 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 辅助合同与结算 | 14 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 辅助合同与结算 | 15 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#331](https://github.com/zodea/crm-new/issues/331)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分包单据 | 8 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -122,4 +122,4 @@
 
 项目罚扣已由 [#329](https://github.com/zodea/crm-new/issues/329) 闭合中央新建/提交、专属只读详情、整改历史与部分抵扣执行；来源合同、分供方、班组、项目及真实结算稳定 ID 往返，余额与审计同源。未实现的审批、签认金额和甲方结算转扣不以假动作/假数据补齐。详情与显式表单分路由；[页面权威](../rewrite/pages/owner-documents.md#issue-329-项目罚扣中央执行链)。
 
-辅助合同中的其他支出与公司支出合同由 [#330](https://github.com/zodea/crm-new/issues/330) 闭合中央只读详情、显式编辑、真实来源往返和专属金额/附件/审计；[页面蓝本](../rewrite/pages/contract-forms.md#ax04-当前浏览器实现330) 与 [运行证据](./evidence/issue-330/README.md) 为准。其他支出结算、材料采购结算与父规格其余工作不据此标记完成；可重置中央测试实例和文件正文缺口仍保留。
+辅助合同中的其他支出与公司支出合同由 [#330](https://github.com/zodea/crm-new/issues/330) 闭合中央只读详情、显式编辑、真实来源往返和专属金额/附件/审计；[页面蓝本](../rewrite/pages/contract-forms.md#ax04-当前浏览器实现330) 与 [运行证据](./evidence/issue-330/README.md) 为准。其他支出结算由 [#331](https://github.com/zodea/crm-new/issues/331) 接入专属中央详情与完整往返，见 [AX05 证据](./evidence/issue-331/README.md)。材料采购结算与父规格其余工作不据此标记完成；可重置中央测试实例和文件正文缺口仍保留。

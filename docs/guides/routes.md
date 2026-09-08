@@ -18,3 +18,9 @@
 | 项目罚扣只读详情、整改与抵扣历史 | `/project/penalty/:id` | 当前已可用，来源返回及部分抵扣 |
 | 项目罚扣新增 | `/project/penalty/new` | 当前已可用，保存草稿或提交 |
 | 项目罚扣显式编辑 | `/project/penalty/form/:id` | 当前已可用，仅正式草稿 |
+
+| 其他支出结算功能 | 路由 | 当前行为 |
+| --- | --- | --- |
+| 专属结算列表 | `/contract/other-settlement` | 中央查询、真实合同来源与分页；[操作指南](./other-expense-settlement.md) |
+| 只读结算详情 | `/contract/other-settlement/:id` | 金额链、真实关联事实、附件与审计；页签及事实由 query 保留 |
+| 新建 / 显式编辑 | `/contract/other-settlement/form`、`/contract/other-settlement/form/:id` | 同项目非草稿源合同，整页保存、提交与确认 |

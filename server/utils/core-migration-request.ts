@@ -252,7 +252,7 @@ export function parseCoreMigrationSourceCommand(value: unknown): CoreMigrationSo
     invalid('source.entities 必须是对象')
   assertOnlyKeys(entityGroups, ENTITY_KEYS, 'source.entities')
 
-  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => entityType !== 'auxiliary_contracts' || entityGroups[entityType] !== undefined).map((entityType) => {
+  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
     const rows = entityGroups[entityType]
     if (!Array.isArray(rows))
       invalid(`source.entities.${entityType}必须是数组`)

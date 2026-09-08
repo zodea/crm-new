@@ -2221,3 +2221,15 @@ CREATE TABLE reconciliation_issues (
 - 受控迁移确认前不接管，准备阶段校验全部候选，任何无效附件或事实使整次准备失败；确认后同源回读，回滚撤销该批接管和相关命令重放缓存。普通正式新建不因迁移回滚被误删。
 
 本切片不创建合同分项、项目其他收入合同或虚拟项目。端到端验证与部署边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax04-辅助合同接管)。
+
+### AX05 其他支出结算中央事实
+
+物理来源仍为 `expenditure_settlements` 的其他支出种类，不新建结算主表或明细表。SQLite v47 仅补充可空 `created_by / updated_by / responsible / department`，旧审计不反推。浏览器通过 `other-settlements` Repository/HTTP/command 接入，中央测试实例不声明生产持久化能力。
+
+- 受控迁移新增 `other_settlements` 节点，位于 `auxiliary_contracts` 后；合同旧 ID 用 `other_expense:` 命名空间映射。试跑重验合同类型、非草稿状态及项目、分供方一致性，错误关系阻断导入。
+- 结算头只保存资料、含税金额、税率和状态；金额链实时投影，有效抵扣来自 `penalty_settlement_deductions`，申请来自 `payment_application_settlement_allocations`，支付来自 `payment_record_application_allocations` 及已确认 `payment_records`。明确旧外键与来源 ID 随关系保留，不按名称或金额猜接。
+- 本次金额为含税金额减有效抵扣；可申请为本次金额减有效申请；未付为本次金额减已确认且精确归属的支付。草稿、无效、已删除事实不计入。涉及多结算但无结算级支付分摊时已付/未付为 null，不按比例分配。无有效记录的真实空集合为零；未知集合、未知金额或身份失效保持 null。无税额复用整数分及税率基点舍入。
+- 同一合同的累计结算仅纳入已确认、同项目同分供方结算。前期金额仅纳入早于本单结算日期的记录；日期缺失或同日先后不明时保持未知。合同详情不再持有独立结算快照，而由同一结算源投影。中央身份被移除时关联不继续显示可用。
+- 附件仍归 `file_refs(owner_type='expenditure_settlement')`；中央只保存元数据，不公开本地路径。保存使用服务端 ID、版本与 commandId，重试幂等，旧版本拒绝覆盖；确认后锁定。未知事实或已有下游事实的结算禁止改挂关系，历史空审计在编辑后仍为空。
+
+专属页面与当前源单下钻边界见[页面蓝本](./pages/contract-forms.md#ax05-当前浏览器实现331)，环境边界见 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md#ax05-其他支出结算接管)。材料到货分摊、冲销和虚构结算明细均未引入。
