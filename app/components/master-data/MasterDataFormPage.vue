@@ -711,7 +711,7 @@ watch(routeSupplierCategory, () => {
 <template>
   <EntityFormShell
     :title="title"
-    subtitle="草稿可暂存不完整内容；提交时校验必填、关联和金额规则。"
+    :subtitle="kind === 'supplier' ? undefined : '草稿可暂存不完整内容；提交时校验必填、关联和金额规则。'"
     :back-label="backLabel"
     :sections="shellSections"
     :state="shellState"
@@ -800,15 +800,8 @@ watch(routeSupplierCategory, () => {
         data-ui="supplier-credential-guidance"
         class="panel scroll-mt-4 p-4"
       >
-        <SectionHeader
-          title="证照资料"
-          subtitle="证照原件、OCR 核对、有效期和人工审核统一在分供方详情维护。"
-        />
-        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 border border-brand/20 bg-brand-soft/35 p-3 text-12px text-ink-soft">
-          <span class="i-lucide-shield-check shrink-0 text-18px text-brand" aria-hidden="true" />
-          <p class="min-w-52 flex-1 leading-5">
-            此处只保存主数据，不会把普通附件伪装成证照。保存后进入“证照附件”，按真实文件、资料要求和人工核验规则完成准入。
-          </p>
+        <SectionHeader title="证照资料" />
+        <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3 text-12px text-ink-soft">
           <NuxtLink
             v-if="isEditing && routeId"
             :to="supplierCredentialPath(routeId)"
@@ -816,6 +809,7 @@ watch(routeSupplierCategory, () => {
           >
             前往证照附件
           </NuxtLink>
+          <span v-else>保存分供方后可维护证照资料。</span>
         </div>
       </section>
 

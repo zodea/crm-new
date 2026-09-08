@@ -2,6 +2,7 @@
 import type { SupplierFormDraft } from '~/lib/master-data/forms'
 import { useClipboard } from '@vueuse/core'
 import { computed, useId } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { openExternalUrl } from '~/lib/platform/external-url'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
@@ -225,7 +226,26 @@ function copyRegisteredAddress() {
         <input v-model="draft.registeredDate" type="date" class="field-input w-full">
       </label>
       <div class="field-block">
-        <label :for="taxpayerTypeInputId" class="field-label">纳税人类型</label>
+        <div class="flex items-center gap-1">
+          <label :for="taxpayerTypeInputId" class="field-label mb-0">纳税人类型</label>
+          <ContextHelp label="纳税人类型" text="官网未查到不等于小规模纳税人；请依据官网查询或其他官方资料记录核验结果。">
+            <p class="m-0">
+              官网未查到不等于小规模纳税人；请依据官网查询或其他官方资料记录核验结果。
+            </p>
+            <dl v-if="draft.taxpayerVerifiedAt || draft.taxpayerVerificationNote" class="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              <dt>核验时间</dt>
+              <dd class="m-0">
+                {{ formatVerificationTime(draft.taxpayerVerifiedAt) }}
+              </dd>
+              <template v-if="draft.taxpayerVerificationNote">
+                <dt>备注</dt>
+                <dd class="m-0 whitespace-pre-wrap break-words">
+                  {{ draft.taxpayerVerificationNote }}
+                </dd>
+              </template>
+            </dl>
+          </ContextHelp>
+        </div>
         <select :id="taxpayerTypeInputId" v-model="draft.taxpayerType" class="field-input w-full">
           <option value="未核验">
             未核验
@@ -237,17 +257,14 @@ function copyRegisteredAddress() {
             小规模纳税人
           </option>
         </select>
-        <span class="field-hint">默认未核验；官网未查到不等于小规模纳税人。</span>
         <div
-          class="mt-2 grid gap-1 border border-line bg-surface-2 p-2 text-11px text-ink-soft"
+          class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-11px text-ink-soft"
           role="status"
           aria-label="纳税人核验留痕"
         >
           <strong class="text-ink">{{ taxpayerVerificationLabel }}</strong>
-          <span>来源：{{ taxpayerVerificationSourceLabel }}</span>
-          <span>核验时间：{{ formatVerificationTime(draft.taxpayerVerifiedAt) }}</span>
-          <span v-if="draft.taxpayerVerificationNote">
-            备注：{{ draft.taxpayerVerificationNote }}
+          <span v-if="draft.taxpayerVerificationSource" class="rounded-[var(--radius-sm)] bg-surface-2 px-1.5 py-0.5">
+            来源：{{ taxpayerVerificationSourceLabel }}
           </span>
         </div>
         <span class="mt-1 flex flex-wrap gap-2">
@@ -270,6 +287,10 @@ function copyRegisteredAddress() {
       <label class="field-block form-span-full">
         <span class="field-label">主营业务</span>
         <textarea v-model="draft.mainBusiness" rows="3" class="field-input w-full" />
+      </label>
+      <label class="field-block form-span-full">
+        <span class="field-label">劳务承包范围</span>
+        <textarea v-model="draft.laborScope" rows="3" class="field-input w-full" data-field="laborScope" />
       </label>
     </div>
   </section>

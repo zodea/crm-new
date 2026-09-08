@@ -18,6 +18,7 @@ const sections = computed<Array<{ title: string, fields: ReadOnlyField[] }>>(() 
       { label: '注册日期', value: props.supplier.registeredDate },
       { label: '统一社会信用代码', value: props.supplier.taxNo },
       { label: '主营业务', value: props.supplier.mainBusiness },
+      { label: '劳务承包范围', value: props.supplier.laborScope },
       { label: '注册地址', value: props.supplier.address, wide: true },
       { label: '备注', value: props.supplier.note, wide: true },
     ],

@@ -2,6 +2,7 @@
 import type { SupplierFactTab } from './SupplierFactTable.vue'
 import type { DataOriginDTO, MetricDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, useTemplateRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateMaterialContractDetailJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
@@ -15,6 +16,7 @@ import {
   validateSupplierDetailReturnTo,
   validateSupplierReturnTo,
 } from '~/lib/supplier/return-context'
+import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE } from '~/lib/supplier/status'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
 import { yuan } from '~/lib/util/money'
 import { useSupplierReadStore } from '~/stores/supplier-read'
@@ -45,6 +47,11 @@ const detail = computed(() => {
   return null
 })
 const supplier = computed(() => detail.value?.supplier ?? null)
+const credentialLabel = computed(() => {
+  const status = supplier.value?.credentialStatus
+  return status ? CREDENTIAL_STATUS_LABEL[status] ?? '未知状态' : '未记录'
+})
+const credentialTone = computed(() => CREDENTIAL_STATUS_TONE[supplier.value?.credentialStatus ?? ''] ?? 'neutral')
 const materialContractReturnTo = computed(() => validateMaterialContractDetailJourneyReturnTo(props.returnTo, props.origin))
 const subcontractChangeReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_change'))
 const subcontractSettlementReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin, 'sub_settlement'))
@@ -145,9 +152,9 @@ const overviewMetadata = computed(() => supplier.value
   : [])
 const recordFields = computed(() => supplier.value
   ? [
-      { label: '内部编码', value: supplier.value.uniqueCode },
-      { label: '业务类型', value: supplier.value.businessType },
-      { label: '资料状态', value: supplier.value.credentialStatus === 'complete' ? '资料完整' : '资料待完善' },
+      { label: '唯一识别码', value: supplier.value.uniqueCode },
+      { label: '经营类型', value: supplier.value.businessType },
+      { label: '资料状态', value: credentialLabel.value },
       { label: '更新时间', value: formatShanghaiDateTime(supplier.value.updatedAt) },
     ]
   : [])
@@ -282,8 +289,12 @@ onActivated(() => void load())
       </div>
     </template>
     <template #status>
-      <span v-if="supplier" :class="supplier.credentialStatus === 'complete' ? 'chip chip-ok' : 'chip chip-warn'">{{ supplier.credentialStatus === 'complete' ? '资料完整' : '资料待完善' }}</span>
-      <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
+      <KitStatusTag v-if="supplier" :tone="credentialTone">
+        {{ credentialLabel }}
+      </KitStatusTag>
+      <KitStatusTag v-if="detail?.dataOrigin === 'demo'" tone="neutral">
+        测试数据
+      </KitStatusTag>
     </template>
     <template #actions>
       <NuxtLink

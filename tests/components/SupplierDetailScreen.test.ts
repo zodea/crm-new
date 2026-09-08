@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
 import SupplierDetailScreen from '~/components/supplier/SupplierDetailScreen.vue'
+import ReadOnlySection from '~/components/ui/ReadOnlySection.vue'
 
 const supplierStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
@@ -47,7 +48,7 @@ const detail = {
 
 const shell = defineComponent({
   props: ['title', 'backTo', 'backLabel'],
-  template: '<main><a :href="backTo">{{ backLabel }}</a><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><slot name="actions"/><slot name="summary"/><slot name="navigation"/><slot/><slot name="aside"/></main>',
+  template: '<main><a :href="backTo">{{ backLabel }}</a><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><div data-testid="detail-status"><slot name="status"/></div><slot name="actions"/><slot name="summary"/><slot name="navigation"/><slot/><slot name="aside"/></main>',
 })
 const tabs = defineComponent({
   props: ['modelValue', 'tabs'],
@@ -66,6 +67,35 @@ describe('分供方中央详情', () => {
     routerReplace.mockReset()
     supplierStoreMock.detailState = { kind: 'ready', data: detail }
     supplierStoreMock.loadDetail.mockClear()
+  })
+
+  it.each([
+    ['incomplete', '资料缺失', 'warn'],
+    ['reviewing', '齐全待核验', 'brand'],
+    ['qualified', '合格', 'ok'],
+    ['rejected', '退回', 'danger'],
+    ['unrecognized', '未知状态', 'neutral'],
+  ])('资料状态 %s 在标题和档案中保持同一业务含义', (credentialStatus, label, tone) => {
+    supplierStoreMock.detailState = {
+      kind: 'ready',
+      data: { ...detail, supplier: { ...detail.supplier, credentialStatus } },
+    }
+    render(SupplierDetailScreen, {
+      props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        ReadOnlySection,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+
+    const status = within(screen.getByTestId('detail-status')).getByText(label)
+    expect(status.getAttribute('data-tone')).toBe(tone)
+    expect(within(screen.getByRole('region', { name: '档案信息' })).getByText(label)).not.toBeNull()
+    expect(screen.queryByText('资料待完善')).toBeNull()
   })
 
   it('零金额仍可进入四类真实事实页签，应付金额保持不可点击', async () => {
@@ -118,6 +148,36 @@ describe('分供方中央详情', () => {
     expect(screen.getByTestId('fact-tab').textContent).toBe('settlements')
     expect(screen.queryByText('主档')).toBeNull()
     expect(screen.getByRole('button', { name: '查看累计付款金额明细' })).not.toBeNull()
+  })
+
+  it('缺金额的合同和结算显示未知占位，仍可进入源记录核对', () => {
+    supplierStoreMock.detailState = {
+      kind: 'partial',
+      data: {
+        ...detail,
+        summary: {
+          ...detail.summary,
+          contractAmount: { ...metric('0.00', 'contract'), value: null, status: 'partial', missingSources: ['contract'] },
+          settlementAmount: { ...metric('0.00', 'settlement'), value: null, status: 'partial', missingSources: ['settlement'] },
+          payableAmount: { ...metric('0.00', 'payment-record', false), value: null, status: 'partial', missingSources: ['contract'] },
+        },
+      },
+    }
+    render(SupplierDetailScreen, {
+      props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+        NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
+      } },
+    })
+    expect(screen.getByRole('button', { name: '查看累计合同金额明细' }).textContent).toBe('—')
+    expect(screen.getByRole('button', { name: '查看累计结算金额明细' }).textContent).toBe('—')
+    const payable = within(screen.getByTestId('supplier-summary')).getByText('应付金额').parentElement!
+    expect(payable.textContent).toContain('—')
+    expect(payable.textContent).not.toContain('¥0.00')
   })
 
   it('从 query 恢复付款页签，刷新失败保留记录并可返回详细资料', async () => {

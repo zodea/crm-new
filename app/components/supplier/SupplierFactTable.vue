@@ -7,6 +7,7 @@ import type {
   SupplierProjectDTO,
   SupplierSettlementDTO,
 } from '~/lib/supplier/repository'
+import { AUXILIARY_LABELS } from '~/lib/auxiliary-contract/contract'
 
 export type SupplierFactTab = 'projects' | 'contracts' | 'settlements' | 'invoices' | 'payments'
 
@@ -28,7 +29,7 @@ const contractColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
   { field: 'contract', title: '合同', minWidth: 220, fixed: 'left', slot: 'contract' },
   { field: 'project', title: '项目', minWidth: 170, slot: 'project' },
-  { field: 'kind', title: '类别', width: 90 },
+  { field: 'kind', title: '类别', width: 90, slot: 'contractKind' },
   { field: 'effectiveAmount', title: '有效合同额', type: 'money', width: 145 },
   { field: 'signDate', title: '签订日期', type: 'date' },
   { field: 'status', title: '状态', width: 100 },
@@ -74,6 +75,9 @@ const paymentColumns: KitTableColumn[] = [
       </template>
     </KitTable>
     <KitTable v-else-if="tab === 'contracts'" :columns="contractColumns" :data="[...contracts]" :min-rows="5" :empty="{ title: '暂无合同事实', description: '当前分供方尚无通过 supplier_id 关联的合同。' }">
+      <template #contractKind="{ row }">
+        {{ AUXILIARY_LABELS[row.kind as keyof typeof AUXILIARY_LABELS] ?? row.kind ?? '—' }}
+      </template>
       <template #contract="{ row }">
         <SupplierRelationLink :reference="row.contract" :navigation="row.navigation" />
       </template>
