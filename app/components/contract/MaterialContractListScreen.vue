@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { MaterialContractListPageDTO } from '~/lib/material-contract/repository'
-import type { ReadState } from '~/types/read-model'
+import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
-import { CONTRACT_STATUSES } from '~/lib/contract/status'
+import { CONTRACT_STATUS_TONE, CONTRACT_STATUSES } from '~/lib/contract/status'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
 import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
@@ -60,28 +61,55 @@ const query = computed(() => parsedQuery.value.query ?? parseMaterialContractLis
   includeDemo: String(visibilityStore.includeDemo),
 }))
 const queryProblem = computed(() => parsedQuery.value.problem)
-const search = ref(query.value.search)
+const search = shallowRef(query.value.search)
 const statusOptions = CONTRACT_STATUSES.map(value => ({ key: value, label: value }))
 const selectedStatuses = computed(() => contractListFilterValues(query.value.status))
-const rowNavigationPending = ref(false)
-const returnContextId = ref(isMaterialContractReturnContextId(route.query.nav)
+const rowNavigationPending = shallowRef(false)
+const returnContextId = shallowRef(isMaterialContractReturnContextId(route.query.nav)
   ? route.query.nav
   : newMaterialContractReturnContextId())
 let restoredRoute = ''
 const projectReturnTo = computed(() => validateProjectJourneyReturnTo(route.query.returnTo, query.value.origin))
 const canCreate = computed(() => page.value?.capabilities.includes('material-contract:write') ?? false)
 const columns: KitTableColumn[] = [
-  { title: '#', type: 'seq', fixed: 'left' },
-  { field: 'no', title: '合同编号', width: 150, fixed: 'left' },
-  { field: 'name', title: '合同名称', minWidth: 190, fixed: 'left', slot: 'name' },
+  { title: '#', type: 'seq', width: 48, fixed: 'left' },
+  { field: 'name', title: '合同名称', width: 210, fixed: 'left', slot: 'name' },
+  { field: 'no', title: '合同编号', width: 150 },
+  { field: 'project', title: '项目名称', width: 180, slot: 'project' },
+  { field: 'supplier', title: '乙方', width: 180, slot: 'supplier' },
+  { field: 'contract', title: '含税合同金额', width: 140, type: 'money', slot: 'contract' },
+  { field: 'changed', title: '变更后合同金额', width: 150, type: 'money', slot: 'changed' },
+  { field: 'settled', title: '累计结算金额', width: 140, type: 'money', slot: 'settled' },
+  { field: 'invoiced', title: '累计收票金额', width: 140, type: 'money', slot: 'invoiced' },
+  { field: 'paid', title: '累计支付金额', width: 140, type: 'money', slot: 'paid' },
+  { field: 'payable', title: '按结算应付金额', width: 150, type: 'money', slot: 'payable' },
+  { field: 'invoicePayable', title: '按收票应付金额', width: 150, type: 'money', slot: 'invoicePayable' },
+  { field: 'signDate', title: '签约日期', width: 120, slot: 'signDate' },
+  { field: 'status', title: '合同状态', width: 110, customHeader: true, slot: 'status' },
   { field: 'dataOrigin', title: '来源', width: 80, slot: 'origin' },
-  { field: 'project', title: '项目', minWidth: 160, slot: 'project' },
-  { field: 'supplier', title: '分供方', minWidth: 170, slot: 'supplier' },
-  { field: 'changed', title: '变更后金额', width: 130, type: 'money', slot: 'changed' },
-  { field: 'invoiced', title: '累计收票', width: 120, type: 'money', slot: 'invoiced' },
-  { field: 'paid', title: '累计支付', width: 120, type: 'money', slot: 'paid' },
-  { field: 'status', title: '状态', width: 110, customHeader: true },
 ]
+const summaries = computed(() => {
+  if (!page.value)
+    return []
+  return (['real', 'demo'] as const)
+    .filter(origin => (!query.value.origin || query.value.origin === origin) && (origin !== 'demo' || visibilityStore.includeDemo))
+    .map(origin => ({ origin, label: origin === 'real' ? '正式' : '演示', ...page.value!.summary.origins[origin] }))
+})
+
+function relationshipTarget(intent: NavigationIntentDTO) {
+  const target = resolveNavigationTarget(intent)
+  return target.state === 'resolved' ? target.to : null
+}
+
+function unavailableLabel(label: string, intent: NavigationIntentDTO) {
+  const target = resolveNavigationTarget(intent)
+  return target.state === 'resolved' ? label : `${label}（${target.message}）`
+}
+
+function statusTone(status: string) {
+  const tone = CONTRACT_STATUS_TONE[status]
+  return tone === 'muted' || !tone ? 'neutral' : tone
+}
 
 function patchQuery(patch: Record<string, string | string[] | number | null | undefined>) {
   const next = { ...route.query }
@@ -222,6 +250,15 @@ useTabTitle('材料采购合同')
       </section>
     </template>
 
+    <template v-if="page && !queryProblem" #summary>
+      <div v-for="summary in summaries" :key="summary.origin" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 tabular-nums" :aria-label="`${summary.label}数据汇总`">
+        <strong class="font-600 text-ink">{{ summary.label }} · {{ summary.contractCount }} 份</strong>
+        <span>变更后合同金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.changedAmount)) }}</strong></span>
+        <span>累计收票金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.invoicedAmount)) }}</strong></span>
+        <span>累计支付金额 <strong class="font-600 text-ink">{{ yuan(Number(summary.paidAmount)) }}</strong></span>
+      </div>
+    </template>
+
     <template #table>
       <StatePanel v-if="queryProblem" kind="error" title="材料采购合同查询条件无效" :description="queryProblem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
       <div v-else-if="page" class="relative min-w-0" :aria-busy="state.kind === 'loading'">
@@ -254,20 +291,30 @@ useTabTitle('材料采购合同')
                 v-if="link(row)"
                 :id="`material-contract-row-${row.rowKey}`"
                 :to="link(row)!"
+                :title="row.name"
                 class="font-700 text-brand hover:underline"
                 @click="captureReturnOrigin(row)"
               >
                 {{ row.name }}
-              </NuxtLink><span v-else>{{ row.name }}</span>
+              </NuxtLink><span v-else>{{ unavailableLabel(row.name, row.navigation) }}</span>
             </template>
             <template #origin="{ row }">
               <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
             </template>
             <template #project="{ row }">
-              {{ materialContractReferenceLabel(row.project) }}
+              <NuxtLink v-if="relationshipTarget(row.projectNavigation)" :to="relationshipTarget(row.projectNavigation)!" class="text-brand hover:underline">
+                {{ materialContractReferenceLabel(row.project) }}
+              </NuxtLink>
+              <span v-else>{{ row.project.state === 'resolved' ? unavailableLabel(row.project.label, row.projectNavigation) : materialContractReferenceLabel(row.project) }}</span>
             </template>
             <template #supplier="{ row }">
-              {{ materialContractReferenceLabel(row.supplier) }}
+              <NuxtLink v-if="relationshipTarget(row.supplierNavigation)" :to="relationshipTarget(row.supplierNavigation)!" class="text-brand hover:underline">
+                {{ materialContractReferenceLabel(row.supplier) }}
+              </NuxtLink>
+              <span v-else>{{ row.supplier.state === 'resolved' ? unavailableLabel(row.supplier.label, row.supplierNavigation) : materialContractReferenceLabel(row.supplier) }}</span>
+            </template>
+            <template #contract="{ row }">
+              {{ yuan(Number(row.amounts.contract)) }}
             </template>
             <template #changed="{ row }">
               {{ yuan(Number(row.amounts.changed)) }}
@@ -277,6 +324,23 @@ useTabTitle('材料采购合同')
             </template>
             <template #paid="{ row }">
               {{ yuan(Number(row.amounts.paid)) }}
+            </template>
+            <template #settled="{ row }">
+              {{ yuan(Number(row.amounts.settled)) }}
+            </template>
+            <template #payable="{ row }">
+              {{ yuan(Number(row.amounts.payable)) }}
+            </template>
+            <template #invoicePayable="{ row }">
+              {{ yuan(Number(row.amounts.invoiced) - Number(row.amounts.paid)) }}
+            </template>
+            <template #signDate="{ row }">
+              {{ row.signDate || '未记录' }}
+            </template>
+            <template #status="{ row }">
+              <KitStatusTag :tone="statusTone(row.status)">
+                {{ row.status }}
+              </KitStatusTag>
             </template>
           </KitTable>
         </section>

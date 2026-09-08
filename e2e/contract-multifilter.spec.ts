@@ -60,7 +60,7 @@ for (const domain of ['material', 'construction', 'subcontract'] as const) {
       await expect(list.getByRole('button', { name: '筛选分包类别，已选 2 项' })).toBeVisible()
     }
 
-    const headerLabel = domain === 'subcontract' ? '分包类别' : '状态'
+    const headerLabel = domain === 'subcontract' ? '分包类别' : domain === 'material' ? '合同状态' : '状态'
     const header = list.getByRole('button', { name: `筛选${headerLabel}`, exact: true })
     await header.click()
     const headerDialog = page.getByRole('dialog').filter({ has: page.getByRole('group', { name: `${headerLabel}筛选值`, exact: true }) })
