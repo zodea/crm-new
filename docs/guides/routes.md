@@ -22,5 +22,5 @@
 | 其他支出结算功能 | 路由 | 当前行为 |
 | --- | --- | --- |
 | 专属结算列表 | `/contract/other-settlement` | 中央查询、真实合同来源与分页；[操作指南](./other-expense-settlement.md) |
-| 只读结算详情 | `/contract/other-settlement/:id` | 金额链、真实关联事实、附件与审计；页签及事实由 query 保留 |
+| 只读结算详情 | `/contract/other-settlement/:id` | 金额链、中央罚扣/申请/支付源单、附件与审计；query 保留页签、所选源单及多级返回链 |
 | 新建 / 显式编辑 | `/contract/other-settlement/form`、`/contract/other-settlement/form/:id` | 同项目非草稿源合同，整页保存、提交与确认 |

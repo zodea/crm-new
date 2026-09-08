@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql.includes('FROM payment_applications p WHERE p.id IN') || sql.includes('FROM payment_records p WHERE EXISTS'))
+    return []
   if (sql.includes('FROM expenditure_settlements s WHERE s.biz_type'))
     return []
   if (sql.includes('\'other_expense\' auxiliary_kind') || sql.includes('\'company_expense\' auxiliary_kind'))
@@ -919,6 +921,7 @@ describe('core migration local source', () => {
       'subcontract_contracts',
       'auxiliary_contracts',
       'other_settlements',
+      'other_settlement_sources',
       'contract_supplements',
       'receipt_registrations',
       'owner_documents',

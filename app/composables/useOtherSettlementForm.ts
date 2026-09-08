@@ -20,9 +20,10 @@ export function useOtherSettlementForm() {
   const saveError = shallowRef('')
   const errors = shallowRef<Record<string, string>>({})
   const saved = shallowRef('')
+  const hydrated = shallowRef(false)
   const loadingAction = shallowRef<FormFooterAction | null>(null)
   const closeAfterSave = shallowRef(true)
-  const dirty = computed(() => !loading.value && (saved.value !== JSON.stringify(draft.value) || files.dirty.value))
+  const dirty = computed(() => hydrated.value && !loading.value && (saved.value !== JSON.stringify(draft.value) || files.dirty.value))
   const title = computed(() => `${id.value ? '编辑' : '新建'} · 其他支出结算`)
   const backTo = computed(() => validateAuxiliaryReturnTo(route.query.returnTo) ?? (id.value ? `${OTHER_SETTLEMENT_PATH}/${id.value}?origin=real` : OTHER_SETTLEMENT_PATH))
   const selectedContract = computed(() => context.value?.contracts.find(c => c.id === draft.value.contractId && c.projectId === draft.value.projectId))
@@ -48,6 +49,7 @@ export function useOtherSettlementForm() {
       version.value = detail?.settlement.version ?? null
       files.reset(detail?.attachments ?? [])
       saved.value = JSON.stringify(draft.value)
+      hydrated.value = true
       errors.value = {}
       saveError.value = ''
     }
@@ -93,13 +95,28 @@ export function useOtherSettlementForm() {
       files.clearPending()
       allowLeave = true
       kit.success('结算已保存')
-      await navigateTo(id.value && backTo.value.startsWith(`${OTHER_SETTLEMENT_PATH}/${id.value}?`) ? backTo.value : `${OTHER_SETTLEMENT_PATH}/${result.id}?origin=real&returnTo=${encodeURIComponent(backTo.value)}`)
+      const detailReturn = id.value && backTo.value.startsWith(`${OTHER_SETTLEMENT_PATH}/${id.value}?`) ? backTo.value : `${OTHER_SETTLEMENT_PATH}/${result.id}?origin=real&returnTo=${encodeURIComponent(backTo.value)}`
+      if (action === 'saveNew') {
+        await navigateTo({ path: `${OTHER_SETTLEMENT_PATH}/form`, query: { contractId: draft.value.contractId || undefined, returnTo: validateAuxiliaryReturnTo(route.query.returnTo) || undefined } })
+        await initialize()
+      }
+      else if (closeAfterSave.value || (action === 'saveSubmit' && confirming)) {
+        await navigateTo(detailReturn)
+      }
+      else {
+        await navigateTo(`${OTHER_SETTLEMENT_PATH}/form/${result.id}?origin=real&returnTo=${encodeURIComponent(detailReturn)}`, { replace: true })
+        await initialize()
+      }
       allowLeave = false
     }
     catch (cause) {
       const problem = auxiliaryProblemFromUnknown(cause).problem
       saveError.value = problem.message
       errors.value = Object.fromEntries(Object.entries(problem.fieldErrors).map(([key, values]) => [key, values[0] ?? '字段无效']))
+      if (problem.code === 'validation-failed')
+        kit.warning(problem.message)
+      else if (problem.code !== 'conflict')
+        kit.error(problem.message)
       if (problem.code === 'conflict' && await kit.confirm({ variant: 'simple', title: '结算已有更新', message: '载入最新版将替换当前输入；尚未覆盖服务器内容。', confirmLabel: '载入最新版', cancelLabel: '保留我的内容' }))
         await initialize()
       await nextTick()

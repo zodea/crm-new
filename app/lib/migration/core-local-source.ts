@@ -37,6 +37,7 @@ import {
   isCoreMigrationMoney,
 } from './core-contract'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
+import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -173,6 +174,7 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
   `,
   auxiliary_contracts: AUXILIARY_CONTRACT_SOURCE_SQL,
   other_settlements: OTHER_SETTLEMENT_SOURCE_SQL,
+  other_settlement_sources: OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL,
   subcontract_contracts: `
     SELECT
       c.id, c.no, c.name, c.sub_kind, c.project_id, c.supplier_id,
@@ -1013,7 +1015,7 @@ function sourceEntity(
       },
       amount: nullableMoney(row.amount),
       attributes: {
-        ...(text(row.kind) === 'project_penalty' ? { deadline: nullableText(row.deadline), rectificationNote: text(row.rectification_note), deductionMethod: text(row.deduction_method), penaltyDeductionsJson: text(row.penalty_deductions_json) || '[]' } : {}),
+        ...(text(row.kind) === 'project_penalty' ? { penaltyOrigin: nullableText(row.penalty_origin), contractKind: nullableText(row.contract_kind), deadline: nullableText(row.deadline), rectificationNote: text(row.rectification_note), deductionMethod: text(row.deduction_method), penaltyDeductionsJson: text(row.penalty_deductions_json) || '[]' } : {}),
         kind: text(row.kind),
         no: text(row.no),
         documentType: text(row.document_type),
@@ -1124,8 +1126,12 @@ async function sha256Bytes(value: Uint8Array): Promise<string> {
 
 const PROJECT_PENALTY_SOURCE_SQL = `
   SELECT penalty.id, penalty.reason AS name, penalty.no,
+    penalty.source AS penalty_origin,
     penalty.projectId AS project_id, penalty.crewId AS crew_id,
-    penalty.supplier_id, penalty.contract_id, penalty.amount,
+    penalty.supplier_id,
+    CASE WHEN EXISTS (SELECT 1 FROM contracts c WHERE c.id = penalty.contract_id AND c.kind = '其他支出') THEN 'other_expense:' || penalty.contract_id ELSE penalty.contract_id END AS contract_id,
+    CASE WHEN EXISTS (SELECT 1 FROM contracts c WHERE c.id = penalty.contract_id AND c.kind = '其他支出') THEN 'other_expense' ELSE 'subcontract' END AS contract_kind,
+    penalty.amount,
     'project_penalty' AS kind, 'penalty_record' AS source_type,
     CASE WHEN penalty.status <> 'draft' THEN 1 ELSE 0 END AS source_locked,
     penalty.penaltyDate AS application_date, penalty.status,
@@ -1142,6 +1148,7 @@ const PROJECT_PENALTY_SOURCE_SQL = `
       'category', f.category, 'uploader', f.uploader, 'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at))
       FROM file_refs f WHERE f.owner_type = 'penalty_record' AND f.owner_id = penalty.id) AS files_json
   FROM penalty_records penalty WHERE penalty.source = 'project'
+    OR EXISTS (SELECT 1 FROM penalty_settlement_deductions d JOIN expenditure_settlements s ON s.id = d.settlement_id WHERE d.penalty_id = penalty.id AND s.biz_type IN ('机械', '其他', '其他支出'))
 `
 
 type SourceSelect = <T extends Record<string, unknown>>(sql: string) => Promise<T[]>
@@ -1152,6 +1159,10 @@ async function buildSource(
 ): Promise<CoreMigrationSourceDTO> {
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
     const rows = await selectSource<Record<string, unknown>>(ENTITY_SQL[entityType])
+    if (entityType === 'other_settlement_sources') {
+      const payments = await selectSource<Record<string, unknown>>(OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL)
+      return [entityType, [...rows.map(row => otherSettlementDocumentSource(row, 'application')), ...payments.map(row => otherSettlementDocumentSource(row, 'payment'))].sort((a, b) => compareCanonicalText(a.legacyId, b.legacyId))] as const
+    }
     if (entityType === 'owner_documents')
       rows.push(...await selectSource<Record<string, unknown>>(PROJECT_PENALTY_SOURCE_SQL))
     if (entityType === 'auxiliary_contracts')

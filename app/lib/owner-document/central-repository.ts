@@ -160,7 +160,7 @@ export interface OwnerCommercialDocumentSource {
   deductionNote?: string
   penaltyDeductions?: PenaltyDeductionSource[]
   penaltyRectifications?: PenaltyRectificationEvent[]
-  penaltyFacts?: { deadline: string | null, rectificationNote: string, deductionMethod: string }
+  penaltyFacts?: { deadline: string | null, rectificationNote: string, deductionMethod: string, origin?: string | null }
   subcontractSettlementEvidence?: SubcontractSettlementEvidence
 }
 

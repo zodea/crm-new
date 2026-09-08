@@ -1,4 +1,4 @@
-import type { OtherSettlementCommand, OtherSettlementContext, OtherSettlementDetail, OtherSettlementDTO, OtherSettlementPage } from './contract'
+import type { OtherSettlementCommand, OtherSettlementContext, OtherSettlementDetail, OtherSettlementDTO, OtherSettlementPage, OtherSettlementSourceDocument } from './contract'
 import { auxiliaryProblem } from '../auxiliary-contract/contract'
 import { auxiliaryProblemFromUnknown } from '../auxiliary-contract/repository'
 import { isCoreMigrationMoney } from '../migration/core-contract'
@@ -41,6 +41,11 @@ export function createOtherSettlementRepository(fetcher: OtherSettlementFetcher)
     }
   }
   return {
+    source: (id: string, factId: string) => read(`/api/read/other-settlements/${encodeURIComponent(id)}/source`, { query: { factId } }, (value) => {
+      if (!object(value) || typeof value.id !== 'string' || !value.id || !['penalty', 'application', 'payment'].includes(String(value.kind)) || typeof value.name !== 'string' || typeof value.status !== 'string' || !(value.amount === null || isCoreMigrationMoney(value.amount)) || !Array.isArray(value.fields) || !value.fields.every(f => object(f) && typeof f.label === 'string' && (f.value === null || typeof f.value === 'string')) || !Array.isArray(value.allocations) || !value.allocations.every(a => object(a) && typeof a.id === 'string' && (a.targetId === null || typeof a.targetId === 'string') && ['application', 'settlement'].includes(String(a.kind)) && typeof a.effective === 'boolean' && (a.amount === null || isCoreMigrationMoney(a.amount))) || !Array.isArray(value.files) || !value.files.every(f => object(f) && typeof f.id === 'string' && typeof f.fileName === 'string' && Number.isSafeInteger(f.fileSize)))
+        return invalid()
+      return value as unknown as OtherSettlementSourceDocument
+    }),
     list: (query: Record<string, unknown>) => read('/api/read/other-settlements', { query }, (value) => {
       if (!object(value) || !Array.isArray(value.items) || !object(value.pagination) || !object(value.summary) || !Array.isArray(value.projectOptions) || !Array.isArray(value.capabilities))
         return invalid()

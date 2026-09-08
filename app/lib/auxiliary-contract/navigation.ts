@@ -26,7 +26,7 @@ export function validateAuxiliaryReturnTo(input: unknown, expectedOrigin: unknow
       return null
     if (auxiliary?.[1] === 'company-expense' && ['projectId', 'supplierId', 'project', 'supplier'].some(key => url.searchParams.has(key)))
       return null
-    const keys = new Set(['origin', 'search', 'page', 'pageSize', 'category', 'status', 'projectId', 'supplierId', 'contractId', 'fact', 'project', 'supplier', 'tab', 'returnTo', 'nav', 'focus', 'returnContext'])
+    const keys = new Set(['origin', 'search', 'page', 'pageSize', 'category', 'status', 'projectId', 'supplierId', 'contractId', 'fact', 'sourceTrail', 'project', 'supplier', 'tab', 'returnTo', 'nav', 'focus', 'returnContext'])
     if ([...url.searchParams.keys()].some(key => !keys.has(key)))
       return null
     let normalized = input

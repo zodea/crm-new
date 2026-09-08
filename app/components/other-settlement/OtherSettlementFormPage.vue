@@ -11,7 +11,9 @@ const { attachments, pendingAttachments, pendingRemoveIds, pendingRestoreIds, de
       </p>
       <OtherSettlementFormFields :draft="draft" :errors="errors" :contract="selectedContract" :supplier-label="context?.suppliers.find(s => s.id === draft.supplierId)?.label" :fetch-projects="fetchProjects" :fetch-contracts="fetchContracts" @patch="patch" />
       <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @files="handleFiles" @pick-native="pickNativeFiles" @toggle-existing="toggleExisting" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patch({ note: $event })" />
-      <FormFooter v-model="closeAfterSave" :actions="draft.status === 'pending' ? ['cancel', 'saveSubmit', 'save'] : ['cancel', 'draft', 'saveSubmit', 'save']" :labels="{ saveSubmit: draft.status === 'pending' ? '确认结算' : '保存并提交' }" :dirty="dirty" :loading-action="loadingAction" @action="save" />
     </form>
+    <template #footer>
+      <FormFooter v-model="closeAfterSave" close-after-save :actions="draft.status === 'pending' ? ['cancel', 'saveNew', 'saveSubmit', 'save'] : ['cancel', 'draft', 'saveNew', 'saveSubmit', 'save']" :labels="{ saveSubmit: draft.status === 'pending' ? '确认结算' : '保存并提交' }" :dirty="dirty" :loading-action="loadingAction" @action="save" />
+    </template>
   </EntityFormShell>
 </template>

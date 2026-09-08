@@ -12,7 +12,7 @@ export const OTHER_SETTLEMENT_SOURCE_SQL = `SELECT s.*,
       (a.deleted_at IS NULL AND p.deleted_at IS NULL), 'exact'
       FROM payment_application_settlement_allocations a JOIN payment_applications p ON p.id = a.payment_application_id WHERE a.settlement_id = s.id
     UNION ALL
-    SELECT r.id || ':' || a.id, 'payment', r.id, p.id, p.project_id, p.supplier_id, p.contract_id, r.no, r.purpose, printf('%.2f', a.allocated_amount), r.payment_date, r.confirmation_status,
+    SELECT a.id, 'payment', r.id, p.id, p.project_id, p.supplier_id, p.contract_id, r.no, r.purpose, printf('%.2f', a.allocated_amount), r.payment_date, r.confirmation_status,
       (a.deleted_at IS NULL AND r.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status IN ('submitted','approved','paying','paid')),
       CASE WHEN (SELECT COUNT(DISTINCT x.settlement_id) FROM payment_application_settlement_allocations x WHERE x.payment_application_id = p.id AND x.deleted_at IS NULL) = 1 THEN 'exact' ELSE 'unknown' END
       FROM payment_record_application_allocations a JOIN payment_records r ON r.id = a.payment_record_id JOIN payment_applications p ON p.id = a.payment_application_id

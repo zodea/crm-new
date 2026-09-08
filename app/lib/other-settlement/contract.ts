@@ -3,6 +3,7 @@ import type { AuxiliaryContractAudit } from '../auxiliary-contract/contract'
 import type { ContractFormAttachment, ContractFormAttachmentChanges } from '../contract/forms'
 
 export const OTHER_SETTLEMENT_PATH = '/contract/other-settlement'
+export const OTHER_SETTLEMENT_STATUS_LABELS: Record<string, string> = { draft: '草稿', pending: '待确认', confirmed: '已确认' }
 export interface OtherSettlementDraft {
   id?: string
   no?: string
@@ -56,6 +57,7 @@ export interface OtherSettlementContext {
 }
 export interface OtherSettlementFact {
   id: string
+  allocationId?: string
   kind: 'penalty' | 'application' | 'payment'
   settlementId: string
   projectId: string | null
@@ -70,6 +72,21 @@ export interface OtherSettlementFact {
   status: string
   effective: boolean
   attribution: 'exact' | 'unknown'
+}
+export interface OtherSettlementSourceDocument {
+  id: string
+  kind: OtherSettlementFact['kind']
+  no: string
+  name: string
+  status: string
+  amount: MoneyDTO | null
+  date: string | null
+  projectId: string | null
+  contractId: string | null
+  supplierId: string | null
+  fields: Array<{ label: string, value: string | null }>
+  allocations: Array<{ id: string, targetId: string | null, kind: 'settlement' | 'application', amount: MoneyDTO | null, effective: boolean, unavailableReason: string | null }>
+  files: Array<{ id: string, fileName: string, fileSize: number, uploader: string, uploadedAt: string }>
 }
 export const OTHER_SETTLEMENT_AMOUNT_LABELS = {
   total: '含税结算金额',

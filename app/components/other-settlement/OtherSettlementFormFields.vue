@@ -44,18 +44,18 @@ function input(key: typeof fields[number]['key'], event: Event) {
     <div class="mt-3 grid min-w-0 gap-4 md:grid-cols-2">
       <div class="min-w-0">
         <label class="mb-2 block text-13px">项目 *</label>
-        <LookupSelect v-model="project" :fetch="fetchProjects" placeholder="检索项目" />
-        <p v-if="errors.projectId" class="text-12px text-danger">
+        <LookupSelect v-model="project" field="projectId" :invalid="Boolean(errors.projectId)" description-id="settlement-project-error" :fetch="fetchProjects" placeholder="检索项目" />
+        <p v-if="errors.projectId" id="settlement-project-error" class="text-12px text-danger">
           {{ errors.projectId }}
         </p>
       </div>
       <div class="min-w-0">
         <label class="mb-2 block text-13px">其他支出合同 *</label>
-        <LookupSelect :key="project" v-model="contractId" :fetch="fetchContracts" placeholder="检索其他支出合同" />
+        <LookupSelect :key="project" v-model="contractId" field="contractId" :invalid="Boolean(errors.contractId)" description-id="settlement-contract-error" :fetch="fetchContracts" placeholder="检索其他支出合同" />
         <p class="text-12px text-ink-soft">
           仅可选择同项目、非草稿的其他支出合同。
         </p>
-        <p v-if="errors.contractId" class="text-12px text-danger">
+        <p v-if="errors.contractId" id="settlement-contract-error" class="text-12px text-danger">
           {{ errors.contractId }}
         </p>
       </div>

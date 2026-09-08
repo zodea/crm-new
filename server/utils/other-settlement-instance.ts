@@ -1,7 +1,8 @@
 import type { AuxiliaryContractAudit } from '../../app/lib/auxiliary-contract/contract'
 import type { ContractFormAttachment } from '../../app/lib/contract/forms'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
-import type { OtherSettlementCommand, OtherSettlementContext, OtherSettlementDetail, OtherSettlementDraft, OtherSettlementDTO, OtherSettlementFact, OtherSettlementPage } from '../../app/lib/other-settlement/contract'
+import type { OtherSettlementCommand, OtherSettlementContext, OtherSettlementDetail, OtherSettlementDraft, OtherSettlementDTO, OtherSettlementFact, OtherSettlementPage, OtherSettlementSourceDocument } from '../../app/lib/other-settlement/contract'
+import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document/central-repository'
 import type { BusinessSession } from './business-session'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryTaxExclusive, subtractAuxiliaryMoney, sumAuxiliaryMoney } from '../../app/lib/auxiliary-contract/facts'
@@ -9,6 +10,7 @@ import { isEffectiveSettlementFact } from '../../app/lib/other-settlement/facts'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { applyAuxiliaryAttachments } from './auxiliary-contract-attachments'
 import { migratedOtherSettlement } from './other-settlement-migration'
+import { migratedSettlementSource, penaltySettlementSource } from './other-settlement-sources'
 
 export interface OtherSettlementStored {
   id: string
@@ -23,11 +25,14 @@ export interface OtherSettlementStored {
 interface Options {
   identities: () => Pick<OtherSettlementContext, 'projects' | 'suppliers' | 'contracts'>
   records?: OtherSettlementStored[]
+  sources?: OtherSettlementSourceDocument[]
+  penalties?: () => OwnerCommercialDocumentSource[]
   now?: () => string
   createId?: () => string
 }
 export function createOtherSettlementInstance(options: Options) {
   let records = new Map((options.records ?? []).map(row => [row.id, structuredClone(row)]))
+  let sourceDocuments = new Map((options.sources ?? []).map(row => [row.id, structuredClone(row)]))
   const commands = new Map<string, {
     fingerprint: string
     result: {
@@ -57,7 +62,28 @@ export function createOtherSettlementInstance(options: Options) {
       return null
     if (row.facts?.some(fact => fact.settlementId !== row.id || fact.projectId !== d.projectId || fact.contractId !== d.contractId || fact.supplierId !== d.supplierId))
       return null
-    return row.facts
+    if (!row.migrationBatchId && !options.sources && !options.penalties)
+      return row.facts
+    return row.facts?.map((fact) => {
+      const document = sourceDocument(fact.sourceId, fact.kind)
+      const allocation = document?.allocations.find(a => a.id === (fact.allocationId ?? fact.id) && a.targetId === (fact.kind === 'payment' ? fact.parentId : row.id))
+      const parent = fact.kind === 'payment' ? sourceDocument(fact.parentId ?? '', 'application') : null
+      const owner = fact.kind === 'payment' ? parent : document
+      const relationValid = owner && owner.projectId === d.projectId && (!owner.contractId || owner.contractId === d.contractId) && (!owner.supplierId || owner.supplierId === d.supplierId)
+      if (!document || !allocation || !relationValid)
+        return { ...fact, amount: null }
+      const active = allocation.effective && (fact.kind === 'penalty' ? document.status !== 'draft' : fact.kind !== 'payment' || Boolean(parent && ['submitted', 'approved', 'paying', 'paid'].includes(parent.status)))
+      const attribution = fact.kind === 'payment' && new Set(parent?.allocations.filter(a => a.effective).map(a => a.targetId)).size !== 1 ? 'unknown' : fact.attribution
+      return { ...fact, no: document.no, name: document.name, date: document.date, amount: allocation.amount, status: fact.kind === 'penalty' && active ? 'executed' : document.status, effective: active, attribution }
+    }) ?? null
+  }
+  function sourceDocument(id: string, kind: OtherSettlementFact['kind']): OtherSettlementSourceDocument | null {
+    if (kind === 'penalty' && options.penalties) {
+      const row = options.penalties().find(p => p.dataOrigin === 'real' && p.kind === 'project_penalty' && p.id === id)
+      return row ? penaltySettlementSource(row) : null
+    }
+    const row = sourceDocuments.get(id)
+    return row?.kind === kind ? row : null
   }
   function dto(row: OtherSettlementStored): OtherSettlementDTO {
     const d = row.draft
@@ -86,7 +112,10 @@ export function createOtherSettlementInstance(options: Options) {
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO) {
       const batchId = snapshot.authority === 'central' ? snapshot.activeBatchId : null
       const entities = batchId ? snapshot.entities.filter(e => !e.deletedAt) : []
-      const candidates = entities.filter(e => e.entityType === 'other_settlements').map(e => migratedOtherSettlement(e, batchId!, entities))
+      const candidates = entities.filter(e => e.entityType === 'other_settlements').map(e => migratedOtherSettlement(e, batchId!, snapshot.entities))
+      const nextSources = new Map((options.sources ?? []).map(row => [row.id, structuredClone(row)]))
+      for (const entity of entities.filter(e => e.entityType === 'other_settlement_sources'))
+        nextSources.set(entity.id, migratedSettlementSource(entity, entities))
       const ids = new Set(candidates.map(e => e.id))
       const next = new Map([...records].filter(([id, row]) => !row.migrationBatchId || (row.migrationBatchId === batchId && ids.has(id))))
       for (const row of candidates) {
@@ -95,6 +124,7 @@ export function createOtherSettlementInstance(options: Options) {
       }
       return () => {
         records = next
+        sourceDocuments = nextSources
         for (const [key, command] of commands) {
           if (!records.has(command.result.id))
             commands.delete(key)
@@ -104,6 +134,20 @@ export function createOtherSettlementInstance(options: Options) {
     context(session: BusinessSession): OtherSettlementContext {
       authorize(session, 'write')
       return { ...session, ...identities() }
+    },
+    source(id: string, factId: string, session: BusinessSession): OtherSettlementSourceDocument {
+      authorize(session, 'read')
+      const row = find(id, session)
+      const fact = facts(row)?.find(f => f.id === factId)
+      if (!fact)
+        throw auxiliaryProblem('relationship-mismatch', '当前结算不包含该源单关系')
+      const document = sourceDocument(fact.sourceId, fact.kind)
+      if (!document)
+        throw auxiliaryProblem('not-found', '关联源单不存在或中央身份已失效')
+      const owner = fact.kind === 'payment' ? sourceDocument(fact.parentId ?? '', 'application') : document
+      if (!owner || owner.projectId !== row.draft.projectId || (owner.contractId && owner.contractId !== row.draft.contractId) || (owner.supplierId && owner.supplierId !== row.draft.supplierId) || !document.allocations.some(a => a.id === (fact.allocationId ?? fact.id) && a.targetId === (fact.kind === 'payment' ? fact.parentId : id)))
+        throw auxiliaryProblem('relationship-mismatch', '源单与当前结算关系已不匹配')
+      return structuredClone(document)
     },
     detail(id: string, query: Record<string, unknown>, session: BusinessSession): OtherSettlementDetail {
       authorize(session, 'read')

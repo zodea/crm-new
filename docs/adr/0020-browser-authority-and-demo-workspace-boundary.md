@@ -55,4 +55,4 @@ Issue #330 追加逻辑 `auxiliary_contracts` 节点，分别接管项目其他�
 
 ## AX05 其他支出结算接管
 
-Issue #331 在辅助合同后追加 `other_settlements` 迁移节点，物理来源仍为统一 `expenditure_settlements`。浏览器结算列表、专属详情与整页表单统一经中央 Repository/HTTP/command；合同中的结算投影也读同一结算源，不保留辅助合同内的第二份正式结算快照。迁移按项目、分供方与带类型命名空间的合同稳定外键接管，试跑检查源合同关系、事实及附件元数据。具体口径见 [DATABASE](../rewrite/DATABASE.md#ax05-其他支出结算中央事实)。本票延续可重置测试实例和附件元数据边界，未接入中央完整源单的关系只提供已有事实的只读核对与不可用原因。
+Issue #331 在辅助合同后追加 `other_settlements` 迁移节点，物理来源仍为统一 `expenditure_settlements`。浏览器结算列表、专属详情与整页表单统一经中央 Repository/HTTP/command；合同中的结算投影也读同一结算源，不保留辅助合同内的第二份正式结算快照。迁移按项目、分供方与带类型命名空间的合同稳定外键接管，试跑检查源合同关系、事实及附件元数据。具体口径见 [DATABASE](../rewrite/DATABASE.md#ax05-其他支出结算中央事实)。本票延续可重置测试实例和附件元数据边界。相关付款申请及支付记录通过 `other_settlement_sources` 独立接管，罚扣复用既有中央项目罚扣；源单与父申请 ID 经迁移映射，下钻单独读取中央资料。源单删除、权限不足或关系失效时明确显示原因。

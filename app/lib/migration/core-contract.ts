@@ -13,6 +13,7 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'subcontract_contracts',
   'auxiliary_contracts',
   'other_settlements',
+  'other_settlement_sources',
   'contract_supplements',
   'receipt_registrations',
   'owner_documents',
@@ -40,8 +41,8 @@ export interface CoreMigrationSourceEntityDTO {
 }
 
 export type CoreMigrationSourceEntitiesDTO = {
-  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements'>]: CoreMigrationSourceEntityDTO[]
-} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[] }
+  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources'>]: CoreMigrationSourceEntityDTO[]
+} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[] }
 
 export type CoreMigrationTotalExpectationDTO
   = | { entityType: CoreMigrationEntityType, metric: 'quantity', expected: number }

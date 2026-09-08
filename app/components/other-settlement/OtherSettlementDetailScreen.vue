@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import type { OtherSettlementFact } from '~/lib/other-settlement/contract'
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
-import { OTHER_SETTLEMENT_PATH } from '~/lib/other-settlement/contract'
+import { OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
 
 const props = defineProps<{
   settlementId: string
@@ -14,7 +16,7 @@ const { data: detail, problem, shellState, load } = useAuxiliaryContractRead(() 
 const settlement = computed(() => detail.value?.settlement)
 const tabs = [{ key: 'info', label: '详细资料' }, { key: 'penalty', label: '奖罚抵扣' }, { key: 'application', label: '付款申请' }, { key: 'payment', label: '支付事实' }] as const
 const activeTab = computed(() => tabs.find(tab => tab.key === route.query.tab)?.key ?? 'info')
-const status = computed(() => ({ draft: '草稿', pending: '待确认', confirmed: '已确认' })[settlement.value?.draft.status as 'draft'] || '未记录')
+const status = computed(() => OTHER_SETTLEMENT_STATUS_LABELS[settlement.value?.draft.status ?? ''] || '未记录')
 const backTo = computed(() => validateAuxiliaryReturnTo(route.query.returnTo) ?? OTHER_SETTLEMENT_PATH)
 const canEdit = computed(() => detail.value?.capabilities.includes('other-settlement:write') && settlement.value?.draft.status !== 'confirmed')
 function tab(key: string) {
@@ -22,9 +24,21 @@ function tab(key: string) {
 }
 function selectFact(id: string) {
   navigation.remember(`fact-${id}`)
-  void navigateTo({ path: route.path, query: { ...route.query, fact: id }, hash: '' }, { replace: true })
+  void navigateTo({ path: route.path, query: { ...route.query, fact: id, sourceTrail: undefined }, hash: '' }, { replace: true })
+}
+const sourceTrail = computed(() => String(route.query.sourceTrail ?? '').split(',').filter(id => detail.value?.facts?.some(f => f.id === id)).slice(-4))
+function openSource(fact: OtherSettlementFact) {
+  const current = String(route.query.fact ?? '')
+  void navigateTo({ path: route.path, query: { ...route.query, tab: fact.kind, fact: fact.id, sourceTrail: [...sourceTrail.value, current].slice(-4).join(',') }, hash: '' }, { replace: true })
 }
 function closeFact() {
+  const trail = [...sourceTrail.value]
+  const previousId = trail.pop()
+  const previous = detail.value?.facts?.find(f => f.id === previousId)
+  if (previous) {
+    void navigateTo({ path: route.path, query: { ...route.query, tab: previous.kind, fact: previous.id, sourceTrail: trail.join(',') || undefined }, hash: '' }, { replace: true })
+    return
+  }
   const id = String(route.query.fact ?? '')
   void navigateTo({ path: route.path, query: { ...route.query, fact: undefined }, hash: `#fact-${id}` }, { replace: true })
 }
@@ -60,15 +74,19 @@ useTabTitle(() => settlement.value?.draft.name || '其他支出结算')
           </div>
         </div>
       </template>
-      <div v-if="detail" class="min-w-0">
-        <nav class="mb-3 flex flex-wrap border-b border-line" aria-label="结算详情页签">
-          <button v-for="item in tabs" :key="item.key" class="cursor-pointer border-0 border-b-2 bg-transparent px-4 py-3 text-13px" :class="activeTab === item.key ? 'border-brand font-700 text-brand' : 'border-transparent text-ink-soft'" :aria-current="activeTab === item.key ? 'page' : undefined" @click="tab(item.key)">
+      <TabsRoot v-if="detail" :model-value="activeTab" class="min-w-0" @update:model-value="tab(String($event))">
+        <TabsList class="mb-3 flex flex-wrap border-b border-line" aria-label="结算详情页签">
+          <TabsTrigger v-for="item in tabs" :key="item.key" :value="item.key" class="cursor-pointer border-0 border-b-2 bg-transparent px-4 py-3 text-13px" :class="activeTab === item.key ? 'border-brand font-700 text-brand' : 'border-transparent text-ink-soft'">
             {{ item.label }}
-          </button>
-        </nav>
-        <OtherSettlementInfo v-if="activeTab === 'info'" :detail="detail" />
-        <OtherSettlementFacts v-else :facts="detail.facts" :kind="activeTab" :selected-id="typeof route.query.fact === 'string' ? route.query.fact : undefined" @select="selectFact" @close="closeFact" />
-      </div>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="info">
+          <OtherSettlementInfo :detail="detail" />
+        </TabsContent>
+        <TabsContent v-for="kind in (['penalty', 'application', 'payment'] as const)" :key="kind" :value="kind">
+          <OtherSettlementFacts :facts="detail.facts" :kind="kind" :selected-id="typeof route.query.fact === 'string' ? route.query.fact : undefined" @select="selectFact" @source="openSource" @close="closeFact" />
+        </TabsContent>
+      </TabsRoot>
     </EntityDetailShell>
   </div>
 </template>

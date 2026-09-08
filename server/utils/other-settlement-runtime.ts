@@ -2,14 +2,15 @@ import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { resolveBusinessSession } from './business-session'
 import { createOtherSettlementInstance } from './other-settlement-instance'
-import { otherSettlementTestRecords } from './other-settlement-test-fixtures'
+import { otherSettlementTestRecords, otherSettlementTestSources } from './other-settlement-test-fixtures'
+import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 
 const instances = new Map<string, ReturnType<typeof createOtherSettlementInstance>>()
 const scenarios = new Map<string, string>()
 export function otherSettlementInstance(key?: string | null) {
   const id = key || 'default'
   if (!instances.has(id))
-    instances.set(id, createOtherSettlementInstance({ identities: () => auxiliaryContractInstance(key).otherSettlementContext(resolveBusinessSession()) }))
+    instances.set(id, createOtherSettlementInstance({ identities: () => auxiliaryContractInstance(key).otherSettlementContext(resolveBusinessSession()), penalties: () => ownerCommercialDocumentCommandTestInstance.rows(key) }))
   return instances.get(id)!
 }
 export function otherSettlementSession(key?: string | null) {
@@ -25,6 +26,7 @@ export async function resetOtherSettlementInstance(key: string, scenario: string
     instances.delete(key)
   if (scenario === 'related') {
     const identities = () => auxiliaryContractInstance(key).otherSettlementContext(resolveBusinessSession())
-    instances.set(key, createOtherSettlementInstance({ identities, records: otherSettlementTestRecords({ ...resolveBusinessSession(), ...identities() }) }))
+    const records = otherSettlementTestRecords({ ...resolveBusinessSession(), ...identities() })
+    instances.set(key, createOtherSettlementInstance({ identities, records, sources: otherSettlementTestSources(records) }))
   }
 }

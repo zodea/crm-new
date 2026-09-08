@@ -4,7 +4,7 @@ import type { OtherSettlementDTO } from '~/lib/other-settlement/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
-import { OTHER_SETTLEMENT_AMOUNT_LABELS, OTHER_SETTLEMENT_PATH } from '~/lib/other-settlement/contract'
+import { OTHER_SETTLEMENT_AMOUNT_LABELS, OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
 
 const route = useRoute()
 const root = useTemplateRef<HTMLElement>('root')
@@ -14,7 +14,7 @@ const { data: page, shellState, problem, load } = useAuxiliaryContractRead(() =>
 const search = shallowRef(String(route.query.search ?? ''))
 const status = computed({ get: () => String(route.query.status ?? 'all'), set: value => void filter({ status: value === 'all' ? undefined : value }) })
 const project = computed({ get: () => String(route.query.projectId ?? ''), set: value => void filter({ projectId: value || undefined }) })
-const statuses = [{ key: 'draft', label: '草稿' }, { key: 'pending', label: '待确认' }, { key: 'confirmed', label: '已确认' }]
+const statuses = Object.entries(OTHER_SETTLEMENT_STATUS_LABELS).map(([key, label]) => ({ key, label }))
 const columns: KitTableColumn[] = [
   { field: 'name', title: '结算名称', width: 210, slot: 'name' },
   { field: 'no', title: '结算单号', width: 150 },
