@@ -59,7 +59,7 @@ describe('read model contract coverage', () => {
     expect(new Set(rows.map(row => row.domain)).size).toBe(rows.length)
     expect(mapped).toEqual(audit)
     for (const row of rows)
-      expect(row.classification, row.domain).toMatch(/`[ABC](?:\+[ABC])?`/)
+      expect(row.classification, row.domain).toMatch(/`[ABC](?:\+[ABC]){0,2}`/)
   })
 
   it('defines identity, decimal, empty, permission and error semantics', () => {

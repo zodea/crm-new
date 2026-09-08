@@ -7,6 +7,7 @@ import type {
   SupplierPaymentRecordSourceRow,
   SupplierProjectRelationSourceRow,
   SupplierProjectSourceRow,
+  SupplierSettlementSourceRow,
 } from '../../app/lib/supplier/repository'
 import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
 import contractsSeed from '../../app/lib/db/seed/contracts.json'
@@ -26,10 +27,10 @@ import {
   SupplierRepositoryProblem,
 } from '../../app/lib/supplier/repository'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
-import { materialContractCommandTestInstance } from './material-contract-command-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
+import { supplierFactSource } from './supplier-fact-source'
 
 export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -217,6 +218,10 @@ export function createSupplierReadTestInstance(
     rows: readonly SupplierProjectSourceRow[]
     sourceVersion: string
   } = () => ({ rows: [], sourceVersion: 'project-command-0' }),
+  resolveSettlementSource?: (sessionId?: string | null) => {
+    rows: readonly SupplierSettlementSourceRow[]
+    sourceVersion: string
+  },
 ) {
   const scenarios = new Map<string, SupplierReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -234,18 +239,20 @@ export function createSupplierReadTestInstance(
     const imported = resolveImportedRelations(sessionId)
     const formalContracts = resolveFormalContractSource(sessionId)
     const formalProjects = resolveFormalProjectSource(sessionId)
+    const settlementSource = resolveSettlementSource?.(sessionId)
     return {
       capabilities,
       suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers] : [],
       projects: ready ? [...formalProjects.rows, ...imported.projects, ...demoProjects] : [],
       projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
       contracts: ready ? [...formalContracts.rows, ...demoContracts] : [],
-      settlements: [],
+      settlements: ready ? settlementSource?.rows ?? [] : [],
+      settlementSourceConnected: settlementSource !== undefined,
       invoices: ready ? demoInvoices : [],
       paymentApplications: ready ? demoPaymentApplications : [],
       paymentRecords: ready ? demoPaymentRecords : [],
       paymentAllocations: ready ? demoPaymentAllocations : [],
-      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
+      sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${formalContracts.sourceVersion}:${formalProjects.sourceVersion}:${settlementSource?.sourceVersion ?? 'settlements-not-connected'}:project-supplier-command-${projectSupplierCommandTestInstance.sourceVersion(sessionId)}`,
     }
   }
 
@@ -264,7 +271,7 @@ export function createSupplierReadTestInstance(
       const query = parseSupplierListQuery(input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildSupplierListPage({ ...data, query, asOf: FIXED_AS_OF })
+      return buildSupplierListPage({ ...data, settlements: data.settlementSourceConnected ? data.settlements : undefined, query, asOf: FIXED_AS_OF })
     },
     async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
@@ -281,24 +288,10 @@ export const supplierReadTestInstance = createSupplierReadTestInstance(
   id => [linkedSubcontractSupplier, ...supplierCommandTestInstance.rows(id)],
   id => `${supplierCommandTestInstance.sourceVersion(id)}+linked-subcontract-supplier-327`,
   id => projectSupplierCommandTestInstance.supplierProjectRows(id),
-  id => ({
-    rows: materialContractCommandTestInstance.rows(id)
-      .filter(row => row.supplierId)
-      .map(row => ({
-        dataOrigin: 'real' as const,
-        id: row.id,
-        supplierId: row.supplierId!,
-        projectId: row.projectId,
-        no: row.no,
-        name: row.name,
-        kind: row.kind,
-        amount: row.amount,
-        supplementAmount: row.supplementAmount,
-        signDate: row.signDate,
-        status: row.status,
-      })),
-    sourceVersion: materialContractCommandTestInstance.sourceVersion(id),
-  }),
+  (id) => {
+    const source = supplierFactSource(id)
+    return { rows: source.contracts, sourceVersion: source.sourceVersion }
+  },
   id => ({
     rows: projectCommandTestInstance.rows(id).map(row => ({
       dataOrigin: 'real' as const,
@@ -309,4 +302,8 @@ export const supplierReadTestInstance = createSupplierReadTestInstance(
     })),
     sourceVersion: projectCommandTestInstance.sourceVersion(id),
   }),
+  (id) => {
+    const source = supplierFactSource(id)
+    return { rows: source.settlements, sourceVersion: source.sourceVersion }
+  },
 )

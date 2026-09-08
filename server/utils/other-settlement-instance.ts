@@ -106,6 +106,13 @@ export function createOtherSettlementInstance(options: Options) {
     return { id: row.id, dataOrigin: 'real', version: String(row.version), draft: structuredClone(d), project: ref('project', d.projectId, identity.projects.find(p => p.id === d.projectId)?.label), supplier: ref('supplier', d.supplierId, identity.suppliers.find(s => s.id === d.supplierId)?.label), contract: ref('contract', d.contractId, contract?.name), navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'settlement', id: row.id, label: d.name || '未命名结算', no: d.no || null }, variant: 'other_settlement', view: null, filters: { dataOrigin: 'real' } }, amounts: { total, deductions, net, applied, applicable: subtractAuxiliaryMoney(net, applied), paid, unpaid: subtractAuxiliaryMoney(net, paid), contract: contract?.amount ?? null, changedContract: contract?.changedAmount ?? null, prior, cumulative: contract ? sumAuxiliaryMoney(confirmed.map(r => r.draft.totalAmount?.toFixed(2) ?? null)) : null, taxExclusive, tax: subtractAuxiliaryMoney(total, taxExclusive) }, audit: structuredClone(row.audit), attachmentCount: row.attachments.filter(f => !f.deletedAt).length }
   }
   return {
+    supplierReadSource(workspaceId: string) {
+      const scoped = [...records.values()].filter(row => row.workspaceId === workspaceId)
+      return {
+        rows: scoped.map(dto),
+        sourceVersion: `other-settlement-supplier:${scoped.map(row => `${row.id}:${row.version}`).sort().join('|')}`,
+      }
+    },
     contractFacts(contractId: string) {
       return [...records.values()].filter(row => row.draft.contractId === contractId).map(row => ({ id: row.id, kind: 'settlement' as const, contractId, contractKind: 'other_expense' as const, dataOrigin: 'real' as const, no: row.draft.no ?? '', name: row.draft.name ?? '', amount: row.draft.totalAmount?.toFixed(2) ?? null, date: row.draft.settlementDate || null, status: row.draft.status ?? '', effective: row.draft.status === 'confirmed' }))
     },

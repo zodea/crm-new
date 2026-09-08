@@ -12,7 +12,23 @@ import type {
 
 export const SUPPLIER_PAGE_SIZES = [10, 20, 50, 100] as const
 export type SupplierPageSize = typeof SUPPLIER_PAGE_SIZES[number]
-export type SupplierListSort = 'updated-desc' | 'name-asc' | 'name-desc' | 'category-asc'
+export const SUPPLIER_LIST_TEXT_FIELDS = ['name', 'uniqueCode', 'taxNo', 'aliases', 'address', 'contact', 'contactPhone', 'mainBusiness', 'laborScope', 'bank', 'bankAccount', 'businessType'] as const
+export type SupplierListTextField = typeof SUPPLIER_LIST_TEXT_FIELDS[number]
+export const SUPPLIER_LIST_NUMERIC_FIELDS = ['settlementAmount', 'cumulativeContractAmount', 'contractAmount', 'paymentAmount', 'projectCount'] as const
+export type SupplierListNumericField = typeof SUPPLIER_LIST_NUMERIC_FIELDS[number]
+export type SupplierListSort = 'updated-desc' | 'name-asc' | 'name-desc' | 'category-asc' | `${SupplierListNumericField}-${'asc' | 'desc'}`
+
+export interface SupplierListColumnFilters {
+  contains?: Partial<Record<SupplierListTextField, string>>
+  taxpayerType?: string | null
+  ranges?: Partial<Record<SupplierListNumericField, { min?: number, max?: number }>>
+}
+
+export interface SupplierBusinessLicenseDTO {
+  state: 'available' | 'missing' | 'unavailable'
+  fileCount: number | null
+  fileIds: string[]
+}
 
 export interface SupplierListQueryDTO {
   includeDemo: boolean
@@ -22,6 +38,7 @@ export interface SupplierListQueryDTO {
   sort: SupplierListSort
   page: number
   pageSize: SupplierPageSize
+  columnFilters?: SupplierListColumnFilters
 }
 
 export interface SupplierDetailQueryDTO {
@@ -52,6 +69,7 @@ export interface SupplierListSourceRow {
   address: string
   taxpayerType: string
   mainBusiness: string
+  laborScope?: string
   invoiceName: string
   invoiceAddress: string
   bank: string
@@ -77,7 +95,17 @@ export interface SupplierListItemDTO {
   contact: string
   contactPhone: string
   projectCount: number
-  contractAmount: MoneyDTO
+  address: string
+  taxpayerType: string
+  mainBusiness: string
+  laborScope: string
+  bank: string
+  bankAccount: string
+  businessType: string
+  businessLicense: SupplierBusinessLicenseDTO
+  cumulativeContractAmount: MoneyDTO | null
+  settlementAmount: MoneyDTO | null
+  contractAmount: MoneyDTO | null
   paymentAmount: MoneyDTO
   updatedAt: ISODateTimeDTO
 }
@@ -85,7 +113,8 @@ export interface SupplierListItemDTO {
 export interface SupplierListSummaryDTO {
   categories: Array<{ value: string, label: string, count: number }>
   credentialStatuses: Array<{ value: string, label: string, count: number }>
-  origins: Record<DataOriginDTO, { supplierCount: number, contractAmount: MoneyDTO, paymentAmount: MoneyDTO }>
+  taxpayerTypes?: Array<{ value: string, label: string, count: number }>
+  origins: Record<DataOriginDTO, { supplierCount: number, contractAmount: MoneyDTO | null, paymentAmount: MoneyDTO }>
 }
 
 export type SupplierListPageDTO = PageDTO<SupplierListItemDTO, SupplierListSummaryDTO>
@@ -114,8 +143,8 @@ export interface SupplierContractSourceRow {
   no: string
   name: string
   kind: string
-  amount: number
-  supplementAmount: number
+  amount: number | null
+  supplementAmount: number | null
   signDate: ISODateDTO | null
   status: string
 }
@@ -129,7 +158,7 @@ export interface SupplierSettlementSourceRow {
   no: string
   name: string
   settlementType: string
-  totalAmount: number
+  totalAmount: number | null
   settlementDate: ISODateDTO | null
   status: string
 }
@@ -207,7 +236,7 @@ export interface SupplierContractDTO {
   project: EntityRefDTO & { entity: 'project' }
   projectNavigation: NavigationIntentDTO
   kind: string
-  effectiveAmount: MoneyDTO
+  effectiveAmount: MoneyDTO | null
   signDate: ISODateDTO | null
   status: string
   isDraft: boolean
@@ -221,7 +250,7 @@ export interface SupplierSettlementDTO {
   contract: EntityRefDTO & { entity: 'contract' }
   contractNavigation: NavigationIntentDTO
   settlementType: string
-  totalAmount: MoneyDTO
+  totalAmount: MoneyDTO | null
   settlementDate: ISODateDTO | null
   status: string
 }

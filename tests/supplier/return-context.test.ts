@@ -3,11 +3,32 @@ import {
   createSupplierDetailJourneyReturnOrigin,
   createSupplierReturnTo,
   resolveSupplierDetailJourneyReturnOrigin,
+  supplierListNavigationStateFromQuery,
   validateSupplierDetailReturnTo,
   validateSupplierReturnTo,
 } from '~/lib/supplier/return-context'
 
 describe('分供方列表返回上下文', () => {
+  it.each(['Infinity', '1.5', '-1', '9007199254740992'])('无效页码 %s 归一到第一页', (page) => {
+    expect(supplierListNavigationStateFromQuery({ page }).page).toBe(1)
+  })
+  it('列筛选、数值排序和每页20条随详情返回保留', () => {
+    const filters = { contains: { laborScope: '油漆' }, ranges: { paymentAmount: { min: 0, max: 100 } } }
+    const returnTo = createSupplierReturnTo('demo:supplier-filtered', {
+      search: '',
+      category: 'all',
+      credentialStatus: 'qualified',
+      sort: 'paymentAmount-desc',
+      page: 2,
+      pageSize: 20,
+      columnFilters: filters,
+    })
+    expect(validateSupplierReturnTo(returnTo)).toBe(returnTo)
+    const parsed = supplierListNavigationStateFromQuery(Object.fromEntries(new URL(returnTo, 'https://crm.test').searchParams))
+    expect(parsed.columnFilters).toEqual(filters)
+    expect(parsed.sort).toBe('paymentAmount-desc')
+    expect(parsed.pageSize).toBe(20)
+  })
   it('包含来源身份的锚点经过多层页面透传仍保持规范且幂等', () => {
     const returnTo = createSupplierReturnTo('real:supplier-1', {
       search: '中央',

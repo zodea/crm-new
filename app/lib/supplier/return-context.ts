@@ -1,6 +1,8 @@
-import type { SupplierListSort } from './repository'
+import type { SupplierListColumnFilters, SupplierListSort } from './read-contract'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
+import { SUPPLIER_LIST_NUMERIC_FIELDS } from './read-contract'
+import { parseSupplierColumnFilters } from './read-query'
 
 export interface SupplierListNavigationState {
   search: string
@@ -9,6 +11,7 @@ export interface SupplierListNavigationState {
   sort: SupplierListSort
   page: number
   pageSize: 10 | 20 | 50 | 100
+  columnFilters?: SupplierListColumnFilters
 }
 
 export interface SupplierDetailJourneyReturnOrigin {
@@ -33,13 +36,21 @@ function value(input: unknown): string | undefined {
 export function supplierListNavigationStateFromQuery(query: Record<string, unknown>): SupplierListNavigationState {
   const sort = value(query.sort)
   const pageSize = Number(value(query.pageSize))
+  const page = Number(value(query.page))
+  const sortKeys = ['name-asc', 'name-desc', 'category-asc', ...SUPPLIER_LIST_NUMERIC_FIELDS.flatMap(field => [`${field}-asc`, `${field}-desc`])]
+  let columnFilters: SupplierListColumnFilters = {}
+  try {
+    columnFilters = parseSupplierColumnFilters(value(query.columnFilters)) ?? {}
+  }
+  catch { /* 无效返回链接不携带列筛选。 */ }
   return {
     search: value(query.search)?.slice(0, 120) ?? '',
     category: value(query.category)?.slice(0, 48) || 'all',
     credentialStatus: value(query.credentialStatus)?.slice(0, 48) || 'all',
-    sort: ['name-asc', 'name-desc', 'category-asc'].includes(String(sort)) ? sort as SupplierListSort : 'updated-desc',
-    page: Math.max(1, Number(value(query.page)) || 1),
-    pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,
+    sort: sortKeys.includes(String(sort)) ? sort as SupplierListSort : 'updated-desc',
+    page: Number.isSafeInteger(page) && page >= 1 ? page : 1,
+    pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 20,
+    ...(Object.keys(columnFilters).length ? { columnFilters } : {}),
   }
 }
 
@@ -55,8 +66,11 @@ export function createSupplierReturnTo(identity: string, state: SupplierListNavi
     query.set('sort', state.sort)
   if (state.page !== 1)
     query.set('page', String(state.page))
-  if (state.pageSize !== 10)
+  if (state.pageSize !== 20)
     query.set('pageSize', String(state.pageSize))
+  const columnFilters = parseSupplierColumnFilters(state.columnFilters)
+  if (columnFilters)
+    query.set('columnFilters', JSON.stringify(columnFilters))
   const anchor = `supplier-row-${encodeURIComponent(identity)}`
   return `${ROUTE}?${query.toString()}#${encodeURIComponent(anchor)}`
 }

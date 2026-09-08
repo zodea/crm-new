@@ -52,6 +52,7 @@ const TEXT_FIELDS = [
   'taxpayerVerificationSource',
   'taxpayerVerificationNote',
   'mainBusiness',
+  'laborScope',
   'invoiceName',
   'invoiceAddress',
   'bank',
@@ -79,7 +80,8 @@ function form(value: unknown, id: string): SupplierFormReadDTO {
     || typeof value.version !== 'string' || !isISODateTimeDTO(value.updatedAt)) {
     return invalid('中央后台返回的分供方表单无效')
   }
-  return value as unknown as SupplierFormReadDTO
+  const loaded = value as unknown as SupplierFormReadDTO
+  return { ...loaded, draft: { ...loaded.draft, laborScope: loaded.draft.laborScope ?? '' } }
 }
 
 export function createHttpSupplierCommandRepository(options: { fetcher: SupplierHttpFetcher }): SupplierCommandRepository {
@@ -93,6 +95,10 @@ export function createHttpSupplierCommandRepository(options: { fetcher: Supplier
         method: request.id ? 'PUT' : 'POST',
         body: { ...request },
       }),
+      result,
+    ),
+    importRow: request => readSupplierHttp(
+      () => options.fetcher('/api/commands/suppliers/import', { method: 'POST', body: { ...request } }),
       result,
     ),
   }

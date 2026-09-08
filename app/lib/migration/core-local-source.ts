@@ -867,6 +867,8 @@ function sourceEntity(
   row: Record<string, unknown>,
 ): CoreMigrationSourceEntityDTO {
   const entity = baseEntity(row)
+  if (entityType === 'suppliers')
+    return { ...entity, attributes: { laborScope: text(row.labor_scope) } }
   if (entityType === 'projects') {
     return {
       ...entity,
@@ -1158,7 +1160,10 @@ async function buildSource(
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
-    const rows = await selectSource<Record<string, unknown>>(ENTITY_SQL[entityType])
+    const sql = entityType === 'suppliers' && schemaVersion >= 48
+      ? 'SELECT id, name, deleted_at, labor_scope FROM suppliers ORDER BY id'
+      : ENTITY_SQL[entityType]
+    const rows = await selectSource<Record<string, unknown>>(sql)
     if (entityType === 'other_settlement_sources') {
       const payments = await selectSource<Record<string, unknown>>(OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL)
       return [entityType, [...rows.map(row => otherSettlementDocumentSource(row, 'application')), ...payments.map(row => otherSettlementDocumentSource(row, 'payment'))].sort((a, b) => compareCanonicalText(a.legacyId, b.legacyId))] as const

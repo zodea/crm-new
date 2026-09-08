@@ -54,6 +54,7 @@ export interface Supplier {
   address: string
   taxpayerType: string
   mainBusiness: string
+  laborScope: string
   invoiceName: string
   invoiceAddress: string
   bank: string
@@ -121,6 +122,7 @@ const SUPPLIER_COLUMNS: { [K in keyof SupplierData]: SupplierColumn<K> } = {
   address: { col: 'address', toBind: d => d.address ?? '', fromRow: r => (r.address ?? '') as string },
   taxpayerType: { col: 'taxpayer_type', toBind: d => d.taxpayerType ?? '', fromRow: r => (r.taxpayer_type ?? '') as string },
   mainBusiness: { col: 'main_business', toBind: d => d.mainBusiness ?? '', fromRow: r => (r.main_business ?? '') as string },
+  laborScope: { col: 'labor_scope', toBind: d => d.laborScope ?? '', fromRow: r => (r.labor_scope ?? '') as string },
   invoiceName: { col: 'invoice_name', toBind: d => d.invoiceName ?? '', fromRow: r => (r.invoice_name ?? '') as string },
   invoiceAddress: { col: 'invoice_address', toBind: d => d.invoiceAddress ?? '', fromRow: r => (r.invoice_address ?? '') as string },
   bank: { col: 'bank', toBind: d => d.bank ?? '', fromRow: r => (r.bank ?? '') as string },
@@ -327,6 +329,7 @@ export const useSupplierStore = defineStore('supplier', () => {
       const safeData: Partial<Supplier> = {
         ...existing,
         ...data,
+        laborScope: data.laborScope ?? existing.laborScope,
         credentialStatus: existing.credentialStatus,
         credentialReviewedAt: existing.credentialReviewedAt,
         credentialReviewNote: existing.credentialReviewNote,

@@ -30,7 +30,7 @@ function sourceRows(sql: string): Record<string, unknown>[] {
     ]
   }
   if (sql.includes('FROM suppliers'))
-    return [{ id: 'supplier-local-1', name: '本地分供方', deleted_at: null }]
+    return [{ id: 'supplier-local-1', name: '本地分供方', labor_scope: '独立劳务范围', deleted_at: null }]
   if (sql.includes('FROM crews'))
     return [{ id: 'crew-local-1', name: '本地班组', deleted_at: null }]
   if (sql.includes('FROM projects')) {
@@ -273,6 +273,7 @@ describe('core migration local source', () => {
     const second = await source.readSource()
 
     expect(first).toEqual(second)
+    expect(first.entities.suppliers).toContainEqual(expect.objectContaining({ legacyId: 'supplier-local-1', attributes: { laborScope: '独立劳务范围' } }))
     expect(first).toMatchObject({
       contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
       mode: CORE_MIGRATION_SOURCE_MODE,

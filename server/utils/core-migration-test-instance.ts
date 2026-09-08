@@ -21,7 +21,7 @@ import {
   CORE_MIGRATION_CAPABILITY,
   CORE_MIGRATION_CONTRACT_VERSION,
   CORE_MIGRATION_SOURCE_MODE,
-  CORE_MIGRATION_SOURCE_VERSION,
+  CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS,
   CORE_MIGRATION_TOPOLOGY,
   coreMigrationCentsToMoney,
   coreMigrationMoneyToCents,
@@ -299,7 +299,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       throw invalid(`不支持的迁移契约版本：${source.contractVersion}`)
     if (source.mode !== CORE_MIGRATION_SOURCE_MODE)
       throw invalid(`不支持的迁移来源模式：${source.mode}`)
-    if (source.sourceVersion !== CORE_MIGRATION_SOURCE_VERSION)
+    if (!CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS.includes(source.sourceVersion as typeof CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS[number]))
       throw invalid(`不支持的本地数据版本：${source.sourceVersion}`)
   }
 

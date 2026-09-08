@@ -82,6 +82,13 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
     }
   }
   return {
+    supplierReadSource(workspaceId: string) {
+      const scoped = [...records.values()].filter(row => row.workspaceId === workspaceId && row.draft.kind === 'other_expense')
+      return {
+        rows: scoped.map(dto),
+        sourceVersion: `auxiliary-supplier:${scoped.map(row => `${row.draft.id}:${row.version}`).sort().join('|')}`,
+      }
+    },
     otherSettlementContext(session: BusinessSession) {
       authorize(session, 'read')
       return { projects: [...projects].map(([id, label]) => ({ id, label })), suppliers: [...suppliers].map(([id, label]) => ({ id, label })), contracts: [...records.values()].filter(row => row.workspaceId === session.workspaceId).map(row => ({ id: row.draft.id, kind: row.draft.kind, name: row.draft.name || '未命名合同', projectId: row.draft.projectId ?? null, supplierId: row.draft.supplierId ?? null, status: row.draft.status || '草稿', amount: row.draft.amount?.toFixed(2) ?? null, changedAmount: sumAuxiliaryMoney([row.draft.amount?.toFixed(2) ?? null, sumAuxiliaryFacts(relatedFacts(row), 'supplement')]) })) }

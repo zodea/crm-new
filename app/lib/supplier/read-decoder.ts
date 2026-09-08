@@ -17,6 +17,7 @@ import {
   supplierProblem,
   SupplierRepositoryProblem,
 } from './read-contract'
+import { parseSupplierColumnFilters } from './read-query'
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -28,6 +29,10 @@ function strings(value: unknown): value is string[] {
 
 function money(value: unknown): value is string {
   return typeof value === 'string' && /^-?(?:0|[1-9]\d*)\.\d{2}$/.test(value)
+}
+
+function nullableMoney(value: unknown): boolean {
+  return value === null || money(value)
 }
 
 function nullableDate(value: unknown): value is string | null {
@@ -120,11 +125,24 @@ function listItem(value: unknown): boolean {
   }
   return navigation(value.navigation, value.supplier, { filters: { dataOrigin: value.dataOrigin } })
     && strings(value.aliases)
-    && ['taxNo', 'uniqueCode', 'supplierCategory', 'credentialStatus', 'contact', 'contactPhone', 'contractAmount', 'paymentAmount', 'updatedAt']
+    && ['taxNo', 'uniqueCode', 'supplierCategory', 'credentialStatus', 'contact', 'contactPhone', 'paymentAmount', 'updatedAt']
       .every(field => typeof value[field] === 'string')
-      && money(value.contractAmount) && money(value.paymentAmount)
+      && nullableMoney(value.contractAmount) && money(value.paymentAmount)
       && isISODateTimeDTO(value.updatedAt)
       && Number.isSafeInteger(value.projectCount) && Number(value.projectCount) >= 0
+      && ['address', 'taxpayerType', 'mainBusiness', 'laborScope', 'bank', 'bankAccount', 'businessType'].every(field => value[field] === undefined || typeof value[field] === 'string')
+      && (value.cumulativeContractAmount === undefined || nullableMoney(value.cumulativeContractAmount))
+      && (value.settlementAmount === undefined || value.settlementAmount === null || money(value.settlementAmount))
+      && (value.businessLicense === undefined || (object(value.businessLicense)
+        && ['available', 'missing', 'unavailable'].includes(String(value.businessLicense.state))
+        && strings(value.businessLicense.fileIds)
+        && value.businessLicense.fileIds.every(id => id.trim().length > 0)
+        && new Set(value.businessLicense.fileIds).size === value.businessLicense.fileIds.length
+        && (value.businessLicense.state === 'unavailable'
+          ? value.businessLicense.fileCount === null && value.businessLicense.fileIds.length === 0
+          : Number.isSafeInteger(value.businessLicense.fileCount) && Number(value.businessLicense.fileCount) >= 0
+            && Number(value.businessLicense.fileCount) === value.businessLicense.fileIds.length
+            && (value.businessLicense.state === 'available' ? value.businessLicense.fileIds.length > 0 : value.businessLicense.fileIds.length === 0))))
 }
 
 function summaryCount(value: unknown): boolean {
@@ -134,7 +152,7 @@ function summaryCount(value: unknown): boolean {
 
 function originSummary(value: unknown): boolean {
   return object(value) && Number.isSafeInteger(value.supplierCount) && Number(value.supplierCount) >= 0
-    && money(value.contractAmount) && money(value.paymentAmount)
+    && nullableMoney(value.contractAmount) && money(value.paymentAmount)
 }
 
 function invalid(message: string): never {
@@ -146,10 +164,27 @@ export function decodeSupplierListPage(value: unknown): SupplierListPageDTO {
     || !object(value.summary)
     || !Array.isArray(value.summary.categories) || !value.summary.categories.every(summaryCount)
     || !Array.isArray(value.summary.credentialStatuses) || !value.summary.credentialStatuses.every(summaryCount)
+    || (value.summary.taxpayerTypes !== undefined && (!Array.isArray(value.summary.taxpayerTypes) || !value.summary.taxpayerTypes.every(summaryCount)))
     || !object(value.summary.origins) || !originSummary(value.summary.origins.real) || !originSummary(value.summary.origins.demo)) {
     return invalid('中央后台返回的分供方列表读模型无效')
   }
-  return value as unknown as SupplierListPageDTO
+  const page = value as unknown as SupplierListPageDTO
+  return {
+    ...page,
+    items: page.items.map(item => ({
+      ...item,
+      address: item.address ?? '',
+      taxpayerType: item.taxpayerType ?? '',
+      mainBusiness: item.mainBusiness ?? '',
+      laborScope: item.laborScope ?? '',
+      bank: item.bank ?? '',
+      bankAccount: item.bankAccount ?? '',
+      businessType: item.businessType ?? '',
+      cumulativeContractAmount: item.cumulativeContractAmount === undefined ? item.contractAmount : item.cumulativeContractAmount,
+      settlementAmount: item.settlementAmount ?? null,
+      businessLicense: item.businessLicense ?? { state: 'unavailable', fileCount: null, fileIds: [] },
+    })),
+  }
 }
 
 function supplier(value: unknown, origin: unknown): boolean {
@@ -157,14 +192,16 @@ function supplier(value: unknown, origin: unknown): boolean {
     && ['id', 'name', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'address', 'taxpayerType', 'mainBusiness', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'credentialStatus', 'note', 'updatedAt']
       .every(field => typeof value[field] === 'string')
       && strings(value.aliases)
+      && (value.laborScope === undefined || typeof value.laborScope === 'string')
       && (value.registeredCapital === null || typeof value.registeredCapital === 'number')
       && nullableDate(value.registeredDate)
       && isISODateTimeDTO(value.updatedAt)
 }
 
 function metric(value: unknown, supplierId: string): boolean {
-  return object(value) && money(value.value) && value.unit === 'CNY'
+  return object(value) && nullableMoney(value.value) && value.unit === 'CNY'
     && ['complete', 'partial', 'pending', 'not-applicable', 'undefined'].includes(String(value.status))
+    && (value.value !== null || value.status !== 'complete')
     && strings(value.missingSources) && isISODateTimeDTO(value.asOf)
     && (value.drilldown === null || (object(value.drilldown) && isEntityKindDTO(value.drilldown.entity)
       && object(value.drilldown.filters) && value.drilldown.filters.supplierId === supplierId))
@@ -172,6 +209,20 @@ function metric(value: unknown, supplierId: string): boolean {
 
 function navigationFilter(value: unknown, key: string, expected: string): boolean {
   return object(value) && object(value.filters) && value.filters[key] === expected
+}
+
+function contractNavigation(value: unknown, reference: EntityRefDTO, origin: unknown, kind?: unknown): boolean {
+  if (navigation(value, reference))
+    return true
+  if (!object(value) || !object(value.filters))
+    return false
+  const contractKind = value.filters.contractKind
+  if (!['材采', '施工', '分包', 'other_expense'].includes(String(contractKind)) || (kind !== undefined && contractKind !== kind))
+    return false
+  return navigation(value, reference, {
+    variant: contractKind === 'other_expense' ? 'other_expense' : 'detail',
+    filters: { dataOrigin: String(origin), contractKind: String(contractKind) },
+  })
 }
 
 function project(value: unknown, origin: unknown, supplierId: string): boolean {
@@ -188,9 +239,9 @@ function project(value: unknown, origin: unknown, supplierId: string): boolean {
 
 function contract(value: unknown, origin: unknown): boolean {
   return object(value) && entityRef(value.contract, 'contract') && value.contract.state === 'resolved'
-    && navigation(value.navigation, value.contract)
+    && contractNavigation(value.navigation, value.contract, origin, value.kind)
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
-    && typeof value.kind === 'string' && money(value.effectiveAmount) && nullableDate(value.signDate)
+    && typeof value.kind === 'string' && nullableMoney(value.effectiveAmount) && nullableDate(value.signDate)
     && typeof value.status === 'string' && typeof value.isDraft === 'boolean'
 }
 
@@ -198,8 +249,8 @@ function settlement(value: unknown, origin: unknown): boolean {
   return object(value) && entityRef(value.settlement, 'settlement') && value.settlement.state === 'resolved'
     && navigation(value.navigation, value.settlement, { unavailableReason: 'missing-route' })
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
-    && entityRef(value.contract, 'contract') && navigation(value.contractNavigation, value.contract)
-    && typeof value.settlementType === 'string' && money(value.totalAmount) && nullableDate(value.settlementDate)
+    && entityRef(value.contract, 'contract') && contractNavigation(value.contractNavigation, value.contract, origin)
+    && typeof value.settlementType === 'string' && nullableMoney(value.totalAmount) && nullableDate(value.settlementDate)
     && typeof value.status === 'string'
 }
 
@@ -207,7 +258,7 @@ function invoice(value: unknown, origin: unknown): boolean {
   return object(value) && entityRef(value.invoice, 'invoice') && value.invoice.state === 'resolved'
     && navigation(value.navigation, value.invoice)
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
-    && entityRef(value.contract, 'contract') && navigation(value.contractNavigation, value.contract)
+    && entityRef(value.contract, 'contract') && contractNavigation(value.contractNavigation, value.contract, origin)
     && typeof value.invoiceType === 'string' && nullableDate(value.invoiceDate)
     && money(value.totalAmount) && money(value.taxAmount) && typeof value.accountStatus === 'string'
 }
@@ -216,7 +267,7 @@ function payment(value: unknown, origin: unknown): boolean {
   return object(value) && entityRef(value.application, 'payment-application') && value.application.state === 'resolved'
     && navigation(value.navigation, value.application)
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
-    && entityRef(value.contract, 'contract') && navigation(value.contractNavigation, value.contract)
+    && entityRef(value.contract, 'contract') && contractNavigation(value.contractNavigation, value.contract, origin)
     && money(value.applyAmount) && money(value.approvedAmount) && money(value.actualPaidAmount)
     && nullableDate(value.applyDate) && typeof value.status === 'string'
 }
@@ -238,10 +289,12 @@ export function decodeSupplierDetailRead(value: unknown): SupplierDetailReadDTO 
       || !strings(value.capabilities)) {
     return invalid('中央后台返回的分供方详情读模型无效')
   }
-  return value as unknown as SupplierDetailReadDTO
+  const detail = value as unknown as SupplierDetailReadDTO
+  return { ...detail, supplier: { ...detail.supplier, laborScope: detail.supplier.laborScope ?? '' } }
 }
 
 export function serializeSupplierListQuery(query: SupplierListQueryDTO): Record<string, string> {
+  const columnFilters = parseSupplierColumnFilters(query.columnFilters)
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
@@ -250,6 +303,7 @@ export function serializeSupplierListQuery(query: SupplierListQueryDTO): Record<
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),
+    ...(columnFilters ? { columnFilters: JSON.stringify(columnFilters) } : {}),
   }
 }
 

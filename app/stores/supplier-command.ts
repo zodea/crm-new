@@ -3,6 +3,7 @@ import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { SUPPLIER_WRITE_CAPABILITY } from '~/lib/supplier/command-contract'
+import { createSupplierRowImporter } from '~/lib/supplier/import-command'
 import { supplierProblemFromUnknown } from '~/lib/supplier/repository'
 
 export class SupplierCommandConflictError extends Error {
@@ -18,6 +19,15 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
   let pendingCommand: { id: string, fingerprint: string } | null = null
   const repository = () => useNuxtApp().$repositories.supplierCommands
+  let rowImporter: ReturnType<typeof createSupplierRowImporter> | null = null
+
+  async function importRow(row: Record<string, unknown>) {
+    rowImporter ??= createSupplierRowImporter(repository())
+    const result = await rowImporter(row)
+    // 导入回读后通知缓存页面；不改变正在编辑的目标、版本或待重试保存命令。
+    latestWrite.value = { id: result.id, version: result.version }
+    return result
+  }
 
   async function hydrate(id: string | null) {
     targetSupplierId.value = id
@@ -90,6 +100,7 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
   return {
     latestWrite: readonly(latestWrite),
     hydrate,
+    importRow,
     saveForm,
     startNewSupplier,
     rebase,

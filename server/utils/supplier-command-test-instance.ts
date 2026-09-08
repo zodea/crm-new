@@ -3,6 +3,7 @@ import type {
   SupplierCommandRequestDTO,
   SupplierCommandResultDTO,
   SupplierFormReadDTO,
+  SupplierImportCommandRequestDTO,
 } from '../../app/lib/supplier/command-contract'
 import type { SupplierListSourceRow } from '../../app/lib/supplier/repository'
 import type { BusinessSession } from './business-session'
@@ -13,12 +14,14 @@ import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/suppli
 interface StoredSupplier {
   id: string
   draft: SupplierFormDraft
+  credentialStatus: string
   version: number
   updatedAt: string
 }
 
 interface SessionState {
   commands: Map<string, SupplierCommandResultDTO>
+  importFingerprints: Map<string, string>
   importedIds: Set<string>
   suppliers: Map<string, StoredSupplier>
   sourceVersion: number
@@ -63,6 +66,7 @@ function cleanDraft(value: SupplierFormDraft): SupplierFormDraft {
     taxpayerVerifiedAt: value.taxpayerVerifiedAt === null ? null : text(value.taxpayerVerifiedAt),
     taxpayerVerificationNote: text(value.taxpayerVerificationNote),
     mainBusiness: text(value.mainBusiness),
+    laborScope: text(value.laborScope),
     invoiceName: text(value.invoiceName),
     invoiceAddress: text(value.invoiceAddress),
     bank: text(value.bank),
@@ -95,6 +99,7 @@ function toRow(stored: StoredSupplier): SupplierListSourceRow {
     address: text(draft.address),
     taxpayerType: text(draft.taxpayerType),
     mainBusiness: text(draft.mainBusiness),
+    laborScope: text(draft.laborScope),
     invoiceName: text(draft.invoiceName),
     invoiceAddress: text(draft.invoiceAddress),
     bank: text(draft.bank),
@@ -103,7 +108,7 @@ function toRow(stored: StoredSupplier): SupplierListSourceRow {
     contact: text(draft.contact),
     contactPhone: text(draft.contactPhone),
     contactTitle: text(draft.contactTitle),
-    credentialStatus: 'incomplete',
+    credentialStatus: stored.credentialStatus,
     note: text(draft.note),
     updatedAt: stored.updatedAt,
   }
@@ -112,6 +117,7 @@ function toRow(stored: StoredSupplier): SupplierListSourceRow {
 function importedStoredSupplier(row: SupplierListSourceRow): StoredSupplier {
   return {
     id: row.id,
+    credentialStatus: row.credentialStatus,
     draft: cleanDraft({
       id: row.id,
       name: row.name,
@@ -132,6 +138,7 @@ function importedStoredSupplier(row: SupplierListSourceRow): StoredSupplier {
       taxpayerVerifiedAt: null,
       taxpayerVerificationNote: '',
       mainBusiness: row.mainBusiness,
+      laborScope: row.laborScope ?? '',
       invoiceName: row.invoiceName,
       invoiceAddress: row.invoiceAddress,
       bank: row.bank,
@@ -151,6 +158,7 @@ function importedStoredSupplier(row: SupplierListSourceRow): StoredSupplier {
 function cloneState(state: SessionState): SessionState {
   return {
     commands: new Map(state.commands),
+    importFingerprints: new Map(state.importFingerprints),
     importedIds: new Set(state.importedIds),
     suppliers: new Map([...state.suppliers].map(([id, stored]) => [id, {
       ...stored,
@@ -169,13 +177,13 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
-      state = { commands: new Map(), importedIds: new Set(), suppliers: new Map(), sourceVersion: 0 }
+      state = { commands: new Map(), importFingerprints: new Map(), importedIds: new Set(), suppliers: new Map(), sourceVersion: 0 }
       states.set(key, state)
     }
     return state
   }
 
-  function assertEnvelope(request: SupplierCommandRequestDTO, session: BusinessSession) {
+  function assertEnvelope(request: Pick<SupplierCommandRequestDTO, 'workspaceId' | 'actorId' | 'requiredCapability' | 'commandId'>, session: BusinessSession) {
     if (request.workspaceId !== session.workspaceId || request.actorId !== session.actorId)
       throw failure('forbidden', '请求身份与当前会话不匹配')
     if (request.requiredCapability !== SUPPLIER_WRITE_CAPABILITY || !session.capabilities.includes(SUPPLIER_WRITE_CAPABILITY))
@@ -184,7 +192,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
       throw failure('validation-failed', 'commandId 必填', { commandId: ['commandId 必填'] })
   }
 
-  return {
+  const instance = {
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
@@ -252,6 +260,44 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         updatedAt: stored.updatedAt,
       }
     },
+    async importRow(request: SupplierImportCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<SupplierCommandResultDTO> {
+      assertEnvelope(request, session)
+      if (!text(request.draft.name))
+        throw failure('validation-failed', '公司全称不能为空', { name: ['公司全称不能为空'] })
+      const state = stateFor(sessionId)
+      const fingerprint = JSON.stringify(request)
+      const previousFingerprint = state.importFingerprints.get(request.commandId)
+      if ((previousFingerprint && previousFingerprint !== fingerprint)
+        || (!previousFingerprint && state.commands.has(request.commandId))) {
+        throw failure('conflict', '此导入标识已用于其他内容，请重新发起导入')
+      }
+      const duplicate = state.commands.get(request.commandId)
+      if (duplicate)
+        return { ...duplicate, attachmentIds: [] }
+      const externalRef = text(request.draft.externalRef)
+      const matches = externalRef
+        ? [...state.suppliers.values()].filter(item => text(item.draft.externalRef) === externalRef)
+        : []
+      if (matches.length > 1)
+        throw failure('conflict', '外部旧 ID 对应多个分供方，请先核对匹配标识', { externalRef: ['外部旧 ID 未唯一匹配'] })
+      const existing = matches[0]
+      // 查找、合并与 execute 的写入在同一同步段内完成；不以客户端分页结果推测匹配。
+      // 新建沿既定最小导入合同；重导只覆盖明确映射的字段，核验结论由原有规则维护。
+      const draft: SupplierFormDraft = {
+        ...(existing?.draft ?? { aliases: [], supplierCategory: '其他', taxpayerType: '未核验', approvalStatus: 'draft' }),
+        ...request.draft,
+        externalRef,
+      }
+      state.importFingerprints.set(request.commandId, fingerprint)
+      return instance.execute({
+        ...request,
+        ...(existing ? { id: existing.id } : {}),
+        draft,
+        baseVersion: existing ? String(existing.version) : null,
+        action: 'draft',
+        attachments: {},
+      }, session, sessionId)
+    },
     async execute(request: SupplierCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<SupplierCommandResultDTO> {
       assertEnvelope(request, session)
       const state = stateFor(sessionId)
@@ -271,6 +317,8 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
           throw failure('validation-failed', '分供方表单校验失败', fieldErrors)
       }
       const existing = request.id ? state.suppliers.get(request.id) : null
+      if (existing && request.draft.laborScope === undefined)
+        draft.laborScope = existing.draft.laborScope ?? ''
       if (request.id && !existing)
         throw failure('not-found', '正式分供方不存在')
       if (!request.id && request.baseVersion !== null)
@@ -285,9 +333,13 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         throw failure('validation-failed', '分供方内部编码已存在', { uniqueCode: ['分供方内部编码已存在'] })
       const timestamp = now()
       const id = existing?.id ?? createId()
+      const invalidatesCredentialReview = existing && ['qualified', 'rejected'].includes(existing.credentialStatus)
+        && (['name', 'uniqueCode', 'taxNo', 'legalRep', 'address', 'bank', 'bankAccount'] as const)
+          .some(field => text(existing.draft[field]) !== text(draft[field]))
       const stored: StoredSupplier = {
         id,
         draft: { ...draft, id },
+        credentialStatus: invalidatesCredentialReview ? 'incomplete' : existing?.credentialStatus ?? 'incomplete',
         version: (existing?.version ?? 0) + 1,
         updatedAt: timestamp,
       }
@@ -304,6 +356,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
       return { ...result, attachmentIds: [] }
     },
   }
+  return instance
 }
 
 export const supplierCommandTestInstance = createSupplierCommandTestInstance()

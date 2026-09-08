@@ -243,6 +243,25 @@ describe('f1 整页表单领域 action', () => {
     }, 'submit')).rejects.toThrow('项目不存在或已删除')
   })
 
+  it('劳务范围省略保留、显式清空，不改主营业务或人工核验结论', async () => {
+    const created = await saveSupplierForm({
+      name: '范围测试分供方',
+      supplierCategory: '劳务分包商',
+      contact: '联系人',
+      mainBusiness: '建筑劳务',
+      laborScope: '石材安装\n楼梯铺贴',
+    }, 'save')
+    await mem.execute('UPDATE suppliers SET credential_status = \'qualified\', credential_reviewed_at = \'2026-09-08T01:00:00.000Z\' WHERE id = ?', [created.id])
+    const loaded = (await loadSupplierForm(created.id))!
+    const { laborScope: _scope, ...withoutScope } = loaded
+    await saveSupplierForm(withoutScope, 'save')
+    expect((await loadSupplierForm(created.id))?.laborScope).toBe('石材安装\n楼梯铺贴')
+    await saveSupplierForm({ ...loaded, laborScope: '' }, 'save')
+    expect(await loadSupplierForm(created.id)).toMatchObject({ laborScope: '', mainBusiness: '建筑劳务' })
+    const [state] = await mem.select<{ credential_status: string }>('SELECT credential_status FROM suppliers WHERE id = ?', [created.id])
+    expect(state?.credential_status).toBe('qualified')
+  })
+
   it('六类表单的全部可编辑标量字段按真实 ID 写入并完整回显', async () => {
     const supplier = await saveSupplierForm({
       name: '华南材料有限公司',
@@ -259,6 +278,7 @@ describe('f1 整页表单领域 action', () => {
       address: '广州市白云区',
       taxpayerType: '一般纳税人',
       mainBusiness: '建筑材料',
+      laborScope: '石材安装\n楼梯铺贴',
       invoiceName: '华南材料有限公司',
       invoiceAddress: '广州市白云区 1 号',
       bank: '建设银行广州支行',
@@ -284,6 +304,7 @@ describe('f1 整页表单领域 action', () => {
       address: '广州市白云区',
       taxpayerType: '一般纳税人',
       mainBusiness: '建筑材料',
+      laborScope: '石材安装\n楼梯铺贴',
       invoiceName: '华南材料有限公司',
       invoiceAddress: '广州市白云区 1 号',
       bank: '建设银行广州支行',

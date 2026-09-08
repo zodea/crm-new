@@ -182,7 +182,7 @@ type ReadState<T> =
 | `home` | 首页 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
 | `project` | 项目 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
 | `master-data` | 基础主数据 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | 客户中央 Repository；班组—工人中央 `CrewWorkerReadRepository` / `CrewWorkerCommandRepository`；Tauri 保留本地 SQLite adapter | `A+B`；客户与班组—工人浏览器链均按来源稳定 ID 读取和写回，missing、forbidden、来源错配分别呈现，测试数据只读。班组成员、当前项目、责任单元、工资单和扣罚可穿透；无个人工资分配不反推。班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
-| `supplier` | 分供方 | 分供方主数据、独立证照文件/审核页、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | 中央 Supplier Repository；既有证照/要求/审计专用边界；跨域事实聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
+| `supplier` | 分供方 | 分供方主数据、独立证照文件/审核页、资料状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | 中央 Supplier Repository；既有证照/要求/审计专用边界；跨域事实聚合 | `A+B+C`；敏感字段按 capability 脱敏，资料状态与业务审批分开；查询、金额完整度和已接/未接来源见[分供方读取契约](#33-分供方列表查询与跨域事实)，字段与交互只见 [`base-supplier.md`](./pages/base-supplier.md) |
 | `project-supplier` | 项目分供方 | 项目×分供方详情、六类事实集合、合作文件与汇总；本地文件选择/分类草稿，确认后中央原子导入 | 中央 `ProjectSupplierReadRepository` 与导入命令；浏览器本地 adapter 只负责文件选择、分类和正文读取 | `A+C`；#317 已闭合双 ID 关系校验、正式/演示六类事实 DTO 与 HTTP，#281 闭合正式分供方/合作关系/文件正文的中央原子写入与反向读回；来源意图携 `dataOrigin`，仅已验证只读目标可返回，其他目标稳定不可用；文件预览/下载和终态结算写入仍不冒充已接入，见 [`project-supplier.md`](./pages/project-supplier.md) |
 | `core-contract` | 核心合同 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | 材采、施工与分包分别经中央领域 Repository；BOQ 按 canonical `contracts` 及下游单据 | `A+B`；#318/#320/#321 分别闭合材采、施工、分包专属列表—七分区详情—正式中央写入—读回；#322 闭合施工/分包补充协议稳定聚焦、父子校验、正式迁移与列表来源恢复；演示须显式授权且只读，未闭合稳定目标返回 `unverified-target` |
 | `aux-contract` | 辅助合同与结算 | 公司/其他支出合同、其他支出结算的专属列表/只读详情/表单，以及材料结算列表和表单；项目/分供方/合同引用、金额链与状态 | 两类辅助合同与其他支出结算经各自中央 Repository；`expenditure_settlements`、真实分摊与独立中央源单 | `A+B`；#330 已闭合两类辅助合同中央链，#331 已闭合其他支出结算及奖罚/申请/支付源单往返；未知付款归属仍保持 null。没有业务明细实体的类型不得返回虚构 lineItems；材料结算—有效到货关系已定，#409 核验实际迁移与实现，见 [`contract-forms.md`](./pages/contract-forms.md) |
@@ -338,6 +338,17 @@ interface NotificationOpenResultDTO {
 - 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
 - `app/stores/notifications.ts` 当前静态样本只在授权后的演示模式可见，正式来源保持真实空态。后台事件接入时按来源隔离提供事件，不将样本作为正式运行 fallback；演示 fixture 的可见性仍服从 ADR 0020。
 - 参考刷新时可观察到持续实时通道，同时待办查询单独返回 `ccTotalCount`、`todoTotalCount`、`delayTodoTotalCount`、`totalCount` 和 `records`。当前证据不能把某条 toast 与具体传输帧强绑定，因此 DTO 保持传输无关；adapter 可用实时增量触发，再以分页查询对账未读数。
+
+### 3.3 分供方列表查询与跨域事实
+
+分供方列表、详情和表单预载沿同一 `dataOrigin + supplierId` 读取主档；新增 `laborScope` 进入同一读取和查询投影，旧载荷缺少该字段时归一为空文本。字段词义、持久化及界面列序分别只见 [CONTEXT.md](../../CONTEXT.md)、[DATABASE.md](./DATABASE.md) 和[页面蓝本](./pages/base-supplier.md)，不在此复制字段表。可执行类型与查询白名单位于 [`read-contract.ts`](../../app/lib/supplier/read-contract.ts)，边界解码位于 [`read-decoder.ts`](../../app/lib/supplier/read-decoder.ts)。
+
+- 查询保留原有关键词、类别、资料状态、排序、分页和来源开关；新增 `columnFilters` 在 HTTP 查询参数中传 JSON，按 [`read-query.ts`](../../app/lib/supplier/read-query.ts) 归一。文本使用包含匹配，枚举使用精确值，数值范围包含两端；空条件不产生约束，未知字段、非有限数值及反向区间返回 `invalid-query`。敏感列先按当前 capability 形成可见值，再参与关键词和列条件匹配，不允许通过筛选探测隐藏原值。
+- 搜索、列条件、排序、总数及金额汇总处理同一完整结果集后分页。枚举 facet 保留其他条件、仅去除自身选中条件，不能从当前页推算选项。分供方缺失或非法页码归一到第一页；合法页码超过结果末页时回到末页，空结果为第一页。数值排序把未知值放在末尾，以稳定身份处理同值；隐藏列不清除已生效条件，返回列表时保留同一查询语义。
+- 列表合同金额、累计合同金额、累计结算金额及对应详情金额允许 `MoneyDTO | null`，不能在 decoder 或展示层把 `null` 变为 `0.00`。参与汇总的源金额缺失时，列表值及该来源汇总保持 `null`，详情 `MetricDTO` 返回 `value=null + status=partial + missingSources`，保留可用的源记录核对入口。只有已读取且确实为空的集合可以计算为零；草稿、失效记录和确认条件按[页面蓝本的金额口径](./pages/base-supplier.md#七跨项目只读汇总)执行，累计指标不另存为主档余额。
+- 当前中央测试实例通过 [`supplier-fact-source.ts`](../../server/utils/supplier-fact-source.ts) 组合各领域未分页读源：材料采购合同及其结算 feed、分包合同有效增补及中央 `sub_settlement`、其他支出合同有效增补及其他支出结算。关系仅按同来源的稳定分供方、项目和合同身份连接；有工作区/会话边界的来源保留原隔离，来源版本随组合读源返回。合同的 canonical kind 和导航意图不因中文类别显示而改写。
+- 接上读源不代表该领域全部业务事实已经迁入：正式材料结算 feed 当前尚无记录，正式发票及确认付款仍缺统一供应商归属/申请分摊来源；不能从合同旧累计字段、付款申请金额或其他票款摘要推造事实。当前已接来源及后续缺口继续由[页面蓝本](./pages/base-supplier.md)和[实现状态](../design/ui-implementation-status.md)维护，本段不宣称生产持久化已经完成。
+- 营业执照继续使用证照专用文件边界。列表普通 DTO 只允许受控文件 ID 与状态，不能返回本地路径或正文；专用真实文件读面尚未接通时返回 `unavailable`，计数为 `null`、ID 集合为空，不能等同于“未上传”。只有成功接通并查明无文件时才是 `missing`；非空真实文件引用才是 `available`。
 
 ## 4. 页面族响应最低字段
 

@@ -143,6 +143,7 @@ export function normalizeSupplierImportRow(row: Record<string, unknown>): Partia
   assignIfPresent(data, row, 'registeredDate', text)
   assignIfPresent(data, row, 'address', text)
   assignIfPresent(data, row, 'mainBusiness', text)
+  assignIfPresent(data, row, 'laborScope', text)
   assignIfPresent(data, row, 'businessType', text)
   assignIfPresent(data, row, 'invoiceName', text)
   assignIfPresent(data, row, 'taxpayerType', text)

@@ -14,6 +14,31 @@ const session: BusinessSession = {
 }
 
 describe('分供方中央写入测试实例', () => {
+  it('独立保存劳务范围，省略保留、显式清空，并从列表与详情回读', async () => {
+    const commands = createSupplierCommandTestInstance({ createId: () => 'labor-supplier' })
+    const reads = createSupplierReadTestInstance(() => session.capabilities, id => commands.rows(id), id => commands.sourceVersion(id))
+    const base = {
+      workspaceId: session.workspaceId,
+      actorId: session.actorId,
+      requiredCapability: SUPPLIER_WRITE_CAPABILITY,
+      action: 'save' as const,
+      attachments: {},
+      draft: { name: '劳务范围验证', supplierCategory: '其他', contact: '联系人', mainBusiness: '主营内容' },
+    }
+    const created = await commands.execute(parseSupplierCommandRequest({ ...base, commandId: 'labor-create', baseVersion: null, draft: { ...base.draft, laborScope: '石材安装\n楼梯铺贴' } }), session)
+    expect(commands.form(created.id, session).draft.laborScope).toBe('石材安装\n楼梯铺贴')
+    const updated = await commands.execute({ ...base, id: created.id, commandId: 'labor-omitted', baseVersion: created.version }, session)
+    expect((await reads.list({ search: '楼梯铺贴' })).items[0]).toMatchObject({ laborScope: '石材安装\n楼梯铺贴', mainBusiness: '主营内容' })
+    expect((await reads.detail(created.id, {})).supplier.laborScope).toBe('石材安装\n楼梯铺贴')
+    await commands.execute({ ...base, id: created.id, commandId: 'labor-clear', baseVersion: updated.version, draft: { ...base.draft, laborScope: '' } }, session)
+    expect(commands.form(created.id, session).draft.laborScope).toBe('')
+    expect((await reads.list({ search: '楼梯铺贴' })).items).toEqual([])
+    const imported = { ...commands.rows()[0]!, id: 'qualified-import', credentialStatus: 'qualified' }
+    commands.prepareImportedSuppliers([imported]).commit()
+    await commands.execute({ ...base, id: imported.id, commandId: 'labor-qualified', baseVersion: '1', draft: { ...base.draft, laborScope: '幕墙安装' } }, session)
+    expect(commands.rows().find(row => row.id === imported.id)).toMatchObject({ laborScope: '幕墙安装', credentialStatus: 'qualified' })
+  })
+
   it('在 HTTP 边界拒绝畸形 draft', () => {
     expect(() => parseSupplierCommandRequest({
       workspaceId: session.workspaceId,

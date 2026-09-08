@@ -117,14 +117,15 @@ const SUPPLIER_FIELDS: readonly ImportTemplateField[] = [
   { key: 'name', label: '公司全称', required: true, aliases: ['分供方名称', '供应商名称', '名称'] },
   { key: 'supplierCategory', label: '分供方类别', aliases: ['类别', '合作类别'] },
   { key: 'aliases', label: '简称/别名', aliases: ['简称', '别名'] },
-  { key: 'uniqueCode', label: '统一社会信用代码', aliases: ['信用代码'] },
-  { key: 'taxNo', label: '税号', aliases: ['纳税人识别号'] },
+  { key: 'uniqueCode', label: '唯一识别码', aliases: ['分供方内部编码', '内部编码'] },
+  { key: 'taxNo', label: '统一社会信用代码', aliases: ['税号', '纳税人识别号', '信用代码'] },
   { key: 'legalRep', label: '法定代表人', aliases: ['法人'] },
   { key: 'registeredCapital', label: '注册资金（万元）', aliases: ['注册资金', '注册资本'] },
   { key: 'registeredDate', label: '注册日期', aliases: ['成立日期'] },
   { key: 'address', label: '注册地址', aliases: ['地址'] },
   { key: 'mainBusiness', label: '主营业务' },
-  { key: 'businessType', label: '业务类型' },
+  { key: 'laborScope', label: '劳务承包范围' },
+  { key: 'businessType', label: '经营类型' },
   { key: 'invoiceName', label: '开票名称' },
   { key: 'taxpayerType', label: '纳税人类型' },
   { key: 'bank', label: '开户行' },
@@ -327,8 +328,17 @@ export const IMPORT_ENTITIES: Readonly<Record<string, ImportEntityDef>> = {
     key: 'supplier',
     label: '分供方',
     fields: SUPPLIER_FIELDS,
+    async validateRow(row) {
+      try {
+        normalizeSupplierImportRow(row)
+        return null
+      }
+      catch (cause) {
+        return cause instanceof Error ? cause.message : '分供方导入内容无效'
+      }
+    },
     async importRow(row) {
-      await useSupplierStore().upsertImported(normalizeSupplierImportRow(row))
+      await useSupplierCommandStore().importRow(row)
     },
   },
   'demo-supplier': {

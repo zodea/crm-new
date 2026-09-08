@@ -179,6 +179,11 @@ function batchCommand(commandId: string, batchId: string): CoreMigrationBatchCom
 }
 
 describe('core migration test instance', () => {
+  it.each(['sqlite-v47', 'sqlite-v48'])('兼容已定版本 %s 的合法快照', async (sourceVersion) => {
+    const instance = createCoreMigrationTestInstance()
+    await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, cleanSource({ sourceVersion })), SESSION)).resolves.toBeDefined()
+  })
+
   it('解析网络命令后保持来源哈希与字段顺序无关', async () => {
     const baseline = source()
     const migrationSource = source({

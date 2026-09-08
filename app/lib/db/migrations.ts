@@ -5699,6 +5699,15 @@ migrations.push({
   },
 })
 
+migrations.push({
+  version: 48,
+  name: 'supplier-independent-optional-labor-scope',
+  async up(db) {
+    if (await tableExists(db, 'suppliers'))
+      await addColumnIfMissing(db, 'suppliers', 'labor_scope', 'TEXT NOT NULL DEFAULT \'\'')
+  },
+})
+
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)
 
 const MIGRATIONS_TABLE = `
