@@ -1,6 +1,6 @@
 # 前后端读模型与 DTO 语义基线
 
-本文是当前生产页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 Wayfinder 的“固化跨域蓝色入口、目标路由与返回语义矩阵”裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
+本文是浏览器业务页面的读模型与后台 DTO 语义权威源。数据库表、字段和外键仍以 [`DATABASE.md`](./DATABASE.md) 为准，页面字段和业务流程仍以 [`pages/`](./pages/) 为准，蓝色入口及返回路由由 [`NAVIGATION.md`](./NAVIGATION.md) 裁定。本文不复制参考站接口名、私有 URL、认证参数或业务数据。
 
 当前实现已有九类中央主链：项目、客户、分供方、班组、工人、项目分供方、材料采购合同、施工合同与分包合同均经 Repository、HTTP adapter 和对应 `/api/read/*` operation 读取。合同 canonical 导航意图使用 `filters.contractKind`，Target Registry 映射为 `contractKind=material|construction|subcontract`；缺失 marker 的深链不会改道中央详情。演示夹具只有在 `includeDemo=true` 且会话拥有 `demo:read` 时可读，三类合同都按稳定来源、ID 和类型返回专属七组详情。#281 已联合验收客户、分供方、班组、工人、项目与项目分供方的中央身份往返；#317、#318、#320 与 #321 已分别闭合工作台、材采、施工与分包的 HTTP/Repository/受限返回链。旧 production SQLite 不再作为这些浏览器普通读 adapter。当前中央端为可重置测试实例，不是生产持久化库。
 
@@ -173,32 +173,32 @@ type ReadState<T> =
 - 需要源版本保护的工程量、工资、排程、OCR 校对和导入结果带 `sourceVersion`；陈旧提交返回 `stale-source`，不覆盖新事实。
 - HTTP adapter 使用 400 表示查询格式错误、403 表示无权限、404 表示不存在或错配、409 表示冲突/陈旧来源、422 表示字段校验失败、503 表示可重试不可用、500 表示未分类内部错误；SQLite adapter 映射到相同 `ProblemDTO.code`。
 
-## 3. 20 个页面域的 DTO 映射
+## 3. 页面域的 DTO 映射
 
-下表的“路由数”与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 130 条生产路由逐域对齐；字段细节只链接页面蓝本，不在此复制全部表字段。
+下表按页面域索引读模型，不维护会漂移的路由数量，也不以路由数作为功能分母。当前对象、动态 kind、状态和公共能力由[复核基线](https://github.com/zodea/crm-new/issues/403)核对，并与 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 对应；字段细节只链接页面蓝本。
 
-| 代码 | 运行证据域 | 路由数 | 页面族与核心读形态 | 当前本地来源 | 分级与后台缺口 |
-| --- | --- | ---: | --- | --- | --- |
-| `home` | 首页 | 1 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
-| `project` | 项目 | 3 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
-| `master-data` | 基础主数据 | 9 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | 客户中央 Repository；班组—工人中央 `CrewWorkerReadRepository` / `CrewWorkerCommandRepository`；Tauri 保留本地 SQLite adapter | `A+B`；客户与班组—工人浏览器链均按来源稳定 ID 读取和写回，missing、forbidden、来源错配分别呈现，测试数据只读。班组成员、当前项目、责任单元、工资单和扣罚可穿透；无个人工资分配不反推。班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
-| `supplier` | 分供方 | 4 | 分供方主数据、独立证照文件/审核页、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | 中央 Supplier Repository；既有证照/要求/审计专用边界；跨域事实聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
-| `project-supplier` | 项目分供方 | 2 | 项目×分供方详情、六类事实集合、合作文件与汇总；本地文件选择/分类草稿，确认后中央原子导入 | 中央 `ProjectSupplierReadRepository` 与导入命令；浏览器本地 adapter 只负责文件选择、分类和正文读取 | `A+C`；#317 已闭合双 ID 关系校验、正式/演示六类事实 DTO 与 HTTP，#281 闭合正式分供方/合作关系/文件正文的中央原子写入与反向读回；来源意图携 `dataOrigin`，仅已验证只读目标可返回，其他目标稳定不可用；文件预览/下载和终态结算写入仍不冒充已接入，见 [`project-supplier.md`](./pages/project-supplier.md) |
-| `core-contract` | 核心合同 | 12 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | 材采、施工与分包分别经中央领域 Repository；BOQ 按 canonical `contracts` 及下游单据 | `A+B`；#318/#320/#321 分别闭合材采、施工、分包专属列表—七分区详情—正式中央写入—读回；#322 闭合施工/分包补充协议稳定聚焦、父子校验、正式迁移与列表来源恢复；演示须显式授权且只读，未闭合稳定目标返回 `unverified-target` |
-| `aux-contract` | 辅助合同与结算 | 15 | 公司/其他支出合同、其他/材料结算列表和表单；项目/分供方/合同引用、金额链与状态 | 四类实体、`expenditure_settlements` 及真实分摊 | `A+B`；没有业务明细实体的类型不得返回虚构 lineItems；结算—到货分摊等待真实桥接，见 [`contract-forms.md`](./pages/contract-forms.md) |
-| `owner-document` | 甲方单据 | 4 | 六类单据变体的专属列表、只读详情投影与表单；项目/施工合同/客户、金额、分视图附件与审计事件 | 甲方单据表、月报量、BOQ 变更、`project_acceptances`、`project_acceptance_lifecycle_events`、`owner_final_settlements`、`owner_penalties`、`contract_supplements`、`receipt_registrations` 和 `file_refs` | `A+B`；#323 已闭合甲方变洽签/月度报量，#324 已闭合验收/保修 canonical 双视图，#325 已闭合最终结算，#326 已闭合甲方罚扣专属只读详情、中央表单命令、真实联系单附件与施工合同来源往返。罚扣金额、联系单、事由、申诉说明与状态来自同一 canonical 事实，申诉说明不推导审批流，见 [`owner-documents.md`](./pages/owner-documents.md) |
-| `subcontract-document` | 分包单据 | 8 | 分包变更、分包结算、项目罚扣专属列表/详情投影/表单；合同/分供方/班组与抵扣关系 | 分包变洽签经中央 owner-document Repository；其余分包单据表、`penalty_records`、抵扣桥表 | `A+B`；#327 已闭合分包变洽签专属只读详情、中央表单命令、签证单附件、分包合同事实行和项目/分供方来源往返；分包结算的付款余额、项目罚扣的签认与抵扣事实仍保持 partial，不用表单记录冒充详情，见 [`owner-documents.md`](./pages/owner-documents.md) |
-| `material` | 自购材 | 12 | 下料、到货、领用、盘点列表/详情投影/表单；材料行、来源单据、库存与结算付款状态 | 乙供材头/行表、合同/项目/分供方外键 | `A+B`；warehouse 仍为文本，到货—归档、结算分摊、领用批次和调拨两端缺稳定 ID，必须返回 missing-relation，见 [`material-management.md`](./pages/material-management.md) |
-| `owner-material` | 甲供材 | 15 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
-| `delivery` | 送货单闭环 | 4 | 处理区、归档库、归档详情/表单；送货头、材料行、归属、OCR/审核/归档/打印状态 | `delivery_records`、`delivery_lines`、`file_refs/file_payloads` | `A+C`；头/行和价格事实可后台化，原件字节、上传会话、OCR 轮询和桌面打印使用专用 adapter；文件名/路径不授予读取权限，见 [`material-delivery.md`](./pages/material-delivery.md) |
-| `material-price` | 材料价格 | 1 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 已归档送货行的确定性聚合，无独立价格表 | `A`；只返回有真实归档来源的事实，reviewed/done 名称差异由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
-| `finance-income` | 收入财务 | 10 | 开票申请、中央只读收款详情、显式收款表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；#314 已闭合客户收款关系的中央只读目标，其他通用本地列表仍需后台 DTO 返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
-| `finance-expense` | 支出财务 | 11 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
-| `invoice` | 发票台账 | 4 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
-| `quantity-payroll` | 工程量与工资 | 9 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类工资在合同责任 FK 和成本防双计决策前禁用，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
-| `schedule-target-cost` | 项目进度成本 | 9 | WBS 分组/任务/依赖/楼层计划、标准库版本、合同绑定预览，目标成本列表/版本/科目与偏差指标 | 排程和目标成本读模型、工程量完成事实、合同/暂估快照 | `A`；排程以创建/绑定时 sourceVersion 和快照为准，目标/实际/已签/已付分别取真实源，不按用途文本归类，见 [`schedule-progress.md`](./pages/schedule-progress.md)、[`target-cost.md`](./pages/target-cost.md) |
-| `import-export` | 导入导出 | 3 | 实体映射候选、逐行错误、批次进度、导出配置、迁移对账与结果引用 | 本地 Excel/SQLite 快照 adapter、`import_batches/source_refs/reconciliation_issues` 与中央迁移快照 | `A+C`；审计元数据可后台化，文件解析/生成与整库备份保留本地 adapter；原始文件值和整库字节只进受控追溯，不进普通列表 DTO 或中央接口，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md)、[迁移指南](../guides/local-data-migration.md) |
-| `ocr-settings` | 系统设置 | 1 | OCR 非敏感能力、超时、只读阈值和保存结果 | 本机 `ocr_settings`、三个 Nitro OCR operation | `C`；Token、API 地址和模型私有配置永不返回前端；桌面静态构建不能假定 Nitro 永久在线，见 [`finance-invoice.md`](./pages/finance-invoice.md)、[`material-delivery.md`](./pages/material-delivery.md) |
+| 代码 | 运行证据域 | 页面族与核心读形态 | 当前数据来源 | 分级与后台缺口 |
+| --- | --- | --- | --- | --- |
+| `home` | 首页 | 当前项目引用、排程分组/任务、计划与实际进度、空排程状态 | `projects`、施工进度读模型、首页聚合 | `A`；不增加参考站待办/公告等无本地路由模块，见 [`homepage-dashboard.md`](./pages/homepage-dashboard.md) |
+| `project` | 项目 | 项目列表/详情/表单；项目身份、客户关系、阶段、十个资料页签、经营 `MetricDTO` | 列表、只读详情与正式新增/编辑表单已走中央 HTTP；SQLite 迁移 adapter 读取 `projects`、`customers`、`receipt_registrations`、`target_costs` | `A+B`；列表与基础详情读切片已实现，经理/执行经理/设计/仓管等仍为名称文本，建立人员主数据 ID 前只显示不可下钻文本；管理费等未知指标保持 `pending`，见 [`project-info.md`](./pages/project-info.md) |
+| `master-data` | 基础主数据 | 客户、班组、工人列表/详情/表单；联系方式脱敏、项目/责任/考勤/工资/扣罚关系 | 客户中央 Repository；班组—工人中央 `CrewWorkerReadRepository` / `CrewWorkerCommandRepository`；Tauri 保留本地 SQLite adapter | `A+B`；客户与班组—工人浏览器链均按来源稳定 ID 读取和写回，missing、forbidden、来源错配分别呈现，测试数据只读。班组成员、当前项目、责任单元、工资单和扣罚可穿透；无个人工资分配不反推。班组合同、公司人员角色等缺稳定关系时不得用姓名拼接，见 [`base-customer.md`](./pages/base-customer.md)、[`base-crew.md`](./pages/base-crew.md)、[`base-worker.md`](./pages/base-worker.md) |
+| `supplier` | 分供方 | 分供方主数据、独立证照文件/审核页、证照状态、联系人/开户资料、跨项目合同/结算/收票/付款摘要 | 中央 Supplier Repository；既有证照/要求/审计专用边界；跨域事实聚合 | `A`；敏感字段按 capability 脱敏，资料缺失/过期/待核验分开；列表失效金额入口不进入 DTO 能力，见 [`base-supplier.md`](./pages/base-supplier.md) |
+| `project-supplier` | 项目分供方 | 项目×分供方详情、六类事实集合、合作文件与汇总；本地文件选择/分类草稿，确认后中央原子导入 | 中央 `ProjectSupplierReadRepository` 与导入命令；浏览器本地 adapter 只负责文件选择、分类和正文读取 | `A+C`；#317 已闭合双 ID 关系校验、正式/演示六类事实 DTO 与 HTTP，#281 闭合正式分供方/合作关系/文件正文的中央原子写入与反向读回；来源意图携 `dataOrigin`，仅已验证只读目标可返回，其他目标稳定不可用；文件预览/下载和终态结算写入仍不冒充已接入，见 [`project-supplier.md`](./pages/project-supplier.md) |
+| `core-contract` | 核心合同 | 三类合同列表/详情/表单、关联单据、材料明细、BOQ 文件/行/变更/月报量与汇总 | 材采、施工与分包分别经中央领域 Repository；BOQ 按 canonical `contracts` 及下游单据 | `A+B`；#318/#320/#321 分别闭合材采、施工、分包专属列表—七分区详情—正式中央写入—读回；#322 闭合施工/分包补充协议稳定聚焦、父子校验、正式迁移与列表来源恢复；演示须显式授权且只读，未闭合稳定目标返回 `unverified-target` |
+| `aux-contract` | 辅助合同与结算 | 公司/其他支出合同、其他支出结算的专属列表/只读详情/表单，以及材料结算列表和表单；项目/分供方/合同引用、金额链与状态 | 两类辅助合同与其他支出结算经各自中央 Repository；`expenditure_settlements`、真实分摊与独立中央源单 | `A+B`；#330 已闭合两类辅助合同中央链，#331 已闭合其他支出结算及奖罚/申请/支付源单往返；未知付款归属仍保持 null。没有业务明细实体的类型不得返回虚构 lineItems；材料结算—有效到货关系已定，#409 核验实际迁移与实现，见 [`contract-forms.md`](./pages/contract-forms.md) |
+| `owner-document` | 甲方单据 | 六类单据变体的专属列表、只读详情投影与表单；项目/施工合同/客户、金额、分视图附件与审计事件 | 甲方单据表、月报量、BOQ 变更、`project_acceptances`、`project_acceptance_lifecycle_events`、`owner_final_settlements`、`owner_penalties`、`contract_supplements`、`receipt_registrations` 和 `file_refs` | `A+B`；#323 已闭合甲方变洽签/月度报量，#324 已闭合验收/保修 canonical 双视图，#325 已闭合最终结算，#326 已闭合甲方罚扣专属只读详情、中央表单命令、真实联系单附件与施工合同来源往返。罚扣金额、联系单、事由、申诉说明与状态来自同一 canonical 事实，申诉说明不推导审批流，见 [`owner-documents.md`](./pages/owner-documents.md) |
+| `subcontract-document` | 分包单据 | 分包变更、分包结算、项目罚扣专属列表/详情投影/表单；合同/分供方/班组与抵扣关系 | 分包变洽签、分包结算与项目罚扣经中央 owner-document Repository；`penalty_records`、独立抵扣与整改事实 | `A+B`；#327 已闭合分包变洽签专属只读链；#328 已闭合分包结算的中央列表、详情、保存确认、附件与迁移，并恢复全局/项目/合同来源；#329 已闭合项目罚扣中央详情、抵扣/整改与审计。分包结算付款来源未接入或精确归属未知时仍保持 partial，不用表单记录冒充详情，见 [`owner-documents.md`](./pages/owner-documents.md) |
+| `material` | 自购材 | 下料、到货、领用、盘点列表/详情投影/表单；材料行、来源单据、库存与结算付款状态 | 乙供材头/行表、合同/项目/分供方外键 | `A+B`；warehouse 仍为文本，到货—归档、结算分摊、领用批次和调拨两端缺稳定 ID，必须返回 missing-relation，见 [`material-management.md`](./pages/material-management.md) |
+| `owner-material` | 甲供材 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
+| `delivery` | 送货单闭环 | 处理区、归档库、归档详情/表单；送货头、材料行、归属、OCR/审核/归档/打印状态 | `delivery_records`、`delivery_lines`、`file_refs/file_payloads` | `A+C`；头/行和价格事实可后台化，原件字节、上传会话、OCR 轮询和桌面打印使用专用 adapter；文件名/路径不授予读取权限，见 [`material-delivery.md`](./pages/material-delivery.md) |
+| `material-price` | 材料价格 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 已归档送货行的确定性聚合，无独立价格表 | `A`；只返回有真实归档来源的事实，reviewed/done 名称差异由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
+| `finance-income` | 收入财务 | 开票申请、中央只读收款详情、显式收款表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；#314 已闭合客户收款关系的中央只读目标，其他通用本地列表仍需后台 DTO 返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
+| `finance-expense` | 支出财务 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
+| `invoice` | 发票台账 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
+| `quantity-payroll` | 工程量与工资 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类合同/BOQ 清单直报工资已决议退役；仅保留 A/C1/C2 的既定现场工资来源，遗留入口/编码/数据隔离待逐项核验，不因补齐合同关系而重开，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
+| `schedule-target-cost` | 项目进度成本 | WBS 分组/任务/依赖/楼层计划、标准库版本、合同绑定预览，目标成本列表/版本/科目与偏差指标 | 排程和目标成本读模型、工程量完成事实、合同/暂估快照 | `A`；排程以创建/绑定时 sourceVersion 和快照为准，目标/实际/已签/已付分别取真实源，不按用途文本归类，见 [`schedule-progress.md`](./pages/schedule-progress.md)、[`target-cost.md`](./pages/target-cost.md) |
+| `import-export` | 导入导出 | 实体映射候选、逐行错误、批次进度、导出配置、迁移对账与结果引用 | 本地 Excel/SQLite 快照 adapter、`import_batches/source_refs/reconciliation_issues` 与中央迁移快照 | `A+C`；审计元数据可后台化，文件解析/生成与整库备份保留本地 adapter；原始文件值和整库字节只进受控追溯，不进普通列表 DTO 或中央接口，见 [`boq-import.md`](./pages/boq-import.md)、[`real-ticket-excel-reference.md`](./pages/real-ticket-excel-reference.md)、[迁移指南](../guides/local-data-migration.md) |
+| `ocr-settings` | 系统设置 | OCR 非敏感能力、超时、只读阈值和保存结果 | 本机 `ocr_settings`、三个 Nitro OCR operation | `C`；Token、API 地址和模型私有配置永不返回前端；桌面静态构建不能假定 Nitro 永久在线，见 [`finance-invoice.md`](./pages/finance-invoice.md)、[`material-delivery.md`](./pages/material-delivery.md) |
 
 ### 3.1 当前实现落点
 
@@ -208,11 +208,11 @@ type ReadState<T> =
 | --- | --- |
 | 首页、项目 | 项目列表与来源感知基础详情：`app/stores/project-list.ts`、`app/lib/project/repository.ts`、`http-repository.ts`、`sqlite-repository.ts`、`server/api/read/projects.get.ts`、`server/api/read/projects/[id].get.ts`；项目详情语义目标统一经 `app/lib/nav/target-registry.ts` 解析；正式项目表单与写入：`app/stores/project-command.ts`、`app/lib/project/command-contract.ts`、`command-http-repository.ts`、`server/api/read/projects/[id]/form.get.ts`、`server/api/commands/projects[/:id]`。首页与详情尚未接入的页签仍在 `project-detail.ts`、`phase-task.ts` 与既有 `app/lib/home/`、`app/lib/project/` |
 | 客户、班组、工人、分供方 | 客户中央链位于 `app/lib/customer/`；分供方中央链位于 `app/lib/supplier/`；班组—工人中央链位于 `app/lib/crew-worker/`、`app/stores/crew-worker-read.ts`、`crew-worker-command.ts` 与 `server/api/read/crews*`、`server/api/read/workers*`、`server/api/commands/crews*`、`server/api/commands/workers*`。浏览器页面不得回退旧详情 store / SQLite；班组/工人关系只按同来源稳定 ID 汇总。Tauri 仍使用 `master-data-read.ts`、`crew-detail.ts`、`worker-detail.ts` 与本地附件边界。 |
-| 核心/辅助合同、BOQ、甲方/分包单据 | 材采、施工与分包浏览器中央读写分别位于 `app/lib/material-contract/`、`app/lib/construction-contract/`、`app/lib/subcontract-contract/`；五类甲方单据与分包变洽签共用 `app/lib/owner-document/central-*`、`app/stores/owner-commercial-document-read.ts`、`/api/read/owner-documents*` 与 `/api/commands/owner-documents*` 的中央边界，但以独立 kind、capability 和投影隔离。分包变洽签只从 canonical `subcontract_change_orders` 读取项目、分供方、分包合同、审批金额、变更面积、实际审定价、状态与签证单附件，并进入分包合同 `changes` 事实行；列表和项目卡片分别消费分包专属审批金额、实际审定价汇总，不复用甲方申报额或含税额字段。BOQ 物理事实仍由原领域存储；已迁移的六类 canonical 单据不再由浏览器日常读写本地 SQLite，分包结算与项目罚扣仍在 `owner-document.ts` 与对应领域目录。目标不存在或关系错配时不回退到其他本地记录。 |
+| 核心/辅助合同、BOQ、甲方/分包单据 | 材采、施工与分包浏览器中央读写分别位于 `app/lib/material-contract/`、`app/lib/construction-contract/`、`app/lib/subcontract-contract/`；两类辅助合同与其他支出结算分别位于 `app/lib/auxiliary-contract/`、`app/lib/other-settlement/`。五类甲方单据、分包变洽签、分包结算与项目罚扣共用 `app/lib/owner-document/central-*`、`app/stores/owner-commercial-document-read.ts`、`/api/read/owner-documents*` 与 `/api/commands/owner-documents*` 的中央边界，但以独立 kind、capability 和投影隔离。分包变洽签只从 canonical `subcontract_change_orders` 读取项目、分供方、分包合同、审批金额、变更面积、实际审定价、状态与签证单附件，并进入分包合同 `changes` 事实行；列表和项目卡片分别消费分包专属审批金额、实际审定价汇总，不复用甲方申报额或含税额字段。BOQ 物理事实仍由原领域存储；已迁移的八类 canonical 单据不再由浏览器日常读写本地 SQLite；`sub_settlement` 使用专属金额/证据投影，`project_penalty` 使用中央独立抵扣与整改审计。目标不存在或关系错配时不回退到其他本地记录。 |
 | 项目×分供方 | 中央读取：`app/stores/project-supplier-read.ts`、`app/lib/project-supplier/repository.ts`、`http-repository.ts`、`server/api/read/project-suppliers/[projectId]/[supplierId].get.ts`；项目详情同一 DTO 返回 ProjectSupplier 反向关系。导入只把文件选择、本地文件名分类留在专用 adapter；确认后的分供方、ProjectSupplier、文件元数据与正文经 `app/stores/project-supplier-command.ts`、`command-http-repository.ts`、`GET /api/read/project-suppliers/:projectId/import-context` 和 `POST /api/commands/project-suppliers/import` 一次性提交中央 |
 | 自购材、甲供材、送货归档、材料价格 | `app/stores/material.ts`、`delivery.ts`、`delivery-record.ts`；`app/lib/material/`、`delivery/` |
 | 收入/支出财务、发票 | `app/stores/finance.ts`、`payment-management.ts`、`invoice.ts`；`app/lib/finance/`、`invoice/` |
-| 付款洞察、应用消息 | `app/lib/finance/payment-detail.ts`、`app/components/finance/PaymentApplicationInsightPanel.vue`、`app/stores/notifications.ts`；当前通知静态 seed 只是待迁移实现，不是后台 DTO 样本 |
+| 付款洞察、应用消息 | `app/lib/finance/payment-detail.ts`、`app/components/finance/PaymentApplicationInsightPanel.vue`、`app/stores/notifications.ts`；当前静态通知只在服务端授权后的演示模式展示；正式消息源仍待接入，不能把演示通知当成后台业务事件 |
 | 工程量、工资、考勤、签工 | `app/stores/quantity.ts`、`payroll.ts`、`payroll-statement-detail.ts`、`attendance.ts`、`signed-daywork.ts`；`app/lib/quantity/`、`payroll/` |
 | 排程、标准库、目标成本 | `app/stores/schedule.ts`、`schedule-process-library.ts`、`target-cost-list.ts`、`target-cost-detail.ts`；`app/lib/schedule/`、`target-cost/` |
 | 导入、导出、OCR 设置 | `app/stores/export-workflows.ts`、`ocr-settings.ts` 及领域导入模块；`server/api/ocr/` 只承载 OCR 专用 operation |
@@ -336,7 +336,7 @@ interface NotificationOpenResultDTO {
 - 用户激活单条消息时调用 `openNotification(eventId)`；adapter 在同一事务内按当前权限解析目标并首次写入 `readAt`，返回 `NotificationOpenResultDTO`。`forbidden` / `missing` 仍保留消息记录，重复打开保持幂等。
 - 目标 resolved 后的前端渲染失败不回滚 `readAt`；消息仍可从抽屉重试目标。全部已读只能由显式批量命令写入。
 - 目标无权限时仍可保留经过脱敏的消息事实，并将目标解析为 forbidden；不能删除消息或把它伪装成无目标。
-- `app/stores/notifications.ts` 当前 5 条静态 seed 不得继续作为运行时 fallback。后台事件接入前使用真实空态；确定性 fixture 只允许存在于测试。
+- `app/stores/notifications.ts` 当前静态样本只在授权后的演示模式可见，正式来源保持真实空态。后台事件接入时按来源隔离提供事件，不将样本作为正式运行 fallback；演示 fixture 的可见性仍服从 ADR 0020。
 - 参考刷新时可观察到持续实时通道，同时待办查询单独返回 `ccTotalCount`、`todoTotalCount`、`delayTodoTotalCount`、`totalCount` 和 `records`。当前证据不能把某条 toast 与具体传输帧强绑定，因此 DTO 保持传输无关；adapter 可用实时增量触发，再以分页查询对账未读数。
 
 ## 4. 页面族响应最低字段
@@ -373,7 +373,7 @@ interface NotificationOpenResultDTO {
 ## 5. 本地 adapter 与后台迁移规则
 
 1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL、SQL 或领域 route map。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。可点击目标统一交给 Target Registry，未登记目标保持不可达。
-2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。迁移页经 `/api/migrations/core/*` 获取预检、批次、问题、映射和中央快照；只有中央 `authority='central'` 且活动批次与本机持久标记一致时，已迁移项目与施工/分包合同才作为正式数据读回。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；但确认切换的六类核心身份与施工/分包合同不得借此绕过中央或回退读取旧 production。禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
+2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。迁移页经 `/api/migrations/core/*` 获取预检、批次、问题、映射和中央快照；只有中央 `authority='central'` 且活动批次与本机持久标记一致时，已迁移项目与施工/分包合同才作为正式数据读回。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；但任何已经接入中央的领域均不得借此绕过中央或回退读取旧 production；具体已接入范围见本文件当前落点与 ADR 0020。禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
 3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。
 4. 不做本地与在线静默双写。项目在线命令失败时只保留明确的本地草稿，不改正式投影、不自动回放；其他领域在全局决策前保持各自单一现有写路径。
 5. OCR、文件和 Excel adapter 与普通业务 DTO 分离。普通 DTO 只引用受控 file id；二进制上传/下载使用专用能力和短期授权，不保存私有地址。
@@ -381,11 +381,11 @@ interface NotificationOpenResultDTO {
 
 ## 6. 验收
 
-- 运行证据矩阵的 20 个业务域、129 条生产路由都在本文件恰有一个页面域归属；路由新增、删除或改域时同一提交更新本矩阵。
+- 当前运行证据矩阵中的业务对象、动态 kind、页面状态及公共入口均有明确页面域归属；新增、删除或改域时同一工作单元更新相关映射，不沿用历史固定路由总数作为验收。
 - `id/no/外部键` 为字符串；金额为两位十进制定点字符串；日期为 ISO；布尔为 JSON boolean；枚举传稳定 code，不传样式类名或中文标签作为唯一身份。
 - 真实 0、未知 null、空集合、缺关系、无权限、加载失败和筛选无结果均可区分。
 - 汇总与列表使用同一筛选；分页排序稳定；关系只按 ID；错配与 not-found 不回退名称。
-- 当前无实体数据的页面保持真实空态；项目列表、语义目标、来源感知基础详情与新增/编辑命令，以及受控迁移的批次快照，由可重置中央实例证明 HTTP 链。其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS；已确认切换的六类核心身份与施工/分包合同除外，不能以 SQLite adapter 作为正式回退路径。
+- 当前无实体数据的页面保持真实空态；项目列表、语义目标、来源感知基础详情与新增/编辑命令，以及受控迁移的批次快照，由可重置中央实例证明 HTTP 链。其余后台未接入页面使用类型化 SQLite adapter，不引入 MockJS；所有已接入中央的领域除外，不能以 SQLite adapter 作为正式回退路径。
 - 本文件与 `DATABASE.md`、页面蓝本或实现冲突时先在对应 Issue 留证，再在同一工作单元消除冲突；不得静默让页面 DTO 成为第二份数据库 schema。
 
 ### AX02 分包结算

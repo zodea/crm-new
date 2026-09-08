@@ -1,6 +1,6 @@
 # 数据库设计 — 全局实体关系 + 外键索引 + 建表顺序
 
-> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；后台物理库结构待迁移切片落地，不能把本文件中的本地 seed 策略解释为正式工作区初始化。
+> 本文件是现有 SQLite 迁移来源（tauri-plugin-sql / sql.js）的实体与外键权威。浏览器中央权威与本地快照隔离由 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 裁定；生产持久库方案由[后置生产关口](https://github.com/zodea/crm-new/issues/416)承接。下文同时保留当前来源结构和明确标注的目标增量；不能把历史本地 seed 策略解释为正式工作区初始化，也不能把中央测试实例当作已落地的生产库。
 
 当前落地事实（#279、#294、#320、#321）：浏览器 `production` 快照只运行迁移、不 seed；只有服务端授予 `demo:read` 后，`demo` 快照才运行现有 JSON、工程量、BOQ 与排程 seed，并在初始化后以只允许 `SELECT` 的驱动暴露。Tauri 不消费浏览器演示偏好，仍只连接原有 `sqlite:crm.db`。`dataOrigin` 是 Repository/DTO 的来源属性，不写进业务名称、编号或金额，也不允许用 `*_demo_*` 字符串前缀反推。既有本地数据中六类核心身份与 canonical 施工/分包合同的一次性分类、ID 映射、导入、对账和回滚使用同一受控迁移；其余领域仍由后续迁移票完成。
 
@@ -417,6 +417,8 @@ CREATE TABLE payment_application_invoice_allocations (
 
 ### 2.5 物资管理类
 
+本节 SQLite 表仍是现有来源结构。[材料到货与送货归档基数决定](https://github.com/zodea/crm-new/issues/284)、[甲供材供货身份与计划决定](https://github.com/zodea/crm-new/issues/285)及[已确认材料结算冲销决定](https://github.com/zodea/crm-new/issues/291)已经采纳；不能因为下文尚保留旧表而重新讨论单一明细、Party/计划行或整张冲销。目标结构、旧表退役和迁移的实际完成度按[物资模块复核](https://github.com/zodea/crm-new/issues/411)与[合同及材料结算复核](https://github.com/zodea/crm-new/issues/409)逐项核验，不由本段宣告完成。缺价格可保留归档到货事实，价格分析排除缺价格行；归档标记本身不证明有效到货、库存与结算门禁全部满足。
+
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | MaterialRequisition | `material_requisitions` | `id` | `material-management.md`（乙供材下料） |
@@ -445,7 +447,7 @@ CREATE TABLE delivery_records (
   orderNo TEXT, deliveryDate TEXT,   -- 去重自然键 = projectId+supplierId+orderNo（全 ID 化，见 §6 唯一索引）
   fileName TEXT, filePath TEXT,
   ocrStatus TEXT DEFAULT 'pending',  -- 待识别 | 识别中 | 待核对 | 已核对
-  archived  INTEGER DEFAULT 0,       -- 归属齐全并由用户触发归档后置 1；送货单 archived=1 即已入库/可供单价分析
+  archived  INTEGER DEFAULT 0,       -- 已人工核对、归属齐全并触发归档后置 1；有效到货与价格分析另按本节现行门禁判断
   stored    INTEGER DEFAULT 0,       -- v25 起只作存量兼容镜像，归档记录统一回填 1；禁止作为独立业务资格判断
   printBatchId TEXT DEFAULT '',      -- v32：同一上传原件拆出的多张送货单共享；跨刷新按批次恢复一个打印任务
   printDisposition TEXT DEFAULT 'excluded', -- pending | printed | excluded；新归档由 store 显式写 pending
@@ -502,7 +504,7 @@ CREATE TABLE project_aliases (
 | UnitStageCompletion | `unit_stage_completions` | `id` | **ADR 0010**：户 × 工序阶段完成事实（状态/日期/照片软卡） |
 | ~~Quantity~~ | ~~`quantities`~~ | — | **已废弃**：原“分项 × 房间 × 工人 × 完成月份”合一表拆为户型模板量、户 × 工种责任和户 × 工序阶段完成；禁用旧表和 `completedMonth` |
 | PayrollSubjectConfig | `payroll_subject_configs` | `id` | C2 请款主体×项目配置；保存负责人、班组、默认大工单价和可编辑签工确认规则，活跃自然键为项目×负责人×格式族 |
-| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；`format_family=A/B/C1/C2`（当前开放 A/C1/C2，B 待真实合同清单），`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
+| WageStatement | `wage_statements` | `id` | 负责人请款簿（请款主体×月×格式族×档位）；现有来源 schema 的 `format_family=A/B/C1/C2` 保留历史 B 编码，现行业务只允许 A/C1/C2，B 类合同/BOQ 清单直报工资已退役，其遗留入口与数据须隔离而非等待清单补齐后启用；`period_kind=monthly/settlement/retention`，`purpose=advance/final`，`quantity_source=provisional/field`，`status=draft/checked/released`；C2 通过 `subject_config_id` 关联主体配置；保存累计应付、此前已发、来源版本/时间与操作者；`released` 冻结 `snapshot_json` 和实际发放金额 |
 | WageStatementMember | `wage_statement_members` | `id` | 请款簿成员归属；同一请款簿包含一名负责人和零至多名成员，负责人同时记入成员表 |
 | WageStatementAllocation | `wage_statement_allocations` | `id` | 已发工资单的组内实际收款分配；按整数分保存，成员集合必须与请款簿成员完全一致，零金额保留且分配合计必须严格等于实际发放金额 |
 | WageStatementLine | `wage_statement_lines` | `id` | 月度分项快照：工人、分项、单位、工程量、工资单价、金额；核对时按现场量/考勤替换，发放后只读 |
@@ -1846,9 +1848,11 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 
 ## § 7 数据迁移策略
 
+本节的 localStorage → SQLite 内容是旧本地版本的来源映射，不是当前浏览器中央切换流程或自动启动命令。当前中央迁移的预检、不可变备份、拓扑导入、对账、确认与回滚以 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 和 [`COMMANDS.md`](./COMMANDS.md) 为准；未迁移领域仍保持其明确现有边界，不新增静默迁移或正式数据 seed。
+
 ### 7.1 旧数据迁移（localStorage → SQLite）
 
-首次启动检测 localStorage 中的旧数据 key：
+旧本地版本曾使用的 localStorage 数据 key 与目标映射如下，是否存在与是否已迁移须先核对实际来源，不能在当前浏览器启动时自动执行：
 
 | 旧 key | 目标表 | 说明 |
 |---|---|---|
@@ -1863,14 +1867,14 @@ CREATE INDEX idx_att_worker ON attendance_records(workerId);
 2. 旧数据保留不删除（用户可手动清理）
 3. 旧 `Supplier.attachments[]` 内嵌数组 → 拆为 `supplier_credentials` 多行
 4. 旧 `Supplier.purchases[]` / `payments[]` → 保留在 `suppliers` 表的 JSON 字段中（兼容），新数据走独立表
-5. 区域树/工程量/施工进度/目标成本等新表**无 localStorage 旧数据来源**，不参与迁移（首启建空表 + seed；工序标准库 22 道随 seed 内置）
+5. 区域树/工程量/施工进度/目标成本等表**无上述 localStorage 旧数据来源**，不参与这条旧 key 映射；这不等于它们不参与后续 SQLite → 中央迁移。浏览器正式 `production` 不 seed，确定性工程量、排程和工序样本只允许在授权演示来源使用。
 6. 旧 `credential_status` 按新必需资料和有效期重新计算：缺失/过期 → `incomplete`；齐全 → `reviewing`。没有人工核验时间/备注凭证的旧自动 `qualified` 不得迁为人工合格，也应进入 `reviewing`；旧 `rejected` 仅在有明确退回凭证时保留，否则同样重算。迁移不得伪造 `credential_reviewed_at` 或核验备注。
 
 ---
 
 ## § 8 撤回机制（V1 已落地，#52）
 
-> 所有新增/编辑/删除操作需支持撤回。V1 用软删除 + 操作日志（已由 #52 实现），后续可扩展为后台管理回退面板。
+> 本节记录 #52 的本地软删除与操作日志基础，不表示每个实体当前都开放删除或任意撤回。可用命令、受保护状态和更正方式分别以 [`COMMANDS.md`](./COMMANDS.md) 及页面领域契约为准；已确认材料结算、已发工资等必须沿用各自冲销/调整规则，不能用通用撤回覆盖历史事实。后台管理回退面板不因此进入本轮范围。
 
 ### 8.1 软删除
 
@@ -1912,7 +1916,7 @@ CREATE INDEX IF NOT EXISTS idx_operation_logs_time ON operation_logs(created_at)
 1. **删除撤回**：从操作日志中恢复 `before_data`，或直接清除 `deleted_at`
 2. **编辑撤回**：从操作日志中恢复 `before_data` 的字段值
 3. **新增撤回**：标记软删除
-4. **撤回时效**：V1 不限制，V2 可按天数限制（如 30 天内可撤回）
+4. **撤回时效**：通用日志基础能力不代表页面允许无限期撤回；用户可见的单条/批量删除撤回按 ADR 0003 的 10 秒窗口，级联采用提交前取消，各实体的受保护状态和更正方式仍优先。
 5. **级联撤回**：见 [ADR 0003](../adr/0003-confirm-dialog-deletion-model.md) 第 5 条——级联只标父级、撤回只恢复父级、下游按「祖先是否已删」自动重现（读取过滤本体见 §8.1）。
 
 ### 8.4 实施计划

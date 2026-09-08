@@ -3,6 +3,8 @@
 > 源文件：`01_成果文件/未来印合同睿璟清单列表_复核版.xlsx`
 > 原则：按实体导入；公式列只用于对账，不作为业务事实。
 
+本文件是指定工作簿的来源映射，不另立数据模型；字段关系以 [DATABASE.md](../rewrite/DATABASE.md) 为准。当前实体导入复核见 [#406](https://github.com/zodea/crm-new/issues/406)，接管后的写入执行 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md)，不能向本地快照回填正式事实。
+
 ## 1. 导入实体顺序
 
 1. Project；

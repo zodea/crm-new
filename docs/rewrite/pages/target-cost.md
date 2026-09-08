@@ -3,7 +3,7 @@
 > 表单蓝本：`targetCostForm`（ADR 0014）
 > 持久化权威：`DATABASE.md` 的 `target_costs` / `target_cost_items`
 > 路由：`/project/target-cost` · `/project/target-cost/form/:id?` · `/project/target-cost/:id`
-> 参考边界：本地脱敏红圈资料只证明 `targetCost3X` / `targetCostListDetails3X` 关系；列表、详情和表单构图采用 DC 直接源码。未观察到红圈目标页运行态，不外推审批、导入或写操作。
+> 参考边界：已观察红圈目标成本列表与只读详情，按 [运行参考 R-TARGET-COST-LIVE](../../design/runtime-reference-audit.md) 对齐构图、密度和安全下钻；表单没有直接运行证据，沿用 DC 与本地业务契约，不外推审批、导入或写操作。当前复核由 [#412](https://github.com/zodea/crm-new/issues/412) 承接。
 
 ## 定位
 
@@ -64,7 +64,7 @@
 - 金额允许草稿为空；提交时必须为非负数。含税、无税和税额只作勾稽提示，不强制覆盖人工确认值。
 - 项目成本对比读取当前基线及其 `target_cost_items`，不读取其他历史版本。
 - 科目明细保存与版本头保存是两个明确动作；编辑明细不静默提交或改写版本头状态。
-- 设计源码中的列表/详情结构是本产品直接蓝本，当前设计覆盖契约已标记为 `covered`；#191 负责真实数据、明细事务和运行态交互闭环。
+- 有直接参考的列表与详情按 ADR 0013 对齐红圈；DC 继续决定品牌及无直接参考的表单。#191 是历史实现来源，`covered` 仅表示设计覆盖，不能代替 #412 对真实数据、明细事务和运行交互的本轮验收。
 
 ## 验收
 

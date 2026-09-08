@@ -35,9 +35,11 @@ DC重构设计源码/
 
 ## 当前待补设计
 
-**当前为 2 条。** `/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但还没有一一对应的 DC 页面；它们在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`，分别由 [#305](https://github.com/zodea/crm-new/issues/305) 与 [#294](https://github.com/zodea/crm-new/issues/294) 承接。迁移页在设计补齐前以运行契约、四档实际视口和表内局部滚动证据验收。此前的施工进度「前后置依赖设置」已由 [#244](https://github.com/zodea/crm-new/issues/244) 合入设计源码，其 brief 仅保留历史说明，不再作为待办。
+现有生成账本登记 **2 条**：`/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但还没有一一对应的 DC 页面，在 [`design-coverage.json`](./design-coverage.json) 中保持 `design-pending`。本轮付款详情的公共洞察形态由 [#404](https://github.com/zodea/crm-new/issues/404) 联同资金模块 [#413](https://github.com/zodea/crm-new/issues/413) 复核，迁移界面由 [#414](https://github.com/zodea/crm-new/issues/414) 承接；旧 #305/#294 仅作历史来源。迁移页在设计补齐前以运行契约、四档实际视口和表内局部滚动证据验收。此前的施工进度「前后置依赖设置」已由 #244 合入设计源码，[补图 brief](../research/schedule-dependency-editor-brief.md) 已移入历史研究，不再作为待办。
 
-当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据、差异状态和对应实施票看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。当前实施权威是父规格 [#292](https://github.com/zodea/crm-new/issues/292) 与账本票 [#276](https://github.com/zodea/crm-new/issues/276)；#181 / #182 / #183 只保留历史证据，不再代表当前 Issue 状态。
+当前界面数量、未实现和未闭环清单统一看 [`ui-implementation-status.md`](./ui-implementation-status.md)；全部生产 Nuxt 路由的运行态参考证据和差异看 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，可机读双向集合见 [`runtime-evidence-ledger.json`](./runtime-evidence-ledger.json)。本轮任务统一进入[瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402)，复核与详细规格按 [`module-review.md`](../agents/module-review.md) 执行。旧总规格、地图及账本中的票号保留历史证据含义；被替代的旧票通过正文指向当前承接者，不再充当当前实施入口。选定代码基线后的路由与机器账本校正由[建立全模块功能清单与可信复核基线](https://github.com/zodea/crm-new/issues/403)负责。
+
+历史溯源继续保留：旧生产链总规格 [#292](https://github.com/zodea/crm-new/issues/292) 与证据账本重建 [#276](https://github.com/zodea/crm-new/issues/276)。这些链接用于核对已有决定和验收来源，当前工作仍跟随新总图与承接任务。
 
 运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
 

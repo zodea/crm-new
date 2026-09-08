@@ -13,16 +13,18 @@
 | 中央写命令、幂等、版本冲突和本地草稿边界 | [`docs/rewrite/COMMANDS.md`](./rewrite/COMMANDS.md) |
 | 蓝色入口、目标路由、页签和返回上下文 | [`docs/rewrite/NAVIGATION.md`](./rewrite/NAVIGATION.md) |
 | 智能洞察、全局消息和业务页签怎样挂载、恢复与对账 | [`docs/rewrite/PUBLIC-SURFACES.md`](./rewrite/PUBLIC-SURFACES.md) |
-| 当前界面应当长什么样 | [`DC重构设计源码/app.dc.html`](../DC重构设计源码/app.dc.html) 与 [`docs/design/README.md`](./design/README.md) |
+| 当前界面应当长什么样 | [`docs/design/README.md`](./design/README.md) 与 ADR 0013；直接对应页看运行参考，瑞航品牌与独有能力看 DC 设计稿 |
 | 页面有哪些字段、Tab 和业务边界 | [`docs/rewrite/pages/`](./rewrite/pages/) |
 | 用户应当怎样完成一条业务流程 | [`docs/guides/`](./guides/) |
 | 如何将浏览器旧核心身份数据显式切换到中央后台 | [`docs/guides/local-data-migration.md`](./guides/local-data-migration.md) |
 | 当前还有哪些界面未实现或未闭环 | [`docs/design/ui-implementation-status.md`](./design/ui-implementation-status.md) |
 | 当前工作是否已定稿、由谁领取 | [GitHub Issues](https://github.com/zodea/crm-new/issues) |
+| 本轮全模块复核、红圈对齐与任务替换 | [瑞航 CRM 全模块复核与红圈对齐路线：前台交互和数据处理优先](https://github.com/zodea/crm-new/issues/402) |
 | Agent 如何开工、分诊和提交 | [`docs/agents/`](./agents/) |
 
 ## 参照索引（非权威源）
 
+- [模块开发方向流程图](./research/module-development-flows.md)：全局业务衔接及八个模块的操作、结果与异常返回，用于核对方向；不表示功能已完成。
 - [红圈四条业务流转](../红圈系统/业务流转.md)：收入、支出、物资、工程量·变更的对象流与关键勾稽索引。
 - [红圈对象 → DC 实体命名对照与系统全景](../红圈系统/命名对照与全景.md)：124 个红圈对象的迁移归属、DC 补集与双视角全景。
 
@@ -36,7 +38,7 @@
 - `guides/`：面向最终用户的操作说明 Markdown 权威源；PDF 是同源生成的交付物。
 - `rewrite/`：当前架构、数据模型、通用业务模式与页面蓝本。
 - `prd/`：仍有独立价值的产品需求文档；落地状态以 Issue 为准。
-- `implementation/`：仍在执行的实施拆解，不是架构或业务权威源。
+- `implementation/`：实施承接与拆分入口，执行顺序以当前 Issue 为准，不是架构或业务权威源。
 - `migration/`：数据迁移、验收与对账材料。
 - `research/`：证据、竞品和历史调查，明确为非权威源。
 
@@ -44,7 +46,7 @@
 
 1. 先看相关 GitHub Issue 的当前状态和最新评论。
 2. 术语冲突以 `CONTEXT.md` 为准，数据冲突以 `DATABASE.md` 为准，已采纳决策冲突以最新 ADR 为准。
-3. 视觉冲突按 ADR 0013：当前 `app.dc.html` 是全站基准，响应式约束仍必须成立。
+3. 视觉冲突按 ADR 0013：直接对应页采用运行参考，瑞航品牌、独有能力及无直接参考页采用 `app.dc.html`，响应式约束仍必须成立。
 4. 代码现状与权威文档冲突时，不用旧代码证明旧文档正确；先把冲突记入 Issue，再在同一工作单元同步实现与文档。
 
 临时过程记录完成后应并入 Issue、ADR 或上述权威源并删除。历史版本由 Git 保存，不在工作树保留“旧版副本”。

@@ -31,11 +31,11 @@
 
 参考费用报销按材料报销、非材料报销和公司报销分类，专属宽表包含申请编号、项目、支出所属公司、业务/报销类型、报销人、申请日期、说明、累计报销、备用金抵扣、扣款、抵扣后需支付、审批、实际支付、剩余待支付、支付状态、生效状态和成本分类；直接证据见 `R-FINANCE-FLOW-LIVE`。
 
-当前参考与本地均为明确空数据。本地没有 `expense_reimbursements` / 明细 seed，应保持真实空态，但不能继续只显示通用列。列表读模型至少返回 `id/no/project/company/bizType/category/applicant/applicationDate/reason/reimbursedAmount/advanceOffset/deductionAmount/payableAmount/approvalStatus/paidAmount/unpaidAmount/paymentStatus/effectiveStatus/costCategory`，其中：
+2026-08-13 参考与本地走查均为空；[#413](https://github.com/zodea/crm-new/issues/413) 按当前数据源重新核实列表，不用演示行补空态。列表读模型至少返回 `id/no/project/company/bizType/category/applicant/applicationDate/reason/reimbursedAmount/advanceOffset/deductionAmount/payableAmount/approvalStatus/paidAmount/unpaidAmount/paymentStatus/effectiveStatus/costCategory`，其中：
 
 - `reimbursedAmount` 从有效明细汇总；
 - `paidAmount/unpaidAmount` 只从已确认支付及分摊派生；
-- `advanceOffset` 在备用金实体未建立前返回 `null + availability='not_connected'`，界面显示“未接”，不得补 `0`；
+- 备用金域沿用本轮排除；其抵扣列明确不适用，不展示为待接后台任务，也不伪造 `0`；后续若明确扩域才调整数据契约；
 - 公司报销的 `project` 可空，不创建虚拟项目。
 
 申请编号主链接应进入只读详情，编辑保持独立动作；列表无数据时仍保留分类、表头、筛选和分页。

@@ -10,7 +10,6 @@ const DOCS_INDEX_PATH = join(PROJECT_ROOT, 'docs/README.md')
 interface DomainContractRow {
   code: string
   domain: string
-  routeCount: number
   classification: string
 }
 
@@ -21,15 +20,15 @@ function markdownCells(line: string): string[] {
     .map(cell => cell.trim())
 }
 
-function auditDomainCounts(markdown: string): Map<string, number> {
-  const counts = new Map<string, number>()
+function auditDomains(markdown: string): Set<string> {
+  const domains = new Set<string>()
   for (const line of markdown.split(/\r?\n/)) {
     if (!line.startsWith('| `app/pages/'))
       continue
     const domain = markdownCells(line)[2]
-    counts.set(domain, (counts.get(domain) ?? 0) + 1)
+    domains.add(domain)
   }
-  return counts
+  return domains
 }
 
 function contractRows(markdown: string): DomainContractRow[] {
@@ -41,8 +40,7 @@ function contractRows(markdown: string): DomainContractRow[] {
       return {
         code: cells[0].replaceAll('`', ''),
         domain: cells[1],
-        routeCount: Number(cells[2]),
-        classification: cells[5],
+        classification: cells[4],
       }
     })
 }
@@ -51,15 +49,15 @@ describe('read model contract coverage', () => {
   it('maps every audited production route to exactly one DTO domain', () => {
     expect(existsSync(CONTRACT_PATH)).toBe(true)
 
-    const audit = auditDomainCounts(readFileSync(AUDIT_PATH, 'utf8'))
+    const audit = auditDomains(readFileSync(AUDIT_PATH, 'utf8'))
     const rows = contractRows(readFileSync(CONTRACT_PATH, 'utf8'))
-    const mapped = new Map(rows.map(row => [row.domain, row.routeCount]))
+    const mapped = new Set(rows.map(row => row.domain))
 
-    expect(rows).toHaveLength(20)
+    expect(audit.size).toBeGreaterThan(0)
+    expect(rows).toHaveLength(audit.size)
     expect(new Set(rows.map(row => row.code)).size).toBe(rows.length)
     expect(new Set(rows.map(row => row.domain)).size).toBe(rows.length)
     expect(mapped).toEqual(audit)
-    expect(rows.reduce((sum, row) => sum + row.routeCount, 0)).toBe(137)
     for (const row of rows)
       expect(row.classification, row.domain).toMatch(/`[ABC](?:\+[ABC])?`/)
   })
@@ -96,7 +94,8 @@ describe('read model contract coverage', () => {
       'eventId: OpaqueIdDTO',
       'readAt: string | null',
       'deliveryState: \'queued\' | \'delivered\' | \'failed\'',
-      '当前 5 条静态 seed 不得继续作为运行时 fallback',
+      '当前静态样本只在授权后的演示模式可见，正式来源保持真实空态',
+      '不将样本作为正式运行 fallback',
       '`subject.id + sourceVersion`',
       '`report.key + 可见范围 + asOf + sourceVersion`',
     ]) {

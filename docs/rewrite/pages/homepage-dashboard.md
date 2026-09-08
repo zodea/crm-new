@@ -2,7 +2,7 @@
 
 > 路由：`/` · 页面：`app/pages/index.vue`
 >
-> 现行版本：2026-07-28，落实 [#189](https://github.com/zodea/crm-new/issues/189)
+> 既有实现来源：[#189](https://github.com/zodea/crm-new/issues/189)；当前复核由 [#414](https://github.com/zodea/crm-new/issues/414) 承接，排程来源与 #412 联验。
 >
 > 关联权威：[施工进度 §7.1](schedule-progress.md)、[ProjectSwitcher 契约](../../design/kit-ui-component-specs.md)、[ADR 0013](../../adr/0013-align-all-ui-to-online-design.md)
 
@@ -33,7 +33,7 @@
 
 ## 3. 数据与状态
 
-所有生产内容来自 `useScheduleStore` 的项目目录和 `ScheduleProjectView`，不得在页面内构造业务指标或模拟事实。
+页面消费 `useScheduleStore` / `ScheduleProjectView` 提供的排程投影，不在页面构造业务指标或模拟事实。项目目录与已接管领域必须由同来源中央 Repository 提供，不能因复用旧 store 回退本地项目；#412 / #414 联验来源、缺源与刷新回读，前台可用不等于生产部署完成。
 
 | 状态 | 页面反馈 | 可恢复路径 |
 | --- | --- | --- |

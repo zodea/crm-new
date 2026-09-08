@@ -162,7 +162,6 @@ describe('runtime reference audit contract', () => {
     expect(status).toContain('| 实现页面文件（含 dev） | 142 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
     expect(status).toContain('| 实现生产路由（排除 dev） | 137 |')
-    expect(status).toContain('**当前为 2。**')
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 

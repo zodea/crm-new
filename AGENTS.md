@@ -11,11 +11,13 @@
 
 Issue 与分诊细则见 [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md) 和 [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)。
 
+逐模块复核、补全规格或承接旧 Issue 时，先按 [`docs/agents/module-review.md`](docs/agents/module-review.md) 调查事实、记录可直接作出的判断、补齐场景与验收，再对确有业务取舍的缺口使用 `grill-with-docs`。
+
 ## 2. 当前工程基线
 
 - Nuxt 4、Vue 3.5、TypeScript，SPA（`ssr: false`）；桌面壳为 Tauri 2。
 - 包管理固定为 pnpm；以 `package.json` 的 `packageManager` 和 scripts 为准。
-- 状态使用 Pinia；持久化统一经 `app/lib/db/` 接入 SQLite（浏览器开发态使用 sql.js fallback）。
+- 状态使用 Pinia；已接管浏览器实体读写统一走中央 Repository/HTTP/command，尚未接管的本地适配和桌面 SQLite 边界见 ADR 0020。浏览器测试实例不代表生产持久化已完成。
 - 样式使用 UnoCSS；交互底座为 reka-ui / shadcn-vue 结构与 vue-sonner；数据网格底座为 vxe-table。
 - 代码目录采用 Nuxt 4 的 `app/` 布局。架构入口见 [`docs/rewrite/ARCHITECTURE.md`](docs/rewrite/ARCHITECTURE.md)。
 

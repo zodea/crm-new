@@ -8,7 +8,7 @@
 - 路由由前端矩阵生成；后台只返回实体引用、语义化目标和筛选 ID，不返回 Vue 路由字符串。
 - 新增/编辑仍走独立整页表单；关系主链接优先进入只读详情。当前只有表单路由的对象标为“读写混用”，不能宣称隐藏详情已闭合。
 - `0`、空列表、缺关系、权限不可见和加载失败是不同状态。聚合值为 `0` 时，只要后端明确返回可用下钻目标，入口仍可进入真实空列表；不得用金额是否为零猜可点击性。
-- 本文覆盖 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 的 20 个生产页面域及应用壳公共入口，不增加保证金、备用金、统计分析等当前没有本地路由的模块。
+- 本文覆盖 [`runtime-reference-audit.md`](../design/runtime-reference-audit.md) 登记的业务页面域及应用壳公共入口；当前对象、动态 kind 与无独立路由的场景按[复核基线](https://github.com/zodea/crm-new/issues/403)核对。延续现有业务范围，不新增保证金、备用金及参考站独有统计模块。
 
 ## 2. 导航意图合同
 
@@ -230,7 +230,7 @@ interface NavigationOrigin {
 | `N-TARGET-COST` | `schedule-target-cost` 目标成本列表/详情 | 名称、项目、已签合同额 | ref 或明确聚合目标 | `/project/target-cost/:id`、`/project/:id`；已签合同额进入当前版本合同聚合区 | 返回列表筛选/详情区块 | 部分；名称/项目闭合，金额聚合锚点待实现 |
 | `N-IMPORT-EXPORT` | `import-export` 映射/导出配置 | 返回来源、错误行源实体、生成结果 | 来源为站内 route key；文件 capability resolved | 返回调用页或受控文件预览 | 恢复调用页上下文 | 部分；不得把原始文件路径或私有 URL 当路由 |
 | `N-OCR-SETTINGS` | `ocr-settings` `/settings/ocr` | 无业务实体关系入口 | — | 仅侧栏导航 `/settings/ocr` | 返回原应用页签 | 非入口；Token/API 地址永不进入导航 DTO |
-| `N-SHELL-NOTIFICATION` | `shell` 顶栏 toast/消息抽屉 | 消息主体/查看动作 | `NotificationDTO.target` resolved 且未 forbidden | 由本矩阵解析 `open-entity/open-list`；后台不传路由字符串 | 关闭抽屉后目标页保留自己的返回上下文 | 部分；本地静态 route 字符串和 5 条 seed 必须迁移 |
+| `N-SHELL-NOTIFICATION` | `shell` 顶栏 toast/消息抽屉 | 消息主体/查看动作 | `NotificationDTO.target` resolved 且未 forbidden | 由本矩阵解析 `open-entity/open-list`；后台不传路由字符串 | 关闭抽屉后目标页保留自己的返回上下文 | 部分；现有样本已隔离到授权演示模式，正式事件目标与原子打开仍待接入，不能以样本 route 冒充中央导航意图 |
 | `N-SHELL-TABS` | `shell` 应用内部页签 | 页签切换、溢出、刷新 | 仅当前活动实例 | 切换不新建业务事实；刷新只重取当前页并重置局部 overlay | 页签状态按实例隔离 | 直接证据：28 个内部页签不等于 28 个浏览器页；详见 §5 |
 
 ## 5. 付款洞察与多页签影响因素

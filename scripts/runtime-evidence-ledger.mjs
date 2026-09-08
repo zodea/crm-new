@@ -216,7 +216,7 @@ function readModelDomains(markdown) {
     .filter(line => /^\| `[a-z][a-z-]+` \|/.test(line))
     .map((line) => {
       const cells = markdownCells(line)
-      return { code: withoutCodeTicks(cells[0]), domain: cells[1], routeCount: Number(cells[2]) }
+      return { code: withoutCodeTicks(cells[0]), domain: cells[1] }
     })
 }
 
@@ -311,6 +311,7 @@ export function buildRuntimeEvidenceLedger() {
 
   assertUnique(rows.map(row => row.page), '页面')
   assertUnique(rows.map(row => row.route), '路由')
+  assertUnique(contracts.map(row => row.code), '页面域编码')
   assertUnique(contracts.map(row => row.domain), '页面域')
 
   const auditedPages = rows.map(row => row.page.replace(/^app\/pages\//, '')).sort()
@@ -324,9 +325,8 @@ export function buildRuntimeEvidenceLedger() {
   for (const row of rows)
     auditDomainCounts.set(row.domain, (auditDomainCounts.get(row.domain) ?? 0) + 1)
 
-  const contractDomainCounts = new Map(contracts.map(row => [row.domain, row.routeCount]))
-  if (JSON.stringify([...auditDomainCounts].sort()) !== JSON.stringify([...contractDomainCounts].sort()))
-    throw new Error('runtime-evidence-ledger: READ-MODELS 与运行矩阵的页面域集合或路由数不一致')
+  if (JSON.stringify([...auditDomainCounts.keys()].sort()) !== JSON.stringify(contracts.map(row => row.domain).sort()))
+    throw new Error('runtime-evidence-ledger: READ-MODELS 与运行矩阵的页面域集合不一致')
 
   const classifiedProfiles = new Set([
     ...HISTORICAL_PROFILES,
@@ -402,7 +402,7 @@ export function buildRuntimeEvidenceLedger() {
   const domains = contracts.map(contract => ({
     code: contract.code,
     domain: contract.domain,
-    routeCount: contract.routeCount,
+    routeCount: auditDomainCounts.get(contract.domain),
     implementationIssues: IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
   }))
 

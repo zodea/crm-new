@@ -2,11 +2,13 @@
 
 > 核对日期：2026-08-25
 >
-> 视觉基准：`DC重构设计源码/app.dc.html`
+> 视觉基准：有直接对应页时采用红圈登录运行态证据；瑞航品牌、独有能力和无对应页采用 `DC重构设计源码/app.dc.html`，优先级见[设计入口](./README.md)。
 >
 > 实现基准：`app/pages/`、`app/lib/nav/nav-tree.ts` 与当前表单注册/路由
 >
-> 本文只回答“界面有没有”和“是否形成生产闭环”，不复制页面字段、历史完成评论或视觉规格。
+> 本文区分界面覆盖、已实现行为与尚未完成的链路，不复制页面字段或视觉规格。“前台功能已验证”与“生产可用”分别验收；历史页面落地记录不自动取得生产可用结论。
+
+> 本轮任务入口：[全模块复核与红圈对齐路线](https://github.com/zodea/crm-new/issues/402)。下文原票号与计数是既有实现证据；被替代票已指向新的承接者，选定 SHA 后由[可信复核基线](https://github.com/zodea/crm-new/issues/403)校正。任务重组不提升完成状态；本轮分别验收规则定稿、前台功能、跨模块链和生产可用。
 
 ## 1. 口径
 
@@ -48,18 +50,18 @@
 
 ### 实现有、设计稿没有
 
-**当前为 2。** `/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但没有一一对应的 DC 页面；分别由 [#305](https://github.com/zodea/crm-new/issues/305) 与 [#294](https://github.com/zodea/crm-new/issues/294) 承接。在补齐设计源码前保持 `design-pending`，不能写成设计已覆盖。
+现有生成账本登记 **2 条**：`/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但没有一一对应的 DC 页面。本轮分别由 [#404](https://github.com/zodea/crm-new/issues/404) 联同 [#413](https://github.com/zodea/crm-new/issues/413)、以及 [#414](https://github.com/zodea/crm-new/issues/414) 复核；旧 #305/#294 仅保留来源含义。在补齐设计源码前保持 `design-pending`，不能写成设计已覆盖。
 
-| 生产路由 | 当前设计状态 | 实施票 |
+| 生产路由 | 当前设计状态 | 本轮复核承接 |
 | --- | --- | --- |
-| `/finance/payment/:id/detail` | `design-pending` | [#305](https://github.com/zodea/crm-new/issues/305) |
-| `/settings/data-migration` | `design-pending` | [#294](https://github.com/zodea/crm-new/issues/294) |
+| `/finance/payment/:id/detail` | `design-pending` | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
+| `/settings/data-migration` | `design-pending` | [#414](https://github.com/zodea/crm-new/issues/414) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和只读详情动作。
 
 ## 4. 已搭但未闭环
 
-以下 20 个页面域与 [`READ-MODELS.md`](../rewrite/READ-MODELS.md) 使用同一稳定 code 和路由数，实施票由 `scripts/runtime-evidence-ledger.mjs` 的唯一映射生成。只有对应票写回提交、测试和运行证据并关闭后，相关范围才可移入“当前已实现”。
+以下既有页面域与 [`READ-MODELS.md`](../rewrite/READ-MODELS.md) 使用同一稳定 code；路由数从运行矩阵计算，表内旧实施票由 `scripts/runtime-evidence-ledger.mjs` 的历史映射生成。新图对应关系由 #403 在选定 SHA 后一并校正；当前执行入口使用 #402 的子票。只有对应实施范围具备提交、测试和运行证据后才可更新实现状态，旧票因“被替代”关闭不能作为完成依据。
 
 <!-- implementation-frontier:begin -->
 | 页面域 | 路由数 | 当前实施票 |
@@ -92,17 +94,17 @@
 
 甲方单据中的变洽签/月度报量子链已由 [#323](https://github.com/zodea/crm-new/issues/323) 闭合；[#324](https://github.com/zodea/crm-new/issues/324) 进一步闭合验收/保修 canonical 双视图；[#325](https://github.com/zodea/crm-new/issues/325) 闭合最终结算；[#326](https://github.com/zodea/crm-new/issues/326) 现已闭合甲方罚扣专属只读链。罚扣编号从全局列表与施工合同事实行进入同一中央详情，独立展示金额、联系单、日期、事由、申诉、状态、项目/甲方/合同关系和真实附件；来源返回恢复原列表或合同分区与焦点。#283 已完成父级联合验收：项目详情按同一稳定项目 ID 同时提供变洽签、报量、验收、保修、最终结算与甲方罚扣六类入口，最终结算和罚扣穿过列表/详情后仍恢复原项目卡片锚点、滚动与焦点。正式保存、提交、迁移和读回只走中央源，申诉说明不扩展为审批流，也不混入项目罚扣或分包结算抵扣。
 
-分包单据中的分包变洽签子链已由 [#327](https://github.com/zodea/crm-new/issues/327) 闭合。全局列表、项目详情第七张业务单据卡片与分包合同变洽签事实行按同一稳定 ID 进入专属只读详情；项目、分供方、分包合同、审批金额、变更面积、实际审定价、状态和签证单附件均来自 canonical `subcontract_change_orders`，返回恢复来源筛选、分区、行与焦点。正式保存、提交、受控迁移和读回只走中央源；分包结算、项目罚扣及未实现审批动作仍由后续票据承接。
+分包单据中的分包变洽签子链已由 [#327](https://github.com/zodea/crm-new/issues/327) 闭合。全局列表、项目详情第七张业务单据卡片与分包合同变洽签事实行按同一稳定 ID 进入专属只读详情；项目、分供方、分包合同、审批金额、变更面积、实际审定价、状态和签证单附件均来自 canonical `subcontract_change_orders`，返回恢复来源筛选、分区、行与焦点。正式保存、提交、受控迁移和读回只走中央源。随后 [#328](https://github.com/zodea/crm-new/issues/328) 已接入分包结算专属详情、显式编辑/确认、附件和迁移；尚未接入的付款、抵扣与完整生命周期由 [#410](https://github.com/zodea/crm-new/issues/410) 按选定基线复核，不再把分包结算整域列为未开发。后续 #329 的远程成果与本地基线差异由 #403 核实，完整审批引擎仍在本轮范围之外。
 
 项目导航公共依赖 [#289](https://github.com/zodea/crm-new/issues/289) 已由 [#312](https://github.com/zodea/crm-new/issues/312) 与 [#313](https://github.com/zodea/crm-new/issues/313) 闭合并完成父级联合验收：项目名称只按稳定 ID、canonical variant、来源与 capability 经唯一 Target Registry 进入只读详情；合法 `returnTo` 恢复搜索、阶段、排序、列筛选、分页、应用页签、滚动与焦点，非法、过期或直达来源降级到规范项目列表。该闭合只确认项目往返基线，不把其他页面域尚未接入的关系入口提前标为完成。
 
 跨页面的项目—材料采购合同—分供方旅程先由 [#319](https://github.com/zodea/crm-new/issues/319) 闭合子切片，并由 [#277](https://github.com/zodea/crm-new/issues/277) 完成父级联合验收：项目与分供方正式身份仍只由各自主档及 #294 核心迁移边界建立，材采合同迁入仅校验已存在的稳定 ID；合同表单候选、校验和只读投影不再使用平行静态身份。正式合同按同一 `supplier_id` 回流分供方合同事实，且能继续穿透同一中央项目；中央目标消失时不保留空标签死链，真实 `0` 结算仍进入专属空表。项目详情按稳定 ID 与来源进入材采列表，真实 `0`、缺失、暂不可用和无权限分开表达；混合来源列表按所点击行记录 `dataOrigin`，并逐级恢复页签、筛选、分页、操作锚点、滚动与焦点。该旅程不扩展为交付、库存或结算核心实现，也不代表父规格其他合同链已完成。
 
-不占独立页面域的公共依赖仍按原生 blocking 关系推进：正式/演示隔离 [#279](https://github.com/zodea/crm-new/issues/279)、财务集成 [#286](https://github.com/zodea/crm-new/issues/286)、服务器事件通知 [#290](https://github.com/zodea/crm-new/issues/290)、页签恢复 [#306](https://github.com/zodea/crm-new/issues/306)，最终由浏览器生产接缝 [#278](https://github.com/zodea/crm-new/issues/278) 验收全域。OCR 设置继续由既有专项 [#204](https://github.com/zodea/crm-new/issues/204) 承接。
+不占独立页面域的公共能力本轮归 [#404](https://github.com/zodea/crm-new/issues/404)（交互、通知、洞察、页签）、[#405](https://github.com/zodea/crm-new/issues/405)（数据处理与对账）、[#406](https://github.com/zodea/crm-new/issues/406)（文件、OCR、导入导出）。资金模块由 [#413](https://github.com/zodea/crm-new/issues/413) 复核，OCR 设置界面归 [#414](https://github.com/zodea/crm-new/issues/414)。旧 #279/#286/#290/#306/#278/#204 保留来源证据；全域实施与验收任务由 [#415](https://github.com/zodea/crm-new/issues/415) 汇总，生产上线另经 [#416](https://github.com/zodea/crm-new/issues/416)。
 
 ## 5. 证据状态边界
 
-- 历史关闭票只证明当前页面基础的来源，不推导 #292 的生产完成状态。
+- 历史完成票只证明相应页面基础的来源；因替代而关闭的票不证明实现完成。两者均不能推导本轮前台复验或生产上线已经通过。
 - 34 条历史证据和 9 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
 - `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐端点记录在生成账本；叙述结论只留在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，生成 JSON 只保存结构化键与权威源引用。
 - 当前已实现数量不在本轮提前汇总；每张实施票关闭时按其真实路由范围更新，避免把“路由存在”再次统计成“业务闭环”。
