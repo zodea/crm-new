@@ -52,6 +52,23 @@ function markdownSection(markdown: string, heading: string, nextHeading: string)
 }
 
 describe('runtime reference audit contract', () => {
+  it('routes current review work to the new map without losing historical evidence', () => {
+    const ledger = buildRuntimeEvidenceLedger()
+    const endpoint = (route: string) => ledger.endpoints.find(item => item.localRoute === route)!
+
+    expect(endpoint('/base/supplier').implementationIssues).toEqual([407])
+    expect(endpoint('/base/supplier').historicalImplementationIssues).toEqual([281, 289])
+    expect(endpoint('/material/settlement').implementationIssues).toEqual([409])
+    expect(endpoint('/material/arrival').implementationIssues).toEqual([411])
+    expect(endpoint('/import/mapping/:entity').implementationIssues).toEqual([406])
+    expect(endpoint('/settings/data-migration').implementationIssues).toEqual([414])
+    expect(endpoint('/finance/invoice/factor').implementationIssues).toEqual([413, 414])
+    expect(endpoint('/finance/payment/:id/detail').implementationIssues).toEqual([413, 404])
+    expect(endpoint('/finance/payment/:id/detail').evidenceGrade).toBe('adjacent')
+    expect(ledger.domains.find(domain => domain.code === 'import-export')?.implementationIssues).toEqual([406, 414])
+    expect(ledger.endpoints.every(item => item.implementationIssues.every(issue => issue >= 403 && issue <= 416))).toBe(true)
+  })
+
   it('recomputes one current evidence record for every production route and page domain', () => {
     const ledger = buildRuntimeEvidenceLedger()
     const committed = JSON.parse(readFileSync(RUNTIME_EVIDENCE_LEDGER_PATH, 'utf8'))

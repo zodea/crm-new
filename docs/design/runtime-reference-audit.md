@@ -18,6 +18,46 @@
 
 2026-09-08 的 #419 / #421 本地运行态实现、实际覆盖路由、视口和交互结果统一见[本批验收入口](./evidence/issue-419/README.md)。该证据记录瑞航本地合成样本或隔离中央测试会话，不提升外部参考证据等级；未观察的参考工具内部行为继续为未知。营业执照读面未接通、正式材料结算 feed 尚无记录等真实边界仍按领域契约保留，不因列表可展示而视为全部数据能力完成。
 
+### 2026-09-08 复核基线与展开边界
+
+本轮固定源码为 `ec392bd602200c8da343b626b5a21c8215b4884d`，工作分支 `codex/ui-reference-layout`；远端 main 与本地 origin/main 均为 `4292291d2a99c94052a6eab743036b149bfa9634`。版本、原生依赖和领取状态的核验见 [#403 开工记录](https://github.com/zodea/crm-new/issues/403#issuecomment-5586540379)。
+
+- #328–#331 经 PR #399/#400/#401/#417 合入，当前源码包含其成果；#418–#421 及多选、刷新修复仅在当前分支本地完成，复用各自实际验收入口。
+- #398 的集成提交 `82dd2debbbcc020a68070182fcbfe0f002926faf` 仅在本地 main；当前分支未包含，旧审计文件也不在当前分支。其十项修复不能作为当前版本通过的证据，整合仍由 #398 承接，不自动合并或推送。
+- 现有三个 `.worktrees/issue-329`、`issue-330`、`issue-331` 保留。工作树存在不等于任务进行中，以对应 PR、提交和当前改动分别核对。
+- 机器账本保留路由级历史证据编号及等级。`implementationIssues` 现指当前复核责任，`historicalImplementationIssues` 单独保留历史来源；导入/导出归 #406，迁移页归 #414，材料结算归 #409，不能按相邻菜单误归物资模块。
+
+下表是已核对源码的展开规则，尚不构成全部子表或运行环境已验收的清单。各项继续由对应模块逐场景采证；父路由的直接证据不自动赋给未观察的子视图。
+
+| 路由或入口 | 已核实展开事实 | 源码入口 / 承接 |
+| --- | --- | --- |
+| `/owner/:kind` 的列表、详情、新建、编辑 | 5 个 kind：change、report、acceptance、final-settlement、penalty；验收与保修为同一 acceptance 的 variant 视图 | `app/lib/owner-document/page.ts`、`app/pages/owner/`；#410 |
+| `/subcontract/:kind` 的列表、详情、新建、编辑 | change、settlement 两个 kind；与上述 8 个动态页面文件合计 28 个路由＋kind，视图及环境继续展开 | `app/lib/owner-document/page.ts`；#410 |
+| `/contract/:id` | construction / subcontract / material 与有效 origin 共同选择中央详情；缺省分支仍走旧适配，不能合记一次通过 | `app/pages/contract/[id].vue`；#409 |
+| `/import/mapping/:entity` | invoice、project、supplier、demo-supplier、quantity-template、quantity-assignment、quantity-completion、quantity-legacy-precheck；分别有上传、映射、预览及失败恢复，demo-supplier 是演示桩 | `app/lib/kit/import-entities.ts`；#406 联同 #407/#408/#412/#413 |
+| 客户 / 分供方 / 项目合作详情 | 客户 3 个事实页签；分供方 6 个页签；项目合作 6 个页签及常驻文件面板 | `CustomerDetailScreen.vue`、`SupplierDetailScreen.vue`、`ProjectSupplierWorkbench.vue`；#407/#408 |
+| 三类中央合同 / 辅助合同 / 其他结算详情 | 三类核心合同各 7 个页签；公司支出 3 个、其他支出 5 个、其他结算 4 个，页签内子表另行登记 | `app/components/contract/`、`app/components/other-settlement/`；#409 |
+| 工程量、BOQ、排程、OCR 工作台 | 工种/班组矩阵，BOQ 五格式导入及三页签，甘特与依赖编辑，发票复核/打印及窄屏面板、送货重复复核分别登记 | `app/components/boq/`、`quantity/`、`schedule/`、`invoice/`、`delivery/`；#406/#409/#411/#412/#413 |
+
+尚未完成：全量调用位置级子表/浮层清单、每个环境分支的运行验证、红圈全部安全可达目标的双向映射、旧任务逐条验收义务迁移及生产持久化验收。当前重算的路由数量只证明登记集合一致；`design-coverage` 的 covered 只表示有设计落点。
+
+本次已通过登录会话只读展开全部工程项目管理菜单，实测内容视口 1293×1051；下表只证明入口名称可见，不证明子页面、保存或私有接口行为。未保存参考截图或真实业务值。
+
+| 红圈可见入口组 | 瑞航映射与边界 |
+| --- | --- |
+| 项目信息、目标成本 | #408 项目与 #412 目标成本 |
+| 主合同：施工合同、甲方报量、甲方罚扣单、甲方变洽签、竣工验收、最终结算、保修到期确认单 | #409 合同；#410 五类单据及验收/保修视图 |
+| 分包及人工：分包合同、项目罚扣、分包结算、分包变洽签 | #409 分包合同；#410 对应单据 |
+| 乙供材：仓库档案、材料采购合同、下料单、材料到货、材料领用、乙供材直入直出、批量调拨、材料采购结算、库存盘点 | #409 合同/结算；#411 其余物资能力。仓库、乙供材直入直出和批量调拨无同名独立生产路由，须按已定领域范围核验实际入口，不能直接判排除 |
+| 甲供材：总控量、下料单、到货、领用、直入直出 | #411 五类明确列表入口 |
+| 资金：开票申请、收款登记、收票登记、付款申请、费用报销、往来收款/付款、付款管理、支付记录 | #413 对应资金与发票能力；往来收付按实际方向展开，收票台账不能冒充 OCR 工作台直接证据 |
+| 资金：保证金申请/退还、备用金申请/退还 | 无同名独立生产路由；#413 核验是否已被往来业务覆盖，尚不声明独立功能已实现 |
+| 项目其他合同：项目其他收入合同、其他支出合同、其他支出结算、公司支出合同 | #409 辅助合同/结算；其他收入无同名入口，须按既定范围核验映射 |
+| 基础信息：客户、分供方、往来单位 | #407 主档与 #413 往来身份协作；不能以往来单位代替瑞航班组/工人独有能力 |
+| 统计分析：分析、公告、审批；物品管理：档案、领用、移交、归还、销毁；协同办公：日程、文件、任务 | 仅菜单观察；独立统计门户、办公/物品管理及完整审批按 #402 排除。瑞航现有通知、文件和 capability 仍按自身契约复核，不因同名而复制外部模块 |
+
+红圈当前材料采购合同列表的列与汇总差异已登记 [#409](https://github.com/zodea/crm-new/issues/409#issuecomment-5586649120)，当前可确定切片不等待菜单对应中的其他业务映射裁定。
+
 ## 1. 裁定边界
 
 - [#181](https://github.com/zodea/crm-new/issues/181) 的裁定已经通过 #183 并入设计权威链：登录后的参考站是有直接对应页时的布局、样式、控件状态和安全交互路径参考；缺失或变化较大的页面先提供裁剪脱敏图或重绘线框。
@@ -138,28 +178,28 @@
 | 历史证据 / 未验证目标 | 34 / 9 |
 | 设计已覆盖 / 待补设计 | 135 / 2 |
 
-| 页面域 | 路由数 | 当前实施票 |
+| 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
-| 首页 | 1 | [#278](https://github.com/zodea/crm-new/issues/278) |
-| 项目 | 3 | [#288](https://github.com/zodea/crm-new/issues/288)、[#293](https://github.com/zodea/crm-new/issues/293)、[#294](https://github.com/zodea/crm-new/issues/294)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 基础主数据 | 9 | [#281](https://github.com/zodea/crm-new/issues/281)、[#316](https://github.com/zodea/crm-new/issues/316)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
-| 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 辅助合同与结算 | 15 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#331](https://github.com/zodea/crm-new/issues/331)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 分包单据 | 8 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 甲供材 | 15 | [#299](https://github.com/zodea/crm-new/issues/299)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 送货单闭环 | 4 | [#296](https://github.com/zodea/crm-new/issues/296)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 材料价格 | 1 | [#296](https://github.com/zodea/crm-new/issues/296)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 收入财务 | 10 | [#302](https://github.com/zodea/crm-new/issues/302)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 支出财务 | 11 | [#303](https://github.com/zodea/crm-new/issues/303)、[#305](https://github.com/zodea/crm-new/issues/305)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 发票台账 | 4 | [#304](https://github.com/zodea/crm-new/issues/304)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 工程量与工资 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#301](https://github.com/zodea/crm-new/issues/301)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 项目进度成本 | 9 | [#300](https://github.com/zodea/crm-new/issues/300)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 导入导出 | 3 | [#278](https://github.com/zodea/crm-new/issues/278)、[#294](https://github.com/zodea/crm-new/issues/294) |
-| 系统设置 | 1 | [#204](https://github.com/zodea/crm-new/issues/204) |
+| 首页 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
+| 项目 | 3 | [#408](https://github.com/zodea/crm-new/issues/408) |
+| 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
+| 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
+| 核心合同 | 12 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 辅助合同与结算 | 15 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
+| 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |
+| 自购材 | 12 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 甲供材 | 15 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 送货单闭环 | 4 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 材料价格 | 1 | [#411](https://github.com/zodea/crm-new/issues/411) |
+| 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
+| 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
+| 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
+| 工程量与工资 | 9 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 项目进度成本 | 9 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
+| 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 <!-- runtime-evidence-summary:end -->
 
 | Page | Route | 业务域 | 模板 | 历史基础票 | 参考证据 | 布局差异 | 状态与跳转结论 | 业务约束 |

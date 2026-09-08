@@ -22,7 +22,7 @@ export const IMPLEMENTATION_FRONTIER_BLOCK_BEGIN = '<!-- implementation-frontier
 export const IMPLEMENTATION_FRONTIER_BLOCK_END = '<!-- implementation-frontier:end -->'
 
 // READ-MODELS 的稳定 code 是页面域身份；中文域名只用于展示。
-const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
+const HISTORICAL_IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['home', [278]],
   ['project', [288, 293, 294, 289]],
   ['master-data', [281, 316, 289]],
@@ -44,6 +44,42 @@ const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
   ['import-export', [278, 294]],
   ['ocr-settings', [204]],
 ])
+
+// 当前复核责任与历史实施证据分开；任务替换不提升证据等级。
+const IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE = new Map([
+  ['home', [414]],
+  ['project', [408]],
+  ['master-data', [407]],
+  ['supplier', [407]],
+  ['project-supplier', [408]],
+  ['core-contract', [409]],
+  ['aux-contract', [409]],
+  ['owner-document', [410]],
+  ['subcontract-document', [410]],
+  ['material', [411]],
+  ['owner-material', [411]],
+  ['delivery', [411]],
+  ['material-price', [411]],
+  ['finance-income', [413]],
+  ['finance-expense', [413]],
+  ['invoice', [413]],
+  ['quantity-payroll', [412]],
+  ['schedule-target-cost', [412]],
+  ['import-export', [406, 414]],
+  ['ocr-settings', [414]],
+])
+
+function currentIssues(route, domainCode) {
+  if (route === '/finance/invoice/factor')
+    return [413, 414]
+  if (route === '/settings/data-migration')
+    return [414]
+  if (route === '/finance/payment/:id/detail')
+    return [413, 404]
+  if (domainCode === 'import-export')
+    return [406]
+  return IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(domainCode)
+}
 
 const HISTORICAL_PROFILES = new Set([
   'R-LIST-PRIOR',
@@ -371,7 +407,8 @@ export function buildRuntimeEvidenceLedger() {
       localRoute: row.route,
       domainCode: contract.code,
       template: row.template,
-      implementationIssues: IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
+      implementationIssues: currentIssues(row.route, contract.code),
+      historicalImplementationIssues: HISTORICAL_IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
       referenceProfile: row.referenceProfile,
       referenceEndpointId: reference.id,
       referenceEndpointLabel: reference.label,
@@ -403,7 +440,8 @@ export function buildRuntimeEvidenceLedger() {
     code: contract.code,
     domain: contract.domain,
     routeCount: auditDomainCounts.get(contract.domain),
-    implementationIssues: IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
+    implementationIssues: [...new Set(endpoints.filter(endpoint => endpoint.domainCode === contract.code).flatMap(endpoint => endpoint.implementationIssues))].sort((a, b) => a - b),
+    historicalImplementationIssues: HISTORICAL_IMPLEMENTATION_ISSUES_BY_DOMAIN_CODE.get(contract.code),
   }))
 
   if (coverage.counts.appPageFiles !== productionRoutes.length)
@@ -442,7 +480,7 @@ function issueLinks(issues) {
 
 function renderDomainIssueTable(domains) {
   return [
-    '| 页面域 | 路由数 | 当前实施票 |',
+    '| 页面域 | 路由数 | 当前复核承接 |',
     '| --- | ---: | --- |',
     ...domains.map(domain => `| ${domain.domain} | ${domain.routeCount} | ${issueLinks(domain.implementationIssues)} |`),
   ].join('\n')
