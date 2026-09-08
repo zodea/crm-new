@@ -3,7 +3,7 @@ import type { MoneyDTO } from '../../types/read-model'
 export const CORE_MIGRATION_CAPABILITY = 'core:migration:write' as const
 export const CORE_MIGRATION_CONTRACT_VERSION = 'core-migration.v1' as const
 export const CORE_MIGRATION_SOURCE_MODE = 'browser-production-snapshot' as const
-export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v46' as const
+export const CORE_MIGRATION_SOURCE_VERSION = 'sqlite-v47' as const
 export const CORE_MIGRATION_TOPOLOGY = [
   'customers',
   'suppliers',
@@ -12,6 +12,8 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'construction_contracts',
   'subcontract_contracts',
   'auxiliary_contracts',
+  'other_settlements',
+  'other_settlement_sources',
   'contract_supplements',
   'receipt_registrations',
   'owner_documents',
@@ -39,8 +41,8 @@ export interface CoreMigrationSourceEntityDTO {
 }
 
 export type CoreMigrationSourceEntitiesDTO = {
-  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts'>]: CoreMigrationSourceEntityDTO[]
-} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[] }
+  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources'>]: CoreMigrationSourceEntityDTO[]
+} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[] }
 
 export type CoreMigrationTotalExpectationDTO
   = | { entityType: CoreMigrationEntityType, metric: 'quantity', expected: number }

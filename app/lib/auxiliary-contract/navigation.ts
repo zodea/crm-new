@@ -16,7 +16,7 @@ export function validateAuxiliaryReturnTo(input: unknown, expectedOrigin: unknow
       return validateProjectReturnTo(input)
     if (url.pathname === '/base/supplier')
       return validateSupplierReturnTo(input)
-    const auxiliary = /^\/contract\/(other-expense|company-expense)(?:\/([\w-]+))?$/.exec(url.pathname)
+    const auxiliary = /^\/contract\/(other-expense|company-expense|other-settlement)(?:\/([\w-]+))?$/.exec(url.pathname)
     const related = /^\/(?:project\/[\w-]+(?:\/supplier\/[\w-]+)?|base\/supplier\/[\w-]+)$/.test(url.pathname)
     if (!auxiliary && !related)
       return null
@@ -26,7 +26,7 @@ export function validateAuxiliaryReturnTo(input: unknown, expectedOrigin: unknow
       return null
     if (auxiliary?.[1] === 'company-expense' && ['projectId', 'supplierId', 'project', 'supplier'].some(key => url.searchParams.has(key)))
       return null
-    const keys = new Set(['origin', 'search', 'page', 'pageSize', 'category', 'status', 'projectId', 'supplierId', 'project', 'supplier', 'tab', 'returnTo', 'nav', 'focus', 'returnContext'])
+    const keys = new Set(['origin', 'search', 'page', 'pageSize', 'category', 'status', 'projectId', 'supplierId', 'contractId', 'fact', 'sourceTrail', 'project', 'supplier', 'tab', 'returnTo', 'nav', 'focus', 'returnContext'])
     if ([...url.searchParams.keys()].some(key => !keys.has(key)))
       return null
     let normalized = input
@@ -49,5 +49,5 @@ export function validateAuxiliaryReturnTo(input: unknown, expectedOrigin: unknow
 }
 export function validateAuxiliaryDetailReturnTo(input: unknown, origin: unknown = 'real'): string | null {
   const valid = validateAuxiliaryReturnTo(input, origin)
-  return valid && /^\/contract\/(?:other-expense|company-expense)\/[\w-]+\?/.test(valid) ? valid : null
+  return valid && /^\/contract\/(?:other-expense|company-expense|other-settlement)\/[\w-]+\?/.test(valid) ? valid : null
 }

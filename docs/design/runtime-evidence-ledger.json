@@ -2,20 +2,20 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 141,
+    "trackedPageFiles": 142,
     "devPageFiles": 5,
-    "productionRoutes": 136,
+    "productionRoutes": 137,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 136,
-    "referenceEndpoints": 136,
-    "referenceProfiles": 40,
+    "evidenceEndpointRecords": 137,
+    "referenceEndpoints": 137,
+    "referenceProfiles": 41,
     "usedReferenceProfiles": 35,
-    "directEvidenceRoutes": 53,
+    "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
     "localAuthorityRoutes": 22,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 9,
-    "designCoveredRoutes": 134,
+    "designCoveredRoutes": 135,
     "designPendingRoutes": 2
   },
   "domains": [
@@ -80,10 +80,11 @@
     {
       "code": "aux-contract",
       "domain": "辅助合同与结算",
-      "routeCount": 14,
+      "routeCount": 15,
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ]
@@ -225,6 +226,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -254,6 +256,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -727,6 +730,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -756,6 +760,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -785,6 +790,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -982,6 +988,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -1011,6 +1018,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -1040,6 +1048,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -1069,6 +1078,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -1098,6 +1108,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -1119,6 +1130,36 @@
       "constraints": "C-FORM"
     },
     {
+      "evidenceRecordId": "E-8DBEF13E368C",
+      "page": "app/pages/contract/other-settlement/[id].vue",
+      "localRoute": "/contract/other-settlement/:id",
+      "domainCode": "aux-contract",
+      "template": "详情",
+      "implementationIssues": [
+        295,
+        330,
+        331,
+        298,
+        289
+      ],
+      "referenceProfile": "R-OTHER-SETTLEMENT-LIVE-331",
+      "referenceEndpointId": "other-settlement-detail",
+      "referenceEndpointLabel": "项目其他合同 > 其他支出结算 > 只读详情",
+      "evidenceGrade": "direct",
+      "observationDate": "2026-09-06",
+      "observationDateStatus": "recorded",
+      "permissionStatus": "read-only-observed",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-settlement/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/other-settlement/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
       "evidenceRecordId": "E-DBBA71207E12",
       "page": "app/pages/contract/other-settlement/index.vue",
       "localRoute": "/contract/other-settlement",
@@ -1127,14 +1168,15 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
-      "referenceProfile": "R-AUX-DOCUMENTS-LIVE",
+      "referenceProfile": "R-OTHER-SETTLEMENT-LIVE-331",
       "referenceEndpointId": "other-settlement-list",
       "referenceEndpointLabel": "项目其他合同 > 其他支出结算",
       "evidenceGrade": "direct",
-      "observationDate": "2026-08-13",
+      "observationDate": "2026-09-06",
       "observationDateStatus": "recorded",
       "permissionStatus": "read-only-observed",
       "layoutConclusion": {
@@ -2316,6 +2358,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -2345,6 +2388,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],
@@ -2374,6 +2418,7 @@
       "implementationIssues": [
         295,
         330,
+        331,
         298,
         289
       ],

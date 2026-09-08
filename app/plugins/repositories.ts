@@ -26,6 +26,7 @@ import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository
 import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
+import { createOtherSettlementRepository } from '~/lib/other-settlement/repository'
 import {
   createHttpOwnerCommercialDocumentCommandRepository,
   createHttpOwnerCommercialDocumentReadRepository,
@@ -40,6 +41,7 @@ import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  otherSettlements: ReturnType<typeof createOtherSettlementRepository>
   auxiliaryContracts: ReturnType<typeof createAuxiliaryContractRepository>
   customerRead: CustomerReadRepository
   customerCommands: CustomerCommandRepository
@@ -64,6 +66,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin(() => {
   const repositories: DomainRepositories = {
+    otherSettlements: createOtherSettlementRepository((url, options) => $fetch(url, options)),
     auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),
     customerRead: createHttpCustomerReadRepository({
       fetcher: (url, options) => $fetch(url, options),

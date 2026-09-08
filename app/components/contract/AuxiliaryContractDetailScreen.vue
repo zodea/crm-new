@@ -7,6 +7,8 @@ import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{ kind: AuxiliaryContractKind, contractId: string }>()
+const detailRoot = useTemplateRef<HTMLElement>('detailRoot')
+const settlementNavigation = useOtherSettlementNavigation(detailRoot)
 const route = useRoute()
 const repository = useNuxtApp().$repositories.auxiliaryContracts
 const { data: detail, shellState, problem, load } = useAuxiliaryContractRead(() => repository.detail(props.contractId, { kind: props.kind, origin: route.query.origin ?? 'real' }), (data) => {
@@ -44,7 +46,7 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
 </script>
 
 <template>
-  <div class="min-w-0" :data-state="shellState">
+  <div ref="detailRoot" class="min-w-0" :data-state="shellState">
     <EntityDetailShell :title="contract?.draft.name || AUXILIARY_LABELS[kind]" :subtitle="`${AUXILIARY_LABELS[kind]} · ${contract?.draft.no || '编号未记录'}`" :state="shellState" :state-title="problem?.message" :state-action-label="problem?.retryable ? '重新加载' : ''" @state-action="load">
       <template #back>
         <KitButton aria-label="返回来源" @click="navigateTo(backTo)">
@@ -80,6 +82,14 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
           <AuxiliaryContractInfo :contract="contract" :attachments="detail.attachments" :project-to="relation(contract.project)" :supplier-to="relation(contract.supplier)" />
         </template>
         <section v-else class="panel min-w-0 p-3">
+          <div v-if="activeTab === 'settlement' && kind === 'other_expense'" class="mb-3 flex flex-wrap gap-3">
+            <NuxtLink id="other-settlements-list" :to="{ path: '/contract/other-settlement', query: { origin: 'real', contractId, projectId: contract.draft.projectId, supplierId: contract.draft.supplierId, returnTo: settlementNavigation.context('other-settlements-list') } }" class="text-13px text-brand underline" @click="settlementNavigation.remember('other-settlements-list')">
+              查看全部结算
+            </NuxtLink>
+            <KitButton v-if="detail.capabilities.includes('other-settlement:write') && contract.draft.status !== '草稿'" variant="primary" @click="navigateTo({ path: '/contract/other-settlement/form', query: { contractId, returnTo: settlementNavigation.context('other-settlements-list') } })">
+              新建结算
+            </KitButton>
+          </div>
           <div class="min-w-0 overflow-x-auto" role="region" tabindex="0" aria-label="合同关联事实表">
             <table class="w-full min-w-160 border-collapse text-left text-13px">
               <thead class="bg-surface-2 text-ink-soft">
@@ -92,7 +102,11 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
                 <tr v-for="fact in facts" :key="fact.id" class="border-b border-line">
                   <td class="p-2">
                     {{ fact.no || '未记录' }}
-                  </td><td>{{ fact.name || '未记录' }}</td><td>{{ fact.date || '未记录' }}</td><td class="font-mono">
+                  </td><td>
+                    <NuxtLink v-if="fact.kind === 'settlement'" :id="`contract-settlement-${fact.id}`" :to="{ path: `/contract/other-settlement/${fact.id}`, query: { origin: 'real', contractId, returnTo: settlementNavigation.context(`contract-settlement-${fact.id}`) } }" class="text-brand underline" @click="settlementNavigation.remember(`contract-settlement-${fact.id}`)">
+                      {{ fact.name || '未命名结算' }}
+                    </NuxtLink><span v-else>{{ fact.name || '未记录' }}</span>
+                  </td><td>{{ fact.date || '未记录' }}</td><td class="font-mono">
                     {{ auxiliaryMoney(fact.amount) }}
                   </td><td>{{ fact.status || '未记录' }}</td>
                 </tr><tr v-if="!facts.length">
@@ -103,7 +117,7 @@ useTabTitle(() => contract.value?.draft.name || AUXILIARY_LABELS[props.kind])
               </tbody>
             </table>
           </div><p class="text-12px text-ink-faint">
-            记录按所属合同展示；暂无可用的来源详情入口。
+            {{ activeTab === 'settlement' ? '结算按真实合同关系读取，名称进入结算只读详情。' : '记录按所属合同展示；暂无可用的来源详情入口。' }}
           </p>
         </section>
       </div>

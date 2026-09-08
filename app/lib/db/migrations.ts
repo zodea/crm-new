@@ -5688,6 +5688,17 @@ migrations.push({
   },
 })
 
+migrations.push({
+  version: 47,
+  name: 'other-settlement-nullable-audit',
+  async up(db) {
+    if (!await tableExists(db, 'expenditure_settlements'))
+      return
+    for (const field of ['created_by', 'updated_by', 'responsible', 'department'])
+      await addColumnIfMissing(db, 'expenditure_settlements', field, 'TEXT DEFAULT NULL')
+  },
+})
+
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)
 
 const MIGRATIONS_TABLE = `

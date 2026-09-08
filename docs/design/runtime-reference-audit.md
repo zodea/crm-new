@@ -52,6 +52,7 @@
 
 | 代码 | 证据级别 | 参考路径或视图 | 视口 | 只读证据与安全状态 |
 | --- | --- | --- | --- | --- |
+| `R-OTHER-SETTLEMENT-LIVE-331` | 直接证据，只读已核验 | 项目其他合同 → 其他支出结算列表及名称只读详情 | 2026-09-06；1293×1051 | 紧凑表格与专属金额列，详情摘要、页签及分区资料；未触发任何写入或文件动作，不保留真实值；本地四档视口合成证据见 `evidence/issue-331/README.md` |
 | `R-LIST-PRIOR` | 历史结构记录，未验证只读 | 业务列表；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | `docs/research/red-circle-ui-gap-2026-07-11.md` §2；仅作列表密度、筛选区、工具栏与分页的采集线索，必须按本轮协议重新观察 |
 | `R-FORM-PRIOR` | 历史结构记录，未验证只读 | 新增/编辑表单；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §1 与 ADR 0014；旧记录包含保存、取消关闭等行为结论，本轮不采信这些交互，也不再点击相关入口 |
 | `R-DETAIL-PRIOR` | 历史结构记录，未验证只读 | 业务详情；目标菜单路径待对应实施票补采 | 历史桌面视口；实现需复核 390、768、1024、1280–1440px | 同一研究记录 §3；仅作结构线索，字段、动作和进入路径都必须通过明确只读入口重新确认 |
@@ -121,13 +122,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 141 / 5 / 136 |
+| 跟踪页面文件 / dev / 生产路由 | 142 / 5 / 137 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 136 / 136 |
-| 参考证据档案 / 被路由使用 | 40 / 35 |
-| 直接 / 邻近 / 本地权威 | 53 / 18 / 22 |
+| 证据行 / 唯一参考端点 | 137 / 137 |
+| 参考证据档案 / 被路由使用 | 41 / 35 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 22 |
 | 历史证据 / 未验证目标 | 34 / 9 |
-| 设计已覆盖 / 待补设计 | 134 / 2 |
+| 设计已覆盖 / 待补设计 | 135 / 2 |
 
 | 页面域 | 路由数 | 当前实施票 |
 | --- | ---: | --- |
@@ -137,7 +138,7 @@
 | 分供方 | 4 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 项目分供方 | 2 | [#281](https://github.com/zodea/crm-new/issues/281)、[#289](https://github.com/zodea/crm-new/issues/289)、[#317](https://github.com/zodea/crm-new/issues/317) |
 | 核心合同 | 12 | [#277](https://github.com/zodea/crm-new/issues/277)、[#282](https://github.com/zodea/crm-new/issues/282)、[#289](https://github.com/zodea/crm-new/issues/289) |
-| 辅助合同与结算 | 14 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
+| 辅助合同与结算 | 15 | [#295](https://github.com/zodea/crm-new/issues/295)、[#330](https://github.com/zodea/crm-new/issues/330)、[#331](https://github.com/zodea/crm-new/issues/331)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 甲方单据 | 4 | [#283](https://github.com/zodea/crm-new/issues/283)、[#323](https://github.com/zodea/crm-new/issues/323)、[#324](https://github.com/zodea/crm-new/issues/324)、[#325](https://github.com/zodea/crm-new/issues/325)、[#326](https://github.com/zodea/crm-new/issues/326)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 分包单据 | 8 | [#295](https://github.com/zodea/crm-new/issues/295)、[#327](https://github.com/zodea/crm-new/issues/327)、[#289](https://github.com/zodea/crm-new/issues/289) |
 | 自购材 | 12 | [#296](https://github.com/zodea/crm-new/issues/296)、[#297](https://github.com/zodea/crm-new/issues/297)、[#298](https://github.com/zodea/crm-new/issues/298)、[#289](https://github.com/zodea/crm-new/issues/289) |
@@ -187,7 +188,8 @@
 | `app/pages/contract/other-expense/index.vue` | `/contract/other-expense` | 辅助合同与结算 | 列表 | #330 | R-AUX-CONTRACT-LIVE-330 | 参考分类窄树、紧凑宽表与项目、乙方、金额链、票款、状态专属列 | 中央聚合真实外键，未知事实未记录；名称只读，项目/分供方来源往返 | C-DENSE |
 | `app/pages/contract/other-settlement/form/[id].vue` | `/contract/other-settlement/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-SETTLEMENT-DC | 按 `otherSettleForm` 直接源码回填基本信息、结算金额、合同情况、附件与备注 | 真实源合同必须属于所选项目；分供方由源合同带出并校验，无候选合同时不允许伪造来源 | C-FORM |
 | `app/pages/contract/other-settlement/form/index.vue` | `/contract/other-settlement/form` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-SETTLEMENT-DC | 按 `otherSettleForm` 直接源码先选项目再选其他支出合同，并展示合同金额等只读来源信息 | 只保存结算头和附件；没有业务明细实体，不引入 `KitEditGrid` | C-FORM |
-| `app/pages/contract/other-settlement/index.vue` | `/contract/other-settlement` | 辅助合同与结算 | 列表 | #196 | R-AUX-DOCUMENTS-LIVE | 参考确认项目/合同/分供方外，还含奖罚、本次结算与申请/支付余额链；当前统一 `expenditure_settlements` 来源正确但读模型不完整 | 余额只从真实付款申请、支付和抵扣事实派生；来源下钻与返回保留 query，名称先进入只读详情，空数据不能删入口 | C-DENSE |
+| `app/pages/contract/other-settlement/[id].vue` | `/contract/other-settlement/:id` | 辅助合同与结算 | 详情 | #331 | R-OTHER-SETTLEMENT-LIVE-331 | 顶部摘要、页签、基础/前期/结算/累计/系统资料与附件 | 专属只读详情按稳定 ID 关联合同和事实，不生成费用明细或审批轨迹；来源返回与未知金额保持语义 | C-DENSE |
+| `app/pages/contract/other-settlement/index.vue` | `/contract/other-settlement` | 辅助合同与结算 | 列表 | #331 | R-OTHER-SETTLEMENT-LIVE-331 | 紧凑宽表保留项目/合同/分供方、奖罚、本次金额与申请/支付余额链；中央统一结算事实 | 余额只从真实付款申请、支付和抵扣事实派生；来源下钻与返回保留 query，名称先进入只读详情，空数据不能删入口 | C-DENSE |
 | `app/pages/contract/subcontract/form/[id].vue` | `/contract/subcontract/form/:id` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #321 保留整页分区和真实 lookup，接入中央预载、幂等命令、乐观锁及保存后同详情读回，并复核四档局部滚动 | 只编辑正式来源；项目、分供方及劳务/专业类别由服务端校验；返回保留同一详情和嵌套列表上下文 | C-FORM |
 | `app/pages/contract/subcontract/form/index.vue` | `/contract/subcontract/form` | 核心合同 | 整页表单 | #195 | R-FORM-PRIOR | #321 接入中央正式项目/分供方选项、服务端 ID 分配、草稿/提交校验和保存读回 | 新建只走中央命令；演示来源禁止写入；不扩展本票外导入、删除或本地生产旁路 | C-FORM |
 | `app/pages/contract/subcontract/index.vue` | `/contract/subcontract` | 核心合同 | 列表 | #195 | R-SUBCONTRACT-CONTRACT-LIVE | #321 闭合中央分源列表、劳务/专业类别、累计结算/收票/支付、两档应付、完工审定及结算/结清可空状态；#282 联合复核项目/分供方稳定入口、筛选分页返回与四档视口 | 完工审定按真实完工结算聚合；结清状态不能由零余额推断；名称、项目和分供方仅在稳定 ID/来源解析成功时生成入口 | C-DENSE |

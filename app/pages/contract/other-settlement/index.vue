@@ -1,3 +1,10 @@
+<script setup lang="ts">
+import { isDesktopRuntime } from '~/lib/platform/runtime'
+
+const desktop = isDesktopRuntime()
+</script>
+
 <template>
-  <ContractAuxListScreen kind="other_settlement" />
+  <ContractAuxListScreen v-if="desktop" kind="other_settlement" />
+  <OtherSettlementListScreen v-else />
 </template>

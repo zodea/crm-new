@@ -31,6 +31,9 @@ import {
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { migratedOtherSettlement } from './other-settlement-migration'
+import { otherSettlementInstance } from './other-settlement-runtime'
+import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
@@ -87,6 +90,11 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  other_settlements: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
+    { field: 'contractId', target: 'auxiliary_contracts', orphanWhenMissing: true },
+  ],
   projects: [
     { field: 'customerId', target: 'customers' },
     { field: 'secondaryCustomerId', target: 'customers' },
@@ -192,7 +200,7 @@ function referenceTargets(rule: ReferenceRule): readonly CoreMigrationEntityType
 }
 
 function isOwnerDocumentDryRunRelationshipBlock(issue: CoreMigrationIssueDTO): boolean {
-  return issue.entityType === 'owner_documents'
+  return ['owner_documents', 'other_settlements', 'other_settlement_sources'].includes(issue.entityType)
     && (issue.metricKey === 'orphan' || issue.metricKey === 'missing-relation')
     && ['projectId', 'contractId', 'supplierId'].includes(issue.field)
 }
@@ -201,11 +209,15 @@ function referenceRulesFor(
   entityType: CoreMigrationEntityType,
   attributes: CoreMigrationSourceEntityDTO['attributes'],
 ): readonly ReferenceRule[] {
+  if (entityType === 'other_settlement_sources' && attributes?.kind === 'application')
+    return REFERENCE_RULES.other_settlements!
+  if (entityType === 'other_settlement_sources')
+    return [{ field: 'projectId', target: 'projects', orphanWhenMissing: true }, { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true }]
   if (entityType === 'owner_documents' && attributes?.kind === 'project_penalty') {
     return [
       { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
       { field: 'supplierId', target: 'suppliers' },
-      { field: 'contractId', target: 'subcontract_contracts' },
+      { field: 'contractId', target: attributes.contractKind === 'other_expense' ? 'auxiliary_contracts' : 'subcontract_contracts' },
       { field: 'crewId', target: 'crews' },
     ]
   }
@@ -560,6 +572,30 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         importableCount: imported,
         skippedCount: rows.length - imported,
       })
+    }
+
+    for (const entity of plannedEntities.filter(row => ['other_settlements', 'other_settlement_sources'].includes(row.entityType) && !row.deletedAt)) {
+      try {
+        if (entity.entityType === 'other_settlements')
+          migratedOtherSettlement(entity, batchId, plannedEntities)
+        else
+          migratedSettlementSource(entity, plannedEntities)
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: entity.entityType,
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'contractId',
+          metricKey: 'missing-relation',
+          sourceValue: entity.references.contractId ?? '',
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'missing-source',
+          reason: cause instanceof Error ? cause.message : '结算迁移校验失败',
+        }))
+      }
     }
 
     for (const [entityType, expected] of Object.entries(command.source.expectations?.counts ?? {})) {
@@ -1073,6 +1109,7 @@ export function synchronizeCoreMigrationCommandSources(
 
 const commandSources = [
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot) },
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,

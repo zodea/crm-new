@@ -24,6 +24,8 @@ const nativeUnsupported = isTauri()
 
 const entityLabels: Record<CoreMigrationEntityType, string> = {
   auxiliary_contracts: '其他支出与公司支出合同',
+  other_settlements: '其他支出结算',
+  other_settlement_sources: '其他支出结算付款源单',
   customers: '客户',
   suppliers: '分供方',
   crews: '班组',

@@ -1999,7 +1999,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const contractId = entity.references.contractId ?? null
       const project = projectId ? state.projects.get(projectId) ?? null : null
       const constructionContract = contractId ? state.contracts.get(contractId) ?? null : null
-      const subcontract = contractId ? state.subcontractContracts.get(contractId) ?? null : null
+      const auxiliary = kind === 'project_penalty' && entity.attributes.contractKind === 'other_expense'
+        ? entities.find(row => row.entityType === 'auxiliary_contracts' && row.id === contractId && !row.deletedAt && row.attributes.kind === 'other_expense' && !['draft', '草稿'].includes(String(row.attributes.status)))
+        : null
+      const subcontract = auxiliary
+        ? { id: auxiliary.id, no: entityAttribute(auxiliary, 'no'), name: auxiliary.name, projectId: auxiliary.references.projectId ?? '', supplierId: auxiliary.references.supplierId ?? '', amount: auxiliary.amount == null ? null : Number(auxiliary.amount) }
+        : contractId ? state.subcontractContracts.get(contractId) ?? null : null
       const contract = (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty')
         ? subcontract && { ...subcontract, customerId: null }
         : constructionContract
@@ -2283,7 +2288,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           : undefined,
         crewId: kind === 'project_penalty' ? entity.references.crewId ?? null : undefined,
         crewName: kind === 'project_penalty' ? state.crews.get(entity.references.crewId ?? '')?.name ?? '' : undefined,
-        penaltyFacts: kind === 'project_penalty' ? { deadline: entityAttribute(entity, 'deadline') || null, rectificationNote: entityAttribute(entity, 'rectificationNote'), deductionMethod: entityAttribute(entity, 'deductionMethod') } : undefined,
+        penaltyFacts: kind === 'project_penalty' ? { deadline: entityAttribute(entity, 'deadline') || null, rectificationNote: entityAttribute(entity, 'rectificationNote'), deductionMethod: entityAttribute(entity, 'deductionMethod'), origin: entityAttribute(entity, 'penaltyOrigin') || null } : undefined,
         deductionNote: kind === 'sub_settlement' ? entityAttribute(entity, 'settlementDifferenceNote') : undefined,
         settlementDifferenceNote: kind === 'final_settlement'
           ? entityAttribute(entity, 'settlementDifferenceNote')
@@ -2325,7 +2330,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         throw failure('validation-failed', '迁移罚扣整改期限无效')
       for (const raw of jsonRecords(entityAttribute(entity, 'penaltyDeductionsJson'))) {
         const target = migratedDocuments.find(row => row.legacyId === raw.settlementId && row.attributes.kind === 'sub_settlement')
-        const settlement = target ? state.documents.get(key('sub_settlement', target.id)) : null
+        const otherTarget = entities.find(row => row.entityType === 'other_settlements' && !row.deletedAt && row.legacyId === raw.settlementId)
+        if (target && otherTarget)
+          throw failure('relationship-mismatch', '结算旧身份同时对应多个类型，不能猜接')
+        const settlement = otherTarget
+          ? { id: otherTarget.id, projectId: otherTarget.references.projectId ?? null, supplierId: otherTarget.references.supplierId ?? null, contractId: otherTarget.references.contractId ?? null, status: ['confirmed', '已确认'].includes(String(otherTarget.attributes.status)) ? 'confirmed' : String(otherTarget.attributes.status), amount: otherTarget.amount == null ? null : Number(otherTarget.amount) }
+          : target ? state.documents.get(key('sub_settlement', target.id)) : null
         const amount = Number(raw.amount)
         if (!settlement || !matchesPenaltySettlement(penalty, settlement) || !Number.isFinite(amount) || amount <= 0 || round(amount) !== amount || !isISODateTimeDTO(raw.occurredAt))
           throw failure('relationship-mismatch', '迁移抵扣缺少真实一致结算、有效金额或发生时间')
@@ -2333,6 +2343,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         if (state.penaltyDeductions.has(id))
           throw failure('conflict', '迁移抵扣 ID 重复')
         state.penaltyDeductions.set(id, { id, penaltyId: penalty.id, settlementId: settlement.id, amount, actorId: text(raw.actorId), occurredAt: text(raw.occurredAt), commandId: text(raw.commandId), note: text(raw.note) })
+        if (settlement.amount !== null && round([...state.penaltyDeductions.values()].filter(row => row.settlementId === settlement.id).reduce((sum, row) => sum + row.amount, 0)) > settlement.amount)
+          throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
       const total = round([...state.penaltyDeductions.values()].filter(row => row.penaltyId === penalty.id).reduce((sum, row) => sum + row.amount, 0))
       if (total > penalty.amount || (penalty.amount > 0 && total === penalty.amount && penalty.status !== 'deducted') || (penalty.status === 'draft' && total > 0) || (penalty.status === 'deducted' && total !== penalty.amount))
