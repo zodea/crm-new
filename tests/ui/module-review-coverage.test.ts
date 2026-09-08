@@ -1,0 +1,96 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { buildModuleReviewCoverage, MODULE_REVIEW_COVERAGE_PATH, MODULE_REVIEW_INDEX_PATH, renderModuleReviewIndex } from '../../scripts/module-review-coverage.mjs'
+import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
+
+describe('module review coverage', () => {
+  it('covers every production route without treating route evidence as subview acceptance', () => {
+    const coverage = buildModuleReviewCoverage()
+    expect(new Set(coverage.surfaces.map(surface => surface.route))).toEqual(
+      new Set(buildRuntimeEvidenceLedger().endpoints.map(endpoint => endpoint.localRoute)),
+    )
+    expect(new Set(coverage.cases.map(item => item.id)).size).toBe(coverage.cases.length)
+    expect(coverage.cases.every(item => item.acceptance.production !== 'passed')).toBe(true)
+    expect(coverage.cases.filter(item => item.reference.status === 'not-observed').length).toBeGreaterThan(137)
+    expect(coverage.excludedDevPages).toHaveLength(5)
+  })
+
+  it('expands registered document kinds and warranty only on the mounted views', () => {
+    const { surfaces } = buildModuleReviewCoverage()
+    const roots = surfaces.filter(surface => surface.path === 'page')
+    expect(roots.filter(surface => surface.route === '/owner/:kind/new').map(surface => surface.kind).sort()).toEqual([
+      'acceptance',
+      'final_settlement',
+      'owner_change',
+      'owner_penalty',
+      'owner_report',
+    ])
+    expect(roots.filter(surface => surface.route === '/subcontract/:kind').map(surface => surface.kind).sort()).toEqual(['sub_change', 'sub_settlement'])
+    expect(roots.filter(surface => surface.variant === 'warranty').map(surface => surface.route).sort()).toEqual(['/owner/:kind', '/owner/:kind/:id'])
+    expect(surfaces.some(surface => surface.kind.includes(':kind'))).toBe(false)
+  })
+
+  it('separates new/edit modes and the central versus legacy contract detail', () => {
+    const { surfaces, cases } = buildModuleReviewCoverage()
+    expect(surfaces.filter(surface => surface.route === '/project/form/:id?' && surface.path === 'page').map(surface => surface.mode).sort()).toEqual(['edit', 'new'])
+    const contract = surfaces.filter(surface => surface.route === '/contract/:id' && surface.path === 'page')
+    expect(contract.filter(surface => surface.variant === 'central').map(surface => surface.kind).sort()).toEqual(['construction', 'material', 'subcontract'])
+    for (const surface of contract.filter(surface => surface.variant === 'central')) {
+      expect(cases.filter(item => item.surfaceId === surface.id).map(item => item.host)).toEqual(['browser'])
+      expect(surface.condition).toContain('origin')
+    }
+    expect(contract.filter(surface => surface.variant === 'legacy').map(surface => surface.kind).sort()).toEqual(['分包', '施工', '材采'])
+  })
+
+  it('tracks every import entity through mapping and preview, with real write boundaries', () => {
+    const { surfaces, cases } = buildModuleReviewCoverage()
+    const imports = surfaces.filter(surface => surface.route === '/import/mapping/:entity')
+    expect(new Set(imports.map(surface => surface.kind)).size).toBe(8)
+    for (const kind of new Set(imports.map(surface => surface.kind)))
+      expect(imports.filter(surface => surface.kind === kind).map(surface => surface.path)).toEqual(expect.arrayContaining(['page', 'step/upload', 'step/mapping', 'step/preview-import']))
+    const at = (kind: string) => cases.find(item => item.host === 'browser' && surfaces.some(surface => surface.id === item.surfaceId && surface.kind === kind && surface.path === 'page' && surface.route === '/import/mapping/:entity'))!
+    expect(at('supplier').adapter).toBe('central-http')
+    expect(at('project').adapter).toBe('browser-local')
+    expect(at('demo-supplier').adapter).toBe('simulation')
+    expect(at('quantity-legacy-precheck').adapter).toBe('precheck-only')
+  })
+
+  it('does not infer desktop SQLite from the presence of a desktop host', () => {
+    const { surfaces, cases } = buildModuleReviewCoverage()
+    const at = (route: string, host: string, mode = 'view') => cases.find(item => item.host === host && surfaces.some(surface => surface.id === item.surfaceId && surface.route === route && surface.mode === mode && surface.path === 'page'))!
+    expect(at('/project', 'tauri').adapter).toBe('central-http')
+    expect(at('/project/form/:id?', 'tauri', 'new').adapter).toBe('desktop-sqlite')
+    expect(at('/material/price', 'browser').adapter).toBe('browser-local')
+    expect(at('/finance/invoice/factor', 'browser').adapter).toBe('tool-local-storage')
+    expect(at('/finance/invoice/factor', 'tauri').adapter).toBe('tool-local-storage')
+    expect(at('/settings/data-migration', 'tauri').adapter).toBe('unsupported')
+    const penaltySources = surfaces.filter(item => item.route === '/project/penalty/:id' && item.variant === 'central-source' && item.path === 'page')
+    expect(penaltySources.map(item => item.branchIdentity).sort()).toEqual(['crew', 'worker'])
+    expect(penaltySources.every(item => cases.filter(row => row.surfaceId === item.id).every(row => row.adapter === 'central-http'))).toBe(true)
+  })
+
+  it('keeps the dedicated subcontract detail sections apart from desktop forms', () => {
+    const { surfaces } = buildModuleReviewCoverage()
+    const details = surfaces.filter(item => item.route === '/subcontract/:kind/:id')
+    expect(details.filter(item => item.kind === 'sub_change' && item.hosts.length === 1 && item.hosts[0] === 'browser').map(item => item.path)).toEqual(['section/basic', 'files'])
+    expect(details.filter(item => item.kind === 'sub_settlement' && item.hosts.length === 1 && item.hosts[0] === 'browser').map(item => item.path)).toEqual(['section/basic', 'section/payment', 'section/files'])
+    expect(details.filter(item => item.path === 'desktop/form').every(item => item.hosts.length === 1 && item.hosts[0] === 'tauri')).toBe(true)
+  })
+
+  it('keeps menu-only evidence, unmapped abilities and scoped #422 acceptance explicit', () => {
+    const coverage = buildModuleReviewCoverage()
+    expect(coverage.referenceMenus.every(menu => menu.observation === 'menu-only')).toBe(true)
+    expect(coverage.referenceMenus.find(menu => menu.label === '保证金申请')?.mappingStatus).toBe('pending')
+    expect(coverage.referenceMenus.find(menu => menu.label === '保修到期确认单')?.localTargets).toContain('/owner/acceptance?variant=warranty')
+    const surface = coverage.surfaces.find(item => item.route === '/contract/material' && item.path === 'page')!
+    const localCase = coverage.cases.find(item => item.surfaceId === surface.id && item.host === 'browser')!
+    expect(localCase.acceptance.frontend).toBe('partial')
+    expect(localCase.reviewEvidence).toContain('docs/design/evidence/issue-422/README.md')
+    expect(localCase.remaining).toContain('逐列筛选、排序、设置和文件工具仍由 #404/#409 复核')
+  })
+
+  it('keeps the committed inventory reproducible and every source anchor resolvable', () => {
+    expect(JSON.parse(readFileSync(MODULE_REVIEW_COVERAGE_PATH, 'utf8'))).toEqual(buildModuleReviewCoverage())
+    expect(readFileSync(MODULE_REVIEW_INDEX_PATH, 'utf8').replaceAll('\r\n', '\n')).toEqual(renderModuleReviewIndex(buildModuleReviewCoverage()))
+  })
+})

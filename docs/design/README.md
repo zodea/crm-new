@@ -41,6 +41,8 @@ DC重构设计源码/
 
 历史溯源继续保留：旧生产链总规格 [#292](https://github.com/zodea/crm-new/issues/292) 与证据账本重建 [#276](https://github.com/zodea/crm-new/issues/276)。这些链接用于核对已有决定和验收来源，当前工作仍跟随新总图与承接任务。
 
+动态单据、导入阶段、当前挂载的页签/子表和 browser/Tauri 读写差异，进入 [全模块复核覆盖索引](./module-review-coverage.md)；其 [JSON](./module-review-coverage.json) 为派生清单。它与路由证据账本分别记录“需要核验哪些面”和“已有何种参考证据”，不以生成行数宣告功能完成。
+
 运行态视觉与公共交互回归的覆盖矩阵、更新方式和数据脱敏边界见 [`runtime-visual-regression.md`](./runtime-visual-regression.md)。页面切片完成时必须同时更新对应模板样本与真实页面基线。
 
 ## 文档放置规则

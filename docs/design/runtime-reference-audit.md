@@ -29,6 +29,8 @@
 
 下表是已核对源码的展开规则，尚不构成全部子表或运行环境已验收的清单。各项继续由对应模块逐场景采证；父路由的直接证据不自动赋给未观察的子视图。
 
+这些规则现已落实为 [全模块复核覆盖索引](./module-review-coverage.md)及同名 JSON：动态注册、当前挂载子视图和宿主适配器分别展开；逐场景状态及动作仍由模块票继续细化。项目旧 `ProjectSubTables` 根组件当前未挂载，不计入可达界面；当前项目详情为资料分组、九项甲方/分包单据入口及材料合同/合作关系区。索引里的待核验状态不覆盖本登记册原有证据等级。
+
 | 路由或入口 | 已核实展开事实 | 源码入口 / 承接 |
 | --- | --- | --- |
 | `/owner/:kind` 的列表、详情、新建、编辑 | 5 个 kind：change、report、acceptance、final-settlement、penalty；验收与保修为同一 acceptance 的 variant 视图 | `app/lib/owner-document/page.ts`、`app/pages/owner/`；#410 |
