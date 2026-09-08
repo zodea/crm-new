@@ -47,7 +47,7 @@ const detail = {
 
 const shell = defineComponent({
   props: ['title', 'backTo', 'backLabel'],
-  template: '<main><a :href="backTo">{{ backLabel }}</a><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><slot name="actions"/><slot name="summary"/><slot/></main>',
+  template: '<main><a :href="backTo">{{ backLabel }}</a><h1 data-entity-detail-title tabindex="-1">{{ title }}</h1><slot name="actions"/><slot name="summary"/><slot name="navigation"/><slot/><slot name="aside"/></main>',
 })
 const tabs = defineComponent({
   props: ['modelValue', 'tabs'],
@@ -109,13 +109,18 @@ describe('分供方中央详情', () => {
     expect(screen.getByRole('button', { name: '查看累计收票金额明细' })).not.toBeNull()
     expect(screen.getByRole('button', { name: '查看累计付款金额明细' })).not.toBeNull()
     expect(screen.queryByRole('button', { name: '查看应付金额明细' })).toBeNull()
+    expect(screen.getByRole('tab', { name: '详细资料' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('主档')).not.toBeNull()
+    expect(screen.queryByTestId('fact-tab')).toBeNull()
 
     await fireEvent.click(screen.getByRole('button', { name: '查看累计结算金额明细' }))
     expect(routerReplace).toHaveBeenLastCalledWith({ query: { tab: 'settlements' } })
     expect(screen.getByTestId('fact-tab').textContent).toBe('settlements')
+    expect(screen.queryByText('主档')).toBeNull()
+    expect(screen.getByRole('button', { name: '查看累计付款金额明细' })).not.toBeNull()
   })
 
-  it('从 query 恢复付款页签，并保留刷新失败前一版详情', () => {
+  it('从 query 恢复付款页签，刷新失败保留记录并可返回详细资料', async () => {
     route.query = { tab: 'payments', from: 'list' }
     supplierStoreMock.detailState = {
       kind: 'error',
@@ -137,8 +142,12 @@ describe('分供方中央详情', () => {
     })
 
     expect(screen.getByTestId('fact-tab').textContent).toBe('payments')
-    expect(screen.getByText('主档仍可见')).not.toBeNull()
+    expect(screen.queryByText('主档仍可见')).toBeNull()
     expect(screen.getByRole('alert').textContent).toContain('中央服务暂时不可用')
+    await fireEvent.click(screen.getByRole('tab', { name: '详细资料' }))
+    expect(screen.getByText('主档仍可见')).not.toBeNull()
+    expect(screen.queryByTestId('fact-tab')).toBeNull()
+    expect(routerReplace).toHaveBeenLastCalledWith({ query: { from: 'list' } })
   })
 
   it('缺少分包变洽签读取权限时不显示跨领域入口', () => {

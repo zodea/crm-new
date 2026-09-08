@@ -379,68 +379,50 @@ onMounted(() => void initialize())
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
+  <div class="min-w-0">
+    <FinancePaymentTypeStep
+      v-if="showPaymentTypeStep"
+      :biz-types="PAYMENT_BIZ_TYPES"
+      @back="leaveToList"
+      @select="selectPaymentType"
+    />
+
+    <EntityFormShell
+      v-else
+      :title="title"
+      :subtitle="meta.subtitle"
+      :back-label="`返回${meta.label}`"
+      :sections="meta.sections"
+      :state="loading ? 'loading' : 'ready'"
+      @back="leaveToList"
     >
-      <a
-        v-for="section in meta.sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
-      >
-        {{ section.label }}
-      </a>
-    </aside>
-
-    <main class="min-w-0 flex-1">
-      <FinancePaymentTypeStep
-        v-if="showPaymentTypeStep"
-        :biz-types="PAYMENT_BIZ_TYPES"
-        @back="leaveToList"
-        @select="selectPaymentType"
-      />
-
-      <header v-if="!showPaymentTypeStep" class="mb-4 flex flex-wrap items-start gap-3">
-        <div>
-          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
-            <span class="i-lucide-arrow-left" aria-hidden="true" />
-            返回{{ meta.label }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            {{ meta.subtitle }}；草稿允许缺项，提交时由领域 action 校验真实关联。
-          </p>
-        </div>
-        <div v-if="kind === 'payment_record'" class="ml-auto flex items-center gap-2">
-          <span class="chip" :class="isConfirmedPayment ? 'chip-ok' : 'chip-brand'">
-            {{ isConfirmedPayment ? '已人工确认' : draft.confirmationStatus === 'needs_review' ? '待核对' : '草稿' }}
-          </span>
-          <KitButton
-            v-if="isConfirmedPayment"
-            variant="secondary"
-            :loading="loadingAction === 'unconfirmPayment'"
-            data-testid="unconfirm-payment"
-            @click="unconfirmPayment"
-          >
-            撤回确认
-          </KitButton>
-          <KitButton
-            v-else
-            :loading="loadingAction === 'confirmPayment'"
-            data-testid="confirm-payment"
-            @click="confirmPayment"
-          >
-            人工确认支付
-          </KitButton>
-        </div>
-      </header>
+      <template v-if="kind === 'payment_record'" #status>
+        <span class="chip" :class="isConfirmedPayment ? 'chip-ok' : 'chip-brand'">
+          {{ isConfirmedPayment ? '已人工确认' : draft.confirmationStatus === 'needs_review' ? '待核对' : '草稿' }}
+        </span>
+      </template>
+      <template v-if="kind === 'payment_record'" #actions>
+        <KitButton
+          v-if="isConfirmedPayment"
+          variant="secondary"
+          :loading="loadingAction === 'unconfirmPayment'"
+          data-testid="unconfirm-payment"
+          @click="unconfirmPayment"
+        >
+          撤回确认
+        </KitButton>
+        <KitButton
+          v-else
+          :loading="loadingAction === 'confirmPayment'"
+          data-testid="confirm-payment"
+          @click="confirmPayment"
+        >
+          人工确认支付
+        </KitButton>
+      </template>
 
       <section
-        v-if="!showPaymentTypeStep && kind === 'receipt'"
+        v-if="kind === 'receipt'"
         class="mb-4 grid min-w-0 gap-3 rounded-[var(--radius-card)] border border-ok/25 bg-ok-soft px-4 py-3 sm:grid-cols-4"
         aria-label="收款方向"
         data-testid="receipt-direction-summary"
@@ -463,10 +445,7 @@ onMounted(() => void initialize())
         </div>
       </section>
 
-      <div v-if="!showPaymentTypeStep && loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
-      <form v-else-if="!showPaymentTypeStep" class="flex flex-col gap-4" data-testid="finance-form" @submit.prevent>
+      <form class="flex min-w-0 flex-col gap-4" data-testid="finance-form" @submit.prevent>
         <FinanceFormFields
           :kind="kind"
           :draft="draft"
@@ -507,6 +486,6 @@ onMounted(() => void initialize())
           @action="handleFooterAction"
         />
       </form>
-    </main>
+    </EntityFormShell>
   </div>
 </template>

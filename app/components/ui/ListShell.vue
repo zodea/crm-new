@@ -11,6 +11,7 @@ const props = defineProps<{
   tree?: TreeNode[]
   views?: ListView[]
   summary?: Record<string, number | string>
+  continuous?: boolean
 }>()
 
 const treeKey = defineModel<string>('treeKey')
@@ -35,14 +36,18 @@ const formattedSummary = computed(() =>
 
 <template>
   <section
-    class="min-w-0 grid gap-3"
-    :class="hasTree && !treeCollapsed ? 'md:grid-cols-[200px_minmax(0,1fr)]' : 'grid-cols-1'"
+    class="min-w-0 grid"
+    :class="[
+      hasTree && !treeCollapsed ? 'md:grid-cols-[200px_minmax(0,1fr)]' : 'grid-cols-1',
+      continuous ? 'list-shell--continuous gap-0 overflow-clip border border-line rounded-[var(--radius-card)] bg-panel' : 'gap-3',
+    ]"
     data-list-shell
   >
     <aside
       v-if="hasTree && !treeCollapsed"
       data-list-shell-tree
       class="min-w-0 md:w-[200px]"
+      :class="continuous ? 'border-b border-line p-2 md:border-b-0 md:border-r' : ''"
     >
       <div class="mb-2 flex justify-end">
         <button
@@ -65,10 +70,12 @@ const formattedSummary = computed(() =>
 
     <div class="min-w-0">
       <header
-        v-if="$slots.toolbar || hasViews || (hasTree && treeCollapsed)"
-        class="mb-2 flex min-w-0 flex-wrap items-center gap-2"
+        v-if="$slots.heading || $slots.toolbar || $slots.actions || hasViews || (hasTree && treeCollapsed)"
+        class="flex min-w-0 flex-wrap items-center gap-2"
+        :class="continuous ? 'px-3 py-2' : 'mb-2'"
         data-list-shell-toolbar
       >
+        <slot name="heading" />
         <button
           v-if="hasTree && treeCollapsed"
           type="button"
@@ -94,17 +101,26 @@ const formattedSummary = computed(() =>
         >
           <slot name="toolbar" />
         </div>
+
+        <div v-if="$slots.actions" class="ml-auto flex min-w-0 flex-wrap items-center gap-2">
+          <slot name="actions" />
+        </div>
       </header>
+
+      <div v-if="$slots.filters" class="min-w-0" :class="continuous ? 'px-3 pb-2' : 'mb-2'" data-list-shell-filters>
+        <slot name="filters" />
+      </div>
 
       <div class="min-w-0" data-list-shell-table>
         <slot name="table" />
       </div>
 
       <div
-        v-if="hasSummary"
+        v-if="hasSummary || $slots.summary"
         role="status"
         aria-label="列表汇总"
-        class="sticky bottom-0 z-1 mt-[-1px] flex min-h-9 flex-wrap items-center gap-x-5 gap-y-1 border border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-soft shadow-[0_-4px_12px_rgba(15,23,42,0.04)]"
+        class="sticky bottom-0 z-1 flex min-h-9 flex-wrap items-center gap-x-5 gap-y-1 border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-soft"
+        :class="continuous ? 'border-t' : 'mt-[-1px] border shadow-[0_-4px_12px_rgba(15,23,42,0.04)]'"
         data-list-shell-summary
       >
         <slot name="summary">
@@ -121,3 +137,13 @@ const formattedSummary = computed(() =>
     </div>
   </section>
 </template>
+
+<style scoped>
+.list-shell--continuous :deep([data-ui="kit-table"]) {
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+</style>

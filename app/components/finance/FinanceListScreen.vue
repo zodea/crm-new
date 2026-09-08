@@ -3,6 +3,7 @@ import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
+import ListShell from '~/components/ui/ListShell.vue'
 import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
@@ -141,35 +142,33 @@ onActivated(() => {
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-4">
-    <header class="panel flex flex-wrap items-center gap-3 px-4 py-3">
-      <div>
-        <h1 class="text-17px font-800 text-ink">
-          {{ meta.label }}
-        </h1>
-        <p class="mt-0.5 text-11px text-ink-faint">
-          {{ meta.subtitle }}
-        </p>
-      </div>
-      <div class="ml-auto flex flex-wrap items-center gap-2">
-        <KitButton variant="secondary" :loading="loading" @click="load">
-          <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
-        </KitButton>
-        <KitButton data-testid="create-finance-form" @click="openCreate">
-          <span class="i-lucide-plus mr-1" aria-hidden="true" />新建{{ meta.label }}
-        </KitButton>
-      </div>
-    </header>
+  <ListShell continuous>
+    <template #toolbar>
+      <ListFilterBar
+        v-model:query="search"
+        embedded
+        :filters="filterDefinitions"
+        :total="rows.length"
+        :filtered="filtered.length"
+        @filter-change="onFilterChange"
+      >
+        <template #heading>
+          <h1 class="text-14px font-700 text-ink" :title="meta.subtitle">
+            {{ meta.label }}
+          </h1>
+        </template>
+        <template #actions>
+          <KitButton variant="secondary" :loading="loading" @click="load">
+            <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
+          </KitButton>
+          <KitButton data-testid="create-finance-form" @click="openCreate">
+            <span class="i-lucide-plus mr-1" aria-hidden="true" />新建{{ meta.label }}
+          </KitButton>
+        </template>
+      </ListFilterBar>
+    </template>
 
-    <ListFilterBar
-      v-model:query="search"
-      :filters="filterDefinitions"
-      :total="rows.length"
-      :filtered="filtered.length"
-      @filter-change="onFilterChange"
-    />
-
-    <div class="panel overflow-hidden">
+    <template #table>
       <KitTable
         :columns="columns"
         :data="pageRows"
@@ -199,12 +198,14 @@ onActivated(() => {
           </button>
         </template>
       </KitTable>
-      <div class="border-t border-line bg-surface-2 px-4 py-2 text-right text-12px text-ink-soft">
+    </template>
+    <template #summary>
+      <span class="ml-auto">
         当前页 {{ pageRows.length }} 条 · {{ amountSummaryLabel }}
         <strong class="ml-1 font-mono text-ink">
           {{ yuan(filtered.reduce((total, row) => total + row.amount, 0)) }}
         </strong>
-      </div>
-    </div>
-  </div>
+      </span>
+    </template>
+  </ListShell>
 </template>

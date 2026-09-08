@@ -502,6 +502,7 @@ onDeactivated(() => {
       v-if="readPage"
       v-model:tree-key="selectedPhase"
       v-model:view-key="sortMode"
+      continuous
       :tree="filtersVisible ? phaseTree : []"
       :views="listViews"
       :summary="listSummary"
@@ -512,6 +513,7 @@ onDeactivated(() => {
           v-model:sort-mode="sortMode"
           v-model:filters-visible="filtersVisible"
           v-model:density="density"
+          class="project-list-toolbar"
           :real-total="realSummary?.projectCount ?? 0"
           :demo-total="demoSummary?.projectCount ?? 0"
           :include-demo="includeDemo"
@@ -662,3 +664,26 @@ onDeactivated(() => {
     </ListShell>
   </div>
 </template>
+
+<style scoped>
+:deep(.project-list-toolbar) {
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:deep(.project-list-toolbar > div) {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+:deep(.project-list-toolbar > div > div) {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+</style>

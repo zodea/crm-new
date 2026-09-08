@@ -16,6 +16,7 @@ const {
   stateTitle = '',
   stateDescription = '',
   stateActionLabel = '',
+  compact = false,
 } = defineProps<{
   title: string
   subtitle?: string
@@ -26,6 +27,7 @@ const {
   stateTitle?: string
   stateDescription?: string
   stateActionLabel?: string
+  compact?: boolean
 }>()
 
 defineEmits<{
@@ -80,7 +82,9 @@ const statePresentation = computed(() => {
   <div
     v-if="state === 'ready'"
     data-ui="entity-detail-shell"
-    class="entity-detail-shell flex min-w-0 flex-col gap-4"
+    class="entity-detail-shell flex min-w-0 flex-col"
+    :class="compact ? 'gap-2' : 'gap-4'"
+    :data-compact="compact"
   >
     <header class="panel min-w-0 overflow-hidden">
       <div class="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3">
@@ -131,9 +135,13 @@ const statePresentation = computed(() => {
     <div
       data-ui="entity-detail-body"
       :data-has-aside="Boolean($slots.aside)"
-      class="entity-detail-shell__body grid min-w-0 items-start gap-4"
+      class="entity-detail-shell__body grid min-w-0 items-start"
+      :class="compact ? 'gap-2' : 'gap-4'"
     >
       <div class="min-w-0">
+        <div v-if="$slots.navigation" data-ui="entity-detail-navigation" class="min-w-0 bg-panel px-3 pt-2">
+          <slot name="navigation" />
+        </div>
         <slot />
       </div>
       <aside
@@ -177,6 +185,22 @@ const statePresentation = computed(() => {
 
 .entity-detail-shell__body {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.entity-detail-shell[data-compact="true"] [data-entity-detail-title] {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.entity-detail-shell[data-compact="true"] [data-ui="entity-detail-summary"] {
+  border-top: 0;
+  padding: 4px 16px 16px;
+}
+
+@container entity-detail-shell (min-width: 52rem) {
+  .entity-detail-shell[data-compact="true"] .entity-detail-shell__body[data-has-aside="true"] {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 30%);
+  }
 }
 
 @container entity-detail-shell (min-width: 68rem) {

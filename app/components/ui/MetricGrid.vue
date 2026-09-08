@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 指标网格（KitAtoms）：cols 仅表示宽屏最大列数；空间不足时按最小可读宽度自动降列。
 // 基准：DC重构设计源码/kit/KitAtoms.jsx MetricGrid。
-// 分隔线由 gap-[1px] 露出 bg-line 实现，格子白底来自 Metric 自带 bg-panel。
+// 空余单元保持白底，分隔线只围绕实际指标，避免换行后露出大块灰色填充。
 const props = withDefaults(defineProps<{
   cols?: number
 }>(), { cols: 5 })
@@ -17,9 +17,16 @@ const gridTemplateColumns = computed(() => {
 
 <template>
   <div
-    class="grid gap-[1px] overflow-hidden border border-line rounded-[var(--radius-card)] bg-line shadow-[var(--shadow-card)]"
+    class="metric-grid grid gap-[1px] overflow-hidden border border-line rounded-[var(--radius-card)] bg-panel"
     :style="{ gridTemplateColumns }"
   >
     <slot />
   </div>
 </template>
+
+<style scoped>
+.metric-grid > :deep(*) {
+  min-width: 0;
+  box-shadow: 0 0 0 1px var(--line);
+}
+</style>

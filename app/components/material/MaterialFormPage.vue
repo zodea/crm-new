@@ -391,107 +391,82 @@ onMounted(() => void initialize())
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-1340px items-start gap-4 pb-6">
-    <aside
-      v-if="meta.sections.length >= 3"
-      class="sticky top-4 hidden w-44 shrink-0 rounded-[var(--radius-card)] border border-line bg-panel p-2 xl:block"
-      aria-label="表单分区"
-    >
-      <a
-        v-for="section in meta.sections"
-        :key="section.key"
-        :href="`#section-${section.key}`"
-        class="block rounded-[var(--radius-control)] px-3 py-2 text-12px text-ink-soft transition-colors hover:bg-brand-soft hover:text-brand-deep"
-      >
-        {{ section.label }}
-      </a>
-    </aside>
+  <EntityFormShell
+    :title="title"
+    :subtitle="meta.subtitle"
+    :back-label="`返回${meta.label}`"
+    :sections="meta.sections"
+    :state="loading ? 'loading' : 'ready'"
+    @back="leaveToList"
+  >
+    <template #status>
+      <span v-if="draft.status" class="chip" :class="isFinal ? 'chip-ok' : 'chip-brand'">
+        {{ isFinal ? '已生效' : '草稿' }}
+      </span>
+    </template>
 
-    <main class="min-w-0 flex-1">
-      <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <button type="button" class="mb-1 inline-flex items-center gap-1 border-0 bg-transparent p-0 text-12px text-brand-deep" @click="leaveToList">
-            <span class="i-lucide-arrow-left" aria-hidden="true" />返回{{ meta.label }}
-          </button>
-          <h1 class="text-20px font-800 text-ink">
-            {{ title }}
-          </h1>
-          <p class="mt-1 text-12px text-ink-faint">
-            {{ meta.subtitle }}；草稿允许缺项，业务动作执行时校验真实关联和数量。
-          </p>
-        </div>
-        <span v-if="draft.status" class="chip" :class="isFinal ? 'chip-ok' : 'chip-brand'">
-          {{ isFinal ? '已生效' : '草稿' }}
-        </span>
-      </header>
+    <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
+      <MaterialFormFields
+        :kind="kind"
+        :draft="draft"
+        :field-errors="fieldErrors"
+        :readonly="isFinal"
+        :fetch-projects="fetchProjects"
+        :fetch-customers="fetchCustomers"
+        :fetch-suppliers="fetchSuppliers"
+        :fetch-contracts="fetchContracts"
+        :fetch-requisitions="fetchRequisitions"
+        :fetch-crews="fetchCrews"
+        @patch="patchDraft"
+        @clear-error="clearFieldError"
+      />
 
-      <div v-if="loading" class="panel grid min-h-56 place-items-center text-13px text-ink-faint">
-        正在载入表单…
-      </div>
+      <MaterialLineGrid
+        v-if="kind === 'mat_arrival' || kind === 'stock_check'"
+        :kind="kind"
+        :lines="draft.lines ?? []"
+        :readonly="isFinal"
+        :resolve-book-qty="kind === 'stock_check' ? resolveBookQty : undefined"
+        @update="patchDraft({ lines: $event })"
+      />
 
-      <form v-else class="flex flex-col gap-4" @submit.prevent>
-        <MaterialFormFields
-          :kind="kind"
-          :draft="draft"
-          :field-errors="fieldErrors"
-          :readonly="isFinal"
-          :fetch-projects="fetchProjects"
-          :fetch-customers="fetchCustomers"
-          :fetch-suppliers="fetchSuppliers"
-          :fetch-contracts="fetchContracts"
-          :fetch-requisitions="fetchRequisitions"
-          :fetch-crews="fetchCrews"
-          @patch="patchDraft"
-          @clear-error="clearFieldError"
+      <FileRefAttachmentSection
+        v-if="supportsAttachments"
+        :attachments="attachments"
+        :pending-attachments="pendingAttachments"
+        :pending-remove-ids="pendingRemoveIds"
+        :pending-restore-ids="pendingRestoreIds"
+        :desktop-picker="desktopAttachmentPicker"
+        :note="String(draft.note ?? '')"
+        :note-readonly="isFinal"
+        @pick-native="pickNativeFiles"
+        @files="handleFiles"
+        @toggle-existing="toggleExistingAttachment"
+        @remove-pending="removePending"
+        @patch-pending="patchPending"
+        @update-note="patchDraft({ note: $event })"
+      />
+
+      <section v-else id="section-note" class="panel scroll-mt-4 p-4">
+        <SectionHeader title="备注" />
+        <textarea
+          :value="String(draft.note ?? '')"
+          :disabled="isFinal"
+          rows="4"
+          class="field-input mt-3 w-full"
+          @input="patchDraft({ note: ($event.target as HTMLTextAreaElement).value })"
         />
+      </section>
 
-        <MaterialLineGrid
-          v-if="kind === 'mat_arrival' || kind === 'stock_check'"
-          :kind="kind"
-          :lines="draft.lines ?? []"
-          :readonly="isFinal"
-          :resolve-book-qty="kind === 'stock_check' ? resolveBookQty : undefined"
-          @update="patchDraft({ lines: $event })"
-        />
-
-        <FileRefAttachmentSection
-          v-if="supportsAttachments"
-          :attachments="attachments"
-          :pending-attachments="pendingAttachments"
-          :pending-remove-ids="pendingRemoveIds"
-          :pending-restore-ids="pendingRestoreIds"
-          :desktop-picker="desktopAttachmentPicker"
-          :note="String(draft.note ?? '')"
-          :note-readonly="isFinal"
-          @pick-native="pickNativeFiles"
-          @files="handleFiles"
-          @toggle-existing="toggleExistingAttachment"
-          @remove-pending="removePending"
-          @patch-pending="patchPending"
-          @update-note="patchDraft({ note: $event })"
-        />
-
-        <section v-else id="section-note" class="panel scroll-mt-4 p-4">
-          <SectionHeader title="备注" />
-          <textarea
-            :value="String(draft.note ?? '')"
-            :disabled="isFinal"
-            rows="4"
-            class="field-input mt-3 w-full"
-            @input="patchDraft({ note: ($event.target as HTMLTextAreaElement).value })"
-          />
-        </section>
-
-        <FormFooter
-          v-model="closeAfterSave"
-          :actions="footerActions"
-          :labels="footerLabels"
-          :dirty="dirty"
-          :close-after-save="showCloseAfterSave"
-          :loading-action="loadingAction"
-          @action="handleFooterAction"
-        />
-      </form>
-    </main>
-  </div>
+      <FormFooter
+        v-model="closeAfterSave"
+        :actions="footerActions"
+        :labels="footerLabels"
+        :dirty="dirty"
+        :close-after-save="showCloseAfterSave"
+        :loading-action="loadingAction"
+        @action="handleFooterAction"
+      />
+    </form>
+  </EntityFormShell>
 </template>

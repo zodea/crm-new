@@ -3,6 +3,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { MaterialContractListPageDTO } from '~/lib/material-contract/repository'
 import type { ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
+import ListShell from '~/components/ui/ListShell.vue'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
 import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
@@ -172,115 +173,114 @@ useTabTitle('材料采购合同')
 </script>
 
 <template>
-  <div class="min-w-0 space-y-3" data-testid="material-contract-list">
-    <header class="panel px-4 py-3">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 id="material-contract-list-heading" tabindex="-1" class="text-18px font-850 text-ink outline-none">
-            材料采购合同
-          </h1><p class="mt-1 text-12px text-ink-soft">
-            正式数据与已授权演示数据分源展示；演示数据只读。
-          </p>
-          <NuxtLink v-if="projectReturnTo" :to="projectReturnTo" class="mt-2 inline-flex text-12px font-700 text-brand hover:underline">
-            返回项目详情
-          </NuxtLink>
-        </div>
-        <NuxtLink v-if="canCreate" to="/contract/material/form" class="btn-primary">
-          新建材料采购合同
-        </NuxtLink>
+  <ListShell continuous data-testid="material-contract-list">
+    <template #heading>
+      <h1 id="material-contract-list-heading" tabindex="-1" class="text-14px font-700 text-ink outline-none" title="正式数据与已授权演示数据分源展示；演示数据只读。">
+        材料采购合同
+      </h1>
+      <NuxtLink v-if="projectReturnTo" :to="projectReturnTo" class="inline-flex text-12px font-700 text-brand hover:underline">
+        返回项目详情
+      </NuxtLink>
+    </template>
+    <template #actions>
+      <div v-if="!queryProblem" class="relative min-w-0 w-60 max-w-full">
+        <span class="i-lucide-search pointer-events-none absolute left-2.5 top-1/2 text-14px text-ink-faint -translate-y-1/2" aria-hidden="true" />
+        <input v-model="search" type="search" class="field-input h-8 min-w-0 w-full pl-8 text-13px" placeholder="搜索合同名称或编号" aria-label="搜索材料采购合同">
       </div>
-    </header>
-
-    <StatePanel v-if="queryProblem" kind="error" title="材料采购合同查询条件无效" :description="queryProblem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
-
-    <section v-else class="panel p-3" aria-label="材料采购合同筛选">
-      <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        <input v-model="search" class="field-input" placeholder="搜索合同名称或编号" aria-label="搜索材料采购合同">
-        <select class="field-input" :value="query.projectId ?? ''" aria-label="筛选项目" @change="patchQuery({ projectId: ($event.target as HTMLSelectElement).value, page: 1 })">
+      <NuxtLink v-if="canCreate" to="/contract/material/form" class="btn-primary min-h-8 text-13px">
+        新建材料采购合同
+      </NuxtLink>
+    </template>
+    <template v-if="!queryProblem" #filters>
+      <section class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2" aria-label="材料采购合同筛选">
+        <select class="field-input h-8 min-w-0 w-40 max-w-full py-1 text-12px" :value="query.projectId ?? ''" aria-label="筛选项目" @change="patchQuery({ projectId: ($event.target as HTMLSelectElement).value, page: 1 })">
           <option value="">
             全部项目
           </option><option v-for="item in page?.summary.projects ?? []" :key="item.id" :value="item.id">
             {{ item.label }}
           </option>
         </select>
-        <select class="field-input" :value="query.supplierId ?? ''" aria-label="筛选分供方" @change="patchQuery({ supplierId: ($event.target as HTMLSelectElement).value, page: 1 })">
+        <select class="field-input h-8 min-w-0 w-40 max-w-full py-1 text-12px" :value="query.supplierId ?? ''" aria-label="筛选分供方" @change="patchQuery({ supplierId: ($event.target as HTMLSelectElement).value, page: 1 })">
           <option value="">
             全部分供方
           </option><option v-for="item in page?.summary.suppliers ?? []" :key="item.id" :value="item.id">
             {{ item.label }}
           </option>
         </select>
-        <select class="field-input" :value="query.status ?? ''" aria-label="筛选状态" @change="patchQuery({ status: ($event.target as HTMLSelectElement).value, page: 1 })">
+        <select class="field-input h-8 min-w-0 w-32 max-w-full py-1 text-12px" :value="query.status ?? ''" aria-label="筛选状态" @change="patchQuery({ status: ($event.target as HTMLSelectElement).value, page: 1 })">
           <option value="">
             全部状态
           </option><option v-for="item in page?.summary.statuses ?? []" :key="item.value" :value="item.value">
             {{ item.value }}（{{ item.count }}）
           </option>
         </select>
-        <select class="field-input" :value="query.pageSize" aria-label="每页数量" @change="patchQuery({ pageSize: Number(($event.target as HTMLSelectElement).value), page: 1 })">
+        <select class="field-input h-8 min-w-0 w-32 max-w-full py-1 text-12px" :value="query.pageSize" aria-label="每页数量" @change="patchQuery({ pageSize: Number(($event.target as HTMLSelectElement).value), page: 1 })">
           <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">
             每页 {{ size }} 条
           </option>
         </select>
-      </div>
-    </section>
-
-    <div v-if="!queryProblem && page" class="space-y-3">
-      <div v-if="state.kind === 'error'" class="panel border-danger/40 bg-danger/5 p-3 text-12px text-danger" role="alert">
-        {{ state.problem.message }}；当前保留上一次成功读取的列表。
-        <button v-if="state.problem.retryable" type="button" class="ml-2 underline" @click="store.loadList(query)">
-          重试
-        </button>
-      </div>
-      <section class="panel min-w-0 overflow-hidden" data-testid="material-contract-list-scroll">
-        <KitTable
-          :columns="columns"
-          :data="page.items"
-          :loading="state.kind === 'loading'"
-          :page="page.pagination"
-          :page-size-options="[10, 20, 50, 100]"
-          :empty="{
-            title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无材料采购合同',
-            description: '可调整筛选条件，或新建正式材料采购合同。',
-          }"
-          row-key="rowKey"
-          @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })"
-        >
-          <template #name="{ row }">
-            <NuxtLink
-              v-if="link(row)"
-              :id="`material-contract-row-${row.rowKey}`"
-              :to="link(row)!"
-              class="font-700 text-brand hover:underline"
-              @click="captureReturnOrigin(row)"
-            >
-              {{ row.name }}
-            </NuxtLink><span v-else>{{ row.name }}</span>
-          </template>
-          <template #origin="{ row }">
-            <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
-          </template>
-          <template #project="{ row }">
-            {{ materialContractReferenceLabel(row.project) }}
-          </template>
-          <template #supplier="{ row }">
-            {{ materialContractReferenceLabel(row.supplier) }}
-          </template>
-          <template #changed="{ row }">
-            {{ yuan(Number(row.amounts.changed)) }}
-          </template>
-          <template #invoiced="{ row }">
-            {{ yuan(Number(row.amounts.invoiced)) }}
-          </template>
-          <template #paid="{ row }">
-            {{ yuan(Number(row.amounts.paid)) }}
-          </template>
-        </KitTable>
       </section>
-    </div>
+    </template>
 
-    <StatePanel v-else-if="!queryProblem && (state.kind === 'loading' || state.kind === 'idle')" kind="loading" title="正在读取材料采购合同" description="正在从中央读模型加载列表。" />
-    <StatePanel v-else-if="!queryProblem && state.kind === 'forbidden'" kind="forbidden" title="无权查看材料采购合同" :description="state.problem.message" />
-    <StatePanel v-else-if="!queryProblem" kind="error" title="材料采购合同读取失败" :description="state.kind === 'error' ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
-  </div>
+    <template #table>
+      <StatePanel v-if="queryProblem" kind="error" title="材料采购合同查询条件无效" :description="queryProblem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
+      <div v-else-if="page" class="min-w-0">
+        <div v-if="state.kind === 'error'" class="border-y border-danger/40 bg-danger/5 p-3 text-12px text-danger" role="alert">
+          {{ state.problem.message }}；当前保留上一次成功读取的列表。
+          <button v-if="state.problem.retryable" type="button" class="ml-2 underline" @click="store.loadList(query)">
+            重试
+          </button>
+        </div>
+        <section class="min-w-0" data-testid="material-contract-list-scroll">
+          <KitTable
+            :columns="columns"
+            :data="page.items"
+            :loading="state.kind === 'loading'"
+            :page="page.pagination"
+            :page-size-options="[10, 20, 50, 100]"
+            :empty="{
+              title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无材料采购合同',
+              description: '可调整筛选条件，或新建正式材料采购合同。',
+            }"
+            row-key="rowKey"
+            @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })"
+          >
+            <template #name="{ row }">
+              <NuxtLink
+                v-if="link(row)"
+                :id="`material-contract-row-${row.rowKey}`"
+                :to="link(row)!"
+                class="font-700 text-brand hover:underline"
+                @click="captureReturnOrigin(row)"
+              >
+                {{ row.name }}
+              </NuxtLink><span v-else>{{ row.name }}</span>
+            </template>
+            <template #origin="{ row }">
+              <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
+            </template>
+            <template #project="{ row }">
+              {{ materialContractReferenceLabel(row.project) }}
+            </template>
+            <template #supplier="{ row }">
+              {{ materialContractReferenceLabel(row.supplier) }}
+            </template>
+            <template #changed="{ row }">
+              {{ yuan(Number(row.amounts.changed)) }}
+            </template>
+            <template #invoiced="{ row }">
+              {{ yuan(Number(row.amounts.invoiced)) }}
+            </template>
+            <template #paid="{ row }">
+              {{ yuan(Number(row.amounts.paid)) }}
+            </template>
+          </KitTable>
+        </section>
+      </div>
+
+      <StatePanel v-else-if="state.kind === 'loading' || state.kind === 'idle'" kind="loading" title="正在读取材料采购合同" description="正在从中央读模型加载列表。" />
+      <StatePanel v-else-if="state.kind === 'forbidden'" kind="forbidden" title="无权查看材料采购合同" :description="state.problem.message" />
+      <StatePanel v-else kind="error" title="材料采购合同读取失败" :description="state.kind === 'error' ? state.problem.message : '中央列表暂不可用'" action-label="重新加载" @action="store.loadList(query)" />
+    </template>
+  </ListShell>
 </template>

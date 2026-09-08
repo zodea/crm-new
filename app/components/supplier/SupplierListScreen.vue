@@ -173,9 +173,9 @@ onActivated(() => void load())
 <template>
   <div class="grid min-w-0 gap-3">
     <StatePanel v-if="problem" :kind="problem.code === 'forbidden' ? 'forbidden' : 'error'" title="分供方列表加载失败" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
-    <ListShell v-if="!problem || readPage" :summary="summary">
+    <ListShell v-if="!problem || readPage" continuous :summary="summary">
       <template #toolbar>
-        <section class="panel flex min-w-0 flex-wrap items-center gap-2 p-2.5" data-supplier-list-return-fallback tabindex="-1">
+        <section class="flex min-w-0 flex-wrap items-center gap-2" data-supplier-list-return-fallback tabindex="-1">
           <div class="mr-auto">
             <h2 class="text-14px font-800 text-ink">
               分供方资料库
@@ -183,17 +183,23 @@ onActivated(() => void load())
               共 {{ readPage?.pagination.total ?? 0 }} 家；测试数据按工作区开关显示
             </p>
           </div>
-          <SearchInput v-model="search" placeholder="搜索公司名、税号、简称…" :width="230" />
+          <div class="ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            <SearchInput v-model="search" placeholder="搜索公司名、税号、简称…" :width="230" />
+            <button type="button" class="btn-secondary" :disabled="loading" @click="load">
+              <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
+            </button>
+            <button type="button" class="btn-primary" @click="createSupplier">
+              <span class="i-lucide-plus mr-1" aria-hidden="true" />新增分供方
+            </button>
+          </div>
+        </section>
+      </template>
+      <template #filters>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <SelectFilter v-model="category" label="类别" :options="categoryOptions" :min-width="145" />
           <SelectFilter v-model="credentialStatus" label="资料" :options="credentialOptions" :min-width="140" />
           <SelectFilter v-model="sort" label="排序" :options="[{ key: 'updated-desc', label: '最近更新' }, { key: 'name-asc', label: '名称升序' }, { key: 'name-desc', label: '名称降序' }, { key: 'category-asc', label: '类别升序' }]" :min-width="125" />
-          <button type="button" class="btn-secondary" :disabled="loading" @click="load">
-            <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
-          </button>
-          <button type="button" class="btn-primary" @click="createSupplier">
-            <span class="i-lucide-plus mr-1" aria-hidden="true" />新增分供方
-          </button>
-        </section>
+        </div>
       </template>
       <template #table>
         <div data-ui="supplier-list-table" class="min-w-0 max-w-full">
