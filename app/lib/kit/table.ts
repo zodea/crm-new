@@ -33,6 +33,8 @@ export interface KitTableColumn {
   filterable?: boolean | KitFilterOption[]
   /** 自定义单元格插槽名;action 列缺省用 'action' 插槽。 */
   slot?: string
+  /** 自定义可操作表头；调用方提供真实筛选/排序能力。 */
+  customHeader?: boolean
 }
 
 export interface NormalizedKitColumn extends KitTableColumn {

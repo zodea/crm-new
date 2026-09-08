@@ -89,7 +89,7 @@ const vFocusTarget: Directive<HTMLElement, boolean> = {
     :data="[...rows]"
     :min-rows="5"
     row-key="id"
-    :empty="{ title: emptyLabel, description: '仅展示通过稳定合同外键关联的真实事实。' }"
+    :empty="{ title: emptyLabel }"
   >
     <template #no="{ row }">
       <span class="font-mono">{{ row.no || '—' }}</span>

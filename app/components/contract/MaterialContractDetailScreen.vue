@@ -271,7 +271,7 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
         </section>
 
         <section v-if="activeTab === 'info'" class="panel p-4">
-          <SectionHeader title="详细信息" subtitle="仅展示中央读模型已核验字段；敏感字段按权限脱敏" />
+          <SectionHeader title="详细信息" />
           <div class="material-contract-grid mt-3">
             <div class="detail-row">
               <span>所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="text-brand hover:underline">
@@ -374,7 +374,7 @@ useTabTitle(() => detail.value?.contract.name ?? '材料采购合同详情')
         </section>
 
         <div v-if="loading" class="fixed bottom-4 right-4 chip chip-brand" role="status">
-          正在刷新中央详情…
+          正在刷新…
         </div>
       </div>
     </EntityDetailShell>

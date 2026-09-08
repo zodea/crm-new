@@ -76,7 +76,7 @@ function pageKey(r: { fullPath: string }) {
     <SidebarInset class="h-svh overflow-hidden">
       <AppTopbar />
       <AppTabBar />
-      <!-- 主区滚动容器（对齐设计稿 main：20px 24px 36px 全宽） -->
+      <!-- 主区滚动容器；密集表格在各自区域内横向滚动。 -->
       <div
         ref="scrollEl"
         data-shell-workspace
@@ -91,7 +91,7 @@ function pageKey(r: { fullPath: string }) {
 
 <style scoped>
 .shell-workspace {
-  padding: clamp(var(--space-3, 12px), 2vw, var(--space-5, 20px)) clamp(var(--space-3, 12px), 2vw, var(--space-6, 24px)) clamp(var(--space-5, 20px), 3vw, 36px);
+  padding: clamp(8px, 1vw, 12px) clamp(8px, 1vw, 12px) 16px;
   scrollbar-gutter: stable;
 }
 </style>

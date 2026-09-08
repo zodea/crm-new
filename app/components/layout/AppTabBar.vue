@@ -200,7 +200,7 @@ onKeyStroke('Escape', () => closeMenu(true))
     <nav
       id="shell-route-tabs"
       ref="tabListEl"
-      class="tabbar-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-[16px]"
+      class="tabbar-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden px-2"
       aria-label="已打开页面"
     >
       <div
@@ -214,10 +214,10 @@ onKeyStroke('Escape', () => closeMenu(true))
           :data-tab-key="tab.key"
           data-shell-tab
           :data-active="tab.key === tabsStore.activeKey"
-          class="browser-tab group/tab relative inline-flex max-w-[200px] shrink-0 select-none items-center gap-[6px] whitespace-nowrap px-[12px] text-13px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
+          class="browser-tab group/tab relative inline-flex max-w-[180px] shrink-0 select-none items-center gap-1 whitespace-nowrap px-2 text-12px transition-[color,background-color,box-shadow] duration-[var(--dur-fast)]"
           :class="tab.key === tabsStore.activeKey
-            ? 'browser-tab--active font-800 text-brand'
-            : 'font-600 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
+            ? 'browser-tab--active font-500 text-brand'
+            : 'font-400 text-ink-soft hover:bg-[rgb(17_24_39/5%)] hover:text-ink'"
           @contextmenu.prevent="openMenu($event, tab.key)"
         >
           <button
@@ -267,8 +267,8 @@ onKeyStroke('Escape', () => closeMenu(true))
       >
         <span class="i-lucide-chevron-right h-3.5 w-3.5" aria-hidden="true" />
       </button>
-      <span class="px-1 text-12px text-ink-faint" title="当前页签数量">
-        <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span> 个页签
+      <span class="px-1 text-11px text-ink-faint" :title="`${tabsStore.tabs.length} 个页签`" :aria-label="`${tabsStore.tabs.length} 个页签`">
+        <span class="font-mono tabular-nums">{{ tabsStore.tabs.length }}</span>
       </span>
       <button
         type="button"
@@ -350,7 +350,7 @@ onKeyStroke('Escape', () => closeMenu(true))
 
 .browser-tab {
   height: var(--tabbar-h);
-  border-radius: 6px 6px 0 0;
+  border-radius: 2px 2px 0 0;
 }
 
 .browser-tab--active {

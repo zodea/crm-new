@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue'
+import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
+import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
 import { financeStatusLabel } from '~/lib/finance/status'
@@ -25,6 +30,18 @@ const partyFilter = shallowRef('')
 const statusFilter = shallowRef('')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
+const filtersOpen = shallowRef(false)
+const hasFilters = computed(() => Boolean(projectFilter.value || partyFilter.value || statusFilter.value))
+const statusTones: Record<string, KitStatusTone> = {
+  draft: 'neutral',
+  submitted: 'brand',
+  approved: 'ok',
+  rejected: 'danger',
+  paid: 'ok',
+  confirmed: 'ok',
+  needs_review: 'warn',
+  cancelled: 'neutral',
+}
 
 const displayRows = computed(() => rows.value.map(row => ({
   ...row,
@@ -80,13 +97,27 @@ watch([search, projectFilter, partyFilter, statusFilter, pageSize], () => {
   page.value = 1
 })
 
-function onFilterChange(key: string, value: string) {
+function onFilterChange(key: string, value: ColumnFilterValue) {
+  if (typeof value !== 'string')
+    return
   if (key === 'project')
     projectFilter.value = value
   else if (key === 'party')
     partyFilter.value = value
   else if (key === 'status')
     statusFilter.value = value
+}
+
+function clearFilters() {
+  projectFilter.value = ''
+  partyFilter.value = ''
+  statusFilter.value = ''
+  filtersOpen.value = false
+}
+
+function columnFilter(field?: string) {
+  const key = field === 'projectName' ? 'project' : field === 'partyName' ? 'party' : 'status'
+  return filterDefinitions.value.find(filter => filter.key === key)
 }
 
 function onPageChange(event: { page: number, pageSize: number }) {
@@ -98,12 +129,12 @@ const columns = computed<KitTableColumn[]>(() => [
   { title: '#', type: 'seq', width: 54 },
   { field: 'name', title: isReceipt.value ? '付款方（甲方客户）' : '名称/对象', minWidth: 220, fixed: 'left', slot: 'name' },
   { field: 'no', title: isReceipt.value ? '收款编号' : '编号', width: 170 },
-  { field: 'projectName', title: '项目', minWidth: 160 },
-  { field: 'partyName', title: isReceipt.value ? '施工合同（可选）' : '关联方/类型', minWidth: 180 },
+  { field: 'projectName', title: '项目', minWidth: 160, customHeader: true },
+  { field: 'partyName', title: isReceipt.value ? '施工合同（可选）' : '关联方/类型', minWidth: 180, customHeader: true },
   ...(isReceipt.value ? [{ title: '收款方', field: 'receiptPayee', minWidth: 140, slot: 'receiptPayee' } satisfies KitTableColumn] : []),
   { field: 'amount', title: isReceipt.value ? '收款金额' : '金额', type: 'money', width: 140 },
   { field: 'date', title: isReceipt.value ? '收款日期' : '日期', type: 'date', width: 128 },
-  { field: 'statusLabel', title: '状态', width: 110, slot: 'status' },
+  { field: 'statusLabel', title: '状态', width: 110, slot: 'status', customHeader: true },
   { title: '操作', type: 'action', width: 72 },
 ])
 
@@ -142,30 +173,34 @@ onActivated(() => {
 </script>
 
 <template>
-  <ListShell continuous>
+  <ListShell continuous class="document-reference-list">
     <template #toolbar>
-      <ListFilterBar
-        v-model:query="search"
-        embedded
-        :filters="filterDefinitions"
-        :total="rows.length"
-        :filtered="filtered.length"
-        @filter-change="onFilterChange"
-      >
-        <template #heading>
-          <h1 class="text-14px font-700 text-ink" :title="meta.subtitle">
-            {{ meta.label }}
-          </h1>
-        </template>
-        <template #actions>
-          <KitButton variant="secondary" :loading="loading" @click="load">
-            <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
-          </KitButton>
-          <KitButton data-testid="create-finance-form" @click="openCreate">
-            <span class="i-lucide-plus mr-1" aria-hidden="true" />新建{{ meta.label }}
-          </KitButton>
-        </template>
-      </ListFilterBar>
+      <div class="flex min-w-0 flex-wrap items-center gap-1.5" aria-label="单据列表工具栏">
+        <h1 class="mr-auto truncate text-12px font-500 text-ink">
+          {{ meta.label }}
+        </h1>
+        <SearchInput v-model="search" placeholder="搜索…" :width="210" class="document-list-search" />
+        <button type="button" class="list-tool-button" title="刷新" aria-label="刷新" :disabled="loading" @click="load">
+          <span class="i-lucide-refresh-cw h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />
+        </button>
+        <KitToolbarPopover v-model:open="filtersOpen" label="列表筛选" icon="i-lucide-filter" :active="hasFilters">
+          <div class="grid gap-3">
+            <label v-for="filter in filterDefinitions" :key="filter.key" class="grid gap-1">
+              <span>{{ filter.label }}</span>
+              <select :value="filter.value" :aria-label="filter.label" class="field-input h-7 text-12px" @change="onFilterChange(filter.key, ($event.target as HTMLSelectElement).value)">
+                <option value="">全部</option>
+                <option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </label>
+            <button type="button" class="btn-secondary h-7 text-12px" @click="clearFilters">
+              清除筛选
+            </button>
+          </div>
+        </KitToolbarPopover>
+        <button type="button" class="btn-primary h-7 px-3 text-12px" data-testid="create-finance-form" :aria-label="`新建${meta.label}`" @click="openCreate">
+          新建
+        </button>
+      </div>
     </template>
 
     <template #table>
@@ -173,9 +208,13 @@ onActivated(() => {
         :columns="columns"
         :data="pageRows"
         :loading="loading"
+        :row-height="32"
         :page="{ page: currentPage, pageSize, total: filtered.length }"
         @page-change="onPageChange"
       >
+        <template #columnHeader="{ column }">
+          <KitColumnHeader :title="column.title" kind="enum" :value="columnFilter(column.field)?.value" :options="columnFilter(column.field)?.options.map(option => ({ key: option.value, label: option.label }))" @apply="onFilterChange(columnFilter(column.field)?.key ?? '', $event)" />
+        </template>
         <template #name="{ row }">
           <button v-if="canOpenDetail(row)" class="cell--link border-0 bg-transparent p-0 text-left" @click="openDetail(row)">
             {{ row.name || (isReceipt ? '待补充甲方客户' : '未命名记录') }}
@@ -185,9 +224,9 @@ onActivated(() => {
           </span>
         </template>
         <template #status="{ row }">
-          <span class="chip" :class="['已确认', '已审批', '已支付'].includes(row.statusLabel) ? 'chip-ok' : 'chip-brand'">
+          <KitStatusTag :tone="statusTones[row.status] ?? 'neutral'">
             {{ row.statusLabel }}
-          </span>
+          </KitStatusTag>
         </template>
         <template #receiptPayee>
           <span class="text-ink-soft">我方乙方</span>
@@ -209,3 +248,14 @@ onActivated(() => {
     </template>
   </ListShell>
 </template>
+
+<style scoped>
+.document-reference-list { border: 0; border-radius: 0; }
+.document-reference-list :deep([data-list-shell-toolbar]) { padding: 10px 10px 6px; }
+.document-reference-list :deep(.document-list-search) { flex: 1 1 100px; max-width: 210px; }
+.document-reference-list :deep(.document-list-search input) { height: 28px; font-size: 12px; border-radius: 2px; }
+.document-reference-list :deep(.vxe-body--column) { border-right-color: transparent; font-size: 12px; }
+.document-reference-list :deep(.vxe-header--column) { font-size: 12px; font-weight: 600; }
+.document-reference-list :deep(.cell--link) { text-decoration: none; }
+.document-reference-list :deep(.cell--link:hover) { text-decoration: underline; }
+</style>

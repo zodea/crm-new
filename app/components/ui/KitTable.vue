@@ -65,7 +65,9 @@ const emit = defineEmits<{
   emptyAction: []
 }>()
 
-defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown>>()
+defineSlots<Record<string, (props: { row: T, rowIndex: number }) => unknown> & {
+  columnHeader: (props: { column: NormalizedKitColumn }) => unknown
+}>()
 
 // 列 props 一次性算好并缓存:v-bind 若每次渲染都产出新对象/新闭包,
 // 会反复触发 vxe 内部列注册/布局,把主线程拖死。
@@ -296,6 +298,9 @@ defineExpose({ clearCheckbox, clearFilter })
           :resizable="col.resizable"
         />
         <vxe-column v-else v-bind="vxeProps">
+          <template v-if="col.customHeader" #header>
+            <slot name="columnHeader" :column="col" />
+          </template>
           <template v-if="slot" #default="{ row, rowIndex }">
             <slot :name="slot" :row="row" :row-index="rowIndex" />
           </template>

@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue'
+import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type {
   MaterialFormKind,
   MaterialFormRecordMap,
 } from '~/lib/material/forms'
+import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { MATERIAL_FORM_META, materialFormPath } from '~/lib/material/page'
@@ -21,6 +26,7 @@ interface MaterialListRow {
   unit: string
   date: string
   status: string
+  statusValue: string
 }
 
 const props = defineProps<{
@@ -36,6 +42,9 @@ const projectFilter = shallowRef('')
 const statusFilter = shallowRef('')
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
+const filtersOpen = shallowRef(false)
+const hasFilters = computed(() => Boolean(projectFilter.value || statusFilter.value))
+const statusTones: Record<string, KitStatusTone> = { draft: 'neutral', submitted: 'brand', posted: 'ok', effective: 'ok', confirmed: 'ok' }
 
 const records = computed(() =>
   (materialStore.records[props.kind] ?? []) as MaterialRecord[],
@@ -89,6 +98,7 @@ function rowFrom(record: MaterialRecord): MaterialListRow {
     unit: String(value.unit ?? (props.kind === 'stock_check' ? '项' : '')),
     date,
     status: statusLabel(String(record.status ?? 'draft')),
+    statusValue: String(record.status ?? 'draft'),
   }
 }
 
@@ -130,11 +140,23 @@ watch([search, projectFilter, statusFilter, pageSize], () => {
   page.value = 1
 })
 
-function onFilterChange(key: string, value: string) {
+function onFilterChange(key: string, value: ColumnFilterValue) {
+  if (typeof value !== 'string')
+    return
   if (key === 'project')
     projectFilter.value = value
   else if (key === 'status')
     statusFilter.value = value
+}
+
+function clearFilters() {
+  projectFilter.value = ''
+  statusFilter.value = ''
+  filtersOpen.value = false
+}
+
+function columnFilter(field?: string) {
+  return filterDefinitions.value.find(filter => filter.key === (field === 'projectName' ? 'project' : field))
 }
 
 function onPageChange(event: { page: number, pageSize: number }) {
@@ -146,10 +168,10 @@ const columns: KitTableColumn[] = [
   { title: '#', type: 'seq', width: 54 },
   { field: 'name', title: '材料/对象', minWidth: 220, fixed: 'left', slot: 'name' },
   { field: 'no', title: '编号', width: 170 },
-  { field: 'projectName', title: '项目', minWidth: 170 },
+  { field: 'projectName', title: '项目', minWidth: 170, customHeader: true },
   { field: 'quantity', title: '数量', width: 130, align: 'right', slot: 'quantity' },
   { field: 'date', title: '日期', type: 'date', width: 128 },
-  { field: 'status', title: '状态', width: 110, slot: 'status' },
+  { field: 'status', title: '状态', width: 110, slot: 'status', customHeader: true },
   { title: '操作', type: 'action', width: 104 },
 ]
 
@@ -201,30 +223,34 @@ onActivated(() => {
 </script>
 
 <template>
-  <ListShell continuous>
+  <ListShell continuous class="document-reference-list">
     <template #toolbar>
-      <ListFilterBar
-        v-model:query="search"
-        embedded
-        :filters="filterDefinitions"
-        :total="rows.length"
-        :filtered="filtered.length"
-        @filter-change="onFilterChange"
-      >
-        <template #heading>
-          <h1 class="text-14px font-700 text-ink" :title="meta.subtitle">
-            {{ meta.label }}
-          </h1>
-        </template>
-        <template #actions>
-          <KitButton variant="secondary" :loading="materialStore.loading" @click="load">
-            <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />刷新
-          </KitButton>
-          <KitButton data-testid="create-material-form" @click="openCreate">
-            <span class="i-lucide-plus mr-1" aria-hidden="true" />新建{{ meta.label }}
-          </KitButton>
-        </template>
-      </ListFilterBar>
+      <div class="flex min-w-0 flex-wrap items-center gap-1.5" aria-label="单据列表工具栏">
+        <h1 class="mr-auto truncate text-12px font-500 text-ink">
+          {{ meta.label }}
+        </h1>
+        <SearchInput v-model="search" placeholder="搜索…" :width="210" class="document-list-search" />
+        <button type="button" class="list-tool-button" title="刷新" aria-label="刷新" :disabled="materialStore.loading" @click="load">
+          <span class="i-lucide-refresh-cw h-3.5 w-3.5" :class="materialStore.loading ? 'animate-spin' : ''" aria-hidden="true" />
+        </button>
+        <KitToolbarPopover v-model:open="filtersOpen" label="列表筛选" icon="i-lucide-filter" :active="hasFilters">
+          <div class="grid gap-3">
+            <label v-for="filter in filterDefinitions" :key="filter.key" class="grid gap-1">
+              <span>{{ filter.label }}</span>
+              <select :value="filter.value" :aria-label="filter.label" class="field-input h-7 text-12px" @change="onFilterChange(filter.key, ($event.target as HTMLSelectElement).value)">
+                <option value="">全部</option>
+                <option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option>
+              </select>
+            </label>
+            <button type="button" class="btn-secondary h-7 text-12px" @click="clearFilters">
+              清除筛选
+            </button>
+          </div>
+        </KitToolbarPopover>
+        <button type="button" class="btn-primary h-7 px-3 text-12px" data-testid="create-material-form" :aria-label="`新建${meta.label}`" @click="openCreate">
+          新建
+        </button>
+      </div>
     </template>
 
     <template #table>
@@ -232,9 +258,13 @@ onActivated(() => {
         :columns="columns"
         :data="pageRows"
         :loading="materialStore.loading"
+        :row-height="32"
         :page="{ page: currentPage, pageSize, total: filtered.length }"
         @page-change="onPageChange"
       >
+        <template #columnHeader="{ column }">
+          <KitColumnHeader :title="column.title" kind="enum" :value="columnFilter(column.field)?.value" :options="columnFilter(column.field)?.options.map(option => ({ key: option.value, label: option.label }))" @apply="onFilterChange(column.field === 'projectName' ? 'project' : 'status', $event)" />
+        </template>
         <template #name="{ row }">
           <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">
             {{ row.name }}
@@ -244,9 +274,9 @@ onActivated(() => {
           <span class="font-mono font-700">{{ Number(row.quantity).toLocaleString('zh-CN') }} {{ row.unit }}</span>
         </template>
         <template #status="{ row }">
-          <span class="chip" :class="row.status === '草稿' ? 'chip-brand' : 'chip-ok'">
+          <KitStatusTag :tone="statusTones[row.statusValue] ?? 'neutral'">
             {{ row.status }}
-          </span>
+          </KitStatusTag>
         </template>
         <template #action="{ row }">
           <div class="flex items-center gap-1">
@@ -270,3 +300,14 @@ onActivated(() => {
     </template>
   </ListShell>
 </template>
+
+<style scoped>
+.document-reference-list { border: 0; border-radius: 0; }
+.document-reference-list :deep([data-list-shell-toolbar]) { padding: 10px 10px 6px; }
+.document-reference-list :deep(.document-list-search) { flex: 1 1 100px; max-width: 210px; }
+.document-reference-list :deep(.document-list-search input) { height: 28px; font-size: 12px; border-radius: 2px; }
+.document-reference-list :deep(.vxe-body--column) { border-right-color: transparent; font-size: 12px; }
+.document-reference-list :deep(.vxe-header--column) { font-size: 12px; font-weight: 600; }
+.document-reference-list :deep(.cell--link) { text-decoration: none; }
+.document-reference-list :deep(.cell--link:hover) { text-decoration: underline; }
+</style>

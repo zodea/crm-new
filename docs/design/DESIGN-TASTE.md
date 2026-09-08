@@ -17,7 +17,7 @@
 
 | 轴 | 定位 | 说明 |
 |---|---|---|
-| 密度 Density | **7 / 10（双档）** | 仪表盘区保留可扫读留白（面板 12–16px、指标大数字）；台账表格区更致密（38px 行高、11–13px label、单元格水平 padding 6px）。两档共存，不改变信息编排。 |
+| 密度 Density | **7 / 10（双档）** | 仪表盘区保留可扫读留白，台账表格区更致密；行高、字号和响应式退化遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，不沿用本文历史尺寸快照覆盖当前规则。 |
 | 变化 Variance | **2 / 10** | 对称、可预期。CRM 工作台靠肌肉记忆吃饭：列表页/详情页模板全站同构（§5），不做非对称炫技。skill 默认值 Variance 8 **不适用**本项目。 |
 | 动效 Motion | **2 / 10** | 克制、瞬时反馈。skill 默认的 spring 物理与常驻微动效 **不适用**本项目（§6 覆盖声明）。 |
 
@@ -87,7 +87,7 @@
 ### 2.5 遮罩与外壳
 
 - 浮层遮罩 = 中性黑 `rgb(0 0 0 / 28%)`（ADR 0003：不上毛玻璃、不用品牌蓝遮罩）。
-- 应用外壳按 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 回归设计稿白底浅色（~~深蓝侧栏 `#162238`~~ 作废；`--shell-*` 令牌名保留、重映射浅色值），与内容区共用同一套设计令牌。
+- 应用外壳按 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 最新直接复刻裁定使用深海军蓝窄侧栏、单行图标导航与紧凑白色顶栏；内容区与品牌色继续使用瑞航令牌。
 
 ---
 
@@ -104,6 +104,8 @@
 - **数字等宽铁律**（skill 高密度覆盖条款，本项目密度 7 触发）：金额、编号、日期、数量、百分比、计数 pill——一切数字一律 `--font-mono` + `tabular-nums`。大额数字可加 `letter-spacing: -0.015em`（Metric 实测值）收紧。
 
 ### 3.2 字号阶（快照自 typography.css）
+
+以下记录通用字阶；直接参考列表与应用外壳的字号、字重和密度以 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 的现行规则为准，不把该快照作为所有控件的固定配方。
 
 | 阶 | px | 用途 |
 |---|---|---|
@@ -167,9 +169,11 @@
 
 ### 4.6 SegTab（业务内容分段 tab，下划线式）
 
-容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项高 32px、水平 padding 12px、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab（应用外壳路由页签除外，视觉归 ADR 0013 的 40px 红圈式页签栏，行为归 ADR 0011）。
+容器 `border-bottom: 1px --line`、`flex-wrap: wrap`（**禁 overflow-x 滚动**）；项高 32px、水平 padding 12px、13px；选中 = `--brand-deep`/700 + 底部 `2px solid --brand`（`margin-bottom:-1`）；未选中 = `--ink-soft`/500。可带计数 pill（11px mono；选中 `--brand-soft` 底，未选中 `--surface-3` 底）。不用方块 tab、不用胶囊 tab。应用外壳路由页签的尺寸、观感和自身横滚例外统一看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，行为沿用其中保留的 ADR 0011 条款。
 
 ### 4.7 SelectFilter / SearchInput（工具栏两件套）
+
+以下为通用控件快照；参考式密集列表的搜索和右侧工具密度遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 与[列表组件规格](./kit-ui-component-specs.md)，在可读宽度前有序换行，不把所有筛选平铺为固定次行。
 
 - **SelectFilter**：label（12/700/`--ink-soft`）+ 原生 select（`appearance:none`，`1px --line-strong` 边、圆角 4px、13px/600、`padding 7px 30px 7px 12px`）+ 自绘 chevron-down（14px `--ink-faint`）。多分类筛选一律收进下拉并入工具栏，**不做 pill 平铺占行**。
 - **SearchInput**：小圆角矩形（4px）、`1px --line-strong` 边、`padding 8px 14px 8px 32px`、13px，左内嵌 14px search 图标，默认宽 210px。
@@ -185,12 +189,12 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 4、选中 `
 
 ### 4.10 表格（KitTable / vxe-table，ADR 0009）
 
-4px 圆角 Panel 承载（padding 0、无阴影）；表头 `--surface-2` 底、13/700/`--ink-soft`、高 38px；数据行 14px、高 38px、单元格水平 padding 6px、分隔 `1px --line`、hover `--surface-3`；首列序号 `--ink-soft`；名称列蓝链；金额列 mono 右对齐 600–700；操作列右对齐 IconButton 排；底部汇总条 `--surface-2` 底（左统计 + 右分页）。分页按钮 28×28（同 IconButton 语言，active 实心蓝）。
+表格的行高、字号、承载面和分页密度统一遵循 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 与[组件规格第 12 节](./kit-ui-component-specs.md#12--数据表格-kit-table--已定案2026-08-15)，本文不再维护另一套固定尺寸。名称列保留真实蓝链，金额列等宽右对齐；工具、可操作表头、状态标签及分页均按对应页面的真实能力配置。筛选和排序必须联动完整查询结果，宽表仅在自身区域横滚。
 
 ### 4.11 加载 / 空态 / 错误态
 
 - **区块/页面加载**：skeleton 扫光（1.5s loop），骨架尺寸贴合真实布局；**禁通用圆形大 spinner**。按钮内 loading 允许 14px 小 spinner（KitButton 既有模式）。
-- **空态**：组合式（图标 + 标题 20px + 一句指引「如何产生数据」+ 可选 CTA），不是一行"暂无数据"。占位 Tab 用统一占位卡：「数据结构已定义，待 X 模块完成后启用」。
+- **空态**：简短标题说明当前无记录；只有能帮助下一步操作时才补充原因或 CTA。未开放功能给出明确可用边界，不展示数据结构、开发阶段等实现说明；信息显隐遵循 [CRM 模式](../rewrite/CRM-PATTERNS.md)。
 - **错误**：行内红字（`--danger-ink`）+ 字段下方说明；表单 label 上、error 下，无浮动 label。
 
 ---
@@ -199,12 +203,12 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 4、选中 `
 
 **页面模板全站同构**（强制响应式契约见 [ADR 0013「响应式与自适应契约」](../adr/0013-align-all-ui-to-online-design.md)，此处只记品味要点）：
 
-- **列表页**：工具栏卡（标题 + 计数 → SelectFilter 组 → 搜索 → 按钮组，一行收齐）→ 可选汇总卡行 → 表格卡。按钮组从左到右由弱到强，accent 永远最右。
+- **列表页**：标题、搜索与工具、表格和有真实口径的汇总构成连续工作面，结构与密度看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) 及[列表组件规格](./kit-ui-component-specs.md)。不强制拆成多张卡，不强加没有业务依据的分类或汇总；窄屏工具可有序换行，主操作保持可达。
 - **详情页**：顶部摘要面板（返回 + 头像方块 + 标题行 + 摘要格行）→ 流程/进度事实 → 经营与票据概览 → SegTab / SectionHeader 分区。SectionHeader = 不超过 34px 的 `--surface-2` 层级条 + 3×14px 品牌竖条 + 13/700 标题；只有参考页或既有业务流程能明确证明更优信息流时才调整模块顺序。
 - **流式网格优先**：重复卡片按最小可读宽度自适应，可使用 `auto-fit` / `auto-fill` + `minmax()`；语义栏位可显式给宽屏列数或比例，但必须用容器/视口断点提供降列、堆叠、Tab 或 Sheet 退化。比例列是宽屏构图，不是固定画布。
 - **禁整页横滚**：宽内容（大表格/矩阵/甘特）在自身容器内 `overflow-x:auto`。SegTab 用 wrap 不用横滚。
 - **SVG 图表**：`viewBox` + 百分比宽随容器缩放；需要重绘时观察**容器**而非只监听窗口，不写死画布宽高。
-- 内容区 `max-width: 1480px` 只是宽度上限；水平 gutter 从窄屏到宽屏流式收敛。面板间 gap 16、面板内 padding 12–16 是令牌目标，可在紧凑视口按令牌阶梯缩小。
+- 内容区宽度、gutter 与连续工作面的留白看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)，不以历史最大宽度或面板间距锁死参考式列表；其他面板按自身可读宽度和内容量排布。
 - **退化基线**：<1024px 侧栏转 Sheet（ADR 0011）；业务区根据容器可用宽度自动降列，<768px 以单列/分段呈现为默认。断点是保护最小可读宽度的触发点，不是固定“两排模板”。
 
 ---
@@ -257,7 +261,7 @@ Panel padding 0；标题条 `--surface-2` 底 12/700；节点圆角 4、选中 `
 
 | 面 | 设计稿（线上） | 本地（权威） | 结论 |
 |---|---|---|---|
-| 应用外壳 | 白底浅色侧栏 248px（单字方块+分组）+ 64px 白顶栏 + 40px 红圈式页签 | ~~深蓝侧栏 `#162238` + 54px 顶栏 + 36px Chrome 式页签~~（ADR 0011 视觉条款已废，见 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)） | **设计稿为准**（2026-07-17 用户指令）。外壳纳入逐屏对照范围；ADR 0011 仅存行为条款 |
+| 应用外壳 | 历史 DC 白底宽侧栏仅供溯源 | 深海军蓝紧凑侧栏与顶栏，具体尺寸看 [ADR 0013](../adr/0013-align-all-ui-to-online-design.md) | 按2026-09-08用户直接复刻裁定；保留瑞航品牌，ADR0011仅存行为条款 |
 | 交互底座 | 手写 React 弹窗/toast | reka-ui Dialog + vue-sonner（ADR 0008） | **本地为准**，视觉语义仍按本文 |
 | 业务字段与状态 | 参考页展示其自身业务对象 | 瑞航页面蓝本、DATABASE、CONTEXT 和现有 action | **瑞航为准**；只复刻信息流，不复制参考数据或状态机 |
 | 新增/编辑形态 | 参考站可能使用弹窗或整页 | ADR 0014 独立路由整页表单 | **ADR 0014 为准**；弹窗只留给行级小对象 |

@@ -130,7 +130,7 @@ async function save(action: FormFooterAction) {
   try {
     const result = await store.saveForm(draft.value, saveAction, attachmentChanges())
     clearPendingAttachments()
-    success(saveAction === 'draft' ? '草稿已保存到中央后台' : '材料采购合同已保存到中央后台')
+    success(saveAction === 'draft' ? '草稿已保存' : '材料采购合同已保存')
     if (closeAfterSave.value) {
       allowLeave = true
       await navigateTo({
@@ -190,7 +190,7 @@ useTabTitle(title)
 </script>
 
 <template>
-  <EntityFormShell :title="title" subtitle="正式材料采购合同统一写入中央命令服务；演示数据不可编辑。" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入中央表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
+  <EntityFormShell :title="title" back-label="返回材料采购合同" :sections="F2_FORM_META.material.sections" :state="pageState" :state-title="loadError || '正在载入表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
       <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="emptyLookup" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
       <ContractLineItemsEditor ref="lineItemsEditor" :lines="draft.lineItems ?? []" @update="patchDraft({ lineItems: $event })" />

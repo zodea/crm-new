@@ -394,7 +394,6 @@ onMounted(() => void initialize())
 <template>
   <EntityFormShell
     :title="title"
-    :subtitle="`${meta.subtitle}；草稿允许缺项，提交时校验真实关联与金额勾稽。`"
     :back-label="`返回${meta.listLabel}`"
     :sections="sections"
     :state="pageState"

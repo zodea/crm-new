@@ -131,7 +131,7 @@ async function save(action: FormFooterAction) {
   try {
     const result = await store.saveForm(draft.value, saveAction, attachmentChanges())
     clearPendingAttachments()
-    success(saveAction === 'draft' ? '草稿已保存到中央后台' : '施工合同已保存到中央后台')
+    success(saveAction === 'draft' ? '草稿已保存' : '施工合同已保存')
     if (closeAfterSave.value) {
       allowLeave = true
       const preserved = detailReturnTo.value
@@ -182,7 +182,7 @@ useTabTitle(title)
 </script>
 
 <template>
-  <EntityFormShell :title="title" subtitle="正式施工合同统一写入中央命令服务；演示数据不可编辑。" back-label="返回施工合同" :sections="F2_FORM_META.construction.sections" :state="pageState" :state-title="loadError || '正在载入中央表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
+  <EntityFormShell :title="title" back-label="返回施工合同" :sections="F2_FORM_META.construction.sections" :state="pageState" :state-title="loadError || '正在载入表单'" state-action-label="重新载入" @back="leave" @state-action="initialize">
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
       <ContractFormFields kind="construction" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="fetchCustomers" :fetch-suppliers="emptyLookup" :fetch-original-contracts="emptyLookup" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError" />
       <ContractAttachmentSection :attachments="attachments" :pending-attachments="pendingAttachments" :pending-remove-ids="pendingRemoveIds" :pending-restore-ids="pendingRestoreIds" :desktop-picker="desktopAttachmentPicker" :note="draft.note ?? ''" @pick-native="pickNativeFiles" @files="handleFiles" @toggle-existing="toggleExistingAttachment" @remove-pending="removePending" @patch-pending="patchPending" @update-note="patchDraft({ note: $event })" />
