@@ -22,7 +22,7 @@ test.describe('Issue #203：付款管理', () => {
       await expect(toolbar.getByRole('heading', { name: '付款管理' }))
         .toBeVisible({ timeout: 15_000 })
       await expect(page.getByRole('group', { name: '应付余额' })).toBeVisible()
-      await expect(page.getByRole('tab', { name: /待支付 2/ })).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('button', { name: '付款状态，已选 1 项' })).toContainText('待支付')
       await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeVisible()
       await expect(page.getByText('灯具采购结清请款', { exact: true })).toBeVisible()
       await expectNoPageOverflow(page, `付款管理 @ ${width}px`)
@@ -38,14 +38,18 @@ test.describe('Issue #203：付款管理', () => {
     await expect(page.getByText('灯具采购结清请款', { exact: true })).toBeHidden()
 
     await search.fill('')
-    await page.getByRole('tab', { name: /已付清 1/ }).click()
+    await page.getByRole('button', { name: '付款状态，已选 1 项' }).click()
+    await page.getByRole('checkbox', { name: '待支付', exact: true }).uncheck()
+    await page.getByRole('checkbox', { name: '已付清', exact: true }).check()
+    await page.getByRole('button', { name: '应用', exact: true }).click()
     await expect(page.getByText('项目进度付款申请', { exact: true })).toBeVisible()
     await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeHidden()
 
-    const paidTab = page.getByRole('tab', { name: /已付清 1/ })
-    await paidTab.focus()
-    await page.keyboard.press('ArrowRight')
-    await expect(page.getByRole('tab', { name: /全部 3/ })).toHaveAttribute('aria-selected', 'true')
+    const paidFilter = page.getByRole('button', { name: '付款状态，已选 1 项' })
+    await paidFilter.focus()
+    await page.keyboard.press('Enter')
+    await page.getByRole('button', { name: '清除', exact: true }).click()
+    await expect(page.getByRole('button', { name: '付款状态，已选 0 项' })).toContainText('不限')
   })
 
   test('窄窗宽表只在表格自身横滚，登记支付仅导航到整页表单', async ({ page }) => {

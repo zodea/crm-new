@@ -1,12 +1,14 @@
+import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
 import { isProjectReturnContextId, validateProjectReturnTo } from '~/lib/nav/return-to'
 import { isDataOriginDTO } from '~/types/read-model'
+import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
 
 export interface MaterialContractListNavigationState {
   search: string
   projectId: string | null
   supplierId: string | null
-  status: string | null
+  status: ContractListFilter
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -211,7 +213,7 @@ export function materialContractListNavigationStateFromQuery(
     search: optionalText(query.search, 120) ?? '',
     projectId: optionalText(query.projectId, 240),
     supplierId: optionalText(query.supplierId, 240),
-    status: optionalText(query.status, 80),
+    status: parseContractListFilter(query.status),
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,
@@ -231,7 +233,7 @@ function materialContractListSearchParams(
   if (state.supplierId)
     query.set('supplierId', state.supplierId)
   if (state.status)
-    query.set('status', state.status)
+    query.set('status', serializeContractListFilter(state.status))
   if (state.origin)
     query.set('origin', state.origin)
   if (state.page !== 1)

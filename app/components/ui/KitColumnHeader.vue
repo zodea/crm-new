@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
+import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
 import { useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 
-export type ColumnFilterValue = string | { min?: number, max?: number }
+export type ColumnFilterValue = string | string[] | { min?: number, max?: number }
 
 const props = defineProps<{
   title: string
-  kind: 'text' | 'enum' | 'number'
+  kind: 'text' | 'enum' | 'multi-enum' | 'number'
   value?: ColumnFilterValue
   options?: { key: string, label: string }[]
   sort?: string
@@ -16,21 +17,26 @@ const props = defineProps<{
 const emit = defineEmits<{ apply: [value: ColumnFilterValue], sort: [key: string] }>()
 const open = shallowRef(false)
 const text = shallowRef('')
+const selected = shallowRef<string[]>([])
 const min = shallowRef('')
 const max = shallowRef('')
 const problem = shallowRef('')
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
-const active = computed(() => typeof props.value === 'string'
-  ? Boolean(props.value)
-  : props.value?.min !== undefined || props.value?.max !== undefined)
+const active = computed(() => Array.isArray(props.value)
+  ? props.value.length > 0
+  : typeof props.value === 'string'
+    ? Boolean(props.value)
+    : props.value?.min !== undefined || props.value?.max !== undefined)
 const sorted = computed(() => props.sortOptions?.some(option => option.key === props.sort))
 
 watch(open, (value) => {
   if (!value)
     return
   text.value = typeof props.value === 'string' ? props.value : ''
-  min.value = typeof props.value === 'object' && props.value.min !== undefined ? String(props.value.min) : ''
-  max.value = typeof props.value === 'object' && props.value.max !== undefined ? String(props.value.max) : ''
+  selected.value = Array.isArray(props.value) ? [...props.value] : text.value ? [text.value] : []
+  const range = typeof props.value === 'object' && !Array.isArray(props.value) ? props.value : undefined
+  min.value = range?.min !== undefined ? String(range.min) : ''
+  max.value = range?.max !== undefined ? String(range.max) : ''
   problem.value = ''
 })
 
@@ -50,6 +56,9 @@ function apply() {
     }
     emit('apply', range)
   }
+  else if (props.kind === 'multi-enum') {
+    emit('apply', [...new Set(selected.value.filter(Boolean))])
+  }
   else {
     emit('apply', text.value.trim())
   }
@@ -57,7 +66,7 @@ function apply() {
 }
 
 function clear() {
-  emit('apply', props.kind === 'number' ? {} : '')
+  emit('apply', props.kind === 'number' ? {} : props.kind === 'multi-enum' ? [] : '')
   open.value = false
 }
 
@@ -74,7 +83,8 @@ function sortBy(key: string) {
         <button type="button" class="kit-column-header" :class="{ 'is-active': active || sorted }" :aria-label="`筛选${title}`" :title="`${title}：筛选${sortOptions?.length ? ' / 排序' : ''}`">
           <span class="truncate">{{ title }}</span>
           <span v-if="sortOptions?.length" :class="sorted ? (sort?.endsWith('-desc') ? 'i-lucide-arrow-down' : 'i-lucide-arrow-up') : 'i-lucide-arrow-up-down'" class="h-3 w-3 shrink-0" aria-hidden="true" />
-          <span class="i-lucide-filter ml-auto h-3 w-3 shrink-0" aria-hidden="true" />
+          <span :class="active ? 'i-lucide-list-filter' : 'i-lucide-filter'" class="ml-auto h-3 w-3 shrink-0" aria-hidden="true" />
+          <span v-if="active" class="sr-only">已筛选</span>
         </button>
       </PopoverTrigger>
       <PopoverPortal>
@@ -89,6 +99,7 @@ function sortBy(key: string) {
               </div>
             </template>
             <input v-if="kind === 'text'" v-model="text" class="kit-filter-input" :aria-label="`${title}包含`" placeholder="包含关键词" maxlength="120">
+            <KitEnumFilterOptions v-else-if="kind === 'multi-enum'" v-model="selected" :label="`${title}筛选值`" :options="options" />
             <select v-else-if="kind === 'enum'" v-model="text" class="kit-filter-input" :aria-label="`${title}筛选值`">
               <option value="">
                 全部
@@ -121,9 +132,9 @@ function sortBy(key: string) {
 </template>
 
 <style scoped>
-.kit-column-header { display: flex; align-items: center; gap: 4px; width: 100%; min-height: 28px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.kit-column-header { display: flex; align-items: center; gap: 4px; width: 100%; min-height: 28px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; outline: none; }
 .kit-column-header:hover, .kit-column-header.is-active { color: var(--brand); }
-.kit-column-header:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.kit-column-header:focus-visible { outline: 1px solid var(--brand); outline-offset: 1px; }
 .kit-filter-input { height: 30px; padding: 4px 7px; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--panel); color: var(--ink); outline: none; }
 .kit-filter-input:focus-visible { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-ring); }
 </style>

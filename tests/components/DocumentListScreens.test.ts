@@ -13,9 +13,9 @@ vi.mock('~/composables/useOverlayStack', () => ({ useOwnedOverlayLayerStyle: () 
 const materialStore = reactive({ records: {} as Record<string, object[]>, loading: false, loadKind: vi.fn() })
 const financeStore = reactive({ listRows: {} as Record<string, object[]>, loading: false, loadList: vi.fn() })
 const TableStub = defineComponent({
-  props: ['columns', 'data', 'page'],
+  props: ['columns', 'data', 'page', 'loading'],
   setup(props, { slots }) {
-    return () => h('section', { 'aria-label': '单据表格' }, [
+    return () => h('section', { 'aria-label': '单据表格', 'data-overlay': String(Boolean(props.loading)) }, [
       h('header', props.columns.map((column: { customHeader?: boolean, title: string }) => column.customHeader
         ? slots.columnHeader?.({ column })
         : h('span', column.title))),
@@ -35,6 +35,8 @@ function mountList(component: typeof FinanceListScreen | typeof MaterialListScre
 }
 
 beforeEach(() => {
+  materialStore.loading = false
+  financeStore.loading = false
   for (const [name, value] of Object.entries({ computed, onActivated, onMounted, shallowRef, watch }))
     vi.stubGlobal(name, value)
   vi.stubGlobal('useMaterialStore', () => materialStore)
@@ -54,6 +56,19 @@ beforeEach(() => {
       { id: 'f2', no: 'FIN-002', name: '乙公司', projectName: '二期项目', partyName: '工程施工', amount: 200, date: '', status: 'needs_review', dataOrigin: 'real', customerId: 'c2' },
     ]
   }
+})
+
+it.each([
+  { component: MaterialListScreen, kind: 'mat_requisition', source: materialStore.records, state: materialStore },
+  { component: FinanceListScreen, kind: 'receipt', source: financeStore.listRows, state: financeStore },
+])('单据列表 $kind 首载显示进度，成功空结果刷新保留空表', async ({ component, kind, source, state }) => {
+  delete source[kind]
+  state.loading = true
+  mountList(component, kind)
+  expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('data-overlay')).toBe('true')
+  source[kind] = []
+  await waitFor(() => expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('data-overlay')).toBe('false'))
+  expect(screen.getByRole('region', { name: '单据表格' }).getAttribute('aria-busy')).toBe('true')
 })
 
 describe('公共单据列表的真实状态与表头筛选', () => {
@@ -80,13 +95,43 @@ describe('公共单据列表的真实状态与表头筛选', () => {
     expect(screen.queryByRole('article', { name: second })).toBeNull()
     await fireEvent.update(screen.getByRole('searchbox'), '')
     await fireEvent.click(screen.getByRole('button', { name: '筛选项目' }))
-    await fireEvent.update(screen.getByRole('combobox', { name: '项目筛选值' }), '二期项目')
+    await fireEvent.click(screen.getByRole('checkbox', { name: '二期项目' }))
     await fireEvent.click(screen.getByRole('button', { name: '应用' }))
     await waitFor(() => expect(screen.queryByRole('article', { name: first })).toBeNull())
     expect(screen.getByRole('article', { name: second })).toBeTruthy()
     await fireEvent.click(screen.getByRole('button', { name: '列表筛选' }))
-    expect((screen.getByRole('combobox', { name: '项目' }) as HTMLSelectElement).value).toBe('二期项目')
+    expect((within(screen.getByRole('group', { name: '项目' })).getByRole('checkbox', { name: '二期项目' }) as HTMLInputElement).checked).toBe(true)
     await fireEvent.click(screen.getByRole('button', { name: '清除筛选' }))
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(2))
+  })
+
+  it.each([
+    ...Object.keys(MATERIAL_FORM_META).map(kind => ({ component: MaterialListScreen, kind, first: 'MAT-001', second: 'MAT-002', status: '已提交' })),
+    ...Object.keys(F3_FORM_META).map(kind => ({ component: FinanceListScreen, kind, first: 'FIN-001', second: 'FIN-002', status: '已驳回' })),
+  ])('$kind 同字段多选取并集，跨字段取交集，候选与工具选中态保留', async ({ component, kind, first, second, status }) => {
+    mountList(component, kind)
+    const trigger = screen.getByRole('button', { name: '筛选项目' })
+    expect(trigger.classList.contains('is-active')).toBe(false)
+    await fireEvent.click(trigger)
+    await fireEvent.click(screen.getByRole('checkbox', { name: '一期项目' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '二期项目' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getByRole('article', { name: first })).toBeTruthy()
+    expect(screen.getByRole('article', { name: second })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '筛选状态' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: status }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getByRole('article', { name: first })).toBeTruthy()
+    expect(screen.queryByRole('article', { name: second })).toBeNull()
+    await fireEvent.click(trigger)
+    expect((screen.getByRole('checkbox', { name: '二期项目' }) as HTMLInputElement).checked).toBe(true)
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    expect(screen.queryByRole('article', { name: second })).toBeNull()
+    expect(trigger.classList.contains('is-active')).toBe(false)
+    await fireEvent.click(screen.getByRole('button', { name: '列表筛选' }))
+    const statuses = within(screen.getByRole('group', { name: '状态' }))
+    expect(statuses.getAllByRole('checkbox')).toHaveLength(3)
+    await fireEvent.click(statuses.getByRole('checkbox', { name: '不限' }))
+    expect(screen.getAllByRole('article')).toHaveLength(2)
   })
 })

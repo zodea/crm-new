@@ -123,6 +123,9 @@ test('返回定位仅执行一次，继续搜索不抢焦点且数值升序正�
   await page.goto('/base/supplier?sort=paymentAmount-asc#supplier-row-real%253Areplica-supplier-1')
   const list = page.locator('.supplier-reference-list')
   await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeFocused()
+  const focusedName = list.getByRole('link', { name: '界面对照供应商01', exact: true })
+  await expect(focusedName).toHaveCSS('outline-style', 'none')
+  await expect(focusedName).toHaveCSS('text-decoration-line', 'underline')
   const search = list.getByRole('searchbox')
   const response = page.waitForResponse(res => res.url().includes('/api/read/suppliers?') && res.url().includes('search='))
   await search.fill('界面对照')
@@ -131,6 +134,60 @@ test('返回定位仅执行一次，继续搜索不抢焦点且数值升序正�
   await expect(search).toBeFocused()
   await list.getByRole('button', { name: '排序', exact: true }).click()
   await expect(page.getByRole('combobox', { name: '排序方式' })).toHaveValue('paymentAmount-asc')
+})
+
+test('列表默认控件使用细实线，不出现浏览器原生凹凸边框', async ({ page }) => {
+  await page.goto('/base/supplier')
+  const list = page.locator('.supplier-reference-list')
+  await expect(list.getByText('共 25 条', { exact: true })).toBeVisible()
+  await expect(list.getByRole('searchbox')).toHaveCSS('border-top-style', 'solid')
+  await expect(list.getByRole('searchbox')).toHaveCSS('border-top-width', '1px')
+  await expect(list.getByRole('button', { name: '界面对照供应商01操作', exact: true })).toHaveCSS('border-top-style', 'solid')
+})
+
+test('筛选等待响应时保留现有表格，不闪出整块加载遮罩', async ({ page }) => {
+  await page.goto('/base/supplier?sort=name-asc')
+  const list = page.locator('.supplier-reference-list')
+  const search = list.getByRole('searchbox')
+  await expect(list.getByText('共 25 条', { exact: true })).toBeVisible()
+  let finishRequest!: () => void
+  const pending = new Promise<void>(resolve => finishRequest = resolve)
+  let requestStarted!: () => void
+  const started = new Promise<void>(resolve => requestStarted = resolve)
+  let requests = 0
+  await page.route('**/api/read/suppliers?*', async (route) => {
+    requests += 1
+    requestStarted()
+    await pending
+    await route.fallback()
+  })
+  const scroller = list.locator('.vxe-table--main-wrapper .vxe-table--body-inner-wrapper')
+  await scroller.evaluate(el => el.scrollLeft = 600)
+  await search.fill('精细油漆')
+  await started
+  try {
+    await expect(list.getByRole('link', { name: '界面对照供应商01', exact: true })).toBeVisible()
+    await expect(list.locator('[data-ui="kit-table-loading"]')).toBeHidden({ timeout: 300 })
+    await expect(list.locator('[data-ui="supplier-list-table"]')).toHaveAttribute('aria-busy', 'true')
+    await expect(search).toBeFocused()
+    expect(await scroller.evaluate(el => el.scrollLeft)).toBeGreaterThan(500)
+  }
+  finally {
+    finishRequest()
+  }
+  await expect(list.getByText('共 1 条', { exact: true })).toBeVisible()
+  await expect(list.getByRole('link', { name: '界面对照供应商25', exact: true })).toBeVisible()
+  await expect(search).toBeFocused()
+  await expect(list.locator('[data-ui="supplier-list-table"]')).toHaveAttribute('aria-busy', 'false')
+  expect(await scroller.evaluate(el => el.scrollLeft)).toBeGreaterThan(500)
+  const beforeClear = requests
+  await list.getByRole('button', { name: '筛选', exact: true }).click()
+  await page.getByRole('button', { name: '清除全部筛选', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(list.getByText('共 25 条', { exact: true })).toBeVisible()
+  // 覆盖180ms防抖窗口，清空操作不能又触发第二次相同请求。
+  await page.waitForTimeout(300)
+  expect(requests - beforeClear).toBe(1)
 })
 
 test('四态从筛选列表进入同来源详情，刷新及返回后文字、色调和定位一致', async ({ page }) => {

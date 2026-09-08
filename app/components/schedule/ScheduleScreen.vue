@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ScheduleGroupView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import { Button } from '~/components/ui/button'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -173,7 +174,7 @@ async function saveTask(payload: {
     taskDialogOpen.value = false
     success('工序计划已更新')
     if (result.conflicts.length)
-      warning(`存在 ${result.conflicts.length} 条前后置日期冲突，请检查 FS 关系`)
+      warning(`存在 ${result.conflicts.length} 条前后置日期冲突，请检查工序衔接关系`)
   }
   catch (cause) {
     error(toErrorMessage(cause))
@@ -337,12 +338,12 @@ onMounted(initialize)
           <div class="text-11px font-700 tracking-wide text-brand">
             施工进度
           </div>
-          <h1 class="mt-0.5 text-20px font-850 text-ink">
-            WBS 排程与实际进度
-          </h1>
-          <p class="mt-1 text-12px text-ink-soft">
-            计划日期、工程量完成事实与 FS 前后置关系在同一行对齐。
-          </p>
+          <div class="mt-0.5 flex items-center gap-1.5">
+            <h1 class="text-20px font-850 text-ink">
+              WBS 排程与实际进度
+            </h1>
+            <ContextHelp label="施工排程" text="在同一行查看计划日期与实际完成进度。前置工序完成后，后续工序按设定的间隔开始。" />
+          </div>
         </div>
         <div class="min-w-52">
           <span class="field-label block">项目</span>

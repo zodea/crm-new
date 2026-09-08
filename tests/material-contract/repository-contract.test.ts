@@ -76,6 +76,23 @@ function emptyFacts(): MaterialContractFactSources {
 }
 
 describe('材料采购合同中央 Repository contract', () => {
+  it('状态多选在分页前按 OR 匹配并汇总全量结果', () => {
+    const page = buildMaterialContractListPage({
+      contracts: [
+        ...Array.from({ length: 12 }, (_, index) => detailSource({ id: `match-${index}`, status: index % 2 ? '草稿' : '履约中' })),
+        detailSource({ id: 'excluded', status: '已结清' }),
+      ],
+      query: parseMaterialContractListQuery({ status: '["草稿","履约中"]' }),
+      asOf: AS_OF,
+      sourceVersion: 'multi-filter',
+      capabilities: [],
+    })
+    expect(page.items).toHaveLength(10)
+    expect(page.pagination.total).toBe(12)
+    expect(page.summary.origins.real).toMatchObject({ contractCount: 12, changedAmount: '13200.00' })
+    expect(page.items.every(row => ['草稿', '履约中'].includes(row.status))).toBe(true)
+  })
+
   it('按稳定 ID 返回材采专属详情，并保留六类真实空事实与零金额', () => {
     const detail = buildMaterialContractDetail({
       contracts: [detailSource()],

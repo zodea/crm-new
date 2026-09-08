@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { NotificationKind, NotificationType } from '~/stores/notifications'
+import type { NotificationKind } from '~/stores/notifications'
 import { useMediaQuery } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import {
@@ -14,6 +14,7 @@ import {
   TabsRoot,
   TabsTrigger,
 } from 'reka-ui'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { useModalLayerRegistration } from '~/composables/useOverlayStack'
 import { NOTIFICATION_TYPE_META } from '~/stores/notifications'
 
@@ -33,13 +34,13 @@ const sheetPlacement = computed(() => isCompact.value ? 'bottom' : 'right')
 
 const activeKind = shallowRef<NotificationKind>('todo')
 const query = shallowRef('')
-const selectedType = shallowRef<'all' | NotificationType>('all')
+const selectedType = shallowRef<string[]>([])
 
 const kindItems = computed(() => items.value.filter(item => item.kind === activeKind.value))
 const filteredItems = computed(() => {
   const keyword = query.value.trim().toLocaleLowerCase('zh-CN')
   return kindItems.value.filter((item) => {
-    const matchesType = selectedType.value === 'all' || item.type === selectedType.value
+    const matchesType = !selectedType.value.length || selectedType.value.includes(item.type)
     const matchesKeyword = !keyword
       || item.title.toLocaleLowerCase('zh-CN').includes(keyword)
       || item.description.toLocaleLowerCase('zh-CN').includes(keyword)
@@ -47,19 +48,13 @@ const filteredItems = computed(() => {
   })
 })
 
-const typeOptions = computed(() => {
-  const types = [...new Set(kindItems.value.map(item => item.type))]
-  return [
-    { key: 'all', label: '全部类型' },
-    ...types.map(type => ({ key: type, label: NOTIFICATION_TYPE_META[type].label })),
-  ]
-})
+const typeOptions = Object.entries(NOTIFICATION_TYPE_META).map(([key, meta]) => ({ key, label: meta.label }))
 
 const todoCount = computed(() => items.value.filter(item => item.kind === 'todo').length)
 const noticeCount = computed(() => items.value.filter(item => item.kind === 'notice').length)
 
 watch(activeKind, () => {
-  selectedType.value = 'all'
+  selectedType.value = []
 })
 
 async function openItem(id: string) {
@@ -132,8 +127,8 @@ async function openItem(id: string) {
             </TabsTrigger>
           </TabsList>
 
-          <div class="grid shrink-0 grid-cols-[116px_minmax(0,1fr)] gap-2 border-b border-line p-3">
-            <SelectFilter v-model="selectedType" :options="typeOptions" :min-width="116" />
+          <div class="flex shrink-0 flex-wrap gap-2 border-b border-line p-3">
+            <KitMultiSelectFilter v-model="selectedType" label="类型" aria-label="消息类型" :options="typeOptions" :min-width="100" />
             <label class="flex h-[34px] min-w-0 items-center gap-2 border border-line-strong rounded-[var(--radius-btn)] bg-panel px-2.5 focus-within:border-brand">
               <span class="i-lucide-search h-3.5 w-3.5 flex-none text-ink-faint" aria-hidden="true" />
               <input
@@ -194,7 +189,7 @@ async function openItem(id: string) {
               <div>
                 <span class="i-lucide-inbox mx-auto h-9 w-9 text-ink-faint" aria-hidden="true" />
                 <p class="mt-3 text-13px font-600 text-ink-soft">
-                  {{ query || selectedType !== 'all' ? '没有匹配的消息' : activeKind === 'todo' ? '暂无待办' : '暂无通知' }}
+                  {{ query || selectedType.length ? '没有匹配的消息' : activeKind === 'todo' ? '暂无待办' : '暂无通知' }}
                 </p>
               </div>
             </div>

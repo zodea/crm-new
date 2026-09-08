@@ -12,6 +12,7 @@
 
 ## 当前指南
 
+- [列表搜索与筛选使用指南](./list-search-and-filters.md)（跨模块公共交互）
 - [其他支出结算使用指南](./other-expense-settlement.md)
 
 - [其他支出与公司支出合同使用指南](./auxiliary-contracts.md)
@@ -97,3 +98,5 @@ output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
 ```
 
 每次改变最终用户可见流程时，先更新 Markdown，再重新生成并逐页渲染检查 PDF。指南必须明确区分“当前已可用”和“已定稿待开发”，不能把目标规格写成已经上线。
+
+公共列表指南生成方式：`python scripts/generate-project-guide-pdf.py --source docs/guides/list-search-and-filters.md --output output/pdf/瑞航CRM_列表搜索与筛选使用指南.pdf`。

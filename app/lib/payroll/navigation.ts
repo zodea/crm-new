@@ -9,7 +9,15 @@ function firstQueryValue(value: QueryValue): string {
   return typeof value === 'string' ? value : ''
 }
 
-function normalizeStatus(value: string): WageStatementStatus | '' {
+function normalizeStatus(value: string): WageStatementStatus | '' | WageStatementStatus[] {
+  if (value.startsWith('[')) {
+    try {
+      const items: unknown = JSON.parse(value)
+      if (Array.isArray(items))
+        return [...new Set(items.filter((item): item is WageStatementStatus => item === 'draft' || item === 'checked' || item === 'released'))]
+    }
+    catch { return '' }
+  }
   return value === 'draft' || value === 'checked' || value === 'released'
     ? value
     : ''
@@ -34,7 +42,7 @@ export function payrollFilterQuery(filters: WageStatementFilter): Record<string,
       ['project', filters.projectId],
       ['month', filters.month],
       ['crew', filters.crewId],
-      ['status', filters.status],
+      ['status', Array.isArray(filters.status) ? JSON.stringify(filters.status) : filters.status],
     ].filter((entry): entry is [string, string] => Boolean(entry[1])),
   )
 }

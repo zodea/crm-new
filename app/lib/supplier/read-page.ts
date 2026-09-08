@@ -20,7 +20,7 @@ import { isDataOriginDTO } from '../../types/read-model'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
-import { parseSupplierColumnFilters } from './read-query'
+import { normalizeSupplierEnumSelection, parseSupplierColumnFilters } from './read-query'
 
 interface BuildSupplierListPageInput {
   suppliers: readonly SupplierListSourceRow[]
@@ -65,6 +65,8 @@ export function parseSupplierListQuery(input: Record<string, unknown> | undefine
   const sort = input?.sort ?? 'updated-desc'
   const pageSize = positiveInteger(input?.pageSize, 10)
   const columnFilters = parseSupplierColumnFilters(input?.columnFilters)
+  const categories = normalizeSupplierEnumSelection(input?.category)
+  const credentialStatuses = normalizeSupplierEnumSelection(input?.credentialStatus)
   if (!['updated-desc', 'name-asc', 'name-desc', 'category-asc', ...SUPPLIER_LIST_NUMERIC_FIELDS.flatMap(field => [`${field}-asc`, `${field}-desc`])].includes(String(sort))
     || !SUPPLIER_PAGE_SIZES.includes(pageSize as SupplierPageSize)) {
     throw new SupplierRepositoryProblem(supplierProblem('invalid-query', '分供方列表查询参数无效'))
@@ -72,8 +74,8 @@ export function parseSupplierListQuery(input: Record<string, unknown> | undefine
   return {
     includeDemo: bool(input?.includeDemo),
     search: typeof input?.search === 'string' ? input.search.trim() : '',
-    category: typeof input?.category === 'string' && input.category.trim() ? input.category.trim() : null,
-    credentialStatus: typeof input?.credentialStatus === 'string' && input.credentialStatus.trim() ? input.credentialStatus.trim() : null,
+    category: categories.length ? categories : null,
+    credentialStatus: credentialStatuses.length ? credentialStatuses : null,
     sort: sort as SupplierListQueryDTO['sort'],
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as SupplierPageSize,
@@ -237,6 +239,9 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const allowedOrigins = query.includeDemo ? new Set(['real', 'demo']) : new Set(['real'])
   const normalizedSearch = query.search.trim().toLocaleLowerCase('zh-CN')
   const columnFilters = parseSupplierColumnFilters(query.columnFilters)
+  const categories = normalizeSupplierEnumSelection(query.category)
+  const credentialStatuses = normalizeSupplierEnumSelection(query.credentialStatus)
+  const taxpayerTypes = normalizeSupplierEnumSelection(columnFilters?.taxpayerType)
   const paid = paymentBySupplier(input)
   const visibleRows = input.suppliers.filter(row => allowedOrigins.has(row.dataOrigin)).map(row => visibleSupplier(row, input.capabilities))
   const summaryById = new Map(visibleRows.map((row) => {
@@ -262,11 +267,11 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const stats = (row: SupplierListSourceRow) => summaryById.get(`${row.dataOrigin}:${row.id}`)!
   const contains = (value: string, text: string) => value.toLocaleLowerCase('zh-CN').includes(text.toLocaleLowerCase('zh-CN'))
   function matches(row: SupplierListSourceRow, except?: 'supplierCategory' | 'credentialStatus' | 'taxpayerType') {
-    if (except !== 'supplierCategory' && query.category && row.supplierCategory !== query.category)
+    if (except !== 'supplierCategory' && categories.length && !categories.includes(row.supplierCategory))
       return false
-    if (except !== 'credentialStatus' && query.credentialStatus && row.credentialStatus !== query.credentialStatus)
+    if (except !== 'credentialStatus' && credentialStatuses.length && !credentialStatuses.includes(row.credentialStatus))
       return false
-    if (except !== 'taxpayerType' && columnFilters?.taxpayerType && row.taxpayerType !== columnFilters.taxpayerType)
+    if (except !== 'taxpayerType' && taxpayerTypes.length && !taxpayerTypes.includes(row.taxpayerType))
       return false
     if (normalizedSearch && ![row.name, row.aliases.join(' '), row.uniqueCode, row.taxNo, row.contact, row.laborScope ?? '']
       .some(value => contains(value, normalizedSearch))) {

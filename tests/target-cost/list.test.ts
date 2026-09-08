@@ -87,5 +87,41 @@ describe('target cost list read model', () => {
       baseline: 'history',
       status: 'draft',
     }).map(row => row.id)).toEqual(['b'])
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: 'all',
+      status: ['draft', 'submitted'],
+    }).map(row => row.id)).toEqual(['a', 'b'])
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: 'all',
+      status: [],
+    })).toHaveLength(2)
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: ['baseline', 'history'],
+      status: [],
+    }).map(row => row.id)).toEqual(['a', 'b'])
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: ['history'],
+      status: ['draft', 'submitted'],
+    }).map(row => row.id)).toEqual(['b'])
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: ['baseline', 'history'],
+      status: ['submitted'],
+    }).map(row => row.id)).toEqual(['a'])
+    expect(filterTargetCostList(rows, {
+      search: '',
+      project: 'all',
+      baseline: [],
+      status: [],
+    })).toHaveLength(2)
   })
 })

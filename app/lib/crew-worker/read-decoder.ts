@@ -11,6 +11,7 @@ import type {
   WorkerListQueryDTO,
 } from './read-contract'
 import { isDataOriginDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeEnumSelection } from '../util/enum-selection'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from './read-contract'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -174,8 +175,8 @@ export function serializeCrewListQuery(query: CrewListQueryDTO): Record<string, 
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    trade: query.trade ?? '',
-    status: query.status ?? '',
+    trade: serializeEnumSelection(query.trade),
+    status: serializeEnumSelection(query.status),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),
@@ -186,10 +187,10 @@ export function serializeWorkerListQuery(query: WorkerListQueryDTO): Record<stri
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    trade: query.trade ?? '',
+    trade: serializeEnumSelection(query.trade),
     crewId: query.crewId ?? '',
-    projectStatus: query.projectStatus ?? '',
-    status: query.status ?? '',
+    projectStatus: serializeEnumSelection(query.projectStatus),
+    status: serializeEnumSelection(query.status),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),

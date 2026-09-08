@@ -14,8 +14,8 @@ export type CrewWorkerPageSize = typeof CREW_WORKER_PAGE_SIZES[number]
 export interface CrewListQueryDTO {
   includeDemo: boolean
   search: string
-  trade: string | null
-  status: string | null
+  trade: string | string[] | null
+  status: string | string[] | null
   sort: 'updated-desc' | 'name-asc' | 'name-desc'
   page: number
   pageSize: CrewWorkerPageSize
@@ -193,10 +193,10 @@ export function crewWorkerProblem(code: ProblemDTO['code'], message: string, ret
 export interface WorkerListQueryDTO {
   includeDemo: boolean
   search: string
-  trade: string | null
+  trade: string | string[] | null
   crewId: string | null
-  projectStatus: string | null
-  status: string | null
+  projectStatus: string | string[] | null
+  status: string | string[] | null
   sort: 'updated-desc' | 'name-asc' | 'name-desc'
   page: number
   pageSize: CrewWorkerPageSize

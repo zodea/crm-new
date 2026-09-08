@@ -5,6 +5,7 @@ import type {
   ConstructionContractListQueryDTO,
 } from './read-contract'
 import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeContractListFilter } from '../contract/list-filters'
 import {
   constructionContractProblem,
   ConstructionContractRepositoryProblem,
@@ -105,7 +106,7 @@ export function serializeConstructionContractListQuery(query: ConstructionContra
     search: query.search,
     projectId: query.projectId ?? '',
     customerId: query.customerId ?? '',
-    status: query.status ?? '',
+    status: serializeContractListFilter(query.status),
     page: String(query.page),
     pageSize: String(query.pageSize),
   }

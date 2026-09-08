@@ -7,6 +7,17 @@ const company = { kind: 'company_expense' as const, name: '办公室租赁', no:
 const command = (draft: AuxiliaryContractDraft = company): AuxiliaryContractCommand => ({ workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'auxiliary-contract:write', commandId: 'create-330', baseVersion: null, action: 'save', draft, attachments: {} })
 
 describe('辅助合同中央事实', () => {
+  it('多选类别和状态先取字段并集再交集，单值旧链接与不限仍有效', async () => {
+    let counter = 0
+    const repository = createAuxiliaryContractTestInstance({ createId: () => `multi-${++counter}` })
+    for (const category of ['房租', '软件', '其他']) {
+      await repository.execute({ ...command({ ...company, category }), commandId: category, action: 'draft' }, session)
+    }
+    expect(repository.list({ kind: 'company_expense', category: ['房租', '软件'], status: ['草稿', '已签订'] }, session).pagination.total).toBe(2)
+    expect(repository.list({ kind: 'company_expense', category: ['房租', '软件'], status: ['已签订'] }, session).pagination.total).toBe(0)
+    expect(repository.list({ kind: 'company_expense', category: '房租' }, session).pagination.total).toBe(1)
+    expect(repository.list({ kind: 'company_expense', category: [], status: [] }, session).pagination.total).toBe(3)
+  })
   it('无税金额在半分边界按十进制四舍五入，税额与含税金额对齐', async () => {
     const repository = createAuxiliaryContractTestInstance()
     const result = await repository.execute(command({ ...company, amount: 0.09, taxRate: 20 }), session)

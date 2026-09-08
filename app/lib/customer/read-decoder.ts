@@ -9,6 +9,7 @@ import type {
   CustomerReceiptDetailReadDTO,
 } from './read-contract'
 import { isDataOriginDTO, isEntityKindDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeEnumSelection } from '../util/enum-selection'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -214,7 +215,7 @@ export function serializeCustomerListQuery(query: CustomerListQueryDTO): Record<
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    status: query.status ?? '',
+    status: serializeEnumSelection(query.status),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),

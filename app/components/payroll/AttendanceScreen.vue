@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, shallowRef } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 import {
   payrollFilterQuery,
   payrollFiltersFromQuery,
@@ -85,19 +86,22 @@ onMounted(() => {
     <header class="panel flex min-w-0 flex-wrap items-center gap-3 px-4 py-3">
       <div class="min-w-0">
         <p class="m-0 text-11px font-700 text-brand">
-          工资核算 · C1 真实来源
+          工资核算
         </p>
-        <h1 class="m-0 mt-0.5 truncate text-18px font-800 text-ink">
-          考勤管理
-        </h1>
-        <p class="m-0 mt-0.5 text-11px text-ink-faint">
-          工人 × 日期 × 工时；记录直接写入 attendance_records
-        </p>
+        <div class="mt-0.5 flex items-center gap-1.5">
+          <h1 class="m-0 truncate text-18px font-800 text-ink">
+            考勤管理
+          </h1>
+          <ContextHelp
+            label="考勤登记"
+            :text="`按工人和日期登记正常工时、加班工时及施工内容。当前范围：${selectedProject?.name || '所选项目'} · ${store.filters.month}。零星用工请在零星签工中登记。批量导入、批量填充及已发放工资的调整单暂不可用。`"
+          />
+        </div>
       </div>
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <NuxtLink :to="{ path: '/subcontract/daywork', query: relatedQuery }" class="btn-secondary">
           <span class="i-lucide-calendar-check mr-1" aria-hidden="true" />
-          C2 零星签工
+          零星签工
         </NuxtLink>
         <NuxtLink :to="payrollReturnTo" class="btn-primary">
           <span class="i-lucide-wallet-cards mr-1" aria-hidden="true" />
@@ -205,37 +209,11 @@ onMounted(() => {
         :blocked-worker-count="visibleBlockedWorkerCount"
       />
 
-      <section
-        data-ui="attendance-boundary"
-        class="grid min-w-0 gap-px overflow-hidden rounded-[var(--radius-card)] border border-line bg-line md:grid-cols-2"
-        aria-label="考勤能力边界"
-      >
-        <div class="min-w-0 bg-panel px-3.5 py-3">
-          <p class="m-0 flex items-center gap-1.5 text-12px font-800 text-ok-ink">
-            <span class="i-lucide-database h-3.5 w-3.5" aria-hidden="true" />
-            当前真实可用
-          </p>
-          <p class="m-0 mt-1 text-11px leading-5 text-ink-soft">
-            逐格新增或覆盖正常工时、加班工时和施工内容；当前范围为
-            {{ selectedProject?.name || '所选项目' }} · {{ store.filters.month }}。
-          </p>
-        </div>
-        <div class="min-w-0 bg-surface-2 px-3.5 py-3">
-          <p class="m-0 flex items-center gap-1.5 text-12px font-800 text-warn-ink">
-            <span class="i-lucide-construction h-3.5 w-3.5" aria-hidden="true" />
-            边界与后续能力
-          </p>
-          <p class="m-0 mt-1 text-11px leading-5 text-ink-soft">
-            C2 人员改走零星签工；批量导入、批量填充及工资已发放后的调整单尚未开放，不在本页伪装入口。
-          </p>
-        </div>
-      </section>
-
       <StatePanel
         v-if="!visibleWorkers.length"
         kind="empty"
         title="当前范围没有可录考勤的工人"
-        description="请检查工人的当前项目、班组档案或工程量责任范围；本页不会临时创建名册关系。"
+        description="请先在工人名册中检查当前项目、班组及工程量责任范围。"
         compact
       >
         <template #action>

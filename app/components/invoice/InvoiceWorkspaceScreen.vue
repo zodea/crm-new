@@ -11,7 +11,7 @@ const { success, warning, info, undoToast, confirm, promise } = useKitUI()
 
 // #60：单一校对工作台，上传、识别状态与字段校对在同一上下文完成。
 const searchText = shallowRef('')
-const workspaceFilter = shallowRef<'all' | 'recognizing' | 'suggested' | 'warning' | 'danger'>('all')
+const workspaceFilter = shallowRef<string[]>([])
 const selectedId = shallowRef<string | null>(null)
 // 子模式的 tab 定义随工具栏走（内联在工具栏那一条里，不再独占一行）
 const workspaceMode = shallowRef<'review' | 'print'>('review')
@@ -266,11 +266,11 @@ const workspaceRows = computed(() =>
 const visibleWorkspaceRows = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
   return workspaceRows.value.filter(({ inv, status, suggested, confidence }) => {
-    const matchesFilter = workspaceFilter.value === 'all'
-      || (workspaceFilter.value === 'recognizing' && status === 'recognizing')
-      || (workspaceFilter.value === 'suggested' && suggested)
-      || (workspaceFilter.value === 'warning' && !suggested && status === 'unreviewed' && confidence === 'warn')
-      || (workspaceFilter.value === 'danger' && !suggested && status === 'unreviewed' && confidence === 'danger')
+    const matchesFilter = !workspaceFilter.value.length
+      || (workspaceFilter.value.includes('recognizing') && status === 'recognizing')
+      || (workspaceFilter.value.includes('suggested') && suggested)
+      || (workspaceFilter.value.includes('warning') && !suggested && status === 'unreviewed' && confidence === 'warn')
+      || (workspaceFilter.value.includes('danger') && !suggested && status === 'unreviewed' && confidence === 'danger')
     if (!matchesFilter)
       return false
     if (!keyword)

@@ -6,6 +6,7 @@ defineProps<{
   statements: WageStatement[]
   selectedId: string
   loading?: boolean
+  hasSnapshot?: boolean
 }>()
 
 const emit = defineEmits<{ select: [id: string] }>()
@@ -32,12 +33,12 @@ const statusLabel = {
 </script>
 
 <template>
-  <section class="panel overflow-hidden" aria-label="工资单列表">
+  <section class="panel overflow-hidden" aria-label="工资单列表" :aria-busy="loading">
     <SectionHeader title="负责人请款簿" subtitle="负责人 × 月份；已发放单据保留当月现场量与金额快照" />
     <KitTable
       :columns="columns"
       :data="statements"
-      :loading="loading"
+      :loading="loading && !(hasSnapshot ?? statements.length > 0)"
       :min-rows="8"
       :empty="{ title: '当前范围暂无工资单', description: '可从上方选择负责人和取数口径生成月度草稿。' }"
     >
@@ -57,7 +58,7 @@ const statusLabel = {
       </template>
       <template #action="{ row }">
         <div class="flex items-center gap-3 whitespace-nowrap">
-          <button type="button" class="text-12px font-700 text-brand" @click="emit('select', row.id)">
+          <button type="button" class="text-12px font-700 text-brand" :disabled="loading" @click="emit('select', row.id)">
             {{ selectedId === row.id ? '查看中' : '查看' }}
           </button>
           <NuxtLink :to="`/subcontract/payroll/${row.id}`" class="text-12px font-700 text-brand">

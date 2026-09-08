@@ -14,6 +14,7 @@ import type {
   ConstructionContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
@@ -73,7 +74,7 @@ export function parseConstructionContractListQuery(
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     customerId: optional(input?.customerId),
-    status: optional(input?.status),
+    status: parseContractListFilter(input?.status, () => new ConstructionContractRepositoryProblem(constructionContractProblem('invalid-query', '合同筛选参数无效'))),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as ConstructionContractPageSize,
   }
@@ -211,7 +212,7 @@ export function buildConstructionContractListPage(
         return false
       if (input.query.customerId && row.customerId !== input.query.customerId)
         return false
-      if (input.query.status && row.status !== input.query.status)
+      if (!matchesContractListFilter(row.status, input.query.status))
         return false
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })

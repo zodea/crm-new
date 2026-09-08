@@ -1,21 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import ContractListToolbar from '~/components/contract/ContractListToolbar.vue'
 
-const SelectFilterStub = defineComponent({
-  props: {
-    label: String,
-  },
-  setup(props) {
-    return () => h('label', [
-      props.label,
-      h('select', { 'aria-label': props.label }, [
-        h('option', { value: 'all' }, '全部项目'),
-      ]),
-    ])
-  },
-})
+vi.mock('~/composables/useOverlayStack', () => ({ useOwnedOverlayLayerStyle: () => ({ zIndex: 80 }) }))
 
 const SearchInputStub = defineComponent({
   props: {
@@ -32,16 +20,15 @@ const SearchInputStub = defineComponent({
 const global = {
   components: {
     SearchInput: SearchInputStub,
-    SelectFilter: SelectFilterStub,
   },
 }
 
 describe('contract list toolbar', () => {
   const props = {
     search: '',
-    project: 'all',
-    party: 'all',
-    status: '履约中',
+    project: [],
+    party: [],
+    status: ['履约中'],
     title: '分包合同',
     loading: false,
     projectOptions: [{ key: 'all', label: '全部项目' }],
@@ -61,9 +48,9 @@ describe('contract list toolbar', () => {
   it('保留项目、分供方、状态、搜索、刷新和新增操作入口', async () => {
     const view = render(ContractListToolbar, { props, global })
 
-    expect(screen.getByRole('combobox', { name: '项目' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '分供方' })).not.toBeNull()
-    expect(screen.getByRole('combobox', { name: '状态' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '项目，已选 0 项' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '分供方，已选 0 项' })).not.toBeNull()
+    expect(screen.getByRole('button', { name: '状态，已选 1 项' })).not.toBeNull()
     expect(screen.getByRole('searchbox', { name: '搜索合同名称 / 编号' })).not.toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '刷新' }))
     await fireEvent.click(screen.getByRole('button', { name: '新增分包合同' }))

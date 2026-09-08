@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { AuxiliaryContractDTO, AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
 import { useMutationObserver } from '@vueuse/core'
+import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { AUXILIARY_CATEGORIES, AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryColumns, auxiliaryMoney, auxiliaryTableRow } from '~/lib/auxiliary-contract/presentation'
+import { enumFilterValues } from '~/lib/kit/enum-filter'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{ kind: AuxiliaryContractKind }>()
@@ -11,20 +14,24 @@ const listRoot = useTemplateRef<HTMLElement>('listRoot')
 let pendingRestore = false
 const route = useRoute()
 const repository = useNuxtApp().$repositories.auxiliaryContracts
-const { data: page, shellState, problem, load } = useAuxiliaryContractRead(() => repository.list({ ...route.query, kind: props.kind }), data => data.empty ? { kind: 'empty', data, empty: data.empty } : { kind: 'ready', data })
-const search = ref(String(route.query.search ?? ''))
-const category = computed({ get: () => String(route.query.category ?? 'all'), set: value => void filter({ category: value === 'all' ? undefined : value }) })
-const status = computed({ get: () => String(route.query.status ?? 'all'), set: value => void filter({ status: value === 'all' ? undefined : value }) })
+const { data: page, shellState, problem, load } = useAuxiliaryContractRead(
+  () => repository.list({ ...route.query, kind: props.kind }),
+  data => data.empty ? { kind: 'empty', data, empty: data.empty } : { kind: 'ready', data },
+  { snapshotKey: () => JSON.stringify([props.kind, route.query.origin ?? 'real']) },
+)
+const search = shallowRef(String(route.query.search ?? ''))
+const category = computed({ get: () => enumFilterValues(route.query.category), set: (value: string[]) => void filter({ category: value.length ? value : undefined }) })
+const status = computed({ get: () => enumFilterValues(route.query.status), set: (value: string[]) => void filter({ status: value.length ? value : undefined }) })
 const project = computed({ get: () => String(route.query.projectId ?? route.query.project ?? ''), set: value => void filter({ projectId: value || undefined, project: undefined }) })
 const fetchProjects = async (keyword: string) => (page.value?.projectOptions ?? []).filter(row => row.label.includes(keyword))
-const categories = computed(() => [{ key: 'all', label: '全部类别' }, ...AUXILIARY_CATEGORIES[props.kind].map(value => ({ key: value, label: value }))])
+const categories = computed(() => AUXILIARY_CATEGORIES[props.kind].map(value => ({ key: value, label: value })))
 const statuses = ['草稿', '审批中', '已签订', '履约中', '已结算', '已结清'].map(value => ({ key: value, label: value }))
 const columns = computed(() => auxiliaryColumns(props.kind))
 const rows = computed(() => page.value?.items.map(auxiliaryTableRow) ?? [])
 const canWrite = computed(() => page.value?.capabilities.includes('auxiliary-contract:write') ?? false)
-const hasFilters = computed(() => ['search', 'category', 'status', 'projectId', 'supplierId', 'project', 'supplier'].some(key => route.query[key]))
+const hasFilters = computed(() => ['search', 'projectId', 'supplierId', 'project', 'supplier'].some(key => route.query[key]) || category.value.length > 0 || status.value.length > 0)
 const empty = computed(() => ({ title: hasFilters.value ? '没有符合条件的合同' : `暂无${AUXILIARY_LABELS[props.kind]}`, description: hasFilters.value ? '请调整或清除筛选。' : '当前范围内还没有合同。', actionLabel: hasFilters.value ? '清除筛选' : '' }))
-async function filter(patch: Record<string, string | undefined>) {
+async function filter(patch: Record<string, string | string[] | undefined>) {
   await navigateTo({ path: route.path, query: { ...route.query, ...patch, page: undefined } }, { replace: true })
 }
 function clearFilters() {
@@ -83,8 +90,8 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
       <h1 class="m-0 mr-auto text-15px font-800">
         {{ AUXILIARY_LABELS[kind] }}
       </h1>
-      <SelectFilter v-model="category" :options="categories" label="类别" class="lg:hidden" />
-      <SelectFilter v-model="status" :options="[{ key: 'all', label: '全部状态' }, ...statuses]" label="状态" />
+      <KitMultiSelectFilter v-model="category" :options="categories" label="类别" class="lg:hidden" />
+      <KitMultiSelectFilter v-model="status" :options="statuses" label="状态" />
       <LookupSelect v-if="kind === 'other_expense'" v-model="project" :fetch="fetchProjects" placeholder="筛选项目" class="w-48 max-w-full" />
       <form class="flex min-w-0 flex-wrap gap-2" @submit.prevent="filter({ search: search || undefined })">
         <input v-model="search" class="field-input min-w-0 max-w-full" placeholder="搜索合同名称 / 编号 / 对方单位" aria-label="搜索合同名称 / 编号 / 对方单位">
@@ -108,18 +115,23 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
     <NuxtLink v-if="validateAuxiliaryReturnTo(route.query.returnTo)" :to="validateAuxiliaryReturnTo(route.query.returnTo)!" class="text-13px text-brand">
       返回来源
     </NuxtLink>
-    <StatePanel v-if="problem" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
-    <div v-else class="grid min-w-0 gap-3 lg:grid-cols-[150px_minmax(0,1fr)]">
+    <p v-if="problem && page" role="alert" class="m-0 rounded-sm bg-danger-soft p-3 text-12px text-danger">
+      {{ problem.message }}；当前保留上一次成功读取的列表。
+      <button v-if="problem.retryable" type="button" class="ml-2 underline" @click="refresh">
+        重试
+      </button>
+    </p>
+    <StatePanel v-if="problem && !page" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
+    <div v-else class="grid min-w-0 gap-3 lg:grid-cols-[150px_minmax(0,1fr)]" :aria-busy="shellState === 'loading'">
       <aside class="panel hidden min-w-0 p-2 lg:block" aria-label="合同类别">
         <p class="m-0 border-b border-line px-2 py-3 text-12px font-700">
           合同分类
         </p>
-        <button v-for="option in categories" :key="option.key" type="button" class="mt-1 block w-full cursor-pointer border-0 rounded px-3 py-2 text-left text-13px" :class="category === option.key ? 'bg-brand-soft font-700 text-brand' : 'bg-transparent text-ink-soft hover:bg-surface-2'" :aria-pressed="category === option.key" @click="category = option.key">
-          {{ option.label }}
-        </button>
+        <KitEnumFilterOptions v-model="category" label="合同类别" :options="categories" class="mt-2" />
       </aside>
-      <div class="min-w-0">
-        <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading'" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="empty" @empty-action="clearFilters" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
+      <div class="relative min-w-0">
+        <span v-if="shellState === 'loading' && page" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
+        <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading' && !page" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="empty" @empty-action="clearFilters" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
           <template #name="{ row }">
             <NuxtLink :id="`aux-row-${row.id}`" :to="target(row.source)" class="cell--link" @click="remember(row.id)">
               {{ row.name }}

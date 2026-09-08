@@ -343,7 +343,7 @@ interface NotificationOpenResultDTO {
 
 分供方列表、详情和表单预载沿同一 `dataOrigin + supplierId` 读取主档；新增 `laborScope` 进入同一读取和查询投影，旧载荷缺少该字段时归一为空文本。字段词义、持久化及界面列序分别只见 [CONTEXT.md](../../CONTEXT.md)、[DATABASE.md](./DATABASE.md) 和[页面蓝本](./pages/base-supplier.md)，不在此复制字段表。可执行类型与查询白名单位于 [`read-contract.ts`](../../app/lib/supplier/read-contract.ts)，边界解码位于 [`read-decoder.ts`](../../app/lib/supplier/read-decoder.ts)。
 
-- 查询保留原有关键词、类别、资料状态、排序、分页和来源开关；新增 `columnFilters` 在 HTTP 查询参数中传 JSON，按 [`read-query.ts`](../../app/lib/supplier/read-query.ts) 归一。文本使用包含匹配，枚举使用精确值，数值范围包含两端；空条件不产生约束，未知字段、非有限数值及反向区间返回 `invalid-query`。敏感列先按当前 capability 形成可见值，再参与关键词和列条件匹配，不允许通过筛选探测隐藏原值。
+- 查询保留原有关键词、类别、资料状态、排序、分页和来源开关；`columnFilters` 在 HTTP 查询参数中传 JSON，按 [`read-query.ts`](../../app/lib/supplier/read-query.ts) 归一。文本使用包含匹配，枚举允许单值或多值精确匹配（同字段 OR、跨字段 AND），数值范围包含两端；空条件不产生约束，未知字段、非法枚举载荷、非有限数值及反向区间返回 `invalid-query`。类别与资料状态兼容旧单值参数，多值使用 JSON 数组；详情返回保存同一语义。敏感列先按当前 capability 形成可见值，再参与关键词和列条件匹配，不允许通过筛选探测隐藏原值。
 - 搜索、列条件、排序、总数及金额汇总处理同一完整结果集后分页。枚举 facet 保留其他条件、仅去除自身选中条件，不能从当前页推算选项。分供方缺失或非法页码归一到第一页；合法页码超过结果末页时回到末页，空结果为第一页。数值排序把未知值放在末尾，以稳定身份处理同值；隐藏列不清除已生效条件，返回列表时保留同一查询语义。
 - 列表合同金额、累计合同金额、累计结算金额及对应详情金额允许 `MoneyDTO | null`，不能在 decoder 或展示层把 `null` 变为 `0.00`。参与汇总的源金额缺失时，列表值及该来源汇总保持 `null`，详情 `MetricDTO` 返回 `value=null + status=partial + missingSources`，保留可用的源记录核对入口。只有已读取且确实为空的集合可以计算为零；草稿、失效记录和确认条件按[页面蓝本的金额口径](./pages/base-supplier.md#七跨项目只读汇总)执行，累计指标不另存为主档余额。
 - 当前中央测试实例通过 [`supplier-fact-source.ts`](../../server/utils/supplier-fact-source.ts) 组合各领域未分页读源：材料采购合同及其结算 feed、分包合同有效增补及中央 `sub_settlement`、其他支出合同有效增补及其他支出结算。关系仅按同来源的稳定分供方、项目和合同身份连接；有工作区/会话边界的来源保留原隔离，来源版本随组合读源返回。合同的 canonical kind 和导航意图不因中文类别显示而改写。

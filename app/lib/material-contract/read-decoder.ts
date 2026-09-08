@@ -7,6 +7,7 @@ import type {
   MaterialContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeContractListFilter } from '../contract/list-filters'
 import {
   MATERIAL_CONTRACT_PAGE_SIZES,
   materialContractProblem,
@@ -219,7 +220,7 @@ export function serializeMaterialContractListQuery(query: MaterialContractListQu
     search: query.search,
     projectId: query.projectId ?? '',
     supplierId: query.supplierId ?? '',
-    status: query.status ?? '',
+    status: serializeContractListFilter(query.status),
     page: String(query.page),
     pageSize: String(query.pageSize),
   }

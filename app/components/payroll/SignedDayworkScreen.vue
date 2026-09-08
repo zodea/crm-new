@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SignedDayworkRecord } from '~/lib/payroll/daywork'
 import { onMounted } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 
 const store = useSignedDayworkStore()
 const kit = useKitUI()
@@ -32,12 +33,12 @@ async function save(input: Parameters<typeof store.save>[0]) {
         <p class="text-11px font-700 text-brand">
           工资核算
         </p>
-        <h1 class="mt-1 text-20px font-800 text-ink">
-          零星签工
-        </h1>
-        <p class="mt-1 text-12px text-ink-soft">
-          C2 独立来源 · 逐日签工 → 证明确认 → 月度工资
-        </p>
+        <div class="mt-1 flex items-center gap-1.5">
+          <h1 class="text-20px font-800 text-ink">
+            零星签工
+          </h1>
+          <ContextHelp label="零星签工" text="按日登记用工，经证明人确认后纳入月度工资核算。" />
+        </div>
       </div>
       <div class="flex flex-wrap gap-2">
         <NuxtLink to="/subcontract/attendance" class="btn-secondary">
@@ -69,6 +70,7 @@ async function save(input: Parameters<typeof store.save>[0]) {
     <SignedDayworkTable
       :records="store.records"
       :loading="store.loading"
+      :has-snapshot="store.hasSnapshot"
       @edit="editingRecord = $event"
     />
   </main>

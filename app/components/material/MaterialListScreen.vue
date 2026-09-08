@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { ListFilterDefinition } from '~/components/shared/ListFilterBar.vue'
 import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
 import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
@@ -8,6 +7,7 @@ import type {
   MaterialFormRecordMap,
 } from '~/lib/material/forms'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
 import ListShell from '~/components/ui/ListShell.vue'
@@ -38,12 +38,12 @@ const projectStore = useProjectStore()
 const { confirm, undoToast, error } = useKitUI()
 const meta = computed(() => MATERIAL_FORM_META[props.kind])
 const search = shallowRef('')
-const projectFilter = shallowRef('')
-const statusFilter = shallowRef('')
+const projectFilter = shallowRef<string[]>([])
+const statusFilter = shallowRef<string[]>([])
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const filtersOpen = shallowRef(false)
-const hasFilters = computed(() => Boolean(projectFilter.value || statusFilter.value))
+const hasFilters = computed(() => projectFilter.value.length > 0 || statusFilter.value.length > 0)
 const statusTones: Record<string, KitStatusTone> = { draft: 'neutral', submitted: 'brand', posted: 'ok', effective: 'ok', confirmed: 'ok' }
 
 const records = computed(() =>
@@ -106,9 +106,9 @@ const rows = computed(() => records.value.map(rowFrom))
 const filtered = computed(() => {
   const keyword = search.value.trim().toLowerCase()
   return rows.value.filter((row) => {
-    if (projectFilter.value && row.projectName !== projectFilter.value)
+    if (projectFilter.value.length && !projectFilter.value.includes(row.projectName))
       return false
-    if (statusFilter.value && row.status !== statusFilter.value)
+    if (statusFilter.value.length && !statusFilter.value.includes(row.statusValue))
       return false
     if (!keyword)
       return true
@@ -119,20 +119,20 @@ const filtered = computed(() => {
 
 const currentPage = computed(() => clampPage(page.value, filtered.value.length, pageSize.value))
 const pageRows = computed(() => paginate(filtered.value, currentPage.value, pageSize.value))
-const filterDefinitions = computed<ListFilterDefinition[]>(() => [
+const filterDefinitions = computed(() => [
   {
     key: 'project',
     label: '项目',
     value: projectFilter.value,
     options: deriveFilterOptions(rows.value, 'projectName')
-      .map(option => ({ label: option.label, value: String(option.value) })),
+      .map(option => ({ label: option.label, key: String(option.value) })),
   },
   {
     key: 'status',
     label: '状态',
     value: statusFilter.value,
-    options: deriveFilterOptions(rows.value, 'status')
-      .map(option => ({ label: option.label, value: String(option.value) })),
+    options: deriveFilterOptions(rows.value, 'statusValue')
+      .map(option => ({ label: statusLabel(String(option.value)), key: String(option.value) })),
   },
 ])
 
@@ -141,7 +141,7 @@ watch([search, projectFilter, statusFilter, pageSize], () => {
 })
 
 function onFilterChange(key: string, value: ColumnFilterValue) {
-  if (typeof value !== 'string')
+  if (!Array.isArray(value))
     return
   if (key === 'project')
     projectFilter.value = value
@@ -150,8 +150,8 @@ function onFilterChange(key: string, value: ColumnFilterValue) {
 }
 
 function clearFilters() {
-  projectFilter.value = ''
-  statusFilter.value = ''
+  projectFilter.value = []
+  statusFilter.value = []
   filtersOpen.value = false
 }
 
@@ -235,13 +235,10 @@ onActivated(() => {
         </button>
         <KitToolbarPopover v-model:open="filtersOpen" label="列表筛选" icon="i-lucide-filter" :active="hasFilters">
           <div class="grid gap-3">
-            <label v-for="filter in filterDefinitions" :key="filter.key" class="grid gap-1">
+            <div v-for="filter in filterDefinitions" :key="filter.key" class="grid gap-1">
               <span>{{ filter.label }}</span>
-              <select :value="filter.value" :aria-label="filter.label" class="field-input h-7 text-12px" @change="onFilterChange(filter.key, ($event.target as HTMLSelectElement).value)">
-                <option value="">全部</option>
-                <option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-            </label>
+              <KitEnumFilterOptions :model-value="filter.value" :label="filter.label" :options="filter.options" @update:model-value="onFilterChange(filter.key, $event)" />
+            </div>
             <button type="button" class="btn-secondary h-7 text-12px" @click="clearFilters">
               清除筛选
             </button>
@@ -257,13 +254,14 @@ onActivated(() => {
       <KitTable
         :columns="columns"
         :data="pageRows"
-        :loading="materialStore.loading"
+        :loading="materialStore.loading && materialStore.records[kind] === undefined"
+        :aria-busy="materialStore.loading"
         :row-height="32"
         :page="{ page: currentPage, pageSize, total: filtered.length }"
         @page-change="onPageChange"
       >
         <template #columnHeader="{ column }">
-          <KitColumnHeader :title="column.title" kind="enum" :value="columnFilter(column.field)?.value" :options="columnFilter(column.field)?.options.map(option => ({ key: option.value, label: option.label }))" @apply="onFilterChange(column.field === 'projectName' ? 'project' : 'status', $event)" />
+          <KitColumnHeader :title="column.title" kind="multi-enum" :value="columnFilter(column.field)?.value" :options="columnFilter(column.field)?.options" @apply="onFilterChange(column.field === 'projectName' ? 'project' : 'status', $event)" />
         </template>
         <template #name="{ row }">
           <button class="cell--link border-0 bg-transparent p-0 text-left" @click="openEdit(row)">

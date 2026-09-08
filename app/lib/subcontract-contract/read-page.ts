@@ -12,6 +12,7 @@ import type {
   SubcontractContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { round2 } from '../util/number'
 import { maskPhone } from '../util/privacy'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
@@ -72,8 +73,8 @@ export function parseSubcontractContractListQuery(
     search: typeof input?.search === 'string' ? input.search.trim() : '',
     projectId: optional(input?.projectId),
     supplierId: optional(input?.supplierId),
-    status: optional(input?.status),
-    subKind: optional(input?.subKind),
+    status: parseContractListFilter(input?.status, () => new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '合同筛选参数无效'))),
+    subKind: parseContractListFilter(input?.subKind, () => new SubcontractContractRepositoryProblem(subcontractContractProblem('invalid-query', '合同筛选参数无效'))),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as SubcontractContractPageSize,
   }
@@ -178,9 +179,9 @@ export function buildSubcontractContractListPage(input: BuildListInput): Subcont
         return false
       if (input.query.supplierId && row.supplierId !== input.query.supplierId)
         return false
-      if (input.query.status && row.status !== input.query.status)
+      if (!matchesContractListFilter(row.status, input.query.status))
         return false
-      if (input.query.subKind && row.subKind !== input.query.subKind)
+      if (!matchesContractListFilter(row.subKind, input.query.subKind))
         return false
       return !search || [row.name, row.no].some(value => value.toLocaleLowerCase('zh-CN').includes(search))
     })

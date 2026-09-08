@@ -39,6 +39,11 @@ describe('payroll workbench components', () => {
     expect(screen.getByText('新建工资草稿')).not.toBeNull()
     expect(screen.queryByTestId('payroll-draft-form')).toBeNull()
     expect(emitted().create).toBeUndefined()
+    expect(screen.getByText('录入零星签工')).not.toBeNull()
+    expect(screen.queryByText(/合同清单直报暂不可用/)).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: '查看工资核算说明' }))
+    expect(screen.getByText(/已发放工资保留发放时的记录/)).not.toBeNull()
+    expect(screen.getByText(/合同清单直报暂不可用/)).not.toBeNull()
   })
 
   it('new draft form exposes only provisional/field quantity and final locks field', async () => {

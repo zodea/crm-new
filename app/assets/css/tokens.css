@@ -29,12 +29,12 @@
   /* ADR 0013：沿用运行参考的紧凑深色外壳，品牌色保留瑞航蓝。 */
   --shell-sidebar-bg: #182237;
   --shell-sidebar-text: #f3f6fc;
-  --shell-sidebar-muted: #b3bfd1;
+  --shell-sidebar-muted: #c8d2e1;
   --shell-sidebar-hover: rgb(255 255 255 / 7%);
-  --shell-sidebar-active: rgb(57 118 198 / 25%);
+  --shell-sidebar-active: rgb(57 118 198 / 32%);
   --shell-sidebar-active-text: #ffffff;
   --shell-sidebar-border: rgb(255 255 255 / 10%);
-  --shell-sidebar-input: rgb(255 255 255 / 7%);
+  --shell-sidebar-input: rgb(255 255 255 / 9%);
   --shell-header-bg: rgb(255 255 255 / 96%);
   --shell-header-text: var(--ink);
   --shell-header-muted: var(--ink-soft);
@@ -175,6 +175,11 @@ html {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* UnoCSS 的 border 只声明宽度；覆盖浏览器原生 inset/outset，避免常态控件像被按下。 */
+:where(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-style: solid;
 }
 
 /* 等宽数字 */

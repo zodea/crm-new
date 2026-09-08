@@ -5,6 +5,7 @@ import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isProjectOwnerDocumentCardAnchor, validateProjectJourneyReturnTo } from '~/lib/material-contract/return-context'
 import { validateSubcontractContractDetailReturnTo } from '~/lib/subcontract-contract/return-context'
 import { validateSupplierDetailReturnTo } from '~/lib/supplier/return-context'
+import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -13,8 +14,8 @@ export interface OwnerDocumentListNavigationState {
   projectId: string | null
   contractId: string | null
   supplierId?: string | null
-  status: string | null
-  documentType: string | null
+  status: string | string[] | null
+  documentType: string | string[] | null
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -151,8 +152,8 @@ export function ownerDocumentListNavigationStateFromQuery(
     projectId: optionalText(query.projectId, 240),
     contractId: optionalText(query.contractId, 240),
     supplierId: optionalText(query.supplierId ?? query.supplier, 240),
-    status: optionalText(query.status, 80),
-    documentType: optionalText(query.documentType, 120),
+    status: value(query.status) === 'all' ? 'all' : serializeEnumSelection(enumSelectionFromQuery(query.status)) || null,
+    documentType: serializeEnumSelection(enumSelectionFromQuery(query.documentType)) || null,
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 20,
@@ -172,9 +173,9 @@ function params(state: OwnerDocumentListNavigationState, contextId: string): URL
   if (state.supplierId)
     query.set('supplier', state.supplierId)
   if (state.status)
-    query.set('status', state.status)
-  if (state.documentType)
-    query.set('documentType', state.documentType)
+    query.set('status', serializeEnumSelection(state.status) || 'all')
+  if (serializeEnumSelection(state.documentType))
+    query.set('documentType', serializeEnumSelection(state.documentType))
   if (state.origin)
     query.set('origin', state.origin)
   if (state.page !== 1)

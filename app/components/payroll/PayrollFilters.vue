@@ -2,8 +2,11 @@
 import type {
   PayrollWorkbenchOptions,
   WageStatementFilter,
+  WageStatementStatus,
 } from '~/lib/payroll/statements'
 import { computed } from 'vue'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import {
   payrollDraftLocation,
   payrollFilterQuery,
@@ -23,6 +26,11 @@ const relatedQuery = computed(() => payrollFilterQuery(props.filters))
 
 function patchFilter(key: keyof WageStatementFilter, value: string) {
   emit('update:filters', { ...props.filters, [key]: value })
+}
+
+const statuses = computed(() => Array.isArray(props.filters.status) ? props.filters.status : props.filters.status ? [props.filters.status] : [])
+function setStatuses(values: string[]) {
+  emit('update:filters', { ...props.filters, status: values.filter((value): value is WageStatementStatus => ['draft', 'checked', 'released'].includes(value)) })
 }
 </script>
 
@@ -61,39 +69,20 @@ function patchFilter(key: keyof WageStatementFilter, value: string) {
           </option>
         </select>
       </label>
-      <label class="field">
-        <span>状态</span>
-        <select
-          :value="filters.status"
-          @change="patchFilter('status', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">全部状态</option>
-          <option value="draft">草稿</option>
-          <option value="checked">已核对</option>
-          <option value="released">已发放</option>
-        </select>
-      </label>
+      <KitMultiSelectFilter :model-value="statuses" label="状态" :options="[{ key: 'draft', label: '草稿' }, { key: 'checked', label: '已核对' }, { key: 'released', label: '已发放' }]" @update:model-value="setStatuses" />
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
         <NuxtLink :to="draftLocation" class="btn-primary">
           新建工资草稿
         </NuxtLink>
+        <ContextHelp label="工资核算" text="计件、考勤和零星签工工资均可在此建单、核对与发放。已发放工资保留发放时的记录，不再随来源变动。合同清单直报暂不可用。" />
         <NuxtLink :to="{ path: '/subcontract/attendance', query: relatedQuery }" class="btn-secondary">
           打开考勤
         </NuxtLink>
         <NuxtLink :to="{ path: '/subcontract/daywork', query: relatedQuery }" class="btn-secondary">
-          录入 C2 签工
+          录入零星签工
         </NuxtLink>
       </div>
-    </div>
-
-    <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-11px text-ink-faint">
-      <p>
-        A、C1、C2 在同一工资工作台建单、核对与发放；已发放单据仅展示冻结快照。
-      </p>
-      <p>
-        B · 合同清单直报：等待合同工资清单关系接入
-      </p>
     </div>
   </section>
 </template>

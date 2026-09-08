@@ -17,7 +17,7 @@ export type CustomerListSort = 'updated-desc' | 'name-asc' | 'name-desc'
 export interface CustomerListQueryDTO {
   includeDemo: boolean
   search: string
-  status: string | null
+  status: string | string[] | null
   sort: CustomerListSort
   page: number
   pageSize: CustomerPageSize

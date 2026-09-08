@@ -1,5 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import { matchesEnumFilter } from '~/lib/kit/enum-filter'
 
 export type QuantityVarianceBasis = 'contract' | 'provisional' | 'field'
 export type QuantityVarianceCompleteness = 'complete' | 'missing'
@@ -51,8 +52,8 @@ export interface QuantityVarianceRow {
 
 export interface QuantityVarianceFilter {
   buildingId?: string
-  section?: string
-  trade?: string
+  section?: string | string[]
+  trade?: string | string[]
   itemKeyword?: string
 }
 
@@ -412,8 +413,8 @@ export function filterQuantityVarianceRows(
   const keyword = filter.itemKeyword?.trim().toLocaleLowerCase('zh-CN') ?? ''
   return rows.filter(row => (
     (!filter.buildingId || row.buildingId === filter.buildingId)
-    && (!filter.section || row.section === filter.section)
-    && (!filter.trade || row.trade === filter.trade)
+    && matchesEnumFilter(row.section, filter.section)
+    && matchesEnumFilter(row.trade, filter.trade)
     && (!keyword || `${row.itemName} ${row.itemId}`.toLocaleLowerCase('zh-CN').includes(keyword))
   ))
 }

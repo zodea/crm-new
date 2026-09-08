@@ -55,6 +55,8 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   })
   const selectedId = ref('')
   const loading = ref(false)
+  const hasSnapshot = ref(false)
+  let snapshotScope = ''
   const error = ref('')
   let loadSequence = 0
   const filters = reactive<WageStatementFilter>({
@@ -67,6 +69,8 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   const selected = computed(() =>
     statements.value.find(statement => statement.id === selectedId.value) ?? null,
   )
+
+  const scopeKey = (value: WageStatementFilter) => JSON.stringify([value.projectId ?? '', value.month ?? '', value.crewId ?? ''])
 
   async function resolveOptions(projectId: string) {
     const db = await getDb()
@@ -108,7 +112,11 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     const requestedFilters: WageStatementFilter = { ...filters }
     loading.value = true
     error.value = ''
-    statements.value = []
+    if (snapshotScope !== scopeKey(requestedFilters)) {
+      statements.value = []
+      hasSnapshot.value = false
+      snapshotScope = ''
+    }
     selectedId.value = ''
     try {
       const { db, resolvedProjectId, nextOptions } = await resolveOptions(requestedFilters.projectId ?? '')
@@ -122,6 +130,8 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
       Object.assign(filters, nextFilters)
       options.value = nextOptions
       statements.value = nextStatements
+      snapshotScope = scopeKey(nextFilters)
+      hasSnapshot.value = true
       if (!statements.value.some(statement => statement.id === selectedId.value))
         selectedId.value = statements.value[0]?.id ?? ''
     }
@@ -255,6 +265,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     selectedId,
     selected,
     loading,
+    hasSnapshot,
     error,
     filters,
     load,

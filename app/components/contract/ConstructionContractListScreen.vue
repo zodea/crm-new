@@ -3,6 +3,8 @@ import type { ConstructionContractListPageDTO } from '~/lib/construction-contrac
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
+import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import {
   constructionContractProblemFromUnknown,
@@ -17,6 +19,8 @@ import {
   resolveConstructionContractReturnContext,
   saveConstructionContractReturnOrigin,
 } from '~/lib/construction-contract/return-context'
+import { contractListFilterValues } from '~/lib/contract/list-filters'
+import { CONTRACT_STATUSES } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
@@ -45,6 +49,8 @@ const parsedQuery = computed(() => {
 })
 const query = computed(() => parsedQuery.value.query ?? parseConstructionContractListQuery({ includeDemo: String(visibilityStore.includeDemo) }))
 const search = ref(query.value.search)
+const statusOptions = CONTRACT_STATUSES.map(value => ({ key: value, label: value }))
+const selectedStatuses = computed(() => contractListFilterValues(query.value.status))
 const rowNavigationPending = ref(false)
 const returnContextId = ref(isConstructionContractReturnContextId(route.query.nav)
   ? route.query.nav
@@ -67,16 +73,16 @@ const columns: KitTableColumn[] = [
   { field: 'received', title: '累计收款', width: 120, type: 'money', slot: 'received' },
   { field: 'receivable', title: '按结算应收', width: 125, type: 'money', slot: 'receivable' },
   { field: 'unreceived', title: '开票未回', width: 120, type: 'money', slot: 'unreceived' },
-  { field: 'status', title: '状态', width: 100 },
+  { field: 'status', title: '状态', width: 110, customHeader: true },
 ]
 
-function patchQuery(patch: Record<string, string | number | null | undefined>) {
+function patchQuery(patch: Record<string, string | string[] | number | null | undefined>) {
   const next = { ...route.query }
   for (const [key, value] of Object.entries(patch)) {
-    if (value == null || value === '' || (key === 'page' && Number(value) === 1))
+    if (value == null || value === '' || (Array.isArray(value) && value.length === 0) || (key === 'page' && Number(value) === 1))
       delete next[key]
     else
-      next[key] = String(value)
+      next[key] = Array.isArray(value) ? JSON.stringify(value) : String(value)
   }
   void router.replace({ query: next })
 }
@@ -191,13 +197,7 @@ useTabTitle('施工合同')
             {{ item.label }}
           </option>
         </select>
-        <select class="field-input h-8 min-w-0 w-32 max-w-full py-1 text-12px" :value="query.status ?? ''" aria-label="筛选状态" @change="patchQuery({ status: ($event.target as HTMLSelectElement).value, page: 1 })">
-          <option value="">
-            全部状态
-          </option><option v-for="item in page?.summary.statuses ?? []" :key="item.value" :value="item.value">
-            {{ item.value }}（{{ item.count }}）
-          </option>
-        </select>
+        <KitMultiSelectFilter :model-value="selectedStatuses" label="状态" aria-label="筛选状态" :options="statusOptions" @update:model-value="patchQuery({ status: $event, page: 1 })" />
         <select class="field-input h-8 min-w-0 w-32 max-w-full py-1 text-12px" :value="query.pageSize" aria-label="每页数量" @change="patchQuery({ pageSize: Number(($event.target as HTMLSelectElement).value), page: 1 })">
           <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">
             每页 {{ size }} 条
@@ -208,9 +208,13 @@ useTabTitle('施工合同')
 
     <template #table>
       <StatePanel v-if="parsedQuery.problem" kind="error" title="施工合同查询条件无效" :description="parsedQuery.problem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
-      <div v-else-if="page" class="min-w-0" data-testid="construction-contract-list-scroll">
+      <div v-else-if="page" class="relative min-w-0" :aria-busy="state.kind === 'loading'" data-testid="construction-contract-list-scroll">
+        <span v-if="state.kind === 'loading'" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
         <StatePanel v-if="state.kind === 'error'" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的列表。`" :action-label="state.problem.retryable ? '重试' : ''" compact @action="store.loadList(query)" />
-        <KitTable :columns="columns" :data="page.items" :loading="state.kind === 'loading'" :page="page.pagination" :page-size-options="[10, 20, 50, 100]" :empty="{ title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无施工合同', description: '可调整筛选条件，或新建正式施工合同。' }" row-key="rowKey" @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })">
+        <KitTable :columns="columns" :data="page.items" :loading="false" :page="page.pagination" :page-size-options="[10, 20, 50, 100]" :empty="{ title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无施工合同', description: '可调整筛选条件，或新建正式施工合同。' }" row-key="rowKey" @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })">
+          <template #columnHeader="{ column }">
+            <KitColumnHeader :title="column.title" kind="multi-enum" :value="selectedStatuses" :options="statusOptions" @apply="Array.isArray($event) && patchQuery({ status: $event, page: 1 })" />
+          </template>
           <template #name="{ row }">
             <NuxtLink v-if="link(row)" :id="`construction-contract-row-${row.rowKey}`" :to="link(row)!" class="font-700 text-brand hover:underline" @click="captureReturnOrigin(row)">
               {{ row.name }}

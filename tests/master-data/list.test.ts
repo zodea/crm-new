@@ -31,6 +31,15 @@ const workers = [
 ]
 
 describe('主数据列表筛选与排序', () => {
+  it('同字段多选取并集，字段间取交集，清空恢复全集', () => {
+    const query = { search: '', sort: 'updated-desc' as const, values: { trade: ['泥水工', '油漆工'], status: [] as string[] } }
+    expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query)).toHaveLength(2)
+    query.values.status = ['submitted']
+    expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query).map(row => row.id)).toEqual(['worker-1'])
+    query.values.status = []
+    query.values.trade = []
+    expect(filterAndSortMasterDataRows(workers, MASTER_DATA_LIST_PROFILES.worker, query)).toHaveLength(2)
+  })
   it('搜索覆盖实体字段并叠加班组和在场状态筛选', () => {
     expect(filterAndSortMasterDataRows(
       workers,

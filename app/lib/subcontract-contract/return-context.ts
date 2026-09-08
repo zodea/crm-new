@@ -1,13 +1,15 @@
+import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
+import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
 
 export interface SubcontractContractListNavigationState {
   search: string
   projectId: string | null
   supplierId: string | null
-  status: string | null
-  subKind: string | null
+  status: ContractListFilter
+  subKind: ContractListFilter
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -58,8 +60,8 @@ export function subcontractContractListNavigationStateFromQuery(query: Record<st
     search: optionalText(query.search, 120) ?? '',
     projectId: optionalText(query.projectId, 240),
     supplierId: optionalText(query.supplierId, 240),
-    status: optionalText(query.status, 80),
-    subKind: optionalText(query.subKind, 80),
+    status: parseContractListFilter(query.status),
+    subKind: parseContractListFilter(query.subKind),
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,
@@ -70,7 +72,7 @@ function searchParams(state: SubcontractContractListNavigationState, contextId: 
   const query = new URLSearchParams()
   for (const [key, entry] of Object.entries(state)) {
     if (entry != null && entry !== '' && !(key === 'page' && entry === 1) && !(key === 'pageSize' && entry === 10))
-      query.set(key, String(entry))
+      query.set(key, key === 'status' || key === 'subKind' ? serializeContractListFilter(entry as ContractListFilter) : String(entry))
   }
   query.set('nav', contextId)
   return query

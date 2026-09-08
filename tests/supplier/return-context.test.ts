@@ -9,6 +9,22 @@ import {
 } from '~/lib/supplier/return-context'
 
 describe('分供方列表返回上下文', () => {
+  it('多选条件完整返回，重复参数可读，旧单值链接仍保持幂等', () => {
+    const state = supplierListNavigationStateFromQuery({ category: ['材料供应商', '劳务分包商'], credentialStatus: '["qualified","reviewing"]', columnFilters: JSON.stringify({ taxpayerType: ['一般纳税人', '小规模纳税人'], contains: { address: '广州' } }), page: '2' })
+    const returnTo = createSupplierReturnTo('real:multi-1', state)
+    expect(validateSupplierReturnTo(returnTo)).toBe(returnTo)
+    expect(supplierListNavigationStateFromQuery(Object.fromEntries(new URL(returnTo, 'https://crm.test').searchParams))).toEqual(state)
+    const repeated = '/base/supplier?category=材料供应商&category=劳务分包商&credentialStatus=qualified#supplier-row-real%253Amulti-1'
+    const normalized = validateSupplierReturnTo(repeated)!
+    expect(supplierListNavigationStateFromQuery(Object.fromEntries(new URL(normalized, 'https://crm.test').searchParams)).category).toHaveLength(2)
+    expect(validateSupplierReturnTo(normalized)).toBe(normalized)
+    const legacy = createSupplierReturnTo('real:multi-1', { ...state, category: '材料供应商', credentialStatus: 'qualified' })
+    expect(new URL(legacy, 'https://crm.test').searchParams.get('category')).toBe('材料供应商')
+    expect(validateSupplierReturnTo(legacy)).toBe(legacy)
+    expect(supplierListNavigationStateFromQuery({ category: '[broken', credentialStatus: [1] })).toMatchObject({ category: [], credentialStatus: [] })
+    expect(validateSupplierReturnTo('//evil.test/base/supplier#supplier-row-test')).toBeNull()
+  })
+
   it.each(['Infinity', '1.5', '-1', '9007199254740992'])('无效页码 %s 归一到第一页', (page) => {
     expect(supplierListNavigationStateFromQuery({ page }).page).toBe(1)
   })

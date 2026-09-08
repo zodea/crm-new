@@ -1,4 +1,5 @@
 import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListTextField } from './read-contract'
+import { normalizeEnumSelection } from '../util/enum-selection'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_LIST_TEXT_FIELDS, supplierProblem, SupplierRepositoryProblem } from './read-contract'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -7,6 +8,21 @@ function object(value: unknown): value is Record<string, unknown> {
 
 function invalid(): never {
   throw new SupplierRepositoryProblem(supplierProblem('invalid-query', '分供方列筛选条件无效'))
+}
+
+/** 单值旧链接、JSON 数组和重复查询参数统一成精确匹配选项；空数组表示不限。 */
+export function normalizeSupplierEnumSelection(value: unknown): string[] {
+  try {
+    return normalizeEnumSelection(value)
+  }
+  catch {
+    return invalid()
+  }
+}
+
+export function serializeSupplierEnumSelection(value: unknown): string {
+  const values = normalizeSupplierEnumSelection(value)
+  return values.length > 1 ? JSON.stringify(values) : values[0] ?? ''
 }
 
 /** 旧客户端不传条件时保持兼容，未知字段与畸形区间在服务器边界拒绝。 */
@@ -38,12 +54,9 @@ export function parseSupplierColumnFilters(value: unknown): SupplierListColumnFi
     if (Object.keys(contains).length)
       result.contains = contains
   }
-  if (input.taxpayerType !== undefined && input.taxpayerType !== null) {
-    if (typeof input.taxpayerType !== 'string')
-      return invalid()
-    if (input.taxpayerType.trim())
-      result.taxpayerType = input.taxpayerType.trim()
-  }
+  const taxpayerTypes = normalizeSupplierEnumSelection(input.taxpayerType)
+  if (taxpayerTypes.length)
+    result.taxpayerType = taxpayerTypes
   if (input.ranges !== undefined) {
     if (!object(input.ranges))
       return invalid()

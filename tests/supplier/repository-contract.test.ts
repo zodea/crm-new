@@ -50,6 +50,43 @@ function supplier(
 }
 
 describe('分供方中央 Repository contract', () => {
+  it('固定枚举多选同字段取并集、跨字段取交集，分页汇总与自身排除 facet 同步', () => {
+    const suppliers = Array.from({ length: 30 }, (_, index) => supplier(`multi-${index}`, `多选 ${index}`, {
+      supplierCategory: ['材料供应商', '劳务分包商', '设备供应商'][index % 3]!,
+      credentialStatus: index < 20 ? 'qualified' : 'reviewing',
+      taxpayerType: index % 2 ? '小规模纳税人' : '一般纳税人',
+    }))
+    const input = { suppliers, projectSuppliers: [], contracts: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], asOf: AS_OF, sourceVersion: 'multi-enum', capabilities: [] }
+    const query = parseSupplierListQuery({ category: ['材料供应商', '劳务分包商'], credentialStatus: ['qualified', 'reviewing'], columnFilters: { taxpayerType: ['一般纳税人', '小规模纳税人'] }, pageSize: 10, page: 2 })
+    expect(parseSupplierListQuery(serializeSupplierListQuery(query))).toEqual(query)
+    const result = buildSupplierListPage({ ...input, query })
+    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 20 })
+    expect(result.summary.origins.real.supplierCount).toBe(20)
+    expect(result.summary.categories).toEqual(expect.arrayContaining([{ value: '设备供应商', label: '设备供应商', count: 10 }]))
+    const narrowed = buildSupplierListPage({ ...input, query: { ...query, credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } } })
+    expect(narrowed.pagination).toEqual({ page: 1, pageSize: 10, total: 7 })
+    expect(narrowed.items.every(item => ['材料供应商', '劳务分包商'].includes(item.supplierCategory) && item.credentialStatus === 'qualified' && item.taxpayerType === '一般纳税人')).toBe(true)
+    expect(narrowed.summary.taxpayerTypes).toEqual(expect.arrayContaining([{ value: '小规模纳税人', label: '小规模纳税人', count: 7 }]))
+    expect(buildSupplierListPage({ ...input, query: { ...query, category: [], credentialStatus: [], columnFilters: { taxpayerType: [] } } }).pagination.total).toBe(30)
+  })
+
+  it('多选编码兼容旧单值和重复参数，去重空白并拒绝非字符串选项', () => {
+    const single = parseSupplierListQuery({ category: '材料供应商', credentialStatus: 'qualified', columnFilters: { taxpayerType: '一般纳税人' } })
+    expect(single).toMatchObject({ category: ['材料供应商'], credentialStatus: ['qualified'], columnFilters: { taxpayerType: ['一般纳税人'] } })
+    expect(serializeSupplierListQuery(single)).toMatchObject({ category: '材料供应商', credentialStatus: 'qualified' })
+    const repeated = parseSupplierListQuery({ category: [' 材料供应商 ', '劳务分包商', '材料供应商', ''], credentialStatus: '["qualified","reviewing","qualified"]' })
+    expect(repeated.category).toEqual(expect.arrayContaining(['材料供应商', '劳务分包商']))
+    expect(repeated.category).toHaveLength(2)
+    expect(repeated.credentialStatus).toHaveLength(2)
+    expect(parseSupplierListQuery(serializeSupplierListQuery(repeated))).toEqual(repeated)
+    for (const value of [[12], ['qualified', null], {}, '[broken']) {
+      expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow()
+      expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow()
+    }
+    expect(parseSupplierListQuery({ category: 'all', credentialStatus: '[]' })).toMatchObject({ category: null, credentialStatus: null })
+    expect(parseSupplierListQuery({ credentialStatus: ['legacy-state'] }).credentialStatus).toEqual(['legacy-state'])
+  })
+
   it.each([false, true])('短敏感值在列表、详情和复制后查询保持一致（敏感权限：%s）', (canReadSensitive) => {
     const raw = { uniqueCode: 'SUP-001', taxNo: 'TAX-01', bankAccount: '1234567', contactPhone: '12345' }
     const visible = canReadSensitive ? raw : { uniqueCode: 'SUP- **** 01', taxNo: 'TAX- **** 1', bankAccount: '1234 **** 67', contactPhone: '123 **** 5' }

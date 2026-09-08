@@ -29,4 +29,11 @@ describe('甲方商务单据列表工具栏权限', () => {
     render(OwnerDocumentListToolbar, { props: { ...props, canCreate: true } })
     expect(screen.getByRole('button', { name: '新建甲方变洽签' })).not.toBeNull()
   })
+
+  it('解释文字默认收进标题旁的帮助入口', () => {
+    render(OwnerDocumentListToolbar, { props: { ...props, subtitle: '同一验收记录的竣工验收与保修到期双视图' } })
+    expect(screen.queryByText('同一验收记录的竣工验收与保修到期双视图')).toBeNull()
+    expect(screen.getByRole('button', { name: '查看甲方变洽签说明' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '甲方变洽签' })).toBeTruthy()
+  })
 })

@@ -8,6 +8,15 @@ import {
 } from '~/lib/payroll/navigation'
 
 describe('payroll navigation state', () => {
+  it('多状态往返保留并清除空选，不影响旧单值URL', () => {
+    const filters = { status: ['draft', 'checked'] as ('draft' | 'checked')[] }
+    expect(payrollFiltersFromQuery(payrollFilterQuery(filters)).status).toEqual(filters.status)
+    const cleared = payrollFilterQuery({ status: [] })
+    expect(cleared).toEqual({ status: '[]' })
+    expect(payrollFiltersFromQuery(cleared, { status: ['released'] }).status).toEqual([])
+    expect(payrollFiltersFromQuery({}, { status: 'released' }).status).toBe('released')
+    expect(payrollFiltersFromQuery({ status: 'checked' }, { status: ['released'] }).status).toBe('checked')
+  })
   it('restores only supported filters from route query', () => {
     expect(payrollFiltersFromQuery({
       project: 'project-a',

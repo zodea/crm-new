@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
   await page.waitForLoadState('networkidle')
 })
 
-test('Issue #419：外壳尺寸、颜色与内容留白对应运行参考', async ({ page }, testInfo) => {
+test('Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸', async ({ page }, testInfo) => {
   const sidebar = page.locator('[data-sidebar="sidebar"]').first()
   const topbar = page.locator('[data-shell-topbar], main > header').first()
   const tabbar = page.locator('[data-shell-tabbar], main > div:has(> nav[aria-label="已打开页面"])').first()
@@ -33,7 +33,7 @@ test('Issue #419：外壳尺寸、颜色与内容留白对应运行参考', asyn
 
   expect(metrics[0]).toMatchObject({
     backgroundColor: 'rgb(24, 34, 55)',
-    width: '176px',
+    width: '208px',
   })
   expect(metrics[1]?.height).toBe('40px')
   expect(metrics[2]?.height).toBe('32px')
@@ -49,7 +49,12 @@ test('Issue #419：侧栏保留品牌与单行图标导航', async ({ page }) =>
 
   const homeLink = sidebar.getByRole('link', { name: '首页', exact: true })
   await expect(homeLink.locator('[data-nav-mark]')).toHaveClass(/i-lucide-house/)
-  await expect(homeLink).toHaveCSS('height', '32px')
+  await expect(homeLink).toHaveCSS('height', '38px')
+  await expect(homeLink.getByText('首页', { exact: true })).toHaveCSS('font-size', '14px')
+  await expect(homeLink.locator('[data-nav-mark]')).toHaveCSS('width', '18px')
+  await expect(sidebar.getByRole('searchbox', { name: '搜索菜单' })).toHaveCSS('font-size', '14px')
+  await expect(sidebar.locator('[data-nav-group-label]').first()).toHaveCSS('font-size', '14px')
+  await expect(sidebar.locator('[data-nav-group-label]').first()).toHaveCSS('color', 'rgb(200, 210, 225)')
   await expect(homeLink.getByText('总览', { exact: true })).toHaveCount(0)
 
   await expect(sidebar.locator('[data-nav-group]')).toHaveCount(9)
@@ -96,7 +101,7 @@ test('Issue #419：折叠轨道保持 48px，并支持悬浮临时展开', async
   await expect(sidebar.locator('[data-nav-item]')).toHaveCount(1)
 
   await sidebar.hover()
-  await expect(sidebarFrame).toHaveCSS('width', '176px')
+  await expect(sidebarFrame).toHaveCSS('width', '208px')
   await expect(sidebar.getByText('瑞航 CRM', { exact: true })).toBeVisible()
 })
 
@@ -129,14 +134,18 @@ test('Issue #419：390、768、1024、1440px 外壳无整页横滚且导航可�
       const sheet = page.getByRole('dialog', { name: '导航菜单' })
       await expect(sheet).toBeVisible()
       const search = sheet.getByRole('searchbox', { name: '搜索菜单' })
+      await expect(sheet).toHaveCSS('width', '208px')
+      await expect(search).toHaveCSS('font-size', '14px')
       await search.fill('分供方')
-      await expect(sheet.getByRole('link', { name: '分供方', exact: true })).toBeInViewport()
+      const supplierLink = sheet.getByRole('link', { name: '分供方', exact: true })
+      await expect(supplierLink).toBeInViewport()
+      await expect(supplierLink.getByText('分供方', { exact: true })).toHaveCSS('font-size', '14px')
       await page.keyboard.press('Escape')
       await expect(sheet).toBeHidden()
       await expect(trigger).toBeFocused()
     }
     else {
-      await expect(page.locator('[data-sidebar="sidebar"]').first()).toHaveCSS('width', '176px')
+      await expect(page.locator('[data-sidebar="sidebar"]').first()).toHaveCSS('width', '208px')
     }
   }
 })

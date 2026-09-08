@@ -7,13 +7,15 @@ defineProps<{
   columns: KitTableColumn[]
   categoryOptions: { key: string, label: string }[]
   credentialOptions: { key: string, label: string }[]
+  taxpayerOptions: { key: string, label: string }[]
   hasFilters: boolean
   canWrite: boolean
 }>()
 const emit = defineEmits<{ refresh: [], create: [], import: [], clear: [], resetView: [] }>()
 const search = defineModel<string>('search', { required: true })
-const category = defineModel<string>('category', { required: true })
-const credentialStatus = defineModel<string>('credentialStatus', { required: true })
+const category = defineModel<string[]>('category', { required: true })
+const credentialStatus = defineModel<string[]>('credentialStatus', { required: true })
+const taxpayerType = defineModel<string[]>('taxpayerType', { required: true })
 const sort = defineModel<SupplierListSort>('sort', { required: true })
 const hiddenColumns = defineModel<string[]>('hiddenColumns', { required: true })
 const comfortable = defineModel<boolean>('comfortable', { required: true })
@@ -61,8 +63,9 @@ function toggleColumn(field: string) {
         </KitToolbarPopover>
         <KitToolbarPopover label="筛选" icon="i-lucide-filter" :active="hasFilters">
           <div class="grid gap-3">
-            <SelectFilter v-model="category" label="类别" :options="categoryOptions" :min-width="160" />
-            <SelectFilter v-model="credentialStatus" label="资料" :options="credentialOptions" :min-width="160" />
+            <div><strong class="mb-1 block font-500">分供方类别</strong><KitEnumFilterOptions v-model="category" label="分供方类别" :options="categoryOptions" /></div>
+            <div><strong class="mb-1 block font-500">资料状态</strong><KitEnumFilterOptions v-model="credentialStatus" label="资料状态" :options="credentialOptions" /></div>
+            <div><strong class="mb-1 block font-500">纳税人类型</strong><KitEnumFilterOptions v-model="taxpayerType" label="纳税人类型" :options="taxpayerOptions" /></div>
             <button type="button" class="btn-secondary justify-center" @click="emit('clear')">
               清除全部筛选
             </button>

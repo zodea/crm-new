@@ -5,6 +5,7 @@ import type { BusinessSession } from './business-session'
 import { auxiliaryKind, auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryTaxExclusive, subtractAuxiliaryMoney, sumAuxiliaryFacts, sumAuxiliaryMoney } from '../../app/lib/auxiliary-contract/facts'
 import { decodeAuxiliaryCommand } from '../../app/lib/auxiliary-contract/validation'
+import { enumFilterValues, matchesEnumFilter } from '../../app/lib/kit/enum-filter'
 import { applyAuxiliaryAttachments } from './auxiliary-contract-attachments'
 import { migratedAuxiliaryContract } from './auxiliary-contract-migration'
 
@@ -144,14 +145,14 @@ export function createAuxiliaryContractTestInstance(options: Options = {}) {
         throw auxiliaryProblem('invalid-query', '数据来源无效')
       const search = String(query.search ?? '').trim().toLocaleLowerCase('zh-CN')
       const items = [...records.values()].filter(row => row.workspaceId === session.workspaceId && row.draft.kind === kind && query.origin !== 'demo').filter(({ draft }) => (!search || [draft.name, draft.no, draft.counterparty, suppliers.get(draft.supplierId ?? '')].some(value => value?.toLocaleLowerCase('zh-CN').includes(search)))
-        && (!query.category || draft.category === query.category)
-        && (!query.status || draft.status === query.status)
+        && matchesEnumFilter(draft.category, query.category)
+        && matchesEnumFilter(draft.status, query.status)
         && (!(query.projectId || query.project) || draft.projectId === (query.projectId || query.project))
         && (!(query.supplierId || query.supplier) || draft.supplierId === (query.supplierId || query.supplier))).sort((a, b) => a.draft.id.localeCompare(b.draft.id)).map(dto)
       const pageSize = [10, 20, 50, 100].includes(Number(query.pageSize)) ? Number(query.pageSize) : 20
       const requestedPage = Number(query.page)
       const page = Math.min(Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1, Math.max(1, Math.ceil(items.length / pageSize)))
-      const filtered = ['search', 'category', 'status', 'projectId', 'supplierId', 'project', 'supplier'].some(key => query[key])
+      const filtered = ['search', 'projectId', 'supplierId', 'project', 'supplier'].some(key => query[key]) || enumFilterValues(query.category).length > 0 || enumFilterValues(query.status).length > 0
       return { items: items.slice((page - 1) * pageSize, page * pageSize), pagination: { total: items.length, page, pageSize }, projectOptions: kind === 'other_expense' ? [...projects].map(([id, label]) => ({ id, label })) : [], empty: items.length ? null : { reason: filtered ? 'no-filter-match' : 'no-records', missingRelations: [] }, asOf: now(), sourceVersion: 'auxiliary-contract-v1', summary: { real: { count: items.length, amount: sumAuxiliaryMoney(items.map(row => row.amounts.contract)) }, demo: { count: 0, amount: '0.00' } }, capabilities: [...session.capabilities] }
     },
     async execute(request: AuxiliaryContractCommand, session: BusinessSession) {

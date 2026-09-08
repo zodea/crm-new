@@ -1,9 +1,10 @@
 import type { DataOriginDTO } from '~/types/read-model'
+import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { isDataOriginDTO } from '~/types/read-model'
 
 export interface CustomerListNavigationState {
   search: string
-  status: string
+  status: string | string[]
   sort: 'updated-desc' | 'name-asc' | 'name-desc'
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -124,8 +125,9 @@ export function createCustomerReturnOrigin(options: {
   const query = new URLSearchParams()
   if (options.state.search)
     query.set('search', options.state.search)
-  if (options.state.status !== 'all')
-    query.set('status', options.state.status)
+  const status = serializeEnumSelection(options.state.status)
+  if (status)
+    query.set('status', status)
   if (options.state.sort !== 'updated-desc')
     query.set('sort', options.state.sort)
   if (options.state.page !== 1)
@@ -172,12 +174,13 @@ export function validateCustomerReturnTo(value: unknown): string | null {
     return null
   const query = new URLSearchParams()
   const search = url.searchParams.get('search')
-  const status = url.searchParams.get('status')
+  const statuses = url.searchParams.getAll('status')
+  const status = serializeEnumSelection(enumSelectionFromQuery(statuses.length > 1 ? statuses : statuses[0]).filter(item => item.length <= 48))
   const sort = url.searchParams.get('sort')
   const nav = url.searchParams.get('nav')
   if (search && search.length <= 120)
     query.set('search', search)
-  if (status && status.length <= 48)
+  if (status)
     query.set('status', status)
   if (sort === 'name-asc' || sort === 'name-desc' || sort === 'updated-desc')
     query.set('sort', sort)
@@ -244,7 +247,7 @@ export function customerListNavigationStateFromQuery(query: Record<string, unkno
   const sort = value(query.sort)
   return {
     search: value(query.search)?.slice(0, 120) ?? '',
-    status: value(query.status)?.slice(0, 48) || 'all',
+    status: enumSelectionFromQuery(query.status).filter(item => item.length <= 48),
     sort: sort === 'name-asc' || sort === 'name-desc' ? sort : 'updated-desc',
     page: Math.max(1, Number(value(query.page)) || 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,

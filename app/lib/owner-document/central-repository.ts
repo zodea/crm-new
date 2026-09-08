@@ -12,6 +12,7 @@ import type {
 import type { PenaltyDeductionDTO, PenaltyDeductionSource, PenaltyRectificationEvent } from './project-penalty'
 import type { SubcontractSettlementAmounts, SubcontractSettlementEvidence } from './subcontract-settlement'
 import { isDataOriginDTO } from '../../types/read-model'
+import { normalizeEnumSelection } from '../util/enum-selection'
 import { round2 } from '../util/number'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { subcontractSettlementAmounts } from './subcontract-settlement'
@@ -172,8 +173,8 @@ export interface OwnerCommercialDocumentListQueryDTO {
   projectId: string | null
   contractId: string | null
   supplierId: string | null
-  status: string | null
-  documentType: string | null
+  status: string | string[] | null
+  documentType: string | string[] | null
   variant?: OwnerAcceptanceViewVariant | null
   page: number
   pageSize: OwnerCommercialDocumentPageSize
@@ -501,6 +502,13 @@ export function parseOwnerCommercialDocumentListQuery(
   if (!OWNER_COMMERCIAL_DOCUMENT_PAGE_SIZES.includes(pageSize as OwnerCommercialDocumentPageSize))
     fail('invalid-query', '甲方商务单据列表查询参数无效')
   const parsedKind = parseKind(kind)
+  let status: string[]
+  let documentType: string[]
+  try {
+    status = normalizeEnumSelection(input?.status)
+    documentType = normalizeEnumSelection(input?.documentType)
+  }
+  catch { return fail('invalid-query', '单据类型或状态筛选无效') }
   return {
     kind: parsedKind,
     includeDemo: bool(input?.includeDemo),
@@ -509,8 +517,8 @@ export function parseOwnerCommercialDocumentListQuery(
     projectId: optional(input?.projectId),
     contractId: optional(input?.contractId),
     supplierId: optional(input?.supplierId ?? input?.supplier),
-    status: optional(input?.status),
-    documentType: optional(input?.documentType),
+    status: status.length > 1 ? status : status[0] ?? null,
+    documentType: documentType.length > 1 ? documentType : documentType[0] ?? null,
     variant: parseVariant(parsedKind, input?.variant),
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as OwnerCommercialDocumentPageSize,
@@ -763,7 +771,9 @@ function relations(source: OwnerCommercialDocumentSource) {
   return { project, customer, supplier, contract }
 }
 
-function statusMatches(source: OwnerCommercialDocumentSource, requested: string | null): boolean {
+function statusMatches(source: OwnerCommercialDocumentSource, requested: string | string[] | null): boolean {
+  if (Array.isArray(requested))
+    return !requested.length || requested.some(value => statusMatches(source, value))
   if (source.kind === 'project_penalty' && requested === 'pending')
     return ['pending', 'repairing', 'repaired_self', 'repaired_other'].includes(source.status)
   if (source.kind === 'project_penalty' && requested === 'done')
@@ -812,7 +822,7 @@ export function buildOwnerCommercialDocumentListPage(
     .filter(row => !input.query.contractId || row.contractId === input.query.contractId)
     .filter(row => !input.query.supplierId || row.supplierId === input.query.supplierId)
     .filter(row => statusMatches(row, input.query.status))
-    .filter(row => !input.query.documentType || row.documentType === input.query.documentType)
+    .filter(row => !normalizeEnumSelection(input.query.documentType).length || normalizeEnumSelection(input.query.documentType).includes(row.documentType))
     .filter(row => !search || [
       row.no,
       row.name,

@@ -2,12 +2,12 @@ import type { SupplierListColumnFilters, SupplierListSort } from './read-contrac
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 import { SUPPLIER_LIST_NUMERIC_FIELDS } from './read-contract'
-import { parseSupplierColumnFilters } from './read-query'
+import { normalizeSupplierEnumSelection, parseSupplierColumnFilters, serializeSupplierEnumSelection } from './read-query'
 
 export interface SupplierListNavigationState {
   search: string
-  category: string
-  credentialStatus: string
+  category: string | string[]
+  credentialStatus: string | string[]
   sort: SupplierListSort
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -33,6 +33,15 @@ function value(input: unknown): string | undefined {
   return typeof input === 'string' ? input : Array.isArray(input) && typeof input[0] === 'string' ? input[0] : undefined
 }
 
+function enumSelection(input: unknown): string[] {
+  try {
+    return normalizeSupplierEnumSelection(input)
+  }
+  catch {
+    return []
+  }
+}
+
 export function supplierListNavigationStateFromQuery(query: Record<string, unknown>): SupplierListNavigationState {
   const sort = value(query.sort)
   const pageSize = Number(value(query.pageSize))
@@ -45,8 +54,8 @@ export function supplierListNavigationStateFromQuery(query: Record<string, unkno
   catch { /* 无效返回链接不携带列筛选。 */ }
   return {
     search: value(query.search)?.slice(0, 120) ?? '',
-    category: value(query.category)?.slice(0, 48) || 'all',
-    credentialStatus: value(query.credentialStatus)?.slice(0, 48) || 'all',
+    category: enumSelection(query.category),
+    credentialStatus: enumSelection(query.credentialStatus),
     sort: sortKeys.includes(String(sort)) ? sort as SupplierListSort : 'updated-desc',
     page: Number.isSafeInteger(page) && page >= 1 ? page : 1,
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 20,
@@ -58,10 +67,12 @@ export function createSupplierReturnTo(identity: string, state: SupplierListNavi
   const query = new URLSearchParams()
   if (state.search)
     query.set('search', state.search)
-  if (state.category !== 'all')
-    query.set('category', state.category)
-  if (state.credentialStatus !== 'all')
-    query.set('credentialStatus', state.credentialStatus)
+  const category = serializeSupplierEnumSelection(state.category)
+  const credentialStatus = serializeSupplierEnumSelection(state.credentialStatus)
+  if (category)
+    query.set('category', category)
+  if (credentialStatus)
+    query.set('credentialStatus', credentialStatus)
   if (state.sort !== 'updated-desc')
     query.set('sort', state.sort)
   if (state.page !== 1)
@@ -84,7 +95,12 @@ export function validateSupplierReturnTo(value: unknown): string | null {
       return null
     const encodedIdentity = decodeURIComponent(url.hash.slice(1)).replace(/^supplier-row-/, '')
     const identity = decodeURIComponent(encodedIdentity)
-    return createSupplierReturnTo(identity, supplierListNavigationStateFromQuery(Object.fromEntries(url.searchParams)))
+    const query: Record<string, unknown> = Object.fromEntries(url.searchParams)
+    for (const field of ['category', 'credentialStatus']) {
+      if (url.searchParams.getAll(field).length > 1)
+        query[field] = url.searchParams.getAll(field)
+    }
+    return createSupplierReturnTo(identity, supplierListNavigationStateFromQuery(query))
   }
   catch {
     return null

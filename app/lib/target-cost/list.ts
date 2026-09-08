@@ -1,5 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
+import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 
 export interface TargetCostListRow {
   id: string
@@ -21,8 +22,8 @@ export interface TargetCostListRow {
 export interface TargetCostListFilters {
   search: string
   project: string
-  baseline: 'all' | 'baseline' | 'history'
-  status: string
+  baseline: string | string[]
+  status: string | string[]
 }
 
 function text(value: unknown): string {
@@ -86,16 +87,16 @@ export function filterTargetCostList(
   filters: TargetCostListFilters,
 ): TargetCostListRow[] {
   const keyword = filters.search.trim().toLocaleLowerCase('zh-CN')
+  const baselines = normalizeEnumSelection(filters.baseline)
+  const statuses = normalizeEnumSelection(filters.status)
   return rows.filter((row) => {
     if (filters.project !== 'all') {
       if (filters.project === 'unassigned' ? row.projectId : row.projectId !== filters.project)
         return false
     }
-    if (filters.baseline === 'baseline' && !row.isBaseline)
+    if (baselines.length && !baselines.includes(row.isBaseline ? 'baseline' : 'history'))
       return false
-    if (filters.baseline === 'history' && row.isBaseline)
-      return false
-    if (filters.status !== 'all' && row.status !== filters.status)
+    if (statuses.length && !statuses.includes(row.status))
       return false
     if (!keyword)
       return true

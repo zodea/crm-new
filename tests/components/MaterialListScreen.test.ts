@@ -71,8 +71,8 @@ describe('物资列表连续工作面', () => {
 
     await fireEvent.update(screen.getByRole('searchbox'), '')
     await fireEvent.click(screen.getByRole('button', { name: '列表筛选' }))
-    await fireEvent.update(screen.getByRole('combobox', { name: '项目' }), '项目乙')
-    await fireEvent.keyDown(screen.getByRole('combobox', { name: '项目' }), { key: 'Escape' })
+    await fireEvent.click(screen.getByRole('checkbox', { name: '项目乙' }))
+    await fireEvent.keyDown(screen.getByRole('checkbox', { name: '项目乙' }), { key: 'Escape' })
     expect(screen.queryByRole('button', { name: '瓷砖' })).toBeNull()
     await fireEvent.click(screen.getByRole('button', { name: '砂浆' }))
     expect(navigateTo).toHaveBeenCalledWith('/material/requisition/material-2')

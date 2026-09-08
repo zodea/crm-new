@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QuantityCompletionQuantityLine, QuantityCompletionStageView } from '~/lib/quantity/completion'
-
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { db } from '~/lib/db/client'
 import { loadQuantityPhotoDataUrl } from '~/lib/quantity/completion'
 import { formatQuantityValue } from '~/lib/quantity/format'
@@ -117,12 +117,12 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
           返回工程量矩阵
         </NuxtLink>
         <div class="min-w-0">
-          <h2 class="truncate text-15px font-800 text-ink">
-            {{ workspace ? `${workspace.unit.buildingName} ${workspace.unit.floorName} ${workspace.unit.name}` : '户施工详情' }}
-          </h2>
-          <p class="mt-0.5 text-12px text-ink-soft">
-            工种 → 工序阶段 → 完成日期 · 三量走户型模板活链接
-          </p>
+          <div class="flex items-center gap-1.5">
+            <h2 class="truncate text-15px font-800 text-ink">
+              {{ workspace ? `${workspace.unit.buildingName} ${workspace.unit.floorName} ${workspace.unit.name}` : '户施工详情' }}
+            </h2>
+            <ContextHelp label="户施工详情" text="按工种、工序阶段和完成日期查看施工记录。合同量、暂定量和现场量随关联的户型模板更新。" />
+          </div>
         </div>
         <span v-if="workspace?.matrixArchivedAt" class="status-warn ml-auto flex-none">
           已归档 · 修改需二次确认
@@ -321,7 +321,7 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
           <span class="text-ink-soft">合同量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.contractQty) }}</b></span>
           <span class="text-ink-soft">暂定量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.provisionalQty) }}</b></span>
           <span class="text-ink-soft">现场量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.fieldQty) }}</b></span>
-          <span class="text-ink-faint">毛利参考待 BOQ 合同单价与班组分项单价落地后接入</span>
+          <span class="text-ink-faint">毛利参考暂不可用：缺少合同与班组单价</span>
         </div>
       </section>
     </template>

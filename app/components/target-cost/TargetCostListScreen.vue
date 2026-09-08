@@ -12,8 +12,8 @@ const { confirm, success, warning } = useKitUI()
 
 const search = shallowRef('')
 const project = shallowRef('all')
-const baseline = shallowRef<TargetCostListFilters['baseline']>('all')
-const status = shallowRef('all')
+const baseline = shallowRef<string[]>([])
+const status = shallowRef<string[]>([])
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 
@@ -57,8 +57,8 @@ const summary = computed(() => filteredRows.value.reduce(
 const hasFilters = computed(() =>
   Boolean(search.value.trim())
   || project.value !== 'all'
-  || baseline.value !== 'all'
-  || status.value !== 'all',
+  || baseline.value.length > 0
+  || status.value.length > 0,
 )
 
 watch([search, project, baseline, status], () => {
@@ -153,7 +153,8 @@ onMounted(() => {
     <TargetCostListTable
       v-else
       :rows="pageRows"
-      :loading="loading"
+      :loading="loading && !listStore.hasSnapshot"
+      :aria-busy="loading"
       :page="currentPage"
       :page-size="pageSize"
       :total="filteredRows.length"

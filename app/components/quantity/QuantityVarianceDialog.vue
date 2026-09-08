@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '~/components/ui/dialog'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { db } from '~/lib/db/client'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import {
@@ -36,8 +37,8 @@ const emit = defineEmits<{
 const ALL = '__all__'
 const basis = ref<QuantityVarianceBasis>('field')
 const buildingId = ref(ALL)
-const section = ref(ALL)
-const trade = ref(ALL)
+const section = ref<string[]>([])
+const trade = ref<string[]>([])
 const itemKeyword = ref('')
 const facts = ref<QuantityVarianceFact[]>([])
 const loading = ref(false)
@@ -74,18 +75,12 @@ const buildingOptions = computed(() => [
   { key: ALL, label: '全部楼栋' },
   ...uniqueOptions(allRows.value, 'buildingId', 'buildingName'),
 ])
-const sectionOptions = computed(() => [
-  { key: ALL, label: '全部分部' },
-  ...uniqueOptions(allRows.value, 'section', 'section'),
-])
-const tradeOptions = computed(() => [
-  { key: ALL, label: '全部工种' },
-  ...uniqueOptions(allRows.value, 'trade', 'trade'),
-])
+const sectionOptions = computed(() => uniqueOptions(allRows.value, 'section', 'section'))
+const tradeOptions = computed(() => uniqueOptions(allRows.value, 'trade', 'trade'))
 const visibleRows = computed(() => filterQuantityVarianceRows(allRows.value, {
   buildingId: buildingId.value === ALL ? undefined : buildingId.value,
-  section: section.value === ALL ? undefined : section.value,
-  trade: trade.value === ALL ? undefined : trade.value,
+  section: section.value,
+  trade: trade.value,
   itemKeyword: itemKeyword.value,
 }))
 const columns = computed<KitTableColumn[]>(() => [
@@ -118,8 +113,8 @@ function resetFilters() {
     && allRows.value.some(row => row.buildingId === props.initialBuildingId)
     ? props.initialBuildingId
     : ALL
-  section.value = ALL
-  trade.value = ALL
+  section.value = []
+  trade.value = []
   itemKeyword.value = ''
 }
 
@@ -196,8 +191,8 @@ function priceCell(row: QuantityVarianceRow): string {
         <div class="flex flex-none flex-wrap items-end gap-3" aria-label="量差筛选">
           <SelectFilter v-model="basis" label="对比口径" :options="basisOptions" :min-width="112" />
           <SelectFilter v-model="buildingId" label="楼栋" :options="buildingOptions" :min-width="116" />
-          <SelectFilter v-model="section" label="分部" :options="sectionOptions" :min-width="128" />
-          <SelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="116" />
+          <KitMultiSelectFilter v-model="section" label="分部" :options="sectionOptions" :min-width="128" />
+          <KitMultiSelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="116" />
           <label class="grid min-w-[180px] flex-1 gap-1 text-12px font-700 text-ink-soft">
             <span>分项</span>
             <input

@@ -6,6 +6,7 @@ import {
   CustomerRepositoryProblem,
   parseCustomerDetailQuery,
   parseCustomerListQuery,
+  serializeCustomerListQuery,
 } from '~/lib/customer/repository'
 
 const AS_OF = '2026-08-23T00:00:00.000Z'
@@ -36,6 +37,20 @@ function customer(
 }
 
 describe('客户中央 Repository contract', () => {
+  it('档案状态多选联动完整结果，facet保留其他状态且不泄露测试候选', () => {
+    const rows = [customer('a', '中央甲', { status: 'active' }), customer('b', '中央乙', { status: 'inactive' }), customer('c', '中央丙', { status: 'draft' }), customer('d', '隐藏测试', { dataOrigin: 'demo', status: 'demo-only' })]
+    const query = parseCustomerListQuery({ status: '["active","inactive"]', page: '999' })
+    expect(parseCustomerListQuery(serializeCustomerListQuery(query))).toEqual(query)
+    const input = { rows, query, asOf: AS_OF, sourceVersion: 'multi-status', capabilities: [] }
+    const result = buildCustomerListPage(input)
+    expect(result.pagination).toEqual({ page: 1, pageSize: 10, total: 2 })
+    expect(result.summary.statuses.map(item => item.value)).toEqual(['active', 'draft', 'inactive'])
+    expect(result.summary.origins).toEqual({ real: { customerCount: 2 }, demo: { customerCount: 0 } })
+    expect(buildCustomerListPage({ ...input, query: { ...query, search: '乙', status: ['active', 'inactive'] } }).items.map(item => item.customer.id)).toEqual(['b'])
+    expect(buildCustomerListPage({ ...input, query: { ...query, status: [] } }).pagination.total).toBe(3)
+    expect(() => parseCustomerListQuery({ status: ['active', 1] })).toThrow(CustomerRepositoryProblem)
+  })
+
   it('按名称、别名或税号搜索并输出稳定分页与语义详情目标', () => {
     const query = parseCustomerListQuery({
       includeDemo: 'false',

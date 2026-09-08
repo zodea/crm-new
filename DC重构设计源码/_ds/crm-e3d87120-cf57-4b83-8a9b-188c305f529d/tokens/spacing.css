@@ -15,7 +15,7 @@
   --space-8: 32px;
 
   /* —— 布局尺度 —— */
-  --sidebar-w: 176px;   /* 桌面固定侧边栏 */
+  --sidebar-w: 208px;   /* 桌面固定侧边栏 */
   --header-h: 40px;     /* 顶栏 */
   --content-max: 1480px;/* 主内容最大宽 */
 

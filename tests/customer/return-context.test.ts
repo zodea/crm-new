@@ -2,12 +2,25 @@ import { describe, expect, it } from 'vitest'
 import {
   createCustomerDetailReturnTo,
   createCustomerReturnOrigin,
+  customerListNavigationStateFromQuery,
   resolveCustomerReturnContext,
   validateCustomerDetailReturnTo,
   validateCustomerReturnTo,
 } from '~/lib/customer/return-context'
 
 describe('客户列表返回上下文', () => {
+  it('多个档案状态随来源返回，兼容单值和重复参数', () => {
+    const origin = createCustomerReturnOrigin({ contextId: 'origin_customer_multi', anchorId: 'customer-row-real%3Ac-1', scrollTop: 0, now: 1000, state: { search: '', status: ['inactive', 'active'], sort: 'updated-desc', page: 1, pageSize: 10 } })
+    const url = new URL(origin.returnTo, 'https://crm.test')
+    expect(customerListNavigationStateFromQuery(Object.fromEntries(url.searchParams)).status).toEqual(['active', 'inactive'])
+    expect(validateCustomerReturnTo(origin.returnTo)).toBe(origin.returnTo)
+    url.searchParams.delete('status')
+    url.searchParams.append('status', 'active')
+    url.searchParams.append('status', 'inactive')
+    expect(validateCustomerReturnTo(`${url.pathname}${url.search}${url.hash}`)).toBe(origin.returnTo)
+    expect(customerListNavigationStateFromQuery({ status: 'active' }).status).toEqual(['active'])
+  })
+
   it('只允许客户列表白名单参数并恢复精确锚点', () => {
     const origin = createCustomerReturnOrigin({
       contextId: 'origin_customer_1234',

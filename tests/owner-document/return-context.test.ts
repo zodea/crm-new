@@ -11,6 +11,12 @@ import {
 } from '~/lib/owner-document/return-context'
 
 describe('甲方商务单据返回上下文', () => {
+  it('多选与显式不限状态经返回地址归一后保持', () => {
+    const state = { search: '', projectId: null, contractId: null, documentType: ['site_visa', 'change_negotiation'], status: ['approved', 'submitted'], origin: 'real' as const, page: 1, pageSize: 20 as const }
+    const origin = createOwnerDocumentReturnOrigin({ kind: 'owner_change', contextId: 'origin_multi_test', rowIdentity: 'real:owner_change:test', scrollTop: 0, now: 0, state })
+    expect(validateOwnerDocumentListReturnTo(origin.returnTo, 'owner_change', 'real')).toBe(origin.returnTo)
+    expect(ownerDocumentListNavigationStateFromQuery({ status: 'all' }, 'owner_change').status).toBe('all')
+  })
   it('项目罚扣拒绝同 ID 的跨来源班组返回', () => {
     expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=demo', 'project_penalty', 'real')).toBeNull()
     expect(validateOwnerDocumentJourneyReturnTo('/base/crew/shared-id?origin=real', 'project_penalty', 'demo')).toBeNull()

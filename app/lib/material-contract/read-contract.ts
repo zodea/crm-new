@@ -9,6 +9,7 @@ import type {
   ProblemDTO,
   RatioDTO,
 } from '../../types/read-model'
+import type { ContractListFilter } from '../contract/list-filters'
 
 export const MATERIAL_CONTRACT_PAGE_SIZES = [10, 20, 50, 100] as const
 export type MaterialContractPageSize = typeof MATERIAL_CONTRACT_PAGE_SIZES[number]
@@ -19,7 +20,7 @@ export interface MaterialContractListQueryDTO {
   search: string
   projectId: string | null
   supplierId: string | null
-  status: string | null
+  status: ContractListFilter
   page: number
   pageSize: MaterialContractPageSize
 }

@@ -144,6 +144,7 @@ function summarize(rows: readonly PaymentManagementRow[]): PaymentManagementSumm
 export const usePaymentManagementStore = defineStore('payment-management', () => {
   const rows = shallowRef<PaymentManagementRow[]>([])
   const loading = shallowRef(false)
+  const hasSnapshot = shallowRef(false)
   let activeLoad: Promise<PaymentManagementRow[]> | null = null
 
   const projectOptions = computed(() => {
@@ -213,6 +214,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
       ORDER BY application.apply_date DESC, application.created_at DESC
     `).then((source) => {
       rows.value = source.map(mapRow)
+      hasSnapshot.value = true
       return rows.value
     }).finally(() => {
       loading.value = false
@@ -225,6 +227,7 @@ export const usePaymentManagementStore = defineStore('payment-management', () =>
   return {
     rows: readonly(rows),
     loading: readonly(loading),
+    hasSnapshot: readonly(hasSnapshot),
     projectOptions,
     summary,
     load,

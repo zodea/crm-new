@@ -1,4 +1,5 @@
 import type { KitTableColumn } from '~/lib/kit/table'
+import { matchesEnumFilter } from '~/lib/kit/enum-filter'
 
 export type ContractAuxListKind
   = 'other_expense'
@@ -26,9 +27,9 @@ export interface ContractAuxRow {
 
 export interface ContractAuxListFilters {
   search: string
-  project: string
-  category: string
-  status: string
+  project: string | string[]
+  category: string | string[]
+  status: string | string[]
   routeProject?: string
   routeContract?: string
   routeSupplier?: string
@@ -142,11 +143,11 @@ export function filterContractAuxRows(
   const config = CONTRACT_AUX_LIST_CONFIG[kind]
   const keyword = normalized(filters.search)
   return rows.filter((row) => {
-    if (filters.project !== 'all' && row.projectId !== filters.project)
+    if (!matchesEnumFilter(row.projectId, filters.project))
       return false
-    if (filters.category !== 'all' && row.category !== filters.category)
+    if (!matchesEnumFilter(row.category, filters.category))
       return false
-    if (filters.status !== 'all' && row.status !== filters.status)
+    if (!matchesEnumFilter(row.status, filters.status))
       return false
     if (filters.routeProject && row.projectId !== filters.routeProject)
       return false

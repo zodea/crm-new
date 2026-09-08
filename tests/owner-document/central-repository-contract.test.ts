@@ -328,6 +328,15 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it('中央多选在分页前取并集，组合类型不缩减候选集', () => {
+    const documents = [change, { ...change, id: 'second', documentType: 'site_visa', status: 'submitted' }, { ...change, id: 'third', status: 'draft' }]
+    const query = parseOwnerCommercialDocumentListQuery('owner_change', { status: '["approved","submitted"]', documentType: '["change_negotiation","site_visa"]' })
+    const page = buildOwnerCommercialDocumentListPage({ ...base, documents, query })
+    expect(page.pagination.total).toBe(2)
+    expect(page.summary.statuses.map(item => item.value)).toContain('draft')
+    expect(buildOwnerCommercialDocumentListPage({ ...base, documents, query: { ...query, documentType: ['site_visa'] } }).items.map(item => item.documentType)).toEqual(['site_visa'])
+    expect(() => parseOwnerCommercialDocumentListQuery('owner_change', { status: '[1]' })).toThrow('筛选无效')
+  })
   it('分包变洽签按稳定项目、分供方与分包合同关系输出专属只读事实', () => {
     const page = buildOwnerCommercialDocumentListPage({
       ...base,

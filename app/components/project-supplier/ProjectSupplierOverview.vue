@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/repository'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
 
 defineProps<{ data: ProjectSupplierWorkbenchReadDTO, returnTo: string }>()
 </script>
@@ -7,9 +8,12 @@ defineProps<{ data: ProjectSupplierWorkbenchReadDTO, returnTo: string }>()
 <template>
   <div class="grid min-w-0 gap-3 lg:grid-cols-2">
     <section class="panel p-4" aria-labelledby="project-profile-title">
-      <h2 id="project-profile-title" class="m-0 text-13px font-800 text-ink">
-        项目身份
-      </h2>
+      <div class="flex items-center gap-1.5">
+        <h2 id="project-profile-title" class="m-0 text-13px font-800 text-ink">
+          项目身份
+        </h2>
+        <ContextHelp label="工作台数据" text="本页汇总该项目与分供方的合同、请款、收票、付款、结算及文件。修改请前往对应业务单据；最终结算登记暂不可用。" />
+      </div>
       <EntityLink class="mt-3 block text-15px" type="project" :intent="data.projectNavigation" :label="data.project.label" :return-to="returnTo" />
       <dl class="mt-4 grid grid-cols-2 gap-3 text-11px">
         <div>
@@ -63,14 +67,6 @@ defineProps<{ data: ProjectSupplierWorkbenchReadDTO, returnTo: string }>()
           </dd>
         </div>
       </dl>
-    </section>
-    <section class="panel p-4 lg:col-span-2" aria-labelledby="fact-boundary-title">
-      <h2 id="fact-boundary-title" class="m-0 text-13px font-800 text-ink">
-        事实口径
-      </h2>
-      <p class="m-0 mt-2 text-11px leading-5 text-ink-soft">
-        本页只读汇总中央 Repository 返回的合同、请款、收票、付款、结算与文件事实；源单维护仍在各业务模块完成。最终结算写入规则尚未定稿，本工作台不提供终态写入入口。
-      </p>
     </section>
   </div>
 </template>

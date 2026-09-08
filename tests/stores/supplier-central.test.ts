@@ -72,6 +72,29 @@ describe('分供方中央 stores', () => {
     expect(store.latestWrite).toEqual({ id: 'supplier-1', version: '4' })
   })
 
+  it('同来源筛选保留快照，关闭测试数据时立即清除旧来源快照', async () => {
+    const page = { items: [{ dataOrigin: 'demo', supplier: { id: 'demo-supplier' } }], empty: null, capabilities: ['supplier:write'] } as SupplierListPageDTO
+    repositories.supplierRead.list.mockResolvedValueOnce(page)
+    const store = useSupplierReadStore()
+    await store.loadList({ ...query, includeDemo: true })
+    let finishFilter!: (value: SupplierListPageDTO) => void
+    repositories.supplierRead.list.mockReturnValueOnce(new Promise<SupplierListPageDTO>(resolve => finishFilter = resolve))
+    const filtering = store.loadList({ ...query, includeDemo: true, search: '测试' })
+    expect(store.listState).toMatchObject({ kind: 'loading', previous: page })
+    finishFilter(page)
+    await filtering
+    let finishSourceChange!: (value: SupplierListPageDTO) => void
+    repositories.supplierRead.list.mockReturnValueOnce(new Promise<SupplierListPageDTO>(resolve => finishSourceChange = resolve))
+    const switching = store.loadList({ ...query, includeDemo: false })
+    try {
+      expect(store.listState).toMatchObject({ kind: 'loading', previous: null })
+    }
+    finally {
+      finishSourceChange({ ...page, items: [] })
+      await switching
+    }
+  })
+
   it('导入回读成功通知缓存，但不覆盖当前编辑目标、baseVersion 或失败保存的命令 ID', async () => {
     repositories.supplierCommands.context.mockResolvedValue({ workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['supplier:write'] })
     repositories.supplierCommands.loadForm

@@ -6,6 +6,7 @@ import type { OwnerCommercialDocumentSource } from '../../app/lib/owner-document
 import type { BusinessSession } from './business-session'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { auxiliaryTaxExclusive, subtractAuxiliaryMoney, sumAuxiliaryMoney } from '../../app/lib/auxiliary-contract/facts'
+import { enumFilterValues, matchesEnumFilter } from '../../app/lib/kit/enum-filter'
 import { isEffectiveSettlementFact } from '../../app/lib/other-settlement/facts'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { applyAuxiliaryAttachments } from './auxiliary-contract-attachments'
@@ -168,11 +169,12 @@ export function createOtherSettlementInstance(options: Options) {
       if (query.origin && !['real', 'demo'].includes(String(query.origin)))
         throw auxiliaryProblem('invalid-query', '数据来源无效')
       const search = String(query.search ?? '').trim().toLocaleLowerCase('zh-CN')
-      const all = [...records.values()].filter(row => row.workspaceId === session.workspaceId && query.origin !== 'demo').map(dto).filter(row => (!query.projectId || row.draft.projectId === query.projectId) && (!query.contractId || row.draft.contractId === query.contractId) && (!query.supplierId || row.draft.supplierId === query.supplierId) && (!query.status || row.draft.status === query.status)
+      const all = [...records.values()].filter(row => row.workspaceId === session.workspaceId && query.origin !== 'demo').map(dto).filter(row => (!query.projectId || row.draft.projectId === query.projectId) && (!query.contractId || row.draft.contractId === query.contractId) && (!query.supplierId || row.draft.supplierId === query.supplierId) && matchesEnumFilter(row.draft.status, query.status)
         && (!search || [row.draft.name, row.draft.no, row.contract.label, row.supplier.label].some(value => value?.toLocaleLowerCase('zh-CN').includes(search)))).sort((a, b) => a.id.localeCompare(b.id))
       const pageSize = [10, 20, 50, 100].includes(Number(query.pageSize)) ? Number(query.pageSize) : 20
       const page = Math.min(Number.isSafeInteger(Number(query.page)) && Number(query.page) > 0 ? Number(query.page) : 1, Math.max(1, Math.ceil(all.length / pageSize)))
-      return { items: all.slice((page - 1) * pageSize, page * pageSize), pagination: { page, pageSize, total: all.length }, summary: { count: all.length, amount: sumAuxiliaryMoney(all.map(row => row.amounts.total)) }, empty: all.length ? null : { reason: Object.keys(query).some(k => ['search', 'status', 'contractId', 'projectId', 'supplierId'].includes(k) && query[k]) ? 'no-filter-match' : 'no-records', missingRelations: [] }, capabilities: [...session.capabilities], asOf: now(), sourceVersion: `other-settlement:${[...records.values()].reduce((sum, row) => sum + row.version, 0)}`, projectOptions: identities().projects }
+      const filtered = ['search', 'contractId', 'projectId', 'supplierId'].some(key => query[key]) || enumFilterValues(query.status).length > 0
+      return { items: all.slice((page - 1) * pageSize, page * pageSize), pagination: { page, pageSize, total: all.length }, summary: { count: all.length, amount: sumAuxiliaryMoney(all.map(row => row.amounts.total)) }, empty: all.length ? null : { reason: filtered ? 'no-filter-match' : 'no-records', missingRelations: [] }, capabilities: [...session.capabilities], asOf: now(), sourceVersion: `other-settlement:${[...records.values()].reduce((sum, row) => sum + row.version, 0)}`, projectOptions: identities().projects }
     },
     async execute(input: unknown, session: BusinessSession) {
       authorize(session, 'write')

@@ -8,6 +8,7 @@ import { toErrorMessage } from '~/lib/util/error'
 export const useTargetCostListStore = defineStore('target-cost-list', () => {
   const rows = shallowRef<TargetCostListRow[]>([])
   const loading = shallowRef(false)
+  const hasSnapshot = shallowRef(false)
   const error = shallowRef('')
   let latestRequest = 0
 
@@ -18,8 +19,10 @@ export const useTargetCostListStore = defineStore('target-cost-list', () => {
     try {
       const db = await getDb()
       const result = await loadTargetCostList(db)
-      if (request === latestRequest)
+      if (request === latestRequest) {
         rows.value = result
+        hasSnapshot.value = true
+      }
     }
     catch (cause) {
       if (request === latestRequest)
@@ -34,6 +37,7 @@ export const useTargetCostListStore = defineStore('target-cost-list', () => {
   return {
     rows: readonly(rows),
     loading: readonly(loading),
+    hasSnapshot: readonly(hasSnapshot),
     error: readonly(error),
     load,
   }

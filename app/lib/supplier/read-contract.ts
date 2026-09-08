@@ -17,10 +17,11 @@ export type SupplierListTextField = typeof SUPPLIER_LIST_TEXT_FIELDS[number]
 export const SUPPLIER_LIST_NUMERIC_FIELDS = ['settlementAmount', 'cumulativeContractAmount', 'contractAmount', 'paymentAmount', 'projectCount'] as const
 export type SupplierListNumericField = typeof SUPPLIER_LIST_NUMERIC_FIELDS[number]
 export type SupplierListSort = 'updated-desc' | 'name-asc' | 'name-desc' | 'category-asc' | `${SupplierListNumericField}-${'asc' | 'desc'}`
+export type SupplierEnumSelection = string | string[] | null
 
 export interface SupplierListColumnFilters {
   contains?: Partial<Record<SupplierListTextField, string>>
-  taxpayerType?: string | null
+  taxpayerType?: SupplierEnumSelection
   ranges?: Partial<Record<SupplierListNumericField, { min?: number, max?: number }>>
 }
 
@@ -33,8 +34,8 @@ export interface SupplierBusinessLicenseDTO {
 export interface SupplierListQueryDTO {
   includeDemo: boolean
   search: string
-  category: string | null
-  credentialStatus: string | null
+  category: SupplierEnumSelection
+  credentialStatus: SupplierEnumSelection
   sort: SupplierListSort
   page: number
   pageSize: SupplierPageSize

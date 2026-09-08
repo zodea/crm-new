@@ -1,0 +1,105 @@
+import { fireEvent, render, screen } from '@testing-library/vue'
+import { storeToRefs } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { computed, defineComponent, h, nextTick, onActivated, onMounted, onScopeDispose, ref, shallowReactive, shallowRef, toRef, useTemplateRef, watch } from 'vue'
+import PaymentManagementScreen from '~/components/finance/payment-management/PaymentManagementScreen.vue'
+import InvoiceQueuePanel from '~/components/invoice/InvoiceQueuePanel.vue'
+import InvoiceWorkspaceScreen from '~/components/invoice/InvoiceWorkspaceScreen.vue'
+import NotificationDrawer from '~/components/shared/NotificationDrawer.vue'
+
+vi.mock('~/composables/useOverlayStack', () => ({
+  useOwnedOverlayLayerStyle: () => ({ zIndex: 81 }),
+  useModalLayerRegistration: () => ({ layerStyle: { zIndex: 80 } }),
+}))
+
+beforeEach(() => {
+  for (const [name, value] of Object.entries({ computed, nextTick, onActivated, onMounted, onScopeDispose, shallowReactive, shallowRef, toRef, useTemplateRef, watch, storeToRefs }))
+    vi.stubGlobal(name, value)
+})
+
+describe('补充列表的同字段多选', () => {
+  it('通知类型取并集并与搜索取交集，切换主视图重置类型，过滤不改变未读', async () => {
+    const items = ref([
+      { id: 'a', kind: 'todo', type: 'invoice', title: '甲发票', description: '', read: false },
+      { id: 'b', kind: 'todo', type: 'payment', title: '甲付款', description: '', read: true },
+      { id: 'c', kind: 'todo', type: 'delivery', title: '乙送货', description: '', read: false },
+      { id: 'd', kind: 'notice', type: 'cert', title: '证照到期', description: '', read: false },
+    ])
+    const markAllRead = vi.fn()
+    vi.stubGlobal('useNotificationStore', () => ({ items, unreadCount: ref(3), markAllRead }))
+    render(NotificationDrawer, { props: { open: true } })
+    await fireEvent.click(await screen.findByRole('button', { name: '消息类型，已选 0 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '发票校对' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '付款审批' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+    await fireEvent.update(screen.getByRole('searchbox'), '发票')
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    await fireEvent.click(screen.getByRole('button', { name: '消息类型，已选 2 项' }))
+    expect(screen.getByRole('checkbox', { name: '送货单识别' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    await fireEvent.update(screen.getByRole('searchbox'), '')
+    expect(screen.getAllByRole('article')).toHaveLength(3)
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /通知/ }), { key: 'Enter' })
+    expect(screen.getByRole('button', { name: '消息类型，已选 0 项' })).toBeTruthy()
+    expect(screen.getByText('证照到期')).toBeTruthy()
+    expect(items.value.filter(item => !item.read)).toHaveLength(3)
+    expect(markAllRead).not.toHaveBeenCalled()
+  })
+
+  it('付款管理保留待支付默认范围，多选并集、搜索交集和清空包含其它付款状态', async () => {
+    const rows = ref([
+      { id: 'a', name: '甲待付', no: 'A', projectName: '', supplierName: '', bizType: '', dueAmount: 5, paymentStatus: '部分支付' },
+      { id: 'b', name: '甲付清', no: 'B', projectName: '', supplierName: '', bizType: '', dueAmount: 0, paymentStatus: '已付清' },
+      { id: 'c', name: '乙超付', no: 'C', projectName: '', supplierName: '', bizType: '', dueAmount: 0, paymentStatus: '超额支付' },
+    ])
+    vi.stubGlobal('usePaymentManagementStore', () => ({ rows, loading: ref(false), projectOptions: ref([]), load: vi.fn() }))
+    const Table = defineComponent({ props: ['rows'], setup: props => () => h('section', props.rows.map((row: { name: string }) => h('article', row.name))) })
+    const Toolbar = defineComponent({ props: ['search'], emits: ['update:search'], setup: (_, { emit }) => () => h('input', { type: 'search', onInput: (event: Event) => emit('update:search', (event.target as HTMLInputElement).value) }) })
+    render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true, SegTab: true } } })
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    await fireEvent.click(screen.getByRole('button', { name: '付款状态，已选 1 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '已付清' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+    await fireEvent.update(screen.getByRole('searchbox'), '待付')
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    await fireEvent.click(screen.getByRole('button', { name: '付款状态，已选 2 项' }))
+    expect(screen.getByRole('checkbox', { name: '已付清' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    await fireEvent.update(screen.getByRole('searchbox'), '')
+    expect(screen.getAllByRole('article')).toHaveLength(3)
+  })
+
+  it('识别队列按既有状态判定多选，不改变归档边界，搜索和选择仍联动', async () => {
+    const documents = [
+      { id: 'a', invoiceNumber: 'A', fileName: '甲识别', accountStatus: 'none', ocrStatus: 'pending', reviewStatus: 'unreviewed', dupStatus: '', fieldConfidence: {} },
+      { id: 'b', invoiceNumber: 'B', fileName: '乙建议', accountStatus: 'none', ocrStatus: 'done', reviewStatus: 'unreviewed', dupStatus: '', fieldConfidence: { amount: 1 } },
+      { id: 'c', invoiceNumber: 'C', fileName: '丙校对', accountStatus: 'none', ocrStatus: 'done', reviewStatus: 'unreviewed', dupStatus: '', fieldConfidence: { amount: 0.1 } },
+      { id: 'd', invoiceNumber: 'D', fileName: '已归档', accountStatus: 'archived', ocrStatus: 'done', reviewStatus: 'reviewed', dupStatus: '', fieldConfidence: { amount: 1 } },
+    ]
+    vi.stubGlobal('useInvoiceStore', () => ({ documents, recognitionProgress: { a: 40 }, pendingRecognition: [], suggestPass: [], pendingReview: [], byId: (id: string) => documents.find(item => item.id === id), load: vi.fn() }))
+    vi.stubGlobal('useProjectStore', () => ({ list: [], load: vi.fn() }))
+    vi.stubGlobal('useKitUI', () => ({}))
+    vi.stubGlobal('useFileDialog', () => ({ open: vi.fn(), onChange: vi.fn() }))
+    vi.stubGlobal('useDropZone', () => ({ isOverDropZone: ref(false) }))
+    const Workbench = defineComponent({ setup: (_, { slots }) => () => h('div', slots.queue?.()) })
+    render(InvoiceWorkspaceScreen, { global: { components: { InvoiceQueuePanel, AdaptiveWorkbench: Workbench }, stubs: { InvoiceWorkspaceToolbar: true, InvoiceManualEntryDialog: true, InvoicePrintDocument: true, InvoiceOriginalPanel: true, InvoicePrintLayout: true, InvoiceReviewForm: true } } })
+    const queueRows = () => screen.getAllByRole('button', { name: /^选择发票 / })
+    expect(queueRows()).toHaveLength(3)
+    await fireEvent.click(screen.getByRole('button', { name: '筛选识别队列，已选 0 项' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '识别中' }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: '建议通过' }))
+    await fireEvent.click(screen.getByRole('button', { name: '应用' }))
+    expect(queueRows()).toHaveLength(2)
+    await fireEvent.update(screen.getByRole('searchbox'), '乙')
+    expect(queueRows()).toHaveLength(1)
+    expect(queueRows()[0]?.textContent).toContain('建议通过')
+    await fireEvent.click(screen.getByRole('button', { name: '筛选识别队列，已选 2 项' }))
+    expect(screen.getByRole('checkbox', { name: '含低置信' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '清除' }))
+    await fireEvent.update(screen.getByRole('searchbox'), '')
+    expect(queueRows()).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: '选择发票 D' })).toBeNull()
+  })
+})

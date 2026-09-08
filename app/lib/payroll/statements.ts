@@ -123,7 +123,7 @@ export interface WageStatement {
 export interface WageStatementFilter {
   projectId?: string
   month?: string
-  status?: WageStatementStatus | ''
+  status?: WageStatementStatus | '' | WageStatementStatus[]
   crewId?: string
 }
 
@@ -1118,9 +1118,10 @@ export async function listWageStatements(
     clauses.push('ws.month = ?')
     params.push(filter.month)
   }
-  if (filter.status) {
-    clauses.push('ws.status = ?')
-    params.push(filter.status)
+  const statuses = Array.isArray(filter.status) ? [...new Set(filter.status)] : filter.status ? [filter.status] : []
+  if (statuses.length) {
+    clauses.push(`ws.status IN (${statuses.map(() => '?').join(', ')})`)
+    params.push(...statuses)
   }
   if (filter.crewId) {
     clauses.push('ws.crew_id = ?')

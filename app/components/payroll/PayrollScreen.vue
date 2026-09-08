@@ -95,6 +95,7 @@ async function printSelected() {
         :statements="store.statements"
         :selected-id="store.selectedId"
         :loading="store.loading"
+        :has-snapshot="store.hasSnapshot"
         @select="store.selectedId = $event"
       />
       <PayrollStatementDetail

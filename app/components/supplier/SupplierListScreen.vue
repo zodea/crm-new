@@ -4,8 +4,9 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListPageDTO, SupplierListQueryDTO, SupplierListSort, SupplierListTextField } from '~/lib/supplier/repository'
 import { useDebounceFn, useMediaQuery, useStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onMounted, shallowRef, watch } from 'vue'
+import { normalizeSupplierEnumSelection } from '~/lib/supplier/read-query'
 import { createSupplierReturnTo, supplierListNavigationStateFromQuery } from '~/lib/supplier/return-context'
-import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { CREDENTIAL_STATUS_LABEL, CREDENTIAL_STATUS_TONE, CREDENTIAL_STATUSES, SUPPLIER_CATEGORIES, SUPPLIER_TAXPAYER_TYPES } from '~/lib/supplier/status'
 import { yuan } from '~/lib/util/money'
 import { useSupplierCommandStore } from '~/stores/supplier-command'
 import { useSupplierReadStore } from '~/stores/supplier-read'
@@ -17,12 +18,16 @@ const visibility = useDataVisibilityStore()
 const { error, typeSelect } = useKitUI()
 const initial = supplierListNavigationStateFromQuery(route.query)
 const search = shallowRef(initial.search)
-const category = shallowRef(initial.category)
-const credentialStatus = shallowRef(initial.credentialStatus)
+const category = shallowRef(normalizeSupplierEnumSelection(initial.category))
+const credentialStatus = shallowRef(normalizeSupplierEnumSelection(initial.credentialStatus))
 const sort = shallowRef<SupplierListSort>(initial.sort)
 const page = shallowRef(initial.page)
 const pageSize = shallowRef(initial.pageSize)
 const columnFilters = shallowRef<SupplierListColumnFilters>(initial.columnFilters ?? {})
+const taxpayerType = computed({
+  get: () => normalizeSupplierEnumSelection(columnFilters.value.taxpayerType),
+  set: (value: string[]) => { columnFilters.value = { ...columnFilters.value, taxpayerType: value } },
+})
 const hiddenColumns = useStorage<string[]>('ruihang:supplier-list:columns:v1', [], undefined, {
   serializer: {
     read: (raw) => {
@@ -74,14 +79,16 @@ const rows = computed(() => (readPage.value?.items ?? []).map(item => ({
 })))
 const loading = computed(() => readStore.listState.kind === 'loading')
 const problem = computed(() => ['forbidden', 'not-found', 'mismatch', 'error'].includes(readStore.listState.kind) && 'problem' in readStore.listState ? readStore.listState.problem : null)
-const categoryOptions = computed(() => [
-  { key: 'all', label: '全部类别' },
-  ...(readPage.value?.summary.categories ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })),
-])
-const credentialOptions = computed(() => [
-  { key: 'all', label: '全部资料状态' },
-  ...(readPage.value?.summary.credentialStatuses ?? []).map(item => ({ key: item.value, label: `${CREDENTIAL_STATUS_LABEL[item.value] ?? item.label}（${item.count}）` })),
-])
+function enumOptions(values: readonly string[], selected: string[], facets: { value: string, label: string, count: number }[] = [], labels: Record<string, string> = {}) {
+  const counts = new Map(facets.map(item => [item.value, item]))
+  return [...new Set([...values, ...facets.map(item => item.value), ...selected])].filter(Boolean).map(key => ({
+    key,
+    label: `${labels[key] ?? counts.get(key)?.label ?? key}（${counts.get(key)?.count ?? 0}）`,
+  }))
+}
+const categoryOptions = computed(() => enumOptions(SUPPLIER_CATEGORIES, category.value, readPage.value?.summary.categories))
+const credentialOptions = computed(() => enumOptions(CREDENTIAL_STATUSES, credentialStatus.value, readPage.value?.summary.credentialStatuses, CREDENTIAL_STATUS_LABEL))
+const taxpayerOptions = computed(() => enumOptions(SUPPLIER_TAXPAYER_TYPES, taxpayerType.value, readPage.value?.summary.taxpayerTypes))
 const allColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', width: 42 },
   { field: 'name', title: '分供方名称', width: 180, slot: 'name' },
@@ -116,17 +123,17 @@ const columns = computed(() => allColumns
     ...(col.field && col.field !== 'businessLicense' ? { customHeader: true } : {}),
     ...(fixedName.value && (col.type === 'seq' || col.field === 'name') ? { fixed: 'left' as const } : {}),
   })))
-const hasFilters = computed(() => Boolean(search.value || category.value !== 'all' || credentialStatus.value !== 'all'
-  || Object.values(columnFilters.value.contains ?? {}).some(Boolean) || columnFilters.value.taxpayerType
+const hasFilters = computed(() => Boolean(search.value || category.value.length || credentialStatus.value.length
+  || Object.values(columnFilters.value.contains ?? {}).some(Boolean) || taxpayerType.value.length
   || Object.values(columnFilters.value.ranges ?? {}).some(range => range?.min !== undefined || range?.max !== undefined)))
 
 function columnValue(field: string): ColumnFilterValue {
   if (field === 'supplierCategory')
-    return category.value === 'all' ? '' : category.value
+    return category.value
   if (field === 'credentialStatus')
-    return credentialStatus.value === 'all' ? '' : credentialStatus.value
+    return credentialStatus.value
   if (field === 'taxpayerType')
-    return columnFilters.value.taxpayerType ?? ''
+    return taxpayerType.value
   if (numericFields.has(field))
     return columnFilters.value.ranges?.[field as SupplierListNumericField] ?? {}
   return columnFilters.value.contains?.[field as SupplierListTextField] ?? ''
@@ -134,10 +141,10 @@ function columnValue(field: string): ColumnFilterValue {
 
 function columnOptions(field: string) {
   if (field === 'supplierCategory')
-    return categoryOptions.value.filter(item => item.key !== 'all')
+    return categoryOptions.value
   if (field === 'credentialStatus')
-    return credentialOptions.value.filter(item => item.key !== 'all')
-  return (readPage.value?.summary.taxpayerTypes ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` }))
+    return credentialOptions.value
+  return taxpayerOptions.value
 }
 
 function columnSortOptions(field: string) {
@@ -152,14 +159,15 @@ function columnSortOptions(field: string) {
 
 function applyColumnFilter(field: string, value: ColumnFilterValue) {
   if (field === 'supplierCategory')
-    category.value = String(value) || 'all'
+    category.value = normalizeSupplierEnumSelection(value)
   else if (field === 'credentialStatus')
-    credentialStatus.value = String(value) || 'all'
+    credentialStatus.value = normalizeSupplierEnumSelection(value)
   else if (field === 'taxpayerType')
-    columnFilters.value = { ...columnFilters.value, taxpayerType: String(value) || null }
-  else if (numericFields.has(field))
+    taxpayerType.value = normalizeSupplierEnumSelection(value)
+  else if (numericFields.has(field) && typeof value === 'object' && !Array.isArray(value))
     columnFilters.value = { ...columnFilters.value, ranges: { ...columnFilters.value.ranges, [field]: value } }
-  else columnFilters.value = { ...columnFilters.value, contains: { ...columnFilters.value.contains, [field]: value } }
+  else if (typeof value === 'string')
+    columnFilters.value = { ...columnFilters.value, contains: { ...columnFilters.value.contains, [field]: value } }
 }
 
 function resetView() {
@@ -171,8 +179,8 @@ function currentQuery(): SupplierListQueryDTO {
   return {
     includeDemo: visibility.includeDemo,
     search: search.value,
-    category: category.value === 'all' ? null : category.value,
-    credentialStatus: credentialStatus.value === 'all' ? null : credentialStatus.value,
+    category: category.value.length ? category.value : null,
+    credentialStatus: credentialStatus.value.length ? credentialStatus.value : null,
     columnFilters: columnFilters.value,
     sort: sort.value,
     page: page.value,
@@ -255,11 +263,10 @@ async function createSupplier() {
 
 function clearFilters() {
   search.value = ''
-  category.value = 'all'
-  credentialStatus.value = 'all'
+  category.value = []
+  credentialStatus.value = []
   columnFilters.value = {}
   page.value = 1
-  void load()
 }
 
 watch([search, category, credentialStatus, sort, columnFilters], debouncedLoad)
@@ -282,18 +289,19 @@ onActivated(() => {
       <template #toolbar>
         <SupplierListControls
           v-model:search="search" v-model:category="category" v-model:credential-status="credentialStatus"
+          v-model:taxpayer-type="taxpayerType"
           v-model:sort="sort" v-model:hidden-columns="hiddenColumns" v-model:comfortable="comfortable"
-          :columns="allColumns" :loading="loading" :category-options="categoryOptions" :credential-options="credentialOptions"
+          :columns="allColumns" :loading="loading" :category-options="categoryOptions" :credential-options="credentialOptions" :taxpayer-options="taxpayerOptions"
           :has-filters="hasFilters" :can-write="Boolean(readPage?.capabilities.includes('supplier:write'))"
           @refresh="load" @create="createSupplier" @import="navigateTo('/import/mapping/supplier')" @clear="clearFilters" @reset-view="resetView"
         />
       </template>
       <template #table>
-        <div data-ui="supplier-list-table" class="min-w-0 max-w-full">
+        <div data-ui="supplier-list-table" class="min-w-0 max-w-full" :aria-busy="loading">
           <KitTable
             :columns="columns"
             :data="rows"
-            :loading="loading"
+            :loading="loading && !readPage"
             :row-height="comfortable ? 44 : 32"
             :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }"
             :page-size-options="[10, 20, 50, 100]"
@@ -304,7 +312,7 @@ onActivated(() => {
           >
             <template #columnHeader="{ column }">
               <KitColumnHeader
-                :title="column.title" :kind="numericFields.has(column.field!) ? 'number' : enumFields.has(column.field!) ? 'enum' : 'text'"
+                :title="column.title" :kind="numericFields.has(column.field!) ? 'number' : enumFields.has(column.field!) ? 'multi-enum' : 'text'"
                 :value="columnValue(column.field!)" :options="columnOptions(column.field!)"
                 :sort="sort" :sort-options="columnSortOptions(column.field!)"
                 @apply="applyColumnFilter(column.field!, $event)" @sort="sort = $event as SupplierListSort"

@@ -1,12 +1,14 @@
+import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
+import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
 
 export interface ConstructionContractListNavigationState {
   search: string
   projectId: string | null
   customerId: string | null
-  status: string | null
+  status: ContractListFilter
   origin: DataOriginDTO | null
   page: number
   pageSize: 10 | 20 | 50 | 100
@@ -61,7 +63,7 @@ export function constructionContractListNavigationStateFromQuery(
     search: optionalText(query.search, 120) ?? '',
     projectId: optionalText(query.projectId, 240),
     customerId: optionalText(query.customerId, 240),
-    status: optionalText(query.status, 80),
+    status: parseContractListFilter(query.status),
     origin: isDataOriginDTO(origin) ? origin : null,
     page: positiveInteger(query.page, 1),
     pageSize: [10, 20, 50, 100].includes(pageSize) ? pageSize as 10 | 20 | 50 | 100 : 10,
@@ -77,7 +79,7 @@ function searchParams(state: ConstructionContractListNavigationState, contextId:
   if (state.customerId)
     query.set('customerId', state.customerId)
   if (state.status)
-    query.set('status', state.status)
+    query.set('status', serializeContractListFilter(state.status))
   if (state.origin)
     query.set('origin', state.origin)
   if (state.page !== 1)

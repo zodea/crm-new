@@ -43,7 +43,9 @@ export const useSubcontractContractReadStore = defineStore('subcontract-contract
 
   async function loadList(query: SubcontractContractListQueryDTO) {
     const request = ++latestList
-    const prior = previous(listState.value)
+    const prior = listQuery.value?.origin === query.origin && listQuery.value.includeDemo === query.includeDemo
+      ? previous(listState.value)
+      : null
     listQuery.value = { ...query }
     listState.value = { kind: 'loading', previous: prior }
     try {

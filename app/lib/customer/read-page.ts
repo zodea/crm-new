@@ -17,6 +17,7 @@ import type {
   CustomerReceiptSourceRow,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { normalizeEnumSelection } from '../util/enum-selection'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
 interface BuildCustomerListPageOptions {
@@ -76,12 +77,24 @@ export function parseCustomerListQuery(
   return {
     includeDemo: includeDemo === 'true',
     search: one(input?.search)?.trim().slice(0, 120) ?? '',
-    status: one(input?.status)?.trim().slice(0, 48) || null,
+    status: customerStatuses(input?.status),
     sort: allowedSorts.has(sort as CustomerListSort)
       ? sort as CustomerListSort
       : 'updated-desc',
     page: positiveInteger(input?.page, 1),
     pageSize: pageSize as CustomerPageSize,
+  }
+}
+
+function customerStatuses(value: unknown): string[] | null {
+  try {
+    const values = normalizeEnumSelection(value)
+    if (values.some(item => item.length > 48))
+      throw new Error('status is too long')
+    return values.length ? values : null
+  }
+  catch {
+    throw new CustomerRepositoryProblem(customerProblem('invalid-query', '客户列表状态筛选无效'))
   }
 }
 
@@ -154,15 +167,17 @@ export function buildCustomerListPage(
     row.dataOrigin === 'real' || options.query.includeDemo,
   )
   const needle = options.query.search.toLocaleLowerCase('zh-CN')
-  const filtered = visibleByOrigin.filter((row) => {
+  const statuses = customerStatuses(options.query.status) ?? []
+  const candidates = visibleByOrigin.filter((row) => {
     const matchesSearch = !needle || [
       row.name,
       ...row.aliases,
       row.taxNo,
       row.contact,
     ].some(value => value.toLocaleLowerCase('zh-CN').includes(needle))
-    return matchesSearch && (!options.query.status || row.status === options.query.status)
+    return matchesSearch
   })
+  const filtered = candidates.filter(row => !statuses.length || statuses.includes(row.status))
   const sorted = [...filtered].sort((left, right) => {
     if (options.query.sort === 'name-asc')
       return left.name.localeCompare(right.name, 'zh-CN') || left.id.localeCompare(right.id)
@@ -170,9 +185,10 @@ export function buildCustomerListPage(
       return right.name.localeCompare(left.name, 'zh-CN') || left.id.localeCompare(right.id)
     return right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id)
   })
-  const start = (options.query.page - 1) * options.query.pageSize
+  const page = Math.min(options.query.page, Math.max(1, Math.ceil(filtered.length / options.query.pageSize)))
+  const start = (page - 1) * options.query.pageSize
   const statusCounts = new Map<string, number>()
-  for (const row of filtered)
+  for (const row of candidates)
     statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1)
   const countOrigin = (origin: CustomerListSourceRow['dataOrigin']) =>
     filtered.filter(row => row.dataOrigin === origin).length
@@ -180,7 +196,7 @@ export function buildCustomerListPage(
   return {
     items: sorted.slice(start, start + options.query.pageSize).map(toListItem),
     pagination: {
-      page: options.query.page,
+      page,
       pageSize: options.query.pageSize,
       total: sorted.length,
     },

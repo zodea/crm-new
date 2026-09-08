@@ -28,7 +28,7 @@ export const useProjectListStore = defineStore('project-list', () => {
 
   async function load(nextQuery: ProjectListQueryDTO) {
     const loadId = ++latestLoad
-    const previous = previousData(state.value)
+    const previous = query.value?.includeDemo === nextQuery.includeDemo ? previousData(state.value) : null
     query.value = {
       ...nextQuery,
       filters: {

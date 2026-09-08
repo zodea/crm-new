@@ -17,7 +17,7 @@ import {
   supplierProblem,
   SupplierRepositoryProblem,
 } from './read-contract'
-import { parseSupplierColumnFilters } from './read-query'
+import { parseSupplierColumnFilters, serializeSupplierEnumSelection } from './read-query'
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -298,8 +298,8 @@ export function serializeSupplierListQuery(query: SupplierListQueryDTO): Record<
   return {
     includeDemo: String(query.includeDemo),
     search: query.search,
-    category: query.category ?? '',
-    credentialStatus: query.credentialStatus ?? '',
+    category: serializeSupplierEnumSelection(query.category),
+    credentialStatus: serializeSupplierEnumSelection(query.credentialStatus),
     sort: query.sort,
     page: String(query.page),
     pageSize: String(query.pageSize),

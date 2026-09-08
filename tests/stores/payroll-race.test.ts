@@ -58,6 +58,34 @@ beforeEach(() => {
 })
 
 describe('payroll store latest-wins', () => {
+  it('同范围刷新保留列表快照含空结果，跨项目先清空', async () => {
+    mocks.loadOptions.mockImplementation((_: unknown, projectId: string) => Promise.resolve(options(projectId)))
+    mocks.listStatements.mockResolvedValueOnce([{ id: 'statement-a' }])
+    const store = usePayrollStore()
+    store.filters.projectId = 'project-a'
+    await store.load()
+    const refresh = deferred<Array<{ id: string }>>()
+    mocks.listStatements.mockReturnValueOnce(refresh.promise)
+    store.filters.status = ['checked']
+    const sameScope = store.load()
+    expect(store.statements.map(row => row.id)).toEqual(['statement-a'])
+    expect(store.hasSnapshot).toBe(true)
+    expect(store.selected).toBeNull()
+    refresh.resolve([])
+    await sameScope
+    expect(store.statements).toEqual([])
+    expect(store.hasSnapshot).toBe(true)
+    mocks.listStatements.mockResolvedValueOnce([])
+    const emptyRefresh = store.load()
+    expect(store.hasSnapshot).toBe(true)
+    await emptyRefresh
+    store.filters.projectId = 'project-b'
+    const otherScope = store.load()
+    expect(store.hasSnapshot).toBe(false)
+    expect(store.statements).toEqual([])
+    await otherScope
+  })
+
   it('旧项目选项请求后完成时不得覆盖最新项目', async () => {
     const projectA = deferred<ReturnType<typeof options>>()
     const projectB = deferred<ReturnType<typeof options>>()

@@ -112,7 +112,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
     @mouseleave="closeTemporaryPanel"
   >
     <SidebarHeader
-      class="shrink-0 gap-3 pb-2 pt-3"
+      class="shrink-0 gap-3 pb-3 pt-3"
       :class="isVisuallyCollapsed ? 'px-1.5' : 'px-2'"
     >
       <NuxtLink
@@ -160,7 +160,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
               :aria-label="`展开${node.label}`"
               @click="openGroupFromRail(node.key)"
             >
-              <span class="h-4 w-4" :class="node.icon" aria-hidden="true" />
+              <span class="h-[18px] w-[18px]" :class="node.icon" aria-hidden="true" />
             </button>
           </template>
 
@@ -178,14 +178,14 @@ onKeyStroke('Escape', closeTemporaryPanel)
             <div v-else data-nav-group>
               <button
                 type="button"
-                class="flex h-8 w-full items-center gap-2 border-0 rounded-[2px] bg-transparent px-[10px] text-[var(--shell-sidebar-muted)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
+                class="flex h-[38px] w-full items-center gap-2 border-0 rounded-[2px] bg-transparent px-[10px] text-[var(--shell-sidebar-muted)] transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)]"
                 :aria-expanded="isGroupOpen(node.key)"
                 @click="toggleGroup(node.key)"
               >
-                <span class="h-[15px] w-[15px] flex-none" :class="node.icon" aria-hidden="true" />
-                <span data-nav-group-label class="min-w-0 flex-1 truncate text-left text-12px font-500">{{ node.label }}</span>
+                <span class="h-[18px] w-[18px] flex-none" :class="node.icon" aria-hidden="true" />
+                <span data-nav-group-label class="min-w-0 flex-1 truncate text-left text-14px font-500 leading-5">{{ node.label }}</span>
                 <span
-                  class="h-[14px] w-[14px] flex-none"
+                  class="h-4 w-4 flex-none"
                   :class="isGroupOpen(node.key) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                   aria-hidden="true"
                 />
@@ -225,8 +225,8 @@ onKeyStroke('Escape', closeTemporaryPanel)
       <button
         v-if="!isMobile"
         type="button"
-        class="flex items-center justify-center gap-2 border-0 rounded-[2px] bg-transparent text-12px text-[var(--shell-sidebar-muted)] outline-none transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)] focus-visible:[box-shadow:0_0_0_2px_var(--brand)]"
-        :class="isVisuallyCollapsed ? 'mx-auto h-9 w-9' : 'h-8 w-full px-2'"
+        class="flex items-center justify-center gap-2 border-0 rounded-[2px] bg-transparent text-14px text-[var(--shell-sidebar-muted)] outline-none transition-colors duration-[var(--dur-fast)] hover:bg-[var(--shell-sidebar-hover)] hover:text-[var(--shell-sidebar-text)] focus-visible:[box-shadow:0_0_0_2px_var(--brand)]"
+        :class="isVisuallyCollapsed ? 'mx-auto h-9 w-9' : 'h-[38px] w-full px-2'"
         :title="isPinned ? '收起侧栏' : '固定侧栏'"
         :aria-label="isPinned ? '收起侧栏' : '固定侧栏'"
         :aria-pressed="isPinned"
@@ -234,7 +234,7 @@ onKeyStroke('Escape', closeTemporaryPanel)
       >
         <span
           :class="isPinned ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
-          class="h-4 w-4 flex-none"
+          class="h-[18px] w-[18px] flex-none"
           aria-hidden="true"
         />
         <span v-if="!isVisuallyCollapsed">{{ isPinned ? '收起侧栏' : '固定侧栏' }}</span>

@@ -74,6 +74,24 @@ function emptyFacts(): ConstructionContractFactSources {
 }
 
 describe('施工合同中央 Repository contract', () => {
+  it('状态多选在分页前按 OR 匹配并汇总全量结果', () => {
+    const page = buildConstructionContractListPage({
+      contracts: [
+        ...Array.from({ length: 12 }, (_, index) => source({ id: `match-${index}`, status: index % 2 ? '草稿' : '履约中' })),
+        source({ id: 'excluded', status: '已结清' }),
+      ],
+      facts: emptyFacts(),
+      query: parseConstructionContractListQuery({ status: '["草稿","履约中"]' }),
+      asOf: AS_OF,
+      sourceVersion: 'multi-filter',
+      capabilities: [],
+    })
+    expect(page.items).toHaveLength(10)
+    expect(page.pagination.total).toBe(12)
+    expect(page.summary.origins.real).toMatchObject({ contractCount: 12, changedAmount: '12000.00' })
+    expect(page.items.every(row => ['草稿', '履约中'].includes(row.status))).toBe(true)
+  })
+
   it('列表保留施工专属列，实际竣工无 canonical 事实时保持 null', () => {
     const page = buildConstructionContractListPage({
       contracts: [

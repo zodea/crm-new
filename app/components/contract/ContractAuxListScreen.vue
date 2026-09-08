@@ -27,9 +27,9 @@ const loading = computed(() => contractStore.auxLoadingFor(props.kind))
 const loadError = computed(() => contractStore.auxError(props.kind))
 
 const search = shallowRef('')
-const projectFilter = shallowRef('all')
-const categoryFilter = shallowRef('all')
-const statusFilter = shallowRef('all')
+const projectFilter = shallowRef<string[]>([])
+const categoryFilter = shallowRef<string[]>([])
+const statusFilter = shallowRef<string[]>([])
 const page = shallowRef(1)
 const pageSize = shallowRef(10)
 
@@ -120,9 +120,9 @@ const contextFilters = computed(() => {
 
 const hasLocalFilters = computed(() =>
   Boolean(search.value)
-  || projectFilter.value !== 'all'
-  || categoryFilter.value !== 'all'
-  || statusFilter.value !== 'all',
+  || projectFilter.value.length > 0
+  || categoryFilter.value.length > 0
+  || statusFilter.value.length > 0,
 )
 
 const emptyState = computed(() => {
@@ -176,9 +176,9 @@ async function clearRouteFilter(key: 'project' | 'contract' | 'supplier') {
 
 async function resetFilters() {
   search.value = ''
-  projectFilter.value = 'all'
-  categoryFilter.value = 'all'
-  statusFilter.value = 'all'
+  projectFilter.value = []
+  categoryFilter.value = []
+  statusFilter.value = []
   if (contextFilters.value.length) {
     const query = { ...route.query }
     delete query.project

@@ -19,6 +19,7 @@ import {
   isISODateTimeDTO,
   isProblemCodeDTO,
 } from '../../types/read-model'
+import { serializeEnumSelection } from '../util/enum-selection'
 import {
   ownerCommercialDocumentProblem,
   OwnerCommercialDocumentRepositoryProblem,
@@ -556,7 +557,7 @@ export function createHttpOwnerCommercialDocumentReadRepository(
 ): OwnerCommercialDocumentReadRepository {
   return {
     list: query => read(
-      () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query } }),
+      () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query, status: serializeEnumSelection(query.status) || null, documentType: serializeEnumSelection(query.documentType) || null } }),
       value => decodeList(value, query),
     ),
     get: query => read(

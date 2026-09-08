@@ -5,6 +5,7 @@ import type {
   SubcontractContractListQueryDTO,
 } from './read-contract'
 import { isDataOriginDTO, isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
+import { serializeContractListFilter } from '../contract/list-filters'
 import { subcontractContractProblem, SubcontractContractRepositoryProblem } from './read-contract'
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -108,8 +109,8 @@ export function serializeSubcontractContractListQuery(query: SubcontractContract
     search: query.search,
     projectId: query.projectId ?? '',
     supplierId: query.supplierId ?? '',
-    status: query.status ?? '',
-    subKind: query.subKind ?? '',
+    status: serializeContractListFilter(query.status),
+    subKind: serializeContractListFilter(query.subKind),
     page: String(query.page),
     pageSize: String(query.pageSize),
   }

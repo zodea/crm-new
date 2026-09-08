@@ -8,6 +8,9 @@ export const SUPPLIER_CATEGORIES = ['材料供应商', '劳务分包商', '专�
 
 export type SupplierCategory = (typeof SUPPLIER_CATEGORIES)[number]
 
+/** 已有档案表单可选的纳税人类型；历史其他值由查询 facet 继续提供。 */
+export const SUPPLIER_TAXPAYER_TYPES = ['未核验', '一般纳税人', '小规模纳税人'] as const
+
 /** 资料状态清单（credential_status，资质准入态；非 approval_status 审批流，见 #89 Out of Scope）。 */
 export const CREDENTIAL_STATUSES = ['incomplete', 'reviewing', 'qualified', 'rejected'] as const
 

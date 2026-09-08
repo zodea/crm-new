@@ -4,6 +4,7 @@ import type {
   SignedDayworkRecord,
 } from '~/lib/payroll/daywork'
 import { defineStore } from 'pinia'
+import { reactive, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import {
   listSignedDayworkRecords,
@@ -30,27 +31,47 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
     status: '',
   })
   const loading = shallowRef(false)
+  const hasSnapshot = shallowRef(false)
   const error = shallowRef('')
+  let loadSequence = 0
+  let snapshotScope = ''
+  const scopeKey = (value: SignedDayworkFilter) => JSON.stringify([value.projectId, value.month, value.crewId ?? ''])
 
   async function load() {
+    const sequence = ++loadSequence
+    const requestedFilters: SignedDayworkFilter = { ...filters }
+    if (snapshotScope !== scopeKey(requestedFilters)) {
+      records.value = []
+      hasSnapshot.value = false
+      snapshotScope = ''
+    }
     loading.value = true
     error.value = ''
     try {
       const db = await getDb()
-      options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      if (!filters.projectId)
-        filters.projectId = options.value.projects[0]?.id ?? ''
-      if (filters.projectId)
-        options.value = await loadPayrollWorkbenchOptions(db, filters.projectId)
-      records.value = filters.projectId
-        ? await listSignedDayworkRecords(db, filters)
+      let nextOptions = await loadPayrollWorkbenchOptions(db, requestedFilters.projectId)
+      if (!requestedFilters.projectId)
+        requestedFilters.projectId = nextOptions.projects[0]?.id ?? ''
+      if (requestedFilters.projectId)
+        nextOptions = await loadPayrollWorkbenchOptions(db, requestedFilters.projectId)
+      const nextRecords = requestedFilters.projectId
+        ? await listSignedDayworkRecords(db, requestedFilters)
         : []
+      if (sequence !== loadSequence)
+        return
+      Object.assign(filters, requestedFilters)
+      options.value = nextOptions
+      records.value = nextRecords
+      snapshotScope = scopeKey(requestedFilters)
+      hasSnapshot.value = true
     }
     catch (cause) {
-      error.value = cause instanceof Error ? cause.message : String(cause)
+      if (sequence === loadSequence)
+        error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
-      loading.value = false
+      if (sequence === loadSequence)
+        loading.value = false
     }
   }
 
@@ -64,6 +85,7 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
     options,
     filters,
     loading,
+    hasSnapshot,
     error,
     load,
     save,

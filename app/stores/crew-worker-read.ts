@@ -42,10 +42,13 @@ export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
   let workerListRequest = 0
   let crewDetailRequest = 0
   let workerDetailRequest = 0
+  let crewIncludeDemo: boolean | undefined
+  let workerIncludeDemo: boolean | undefined
 
   async function loadCrewList(query: CrewListQueryDTO) {
     const request = ++crewListRequest
-    const prior = previous(crewListState.value)
+    const prior = crewIncludeDemo === query.includeDemo ? previous(crewListState.value) : null
+    crewIncludeDemo = query.includeDemo
     crewListState.value = { kind: 'loading', previous: prior }
     try {
       const page = await repository().listCrews(query)
@@ -60,7 +63,8 @@ export const useCrewWorkerReadStore = defineStore('crew-worker-read', () => {
 
   async function loadWorkerList(query: WorkerListQueryDTO) {
     const request = ++workerListRequest
-    const prior = previous(workerListState.value)
+    const prior = workerIncludeDemo === query.includeDemo ? previous(workerListState.value) : null
+    workerIncludeDemo = query.includeDemo
     workerListState.value = { kind: 'loading', previous: prior }
     try {
       const page = await repository().listWorkers(query)

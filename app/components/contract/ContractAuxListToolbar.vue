@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
+import ContextHelp from '~/components/ui/ContextHelp.vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 
 interface FilterOption {
   key: string
@@ -25,9 +27,9 @@ const emit = defineEmits<{
 }>()
 
 const search = defineModel<string>('search', { required: true })
-const project = defineModel<string>('project', { required: true })
-const category = defineModel<string>('category', { required: true })
-const status = defineModel<string>('status', { required: true })
+const project = defineModel<string[]>('project', { required: true })
+const category = defineModel<string[]>('category', { required: true })
+const status = defineModel<string[]>('status', { required: true })
 </script>
 
 <template>
@@ -37,17 +39,15 @@ const status = defineModel<string>('status', { required: true })
     class="aux-toolbar panel min-w-0 p-3.5"
   >
     <div class="aux-toolbar__layout grid min-w-0 items-center gap-3">
-      <div class="min-w-0">
+      <div class="min-w-0 flex items-center gap-1.5">
         <h1 class="m-0 truncate text-15px font-800 text-ink" :title="title">
           {{ title }}
         </h1>
-        <p class="m-0 mt-0.5 truncate text-11px text-ink-faint" :title="subtitle">
-          {{ subtitle }}
-        </p>
+        <ContextHelp v-if="subtitle" :label="title" :text="subtitle" />
       </div>
 
       <div v-if="showProject" class="aux-toolbar__filter min-w-0">
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="project"
           label="项目"
           :options="projectOptions"
@@ -56,7 +56,7 @@ const status = defineModel<string>('status', { required: true })
         />
       </div>
       <div v-if="showCategory" class="aux-toolbar__filter min-w-0">
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="category"
           label="类别"
           :options="categoryOptions"
@@ -66,7 +66,7 @@ const status = defineModel<string>('status', { required: true })
       </div>
 
       <div class="aux-toolbar__actions min-w-0 flex flex-wrap items-center gap-2.5">
-        <SelectFilter
+        <KitMultiSelectFilter
           v-model="status"
           label="状态"
           :options="statusOptions"

@@ -5,6 +5,7 @@ import type { DataOriginDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/r
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onMounted, shallowRef, watch } from 'vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { enumSelectionFromQuery, serializeEnumSelection } from '~/lib/util/enum-selection'
 import { useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
 import { useCrewWorkerReadStore } from '~/stores/crew-worker-read'
 
@@ -25,8 +26,8 @@ function queryPageSize(value: unknown): 10 | 20 | 50 | 100 {
   return [10, 20, 50, 100].includes(parsed) ? parsed as 10 | 20 | 50 | 100 : 20
 }
 const search = shallowRef(queryText(route.query.search))
-const trade = shallowRef(queryText(route.query.trade) || 'all')
-const status = shallowRef('all')
+const trade = shallowRef(enumSelectionFromQuery(route.query.trade))
+const status = shallowRef(enumSelectionFromQuery(route.query.status))
 const initialSort = queryText(route.query.sort)
 const sort = shallowRef<'updated-desc' | 'name-asc' | 'name-desc'>(['name-asc', 'name-desc'].includes(initialSort) ? initialSort as 'name-asc' | 'name-desc' : 'updated-desc')
 const page = shallowRef(queryPage(route.query.page))
@@ -147,15 +148,17 @@ const summary = computed<Record<string, string | number>>(() => {
   const result: Record<string, string | number> = { 正式工人: `${data?.summary.origins.real.workerCount ?? 0} 人`, 在场工人: `${data?.summary.origins.real.activeWorkerCount ?? 0} 人`, 测试工人: `${visibility.includeDemo ? data?.summary.origins.demo.workerCount ?? 0 : 0} 人` }
   return result
 })
-const tradeOptions = computed(() => [{ key: 'all', label: '全部工种' }, ...((readPage.value?.summary.trades ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })))])
+const tradeOptions = computed(() => (readPage.value?.summary.trades ?? []).map(item => ({ key: item.value, label: `${item.label}（${item.count}）` })))
 
 async function load() {
   if (props.kind === 'crew') {
-    await store.loadCrewList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value === 'all' ? null : trade.value, status: status.value === 'all' ? null : status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
+    await store.loadCrewList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value, status: status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
   }
   else {
-    await store.loadWorkerList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value === 'all' ? null : trade.value, crewId: null, projectStatus: null, status: status.value === 'all' ? null : status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
+    await store.loadWorkerList({ includeDemo: visibility.includeDemo, search: search.value, trade: trade.value, crewId: null, projectStatus: null, status: status.value, sort: sort.value, page: page.value, pageSize: pageSize.value })
   }
+  if (readPage.value)
+    page.value = readPage.value.pagination.page
 }
 const debouncedLoad = useDebounceFn(() => {
   page.value = 1
@@ -163,18 +166,19 @@ const debouncedLoad = useDebounceFn(() => {
 }, 180)
 function clearFilters() {
   search.value = ''
-  trade.value = 'all'
-  status.value = 'all'
+  trade.value = []
+  status.value = []
   sort.value = 'updated-desc'
   page.value = 1
-  void load()
 }
 function rowReturnTo(row: CentralRow): string {
   const query = new URLSearchParams()
   if (search.value)
     query.set('search', search.value)
-  if (trade.value !== 'all')
-    query.set('trade', trade.value)
+  if (trade.value.length)
+    query.set('trade', serializeEnumSelection(trade.value))
+  if (status.value.length)
+    query.set('status', serializeEnumSelection(status.value))
   if (sort.value !== 'updated-desc')
     query.set('sort', sort.value)
   if (page.value !== 1)
@@ -210,11 +214,11 @@ onActivated(() => void load())
               {{ kind === 'crew' ? '班组资料库' : '工人资料库' }}
             </h2>
             <p class="text-11px text-ink-soft">
-              共 {{ readPage?.pagination.total ?? 0 }} {{ kind === 'crew' ? '个班组' : '名工人' }}；正式与测试数据按来源隔离
+              共 {{ readPage?.pagination.total ?? 0 }} {{ kind === 'crew' ? '个班组' : '名工人' }}
             </p>
           </div>
           <SearchInput v-model="search" :placeholder="kind === 'crew' ? '搜索班组、负责人…' : '搜索姓名、手机号、证件号…'" :width="230" />
-          <SelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="135" />
+          <KitMultiSelectFilter v-model="trade" label="工种" :options="tradeOptions" :min-width="135" />
           <SelectFilter v-model="sort" label="排序" :options="[{ key: 'updated-desc', label: '最近更新' }, { key: 'name-asc', label: '名称升序' }, { key: 'name-desc', label: '名称降序' }]" :min-width="125" />
           <button type="button" class="btn-secondary" :disabled="loading" @click="load">
             <span class="i-lucide-refresh-cw mr-1" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />刷新
@@ -225,8 +229,8 @@ onActivated(() => void load())
         </section>
       </template>
       <template #table>
-        <div :data-ui="`${kind}-central-list-table`" class="min-w-0 max-w-full">
-          <KitTable :columns="columns" :data="rows" :loading="loading" :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }" :page-size-options="[10, 20, 50, 100]" :empty="{ title: search || trade !== 'all' ? '没有符合条件的记录' : `还没有${kind === 'crew' ? '班组' : '工人'}档案`, description: '可调整筛选或新建正式档案。', actionLabel: search || trade !== 'all' ? '清除筛选' : `新建${kind === 'crew' ? '班组' : '工人'}` }" row-key="identity" @empty-action="search || trade !== 'all' ? clearFilters() : navigateTo(`/base/${kind}/form`)" @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }">
+        <div :data-ui="`${kind}-central-list-table`" class="min-w-0 max-w-full" :aria-busy="loading">
+          <KitTable :columns="columns" :data="rows" :loading="loading && !readPage" :page="{ page, pageSize, total: readPage?.pagination.total ?? 0 }" :page-size-options="[10, 20, 50, 100]" :empty="{ title: search || trade.length || status.length ? '没有符合条件的记录' : `还没有${kind === 'crew' ? '班组' : '工人'}档案`, description: '可调整筛选或新建正式档案。', actionLabel: search || trade.length || status.length ? '清除筛选' : `新建${kind === 'crew' ? '班组' : '工人'}` }" row-key="identity" @empty-action="search || trade.length || status.length ? clearFilters() : navigateTo(`/base/${kind}/form`)" @page-change="({ page: nextPage, pageSize: nextSize }) => { page = nextPage; pageSize = nextSize as 10 | 20 | 50 | 100; load() }">
             <template #name="{ row }">
               <div :id="`${kind}-row-${row.identity}`">
                 <EntityLink :id="row.id" :type="kind" :label="row.name" :intent="row.intent" :return-to="rowReturnTo(row)" /><span class="ml-1 text-10px text-ink-faint">{{ row.dataOrigin === 'demo' ? '测试' : '正式' }}</span>
