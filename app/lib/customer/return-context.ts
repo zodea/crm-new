@@ -120,18 +120,19 @@ export function validateCustomerDetailReturnTo(
   }
 }
 
-export interface CustomerProjectReturnOrigin {
+export interface CustomerRelationReturnOrigin {
   returnTo: string
-  projectId: string
+  targetEntity: 'project' | 'contract'
+  targetId: string
   anchorId: string | null
   scrollTop: number
   scrollLeft: number
   expiresAt: number
 }
 
-const PROJECT_RETURN_PREFIX = 'ruihang:customer-project-return:'
+const PROJECT_RETURN_PREFIX = 'ruihang:customer-relation-return:'
 
-export function customerProjectReturnTo(returnTo: unknown, contextId: string): string | null {
+export function customerRelationReturnTo(returnTo: unknown, contextId: string): string | null {
   const canonical = validateCustomerDetailReturnTo(returnTo)
   if (!canonical || !isCustomerReturnContextId(contextId))
     return null
@@ -140,7 +141,7 @@ export function customerProjectReturnTo(returnTo: unknown, contextId: string): s
   return validateCustomerDetailReturnTo(`${url.pathname}${url.search}`)
 }
 
-export function saveCustomerProjectReturnOrigin(origin: CustomerProjectReturnOrigin, storage: Storage = sessionStorage) {
+export function saveCustomerRelationReturnOrigin(origin: CustomerRelationReturnOrigin, storage: Storage = sessionStorage) {
   const canonical = validateCustomerDetailReturnTo(origin.returnTo)
   const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
   if (!id)
@@ -151,21 +152,23 @@ export function saveCustomerProjectReturnOrigin(origin: CustomerProjectReturnOri
   catch { /* 浏览器禁用存储时使用规范返回，不影响导航。 */ }
 }
 
-export function resolveCustomerProjectReturnOrigin(
+export function resolveCustomerRelationReturnOrigin(
   returnTo: unknown,
-  expected: { projectId?: string, origin?: DataOriginDTO },
+  expected: { targetEntity?: 'project' | 'contract', targetId?: string, origin?: DataOriginDTO },
   now = Date.now(),
   storage: Storage = sessionStorage,
-): CustomerProjectReturnOrigin | null {
+): CustomerRelationReturnOrigin | null {
   const canonical = validateCustomerDetailReturnTo(returnTo, expected.origin)
   const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
   if (!id)
     return null
   try {
-    const value = JSON.parse(storage.getItem(`${PROJECT_RETURN_PREFIX}${id}`) ?? 'null') as CustomerProjectReturnOrigin | null
-    return value && value.returnTo === canonical && typeof value.projectId === 'string' && value.projectId.length > 0
+    const value = JSON.parse(storage.getItem(`${PROJECT_RETURN_PREFIX}${id}`) ?? 'null') as CustomerRelationReturnOrigin | null
+    return value && value.returnTo === canonical && typeof value.targetId === 'string' && value.targetId.length > 0
+      && (value.targetEntity === 'project' || value.targetEntity === 'contract')
+      && (!expected.targetEntity || value.targetEntity === expected.targetEntity)
       && (value.anchorId === null || (typeof value.anchorId === 'string' && value.anchorId.length <= 512 && /^(?:project|contract|receipt):[\w%.~-]+$/.test(value.anchorId)))
-      && (!expected.projectId || value.projectId === expected.projectId)
+      && (!expected.targetId || value.targetId === expected.targetId)
       && Number.isFinite(value.expiresAt) && value.expiresAt > now
       && Number.isFinite(value.scrollTop) && value.scrollTop >= 0
       && Number.isFinite(value.scrollLeft) && value.scrollLeft >= 0

@@ -6,6 +6,7 @@ import type {
 } from '../../app/lib/customer/repository'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { ProblemDTO } from '../../app/types/read-model'
+import { ConstructionContractRepositoryProblem } from '../../app/lib/construction-contract/repository'
 import {
   buildCustomerDetailRead,
   buildCustomerListPage,
@@ -15,8 +16,6 @@ import {
   parseCustomerListQuery,
   parseCustomerReceiptDetailQuery,
 } from '../../app/lib/customer/repository'
-import supplementsSeed from '../../app/lib/db/seed/contract_supplements.json'
-import contractsSeed from '../../app/lib/db/seed/contracts.json'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
@@ -25,6 +24,7 @@ import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
+import { customerConstructionContractFacts } from './customer-construction-contract-facts'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from './owner-commercial-document-fixtures'
 
@@ -112,7 +112,6 @@ const demoCustomers: CustomerListSourceRow[] = customersSeed.map(customer => ({
   updatedAt: customer.updated_at,
 }))
 
-const projectById = new Map(projectsSeed.map(project => [project.id, project]))
 const demoProjects: CustomerProjectSourceRow[] = projectsSeed.map(project => ({
   dataOrigin: 'demo',
   id: project.id,
@@ -129,42 +128,6 @@ const demoProjects: CustomerProjectSourceRow[] = projectsSeed.map(project => ({
   manager: project.manager,
 }))
 
-const supplementByContract = new Map<string, number>()
-for (const supplement of supplementsSeed) {
-  if (supplement.status === 'draft' || supplement.status === '草稿')
-    continue
-  supplementByContract.set(
-    supplement.contract_id,
-    (supplementByContract.get(supplement.contract_id) ?? 0) + Number(supplement.amount ?? 0),
-  )
-}
-const receiptByContract = new Map<string, number>()
-for (const receipt of receiptsSeed) {
-  if (!('contract_id' in receipt) || !receipt.contract_id)
-    continue
-  receiptByContract.set(
-    String(receipt.contract_id),
-    (receiptByContract.get(String(receipt.contract_id)) ?? 0) + Number(receipt.amount ?? 0),
-  )
-}
-const demoContracts: CustomerContractSourceRow[] = contractsSeed
-  .filter(contract => contract.kind === '施工')
-  .map((contract) => {
-    const project = contract.project_id ? projectById.get(contract.project_id) : null
-    return {
-      dataOrigin: 'demo',
-      id: contract.id,
-      no: contract.no,
-      name: contract.name,
-      projectId: contract.project_id ?? null,
-      customerId: project?.customer_id ?? null,
-      amount: Number(contract.amount ?? 0),
-      supplementAmount: supplementByContract.get(contract.id) ?? 0,
-      receiptAmount: receiptByContract.get(contract.id) ?? 0,
-      signDate: contract.sign_date || null,
-      status: contract.status,
-    }
-  })
 const demoReceipts: CustomerReceiptSourceRow[] = receiptsSeed.map(receipt => ({
   dataOrigin: 'demo',
   id: receipt.id,
@@ -213,6 +176,11 @@ export function createCustomerReadTestInstance(
     sourceVersion: string
     asOf: string
   }> = async () => ({ rows: demoProjects, sourceVersion: SOURCE_VERSION, asOf: FIXED_AS_OF }),
+  resolveContractFacts: (sessionId?: string | null) => {
+    rows: readonly CustomerContractSourceRow[]
+    sourceVersion: string
+    asOf: string
+  } = customerConstructionContractFacts,
 ) {
   const scenarios = new Map<string, CustomerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -234,7 +202,7 @@ export function createCustomerReadTestInstance(
       capabilities,
       customers,
       projects: scenario === 'ready' ? demoProjects : [],
-      contracts: scenario === 'ready' ? demoContracts : [],
+      contracts: [] as CustomerContractSourceRow[],
       receipts: scenario === 'ready' ? [...formalFinalSettlementReceipts, ...demoReceipts] : [],
       sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
         migrationSnapshot.authority === 'central'
@@ -247,16 +215,18 @@ export function createCustomerReadTestInstance(
   async function detailContext(sessionId?: string | null) {
     const data = context(sessionId)
     let projectsProblem: ProblemDTO | undefined
+    let contractsProblem: ProblemDTO | undefined
+    let projects: readonly CustomerProjectSourceRow[] = []
+    let contracts: readonly CustomerContractSourceRow[] = []
+    let asOf = FIXED_AS_OF
+    let sourceVersion = data.sourceVersion
     if ((scenarios.get(keyFor(sessionId)) ?? 'ready') !== 'ready')
       return { ...data, asOf: FIXED_AS_OF }
     try {
-      const projects = await resolveProjectFacts(sessionId)
-      return {
-        ...data,
-        projects: projects.rows,
-        asOf: projects.asOf > FIXED_AS_OF ? projects.asOf : FIXED_AS_OF,
-        sourceVersion: `${data.sourceVersion}:${projects.sourceVersion}`,
-      }
+      const source = await resolveProjectFacts(sessionId)
+      projects = source.rows
+      asOf = source.asOf > asOf ? source.asOf : asOf
+      sourceVersion += `:${source.sourceVersion}`
     }
     catch (cause) {
       if (!(cause instanceof ProjectRepositoryProblem)
@@ -265,10 +235,27 @@ export function createCustomerReadTestInstance(
       }
       projectsProblem = cause.problem
     }
-    return { ...data, projects: [], projectsProblem, asOf: FIXED_AS_OF }
+    try {
+      const source = resolveContractFacts(sessionId)
+      contracts = source.rows
+      asOf = source.asOf > asOf ? source.asOf : asOf
+      sourceVersion += `:${source.sourceVersion}`
+    }
+    catch (cause) {
+      if (!(cause instanceof ConstructionContractRepositoryProblem)
+        || !['forbidden', 'unavailable'].includes(cause.problem.code)) {
+        throw cause
+      }
+      contractsProblem = cause.problem
+    }
+    return { ...data, projects, contracts, projectsProblem, contractsProblem, asOf, sourceVersion }
   }
 
   return {
+    facts(sessionId?: string | null) {
+      const data = context(sessionId)
+      return { rows: data.customers, capabilities: data.capabilities, sourceVersion: data.sourceVersion }
+    },
     reset(next: CustomerReadTestScenario, sessionId?: string | null) {
       if (next === 'ready')
         scenarios.delete(keyFor(sessionId))

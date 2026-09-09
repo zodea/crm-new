@@ -7,7 +7,7 @@ import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
-import { resolveCustomerProjectReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
+import { resolveCustomerRelationReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
   isProjectOwnerDocumentCardAnchor,
@@ -73,7 +73,7 @@ const ownerJourneys = shallowRef<OwnerJourneyPages | null>(null)
 const ownerJourneysError = shallowRef('')
 
 const item = computed(() => detail.value?.item ?? null)
-const customerReturnOrigin = computed(() => resolveCustomerProjectReturnOrigin(props.customerReturnTo, { projectId: props.projectId, origin: props.originHint }))
+const customerReturnOrigin = computed(() => resolveCustomerRelationReturnOrigin(props.customerReturnTo, { targetEntity: 'project', targetId: props.projectId, origin: props.originHint }))
 const verifiedCustomerReturnTo = computed(() => {
   if (!props.customerReturnTo)
     return null

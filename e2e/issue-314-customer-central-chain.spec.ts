@@ -116,10 +116,11 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
 
     await page.getByRole('tab', { name: /施工合同/ }).click()
     const contract = page.getByRole('link', { name: '合和新城施工总承包合同' })
-    await expect(contract).toHaveAttribute('href', '/contract/con_demo_sg01')
+    await expect(contract).toHaveAttribute('href', /\/contract\/con_demo_sg01\?origin=demo&contractKind=construction&returnTo=/)
     await contract.click()
     await expect(page).toHaveURL(/\/contract\/con_demo_sg01/)
-    await page.goBack()
+    await page.getByRole('link', { name: '返回客户详情', exact: true }).click()
+    await expect(contract).toBeFocused()
 
     await page.getByRole('tab', { name: /收款明细/ }).click()
     const receipt = page.getByRole('link', { name: 'SK-2026-001' })

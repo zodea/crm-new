@@ -283,6 +283,9 @@ export function createConstructionContractReadTestInstance(
   }
 
   return {
+    facts(sessionId?: string | null) {
+      return { ...context(sessionId), asOf: FIXED_AS_OF }
+    },
     reset(scenario: ConstructionContractReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
         scenarios.delete(keyFor(sessionId))

@@ -26,6 +26,7 @@ export const useConstructionContractCommandStore = defineStore('construction-con
   }
 
   async function hydrate(id: string | null) {
+    contextValue.value = null
     targetId.value = id
     pendingCommand = null
     const [form, commandContext] = await Promise.all([

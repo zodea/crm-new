@@ -431,7 +431,7 @@ export function resolveNavigationTarget(
         to = `${to}${separator}returnTo=${encodeURIComponent(ownerReturnTo)}`
       }
     }
-    if (key === 'project:detail' && options.returnTo) {
+    if ((key === 'project:detail' || (key === 'contract:detail' && intent.filters.contractKind === '施工')) && options.returnTo) {
       const customerId = intent.filters.customerId
       const customerReturnTo = typeof customerId === 'string'
         ? validateCustomerDetailReturnTo(options.returnTo, intent.filters.dataOrigin, customerId)

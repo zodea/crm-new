@@ -3,28 +3,29 @@ import {
   createCustomerDetailReturnTo,
   createCustomerReturnOrigin,
   customerListNavigationStateFromQuery,
-  customerProjectReturnTo,
-  resolveCustomerProjectReturnOrigin,
+  customerRelationReturnTo,
+  resolveCustomerRelationReturnOrigin,
   resolveCustomerReturnContext,
-  saveCustomerProjectReturnOrigin,
+  saveCustomerRelationReturnOrigin,
   validateCustomerDetailReturnTo,
   validateCustomerReturnTo,
 } from '~/lib/customer/return-context'
 
 describe('客户列表返回上下文', () => {
-  it('客户项目往返在同一来源内绑定目标、有效期和滚动，拒绝篡改或失效上下文', () => {
+  it.each(['project', 'contract'] as const)('客户 %s 往返在同一来源内绑定目标、有效期和滚动，拒绝篡改或失效上下文', (targetEntity) => {
     const values = new Map<string, string>()
     const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) } as Storage
-    const to = customerProjectReturnTo('/base/customer/customer-a?origin=real&tab=projects', 'origin_relation_424')!
-    const origin = { returnTo: to, projectId: 'p-a', anchorId: 'project:p-a', scrollTop: 201, scrollLeft: 110, expiresAt: 2000 }
-    saveCustomerProjectReturnOrigin(origin, storage)
-    expect(resolveCustomerProjectReturnOrigin(to, { projectId: 'p-a', origin: 'real' }, 1000, storage)).toEqual(origin)
-    expect(resolveCustomerProjectReturnOrigin(to, { projectId: 'p-b', origin: 'real' }, 1000, storage)).toBeNull()
-    expect(resolveCustomerProjectReturnOrigin(to, { projectId: 'p-a', origin: 'demo' }, 1000, storage)).toBeNull()
-    expect(resolveCustomerProjectReturnOrigin(to, {}, 2000, storage)).toBeNull()
-    expect(resolveCustomerProjectReturnOrigin(to.replace('customer-a', 'customer-b'), {}, 1000, storage)).toBeNull()
+    const to = customerRelationReturnTo('/base/customer/customer-a?origin=real&tab=projects', 'origin_relation_424')!
+    const origin = { returnTo: to, targetEntity, targetId: 'p-a', anchorId: `${targetEntity}:p-a`, scrollTop: 201, scrollLeft: 110, expiresAt: 2000 }
+    saveCustomerRelationReturnOrigin(origin, storage)
+    expect(resolveCustomerRelationReturnOrigin(to, { targetEntity, targetId: 'p-a', origin: 'real' }, 1000, storage)).toEqual(origin)
+    expect(resolveCustomerRelationReturnOrigin(to, { targetEntity: targetEntity === 'project' ? 'contract' : 'project', targetId: 'p-a', origin: 'real' }, 1000, storage)).toBeNull()
+    expect(resolveCustomerRelationReturnOrigin(to, { targetEntity: 'project' as const, targetId: 'p-b', origin: 'real' }, 1000, storage)).toBeNull()
+    expect(resolveCustomerRelationReturnOrigin(to, { targetEntity: 'project' as const, targetId: 'p-a', origin: 'demo' }, 1000, storage)).toBeNull()
+    expect(resolveCustomerRelationReturnOrigin(to, {}, 2000, storage)).toBeNull()
+    expect(resolveCustomerRelationReturnOrigin(to.replace('customer-a', 'customer-b'), {}, 1000, storage)).toBeNull()
     expect(validateCustomerDetailReturnTo(`${to}&relationContext=duplicate`)).toBeNull()
-    expect(customerProjectReturnTo('https://evil.example', 'origin_relation_424')).toBeNull()
+    expect(customerRelationReturnTo('https://evil.example', 'origin_relation_424')).toBeNull()
   })
   it('多个档案状态随来源返回，兼容单值和重复参数', () => {
     const origin = createCustomerReturnOrigin({ contextId: 'origin_customer_multi', anchorId: 'customer-row-real%3Ac-1', scrollTop: 0, now: 1000, state: { search: '', status: ['inactive', 'active'], sort: 'updated-desc', page: 1, pageSize: 10 } })

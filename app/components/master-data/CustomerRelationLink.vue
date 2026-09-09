@@ -3,9 +3,9 @@ import type { EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { computed, inject } from 'vue'
 import {
   CUSTOMER_RETURN_CONTEXT_TTL,
-  customerProjectReturnTo,
+  customerRelationReturnTo,
   newCustomerReturnContextId,
-  saveCustomerProjectReturnOrigin,
+  saveCustomerRelationReturnOrigin,
 } from '~/lib/customer/return-context'
 import { KIT_TABLE_VIEW_KEY } from '~/lib/kit/table-view'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
@@ -20,22 +20,25 @@ const props = defineProps<{
 const tableView = inject(KIT_TABLE_VIEW_KEY, null)
 const anchorId = computed(() => props.returnAnchor !== undefined
   ? props.returnAnchor
-  : props.reference.state === 'resolved' ? `project:${encodeURIComponent(props.reference.id)}` : null)
+  : props.reference.state === 'resolved' ? `${props.reference.entity}:${encodeURIComponent(props.reference.id)}` : null)
 const contextId = newCustomerReturnContextId()
-const projectReturnTo = computed(() => props.reference.entity === 'project' && props.reference.state === 'resolved'
-  ? customerProjectReturnTo(props.returnTo, contextId)
+const relationReturnTo = computed(() => (props.reference.entity === 'project' || props.reference.entity === 'contract') && props.reference.state === 'resolved'
+  ? customerRelationReturnTo(props.returnTo, contextId)
   : null)
 const resolution = computed(() => resolveNavigationTarget(props.navigation, {
-  returnTo: projectReturnTo.value ?? props.returnTo,
+  returnTo: relationReturnTo.value ?? props.returnTo,
   returnContextId: props.returnContext,
 }))
 
 function capture() {
-  if (!projectReturnTo.value || props.reference.state !== 'resolved')
+  if (!relationReturnTo.value || props.reference.state !== 'resolved'
+    || (props.reference.entity !== 'project' && props.reference.entity !== 'contract')) {
     return
-  saveCustomerProjectReturnOrigin({
-    returnTo: projectReturnTo.value,
-    projectId: props.reference.id,
+  }
+  saveCustomerRelationReturnOrigin({
+    returnTo: relationReturnTo.value,
+    targetEntity: props.reference.entity,
+    targetId: props.reference.id,
     anchorId: anchorId.value,
     scrollTop: document.querySelector<HTMLElement>('[data-shell-workspace]')?.scrollTop ?? 0,
     scrollLeft: tableView?.scrollLeft() ?? 0,
@@ -50,8 +53,10 @@ function capture() {
     :to="resolution.to"
     class="cell--link block max-w-full truncate"
     :title="resolution.label"
-    :data-customer-project-id="projectReturnTo ? reference.id : undefined"
-    :data-customer-relation-anchor="projectReturnTo ? anchorId : undefined"
+    :data-customer-project-id="relationReturnTo && reference.entity === 'project' ? reference.id : undefined"
+    :data-customer-target-id="relationReturnTo ? reference.id : undefined"
+    :data-customer-target-entity="relationReturnTo ? reference.entity : undefined"
+    :data-customer-relation-anchor="relationReturnTo ? anchorId : undefined"
     @click="capture"
   >
     {{ resolution.label }}

@@ -19,6 +19,8 @@ import {
   constructionContractProblem,
   ConstructionContractRepositoryProblem,
 } from '../../app/lib/construction-contract/repository'
+import { customerCommandTestInstance } from './customer-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
 
 interface ProjectOption {
   id: string
@@ -52,6 +54,9 @@ interface SessionState {
 }
 
 interface Options {
+  resolveProjects?: (sessionId?: string | null) => ProjectOption[]
+  resolveCustomers?: (sessionId?: string | null) => CustomerOption[]
+  assertReferences?: (draft: ProjectContractFormDraft, sessionId?: string | null) => Promise<void>
   createId?: () => string
   createAttachmentId?: () => string
   now?: () => string
@@ -166,15 +171,15 @@ export function createConstructionContractCommandTestInstance(options: Options =
     }
   }
 
-  function projectFor(state: SessionState, id: string) {
-    return state.migratedProjects.get(id) ?? projects.get(id)
+  function projectFor(state: SessionState, id: string, sessionId?: string | null) {
+    return options.resolveProjects?.(sessionId).find(row => row.id === id) ?? state.migratedProjects.get(id) ?? projects.get(id)
   }
 
-  function customerFor(state: SessionState, id: string) {
-    return state.migratedCustomers.get(id) ?? customers.get(id)
+  function customerFor(state: SessionState, id: string, sessionId?: string | null) {
+    return options.resolveCustomers?.(sessionId).find(row => row.id === id) ?? state.migratedCustomers.get(id) ?? customers.get(id)
   }
 
-  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action']) {
+  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action'], sessionId?: string | null) {
     const fieldErrors: Record<string, string[]> = {}
     if (action !== 'draft') {
       if (!text(draft.name))
@@ -204,10 +209,10 @@ export function createConstructionContractCommandTestInstance(options: Options =
       fieldErrors.lineItems = ['施工合同不接受采购明细']
     if (Object.keys(fieldErrors).length)
       throw failure('validation-failed', '施工合同表单校验失败', fieldErrors)
-    const project = projectFor(state, text(draft.projectId))
+    const project = projectFor(state, text(draft.projectId), sessionId)
     if (text(draft.projectId) && !project)
       throw failure('validation-failed', '项目不存在或来源不可用', { projectId: ['项目不存在'] })
-    if (text(draft.customerId) && !customerFor(state, text(draft.customerId)))
+    if (text(draft.customerId) && !customerFor(state, text(draft.customerId), sessionId))
       throw failure('validation-failed', '客户不存在或来源不可用', { customerId: ['客户不存在'] })
     if (project && text(draft.customerId) && project.customerId !== text(draft.customerId))
       throw failure('validation-failed', '项目与甲方客户关系不匹配', { customerId: ['必须选择项目当前客户'] })
@@ -224,10 +229,10 @@ export function createConstructionContractCommandTestInstance(options: Options =
       throw failure('validation-failed', 'commandId 必填')
   }
 
-  function toRow(state: SessionState, stored: StoredContract): ConstructionContractDetailSource {
+  function toRow(state: SessionState, stored: StoredContract, sessionId?: string | null): ConstructionContractDetailSource {
     const draft = stored.draft
-    const project = projectFor(state, text(draft.projectId))
-    const customer = customerFor(state, text(draft.customerId))
+    const project = projectFor(state, text(draft.projectId), sessionId)
+    const customer = customerFor(state, text(draft.customerId), sessionId)
     return {
       dataOrigin: 'real',
       id: stored.id,
@@ -291,7 +296,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
     },
     rows(sessionId?: string | null) {
       const state = stateFor(sessionId)
-      return [...state.contracts.values()].map(stored => toRow(state, stored))
+      return [...state.contracts.values()].map(stored => toRow(state, stored, sessionId))
     },
     facts(sessionId?: string | null): ConstructionContractFactSources {
       const state = stateFor(sessionId)
@@ -474,6 +479,12 @@ export function createConstructionContractCommandTestInstance(options: Options =
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return structuredClone(duplicate)
+      if (options.assertReferences) {
+        await options.assertReferences(request.draft, sessionId)
+        const completed = state.commands.get(request.commandId)
+        if (completed)
+          return structuredClone(completed)
+      }
       const existing = request.id ? state.contracts.get(request.id) ?? null : null
       if (request.id && !existing)
         throw failure('not-found', '正式施工合同不存在')
@@ -481,7 +492,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
         throw failure('validation-failed', '新建施工合同不能带 baseVersion')
       if (existing && request.baseVersion !== String(existing.version))
         throw failure('conflict', '施工合同已被其他操作更新，请先处理最新版本')
-      validate(state, request.draft, request.action)
+      validate(state, request.draft, request.action, sessionId)
       const timestamp = now()
       const id = existing?.id ?? createId()
       const removed = new Set(request.attachments.removeIds ?? [])
@@ -566,4 +577,7 @@ export const CONSTRUCTION_CONTRACT_EXISTING_RECORD: ConstructionContractMigratio
 export const constructionContractCommandTestInstance = createConstructionContractCommandTestInstance({
   projects: CONSTRUCTION_CONTRACT_FORM_PROJECTS,
   customers: CONSTRUCTION_CONTRACT_FORM_CUSTOMERS,
+  resolveProjects: id => projectCommandTestInstance.rows(id).map(row => ({ id: row.id, name: row.name, customerId: row.customerId })),
+  resolveCustomers: id => customerCommandTestInstance.rows(id).map(row => ({ id: row.id, name: row.name })),
+  assertReferences: async (draft, sessionId) => (await import('./construction-contract-references')).assertConstructionContractReferences(draft, sessionId),
 })

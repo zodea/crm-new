@@ -135,23 +135,27 @@ export function decodeCustomerListPage(value: unknown): CustomerListPageDTO {
   return value as unknown as CustomerListPageDTO
 }
 
-function project(value: unknown, origin: unknown): boolean {
+function project(value: unknown, origin: unknown, contractsUnavailable = false): boolean {
   if (!object(value) || !entityRef(value.project, 'project') || value.project.state !== 'resolved')
     return false
   return navigationFor(value.navigation, value.project, origin)
     && typeof value.code === 'string' && ['主客户', '次客户'].includes(String(value.relationRole))
     && typeof value.status === 'string' && typeof value.manager === 'string'
     && nullableDate(value.startDate) && nullableDate(value.plannedEnd)
-    && Number.isSafeInteger(value.contractCount) && Number(value.contractCount) >= 0 && money(value.effectiveContractAmount)
+    && (contractsUnavailable
+      ? value.contractCount === null && value.effectiveContractAmount === null
+      : Number.isSafeInteger(value.contractCount) && Number(value.contractCount) >= 0 && money(value.effectiveContractAmount))
     && Number.isSafeInteger(value.receiptCount) && Number(value.receiptCount) >= 0 && money(value.effectiveReceiptAmount)
 }
 
-function contract(value: unknown, origin: unknown): boolean {
+function contract(value: unknown, origin: unknown, customerId: string): boolean {
   if (!object(value) || !entityRef(value.contract, 'contract') || value.contract.state !== 'resolved'
     || !entityRef(value.project, 'project')) {
     return false
   }
-  return navigationFor(value.navigation, value.contract)
+  return navigationFor(value.navigation, value.contract, origin)
+    && navigationCustomerId(value.navigation) === customerId
+    && value.navigation.kind === 'entity-detail' && value.navigation.filters.contractKind === '施工'
     && navigationFor(value.projectNavigation, value.project, origin)
     && money(value.effectiveAmount) && money(value.receiptAmount) && money(value.outstandingAmount)
     && nullableDate(value.signDate)
@@ -178,25 +182,33 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
     ? value.customer.id
     : null
   const hasValidSummaryCounts = summary !== null
-    && ['contractCount', 'receiptCount', 'draftReceiptCount']
+    && ['receiptCount', 'draftReceiptCount']
       .every(field => Number.isSafeInteger(summary[field]) && Number(summary[field]) >= 0)
   if (!object(value) || !customerId || !isDataOriginDTO(value.dataOrigin) || !customer(value.customer, value.dataOrigin)
-    || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin))
-    || !Array.isArray(value.contracts) || !value.contracts.every(item => contract(item, value.dataOrigin))
+    || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin, value.contractsProblem !== undefined))
+    || !Array.isArray(value.contracts) || !value.contracts.every(item => contract(item, value.dataOrigin, customerId))
     || !Array.isArray(value.receipts) || !value.receipts.every(item => receipt(item, value.dataOrigin, customerId))
     || !summary
-    || !['effectiveContractAmount', 'effectiveReceiptAmount', 'outstandingAmount'].every(field => money(summary[field]))
-    || !hasValidSummaryCounts
-    || (value.projectsProblem === undefined
-      ? summary.projectCount !== value.projects.length
-      : !object(value.projectsProblem)
-        || !['forbidden', 'unavailable'].includes(String(value.projectsProblem.code))
-        || typeof value.projectsProblem.message !== 'string'
-        || typeof value.projectsProblem.retryable !== 'boolean'
-        || summary.projectCount !== null || value.projects.length !== 0)
-      || !isISODateTimeDTO(value.asOf)
-      || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')
-      || !strings(value.capabilities)) {
+    || !money(summary.effectiveReceiptAmount)
+    || (value.contractsProblem === undefined
+      ? summary.contractCount !== value.contracts.length || !money(summary.effectiveContractAmount) || !money(summary.outstandingAmount)
+      : !object(value.contractsProblem)
+        || !['forbidden', 'unavailable'].includes(String(value.contractsProblem.code))
+        || typeof value.contractsProblem.message !== 'string'
+        || typeof value.contractsProblem.retryable !== 'boolean'
+        || summary.contractCount !== null || value.contracts.length !== 0
+        || summary.effectiveContractAmount !== null || summary.outstandingAmount !== null)
+      || !hasValidSummaryCounts
+      || (value.projectsProblem === undefined
+        ? summary.projectCount !== value.projects.length
+        : !object(value.projectsProblem)
+          || !['forbidden', 'unavailable'].includes(String(value.projectsProblem.code))
+          || typeof value.projectsProblem.message !== 'string'
+          || typeof value.projectsProblem.retryable !== 'boolean'
+          || summary.projectCount !== null || value.projects.length !== 0)
+        || !isISODateTimeDTO(value.asOf)
+        || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')
+        || !strings(value.capabilities)) {
     return invalid('中央后台返回的客户详情读模型无效')
   }
   return value as unknown as CustomerDetailReadDTO

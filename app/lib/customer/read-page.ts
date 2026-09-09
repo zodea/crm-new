@@ -29,6 +29,7 @@ interface BuildCustomerListPageOptions {
 }
 
 interface BuildCustomerDetailReadOptions {
+  contractsProblem?: ProblemDTO
   projectsProblem?: ProblemDTO
   customers: readonly CustomerListSourceRow[]
   projects: readonly CustomerProjectSourceRow[]
@@ -314,10 +315,12 @@ export function buildCustomerDetailRead(
     row.permission !== 'forbidden'
     && (row.customerId === customer.id || row.secondaryCustomerId === customer.id),
   )
-  const contractRows = options.contracts.filter(row =>
-    row.dataOrigin === customer.dataOrigin
-    && row.customerId === customer.id,
-  )
+  const contractRows = options.contractsProblem
+    ? []
+    : options.contracts.filter(row =>
+        row.dataOrigin === customer.dataOrigin
+        && row.customerId === customer.id,
+      )
   const receiptRows = options.receipts.filter(row =>
     row.dataOrigin === customer.dataOrigin
     && row.customerId === customer.id,
@@ -327,7 +330,7 @@ export function buildCustomerDetailRead(
     originProjects.filter(row => row.permission === 'forbidden').map(row => row.id),
   )
   const contractLabels = new Map(
-    options.contracts
+    (options.contractsProblem ? [] : options.contracts)
       .filter(row => row.dataOrigin === customer.dataOrigin)
       .map(row => [row.id, row.name]),
   )
@@ -365,27 +368,29 @@ export function buildCustomerDetailRead(
       startDate: row.startDate,
       plannedEnd: row.plannedEnd,
       manager: row.manager,
-      contractCount: contractFact.count,
-      effectiveContractAmount: money(contractFact.amount),
+      contractCount: options.contractsProblem ? null : contractFact.count,
+      effectiveContractAmount: options.contractsProblem ? null : money(contractFact.amount),
       receiptCount: receiptFact.count,
       effectiveReceiptAmount: money(receiptFact.amount),
     }
   })
 
   const contracts: CustomerContractDTO[] = contractRows.map((row) => {
-    const project = refAndNavigation(
-      'project',
-      row.projectId,
-      projectLabels,
-      forbiddenProjects,
-      row.dataOrigin,
-      { customerId: customer.id },
-    )
+    const project = row.projectPermission === 'forbidden'
+      ? { ref: forbiddenRef('project'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'project',
+          row.projectId,
+          projectLabels,
+          forbiddenProjects,
+          row.dataOrigin,
+          { customerId: customer.id },
+        )
     const contractRef = resolvedRef('contract', row.id, row.name, row.no || null)
     const effectiveAmount = isDraft(row.status) ? 0 : row.amount + row.supplementAmount
     return {
       contract: contractRef as CustomerContractDTO['contract'],
-      navigation: detailIntent(contractRef),
+      navigation: detailIntent(contractRef, row.dataOrigin, { contractKind: '施工', customerId: customer.id }),
       project: project.ref as CustomerContractDTO['project'],
       projectNavigation: project.navigation,
       effectiveAmount: money(effectiveAmount),
@@ -445,16 +450,17 @@ export function buildCustomerDetailRead(
     dataOrigin: customer.dataOrigin,
     customer: { ...customer, aliases: [...customer.aliases] },
     ...(options.projectsProblem ? { projectsProblem: options.projectsProblem } : {}),
+    ...(options.contractsProblem ? { contractsProblem: options.contractsProblem } : {}),
     projects,
     contracts,
     receipts,
     summary: {
       projectCount: options.projectsProblem ? null : projects.length,
-      contractCount: contracts.length,
-      effectiveContractAmount: money(effectiveContractAmount),
+      contractCount: options.contractsProblem ? null : contracts.length,
+      effectiveContractAmount: options.contractsProblem ? null : money(effectiveContractAmount),
       receiptCount: receipts.length,
       effectiveReceiptAmount: money(effectiveReceiptAmount),
-      outstandingAmount: money(effectiveContractAmount - effectiveReceiptAmount),
+      outstandingAmount: options.contractsProblem ? null : money(effectiveContractAmount - effectiveReceiptAmount),
       draftReceiptCount: receipts.filter(row => row.isDraft).length,
     },
     asOf: options.asOf,

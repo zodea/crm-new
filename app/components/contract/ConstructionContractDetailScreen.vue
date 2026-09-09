@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
+import { useTimeoutFn } from '@vueuse/core'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
@@ -71,10 +73,23 @@ const focus = computed<ConstructionContractDetailFocusDTO | null>(() => {
   return { id: focusId.value, scope: focusScope.value }
 })
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
-const returnTo = computed(() => ownerDocumentReturnTo.value
+const returnCheckTime = shallowRef(Date.now())
+const customerReturnOrigin = computed(() => resolveCustomerRelationReturnOrigin(route.query.returnTo, {
+  targetEntity: 'contract',
+  targetId: props.contractId,
+  origin: props.origin,
+}, Math.max(returnCheckTime.value, Date.now())))
+const { start: startReturnExpiry, stop: stopReturnExpiry } = useTimeoutFn(
+  () => returnCheckTime.value = Date.now(),
+  () => Math.max(0, (customerReturnOrigin.value?.expiresAt ?? 0) - Date.now() + 1),
+  { immediate: false },
+)
+watch(customerReturnOrigin, origin => origin ? startReturnExpiry() : stopReturnExpiry(), { immediate: true })
+const customerReturnTo = computed(() => customerReturnOrigin.value?.returnTo ?? null)
+const returnTo = computed(() => customerReturnTo.value ?? ownerDocumentReturnTo.value
   ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
   ?? '/contract/construction')
-const backLabel = computed(() => ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
+const backLabel = computed(() => customerReturnTo.value ? '返回客户详情' : ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
 const canEdit = computed(() => detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
 const boqTo = computed(() => {
   const current = detail.value

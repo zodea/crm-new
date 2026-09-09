@@ -14,6 +14,7 @@ defineProps<{
   tab: CustomerRelationTab
   projects: readonly CustomerProjectDTO[]
   projectsProblem?: ProblemDTO
+  contractsProblem?: ProblemDTO
   restoreScrollLeft?: number
   contracts: readonly CustomerContractDTO[]
   receipts: readonly CustomerReceiptDTO[]
@@ -22,7 +23,7 @@ defineProps<{
   returnContext?: string
 }>()
 
-defineEmits<{ retryProjects: [], viewRestored: [] }>()
+defineEmits<{ retryProjects: [], retryContracts: [], viewRestored: [] }>()
 
 const projectColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
@@ -94,17 +95,25 @@ const receiptColumns: KitTableColumn[] = [
       </template>
     </KitTable>
 
+    <StatePanel
+      v-else-if="tab === 'contracts' && contractsProblem"
+      :kind="contractsProblem.code === 'forbidden' ? 'forbidden' : 'error'"
+      :title="contractsProblem.code === 'forbidden' ? '无权查看施工合同' : '施工合同加载失败'"
+      :description="contractsProblem.message"
+      :action-label="contractsProblem.retryable ? '重新加载施工合同' : ''"
+      @action="$emit('retryContracts')"
+    />
     <KitTable
       v-else-if="tab === 'contracts'"
       :columns="contractColumns"
       :data="[...contracts]"
       :min-rows="5"
       :restore-scroll-left="restoreScrollLeft"
-      :empty="{ title: '暂无施工合同', description: '仅展示 customer_id 指向当前客户的施工合同。' }"
+      :empty="{ title: '暂无施工合同', description: '当前客户尚未关联可查看的施工合同。' }"
       @view-restored="$emit('viewRestored')"
     >
       <template #contract="{ row }">
-        <CustomerRelationLink :reference="row.contract" :navigation="row.navigation" />
+        <CustomerRelationLink :reference="row.contract" :navigation="row.navigation" :return-to="relationshipReturnTo" />
       </template>
       <template #project="{ row }">
         <CustomerRelationLink :reference="row.project" :navigation="row.projectNavigation" :return-to="relationshipReturnTo" :return-anchor="row.contract.id ? `contract:${encodeURIComponent(row.contract.id)}` : null" />

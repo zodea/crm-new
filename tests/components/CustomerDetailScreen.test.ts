@@ -137,6 +137,46 @@ describe('客户详情业务页签', () => {
     }
   })
 
+  it.each(['forbidden', 'unavailable'] as const)('合同源 %s 时派生金额未知，禁止假空态且只在允许时重试', async (code) => {
+    route.query = { tab: 'contracts' }
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        contracts: [],
+        contractsProblem: { code, message: '合同源暂不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, contractCount: null, effectiveContractAmount: null, outstandingAmount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: EntityDetailShellStub,
+        SegTab: SegTabStub,
+        StatePanel,
+        CustomerDetailRelations,
+        CustomerDetailOverview: defineComponent({ template: '<section />' }),
+        KitTable: defineComponent({ template: '<section data-testid="contract-table">暂无施工合同</section>' }),
+        MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+        Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+        NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+      } },
+    })
+    expect(screen.getByRole('tab', { name: '施工合同' })).not.toBeNull()
+    for (const label of ['施工合同', '有效合同额', '待收差额'])
+      expect(screen.getByText(`${label}：—`)).not.toBeNull()
+    expect(screen.queryByTestId('contract-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看施工合同' : '施工合同加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载施工合同' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载施工合同' })).toBeNull()
+    }
+  })
+
   it('从 query 恢复页签，展示真实数量并在切换时保留其他 query', async () => {
     route.query = { tab: 'contracts', from: 'list' }
     render(CustomerDetailScreen, {

@@ -1,5 +1,6 @@
 import type { ContractListFilter } from '../contract/list-filters'
 import type { DataOriginDTO } from '~/types/read-model'
+import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 import { parseContractListFilter, serializeContractListFilter } from '../contract/list-filters'
@@ -138,7 +139,9 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (anchorId && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
       return null
     const returnTo = url.searchParams.get('returnTo')
-    const validatedListReturnTo = returnTo ? validateConstructionContractReturnTo(returnTo) : null
+    const validatedListReturnTo = returnTo
+      ? validateConstructionContractReturnTo(returnTo, origin) ?? validateCustomerDetailReturnTo(returnTo, origin)
+      : null
     if (returnTo && !validatedListReturnTo)
       return null
     if (validatedListReturnTo) {

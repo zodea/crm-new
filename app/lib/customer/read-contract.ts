@@ -97,6 +97,7 @@ export interface CustomerProjectSourceRow {
 }
 
 export interface CustomerContractSourceRow {
+  projectPermission?: 'allowed' | 'forbidden'
   dataOrigin: DataOriginDTO
   id: string
   no: string
@@ -133,8 +134,8 @@ export interface CustomerProjectDTO {
   startDate: ISODateDTO | null
   plannedEnd: ISODateDTO | null
   manager: string
-  contractCount: number
-  effectiveContractAmount: MoneyDTO
+  contractCount: number | null
+  effectiveContractAmount: MoneyDTO | null
   receiptCount: number
   effectiveReceiptAmount: MoneyDTO
 }
@@ -180,15 +181,16 @@ export interface CustomerReceiptDetailReadDTO {
 
 export interface CustomerDetailSummaryDTO {
   projectCount: number | null
-  contractCount: number
-  effectiveContractAmount: MoneyDTO
+  contractCount: number | null
+  effectiveContractAmount: MoneyDTO | null
   receiptCount: number
   effectiveReceiptAmount: MoneyDTO
-  outstandingAmount: MoneyDTO
+  outstandingAmount: MoneyDTO | null
   draftReceiptCount: number
 }
 
 export interface CustomerDetailReadDTO {
+  contractsProblem?: ProblemDTO
   projectsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO
   customer: CustomerListSourceRow

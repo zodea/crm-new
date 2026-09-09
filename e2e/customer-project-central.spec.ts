@@ -230,7 +230,7 @@ test('项目详情读取失败保留已捕获客户来源；直接深链、伪�
   await expect(page.getByRole('link', { name: '返回项目列表', exact: true })).toHaveAttribute('href', '/project')
   await page.evaluate(() => {
     for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith('ruihang:customer-project-return:')) {
+      if (key.startsWith('ruihang:customer-relation-return:')) {
         const value = JSON.parse(sessionStorage.getItem(key)!)
         value.expiresAt = 1
         sessionStorage.setItem(key, JSON.stringify(value))

@@ -163,7 +163,7 @@ function contractNavigation(source: ConstructionContractDetailSource): Navigatio
 }
 
 function activeSupplement(row: ConstructionContractFactSource): boolean {
-  return !['草稿', '无效', '作废', 'cancelled'].includes(row.status)
+  return !['draft', '草稿', '无效', '作废', 'cancelled'].includes(row.status)
 }
 
 function approvedChange(row: ConstructionContractFactSource): boolean {
@@ -177,10 +177,14 @@ function sameContract<T extends { dataOrigin: string, contractId: string | null 
   return rows.filter(row => row.dataOrigin === source.dataOrigin && row.contractId === source.id)
 }
 
-function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
-  const supplements = sameContract(facts.supplements, source)
+export function constructionContractSupplementAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
+  return round2(sameContract(facts.supplements, source)
     .filter(activeSupplement)
-    .reduce((sum, row) => sum + (row.amount ?? 0), 0)
+    .reduce((sum, row) => sum + (row.amount ?? 0), 0))
+}
+
+function changedAmount(source: ConstructionContractDetailSource, facts: ConstructionContractFactSources): number {
+  const supplements = constructionContractSupplementAmount(source, facts)
   const changes = sameContract(facts.changes, source)
     .filter(approvedChange)
     .reduce((sum, row) => sum + (row.amount ?? 0), 0)

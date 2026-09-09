@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildConstructionContractDetail,
   buildConstructionContractListPage,
+  constructionContractSupplementAmount,
   parseConstructionContractDetailQuery,
   parseConstructionContractListQuery,
 } from '~/lib/construction-contract/repository'
@@ -74,6 +75,18 @@ function emptyFacts(): ConstructionContractFactSources {
 }
 
 describe('施工合同中央 Repository contract', () => {
+  it('有效补充金额与变更后金额分开，排除草稿/作废及其他来源或合同', () => {
+    const contract = source()
+    const row = { dataOrigin: 'real' as const, id: 's', contractId: contract.id, no: '', name: '', amount: 100, date: null, status: '有效' }
+    const facts = {
+      ...emptyFacts(),
+      supplements: [row, ...['draft', '草稿', '无效', '作废', 'cancelled'].map(status => ({ ...row, status, amount: 999 })), { ...row, dataOrigin: 'demo' as const }, { ...row, contractId: 'another' }],
+      changes: [{ ...row, id: 'change', amount: 250, status: 'approved' }],
+    }
+    expect(constructionContractSupplementAmount(contract, facts)).toBe(100)
+    const read = buildConstructionContractDetail({ contracts: [contract], facts, query: parseConstructionContractDetailQuery(contract.id, { origin: 'real' }), asOf: AS_OF, sourceVersion: '1', capabilities: [] })
+    expect(read.contract.amounts.changed).toBe('1350.00')
+  })
   it('状态多选在分页前按 OR 匹配并汇总全量结果', () => {
     const page = buildConstructionContractListPage({
       contracts: [

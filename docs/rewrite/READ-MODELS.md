@@ -391,6 +391,14 @@ interface NotificationOpenResultDTO {
 
 中央可重置内存实例的通过只证明本切片，生产持久化仍由 #416 验收。合同、收款等其他客户关联的正式写源接入不由项目切片的通过推定完成。
 
+### 客户关联施工合同
+
+#425 的 `CustomerDetailReadDTO.contracts` 复用施工合同中央主读事实，按合同自身客户 ID/来源投影；合同、有效补充协议和累计收款字段均来自该主读源，版本随合同命令及其既有事实来源变化。有效补充金额的状态判定与施工合同主读共享；客户有效额与合同变更后金额的区别见[客户页](./pages/base-customer.md#详情)。客户列表与客户原始身份 facts 不读取合同/项目聚合，避免候选、命令校验和客户详情互相递归。
+
+`summary.contractCount=contracts.length`；合同导航必须含同一 `dataOrigin`、`contractKind=施工` 与父 `customerId`，解码器拒绝来源/类型/客户错配。项目引用仍检查实际可读项目和合同源的关系权限。
+
+整个合同源无权/不可用返回 `contractsProblem`（`forbidden` / `unavailable`），`contracts=[]`，摘要合同数/有效合同额/待收差额与项目行合同数/有效合同额为 `null`，保持独立可读的客户和项目。解码验证问题态、未知值、集合及计数一致，不将失败转换为真实零。前端对合同页签给出明确反馈和适用重试；未接入的新收款写源不由本票推定完成。
+
 ### 适配边界
 
 1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL、SQL 或领域 route map。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。可点击目标统一交给 Target Registry，未登记目标保持不可达。
