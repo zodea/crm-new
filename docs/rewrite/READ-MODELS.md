@@ -383,6 +383,16 @@ interface NotificationOpenResultDTO {
 
 ## 5. 本地 adapter 与后台迁移规则
 
+### 客户关联项目
+
+`CustomerDetailReadDTO.projects` 从中央项目原始事实快照投影，不经项目列表/详情的客户名称富化回调；客户列表本身不依赖项目聚合，避免两端递归。项目主读与客户投影共享命令、已确认迁移、测试会话、来源版本和服务可用性边界，未创建本地正式镜像或第二张关系表。
+
+`summary.projectCount` 等于可读 `projects.length`。受限单记录从集合排除；关联引用的 forbidden 身份置空。整个项目源无权/暂不可用时返回 `projectsProblem`（`forbidden` / `unavailable`），`projects=[]`、`projectCount=null`，前端须以问题状态解释，不能呈现空关系或真实 0；恢复后重新读取集合。DTO 解码验证数量、状态与集合一致。关系更正和匹配规则见[客户页面](./pages/base-customer.md#详情)。
+
+中央可重置内存实例的通过只证明本切片，生产持久化仍由 #416 验收。合同、收款等其他客户关联的正式写源接入不由项目切片的通过推定完成。
+
+### 适配边界
+
 1. Pinia store 只依赖领域 repository port；SQLite adapter 与 HTTP adapter 返回同一 DTO 语义。页面不得直接拼 HTTP URL、SQL 或领域 route map。项目列表的搜索、阶段与表头筛选都进入强类型 Repository 查询，分页、汇总和导出读取同一完整筛选集；表头筛选选项来自全量服务端 facet，不从当前页反推。可点击目标统一交给 Target Registry，未登记目标保持不可达。
 2. 项目列表与来源感知基础详情已经使用中央 HTTP 读 adapter，正式项目表单使用中央命令 adapter；其非生产重置端点只接受显式测试请求，不是用户写接口。迁移页经 `/api/migrations/core/*` 获取预检、批次、问题、映射和中央快照；只有中央 `authority='central'` 且活动批次与本机持久标记一致时，已迁移项目与施工/分包合同才作为正式数据读回。其他页面域在通用业务 API 接入前继续使用 SQLite adapter；但任何已经接入中央的领域均不得借此绕过中央或回退读取旧 production；具体已接入范围见本文件当前落点与 ADR 0020。禁止新增 MockJS、随机工厂、静态成功记录或名称匹配伪外键。
 3. 按上表页面域逐个迁移读路径。同一页面切换 adapter 前，用相同确定性夹具验证列表、详情、空态、错误、权限、分页汇总和 sourceVersion 等价。

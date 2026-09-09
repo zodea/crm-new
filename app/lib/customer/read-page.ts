@@ -1,4 +1,4 @@
-import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
 import type {
   CustomerContractDTO,
   CustomerContractSourceRow,
@@ -29,6 +29,7 @@ interface BuildCustomerListPageOptions {
 }
 
 interface BuildCustomerDetailReadOptions {
+  projectsProblem?: ProblemDTO
   customers: readonly CustomerListSourceRow[]
   projects: readonly CustomerProjectSourceRow[]
   contracts: readonly CustomerContractSourceRow[]
@@ -244,9 +245,8 @@ function missingRef(entity: EntityKindDTO): Extract<EntityRefDTO, { state: 'miss
 
 function forbiddenRef(
   entity: EntityKindDTO,
-  id: string,
 ): Extract<EntityRefDTO, { state: 'forbidden' }> {
-  return { state: 'forbidden', entity, id, label: null, reason: 'permission-denied' }
+  return { state: 'forbidden', entity, id: null, label: null, reason: 'permission-denied' }
 }
 
 function unavailable(reason: 'missing-id' | 'forbidden'): NavigationIntentDTO {
@@ -278,7 +278,7 @@ function refAndNavigation(
   if (!id)
     return { ref: missingRef(entity), navigation: unavailable('missing-id') }
   if (forbiddenIds.has(id))
-    return { ref: forbiddenRef(entity, id), navigation: unavailable('forbidden') }
+    return { ref: forbiddenRef(entity), navigation: unavailable('forbidden') }
   const label = labels.get(id)
   if (!label)
     return { ref: missingRef(entity), navigation: unavailable('missing-id') }
@@ -309,9 +309,10 @@ export function buildCustomerDetailRead(
     ))
   }
 
-  const originProjects = options.projects.filter(row => row.dataOrigin === customer.dataOrigin)
+  const originProjects = options.projectsProblem ? [] : options.projects.filter(row => row.dataOrigin === customer.dataOrigin)
   const projectRows = originProjects.filter(row =>
-    row.customerId === customer.id || row.secondaryCustomerId === customer.id,
+    row.permission !== 'forbidden'
+    && (row.customerId === customer.id || row.secondaryCustomerId === customer.id),
   )
   const contractRows = options.contracts.filter(row =>
     row.dataOrigin === customer.dataOrigin
@@ -354,25 +355,20 @@ export function buildCustomerDetailRead(
   const projects: CustomerProjectDTO[] = projectRows.map((row) => {
     const contractFact = contractsByProject.get(row.id) ?? { count: 0, amount: 0 }
     const receiptFact = receiptsByProject.get(row.id) ?? { count: 0, amount: 0 }
-    const target = row.permission === 'forbidden'
-      ? { ref: forbiddenRef('project', row.id), navigation: unavailable('forbidden') }
-      : (() => {
-          const ref = resolvedRef('project', row.id, row.name, row.code || null)
-          return { ref, navigation: detailIntent(ref, row.dataOrigin, { customerId: customer.id }) }
-        })()
+    const ref = resolvedRef('project', row.id, row.name, row.code || null)
     return {
-      project: target.ref as CustomerProjectDTO['project'],
-      navigation: target.navigation,
-      code: row.permission === 'forbidden' ? '' : row.code,
+      project: ref as CustomerProjectDTO['project'],
+      navigation: detailIntent(ref, row.dataOrigin, { customerId: customer.id }),
+      code: row.code,
       relationRole: row.customerId === customer.id ? '主客户' : '次客户',
-      status: row.permission === 'forbidden' ? '' : row.status,
-      startDate: row.permission === 'forbidden' ? null : row.startDate,
-      plannedEnd: row.permission === 'forbidden' ? null : row.plannedEnd,
-      manager: row.permission === 'forbidden' ? '' : row.manager,
-      contractCount: row.permission === 'forbidden' ? 0 : contractFact.count,
-      effectiveContractAmount: money(row.permission === 'forbidden' ? 0 : contractFact.amount),
-      receiptCount: row.permission === 'forbidden' ? 0 : receiptFact.count,
-      effectiveReceiptAmount: money(row.permission === 'forbidden' ? 0 : receiptFact.amount),
+      status: row.status,
+      startDate: row.startDate,
+      plannedEnd: row.plannedEnd,
+      manager: row.manager,
+      contractCount: contractFact.count,
+      effectiveContractAmount: money(contractFact.amount),
+      receiptCount: receiptFact.count,
+      effectiveReceiptAmount: money(receiptFact.amount),
     }
   })
 
@@ -448,11 +444,12 @@ export function buildCustomerDetailRead(
   return {
     dataOrigin: customer.dataOrigin,
     customer: { ...customer, aliases: [...customer.aliases] },
+    ...(options.projectsProblem ? { projectsProblem: options.projectsProblem } : {}),
     projects,
     contracts,
     receipts,
     summary: {
-      projectCount: projects.length,
+      projectCount: options.projectsProblem ? null : projects.length,
       contractCount: contracts.length,
       effectiveContractAmount: money(effectiveContractAmount),
       receiptCount: receipts.length,

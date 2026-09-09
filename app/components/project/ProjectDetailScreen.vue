@@ -7,7 +7,7 @@ import type { DataOriginDTO, ProblemDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
-import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
+import { resolveCustomerProjectReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
   createMaterialContractJourneyReturnOrigin,
   isProjectOwnerDocumentCardAnchor,
@@ -73,9 +73,15 @@ const ownerJourneys = shallowRef<OwnerJourneyPages | null>(null)
 const ownerJourneysError = shallowRef('')
 
 const item = computed(() => detail.value?.item ?? null)
+const customerReturnOrigin = computed(() => resolveCustomerProjectReturnOrigin(props.customerReturnTo, { projectId: props.projectId, origin: props.originHint }))
 const verifiedCustomerReturnTo = computed(() => {
-  if (!item.value || !props.customerReturnTo)
+  if (!props.customerReturnTo)
     return null
+  const hasContext = new URL(props.customerReturnTo, 'https://ruihang.invalid').searchParams.has('relationContext')
+  if (hasContext && !customerReturnOrigin.value)
+    return null
+  if (!item.value)
+    return customerReturnOrigin.value?.returnTo ?? null
   const customerIds = [item.value.customer, item.value.secondaryCustomer]
     .filter(reference => reference.state === 'resolved')
     .map(reference => reference.id)
@@ -85,7 +91,7 @@ const verifiedCustomerReturnTo = computed(() => {
 })
 const effectiveReturnTo = computed(() => verifiedCustomerReturnTo.value ?? props.returnTo)
 const effectiveReturnLabel = computed(() => verifiedCustomerReturnTo.value ? '返回客户详情' : props.returnLabel)
-const effectiveReturnExpiresAt = computed(() => verifiedCustomerReturnTo.value ? undefined : props.returnExpiresAt)
+const effectiveReturnExpiresAt = computed(() => verifiedCustomerReturnTo.value ? customerReturnOrigin.value?.expiresAt : props.returnExpiresAt)
 const project = computed(() => item.value ? projectFromRead(item.value) : null)
 const isDemo = computed(() => item.value?.dataOrigin === 'demo')
 const journeyReturnTo = computed(() => props.currentRoute

@@ -36,6 +36,6 @@ onBeforeUnmount(() => {
 <template>
   <NuxtLink :to="target" class="btn-secondary flex-none">
     <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />
-    {{ label || '返回项目列表' }}
+    {{ target !== to ? '返回项目列表' : label || '返回项目列表' }}
   </NuxtLink>
 </template>

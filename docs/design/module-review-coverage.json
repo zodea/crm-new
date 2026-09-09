@@ -19655,14 +19655,16 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "partial",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-424/customer-project-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416"
       ]
     },
     {
@@ -19701,14 +19703,16 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "partial",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-424/customer-project-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416"
       ]
     },
     {
@@ -19839,14 +19843,16 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "partial",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-424/customer-project-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416"
       ]
     },
     {
@@ -34709,14 +34715,16 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "partial",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-424/customer-project-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416"
       ]
     },
     {

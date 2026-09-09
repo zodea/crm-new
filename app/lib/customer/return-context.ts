@@ -21,7 +21,7 @@ export interface CustomerReturnOrigin {
 
 const ROUTE = '/base/customer'
 const DETAIL_ROUTE = /^\/base\/customer\/([^/]+)$/
-const DETAIL_QUERY = new Set(['origin', 'tab', 'returnTo', 'returnContext'])
+const DETAIL_QUERY = new Set(['origin', 'tab', 'returnTo', 'returnContext', 'relationContext'])
 const DETAIL_TABS = new Set(['projects', 'contracts', 'receipts'])
 const ID = /^[\w-]{8,64}$/
 const ANCHOR = /^customer-row-[\w%.~-]+$/
@@ -54,6 +54,7 @@ export function createCustomerDetailReturnTo(options: {
   tab: 'projects' | 'contracts' | 'receipts'
   returnTo?: string
   returnContext?: string
+  relationContext?: string
 }): string {
   const customerId = decodeDetailIdentity(encodeURIComponent(options.customerId))
   if (!customerId || !isDataOriginDTO(options.origin) || !DETAIL_TABS.has(options.tab))
@@ -61,6 +62,11 @@ export function createCustomerDetailReturnTo(options: {
   const query = new URLSearchParams({ origin: options.origin })
   if (options.tab !== 'projects')
     query.set('tab', options.tab)
+  if (options.relationContext != null) {
+    if (!isCustomerReturnContextId(options.relationContext))
+      throw new Error('invalid customer project return context')
+    query.set('relationContext', options.relationContext)
+  }
   if (options.returnTo != null || options.returnContext != null) {
     const returnTo = validateCustomerReturnTo(options.returnTo)
     if (!returnTo || !isCustomerReturnContextId(options.returnContext))
@@ -106,11 +112,67 @@ export function validateCustomerDetailReturnTo(
       tab: tab as 'projects' | 'contracts' | 'receipts',
       returnTo: url.searchParams.get('returnTo') ?? undefined,
       returnContext: url.searchParams.get('returnContext') ?? undefined,
+      relationContext: url.searchParams.get('relationContext') ?? undefined,
     })
   }
   catch {
     return null
   }
+}
+
+export interface CustomerProjectReturnOrigin {
+  returnTo: string
+  projectId: string
+  anchorId: string | null
+  scrollTop: number
+  scrollLeft: number
+  expiresAt: number
+}
+
+const PROJECT_RETURN_PREFIX = 'ruihang:customer-project-return:'
+
+export function customerProjectReturnTo(returnTo: unknown, contextId: string): string | null {
+  const canonical = validateCustomerDetailReturnTo(returnTo)
+  if (!canonical || !isCustomerReturnContextId(contextId))
+    return null
+  const url = new URL(canonical, 'https://ruihang.invalid')
+  url.searchParams.set('relationContext', contextId)
+  return validateCustomerDetailReturnTo(`${url.pathname}${url.search}`)
+}
+
+export function saveCustomerProjectReturnOrigin(origin: CustomerProjectReturnOrigin, storage: Storage = sessionStorage) {
+  const canonical = validateCustomerDetailReturnTo(origin.returnTo)
+  const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
+  if (!id)
+    return
+  try {
+    storage.setItem(`${PROJECT_RETURN_PREFIX}${id}`, JSON.stringify(origin))
+  }
+  catch { /* 浏览器禁用存储时使用规范返回，不影响导航。 */ }
+}
+
+export function resolveCustomerProjectReturnOrigin(
+  returnTo: unknown,
+  expected: { projectId?: string, origin?: DataOriginDTO },
+  now = Date.now(),
+  storage: Storage = sessionStorage,
+): CustomerProjectReturnOrigin | null {
+  const canonical = validateCustomerDetailReturnTo(returnTo, expected.origin)
+  const id = canonical && new URL(canonical, 'https://ruihang.invalid').searchParams.get('relationContext')
+  if (!id)
+    return null
+  try {
+    const value = JSON.parse(storage.getItem(`${PROJECT_RETURN_PREFIX}${id}`) ?? 'null') as CustomerProjectReturnOrigin | null
+    return value && value.returnTo === canonical && typeof value.projectId === 'string' && value.projectId.length > 0
+      && (value.anchorId === null || (typeof value.anchorId === 'string' && value.anchorId.length <= 512 && /^(?:project|contract|receipt):[\w%.~-]+$/.test(value.anchorId)))
+      && (!expected.projectId || value.projectId === expected.projectId)
+      && Number.isFinite(value.expiresAt) && value.expiresAt > now
+      && Number.isFinite(value.scrollTop) && value.scrollTop >= 0
+      && Number.isFinite(value.scrollLeft) && value.scrollLeft >= 0
+      ? value
+      : null
+  }
+  catch { return null }
 }
 
 export function createCustomerReturnOrigin(options: {

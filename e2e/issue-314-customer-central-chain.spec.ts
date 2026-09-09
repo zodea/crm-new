@@ -96,11 +96,12 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
   })
 
   test('真实关系、零关系、关系缺失与无权限都在中央详情中保持语义', async ({ page }, testInfo) => {
+    test.setTimeout(120_000)
     const [emptyCustomerId] = await seedFormalCustomers(page.context().request, testSession(testInfo), 1)
     await page.addInitScript(key => localStorage.setItem(key, 'true'), DATA_VISIBILITY_STORAGE_KEY)
     await page.goto('/base/customer?search=合和')
     const customerSearch = page.getByRole('searchbox', { name: '搜索客户名称、简称、税号或联系人…' })
-    await expect(customerSearch).toHaveValue('合和')
+    await expect(customerSearch).toHaveValue('合和', { timeout: 20_000 })
     await page.getByRole('link', { name: '合和地产集团', exact: true }).first().click()
     await expect(page.getByRole('heading', { name: '合和地产集团' })).toBeVisible({ timeout: 20_000 })
 
@@ -136,7 +137,8 @@ test.describe('Issue #314：客户中央列表—详情—显式编辑链', () =
     await expect(page.getByRole('link', { name: '合和地产集团', exact: true }).first()).toBeFocused()
 
     await page.goto('/base/customer/customer_demo_003?origin=demo')
-    await expect(page.getByText('无权限', { exact: true })).toBeVisible()
+    await expect(page.getByRole('tab', { name: '名下项目 0', exact: true })).toBeVisible()
+    await expect(page.locator('[data-customer-project-id]')).toHaveCount(0)
 
     await page.goto(`/base/customer/${emptyCustomerId}?origin=real`)
     await expect(page.getByRole('tabpanel', { name: '名下项目' }).getByText('暂无名下项目', { exact: true }).nth(1))

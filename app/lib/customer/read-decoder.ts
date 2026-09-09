@@ -136,7 +136,7 @@ export function decodeCustomerListPage(value: unknown): CustomerListPageDTO {
 }
 
 function project(value: unknown, origin: unknown): boolean {
-  if (!object(value) || !entityRef(value.project, 'project'))
+  if (!object(value) || !entityRef(value.project, 'project') || value.project.state !== 'resolved')
     return false
   return navigationFor(value.navigation, value.project, origin)
     && typeof value.code === 'string' && ['主客户', '次客户'].includes(String(value.relationRole))
@@ -178,7 +178,7 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
     ? value.customer.id
     : null
   const hasValidSummaryCounts = summary !== null
-    && ['projectCount', 'contractCount', 'receiptCount', 'draftReceiptCount']
+    && ['contractCount', 'receiptCount', 'draftReceiptCount']
       .every(field => Number.isSafeInteger(summary[field]) && Number(summary[field]) >= 0)
   if (!object(value) || !customerId || !isDataOriginDTO(value.dataOrigin) || !customer(value.customer, value.dataOrigin)
     || !Array.isArray(value.projects) || !value.projects.every(item => project(item, value.dataOrigin))
@@ -187,9 +187,16 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
     || !summary
     || !['effectiveContractAmount', 'effectiveReceiptAmount', 'outstandingAmount'].every(field => money(summary[field]))
     || !hasValidSummaryCounts
-    || !isISODateTimeDTO(value.asOf)
-    || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')
-    || !strings(value.capabilities)) {
+    || (value.projectsProblem === undefined
+      ? summary.projectCount !== value.projects.length
+      : !object(value.projectsProblem)
+        || !['forbidden', 'unavailable'].includes(String(value.projectsProblem.code))
+        || typeof value.projectsProblem.message !== 'string'
+        || typeof value.projectsProblem.retryable !== 'boolean'
+        || summary.projectCount !== null || value.projects.length !== 0)
+      || !isISODateTimeDTO(value.asOf)
+      || (value.sourceVersion !== null && typeof value.sourceVersion !== 'string')
+      || !strings(value.capabilities)) {
     return invalid('中央后台返回的客户详情读模型无效')
   }
   return value as unknown as CustomerDetailReadDTO

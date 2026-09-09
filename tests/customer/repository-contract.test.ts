@@ -177,13 +177,10 @@ describe('客户中央 Repository contract', () => {
       kind: 'entity-detail',
       filters: { dataOrigin: 'real', customerId: 'customer-1' },
     })
-    expect(detail.projects[1]?.project).toEqual({
-      state: 'forbidden',
-      entity: 'project',
-      id: 'project-secret',
-      label: null,
-      reason: 'permission-denied',
-    })
+    expect(detail.projects).toHaveLength(1)
+    expect(detail.summary.projectCount).toBe(1)
+    expect(JSON.stringify(detail)).not.toContain('project-secret')
+    expect(JSON.stringify(detail)).not.toContain('不能泄露的项目')
     expect(detail.contracts[0]?.project).toEqual({
       state: 'missing',
       entity: 'project',

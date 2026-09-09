@@ -358,6 +358,8 @@ openDrawer({
 
 **表格空态**：`KitTable.empty` 兼容原有字符串，也接受 `{ title, description?, actionLabel? }`。传对象时组件发出 `emptyAction`，由业务页决定清筛选、创建首条记录等动作；不能在通用表格里猜业务路由。
 
+**来源视图恢复**：`KitTable.restoreScrollLeft?: number` 只接受非负有限位置；数据渲染、布局与滚动完成后发出 `viewRestored`，由领域恢复焦点。失效来源取消待完成的恢复。单元格通过 `KIT_TABLE_VIEW_KEY` 注入的 `scrollLeft()` 读取当前位置，领域不访问 vxe DOM。视图状态不承载业务数据、筛选或权限。
+
 **与 #97 KitListShell 的边界**：#185 实施时不采用也不替代 `KitListShell`，当时延期到具有真实左树、视图切换或服务端汇总需求的领域列表票。后续 `ListShell` 已用于领域列表，#418 的连续工作面合同见第 13 节；`StatePanel` 与 `KitTable` 继续可组合，不为状态原语虚构列表业务。
 
 **页面状态机**：

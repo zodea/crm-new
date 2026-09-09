@@ -177,6 +177,10 @@ function buildSurfaces(ledger, registry) {
 function caseFor(surface, host) {
   const materialList = surface.route === '/contract/material' && surface.path === 'page' && host === 'browser'
   const projectImport = surface.route === '/import/mapping/:entity' && surface.kind === 'project' && host === 'browser'
+  const customerProjects = host === 'browser' && (
+    (surface.route === '/base/customer/:id' && ['page', 'tab/projects', 'tab/projects/table'].includes(surface.path))
+    || (surface.route === '/project/:id' && surface.path === 'page')
+  )
   return {
     id: stableId('C', [surface.id, host]),
     surfaceId: surface.id,
@@ -190,13 +194,13 @@ function caseFor(surface, host) {
       note: '父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据',
     },
     acceptance: {
-      rules: materialList || projectImport ? 'scoped-defined' : 'needs-review',
-      frontend: projectImport ? 'passed' : materialList ? 'partial' : 'not-verified',
-      crossModule: projectImport ? 'passed' : materialList ? 'partial' : 'not-verified',
+      rules: materialList || projectImport || customerProjects ? 'scoped-defined' : 'needs-review',
+      frontend: projectImport ? 'passed' : materialList || customerProjects ? 'partial' : 'not-verified',
+      crossModule: projectImport || customerProjects ? 'passed' : materialList ? 'partial' : 'not-verified',
       production: host === 'tauri' ? 'out-of-scope' : 'not-verified',
     },
-    reviewEvidence: projectImport ? ['docs/design/evidence/issue-423/project-import-verification.md'] : materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
-    remaining: projectImport ? ['生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射'] : materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
+    reviewEvidence: customerProjects ? ['docs/design/evidence/issue-424/customer-project-verification.md'] : projectImport ? ['docs/design/evidence/issue-423/project-import-verification.md'] : materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
+    remaining: customerProjects ? ['#424 仅验收中央项目→客户关联回读及往返；其他关联、逐列工具由 #407/#408/#404 继续复核，生产持久化归 #416'] : projectImport ? ['生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射'] : materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
   }
 }
 

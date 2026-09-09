@@ -192,12 +192,16 @@ export function createProjectReadTestInstance(
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
 
-  async function readContext(sessionId?: string | null) {
+  // 未富化的同一项目事实快照；关联读面不得经 list/detail 回调客户读取。
+  function facts(sessionId?: string | null) {
     const scenario = scenarios.get(keyFor(sessionId)) ?? 'ready'
     if (scenario === 'forbidden')
       throw repositoryProblem('forbidden', '无项目查看权限', false)
     if (scenario === 'unavailable')
       throw repositoryProblem('unavailable', '中央后台测试实例暂时不可用', true)
+    const capabilities = resolveCapabilities(sessionId)
+    if (!capabilities.includes('project:list:read'))
+      throw repositoryProblem('forbidden', '无项目查看权限', false)
     const migrationSnapshot = resolveMigrationSnapshot(sessionId)
     const rows = scenario === 'ready'
       ? [
@@ -207,8 +211,8 @@ export function createProjectReadTestInstance(
         ]
       : []
     return {
-      capabilities: resolveCapabilities(sessionId),
-      rows: await resolveCustomerReferences(rows, sessionId),
+      capabilities,
+      rows,
       asOf: latestAsOf(rows),
       sourceVersion: scenario === 'ready'
         ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
@@ -220,7 +224,13 @@ export function createProjectReadTestInstance(
     }
   }
 
+  async function readContext(sessionId?: string | null) {
+    const context = facts(sessionId)
+    return { ...context, rows: await resolveCustomerReferences(context.rows, sessionId) }
+  }
+
   return {
+    facts,
     reset(next: ProjectReadTestScenario, sessionId?: string | null) {
       const key = keyFor(sessionId)
       if (next === 'ready')

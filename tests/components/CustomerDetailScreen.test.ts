@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
+import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
 import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
+import StatePanel from '~/components/ui/StatePanel.vue'
 
 const customerStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
@@ -93,6 +95,46 @@ describe('客户详情业务页签', () => {
     routerReplace.mockReset()
     customerStoreMock.detailState = { kind: 'ready', data: detail }
     customerStoreMock.loadDetail.mockClear()
+  })
+
+  it.each(['forbidden', 'unavailable'] as const)('项目源 %s 时数量未知、不渲染假空列表，仅失败可重试', async (code) => {
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        projects: [],
+        projectsProblem: { code, message: '项目源暂不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, projectCount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: {
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
+          StatePanel,
+          CustomerDetailRelations,
+          CustomerDetailOverview: defineComponent({ template: '<section />' }),
+          KitTable: defineComponent({ template: '<section data-testid="project-table">暂无名下项目</section>' }),
+          MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+          Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+          NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+        },
+      },
+    })
+    expect(screen.getByRole('tab', { name: '名下项目' })).not.toBeNull()
+    expect(screen.getByText('名下项目：—')).not.toBeNull()
+    expect(screen.queryByTestId('project-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看关联项目' : '关联项目加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载关联项目' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载关联项目' })).toBeNull()
+    }
   })
 
   it('从 query 恢复页签，展示真实数量并在切换时保留其他 query', async () => {

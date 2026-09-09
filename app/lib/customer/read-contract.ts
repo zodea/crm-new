@@ -125,7 +125,7 @@ export interface CustomerReceiptSourceRow {
 }
 
 export interface CustomerProjectDTO {
-  project: EntityRefDTO & { entity: 'project' }
+  project: Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'project' }
   navigation: NavigationIntentDTO
   code: string
   relationRole: '主客户' | '次客户'
@@ -179,7 +179,7 @@ export interface CustomerReceiptDetailReadDTO {
 }
 
 export interface CustomerDetailSummaryDTO {
-  projectCount: number
+  projectCount: number | null
   contractCount: number
   effectiveContractAmount: MoneyDTO
   receiptCount: number
@@ -189,6 +189,7 @@ export interface CustomerDetailSummaryDTO {
 }
 
 export interface CustomerDetailReadDTO {
+  projectsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO
   customer: CustomerListSourceRow
   projects: CustomerProjectDTO[]

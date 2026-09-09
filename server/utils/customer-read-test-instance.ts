@@ -5,6 +5,7 @@ import type {
   CustomerReceiptSourceRow,
 } from '../../app/lib/customer/repository'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
+import type { ProblemDTO } from '../../app/types/read-model'
 import {
   buildCustomerDetailRead,
   buildCustomerListPage,
@@ -20,6 +21,7 @@ import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
 import { ownerFinalSettlementReceiptIsActive } from '../../app/lib/owner-document/central-repository'
+import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { resolveBusinessSession } from './business-session'
 import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
@@ -206,6 +208,11 @@ export function createCustomerReadTestInstance(
   resolveFormalRows: (sessionId?: string | null) => readonly CustomerListSourceRow[] = id => customerCommandTestInstance.rows(id),
   resolveFormalSourceVersion: (sessionId?: string | null) => string = id => customerCommandTestInstance.sourceVersion(id),
   resolveMigrationSnapshot: (sessionId?: string | null) => CoreMigrationSnapshotDTO = () => EMPTY_MIGRATION_SNAPSHOT,
+  resolveProjectFacts: (sessionId?: string | null) => Promise<{
+    rows: readonly CustomerProjectSourceRow[]
+    sourceVersion: string
+    asOf: string
+  }> = async () => ({ rows: demoProjects, sourceVersion: SOURCE_VERSION, asOf: FIXED_AS_OF }),
 ) {
   const scenarios = new Map<string, CustomerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -237,6 +244,30 @@ export function createCustomerReadTestInstance(
     }
   }
 
+  async function detailContext(sessionId?: string | null) {
+    const data = context(sessionId)
+    let projectsProblem: ProblemDTO | undefined
+    if ((scenarios.get(keyFor(sessionId)) ?? 'ready') !== 'ready')
+      return { ...data, asOf: FIXED_AS_OF }
+    try {
+      const projects = await resolveProjectFacts(sessionId)
+      return {
+        ...data,
+        projects: projects.rows,
+        asOf: projects.asOf > FIXED_AS_OF ? projects.asOf : FIXED_AS_OF,
+        sourceVersion: `${data.sourceVersion}:${projects.sourceVersion}`,
+      }
+    }
+    catch (cause) {
+      if (!(cause instanceof ProjectRepositoryProblem)
+        || !['forbidden', 'unavailable'].includes(cause.problem.code)) {
+        throw cause
+      }
+      projectsProblem = cause.problem
+    }
+    return { ...data, projects: [], projectsProblem, asOf: FIXED_AS_OF }
+  }
+
   return {
     reset(next: CustomerReadTestScenario, sessionId?: string | null) {
       if (next === 'ready')
@@ -258,14 +289,14 @@ export function createCustomerReadTestInstance(
       })
     },
     async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
+      const data = await detailContext(sessionId)
       const query = parseCustomerDetailQuery(id, input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
-      return buildCustomerDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      return buildCustomerDetailRead({ ...data, query })
     },
     async receipt(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = context(sessionId)
+      const data = await detailContext(sessionId)
       const query = parseCustomerReceiptDetailQuery(id, input)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
@@ -327,4 +358,24 @@ export const customerReadTestInstance = createCustomerReadTestInstance(
   sessionId => [CONSTRUCTION_CUSTOMER_FIXTURE, ...customerCommandTestInstance.rows(sessionId)],
   sessionId => customerCommandTestInstance.sourceVersion(sessionId),
   () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
+  async (sessionId) => {
+    const facts = (await import('./project-read-test-instance')).projectReadTestInstance.facts(sessionId)
+    return {
+      rows: facts.rows.map(row => ({
+        dataOrigin: row.dataOrigin,
+        id: row.id,
+        name: row.name,
+        code: row.code,
+        customerId: row.customerId,
+        secondaryCustomerId: row.secondaryCustomerId,
+        permission: demoProjects.find(project => row.dataOrigin === 'demo' && project.id === row.id)?.permission ?? 'allowed',
+        status: row.status,
+        startDate: row.startDate,
+        plannedEnd: row.plannedEnd,
+        manager: row.manager,
+      })),
+      sourceVersion: facts.sourceVersion,
+      asOf: facts.asOf,
+    }
+  },
 )

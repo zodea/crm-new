@@ -2,10 +2,12 @@
 import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import { useCustomerProjectReturnContext } from '~/composables/useCustomerProjectReturnContext'
 import {
   createCustomerDetailReturnTo,
   isCustomerReturnContextId,
   loadCustomerReturnOrigin,
+  resolveCustomerProjectReturnOrigin,
   resolveCustomerReturnContext,
   validateCustomerReturnTo,
 } from '~/lib/customer/return-context'
@@ -25,6 +27,9 @@ const router = useRouter()
 const store = useCustomerReadStore()
 const relationTabs = new Set<CustomerRelationTab>(['projects', 'contracts', 'receipts'])
 const activeTab = shallowRef<CustomerRelationTab>(validTab(route.query.tab))
+const restoreProjectContext = useCustomerProjectReturnContext({ customerId: () => props.customerId, origin: () => props.origin })
+const projectReturnContext = computed(() => resolveCustomerProjectReturnOrigin(route.fullPath, { origin: props.origin }))
+let loadGeneration = 0
 
 const detail = computed(() => {
   const state = store.detailState
@@ -80,7 +85,7 @@ const editTo = computed(() => {
   return `/base/customer/form/${encodeURIComponent(props.customerId)}?${query.toString()}`
 })
 const tabs = computed(() => [
-  { key: 'projects', label: '名下项目', count: detail.value?.projects.length ?? 0 },
+  { key: 'projects', label: '名下项目', count: detail.value?.projectsProblem ? undefined : detail.value?.projects.length ?? 0 },
   { key: 'contracts', label: '施工合同', count: detail.value?.contracts.length ?? 0 },
   { key: 'receipts', label: '收款明细', count: detail.value?.receipts.length ?? 0 },
 ])
@@ -106,10 +111,12 @@ function selectTab(value: string | undefined) {
 }
 
 async function load() {
+  const generation = ++loadGeneration
   await store.loadDetail({ id: props.customerId, origin: props.origin, includeDemo: props.includeDemo })
-  if (store.detailState.kind === 'ready') {
+  if (generation === loadGeneration && store.detailState.kind === 'ready') {
     await nextTick()
-    document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
+    if (!await restoreProjectContext())
+      document.querySelector<HTMLElement>('[data-entity-detail-title]')?.focus({ preventScroll: true })
   }
 }
 
@@ -149,7 +156,7 @@ onActivated(() => void load())
     </template>
     <template #summary>
       <MetricGrid v-if="detail" :cols="5" data-testid="customer-summary">
-        <Metric label="名下项目" :value="`${detail.summary.projectCount} 个`" />
+        <Metric label="名下项目" :value="detail.summary.projectCount === null ? '—' : `${detail.summary.projectCount} 个`" />
         <Metric label="施工合同" :value="`${detail.summary.contractCount} 份`" />
         <Metric label="有效合同额" :value="yuan(detail.summary.effectiveContractAmount)" />
         <Metric label="有效收款" :value="yuan(detail.summary.effectiveReceiptAmount)" />
@@ -167,7 +174,7 @@ onActivated(() => void load())
         @action="load"
       />
       <CustomerDetailOverview :customer="customer" />
-      <section class="panel min-w-0 overflow-hidden" aria-labelledby="customer-relations-heading">
+      <section class="panel min-w-0 overflow-hidden" aria-labelledby="customer-relations-heading" data-customer-relations tabindex="-1">
         <div class="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-3 py-2">
           <h3 id="customer-relations-heading" class="m-0 mr-auto text-14px font-800 text-ink">
             业务关系
@@ -180,11 +187,15 @@ onActivated(() => void load())
           <CustomerDetailRelations
             :tab="activeTab"
             :projects="detail.projects"
+            :projects-problem="detail.projectsProblem"
+            :restore-scroll-left="projectReturnContext?.scrollLeft"
             :contracts="detail.contracts"
             :receipts="detail.receipts"
             :relationship-return-to="relationshipReturnTo"
             :return-to="returnTo"
             :return-context="returnContext"
+            @retry-projects="load"
+            @view-restored="restoreProjectContext"
           />
         </div>
       </section>

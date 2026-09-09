@@ -191,7 +191,7 @@ interface NavigationOrigin {
 | `N-PROJECT-CUSTOMER` | `project` `/project` | 客户 | `customer.id` resolved | `/base/customer/:id` | 返回项目列表原上下文 | 闭合；参考权限拒绝记为 forbidden |
 | `N-PROJECT-METRICS` | `project` `/project/:id` | 合同/收付/票税/支付金额 | 明确 drilldown，不以非零判断 | 同一项目详情 `?tab=construction,fund,current,tax,payment`，进项票也可到 `/finance/ledger?project=:id` | 返回同一项目与页签/子表 | 闭合主链；0 金额公共组件规则待统一 |
 | `N-CUSTOMER-DETAIL` | `master-data` `/base/customer` | 客户名称 | `customer.id` resolved | `/base/customer/:id?origin=:dataOrigin` | 返回原搜索、状态、排序、页码、每页条数、滚动与行焦点；详情再显式进入正式编辑 | 闭合；#314 以白名单 `returnTo` + 有时效会话上下文恢复，直达或伪造来源回退 canonical 列表 |
-| `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id?origin=:dataOrigin`、`/contract/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`；页签 `contracts,receipts` | 项目详情刷新后显式返回当前客户页签并继续透传已校验的客户列表上下文；收款详情返回客户收款页签 | 闭合；三类关系均由 Target Registry 按稳定 ID 进入只读目标，客户详情来源只接受稳定客户 ID、同一 `dataOrigin`、白名单页签和成对列表上下文；项目返回地址还必须命中该项目实际主/次客户 ID，不能只验路径形状；missing、forbidden 与错配不生成死链；收款编辑仅从列表显式动作进入 `/finance/receipt/form/:id` |
+| `N-CUSTOMER-RELATIONS` | `master-data` `/base/customer/:id` | 名下项目/施工合同/收款单 | 关系 ref resolved | `/project/:id?origin=:dataOrigin`、`/contract/:id`、`/finance/receipt/:id?origin=:dataOrigin&customerId=:customerId`；页签 `contracts,receipts` | 项目往返按下文“客户关联项目返回”；收款详情返回客户收款页签 | #424 接通正式项目回读与往返；三类入口继续使用唯一 Target Registry；合同/收款的其他中央写源链另行复核，不以本切片通过推定闭合 |
 | `N-CREW-WORKER` | `master-data` 班组/工人列表与详情 | 班组、工人、项目、责任户、工资单、罚扣 | 相应 ref resolved，且来源一致 | `/base/crew/:id`、`/base/worker/:id`、`/project/:id`、`/subcontract/quantity/:pid/:uid`、`/subcontract/payroll/:id`、`/project/penalty/:id` | 所有目标都携白名单校验的 `returnTo` 返回班组/工人来源；列表保留搜索、工种、排序、页码 | 闭合；公共 Target Registry 按稳定 ID 解析；责任户/工资/扣罚携 `dataOrigin + ownerKind + ownerId` 进入只读事实详情，不按名称猜测或借编辑表单 |
 | `N-SUPPLIER-NAME` | `supplier` `/base/supplier` | 分供方名称 | `supplier.id + dataOrigin` resolved | `/base/supplier/:id?origin=` | 返回中央列表原搜索、类别、资料状态、排序、页码与原行焦点 | 闭合 |
 | `N-SUPPLIER-PROJECT` | `supplier` `/base/supplier/:id` | 合作项目 | `project.id + supplier.id` resolved | `/project/:pid/supplier/:sid`，`?tab=projects` 为来源视图 | 返回分供方详情合作项目页签 | 闭合 |
@@ -266,3 +266,13 @@ interface NavigationOrigin {
 - 0 条目标能显示真实空态；未读取、权限不可见、错误和缺关系不显示伪造 0 条。
 - 付款洞察按记录级和跨域报表级分别缓存；切换应用页签、切换付款记录、局部刷新和关闭面板均不串用结果。
 - 通知与洞察只返回语义目标；后端、seed 和参考私有接口均不成为前端路由权威。
+
+### 客户关联项目返回
+
+来源同时记录稳定业务行锚点（项目/合同/收款 ID）与项目 ID，同项目出现多行时恢复原点击行；原行消失或不可读时焦点落到关系区，不能误落同项目另一行。
+
+#424 沿唯一 Target Registry 的 `project:detail` 分支携带受限 `returnTo`。客户详情白名单增加 `relationContext`，与既有 `origin`、业务页签及成对列表返回上下文共存。进入项目前捕获当前客户来源、目标项目 ID、工作区纵滚与表格横滚，存入 30 分钟有效的会话返回记录；它只保存视图位置，不保存业务事实。
+
+项目详情有可读数据时，客户返回地址必须命中同来源的实际主/次客户 ID；携带 relationContext 时还须通过会话记录的目标、完整地址及有效期校验。首次项目读取失败、无权或不存在时，只有已经捕获且仍有效的同项目来源可提供“返回客户详情”，不接受任意形状正确的 URL。直接项目深链、外部地址、错配或过期来源返回规范 `/project`；旧无 relationContext 来源只在项目实际关系验证通过后返回客户。
+
+返回客户先重新读取中央关系，再恢复适用页签、横滚、纵滚与原项目链接焦点；该链接已不在可读集合时焦点落在业务关系区。客户详情本身刷新仍能恢复有效位置；失效视图记录只恢复规范详情内容及标题焦点。继续返回客户列表时沿既有列表上下文恢复搜索、状态、排序、分页、滚动、应用页签及原客户焦点。客户详情子表尚无独立筛选/分页，本切片不新增这类状态。
