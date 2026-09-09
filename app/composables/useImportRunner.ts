@@ -1,7 +1,10 @@
 import type { ShallowRef } from 'vue'
 import type { ImportRunPhase } from '~/lib/kit/import-mapping'
 import { nextTick, shallowRef } from 'vue'
+import { ImportRowRejected } from '~/lib/kit/import-mapping'
 import { toErrorMessage } from '~/lib/util/error'
+
+export { ImportRowRejected } from '~/lib/kit/import-mapping'
 
 export type ImportRunResult
   = | { status: 'completed', rejected?: readonly ImportRowRejection[] }
@@ -102,6 +105,11 @@ export function useImportRunner(
         await sink!(row)
       }
       catch (cause) {
+        if (cause instanceof ImportRowRejected) {
+          rejected.value = [...rejected.value, { index: done.value, row, reason: cause.message }]
+          done.value += 1
+          continue
+        }
         phase.value = 'failed'
         error.value = toErrorMessage(cause)
         return { status: 'failed', error: cause }

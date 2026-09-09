@@ -152,9 +152,11 @@ function buildSurfaces(ledger, registry) {
       const root = makeSurface(endpoint, variant, { path: 'page', label: endpoint.template, type: 'page' })
       surfaces.push(root)
       if (endpoint.localRoute === '/import/mapping/:entity') {
+        const projectImport = variant.kind === 'project'
+        const stepSource = projectImport ? 'app/composables/useProjectImport.ts' : endpoint.page
         for (const step of ['upload', 'mapping', 'preview-import'])
-          surfaces.push(makeSurface(endpoint, variant, { path: `step/${step}`, label: step, type: 'wizard-step', sources: [[endpoint.page, `'${step}'`]] }))
-        surfaces.push(makeSurface(endpoint, variant, { path: 'step/preview-import/rejected', label: '拒绝行与来源', type: 'subtable', sources: [[endpoint.page, 'rejectionRowNumber']] }))
+          surfaces.push(makeSurface(endpoint, variant, { path: `step/${step}`, label: step, type: 'wizard-step', sources: [[stepSource, `'${step}'`]] }))
+        surfaces.push(makeSurface(endpoint, variant, { path: 'step/preview-import/rejected', label: '拒绝行与来源', type: 'subtable', sources: projectImport ? [['app/components/project/ProjectImportScreen.vue', '项目行级拒绝清单']] : [[endpoint.page, 'rejectionRowNumber']] }))
       }
       if (endpoint.localRoute.includes(':kind') && endpoint.template === '整页表单') {
         for (const section of variant.sections)
@@ -174,6 +176,7 @@ function buildSurfaces(ledger, registry) {
 
 function caseFor(surface, host) {
   const materialList = surface.route === '/contract/material' && surface.path === 'page' && host === 'browser'
+  const projectImport = surface.route === '/import/mapping/:entity' && surface.kind === 'project' && host === 'browser'
   return {
     id: stableId('C', [surface.id, host]),
     surfaceId: surface.id,
@@ -187,13 +190,13 @@ function caseFor(surface, host) {
       note: '父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据',
     },
     acceptance: {
-      rules: materialList ? 'scoped-defined' : 'needs-review',
-      frontend: materialList ? 'partial' : 'not-verified',
-      crossModule: materialList ? 'partial' : 'not-verified',
+      rules: materialList || projectImport ? 'scoped-defined' : 'needs-review',
+      frontend: projectImport ? 'passed' : materialList ? 'partial' : 'not-verified',
+      crossModule: projectImport ? 'passed' : materialList ? 'partial' : 'not-verified',
       production: host === 'tauri' ? 'out-of-scope' : 'not-verified',
     },
-    reviewEvidence: materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
-    remaining: materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
+    reviewEvidence: projectImport ? ['docs/design/evidence/issue-423/project-import-verification.md'] : materialList ? ['docs/design/evidence/issue-422/README.md'] : [],
+    remaining: projectImport ? ['生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射'] : materialList ? ['逐列筛选、排序、设置和文件工具仍由 #404/#409 复核'] : ['逐动作及正常/边界/失败/重复/更正/跨域场景待核验'],
   }
 }
 

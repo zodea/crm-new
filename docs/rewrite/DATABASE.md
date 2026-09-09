@@ -2157,6 +2157,10 @@ interface OperatingMetric {
 
 ### 10.7 导入追溯与差异表
 
+#423 项目 Excel 切片在同一中央项目事实内保存 `importSource` 回执，命令和表单回读共享它；不向浏览器 SQLite 写正式项目，也不新增平行业务表。当前为可重置内存实例中的映射：`fileName → source_file`、`fileDigest → source_hash`（原文件字节 SHA-256）、`sheetName → source_sheet`、`rowNumber → source_row`（原 Sheet 的 1 起始行号）、`externalRef → source_key`、`rawSnapshot → raw_snapshot`（包含未映射源列的解析值）。项目 ID 为中央分配的稳定 ID；客户关系使用中央正式客户 ID。
+
+原 Excel 文件字节仅在当前浏览器解析，不作为中央附件上传；文件名、摘要、Sheet、行号和源行快照随成功行保留。下载的拒绝清单携来源定位与原因，未成功行不冒充正式项目。当前回执仅对本 Excel 链路已保存行去重，不解释既有受控迁移的 `legacyId → serverId` 映射；处理历史整库身份必须沿既有迁移边界。防重与冲突契约见 [COMMANDS 项目 Excel 导入](./COMMANDS.md#项目-excel-导入423)。下列持久化表的实际部署、唯一约束、重启与备份恢复仍由 #416 验收，本切片没有执行迁移。
+
 ```sql
 CREATE TABLE import_batches (
   id             TEXT PRIMARY KEY,

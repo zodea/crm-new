@@ -11,6 +11,7 @@ import {
   ProjectCommandValidationError,
 } from './command-validation'
 import { readProjectHttp } from './http-repository'
+import { decodeProjectImportSource } from './import'
 import { projectProblem, ProjectRepositoryProblem } from './repository'
 
 interface HttpProjectCommandRepositoryOptions {
@@ -81,6 +82,7 @@ function decodeForm(value: unknown, expectedId: string): ProjectFormReadDTO {
       attachments: value.attachments as ProjectFormReadDTO['attachments'],
       version: value.version,
       updatedAt: value.updatedAt,
+      ...(value.importSource ? { importSource: decodeProjectImportSource(value.importSource) } : {}),
     }
   }
   catch (cause) {

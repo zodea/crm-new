@@ -50,7 +50,10 @@ describe('module review coverage', () => {
       expect(imports.filter(surface => surface.kind === kind).map(surface => surface.path)).toEqual(expect.arrayContaining(['page', 'step/upload', 'step/mapping', 'step/preview-import']))
     const at = (kind: string) => cases.find(item => item.host === 'browser' && surfaces.some(surface => surface.id === item.surfaceId && surface.kind === kind && surface.path === 'page' && surface.route === '/import/mapping/:entity'))!
     expect(at('supplier').adapter).toBe('central-http')
-    expect(at('project').adapter).toBe('browser-local')
+    expect(at('project').adapter).toBe('central-http')
+    expect(at('project').acceptance.frontend).toBe('passed')
+    expect(at('project').acceptance.production).toBe('not-verified')
+    expect(at('project').reviewEvidence).toContain('docs/design/evidence/issue-423/project-import-verification.md')
     expect(at('demo-supplier').adapter).toBe('simulation')
     expect(at('quantity-legacy-precheck').adapter).toBe('precheck-only')
   })

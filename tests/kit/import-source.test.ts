@@ -137,4 +137,16 @@ describe('导入源解析：原始表头 + 行', () => {
   it('没有表头的空表报可读错误', async () => {
     await expect(parseSheetForMapping(workbookBuffer([]))).rejects.toThrow('表头')
   })
+
+  it('工作簿允许空白辅助 Sheet，所选数据表保留文件摘要与原始空行后的行号', async () => {
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([]), '空白预留')
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([[], ['项目名称', '客户', '项目经理'], [], ['项目423', '客户423', '经理423']]), '项目')
+    const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+    const parsed = await parseWorkbookForMapping(buffer)
+    expect(parsed.sheets[0]?.columns).toEqual([])
+    expect(parsed.sheets[1]).toMatchObject({ headerRow: 1, rowNumbers: [4], rows: [{ 项目名称: '项目423', 客户: '客户423', 项目经理: '经理423' }] })
+    expect(parsed.sheets[1]?.sourceHash).toMatch(/^[a-f0-9]{64}$/)
+    expect((await parseWorkbookForMapping(buffer)).sheets[1]?.sourceHash).toBe(parsed.sheets[1]?.sourceHash)
+  })
 })

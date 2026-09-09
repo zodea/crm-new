@@ -20,6 +20,8 @@
 
 ### 2026-09-08 复核基线与展开边界
 
+2026-09-09 #423 项目 Excel 导入仅使用隔离合成文件与中央测试会话，实际入口、选 Sheet、映射预览、结果、五档视口和失败反馈见[验收记录](./evidence/issue-423/project-import-verification.md)。本次没有触碰外部参考站的上传或写入口；导入内部流程仍保持 `R-TOOL-PENDING` 的参考证据等级，采用本地 `ImportMappingScreen.jsx` 与 ADR 0005 蓝本。
+
 本轮固定源码为 `ec392bd602200c8da343b626b5a21c8215b4884d`，工作分支 `codex/ui-reference-layout`；远端 main 与本地 origin/main 均为 `4292291d2a99c94052a6eab743036b149bfa9634`。版本、原生依赖和领取状态的核验见 [#403 开工记录](https://github.com/zodea/crm-new/issues/403#issuecomment-5586540379)。
 
 - #328–#331 经 PR #399/#400/#401/#417 合入，当前源码包含其成果；#418–#421 及多选、刷新修复仅在当前分支本地完成，复用各自实际验收入口。

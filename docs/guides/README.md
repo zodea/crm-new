@@ -20,6 +20,7 @@
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)
+- [项目 Excel 导入使用指南](./project-excel-import.md)
 - [核心合同与工程量清单使用指南](./core-contract-and-boq.md)
 - [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
 - [分供方证照与资料核验使用指南](./supplier-credential-review.md)
@@ -37,6 +38,9 @@
 
 ```powershell
 python scripts/generate-project-guide-pdf.py
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/project-excel-import.md `
+  --output output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/customer-records.md `
   --output output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
@@ -82,6 +86,7 @@ python scripts/generate-project-guide-pdf.py `
 
 ```text
 output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
+output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
 output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
 output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf
 output/pdf/瑞航CRM_班组与工人档案使用指南.pdf

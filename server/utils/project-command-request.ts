@@ -1,5 +1,6 @@
 import type { ProjectCommandRequestDTO } from '../../app/lib/project/command-contract'
 import { PROJECT_WRITE_CAPABILITY } from '../../app/lib/project/command-contract'
+import { decodeProjectImportSource } from '../../app/lib/project/import'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { decodeProjectCommandContent } from './project-command-domain'
 
@@ -32,6 +33,15 @@ export function parseProjectCommandRequest(
   if (!routeId && value.id !== undefined)
     return fail('新建命令不能指定项目 ID')
   const content = decodeProjectCommandContent(value.draft, value.attachments)
+  let importSource
+  if (value.importSource !== undefined) {
+    try {
+      importSource = decodeProjectImportSource(value.importSource)
+    }
+    catch (cause) { return fail(cause instanceof Error ? cause.message : '导入来源无效') }
+    if (routeId || value.action !== 'save' || value.baseVersion !== null)
+      return fail('项目导入只能新建并保存，修改已有项目请进入编辑页')
+  }
   return {
     ...(routeId ? { id: routeId } : {}),
     workspaceId: value.workspaceId,
@@ -42,5 +52,6 @@ export function parseProjectCommandRequest(
     action: value.action as ProjectCommandRequestDTO['action'],
     draft: content.draft,
     attachments: content.attachments,
+    ...(importSource ? { importSource } : {}),
   }
 }

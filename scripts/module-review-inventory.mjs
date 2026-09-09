@@ -95,7 +95,7 @@ export function resolveAdapter(surface, host) {
   if (route === '/finance/invoice/factor')
     return 'tool-local-storage'
   if (route === '/import/mapping/:entity') {
-    if (kind === 'supplier')
+    if (kind === 'supplier' || kind === 'project')
       return 'central-http'
     if (kind === 'demo-supplier')
       return 'simulation'

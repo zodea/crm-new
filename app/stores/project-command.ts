@@ -9,6 +9,7 @@ import type { ProjectLocalDraft } from '~/lib/project/local-draft'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
 import { PROJECT_WRITE_CAPABILITY } from '~/lib/project/command-contract'
+import { createProjectRowImporter } from '~/lib/project/import-command'
 import {
   clearProjectLocalDraft,
   loadProjectLocalDraft,
@@ -50,6 +51,22 @@ export const useProjectCommandStore = defineStore('project-command', () => {
 
   function repository() {
     return useNuxtApp().$repositories.projectCommands
+  }
+
+  let rowImporter: ReturnType<typeof createProjectRowImporter> | undefined
+  function importer() {
+    return rowImporter ??= createProjectRowImporter(repository(), useNuxtApp().$repositories.customerRead)
+  }
+  async function prepareImportRow(row: Record<string, unknown>) {
+    return importer().prepare(row)
+  }
+  async function validateImportRow(row: Record<string, unknown>) {
+    return importer().validate(row)
+  }
+  async function importRow(row: Record<string, unknown>) {
+    const saved = await importer().importRow(row)
+    latestWrite.value = { id: saved.id, version: saved.version }
+    return saved
   }
 
   async function hydrate(id: string | null): Promise<HydratedProjectCommandForm> {
@@ -165,6 +182,9 @@ export const useProjectCommandStore = defineStore('project-command', () => {
   }
 
   return {
+    prepareImportRow,
+    validateImportRow,
+    importRow,
     latestWrite: readonly(latestWrite),
     hydrate,
     saveForm,

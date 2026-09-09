@@ -19,7 +19,7 @@ const readStore = useProjectListStore()
 const commandStore = useProjectCommandStore()
 const dataVisibilityStore = useDataVisibilityStore()
 const includeDemo = computed(() => dataVisibilityStore.includeDemo)
-const { error, exportFile } = useKitUI()
+const { error, exportFile, openImportTab } = useKitUI()
 
 const searchText = shallowRef('')
 const selectedPhase = shallowRef('all')
@@ -32,7 +32,6 @@ const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
 const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
 
 const IMPORTED_PHASES_KEY = 'imported-phases'
-const IMPORT_DISABLED_REASON = '项目导入尚未接入中央后台'
 const DELETE_DISABLED_REASON = '项目删除不在当前实施范围'
 const listViews = [
   { key: 'updated-desc', label: '最近更新' },
@@ -519,9 +518,10 @@ onDeactivated(() => {
           :include-demo="includeDemo"
           :visible="visibleTotal"
           :loading="loading"
-          :import-disabled-reason="IMPORT_DISABLED_REASON"
+          :import-disabled-reason="createDisabledReason"
           :create-disabled-reason="createDisabledReason"
           @create="createProject"
+          @import="openImportTab({ entity: 'project' })"
           @refresh="refresh"
           @export-ledger="exportLedger"
           @export-by-category="exportByCategory"

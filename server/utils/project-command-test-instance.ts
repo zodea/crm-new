@@ -9,12 +9,14 @@ import type {
   ProjectCommandResultDTO,
   ProjectFormReadDTO,
 } from '../../app/lib/project/command-contract'
+import type { ProjectImportSource } from '../../app/lib/project/import'
 import type { ProjectListSourceRow } from '../../app/lib/project/repository'
 import type { BusinessSession } from './business-session'
 import { randomUUID } from 'node:crypto'
 import {
   PROJECT_WRITE_CAPABILITY,
 } from '../../app/lib/project/command-contract'
+import { decodeProjectImportSource, matchesProjectImportSource } from '../../app/lib/project/import'
 import {
   projectProblem,
   ProjectRepositoryProblem,
@@ -31,6 +33,9 @@ interface StoredProject {
   attachments: FormAttachment[]
   version: number
   updatedAt: string
+  importSource?: ProjectImportSource
+  importSignature?: string
+  importResult?: ProjectCommandResultDTO
 }
 
 interface SessionState {
@@ -42,6 +47,7 @@ interface SessionState {
 interface ProjectCommandTestInstanceOptions {
   createId?: () => string
   now?: () => string
+  validateImportCustomers?: (draft: ProjectFormDraft, session: BusinessSession, sessionId?: string | null) => Promise<void>
 }
 
 export interface ProjectImportAdoptionTransaction {
@@ -269,6 +275,7 @@ export function createProjectCommandTestInstance(
       }
       return {
         draft: { ...project.draft, id: project.id },
+        ...(project.importSource ? { importSource: structuredClone(project.importSource) } : {}),
         attachments: project.attachments.map(attachment => ({ ...attachment })),
         version: String(project.version),
         updatedAt: project.updatedAt,
@@ -281,11 +288,38 @@ export function createProjectCommandTestInstance(
     ): Promise<ProjectCommandResultDTO> {
       validateEnvelope(request, session)
       const state = stateFor(sessionId)
+      let importSource: ProjectImportSource | undefined
+      if (request.importSource) {
+        try {
+          importSource = decodeProjectImportSource(request.importSource)
+        }
+        catch (cause) { throw invalid(cause instanceof Error ? cause.message : '项目导入来源无效') }
+        if (request.id || request.action !== 'save' || request.baseVersion !== null)
+          throw invalid('项目导入只能新建并保存，修改已有项目请进入编辑页')
+      }
+      const signature = JSON.stringify(Object.entries(request.draft).sort(([a], [b]) => a.localeCompare(b)))
+      const findImported = () => importSource ? [...state.projects.values()].find(project => matchesProjectImportSource(project.importSource, importSource!)) : undefined
+      const imported = findImported()
+      if (imported) {
+        if (imported.importSignature !== signature)
+          throw new ProjectRepositoryProblem(projectProblem('conflict', `来源行或外部旧 ID 已导入项目 ${imported.id}，内容不同；请进入项目编辑页修改`))
+        return { ...imported.importResult!, attachmentIds: [...imported.importResult!.attachmentIds] }
+      }
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return { ...duplicate, attachmentIds: [...duplicate.attachmentIds] }
       const content = decodeProjectCommandContent(request.draft, request.attachments)
       assertProjectCommandBusinessRules(content.draft, request.action)
+      if (importSource) {
+        if (options.validateImportCustomers)
+          await options.validateImportCustomers(content.draft, session, sessionId)
+        else
+          await (await import('./project-import-customers')).assertProjectImportCustomers(content.draft, session, sessionId)
+        // 关系重验期间可能有另一份相同命令完成；重新进入同步去重/提交段。
+        if (state.commands.has(request.commandId) || findImported()) {
+          return this.execute(request, session, sessionId)
+        }
+      }
 
       const existing = request.id ? state.projects.get(request.id) : null
       if (request.id && !existing) {
@@ -316,6 +350,8 @@ export function createProjectCommandTestInstance(
         attachments: applyAttachments(id, existing?.attachments ?? [], content.attachments, timestamp),
         version,
         updatedAt: timestamp,
+        ...(existing?.importSource ? { importSource: existing.importSource, importSignature: existing.importSignature, importResult: existing.importResult } : {}),
+        ...(importSource ? { importSource: structuredClone(importSource), importSignature: signature } : {}),
       }
       state.projects.set(id, project)
       state.sourceVersion += 1
@@ -329,6 +365,8 @@ export function createProjectCommandTestInstance(
           .map(attachment => attachment.id),
       }
       state.commands.set(request.commandId, result)
+      if (importSource)
+        project.importResult = result
       return { ...result, attachmentIds: [...result.attachmentIds] }
     },
   }

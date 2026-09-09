@@ -42,7 +42,7 @@ function cellText(value: unknown): string {
     </p>
 
     <div class="overflow-x-auto border border-line rounded-[var(--radius-card)] bg-panel">
-      <table class="w-full border-collapse text-12px">
+      <table class="w-full border-collapse whitespace-nowrap text-12px">
         <thead>
           <tr class="border-b border-line text-left text-11px text-ink-faint">
             <th class="px-3 py-2 font-700">

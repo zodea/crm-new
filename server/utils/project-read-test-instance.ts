@@ -186,11 +186,13 @@ export function createProjectReadTestInstance(
     }, sessionId).pagination.total,
   resolveProjectSupplierRelations: (projectId: string, origin: DataOriginDTO, sessionId?: string | null) => Promise<readonly ProjectSupplierReferenceSourceRow[]>
     = async (projectId, origin, sessionId) => projectSupplierReadTestInstance.references(projectId, origin, sessionId),
+  resolveCustomerReferences: (rows: readonly ProjectListSourceRow[], sessionId?: string | null) => Promise<readonly ProjectListSourceRow[]>
+    = async rows => rows,
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
 
-  function readContext(sessionId?: string | null) {
+  async function readContext(sessionId?: string | null) {
     const scenario = scenarios.get(keyFor(sessionId)) ?? 'ready'
     if (scenario === 'forbidden')
       throw repositoryProblem('forbidden', '无项目查看权限', false)
@@ -206,7 +208,7 @@ export function createProjectReadTestInstance(
       : []
     return {
       capabilities: resolveCapabilities(sessionId),
-      rows,
+      rows: await resolveCustomerReferences(rows, sessionId),
       asOf: latestAsOf(rows),
       sourceVersion: scenario === 'ready'
         ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
@@ -233,7 +235,7 @@ export function createProjectReadTestInstance(
       input: Record<string, unknown> | undefined,
       sessionId?: string | null,
     ) {
-      const context = readContext(sessionId)
+      const context = await readContext(sessionId)
       const query = parseProjectListQuery(input as Record<string, unknown> | undefined)
       if (query.includeDemo && !context.capabilities.includes('demo:read'))
         throw repositoryProblem('forbidden', '无测试数据查看权限', false)
@@ -250,7 +252,7 @@ export function createProjectReadTestInstance(
       input: Record<string, unknown> | undefined,
       sessionId?: string | null,
     ) {
-      const context = readContext(sessionId)
+      const context = await readContext(sessionId)
       const query = parseProjectDetailQuery(id, input)
       if (query.includeDemo && !context.capabilities.includes('demo:read'))
         throw repositoryProblem('forbidden', '无测试数据查看权限', false)
@@ -301,4 +303,7 @@ export const projectReadTestInstance = createProjectReadTestInstance(
   sessionId => [CONSTRUCTION_PROJECT_FIXTURE, ...projectCommandTestInstance.rows(sessionId)],
   sessionId => projectCommandTestInstance.sourceVersion(sessionId),
   () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
+  undefined,
+  undefined,
+  async (rows, sessionId) => (await import('./project-import-customers')).resolveProjectCustomerReferences(rows, sessionId),
 )

@@ -713,11 +713,11 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/import/mapping/invoice` view | invoice / default | step/mapping · mapping | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
 | `/import/mapping/invoice` view | invoice / default | step/preview-import · preview-import | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
 | `/import/mapping/invoice` view | invoice / default | step/preview-import/rejected · 拒绝行与来源 | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
-| `/import/mapping/project` view | project / default | page · 特殊工具 | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
-| `/import/mapping/project` view | project / default | step/upload · upload | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
-| `/import/mapping/project` view | project / default | step/mapping · mapping | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
-| `/import/mapping/project` view | project / default | step/preview-import · preview-import | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
-| `/import/mapping/project` view | project / default | step/preview-import/rejected · 拒绝行与来源 | browser-local / desktop-sqlite | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
+| `/import/mapping/project` view | project / default | page · 特殊工具 | central-http / central-http | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
+| `/import/mapping/project` view | project / default | step/upload · upload | central-http / central-http | [app/composables/useProjectImport.ts](../../app/composables/useProjectImport.ts) |
+| `/import/mapping/project` view | project / default | step/mapping · mapping | central-http / central-http | [app/composables/useProjectImport.ts](../../app/composables/useProjectImport.ts) |
+| `/import/mapping/project` view | project / default | step/preview-import · preview-import | central-http / central-http | [app/composables/useProjectImport.ts](../../app/composables/useProjectImport.ts) |
+| `/import/mapping/project` view | project / default | step/preview-import/rejected · 拒绝行与来源 | central-http / central-http | [app/components/project/ProjectImportScreen.vue](../../app/components/project/ProjectImportScreen.vue) |
 | `/import/mapping/supplier` view | supplier / default | page · 特殊工具 | central-http / central-http | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
 | `/import/mapping/supplier` view | supplier / default | step/upload · upload | central-http / central-http | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |
 | `/import/mapping/supplier` view | supplier / default | step/mapping · mapping | central-http / central-http | [app/pages/import/mapping/[entity].vue](../../app/pages/import/mapping/[entity].vue) |

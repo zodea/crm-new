@@ -68,6 +68,10 @@ export function exportToXlsx<T extends Record<string, unknown>>(
 }
 
 export interface RawImportSheet {
+  sourceFileName?: string
+  sourceHash?: string
+  /** 与 rows 对齐的 Excel 原始 1 起始行号，保留被跳过的空行位置。 */
+  rowNumbers?: number[]
   name: string
   headerRow: number
   range: string
@@ -102,7 +106,7 @@ const IMPORT_HEADER_HINTS = [
 ] as const
 
 function matrixFromSheet(ws: XLSX.WorkSheet): unknown[][] {
-  return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false })
+  return XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, range: 0 })
 }
 
 function expandMergedValues(ws: XLSX.WorkSheet, source: unknown[][]): unknown[][] {
@@ -169,23 +173,24 @@ function sheetToRawImport(
     columnEntries.push({ name: count === 0 ? raw : `${raw}_${count}`, index })
   }
   const columns = columnEntries.map(entry => entry.name)
-  if (!columns.length)
+  if (!columns.length && matrix.some(row => row.some(value => String(value ?? '').trim())))
     throw new Error('未能从文件读取到表头')
 
   // raw:false = 所见即所得：日期/数字按单元格显示格式转文本，
   // 避免日期以 Excel 序列号进入预览与导入行；合并区续行已展开。
-  const rows = matrix
+  const entries = matrix
     .slice(headerRow + 1)
-    .filter(row => row.some(value => value != null && String(value).trim() !== ''))
-    .map((row) => {
-      const result: Record<string, unknown> = {}
-      for (const entry of columnEntries) {
-        const value = row[entry.index]
-        if (value != null && value !== '')
-          result[entry.name] = value
-      }
-      return result
-    })
+    .map((row, index) => ({ row, rowNumber: headerRow + index + 2 }))
+    .filter(({ row }) => row.some(value => value != null && String(value).trim() !== ''))
+  const rows = entries.map(({ row }) => {
+    const result: Record<string, unknown> = {}
+    for (const entry of columnEntries) {
+      const value = row[entry.index]
+      if (value != null && value !== '')
+        result[entry.name] = value
+    }
+    return result
+  })
 
   const mergeRanges = (ws['!merges'] ?? []).map(merge => XLSX.utils.encode_range(merge))
   const formulaCount = Object.keys(ws)
@@ -201,6 +206,7 @@ function sheetToRawImport(
     formulaCount,
     columns,
     rows,
+    rowNumbers: entries.map(entry => entry.rowNumber),
   }
 }
 
@@ -217,6 +223,8 @@ export async function parseSheetForMapping(file: File | ArrayBuffer): Promise<Ra
   const sheet = workbook.sheets[0]
   if (!sheet)
     throw new Error('文件中没有工作表')
+  if (!sheet.columns.length)
+    throw new Error('未能从文件读取到表头')
   return sheet
 }
 
@@ -226,9 +234,12 @@ export async function parseSheetForMapping(file: File | ArrayBuffer): Promise<Ra
  */
 export async function parseWorkbookForMapping(file: File | ArrayBuffer): Promise<RawImportWorkbook> {
   const buffer = file instanceof File ? await bufferFromFile(file) : file
+  const hash = await crypto.subtle.digest('SHA-256', buffer)
+  const sourceHash = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
+  const withSource = (sheet: RawImportSheet) => ({ ...sheet, sourceFileName: file instanceof File ? file.name : '导入.xlsx', sourceHash })
   // codepage 65001 = UTF-8：无 BOM CSV 默认按 UTF-8 解码，避免中文表头乱码。
   const workbook = XLSX.read(buffer, { type: 'array', codepage: 65001 })
-  const sheets = workbook.SheetNames.map(name => sheetToRawImport(workbook, name))
+  const sheets = workbook.SheetNames.map(name => withSource(sheetToRawImport(workbook, name)))
   const parsed = { sheets }
   if (!sheets.some(sheet => hasMojibake(sheet)))
     return parsed
@@ -237,7 +248,7 @@ export async function parseWorkbookForMapping(file: File | ArrayBuffer): Promise
   const text = new TextDecoder('gb18030').decode(buffer)
   const fallbackWorkbook = XLSX.read(text, { type: 'string' })
   const fallback = {
-    sheets: fallbackWorkbook.SheetNames.map(name => sheetToRawImport(fallbackWorkbook, name)),
+    sheets: fallbackWorkbook.SheetNames.map(name => withSource(sheetToRawImport(fallbackWorkbook, name))),
   }
   return fallback.sheets.some(sheet => hasMojibake(sheet)) ? parsed : fallback
 }

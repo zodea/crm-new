@@ -9078,7 +9078,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/pages/import/mapping/[entity].vue",
+          "path": "app/composables/useProjectImport.ts",
           "anchor": "'upload'"
         }
       ],
@@ -9111,7 +9111,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/pages/import/mapping/[entity].vue",
+          "path": "app/composables/useProjectImport.ts",
           "anchor": "'mapping'"
         }
       ],
@@ -9144,7 +9144,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/pages/import/mapping/[entity].vue",
+          "path": "app/composables/useProjectImport.ts",
           "anchor": "'preview-import'"
         }
       ],
@@ -9177,8 +9177,8 @@
           "anchor": "<template"
         },
         {
-          "path": "app/pages/import/mapping/[entity].vue",
-          "anchor": "rejectionRowNumber"
+          "path": "app/components/project/ProjectImportScreen.vue",
+          "anchor": "项目行级拒绝清单"
         }
       ],
       "issueNumbers": [
@@ -28457,7 +28457,7 @@
       "id": "C-D438AF8221A2",
       "surfaceId": "S-5ED871A6D4B6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28466,21 +28466,23 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "passed",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-423/project-import-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射"
       ]
     },
     {
       "id": "C-484F76717266",
       "surfaceId": "S-5ED871A6D4B6",
       "host": "tauri",
-      "adapter": "desktop-sqlite",
+      "adapter": "central-http",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28503,7 +28505,7 @@
       "id": "C-D81A37DD89DB",
       "surfaceId": "S-CF7B3485A9DF",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28512,21 +28514,23 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "passed",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-423/project-import-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射"
       ]
     },
     {
       "id": "C-1F62AF86E216",
       "surfaceId": "S-CF7B3485A9DF",
       "host": "tauri",
-      "adapter": "desktop-sqlite",
+      "adapter": "central-http",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28549,7 +28553,7 @@
       "id": "C-A9A69E9186CC",
       "surfaceId": "S-54395993D398",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28558,21 +28562,23 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "passed",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-423/project-import-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射"
       ]
     },
     {
       "id": "C-BDAC07D1361C",
       "surfaceId": "S-54395993D398",
       "host": "tauri",
-      "adapter": "desktop-sqlite",
+      "adapter": "central-http",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28595,7 +28601,7 @@
       "id": "C-BB3D3910EB89",
       "surfaceId": "S-4D6C087C51B5",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28604,21 +28610,23 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "passed",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-423/project-import-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射"
       ]
     },
     {
       "id": "C-3A600CCED80E",
       "surfaceId": "S-4D6C087C51B5",
       "host": "tauri",
-      "adapter": "desktop-sqlite",
+      "adapter": "central-http",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28641,7 +28649,7 @@
       "id": "C-3B925118D0B9",
       "surfaceId": "S-B55DDE485A90",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -28650,21 +28658,23 @@
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
+        "rules": "scoped-defined",
+        "frontend": "passed",
+        "crossModule": "passed",
         "production": "not-verified"
       },
-      "reviewEvidence": [],
+      "reviewEvidence": [
+        "docs/design/evidence/issue-423/project-import-verification.md"
+      ],
       "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+        "生产持久化由 #416 验收；外部旧 ID 仅本 Excel 回执防重，不核对整库迁移映射"
       ]
     },
     {
       "id": "C-6EF19E72F693",
       "surfaceId": "S-B55DDE485A90",
       "host": "tauri",
-      "adapter": "desktop-sqlite",
+      "adapter": "central-http",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",
       "sourceState": "wired-needs-action-audit",
       "reference": {

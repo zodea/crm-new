@@ -4,6 +4,7 @@
 
 | 功能 | 路由 | 当前状态与使用说明 |
 | --- | --- | --- |
+| 项目 Excel 导入 | `/project` → `/import/mapping/project` | 当前浏览器验证环境可用；[操作指南](./project-excel-import.md)。历史深链遵守相同中央写入边界 |
 | 其他支出合同列表 | `/contract/other-expense` | 当前浏览器验证环境可用；[操作指南](./auxiliary-contracts.md) |
 | 其他支出合同只读详情 | `/contract/other-expense/:id` | 真实项目与分供方关系，来源返回 |
 | 其他支出合同新建 / 显式编辑 | `/contract/other-expense/form`、`/contract/other-expense/form/:id` | 独立整页表单，中央保存 |

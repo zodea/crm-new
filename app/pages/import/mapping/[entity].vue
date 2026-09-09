@@ -193,7 +193,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-4xl py-3" aria-labelledby="import-mapping-title">
+  <ProjectImportScreen v-if="entityKey === 'project'" />
+  <main v-else class="mx-auto max-w-4xl py-3" aria-labelledby="import-mapping-title">
     <template v-if="entity">
       <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>

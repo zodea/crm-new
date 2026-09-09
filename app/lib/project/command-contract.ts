@@ -4,6 +4,7 @@ import type {
   MasterDataSaveAction,
   ProjectFormDraft,
 } from '../master-data/forms'
+import type { ProjectImportSource } from './import'
 
 export const PROJECT_WRITE_CAPABILITY = 'project:write' as const
 
@@ -23,6 +24,8 @@ export interface ProjectCommandRequestDTO {
   action: MasterDataSaveAction
   draft: ProjectFormDraft
   attachments: FormAttachmentChanges
+  /** Excel 导入来源；只允许新建 save，沿同一中央项目事实源保存。 */
+  importSource?: ProjectImportSource
 }
 
 export interface ProjectCommandResultDTO {
@@ -38,6 +41,7 @@ export interface ProjectFormReadDTO {
   attachments: FormAttachment[]
   version: string
   updatedAt: string
+  importSource?: ProjectImportSource
 }
 
 export interface ProjectCommandRepository {

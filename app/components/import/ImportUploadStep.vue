@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import type { RawImportSheet } from '~/lib/util/excel'
+import type { RawImportSheet, RawImportWorkbook } from '~/lib/util/excel'
 import { useDropZone } from '@vueuse/core'
 import { shallowRef, useTemplateRef } from 'vue'
 import { toErrorMessage } from '~/lib/util/error'
-import { parseSheetForMapping } from '~/lib/util/excel'
+import { parseWorkbookForMapping } from '~/lib/util/excel'
 
+const props = defineProps<{ chooseSheet?: boolean }>()
 const emit = defineEmits<{
   loaded: [sheet: RawImportSheet]
 }>()
+const workbook = shallowRef<RawImportWorkbook | null>(null)
+const selectedSheet = shallowRef('')
 
 const parsing = shallowRef(false)
 const error = shallowRef<string | null>(null)
@@ -29,7 +32,13 @@ async function handleFile(file: File | undefined) {
   parsing.value = true
   error.value = null
   try {
-    const sheet = await parseSheetForMapping(file)
+    const parsed = await parseWorkbookForMapping(file)
+    if (props.chooseSheet) {
+      workbook.value = parsed
+      selectedSheet.value = parsed.sheets.find(sheet => sheet.rows.length)?.name ?? ''
+      return
+    }
+    const sheet = parsed.sheets[0]!
     if (!sheet.rows.length)
       throw new Error('文件没有数据行，请检查后重新上传')
     emit('loaded', sheet)
@@ -40,6 +49,15 @@ async function handleFile(file: File | undefined) {
   finally {
     parsing.value = false
   }
+}
+
+function confirmSheet() {
+  const sheet = workbook.value?.sheets.find(sheet => sheet.name === selectedSheet.value)
+  if (!sheet?.rows.length) {
+    error.value = '文件没有数据行，请检查后重新上传'
+    return
+  }
+  emit('loaded', sheet)
 }
 
 function onPick(event: Event) {
@@ -59,7 +77,7 @@ function onPick(event: Event) {
     >
       <span class="i-lucide-file-up h-7 w-7 text-brand" aria-hidden="true" />
       <span class="text-13px font-700 text-ink">拖入 Excel / CSV 文件，或点击选择</span>
-      <span class="text-11px text-ink-faint">第一行须为表头；支持 .xlsx / .xls / .csv</span>
+      <span class="text-11px text-ink-faint">自动识别表头；支持 .xlsx / .xls / .csv</span>
       <input
         type="file"
         accept=".xlsx,.xls,.csv"
@@ -68,6 +86,20 @@ function onPick(event: Event) {
         @change="onPick"
       >
     </label>
+
+    <div v-if="chooseSheet && workbook" class="mt-3 flex flex-wrap items-center gap-3">
+      <label class="min-w-0 flex flex-wrap items-center gap-2 text-12px">
+        工作表
+        <select v-model="selectedSheet" aria-label="选择导入 Sheet" class="max-w-full min-w-0 border border-line rounded bg-panel px-3 py-2">
+          <option v-for="item in workbook.sheets" :key="item.name" :value="item.name">
+            {{ item.name }} · {{ item.rows.length }} 行
+          </option>
+        </select>
+      </label>
+      <button type="button" class="btn-primary" @click="confirmSheet">
+        使用此工作表
+      </button>
+    </div>
 
     <p v-if="parsing" class="mt-3 text-12px text-ink-soft" role="status">
       正在解析文件…
