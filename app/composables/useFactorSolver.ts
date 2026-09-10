@@ -5,14 +5,15 @@ import { useLocalStorage } from '@vueuse/core'
 import {
   FACTOR_SOLVER_MAX_RESULTS,
   FACTOR_SOLVER_TIME_LIMIT_MS,
+  yuanToFen,
 } from '~/lib/finance/factor-combination'
 
 const DEFAULT_STATE: FactorSolverStoredState = {
-  target: 10,
+  target: 128640,
   maxResults: 100,
   factors: [
-    { id: 1, value: 2, maxQuantity: null, allowDecimal: false },
-    { id: 2, value: 4, maxQuantity: 5, allowDecimal: false },
+    { id: 1, value: 640, maxQuantity: null, allowDecimal: false },
+    { id: 2, value: 960, maxQuantity: null, allowDecimal: false },
   ],
 }
 
@@ -27,6 +28,7 @@ function migrateStoredState(
   stored: FactorSolverStoredState,
   defaults: FactorSolverStoredState,
 ): FactorSolverStoredState {
+  const numericDraft = (value: unknown): NumericDraft => value === '' ? '' : numberOrNull(value)
   const rawFactors = (stored as unknown as {
     factors?: Array<Partial<FactorSolverStoredState['factors'][number]> & {
       f?: unknown
@@ -37,16 +39,16 @@ function migrateStoredState(
   const factors = Array.isArray(rawFactors)
     ? rawFactors.map((factor, index) => ({
         id: Number(factor.id) || index + 1,
-        value: numberOrNull(factor.value ?? factor.f),
-        maxQuantity: numberOrNull(factor.maxQuantity ?? factor.m),
-        allowDecimal: Boolean(factor.allowDecimal ?? factor.d),
+        value: numericDraft(Object.hasOwn(factor, 'value') ? factor.value : factor.f),
+        maxQuantity: numericDraft(Object.hasOwn(factor, 'maxQuantity') ? factor.maxQuantity : factor.m),
+        allowDecimal: Boolean(Object.hasOwn(factor, 'allowDecimal') ? factor.allowDecimal : factor.d),
       }))
     : defaults.factors
 
   return {
-    target: numberOrNull(stored.target) ?? defaults.target,
-    maxResults: numberOrNull(stored.maxResults) ?? defaults.maxResults,
-    factors: factors.length ? factors : defaults.factors,
+    target: Object.hasOwn(stored, 'target') ? numericDraft(stored.target) : defaults.target,
+    maxResults: Object.hasOwn(stored, 'maxResults') ? numericDraft(stored.maxResults) : defaults.maxResults,
+    factors,
   }
 }
 
@@ -61,6 +63,7 @@ export function useFactorSolver() {
   const includeFactor = shallowRef<NumericDraft>(null)
   const excludeFactor = shallowRef<NumericDraft>(null)
   const solverResult = shallowRef<FactorSolverResult | null>(null)
+  const resultTarget = shallowRef<number | null>(null)
   const statusMessage = shallowRef('配置目标值和因子后开始计算')
   const calculating = shallowRef(false)
   const showCalculationMask = shallowRef(false)
@@ -153,9 +156,11 @@ export function useFactorSolver() {
 
   function calculate() {
     const target = Number(state.value.target)
-    if (!Number.isFinite(target) || target <= 0) {
+    const targetFen = yuanToFen(target)
+    if (targetFen == null || target <= 0) {
       statusMessage.value = '请输入有效的目标值'
       solverResult.value = null
+      resultTarget.value = null
       return
     }
 
@@ -163,6 +168,7 @@ export function useFactorSolver() {
     if (factors.length === 0) {
       statusMessage.value = '请至少添加一个有效因子'
       solverResult.value = null
+      resultTarget.value = null
       return
     }
 
@@ -184,6 +190,7 @@ export function useFactorSolver() {
       if (jobId !== jobSequence)
         return
       solverResult.value = event.data
+      resultTarget.value = targetFen / 100
       statusMessage.value = ''
       finishCalculation()
     }
@@ -220,7 +227,7 @@ export function useFactorSolver() {
   }
 
   const rerunForFilter = useDebounceFn(() => {
-    if (Number(state.value.target) > 0)
+    if (solverResult.value && Number(state.value.target) > 0)
       calculate()
   }, 300)
 
@@ -254,6 +261,7 @@ export function useFactorSolver() {
     runningElapsedMs,
     showCalculationMask,
     solverResult,
+    resultTarget,
     state,
     summary,
   }

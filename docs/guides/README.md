@@ -26,6 +26,7 @@
 - [工资与考勤工作台使用说明](./payroll-attendance.md)
 - [OCR 设置使用说明](./ocr-settings.md)
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
+- [开票因子与税额计算使用说明](./invoice-factor.md)
 - [付款申请与登记支付使用说明](./finance-payment.md)
 - [送货单归档与原件包导出使用说明](./material-delivery.md)
 - [本地核心身份数据迁移使用指南](./local-data-migration.md)
@@ -74,6 +75,9 @@ python scripts/generate-project-guide-pdf.py `
   --source docs/guides/finance-invoice.md `
   --output output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
 python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/invoice-factor.md `
+  --output output/pdf/瑞航CRM_开票因子与税额计算使用说明.pdf
+python scripts/generate-project-guide-pdf.py `
   --source docs/guides/finance-payment.md `
   --output output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
 python scripts/generate-project-guide-pdf.py `
@@ -98,6 +102,7 @@ output/pdf/瑞航CRM_分供方证照与资料核验使用指南.pdf
 output/pdf/瑞航CRM_材料单价分析使用说明.pdf
 output/pdf/瑞航CRM_工资与考勤工作台使用说明.pdf
 output/pdf/瑞航CRM_OCR设置使用说明.pdf
+output/pdf/瑞航CRM_开票因子与税额计算使用说明.pdf
 output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
 output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
 output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf

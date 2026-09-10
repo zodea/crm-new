@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { FactorSolutionItem, FactorSolverResult } from '~/lib/finance/factor-combination'
-import type { NumericDraft } from '~/types/finance-factor'
 
 interface Props {
   result: FactorSolverResult | null
   summary: string
+  target: number | null
 }
 
 defineProps<Props>()
@@ -12,9 +12,6 @@ defineProps<Props>()
 const emit = defineEmits<{
   copy: [text: string]
 }>()
-
-const includeFactor = defineModel<NumericDraft>('includeFactor', { required: true })
-const excludeFactor = defineModel<NumericDraft>('excludeFactor', { required: true })
 
 function formatFactor(value: number): string {
   return value.toFixed(2).replace(/\.?0+$/, '')
@@ -45,45 +42,20 @@ function totalQuantity(items: FactorSolutionItem[]): string {
 </script>
 
 <template>
-  <section class="flex min-w-0 flex-col xl:min-h-0" style="background-color: var(--panel)">
-    <div class="shrink-0 border-b border-line p-4">
-      <div class="mb-3 flex items-start justify-between gap-3">
+  <section data-testid="factor-results-panel" class="min-w-0 flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-panel lg:min-h-0">
+    <div class="shrink-0 border-b border-line p-3">
+      <div class="flex items-start justify-between gap-3">
         <div>
           <h2 class="text-14px font-800 text-ink">
             精确组合结果
           </h2>
-          <p class="mt-1 text-11px text-ink-faint">
-            筛选条件变化后自动重算，保证展示结果完整准确
+          <p v-if="target != null" class="mt-1 text-11px text-ink-faint" data-testid="factor-result-target">
+            本轮目标 {{ target.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
           </p>
         </div>
         <span v-if="result?.mode" class="text-11px font-600 text-ink-faint">
           {{ result.mode === 'light' ? '轻量搜索' : '可达性剪枝' }}
         </span>
-      </div>
-
-      <div class="grid gap-2 sm:grid-cols-2">
-        <div>
-          <label for="factor-include" class="field-label block">必须包含因子</label>
-          <input
-            id="factor-include"
-            v-model.number="includeFactor"
-            type="number"
-            step="any"
-            class="field-input w-full font-mono"
-            placeholder="例如 4"
-          >
-        </div>
-        <div>
-          <label for="factor-exclude" class="field-label block">排除因子</label>
-          <input
-            id="factor-exclude"
-            v-model.number="excludeFactor"
-            type="number"
-            step="any"
-            class="field-input w-full font-mono"
-            placeholder="例如 2"
-          >
-        </div>
       </div>
 
       <div class="mt-3 flex items-center gap-2 rounded-[var(--radius-btn)] bg-surface-2 px-3 py-2 text-12px text-ink-soft" aria-live="polite">
@@ -95,7 +67,7 @@ function totalQuantity(items: FactorSolutionItem[]): string {
     <div
       v-if="result?.solutions.length"
       data-testid="factor-results-scroll"
-      class="max-h-[520px] overflow-auto overscroll-contain xl:min-h-0 xl:flex-1 xl:max-h-none"
+      class="max-h-[520px] overflow-auto overscroll-contain lg:min-h-0 lg:flex-1 lg:max-h-none"
     >
       <table class="w-full min-w-[620px] border-collapse text-14px">
         <thead class="sticky top-0 z-1 bg-surface-2">
