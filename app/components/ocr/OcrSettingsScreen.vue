@@ -30,6 +30,10 @@ const draft = ref<OcrRecognitionSettings>(createDefaultOcrRecognitionSettings())
 const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(settings.value))
 let latestRequest = 0
 
+watch(settings, (next) => {
+  draft.value = { ...next }
+}, { flush: 'sync' })
+
 watch(dirty, (isDirty) => {
   if (isDirty)
     savedMessage.value = ''
@@ -59,7 +63,6 @@ async function refreshStatus() {
 async function loadSettings() {
   try {
     await store.load()
-    draft.value = { ...settings.value }
   }
   catch {
     // store.error 是页面唯一的设置加载错误源。
@@ -75,7 +78,6 @@ async function saveSettings() {
   savedMessage.value = ''
   try {
     await store.save(draft.value)
-    draft.value = { ...settings.value }
     savedMessage.value = '设置已保存，将用于后续识别任务。'
   }
   catch {

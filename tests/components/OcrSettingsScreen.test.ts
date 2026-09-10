@@ -39,7 +39,8 @@ describe('ocr 设置页面', () => {
       },
     })
 
-    const chartRecognition = await screen.findByRole('checkbox', { name: '图表识别' })
+    await screen.findByText('已保存')
+    const chartRecognition = screen.getByRole('checkbox', { name: '图表识别' })
     await fireEvent.click(chartRecognition)
     await fireEvent.click(screen.getByRole('button', { name: '保存设置' }))
     expect(await screen.findByText('设置已保存，将用于后续识别任务。')).not.toBeNull()
