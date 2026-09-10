@@ -18,6 +18,14 @@ async function reset(page: Page, info: TestInfo) {
     })
     expect(result.ok()).toBe(true)
   }
+  // 显式测试入口准备中央身份；随后清空合同，以验证真正的首次保存回读。
+  for (const scenario of ['ready', 'empty']) {
+    const result = await page.context().request.post('/api/testing/construction-contracts/reset', {
+      headers: { ...headers(info), 'x-ruihang-test-reset': '1' },
+      data: { scenario },
+    })
+    expect(result.ok()).toBe(true)
+  }
 }
 
 async function saveEntity(page: Page, entity: 'customers' | 'projects' | 'construction-contracts', draft: Record<string, unknown>, id?: string) {
@@ -194,7 +202,8 @@ test('合同源失败/无权反馈与重试，正式演示来源和会话隔离'
   await page.getByRole('button', { name: '重新加载施工合同' }).click()
   await expect(page.getByRole('link', { name: '恢复后合成合同425', exact: true })).toBeVisible()
   const other = await page.context().request.get('/api/read/customers/customer-real-320?origin=real&includeDemo=false', { headers: { 'x-ruihang-test-session': `other-${info.testId}` } })
-  expect((await other.json()).contracts).toEqual([])
+  expect(other.status()).toBe(404)
+  expect(await other.text()).not.toContain(c.id)
   await page.getByRole('button', { name: '包含测试数据' }).click()
   await page.getByRole('button', { name: '确认切换' }).click()
   await expect(page.getByRole('button', { name: '关闭测试数据' })).toBeVisible()

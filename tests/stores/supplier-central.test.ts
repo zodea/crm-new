@@ -54,11 +54,12 @@ describe('分供方中央 stores', () => {
       .mockRejectedValueOnce(new SupplierRepositoryProblem(supplierProblem('unavailable', '响应丢失', true)))
       .mockResolvedValueOnce({ id: 'supplier-1', commandId: 'supplier-command-1', version: '4', updatedAt: '2026-08-23T01:00:00.000Z', attachmentIds: [] })
     const store = useSupplierCommandStore()
-    await store.hydrate('supplier-1')
+    const session = store.createSession()
+    await store.hydrate(session, 'supplier-1')
 
     const draft = { id: 'supplier-1', name: '新分供方', supplierCategory: '材料供应商', contact: '陈经理' }
-    await expect(store.saveForm(draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
-    await store.saveForm(draft, 'save')
+    await expect(store.saveForm(session, draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
+    await store.saveForm(session, draft, 'save')
 
     expect(repositories.supplierCommands.execute.mock.calls[0]?.[0]).toMatchObject({
       id: 'supplier-1',
@@ -105,14 +106,15 @@ describe('分供方中央 stores', () => {
       .mockResolvedValueOnce({ id: 'editing-supplier', version: '4', updatedAt: '2026-09-08T02:00:00.000Z', attachmentIds: [] })
     repositories.supplierCommands.importRow.mockResolvedValue({ id: 'imported-supplier', version: '2', updatedAt: '2026-09-08T01:00:00.000Z', attachmentIds: [] })
     const store = useSupplierCommandStore()
-    await store.hydrate('editing-supplier')
+    const session = store.createSession()
+    await store.hydrate(session, 'editing-supplier')
     const draft = { id: 'editing-supplier', name: '正在编辑（修改）', supplierCategory: '其他', contact: '联系人' }
-    await expect(store.saveForm(draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
+    await expect(store.saveForm(session, draft, 'save')).rejects.toBeInstanceOf(SupplierRepositoryProblem)
 
     await store.importRow({ name: '另一家导入供方', externalRef: 'OLD-IMPORTED' })
     expect(store.latestWrite).toEqual({ id: 'imported-supplier', version: '2' })
     expect(repositories.supplierCommands.loadForm).toHaveBeenLastCalledWith('imported-supplier')
-    await store.saveForm(draft, 'save')
+    await store.saveForm(session, draft, 'save')
     const [first, retried] = repositories.supplierCommands.execute.mock.calls.map(([request]) => request)
     expect(retried).toMatchObject({ id: 'editing-supplier', baseVersion: '3', commandId: first.commandId, draft })
     expect(store.latestWrite).toEqual({ id: 'editing-supplier', version: '4' })

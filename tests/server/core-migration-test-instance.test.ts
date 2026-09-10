@@ -211,6 +211,24 @@ describe('core migration test instance', () => {
       .toMatchObject({ sourceHash: migrationSource.sourceHash })
   })
 
+  it.each(['独立劳务范围', null])('分供方迁移 HTTP 保留 laborScope=%s 并继续拒绝未知字段', async (laborScope) => {
+    const baseline = cleanSource()
+    const migrationSource = source({
+      ...baseline,
+      entities: {
+        ...baseline.entities,
+        suppliers: baseline.entities.suppliers.map(row => ({ ...row, attributes: { laborScope } })),
+      },
+    })
+    const command = sourceCommand('supplier-scope-http', migrationSource)
+    const parsed = parseCoreMigrationSourceCommand(JSON.parse(JSON.stringify(command)))
+    expect(parsed.source.entities.suppliers[0]?.attributes).toEqual({ laborScope })
+    await expect(createCoreMigrationTestInstance().preflight(parsed, SESSION)).resolves.toMatchObject({ sourceHash: migrationSource.sourceHash })
+    const unknown = structuredClone(command)
+    unknown.source.entities.suppliers[0]!.attributes!.unknownField = '拒绝'
+    expect(() => parseCoreMigrationSourceCommand(unknown)).toThrow('包含未知字段')
+  })
+
   it('服务端重算来源哈希，预检仅接受未备份命令且 dry-run 必须先有同一来源预检', async () => {
     const instance = createCoreMigrationTestInstance()
     const migrationSource = source()

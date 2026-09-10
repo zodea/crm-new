@@ -35,7 +35,7 @@
 - `adr/`：已经采纳的、会约束后续实现的决策；入口见 [`adr/README.md`](./adr/README.md)。
 - `agents/`：仓库协作规则，不承载产品规格。
 - `design/`：设计入口、组件规格和视觉验收规则。
-- `guides/`：面向最终用户的操作说明 Markdown 权威源；PDF 是同源生成的交付物。
+- `guides/`：面向最终用户的 Markdown 操作说明与[功能路由索引](./guides/routes.md)；PDF 是同源生成的交付物。
 - `rewrite/`：当前架构、数据模型、通用业务模式与页面蓝本。
 - `prd/`：仍有独立价值的产品需求文档；落地状态以 Issue 为准。
 - `implementation/`：实施承接与拆分入口，执行顺序以当前 Issue 为准，不是架构或业务权威源。

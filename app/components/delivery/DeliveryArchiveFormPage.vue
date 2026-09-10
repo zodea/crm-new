@@ -2,7 +2,7 @@
 import type { DeliveryAmountSource } from '~/lib/delivery/review'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import type { DeliveryLineDraft, DeliveryRecordInput } from '~/stores/delivery-record'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { hasDeliveryPricePending, normalizeDeliveryOrderNo } from '~/lib/delivery/review'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
@@ -255,10 +255,8 @@ async function leaveToDetail() {
     : `/material/delivery/archive/${recordId.value}`)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey.value))
     return true
   const leave = await confirm({
     variant: 'simple',
@@ -266,8 +264,6 @@ onBeforeRouteLeave(async () => {
     message: '当前送货单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath.value, title: title.value })
   return leave
 })
 

@@ -21,8 +21,6 @@ import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
 import { ownerFinalSettlementReceiptIsActive } from '../../app/lib/owner-document/central-repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
-import { resolveBusinessSession } from './business-session'
-import { coreMigrationTestInstance } from './core-migration-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { customerConstructionContractFacts } from './customer-construction-contract-facts'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
@@ -32,24 +30,6 @@ export type CustomerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavai
 
 const FIXED_AS_OF = '2026-08-23T00:00:00.000Z'
 const SOURCE_VERSION = 'customer-read-fixture-v1'
-
-const CONSTRUCTION_CUSTOMER_FIXTURE: CustomerListSourceRow = {
-  dataOrigin: 'real',
-  id: 'customer-real-320',
-  name: '中央正式甲方客户',
-  aliases: [],
-  taxNo: 'CUSTOMER-CENTRAL-320',
-  legalRep: '',
-  registeredAddress: '',
-  invoiceName: '中央正式甲方客户',
-  bank: '',
-  bankAccount: '',
-  contact: '甲方联系人',
-  contactPhone: '',
-  status: 'active',
-  note: '',
-  updatedAt: FIXED_AS_OF,
-}
 
 const EMPTY_MIGRATION_SNAPSHOT: CoreMigrationSnapshotDTO = {
   authority: 'local',
@@ -342,9 +322,9 @@ export function createCustomerReadTestInstance(
 
 export const customerReadTestInstance = createCustomerReadTestInstance(
   sessionId => demoWorkspaceTestInstance.capabilities(sessionId),
-  sessionId => [CONSTRUCTION_CUSTOMER_FIXTURE, ...customerCommandTestInstance.rows(sessionId)],
+  sessionId => customerCommandTestInstance.rows(sessionId),
   sessionId => customerCommandTestInstance.sourceVersion(sessionId),
-  () => coreMigrationTestInstance.snapshot(resolveBusinessSession()),
+  () => EMPTY_MIGRATION_SNAPSHOT,
   async (sessionId) => {
     const facts = (await import('./project-read-test-instance')).projectReadTestInstance.facts(sessionId)
     return {

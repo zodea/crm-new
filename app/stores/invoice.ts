@@ -10,11 +10,13 @@ import type { InvoiceItem } from '~/lib/invoice/recognize'
 import type { ArchivedInvoiceAggregate } from '~/lib/project/detail-aggregate'
 import { defineStore } from 'pinia'
 import { computed, readonly, ref, shallowRef } from 'vue'
+import { useSessionFileCache } from '~/composables/useSessionFileCache'
 import { db } from '~/lib/db/client'
 import { execute, select, withTransaction } from '~/lib/db/connection'
 import { createSoftDeleteActions, logCreate, logOperation, selectVisibleSql, withUpdateLog } from '~/lib/db/soft-delete'
 import { checkInvoiceArchiveReady, checkNotDuplicate } from '~/lib/invoice/archive'
 import { partitionBatchPass, selectBatchCandidates } from '~/lib/invoice/batch-pass'
+import { hasInvoiceDuplicate } from '~/lib/invoice/duplicate'
 import { createDefaultInvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
 import { loadInvoiceExportStyleSetting, saveInvoiceExportStyleSetting } from '~/lib/invoice/preferences'
 import { normalizePrintRotation } from '~/lib/invoice/print-layout'
@@ -246,9 +248,9 @@ export const useInvoiceStore = defineStore('invoice', () => {
   const invoiceExportStyleLoaded = shallowRef(false)
   /** 识别进度 {发票id: 0~100}——仅识别期间存在，完成即删（左栏「识别中 N%」的数据源） */
   const recognitionProgress = ref<Record<string, number>>({})
-  /** 原文件仅保留在当前应用会话，不写入 SQLite，也不进入 Vue 响应式代理。 */
-  const recognitionFiles = new Map<string, File>()
   const recognitionErrors = ref<Record<string, string>>({})
+  /** 原文件不进入响应式代理；删除或归档后仅保留 10 秒撤回窗口。 */
+  const recognitionFiles = useSessionFileCache(10_000, clearRecognitionError)
 
   function recognitionError(id: string): string {
     return recognitionErrors.value[id] ?? ''
@@ -364,6 +366,12 @@ export const useInvoiceStore = defineStore('invoice', () => {
       ])
       list.value = rows.map(rowToInvoice)
       archivedAggregateRows.value = aggregates
+      const activeIds = new Set(list.value.filter(invoice => invoice.accountStatus !== 'archived').map(invoice => invoice.id))
+      recognitionFiles.sync(activeIds)
+      for (const id of Object.keys(recognitionErrors.value)) {
+        if (!activeIds.has(id))
+          clearRecognitionError(id)
+      }
     }
     finally {
       loading.value = false
@@ -408,8 +416,13 @@ export const useInvoiceStore = defineStore('invoice', () => {
   async function add(data: Partial<Invoice>) {
     const id = generateId('inv')
     const now = new Date().toISOString()
-    await execute(INSERT_SQL, [id, ...invoiceToBindings(data), now, now])
-    await logCreate(db, 'invoices', id)
+    await withTransaction(async (tx) => {
+      const duplicate = await hasInvoiceDuplicate(tx, id, data.invoiceNumber ?? '')
+      if (duplicate && data.accountStatus === 'archived')
+        throw new Error('发票号码重复，不能计入台账')
+      await tx.execute(INSERT_SQL, [id, ...invoiceToBindings({ ...data, ...(duplicate ? { dupStatus: 'duplicate' } : {}) }), now, now])
+      await logCreate(tx, 'invoices', id)
+    })
     await load()
     return id
   }
@@ -418,10 +431,19 @@ export const useInvoiceStore = defineStore('invoice', () => {
   /** 全列覆写：data 必须是「最新行 + 改动」的合并结果（`{ ...byId(id), ...patch }`），缺列会被写回默认值。 */
   async function update(id: string, data: Partial<Invoice>, operator = '') {
     const now = new Date().toISOString()
-    const logId = await withUpdateLog(db, 'invoices', id, () => execute(
-      UPDATE_SQL,
-      [...invoiceToBindings(data), now, id],
-    ), operator)
+    const logId = await withTransaction(async (tx) => {
+      const [current] = await tx.select<{ invoice_number: string, account_status: string }>('SELECT invoice_number, account_status FROM invoices WHERE id = ? AND deleted_at IS NULL', [id])
+      if (!current)
+        return null
+      const changedNumber = (data.invoiceNumber ?? '') !== current.invoice_number
+      const recheck = changedNumber || operator === INVOICE_RECOGNITION_LOG_OPERATOR
+      const duplicate = (recheck || (data.accountStatus === 'archived' && current.account_status !== 'archived'))
+        && await hasInvoiceDuplicate(tx, id, data.invoiceNumber ?? '')
+      if (duplicate && (current.account_status === 'archived' || data.accountStatus === 'archived'))
+        throw new Error('发票号码重复，不能计入台账')
+      const values = { ...data, ...(recheck ? { dupStatus: duplicate ? 'duplicate' as const : 'normal' as const } : {}) }
+      return withUpdateLog(tx, 'invoices', id, () => tx.execute(UPDATE_SQL, [...invoiceToBindings(values), now, id]), operator)
+    })
     await load()
     return logId
   }
@@ -506,26 +528,22 @@ export const useInvoiceStore = defineStore('invoice', () => {
       const current = byId(id)
       if (!current)
         return false
-      const dupRows = await select<{ id: string }>(
-        `SELECT id FROM invoices WHERE invoice_number = ? AND id <> ? AND deleted_at IS NULL LIMIT 1`,
-        [r.invoiceNumber, id],
-      )
       const logId = await update(id, {
         ...current,
         ...r,
         ocrStatus: 'done',
         reviewStatus: 'unreviewed',
-        dupStatus: dupRows.length ? 'duplicate' : 'normal',
       }, INVOICE_RECOGNITION_LOG_OPERATOR)
       if (logId)
         clearRecognitionError(id)
       return logId != null
     }
     catch (error) {
-      recognitionErrors.value[id] = error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试'
       const current = byId(id)
-      if (current)
+      if (current) {
+        recognitionErrors.value[id] = error instanceof Error ? error.message : 'OCR 识别失败，请稍后重试'
         await markRecognitionFailed(current)
+      }
       return false
     }
     finally {
@@ -631,6 +649,10 @@ export const useInvoiceStore = defineStore('invoice', () => {
           return
 
         const inv = rowToInvoice(row)
+        if (await hasInvoiceDuplicate(tx, id, inv.invoiceNumber, true)) {
+          result = { ok: false, reason: '发票号码重复，请核对或排除副本后再归档' }
+          return
+        }
         const provenance = await buildArchiveProvenance(inv, tx)
         const ready = checkInvoiceArchiveReady({
           ocrStatus: inv.ocrStatus,

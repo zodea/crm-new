@@ -33,11 +33,10 @@ let loadGeneration = 0
 
 const detail = computed(() => {
   const state = store.detailState
-  if (state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty')
-    return state.data
-  if (state.kind === 'loading' || state.kind === 'error')
-    return state.previous
-  return null
+  const data = state.kind === 'ready' || state.kind === 'partial' || state.kind === 'empty'
+    ? state.data
+    : state.kind === 'loading' || state.kind === 'error' ? state.previous : null
+  return data?.customer.id === props.customerId && data.dataOrigin === props.origin ? data : null
 })
 const customer = computed(() => detail.value?.customer ?? null)
 const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(props.returnTo, props.origin))

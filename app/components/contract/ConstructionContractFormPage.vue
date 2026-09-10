@@ -2,7 +2,8 @@
 import type { F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/forms'
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { constructionContractProblemFromUnknown } from '~/lib/construction-contract/repository'
 import {
   validateConstructionContractDetailReturnTo,
@@ -13,6 +14,8 @@ import { ConstructionContractCommandConflictError, useConstructionContractComman
 
 const route = useRoute()
 const store = useConstructionContractCommandStore()
+const commandSession = store.createSession()
+const { closeCurrent, openNew } = useContractFormNavigation('construction')
 const { confirm, success, warning, error } = useKitUI()
 const {
   attachments,
@@ -42,7 +45,6 @@ const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = ref(true)
 const savedSnapshot = shallowRef('')
 const context = shallowRef<Awaited<ReturnType<typeof store.hydrate>>['context'] | null>(null)
-let allowLeave = false
 
 const dirty = computed(() => JSON.stringify(draft.value) !== savedSnapshot.value || attachmentDirty.value)
 const pageState = computed(() => loading.value ? 'loading' : loadError.value ? 'error' : 'ready')
@@ -71,7 +73,7 @@ async function initialize(targetId = routeId.value) {
   fieldErrors.value = {}
   resetAttachments()
   try {
-    const hydrated = await store.hydrate(targetId)
+    const hydrated = await store.hydrate(commandSession, targetId)
     if (request !== initializeRequest)
       return
     context.value = hydrated.context
@@ -129,26 +131,30 @@ async function save(action: FormFooterAction) {
     return
   loadingAction.value = action
   try {
-    const result = await store.saveForm(draft.value, saveAction, attachmentChanges())
+    const result = await store.saveForm(commandSession, draft.value, saveAction, attachmentChanges())
     clearPendingAttachments()
     success(saveAction === 'draft' ? '草稿已保存' : '施工合同已保存')
+    savedSnapshot.value = JSON.stringify(draft.value)
+    if (action === 'saveNew') {
+      await openNew(() => initialize(null))
+      return
+    }
     if (closeAfterSave.value) {
-      allowLeave = true
+      closeCurrent()
       const preserved = detailReturnTo.value
       await navigateTo(preserved && routeId.value === result.id
         ? preserved
         : { path: `/contract/${encodeURIComponent(result.id)}`, query: { origin: 'real', contractKind: 'construction', returnTo: listReturnTo.value ?? undefined } })
       return
     }
-    allowLeave = true
+    closeCurrent()
     await navigateTo({ path: `/contract/construction/form/${encodeURIComponent(result.id)}`, query: { origin: 'real', returnTo: returnTo.value } }, { replace: true })
     await initialize(result.id)
-    allowLeave = false
   }
   catch (cause) {
     if (cause instanceof ConstructionContractCommandConflictError) {
       const reload = await confirm({ variant: 'simple', title: '合同已有更新', message: '载入服务器最新版会替换当前内容；选择“保留我的内容”后，可基于服务器新版本再次保存。', confirmLabel: '载入最新版', cancelLabel: '保留我的内容' })
-      store.adoptConflictVersion(cause.latest)
+      store.adoptConflictVersion(commandSession, cause.latest)
       if (reload) {
         draft.value = cause.latest.draft
         resetAttachments(cause.latest.attachments)
@@ -172,11 +178,11 @@ async function save(action: FormFooterAction) {
 async function leave() {
   if (dirty.value && !await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
     return
-  allowLeave = true
+  closeCurrent()
   await navigateTo(returnTo.value)
 }
 
-onBeforeRouteLeave(async () => allowLeave || !dirty.value || await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
+useTabCloseGuard(async () => !dirty.value || await confirm({ variant: 'simple', title: '放弃修改', message: '当前表单还有未保存内容，确认离开？', confirmLabel: '放弃修改' }))
 watch(routeId, id => void initialize(id), { immediate: true })
 useTabTitle(title)
 </script>

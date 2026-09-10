@@ -1726,8 +1726,8 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/crew-worker/CrewWorkerCentralDetailScreen.vue",
-          "anchor": "crewDetail.members"
+          "path": "app/components/crew-worker/CrewMemberSection.vue",
+          "anchor": "detail.members"
         }
       ],
       "issueNumbers": [

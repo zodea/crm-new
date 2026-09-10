@@ -123,8 +123,9 @@ describe('项目中央逐行导入命令', () => {
     const store = useProjectCommandStore()
     const execute = h.repository.execute
     const write = vi.spyOn(h.repository, 'execute').mockRejectedValueOnce(new Error('离线'))
-    await store.hydrate(null)
-    await expect(store.saveForm({ name: '另一个编辑页的草稿' }, 'draft')).rejects.toThrow('仅保留本地草稿')
+    const session = store.createSession()
+    await store.hydrate(session, null)
+    await expect(store.saveForm(session, { name: '另一个编辑页的草稿' }, 'draft')).rejects.toThrow('仅保留本地草稿')
     const before = [...values]
     write.mockImplementationOnce(async (request) => {
       await execute(request)
@@ -139,7 +140,7 @@ describe('项目中央逐行导入命令', () => {
     expect(h.commands.rows()).toHaveLength(1)
     const importCalls = write.mock.calls.filter(([request]) => request.importSource)
     expect(new Set(importCalls.map(([request]) => request.commandId)).size).toBe(1)
-    await store.saveForm({ name: '另一个编辑页的草稿' }, 'draft')
+    await store.saveForm(session, { name: '另一个编辑页的草稿' }, 'draft')
     expect(write.mock.calls.at(-1)![0]).toMatchObject({ commandId: JSON.parse(before[0]![1]).commandId, baseVersion: null })
     expect(write.mock.calls.at(-1)![0]).not.toHaveProperty('id')
     expect(h.commands.rows()).toHaveLength(2)

@@ -45,6 +45,8 @@ interface StoredContract {
 }
 
 interface SessionState {
+  referenceProjects: Map<string, ProjectOption>
+  referenceCustomers: Map<string, CustomerOption>
   commands: Map<string, ConstructionContractCommandResultDTO>
   contracts: Map<string, StoredContract>
   sourceVersion: number
@@ -54,14 +56,14 @@ interface SessionState {
 }
 
 interface Options {
-  resolveProjects?: (sessionId?: string | null) => ProjectOption[]
-  resolveCustomers?: (sessionId?: string | null) => CustomerOption[]
   assertReferences?: (draft: ProjectContractFormDraft, sessionId?: string | null) => Promise<void>
   createId?: () => string
   createAttachmentId?: () => string
   now?: () => string
   projects?: ProjectOption[]
   customers?: CustomerOption[]
+  resolveProjects?: (sessionId?: string | null) => readonly ProjectOption[]
+  resolveCustomers?: (sessionId?: string | null) => readonly CustomerOption[]
 }
 
 export interface ConstructionContractMigrationRecord {
@@ -112,14 +114,14 @@ export function createConstructionContractCommandTestInstance(options: Options =
   const createId = options.createId ?? (() => randomUUID())
   const createAttachmentId = options.createAttachmentId ?? (() => randomUUID())
   const now = options.now ?? (() => new Date().toISOString())
-  const projects = new Map((options.projects ?? []).map(row => [row.id, row]))
-  const customers = new Map((options.customers ?? []).map(row => [row.id, row]))
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
   const stateFor = (sessionId?: string | null) => {
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
       state = {
+        referenceProjects: new Map(),
+        referenceCustomers: new Map(),
         commands: new Map(),
         contracts: new Map(),
         sourceVersion: 0,
@@ -129,6 +131,8 @@ export function createConstructionContractCommandTestInstance(options: Options =
       }
       states.set(key, state)
     }
+    state.referenceProjects = new Map((options.resolveProjects?.(sessionId) ?? options.projects ?? []).map(row => [row.id, row]))
+    state.referenceCustomers = new Map((options.resolveCustomers?.(sessionId) ?? options.customers ?? []).map(row => [row.id, row]))
     return state
   }
 
@@ -171,15 +175,15 @@ export function createConstructionContractCommandTestInstance(options: Options =
     }
   }
 
-  function projectFor(state: SessionState, id: string, sessionId?: string | null) {
-    return options.resolveProjects?.(sessionId).find(row => row.id === id) ?? state.migratedProjects.get(id) ?? projects.get(id)
+  function projectFor(state: SessionState, id: string) {
+    return state.referenceProjects.get(id) ?? state.migratedProjects.get(id)
   }
 
-  function customerFor(state: SessionState, id: string, sessionId?: string | null) {
-    return options.resolveCustomers?.(sessionId).find(row => row.id === id) ?? state.migratedCustomers.get(id) ?? customers.get(id)
+  function customerFor(state: SessionState, id: string) {
+    return state.referenceCustomers.get(id) ?? state.migratedCustomers.get(id)
   }
 
-  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action'], sessionId?: string | null) {
+  function validate(state: SessionState, draft: ProjectContractFormDraft, action: ConstructionContractCommandRequestDTO['action']) {
     const fieldErrors: Record<string, string[]> = {}
     if (action !== 'draft') {
       if (!text(draft.name))
@@ -209,10 +213,10 @@ export function createConstructionContractCommandTestInstance(options: Options =
       fieldErrors.lineItems = ['施工合同不接受采购明细']
     if (Object.keys(fieldErrors).length)
       throw failure('validation-failed', '施工合同表单校验失败', fieldErrors)
-    const project = projectFor(state, text(draft.projectId), sessionId)
+    const project = projectFor(state, text(draft.projectId))
     if (text(draft.projectId) && !project)
       throw failure('validation-failed', '项目不存在或来源不可用', { projectId: ['项目不存在'] })
-    if (text(draft.customerId) && !customerFor(state, text(draft.customerId), sessionId))
+    if (text(draft.customerId) && !customerFor(state, text(draft.customerId)))
       throw failure('validation-failed', '客户不存在或来源不可用', { customerId: ['客户不存在'] })
     if (project && text(draft.customerId) && project.customerId !== text(draft.customerId))
       throw failure('validation-failed', '项目与甲方客户关系不匹配', { customerId: ['必须选择项目当前客户'] })
@@ -229,10 +233,10 @@ export function createConstructionContractCommandTestInstance(options: Options =
       throw failure('validation-failed', 'commandId 必填')
   }
 
-  function toRow(state: SessionState, stored: StoredContract, sessionId?: string | null): ConstructionContractDetailSource {
+  function toRow(state: SessionState, stored: StoredContract): ConstructionContractDetailSource {
     const draft = stored.draft
-    const project = projectFor(state, text(draft.projectId), sessionId)
-    const customer = customerFor(state, text(draft.customerId), sessionId)
+    const project = projectFor(state, text(draft.projectId))
+    const customer = customerFor(state, text(draft.customerId))
     return {
       dataOrigin: 'real',
       id: stored.id,
@@ -291,12 +295,19 @@ export function createConstructionContractCommandTestInstance(options: Options =
   }
 
   const instance = {
+    formContext(sessionId?: string | null) {
+      const state = stateFor(sessionId)
+      return {
+        projects: [...new Map([...state.migratedProjects, ...state.referenceProjects]).values()],
+        customers: [...new Map([...state.migratedCustomers, ...state.referenceCustomers]).values()],
+      }
+    },
     reset(sessionId?: string | null) {
       states.delete(keyFor(sessionId))
     },
     rows(sessionId?: string | null) {
       const state = stateFor(sessionId)
-      return [...state.contracts.values()].map(stored => toRow(state, stored, sessionId))
+      return [...state.contracts.values()].map(stored => toRow(state, stored))
     },
     facts(sessionId?: string | null): ConstructionContractFactSources {
       const state = stateFor(sessionId)
@@ -492,7 +503,7 @@ export function createConstructionContractCommandTestInstance(options: Options =
         throw failure('validation-failed', '新建施工合同不能带 baseVersion')
       if (existing && request.baseVersion !== String(existing.version))
         throw failure('conflict', '施工合同已被其他操作更新，请先处理最新版本')
-      validate(state, request.draft, request.action, sessionId)
+      validate(state, request.draft, request.action)
       const timestamp = now()
       const id = existing?.id ?? createId()
       const removed = new Set(request.attachments.removeIds ?? [])
@@ -543,14 +554,6 @@ export function createConstructionContractCommandTestInstance(options: Options =
   return instance
 }
 
-export const CONSTRUCTION_CONTRACT_FORM_CUSTOMERS = [
-  { id: 'customer-real-320', name: '中央正式甲方客户' },
-]
-
-export const CONSTRUCTION_CONTRACT_FORM_PROJECTS = [
-  { id: 'project-real-320', name: '中央正式施工项目', customerId: 'customer-real-320' },
-]
-
 export const CONSTRUCTION_CONTRACT_EXISTING_ID = 'construction-contract-existing-320'
 
 export const CONSTRUCTION_CONTRACT_EXISTING_RECORD: ConstructionContractMigrationRecord = {
@@ -575,9 +578,7 @@ export const CONSTRUCTION_CONTRACT_EXISTING_RECORD: ConstructionContractMigratio
 }
 
 export const constructionContractCommandTestInstance = createConstructionContractCommandTestInstance({
-  projects: CONSTRUCTION_CONTRACT_FORM_PROJECTS,
-  customers: CONSTRUCTION_CONTRACT_FORM_CUSTOMERS,
-  resolveProjects: id => projectCommandTestInstance.rows(id).map(row => ({ id: row.id, name: row.name, customerId: row.customerId })),
-  resolveCustomers: id => customerCommandTestInstance.rows(id).map(row => ({ id: row.id, name: row.name })),
+  resolveProjects: sessionId => projectCommandTestInstance.rows(sessionId).map(row => ({ id: row.id, name: row.name, customerId: row.customerId ?? null })),
+  resolveCustomers: sessionId => customerCommandTestInstance.rows(sessionId),
   assertReferences: async (draft, sessionId) => (await import('./construction-contract-references')).assertConstructionContractReferences(draft, sessionId),
 })

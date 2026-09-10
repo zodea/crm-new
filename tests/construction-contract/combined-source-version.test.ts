@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { prepareConstructionContractChainIdentityFixtures } from '../../server/utils/construction-contract-chain-test-fixture'
 import {
   CONSTRUCTION_CONTRACT_EXISTING_ID,
   CONSTRUCTION_CONTRACT_EXISTING_RECORD,
@@ -30,6 +31,7 @@ describe('施工合同聚合读取版本', () => {
   it('把同一 canonical 验收记录同步为施工合同的验收与保修双事实入口', () => {
     const sessionId = 'construction-owner-acceptance-324'
     constructionContractCommandTestInstance.reset(sessionId)
+    prepareConstructionContractChainIdentityFixtures(sessionId)
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)
     try {
       const read = createConstructionContractReadTestInstance(
@@ -59,6 +61,7 @@ describe('施工合同聚合读取版本', () => {
   it('把 canonical 最终结算及其补充协议、收款事实同步回施工合同来源链', () => {
     const sessionId = 'construction-owner-final-settlement-325'
     constructionContractCommandTestInstance.reset(sessionId)
+    prepareConstructionContractChainIdentityFixtures(sessionId)
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)
     try {
       const read = createConstructionContractReadTestInstance(
@@ -114,6 +117,7 @@ describe('施工合同聚合读取版本', () => {
   it('把 canonical 甲方罚扣同步为施工合同中的专属只读入口', () => {
     const sessionId = 'construction-owner-penalty-326'
     constructionContractCommandTestInstance.reset(sessionId)
+    prepareConstructionContractChainIdentityFixtures(sessionId)
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], sessionId)
     try {
       const read = createConstructionContractReadTestInstance(

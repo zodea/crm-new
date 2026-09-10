@@ -8,7 +8,7 @@ import type {
   OwnerDocumentSaveAction,
 } from '~/lib/owner-document/forms'
 import { useDebounceFn } from '@vueuse/core'
-import { onBeforeRouteLeave } from 'vue-router'
+import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
 import {
   ownerDocumentFormCanRebase,
@@ -619,10 +619,8 @@ async function leaveToList() {
   await navigateTo(returnTarget.value)
 }
 
-onBeforeRouteLeave(async () => {
+useTabCloseGuard(async () => {
   if (allowLeave || !dirty.value)
-    return true
-  if (tabsStore.tabs.some(tab => tab.key === pageKey))
     return true
   const leave = await confirm({
     variant: 'simple',
@@ -630,8 +628,6 @@ onBeforeRouteLeave(async () => {
     message: '当前表单还有未保存内容，确认离开？',
     confirmLabel: '放弃修改',
   })
-  if (!leave)
-    tabsStore.open({ fullPath: pageFullPath, title: title.value })
   return leave
 })
 

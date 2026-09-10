@@ -42,9 +42,21 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
   const saving = shallowRef(false)
   const previewFiles = shallowReactive(new Map<string, File>())
   const duplicateSelectedId = shallowRef<string | null>(null)
-  const duplicatePreview = shallowRef<DeliveryDuplicatePreview | null>(null)
+  const duplicateFiles = shallowRef<{ duplicate: File, representative: File, kind: DeliveryFile['kind'] } | null>(null)
+  const duplicateUrl = useObjectUrl(() => duplicateFiles.value?.duplicate)
+  const representativeUrl = useObjectUrl(() => duplicateFiles.value?.representative)
+  const duplicatePreview = computed<DeliveryDuplicatePreview | null>(() => {
+    if (!duplicateFiles.value || !duplicateUrl.value || !representativeUrl.value)
+      return null
+    return {
+      duplicateUrl: duplicateUrl.value,
+      duplicateKind: duplicateFiles.value.kind,
+      representativeUrl: representativeUrl.value,
+      representativeKind: /\.pdf$/i.test(duplicateFiles.value.representative.name) ? 'pdf' : 'image',
+    }
+  })
   const duplicateLoading = shallowRef(false)
-  let duplicateObjectUrls: string[] = []
+  let duplicateSequence = 0
 
   // Pinia setup stores normally unwrap refs, but keeping this projection tolerant
   // of both forms also makes the queue stable during HMR and persisted-state restore.
@@ -376,16 +388,17 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
     }
   }
 
-  function releaseDuplicateObjectUrls() {
-    duplicateObjectUrls.forEach(url => URL.revokeObjectURL(url))
-    duplicateObjectUrls = []
-    duplicatePreview.value = null
+  function clearDuplicatePreview() {
+    duplicateSequence += 1
+    duplicateFiles.value = null
+    duplicateLoading.value = false
   }
 
   async function selectDuplicate(id: string) {
+    clearDuplicatePreview()
+    const sequence = duplicateSequence
     duplicateSelectedId.value = id
     duplicateLoading.value = true
-    releaseDuplicateObjectUrls()
     try {
       const duplicate = duplicateList.value.find(item => item.id === id)
       if (!duplicate)
@@ -394,20 +407,13 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
         store.loadDuplicateFile(id),
         store.loadDuplicateRepresentativeFile(id),
       ])
-      if (!duplicateFile || !representativeFile)
+      if (sequence !== duplicateSequence || !duplicateFile || !representativeFile)
         return
-      const duplicateUrl = URL.createObjectURL(duplicateFile)
-      const representativeUrl = URL.createObjectURL(representativeFile)
-      duplicateObjectUrls = [duplicateUrl, representativeUrl]
-      duplicatePreview.value = {
-        duplicateUrl,
-        duplicateKind: duplicate.kind,
-        representativeUrl,
-        representativeKind: /.pdf$/i.test(representativeFile.name) ? 'pdf' : 'image',
-      }
+      duplicateFiles.value = { duplicate: duplicateFile, representative: representativeFile, kind: duplicate.kind }
     }
     finally {
-      duplicateLoading.value = false
+      if (sequence === duplicateSequence)
+        duplicateLoading.value = false
     }
   }
 
@@ -683,12 +689,12 @@ export function useDeliveryRecognitionWorkspace(pageRef: Readonly<ShallowRef<HTM
         void selectDuplicate(ids[0])
       }
       else {
-        releaseDuplicateObjectUrls()
+        clearDuplicatePreview()
       }
     }
   }, { immediate: true })
 
-  onBeforeUnmount(releaseDuplicateObjectUrls)
+  onScopeDispose(clearDuplicatePreview)
 
   return {
     store,

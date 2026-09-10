@@ -96,8 +96,9 @@ describe('客户中央 stores', () => {
       attachmentIds: [],
     })
     const store = useCustomerCommandStore()
-    await store.hydrate('c-1')
-    await store.saveForm({ id: 'c-1', name: '新客户' }, 'save')
+    const session = store.createSession()
+    await store.hydrate(session, 'c-1')
+    await store.saveForm(session, { id: 'c-1', name: '新客户' }, 'save')
 
     expect(repositories.customerCommands.execute).toHaveBeenCalledWith(expect.objectContaining({
       id: 'c-1',
@@ -127,10 +128,11 @@ describe('客户中央 stores', () => {
         attachmentIds: [],
       })
     const store = useCustomerCommandStore()
-    await store.hydrate(null)
+    const session = store.createSession()
+    await store.hydrate(session, null)
 
-    await expect(store.saveForm({ name: '幂等客户' }, 'save')).rejects.toBeInstanceOf(CustomerRepositoryProblem)
-    await store.saveForm({ name: '幂等客户' }, 'save')
+    await expect(store.saveForm(session, { name: '幂等客户' }, 'save')).rejects.toBeInstanceOf(CustomerRepositoryProblem)
+    await store.saveForm(session, { name: '幂等客户' }, 'save')
 
     expect(repositories.customerCommands.execute.mock.calls[0]?.[0].commandId)
       .toBe(repositories.customerCommands.execute.mock.calls[1]?.[0].commandId)

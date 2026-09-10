@@ -1,12 +1,15 @@
 import type { ProjectContractFormDraft } from '~/lib/contract/forms'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { decodeCustomerDetailRead } from '~/lib/customer/repository'
 import { resolveBusinessSession } from '../../server/utils/business-session'
+import { prepareConstructionContractChainIdentityFixtures } from '../../server/utils/construction-contract-chain-test-fixture'
 import { constructionContractCommandTestInstance as commands } from '../../server/utils/construction-contract-command-test-instance'
 import { constructionContractReadTestInstance as contracts } from '../../server/utils/construction-contract-read-test-instance'
 import { customerCommandTestInstance as customers } from '../../server/utils/customer-command-test-instance'
 import { customerReadTestInstance as reads } from '../../server/utils/customer-read-test-instance'
+import { projectCommandTestInstance } from '../../server/utils/project-command-test-instance'
 import { projectReadTestInstance as projects } from '../../server/utils/project-read-test-instance'
+import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
 
 const session = resolveBusinessSession()
 const scope = 'customer-construction-contract-425'
@@ -21,12 +24,21 @@ function save(draft: ProjectContractFormDraft = {}) {
 }
 const detail = async (id = 'customer-real-320', origin = 'real', sessionId = scope) => decodeCustomerDetailRead(await reads.detail(id, { origin, includeDemo: String(origin === 'demo') }, sessionId))
 
+beforeEach(() => {
+  prepareConstructionContractChainIdentityFixtures(scope)
+  prepareConstructionContractChainIdentityFixtures('other-contract-425')
+})
+
 afterEach(() => {
-  commands.reset(scope)
-  contracts.reset('ready', scope)
-  reads.reset('ready', scope)
-  projects.reset('ready', scope)
-  customers.reset(scope)
+  for (const sessionId of [scope, 'other-contract-425']) {
+    commands.reset(sessionId)
+    contracts.reset('ready', sessionId)
+    reads.reset('ready', sessionId)
+    projects.reset('ready', sessionId)
+    customers.reset(sessionId)
+    projectCommandTestInstance.reset(sessionId)
+    supplierCommandTestInstance.reset(sessionId)
+  }
 })
 
 describe('正式施工合同保存→客户中央回读', () => {

@@ -90,7 +90,7 @@ describe('财务和物资整页表单布局接线', () => {
     vi.stubGlobal('navigateTo', navigate)
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useKitUI', () => ({ confirm, success: vi.fn(), warning: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useTabsStore', () => ({ tabs: [], close: vi.fn(), open: vi.fn() }))
+    vi.stubGlobal('useTabsStore', () => ({ tabs: [], close: vi.fn(), open: vi.fn(), registerCloseGuard: vi.fn(() => vi.fn()) }))
     const store = {
       saveForm,
       saveAttachments,

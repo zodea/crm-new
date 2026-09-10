@@ -566,6 +566,94 @@ describe('attendance register', () => {
     })
   })
 
+  it('c1 保留不足整天的考勤精度，草稿按实际工时计薪', async () => {
+    await upsertAttendanceRecord(db, {
+      projectId: 'project-a',
+      workerId: 'worker-a',
+      workDate: '2026-07-06',
+      hours: 7.5,
+    })
+    const source = await buildWageDraftSource(db, {
+      projectId: 'project-a',
+      crewId: 'crew-a',
+      leaderWorkerId: 'worker-a',
+      month: '2026-07',
+      formatFamily: 'C1',
+      quantitySource: 'field',
+      dailyRate: 480,
+    })
+    const statementId = await createWageStatementDraft(db, {
+      projectId: 'project-a',
+      crewId: 'crew-a',
+      leaderWorkerId: 'worker-a',
+      month: '2026-07',
+      purpose: 'advance',
+      formatFamily: 'C1',
+      quantitySource: 'field',
+      payRatio: 1,
+      lines: source.lines,
+      sourceVersion: source.sourceVersion,
+    })
+    expect(await loadWageStatement(db, statementId)).toMatchObject({
+      grossAmount: 450,
+      lines: expect.arrayContaining([expect.objectContaining({ quantity: 0.9375, amount: 450 })]),
+    })
+    await checkWageStatement(db, statementId, source.lines, source)
+    expect(await loadWageStatement(db, statementId)).toMatchObject({ status: 'checked', grossAmount: 450 })
+  })
+
+  it('c1 档案日薪换算的加班时薪不提前舍入', async () => {
+    await db.execute('UPDATE workers SET daily_wage = 481 WHERE id = \'worker-a\'')
+    await upsertAttendanceRecord(db, {
+      projectId: 'project-a',
+      workerId: 'worker-a',
+      workDate: '2026-07-06',
+      hours: 8,
+      overtimeHours: 2,
+    })
+    const source = await buildWageDraftSource(db, {
+      projectId: 'project-a',
+      crewId: 'crew-a',
+      leaderWorkerId: 'worker-a',
+      month: '2026-07',
+      formatFamily: 'C1',
+      quantitySource: 'field',
+    })
+    const statementId = await createWageStatementDraft(db, {
+      projectId: 'project-a',
+      crewId: 'crew-a',
+      leaderWorkerId: 'worker-a',
+      month: '2026-07',
+      purpose: 'advance',
+      formatFamily: 'C1',
+      quantitySource: 'field',
+      payRatio: 1,
+      lines: source.lines,
+      sourceVersion: source.sourceVersion,
+    })
+    expect(await loadWageStatement(db, statementId)).toMatchObject({ grossAmount: 601.25 })
+  })
+
+  it('c1 同一时间戳内的小幅工时变化也会更新来源版本', async () => {
+    async function sourceAt(hours: number) {
+      await upsertAttendanceRecord(db, { projectId: 'project-a', workerId: 'worker-a', workDate: '2026-07-06', hours })
+      await db.execute('UPDATE attendance_records SET updated_at = \'2026-07-06 10:00:00\'')
+      await db.execute('UPDATE workers SET updated_at = \'2026-07-06 10:00:00\'')
+      return buildWageDraftSource(db, {
+        projectId: 'project-a',
+        crewId: 'crew-a',
+        leaderWorkerId: 'worker-a',
+        month: '2026-07',
+        formatFamily: 'C1',
+        quantitySource: 'field',
+        dailyRate: 480,
+      })
+    }
+    const before = await sourceAt(7.5)
+    const after = await sourceAt(7.51)
+    expect(after.sourceVersion).not.toBe(before.sourceVersion)
+  })
+
   it('locks C1 attendance after the month wage was released', async () => {
     await db.execute(`
       INSERT INTO wage_statements (

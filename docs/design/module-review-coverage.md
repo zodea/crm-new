@@ -138,7 +138,7 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | 路由变体 / mode | kind / variant | 子视图 | browser / tauri | 源码 |
 | --- | --- | --- | --- | --- |
 | `/base/crew/:id` view | crew / default | page · 详情 | central-http / desktop-sqlite | [app/pages/base/crew/[id].vue](../../app/pages/base/crew/[id].vue) |
-| `/base/crew/:id` view | crew / default | table/members · members | central-http / 不适用 | [app/components/crew-worker/CrewWorkerCentralDetailScreen.vue](../../app/components/crew-worker/CrewWorkerCentralDetailScreen.vue) |
+| `/base/crew/:id` view | crew / default | table/members · members | central-http / 不适用 | [app/components/crew-worker/CrewMemberSection.vue](../../app/components/crew-worker/CrewMemberSection.vue) |
 | `/base/crew/:id` view | crew / default | table/projects · projects | central-http / 不适用 | [app/components/crew-worker/CrewWorkerCentralDetailScreen.vue](../../app/components/crew-worker/CrewWorkerCentralDetailScreen.vue) |
 | `/base/crew/:id` view | crew / default | table/penalties · penalties | central-http / 不适用 | [app/components/crew-worker/CrewWorkerCentralDetailScreen.vue](../../app/components/crew-worker/CrewWorkerCentralDetailScreen.vue) |
 | `/base/crew/:id` view | crew / default | section/CrewDetailCapabilities · CrewDetailCapabilities | 不适用 / desktop-sqlite | [app/components/master-data/CrewDetailScreen.vue](../../app/components/master-data/CrewDetailScreen.vue) |

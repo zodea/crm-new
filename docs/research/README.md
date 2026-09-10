@@ -6,10 +6,13 @@
 
 | 文档 | 用途 | 现行权威 |
 | --- | --- | --- |
+| [`local-branch-integration-2026-09-10.md`](./local-branch-integration-2026-09-10.md) | 本地分支整合、冲突裁定、回归验证及恢复入口 | 当前 Git 历史、#398 / #403、相关 ADR 与页面规格 |
+| [`local-branch-integration-2026-09-05.md`](./local-branch-integration-2026-09-05.md) | 旧分支整合时点的依据与分支头，非当前分支状态 | 当前 Git 历史及后续整合记录 |
 | [`module-development-flows.md`](./module-development-flows.md) | 全局及八模块流程方向确认稿，不代表实现完成 | [全模块复核总图 #402](https://github.com/zodea/crm-new/issues/402)、各模块票及页面蓝本 |
 | [`kitui-to-shadcn-migration.md`](./kitui-to-shadcn-migration.md) | 已执行的 KitUI 迁移映射及当时取舍 | ADR 0008、当前 KitUI 组件契约 |
 | [`kit-ui-primitives-wave2-prd.md`](./kit-ui-primitives-wave2-prd.md) | 第二波原语建设历史需求 | 当前组件契约、[交互复核 #404](https://github.com/zodea/crm-new/issues/404) |
 | [`schedule-dependency-editor-brief.md`](./schedule-dependency-editor-brief.md) | 排程依赖编辑器历史设计任务书 | 排程页面蓝本、ADR 0018、[工程模块 #412](https://github.com/zodea/crm-new/issues/412) |
+| [`browser-audit-2026-09-05.md`](./browser-audit-2026-09-05.md) | 浏览器功能、数据边界、页签与内存审计及复现入口 | 当前 Issue、实现状态与对应领域规格 |
 | [`red-circle-ui-gap-2026-07-11.md`](./red-circle-ui-gap-2026-07-11.md) | 红圈系统结构与交互差距走查，保留来源证据 | ADR 0013–0015、界面状态页、open Issues |
 | [`architecture-review-2026-07-05.html`](./architecture-review-2026-07-05.html) | 早期架构扫描报告 | `docs/rewrite/ARCHITECTURE.md`、ADR |
 | [`invoice-recognition-app-port-plan.md`](./invoice-recognition-app-port-plan.md) | 旧识别应用可迁移能力调查 | ADR 0006、当前 `app/lib/recognize/` |

@@ -102,7 +102,7 @@ test.describe('Issue #293：项目中央命令与本地草稿', () => {
     expect(serverFormName).toBe('中央编辑后项目')
     await expect(page.getByRole('heading', { name: '中央编辑后项目' })).toBeVisible()
 
-    await page.getByRole('link', { name: '关闭项目详情' }).click()
+    await page.getByRole('link', { name: '返回项目列表' }).click()
     await expect(page.getByRole('link', { name: '中央编辑后项目', exact: true })).toBeVisible()
   })
 

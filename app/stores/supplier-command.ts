@@ -14,10 +14,12 @@ export class SupplierCommandConflictError extends Error {
 }
 
 export const useSupplierCommandStore = defineStore('supplier-command', () => {
-  const targetSupplierId = shallowRef<string | null>(null)
-  const baseVersion = shallowRef<string | null>(null)
+  function createSession() {
+    return { targetSupplierId: null as string | null, baseVersion: null as string | null, pendingCommand: null as { id: string, fingerprint: string } | null }
+  }
+  type CommandSession = ReturnType<typeof createSession>
+
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
-  let pendingCommand: { id: string, fingerprint: string } | null = null
   const repository = () => useNuxtApp().$repositories.supplierCommands
   let rowImporter: ReturnType<typeof createSupplierRowImporter> | null = null
 
@@ -29,11 +31,11 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
     return result
   }
 
-  async function hydrate(id: string | null) {
-    targetSupplierId.value = id
-    pendingCommand = null
+  async function hydrate(session: CommandSession, id: string | null) {
+    session.targetSupplierId = id
+    session.pendingCommand = null
     const form = id ? await repository().loadForm(id) : null
-    baseVersion.value = form?.version ?? null
+    session.baseVersion = form?.version ?? null
     return {
       draft: form?.draft ?? null,
       attachments: [],
@@ -44,48 +46,48 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
     }
   }
 
-  function startNewSupplier() {
-    targetSupplierId.value = null
-    baseVersion.value = null
-    pendingCommand = null
+  function startNewSupplier(session: CommandSession) {
+    session.targetSupplierId = null
+    session.baseVersion = null
+    session.pendingCommand = null
   }
 
-  function rebase(version: string) {
-    baseVersion.value = version
+  function rebase(session: CommandSession, version: string) {
+    session.baseVersion = version
   }
 
-  function acceptLatest(latest: SupplierFormReadDTO) {
-    targetSupplierId.value = latest.draft.id
-    baseVersion.value = latest.version
+  function acceptLatest(session: CommandSession, latest: SupplierFormReadDTO) {
+    session.targetSupplierId = latest.draft.id
+    session.baseVersion = latest.version
   }
 
-  async function saveForm(draft: SupplierFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
-    const id = targetSupplierId.value ?? draft.id ?? null
+  async function saveForm(session: CommandSession, draft: SupplierFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    const id = session.targetSupplierId ?? draft.id ?? null
     const context = await repository().context()
     const attachmentChanges: FormAttachmentChanges = {
       ...(attachments.add?.length ? { add: attachments.add } : {}),
       ...(attachments.removeIds?.length ? { removeIds: attachments.removeIds } : {}),
       ...(attachments.restoreIds?.length ? { restoreIds: attachments.restoreIds } : {}),
     }
-    const content = { id, baseVersion: baseVersion.value, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments: attachmentChanges }
+    const content = { id, baseVersion: session.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments: attachmentChanges }
     const fingerprint = JSON.stringify(content)
-    if (!pendingCommand || pendingCommand.fingerprint !== fingerprint)
-      pendingCommand = { id: crypto.randomUUID(), fingerprint }
+    if (!session.pendingCommand || session.pendingCommand.fingerprint !== fingerprint)
+      session.pendingCommand = { id: crypto.randomUUID(), fingerprint }
     try {
       const result = await repository().execute({
         ...(id ? { id } : {}),
         workspaceId: context.workspaceId,
         actorId: context.actorId,
         requiredCapability: SUPPLIER_WRITE_CAPABILITY,
-        commandId: pendingCommand.id,
-        baseVersion: baseVersion.value,
+        commandId: session.pendingCommand.id,
+        baseVersion: session.baseVersion,
         action,
         draft: content.draft,
         attachments: attachmentChanges,
       })
-      pendingCommand = null
-      targetSupplierId.value = result.id
-      baseVersion.value = result.version
+      session.pendingCommand = null
+      session.targetSupplierId = result.id
+      session.baseVersion = result.version
       latestWrite.value = { id: result.id, version: result.version }
       return { id: result.id, logId: null, attachmentIds: result.attachmentIds }
     }
@@ -99,6 +101,7 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
 
   return {
     latestWrite: readonly(latestWrite),
+    createSession,
     hydrate,
     importRow,
     saveForm,

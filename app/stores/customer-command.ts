@@ -27,17 +27,19 @@ export class CustomerCommandConflictError extends Error {
 }
 
 export const useCustomerCommandStore = defineStore('customer-command', () => {
-  const targetCustomerId = shallowRef<string | null>(null)
-  const baseVersion = shallowRef<string | null>(null)
+  function createSession() {
+    return { targetCustomerId: null as string | null, baseVersion: null as string | null, pendingCommand: null as { id: string, fingerprint: string } | null }
+  }
+  type CommandSession = ReturnType<typeof createSession>
+
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
-  let pendingCommand: { id: string, fingerprint: string } | null = null
   const repository = () => useNuxtApp().$repositories.customerCommands
 
-  async function hydrate(id: string | null): Promise<HydratedCustomerCommandForm> {
-    targetCustomerId.value = id
-    pendingCommand = null
+  async function hydrate(session: CommandSession, id: string | null): Promise<HydratedCustomerCommandForm> {
+    session.targetCustomerId = id
+    session.pendingCommand = null
     const form = id ? await repository().loadForm(id) : null
-    baseVersion.value = form?.version ?? null
+    session.baseVersion = form?.version ?? null
     return {
       draft: form?.draft ?? null,
       attachments: form?.attachments ?? [],
@@ -48,34 +50,34 @@ export const useCustomerCommandStore = defineStore('customer-command', () => {
     }
   }
 
-  function startNewCustomer() {
-    targetCustomerId.value = null
-    baseVersion.value = null
-    pendingCommand = null
+  function startNewCustomer(session: CommandSession) {
+    session.targetCustomerId = null
+    session.baseVersion = null
+    session.pendingCommand = null
   }
 
-  function rebase(version: string) {
-    baseVersion.value = version
+  function rebase(session: CommandSession, version: string) {
+    session.baseVersion = version
   }
 
-  function acceptLatest(latest: CustomerFormReadDTO) {
-    targetCustomerId.value = latest.draft.id
-    baseVersion.value = latest.version
+  function acceptLatest(session: CommandSession, latest: CustomerFormReadDTO) {
+    session.targetCustomerId = latest.draft.id
+    session.baseVersion = latest.version
   }
 
-  async function saveForm(draft: CustomerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
-    const id = targetCustomerId.value ?? draft.id ?? null
+  async function saveForm(session: CommandSession, draft: CustomerFormDraft, action: MasterDataSaveAction, attachments: FormAttachmentChanges = {}) {
+    const id = session.targetCustomerId ?? draft.id ?? null
     const context = await repository().context()
     const content = {
       id,
-      baseVersion: baseVersion.value,
+      baseVersion: session.baseVersion,
       action,
       draft: { ...draft, ...(id ? { id } : {}) },
       attachments,
     }
     const fingerprint = JSON.stringify(content)
-    if (!pendingCommand || pendingCommand.fingerprint !== fingerprint) {
-      pendingCommand = {
+    if (!session.pendingCommand || session.pendingCommand.fingerprint !== fingerprint) {
+      session.pendingCommand = {
         id: crypto.randomUUID(),
         fingerprint,
       }
@@ -86,15 +88,15 @@ export const useCustomerCommandStore = defineStore('customer-command', () => {
         workspaceId: context.workspaceId,
         actorId: context.actorId,
         requiredCapability: CUSTOMER_WRITE_CAPABILITY,
-        commandId: pendingCommand.id,
-        baseVersion: baseVersion.value,
+        commandId: session.pendingCommand.id,
+        baseVersion: session.baseVersion,
         action,
         draft: content.draft,
         attachments,
       })
-      pendingCommand = null
-      targetCustomerId.value = result.id
-      baseVersion.value = result.version
+      session.pendingCommand = null
+      session.targetCustomerId = result.id
+      session.baseVersion = result.version
       latestWrite.value = { id: result.id, version: result.version }
       return { id: result.id, logId: null, attachmentIds: result.attachmentIds }
     }
@@ -108,6 +110,7 @@ export const useCustomerCommandStore = defineStore('customer-command', () => {
 
   return {
     latestWrite: readonly(latestWrite),
+    createSession,
     hydrate,
     saveForm,
     startNewCustomer,

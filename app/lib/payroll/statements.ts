@@ -234,8 +234,8 @@ function stableSourceVersion(
       line.itemId ?? '',
       line.itemName.trim(),
       line.unit.trim(),
-      rounded(line.quantity),
-      includeUnitPrice ? rounded(line.unitPrice) : '',
+      line.quantity,
+      includeUnitPrice ? line.unitPrice : '',
     ].join('|'))
     .sort()
     .join('\n')}`
@@ -1426,8 +1426,8 @@ export async function buildWageDraftSource(
       )
       const workerOvertimeRate = row.daily_wage == null
         ? Number(workerFallback?.overtimeRate ?? overtimeRate)
-        : rounded(workerDailyRate / 8)
-      const days = rounded(Number(row.hours) / 8)
+        : workerDailyRate / 8
+      const days = Number(row.hours) / 8
       return [
         {
           workerId: row.worker_id,

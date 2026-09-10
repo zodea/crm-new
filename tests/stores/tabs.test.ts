@@ -1,10 +1,83 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTabsStore } from '~/stores/tabs'
 
 describe('页签缓存失效', () => {
+  it('取消关闭、批量关闭和刷新时，页签及缓存都保持原样', async () => {
+    setActivePinia(createPinia())
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '表单 A' })
+    store.open({ fullPath: '/b', title: '表单 B' })
+    store.registerCloseGuard('/a', () => true)
+    store.registerCloseGuard('/b', () => false)
+    const before = [...store.tabs]
+    expect(await store.requestClose('/b')).toBe(false)
+    expect(await store.requestCloseEvery()).toBe(false)
+    expect(await store.requestCloseOther('/a')).toBe(false)
+    expect(await store.requestCloseToRight('/a')).toBe(false)
+    expect(await store.requestRefresh()).toBe(false)
+    expect(store.tabs).toEqual(before)
+    expect(store.invalidatedKeys).toEqual([])
+  })
+
+  it('确认期间新打开的页面不被批量关闭，旧实例释放不会移除新实例的守卫', async () => {
+    setActivePinia(createPinia())
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '表单 A' })
+    let approve!: (value: boolean) => void
+    const dispose = store.registerCloseGuard('/a', () => new Promise<boolean>((resolve) => {
+      approve = resolve
+    }))
+    const request = store.requestCloseEvery()
+    store.open({ fullPath: '/b', title: '表单 B' })
+    expect(await store.requestCloseEvery()).toBe(false)
+    approve(true)
+    expect(await request).toBe(true)
+    expect(store.tabs.some(tab => tab.key === '/b')).toBe(true)
+    store.open({ fullPath: '/a', title: '新表单 A' })
+    const newGuard = vi.fn(() => false)
+    store.registerCloseGuard('/a', newGuard)
+    dispose()
+    expect(await store.requestClose('/a')).toBe(false)
+    expect(newGuard).toHaveBeenCalledOnce()
+  })
+
   beforeEach(() => {
     setActivePinia(createPinia())
+  })
+
+  it('关闭其他确认成功后激活保留页签，取消不改变页签或缓存', async () => {
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '保留 A' })
+    store.open({ fullPath: '/b', title: '关闭 B' })
+    store.activate('home')
+    const guard = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    store.registerCloseGuard('/b', guard)
+    expect(await store.requestCloseOther('/a')).toBe(false)
+    expect(store.activeKey).toBe('home')
+    expect(store.tabs.map(tab => tab.key)).toEqual(['home', '/a', '/b'])
+    expect(store.invalidatedKeys).toEqual([])
+    expect(await store.requestCloseOther('/a')).toBe(true)
+    expect(store.tabs.map(tab => tab.key)).toEqual(['home', '/a'])
+    expect(store.activeKey).toBe('/a')
+    expect(store.invalidatedKeys).toEqual(['/b'])
+  })
+
+  it('关闭其他等待期间新打开的页签保留，确认后仍激活指定页签', async () => {
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: '保留 A' })
+    store.open({ fullPath: '/b', title: '关闭 B' })
+    let approve!: (value: boolean) => void
+    store.registerCloseGuard('/b', () => new Promise<boolean>((resolve) => {
+      approve = resolve
+    }))
+    const request = store.requestCloseOther('/a')
+    store.open({ fullPath: '/c', title: '新打开 C' })
+    approve(true)
+    expect(await request).toBe(true)
+    expect(store.tabs.map(tab => tab.key)).toEqual(['home', '/a', '/c'])
+    expect(store.activeKey).toBe('/a')
+    expect(store.invalidatedKeys).toEqual(['/b'])
   })
 
   it('软刷新只更新当前页签缓存键并记录失效项', () => {
@@ -55,6 +128,25 @@ describe('页签缓存失效', () => {
     expect(store.invalidatedKeys).toEqual(['/project', '/base/supplier'])
     store.acknowledgeInvalidations(['/project'])
     expect(store.invalidatedKeys).toEqual(['/base/supplier'])
+  })
+
+  it('完成卸载后释放历史路径版本，快速重开仍保留新实例身份', () => {
+    const store = useTabsStore()
+    for (let index = 0; index < 100; index++) {
+      const path = `/project/closed-${index}`
+      const initial = store.pageCacheKey(path)
+      store.open({ fullPath: path, title: '临时详情' })
+      store.close(path)
+      store.acknowledgeInvalidations([path])
+      expect(store.pageCacheKey(path)).toBe(initial)
+    }
+
+    store.open({ fullPath: '/project/reopened', title: '重新打开' })
+    const before = store.pageCacheKey('/project/reopened')
+    store.close('/project/reopened')
+    store.open({ fullPath: '/project/reopened', title: '重新打开' })
+    store.acknowledgeInvalidations(['/project/reopened'])
+    expect(store.pageCacheKey('/project/reopened')).not.toBe(before)
   })
 })
 

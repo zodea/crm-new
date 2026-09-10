@@ -35,6 +35,48 @@ afterEach(() => {
 })
 
 describe('invoice store 归档来源留痕', () => {
+  it('排除的同号副本不会阻塞原票归档，空号也不会互相误判重复', async () => {
+    const store = useInvoiceStore()
+    const base = { source: 'excel' as const, ocrStatus: 'done' as const, reviewStatus: 'reviewed' as const, invoiceDate: '2026-09-05', seller: '供应商', totalAmount: 113 }
+    const first = await store.add({ ...base, invoiceNumber: 'ORIGINAL-398' })
+    const duplicate = await store.add({ ...base, invoiceNumber: 'ORIGINAL-398' })
+    expect(store.byId(duplicate)?.dupStatus).toBe('duplicate')
+    expect(await store.archiveInvoice(first, 'personal')).toEqual({ ok: true })
+    expect(await store.archiveInvoice(duplicate, 'personal')).toMatchObject({ ok: false })
+    await store.add({ ...base, invoiceNumber: '' })
+    const empty = await store.add({ ...base, invoiceNumber: '' })
+    expect(store.byId(empty)?.dupStatus).toBe('normal')
+  })
+
+  it('人工改号立即查重，不能重复入账；改为新号后恢复正常', async () => {
+    const store = useInvoiceStore()
+    const base = { source: 'excel' as const, ocrStatus: 'done' as const, reviewStatus: 'reviewed' as const, invoiceDate: '2026-09-05', seller: '供应商', totalAmount: 113 }
+    const first = await store.add({ ...base, invoiceNumber: 'A-398' })
+    expect(await store.archiveInvoice(first, 'personal')).toEqual({ ok: true })
+    const second = await store.add({ ...base, invoiceNumber: 'B-398' })
+    await store.correctField(second, 'invoiceNumber', 'A-398')
+    expect(store.byId(second)?.dupStatus).toBe('duplicate')
+    expect(await store.archiveInvoice(second, 'personal')).toMatchObject({ ok: false })
+    expect(store.ledger.reduce((sum, invoice) => sum + invoice.totalAmount, 0)).toBe(113)
+    await store.correctField(second, 'invoiceNumber', 'C-398')
+    expect(store.byId(second)?.dupStatus).toBe('normal')
+    expect(await store.archiveInvoice(second, 'personal')).toEqual({ ok: true })
+  })
+
+  it('归档事务重查最新号码，旧 normal 标记无法绕过，已归档改号也不能撞号', async () => {
+    const store = useInvoiceStore()
+    const base = { source: 'excel' as const, ocrStatus: 'done' as const, reviewStatus: 'reviewed' as const, invoiceDate: '2026-09-05', seller: '供应商', totalAmount: 113 }
+    const first = await store.add({ ...base, invoiceNumber: 'A-398' })
+    const second = await store.add({ ...base, invoiceNumber: 'B-398' })
+    expect(await store.archiveInvoice(first, 'personal')).toEqual({ ok: true })
+    await mem.execute('UPDATE invoices SET invoice_number = ? WHERE id = ?', ['A-398', second])
+    expect(await store.archiveInvoice(second, 'personal')).toMatchObject({ ok: false })
+    await mem.execute('UPDATE invoices SET invoice_number = ? WHERE id = ?', ['B-398', second])
+    expect(await store.archiveInvoice(second, 'personal')).toEqual({ ok: true })
+    await expect(store.update(second, { ...store.byId(second), invoiceNumber: 'A-398' })).rejects.toThrow('重复')
+    expect(store.byId(second)?.invoiceNumber).toBe('B-398')
+  })
+
   it('归档使用人工确认当前值，并把原始 OCR、人工修订和来源分开写入且可重载', async () => {
     await mem.execute(`
       INSERT INTO invoices (

@@ -31,11 +31,15 @@ import {
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
+import { customerCommandTestInstance } from './customer-command-test-instance'
 import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
+import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -1110,6 +1114,10 @@ export function synchronizeCoreMigrationCommandSources(
 const commandSources = [
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot) },
+  projectCommandTestInstance,
+  customerCommandTestInstance,
+  supplierCommandTestInstance,
+  crewWorkerCommandTestInstance,
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,
