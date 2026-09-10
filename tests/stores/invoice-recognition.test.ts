@@ -99,6 +99,7 @@ describe('invoice store 真实识别管线', () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(ocrResponse(MARKDOWN))
     vi.stubGlobal('fetch', fetchMock)
     const file = new File([new Uint8Array([1, 2, 3])], '一季度发票.pdf', { type: 'application/pdf' })
+    await useOcrSettingsStore().load(mem)
     await useOcrSettingsStore().save({
       ...createDefaultOcrRecognitionSettings(),
       useDocUnwarping: false,

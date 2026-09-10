@@ -20,6 +20,7 @@ export const useOcrSettingsStore = defineStore('ocr-settings', () => {
   const recognitionOptions = computed(() => toOcrRuntimeOptions(settings.value))
 
   async function load(database: OcrSettingsDatabase = db) {
+    loaded.value = false
     loading.value = true
     error.value = ''
     try {
@@ -36,6 +37,10 @@ export const useOcrSettingsStore = defineStore('ocr-settings', () => {
   }
 
   async function save(next: OcrRecognitionSettings, database: OcrSettingsDatabase = db) {
+    if (!loaded.value || loading.value) {
+      error.value = '请先成功读取 OCR 设置'
+      throw new Error(error.value)
+    }
     saving.value = true
     error.value = ''
     try {

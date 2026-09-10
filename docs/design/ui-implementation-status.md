@@ -12,6 +12,8 @@
 
 ## 1. 口径
 
+2026-09-10 #429 补齐 OCR 设置读取失败保护、独立重读和保存失败重试；五档视口与键盘验证见[验收记录](./evidence/issue-429/ocr-settings-recovery-verification.md)。本项不提升 OCR 样本识别准确率或设置模块整体完成状态。
+
 2026-09-10 #428 统一付款结算候选、保存复验、往期汇总和动态成本的已确认口径，运行与失败回归见[验收记录](./evidence/issue-428/settlement-confirmation-verification.md)。本项不补造旧材料结算确认入口，也不代表资金中央写源或历史金额迁移已完成。
 
 2026-09-10 #427 修正合作工作台的有效合同/已确认结算汇总，以及文件导入全称优先的匹配顺序；现有工作台、导入与关系返回回归见[验收记录](./evidence/issue-427/cooperation-rules-verification.md)。合作终态仍待业务裁定，#408 其他范围继续开放。

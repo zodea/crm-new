@@ -2,10 +2,12 @@
 import type { OcrRecognitionSettings } from '~/lib/ocr/settings'
 import { computed } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { OCR_TIMEOUT_LIMITS } from '~/lib/ocr/settings'
 
 interface Props {
   dirty: boolean
+  loaded: boolean
   saving: boolean
   loading?: boolean
 }
@@ -98,12 +100,11 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
           设置保存在本机 SQLite，并随每次识别请求发送；不会保存 Token、API 地址或模型名。
         </p>
       </div>
-      <span
-        class="status-chip shrink-0"
-        :class="dirty ? 'bg-warn-soft text-warn-ink' : 'bg-ok-soft text-ok-ink'"
+      <KitStatusTag
+        :tone="loading ? 'neutral' : !loaded ? 'danger' : dirty ? 'warn' : 'ok'"
       >
-        {{ dirty ? '有未保存修改' : '已保存' }}
-      </span>
+        {{ loading ? '正在读取' : !loaded ? '尚未读取设置' : dirty ? '有未保存修改' : '已保存' }}
+      </KitStatusTag>
     </header>
 
     <div v-if="loading" role="status" aria-label="正在读取 OCR 设置" class="grid gap-2 p-4">
@@ -127,10 +128,10 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
           <span class="switch-control">
             <input
               type="checkbox"
-              class="peer absolute inset-0 z-1 h-full w-full cursor-pointer opacity-0"
+              class="peer absolute inset-0 z-1 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               :aria-label="row.label"
               :checked="model[row.key]"
-              :disabled="saving || loading"
+              :disabled="!loaded || saving || loading"
               @change="updateBoolean(row.key, ($event.target as HTMLInputElement).checked)"
             >
             <span class="switch-track" aria-hidden="true">
@@ -155,7 +156,7 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
               :max="OCR_TIMEOUT_LIMITS.requestTimeoutMs.max / 1000"
               step="5"
               :value="model.requestTimeoutMs / 1000"
-              :disabled="saving || loading"
+              :disabled="!loaded || saving || loading"
               :aria-invalid="Boolean(timeoutErrors.requestTimeoutMs)"
               aria-describedby="ocr-request-timeout-help"
               @input="updateTimeout('requestTimeoutMs', ($event.target as HTMLInputElement).value)"
@@ -178,7 +179,7 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
               :max="OCR_TIMEOUT_LIMITS.pollTimeoutMs.max / 1000"
               step="30"
               :value="model.pollTimeoutMs / 1000"
-              :disabled="saving || loading"
+              :disabled="!loaded || saving || loading"
               :aria-invalid="Boolean(timeoutErrors.pollTimeoutMs)"
               aria-describedby="ocr-poll-timeout-help"
               @input="updateTimeout('pollTimeoutMs', ($event.target as HTMLInputElement).value)"
@@ -230,7 +231,7 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
       <KitButton
         type="button"
         variant="secondary"
-        :disabled="saving || loading"
+        :disabled="!loaded || saving || loading"
         @click="emit('restoreDefault')"
       >
         恢复默认
@@ -239,7 +240,7 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
         type="button"
         variant="primary"
         :loading="saving"
-        :disabled="!dirty || loading || saving || hasValidationErrors"
+        :disabled="!loaded || !dirty || loading || saving || hasValidationErrors"
         @click="emit('save')"
       >
         保存设置
@@ -296,6 +297,10 @@ function updateTimeout(key: TimeoutKey, rawSeconds: string) {
 
 .peer:checked + .switch-track .switch-thumb {
   transform: translateX(1rem);
+}
+
+.peer:disabled + .switch-track {
+  opacity: 0.45;
 }
 
 .peer:focus-visible + .switch-track {

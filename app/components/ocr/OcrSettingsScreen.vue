@@ -5,6 +5,7 @@ import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import OcrDocumentSupportTable from '~/components/ocr/OcrDocumentSupportTable.vue'
 import OcrRecognitionSettingsForm from '~/components/ocr/OcrRecognitionSettingsForm.vue'
 import OcrRuntimeStatusCard from '~/components/ocr/OcrRuntimeStatusCard.vue'
+import KitButton from '~/components/ui/KitButton.vue'
 import {
   createDefaultOcrRecognitionSettings,
   fetchOcrRuntimeStatus,
@@ -20,6 +21,7 @@ const savedMessage = shallowRef('')
 const store = useOcrSettingsStore()
 const {
   settings,
+  loaded,
   loading: settingsLoading,
   saving,
   error: settingsError,
@@ -123,7 +125,18 @@ onMounted(() => {
       role="alert"
       class="rounded-[var(--radius-control)] border border-danger/30 bg-danger-soft px-3 py-2 text-12px text-danger-ink"
     >
-      {{ settingsError }}
+      <p class="m-0 break-words">
+        {{ settingsError }}
+      </p>
+      <KitButton
+        v-if="!loaded"
+        class="mt-2"
+        variant="secondary"
+        :loading="settingsLoading"
+        @click="loadSettings"
+      >
+        重新读取设置
+      </KitButton>
     </div>
     <div
       v-else-if="savedMessage"
@@ -136,6 +149,7 @@ onMounted(() => {
     <OcrRecognitionSettingsForm
       v-model="draft"
       :dirty="dirty"
+      :loaded="loaded"
       :saving="saving"
       :loading="settingsLoading"
       @save="saveSettings"
