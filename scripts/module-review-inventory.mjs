@@ -1,7 +1,7 @@
 // #403 的源码采证清单。只登记实际接线与入口，不定义业务字段或提升运行验收。
 // 页签/子表的权威规格仍在 docs/rewrite/pages；参考证据仍在 runtime-reference-audit。
-export const SOURCE_BASELINE = '8252e1abe1520d03aa75c48f7bf237631742ddf7'
-export const OBSERVATION_DATE = '2026-09-08'
+export const SOURCE_BASELINE = 'c9c0ec5ad044670f4e41ded17e46a6e8d9293d90'
+export const OBSERVATION_DATE = '2026-09-10'
 
 export const ADAPTERS = {
   'central-http': {

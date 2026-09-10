@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildModuleReviewCoverage, MODULE_REVIEW_COVERAGE_PATH, MODULE_REVIEW_INDEX_PATH, renderModuleReviewIndex } from '../../scripts/module-review-coverage.mjs'
+import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/module-review-obligations.mjs'
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
 describe('module review coverage', () => {
@@ -95,5 +96,49 @@ describe('module review coverage', () => {
   it('keeps the committed inventory reproducible and every source anchor resolvable', () => {
     expect(JSON.parse(readFileSync(MODULE_REVIEW_COVERAGE_PATH, 'utf8'))).toEqual(buildModuleReviewCoverage())
     expect(readFileSync(MODULE_REVIEW_INDEX_PATH, 'utf8').replaceAll('\r\n', '\n')).toEqual(renderModuleReviewIndex(buildModuleReviewCoverage()))
+  })
+
+  it('links legacy obligations to actual host cases without inheriting page or production acceptance', () => {
+    const coverage = buildModuleReviewCoverage()
+    expect(coverage.obligations.length).toBeGreaterThan(20)
+    expect(new Set(coverage.obligations.map(item => item.id)).size).toBe(coverage.obligations.length)
+    for (const obligation of coverage.obligations) {
+      expect(obligation.sources.length).toBeGreaterThan(0)
+      expect(obligation.caseIds.length).toBeGreaterThan(0)
+      for (const caseId of obligation.caseIds) {
+        const linked = coverage.cases.find(item => item.id === caseId)!
+        expect(linked.host).toBe('browser')
+        expect(linked.obligationIds).toContain(obligation.id)
+        expect(linked.acceptance.production).toBe('not-verified')
+      }
+      if (obligation.status === 'current-passed')
+        expect(obligation.evidence.some(item => item.recency === 'current-run' && /^[a-f0-9]{40}$/.test(item.commit ?? ''))).toBe(true)
+    }
+    for (const caseItem of coverage.cases) {
+      for (const id of caseItem.obligationIds ?? [])
+        expect(coverage.obligations.some(item => item.id === id && item.caseIds.includes(caseItem.id))).toBe(true)
+    }
+  })
+
+  it('retains unfulfilled OCR samples, central payments, global migration and adopted factor decisions', () => {
+    const coverage = buildModuleReviewCoverage()
+    const at = (id: string) => coverage.obligations.find(item => item.id === id)!
+    expect(at('OCR-06').status).toBe('partial')
+    expect(at('PAY-05').status).toBe('ready')
+    expect(at('MIG-07').status).toBe('partial')
+    expect(at('PAY-08').status).toBe('needs-decision')
+    expect(at('FACTOR-01').status).toBe('ready')
+    expect(at('FACTOR-01').sources).toContain('https://github.com/zodea/crm-new/issues/204#issuecomment-5145177434')
+    const ocrCase = coverage.cases.find(item => item.obligationIds?.includes('OCR-04'))!
+    expect(ocrCase.acceptance.frontend).not.toBe('passed')
+  })
+
+  it('rejects duplicate obligations, stale case references and unsupported pass claims', () => {
+    const { cases } = buildModuleReviewCoverage()
+    const original = REVIEW_OBLIGATIONS[0]!
+    expect(() => validateReviewObligations([original, original], cases)).toThrow('重复验收义务')
+    expect(() => validateReviewObligations([{ ...original, caseIds: ['missing-case'] }], cases)).toThrow('缺少适用浏览器用例')
+    expect(() => validateReviewObligations([{ ...original, evidence: [] }], cases)).toThrow('无固定提交的本轮证据')
+    expect(() => validateReviewObligations([{ ...original, status: 'complete' }], cases)).toThrow('未知义务状态')
   })
 })

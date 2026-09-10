@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROJECT_ROOT, readAppPageFiles } from './design-coverage.mjs'
 import { ADAPTERS, OBSERVATION_DATE, PUBLIC_SURFACES, REFERENCE_MENUS, resolveAdapter, SOURCE_BASELINE, SUBVIEWS } from './module-review-inventory.mjs'
+import { OBLIGATION_STATUS_LABELS, REVIEW_OBLIGATIONS, validateReviewObligations } from './module-review-obligations.mjs'
 import { buildRuntimeEvidenceLedger } from './runtime-evidence-ledger.mjs'
 
 export const MODULE_REVIEW_COVERAGE_PATH = join(PROJECT_ROOT, 'docs/design/module-review-coverage.json')
@@ -212,6 +213,13 @@ export function buildModuleReviewCoverage() {
     throw new Error('module-review-coverage: 动态注册表为空或解析失效')
   const surfaces = buildSurfaces(routeLedger, registry)
   const cases = surfaces.flatMap(surface => surface.hosts.map(host => caseFor(surface, host)))
+  validateReviewObligations(REVIEW_OBLIGATIONS, cases)
+  for (const obligation of REVIEW_OBLIGATIONS) {
+    for (const reference of [...obligation.sources, ...obligation.evidence.map(item => item.reference)]) {
+      if (!reference.startsWith('https://'))
+        sourceText(reference)
+    }
+  }
   return {
     schemaVersion: 1,
     sourceBaseline: SOURCE_BASELINE,
@@ -225,7 +233,8 @@ export function buildModuleReviewCoverage() {
     publicSurfaces: PUBLIC_SURFACES.map(item => ({ ...item, source: checkSource([item.source, item.anchor]), status: 'needs-scenario-audit', acceptance: 'not-verified' })),
     domains: routeLedger.domains.map(domain => ({ code: domain.code, label: domain.domain, issues: domain.implementationIssues, surfaces: surfaces.filter(surface => surface.domain === domain.code).length })),
     surfaces,
-    cases,
+    obligations: REVIEW_OBLIGATIONS,
+    cases: cases.map(item => ({ ...item, obligationIds: REVIEW_OBLIGATIONS.filter(obligation => obligation.caseIds.includes(item.id)).map(obligation => obligation.id) })),
   }
 }
 
@@ -246,6 +255,16 @@ export function renderModuleReviewIndex(coverage) {
     '实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。',
     '',
     '源码清点仍需逐模块补全动作、合法状态、附件正文及审计细节。新增动态注册、路由或已登记源码锚点变化时运行生成器并审查差异；不要把自动新增行提升为验收通过。',
+    '',
+    '## 旧验收义务承接（已登记范围）',
+    '',
+    `当前登记 ${coverage.obligations.length} 项，限定 OCR 设置、核心迁移、付款结算口径及因子工具。#431 只登记该范围，不代表全部历史任务已映射；剩余模块由 #415 继续补齐。输入为 scripts/module-review-obligations.mjs，JSON obligations 保存来源、唯一承接、适用 case ID、范围和固定证据提交，cases.obligationIds 提供反向索引。`,
+    '',
+    '义务的“本轮限定范围已验证”不提升所在页面、其他宿主或生产可用等级。历史评论和源码检查分别标记，不冒充本轮运行；状态为已定待实施的条目沿用有效决定，不重新提问。',
+    '',
+    '| 义务 / 原条款 | 当前承接 | 状态 | 证据及限制 |',
+    '| --- | --- | --- | --- |',
+    ...coverage.obligations.map(item => `| ${item.id} · ${item.label}（${item.sources.map((source, index) => source.startsWith('https://') ? `[来源${index + 1}](${source})` : link(source)).join('、')}） | [#${item.ownerIssue}](https://github.com/zodea/crm-new/issues/${item.ownerIssue}) | ${OBLIGATION_STATUS_LABELS[item.status]} | ${item.evidence.map(evidence => `${evidence.reference.startsWith('https://') ? `[记录](${evidence.reference})` : link(evidence.reference)}${evidence.commit ? ` @ \`${evidence.commit.slice(0, 8)}\`` : ''}（${evidence.recency}）`).join('、') || '待补证据'}；${item.remaining} |`),
     '',
     '## 宿主与读写边界',
     '',
