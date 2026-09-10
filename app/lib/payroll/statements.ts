@@ -511,7 +511,7 @@ export async function createWageStatementDraft(
   const formatFamily = input.formatFamily ?? 'A'
   const periodKind = input.periodKind ?? 'monthly'
   if (formatFamily === 'B')
-    throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
+    throw new Error('B 类工资已退役，请选择 A、C1 或 C2')
   if (formatFamily === 'C1' && periodKind !== 'monthly')
     throw new Error('C1 当前只支持月度考勤工资，结算与尾款档尚未实现')
   if (formatFamily === 'C1' && input.lines.length === 0)
@@ -666,6 +666,8 @@ export async function checkWageStatement(
     throw new Error('工资单不存在')
   if (statement.status === 'released')
     throw new Error('该工资单已发放，快照不可修改')
+  if (statement.format_family === 'B')
+    throw new Error('B 类工资已退役，历史记录只读')
   if (
     statement.format_family === 'C2'
     && (
@@ -756,6 +758,8 @@ export async function releaseWageStatement(
   const statement = await loadWageStatement(db, statementId)
   if (!statement)
     throw new Error('工资单不存在')
+  if (statement.formatFamily === 'B')
+    throw new Error('B 类工资已退役，历史记录只读')
   if (statement.status !== 'checked')
     throw new Error('工资单必须先核对')
   if (statement.quantitySource !== 'field')
@@ -1227,7 +1231,7 @@ export async function buildWageDraftSource(
   })
 
   if (formatFamily === 'B')
-    throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量生成工资行')
+    throw new Error('B 类工资已退役，历史记录只读')
 
   if (formatFamily === 'C2') {
     if (!input.month)
@@ -1636,6 +1640,8 @@ export async function updateDraftLinePrice(
     throw new Error('工资单不存在')
   if (statement.status !== 'draft')
     throw new Error('只有草稿可以调整单价')
+  if (statement.format_family === 'B')
+    throw new Error('B 类工资已退役，历史记录只读')
   if (statement.format_family === 'C1' || statement.format_family === 'C2')
     throw new Error(`${statement.format_family} 工资标准来自责任配置，不能在工资明细中改价`)
   await db.execute(`

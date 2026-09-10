@@ -1,11 +1,13 @@
 import type { AttendanceRecord } from '~/lib/payroll/attendance'
 import { defineStore } from 'pinia'
+import { reactive, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import {
   listAttendanceBlockedWorkerIds,
   listAttendanceRecords,
   upsertAttendanceRecord,
 } from '~/lib/payroll/attendance'
+import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
 import { loadPayrollWorkbenchOptions } from '~/lib/payroll/statements'
 
 function currentMonth(): string {
@@ -46,17 +48,10 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
     error.value = ''
     try {
       const db = await getDb()
-      let projectId = requestedScope.projectId
-      let nextOptions = await loadPayrollWorkbenchOptions(db, projectId)
-      if (!projectId) {
-        projectId = nextOptions.projects[0]?.id ?? ''
-        if (projectId)
-          nextOptions = await loadPayrollWorkbenchOptions(db, projectId)
-      }
-      const crewId = requestedScope.crewId
-        && nextOptions.crews.some(crew => crew.id === requestedScope.crewId)
-        ? requestedScope.crewId
-        : ''
+      let nextOptions = await loadPayrollWorkbenchOptions(db, requestedScope.projectId)
+      const { projectId, crewId } = payrollScopeFromOptions(requestedScope, nextOptions)
+      if (projectId !== requestedScope.projectId)
+        nextOptions = await loadPayrollWorkbenchOptions(db, projectId)
       const [nextRecords, nextBlockedWorkerIds] = projectId
         ? await Promise.all([
             listAttendanceRecords(db, {

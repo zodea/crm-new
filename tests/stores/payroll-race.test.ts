@@ -58,6 +58,21 @@ beforeEach(() => {
 })
 
 describe('payroll store latest-wins', () => {
+  it('下一次路由同步尚未开始读取时，旧响应也不得覆盖刚改的月份', async () => {
+    mocks.loadOptions.mockImplementation((_: unknown, projectId: string) => Promise.resolve(options(projectId)))
+    const old = deferred<Array<{ id: string }>>()
+    mocks.listStatements.mockReturnValueOnce(old.promise)
+    const store = usePayrollStore()
+    Object.assign(store.filters, { projectId: 'project-a', month: '2025-11' })
+    const pending = store.load()
+    await vi.waitFor(() => expect(mocks.listStatements).toHaveBeenCalledOnce())
+    store.filters.month = '2025-12'
+    old.resolve([{ id: 'november' }])
+    await pending
+    expect(store.filters.month).toBe('2025-12')
+    expect(store.statements).toEqual([])
+  })
+
   it('同范围刷新保留列表快照含空结果，跨项目先清空', async () => {
     mocks.loadOptions.mockImplementation((_: unknown, projectId: string) => Promise.resolve(options(projectId)))
     mocks.listStatements.mockResolvedValueOnce([{ id: 'statement-a' }])

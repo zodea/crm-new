@@ -2,13 +2,16 @@
 import type {
   WageAllocationInput,
   WageStatement,
+  WageStatementFilter,
 } from '~/lib/payroll/statements'
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import PayrollPrintSheet from '~/components/payroll/PayrollPrintSheet.vue'
 import PayrollReleaseAllocationDialog from '~/components/payroll/PayrollReleaseAllocationDialog.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
+import { payrollFilterQuery } from '~/lib/payroll/navigation'
+import { wageCheckLabel, wageQuantityLabel, wageSourceLabel } from '~/lib/payroll/presentation'
 
-defineProps<{ statement: WageStatement | null }>()
+defineProps<{ statement: WageStatement | null, returnFilters?: WageStatementFilter }>()
 const emit = defineEmits<{
   updatePrice: [lineId: string, unitPrice: number]
   check: []
@@ -17,7 +20,7 @@ const emit = defineEmits<{
   export: []
 }>()
 
-const releaseDialogOpen = ref(false)
+const releaseDialogOpen = shallowRef(false)
 
 function money(value: number | null) {
   return value == null ? '—' : `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
@@ -44,7 +47,7 @@ function money(value: number | null) {
           <p class="mt-1 text-12px text-ink-soft">
             {{ statement.formatFamily }} 族 ·
             {{ statement.periodKind === 'retention' ? '尾款 100%' : statement.periodKind === 'settlement' ? '结算档' : '月度进度' }} ·
-            {{ statement.formatFamily === 'C2' ? '已确认签工' : statement.quantitySource === 'field' ? '现场复核量' : '暂估量' }}
+            {{ wageSourceLabel(statement) }}
             × {{ Math.round(statement.payRatio * 100) }}%
           </p>
         </div>
@@ -61,12 +64,15 @@ function money(value: number | null) {
         </div>
       </header>
 
+      <p v-if="statement.formatFamily === 'B'" role="status" class="mx-4 mt-4 rounded-md bg-surface-2 px-3 py-2 text-12px text-ink-soft">
+        B 类工资已退役，历史记录只读；保留原金额与状态，不重新生成、核对或发放。
+      </p>
       <div
         v-if="statement.status === 'released'"
         class="mx-4 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-success-soft px-3 py-2 text-12px text-success"
       >
         <span>
-          已按{{ statement.formatFamily === 'C2' ? '签工' : statement.formatFamily === 'C1' ? '考勤' : '现场复核量' }}快照发放
+          {{ statement.formatFamily === 'B' ? '历史记录已发放' : `已按${statement.formatFamily === 'C2' ? '签工' : statement.formatFamily === 'C1' ? '考勤' : '现场复核量'}快照发放` }}
           {{ money(statement.actualAmount) }}；后续改量改价不追溯本月。
         </span>
         <span v-if="statement.formatFamily !== 'B'" class="flex flex-wrap gap-2">
@@ -114,13 +120,13 @@ function money(value: number | null) {
         </p>
       </section>
       <div
-        v-else-if="statement.needsRecheck"
+        v-else-if="statement.formatFamily !== 'B' && statement.needsRecheck"
         class="mx-4 mt-4 rounded-md bg-danger-soft px-3 py-2 text-12px text-danger"
       >
-        上游现场量或考勤已变化，必须重新核对后才能发放。
+        {{ wageSourceLabel(statement) }}来源已变化，必须重新核对后才能发放。
       </div>
       <div
-        v-else-if="statement.status === 'draft' && statement.quantitySource === 'provisional'"
+        v-else-if="statement.formatFamily === 'A' && statement.status === 'draft' && statement.quantitySource === 'provisional'"
         class="mx-4 mt-4 rounded-md bg-warn-soft px-3 py-2 text-12px text-warn"
       >
         当前为进度预付草稿。核对时会重新读取现场复核量，不会沿用暂估量发放。
@@ -145,7 +151,7 @@ function money(value: number | null) {
               {{ statement.dayworkRecords.length }} 条确认记录 · 半工按 0.5 工
             </p>
           </div>
-          <NuxtLink to="/subcontract/daywork" class="btn-ghost">
+          <NuxtLink :to="{ path: '/subcontract/daywork', query: payrollFilterQuery(returnFilters ?? { projectId: statement.projectId, month: statement.month, crewId: statement.crewId ?? '', status: statement.status }) }" class="btn-ghost">
             打开签工台账
           </NuxtLink>
         </header>
@@ -194,7 +200,7 @@ function money(value: number | null) {
             <tr>
               <th>工人</th>
               <th>分项</th>
-              <th>工程量</th>
+              <th>{{ wageQuantityLabel(statement.formatFamily) }}</th>
               <th>工资单价</th>
               <th>分项金额</th>
             </tr>
@@ -208,7 +214,7 @@ function money(value: number | null) {
               </td>
               <td>
                 <input
-                  v-if="statement.status === 'draft' && statement.formatFamily !== 'C1' && statement.formatFamily !== 'C2'"
+                  v-if="statement.status === 'draft' && statement.formatFamily === 'A'"
                   :aria-label="`${line.itemName}工资单价`"
                   type="number"
                   min="0"
@@ -226,7 +232,7 @@ function money(value: number | null) {
         </table>
       </div>
 
-      <footer v-if="statement.status !== 'released'" class="flex flex-wrap items-center justify-end gap-3 border-t border-line p-4">
+      <footer v-if="statement.status !== 'released' && statement.formatFamily !== 'B'" class="flex flex-wrap items-center justify-end gap-3 border-t border-line p-4">
         <button
           v-if="statement.status === 'draft' || statement.needsRecheck"
           type="button"
@@ -235,8 +241,8 @@ function money(value: number | null) {
         >
           {{
             statement.needsRecheck
-              ? (statement.formatFamily === 'C2' ? '重新核对签工' : '重新核对现场量')
-              : (statement.formatFamily === 'C2' ? '核对并锁定签工' : '核对并锁定现场量')
+              ? `重新核对${wageCheckLabel(statement.formatFamily)}`
+              : `核对并锁定${wageCheckLabel(statement.formatFamily)}`
           }}
         </button>
         <template v-else>
@@ -252,6 +258,7 @@ function money(value: number | null) {
       </footer>
 
       <PayrollReleaseAllocationDialog
+        v-if="statement.formatFamily !== 'B'"
         :open="releaseDialogOpen"
         :statement="statement"
         @update:open="releaseDialogOpen = $event"

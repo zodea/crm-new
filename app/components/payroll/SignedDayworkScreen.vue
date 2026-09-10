@@ -1,15 +1,48 @@
 <script setup lang="ts">
 import type { SignedDayworkRecord } from '~/lib/payroll/daywork'
-import { onMounted } from 'vue'
+import { computed, shallowRef } from 'vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
+import { usePayrollRouteContext } from '~/composables/usePayrollRouteContext'
+import { payrollFilterQuery, payrollFiltersFromQuery, payrollListLocation } from '~/lib/payroll/navigation'
 
 const store = useSignedDayworkStore()
 const kit = useKitUI()
 const editingRecord = shallowRef<SignedDayworkRecord | null>(null)
+const returnStatus = shallowRef<ReturnType<typeof payrollFiltersFromQuery>['status']>('')
+const entryScope = computed(() => JSON.stringify([store.filters.projectId, store.filters.month, store.filters.crewId]))
+const relatedFilters = computed(() => ({
+  projectId: store.filters.projectId,
+  month: store.filters.month,
+  crewId: store.filters.crewId,
+  status: returnStatus.value,
+}))
+const attendanceLocation = computed(() => ({
+  path: '/subcontract/attendance',
+  query: payrollFilterQuery(relatedFilters.value),
+}))
+const payrollLocation = computed(() => payrollListLocation(relatedFilters.value))
 
-onMounted(store.load)
+usePayrollRouteContext('/subcontract/daywork', async (query) => {
+  const incoming = payrollFiltersFromQuery(query, {
+    projectId: store.filters.projectId,
+    month: store.filters.month,
+    crewId: store.filters.crewId,
+    status: returnStatus.value,
+  })
+  const nextScope = JSON.stringify([incoming.projectId, incoming.month, incoming.crewId])
+  if (nextScope !== entryScope.value)
+    editingRecord.value = null
+  Object.assign(store.filters, {
+    projectId: incoming.projectId ?? '',
+    month: incoming.month ?? '',
+    crewId: incoming.crewId ?? '',
+  })
+  returnStatus.value = incoming.status ?? ''
+  await store.load()
+})
 
 async function reload(filters: typeof store.filters) {
+  editingRecord.value = null
   Object.assign(store.filters, filters)
   await store.load()
 }
@@ -41,10 +74,10 @@ async function save(input: Parameters<typeof store.save>[0]) {
         </div>
       </div>
       <div class="flex flex-wrap gap-2">
-        <NuxtLink to="/subcontract/attendance" class="btn-secondary">
+        <NuxtLink :to="attendanceLocation" class="btn-secondary">
           打开考勤
         </NuxtLink>
-        <NuxtLink to="/subcontract/payroll" class="btn-primary">
+        <NuxtLink :to="payrollLocation" class="btn-primary">
           返回工资核算
         </NuxtLink>
       </div>
@@ -59,6 +92,7 @@ async function save(input: Parameters<typeof store.save>[0]) {
       {{ store.error }}
     </p>
     <SignedDayworkEntryForm
+      :key="entryScope"
       :project-id="store.filters.projectId"
       :crew-id="store.filters.crewId"
       :month="store.filters.month"

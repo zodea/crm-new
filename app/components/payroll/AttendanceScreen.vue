@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, shallowRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
+import { usePayrollRouteContext } from '~/composables/usePayrollRouteContext'
 import {
   payrollFilterQuery,
   payrollFiltersFromQuery,
@@ -9,11 +10,8 @@ import {
 
 const store = useAttendanceStore()
 const kit = useKitUI()
-const route = useRoute()
 const saveError = shallowRef('')
-const returnStatus = shallowRef(
-  payrollFiltersFromQuery(route.query).status ?? '',
-)
+const returnStatus = shallowRef<ReturnType<typeof payrollFiltersFromQuery>['status']>('')
 
 const visibleWorkers = computed(() =>
   store.options.workers.filter(worker =>
@@ -64,12 +62,12 @@ async function save(input: Parameters<typeof store.save>[0]) {
   }
 }
 
-onMounted(() => {
-  const incoming = payrollFiltersFromQuery(route.query, {
+usePayrollRouteContext('/subcontract/attendance', (query) => {
+  const incoming = payrollFiltersFromQuery(query, {
     projectId: store.filters.projectId,
     month: store.filters.month,
     crewId: store.filters.crewId,
-    status: '',
+    status: returnStatus.value,
   })
   Object.assign(store.filters, {
     projectId: incoming.projectId ?? '',

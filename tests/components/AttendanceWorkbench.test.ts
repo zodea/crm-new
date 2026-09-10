@@ -259,7 +259,7 @@ describe('attendance screen truth-first states', () => {
     const store = createScreenStore()
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({ query: {} }))
+    vi.stubGlobal('useRoute', () => ({ path: '/subcontract/attendance', fullPath: '/subcontract/attendance', query: {} }))
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -276,7 +276,7 @@ describe('attendance screen truth-first states', () => {
     })
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({ query: {} }))
+    vi.stubGlobal('useRoute', () => ({ path: '/subcontract/attendance', fullPath: '/subcontract/attendance', query: {} }))
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -305,14 +305,17 @@ describe('attendance screen truth-first states', () => {
     })
     vi.stubGlobal('useAttendanceStore', () => store)
     vi.stubGlobal('useKitUI', () => ({ success: vi.fn(), error: vi.fn() }))
-    vi.stubGlobal('useRoute', () => ({
+    const route = reactive({
+      path: '/subcontract/attendance',
+      fullPath: '/subcontract/attendance?project=project-a&month=2026-05&crew=crew-a&status=released',
       query: {
         project: 'project-a',
         month: '2026-05',
         crew: 'crew-a',
         status: 'released',
       },
-    }))
+    })
+    vi.stubGlobal('useRoute', () => route)
 
     render(AttendanceScreen, {
       global: { components: screenComponents },
@@ -333,6 +336,18 @@ describe('attendance screen truth-first states', () => {
     expect(store.load).toHaveBeenLastCalledWith({ clearFacts: true })
     expect(screen.getByRole('link', { name: '工资核算' }).getAttribute('href')).toBe(
       '/subcontract/payroll?project=project-a&month=2026-06&crew=crew-a&status=released',
+    )
+    route.path = '/subcontract/payroll'
+    route.fullPath = '/subcontract/payroll?project=project-b&month=2026-08&crew=crew-a&status=checked'
+    route.query = { project: 'project-b', month: '2026-08', crew: 'crew-a', status: 'checked' }
+    await nextTick()
+    expect(store.filters.month).toBe('2026-06')
+    route.path = '/subcontract/attendance'
+    route.fullPath = '/subcontract/attendance?project=project-b&month=2026-08&crew=crew-a&status=checked'
+    await nextTick()
+    expect(store.filters).toEqual({ projectId: 'project-b', month: '2026-08', crewId: 'crew-a' })
+    expect(screen.getByRole('link', { name: '工资核算' }).getAttribute('href')).toBe(
+      '/subcontract/payroll?project=project-b&month=2026-08&crew=crew-a&status=checked',
     )
   })
 })

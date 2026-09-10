@@ -12,6 +12,7 @@ import { defineStore } from 'pinia'
 import { computed, reactive, ref, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
+import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
 import {
   buildWageDraftSource,
   checkWageStatement,
@@ -76,8 +77,9 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     const db = await getDb()
     let resolvedProjectId = projectId
     let nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
-    if (!resolvedProjectId && nextOptions.projects[0]) {
-      resolvedProjectId = nextOptions.projects[0].id
+    const normalized = payrollScopeFromOptions({ projectId }, nextOptions)
+    if (resolvedProjectId !== normalized.projectId) {
+      resolvedProjectId = normalized.projectId
       nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
     }
     return { db, resolvedProjectId, nextOptions }
@@ -92,6 +94,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
       if (sequence !== loadSequence)
         return nextOptions
       filters.projectId = resolvedProjectId
+      filters.crewId = payrollScopeFromOptions(filters, nextOptions).crewId
       options.value = nextOptions
       return nextOptions
     }
@@ -110,6 +113,9 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   async function load() {
     const sequence = ++loadSequence
     const requestedFilters: WageStatementFilter = { ...filters }
+    const isCurrentRead = () => sequence === loadSequence
+      && scopeKey(filters) === scopeKey(requestedFilters)
+      && JSON.stringify(filters.status) === JSON.stringify(requestedFilters.status)
     loading.value = true
     error.value = ''
     if (snapshotScope !== scopeKey(requestedFilters)) {
@@ -122,10 +128,10 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
       const { db, resolvedProjectId, nextOptions } = await resolveOptions(requestedFilters.projectId ?? '')
       const nextFilters: WageStatementFilter = {
         ...requestedFilters,
-        projectId: resolvedProjectId,
+        ...payrollScopeFromOptions({ ...requestedFilters, projectId: resolvedProjectId }, nextOptions),
       }
       const nextStatements = await listWageStatements(db, nextFilters)
-      if (sequence !== loadSequence)
+      if (!isCurrentRead())
         return
       Object.assign(filters, nextFilters)
       options.value = nextOptions
@@ -136,7 +142,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
         selectedId.value = statements.value[0]?.id ?? ''
     }
     catch (cause) {
-      if (sequence === loadSequence)
+      if (isCurrentRead())
         error.value = cause instanceof Error ? cause.message : String(cause)
     }
     finally {
@@ -147,7 +153,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
 
   async function createDraft(input: PayrollDraftCreateInput) {
     if (input.formatFamily === 'B')
-      throw new Error('B 类合同清单直报尚未实现，不能按 A 类工程量代建工资单')
+      throw new Error('B 类工资已退役，请选择 A、C1 或 C2')
     const id = await withTransaction(async (tx) => {
       const subjectConfigId = input.formatFamily === 'C2'
         ? await upsertC2SubjectConfig(tx, {

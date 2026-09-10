@@ -24,7 +24,7 @@ test.describe('Issue #198：工资与考勤生产工作台', () => {
     await expect(source).toBeVisible()
     await expect(source.locator('option')).toHaveText(['暂估量', '现场复核量'])
     const format = page.getByRole('combobox', { name: '工资格式族' })
-    await expect(format.locator('option[value="B"]')).toHaveAttribute('disabled', '')
+    await expect(format.locator('option[value="B"]')).toHaveCount(0)
     await expect(format.locator('option[value="C2"]')).not.toHaveAttribute('disabled', '')
     await format.selectOption('C2')
     await expect(page.getByLabel('C2 大工单价')).toBeVisible()

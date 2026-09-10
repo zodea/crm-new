@@ -392,7 +392,7 @@ describe('payroll statement lifecycle', () => {
       quantitySource: 'field',
       payRatio: 0.8,
       lines: [],
-    })).rejects.toThrow('B 类合同清单直报尚未实现')
+    })).rejects.toThrow('B 类工资已退役')
 
     await expect(createWageStatementDraft(db, {
       projectId: 'project-a',

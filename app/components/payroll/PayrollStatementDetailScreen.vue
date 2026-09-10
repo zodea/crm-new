@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import { payrollFiltersFromQuery, payrollListLocation } from '~/lib/payroll/navigation'
+import { wageSourceLabel } from '~/lib/payroll/presentation'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
 
@@ -18,9 +20,8 @@ const statusLabel = {
   checked: '已核对',
   released: '已发放',
 }
-const sourceLabel = computed(() => statement.value?.formatFamily === 'C2'
-  ? '已确认签工'
-  : statement.value?.quantitySource === 'field' ? '现场复核量' : '暂估量')
+const sourceLabel = computed(() => statement.value ? wageSourceLabel(statement.value) : '')
+const returnLocation = computed(() => payrollListLocation(payrollFiltersFromQuery(route.query)))
 const periodLabel = computed(() => statement.value?.periodKind === 'retention'
   ? '尾款 100%'
   : statement.value?.periodKind === 'settlement' ? '结算档' : '月度进度')
@@ -62,7 +63,7 @@ watch(statementId, () => void load(), { immediate: true })
     :subtitle="statement
       ? `${statement.month} · ${statement.projectName} · ${statement.crewName || '个人责任'} · ${statement.formatFamily} 族`
       : ''"
-    back-to="/subcontract/payroll"
+    :back-to="returnLocation"
     back-label="返回工资核算"
     :state="shellState"
     :state-title="shellState === 'not-found' ? '请款簿不存在或已删除' : shellState === 'error' ? '请款簿详情加载失败' : '正在加载请款簿详情'"
@@ -98,7 +99,14 @@ watch(statementId, () => void load(), { immediate: true })
 
     <template v-if="statement && snapshot">
       <section
-        v-if="statement.status === 'draft' && statement.quantitySource === 'provisional'"
+        v-if="statement.formatFamily === 'B'"
+        role="status"
+        class="panel mb-4 bg-surface-2 px-4 py-3 text-12px text-ink-soft"
+      >
+        B 类工资已退役，历史记录只读；保留原金额与状态，不重新生成、核对或发放。
+      </section>
+      <section
+        v-else-if="statement.formatFamily === 'A' && statement.status === 'draft' && statement.quantitySource === 'provisional'"
         role="status"
         class="panel mb-4 border-warn-border bg-warn-soft px-4 py-3 text-12px text-warn-ink"
       >
@@ -114,7 +122,7 @@ watch(statementId, () => void load(), { immediate: true })
       >
         <strong>来源已变化，需重新核对</strong>
         <p class="mt-1">
-          上游现场量或考勤版本发生变化，本单暂不能发放。
+          {{ sourceLabel }}来源版本发生变化，本单暂不能发放。
         </p>
       </section>
 

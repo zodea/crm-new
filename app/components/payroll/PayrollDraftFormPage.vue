@@ -72,7 +72,7 @@ async function leaveToList() {
 
 async function submit(input: PayrollDraftCreateInput) {
   if (input.formatFamily === 'B') {
-    kit.error('B 类合同工资清单关系尚未接入，暂不能建单')
+    kit.error('B 类工资已退役，请选择 A、C1 或 C2')
     return
   }
   submitting.value = true

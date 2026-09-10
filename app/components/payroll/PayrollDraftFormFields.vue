@@ -18,6 +18,7 @@ import {
   watch,
 } from 'vue'
 import FormFooter from '~/components/ui/FormFooter.vue'
+import { wageSourceLabel } from '~/lib/payroll/presentation'
 
 const props = defineProps<{
   options: PayrollWorkbenchOptions
@@ -188,7 +189,7 @@ function validate(): boolean {
   if (!draft.leaderWorkerId)
     next.leaderWorkerId = '请选择请款负责人'
   if (draft.formatFamily === 'B')
-    next.formatFamily = 'B 类合同工资清单关系尚未接入，暂不能建单'
+    next.formatFamily = 'B 类工资已退役，请选择 A、C1 或 C2'
   if (!Number.isFinite(draft.payRatioPercent) || draft.payRatioPercent < 0 || draft.payRatioPercent > 100)
     next.payRatioPercent = '发放比例应为 0–100'
   if (draft.formatFamily === 'C1') {
@@ -300,7 +301,6 @@ function submit() {
           <span>格式族</span>
           <select ref="formatInput" v-model="draft.formatFamily" aria-label="工资格式族" :disabled="submitting">
             <option value="A">A · 户型派生</option>
-            <option value="B" disabled>B · 合同清单直报（待接入）</option>
             <option value="C1">C1 · 月薪时工</option>
             <option value="C2">C2 · 零星签工</option>
           </select>
@@ -328,8 +328,8 @@ function submit() {
             aria-label="工资取数口径"
             :disabled="submitting || sourceLocked"
           >
-            <option value="provisional">暂估量</option>
-            <option value="field">现场复核量</option>
+            <option v-if="draft.formatFamily === 'A'" value="provisional">暂估量</option>
+            <option value="field">{{ wageSourceLabel({ formatFamily: draft.formatFamily, quantitySource: 'field' }) }}</option>
           </select>
         </label>
         <label class="field">

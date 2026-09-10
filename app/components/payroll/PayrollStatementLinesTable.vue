@@ -2,16 +2,17 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { WageStatement } from '~/lib/payroll/statements'
 import { computed } from 'vue'
+import { wageQuantityLabel } from '~/lib/payroll/presentation'
 
 const { statement } = defineProps<{ statement: WageStatement }>()
 
-const columns: KitTableColumn[] = [
+const columns = computed<KitTableColumn[]>(() => [
   { field: 'workerName', title: '工人', minWidth: 130, fixed: 'left' },
   { field: 'itemName', title: '分项', minWidth: 200 },
-  { field: 'quantity', title: '工程量', width: 130, slot: 'quantity', align: 'right' },
+  { field: 'quantity', title: wageQuantityLabel(statement.formatFamily), width: 130, slot: 'quantity', align: 'right' },
   { field: 'unitPrice', title: '工资单价', width: 130, type: 'money' },
   { field: 'amount', title: '分项金额', width: 140, type: 'money' },
-]
+])
 
 const rows = computed(() => {
   const workerById = new Map(statement.members.map(member => [member.workerId, member.workerName]))

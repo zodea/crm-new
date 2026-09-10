@@ -10,6 +10,7 @@ import {
   listSignedDayworkRecords,
   saveSignedDayworkRecord,
 } from '~/lib/payroll/daywork'
+import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
 import { loadPayrollWorkbenchOptions } from '~/lib/payroll/statements'
 
 function currentMonth(): string {
@@ -50,10 +51,10 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
     try {
       const db = await getDb()
       let nextOptions = await loadPayrollWorkbenchOptions(db, requestedFilters.projectId)
-      if (!requestedFilters.projectId)
-        requestedFilters.projectId = nextOptions.projects[0]?.id ?? ''
-      if (requestedFilters.projectId)
-        nextOptions = await loadPayrollWorkbenchOptions(db, requestedFilters.projectId)
+      const scope = payrollScopeFromOptions(requestedFilters, nextOptions)
+      if (scope.projectId !== requestedFilters.projectId)
+        nextOptions = await loadPayrollWorkbenchOptions(db, scope.projectId)
+      Object.assign(requestedFilters, scope)
       const nextRecords = requestedFilters.projectId
         ? await listSignedDayworkRecords(db, requestedFilters)
         : []

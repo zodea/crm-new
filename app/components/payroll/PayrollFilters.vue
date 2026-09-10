@@ -75,7 +75,7 @@ function setStatuses(values: string[]) {
         <NuxtLink :to="draftLocation" class="btn-primary">
           新建工资草稿
         </NuxtLink>
-        <ContextHelp label="工资核算" text="计件、考勤和零星签工工资均可在此建单、核对与发放。已发放工资保留发放时的记录，不再随来源变动。合同清单直报暂不可用。" />
+        <ContextHelp label="工资核算" text="计件、考勤和零星签工工资均可在此建单、核对与发放。已发放工资保留发放时的记录，不再随来源变动。B 类工资已退役，历史记录只读。" />
         <NuxtLink :to="{ path: '/subcontract/attendance', query: relatedQuery }" class="btn-secondary">
           打开考勤
         </NuxtLink>
