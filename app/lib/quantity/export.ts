@@ -7,6 +7,7 @@ import type {
   QuantityStageProgress,
 } from '~/lib/quantity/derived'
 import * as XLSX from 'xlsx'
+import { formatQuantityTotalCompleteness } from './format'
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -69,10 +70,17 @@ export function quantityMonthlyRows(
     月份: row.month,
     工种: row.trade,
     工序阶段: row.stageName,
+    单位: row.unit,
     完成户数: row.completedUnits,
-    合同量: row.contractQty,
-    暂定量: row.provisionalQty,
-    现场量: row.fieldQty,
+    合同量: row.contractQty.value ?? '',
+    合同量完整度: formatQuantityTotalCompleteness(row.contractQty),
+    合同量已知部分: row.contractQty.completeness === 'partial' ? row.contractQty.knownValue ?? '' : '',
+    暂估量: row.provisionalQty.value ?? '',
+    暂估量完整度: formatQuantityTotalCompleteness(row.provisionalQty),
+    暂估量已知部分: row.provisionalQty.completeness === 'partial' ? row.provisionalQty.knownValue ?? '' : '',
+    现场量: row.fieldQty.value ?? '',
+    现场量完整度: formatQuantityTotalCompleteness(row.fieldQty),
+    现场量已知部分: row.fieldQty.completeness === 'partial' ? row.fieldQty.knownValue ?? '' : '',
   }))
 }
 

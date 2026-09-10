@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { QuantityCompletionQuantityLine, QuantityCompletionStageView } from '~/lib/quantity/completion'
+import QuantityTotalValue from '~/components/quantity/QuantityTotalValue.vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { db } from '~/lib/db/client'
 import { loadQuantityPhotoDataUrl } from '~/lib/quantity/completion'
 import { formatQuantityValue } from '~/lib/quantity/format'
+import { sumQuantityLines } from '~/lib/quantity/totals'
 import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
@@ -54,37 +56,23 @@ const tradeGroups = computed(() => {
   return [...groups.entries()].map(([trade, stages]) => ({ trade, stages }))
 })
 
-interface QuantityTotals {
-  contractQty: number
-  provisionalQty: number
-  fieldQty: number
-}
-
-function sumLines(lines: readonly QuantityCompletionQuantityLine[]): QuantityTotals {
-  return lines.reduce<QuantityTotals>((totals, line) => ({
-    contractQty: totals.contractQty + (line.contractQty ?? 0),
-    provisionalQty: totals.provisionalQty + (line.provisionalQty ?? 0),
-    fieldQty: totals.fieldQty + (line.fieldQty ?? 0),
-  }), { contractQty: 0, provisionalQty: 0, fieldQty: 0 })
-}
-
 const unitTotals = computed(() => {
   const seen = new Set<string>()
   const lines: QuantityCompletionQuantityLine[] = []
   for (const stage of workspace.value?.stages ?? []) {
     for (const line of stage.quantities) {
-      const key = `${line.roomId} ${line.itemId}`
+      const key = JSON.stringify([line.roomId, line.itemId])
       if (seen.has(key))
         continue
       seen.add(key)
       lines.push(line)
     }
   }
-  return sumLines(lines)
+  return sumQuantityLines(lines)
 })
 
 const stageTotals = computed(() => new Map(
-  (workspace.value?.stages ?? []).map(stage => [stage.id, sumLines(stage.quantities)]),
+  (workspace.value?.stages ?? []).map(stage => [stage.id, sumQuantityLines(stage.quantities)]),
 ))
 
 function statusChip(stage: QuantityCompletionStageView): { label: string, cls: string } {
@@ -121,7 +109,7 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
             <h2 class="truncate text-15px font-800 text-ink">
               {{ workspace ? `${workspace.unit.buildingName} ${workspace.unit.floorName} ${workspace.unit.name}` : '户施工详情' }}
             </h2>
-            <ContextHelp label="户施工详情" text="按工种、工序阶段和完成日期查看施工记录。合同量、暂定量和现场量随关联的户型模板更新。" />
+            <ContextHelp label="户施工详情" text="按工种、工序阶段和完成日期查看施工记录。合同量、暂估量和现场量随关联的户型模板更新。" />
           </div>
         </div>
         <span v-if="workspace?.matrixArchivedAt" class="status-warn ml-auto flex-none">
@@ -244,7 +232,7 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
                     合同量
                   </th>
                   <th scope="col" class="px-3 py-1.5 text-right font-700">
-                    暂定量
+                    暂估量
                   </th>
                   <th scope="col" class="px-3 py-1.5 text-right font-700">
                     现场量
@@ -278,18 +266,21 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
                     待单价数据
                   </td>
                 </tr>
-                <tr class="border-t border-line bg-surface-2 font-700">
-                  <td colspan="3" class="px-3 py-1.5 text-ink">
+                <tr v-for="total in stageTotals.get(stage.id)" :key="total.unit" class="border-t border-line bg-surface-2 font-700">
+                  <td colspan="2" class="px-3 py-1.5 text-ink">
                     分项小计
                   </td>
-                  <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ formatQuantityValue(stageTotals.get(stage.id)!.contractQty) }}
+                  <td class="px-3 py-1.5 text-ink-soft">
+                    {{ total.unit || '—' }}
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ formatQuantityValue(stageTotals.get(stage.id)!.provisionalQty) }}
+                    <QuantityTotalValue :total="total.contractQty" label="合同量合计" />
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink font-mono">
-                    {{ formatQuantityValue(stageTotals.get(stage.id)!.fieldQty) }}
+                    <QuantityTotalValue :total="total.provisionalQty" label="暂估量合计" />
+                  </td>
+                  <td class="px-3 py-1.5 text-right text-ink font-mono">
+                    <QuantityTotalValue :total="total.fieldQty" label="现场量合计" />
                   </td>
                   <td class="px-3 py-1.5 text-right text-ink-faint">
                     —
@@ -316,12 +307,23 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
       </section>
 
       <section class="panel min-w-0 px-4 py-3" aria-label="全户合计">
-        <div class="flex flex-wrap items-baseline gap-x-6 gap-y-1.5 text-12px">
-          <span class="text-13px font-800 text-ink">全户合计</span>
-          <span class="text-ink-soft">合同量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.contractQty) }}</b></span>
-          <span class="text-ink-soft">暂定量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.provisionalQty) }}</b></span>
-          <span class="text-ink-soft">现场量 <b class="text-ink font-mono">{{ formatQuantityValue(unitTotals.fieldQty) }}</b></span>
+        <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-12px">
+          <h3 class="text-13px font-800 text-ink">
+            全户合计
+          </h3>
           <span class="text-ink-faint">毛利参考暂不可用：缺少合同与班组单价</span>
+        </div>
+        <div
+          v-for="total in unitTotals"
+          :key="total.unit"
+          role="group"
+          :aria-label="`${total.unit || '未标明单位'}全户合计`"
+          class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-12px"
+        >
+          <span class="min-w-8 text-ink font-700">{{ total.unit || '未标明单位' }}</span>
+          <span class="inline-flex items-center gap-1 text-ink-soft">合同量 <QuantityTotalValue :total="total.contractQty" label="全户合同量合计" /></span>
+          <span class="inline-flex items-center gap-1 text-ink-soft">暂估量 <QuantityTotalValue :total="total.provisionalQty" label="全户暂估量合计" /></span>
+          <span class="inline-flex items-center gap-1 text-ink-soft">现场量 <QuantityTotalValue :total="total.fieldQty" label="全户现场量合计" /></span>
         </div>
       </section>
     </template>

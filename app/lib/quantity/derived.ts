@@ -1,8 +1,10 @@
 // 工程量统一派生读 seam（ADR 0010 / #103）：阶段进度、施工记录、月度完成量。
 // 施工记录不落独立表；页面、工资预览、排程（#114/#117）都消费这里，不各自重算口径。
 import type { QuantityCompletionStatus } from './read-model'
+import type { QuantityTotals } from './totals'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtes, hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
+import { quantityMeasureTotal } from './totals'
 
 export interface QuantityStageProgress {
   stageId: string
@@ -51,16 +53,13 @@ export interface QuantityConstructionRecordFilter {
   workerId?: string
 }
 
-export interface QuantityMonthlyOutput {
+export interface QuantityMonthlyOutput extends QuantityTotals {
   month: string
   trade: string
   stageId: string
   stageName: string
   stageSortOrder: number
   completedUnits: number
-  contractQty: number
-  provisionalQty: number
-  fieldQty: number
 }
 
 interface StageRow {
@@ -111,9 +110,14 @@ interface MonthlyRow {
   trade: string
   stage_sort_order: number
   completed_units: number
+  quantity_unit: string
+  source_count: number
   contract_qty: number | null
   provisional_qty: number | null
   field_qty: number | null
+  contract_missing: number
+  provisional_missing: number
+  field_missing: number
 }
 
 function numberValue(value: unknown): number {
@@ -349,38 +353,36 @@ export async function loadQuantityMonthlyOutput(db: Pick<SoftDb, 'select'>, proj
             s.name AS stage_name,
             s.trade,
             s.sort_order AS stage_sort_order,
+            item.unit AS quantity_unit,
             COUNT(DISTINCT usc.id) AS completed_units,
-            SUM(qty.contract_qty) AS contract_qty,
-            SUM(qty.provisional_qty) AS provisional_qty,
-            SUM(qty.field_qty) AS field_qty
+            COUNT(*) AS source_count,
+            SUM(hti.contract_qty) AS contract_qty,
+            SUM(hti.provisional_qty) AS provisional_qty,
+            SUM(hti.field_qty) AS field_qty,
+            SUM(CASE WHEN hti.contract_qty IS NULL THEN 1 ELSE 0 END) AS contract_missing,
+            SUM(CASE WHEN hti.provisional_qty IS NULL THEN 1 ELSE 0 END) AS provisional_missing,
+            SUM(CASE WHEN hti.field_qty IS NULL THEN 1 ELSE 0 END) AS field_missing
      FROM unit_stage_completions usc
      JOIN units u ON u.id = usc.unit_id
      JOIN floors f ON f.id = u.floor_id
      JOIN buildings b ON b.id = f.building_id
      JOIN house_type_templates ht ON ht.id = u.house_type_template_id
      JOIN construction_stages s ON s.id = usc.stage_id
-     JOIN (
-       SELECT r.template_id,
-              csi.stage_id,
-              SUM(COALESCE(hti.contract_qty, 0)) AS contract_qty,
-              SUM(COALESCE(hti.provisional_qty, 0)) AS provisional_qty,
-              SUM(COALESCE(hti.field_qty, 0)) AS field_qty
-       FROM construction_stage_items csi
-       JOIN house_type_template_items hti ON hti.item_id = csi.item_id
-       JOIN rooms r ON r.id = hti.room_id
-       WHERE ${visibleCond('construction_stage_items', 'csi')}
-         AND ${visibleCond('house_type_template_items', 'hti')}
-         AND csi.is_reporting_stage = 1
-       GROUP BY r.template_id, csi.stage_id
-     ) qty ON qty.template_id = u.house_type_template_id AND qty.stage_id = usc.stage_id
+     JOIN construction_stage_items csi ON csi.stage_id = usc.stage_id
+     JOIN items item ON item.id = csi.item_id
+     JOIN house_type_template_items hti ON hti.item_id = csi.item_id
+     JOIN rooms r ON r.id = hti.room_id AND r.template_id = u.house_type_template_id
      WHERE ${visibleCond('unit_stage_completions', 'usc')}
+       AND ${visibleCond('construction_stage_items', 'csi')}
+       AND ${visibleCond('house_type_template_items', 'hti')}
+       AND csi.is_reporting_stage = 1
        AND usc.status = 'completed'
        AND usc.completed_at IS NOT NULL
        AND b.project_id = ?
        AND ht.project_id = ?
        AND s.project_id = ?
-     GROUP BY month, usc.stage_id
-     ORDER BY month, s.sort_order, s.code, usc.stage_id`,
+     GROUP BY month, usc.stage_id, item.unit
+     ORDER BY month, s.sort_order, s.code, usc.stage_id, item.unit`,
     [projectId, projectId, projectId],
   )
 
@@ -390,9 +392,10 @@ export async function loadQuantityMonthlyOutput(db: Pick<SoftDb, 'select'>, proj
     stageId: row.stage_id,
     stageName: row.stage_name,
     stageSortOrder: numberValue(row.stage_sort_order),
+    unit: row.quantity_unit,
     completedUnits: numberValue(row.completed_units),
-    contractQty: numberValue(row.contract_qty),
-    provisionalQty: numberValue(row.provisional_qty),
-    fieldQty: numberValue(row.field_qty),
+    contractQty: quantityMeasureTotal(row.contract_qty, row.source_count, row.contract_missing, row.quantity_unit),
+    provisionalQty: quantityMeasureTotal(row.provisional_qty, row.source_count, row.provisional_missing, row.quantity_unit),
+    fieldQty: quantityMeasureTotal(row.field_qty, row.source_count, row.field_missing, row.quantity_unit),
   }))
 }

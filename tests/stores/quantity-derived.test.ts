@@ -79,6 +79,51 @@ beforeEach(async () => {
 afterEach(() => mem.close())
 
 describe('quantity derived：统一派生读 seam', () => {
+  it('未标明单位的月度量不生成可以误用的完整合计或已知部分', async () => {
+    await mem.execute(`UPDATE items SET unit = '' WHERE id = 'i-wall'`)
+
+    const row = (await loadQuantityMonthlyOutput(mem, 'p1')).find(row => row.month === '2026-06' && row.stageId === 's-wall')
+    expect(row).toMatchObject({
+      unit: '',
+      fieldQty: { value: null, knownValue: null, unitMissing: true, completeness: 'partial' },
+    })
+  })
+
+  it('月度现场量缺失保持未知，不把已完成户的缺量导出成零', async () => {
+    await mem.execute(`UPDATE house_type_template_items SET field_qty = NULL WHERE id = 'line-wall'`)
+
+    const monthly = await loadQuantityMonthlyOutput(mem, 'p1')
+    expect(monthly.find(row => row.month === '2026-06' && row.stageId === 's-wall')).toMatchObject({
+      unit: '㎡',
+      completedUnits: 1,
+      fieldQty: { value: null, knownValue: null, missingCount: 1, sourceCount: 1, completeness: 'partial' },
+    })
+  })
+
+  it('月度同单位保留已知部分与缺项，不同单位分行且明确零仍是完整零', async () => {
+    await mem.execute(`INSERT INTO rooms (id, template_id, code, name, kind) VALUES ('r-extra', 't1', 'extra', '次卧', 'room')`)
+    await mem.execute(`INSERT INTO house_type_template_items (id, room_id, item_id, contract_qty, provisional_qty, field_qty)
+      VALUES ('line-extra', 'r-extra', 'i-wall', 0, NULL, NULL)`)
+    await mem.execute(`INSERT INTO items (id, project_id, code, name, trade, unit) VALUES ('i-length', 'p1', 'length', '收边长度', '泥水工', 'm')`)
+    await mem.execute(`INSERT INTO house_type_template_items (id, room_id, item_id, contract_qty, provisional_qty, field_qty)
+      VALUES ('line-length', 'r1', 'i-length', 7, 8, 0)`)
+    await mem.execute(`INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage)
+      VALUES ('map-length', 's-wall', 'i-length', 1)`)
+
+    const rows = (await loadQuantityMonthlyOutput(mem, 'p1')).filter(row => row.month === '2026-06' && row.stageId === 's-wall')
+    expect(rows).toHaveLength(2)
+    expect(rows.find(row => row.unit === '㎡')).toMatchObject({
+      completedUnits: 1,
+      contractQty: { value: 21, knownValue: 21, missingCount: 0, sourceCount: 2, completeness: 'complete' },
+      provisionalQty: { value: null, knownValue: 22, missingCount: 1, sourceCount: 2, completeness: 'partial' },
+      fieldQty: { value: null, knownValue: 20, missingCount: 1, sourceCount: 2, completeness: 'partial' },
+    })
+    expect(rows.find(row => row.unit === 'm')).toMatchObject({
+      completedUnits: 1,
+      fieldQty: { value: 0, knownValue: 0, missingCount: 0, sourceCount: 1, completeness: 'complete' },
+    })
+  })
+
   it('阶段进度：应做户数按模板明细、完成/草稿分计、manual 阶段排除', async () => {
     const progress = await loadQuantityStageProgress(mem, 'p1')
 
@@ -160,13 +205,13 @@ describe('quantity derived：统一派生读 seam', () => {
     expect(monthly.find(row => row.month === '2026-06' && row.stageId === 's-wall')).toMatchObject({
       trade: '泥水工',
       completedUnits: 1,
-      contractQty: 21,
-      provisionalQty: 22,
-      fieldQty: 20,
+      contractQty: expect.objectContaining({ value: 21, completeness: 'complete' }),
+      provisionalQty: expect.objectContaining({ value: 22, completeness: 'complete' }),
+      fieldQty: expect.objectContaining({ value: 20, completeness: 'complete' }),
     })
     expect(monthly.find(row => row.month === '2026-07' && row.stageId === 's-wall')).toMatchObject({
       completedUnits: 1,
-      contractQty: 21,
+      contractQty: expect.objectContaining({ value: 21 }),
     })
     expect(monthly.some(row => row.stageId === 's-floor' && row.month === '2026-06')).toBe(false)
   })
@@ -192,9 +237,9 @@ describe('quantity derived：统一派生读 seam', () => {
         month: '2026-06',
         stageId: 's-putty-final',
         completedUnits: 1,
-        contractQty: 40,
-        provisionalQty: 41,
-        fieldQty: 42,
+        contractQty: expect.objectContaining({ value: 40 }),
+        provisionalQty: expect.objectContaining({ value: 41 }),
+        fieldQty: expect.objectContaining({ value: 42 }),
       }),
     ])
   })
