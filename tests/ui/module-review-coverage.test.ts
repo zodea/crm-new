@@ -168,4 +168,29 @@ describe('module review coverage', () => {
     expect(() => validateReviewObligations([{ ...original, evidence: [] }], cases)).toThrow('无固定提交的本轮证据')
     expect(() => validateReviewObligations([{ ...original, status: 'complete' }], cases)).toThrow('未知义务状态')
   })
+
+  it('retains each inherited progress and payroll ticket without promoting local evidence to central acceptance', () => {
+    const coverage = buildModuleReviewCoverage()
+    const inherited = coverage.obligations.filter(item => item.id.startsWith('PRG-') || item.id.startsWith('WAGE-'))
+    for (const number of [300, 301, 347, 348, 349, 350, 351, 352, 353, 354]) {
+      expect(inherited.some(item => item.sources.includes(`https://github.com/zodea/crm-new/issues/${number}`))).toBe(true)
+    }
+    const byId = (id: string) => inherited.find(item => item.id === id)!
+    expect(byId('WAGE-01').status).toBe('current-passed')
+    expect(byId('WAGE-02').status).toBe('ready')
+    expect(byId('WAGE-06').status).toBe('ready')
+    expect(byId('WAGE-10').status).toBe('ready')
+    expect(byId('PRG-01').status).toBe('ready')
+    expect(byId('PRG-07').status).toBe('ready')
+    expect(byId('PRG-09').status).toBe('partial')
+    for (const obligation of inherited) {
+      expect(obligation.ownerIssue).toBe(412)
+      expect(obligation.status).not.toBe('needs-decision')
+      for (const caseId of obligation.caseIds) {
+        const linked = coverage.cases.find(item => item.id === caseId)!
+        expect(linked.acceptance.frontend).not.toBe('passed')
+        expect(linked.acceptance.crossModule).not.toBe('passed')
+      }
+    }
+  })
 })

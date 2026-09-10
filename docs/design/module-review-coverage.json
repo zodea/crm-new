@@ -19447,6 +19447,514 @@
         }
       ],
       "remaining": "分值、包含/排除、耗时与超时部分结果经算法回归；浏览器验证返回上限、目标金额一致、短任务反馈及局部滚动，未扩称浏览器全部失败场景通过。"
+    },
+    {
+      "id": "PRG-01",
+      "label": "#300 AC1 / #347 AC1/4 排程拓扑迁移与中央唯一写入",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/347",
+        "docs/adr/0020-browser-authority-and-demo-workspace-boundary.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "当前 schedule store 仍用本地 DB；中央分组、任务、依赖及其工序库快照尚未闭合。按真实区域/合同前置受控迁移，不能以首页读取中央项目替代。"
+    },
+    {
+      "id": "PRG-02",
+      "label": "#300 AC3 / #347 AC2 排程稳定 ID 与后台关系验证",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/347",
+        "docs/rewrite/pages/schedule-progress.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "中央保存需验证 project/group/task/stage/dependency 与楼栋/合同归属，区分不存在和错配；不得按名称或本地同 ID 补配。"
+    },
+    {
+      "id": "PRG-03",
+      "label": "#300 AC5 / #347 AC3 排程版本冲突与刷新重读",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/347"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "sourceVersion 陈旧提交、409 后草稿保留、缓存失效、失败重试与保存后中央刷新读取待实施；本地事务不证明中央并发。"
+    },
+    {
+      "id": "PRG-04",
+      "label": "#300 AC1 / #348 AC1/4 工程量责任、阶段完成与现场量中央化",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/348",
+        "docs/adr/0010-quantity-matrix-and-construction-record-model.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "现有区域、户型、责任、阶段完成和现场量仍需接入同一中央迁移/Repository/HTTP/command；责任配置不能产生完成事实。"
+    },
+    {
+      "id": "PRG-05",
+      "label": "#300 AC3/5 / #348 AC2/3 工程量关系、来源版本与错配反馈",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/348"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "后台验证 project/task/stage/item/building/unit 等关系并拒绝陈旧版本；错误身份、无权、空态和重试逐场景验证，不由本地既有页面推定完成。"
+    },
+    {
+      "id": "PRG-06",
+      "label": "#300 AC2 / #348 AC3 缺现场量保持 null 与聚合 completeness",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/348",
+        "docs/rewrite/pages/subcontract-quantity.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557"
+      ],
+      "status": "partial",
+      "evidence": [],
+      "remaining": "既有工程量本地读模型已区分三量；完整中央投影、逐页显示/汇总、缺来源 completeness 及空与明确零的本轮运行证据仍待补齐。"
+    },
+    {
+      "id": "PRG-07",
+      "label": "#300 AC1 / #349 AC1/4 目标成本迁移和中央正式保存",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/349",
+        "docs/rewrite/pages/target-cost.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-050232A62894",
+        "C-F06D8D7FCF2C",
+        "C-CF708A06FEBF",
+        "C-73665550F1A0"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "目标成本既有数据与正式保存尚未闭合中央 Repository/HTTP/command；不能保留并行正式来源或把付款结算成本回归外推到目标成本。"
+    },
+    {
+      "id": "PRG-08",
+      "label": "#300 AC3/5 / #349 AC2 排程、户详情与成本的真实来源聚合",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/349"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F",
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557",
+        "C-050232A62894",
+        "C-F06D8D7FCF2C",
+        "C-CF708A06FEBF",
+        "C-73665550F1A0"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "三域下钻只传稳定 ID 与 sourceVersion，聚合来自当前真实事实；未接入或缺映射必须可解释，不造零量、零成本或同名关系。"
+    },
+    {
+      "id": "PRG-09",
+      "label": "#300 AC4 / #349 AC3 全上下文往返、深链和局部滚动",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/349",
+        "https://github.com/zodea/crm-new/issues/434"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F",
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557",
+        "C-050232A62894",
+        "C-F06D8D7FCF2C",
+        "C-CF708A06FEBF",
+        "C-73665550F1A0"
+      ],
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-434/README.md",
+          "commit": "0dd6c91e096789d842cea417cd40a496363fe52e",
+          "recency": "current-run",
+          "scope": "中央项目到未接入排程提示、授权演示工序往返；不含正式排程事实链"
+        }
+      ],
+      "remaining": "#434 仅覆盖首页项目及演示工序往返；正式项目/分组/任务/阶段/楼栋/月/视图/工种/责任户、目标成本往返、直接深链和错误重试仍须逐链验证。"
+    },
+    {
+      "id": "PRG-10",
+      "label": "#300 AC6 / #347–349 AC5/6 排程工程量成本集成验收与权威文档",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/300",
+        "https://github.com/zodea/crm-new/issues/347",
+        "https://github.com/zodea/crm-new/issues/348",
+        "https://github.com/zodea/crm-new/issues/349"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-BF25FD114CFC",
+        "C-439AC7326E15",
+        "C-00E0EA0DAD9D",
+        "C-B08165B1191F",
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557",
+        "C-050232A62894",
+        "C-F06D8D7FCF2C",
+        "C-CF708A06FEBF",
+        "C-73665550F1A0"
+      ],
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-434/README.md",
+          "commit": "0dd6c91e096789d842cea417cd40a496363fe52e",
+          "recency": "current-run",
+          "scope": "中央项目到未接入排程提示、授权演示工序往返；不含正式排程事实链"
+        }
+      ],
+      "remaining": "单独首页切片不等于三域验收；接齐实际前置后完成定向契约/组件、规定视口、最终全量、独立双轴复核、指南/PDF与提交回执。生产可用归 #416。"
+    },
+    {
+      "id": "WAGE-01",
+      "label": "#301 AC1/3 / #350 AC1/3 B 类生成入口及历史写入保护",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/350",
+        "https://github.com/zodea/crm-new/issues/433"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485"
+      ],
+      "status": "current-passed",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-433/payroll-verification.md",
+          "commit": "b2f1e2e578bc3db6524fd7bfd67886814fcc38b9",
+          "recency": "current-run",
+          "scope": "本地工资 B 三态只读、C1 来源呈现及工资/考勤/签工返回；不含中央写入、历史迁移或发放调整"
+        }
+      ],
+      "remaining": "限定当前本地 B 草稿/已核对/已发放三态只读、新建不再提供 B、公开改价/核对/发放/新输出拒绝；保留原状态与金额。历史迁移报告另列 WAGE-02。"
+    },
+    {
+      "id": "WAGE-02",
+      "label": "#301 AC1/6 / #350 AC2/4 B 类旧数据可诊断隔离报告",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/350"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "仍需受控迁移/隔离报告与中央读写边界；不静默把历史 B 改解释为 A/C1/C2，不改写历史金额，不以现有只读提示替代报告。"
+    },
+    {
+      "id": "WAGE-03",
+      "label": "#301 AC2/3 / #351 AC1 A 类只取已完成施工事实和现场量",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/351",
+        "docs/rewrite/pages/subcontract-payroll.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557"
+      ],
+      "status": "partial",
+      "evidence": [],
+      "remaining": "既有本地 A 来源逻辑需本轮完整验证；缺现场量不可生成，不补 0；单价只取工资配置，合同/BOQ/劳务结算及乙方内部工资不得进入生成。"
+    },
+    {
+      "id": "WAGE-04",
+      "label": "#301 AC2/3 / #352 AC1 C1 真实考勤来源与空态",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/352",
+        "https://github.com/zodea/crm-new/issues/433"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-5751CF6E9985"
+      ],
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-433/payroll-verification.md",
+          "commit": "b2f1e2e578bc3db6524fd7bfd67886814fcc38b9",
+          "recency": "current-run",
+          "scope": "本地工资 B 三态只读、C1 来源呈现及工资/考勤/签工返回；不含中央写入、历史迁移或发放调整"
+        }
+      ],
+      "remaining": "#433 已验证 C1 来源呈现与相关本地回归；中央考勤生成、工资配置读取和真实空态仍需端到端验证，不从工程量或合同补记录。"
+    },
+    {
+      "id": "WAGE-05",
+      "label": "#301 AC2/3 / #353 AC1 C2 仅消费已确认签工",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/353",
+        "https://github.com/zodea/crm-new/issues/433"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-7C09C38C854D"
+      ],
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-433/payroll-verification.md",
+          "commit": "b2f1e2e578bc3db6524fd7bfd67886814fcc38b9",
+          "recency": "current-run",
+          "scope": "本地工资 B 三态只读、C1 来源呈现及工资/考勤/签工返回；不含中央写入、历史迁移或发放调整"
+        }
+      ],
+      "remaining": "签工上下文已修复；已确认签工与工资配置的中央生成链未验收，草稿/驳回签工不可成为工资来源。"
+    },
+    {
+      "id": "WAGE-06",
+      "label": "#301 AC6 / #351–353 AC2/4 工资来源、草稿与成员分配中央保存",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/351",
+        "https://github.com/zodea/crm-new/issues/352",
+        "https://github.com/zodea/crm-new/issues/353"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-5751CF6E9985",
+        "C-7C09C38C854D"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "责任、数量、工资配置单价、来源版本、成员分配及操作者经中央 command 原子保存，重复命令幂等；来源域迁移/关系是实际前置，不能用本地存储证明完成。"
+    },
+    {
+      "id": "WAGE-07",
+      "label": "#352/353 AC3 工资、考勤、签工来源范围恢复",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/352",
+        "https://github.com/zodea/crm-new/issues/353",
+        "https://github.com/zodea/crm-new/issues/433"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-5751CF6E9985",
+        "C-7C09C38C854D"
+      ],
+      "status": "current-passed",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-433/payroll-verification.md",
+          "commit": "b2f1e2e578bc3db6524fd7bfd67886814fcc38b9",
+          "recency": "current-run",
+          "scope": "本地工资 B 三态只读、C1 来源呈现及工资/考勤/签工返回；不含中央写入、历史迁移或发放调整"
+        }
+      ],
+      "remaining": "限定本地工资台账/独立详情/考勤/签工的项目、月份、班组、工资状态及来源返回，含缓存与未保存输入；A 类工程量入口另列 WAGE-08。"
+    },
+    {
+      "id": "WAGE-08",
+      "label": "#351 AC3 工程量进入 A 类草稿并恢复原范围",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/351"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-D5B7E5570149",
+        "C-DF7B130B33EE",
+        "C-5BF5E8DBAFCE",
+        "C-773254DBB2C2",
+        "C-65CCC6704277",
+        "C-B00376092557"
+      ],
+      "status": "partial",
+      "evidence": [],
+      "remaining": "工程量→A 类工资草稿→原项目/月/班组/筛选的本轮中央链与实际浏览器验证待补；C1/C2 往返证据不覆盖此入口。"
+    },
+    {
+      "id": "WAGE-09",
+      "label": "#301 AC4 / #354 AC1 发放工资与劳务结算成本防双计",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/354",
+        "docs/rewrite/DATABASE.md"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485"
+      ],
+      "status": "partial",
+      "evidence": [],
+      "remaining": "既有本地发放/成本逻辑仍需中央端到端核验：工资仅取 released 实际发放额一次，合同劳务仅取有效结算；重复命令、跨页汇总和更正后再核对。"
+    },
+    {
+      "id": "WAGE-10",
+      "label": "#301 AC5 / #354 AC2 有符号工资调整与冲销",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/354"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485"
+      ],
+      "status": "ready",
+      "evidence": [],
+      "remaining": "补差、扣回或纠错新增独立可追溯有符号记录，不能覆盖已发原单；调整/冲销的中央写入、关联原单、幂等并发及成本回读待实施。已定规则不重新 grill。"
+    },
+    {
+      "id": "WAGE-11",
+      "label": "#301 AC5 / #354 AC2/3 发放冻结、详情和调整历史",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/354"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485"
+      ],
+      "status": "partial",
+      "evidence": [],
+      "remaining": "既有本地发放保护不等于完整冻结验收；责任/数量/单价/金额/分配/来源版本/操作者快照、成本来源、调整历史、来源返回及并发仍需中央验证。"
+    },
+    {
+      "id": "WAGE-12",
+      "label": "#301 AC6 / #350–354 AC4–6 工资迁移、集成、指南和独立交付",
+      "sources": [
+        "https://github.com/zodea/crm-new/issues/301",
+        "https://github.com/zodea/crm-new/issues/350",
+        "https://github.com/zodea/crm-new/issues/351",
+        "https://github.com/zodea/crm-new/issues/352",
+        "https://github.com/zodea/crm-new/issues/353",
+        "https://github.com/zodea/crm-new/issues/354"
+      ],
+      "ownerIssue": 412,
+      "caseIds": [
+        "C-9C98D806E9B1",
+        "C-D8B07FE3B973",
+        "C-A7B5F1FDD485",
+        "C-5751CF6E9985",
+        "C-7C09C38C854D"
+      ],
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-433/payroll-verification.md",
+          "commit": "b2f1e2e578bc3db6524fd7bfd67886814fcc38b9",
+          "recency": "current-run",
+          "scope": "本地工资 B 三态只读、C1 来源呈现及工资/考勤/签工返回；不含中央写入、历史迁移或发放调整"
+        }
+      ],
+      "remaining": "#433 仅限定切片完成定向/全量、五档浏览器、双轴审查和指南/PDF；A/C1/C2 全链中央迁移、回归、跨模块更正及固定提交回执未完成。生产关口归 #416。"
     }
   ],
   "cases": [
@@ -37939,7 +38447,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-07",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-8F6F297836C8",
@@ -38227,7 +38740,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-07",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-5EFB66696086",
@@ -38275,7 +38793,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-07",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-06DBE0148814",
@@ -38323,7 +38846,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-07",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-5E6108A9FDEE",
@@ -38371,7 +38899,14 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-01",
+        "PRG-02",
+        "PRG-03",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-3AF3858116F6",
@@ -38659,7 +39194,14 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-01",
+        "PRG-02",
+        "PRG-03",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-FBDB2DAEB824",
@@ -38707,7 +39249,14 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-01",
+        "PRG-02",
+        "PRG-03",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-1E1857829B33",
@@ -38995,7 +39544,14 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-01",
+        "PRG-02",
+        "PRG-03",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10"
+      ]
     },
     {
       "id": "C-FE5343E53031",
@@ -40388,7 +40944,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "WAGE-04",
+        "WAGE-06",
+        "WAGE-07",
+        "WAGE-12"
+      ]
     },
     {
       "id": "C-DCBAB1F1BF84",
@@ -40436,7 +40997,12 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "WAGE-05",
+        "WAGE-06",
+        "WAGE-07",
+        "WAGE-12"
+      ]
     },
     {
       "id": "C-0CC3B378697C",
@@ -40484,7 +41050,20 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "WAGE-01",
+        "WAGE-02",
+        "WAGE-03",
+        "WAGE-04",
+        "WAGE-05",
+        "WAGE-06",
+        "WAGE-07",
+        "WAGE-08",
+        "WAGE-09",
+        "WAGE-10",
+        "WAGE-11",
+        "WAGE-12"
+      ]
     },
     {
       "id": "C-8A1CCC0B5A5C",
@@ -40772,7 +41351,20 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "WAGE-01",
+        "WAGE-02",
+        "WAGE-03",
+        "WAGE-04",
+        "WAGE-05",
+        "WAGE-06",
+        "WAGE-07",
+        "WAGE-08",
+        "WAGE-09",
+        "WAGE-10",
+        "WAGE-11",
+        "WAGE-12"
+      ]
     },
     {
       "id": "C-5F1F537F0978",
@@ -41060,7 +41652,20 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "WAGE-01",
+        "WAGE-02",
+        "WAGE-03",
+        "WAGE-04",
+        "WAGE-05",
+        "WAGE-06",
+        "WAGE-07",
+        "WAGE-08",
+        "WAGE-09",
+        "WAGE-10",
+        "WAGE-11",
+        "WAGE-12"
+      ]
     },
     {
       "id": "C-F2C5964D7A22",
@@ -41300,7 +41905,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-2FDD32560974",
@@ -41540,7 +42154,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-E41163CF744B",
@@ -42404,7 +43027,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-B1E14699EEE0",
@@ -43268,7 +43900,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-2922FE62112F",
@@ -43460,7 +44101,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-F24FDE6BF8EC",
@@ -43652,7 +44302,16 @@
       "remaining": [
         "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
       ],
-      "obligationIds": []
+      "obligationIds": [
+        "PRG-04",
+        "PRG-05",
+        "PRG-06",
+        "PRG-08",
+        "PRG-09",
+        "PRG-10",
+        "WAGE-03",
+        "WAGE-08"
+      ]
     },
     {
       "id": "C-A8D4F8B4FB94",

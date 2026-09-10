@@ -258,7 +258,7 @@ export function renderModuleReviewIndex(coverage) {
     '',
     '## 旧验收义务承接（已登记范围）',
     '',
-    `当前登记 ${coverage.obligations.length} 项，限定 OCR 设置、核心迁移、付款结算口径及因子工具。#431 只登记该范围，不代表全部历史任务已映射；剩余模块由 #415 继续补齐。输入为 scripts/module-review-obligations.mjs，JSON obligations 保存来源、唯一承接、适用 case ID、范围和固定证据提交，cases.obligationIds 提供反向索引。`,
+    `当前登记 ${coverage.obligations.length} 项，覆盖 OCR 设置、核心迁移、付款结算口径、因子工具，以及 #412 继承的排程/工程量/目标成本与工资条款。#431 的首批登记和后续补充均不代表全部历史任务已映射；剩余模块由 #415 继续补齐。输入为 scripts/module-review-obligations.mjs，JSON obligations 保存来源、唯一承接、适用 case ID、范围和固定证据提交，cases.obligationIds 提供反向索引。`,
     '',
     '义务的“本轮限定范围已验证”不提升所在页面、其他宿主或生产可用等级。历史评论和源码检查分别标记，不冒充本轮运行；状态为已定待实施的条目沿用有效决定，不重新提问。',
     '',
