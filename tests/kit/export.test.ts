@@ -12,6 +12,113 @@ describe('导出路径分流：chooseExportPath', () => {
 })
 
 describe('直接保存：exportFile', () => {
+  it('同步请求保存位置，选定后才读取慢速正文并写入相同字节', async () => {
+    const events: string[] = []
+    const data = new Uint8Array([37, 80, 68, 70])
+    const read = vi.fn(async () => {
+      events.push('read')
+      return data
+    })
+    const writeFile = vi.fn(async () => {
+      events.push('write')
+    })
+    let choose!: (value: any) => void
+    const pending = exportFile({ data: read, defaultName: '原件.pdf' }, {
+      pickDirectory: () => {
+        events.push('pick')
+        return new Promise((resolve) => {
+          choose = resolve
+        })
+      },
+      feedback: { during: task => task(), success: vi.fn(), failure: vi.fn() },
+    })
+    expect(events).toEqual(['pick'])
+    choose({ displayPath: '目标目录', supportsSubdirectories: true, writeFile })
+    await expect(pending).resolves.toEqual({ status: 'exported', displayPath: '目标目录' })
+    expect(events).toEqual(['pick', 'read', 'write'])
+    expect(writeFile).toHaveBeenCalledWith('原件.pdf', data, undefined)
+  })
+
+  it('取消保存位置时不读取惰性正文', async () => {
+    const read = vi.fn(async () => '原件')
+    await expect(exportFile({ data: read, defaultName: '原件.pdf' }, {
+      pickDirectory: async () => null,
+      feedback: { during: task => task(), success: vi.fn(), failure: vi.fn() },
+    })).resolves.toEqual({ status: 'cancelled' })
+    expect(read).not.toHaveBeenCalled()
+  })
+
+  it.each(['resolve', 'reject'])('读取正文期间取消后迟到 %s 不写盘、不触发失败反馈', async (outcome) => {
+    const controller = new AbortController()
+    const writeFile = vi.fn()
+    const success = vi.fn()
+    const failure = vi.fn()
+    let resolve!: (value: string) => void
+    let reject!: (error: Error) => void
+    const read = vi.fn(() => new Promise<string>((done, fail) => {
+      resolve = done
+      reject = fail
+    }))
+    const pending = exportFile({ data: read, defaultName: '原件.pdf', signal: controller.signal }, {
+      pickDirectory: async () => ({ displayPath: '目标目录', supportsSubdirectories: true, writeFile }),
+      feedback: { during: async (task) => {
+        try {
+          return await task()
+        }
+        catch (error) {
+          failure(error)
+          throw error
+        }
+      }, success, failure },
+    })
+    await Promise.resolve()
+    expect(read).toHaveBeenCalledOnce()
+    controller.abort()
+    if (outcome === 'resolve')
+      resolve('迟到正文')
+    else reject(new Error('迟到失败'))
+    await expect(pending).resolves.toEqual({ status: 'cancelled' })
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
+    expect(failure).not.toHaveBeenCalled()
+  })
+
+  it('惰性正文读取失败时由统一进度反馈报告且不创建文件', async () => {
+    const cause = new Error('中央正文校验失败')
+    const writeFile = vi.fn()
+    const success = vi.fn()
+    const during = vi.fn(async <T>(task: () => Promise<T>) => task())
+    await expect(exportFile({ data: async () => {
+      throw cause
+    }, defaultName: '原件.pdf' }, {
+      pickDirectory: async () => ({ displayPath: '目标目录', supportsSubdirectories: true, writeFile }),
+      feedback: { during, success, failure: vi.fn() },
+    })).rejects.toBe(cause)
+    expect(during).toHaveBeenCalledOnce()
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
+  })
+
+  it('等待目录期间来源已失效时静默取消，不写入旧原件', async () => {
+    const controller = new AbortController()
+    const writeFile = vi.fn()
+    const during = vi.fn(async <T>(task: () => Promise<T>) => await task())
+    const success = vi.fn()
+    const failure = vi.fn()
+    let choose!: (value: any) => void
+    const pending = exportFile({ data: '旧关系原件', defaultName: '原件.pdf', signal: controller.signal }, {
+      pickDirectory: () => new Promise((resolve) => { choose = resolve }),
+      feedback: { during, success, failure },
+    })
+    controller.abort()
+    choose({ displayPath: '目标目录', supportsSubdirectories: true, writeFile })
+    await expect(pending).resolves.toEqual({ status: 'cancelled' })
+    expect(writeFile).not.toHaveBeenCalled()
+    expect(during).not.toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
+    expect(failure).not.toHaveBeenCalled()
+  })
+
   it('用户取消目录选择时静默结束', async () => {
     const during = vi.fn()
     const success = vi.fn()

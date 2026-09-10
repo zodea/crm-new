@@ -204,7 +204,7 @@ export const SUBVIEWS = [
     ...['change', 'report', 'acceptance', 'warranty', 'final-settlement', 'penalty', 'project-penalty', 'sub-settlement', 'sub-change'].map(key => view(`journey/owner/${key}`, `'${key}'`, 'journey')),
     view('relations/suppliers', 'ProjectSupplierLinksPanel', 'subtable'),
   ]),
-  group({ route: '/project/:pid/supplier/:sid' }, 'app/components/project-supplier/ProjectSupplierWorkbench.vue', [...tabs(['overview', 'contract', 'claim', 'ticket', 'payment', 'settlement']), view('files', 'ProjectSupplierFilePanel', 'files')]),
+  group({ route: '/project/:pid/supplier/:sid' }, 'app/components/project-supplier/ProjectSupplierWorkbench.vue', [...tabs(['overview', 'contract', 'claim', 'ticket', 'payment', 'settlement']), view('files', 'ProjectSupplierFileAccess', 'files')]),
   group({ route: '/project/:pid/supplier/import' }, 'app/components/project-supplier/ProjectSupplierImportWizard.vue', ['files', 'classify', 'confirm'].map(key => view(`step/${key}`, `'${key}'`, 'wizard-step'))),
   group(contract('construction'), 'app/components/contract/ConstructionContractDetailScreen.vue', [
     ...tabs(['info', 'supplements', 'changes', 'settlements', 'invoices', 'receipts', 'acceptance']),

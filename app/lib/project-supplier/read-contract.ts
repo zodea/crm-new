@@ -7,6 +7,7 @@ import type {
   NavigationIntentDTO,
   ProblemDTO,
 } from '../../types/read-model'
+import type { ProjectSupplierFileRepository } from './file-content'
 
 export const PROJECT_SUPPLIER_READ_CAPABILITY = 'project-supplier:read' as const
 
@@ -24,7 +25,7 @@ export interface ProjectSupplierWorkbenchQueryDTO {
   includeDemo: boolean
 }
 
-export interface ProjectSupplierReadRepository {
+export interface ProjectSupplierReadRepository extends ProjectSupplierFileRepository {
   get: (query: ProjectSupplierWorkbenchQueryDTO) => Promise<ProjectSupplierWorkbenchReadDTO>
 }
 
@@ -144,6 +145,8 @@ export interface ProjectSupplierFileSourceRow {
   category: string
   uploader: string
   uploadedAt: ISODateTimeDTO
+  hasPayload?: boolean
+  sha256?: string | null
 }
 
 export interface ProjectSupplierContractDTO {
@@ -212,6 +215,7 @@ export interface ProjectSupplierFileDTO {
   category: string
   uploader: string
   uploadedAt: ISODateTimeDTO
+  content?: { state: 'available' | 'missing' | 'not-connected', sha256: string | null }
 }
 
 export interface ProjectSupplierWorkbenchReadDTO {

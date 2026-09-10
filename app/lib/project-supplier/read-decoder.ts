@@ -148,6 +148,9 @@ function file(value: unknown, origin: string): boolean {
     && fileNavigation(value.navigation, origin)
     && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0
     && isISODateTimeDTO(value.uploadedAt)
+    && (value.content === undefined || (object(value.content)
+      && ['available', 'missing', 'not-connected'].includes(String(value.content.state))
+      && (value.content.sha256 === null || (typeof value.content.sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.content.sha256)))))
 }
 
 function invalid(message: string): never {

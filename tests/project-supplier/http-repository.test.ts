@@ -1,6 +1,8 @@
 import type {
   ProjectSupplierRepositoryProblem,
 } from '~/lib/project-supplier/repository'
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import {
   buildProjectSupplierWorkbenchRead,
@@ -41,6 +43,33 @@ function validRead() {
 }
 
 describe('项目×分供方 HTTP Repository', () => {
+  it('原件按编码后的文件与双父身份读取，解码真实字节并传递取消与超时边界', async () => {
+    const query = { projectId: 'project/1', supplierId: 'supplier/1', fileId: 'file/1', relationId: 'relation-1', ownerType: 'project_supplier', ownerId: 'relation-1', origin: 'real' as const, includeDemo: false }
+    const bytes = Buffer.from('中央原件')
+    const fetcher = vi.fn().mockResolvedValue({
+      ...query,
+      dataOrigin: 'real',
+      state: 'available',
+      fileName: '原件.txt',
+      mimeType: 'text/plain',
+      fileSize: bytes.byteLength,
+      sourceVersion: 'current:1',
+      payloadBase64: bytes.toString('base64'),
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    })
+    const controller = new AbortController()
+    const repository = createHttpProjectSupplierReadRepository({ fetcher })
+    const result = await repository.getContent(query, { signal: controller.signal })
+    expect(result).toMatchObject({ state: 'available', bytes: new Uint8Array(bytes) })
+    expect(fetcher).toHaveBeenCalledWith('/api/read/project-suppliers/project%2F1/supplier%2F1/files/file%2F1', {
+      query: { origin: 'real', relationId: 'relation-1', ownerType: 'project_supplier', ownerId: 'relation-1' },
+      signal: controller.signal,
+      timeout: 30_000,
+    })
+    controller.abort()
+    await expect(repository.getContent(query, { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
   it('只通过编码后的双父 ID 端点读取并解码中央 DTO', async () => {
     const fetcher = vi.fn().mockResolvedValue(validRead())
     const repository = createHttpProjectSupplierReadRepository({ fetcher })

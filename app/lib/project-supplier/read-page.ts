@@ -250,6 +250,12 @@ export function buildProjectSupplierWorkbenchRead(
         category: row.category,
         uploader: row.uploader,
         uploadedAt: row.uploadedAt,
+        content: {
+          state: row.ownerType !== 'project_supplier' || row.ownerId !== relation.id
+            ? 'not-connected' as const
+            : row.hasPayload ? 'available' as const : 'missing' as const,
+          sha256: row.sha256 ?? null,
+        },
       }
     })
 

@@ -50,6 +50,7 @@ function dateTime(value: string): string {
     </button>
 
     <div v-if="expanded" id="supplier-workbench-file-content">
+      <slot name="toolbar" />
       <div v-if="groups.length === 0" class="bg-surface-2 px-4 py-7 text-center text-12px text-ink-faint">
         暂无来自合同、付款申请、支付或结算的附件
       </div>
@@ -67,6 +68,7 @@ function dateTime(value: string): string {
             >
               <div class="min-w-0">
                 <div class="flex items-center gap-1.5">
+                  <slot name="selection" :file="file" />
                   <span class="i-lucide-file-text flex-none text-13px text-ink-faint" aria-hidden="true" />
                   <span class="truncate text-12px font-700 text-ink" :title="file.file.label">
                     {{ file.file.label || '未命名附件' }}
@@ -78,7 +80,9 @@ function dateTime(value: string): string {
                 </p>
               </div>
               <div class="flex items-center justify-end text-10px text-ink-faint">
-                中央只读元数据
+                <slot name="actions" :file="file">
+                  中央只读元数据
+                </slot>
               </div>
             </div>
           </div>

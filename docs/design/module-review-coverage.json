@@ -14365,7 +14365,7 @@
         },
         {
           "path": "app/components/project-supplier/ProjectSupplierWorkbench.vue",
-          "anchor": "ProjectSupplierFilePanel"
+          "anchor": "ProjectSupplierFileAccess"
         }
       ],
       "issueNumbers": [
