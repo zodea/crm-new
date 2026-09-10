@@ -6,6 +6,7 @@ import type {
 } from '~/lib/customer/repository'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { ProblemDTO } from '~/types/read-model'
+import { financeStatusLabel } from '~/lib/finance/status'
 import CustomerRelationLink from './CustomerRelationLink.vue'
 
 export type CustomerRelationTab = 'projects' | 'contracts' | 'receipts'
@@ -15,6 +16,7 @@ defineProps<{
   projects: readonly CustomerProjectDTO[]
   projectsProblem?: ProblemDTO
   contractsProblem?: ProblemDTO
+  receiptsProblem?: ProblemDTO
   restoreScrollLeft?: number
   contracts: readonly CustomerContractDTO[]
   receipts: readonly CustomerReceiptDTO[]
@@ -23,7 +25,7 @@ defineProps<{
   returnContext?: string
 }>()
 
-defineEmits<{ retryProjects: [], retryContracts: [], viewRestored: [] }>()
+defineEmits<{ retryProjects: [], retryContracts: [], retryReceipts: [], viewRestored: [] }>()
 
 const projectColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', fixed: 'left' },
@@ -123,6 +125,14 @@ const receiptColumns: KitTableColumn[] = [
       </template>
     </KitTable>
 
+    <StatePanel
+      v-else-if="receiptsProblem"
+      :kind="receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'"
+      :title="receiptsProblem.code === 'forbidden' ? '无权查看收款明细' : '收款明细加载失败'"
+      :description="receiptsProblem.message"
+      :action-label="receiptsProblem.retryable ? '重新加载收款明细' : ''"
+      @action="$emit('retryReceipts')"
+    />
     <KitTable
       v-else
       :columns="receiptColumns"
@@ -147,7 +157,9 @@ const receiptColumns: KitTableColumn[] = [
         <CustomerRelationLink :reference="row.contract" :navigation="row.contractNavigation" />
       </template>
       <template #status="{ row }">
-        <span :class="row.isDraft ? 'chip chip-warn' : 'chip chip-ok'">{{ row.status || '—' }}</span>
+        <KitStatusTag :tone="row.isDraft ? 'warn' : 'brand'">
+          {{ financeStatusLabel(row.status) }}
+        </KitStatusTag>
       </template>
     </KitTable>
   </section>

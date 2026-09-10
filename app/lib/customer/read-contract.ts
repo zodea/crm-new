@@ -136,8 +136,8 @@ export interface CustomerProjectDTO {
   manager: string
   contractCount: number | null
   effectiveContractAmount: MoneyDTO | null
-  receiptCount: number
-  effectiveReceiptAmount: MoneyDTO
+  receiptCount: number | null
+  effectiveReceiptAmount: MoneyDTO | null
 }
 
 export interface CustomerContractDTO {
@@ -146,8 +146,8 @@ export interface CustomerContractDTO {
   project: EntityRefDTO & { entity: 'project' }
   projectNavigation: NavigationIntentDTO
   effectiveAmount: MoneyDTO
-  receiptAmount: MoneyDTO
-  outstandingAmount: MoneyDTO
+  receiptAmount: MoneyDTO | null
+  outstandingAmount: MoneyDTO | null
   signDate: ISODateDTO | null
   status: string
   isDraft: boolean
@@ -183,13 +183,14 @@ export interface CustomerDetailSummaryDTO {
   projectCount: number | null
   contractCount: number | null
   effectiveContractAmount: MoneyDTO | null
-  receiptCount: number
-  effectiveReceiptAmount: MoneyDTO
+  receiptCount: number | null
+  effectiveReceiptAmount: MoneyDTO | null
   outstandingAmount: MoneyDTO | null
-  draftReceiptCount: number
+  draftReceiptCount: number | null
 }
 
 export interface CustomerDetailReadDTO {
+  receiptsProblem?: ProblemDTO
   contractsProblem?: ProblemDTO
   projectsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO

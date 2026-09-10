@@ -29,6 +29,7 @@ interface BuildCustomerListPageOptions {
 }
 
 interface BuildCustomerDetailReadOptions {
+  receiptsProblem?: ProblemDTO
   contractsProblem?: ProblemDTO
   projectsProblem?: ProblemDTO
   customers: readonly CustomerListSourceRow[]
@@ -321,10 +322,12 @@ export function buildCustomerDetailRead(
         row.dataOrigin === customer.dataOrigin
         && row.customerId === customer.id,
       )
-  const receiptRows = options.receipts.filter(row =>
-    row.dataOrigin === customer.dataOrigin
-    && row.customerId === customer.id,
-  )
+  const receiptRows = options.receiptsProblem
+    ? []
+    : options.receipts.filter(row =>
+        row.dataOrigin === customer.dataOrigin
+        && row.customerId === customer.id,
+      )
   const projectLabels = new Map(originProjects.map(row => [row.id, row.name]))
   const forbiddenProjects = new Set(
     originProjects.filter(row => row.permission === 'forbidden').map(row => row.id),
@@ -370,8 +373,8 @@ export function buildCustomerDetailRead(
       manager: row.manager,
       contractCount: options.contractsProblem ? null : contractFact.count,
       effectiveContractAmount: options.contractsProblem ? null : money(contractFact.amount),
-      receiptCount: receiptFact.count,
-      effectiveReceiptAmount: money(receiptFact.amount),
+      receiptCount: options.receiptsProblem ? null : receiptFact.count,
+      effectiveReceiptAmount: options.receiptsProblem ? null : money(receiptFact.amount),
     }
   })
 
@@ -394,8 +397,8 @@ export function buildCustomerDetailRead(
       project: project.ref as CustomerContractDTO['project'],
       projectNavigation: project.navigation,
       effectiveAmount: money(effectiveAmount),
-      receiptAmount: money(row.receiptAmount),
-      outstandingAmount: money(effectiveAmount - row.receiptAmount),
+      receiptAmount: options.receiptsProblem ? null : money(row.receiptAmount),
+      outstandingAmount: options.receiptsProblem ? null : money(effectiveAmount - row.receiptAmount),
       signDate: row.signDate,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -451,6 +454,7 @@ export function buildCustomerDetailRead(
     customer: { ...customer, aliases: [...customer.aliases] },
     ...(options.projectsProblem ? { projectsProblem: options.projectsProblem } : {}),
     ...(options.contractsProblem ? { contractsProblem: options.contractsProblem } : {}),
+    ...(options.receiptsProblem ? { receiptsProblem: options.receiptsProblem } : {}),
     projects,
     contracts,
     receipts,
@@ -458,10 +462,10 @@ export function buildCustomerDetailRead(
       projectCount: options.projectsProblem ? null : projects.length,
       contractCount: options.contractsProblem ? null : contracts.length,
       effectiveContractAmount: options.contractsProblem ? null : money(effectiveContractAmount),
-      receiptCount: receipts.length,
-      effectiveReceiptAmount: money(effectiveReceiptAmount),
-      outstandingAmount: options.contractsProblem ? null : money(effectiveContractAmount - effectiveReceiptAmount),
-      draftReceiptCount: receipts.filter(row => row.isDraft).length,
+      receiptCount: options.receiptsProblem ? null : receipts.length,
+      effectiveReceiptAmount: options.receiptsProblem ? null : money(effectiveReceiptAmount),
+      outstandingAmount: options.contractsProblem || options.receiptsProblem ? null : money(effectiveContractAmount - effectiveReceiptAmount),
+      draftReceiptCount: options.receiptsProblem ? null : receipts.filter(row => row.isDraft).length,
     },
     asOf: options.asOf,
     sourceVersion: options.sourceVersion,

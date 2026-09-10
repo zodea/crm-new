@@ -86,7 +86,7 @@ const editTo = computed(() => {
 const tabs = computed(() => [
   { key: 'projects', label: '名下项目', count: detail.value?.projectsProblem ? undefined : detail.value?.projects.length ?? 0 },
   { key: 'contracts', label: '施工合同', count: detail.value?.contractsProblem ? undefined : detail.value?.contracts.length ?? 0 },
-  { key: 'receipts', label: '收款明细', count: detail.value?.receipts.length ?? 0 },
+  { key: 'receipts', label: '收款明细', count: detail.value?.receiptsProblem ? undefined : detail.value?.receipts.length ?? 0 },
 ])
 
 useTabTitle(() => customer.value?.name)
@@ -158,7 +158,7 @@ onActivated(() => void load())
         <Metric label="名下项目" :value="detail.summary.projectCount === null ? '—' : `${detail.summary.projectCount} 个`" />
         <Metric label="施工合同" :value="detail.summary.contractCount === null ? '—' : `${detail.summary.contractCount} 份`" />
         <Metric label="有效合同额" :value="detail.summary.effectiveContractAmount === null ? '—' : yuan(detail.summary.effectiveContractAmount)" />
-        <Metric label="有效收款" :value="yuan(detail.summary.effectiveReceiptAmount)" />
+        <Metric label="有效收款" :value="detail.summary.effectiveReceiptAmount === null ? '—' : yuan(detail.summary.effectiveReceiptAmount)" />
         <Metric label="待收差额" :value="detail.summary.outstandingAmount === null ? '—' : yuan(detail.summary.outstandingAmount)" />
       </MetricGrid>
     </template>
@@ -188,6 +188,7 @@ onActivated(() => void load())
             :projects="detail.projects"
             :projects-problem="detail.projectsProblem"
             :contracts-problem="detail.contractsProblem"
+            :receipts-problem="detail.receiptsProblem"
             :restore-scroll-left="relationReturnContext?.scrollLeft"
             :contracts="detail.contracts"
             :receipts="detail.receipts"
@@ -196,6 +197,7 @@ onActivated(() => void load())
             :return-context="returnContext"
             @retry-projects="load"
             @retry-contracts="load"
+            @retry-receipts="load"
             @view-restored="restoreRelationContext"
           />
         </div>

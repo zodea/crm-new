@@ -19,12 +19,12 @@ import {
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
-import { ownerFinalSettlementReceiptIsActive } from '../../app/lib/owner-document/central-repository'
+import { OwnerCommercialDocumentRepositoryProblem } from '../../app/lib/owner-document/central-repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { customerConstructionContractFacts } from './customer-construction-contract-facts'
+import { customerReceiptFacts } from './customer-receipt-facts'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
-import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from './owner-commercial-document-fixtures'
 
 export type CustomerReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 
@@ -121,23 +121,6 @@ const demoReceipts: CustomerReceiptSourceRow[] = receiptsSeed.map(receipt => ({
   receiptDate: receipt.receipt_date || null,
   status: receipt.status,
 }))
-const formalFinalSettlementReceipts: CustomerReceiptSourceRow[] = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS
-  .filter(document => document.kind === 'final_settlement' && document.customerId)
-  .flatMap(document => (document.finalSettlementEvidence?.receipts ?? [])
-    .filter(receipt => ownerFinalSettlementReceiptIsActive(receipt.status))
-    .map(receipt => ({
-      dataOrigin: 'real' as const,
-      id: receipt.id,
-      no: receipt.no,
-      customerId: document.customerId!,
-      projectId: document.projectId,
-      contractId: document.contractId,
-      payerAccount: document.customerName,
-      amount: receipt.amount,
-      paymentMethod: '',
-      receiptDate: receipt.date,
-      status: receipt.status,
-    })))
 
 function problem(code: 'forbidden' | 'unavailable', message: string, retryable = false) {
   return new CustomerRepositoryProblem({
@@ -183,7 +166,7 @@ export function createCustomerReadTestInstance(
       customers,
       projects: scenario === 'ready' ? demoProjects : [],
       contracts: [] as CustomerContractSourceRow[],
-      receipts: scenario === 'ready' ? [...formalFinalSettlementReceipts, ...demoReceipts] : [],
+      receipts: scenario === 'ready' ? demoReceipts : [],
       sourceVersion: `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
         migrationSnapshot.authority === 'central'
           ? migrationSnapshot.activeBatchId ?? 'migration-central'
@@ -196,12 +179,13 @@ export function createCustomerReadTestInstance(
     const data = context(sessionId)
     let projectsProblem: ProblemDTO | undefined
     let contractsProblem: ProblemDTO | undefined
+    let receiptsProblem: ProblemDTO | undefined
     let projects: readonly CustomerProjectSourceRow[] = []
     let contracts: readonly CustomerContractSourceRow[] = []
     let asOf = FIXED_AS_OF
     let sourceVersion = data.sourceVersion
     if ((scenarios.get(keyFor(sessionId)) ?? 'ready') !== 'ready')
-      return { ...data, asOf: FIXED_AS_OF }
+      return { ...data, projectsProblem, contractsProblem, receiptsProblem, asOf: FIXED_AS_OF }
     try {
       const source = await resolveProjectFacts(sessionId)
       projects = source.rows
@@ -228,7 +212,21 @@ export function createCustomerReadTestInstance(
       }
       contractsProblem = cause.problem
     }
-    return { ...data, projects, contracts, projectsProblem, contractsProblem, asOf, sourceVersion }
+    let receipts: readonly CustomerReceiptSourceRow[] = []
+    try {
+      const source = customerReceiptFacts(sessionId)
+      receipts = [...source.rows, ...data.receipts]
+      asOf = source.asOf > asOf ? source.asOf : asOf
+      sourceVersion += `:${source.sourceVersion}`
+    }
+    catch (cause) {
+      if (!(cause instanceof OwnerCommercialDocumentRepositoryProblem)
+        || !['forbidden', 'unavailable'].includes(cause.problem.code)) {
+        throw cause
+      }
+      receiptsProblem = cause.problem
+    }
+    return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf, sourceVersion }
   }
 
   return {
@@ -269,6 +267,8 @@ export function createCustomerReadTestInstance(
         throw problem('forbidden', '无测试数据查看权限')
       if (query.origin === 'demo' && !query.includeDemo)
         throw problem('forbidden', '测试收款未授权显示')
+      if (data.receiptsProblem)
+        throw new CustomerRepositoryProblem(data.receiptsProblem)
       const source = data.receipts.find(row => row.id === id && row.dataOrigin === query.origin)
       if (!source) {
         const sameId = data.receipts.some(row => row.id === id)
@@ -289,7 +289,7 @@ export function createCustomerReadTestInstance(
           origin: query.origin,
           includeDemo: String(query.includeDemo),
         }),
-        asOf: FIXED_AS_OF,
+        asOf: data.asOf,
       })
       const receipt = customerDetail.receipts.find(item => item.receipt.id === id)
       if (!receipt)
@@ -312,7 +312,7 @@ export function createCustomerReadTestInstance(
           view: null,
           filters: { dataOrigin: query.origin },
         },
-        asOf: FIXED_AS_OF,
+        asOf: data.asOf,
         sourceVersion: data.sourceVersion,
         capabilities: data.capabilities,
       }

@@ -70,6 +70,9 @@ export function createOwnerCommercialDocumentReadTestInstance(
   }
 
   return {
+    facts(kind: string, sessionId?: string | null) {
+      return { ...context(kind, sessionId), asOf: FIXED_AS_OF }
+    },
     reset(scenario: OwnerCommercialDocumentReadTestScenario, sessionId?: string | null) {
       if (scenario === 'ready')
         scenarios.delete(keyFor(sessionId))

@@ -2,6 +2,7 @@
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, watch } from 'vue'
 import { loadCustomerReturnOrigin, resolveCustomerReturnContext } from '~/lib/customer/return-context'
+import { financeStatusLabel } from '~/lib/finance/status'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { yuan } from '~/lib/util/money'
 import { useCustomerReadStore } from '~/stores/customer-read'
@@ -87,9 +88,9 @@ watch(() => [props.receiptId, props.customerId, props.origin, props.includeDemo]
   >
     <template #status>
       <span v-if="detail" class="chip">{{ detail.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}</span>
-      <span v-if="detail" :class="detail.receipt.isDraft ? 'chip chip-warn' : 'chip chip-ok'">
-        {{ detail.receipt.status || '未登记' }}
-      </span>
+      <KitStatusTag v-if="detail" :tone="detail.receipt.isDraft ? 'warn' : 'brand'">
+        {{ financeStatusLabel(detail.receipt.status) }}
+      </KitStatusTag>
     </template>
     <template #summary>
       <MetricGrid v-if="detail" :cols="3">

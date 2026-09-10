@@ -190,6 +190,46 @@ describe('客户详情业务页签', () => {
     }
   })
 
+  it.each(['forbidden', 'unavailable'] as const)('收款源 %s 显示未知与独立反馈，重试继续读取同一客户', async (code) => {
+    route.query = { tab: 'receipts' }
+    customerStoreMock.detailState = {
+      kind: 'ready',
+      data: {
+        ...detail,
+        receipts: [],
+        receiptsProblem: { code, message: '收款来源不可读', retryable: code === 'unavailable', fieldErrors: {}, traceId: null },
+        summary: { ...detail.summary, receiptCount: null, effectiveReceiptAmount: null, outstandingAmount: null, draftReceiptCount: null },
+      },
+    }
+    render(CustomerDetailScreen, {
+      props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
+      global: { components: {
+        EntityDetailShell: EntityDetailShellStub,
+        SegTab: SegTabStub,
+        StatePanel,
+        CustomerDetailRelations,
+        CustomerDetailOverview: defineComponent({ template: '<section />' }),
+        KitTable: defineComponent({ template: '<section data-testid="receipt-table">暂无收款记录</section>' }),
+        MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
+        Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
+        NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
+      } },
+    })
+    expect(screen.getByRole('tab', { name: '收款明细' })).not.toBeNull()
+    expect(screen.getByText('有效收款：—')).not.toBeNull()
+    expect(screen.getByText('待收差额：—')).not.toBeNull()
+    expect(screen.queryByTestId('receipt-table')).toBeNull()
+    expect(screen.getByRole(code === 'forbidden' ? 'status' : 'alert', { name: code === 'forbidden' ? '无权查看收款明细' : '收款明细加载失败' })).not.toBeNull()
+    if (code === 'unavailable') {
+      customerStoreMock.loadDetail.mockClear()
+      await fireEvent.click(screen.getByRole('button', { name: '重新加载收款明细' }))
+      expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: 'customer-1', origin: 'real', includeDemo: false })
+    }
+    else {
+      expect(screen.queryByRole('button', { name: '重新加载收款明细' })).toBeNull()
+    }
+  })
+
   it('从 query 恢复页签，展示真实数量并在切换时保留其他 query', async () => {
     route.query = { tab: 'contracts', from: 'list' }
     render(CustomerDetailScreen, {
