@@ -8,6 +8,7 @@ const router = useRouter()
 // 外壳跟随已确认的导航。Nuxt useRoute 要等页面挂载才同步，启动恢复时仍可能是旧写态地址。
 const route = computed(() => router.currentRoute.value)
 const tabsStore = useTabsStore()
+const { openStoredTab } = useTabNavigation()
 const kit = useKitUI()
 const { hasActiveModal } = useOverlayStack()
 const ownedLayerStyle = useOwnedOverlayLayerStyle()
@@ -57,7 +58,7 @@ watch(
     if (blocked) {
       kit.warning(`页签已达上限 ${MAX_TABS} 个`, '请先关闭不需要的页签')
       if (tabsStore.activeFullPath !== fullPath)
-        router.replace(tabsStore.activeFullPath)
+        void openStoredTab(tabsStore.activeFullPath, { replace: true })
     }
   },
   { immediate: true },
@@ -74,14 +75,14 @@ watch(
 
 function goTab(fullPath: string, key: string) {
   if (key !== tabsStore.activeKey)
-    router.push(fullPath)
+    void openStoredTab(fullPath)
 }
 
 async function closeAndFollow(key: string) {
   if (!await tabsStore.requestClose(key))
     return
   if (tabsStore.activeFullPath !== route.value.fullPath)
-    router.push(tabsStore.activeFullPath)
+    void openStoredTab(tabsStore.activeFullPath)
 }
 
 function refreshCurrent() {
@@ -192,7 +193,7 @@ async function act(action: () => Promise<boolean>) {
   if (!await pending)
     return
   if (tabsStore.activeFullPath !== route.value.fullPath)
-    router.push(tabsStore.activeFullPath)
+    void openStoredTab(tabsStore.activeFullPath)
 }
 
 useEventListener('click', () => closeMenu())

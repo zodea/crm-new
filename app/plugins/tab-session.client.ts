@@ -28,9 +28,10 @@ export default defineNuxtPlugin({
             capabilities: () => context.capabilities,
           }),
         })
-        router.beforeEach(async (to) => {
-          const path = await session.beforeNavigation(to.fullPath)
-          return path === null ? false : path === to.fullPath ? true : { path, replace: true }
+        router.beforeEach(() => session.cancel())
+        router.afterEach((to, _from, failure) => {
+          if (!failure)
+            session.navigationSucceeded(to.fullPath)
         })
         const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
         const target = await session.startupPath(initialPath, navigation?.type === 'reload')

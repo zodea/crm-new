@@ -139,7 +139,7 @@ export const useTabSessionStore = defineStore('tab-session', () => {
     }
   }
 
-  async function beforeNavigation(fullPath: string): Promise<string | null> {
+  async function restorePath(fullPath: string): Promise<string | null> {
     cancel()
     const key = deriveKey(fullPath)
     if (!snapshot || !pending.has(key))
@@ -160,12 +160,29 @@ export const useTabSessionStore = defineStore('tab-session', () => {
     return resolve(key)
   }
 
+  function navigationSucceeded(fullPath: string) {
+    const key = deriveKey(fullPath)
+    if (!snapshot || !pending.delete(key))
+      return
+    // 新业务入口已经完成导航；旧恢复事实不能继续占有这个页面身份。
+    // 路由成功不代表业务读取已获授权，也不提供当前数据版本。
+    const current = inspectRestorableTabPath(fullPath)
+    snapshot = {
+      ...snapshot,
+      tabs: snapshot.tabs.map(tab => tab.key === key
+        ? { ...tab, ...current, sourceVersion: null, targetVersion: TAB_TARGET_VERSION }
+        : tab),
+    }
+    problems.value = problems.value.filter(problem => problem.key !== key)
+    persist()
+  }
+
   async function startupPath(fullPath: string, browserReload: boolean): Promise<string | null> {
     if (!snapshot)
       return fullPath
     if (fullPath === '/' || (browserReload && !inspectRestorableTabPath(fullPath)))
       return resolve(snapshot.activeKey)
-    return beforeNavigation(fullPath)
+    return browserReload ? restorePath(fullPath) : fullPath
   }
 
   function finishStartup(fullPath: string) {
@@ -182,6 +199,7 @@ export const useTabSessionStore = defineStore('tab-session', () => {
       tabs.open({ fullPath, title: routeTitle(fullPath.split('?')[0]!) || '未命名' })
     })
     ready = true
+    navigationSucceeded(fullPath)
     persist()
   }
 
@@ -198,5 +216,5 @@ export const useTabSessionStore = defineStore('tab-session', () => {
   }
 
   onScopeDispose(dispose)
-  return { problems, diagnostics, loadingKey, storageProblem, initialize, startupPath, finishStartup, beforeNavigation, cancel, dispose, dismissDiagnostics, unavailable, dismissStorageProblem }
+  return { problems, diagnostics, loadingKey, storageProblem, initialize, startupPath, finishStartup, restorePath, navigationSucceeded, cancel, dispose, dismissDiagnostics, unavailable, dismissStorageProblem }
 })

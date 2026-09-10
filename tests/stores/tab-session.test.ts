@@ -51,9 +51,9 @@ describe('浏览器页签恢复接线', () => {
     session.finishStartup(path!)
     expect(validate.mock.calls.map(([tab]) => tab.key)).toEqual(['/base/supplier'])
     expect(stored().tabs.find(tab => tab.key === '/base/supplier')?.sourceVersion).toBe('v2')
-    expect(await session.beforeNavigation('/project')).toBe('/project')
+    expect(await session.restorePath('/project')).toBe('/project')
     expect(validate.mock.calls.map(([tab]) => tab.key)).toEqual(['/base/supplier', '/project'])
-    expect(await session.beforeNavigation('/base/supplier')).toBe('/base/supplier')
+    expect(await session.restorePath('/base/supplier')).toBe('/base/supplier')
     expect(validate).toHaveBeenCalledTimes(2)
   })
 
@@ -95,9 +95,9 @@ describe('浏览器页签恢复接线', () => {
       resolve = done
     }))
     session.finishStartup('/')
-    const request = session.beforeNavigation('/project')
+    const request = session.restorePath('/project')
     tabs.close('/project')
-    expect(await session.beforeNavigation('/base/customer')).toBe('/base/customer')
+    session.cancel()
     resolve({ state: 'resolved', title: '迟到项目', fullPath: '/project', sourceVersion: 'v2' })
     expect(await request).toBeNull()
     expect(tabs.tabs.some(tab => tab.key === '/project')).toBe(false)

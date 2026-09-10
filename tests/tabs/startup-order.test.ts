@@ -22,7 +22,8 @@ describe('nuxt 初始导航与页签恢复顺序', () => {
     }]
     const session = {
       initialize: vi.fn(() => events.push('session-initialize')),
-      beforeNavigation: vi.fn(async (path: string) => path),
+      cancel: vi.fn(),
+      navigationSucceeded: vi.fn(),
       startupPath: vi.fn(async () => '/project'),
       finishStartup: vi.fn(() => events.push('session-ready')),
       dispose: vi.fn(),

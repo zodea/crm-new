@@ -1,11 +1,11 @@
 <script setup lang="ts">
 const session = useTabSessionStore()
 const tabs = useTabsStore()
-const router = useRouter()
+const { openStoredTab } = useTabNavigation()
 
 async function close(key: string) {
   if (await tabs.requestClose(key))
-    await router.push(tabs.activeFullPath)
+    await openStoredTab(tabs.activeFullPath)
 }
 </script>
 
@@ -32,7 +32,7 @@ async function close(key: string) {
     </div>
     <div v-for="problem in session.problems" :key="problem.key" class="flex flex-wrap items-center gap-2 py-1" role="alert">
       <span class="min-w-0 flex-1">{{ problem.title }}：{{ problem.message }}</span>
-      <KitButton variant="secondary" size="sm" :disabled="!!session.loadingKey" @click="router.push(problem.fullPath)">
+      <KitButton variant="secondary" size="sm" :disabled="!!session.loadingKey" @click="openStoredTab(problem.fullPath)">
         重试恢复
       </KitButton>
       <KitButton variant="ghost" size="sm" @click="close(problem.key)">
