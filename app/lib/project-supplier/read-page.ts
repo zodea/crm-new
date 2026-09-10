@@ -14,6 +14,7 @@ import type {
   ProjectSupplierWorkbenchReadDTO,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { isConfirmedExpenditureSettlement, isEffectiveExpenditureContract } from '../contract/effective-status'
 import { round2 } from '../util/number'
 import {
   PROJECT_SUPPLIER_READ_CAPABILITY,
@@ -95,10 +96,6 @@ function settlementVariant(type: string): string {
 
 function approved(status: string): boolean {
   return ['approved', '已审批', '已批复'].includes(status)
-}
-
-function confirmed(status: string): boolean {
-  return ['confirmed', 'approved', '已确认', '已审批'].includes(status)
 }
 
 function sourceOwnerNavigation(
@@ -256,14 +253,14 @@ export function buildProjectSupplierWorkbenchRead(
       }
     })
 
-  const formalContracts = contracts.filter(row => !['draft', '草稿'].includes(row.status))
+  const formalContracts = contracts.filter(row => isEffectiveExpenditureContract(row.status))
   const contractTotal = formalContracts.reduce((total, row) => total + Number(row.effectiveAmount), 0)
   const claimedTotal = claims.filter(row => approved(row.status)).reduce((total, row) => total + Number(row.approvedAmount), 0)
   const archivedInvoices = invoices.filter(row => row.accountStatus === 'archived')
   const invoiceTotal = archivedInvoices.reduce((total, row) => total + Number(row.totalAmount), 0)
   const taxTotal = archivedInvoices.reduce((total, row) => total + Number(row.taxAmount), 0)
   const paidTotal = payments.filter(row => row.confirmationStatus === 'confirmed').reduce((total, row) => total + Number(row.allocatedAmount), 0)
-  const settlementTotal = settlements.filter(row => confirmed(row.status)).reduce((total, row) => total + Number(row.totalAmount), 0)
+  const settlementTotal = settlements.filter(row => isConfirmedExpenditureSettlement(row.status)).reduce((total, row) => total + Number(row.totalAmount), 0)
   const projectRef = resolvedRef('project', project.id, project.name, null)
   const supplierRef = resolvedRef('supplier', supplier.id, supplier.name, null)
 

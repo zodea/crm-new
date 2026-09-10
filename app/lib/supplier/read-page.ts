@@ -17,6 +17,7 @@ import type {
   SupplierSettlementSourceRow,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { isConfirmedExpenditureSettlement as confirmedSettlement, isEffectiveExpenditureContract as effectiveContract } from '../contract/effective-status'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
@@ -204,14 +205,6 @@ function contractSourceNavigation(reference: EntityRefDTO, contracts: readonly S
 
 function sumKnown(values: readonly (number | null)[]): number | null {
   return values.includes(null) ? null : round2(values.reduce<number>((sum, value) => sum + value!, 0))
-}
-
-function effectiveContract(status: string): boolean {
-  return !['draft', '草稿', '无效', '作废', 'cancelled'].includes(status)
-}
-
-function confirmedSettlement(status: string): boolean {
-  return ['confirmed', '已确认'].includes(status)
 }
 
 function paymentBySupplier(input: BuildSupplierListPageInput): Map<string, number> {

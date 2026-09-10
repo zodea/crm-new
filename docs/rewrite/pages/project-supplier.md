@@ -34,11 +34,11 @@
 
 | 工作台内容 | 唯一事实来源 | 汇总口径 |
 | --- | --- | --- |
-| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 非草稿支出合同 `amount` + 该合同非草稿补充协议 `amount`；不得读取迁移兼容列 `contracts.changed/paid` |
+| 合同 | `contracts` + `contract_supplements` | 有效合同额 = 有效支出合同 `amount` + 该合同有效补充协议 `amount`；草稿、作废和无效合同不计入汇总，明细仍保留；不得读取迁移兼容列 `contracts.changed/paid` |
 | 请款 | `payment_applications` | 只把有效审批态的 `approved_amount` 计入已批请款；列表保留草稿、提交中等状态供追溯 |
 | 收票 | `invoices` | 列表按项目和分供方关联；汇总只计 `account_status='archived'` 的 `total_amount` 与 `tax_amount` |
 | 付款 | `payment_records` + `payment_record_application_allocations` + `payment_applications` | 只计已确认支付，并按分摊到当前项目×分供方付款申请的 `allocated_amount` 归属；不得把整张回单金额或手写实付副本直接归入 |
-| 支出结算 | `expenditure_settlements` | 只计有效确认态的 `total_amount`，保留合同、分供方和项目外键 |
+| 支出结算 | `expenditure_settlements` | 只计有效确认态 `confirmed/已确认` 的 `total_amount`，仅审批通过不等于确认；保留合同、分供方和项目外键 |
 | 合作文件 | `file_refs` | 按真实 owner 分组；向导导入文件固定挂 `owner_type='project_supplier'` |
 
 ### 实时摘要

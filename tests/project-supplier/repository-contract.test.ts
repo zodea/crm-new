@@ -109,6 +109,31 @@ function source() {
 }
 
 describe('项目×分供方中央 Repository 契约', () => {
+  it('无效合同和未确认结算保留追溯行，但不抬高有效汇总', () => {
+    const facts = source()
+    facts.contracts = ['draft', '草稿', 'cancelled', '作废', '无效', 'approved'].map((status, index) => ({
+      ...facts.contracts[0],
+      id: `contract-${index}`,
+      status,
+    }))
+    facts.settlements = ['approved', '已审批', 'draft', 'confirmed', '已确认'].map((status, index) => ({
+      ...facts.settlements[0],
+      id: `settlement-${index}`,
+      status,
+    }))
+    const detail = buildProjectSupplierWorkbenchRead({
+      ...facts,
+      query: parseProjectSupplierWorkbenchQuery('project-1', 'supplier-1', { origin: 'demo', includeDemo: 'true' }),
+      asOf,
+      sourceVersion: 'fixture-v1',
+      capabilities: ['project-supplier:read', 'demo:read'],
+    })
+    expect(detail.summary).toMatchObject({ contractTotal: '120.00', settlementTotal: '100.00', balance: '65.00' })
+    expect(detail.counts).toMatchObject({ contracts: 6, settlements: 5 })
+    expect(detail.contracts.map(row => row.status)).toEqual(facts.contracts.map(row => row.status))
+    expect(detail.settlements.map(row => row.status)).toEqual(facts.settlements.map(row => row.status))
+  })
+
   it('验证两个父 ID 的真实关系，并返回六类事实、汇总与语义来源目标', () => {
     const detail = buildProjectSupplierWorkbenchRead({
       ...source(),

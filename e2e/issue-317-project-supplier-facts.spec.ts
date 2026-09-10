@@ -97,8 +97,13 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await expect(page.getByRole('link', { name: '查看源单' })).toHaveCount(0)
   })
 
-  test('正式项目导入只在确认时原子提交中央身份、关系与文件元数据，刷新仍可读取', async ({ page }) => {
+  test('正式项目导入只在确认时原子提交中央身份、关系与文件元数据，刷新仍可读取', async ({ page }, testInfo) => {
     test.setTimeout(60_000)
+    const prepared = await page.request.post('/api/testing/construction-contracts/reset', {
+      headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session(testInfo) },
+      data: { scenario: 'ready' },
+    })
+    expect(prepared.ok()).toBe(true)
     const projectPath = '/project/project-real-320?origin=real'
     const suffix = Date.now().toString(36)
     const fileName = `中央新候选分供方${suffix}-合同.pdf`
