@@ -7,6 +7,7 @@ import type {
   NavigationIntentDTO,
   ProblemDTO,
 } from '../../types/read-model'
+import type { ApprovedAmountOrigin, ApprovedAmountState } from '../finance/approval-amount'
 import type { ProjectSupplierFileRepository } from './file-content'
 
 export const PROJECT_SUPPLIER_READ_CAPABILITY = 'project-supplier:read' as const
@@ -80,7 +81,8 @@ export interface ProjectSupplierClaimSourceRow {
   name: string
   status: string
   applyAmount: number
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountOrigin?: ApprovedAmountOrigin
   applyDate: ISODateDTO | null
   invoiceState: string
   attachmentCount: number
@@ -165,7 +167,8 @@ export interface ProjectSupplierClaimDTO {
   navigation: NavigationIntentDTO
   status: string
   applyAmount: MoneyDTO
-  approvedAmount: MoneyDTO
+  approvedAmount: MoneyDTO | null
+  approvedAmountState: ApprovedAmountState
   applyDate: ISODateDTO | null
   invoiceState: string
   attachmentCount: number
@@ -235,7 +238,7 @@ export interface ProjectSupplierWorkbenchReadDTO {
   files: ProjectSupplierFileDTO[]
   summary: {
     contractTotal: MoneyDTO
-    claimedTotal: MoneyDTO
+    claimedTotal: MoneyDTO | null
     invoiceTotal: MoneyDTO
     taxTotal: MoneyDTO
     paidTotal: MoneyDTO

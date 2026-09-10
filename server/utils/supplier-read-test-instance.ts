@@ -142,7 +142,8 @@ const demoPaymentApplications: SupplierPaymentApplicationSourceRow[] = paymentAp
   no: row.no,
   name: row.name,
   applyAmount: Number(row.apply_amount ?? 0),
-  approvedAmount: Number(row.approved_amount ?? 0),
+  approvedAmount: row.approved_amount == null ? null : Number(row.approved_amount),
+  approvedAmountOrigin: 'legacy',
   applyDate: row.apply_date || null,
   status: row.status,
 }))

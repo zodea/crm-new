@@ -102,6 +102,22 @@ afterEach(() => {
 })
 
 describe('payment management store', () => {
+  it('明确改为零元后保留真实已付，并指出超额而非已付清', async () => {
+    await mem.execute('UPDATE payment_applications SET approved_amount = 0, approved_amount_origin = \'user-entry\' WHERE id = \'application-partial\'')
+    const store = usePaymentManagementStore()
+    await store.load()
+    expect(store.rows.find(row => row.id === 'application-partial')).toMatchObject({ approvedAmount: 0, dueAmount: 0, paidAmount: 300, paymentStatus: '超额支付' })
+  })
+  it('未知批复不显示已付清或零元；明确零保持零，未填按申请额派生余额', async () => {
+    for (const [id, value, origin] of [['legacy', 0, 'legacy'], ['empty', null, 'user-entry'], ['zero', 0, 'user-entry']] as const)
+      await mem.execute('INSERT INTO payment_applications (id, apply_amount, approved_amount, approved_amount_origin, status) VALUES (?, 100, ?, ?, ?)', [id, value, origin, 'approved'])
+    const store = usePaymentManagementStore()
+    await store.load()
+    expect(store.rows.find(row => row.id === 'legacy')).toMatchObject({ approvedAmount: null, dueAmount: null, paymentStatus: '历史批复待核验' })
+    expect(store.rows.find(row => row.id === 'empty')).toMatchObject({ approvedAmount: null, dueAmount: 100, paymentStatus: '待支付' })
+    expect(store.rows.find(row => row.id === 'zero')).toMatchObject({ approvedAmount: 0, dueAmount: 0, paymentStatus: '批复为 0' })
+    expect(store.summary).toMatchObject({ approvedAmount: null, dueAmount: null, dueCount: null, paidAmount: 800 })
+  })
   it('只展示已批复申请，并从已确认银行支付分摊派生已付和应付余额', async () => {
     const store = usePaymentManagementStore()
 

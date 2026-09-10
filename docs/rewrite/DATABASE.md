@@ -393,7 +393,8 @@ CREATE TABLE payment_applications (
   pay_content     TEXT,
   prepay_deduct   REAL,
   prepay_note     TEXT,
-  approved_amount REAL,
+  approved_amount REAL DEFAULT NULL CHECK (approved_amount IS NULL OR approved_amount >= 0),
+  approved_amount_origin TEXT NOT NULL DEFAULT 'legacy' CHECK (approved_amount_origin IN ('legacy', 'user-entry')),
   paid_amount     REAL,                -- 兼容旧列，只读；新值由已确认支付记录分摊派生（§10.2）
   external_ref    TEXT DEFAULT '',      -- 外部业务键；导入时用于幂等和来源关联
   status          TEXT DEFAULT 'draft',
@@ -2057,7 +2058,15 @@ CREATE INDEX idx_praa_application
 4. OCR 置信度不替代人工确认；
 5. 未确认支付不进入已付、合同付款或现金流汇总。
 
-付款申请派生字段：
+付款申请批复来源（[#439 / PAY-07](https://github.com/zodea/crm-new/issues/439)）：
+
+- `approved_amount = NULL` 表示未填写，明确录入 `0` 表示批复零元；只有未填写时才回退申请金额作为可付上限。新申请默认保存 `NULL`，不得经过 `|| 0` 或默认值压成零。
+- `approved_amount_origin` 由保存域维护：新建及明确编辑批复后为 `user-entry`，迁移前存量为 `legacy`。修改批复必须携带与金额一致的明确输入意图；仅改备注、整单保存或客户端声称来源已确认，不会升级存量来源。金额、来源、分摊和附件沿用同一保存事务，取消或保存失败不留下来源变更。
+- v21/v22 曾把空值、缺列和非法负值压成零，无法从零值、状态、备注或时间戳恢复当时批复事实。v49 仅改为可空列并给旧记录添加来源标记，原始金额、银行记录、三类分摊、索引及约束保持；不批量猜测旧零的含义。
+- `legacy + 0` 读为“历史批复待核验”，批复金额、依赖它的余额及完整合计为未知；原存储零仍保留。旧非零批复仍按已有金额读取，已确认银行实付独立显示，不为对平批复而修改。
+- 历史未知批复的新支付确认政策仍由 [PAY-08 待裁定项](https://github.com/zodea/crm-new/issues/413#issuecomment-5616431545) 决定。PAY-07 保留既有登记与确认操作的申请额兼容上限，并在读侧显示未知；该技术兼容不构成批准申请全额的业务裁定。明确重填后使用新金额语义。
+
+付款申请派生字段（批复来源已明确，或批复为未填写时）：
 
 ```text
 paid_amount =
@@ -2067,6 +2076,8 @@ paid_amount =
 actual_payment = paid_amount
 unpaid_amount = max(COALESCE(approved_amount, apply_amount) - paid_amount, 0)
 ```
+
+历史待核验批复的 `unpaid_amount` 为 `NULL`，不能使用上式回退申请额并将结果冒充已知余额；登记动作的兼容回填与读侧金额事实分开。当前实现覆盖本地付款表单、详情、付款管理、分供方/项目分供方读投影及其他支出结算关联源单，不代表通用付款中央写命令或生产持久化已经接管。
 
 `payment_applications.paid_amount/actual_payment` 旧列在兼容期只读；迁移完成后移除。分摊金额写入、支付确认、撤回及操作日志必须在同一事务内。
 

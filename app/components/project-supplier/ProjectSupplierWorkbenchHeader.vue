@@ -32,10 +32,10 @@ const STATUS_LABEL: Record<string, string> = {
           关系 {{ data.relation.id }} · {{ STATUS_LABEL[data.relation.status] || data.relation.status || '未记录状态' }}
         </p>
       </div>
-      <button type="button" class="btn-secondary" :disabled="refreshing" @click="$emit('refresh')">
+      <KitButton variant="secondary" :disabled="refreshing" @click="$emit('refresh')">
         <span class="i-lucide-refresh-cw mr-1" :class="refreshing ? 'animate-spin' : ''" aria-hidden="true" />
         刷新
-      </button>
+      </KitButton>
     </div>
     <dl class="grid grid-cols-2 gap-px bg-line sm:grid-cols-3 xl:grid-cols-7">
       <div
@@ -54,6 +54,9 @@ const STATUS_LABEL: Record<string, string> = {
         </dt>
         <dd class="m-0 mt-1 whitespace-nowrap font-mono text-13px font-700 tabular-nums text-ink">
           {{ yuan(metric[1]) }}
+        </dd>
+        <dd v-if="metric[1] === null" class="m-0 mt-1 text-10px text-ink-faint">
+          含未填写或待核验批复，合计不完整
         </dd>
       </div>
     </dl>

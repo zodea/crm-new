@@ -15,6 +15,7 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { isConfirmedExpenditureSettlement, isEffectiveExpenditureContract } from '../contract/effective-status'
+import { readApprovalAmount } from '../finance/approval-amount'
 import { round2 } from '../util/number'
 import {
   PROJECT_SUPPLIER_READ_CAPABILITY,
@@ -160,12 +161,14 @@ export function buildProjectSupplierWorkbenchRead(
   })
   const claims = input.claims.filter(samePair).map((row) => {
     const application = resolvedRef('payment-application', row.id, row.name, row.no || null)
+    const approval = readApprovalAmount(row.approvedAmount, row.approvedAmountOrigin)
     return {
       application,
       navigation: sourceNavigation(application, 'detail', query.origin),
       status: row.status,
       applyAmount: money(row.applyAmount),
-      approvedAmount: money(row.approvedAmount),
+      approvedAmount: approval.amount === null ? null : money(approval.amount),
+      approvedAmountState: approval.state,
       applyDate: row.applyDate,
       invoiceState: row.invoiceState,
       attachmentCount: row.attachmentCount,
@@ -261,7 +264,8 @@ export function buildProjectSupplierWorkbenchRead(
 
   const formalContracts = contracts.filter(row => isEffectiveExpenditureContract(row.status))
   const contractTotal = formalContracts.reduce((total, row) => total + Number(row.effectiveAmount), 0)
-  const claimedTotal = claims.filter(row => approved(row.status)).reduce((total, row) => total + Number(row.approvedAmount), 0)
+  const approvedClaims = claims.filter(row => approved(row.status))
+  const claimedTotal = approvedClaims.some(row => row.approvedAmount === null) ? null : approvedClaims.reduce((total, row) => total + Number(row.approvedAmount), 0)
   const archivedInvoices = invoices.filter(row => row.accountStatus === 'archived')
   const invoiceTotal = archivedInvoices.reduce((total, row) => total + Number(row.totalAmount), 0)
   const taxTotal = archivedInvoices.reduce((total, row) => total + Number(row.taxAmount), 0)
@@ -287,7 +291,7 @@ export function buildProjectSupplierWorkbenchRead(
     files,
     summary: {
       contractTotal: money(contractTotal),
-      claimedTotal: money(claimedTotal),
+      claimedTotal: claimedTotal === null ? null : money(claimedTotal),
       invoiceTotal: money(invoiceTotal),
       taxTotal: money(taxTotal),
       paidTotal: money(paidTotal),

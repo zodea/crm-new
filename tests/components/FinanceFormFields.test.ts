@@ -68,6 +68,25 @@ const KitTable = defineComponent({
 
 const fetchLookup = vi.fn(async () => [])
 
+it('批复输入的空值和明确零分别携带输入意图；仅改备注不产生批复修改', async () => {
+  const wrapper = mountFields('payment_application', { bizType: '公司付款', approvedAmount: 0, approvedAmountOrigin: 'legacy' })
+  expect(wrapper.text()).toContain('历史批复待核验')
+  const amount = wrapper.get('input[aria-describedby="approval-amount-help"]')
+  await amount.setValue('')
+  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvedAmount: null, approvedAmountEdit: { value: null } })
+  await amount.setValue('0')
+  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvedAmount: 0, approvedAmountEdit: { value: 0 } })
+  await wrapper.get('#section-approval textarea').setValue('核对备注')
+  expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ approvalNote: '核对备注' })
+})
+
+it('批复临时负数保持表单可编辑并提示修正，不能因读取金额而渲染异常', async () => {
+  const wrapper = mountFields('payment_application', { bizType: '公司付款', approvedAmount: null })
+  await wrapper.setProps({ draft: { bizType: '公司付款', approvedAmount: -1, approvedAmountEdit: { value: -1 } } })
+  expect(wrapper.text()).toContain('请输入非负有效金额')
+  expect(wrapper.get('input[aria-describedby="approval-amount-help"]').element).toHaveProperty('value', '-1')
+})
+
 function mountFields(
   kind: 'payment_application' | 'payment_record' | 'reimbursement',
   draft: Record<string, unknown>,

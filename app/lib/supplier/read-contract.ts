@@ -9,6 +9,7 @@ import type {
   PageDTO,
   ProblemDTO,
 } from '../../types/read-model'
+import type { ApprovedAmountOrigin, ApprovedAmountState } from '../finance/approval-amount'
 
 export const SUPPLIER_PAGE_SIZES = [10, 20, 50, 100] as const
 export type SupplierPageSize = typeof SUPPLIER_PAGE_SIZES[number]
@@ -187,7 +188,8 @@ export interface SupplierPaymentApplicationSourceRow {
   no: string
   name: string
   applyAmount: number
-  approvedAmount: number
+  approvedAmount: number | null
+  approvedAmountOrigin?: ApprovedAmountOrigin
   applyDate: ISODateDTO | null
   status: string
 }
@@ -278,7 +280,8 @@ export interface SupplierPaymentDTO {
   contract: EntityRefDTO & { entity: 'contract' }
   contractNavigation: NavigationIntentDTO
   applyAmount: MoneyDTO
-  approvedAmount: MoneyDTO
+  approvedAmount: MoneyDTO | null
+  approvedAmountState: ApprovedAmountState
   actualPaidAmount: MoneyDTO
   applyDate: ISODateDTO | null
   status: string

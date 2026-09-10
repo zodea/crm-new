@@ -27,6 +27,14 @@ const SESSION: BusinessSession = {
   capabilities: [CORE_MIGRATION_CAPABILITY],
 }
 
+it.each(['sqlite-v47', 'sqlite-v48', 'sqlite-v49'])('批复来源迁移后仍接受 %s 受保护来源，并重验来源哈希', async (sourceVersion) => {
+  const instance = createCoreMigrationTestInstance()
+  const input = source({ sourceVersion })
+  const envelope = { workspaceId: SESSION.workspaceId, actorId: SESSION.actorId, requiredCapability: CORE_MIGRATION_CAPABILITY, source: input, backup: null }
+  await expect(instance.preflight({ ...envelope, commandId: `approval-${sourceVersion}` }, SESSION)).resolves.toBeDefined()
+  await expect(instance.preflight({ ...envelope, commandId: `tampered-${sourceVersion}`, source: { ...input, sourceHash: '0'.repeat(64) } }, SESSION)).rejects.toThrow('sourceHash')
+})
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex')
 }

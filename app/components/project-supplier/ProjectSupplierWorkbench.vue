@@ -2,6 +2,7 @@
 import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/repository'
 import type { ProjectSupplierWorkbenchTab } from '~/lib/project-supplier/workbench'
 import { computed, shallowRef, watch } from 'vue'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { projectSupplierWorkbenchTab } from '~/lib/project-supplier/workbench'
 import { yuan } from '~/lib/util/money'
 import { isDataOriginDTO } from '~/types/read-model'
@@ -58,7 +59,7 @@ const claimRows = computed(() => (data.value?.claims ?? []).map(row => ({ id: ro
   { text: row.application.no || '—', tone: 'muted' as const },
   { text: row.application.label },
   { text: yuan(row.applyAmount), tone: 'money' as const },
-  { text: yuan(row.approvedAmount), tone: 'money' as const },
+  { text: row.approvedAmount === null ? approvalAmountLabel(row.approvedAmountState) : yuan(row.approvedAmount), tone: 'money' as const },
   { text: date(row.applyDate), tone: 'muted' as const },
   { text: row.invoiceState },
   { text: `${row.attachmentCount} 份`, tone: 'muted' as const },

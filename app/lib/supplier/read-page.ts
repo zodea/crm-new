@@ -18,6 +18,7 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
 import { isConfirmedExpenditureSettlement as confirmedSettlement, isEffectiveExpenditureContract as effectiveContract } from '../contract/effective-status'
+import { readApprovalAmount } from '../finance/approval-amount'
 import { round2 } from '../util/number'
 import { maskBankAccount, maskIdentifier, maskPhone } from '../util/privacy'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_PAGE_SIZES, supplierProblem, SupplierRepositoryProblem } from './read-contract'
@@ -461,6 +462,7 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
   const paymentSources = input.paymentApplications.filter(row =>
     row.dataOrigin === input.query.origin && row.supplierId === source.id)
   const paymentDTOs = paymentSources.map((row) => {
+    const approval = readApprovalAmount(row.approvedAmount, row.approvedAmountOrigin)
     const application = resolvedRef('payment-application', row.id, row.name, row.no) as Extract<EntityRefDTO, { state: 'resolved' }> & { entity: 'payment-application' }
     const project = projectRef(row.projectId, input.projects, input.query.origin)
     const contract = contractRef(row.contractId, input.contracts, input.query.origin)
@@ -472,7 +474,8 @@ export function buildSupplierDetailRead(input: BuildSupplierDetailReadInput): Su
       contract,
       contractNavigation: contractSourceNavigation(contract, input.contracts, input.query.origin),
       applyAmount: money(row.applyAmount),
-      approvedAmount: money(row.approvedAmount),
+      approvedAmount: money(approval.amount),
+      approvedAmountState: approval.state,
       actualPaidAmount: money(paidByApplication.get(row.id) ?? 0),
       applyDate: row.applyDate,
       status: row.status,

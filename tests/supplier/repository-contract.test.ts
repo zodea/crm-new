@@ -50,6 +50,13 @@ function supplier(
 }
 
 describe('分供方中央 Repository contract', () => {
+  it('分供方请款读回不把历史零和未填解释成零元批复', () => {
+    for (const [amount, origin, state, expected] of [[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const) {
+      const result = buildSupplierDetailRead({ suppliers: [supplier('s', '分供方')], projects: [], projectSuppliers: [], contracts: [], settlements: [], invoices: [], paymentRecords: [], paymentAllocations: [], paymentApplications: [{ dataOrigin: 'real', id: 'a', supplierId: 's', projectId: null, contractId: null, no: '', name: '请款', applyAmount: 100, approvedAmount: amount, approvedAmountOrigin: origin, status: 'approved', applyDate: null }], query: parseSupplierDetailQuery('s', {}), asOf: AS_OF, sourceVersion: 'approval', capabilities: [] })
+      expect(result.payments[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state, actualPaidAmount: '0.00' })
+      expect(decodeSupplierDetailRead(result)).toEqual(result)
+    }
+  })
   it('固定枚举多选同字段取并集、跨字段取交集，分页汇总与自身排除 facet 同步', () => {
     const suppliers = Array.from({ length: 30 }, (_, index) => supplier(`multi-${index}`, `多选 ${index}`, {
       supplierCategory: ['材料供应商', '劳务分包商', '设备供应商'][index % 3]!,

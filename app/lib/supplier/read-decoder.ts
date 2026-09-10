@@ -12,6 +12,7 @@ import {
   isISODateDTO,
   isISODateTimeDTO,
 } from '../../types/read-model'
+import { isApprovalReadState } from '../finance/approval-amount'
 import {
   SUPPLIER_PAGE_SIZES,
   supplierProblem,
@@ -268,7 +269,8 @@ function payment(value: unknown, origin: unknown): boolean {
     && navigation(value.navigation, value.application)
     && entityRef(value.project, 'project') && navigation(value.projectNavigation, value.project, { filters: { dataOrigin: String(origin) } })
     && entityRef(value.contract, 'contract') && contractNavigation(value.contractNavigation, value.contract, origin)
-    && money(value.applyAmount) && money(value.approvedAmount) && money(value.actualPaidAmount)
+    && money(value.applyAmount) && (value.approvedAmount === null || money(value.approvedAmount)) && money(value.actualPaidAmount)
+    && isApprovalReadState(value.approvedAmount, value.approvedAmountState)
     && nullableDate(value.applyDate) && typeof value.status === 'string'
 }
 

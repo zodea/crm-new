@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildProjectSupplierWorkbenchRead,
+  decodeProjectSupplierWorkbenchRead,
   parseProjectSupplierWorkbenchQuery,
   ProjectSupplierRepositoryProblem,
 } from '~/lib/project-supplier/repository'
 
 const asOf = '2026-08-24T00:00:00.000Z'
+
+it('工作台请款保留空批复和历史未知，明确零不污染已支付事实', () => {
+  for (const [amount, origin, state, expected] of [[null, 'user-entry', 'not-entered', null], [0, 'legacy', 'legacy-unknown', null], [0, 'user-entry', 'known', '0.00']] as const) {
+    const input = source()
+    const result = buildProjectSupplierWorkbenchRead({ ...input, claims: input.claims.map(row => ({ ...row, approvedAmount: amount, approvedAmountOrigin: origin })), query: parseProjectSupplierWorkbenchQuery('project-1', 'supplier-1', { origin: 'demo', includeDemo: 'true' }), asOf, sourceVersion: 'approval', capabilities: ['project-supplier:read', 'demo:read'] })
+    expect(result.claims[0]).toMatchObject({ approvedAmount: expected, approvedAmountState: state })
+    expect(result.summary).toMatchObject({ claimedTotal: expected, paidTotal: '55.00' })
+    expect(decodeProjectSupplierWorkbenchRead(result)).toEqual(result)
+  }
+})
 
 function source() {
   return {

@@ -8,6 +8,8 @@ import type {
   SupplierSettlementDTO,
 } from '~/lib/supplier/repository'
 import { AUXILIARY_LABELS } from '~/lib/auxiliary-contract/contract'
+import { approvalAmountLabel } from '~/lib/finance/approval-amount'
+import { yuan } from '~/lib/util/money'
 
 export type SupplierFactTab = 'projects' | 'contracts' | 'settlements' | 'invoices' | 'payments'
 
@@ -60,7 +62,7 @@ const paymentColumns: KitTableColumn[] = [
   { field: 'project', title: '项目', minWidth: 170, slot: 'project' },
   { field: 'contract', title: '合同', minWidth: 190, slot: 'contract' },
   { field: 'applyAmount', title: '申请金额', type: 'money', width: 130 },
-  { field: 'approvedAmount', title: '核准金额', type: 'money', width: 130 },
+  { field: 'approvedAmount', title: '核准金额', width: 150, align: 'right', slot: 'approval' },
   { field: 'actualPaidAmount', title: '确认实付', type: 'money', width: 130 },
   { field: 'applyDate', title: '申请日期', type: 'date' },
   { field: 'status', title: '状态', width: 100 },
@@ -108,6 +110,10 @@ const paymentColumns: KitTableColumn[] = [
       </template>
     </KitTable>
     <KitTable v-else :columns="paymentColumns" :data="[...payments]" :min-rows="5" :empty="{ title: '暂无付款事实', description: '当前分供方尚无确认付款分摊；不会从申请金额推算实付。' }">
+      <template #approval="{ row }">
+        <span class="block font-mono tabular-nums">{{ yuan(row.approvedAmount) }}</span>
+        <span v-if="row.approvedAmount === null" class="text-10px text-ink-faint">{{ approvalAmountLabel(row.approvedAmountState) }}</span>
+      </template>
       <template #application="{ row }">
         <SupplierRelationLink :reference="row.application" :navigation="row.navigation" />
       </template>

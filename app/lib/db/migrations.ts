@@ -1,3 +1,4 @@
+import { migratePaymentApprovalAmounts } from './payment-approval-migration'
 import { ALL_SCHEMA, BATCH_5_PAYROLL_ATTENDANCE } from './schema'
 
 /** 迁移器依赖的最小驱动形状（connection.ts 的 DbDriver 结构兼容，测试可用 sql.js 内存库实现） */
@@ -5706,6 +5707,12 @@ migrations.push({
     if (await tableExists(db, 'suppliers'))
       await addColumnIfMissing(db, 'suppliers', 'labor_scope', 'TEXT NOT NULL DEFAULT \'\'')
   },
+})
+
+migrations.push({
+  version: 49,
+  name: 'payment-approval-nullable-amount-and-origin',
+  up: migratePaymentApprovalAmounts,
 })
 
 export const LATEST_VERSION = migrations.reduce((max, m) => Math.max(max, m.version), 0)

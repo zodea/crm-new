@@ -2,6 +2,7 @@
 import type { FinancePageDraft } from '~/lib/finance/page'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { computed } from 'vue'
+import { approvalAmountLabel, readApprovalAmount } from '~/lib/finance/approval-amount'
 import FinanceLineGrid from './FinanceLineGrid.vue'
 
 const props = defineProps<{
@@ -74,6 +75,20 @@ const paymentAllocationTotal = computed(() =>
 )
 const applyAmount = computed(() => Number(props.draft.applyAmount) || 0)
 const paymentAmount = computed(() => Number(props.draft.amount) || 0)
+const approvalHint = computed(() => {
+  const amount = props.draft.approvedAmount ?? null
+  if (amount !== null && (!Number.isFinite(amount) || amount < 0))
+    return '请输入非负有效金额'
+  return approvalAmountLabel(readApprovalAmount(amount, props.draft.approvedAmountEdit ? 'user-entry' : props.draft.approvedAmountOrigin).state)
+})
+
+function inputApproval(event: Event) {
+  const input = event.target as HTMLInputElement
+  const value = input.value.trim()
+  const amount = input.validity.badInput ? Number.NaN : value === '' ? null : Number(value)
+  emit('patch', { approvedAmount: amount, approvedAmountEdit: { value: amount } })
+  emit('clearError', 'approvedAmount')
+}
 
 function patch(field: keyof FinancePageDraft, value: unknown) {
   const next = { [field]: value } as Partial<FinancePageDraft>
@@ -224,10 +239,11 @@ function fieldClass(field: string) {
           <span class="field-label">扣除说明</span>
           <input :value="draft.prepayNote" class="field-input w-full" @input="patch('prepayNote', inputValue($event))">
         </label>
-        <label class="field-block">
-          <span class="field-label">本期批复金额</span>
-          <input :value="draft.approvedAmount" type="number" min="0" step="0.01" class="field-input w-full font-mono" @input="patch('approvedAmount', inputNumber($event))">
-        </label>
+        <div class="field-block">
+          <label for="approval-amount" class="field-label">本期批复金额</label>
+          <input id="approval-amount" :value="draft.approvedAmount" type="number" min="0" step="0.01" class="field-input w-full font-mono" aria-describedby="approval-amount-help" @input="inputApproval">
+          <span id="approval-amount-help" class="text-11px text-ink-faint">{{ approvalHint }}。留空表示未填写；填写 0 表示明确零元。历史金额请按原始凭据核对后填写。</span>
+        </div>
         <label class="field-block form-span-full">
           <span class="field-label">审批备注</span>
           <textarea :value="draft.approvalNote" rows="2" class="field-input w-full" @input="patch('approvalNote', inputValue($event))" />

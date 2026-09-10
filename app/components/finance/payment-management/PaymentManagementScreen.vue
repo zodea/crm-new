@@ -8,6 +8,7 @@ import StatePanel from '~/components/ui/StatePanel.vue'
 import { financeDetailPath } from '~/lib/finance/page'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { toErrorMessage } from '~/lib/util/error'
+import { summarizePayments } from '~/stores/payment-management'
 
 const store = usePaymentManagementStore()
 const { rows, loading, hasSnapshot, projectOptions } = storeToRefs(store)
@@ -43,25 +44,11 @@ const viewOptions = [
 
 const filteredRows = computed(() => scopedRows.value.filter(row =>
   !view.value.length
-  || (view.value.includes('due') && row.dueAmount > 0)
+  || (view.value.includes('due') && (row.dueAmount ?? 0) > 0)
   || (view.value.includes('paid') && row.paymentStatus === '已付清'),
 ))
 
-const summary = computed<PaymentManagementSummary>(() =>
-  filteredRows.value.reduce<PaymentManagementSummary>((result, row) => ({
-    applicationCount: result.applicationCount + 1,
-    approvedAmount: result.approvedAmount + row.approvedAmount,
-    paidAmount: result.paidAmount + row.paidAmount,
-    dueAmount: result.dueAmount + row.dueAmount,
-    dueCount: result.dueCount + Number(row.dueAmount > 0),
-  }), {
-    applicationCount: 0,
-    approvedAmount: 0,
-    paidAmount: 0,
-    dueAmount: 0,
-    dueCount: 0,
-  }),
-)
+const summary = computed<PaymentManagementSummary>(() => summarizePayments(filteredRows.value))
 
 const currentPage = computed(() =>
   clampPage(page.value, filteredRows.value.length, pageSize.value),
@@ -94,7 +81,7 @@ function openApplication(row: PaymentManagementRow) {
 function createPayment(row: PaymentManagementRow) {
   const query: Record<string, string> = {
     paymentApplicationId: row.id,
-    amount: String(row.dueAmount),
+    amount: String(row.dueAmount ?? 0),
   }
   if (row.projectId)
     query.projectId = row.projectId
