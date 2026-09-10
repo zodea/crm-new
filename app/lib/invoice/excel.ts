@@ -1,8 +1,12 @@
+import type { InvoiceBorderOverrides, InvoiceBorderSide, InvoiceBorderStyle } from './xlsx-border'
 import type { ExportData } from '~/lib/kit/export'
 import type { RawImportSheet, RawImportWorkbook } from '~/lib/util/excel'
 import type { Invoice } from '~/stores/invoice'
 import * as XLSX from 'xlsx'
 import { IMPORT_SOURCE_META_KEY } from '~/lib/kit/import-mapping'
+import { resolveInvoiceBorder } from './xlsx-border'
+
+export type { InvoiceBorderOverrides, InvoiceBorderSide, InvoiceBorderStyle } from './xlsx-border'
 
 export const INVOICE_XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -16,18 +20,6 @@ export interface InvoiceFontStyle {
   bold?: boolean
   italic?: boolean
   color?: string
-}
-
-export interface InvoiceBorderSide {
-  style: string
-  color?: string
-}
-
-export interface InvoiceBorderStyle {
-  top: InvoiceBorderSide
-  bottom: InvoiceBorderSide
-  left: InvoiceBorderSide
-  right: InvoiceBorderSide
 }
 
 export interface InvoiceCellStyleSnapshot {
@@ -79,7 +71,9 @@ export interface InvoiceXlsxStyleConfig {
   headerFont?: Partial<InvoiceFontStyle>
   dataFont?: Partial<InvoiceFontStyle>
   totalFont?: Partial<InvoiceFontStyle>
-  border?: Partial<InvoiceBorderStyle>
+  border?: InvoiceBorderOverrides
+  headerBorder?: InvoiceBorderOverrides
+  dataBorder?: InvoiceBorderOverrides
 }
 
 export interface InvoiceSourceCell {
@@ -146,7 +140,7 @@ const TEXT_FORMAT = '@'
 
 type InvoiceStyleRole = 'title' | 'header' | 'data' | 'total'
 
-interface InvoiceResolvedStyleConfig {
+export interface InvoiceResolvedStyleConfig {
   freezeRows: number
   titleRowHeight: number
   headerRowHeight: number
@@ -163,6 +157,8 @@ interface InvoiceResolvedStyleConfig {
   dataFont: InvoiceFontStyle
   totalFont: InvoiceFontStyle
   border: InvoiceBorderStyle
+  headerBorder: InvoiceBorderStyle
+  dataBorder: InvoiceBorderStyle
 }
 
 interface InvoiceStylePlan {
@@ -172,7 +168,7 @@ interface InvoiceStylePlan {
 
 const INVOICE_STYLE_PLANS = new WeakMap<XLSX.WorkSheet, InvoiceStylePlan>()
 
-const DEFAULT_INVOICE_STYLE: InvoiceResolvedStyleConfig = {
+const DEFAULT_INVOICE_STYLE: Omit<InvoiceResolvedStyleConfig, 'headerBorder' | 'dataBorder'> = {
   freezeRows: 2,
   titleRowHeight: 24,
   headerRowHeight: 28,
@@ -256,7 +252,7 @@ export function createDefaultInvoiceXlsxStyleConfig(): InvoiceXlsxStyleConfig {
   }
 }
 
-const EXPORT_COLUMNS: readonly { key: keyof InvoiceLedgerExportRow, label: string, width: number }[] = [
+export const INVOICE_LEDGER_EXPORT_COLUMNS: readonly { key: keyof InvoiceLedgerExportRow, label: string, width: number }[] = [
   { key: 'invoiceDate', label: '发票日期', width: 15 },
   { key: 'invoiceNumber', label: '发票号码', width: 23 },
   { key: 'seller', label: '供应商', width: 30 },
@@ -286,12 +282,7 @@ function resolveInvoiceStyleConfig(config: InvoiceXlsxStyleConfig = {}): Invoice
     ...fallback,
     ...font,
   })
-  const mergeBorder = (border: Partial<InvoiceBorderStyle> | undefined): InvoiceBorderStyle => ({
-    top: { ...DEFAULT_INVOICE_STYLE.border.top, ...border?.top },
-    bottom: { ...DEFAULT_INVOICE_STYLE.border.bottom, ...border?.bottom },
-    left: { ...DEFAULT_INVOICE_STYLE.border.left, ...border?.left },
-    right: { ...DEFAULT_INVOICE_STYLE.border.right, ...border?.right },
-  })
+  const border = resolveInvoiceBorder(config.border, DEFAULT_INVOICE_STYLE.border)
   return {
     freezeRows: Math.max(0, Math.trunc(config.freezeRows ?? DEFAULT_INVOICE_STYLE.freezeRows)),
     titleRowHeight: config.titleRowHeight ?? DEFAULT_INVOICE_STYLE.titleRowHeight,
@@ -308,7 +299,9 @@ function resolveInvoiceStyleConfig(config: InvoiceXlsxStyleConfig = {}): Invoice
     headerFont: mergeFont(config.headerFont, DEFAULT_INVOICE_STYLE.headerFont),
     dataFont: mergeFont(config.dataFont, DEFAULT_INVOICE_STYLE.dataFont),
     totalFont: mergeFont(config.totalFont, DEFAULT_INVOICE_STYLE.totalFont),
-    border: mergeBorder(config.border),
+    border,
+    headerBorder: resolveInvoiceBorder(config.headerBorder, border),
+    dataBorder: resolveInvoiceBorder(config.dataBorder, border),
   }
 }
 
@@ -407,6 +400,14 @@ function styleRoleFont(role: InvoiceStyleRole, config: InvoiceResolvedStyleConfi
   if (role === 'total')
     return config.totalFont
   return config.dataFont
+}
+
+function styleRoleBorder(role: InvoiceStyleRole, config: InvoiceResolvedStyleConfig): InvoiceBorderStyle {
+  if (role === 'header')
+    return config.headerBorder
+  if (role === 'data')
+    return config.dataBorder
+  return config.border
 }
 
 function createStylePlan(freezeRows: number): InvoiceStylePlan {
@@ -705,7 +706,7 @@ function patchStylesXml(
   const formatResult = appendNumberFormats(xml, formats)
   xml = formatResult.xml
   const fonts = roles.map(role => styleFontXml(styleRoleFont(role, config)))
-  const borders = [styleBorderXml(config.border)]
+  const borders = roles.map(role => styleBorderXml(styleRoleBorder(role, config)))
   const fontResult = appendXmlSection(xml, 'fonts', fonts)
   xml = fontResult.xml
   const borderResult = appendXmlSection(xml, 'borders', borders)
@@ -724,7 +725,7 @@ function patchStylesXml(
       if (styleIds.has(key))
         continue
       const fontId = fontResult.startIndex + roles.indexOf(role)
-      const borderId = borderResult.startIndex
+      const borderId = borderResult.startIndex + roles.indexOf(role)
       const numFmtId = formatResult.ids.get(numberFormat ?? 'General') ?? 0
       const applyNumberFormat = numberFormat && numberFormat !== 'General' ? ' applyNumberFormat="1"' : ''
       styleChildren.push(`<xf numFmtId="${numFmtId}" fontId="${fontId}" fillId="0" borderId="${borderId}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"${applyNumberFormat}><alignment horizontal="center" vertical="center" wrapText="1"/></xf>`)
@@ -1279,8 +1280,8 @@ function mergeContiguousValues(
   let groupStart = 0
 
   for (let index = 1; index <= rows.length; index++) {
-    const previous = rows[index - 1]?.[EXPORT_COLUMNS[column]!.key]
-    const current = rows[index]?.[EXPORT_COLUMNS[column]!.key]
+    const previous = rows[index - 1]?.[INVOICE_LEDGER_EXPORT_COLUMNS[column]!.key]
+    const current = rows[index]?.[INVOICE_LEDGER_EXPORT_COLUMNS[column]!.key]
     const changed = index === rows.length || current !== previous || current === '' || current == null
     if (!changed)
       continue
@@ -1359,8 +1360,8 @@ export function createInvoiceLedgerXlsxFromRows(
   const config = resolveInvoiceStyleConfig(styleConfig)
   const values = [
     ['发票台账'],
-    EXPORT_COLUMNS.map(column => column.label),
-    ...rows.map(row => EXPORT_COLUMNS.map(column =>
+    INVOICE_LEDGER_EXPORT_COLUMNS.map(column => column.label),
+    ...rows.map(row => INVOICE_LEDGER_EXPORT_COLUMNS.map(column =>
       column.key === 'invoiceDate' ? excelDateValue(row.invoiceDate) : row[column.key],
     )),
     ['总数'],
@@ -1370,11 +1371,11 @@ export function createInvoiceLedgerXlsxFromRows(
   const dataStartRow = 2
   const totalRow = dataStartRow + rows.length
 
-  worksheet['!cols'] = EXPORT_COLUMNS.map(column => ({ wch: config.columnWidths[column.key] ?? column.width }))
+  worksheet['!cols'] = INVOICE_LEDGER_EXPORT_COLUMNS.map(column => ({ wch: config.columnWidths[column.key] ?? column.width }))
   worksheet['!merges'] = config.mergeTitle
     ? [{
         s: { r: 0, c: 0 },
-        e: { r: 0, c: EXPORT_COLUMNS.length - 1 },
+        e: { r: 0, c: INVOICE_LEDGER_EXPORT_COLUMNS.length - 1 },
       }]
     : []
   if (config.mergeRepeatedValues) {
@@ -1383,14 +1384,14 @@ export function createInvoiceLedgerXlsxFromRows(
   }
 
   newInvoiceStylePlan(worksheet, config.freezeRows)
-  cellStyleAddresses(worksheet, 0, 0, 0, EXPORT_COLUMNS.length - 1, 'title')
-  cellStyleAddresses(worksheet, 1, 1, 0, EXPORT_COLUMNS.length - 1, 'header')
-  cellStyleAddresses(worksheet, dataStartRow, totalRow - 1, 0, EXPORT_COLUMNS.length - 1, 'data', {
+  cellStyleAddresses(worksheet, 0, 0, 0, INVOICE_LEDGER_EXPORT_COLUMNS.length - 1, 'title')
+  cellStyleAddresses(worksheet, 1, 1, 0, INVOICE_LEDGER_EXPORT_COLUMNS.length - 1, 'header')
+  cellStyleAddresses(worksheet, dataStartRow, totalRow - 1, 0, INVOICE_LEDGER_EXPORT_COLUMNS.length - 1, 'data', {
     0: config.dateFormat,
     1: config.textFormat,
     4: config.moneyFormat,
   })
-  cellStyleAddresses(worksheet, totalRow, totalRow, 0, EXPORT_COLUMNS.length - 1, 'total', { 4: config.moneyFormat })
+  cellStyleAddresses(worksheet, totalRow, totalRow, 0, INVOICE_LEDGER_EXPORT_COLUMNS.length - 1, 'total', { 4: config.moneyFormat })
   setRowHeights(worksheet, [
     config.titleRowHeight,
     config.headerRowHeight,
@@ -1416,7 +1417,7 @@ export function createInvoiceLedgerXlsxFromRows(
   worksheet[cellAddress(totalRow, 4)] = totalCell
   worksheet['!ref'] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
-    e: { r: totalRow, c: EXPORT_COLUMNS.length - 1 },
+    e: { r: totalRow, c: INVOICE_LEDGER_EXPORT_COLUMNS.length - 1 },
   })
 
   XLSX.utils.book_append_sheet(workbook, worksheet, '发票台账')
