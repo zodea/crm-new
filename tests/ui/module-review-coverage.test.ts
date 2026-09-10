@@ -93,6 +93,14 @@ describe('module review coverage', () => {
     expect(localCase.remaining).toContain('逐列筛选、排序、设置和文件工具仍由 #404/#409 复核')
   })
 
+  it('preserves original reference observation dates when the source baseline is inspected later', () => {
+    const coverage = buildModuleReviewCoverage()
+    const originalMenus = coverage.referenceMenus.filter(menu => menu.evidence === 'docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界')
+    expect(coverage.sourceInspectedAt > '2026-09-08').toBe(true)
+    expect(originalMenus).toHaveLength(59)
+    expect(new Set(originalMenus.map(menu => menu.date))).toEqual(new Set(['2026-09-08']))
+  })
+
   it('keeps the committed inventory reproducible and every source anchor resolvable', () => {
     expect(JSON.parse(readFileSync(MODULE_REVIEW_COVERAGE_PATH, 'utf8'))).toEqual(buildModuleReviewCoverage())
     expect(readFileSync(MODULE_REVIEW_INDEX_PATH, 'utf8').replaceAll('\r\n', '\n')).toEqual(renderModuleReviewIndex(buildModuleReviewCoverage()))

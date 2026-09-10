@@ -249,7 +249,7 @@
       "mappingStatus": "partial",
       "note": "仅施工进度属于当前首页范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -265,7 +265,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -281,7 +281,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -295,7 +295,7 @@
       "mappingStatus": "excluded",
       "note": "独立统计门户/完整审批按 #402 排除；现有通知与 capability 仍须复核",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -309,7 +309,7 @@
       "mappingStatus": "excluded",
       "note": "独立统计门户/完整审批按 #402 排除；现有通知与 capability 仍须复核",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -323,7 +323,7 @@
       "mappingStatus": "excluded",
       "note": "独立统计门户/完整审批按 #402 排除；现有通知与 capability 仍须复核",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -337,7 +337,7 @@
       "mappingStatus": "pending",
       "note": "尚未找到独立本地路由；仓库业务归属和已有字段需核验",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -353,7 +353,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -369,7 +369,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -385,7 +385,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -401,7 +401,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -415,7 +415,7 @@
       "mappingStatus": "pending",
       "note": "不能把甲供材 direct 当作乙供对应能力",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -429,7 +429,7 @@
       "mappingStatus": "pending",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -445,7 +445,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -461,7 +461,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -477,7 +477,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -493,7 +493,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -509,7 +509,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -525,7 +525,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -541,7 +541,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -557,7 +557,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -573,7 +573,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -589,7 +589,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -605,7 +605,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -621,7 +621,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -637,7 +637,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -653,7 +653,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -669,7 +669,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -685,7 +685,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -701,7 +701,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -717,7 +717,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -731,7 +731,7 @@
       "mappingStatus": "pending",
       "note": "只有菜单证据，尚不能裁定为瑞航往来单据或现有付款类型",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -745,7 +745,7 @@
       "mappingStatus": "pending",
       "note": "只有菜单证据，尚不能裁定为瑞航往来单据或现有付款类型",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -759,7 +759,7 @@
       "mappingStatus": "pending",
       "note": "只有菜单证据，尚不能裁定为瑞航往来单据或现有付款类型",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -773,7 +773,7 @@
       "mappingStatus": "pending",
       "note": "只有菜单证据，尚不能裁定为瑞航往来单据或现有付款类型",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -789,7 +789,7 @@
       "mappingStatus": "partial",
       "note": "按本地实际收付方向逐场景核验",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -805,7 +805,7 @@
       "mappingStatus": "partial",
       "note": "按本地实际收付方向逐场景核验",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -821,7 +821,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -837,7 +837,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -851,7 +851,7 @@
       "mappingStatus": "pending",
       "note": "Party/客户/分供方的当前归属须依 CONTEXT 核对，不新造平行主档",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -867,7 +867,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -883,7 +883,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -899,7 +899,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -915,7 +915,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -931,7 +931,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -947,7 +947,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -963,7 +963,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -977,7 +977,7 @@
       "mappingStatus": "pending",
       "note": "独立收入合同现有范围及本地对应待核对",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -993,7 +993,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1009,7 +1009,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1025,7 +1025,7 @@
       "mappingStatus": "mapped",
       "note": "",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1039,7 +1039,7 @@
       "mappingStatus": "excluded",
       "note": "独立办公物品管理不在 #402 当前范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1053,7 +1053,7 @@
       "mappingStatus": "excluded",
       "note": "独立办公物品管理不在 #402 当前范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1067,7 +1067,7 @@
       "mappingStatus": "excluded",
       "note": "独立办公物品管理不在 #402 当前范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1081,7 +1081,7 @@
       "mappingStatus": "excluded",
       "note": "独立办公物品管理不在 #402 当前范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1095,7 +1095,7 @@
       "mappingStatus": "excluded",
       "note": "独立办公物品管理不在 #402 当前范围",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1109,7 +1109,7 @@
       "mappingStatus": "excluded",
       "note": "独立协同办公不在 #402 当前范围；瑞航业务附件/排程不因此排除",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1123,7 +1123,7 @@
       "mappingStatus": "excluded",
       "note": "独立协同办公不在 #402 当前范围；瑞航业务附件/排程不因此排除",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     },
@@ -1137,7 +1137,7 @@
       "mappingStatus": "excluded",
       "note": "独立协同办公不在 #402 当前范围；瑞航业务附件/排程不因此排除",
       "observation": "menu-only",
-      "date": "2026-09-10",
+      "date": "2026-09-08",
       "viewport": "1293x1051",
       "evidence": "docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界"
     }

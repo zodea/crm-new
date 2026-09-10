@@ -1,7 +1,9 @@
 // #403 的源码采证清单。只登记实际接线与入口，不定义业务字段或提升运行验收。
 // 页签/子表的权威规格仍在 docs/rewrite/pages；参考证据仍在 runtime-reference-audit。
 export const SOURCE_BASELINE = 'c9c0ec5ad044670f4e41ded17e46a6e8d9293d90'
-export const OBSERVATION_DATE = '2026-09-10'
+export const SOURCE_INSPECTED_AT = '2026-09-10'
+// 更新源码采证基线不代表重新观察外部参考菜单。
+const REFERENCE_MENU_OBSERVED_AT = '2026-09-08'
 
 export const ADAPTERS = {
   'central-http': {
@@ -136,7 +138,7 @@ function menu(group, label, localTargets, issues, mappingStatus = 'mapped', note
     mappingStatus,
     note,
     observation: 'menu-only',
-    date: OBSERVATION_DATE,
+    date: REFERENCE_MENU_OBSERVED_AT,
     viewport: '1293x1051',
     evidence: 'docs/design/runtime-reference-audit.md#2026-09-08-复核基线与展开边界',
   }

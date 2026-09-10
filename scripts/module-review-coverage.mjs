@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PROJECT_ROOT, readAppPageFiles } from './design-coverage.mjs'
-import { ADAPTERS, OBSERVATION_DATE, PUBLIC_SURFACES, REFERENCE_MENUS, resolveAdapter, SOURCE_BASELINE, SUBVIEWS } from './module-review-inventory.mjs'
+import { ADAPTERS, PUBLIC_SURFACES, REFERENCE_MENUS, resolveAdapter, SOURCE_BASELINE, SOURCE_INSPECTED_AT, SUBVIEWS } from './module-review-inventory.mjs'
 import { OBLIGATION_STATUS_LABELS, REVIEW_OBLIGATIONS, validateReviewObligations } from './module-review-obligations.mjs'
 import { buildRuntimeEvidenceLedger } from './runtime-evidence-ledger.mjs'
 
@@ -223,7 +223,7 @@ export function buildModuleReviewCoverage() {
   return {
     schemaVersion: 1,
     sourceBaseline: SOURCE_BASELINE,
-    sourceInspectedAt: OBSERVATION_DATE,
+    sourceInspectedAt: SOURCE_INSPECTED_AT,
     scope: '源码覆盖索引，非全模块运行验收；未列出的运行状态继续按 module-review 规程扩展',
     registry,
     counts: { productionRoutes: routeLedger.endpoints.length, rootVariants: surfaces.filter(surface => surface.path === 'page').length, surfaces: surfaces.length, environmentCases: cases.length, referenceMenus: REFERENCE_MENUS.length },
