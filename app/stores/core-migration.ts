@@ -212,6 +212,7 @@ export function createCoreMigrationStoreDefinition(
         activeMigration.value = marker
 
         if (!marker && pendingMarker) {
+          phase.value = 'cutover-pending'
           if (snapshot.activeBatchId === pendingMarker.batchId) {
             if (snapshot.authority === 'local') {
               await dependencies.localSource.assertCurrentSource(
@@ -243,7 +244,6 @@ export function createCoreMigrationStoreDefinition(
             phase.value = 'idle'
             return snapshot
           }
-          phase.value = 'cutover-pending'
           throw new CoreMigrationFlowError('source-mismatch', '待切换标记与中央迁移状态不一致')
         }
 
