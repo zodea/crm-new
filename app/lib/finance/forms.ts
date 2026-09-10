@@ -3,6 +3,7 @@ import type {
   FileRefChanges,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'
 import { select, withTransaction } from '~/lib/db/connection'
 import {
   logCreate,
@@ -806,7 +807,10 @@ async function validatePaymentApplicationAllocations(
     const settlement = await assertReference<{
       project_id: string
       contract_id: string
+      status: string
     }>(tx, 'expenditure_settlements', settlementId, '关联结算')
+    if (!isConfirmedExpenditureSettlement(settlement.status))
+      throw new Error('关联结算尚未确认，不能用于付款申请')
     if (draft.projectId && settlement.project_id !== draft.projectId)
       throw new Error('关联结算不属于所选项目')
     if (draft.contractId && settlement.contract_id !== draft.contractId)

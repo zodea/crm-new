@@ -34,7 +34,7 @@ beforeEach(async () => {
       total_amount, settlement_date, status
     ) VALUES (
       'detail-settlement', 'JS-DETAIL', '详情材料结算', '材采', 'detail-project',
-      'detail-supplier', 'detail-contract', 100, '2026-08-01', '已审批'
+      'detail-supplier', 'detail-contract', 100, '2026-08-01', '已确认'
     )
   `)
   await mem.execute(`
@@ -103,6 +103,13 @@ beforeEach(async () => {
 afterEach(() => mem.close())
 
 describe('付款申请智能业务洞察', () => {
+  it.each(['pending', '待确认', 'approved', '已审批'])('往期结算不计入 %s 状态，确认后再纳入', async (status) => {
+    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', [status, 'detail-settlement'])
+    expect((await loadPaymentApplicationDetail('detail-application'))?.contractSettledAmount).toBe(0)
+    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', ['confirmed', 'detail-settlement'])
+    expect((await loadPaymentApplicationDetail('detail-application'))?.contractSettledAmount).toBe(100)
+  })
+
   it('只把真实勾稽异常标成待处理，正常的待支付余额不误报', () => {
     const insight = buildPaymentApplicationInsight({
       status: 'submitted',

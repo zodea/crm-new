@@ -1,4 +1,5 @@
 import type { InvoiceState } from './forms'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES } from '~/lib/contract/effective-status'
 import { select } from '~/lib/db/connection'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
 
@@ -278,7 +279,7 @@ export async function loadPaymentApplicationDetail(
         FROM expenditure_settlements AS settlement
         WHERE settlement.contract_id = application.contract_id
           AND ${visibleCond('expenditure_settlements', 'settlement')}
-          AND settlement.status NOT IN ('草稿', 'draft')
+          AND settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})
       ), 0) AS contract_settled_amount,
       COALESCE((
         SELECT SUM(recordAllocation.allocated_amount)

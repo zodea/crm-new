@@ -83,7 +83,7 @@ beforeEach(async () => {
     )
     VALUES (
       'settlement-finance', 'JS-F3', '材料结算', '材采', 'project-finance',
-      'supplier-finance', 'contract-expense', 100, '2026-07-01', '已审批'
+      'supplier-finance', 'contract-expense', 100, '2026-07-01', '已确认'
     )
   `)
   await mem.execute(`
@@ -104,6 +104,22 @@ afterEach(() => {
 })
 
 describe('f3 六条资金表单领域 action', () => {
+  it.each(['draft', '待确认', 'pending', 'approved', '已审批'])('拒绝引用 %s 结算且不留下付款头或分摊', async (status) => {
+    await mem.execute('UPDATE expenditure_settlements SET status = ? WHERE id = ?', [status, 'settlement-finance'])
+    await expect(useFinanceStore().saveForm('payment_application', {
+      name: '无效结算关联',
+      bizType: '有合同-材料',
+      projectId: 'project-finance',
+      supplierId: 'supplier-finance',
+      contractId: 'contract-expense',
+      applyAmount: 100,
+      invoiceState: '先款后票',
+      settlementAllocations: [{ settlementId: 'settlement-finance', allocatedAmount: 100 }],
+    }, 'draft')).rejects.toThrow('关联结算尚未确认')
+    expect(await mem.select('SELECT id FROM payment_applications')).toEqual([])
+    expect(await mem.select('SELECT id FROM payment_application_settlement_allocations')).toEqual([])
+  })
+
   it('通过同一 Pinia store 保存六种真实实体、明细、分摊和附件', async () => {
     const store = useFinanceStore()
     const receipt = await store.saveForm('receipt', {

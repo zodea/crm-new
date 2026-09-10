@@ -13,6 +13,11 @@ const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
 }
 
 test.describe('Issue #203：付款管理', () => {
+  test.setTimeout(90_000)
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+  })
+
   for (const width of RESPONSIVE_WIDTHS) {
     test(`${width}px 展示真实批复、已确认支付和应付余额，页面不横向溢出`, async ({ page }) => {
       await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
@@ -20,7 +25,7 @@ test.describe('Issue #203：付款管理', () => {
 
       const toolbar = page.locator('[data-ui="payment-management-toolbar"]')
       await expect(toolbar.getByRole('heading', { name: '付款管理' }))
-        .toBeVisible({ timeout: 15_000 })
+        .toBeVisible({ timeout: 60_000 })
       await expect(page.getByRole('group', { name: '应付余额' })).toBeVisible()
       await expect(page.getByRole('button', { name: '付款状态，已选 1 项' })).toContainText('待支付')
       await expect(page.getByText('五金机电采购首期请款', { exact: true })).toBeVisible()

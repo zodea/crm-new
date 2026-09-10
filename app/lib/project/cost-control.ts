@@ -1,4 +1,5 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES } from '~/lib/contract/effective-status'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
 
 export const COST_CATEGORIES = [
@@ -196,7 +197,7 @@ export async function loadProjectCostControl(db: SoftDb): Promise<ProjectCostCon
       JOIN contracts AS contract ON contract.id = settlement.contract_id
       WHERE ${visibleCond('expenditure_settlements', 'settlement')}
         AND ${visibleCond('contracts', 'contract')}
-        AND settlement.status IN ('confirmed', 'approved', '已确认', '已审批')
+        AND settlement.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})
         AND contract.status NOT IN ('draft', '草稿')
         ORDER BY settlement.created_at, settlement.id
     `),
