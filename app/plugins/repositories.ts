@@ -64,7 +64,7 @@ export interface DomainRepositories {
   ownerCommercialDocumentCommands: OwnerCommercialDocumentCommandRepository
 }
 
-export default defineNuxtPlugin(() => {
+export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
     otherSettlements: createOtherSettlementRepository((url, options) => $fetch(url, options)),
     auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),
@@ -127,7 +127,7 @@ export default defineNuxtPlugin(() => {
     }),
   }
   return { provide: { repositories } }
-})
+} })
 
 declare module '#app' {
   interface NuxtApp {

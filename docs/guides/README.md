@@ -11,6 +11,7 @@
 ## 当前指南
 
 - [列表搜索与筛选使用指南](./list-search-and-filters.md)（跨模块公共交互）
+- [页签与页面恢复使用指南](./tabs-and-recovery.md)
 - [其他支出结算使用指南](./other-expense-settlement.md)
 
 - [其他支出与公司支出合同使用指南](./auxiliary-contracts.md)
@@ -34,6 +35,8 @@
 
 ## 页签与未保存内容
 
+浏览器刷新会恢复已登记的只读页签位置；新建、编辑、导入映射等写态及未保存内容不纳入恢复。页签内“刷新当前页”继续保留其他页面的会话状态；范围与失败处理见[页签与页面恢复指南](./tabs-and-recovery.md)。
+
 主数据、合同、甲方单据、财务表单、材料表单、送货单归档及新建工资草稿支持页签草稿保护：切换页签保留输入；关闭、关闭其他/右侧/全部或刷新前先确认未保存内容。选择“取消”保留页面和输入；批量关闭中任一页面取消，本次整批都不关闭。
 
 项目、客户、分供方、班组、工人与三类核心合同的每个编辑页独立保留记录身份和版本。先打开 A，再打开 B，切回 A 保存时只更新 A；版本冲突仍需显式选择保留本地内容或使用服务器最新版。
@@ -42,6 +45,9 @@
 
 ```powershell
 python scripts/generate-project-guide-pdf.py
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/tabs-and-recovery.md `
+  --output output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/home-project-progress.md `
   --output output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
@@ -96,6 +102,7 @@ python scripts/generate-project-guide-pdf.py `
 
 ```text
 output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
+output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
 output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
 output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
 output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf

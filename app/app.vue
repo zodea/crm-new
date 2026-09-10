@@ -2,7 +2,7 @@
 // 应用外框（ADR 0008 交互底座 + ADR 0013 外壳规格）：shadcn-vue Sidebar 体系 ——
 // SidebarProvider（响应式状态）> AppSidebar（可固定/悬浮的完整导航树）
 // + SidebarInset 主区（动作顶栏 AppTopbar + 路由页签 AppTabBar + keep-alive 页面）。
-// 页签隔离：page-key=fullPath 让每个页签是独立组件实例（表单/内部 state 互不串），
+// 页签隔离：page-key 按路径身份与缓存版本区分实例，同路径 query 应用新预筛，
 // 配合 keepalive 缓存；滚动位置按页签 key 手动存取（滚动容器是共享的，keep-alive 不覆盖）。
 import { useScrollLock } from '@vueuse/core'
 import { pruneTabPageWrappers, tabPageCacheName } from '~/lib/tabs/page-cache'
@@ -62,7 +62,7 @@ watch(
     pruneTabPageWrappers(tabsStore.tabs.map(tab => tab.key))
     tabsStore.acknowledgeInvalidations(keys)
   },
-  { flush: 'post' },
+  { flush: 'post', immediate: true },
 )
 
 function pageKey(r: { fullPath: string }) {
@@ -76,6 +76,7 @@ function pageKey(r: { fullPath: string }) {
     <SidebarInset class="h-svh overflow-hidden">
       <AppTopbar />
       <AppTabBar />
+      <TabRestoreStatus />
       <!-- 主区滚动容器；密集表格在各自区域内横向滚动。 -->
       <div
         ref="scrollEl"

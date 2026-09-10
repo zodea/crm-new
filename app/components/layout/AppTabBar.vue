@@ -4,8 +4,9 @@ import { useOverlayStack, useOwnedOverlayLayerStyle } from '~/composables/useOve
 import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
 
-const route = useRoute()
 const router = useRouter()
+// 外壳跟随已确认的导航。Nuxt useRoute 要等页面挂载才同步，启动恢复时仍可能是旧写态地址。
+const route = computed(() => router.currentRoute.value)
 const tabsStore = useTabsStore()
 const kit = useKitUI()
 const { hasActiveModal } = useOverlayStack()
@@ -31,6 +32,14 @@ function syncScrollControls() {
   canScrollForward.value = element.scrollLeft < maxScrollLeft - 1
 }
 
+function scrollActiveTabIntoView() {
+  tabEls.value?.find(element => element.dataset.tabKey === tabsStore.activeKey)?.scrollIntoView({
+    block: 'nearest',
+    inline: 'nearest',
+  })
+  syncScrollControls()
+}
+
 function pageTabs(direction: -1 | 1) {
   const element = tabListEl.value
   if (!element)
@@ -42,9 +51,9 @@ function pageTabs(direction: -1 | 1) {
 }
 
 watch(
-  () => route.fullPath,
+  () => route.value.fullPath,
   (fullPath) => {
-    const blocked = tabsStore.open({ fullPath, title: routeTitle(route.path) || '未命名' })
+    const blocked = tabsStore.open({ fullPath, title: routeTitle(route.value.path) || '未命名' })
     if (blocked) {
       kit.warning(`页签已达上限 ${MAX_TABS} 个`, '请先关闭不需要的页签')
       if (tabsStore.activeFullPath !== fullPath)
@@ -56,15 +65,11 @@ watch(
 
 watch(
   () => tabsStore.activeKey,
-  async (key) => {
+  async () => {
     await nextTick()
-    tabEls.value?.find(element => element.dataset.tabKey === key)?.scrollIntoView({
-      block: 'nearest',
-      inline: 'nearest',
-    })
-    syncScrollControls()
+    scrollActiveTabIntoView()
   },
-  { flush: 'post' },
+  { flush: 'post', immediate: true },
 )
 
 function goTab(fullPath: string, key: string) {
@@ -75,7 +80,7 @@ function goTab(fullPath: string, key: string) {
 async function closeAndFollow(key: string) {
   if (!await tabsStore.requestClose(key))
     return
-  if (tabsStore.activeFullPath !== route.fullPath)
+  if (tabsStore.activeFullPath !== route.value.fullPath)
     router.push(tabsStore.activeFullPath)
 }
 
@@ -93,7 +98,7 @@ useEventListener(tabListEl, 'wheel', (event) => {
 useEventListener(tabListEl, 'scroll', syncScrollControls, { passive: true })
 useResizeObserver(
   () => [tabListEl.value, tabTrackEl.value],
-  syncScrollControls,
+  scrollActiveTabIntoView,
 )
 
 watch(
@@ -117,7 +122,7 @@ async function showMenu(key: string, x: number, y: number) {
     key,
   }
   await nextTick()
-  menuEl.value?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+  menuEl.value?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus({ preventScroll: true })
 }
 
 function openMenu(event: MouseEvent, key: string) {
@@ -141,7 +146,7 @@ function closeMenu(restoreFocus = false) {
     nextTick(() => tabEls.value
       ?.find(element => element.dataset.tabKey === key)
       ?.querySelector<HTMLButtonElement>('[data-tab-trigger]')
-      ?.focus())
+      ?.focus({ preventScroll: true }))
   }
 }
 
@@ -186,12 +191,22 @@ async function act(action: () => Promise<boolean>) {
   closeMenu()
   if (!await pending)
     return
-  if (tabsStore.activeFullPath !== route.fullPath)
+  if (tabsStore.activeFullPath !== route.value.fullPath)
     router.push(tabsStore.activeFullPath)
 }
 
 useEventListener('click', () => closeMenu())
-useEventListener('scroll', () => closeMenu(), true)
+useEventListener('scroll', (event) => {
+  if (menu.value.open && event.target === tabListEl.value) {
+    // 恢复活动页、键盘聚焦和视口变化会异步滚动页签栏；菜单随所属页签定位，不能刚打开就被关闭。
+    const anchor = tabEls.value?.find(element => element.dataset.tabKey === menu.value.key)
+    const rect = anchor?.getBoundingClientRect()
+    if (rect)
+      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 166) }
+    return
+  }
+  closeMenu(!!menuEl.value?.contains(document.activeElement))
+}, true)
 onKeyStroke('Escape', () => closeMenu(true))
 </script>
 

@@ -1,3 +1,4 @@
+import type { Tab } from '~/lib/tabs/tab-machine'
 // 页签导航 store（Pinia）——纯状态机 tab-machine 的响应式外壳 + 副作用边界。
 // 唯一写路径走 action；超限由 open() 返回 blocked，交调用方弹临时 toast（CONTEXT.md）。
 import { defineStore } from 'pinia'
@@ -165,6 +166,34 @@ export const useTabsStore = defineStore('tabs', () => {
     state.value = { ...state.value, tabs }
   }
 
+  /** 仅由恢复边界传入已完成结构校验的页面；不激活或挂载后台页。 */
+  function restoreSession(pages: Tab[]) {
+    const previous = tabs.value.map(tab => tab.key)
+    let restored = initialTabsState()
+    for (const page of pages)
+      restored = openTab(restored, page).state
+    state.value = { ...restored, activeKey: initialTabsState().activeKey }
+    closeGuards.clear()
+    invalidate(previous)
+  }
+
+  function updateRestoredTab(key: string, input: { fullPath: string, title: string }) {
+    if (!tabs.value.some(tab => tab.key === key))
+      return
+    const canonicalKey = deriveKey(input.fullPath)
+    state.value = {
+      ...state.value,
+      activeKey: activeKey.value === key ? canonicalKey : activeKey.value,
+      tabs: tabs.value
+        .filter(tab => tab.key !== canonicalKey || tab.key === key)
+        .map(tab => tab.key === key ? { ...tab, ...input, key: canonicalKey } : tab),
+    }
+    if (key !== canonicalKey) {
+      invalidate([key])
+      closeGuards.delete(key)
+    }
+  }
+
   return {
     tabs,
     activeKey,
@@ -186,5 +215,7 @@ export const useTabsStore = defineStore('tabs', () => {
     acknowledgeInvalidations,
     pageCacheKey,
     setTitle,
+    restoreSession,
+    updateRestoredTab,
   }
 })
