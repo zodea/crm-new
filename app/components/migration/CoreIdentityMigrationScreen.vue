@@ -13,6 +13,7 @@ import type {
 } from '~/lib/migration/core-contract'
 import { isTauri } from '@tauri-apps/api/core'
 import { computed, onMounted } from 'vue'
+import KitButton from '~/components/ui/KitButton.vue'
 import { isCoreMigrationBlockingIssue } from '~/lib/migration/core-contract'
 import { useCoreMigrationStore } from '~/stores/core-migration'
 import MigrationPreflightPanel from './MigrationPreflightPanel.vue'
@@ -176,8 +177,8 @@ onMounted(() => run(store.hydrate))
       :mode="store.source?.mode ?? '浏览器正式快照'"
       :checks="checks"
       :backup="backupDisplay"
-      :preflight-disabled="nativeUnsupported || store.busy || store.phase === 'confirmed'"
-      :create-backup-disabled="store.busy || !store.preflightResult || Boolean(store.backup)"
+      :preflight-disabled="nativeUnsupported || store.busy || store.preparationBlocked"
+      :create-backup-disabled="store.busy || store.preparationBlocked || !store.preflightResult || Boolean(store.backup)"
       @preflight="run(store.preflight)"
       @create-backup="run(store.createBackup)"
     />
@@ -193,22 +194,22 @@ onMounted(() => run(store.hydrate))
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button
+          <KitButton
             type="button"
-            class="btn-secondary"
-            :disabled="store.busy || !store.backup || store.phase === 'confirmed'"
+            variant="secondary"
+            :disabled="store.busy || store.preparationBlocked || !store.backup"
             @click="run(store.dryRun)"
           >
             执行 dry-run
-          </button>
-          <button
+          </KitButton>
+          <KitButton
             type="button"
-            class="btn-primary"
-            :disabled="store.busy || !['dry-run', 'failed'].includes(store.phase) || !store.batch"
+            variant="primary"
+            :disabled="store.busy || store.preparationBlocked || !['dry-run', 'failed'].includes(store.phase) || !store.batch"
             @click="run(store.importBatch)"
           >
             {{ store.phase === 'failed' ? '重试导入可导入记录' : '导入可导入记录' }}
-          </button>
+          </KitButton>
         </div>
       </div>
 
@@ -233,12 +234,12 @@ onMounted(() => run(store.hydrate))
 
     <MigrationReconciliationTable
       :rows="reconciliationRows"
-      :state="store.batch
-        ? 'checked'
-        : store.phase === 'confirmed'
-          ? 'verified'
-          : store.phase === 'rollback-pending'
-            ? 'rollback-pending'
+      :state="store.phase === 'rollback-pending'
+        ? 'rollback-pending'
+        : store.batch
+          ? 'checked'
+          : store.phase === 'confirmed'
+            ? 'verified'
             : 'unchecked'"
     />
 

@@ -64,6 +64,18 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
       <span class="text-12px text-ink-soft">{{ rows.length }} 条对账记录</span>
     </div>
 
+    <div v-if="state === 'rollback-pending'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
+      <div>
+        <span class="i-lucide-rotate-ccw text-22px text-warn" aria-hidden="true" />
+        <p class="m-0 mt-2 text-13px font-700 text-ink">
+          中央已回滚，等待恢复本地快照
+        </p>
+        <p class="m-0 mt-1 text-12px text-ink-soft">
+          历史对账已经完成；请重试回滚以恢复受保护备份。
+        </p>
+      </div>
+    </div>
+
     <div v-if="rows.length" class="max-w-full overflow-x-auto" data-testid="migration-reconciliation-scroll">
       <table class="w-full min-w-1500px border-collapse text-left text-12px" aria-label="迁移对账问题">
         <thead class="bg-surface-2 text-ink-soft">
@@ -164,18 +176,7 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
         </p>
       </div>
     </div>
-    <div v-else-if="state === 'rollback-pending'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
-      <div>
-        <span class="i-lucide-rotate-ccw text-22px text-warn" aria-hidden="true" />
-        <p class="m-0 mt-2 text-13px font-700 text-ink">
-          中央已回滚，等待恢复本地快照
-        </p>
-        <p class="m-0 mt-1 text-12px text-ink-soft">
-          历史对账已经完成；请重试回滚以恢复受保护备份。
-        </p>
-      </div>
-    </div>
-    <div v-else class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
+    <div v-else-if="state === 'unchecked'" class="flex min-h-28 items-center justify-center px-4 py-6 text-center" role="status">
       <div>
         <span class="i-lucide-clock-3 text-22px text-ink-muted" aria-hidden="true" />
         <p class="m-0 mt-2 text-13px font-700 text-ink">

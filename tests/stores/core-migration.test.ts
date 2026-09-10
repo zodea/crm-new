@@ -280,6 +280,17 @@ describe('core migration store', () => {
     expect(store.activeMigration).toEqual(marker())
     expect(store.batch).toMatchObject({ status: 'rolled-back', authority: 'local' })
 
+    const recoveryBatch = store.batch
+    const protectedBackup = store.backup
+    const eventCount = events.length
+    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+      await expect(action()).rejects.toThrow('不能重新发起迁移')
+      expect(store.phase).toBe('rollback-pending')
+      expect(store.batch).toBe(recoveryBatch)
+      expect(store.backup).toBe(protectedBackup)
+    }
+    expect(events).toHaveLength(eventCount)
+
     await store.rollback()
 
     expect(repository.rollback).toHaveBeenCalledTimes(2)
@@ -444,5 +455,9 @@ describe('core migration store', () => {
 
     expect(localSource.abortSwitch).not.toHaveBeenCalled()
     expect(store.phase).toBe('cutover-pending')
+    for (const action of [store.preflight, store.createBackup, store.dryRun, store.importBatch]) {
+      await expect(action()).rejects.toThrow('不能重新发起迁移')
+      expect(store.phase).toBe('cutover-pending')
+    }
   })
 })

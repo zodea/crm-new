@@ -1,4 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
 import { createMemoryDb } from '../tests/helpers/memory-db'
@@ -281,4 +283,66 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
       await expectNoPageOverflow(page, `#294 核心身份迁移 @ ${width}px`)
     })
   }
+
+  test('中央回滚后本地恢复失败时保留原批次并允许键盘重试', async ({ page }) => {
+    test.setTimeout(120_000)
+    await page.goto('/settings/data-migration')
+    await expect(page.getByTestId('core-migration-page')).toBeVisible({ timeout: 60_000 })
+    await installProductionSnapshot(page, await legacyProductionSnapshot({ withSoftDeletedSupplier: true }))
+    await page.reload()
+    await page.getByRole('button', { name: '运行预检' }).click()
+    await expect(page.getByText(`sqlite-v${LATEST_VERSION}`, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '创建不可变备份' }).click()
+    await page.getByRole('button', { name: '执行 dry-run' }).click()
+    await expect(page.getByText('已保留软删除', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '导入可导入记录' }).click()
+    await page.getByRole('button', { name: '确认切换中央后台' }).click()
+    await expect(page.getByText('已切换中央后台', { exact: true })).toBeVisible()
+    const protectedState = await localMigrationState(page)
+
+    await page.evaluate(() => {
+      const transaction = IDBDatabase.prototype.transaction
+      IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<IDBDatabase['transaction']>) {
+        const [stores, mode] = args
+        const names = typeof stores === 'string' ? [stores] : [...stores]
+        if (this.name === 'crm-new-browser' && mode === 'readwrite' && names.includes('database_snapshots')) {
+          IDBDatabase.prototype.transaction = transaction
+          throw new Error('测试：本地快照暂时无法恢复')
+        }
+        return transaction.apply(this, args)
+      }
+    })
+    const rollback = page.getByRole('button', { name: '回滚到本地快照' })
+    await rollback.click()
+    await expect(page.getByRole('alert')).toHaveText('测试：本地快照暂时无法恢复')
+    await expect(page.getByText('中央已回滚，等待恢复本地快照', { exact: true })).toBeVisible()
+    await expect(page.getByText('对账通过，未发现迁移差异')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '运行预检' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '执行 dry-run' })).toBeDisabled()
+    const pendingState = await localMigrationState(page)
+    expect(pendingState.marker).toEqual(protectedState.marker)
+    expect(pendingState.backup).toEqual(protectedState.backup)
+    const central = await page.request.get('/api/migrations/core/snapshot')
+    expect(await central.json()).toMatchObject({ authority: 'local', activeBatchId: null })
+
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+      await page.getByText('中央已回滚，等待恢复本地快照', { exact: true }).scrollIntoViewIfNeeded()
+      await expectNoPageOverflow(page, `迁移回滚待恢复 @ ${width}px`)
+      if (process.env.CRM_EVIDENCE_DIR) {
+        await mkdir(process.env.CRM_EVIDENCE_DIR, { recursive: true })
+        await page.screenshot({ path: path.join(process.env.CRM_EVIDENCE_DIR, `migration-recovery-${width}.png`) })
+      }
+    }
+    await rollback.focus()
+    await rollback.press('Tab')
+    await page.keyboard.press('Shift+Tab')
+    await expect(rollback).toBeFocused()
+    await rollback.press('Enter')
+    await expect(page.getByText('已回滚本地快照', { exact: true })).toBeVisible()
+    const restored = await localMigrationState(page)
+    expect(restored.marker).toBeUndefined()
+    expect(restored.readOnly).toBe(false)
+    expect(restored.production).toEqual(protectedState.backup)
+  })
 })

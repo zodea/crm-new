@@ -61,6 +61,10 @@ const switchDisabled = computed(() => props.busy
 const rollbackDisabled = computed(() => props.busy
   || (props.status !== 'switched' && props.status !== 'rollback-pending')
   || !props.rollbackExpiresAt)
+
+const historicalReconciliation = computed(() =>
+  ['switched', 'rolling-back', 'rollback-pending', 'rolled-back'].includes(props.status),
+)
 </script>
 
 <template>
@@ -89,8 +93,8 @@ const rollbackDisabled = computed(() => props.busy
         </span>
       </li>
       <li class="border border-line bg-surface-2 px-3 py-2">
-        <span :class="reconciliationPassed ? 'status-ok' : 'status-danger'">
-          {{ reconciliationPassed ? '对账已通过' : '对账未通过' }}
+        <span :class="historicalReconciliation ? 'text-ink-soft' : reconciliationPassed ? 'status-ok' : 'status-danger'">
+          {{ historicalReconciliation ? '历史对账已完成' : reconciliationPassed ? '对账已通过' : '对账未通过' }}
         </span>
       </li>
     </ul>
