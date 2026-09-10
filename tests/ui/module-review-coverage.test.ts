@@ -128,17 +128,36 @@ describe('module review coverage', () => {
     }
   })
 
-  it('retains unfulfilled OCR samples, central payments, global migration and adopted factor decisions', () => {
+  it('retains unfulfilled OCR samples, central payments and global migration', () => {
     const coverage = buildModuleReviewCoverage()
     const at = (id: string) => coverage.obligations.find(item => item.id === id)!
     expect(at('OCR-06').status).toBe('partial')
     expect(at('PAY-05').status).toBe('ready')
     expect(at('MIG-07').status).toBe('partial')
     expect(at('PAY-08').status).toBe('needs-decision')
-    expect(at('FACTOR-01').status).toBe('ready')
-    expect(at('FACTOR-01').sources).toContain('https://github.com/zodea/crm-new/issues/204#issuecomment-5145177434')
     const ocrCase = coverage.cases.find(item => item.obligationIds?.includes('OCR-04'))!
     expect(ocrCase.acceptance.frontend).not.toBe('passed')
+  })
+
+  it('records verified factor obligations at the implementation commit without upgrading the whole case', () => {
+    const coverage = buildModuleReviewCoverage()
+    const factors = coverage.obligations.filter(item => item.id.startsWith('FACTOR-'))
+    expect(factors.map(item => item.id)).toEqual(['FACTOR-01', 'FACTOR-02', 'FACTOR-03', 'FACTOR-04'])
+    for (const obligation of factors) {
+      expect(obligation.status).toBe('current-passed')
+      expect(obligation.ownerIssue).toBe(432)
+      expect(obligation.sources).toContain('https://github.com/zodea/crm-new/issues/204#issuecomment-5145177434')
+      expect(obligation.evidence).toContainEqual(expect.objectContaining({
+        reference: 'docs/design/evidence/issue-432/factor-workbench-verification.md',
+        commit: '338eaa978a7e325d6d7f86a9de272476ddfed5ef',
+        recency: 'current-run',
+      }))
+      for (const caseId of obligation.caseIds) {
+        const linked = coverage.cases.find(item => item.id === caseId)!
+        expect(linked.acceptance.frontend).toBe('not-verified')
+        expect(linked.acceptance.production).toBe('not-verified')
+      }
+    }
   })
 
   it('rejects duplicate obligations, stale case references and unsupported pass claims', () => {
