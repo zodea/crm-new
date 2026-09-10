@@ -25,6 +25,15 @@ const group = {
 } as ScheduleGroupView
 
 describe('排程下钻导航', () => {
+  it('来源感知的排程下钻及返回保留正式或测试身份', () => {
+    for (const origin of ['real', 'demo'] as const) {
+      const location = buildQuantityDrillLocation('home', group, task, origin) as { query: Record<string, string> }
+      expect(location.query.origin).toBe(origin)
+      const context = parseScheduleDrillContext(location.query)!
+      expect(buildScheduleReturnLocation(context)).toMatchObject({ path: '/', query: { project: task.projectId, origin } })
+      expect(buildScheduleReturnLocation({ ...context, source: 'schedule' })).toMatchObject({ path: '/schedule', query: { origin } })
+    }
+  })
   it('首页和施工进度页共用完整工程量筛选参数', () => {
     const location = buildQuantityDrillLocation('home', group, task)
 

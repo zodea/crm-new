@@ -38,6 +38,17 @@ const global = {
 }
 
 describe('homeDashboardSurface', () => {
+  it('中央排程缺源不显示假进度或创建入口，查看来源保留项目身份', () => {
+    render(HomeDashboardSurface, {
+      props: { state: 'not-connected', today: '2026-09-10', selectedProjectId: 'new-project', selectedProjectName: '中央新项目', selectedOrigin: 'real', sourceDescription: '中央排程尚未接入，计划与实际进度未知。' },
+      global,
+    })
+    expect(screen.getByRole('status', { name: '中央新项目的排程来源尚未接入' })).not.toBeNull()
+    expect(screen.getByText('中央排程尚未接入，计划与实际进度未知。')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '施工进度甘特' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '新建楼栋分组' })).toBeNull()
+    expect(JSON.parse(screen.getByRole('link', { name: '查看施工进度来源' }).getAttribute('href')!)).toEqual({ path: '/schedule', query: { project: 'new-project', origin: 'real', from: 'home' } })
+  })
   it('renders loading, catalog-empty, schedule-empty and error as explicit shared states', async () => {
     const loading = render(HomeDashboardSurface, {
       props: { state: 'loading', today: '2026-07-27' },

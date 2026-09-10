@@ -212,7 +212,7 @@ function maxDate(values: readonly string[]): string | null {
   return values.length ? [...values].sort().at(-1)! : null
 }
 
-export async function loadScheduleCatalog(db: SoftDb): Promise<ScheduleCatalogProject[]> {
+export async function loadScheduleCatalog(db: Pick<SoftDb, 'select'>): Promise<ScheduleCatalogProject[]> {
   const rows = await db.select<ProjectRow>(selectVisibleSql('projects', 'ORDER BY created_at DESC, id'))
   const counts = await db.select<{ project_id: string, n: number }>(
     `${hiddenCtesFor('schedule_groups')}
@@ -232,7 +232,7 @@ export async function loadScheduleCatalog(db: SoftDb): Promise<ScheduleCatalogPr
 }
 
 export async function loadScheduleBuildings(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId = '',
 ): Promise<ScheduleBuildingOption[]> {
@@ -270,7 +270,7 @@ export async function loadScheduleBuildings(
 }
 
 export async function loadScheduleBuildingCoverage(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   contractId: string,
 ): Promise<ScheduleBuildingCoverage[]> {
@@ -331,7 +331,7 @@ export async function loadScheduleBuildingCoverage(
   }))
 }
 
-export async function loadScheduleContracts(db: SoftDb, projectId: string): Promise<ScheduleContractOption[]> {
+export async function loadScheduleContracts(db: Pick<SoftDb, 'select'>, projectId: string): Promise<ScheduleContractOption[]> {
   const rows = await db.select<{
     id: string
     project_id: string
@@ -364,7 +364,7 @@ export async function loadScheduleContracts(db: SoftDb, projectId: string): Prom
 }
 
 export async function loadScheduleProject(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   today: string,
 ): Promise<ScheduleProjectView | null> {

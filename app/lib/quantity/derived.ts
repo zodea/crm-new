@@ -126,7 +126,7 @@ function inClause(values: readonly string[] | undefined): string {
 }
 
 export async function loadQuantityStageProgress(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   scope: QuantityStageProgressScope = {},
 ): Promise<QuantityStageProgress[]> {
@@ -234,7 +234,7 @@ export async function loadQuantityStageProgress(
 }
 
 export async function loadQuantityConstructionRecords(
-  db: SoftDb,
+  db: Pick<SoftDb, 'select'>,
   projectId: string,
   filter: QuantityConstructionRecordFilter = {},
 ): Promise<QuantityConstructionRecord[]> {
@@ -340,7 +340,7 @@ export async function loadQuantityConstructionRecords(
     ))
 }
 
-export async function loadQuantityMonthlyOutput(db: SoftDb, projectId: string): Promise<QuantityMonthlyOutput[]> {
+export async function loadQuantityMonthlyOutput(db: Pick<SoftDb, 'select'>, projectId: string): Promise<QuantityMonthlyOutput[]> {
   // 月度只聚合 completed；量走活链接，且每个分项只在显式报量阶段计一次。
   const rows = await db.select<MonthlyRow>(
     `${hiddenCtesFor('unit_stage_completions', 'construction_stage_items', 'house_type_template_items')}

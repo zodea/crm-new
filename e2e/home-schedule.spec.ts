@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+})
+
 async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Page) {
   const widths = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
@@ -13,7 +17,7 @@ test.describe('Issue #7：首页共享施工进度甘特', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.goto('/')
+    await page.goto('/?project=proj_demo_001&origin=demo')
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: '施工进度', exact: true })).toBeVisible()

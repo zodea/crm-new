@@ -1,10 +1,12 @@
 import type { LocationQuery, RouteLocationRaw } from 'vue-router'
 import type { ScheduleGroupView, ScheduleTaskView } from './read-model'
+import type { DataOriginDTO } from '~/types/read-model'
 
 export type ScheduleDrillSource = 'home' | 'schedule'
 
 export interface ScheduleDrillContext {
   source: ScheduleDrillSource
+  origin?: DataOriginDTO
   projectId: string
   groupId: string
   taskId: string
@@ -28,6 +30,7 @@ export function buildQuantityDrillLocation(
   source: ScheduleDrillSource,
   group: ScheduleGroupView,
   task: ScheduleTaskView,
+  origin?: DataOriginDTO,
 ): RouteLocationRaw {
   return {
     path: '/subcontract/quantity',
@@ -45,17 +48,20 @@ export function buildQuantityDrillLocation(
       planStart: task.plannedStart,
       planFinish: task.plannedFinish,
       from: source,
+      ...(origin ? { origin } : {}),
     },
   }
 }
 
 export function parseScheduleDrillContext(query: LocationQuery): ScheduleDrillContext | null {
   const source = queryString(query.from)
+  const origin = queryString(query.origin)
   if (source !== 'home' && source !== 'schedule')
     return null
 
   return {
     source,
+    ...(origin === 'real' || origin === 'demo' ? { origin } : {}),
     projectId: queryString(query.project),
     groupId: queryString(query.group),
     taskId: queryString(query.task),
@@ -79,6 +85,7 @@ export function buildScheduleReturnLocation(context: ScheduleDrillContext): Rout
         project: context.projectId,
         group: context.groupId,
         task: context.taskId,
+        ...(context.origin ? { origin: context.origin } : {}),
       },
     }
   }
@@ -89,6 +96,7 @@ export function buildScheduleReturnLocation(context: ScheduleDrillContext): Rout
       project: context.projectId,
       group: context.groupId,
       task: context.taskId,
+      ...(context.origin ? { origin: context.origin } : {}),
     },
   }
 }

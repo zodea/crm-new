@@ -6,10 +6,9 @@ import type {
 import type { ReadState } from '~/types/read-model'
 import { defineStore } from 'pinia'
 import { shallowReadonly, shallowRef } from 'vue'
+import { listAllProjects } from '~/lib/project/list-all'
 import {
-  projectProblem,
   projectProblemFromUnknown,
-  ProjectRepositoryProblem,
 } from '~/lib/project/repository'
 
 function previousData(state: ReadState<ProjectListPageDTO>): ProjectListPageDTO | null {
@@ -63,21 +62,7 @@ export const useProjectListStore = defineStore('project-list', () => {
   }
 
   async function listAll(nextQuery: ProjectListQueryDTO): Promise<ProjectListItemDTO[]> {
-    const first = await repository.list({ ...nextQuery, page: 1, pageSize: 100 })
-    const items = [...first.items]
-    const pageCount = Math.ceil(first.pagination.total / 100)
-    for (let page = 2; page <= pageCount; page += 1) {
-      const next = await repository.list({ ...nextQuery, page, pageSize: 100 })
-      if (next.sourceVersion !== first.sourceVersion) {
-        throw new ProjectRepositoryProblem(projectProblem(
-          'stale-source',
-          '项目列表在导出读取期间发生变化，请重试',
-          true,
-        ))
-      }
-      items.push(...next.items)
-    }
-    return items
+    return listAllProjects(repository, nextQuery)
   }
 
   async function retry() {

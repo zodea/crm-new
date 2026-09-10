@@ -11,6 +11,8 @@ export type HomeDashboardViewState
   = | 'loading'
     | 'catalog-empty'
     | 'schedule-empty'
+    | 'not-connected'
+    | 'forbidden'
     | 'error'
     | 'ready'
 
@@ -50,44 +52,5 @@ export function summarizeHomeScheduleCoverage(
     isPartial: true,
     title: '部分排程数据尚未就绪',
     description: `${reasons.join('；')}。已显示可用进度，缺失部分不按 0 推断。`,
-  }
-}
-
-interface ResolveHomeProjectSwitchOptions<T> {
-  requestedId: string
-  confirmedId: string
-  load: (projectId: string) => Promise<T>
-}
-
-export type HomeProjectSwitchResult<T> = {
-  ok: true
-  selectedId: string
-  value: T
-} | {
-  ok: false
-  selectedId: string
-  failedId: string
-  error: unknown
-}
-
-export async function resolveHomeProjectSwitch<T>({
-  requestedId,
-  confirmedId,
-  load,
-}: ResolveHomeProjectSwitchOptions<T>): Promise<HomeProjectSwitchResult<T>> {
-  try {
-    return {
-      ok: true,
-      selectedId: requestedId,
-      value: await load(requestedId),
-    }
-  }
-  catch (error) {
-    return {
-      ok: false,
-      selectedId: confirmedId,
-      failedId: requestedId,
-      error,
-    }
   }
 }

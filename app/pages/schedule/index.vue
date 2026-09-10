@@ -1,3 +1,8 @@
+<script setup lang="ts">
+const route = useRoute()
+</script>
+
 <template>
-  <ScheduleScreen />
+  <HomeScheduleSourceScreen v-if="route.query.origin !== undefined" />
+  <ScheduleScreen v-else />
 </template>

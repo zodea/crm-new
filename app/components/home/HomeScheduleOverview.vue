@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
+import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
+import { Button } from '~/components/ui/button'
 
 const props = defineProps<{
   snapshot: ScheduleProjectView
   today: string
+  origin?: DataOriginDTO
+  hideScheduleLink?: boolean
   highlightedGroupId?: string
   highlightedTaskId?: string
 }>()
@@ -52,11 +56,13 @@ function dottedDate(value: string | null): string {
         计划完工 <strong>{{ dottedDate(snapshot.plannedFinish) }}</strong>
       </span>
       <span class="ml-auto text-11px text-ink-faint">
-        点工序下钻工程量 · 计划编辑在施工进度页
+        {{ origin ? '只读排程 · 点工序查看工程量' : '点工序下钻工程量 · 计划编辑在施工进度页' }}
       </span>
-      <NuxtLink :to="{ path: '/schedule', query: { project: snapshot.id } }" class="btn-secondary">
-        <span class="i-lucide-calendar-range mr-1" /> 打开施工进度
-      </NuxtLink>
+      <Button v-if="!hideScheduleLink" class="border-solid no-underline" as-child>
+        <NuxtLink :to="{ path: '/schedule', query: { project: snapshot.id, origin, from: 'home' } }">
+          <span class="i-lucide-calendar-range mr-1" /> 打开施工进度
+        </NuxtLink>
+      </Button>
     </header>
 
     <ScheduleTimeline
