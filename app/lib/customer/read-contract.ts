@@ -112,6 +112,8 @@ export interface CustomerContractSourceRow {
 }
 
 export interface CustomerReceiptSourceRow {
+  projectPermission?: 'allowed' | 'forbidden'
+  contractPermission?: 'allowed' | 'forbidden'
   dataOrigin: DataOriginDTO
   id: string
   no: string

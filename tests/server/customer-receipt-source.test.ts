@@ -27,6 +27,44 @@ afterEach(() => {
 })
 
 describe('客户收款只读取当前会话的中央事实', () => {
+  it.each(['forbidden', 'unavailable'] as const)('正式收款源 %s 不影响独立演示收款', async (scenario) => {
+    const scope = scopes[0]
+    const demoQuery = { origin: 'demo', includeDemo: 'true' }
+    const before = await customerReadTestInstance.detail('customer_demo_001', demoQuery, scope)
+    expect(before.receipts.length).toBeGreaterThan(0)
+    ownerCommercialDocumentReadTestInstance.reset(scenario, scope)
+    const after = await customerReadTestInstance.detail('customer_demo_001', demoQuery, scope)
+    expect(after.receiptsProblem).toBeUndefined()
+    expect(after.receipts).toEqual(before.receipts)
+    const receipt = await customerReadTestInstance.receipt('rr_mz0x1_0', { ...demoQuery, customerId: 'customer_demo_001' }, scope)
+    expect(receipt.receipt.receipt.id).toBe('rr_mz0x1_0')
+  })
+
+  it('源记录隐藏客户关系时不反向泄露收款，恢复关联权限后再回读', async () => {
+    const scope = scopes[0]
+    prepareConstructionContractChainIdentityFixtures(scope)
+    const source = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!
+    ownerCommercialDocumentCommandTestInstance.importExisting([{ ...source, customerPermission: 'forbidden' }], scope)
+    const hidden = await customerReadTestInstance.detail(customerId, query, scope)
+    expect(hidden.receipts).toEqual([])
+    expect(hidden.summary.effectiveReceiptAmount).toBe('0.00')
+    await expect(customerReadTestInstance.receipt('receipt-real-325', { ...query, customerId }, scope)).rejects.toMatchObject({ problem: { code: 'not-found' } })
+    ownerCommercialDocumentCommandTestInstance.reset(scope)
+    ownerCommercialDocumentCommandTestInstance.importExisting([source], scope)
+    expect((await customerReadTestInstance.detail(customerId, query, scope)).receipts).toHaveLength(1)
+  })
+
+  it('可读收款保留受限项目和合同的权限态，不从独立可读关系补出关联', async () => {
+    const scope = scopes[0]
+    prepareConstructionContractChainIdentityFixtures(scope)
+    constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], scope)
+    const source = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!
+    ownerCommercialDocumentCommandTestInstance.importExisting([{ ...source, projectPermission: 'forbidden', contractPermission: 'forbidden' }], scope)
+    const detail = decodeCustomerDetailRead(await customerReadTestInstance.detail(customerId, query, scope))
+    expect(detail.receipts[0]).toMatchObject({ project: { state: 'forbidden', id: null }, contract: { state: 'forbidden', id: null } })
+    expect(detail.projects[0]).toMatchObject({ receiptCount: 0, effectiveReceiptAmount: '0.00' })
+  })
+
   it('只有客户身份时不出现固定正式收款；已导入会话与其他会话隔离', async () => {
     for (const scope of scopes)
       prepareConstructionContractChainIdentityFixtures(scope)

@@ -7,8 +7,10 @@ export function customerReceiptFacts(sessionId?: string | null) {
   const source = ownerCommercialDocumentReadTestInstance.facts('final_settlement', sessionId)
   const rows = new Map<string, CustomerReceiptSourceRow>()
   for (const document of source.documents) {
-    if (document.kind !== 'final_settlement' || document.dataOrigin !== 'real' || !document.customerId)
+    if (document.kind !== 'final_settlement' || document.dataOrigin !== 'real'
+      || !document.customerId || document.customerPermission !== 'allowed') {
       continue
+    }
     for (const receipt of document.finalSettlementEvidence?.receipts ?? []) {
       if (!ownerFinalSettlementReceiptIsActive(receipt.status))
         continue
@@ -17,8 +19,10 @@ export function customerReceiptFacts(sessionId?: string | null) {
         id: receipt.id,
         no: receipt.no,
         customerId: document.customerId,
-        projectId: document.projectId,
-        contractId: document.contractId,
+        projectId: document.projectPermission === 'allowed' ? document.projectId : null,
+        projectPermission: document.projectPermission,
+        contractId: document.contractPermission === 'allowed' ? document.contractId : null,
+        contractPermission: document.contractPermission,
         payerAccount: '',
         amount: receipt.amount,
         paymentMethod: '',

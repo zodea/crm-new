@@ -5,7 +5,7 @@ import type {
   CustomerReceiptSourceRow,
 } from '../../app/lib/customer/repository'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
-import type { ProblemDTO } from '../../app/types/read-model'
+import type { DataOriginDTO, ProblemDTO } from '../../app/types/read-model'
 import { ConstructionContractRepositoryProblem } from '../../app/lib/construction-contract/repository'
 import {
   buildCustomerDetailRead,
@@ -175,7 +175,7 @@ export function createCustomerReadTestInstance(
     }
   }
 
-  async function detailContext(sessionId?: string | null) {
+  async function detailContext(origin: DataOriginDTO, sessionId?: string | null) {
     const data = context(sessionId)
     let projectsProblem: ProblemDTO | undefined
     let contractsProblem: ProblemDTO | undefined
@@ -212,7 +212,9 @@ export function createCustomerReadTestInstance(
       }
       contractsProblem = cause.problem
     }
-    let receipts: readonly CustomerReceiptSourceRow[] = []
+    let receipts: readonly CustomerReceiptSourceRow[] = data.receipts
+    if (origin === 'demo')
+      return { ...data, receipts, projects, contracts, projectsProblem, contractsProblem, receiptsProblem, asOf, sourceVersion }
     try {
       const source = customerReceiptFacts(sessionId)
       receipts = [...source.rows, ...data.receipts]
@@ -254,15 +256,15 @@ export function createCustomerReadTestInstance(
       })
     },
     async detail(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = await detailContext(sessionId)
       const query = parseCustomerDetailQuery(id, input)
+      const data = await detailContext(query.origin, sessionId)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
       return buildCustomerDetailRead({ ...data, query })
     },
     async receipt(id: string, input: Record<string, unknown> | undefined, sessionId?: string | null) {
-      const data = await detailContext(sessionId)
       const query = parseCustomerReceiptDetailQuery(id, input)
+      const data = await detailContext(query.origin, sessionId)
       if (query.includeDemo && !data.capabilities.includes('demo:read'))
         throw problem('forbidden', '无测试数据查看权限')
       if (query.origin === 'demo' && !query.includeDemo)

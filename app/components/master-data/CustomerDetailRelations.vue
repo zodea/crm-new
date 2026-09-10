@@ -6,7 +6,7 @@ import type {
 } from '~/lib/customer/repository'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { ProblemDTO } from '~/types/read-model'
-import { financeStatusLabel } from '~/lib/finance/status'
+import { financeStatusLabel, financeStatusTone } from '~/lib/finance/status'
 import CustomerRelationLink from './CustomerRelationLink.vue'
 
 export type CustomerRelationTab = 'projects' | 'contracts' | 'receipts'
@@ -157,7 +157,7 @@ const receiptColumns: KitTableColumn[] = [
         <CustomerRelationLink :reference="row.contract" :navigation="row.contractNavigation" />
       </template>
       <template #status="{ row }">
-        <KitStatusTag :tone="row.isDraft ? 'warn' : 'brand'">
+        <KitStatusTag :tone="financeStatusTone(row.status)">
           {{ financeStatusLabel(row.status) }}
         </KitStatusTag>
       </template>

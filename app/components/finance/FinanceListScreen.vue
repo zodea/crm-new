@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ColumnFilterValue } from '~/components/ui/KitColumnHeader.vue'
-import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { F3FormKind } from '~/lib/finance/forms'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { FinanceListRow } from '~/stores/finance'
@@ -10,7 +9,7 @@ import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import KitToolbarPopover from '~/components/ui/KitToolbarPopover.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { F3_FORM_META, financeDetailPath, financeFormPath, receiptDetailPath } from '~/lib/finance/page'
-import { financeStatusLabel } from '~/lib/finance/status'
+import { financeStatusLabel, financeStatusTone } from '~/lib/finance/status'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
 import { yuan } from '~/lib/util/money'
 
@@ -32,16 +31,6 @@ const page = shallowRef(1)
 const pageSize = shallowRef(10)
 const filtersOpen = shallowRef(false)
 const hasFilters = computed(() => projectFilter.value.length > 0 || partyFilter.value.length > 0 || statusFilter.value.length > 0)
-const statusTones: Record<string, KitStatusTone> = {
-  draft: 'neutral',
-  submitted: 'brand',
-  approved: 'ok',
-  rejected: 'danger',
-  paid: 'ok',
-  confirmed: 'ok',
-  needs_review: 'warn',
-  cancelled: 'neutral',
-}
 
 const displayRows = computed(() => rows.value.map(row => ({
   ...row,
@@ -222,7 +211,7 @@ onActivated(() => {
           </span>
         </template>
         <template #status="{ row }">
-          <KitStatusTag :tone="statusTones[row.status] ?? 'neutral'">
+          <KitStatusTag :tone="financeStatusTone(row.status)">
             {{ row.statusLabel }}
           </KitStatusTag>
         </template>

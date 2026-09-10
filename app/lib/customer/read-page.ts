@@ -406,21 +406,25 @@ export function buildCustomerDetailRead(
   })
 
   const receipts: CustomerReceiptDTO[] = receiptRows.map((row) => {
-    const project = refAndNavigation(
-      'project',
-      row.projectId,
-      projectLabels,
-      forbiddenProjects,
-      row.dataOrigin,
-      { customerId: customer.id },
-    )
-    const contract = refAndNavigation(
-      'contract',
-      row.contractId,
-      contractLabels,
-      new Set(),
-      row.dataOrigin,
-    )
+    const project = row.projectPermission === 'forbidden'
+      ? { ref: forbiddenRef('project'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'project',
+          row.projectId,
+          projectLabels,
+          forbiddenProjects,
+          row.dataOrigin,
+          { customerId: customer.id },
+        )
+    const contract = row.contractPermission === 'forbidden'
+      ? { ref: forbiddenRef('contract'), navigation: unavailable('forbidden') }
+      : refAndNavigation(
+          'contract',
+          row.contractId,
+          contractLabels,
+          new Set(),
+          row.dataOrigin,
+        )
     const receiptRef = resolvedRef('receipt', row.id, row.no || row.id, row.no || null)
     return {
       receipt: receiptRef as CustomerReceiptDTO['receipt'],
