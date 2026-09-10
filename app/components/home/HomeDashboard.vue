@@ -98,7 +98,7 @@ async function selectProject(project: HomeProjectReference) {
     error.value = problem.message
     forbidden.value = problem.code === 'forbidden'
     failedProject.value = project
-    if (current.value?.project.key === project.key && ['forbidden', 'not-found', 'source-mismatch'].includes(problem.code))
+    if (current.value?.project.key === project.key && ['forbidden', 'not-found', 'relationship-mismatch'].includes(problem.code))
       current.value = null
     if (current.value) {
       await syncRoute(current.value.project)

@@ -69,6 +69,31 @@ test('删除或来源不匹配的深链不借用首个本地项目', async ({ pa
   await expect(page).toHaveURL(/project=proj_demo_001&origin=real/)
 })
 
+test('缓存首页当前项目关系失效后撤下旧事实与查看入口', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 960 })
+  await page.goto('/project/form')
+  const name = '首页来源关系验证项目'
+  await page.getByLabel('项目名称 *').fill(name)
+  await page.getByLabel('项目经理 *').fill('项目经理')
+  await page.getByRole('button', { name: '保存草稿' }).click()
+  await expect(page).toHaveURL(/\/project\/[A-Za-z0-9-]+\?origin=real$/)
+  const id = new URL(page.url()).pathname.split('/').at(-1)!
+  await page.goto(`/?project=${id}&origin=real`)
+  await expect(page.getByRole('status', { name: `${name}的排程来源尚未接入` })).toBeVisible()
+  await page.getByRole('link', { name: '全部项目', exact: true }).click()
+  await expect(page).toHaveURL('/project')
+  await page.route(`**/api/read/projects/${id}?*`, route => route.fulfill({
+    status: 409,
+    json: { data: { code: 'relationship-mismatch', message: '项目来源关系已失效', retryable: false, fieldErrors: {}, traceId: null } },
+  }))
+  await page.goBack()
+  await expect(page.getByRole('alert', { name: '首页施工进度加载失败' })).toContainText('项目来源关系已失效')
+  await expect(page.getByRole('status', { name: `${name}的排程来源尚未接入` })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '查看施工进度来源' })).toHaveCount(0)
+  await expectNoPageOverflow(page, '390px 当前项目关系失效')
+  await page.screenshot({ path: testInfo.outputPath('home-relationship-mismatch-390.png'), fullPage: true })
+})
+
 test('离开缓存首页后，迟到的项目读取不污染项目列表地址', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
   await page.goto('/?project=proj_demo_001&origin=demo')

@@ -119,11 +119,11 @@ describe('首页中央项目与施工进度来源导航', () => {
     wrapper.unmount()
   })
 
-  it('切换失败保留可读项目和地址，重试后确认目标项目', async () => {
+  it.each(['unavailable', 'relationship-mismatch'] as const)('切换失败 %s 保留其他可读项目和地址，重试后确认目标项目', async (code) => {
     const { wrapper, router } = await open()
     beforeRead = async (id) => {
       if (id === 'b')
-        throw new ProjectRepositoryProblem(projectProblem('unavailable', '读取中断', true))
+        throw new ProjectRepositoryProblem(projectProblem(code, '读取中断', true))
     }
     await wrapper.get('select').setValue('real:b')
     await flushPromises()
@@ -133,6 +133,27 @@ describe('首页中央项目与施工进度来源导航', () => {
     await wrapper.get('button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.query.project).toBe('b')
+    wrapper.unmount()
+  })
+
+  it('当前项目重新读取时来源关系失配，撤下旧事实后仍可选择其他项目', async () => {
+    const { wrapper, router } = await open()
+    expect(wrapper.text()).toContain('中央项目 a的排程来源尚未接入')
+    await router.push('/project')
+    beforeRead = async (id) => {
+      if (id === 'a')
+        throw new ProjectRepositoryProblem(projectProblem('relationship-mismatch', '项目来源关系已失效'))
+    }
+    await router.push('/?project=a&origin=real')
+    await flushPromises()
+    expect(wrapper.text()).toContain('首页施工进度加载失败')
+    expect(wrapper.text()).toContain('项目来源关系已失效')
+    expect(wrapper.text()).not.toContain('中央项目 a的排程来源尚未接入')
+    expect(wrapper.find('a[href^="/schedule"]').exists()).toBe(false)
+    await wrapper.get('select').setValue('real:b')
+    await flushPromises()
+    expect(wrapper.text()).toContain('中央项目 b的排程来源尚未接入')
+    expect(router.currentRoute.value.query).toMatchObject({ project: 'b', origin: 'real' })
     wrapper.unmount()
   })
 
