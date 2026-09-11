@@ -48,7 +48,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/finance/invoice/factor': ['开票因子与税额计算'],
   '/finance/payment': ['付款申请'],
   '/finance/payment-management': ['付款管理'],
-  '/finance/receipt': ['收款登记'],
+  '/finance/receipt': ['收款登记', 'receipt:read'],
   '/finance/billing': ['开票申请'],
   '/finance/current': ['往来收付'],
   '/finance/records': ['支付记录'],

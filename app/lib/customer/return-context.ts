@@ -122,7 +122,7 @@ export function validateCustomerDetailReturnTo(
 
 export interface CustomerRelationReturnOrigin {
   returnTo: string
-  targetEntity: 'project' | 'contract'
+  targetEntity: 'project' | 'contract' | 'receipt'
   targetId: string
   anchorId: string | null
   scrollTop: number
@@ -154,7 +154,7 @@ export function saveCustomerRelationReturnOrigin(origin: CustomerRelationReturnO
 
 export function resolveCustomerRelationReturnOrigin(
   returnTo: unknown,
-  expected: { targetEntity?: 'project' | 'contract', targetId?: string, origin?: DataOriginDTO },
+  expected: { targetEntity?: 'project' | 'contract' | 'receipt', targetId?: string, origin?: DataOriginDTO },
   now = Date.now(),
   storage: Storage = sessionStorage,
 ): CustomerRelationReturnOrigin | null {
@@ -165,7 +165,7 @@ export function resolveCustomerRelationReturnOrigin(
   try {
     const value = JSON.parse(storage.getItem(`${PROJECT_RETURN_PREFIX}${id}`) ?? 'null') as CustomerRelationReturnOrigin | null
     return value && value.returnTo === canonical && typeof value.targetId === 'string' && value.targetId.length > 0
-      && (value.targetEntity === 'project' || value.targetEntity === 'contract')
+      && (value.targetEntity === 'project' || value.targetEntity === 'contract' || value.targetEntity === 'receipt')
       && (!expected.targetEntity || value.targetEntity === expected.targetEntity)
       && (value.anchorId === null || (typeof value.anchorId === 'string' && value.anchorId.length <= 512 && /^(?:project|contract|receipt):[\w%.~-]+$/.test(value.anchorId)))
       && (!expected.targetId || value.targetId === expected.targetId)

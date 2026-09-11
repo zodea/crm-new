@@ -4,6 +4,7 @@ import { computed, onActivated, watch } from 'vue'
 import OwnerAcceptanceFilesPanel from '~/components/owner-document/OwnerAcceptanceFilesPanel.vue'
 import OwnerFinalSettlementFactsPanel from '~/components/owner-document/OwnerFinalSettlementFactsPanel.vue'
 import OwnerFinalSettlementSourceTable from '~/components/owner-document/OwnerFinalSettlementSourceTable.vue'
+import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
 import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
 import { ownerDocumentFormPath } from '~/lib/owner-document/page'
 import { loadOwnerDocumentReturnOrigin, resolveOwnerDocumentReturnContext } from '~/lib/owner-document/return-context'
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const restoreReceiptSource = useReceiptSourceReturn()
 const store = useOwnerCommercialDocumentReadStore()
 const visibilityStore = useDataVisibilityStore()
 const detail = computed(() => {
@@ -73,14 +75,16 @@ function amount(value: string | null | undefined): string {
   return value == null ? '未记录' : yuan(Number(value))
 }
 
-function load() {
-  return store.loadDetail({
+async function load() {
+  await store.loadDetail({
     kind: 'final_settlement',
     id: props.documentId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
     variant: null,
   })
+  if (store.detailState.kind === 'ready')
+    await restoreReceiptSource(route.fullPath, document.querySelector<HTMLElement>('[data-testid="final-settlement-source-scroll"]'))
 }
 
 function edit() {
@@ -132,6 +136,7 @@ useTabTitle(() => detail.value?.document.name ?? '最终结算详情')
         <OwnerFinalSettlementSourceTable
           :sources="detail.finalSettlementEvidence?.sources ?? null"
           :return-to="route.fullPath"
+          :receipts-problem="detail.finalSettlementEvidence?.receiptsProblem"
           @retry="load"
         />
         <OwnerAcceptanceFilesPanel label="最终结算" :files="detail.files" />

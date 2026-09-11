@@ -97,6 +97,7 @@ export interface OwnerFinalSettlementReceiptSource {
 }
 
 export interface OwnerFinalSettlementEvidenceSource {
+  receiptsProblem?: ProblemDTO
   originalContractAmount: number | null
   supplements: OwnerFinalSettlementSupplementSource[] | null
   receipts: OwnerFinalSettlementReceiptSource[] | null
@@ -387,6 +388,7 @@ export interface OwnerCommercialDocumentDetailReadDTO {
   acceptanceView: OwnerAcceptanceViewDTO | null
   lifecycleEvents: OwnerAcceptanceLifecycleEventSource[]
   finalSettlementEvidence: {
+    receiptsProblem?: ProblemDTO
     basis: string
     differenceNote: string
     sources: Array<{
@@ -559,7 +561,7 @@ export function ownerFinalSettlementSupplementIsActive(status: string): boolean 
 }
 
 export function ownerFinalSettlementReceiptIsActive(status: string): boolean {
-  return !['draft', '草稿', 'void', '作废'].includes(status)
+  return !['draft', '草稿', 'void', '作废', '已作废'].includes(status)
 }
 
 function finalSettlementSourceStatusLabel(kind: 'contract-supplement' | 'receipt', status: string): string {
@@ -1009,6 +1011,7 @@ export function buildOwnerCommercialDocumentDetail(
     : null
   const finalSettlementEvidence = source.kind === 'final_settlement'
     ? {
+        ...(source.finalSettlementEvidence?.receiptsProblem ? { receiptsProblem: source.finalSettlementEvidence.receiptsProblem } : {}),
         basis: source.settlementBasis ?? '',
         differenceNote: source.settlementDifferenceNote ?? '',
         sources: settlementSources,

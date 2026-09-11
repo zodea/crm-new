@@ -110,7 +110,7 @@ describe('客户详情展示', () => {
         isDraft: false,
       }],
     }
-    const global = { components: { KitTable, NuxtLink } }
+    const global = { components: { KitTable, NuxtLink }, stubs: { StatePanel: true, KitStatusTag: true } }
 
     const projectView = mount(CustomerDetailRelations, {
       props: { ...baseProps, tab: 'projects' },
@@ -132,10 +132,16 @@ describe('客户详情展示', () => {
       global,
     })
     expectProjectLink(receiptView.get('a').attributes('href'))
-    expect(receiptView.findAll('a').slice(1).map(link => link.attributes('href'))).toEqual([
-      '/contract/contract_1',
-      '/finance/receipt/receipt_1?origin=real&customerId=customer_1',
-    ])
+    const receiptLinks = receiptView.findAll('a').slice(1)
+    expect(receiptLinks[0]!.attributes('href')).toBe('/contract/contract_1')
+    const receiptTarget = new URL(receiptLinks[1]!.attributes('href'), 'https://ruihang.invalid')
+    expect(receiptTarget.pathname).toBe('/finance/receipt/receipt_1')
+    expect(receiptTarget.searchParams.get('origin')).toBe('real')
+    expect(receiptTarget.searchParams.get('customerId')).toBe('customer_1')
+    const receiptSource = new URL(receiptTarget.searchParams.get('returnTo')!, receiptTarget.origin)
+    expect(receiptSource.searchParams.get('relationContext')).toMatch(/^origin_[\w-]+$/)
+    receiptSource.searchParams.delete('relationContext')
+    expect(`${receiptSource.pathname}${receiptSource.search}`).toBe(relationshipReturnTo)
   })
 
   it('没有业务关系时展示领域空状态，不生成静态成功数据', () => {

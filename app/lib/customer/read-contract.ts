@@ -106,7 +106,7 @@ export interface CustomerContractSourceRow {
   customerId: string | null
   amount: number
   supplementAmount: number
-  receiptAmount: number
+  receiptAmount: number | null
   signDate: ISODateDTO | null
   status: string
 }
@@ -121,7 +121,7 @@ export interface CustomerReceiptSourceRow {
   projectId: string | null
   contractId: string | null
   payerAccount: string
-  amount: number
+  amount: number | null
   paymentMethod: string
   receiptDate: ISODateDTO | null
   status: string
@@ -164,8 +164,8 @@ export interface CustomerReceiptDTO {
   contractNavigation: NavigationIntentDTO
   receiptDate: ISODateDTO | null
   payerAccount: string
-  amount: MoneyDTO
-  effectiveAmount: MoneyDTO
+  amount: MoneyDTO | null
+  effectiveAmount: MoneyDTO | null
   paymentMethod: string
   status: string
   isDraft: boolean

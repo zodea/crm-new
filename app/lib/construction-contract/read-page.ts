@@ -1,4 +1,4 @@
-import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { EntityKindDTO, EntityRefDTO, NavigationIntentDTO, ProblemDTO } from '../../types/read-model'
 import type {
   ConstructionContractDetailFocusDTO,
   ConstructionContractDetailFocusScope,
@@ -26,6 +26,7 @@ import {
 } from './read-contract'
 
 interface BuildConstructionContractListPageInput {
+  receiptsProblem?: ProblemDTO
   contracts: readonly ConstructionContractDetailSource[]
   facts: ConstructionContractFactSources
   query: ConstructionContractListQueryDTO
@@ -35,6 +36,7 @@ interface BuildConstructionContractListPageInput {
 }
 
 interface BuildConstructionContractDetailInput {
+  receiptsProblem?: ProblemDTO
   contracts: readonly ConstructionContractDetailSource[]
   facts: ConstructionContractFactSources
   query: ConstructionContractDetailQueryDTO
@@ -197,9 +199,9 @@ function amounts(source: ConstructionContractDetailSource, facts: ConstructionCo
     changed: money(changedAmount(source, facts)),
     settled: money(source.settledAmount),
     invoiced: money(source.invoicedAmount),
-    received: money(source.receivedAmount),
-    bySettlementReceivable: money(source.settledAmount - source.receivedAmount),
-    invoicedUnreceived: money(source.invoicedAmount - source.receivedAmount),
+    received: source.receivedAmount === null ? null : money(source.receivedAmount),
+    bySettlementReceivable: source.receivedAmount === null ? null : money(source.settledAmount - source.receivedAmount),
+    invoicedUnreceived: source.receivedAmount === null ? null : money(source.invoicedAmount - source.receivedAmount),
   }
 }
 
@@ -249,7 +251,7 @@ export function buildConstructionContractListPage(
       contractCount: rows.length,
       changedAmount: money(rows.reduce((sum, row) => sum + changedAmount(row, input.facts), 0)),
       invoicedAmount: money(rows.reduce((sum, row) => sum + row.invoicedAmount, 0)),
-      receivedAmount: money(rows.reduce((sum, row) => sum + row.receivedAmount, 0)),
+      receivedAmount: (dataOrigin === 'real' && input.receiptsProblem) || rows.some(row => row.receivedAmount === null) ? null : money(rows.reduce((sum, row) => sum + row.receivedAmount!, 0)),
     }
   }
   const options = (id: (row: ConstructionContractDetailSource) => string | null, label: (row: ConstructionContractDetailSource) => string) =>
@@ -261,6 +263,7 @@ export function buildConstructionContractListPage(
     .map(value => ({ value, count: filtered.filter(row => row.status === value).length }))
   return {
     items,
+    ...(input.query.origin !== 'demo' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
     pagination: { page: input.query.page, pageSize: input.query.pageSize, total: filtered.length },
     summary: {
       projects: options(row => row.projectId, row => row.projectName),
@@ -430,6 +433,7 @@ export function buildConstructionContractDetail(
   const canReadSensitive = input.capabilities.includes('construction-contract:sensitive:read')
   return {
     dataOrigin: source.dataOrigin,
+    ...(source.dataOrigin === 'real' && input.receiptsProblem ? { receiptsProblem: input.receiptsProblem } : {}),
     contract: {
       dataOrigin: source.dataOrigin,
       id: source.id,

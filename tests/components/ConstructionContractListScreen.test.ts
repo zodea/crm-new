@@ -65,7 +65,7 @@ const KitTableStub = defineComponent({
   emits: ['page-change'],
   setup(props, { slots, emit }) {
     return () => h('section', { 'aria-label': '施工合同表格' }, [
-      ...props.data.map((row: unknown) => [slots.name?.({ row }), slots.origin?.({ row }), slots.actualCompletionDate?.({ row })]),
+      ...props.data.map((row: unknown) => [slots.name?.({ row }), slots.origin?.({ row }), h('span', slots.actualCompletionDate?.({ row })), h('span', slots.received?.({ row })), h('span', slots.receivable?.({ row })), h('span', slots.unreceived?.({ row }))]),
       h('button', { onClick: () => emit('page-change', { page: 2, pageSize: 20 }) }, '下一页'),
     ])
   },
@@ -100,6 +100,19 @@ function renderList() {
 }
 
 describe('施工合同列表连续工作面', () => {
+  it('收款源不可用时合同继续显示，收款及余额为未知并提供独立原因和重试', async () => {
+    const page = listPage()
+    page.receiptsProblem = constructionContractProblem('unavailable', '收款服务暂时不可用', true)
+    Object.assign(page.items[0]!.amounts, { received: null, bySettlementReceivable: null, invoicedUnreceived: null })
+    listState.value = { kind: 'ready', data: page }
+    renderList()
+    expect(screen.getByRole('link', { name: '示例施工合同' })).toBeTruthy()
+    expect(screen.queryByText('¥0.00')).toBeNull()
+    expect(screen.getByRole('alert', { name: '收款金额暂不可用' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: '重新读取收款' }))
+    expect(store.loadList).toHaveBeenCalled()
+  })
+
   it('搜索、次行筛选和表尾分页仍修改原查询，保留新建入口', async () => {
     route.query = { page: '3', origin: 'real' }
     const { container } = renderList()

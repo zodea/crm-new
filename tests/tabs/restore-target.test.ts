@@ -7,7 +7,7 @@ function descriptor(fullPath: string): TabDescriptor {
   return { key: fullPath.split('?')[0]!, title: '旧名称', fullPath, origin: 'real', targetVersion: 1, sourceVersion: 'old-version', updatedAt: 1, closable: true }
 }
 
-const capabilities = ['project:list:read', 'customer:list:read', 'supplier:list:read', 'crew:list:read', 'worker:list:read', 'project-supplier:read', 'material-contract:read', 'construction-contract:read', 'subcontract-contract:read', 'owner-document:read', 'subcontract-document:read', 'auxiliary-contract:read', 'other-settlement:read', 'demo:read']
+const capabilities = ['project:list:read', 'customer:list:read', 'supplier:list:read', 'crew:list:read', 'worker:list:read', 'project-supplier:read', 'material-contract:read', 'construction-contract:read', 'subcontract-contract:read', 'owner-document:read', 'subcontract-document:read', 'auxiliary-contract:read', 'other-settlement:read', 'receipt:read', 'demo:read']
 const ref = (entity: string, id = 'record-1') => ({ state: 'resolved', entity, id, label: '当前名称', no: null })
 const base = { dataOrigin: 'real', capabilities, sourceVersion: 'current-version' }
 const CASES = [
@@ -16,7 +16,7 @@ const CASES = [
   ...['crew', 'worker'].map(entity => ({ path: `/base/${entity}/record-1?origin=real`, repository: 'crewWorkerRead', method: entity === 'crew' ? 'getCrew' : 'getWorker', data: { ...base, [entity]: { id: 'record-1', name: '当前名称' } } })),
   ...[['material', '材采'], ['construction', '施工'], ['subcontract', '分包']].map(([kind, label]) => ({ path: `/contract/record-1?origin=real&contractKind=${kind}`, repository: `${kind}ContractRead`, method: 'get', data: { ...base, contract: { id: 'record-1', name: '当前名称', kind: label } } })),
   { path: '/project/record-1/supplier/supplier-1?origin=real&tab=payment', repository: 'projectSupplierRead', method: 'get', data: { ...base, project: ref('project'), supplier: ref('supplier', 'supplier-1') } },
-  { path: '/finance/receipt/record-1?origin=real&customerId=customer-1', repository: 'customerRead', method: 'getReceipt', data: { ...base, customer: ref('customer', 'customer-1'), receipt: { receipt: ref('receipt') } } },
+  { path: '/finance/receipt/record-1?origin=real', repository: 'receipts', method: 'detail', data: { ...base, record: { id: 'record-1', dataOrigin: 'real', draft: { no: '当前名称' } } } },
   { path: '/owner/change/record-1?origin=real', repository: 'ownerCommercialDocumentRead', method: 'get', data: { ...base, document: { id: 'record-1', name: '当前名称', kind: 'owner_change' } } },
   { path: '/subcontract/settlement/record-1?origin=real', repository: 'ownerCommercialDocumentRead', method: 'get', data: { ...base, document: { id: 'record-1', name: '当前名称', kind: 'sub_settlement' } } },
   { path: '/contract/other-expense/record-1?origin=real', repository: 'auxiliaryContracts', method: 'detail', data: { ...base, contract: { id: 'record-1', dataOrigin: 'real', kind: 'other_expense', version: 'current-version', draft: { name: '当前名称' } } } },

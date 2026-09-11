@@ -31,6 +31,7 @@
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 - [开票因子与税额计算使用说明](./invoice-factor.md)
 - [付款申请与登记支付使用说明](./finance-payment.md)
+- [收款登记使用指南](./receipt-registration.md)
 - [送货单归档与原件包导出使用说明](./material-delivery.md)
 - [本地核心身份数据迁移使用指南](./local-data-migration.md)
 
@@ -95,6 +96,9 @@ python scripts/generate-project-guide-pdf.py `
   --source docs/guides/finance-payment.md `
   --output output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
 python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/receipt-registration.md `
+  --output output/pdf/瑞航CRM_收款登记使用指南.pdf
+python scripts/generate-project-guide-pdf.py `
   --source docs/guides/material-delivery.md `
   --output output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
 python scripts/generate-project-guide-pdf.py `
@@ -122,6 +126,7 @@ output/pdf/瑞航CRM_OCR设置使用说明.pdf
 output/pdf/瑞航CRM_开票因子与税额计算使用说明.pdf
 output/pdf/瑞航CRM_发票台账与Excel导入导出使用说明.pdf
 output/pdf/瑞航CRM_付款申请与登记支付使用说明.pdf
+output/pdf/瑞航CRM_收款登记使用指南.pdf
 output/pdf/瑞航CRM_送货单归档与原件包导出使用说明.pdf
 output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf
 ```

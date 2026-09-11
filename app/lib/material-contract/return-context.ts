@@ -140,6 +140,7 @@ export function validateProjectJourneyReturnTo(input: unknown, expectedOrigin?: 
     if (anchor
       && anchor !== 'project-detail-title'
       && anchor !== PROJECT_MATERIAL_ANCHOR
+      && anchor !== 'project-receipt-link'
       && !isProjectOwnerDocumentCardAnchor(anchor)) {
       return null
     }

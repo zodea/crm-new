@@ -19,8 +19,8 @@ import {
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import receiptsSeed from '../../app/lib/db/seed/receipt_registrations.json'
-import { OwnerCommercialDocumentRepositoryProblem } from '../../app/lib/owner-document/central-repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { customerConstructionContractFacts } from './customer-construction-contract-facts'
 import { customerReceiptFacts } from './customer-receipt-facts'
@@ -222,7 +222,7 @@ export function createCustomerReadTestInstance(
       sourceVersion += `:${source.sourceVersion}`
     }
     catch (cause) {
-      if (!(cause instanceof OwnerCommercialDocumentRepositoryProblem)
+      if (!(cause instanceof ReceiptRepositoryProblem)
         || !['forbidden', 'unavailable'].includes(cause.problem.code)) {
         throw cause
       }

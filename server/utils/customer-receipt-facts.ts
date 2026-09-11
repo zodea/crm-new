@@ -1,35 +1,25 @@
 import type { CustomerReceiptSourceRow } from '../../app/lib/customer/repository'
-import { ownerFinalSettlementReceiptIsActive } from '../../app/lib/owner-document/central-repository'
-import { ownerCommercialDocumentReadTestInstance } from './owner-commercial-document-read-test-instance'
+import { receiptReadTestInstance } from './receipt-read-test-instance'
 
-/** 复用已有最终结算的中央收款事实；同一收款被多张结算引用时只投影一次。 */
+/** 客户读取普通收款的中央事实；最终结算引用不拥有或复制这份事实。 */
 export function customerReceiptFacts(sessionId?: string | null) {
-  const source = ownerCommercialDocumentReadTestInstance.facts('final_settlement', sessionId)
-  const rows = new Map<string, CustomerReceiptSourceRow>()
-  for (const document of source.documents) {
-    if (document.kind !== 'final_settlement' || document.dataOrigin !== 'real'
-      || !document.customerId || document.customerPermission !== 'allowed') {
-      continue
-    }
-    for (const receipt of document.finalSettlementEvidence?.receipts ?? []) {
-      if (!ownerFinalSettlementReceiptIsActive(receipt.status))
-        continue
-      rows.set(receipt.id, {
-        dataOrigin: document.dataOrigin,
-        id: receipt.id,
-        no: receipt.no,
-        customerId: document.customerId,
-        projectId: document.projectPermission === 'allowed' ? document.projectId : null,
-        projectPermission: document.projectPermission,
-        contractId: document.contractPermission === 'allowed' ? document.contractId : null,
-        contractPermission: document.contractPermission,
-        payerAccount: '',
-        amount: receipt.amount,
-        paymentMethod: '',
-        receiptDate: receipt.date,
-        status: receipt.status,
-      })
-    }
-  }
-  return { rows: [...rows.values()], sourceVersion: source.sourceVersion, asOf: source.asOf }
+  const source = receiptReadTestInstance.facts(sessionId)
+  const rows: CustomerReceiptSourceRow[] = source.capabilities.includes('customer:list:read')
+    ? source.rows.filter(row => row.draft.customerId).map(({ id, dataOrigin, draft }) => ({
+        dataOrigin,
+        id,
+        no: draft.no,
+        customerId: draft.customerId!,
+        projectId: source.capabilities.includes('project:list:read') ? draft.projectId : null,
+        projectPermission: source.capabilities.includes('project:list:read') ? 'allowed' : 'forbidden',
+        contractId: source.capabilities.includes('construction-contract:read') ? draft.contractId : null,
+        contractPermission: source.capabilities.includes('construction-contract:read') ? 'allowed' : 'forbidden',
+        payerAccount: draft.payerAccount,
+        amount: draft.amount === null ? null : Number(draft.amount),
+        paymentMethod: draft.paymentMethod,
+        receiptDate: draft.receiptDate || null,
+        status: draft.status,
+      }))
+    : []
+  return { rows, sourceVersion: source.sourceVersion, asOf: source.asOf }
 }

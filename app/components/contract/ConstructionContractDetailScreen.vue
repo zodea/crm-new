@@ -2,16 +2,20 @@
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useTimeoutFn } from '@vueuse/core'
+import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
 import { validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
 import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { loadReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
 import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 const props = defineProps<{ contractId: string, origin: DataOriginDTO }>()
 const route = useRoute()
+const restoreReceiptSource = useReceiptSourceReturn()
+const receiptReturnOrigin = computed(() => loadReceiptSourceOrigin(route.fullPath))
 const router = useRouter()
 const store = useConstructionContractReadStore()
 const visibilityStore = useDataVisibilityStore()
@@ -128,7 +132,7 @@ const metrics = computed(() => {
   const amounts = detail.value?.contract.amounts
   if (!amounts)
     return []
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, string | null]> = [
     ['合同金额', amounts.contract],
     ['变更后金额', amounts.changed],
     ['累计结算', amounts.settled],
@@ -136,16 +140,18 @@ const metrics = computed(() => {
     ['累计收款', amounts.received],
     ['按结算应收', amounts.bySettlementReceivable],
   ]
-  return rows.map(([label, value]) => ({ label, value: yuan(Number(value)) }))
+  return rows.map(([label, value]) => ({ label, value: yuan(value) }))
 })
 
-function load() {
-  return store.loadDetail({
+async function load() {
+  await store.loadDetail({
     id: props.contractId,
     origin: props.origin,
     includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
     focus: focus.value,
   })
+  if (store.detailState.kind === 'ready')
+    await restoreReceiptSource(route.fullPath)
 }
 
 function edit() {
@@ -280,7 +286,9 @@ useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
           </div>
         </section>
         <section v-else-if="activeTab === 'receipts'" class="panel min-w-0 overflow-hidden p-4">
-          <SectionHeader title="收款登记" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" />
+          <SectionHeader title="收款登记" />
+          <StatePanel v-if="detail.receiptsProblem" class="mt-3" :kind="detail.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="detail.receiptsProblem.message" :action-label="detail.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="load" />
+          <ConstructionContractFactTable v-else class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" :return-to="route.fullPath" :restore-scroll-left="receiptReturnOrigin?.scrollLeft" @view-restored="restoreReceiptSource(route.fullPath)" />
         </section>
         <section v-else class="space-y-3">
           <div class="panel min-w-0 overflow-hidden p-4">

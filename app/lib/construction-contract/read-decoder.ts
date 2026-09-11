@@ -50,8 +50,8 @@ function entity(value: unknown, kind: 'project' | 'customer'): boolean {
 }
 
 function amounts(value: unknown): boolean {
-  return object(value) && ['contract', 'changed', 'settled', 'invoiced', 'received', 'bySettlementReceivable', 'invoicedUnreceived']
-    .every(key => money(value[key]))
+  return object(value) && ['contract', 'changed', 'settled', 'invoiced'].every(key => money(value[key]))
+    && (value.received === null ? value.bySettlementReceivable === null && value.invoicedUnreceived === null : ['received', 'bySettlementReceivable', 'invoicedUnreceived'].every(key => money(value[key])))
 }
 
 export function decodeConstructionContractListPage(value: unknown): ConstructionContractListPageDTO {
@@ -78,6 +78,12 @@ export function decodeConstructionContractListPage(value: unknown): Construction
 export function decodeConstructionContractDetailRead(value: unknown): ConstructionContractDetailReadDTO {
   const contract = object(value) && object(value.contract) ? value.contract : null
   const sections = object(value) && object(value.sections) ? value.sections : null
+  if (object(value) && value.receiptsProblem !== undefined && (!object(value.receiptsProblem)
+    || !['forbidden', 'unavailable'].includes(String(value.receiptsProblem.code)) || typeof value.receiptsProblem.message !== 'string'
+    || typeof value.receiptsProblem.retryable !== 'boolean' || !Array.isArray(sections?.receipts) || sections.receipts.length !== 0
+    || !object(contract?.amounts) || contract.amounts.received !== null)) {
+    return invalid('收款问题状态与依赖金额不一致')
+  }
   if (!object(value) || !isDataOriginDTO(value.dataOrigin) || !contract || contract.kind !== '施工'
     || contract.dataOrigin !== value.dataOrigin
     || !['id', 'no', 'name', 'content', 'invoiceType', 'contactName', 'contactPhone', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note']

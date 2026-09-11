@@ -54,7 +54,7 @@ export interface ConstructionContractDetailSource {
   amount: number
   settledAmount: number
   invoicedAmount: number
-  receivedAmount: number
+  receivedAmount: number | null
   actualCompletionDate: ISODateDTO | null
   content: string
   invoiceType: string
@@ -123,9 +123,9 @@ export interface ConstructionContractAmountsDTO {
   changed: MoneyDTO
   settled: MoneyDTO
   invoiced: MoneyDTO
-  received: MoneyDTO
-  bySettlementReceivable: MoneyDTO
-  invoicedUnreceived: MoneyDTO
+  received: MoneyDTO | null
+  bySettlementReceivable: MoneyDTO | null
+  invoicedUnreceived: MoneyDTO | null
 }
 
 export interface ConstructionContractDTO {
@@ -180,6 +180,7 @@ export interface ConstructionContractFileDTO {
 }
 
 export interface ConstructionContractDetailReadDTO {
+  receiptsProblem?: ProblemDTO
   dataOrigin: DataOriginDTO
   contract: ConstructionContractDTO
   projectNavigation: NavigationIntentDTO
@@ -234,14 +235,14 @@ export interface ConstructionContractListSummaryDTO {
     contractCount: number
     changedAmount: MoneyDTO
     invoicedAmount: MoneyDTO
-    receivedAmount: MoneyDTO
+    receivedAmount: MoneyDTO | null
   }>
 }
 
 export type ConstructionContractListPageDTO = PageDTO<
   ConstructionContractListItemDTO,
   ConstructionContractListSummaryDTO
->
+> & { receiptsProblem?: ProblemDTO }
 
 export interface ConstructionContractReadRepository {
   list: (query: ConstructionContractListQueryDTO) => Promise<ConstructionContractListPageDTO>

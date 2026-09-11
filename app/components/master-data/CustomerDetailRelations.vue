@@ -146,7 +146,7 @@ const receiptColumns: KitTableColumn[] = [
         <CustomerRelationLink
           :reference="row.receipt"
           :navigation="row.navigation"
-          :return-to="returnTo"
+          :return-to="relationshipReturnTo"
           :return-context="returnContext"
         />
       </template>

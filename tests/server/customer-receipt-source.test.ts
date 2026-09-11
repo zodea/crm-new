@@ -8,6 +8,9 @@ import { ownerCommercialDocumentCommandTestInstance } from '../../server/utils/o
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../server/utils/owner-commercial-document-fixtures'
 import { ownerCommercialDocumentReadTestInstance } from '../../server/utils/owner-commercial-document-read-test-instance'
 import { projectCommandTestInstance } from '../../server/utils/project-command-test-instance'
+import { receiptCommandTestInstance } from '../../server/utils/receipt-command-service'
+import { receiptReadTestInstance } from '../../server/utils/receipt-read-test-instance'
+import { prepareLegacyReceiptTestFixtures } from '../../server/utils/receipt-test-fixtures'
 import { supplierCommandTestInstance } from '../../server/utils/supplier-command-test-instance'
 
 const scopes = ['customer-receipt-source', 'customer-receipt-other']
@@ -23,6 +26,8 @@ afterEach(() => {
     ownerCommercialDocumentReadTestInstance.reset('ready', scope)
     projectCommandTestInstance.reset(scope)
     supplierCommandTestInstance.reset(scope)
+    receiptCommandTestInstance.reset(scope)
+    receiptReadTestInstance.reset('ready', scope)
   }
 })
 
@@ -32,7 +37,7 @@ describe('客户收款只读取当前会话的中央事实', () => {
     const demoQuery = { origin: 'demo', includeDemo: 'true' }
     const before = await customerReadTestInstance.detail('customer_demo_001', demoQuery, scope)
     expect(before.receipts.length).toBeGreaterThan(0)
-    ownerCommercialDocumentReadTestInstance.reset(scenario, scope)
+    receiptReadTestInstance.reset(scenario, scope)
     const after = await customerReadTestInstance.detail('customer_demo_001', demoQuery, scope)
     expect(after.receiptsProblem).toBeUndefined()
     expect(after.receipts).toEqual(before.receipts)
@@ -44,13 +49,13 @@ describe('客户收款只读取当前会话的中央事实', () => {
     const scope = scopes[0]
     prepareConstructionContractChainIdentityFixtures(scope)
     const source = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!
-    ownerCommercialDocumentCommandTestInstance.importExisting([{ ...source, customerPermission: 'forbidden' }], scope)
+    prepareLegacyReceiptTestFixtures(scope, [source])
+    receiptReadTestInstance.reset('customer-forbidden', scope)
     const hidden = await customerReadTestInstance.detail(customerId, query, scope)
     expect(hidden.receipts).toEqual([])
     expect(hidden.summary.effectiveReceiptAmount).toBe('0.00')
     await expect(customerReadTestInstance.receipt('receipt-real-325', { ...query, customerId }, scope)).rejects.toMatchObject({ problem: { code: 'not-found' } })
-    ownerCommercialDocumentCommandTestInstance.reset(scope)
-    ownerCommercialDocumentCommandTestInstance.importExisting([source], scope)
+    receiptReadTestInstance.reset('ready', scope)
     expect((await customerReadTestInstance.detail(customerId, query, scope)).receipts).toHaveLength(1)
   })
 
@@ -59,7 +64,8 @@ describe('客户收款只读取当前会话的中央事实', () => {
     prepareConstructionContractChainIdentityFixtures(scope)
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], scope)
     const source = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!
-    ownerCommercialDocumentCommandTestInstance.importExisting([{ ...source, projectPermission: 'forbidden', contractPermission: 'forbidden' }], scope)
+    prepareLegacyReceiptTestFixtures(scope, [source])
+    receiptReadTestInstance.reset('project-contract-forbidden', scope)
     const detail = decodeCustomerDetailRead(await customerReadTestInstance.detail(customerId, query, scope))
     expect(detail.receipts[0]).toMatchObject({ project: { state: 'forbidden', id: null }, contract: { state: 'forbidden', id: null } })
     expect(detail.projects[0]).toMatchObject({ receiptCount: 0, effectiveReceiptAmount: '0.00' })
@@ -73,14 +79,14 @@ describe('客户收款只读取当前会话的中央事实', () => {
     expect(empty.receipts).toEqual([])
     expect(empty.summary).toMatchObject({ receiptCount: 0, effectiveReceiptAmount: '0.00' })
 
-    ownerCommercialDocumentCommandTestInstance.importExisting(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS, scopes[0])
+    prepareLegacyReceiptTestFixtures(scopes[0])
     const imported = await customerReadTestInstance.detail(customerId, query, scopes[0])
     expect(imported.receipts.map(row => row.receipt.id)).toEqual(['receipt-real-325'])
     expect(imported.summary.effectiveReceiptAmount).toBe('900000.00')
     expect(imported.sourceVersion).not.toBe(empty.sourceVersion)
     expect((await customerReadTestInstance.detail(customerId, query, scopes[1])).receipts).toEqual([])
 
-    ownerCommercialDocumentCommandTestInstance.reset(scopes[0])
+    receiptCommandTestInstance.reset(scopes[0])
     const removed = await customerReadTestInstance.detail(customerId, query, scopes[0])
     expect(removed.receipts).toEqual([])
     await expect(customerReadTestInstance.receipt('receipt-real-325', { ...query, customerId }, scopes[0]))
@@ -92,8 +98,8 @@ describe('客户收款只读取当前会话的中央事实', () => {
     const scope = scopes[0]
     prepareConstructionContractChainIdentityFixtures(scope)
     constructionContractCommandTestInstance.importExisting([CONSTRUCTION_CONTRACT_EXISTING_RECORD], scope)
-    ownerCommercialDocumentCommandTestInstance.importExisting(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS, scope)
-    ownerCommercialDocumentReadTestInstance.reset(scenario, scope)
+    prepareLegacyReceiptTestFixtures(scope)
+    receiptReadTestInstance.reset(scenario, scope)
     const detail = await customerReadTestInstance.detail(customerId, query, scope)
     expect(decodeCustomerDetailRead(detail)).toEqual(detail)
     expect(detail.customer.id).toBe(customerId)
@@ -109,7 +115,7 @@ describe('客户收款只读取当前会话的中央事实', () => {
       .rejects
       .toMatchObject({ problem: { code: scenario } })
     expect((await customerReadTestInstance.list({}, scope)).items).toHaveLength(1)
-    ownerCommercialDocumentReadTestInstance.reset('ready', scope)
+    receiptReadTestInstance.reset('ready', scope)
     expect((await customerReadTestInstance.detail(customerId, query, scope)).summary.effectiveReceiptAmount).toBe('900000.00')
   })
 
@@ -118,6 +124,7 @@ describe('客户收款只读取当前会话的中央事实', () => {
     prepareConstructionContractChainIdentityFixtures(scope)
     const source = OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!
     ownerCommercialDocumentCommandTestInstance.importExisting([source, { ...source, id: 'another-final-settlement', no: 'JS-SECOND' }], scope)
+    prepareLegacyReceiptTestFixtures(scope, [source, { ...source, id: 'another-final-settlement', no: 'JS-SECOND' }])
     const detail = decodeCustomerDetailRead(await customerReadTestInstance.detail(customerId, query, scope))
     expect(detail.summary).toMatchObject({ receiptCount: 1, effectiveReceiptAmount: '900000.00' })
     const receipt = await customerReadTestInstance.receipt('receipt-real-325', { ...query, customerId }, scope)

@@ -136,7 +136,8 @@ export function validateConstructionContractDetailReturnTo(input: unknown, expec
     if (focusView && (tab !== 'acceptance' || !focus || (focusView !== 'acceptance' && focusView !== 'warranty')))
       return null
     const anchorId = decodeURIComponent(url.hash.slice(1))
-    if (anchorId && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
+    const receiptAnchor = tab === 'receipts' && anchorId.startsWith('construction-contract-receipt-') && isStableRouteIdentity(anchorId.slice('construction-contract-receipt-'.length))
+    if (anchorId && !receiptAnchor && (!focus || !focusView || anchorId !== `construction-contract-fact-${focusView}-${focus}`))
       return null
     const returnTo = url.searchParams.get('returnTo')
     const validatedListReturnTo = returnTo

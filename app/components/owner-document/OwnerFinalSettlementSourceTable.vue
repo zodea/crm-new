@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { OwnerCommercialDocumentDetailReadDTO } from '~/lib/owner-document/central-repository'
+import type { ProblemDTO } from '~/types/read-model'
+import ReceiptSourceLink from '~/components/receipt/ReceiptSourceLink.vue'
 import { yuan } from '~/lib/util/money'
 
 type SettlementSources = NonNullable<OwnerCommercialDocumentDetailReadDTO['finalSettlementEvidence']>['sources']
@@ -8,6 +10,7 @@ type SettlementSource = NonNullable<SettlementSources>[number]
 defineProps<{
   sources: SettlementSources
   returnTo: string
+  receiptsProblem?: ProblemDTO
 }>()
 
 defineEmits<{
@@ -26,6 +29,7 @@ function kindLabel(kind: SettlementSource['kind']): string {
       title="来源单据"
       subtitle="只列入变更后合同额或累计收款计算的有效事实"
     />
+    <StatePanel v-if="receiptsProblem" class="mt-3" :kind="receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款事实暂不可用" :description="receiptsProblem.message" action-label="重新读取" compact @action="$emit('retry')" />
     <StatePanel
       v-if="sources === null"
       class="mt-3"
@@ -91,10 +95,12 @@ function kindLabel(kind: SettlementSource['kind']): string {
               {{ source.statusLabel }}
             </td>
             <td class="px-3 py-2.5">
+              <ReceiptSourceLink v-if="source.kind === 'receipt'" :intent="source.navigation" :return-to="returnTo" :anchor-id="`final-settlement-receipt-${source.id}`" label="查看收款" />
               <EntityLink
-                :type="source.kind === 'receipt' ? 'receipt' : 'contract'"
+                v-else
+                type="contract"
                 :intent="source.navigation"
-                :label="source.kind === 'receipt' ? '查看收款' : '查看补充协议'"
+                label="查看补充协议"
                 :return-to="returnTo"
               />
             </td>

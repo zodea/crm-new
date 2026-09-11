@@ -35,12 +35,14 @@ import { createHttpProjectSupplierCommandRepository } from '~/lib/project-suppli
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
+import { createReceiptRepository } from '~/lib/receipt/repository'
 import { createHttpSubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-http-repository'
 import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-contract/http-repository'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  receipts: ReturnType<typeof createReceiptRepository>
   otherSettlements: ReturnType<typeof createOtherSettlementRepository>
   auxiliaryContracts: ReturnType<typeof createAuxiliaryContractRepository>
   customerRead: CustomerReadRepository
@@ -66,6 +68,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    receipts: createReceiptRepository((url, options) => $fetch(url, options)),
     otherSettlements: createOtherSettlementRepository((url, options) => $fetch(url, options)),
     auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),
     customerRead: createHttpCustomerReadRepository({

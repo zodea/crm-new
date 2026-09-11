@@ -294,7 +294,9 @@ export function validateOwnerDocumentDetailReturnTo(
       query.set('returnTo', validatedNested)
     if (contextId)
       query.set('returnContext', contextId)
-    return `${url.pathname}?${query.toString()}`
+    const anchor = decodeURIComponent(url.hash.slice(1))
+    const receiptAnchor = kind === 'final_settlement' && anchor.startsWith('final-settlement-receipt-') && isStableRouteIdentity(anchor.slice('final-settlement-receipt-'.length))
+    return `${url.pathname}?${query.toString()}${receiptAnchor ? `#${encodeURIComponent(anchor)}` : ''}`
   }
   catch {
     return null

@@ -38,6 +38,7 @@ import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
+import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 
@@ -1120,6 +1121,7 @@ const commandSources = [
   crewWorkerCommandTestInstance,
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
+  receiptCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,
 ] as const
 

@@ -15,6 +15,7 @@ import {
   applyFileRefChanges,
   listFileRefs,
 } from '~/lib/forms/file-refs'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { generateId } from '~/lib/util/id'
 import { approvalAmountForSave, paymentConfirmationCap } from './approval-amount'
 
@@ -1230,6 +1231,8 @@ export async function saveFinanceForm(
   action: F3SaveAction,
   attachments: FileRefChanges = {},
 ): Promise<F3SaveResult> {
+  if (kind === 'receipt' && 'window' in globalThis && !isDesktopRuntime())
+    throw new Error('浏览器收款请通过中央收款表单保存')
   if (action === 'confirm' && kind !== 'payment_record')
     throw new Error('只有支付记录支持确认动作')
   return withTransaction(async (tx) => {

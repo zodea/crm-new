@@ -157,6 +157,8 @@ export function createProjectReadTestInstance(
     = async (projectId, origin, sessionId) => projectSupplierReadTestInstance.references(projectId, origin, sessionId),
   resolveCustomerReferences: (rows: readonly ProjectListSourceRow[], sessionId?: string | null) => Promise<readonly ProjectListSourceRow[]>
     = async rows => rows,
+  resolveReceiptIncome: (rows: readonly ProjectListSourceRow[], sessionId?: string | null) => Promise<{ rows: readonly ProjectListSourceRow[], sourceVersion?: string, asOf?: string }>
+    = async rows => ({ rows }),
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -195,7 +197,8 @@ export function createProjectReadTestInstance(
 
   async function readContext(sessionId?: string | null) {
     const context = facts(sessionId)
-    return { ...context, rows: await resolveCustomerReferences(context.rows, sessionId) }
+    const income = await resolveReceiptIncome(await resolveCustomerReferences(context.rows, sessionId), sessionId)
+    return { ...context, rows: income.rows, asOf: income.asOf ?? context.asOf, sourceVersion: [context.sourceVersion, income.sourceVersion].filter(Boolean).join('+') }
   }
 
   return {
@@ -292,4 +295,5 @@ export const projectReadTestInstance = createProjectReadTestInstance(
   undefined,
   undefined,
   async (rows, sessionId) => (await import('./project-import-customers')).resolveProjectCustomerReferences(rows, sessionId),
+  async (rows, sessionId) => (await import('./project-receipt-income')).projectReceiptIncome(rows, sessionId),
 )

@@ -162,7 +162,7 @@ function contract(value: unknown, origin: unknown, customerId: string, receiptsU
     && money(value.effectiveAmount)
     && (receiptsUnavailable
       ? value.receiptAmount === null && value.outstandingAmount === null
-      : money(value.receiptAmount) && money(value.outstandingAmount))
+      : value.receiptAmount === null ? value.outstandingAmount === null : money(value.receiptAmount) && money(value.outstandingAmount))
     && nullableDate(value.signDate)
     && typeof value.status === 'string' && typeof value.isDraft === 'boolean'
 }
@@ -176,7 +176,7 @@ function receipt(value: unknown, origin: unknown, expectedCustomerId?: string): 
     && (!expectedCustomerId || navigationCustomerId(value.navigation) === expectedCustomerId)
     && navigationFor(value.projectNavigation, value.project, origin)
     && navigationFor(value.contractNavigation, value.contract)
-    && typeof value.payerAccount === 'string' && money(value.amount) && money(value.effectiveAmount)
+    && typeof value.payerAccount === 'string' && (value.amount === null || money(value.amount)) && (value.effectiveAmount === null || money(value.effectiveAmount))
     && nullableDate(value.receiptDate)
     && typeof value.paymentMethod === 'string' && typeof value.status === 'string' && typeof value.isDraft === 'boolean'
 }
@@ -194,14 +194,14 @@ export function decodeCustomerDetailRead(value: unknown): CustomerDetailReadDTO 
     || (value.receiptsProblem === undefined
       ? summary.receiptCount !== value.receipts.length
       || summary.draftReceiptCount !== value.receipts.filter(item => object(item) && item.isDraft).length
-      || !money(summary.effectiveReceiptAmount)
+      || (value.receipts.some(item => object(item) && item.effectiveAmount === null) ? summary.effectiveReceiptAmount !== null : !money(summary.effectiveReceiptAmount))
       : !object(value.receiptsProblem)
         || !['forbidden', 'unavailable'].includes(String(value.receiptsProblem.code))
         || typeof value.receiptsProblem.message !== 'string'
         || typeof value.receiptsProblem.retryable !== 'boolean'
         || value.receipts.length !== 0 || summary.receiptCount !== null
         || summary.draftReceiptCount !== null || summary.effectiveReceiptAmount !== null)
-      || (value.contractsProblem !== undefined || value.receiptsProblem !== undefined
+      || (value.contractsProblem !== undefined || value.receiptsProblem !== undefined || summary.effectiveReceiptAmount === null
         ? summary.outstandingAmount !== null
         : !money(summary.outstandingAmount))
       || (value.contractsProblem === undefined

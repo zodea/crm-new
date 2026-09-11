@@ -263,10 +263,10 @@
 | `app/pages/finance/payment/index.vue` | `/finance/payment` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖申请编号/名称、项目/收款单位/合同、申请/批复/实付、成本、业务类型、支付/审批/生效/回票、结算与审批人；当前通用列表只显示基础 7 列 | 名称先进入只读详情；合同、结算、发票、项目、分供方与支付记录全部按真实外键下钻，来源 query 和列表筛选需可恢复 | C-DENSE |
 | `app/pages/finance/payment/new.vue` | `/finance/payment/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/payment-management/index.vue` | `/finance/payment-management` | 支出财务 | 工作台 | #203 | R-FINANCE-FLOW-LIVE | 本地已是独立工作台且运行有 2 条已批复申请；参考默认按支付状态分段，并额外展示合同、付款内容、来源单据/业务类型、所属部门和剩余待支付 | 只读核对批复与已确认支付；申请/项目/分供方/合同/来源单据可下钻，登记支付仍跳整页支付记录，来源字段无 canonical ID 时保持“未接”而非猜文本路由 | C-DENSE |
-| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #314 | R-FINANCE-FLOW-LIVE | 客户收款关系按稳定 ID 进入中央只读详情；详情展示收款、客户、项目与合同并返回客户收款页签 | 收款查看不得复用表单壳，来源错配/缺失/无权限分别呈现 | C-DENSE |
-| `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 原编辑表单迁至显式 form 路由，保持既有字段与保存契约 | 只从收款列表显式编辑动作进入 | C-FORM |
-| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #202 | R-FINANCE-FLOW-LIVE | 参考专属列覆盖收款编号/分类、项目/付款单位/合同、收款日期/金额/方式/类型与累计合同收款，编号进入只读详情；当前本地只有 1 条并缺分类、累计列与中央来源身份 | 详情由有效收款聚合累计值，不回写合同静态金额；只有读模型明确返回来源与稳定 ID 时才下钻，旧本地行降级普通文本，编辑保持显式独立动作 | C-DENSE |
-| `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #202 | R-FORM-PRIOR | 待 #202 同屏测量 | 写入路径保持现有契约 | C-FORM |
+| `app/pages/finance/receipt/[id].vue` | `/finance/receipt/:id` | 收入财务 | 详情 | #436 | R-FINANCE-FLOW-LIVE | 浏览器按收款自身 ID 与当前来源读取；客户、合同、项目、最终结算保持各自返回位置；附件支持正文预览与下载 | [本切片证据](./evidence/issue-436/README.md)；来源错配/缺失/无权限分别呈现，生产持久化仍属 #416 | C-DENSE |
+| `app/pages/finance/receipt/form/[id].vue` | `/finance/receipt/form/:id` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器显式整页编辑接入中央命令与附件正文，失败保留输入；五档及来源恢复见本切片证据 | 保存动作与已知缺项只按[页面契约](../rewrite/pages/finance-receipt.md)，不推断参考系统写行为 | C-FORM |
+| `app/pages/finance/receipt/index.vue` | `/finance/receipt` | 收入财务 | 列表 | #436 | R-FINANCE-FLOW-LIVE | 浏览器已接专属中央列表、来源分别累计及关系下钻；无原始事实的分类/类型显示未记录 | [本切片证据](./evidence/issue-436/README.md)；宽表仅区域横滚，Tauri 原适配边界保持 ADR 0020 | C-DENSE |
+| `app/pages/finance/receipt/new.vue` | `/finance/receipt/new` | 收入财务 | 整页表单 | #436 | R-FORM-PRIOR | 浏览器整页新建、空草稿、提交、附件及首错焦点已接入；使用既有表单参考与 Kit 原语 | 写入生命周期只按[页面契约](../rewrite/pages/finance-receipt.md)，真实验证见本切片证据 | C-FORM |
 | `app/pages/finance/records/[id].vue` | `/finance/records/:id` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |
 | `app/pages/finance/records/index.vue` | `/finance/records` | 支出财务 | 列表 | #203 | R-FINANCE-FLOW-LIVE | 参考空表仍明确支付编号/日期/金额/方式、收款账户/开户行/账号和创建审计；当前本地有 3 条已确认支付但继续使用通用列表，未展示银行凭证身份 | 编号先进入只读详情，付款申请分摊和收款方下钻按真实 ID；银行流水唯一性、人工确认和 OCR 来源继续以 ADR 0015 为准 | C-DENSE |
 | `app/pages/finance/records/new.vue` | `/finance/records/new` | 支出财务 | 整页表单 | #203 | R-FORM-PRIOR | 待 #203 同屏测量 | 写入路径保持现有契约 | C-FORM |

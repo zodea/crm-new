@@ -61,7 +61,7 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
       : family === 'auxiliary'
         ? 'auxiliary-contract:read'
         : family === 'receipt'
-          ? 'customer:list:read'
+          ? 'receipt:read'
           : ['project', 'customer', 'supplier', 'crew', 'worker'].includes(family)
               ? `${family}:list:read`
               : `${family}:read`
@@ -119,13 +119,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
     return { ...common, ...dto, subject: reference('contract', dto.contract.id, dto.contract.name), origin: dto.dataOrigin, filters: { contractKind: expectedKind } }
   }
   if (family === 'receipt') {
-    const customerId = url.searchParams.get('customerId')
-    if (!isStableRouteIdentity(customerId))
-      return restoreProblem('not-connected')
-    const dto = await repos.customerRead.getReceipt({ ...query, customerId })
-    if (dto.customer.id !== customerId)
-      return restoreProblem('mismatch')
-    return { ...common, ...dto, subject: dto.receipt.receipt, origin: dto.dataOrigin, filters: { customerId } }
+    const dto = await repos.receipts.detail(detail.id, { origin, includeDemo: query.includeDemo })
+    return { ...common, capabilities: dto.capabilities, sourceVersion: dto.sourceVersion, subject: reference('receipt', dto.record.id, dto.record.draft.no || '收款登记'), origin: dto.record.dataOrigin }
   }
   if (family === 'owner-document' || family === 'subcontract-document') {
     const kind = DOCUMENT_KINDS[`${family}/${detail.kind}`]!

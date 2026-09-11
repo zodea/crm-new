@@ -20,11 +20,16 @@ const REFERENCE_KEYS = new Set<CoreMigrationReferenceField>([
   'customerId',
   'secondaryCustomerId',
   'projectId',
+  'contractId',
   'supplierId',
   'crewId',
 ])
 const ROW_KEYS = new Set(['legacyId', 'name', 'references', 'quantity', 'amount', 'attributes', 'deletedAt'])
 const ATTRIBUTE_KEYS = new Set(['no', 'content', 'invoiceType', 'contactName', 'contactPhone', 'taxRate', 'signDate', 'mainTerms', 'paymentTerms', 'warrantyTerms', 'retentionRatio', 'retentionAmount', 'retentionDays', 'invoiceName', 'invoiceTaxNo', 'invoiceAddressPhone', 'invoiceBank', 'invoiceBankAccount', 'status', 'note', 'actualCompletionDate', 'createdAt', 'updatedAt', 'laborScope'])
+const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, ReadonlySet<string>>> = {
+  construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson']),
+  receipt_registrations: new Set(['no', 'receiptDate', 'payerAccount', 'paymentMethod', 'acceptanceBillNo', 'billDueDate', 'periodNo', 'bankSerialNo', 'handler', 'reviewStatus', 'status', 'note', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'attachmentsJson']),
+}
 const SOURCE_KEYS = new Set([
   'contractVersion',
   'mode',
@@ -140,12 +145,12 @@ function parseReferences(value: unknown, label: string): CoreMigrationSourceEnti
   return result
 }
 
-function parseAttributes(value: unknown, label: string): CoreMigrationSourceEntityDTO['attributes'] {
+function parseAttributes(value: unknown, label: string, entityType: CoreMigrationEntityType): CoreMigrationSourceEntityDTO['attributes'] {
   if (value === undefined)
     return undefined
   if (!isObject(value))
     invalid(`${label}必须是对象`)
-  assertOnlyKeys(value, ATTRIBUTE_KEYS, label)
+  assertOnlyKeys(value, ATTRIBUTE_KEYS_BY_ENTITY[entityType] ?? ATTRIBUTE_KEYS, label)
   const result: Record<string, string | number | null> = {}
   for (const [key, entry] of Object.entries(value)) {
     if (entry !== null && typeof entry !== 'string' && (typeof entry !== 'number' || !Number.isFinite(entry)))
@@ -168,7 +173,7 @@ function parseEntity(value: unknown, entityType: CoreMigrationEntityType, index:
       : {}),
     ...(value.quantity !== undefined ? { quantity: optionalFinite(value.quantity, `${label}.quantity`) } : {}),
     ...(value.amount !== undefined ? { amount: optionalMoney(value.amount, `${label}.amount`) } : {}),
-    ...(value.attributes !== undefined ? { attributes: parseAttributes(value.attributes, `${label}.attributes`) } : {}),
+    ...(value.attributes !== undefined ? { attributes: parseAttributes(value.attributes, `${label}.attributes`, entityType) } : {}),
     ...(value.deletedAt !== undefined ? { deletedAt: optionalIso(value.deletedAt, `${label}.deletedAt`) } : {}),
   }
 }

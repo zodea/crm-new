@@ -200,8 +200,20 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
   receipt_registrations: `
     SELECT
       id, no, receipt_date, project_id, contract_id, customer_id,
-      payer_account, amount, payment_method, review_status, status, note,
-      created_at, updated_at, deleted_at
+      payer_account, amount, payment_method, acceptance_bill_no, bill_due_date,
+      period_no, bank_serial_no, handler, review_status, status, note,
+      created_at, updated_at, deleted_at,
+      (SELECT COALESCE(json_group_array(json_object(
+        'id', f.id, 'ownerType', f.owner_type, 'ownerId', f.owner_id,
+        'fileName', f.file_name, 'filePath', f.file_path, 'fileSize', f.file_size,
+        'mimeType', f.mime_type, 'category', f.category, 'uploader', f.uploader,
+        'uploadedAt', f.uploaded_at, 'deletedAt', f.deleted_at,
+        'payloadEncoding', payload.encoding, 'payloadBase64', CASE WHEN payload.encoding = 'base64' THEN payload.content ELSE NULL END
+      )), '[]') FROM (
+        SELECT * FROM file_refs
+        WHERE owner_type = 'receipt_registration' AND owner_id = receipt_registrations.id
+        ORDER BY id
+      ) f LEFT JOIN file_payloads payload ON payload.file_ref_id = f.id) AS attachments_json
     FROM receipt_registrations
     ORDER BY id
   `,
@@ -997,11 +1009,17 @@ function sourceEntity(
         receiptDate: nullableText(row.receipt_date),
         payerAccount: text(row.payer_account),
         paymentMethod: text(row.payment_method),
+        acceptanceBillNo: text(row.acceptance_bill_no),
+        billDueDate: text(row.bill_due_date),
+        periodNo: text(row.period_no),
+        bankSerialNo: text(row.bank_serial_no),
+        handler: text(row.handler),
         reviewStatus: text(row.review_status),
         status: text(row.status),
         note: text(row.note),
         createdAt: isoDateTimeText(row.created_at) ?? '',
         updatedAt: isoDateTimeText(row.updated_at) ?? '',
+        attachmentsJson: text(row.attachments_json) || '[]',
       },
     }
   }

@@ -24,6 +24,7 @@ import {
   validateProjectSupplierReturnTo,
 } from '~/lib/project-supplier/return-context'
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
+import { validateReceiptReturnTo } from '~/lib/receipt/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
@@ -233,9 +234,12 @@ function receiptPath(intent: EntityTargetIntent): string {
   const path = entityPath('/finance/receipt', intent)
   const dataOrigin = intent.filters.dataOrigin
   const customerId = intent.filters.customerId
-  if (!isDataOriginDTO(dataOrigin) || typeof customerId !== 'string' || !customerId)
+  if (!isDataOriginDTO(dataOrigin) || (customerId != null && customerId !== '' && !isStableRouteIdentity(customerId)))
     throw new Error('invalid receipt relation context')
-  return `${path}?origin=${dataOrigin}&customerId=${encodeURIComponent(customerId)}`
+  const query = new URLSearchParams({ origin: dataOrigin })
+  if (typeof customerId === 'string' && customerId)
+    query.set('customerId', customerId)
+  return `${path}?${query}`
 }
 
 function ownerDocumentPath(intent: EntityTargetIntent): string {
@@ -497,9 +501,10 @@ export function resolveNavigationTarget(
     }
     if (key === 'receipt:detail' && options.returnTo) {
       const entityIntent = intent as EntityTargetIntent
-      const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, entityIntent.filters.dataOrigin)
-      if (ownerReturnTo && !to.includes('returnTo='))
-        to = `${to}&returnTo=${encodeURIComponent(ownerReturnTo)}`
+      const dataOrigin = entityIntent.filters.dataOrigin
+      const returnTo = isDataOriginDTO(dataOrigin) ? validateReceiptReturnTo(options.returnTo, dataOrigin) : null
+      if (returnTo && !to.includes('returnTo='))
+        to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
     }
     if ((key === 'owner-document:change' || key === 'owner-document:report'
       || key === 'owner-document:acceptance' || key === 'owner-document:warranty'

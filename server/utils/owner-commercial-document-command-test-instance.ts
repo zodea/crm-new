@@ -17,7 +17,9 @@ import type {
   OwnerDocumentDraft,
 } from '../../app/lib/owner-document/forms'
 import type { PenaltyDeductionSource, PenaltyRectificationEvent } from '../../app/lib/owner-document/project-penalty'
+import type { ReceiptRecord } from '../../app/lib/receipt/contract'
 import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
+import type { ProblemDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
 import {
@@ -31,8 +33,13 @@ import {
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-penalty'
+import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
+import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
+import { customerCommandTestInstance } from './customer-command-test-instance'
+import { projectCommandTestInstance } from './project-command-test-instance'
+import { receiptReadTestInstance } from './receipt-read-test-instance'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 
 interface ProjectSeed {
@@ -116,15 +123,19 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   crews?: readonly SupplierSeed[]
   crewSource?: Pick<typeof crewWorkerCommandTestInstance, 'crewRows'>
   projects?: readonly ProjectSeed[]
+  projectSource?: Pick<typeof projectCommandTestInstance, 'rows'>
   customers?: readonly CustomerSeed[]
+  customerSource?: Pick<typeof customerCommandTestInstance, 'rows'>
   suppliers?: readonly SupplierSeed[]
   contracts?: readonly ContractSeed[]
+  constructionContractSource?: Pick<typeof constructionContractCommandTestInstance, 'rows' | 'facts'>
   subcontractContracts?: readonly SubcontractSeed[]
   subcontractContractSource?: Pick<typeof subcontractContractCommandTestInstance, 'rows'>
   boqLines?: readonly BoqLineSeed[]
   monthlyQuantityFacts?: readonly MonthlyQuantityFactSeed[]
   finalSettlementSupplements?: readonly FinalSettlementSupplementSeed[]
   finalSettlementReceipts?: readonly FinalSettlementReceiptSeed[]
+  receiptSource?: typeof receiptReadTestInstance.facts
   documents?: readonly OwnerCommercialDocumentSource[]
 }
 
@@ -614,12 +625,41 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   function effectiveProjects(state: WorkspaceState): Map<string, ProjectSeed> {
+    if (options.projectSource)
+      return new Map(options.projectSource.rows(state.sessionId).map(row => [row.id, { id: row.id, name: row.name, customerId: row.customerId }]))
     return new Map([
       ...linkedSubcontractRows(state)
         .filter(row => row.projectId)
         .map(row => [row.projectId!, { id: row.projectId!, name: row.projectName, customerId: null }] as const),
       ...state.projects.entries(),
     ])
+  }
+
+  function effectiveCustomers(state: WorkspaceState): Map<string, CustomerSeed> {
+    return options.customerSource
+      ? new Map(options.customerSource.rows(state.sessionId).map(row => [row.id, { id: row.id, name: row.name }]))
+      : state.customers
+  }
+
+  function effectiveConstructionContracts(state: WorkspaceState): Map<string, ContractSeed> {
+    return options.constructionContractSource
+      ? new Map(options.constructionContractSource.rows(state.sessionId).map(row => [row.id, { id: row.id, no: row.no, name: row.name, projectId: row.projectId ?? '', customerId: row.customerId, amount: row.amount }]))
+      : state.contracts
+  }
+
+  function finalSettlementSupplements(state: WorkspaceState, contractId: string) {
+    const known = options.constructionContractSource !== undefined || state.finalSettlementSupplementsKnownContractIds.has(contractId)
+    if (!known)
+      return null
+    const sources = new Map([...state.finalSettlementSupplements.values()].filter(row => row.contractId === contractId).map(row => [row.id, row]))
+    for (const row of options.constructionContractSource?.facts(state.sessionId).supplements ?? []) {
+      if (row.dataOrigin !== 'real' || row.contractId !== contractId)
+        continue
+      if (row.amount === null)
+        return null
+      sources.set(row.id, { contractId, id: row.id, no: row.no, name: row.name, status: row.status, amount: row.amount, date: row.date })
+    }
+    return [...sources.values()].map(({ contractId: _contractId, ...row }) => clone(row))
   }
 
   function effectiveSuppliers(state: WorkspaceState): Map<string, SupplierSeed> {
@@ -631,26 +671,48 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     ])
   }
 
+  function currentReceiptFacts(state: WorkspaceState): { rows: ReceiptRecord[] | null, sourceVersion: string, problem?: ProblemDTO } | undefined {
+    if (!options.receiptSource)
+      return undefined
+    try {
+      const source = options.receiptSource(state.sessionId)
+      if (source.rows.some(row => ownerFinalSettlementReceiptIsActive(row.draft.status) && row.draft.amount === null))
+        throw new ReceiptRepositoryProblem({ code: 'unavailable', message: '有效收款金额尚未记录，当前无法计算', retryable: false, fieldErrors: {}, traceId: null })
+      if (!['project:list:read', 'customer:list:read', 'construction-contract:read'].every(capability => source.capabilities.includes(capability)))
+        throw new ReceiptRepositoryProblem({ code: 'forbidden', message: '无权读取收款与结算的关联', retryable: false, fieldErrors: {}, traceId: null })
+      return source
+    }
+    catch (cause) {
+      if (!(cause instanceof ReceiptRepositoryProblem) || !['forbidden', 'unavailable'].includes(cause.problem.code))
+        throw cause
+      return { rows: null, sourceVersion: `receipt-${cause.problem.code}`, problem: cause.problem }
+    }
+  }
+
   function finalSettlementEvidenceForContract(state: WorkspaceState, contractId: string | null) {
-    const contract = contractId ? state.contracts.get(contractId) ?? null : null
+    const contract = contractId ? effectiveConstructionContracts(state).get(contractId) ?? null : null
     if (!contract)
       return undefined
-    const project = state.projects.get(contract.projectId) ?? null
+    const project = effectiveProjects(state).get(contract.projectId) ?? null
     const customerId = contract.customerId ?? project?.customerId ?? null
+    const receiptSource = currentReceiptFacts(state)
     return {
+      ...(receiptSource?.problem ? { receiptsProblem: receiptSource.problem } : {}),
       originalContractAmount: contract.amount ?? null,
-      supplements: state.finalSettlementSupplementsKnownContractIds.has(contract.id)
-        ? [...state.finalSettlementSupplements.values()]
-            .filter(source => source.contractId === contract.id)
-            .map(({ contractId: _contractId, ...source }) => clone(source))
-        : null,
-      receipts: state.finalSettlementReceiptsKnownContractIds.has(contract.id)
-        ? [...state.finalSettlementReceipts.values()]
-            .filter(source => source.contractId === contract.id
-              && source.projectId === contract.projectId
-              && source.customerId === customerId)
-            .map(({ contractId: _contractId, projectId: _projectId, customerId: _customerId, ...source }) => clone(source))
-        : null,
+      supplements: finalSettlementSupplements(state, contract.id),
+      receipts: receiptSource
+        ? receiptSource.rows === null
+          ? null
+          : receiptSource.rows
+              .filter(row => row.dataOrigin === 'real' && row.draft.contractId === contract.id && row.draft.projectId === contract.projectId && row.draft.customerId === customerId && ownerFinalSettlementReceiptIsActive(row.draft.status))
+              .map(({ id, draft }) => ({ id, no: draft.no, name: draft.no || '收款登记', status: draft.status, amount: Number(draft.amount), date: draft.receiptDate || null }))
+        : state.finalSettlementReceiptsKnownContractIds.has(contract.id)
+          ? [...state.finalSettlementReceipts.values()]
+              .filter(source => source.contractId === contract.id
+                && source.projectId === contract.projectId
+                && source.customerId === customerId)
+              .map(({ contractId: _contractId, projectId: _projectId, customerId: _customerId, ...source }) => clone(source))
+          : null,
     }
   }
 
@@ -767,14 +829,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const contractId = complete ? required(draft.contractId, '施工合同') : text(draft.contractId)
     if (contractId && !projectId)
       throw failure('relationship-mismatch', '选择施工合同前必须先选择项目')
-    const project = projectId ? state.projects.get(projectId) ?? null : null
-    const contract = contractId ? state.contracts.get(contractId) ?? null : null
+    const project = projectId ? effectiveProjects(state).get(projectId) ?? null : null
+    const contract = contractId ? effectiveConstructionContracts(state).get(contractId) ?? null : null
     if (projectId && !project)
       throw failure('relationship-mismatch', '项目不存在或已删除')
     if (contractId && (!contract || contract.projectId !== projectId))
       throw failure('relationship-mismatch', '施工合同不存在、已删除或不属于所选项目')
     const customerId = contract?.customerId ?? project?.customerId ?? null
-    const customer = customerId ? state.customers.get(customerId) ?? null : null
+    const customer = customerId ? effectiveCustomers(state).get(customerId) ?? null : null
     return { project, contract, subcontract: null, customerId, customer, supplierId: null, supplier: null }
   }
 
@@ -1911,7 +1973,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
             date: entityAttribute(entity, 'signDate') || null,
           })
         }
-        if (entity.entityType === 'receipt_registrations') {
+        if (entity.entityType === 'receipt_registrations' && !options.receiptSource) {
           const contractId = entity.references.contractId ?? ''
           const projectId = entity.references.projectId ?? ''
           const customerId = entity.references.customerId ?? ''
@@ -2379,7 +2441,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       return [...state.documents.values()].map(source => withFinalSettlementEvidence(state, source))
     },
     sourceVersion(sessionId?: string | null) {
-      return `owner-document-command-${stateFor(sessionId).sourceVersion}`
+      const state = stateFor(sessionId)
+      const receipts = currentReceiptFacts(state)
+      return `owner-document-command-${state.sourceVersion}${receipts ? `+${receipts.sourceVersion}` : ''}`
     },
     importExisting(
       records: readonly OwnerCommercialDocumentSource[],
@@ -2420,11 +2484,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         crews: includeSubcontract ? [...state.crews.values()].map(row => ({ id: row.id, label: row.name })) : [],
         settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount, version: String(row.version), remainingAmount: round(row.amount - [...state.penaltyDeductions.values()].filter(d => d.settlementId === row.id).reduce((sum, d) => sum + d.amount, 0)) })) : [],
         projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
-        customers: includeOwner ? [...state.customers.values()].map(row => ({ id: row.id, label: row.name })) : [],
+        customers: includeOwner ? [...effectiveCustomers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
         suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
         contracts: [
           ...(includeOwner
-            ? [...state.contracts.values()].map(row => ({
+            ? [...effectiveConstructionContracts(state).values()].map(row => ({
                 id: row.id,
                 label: row.name,
                 hint: row.no,
@@ -2542,6 +2606,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
 export const ownerCommercialDocumentCommandTestInstance
   = createOwnerCommercialDocumentCommandTestInstance({
+    receiptSource: sessionId => receiptReadTestInstance.facts(sessionId),
+    projectSource: projectCommandTestInstance,
+    customerSource: customerCommandTestInstance,
+    constructionContractSource: constructionContractCommandTestInstance,
     subcontractContractSource: subcontractContractCommandTestInstance,
     crewSource: crewWorkerCommandTestInstance,
     projects: [{ id: 'project-real-320', name: '中央正式施工项目', customerId: 'customer-real-320' }],

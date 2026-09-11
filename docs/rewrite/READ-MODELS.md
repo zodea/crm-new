@@ -193,7 +193,7 @@ type ReadState<T> =
 | `owner-material` | 甲供材 | 总控、下料、到货、领用、直入直出五类专属列表/详情投影/表单 | 五类甲供材实体、项目/客户/班组引用和三量派生 | `A+B`；供货单位不得冒用项目客户，总计划头/行、仓库、送货单和班组合同身份待建；无 seed 时返回真实 0 条，见 [`material-management.md`](./pages/material-management.md) |
 | `delivery` | 送货单闭环 | 处理区、归档库、归档详情/表单；送货头、材料行、归属、OCR/审核/归档/打印状态 | `delivery_records`、`delivery_lines`、`file_refs/file_payloads` | `A+C`；头/行和价格事实可后台化，原件字节、上传会话、OCR 轮询和桌面打印使用专用 adapter；文件名/路径不授予读取权限，见 [`material-delivery.md`](./pages/material-delivery.md) |
 | `material-price` | 材料价格 | 材料×规格×单位×分供方×项目×时间的价格事实、序列、对比和来源下钻 | 已归档送货行的确定性聚合，无独立价格表 | `A`；只返回有真实归档来源的事实，reviewed/done 名称差异由 adapter 归一，不保存第二份价格，见 [`material-management.md`](./pages/material-management.md) |
-| `finance-income` | 收入财务 | 开票申请、中央只读收款详情、显式收款表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | `A`；#314 已闭合客户收款关系的中央只读目标，其他通用本地列表仍需后台 DTO 返回真实关系 ID；保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
+| `finance-income` | 收入财务 | 开票申请、普通收款专属列表/详情/整页表单、往来列表/详情投影；项目/客户、金额/税额、方向、状态、来源 | `invoice_applications`、`receipt_registrations`、`current_transactions` | 普通收款 `A+B`：#436 接通中央读写、完整迁移与附件正文；开票和往来仍按实际接入范围为 `A`，不得由收款通过推定完成。保证金/备用金无本地路由不扩张，见 [`finance-billing.md`](./pages/finance-billing.md)、[`finance-receipt.md`](./pages/finance-receipt.md) |
 | `finance-expense` | 支出财务 | 付款申请、付款管理、支付记录、费用报销列表/详情/表单；结算/发票/申请分摊、支付状态及付款申请只读洞察 | F3 头/行/分摊表和确认支付聚合 | `A+B`；项目/分供方/合同/来源 ID 必须进入读 DTO；付款洞察除当前源单外还含跨项目/跨供应商聚合，不能挂在单个项目 store；部门/经办人员身份和部分参考专属列无 canonical 来源时保持 null，见 [`finance-payment.md`](./pages/finance-payment.md)、[`finance-records.md`](./pages/finance-records.md)、[`finance-reimbursement.md`](./pages/finance-reimbursement.md) |
 | `invoice` | 发票台账 | 上传识别工作台、单票校对、归档台账与因子计算；票面字段、归属、状态、明细、置信度 | `invoices` 单表、明细/置信度 JSON、OCR 专用服务 | `A+C`；归档读模型可后台化，原件、Token、识别请求和打印能力走专用 adapter；`reviewStatus` 与 `accountStatus` 不能合并，见 [`finance-invoice.md`](./pages/finance-invoice.md) |
 | `quantity-payroll` | 工程量与工资 | 区域/模板/三量、责任/阶段完成、矩阵/户详情，工资单/成员/分配/行、考勤和 C2 签工 | 工程量、工资、考勤、签工实体及读模型 | `A+B`；现场量 null 不得汇总成 0；工资/考勤/签工无 seed 保持空；B 类合同/BOQ 清单直报工资已决议退役；仅保留 A/C1/C2 的既定现场工资来源，遗留入口/编码/数据隔离待逐项核验，不因补齐合同关系而重开，见 [`subcontract-quantity.md`](./pages/subcontract-quantity.md)、[`subcontract-payroll.md`](./pages/subcontract-payroll.md) |
@@ -400,13 +400,15 @@ interface NotificationOpenResultDTO {
 
 整个合同源无权/不可用返回 `contractsProblem`（`forbidden` / `unavailable`），`contracts=[]`，摘要合同数/有效合同额/待收差额与项目行合同数/有效合同额为 `null`，保持独立可读的客户和项目。解码验证问题态、未知值、集合及计数一致，不将失败转换为真实零。前端对合同页签给出明确反馈和适用重试；未接入的新收款写源不由本票推定完成。
 
-### 客户已有中央收款来源
+### 普通收款及客户关联来源
 
-#426 的客户收款投影复用当前会话最终结算的中央收款事实，按稳定收款 ID 去重；普通读取不导入固定正式样例，来源撤回后客户与收款详情同步移除，读取版本包含来源版本。付款账户未在该来源记录时为空，不把客户名称冒充账号。既有演示收款保持独立来源。
+#436 将普通收款接入单一中央命令事实源，取代 #426 依赖最终结算文档的临时投影边界。列表、详情、表单、客户关系、施工合同累计、项目收入和最终结算共用原始收款，按 `(dataOrigin, id)` 去重；没有最终结算的普通收款仍进入关系，多张结算不重复累计。原始 `facts` 不读取消费方的聚合，避免客户—合同—收款相互递归。读取版本随收款和合同事实变化，普通读取不导入正式样例。
+
+普通收款读取使用 `receipt:read`；详情按稳定 ID 与 `dataOrigin` 独立读取，客户上下文不是必需身份。项目、客户和合同引用分别复验对应读权，受限引用不返回 ID/名称，包含受限关联的记录撤下 `receipt:write`。列表分页和汇总使用同一完整筛选集，正式与演示分别汇总。金额缺失为 `null`，已知零为两位小数字符串；未知历史账号、分类与类型不从其他字段推断。字段展示及状态口径见[收款页面契约](./pages/finance-receipt.md)。
 
 整个来源无权/不可用时返回 `receiptsProblem`，收款集合为空；摘要收款数、草稿数、有效收款、待收差额，项目行收款数/金额，以及合同行累计收款/余额为 `null`，不得用其他摘要泄露受限金额。客户主数据、列表和其他可读关系仍可使用；收款详情返回同一问题，前端支持适用重试。解码同时检查问题状态、集合、计数和未知金额。
 
-本切片只修复已有中央来源；普通收款登记表单、列表及完整迁移仍由 #413 承接，不把最终结算来源投影视为全部收款写源接入。
+施工合同、最终结算和项目收入对同一收款源故障同样返回未知金额与来源问题，保留独立可读主档。中央列表和详情重读时撤下旧事实，权限恢复后才再次显示。收款附件正文经当前记录、来源、归属和哈希校验，历史本机路径不暴露为读取入口。完整迁移仍经显式准备、确认与回滚接管；该可重置实例不构成 #416 的生产持久化证明。
 
 ### 适配边界
 

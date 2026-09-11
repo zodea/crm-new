@@ -22,7 +22,7 @@ const anchorId = computed(() => props.returnAnchor !== undefined
   ? props.returnAnchor
   : props.reference.state === 'resolved' ? `${props.reference.entity}:${encodeURIComponent(props.reference.id)}` : null)
 const contextId = newCustomerReturnContextId()
-const relationReturnTo = computed(() => (props.reference.entity === 'project' || props.reference.entity === 'contract') && props.reference.state === 'resolved'
+const relationReturnTo = computed(() => ['project', 'contract', 'receipt'].includes(props.reference.entity) && props.reference.state === 'resolved'
   ? customerRelationReturnTo(props.returnTo, contextId)
   : null)
 const resolution = computed(() => resolveNavigationTarget(props.navigation, {
@@ -32,7 +32,7 @@ const resolution = computed(() => resolveNavigationTarget(props.navigation, {
 
 function capture() {
   if (!relationReturnTo.value || props.reference.state !== 'resolved'
-    || (props.reference.entity !== 'project' && props.reference.entity !== 'contract')) {
+    || (props.reference.entity !== 'project' && props.reference.entity !== 'contract' && props.reference.entity !== 'receipt')) {
     return
   }
   saveCustomerRelationReturnOrigin({

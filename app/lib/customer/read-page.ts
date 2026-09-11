@@ -17,6 +17,7 @@ import type {
   CustomerReceiptSourceRow,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
+import { ownerFinalSettlementReceiptIsActive } from '../owner-document/central-repository'
 import { normalizeEnumSelection } from '../util/enum-selection'
 import { CUSTOMER_PAGE_SIZES, customerProblem, CustomerRepositoryProblem } from './read-contract'
 
@@ -347,14 +348,14 @@ export function buildCustomerDetailRead(
       fact.amount += row.amount + row.supplementAmount
     contractsByProject.set(row.projectId, fact)
   }
-  const receiptsByProject = new Map<string, { count: number, amount: number }>()
+  const receiptsByProject = new Map<string, { count: number, amount: number | null }>()
   for (const row of receiptRows) {
     if (!row.projectId)
       continue
     const fact = receiptsByProject.get(row.projectId) ?? { count: 0, amount: 0 }
     fact.count += 1
-    if (!isDraft(row.status))
-      fact.amount += row.amount
+    if (ownerFinalSettlementReceiptIsActive(row.status))
+      fact.amount = fact.amount === null || row.amount === null ? null : fact.amount + row.amount
     receiptsByProject.set(row.projectId, fact)
   }
 
@@ -374,7 +375,7 @@ export function buildCustomerDetailRead(
       contractCount: options.contractsProblem ? null : contractFact.count,
       effectiveContractAmount: options.contractsProblem ? null : money(contractFact.amount),
       receiptCount: options.receiptsProblem ? null : receiptFact.count,
-      effectiveReceiptAmount: options.receiptsProblem ? null : money(receiptFact.amount),
+      effectiveReceiptAmount: options.receiptsProblem || receiptFact.amount === null ? null : money(receiptFact.amount),
     }
   })
 
@@ -397,8 +398,8 @@ export function buildCustomerDetailRead(
       project: project.ref as CustomerContractDTO['project'],
       projectNavigation: project.navigation,
       effectiveAmount: money(effectiveAmount),
-      receiptAmount: options.receiptsProblem ? null : money(row.receiptAmount),
-      outstandingAmount: options.receiptsProblem ? null : money(effectiveAmount - row.receiptAmount),
+      receiptAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(row.receiptAmount),
+      outstandingAmount: options.receiptsProblem || row.receiptAmount === null ? null : money(effectiveAmount - row.receiptAmount),
       signDate: row.signDate,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -438,8 +439,8 @@ export function buildCustomerDetailRead(
       contractNavigation: contract.navigation,
       receiptDate: row.receiptDate,
       payerAccount: row.payerAccount,
-      amount: money(row.amount),
-      effectiveAmount: money(isDraft(row.status) ? 0 : row.amount),
+      amount: row.amount === null ? null : money(row.amount),
+      effectiveAmount: !ownerFinalSettlementReceiptIsActive(row.status) ? '0.00' : row.amount === null ? null : money(row.amount),
       paymentMethod: row.paymentMethod,
       status: row.status,
       isDraft: isDraft(row.status),
@@ -449,10 +450,12 @@ export function buildCustomerDetailRead(
     (sum, row) => sum + Number(row.effectiveAmount),
     0,
   )
-  const effectiveReceiptAmount = receipts.reduce(
-    (sum, row) => sum + Number(row.effectiveAmount),
-    0,
-  )
+  const effectiveReceiptAmount = receipts.some(row => row.effectiveAmount === null)
+    ? null
+    : receipts.reduce(
+        (sum, row) => sum + Number(row.effectiveAmount),
+        0,
+      )
   return {
     dataOrigin: customer.dataOrigin,
     customer: { ...customer, aliases: [...customer.aliases] },
@@ -467,8 +470,8 @@ export function buildCustomerDetailRead(
       contractCount: options.contractsProblem ? null : contracts.length,
       effectiveContractAmount: options.contractsProblem ? null : money(effectiveContractAmount),
       receiptCount: options.receiptsProblem ? null : receipts.length,
-      effectiveReceiptAmount: options.receiptsProblem ? null : money(effectiveReceiptAmount),
-      outstandingAmount: options.contractsProblem || options.receiptsProblem ? null : money(effectiveContractAmount - effectiveReceiptAmount),
+      effectiveReceiptAmount: options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveReceiptAmount),
+      outstandingAmount: options.contractsProblem || options.receiptsProblem || effectiveReceiptAmount === null ? null : money(effectiveContractAmount - effectiveReceiptAmount),
       draftReceiptCount: options.receiptsProblem ? null : receipts.filter(row => row.isDraft).length,
     },
     asOf: options.asOf,

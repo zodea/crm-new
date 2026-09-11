@@ -68,6 +68,7 @@ export interface ProjectListSourceRow {
   riskLevel: string
   address: string
   income: number | null
+  incomeMissingSource?: string
   budget: number | null
   updatedAt: string
 }

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DataOriginDTO } from '~/types/read-model'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 
 definePageMeta({ name: 'receiptDetail' })
 const route = useRoute()
+const desktop = isDesktopRuntime()
 const visibility = useDataVisibilityStore()
 const origin = computed<DataOriginDTO>(() => route.query.origin === 'demo' ? 'demo' : 'real')
 const customerId = computed(() => typeof route.query.customerId === 'string' ? route.query.customerId : '')
@@ -12,6 +14,7 @@ const returnContext = computed(() => typeof route.query.returnContext === 'strin
 
 <template>
   <ReceiptDetailScreen
+    v-if="desktop"
     :receipt-id="String(route.params.id ?? '')"
     :customer-id="customerId"
     :origin="origin"
@@ -19,4 +22,5 @@ const returnContext = computed(() => typeof route.query.returnContext === 'strin
     :return-to="returnTo"
     :return-context="returnContext"
   />
+  <ReceiptRegistrationDetailScreen v-else />
 </template>

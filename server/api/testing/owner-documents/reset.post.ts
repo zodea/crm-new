@@ -5,6 +5,7 @@ import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-in
 import { ownerCommercialDocumentCommandTestInstance } from '../../../utils/owner-commercial-document-command-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../../utils/owner-commercial-document-fixtures'
 import { ownerCommercialDocumentReadTestInstance } from '../../../utils/owner-commercial-document-read-test-instance'
+import { prepareLegacyReceiptTestFixtures } from '../../../utils/receipt-test-fixtures'
 
 type Scenario = OwnerCommercialDocumentReadTestScenario | 'demo-forbidden'
 const scenarios = new Set<Scenario>(['ready', 'empty', 'forbidden', 'unavailable', 'demo-forbidden'])
@@ -21,8 +22,10 @@ export default defineEventHandler(async (event) => {
   if (body.scenario === 'ready')
     prepareConstructionContractChainIdentityFixtures(sessionId)
   ownerCommercialDocumentCommandTestInstance.reset(sessionId)
-  if (body.scenario === 'ready')
+  if (body.scenario === 'ready') {
+    prepareLegacyReceiptTestFixtures(sessionId)
     ownerCommercialDocumentCommandTestInstance.importExisting(OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS, sessionId)
+  }
   if (body.scenario === 'demo-forbidden') {
     ownerCommercialDocumentReadTestInstance.reset('ready', sessionId)
     demoWorkspaceTestInstance.reset('forbidden', sessionId)

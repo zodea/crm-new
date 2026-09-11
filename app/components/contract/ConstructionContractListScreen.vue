@@ -211,6 +211,7 @@ useTabTitle('施工合同')
       <div v-else-if="page" class="relative min-w-0" :aria-busy="state.kind === 'loading'" data-testid="construction-contract-list-scroll">
         <span v-if="state.kind === 'loading'" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
         <StatePanel v-if="state.kind === 'error'" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的列表。`" :action-label="state.problem.retryable ? '重试' : ''" compact @action="store.loadList(query)" />
+        <StatePanel v-if="page.receiptsProblem" :kind="page.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="page.receiptsProblem.message" :action-label="page.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="store.loadList(query)" />
         <KitTable :columns="columns" :data="page.items" :loading="false" :page="page.pagination" :page-size-options="[10, 20, 50, 100]" :empty="{ title: page.empty?.reason === 'no-filter-match' ? '没有符合当前筛选条件的合同' : '暂无施工合同', description: '可调整筛选条件，或新建正式施工合同。' }" row-key="rowKey" @page-change="({ page: nextPage, pageSize: nextSize }) => patchQuery({ page: nextPage, pageSize: nextSize })">
           <template #columnHeader="{ column }">
             <KitColumnHeader :title="column.title" kind="multi-enum" :value="selectedStatuses" :options="statusOptions" @apply="Array.isArray($event) && patchQuery({ status: $event, page: 1 })" />
@@ -246,13 +247,13 @@ useTabTitle('施工合同')
             {{ yuan(Number(row.amounts.invoiced)) }}
           </template>
           <template #received="{ row }">
-            {{ yuan(Number(row.amounts.received)) }}
+            {{ yuan(row.amounts.received) }}
           </template>
           <template #receivable="{ row }">
-            {{ yuan(Number(row.amounts.bySettlementReceivable)) }}
+            {{ yuan(row.amounts.bySettlementReceivable) }}
           </template>
           <template #unreceived="{ row }">
-            {{ yuan(Number(row.amounts.invoicedUnreceived)) }}
+            {{ yuan(row.amounts.invoicedUnreceived) }}
           </template>
         </KitTable>
       </div>
