@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocationQueryRaw } from 'vue-router'
 import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from '~/lib/quantity/matrix'
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
@@ -18,10 +19,11 @@ import {
   readQuantityFilterQuery,
   readQuantityOrigin,
 } from '~/lib/quantity/navigation'
-import { buildScheduleReturnLocation, parseScheduleDrillContext } from '~/lib/schedule/navigation'
+import { buildScheduleReturnLocation, parseScheduleDrillContext, scheduleSourceQuery, validateScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 
 const store = useQuantityStore()
+const scheduleStore = useScheduleStore()
 const route = useRoute()
 const router = useRouter()
 const { confirm, error: toastError, exportFile, formModal, openImportTab, success, warning } = useKitUI()
@@ -58,7 +60,7 @@ const fromBoq = computed(() => Boolean(boqLineId.value))
 
 const scheduleContext = computed(() => parseScheduleDrillContext(route.query))
 const scheduleReturnTo = computed(() => scheduleContext.value
-  ? buildScheduleReturnLocation(scheduleContext.value)
+  ? buildScheduleReturnLocation({ ...scheduleContext.value, filters: quantityFilterQuery() })
   : '/schedule')
 const scheduleSourceLabel = computed(() => scheduleContext.value?.source === 'home'
   ? '来自首页施工进度'
@@ -145,6 +147,11 @@ async function initialize() {
   const sequence = ++initializeSequence
   initialized.value = false
   sourceError.value = ''
+  if ((route.query.from === 'schedule' || route.query.from === 'home') && !scheduleContext.value) {
+    sourceError.value = '排程来源参数无效，请从原工序重新打开'
+    initialized.value = true
+    return
+  }
   const requestedOrigin = readQuantityOrigin(route.query)
   if (!requestedOrigin) {
     sourceError.value = '工程量来源无效，请从项目列表重新打开'
@@ -165,7 +172,19 @@ async function initialize() {
     await loadSelectedProject(true, Boolean(scheduleContext.value))
   if (sequence !== initializeSequence || !active)
     return
-  if (!scheduleContext.value && store.snapshot)
+  if (scheduleContext.value && projectId.value && store.snapshot) {
+    try {
+      await scheduleStore.loadProject(projectId.value, undefined, requestedOrigin)
+      if (sequence !== initializeSequence || !active)
+        return
+      sourceError.value = validateScheduleDrillContext(scheduleContext.value, scheduleStore.snapshot, store.snapshot)
+    }
+    catch (cause) {
+      if (sequence === initializeSequence && active)
+        sourceError.value = `排程来源无法核对：${toErrorMessage(cause)}`
+    }
+  }
+  if (store.snapshot)
     restoreRouteFilters(store.snapshot)
   initialized.value = true
   if (fromBoq.value)
@@ -180,13 +199,19 @@ watch([projectId, origin], async () => {
   completionDialogOpen.value = false
   batchCompletionDialogOpen.value = false
   varianceDialogOpen.value = false
+  if (scheduleContext.value && (scheduleContext.value.projectId !== projectId.value || scheduleContext.value.origin !== origin.value)) {
+    const query: LocationQueryRaw = { ...route.query, project: projectId.value, origin: origin.value }
+    for (const key of ['from', 'group', 'task', 'stage', 'item', 'buildings', 'groupName', 'taskName', 'itemName', 'planStart', 'planFinish'])
+      delete query[key]
+    await router.replace({ query })
+  }
   await loadSelectedProject(true)
 })
 
 watch(
   [projectId, origin, buildingId, month, viewMode, trade, assigneeKey],
   () => {
-    if (!initialized.value || !active || sourceError.value || scheduleContext.value)
+    if (!initialized.value || !active || sourceError.value)
       return
     void router.replace({
       query: {
@@ -199,7 +224,7 @@ watch(
 )
 
 async function retry() {
-  if (!store.catalog.length)
+  if (!store.catalog.length || sourceError.value)
     await initialize()
   else
     await loadSelectedProject(false)
@@ -229,7 +254,7 @@ function completeCell(cell: QuantityMatrixCell): void {
 }
 
 function quantityFilterQuery() {
-  return buildQuantityFilterQuery({
+  return { ...scheduleSourceQuery(route.query), ...buildQuantityFilterQuery({
     project: projectId.value,
     building: buildingId.value,
     month: month.value,
@@ -237,7 +262,7 @@ function quantityFilterQuery() {
     trade: trade.value,
     assignee: assigneeKey.value,
     origin: origin.value,
-  })
+  }) }
 }
 
 function restoreRouteFilters(next: QuantityProjectSnapshot) {
@@ -425,9 +450,9 @@ onDeactivated(() => {
   initializeSequence++
   store.cancelProject()
 })
-watch(() => [route.query.project, route.query.origin], () => {
+watch(() => [route.query.project, route.query.origin, route.query.from, route.query.group, route.query.task, route.query.stage, route.query.item, route.query.buildings], (next, previous) => {
   if (active && initialized.value && route.path === '/subcontract/quantity'
-    && (route.query.project !== projectId.value || readQuantityOrigin(route.query) !== origin.value)) {
+    && (route.query.project !== projectId.value || readQuantityOrigin(route.query) !== origin.value || next.slice(2).some((value, index) => value !== previous?.[index + 2]))) {
     void initialize()
   }
 })

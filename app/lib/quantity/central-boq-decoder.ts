@@ -17,6 +17,7 @@ export function decodeQuantityBoq(value: unknown, query: QuantityReadQuery): Qua
     && ['qty', 'unitPrice', 'effectiveUnitPrice'].every(key => quantity(row[key]))
     && typeof row.approvedDeltaQty === 'number' && Number.isFinite(row.approvedDeltaQty)
     && (row.building === null || typeof row.building === 'string')
+    && [row.unitType, row.floorZone].every(value => value === undefined || value === null || typeof value === 'string')
     && (row.updatedAt === null || isISODateTimeDTO(row.updatedAt)))
   || new Set(lines.map(row => row.id)).size !== lines.length) {
     invalidQuantityResponse()

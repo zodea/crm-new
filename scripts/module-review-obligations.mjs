@@ -55,6 +55,12 @@ const homeScheduleEvidence = {
   recency: 'current-run',
   scope: '中央项目到未接入排程提示、授权演示工序往返；不含正式排程事实链',
 }
+const quantityCentralEvidence = {
+  reference: 'docs/design/evidence/issue-442/README.md',
+  commit: '0a9c37680a02693c6c9a43661cc5e129c38649ea',
+  recency: 'current-run',
+  scope: '中央区域、模板、三量、阶段与责任完成、照片、报量、导入导出及受控迁移；不代验 WBS、工资和目标成本',
+}
 
 export const OBLIGATION_STATUS_LABELS = {
   'current-passed': '本轮限定范围已验证',
@@ -361,9 +367,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(348), 'docs/adr/0010-quantity-matrix-and-construction-record-model.md'],
     ownerIssue: 412,
     caseIds: quantityCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '现有区域、户型、责任、阶段完成和现场量仍需接入同一中央迁移/Repository/HTTP/command；责任配置不能产生完成事实。',
+    status: 'current-passed',
+    evidence: [quantityCentralEvidence],
+    remaining: '#442 已接通同一中央区域、模板、责任、阶段完成及现场量，真实 SQLite/HTTP 迁入与浏览器回读通过；责任配置不产生完成。WBS、工资和目标成本继续按各自条款验收。',
   },
   {
     id: 'PRG-05',
@@ -371,9 +377,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(348)],
     ownerIssue: 412,
     caseIds: quantityCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '后台验证 project/task/stage/item/building/unit 等关系并拒绝陈旧版本；错误身份、无权、空态和重试逐场景验证，不由本地既有页面推定完成。',
+    status: 'partial',
+    evidence: [quantityCentralEvidence],
+    remaining: '#442 已验证工程量项目、阶段、分项、楼栋、户关系、陈旧来源及失败保稿；排程 task 与工程量的中央关联和往返由 #444 继续验收，不由工程量单域通过推定。',
   },
   {
     id: 'PRG-06',
@@ -381,9 +387,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(348), 'docs/rewrite/pages/subcontract-quantity.md'],
     ownerIssue: 412,
     caseIds: quantityCases,
-    status: 'partial',
-    evidence: [],
-    remaining: '既有工程量本地读模型已区分三量；完整中央投影、逐页显示/汇总、缺来源 completeness 及空与明确零的本轮运行证据仍待补齐。',
+    status: 'current-passed',
+    evidence: [quantityCentralEvidence],
+    remaining: '#442 已验证中央三量、按单位汇总、缺项与已知小计、真实零及台账/分类 Excel 回读；不跨数量基准补值。工资和目标成本的消费正确性继续单独验收。',
   },
   {
     id: 'PRG-07',

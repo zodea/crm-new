@@ -31,6 +31,7 @@ const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, Readonly
   suppliers: new Set(['aliases', 'externalRef', 'uniqueCode', 'taxNo', 'businessType', 'supplierCategory', 'rating', 'legalRep', 'registeredCapital', 'registeredDate', 'address', 'taxpayerType', 'taxpayerVerificationStatus', 'taxpayerVerificationSource', 'taxpayerVerifiedAt', 'taxpayerVerificationNote', 'mainBusiness', 'laborScope', 'invoiceName', 'invoiceAddress', 'bank', 'bankAccount', 'phone', 'contact', 'contactPhone', 'contactTitle', 'note', 'approvalStatus', 'createdAt', 'updatedAt']),
   process_libraries: new Set(['graphJson']),
   quantity_projects: new Set(['graphJson']),
+  wbs_projects: new Set(['graphJson']),
   construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson']),
   receipt_registrations: new Set(['no', 'receiptDate', 'payerAccount', 'paymentMethod', 'acceptanceBillNo', 'billDueDate', 'periodNo', 'bankSerialNo', 'handler', 'reviewStatus', 'status', 'note', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'attachmentsJson']),
   delivery_records: new Set(['orderNo', 'deliveryDate', 'rawSiteText', 'fileName', 'ocrStatus', 'archived', 'printBatchId', 'printDisposition', 'printedAt', 'printExcludedAt', 'reviewFlag', 'note', 'createdAt', 'updatedAt', 'sourceState', 'sourceProblem', 'assetJson', 'allLinesJson', 'auditJson', 'legacyOriginalsJson']),
@@ -262,7 +263,7 @@ export function parseCoreMigrationSourceCommand(value: unknown): CoreMigrationSo
     invalid('source.entities 必须是对象')
   assertOnlyKeys(entityGroups, ENTITY_KEYS, 'source.entities')
 
-  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
+  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
     const rows = entityGroups[entityType]
     if (!Array.isArray(rows))
       invalid(`source.entities.${entityType}必须是数组`)

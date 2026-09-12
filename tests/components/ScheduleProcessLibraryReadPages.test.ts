@@ -68,7 +68,7 @@ describe('工序库中央只读页面', () => {
 
   it('列表未知引用不会伪装成零；详情和复制链接保留版本与来源', async () => {
     harness(ScheduleProcessLibraryScreen)
-    await screen.findByText('引用数量未知 · 中央 WBS 尚未接通')
+    await screen.findByText('当前身份无法读取引用情况')
     expect(screen.queryByText(/尚未引用/)).toBeNull()
     expect(screen.getByRole('link', { name: '查看版本' }).getAttribute('href')).toBe('/schedule/process-library/old?origin=real')
     expect(screen.getByRole('link', { name: '基于此版本新建' }).getAttribute('href')).toBe('/schedule/process-library/form?origin=real&source=old')
@@ -105,5 +105,31 @@ describe('工序库中央只读页面', () => {
     await screen.findByText('放线-next')
     finish(version('slow'))
     await waitFor(() => expect(screen.queryByText('放线-slow')).toBeNull())
+  })
+
+  it('中央引用项目链接使用已核验的来源，未知引用不显示项目投影', async () => {
+    const { repository, route } = harness(ScheduleProcessLibraryDetail)
+    await screen.findByText('放线-old')
+    const usageProjects = [{ id: 'project-1', name: '中央引用项目', groupCount: 2 }]
+    repository.detail.mockResolvedValueOnce({ ...version('used'), usageCount: 2, usageProjects })
+    route.params.id = 'used'
+    const link = await screen.findByRole('link', { name: '中央引用项目' })
+    expect(link.getAttribute('href')).toBe('/schedule?project=project-1&origin=real')
+    expect(screen.getByText('2 个楼栋分组')).not.toBeNull()
+    repository.detail.mockResolvedValueOnce({ ...version('unknown'), usageCount: null, usageProjects })
+    route.params.id = 'unknown'
+    await screen.findByText('放线-unknown')
+    expect(screen.queryByRole('link', { name: '中央引用项目' })).toBeNull()
+    expect(screen.getByText('当前身份无法读取引用情况')).not.toBeNull()
+  })
+
+  it('桌面旧适配没有中央投影字段时仍可正常展示版本', async () => {
+    const nativeDetail = { id: 'old', code: 'native', name: '桌面本地库', version: 1, description: '', isDefault: false, taskCount: 0, usageCount: 2, tasks: [] }
+    vi.stubGlobal('useRoute', () => ({ params: { id: 'old' }, query: { origin: 'real' } }))
+    vi.stubGlobal('useScheduleProcessLibraryStore', () => ({ origin: 'real', canWrite: true, loadDetail: vi.fn().mockResolvedValue(nativeDetail) }))
+    render(ScheduleProcessLibraryDetail, { global: { components: { NuxtLink: Link }, stubs: { KitTable: Table } } })
+    await screen.findByRole('heading', { name: '桌面本地库 · v1' })
+    expect(screen.getByText('已被 2 个排程引用')).not.toBeNull()
+    expect(screen.queryByRole('region', { name: '引用项目' })).toBeNull()
   })
 })

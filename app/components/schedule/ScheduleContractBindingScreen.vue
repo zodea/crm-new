@@ -3,6 +3,7 @@ import type { LookupOption } from '~/lib/kit/lookup'
 import type { ScheduleContractBindingPreview } from '~/lib/schedule/contract-binding'
 import { computed, shallowRef, watch } from 'vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{
@@ -53,6 +54,10 @@ async function initialize() {
   preview.value = null
   fatalError.value = ''
   previewError.value = ''
+  if (!isDesktopRuntime()) {
+    fatalError.value = '新的合同绑定尚未接通。现有分组、计划与历史绑定结果保持不变，请返回施工进度查看。'
+    return
+  }
   if (!props.projectId || !props.groupId) {
     fatalError.value = '项目或楼栋分组参数缺失'
     return
@@ -124,6 +129,8 @@ function returnToSchedule() {
 }
 
 async function bindContract() {
+  if (!isDesktopRuntime())
+    return
   const current = preview.value
   if (!current?.canBind)
     return

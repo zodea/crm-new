@@ -3,6 +3,6 @@ const route = useRoute()
 </script>
 
 <template>
-  <HomeScheduleSourceScreen v-if="route.query.origin !== undefined" />
+  <HomeScheduleSourceScreen v-if="route.query.from === 'home'" />
   <ScheduleScreen v-else />
 </template>

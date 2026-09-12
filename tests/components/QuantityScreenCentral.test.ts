@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, onMounted, reactive, shallowRef, watch } from 'vue'
 import QuantityScreen from '~/components/quantity/QuantityScreen.vue'
 
@@ -12,6 +12,7 @@ const route = reactive({ path: '/subcontract/quantity', query: { project: 'same'
 const router = { push: vi.fn(), replace: vi.fn() }
 const confirm = vi.fn()
 const exportFile = vi.fn()
+const scheduleStore = { loadProject: vi.fn(), snapshot: null }
 const snapshot = () => ({ projectId: 'same', matrixArchivedAt: null, buildings: [], floors: [], units: [], stages: [], assignments: [], completions: [] })
 let store: ReturnType<typeof createStore>
 function createStore() {
@@ -43,8 +44,12 @@ beforeEach(() => {
   databaseRead.mockClear()
   confirm.mockReset()
   exportFile.mockReset()
-  for (const [name, value] of Object.entries({ computed, shallowRef, watch, onMounted, useRoute: () => route, useRouter: () => router, useQuantityStore: () => store, useKitUI: () => ({ confirm, exportFile, error: vi.fn(), success: vi.fn(), warning: vi.fn() }) }))
+  scheduleStore.loadProject.mockReset()
+  for (const [name, value] of Object.entries({ computed, shallowRef, watch, onMounted, useRoute: () => route, useRouter: () => router, useQuantityStore: () => store, useScheduleStore: () => scheduleStore, useKitUI: () => ({ confirm, exportFile, error: vi.fn(), success: vi.fn(), warning: vi.fn() }) }))
     vi.stubGlobal(name, value)
+})
+afterEach(() => {
+  expect(scheduleStore.loadProject).not.toHaveBeenCalled()
 })
 const Toolbar = defineComponent({ props: ['projectId', 'projectOptions', 'canWrite'], emits: ['update:projectId', 'manageStages', 'toggleArchive', 'exportByCategory'], template: `<div><select aria-label="项目" :value="projectId" @change="$emit('update:projectId', $event.target.value)"><option v-for="option in projectOptions" :key="option.key" :value="option.key">{{ option.label }}</option></select><button @click="$emit('manageStages')">阶段配置</button><button @click="$emit('toggleArchive')">归档矩阵</button><button @click="$emit('exportByCategory')">分类导出</button></div>` })
 function open() {

@@ -19,6 +19,8 @@ function sourceRows(sql: string): Record<string, unknown>[] {
     return []
   if (/FROM schedule_process_librar(?:ies|y_tasks)/.test(sql))
     return []
+  if (/FROM (?:schedule_groups|schedule_group_buildings|schedule_tasks|task_item_map|task_dependencies|schedule_task_floor_plans) ORDER BY id/.test(sql))
+    return []
   if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
     return []
   if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs)(?: WHERE | ORDER BY )/.test(sql))
@@ -984,6 +986,7 @@ describe('core migration local source', () => {
       'project_suppliers',
       'quantity_projects',
       'process_libraries',
+      'wbs_projects',
     ])
   })
 })

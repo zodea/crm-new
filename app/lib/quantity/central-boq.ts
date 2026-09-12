@@ -2,6 +2,8 @@ import type { QuantityContext } from './central-contract'
 
 /** 原始认可量和已批调量分别提供，调用方不得重复叠加。 */
 export interface QuantityBoqLine {
+  unitType?: string | null
+  floorZone?: string | null
   id: string
   contractId: string
   contractName: string

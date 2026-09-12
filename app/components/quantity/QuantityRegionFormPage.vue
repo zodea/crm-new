@@ -48,6 +48,7 @@ const schedulePath = computed(() => ({
   query: {
     project: props.projectId,
     resume: props.resumeSchedule ? 'region' : undefined,
+    origin: props.origin ?? 'real',
   },
 }))
 const backPath = computed(() => props.returnSource === 'schedule'

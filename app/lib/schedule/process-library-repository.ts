@@ -38,6 +38,12 @@ function summary(value: unknown, origin: DataOriginDTO): asserts value is Proces
     || !['sourceVersionId', 'createdAt', 'createdBy', 'updatedAt', 'migrationBatchId', 'legacyId'].every(key => nullableText(value[key]))) {
     invalid()
   }
+  if (value.usageProjects !== undefined && (!Array.isArray(value.usageProjects)
+    || value.usageProjects.some(row => !object(row) || typeof row.id !== 'string' || !row.id || typeof row.name !== 'string' || !integer(row.groupCount, 1))
+    || new Set(value.usageProjects.map(row => row.id)).size !== value.usageProjects.length
+    || (value.usageCount !== null && value.usageProjects.reduce((sum, row) => sum + row.groupCount, 0) !== value.usageCount))) {
+    invalid()
+  }
 }
 function detail(value: unknown, id: string, origin: DataOriginDTO): ProcessLibraryVersion {
   summary(value, origin)

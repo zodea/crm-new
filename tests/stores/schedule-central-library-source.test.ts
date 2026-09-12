@@ -40,19 +40,21 @@ describe('浏览器 WBS 的工序库来源接管', () => {
     runtime.list.mockImplementationOnce(() => new Promise(resolve => release = resolve))
     const pending = store.loadProcessLibraries()
     runtime.demo = true
+    store.setOrigin('demo')
     runtime.list.mockResolvedValue({ libraries: [{ id: 'demo' }] })
     await store.loadProcessLibraries()
     release({ libraries: [{ id: 'real' }] })
     await pending
     expect(store.processLibraries[0]?.id).toBe('demo')
+    expect(runtime.list).toHaveBeenLastCalledWith('demo')
   })
 
-  it('建组保存前从同源中央库复核，WBS 未接管时明确阻断且不写旧数据库', async () => {
+  it('未读取项目写上下文时不能提交建组，也不写旧数据库', async () => {
     const store = useScheduleStore()
     runtime.list.mockResolvedValue({ libraries: [{ id: 'central', isDefault: true }] })
     runtime.detail.mockResolvedValue({ tasks: [{ key: 'a' }] })
-    await expect(store.createGroup({ projectId: 'project', name: '新组', buildingIds: ['building'], processLibraryId: 'central', startDate: '2026-09-12', overlapMode: 'seq', tasks: [{ templateKey: 'a', durationDays: 1, enabled: true, anchorStart: null }] })).rejects.toThrow(/WBS.*尚未接入|WBS.*尚未接管/)
-    expect(runtime.detail).toHaveBeenCalledWith('central', 'real')
+    await expect(store.createGroup({ projectId: 'project', name: '新组', buildingIds: ['building'], processLibraryId: 'central', startDate: '2026-09-12', overlapMode: 'seq', tasks: [{ templateKey: 'a', durationDays: 1, enabled: true, anchorStart: null }] })).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    expect(runtime.detail).not.toHaveBeenCalled()
     expect(runtime.transaction).not.toHaveBeenCalled()
     expect(runtime.select).not.toHaveBeenCalled()
   })

@@ -6,6 +6,9 @@ import { computed, defineComponent, h, shallowRef, watch } from 'vue'
 import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 
+const isDesktopRuntime = vi.hoisted(() => vi.fn())
+vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime }))
+
 vi.stubGlobal('computed', computed)
 vi.stubGlobal('shallowRef', shallowRef)
 vi.stubGlobal('watch', watch)
@@ -60,15 +63,17 @@ const snapshot: ScheduleProjectView = {
 
 describe('内部暂估排程绑定入口', () => {
   beforeEach(() => {
+    isDesktopRuntime.mockReset().mockReturnValue(true)
     window.sessionStorage.clear()
     setActivePinia(createPinia())
   })
 
-  it('只给待绑定合同分组显示状态与独立页面入口', async () => {
+  it('桌面工作区只给待绑定合同分组显示状态与独立页面入口', async () => {
     const view = render(ScheduleBoard, {
       props: {
         snapshot,
         today: '2026-07-15',
+        readonly: false,
       },
       global: {
         components: {
@@ -94,6 +99,28 @@ describe('内部暂估排程绑定入口', () => {
     })
 
     expect(screen.queryByText('待绑定合同')).toBeNull()
+    expect(screen.queryByRole('link', { name: '绑定施工合同' })).toBeNull()
+  })
+
+  it('浏览器工作区保留待绑定状态，但不开放尚未接通的本地绑定入口', () => {
+    isDesktopRuntime.mockReturnValue(false)
+    render(ScheduleBoard, {
+      props: { snapshot, today: '2026-07-15', readonly: false, origin: 'real' },
+      global: { components: { NuxtLink: NuxtLinkStub } },
+    })
+
+    expect(screen.getByText('待绑定合同')).not.toBeNull()
+    expect(screen.getByText('绑定待接通')).not.toBeNull()
+    expect(screen.queryByRole('link', { name: '绑定施工合同' })).toBeNull()
+  })
+
+  it('桌面只读工作区也不能通过分组入口发起绑定', () => {
+    render(ScheduleBoard, {
+      props: { snapshot, today: '2026-07-15', readonly: true },
+      global: { components: { NuxtLink: NuxtLinkStub } },
+    })
+
+    expect(screen.getByText('待绑定合同')).not.toBeNull()
     expect(screen.queryByRole('link', { name: '绑定施工合同' })).toBeNull()
   })
 

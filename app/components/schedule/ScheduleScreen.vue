@@ -1,333 +1,10 @@
 <script setup lang="ts">
-import type { ScheduleGroupView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import { Button } from '~/components/ui/button'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
-import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
-import { toErrorMessage } from '~/lib/util/error'
-import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { useScheduleWorkspace } from '~/composables/useScheduleWorkspace'
 
 const props = withDefaults(defineProps<{ projectId?: string }>(), { projectId: '' })
-const route = useRoute()
-const router = useRouter()
-const store = useScheduleStore()
-const { confirm, error, formModal, success, warning } = useKitUI()
-
-const today = toLocalDateInputValue()
-const selectedProjectId = shallowRef('')
-const initialized = shallowRef(false)
-const selectedTask = shallowRef<ScheduleTaskView | null>(null)
-const taskDialogOpen = shallowRef(false)
-const dependencyDialogOpen = shallowRef(false)
-const highlightedGroupId = computed(() => String(route.query.group ?? ''))
-
-const selectedGroupName = computed(() => {
-  if (!selectedTask.value)
-    return ''
-  return store.snapshot?.groups.find(group => group.id === selectedTask.value?.groupId)?.name ?? ''
-})
-const selectedDependency = computed(() => selectedTask.value
-  ? store.snapshot?.dependencies.find(dependency => dependency.succId === selectedTask.value?.id) ?? null
-  : null)
-const selectedGroupTasks = computed(() => {
-  const task = selectedTask.value
-  if (!task)
-    return []
-  return store.snapshot?.groups.find(candidate => candidate.id === task.groupId)?.tasks ?? []
-})
-const predecessorTasks = computed(() => {
-  const task = selectedTask.value
-  if (!task)
-    return []
-  return selectedGroupTasks.value.filter(candidate =>
-    candidate.id !== task.id
-    && candidate.plannedStart < task.plannedStart,
-  )
-})
-const selectedDisabledDependencies = computed(() => {
-  const task = selectedTask.value
-  return task
-    ? store.snapshot?.disabledDependencies.filter(dependency => dependency.succId === task.id) ?? []
-    : []
-})
-
-const projectOptions = computed(() => store.catalog.map(project => ({
-  id: project.id,
-  name: project.name,
-  code: project.code,
-  status: project.status,
-})))
-
-async function initialize() {
-  await store.loadCatalog()
-  const requested = props.projectId || String(route.query.project ?? '')
-  const preferred = store.catalog.find(project => project.id === requested)
-    ?? store.catalog.find(project => project.groupCount > 0)
-    ?? store.catalog[0]
-  selectedProjectId.value = preferred?.id ?? ''
-  if (selectedProjectId.value)
-    await store.loadProject(selectedProjectId.value, today)
-  initialized.value = true
-  restoreTaskFromRoute(route.query.task, route.query.boqLine)
-}
-
-watch(selectedProjectId, async (next, previous) => {
-  if (!initialized.value || !next || next === previous)
-    return
-  await router.replace({
-    query: {
-      ...route.query,
-      project: next,
-      group: undefined,
-      task: undefined,
-      boqLine: undefined,
-    },
-  })
-  await store.loadProject(next, today)
-})
-
-function restoreTaskFromRoute(taskId: unknown, boqLineId: unknown = route.query.boqLine) {
-  if (!store.snapshot)
-    return
-  const tasks = store.snapshot.groups.flatMap(group => group.tasks)
-  const task = taskId
-    ? tasks.find(candidate => candidate.id === taskId)
-    : tasks.find(candidate => candidate.boqLineIds.includes(String(boqLineId ?? '')))
-  if (task) {
-    selectedTask.value = task
-    taskDialogOpen.value = true
-  }
-}
-
-watch(
-  () => [route.query.task, route.query.boqLine] as const,
-  ([taskId, boqLineId]) => restoreTaskFromRoute(taskId, boqLineId),
-)
-
-function openTask(task: ScheduleTaskView) {
-  selectedTask.value = task
-  dependencyDialogOpen.value = false
-  taskDialogOpen.value = true
-}
-
-async function openDependencyEditor() {
-  taskDialogOpen.value = false
-  await nextTick()
-  dependencyDialogOpen.value = true
-}
-
-async function returnToTaskDetail() {
-  const taskId = selectedTask.value?.id
-  dependencyDialogOpen.value = false
-  if (taskId) {
-    selectedTask.value = store.snapshot?.groups
-      .flatMap(group => group.tasks)
-      .find(task => task.id === taskId) ?? selectedTask.value
-  }
-  await nextTick()
-  taskDialogOpen.value = Boolean(selectedTask.value)
-}
-
-async function closeDependencyEditor(dirty: boolean) {
-  if (dirty) {
-    const approved = await confirm({
-      variant: 'simple',
-      title: '放弃依赖设置修改？',
-      message: '前置工序或 Lag 尚未保存，关闭后本次修改不会保留。',
-      confirmLabel: '放弃修改',
-    })
-    if (!approved)
-      return
-  }
-  await returnToTaskDetail()
-}
-
-async function setBaseline() {
-  if (!store.snapshot?.groups.length)
-    return
-  const approved = await confirm({
-    variant: 'simple',
-    title: '设置当前计划为基准？',
-    message: '全部工序会保存当前开始与完成日期。后续调整仍可与这条基准对照。',
-    confirmLabel: '设置基准',
-  })
-  if (!approved)
-    return
-  try {
-    await store.setBaseline(store.snapshot.id, today)
-    success('排程基准已保存')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function saveTask(payload: {
-  task: { plannedStart: string, plannedFinish: string, manualProgress?: number }
-  dependency: { predecessorId: string, lagDays: number } | null
-  floorPlans: { id: string, plannedStart: string, plannedFinish: string }[]
-}) {
-  if (!selectedTask.value)
-    return
-  try {
-    const taskId = selectedTask.value.id
-    const result = await store.saveTaskPlan(taskId, payload, today)
-    taskDialogOpen.value = false
-    success('工序计划已更新')
-    if (result.conflicts.length)
-      warning(`存在 ${result.conflicts.length} 条前后置日期冲突，请检查工序衔接关系`)
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function removeTask() {
-  if (!selectedTask.value)
-    return
-  const approved = await confirm({
-    variant: 'simple',
-    title: `删除工序「${selectedTask.value.name}」？`,
-    message: '对应前后置关系会随工序一并软删除，可通过操作日志恢复。',
-    confirmLabel: '删除工序',
-  })
-  if (!approved)
-    return
-  try {
-    await store.removeTask(selectedTask.value.id, today)
-    taskDialogOpen.value = false
-    success('工序已删除')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function saveDependency(payload: { predecessorId: string, lagDays: number }) {
-  if (!selectedTask.value)
-    return
-  try {
-    const result = await store.updateDependency(
-      selectedTask.value.id,
-      payload.predecessorId,
-      payload.lagDays,
-      today,
-    )
-    await returnToTaskDetail()
-    success('前后置依赖已保存')
-    if (result.conflicts.length)
-      warning(`当前计划存在 ${result.conflicts.length} 条日期冲突，关系已保留供排程核对`)
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function removeDependency(dependencyId: string) {
-  const approved = await confirm({
-    variant: 'simple',
-    title: '移除当前前后置依赖？',
-    message: '这是主动移除：关系会软删除并保留操作日志，但不会显示为“调期冲突待恢复”。',
-    confirmLabel: '移除依赖',
-  })
-  if (!approved)
-    return
-  try {
-    await store.removeDependency(dependencyId, today)
-    await returnToTaskDetail()
-    success('前后置依赖已移除')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function restoreDependency(dependencyId: string) {
-  try {
-    await store.restoreDependency(dependencyId, today)
-    success('前后置依赖已恢复')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function rescheduleTask(payload: {
-  task: ScheduleTaskView
-  plannedStart: string
-  plannedFinish: string
-}) {
-  try {
-    const patch = {
-      plannedStart: payload.plannedStart,
-      plannedFinish: payload.plannedFinish,
-    }
-    const preview = store.previewTaskReschedule(payload.task.id, patch)
-    const conflictIds = [...new Set(preview.conflicts.map(conflict => conflict.dependencyId))]
-    if (conflictIds.length) {
-      const conflictLines = preview.conflicts
-        .slice(0, 3)
-        .map(conflict => `${conflict.predecessorName} → ${conflict.successorName}（至少 ${conflict.requiredDate}）`)
-      const approved = await confirm({
-        variant: 'simple',
-        title: `本次调期会冲突 ${conflictIds.length} 条依赖`,
-        message: `${conflictLines.join('；')}${preview.conflicts.length > 3 ? '；…' : ''}。继续后只置灰这些关系，不会清除记录。`,
-        confirmLabel: '调期并置灰冲突',
-      })
-      if (!approved)
-        return
-    }
-    await store.rescheduleTask(payload.task.id, patch, conflictIds, today)
-    success(conflictIds.length ? '计划已调整，冲突依赖已置灰' : '计划日期已调整')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-async function addTask(group: ScheduleGroupView) {
-  await store.loadProcessLibraryTasks(group.processLibraryId)
-  const options = store.processTasks
-    .filter(template => !group.tasks.some(task =>
-      task.sourceLibraryTaskId === template.id || task.name === template.name,
-    ))
-  if (!options.length) {
-    warning('标准工序已全部加入当前分组')
-    return
-  }
-  const values = await formModal({
-    title: `向「${group.name}」追加工序`,
-    saveText: '添加工序',
-    fields: [
-      { key: 'task', label: '标准工序', type: 'select', options: options.map(option => option.name), value: options[0]!.name, required: true },
-      { key: 'start', label: '计划开始', type: 'date', value: group.plannedFinish ?? today, required: true },
-    ],
-  })
-  if (!values)
-    return
-  const template = options.find(option => option.name === values.task)
-  if (!template)
-    return
-  try {
-    await store.addTask(group.id, { templateKey: template.key, plannedStart: String(values.start ?? '') }, today)
-    success('工序已追加')
-  }
-  catch (cause) {
-    error(toErrorMessage(cause))
-  }
-}
-
-function drillQuantity() {
-  const task = selectedTask.value
-  if (!task)
-    return
-  const group = store.snapshot?.groups.find(candidate => candidate.id === task.groupId)
-  if (!group)
-    return
-  taskDialogOpen.value = false
-  router.push(buildQuantityDrillLocation('schedule', group, task))
-}
-
-onMounted(initialize)
+const { store, today, origin, canWrite, sourceError, selectedProjectId, initialized, taskDraftKey, selectedTask, taskDialogOpen, dependencyDialogOpen, highlightedGroupId, selectedGroupName, selectedDependency, selectedGroupTasks, predecessorTasks, selectedDisabledDependencies, projectOptions, initialize, openTask, openDependencyEditor, closeDependencyEditor, setBaseline, saveTask, removeTask, saveDependency, removeDependency, restoreDependency, rescheduleTask, addTask, drillQuantity, recheck, recoverPending } = useScheduleWorkspace(props)
 </script>
 
 <template>
@@ -362,10 +39,10 @@ onMounted(initialize)
               标准工序库
             </NuxtLink>
           </Button>
-          <button type="button" class="btn-secondary" :disabled="!store.snapshot?.groups.length" @click="setBaseline">
+          <button type="button" class="btn-secondary" :disabled="!canWrite || !store.snapshot?.groups.length" @click="setBaseline">
             <span class="i-lucide-git-commit-horizontal mr-1" /> 设置基准
           </button>
-          <NuxtLink :to="{ path: '/schedule/new', query: { project: selectedProjectId } }" class="btn-accent">
+          <NuxtLink v-if="canWrite" :to="{ path: '/schedule/new', query: { project: selectedProjectId, origin } }" class="btn-accent">
             <span class="i-lucide-plus mr-1" /> 新建楼栋分组
           </NuxtLink>
         </div>
@@ -395,8 +72,11 @@ onMounted(initialize)
       </div>
       <div class="h-36 animate-pulse rounded-lg bg-surface-2" />
     </section>
-    <section v-else-if="store.error" class="panel grid min-h-64 place-items-center p-5 text-center text-12px text-danger" role="alert">
-      {{ store.error }}
+    <section v-else-if="sourceError || store.error" class="panel grid min-h-64 place-items-center p-5 text-center text-12px text-danger" role="alert">
+      {{ sourceError || store.error }}
+      <button type="button" class="btn-secondary" @click="initialize">
+        重新读取
+      </button>
     </section>
     <section v-else-if="!store.catalog.length" class="panel grid min-h-64 place-items-center p-5 text-center">
       <div>
@@ -411,9 +91,9 @@ onMounted(initialize)
         当前项目还没有楼栋排程分组
       </p>
       <p class="text-12px text-ink-soft">
-        从 22 道标准工序生成第一份计划，再按现场情况调整。
+        选择当前工序库版本建立计划，再按现场情况调整。
       </p>
-      <NuxtLink :to="{ path: '/schedule/new', query: { project: selectedProjectId } }" class="btn-accent mt-1">
+      <NuxtLink v-if="canWrite" :to="{ path: '/schedule/new', query: { project: selectedProjectId, origin } }" class="btn-accent mt-1">
         新建楼栋分组
       </NuxtLink>
     </section>
@@ -422,18 +102,37 @@ onMounted(initialize)
       :snapshot="store.snapshot"
       :today="today"
       :highlighted-group-id="highlightedGroupId"
+      :readonly="!canWrite"
+      :origin="origin ?? undefined"
       @select-task="openTask"
       @add-task="addTask"
       @reschedule-task="rescheduleTask"
     />
 
+    <section v-if="store.pendingCommand" class="panel grid gap-2 p-4" role="alert">
+      <p>上次提交结果尚未确认，当前输入已保留。核对原提交后才能继续修改。</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn-primary" :disabled="store.saving" @click="recoverPending">
+          核对原提交
+        </button><button type="button" class="btn-secondary" :disabled="store.saving" @click="recheck">
+          重新核对权限与资料
+        </button>
+      </div>
+    </section>
+    <ScheduleHistoryPanel v-if="store.history && !sourceError" :history="store.history" />
     <ScheduleTaskDialog
       v-model:open="taskDialogOpen"
       :task="selectedTask"
+      :read-error="store.error"
+      :draft-key="taskDraftKey"
       :group-name="selectedGroupName"
       :dependency="selectedDependency"
       :predecessor-tasks="predecessorTasks"
       :busy="store.saving"
+      :pending="Boolean(store.pendingCommand)"
+      :readonly="!canWrite"
+      @recover="recoverPending"
+      @recheck="recheck"
       @save="saveTask"
       @remove="removeTask"
       @drill="drillQuantity"
@@ -443,12 +142,17 @@ onMounted(initialize)
     <ScheduleDependencyDialog
       v-model:open="dependencyDialogOpen"
       :task="selectedTask"
+      :read-error="store.error"
       :group-name="selectedGroupName"
       :group-tasks="selectedGroupTasks"
       :dependencies="store.snapshot?.dependencies ?? []"
       :dependency="selectedDependency"
       :disabled-dependencies="selectedDisabledDependencies"
       :busy="store.saving"
+      :pending="Boolean(store.pendingCommand)"
+      :readonly="!canWrite"
+      @recover="recoverPending"
+      @recheck="recheck"
       @save="saveDependency"
       @remove="removeDependency"
       @restore="restoreDependency"

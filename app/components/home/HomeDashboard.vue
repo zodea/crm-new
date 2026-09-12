@@ -6,7 +6,7 @@ import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shall
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
-import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
+import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useHomeDashboardStore } from '~/stores/home-dashboard'
@@ -168,7 +168,7 @@ function selectTask(task: ScheduleTaskView) {
     warning(`「${task.name}」为手动填报工序，首页仅提供只读查看`)
     return
   }
-  void router.push(buildQuantityDrillLocation('home', group, task, desktop ? undefined : current.value?.project.origin))
+  void router.push(buildQuantityDrillLocation('home', group, task, desktop ? undefined : current.value?.project.origin, scheduleFilterQuery(route.query)))
 }
 
 watch(() => [route.query.project, route.query.origin], () => {
@@ -233,6 +233,7 @@ onActivated(() => {
       :error-description="error"
       :coverage-title="coverage.title"
       :coverage-description="coverage.description"
+      :return-context="scheduleReturnContextQuery(route.query)"
       :highlighted-group-id="queryText(route.query.group)"
       :highlighted-task-id="queryText(route.query.task)"
       @select-task="selectTask"

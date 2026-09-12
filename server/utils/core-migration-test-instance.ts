@@ -49,6 +49,7 @@ import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 import { prepareSupplierCredentialMigration } from './supplier-credential-migration'
+import { planWbsMigration } from './wbs-migration'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -108,6 +109,9 @@ const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly Referenc
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
   ],
   quantity_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  wbs_projects: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
   ],
   delivery_records: [
@@ -772,6 +776,59 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       }
     }
 
+    for (const entity of plannedEntities.filter(row => row.entityType === 'wbs_projects')) {
+      try {
+        const plan = planWbsMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities.filter(row => row.entityType !== 'wbs_projects' || row.id === entity.id) }, new Map())
+        const legacy = plan.incoming[0]!.graph.tables.schedule_task_floor_plans.filter(row => row.source_basis === 'provisional').length
+        if (legacy) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'wbs_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'graphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: String(legacy),
+            expectedValue: null,
+            actualValue: legacy,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${legacy} 条旧暂估楼层保留原冻结数值及原快照，但旧库没有完整冻结单位、逐户来源与缺量信息；明确登记历史不足，不用当前模板或合同量补造。`,
+          }))
+        }
+        const missingSnapshots = plan.incoming[0]!.graph.tables.schedule_tasks.filter(row => row.template_snapshot_json === null).length
+        if (missingSnapshots) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'wbs_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'template_snapshot_json',
+            metricKey: 'legacy-audit',
+            sourceValue: String(missingSnapshots),
+            expectedValue: null,
+            actualValue: missingSnapshots,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${missingSnapshots} 条旧任务缺少原冻结工序快照，保留原计划和空值，不以当前工序库补造历史。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'wbs_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : 'WBS 完整来源图校验失败',
+        }))
+      }
+    }
+
     for (const [entityType, expected] of Object.entries(command.source.expectations?.counts ?? {})) {
       const actual = steps.find(step => step.entityType === entityType)?.importableCount ?? 0
       if (actual !== expected) {
@@ -1089,7 +1146,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
-    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
       || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
     }

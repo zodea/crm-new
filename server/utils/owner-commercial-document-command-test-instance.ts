@@ -2034,6 +2034,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           qty: nullableNumber(raw.qty),
           unitPrice: nullableNumber(raw.unitPrice),
           building: text(raw.building) || null,
+          unitType: text(raw.unitType) || null,
+          floorZone: text(raw.floorZone) || null,
           updatedAt: text(raw.updatedAt) || null,
           autoQty: 0,
           missingQtyCount: 0,
@@ -2557,6 +2559,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
               approvedDeltaQty: current.approvedDeltaQty,
               effectiveUnitPrice: current.effectiveUnitPrice,
               building: line.building ?? null,
+              unitType: line.unitType ?? null,
+              floorZone: line.floorZone ?? null,
               updatedAt: current.updatedAt,
             })
           }

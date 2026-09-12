@@ -19,6 +19,7 @@ withDefaults(defineProps<{
   recoverableLoading?: boolean
   coverageTitle?: string
   coverageDescription?: string
+  returnContext?: Record<string, string>
   highlightedGroupId?: string
   highlightedTaskId?: string
 }>(), {
@@ -152,6 +153,7 @@ defineEmits<{
       :snapshot="snapshot"
       :today="today"
       :origin="selectedOrigin"
+      :return-context="returnContext"
       :highlighted-group-id="highlightedGroupId"
       :highlighted-task-id="highlightedTaskId"
       @select-task="$emit('selectTask', $event)"

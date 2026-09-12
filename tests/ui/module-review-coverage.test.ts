@@ -42,9 +42,13 @@ describe('module review coverage', () => {
       if (desktop)
         expect(desktop.adapter).toBe(surface.variant === 'central-source' ? 'central-http' : 'desktop-sqlite')
     }
-    for (const route of ['/subcontract/payroll', '/schedule', '/project/target-cost']) {
+    for (const route of ['/subcontract/payroll', '/project/target-cost']) {
       const surface = surfaces.find(item => item.route === route && item.path === 'page')!
       expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe('browser-local')
+    }
+    for (const route of ['/', '/schedule', '/schedule/:pid', '/schedule/new']) {
+      const surface = surfaces.find(item => item.route === route && item.variant === 'default')!
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')!.adapter).toBe('schedule-browser')
     }
     expect(adapterProfiles['central-http'].storage).toContain('不具备进程重启持久化证据')
   })

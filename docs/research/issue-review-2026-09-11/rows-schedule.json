@@ -14,7 +14,7 @@
     ],
     "remaining": [
       "本地切片已验收并独立提交，等待远端交付；尚未推送或部署。",
-      "中央 WBS 写入与工序库引用数量由 #444 接通，当前引用数显示未知；新增暂估绑定由 #445 承接。",
+      "中央 WBS 写入和当前可见库引用量已由 #444 完成本地验收；新增暂估绑定由 #445 承接。",
       "独立工序库详情尚无一一对应的 DC 设计页，仍保留 design-pending；生产持久化和部署继续由 #416 验收。"
     ],
     "flow": [
@@ -73,15 +73,19 @@
   },
   {
     "number": 444,
-    "status": "planned",
+    "status": "local-done",
     "solved": [
-      "已发布合同/暂估三步建组、计划调整、当前阶段进度及完整往返规格；已建立前置 #443。",
-      "明确暂估 8/null 的缺失信息、真实零、单位隔离、阶段分母及工期权重，沿用既定业务规则。"
+      "中央 WBS 读写、合同与暂估建组、完整旧图迁入及首页同源进度已完成本地验收，本票代码、权威说明与图文证据一起独立提交。",
+      "暂估 8/null 保留缺失，真实零及不同单位分开核对；冻结楼层不被当前模板或已隐藏分项回填、抹除。",
+      "调期取消、依赖置灰/恢复/独立移除、楼层人工微调、基线及任务增删已实际操作，普通保存不误删前置。",
+      "首页、排程、矩阵、户详情及合同清单来源往返保留同一项目、工序、阶段、楼栋、月份和视图，冷刷新仍可回到原位置。",
+      "独立 Spec 七项缺陷与 Standards 可见性、首次读取和窄屏问题均已修复；合同来源、父任务或阶段隐藏后，统计和当前依赖使用同一可见范围。",
+      "最终完整浏览器批次4项通过（49.4秒）；弹窗截图等待修正后暂估旅程另通过（27.1秒）。66张五档交互图逐张检查，三份指南18页PDF逐页检查。",
+      "最终完整 npm test 559 个文件、3476 项通过（179.98 秒）；类型、构建、100 个代码文件规范及独立 Standards/Spec 通过，旧组件适配边界回归已补齐。"
     ],
     "remaining": [
-      "接通项目 WBS 中央读写及旧分组、任务、楼层计划、依赖、既有绑定身份和历史迁移。",
-      "验收合同与暂估建组、调期取消/置灰/恢复、基线、任务增删、手工进度与首页同源回读。",
-      "完成排程、矩阵、户详情和清单楼层计划的同一身份往返；现有本地界面不代表中央链已完成。"
+      "本地切片已验收，远端交付尚待完成；未推送或部署。",
+      "新增暂估绑定由 #445 承接，目标成本和工资仍归 #412；生产持久化及部署归 #416。"
     ],
     "flow": [
       "选择当前授权项目",
@@ -100,23 +104,41 @@
     },
     "screens": [
       {
-        "title": "选择计划依据（已定稿待开发）",
-        "action": "选合同清单或内部暂估，再核验逐栋范围",
-        "result": "预期缺区域可去配置后返回；未知数量不会填成零"
+        "title": "选择计划依据（已实际操作）",
+        "action": "选择合同清单或内部暂估，核验逐栋范围；缺区域先配置后返回",
+        "result": "原建组输入保留，未知数量不填零，单位分别核对"
       },
       {
-        "title": "调期与依赖（已定稿待开发）",
-        "action": "调整工序日期，查看受影响的前置关系",
-        "result": "预期取消不写入，确认置灰并保留审计，可在条件满足后恢复"
+        "title": "调期与依赖（已实际操作）",
+        "action": "取消一次冲突调期，再确认置灰，修复后恢复同一关系",
+        "result": "取消不写入，置灰保留身份；只改进度不误删前置"
       },
       {
-        "title": "进度下钻与返回（已定稿待开发）",
-        "action": "从当前阶段进度打开矩阵和户详情，再返回",
-        "result": "预期恢复同一项目、工序、阶段、楼栋、月份和视图；仍需真实联验"
+        "title": "进度下钻与返回（已实际操作）",
+        "action": "由首页同源进度打开工序、矩阵及户详情，再冷刷新返回",
+        "result": "保留同一项目、工序、阶段和筛选；不同阶段完成率不串用"
+      },
+      {
+        "title": "失响应恢复（已实际操作）",
+        "action": "确认页保留输入，核对原提交结果",
+        "result": "恢复相同提交编号，只生成一个分组，成功后可冷读"
       }
     ],
     "evidence": [
-      "docs/research/issue-review-2026-09-11/schedule-tickets/02-central-wbs.md"
+      "docs/research/issue-review-2026-09-11/schedule-tickets/02-central-wbs.md",
+      "docs/design/evidence/issue-444/README.md",
+      "docs/design/evidence/issue-444/contract/contract-step3-768.png",
+      "docs/design/evidence/issue-444/contract/dependency-recovery-390.png",
+      "docs/design/evidence/issue-444/contract/central-wbs-1440.png",
+      "docs/design/evidence/issue-444/contract/boq-floor-source-390.png",
+      "docs/design/evidence/issue-444/provisional/pending-command-768.png",
+      "docs/design/evidence/issue-444/provisional/home-central-readonly-390.png",
+      "docs/design/evidence/issue-444/provisional/home-source-readonly-1440.png",
+      "docs/design/evidence/issue-444/provisional/task-quantity-frozen-390.png",
+      "docs/design/evidence/issue-444/region/provisional-zero-missing-preview-768.png",
+      "docs/design/evidence/issue-444/pdf/README.md",
+      "e2e/schedule-central.spec.ts",
+      "e2e/wbs-migration.spec.ts"
     ],
     "questions": []
   },

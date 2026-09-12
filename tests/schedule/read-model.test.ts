@@ -75,6 +75,24 @@ beforeEach(async () => {
 afterEach(() => db.close())
 
 describe('排程 read model', () => {
+  it.each(['schedule_group_buildings', 'task_item_map'])('全部 %s 范围软删后不扩大为全项目或全分项', async (table) => {
+    await db.execute(`UPDATE ${table} SET deleted_at = '2026-09-12'`)
+    const task = (await loadScheduleProject(db, 'p1', '2026-07-10'))!.groups[0]!.tasks.find(row => row.id === 'task-wall')!
+    expect(task.applicableUnits).toBe(0)
+    expect(task.completedUnits).toBe(0)
+    expect(task.actualProgress).toBe(0)
+    expect(task.actualStart).toBeNull()
+    expect(task.actualFinish).toBeNull()
+  })
+  it('当前模板已移除的历史完成不再计入排程分子或实际完工日', async () => {
+    await db.execute('UPDATE house_type_template_items SET deleted_at = \'2026-07-09\' WHERE id = \'line-wall\'')
+    const result = await loadScheduleProject(db, 'p1', '2026-07-10')
+    const task = result!.groups[0]!.tasks.find(row => row.id === 'task-wall')!
+    expect(task.applicableUnits).toBe(0)
+    expect(task.completedUnits).toBe(0)
+    expect(task.actualStart).toBeNull()
+    expect(task.actualFinish).toBeNull()
+  })
   it('只接受显式楼栋作为合同覆盖证据，不用跨楼栋复用的同名户型反推', async () => {
     await db.execute(`
       UPDATE boq_lines

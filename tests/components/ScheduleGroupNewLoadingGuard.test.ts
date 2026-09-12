@@ -12,6 +12,8 @@ import {
 } from 'vue'
 import ScheduleGroupNewScreen from '~/components/schedule/ScheduleGroupNewScreen.vue'
 
+vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
+
 vi.mock('~/stores/data-visibility', () => ({ useDataVisibilityStore: () => ({ includeDemo: false }) }))
 
 const NuxtLinkStub = defineComponent({
@@ -22,6 +24,7 @@ const NuxtLinkStub = defineComponent({
 
 const SelectFilterStub = defineComponent({
   inheritAttrs: false,
+  props: ['options', 'minWidth'],
   setup(_, { attrs }) {
     return () => h('select', attrs)
   },
@@ -47,6 +50,8 @@ const validProvisionalPreview = {
     itemCount: 1,
     itemCodes: ['ITEM-1'],
     totalQty: 10,
+    quantities: [{ unit: '㎡', value: 10, knownValue: 10, sourceCount: 1, missingCount: 0, unitMissing: false, completeness: 'complete' }],
+    blockers: [],
   }],
 }
 
@@ -59,8 +64,9 @@ describe('新建排程范围加载保护', () => {
   it('切换范围时禁用下一步，楼栋加载完成后才允许进入第二步', async () => {
     let loadBuildingsCalls = 0
     let resolveProvisionalBuildings: (() => void) | undefined
+    let resolveCatalog!: () => void
     const store = {
-      catalog: [{ id: 'project-1', name: '测试项目', code: 'P-01' }],
+      catalog: [{ id: 'project-1', origin: 'real', name: '测试项目', code: 'P-01' }],
       contracts: [{ id: 'contract-1', name: '施工合同', no: 'SG-01', lineCount: 1 }],
       processLibraries: [{
         id: 'library-1',
@@ -88,7 +94,11 @@ describe('新建排程范围加载保护', () => {
         scheduled: false,
       }],
       saving: false,
-      loadCatalog: vi.fn().mockResolvedValue(undefined),
+      canWrite: true,
+      sessionKey: 'w:a:real',
+      setOrigin: vi.fn(),
+      recheck: vi.fn(),
+      loadCatalog: vi.fn(() => new Promise<void>((resolve) => { resolveCatalog = resolve })),
       loadProcessLibraries: vi.fn().mockResolvedValue(undefined),
       loadProcessLibraryTasks: vi.fn().mockResolvedValue([{
         key: 'setting-out',
@@ -137,6 +147,8 @@ describe('新建排程范围加载保护', () => {
       },
     })
 
+    expect(screen.getByLabelText('分组名称').closest('section')?.getAttribute('inert')).toBe('true')
+    resolveCatalog()
     const nextStep = await screen.findByRole('button', { name: '下一步：选择工序' })
     await waitFor(() => expect(loadBuildingsCalls).toBe(1))
     await waitFor(() => expect((nextStep as HTMLButtonElement).disabled).toBe(false))
@@ -159,7 +171,7 @@ describe('新建排程范围加载保护', () => {
       .mockRejectedValueOnce(new Error('catalog offline'))
       .mockResolvedValue(undefined)
     const store = {
-      catalog: [{ id: 'project-1', name: '测试项目', code: 'P-01' }],
+      catalog: [{ id: 'project-1', origin: 'real', name: '测试项目', code: 'P-01' }],
       contracts: [],
       processLibraries: [{
         id: 'library-1',
@@ -181,6 +193,10 @@ describe('新建排程范围加载保护', () => {
       buildings: [{ id: 'building-1', name: '1栋', code: 'B1' }],
       buildingCoverage: [],
       saving: false,
+      canWrite: true,
+      sessionKey: 'w:a:real',
+      setOrigin: vi.fn(),
+      recheck: vi.fn(),
       loadCatalog,
       loadProcessLibraries: vi.fn().mockResolvedValue(undefined),
       loadProcessLibraryTasks: vi.fn().mockResolvedValue([{
@@ -249,8 +265,9 @@ describe('新建排程范围加载保护', () => {
         predecessorDisabled: false,
       }],
     }
-    const draftKey = 'schedule-new-region-draft:project-1'
-    window.sessionStorage.setItem(draftKey, JSON.stringify(draft))
+    const draftKey = 'ruihang:schedule-region-drafts'
+    const draftIdentity = 'w:a:real:real:project-1'
+    window.sessionStorage.setItem(draftKey, JSON.stringify({ [draftIdentity]: draft }))
     const loadProcessLibraryTasks = vi.fn()
       .mockRejectedValueOnce(new Error('process library offline'))
       .mockResolvedValue([{
@@ -264,7 +281,7 @@ describe('新建排程范围加载保护', () => {
       }])
     const warning = vi.fn()
     const store = {
-      catalog: [{ id: 'project-1', name: '测试项目', code: 'P-01' }],
+      catalog: [{ id: 'project-1', origin: 'real', name: '测试项目', code: 'P-01' }],
       contracts: [],
       processLibraries: [{
         id: 'library-1',
@@ -287,6 +304,10 @@ describe('新建排程范围加载保护', () => {
       buildings: [{ id: 'building-1', name: '1栋', code: 'B1' }],
       buildingCoverage: [],
       saving: false,
+      canWrite: true,
+      sessionKey: 'w:a:real',
+      setOrigin: vi.fn(),
+      recheck: vi.fn(),
       loadCatalog: vi.fn().mockResolvedValue(undefined),
       loadProcessLibraries: vi.fn().mockResolvedValue(undefined),
       loadProcessLibraryTasks,
@@ -323,14 +344,14 @@ describe('新建排程范围加载保护', () => {
     })
 
     expect((await screen.findByRole('alert')).textContent).toContain('process library offline')
-    expect(window.sessionStorage.getItem(draftKey)).toBe(JSON.stringify(draft))
+    expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)[draftIdentity]).toEqual(draft)
 
     await fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
 
     await waitFor(() => {
       expect((screen.getByLabelText('分组名称') as HTMLInputElement).value).toBe('区域返回草稿')
     })
-    await waitFor(() => expect(window.sessionStorage.getItem(draftKey)).toBeNull())
+    await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(draftKey)!)[draftIdentity]).toBeUndefined())
     expect(warning).toHaveBeenCalledWith(
       expect.stringContaining('已从排程范围移除 1 栋失效楼栋'),
     )

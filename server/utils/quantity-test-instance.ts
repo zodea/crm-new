@@ -1,3 +1,4 @@
+import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { QuantityBoqWorkspace } from '../../app/lib/quantity/central-boq'
 import type { QuantityBatchReadQuery, QuantityCommand, QuantityContext, QuantityReadQuery, QuantityUnitReadQuery } from '../../app/lib/quantity/central-contract'
@@ -6,10 +7,12 @@ import type { QuantityPersonSource } from '../../app/lib/quantity/central-people
 import type { QuantityPhotoIdentity } from '../../app/lib/quantity/central-photo'
 import type { PreparedCoreMigration } from './core-migration-preparation'
 import type { ImportedQuantityProject } from './quantity-migration'
+import type { ImportedWbsProject } from './wbs-migration'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
 import { createQuantityDatabase } from './quantity-database'
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
+import { applyWbsMigration, planWbsMigration, removeWbsMigration } from './wbs-migration'
 
 interface QuantityProjectSource {
   id: string
@@ -34,6 +37,8 @@ export function createQuantityTestInstance(options: Options) {
     service: ReturnType<typeof createQuantityService>
     pending: Promise<void>
     imports: Map<string, ImportedQuantityProject>
+    wbsImports: Map<string, ImportedWbsProject>
+    migrationLibraryIds: Set<string>
   }
   const states = new Map<string, State>()
 
@@ -68,6 +73,8 @@ export function createQuantityTestInstance(options: Options) {
         }),
         pending: Promise.resolve(),
         imports: new Map(),
+        wbsImports: new Map(),
+        migrationLibraryIds: new Set(),
       }
       states.set(key, state)
     }
@@ -109,8 +116,18 @@ export function createQuantityTestInstance(options: Options) {
       await previous
       try {
         const plan = planQuantityMigration(scope, state.imports)
-        const prepared = plan.affectedProjects.length
-          ? await (await state.driver()).prepare(candidate => applyQuantityMigration(candidate, plan))
+        const wbs = planWbsMigration(scope, state.wbsImports)
+        const migrationLibraryIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'process_libraries').map(row => row.id) : [])
+        const removedLibraryIds = new Set([...state.migrationLibraryIds].filter(id => !migrationLibraryIds.has(id)))
+        const affectedProjects = [...new Set([...plan.affectedProjects, ...wbs.affectedProjects])]
+        const prepared = affectedProjects.length || removedLibraryIds.size
+          ? await (await state.driver()).prepare(async (candidate) => {
+              await removeWbsMigration(candidate, wbs, plan.removed, removedLibraryIds)
+              await applyQuantityMigration(candidate, plan)
+              await applyWbsMigration(candidate, wbs)
+              for (const projectId of affectedProjects)
+                await candidate.execute('DELETE FROM schedule_command_receipts WHERE project_id = ?', [projectId])
+            })
           : null
         let finished = false
         return {
@@ -120,7 +137,9 @@ export function createQuantityTestInstance(options: Options) {
             finished = true
             prepared?.commit()
             state.imports = plan.imports
-            state.service.invalidateProjects(plan.affectedProjects)
+            state.wbsImports = wbs.imports
+            state.migrationLibraryIds = migrationLibraryIds
+            state.service.invalidateProjects(affectedProjects)
             release()
           },
           async abort() {
@@ -138,6 +157,10 @@ export function createQuantityTestInstance(options: Options) {
         release()
         throw cause
       }
+    },
+    withSchedule<T>(query: QuantityReadQuery, consume: (db: TransactionDb, context: QuantityContext, quantityVersion: string) => Promise<T>, sessionId?: string | null): Promise<T> {
+      const request = structuredClone(query)
+      return run(sessionId, (service, context) => service.withSchedule(request, context, (db, version) => consume(db, context, version)))
     },
     withMonthly<T>(query: QuantityMonthlyReadQuery, consume: (facts: readonly QuantityMonthlyBoqFact[]) => T, sessionId?: string | null): Promise<T> {
       const request = structuredClone(query)

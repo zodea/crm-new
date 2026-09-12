@@ -46,4 +46,9 @@ describe('中央工程量户详情只读恢复', () => {
       await expect(validate({ ...descriptor, key: path, fullPath })).resolves.toMatchObject({ state: 'resolved', fullPath })
     }
   })
+  it('排程下钻到户详情冷读仍保留来源链，返回链接可以核对原工序', async () => {
+    const { validate } = setup()
+    const fullPath = `${descriptor.key}?origin=real&project=project-1&from=schedule&group=g&task=t&stage=s&item=i&buildings=b&month=2026-08&view=crew`
+    await expect(validate({ ...descriptor, fullPath })).resolves.toMatchObject({ state: 'resolved', fullPath })
+  })
 })

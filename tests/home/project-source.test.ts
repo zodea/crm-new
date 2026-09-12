@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
 import { createHomeProjectSource } from '~/lib/home/project-source'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
+import { createScheduleRepository } from '~/lib/schedule/central-repository'
 import { createProjectReadTestInstance, PROJECT_READ_FIXTURE } from '../../server/utils/project-read-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
 
@@ -18,6 +19,19 @@ function central() {
 }
 
 describe('首页项目中央来源', () => {
+  it('首页与独立排程消费同一中央快照及用户运行日，读取失败不退本地', async () => {
+    const { repository } = central()
+    const id = 'new-central-project'
+    const wire = { workspaceId: 'workspace', actorId: 'actor', origin: 'real', capabilities: ['schedule:read'], sourceVersion: 'wbs:1', snapshot: { id, name: '新建中央项目', code: '', groups: [], dependencies: [], disabledDependencies: [], plannedStart: null, plannedFinish: null, actualProgress: 0, plannedProgress: 0, deviationDays: 0 }, history: { logs: [], removedTasks: [], migrationEvidence: [] }, contracts: [], buildings: [], buildingCoverage: [] }
+    const fetcher = vi.fn(async () => wire)
+    const local = vi.fn(async () => [])
+    const source = createHomeProjectSource({ projects: repository, schedule: createScheduleRepository(fetcher), localDb: { select: local } })
+    expect(await source.read({ id, origin: 'real', includeDemo: false }, '2026-09-12')).toMatchObject({ availability: 'empty', snapshot: { id } })
+    expect(fetcher).toHaveBeenCalledWith('/api/read/schedule/workspace', { query: { projectId: id, origin: 'real', includeDemo: false, today: '2026-09-12', contractId: '' } })
+    fetcher.mockRejectedValueOnce(new Error('connection lost'))
+    await expect(source.read({ id, origin: 'real', includeDemo: false }, '2026-09-12')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    expect(local).not.toHaveBeenCalled()
+  })
   it('本地项目为空时仍读取中央新建项目，改名后从中央回读', async () => {
     const { rows, repository } = central()
     const source = createHomeProjectSource({ projects: repository, localDb: { select: async () => [] } })

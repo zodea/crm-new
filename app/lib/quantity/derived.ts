@@ -22,6 +22,8 @@ export interface QuantityStageProgress {
 }
 
 export interface QuantityStageProgressScope {
+  /** 排程只消费当前应做户的完成交集；历史报量仍保留原事实口径。 */
+  currentApplicabilityOnly?: boolean
   stageIds?: readonly string[]
   buildingIds?: readonly string[]
   itemIds?: readonly string[]
@@ -143,6 +145,20 @@ export async function loadQuantityStageProgress(
       ORDER BY sort_order, code, id`),
     [projectId, ...(scope.stageIds ?? [])],
   )
+  if (scope.currentApplicabilityOnly && (scope.buildingIds?.length === 0 || scope.itemIds?.length === 0)) {
+    return stages.map(stage => ({
+      stageId: stage.id,
+      stageName: stage.name,
+      trade: stage.trade,
+      sortOrder: numberValue(stage.sort_order),
+      applicableUnits: 0,
+      completedUnits: 0,
+      draftUnits: 0,
+      completionRate: 0,
+      firstCompletedAt: null,
+      lastCompletedAt: null,
+    }))
+  }
 
   const applicability = await db.select<ApplicabilityRow>(
     `${hiddenCtesFor('construction_stage_items', 'house_type_template_items', 'units')}
@@ -175,7 +191,7 @@ export async function loadQuantityStageProgress(
 
   // 完成事实以事实为准：模板后删分项不隐藏历史完成，应做口径只影响分母。
   const statusCounts = await db.select<StatusCountRow>(
-    `${hiddenCtes('unit_stage_completions')}
+    `${scope.currentApplicabilityOnly ? hiddenCtesFor('unit_stage_completions', 'construction_stage_items', 'house_type_template_items', 'units') : hiddenCtes('unit_stage_completions')}
      SELECT usc.stage_id,
             usc.status,
             COUNT(*) AS n,
@@ -188,10 +204,23 @@ export async function loadQuantityStageProgress(
      JOIN buildings b ON b.id = f.building_id
      WHERE ${visibleCond('unit_stage_completions', 'usc')}
        AND s.project_id = ?
+       ${scope.currentApplicabilityOnly
+          ? `AND b.project_id = s.project_id
+       AND ${visibleCond('units', 'u')}
+       AND EXISTS (
+         SELECT 1 FROM construction_stage_items csi
+         JOIN house_type_template_items hti ON hti.item_id = csi.item_id
+         JOIN rooms r ON r.id = hti.room_id
+         WHERE csi.stage_id = usc.stage_id AND r.template_id = u.house_type_template_id
+           AND ${visibleCond('construction_stage_items', 'csi')}
+           AND ${visibleCond('house_type_template_items', 'hti')}
+           ${itemClause ? `AND csi.item_id IN ${itemClause}` : ''}
+       )`
+          : ''}
        ${stageClause ? `AND usc.stage_id IN ${stageClause}` : ''}
        ${buildingClause ? `AND b.id IN ${buildingClause}` : ''}
      GROUP BY usc.stage_id, usc.status`,
-    [projectId, ...(scope.stageIds ?? []), ...(scope.buildingIds ?? [])],
+    [projectId, ...(scope.currentApplicabilityOnly ? scope.itemIds ?? [] : []), ...(scope.stageIds ?? []), ...(scope.buildingIds ?? [])],
   )
   const countByStage = new Map<string, {
     completed: number

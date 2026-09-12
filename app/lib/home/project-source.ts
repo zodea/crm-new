@@ -1,5 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
 import type { ProjectDetailQueryDTO, ProjectListItemDTO, ProjectListRepository } from '~/lib/project/repository'
+import type { createScheduleRepository } from '~/lib/schedule/central-repository'
 import type { ScheduleProjectView } from '~/lib/schedule/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
 import { listAllProjects } from '~/lib/project/list-all'
@@ -30,7 +31,7 @@ function reference(row: ProjectListItemDTO): HomeProjectReference {
   return { key: homeProjectKey(row.project.id, row.dataOrigin), id: row.project.id, origin: row.dataOrigin, name: row.project.label, code: row.code, status: row.status }
 }
 
-export function createHomeProjectSource(options: { projects: ProjectListRepository, localDb: Pick<SoftDb, 'select'>, desktop?: boolean }) {
+export function createHomeProjectSource(options: { projects: ProjectListRepository, localDb: Pick<SoftDb, 'select'>, desktop?: boolean, schedule?: ReturnType<typeof createScheduleRepository> }) {
   return {
     async catalog(includeDemo: boolean): Promise<HomeProjectReference[]> {
       if (options.desktop) {
@@ -56,7 +57,16 @@ export function createHomeProjectSource(options: { projects: ProjectListReposito
       if (!project)
         throw new ProjectRepositoryProblem(projectProblem('not-found', '项目不存在或已删除'))
       if (!options.desktop && query.origin === 'real') {
+        if (options.schedule) {
+          const read = await options.schedule.read({ projectId: query.id, origin: query.origin, includeDemo: query.includeDemo, today })
+          return { project, availability: read.snapshot.groups.length ? 'ready' : 'empty', snapshot: read.snapshot, reason: '' }
+        }
         return { project, availability: 'not-connected', snapshot: null, reason: '该项目的中央排程来源尚未接入，计划与实际进度未知。当前不会读取旧本地项目或演示排程补齐。' }
+      }
+      if (!options.desktop && query.origin === 'demo' && options.schedule) {
+        const catalog = await options.schedule.catalog('demo', query.includeDemo)
+        if (!catalog.projects.some(row => row.id === query.id))
+          throw new ProjectRepositoryProblem(projectProblem('not-found', '当前演示项目不存在或已删除'))
       }
       const snapshot = await loadScheduleProject(options.localDb, query.id, today)
       if (!snapshot)

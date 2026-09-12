@@ -5,6 +5,7 @@ import { generateId } from '~/lib/util/id'
 import { normalizeProcessLibraryDraft } from './process-library-domain'
 
 export interface ScheduleProcessLibraryOption {
+  sourceVersion?: string
   id: string
   code: string
   name: string

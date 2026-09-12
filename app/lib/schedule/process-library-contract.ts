@@ -14,6 +14,7 @@ export interface ProcessLibraryTask extends ScheduleProcessLibraryTask {
 
 /** 每个 id 代表一个不可变版本；使用数量在中央 WBS 接管前保持未知。 */
 export interface ProcessLibraryVersion extends Omit<ScheduleProcessLibraryDetail, 'tasks' | 'usageCount'> {
+  usageProjects?: { id: string, name: string, groupCount: number }[]
   tasks: ProcessLibraryTask[]
   usageCount: number | null
   dataOrigin: DataOriginDTO

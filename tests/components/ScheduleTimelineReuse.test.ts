@@ -162,8 +162,8 @@ describe('施工排程时间轴复用', () => {
     expect(screen.queryByRole('button', { name: '给排水安装', exact: true })).toBeNull()
     await fireEvent.keyDown(secondGroupItem, { key: 'ArrowRight' })
     expect(screen.getByRole('button', { name: '给排水安装', exact: true })).not.toBeNull()
-    expect(JSON.parse(window.sessionStorage.getItem('schedule-wbs-expanded-groups') ?? '{}')).toEqual({
-      'project-1': ['group-1', 'group-2'],
+    expect(JSON.parse(window.sessionStorage.getItem('schedule-wbs-expanded-groups-v2') ?? '{}')).toEqual({
+      '["","","real"]:real:project-1': ['group-1', 'group-2'],
     })
     board.unmount()
 

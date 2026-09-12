@@ -38,6 +38,7 @@ import { createHttpProjectCommandRepository } from '~/lib/project/command-http-r
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
 import { createReceiptRepository } from '~/lib/receipt/repository'
+import { createScheduleRepository } from '~/lib/schedule/central-repository'
 import { createProcessLibraryRepository } from '~/lib/schedule/process-library-repository'
 import { createHttpSubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-http-repository'
 import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-contract/http-repository'
@@ -46,6 +47,7 @@ import { createSupplierCredentialRepository } from '~/lib/supplier/credential-re
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  schedule: ReturnType<typeof createScheduleRepository>
   supplierCredentials: ReturnType<typeof createSupplierCredentialRepository>
   processLibraries: ReturnType<typeof createProcessLibraryRepository>
   quantity: ReturnType<typeof createQuantityRepository>
@@ -76,6 +78,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    schedule: createScheduleRepository((url, options) => $fetch<unknown>(url, options)),
     supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch<unknown>(url, options)),
     processLibraries: createProcessLibraryRepository((url, options) => $fetch<unknown>(url, options)),
     quantity: createQuantityRepository((url, options) => $fetch<unknown>(url, options)),

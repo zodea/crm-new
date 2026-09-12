@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
-import type { ScheduleProcessLibraryDetail } from '~/lib/schedule/process-library'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { Button } from '~/components/ui/button'
 import KitTable from '~/components/ui/KitTable.vue'
@@ -10,13 +9,21 @@ import { toErrorMessage } from '~/lib/util/error'
 
 const route = useRoute()
 const store = useScheduleProcessLibraryStore()
-const version = shallowRef<ScheduleProcessLibraryDetail | null>(null)
+const version = shallowRef<Awaited<ReturnType<typeof store.loadDetail>>>(null)
 const loading = shallowRef(false)
 const error = shallowRef('')
 let active = true
 let generation = 0
 const id = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
 const origin = computed(() => route.query.origin === 'demo' ? 'demo' : route.query.origin === 'real' ? 'real' : store.origin)
+const usage = computed(() => {
+  const detail = version.value
+  if (!detail || !('usageProjects' in detail) || !('dataOrigin' in detail)
+    || detail.usageCount === null || detail.dataOrigin !== origin.value) {
+    return null
+  }
+  return { projects: detail.usageProjects ?? [], origin: detail.dataOrigin }
+})
 const returnTo = computed(() => processLibraryReturnTo(route.query))
 const navigationQuery = computed(() => processLibraryNavigationQuery(origin.value, returnTo.value))
 const key = () => `${id.value}:${origin.value}:${store.origin}`
@@ -131,9 +138,22 @@ onScopeDispose(() => {
           <p class="text-11px text-ink-faint">
             引用状态
           </p><p class="mt-1 text-13px text-ink">
-            {{ version.usageCount === null ? '引用数量未知 · 中央 WBS 尚未接通' : `已被 ${version.usageCount} 个排程引用` }}
+            {{ version.usageCount === null ? '当前身份无法读取引用情况' : `已被 ${version.usageCount} 个排程引用` }}
           </p>
         </div>
+      </section>
+      <section v-if="usage?.projects.length" class="panel p-4" aria-label="引用项目">
+        <h2 class="text-14px font-800">
+          引用项目
+        </h2>
+        <ul class="mt-2 grid gap-2">
+          <li v-for="project in usage.projects" :key="project.id" class="flex flex-wrap justify-between gap-2 text-12px">
+            <NuxtLink :to="{ path: '/schedule', query: { project: project.id, origin: usage.origin } }" class="text-brand hover:underline">
+              {{ project.name }}
+            </NuxtLink>
+            <span class="text-ink-soft">{{ project.groupCount }} 个楼栋分组</span>
+          </li>
+        </ul>
       </section>
       <section class="panel min-w-0 overflow-hidden" aria-labelledby="process-version-tasks">
         <h2 id="process-version-tasks" class="border-b border-line px-4 py-3 text-14px font-800 text-ink">

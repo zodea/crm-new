@@ -5,7 +5,7 @@ import { computed, onActivated, onBeforeUnmount, onDeactivated, shallowRef, watc
 import { Button } from '~/components/ui/button'
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
-import { buildQuantityDrillLocation } from '~/lib/schedule/navigation'
+import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
 import { useDataVisibilityStore } from '~/stores/data-visibility'
 import { useHomeDashboardStore } from '~/stores/home-dashboard'
@@ -24,7 +24,7 @@ let latestRequest = 0
 let wasDeactivated = false
 const projectId = computed(() => String(route.query.project ?? ''))
 const origin = computed(() => route.query.origin === 'real' || route.query.origin === 'demo' ? route.query.origin : undefined)
-const returnLocation = computed(() => ({ path: '/', query: { project: projectId.value || undefined, origin: origin.value, group: route.query.group, task: route.query.task } }))
+const returnLocation = computed(() => ({ path: '/', query: { project: projectId.value || undefined, origin: origin.value, ...scheduleReturnContextQuery(route.query) } }))
 const coverage = computed(() => result.value?.snapshot ? summarizeHomeScheduleCoverage(result.value.snapshot) : null)
 
 async function read() {
@@ -40,8 +40,15 @@ async function read() {
   loading.value = true
   try {
     const next = await store.readProject({ id: projectId.value, origin: origin.value, includeDemo: visibility.includeDemo }, today)
-    if (request === latestRequest)
-      result.value = next
+    if (request === latestRequest) {
+      const groupId = route.query.group
+      const taskId = route.query.task
+      const group = typeof groupId === 'string' ? next.snapshot?.groups.find(row => row.id === groupId) : null
+      if ((groupId && !group) || (taskId && (typeof taskId !== 'string' || !(group ? group.tasks : next.snapshot?.groups.flatMap(row => row.tasks))?.some(task => task.id === taskId))))
+        error.value = '来源分组或工序已不可用，请返回首页重新选择。'
+      else
+        result.value = next
+    }
   }
   catch (cause) {
     if (request === latestRequest) {
@@ -64,10 +71,10 @@ function selectTask(task: ScheduleTaskView) {
     warning(`「${task.name}」为手动填报工序，当前入口仅提供只读查看`)
     return
   }
-  void router.push(buildQuantityDrillLocation('schedule', group, task, origin.value))
+  void router.push(buildQuantityDrillLocation('home', group, task, origin.value, scheduleFilterQuery(route.query)))
 }
 
-watch([projectId, origin, () => visibility.includeDemo], () => {
+watch([projectId, origin, () => visibility.includeDemo, () => route.query.group, () => route.query.task], () => {
   if (!wasDeactivated && route.path === '/schedule')
     void read()
 }, { immediate: true })

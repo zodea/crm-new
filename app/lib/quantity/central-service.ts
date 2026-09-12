@@ -148,6 +148,17 @@ export function createQuantityService(options: Options) {
   }
 
   return {
+    /** WBS 与当前工程量共用事务，迁移准备期间不另行排队读取。 */
+    withSchedule<T>(query: QuantityReadQuery, context: QuantityContext, consume: (db: TransactionDb, quantityVersion: string) => Promise<T>): Promise<T> {
+      const scope = { ...query }
+      return serial(async () => {
+        const project = await authorize(scope.projectId, scope.origin, context, false)
+        return quantityTransaction(options.database, async (db) => {
+          await projectMirror(db, project)
+          return consume(db, version(project.id))
+        })
+      })
+    },
     /** 保持工程量命令串行边界，供月报在当前事实读取后同步固化快照。 */
     withMonthly<T>(query: QuantityMonthlyReadQuery, context: QuantityContext, consume: (facts: readonly QuantityMonthlyBoqFact[]) => T): Promise<T> {
       const scope = { ...query }

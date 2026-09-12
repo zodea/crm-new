@@ -4,11 +4,13 @@ import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
 import ScheduleTimeline from '~/components/schedule/ScheduleTimeline.vue'
 import { Button } from '~/components/ui/button'
+import { scheduleReturnContextQuery } from '~/lib/schedule/navigation'
 
 const props = defineProps<{
   snapshot: ScheduleProjectView
   today: string
   origin?: DataOriginDTO
+  returnContext?: Record<string, string>
   hideScheduleLink?: boolean
   highlightedGroupId?: string
   highlightedTaskId?: string
@@ -59,7 +61,7 @@ function dottedDate(value: string | null): string {
         {{ origin ? '只读排程 · 点工序查看工程量' : '点工序下钻工程量 · 计划编辑在施工进度页' }}
       </span>
       <Button v-if="!hideScheduleLink" class="border-solid no-underline" as-child>
-        <NuxtLink :to="{ path: '/schedule', query: { project: snapshot.id, origin, from: 'home' } }">
+        <NuxtLink :to="{ path: '/schedule', query: { ...scheduleReturnContextQuery(returnContext ?? {}), project: snapshot.id, origin, from: 'home' } }">
           <span class="i-lucide-calendar-range mr-1" /> 打开施工进度
         </NuxtLink>
       </Button>
@@ -71,6 +73,7 @@ function dottedDate(value: string | null): string {
       :today="today"
       :highlighted-group-id="highlightedGroupId"
       :highlighted-task-id="highlightedTaskId"
+      :origin="origin"
       @select-task="emit('selectTask', $event)"
     />
 

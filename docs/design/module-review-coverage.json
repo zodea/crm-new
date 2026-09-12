@@ -101,8 +101,8 @@
   "counts": {
     "productionRoutes": 139,
     "rootVariants": 195,
-    "surfaces": 590,
-    "environmentCases": 1047,
+    "surfaces": 593,
+    "environmentCases": 1053,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -174,6 +174,36 @@
         {
           "path": "server/utils/supplier-credential-service.ts",
           "anchor": "ports.transact"
+        }
+      ]
+    },
+    "schedule-browser": {
+      "read": "正式项目 WBS 经中央 Repository；首页同源只读，demo 经服务端授权后沿隔离只读适配",
+      "write": "独立正式 WBS 经中央 command 建组、调期、依赖、楼层、基线与任务维护；首页和演示只读",
+      "storage": "与工程量共用中央验证候选和事务；生产持久化仍待 #416",
+      "sources": [
+        {
+          "path": "app/stores/schedule.ts",
+          "anchor": "repositories().schedule"
+        },
+        {
+          "path": "server/utils/schedule-service.ts",
+          "anchor": "createScheduleService"
+        },
+        {
+          "path": "app/lib/home/project-source.ts",
+          "anchor": "options.schedule"
+        }
+      ]
+    },
+    "schedule-binding-pending": {
+      "read": "浏览器直达显示新绑定尚未接通，引导返回排程核对现有分组",
+      "write": "新的合同绑定由 #445 接通，当前入口不修改合同外键或旧库",
+      "storage": "不产生新绑定；已迁入历史仍在中央 WBS 读取",
+      "sources": [
+        {
+          "path": "app/components/schedule/ScheduleContractBindingScreen.vue",
+          "anchor": "新的合同绑定尚未接通"
         }
       ]
     },
@@ -1339,7 +1369,7 @@
       "issues": [
         412
       ],
-      "surfaces": 27
+      "surfaces": 30
     },
     {
       "code": "import-export",
@@ -16176,6 +16206,39 @@
       "routeEvidenceId": "E-1ADAF926A670"
     },
     {
+      "id": "S-584BC6AE2AB4",
+      "route": "/schedule/:pid",
+      "routePattern": "/schedule/:pid",
+      "domain": "schedule-target-cost",
+      "kind": "schedule",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "按现有路由和 capability；未确认原提交结果；弹窗内另提供可达的原提交恢复入口",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/schedule/[pid]/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/schedule/ScheduleScreen.vue",
+          "anchor": "store.pendingCommand"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-1ADAF926A670"
+    },
+    {
       "id": "S-C4484D734B2D",
       "route": "/schedule/:pid/bind/:gid",
       "routePattern": "/schedule/:pid/bind/:gid",
@@ -16399,6 +16462,39 @@
       "routeEvidenceId": "E-B8269C2977EF"
     },
     {
+      "id": "S-AA25087FC366",
+      "route": "/schedule",
+      "routePattern": "/schedule",
+      "domain": "schedule-target-cost",
+      "kind": "schedule",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "按现有路由和 capability；未确认原提交结果；弹窗内另提供可达的原提交恢复入口",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/schedule/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/schedule/ScheduleScreen.vue",
+          "anchor": "store.pendingCommand"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8269C2977EF"
+    },
+    {
       "id": "S-0AE3159FFF27",
       "route": "/schedule/new",
       "routePattern": "/schedule/new",
@@ -16420,6 +16516,39 @@
         {
           "path": "app/pages/schedule/new.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-81AE39E9EDDC"
+    },
+    {
+      "id": "S-76E29BEB20D4",
+      "route": "/schedule/new",
+      "routePattern": "/schedule/new",
+      "domain": "schedule-target-cost",
+      "kind": "schedule",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "按现有路由和 capability；保留确认步骤及原命令；恢复前禁止形成新提交",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/schedule/new.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/schedule/ScheduleGroupNewScreen.vue",
+          "anchor": "ScheduleCommandRecovery"
         }
       ],
       "issueNumbers": [
@@ -20606,9 +20735,16 @@
         "C-65CCC6704277",
         "C-B00376092557"
       ],
-      "status": "ready",
-      "evidence": [],
-      "remaining": "现有区域、户型、责任、阶段完成和现场量仍需接入同一中央迁移/Repository/HTTP/command；责任配置不能产生完成事实。"
+      "status": "current-passed",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-442/README.md",
+          "commit": "0a9c37680a02693c6c9a43661cc5e129c38649ea",
+          "recency": "current-run",
+          "scope": "中央区域、模板、三量、阶段与责任完成、照片、报量、导入导出及受控迁移；不代验 WBS、工资和目标成本"
+        }
+      ],
+      "remaining": "#442 已接通同一中央区域、模板、责任、阶段完成及现场量，真实 SQLite/HTTP 迁入与浏览器回读通过；责任配置不产生完成。WBS、工资和目标成本继续按各自条款验收。"
     },
     {
       "id": "PRG-05",
@@ -20626,9 +20762,16 @@
         "C-65CCC6704277",
         "C-B00376092557"
       ],
-      "status": "ready",
-      "evidence": [],
-      "remaining": "后台验证 project/task/stage/item/building/unit 等关系并拒绝陈旧版本；错误身份、无权、空态和重试逐场景验证，不由本地既有页面推定完成。"
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-442/README.md",
+          "commit": "0a9c37680a02693c6c9a43661cc5e129c38649ea",
+          "recency": "current-run",
+          "scope": "中央区域、模板、三量、阶段与责任完成、照片、报量、导入导出及受控迁移；不代验 WBS、工资和目标成本"
+        }
+      ],
+      "remaining": "#442 已验证工程量项目、阶段、分项、楼栋、户关系、陈旧来源及失败保稿；排程 task 与工程量的中央关联和往返由 #444 继续验收，不由工程量单域通过推定。"
     },
     {
       "id": "PRG-06",
@@ -20647,9 +20790,16 @@
         "C-65CCC6704277",
         "C-B00376092557"
       ],
-      "status": "partial",
-      "evidence": [],
-      "remaining": "既有工程量本地读模型已区分三量；完整中央投影、逐页显示/汇总、缺来源 completeness 及空与明确零的本轮运行证据仍待补齐。"
+      "status": "current-passed",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-442/README.md",
+          "commit": "0a9c37680a02693c6c9a43661cc5e129c38649ea",
+          "recency": "current-run",
+          "scope": "中央区域、模板、三量、阶段与责任完成、照片、报量、导入导出及受控迁移；不代验 WBS、工资和目标成本"
+        }
+      ],
+      "remaining": "#442 已验证中央三量、按单位汇总、缺项与已知小计、真实零及台账/分类 Excel 回读；不跨数量基准补值。工资和目标成本的消费正确性继续单独验收。"
     },
     {
       "id": "PRG-07",
@@ -33464,7 +33614,7 @@
       "id": "C-54C9BCC4C290",
       "surfaceId": "S-14B3FFC73DF6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40614,7 +40764,7 @@
       "id": "C-BF25FD114CFC",
       "surfaceId": "S-F92716450EDE",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40669,7 +40819,7 @@
       "id": "C-C6FF96D2F04F",
       "surfaceId": "S-6A7A132F528A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40717,7 +40867,7 @@
       "id": "C-D5D7EEA6E985",
       "surfaceId": "S-A10A70EEA6E2",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40765,7 +40915,7 @@
       "id": "C-AC0CA3518F37",
       "surfaceId": "S-D8ECF84EEB73",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40813,7 +40963,7 @@
       "id": "C-9343A79FE980",
       "surfaceId": "S-AA8112022B4D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40861,7 +41011,7 @@
       "id": "C-919CDA2B9DF5",
       "surfaceId": "S-C699D9D5510B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40906,10 +41056,58 @@
       "obligationIds": []
     },
     {
+      "id": "C-85CBD46DBDC1",
+      "surfaceId": "S-584BC6AE2AB4",
+      "host": "browser",
+      "adapter": "schedule-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-1ADAF926A670",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D21731750024",
+      "surfaceId": "S-584BC6AE2AB4",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-1ADAF926A670",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-B08165B1191F",
       "surfaceId": "S-C4484D734B2D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-binding-pending",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40964,7 +41162,7 @@
       "id": "C-439AC7326E15",
       "surfaceId": "S-66651DB4C303",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41019,7 +41217,7 @@
       "id": "C-94CE4B65EF14",
       "surfaceId": "S-C03E6C5A1133",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41067,7 +41265,7 @@
       "id": "C-F3DBBD977D93",
       "surfaceId": "S-7C1B0D8B463A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41115,7 +41313,7 @@
       "id": "C-DF6C8C872713",
       "surfaceId": "S-23DE2E250C51",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41163,7 +41361,7 @@
       "id": "C-E3B0FBBD0D78",
       "surfaceId": "S-A703707D74E6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41211,7 +41409,7 @@
       "id": "C-D974D187FE66",
       "surfaceId": "S-CAD316E53C26",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41256,10 +41454,58 @@
       "obligationIds": []
     },
     {
+      "id": "C-E9D46991219E",
+      "surfaceId": "S-AA25087FC366",
+      "host": "browser",
+      "adapter": "schedule-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8269C2977EF",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-77963A3EA12E",
+      "surfaceId": "S-AA25087FC366",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8269C2977EF",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-00E0EA0DAD9D",
       "surfaceId": "S-0AE3159FFF27",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "schedule-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41289,6 +41535,54 @@
     {
       "id": "C-FE5343E53031",
       "surfaceId": "S-0AE3159FFF27",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-81AE39E9EDDC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-5B74885EBFF2",
+      "surfaceId": "S-76E29BEB20D4",
+      "host": "browser",
+      "adapter": "schedule-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-81AE39E9EDDC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-069D6BA00951",
+      "surfaceId": "S-76E29BEB20D4",
       "host": "tauri",
       "adapter": "desktop-sqlite",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",

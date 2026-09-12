@@ -6,6 +6,8 @@ defineProps<{
   snapshot: ScheduleProjectView
   today: string
   highlightedGroupId?: string
+  readonly?: boolean
+  origin?: 'real' | 'demo'
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +37,8 @@ const emit = defineEmits<{
       :snapshot="snapshot"
       :today="today"
       :highlighted-group-id="highlightedGroupId"
+      :readonly="readonly"
+      :origin="origin"
       @select-task="emit('selectTask', $event)"
       @add-task="emit('addTask', $event)"
       @reschedule-task="emit('rescheduleTask', $event)"

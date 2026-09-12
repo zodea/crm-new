@@ -8,7 +8,7 @@ import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 
 export const useHomeDashboardStore = defineStore('home-dashboard', () => {
-  const source = createHomeProjectSource({ projects: useNuxtApp().$repositories.projectList, localDb: { select }, desktop: isDesktopRuntime() })
+  const source = createHomeProjectSource({ projects: useNuxtApp().$repositories.projectList, schedule: useNuxtApp().$repositories.schedule, localDb: { select }, desktop: isDesktopRuntime() })
   const catalog = shallowRef<HomeProjectReference[]>([])
   const loading = shallowRef(false)
   let catalogRequest = 0

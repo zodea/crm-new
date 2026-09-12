@@ -44,6 +44,7 @@ import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './othe
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 import { readProcessLibraryMigrationGraphs } from './process-library-source'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
+import { readWbsMigrationGraphs } from './wbs-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -74,7 +75,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -115,6 +116,8 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
           'qty', boq_catalog.qty,
           'unitPrice', boq_catalog.unit_price,
           'building', boq_catalog.building,
+          'unitType', boq_catalog.unit_type,
+          'floorZone', boq_catalog.floor_zone,
           'updatedAt', boq_catalog.updated_at
         ))
         FROM (
@@ -124,6 +127,8 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
                  COALESCE(boq_line.recognized_qty, boq_line.qty) AS qty,
                  COALESCE(boq_line.recognized_unit_price, boq_line.unit_price) AS unit_price,
                  boq_line.building,
+                 boq_line.unit_type,
+                 boq_line.floor_zone,
                  boq_line.updated_at
           FROM boq_lines boq_line
           WHERE boq_line.contract_id = c.id
@@ -1211,6 +1216,8 @@ async function buildSource(
       return [entityType, credentialGraphs.map(entity => ({ legacyId: entity.legacyId, name: entity.name, deletedAt: entity.deletedAt, attributes: supplierCredentialMasterAttributes(JSON.parse(String(entity.attributes?.graphJson)).supplier) }))] as const
     if (entityType === 'process_libraries')
       return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'wbs_projects')
+      return [entityType, await readWbsMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'quantity_projects') {
       const projects = await readQuantityMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
       return [entityType, projects.map(({ project, graph }): CoreMigrationSourceEntityDTO => ({

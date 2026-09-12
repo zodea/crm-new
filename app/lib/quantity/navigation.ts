@@ -1,5 +1,6 @@
 import type { DataOriginDTO } from '../../types/read-model'
 import { isDataOriginDTO } from '../../types/read-model'
+import { SCHEDULE_DRILL_QUERY_KEYS, scheduleSourceQuery } from '../schedule/navigation'
 
 export type QuantityRouteQueryValue = string | readonly (string | null)[] | null | undefined
 export type QuantityRouteQuery = Record<string, QuantityRouteQueryValue>
@@ -66,6 +67,8 @@ export function quantityMatrixReturnPath(query: QuantityRouteQuery): string {
     if (value)
       params.set(key, value)
   }
+  for (const [key, value] of Object.entries(scheduleSourceQuery(query)))
+    params.set(key, value)
   const search = params.toString()
   return search ? `/subcontract/quantity?${search}` : '/subcontract/quantity'
 }
@@ -76,7 +79,7 @@ export function quantityUnitReturnPath(projectId: string, query: QuantityRouteQu
     const values = Object.fromEntries(target.searchParams)
     if (target.pathname === '/subcontract/quantity' && values.project === projectId
       && readQuantityOrigin(values) === readQuantityOrigin(query)
-      && QUANTITY_FILTER_KEYS.every(key => target.searchParams.getAll(key).length <= 1)) {
+      && [...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS].every(key => target.searchParams.getAll(key).length <= 1)) {
       return quantityMatrixReturnPath(values)
     }
   }

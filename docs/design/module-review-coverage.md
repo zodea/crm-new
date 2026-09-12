@@ -4,7 +4,7 @@
 
 本索引负责防遗漏，不定义业务规格，也不是完成率。路由来源为 [运行证据账本](./runtime-evidence-ledger.json)；子视图和宿主接线来自实际源码。父路由的 direct/historical 等级不自动赋给子视图。逐场景规则、差异和验收继续写入 [模块复核规程](../agents/module-review.md) 指定的当前 Issue。
 
-现有 139 条生产路由展开为 195 个路由变体、590 个页面/子视图、1047 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
+现有 139 条生产路由展开为 195 个路由变体、593 个页面/子视图、1053 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
 
 实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。
 
@@ -47,9 +47,9 @@
 | PRG-01 · #300 AC1 / #347 AC1/4 排程拓扑迁移与中央唯一写入（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/347)、[docs/adr/0020-browser-authority-and-demo-workspace-boundary.md](../../docs/adr/0020-browser-authority-and-demo-workspace-boundary.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；当前 schedule store 仍用本地 DB；中央分组、任务、依赖及其工序库快照尚未闭合。按真实区域/合同前置受控迁移，不能以首页读取中央项目替代。 |
 | PRG-02 · #300 AC3 / #347 AC2 排程稳定 ID 与后台关系验证（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/347)、[docs/rewrite/pages/schedule-progress.md](../../docs/rewrite/pages/schedule-progress.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；中央保存需验证 project/group/task/stage/dependency 与楼栋/合同归属，区分不存在和错配；不得按名称或本地同 ID 补配。 |
 | PRG-03 · #300 AC5 / #347 AC3 排程版本冲突与刷新重读（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/347)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；sourceVersion 陈旧提交、409 后草稿保留、缓存失效、失败重试与保存后中央刷新读取待实施；本地事务不证明中央并发。 |
-| PRG-04 · #300 AC1 / #348 AC1/4 工程量责任、阶段完成与现场量中央化（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)、[docs/adr/0010-quantity-matrix-and-construction-record-model.md](../../docs/adr/0010-quantity-matrix-and-construction-record-model.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；现有区域、户型、责任、阶段完成和现场量仍需接入同一中央迁移/Repository/HTTP/command；责任配置不能产生完成事实。 |
-| PRG-05 · #300 AC3/5 / #348 AC2/3 工程量关系、来源版本与错配反馈（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；后台验证 project/task/stage/item/building/unit 等关系并拒绝陈旧版本；错误身份、无权、空态和重试逐场景验证，不由本地既有页面推定完成。 |
-| PRG-06 · #300 AC2 / #348 AC3 缺现场量保持 null 与聚合 completeness（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)、[docs/rewrite/pages/subcontract-quantity.md](../../docs/rewrite/pages/subcontract-quantity.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 部分完成，仍有缺口 | 待补证据；既有工程量本地读模型已区分三量；完整中央投影、逐页显示/汇总、缺来源 completeness 及空与明确零的本轮运行证据仍待补齐。 |
+| PRG-04 · #300 AC1 / #348 AC1/4 工程量责任、阶段完成与现场量中央化（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)、[docs/adr/0010-quantity-matrix-and-construction-record-model.md](../../docs/adr/0010-quantity-matrix-and-construction-record-model.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 本轮限定范围已验证 | [docs/design/evidence/issue-442/README.md](../../docs/design/evidence/issue-442/README.md) @ `0a9c3768`（current-run）；#442 已接通同一中央区域、模板、责任、阶段完成及现场量，真实 SQLite/HTTP 迁入与浏览器回读通过；责任配置不产生完成。WBS、工资和目标成本继续按各自条款验收。 |
+| PRG-05 · #300 AC3/5 / #348 AC2/3 工程量关系、来源版本与错配反馈（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)） | [#412](https://github.com/zodea/crm-new/issues/412) | 部分完成，仍有缺口 | [docs/design/evidence/issue-442/README.md](../../docs/design/evidence/issue-442/README.md) @ `0a9c3768`（current-run）；#442 已验证工程量项目、阶段、分项、楼栋、户关系、陈旧来源及失败保稿；排程 task 与工程量的中央关联和往返由 #444 继续验收，不由工程量单域通过推定。 |
+| PRG-06 · #300 AC2 / #348 AC3 缺现场量保持 null 与聚合 completeness（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/348)、[docs/rewrite/pages/subcontract-quantity.md](../../docs/rewrite/pages/subcontract-quantity.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 本轮限定范围已验证 | [docs/design/evidence/issue-442/README.md](../../docs/design/evidence/issue-442/README.md) @ `0a9c3768`（current-run）；#442 已验证中央三量、按单位汇总、缺项与已知小计、真实零及台账/分类 Excel 回读；不跨数量基准补值。工资和目标成本的消费正确性继续单独验收。 |
 | PRG-07 · #300 AC1 / #349 AC1/4 目标成本迁移和中央正式保存（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/349)、[docs/rewrite/pages/target-cost.md](../../docs/rewrite/pages/target-cost.md)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；目标成本既有数据与正式保存尚未闭合中央 Repository/HTTP/command；不能保留并行正式来源或把付款结算成本回归外推到目标成本。 |
 | PRG-08 · #300 AC3/5 / #349 AC2 排程、户详情与成本的真实来源聚合（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/349)） | [#412](https://github.com/zodea/crm-new/issues/412) | 已定待实施 | 待补证据；三域下钻只传稳定 ID 与 sourceVersion，聚合来自当前真实事实；未接入或缺映射必须可解释，不造零量、零成本或同名关系。 |
 | PRG-09 · #300 AC4 / #349 AC3 全上下文往返、深链和局部滚动（[来源1](https://github.com/zodea/crm-new/issues/300)、[来源2](https://github.com/zodea/crm-new/issues/349)、[来源3](https://github.com/zodea/crm-new/issues/434)） | [#412](https://github.com/zodea/crm-new/issues/412) | 部分完成，仍有缺口 | [docs/design/evidence/issue-434/README.md](../../docs/design/evidence/issue-434/README.md) @ `0dd6c91e`（current-run）；#434 仅覆盖首页项目及演示工序往返；正式项目/分组/任务/阶段/楼栋/月/视图/工种/责任户、目标成本往返、直接深链和错误重试仍须逐链验证。 |
@@ -75,6 +75,8 @@
 | browser-local | 本地 DB adapter：sql.js / IndexedDB 快照 | 本地 DB 事务；尚未接管的业务边界，不能冒充中央正式写入 | IndexedDB crm-new-browser / database_snapshots；文件正文须另验 |
 | desktop-sqlite | Tauri 本地 DB adapter | 现有桌面 SQLite 分支；本轮只核对既有能力 | sqlite:crm.db；桌面正式交付不在本轮扩展范围 |
 | credential-browser | 中央专用证照 Repository：当前主档、原件、要求、资料状态与人工凭证；demo 经授权只读 | 正式来源专用 command：上传、类别/有效期、要求、人工核验、删除/撤回；日常 OCR 由 #447 接通 | 中央验证实例；原件正文与主档原子协调，生产持久化仍待 #416 |
+| schedule-browser | 正式项目 WBS 经中央 Repository；首页同源只读，demo 经服务端授权后沿隔离只读适配 | 独立正式 WBS 经中央 command 建组、调期、依赖、楼层、基线与任务维护；首页和演示只读 | 与工程量共用中央验证候选和事务；生产持久化仍待 #416 |
+| schedule-binding-pending | 浏览器直达显示新绑定尚未接通，引导返回排程核对现有分组 | 新的合同绑定由 #445 接通，当前入口不修改合同外键或旧库 | 不产生新绑定；已迁入历史仍在中央 WBS 读取 |
 | simulation | 合成导入演示 | 模拟成功/首次失败，无业务记录写入 | 无业务持久化 |
 | precheck-only | 本地来源预检 | 只预检，不写业务行 | 无导入写入 |
 | file-workflow | 导出任务上下文与选定数据集 | 生成真实文件；不是业务存储写入 | 瞬时文件工作流；完整数据集/正文/失败清理分别验收 |
@@ -164,7 +166,7 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 
 | 路由变体 / mode | kind / variant | 子视图 | browser / tauri | 源码 |
 | --- | --- | --- | --- | --- |
-| `/` view | home / default | page · 工作台 | browser-local / desktop-sqlite | [app/pages/index.vue](../../app/pages/index.vue) |
+| `/` view | home / default | page · 工作台 | schedule-browser / desktop-sqlite | [app/pages/index.vue](../../app/pages/index.vue) |
 
 ### 项目（#408）
 
@@ -775,20 +777,23 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/project/target-cost/form` new | project.target-cost / default | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/project/target-cost/form/[[id]].vue](../../app/pages/project/target-cost/form/[[id]].vue) |
 | `/project/target-cost/form/:id` edit | project.target-cost / default | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/project/target-cost/form/[[id]].vue](../../app/pages/project/target-cost/form/[[id]].vue) |
 | `/project/target-cost` view | project.target-cost / default | page · 列表 | browser-local / desktop-sqlite | [app/pages/project/target-cost/index.vue](../../app/pages/project/target-cost/index.vue) |
-| `/schedule/:pid` view | schedule / default | page · 工作台 | browser-local / desktop-sqlite | [app/pages/schedule/[pid]/index.vue](../../app/pages/schedule/[pid]/index.vue) |
-| `/schedule/:pid` view | schedule / default | workspace/ScheduleBoard · ScheduleBoard | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule/:pid` view | schedule / default | workspace/ScheduleTaskDialog · ScheduleTaskDialog | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule/:pid` view | schedule / default | workspace/ScheduleDependencyDialog · ScheduleDependencyDialog | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule/:pid` view | schedule / default | workspace/mobile/wbs · wbs | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
-| `/schedule/:pid` view | schedule / default | workspace/mobile/gantt · gantt | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
-| `/schedule/:pid/bind/:gid` new | schedule.bind / default | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/schedule/[pid]/bind/[gid].vue](../../app/pages/schedule/[pid]/bind/[gid].vue) |
-| `/schedule` view | schedule / default | page · 工作台 | browser-local / desktop-sqlite | [app/pages/schedule/index.vue](../../app/pages/schedule/index.vue) |
-| `/schedule` view | schedule / default | workspace/ScheduleBoard · ScheduleBoard | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule` view | schedule / default | workspace/ScheduleTaskDialog · ScheduleTaskDialog | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule` view | schedule / default | workspace/ScheduleDependencyDialog · ScheduleDependencyDialog | browser-local / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
-| `/schedule` view | schedule / default | workspace/mobile/wbs · wbs | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
-| `/schedule` view | schedule / default | workspace/mobile/gantt · gantt | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
-| `/schedule/new` new | schedule / default | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/schedule/new.vue](../../app/pages/schedule/new.vue) |
+| `/schedule/:pid` view | schedule / default | page · 工作台 | schedule-browser / desktop-sqlite | [app/pages/schedule/[pid]/index.vue](../../app/pages/schedule/[pid]/index.vue) |
+| `/schedule/:pid` view | schedule / default | workspace/ScheduleBoard · ScheduleBoard | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule/:pid` view | schedule / default | workspace/ScheduleTaskDialog · ScheduleTaskDialog | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule/:pid` view | schedule / default | workspace/ScheduleDependencyDialog · ScheduleDependencyDialog | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule/:pid` view | schedule / default | workspace/mobile/wbs · wbs | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
+| `/schedule/:pid` view | schedule / default | workspace/mobile/gantt · gantt | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
+| `/schedule/:pid` view | schedule / default | recovery/pending · pending | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule/:pid/bind/:gid` new | schedule.bind / default | page · 整页表单 | schedule-binding-pending / desktop-sqlite | [app/pages/schedule/[pid]/bind/[gid].vue](../../app/pages/schedule/[pid]/bind/[gid].vue) |
+| `/schedule` view | schedule / default | page · 工作台 | schedule-browser / desktop-sqlite | [app/pages/schedule/index.vue](../../app/pages/schedule/index.vue) |
+| `/schedule` view | schedule / default | workspace/ScheduleBoard · ScheduleBoard | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule` view | schedule / default | workspace/ScheduleTaskDialog · ScheduleTaskDialog | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule` view | schedule / default | workspace/ScheduleDependencyDialog · ScheduleDependencyDialog | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule` view | schedule / default | workspace/mobile/wbs · wbs | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
+| `/schedule` view | schedule / default | workspace/mobile/gantt · gantt | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
+| `/schedule` view | schedule / default | recovery/pending · pending | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleScreen.vue](../../app/components/schedule/ScheduleScreen.vue) |
+| `/schedule/new` new | schedule / default | page · 整页表单 | schedule-browser / desktop-sqlite | [app/pages/schedule/new.vue](../../app/pages/schedule/new.vue) |
+| `/schedule/new` new | schedule / default | recovery/pending · pending | schedule-browser / desktop-sqlite | [app/components/schedule/ScheduleGroupNewScreen.vue](../../app/components/schedule/ScheduleGroupNewScreen.vue) |
 | `/schedule/process-library/form` new | process-library / new | page · 整页表单 | central-http / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
 | `/schedule/process-library/form?source=:versionId` new | process-library / copy-version | page · 整页表单 | central-http / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
 | `/schedule/process-library` view | schedule.process-library / default | page · 列表 | central-http / desktop-sqlite | [app/pages/schedule/process-library/index.vue](../../app/pages/schedule/process-library/index.vue) |

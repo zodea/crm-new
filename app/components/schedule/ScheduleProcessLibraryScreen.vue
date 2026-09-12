@@ -157,7 +157,7 @@ onDeactivated(() => {
             {{ row.taskCount }} 道
           </template>
           <template #usage="{ row }">
-            <span v-if="row.usageCount === null" class="text-11px text-ink-soft">引用数量未知 · 中央 WBS 尚未接通</span>
+            <span v-if="row.usageCount === null" class="text-11px text-ink-soft">当前身份无法读取引用情况</span>
             <span v-else-if="row.usageCount" class="text-11px text-ink-soft">已被 {{ row.usageCount }} 个排程引用 · 只读</span>
             <span v-else class="text-11px text-ink-faint">尚未引用 · 仍以新版本方式调整</span>
           </template>

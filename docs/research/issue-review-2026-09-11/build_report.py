@@ -81,6 +81,8 @@ def overview_screens():
         (424, '从客户进入同一项目', 'docs/design/evidence/issue-424/customer-project-1280.png'),
         (425, '回读施工合同与客户关系', 'docs/design/evidence/issue-425/customer-contract-1280.png'),
         (442, '维护施工阶段及报量映射', 'docs/design/evidence/issue-442/stages/stages-1440.png'),
+        (444, '排程分支：中央计划与阶段进度', 'docs/design/evidence/issue-444/contract/central-wbs-1440.png'),
+        (444, '从首页来源查看同一工序进度', 'docs/design/evidence/issue-444/provisional/home-source-readonly-1440.png'),
         (442, '核对月报基准并冻结申报', 'docs/design/evidence/issue-442/monthly/monthly-submitted-snapshot.png'),
         (441, '材料分支：对照原件人工核对送货', 'docs/design/evidence/issue-441/delivery-form-1440.png'),
         (436, '收入分支：保存后回读普通收款', 'docs/design/evidence/issue-436/receipt-detail-1440.png'),

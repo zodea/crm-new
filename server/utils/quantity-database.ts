@@ -4,6 +4,7 @@ import type { PreparedCoreMigration } from './core-migration-preparation'
 import { createRequire } from 'node:module'
 import initSqlJs from 'sql.js'
 import { runMigrations } from '../../app/lib/db/migrations'
+import { initializeScheduleSchema } from '../../app/lib/schedule/central-schema'
 
 let runtime: ReturnType<typeof initSqlJs> | null = null
 
@@ -54,6 +55,47 @@ async function initializeExternalBoqReferences(driver: TransactionDb) {
   finally { await driver.execute('PRAGMA foreign_keys = ON') }
 }
 
+async function initializeScheduleReferences(driver: TransactionDb) {
+  await driver.execute('PRAGMA foreign_keys = OFF')
+  try {
+    await driver.execute('BEGIN')
+    await driver.execute('CREATE TABLE quantity_contract_references (id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id))')
+    for (const name of ['schedule_groups', 'schedule_tasks', 'task_item_map', 'schedule_task_floor_plans']) {
+      const [table] = await driver.select<{ sql: string }>('SELECT sql FROM sqlite_master WHERE type=\'table\' AND name=?', [name])
+      const indexes = await driver.select<{ sql: string }>('SELECT sql FROM sqlite_master WHERE type=\'index\' AND tbl_name=? AND sql IS NOT NULL', [name])
+      const triggers = await driver.select<{ sql: string }>('SELECT sql FROM sqlite_master WHERE type=\'trigger\' AND tbl_name=? AND sql IS NOT NULL', [name])
+      const columns = await driver.select<{ name: string }>(`PRAGMA table_info(${name})`)
+      if (!table?.sql || columns.some(column => !/^[a-z_]+$/.test(column.name)))
+        throw new Error('WBS 中央外键结构与已知本地表不一致')
+      const sql = table.sql.replace(new RegExp(`\\b${name}\\b`), `${name}_central_next`)
+        .replace(/REFERENCES\s+contracts\s*\(\s*id\s*\)/gi, 'REFERENCES quantity_contract_references(id)')
+        .replace(/REFERENCES\s+boq_lines\s*\(\s*id\s*\)/gi, 'REFERENCES quantity_boq_references(id)')
+        .replace(/AND\s+provisional_qty\s+IS\s+NOT\s+NULL/gi, '')
+        .replace(/(template_snapshot_json"?\s+TEXT)\s+NOT\s+NULL/gi, '$1')
+      await driver.execute(sql)
+      const fields = columns.map(column => column.name).join(', ')
+      await driver.execute(`INSERT INTO ${name}_central_next (${fields}) SELECT ${fields} FROM ${name}`)
+      await driver.execute(`DROP TABLE ${name}`)
+      await driver.execute(`ALTER TABLE ${name}_central_next RENAME TO ${name}`)
+      for (const entry of [...indexes, ...triggers])
+        await driver.execute(entry.sql)
+    }
+    // 本地升级种的默认库不是中央正式事实；中央随后只投影授权版本。
+    await driver.execute('DELETE FROM schedule_process_library_tasks')
+    await driver.execute('DELETE FROM schedule_process_libraries')
+    await driver.execute('CREATE TABLE schedule_migration_evidence (entity_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, batch_id TEXT NOT NULL, source_graph_json TEXT NOT NULL, provisional_detail_status TEXT NOT NULL)')
+    await initializeScheduleSchema(driver)
+    if ((await driver.select('PRAGMA foreign_key_check')).length)
+      throw new Error('WBS 中央外键初始化未通过核对')
+    await driver.execute('COMMIT')
+  }
+  catch (cause) {
+    await driver.execute('ROLLBACK')
+    throw cause
+  }
+  finally { await driver.execute('PRAGMA foreign_keys = ON') }
+}
+
 /** 可重置中央内存数据库。候选副本不公开，提交仅交换连接，不重建领域 service。 */
 export async function createQuantityDatabase() {
   if (!runtime) {
@@ -69,6 +111,7 @@ export async function createQuantityDatabase() {
   try {
     await runMigrations(driver)
     await initializeExternalBoqReferences(driver)
+    await initializeScheduleReferences(driver)
   }
   catch (cause) {
     await driver.close()

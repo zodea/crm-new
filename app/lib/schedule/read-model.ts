@@ -1,3 +1,4 @@
+import type { QuantityMeasureTotal } from '../quantity/totals'
 import type { ScheduleDependencyInput, ScheduleDependencyType } from './planning'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
@@ -37,6 +38,8 @@ export interface ScheduleContractOption {
 }
 
 export interface ScheduleFloorPlanView {
+  quantitySnapshot?: (QuantityMeasureTotal & { unit: string, sources: { unitId: string, templateItemId: string, quantity: number | null, unit: string }[] }) | null
+  legacyQuantityDetailMissing?: boolean
   id: string
   taskId: string
   floorId: string
@@ -305,6 +308,10 @@ export async function loadScheduleBuildingCoverage(
               boq_line.building = building.code
               OR boq_line.building = building.name
             )
+            AND (SELECT COUNT(*) FROM buildings matched_building
+              WHERE matched_building.project_id = building.project_id
+                AND ${visibleCond('buildings', 'matched_building')}
+                AND (boq_line.building = matched_building.code OR boq_line.building = matched_building.name)) = 1
         )
      ORDER BY building.sort_order, building.code, building.id`,
     [projectId, projectId, contractId],
@@ -533,6 +540,7 @@ export async function loadScheduleProject(
     let actualFinish: string | null = null
     if (task.has_qty && task.stage_id) {
       const [progress] = await loadQuantityStageProgress(db, projectId, {
+        currentApplicabilityOnly: true,
         stageIds: [task.stage_id],
         buildingIds,
         itemIds: mappedItems.map(item => item.item_id),

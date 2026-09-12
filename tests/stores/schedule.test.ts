@@ -8,6 +8,13 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
+async function addProvisionalBuilding(buildingId: string, floorId: string, itemId: string) {
+  await mem.execute('INSERT INTO house_type_templates (id, project_id, code, name) VALUES (?, ?, ?, ?)', [`template-${buildingId}`, 'p1', buildingId, `${buildingId}户型`])
+  await mem.execute('INSERT INTO rooms (id, template_id, code, name) VALUES (?, ?, ?, ?)', [`room-${buildingId}`, `template-${buildingId}`, 'whole', '整户'])
+  await mem.execute('INSERT INTO units (id, floor_id, house_type_template_id, code, name) VALUES (?, ?, ?, ?, ?)', [`unit-${buildingId}`, floorId, `template-${buildingId}`, '1', '一户'])
+  await mem.execute('INSERT INTO house_type_template_items (id, room_id, item_id, provisional_qty) VALUES (?, ?, ?, ?)', [`line-${buildingId}`, `room-${buildingId}`, itemId, 0])
+}
+
 // 此套件验证桌面 SQLite WBS 适配；浏览器来源在独立中央库套件验证。
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
@@ -110,6 +117,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
       task: { plannedFinish: '2026-07-28' },
       floorPlans: [],
       dependency: { predecessorId: manualTask.id, lagDays: 2 },
+      disableDependencyIds: [store.snapshot!.dependencies[0]!.id],
     }, '2026-07-01')).rejects.toThrow('dependency write failed')
     expect(await mem.select<{ planned_finish: string }>(
       `SELECT planned_finish FROM schedule_tasks WHERE id = ?`,
@@ -236,6 +244,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
     await store.loadBuildings('p1')
     expect(store.buildings.map(building => building.id)).toEqual(['b1', 'b2'])
     const provisionalPreview = await store.previewProvisionalScope(['b1', 'b2'])
+    expect(provisionalPreview.quantities).toEqual([expect.objectContaining({ unit: '', unitMissing: true, value: null, knownValue: null, completeness: 'partial' })])
     expect(provisionalPreview.buildings).toEqual([
       expect.objectContaining({
         buildingId: 'b1',
@@ -266,7 +275,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
       tasks: [
         { templateKey: waterproof.key, enabled: true, durationDays: 8, anchorStart: null },
       ],
-    }, '2026-07-01')).rejects.toThrow(/1栋.*防水.*有效暂估量/)
+    }, '2026-07-01')).rejects.toThrow(/b1.*缺少户/)
 
     const groupId = await store.createGroup({
       projectId: 'p1',
@@ -428,6 +437,8 @@ describe('schedule store：排程唯一 action 写路径', () => {
     await store.loadProcessLibraryTasks(libraryId)
     const settingOut = store.processTasks.find(task => task.key === 'setting-out')!
     const waterproof = store.processTasks.find(task => task.key === 'waterproof')!
+    await mem.execute('INSERT INTO items (id, project_id, code, name, trade, unit) VALUES (\'i-other\', \'p1\', \'OTHER\', \'其他有效分项\', \'综合\', \'m\')')
+    await addProvisionalBuilding('b1', 'f1', 'i-other')
     await mem.execute(`
       INSERT INTO house_type_templates (id, project_id, code, name)
       VALUES ('template-b2-add', 'p1', 'B-ADD', 'B户型')
@@ -552,6 +563,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
   })
 
   it('建组保留并软禁用冲突前置关系，未置灰时拒绝错序日期', async () => {
+    await addProvisionalBuilding('b2', 'f2', 'i-wp-wall')
     const store = useScheduleStore()
     await store.loadProcessLibraries()
     const libraryId = store.processLibraries[0]!.id
@@ -656,7 +668,7 @@ describe('schedule store：排程唯一 action 写路径', () => {
 
     await expect(store.updateDependency(first!.id, second!.id, 0, '2026-07-01'))
       .rejects
-      .toThrow(/计划开始必须早于/)
+      .toThrow(/计划开始不得晚于/)
     await expect(store.updateDependency(third!.id, first!.id, 366, '2026-07-01'))
       .rejects
       .toThrow(/-365.*365/)

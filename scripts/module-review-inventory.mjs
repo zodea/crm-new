@@ -38,6 +38,22 @@ export const ADAPTERS = {
       ['server/utils/supplier-credential-service.ts', 'ports.transact'],
     ],
   },
+  'schedule-browser': {
+    read: '正式项目 WBS 经中央 Repository；首页同源只读，demo 经服务端授权后沿隔离只读适配',
+    write: '独立正式 WBS 经中央 command 建组、调期、依赖、楼层、基线与任务维护；首页和演示只读',
+    storage: '与工程量共用中央验证候选和事务；生产持久化仍待 #416',
+    sources: [
+      ['app/stores/schedule.ts', 'repositories().schedule'],
+      ['server/utils/schedule-service.ts', 'createScheduleService'],
+      ['app/lib/home/project-source.ts', 'options.schedule'],
+    ],
+  },
+  'schedule-binding-pending': {
+    read: '浏览器直达显示新绑定尚未接通，引导返回排程核对现有分组',
+    write: '新的合同绑定由 #445 接通，当前入口不修改合同外键或旧库',
+    storage: '不产生新绑定；已迁入历史仍在中央 WBS 读取',
+    sources: [['app/components/schedule/ScheduleContractBindingScreen.vue', '新的合同绑定尚未接通']],
+  },
   'simulation': {
     read: '合成导入演示',
     write: '模拟成功/首次失败，无业务记录写入',
@@ -104,6 +120,10 @@ export function resolveAdapter(surface, host) {
     return host === 'browser' ? 'central-http' : 'unsupported'
   if (route === '/schedule/process-library' || route.startsWith('/schedule/process-library/'))
     return host === 'browser' ? 'central-http' : 'desktop-sqlite'
+  if (host === 'browser' && ['/', '/schedule', '/schedule/:pid', '/schedule/new'].includes(route))
+    return 'schedule-browser'
+  if (host === 'browser' && route === '/schedule/:pid/bind/:gid')
+    return 'schedule-binding-pending'
   if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
     return 'central-http'
   if (route === '/import/mapping/:entity') {
@@ -297,6 +317,8 @@ export const SUBVIEWS = [
   group({ route: '/subcontract/payroll/new' }, 'app/components/payroll/PayrollDraftFormPage.vue', ['basic', 'source', 'members', 'audit'].map(key => view(`section/${key}`, `'${key}'`, 'form-section'))),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', mounted('workspace', ['ScheduleBoard', 'ScheduleTaskDialog', 'ScheduleDependencyDialog'])),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleTimeline.vue', ['wbs', 'gantt'].map(key => view(`workspace/mobile/${key}`, `'${key}'`, 'matrix'))),
+  group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', [view('recovery/pending', 'store.pendingCommand', 'recovery-panel', '未确认原提交结果；弹窗内另提供可达的原提交恢复入口')]),
+  group({ route: '/schedule/new' }, 'app/components/schedule/ScheduleGroupNewScreen.vue', [view('recovery/pending', 'ScheduleCommandRecovery', 'recovery-panel', '保留确认步骤及原命令；恢复前禁止形成新提交')]),
   group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/TargetCostDetailScreen.vue', [...tabs(['items', 'comparison']), ...mounted('table', ['TargetCostItemEditor', 'TargetCostItemTable', 'TargetCostComparisonTable'])]),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryRecognitionScreen.vue', [...['queue', 'source', 'review'].map(key => view(`pane/${key}`, `#${key}`, 'pane')), view('duplicates', 'DeliveryDuplicateReviewPanel', 'review-panel')]),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryReviewPanel.vue', mounted('pane/review', ['DeliveryDocumentFields', 'DeliveryItemsEditor'])),

@@ -100,6 +100,8 @@ export interface OwnerDocumentListRecord {
 }
 
 export interface OwnerDocumentBoqLine {
+  unitType?: string | null
+  floorZone?: string | null
   id: string
   itemName: string
   unit: string

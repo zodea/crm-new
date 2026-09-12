@@ -38,6 +38,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   delivery_records: '送货归档、原件与修订',
   quantity_projects: '工程量区域、模板与完成',
   process_libraries: '标准工序库与不可变版本',
+  wbs_projects: '项目 WBS 与完整计划历史',
   supplier_credentials: '分供方证照、原件与核验凭证',
   owner_documents: '甲方变洽签、月度报量、验收保修与最终结算',
   workers: '工人',
