@@ -164,17 +164,17 @@ export function createProjectReadTestInstance(
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
 
   // 未富化的同一项目事实快照；关联读面不得经 list/detail 回调客户读取。
-  function facts(sessionId?: string | null) {
+  function facts(sessionId?: string | null, requireRead = true) {
     const scenario = scenarios.get(keyFor(sessionId)) ?? 'ready'
-    if (scenario === 'forbidden')
+    if (scenario === 'forbidden' && requireRead)
       throw repositoryProblem('forbidden', '无项目查看权限', false)
     if (scenario === 'unavailable')
       throw repositoryProblem('unavailable', '中央后台测试实例暂时不可用', true)
     const capabilities = resolveCapabilities(sessionId)
-    if (!capabilities.includes('project:list:read'))
+    if (requireRead && !capabilities.includes('project:list:read'))
       throw repositoryProblem('forbidden', '无项目查看权限', false)
     const migrationSnapshot = resolveMigrationSnapshot(sessionId)
-    const rows = scenario === 'ready'
+    const rows = scenario === 'ready' || scenario === 'forbidden'
       ? [
           ...resolveFormalRows(sessionId),
           ...projectRowsFromMigration(migrationSnapshot),
@@ -185,7 +185,7 @@ export function createProjectReadTestInstance(
       capabilities,
       rows,
       asOf: latestAsOf(rows),
-      sourceVersion: scenario === 'ready'
+      sourceVersion: scenario === 'ready' || scenario === 'forbidden'
         ? `${SOURCE_VERSION}:${resolveFormalSourceVersion(sessionId)}:${
           migrationSnapshot.authority === 'central'
             ? migrationSnapshot.activeBatchId ?? 'migration-central'
@@ -202,7 +202,9 @@ export function createProjectReadTestInstance(
   }
 
   return {
-    facts,
+    facts: (sessionId?: string | null) => facts(sessionId),
+    /** 领域事务的完整资格快照。不得直接作为无权限用户的项目目录返回。 */
+    identities: (sessionId?: string | null) => facts(sessionId, false),
     reset(next: ProjectReadTestScenario, sessionId?: string | null) {
       const key = keyFor(sessionId)
       if (next === 'ready')

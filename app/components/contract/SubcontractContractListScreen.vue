@@ -156,6 +156,7 @@ useTabTitle('分包合同')
 
 <template>
   <div class="min-w-0 space-y-3" data-testid="subcontract-contract-list">
+    <TargetCostSourceReturn />
     <header class="panel px-4 py-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -170,25 +171,25 @@ useTabTitle('分包合同')
     </header>
     <StatePanel v-if="parsedQuery.problem" kind="error" title="分包合同查询条件无效" :description="parsedQuery.problem.message" action-label="清除无效条件" @action="router.replace({ query: {} })" />
     <section v-else class="panel p-3" aria-label="分包合同筛选">
-      <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-        <input v-model="search" class="field-input" placeholder="搜索名称或编号" aria-label="搜索分包合同">
-        <select class="field-input" :value="query.projectId ?? ''" aria-label="筛选项目" @change="patchQuery({ projectId: ($event.target as HTMLSelectElement).value, page: 1 })">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
+        <input v-model="search" class="field-input min-w-0" placeholder="搜索名称或编号" aria-label="搜索分包合同">
+        <select class="field-input min-w-0" :value="query.projectId ?? ''" aria-label="筛选项目" @change="patchQuery({ projectId: ($event.target as HTMLSelectElement).value, page: 1 })">
           <option value="">
             全部项目
           </option><option v-for="item in page?.summary.projects ?? []" :key="item.id" :value="item.id">
             {{ item.label }}
           </option>
         </select>
-        <select class="field-input" :value="query.supplierId ?? ''" aria-label="筛选分供方" @change="patchQuery({ supplierId: ($event.target as HTMLSelectElement).value, page: 1 })">
+        <select class="field-input min-w-0" :value="query.supplierId ?? ''" aria-label="筛选分供方" @change="patchQuery({ supplierId: ($event.target as HTMLSelectElement).value, page: 1 })">
           <option value="">
             全部分供方
           </option><option v-for="item in page?.summary.suppliers ?? []" :key="item.id" :value="item.id">
             {{ item.label }}
           </option>
         </select>
-        <KitMultiSelectFilter :model-value="selectedSubKinds" label="分包类别" aria-label="筛选分包类别" :options="subKindOptions" full-width @update:model-value="patchQuery({ subKind: $event, page: 1 })" />
-        <KitMultiSelectFilter :model-value="selectedStatuses" label="状态" aria-label="筛选状态" :options="statusOptions" full-width @update:model-value="patchQuery({ status: $event, page: 1 })" />
-        <select class="field-input" :value="query.pageSize" aria-label="每页数量" @change="patchQuery({ pageSize: Number(($event.target as HTMLSelectElement).value), page: 1 })">
+        <KitMultiSelectFilter :model-value="selectedSubKinds" label="分包类别" aria-label="筛选分包类别" :options="subKindOptions" :min-width="0" full-width @update:model-value="patchQuery({ subKind: $event, page: 1 })" />
+        <KitMultiSelectFilter :model-value="selectedStatuses" label="状态" aria-label="筛选状态" :options="statusOptions" :min-width="0" full-width @update:model-value="patchQuery({ status: $event, page: 1 })" />
+        <select class="field-input min-w-0" :value="query.pageSize" aria-label="每页数量" @change="patchQuery({ pageSize: Number(($event.target as HTMLSelectElement).value), page: 1 })">
           <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">
             每页 {{ size }} 条
           </option>

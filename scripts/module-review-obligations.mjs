@@ -69,9 +69,9 @@ const wbsCentralEvidence = {
 }
 const bindingCentralEvidence = {
   reference: 'docs/design/evidence/issue-445/README.md',
-  commit: null,
+  commit: '59d5c735414e04b90e2cba7f2f750b6151e697bc',
   recency: 'current-run',
-  scope: '与本工作单元一同提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署',
+  scope: '已独立提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署',
 }
 
 export const OBLIGATION_STATUS_LABELS = {
@@ -409,9 +409,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(349), 'docs/rewrite/pages/target-cost.md'],
     ownerIssue: 412,
     caseIds: targetCostCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '目标成本既有数据与正式保存尚未闭合中央 Repository/HTTP/command；不能保留并行正式来源或把付款结算成本回归外推到目标成本。',
+    status: 'partial',
+    evidence: [{ reference: 'docs/design/evidence/issue-412-target-cost/README.md', commit: null, recency: 'current-run', scope: '预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；本单元固定提交待登记' }],
+    remaining: '预算中央链已完成本轮浏览器运行与独立审查，完整检查及固定提交按证据目录登记；不提前取得固定提交完成态。完整工资、材料和财务来源的消费及生产关口继续分项验收。',
   },
   {
     id: 'PRG-08',

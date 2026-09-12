@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TargetCostListRow } from '~/lib/target-cost/list'
+import type { DataOriginDTO } from '~/types/read-model'
+import { targetCostLocation } from '~/lib/target-cost/navigation'
+import { targetCostProjectTarget } from '~/lib/target-cost/project-navigation'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   rows: readonly TargetCostListRow[]
   loading: boolean
   page: number
   pageSize: number
   total: number
   filtered: boolean
-}>()
+  origin?: DataOriginDTO
+  returnTo?: string
+  canWrite?: boolean
+  canReadProject?: boolean
+}>(), { canWrite: true, canReadProject: true })
 
 const emit = defineEmits<{
   pageChange: [payload: { page: number, pageSize: number }]
@@ -38,6 +45,19 @@ const rowActions = [
   { key: 'edit', label: '编辑版本', icon: 'i-lucide-square-pen' },
   { key: 'delete', label: '删除', icon: 'i-lucide-trash-2', tone: 'danger' as const },
 ]
+function projectTarget(row: TargetCostListRow) {
+  if (!props.origin)
+    return row.projectId ? `/project/${encodeURIComponent(row.projectId)}` : null
+  return targetCostProjectTarget({ projectId: row.projectId, projectName: row.projectName, origin: props.origin, allowed: props.canReadProject, returnTo: props.returnTo })
+}
+
+function actions(row: TargetCostListRow) {
+  if (!props.canWrite)
+    return rowActions.filter(action => action.key === 'detail')
+  if (row.deletedAt)
+    return [{ key: 'detail', label: '查看详情', icon: 'i-lucide-file-text' }, { key: 'restore', label: '恢复', icon: 'i-lucide-undo-2' }]
+  return rowActions
+}
 </script>
 
 <template>
@@ -53,18 +73,18 @@ const rowActions = [
     @page-change="emit('pageChange', $event)"
   >
     <template #name="{ row }">
-      <NuxtLink :to="`/project/target-cost/${row.id}`" class="cell--link" :title="row.name">
-        {{ row.name }}
+      <NuxtLink :to="origin ? targetCostLocation(row.id, origin, returnTo) : `/project/target-cost/${row.id}`" class="cell--link" :title="row.name">
+        {{ row.name || '未填写版本名' }}
       </NuxtLink>
     </template>
     <template #project="{ row }">
-      <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
+      <NuxtLink v-if="projectTarget(row)" :to="projectTarget(row)!" class="cell--link">
         {{ row.projectName || row.projectId }}
       </NuxtLink>
-      <span v-else class="text-ink-faint">未关联项目</span>
+      <span v-else class="text-ink-faint">{{ row.projectId ? row.projectName || '已关联项目' : '未关联项目' }}</span>
     </template>
     <template #baseline="{ row }">
-      <span v-if="row.isBaseline" class="chip-brand">当前基线</span>
+      <span v-if="row.isBaseline" class="chip-brand">{{ row.status === 'submitted' && !row.deletedAt ? '当前基线' : '草稿/已删基线' }}</span>
       <span v-else class="chip bg-surface-3 text-ink-faint">历史/非基线</span>
     </template>
     <template #profitRate="{ row }">
@@ -79,7 +99,7 @@ const rowActions = [
     </template>
     <template #action="{ row }">
       <RowActionMenu
-        :items="rowActions"
+        :items="actions(row)"
         :label="`${row.name}目标成本操作`"
         @select="emit('action', $event, row)"
       />

@@ -54,6 +54,12 @@ export const ADAPTERS = {
     storage: '原中央 WBS 分组与冻结比较审计；生产持久化仍待 #416',
     sources: [['app/components/schedule/ScheduleContractBindingScreen.vue', 'CentralScheduleContractBindingScreen'], ['app/lib/schedule/central-binding.ts', 'bindCentralScheduleContract']],
   },
+  'target-cost-browser': {
+    read: '预算专用中央 Repository；版本头、科目、附件和实际来源完整度分别读取',
+    write: '固定读取依据的版本头、整份明细、基线切换及删除恢复命令；当前单元实施中，逐动作待验收',
+    storage: '现有中央工作区 SQLite 验证实例与受控迁移；生产持久化仍待 #416',
+    sources: [['app/components/target-cost/TargetCostListScreen.vue', 'CentralTargetCostListScreen'], ['server/utils/target-cost-service.ts', 'createTargetCostService']],
+  },
   'simulation': {
     read: '合成导入演示',
     write: '模拟成功/首次失败，无业务记录写入',
@@ -124,6 +130,8 @@ export function resolveAdapter(surface, host) {
     return 'schedule-browser'
   if (host === 'browser' && route === '/schedule/:pid/bind/:gid')
     return 'schedule-binding-browser'
+  if (route === '/project/target-cost' || route.startsWith('/project/target-cost/'))
+    return host === 'browser' ? 'target-cost-browser' : 'desktop-sqlite'
   if (route === '/contract/boq/building-evidence')
     return 'central-http'
   if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
@@ -323,7 +331,29 @@ export const SUBVIEWS = [
   group({ route: '/schedule/new' }, 'app/components/schedule/ScheduleGroupNewScreen.vue', [view('recovery/pending', 'ScheduleCommandRecovery', 'recovery-panel', '保留确认步骤及原命令；恢复前禁止形成新提交')]),
   group({ route: '/schedule/:pid/bind/:gid' }, 'app/components/schedule/CentralScheduleContractBindingScreen.vue', [view('binding/preview', 'ScheduleBindingReview', 'review-panel', '浏览器中央楼栋覆盖、冻结数量及差异复核；桌面保留原适配'), view('binding/pending', 'ScheduleCommandRecovery', 'recovery-panel', '原提交未明确前禁止新增绑定'), view('binding/history', 'legacyDetailMissing', 'detail', '旧绑定历史缺口不由当前来源补造')]),
   group({ route: '/contract/boq/building-evidence' }, 'app/components/boq/BoqBuildingEvidenceScreen.vue', [view('evidence/form', '保存楼栋证据', 'form-section', '仅已确认导入基准行可更正'), view('evidence/source', '绑定时的原楼层计划', 'detail', '只读来源模式与原楼层计划稳定关系返回'), view('evidence/pending', 'ScheduleCommandRecovery', 'recovery-panel', '按原提交及清单行恢复，不串用其他行草稿')]),
-  group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/TargetCostDetailScreen.vue', [...tabs(['items', 'comparison']), ...mounted('table', ['TargetCostItemEditor', 'TargetCostItemTable', 'TargetCostComparisonTable'])]),
+  group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/CentralTargetCostDetailScreen.vue', [
+    ...tabs(['items', 'comparison']).map(item => ({ ...item, condition: 'browser=中央详情；tauri=既有本地详情', sources: [['app/components/target-cost/CentralTargetCostDetailScreen.vue', item.anchor], ['app/components/target-cost/NativeTargetCostDetailScreen.vue', item.anchor]] })),
+    ...mounted('table', ['TargetCostItemEditor', 'TargetCostItemTable', 'TargetCostComparisonTable']).map(item => ({ ...item, condition: 'browser=中央详情；tauri=既有本地详情', sources: [['app/components/target-cost/CentralTargetCostDetailScreen.vue', item.anchor === 'TargetCostComparisonTable' ? 'CentralTargetCostComparison' : item.anchor], ['app/components/target-cost/NativeTargetCostDetailScreen.vue', item.anchor]] })),
+  ]),
+  group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/CentralTargetCostDetailScreen.vue', [
+    view('files/originals', 'TargetCostAttachments', 'files', '仅浏览器中央详情；旧缺正文保留缺口'),
+    view('history/version', '预算版本历史', 'detail', '仅浏览器中央详情；版本头、明细及附件审计'),
+    view('recovery/pending', 'TargetCostCommandState', 'recovery-panel', '原科目提交与读取依据独立保留；不能借另一版本恢复'),
+  ], ['browser']),
+  group({ route: '/project/target-cost' }, 'app/components/target-cost/CentralTargetCostListScreen.vue', [view('recovery/pending', 'TargetCostCommandState', 'recovery-panel', '仅当前身份、来源及可见预算的删除恢复原提交')], ['browser']),
+  group({ route: '/project/target-cost/form/:id?' }, 'app/components/target-cost/CentralTargetCostFormScreen.vue', [
+    view('section/basic-and-amount', 'TargetCostFormFields', 'form-section', '新建 draftKey 或编辑版本各自保稿；税价独立确认'),
+    view('files/originals', 'TargetCostAttachments', 'files', '完整正文随版本头一起提交；未知大小与缺原件分别呈现'),
+    view('recovery/pending', 'TargetCostCommandState', 'recovery-panel', '发送前持久保存原内容；结果未知只能恢复原命令'),
+  ], ['browser']),
+  group({ route: '/project/:id' }, 'app/pages/project/[id].vue', [view('return/target-cost', 'TargetCostProjectReturn', 'source-return', '预算及项目稳定身份复验后返回原版本；demo沿既有隔离只读源')], ['browser']),
+  ...[
+    ['/contract/material', 'app/components/contract/MaterialContractListScreen.vue'],
+    ['/contract/subcontract', 'app/components/contract/SubcontractContractListScreen.vue'],
+    ['/contract/other-expense', 'app/components/contract/AuxiliaryContractListScreen.vue'],
+    ['/contract/other-settlement', 'app/components/other-settlement/OtherSettlementListScreen.vue'],
+  ].map(([route, source]) => group({ route }, source, [view('return/target-cost', 'TargetCostSourceReturn', 'source-return', '明确预算、项目与来源返回关系；不接受任意 returnTo')], ['browser'])),
+  group({ route: '/subcontract/:kind', kind: 'sub_settlement' }, 'app/components/owner-document/OwnerDocumentListScreen.vue', [view('return/target-cost', 'TargetCostSourceReturn', 'source-return', '仅中央分包结算来源返回')], ['browser']),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryRecognitionScreen.vue', [...['queue', 'source', 'review'].map(key => view(`pane/${key}`, `#${key}`, 'pane')), view('duplicates', 'DeliveryDuplicateReviewPanel', 'review-panel')]),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryReviewPanel.vue', mounted('pane/review', ['DeliveryDocumentFields', 'DeliveryItemsEditor'])),
   group({ route: '/finance/invoice' }, 'app/components/invoice/InvoiceWorkspaceScreen.vue', [...['queue', 'source', 'review'].map(key => view(`pane/${key}`, `#${key}`, 'pane')), view('manual-entry', 'InvoiceManualEntryDialog', 'dialog')]),

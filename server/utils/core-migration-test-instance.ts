@@ -49,6 +49,7 @@ import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
 import { prepareSupplierCredentialMigration } from './supplier-credential-migration'
+import { planBudgetMigration } from './target-cost-migration'
 import { planWbsMigration } from './wbs-migration'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -105,6 +106,9 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  target_cost_versions: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true },
+  ],
   supplier_credentials: [
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
   ],
@@ -829,6 +833,45 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       }
     }
 
+    for (const entity of plannedEntities.filter(row => row.entityType === 'target_cost_versions')) {
+      try {
+        // 整批验证同一项目的当前版本唯一性，不能将每版单独通过后交给 SQL 报错。
+        const plan = planBudgetMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities }, new Map())
+        const graph = plan.incoming.find(row => row.entityId === entity.id)!.graph
+        const missing = graph.files.filter(file => !graph.payloads.some(payload => payload.file_ref_id === file.id)).length
+        if (missing) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'target_cost_versions',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'budgetGraphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: String(missing),
+            expectedValue: null,
+            actualValue: missing,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${missing} 份历史预算附件缺少原件正文；保留原元数据和缺件状态，不读取旧本地路径或伪造文件。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'target_cost_versions',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'budgetGraphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '预算完整来源图校验失败',
+        }))
+      }
+    }
+
     for (const [entityType, expected] of Object.entries(command.source.expectations?.counts ?? {})) {
       const actual = steps.find(step => step.entityType === entityType)?.importableCount ?? 0
       if (actual !== expected) {
@@ -1147,6 +1190,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
     if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+      || batch.dto.issues.some(item => item.entityType === 'target_cost_versions' && item.field === 'budgetGraphJson' && item.metricKey === 'apply-failed')
       || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
     }

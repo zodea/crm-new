@@ -195,6 +195,9 @@ const taxpayerEditor = createTaxpayerEditorState({
     success('纳税人核验记录已保存；主档其他输入仍保留')
   },
 })
+
+// 浏览器预算有独立中央表单；不启动此页的本地记录、附件或保存流程。
+const centralTargetCost = props.kind === 'target_cost' && !isDesktopRuntime()
 let taxpayerTrigger: HTMLElement | null = null
 async function openTaxpayerEditor() {
   taxpayerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -728,27 +731,33 @@ async function leaveForm() {
   await navigateTo(returnPath.value)
 }
 
-useTabCloseGuard(async () => {
-  if (taxpayerEditor.busy.value)
-    return false
-  if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
-    return true
+if (!centralTargetCost) {
+  useTabCloseGuard(async () => {
+    if (taxpayerEditor.busy.value)
+      return false
+    if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
+      return true
 
-  const leave = await confirm({
-    variant: 'simple',
-    title: '放弃修改',
-    message: '当前表单还有未保存内容，确认离开？',
-    confirmLabel: '放弃修改',
+    const leave = await confirm({
+      variant: 'simple',
+      title: '放弃修改',
+      message: '当前表单还有未保存内容，确认离开？',
+      confirmLabel: '放弃修改',
+    })
+    return leave
   })
-  return leave
-})
+}
 
 onMounted(() => {
+  if (centralTargetCost)
+    return
   desktopAttachmentPicker.value = isDesktopRuntime()
   void initialize()
 })
 
 onActivated(() => {
+  if (centralTargetCost)
+    return
   taxpayerEditor.activate()
   const target = `${props.kind}:${routeId.value ?? 'new'}`
   if (lastInitializedTarget && target !== lastInitializedTarget)
@@ -764,7 +773,9 @@ watch(routeSupplierCategory, () => {
 </script>
 
 <template>
+  <CentralTargetCostFormScreen v-if="centralTargetCost" />
   <EntityFormShell
+    v-else
     :title="title"
     :subtitle="kind === 'supplier' ? undefined : '草稿可暂存不完整内容；提交时校验必填、关联和金额规则。'"
     :back-label="backLabel"

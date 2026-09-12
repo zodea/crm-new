@@ -333,6 +333,10 @@ export function createMaterialContractCommandTestInstance(options: Options = {})
     rows(sessionId?: string | null) {
       return [...stateFor(sessionId).contracts.values()].map(row => toRow(row, sessionId))
     },
+    /** 预算对比须保留原金额空值；调用方先经本领域 read 授权。 */
+    budgetRows(sessionId?: string | null) {
+      return [...stateFor(sessionId).contracts.values()].map(row => ({ ...toRow(row, sessionId), amount: row.draft.amount ?? null }))
+    },
     facts(sessionId?: string | null): MaterialContractFactSources {
       const state = stateFor(sessionId)
       const files = [...state.contracts.values()].flatMap(stored => stored.attachments

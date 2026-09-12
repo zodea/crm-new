@@ -9,7 +9,7 @@ import { COST_CATEGORIES } from '~/lib/project/cost-control'
 
 type EditableTargetCostItem = TargetCostItemDraft & Record<string, unknown>
 
-defineProps<{
+const props = defineProps<{
   saving: boolean
 }>()
 
@@ -39,7 +39,20 @@ const columns: KitEditGridColumn<EditableTargetCostItem>[] = [
   { key: 'unitPrice', label: '单价', type: 'number', width: 130 },
   { key: 'amount', label: '目标金额', type: 'number', required: true, width: 142 },
   { key: 'note', label: '备注', minWidth: 180 },
+  { key: 'order', label: '顺序', type: 'readonly', width: 110 },
 ]
+
+function moveRow(index: number, offset: number) {
+  const destination = index + offset
+  if (props.saving || destination < 0 || destination >= items.value.length)
+    return
+  const next = [...items.value]
+  const [row] = next.splice(index, 1)
+  if (!row)
+    return
+  next.splice(destination, 0, row)
+  items.value = next
+}
 
 function validateNumber(
   errors: KitEditGridValidationError[],
@@ -86,7 +99,17 @@ async function validate() {
   return errors
 }
 
-defineExpose({ validate })
+async function setServerErrors(fields: Record<string, string | string[]>) {
+  const errors = Object.entries(fields).flatMap(([path, message]) => {
+    const match = path.match(/^items\.(\d+)\.(category|itemName|qty|unitPrice|amount|unit|note)$/)
+    return match ? [{ row: Number(match[1]), key: match[2]!, message: Array.isArray(message) ? message.join('；') : message }] : []
+  })
+  grid.value?.setErrors(errors)
+  if (errors.length)
+    await grid.value?.focusFirstError()
+}
+
+defineExpose({ validate, setServerErrors })
 </script>
 
 <template>
@@ -119,7 +142,19 @@ defineExpose({ validate })
         :row-ops="['add', 'copy', 'del']"
         :summary="[{ key: 'amount', agg: 'sum' }]"
         :min-rows="6"
-      />
+        :readonly="saving"
+      >
+        <template #cell-order="{ rowIndex }">
+          <div class="flex items-center gap-2 px-2">
+            <button type="button" class="border-0 bg-transparent p-0 text-12px text-brand disabled:opacity-40" :disabled="saving || rowIndex === 0" :aria-label="`第 ${rowIndex + 1} 行上移`" @click="moveRow(rowIndex, -1)">
+              上移
+            </button>
+            <button type="button" class="border-0 bg-transparent p-0 text-12px text-brand disabled:opacity-40" :disabled="saving || rowIndex === items.length - 1" :aria-label="`第 ${rowIndex + 1} 行下移`" @click="moveRow(rowIndex, 1)">
+              下移
+            </button>
+          </div>
+        </template>
+      </KitEditGrid>
     </div>
   </section>
 </template>

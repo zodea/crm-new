@@ -549,6 +549,7 @@ onActivated(async () => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-3">
+    <TargetCostSourceReturn v-if="kind === 'sub_settlement' && centralReadOnly" />
     <div v-if="journeyReturnTo" class="flex">
       <NuxtLink :to="journeyReturnTo" class="btn-ghost text-12px">
         <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回来源详情

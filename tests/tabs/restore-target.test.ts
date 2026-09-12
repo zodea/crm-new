@@ -129,9 +129,17 @@ describe('页签恢复重新读取当前权威目标', () => {
     expect(await validator('projectList', 'get', vi.fn())(descriptor('/contract/record-1'))).toMatchObject({ state: 'not-connected' })
   })
 
-  it.each(['/project/target-cost/record-1', '/schedule/record-1'])('只读稳定详情 %s 没有目标读取入口时保留明确原因', async (path) => {
+  it.each(['/schedule/record-1'])('只读稳定详情 %s 没有目标读取入口时保留明确原因', async (path) => {
     expect(inspectRestorableTabPath(path)).not.toBeNull()
     expect(await validator('projectList', 'get', vi.fn())(descriptor(path))).toMatchObject({ state: 'not-connected' })
+  })
+
+  it('中央预算详情已接入，但缺目标成本读取能力时不发出恢复读取', async () => {
+    const path = '/project/target-cost/record-1?origin=real'
+    const read = vi.fn()
+    expect(inspectRestorableTabPath(path)).not.toBeNull()
+    expect(await validator('targetCosts', 'detail', read)(descriptor(path))).toMatchObject({ state: 'forbidden' })
+    expect(read).not.toHaveBeenCalled()
   })
 
   it('后台读取期间权限或演示开关改变时不应用已失权结果', async () => {

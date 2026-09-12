@@ -86,6 +86,7 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
 
 <template>
   <div ref="listRoot" class="flex min-w-0 flex-col gap-3" data-testid="auxiliary-list">
+    <TargetCostSourceReturn />
     <header class="panel flex min-w-0 flex-wrap items-center gap-2 p-3">
       <h1 class="m-0 mr-auto text-15px font-800">
         {{ AUXILIARY_LABELS[kind] }}

@@ -101,8 +101,8 @@
   "counts": {
     "productionRoutes": 140,
     "rootVariants": 196,
-    "surfaces": 600,
-    "environmentCases": 1067,
+    "surfaces": 616,
+    "environmentCases": 1083,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -208,6 +208,21 @@
         {
           "path": "app/lib/schedule/central-binding.ts",
           "anchor": "bindCentralScheduleContract"
+        }
+      ]
+    },
+    "target-cost-browser": {
+      "read": "预算专用中央 Repository；版本头、科目、附件和实际来源完整度分别读取",
+      "write": "固定读取依据的版本头、整份明细、基线切换及删除恢复命令；当前单元实施中，逐动作待验收",
+      "storage": "现有中央工作区 SQLite 验证实例与受控迁移；生产持久化仍待 #416",
+      "sources": [
+        {
+          "path": "app/components/target-cost/TargetCostListScreen.vue",
+          "anchor": "CentralTargetCostListScreen"
+        },
+        {
+          "path": "server/utils/target-cost-service.ts",
+          "anchor": "createTargetCostService"
         }
       ]
     },
@@ -1243,7 +1258,7 @@
       "issues": [
         408
       ],
-      "surfaces": 19
+      "surfaces": 20
     },
     {
       "code": "master-data",
@@ -1275,7 +1290,7 @@
       "issues": [
         409
       ],
-      "surfaces": 129
+      "surfaces": 131
     },
     {
       "code": "aux-contract",
@@ -1283,7 +1298,7 @@
       "issues": [
         409
       ],
-      "surfaces": 28
+      "surfaces": 30
     },
     {
       "code": "owner-document",
@@ -1299,7 +1314,7 @@
       "issues": [
         410
       ],
-      "surfaces": 31
+      "surfaces": 32
     },
     {
       "code": "material",
@@ -1373,7 +1388,7 @@
       "issues": [
         412
       ],
-      "surfaces": 33
+      "surfaces": 43
     },
     {
       "code": "import-export",
@@ -8229,6 +8244,38 @@
       "routeEvidenceId": "E-0F4B8BA52B95"
     },
     {
+      "id": "S-EA89E1A972BB",
+      "route": "/contract/material",
+      "routePattern": "/contract/material",
+      "domain": "core-contract",
+      "kind": "material",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "按现有路由和 capability；明确预算、项目与来源返回关系；不接受任意 returnTo",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/contract/material/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/contract/MaterialContractListScreen.vue",
+          "anchor": "TargetCostSourceReturn"
+        }
+      ],
+      "issueNumbers": [
+        409
+      ],
+      "routeEvidenceId": "E-0F4B8BA52B95"
+    },
+    {
       "id": "S-97C05E4075D8",
       "route": "/contract/other-expense/form/:id",
       "routePattern": "/contract/other-expense/form/:id",
@@ -8308,6 +8355,38 @@
         {
           "path": "app/pages/contract/other-expense/index.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        409
+      ],
+      "routeEvidenceId": "E-F3E536C1B666"
+    },
+    {
+      "id": "S-E3CCE8C35F34",
+      "route": "/contract/other-expense",
+      "routePattern": "/contract/other-expense",
+      "domain": "aux-contract",
+      "kind": "other_expense",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "按现有路由和 capability；明确预算、项目与来源返回关系；不接受任意 returnTo",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/contract/other-expense/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/contract/AuxiliaryContractListScreen.vue",
+          "anchor": "TargetCostSourceReturn"
         }
       ],
       "issueNumbers": [
@@ -8597,6 +8676,38 @@
       "routeEvidenceId": "E-DBBA71207E12"
     },
     {
+      "id": "S-AABDF43131F3",
+      "route": "/contract/other-settlement",
+      "routePattern": "/contract/other-settlement",
+      "domain": "aux-contract",
+      "kind": "other_settlement",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "按现有路由和 capability；明确预算、项目与来源返回关系；不接受任意 returnTo",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/contract/other-settlement/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/other-settlement/OtherSettlementListScreen.vue",
+          "anchor": "TargetCostSourceReturn"
+        }
+      ],
+      "issueNumbers": [
+        409
+      ],
+      "routeEvidenceId": "E-DBBA71207E12"
+    },
+    {
       "id": "S-5D070108D389",
       "route": "/contract/subcontract/form/:id",
       "routePattern": "/contract/subcontract/form/:id",
@@ -8676,6 +8787,38 @@
         {
           "path": "app/pages/contract/subcontract/index.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        409
+      ],
+      "routeEvidenceId": "E-619F18EF4FD9"
+    },
+    {
+      "id": "S-50E173FCFEEA",
+      "route": "/contract/subcontract",
+      "routePattern": "/contract/subcontract",
+      "domain": "core-contract",
+      "kind": "subcontract",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "按现有路由和 capability；明确预算、项目与来源返回关系；不接受任意 returnTo",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/contract/subcontract/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/contract/SubcontractContractListScreen.vue",
+          "anchor": "TargetCostSourceReturn"
         }
       ],
       "issueNumbers": [
@@ -15148,6 +15291,38 @@
       "routeEvidenceId": "E-E8A8784C7D85"
     },
     {
+      "id": "S-ECF05B5B178B",
+      "route": "/project/:id",
+      "routePattern": "/project/:id",
+      "domain": "project",
+      "kind": "project",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "按现有路由和 capability；预算及项目稳定身份复验后返回原版本；demo沿既有隔离只读源",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/pages/project/[id].vue",
+          "anchor": "TargetCostProjectReturn"
+        }
+      ],
+      "issueNumbers": [
+        408
+      ],
+      "routeEvidenceId": "E-E8A8784C7D85"
+    },
+    {
       "id": "S-80132F71D5AA",
       "route": "/project/:pid/supplier/:sid",
       "routePattern": "/project/:pid/supplier/:sid",
@@ -15904,7 +16079,7 @@
       "path": "tab/items",
       "label": "items",
       "type": "tab",
-      "condition": "按现有路由和 capability",
+      "condition": "按现有路由和 capability；browser=中央详情；tauri=既有本地详情",
       "hosts": [
         "browser",
         "tauri"
@@ -15915,7 +16090,11 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/target-cost/TargetCostDetailScreen.vue",
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "'items'"
+        },
+        {
+          "path": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
           "anchor": "'items'"
         }
       ],
@@ -15937,7 +16116,7 @@
       "path": "tab/comparison",
       "label": "comparison",
       "type": "tab",
-      "condition": "按现有路由和 capability",
+      "condition": "按现有路由和 capability；browser=中央详情；tauri=既有本地详情",
       "hosts": [
         "browser",
         "tauri"
@@ -15948,7 +16127,11 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/target-cost/TargetCostDetailScreen.vue",
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "'comparison'"
+        },
+        {
+          "path": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
           "anchor": "'comparison'"
         }
       ],
@@ -15970,7 +16153,7 @@
       "path": "table/TargetCostItemEditor",
       "label": "TargetCostItemEditor",
       "type": "table",
-      "condition": "按现有路由和 capability",
+      "condition": "按现有路由和 capability；browser=中央详情；tauri=既有本地详情",
       "hosts": [
         "browser",
         "tauri"
@@ -15981,7 +16164,11 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/target-cost/TargetCostDetailScreen.vue",
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "TargetCostItemEditor"
+        },
+        {
+          "path": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
           "anchor": "TargetCostItemEditor"
         }
       ],
@@ -16003,7 +16190,7 @@
       "path": "table/TargetCostItemTable",
       "label": "TargetCostItemTable",
       "type": "table",
-      "condition": "按现有路由和 capability",
+      "condition": "按现有路由和 capability；browser=中央详情；tauri=既有本地详情",
       "hosts": [
         "browser",
         "tauri"
@@ -16014,7 +16201,11 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/target-cost/TargetCostDetailScreen.vue",
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "TargetCostItemTable"
+        },
+        {
+          "path": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
           "anchor": "TargetCostItemTable"
         }
       ],
@@ -16036,7 +16227,7 @@
       "path": "table/TargetCostComparisonTable",
       "label": "TargetCostComparisonTable",
       "type": "table",
-      "condition": "按现有路由和 capability",
+      "condition": "按现有路由和 capability；browser=中央详情；tauri=既有本地详情",
       "hosts": [
         "browser",
         "tauri"
@@ -16047,8 +16238,108 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/target-cost/TargetCostDetailScreen.vue",
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "CentralTargetCostComparison"
+        },
+        {
+          "path": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
           "anchor": "TargetCostComparisonTable"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-8895D4B79437"
+    },
+    {
+      "id": "S-62C4FCC000FF",
+      "route": "/project/target-cost/:id",
+      "routePattern": "/project/target-cost/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "files/originals",
+      "label": "originals",
+      "type": "files",
+      "condition": "按现有路由和 capability；仅浏览器中央详情；旧缺正文保留缺口",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "TargetCostAttachments"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-8895D4B79437"
+    },
+    {
+      "id": "S-E1D058025454",
+      "route": "/project/target-cost/:id",
+      "routePattern": "/project/target-cost/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "history/version",
+      "label": "version",
+      "type": "detail",
+      "condition": "按现有路由和 capability；仅浏览器中央详情；版本头、明细及附件审计",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "预算版本历史"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-8895D4B79437"
+    },
+    {
+      "id": "S-21EFE77313F3",
+      "route": "/project/target-cost/:id",
+      "routePattern": "/project/target-cost/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "按现有路由和 capability；原科目提交与读取依据独立保留；不能借另一版本恢复",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
+          "anchor": "TargetCostCommandState"
         }
       ],
       "issueNumbers": [
@@ -16086,6 +16377,102 @@
       "routeEvidenceId": "E-324BD925ACB4"
     },
     {
+      "id": "S-486A528CBBA4",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "section/basic-and-amount",
+      "label": "basic-and-amount",
+      "type": "form-section",
+      "condition": "未传 id；新建 draftKey 或编辑版本各自保稿；税价独立确认",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostFormFields"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
+      "id": "S-6AA305BF75DA",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "files/originals",
+      "label": "originals",
+      "type": "files",
+      "condition": "未传 id；完整正文随版本头一起提交；未知大小与缺原件分别呈现",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostAttachments"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
+      "id": "S-DE1F0A75A8B1",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "未传 id；发送前持久保存原内容；结果未知只能恢复原命令",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostCommandState"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
       "id": "S-D575EDF812B1",
       "route": "/project/target-cost/form/:id?",
       "routePattern": "/project/target-cost/form/:id",
@@ -16115,6 +16502,102 @@
       "routeEvidenceId": "E-324BD925ACB4"
     },
     {
+      "id": "S-EB3C5CE4996E",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "section/basic-and-amount",
+      "label": "basic-and-amount",
+      "type": "form-section",
+      "condition": "有效 id；新建 draftKey 或编辑版本各自保稿；税价独立确认",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostFormFields"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
+      "id": "S-D262A34E24D2",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "files/originals",
+      "label": "originals",
+      "type": "files",
+      "condition": "有效 id；完整正文随版本头一起提交；未知大小与缺原件分别呈现",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostAttachments"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
+      "id": "S-788D46D9121C",
+      "route": "/project/target-cost/form/:id?",
+      "routePattern": "/project/target-cost/form/:id",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "有效 id；发送前持久保存原内容；结果未知只能恢复原命令",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostFormScreen.vue",
+          "anchor": "TargetCostCommandState"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-324BD925ACB4"
+    },
+    {
       "id": "S-FD9FB5294A89",
       "route": "/project/target-cost",
       "routePattern": "/project/target-cost",
@@ -16136,6 +16619,38 @@
         {
           "path": "app/pages/project/target-cost/index.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-DAB3C0C44CD3"
+    },
+    {
+      "id": "S-875B8436EA29",
+      "route": "/project/target-cost",
+      "routePattern": "/project/target-cost",
+      "domain": "schedule-target-cost",
+      "kind": "project.target-cost",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "recovery/pending",
+      "label": "pending",
+      "type": "recovery-panel",
+      "condition": "按现有路由和 capability；仅当前身份、来源及可见预算的删除恢复原提交",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/project/target-cost/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/target-cost/CentralTargetCostListScreen.vue",
+          "anchor": "TargetCostCommandState"
         }
       ],
       "issueNumbers": [
@@ -17583,6 +18098,38 @@
         {
           "path": "app/pages/subcontract/[kind]/index.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        410
+      ],
+      "routeEvidenceId": "E-12ABF110688C"
+    },
+    {
+      "id": "S-498C1FF6350F",
+      "route": "/subcontract/:kind",
+      "routePattern": "/subcontract/settlement",
+      "domain": "subcontract-document",
+      "kind": "sub_settlement",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "列表",
+      "path": "return/target-cost",
+      "label": "target-cost",
+      "type": "source-return",
+      "condition": "routeScope=subcontract; routeKind=settlement；仅中央分包结算来源返回",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/[kind]/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/owner-document/OwnerDocumentListScreen.vue",
+          "anchor": "TargetCostSourceReturn"
         }
       ],
       "issueNumbers": [
@@ -20918,9 +21465,9 @@
         },
         {
           "reference": "docs/design/evidence/issue-445/README.md",
-          "commit": null,
+          "commit": "59d5c735414e04b90e2cba7f2f750b6151e697bc",
           "recency": "current-run",
-          "scope": "与本工作单元一同提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
+          "scope": "已独立提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
         }
       ],
       "remaining": "#444/#445 已接管中央分组、任务、依赖、冻结来源、绑定历史及新增绑定，整图迁移、日常写入与危险恢复通过。生产持久化仍归 #416。"
@@ -20950,9 +21497,9 @@
         },
         {
           "reference": "docs/design/evidence/issue-445/README.md",
-          "commit": null,
+          "commit": "59d5c735414e04b90e2cba7f2f750b6151e697bc",
           "recency": "current-run",
-          "scope": "与本工作单元一同提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
+          "scope": "已独立提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
         }
       ],
       "remaining": "#444/#445 已验证项目、分组、任务、阶段、依赖、楼栋、合同与原清单行身份及来源往返；来源更正复验原确认导入资格，不按同名对象补配。"
@@ -20981,9 +21528,9 @@
         },
         {
           "reference": "docs/design/evidence/issue-445/README.md",
-          "commit": null,
+          "commit": "59d5c735414e04b90e2cba7f2f750b6151e697bc",
           "recency": "current-run",
-          "scope": "与本工作单元一同提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
+          "scope": "已独立提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署"
         }
       ],
       "remaining": "#444/#445 已验证固定预览版本、陈旧来源保稿、未知结果原提交恢复、缓存页签与来源切换保护及冷读；完整成本和工资消费继续单独验收。"
@@ -21092,9 +21639,16 @@
         "C-CF708A06FEBF",
         "C-73665550F1A0"
       ],
-      "status": "ready",
-      "evidence": [],
-      "remaining": "目标成本既有数据与正式保存尚未闭合中央 Repository/HTTP/command；不能保留并行正式来源或把付款结算成本回归外推到目标成本。"
+      "status": "partial",
+      "evidence": [
+        {
+          "reference": "docs/design/evidence/issue-412-target-cost/README.md",
+          "commit": null,
+          "recency": "current-run",
+          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；本单元固定提交待登记"
+        }
+      ],
+      "remaining": "预算中央链已完成本轮浏览器运行与独立审查，完整检查及固定提交按证据目录登记；不提前取得固定提交完成态。完整工资、材料和财务来源的消费及生产关口继续分项验收。"
     },
     {
       "id": "PRG-08",
@@ -29501,6 +30055,30 @@
       "obligationIds": []
     },
     {
+      "id": "C-61FEEB0E13A7",
+      "surfaceId": "S-EA89E1A972BB",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-0F4B8BA52B95",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-2AACD84A1E18",
       "surfaceId": "S-97C05E4075D8",
       "host": "browser",
@@ -29637,6 +30215,30 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-9D9C50431AC0",
+      "surfaceId": "S-E3CCE8C35F34",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3E536C1B666",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -30077,6 +30679,30 @@
       "obligationIds": []
     },
     {
+      "id": "C-3788A209157C",
+      "surfaceId": "S-AABDF43131F3",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-DBBA71207E12",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-665804FB376C",
       "surfaceId": "S-5D070108D389",
       "host": "browser",
@@ -30213,6 +30839,30 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-2173C7D31058",
+      "surfaceId": "S-50E173FCFEEA",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-619F18EF4FD9",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -39704,6 +40354,30 @@
       "obligationIds": []
     },
     {
+      "id": "C-C9007373C1FA",
+      "surfaceId": "S-ECF05B5B178B",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-E8A8784C7D85",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-9230BF4A3E49",
       "surfaceId": "S-80132F71D5AA",
       "host": "browser",
@@ -40811,7 +41485,7 @@
       "id": "C-050232A62894",
       "surfaceId": "S-CC3E14C91C8B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40864,7 +41538,7 @@
       "id": "C-0A33C8C7C060",
       "surfaceId": "S-88CF316F5F3B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40912,7 +41586,7 @@
       "id": "C-213E95DA35EA",
       "surfaceId": "S-3314CAEE0F33",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -40960,7 +41634,7 @@
       "id": "C-57F20E73D872",
       "surfaceId": "S-97580BB4A1F7",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41008,7 +41682,7 @@
       "id": "C-450A43BD7C96",
       "surfaceId": "S-E37B75672B95",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41056,7 +41730,7 @@
       "id": "C-E2AFD6B6F704",
       "surfaceId": "S-68EAF1346DD8",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41101,10 +41775,82 @@
       "obligationIds": []
     },
     {
+      "id": "C-D0AB07FAFA63",
+      "surfaceId": "S-62C4FCC000FF",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-8895D4B79437",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-95AFE4FD7FA9",
+      "surfaceId": "S-E1D058025454",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-8895D4B79437",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-1D0B162C9359",
+      "surfaceId": "S-21EFE77313F3",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-8895D4B79437",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-F06D8D7FCF2C",
       "surfaceId": "S-D0BD4C02CC66",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41154,10 +41900,82 @@
       "obligationIds": []
     },
     {
+      "id": "C-8CB12EDC641F",
+      "surfaceId": "S-486A528CBBA4",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-6C82B346B266",
+      "surfaceId": "S-6AA305BF75DA",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-54B2F8977E9E",
+      "surfaceId": "S-DE1F0A75A8B1",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-CF708A06FEBF",
       "surfaceId": "S-D575EDF812B1",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41207,10 +42025,82 @@
       "obligationIds": []
     },
     {
+      "id": "C-AD60740EB5E7",
+      "surfaceId": "S-EB3C5CE4996E",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-E3B056BB255D",
+      "surfaceId": "S-D262A34E24D2",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-6C02B054A730",
+      "surfaceId": "S-788D46D9121C",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-324BD925ACB4",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-73665550F1A0",
       "surfaceId": "S-FD9FB5294A89",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "target-cost-browser",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41252,6 +42142,30 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-60C6BC4E775C",
+      "surfaceId": "S-875B8436EA29",
+      "host": "browser",
+      "adapter": "target-cost-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-DAB3C0C44CD3",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -43345,6 +44259,30 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-A34DD105190E",
+      "surfaceId": "S-498C1FF6350F",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-12ABF110688C",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [

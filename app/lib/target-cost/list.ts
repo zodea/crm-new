@@ -4,19 +4,20 @@ import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 
 export interface TargetCostListRow {
   id: string
-  projectId: string
+  projectId: string | null
   projectName: string
   name: string
   isBaseline: boolean
-  contractRevenue: number
-  plannedProfit: number
-  taxInclusiveTotal: number
-  taxExclusiveTotal: number
-  taxAmount: number
-  signedContractSum: number
+  contractRevenue: number | null
+  plannedProfit: number | null
+  taxInclusiveTotal: number | null
+  taxExclusiveTotal: number | null
+  taxAmount: number | null
+  signedContractSum: number | null
   profitRate: number | null
   status: string
   updatedAt: string
+  deletedAt: string | null
 }
 
 export interface TargetCostListFilters {
@@ -30,13 +31,16 @@ function text(value: unknown): string {
   return value == null ? '' : String(value)
 }
 
-function number(value: unknown): number {
+function number(value: unknown): number | null {
+  if (value == null || value === '')
+    return null
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : 0
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 export async function loadTargetCostList(
   db: SoftDb,
+  includeDeleted = false,
 ): Promise<TargetCostListRow[]> {
   const rows = await db.select<Record<string, unknown>>(`
     ${hiddenCtesFor('target_costs', 'projects')}
@@ -53,18 +57,18 @@ export async function loadTargetCostList(
       target.tax_amount,
       target.signed_contract_sum,
       target.status,
-      target.updated_at
+      target.updated_at, target.deleted_at
     FROM target_costs AS target
     LEFT JOIN projects AS project
       ON project.id = target.project_id
      AND ${visibleCond('projects', 'project')}
-    WHERE ${visibleCond('target_costs', 'target')}
+    WHERE ${includeDeleted ? `(target.project_id IS NULL OR project.id IS NOT NULL)` : visibleCond('target_costs', 'target')}
     ORDER BY target.updated_at DESC, target.created_at DESC, target.id
   `)
 
   return rows.map(row => ({
     id: text(row.id),
-    projectId: text(row.project_id),
+    projectId: row.project_id == null ? null : text(row.project_id),
     projectName: text(row.project_name),
     name: text(row.name),
     isBaseline: row.is_baseline === 1,
@@ -74,11 +78,12 @@ export async function loadTargetCostList(
     taxExclusiveTotal: number(row.tax_exclusive_total),
     taxAmount: number(row.tax_amount),
     signedContractSum: number(row.signed_contract_sum),
-    profitRate: number(row.contract_revenue) > 0
-      ? number(row.planned_profit) / number(row.contract_revenue)
+    profitRate: number(row.contract_revenue) != null && number(row.contract_revenue)! > 0 && number(row.planned_profit) != null
+      ? number(row.planned_profit)! / number(row.contract_revenue)!
       : null,
     status: text(row.status),
     updatedAt: text(row.updated_at),
+    deletedAt: row.deleted_at == null ? null : text(row.deleted_at),
   }))
 }
 

@@ -46,8 +46,10 @@ import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-c
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createSupplierCredentialRepository } from '~/lib/supplier/credential-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
+import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 
 export interface DomainRepositories {
+  targetCosts: ReturnType<typeof createTargetCostRepository>
   boqBuilding: ReturnType<typeof createBoqBuildingRepository>
   schedule: ReturnType<typeof createScheduleRepository>
   supplierCredentials: ReturnType<typeof createSupplierCredentialRepository>
@@ -80,6 +82,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),
     boqBuilding: createBoqBuildingRepository((url, options) => $fetch<unknown>(url, options)),
     schedule: createScheduleRepository((url, options) => $fetch<unknown>(url, options)),
     supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch<unknown>(url, options)),

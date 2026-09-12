@@ -4,6 +4,9 @@
 
 | 功能 | 路由 | 当前状态与使用说明 |
 | --- | --- | --- |
+| 目标成本列表 | `/project/target-cost` | 当前浏览器验证实例可用；筛选、基线、删除与恢复见[预算指南](./target-cost.md) |
+| 目标成本版本详情 | `/project/target-cost/:id` | 固定版本科目、来源对比、附件与历史；来源未齐保持未知 |
+| 目标成本新建 / 显式编辑 | `/project/target-cost/form`、`/project/target-cost/form/:id` | 整页版本头与原件保存，缺项目草稿及原提交恢复 |
 | 项目 Excel 导入 | `/project` → `/import/mapping/project` | 当前浏览器验证环境可用；[操作指南](./project-excel-import.md)。历史深链遵守相同中央写入边界 |
 | 其他支出合同列表 | `/contract/other-expense` | 当前浏览器验证环境可用；[操作指南](./auxiliary-contracts.md) |
 | 其他支出合同只读详情 | `/contract/other-expense/:id` | 真实项目与分供方关系，来源返回 |

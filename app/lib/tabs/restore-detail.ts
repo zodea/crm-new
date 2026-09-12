@@ -73,6 +73,21 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'target-cost') {
+    let dto
+    if (origin === 'demo') {
+      const authorized = await repos.targetCosts.list({ origin, includeDemo: query.includeDemo })
+      checkRestoreAbort(options.signal)
+      if (authorized.context.origin !== origin || !authorized.context.capabilities.includes('target-cost:read') || !authorized.context.capabilities.includes('demo:read'))
+        return restoreProblem('forbidden')
+      const { localTargetCostDetail } = await import('../target-cost/local-read')
+      dto = await localTargetCostDetail(authorized.context, detail.id)
+    }
+    else {
+      dto = await repos.targetCosts.detail({ origin, includeDemo: query.includeDemo }, detail.id)
+    }
+    return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('target-cost', dto.targetCostId, dto.view.header.name || '未填写版本名'), origin: dto.context.origin }
+  }
   if (family === 'supplier-credential') {
     const dto = await repos.supplierCredentials.read(detail.id, origin, { signal: options.signal })
     return { ...common, capabilities: dto.capabilities, sourceVersion: dto.credentialVersion, subject: reference('supplier', dto.supplierId, `${dto.supplierName} · 证照附件`), origin: dto.dataOrigin, variant: 'credentials' }

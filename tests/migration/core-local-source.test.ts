@@ -23,7 +23,7 @@ function sourceRows(sql: string): Record<string, unknown>[] {
     return []
   if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
     return []
-  if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs)(?: WHERE | ORDER BY )/.test(sql))
+  if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs|target_costs|target_cost_items)(?: WHERE | ORDER BY )/.test(sql))
     return []
   if (sql.includes('AS orphan_lines'))
     return [{ orphan_lines: 0, orphan_sources: 0, orphan_audit: 0 }]
@@ -987,6 +987,7 @@ describe('core migration local source', () => {
       'quantity_projects',
       'process_libraries',
       'wbs_projects',
+      'target_cost_versions',
     ])
   })
 })

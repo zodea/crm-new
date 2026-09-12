@@ -9,7 +9,7 @@ import {
   useTemplateRef,
   watch,
 } from 'vue'
-import TargetCostDetailScreen from '~/components/target-cost/TargetCostDetailScreen.vue'
+import TargetCostDetailScreen from '~/components/target-cost/NativeTargetCostDetailScreen.vue'
 
 const routerMocks = vi.hoisted(() => ({
   leaveGuard: undefined as undefined | (() => Promise<boolean>),

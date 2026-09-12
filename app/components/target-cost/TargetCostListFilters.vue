@@ -7,11 +7,12 @@ interface FilterOption {
   label: string
 }
 
-defineProps<{
+withDefaults(defineProps<{
   loading: boolean
   projectOptions: readonly FilterOption[]
   statusOptions: readonly FilterOption[]
-}>()
+  canCreate?: boolean
+}>(), { canCreate: true })
 
 const emit = defineEmits<{
   refresh: []
@@ -37,7 +38,7 @@ const status = defineModel<string[]>('status', { required: true })
         <span class="i-lucide-refresh-cw mr-1" aria-hidden="true" />
         刷新
       </KitButton>
-      <KitButton type="button" variant="primary" @click="emit('create')">
+      <KitButton type="button" variant="primary" :disabled="!canCreate" @click="emit('create')">
         <span class="i-lucide-plus mr-1" aria-hidden="true" />
         新建目标成本
       </KitButton>

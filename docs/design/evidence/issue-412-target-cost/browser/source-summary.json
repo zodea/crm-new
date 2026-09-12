@@ -1,0 +1,17 @@
+{
+  "runId": "74990341-68ed-479c-8f92-c5e0301db9cf",
+  "workspaceId": "workspace-default",
+  "actorId": "actor-default",
+  "projectId": "core-projects-75b74f7974b139d228816c2b",
+  "versionIds": {
+    "original": "core-target_cost_versions-0162db371415b146a7835da9",
+    "revised": "core-target_cost_versions-45b32428df7ebaeb3f503609"
+  },
+  "supplierId": "core-suppliers-818a99a74a949c711be6ca71",
+  "batchId": "core-batch-9a15004e22eb683e25f37894",
+  "sourceHash": "767d8b15b5d269d3848a5c30e1a1f77707727db7e50f51981f0ff65feb013347",
+  "snapshotSha256": "06d78a6214d721db1fa596bfe5e02c2a407a6b882527ea5782b0cffa0f4e5fec",
+  "byteLength": 2285568,
+  "sourceKind": "真实 SQLite 经正式 preflight / dry-run / import / confirm；仅本任务合成资料",
+  "sourcePayload": "完整源与失败复现只保留于本任务临时目录，不作为业务数据交付"
+}

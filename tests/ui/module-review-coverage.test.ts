@@ -42,9 +42,10 @@ describe('module review coverage', () => {
       if (desktop)
         expect(desktop.adapter).toBe(surface.variant === 'central-source' ? 'central-http' : 'desktop-sqlite')
     }
-    for (const route of ['/subcontract/payroll', '/project/target-cost']) {
+    for (const [route, expectedAdapter] of [['/subcontract/payroll', 'browser-local'], ['/project/target-cost', 'target-cost-browser']]) {
       const surface = surfaces.find(item => item.route === route && item.path === 'page')!
-      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe('browser-local')
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe(expectedAdapter)
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'tauri')?.adapter).toBe('desktop-sqlite')
     }
     for (const route of ['/', '/schedule', '/schedule/:pid', '/schedule/new']) {
       const surface = surfaces.find(item => item.route === route && item.variant === 'default')!
@@ -218,7 +219,8 @@ describe('module review coverage', () => {
     expect(byId('WAGE-06').status).toBe('ready')
     expect(byId('WAGE-10').status).toBe('ready')
     expect(byId('PRG-01').status).toBe('current-passed')
-    expect(byId('PRG-07').status).toBe('ready')
+    expect(byId('PRG-07').status).toBe('partial')
+    expect(byId('PRG-07').evidence).toEqual([expect.objectContaining({ reference: 'docs/design/evidence/issue-412-target-cost/README.md', commit: null, recency: 'current-run' })])
     expect(byId('PRG-09').status).toBe('partial')
     for (const obligation of inherited) {
       expect(obligation.ownerIssue).toBe(412)

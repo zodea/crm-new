@@ -27,6 +27,7 @@ import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/so
 import { validateReceiptReturnTo } from '~/lib/receipt/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
 import { validateSupplierDetailReturnTo, validateSupplierReturnTo } from '~/lib/supplier/return-context'
+import { TARGET_COST_LIST_PATH, targetCostReturnTo, targetCostSourceLocation } from '~/lib/target-cost/navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -294,6 +295,11 @@ function hasCrewWorkerFactContext(intent: EntityTargetIntent): boolean {
 }
 
 const TARGET_REGISTRY = {
+  'target-cost:detail': (intent: EntityTargetIntent) => {
+    if (!isDataOriginDTO(intent.filters.dataOrigin))
+      throw new Error('invalid target cost origin')
+    return `${entityPath(TARGET_COST_LIST_PATH, intent)}?origin=${intent.filters.dataOrigin}`
+  },
   'settlement:other_settlement': (intent: EntityTargetIntent) => {
     if (intent.filters.dataOrigin !== 'real')
       throw new Error('invalid settlement origin')
@@ -347,6 +353,10 @@ const TARGET_REGISTRY = {
 } satisfies Record<string, TargetBuilder>
 
 const LIST_TARGET_REGISTRY = {
+  'contract:subcontract': (intent: ListTargetIntent) => budgetSourceListPath('/contract/subcontract', intent),
+  'contract:other_expense': (intent: ListTargetIntent) => budgetSourceListPath('/contract/other-expense', intent),
+  'subcontract-document:settlement': (intent: ListTargetIntent) => budgetSourceListPath('/subcontract/settlement', intent),
+  'settlement:other_settlement': (intent: ListTargetIntent) => budgetSourceListPath('/contract/other-settlement', intent),
   'contract:material': (intent: ListTargetIntent) => {
     const projectId = intent.filters.projectId
     const dataOrigin = intent.filters.dataOrigin
@@ -355,6 +365,16 @@ const LIST_TARGET_REGISTRY = {
     return `/contract/material?${new URLSearchParams({ projectId, origin: dataOrigin }).toString()}`
   },
 } satisfies Record<string, ListTargetBuilder>
+
+function budgetSourceListPath(path: string, intent: ListTargetIntent): string {
+  const { projectId, dataOrigin, costCategory } = intent.filters
+  if (!isStableRouteIdentity(projectId) || !isDataOriginDTO(dataOrigin))
+    throw new Error('invalid budget source identity')
+  const query = new URLSearchParams({ projectId, origin: dataOrigin })
+  if (path === '/contract/subcontract' && (costCategory === '专业分包' || costCategory === '合同劳务'))
+    query.set('subKind', costCategory === '合同劳务' ? '劳务' : '专业')
+  return `${path}?${query}`
+}
 
 type RegisteredTargetKey = keyof typeof TARGET_REGISTRY
 
@@ -405,7 +425,21 @@ export function resolveNavigationTarget(
       const returnTo = validateProjectJourneyReturnTo(options.returnTo, intent.filters.dataOrigin)
       if (returnTo)
         to = `${to}&returnTo=${encodeURIComponent(returnTo)}`
-      return { state: 'resolved', label: '材料采购合同', to }
+      const origin = intent.filters.dataOrigin
+      const budgetReturn = isDataOriginDTO(origin) ? targetCostReturnTo(options.returnTo, origin) : null
+      if (budgetReturn && isDataOriginDTO(origin)) {
+        const budget = new URL(budgetReturn, 'https://ruihang.invalid')
+        const id = decodeURIComponent(budget.pathname.slice(`${TARGET_COST_LIST_PATH}/`.length))
+        const path = new URL(to, 'https://ruihang.invalid')
+        const source = targetCostSourceLocation(path.pathname, { id, projectId: typeof intent.filters.projectId === 'string' ? intent.filters.projectId : null, origin, returnTo: budgetReturn })
+        if (source) {
+          for (const [key, value] of Object.entries(source.query))
+            path.searchParams.set(key, value)
+          to = `${path.pathname}${path.search}`
+        }
+      }
+      const labels: Record<string, string> = { 'contract:material': '材料采购合同', 'contract:subcontract': '分包合同', 'contract:other_expense': '其他支出合同', 'subcontract-document:settlement': '分包结算', 'settlement:other_settlement': '其他支出结算' }
+      return { state: 'resolved', label: labels[key] ?? '来源记录', to }
     }
     catch {
       return unavailable('error', options.label ?? null)
@@ -445,6 +479,11 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
+    if ((key === 'target-cost:detail' || key === 'project:detail') && options.returnTo && isDataOriginDTO(intent.filters.dataOrigin)) {
+      const validated = targetCostReturnTo(options.returnTo, intent.filters.dataOrigin)
+      if (validated)
+        to += `&returnTo=${encodeURIComponent(validated)}`
+    }
     if (['supplier:credentials', 'supplier:detail'].includes(key) && options.returnTo) {
       const detailReturn = key === 'supplier:credentials' ? validateSupplierDetailReturnTo(options.returnTo, intent.filters.dataOrigin, intent.subject.id) : null
       const listReturn = validateSupplierReturnTo(options.returnTo)

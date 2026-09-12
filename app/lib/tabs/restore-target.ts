@@ -3,6 +3,7 @@ import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
+import { TARGET_COST_FILTER_KEYS, TARGET_COST_LIST_PATH, TARGET_COST_SOURCE_PATHS, TARGET_COST_SOURCE_QUERY_KEYS, targetCostSourceContext } from '~/lib/target-cost/navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
@@ -14,7 +15,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/project': ['项目列表', 'project:list:read'],
   '/schedule': ['施工进度', 'project:list:read'],
   '/schedule/process-library': ['工序库', 'process-library:read'],
-  '/project/target-cost': ['目标成本'],
+  '/project/target-cost': ['目标成本', 'target-cost:read'],
   '/contract/construction': ['施工合同', 'construction-contract:read'],
   '/contract/subcontract': ['分包合同', 'subcontract-contract:read'],
   '/contract/material': ['材料采购合同', 'material-contract:read'],
@@ -71,6 +72,7 @@ export interface RestoredDetailPath {
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
   [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
   [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
+  [/^\/project\/target-cost\/([^/]+)$/, m => ({ family: 'target-cost', id: m[1]! })],
   [/^\/project\/([^/]+)\/supplier\/([^/]+)$/, m => ({ family: 'project-supplier', id: m[1]!, secondId: m[2]! })],
   [/^\/project\/([^/]+)$/, m => ({ family: 'project', id: m[1]! })],
   [/^\/base\/(customer|supplier|crew|worker)\/([^/]+)$/, m => ({ family: m[1]!, id: m[2]! })],
@@ -84,7 +86,7 @@ const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDeta
   [/^\/finance\/payment\/([^/]+)\/detail$/, m => ({ family: 'unconnected', id: m[1]! })],
   [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'wage', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'assignment', id: m[2]!, secondId: m[1]! })],
-  [/^\/(?:project\/target-cost|schedule)\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
+  [/^\/schedule\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
 ]
 
 const LIST_QUERY = new Set(['origin', 'search', 'page', 'pageSize', 'sort', 'status', 'category', 'type', 'projectId', 'supplierId', 'customerId', 'contractId', 'project', 'supplier', 'customer', 'contract', 'phase', 'manager', 'plannedEnd', 'trade', 'crewId', 'crew', 'projectStatus', 'month', 'tab', 'variant', 'nav', 'returnTo', 'returnContext', 'credentialStatus', 'columnFilters', 'subKind', 'documentType', 'from', 'group', 'task', 'stage', 'item', 'building', 'buildings', 'groupName', 'taskName', 'itemName', 'planStart', 'planFinish', 'focus'])
@@ -128,7 +130,17 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const baseAllowed = detail ? DETAIL_QUERY : LIST_QUERY
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
-    const allowed = quantity || schedule ? new Set([...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS]) : baseAllowed
+    const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (url.pathname === TARGET_COST_LIST_PATH)
+      TARGET_COST_FILTER_KEYS.forEach(key => allowed.add(key))
+    if ((TARGET_COST_SOURCE_PATHS as readonly string[]).includes(url.pathname)) {
+      const sourceQuery: Record<string, unknown> = Object.fromEntries(url.searchParams)
+      if (TARGET_COST_SOURCE_QUERY_KEYS.some(key => url.searchParams.has(key))) {
+        if (TARGET_COST_SOURCE_QUERY_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !targetCostSourceContext(url.pathname, sourceQuery))
+          return null
+        TARGET_COST_SOURCE_QUERY_KEYS.forEach(key => allowed.add(key))
+      }
+    }
     if (url.pathname === '/schedule') {
       for (const key of ['floorPlan', 'bindingContract', 'bindingLine']) {
         if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))

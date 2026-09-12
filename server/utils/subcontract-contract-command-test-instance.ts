@@ -223,6 +223,16 @@ export function createSubcontractContractCommandTestInstance(options: Options = 
       const refs = references(sessionId)
       return [...contracts.values()].map(record => toRow(record, refs))
     },
+    /** 预算对比保留原金额与真实关联资格，调用方须先取得分包读取授权。 */
+    budgetRows(sessionId?: string | null) {
+      const refs = references(sessionId)
+      return [...contracts.values()].map(record => ({
+        ...toRow(record, refs),
+        amount: record.draft.amount ?? null,
+        projectResolved: Boolean(record.draft.projectId && (refs.projects.has(record.draft.projectId) || migratedProjects.has(record.draft.projectId))),
+        supplierResolved: Boolean(record.draft.supplierId && (refs.suppliers.has(record.draft.supplierId) || migratedSuppliers.has(record.draft.supplierId))),
+      }))
+    },
     facts(): SubcontractContractFactSources {
       return {
         supplements: structuredClone(migratedSupplements),

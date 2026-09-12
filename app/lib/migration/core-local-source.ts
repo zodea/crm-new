@@ -44,6 +44,7 @@ import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './othe
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 import { readProcessLibraryMigrationGraphs } from './process-library-source'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
+import { readBudgetVersionMigrationGraphs } from './target-cost-source'
 import { readWbsMigrationGraphs } from './wbs-source'
 
 export interface CoreMigrationLocalSourceDependencies {
@@ -75,7 +76,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -1232,6 +1233,8 @@ async function buildSource(
       return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'wbs_projects')
       return [entityType, await readWbsMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'target_cost_versions')
+      return [entityType, await readBudgetVersionMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'quantity_projects') {
       const projects = await readQuantityMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
       return [entityType, projects.map(({ project, graph }): CoreMigrationSourceEntityDTO => ({

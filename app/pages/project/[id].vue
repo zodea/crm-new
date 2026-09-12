@@ -39,14 +39,17 @@ const returnExpiresAt = computed(() => auxiliaryReturnTo.value || ownerDocumentR
 </script>
 
 <template>
-  <ProjectDetailScreen
-    :project-id="projectId"
-    :origin-hint="originHint"
-    :include-demo="dataVisibilityStore.includeDemo"
-    :return-to="returnTo"
-    :customer-return-to="customerReturnTo || undefined"
-    :return-expires-at="returnExpiresAt"
-    :return-label="projectSupplierReturnTo ? '返回项目分供方工作台' : auxiliaryReturnTo || ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
-    :current-route="route.fullPath"
-  />
+  <div class="min-w-0">
+    <TargetCostProjectReturn :project-id="projectId" :origin="originHint" :return-to="route.query.returnTo" />
+    <ProjectDetailScreen
+      :project-id="projectId"
+      :origin-hint="originHint"
+      :include-demo="dataVisibilityStore.includeDemo"
+      :return-to="returnTo"
+      :customer-return-to="customerReturnTo || undefined"
+      :return-expires-at="returnExpiresAt"
+      :return-label="projectSupplierReturnTo ? '返回项目分供方工作台' : auxiliaryReturnTo || ownerDocumentReturnTo || crewWorkerReturnTo ? '返回来源详情' : undefined"
+      :current-route="route.fullPath"
+    />
+  </div>
 </template>

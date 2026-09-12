@@ -32,6 +32,7 @@ const ATTRIBUTE_KEYS_BY_ENTITY: Partial<Record<CoreMigrationEntityType, Readonly
   process_libraries: new Set(['graphJson']),
   quantity_projects: new Set(['graphJson']),
   wbs_projects: new Set(['graphJson']),
+  target_cost_versions: new Set(['budgetGraphJson']),
   construction_contracts: new Set([...ATTRIBUTE_KEYS, 'boqCatalogJson', 'monthlyQuantityFactsJson']),
   receipt_registrations: new Set(['no', 'receiptDate', 'payerAccount', 'paymentMethod', 'acceptanceBillNo', 'billDueDate', 'periodNo', 'bankSerialNo', 'handler', 'reviewStatus', 'status', 'note', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'attachmentsJson']),
   delivery_records: new Set(['orderNo', 'deliveryDate', 'rawSiteText', 'fileName', 'ocrStatus', 'archived', 'printBatchId', 'printDisposition', 'printedAt', 'printExcludedAt', 'reviewFlag', 'note', 'createdAt', 'updatedAt', 'sourceState', 'sourceProblem', 'assetJson', 'allLinesJson', 'auditJson', 'legacyOriginalsJson']),
@@ -263,7 +264,7 @@ export function parseCoreMigrationSourceCommand(value: unknown): CoreMigrationSo
     invalid('source.entities 必须是对象')
   assertOnlyKeys(entityGroups, ENTITY_KEYS, 'source.entities')
 
-  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
+  const entities = Object.fromEntries(CORE_MIGRATION_TOPOLOGY.filter(entityType => !['auxiliary_contracts', 'other_settlements', 'other_settlement_sources', 'delivery_records', 'quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects', 'target_cost_versions'].includes(entityType) || entityGroups[entityType] !== undefined).map((entityType) => {
     const rows = entityGroups[entityType]
     if (!Array.isArray(rows))
       invalid(`source.entities.${entityType}必须是数组`)

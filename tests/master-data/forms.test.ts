@@ -32,6 +32,8 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 let failFileInsert = false
+// 本文件验证保留的桌面 SQLite 表单边界；浏览器预算另测中央 Repository。
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 
 vi.mock('~/lib/db/connection', () => ({
   execute: (sql: string, params?: unknown[]) => mem.execute(sql, params),

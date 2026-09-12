@@ -209,6 +209,7 @@ useTabTitle('材料采购合同')
 <template>
   <ListShell continuous data-testid="material-contract-list">
     <template #heading>
+      <TargetCostSourceReturn />
       <h1 id="material-contract-list-heading" tabindex="-1" class="text-14px font-700 text-ink outline-none" title="正式数据与已授权演示数据分源展示；演示数据只读。">
         材料采购合同
       </h1>

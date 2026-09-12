@@ -19,6 +19,7 @@
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)（中央 WBS、来源返回与受控接管见 [#444](../design/evidence/issue-444/README.md)，暂估后补合同与楼栋证据更正见 [#445](../design/evidence/issue-445/README.md)）
+- [目标成本预算使用指南](./target-cost.md)（版本头、七类科目、基线、原件及完整迁移；来源缺口单独说明）
 - [首页项目与施工进度使用指南](./home-project-progress.md)（首页只读入口与独立维护入口分别说明）
 - [工程量合计与台账导出使用说明](./quantity-totals-and-export.md)
 - [工程量区域、模板与完成使用指南](./quantity-central-workflow.md)
@@ -48,6 +49,9 @@
 
 ```powershell
 python scripts/generate-project-guide-pdf.py
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/target-cost.md `
+  --output output/pdf/瑞航CRM_目标成本预算使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/tabs-and-recovery.md `
   --output output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
@@ -114,6 +118,7 @@ python scripts/generate-project-guide-pdf.py `
 
 ```text
 output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
+output/pdf/瑞航CRM_目标成本预算使用指南.pdf
 output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
 output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
 output/pdf/瑞航CRM_工程量合计与台账导出使用说明.pdf

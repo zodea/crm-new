@@ -7,11 +7,13 @@ import type { QuantityPersonSource } from '../../app/lib/quantity/central-people
 import type { QuantityPhotoIdentity } from '../../app/lib/quantity/central-photo'
 import type { PreparedCoreMigration } from './core-migration-preparation'
 import type { ImportedQuantityProject } from './quantity-migration'
+import type { ImportedBudgetVersion } from './target-cost-migration'
 import type { ImportedWbsProject } from './wbs-migration'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
 import { createQuantityDatabase } from './quantity-database'
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
+import { applyBudgetMigration, planBudgetMigration } from './target-cost-migration'
 import { applyWbsMigration, planWbsMigration, removeWbsMigration } from './wbs-migration'
 
 interface QuantityProjectSource {
@@ -28,6 +30,21 @@ interface Options {
   boq?: (projectId: string, sessionId?: string | null) => (QuantityBoqWorkspace & { sourceVersion: string }) | Promise<QuantityBoqWorkspace & { sourceVersion: string }>
 }
 
+/** 共用事务队列的来源域将此错误翻译成自身的权限/身份问题。 */
+export class WorkspaceTransactionSessionChanged extends Error {
+  constructor() {
+    super('工作区、经办身份或权限已变化，请重新核对')
+    this.name = 'WorkspaceTransactionSessionChanged'
+  }
+}
+
+function sameWorkspaceSession(expected: QuantityContext, actual: QuantityContext) {
+  if (expected.workspaceId !== actual.workspaceId || expected.actorId !== actual.actorId
+    || JSON.stringify([...expected.capabilities].sort()) !== JSON.stringify([...actual.capabilities].sort())) {
+    throw new WorkspaceTransactionSessionChanged()
+  }
+}
+
 /** 可重置中央验证实例。SQL 状态位于服务端内存，不代表生产持久化已交付。 */
 export function createQuantityTestInstance(options: Options) {
   interface State {
@@ -38,6 +55,8 @@ export function createQuantityTestInstance(options: Options) {
     pending: Promise<void>
     imports: Map<string, ImportedQuantityProject>
     wbsImports: Map<string, ImportedWbsProject>
+    budgetImports: Map<string, ImportedBudgetVersion>
+    migrationProjectIds: Set<string>
     migrationLibraryIds: Set<string>
   }
   const states = new Map<string, State>()
@@ -74,6 +93,8 @@ export function createQuantityTestInstance(options: Options) {
         pending: Promise.resolve(),
         imports: new Map(),
         wbsImports: new Map(),
+        budgetImports: new Map(),
+        migrationProjectIds: new Set(),
         migrationLibraryIds: new Set(),
       }
       states.set(key, state)
@@ -104,6 +125,22 @@ export function createQuantityTestInstance(options: Options) {
   }
 
   return {
+    /** 仅提供工作区互斥与 SQL 原子性。领域在回调内验证自身能力、来源和项目版本；不得嵌套调用同队列。 */
+    withWorkspaceTransaction<T>(consume: (db: TransactionDb, context: QuantityContext) => Promise<T>, sessionId?: string | null): Promise<T> {
+      const scheduled = structuredClone(options.session(sessionId))
+      const state = stateFor(sessionId, scheduled)
+      const pending = state.pending.then(async () => {
+        const context = structuredClone(options.session(sessionId))
+        sameWorkspaceSession(scheduled, context)
+        return state.database.withTransaction(async (db) => {
+          const result = await consume(db, context)
+          sameWorkspaceSession(context, options.session(sessionId))
+          return result
+        })
+      })
+      state.pending = pending.then(() => undefined, () => undefined)
+      return pending
+    },
     async prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null): Promise<PreparedCoreMigration> {
       const scope = structuredClone(snapshot)
       const state = stateFor(sessionId, options.session(sessionId))
@@ -117,11 +154,15 @@ export function createQuantityTestInstance(options: Options) {
       try {
         const plan = planQuantityMigration(scope, state.imports)
         const wbs = planWbsMigration(scope, state.wbsImports)
+        const budget = planBudgetMigration(scope, state.budgetImports)
+        const migrationProjectIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'projects').map(row => row.id) : [])
+        const removedProjectIds = new Set([...state.migrationProjectIds].filter(id => !migrationProjectIds.has(id)))
         const migrationLibraryIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'process_libraries').map(row => row.id) : [])
         const removedLibraryIds = new Set([...state.migrationLibraryIds].filter(id => !migrationLibraryIds.has(id)))
         const affectedProjects = [...new Set([...plan.affectedProjects, ...wbs.affectedProjects])]
-        const prepared = affectedProjects.length || removedLibraryIds.size
+        const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || removedProjectIds.size
           ? await (await state.driver()).prepare(async (candidate) => {
+              await applyBudgetMigration(candidate, budget, removedProjectIds)
               await removeWbsMigration(candidate, wbs, plan.removed, removedLibraryIds)
               await applyQuantityMigration(candidate, plan)
               await applyWbsMigration(candidate, wbs)
@@ -138,6 +179,8 @@ export function createQuantityTestInstance(options: Options) {
             prepared?.commit()
             state.imports = plan.imports
             state.wbsImports = wbs.imports
+            state.budgetImports = budget.imports
+            state.migrationProjectIds = migrationProjectIds
             state.migrationLibraryIds = migrationLibraryIds
             state.service.invalidateProjects(affectedProjects)
             release()

@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { useTargetCostListStore } from '~/stores/target-cost-list'
 
 const load = vi.hoisted(() => vi.fn())
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 vi.mock('~/lib/db/connection', () => ({ getDb: async () => ({}) }))
 vi.mock('~/lib/target-cost/list', () => ({ loadTargetCostList: load }))
 
@@ -14,7 +15,7 @@ beforeEach(() => {
 it('首次失败不能伪造快照，成功空结果刷新保留快照，失败仍可辨认', async () => {
   const store = useTargetCostListStore()
   load.mockRejectedValueOnce(new Error('首次读取失败'))
-  await store.load()
+  await expect(store.load()).rejects.toThrow('首次读取失败')
   expect(store.hasSnapshot).toBe(false)
   expect(store.error).toContain('首次读取失败')
   load.mockResolvedValueOnce([])
@@ -30,7 +31,7 @@ it('首次失败不能伪造快照，成功空结果刷新保留快照，失败�
   expect(store.hasSnapshot).toBe(true)
   expect(store.rows).toEqual([])
   reject(new Error('刷新失败'))
-  await pending
+  await expect(pending).rejects.toThrow('刷新失败')
   expect(store.hasSnapshot).toBe(true)
   expect(store.error).toContain('刷新失败')
 })

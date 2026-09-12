@@ -167,7 +167,7 @@ function buildSurfaces(ledger, registry) {
       }
       for (const group of SUBVIEWS.filter(group => matches(root, group.selector))) {
         for (const view of group.views)
-          surfaces.push(makeSurface(endpoint, variant, { ...view, sources: [[group.source, view.anchor ?? group.anchor]], hosts: group.hosts, issues: group.issues }))
+          surfaces.push(makeSurface(endpoint, variant, { ...view, sources: view.sources ?? [[group.source, view.anchor ?? group.anchor]], hosts: group.hosts, issues: group.issues }))
       }
     }
   }

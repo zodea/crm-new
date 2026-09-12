@@ -787,14 +787,14 @@ END;
 | 实体 | 表名 | PK | 设计文档 |
 |---|---|---|---|
 | TargetCost | `target_costs` | `id` | `target-cost.md`（项目目标成本，`is_baseline` 版本化） |
-| TargetCostItem | `target_cost_items` | `id` | `schedule-progress.md` §六（科目行：专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，可细到分项） |
+| TargetCostItem | `target_cost_items` | `id` | `target-cost.md`（科目行：专业分包/合同劳务/材料/机械/工人工资/费用报销/其他，可细到分项） |
 
 ```sql
 CREATE TABLE target_costs (
   id                  TEXT PRIMARY KEY,
-  project_id          TEXT,                 -- → projects.id；仅 draft 可空，提交时应用层强制必填
+  project_id          TEXT REFERENCES projects(id), -- 仅 draft 可空，提交时应用层强制必填
   name                TEXT NOT NULL,        -- 版本名（“投标预算”/“开工基线”）
-  is_baseline         INTEGER DEFAULT 0,    -- 1=当前对比基线；部分唯一索引保证一项目一条
+  is_baseline         INTEGER NOT NULL DEFAULT 0 CHECK (is_baseline IN (0, 1)), -- 部分唯一索引保证一项目一条
   contract_revenue    REAL DEFAULT 0 CHECK (contract_revenue >= 0),
   planned_profit      REAL DEFAULT 0 CHECK (planned_profit >= 0),
   signed_contract_sum REAL DEFAULT 0 CHECK (signed_contract_sum >= 0),
@@ -802,25 +802,41 @@ CREATE TABLE target_costs (
   tax_exclusive_total REAL DEFAULT 0 CHECK (tax_exclusive_total >= 0),
   tax_amount          REAL DEFAULT 0 CHECK (tax_amount >= 0),
   status TEXT NOT NULL DEFAULT 'draft',     -- draft | submitted
-  note TEXT DEFAULT '',
-  created_at TEXT, updated_at TEXT, deleted_at TEXT
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
 );
 
 CREATE TABLE target_cost_items (
   id           TEXT PRIMARY KEY,
-  target_cost_id TEXT NOT NULL,     -- → target_costs.id
-  cost_category TEXT NOT NULL,      -- '专业分包' | '合同劳务' | '材料' | '机械' | '工人工资' | '费用报销' | '其他'
+  target_cost_id TEXT NOT NULL REFERENCES target_costs(id),
+  cost_category TEXT NOT NULL CHECK (cost_category IN ('专业分包', '合同劳务', '材料', '机械', '工人工资', '费用报销', '其他')),
   item_name     TEXT,               -- 可选：细到分项（墙砖/地砖…），NULL=科目级
-  unit TEXT, qty REAL, unit_price REAL,
-  amount       REAL NOT NULL,
-  note TEXT, sort_order INTEGER DEFAULT 0,
-  created_at TEXT, updated_at TEXT, deleted_at TEXT
+  unit TEXT DEFAULT '',
+  qty REAL CHECK (qty IS NULL OR qty >= 0),
+  unit_price REAL CHECK (unit_price IS NULL OR unit_price >= 0),
+  amount REAL NOT NULL CHECK (amount >= 0),
+  note TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT DEFAULT NULL
 );
 ```
 
 > 迁移 v20 `target-cost-incomplete-drafts` 将已落过 v19 的存量库安全重建为 `project_id` 草稿可空，并原样保留目标成本头、科目明细、软删除状态和索引；非草稿保存仍必须校验真实项目 ID。
 
 > **costCategory 全局归集约定（2026-07-23 修订）**：合同成本按专业分包、合同劳务、材料、机械、其他五类；直接工人工资和费用报销分别作为独立成本来源。**合同劳务与工人工资不得合并为“人工”**。动态成本以已确认支出结算、已发放工资和已确认费用报销归集；付款申请、支付记录和送货单分别代表审批、现金流和收货事实，不与结算重复计入成本。红圈参照：目标成本 + 目标成本清单明细。
+
+#### 目标成本中央版本与完整接管（#412）
+
+预算头、科目明细和文件仍使用上述业务表；中央读写不创建另一套预算金额或成本快照。`target_cost_revision(singleton, revision)` 保存工作区预算版本，`target_cost_command_receipts(command_id, actor_id, target_cost_id, action, fingerprint, result_json)` 记录已提交命令及原回执；工作区隔离沿共享中央实例。预算与当前项目来源共同决定保存依据，版本头、基线旧新变更、附件与审计在同一工作区事务核对。命令和读面见 [COMMANDS](./COMMANDS.md#目标成本中央命令412)及 [READ-MODELS](./READ-MODELS.md#目标成本中央读取412)，实际验收状态见 [#412 预算证据](../design/evidence/issue-412-target-cost/README.md)。
+
+受控迁移节点为 `target_cost_versions`，每个版本携带完整 `budgetGraphJson`：版本头、科目、`file_refs` 中 `owner_type='target_cost'` 的附件、按文件稳定 ID 取得的真实 `file_payloads` 及可识别的 `operation_logs`。项目只按显式迁入映射归属；项目没有工程量不阻止预算接管，无项目草稿原样保留。迁入图金额、空值、真实零、排序、删除时间、旧空分项名和合法空附件元数据均按原表约束核对，不套新建表单必填规则改写历史。完整图所用头与明细非空约束以上述现行 v20 schema 为准。
+
+文件正文缺失保留缺件；存在正文时验证编码及已知长度，不从旧路径补读。日志原实体已不存在，但前后快照明确指向该预算时仍保留并可追溯；不得按同名对象补接。确认前先在候选实例逐列对账再整体发布，重复确认不覆盖日常变化。恢复依据可信迁入基准、命令回执和实际引用阻断预算日常变更、独立版本及当前/历史项目引用的丢失，软删除不解除这种保护。
+
+实际成本为当前真实来源投影，预算头的手录已签金额不替代正式合同。同一支付在不同读面出现时只计一次，独立分摊按稳定支付/分摊身份核对；归属或金额冲突保留未知。合法已知部分、真实零、无权、缺源和不可用不混淆；来源未齐时不生成完整余额或偏差。此扩展仍为 [ADR 0020](../adr/0020-browser-authority-and-demo-workspace-boundary.md) 的可重置中央验证实例，完整工资、材料、财务来源及 #416 生产关口不因预算接管而完成。
 
 ### 2.9 导入与对账审计类
 

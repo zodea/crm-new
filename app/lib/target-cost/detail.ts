@@ -6,17 +6,17 @@ import { round2 } from '~/lib/util/number'
 
 export interface TargetCostDetailHeader {
   id: string
-  projectId: string
+  projectId: string | null
   projectCode: string
   projectName: string
   name: string
   isBaseline: boolean
-  contractRevenue: number
-  plannedProfit: number
-  signedContractSum: number
-  taxInclusiveTotal: number
-  taxExclusiveTotal: number
-  taxAmount: number
+  contractRevenue: number | null
+  plannedProfit: number | null
+  signedContractSum: number | null
+  taxInclusiveTotal: number | null
+  taxExclusiveTotal: number | null
+  taxAmount: number | null
   status: string
   note: string
   createdAt: string
@@ -28,8 +28,8 @@ export interface TargetCostDetailItem {
   category: CostCategory
   itemName: string
   unit: string
-  qty: number
-  unitPrice: number
+  qty: number | null
+  unitPrice: number | null
   amount: number
   note: string
   sortOrder: number
@@ -78,20 +78,24 @@ function number(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function toHeader(row: Record<string, unknown>): TargetCostDetailHeader {
+function nullableNumber(value: unknown): number | null {
+  return value == null || value === '' ? null : Number.isFinite(Number(value)) ? Number(value) : null
+}
+
+export function targetCostHeaderFromRow(row: Record<string, unknown>): TargetCostDetailHeader {
   return {
     id: text(row.id),
-    projectId: text(row.project_id),
+    projectId: row.project_id == null ? null : text(row.project_id),
     projectCode: text(row.project_code),
     projectName: text(row.project_name),
     name: text(row.name),
     isBaseline: row.is_baseline === 1,
-    contractRevenue: number(row.contract_revenue),
-    plannedProfit: number(row.planned_profit),
-    signedContractSum: number(row.signed_contract_sum),
-    taxInclusiveTotal: number(row.tax_inclusive_total),
-    taxExclusiveTotal: number(row.tax_exclusive_total),
-    taxAmount: number(row.tax_amount),
+    contractRevenue: nullableNumber(row.contract_revenue),
+    plannedProfit: nullableNumber(row.planned_profit),
+    signedContractSum: nullableNumber(row.signed_contract_sum),
+    taxInclusiveTotal: nullableNumber(row.tax_inclusive_total),
+    taxExclusiveTotal: nullableNumber(row.tax_exclusive_total),
+    taxAmount: nullableNumber(row.tax_amount),
     status: text(row.status),
     note: text(row.note),
     createdAt: text(row.created_at),
@@ -99,14 +103,14 @@ function toHeader(row: Record<string, unknown>): TargetCostDetailHeader {
   }
 }
 
-function toItem(row: Record<string, unknown>): TargetCostDetailItem {
+export function targetCostItemFromRow(row: Record<string, unknown>): TargetCostDetailItem {
   return {
     id: text(row.id),
     category: text(row.cost_category) as CostCategory,
     itemName: text(row.item_name),
     unit: text(row.unit),
-    qty: number(row.qty),
-    unitPrice: number(row.unit_price),
+    qty: nullableNumber(row.qty),
+    unitPrice: nullableNumber(row.unit_price),
     amount: number(row.amount),
     note: text(row.note),
     sortOrder: number(row.sort_order),
@@ -153,8 +157,8 @@ export async function loadTargetCostDetail(
   if (!headerRow)
     return null
 
-  const header = toHeader(headerRow)
-  const items = itemRows.map(toItem)
+  const header = targetCostHeaderFromRow(headerRow)
+  const items = itemRows.map(targetCostItemFromRow)
   const itemFacts = new Map<CostCategory, { amount: number, count: number }>()
   for (const item of items) {
     const current = itemFacts.get(item.category) ?? { amount: 0, count: 0 }

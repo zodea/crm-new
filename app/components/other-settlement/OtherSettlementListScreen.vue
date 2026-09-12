@@ -67,6 +67,7 @@ useTabTitle(() => '其他支出结算')
 
 <template>
   <div ref="root" class="flex min-w-0 flex-col gap-3" data-testid="other-settlement-list">
+    <TargetCostSourceReturn />
     <header class="panel flex min-w-0 flex-wrap items-center gap-2 p-3">
       <h1 class="m-0 mr-auto text-15px font-800">
         其他支出结算

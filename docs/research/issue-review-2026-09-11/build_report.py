@@ -80,6 +80,7 @@ def overview_screens():
         (447, '主档分支：人工核对证照并回读税号', 'docs/design/evidence/issue-447/06-confirmed-master-readback-1440.png'),
         (424, '从客户进入同一项目', 'docs/design/evidence/issue-424/customer-project-1280.png'),
         (425, '回读施工合同与客户关系', 'docs/design/evidence/issue-425/customer-contract-1280.png'),
+        (412, '预算分支：维护七科目并保留版本身份', 'docs/design/evidence/issue-412-target-cost/browser/seven-category-edit-1440.png'),
         (442, '维护施工阶段及报量映射', 'docs/design/evidence/issue-442/stages/stages-1440.png'),
         (444, '排程分支：中央计划与阶段进度', 'docs/design/evidence/issue-444/contract/central-wbs-1440.png'),
         (444, '从首页来源查看同一工序进度', 'docs/design/evidence/issue-444/provisional/home-source-readonly-1440.png'),
@@ -88,6 +89,7 @@ def overview_screens():
         (442, '核对月报基准并冻结申报', 'docs/design/evidence/issue-442/monthly/monthly-submitted-snapshot.png'),
         (441, '材料分支：对照原件人工核对送货', 'docs/design/evidence/issue-441/delivery-form-1440.png'),
         (436, '收入分支：保存后回读普通收款', 'docs/design/evidence/issue-436/receipt-detail-1440.png'),
+        (412, '回看预算与真实来源；来源未齐时余额保持未知', 'docs/design/evidence/issue-412-target-cost/browser/actual-source-completeness-1440.png'),
     ]
     result = '<details open><summary>完整流程的交互画面</summary><p class="muted"><small>以下为各段独立合成数据验收的实际画面，用于核对入口与结果；不表示同一笔业务已贯穿全部模块。完整链的缺口仍见总图。</small></p><div class="image-grid">'
     for number, caption, path in samples:
