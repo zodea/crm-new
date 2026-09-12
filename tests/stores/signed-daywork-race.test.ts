@@ -2,6 +2,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSignedDayworkStore } from '~/stores/signed-daywork'
 
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 const mocks = vi.hoisted(() => ({ list: vi.fn(), options: vi.fn() }))
 vi.mock('~/lib/db/connection', () => ({ getDb: vi.fn().mockResolvedValue({}), withTransaction: vi.fn() }))
 vi.mock('~/lib/payroll/daywork', () => ({ listSignedDayworkRecords: mocks.list, saveSignedDayworkRecord: vi.fn() }))
@@ -13,7 +15,7 @@ beforeEach(() => {
   mocks.options.mockReset().mockImplementation(async (_db, projectId) => ({ projects: [{ id: projectId }], crews: [], workers: [], c2SubjectConfigs: [] }))
 })
 
-describe('签工读取范围与竞态', () => {
+describe('桌面签工读取范围与竞态', () => {
   it('同范围状态筛选保留记录与空快照，切换月份立即清空', async () => {
     const store = useSignedDayworkStore()
     store.filters.projectId = 'project-a'

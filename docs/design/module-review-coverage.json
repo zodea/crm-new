@@ -99,10 +99,10 @@
     ]
   },
   "counts": {
-    "productionRoutes": 140,
-    "rootVariants": 196,
-    "surfaces": 616,
-    "environmentCases": 1083,
+    "productionRoutes": 141,
+    "rootVariants": 197,
+    "surfaces": 649,
+    "environmentCases": 1105,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -223,6 +223,21 @@
         {
           "path": "server/utils/target-cost-service.ts",
           "anchor": "createTargetCostService"
+        }
+      ]
+    },
+    "payroll-browser-readonly": {
+      "read": "工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取",
+      "write": "当前仅受控迁移接管完整旧资料；浏览器日常建单、改价、核对、发放与输出尚未开放",
+      "storage": "中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416",
+      "sources": [
+        {
+          "path": "app/components/payroll/PayrollScreen.vue",
+          "anchor": "CentralPayrollScreen"
+        },
+        {
+          "path": "server/utils/payroll-service.ts",
+          "anchor": "createPayrollService"
         }
       ]
     },
@@ -1380,7 +1395,7 @@
       "issues": [
         412
       ],
-      "surfaces": 78
+      "surfaces": 111
     },
     {
       "code": "schedule-target-cost",
@@ -18357,6 +18372,230 @@
       "routeEvidenceId": "E-BF8364C82DD2"
     },
     {
+      "id": "S-3674F4DF4708",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/filters",
+      "label": "filters",
+      "type": "form-section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadFilters"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-60BEE2CBB67F",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/configs",
+      "label": "configs",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'configs'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-643537135401",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/attendance",
+      "label": "attendance",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'attendance'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-01D2C66F52A2",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/daywork",
+      "label": "daywork",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'daywork'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-35E0C9FCEAD6",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/locks",
+      "label": "locks",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'locks'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-C02B41E78FDD",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/history",
+      "label": "history",
+      "type": "subtable",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadHistory"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
+      "id": "S-4D6EBF74A703",
+      "route": "/subcontract/attendance",
+      "routePattern": "/subcontract/attendance",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.attendance",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/evidence",
+      "label": "evidence",
+      "type": "detail",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/attendance.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollSourceEvidence"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-BF8364C82DD2"
+    },
+    {
       "id": "S-AB65CC13A74C",
       "route": "/subcontract/daywork",
       "routePattern": "/subcontract/daywork",
@@ -18378,6 +18617,230 @@
         {
           "path": "app/pages/subcontract/daywork.vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-C9A8A6D98F3C",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/filters",
+      "label": "filters",
+      "type": "form-section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadFilters"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-E3C40376C5A7",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/configs",
+      "label": "configs",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'configs'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-5FF75E53356B",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/attendance",
+      "label": "attendance",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'attendance'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-22568A3FDFD1",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/daywork",
+      "label": "daywork",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'daywork'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-46C98E70F52D",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/locks",
+      "label": "locks",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'locks'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-2C332E95CBCA",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/history",
+      "label": "history",
+      "type": "subtable",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadHistory"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-F3C41F60CBA6"
+    },
+    {
+      "id": "S-9283AA9AD1CE",
+      "route": "/subcontract/daywork",
+      "routePattern": "/subcontract/daywork",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.daywork",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/evidence",
+      "label": "evidence",
+      "type": "detail",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/daywork.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollSourceEvidence"
         }
       ],
       "issueNumbers": [
@@ -18429,7 +18892,6 @@
       "type": "table",
       "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18438,7 +18900,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollStatementDetailScreen.vue",
+          "path": "app/components/payroll/NativePayrollStatementDetailScreen.vue",
           "anchor": "PayrollStatementMembersTable"
         }
       ],
@@ -18462,7 +18924,6 @@
       "type": "table",
       "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18471,7 +18932,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollStatementDetailScreen.vue",
+          "path": "app/components/payroll/NativePayrollStatementDetailScreen.vue",
           "anchor": "PayrollStatementLinesTable"
         }
       ],
@@ -18495,7 +18956,6 @@
       "type": "subtable",
       "condition": "未满足中央 origin + ownerKind + ownerId 来源标记；仅 formatFamily=C2",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18504,8 +18964,264 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollStatementDetailScreen.vue",
+          "path": "app/components/payroll/NativePayrollStatementDetailScreen.vue",
           "anchor": "PayrollStatementDayworkTable"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-0B2DD8359C59",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/snapshot",
+      "label": "snapshot",
+      "type": "detail",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记；冻结结果缺项保留未知，不由当前资料补齐",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "PayrollSnapshotEvidence"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-CA6767AC0202",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/table/工资明细",
+      "label": "工资明细",
+      "type": "subtable",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "title=\"工资明细\""
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-FB5040DC6FAD",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/table/请款成员",
+      "label": "请款成员",
+      "type": "subtable",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "title=\"请款成员\""
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-38C01C9DC506",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/table/收款分配",
+      "label": "收款分配",
+      "type": "subtable",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "title=\"收款分配\""
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-D4822AB88AA4",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/table/关联签工",
+      "label": "关联签工",
+      "type": "subtable",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "title=\"关联签工\""
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-9792D7BFF0B8",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/original",
+      "label": "original",
+      "type": "detail",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记；原表金额与冻结结果分别呈现",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "原工资头业务记录"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-7C0070CE253B",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/history",
+      "label": "history",
+      "type": "subtable",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "PayrollReadHistory"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-A0FBACD602EC"
+    },
+    {
+      "id": "S-5F8E7122D43D",
+      "route": "/subcontract/payroll/:id",
+      "routePattern": "/subcontract/payroll/:id",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "central/evidence",
+      "label": "evidence",
+      "type": "detail",
+      "condition": "未满足中央 origin + ownerKind + ownerId 来源标记",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+          "anchor": "PayrollSourceEvidence"
         }
       ],
       "issueNumbers": [
@@ -18615,7 +19331,6 @@
       "type": "workspace",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18624,7 +19339,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollScreen.vue",
+          "path": "app/components/payroll/NativePayrollScreen.vue",
           "anchor": "PayrollStatementTable"
         }
       ],
@@ -18648,7 +19363,6 @@
       "type": "workspace",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18657,7 +19371,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollScreen.vue",
+          "path": "app/components/payroll/NativePayrollScreen.vue",
           "anchor": "PayrollStatementDetail"
         }
       ],
@@ -18681,7 +19395,6 @@
       "type": "subtable",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18714,7 +19427,6 @@
       "type": "dialog",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18747,7 +19459,6 @@
       "type": "print",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18758,6 +19469,102 @@
         {
           "path": "app/components/payroll/PayrollStatementDetail.vue",
           "anchor": "PayrollPrintSheet"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-CBE397BB8BDD"
+    },
+    {
+      "id": "S-4146ABF50FE6",
+      "route": "/subcontract/payroll",
+      "routePattern": "/subcontract/payroll",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/filters",
+      "label": "filters",
+      "type": "form-section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollScreen.vue",
+          "anchor": "PayrollReadFilters"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-CBE397BB8BDD"
+    },
+    {
+      "id": "S-1E3217B7F28F",
+      "route": "/subcontract/payroll",
+      "routePattern": "/subcontract/payroll",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/ledger",
+      "label": "ledger",
+      "type": "subtable",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollScreen.vue",
+          "anchor": "工资只读台账"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-CBE397BB8BDD"
+    },
+    {
+      "id": "S-E10BFF3DB452",
+      "route": "/subcontract/payroll",
+      "routePattern": "/subcontract/payroll",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/sources",
+      "label": "sources",
+      "type": "source-return",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/index.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollScreen.vue",
+          "anchor": "查看工资来源"
         }
       ],
       "issueNumbers": [
@@ -18809,7 +19616,6 @@
       "type": "form-section",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18818,7 +19624,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollDraftFormPage.vue",
+          "path": "app/components/payroll/NativePayrollDraftFormPage.vue",
           "anchor": "'basic'"
         }
       ],
@@ -18842,7 +19648,6 @@
       "type": "form-section",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18851,7 +19656,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollDraftFormPage.vue",
+          "path": "app/components/payroll/NativePayrollDraftFormPage.vue",
           "anchor": "'source'"
         }
       ],
@@ -18875,7 +19680,6 @@
       "type": "form-section",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18884,7 +19688,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollDraftFormPage.vue",
+          "path": "app/components/payroll/NativePayrollDraftFormPage.vue",
           "anchor": "'members'"
         }
       ],
@@ -18908,7 +19712,6 @@
       "type": "form-section",
       "condition": "按现有路由和 capability",
       "hosts": [
-        "browser",
         "tauri"
       ],
       "sources": [
@@ -18917,7 +19720,7 @@
           "anchor": "<template"
         },
         {
-          "path": "app/components/payroll/PayrollDraftFormPage.vue",
+          "path": "app/components/payroll/NativePayrollDraftFormPage.vue",
           "anchor": "'audit'"
         }
       ],
@@ -18925,6 +19728,259 @@
         412
       ],
       "routeEvidenceId": "E-2965A9E724B0"
+    },
+    {
+      "id": "S-5FB6CAFF3204",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "page",
+      "label": "工作台",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-16A18DF3F811",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/filters",
+      "label": "filters",
+      "type": "form-section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadFilters"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-08998521E388",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/configs",
+      "label": "configs",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'configs'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-E1AB1AFA102D",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/attendance",
+      "label": "attendance",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'attendance'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-3C08B6993F05",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/daywork",
+      "label": "daywork",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'daywork'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-63644B2A1D78",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/tab/locks",
+      "label": "locks",
+      "type": "tab",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "selectedTab === 'locks'"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-37A887BBC5BF",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/history",
+      "label": "history",
+      "type": "subtable",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollReadHistory"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
+    },
+    {
+      "id": "S-20C0CCADCFBB",
+      "route": "/subcontract/payroll/sources",
+      "routePattern": "/subcontract/payroll/sources",
+      "domain": "quantity-payroll",
+      "kind": "subcontract.payroll.sources",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "工作台",
+      "path": "central/evidence",
+      "label": "evidence",
+      "type": "detail",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/payroll/sources.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/payroll/CentralPayrollSourcesScreen.vue",
+          "anchor": "PayrollSourceEvidence"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-3C1576C18107"
     },
     {
       "id": "S-ED03E2A1D592",
@@ -21639,16 +22695,16 @@
         "C-CF708A06FEBF",
         "C-73665550F1A0"
       ],
-      "status": "partial",
+      "status": "current-passed",
       "evidence": [
         {
           "reference": "docs/design/evidence/issue-412-target-cost/README.md",
-          "commit": null,
+          "commit": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
           "recency": "current-run",
-          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；本单元固定提交待登记"
+          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；实际成本仅限定已接来源，不代表完整工资、材料、财务或生产交付"
         }
       ],
-      "remaining": "预算中央链已完成本轮浏览器运行与独立审查，完整检查及固定提交按证据目录登记；不提前取得固定提交完成态。完整工资、材料和财务来源的消费及生产关口继续分项验收。"
+      "remaining": "预算迁移和中央正式保存的限定范围已独立提交并验证。完整工资、材料和财务实际来源继续按 PRG-08/09/10 和对应领域验收；生产关口归 #416。"
     },
     {
       "id": "PRG-08",
@@ -21687,9 +22743,15 @@
           "commit": "ab056768ebf17dd3a2713bb6bc0df37dbb118ba6",
           "recency": "current-run",
           "scope": "中央 WBS 建组、计划与依赖、冻结来源、基线、全图接管及阶段往返；新增暂估绑定见 #445，工资和目标成本另验"
+        },
+        {
+          "reference": "docs/design/evidence/issue-412-target-cost/README.md",
+          "commit": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+          "recency": "current-run",
+          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；实际成本仅限定已接来源，不代表完整工资、材料、财务或生产交付"
         }
       ],
-      "remaining": "#442/#444/#445 已验证排程、绑定与工程量同源下钻及真实阶段聚合。目标成本与工资聚合尚未接齐，继续明确未知，不造零量、零成本或同名关系。"
+      "remaining": "#442/#444/#445 已验证排程、绑定与工程量同源下钻及真实阶段聚合；预算已接入限定合同、结算及支付来源，缺源不伪造总余额。完整工资、材料和财务来源尚未接齐，继续明确未知。"
     },
     {
       "id": "PRG-09",
@@ -21729,9 +22791,15 @@
           "commit": "ab056768ebf17dd3a2713bb6bc0df37dbb118ba6",
           "recency": "current-run",
           "scope": "中央 WBS 建组、计划与依赖、冻结来源、基线、全图接管及阶段往返；新增暂估绑定见 #445，工资和目标成本另验"
+        },
+        {
+          "reference": "docs/design/evidence/issue-412-target-cost/README.md",
+          "commit": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+          "recency": "current-run",
+          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；实际成本仅限定已接来源，不代表完整工资、材料、财务或生产交付"
         }
       ],
-      "remaining": "#444/#445 已覆盖正式项目、分组、任务、阶段、楼栋、月、视图、工种、责任户及绑定来源的上下文往返和深链；目标成本和工资来源往返继续逐链验证。"
+      "remaining": "#444/#445 已覆盖正式项目、分组、任务、阶段、楼栋、月、视图、工种、责任户及绑定来源往返；预算已验证稳定版本、项目及当前合同来源返回。工资与尚未接入的材料、财务来源继续逐链验证。"
     },
     {
       "id": "PRG-10",
@@ -21778,9 +22846,15 @@
           "commit": "ab056768ebf17dd3a2713bb6bc0df37dbb118ba6",
           "recency": "current-run",
           "scope": "中央 WBS 建组、计划与依赖、冻结来源、基线、全图接管及阶段往返；新增暂估绑定见 #445，工资和目标成本另验"
+        },
+        {
+          "reference": "docs/design/evidence/issue-412-target-cost/README.md",
+          "commit": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
+          "recency": "current-run",
+          "scope": "预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；实际成本仅限定已接来源，不代表完整工资、材料、财务或生产交付"
         }
       ],
-      "remaining": "#442/#444/#445 已完成限定中央链的定向契约/组件、五档视口、独立复核与指南/PDF，最终验证及本地提交见各票证据；工资及目标成本联验尚未完成，生产可用归 #416。"
+      "remaining": "#442/#444/#445 及预算中央链均完成各自定向契约/组件、五档视口、独立复核、指南/PDF与完整本地检查，见固定证据；完整工资及实际成本来源联验仍待完成，生产可用归 #416。"
     },
     {
       "id": "WAGE-01",
@@ -44582,7 +45656,7 @@
       "id": "C-5751CF6E9985",
       "surfaceId": "S-F63F731FEC44",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44632,10 +45706,178 @@
       "obligationIds": []
     },
     {
+      "id": "C-1FCDDCECAE96",
+      "surfaceId": "S-3674F4DF4708",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-BCB88C802FE6",
+      "surfaceId": "S-60BEE2CBB67F",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-8CA517C4EBFD",
+      "surfaceId": "S-643537135401",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-059ED8FB4F57",
+      "surfaceId": "S-01D2C66F52A2",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-4B20C7DE4996",
+      "surfaceId": "S-35E0C9FCEAD6",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-4D735968E2BD",
+      "surfaceId": "S-C02B41E78FDD",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-0854FBBF9E88",
+      "surfaceId": "S-4D6EBF74A703",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-BF8364C82DD2",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-7C09C38C854D",
       "surfaceId": "S-AB65CC13A74C",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44685,10 +45927,178 @@
       "obligationIds": []
     },
     {
+      "id": "C-263664A8FCD9",
+      "surfaceId": "S-C9A8A6D98F3C",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-C7596B964513",
+      "surfaceId": "S-E3C40376C5A7",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-EE9963B47F08",
+      "surfaceId": "S-5FF75E53356B",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-19A9B528F716",
+      "surfaceId": "S-22568A3FDFD1",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-440F2953E528",
+      "surfaceId": "S-46C98E70F52D",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-F804644E476D",
+      "surfaceId": "S-2C332E95CBCA",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-4E7BED6AE9DA",
+      "surfaceId": "S-9283AA9AD1CE",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-F3C41F60CBA6",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-A7B5F1FDD485",
       "surfaceId": "S-5A34A61F4C4F",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44746,30 +46156,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-118A4B2D362C",
-      "surfaceId": "S-48BABD70DEED",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-A0FBACD602EC",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-504B9031A419",
       "surfaceId": "S-48BABD70DEED",
       "host": "tauri",
@@ -44786,30 +46172,6 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
-      "id": "C-11FADF2EFC39",
-      "surfaceId": "S-FF50867086CE",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-A0FBACD602EC",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -44842,10 +46204,34 @@
       "obligationIds": []
     },
     {
-      "id": "C-17B0D5896022",
+      "id": "C-64BADE182A53",
       "surfaceId": "S-2D680BA08135",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-532C13E0E9F1",
+      "surfaceId": "S-0B2DD8359C59",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44866,11 +46252,11 @@
       "obligationIds": []
     },
     {
-      "id": "C-64BADE182A53",
-      "surfaceId": "S-2D680BA08135",
-      "host": "tauri",
-      "adapter": "desktop-sqlite",
-      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "id": "C-596973BF1F37",
+      "surfaceId": "S-CA6767AC0202",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
         "status": "not-observed",
@@ -44881,7 +46267,151 @@
         "rules": "needs-review",
         "frontend": "not-verified",
         "crossModule": "not-verified",
-        "production": "out-of-scope"
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-BF97E1994F13",
+      "surfaceId": "S-FB5040DC6FAD",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-DAD6577BEB83",
+      "surfaceId": "S-38C01C9DC506",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-07B8686C6F19",
+      "surfaceId": "S-D4822AB88AA4",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D296AE3D3E3C",
+      "surfaceId": "S-9792D7BFF0B8",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-F2BBF432BAB8",
+      "surfaceId": "S-7C0070CE253B",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-3049BD4563F0",
+      "surfaceId": "S-5F8E7122D43D",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-A0FBACD602EC",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -44989,7 +46519,7 @@
       "id": "C-9C98D806E9B1",
       "surfaceId": "S-816026D9A40D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -45047,30 +46577,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-9B6EA2D84AB1",
-      "surfaceId": "S-CF118B66451B",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-CBE397BB8BDD",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-B105762C8855",
       "surfaceId": "S-CF118B66451B",
       "host": "tauri",
@@ -45087,30 +46593,6 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
-      "id": "C-0DC284263996",
-      "surfaceId": "S-5EB583B1D63F",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-CBE397BB8BDD",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -45143,30 +46625,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-4817B55ED132",
-      "surfaceId": "S-B834A5D33778",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-CBE397BB8BDD",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-D0B8AC70A46A",
       "surfaceId": "S-B834A5D33778",
       "host": "tauri",
@@ -45183,30 +46641,6 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
-      "id": "C-CB220B1BCA24",
-      "surfaceId": "S-FD6233323CD0",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-CBE397BB8BDD",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -45239,30 +46673,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-B1092CA9B866",
-      "surfaceId": "S-8788C78B3D40",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-CBE397BB8BDD",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-A99110434883",
       "surfaceId": "S-8788C78B3D40",
       "host": "tauri",
@@ -45287,10 +46697,82 @@
       "obligationIds": []
     },
     {
+      "id": "C-3A1B9048B32C",
+      "surfaceId": "S-4146ABF50FE6",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-CBE397BB8BDD",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-CCAF65E48F0B",
+      "surfaceId": "S-1E3217B7F28F",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-CBE397BB8BDD",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-6C43AB2AD4B0",
+      "surfaceId": "S-E10BFF3DB452",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-CBE397BB8BDD",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-D8B07FE3B973",
       "surfaceId": "S-F0A4B4588002",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "payroll-browser-readonly",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -45348,30 +46830,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-0F1ECA1BEF70",
-      "surfaceId": "S-B91AB8D8DF40",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-2965A9E724B0",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-8DE996D9BBE3",
       "surfaceId": "S-B91AB8D8DF40",
       "host": "tauri",
@@ -45388,30 +46846,6 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
-      "id": "C-33C2E4127FC1",
-      "surfaceId": "S-8FCE426EA53C",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-2965A9E724B0",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [
@@ -45444,30 +46878,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-818512940840",
-      "surfaceId": "S-16F6418388B1",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-2965A9E724B0",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-B1918E34E9A9",
       "surfaceId": "S-16F6418388B1",
       "host": "tauri",
@@ -45492,30 +46902,6 @@
       "obligationIds": []
     },
     {
-      "id": "C-80A0B1B1BDA0",
-      "surfaceId": "S-2F535C0F344F",
-      "host": "browser",
-      "adapter": "browser-local",
-      "applicability": "in-scope",
-      "sourceState": "wired-needs-action-audit",
-      "reference": {
-        "status": "not-observed",
-        "routeEvidenceId": "E-2965A9E724B0",
-        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
-      },
-      "acceptance": {
-        "rules": "needs-review",
-        "frontend": "not-verified",
-        "crossModule": "not-verified",
-        "production": "not-verified"
-      },
-      "reviewEvidence": [],
-      "remaining": [
-        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
-      ],
-      "obligationIds": []
-    },
-    {
       "id": "C-FE3C21C837BE",
       "surfaceId": "S-2F535C0F344F",
       "host": "tauri",
@@ -45532,6 +46918,222 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D1C140FD72A3",
+      "surfaceId": "S-5FB6CAFF3204",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D3011ED02BDB",
+      "surfaceId": "S-5FB6CAFF3204",
+      "host": "tauri",
+      "adapter": "unsupported",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-632E13691388",
+      "surfaceId": "S-16A18DF3F811",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-86D4CCA647CE",
+      "surfaceId": "S-08998521E388",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-9E709412B53B",
+      "surfaceId": "S-E1AB1AFA102D",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-8157ED817E71",
+      "surfaceId": "S-3C08B6993F05",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D970E9D80969",
+      "surfaceId": "S-63644B2A1D78",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-17B4C427DC32",
+      "surfaceId": "S-37A887BBC5BF",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-76E3C972FEAA",
+      "surfaceId": "S-20C0CCADCFBB",
+      "host": "browser",
+      "adapter": "payroll-browser-readonly",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-3C1576C18107",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [

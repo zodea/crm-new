@@ -3,8 +3,8 @@ import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, reactive } from 'vue'
 import AttendanceGrid from '~/components/payroll/AttendanceGrid.vue'
-import AttendanceScreen from '~/components/payroll/AttendanceScreen.vue'
 import AttendanceSummary from '~/components/payroll/AttendanceSummary.vue'
+import AttendanceScreen from '~/components/payroll/NativeAttendanceScreen.vue'
 
 const workers = [
   { id: 'worker-a', name: '张师傅', crewId: 'crew-a' },

@@ -1,8 +1,11 @@
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import type { PayrollStatementDetailSnapshot } from '~/lib/payroll/detail'
 import { defineStore } from 'pinia'
 import { shallowRef } from 'vue'
 import { getDb } from '~/lib/db/connection'
 import { loadPayrollStatementDetail } from '~/lib/payroll/detail'
+import { loadPayrollDetailRead, requirePayrollNative } from '~/lib/payroll/platform-read'
+import { useDataVisibilityStore } from './data-visibility'
 
 export const usePayrollStatementDetailStore = defineStore('payroll-statement-detail', () => {
   const snapshots = shallowRef<Record<string, PayrollStatementDetailSnapshot | null>>({})
@@ -17,6 +20,7 @@ export const usePayrollStatementDetailStore = defineStore('payroll-statement-det
   }
 
   async function load(statementId: string): Promise<void> {
+    requirePayrollNative()
     const nextLoading = new Set(loadingIds.value)
     nextLoading.add(statementId)
     loadingIds.value = nextLoading
@@ -32,5 +36,5 @@ export const usePayrollStatementDetailStore = defineStore('payroll-statement-det
     }
   }
 
-  return { byId, isLoading, load }
+  return { byId, isLoading, load, loadRead: (query: PayrollQuery, id: string) => loadPayrollDetailRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }, id) }
 })

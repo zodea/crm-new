@@ -1,3 +1,4 @@
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import type {
   SignedDayworkFilter,
   SignedDayworkInput,
@@ -11,7 +12,9 @@ import {
   saveSignedDayworkRecord,
 } from '~/lib/payroll/daywork'
 import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
+import { loadPayrollSourcesRead, requirePayrollNative } from '~/lib/payroll/platform-read'
 import { loadPayrollWorkbenchOptions } from '~/lib/payroll/statements'
+import { useDataVisibilityStore } from './data-visibility'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -39,6 +42,7 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
   const scopeKey = (value: SignedDayworkFilter) => JSON.stringify([value.projectId, value.month, value.crewId ?? ''])
 
   async function load() {
+    requirePayrollNative()
     const sequence = ++loadSequence
     const requestedFilters: SignedDayworkFilter = { ...filters }
     if (snapshotScope !== scopeKey(requestedFilters)) {
@@ -77,11 +81,13 @@ export const useSignedDayworkStore = defineStore('signed-daywork-workbench', () 
   }
 
   async function save(input: SignedDayworkInput) {
+    requirePayrollNative()
     await withTransaction(tx => saveSignedDayworkRecord(tx, input))
     await load()
   }
 
   return {
+    loadRead: (query: PayrollQuery & { projectId: string }) => loadPayrollSourcesRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     records,
     options,
     filters,

@@ -81,12 +81,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 145 |
+| 实现页面文件（含 dev） | 146 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 140 |
+| 实现生产路由（排除 dev） | 141 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 5 |
+| 待补设计（实现有、设计稿没有） | 6 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -134,7 +134,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 11 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -217,3 +217,11 @@
 
 本票未新增路由或提升参考来源等级。识别验收只使用隔离合成原件与本机合成 OCR 服务，真实外部识别质量未代验；税务结果由用户手工核对，不抓取官网或代做验证码。#406 其他文件、#407 其他主档及 #416 生产持久化与部署义务继续开放。
 <!-- issue-447:end -->
+
+<!-- issue-412-payroll-p0:begin -->
+## #412 工资完整资料接管与中央历史只读
+
+工资 P0 达到本地 `slice-verified`：完整旧工资图和独立配置、考勤、签工经受控迁入后，由中央台账、历史详情与来源页读取；冻结缺口、原表金额、零分配与月份锁分别呈现。实际浏览器整批 9 项通过，85 张五档交互图及两份指南共 9 页已逐张检查；完整测试 600 个文件、3697 项，类型、构建和独立双轴复核通过。证据统一见 [工资 P0 验收](./evidence/issue-412-payroll-history/README.md)。
+
+新增 `/subcontract/payroll/sources` 保留独立设计缺口，未继承旧空台账的运行观察。当前浏览器日常工资写入及新输出仍未开放；A/C1/C2 核算发放、独立更正、房补管理费、空鼓扣款、资金建议和完整工作簿继续由 #412 承接，生产由 #416 承接。覆盖账本的旧 WAGE 固定提交回执在后续单元续记，不将本只读切片提升为完整工资链完成。
+<!-- issue-412-payroll-p0:end -->

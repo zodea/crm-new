@@ -4,6 +4,9 @@
 
 | 功能 | 路由 | 当前状态与使用说明 |
 | --- | --- | --- |
+| 工资台账与历史详情 | `/subcontract/payroll`、`/subcontract/payroll/:id` | 浏览器中央接管阶段只读；冻结资料、历史缺口与返回见[工资指南](./payroll-attendance.md) |
+| 考勤、签工与主体配置来源 | `/subcontract/payroll/sources`、`/subcontract/attendance`、`/subcontract/daywork` | 同项目真实来源及月锁查看；包含尚无工资头的独立来源 |
+| 新建工资入口 | `/subcontract/payroll/new` | 浏览器当前阶段明确尚未开放；后续按 A/C1/C2 接通，不回落本地建单 |
 | 目标成本列表 | `/project/target-cost` | 当前浏览器验证实例可用；筛选、基线、删除与恢复见[预算指南](./target-cost.md) |
 | 目标成本版本详情 | `/project/target-cost/:id` | 固定版本科目、来源对比、附件与历史；来源未齐保持未知 |
 | 目标成本新建 / 显式编辑 | `/project/target-cost/form`、`/project/target-cost/form/:id` | 整页版本头与原件保存，缺项目草稿及原提交恢复 |

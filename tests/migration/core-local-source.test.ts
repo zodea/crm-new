@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (/FROM (?:payroll_subject_configs|wage_statements|wage_statement_lines|wage_statement_members|wage_statement_allocations|attendance_records|signed_daywork_records|wage_statement_daywork_records) ORDER BY id/.test(sql))
+    return []
   if (/FROM supplier_(?:credentials|credential_requirements|credential_audits|audits)(?: ORDER BY|$)/.test(sql))
     return []
   if (/FROM schedule_process_librar(?:ies|y_tasks)/.test(sql))
@@ -988,6 +990,7 @@ describe('core migration local source', () => {
       'process_libraries',
       'wbs_projects',
       'target_cost_versions',
+      'payroll_projects',
     ])
   })
 })

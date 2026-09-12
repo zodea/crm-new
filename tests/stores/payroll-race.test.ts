@@ -2,6 +2,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePayrollStore } from '~/stores/payroll'
 
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 interface Deferred<T> {
   promise: Promise<T>
   resolve: (value: T) => void

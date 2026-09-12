@@ -1,3 +1,4 @@
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import type {
   PayrollWorkbenchOptions,
   WageAllocationInput,
@@ -13,6 +14,7 @@ import { computed, reactive, ref, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
 import { upsertC2SubjectConfig } from '~/lib/payroll/daywork'
 import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
+import { loadPayrollListRead, requirePayrollNative } from '~/lib/payroll/platform-read'
 import {
   buildWageDraftSource,
   checkWageStatement,
@@ -22,6 +24,7 @@ import {
   releaseWageStatement,
   updateDraftLinePrice,
 } from '~/lib/payroll/statements'
+import { useDataVisibilityStore } from './data-visibility'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -74,6 +77,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   const scopeKey = (value: WageStatementFilter) => JSON.stringify([value.projectId ?? '', value.month ?? '', value.crewId ?? ''])
 
   async function resolveOptions(projectId: string) {
+    requirePayrollNative()
     const db = await getDb()
     let resolvedProjectId = projectId
     let nextOptions = await loadPayrollWorkbenchOptions(db, resolvedProjectId)
@@ -152,6 +156,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function createDraft(input: PayrollDraftCreateInput) {
+    requirePayrollNative()
     if (input.formatFamily === 'B')
       throw new Error('B 类工资已退役，请选择 A、C1 或 C2')
     const id = await withTransaction(async (tx) => {
@@ -190,6 +195,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function updatePrice(lineId: string, value: number) {
+    requirePayrollNative()
     if (!selected.value)
       return
     await withTransaction(tx => updateDraftLinePrice(tx, selected.value!.id, lineId, value))
@@ -197,6 +203,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   async function checkSelected() {
+    requirePayrollNative()
     if (!selected.value)
       return
     const statement = selected.value
@@ -250,6 +257,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     actualAmount: number,
     allocations: readonly WageAllocationInput[] = [],
   ) {
+    requirePayrollNative()
     if (!selected.value)
       return
     try {
@@ -266,6 +274,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   return {
+    loadRead: (query: PayrollQuery) => loadPayrollListRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     statements,
     options,
     selectedId,

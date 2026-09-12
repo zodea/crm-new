@@ -87,6 +87,8 @@ def overview_screens():
         (445, '暂估后补合同：核对原冻结量与当前合同来源', 'docs/design/evidence/issue-445/browser/comparison-lower-and-confirm-1440.png'),
         (445, '绑定后回读原楼层计划与冻结来源', 'docs/design/evidence/issue-445/browser/original-floor-readonly-390.png'),
         (442, '核对月报基准并冻结申报', 'docs/design/evidence/issue-442/monthly/monthly-submitted-snapshot.png'),
+        (412, '工资分支：接管后核对当时冻结的工资与分配', 'docs/design/evidence/issue-412-payroll-history/browser/healthy-frozen-detail-1440.png'),
+        (412, '工资历史缺口：原表金额与冻结未知分别说明', 'docs/design/evidence/issue-412-payroll-history/browser/missing-snapshot-original-head-390.png'),
         (441, '材料分支：对照原件人工核对送货', 'docs/design/evidence/issue-441/delivery-form-1440.png'),
         (436, '收入分支：保存后回读普通收款', 'docs/design/evidence/issue-436/receipt-detail-1440.png'),
         (412, '回看预算与真实来源；来源未齐时余额保持未知', 'docs/design/evidence/issue-412-target-cost/browser/actual-source-completeness-1440.png'),

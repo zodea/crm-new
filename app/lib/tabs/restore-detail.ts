@@ -5,6 +5,8 @@ import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO, EntityKindDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { parseConstructionContractDetailQuery } from '~/lib/construction-contract/read-page'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
+import { loadPayrollDetailRead } from '~/lib/payroll/platform-read'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { readRestoredCrewWorkerFact } from './restore-crew-worker'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
@@ -52,6 +54,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   const query = { id: detail.id, origin, includeDemo: options.includeDemo() }
   const capabilities = options.capabilities()
   const family = detail.family
+  if (family === 'payroll' && (url.searchParams.has('ownerKind') || url.searchParams.has('ownerId')))
+    return readRestoredCrewWorkerFact({ ...options, detail: { ...detail, family: 'crew-worker-fact', kind: 'wage' } })
   if (family === 'crew-worker-fact' && detail.kind === 'assignment' && !url.searchParams.has('ownerKind') && !url.searchParams.has('ownerId'))
     return readRestoredQuantityUnit(options)
   if (family === 'crew-worker-fact' || (family === 'subcontract-document' && detail.kind === 'penalty' && (url.searchParams.has('ownerKind') || url.searchParams.has('ownerId'))))
@@ -73,6 +77,12 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'payroll') {
+    const scope = payrollViewScope(Object.fromEntries(url.searchParams))
+    const sourceQuery = payrollReadQuery(scope, query.includeDemo)
+    const dto = await loadPayrollDetailRead(repos.payroll, { origin: sourceQuery.origin, includeDemo: sourceQuery.includeDemo }, detail.id)
+    return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('wage-statement', dto.statement.id, `${dto.statement.month} · 工资历史`), origin: dto.context.origin, filters: payrollViewQuery(scope) }
+  }
   if (family === 'target-cost') {
     let dto
     if (origin === 'demo') {

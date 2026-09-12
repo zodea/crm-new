@@ -65,12 +65,13 @@
       "排程已拆为 #443 工序库、#444 中央 WBS、#445 暂估绑定，用户已确认发布，原生父子及依赖关系已核验；#443 已独立提交 a0c06a527e3049188d75f162098cbf294d600dce，三条浏览器流程及 530 文件、3227 项测试通过。",
       "#444 已实际验证合同与暂估建组、调期与依赖、冻结楼层、阶段进度和完整旧图迁入；首页、矩阵、户详情及清单的同源往返与冷刷新通过，66 张交互图及三份指南 18 页已检查。最终提交状态见 #444 独立记录。",
       "#445 已接通冻结暂估绑定、合同楼栋来源更正、陈旧及未决恢复和原楼层返回；实际交互、独立复核及指南 PDF 已验收，完整边界见该子票。",
-      "目标成本预算中央链已完成完整浏览器批次：10 项通过（51.1 秒）。版本头与七科目独立保存、唯一基线、附件与完整旧图接管、并开页签保稿、冲突及同键恢复、删除恢复和项目/来源往返均已实际操作；70 张交互图及三份指南 19 页单独登记。"
+      "目标成本预算中央链已独立提交 b64d52240cb4d229dc5458b4009d5a16a982bc3c：完整检查 589 文件、3628 项通过，浏览器 10 项通过（51.1 秒）。版本头与七科目独立保存、唯一基线、附件与完整旧图接管、并开保稿、冲突及同键恢复、删除恢复和项目/来源往返均已实际操作；70 张交互图及三份指南 19 页已核对。",
+      "工资 P0 完整资料接管与中央历史只读已完成本地验收：600 文件、3697 项测试及类型、构建通过；9 条实际浏览器流程、85 张五档图和两份指南共9页均已检查。坏快照、零成员锁、日志归属、旧备份兼容及多状态返回已修复；日常核算发放仍在后续范围。"
     ],
     "remaining": [
-      "#442–#447 已独立本地提交，远端交付仍待本轮收尾；目标成本预算的完整检查和独立提交按预算验收目录登记。",
+      "#442–#447 及预算中央接管已独立本地提交，尚未推送或部署；完整验证和范围见各自验收目录。",
       "中央 WBS 与新增暂估绑定分别见 #444/#445；预算维护已接通，完整工资、材料和财务成本来源继续实施。",
-      "工资中央来源、防双计、发放冻结与已定调整路径仍须逐条验证，不能以只读保护代替。",
+      "工资 P0 接管与历史只读已完成验收并准备独立提交；A/C1/C2 的中央生成、防双计、发放冻结、更正、实际收付，以及房补、管理费、空鼓和批量工作簿继续逐条完成，不能以只读保护代替。",
       "工程量—排程—A/C1/C2—目标成本的跨模块数量和金额勾稽尚未闭合；缺源保留未知，不产生假余额。"
     ],
     "flow": [
@@ -79,15 +80,16 @@
       "显式配置阶段及唯一报量映射",
       "按合同清单或内部暂估维护计划与工序",
       "分配责任，登记具体户与阶段完成",
+      "已有工资先接管历史；无旧资料不要求迁移",
       "分别读取 A 完成、C1 考勤或 C2 确认签工",
       "生成工资草稿并核对来源、人员和防双计",
       "确认发放并冻结工资及分配快照",
       "回看月报与预算对比，缺源保留未知并回源更正"
     ],
     "exception": {
-      "at": 6,
+      "at": 7,
       "label": "来源变化、缺量或重复计薪：保留草稿，回源修正再核对",
-      "returnTo": 5
+      "returnTo": 6
     },
     "screens": [
       {
@@ -109,6 +111,16 @@
         "title": "工程量矩阵（已实际操作）",
         "action": "查看阶段、责任及合同量/暂估量/现场量，进入户详情",
         "result": "已验证缺失保持未知、明确零保留，矩阵只在自身容器横滚"
+      },
+      {
+        "title": "工资历史接管（已实际操作）",
+        "action": "完整迁入后，从台账查看原发放记录、零分配与原表历史",
+        "result": "完整、部分、缺失和损坏分别说明；原记录100元不会冒充缺失的冻结金额"
+      },
+      {
+        "title": "独立工资来源（已实际操作）",
+        "action": "无工资单项目查询工资配置、考勤、签工及月份锁，再返回原范围",
+        "result": "真实零和未记录分开；同月零成员锁保留，多状态与班组筛选不丢失"
       },
       {
         "title": "工资核对（交互示意）",
@@ -136,7 +148,16 @@
       "docs/design/evidence/issue-412-target-cost/browser/source-return-390.png",
       "docs/design/evidence/issue-412-target-cost/browser/restored-baseline-list-1440.png",
       "docs/design/evidence/issue-412-target-cost/browser/manifest.json",
-      "docs/design/evidence/issue-412-target-cost/pdf/README.md"
+      "docs/design/evidence/issue-412-target-cost/pdf/README.md",
+      "docs/design/evidence/issue-412-payroll-history/README.md",
+      "docs/design/evidence/issue-412-payroll-history/browser/filtered-payroll-list-1440.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/healthy-frozen-detail-1440.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/zero-member-allocation-390.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/independent-source-configuration-1440.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/missing-snapshot-original-head-390.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/retired-b-history-390.png",
+      "docs/design/evidence/issue-412-payroll-history/browser/manifest.json",
+      "docs/design/evidence/issue-412-payroll-history/pdf/README.md"
     ],
     "questions": []
   },

@@ -1,6 +1,7 @@
 import type { RestorableTabPath, TabRestoreValidator } from './restoration-contract'
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
+import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
 import { TARGET_COST_FILTER_KEYS, TARGET_COST_LIST_PATH, TARGET_COST_SOURCE_PATHS, TARGET_COST_SOURCE_QUERY_KEYS, targetCostSourceContext } from '~/lib/target-cost/navigation'
@@ -32,9 +33,10 @@ const LISTS: Record<string, [string, string?]> = {
   '/subcontract/settlement': ['分包结算', 'subcontract-document:read'],
   '/project/penalty': ['项目罚扣', 'subcontract-document:read'],
   '/subcontract/quantity': ['工程量管理'],
-  '/subcontract/payroll': ['工资核算'],
-  '/subcontract/attendance': ['考勤管理'],
-  '/subcontract/daywork': ['签工管理'],
+  '/subcontract/payroll': ['工资台账', 'payroll:read'],
+  '/subcontract/payroll/sources': ['工资来源', 'payroll:read'],
+  '/subcontract/attendance': ['考勤管理', 'payroll:read'],
+  '/subcontract/daywork': ['签工管理', 'payroll:read'],
   '/material/requisition': ['下料单'],
   '/material/arrival': ['材料到货'],
   '/material/use': ['材料领用'],
@@ -84,7 +86,7 @@ const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDeta
   [/^\/finance\/receipt\/([^/]+)$/, m => ({ family: 'receipt', id: m[1]! })],
   [/^\/material\/delivery\/archive\/([^/]+)$/, m => ({ family: 'delivery', id: m[1]! })],
   [/^\/finance\/payment\/([^/]+)\/detail$/, m => ({ family: 'unconnected', id: m[1]! })],
-  [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'wage', id: m[1]! })],
+  [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'payroll', kind: 'wage', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'assignment', id: m[2]!, secondId: m[1]! })],
   [/^\/schedule\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
 ]
@@ -131,6 +133,16 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (detail?.family === 'payroll' || ['/subcontract/payroll', '/subcontract/payroll/sources', '/subcontract/attendance', '/subcontract/daywork'].includes(url.pathname)) {
+      const scope = payrollViewScope(Object.fromEntries([...url.searchParams.keys()].map(key => [key, url.searchParams.getAll(key).length > 1 ? url.searchParams.getAll(key) : url.searchParams.get(key)])))
+      if (scope.error)
+        return null
+      if (scope.status)
+        url.searchParams.set('status', scope.status)
+      else
+        url.searchParams.delete('status')
+      PAYROLL_READ_QUERY_KEYS.forEach(key => allowed.add(key))
+    }
     if (url.pathname === TARGET_COST_LIST_PATH)
       TARGET_COST_FILTER_KEYS.forEach(key => allowed.add(key))
     if ((TARGET_COST_SOURCE_PATHS as readonly string[]).includes(url.pathname)) {

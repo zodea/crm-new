@@ -60,6 +60,12 @@ export const ADAPTERS = {
     storage: '现有中央工作区 SQLite 验证实例与受控迁移；生产持久化仍待 #416',
     sources: [['app/components/target-cost/TargetCostListScreen.vue', 'CentralTargetCostListScreen'], ['server/utils/target-cost-service.ts', 'createTargetCostService']],
   },
+  'payroll-browser-readonly': {
+    read: '工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取',
+    write: '当前仅受控迁移接管完整旧资料；浏览器日常建单、改价、核对、发放与输出尚未开放',
+    storage: '中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416',
+    sources: [['app/components/payroll/PayrollScreen.vue', 'CentralPayrollScreen'], ['server/utils/payroll-service.ts', 'createPayrollService']],
+  },
   'simulation': {
     read: '合成导入演示',
     write: '模拟成功/首次失败，无业务记录写入',
@@ -132,6 +138,10 @@ export function resolveAdapter(surface, host) {
     return 'schedule-binding-browser'
   if (route === '/project/target-cost' || route.startsWith('/project/target-cost/'))
     return host === 'browser' ? 'target-cost-browser' : 'desktop-sqlite'
+  if (route === '/subcontract/payroll/sources' && host === 'tauri')
+    return 'unsupported'
+  if (variant !== 'central-source' && (route === '/subcontract/payroll' || route.startsWith('/subcontract/payroll/') || ['/subcontract/attendance', '/subcontract/daywork'].includes(route)))
+    return host === 'browser' ? 'payroll-browser-readonly' : 'desktop-sqlite'
   if (route === '/contract/boq/building-evidence')
     return 'central-http'
   if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
@@ -320,11 +330,25 @@ export const SUBVIEWS = [
   group({ route: '/subcontract/quantity/template' }, 'app/components/quantity/QuantityTemplateFormPage.vue', mounted('section', ['QuantityTemplateBasicSection', 'QuantityTemplateRoomsSection', 'QuantityTemplateLinesSection'])),
   group({ route: '/subcontract/quantity/stages' }, 'app/components/quantity/QuantityStageFormPage.vue', mounted('section', ['QuantityStageFields', 'QuantityStageReporting'])),
   group({ route: '/subcontract/quantity/region' }, 'app/components/quantity/QuantityRegionFormPage.vue', ['createBuilding', 'createFloor', 'createUnit'].map(key => view(`form/${key}`, key, 'form-section'))),
-  group({ route: '/subcontract/payroll' }, 'app/components/payroll/PayrollScreen.vue', mounted('workspace', ['PayrollStatementTable', 'PayrollStatementDetail'])),
-  group({ route: '/subcontract/payroll' }, 'app/components/payroll/PayrollStatementDetail.vue', [view('embedded/lines', '<table', 'subtable'), ...mounted('dialog', ['PayrollReleaseAllocationDialog']), ...mounted('print', ['PayrollPrintSheet'])]),
-  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/PayrollStatementDetailScreen.vue', mounted('table', ['PayrollStatementMembersTable', 'PayrollStatementLinesTable'])),
-  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/PayrollStatementDetailScreen.vue', [view('table/daywork', 'PayrollStatementDayworkTable', 'subtable', '仅 formatFamily=C2')]),
-  group({ route: '/subcontract/payroll/new' }, 'app/components/payroll/PayrollDraftFormPage.vue', ['basic', 'source', 'members', 'audit'].map(key => view(`section/${key}`, `'${key}'`, 'form-section'))),
+  group({ route: '/subcontract/payroll' }, 'app/components/payroll/NativePayrollScreen.vue', mounted('workspace', ['PayrollStatementTable', 'PayrollStatementDetail']), ['tauri']),
+  group({ route: '/subcontract/payroll' }, 'app/components/payroll/PayrollStatementDetail.vue', [view('embedded/lines', '<table', 'subtable'), ...mounted('dialog', ['PayrollReleaseAllocationDialog']), ...mounted('print', ['PayrollPrintSheet'])], ['tauri']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/NativePayrollStatementDetailScreen.vue', mounted('table', ['PayrollStatementMembersTable', 'PayrollStatementLinesTable']), ['tauri']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/NativePayrollStatementDetailScreen.vue', [view('table/daywork', 'PayrollStatementDayworkTable', 'subtable', '仅 formatFamily=C2')], ['tauri']),
+  group({ route: '/subcontract/payroll/new' }, 'app/components/payroll/NativePayrollDraftFormPage.vue', ['basic', 'source', 'members', 'audit'].map(key => view(`section/${key}`, `'${key}'`, 'form-section')), ['tauri']),
+  group({ route: '/subcontract/payroll' }, 'app/components/payroll/CentralPayrollScreen.vue', [view('central/filters', 'PayrollReadFilters', 'form-section'), view('central/ledger', '工资只读台账', 'subtable'), view('central/sources', '查看工资来源', 'source-return')], ['browser']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/CentralPayrollDetailScreen.vue', [
+    view('central/snapshot', 'PayrollSnapshotEvidence', 'detail', '冻结结果缺项保留未知，不由当前资料补齐'),
+    ...['工资明细', '请款成员', '收款分配', '关联签工'].map(title => view(`central/table/${title}`, `title="${title}"`, 'subtable')),
+    view('central/original', '原工资头业务记录', 'detail', '原表金额与冻结结果分别呈现'),
+    view('central/history', 'PayrollReadHistory', 'subtable'),
+    view('central/evidence', 'PayrollSourceEvidence', 'detail'),
+  ], ['browser']),
+  group({ route: ['/subcontract/payroll/sources', '/subcontract/attendance', '/subcontract/daywork'] }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
+    view('central/filters', 'PayrollReadFilters', 'form-section'),
+    ...['configs', 'attendance', 'daywork', 'locks'].map(key => view(`central/tab/${key}`, `selectedTab === '${key}'`, 'tab')),
+    view('central/history', 'PayrollReadHistory', 'subtable'),
+    view('central/evidence', 'PayrollSourceEvidence', 'detail'),
+  ], ['browser']),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', mounted('workspace', ['ScheduleBoard', 'ScheduleTaskDialog', 'ScheduleDependencyDialog'])),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleTimeline.vue', ['wbs', 'gantt'].map(key => view(`workspace/mobile/${key}`, `'${key}'`, 'matrix'))),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', [view('recovery/pending', 'store.pendingCommand', 'recovery-panel', '未确认原提交结果；弹窗内另提供可达的原提交恢复入口')]),

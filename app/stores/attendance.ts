@@ -1,4 +1,5 @@
 import type { AttendanceRecord } from '~/lib/payroll/attendance'
+import type { PayrollQuery } from '~/lib/payroll/central-contract'
 import { defineStore } from 'pinia'
 import { reactive, shallowRef } from 'vue'
 import { getDb, withTransaction } from '~/lib/db/connection'
@@ -8,7 +9,9 @@ import {
   upsertAttendanceRecord,
 } from '~/lib/payroll/attendance'
 import { payrollScopeFromOptions } from '~/lib/payroll/navigation'
+import { loadPayrollSourcesRead, requirePayrollNative } from '~/lib/payroll/platform-read'
 import { loadPayrollWorkbenchOptions } from '~/lib/payroll/statements'
+import { useDataVisibilityStore } from './data-visibility'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -34,6 +37,7 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
   let loadSequence = 0
 
   async function load(loadOptions: { clearFacts?: boolean } = {}) {
+    requirePayrollNative()
     const sequence = ++loadSequence
     const requestedScope = {
       projectId: filters.projectId,
@@ -89,6 +93,7 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
   }
 
   async function save(input: Parameters<typeof upsertAttendanceRecord>[1]) {
+    requirePayrollNative()
     if (saving.value)
       return false
     saving.value = true
@@ -103,6 +108,7 @@ export const useAttendanceStore = defineStore('attendance-workbench', () => {
   }
 
   return {
+    loadRead: (query: PayrollQuery & { projectId: string }) => loadPayrollSourcesRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     records,
     options,
     blockedWorkerIds,

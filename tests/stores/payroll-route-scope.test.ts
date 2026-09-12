@@ -7,6 +7,8 @@ import { usePayrollStore } from '~/stores/payroll'
 import { useSignedDayworkStore } from '~/stores/signed-daywork'
 import { createMemoryDb } from '../helpers/memory-db'
 
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 let db: TestDb
 vi.mock('~/lib/db/connection', () => ({ getDb: () => Promise.resolve(db), withTransaction: vi.fn() }))
 

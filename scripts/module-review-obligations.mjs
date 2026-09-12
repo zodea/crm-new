@@ -73,6 +73,12 @@ const bindingCentralEvidence = {
   recency: 'current-run',
   scope: '已独立提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署',
 }
+const targetCostCentralEvidence = {
+  reference: 'docs/design/evidence/issue-412-target-cost/README.md',
+  commit: 'b64d52240cb4d229dc5458b4009d5a16a982bc3c',
+  recency: 'current-run',
+  scope: '预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；实际成本仅限定已接来源，不代表完整工资、材料、财务或生产交付',
+}
 
 export const OBLIGATION_STATUS_LABELS = {
   'current-passed': '本轮限定范围已验证',
@@ -409,9 +415,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(349), 'docs/rewrite/pages/target-cost.md'],
     ownerIssue: 412,
     caseIds: targetCostCases,
-    status: 'partial',
-    evidence: [{ reference: 'docs/design/evidence/issue-412-target-cost/README.md', commit: null, recency: 'current-run', scope: '预算中央版本、科目、附件、唯一基线、完整旧图迁入与原提交恢复；本单元固定提交待登记' }],
-    remaining: '预算中央链已完成本轮浏览器运行与独立审查，完整检查及固定提交按证据目录登记；不提前取得固定提交完成态。完整工资、材料和财务来源的消费及生产关口继续分项验收。',
+    status: 'current-passed',
+    evidence: [targetCostCentralEvidence],
+    remaining: '预算迁移和中央正式保存的限定范围已独立提交并验证。完整工资、材料和财务实际来源继续按 PRG-08/09/10 和对应领域验收；生产关口归 #416。',
   },
   {
     id: 'PRG-08',
@@ -420,8 +426,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: progressCases,
     status: 'partial',
-    evidence: [quantityCentralEvidence, wbsCentralEvidence],
-    remaining: '#442/#444/#445 已验证排程、绑定与工程量同源下钻及真实阶段聚合。目标成本与工资聚合尚未接齐，继续明确未知，不造零量、零成本或同名关系。',
+    evidence: [quantityCentralEvidence, wbsCentralEvidence, targetCostCentralEvidence],
+    remaining: '#442/#444/#445 已验证排程、绑定与工程量同源下钻及真实阶段聚合；预算已接入限定合同、结算及支付来源，缺源不伪造总余额。完整工资、材料和财务来源尚未接齐，继续明确未知。',
   },
   {
     id: 'PRG-09',
@@ -430,8 +436,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: progressCases,
     status: 'partial',
-    evidence: [homeScheduleEvidence, wbsCentralEvidence],
-    remaining: '#444/#445 已覆盖正式项目、分组、任务、阶段、楼栋、月、视图、工种、责任户及绑定来源的上下文往返和深链；目标成本和工资来源往返继续逐链验证。',
+    evidence: [homeScheduleEvidence, wbsCentralEvidence, targetCostCentralEvidence],
+    remaining: '#444/#445 已覆盖正式项目、分组、任务、阶段、楼栋、月、视图、工种、责任户及绑定来源往返；预算已验证稳定版本、项目及当前合同来源返回。工资与尚未接入的材料、财务来源继续逐链验证。',
   },
   {
     id: 'PRG-10',
@@ -440,8 +446,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: progressCases,
     status: 'partial',
-    evidence: [homeScheduleEvidence, quantityCentralEvidence, wbsCentralEvidence],
-    remaining: '#442/#444/#445 已完成限定中央链的定向契约/组件、五档视口、独立复核与指南/PDF，最终验证及本地提交见各票证据；工资及目标成本联验尚未完成，生产可用归 #416。',
+    evidence: [homeScheduleEvidence, quantityCentralEvidence, wbsCentralEvidence, targetCostCentralEvidence],
+    remaining: '#442/#444/#445 及预算中央链均完成各自定向契约/组件、五档视口、独立复核、指南/PDF与完整本地检查，见固定证据；完整工资及实际成本来源联验仍待完成，生产可用归 #416。',
   },
   {
     id: 'WAGE-01',

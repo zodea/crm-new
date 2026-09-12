@@ -40,6 +40,7 @@ import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { planPayrollMigration } from './payroll-migration'
 import { prepareProcessLibraryMigration } from './process-library-migration'
 import { processLibraryService, processLibrarySession } from './process-library-runtime'
 import { projectCommandTestInstance } from './project-command-test-instance'
@@ -106,6 +107,9 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  payroll_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
   target_cost_versions: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
   ],
@@ -833,6 +837,43 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       }
     }
 
+    for (const entity of plannedEntities.filter(row => row.entityType === 'payroll_projects')) {
+      try {
+        const snapshot = { authority: 'central' as const, activeBatchId: batchId, entities: plannedEntities }
+        const quantity = planQuantityMigration(snapshot, new Map())
+        const plan = planPayrollMigration(snapshot, new Map(), quantity.incoming.flatMap(row => row.identities.map(identity => ({ ...identity, projectId: row.project.id }))))
+        for (const diagnostic of plan.incoming.find(row => row.entityId === entity.id)!.diagnostics) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'payroll_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'payrollGraphJson',
+            metricKey: 'legacy-audit',
+            sourceValue: diagnostic.recordId ?? entity.legacyId,
+            expectedValue: null,
+            actualValue: null,
+            difference: null,
+            attribution: 'missing-source',
+            reason: `${diagnostic.code}：${diagnostic.message}`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'payroll_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'payrollGraphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工资完整项目图校验失败',
+        }))
+      }
+    }
     for (const entity of plannedEntities.filter(row => row.entityType === 'target_cost_versions')) {
       try {
         // 整批验证同一项目的当前版本唯一性，不能将每版单独通过后交给 SQL 报错。
@@ -1191,6 +1232,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
     if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials', 'wbs_projects'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
       || batch.dto.issues.some(item => item.entityType === 'target_cost_versions' && item.field === 'budgetGraphJson' && item.metricKey === 'apply-failed')
+      || batch.dto.issues.some(item => item.entityType === 'payroll_projects' && item.field === 'payrollGraphJson' && item.metricKey === 'apply-failed')
       || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
     }

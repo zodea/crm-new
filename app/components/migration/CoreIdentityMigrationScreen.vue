@@ -40,6 +40,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   process_libraries: '标准工序库与不可变版本',
   wbs_projects: '项目 WBS 与完整计划历史',
   target_cost_versions: '预算版本与完整明细/附件历史',
+  payroll_projects: '工资与完整考勤、签工历史',
   supplier_credentials: '分供方证照、原件与核验凭证',
   owner_documents: '甲方变洽签、月度报量、验收保修与最终结算',
   workers: '工人',

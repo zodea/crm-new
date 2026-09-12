@@ -6,11 +6,13 @@ import type { QuantityMonthlyBoqFact, QuantityMonthlyReadQuery } from '../../app
 import type { QuantityPersonSource } from '../../app/lib/quantity/central-people'
 import type { QuantityPhotoIdentity } from '../../app/lib/quantity/central-photo'
 import type { PreparedCoreMigration } from './core-migration-preparation'
+import type { ImportedPayrollProject } from './payroll-migration'
 import type { ImportedQuantityProject } from './quantity-migration'
 import type { ImportedBudgetVersion } from './target-cost-migration'
 import type { ImportedWbsProject } from './wbs-migration'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createQuantityService } from '../../app/lib/quantity/central-service'
+import { applyPayrollMigration, assertPayrollMigrationRemoval, planPayrollMigration } from './payroll-migration'
 import { createQuantityDatabase } from './quantity-database'
 import { applyQuantityMigration, planQuantityMigration } from './quantity-migration'
 import { applyBudgetMigration, planBudgetMigration } from './target-cost-migration'
@@ -56,6 +58,8 @@ export function createQuantityTestInstance(options: Options) {
     imports: Map<string, ImportedQuantityProject>
     wbsImports: Map<string, ImportedWbsProject>
     budgetImports: Map<string, ImportedBudgetVersion>
+    payrollImports: Map<string, ImportedPayrollProject>
+    migrationPeople: { crews: Set<string>, workers: Set<string> }
     migrationProjectIds: Set<string>
     migrationLibraryIds: Set<string>
   }
@@ -94,6 +98,8 @@ export function createQuantityTestInstance(options: Options) {
         imports: new Map(),
         wbsImports: new Map(),
         budgetImports: new Map(),
+        payrollImports: new Map(),
+        migrationPeople: { crews: new Set(), workers: new Set() },
         migrationProjectIds: new Set(),
         migrationLibraryIds: new Set(),
       }
@@ -155,17 +161,28 @@ export function createQuantityTestInstance(options: Options) {
         const plan = planQuantityMigration(scope, state.imports)
         const wbs = planWbsMigration(scope, state.wbsImports)
         const budget = planBudgetMigration(scope, state.budgetImports)
+        const payroll = planPayrollMigration(scope, state.payrollImports, [...plan.incoming.flatMap(row => row.identities.map(identity => ({ ...identity, projectId: row.project.id }))), ...[...plan.imports.values()].flatMap(row => row.identities.map(identity => ({ ...identity, projectId: row.projectId })))])
+        const migrationPeople = {
+          crews: new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'crews').map(row => row.id) : []),
+          workers: new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'workers').map(row => row.id) : []),
+        }
+        const removedPeople = {
+          crews: new Set([...state.migrationPeople.crews].filter(id => !migrationPeople.crews.has(id))),
+          workers: new Set([...state.migrationPeople.workers].filter(id => !migrationPeople.workers.has(id))),
+        }
         const migrationProjectIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'projects').map(row => row.id) : [])
         const removedProjectIds = new Set([...state.migrationProjectIds].filter(id => !migrationProjectIds.has(id)))
         const migrationLibraryIds = new Set(scope.authority === 'central' ? scope.entities.filter(row => row.entityType === 'process_libraries').map(row => row.id) : [])
         const removedLibraryIds = new Set([...state.migrationLibraryIds].filter(id => !migrationLibraryIds.has(id)))
         const affectedProjects = [...new Set([...plan.affectedProjects, ...wbs.affectedProjects])]
-        const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || removedProjectIds.size
+        const prepared = affectedProjects.length || removedLibraryIds.size || budget.incoming.length || budget.removed.length || payroll.incoming.length || payroll.removed.length || removedProjectIds.size || removedPeople.crews.size || removedPeople.workers.size
           ? await (await state.driver()).prepare(async (candidate) => {
+              await assertPayrollMigrationRemoval(candidate, payroll, { projects: removedProjectIds, ...removedPeople, quantity: plan.removed.flatMap(row => row.identities) })
               await applyBudgetMigration(candidate, budget, removedProjectIds)
               await removeWbsMigration(candidate, wbs, plan.removed, removedLibraryIds)
               await applyQuantityMigration(candidate, plan)
               await applyWbsMigration(candidate, wbs)
+              await applyPayrollMigration(candidate, payroll)
               for (const projectId of affectedProjects)
                 await candidate.execute('DELETE FROM schedule_command_receipts WHERE project_id = ?', [projectId])
             })
@@ -180,6 +197,8 @@ export function createQuantityTestInstance(options: Options) {
             state.imports = plan.imports
             state.wbsImports = wbs.imports
             state.budgetImports = budget.imports
+            state.payrollImports = payroll.imports
+            state.migrationPeople = migrationPeople
             state.migrationProjectIds = migrationProjectIds
             state.migrationLibraryIds = migrationLibraryIds
             state.service.invalidateProjects(affectedProjects)

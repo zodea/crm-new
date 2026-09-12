@@ -18,6 +18,7 @@ import {
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
+import { payrollReadLocation, payrollReturnTo, payrollViewScope } from '~/lib/payroll/central-navigation'
 import {
   appendProjectSupplierReturnContext,
   validateProjectSupplierIdentityReturnTo,
@@ -348,7 +349,15 @@ const TARGET_REGISTRY = {
     return `${entityPath('/schedule/process-library', intent)}?origin=${origin}`
   },
   'quantity-unit:detail': quantityUnitPath,
-  'wage-statement:detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/subcontract/payroll', intent), intent),
+  'wage-statement:detail': (intent: EntityTargetIntent) => {
+    const path = entityPath('/subcontract/payroll', intent)
+    if (intent.filters.ownerKind != null || intent.filters.ownerId != null)
+      return withCrewWorkerFactContext(path, intent)
+    const scope = payrollViewScope({ ...intent.filters, origin: intent.filters.dataOrigin })
+    if (scope.error)
+      throw new Error('invalid payroll read context')
+    return payrollReadLocation(path, scope)
+  },
   'subcontract-document:penalty-detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/project/penalty', intent), intent),
 } satisfies Record<string, TargetBuilder>
 
@@ -609,7 +618,9 @@ export function resolveNavigationTarget(
       || key === 'quantity-unit:detail'
       || key === 'wage-statement:detail'
       || key === 'subcontract-document:penalty-detail')) {
-      const returnTo = validateCrewWorkerReturnTo(options.returnTo)
+      const returnTo = key === 'wage-statement:detail'
+        ? payrollReturnTo(options.returnTo, isDataOriginDTO(intent.filters.dataOrigin) ? intent.filters.dataOrigin : null) || validateCrewWorkerReturnTo(options.returnTo)
+        : validateCrewWorkerReturnTo(options.returnTo)
       if (returnTo) {
         const separator = to.includes('?') ? '&' : '?'
         to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}`

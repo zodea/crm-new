@@ -192,6 +192,22 @@ describe('core migration test instance', () => {
     await expect(instance.preflight(sourceCommand(`version-${sourceVersion}`, cleanSource({ sourceVersion })), SESSION)).resolves.toBeDefined()
   })
 
+  it.each(['缺省', '显式空数组'])('网络命令保留%s工资图并保持来源哈希', async (mode) => {
+    const baseline = source()
+    const migrationSource = mode === '缺省'
+      ? baseline
+      : source({ entities: { ...baseline.entities, payroll_projects: [] } })
+    const command = sourceCommand(`payroll-optional-${mode}`, migrationSource)
+    const parsed = parseCoreMigrationSourceCommand(JSON.parse(JSON.stringify(command)))
+
+    expect(parsed).toEqual(command)
+    expect(Object.hasOwn(parsed.source.entities, 'payroll_projects')).toBe(mode === '显式空数组')
+    expect(coreMigrationSourceHashInput(parsed.source)).toBe(coreMigrationSourceHashInput(migrationSource))
+    await expect(createCoreMigrationTestInstance().preflight(parsed, SESSION))
+      .resolves
+      .toMatchObject({ sourceHash: migrationSource.sourceHash })
+  })
+
   it('解析网络命令后保持来源哈希与字段顺序无关', async () => {
     const baseline = source()
     const migrationSource = source({

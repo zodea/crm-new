@@ -42,6 +42,7 @@ import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from './deli
 import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from './delivery-source-diagnostics'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
+import { readPayrollProjectMigrationGraphs } from './payroll-source'
 import { readProcessLibraryMigrationGraphs } from './process-library-source'
 import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
 import { readBudgetVersionMigrationGraphs } from './target-cost-source'
@@ -76,7 +77,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials' | 'wbs_projects' | 'target_cost_versions' | 'payroll_projects'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -1233,6 +1234,8 @@ async function buildSource(
       return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'wbs_projects')
       return [entityType, await readWbsMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
+    if (entityType === 'payroll_projects')
+      return [entityType, await readPayrollProjectMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'target_cost_versions')
       return [entityType, await readBudgetVersionMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'quantity_projects') {

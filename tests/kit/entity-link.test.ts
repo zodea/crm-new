@@ -68,7 +68,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       variant: 'detail',
       view: null,
       filters: { dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1', label: '7月工资单' })
+    })).toEqual({ state: 'resolved', to: '/subcontract/payroll/ws1?origin=real', label: '7月工资单' })
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
       subject: { state: 'resolved', entity: 'subcontract-document', id: 'f1', label: 'FK-1', no: null },

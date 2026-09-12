@@ -1,8 +1,17 @@
 {
   "date": "2026-09-13",
   "baseCommit": "59d5c735414e04b90e2cba7f2f750b6151e697bc",
+  "commit": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
   "scope": "目标成本预算中央链；未推送/部署，不代表完整实际来源或生产持久化",
   "checks": {
+    "commit hooks": {
+      "files": 589,
+      "tests": 3628,
+      "failed": 0,
+      "seconds": 210.35,
+      "startedAtLocal": "2026-09-13 02:15:58",
+      "typecheckExitCode": 0
+    },
     "npm test": {
       "files": 589,
       "tests": 3628,
@@ -41,444 +50,564 @@
     "independentReview": {
       "standardsUnresolved": 0,
       "specUnresolved": 0
+    },
+    "commit content": {
+      "files": 109,
+      "unchangedFromPreHookStagedContent": true,
+      "browserHashesMatched": 70,
+      "pdfPagesMatched": 19,
+      "pdfDocumentsMatched": 3
     }
   },
   "codeFiles": [
     {
       "file": "app/components/contract/AuxiliaryContractListScreen.vue",
-      "sha256": "21dbdb9824c2a26489eda5e3e072ef4e376778def85cdb68996a699beef3edbe"
+      "sha256": "21dbdb9824c2a26489eda5e3e072ef4e376778def85cdb68996a699beef3edbe",
+      "committedSha256": "3c09b6dd9c2dd748e783662e67e44a66c78c074d34437ff6c05078b02bb51dfd"
     },
     {
       "file": "app/components/contract/MaterialContractListScreen.vue",
-      "sha256": "7969b54ad687d5ad3a43cb6e9f680734e1ae40cd38f5860cc671b4d20b1c7a71"
+      "sha256": "7969b54ad687d5ad3a43cb6e9f680734e1ae40cd38f5860cc671b4d20b1c7a71",
+      "committedSha256": "7969b54ad687d5ad3a43cb6e9f680734e1ae40cd38f5860cc671b4d20b1c7a71"
     },
     {
       "file": "app/components/contract/SubcontractContractListScreen.vue",
-      "sha256": "bd2cbb4f78dc58580bc4d279deb54629cd17c0397148471cab8a714f1e176b4f"
+      "sha256": "bd2cbb4f78dc58580bc4d279deb54629cd17c0397148471cab8a714f1e176b4f",
+      "committedSha256": "bd2cbb4f78dc58580bc4d279deb54629cd17c0397148471cab8a714f1e176b4f"
     },
     {
       "file": "app/components/master-data/MasterDataFormPage.vue",
-      "sha256": "aebbf374c19f46384d9fe61dcf3af78867b5010808dd2856e1fd695be3f4f23f"
+      "sha256": "aebbf374c19f46384d9fe61dcf3af78867b5010808dd2856e1fd695be3f4f23f",
+      "committedSha256": "20375b15c81eb589f28e0a5d5d1e6bbe6dedcca2acbb770d889fc3d11f706984"
     },
     {
       "file": "app/components/master-data/TargetCostFormFields.vue",
-      "sha256": "b61ee200e99c607efb8503d2508e278215cb05c53014c5f8323de33afb293472"
+      "sha256": "b61ee200e99c607efb8503d2508e278215cb05c53014c5f8323de33afb293472",
+      "committedSha256": "7193afe1b3a278e92443a7518320990a2435f761d47bc1cd5c7af2cb84842cdb"
     },
     {
       "file": "app/components/migration/CoreIdentityMigrationScreen.vue",
-      "sha256": "c5d6a8adb99ea43f6bef480536ca3f53a8f04d658e1bfcb58e73986462d1ba2f"
+      "sha256": "c5d6a8adb99ea43f6bef480536ca3f53a8f04d658e1bfcb58e73986462d1ba2f",
+      "committedSha256": "1240cf53d6ec1ce60b426958031e1f9113b93d2f18bc344ca102f1a3c3bf48a5"
     },
     {
       "file": "app/components/other-settlement/OtherSettlementListScreen.vue",
-      "sha256": "fa9da8493ea11bfeb8eb8154be8e033b9b1d73e93dd780e4df38cca56b854fd1"
+      "sha256": "fa9da8493ea11bfeb8eb8154be8e033b9b1d73e93dd780e4df38cca56b854fd1",
+      "committedSha256": "aaba0bc8a955d373091490a6635e2473f82a3be6db5d3948b3c769f836453472"
     },
     {
       "file": "app/components/owner-document/OwnerDocumentListScreen.vue",
-      "sha256": "0ba40bf097c5069d200a57b7ebe2f322f9cf44f6a7262ab4ac36f0f03eddadb3"
+      "sha256": "0ba40bf097c5069d200a57b7ebe2f322f9cf44f6a7262ab4ac36f0f03eddadb3",
+      "committedSha256": "b1fa56b2f4fb74c9dd158e8b56dafedc43c59c873c2fc004b8ef62e82f740140"
     },
     {
       "file": "app/components/target-cost/CentralTargetCostComparison.vue",
-      "sha256": "25cd46d1d7fb71834bef17766d6e72094c2d2cd2ebef469ca0bd182e71c87b35"
+      "sha256": "25cd46d1d7fb71834bef17766d6e72094c2d2cd2ebef469ca0bd182e71c87b35",
+      "committedSha256": "25cd46d1d7fb71834bef17766d6e72094c2d2cd2ebef469ca0bd182e71c87b35"
     },
     {
       "file": "app/components/target-cost/CentralTargetCostDetailScreen.vue",
-      "sha256": "64079f61430d3478d3742a6354c9b70ebc3640508adb47876e996913b9527493"
+      "sha256": "64079f61430d3478d3742a6354c9b70ebc3640508adb47876e996913b9527493",
+      "committedSha256": "64079f61430d3478d3742a6354c9b70ebc3640508adb47876e996913b9527493"
     },
     {
       "file": "app/components/target-cost/CentralTargetCostFormScreen.vue",
-      "sha256": "b10930f157f54b506a4ebd54df16cec32d8a30d2128b51a3a0dd801c9375ab10"
+      "sha256": "b10930f157f54b506a4ebd54df16cec32d8a30d2128b51a3a0dd801c9375ab10",
+      "committedSha256": "b10930f157f54b506a4ebd54df16cec32d8a30d2128b51a3a0dd801c9375ab10"
     },
     {
       "file": "app/components/target-cost/CentralTargetCostListScreen.vue",
-      "sha256": "c2e47a01bc98000e680c781b515dd9e1c3e878acadc9ee6e40cb00a7a895d3b4"
+      "sha256": "c2e47a01bc98000e680c781b515dd9e1c3e878acadc9ee6e40cb00a7a895d3b4",
+      "committedSha256": "c2e47a01bc98000e680c781b515dd9e1c3e878acadc9ee6e40cb00a7a895d3b4"
     },
     {
       "file": "app/components/target-cost/CentralTargetCostSummary.vue",
-      "sha256": "6c439b6f5d9f3c3c00f915dd42a64ae029bc871f4f857bea37280ac6ad627766"
+      "sha256": "6c439b6f5d9f3c3c00f915dd42a64ae029bc871f4f857bea37280ac6ad627766",
+      "committedSha256": "6c439b6f5d9f3c3c00f915dd42a64ae029bc871f4f857bea37280ac6ad627766"
     },
     {
       "file": "app/components/target-cost/NativeTargetCostDetailScreen.vue",
-      "sha256": "b7c1e44e7a6ab6faa2c97406bcd4473f5c31ad9ca443b99fd44d3333528e9896"
+      "sha256": "b7c1e44e7a6ab6faa2c97406bcd4473f5c31ad9ca443b99fd44d3333528e9896",
+      "committedSha256": "b7c1e44e7a6ab6faa2c97406bcd4473f5c31ad9ca443b99fd44d3333528e9896"
     },
     {
       "file": "app/components/target-cost/NativeTargetCostListScreen.vue",
-      "sha256": "d71b2fb3b36579cc0fa5085dc9f8e70a02e567ff74149a045125df8991cf0663"
+      "sha256": "d71b2fb3b36579cc0fa5085dc9f8e70a02e567ff74149a045125df8991cf0663",
+      "committedSha256": "d71b2fb3b36579cc0fa5085dc9f8e70a02e567ff74149a045125df8991cf0663"
     },
     {
       "file": "app/components/target-cost/TargetCostAttachments.vue",
-      "sha256": "47fb2d8ae42ba05753a6d57a31ebaa1b504a006d9279632f2c01f64760aa297d"
+      "sha256": "47fb2d8ae42ba05753a6d57a31ebaa1b504a006d9279632f2c01f64760aa297d",
+      "committedSha256": "47fb2d8ae42ba05753a6d57a31ebaa1b504a006d9279632f2c01f64760aa297d"
     },
     {
       "file": "app/components/target-cost/TargetCostCommandState.vue",
-      "sha256": "9797a557e2eafdf530471b7f1c84782c6020b90d685a71723bddf99c7d9a4379"
+      "sha256": "9797a557e2eafdf530471b7f1c84782c6020b90d685a71723bddf99c7d9a4379",
+      "committedSha256": "9797a557e2eafdf530471b7f1c84782c6020b90d685a71723bddf99c7d9a4379"
     },
     {
       "file": "app/components/target-cost/TargetCostDetailScreen.vue",
-      "sha256": "cd9c2d7465a11be7acfad38a536cf28d7175a52991953f06f13b2cd1b393b12f"
+      "sha256": "cd9c2d7465a11be7acfad38a536cf28d7175a52991953f06f13b2cd1b393b12f",
+      "committedSha256": "cd9c2d7465a11be7acfad38a536cf28d7175a52991953f06f13b2cd1b393b12f"
     },
     {
       "file": "app/components/target-cost/TargetCostItemEditor.vue",
-      "sha256": "0194227ca262038c04f919ffe6764bec85aacbdbc67b52f9f2d70e749ddf9553"
+      "sha256": "0194227ca262038c04f919ffe6764bec85aacbdbc67b52f9f2d70e749ddf9553",
+      "committedSha256": "0194227ca262038c04f919ffe6764bec85aacbdbc67b52f9f2d70e749ddf9553"
     },
     {
       "file": "app/components/target-cost/TargetCostItemTable.vue",
-      "sha256": "2910174b947c92e304f409b177ab59ac6d4bad6b1fdb2c9eb2cfdfea5bb6ea97"
+      "sha256": "2910174b947c92e304f409b177ab59ac6d4bad6b1fdb2c9eb2cfdfea5bb6ea97",
+      "committedSha256": "2910174b947c92e304f409b177ab59ac6d4bad6b1fdb2c9eb2cfdfea5bb6ea97"
     },
     {
       "file": "app/components/target-cost/TargetCostListFilters.vue",
-      "sha256": "5d1f881cb601ef310deecc2dcb8437e5bf297a7f5d311df015208ecaf3507e67"
+      "sha256": "5d1f881cb601ef310deecc2dcb8437e5bf297a7f5d311df015208ecaf3507e67",
+      "committedSha256": "5d1f881cb601ef310deecc2dcb8437e5bf297a7f5d311df015208ecaf3507e67"
     },
     {
       "file": "app/components/target-cost/TargetCostListScreen.vue",
-      "sha256": "f7f5266618f4fd0c756861449ed1116e6d317e11b1f47b9adc53273595450770"
+      "sha256": "f7f5266618f4fd0c756861449ed1116e6d317e11b1f47b9adc53273595450770",
+      "committedSha256": "f7f5266618f4fd0c756861449ed1116e6d317e11b1f47b9adc53273595450770"
     },
     {
       "file": "app/components/target-cost/TargetCostListTable.vue",
-      "sha256": "b131a71e0a8d2dfaf706b602abf7d4dc483a4510fa01c0d11feacad9fe752af7"
+      "sha256": "b131a71e0a8d2dfaf706b602abf7d4dc483a4510fa01c0d11feacad9fe752af7",
+      "committedSha256": "b131a71e0a8d2dfaf706b602abf7d4dc483a4510fa01c0d11feacad9fe752af7"
     },
     {
       "file": "app/components/target-cost/TargetCostMetricValue.vue",
-      "sha256": "3636241b5cd844e8e255ede55babb7c178144e686f3f98a41fdc03d543876f2c"
+      "sha256": "3636241b5cd844e8e255ede55babb7c178144e686f3f98a41fdc03d543876f2c",
+      "committedSha256": "3636241b5cd844e8e255ede55babb7c178144e686f3f98a41fdc03d543876f2c"
     },
     {
       "file": "app/components/target-cost/TargetCostProjectReturn.vue",
-      "sha256": "581ccae9beb0b9958750e0840911749e195011c6a50e1921e633020383e45c0b"
+      "sha256": "581ccae9beb0b9958750e0840911749e195011c6a50e1921e633020383e45c0b",
+      "committedSha256": "581ccae9beb0b9958750e0840911749e195011c6a50e1921e633020383e45c0b"
     },
     {
       "file": "app/components/target-cost/TargetCostSourceReturn.vue",
-      "sha256": "3e862f67096e56bc6999991a6728b872fb020c245e8e1082dac4b0240c6e11f1"
+      "sha256": "3e862f67096e56bc6999991a6728b872fb020c245e8e1082dac4b0240c6e11f1",
+      "committedSha256": "3e862f67096e56bc6999991a6728b872fb020c245e8e1082dac4b0240c6e11f1"
     },
     {
       "file": "app/composables/useTargetCostDetail.ts",
-      "sha256": "ce2de188d12b33fb7ea5f34bcaf14a6b4421a1d4101daef829b59d5b865750ad"
+      "sha256": "ce2de188d12b33fb7ea5f34bcaf14a6b4421a1d4101daef829b59d5b865750ad",
+      "committedSha256": "ce2de188d12b33fb7ea5f34bcaf14a6b4421a1d4101daef829b59d5b865750ad"
     },
     {
       "file": "app/composables/useTargetCostFiles.ts",
-      "sha256": "cb21a7cc2e76b5bae735e236be6772882e76aaae1bd50f2d64979824b8999460"
+      "sha256": "cb21a7cc2e76b5bae735e236be6772882e76aaae1bd50f2d64979824b8999460",
+      "committedSha256": "cb21a7cc2e76b5bae735e236be6772882e76aaae1bd50f2d64979824b8999460"
     },
     {
       "file": "app/composables/useTargetCostForm.ts",
-      "sha256": "2d49d372c68ae14df9171b0358215d44b9aba5809642ac7460256d1080f6e66f"
+      "sha256": "2d49d372c68ae14df9171b0358215d44b9aba5809642ac7460256d1080f6e66f",
+      "committedSha256": "2d49d372c68ae14df9171b0358215d44b9aba5809642ac7460256d1080f6e66f"
     },
     {
       "file": "app/lib/migration/core-contract.ts",
-      "sha256": "83ac7643973c5b3bc26c929e7740ad9f0f0933e00231640748917da669fb41d6"
+      "sha256": "83ac7643973c5b3bc26c929e7740ad9f0f0933e00231640748917da669fb41d6",
+      "committedSha256": "9a060bbaf1a9c21c6a4812f5c31237e1cb65bfba07d184c9fb3fd5e52c721b7c"
     },
     {
       "file": "app/lib/migration/core-local-source.ts",
-      "sha256": "ba609d1be19f42ba113ecc398f6d76808e0d1a2192e4073551962ec02e6711f1"
+      "sha256": "ba609d1be19f42ba113ecc398f6d76808e0d1a2192e4073551962ec02e6711f1",
+      "committedSha256": "edac686db5bc2d5c4ab4e49794f1d05652968176d4c3414777b1b707ac4cf14f"
     },
     {
       "file": "app/lib/migration/target-cost-source.ts",
-      "sha256": "a21f628f3c65088a5232970c7180d958225701cda88e5c5d739a2f3184f539ed"
+      "sha256": "a21f628f3c65088a5232970c7180d958225701cda88e5c5d739a2f3184f539ed",
+      "committedSha256": "a21f628f3c65088a5232970c7180d958225701cda88e5c5d739a2f3184f539ed"
     },
     {
       "file": "app/lib/nav/target-registry.ts",
-      "sha256": "4dd8077e57624ea19a272349931b925eb82be59e2c5f3063f0b34d5ead99285b"
+      "sha256": "4dd8077e57624ea19a272349931b925eb82be59e2c5f3063f0b34d5ead99285b",
+      "committedSha256": "1c78c95bd0325656bd3445199e86a0a064ff675c4f9468bcc1354ded9f6ad22d"
     },
     {
       "file": "app/lib/tabs/restore-detail.ts",
-      "sha256": "dad29629c42d904ddbaa9c23828983459cf3e7ae2e76e94c7e0cef18db330a10"
+      "sha256": "dad29629c42d904ddbaa9c23828983459cf3e7ae2e76e94c7e0cef18db330a10",
+      "committedSha256": "27ec77c7e2091235f98ce94089cece336f8ce3e789edecffa9a93eb7b7479280"
     },
     {
       "file": "app/lib/tabs/restore-target.ts",
-      "sha256": "fb5a4b0cc3e9a2a3071d3a2dc8e2ba7061f257f9bca27ff4540018b380b16bab"
+      "sha256": "fb5a4b0cc3e9a2a3071d3a2dc8e2ba7061f257f9bca27ff4540018b380b16bab",
+      "committedSha256": "0928ddc31f7fa6ff503abc60ccfd95a8a55296b26a9ac78479c6180713624038"
     },
     {
       "file": "app/lib/target-cost/central-codec.ts",
-      "sha256": "6038b3cb3e4cbc859b59f193d09106f27aab17f61360554589a8609a33490684"
+      "sha256": "6038b3cb3e4cbc859b59f193d09106f27aab17f61360554589a8609a33490684",
+      "committedSha256": "6038b3cb3e4cbc859b59f193d09106f27aab17f61360554589a8609a33490684"
     },
     {
       "file": "app/lib/target-cost/central-contract.ts",
-      "sha256": "955eaadb625f73448009d82e85ada6e04d52076b02b66ed19be12bfeeb9cd8ce"
+      "sha256": "955eaadb625f73448009d82e85ada6e04d52076b02b66ed19be12bfeeb9cd8ce",
+      "committedSha256": "955eaadb625f73448009d82e85ada6e04d52076b02b66ed19be12bfeeb9cd8ce"
     },
     {
       "file": "app/lib/target-cost/central-domain.ts",
-      "sha256": "ed5b8f5b098b15df44cc4c7e79485e6b0859c3d4edf754a6ebad4b8407d94e53"
+      "sha256": "ed5b8f5b098b15df44cc4c7e79485e6b0859c3d4edf754a6ebad4b8407d94e53",
+      "committedSha256": "ed5b8f5b098b15df44cc4c7e79485e6b0859c3d4edf754a6ebad4b8407d94e53"
     },
     {
       "file": "app/lib/target-cost/central-files.ts",
-      "sha256": "0037a5c0091162133b54f04a02c8943bc522ad817898b98f79412a5822be145b"
+      "sha256": "0037a5c0091162133b54f04a02c8943bc522ad817898b98f79412a5822be145b",
+      "committedSha256": "0037a5c0091162133b54f04a02c8943bc522ad817898b98f79412a5822be145b"
     },
     {
       "file": "app/lib/target-cost/central-history.ts",
-      "sha256": "827b5692e48e87a0ab5e193e6c00d9bf6bd7a72d3516df26865d334f96744c81"
+      "sha256": "827b5692e48e87a0ab5e193e6c00d9bf6bd7a72d3516df26865d334f96744c81",
+      "committedSha256": "827b5692e48e87a0ab5e193e6c00d9bf6bd7a72d3516df26865d334f96744c81"
     },
     {
       "file": "app/lib/target-cost/central-repository.ts",
-      "sha256": "8d2de182db37bdf8ae6b51967ae0220dc6f1990f24af138e28f776217ef0a255"
+      "sha256": "8d2de182db37bdf8ae6b51967ae0220dc6f1990f24af138e28f776217ef0a255",
+      "committedSha256": "8d2de182db37bdf8ae6b51967ae0220dc6f1990f24af138e28f776217ef0a255"
     },
     {
       "file": "app/lib/target-cost/central-schema.ts",
-      "sha256": "8f2b7a85279ffcf05ce4ce5ed4f229b5177935307558a7273f369ed31cca0f7d"
+      "sha256": "8f2b7a85279ffcf05ce4ce5ed4f229b5177935307558a7273f369ed31cca0f7d",
+      "committedSha256": "8f2b7a85279ffcf05ce4ce5ed4f229b5177935307558a7273f369ed31cca0f7d"
     },
     {
       "file": "app/lib/target-cost/detail.ts",
-      "sha256": "71a3e905fd87cc22987b5b7862bf6aa0c2f6634f8128df265203a10fd698bb01"
+      "sha256": "71a3e905fd87cc22987b5b7862bf6aa0c2f6634f8128df265203a10fd698bb01",
+      "committedSha256": "71a3e905fd87cc22987b5b7862bf6aa0c2f6634f8128df265203a10fd698bb01"
     },
     {
       "file": "app/lib/target-cost/history-presentation.ts",
-      "sha256": "291684d1ab9c4706edeff8aeaac17745bd51513e6f857bb8747bbd06cc654b37"
+      "sha256": "291684d1ab9c4706edeff8aeaac17745bd51513e6f857bb8747bbd06cc654b37",
+      "committedSha256": "291684d1ab9c4706edeff8aeaac17745bd51513e6f857bb8747bbd06cc654b37"
     },
     {
       "file": "app/lib/target-cost/items.ts",
-      "sha256": "2d96ec3d6e2efb2524d50a5da75f446673b093e6f7118b5c274c457a186baa74"
+      "sha256": "2d96ec3d6e2efb2524d50a5da75f446673b093e6f7118b5c274c457a186baa74",
+      "committedSha256": "2d96ec3d6e2efb2524d50a5da75f446673b093e6f7118b5c274c457a186baa74"
     },
     {
       "file": "app/lib/target-cost/list.ts",
-      "sha256": "e81395396603b2e66500fea4d54a696179e4090823588d75e367cccb021ac89a"
+      "sha256": "e81395396603b2e66500fea4d54a696179e4090823588d75e367cccb021ac89a",
+      "committedSha256": "e81395396603b2e66500fea4d54a696179e4090823588d75e367cccb021ac89a"
     },
     {
       "file": "app/lib/target-cost/local-read.ts",
-      "sha256": "422b4f6012f488b24b7d0c6c34bb79e8b8d8c88d36b9d946541816cbc6b6ec7d"
+      "sha256": "422b4f6012f488b24b7d0c6c34bb79e8b8d8c88d36b9d946541816cbc6b6ec7d",
+      "committedSha256": "422b4f6012f488b24b7d0c6c34bb79e8b8d8c88d36b9d946541816cbc6b6ec7d"
     },
     {
       "file": "app/lib/target-cost/navigation.ts",
-      "sha256": "19698aa4ce93343a5e8c991affee9c8144161251128402392f058c69f0ccecf0"
+      "sha256": "19698aa4ce93343a5e8c991affee9c8144161251128402392f058c69f0ccecf0",
+      "committedSha256": "19698aa4ce93343a5e8c991affee9c8144161251128402392f058c69f0ccecf0"
     },
     {
       "file": "app/lib/target-cost/project-navigation.ts",
-      "sha256": "16d09ed53b33842885a7d08582efcfcef1b67a3dfe0e7cd5d4c0a29091bcede1"
+      "sha256": "16d09ed53b33842885a7d08582efcfcef1b67a3dfe0e7cd5d4c0a29091bcede1",
+      "committedSha256": "16d09ed53b33842885a7d08582efcfcef1b67a3dfe0e7cd5d4c0a29091bcede1"
     },
     {
       "file": "app/pages/project/[id].vue",
-      "sha256": "15f2b2bd0079d657d432e962f96f46a63140eec528c581f38ce20ee432f1529e"
+      "sha256": "15f2b2bd0079d657d432e962f96f46a63140eec528c581f38ce20ee432f1529e",
+      "committedSha256": "6491d4f93d46dda147cbe50ee051e60f54da31cbde289c943cb67918915eeffc"
     },
     {
       "file": "app/plugins/repositories.ts",
-      "sha256": "62beaedb808b3f73f20a792ff463767d75df949364c4df3f0f028269e5591cde"
+      "sha256": "62beaedb808b3f73f20a792ff463767d75df949364c4df3f0f028269e5591cde",
+      "committedSha256": "7498c1aa5e721d3fe4628e0455f45b533de4b47f4863fd86687b9e498ff89cd9"
     },
     {
       "file": "app/stores/target-cost-detail.ts",
-      "sha256": "74e3065758812e567eb7426bf4ed197049de2bf79a75711e653cab3442bdd9e4"
+      "sha256": "74e3065758812e567eb7426bf4ed197049de2bf79a75711e653cab3442bdd9e4",
+      "committedSha256": "74e3065758812e567eb7426bf4ed197049de2bf79a75711e653cab3442bdd9e4"
     },
     {
       "file": "app/stores/target-cost-list.ts",
-      "sha256": "4be3d94016c8bcefc874f4e247846237716b42498537a72adeb7b6ae3fafc81b"
+      "sha256": "4be3d94016c8bcefc874f4e247846237716b42498537a72adeb7b6ae3fafc81b",
+      "committedSha256": "4be3d94016c8bcefc874f4e247846237716b42498537a72adeb7b6ae3fafc81b"
     },
     {
       "file": "app/stores/target-cost.ts",
-      "sha256": "5c3b30eef7c7ecd169b6af09ec6edabeb09bcb12419bb19de3206aab7474c5e8"
+      "sha256": "5c3b30eef7c7ecd169b6af09ec6edabeb09bcb12419bb19de3206aab7474c5e8",
+      "committedSha256": "5c3b30eef7c7ecd169b6af09ec6edabeb09bcb12419bb19de3206aab7474c5e8"
     },
     {
       "file": "e2e/helpers/target-cost-migration-source.ts",
-      "sha256": "739acd2d679f1093528baccc2980a2574027b0ba632fff0fad4bc5281abe2c95"
+      "sha256": "739acd2d679f1093528baccc2980a2574027b0ba632fff0fad4bc5281abe2c95",
+      "committedSha256": "739acd2d679f1093528baccc2980a2574027b0ba632fff0fad4bc5281abe2c95"
     },
     {
       "file": "e2e/target-cost-central.spec.ts",
-      "sha256": "13ad21af3e99e7b8f07a544515a36cae0aeeb5a7433b0dd5e2a08784c0f7faf2"
+      "sha256": "13ad21af3e99e7b8f07a544515a36cae0aeeb5a7433b0dd5e2a08784c0f7faf2",
+      "committedSha256": "13ad21af3e99e7b8f07a544515a36cae0aeeb5a7433b0dd5e2a08784c0f7faf2"
     },
     {
       "file": "e2e/target-cost-detail.spec.ts",
-      "sha256": "46491ce0d945dc7f1821139aab2e676fb0c7e7ef088471d2d6448787f776b593"
+      "sha256": "46491ce0d945dc7f1821139aab2e676fb0c7e7ef088471d2d6448787f776b593",
+      "committedSha256": "46491ce0d945dc7f1821139aab2e676fb0c7e7ef088471d2d6448787f776b593"
     },
     {
       "file": "e2e/target-cost-management.spec.ts",
-      "sha256": "3bcfef49006ddd4ee9f1f989dfe615639d01369d4a8179d6eebec95491c38a1b"
+      "sha256": "3bcfef49006ddd4ee9f1f989dfe615639d01369d4a8179d6eebec95491c38a1b",
+      "committedSha256": "3bcfef49006ddd4ee9f1f989dfe615639d01369d4a8179d6eebec95491c38a1b"
     },
     {
       "file": "scripts/module-review-coverage.mjs",
-      "sha256": "30a9960e869a35fbe8a52aceb8c61ea294a3e2ff792ca4012a1f413ce5f51c36"
+      "sha256": "30a9960e869a35fbe8a52aceb8c61ea294a3e2ff792ca4012a1f413ce5f51c36",
+      "committedSha256": "30a9960e869a35fbe8a52aceb8c61ea294a3e2ff792ca4012a1f413ce5f51c36"
     },
     {
       "file": "scripts/module-review-inventory.mjs",
-      "sha256": "d2ee3fee177f634db6fc5aff15d38c2a421e1b193449135648a68811039c2b18"
+      "sha256": "d2ee3fee177f634db6fc5aff15d38c2a421e1b193449135648a68811039c2b18",
+      "committedSha256": "d2ee3fee177f634db6fc5aff15d38c2a421e1b193449135648a68811039c2b18"
     },
     {
       "file": "scripts/module-review-obligations.mjs",
-      "sha256": "3a1d99a48760fd52dd305d0afc769cb8f1bca1f1f92969089227e6ec125c4f84"
+      "sha256": "3a1d99a48760fd52dd305d0afc769cb8f1bca1f1f92969089227e6ec125c4f84",
+      "committedSha256": "3a1d99a48760fd52dd305d0afc769cb8f1bca1f1f92969089227e6ec125c4f84"
     },
     {
       "file": "server/api/commands/target-costs.post.ts",
-      "sha256": "41436bde2e3746efe65f49e43571ace6a16d95ca3bac6c0ef744f079aa922147"
+      "sha256": "41436bde2e3746efe65f49e43571ace6a16d95ca3bac6c0ef744f079aa922147",
+      "committedSha256": "41436bde2e3746efe65f49e43571ace6a16d95ca3bac6c0ef744f079aa922147"
     },
     {
       "file": "server/api/read/target-costs/[id].get.ts",
-      "sha256": "1a7b7f6c59030881c0d728ee5609eb859e5c9dadd213ca1c090ab0154fcc39f3"
+      "sha256": "1a7b7f6c59030881c0d728ee5609eb859e5c9dadd213ca1c090ab0154fcc39f3",
+      "committedSha256": "1a7b7f6c59030881c0d728ee5609eb859e5c9dadd213ca1c090ab0154fcc39f3"
     },
     {
       "file": "server/api/read/target-costs/[id]/files/[fileId].get.ts",
-      "sha256": "cf1eed33312bb061e59f57fcff4764741615c486985e631e98e80b581ea80da1"
+      "sha256": "cf1eed33312bb061e59f57fcff4764741615c486985e631e98e80b581ea80da1",
+      "committedSha256": "cf1eed33312bb061e59f57fcff4764741615c486985e631e98e80b581ea80da1"
     },
     {
       "file": "server/api/read/target-costs/form.get.ts",
-      "sha256": "a42ea35bb8fb5db2fdb9729475ef2dabdf832188e7083de5e706213f4336899d"
+      "sha256": "a42ea35bb8fb5db2fdb9729475ef2dabdf832188e7083de5e706213f4336899d",
+      "committedSha256": "a42ea35bb8fb5db2fdb9729475ef2dabdf832188e7083de5e706213f4336899d"
     },
     {
       "file": "server/api/read/target-costs/index.get.ts",
-      "sha256": "e5c641e96ab62d9430e1d7b5039cd4d9de411bd64949d451f1c0d2f016a262de"
+      "sha256": "e5c641e96ab62d9430e1d7b5039cd4d9de411bd64949d451f1c0d2f016a262de",
+      "committedSha256": "e5c641e96ab62d9430e1d7b5039cd4d9de411bd64949d451f1c0d2f016a262de"
     },
     {
       "file": "server/utils/business-session.ts",
-      "sha256": "6117ce9f7315575202d9ffe9cfa38ac5904963fbd70789b43f0d8160199a876d"
+      "sha256": "6117ce9f7315575202d9ffe9cfa38ac5904963fbd70789b43f0d8160199a876d",
+      "committedSha256": "7457fd3aa46e501c0a8ec0dba4b8ec75b1940a9f56141a9346b8fe1debec2292"
     },
     {
       "file": "server/utils/core-migration-request.ts",
-      "sha256": "02838447a97eba4f8f37662e087264a6b5b28eeefefa94e18d34be52ebb4e1e3"
+      "sha256": "02838447a97eba4f8f37662e087264a6b5b28eeefefa94e18d34be52ebb4e1e3",
+      "committedSha256": "192919acb63cae3ee2a8e46c4fc659e043dddc4dd2ed45fe6253a801291bd511"
     },
     {
       "file": "server/utils/core-migration-test-instance.ts",
-      "sha256": "e9346bf3048099a1f0e76ebc181cd2089ff4e49c54cf8486158dedab3256bf66"
+      "sha256": "e9346bf3048099a1f0e76ebc181cd2089ff4e49c54cf8486158dedab3256bf66",
+      "committedSha256": "115b6b6217bae51bb0b94be8ae7a6b100585962f4528adf7176c23c3eed3ea86"
     },
     {
       "file": "server/utils/material-contract-command-test-instance.ts",
-      "sha256": "815f06c63664f857c2c136cb0fdd2ea96021ef9b8651aa39f482bd57ee46ddde"
+      "sha256": "815f06c63664f857c2c136cb0fdd2ea96021ef9b8651aa39f482bd57ee46ddde",
+      "committedSha256": "35535975244a0e4f4cf17de2ef7f1953419e7c0512b5fd964b540350e05b8865"
     },
     {
       "file": "server/utils/project-read-test-instance.ts",
-      "sha256": "6d6589eb04b8961e8321a64906a151bcdd92b24d17c738be1b4199a9e0d5f3be"
+      "sha256": "6d6589eb04b8961e8321a64906a151bcdd92b24d17c738be1b4199a9e0d5f3be",
+      "committedSha256": "6d6589eb04b8961e8321a64906a151bcdd92b24d17c738be1b4199a9e0d5f3be"
     },
     {
       "file": "server/utils/quantity-test-instance.ts",
-      "sha256": "4de60eae2cd548b27a4bbe1f03d18d1ad389732debda0dc27faf034c3b95cea1"
+      "sha256": "4de60eae2cd548b27a4bbe1f03d18d1ad389732debda0dc27faf034c3b95cea1",
+      "committedSha256": "4de60eae2cd548b27a4bbe1f03d18d1ad389732debda0dc27faf034c3b95cea1"
     },
     {
       "file": "server/utils/subcontract-contract-command-test-instance.ts",
-      "sha256": "e7a9621bff73f238935a295dfa5b8e88dcbebbd9fe9680b381155c20e9c0030e"
+      "sha256": "e7a9621bff73f238935a295dfa5b8e88dcbebbd9fe9680b381155c20e9c0030e",
+      "committedSha256": "035d909684313e2bd680dbb9af5d7f36db54c98705822684df26895ee45c77c0"
     },
     {
       "file": "server/utils/target-cost-actual-sources.ts",
-      "sha256": "43384292229040a3138177ed2b46d2168cd73f4282814e996da2d2a3bc1b89b7"
+      "sha256": "43384292229040a3138177ed2b46d2168cd73f4282814e996da2d2a3bc1b89b7",
+      "committedSha256": "43384292229040a3138177ed2b46d2168cd73f4282814e996da2d2a3bc1b89b7"
     },
     {
       "file": "server/utils/target-cost-actual.ts",
-      "sha256": "b79a63936bd07abf13b44f2d8411c8e77db474a2405364e5c9b20ae2f4e39793"
+      "sha256": "b79a63936bd07abf13b44f2d8411c8e77db474a2405364e5c9b20ae2f4e39793",
+      "committedSha256": "b79a63936bd07abf13b44f2d8411c8e77db474a2405364e5c9b20ae2f4e39793"
     },
     {
       "file": "server/utils/target-cost-files.ts",
-      "sha256": "e2a220c06d9f2595968529138f56e479dde4aac22f7133fba62ecd0244295cb7"
+      "sha256": "e2a220c06d9f2595968529138f56e479dde4aac22f7133fba62ecd0244295cb7",
+      "committedSha256": "e2a220c06d9f2595968529138f56e479dde4aac22f7133fba62ecd0244295cb7"
     },
     {
       "file": "server/utils/target-cost-migration.ts",
-      "sha256": "130395e006d7f607cc2811633934c5e6754544bd1b7151588b93f35f4c7dd614"
+      "sha256": "130395e006d7f607cc2811633934c5e6754544bd1b7151588b93f35f4c7dd614",
+      "committedSha256": "130395e006d7f607cc2811633934c5e6754544bd1b7151588b93f35f4c7dd614"
     },
     {
       "file": "server/utils/target-cost-runtime.ts",
-      "sha256": "1808e450c7fa885183c22896dc77f44af98bb532de4c69ce286267b170b773a6"
+      "sha256": "1808e450c7fa885183c22896dc77f44af98bb532de4c69ce286267b170b773a6",
+      "committedSha256": "1808e450c7fa885183c22896dc77f44af98bb532de4c69ce286267b170b773a6"
     },
     {
       "file": "server/utils/target-cost-service.ts",
-      "sha256": "41fea2dcd0e894a662d125f62d349460a86767cb90bc619a71fa97220eaafd24"
+      "sha256": "41fea2dcd0e894a662d125f62d349460a86767cb90bc619a71fa97220eaafd24",
+      "committedSha256": "41fea2dcd0e894a662d125f62d349460a86767cb90bc619a71fa97220eaafd24"
     },
     {
       "file": "tests/components/TargetCostCentralDetailState.test.ts",
-      "sha256": "7acd0037aaccd9a63d44845c53a1e03669438cb5d2bab1c0c3b954539196ecf3"
+      "sha256": "7acd0037aaccd9a63d44845c53a1e03669438cb5d2bab1c0c3b954539196ecf3",
+      "committedSha256": "7acd0037aaccd9a63d44845c53a1e03669438cb5d2bab1c0c3b954539196ecf3"
     },
     {
       "file": "tests/components/TargetCostCentralList.test.ts",
-      "sha256": "d5d8712b55eac3d061e3477a71585902ece91ba4c3b913c7b377a3653ca111c0"
+      "sha256": "d5d8712b55eac3d061e3477a71585902ece91ba4c3b913c7b377a3653ca111c0",
+      "committedSha256": "d5d8712b55eac3d061e3477a71585902ece91ba4c3b913c7b377a3653ca111c0"
     },
     {
       "file": "tests/components/TargetCostCentralUiState.test.ts",
-      "sha256": "9e3d7f4aad3d220b5be7a0bba3732026d5f4494234876b9ecf05b3d30652e92d"
+      "sha256": "9e3d7f4aad3d220b5be7a0bba3732026d5f4494234876b9ecf05b3d30652e92d",
+      "committedSha256": "9e3d7f4aad3d220b5be7a0bba3732026d5f4494234876b9ecf05b3d30652e92d"
     },
     {
       "file": "tests/components/TargetCostDetailLeaveGuard.test.ts",
-      "sha256": "366e52958f64c02b17792ee04f1646732947d3ecee93b42598cce06d631e9abc"
+      "sha256": "366e52958f64c02b17792ee04f1646732947d3ecee93b42598cce06d631e9abc",
+      "committedSha256": "366e52958f64c02b17792ee04f1646732947d3ecee93b42598cce06d631e9abc"
     },
     {
       "file": "tests/components/TargetCostFiles.test.ts",
-      "sha256": "52650b11c6ff1a36f21d6ed8b6eb049fe44978d22ef189eb5de3e88b48481f34"
+      "sha256": "52650b11c6ff1a36f21d6ed8b6eb049fe44978d22ef189eb5de3e88b48481f34",
+      "committedSha256": "52650b11c6ff1a36f21d6ed8b6eb049fe44978d22ef189eb5de3e88b48481f34"
     },
     {
       "file": "tests/components/TargetCostItemEditor.test.ts",
-      "sha256": "4baf79af9fdd9018b4d875f070c1ab16d1cf47eaf80e466b170f7514092ab4d7"
+      "sha256": "4baf79af9fdd9018b4d875f070c1ab16d1cf47eaf80e466b170f7514092ab4d7",
+      "committedSha256": "4baf79af9fdd9018b4d875f070c1ab16d1cf47eaf80e466b170f7514092ab4d7"
     },
     {
       "file": "tests/components/TargetCostReadPresentation.test.ts",
-      "sha256": "28a1d51c675edb361e65a6d4bcc5b0bdceca9e42abb9bc3052b463ba680d3bbe"
+      "sha256": "28a1d51c675edb361e65a6d4bcc5b0bdceca9e42abb9bc3052b463ba680d3bbe",
+      "committedSha256": "28a1d51c675edb361e65a6d4bcc5b0bdceca9e42abb9bc3052b463ba680d3bbe"
     },
     {
       "file": "tests/helpers/target-cost-migration-source.ts",
-      "sha256": "063092f0dd1be9a56813ddc1bfdaa3f78ce51e703282956730d968fdff50b643"
+      "sha256": "063092f0dd1be9a56813ddc1bfdaa3f78ce51e703282956730d968fdff50b643",
+      "committedSha256": "063092f0dd1be9a56813ddc1bfdaa3f78ce51e703282956730d968fdff50b643"
     },
     {
       "file": "tests/kit/entity-link.test.ts",
-      "sha256": "bb333b73b27351130a12bb02e1c3a7bc71436a24e6fd83612f7e5490d2888c50"
+      "sha256": "bb333b73b27351130a12bb02e1c3a7bc71436a24e6fd83612f7e5490d2888c50",
+      "committedSha256": "761bd1a31e01aeca5eada4a082fb72305e1fd748c083e30d5b2b27ac4b28643d"
     },
     {
       "file": "tests/master-data/forms.test.ts",
-      "sha256": "068215f46f40216d0b71cf8bb3cafe7dd095da2e0e1f7db42cd50ff2db86bdc0"
+      "sha256": "068215f46f40216d0b71cf8bb3cafe7dd095da2e0e1f7db42cd50ff2db86bdc0",
+      "committedSha256": "d45ec7c02fd1fbb530906b590f3c100b20dc715a401aa278d14e3603e508f8ce"
     },
     {
       "file": "tests/migration/core-local-source.test.ts",
-      "sha256": "f72d94f8c0e9ac12f636c2f8d31c995dd89ca88e37c6bbc1320e6a78dbcaf478"
+      "sha256": "f72d94f8c0e9ac12f636c2f8d31c995dd89ca88e37c6bbc1320e6a78dbcaf478",
+      "committedSha256": "ca8bcf00a1c261f4201812598d258499758b7f71eb33839a0797397e3c89a33e"
     },
     {
       "file": "tests/migration/target-cost-source.test.ts",
-      "sha256": "2c65e1518d1d4b8bd774c27d517460fbc261bebfa0fc3e4718871dbfe2a7e893"
+      "sha256": "2c65e1518d1d4b8bd774c27d517460fbc261bebfa0fc3e4718871dbfe2a7e893",
+      "committedSha256": "2c65e1518d1d4b8bd774c27d517460fbc261bebfa0fc3e4718871dbfe2a7e893"
     },
     {
       "file": "tests/server/business-session.test.ts",
-      "sha256": "44fd15384ab0ad8b9bb2077c4b8285812dfdd80928ab4375ade2efea7991e9f3"
+      "sha256": "44fd15384ab0ad8b9bb2077c4b8285812dfdd80928ab4375ade2efea7991e9f3",
+      "committedSha256": "7c71083c7fc9a08c053ce6dbcd9b2d09a0fc1ecc873cb088914be8c7a945ded0"
     },
     {
       "file": "tests/server/quantity-workspace.test.ts",
-      "sha256": "c5c402e1ab977ad75250ec49075482ed56cec6bdbdf0e46f0cb7ed04cfd8b1e9"
+      "sha256": "c5c402e1ab977ad75250ec49075482ed56cec6bdbdf0e46f0cb7ed04cfd8b1e9",
+      "committedSha256": "c5c402e1ab977ad75250ec49075482ed56cec6bdbdf0e46f0cb7ed04cfd8b1e9"
     },
     {
       "file": "tests/stores/target-cost-central.test.ts",
-      "sha256": "25872b9b4f4d72f465540a823f10316ea185dcf8aaeb5eac5fd4f780c12409db"
+      "sha256": "25872b9b4f4d72f465540a823f10316ea185dcf8aaeb5eac5fd4f780c12409db",
+      "committedSha256": "25872b9b4f4d72f465540a823f10316ea185dcf8aaeb5eac5fd4f780c12409db"
     },
     {
       "file": "tests/stores/target-cost-list-refresh.test.ts",
-      "sha256": "967b6660640432c9821753b4c846a9b0a81ea388dc46846c2f5b4222b8954f2c"
+      "sha256": "967b6660640432c9821753b4c846a9b0a81ea388dc46846c2f5b4222b8954f2c",
+      "committedSha256": "967b6660640432c9821753b4c846a9b0a81ea388dc46846c2f5b4222b8954f2c"
     },
     {
       "file": "tests/stores/target-cost-pending-storage.test.ts",
-      "sha256": "699862227eaa3d6355fd0a3bdbc9bdb7d261eb70a9cf9a8762b158d6401b150c"
+      "sha256": "699862227eaa3d6355fd0a3bdbc9bdb7d261eb70a9cf9a8762b158d6401b150c",
+      "committedSha256": "699862227eaa3d6355fd0a3bdbc9bdb7d261eb70a9cf9a8762b158d6401b150c"
     },
     {
       "file": "tests/tabs/restore-target.test.ts",
-      "sha256": "de8462a10d54dba4d17fd843b6888023c494179cddacf0d6ec7564955cfc4a5f"
+      "sha256": "de8462a10d54dba4d17fd843b6888023c494179cddacf0d6ec7564955cfc4a5f",
+      "committedSha256": "92f9d84b30bf2736e22eadf0fafef05b22f81c02930ae8254c7f9654fd714bc3"
     },
     {
       "file": "tests/tabs/target-cost-restore.test.ts",
-      "sha256": "b3600fe4150baa367ac56612abd6d258b460a815d3981575c7707ce6abbca9c3"
+      "sha256": "b3600fe4150baa367ac56612abd6d258b460a815d3981575c7707ce6abbca9c3",
+      "committedSha256": "b3600fe4150baa367ac56612abd6d258b460a815d3981575c7707ce6abbca9c3"
     },
     {
       "file": "tests/target-cost/central-actual-sources.test.ts",
-      "sha256": "4a68edcf0c7ec84179f8fff3385d88ff86f7d60644e901db5c03093621690243"
+      "sha256": "4a68edcf0c7ec84179f8fff3385d88ff86f7d60644e901db5c03093621690243",
+      "committedSha256": "4a68edcf0c7ec84179f8fff3385d88ff86f7d60644e901db5c03093621690243"
     },
     {
       "file": "tests/target-cost/central-history.test.ts",
-      "sha256": "d69b23a9158cf338dc8f9cddf28a0dc21dfb85f360160d6a48e45ab071f93c56"
+      "sha256": "d69b23a9158cf338dc8f9cddf28a0dc21dfb85f360160d6a48e45ab071f93c56",
+      "committedSha256": "d69b23a9158cf338dc8f9cddf28a0dc21dfb85f360160d6a48e45ab071f93c56"
     },
     {
       "file": "tests/target-cost/central-http.test.ts",
-      "sha256": "33b62e1c0231ad6e1156f4c61c6478eb7a0dcd7f27ae46b6c3f6afc4bd20f201"
+      "sha256": "33b62e1c0231ad6e1156f4c61c6478eb7a0dcd7f27ae46b6c3f6afc4bd20f201",
+      "committedSha256": "33b62e1c0231ad6e1156f4c61c6478eb7a0dcd7f27ae46b6c3f6afc4bd20f201"
     },
     {
       "file": "tests/target-cost/central-runtime.test.ts",
-      "sha256": "73f394db1b6bc96fa787027fdeb23891d96a2b270edb5dbb9eccbce1f1f67abb"
+      "sha256": "73f394db1b6bc96fa787027fdeb23891d96a2b270edb5dbb9eccbce1f1f67abb",
+      "committedSha256": "73f394db1b6bc96fa787027fdeb23891d96a2b270edb5dbb9eccbce1f1f67abb"
     },
     {
       "file": "tests/target-cost/central-service.test.ts",
-      "sha256": "f9a82b0ecbc3de3a1a87945f851090c5247f787895c3cf1748cc0b955b4a7ebc"
+      "sha256": "f9a82b0ecbc3de3a1a87945f851090c5247f787895c3cf1748cc0b955b4a7ebc",
+      "committedSha256": "f9a82b0ecbc3de3a1a87945f851090c5247f787895c3cf1748cc0b955b4a7ebc"
     },
     {
       "file": "tests/target-cost/controlled-migration.test.ts",
-      "sha256": "157f8fb6fbacf5c5d15c6f14d68d8670fffa615ce2a7fac2c10856f13883ba08"
+      "sha256": "157f8fb6fbacf5c5d15c6f14d68d8670fffa615ce2a7fac2c10856f13883ba08",
+      "committedSha256": "157f8fb6fbacf5c5d15c6f14d68d8670fffa615ce2a7fac2c10856f13883ba08"
     },
     {
       "file": "tests/target-cost/files.test.ts",
-      "sha256": "7a1c87fcb2879f86b1362a000c1bd814c6f3b2e93f42dac3f606648b018d28ab"
+      "sha256": "7a1c87fcb2879f86b1362a000c1bd814c6f3b2e93f42dac3f606648b018d28ab",
+      "committedSha256": "7a1c87fcb2879f86b1362a000c1bd814c6f3b2e93f42dac3f606648b018d28ab"
     },
     {
       "file": "tests/target-cost/history-presentation.test.ts",
-      "sha256": "a61c1a5fa98f98a961d879f5e61e5ee635e03af351276959497ea7f6b0901f50"
+      "sha256": "a61c1a5fa98f98a961d879f5e61e5ee635e03af351276959497ea7f6b0901f50",
+      "committedSha256": "a61c1a5fa98f98a961d879f5e61e5ee635e03af351276959497ea7f6b0901f50"
     },
     {
       "file": "tests/target-cost/navigation.test.ts",
-      "sha256": "adaf05eefd3e67b8032c2d5992e19aca07e19903f2bb0cc684c428e171e7ab61"
+      "sha256": "adaf05eefd3e67b8032c2d5992e19aca07e19903f2bb0cc684c428e171e7ab61",
+      "committedSha256": "adaf05eefd3e67b8032c2d5992e19aca07e19903f2bb0cc684c428e171e7ab61"
     },
     {
       "file": "tests/target-cost/null-read.test.ts",
-      "sha256": "4f11f266d4dc7f2523a16d6cf5a8cf8f6ea498055405e1cc9a47fff3cf83a84b"
+      "sha256": "4f11f266d4dc7f2523a16d6cf5a8cf8f6ea498055405e1cc9a47fff3cf83a84b",
+      "committedSha256": "4f11f266d4dc7f2523a16d6cf5a8cf8f6ea498055405e1cc9a47fff3cf83a84b"
     },
     {
       "file": "tests/ui/module-review-coverage.test.ts",
-      "sha256": "80ef62b32c66971f8f5897717d3dcb3c235aa1ae4ab9cf773d7fd24630d7949c"
+      "sha256": "80ef62b32c66971f8f5897717d3dcb3c235aa1ae4ab9cf773d7fd24630d7949c",
+      "committedSha256": "80ef62b32c66971f8f5897717d3dcb3c235aa1ae4ab9cf773d7fd24630d7949c"
     }
-  ]
+  ],
+  "hashBasis": {
+    "sha256": "冻结时原工作区文件字节，可能包含混合行尾",
+    "committedSha256": "b64d52240cb4d229dc5458b4009d5a16a982bc3c 对应 Git blob 字节"
+  }
 }

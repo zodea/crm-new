@@ -5,9 +5,9 @@ import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink, useRoute } from 'vue-router'
-import PayrollStatementDetailScreen from '~/components/payroll/PayrollStatementDetailScreen.vue'
+import PayrollStatementDetailScreen from '~/components/payroll/NativePayrollStatementDetailScreen.vue'
+import SignedDayworkScreen from '~/components/payroll/NativeSignedDayworkScreen.vue'
 import SignedDayworkEntryForm from '~/components/payroll/SignedDayworkEntryForm.vue'
-import SignedDayworkScreen from '~/components/payroll/SignedDayworkScreen.vue'
 import SignedDayworkTable from '~/components/payroll/SignedDayworkTable.vue'
 import SignedDayworkToolbar from '~/components/payroll/SignedDayworkToolbar.vue'
 import EntityDetailShell from '~/components/ui/EntityDetailShell.vue'
@@ -21,6 +21,7 @@ import { useSignedDayworkStore } from '~/stores/signed-daywork'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 vi.mock('~/lib/db/connection', () => ({ getDb: () => Promise.resolve(db), withTransaction: vi.fn() }))
 
 const query = { project: 'project-b', month: '2025-11', crew: 'crew-b', status: '["draft","checked"]' }

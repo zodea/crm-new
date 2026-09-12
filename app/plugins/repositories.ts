@@ -33,6 +33,7 @@ import {
   createHttpOwnerCommercialDocumentCommandRepository,
   createHttpOwnerCommercialDocumentReadRepository,
 } from '~/lib/owner-document/central-http-repository'
+import { createPayrollRepository } from '~/lib/payroll/central-repository'
 import { createHttpProjectSupplierCommandRepository } from '~/lib/project-supplier/command-http-repository'
 import { createHttpProjectSupplierReadRepository } from '~/lib/project-supplier/http-repository'
 import { createHttpProjectCommandRepository } from '~/lib/project/command-http-repository'
@@ -49,6 +50,7 @@ import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository
 import { createTargetCostRepository } from '~/lib/target-cost/central-repository'
 
 export interface DomainRepositories {
+  payroll: ReturnType<typeof createPayrollRepository>
   targetCosts: ReturnType<typeof createTargetCostRepository>
   boqBuilding: ReturnType<typeof createBoqBuildingRepository>
   schedule: ReturnType<typeof createScheduleRepository>
@@ -82,6 +84,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    payroll: createPayrollRepository((url, options) => $fetch<unknown>(url, options)),
     targetCosts: createTargetCostRepository((url, options) => $fetch<unknown>(url, options)),
     boqBuilding: createBoqBuildingRepository((url, options) => $fetch<unknown>(url, options)),
     schedule: createScheduleRepository((url, options) => $fetch<unknown>(url, options)),
