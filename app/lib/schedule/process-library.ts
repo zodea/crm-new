@@ -2,6 +2,7 @@ import type { ScheduleTaskTemplate } from './template'
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, logCreate, visibleCond } from '~/lib/db/soft-delete'
 import { generateId } from '~/lib/util/id'
+import { normalizeProcessLibraryDraft } from './process-library-domain'
 
 export interface ScheduleProcessLibraryOption {
   id: string
@@ -11,7 +12,7 @@ export interface ScheduleProcessLibraryOption {
   description: string
   isDefault: boolean
   taskCount: number
-  usageCount: number
+  usageCount: number | null
 }
 
 export interface ScheduleProcessLibraryTask extends ScheduleTaskTemplate {
@@ -182,66 +183,11 @@ export async function loadScheduleProcessLibraryDetail(
   }
 }
 
-function requiredText(value: string, label: string): string {
-  const normalized = value.trim()
-  if (!normalized)
-    throw new Error(`${label}必填`)
-  return normalized
-}
-
-function normalizedStringList(values: readonly string[]): string[] {
-  return [...new Set(values.map(value => value.trim()).filter(Boolean))]
-}
-
-function validatedTasks(
-  tasks: readonly ScheduleProcessLibraryTaskDraft[],
-): ScheduleProcessLibraryTaskDraft[] {
-  if (!tasks.length)
-    throw new Error('标准工序库至少需要一道工序')
-  const keys = new Set<string>()
-  const result = tasks.map((task, index): ScheduleProcessLibraryTaskDraft => {
-    const key = requiredText(task.key, `第 ${index + 1} 道工序编码`)
-    if (keys.has(key))
-      throw new Error(`工序编码重复：${key}`)
-    const durationDays = Math.trunc(task.durationDays)
-    if (!Number.isFinite(durationDays) || durationDays < 1 || durationDays > 365)
-      throw new Error(`工序「${task.name || key}」工期必须为 1 到 365 天`)
-    keys.add(key)
-    return {
-      key,
-      name: requiredText(task.name, `第 ${index + 1} 道工序名称`),
-      trade: task.trade.trim(),
-      color: task.color.trim() || '#64748b',
-      durationDays,
-      stageCode: task.stageCode?.trim() ?? '',
-      itemCodes: normalizedStringList(task.itemCodes),
-      predecessorKey: task.predecessorKey?.trim() || null,
-      predecessorDisabled: Boolean(task.predecessorDisabled),
-    }
-  })
-  const indexByKey = new Map(result.map((task, index) => [task.key, index]))
-  for (const [index, task] of tasks.entries()) {
-    const predecessorKey = task.predecessorKey?.trim() || null
-    if (predecessorKey && !indexByKey.has(predecessorKey))
-      throw new Error(`工序「${task.name || task.key}」的前置工序不存在`)
-    const predecessorIndex = predecessorKey ? indexByKey.get(predecessorKey)! : -1
-    if (
-      predecessorKey
-      && predecessorIndex >= index
-      && !task.predecessorDisabled
-    ) {
-      throw new Error(`工序「${task.name || task.key}」的前置工序必须排在当前工序之前`)
-    }
-  }
-  return result
-}
-
 export async function createScheduleProcessLibraryVersion(
   db: SoftDb,
   draft: ScheduleProcessLibraryVersionDraft,
 ): Promise<ScheduleProcessLibraryDetail> {
-  const code = requiredText(draft.code, '工序库编码')
-  const name = requiredText(draft.name, '工序库名称')
+  const { code, name, tasks } = normalizeProcessLibraryDraft(draft)
   if (draft.sourceLibraryId) {
     const source = await loadScheduleProcessLibraryDetail(db, draft.sourceLibraryId)
     if (!source)
@@ -249,7 +195,6 @@ export async function createScheduleProcessLibraryVersion(
     if (source.code !== code)
       throw new Error('基于旧版新建时不能修改工序库编码')
   }
-  const tasks = validatedTasks(draft.tasks)
   const [versionRow] = await db.select<{ next_version: number }>(`
     SELECT COALESCE(MAX(version), 0) + 1 AS next_version
     FROM schedule_process_libraries

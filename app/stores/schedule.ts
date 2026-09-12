@@ -11,6 +11,7 @@ import type {
   ScheduleProjectView,
   ScheduleTaskView,
 } from '~/lib/schedule/read-model'
+import { isTauri } from '@tauri-apps/api/core'
 import { useSessionStorage } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
@@ -55,6 +56,7 @@ import {
 import { toErrorMessage } from '~/lib/util/error'
 import { generateId } from '~/lib/util/id'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 interface ScheduleDb {
   execute: typeof execute
@@ -371,6 +373,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const processTasks = shallowRef<Awaited<ReturnType<typeof loadScheduleProcessLibraryTasks>>>([])
   const processTasksLibraryId = shallowRef('')
   let processTaskRequestGeneration = 0
+  let processLibraryRequestGeneration = 0
+  const processLibraryOrigin = () => useDataVisibilityStore().includeDemo ? 'demo' as const : 'real' as const
   const snapshot = shallowRef<ScheduleProjectView | null>(null)
   const loading = shallowRef(false)
   const saving = shallowRef(false)
@@ -476,17 +480,44 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   async function loadProcessLibraries() {
-    processLibraries.value = await loadScheduleProcessLibraries(db)
+    const generation = ++processLibraryRequestGeneration
+    const origin = isTauri() ? 'real' : processLibraryOrigin()
+    processLibraries.value = []
+    const loaded = isTauri()
+      ? await loadScheduleProcessLibraries(db)
+      : (await useNuxtApp().$repositories.processLibraries.list(origin)).libraries
+    if (generation === processLibraryRequestGeneration && (isTauri() || origin === processLibraryOrigin()))
+      processLibraries.value = loaded
   }
 
   async function loadProcessLibraryTasks(libraryId: string) {
     const generation = ++processTaskRequestGeneration
-    const loaded = await loadScheduleProcessLibraryTasks(db, libraryId)
-    if (generation !== processTaskRequestGeneration)
+    const origin = isTauri() ? 'real' : processLibraryOrigin()
+    processTasks.value = []
+    processTasksLibraryId.value = ''
+    const loaded = isTauri()
+      ? await loadScheduleProcessLibraryTasks(db, libraryId)
+      : (await useNuxtApp().$repositories.processLibraries.detail(libraryId, origin)).tasks
+    if (generation !== processTaskRequestGeneration || (!isTauri() && origin !== processLibraryOrigin()))
       return []
     processTasks.value = loaded
     processTasksLibraryId.value = libraryId
     return loaded
+  }
+
+  async function recheckCentralLibraryBeforeWbsWrite(libraryId: string | undefined, templateKeys: readonly string[]): Promise<never> {
+    const origin = processLibraryOrigin()
+    const repository = useNuxtApp().$repositories.processLibraries
+    const catalog = await repository.list(origin)
+    const selected = libraryId ? catalog.libraries.find(row => row.id === libraryId) : catalog.libraries.find(row => row.isDefault) ?? catalog.libraries[0]
+    if (!selected)
+      throw new Error('当前来源的标准工序库版本不存在或已删除')
+    const current = await repository.detail(selected.id, origin)
+    if (origin !== processLibraryOrigin())
+      throw new Error('工序库来源已变化，请重新读取后核对')
+    if (templateKeys.some(key => !current.tasks.some(task => task.key === key)))
+      throw new Error('标准工序库不包含所选工序，请保留草稿并重新核对')
+    throw new Error('浏览器 WBS 写入尚未接入中央服务，草稿已保留；工序库版本可正常维护')
   }
 
   async function previewContractBinding(groupId: string, contractId: string) {
@@ -563,6 +594,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     )
     if (!plannedRows.length)
       throw new Error('请至少选择一道工序')
+    if (!isTauri())
+      return recheckCentralLibraryBeforeWbsWrite(draft.processLibraryId, plannedRows.map(row => row.key))
 
     const groupId = generateId('schedule_group')
     saving.value = true
@@ -1332,6 +1365,8 @@ export const useScheduleStore = defineStore('schedule', () => {
     today = activeToday,
   ) {
     const group = snapshot.value?.groups.find(candidate => candidate.id === groupId)
+    if (group && !isTauri())
+      return recheckCentralLibraryBeforeWbsWrite(group.processLibraryId, [draft.templateKey])
     const template = group
       ? (await loadScheduleProcessLibraryTasks(db, group.processLibraryId))
           .find(candidate => candidate.key === draft.templateKey)

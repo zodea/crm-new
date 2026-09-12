@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 143,
+    "trackedPageFiles": 144,
     "devPageFiles": 5,
-    "appPageFiles": 138,
+    "appPageFiles": 139,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 3,
+    "designPending": 4,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -649,6 +649,13 @@
       "status": "covered"
     },
     {
+      "appRoute": "/schedule/process-library/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "#443 新增不可变工序库版本的独立只读详情；采用已有工序库列表/表单、Table 原语与 ADR 0018 的只读语义，当前没有一一对应的 DC 详情页，按本票五档实际视口验证。",
+      "issue": "#443"
+    },
+    {
       "appRoute": "/schedule/process-library/form",
       "designRoute": "processLibraryForm",
       "status": "covered"
@@ -738,7 +745,7 @@
       "appRoute": "/subcontract/quantity/stages",
       "designRoute": null,
       "status": "design-pending",
-      "reason": "阶段目录与报量映射为 #442 新增整页，当前无一一对应的 DC 页面；按既有实体表单原语实现，运行验收待完成。",
+      "reason": "阶段目录与报量映射为 #442 新增整页，当前无一一对应的 DC 页面；按既有实体表单原语实现，本地运行验收见 evidence/issue-442/README.md，不等于设计源码已覆盖。",
       "issue": "#442"
     },
     {

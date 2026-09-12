@@ -8,6 +8,9 @@ import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
+// 此套件验证桌面 SQLite WBS 适配；浏览器来源在独立中央库套件验证。
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
+
 vi.mock('~/lib/db/connection', () => ({
   execute: async (sql: string, params?: unknown[]) => mem.execute(sql, params),
   select: async (sql: string, params?: unknown[]) => mem.select(sql, params),

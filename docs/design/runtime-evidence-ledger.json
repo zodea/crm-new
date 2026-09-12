@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 143,
+    "trackedPageFiles": 144,
     "devPageFiles": 5,
-    "productionRoutes": 138,
+    "productionRoutes": 139,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 138,
-    "referenceEndpoints": 138,
+    "evidenceEndpointRecords": 139,
+    "referenceEndpoints": 139,
     "referenceProfiles": 42,
     "usedReferenceProfiles": 36,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 22,
+    "localAuthorityRoutes": 23,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 3
+    "designPendingRoutes": 4
   },
   "domains": [
     {
@@ -245,7 +245,7 @@
     {
       "code": "schedule-target-cost",
       "domain": "项目进度成本",
-      "routeCount": 9,
+      "routeCount": 10,
       "implementationIssues": [
         412
       ],
@@ -4068,6 +4068,36 @@
       "stateAndNavigationConclusion": {
         "sourceDocument": "docs/design/runtime-reference-audit.md",
         "routeKey": "/schedule/process-library"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-722913A7E296",
+      "page": "app/pages/schedule/process-library/[id].vue",
+      "localRoute": "/schedule/process-library/:id",
+      "domainCode": "schedule-target-cost",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        289
+      ],
+      "referenceProfile": "R-SCHEDULE-LOCAL",
+      "referenceEndpointId": "local-722913A7E296",
+      "referenceEndpointLabel": "本地权威端点：/schedule/process-library/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/schedule/process-library/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/schedule/process-library/:id"
       },
       "constraints": "C-DENSE"
     },

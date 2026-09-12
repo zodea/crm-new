@@ -177,13 +177,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 143 / 5 / 138 |
+| 跟踪页面文件 / dev / 生产路由 | 144 / 5 / 139 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 138 / 138 |
+| 证据行 / 唯一参考端点 | 139 / 139 |
 | 参考证据档案 / 被路由使用 | 42 / 36 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 22 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 23 |
 | 历史证据 / 未验证目标 | 34 / 10 |
-| 设计已覆盖 / 待补设计 | 135 / 3 |
+| 设计已覆盖 / 待补设计 | 135 / 4 |
 
 | 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
@@ -204,7 +204,7 @@
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 工程量与工资 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
-| 项目进度成本 | 9 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 <!-- runtime-evidence-summary:end -->
@@ -333,6 +333,7 @@
 | `app/pages/schedule/new.vue` | `/schedule/new` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | DC 有新建排程源码但形态早于当前三步向导；业务字段只取其本地蓝本，生产结构按“范围 → 工序 → 确认”与 ADR 0017 / 0018 裁定，不声称红圈有目标页 | 无项目区域时直达区域配置；内部暂估只读手工暂估量；第三步集中汇总范围、依据、周期、依赖与阻断项，失败保留草稿并可重试 | C-FORM |
 | `app/pages/schedule/process-library/form.vue` | `/schedule/process-library/form` | 项目进度成本 | 整页表单 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `forms/ScheduleForms.jsx`、ADR 0014 与本地甘特/精确表格双视图 | 进入页面只读来源版本；只有“保存为新版本”才新增库与工序定义，绝不回写来源版本 | C-FORM |
 | `app/pages/schedule/process-library/index.vue` | `/schedule/process-library` | 项目进度成本 | 列表 | #191 | R-SCHEDULE-LOCAL | 红圈无直接目标页；采用 #244 已补齐的 `ScheduleProcessLibraryScreen.jsx`、本地紧凑列表模板与局部横向滚动 | 只读展示版本、工序数及引用数；编辑动作统一转入新版本整页表单 | C-DENSE |
+| `app/pages/schedule/process-library/[id].vue` | `/schedule/process-library/:id` | 项目进度成本 | 详情 | #443 | R-SCHEDULE-LOCAL | 红圈无直接目标页；当前 DC 无一一对应详情，采用已有工序库列表/表单与 Table 原语，依 ADR 0018 核对不可变版本及本地五档视口 | 只读当前授权版本；基于此版调整进入整页新建，旧版不改；未接中央 WBS 时引用数量未知 | C-DENSE |
 | `app/pages/settings/ocr.vue` | `/settings/ocr` | 系统设置 | 工作台 | #204 | R-OCR-STUDIO-SOURCE | 采用参考项目的单页纵向区块、紧凑密度和底部恢复/保存反馈；字段与能力只按 ADR 0006 的 PaddleOCR-VL 单模型契约实现，不照搬传统 PP-OCRv6 参数 | 当前路由已可达；7 项 VL 文档能力和有界请求/轮询超时保存到本机 SQLite，并真实进入发票、送货单识别请求。Token、API 地址和模型仍由服务端私有配置持有，不提供假保存 | C-TOOL |
 | `app/pages/settings/data-migration.vue` | `/settings/data-migration` | 导入导出 | 工作台 | #294 | R-TOOL-PENDING | 按本地迁移契约使用纵向步骤、预检/备份/对账/切换分区和表内横向滚动；外部参考站没有可安全观察的一一对应迁移页 | 仅浏览器正式工作区可执行；后台权威校验拓扑、整库摘要、映射、实际写入对账和回滚窗口，Tauri 明确不可用；备份字节不上传 | C-TOOL |
 | `app/pages/subcontract/[kind]/[id].vue` | `/subcontract/:kind/:id` | 分包单据 | 详情 | #328 | R-SUB-SETTLEMENT-LIVE-328 | #327 按 DC 分包变洽签字段与本地只读详情蓝本交付 change 专属详情；#328 settlement 现为专属只读详情，编辑使用独立 form 路由 | 分包变洽签及分包结算分别展示专属金额、真实项目/分供方/合同、状态与附件，列表/项目/合同来源可恢复；缺失、无权、错配与重试分态，不补造审批流 | C-FORM |

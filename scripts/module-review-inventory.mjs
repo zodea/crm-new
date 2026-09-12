@@ -98,6 +98,8 @@ export function resolveAdapter(surface, host) {
     return 'tool-local-storage'
   if (route === '/subcontract/quantity/stages')
     return host === 'browser' ? 'central-http' : 'unsupported'
+  if (route === '/schedule/process-library' || route.startsWith('/schedule/process-library/'))
+    return host === 'browser' ? 'central-http' : 'desktop-sqlite'
   if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
     return 'central-http'
   if (route === '/import/mapping/:entity') {

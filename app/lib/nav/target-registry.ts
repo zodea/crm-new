@@ -328,6 +328,12 @@ const TARGET_REGISTRY = {
     return `${entityPath('/material/delivery/archive', intent)}?origin=${intent.filters.dataOrigin}`
   },
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
+  'process-library:detail': (intent: EntityTargetIntent) => {
+    const origin = intent.filters.dataOrigin
+    if (!isDataOriginDTO(origin))
+      throw new Error('invalid process library data origin')
+    return `${entityPath('/schedule/process-library', intent)}?origin=${origin}`
+  },
   'quantity-unit:detail': quantityUnitPath,
   'wage-statement:detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/subcontract/payroll', intent), intent),
   'subcontract-document:penalty-detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/project/penalty', intent), intent),

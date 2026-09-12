@@ -4,7 +4,7 @@
 
 本索引负责防遗漏，不定义业务规格，也不是完成率。路由来源为 [运行证据账本](./runtime-evidence-ledger.json)；子视图和宿主接线来自实际源码。父路由的 direct/historical 等级不自动赋给子视图。逐场景规则、差异和验收继续写入 [模块复核规程](../agents/module-review.md) 指定的当前 Issue。
 
-现有 138 条生产路由展开为 194 个路由变体、562 个页面/子视图、1018 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
+现有 139 条生产路由展开为 195 个路由变体、563 个页面/子视图、1020 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
 
 实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。
 
@@ -762,9 +762,10 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/schedule` view | schedule / default | workspace/mobile/wbs · wbs | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
 | `/schedule` view | schedule / default | workspace/mobile/gantt · gantt | browser-local / desktop-sqlite | [app/components/schedule/ScheduleTimeline.vue](../../app/components/schedule/ScheduleTimeline.vue) |
 | `/schedule/new` new | schedule / default | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/schedule/new.vue](../../app/pages/schedule/new.vue) |
-| `/schedule/process-library/form` new | process-library / new | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
-| `/schedule/process-library/form?source=:versionId` new | process-library / copy-version | page · 整页表单 | browser-local / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
-| `/schedule/process-library` view | schedule.process-library / default | page · 列表 | browser-local / desktop-sqlite | [app/pages/schedule/process-library/index.vue](../../app/pages/schedule/process-library/index.vue) |
+| `/schedule/process-library/form` new | process-library / new | page · 整页表单 | central-http / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
+| `/schedule/process-library/form?source=:versionId` new | process-library / copy-version | page · 整页表单 | central-http / desktop-sqlite | [app/pages/schedule/process-library/form.vue](../../app/pages/schedule/process-library/form.vue) |
+| `/schedule/process-library` view | schedule.process-library / default | page · 列表 | central-http / desktop-sqlite | [app/pages/schedule/process-library/index.vue](../../app/pages/schedule/process-library/index.vue) |
+| `/schedule/process-library/:id` view | schedule.process-library / default | page · 详情 | central-http / desktop-sqlite | [app/pages/schedule/process-library/[id].vue](../../app/pages/schedule/process-library/[id].vue) |
 
 ### 导入导出（#406/#414）
 

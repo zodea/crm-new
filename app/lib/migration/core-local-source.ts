@@ -42,6 +42,7 @@ import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from './deli
 import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from './delivery-source-diagnostics'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
+import { readProcessLibraryMigrationGraphs } from './process-library-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -72,7 +73,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -1202,6 +1203,8 @@ async function buildSource(
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
+    if (entityType === 'process_libraries')
+      return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'quantity_projects') {
       const projects = await readQuantityMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
       return [entityType, projects.map(({ project, graph }): CoreMigrationSourceEntityDTO => ({

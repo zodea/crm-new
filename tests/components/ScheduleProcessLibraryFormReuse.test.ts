@@ -12,6 +12,9 @@ import {
 } from 'vue'
 import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
 
+vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
+vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
+
 const NuxtLinkStub = defineComponent({
   setup(_, { slots }) {
     return () => h('a', { href: '#' }, slots.default?.())
@@ -67,6 +70,10 @@ describe('标准工序库表单页签复用', () => {
       loading: shallowRef(false),
       saving: shallowRef(false),
       error: shallowRef(''),
+      origin: shallowRef('real'),
+      canWrite: shallowRef(true),
+      readVersion: shallowRef(null),
+      loadLibraries: vi.fn(async () => undefined),
       loadDetail,
       saveVersion: vi.fn(),
     }))
@@ -126,6 +133,6 @@ describe('标准工序库表单页签复用', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: '新建标准工序库' })).not.toBeNull(),
     )
-    expect((screen.getByLabelText('工序库编码 *') as HTMLInputElement).value).toBe('')
+    expect((await screen.findByLabelText('工序库编码 *') as HTMLInputElement).value).toBe('')
   })
 })

@@ -4,9 +4,12 @@ import type {
   ScheduleProvisionalBuildingPreview,
   ScheduleProvisionalScopePreview,
 } from '~/stores/schedule'
+import { onActivated } from 'vue'
 import { addCalendarDays, calendarDays, planTemplateTasks } from '~/lib/schedule/planning'
+import { processLibraryNavigationQuery } from '~/lib/schedule/process-library-navigation'
 import { toErrorMessage } from '~/lib/util/error'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
 
 interface TaskDraft {
   templateKey: string
@@ -49,6 +52,9 @@ const initialized = shallowRef(false)
 const loadingRange = shallowRef(false)
 const loadError = shallowRef('')
 const currentStep = shallowRef<WizardStep>(1)
+const visibility = useDataVisibilityStore()
+const libraryOrigin = computed(() => visibility.includeDemo ? 'demo' : 'real')
+const libraryReturnTo = computed(() => projectId.value ? `/schedule/new?${new URLSearchParams({ project: projectId.value, origin: libraryOrigin.value })}` : null)
 const provisionalPreview = shallowRef<ScheduleProvisionalScopePreview | null>(null)
 
 const templateByKey = computed(() => new Map(store.processTasks.map(template => [template.key, template])))
@@ -644,6 +650,10 @@ async function initialize() {
 }
 
 onMounted(initialize)
+onActivated(() => {
+  if (initialized.value)
+    void store.loadProcessLibraries().catch(cause => warning(`工序库列表读取失败，当前建组草稿已保留：${toErrorMessage(cause)}`))
+})
 </script>
 
 <template>
@@ -876,7 +886,7 @@ onMounted(initialize)
             {{ activeProcessLibrary?.name ?? '标准工序' }} · 已启用 {{ enabledCount }} 道 · 预计完成 {{ finishDate }}
           </div>
           <NuxtLink
-            to="/schedule/process-library"
+            :to="{ path: '/schedule/process-library', query: processLibraryNavigationQuery(libraryOrigin, libraryReturnTo) }"
             class="text-11px font-700 text-brand hover:underline"
           >
             维护标准工序库 →

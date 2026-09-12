@@ -73,6 +73,14 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'process-library') {
+    const catalog = await repos.processLibraries.list(origin, { signal: options.signal })
+    checkRestoreAbort(options.signal)
+    if (!catalog.capabilities.includes(capability))
+      return restoreProblem('forbidden')
+    const record = await repos.processLibraries.detail(detail.id, origin, { signal: options.signal })
+    return { ...common, capabilities: catalog.capabilities, sourceVersion: record.sourceVersion, subject: reference('process-library', record.id, `${record.name} v${record.version}`), origin: record.dataOrigin }
+  }
   if (family === 'project' || family === 'schedule-project') {
     const dto = await repos.projectList.get(query)
     return { ...common, ...dto, subject: dto.item.project, origin: dto.item.dataOrigin }

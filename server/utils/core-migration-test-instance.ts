@@ -40,6 +40,8 @@ import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
+import { prepareProcessLibraryMigration } from './process-library-migration'
+import { processLibraryService, processLibrarySession } from './process-library-runtime'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { planQuantityMigration } from './quantity-migration'
 import { quantityTestInstance } from './quantity-runtime'
@@ -684,6 +686,28 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       }
     }
 
+    try {
+      prepareProcessLibraryMigration([], { authority: 'central', activeBatchId: batchId, entities: plannedEntities })
+    }
+    catch (cause) {
+      const entity = plannedEntities.find(row => row.entityType === 'process_libraries')
+      if (entity) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'process_libraries',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工序库完整来源图校验失败',
+        }))
+      }
+    }
+
     for (const entity of plannedEntities.filter(row => row.entityType === 'quantity_projects')) {
       try {
         const plan = planQuantityMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities.filter(row => row.entityType !== 'quantity_projects' || row.id === entity.id) }, new Map())
@@ -1040,7 +1064,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
-    if (batch.dto.issues.some(item => item.entityType === 'quantity_projects' && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
       || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
     }
@@ -1241,6 +1265,7 @@ export function synchronizeCoreMigrationCommandSources(
 }
 
 const commandSources = [
+  { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => processLibraryService.prepareMigrationSnapshot(snapshot, processLibrarySession()) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => auxiliaryContractInstance().prepareMigrationSnapshot(snapshot) },
   { prepareMigrationSnapshot: (snapshot: CoreMigrationSnapshotDTO) => otherSettlementInstance().prepareMigrationSnapshot(snapshot) },
   projectCommandTestInstance,

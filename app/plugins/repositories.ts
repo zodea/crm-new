@@ -38,12 +38,14 @@ import { createHttpProjectCommandRepository } from '~/lib/project/command-http-r
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
 import { createReceiptRepository } from '~/lib/receipt/repository'
+import { createProcessLibraryRepository } from '~/lib/schedule/process-library-repository'
 import { createHttpSubcontractContractCommandRepository } from '~/lib/subcontract-contract/command-http-repository'
 import { createHttpSubcontractContractReadRepository } from '~/lib/subcontract-contract/http-repository'
 import { createHttpSupplierCommandRepository } from '~/lib/supplier/command-http-repository'
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  processLibraries: ReturnType<typeof createProcessLibraryRepository>
   quantity: ReturnType<typeof createQuantityRepository>
   deliveries: ReturnType<typeof createDeliveryRepository>
   receipts: ReturnType<typeof createReceiptRepository>
@@ -72,6 +74,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    processLibraries: createProcessLibraryRepository((url, options) => $fetch(url, options)),
     quantity: createQuantityRepository((url, options) => $fetch(url, options)),
     deliveries: createDeliveryRepository((url, options) => $fetch(url, options)),
     receipts: createReceiptRepository((url, options) => $fetch(url, options)),

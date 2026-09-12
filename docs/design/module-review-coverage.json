@@ -99,10 +99,10 @@
     ]
   },
   "counts": {
-    "productionRoutes": 138,
-    "rootVariants": 194,
-    "surfaces": 562,
-    "environmentCases": 1018,
+    "productionRoutes": 139,
+    "rootVariants": 195,
+    "surfaces": 563,
+    "environmentCases": 1020,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -1331,7 +1331,7 @@
       "issues": [
         412
       ],
-      "surfaces": 26
+      "surfaces": 27
     },
     {
       "code": "import-export",
@@ -15641,6 +15641,35 @@
         412
       ],
       "routeEvidenceId": "E-A5F8F88D1193"
+    },
+    {
+      "id": "S-E1674426E0C0",
+      "route": "/schedule/process-library/:id",
+      "routePattern": "/schedule/process-library/:id",
+      "domain": "schedule-target-cost",
+      "kind": "schedule.process-library",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "page",
+      "label": "详情",
+      "type": "page",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser",
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/schedule/process-library/[id].vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-722913A7E296"
     },
     {
       "id": "S-A2DF8AAD417C",
@@ -39765,7 +39794,7 @@
       "id": "C-FE99FD43A2E4",
       "surfaceId": "S-D5BD0429F7EA",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -39813,7 +39842,7 @@
       "id": "C-0F31EBC34647",
       "surfaceId": "S-DCF0953E53F2",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -39861,7 +39890,7 @@
       "id": "C-9DF8B5F039C1",
       "surfaceId": "S-AC84F93C6A5A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -39891,6 +39920,54 @@
       "reference": {
         "status": "not-observed",
         "routeEvidenceId": "E-A5F8F88D1193",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-E43E17D9D11D",
+      "surfaceId": "S-E1674426E0C0",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-722913A7E296",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-ACFF80CF5D39",
+      "surfaceId": "S-E1674426E0C0",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-722913A7E296",
         "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
       },
       "acceptance": {

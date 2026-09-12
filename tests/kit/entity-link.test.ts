@@ -176,6 +176,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'owner-document:report',
       'owner-document:warranty',
       'payment-application:detail',
+      'process-library:detail',
       'project:detail',
       'project:supplier-workbench',
       'quantity-unit:detail',

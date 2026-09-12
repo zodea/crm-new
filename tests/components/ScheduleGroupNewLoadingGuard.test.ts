@@ -12,6 +12,8 @@ import {
 } from 'vue'
 import ScheduleGroupNewScreen from '~/components/schedule/ScheduleGroupNewScreen.vue'
 
+vi.mock('~/stores/data-visibility', () => ({ useDataVisibilityStore: () => ({ includeDemo: false }) }))
+
 const NuxtLinkStub = defineComponent({
   setup(_, { slots }) {
     return () => h('a', { href: '#' }, slots.default?.())

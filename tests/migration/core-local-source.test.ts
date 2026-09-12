@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (/FROM schedule_process_librar(?:ies|y_tasks)/.test(sql))
+    return []
   if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
     return []
   if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs)(?: WHERE | ORDER BY )/.test(sql))
@@ -939,6 +941,7 @@ describe('core migration local source', () => {
       'workers',
       'project_suppliers',
       'quantity_projects',
+      'process_libraries',
     ])
   })
 })

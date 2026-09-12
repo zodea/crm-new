@@ -79,12 +79,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 143 |
+| 实现页面文件（含 dev） | 144 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 138 |
+| 实现生产路由（排除 dev） | 139 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 3 |
+| 待补设计（实现有、设计稿没有） | 4 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -98,12 +98,14 @@
 
 ### 实现有、设计稿没有
 
-现有生成账本登记 **2 条**：`/finance/payment/:id/detail` 与 `/settings/data-migration` 已有生产路由，但没有一一对应的 DC 页面。本轮分别由 [#404](https://github.com/zodea/crm-new/issues/404) 联同 [#413](https://github.com/zodea/crm-new/issues/413)、以及 [#414](https://github.com/zodea/crm-new/issues/414) 复核；旧 #305/#294 仅保留来源含义。在补齐设计源码前保持 `design-pending`，不能写成设计已覆盖。
+下表路由已有实现，尚无一一对应的 DC 页面；数量只看上方生成表。在补齐设计源码前保持 `design-pending`，本地运行验收不等于设计源码已覆盖。旧 #305/#294 仅保留来源含义。
 
 | 生产路由 | 当前设计状态 | 本轮复核承接 |
 | --- | --- | --- |
 | `/finance/payment/:id/detail` | `design-pending` | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | `/settings/data-migration` | `design-pending` | [#414](https://github.com/zodea/crm-new/issues/414) |
+| `/subcontract/quantity/stages` | `design-pending`；本地运行已验收 | [#442](https://github.com/zodea/crm-new/issues/442) |
+| `/schedule/process-library/:id` | `design-pending`；采用既有工序库与表格原语 | [#443](https://github.com/zodea/crm-new/issues/443) |
 
 编辑表单不等于详情页；能修改基础字段不能替代反向聚合、来源穿透和只读详情动作。
 
@@ -131,7 +133,7 @@
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 工程量与工资 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
-| 项目进度成本 | 9 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
 <!-- implementation-frontier:end -->
@@ -153,7 +155,7 @@
 ## 5. 证据状态边界
 
 - 历史完成票只证明相应页面基础的来源；因替代而关闭的票不证明实现完成。两者均不能推导本轮前台复验或生产上线已经通过。
-- 34 条历史证据和 9 条 `unverified-target` 保持原等级；没有新的安全直接证据不得升级。
+- 历史证据和 `unverified-target` 保持各自等级，数量以生成账本为准；没有新的安全直接证据不得升级。
 - `direct`、`adjacent`、`local-authority`、权限状态和观测日期逐端点记录在生成账本；叙述结论只留在 [`runtime-reference-audit.md`](./runtime-reference-audit.md)，生成 JSON 只保存结构化键与权威源引用。
 - 当前已实现数量不在本轮提前汇总；每张实施票关闭时按其真实路由范围更新，避免把“路由存在”再次统计成“业务闭环”。
 
@@ -179,3 +181,11 @@
 
 送货原件、逻辑归档及修订中央链已达到本地 `slice-verified`：实际入口、异常保稿、完整原件、迁移、打印和五档界面证据见 [#441 验收记录](./evidence/issue-441/README.md)。最终整合测试、类型检查与构建通过；该行为结论不改变生成路由计数。有效到货、仓库与库存、旧项目别名迁移和材料结算继续由 #411 及相关后续实施承接。
 <!-- issue-441:end -->
+
+<!-- issue-443:begin -->
+## #443 工序库中央版本切片验收状态
+
+中央工序库列表、不可变版本详情、整页保存下一版、受控迁移及建组调用页往返已达到本地 `slice-verified`。三条真实浏览器旅程、同源刷新保表格与横滚、43 张交互图和两份指南共 13 页的证据见 [#443 验收记录](./evidence/issue-443/README.md)。完整测试 530 个文件、3227 项通过，类型、构建和本工作单元规范检查通过。
+
+该行为结论不升级设计来源等级：新增版本详情仍缺一一对应 DC 页面，保持 `design-pending`。中央 WBS 写入和当前库引用数量由 #444 接通，新增暂估绑定由 #445 接通；当前引用数量为未知，不以零代替。#412 整个排程、成本和工资链，以及 #416 生产持久化与部署不由本切片代验。
+<!-- issue-443:end -->

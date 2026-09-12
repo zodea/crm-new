@@ -12,7 +12,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/': ['首页'],
   '/project': ['项目列表', 'project:list:read'],
   '/schedule': ['施工进度', 'project:list:read'],
-  '/schedule/process-library': ['工序库'],
+  '/schedule/process-library': ['工序库', 'process-library:read'],
   '/project/target-cost': ['目标成本'],
   '/contract/construction': ['施工合同', 'construction-contract:read'],
   '/contract/subcontract': ['分包合同', 'subcontract-contract:read'],
@@ -68,6 +68,7 @@ export interface RestoredDetailPath {
 }
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
+  [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
   [/^\/project\/([^/]+)\/supplier\/([^/]+)$/, m => ({ family: 'project-supplier', id: m[1]!, secondId: m[2]! })],
   [/^\/project\/([^/]+)$/, m => ({ family: 'project', id: m[1]! })],
   [/^\/base\/(customer|supplier|crew|worker)\/([^/]+)$/, m => ({ family: m[1]!, id: m[2]! })],

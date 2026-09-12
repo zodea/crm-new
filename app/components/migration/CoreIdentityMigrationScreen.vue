@@ -37,6 +37,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   receipt_registrations: '收款登记',
   delivery_records: '送货归档、原件与修订',
   quantity_projects: '工程量区域、模板与完成',
+  process_libraries: '标准工序库与不可变版本',
   owner_documents: '甲方变洽签、月度报量、验收保修与最终结算',
   workers: '工人',
   project_suppliers: '项目分供方',

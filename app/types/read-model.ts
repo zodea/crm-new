@@ -63,6 +63,7 @@ export const ENTITY_KINDS = [
   'attendance',
   'schedule-group',
   'schedule-task',
+  'process-library',
   'quantity-unit',
   'target-cost',
   'file',
