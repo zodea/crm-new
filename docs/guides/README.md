@@ -18,7 +18,7 @@
 - [客户档案与业务关系使用指南](./customer-records.md)
 - [分供方档案与真实事实使用指南](./supplier-records.md)
 - [班组与工人档案使用指南](./crew-worker-records.md)
-- [新项目启动与施工排程使用指南](./project-start-and-schedule.md)（中央 WBS、来源返回与受控接管的实际记录见 [#444](../design/evidence/issue-444/README.md)）
+- [新项目启动与施工排程使用指南](./project-start-and-schedule.md)（中央 WBS、来源返回与受控接管见 [#444](../design/evidence/issue-444/README.md)，暂估后补合同与楼栋证据更正见 [#445](../design/evidence/issue-445/README.md)）
 - [首页项目与施工进度使用指南](./home-project-progress.md)（首页只读入口与独立维护入口分别说明）
 - [工程量合计与台账导出使用说明](./quantity-totals-and-export.md)
 - [工程量区域、模板与完成使用指南](./quantity-central-workflow.md)

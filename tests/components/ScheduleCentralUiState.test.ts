@@ -65,6 +65,25 @@ afterEach(() => {
 })
 
 describe('中央排程界面目标与草稿边界', () => {
+  it('已绑定清单按冻结楼层ID精确打开原工序，错配合同与失效楼层不回退', async () => {
+    const { store, route } = fixture()
+    Object.assign(store.snapshot.groups[0]!, { contractId: 'bound-contract' })
+    Object.assign(store.snapshot.groups[0]!.tasks[0]!, { floorPlans: [{ id: 'frozen-floor', taskId: 't1' }] })
+    Object.assign(route.query, { group: 'g1', floorPlan: 'frozen-floor', bindingContract: 'bound-contract' })
+    const ui = mountHook(() => useScheduleWorkspace({}))
+    await waitFor(() => expect(ui.initialized.value).toBe(true))
+    expect(ui.selectedTask.value?.id).toBe('t1')
+    expect(ui.canWrite.value).toBe(false)
+    route.query.bindingContract = 'other-contract'
+    await ui.initialize()
+    expect(ui.sourceError.value).toContain('绑定合同或原楼层计划身份不匹配')
+    expect(ui.selectedTask.value).toBeNull()
+    route.query.bindingContract = 'bound-contract'
+    route.query.floorPlan = 'missing-floor'
+    await ui.initialize()
+    expect(ui.sourceError.value).toContain('失效')
+    expect(ui.selectedTask.value).toBeNull()
+  })
   it('旧库请求迟到不覆盖新的项目与工序草稿', async () => {
     const { store, route } = fixture()
     let release!: (value: unknown) => void

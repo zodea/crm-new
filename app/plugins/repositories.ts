@@ -17,6 +17,7 @@ import type { SubcontractContractReadRepository } from '~/lib/subcontract-contra
 import type { SupplierCommandRepository } from '~/lib/supplier/command-contract'
 import type { SupplierReadRepository } from '~/lib/supplier/repository'
 import { createAuxiliaryContractRepository } from '~/lib/auxiliary-contract/repository'
+import { createBoqBuildingRepository } from '~/lib/boq/central-building-repository'
 import { createHttpConstructionContractCommandRepository } from '~/lib/construction-contract/command-http-repository'
 import { createHttpConstructionContractReadRepository } from '~/lib/construction-contract/http-repository'
 import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command-http-repository'
@@ -47,6 +48,7 @@ import { createSupplierCredentialRepository } from '~/lib/supplier/credential-re
 import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository'
 
 export interface DomainRepositories {
+  boqBuilding: ReturnType<typeof createBoqBuildingRepository>
   schedule: ReturnType<typeof createScheduleRepository>
   supplierCredentials: ReturnType<typeof createSupplierCredentialRepository>
   processLibraries: ReturnType<typeof createProcessLibraryRepository>
@@ -78,6 +80,7 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
+    boqBuilding: createBoqBuildingRepository((url, options) => $fetch<unknown>(url, options)),
     schedule: createScheduleRepository((url, options) => $fetch<unknown>(url, options)),
     supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch<unknown>(url, options)),
     processLibraries: createProcessLibraryRepository((url, options) => $fetch<unknown>(url, options)),

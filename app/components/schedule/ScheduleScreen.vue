@@ -1,15 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '~/components/ui/button'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { useScheduleWorkspace } from '~/composables/useScheduleWorkspace'
+import { buildBoqBuildingEvidenceLocation } from '~/lib/schedule/binding-navigation'
 
 const props = withDefaults(defineProps<{ projectId?: string }>(), { projectId: '' })
+const route = useRoute()
+const bindingSource = computed(() => {
+  const projectId = typeof route.query.project === 'string' ? route.query.project : ''
+  const groupId = typeof route.query.group === 'string' ? route.query.group : ''
+  const contractId = typeof route.query.bindingContract === 'string' ? route.query.bindingContract : ''
+  const lineId = typeof route.query.bindingLine === 'string' ? route.query.bindingLine : ''
+  return projectId && groupId && contractId && route.query.origin === 'real' ? buildBoqBuildingEvidenceLocation(projectId, groupId, contractId, route.query, lineId, true) : null
+})
 const { store, today, origin, canWrite, sourceError, selectedProjectId, initialized, taskDraftKey, selectedTask, taskDialogOpen, dependencyDialogOpen, highlightedGroupId, selectedGroupName, selectedDependency, selectedGroupTasks, predecessorTasks, selectedDisabledDependencies, projectOptions, initialize, openTask, openDependencyEditor, closeDependencyEditor, setBaseline, saveTask, removeTask, saveDependency, removeDependency, restoreDependency, rescheduleTask, addTask, drillQuantity, recheck, recoverPending } = useScheduleWorkspace(props)
 </script>
 
 <template>
   <div class="schedule-screen flex min-w-0 flex-col gap-4">
     <section class="panel p-4">
+      <NuxtLink v-if="bindingSource" :to="bindingSource" class="mb-3 inline-flex text-12px text-brand underline">
+        返回合同清单来源
+      </NuxtLink>
       <div class="flex flex-wrap items-start gap-3">
         <div class="min-w-52 flex-1">
           <div class="text-11px font-700 tracking-wide text-brand">
@@ -104,6 +117,7 @@ const { store, today, origin, canWrite, sourceError, selectedProjectId, initiali
       :highlighted-group-id="highlightedGroupId"
       :readonly="!canWrite"
       :origin="origin ?? undefined"
+      :return-context="route.query"
       @select-task="openTask"
       @add-task="addTask"
       @reschedule-task="rescheduleTask"

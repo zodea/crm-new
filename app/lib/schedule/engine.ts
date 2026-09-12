@@ -360,7 +360,7 @@ async function loadProvisionalFloorSources(
   )
 }
 
-async function loadBoqLinesByItem(
+export async function loadBoqLinesByItem(
   targetDb: ScheduleDb,
   projectId: string,
   contractId: string,

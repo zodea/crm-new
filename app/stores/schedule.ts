@@ -1,3 +1,4 @@
+import type { ScheduleBindingRead, ScheduleBindingResult } from '~/lib/schedule/central-binding-contract'
 import type { ScheduleAction, ScheduleCommand, ScheduleRead, ScheduleReadContext } from '~/lib/schedule/central-contract'
 import type { ScheduleHistory } from '~/lib/schedule/history'
 import type { DataOriginDTO } from '~/types/read-model'
@@ -40,6 +41,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   let catalogGeneration = 0
   let libraryGeneration = 0
   let taskGeneration = 0
+  let bindingTarget: { projectId: string, groupId: string, contractId: string } | null = null
+  let bindingGeneration = 0
   const catalog = shallowRef<(Engine['catalog']['value'][number] & { origin: DataOriginDTO })[]>([])
 
   function setOrigin(value: DataOriginDTO) {
@@ -60,6 +63,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     generation += 1
     libraryGeneration += 1
     taskGeneration += 1
+    cancelBindingRead()
   }
   function query(projectId = scopeProjectId.value) {
     return { projectId, origin: origin.value, includeDemo: useDataVisibilityStore().includeDemo, today }
@@ -92,6 +96,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     setOrigin(selectedOrigin)
     const request = ++generation
     if (scopeProjectId.value !== projectId) {
+      cancelBindingRead()
       local.snapshot.value = null
       context.value = null
       history.value = { logs: [], removedTasks: [], migrationEvidence: [] }
@@ -186,6 +191,39 @@ export const useScheduleStore = defineStore('schedule', () => {
     if (request === libraryGeneration && selected === origin.value)
       local.processLibraries.value = loaded.libraries
   }
+  function cancelBindingRead() {
+    bindingGeneration += 1
+    bindingTarget = null
+  }
+  async function readBinding(projectId: string, groupId: string, contractId = '', selectedOrigin: DataOriginDTO = 'real'): Promise<ScheduleBindingRead> {
+    if (isTauri() || selectedOrigin !== 'real')
+      throw scheduleProblem('forbidden', '中央绑定仅用于真实来源，桌面与演示保持各自读取边界')
+    setOrigin(selectedOrigin)
+    const request = ++bindingGeneration
+    generation += 1
+    if (scopeProjectId.value !== projectId) {
+      context.value = null
+      local.snapshot.value = null
+      history.value = { logs: [], removedTasks: [], migrationEvidence: [] }
+      local.saving.value = false
+    }
+    scopeProjectId.value = projectId
+    bindingTarget = { projectId, groupId, contractId }
+    const result = await repositories().schedule.binding(query(projectId), groupId, contractId)
+    if (request !== bindingGeneration || projectId !== scopeProjectId.value || origin.value !== selectedOrigin)
+      throw scheduleProblem('stale-source', '绑定目标已变化，请重新读取当前分组')
+    context.value = result
+    return result
+  }
+  async function confirmBinding(read: ScheduleBindingRead): Promise<ScheduleBindingResult> {
+    if (read.state !== 'unbound' || !read.preview?.canBind || !bindingTarget || bindingTarget.projectId !== read.group.projectId
+      || bindingTarget.groupId !== read.group.id || bindingTarget.contractId !== read.preview.contractId
+      || read.group.projectId !== scopeProjectId.value || read.origin !== origin.value
+      || read.workspaceId !== workspaceId.value || read.actorId !== actorId.value) {
+      throw scheduleProblem('stale-source', '绑定分组或确认依据已变化，请重新预览')
+    }
+    return submit<ScheduleBindingResult>({ kind: 'bind-contract', groupId: read.group.id, contractId: read.preview.contractId }, read)
+  }
   async function loadProcessLibraryTasks(libraryId: string) {
     if (isTauri())
       return local.loadProcessLibraryTasks(libraryId)
@@ -207,12 +245,12 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw cause
     }
   }
-  async function submit<T>(action: ScheduleAction): Promise<T> {
+  async function submit<T>(action: ScheduleAction, baseline: ScheduleReadContext | null = context.value): Promise<T> {
     if (!canWrite.value || !context.value)
       throw scheduleProblem('forbidden', '当前来源或身份不能修改排程')
     if (pendingCommand.value)
       throw scheduleProblem('conflict', '上次提交结果尚未确认，请先恢复原提交')
-    const command: ScheduleCommand = { commandId: generateId('schedule-command'), workspaceId: workspaceId.value, actorId: actorId.value, origin: origin.value, requiredCapability: 'schedule:write', projectId: scopeProjectId.value, sourceVersion: sourceVersion.value, action: JSON.parse(JSON.stringify(action)) }
+    const command: ScheduleCommand = { commandId: generateId('schedule-command'), workspaceId: workspaceId.value, actorId: actorId.value, origin: origin.value, requiredCapability: 'schedule:write', projectId: scopeProjectId.value, sourceVersion: baseline!.sourceVersion, action: JSON.parse(JSON.stringify(action)) }
     const key = scopeKey.value
     pending.value = { ...pending.value, [key]: command }
     return send<T>(command, key)
@@ -298,6 +336,9 @@ export const useScheduleStore = defineStore('schedule', () => {
     loadProcessLibraries,
     loadProcessLibraryTasks,
     recoverPending,
+    readBinding,
+    confirmBinding,
+    cancelBindingRead,
     recheck,
     createGroup: (...args: Parameters<Engine['createGroup']>) => isTauri() ? local.createGroup(...args) : submit<Awaited<ReturnType<Engine['createGroup']>>>({ kind: 'create-group', draft: args[0] }),
     updateTask: (...args: Parameters<Engine['updateTask']>) => isTauri() ? local.updateTask(...args) : submit<Awaited<ReturnType<Engine['updateTask']>>>({ kind: 'update-task', taskId: args[0], patch: args[1] }),

@@ -5,6 +5,7 @@ import { useNow } from '@vueuse/core'
 import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, shallowRef, watch } from 'vue'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
+import { buildScheduleBindingLocation } from '~/lib/schedule/binding-navigation'
 import {
   calendarDays,
   rescheduledTaskWindow,
@@ -60,6 +61,7 @@ const props = withDefaults(defineProps<{
   highlightedTaskId?: string
   readonly?: boolean
   origin?: 'real' | 'demo'
+  returnContext?: Record<string, unknown>
 }>(), {
   mode: 'workspace',
   highlightedGroupId: '',
@@ -638,8 +640,8 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                 <template v-if="item.value.kind === 'group' && item.value.group.scopeBasis === 'provisional'">
                   <span class="pending-contract-chip">待绑定合同</span>
                   <NuxtLink
-                    v-if="mode === 'workspace' && desktop && !readonly"
-                    :to="`/schedule/${item.value.group.projectId}/bind/${item.value.group.id}`"
+                    v-if="mode === 'workspace' && !readonly && (desktop || origin !== 'demo')"
+                    :to="desktop ? `/schedule/${item.value.group.projectId}/bind/${item.value.group.id}` : buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
                     class="binding-entry"
                     aria-label="绑定施工合同"
                     @click.stop
@@ -647,8 +649,15 @@ function nudgeTask(task: ScheduleTaskView, mode: 'move' | 'resize-finish', delta
                     <span class="i-lucide-link-2" aria-hidden="true" />
                     <span>绑定</span>
                   </NuxtLink>
-                  <span v-else-if="mode === 'workspace' && !desktop" class="text-10px text-ink-faint" title="新的合同绑定由后续流程接通，现有分组和计划保持不变">绑定待接通</span>
                 </template>
+                <NuxtLink
+                  v-if="mode === 'workspace' && !desktop && origin !== 'demo' && item.value.kind === 'group' && item.value.group.contractId"
+                  :to="buildScheduleBindingLocation(item.value.group.projectId, item.value.group.id, origin ?? 'real', returnContext)"
+                  class="binding-entry"
+                  aria-label="查看合同依据"
+                >
+                  合同依据
+                </NuxtLink>
                 <span v-if="mode === 'overview' && item.value.kind === 'group'" class="status-label">
                   {{ groupStatusLabel(item.value.group) }}
                 </span>

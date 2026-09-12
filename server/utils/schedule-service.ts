@@ -7,9 +7,11 @@ import { createHash } from 'node:crypto'
 import { fetchRowById, hiddenCtesFor, PARENT_REFS, selectVisibleSql, visibleCond } from '../../app/lib/db/soft-delete'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { QuantityRepositoryProblem } from '../../app/lib/quantity/central-contract'
+import { bindCentralScheduleContract, readScheduleBinding } from '../../app/lib/schedule/central-binding'
 import { scheduleProblem } from '../../app/lib/schedule/central-contract'
 import { assertScheduleDependencyGraph } from '../../app/lib/schedule/central-invariants'
 import { initializeScheduleSchema } from '../../app/lib/schedule/central-schema'
+import { SCHEDULE_CONTRACT_BIND_OPERATOR } from '../../app/lib/schedule/contract-binding'
 import { createScheduleEngine } from '../../app/lib/schedule/engine'
 import { loadScheduleHistory } from '../../app/lib/schedule/history'
 import { loadScheduleBuildingCoverage } from '../../app/lib/schedule/read-model'
@@ -57,6 +59,7 @@ async function executeEngine(engine: ReturnType<typeof createScheduleEngine>, ac
     case 'add-task': return engine.addTask(action.groupId, action.draft)
     case 'remove-task': return engine.removeTask(action.taskId)
     case 'undo': return engine.undo(action.logIds)
+    case 'bind-contract': throw scheduleProblem('validation-failed', '合同绑定必须经过中央来源核验')
   }
 }
 
@@ -91,6 +94,9 @@ export function createScheduleService(options: Options) {
     }, sessionId)
   }
   return {
+    binding(query: ScheduleReadQuery, groupId: string, contractId = '', sessionId?: string | null) {
+      return run(query, sessionId, (db, _engine, sourceVersion, sources, context) => readScheduleBinding(db, { ...context, origin: 'real', sourceVersion }, query.projectId, groupId, contractId, sources.boq.lines))
+    },
     groupUsage(query: ScheduleReadQuery, sessionId?: string | null) {
       return run(query, sessionId, async (_db, engine, sourceVersion) => {
         const counts = new Map<string, number>()
@@ -153,9 +159,11 @@ export function createScheduleService(options: Options) {
         // 通用撤销只接受本项目 WBS 动作的日志，不能越过中央领域边界。
         if (command.action.kind === 'undo') {
           for (const id of command.action.logIds) {
-            const [log] = await db.select<{ table_name: string, record_id: string }>('SELECT table_name, record_id FROM operation_logs WHERE id = ?', [id])
+            const [log] = await db.select<{ table_name: string, record_id: string, operator: string }>('SELECT table_name, record_id, operator FROM operation_logs WHERE id = ?', [id])
             if (!log || !['schedule_groups', 'schedule_group_buildings', 'schedule_tasks', 'task_item_map', 'task_dependencies', 'schedule_task_floor_plans'].includes(log.table_name))
               throw scheduleProblem('relationship-mismatch', '撤销记录不属于排程')
+            if (log.operator === SCHEDULE_CONTRACT_BIND_OPERATOR)
+              throw scheduleProblem('validation-failed', '合同绑定是既有依据，不支持通过普通撤销解绑或换绑')
             const relation = log.table_name === 'schedule_tasks' || log.table_name === 'schedule_groups'
               ? `SELECT project_id FROM ${log.table_name} WHERE id = ?`
               : log.table_name === 'schedule_group_buildings'
@@ -196,7 +204,9 @@ export function createScheduleService(options: Options) {
         }
         let value: unknown
         try {
-          value = await executeEngine(engine, command.action, command.projectId)
+          value = command.action.kind === 'bind-contract'
+            ? await bindCentralScheduleContract(db, { ...context, origin: 'real', sourceVersion }, command.projectId, command.action.groupId, command.action.contractId, sources.boq.lines)
+            : await executeEngine(engine, command.action, command.projectId)
           await assertScheduleDependencyGraph(db, command.projectId)
         }
         catch (cause) {

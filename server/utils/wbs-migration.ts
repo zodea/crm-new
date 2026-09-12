@@ -15,6 +15,8 @@ export interface ImportedWbsProject {
   batchId: string
   fingerprint: string
   identities: { table: WbsMigrationTable, legacyId: string, id: string }[]
+  /** 候选验证后冻结的原合同关系；恢复不得靠可变日志显示字段推测日常绑定。 */
+  bindings: { groupId: string, contractId: string | null, scopeBasis: string | null, boundAt: string | null }[]
 }
 type IdMaps = Record<string, Map<string, string>>
 function resolve(maps: IdMaps, table: string, value: unknown): string | null {
@@ -213,13 +215,22 @@ export function planWbsMigration(snapshot: CoreMigrationSnapshotDTO, current: Re
     }
     for (const mapping of graph.tables.task_item_map)
       assertBoqContract(mapping.task_id, mapping.boq_line_id)
-    incoming.push({ record: { entityId: entity.id, projectId: project.id, batchId, fingerprint, identities }, graph, legacyGraphJson: JSON.stringify(source) })
+    const bindings = graph.tables.schedule_groups.map(row => ({ groupId: String(row.id), contractId: row.contract_id === null ? null : String(row.contract_id), scopeBasis: row.scope_basis === null ? null : String(row.scope_basis), boundAt: row.contract_bound_at === null ? null : String(row.contract_bound_at) }))
+    incoming.push({ record: { entityId: entity.id, projectId: project.id, batchId, fingerprint, identities, bindings }, graph, legacyGraphJson: JSON.stringify(source) })
   }
   return { incoming, removed, imports, snapshot, affectedProjects: [...new Set([...incoming.map(row => row.record.projectId), ...removed.map(row => row.projectId)])] }
 }
 
 /** 删除迁入祖先前，独立 WBS（包括软删除边界和审计）仍需保有全部可解释引用。 */
 export async function removeWbsMigration(db: TransactionDb, plan: ReturnType<typeof planWbsMigration>, removedQuantity: readonly ImportedQuantityProject[], removedLibraryIds: ReadonlySet<string> = new Set()) {
+  // 在删除组及审计前与可信迁入基准比较。即使日志/回执缺损，也不丢掉已经改变的合同关系。
+  for (const imported of plan.removed) {
+    for (const binding of imported.bindings) {
+      const [current] = await db.select<{ contract_id: string | null, scope_basis: string | null, contract_bound_at: string | null }>('SELECT contract_id, scope_basis, contract_bound_at FROM schedule_groups WHERE id = ?', [binding.groupId])
+      if (!current || current.contract_id !== binding.contractId || current.scope_basis !== binding.scopeBasis || current.contract_bound_at !== binding.boundAt)
+        throw quantityProblem('conflict', '迁入后分组已有新的施工合同绑定依据，恢复会删除其关系及审计；已保留全部当前事实')
+    }
+  }
   const removedProjectIds = new Set(removedQuantity.map(row => row.projectId))
   if (plan.snapshot.authority !== 'central') {
     for (const imported of plan.removed)

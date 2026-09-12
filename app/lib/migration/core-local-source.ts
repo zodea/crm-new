@@ -118,6 +118,14 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
           'building', boq_catalog.building,
           'unitType', boq_catalog.unit_type,
           'floorZone', boq_catalog.floor_zone,
+          'source', json_object(
+            'boqFileId', boq_catalog.boq_file_id,
+            'changeOrderId', boq_catalog.change_order_id,
+            'traceKey', boq_catalog.trace_key,
+            'sourceSheet', boq_catalog.source_sheet,
+            'sourceRow', boq_catalog.source_row,
+            'confirmed', json(CASE WHEN boq_catalog.confirmed = 1 THEN 'true' ELSE 'false' END)
+          ),
           'updatedAt', boq_catalog.updated_at
         ))
         FROM (
@@ -129,8 +137,14 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
                  boq_line.building,
                  boq_line.unit_type,
                  boq_line.floor_zone,
+                 boq_line.boq_file_id, boq_line.change_order_id,
+                 boq_line.trace_key, boq_line.source_sheet, boq_line.source_row,
+                 CASE WHEN boq_line.change_order_id IS NULL AND boq_file.id IS NOT NULL
+                   AND boq_file.contract_id = c.id AND boq_file.deleted_at IS NULL
+                   AND boq_file.parse_status = 'parsed' THEN 1 ELSE 0 END AS confirmed,
                  boq_line.updated_at
           FROM boq_lines boq_line
+          LEFT JOIN boq_files boq_file ON boq_file.id = boq_line.boq_file_id
           WHERE boq_line.contract_id = c.id
             AND boq_line.project_id = c.project_id
             AND boq_line.deleted_at IS NULL

@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 144,
+    "trackedPageFiles": 145,
     "devPageFiles": 5,
-    "productionRoutes": 139,
+    "productionRoutes": 140,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 139,
-    "referenceEndpoints": 139,
+    "evidenceEndpointRecords": 140,
+    "referenceEndpoints": 140,
     "referenceProfiles": 42,
     "usedReferenceProfiles": 36,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 23,
+    "localAuthorityRoutes": 24,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 4
+    "designPendingRoutes": 5
   },
   "domains": [
     {
@@ -85,7 +85,7 @@
     {
       "code": "core-contract",
       "domain": "核心合同",
-      "routeCount": 12,
+      "routeCount": 13,
       "implementationIssues": [
         409
       ],
@@ -775,6 +775,37 @@
         "routeKey": "/contract/:id"
       },
       "constraints": "C-BASE"
+    },
+    {
+      "evidenceRecordId": "E-15375394D923",
+      "page": "app/pages/contract/boq/building-evidence.vue",
+      "localRoute": "/contract/boq/building-evidence",
+      "domainCode": "core-contract",
+      "template": "整页表单",
+      "implementationIssues": [
+        409
+      ],
+      "historicalImplementationIssues": [
+        277,
+        282,
+        289
+      ],
+      "referenceProfile": "R-SCHEDULE-LOCAL",
+      "referenceEndpointId": "local-15375394D923",
+      "referenceEndpointLabel": "本地权威端点：/contract/boq/building-evidence",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/boq/building-evidence"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/contract/boq/building-evidence"
+      },
+      "constraints": "C-FORM"
     },
     {
       "evidenceRecordId": "E-0CDB640E8346",

@@ -1,0 +1,106 @@
+[
+  {
+    "source": "output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf",
+    "sha256": "2eb060c80801cd6fc5290d9e99c2db64491dbcd0597956a7e80dfdcadc4cbe03",
+    "pageCount": 9,
+    "pages": [
+      {
+        "file": "schedule-1.png",
+        "page": 1,
+        "sha256": "594019b49aa9d9344ff20cd73d1e96c9cd690f993ca0b1b93a740818a41dd3e4",
+        "textCharacters": 162
+      },
+      {
+        "file": "schedule-2.png",
+        "page": 2,
+        "sha256": "93f670bdc99effadca6a48a8d1d1e0610a4bf75fa1f4a4c9dbeaeadbeb13e208",
+        "textCharacters": 728
+      },
+      {
+        "file": "schedule-3.png",
+        "page": 3,
+        "sha256": "f54f75d0047f9374db9a7eee24dac6a73a243ffc746169dbe876135dad6ecc48",
+        "textCharacters": 1329
+      },
+      {
+        "file": "schedule-4.png",
+        "page": 4,
+        "sha256": "02762cd1aff8ee6f4a4dd0cc94eec048e1b5d1fa4ae79fdd655aa5c72a889cdd",
+        "textCharacters": 1269
+      },
+      {
+        "file": "schedule-5.png",
+        "page": 5,
+        "sha256": "06ded6ebd1c27d69cfb02df3e041883848997784b58ca7fb74e662636b937c49",
+        "textCharacters": 1220
+      },
+      {
+        "file": "schedule-6.png",
+        "page": 6,
+        "sha256": "92a2c3d57f43f055eafb6646da7eb28576185f772efd542d4b63ceb6eeeaaad8",
+        "textCharacters": 1237
+      },
+      {
+        "file": "schedule-7.png",
+        "page": 7,
+        "sha256": "69dee1d97c3aae9802127edc04c7e8fa077a4fb80d27e4baa570a51ba050521c",
+        "textCharacters": 1413
+      },
+      {
+        "file": "schedule-8.png",
+        "page": 8,
+        "sha256": "348f3a12c43ac8d271ad713741d6a43114d4e8ee0c0656a6de29368fc2eed20d",
+        "textCharacters": 1439
+      },
+      {
+        "file": "schedule-9.png",
+        "page": 9,
+        "sha256": "c571c3866793131ab283ed167639f49ff83ca00edbe8eacf181931a9fc96de38",
+        "textCharacters": 880
+      }
+    ]
+  },
+  {
+    "source": "output/pdf/瑞航CRM_本地核心身份数据迁移使用指南.pdf",
+    "sha256": "64d3aacbf183512d3ff931074245d041ebe18906ac37b3efa9e0b45e8510faad",
+    "pageCount": 6,
+    "pages": [
+      {
+        "file": "migration-1.png",
+        "page": 1,
+        "sha256": "769fe2e02e6b54428c976166649100e047e8ddf6a146f8c25b50fe0a269cb283",
+        "textCharacters": 170
+      },
+      {
+        "file": "migration-2.png",
+        "page": 2,
+        "sha256": "fb1240c610f1edd622d99b44a75b2413a047fad78697331e0e4c8f991c81e32d",
+        "textCharacters": 1560
+      },
+      {
+        "file": "migration-3.png",
+        "page": 3,
+        "sha256": "1b6ffea807228d8ae29e868d66d97993743d24c257c128569d27d13a27602d8d",
+        "textCharacters": 1578
+      },
+      {
+        "file": "migration-4.png",
+        "page": 4,
+        "sha256": "a268e3f152f05e06ed331d0d26ed3323420da8a0b8db1b7f507815c96eba1ce1",
+        "textCharacters": 1554
+      },
+      {
+        "file": "migration-5.png",
+        "page": 5,
+        "sha256": "624909712c1d8acb66baf8c98002866febae3f020737637899e7d362c50e1f1c",
+        "textCharacters": 851
+      },
+      {
+        "file": "migration-6.png",
+        "page": 6,
+        "sha256": "acc97518af744e7ab62192256ab277cef18e0bab82a2b64bd3fe9dd0e75730d3",
+        "textCharacters": 946
+      }
+    ]
+  }
+]

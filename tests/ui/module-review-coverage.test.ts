@@ -217,7 +217,7 @@ describe('module review coverage', () => {
     expect(byId('WAGE-02').status).toBe('ready')
     expect(byId('WAGE-06').status).toBe('ready')
     expect(byId('WAGE-10').status).toBe('ready')
-    expect(byId('PRG-01').status).toBe('ready')
+    expect(byId('PRG-01').status).toBe('current-passed')
     expect(byId('PRG-07').status).toBe('ready')
     expect(byId('PRG-09').status).toBe('partial')
     for (const obligation of inherited) {

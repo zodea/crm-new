@@ -111,6 +111,8 @@ const store = {
   loadContracts: vi.fn(),
   previewContractBinding: vi.fn(),
   bindContract: vi.fn(),
+  readBinding: vi.fn(),
+  cancelBindingRead: vi.fn(),
 }
 
 describe('scheduleContractBindingScreen', () => {
@@ -124,6 +126,7 @@ describe('scheduleContractBindingScreen', () => {
     store.loadContracts.mockReset().mockResolvedValue(undefined)
     store.previewContractBinding.mockReset().mockResolvedValue(preview)
     store.bindContract.mockReset().mockResolvedValue({ preview, logId: 'log-1' })
+    store.readBinding.mockReset().mockRejectedValue(new Error('当前身份无法读取中央绑定资料'))
     vi.stubGlobal('useRouter', () => ({ push }))
     vi.stubGlobal('useScheduleStore', () => store)
     vi.stubGlobal('useKitUI', () => ({
@@ -201,14 +204,17 @@ describe('scheduleContractBindingScreen', () => {
     expect(screen.getByRole('textbox', { name: '搜索合同名称或编号' })).not.toBeNull()
   })
 
-  it('浏览器未接通新绑定时只提供返回入口，不读取或调用本地绑定', async () => {
+  it('浏览器中央绑定读取失败时明确报错，不回退读取或调用本地绑定', async () => {
     isDesktopRuntime.mockReturnValue(false)
+    vi.stubGlobal('useRoute', () => ({ fullPath: '/schedule/project-1/bind/group-1?origin=real', query: { origin: 'real' } }))
+    vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, close: vi.fn() }))
     render(ScheduleContractBindingScreen, {
       props: { projectId: 'project-1', groupId: 'group-1' },
       global: { components: { LookupSelect: LookupSelectStub, ScheduleContractBindingReview: ReviewStub } },
     })
 
-    expect((await screen.findByRole('alert')).textContent).toContain('新的合同绑定尚未接通')
+    expect((await screen.findByRole('alert')).textContent).toContain('当前身份无法读取中央绑定资料')
+    expect(store.readBinding).toHaveBeenCalledExactlyOnceWith('project-1', 'group-1', '', 'real')
     expect(screen.queryByRole('textbox', { name: '搜索合同名称或编号' })).toBeNull()
     expect(screen.queryByRole('button', { name: '确认绑定合同' })).toBeNull()
     expect(store.loadProject).not.toHaveBeenCalled()
@@ -217,6 +223,6 @@ describe('scheduleContractBindingScreen', () => {
     expect(store.bindContract).not.toHaveBeenCalled()
     expect(confirm).not.toHaveBeenCalled()
     await fireEvent.click(screen.getAllByRole('button', { name: '返回施工进度' })[0]!)
-    expect(push).toHaveBeenCalledWith({ path: '/schedule/project-1', query: { group: 'group-1' } })
+    expect(push).toHaveBeenCalledWith({ path: '/schedule', query: { project: 'project-1', group: 'group-1', origin: 'real' } })
   })
 })

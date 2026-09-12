@@ -12,6 +12,15 @@ it.each(['/', '/schedule'])('排程返回上下文在%s冷刷时完整保留', (
   expect(inspectRestorableTabPath(fullPath)?.fullPath).toBe(fullPath)
 })
 
+it('绑定来源的三项身份仅在只读排程入口保留，两个写态页面不注册恢复', () => {
+  const query = 'project=p&origin=real&group=g&floorPlan=f&bindingContract=c&bindingLine=line'
+  expect(inspectRestorableTabPath(`/schedule?${query}`)?.fullPath).toBe(`/schedule?${query}`)
+  expect(inspectRestorableTabPath(`/?${query}`)?.fullPath).not.toContain('floorPlan')
+  expect(inspectRestorableTabPath('/schedule/p/bind/g?origin=real')).toBeNull()
+  expect(inspectRestorableTabPath('/contract/boq/building-evidence?project=p&contract=c&origin=real')).toBeNull()
+  expect(inspectRestorableTabPath(`/schedule?${query}&floorPlan=other`)).toBeNull()
+})
+
 const capabilities = ['project:list:read', 'customer:list:read', 'supplier:list:read', 'crew:list:read', 'worker:list:read', 'project-supplier:read', 'material-contract:read', 'construction-contract:read', 'subcontract-contract:read', 'owner-document:read', 'subcontract-document:read', 'auxiliary-contract:read', 'other-settlement:read', 'receipt:read', 'demo:read']
 const ref = (entity: string, id = 'record-1') => ({ state: 'resolved', entity, id, label: '当前名称', no: null })
 const base = { dataOrigin: 'real', capabilities, sourceVersion: 'current-version' }

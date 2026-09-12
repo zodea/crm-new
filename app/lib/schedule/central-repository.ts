@@ -1,5 +1,6 @@
 import type { ScheduleCatalog, ScheduleCommand, ScheduleCommandResult, ScheduleRead, ScheduleReadContext, ScheduleReadQuery, ScheduleScopeRead } from './central-contract'
 import { readProjectHttp } from '../project/http-repository'
+import { decodeScheduleBindingRead } from './central-binding-decoder'
 import { scheduleProblem } from './central-contract'
 import { calendarDays } from './planning'
 
@@ -62,6 +63,13 @@ function read(value: unknown, query: ScheduleReadQuery): ScheduleRead {
 }
 export function createScheduleRepository(fetcher: ScheduleFetcher) {
   return {
+    binding(query: ScheduleReadQuery, groupId: string, contractId = '') {
+      const scope = { ...query }
+      return readProjectHttp(() => fetcher('/api/read/schedule/binding', { query: { ...scope, groupId, contractId } }), (value) => {
+        context(value, scope.origin)
+        return decodeScheduleBindingRead(value, scope.projectId, groupId, contractId)
+      })
+    },
     catalog(origin: 'real' | 'demo', includeDemo = false): Promise<ScheduleCatalog> {
       return readProjectHttp(() => fetcher('/api/read/schedule/catalog', { query: { origin, includeDemo } }), (value) => {
         context(value, origin)

@@ -129,6 +129,13 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = quantity || schedule ? new Set([...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS]) : baseAllowed
+    if (url.pathname === '/schedule') {
+      for (const key of ['floorPlan', 'bindingContract', 'bindingLine']) {
+        if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))
+          return null
+        allowed.add(key)
+      }
+    }
     for (const key of [...url.searchParams.keys()]) {
       if (!allowed.has(key) || url.searchParams.getAll(key).some(hasControlCharacters))
         url.searchParams.delete(key)

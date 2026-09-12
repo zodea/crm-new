@@ -162,6 +162,14 @@ export function createQuantityTestInstance(options: Options) {
       const request = structuredClone(query)
       return run(sessionId, (service, context) => service.withSchedule(request, context, (db, version) => consume(db, context, version)))
     },
+    /** 来源域在 SQL 读取成功后同步发布，整个窗口仍持有量域/迁移互斥队列。 */
+    withSourceCommit<T>(query: QuantityReadQuery, prepare: (db: TransactionDb, context: QuantityContext, quantityVersion: string) => Promise<(currentContext: QuantityContext) => T>, sessionId?: string | null): Promise<T> {
+      const request = structuredClone(query)
+      return run(sessionId, async (service, context) => {
+        const commit = await service.withSchedule(request, context, (db, version) => prepare(db, context, version))
+        return commit(options.session(sessionId))
+      })
+    },
     withMonthly<T>(query: QuantityMonthlyReadQuery, consume: (facts: readonly QuantityMonthlyBoqFact[]) => T, sessionId?: string | null): Promise<T> {
       const request = structuredClone(query)
       return run(sessionId, (service, context) => service.withMonthly(request, context, consume))

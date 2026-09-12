@@ -3,6 +3,7 @@ import type { ScheduleDependencyInput, ScheduleDependencyType } from './planning
 import type { SoftDb } from '~/lib/db/soft-delete'
 import { hiddenCtesFor, selectVisibleSql, visibleCond } from '~/lib/db/soft-delete'
 import { loadQuantityStageProgress } from '~/lib/quantity/derived'
+import { resolveScheduleBuildingReference } from './building-reference'
 import {
   SCHEDULE_DEPENDENCY_CONFLICT_OPERATOR,
   scheduleDeviationDays,
@@ -291,31 +292,7 @@ export async function loadScheduleBuildingCoverage(
       scheduled: false,
     }))
   }
-  const contractRows = await db.select<{ id: string }>(
-    `${hiddenCtesFor('buildings', 'boq_lines')}
-     SELECT building.id
-     FROM buildings building
-     WHERE ${visibleCond('buildings', 'building')}
-       AND building.project_id = ?
-       AND EXISTS (
-         SELECT 1
-         FROM boq_lines boq_line
-         WHERE ${visibleCond('boq_lines', 'boq_line')}
-            AND boq_line.project_id = ?
-            AND boq_line.contract_id = ?
-            AND trim(boq_line.building) <> ''
-            AND (
-              boq_line.building = building.code
-              OR boq_line.building = building.name
-            )
-            AND (SELECT COUNT(*) FROM buildings matched_building
-              WHERE matched_building.project_id = building.project_id
-                AND ${visibleCond('buildings', 'matched_building')}
-                AND (boq_line.building = matched_building.code OR boq_line.building = matched_building.name)) = 1
-        )
-     ORDER BY building.sort_order, building.code, building.id`,
-    [projectId, projectId, contractId],
-  )
+  const contractRows = await db.select<{ building: string | null }>(selectVisibleSql('boq_lines', 'AND project_id = ? AND contract_id = ?'), [projectId, contractId])
   const scheduledRows = await db.select<{ building_id: string }>(
     `${hiddenCtesFor('schedule_group_buildings')}
      SELECT DISTINCT group_building.building_id
@@ -326,7 +303,7 @@ export async function loadScheduleBuildingCoverage(
        AND group_row.contract_id = ?`,
     [projectId, contractId],
   )
-  const contractIds = new Set(contractRows.map(row => row.id))
+  const contractIds = new Set(contractRows.map(row => resolveScheduleBuildingReference(allRows, row.building)?.id).filter(Boolean))
   const scheduledIds = new Set(scheduledRows.map(row => row.building_id))
   return allRows.map(row => ({
     id: row.id,
@@ -355,7 +332,7 @@ export async function loadScheduleContracts(db: Pick<SoftDb, 'select'>, projectI
     LEFT JOIN boq_lines boq_line
       ON boq_line.contract_id = contract.id
      AND ${visibleCond('boq_lines', 'boq_line')}
-    WHERE contract.deleted_at IS NULL
+    WHERE ${visibleCond('contracts', 'contract')}
       AND contract.project_id = ?
       AND contract.kind = '施工'
     GROUP BY contract.id

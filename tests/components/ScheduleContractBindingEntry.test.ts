@@ -102,16 +102,16 @@ describe('内部暂估排程绑定入口', () => {
     expect(screen.queryByRole('link', { name: '绑定施工合同' })).toBeNull()
   })
 
-  it('浏览器工作区保留待绑定状态，但不开放尚未接通的本地绑定入口', () => {
+  it('浏览器可写工作区开放中央绑定并携带完整分组返回筛选', () => {
     isDesktopRuntime.mockReturnValue(false)
     render(ScheduleBoard, {
-      props: { snapshot, today: '2026-07-15', readonly: false, origin: 'real' },
+      props: { snapshot, today: '2026-07-15', readonly: false, origin: 'real', returnContext: { task: 't', month: '2026-09', view: 'crew', assignee: 'crew:c' } },
       global: { components: { NuxtLink: NuxtLinkStub } },
     })
 
     expect(screen.getByText('待绑定合同')).not.toBeNull()
-    expect(screen.getByText('绑定待接通')).not.toBeNull()
-    expect(screen.queryByRole('link', { name: '绑定施工合同' })).toBeNull()
+    expect(screen.getByRole('link', { name: '绑定施工合同' }).dataset.to).toContain('"origin":"real"')
+    expect(screen.getByRole('link', { name: '绑定施工合同' }).dataset.to).toContain('"assignee":"crew:c"')
   })
 
   it('桌面只读工作区也不能通过分组入口发起绑定', () => {

@@ -118,6 +118,8 @@ def inline_markup(text: str) -> str:
 
 def make_styles() -> dict[str, ParagraphStyle]:
     samples = getSampleStyleSheet()
+    # 使用中文断行禁则，避免句号等闭合标点单独落到下一行。
+    samples["BodyText"].wordWrap = "CJK"
     return {
         "body": ParagraphStyle(
             "Body",
@@ -192,6 +194,7 @@ def make_styles() -> dict[str, ParagraphStyle]:
             leading=12.5,
             textColor=INK,
             alignment=TA_LEFT,
+            wordWrap=None,
         ),
         "table_cell": ParagraphStyle(
             "TableCell",
@@ -201,6 +204,7 @@ def make_styles() -> dict[str, ParagraphStyle]:
             leading=12.5,
             textColor=INK,
             alignment=TA_LEFT,
+            wordWrap=None,
         ),
         "code": ParagraphStyle(
             "Code",

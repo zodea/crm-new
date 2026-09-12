@@ -750,7 +750,7 @@ END;
 > 标准工序库按 [ADR 0018](../adr/0018-versioned-schedule-process-library.md) 保存全局不可变版本。基于旧版只能沿用相同 `code` 新建下一版本；`schedule_process_library_tasks.predecessor_task_key` 保存前置身份，`predecessor_disabled=1` 表示因顺序冲突已置灰但未删除。建组时 `schedule_groups` 冻结库名/版本，`schedule_tasks` 同时保存来源工序 ID、来源版本和 `template_snapshot_json`；任务名称、工种、颜色、应用工期、阶段码、分项码及前置状态均以创建时快照为准。禁用关系仍创建 `task_dependencies` 后按 `schedule:conflict-reschedule` 软删除，之后全局库变化不会追溯改写既有项目 WBS。迁移历史冻结为：v34 只增加并回填 `predecessor_task_key`，v35 再通过 `addColumnIfMissing` 增加 `predecessor_disabled` 并把空值或非法值回填为 `0`，以覆盖已经登记 v34 的存量数据库。
 > `schedule_tasks.stage_id` 引用 `construction_stages.id`。工序 `has_qty=1` 按楼栋分组聚合 `unit_stage_completions`，`=0` 才读 `manual_progress`；墙砖/地砖、一遍/二遍腻子使用不同 `stage_id`。
 > `schedule_tasks` 预留 `baseline_start/baseline_finish`（「设为基线」= 保存当前计划快照，NULL=未设基线）。
-> `schedule_task_floor_plans` 由排程域拥有，并以 `source_basis` 区分来源。合同清单行保存 `item_id + boq_line_id`，唯一范围为 `task_id + floor_id + boq_line_id`；内部暂估行保存 `item_id + provisional_qty`、`boq_line_id=NULL`，唯一范围为 `task_id + floor_id + item_id`。两种来源均从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。v38 只从真实 `boq_lines.item_id` 回填存量合同计划；缺少可验证分项的旧行会阻断迁移，不伪造 BOQ。`boq_line_id` 是来源追溯引用，不是该排程行的可见性祖先：BOQ 行后续软删除不能隐藏已冻结的楼层计划。内部暂估后补合同时仅改变分组依据，预览与写入统一聚合分组内有效 `provisional_qty` 快照；既有暂估计划行继续保持 `source_basis='provisional'`，不被户型模板后续修改或合同量覆盖。
+> `schedule_task_floor_plans` 由排程域拥有，并以 `source_basis` 区分来源。合同清单行保存 `item_id + boq_line_id`，唯一范围为 `task_id + floor_id + boq_line_id`；内部暂估行保存 `item_id + provisional_qty`、`boq_line_id=NULL`，唯一范围为 `task_id + floor_id + item_id`。两种来源均从工序窗口自动分摊，个别楼层调期后 `is_manual=1`。v38 只从真实 `boq_lines.item_id` 回填存量合同计划；缺少可验证分项的旧行会阻断迁移，不伪造 BOQ。`item_id` 与 `boq_line_id` 是冻结来源追溯引用，不是该排程行的可见性祖先：分项或 BOQ 行后续软删除不能隐藏排程自己保存的楼层计划；工序、楼层及其语义祖先仍决定当前可见性。稳定来源身份、物理外键与迁移/恢复引用保护仍须保留，当前模板适用范围不因此扩大。内部暂估后补合同时仅改变分组依据，预览与写入统一聚合分组内有效 `provisional_qty` 快照；既有暂估计划行继续保持 `source_basis='provisional'`，不被户型模板后续修改或合同量覆盖。
 
 #### 标准工序库中央版本（#443）
 
@@ -771,6 +771,16 @@ END;
 旧分组已绑定合同、其楼层计划仍保存暂估来源属于合法历史，两者一起保留；新绑定仍由 #445 实施。旧冻结来源没有记录单位或逐户完整性时，保留实际值与原始快照并登记历史缺口，不从当前模板反推旧值、不用合同量填补。缺失或歧义身份、非法关系、日期或依赖阻断试跑。
 
 完整候选准备、对账、确认和恢复复用现有核心迁移协调器；对账检查关系和事实，不只比较行数。重复确认保留接管后的日常更正，不回放历史通知。恢复只处理本批所属图；独立中央 WBS 仍引用待撤的项目、合同、区域、阶段、分项或库版本时，整批拒绝恢复，各领域保持当前状态，不删除独立 WBS 来强行满足回滚，也不旁路修改工程量完成。实际验证及当前实例边界见 [#444 证据](../design/evidence/issue-444/README.md) 和 ADR 0020。
+
+#### 中央暂估绑定与楼栋证据（#445）
+
+暂估绑定复用原 `schedule_groups`、楼层冻结来源和操作日志，不另建平行 WBS 图。新命令在原组保存合同依据及绑定时间，操作日志同时冻结所选合同、楼栋覆盖、按稳定分项与单位组织的数量比较、来源版本和操作身份。原任务、依赖、楼层计划、基线和完成事实不变；原暂估楼层行继续保留暂估来源。旧记录没有完整比较时显示明确缺口，不能从当前模板或合同反推历史。
+
+完整冻结快照的逐户来源与单位负责数量完整性：同一户及模板行被多个阶段引用时不重复相加；来源缺失保持未知，真实零保留，异单位分别比较。原 `provisional_qty` 只保留旧数值，缺少单位或逐户证据时不能单独用来制造完整差异。
+
+合同楼栋证据更正仍由原施工合同清单中央来源拥有。受控来源保全导入文件、签证新增来源、确认状态及可用的原表追溯；只有可证明属于已确认导入基准的行允许更正。保存只更新原行楼栋并追加不可变审计，原项目、合同、分项、行 ID、量价及签证事实保留。签证新增结果和资格未知的历史行不提供独立改写入口，不另建覆盖表代替原行证据。
+
+迁移与日常命令遵守同一互斥边界。重复确认保留接管后新增的绑定与楼栋更正；移除或替换已有更正的来源须整体拒绝。WBS 恢复在删除日志前，对比受控接管时保存的原分组合同关系与当前关系；迁入后新增绑定即使审计或回执缺失，也不能被旧批次恢复吞掉。原本已绑定的迁入历史与迁入后新增动作分别判断，不能把显示用操作人字符串作为唯一保护依据。读取和写入契约分别见 [READ-MODELS](./READ-MODELS.md#中央暂估绑定与楼栋证据读取445)、[COMMANDS](./COMMANDS.md#中央暂估绑定与合同楼栋证据更正445)，运行范围见 [#445 证据](../design/evidence/issue-445/README.md)。
 
 ### 2.8 目标成本类（成本控制基线）
 

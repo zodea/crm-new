@@ -2,13 +2,15 @@
 import { computed } from 'vue'
 
 const route = useRoute()
-const projectId = computed(() => String(route.params.pid ?? ''))
-const groupId = computed(() => String(route.params.gid ?? ''))
+const projectId = computed(() => typeof route.params.pid === 'string' ? route.params.pid : '')
+const groupId = computed(() => typeof route.params.gid === 'string' ? route.params.gid : '')
+const origin = computed(() => route.query.origin === undefined || route.query.origin === 'real' ? 'real' : route.query.origin === 'demo' ? 'demo' : null)
 </script>
 
 <template>
   <ScheduleContractBindingScreen
     :project-id="projectId"
     :group-id="groupId"
+    :origin="origin"
   />
 </template>

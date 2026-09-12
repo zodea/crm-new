@@ -8,6 +8,7 @@ defineProps<{
   highlightedGroupId?: string
   readonly?: boolean
   origin?: 'real' | 'demo'
+  returnContext?: Record<string, unknown>
 }>()
 
 const emit = defineEmits<{
@@ -39,6 +40,7 @@ const emit = defineEmits<{
       :highlighted-group-id="highlightedGroupId"
       :readonly="readonly"
       :origin="origin"
+      :return-context="returnContext"
       @select-task="emit('selectTask', $event)"
       @add-task="emit('addTask', $event)"
       @reschedule-task="emit('rescheduleTask', $event)"

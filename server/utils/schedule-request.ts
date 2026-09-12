@@ -30,6 +30,7 @@ const actions: Record<string, string[]> = {
   'add-task': ['groupId', 'draft'],
   'remove-task': ['taskId'],
   'undo': ['logIds'],
+  'bind-contract': ['groupId', 'contractId'],
 }
 function record(value: unknown, keys: readonly string[]) {
   if (!scheduleObject(value) || Object.keys(value).some(key => !keys.includes(key)))
@@ -72,7 +73,7 @@ function floors(value: unknown) {
   }
 }
 function validateAction(action: Record<string, unknown>) {
-  for (const key of ['taskId', 'groupId', 'dependencyId', 'successorId', 'predecessorId']) {
+  for (const key of ['taskId', 'groupId', 'contractId', 'dependencyId', 'successorId', 'predecessorId']) {
     if (key in action)
       text(action[key])
   }

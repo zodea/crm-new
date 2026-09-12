@@ -79,12 +79,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 144 |
+| 实现页面文件（含 dev） | 145 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 139 |
+| 实现生产路由（排除 dev） | 140 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 4 |
+| 待补设计（实现有、设计稿没有） | 5 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -121,7 +121,7 @@
 | 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 核心合同 | 12 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
 | 辅助合同与结算 | 15 | [#409](https://github.com/zodea/crm-new/issues/409) |
 | 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
 | 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |

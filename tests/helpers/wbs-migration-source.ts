@@ -5,6 +5,8 @@ import { readQuantityCoreSource, seedQuantityMigrationSource } from './quantity-
 /** SQLite 六表、无组旧任务、绑定前后审计和冻结量均是原始事实。 */
 export async function seedWbsMigrationSource(db: TestDb) {
   await seedQuantityMigrationSource(db)
+  await db.execute('UPDATE boq_files SET parse_status = ? WHERE id = ?', ['parsed', 'q-source'])
+  await db.execute('UPDATE boq_lines SET trace_key = ?, source_sheet = ?, source_row = ? WHERE id = ?', ['清单:1', '清单', 1, 'q-boq'])
   await db.execute('INSERT INTO buildings (id,project_id,code,name) VALUES (?,?,?,?)', ['wbs-contract-building', 'q-project', 'B2', '合同待建二栋'])
   await db.execute('INSERT INTO floors (id,building_id,code,name) VALUES (?,?,?,?)', ['wbs-contract-floor', 'wbs-contract-building', 'F1', '一层'])
   await db.execute('INSERT INTO house_type_templates (id,project_id,code,name) VALUES (?,?,?,?)', ['wbs-contract-template', 'q-project', 'TC', '合同待建户型'])
@@ -12,6 +14,7 @@ export async function seedWbsMigrationSource(db: TestDb) {
   await db.execute('INSERT INTO units (id,floor_id,house_type_template_id,code) VALUES (?,?,?,?)', ['wbs-contract-unit', 'wbs-contract-floor', 'wbs-contract-template', '201'])
   await db.execute('INSERT INTO boq_lines (id,boq_file_id,project_id,contract_id,item_id,item_name,unit,qty,unit_price,building) VALUES (?,?,?,?,?,?,?,?,?,?)', ['wbs-contract-boq', 'q-source', 'q-project', 'q-contract', 'q-item', '腻子', '㎡', 12, 1, '合同待建二栋'])
   await db.execute('UPDATE boq_lines SET unit_type = ?, floor_zone = ? WHERE id = ?', ['合同待建户型', '一层', 'wbs-contract-boq'])
+  await db.execute('UPDATE boq_lines SET trace_key = ?, source_sheet = ?, source_row = ? WHERE id = ?', ['清单:2', '清单', 2, 'wbs-contract-boq'])
   await db.execute('INSERT INTO house_type_template_items (id,room_id,item_id,boq_line_id,contract_qty,provisional_qty) VALUES (?,?,?,?,?,?)', ['wbs-contract-line', 'wbs-contract-room', 'q-item', 'wbs-contract-boq', 12, 8])
   await db.execute('INSERT INTO schedule_process_libraries (id,code,name,version) VALUES (?,?,?,?)', ['wbs-library', 'wbs-history', '历史排程库', 3])
   await db.execute('INSERT INTO schedule_process_library_tasks (id,library_id,task_key,name,trade,color,duration_days,stage_code,item_codes_json) VALUES (?,?,?,?,?,?,?,?,?)', ['wbs-library-task', 'wbs-library', 'paint', '原腻子工序', '油漆工', '#123456', 3, 'S', '["I"]'])

@@ -48,11 +48,11 @@ export const ADAPTERS = {
       ['app/lib/home/project-source.ts', 'options.schedule'],
     ],
   },
-  'schedule-binding-pending': {
-    read: '浏览器直达显示新绑定尚未接通，引导返回排程核对现有分组',
-    write: '新的合同绑定由 #445 接通，当前入口不修改合同外键或旧库',
-    storage: '不产生新绑定；已迁入历史仍在中央 WBS 读取',
-    sources: [['app/components/schedule/ScheduleContractBindingScreen.vue', '新的合同绑定尚未接通']],
+  'schedule-binding-browser': {
+    read: '中央绑定预览与已绑定依据；冻结暂估、当前合同范围及历史缺口分别说明',
+    write: '独立 bind-contract 中央命令；固定来源版本与原提交恢复，不开放解绑或换绑',
+    storage: '原中央 WBS 分组与冻结比较审计；生产持久化仍待 #416',
+    sources: [['app/components/schedule/ScheduleContractBindingScreen.vue', 'CentralScheduleContractBindingScreen'], ['app/lib/schedule/central-binding.ts', 'bindCentralScheduleContract']],
   },
   'simulation': {
     read: '合成导入演示',
@@ -123,7 +123,9 @@ export function resolveAdapter(surface, host) {
   if (host === 'browser' && ['/', '/schedule', '/schedule/:pid', '/schedule/new'].includes(route))
     return 'schedule-browser'
   if (host === 'browser' && route === '/schedule/:pid/bind/:gid')
-    return 'schedule-binding-pending'
+    return 'schedule-binding-browser'
+  if (route === '/contract/boq/building-evidence')
+    return 'central-http'
   if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
     return 'central-http'
   if (route === '/import/mapping/:entity') {
@@ -319,6 +321,8 @@ export const SUBVIEWS = [
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleTimeline.vue', ['wbs', 'gantt'].map(key => view(`workspace/mobile/${key}`, `'${key}'`, 'matrix'))),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', [view('recovery/pending', 'store.pendingCommand', 'recovery-panel', '未确认原提交结果；弹窗内另提供可达的原提交恢复入口')]),
   group({ route: '/schedule/new' }, 'app/components/schedule/ScheduleGroupNewScreen.vue', [view('recovery/pending', 'ScheduleCommandRecovery', 'recovery-panel', '保留确认步骤及原命令；恢复前禁止形成新提交')]),
+  group({ route: '/schedule/:pid/bind/:gid' }, 'app/components/schedule/CentralScheduleContractBindingScreen.vue', [view('binding/preview', 'ScheduleBindingReview', 'review-panel', '浏览器中央楼栋覆盖、冻结数量及差异复核；桌面保留原适配'), view('binding/pending', 'ScheduleCommandRecovery', 'recovery-panel', '原提交未明确前禁止新增绑定'), view('binding/history', 'legacyDetailMissing', 'detail', '旧绑定历史缺口不由当前来源补造')]),
+  group({ route: '/contract/boq/building-evidence' }, 'app/components/boq/BoqBuildingEvidenceScreen.vue', [view('evidence/form', '保存楼栋证据', 'form-section', '仅已确认导入基准行可更正'), view('evidence/source', '绑定时的原楼层计划', 'detail', '只读来源模式与原楼层计划稳定关系返回'), view('evidence/pending', 'ScheduleCommandRecovery', 'recovery-panel', '按原提交及清单行恢复，不串用其他行草稿')]),
   group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/TargetCostDetailScreen.vue', [...tabs(['items', 'comparison']), ...mounted('table', ['TargetCostItemEditor', 'TargetCostItemTable', 'TargetCostComparisonTable'])]),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryRecognitionScreen.vue', [...['queue', 'source', 'review'].map(key => view(`pane/${key}`, `#${key}`, 'pane')), view('duplicates', 'DeliveryDuplicateReviewPanel', 'review-panel')]),
   group({ route: '/material/delivery' }, 'app/components/delivery/DeliveryReviewPanel.vue', mounted('pane/review', ['DeliveryDocumentFields', 'DeliveryItemsEditor'])),

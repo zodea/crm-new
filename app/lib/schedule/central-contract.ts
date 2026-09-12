@@ -33,6 +33,7 @@ export type ScheduleAction = { kind: 'create-group', draft: CreateScheduleGroupD
   | { kind: 'add-task', groupId: string, draft: AddScheduleTaskDraft }
   | { kind: 'remove-task', taskId: string }
   | { kind: 'undo', logIds: string[] }
+  | { kind: 'bind-contract', groupId: string, contractId: string }
 export interface ScheduleCommand {
   commandId: string
   workspaceId: string

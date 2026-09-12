@@ -61,6 +61,18 @@ const quantityCentralEvidence = {
   recency: 'current-run',
   scope: '中央区域、模板、三量、阶段与责任完成、照片、报量、导入导出及受控迁移；不代验 WBS、工资和目标成本',
 }
+const wbsCentralEvidence = {
+  reference: 'docs/design/evidence/issue-444/README.md',
+  commit: 'ab056768ebf17dd3a2713bb6bc0df37dbb118ba6',
+  recency: 'current-run',
+  scope: '中央 WBS 建组、计划与依赖、冻结来源、基线、全图接管及阶段往返；新增暂估绑定见 #445，工资和目标成本另验',
+}
+const bindingCentralEvidence = {
+  reference: 'docs/design/evidence/issue-445/README.md',
+  commit: null,
+  recency: 'current-run',
+  scope: '与本工作单元一同提交的暂估绑定、原清单楼栋更正、异常恢复和原楼层返回；前置固定提交见 #444，不含工资、目标成本或生产部署',
+}
 
 export const OBLIGATION_STATUS_LABELS = {
   'current-passed': '本轮限定范围已验证',
@@ -337,9 +349,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(347), 'docs/adr/0020-browser-authority-and-demo-workspace-boundary.md'],
     ownerIssue: 412,
     caseIds: scheduleCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '当前 schedule store 仍用本地 DB；中央分组、任务、依赖及其工序库快照尚未闭合。按真实区域/合同前置受控迁移，不能以首页读取中央项目替代。',
+    status: 'current-passed',
+    evidence: [wbsCentralEvidence, bindingCentralEvidence],
+    remaining: '#444/#445 已接管中央分组、任务、依赖、冻结来源、绑定历史及新增绑定，整图迁移、日常写入与危险恢复通过。生产持久化仍归 #416。',
   },
   {
     id: 'PRG-02',
@@ -347,9 +359,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(347), 'docs/rewrite/pages/schedule-progress.md'],
     ownerIssue: 412,
     caseIds: scheduleCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '中央保存需验证 project/group/task/stage/dependency 与楼栋/合同归属，区分不存在和错配；不得按名称或本地同 ID 补配。',
+    status: 'current-passed',
+    evidence: [wbsCentralEvidence, bindingCentralEvidence],
+    remaining: '#444/#445 已验证项目、分组、任务、阶段、依赖、楼栋、合同与原清单行身份及来源往返；来源更正复验原确认导入资格，不按同名对象补配。',
   },
   {
     id: 'PRG-03',
@@ -357,9 +369,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(347)],
     ownerIssue: 412,
     caseIds: scheduleCases,
-    status: 'ready',
-    evidence: [],
-    remaining: 'sourceVersion 陈旧提交、409 后草稿保留、缓存失效、失败重试与保存后中央刷新读取待实施；本地事务不证明中央并发。',
+    status: 'current-passed',
+    evidence: [wbsCentralEvidence, bindingCentralEvidence],
+    remaining: '#444/#445 已验证固定预览版本、陈旧来源保稿、未知结果原提交恢复、缓存页签与来源切换保护及冷读；完整成本和工资消费继续单独验收。',
   },
   {
     id: 'PRG-04',
@@ -377,9 +389,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(348)],
     ownerIssue: 412,
     caseIds: quantityCases,
-    status: 'partial',
-    evidence: [quantityCentralEvidence],
-    remaining: '#442 已验证工程量项目、阶段、分项、楼栋、户关系、陈旧来源及失败保稿；排程 task 与工程量的中央关联和往返由 #444 继续验收，不由工程量单域通过推定。',
+    status: 'current-passed',
+    evidence: [quantityCentralEvidence, wbsCentralEvidence],
+    remaining: '#442/#444 已分别验证工程量及排程项目、阶段、任务、分项、楼栋、户关系、陈旧来源、失败保稿和往返；当前适用关联已完成。工资及目标成本消费继续按各自义务验收。',
   },
   {
     id: 'PRG-06',
@@ -407,9 +419,9 @@ export const REVIEW_OBLIGATIONS = [
     sources: [issue(300), issue(349)],
     ownerIssue: 412,
     caseIds: progressCases,
-    status: 'ready',
-    evidence: [],
-    remaining: '三域下钻只传稳定 ID 与 sourceVersion，聚合来自当前真实事实；未接入或缺映射必须可解释，不造零量、零成本或同名关系。',
+    status: 'partial',
+    evidence: [quantityCentralEvidence, wbsCentralEvidence],
+    remaining: '#442/#444/#445 已验证排程、绑定与工程量同源下钻及真实阶段聚合。目标成本与工资聚合尚未接齐，继续明确未知，不造零量、零成本或同名关系。',
   },
   {
     id: 'PRG-09',
@@ -418,8 +430,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: progressCases,
     status: 'partial',
-    evidence: [homeScheduleEvidence],
-    remaining: '#434 仅覆盖首页项目及演示工序往返；正式项目/分组/任务/阶段/楼栋/月/视图/工种/责任户、目标成本往返、直接深链和错误重试仍须逐链验证。',
+    evidence: [homeScheduleEvidence, wbsCentralEvidence],
+    remaining: '#444/#445 已覆盖正式项目、分组、任务、阶段、楼栋、月、视图、工种、责任户及绑定来源的上下文往返和深链；目标成本和工资来源往返继续逐链验证。',
   },
   {
     id: 'PRG-10',
@@ -428,8 +440,8 @@ export const REVIEW_OBLIGATIONS = [
     ownerIssue: 412,
     caseIds: progressCases,
     status: 'partial',
-    evidence: [homeScheduleEvidence],
-    remaining: '单独首页切片不等于三域验收；接齐实际前置后完成定向契约/组件、规定视口、最终全量、独立双轴复核、指南/PDF与提交回执。生产可用归 #416。',
+    evidence: [homeScheduleEvidence, quantityCentralEvidence, wbsCentralEvidence],
+    remaining: '#442/#444/#445 已完成限定中央链的定向契约/组件、五档视口、独立复核与指南/PDF，最终验证及本地提交见各票证据；工资及目标成本联验尚未完成，生产可用归 #416。',
   },
   {
     id: 'WAGE-01',

@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 144,
+    "trackedPageFiles": 145,
     "devPageFiles": 5,
-    "appPageFiles": 139,
+    "appPageFiles": 140,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 4,
+    "designPending": 5,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -95,6 +95,13 @@
       "appRoute": "/contract/boq",
       "designRoute": "boqList",
       "status": "covered"
+    },
+    {
+      "appRoute": "/contract/boq/building-evidence",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "#445 新增原合同清单楼栋证据更正与只读来源整页；沿 ADR 0014、现有合同原语及本地排程权威，当前没有一一对应的 DC 页面，已按本票五档实际视口验收。",
+      "issue": "#445"
     },
     {
       "appRoute": "/contract/boq/import",

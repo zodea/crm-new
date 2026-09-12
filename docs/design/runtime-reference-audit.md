@@ -177,13 +177,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 144 / 5 / 139 |
+| 跟踪页面文件 / dev / 生产路由 | 145 / 5 / 140 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 139 / 139 |
+| 证据行 / 唯一参考端点 | 140 / 140 |
 | 参考证据档案 / 被路由使用 | 42 / 36 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 23 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 24 |
 | 历史证据 / 未验证目标 | 34 / 10 |
-| 设计已覆盖 / 待补设计 | 135 / 4 |
+| 设计已覆盖 / 待补设计 | 135 / 5 |
 
 | 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
@@ -192,7 +192,7 @@
 | 基础主数据 | 9 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 分供方 | 4 | [#407](https://github.com/zodea/crm-new/issues/407) |
 | 项目分供方 | 2 | [#408](https://github.com/zodea/crm-new/issues/408) |
-| 核心合同 | 12 | [#409](https://github.com/zodea/crm-new/issues/409) |
+| 核心合同 | 13 | [#409](https://github.com/zodea/crm-new/issues/409) |
 | 辅助合同与结算 | 15 | [#409](https://github.com/zodea/crm-new/issues/409) |
 | 甲方单据 | 4 | [#410](https://github.com/zodea/crm-new/issues/410) |
 | 分包单据 | 8 | [#410](https://github.com/zodea/crm-new/issues/410) |
@@ -227,6 +227,7 @@
 | `app/pages/base/worker/form/[[id]].vue` | `/base/worker/form/:id?` | 基础主数据 | 整页表单 | #316 | R-FORM-PRIOR | #316 已完成浏览器中央表单预载、中央班组/项目选择、幂等命令、乐观锁和返回详情 | 班组与当前项目只保存同来源稳定 ID；中央附件未接入时不回退本地 | C-FORM |
 | `app/pages/base/worker/index.vue` | `/base/worker` | 基础主数据 | 列表 | #316 | R-LIST-PRIOR | #316 已完成中央来源隔离、班组/项目/档案/在场/安全教育展示、筛选、安全回程与四档局部横滚回归 | 电话和身份证脱敏；浏览器无本地删除/快捷编辑；键盘链接按稳定 ID 进入详情 | C-DENSE |
 | `app/pages/contract/[id].vue` | `/contract/:id` | 核心合同 | 详情 | #195 | R-CONTRACT-DETAIL-LIVE | #318 闭合材采中央七页签；#320/#321 闭合施工/分包专属七分区；#322 以真实浏览器证明两类补充协议 canonical 聚焦、键盘焦点、目标不存在/父子错配和列表来源恢复，并复核 390/768/1024/1440px 无页面级横滚 | 只有 `dataOrigin` 加对应 `contractKind` 进入各类中央读模型；补充协议还必须用稳定 `focusId` 命中当前主合同；正式来源显式编辑，演示只读；未核验事实目标保持文本 | C-BASE |
+| `app/pages/contract/boq/building-evidence.vue` | `/contract/boq/building-evidence` | 核心合同 | 整页表单 | #445 | R-SCHEDULE-LOCAL | 无直接对应外部参考页；采用瑞航排程绑定与合同清单来源、DC 表单及现有原语，按 ADR 0014 独立整页维护；实际五档验收单独记录于 #445 | 只对已确认导入基准行更正楼栋；签证新增和来源不明只读，返回原分组重新预览，绑定后可按冻结身份进入楼层再返回，不重建历史 | C-FORM |
 | `app/pages/contract/boq/import.vue` | `/contract/boq/import` | 核心合同 | 特殊工具 | #195 | R-TOOL-PENDING | #195 已按本地清单拆表蓝本完成三步导入、逐 sheet 映射、持久缺失字段错误与四档无整页横滚回归；无红圈安全直接证据，不宣称同屏复刻 | 未对参考站触发上传或导入；A–E 格式与人工确认口径以 `docs/rewrite/pages/boq-import.md` 为准 | C-TOOL |
 | `app/pages/contract/boq/index.vue` | `/contract/boq` | 核心合同 | 工作台 | #195 | R-WORKBENCH-PRIOR | #195 已完成目录/密集表格/变更/月度报量三页签、完整合同编号、直接业务入口、金额完整显示、键盘与四档局部横滚回归；无红圈安全直接证据 | 原始金额不做 MoneyLink；清单手调/导出不推进甲方报量状态；布局权威见 `docs/rewrite/pages/boq-import.md` | C-DENSE |
 | `app/pages/contract/company-expense/form/[id].vue` | `/contract/company-expense/form/:id` | 辅助合同与结算 | 整页表单 | #196 | R-AUX-CONTRACT-DC | 按 `companyExpForm` 直接源码呈现基本信息、金额、合同条款、附件与备注；外部运行态只佐证短表单两列字段、内容滚动和固定底栏 | 编辑只回填并保存独立公司合同中央事实，不补项目、项目结算或分供方外键 | C-FORM |

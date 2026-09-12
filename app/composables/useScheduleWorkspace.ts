@@ -18,7 +18,7 @@ export function useScheduleWorkspace(props: { projectId?: string }) {
   const sourceError = shallowRef('')
   const active = shallowRef(true)
   let sequence = 0
-  const canWrite = computed(() => store.canWrite && !store.pendingCommand && !sourceError.value && active.value)
+  const canWrite = computed(() => store.canWrite && !store.pendingCommand && !sourceError.value && active.value && !route.query.bindingContract)
   const busy = computed(() => store.saving || Boolean(store.pendingCommand))
   const selectedProjectId = shallowRef('')
   const initialized = shallowRef(false)
@@ -119,14 +119,20 @@ export function useScheduleWorkspace(props: { projectId?: string }) {
     const groupId = typeof route.query.group === 'string' ? route.query.group : ''
     const taskId = typeof route.query.task === 'string' ? route.query.task : ''
     const boqLineId = typeof route.query.boqLine === 'string' ? route.query.boqLine : ''
+    const floorPlanId = typeof route.query.floorPlan === 'string' ? route.query.floorPlan : ''
+    const bindingContractId = typeof route.query.bindingContract === 'string' ? route.query.bindingContract : ''
     const group = groupId ? snapshot.groups.find(candidate => candidate.id === groupId) : null
     if (groupId && !group) {
       sourceError.value = '来源分组已删除或不属于当前项目'
       return
     }
     const tasks = (group ? [group] : snapshot.groups).flatMap(candidate => candidate.tasks)
-    const task = taskId ? tasks.find(candidate => candidate.id === taskId) : boqLineId ? tasks.find(candidate => candidate.boqLineIds.includes(boqLineId)) : null
-    if ((taskId || boqLineId) && !task) {
+    if ((route.query.floorPlan || route.query.bindingContract) && (!floorPlanId || !bindingContractId || !group || group.contractId !== bindingContractId)) {
+      sourceError.value = '绑定合同或原楼层计划身份不匹配，请返回合同依据重新选择'
+      return
+    }
+    const task = floorPlanId ? tasks.find(candidate => candidate.floorPlans.some(plan => plan.id === floorPlanId)) : taskId ? tasks.find(candidate => candidate.id === taskId) : boqLineId ? tasks.find(candidate => candidate.boqLineIds.includes(boqLineId)) : null
+    if ((taskId || boqLineId || floorPlanId) && !task) {
       sourceError.value = '来源工序或清单分项已失效，请从当前项目重新选择'
       return
     }
@@ -441,7 +447,7 @@ export function useScheduleWorkspace(props: { projectId?: string }) {
     if (active.value)
       void initialize()
   }, { immediate: true })
-  watch(() => [route.query.group, route.query.task, route.query.boqLine], () => {
+  watch(() => [route.query.group, route.query.task, route.query.boqLine, route.query.floorPlan, route.query.bindingContract], () => {
     if (initialized.value && active.value)
       restoreTaskFromRoute()
   })

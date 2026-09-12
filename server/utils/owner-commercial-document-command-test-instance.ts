@@ -1,3 +1,4 @@
+import type { BoqBuildingAudit, BoqBuildingCommand, BoqBuildingContext, BoqBuildingEvidence, BoqBuildingQuery, BoqBuildingResult, BoqLineSource } from '../../app/lib/boq/central-building-contract'
 import type { BoqChangeOperation } from '../../app/lib/boq/read-model'
 import type { FileRefChanges, FileRefRecord } from '../../app/lib/forms/file-refs'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
@@ -25,6 +26,7 @@ import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-
 import type { ProblemDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
+import { parseBoqBuildingCommand } from '../../app/lib/boq/central-building-request'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
 import {
   OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
@@ -84,6 +86,7 @@ interface SubcontractSeed {
 interface BoqLineSeed extends OwnerDocumentBoqLine {
   projectId: string
   contractId: string
+  source?: BoqLineSource
 }
 
 interface MonthlyQuantityFactSeed {
@@ -160,6 +163,9 @@ interface WorkspaceState {
   contracts: Map<string, ContractSeed>
   subcontractContracts: Map<string, SubcontractSeed>
   boqLines: Map<string, BoqLineSeed>
+  boqBuildingOriginals: Map<string, BoqLineSeed>
+  boqBuildingAudit: BoqBuildingAudit[]
+  boqBuildingCommands: Map<string, { fingerprint: string, result: BoqBuildingResult }>
   monthlyQuantityFacts: MonthlyQuantityFactSeed[]
   finalSettlementSupplements: Map<string, FinalSettlementSupplementSeed>
   finalSettlementReceipts: Map<string, FinalSettlementReceiptSeed>
@@ -190,6 +196,17 @@ function nullableNumber(value: unknown): number | null {
     return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function migrationBoqLineSource(value: unknown): BoqLineSource | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.confirmed !== 'boolean' || !['boqFileId', 'changeOrderId', 'traceKey', 'sourceSheet'].every(key => row[key] === null || typeof row[key] === 'string')
+    || !(row.sourceRow === null || (Number.isSafeInteger(row.sourceRow) && Number(row.sourceRow) >= 0))) {
+    return undefined
+  }
+  return { boqFileId: text(row.boqFileId) || null, changeOrderId: text(row.changeOrderId) || null, traceKey: text(row.traceKey) || null, sourceSheet: text(row.sourceSheet) || null, sourceRow: row.sourceRow as number | null, confirmed: row.confirmed }
 }
 
 function round(value: number): number {
@@ -580,6 +597,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       contracts: new Map(baseContracts.map(row => [row.id, clone(row)])),
       subcontractContracts: new Map(baseSubcontractContracts.map(row => [row.id, clone(row)])),
       boqLines: new Map(baseBoqLines.map(row => [row.id, clone(row)])),
+      boqBuildingOriginals: new Map(),
+      boqBuildingAudit: [],
+      boqBuildingCommands: new Map(),
       monthlyQuantityFacts: baseMonthlyQuantityFacts.map(clone),
       finalSettlementSupplements: new Map(baseFinalSettlementSupplements.map(row => [row.id, clone(row)])),
       finalSettlementReceipts: new Map(baseFinalSettlementReceipts.map(row => [row.id, clone(row)])),
@@ -610,6 +630,78 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     }
     state.sessionId = sessionId
     return state
+  }
+
+  function buildBoqBuildingContext(state: WorkspaceState, query: BoqBuildingQuery, session: BusinessSession, evidence: BoqBuildingEvidence): BoqBuildingContext {
+    if (!session.workspaceId || !session.actorId || query.origin !== 'real'
+      || !['project:list:read', 'construction-contract:read', 'owner-document:read', 'quantity:read'].every(capability => session.capabilities.includes(capability))) {
+      throw failure('forbidden', '当前身份无权读取正式施工合同清单')
+    }
+    const contract = effectiveConstructionContracts(state).get(query.contractId)
+    if (!effectiveProjects(state).has(query.projectId) || !contract)
+      throw failure('not-found', '项目或施工合同已失效，请返回重新读取')
+    if (contract.projectId !== query.projectId)
+      throw failure('relationship-mismatch', '施工合同不属于当前项目')
+    const sourceLines = [...state.boqLines.values()].filter(row => row.projectId === query.projectId && row.contractId === query.contractId).sort((a, b) => a.id.localeCompare(b.id))
+    const effectiveLines = effectiveBoqState(state, { projectId: query.projectId, contractId: query.contractId })
+    const lines = sourceLines.map((line) => {
+      const sourceKind = line.source?.changeOrderId ? 'change-addition' as const : line.source?.boqFileId && line.source.confirmed ? 'confirmed-import' as const : 'unknown' as const
+      const effective = effectiveLines.get(line.id)!
+      return { id: line.id, itemName: line.itemName, unit: line.unit, qty: line.qty, unitPrice: line.unitPrice, effectiveQty: effective.effectiveQty, effectiveUnitPrice: effective.effectiveUnitPrice, building: line.building ?? null, sourceKind, readOnlyReason: sourceKind === 'change-addition' ? '已签证变更新增行不可直接更正，请沿原变洽签业务处理' : sourceKind === 'unknown' ? '缺少已确认导入原始行证据，不可直接更正' : !session.capabilities.includes('owner-document:write') ? '当前身份无权更正清单' : null }
+    })
+    const sourceVersion = `boq-building:${createHash('sha256').update(JSON.stringify([session.workspaceId, query, contract, sourceLines, lines, evidence, state.sourceVersion])).digest('hex')}`
+    return clone({ ...query, workspaceId: session.workspaceId, actorId: session.actorId, contractName: contract.name, sourceVersion, capabilities: [...session.capabilities], buildings: evidence.buildings, lines, audit: state.boqBuildingAudit.filter(row => row.projectId === query.projectId && row.contractId === query.contractId) })
+  }
+
+  function boqBuildingContext(query: BoqBuildingQuery, session: BusinessSession, evidence: BoqBuildingEvidence, sessionId?: string | null): BoqBuildingContext {
+    return buildBoqBuildingContext(stateFor(sessionId), query, session, evidence)
+  }
+
+  /** 只能在量域串行窗口的 SQL 读取成功后同步调用；全部校验和结果生成先于发布。 */
+  function correctBoqBuilding(input: BoqBuildingCommand, session: BusinessSession, evidence: BoqBuildingEvidence, sessionId?: string | null): BoqBuildingResult {
+    const command = parseBoqBuildingCommand(input)
+    if (command.workspaceId !== session.workspaceId || command.actorId !== session.actorId || !session.capabilities.includes(command.requiredCapability))
+      throw failure('forbidden', '当前身份无权更正施工合同清单')
+    const query: BoqBuildingQuery = { projectId: command.projectId, contractId: command.contractId, origin: command.origin }
+    const state = stateFor(sessionId)
+    const context = buildBoqBuildingContext(state, query, session, evidence)
+    const fingerprint = JSON.stringify(command)
+    const duplicate = state.boqBuildingCommands.get(command.commandId)
+    if (duplicate) {
+      if (duplicate.fingerprint !== fingerprint)
+        throw failure('conflict', '同一提交编号不能更换更正内容')
+      return clone(duplicate.result)
+    }
+    if (command.sourceVersion !== context.sourceVersion)
+      throw new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem('stale-source', '清单、合同或楼栋来源已变化，请重新读取后更正'))
+    const line = context.lines.find(row => row.id === command.lineId)
+    if (!line)
+      throw failure('not-found', '所选清单行已失效或不属于当前合同')
+    if (line.readOnlyReason)
+      throw failure('forbidden', line.readOnlyReason)
+    const building = context.buildings.find(row => row.id === command.buildingId)
+    if (!building)
+      throw failure('relationship-mismatch', '所选楼栋已失效或不属于当前项目')
+    const code = building.code.trim()
+    const matches = context.buildings.filter(row => row.code === code || row.name === code)
+    if (!code || matches.length !== 1 || matches[0]!.id !== building.id)
+      throw failure('validation-failed', '楼栋编码不能唯一识别当前楼栋，请先修正项目区域')
+    if (line.building === code)
+      throw failure('validation-failed', '该行已有相同楼栋证据，无需更正')
+    const candidate = clone(state)
+    const original = candidate.boqLines.get(command.lineId)!
+    if (!candidate.boqBuildingOriginals.has(original.id))
+      candidate.boqBuildingOriginals.set(original.id, clone(original))
+    const occurredAt = now()
+    const audit: BoqBuildingAudit = { id: `boq-building:${command.commandId}`, tableName: 'boq_lines', lineId: line.id, projectId: query.projectId, contractId: query.contractId, commandId: command.commandId, actorId: session.actorId, occurredAt, reason: command.reason, beforeBuilding: line.building, building: code, buildingId: building.id, sourceVersion: context.sourceVersion, source: clone(original.source!) }
+    candidate.boqLines.set(original.id, { ...original, building: code, updatedAt: occurredAt })
+    candidate.boqBuildingAudit.push(audit)
+    candidate.sourceVersion += 1
+    const result: BoqBuildingResult = { commandId: command.commandId, projectId: query.projectId, contractId: query.contractId, lineId: original.id, buildingId: building.id, building: code, sourceVersion: buildBoqBuildingContext(candidate, query, session, evidence).sourceVersion, auditId: audit.id }
+    candidate.boqBuildingCommands.set(command.commandId, { fingerprint, result })
+    const response = clone(result)
+    workspaces.set(workspaceKey(sessionId), candidate)
+    return response
   }
 
   function linkedSubcontractRows(state: WorkspaceState): SubcontractContractDetailSource[] {
@@ -1717,6 +1809,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         unit: line.unit,
         qty: quantity,
         unitPrice,
+        source: { boqFileId: null, changeOrderId: current.id, traceKey: null, sourceSheet: null, sourceRow: null, confirmed: false },
         autoQty: 0,
         missingQtyCount: 0,
       }
@@ -1890,6 +1983,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     sessionId?: string | null,
   ): () => void {
     const state = clone(stateFor(sessionId))
+    const previousBoqLines = new Map(state.boqLines)
     for (const migratedKey of state.migrationKeys)
       state.documents.delete(migratedKey)
     const previousMigrationKeys = new Set(state.migrationKeys)
@@ -2037,6 +2131,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           unitType: text(raw.unitType) || null,
           floorZone: text(raw.floorZone) || null,
           updatedAt: text(raw.updatedAt) || null,
+          source: migrationBoqLineSource(raw.source),
           autoQty: 0,
           missingQtyCount: 0,
         }
@@ -2437,6 +2532,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
     }
+    for (const [id, original] of state.boqBuildingOriginals) {
+      const incoming = state.boqLines.get(id)
+      if (!state.projects.has(original.projectId) || !state.contracts.has(original.contractId) || !incoming || JSON.stringify(incoming) !== JSON.stringify(original))
+        throw failure('conflict', '该清单已有中央日常更正，迁入或恢复不能删除、替换其原始来源')
+      state.boqLines.set(id, clone(previousBoqLines.get(id)!))
+    }
     state.sourceVersion += 1
     return () => workspaces.set(workspaceKey(sessionId), state)
   }
@@ -2449,6 +2550,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   return {
+    boqBuildingContext,
+    correctBoqBuilding,
+    hasBoqBuildingCommand(commandId: string, sessionId?: string | null) {
+      return stateFor(sessionId).boqBuildingCommands.has(commandId)
+    },
     reset(sessionId?: string | null) {
       if (sessionId)
         workspaces.delete(sessionId)
@@ -2585,7 +2691,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       return [...state.boqLines.values()]
         .filter(line => line.projectId === projectId && line.contractId === contractId)
         .filter(line => !periodNo || factByLine.has(line.id))
-        .map(({ projectId: _projectId, contractId: _contractId, ...line }) => {
+        .map(({ projectId: _projectId, contractId: _contractId, source: _source, ...line }) => {
           const fact = factByLine.get(line.id)
           const effectiveLine = effective.get(line.id)
           return clone({

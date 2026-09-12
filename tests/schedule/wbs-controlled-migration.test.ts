@@ -7,7 +7,9 @@ import { resolveBusinessSession } from '../../server/utils/business-session'
 import { parseCoreMigrationSourceCommand } from '../../server/utils/core-migration-request'
 import { coreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { quantityTestInstance } from '../../server/utils/quantity-runtime'
+import { scheduleService } from '../../server/utils/schedule-runtime'
 import { createMemoryDb } from '../helpers/memory-db'
+import { readQuantityCoreSource } from '../helpers/quantity-migration-source'
 import { seedWbsMigrationSource } from '../helpers/wbs-migration-source'
 
 const session = resolveBusinessSession()
@@ -97,6 +99,43 @@ it.each(['missing-floor', 'foreign-stage', 'wrong-library-version', 'snapshot-li
     expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'wbs_projects', field: 'graphJson', metricKey: 'apply-failed' }))
     await expect(coreMigrationTestInstance.importBatch({ ...envelope('wbs-invalid-import'), batchId: batch.batchId }, session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     expect(coreMigrationTestInstance.snapshot(session).authority).toBe('local')
+  }
+  finally { db.close() }
+})
+
+it.each([false, true])('迁入后新绑定经重复确认保持不变，危险恢复即使审计缺失=%s也不能吞掉新合同关系', async (missingAudit) => {
+  const db = await createMemoryDb()
+  try {
+    await seedWbsMigrationSource(db)
+    await db.execute('UPDATE schedule_groups SET contract_id = NULL, scope_basis = \'provisional\', contract_bound_at = NULL WHERE id = \'wbs-group\'')
+    await db.execute('DELETE FROM operation_logs WHERE id = \'wbs-bind-log\'')
+    const batch = await prepare(await readQuantityCoreSource(db))
+    await coreMigrationTestInstance.importBatch({ ...envelope('binding-import'), batchId: batch.batchId }, session)
+    await coreMigrationTestInstance.confirm({ ...envelope('binding-confirm'), batchId: batch.batchId }, session)
+    const projectId = batch.mappings.find(row => row.entityType === 'projects')!.serverId
+    const groupId = `${batch.mappings.find(row => row.entityType === 'wbs_projects')!.serverId}:schedule_groups:wbs-group`
+    const contractId = batch.mappings.find(row => row.entityType === 'construction_contracts')!.serverId
+    const query = { projectId, origin: 'real' as const, includeDemo: false }
+    const preview = await scheduleService.binding(query, groupId, contractId)
+    expect(preview.preview!.canBind).toBe(true)
+    const command = { commandId: 'bind-imported', workspaceId: session.workspaceId, actorId: session.actorId, origin: 'real' as const, projectId, requiredCapability: 'schedule:write' as const, sourceVersion: preview.sourceVersion, action: { kind: 'bind-contract' as const, groupId, contractId } }
+    const saved = await scheduleService.execute(command)
+    await coreMigrationTestInstance.confirm({ ...envelope('binding-repeat-confirm'), batchId: batch.batchId }, session)
+    expect((await scheduleService.binding(query, groupId)).binding).toEqual((saved.value as { binding: unknown }).binding)
+    expect(await scheduleService.execute(command)).toEqual(saved)
+    if (missingAudit) {
+      await quantityTestInstance.withSchedule(query, async (central) => {
+        await central.execute('DELETE FROM operation_logs WHERE record_id = ? AND operator = \'schedule:bind-contract\'', [groupId])
+        await central.execute('DELETE FROM schedule_command_receipts WHERE command_id = ?', [command.commandId])
+      })
+    }
+    const before = coreMigrationTestInstance.snapshot(session)
+    const bindingBefore = await scheduleService.binding(query, groupId)
+    const readBefore = await scheduleService.read(query)
+    await expect(coreMigrationTestInstance.rollback({ ...envelope('binding-unsafe-restore'), batchId: batch.batchId }, session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect(coreMigrationTestInstance.snapshot(session)).toEqual(before)
+    expect(await scheduleService.binding(query, groupId)).toEqual(bindingBefore)
+    expect(await scheduleService.read(query)).toEqual(readBefore)
   }
   finally { db.close() }
 })
