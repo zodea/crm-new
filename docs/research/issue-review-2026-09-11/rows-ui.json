@@ -1,0 +1,437 @@
+[
+  {
+    "number": 418,
+    "status": "local-done",
+    "solved": [
+      "19 个列表入口复用连续工作面，分供方详情六页签和资金/材料整页表单完成布局调整。",
+      "提交 35993d4 已核实包含在当前本地主分支；历史验收 29 个浏览器场景与四档及等效缩放视口通过。"
+    ],
+    "remaining": [
+      "等待本地与远端分支整理及交付；本票不代表所有模块详情和专属工具已逐屏复核。",
+      "生产持久化与部署仍由 #416 承接。"
+    ],
+    "flow": [
+      "打开已覆盖的业务列表",
+      "在同一工作面搜索或筛选",
+      "查看紧邻工具栏的明细和汇总",
+      "进入分供方详情默认资料页签",
+      "切换合同等业务页签直接查看明细",
+      "进入整页编辑并保存或取消",
+      "返回原列表并恢复来源及焦点"
+    ],
+    "exception": {
+      "at": 5,
+      "label": "存在未保存修改：保留输入并确认离开",
+      "returnTo": 5
+    },
+    "screens": [
+      {
+        "title": "连续列表",
+        "action": "搜索后进入一条记录",
+        "result": "工具、表头、数据与汇总形成连续工作面"
+      },
+      {
+        "title": "业务详情",
+        "action": "点击合同页签或金额摘要",
+        "result": "直接显示合同明细，窄屏汇总和表内滚动可达"
+      },
+      {
+        "title": "整页表单",
+        "action": "切换分区后保存或取消",
+        "result": "两列上限、分区定位与原草稿保护继续有效"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-418/README.md",
+      "docs/design/evidence/issue-419/supplier-list-390.png"
+    ],
+    "questions": []
+  },
+  {
+    "number": 419,
+    "status": "local-done",
+    "solved": [
+      "分供方资料缺失、齐全待核验、合格、退回及未知状态使用同一领域映射，列表、详情和筛选一致。",
+      "7714e8ff、810a86d、dc5a1d0 已在本地主分支；实际列表与详情浏览器 7 项通过。"
+    ],
+    "remaining": [
+      "等待远端交付；其他页面的状态显示继续由所属模块验收，不扩大为全站完成。"
+    ],
+    "flow": [
+      "读取当前来源分供方列表",
+      "查看明确的资料状态文字",
+      "按资料状态筛选",
+      "进入同 ID 和来源详情",
+      "刷新确认状态一致",
+      "返回列表保留查询与焦点"
+    ],
+    "exception": {
+      "at": 1,
+      "label": "状态未知或读取失败：分别显示中性状态或读取错误",
+      "returnTo": 0
+    },
+    "screens": [
+      {
+        "title": "分供方列表",
+        "action": "筛选齐全待核验或退回",
+        "result": "显示对应真实状态文字及语义色"
+      },
+      {
+        "title": "同来源详情",
+        "action": "进入后刷新再返回",
+        "result": "状态一致，返回查询与焦点保留"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-419/README.md",
+      "docs/design/evidence/issue-419/supplier-list-1024.png",
+      "e2e/supplier-list-replica.spec.ts"
+    ],
+    "questions": []
+  },
+  {
+    "number": 420,
+    "status": "local-done",
+    "solved": [
+      "劳务承包范围独立字段贯通旧库兼容、中央命令、全量查询、列表、详情、表单及分供方导入。",
+      "省略保留、显式空串清空，旧记录不自动填值，人工资料核验结论保持；相关三个提交已在本地主分支。"
+    ],
+    "remaining": [
+      "等待远端交付；本字段不构成资质许可或新增审批规则，生产持久化仍待 #416。"
+    ],
+    "flow": [
+      "打开分供方新增或编辑整页",
+      "在主营业务后填写可选劳务承包范围",
+      "保存时校验权限及原编辑版本",
+      "中央确认后列表和详情回读",
+      "再次编辑核对多行原文",
+      "明确清空后保存",
+      "按关键词或该列筛选完整授权集合"
+    ],
+    "exception": {
+      "at": 2,
+      "label": "版本冲突、无权或保存失败：保留本页输入",
+      "returnTo": 1
+    },
+    "screens": [
+      {
+        "title": "分供方整页表单",
+        "action": "填写多行劳务承包范围并保存",
+        "result": "与主营业务独立保存，核验状态不变"
+      },
+      {
+        "title": "列表与详情",
+        "action": "按内容筛选并再次编辑",
+        "result": "读取同一内容；显式清空可以持久回读"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-419/README.md",
+      "docs/design/evidence/issue-421/supplier-import-form-verification.md"
+    ],
+    "questions": []
+  },
+  {
+    "number": 421,
+    "status": "local-done",
+    "solved": [
+      "公共 ContextHelp 与分供方列表、详情、整页表单落实就近帮助，冗余开发说明移除，错误、权限及来源提示保留。",
+      "鼠标、键盘、点击、触摸和 Escape 焦点回归及四档帮助显示已验；相关提交已在本地主分支，指南 PDF 六页已逐页核验。"
+    ],
+    "remaining": [
+      "等待远端交付；其他领域仍须逐页整理说明，不默认隐藏全站必要反馈。"
+    ],
+    "flow": [
+      "进入分供方整页表单",
+      "查看当前必填、错误及来源信息",
+      "聚焦或悬停字段旁问号",
+      "点击或触摸打开详细帮助",
+      "按 Escape 关闭并回到触发点",
+      "继续输入并按原流程保存"
+    ],
+    "exception": {
+      "at": 5,
+      "label": "保存或权限失败仍在操作处直接显示",
+      "returnTo": 1
+    },
+    "screens": [
+      {
+        "title": "字段旁帮助",
+        "action": "使用键盘、点击或触摸问号",
+        "result": "说明就近出现，关闭后焦点回到原控件"
+      },
+      {
+        "title": "表单反馈",
+        "action": "触发必填或保存错误",
+        "result": "必要反馈直接可见，不依赖悬停"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-421/supplier-import-form-verification.md",
+      "docs/design/evidence/issue-419/README.md"
+    ],
+    "questions": []
+  },
+  {
+    "number": 422,
+    "status": "local-done",
+    "solved": [
+      "材料采购合同显示适用金额、日期和稳定关系入口，全量筛选汇总消费同次中央响应，正式与演示分开。",
+      "8252e1a 已在本地主分支；真实金额、详情往返、失败重试、权限撤回及参考视口通过，历史去重 22 个浏览器场景。"
+    ],
+    "remaining": [
+      "等待远端交付；独立完工审定、结算和结清事实由 #409 继续调查，不能由零余额推断。",
+      "其他列工具及文件链和桌面旧适配仍按父票范围验收。"
+    ],
+    "flow": [
+      "打开材料采购合同列表",
+      "组合搜索、状态和项目条件",
+      "查看中央完整查询汇总",
+      "分页后核对汇总不变",
+      "通过合法合同或关系入口进入详情",
+      "核对同来源金额后返回",
+      "清空条件恢复全量查询"
+    ],
+    "exception": {
+      "at": 2,
+      "label": "权限撤回或读取失败：撤销旧汇总并显示可重试问题",
+      "returnTo": 0
+    },
+    "screens": [
+      {
+        "title": "材料合同列表",
+        "action": "组合筛选并翻页",
+        "result": "行与汇总同源，正式和演示金额分别显示"
+      },
+      {
+        "title": "合同及关系详情",
+        "action": "进入稳定项目或乙方链接后返回",
+        "result": "真实金额一致，不可用关系显示原因"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-422/README.md",
+      "docs/design/evidence/issue-422/material-contract-list-390-scrolled.png",
+      "docs/design/evidence/issue-422/material-contract-list-1293.png"
+    ],
+    "questions": []
+  },
+  {
+    "number": 423,
+    "status": "local-done",
+    "solved": [
+      "项目 Excel 解析、映射、人工预览、中央逐行保存与列表/详情刷新回读已贯通，正式项目不再写入旧浏览器 SQL。",
+      "3edab0c4 已在本地主分支；稳定客户关系、来源行防重、部分成功、失败重试及取消通过，历史浏览器 11 项和五档视口已验。"
+    ],
+    "remaining": [
+      "等待远端交付；生产重启、持久化与备份恢复仍属 #416。",
+      "本 Excel 防重不查询整库迁移映射；原 Excel 字节不作为中央附件上传。"
+    ],
+    "flow": [
+      "从项目列表选择 Excel 导入",
+      "选择文件及 Sheet",
+      "映射列并保留原始行号",
+      "人工核对项目与稳定客户关系",
+      "确认后逐行提交中央命令",
+      "中央回读确认成功并记录来源回执",
+      "进入列表或详情并刷新核对"
+    ],
+    "exception": {
+      "at": 4,
+      "label": "瞬时故障停在当前行，同一命令重试；成功行不重复建立",
+      "returnTo": 4
+    },
+    "screens": [
+      {
+        "title": "文件映射",
+        "action": "选择 Sheet 并检查原始行",
+        "result": "预览明确关系、缺失、歧义和归一结果"
+      },
+      {
+        "title": "导入进度",
+        "action": "确认、取消或重试当前失败行",
+        "result": "保留已确认成功行及稳定命令身份"
+      },
+      {
+        "title": "项目列表",
+        "action": "打开导入项目后刷新",
+        "result": "中央列表和详情读取同一身份"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-423/project-import-verification.md",
+      "docs/guides/project-excel-import.md",
+      "output/pdf/瑞航CRM_项目Excel导入使用指南.pdf"
+    ],
+    "questions": []
+  },
+  {
+    "number": 424,
+    "status": "local-done",
+    "solved": [
+      "客户关联项目改为中央事实按主/次客户稳定 ID 和来源投影，重复角色去重，无权项目不泄露身份或数量。",
+      "e2410088 已在本地主分支；客户→项目→返回、刷新、过期来源、原行焦点及五档视口已验，历史浏览器 17 项通过。"
+    ],
+    "remaining": [
+      "等待远端交付；本票没有新增客户详情子表筛选分页，保留的是父列表状态。",
+      "施工合同关联后续由 #425 完成，普通收款由 #436 完成各自切片；生产关口仍属 #416。"
+    ],
+    "flow": [
+      "中央新建或 Excel 导入项目",
+      "保存主客户及可选次客户稳定身份",
+      "打开客户详情关联项目页签",
+      "读取同来源项目及一致数量",
+      "从稳定项目行进入项目详情",
+      "刷新或查看后返回客户",
+      "恢复父列表条件、关系页签与原行焦点"
+    ],
+    "exception": {
+      "at": 3,
+      "label": "项目源失败或无权：数量未知且不泄露记录，支持同来源重试",
+      "returnTo": 2
+    },
+    "screens": [
+      {
+        "title": "客户关联项目",
+        "action": "新建项目后重新打开客户",
+        "result": "主次客户关系按 ID 回读，同一项目只计一次"
+      },
+      {
+        "title": "项目详情往返",
+        "action": "键盘进入第二行项目后返回",
+        "result": "恢复同一关系行、滚动及父列表上下文"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-424/customer-project-verification.md",
+      "docs/design/evidence/issue-424/customer-project-390.png",
+      "docs/design/evidence/issue-424/customer-project-1280.png"
+    ],
+    "questions": []
+  },
+  {
+    "number": 425,
+    "status": "local-done",
+    "solved": [
+      "正式施工合同保存后客户详情读取同一中央合同事实，合同自身客户 ID 和来源决定归属，客户有效合同额沿既有合同及补充协议口径。",
+      "87fad3b2 已在本地主分支；独立异常态、归属更正、详情返回、上下文到期和五档视口已验，历史去重 16 个浏览器场景通过。"
+    ],
+    "remaining": [
+      "等待远端交付；客户聚合金额和合同详情变更后金额含义不同，不能混用。",
+      "本票外的普通收款中央链已有 #436 独立提交承接；生产持久化等仍由 #416 验收。"
+    ],
+    "flow": [
+      "从正式施工合同整页填写项目及客户",
+      "中央校验当前关系并保存",
+      "客户详情施工合同页签重新取事实",
+      "核对合同数量及客户有效合同额",
+      "进入同来源专属施工合同详情",
+      "刷新或显式编辑后返回客户",
+      "恢复来源页签与稳定业务行焦点"
+    ],
+    "exception": {
+      "at": 2,
+      "label": "合同源无权或不可用：保留客户主数据，依赖合同的金额与数量未知",
+      "returnTo": 2
+    },
+    "screens": [
+      {
+        "title": "施工合同保存",
+        "action": "保存新合同并打开关联客户",
+        "result": "客户按合同自身客户身份读取真实合同"
+      },
+      {
+        "title": "合同来源异常",
+        "action": "读取失败后重试",
+        "result": "旧合同及金额不泄露，其他客户关系仍可读"
+      },
+      {
+        "title": "详情返回",
+        "action": "进入合同、刷新并返回",
+        "result": "仅有效同来源上下文恢复原行，过期来源规范降级"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-425/customer-contract-verification.md",
+      "docs/design/evidence/issue-425/customer-contract-390.png",
+      "docs/design/evidence/issue-425/customer-contract-1280.png"
+    ],
+    "questions": []
+  },
+  {
+    "number": 442,
+    "status": "local-done",
+    "solved": [
+      "工程量中央命令、读取、阶段目录及报量映射、责任与完成、照片和受控迁移已接入，并已独立提交 0a9c37680a02693c6c9a43661cc5e129c38649ea。",
+      "阶段、模板 BOQ 关联、零/未知/现场公式、区域与矩阵、责任和照片完成均已实际验证。列宽 19.5px 反例修至五档 >=100px；本组去重 7 文件 16 项 UI 通过，48 张截图逐张核验。",
+      "月报实际 HTTP 与表单两项通过，现场量 6、合同量 0、暂估量缺失独立；确认换基准、取消留手工量、缺量待核对、312 元申报快照及改模板后不重写均已验。9 月 12 日最终五档补拍 1/1 通过。",
+      "旧责任、户详情、合计和真实台账下载 11 项已迁正式 API 并全部通过；五档合计图逐张核验，归档跨项目和目录慢读取的迟到确认反例已修绿。",
+      "慢响应先选择目录、归档取消/确认/解除、冷刷新及分类 XLSX 实际回读全部通过；分类准备时切项目不会迟到打开旧配置。三类日常中央 CSV 导入实际 1 项通过，缺照 completed 拒绝而显式 draft 成功。指南 PDF 最终 6 页已逐页检查。",
+      "真实十五表旧库受控迁移实际 HTTP 1 项通过；先前 #440 的三量汇总保持为独立已提交切片。",
+      "独立剥离 #441 的候选通过类型检查及完整测试：498 个文件、2942 项，172.61 秒。提交前代码与测试字节保持一致，仅排除汇总报告并更新验收文档状态。",
+      "包含 #441/#442 的完整工作区通过完整测试 515 个文件、3079 项，以及 typecheck 和 build；最终修改范围 280 个代码与 JSON 文件 lint 通过。全库仍有其他格式错误，未宣称全库 lint 通过。"
+    ],
+    "remaining": [
+      "本票已完成本地验收、独立复核和独立提交，等待远端交付。",
+      "月报和日常导入证据已齐；WBS/工资后续中央消费与 #416 生产持久化及部署关口不由本票代验。"
+    ],
+    "flow": [
+      "选择中央项目及明确来源",
+      "建立户型模板、三量与稳定 BOQ 关联",
+      "建立楼栋、楼层及挂接模板的户",
+      "显式维护阶段及唯一报量映射",
+      "按户和工种配置当前责任",
+      "登记阶段完成与照片并刷新户详情",
+      "检查矩阵、量差及导出同一事实",
+      "由当前量生成月报快照，或按目标进入日常映射导入"
+    ],
+    "exception": {
+      "at": 5,
+      "label": "权限、版本或关系变化：保留输入并阻止旧事实提交，重新核验后重试",
+      "returnTo": 4
+    },
+    "screens": [
+      {
+        "title": "户型模板与清单",
+        "action": "显式选择稳定清单，分别填零、留空及现场算式",
+        "result": "保存后独立回读 0、null 和算式结果；原识别量保留"
+      },
+      {
+        "title": "区域与阶段",
+        "action": "新建户并挂接模板，显式选择报量阶段",
+        "result": "新项目拥有稳定祖先与映射，不按名称猜关联"
+      },
+      {
+        "title": "责任与完成",
+        "action": "选择当前责任后登记完成、上传照片并刷新",
+        "result": "已实际回读照片原文，替换当前责任后保留完成时执行责任"
+      },
+      {
+        "title": "月报三基准与申报",
+        "action": "取消换基准保留手工量，确认重算后保存并申报",
+        "result": "缺量保留待核对；已申报 312 元在模板改量后保持原快照"
+      }
+    ],
+    "evidence": [
+      "docs/design/evidence/issue-442/README.md",
+      "e2e/quantity-central-ui.spec.ts",
+      "e2e/quantity-stages.spec.ts",
+      "docs/design/evidence/issue-442/stages/stages-1440.png",
+      "docs/design/evidence/issue-442/migration/README.md",
+      "docs/design/evidence/issue-442/migration/http-result.json",
+      "docs/design/evidence/issue-442/monthly/monthly-missing-390.png",
+      "docs/design/evidence/issue-442/monthly/monthly-basis-confirm.png",
+      "docs/design/evidence/issue-442/monthly/monthly-submitted-snapshot.png",
+      "docs/design/evidence/issue-442/totals/totals-390.png",
+      "docs/design/evidence/issue-442/totals/totals-1440.png",
+      "docs/design/evidence/issue-442/totals/workbook-readback.json",
+      "docs/design/evidence/issue-442/completion/assignment-390.png",
+      "docs/design/evidence/issue-442/completion/completion-1440.png",
+      "docs/design/evidence/issue-442/completion/batch-390.png",
+      "docs/design/evidence/issue-442/exports/category-export.png",
+      "docs/design/evidence/issue-442/import/quantity-import-1440.png",
+      "docs/design/evidence/issue-442/ui-verification.md"
+    ],
+    "questions": []
+  }
+]
