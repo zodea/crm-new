@@ -11,7 +11,7 @@ export interface SupplierCredentialFormValue {
   decision: 'qualified' | 'rejected'
   note: string
 }
-export type SupplierCredentialEditorMode = SupplierCredentialAction['action']
+export type SupplierCredentialEditorMode = Exclude<SupplierCredentialAction['action'], 'ocr-recognize' | 'ocr-confirm'>
 export function emptySupplierCredentialForm(): SupplierCredentialFormValue {
   return { category: '营业执照', validFrom: '', expiresAt: '', longTerm: false, requirement: 'required', reason: '', decision: 'qualified', note: '' }
 }

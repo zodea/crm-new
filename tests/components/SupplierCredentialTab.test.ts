@@ -311,15 +311,15 @@ describe('supplier credential tab', () => {
       category: '营业执照',
       confirmedFields: expect.objectContaining({
         name: '当前公司',
-        uniqueCode: '91440000TEST123456',
+        taxNo: '91440000TEST123456',
         decisions: expect.objectContaining({
           name: 'keep-current',
-          uniqueCode: 'use-recognized',
+          taxNo: 'use-recognized',
         }),
         sourceFile: '合成营业执照.pdf',
       }),
       supplierFields: {
-        uniqueCode: '91440000TEST123456',
+        taxNo: '91440000TEST123456',
         legalRep: '张某',
       },
     })

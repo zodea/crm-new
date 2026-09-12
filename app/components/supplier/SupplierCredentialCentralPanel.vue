@@ -19,6 +19,7 @@ import { CREDENTIAL_STATUS_LABEL } from '~/lib/supplier/status'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
 import { useSupplierCredentialStore } from '~/stores/supplier-credential'
 import SupplierCredentialEditor from './SupplierCredentialEditor.vue'
+import SupplierCredentialOcrWorkflow from './SupplierCredentialOcrWorkflow.vue'
 import SupplierCredentialOriginalList from './SupplierCredentialOriginalList.vue'
 import SupplierCredentialRequirements from './SupplierCredentialRequirements.vue'
 import SupplierCredentialReviewStatus from './SupplierCredentialReviewStatus.vue'
@@ -45,6 +46,10 @@ const previewName = shallowRef('')
 const previewCloseButton = shallowRef<HTMLButtonElement | null>(null)
 const previewUrl = useObjectUrl(previewBlob)
 const fileBusy = shallowRef(false)
+const ocrRecordId = shallowRef('')
+const ocrRecognizeOnOpen = shallowRef(false)
+const ocrPreparing = shallowRef(false)
+const ocrWorkflow = shallowRef<InstanceType<typeof SupplierCredentialOcrWorkflow> | null>(null)
 const fileError = shallowRef('')
 const downloadUrls = new Set<string>()
 let initialForm = ''
@@ -52,7 +57,8 @@ let epoch = 0
 let deactivated = false
 let editorTrigger: HTMLElement | null = null
 let previewTrigger: HTMLElement | null = null
-const busy = computed(() => saving.value || preparing.value || fileBusy.value)
+let ocrTrigger: HTMLElement | null = null
+const busy = computed(() => saving.value || preparing.value || fileBusy.value || ocrPreparing.value)
 const dirty = computed(() => mode.value !== null && (pendingAction.value !== null || selectedFile.value !== null || JSON.stringify(form) !== initialForm))
 const currentFileName = computed(() => selectedFile.value?.name ?? selectedRecord.value?.file?.fileName ?? selectedRecord.value?.category ?? '')
 const missing = computed(() => {
@@ -109,7 +115,7 @@ async function load(focusTitle = false) {
   const currentEpoch = epoch
   try {
     await session.load()
-    if (focusTitle && active.value && currentEpoch === epoch && data.value && !mode.value) {
+    if (focusTitle && active.value && currentEpoch === epoch && data.value && !mode.value && !ocrRecordId.value) {
       await nextTick()
       detailShell.value?.$el.querySelector?.('[data-entity-detail-title]')?.focus({ preventScroll: true })
     }
@@ -129,7 +135,7 @@ function resetEditor() {
   Object.assign(form, emptySupplierCredentialForm())
 }
 function openEditor(next: SupplierCredentialEditorMode, record?: SupplierCredentialRecord, requirement?: SupplierCredentialRequirementRecord, decision?: 'qualified' | 'rejected', audit?: SupplierCredentialAudit) {
-  if (!canWrite.value || busy.value)
+  if (!canWrite.value || busy.value || ocrRecordId.value)
     return
   resetEditor()
   editorTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -150,6 +156,8 @@ function patchForm(patch: Partial<SupplierCredentialFormValue>) {
     Object.assign(form, patch)
 }
 async function mayClose() {
+  if (ocrWorkflow.value && !await ocrWorkflow.value.mayClose())
+    return false
   if (busy.value)
     return false
   if (!dirty.value)
@@ -157,6 +165,20 @@ async function mayClose() {
   const currentEpoch = epoch
   const approved = await confirm({ variant: 'simple', title: '放弃未保存的证照输入？', message: pendingAction.value ? '上次提交可能已保存，重新进入后请核对原件清单。关闭会放弃当前保留的输入。' : '当前输入尚未保存，确认放弃后再关闭。', confirmLabel: '放弃输入' })
   return approved && currentEpoch === epoch
+}
+function openOcr(record: SupplierCredentialRecord, recognize: boolean) {
+  if (busy.value || mode.value || ocrRecordId.value)
+    return
+  ocrTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  ocrRecognizeOnOpen.value = recognize
+  ocrRecordId.value = record.id
+}
+async function closeOcr() {
+  ocrRecordId.value = ''
+  ocrPreparing.value = false
+  await nextTick()
+  if (active.value && ocrTrigger?.isConnected)
+    ocrTrigger.focus()
 }
 async function closeEditor() {
   if (!await mayClose())
@@ -303,6 +325,8 @@ function restorePreviewFocus(event: Event) {
 }
 watch(() => [props.supplierId, props.origin, props.origin === 'demo' ? visibility.includeDemo : true], () => {
   resetEditor()
+  ocrRecordId.value = ''
+  ocrPreparing.value = false
   previewBlob.value = null
   if (active.value)
     void load(true)
@@ -344,7 +368,7 @@ onScopeDispose(() => {
       <div v-if="fileError" class="border border-danger/30 bg-danger-soft p-3 text-12px leading-5 text-danger-ink" role="alert">
         {{ fileError }}
       </div>
-      <SupplierCredentialOriginalList :credentials="data.credentials" :business-date="data.businessDate" :can-write="canWrite" :busy="busy" @upload="openEditor('upload')" @edit="openEditor('edit', $event)" @remove="openEditor('delete', $event)" @preview="accessFile($event, false)" @download="accessFile($event, true)" />
+      <SupplierCredentialOriginalList :credentials="data.credentials" :business-date="data.businessDate" :can-write="canWrite" :busy="busy || Boolean(ocrRecordId)" @upload="openEditor('upload')" @edit="openEditor('edit', $event)" @remove="openEditor('delete', $event)" @preview="accessFile($event, false)" @download="accessFile($event, true)" @recognize="openOcr($event, true)" @review-ocr="openOcr($event, false)" />
       <section v-if="restorableAudits.length" class="panel p-4" aria-label="可撤回的证照删除记录">
         <h3 class="m-0 text-13px font-700 text-ink">
           删除记录
@@ -361,6 +385,7 @@ onScopeDispose(() => {
     </div>
   </EntityDetailShell>
   <SupplierCredentialEditor v-if="mode && active" :mode="mode" :value="form" :file-name="currentFileName" :busy="busy" :locked="pendingAction !== null" :error="editorError" :conflict="conflict" :unavailable="unavailableIntent" :recheck-summary="recheckSummary" @patch="patchForm" @file="selectedFile = $event" @submit="submit" @cancel="closeEditor" @recheck="recheck" />
+  <SupplierCredentialOcrWorkflow v-if="ocrRecordId" :key="`${supplierId}:${origin}:${ocrRecordId}`" ref="ocrWorkflow" :session="session" :credential-id="ocrRecordId" :active="active" :recognize-on-open="ocrRecognizeOnOpen" @close="closeOcr" @busy="ocrPreparing = $event" />
   <Dialog :open="Boolean(previewBlob) && active" @update:open="open => { if (!open) previewBlob = null }">
     <DialogContent :show-close="false" class="flex max-h-[90dvh] w-[min(64rem,calc(100vw-2rem))] flex-col p-4" @open-auto-focus="focusPreviewClose" @close-auto-focus="restorePreviewFocus">
       <div class="flex min-w-0 items-start gap-3">

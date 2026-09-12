@@ -1,7 +1,10 @@
 import type { SupplierCredentialAction, SupplierCredentialCommand, SupplierCredentialValidity } from '../../app/lib/supplier/credential-contract'
+import type { CredentialOcrDecision, CredentialOcrFieldChoice, CredentialOcrFieldKey } from '../../app/lib/supplier/credential-ocr'
 import type { SupplierCredentialCategory, SupplierCredentialRequirement } from '../../app/lib/supplier/credentials'
 import type { DataOriginDTO } from '../../app/types/read-model'
 import { credentialProblem } from '../../app/lib/supplier/credential-contract'
+import { CREDENTIAL_OCR_FIELD_KEYS } from '../../app/lib/supplier/credential-ocr'
+import { parseOcrRuntimeOptionsJson } from './ocr-runtime-options'
 
 function invalid(): never {
   throw credentialProblem('validation-failed', '证照命令格式无效，请重新核对')
@@ -23,7 +26,7 @@ function validity(input: Record<string, unknown>): SupplierCredentialValidity {
 }
 export function parseSupplierCredentialCommand(value: unknown): SupplierCredentialCommand {
   const commonKeys = ['commandId', 'supplierId', 'origin', 'workspaceId', 'actorId', 'requiredCapability', 'baseSupplierVersion', 'baseCredentialVersion', 'action']
-  const outer = object(value, [...commonKeys, 'draft', 'credentialId', 'auditId', 'deletionToken'])
+  const outer = object(value, [...commonKeys, 'draft', 'credentialId', 'auditId', 'deletionToken', 'options'])
   if ((outer.origin !== 'real' && outer.origin !== 'demo') || outer.requiredCapability !== 'supplier-credential:write')
     return invalid()
   let action: SupplierCredentialAction
@@ -58,6 +61,42 @@ export function parseSupplierCredentialCommand(value: unknown): SupplierCredenti
   else if (outer.action === 'restore') {
     object(value, [...commonKeys, 'credentialId', 'auditId', 'deletionToken'])
     action = { action: 'restore', credentialId: text(outer.credentialId, true), auditId: text(outer.auditId, true), deletionToken: text(outer.deletionToken, true) }
+  }
+  else if (outer.action === 'ocr-recognize') {
+    object(value, [...commonKeys, 'credentialId', 'options'])
+    try {
+      action = { action: 'ocr-recognize', credentialId: text(outer.credentialId, true), options: parseOcrRuntimeOptionsJson(JSON.stringify(outer.options)) }
+    }
+    catch { return invalid() }
+  }
+  else if (outer.action === 'ocr-confirm') {
+    object(value, [...commonKeys, 'credentialId', 'draft'])
+    const draft = object(outer.draft, ['recognitionId', 'choices', 'category', 'longTerm', 'decisions'])
+    const decisions = object(draft.decisions, ['category', 'longTerm'])
+    if (![decisions.category, decisions.longTerm].every(value => ['keep-current', 'use-recognized', 'manual'].includes(String(value))))
+      return invalid()
+    if (typeof draft.longTerm !== 'boolean' || !Array.isArray(draft.choices) || draft.choices.length > 10)
+      return invalid()
+    const choices = draft.choices.map((value): CredentialOcrFieldChoice => {
+      const choice = object(value, ['key', 'decision', 'candidateId', 'manualValue'])
+      const key = text(choice.key, true) as CredentialOcrFieldKey
+      if (!(CREDENTIAL_OCR_FIELD_KEYS as readonly string[]).includes(key))
+        return invalid()
+      if (choice.decision === 'keep-current') {
+        object(value, ['key', 'decision'])
+        return { key, decision: 'keep-current' }
+      }
+      if (choice.decision === 'use-recognized') {
+        object(value, ['key', 'decision', 'candidateId'])
+        return { key, decision: 'use-recognized', candidateId: text(choice.candidateId, true) }
+      }
+      if (choice.decision === 'manual') {
+        object(value, ['key', 'decision', 'manualValue'])
+        return { key, decision: 'manual', manualValue: text(choice.manualValue) }
+      }
+      return invalid()
+    })
+    action = { action: 'ocr-confirm', credentialId: text(outer.credentialId, true), draft: { recognitionId: text(draft.recognitionId, true), category: text(draft.category, true) as SupplierCredentialCategory, longTerm: draft.longTerm, choices, decisions: { category: decisions.category as CredentialOcrDecision, longTerm: decisions.longTerm as CredentialOcrDecision } } }
   }
   else { return invalid() }
   return { ...action, commandId: text(outer.commandId, true), supplierId: text(outer.supplierId, true), origin: outer.origin as DataOriginDTO, workspaceId: text(outer.workspaceId, true), actorId: text(outer.actorId, true), requiredCapability: 'supplier-credential:write', baseSupplierVersion: text(outer.baseSupplierVersion, true), baseCredentialVersion: text(outer.baseCredentialVersion, true) }

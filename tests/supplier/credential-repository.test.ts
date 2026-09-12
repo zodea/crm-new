@@ -2,6 +2,7 @@ import type { SupplierCredentialCommand, SupplierCredentialFileContent } from '~
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
+import { SupplierCredentialNotAppliedProblem } from '~/lib/supplier/credential-contract'
 import { createSupplierCredentialRepository, credentialContentBytes } from '~/lib/supplier/credential-repository'
 import { credentialRecord, credentialSnapshot } from './credential-ui-fixtures'
 
@@ -11,6 +12,21 @@ function original(): SupplierCredentialFileContent {
   return { ...query, id: 'file-a', ownerType: 'supplier_credential', ownerId: 'credential-a', fileName: '合成证照.pdf', mimeType: 'application/pdf', fileSize: bytes.length, state: 'available', payloadBase64: bytes.toString('base64'), sha256: createHash('sha256').update(bytes).digest('hex') }
 }
 describe('中央证照 Repository', () => {
+  it('只有完整且绑定本次识别命令的未应用证明才能释放原提交', async () => {
+    const command: SupplierCredentialCommand = { action: 'ocr-recognize', credentialId: 'credential-a', commandId: 'recognize-a', supplierId: 'supplier-a', origin: 'real', workspaceId: 'w', actorId: 'a', requiredCapability: 'supplier-credential:write', baseSupplierVersion: 's1', baseCredentialVersion: 'c1', options: {} }
+    const problem = { code: 'unavailable', message: '服务明确识别失败', retryable: true, fieldErrors: {}, traceId: null, commandId: 'recognize-a', commandOutcome: 'not-applied' }
+    const repository = createSupplierCredentialRepository(vi.fn().mockRejectedValue({ data: problem }))
+    await expect(repository.execute(command)).rejects.toBeInstanceOf(SupplierCredentialNotAppliedProblem)
+    for (const patch of [{ commandId: 'another' }, { commandId: undefined }, { retryable: undefined }, { commandOutcome: 'unknown' }]) {
+      const invalid = createSupplierCredentialRepository(vi.fn().mockRejectedValue({ data: { ...problem, ...patch } }))
+      await expect(invalid.execute(command)).rejects.not.toBeInstanceOf(SupplierCredentialNotAppliedProblem)
+    }
+  })
+  it('识别快照必须绑定同一原件，不能携带另一个主档的核对字段', async () => {
+    const recognition = { id: 'recognition-a', fileId: 'another-original', sha256: 'a'.repeat(64), recognizedAt: '2026-09-12T00:00:00Z', result: {}, parsed: { rawText: '', category: { category: '营业执照' as const, confidence: 0.9, evidence: [] }, fields: [], longTerm: false } }
+    const value = credentialSnapshot({ credentials: [credentialRecord({ recognition })] })
+    await expect(createSupplierCredentialRepository(vi.fn().mockResolvedValue(value)).read('supplier-a', 'real')).rejects.toThrow(/归属/)
+  })
   it('正式与演示按当前稳定身份读取，不含本地回退', async () => {
     const fetcher = vi.fn().mockResolvedValue(credentialSnapshot({ dataOrigin: 'demo' }))
     await createSupplierCredentialRepository(fetcher).read('supplier-a', 'demo')

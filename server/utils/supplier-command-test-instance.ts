@@ -13,8 +13,10 @@ import type { SupplierCredentialScope } from './supplier-credential-service'
 import { randomUUID } from 'node:crypto'
 import { supplierCredentialMasterDraft } from '../../app/lib/migration/supplier-credential-source'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
+import { SupplierCredentialNotAppliedProblem } from '../../app/lib/supplier/credential-contract'
 import { credentialMasterChanged, credentialRecords, currentCredentialStatus, emptySupplierCredentialAggregate, revalidateCredentialReview } from '../../app/lib/supplier/credential-domain'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
+import { preserveTaxpayerVerification } from '../../app/lib/supplier/taxpayer-verification'
 import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
 import { migratedSupplierCredentialMaster, prepareSupplierCredentialMigration } from './supplier-credential-migration'
 
@@ -88,6 +90,13 @@ function cleanDraft(value: SupplierFormDraft): SupplierFormDraft {
     note: text(value.note),
     approvalStatus: text(value.approvalStatus) || 'active',
   }
+}
+
+function assertUniqueSupplierDraft(state: SessionState, draft: SupplierFormDraft, supplierId?: string) {
+  if (draft.taxNo && [...state.suppliers.values()].some(item => item.id !== supplierId && text(item.draft.taxNo) === draft.taxNo))
+    throw failure('validation-failed', '统一社会信用代码已存在', { taxNo: ['统一社会信用代码已存在'] })
+  if (draft.uniqueCode && [...state.suppliers.values()].some(item => item.id !== supplierId && text(item.draft.uniqueCode) === draft.uniqueCode))
+    throw failure('validation-failed', '分供方内部编码已存在', { uniqueCode: ['分供方内部编码已存在'] })
 }
 
 function toRow(stored: StoredSupplier): SupplierListSourceRow {
@@ -224,14 +233,26 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
 
   const instance = {
     readCredentialScope: credentialScope,
-    transactCredentialScope<T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T }, sessionId?: string | null): T {
+    transactCredentialScope<T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T, commandId?: string }, sessionId?: string | null): T {
       const scope = credentialScope(supplierId, sessionId)
       const result = operation(scope)
       if (result.changed) {
         const state = stateFor(sessionId)
         const supplier = state.suppliers.get(supplierId)!
+        const draft = cleanDraft(scope.draft)
+        try {
+          assertUniqueSupplierDraft(state, draft, supplierId)
+        }
+        catch (cause) {
+          // 当前候选还没有发布；可证明本命令被重复字段校验整体拒绝。
+          if (result.commandId && cause instanceof SupplierRepositoryProblem)
+            throw new SupplierCredentialNotAppliedProblem(result.commandId, cause.message, 'validation-failed')
+          throw cause
+        }
+        if (credentialMasterChanged(supplier.draft, draft))
+          scope.aggregate.review = null
         state.credentialScopes.set(supplierId, scope.aggregate)
-        state.suppliers.set(supplierId, { ...supplier, version: supplier.version + 1, credentialStatus: currentCredentialStatus(scope.aggregate, new Date(now())), updatedAt: now() })
+        state.suppliers.set(supplierId, { ...supplier, draft: { ...draft, id: supplierId }, version: supplier.version + 1, credentialStatus: currentCredentialStatus(scope.aggregate, new Date(now())), updatedAt: now() })
         state.sourceVersion++
       }
       return result.value
@@ -373,7 +394,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return { ...duplicate, attachmentIds: [] }
-      const draft = cleanDraft(request.draft)
+      let draft = cleanDraft(request.draft)
       if (request.action !== 'draft') {
         const fieldErrors: Record<string, string[]> = {}
         if (!draft.name)
@@ -386,6 +407,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
           throw failure('validation-failed', '分供方表单校验失败', fieldErrors)
       }
       const existing = request.id ? state.suppliers.get(request.id) : null
+      draft = preserveTaxpayerVerification(existing?.draft ?? null, draft)
       if (existing)
         credentialScope(existing.id, sessionId)
       if (existing && request.draft.laborScope === undefined)
@@ -396,12 +418,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         throw failure('validation-failed', '新建分供方不能带 baseVersion')
       if (existing && request.baseVersion !== String(existing.version))
         throw failure('conflict', '分供方已被其他操作更新，请先处理最新版本')
-      const duplicateTaxNo = draft.taxNo && [...state.suppliers.values()].some(item => item.id !== request.id && text(item.draft.taxNo) === draft.taxNo)
-      const duplicateCode = draft.uniqueCode && [...state.suppliers.values()].some(item => item.id !== request.id && text(item.draft.uniqueCode) === draft.uniqueCode)
-      if (duplicateTaxNo)
-        throw failure('validation-failed', '统一社会信用代码已存在', { taxNo: ['统一社会信用代码已存在'] })
-      if (duplicateCode)
-        throw failure('validation-failed', '分供方内部编码已存在', { uniqueCode: ['分供方内部编码已存在'] })
+      assertUniqueSupplierDraft(state, draft, request.id)
       const timestamp = now()
       const id = existing?.id ?? createId()
       const aggregate = structuredClone(state.credentialScopes.get(id) ?? emptySupplierCredentialAggregate(id))

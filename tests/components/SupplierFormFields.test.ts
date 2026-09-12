@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
 import SupplierFormFields from '~/components/master-data/SupplierFormFields.vue'
 
+const runtime = vi.hoisted(() => ({ desktop: true }))
+vi.mock('~/lib/platform/runtime', () => ({ isDesktopRuntime: () => runtime.desktop }))
+
 const recordTaxpayerVerification = vi.fn()
 const formModal = vi.fn()
 const success = vi.fn()
 const warning = vi.fn()
 const error = vi.fn()
+const verifyCentral = vi.fn()
 
 vi.stubGlobal('useSupplierDetailStore', () => ({
   recordTaxpayerVerification,
@@ -37,6 +41,7 @@ function renderFields(overrides: Partial<SupplierFormDraft> = {}) {
     props: {
       modelValue: draft,
       fieldErrors: {},
+      onVerifyTaxpayer: verifyCentral,
     },
     global: {
       components: {
@@ -53,6 +58,7 @@ function renderFields(overrides: Partial<SupplierFormDraft> = {}) {
 describe('分供方表单资料辅助动作', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    runtime.desktop = true
     recordTaxpayerVerification.mockImplementation(async (input: {
       status: string
       taxpayerType: string
@@ -65,6 +71,15 @@ describe('分供方表单资料辅助动作', () => {
       verifiedAt: '2026-07-30T16:20:30.000Z',
       note: input.note,
     }))
+  })
+
+  it('浏览器只向整页父级发核验意图，不调用旧本地存储或全局表单弹窗', async () => {
+    runtime.desktop = false
+    renderFields()
+    await fireEvent.click(screen.getByRole('button', { name: '记录人工核验' }))
+    expect(verifyCentral).toHaveBeenCalledOnce()
+    expect(recordTaxpayerVerification).not.toHaveBeenCalled()
+    expect(formModal).not.toHaveBeenCalled()
   })
 
   it('一次性复制注册地址，复制后开票资料地址仍可独立编辑', async () => {

@@ -1,7 +1,9 @@
 import type { DataOriginDTO } from '../../types/read-model'
 import type { SupplierCredentialCommand, SupplierCredentialCommandResult, SupplierCredentialFile, SupplierCredentialFileContent, SupplierCredentialFileQuery, SupplierCredentialRepository, SupplierCredentialSnapshot } from './credential-contract'
 import { isProblemCodeDTO } from '../../types/read-model'
-import { credentialProblem } from './credential-contract'
+import { credentialProblem, SupplierCredentialNotAppliedProblem } from './credential-contract'
+import { CREDENTIAL_MASTER_FIELDS } from './credential-domain'
+import { CREDENTIAL_OCR_FIELD_KEYS } from './credential-ocr'
 import { SUPPLIER_CREDENTIAL_CATEGORIES } from './credentials'
 import { SupplierRepositoryProblem } from './read-contract'
 
@@ -39,6 +41,28 @@ function file(value: unknown, credentialId: string): asserts value is SupplierCr
     invalid()
   }
 }
+function recognition(value: unknown, fileId: unknown) {
+  if (!object(value) || !text(value.id) || !value.id || value.fileId !== fileId || !text(value.sha256) || !/^[a-f\d]{64}$/i.test(value.sha256)
+    || !text(value.recognizedAt) || ![undefined, true, false].includes(value.historical as never) || !object(value.result) || !object(value.parsed)) {
+    invalid()
+  }
+  const parsed = value.parsed
+  if (!text(parsed.rawText) || typeof parsed.longTerm !== 'boolean' || !object(parsed.category) || !category(parsed.category.category)
+    || typeof parsed.category.confidence !== 'number' || !Number.isFinite(parsed.category.confidence) || parsed.category.confidence < 0 || parsed.category.confidence > 1
+    || !Array.isArray(parsed.category.evidence) || !parsed.category.evidence.every(text) || !Array.isArray(parsed.fields)) {
+    invalid()
+  }
+  const ids = new Set<string>()
+  for (const candidate of parsed.fields) {
+    if (!object(candidate) || !text(candidate.id) || !candidate.id || ids.has(candidate.id)
+      || !(CREDENTIAL_OCR_FIELD_KEYS as readonly string[]).includes(String(candidate.key))
+      || !text(candidate.label) || !text(candidate.value) || !text(candidate.sourceLabel)
+      || typeof candidate.confidence !== 'number' || !Number.isFinite(candidate.confidence) || candidate.confidence < 0 || candidate.confidence > 1) {
+      invalid()
+    }
+    ids.add(candidate.id)
+  }
+}
 function decodeSnapshot(value: unknown, supplierId: string, origin: DataOriginDTO): SupplierCredentialSnapshot {
   if (!object(value) || value.supplierId !== supplierId || value.dataOrigin !== origin
     || !['supplierName', 'supplierVersion', 'credentialVersion', 'workspaceId', 'actorId', 'asOf', 'businessDate'].every(key => text(value[key]) && value[key])
@@ -49,6 +73,10 @@ function decodeSnapshot(value: unknown, supplierId: string, origin: DataOriginDT
   }
   if (value.review !== null && (!object(value.review) || !['qualified', 'rejected'].includes(String(value.review.decision))
     || !text(value.review.reviewedAt) || !nullableText(value.review.actorId) || !text(value.review.note))) {
+    invalid()
+  }
+  if (value.masterValues !== undefined && (origin !== 'real' || !value.capabilities.includes('supplier:write') || !object(value.masterValues)
+    || Object.entries(value.masterValues).some(([key, entry]) => !(CREDENTIAL_MASTER_FIELDS as readonly string[]).includes(key) || !text(entry)))) {
     invalid()
   }
   const ids = new Set<string>()
@@ -68,6 +96,8 @@ function decodeSnapshot(value: unknown, supplierId: string, origin: DataOriginDT
         invalid()
       fileIds.add(row.file.id)
     }
+    if (row.recognition !== undefined && row.recognition !== null)
+      recognition(row.recognition, object(row.file) ? row.file.id : null)
   }
   const categories = new Set<string>()
   for (const row of value.requirements) {
@@ -100,12 +130,16 @@ export function credentialContentBytes(content: SupplierCredentialFileContent): 
   return Uint8Array.from(atob(content.payloadBase64), character => character.charCodeAt(0))
 }
 
-function failure(cause: unknown): Error {
+function failure(cause: unknown, command?: SupplierCredentialCommand): Error {
   if (cause instanceof SupplierRepositoryProblem || (cause instanceof Error && cause.name === 'AbortError'))
     return cause
   const response = object(cause) && object(cause.response) ? cause.response : null
   const body = response?._data ?? (object(cause) ? cause.data : null)
   const problem = object(body) && object(body.data) ? body.data : body
+  if (object(problem) && command && ['ocr-recognize', 'ocr-confirm'].includes(command.action) && problem.commandId === command.commandId && problem.commandOutcome === 'not-applied'
+    && ['unavailable', 'conflict', 'not-found', 'validation-failed'].includes(String(problem.code)) && text(problem.message) && typeof problem.retryable === 'boolean' && object(problem.fieldErrors) && nullableText(problem.traceId)) {
+    return new SupplierCredentialNotAppliedProblem(command.commandId, problem.message, problem.code as 'unavailable' | 'conflict' | 'not-found' | 'validation-failed')
+  }
   if (object(problem) && isProblemCodeDTO(problem.code) && text(problem.message))
     return credentialProblem(problem.code, problem.message)
   return credentialProblem('unavailable', '证照服务暂时不可用，请保留输入并重试')
@@ -124,7 +158,7 @@ export function createSupplierCredentialRepository(fetcher: SupplierCredentialFe
       options.signal?.throwIfAborted()
       return result
     }
-    catch (cause) { throw failure(cause) }
+    catch (cause) { throw failure(cause, options.body) }
   }
   return {
     read: (supplierId, origin, options) => request(`/api/read/supplier-credentials/${encodeURIComponent(supplierId)}`, { ...options, query: originQuery(origin) }, value => decodeSnapshot(value, supplierId, origin)),

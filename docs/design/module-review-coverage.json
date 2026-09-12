@@ -101,8 +101,8 @@
   "counts": {
     "productionRoutes": 139,
     "rootVariants": 195,
-    "surfaces": 577,
-    "environmentCases": 1034,
+    "surfaces": 590,
+    "environmentCases": 1047,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -1225,7 +1225,7 @@
       "issues": [
         407
       ],
-      "surfaces": 30
+      "surfaces": 43
     },
     {
       "code": "project-supplier",
@@ -3110,6 +3110,230 @@
       "routeEvidenceId": "E-41EF6B00AA02"
     },
     {
+      "id": "S-3962546BC636",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/recognition-review",
+      "label": "recognition-review",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；按当前原件识别，逐目标人工确认；税号与内部码分别维护",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "SupplierCredentialOcrReview"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-943704D11131",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/raw-candidates",
+      "label": "raw-candidates",
+      "type": "section",
+      "condition": "按现有路由和 capability；受控原始候选与置信度，稍后核对和冷刷新保留",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "识别原文"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-E1C6FE3B8D0C",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/history",
+      "label": "history",
+      "type": "section",
+      "condition": "按现有路由和 capability；历史原义保留，不自动搬值；再识别不抹上次确认",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "历史识别与人工确认记录"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-2C57DC060031",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/lost-response",
+      "label": "lost-response",
+      "type": "section",
+      "condition": "按现有路由和 capability；结果不确定时恢复同一命令，不重复识别或确认",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "恢复原提交"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-28F818BE3D5C",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/stale-review",
+      "label": "stale-review",
+      "type": "section",
+      "condition": "按现有路由和 capability；原件或主档变化时保留人工选择，重读后再确认",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "重新核对当前资料"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-12E040AD4D33",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/new-recognition",
+      "label": "new-recognition",
+      "type": "section",
+      "condition": "按现有路由和 capability；明确切换候选，不把旧选择静默应用到新结果",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "核对新识别结果"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-08CC096BF216",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "ocr/missing-original",
+      "label": "missing-original",
+      "type": "section",
+      "condition": "按现有路由和 capability；历史路径只作线索，缺正文不提供可确认快照",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialOcrWorkflow.vue",
+          "anchor": "此证照缺少可读取的原件"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
       "id": "S-F57A58798B3C",
       "route": "/base/supplier/credential/:id",
       "routePattern": "/base/supplier/credential/:id",
@@ -3186,7 +3410,7 @@
       "path": "desktop/ocr-review",
       "label": "ocr-review",
       "type": "section",
-      "condition": "按现有路由和 capability；保留既有 Tauri 适配，不代表浏览器 OCR 已接入",
+      "condition": "按现有路由和 capability；保留既有 Tauri 适配；浏览器中央 OCR 另按专用工作流验收",
       "hosts": [
         "tauri"
       ],
@@ -3235,6 +3459,102 @@
       "routeEvidenceId": "E-5C5EDCA85C62"
     },
     {
+      "id": "S-F6FF07957E4A",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "taxpayer/manual-verification",
+      "label": "manual-verification",
+      "type": "dialog",
+      "condition": "未传 id；已保存正式主体与税号；官网由用户查询，应用保存人工结果",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "记录纳税人核验结果"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
+      "id": "S-8E96BA2A0484",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "taxpayer/lost-response",
+      "label": "lost-response",
+      "type": "section",
+      "condition": "未传 id；失败保核验输入；成功只合并核验字段与保存基准",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "恢复原提交"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
+      "id": "S-AA26D0321529",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "taxpayer/stale-master",
+      "label": "stale-master",
+      "type": "section",
+      "condition": "未传 id；税号或主档版本已变化时禁止旧结论覆盖",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "重新核对当前主档"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
       "id": "S-143969BEC9A9",
       "route": "/base/supplier/form/:id?",
       "routePattern": "/base/supplier/form/:id",
@@ -3256,6 +3576,102 @@
         {
           "path": "app/pages/base/supplier/form/[[id]].vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
+      "id": "S-E5002C7F7FBB",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "taxpayer/manual-verification",
+      "label": "manual-verification",
+      "type": "dialog",
+      "condition": "有效 id；已保存正式主体与税号；官网由用户查询，应用保存人工结果",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "记录纳税人核验结果"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
+      "id": "S-14ADCAD5984E",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "taxpayer/lost-response",
+      "label": "lost-response",
+      "type": "section",
+      "condition": "有效 id；失败保核验输入；成功只合并核验字段与保存基准",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "恢复原提交"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-5C5EDCA85C62"
+    },
+    {
+      "id": "S-00EC51E903EC",
+      "route": "/base/supplier/form/:id?",
+      "routePattern": "/base/supplier/form/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "taxpayer/stale-master",
+      "label": "stale-master",
+      "type": "section",
+      "condition": "有效 id；税号或主档版本已变化时禁止旧结论覆盖",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/form/[[id]].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierTaxpayerDialog.vue",
+          "anchor": "重新核对当前主档"
         }
       ],
       "issueNumbers": [
@@ -22842,6 +23258,174 @@
       "obligationIds": []
     },
     {
+      "id": "C-6171E00D6AD4",
+      "surfaceId": "S-3962546BC636",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-A7B905ACDD3C",
+      "surfaceId": "S-943704D11131",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-DD2BA5CDD9B7",
+      "surfaceId": "S-E1C6FE3B8D0C",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-E53D3692DD2D",
+      "surfaceId": "S-2C57DC060031",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-0AB7B3460320",
+      "surfaceId": "S-28F818BE3D5C",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-2E9F4B6AEE88",
+      "surfaceId": "S-12E040AD4D33",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-716C3BEAC79E",
+      "surfaceId": "S-08CC096BF216",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-5664B4B74C87",
       "surfaceId": "S-F57A58798B3C",
       "host": "tauri",
@@ -22962,6 +23546,78 @@
       "obligationIds": []
     },
     {
+      "id": "C-87E1E8F6FA39",
+      "surfaceId": "S-F6FF07957E4A",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-28FF53F4C0D1",
+      "surfaceId": "S-8E96BA2A0484",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-6F8BB1FBBCEC",
+      "surfaceId": "S-AA26D0321529",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-421645197531",
       "surfaceId": "S-143969BEC9A9",
       "host": "browser",
@@ -23002,6 +23658,78 @@
         "frontend": "not-verified",
         "crossModule": "not-verified",
         "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D6EE8872A07B",
+      "surfaceId": "S-E5002C7F7FBB",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-10E33E3BF59D",
+      "surfaceId": "S-14ADCAD5984E",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-7F6388F73FE5",
+      "surfaceId": "S-00EC51E903EC",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-5C5EDCA85C62",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
       },
       "reviewEvidence": [],
       "remaining": [

@@ -4,6 +4,17 @@ import { parseSupplierCredentialCommand, supplierCredentialOrigin } from '../../
 
 const command: SupplierCredentialCommand = { action: 'review', commandId: 'manual-review-1', supplierId: 'supplier-1', origin: 'real', workspaceId: 'workspace', actorId: 'actor', requiredCapability: 'supplier-credential:write', baseSupplierVersion: '3', baseCredentialVersion: '2', draft: { decision: 'qualified', note: '人工核对' } }
 describe('证照 HTTP 请求边界', () => {
+  it('识别仅接受当前证照身份和现有设置，人工确认仅接受候选身份及明确选择', () => {
+    const { draft: _draft, ...base } = command
+    const recognition = { ...base, action: 'ocr-recognize', credentialId: 'credential-1', options: { useSealRecognition: false, requestTimeoutMs: 20000 } }
+    expect(parseSupplierCredentialCommand(recognition)).toEqual(recognition)
+    expect(() => parseSupplierCredentialCommand({ ...recognition, payloadBase64: '用户替换正文' })).toThrow()
+    expect(() => parseSupplierCredentialCommand({ ...recognition, options: { accessToken: '不能携带私钥' } })).toThrow()
+    const confirmation = { ...base, action: 'ocr-confirm', credentialId: 'credential-1', draft: { decisions: { category: 'keep-current', longTerm: 'keep-current' }, recognitionId: 'ocr-1', choices: [{ key: 'taxNo', decision: 'use-recognized', candidateId: 'tax-1' }], category: '营业执照', longTerm: false } }
+    expect(parseSupplierCredentialCommand(confirmation)).toEqual(confirmation)
+    expect(() => parseSupplierCredentialCommand({ ...confirmation, draft: { ...confirmation.draft, fields: { taxNo: '伪造最终值' } } })).toThrow()
+    expect(() => parseSupplierCredentialCommand({ ...confirmation, draft: { ...confirmation.draft, choices: [{ key: 'taxNo', decision: 'keep-current', candidateId: '额外内容' }] } })).toThrow()
+  })
   it('明确携带主档及证照双版本，不接受人工凭证注入', () => {
     expect(parseSupplierCredentialCommand(command)).toEqual(command)
     expect(() => parseSupplierCredentialCommand({ ...command, reviewedAt: '2000-01-01' })).toThrow()

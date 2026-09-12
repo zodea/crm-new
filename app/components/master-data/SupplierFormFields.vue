@@ -4,7 +4,9 @@ import { useClipboard } from '@vueuse/core'
 import { computed, useId } from 'vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { openExternalUrl } from '~/lib/platform/external-url'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { GUANGDONG_TAX_QUERY_URL } from '~/lib/supplier/taxpayer-verification'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -14,11 +16,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   clearError: [field: keyof SupplierFormDraft]
+  verifyTaxpayer: []
 }>()
 
 const draft = defineModel<SupplierFormDraft>({ required: true })
-const GUANGDONG_TAX_QUERY_URL = 'https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx'
-const detailStore = useSupplierDetailStore()
+const detailStore = isDesktopRuntime() ? useSupplierDetailStore() : null
 const { copy, isSupported: clipboardSupported } = useClipboard()
 const { error, formModal, success, warning } = useKitUI()
 const taxNoInputId = useId()
@@ -85,6 +87,10 @@ async function openTaxQuery() {
 }
 
 async function recordTaxpayerVerification() {
+  if (!detailStore) {
+    emit('verifyTaxpayer')
+    return
+  }
   if (!draft.value.id) {
     warning('请先保存分供方，再记录官网核验结果')
     return
@@ -268,10 +274,10 @@ function copyRegisteredAddress() {
           </span>
         </div>
         <span class="mt-1 flex flex-wrap gap-2">
-          <button type="button" class="cell--link text-11px" @click="openTaxQuery">
+          <button type="button" class="btn-secondary text-11px" @click="openTaxQuery">
             打开广东税务查询
           </button>
-          <button type="button" class="cell--link text-11px" @click="recordTaxpayerVerification">
+          <button type="button" class="btn-secondary text-11px" @click="recordTaxpayerVerification">
             记录人工核验
           </button>
         </span>
@@ -336,7 +342,7 @@ function copyRegisteredAddress() {
       <div class="field-block">
         <span class="flex items-center justify-between gap-2">
           <label :for="invoiceAddressInputId" class="field-label">开票资料地址（选填）</label>
-          <button type="button" class="cell--link text-10px" @click="copyRegisteredAddress">
+          <button type="button" class="btn-secondary text-10px" @click="copyRegisteredAddress">
             同注册地址
           </button>
         </span>

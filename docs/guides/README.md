@@ -25,7 +25,7 @@
 - [项目 Excel 导入使用指南](./project-excel-import.md)
 - [核心合同与工程量清单使用指南](./core-contract-and-boq.md)
 - [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
-- [分供方证照与资料核验使用指南](./supplier-credential-review.md)（中央原件及人工核验，运行范围见 [#446 证据](../design/evidence/issue-446/README.md)）
+- [分供方证照与资料核验使用指南](./supplier-credential-review.md)（中央原件及人工核验见 [#446](../design/evidence/issue-446/README.md)，OCR 人工确认与税务核验见 [#447](../design/evidence/issue-447/README.md)）
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)
 - [OCR 设置使用说明](./ocr-settings.md)

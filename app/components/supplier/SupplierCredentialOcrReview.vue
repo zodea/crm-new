@@ -2,30 +2,40 @@
 import type {
   CredentialCategorySuggestion,
   CredentialOcrDecision,
+  CredentialOcrFieldChoice,
+  CredentialOcrReviewDraft,
   CredentialOcrReviewField,
-} from '~/lib/supplier/credential-ocr'
-import type { SupplierCredentialCategory } from '~/lib/supplier/detail'
-import { computed, onMounted, reactive, shallowRef, useTemplateRef } from 'vue'
-import {
+  CredentialOcrReviewGroup,
   resolveCredentialOcrReview,
 } from '~/lib/supplier/credential-ocr'
+import type { SupplierCredentialCategory } from '~/lib/supplier/detail'
+import { computed, onMounted, reactive, shallowRef, useTemplateRef, watch } from 'vue'
+import {
+  buildCredentialOcrReview,
+  resolveCredentialOcrChoices,
+} from '~/lib/supplier/credential-ocr'
 import { SUPPLIER_CREDENTIAL_CATEGORIES } from '~/lib/supplier/detail'
+import SupplierCredentialOcrFieldReview from './SupplierCredentialOcrFieldReview.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   fileName: string
   category: CredentialCategorySuggestion
   currentCategory?: SupplierCredentialCategory
   fields: readonly CredentialOcrReviewField[]
   currentLongTerm?: boolean
   recognizedLongTerm?: boolean | null
-}>()
+  draft?: CredentialOcrReviewDraft | null
+  autofocus?: boolean
+}>(), { autofocus: true })
 
 const emit = defineEmits<{
   cancel: []
+  draftChange: [draft: CredentialOcrReviewDraft]
   confirm: [payload: {
     category: SupplierCredentialCategory
     fields: ReturnType<typeof resolveCredentialOcrReview>
     decisions: Record<string, string>
+    choices: CredentialOcrFieldChoice[]
     longTerm: boolean
   }]
 }>()
@@ -38,9 +48,9 @@ const categoryConflict = computed(
   () => effectiveCurrentCategory.value !== props.category.category,
 )
 const categoryDecision = shallowRef<CredentialOcrDecision>(
-  categoryConflict.value ? 'keep-current' : 'use-recognized',
+  props.draft?.categoryDecision ?? (categoryConflict.value ? 'keep-current' : 'use-recognized'),
 )
-const manualCategory = shallowRef<SupplierCredentialCategory>(effectiveCurrentCategory.value)
+const manualCategory = shallowRef<SupplierCredentialCategory>(props.draft?.manualCategory ?? effectiveCurrentCategory.value)
 const resolvedCategory = computed(() => {
   if (categoryDecision.value === 'keep-current')
     return effectiveCurrentCategory.value
@@ -48,30 +58,40 @@ const resolvedCategory = computed(() => {
     return props.category.category
   return manualCategory.value
 })
-const reviewFields = reactive<CredentialOcrReviewField[]>(props.fields.map(field => ({ ...field })))
-for (const dateField of [
-  { key: 'validFrom' as const, label: '生效日期' },
-  { key: 'expiresAt' as const, label: '到期日期' },
-]) {
-  if (!reviewFields.some(field => field.key === dateField.key)) {
-    reviewFields.push({
-      ...dateField,
-      value: '',
-      confidence: 0,
-      currentValue: '',
-      decision: 'manual',
-      manualValue: '',
-      conflict: false,
-    })
+const reviewGroups = reactive<CredentialOcrReviewGroup[]>([])
+watch(() => props.fields, (fields) => {
+  const normalized = buildCredentialOcrReview(fields, Object.fromEntries(fields.map(field => [field.key, field.currentValue])))
+  for (const key of ['validFrom', 'expiresAt'] as const) {
+    if (!normalized.some(field => field.key === key))
+      normalized.push({ id: `manual-${key}`, key, label: key === 'validFrom' ? '生效日期' : '到期日期', value: '', confidence: 0, currentValue: '', decision: 'manual', manualValue: '', conflict: false })
   }
-}
+  const next = [...new Set(normalized.map(field => field.key))].map((key): CredentialOcrReviewGroup => {
+    const candidates = normalized.filter(field => field.key === key)
+    const current = candidates[0]!
+    const previous = reviewGroups.find(group => group.key === key)
+    const saved = props.draft?.choices.find(choice => choice.key === key)
+    const selected = fields.find(field => field.key === key && field.decision !== 'keep-current') ?? current
+    const conflict = candidates.some(field => field.conflict)
+    return {
+      key,
+      label: current.label,
+      currentValue: current.currentValue,
+      candidates,
+      conflict,
+      decision: previous?.decision ?? saved?.decision ?? (conflict ? 'keep-current' : selected.decision),
+      candidateId: previous?.candidateId ?? (saved?.decision === 'use-recognized' ? saved.candidateId : undefined) ?? candidates.find(field => field.value === selected.value)?.id ?? current.id!,
+      manualValue: previous?.manualValue ?? (saved?.decision === 'manual' ? saved.manualValue : selected.manualValue),
+    }
+  })
+  reviewGroups.splice(0, reviewGroups.length, ...next)
+}, { immediate: true })
 const longTermDecision = shallowRef<CredentialOcrDecision>(
-  props.recognizedLongTerm == null
-  || (props.currentLongTerm ?? false) !== props.recognizedLongTerm
+  props.draft?.longTermDecision ?? (props.recognizedLongTerm == null
+    || (props.currentLongTerm ?? false) !== props.recognizedLongTerm
     ? 'keep-current'
-    : 'use-recognized',
+    : 'use-recognized'),
 )
-const manualLongTerm = shallowRef(false)
+const manualLongTerm = shallowRef(props.draft?.manualLongTerm ?? false)
 const resolvedLongTerm = computed(() => {
   if (longTermDecision.value === 'keep-current')
     return props.currentLongTerm ?? false
@@ -80,41 +100,53 @@ const resolvedLongTerm = computed(() => {
   return manualLongTerm.value
 })
 
-const unresolvedManualFields = computed(() =>
-  reviewFields.filter(field =>
-    field.decision === 'manual'
-    && field.key !== 'validFrom'
-    && field.key !== 'expiresAt'
-    && !field.manualValue.trim(),
-  ),
-)
-const canConfirm = computed(() => unresolvedManualFields.value.length === 0)
+const choices = computed<CredentialOcrFieldChoice[]>(() => reviewGroups.map(group => group.decision === 'keep-current'
+  ? { key: group.key, decision: 'keep-current' }
+  : group.decision === 'manual'
+    ? { key: group.key, decision: 'manual', manualValue: group.manualValue }
+    : { key: group.key, decision: 'use-recognized', candidateId: group.candidateId }))
+const resolution = computed(() => {
+  try {
+    const fields = resolveCredentialOcrChoices(reviewGroups.flatMap(group => group.candidates), Object.fromEntries(reviewGroups.map(group => [group.key, group.currentValue])), choices.value)
+    if (resolvedLongTerm.value)
+      delete fields.expiresAt
+    const dates = [fields.validFrom, fields.expiresAt].filter((value): value is string => Boolean(value))
+    if (dates.some(value => !/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T00:00:00Z`)) || new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) !== value)
+      || (fields.validFrom && fields.expiresAt && fields.validFrom > fields.expiresAt)) {
+      return { fields: null, error: '请核对有效期，截止日期不能早于开始日期' }
+    }
+    return { fields, error: '' }
+  }
+  catch (cause) { return { fields: null, error: cause instanceof Error ? cause.message : '请核对人工选择' } }
+})
+const canConfirm = computed(() => resolution.value.fields !== null)
+watch(() => JSON.stringify([choices.value, categoryDecision.value, manualCategory.value, longTermDecision.value, manualLongTerm.value]), () => {
+  emit('draftChange', { choices: choices.value, categoryDecision: categoryDecision.value, manualCategory: manualCategory.value, longTermDecision: longTermDecision.value, manualLongTerm: manualLongTerm.value })
+})
 
 onMounted(() => {
-  reviewRegion.value?.focus()
+  if (props.autofocus !== false)
+    reviewRegion.value?.focus()
 })
 
 function keepAllCurrent() {
-  for (const field of reviewFields) {
-    if (field.currentValue)
-      field.decision = 'keep-current'
-  }
+  for (const group of reviewGroups)
+    group.decision = 'keep-current'
 }
 
 function confirmReview() {
   if (!canConfirm.value)
     return
-  const fields = resolveCredentialOcrReview(reviewFields)
-  if (resolvedLongTerm.value)
-    delete fields.expiresAt
+  const fields = resolution.value.fields!
   emit('confirm', {
     category: resolvedCategory.value,
     fields,
     decisions: {
-      ...Object.fromEntries(reviewFields.map(field => [field.key, field.decision])),
+      ...Object.fromEntries(reviewGroups.map(group => [group.key, group.decision])),
       category: categoryDecision.value,
       longTerm: longTermDecision.value,
     },
+    choices: choices.value,
     longTerm: resolvedLongTerm.value,
   })
 }
@@ -195,64 +227,7 @@ function confirmReview() {
 
       <div class="max-w-full overflow-x-auto" tabindex="0" aria-label="OCR 字段核对表，可横向滚动">
         <div class="grid min-w-[48rem] gap-2">
-          <fieldset
-            v-for="field in reviewFields"
-            :key="field.key"
-            class="grid grid-cols-[8rem_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(18rem,1.4fr)] items-start gap-3 border border-line bg-panel p-3"
-          >
-            <legend class="sr-only">
-              {{ field.label }}
-            </legend>
-            <div>
-              <p class="text-12px font-700 text-ink">
-                {{ field.label }}
-              </p>
-              <span v-if="field.conflict" class="chip chip-warn mt-1">存在冲突</span>
-              <span v-else-if="field.value" class="chip chip-ok mt-1">可采用</span>
-              <span v-else class="chip chip-warn mt-1">待人工录入</span>
-            </div>
-            <div class="min-w-0">
-              <p class="text-9px text-ink-faint">
-                当前值
-              </p>
-              <p class="mt-1 break-all text-12px text-ink-soft">
-                {{ field.currentValue || '未录入' }}
-              </p>
-            </div>
-            <div class="min-w-0">
-              <p class="text-9px text-ink-faint">
-                识别值 · {{ Math.round(field.confidence * 100) }}%
-              </p>
-              <p class="mt-1 break-all text-12px text-ink">
-                {{ field.value || '未识别' }}
-              </p>
-            </div>
-            <div class="grid min-w-0 gap-2">
-              <div class="flex flex-wrap gap-x-3 gap-y-1 text-11px">
-                <label class="inline-flex items-center gap-1">
-                  <input v-model="field.decision" type="radio" :name="`decision-${field.key}`" value="keep-current">
-                  保留当前值
-                </label>
-                <label class="inline-flex items-center gap-1">
-                  <input v-model="field.decision" type="radio" :name="`decision-${field.key}`" value="use-recognized">
-                  使用识别值
-                </label>
-                <label class="inline-flex items-center gap-1">
-                  <input v-model="field.decision" type="radio" :name="`decision-${field.key}`" value="manual">
-                  手工修改
-                </label>
-              </div>
-              <input
-                v-if="field.decision === 'manual'"
-                v-model="field.manualValue"
-                class="field-input w-full"
-                :type="field.key === 'validFrom' || field.key === 'expiresAt' ? 'date' : 'text'"
-                :aria-label="`${field.label}手工确认值`"
-                :placeholder="`填写${field.label}`"
-                :disabled="field.key === 'expiresAt' && resolvedLongTerm"
-              >
-            </div>
-          </fieldset>
+          <SupplierCredentialOcrFieldReview v-for="group in reviewGroups" :key="group.key" :group="group" :long-term="resolvedLongTerm" @patch="Object.assign(group, $event)" />
         </div>
       </div>
 
@@ -297,8 +272,8 @@ function confirmReview() {
         </div>
       </fieldset>
 
-      <p v-if="unresolvedManualFields.length" class="text-11px text-danger" role="alert">
-        请填写手工确认值：{{ unresolvedManualFields.map(field => field.label).join('、') }}
+      <p v-if="resolution.error" class="text-11px text-danger" role="alert">
+        {{ resolution.error }}
       </p>
 
       <footer class="flex flex-wrap justify-end gap-2 border-t border-line pt-3">

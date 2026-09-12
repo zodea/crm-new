@@ -15,7 +15,8 @@ import type {
 } from '~/lib/master-data/page'
 import type { ProjectFormReadDTO } from '~/lib/project/command-contract'
 import type { SupplierFormReadDTO } from '~/lib/supplier/command-contract'
-import { onActivated } from 'vue'
+import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import {
@@ -35,6 +36,8 @@ import {
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
+import { createTaxpayerEditorState } from '~/lib/supplier/taxpayer-editor-state'
+import { mergeTaxpayerVerification } from '~/lib/supplier/taxpayer-verification'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 import { CrewWorkerCommandConflictError, useCrewWorkerCommandStore } from '~/stores/crew-worker-command'
@@ -173,6 +176,49 @@ const dirty = computed(() => hydrated.value && (
   || pendingRemoveIds.value.length > 0
   || pendingRestoreIds.value.length > 0
 ))
+
+const taxpayerEditor = createTaxpayerEditorState({
+  target: () => ({ supplierId: supplierSession?.targetSupplierId ?? null, origin: route.query.origin && route.query.origin !== 'real' ? 'demo' : 'real', version: supplierSession?.baseVersion ?? null, draft: draft.value, saved: savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}, enabled: props.kind === 'supplier' && !isDesktopRuntime() && hydrated.value && !loadingAction.value }),
+  pending: () => supplierSession?.pendingTaxpayerCommand ?? null,
+  execute: (input, current) => supplierCommandStore().recordTaxpayerVerification(supplierSession!, input, current),
+  read: id => useNuxtApp().$repositories.supplierCommands.loadForm(id),
+  apply: (result, verifiedTaxNo) => {
+    const saved = savedSnapshot.value ? JSON.parse(savedSnapshot.value) : {}
+    const merged = mergeTaxpayerVerification(draft.value, saved, result.verification)
+    // 重新核对见到的新税号只有在本页税号未被编辑时才同步；其他草稿保持原样。
+    if ((draft.value.taxNo ?? '').trim() === (saved.taxNo ?? '').trim()) {
+      merged.draft.taxNo = verifiedTaxNo
+      merged.saved.taxNo = verifiedTaxNo
+    }
+    draft.value = merged.draft as MasterDataPageDraft
+    savedSnapshot.value = JSON.stringify(merged.saved)
+    success('纳税人核验记录已保存；主档其他输入仍保留')
+  },
+})
+let taxpayerTrigger: HTMLElement | null = null
+async function openTaxpayerEditor() {
+  taxpayerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  const message = taxpayerEditor.begin()
+  if (message)
+    warning(message)
+}
+async function closeTaxpayerEditor() {
+  if (taxpayerEditor.busy.value || taxpayerEditor.locked.value)
+    return
+  if (taxpayerEditor.dirty.value && !await confirm({ variant: 'simple', title: '放弃未保存的核验输入？', message: '仅放弃本次核验输入，主档其他输入继续保留。', confirmLabel: '放弃核验输入' }))
+    return
+  taxpayerEditor.close()
+  await nextTick()
+  if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+    taxpayerTrigger.focus()
+}
+async function submitTaxpayerEditor() {
+  if (await taxpayerEditor.save()) {
+    await nextTick()
+    if (taxpayerEditor.active.value && taxpayerTrigger?.isConnected)
+      taxpayerTrigger.focus()
+  }
+}
 
 const sections = computed(() => meta.value.sections)
 const usesSupplierCredentialFlow = computed(() =>
@@ -426,6 +472,10 @@ async function saveThroughStore(action: MasterDataSaveAction) {
 }
 
 async function handleFooterAction(action: FormFooterAction) {
+  if (taxpayerEditor.open.value) {
+    warning('请先完成或取消当前税务核验')
+    return
+  }
   if (action === 'cancel') {
     await leaveForm()
     return
@@ -661,7 +711,9 @@ function toggleExistingAttachment(id: string) {
 }
 
 async function leaveForm() {
-  if (dirty.value) {
+  if (taxpayerEditor.busy.value)
+    return
+  if (dirty.value || taxpayerEditor.dirty.value) {
     const leave = await confirm({
       variant: 'simple',
       title: '放弃修改',
@@ -677,7 +729,9 @@ async function leaveForm() {
 }
 
 useTabCloseGuard(async () => {
-  if (allowLeave || !dirty.value)
+  if (taxpayerEditor.busy.value)
+    return false
+  if (allowLeave || (!dirty.value && !taxpayerEditor.dirty.value))
     return true
 
   const leave = await confirm({
@@ -695,10 +749,13 @@ onMounted(() => {
 })
 
 onActivated(() => {
+  taxpayerEditor.activate()
   const target = `${props.kind}:${routeId.value ?? 'new'}`
   if (lastInitializedTarget && target !== lastInitializedTarget)
     void initialize()
 })
+onDeactivated(taxpayerEditor.deactivate)
+onScopeDispose(taxpayerEditor.deactivate)
 
 watch(routeSupplierCategory, () => {
   if (props.kind === 'supplier' && !isEditing.value)
@@ -775,6 +832,7 @@ watch(routeSupplierCategory, () => {
         :fetch-projects="fetchProjects"
         :fetch-crews="fetchCrews"
         @clear-error="clearFieldError"
+        @verify-taxpayer="openTaxpayerEditor"
       />
 
       <MasterDataAttachmentSection
@@ -840,6 +898,7 @@ watch(routeSupplierCategory, () => {
       />
     </template>
   </EntityFormShell>
+  <SupplierTaxpayerDialog v-if="taxpayerEditor.open.value && taxpayerEditor.active.value" :value="taxpayerEditor.form" :tax-no="taxpayerEditor.taxNo.value" :busy="taxpayerEditor.busy.value" :locked="taxpayerEditor.locked.value" :conflict="taxpayerEditor.conflict.value" :error="taxpayerEditor.error.value" :summary="taxpayerEditor.summary.value" @patch="patch => { if (!taxpayerEditor.busy.value && !taxpayerEditor.locked.value && !taxpayerEditor.conflict.value) Object.assign(taxpayerEditor.form, patch) }" @submit="submitTaxpayerEditor" @cancel="closeTaxpayerEditor" @recheck="taxpayerEditor.recheck" />
 </template>
 
 <style scoped>

@@ -2,7 +2,7 @@ import type { SupplierCredentialAction, SupplierCredentialCommand, SupplierCrede
 import type { SupplierCredentialTarget } from '~/lib/supplier/credential-state'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
-import { credentialProblem } from '~/lib/supplier/credential-contract'
+import { credentialProblem, SupplierCredentialNotAppliedProblem } from '~/lib/supplier/credential-contract'
 import { createSupplierCredentialState } from '~/lib/supplier/credential-state'
 import { credentialRecord, credentialSnapshot } from '../supplier/credential-ui-fixtures'
 
@@ -29,6 +29,12 @@ function setup() {
 }
 
 describe('中央证照会话所有权和原提交恢复', () => {
+  it('只有证照写权时可以识别，不能提交主档人工确认', async () => {
+    const { state, execute } = setup()
+    await state.load()
+    await expect(state.execute({ action: 'ocr-confirm', credentialId: 'credential-a', draft: { decisions: { category: 'keep-current', longTerm: 'keep-current' }, recognitionId: 'recognition-a', choices: [], category: '营业执照', longTerm: false } })).rejects.toThrow(/主档/)
+    expect(execute).not.toHaveBeenCalled()
+  })
   it('a 读取迟到不覆盖已经读取的 B，同名主档也按 ID 隔离', async () => {
     const { state, read, setTarget } = setup()
     const old = deferred<ReturnType<typeof credentialSnapshot>>()
@@ -53,6 +59,33 @@ describe('中央证照会话所有权和原提交恢复', () => {
     await state.execute(action)
     expect(execute.mock.calls[1]![0]).toEqual(original)
   })
+  it('已有不确定提交恢复时暂时无权，恢复权限后仍只能用原命令核验', async () => {
+    const { state, execute } = setup()
+    await state.load()
+    execute.mockRejectedValueOnce(credentialProblem('unavailable', '响应丢失'))
+    await expect(state.execute(action)).rejects.toThrow('响应丢失')
+    const original = execute.mock.calls[0]![0]
+    execute.mockRejectedValueOnce(credentialProblem('forbidden', '临时撤权'))
+    await expect(state.execute(action)).rejects.toThrow('临时撤权')
+    await state.recheck()
+    await state.execute(action)
+    expect(execute.mock.calls[2]![0]).toEqual(original)
+  })
+  it('断网请求未到后台，恢复时获同命令未应用冲突证明后可保选择重新核对', async () => {
+    const { state, read, execute } = setup()
+    await state.load()
+    execute.mockRejectedValueOnce(credentialProblem('unavailable', '请求未送达'))
+    await expect(state.execute(action)).rejects.toThrow()
+    const original = execute.mock.calls[0]![0]
+    execute.mockRejectedValueOnce(new SupplierCredentialNotAppliedProblem(original.commandId, '收据不存在且版本已变化', 'conflict'))
+    await expect(state.execute(action)).rejects.toThrow(/版本已变化/)
+    expect(state.hasPending(action)).toBe(false)
+    expect(state.conflict.value).toBe(true)
+    read.mockResolvedValue(credentialSnapshot({ supplierVersion: 's-new', credentialVersion: 'c-new' }))
+    await state.recheck()
+    await state.execute(action)
+    expect(execute.mock.calls[2]![0].commandId).not.toBe(original.commandId)
+  })
 
   it('写入成功而回读失败，重试仍恢复原提交', async () => {
     const { state, read, execute } = setup()
@@ -61,6 +94,16 @@ describe('中央证照会话所有权和原提交恢复', () => {
     await expect(state.execute(action)).rejects.toThrow('回读失败')
     await state.execute(action)
     expect(execute.mock.calls[1]![0].commandId).toBe(execute.mock.calls[0]![0].commandId)
+  })
+  it('首次命令已成功但回读无权，恢复也不能生成第二命令', async () => {
+    const { state, read, execute } = setup()
+    await state.load()
+    read.mockRejectedValueOnce(credentialProblem('forbidden', '保存已完成，回读暂时无权'))
+    await expect(state.execute(action)).rejects.toThrow(/回读暂时无权/)
+    const first = execute.mock.calls[0]![0]
+    await state.recheck()
+    await state.execute(action)
+    expect(execute.mock.calls[1]![0]).toEqual(first)
   })
 
   it('明确版本冲突后旧稿不能自动重试，重新核对才换新命令', async () => {

@@ -6,9 +6,10 @@ import type { BusinessSession } from './business-session'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { credentialProblem, SUPPLIER_CREDENTIAL_READ_CAPABILITY, SUPPLIER_CREDENTIAL_WRITE_CAPABILITY } from '../../app/lib/supplier/credential-contract'
-import { automaticCredentialStatus, credentialRecords, credentialRequirements, credentialReviewBasis, currentCredentialStatus, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
+import { automaticCredentialStatus, CREDENTIAL_MASTER_FIELDS, credentialRecords, credentialRequirements, credentialReviewBasis, currentCredentialStatus, normalizeCredentialValidity } from '../../app/lib/supplier/credential-domain'
 import { assertSupplierCredentialFile, MAX_CREDENTIAL_FILE_BYTES } from '../../app/lib/supplier/credential-files'
 import { REQUIRED_SUPPLIER_CREDENTIALS, shanghaiBusinessDate, SUPPLIER_CREDENTIAL_CATEGORIES } from '../../app/lib/supplier/credentials'
+import { supplierCredentialRecognition } from './supplier-credential-recognition'
 
 export interface SupplierCredentialScope {
   draft: SupplierFormDraft
@@ -18,7 +19,7 @@ export interface SupplierCredentialScope {
 export interface SupplierCredentialPorts {
   read: (supplierId: string, sessionId?: string | null) => SupplierCredentialScope
   /** 同步复制、重验及提交，不在验证与写入之间让出执行权。 */
-  transact: <T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T }, sessionId?: string | null) => T
+  transact: <T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T, commandId?: string }, sessionId?: string | null) => T
   demoRead?: (supplierId: string, sessionId?: string | null) => SupplierCredentialScope
 }
 
@@ -71,6 +72,7 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
         dataOrigin: origin,
         supplierId,
         supplierName: scope.draft.name ?? '',
+        ...(origin === 'real' && session.capabilities.includes('supplier:write') ? { masterValues: Object.fromEntries(CREDENTIAL_MASTER_FIELDS.map(key => [key, String(scope.draft[key as keyof SupplierFormDraft] ?? '')])) } : {}),
         supplierVersion: String(scope.version),
         credentialVersion: String(aggregate.version),
         workspaceId: session.workspaceId,
@@ -80,7 +82,11 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
         businessDate: shanghaiBusinessDate(new Date(timestamp)),
         status,
         review: status === 'qualified' || status === 'rejected' ? structuredClone(aggregate.review) : null,
-        credentials: credentialRecords(aggregate),
+        credentials: credentialRecords(aggregate).map((record) => {
+          const target = aggregate.credentials.find(row => row.id === record.id)!
+          const file = aggregate.files.find(row => row.id === target.fileRefId && row.ownerId === target.id)
+          return { ...record, recognition: supplierCredentialRecognition(target, file) }
+        }),
         requirements: credentialRequirements(aggregate),
         audits: aggregate.audits.map(audit => ({ ...structuredClone(audit), canRestore: ['delete', 'credential_delete'].includes(audit.action) && audit.deletionToken !== null && aggregate.credentials.some(row => row.id === audit.credentialId && row.deletedAt !== null && row.deletionToken === audit.deletionToken) })),
       }
@@ -104,6 +110,8 @@ export function createSupplierCredentialService(ports: SupplierCredentialPorts, 
       return { ...identity, state: 'available', payloadBase64: file.payloadBase64, sha256 }
     },
     execute(command: SupplierCredentialCommand, session: BusinessSession, sessionId?: string | null): SupplierCredentialCommandResult {
+      if (command.action === 'ocr-recognize' || command.action === 'ocr-confirm')
+        throw credentialProblem('validation-failed', '识别及人工确认需要使用对应中央处理入口')
       assertRead(command.origin, session)
       if (command.origin !== 'real' || command.workspaceId !== session.workspaceId || command.actorId !== session.actorId
         || command.requiredCapability !== SUPPLIER_CREDENTIAL_WRITE_CAPABILITY || !session.capabilities.includes(SUPPLIER_CREDENTIAL_WRITE_CAPABILITY)) {

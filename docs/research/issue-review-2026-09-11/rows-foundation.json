@@ -274,11 +274,12 @@
       "项目 Excel 导入已由 #423 接通文件/Sheet/原始行追溯、逐行拒绝、幂等保存及中央列表详情回读。",
       "#437 已把分组四向边框、已有配置兼容、日期和金额格式落实到实际 XLSX，并实际下载回读。",
       "#438 已接通合作档案原件预览、单份与 ZIP 下载，核对原字节、摘要、当前祖先权限和取消/迟到隔离。",
-      "#441 已完成送货原件、修订及实际 PDF+Excel 归档链验收，并独立本地提交；已核验共享原件字节、补传历史、打印回执及归档包。"
+      "#441 已完成送货原件、修订及实际 PDF+Excel 归档链验收，并独立本地提交；已核验共享原件字节、补传历史、打印回执及归档包。",
+      "分供方原件和资料核验由#446验收；#447接通当前原件识别、持久候选、人工冲突核对及确认后同源回读，识别失败保原件，再识别保上次确认。"
     ],
     "remaining": [
       "各实体附件替换/删除/缺原件、OCR 原值与人工值、重复识别和真实云调用异常仍需逐类完整验收。",
-      "#441 的完成证据限定于送货归档链，其他领域的文件处理和真实云调用仍须各自验收。",
+      "#441/#446/#447只证明各自已记录文件链，真实外部OCR质量、其他领域文件处理及云调用仍须各自验收。",
       "其他 Excel 目标、全筛选集导出、真实打印及样式能力仍按各领域逐项核对。"
     ],
     "flow": [
@@ -317,6 +318,8 @@
       "docs/design/evidence/issue-423/project-import-verification.md",
       "docs/design/evidence/issue-437/README.md",
       "docs/design/evidence/issue-438/project-supplier-files-verification.md",
+      "docs/design/evidence/issue-447/README.md",
+      "docs/design/evidence/issue-447/04-conflicting-tax-number-choices-768.png",
       "docs/guides/finance-invoice.md"
     ],
     "questions": []
@@ -327,11 +330,12 @@
     "solved": [
       "分供方真实四态、完整适用列、独立可选劳务承包范围、查询和帮助已具备实际页面证据。",
       "客户→项目与客户→施工合同的中央保存、计数和往返由 #424/#425 完成本地交付。",
-      "客户收款旧固定来源已由 #426 撤除；#436 普通收款进入同一中央保存、关系投影和详情链。"
+      "客户收款旧固定来源已由 #426 撤除；#436 普通收款进入同一中央保存、关系投影和详情链。",
+      "#446完成分供方证照原件、资料状态、人工核验和旧图迁入；#447接通OCR人工核对与原子回填、税号和内部码隔离，以及保留其他未保存内容的人工税务核验。"
     ],
     "remaining": [
-      "四类主档各自完整字段、证照缺失/过期/人工核验和被引用行为仍需逐对象覆盖。",
-      "证照原件、资料状态、人工核验与旧图迁入已由 #446 完成本地验收；OCR 人工核对、回填和税务确认由 #447 接通，整模块仍未完成。",
+      "四类主档其余完整字段、缺失/过期规则及被引用行为仍需逐对象覆盖，不能由分供方证照子链代验班组或工人资料。",
+      "#446/#447的证照与税务子链不代表整模块完成；真实外部OCR质量和生产保存仍须按各自关口验收。",
       "客户参考详情权限受限的直接对标证据仍不能推定；不扩展完整人员账号体系。"
     ],
     "flow": [
@@ -370,6 +374,8 @@
       "docs/design/evidence/issue-424/customer-project-verification.md",
       "docs/design/evidence/issue-425/customer-contract-verification.md",
       "docs/design/evidence/issue-426/customer-receipt-verification.md",
+      "docs/design/evidence/issue-447/README.md",
+      "docs/design/evidence/issue-447/12-taxpayer-cold-proof-768.png",
       "docs/design/evidence/issue-436/README.md"
     ],
     "questions": []

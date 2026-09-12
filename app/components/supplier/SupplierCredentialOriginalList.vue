@@ -5,7 +5,7 @@ import { credentialExpiryState } from '~/lib/supplier/credentials'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
 
 const props = defineProps<{ credentials: readonly SupplierCredentialRecord[], canWrite: boolean, businessDate: string, busy: boolean }>()
-defineEmits<{ upload: [], edit: [record: SupplierCredentialRecord], remove: [record: SupplierCredentialRecord], preview: [record: SupplierCredentialRecord], download: [record: SupplierCredentialRecord] }>()
+defineEmits<{ upload: [], edit: [record: SupplierCredentialRecord], remove: [record: SupplierCredentialRecord], preview: [record: SupplierCredentialRecord], download: [record: SupplierCredentialRecord], recognize: [record: SupplierCredentialRecord], reviewOcr: [record: SupplierCredentialRecord] }>()
 const rows = computed(() => props.credentials.map((record) => {
   const expiry = credentialExpiryState(record, new Date(`${props.businessDate}T12:00:00+08:00`))
   return {
@@ -70,13 +70,19 @@ const rows = computed(() => props.credentials.map((record) => {
               <span class="chip" :class="expiryClass">{{ expiryLabel }}</span>
             </td>
             <td class="px-3 py-3 text-ink-soft">
-              {{ record.ocrReviewStatus === 'confirmed' ? '历史已核对' : record.ocrReviewStatus === 'pending' ? '历史待核对' : '未识别' }}
+              <span>{{ record.ocrReviewStatus === 'confirmed' ? '已核对' : record.ocrReviewStatus === 'pending' ? '待核对' : '未识别' }}</span>
+              <button v-if="record.ocrReviewStatus !== 'not_started' || Object.keys(record.ocrResult).length" type="button" class="ml-2 cursor-pointer border-0 bg-transparent p-0 text-brand hover:underline focus-visible:outline-2 focus-visible:outline-brand" :disabled="busy" :aria-label="`核对识别结果 ${record.file?.fileName || record.category}`" @click="$emit('reviewOcr', record)">
+                {{ record.ocrReviewStatus === 'pending' ? '继续核对' : '查看记录' }}
+              </button>
             </td>
             <td class="px-3 py-3 text-11px text-ink-soft">
               {{ formatShanghaiDateTime(record.addedAt, '历史时间未知') }}
             </td>
             <td class="px-3 py-3">
               <div class="flex justify-end gap-1">
+                <button v-if="canWrite" type="button" class="icon-btn" :disabled="busy || record.file?.state !== 'available'" :aria-label="`识别当前原件 ${record.file?.fileName || record.category}`" title="识别当前原件" @click="$emit('recognize', record)">
+                  <span class="i-lucide-scan-text" aria-hidden="true" />
+                </button>
                 <button v-if="canWrite" type="button" class="icon-btn" :disabled="busy" :aria-label="`编辑类别和有效期 ${record.file?.fileName || record.category}`" title="编辑类别和有效期" @click="$emit('edit', record)">
                   <span class="i-lucide-pencil" aria-hidden="true" />
                 </button>

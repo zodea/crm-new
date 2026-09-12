@@ -76,69 +76,69 @@ export interface DomainRepositories {
 
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
-    supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch(url, options)),
-    processLibraries: createProcessLibraryRepository((url, options) => $fetch(url, options)),
-    quantity: createQuantityRepository((url, options) => $fetch(url, options)),
-    deliveries: createDeliveryRepository((url, options) => $fetch(url, options)),
-    receipts: createReceiptRepository((url, options) => $fetch(url, options)),
-    otherSettlements: createOtherSettlementRepository((url, options) => $fetch(url, options)),
-    auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),
+    supplierCredentials: createSupplierCredentialRepository((url, options) => $fetch<unknown>(url, options)),
+    processLibraries: createProcessLibraryRepository((url, options) => $fetch<unknown>(url, options)),
+    quantity: createQuantityRepository((url, options) => $fetch<unknown>(url, options)),
+    deliveries: createDeliveryRepository((url, options) => $fetch<unknown>(url, options)),
+    receipts: createReceiptRepository((url, options) => $fetch<unknown>(url, options)),
+    otherSettlements: createOtherSettlementRepository((url, options) => $fetch<unknown>(url, options)),
+    auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch<unknown>(url, options)),
     customerRead: createHttpCustomerReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     customerCommands: createHttpCustomerCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     constructionContractRead: createHttpConstructionContractReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     constructionContractCommands: createHttpConstructionContractCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     subcontractContractRead: createHttpSubcontractContractReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     subcontractContractCommands: createHttpSubcontractContractCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     crewWorkerRead: createHttpCrewWorkerReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     crewWorkerCommands: createHttpCrewWorkerCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     supplierRead: createHttpSupplierReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     supplierCommands: createHttpSupplierCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     projectList: createHttpProjectListRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     projectSupplierRead: createHttpProjectSupplierReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     projectSupplierCommands: createHttpProjectSupplierCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     projectCommands: createHttpProjectCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     coreMigration: createHttpCoreMigrationRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     materialContractRead: createHttpMaterialContractReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     materialContractCommands: createHttpMaterialContractCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     ownerCommercialDocumentRead: createHttpOwnerCommercialDocumentReadRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
     ownerCommercialDocumentCommands: createHttpOwnerCommercialDocumentCommandRepository({
-      fetcher: (url, options) => $fetch(url, options),
+      fetcher: (url, options) => $fetch<unknown>(url, options),
     }),
   }
   return { provide: { repositories } }

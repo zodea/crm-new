@@ -1,7 +1,7 @@
 import type { DataOriginDTO } from '../../types/read-model'
 import type { SupplierCredentialAction, SupplierCredentialCommand, SupplierCredentialRepository, SupplierCredentialSnapshot } from './credential-contract'
 import { computed, shallowReadonly, shallowRef } from 'vue'
-import { credentialProblem, SUPPLIER_CREDENTIAL_WRITE_CAPABILITY } from './credential-contract'
+import { credentialProblem, SUPPLIER_CREDENTIAL_WRITE_CAPABILITY, SupplierCredentialNotAppliedProblem } from './credential-contract'
 import { SupplierRepositoryProblem } from './read-contract'
 
 export interface SupplierCredentialTarget { supplierId: string, origin: DataOriginDTO, enabled: boolean }
@@ -102,7 +102,15 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
   function baselineKey(base: SupplierCredentialBaseline) {
     return JSON.stringify([base.supplierId, base.origin, base.workspaceId, base.actorId, base.supplierVersion, base.credentialVersion])
   }
+  function pendingKey(action: SupplierCredentialAction, base: SupplierCredentialBaseline) {
+    return JSON.stringify([base.supplierId, base.origin, base.workspaceId, base.actorId, action])
+  }
+  function hasPending(action: SupplierCredentialAction, base = baseline()) {
+    return base !== null && pending.has(pendingKey(action, base))
+  }
   async function execute(action: SupplierCredentialAction, base = baseline()) {
+    if (action.action === 'ocr-confirm' && !data.value?.capabilities.includes('supplier:write'))
+      throw credentialProblem('forbidden', '无分供方主档写入权限，不能保存人工确认')
     if (!base || !canWrite.value || base.supplierId !== data.value?.supplierId || base.origin !== data.value.dataOrigin)
       throw credentialProblem('forbidden', '请先读取当前分供方证照及写入权限')
     if (base.workspaceId !== data.value.workspaceId || base.actorId !== data.value.actorId) {
@@ -115,7 +123,8 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       throw credentialProblem('conflict', '资料已发生变化，请先重新核对当前资料')
     const target = { ...targetFor() }
     const sequence = generation
-    const key = JSON.stringify([base.supplierId, base.origin, base.workspaceId, base.actorId, action])
+    const key = pendingKey(action, base)
+    const recovering = pending.has(key)
     const command = pending.get(key) ?? { ...structuredClone(action), commandId: createId(), supplierId: base.supplierId, origin: base.origin, workspaceId: base.workspaceId, actorId: base.actorId, requiredCapability: SUPPLIER_CREDENTIAL_WRITE_CAPABILITY, baseSupplierVersion: base.supplierVersion, baseCredentialVersion: base.credentialVersion }
     pending.set(key, command)
     saving.value = true
@@ -125,8 +134,10 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       if (sequence !== generation || !matches(target))
         throw new DOMException('证照操作目标已变化，请返回原分供方查看结果', 'AbortError')
     }
+    let acknowledged = false
     try {
       const result = await repository.execute(command)
+      acknowledged = true
       assertCurrent()
       const latest = await repository.read(target.supplierId, target.origin)
       assertCurrent()
@@ -138,9 +149,10 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       return result
     }
     catch (cause) {
-      if (cause instanceof SupplierRepositoryProblem && !['unavailable', 'internal-error'].includes(cause.problem.code))
+      const notApplied = cause instanceof SupplierCredentialNotAppliedProblem && cause.commandId === command.commandId
+      if (notApplied || (!recovering && !acknowledged && cause instanceof SupplierRepositoryProblem && !['unavailable', 'internal-error'].includes(cause.problem.code)))
         pending.delete(key)
-      if (cause instanceof SupplierRepositoryProblem && cause.problem.code === 'conflict') {
+      if ((!recovering || notApplied) && !acknowledged && cause instanceof SupplierRepositoryProblem && cause.problem.code === 'conflict') {
         pending.delete(key)
         blocked.add(baselineKey(base))
         if (sequence === generation && matches(target))
@@ -174,5 +186,5 @@ export function createSupplierCredentialState(repository: SupplierCredentialRepo
       throw new DOMException('原件读取目标已变化', 'AbortError')
     return result
   }
-  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), canWrite, baseline, load, execute, recheck, file, cancelRead }
+  return { data, loading: shallowReadonly(loading), saving: shallowReadonly(saving), error: shallowReadonly(error), errorCode: shallowReadonly(errorCode), conflict: shallowReadonly(conflict), canWrite, baseline, load, execute, recheck, file, cancelRead, hasPending }
 }

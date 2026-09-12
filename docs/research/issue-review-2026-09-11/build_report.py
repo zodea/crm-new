@@ -77,6 +77,7 @@ def overview(rows):
 
 def overview_screens():
     samples = [
+        (447, '主档分支：人工核对证照并回读税号', 'docs/design/evidence/issue-447/06-confirmed-master-readback-1440.png'),
         (424, '从客户进入同一项目', 'docs/design/evidence/issue-424/customer-project-1280.png'),
         (425, '回读施工合同与客户关系', 'docs/design/evidence/issue-425/customer-contract-1280.png'),
         (442, '维护施工阶段及报量映射', 'docs/design/evidence/issue-442/stages/stages-1440.png'),
