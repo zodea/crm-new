@@ -7,6 +7,8 @@ describe('default business session boundary', () => {
       workspaceId: 'workspace-default',
       actorId: 'actor-default',
       capabilities: [
+        'quantity:read',
+        'quantity:write',
         'receipt:read',
         'receipt:write',
         'other-settlement:read',

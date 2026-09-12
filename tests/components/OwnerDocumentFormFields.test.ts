@@ -85,6 +85,17 @@ function mountFields(kind: Parameters<typeof ownerDocumentDefaults>[0], readonly
 }
 
 describe('ownerDocumentFormFields data flow', () => {
+  it('中央报量显式选择三量基准，提交后的表单不能再改基准', async () => {
+    const wrapper = mountFields('owner_report')
+    await wrapper.setProps({ quantityBasisEditable: true })
+    const selector = wrapper.getComponent('[data-testid="owner-document-quantityBasis"]')
+    expect(selector.props('modelValue')).toBe('field')
+    selector.vm.$emit('update:modelValue', 'contract')
+    expect(wrapper.emitted('patch')?.at(-1)?.[0]).toEqual({ quantityBasis: 'contract' })
+    await wrapper.setProps({ readonly: true })
+    expect(selector.props('disabled')).toBe(true)
+  })
+
   it('keeps the document type independent from BOQ line operation and emits numeric amounts', async () => {
     const wrapper = mountFields('owner_change')
 

@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import type { QuantityBoqLine } from '~/lib/quantity/central-boq'
 import type {
   QuantityTemplateDraft,
   QuantityTemplateLineDraft,
   QuantityTemplateNewItemDraft,
   QuantityTemplateRoomDraft,
 } from '~/lib/quantity/template'
+import type { DataOriginDTO } from '~/types/read-model'
 import { useEventListener } from '@vueuse/core'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onActivated, onDeactivated } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import KitButton from '~/components/ui/KitButton.vue'
 import { quantityMatrixReturnPath } from '~/lib/quantity/navigation'
 import {
   blankQuantityTemplateDraft,
@@ -18,6 +22,7 @@ import { toErrorMessage } from '~/lib/util/error'
 const props = defineProps<{
   projectId: string
   initialBoqLineId?: string
+  origin?: DataOriginDTO | null
 }>()
 
 const store = useQuantityStore()
@@ -30,15 +35,22 @@ const draft = ref<QuantityTemplateDraft | null>(null)
 const baseline = shallowRef('')
 const initializing = shallowRef(false)
 const loadingAction = shallowRef<'save' | null>(null)
+const boqLines = shallowRef<readonly QuantityBoqLine[]>([])
+const boqLoading = shallowRef(false)
+const boqError = shallowRef('')
+const resumeFailed = shallowRef(false)
+let boqRequest: AbortController | null = null
 let localSequence = 0
 let initializeSequence = 0
 let allowLeave = false
+let active = true
 
 interface RoomUpdate { key: string, field: 'code' | 'name', value: string }
 interface NewItemUpdate { key: string, field: 'code' | 'name' | 'trade' | 'unit', value: string }
 type LineUpdate
   = | { key: string, field: 'roomKey' | 'itemId' | 'fieldFormula' | 'note', value: string }
     | { key: string, field: 'contractQty' | 'provisionalQty', value: number | null }
+    | { key: string, field: 'boqLineId', value: string | null }
 
 const sections = [
   { key: 'basic', label: '模板信息' },
@@ -46,13 +58,14 @@ const sections = [
   { key: 'items', label: '三量明细' },
 ]
 
-const workspace = computed(() => store.templateWorkspace?.projectId === props.projectId
+const workspace = computed(() => props.origin !== null && store.templateOrigin === (props.origin ?? 'real') && store.templateWorkspace?.projectId === props.projectId
   ? store.templateWorkspace
   : null)
 const selectedTemplate = computed(() => workspace.value?.templates.find(template => template.id === selectedTemplateId.value) ?? null)
+const originalBoqIds = computed(() => Object.fromEntries((draft.value?.lines ?? []).map(line => [line.key, workspace.value?.lines.find(original => original.id === (line.id ?? line.sourceLineId))?.boqLineId ?? null])))
 const dirty = computed(() => draft.value != null && JSON.stringify(draft.value) !== baseline.value)
 const shellState = computed(() => {
-  if (!props.projectId)
+  if (!props.projectId || props.origin === null)
     return 'error'
   if (initializing.value)
     return 'loading'
@@ -60,19 +73,22 @@ const shellState = computed(() => {
     return 'error'
   return 'ready'
 })
-const shellDescription = computed(() => props.projectId
-  ? store.templateError
-  : '请从工程量矩阵选择项目后进入户型模板。')
+const shellDescription = computed(() => props.origin === null
+  ? '工程量来源无效，请从项目列表重新打开。'
+  : props.projectId
+    ? store.templateError
+    : '请从工程量矩阵选择项目后进入户型模板。')
 const returnLabel = computed(() => route.query.return === 'region'
   ? '返回区域配置'
   : '返回工程量矩阵')
 const returnTo = computed(() => {
   if (route.query.return === 'region') {
-    const returnToSchedule = route.query.origin === 'schedule'
+    const returnToSchedule = route.query.from === 'schedule' || route.query.origin === 'schedule'
     return {
       path: '/subcontract/quantity/region',
       query: {
         project: props.projectId,
+        origin: props.origin ?? 'real',
         return: returnToSchedule ? 'schedule' : undefined,
         resume: returnToSchedule && route.query.resume === 'region' ? 'region' : undefined,
       },
@@ -96,6 +112,32 @@ function remember(next: QuantityTemplateDraft) {
   baseline.value = JSON.stringify(next)
 }
 
+async function loadBoq() {
+  boqRequest?.abort()
+  const controller = new AbortController()
+  boqRequest = controller
+  boqLines.value = []
+  boqError.value = ''
+  if (!store.canLinkBoq) {
+    boqLoading.value = false
+    return
+  }
+  boqLoading.value = true
+  try {
+    const response = await store.loadBoq(props.projectId, { signal: controller.signal })
+    if (boqRequest === controller && !controller.signal.aborted)
+      boqLines.value = response.data.lines
+  }
+  catch (cause) {
+    if (boqRequest === controller && !controller.signal.aborted)
+      boqError.value = `合同清单读取失败：${toErrorMessage(cause)}`
+  }
+  finally {
+    if (boqRequest === controller)
+      boqLoading.value = false
+  }
+}
+
 function selectDraft(templateId: string) {
   if (!workspace.value)
     return
@@ -109,9 +151,12 @@ async function initialize(sequence: number, projectId: string) {
   if (sequence !== initializeSequence || props.projectId !== projectId)
     return
   try {
-    await store.loadTemplates(projectId)
+    if (props.origin === null)
+      return
+    await store.loadTemplates(projectId, props.origin ?? 'real')
     if (sequence !== initializeSequence || props.projectId !== projectId || workspace.value?.projectId !== projectId)
       return
+    void loadBoq()
     const linkedLine = props.initialBoqLineId
       ? workspace.value.lines.find(line => line.boqLineId === props.initialBoqLineId)
       : null
@@ -134,6 +179,10 @@ async function initialize(sequence: number, projectId: string) {
 }
 
 function requestInitialize(projectId: string) {
+  resumeFailed.value = false
+  boqRequest?.abort()
+  boqLines.value = []
+  boqError.value = ''
   const sequence = ++initializeSequence
   draft.value = null
   baseline.value = ''
@@ -147,8 +196,11 @@ function requestInitialize(projectId: string) {
 }
 
 watch(
-  [() => props.projectId, () => props.initialBoqLineId],
-  ([projectId]) => requestInitialize(projectId),
+  [() => props.projectId, () => props.initialBoqLineId, () => props.origin],
+  ([projectId]) => {
+    if (active)
+      requestInitialize(projectId)
+  },
   { immediate: true },
 )
 
@@ -313,6 +365,9 @@ function updateLine(payload: LineUpdate) {
     case 'itemId':
       line.itemId = payload.value
       break
+    case 'boqLineId':
+      line.boqLineId = payload.value
+      break
     case 'contractQty':
       line.contractQty = payload.value
       break
@@ -338,8 +393,22 @@ async function confirmArchivedEdit(action: string): Promise<boolean> {
   })
 }
 
+async function undoTemplateOperation(projectId: string, logIds: readonly string[], reloadProject: boolean): Promise<boolean> {
+  try {
+    await store.undoTemplateSave(projectId, logIds, reloadProject)
+  }
+  catch (cause) {
+    if (!toErrorMessage(cause).includes('已归档'))
+      throw cause
+    if (!await confirmArchivedEdit('撤回模板操作'))
+      return false
+    await store.undoTemplateSave(projectId, logIds, reloadProject, { allowArchivedEdit: true })
+  }
+  return true
+}
+
 async function save() {
-  if (!draft.value || store.templateSaving || store.templateLoading || initializing.value)
+  if (!store.templateCanWrite || !draft.value || store.templateSaving || store.templateLoading || initializing.value)
     return
   if (!dirty.value) {
     warning('当前模板没有需要保存的修改')
@@ -375,7 +444,8 @@ async function save() {
         if (isCurrentProject && !await confirmDiscard('撤回已保存版本会放弃当前未保存草稿，确认继续？')) {
           return 'cancelled' as const
         }
-        await store.undoTemplateSave(operationProjectId, result.logIds, isCurrentProject)
+        if (!await undoTemplateOperation(operationProjectId, result.logIds, isCurrentProject))
+          return 'cancelled' as const
         if (!isCurrentProject) {
           warning('已撤回原项目的模板保存；当前项目与草稿保持不变')
           return
@@ -438,7 +508,8 @@ async function removeTemplate() {
       if (isCurrentProject && !await confirmDiscard('恢复已删除模板会放弃当前未保存草稿，确认继续？')) {
         return 'cancelled' as const
       }
-      await store.undoTemplateSave(operationProjectId, [logId], isCurrentProject)
+      if (!await undoTemplateOperation(operationProjectId, [logId], isCurrentProject))
+        return 'cancelled' as const
       if (!isCurrentProject) {
         warning('已恢复原项目的模板；当前项目与草稿保持不变')
         return
@@ -466,6 +537,12 @@ onBeforeRouteLeave(async () => {
     discardLocalDraft()
   return approved
 })
+onBeforeRouteUpdate(async () => {
+  const approved = await confirmDiscard('切换项目或来源会放弃当前未保存的模板输入，确认继续？')
+  if (approved)
+    discardLocalDraft()
+  return approved
+})
 
 useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
   if (!dirty.value && !store.templateSaving)
@@ -474,8 +551,32 @@ useEventListener('beforeunload', (event: BeforeUnloadEvent) => {
   event.returnValue = ''
 })
 
-onActivated(() => {
+let activated = false
+async function resumePermissions() {
+  try {
+    if (await store.revalidateTemplate())
+      resumeFailed.value = false
+  }
+  catch {
+    resumeFailed.value = true
+  }
+}
+onActivated(async () => {
+  active = true
   allowLeave = false
+  if (activated) {
+    if (dirty.value)
+      await resumePermissions()
+    else
+      requestInitialize(props.projectId)
+  }
+  activated = true
+})
+onDeactivated(() => {
+  active = false
+  initializeSequence++
+  boqRequest?.abort()
+  store.cancelTemplate()
 })
 
 useTabTitle(() => selectedTemplate.value
@@ -498,24 +599,37 @@ useTabTitle(() => selectedTemplate.value
     @state-action="requestInitialize(projectId)"
   >
     <template #status>
+      <span v-if="origin === 'demo'" class="status-warn">演示数据只读</span>
       <span v-if="selectedTemplate" class="chip-brand">活链接 {{ selectedTemplate.unitCount }} 户</span>
       <span v-if="dirty" class="status-warn">有未保存修改</span>
     </template>
 
     <template #actions>
-      <button
-        v-if="draft && selectedTemplate"
+      <KitButton
+        v-if="store.templateCanWrite && draft && selectedTemplate"
         type="button"
-        class="btn-danger"
+        variant="danger" class=""
         :disabled="selectedTemplate.unitCount > 0 || store.templateSaving || store.templateLoading || initializing"
         :title="selectedTemplate.unitCount ? `仍挂靠 ${selectedTemplate.unitCount} 户，不能删除` : '删除未挂靠模板'"
         @click="removeTemplate"
       >
         删除模板
-      </button>
+      </KitButton>
     </template>
 
     <section v-if="draft && workspace" class="panel min-w-0 p-4">
+      <div v-if="resumeFailed" class="mb-3 flex flex-wrap items-center gap-2 text-12px text-danger" role="alert">
+        <span>{{ store.templateError || '当前权限暂时无法读取，输入已保留。' }}</span>
+        <KitButton variant="secondary" @click="resumePermissions">
+          重新核验权限
+        </KitButton>
+      </div>
+      <div v-if="store.canLinkBoq && boqError" class="mb-3 flex flex-wrap items-center gap-2 text-12px text-danger" role="alert">
+        <span>{{ boqError }}</span>
+        <KitButton variant="secondary" :loading="boqLoading" @click="loadBoq">
+          重新读取清单
+        </KitButton>
+      </div>
       <fieldset :disabled="store.templateSaving || store.templateLoading || initializing" class="contents">
         <QuantityTemplateBasicSection
           v-model:code="draft.code"
@@ -525,36 +639,44 @@ useTabTitle(() => selectedTemplate.value
           :selected-template="selectedTemplate"
           :copied-from-template-id="draft.copiedFromTemplateId"
           :dirty="dirty"
+          :readonly="!store.templateCanWrite"
           @template-change="requestTemplateChange"
           @create-blank="createBlank"
           @borrow-current="borrowCurrent"
         />
 
-        <QuantityTemplateRoomsSection
-          :rooms="draft.rooms"
-          @add="addRoom"
-          @remove="removeRoom"
-          @update-room="updateRoom"
-        />
+        <fieldset :disabled="!store.templateCanWrite" class="contents">
+          <QuantityTemplateRoomsSection
+            :rooms="draft.rooms"
+            @add="addRoom"
+            @remove="removeRoom"
+            @update-room="updateRoom"
+          />
 
-        <QuantityTemplateLinesSection
-          :rooms="draft.rooms"
-          :new-items="draft.newItems"
-          :lines="draft.lines"
-          :item-options="itemOptions"
-          @add-manual-item="addManualItem"
-          @add-line="addLine()"
-          @remove-new-item="removeNewItem"
-          @remove-line="removeLine"
-          @update-new-item="updateNewItem"
-          @update-line="updateLine"
-        />
+          <QuantityTemplateLinesSection
+            :rooms="draft.rooms"
+            :new-items="draft.newItems"
+            :lines="draft.lines"
+            :item-options="itemOptions"
+            :can-link-boq="store.canLinkBoq"
+            :boq-lines="boqLines"
+            :original-boq-ids="originalBoqIds"
+            :boq-loading="boqLoading"
+            :boq-error="boqError"
+            @add-manual-item="addManualItem"
+            @add-line="addLine()"
+            @remove-new-item="removeNewItem"
+            @remove-line="removeLine"
+            @update-new-item="updateNewItem"
+            @update-line="updateLine"
+          />
+        </fieldset>
       </fieldset>
     </section>
 
     <template #footer>
       <FormFooter
-        :actions="['cancel', 'save']"
+        :actions="store.templateCanWrite ? ['cancel', 'save'] : ['cancel']"
         :labels="{ save: '保存模板' }"
         :dirty="dirty"
         :loading-action="loadingAction"

@@ -2,8 +2,8 @@ import type { BoqChangeOperation } from './read-model'
 import { round2 } from '~/lib/util/number'
 
 export interface BoqChangeCalculationTarget {
-  effectiveQty: number
-  effectiveUnitPrice: number
+  effectiveQty: number | null
+  effectiveUnitPrice: number | null
 }
 
 export interface CalculatedBoqChangeLine {
@@ -36,6 +36,8 @@ export function calculateBoqChangeLine(
   }
   if (!target)
     throw new Error('调量或调价必须指向有效清单行')
+  if (target.effectiveQty === null || target.effectiveUnitPrice === null)
+    throw new Error('当前清单原量或单价未知，请补齐清单后再调整')
   if (operation === 'qty') {
     const delta = requiredBoqFinite(deltaQty, '调整工程量')
     if (delta === 0)

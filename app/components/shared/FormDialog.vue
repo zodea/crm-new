@@ -14,10 +14,12 @@ const props = withDefaults(defineProps<{
   saveLabel?: string
   width?: string
   busy?: boolean
+  saveDisabled?: boolean
 }>(), {
   saveLabel: '保存',
   width: 'min(880px, calc(100dvw - var(--space-6, 24px)))',
   busy: false,
+  saveDisabled: false,
 })
 
 const emit = defineEmits<{
@@ -108,7 +110,7 @@ function onOpenChange(value: boolean) {
           取消
         </Button>
         <slot name="actions" />
-        <Button variant="accent" :disabled="busy" @click="emit('save')">
+        <Button variant="accent" :disabled="busy || saveDisabled" @click="emit('save')">
           {{ saveLabel }}
         </Button>
       </div>

@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 142,
+    "trackedPageFiles": 143,
     "devPageFiles": 5,
-    "appPageFiles": 137,
+    "appPageFiles": 138,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 2,
+    "designPending": 3,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -733,6 +733,13 @@
       "appRoute": "/subcontract/quantity/region",
       "designRoute": "quantityRegionForm",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/quantity/stages",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "阶段目录与报量映射为 #442 新增整页，当前无一一对应的 DC 页面；按既有实体表单原语实现，运行验收待完成。",
+      "issue": "#442"
     },
     {
       "appRoute": "/subcontract/quantity/template",

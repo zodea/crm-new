@@ -21,6 +21,7 @@
 - [新项目启动与施工排程使用指南](./project-start-and-schedule.md)
 - [首页项目与施工进度使用指南](./home-project-progress.md)
 - [工程量合计与台账导出使用说明](./quantity-totals-and-export.md)
+- [工程量区域、模板与完成使用指南](./quantity-central-workflow.md)
 - [项目 Excel 导入使用指南](./project-excel-import.md)
 - [核心合同与工程量清单使用指南](./core-contract-and-boq.md)
 - [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
@@ -56,6 +57,9 @@ python scripts/generate-project-guide-pdf.py `
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/quantity-totals-and-export.md `
   --output output/pdf/瑞航CRM_工程量合计与台账导出使用说明.pdf
+python scripts/generate-project-guide-pdf.py `
+  --source docs/guides/quantity-central-workflow.md `
+  --output output/pdf/瑞航CRM_工程量中央流程使用指南.pdf
 python scripts/generate-project-guide-pdf.py `
   --source docs/guides/project-excel-import.md `
   --output output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
@@ -113,6 +117,7 @@ output/pdf/瑞航CRM_新项目启动与施工排程使用指南.pdf
 output/pdf/瑞航CRM_页签与页面恢复使用指南.pdf
 output/pdf/瑞航CRM_首页项目与施工进度使用指南.pdf
 output/pdf/瑞航CRM_工程量合计与台账导出使用说明.pdf
+output/pdf/瑞航CRM_工程量中央流程使用指南.pdf
 output/pdf/瑞航CRM_项目Excel导入使用指南.pdf
 output/pdf/瑞航CRM_客户档案与业务关系使用指南.pdf
 output/pdf/瑞航CRM_分供方档案与真实事实使用指南.pdf

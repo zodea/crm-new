@@ -84,6 +84,8 @@ export interface QuantityTemplateLineDraft {
   sourceLineId?: string | null
   sourceRoomId?: string | null
   sourceItemId?: string | null
+  /** undefined 保留原关联，null 明确解除；字符串为当前项目的稳定清单身份。 */
+  boqLineId?: string | null
   roomKey: string
   /** 既有 item.id，或 newItems 中的 client key。 */
   itemId: string
@@ -448,6 +450,7 @@ export function editableQuantityTemplateDraft(
         id: line.id,
         roomKey: line.roomId,
         itemId: line.itemId,
+        boqLineId: line.boqLineId,
         recognizedContractQty: line.recognizedContractQty,
         contractQty: line.contractQty,
         provisionalQty: line.provisionalQty,
@@ -526,6 +529,7 @@ async function insertCatalogItems(
 export async function persistQuantityTemplate(
   db: SoftDb,
   draft: QuantityTemplateDraft,
+  options: { boqLines?: readonly { id: string, qty: number | null }[] } = {},
 ): Promise<{ templateId: string, logIds: string[] }> {
   const [project] = await db.select<{ id: string, matrix_archived_at: string | null }>(
     `${selectVisibleSql('projects')} AND id = ?`,
@@ -706,6 +710,25 @@ export async function persistQuantityTemplate(
   }
   const obsoleteLines = currentLines.filter(line => !removedRoomIds.has(line.room_id) && !keptLineIds.has(line.id))
 
+  const boqByKey = new Map<string, { id: string | null, recognizedQty: number | null }>()
+  for (const line of normalized.lines) {
+    const existing = line.id && keptLineIds.has(line.id) ? existingLineById.get(line.id) : undefined
+    const id = line.boqLineId === undefined ? existing?.boq_line_id ?? null : line.boqLineId
+    let recognizedQty = existing?.recognized_contract_qty ?? (line.sourceLineId ? line.recognizedContractQty : null)
+    if (id && id !== existing?.boq_line_id) {
+      const rows = options.boqLines ?? await db.select<{ id: string, qty: number | null }>(
+        `${selectVisibleSql('boq_lines')} AND project_id = ? AND id = ?`,
+        [draft.projectId, id],
+      )
+      const selected = rows.find(row => row.id === id)
+      if (!selected)
+        throw new Error('关联清单不存在、已删除或不属于当前项目，请重新选择')
+      const source = line.sourceLineId ? sourceLineById.get(line.sourceLineId) : undefined
+      recognizedQty = source?.boq_line_id === id ? line.recognizedContractQty : selected.qty
+    }
+    boqByKey.set(line.key, { id, recognizedQty })
+  }
+
   const scopeRows = templateId
     ? await db.select<{ room_id: string, item_id: string }>(
         `${hiddenCtes('unit_assignment_scopes')}
@@ -743,7 +766,9 @@ export async function persistQuantityTemplate(
     if (!line.id || !keptLineIds.has(line.id))
       return true
     const existing = existingLineById.get(line.id)!
-    return existing.contract_qty !== line.contractQty
+    return existing.boq_line_id !== boqByKey.get(line.key)!.id
+      || existing.recognized_contract_qty !== boqByKey.get(line.key)!.recognizedQty
+      || existing.contract_qty !== line.contractQty
       || existing.provisional_qty !== line.provisionalQty
       || (existing.field_formula ?? '') !== line.fieldFormula
       || existing.field_qty !== line.fieldQty
@@ -841,13 +866,13 @@ export async function persistQuantityTemplate(
     const itemId = resolveItemId(line.itemId)
     const existing = line.id ? existingLineById.get(line.id) : null
     const pairUnchanged = existing != null && keptLineIds.has(existing.id)
-    const recognizedContractQty = pairUnchanged
-      ? existing!.recognized_contract_qty
-      : line.sourceLineId ? line.recognizedContractQty : null
+    const { id: boqLineId, recognizedQty: recognizedContractQty } = boqByKey.get(line.key)!
 
     if (pairUnchanged) {
       const changed = normalizedLineById.has(existing!.id) && (
-        existing!.contract_qty !== line.contractQty
+        existing!.boq_line_id !== boqLineId
+        || existing!.recognized_contract_qty !== recognizedContractQty
+        || existing!.contract_qty !== line.contractQty
         || existing!.provisional_qty !== line.provisionalQty
         || (existing!.field_formula ?? '') !== line.fieldFormula
         || existing!.field_qty !== line.fieldQty
@@ -857,9 +882,11 @@ export async function persistQuantityTemplate(
       if (changed) {
         logIds.push(strictLog(await withUpdateLog(db, 'house_type_template_items', existing!.id, () => db.execute(
           `UPDATE house_type_template_items
-           SET contract_qty = ?, provisional_qty = ?, field_formula = ?, field_qty = ?, note = ?, sort_order = ?, updated_at = ?
+           SET boq_line_id = ?, recognized_contract_qty = ?, contract_qty = ?, provisional_qty = ?, field_formula = ?, field_qty = ?, note = ?, sort_order = ?, updated_at = ?
            WHERE id = ?`,
           [
+            boqLineId,
+            recognizedContractQty,
             line.contractQty,
             line.provisionalQty,
             line.fieldFormula || null,
@@ -877,13 +904,14 @@ export async function persistQuantityTemplate(
     const id = generateId('qty_line')
     await db.execute(
       `INSERT INTO house_type_template_items
-        (id, room_id, item_id, recognized_contract_qty, contract_qty, provisional_qty,
+        (id, room_id, item_id, boq_line_id, recognized_contract_qty, contract_qty, provisional_qty,
          field_formula, field_qty, note, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         roomId,
         itemId,
+        boqLineId,
         recognizedContractQty,
         line.contractQty,
         line.provisionalQty,

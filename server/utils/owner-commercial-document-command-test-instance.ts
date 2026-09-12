@@ -17,10 +17,14 @@ import type {
   OwnerDocumentDraft,
 } from '../../app/lib/owner-document/forms'
 import type { PenaltyDeductionSource, PenaltyRectificationEvent } from '../../app/lib/owner-document/project-penalty'
+import type { QuantityBasis } from '../../app/lib/quantity/basis'
+import type { QuantityBoqLine, QuantityBoqWorkspace } from '../../app/lib/quantity/central-boq'
+import type { QuantityMonthlyBoqFact } from '../../app/lib/quantity/central-monthly'
 import type { ReceiptRecord } from '../../app/lib/receipt/contract'
 import type { SubcontractContractDetailSource } from '../../app/lib/subcontract-contract/repository'
 import type { ProblemDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
+import { createHash } from 'node:crypto'
 import { calculateBoqChangeLine } from '../../app/lib/boq/change-calculation'
 import {
   OWNER_COMMERCIAL_DOCUMENT_WRITE_CAPABILITY,
@@ -33,6 +37,7 @@ import {
   ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-penalty'
+import { isQuantityBasis } from '../../app/lib/quantity/basis'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
@@ -133,6 +138,7 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   subcontractContractSource?: Pick<typeof subcontractContractCommandTestInstance, 'rows'>
   boqLines?: readonly BoqLineSeed[]
   monthlyQuantityFacts?: readonly MonthlyQuantityFactSeed[]
+  withMonthlyQuantity?: <T>(projectId: string, sessionId: string | null | undefined, consume: (facts: readonly QuantityMonthlyBoqFact[]) => T, basis: QuantityBasis) => Promise<T>
   finalSettlementSupplements?: readonly FinalSettlementSupplementSeed[]
   finalSettlementReceipts?: readonly FinalSettlementReceiptSeed[]
   receiptSource?: typeof receiptReadTestInstance.facts
@@ -856,7 +862,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     const effective = new Map(
       [...state.boqLines.values()]
         .filter(line => line.projectId === text(draft.projectId) && line.contractId === text(draft.contractId))
-        .map(line => [line.id, { effectiveQty: line.qty, effectiveUnitPrice: line.unitPrice }]),
+        .map(line => [line.id, { effectiveQty: line.qty, effectiveUnitPrice: line.unitPrice, approvedDeltaQty: 0, updatedAt: line.updatedAt ?? null }]),
     )
     const approvedChanges = [...state.documents.values()]
       .filter(source => source.kind === 'owner_change' && source.status === 'approved'
@@ -871,10 +877,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         const target = effective.get(line.boqLineId)
         if (!target)
           continue
-        if (line.operation === 'qty')
-          target.effectiveQty += line.deltaQty ?? 0
+        if (line.operation === 'qty') {
+          target.approvedDeltaQty += line.deltaQty ?? 0
+          if (target.effectiveQty !== null)
+            target.effectiveQty += line.deltaQty ?? 0
+        }
         if (line.operation === 'price' && line.newUnitPrice != null)
           target.effectiveUnitPrice = line.newUnitPrice
+        if (!target.updatedAt || source.updatedAt > target.updatedAt)
+          target.updatedAt = source.updatedAt
       }
     }
     return effective
@@ -894,7 +905,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       try {
         calculation = calculateBoqChangeLine(
           operation as BoqChangeOperation,
-          catalog ? effective.get(catalog.id) ?? null : null,
+          priorEffective,
           deltaQty,
           newUnitPrice,
         )
@@ -906,7 +917,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const unit = operation === 'add' ? text(raw.unit) : catalog!.unit
       if (catalog) {
         const target = effective.get(catalog.id)!
-        if (operation === 'qty')
+        if (operation === 'qty' && target.effectiveQty !== null)
           target.effectiveQty += calculation.deltaQty ?? 0
         if (operation === 'price' && calculation.newUnitPrice != null)
           target.effectiveUnitPrice = calculation.newUnitPrice
@@ -954,7 +965,11 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const effectiveLine = effective.get(catalog.id)
       if (!effectiveLine)
         throw failure('relationship-mismatch', 'BOQ 行不属于当前施工合同有效量价台账')
+      if (effectiveLine.effectiveUnitPrice === null)
+        throw failure('validation-failed', '当前清单单价未知，请补齐清单后再申报')
       const reportedQty = nullableNumber(raw.reportedQty) ?? fact.autoQty
+      if (nullableNumber(raw.reportedQty) === null && fact.missingQtyCount > 0)
+        throw failure('validation-failed', '当前自动完成量存在缺量，请核实后明确填写申报量')
       if (reportedQty < 0)
         throw failure('validation-failed', '申报量不能为负数')
       return {
@@ -1427,7 +1442,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state) : null
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
-    else if (canResolveDraft(request.kind, request.draft, state)) {
+    else if (!(request.kind === 'owner_report' && options.withMonthlyQuantity) && canResolveDraft(request.kind, request.draft, state)) {
       report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state) : null
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
@@ -1485,7 +1500,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       applicationDate: applicationDate || null,
       approvalDate: current?.approvalDate ?? null,
       approvalSequenceAt: current?.approvalSequenceAt ?? null,
-      quantityBasis: report?.evidence.basis ?? null,
+      quantityBasis: report?.evidence.basis ?? (request.kind === 'owner_report' && isQuantityBasis(request.draft.quantityBasis) ? request.draft.quantityBasis : null),
       quantitySourceVersion: report?.evidence.sourceVersion ?? null,
       quantitySourceUpdatedAt: report?.evidence.sourceUpdatedAt ?? null,
       operatorName: request.kind === 'owner_report' && isSubmit ? text(request.draft.operatorName) : '',
@@ -2016,8 +2031,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           contractId: required(contract?.id, '合同'),
           itemName: required(raw.itemName, 'BOQ 名称'),
           unit: text(raw.unit),
-          qty: number(raw.qty),
-          unitPrice: number(raw.unitPrice),
+          qty: nullableNumber(raw.qty),
+          unitPrice: nullableNumber(raw.unitPrice),
+          building: text(raw.building) || null,
+          updatedAt: text(raw.updatedAt) || null,
           autoQty: 0,
           missingQtyCount: 0,
         }
@@ -2515,11 +2532,47 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         ],
       }
     },
-    boqLinesFor(projectId: string, contractId: string, periodNo = '', sessionId?: string | null): OwnerDocumentBoqLine[] {
+    quantityBoqFacts(projectId: string, sessionId?: string | null): QuantityBoqWorkspace & { sourceVersion: string } {
       const state = stateFor(sessionId)
+      const contracts = effectiveConstructionContracts(state)
+      const lines: QuantityBoqLine[] = []
+      if (effectiveProjects(state).has(projectId)) {
+        for (const contract of contracts.values()) {
+          if (contract.projectId !== projectId)
+            continue
+          const effective = effectiveBoqState(state, { projectId, contractId: contract.id })
+          for (const line of state.boqLines.values()) {
+            if (line.projectId !== projectId || line.contractId !== contract.id)
+              continue
+            const current = effective.get(line.id)!
+            lines.push({
+              id: line.id,
+              contractId: contract.id,
+              contractName: contract.name,
+              contractNo: contract.no,
+              itemName: line.itemName,
+              unit: line.unit,
+              qty: line.qty,
+              unitPrice: line.unitPrice,
+              approvedDeltaQty: current.approvedDeltaQty,
+              effectiveUnitPrice: current.effectiveUnitPrice,
+              building: line.building ?? null,
+              updatedAt: current.updatedAt,
+            })
+          }
+        }
+      }
+      lines.sort((left, right) => left.contractId.localeCompare(right.contractId) || left.id.localeCompare(right.id))
+      const sourceVersion = `quantity-boq:${createHash('sha256').update(JSON.stringify([projectId, lines])).digest('hex')}`
+      return { projectId, lines: clone(lines), sourceVersion }
+    },
+    boqLinesFor(projectId: string, contractId: string, periodNo = '', sessionId?: string | null, monthlyFacts?: readonly QuantityMonthlyBoqFact[]): OwnerDocumentBoqLine[] {
+      const state = stateFor(sessionId)
+      if (!effectiveProjects(state).has(projectId) || effectiveConstructionContracts(state).get(contractId)?.projectId !== projectId)
+        return []
       const effective = effectiveBoqState(state, { projectId, contractId })
       const facts = periodNo
-        ? state.monthlyQuantityFacts.filter(fact => fact.projectId === projectId
+        ? (monthlyFacts ?? state.monthlyQuantityFacts).filter(fact => fact.projectId === projectId
           && fact.contractId === contractId && fact.periodNo === periodNo)
         : []
       const factByLine = new Map(facts.map(fact => [fact.boqLineId, fact]))
@@ -2562,50 +2615,77 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       }
     },
     async execute(
-      request: OwnerCommercialDocumentCommandRequestDTO,
+      input: OwnerCommercialDocumentCommandRequestDTO,
       session: BusinessSession,
       sessionId?: string | null,
     ): Promise<OwnerCommercialDocumentCommandResultDTO> {
+      const request = clone(input)
       authorizeCommand(request, session)
       const state = stateFor(sessionId)
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return clone(duplicate)
-      let source: OwnerCommercialDocumentSource
-      switch (request.action) {
-        case 'save':
-        case 'submit':
-          source = save(request, state)
-          break
-        case 'deduct-penalty':
-        case 'rectify-penalty':
-          source = penaltyAction(request, state)
-          break
-        case 'approve':
-          source = approve(request, state)
-          break
-        case 'audit':
-          source = audit(request, state)
-          break
-        case 'transition-acceptance':
-          source = transitionAcceptance(request, state)
-          break
-        case 'attachments':
-          source = updateAttachments(request, state)
-          break
-        case 'delete':
-          source = remove(request, state)
-          break
+      const run = (monthlyFacts?: readonly QuantityMonthlyBoqFact[]) => {
+        const state = stateFor(sessionId)
+        const duplicate = state.commands.get(request.commandId)
+        if (duplicate)
+          return clone(duplicate)
+        const previousMonthlyFacts = state.monthlyQuantityFacts
+        if (monthlyFacts)
+          state.monthlyQuantityFacts = monthlyFacts.map(clone)
+        try {
+          let source: OwnerCommercialDocumentSource
+          switch (request.action) {
+            case 'save':
+            case 'submit':
+              source = save(request, state)
+              break
+            case 'deduct-penalty':
+            case 'rectify-penalty':
+              source = penaltyAction(request, state)
+              break
+            case 'approve':
+              source = approve(request, state)
+              break
+            case 'audit':
+              source = audit(request, state)
+              break
+            case 'transition-acceptance':
+              source = transitionAcceptance(request, state)
+              break
+            case 'attachments':
+              source = updateAttachments(request, state)
+              break
+            case 'delete':
+              source = remove(request, state)
+              break
+          }
+          const commandResult = result(request, source)
+          state.commands.set(request.commandId, commandResult)
+          return clone(commandResult)
+        }
+        finally {
+          state.monthlyQuantityFacts = previousMonthlyFacts
+        }
       }
-      const commandResult = result(request, source)
-      state.commands.set(request.commandId, commandResult)
-      return clone(commandResult)
+      if (options.withMonthlyQuantity && request.kind === 'owner_report' && (request.action === 'save' || request.action === 'submit') && request.draft.projectId) {
+        const basis = request.draft.quantityBasis ?? 'field'
+        if (!isQuantityBasis(basis))
+          throw failure('validation-failed', '取数基准只能是合同量、暂估量或现场复核量')
+        if (request.action === 'submit')
+          return options.withMonthlyQuantity(String(request.draft.projectId), sessionId, run, basis)
+      }
+      return run()
     },
   }
 }
 
 export const ownerCommercialDocumentCommandTestInstance
   = createOwnerCommercialDocumentCommandTestInstance({
+    withMonthlyQuantity: async (projectId, sessionId, consume, basis) => {
+      const { quantityTestInstance } = await import('./quantity-runtime')
+      return quantityTestInstance.withMonthly({ projectId, origin: 'real', includeDemo: false, basis }, consume, sessionId)
+    },
     receiptSource: sessionId => receiptReadTestInstance.facts(sessionId),
     projectSource: projectCommandTestInstance,
     customerSource: customerCommandTestInstance,

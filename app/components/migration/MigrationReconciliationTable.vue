@@ -5,6 +5,7 @@ export type MigrationReconciliationType
     | 'amount-mismatch'
     | 'reference-mismatch'
     | 'soft-delete-info'
+    | 'source-info'
     | 'soft-delete-mismatch'
     | 'orphan'
     | 'duplicate-source'
@@ -36,6 +37,7 @@ const typeLabels: Record<MigrationReconciliationType, string> = {
   'amount-mismatch': '金额不一致',
   'reference-mismatch': '引用不一致',
   'soft-delete-info': '已保留软删除',
+  'source-info': '来源缺失或历史留痕',
   'soft-delete-mismatch': '软删除不一致',
   'orphan': '孤儿记录',
   'duplicate-source': '来源重复',
@@ -48,6 +50,7 @@ const typeClasses: Record<MigrationReconciliationType, string> = {
   'amount-mismatch': 'chip-warn',
   'reference-mismatch': 'chip-danger',
   'soft-delete-info': 'chip-ok',
+  'source-info': 'chip-warn',
   'soft-delete-mismatch': 'chip-warn',
   'orphan': 'chip-danger',
   'duplicate-source': 'chip-danger',

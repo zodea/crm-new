@@ -25,6 +25,8 @@ import {
 import { closeDb, getDb } from '../db/connection'
 import { getCurrentVersion } from '../db/migrations'
 import { openBrowserSqlite } from '../db/sqljs'
+import { quantityMigrationTimestamp } from '../quantity/migration-graph'
+import { readQuantityMigrationGraphs } from '../quantity/migration-source'
 import { AUXILIARY_CONTRACT_SOURCE_SQL, auxiliaryContractSourceEntity, COMPANY_CONTRACT_SOURCE_SQL } from './auxiliary-contract-source'
 import {
   compareCanonicalText,
@@ -68,7 +70,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects'>, string> = {
   customers: `
     SELECT id, name, deleted_at
     FROM customers
@@ -106,14 +108,18 @@ const ENTITY_SQL: Record<CoreMigrationEntityType, string> = {
           'itemName', boq_catalog.item_name,
           'unit', boq_catalog.unit,
           'qty', boq_catalog.qty,
-          'unitPrice', boq_catalog.unit_price
+          'unitPrice', boq_catalog.unit_price,
+          'building', boq_catalog.building,
+          'updatedAt', boq_catalog.updated_at
         ))
         FROM (
           SELECT boq_line.id,
                  boq_line.item_name,
                  boq_line.unit,
-                 COALESCE(boq_line.recognized_qty, boq_line.qty, 0) AS qty,
-                 COALESCE(boq_line.recognized_unit_price, boq_line.unit_price, 0) AS unit_price
+                 COALESCE(boq_line.recognized_qty, boq_line.qty) AS qty,
+                 COALESCE(boq_line.recognized_unit_price, boq_line.unit_price) AS unit_price,
+                 boq_line.building,
+                 boq_line.updated_at
           FROM boq_lines boq_line
           WHERE boq_line.contract_id = c.id
             AND boq_line.project_id = c.project_id
@@ -849,6 +855,21 @@ function normalizeMonthlyQuantityFactsJson(value: unknown): string {
   }
 }
 
+function normalizeBoqCatalogJson(value: unknown): string {
+  const serialized = text(value) || '[]'
+  try {
+    const parsed: unknown = JSON.parse(serialized)
+    if (!Array.isArray(parsed))
+      return serialized
+    return JSON.stringify(parsed.map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry) || !Object.hasOwn(entry, 'updatedAt'))
+        return entry
+      return { ...entry, updatedAt: isoDateTimeText(entry.updatedAt) }
+    }))
+  }
+  catch { return serialized }
+}
+
 function nullableNumber(value: unknown): number | null {
   if (value == null || value === '')
     return null
@@ -931,7 +952,7 @@ function sourceEntity(
         status: text(row.status),
         note: text(row.note),
         actualCompletionDate: nullableText(row.actual_completion_date),
-        boqCatalogJson: text(row.boq_catalog_json) || '[]',
+        boqCatalogJson: normalizeBoqCatalogJson(row.boq_catalog_json),
         monthlyQuantityFactsJson: normalizeMonthlyQuantityFactsJson(row.monthly_quantity_facts_json),
         createdAt: text(row.created_at),
         updatedAt: text(row.updated_at),
@@ -1178,6 +1199,16 @@ async function buildSource(
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
+    if (entityType === 'quantity_projects') {
+      const projects = await readQuantityMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })
+      return [entityType, projects.map(({ project, graph }): CoreMigrationSourceEntityDTO => ({
+        legacyId: project.id,
+        name: project.name,
+        references: { projectId: project.id },
+        attributes: { graphJson: JSON.stringify(graph) },
+        deletedAt: quantityMigrationTimestamp(project.deleted_at, '工程量项目删除'),
+      }))] as const
+    }
     const sql = entityType === 'suppliers' && schemaVersion >= 48
       ? 'SELECT id, name, deleted_at, labor_scope FROM suppliers ORDER BY id'
       : ENTITY_SQL[entityType]

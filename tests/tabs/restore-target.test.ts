@@ -39,7 +39,7 @@ describe('页签恢复目标白名单', () => {
     })
   })
 
-  it.each(['/project/form/new', '/base/customer/new', '/finance/invoice/invoice-1', '/finance/invoice', '/import/mapping/project', '/dev/kit-ui', '/settings/data-migration', '/settings/ocr', '//evil.example/project', '/project/%2e%2e/base/customer', '/project/id?origin=other'])('排除写态或非法目标 %s', (path) => {
+  it.each(['/project/form/new', '/base/customer/new', '/finance/invoice/invoice-1', '/finance/invoice', '/import/mapping/project', '/dev/kit-ui', '/settings/data-migration', '/settings/ocr', '/subcontract/quantity/stages?project=p&origin=real', '//evil.example/project', '/project/%2e%2e/base/customer', '/project/id?origin=other'])('排除写态或非法目标 %s', (path) => {
     expect(inspectRestorableTabPath(path)).toBeNull()
   })
 

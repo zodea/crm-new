@@ -71,6 +71,7 @@ const RULES: { test: (p: string) => boolean, title: string, subtitle?: string }[
   { test: p => p.startsWith('/subcontract/change'), title: '分包变洽签', subtitle: '分包增项 · 签证 · 审批金额' },
   { test: p => p.startsWith('/subcontract/settlement'), title: '分包结算', subtitle: '过程结算 · 完工结算 · 抵扣' },
   { test: p => p === '/subcontract/quantity/template', title: '户型模板', subtitle: '房间 × 分项 × 三量' },
+  { test: p => p === '/subcontract/quantity/stages', title: '施工阶段配置', subtitle: '项目阶段 · 分项关系 · 月度报量选择' },
   { test: p => p === '/subcontract/quantity/region', title: '项目区域配置', subtitle: '楼栋 → 楼层 → 户' },
   { test: p => /^\/subcontract\/quantity\/[^/]+\/[^/]+/.test(p), title: '户施工详情', subtitle: '工种 → 工序阶段 → 完成日期 · 三量与验收照片' },
   { test: p => p.startsWith('/subcontract/quantity'), title: '工程量管理', subtitle: '户型模板 · 责任指派 · 阶段完成' },

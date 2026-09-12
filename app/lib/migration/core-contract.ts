@@ -20,6 +20,7 @@ export const CORE_MIGRATION_TOPOLOGY = [
   'owner_documents',
   'workers',
   'project_suppliers',
+  'quantity_projects',
 ] as const
 
 export type CoreMigrationEntityType = typeof CORE_MIGRATION_TOPOLOGY[number]
@@ -42,8 +43,8 @@ export interface CoreMigrationSourceEntityDTO {
 }
 
 export type CoreMigrationSourceEntitiesDTO = {
-  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources'>]: CoreMigrationSourceEntityDTO[]
-} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[] }
+  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources' | 'quantity_projects'>]: CoreMigrationSourceEntityDTO[]
+} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[], quantity_projects?: CoreMigrationSourceEntityDTO[] }
 
 export type CoreMigrationTotalExpectationDTO
   = | { entityType: CoreMigrationEntityType, metric: 'quantity', expected: number }
@@ -181,6 +182,7 @@ export type CoreMigrationIssueMetric
     | 'missing-relation'
     | 'orphan'
     | 'soft-delete'
+    | 'missing-original'
     | 'soft-delete-mismatch'
     | 'duplicate-source'
     | 'apply-failed'
@@ -205,7 +207,7 @@ export interface CoreMigrationIssueDTO {
 export function isCoreMigrationBlockingIssue(
   issue: Pick<CoreMigrationIssueDTO, 'metricKey'>,
 ): boolean {
-  return issue.metricKey !== 'soft-delete'
+  return !['soft-delete', 'missing-original'].includes(issue.metricKey)
 }
 
 export interface CoreMigrationStepDTO {

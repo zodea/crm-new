@@ -105,6 +105,8 @@ function routeVariants(endpoint, registry) {
   }
   if (route === '/subcontract/quantity/template')
     return ['new', 'edit'].map(mode => ({ kind: 'quantity-template', variant: 'default', routePattern: route, mode, condition: mode === 'new' ? '组件内未选 selectedTemplateId' : '组件内 selectDraft(templateId) 或 boqLine 预选；不是 query id' }))
+  if (route === '/subcontract/quantity/stages')
+    return ['new', 'edit'].map(mode => ({ kind: 'quantity-stage', variant: 'default', routePattern: route, mode, hosts: ['browser'], condition: mode === 'new' ? '新建阶段；报量选择为独立显式动作，尚待运行验收' : '选定当前阶段；逐项保存报量草稿，尚待运行验收' }))
   if (route === '/schedule/process-library/form')
     return ['new', 'copy-version'].map(variant => ({ kind: 'process-library', variant, routePattern: route + (variant === 'copy-version' ? '?source=:versionId' : ''), mode: 'new', condition: variant === 'copy-version' ? '基于 source 旧版本新建，旧版只读' : '不带 source' }))
   return modes.map(mode => ({

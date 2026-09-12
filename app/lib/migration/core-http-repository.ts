@@ -73,6 +73,7 @@ const ISSUE_METRICS = new Set([
   'missing-relation',
   'orphan',
   'soft-delete',
+  'missing-original',
   'soft-delete-mismatch',
   'duplicate-source',
   'apply-failed',

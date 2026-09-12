@@ -75,21 +75,21 @@ describe('runtime reference audit contract', () => {
 
     expect(committed).toEqual(ledger)
     expect(ledger.counts).toMatchObject({
-      trackedPageFiles: 142,
+      trackedPageFiles: 143,
       devPageFiles: 5,
-      productionRoutes: 137,
+      productionRoutes: 138,
       pageDomains: 20,
-      evidenceEndpointRecords: 137,
-      referenceEndpoints: 137,
-      referenceProfiles: 41,
-      usedReferenceProfiles: 35,
+      evidenceEndpointRecords: 138,
+      referenceEndpoints: 138,
+      referenceProfiles: 42,
+      usedReferenceProfiles: 36,
       directEvidenceRoutes: 54,
       adjacentEvidenceRoutes: 18,
       localAuthorityRoutes: 22,
       historicalEvidenceRoutes: 34,
-      unverifiedTargetRoutes: 9,
+      unverifiedTargetRoutes: 10,
     })
-    expect(ledger.endpoints).toHaveLength(137)
+    expect(ledger.endpoints).toHaveLength(138)
     expect(ledger.domains).toHaveLength(20)
 
     for (const endpoint of ledger.endpoints) {
@@ -138,7 +138,7 @@ describe('runtime reference audit contract', () => {
       'R-DETAIL-PRIOR',
       'R-WORKBENCH-PRIOR',
     ]))
-    expect(new Set(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === 'unverified-target').map(endpoint => endpoint.referenceProfile))).toEqual(new Set(['R-TOOL-PENDING']))
+    expect(new Set(ledger.endpoints.filter(endpoint => endpoint.evidenceGrade === 'unverified-target').map(endpoint => endpoint.referenceProfile))).toEqual(new Set(['R-TOOL-PENDING', 'R-STAGE-PENDING']))
     expect(ledger.endpoints.filter(endpoint => endpoint.observationDate === null).every(endpoint => endpoint.observationDateStatus !== 'recorded')).toBe(true)
 
     expect(ledger.endpoints.filter(endpoint => [
@@ -176,9 +176,9 @@ describe('runtime reference audit contract', () => {
     const designPending = coverage.screenParity.filter((entry: { status: string }) => entry.status === 'design-pending')
 
     expect(status).toContain('> 核对日期：2026-08-25')
-    expect(status).toContain('| 实现页面文件（含 dev） | 142 |')
+    expect(status).toContain('| 实现页面文件（含 dev） | 143 |')
     expect(status).toContain('| 开发预览路由 | 5 |')
-    expect(status).toContain('| 实现生产路由（排除 dev） | 137 |')
+    expect(status).toContain('| 实现生产路由（排除 dev） | 138 |')
     expect(status).toContain('`/finance/payment/:id/detail`')
     expect(status).not.toMatch(/\| 已闭环 \|/)
 
@@ -190,6 +190,10 @@ describe('runtime reference audit contract', () => {
       expect.objectContaining({
         appRoute: '/settings/data-migration',
         issue: '#294',
+      }),
+      expect.objectContaining({
+        appRoute: '/subcontract/quantity/stages',
+        issue: '#442',
       }),
     ])
     expect(designIndex).toContain('[#292](https://github.com/zodea/crm-new/issues/292)')
@@ -213,10 +217,10 @@ describe('runtime reference audit contract', () => {
     expect(existsSync(AUDIT_PATH)).toBe(true)
 
     const endpoints = buildRuntimeEvidenceLedger().endpoints
-    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(137)
-    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(137)
-    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(137)
-    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(137)
+    expect(new Set(endpoints.map(endpoint => endpoint.evidenceRecordId)).size).toBe(138)
+    expect(new Set(endpoints.map(endpoint => endpoint.page)).size).toBe(138)
+    expect(new Set(endpoints.map(endpoint => endpoint.localRoute)).size).toBe(138)
+    expect(new Set(endpoints.map(endpoint => endpoint.referenceEndpointId)).size).toBe(138)
   })
 
   it('records classification, evidence, differences and constraints for each route', () => {

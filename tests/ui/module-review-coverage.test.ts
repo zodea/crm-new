@@ -5,6 +5,17 @@ import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/mod
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
 describe('module review coverage', () => {
+  it('registers stage creation, editing and reporting as unverified central browser work', () => {
+    const { surfaces, cases } = buildModuleReviewCoverage()
+    const stages = surfaces.filter(surface => surface.route === '/subcontract/quantity/stages')
+    expect(stages.filter(surface => surface.path === 'page').map(surface => surface.mode)).toEqual(['new', 'edit'])
+    expect(stages.some(surface => surface.path === 'section/QuantityStageReporting')).toBe(true)
+    expect(stages.every(surface => surface.hosts.length === 1 && surface.hosts[0] === 'browser')).toBe(true)
+    const stageCases = cases.filter(item => stages.some(surface => surface.id === item.surfaceId))
+    expect(stageCases.length).toBeGreaterThan(0)
+    expect(stageCases.every(item => item.adapter === 'central-http' && item.acceptance.frontend !== 'passed' && item.acceptance.production !== 'passed')).toBe(true)
+  })
+
   it('covers every production route without treating route evidence as subview acceptance', () => {
     const coverage = buildModuleReviewCoverage()
     expect(new Set(coverage.surfaces.map(surface => surface.route))).toEqual(
@@ -14,6 +25,28 @@ describe('module review coverage', () => {
     expect(coverage.cases.every(item => item.acceptance.production !== 'passed')).toBe(true)
     expect(coverage.cases.filter(item => item.reference.status === 'not-observed').length).toBeGreaterThan(137)
     expect(coverage.excludedDevPages).toHaveLength(5)
+  })
+
+  it('records central quantity pages and imports while preserving desktop and downstream boundaries', () => {
+    const { surfaces, cases, adapterProfiles } = buildModuleReviewCoverage()
+    const quantityRoutes = ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template']
+    const imports = ['quantity-template', 'quantity-assignment', 'quantity-completion']
+    const selected = surfaces.filter(surface => quantityRoutes.includes(surface.route)
+      || (surface.route === '/import/mapping/:entity' && imports.includes(surface.kind)))
+    expect(new Set(selected.map(surface => surface.route))).toEqual(new Set([...quantityRoutes, '/import/mapping/:entity']))
+    for (const surface of selected) {
+      const browser = cases.find(item => item.surfaceId === surface.id && item.host === 'browser')!
+      expect(browser.adapter).toBe('central-http')
+      expect(browser.acceptance.production).toBe('not-verified')
+      const desktop = cases.find(item => item.surfaceId === surface.id && item.host === 'tauri')
+      if (desktop)
+        expect(desktop.adapter).toBe(surface.variant === 'central-source' ? 'central-http' : 'desktop-sqlite')
+    }
+    for (const route of ['/subcontract/payroll', '/schedule', '/project/target-cost']) {
+      const surface = surfaces.find(item => item.route === route && item.path === 'page')!
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe('browser-local')
+    }
+    expect(adapterProfiles['central-http'].storage).toContain('不具备进程重启持久化证据')
   })
 
   it('expands registered document kinds and warranty only on the mounted views', () => {

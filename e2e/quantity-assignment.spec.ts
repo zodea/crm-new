@@ -22,8 +22,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
 
     const cell = await openCellConfigure(page, 0)
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
@@ -65,8 +64,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
     const pageErrors: string[] = []
     page.on('pageerror', error => pageErrors.push(error.message))
 
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     let editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
@@ -100,8 +98,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
   })
 
   test('责任编辑器 Esc 关闭后焦点回到触发按钮并解除背景滚动锁', async ({ page }) => {
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
 
     const trigger = page.getByRole('button', { name: '责任配置', exact: true })
     await trigger.click()
@@ -120,8 +117,7 @@ test.describe('Issue #103 Slice 4：户×工种责任配置', () => {
 
   test('390px 责任编辑器不撑宽页面，楼层批选可用键盘操作', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto('/subcontract/quantity')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('quantity-matrix-cell').first()).toBeVisible()
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { QuantityCompletionQuantityLine, QuantityCompletionStageView } from '~/lib/quantity/completion'
+import type { DataOriginDTO } from '~/types/read-model'
+import { onActivated, onDeactivated, onScopeDispose } from 'vue'
 import QuantityTotalValue from '~/components/quantity/QuantityTotalValue.vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
-import { db } from '~/lib/db/client'
-import { loadQuantityPhotoDataUrl } from '~/lib/quantity/completion'
+import KitButton from '~/components/ui/KitButton.vue'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import { sumQuantityLines } from '~/lib/quantity/totals'
 import { toErrorMessage } from '~/lib/util/error'
@@ -12,6 +13,7 @@ const props = defineProps<{
   projectId: string
   unitId: string
   returnTo?: string
+  origin?: DataOriginDTO | null
 }>()
 
 const store = useQuantityStore()
@@ -19,23 +21,44 @@ const { error: toastError } = useKitUI()
 
 const completionDialogOpen = shallowRef(false)
 const completionInitialStageId = shallowRef('')
-const previewPhoto = shallowRef<{ fileName: string, dataUrl: string } | null>(null)
+const previewPhoto = shallowRef<{ fileName: string, dataUrl: string | null } | null>(null)
+let photoRequest: AbortController | null = null
+let activated = false
+let active = true
+
+function closePhoto() {
+  photoRequest?.abort()
+  photoRequest = null
+  previewPhoto.value = null
+}
 
 // 验收照片正文惰性读取（蓝本§五「展示…验收照片」）：点击 chip 才拉 payload。
-async function openPhotoPreview(photo: { id: string, fileName: string }) {
+async function openPhotoPreview(stage: QuantityCompletionStageView, photo: { id: string, fileName: string }) {
+  if (!stage.completion || props.origin === null)
+    return
+  closePhoto()
+  const controller = new AbortController()
+  photoRequest = controller
+  previewPhoto.value = { fileName: photo.fileName, dataUrl: null }
   try {
+    const content = await store.loadPhoto({ projectId: props.projectId, unitId: props.unitId, completionId: stage.completion.id, photoId: photo.id }, props.origin ?? 'real', { signal: controller.signal })
+    if (photoRequest !== controller || controller.signal.aborted)
+      return
     previewPhoto.value = {
-      fileName: photo.fileName,
-      dataUrl: await loadQuantityPhotoDataUrl(db, photo.id),
+      fileName: content.fileName,
+      dataUrl: `data:${content.mimeType};base64,${content.contentBase64}`,
     }
   }
   catch (cause) {
+    if (photoRequest !== controller || controller.signal.aborted)
+      return
+    closePhoto()
     toastError(`验收照片加载失败：${toErrorMessage(cause)}`)
   }
 }
 
 const workspace = computed(() => (
-  store.completionWorkspace?.projectId === props.projectId
+  props.origin !== null && store.completionOrigin === (props.origin ?? 'real') && store.completionWorkspace?.projectId === props.projectId
   && store.completionWorkspace.unit.id === props.unitId
     ? store.completionWorkspace
     : null
@@ -84,23 +107,48 @@ function statusChip(stage: QuantityCompletionStageView): { label: string, cls: s
 }
 
 function openCompletion(stageId: string) {
+  if (!store.completionCanWrite)
+    return
   completionInitialStageId.value = stageId
   completionDialogOpen.value = true
 }
 
 async function load() {
-  if (props.projectId && props.unitId)
-    await store.loadCompletion(props.projectId, props.unitId).catch(() => {})
+  closePhoto()
+  completionDialogOpen.value = false
+  if (props.projectId && props.unitId && props.origin !== null)
+    await store.loadCompletion(props.projectId, props.unitId, props.origin ?? 'real').catch(() => {})
 }
 
-watch(() => [props.projectId, props.unitId], load, { immediate: true })
+watch(() => [props.projectId, props.unitId, props.origin], () => {
+  if (active)
+    void load()
+}, { immediate: true })
+onActivated(() => {
+  active = true
+  if (activated)
+    void load()
+  activated = true
+})
+onDeactivated(() => {
+  active = false
+  closePhoto()
+  store.cancelCompletion()
+})
+onScopeDispose(closePhoto)
 </script>
 
 <template>
   <div class="quantity-unit-detail flex min-w-0 flex-col gap-4">
+    <p v-if="origin === null" class="panel p-4 text-danger" role="alert">
+      工程量来源无效，请从项目列表重新打开。
+    </p>
+    <p v-else-if="origin === 'demo'" class="panel p-4 text-ink-soft" role="status">
+      演示工程量只读。
+    </p>
     <section class="panel min-w-0 px-4 py-3">
       <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <NuxtLink :to="props.returnTo || '/subcontract/quantity'" class="btn-secondary flex-none">
+        <NuxtLink :to="props.returnTo || '/subcontract/quantity'" class="btn-secondary  flex-none">
           <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />
           返回工程量矩阵
         </NuxtLink>
@@ -139,12 +187,12 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
       <p class="max-w-xl text-12px text-ink-soft">
         {{ store.completionError }}
       </p>
-      <button type="button" class="btn-primary" @click="load">
+      <KitButton type="button" variant="primary" class="" @click="load">
         重新加载
-      </button>
+      </KitButton>
     </section>
 
-    <template v-else-if="workspace">
+    <template v-else-if="workspace && origin !== null">
       <section
         v-for="group in tradeGroups"
         :key="group.trade"
@@ -168,13 +216,14 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
             <span v-if="stage.photos.length" class="text-11px text-ink-faint">
               <span class="i-lucide-image mr-0.5 align-[-2px]" aria-hidden="true" />照片 {{ stage.photos.length }}
             </span>
-            <button
+            <KitButton
+              v-if="store.completionCanWrite"
               type="button"
-              class="btn-secondary ml-auto flex-none"
+              variant="secondary" class=" ml-auto flex-none"
               @click="openCompletion(stage.id)"
             >
               登记
-            </button>
+            </KitButton>
           </div>
 
           <dl class="mt-2 grid gap-x-6 gap-y-1 text-12px sm:grid-cols-2 xl:grid-cols-4">
@@ -292,15 +341,15 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
 
           <ul v-if="stage.photos.length" class="mt-2 flex flex-wrap gap-1.5">
             <li v-for="photo in stage.photos" :key="photo.id">
-              <button
+              <KitButton
                 type="button"
                 class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-surface-2 px-2.5 py-1 text-11px text-ink-soft outline-none hover:bg-brand-soft/50 focus-visible:[box-shadow:0_0_0_2px_var(--brand-ring)]"
                 :aria-label="`预览照片 ${photo.fileName}`"
-                @click="openPhotoPreview(photo)"
+                @click="openPhotoPreview(stage, photo)"
               >
                 <span class="i-lucide-image flex-none" aria-hidden="true" />
                 <span class="max-w-40 truncate">{{ photo.fileName }}</span>
-              </button>
+              </KitButton>
             </li>
           </ul>
         </article>
@@ -332,17 +381,21 @@ watch(() => [props.projectId, props.unitId], load, { immediate: true })
       v-if="projectId && unitId"
       v-model:open="completionDialogOpen"
       :project-id="projectId"
+      :origin="origin ?? 'real'"
       :unit-id="unitId"
       :initial-stage-id="completionInitialStageId"
     />
 
-    <Dialog :open="previewPhoto != null" @update:open="(value: boolean) => { if (!value) previewPhoto = null }">
+    <Dialog :open="previewPhoto != null" @update:open="(value: boolean) => { if (!value) closePhoto() }">
       <DialogContent class="max-w-[min(880px,calc(100dvw-32px))] p-4">
         <DialogTitle class="truncate pr-8 text-13px">
           {{ previewPhoto?.fileName }}
         </DialogTitle>
+        <p v-if="previewPhoto && !previewPhoto.dataUrl" class="p-4 text-ink-soft" role="status">
+          正在读取验收照片…
+        </p>
         <img
-          v-if="previewPhoto"
+          v-if="previewPhoto?.dataUrl"
           :src="previewPhoto.dataUrl"
           :alt="`验收照片 ${previewPhoto.fileName}`"
           class="mt-2 max-h-[70dvh] max-w-full rounded-[var(--radius-btn)] object-contain"

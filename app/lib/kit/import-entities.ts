@@ -1,6 +1,7 @@
 import type { ImportTemplateField } from './import-mapping'
 import type { Invoice } from '~/stores/invoice'
 import { getInvoiceImportSourceMeta, invoiceNaturalKey } from '~/lib/invoice/excel'
+import { isDesktopRuntime } from '~/lib/platform/runtime'
 import {
   QUANTITY_ASSIGNMENT_IMPORT_FIELDS,
   QUANTITY_COMPLETION_IMPORT_FIELDS,
@@ -9,6 +10,7 @@ import {
 } from '~/lib/quantity/import'
 import { normalizeSupplierImportRow } from '~/lib/supplier/import'
 import { round2 } from '~/lib/util/number'
+import { useBrowserQuantityStore } from '~/stores/quantity-browser'
 import { EXTERNAL_REF_FIELD } from './import-mapping'
 
 // 工程量三类目标（#103 切片 6B）：逐行复用领域唯一写路径，行内自带项目编码定位归属；
@@ -17,6 +19,11 @@ async function runQuantityImport(
   row: Record<string, unknown>,
   handler: 'importQuantityTemplateRow' | 'importQuantityAssignmentRow' | 'importQuantityCompletionRow',
 ): Promise<void> {
+  if (!isDesktopRuntime()) {
+    const targets = { importQuantityTemplateRow: 'template', importQuantityAssignmentRow: 'assignment', importQuantityCompletionRow: 'completion' } as const
+    await useBrowserQuantityStore().importRow(targets[handler], row)
+    return
+  }
   const [{ withTransaction }, quantityImport] = await Promise.all([
     import('~/lib/db/connection'),
     import('~/lib/quantity/import'),

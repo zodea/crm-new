@@ -299,7 +299,7 @@ function fileRecord(value: unknown, ownerType?: string, ownerId?: string): boole
 
 function boqLine(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.itemName === 'string'
-    && typeof value.unit === 'string' && finite(value.qty) && finite(value.unitPrice)
+    && typeof value.unit === 'string' && (value.qty === null || finite(value.qty)) && (value.unitPrice === null || finite(value.unitPrice))
     && finite(value.autoQty) && finite(value.missingQtyCount)
 }
 
@@ -579,8 +579,8 @@ export function createHttpOwnerCommercialDocumentCommandRepository(
       () => options.fetcher(`/api/commands/owner-documents/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/form`),
       value => decodeForm(value, kind, id),
     ),
-    boqLines: (projectId, contractId, periodNo = '') => read(
-      () => options.fetcher('/api/commands/owner-documents/boq-lines', { query: { projectId, contractId, periodNo } }),
+    boqLines: (projectId, contractId, periodNo = '', quantityBasis) => read(
+      () => options.fetcher('/api/commands/owner-documents/boq-lines', { query: { projectId, contractId, periodNo, ...(quantityBasis ? { quantityBasis } : {}) } }),
       decodeBoqLines,
     ),
     execute: (request: OwnerCommercialDocumentCommandRequestDTO) => read(

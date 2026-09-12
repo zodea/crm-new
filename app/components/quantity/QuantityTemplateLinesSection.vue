@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { QuantityBoqLine } from '~/lib/quantity/central-boq'
 import type { QuantityEntrySource } from '~/lib/quantity/entry-source'
 import type {
   QuantityTemplateLineDraft,
@@ -7,8 +8,10 @@ import type {
 } from '~/lib/quantity/template'
 import type { WageQuantitySource } from '~/lib/quantity/wage-source'
 import { computed, reactive, shallowRef, watch } from 'vue'
+import QuantityBoqLinkField from '~/components/quantity/QuantityBoqLinkField.vue'
 import QuantityFieldFormulaCell from '~/components/quantity/QuantityFieldFormulaCell.vue'
 import WageQuantitySourcePicker from '~/components/quantity/WageQuantitySourcePicker.vue'
+import KitButton from '~/components/ui/KitButton.vue'
 import {
   defaultQuantityEntrySource,
   QUANTITY_ENTRY_SOURCE_OPTIONS,
@@ -25,12 +28,18 @@ type NewItemField = 'code' | 'name' | 'trade' | 'unit'
 type LineUpdate
   = | { key: string, field: 'roomKey' | 'itemId' | 'fieldFormula' | 'note', value: string }
     | { key: string, field: 'contractQty' | 'provisionalQty', value: number | null }
+    | { key: string, field: 'boqLineId', value: string | null }
 
 const props = defineProps<{
   rooms: readonly QuantityTemplateRoomDraft[]
   newItems: readonly QuantityTemplateNewItemDraft[]
   lines: readonly QuantityTemplateLineDraft[]
   itemOptions: readonly ItemOption[]
+  canLinkBoq?: boolean
+  boqLines?: readonly QuantityBoqLine[]
+  originalBoqIds?: Readonly<Record<string, string | null>>
+  boqLoading?: boolean
+  boqError?: string
 }>()
 
 const emit = defineEmits<{
@@ -146,12 +155,12 @@ function quantityLabel(value: number | null): string {
         </span>
         <span class="text-9px text-ink-faint">最终结算固定取现场复核量</span>
       </div>
-      <button type="button" class="btn-secondary ml-auto" @click="emit('addManualItem')">
+      <KitButton type="button" variant="secondary" class=" ml-auto" @click="emit('addManualItem')">
         <span class="i-lucide-list-plus mr-1" aria-hidden="true" />新增手工分项
-      </button>
-      <button type="button" class="btn-secondary" :disabled="!props.itemOptions.length" @click="emit('addLine')">
+      </KitButton>
+      <KitButton type="button" variant="secondary" class="" :disabled="!props.itemOptions.length" @click="emit('addLine')">
         <span class="i-lucide-plus mr-1" aria-hidden="true" />添加明细
-      </button>
+      </KitButton>
     </div>
 
     <div v-if="props.newItems.length" class="mb-3 rounded-[var(--radius-btn)] border border-brand/25 bg-brand-soft/25 p-3">
@@ -167,9 +176,9 @@ function quantityLabel(value: number | null): string {
         <input :value="item.name" class="field-input min-w-0" aria-label="新分项名称" placeholder="分项名称" @input="emit('updateNewItem', { key: item.key, field: 'name', value: inputValue($event) })">
         <input :value="item.trade" class="field-input min-w-0" aria-label="新分项工种" placeholder="工种" @input="emit('updateNewItem', { key: item.key, field: 'trade', value: inputValue($event) })">
         <input :value="item.unit" class="field-input min-w-0" aria-label="新分项单位" placeholder="单位" @input="emit('updateNewItem', { key: item.key, field: 'unit', value: inputValue($event) })">
-        <button type="button" class="icon-btn-danger" aria-label="删除新分项" @click="emit('removeNewItem', item)">
+        <KitButton type="button" variant="danger" class="" aria-label="删除新分项" @click="emit('removeNewItem', item)">
           <span class="i-lucide-x" aria-hidden="true" />
-        </button>
+        </KitButton>
       </div>
     </div>
 
@@ -183,7 +192,10 @@ function quantityLabel(value: number | null): string {
             <th class="min-w-44 px-2 py-2 text-left">
               分项
             </th>
-            <th class="w-28 px-2 py-2 text-left">
+            <th v-if="canLinkBoq" class="min-w-64 px-2 py-2 text-left">
+              关联合同清单
+            </th>
+            <th class="min-w-32 px-2 py-2 text-left whitespace-nowrap">
               录入来源
             </th>
             <th class="min-w-52 px-2 py-2 text-left">
@@ -226,10 +238,21 @@ function quantityLabel(value: number | null): string {
                 </option>
               </select>
             </td>
+            <td v-if="canLinkBoq" class="min-w-64 p-1">
+              <QuantityBoqLinkField
+                :value="line.boqLineId"
+                :original-id="originalBoqIds?.[line.key]"
+                :recognized-qty="line.recognizedContractQty"
+                :lines="boqLines ?? []"
+                :loading="boqLoading"
+                :error="boqError"
+                @change="emit('updateLine', { key: line.key, field: 'boqLineId', value: $event })"
+              />
+            </td>
             <td class="p-1">
               <select
                 :value="entrySource(line)"
-                class="field-input w-full"
+                class="field-input min-w-30 w-full"
                 aria-label="录入来源"
                 @change="setEntrySource(line, $event)"
               >
@@ -276,8 +299,8 @@ function quantityLabel(value: number | null): string {
                 <span>工资预付 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
                 <span>工资结算 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
               </div>
-              <div class="mt-1 text-9px text-ink-faint">
-                识别原值：{{ line.recognizedContractQty == null ? '手工' : line.recognizedContractQty }}
+              <div v-if="!canLinkBoq" class="mt-1 text-9px text-ink-faint">
+                原识别值：{{ line.recognizedContractQty == null ? '未记录' : line.recognizedContractQty }}
               </div>
             </td>
             <td class="p-1">
@@ -290,13 +313,13 @@ function quantityLabel(value: number | null): string {
               >
             </td>
             <td class="px-1 py-1 text-center">
-              <button type="button" class="icon-btn-danger h-7 w-7" aria-label="删除三量明细" @click="emit('removeLine', line)">
+              <KitButton type="button" variant="danger" class=" h-7 w-7" aria-label="删除三量明细" @click="emit('removeLine', line)">
                 <span class="i-lucide-x" aria-hidden="true" />
-              </button>
+              </KitButton>
             </td>
           </tr>
           <tr v-if="!props.lines.length">
-            <td colspan="7" class="px-4 py-8 text-center text-ink-faint">
+            <td :colspan="canLinkBoq ? 8 : 7" class="px-4 py-8 text-center text-ink-faint">
               暂无三量明细；可选择已有分项，或在无 BOQ 时新增手工分项。
             </td>
           </tr>

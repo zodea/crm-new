@@ -1,0 +1,2 @@
+﻿"原始行号","关键值","拒绝原因","projectCode","buildingCode","floorCode","unitCode","stageCode","status","completedAt","note"
+"2","—","缺少验收照片：请补拍上传，或保存到草稿；可将状态明确填为 draft 导入草稿，再到户详情补齐责任和照片","Q-IMPORT-442","B","F","101","S","completed","2026-09-11","不应假完成"

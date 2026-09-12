@@ -19,6 +19,8 @@ export interface QuantityCompletionAssignment {
   assigneeKind: QuantityAssigneeKind
   assigneeId: string
   assigneeName: string
+  /** 当前主数据仍可用；历史审计身份可保留但不能据此新登记完成。 */
+  available: boolean
   note: string
 }
 
@@ -310,6 +312,7 @@ export async function loadQuantityCompletionWorkspace(
       assigneeKind: assignee.kind,
       assigneeId: assignee.id,
       assigneeName: assignee.name,
+      available: row.crew_id ? row.crew_name !== null : row.worker_name !== null,
       note: row.note ?? '',
     })
   }
@@ -511,6 +514,7 @@ export async function loadQuantityPhotoDataUrl(db: SoftDb, photoId: string): Pro
 export async function persistQuantityStageCompletion(
   db: SoftDb,
   draft: QuantityCompletionDraft,
+  options: { uploader?: string } = {},
 ): Promise<QuantityCompletionWriteResult> {
   const projectId = draft.projectId.trim()
   const unitId = draft.unitId.trim()
@@ -550,6 +554,8 @@ export async function persistQuantityStageCompletion(
       throw new Error('请填写完成日期')
     if (!assignmentId)
       throw new Error('该户当前工种还没有责任人，请先在责任配置中指派')
+    if (current?.status !== 'completed' && !stage.currentAssignment?.available)
+      throw new Error('该户当前责任人已不可用，请先在责任配置中重新指派')
     if (!draft.photos.length && !stage.photos.length && !draft.allowMissingPhotos)
       throw new Error('缺少验收照片：请补拍上传，或保存到草稿')
   }
@@ -611,8 +617,8 @@ export async function persistQuantityStageCompletion(
     await db.execute(
       `INSERT INTO file_refs
         (id, owner_type, owner_id, file_name, file_path, file_size, category, uploader, uploaded_at, mime_type)
-       VALUES (?, 'unit_stage_completion', ?, ?, '', ?, 'acceptance_photo', '', ?, ?)`,
-      [photoId, completionId, photo.fileName.trim(), photo.fileSize, now, photo.mimeType],
+       VALUES (?, 'unit_stage_completion', ?, ?, '', ?, 'acceptance_photo', ?, ?, ?)`,
+      [photoId, completionId, photo.fileName.trim(), photo.fileSize, options.uploader ?? '', now, photo.mimeType],
     )
     logIds.push(strictLog(
       await logCreate(db, 'file_refs', photoId),

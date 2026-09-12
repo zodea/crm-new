@@ -14,6 +14,7 @@ import type {
   OwnerDocumentSaveAction,
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
+import type { QuantityBasis } from '~/lib/quantity/basis'
 import { isTauri } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
@@ -242,9 +243,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     projectId: string,
     contractId: string,
     periodNo = '',
+    quantityBasis?: QuantityBasis,
   ) {
     if (usesCentralBrowser)
-      return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo)
+      return centralRepositories().ownerCommercialDocumentCommands.boqLines(projectId, contractId, periodNo, quantityBasis)
     return listOwnerDocumentBoqLines(projectId, contractId, periodNo)
   }
 

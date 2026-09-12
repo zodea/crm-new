@@ -178,6 +178,7 @@ export function ownerDocumentDefaults(kind: OwnerDocumentKind): OwnerDocumentDra
       return {
         ...base,
         periodNo: ownerDocumentLocalDate().slice(0, 7),
+        quantityBasis: 'field',
         applicationDate: ownerDocumentLocalDate(),
         lines: [],
       }
@@ -342,7 +343,7 @@ export function validateOwnerDocumentForm(
               line.newUnitPrice == null || line.newUnitPrice === '' ? null : Number(line.newUnitPrice),
             )
             if (target) {
-              if (operation === 'qty')
+              if (operation === 'qty' && target.effectiveQty !== null)
                 target.effectiveQty += calculated.deltaQty ?? 0
               if (operation === 'price' && calculated.newUnitPrice != null)
                 target.effectiveUnitPrice = calculated.newUnitPrice
@@ -371,7 +372,8 @@ export function validateOwnerDocumentForm(
           const reportedQty = line.reportedQty == null || line.reportedQty === ''
             ? source?.autoQty
             : Number(line.reportedQty)
-          return !id || !source || reportedQty == null || !Number.isFinite(reportedQty) || reportedQty < 0
+          return !id || !source || source.unitPrice === null || reportedQty == null || !Number.isFinite(reportedQty) || reportedQty < 0
+            || (source.missingQtyCount > 0 && (line.reportedQty == null || line.reportedQty === ''))
         })
         if (invalidIndex >= 0) {
           const line = draft.lines[invalidIndex]!
@@ -382,9 +384,13 @@ export function validateOwnerDocumentForm(
             : Number(line.reportedQty)
           errors.lines = !id || !source
             ? `第 ${invalidIndex + 1} 行：请选择有效 BOQ 行`
-            : reportedQty != null && Number.isFinite(reportedQty) && reportedQty < 0
-              ? `第 ${invalidIndex + 1} 行：申报量不能为负数`
-              : `第 ${invalidIndex + 1} 行：请填写有效申报量`
+            : source.unitPrice === null
+              ? `第 ${invalidIndex + 1} 行：当前清单单价未知，请补齐清单后再申报`
+              : source.missingQtyCount > 0 && (line.reportedQty == null || line.reportedQty === '')
+                ? `第 ${invalidIndex + 1} 行：自动完成量存在缺量，请核实后填写申报量`
+                : reportedQty != null && Number.isFinite(reportedQty) && reportedQty < 0
+                  ? `第 ${invalidIndex + 1} 行：申报量不能为负数`
+                  : `第 ${invalidIndex + 1} 行：请填写有效申报量`
         }
         else if (new Set(boqLineIds).size !== boqLineIds.length) {
           errors.lines = '同一月度报量不能重复选择 BOQ 行'
@@ -463,17 +469,38 @@ export function ownerDocumentStatusLabel(status: string): string {
 export function ownerDocumentLineAmount(
   kind: OwnerDocumentKind,
   line: Record<string, unknown>,
-): number {
-  if (kind === 'owner_report')
-    return (Number(line.reportedQty) || 0) * (Number(line.unitPrice) || 0)
+): number | null {
+  const number = (value: unknown): number | null => {
+    if (value == null || value === '' || (typeof value === 'string' && !value.trim()))
+      return null
+    if (typeof value !== 'number' && typeof value !== 'string')
+      return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const unitPrice = number(line.unitPrice)
+  if (kind === 'owner_report') {
+    const reportedQty = number(line.reportedQty)
+    return reportedQty == null || unitPrice == null ? null : reportedQty * unitPrice
+  }
   const operation = String(line.operation ?? 'qty')
-  const qty = Number(line.qty) || 0
-  const deltaQty = Number(line.deltaQty) || 0
-  const unitPrice = Number(line.unitPrice) || 0
-  const newUnitPrice = Number(line.newUnitPrice) || 0
+  const qty = number(line.qty)
+  const deltaQty = number(line.deltaQty)
+  const newUnitPrice = number(line.newUnitPrice)
   if (operation === 'add')
-    return deltaQty * newUnitPrice
+    return deltaQty == null || newUnitPrice == null ? null : deltaQty * newUnitPrice
   if (operation === 'price')
-    return qty * (newUnitPrice - unitPrice)
-  return deltaQty * unitPrice
+    return qty == null || newUnitPrice == null || unitPrice == null ? null : qty * (newUnitPrice - unitPrice)
+  return deltaQty == null || unitPrice == null ? null : deltaQty * unitPrice
+}
+
+export function ownerDocumentTotalAmount(kind: OwnerDocumentKind, lines: Array<Record<string, unknown>>): number | null {
+  let total = 0
+  for (const line of lines) {
+    const amount = ownerDocumentLineAmount(kind, line)
+    if (amount == null)
+      return null
+    total += amount
+  }
+  return Math.round(total * 100) / 100
 }

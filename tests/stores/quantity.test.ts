@@ -2,7 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runMigrations } from '~/lib/db/migrations'
-import { useQuantityStore } from '~/stores/quantity'
+import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
@@ -39,7 +39,7 @@ describe('quantity store', () => {
     await store.loadProject('p1')
 
     expect(store.catalog).toEqual([
-      { id: 'p1', code: 'P1', name: '项目一', hasQuantityData: true },
+      { id: 'p1', code: 'P1', name: '项目一', hasQuantityData: true, dataOrigin: 'real' },
     ])
     expect(store.snapshot?.units.map(unit => unit.id)).toEqual(['u1'])
     expect(store.loading).toBe(false)

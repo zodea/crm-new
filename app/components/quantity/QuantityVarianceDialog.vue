@@ -5,6 +5,7 @@ import type {
   QuantityVarianceFact,
   QuantityVarianceRow,
 } from '~/lib/quantity/variance'
+import type { DataOriginDTO } from '~/types/read-model'
 import { computed, ref, watch } from 'vue'
 import {
   Dialog,
@@ -14,12 +15,10 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
-import { db } from '~/lib/db/client'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import {
   buildQuantityVarianceRows,
   filterQuantityVarianceRows,
-  loadQuantityVarianceFacts,
 } from '~/lib/quantity/variance'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
@@ -27,6 +26,7 @@ import { yuan } from '~/lib/util/money'
 const props = defineProps<{
   open: boolean
   projectId: string
+  origin?: DataOriginDTO
   initialBuildingId?: string
 }>()
 
@@ -35,6 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const ALL = '__all__'
+const store = useQuantityStore()
 const basis = ref<QuantityVarianceBasis>('field')
 const buildingId = ref(ALL)
 const section = ref<string[]>([])
@@ -129,7 +130,7 @@ async function load() {
   }
   loading.value = true
   try {
-    const next = await loadQuantityVarianceFacts(db, props.projectId)
+    const next = await store.loadVariance(props.projectId, props.origin ?? 'real')
     if (sequence !== loadSequence)
       return
     facts.value = next
@@ -146,10 +147,16 @@ async function load() {
 }
 
 watch(
-  () => [props.open, props.projectId] as const,
+  () => [props.open, props.projectId, props.origin] as const,
   ([open]) => {
-    if (open)
+    if (open) {
       void load()
+    }
+    else {
+      loadSequence++
+      facts.value = []
+      loading.value = false
+    }
   },
 )
 

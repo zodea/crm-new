@@ -8,6 +8,7 @@ import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { readRestoredCrewWorkerFact } from './restore-crew-worker'
 import { checkRestoreAbort, restoreProblem } from './restore-problem'
+import { readRestoredQuantityUnit } from './restore-quantity'
 
 export interface RestoreDetailOptions {
   repositories: DomainRepositories
@@ -51,6 +52,8 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   const query = { id: detail.id, origin, includeDemo: options.includeDemo() }
   const capabilities = options.capabilities()
   const family = detail.family
+  if (family === 'crew-worker-fact' && detail.kind === 'assignment' && !url.searchParams.has('ownerKind') && !url.searchParams.has('ownerId'))
+    return readRestoredQuantityUnit(options)
   if (family === 'crew-worker-fact' || (family === 'subcontract-document' && detail.kind === 'penalty' && (url.searchParams.has('ownerKind') || url.searchParams.has('ownerId'))))
     return readRestoredCrewWorkerFact(options)
   const contractKind = url.searchParams.get('contractKind')

@@ -1,0 +1,561 @@
+import type { SoftDb } from '~/lib/db/soft-delete'
+import type { QuantityAssignmentBatchDraft, QuantityAssignmentWorkspace } from '~/lib/quantity/assignment'
+import type { QuantityBatchCompletionDraft } from '~/lib/quantity/batch-completion'
+import type { QuantityBoqWorkspace } from '~/lib/quantity/central-boq'
+import type { QuantityReadResult } from '~/lib/quantity/central-contract'
+import type { QuantityPhotoIdentity } from '~/lib/quantity/central-photo'
+import type { QuantityCompletionDraft, QuantityCompletionWorkspace } from '~/lib/quantity/completion'
+import type { QuantityStageProgress } from '~/lib/quantity/derived'
+import type { QuantityCatalogProject, QuantityProjectSnapshot } from '~/lib/quantity/read-model'
+import type {
+  QuantityRegionNodeDraft,
+  QuantityRegionUnitDraft,
+  QuantityRegionWorkspace,
+} from '~/lib/quantity/region'
+import type { QuantityTemplateDraft, QuantityTemplateWorkspace } from '~/lib/quantity/template'
+import type { DataOriginDTO } from '~/types/read-model'
+import { defineStore } from 'pinia'
+import { computed, readonly, shallowRef } from 'vue'
+import { db } from '~/lib/db/client'
+import { withTransaction } from '~/lib/db/connection'
+import { withUpdateLog } from '~/lib/db/soft-delete'
+import { loadQuantityAssignmentWorkspace, persistQuantityAssignments } from '~/lib/quantity/assignment'
+import { loadQuantityBatchCompletionPlan, persistQuantityBatchCompletion } from '~/lib/quantity/batch-completion'
+import { readQuantityCentralPhoto } from '~/lib/quantity/central-photo'
+import { loadQuantityCentralWorkspace } from '~/lib/quantity/central-workspace'
+import { loadQuantityCompletionWorkspace, persistQuantityStageCompletion } from '~/lib/quantity/completion'
+import { loadQuantityStageProgress } from '~/lib/quantity/derived'
+import { loadQuantityCatalog, loadQuantityProjectSnapshot } from '~/lib/quantity/read-model'
+import {
+  loadQuantityRegionWorkspace,
+  persistQuantityBuilding,
+  persistQuantityFloor,
+  persistQuantityUnit,
+} from '~/lib/quantity/region'
+import {
+  deleteQuantityTemplate,
+  loadQuantityTemplateWorkspace,
+  persistQuantityTemplate,
+  snapshotQuantityTemplateDraft,
+  undoQuantityTemplateOperations,
+} from '~/lib/quantity/template'
+import { loadQuantityVarianceFacts } from '~/lib/quantity/variance'
+import { toErrorMessage } from '~/lib/util/error'
+
+export const useNativeQuantityStore = defineStore('quantity-native', () => {
+  const catalog = shallowRef<QuantityCatalogProject[]>([])
+  const snapshot = shallowRef<QuantityProjectSnapshot | null>(null)
+  const stageProgress = shallowRef<QuantityStageProgress[]>([])
+  const loading = shallowRef(false)
+  const error = shallowRef('')
+  const templateWorkspace = shallowRef<QuantityTemplateWorkspace | null>(null)
+  const templateLoading = shallowRef(false)
+  const templateSaving = shallowRef(false)
+  const templateError = shallowRef('')
+  const assignmentWorkspace = shallowRef<QuantityAssignmentWorkspace | null>(null)
+  const assignmentLoading = shallowRef(false)
+  const assignmentSaving = shallowRef(false)
+  const assignmentError = shallowRef('')
+  const completionWorkspace = shallowRef<QuantityCompletionWorkspace | null>(null)
+  const completionLoading = shallowRef(false)
+  const completionSaving = shallowRef(false)
+  const completionError = shallowRef('')
+  const regionWorkspace = shallowRef<QuantityRegionWorkspace | null>(null)
+  const regionLoading = shallowRef(false)
+  const regionSaving = shallowRef(false)
+  const regionError = shallowRef('')
+  let pending = 0
+  let latestProjectRequest = 0
+  let pendingTemplateRequests = 0
+  let latestTemplateRequest = 0
+  let pendingAssignmentRequests = 0
+  let latestAssignmentRequest = 0
+  let pendingCompletionRequests = 0
+  let latestCompletionRequest = 0
+  let latestRegionRequest = 0
+
+  function beginRequest() {
+    pending += 1
+    loading.value = true
+    error.value = ''
+  }
+
+  function endRequest() {
+    pending = Math.max(0, pending - 1)
+    loading.value = pending > 0
+  }
+
+  async function loadCatalog() {
+    beginRequest()
+    try {
+      catalog.value = await loadQuantityCatalog(db)
+    }
+    catch (cause) {
+      catalog.value = []
+      error.value = `工程量项目加载失败：${toErrorMessage(cause)}`
+    }
+    finally {
+      endRequest()
+    }
+  }
+
+  async function loadProject(projectId: string, origin: DataOriginDTO = 'real') {
+    if (origin !== 'real')
+      throw new Error('桌面工程量仅提供当前本地正式资料')
+    const request = ++latestProjectRequest
+    if (!projectId) {
+      snapshot.value = null
+      stageProgress.value = []
+      return
+    }
+    if (snapshot.value?.projectId !== projectId) {
+      snapshot.value = null
+      stageProgress.value = []
+    }
+    beginRequest()
+    try {
+      const [result, progress] = await Promise.all([
+        loadQuantityProjectSnapshot(db, projectId),
+        loadQuantityStageProgress(db, projectId),
+      ])
+      if (request === latestProjectRequest) {
+        snapshot.value = result
+        stageProgress.value = progress
+      }
+    }
+    catch (cause) {
+      if (request === latestProjectRequest) {
+        snapshot.value = null
+        stageProgress.value = []
+        error.value = `工程量矩阵加载失败：${toErrorMessage(cause)}`
+      }
+    }
+    finally {
+      endRequest()
+    }
+  }
+
+  async function loadTemplates(projectId: string, origin: DataOriginDTO = 'real') {
+    if (origin !== 'real')
+      throw new Error('桌面工程量仅提供当前本地正式资料')
+    const request = ++latestTemplateRequest
+    pendingTemplateRequests += 1
+    templateLoading.value = true
+    templateError.value = ''
+    if (templateWorkspace.value?.projectId !== projectId)
+      templateWorkspace.value = null
+    try {
+      const result = projectId
+        ? await loadQuantityTemplateWorkspace(db, projectId)
+        : null
+      if (request === latestTemplateRequest)
+        templateWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestTemplateRequest) {
+        templateWorkspace.value = null
+        templateError.value = `户型模板加载失败：${toErrorMessage(cause)}`
+        throw cause
+      }
+    }
+    finally {
+      pendingTemplateRequests = Math.max(0, pendingTemplateRequests - 1)
+      templateLoading.value = pendingTemplateRequests > 0
+    }
+  }
+
+  async function loadRegion(projectId: string, origin: DataOriginDTO = 'real') {
+    if (origin !== 'real')
+      throw new Error('桌面工程量仅提供当前本地正式资料')
+    const request = ++latestRegionRequest
+    regionLoading.value = true
+    regionError.value = ''
+    if (regionWorkspace.value?.projectId !== projectId)
+      regionWorkspace.value = null
+    try {
+      const result = projectId
+        ? await loadQuantityRegionWorkspace(db, projectId)
+        : null
+      if (request === latestRegionRequest)
+        regionWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestRegionRequest) {
+        regionWorkspace.value = null
+        regionError.value = `项目区域加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      if (request === latestRegionRequest)
+        regionLoading.value = false
+    }
+  }
+
+  async function saveRegionNode(
+    projectId: string,
+    operation: (tx: SoftDb) => Promise<string>,
+  ) {
+    regionSaving.value = true
+    regionError.value = ''
+    try {
+      const id = await withTransaction(operation)
+      try {
+        await Promise.all([
+          loadRegion(projectId),
+          loadProject(projectId),
+          loadCatalog(),
+        ])
+      }
+      catch (cause) {
+        regionError.value = `项目区域已保存，但刷新失败：${toErrorMessage(cause)}；请重新打开页面加载最新数据。`
+      }
+      return id
+    }
+    catch (cause) {
+      regionError.value = `项目区域保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      regionSaving.value = false
+    }
+  }
+
+  async function createRegionBuilding(projectId: string, draft: QuantityRegionNodeDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityBuilding(tx, projectId, draft))
+  }
+
+  async function createRegionFloor(projectId: string, buildingId: string, draft: QuantityRegionNodeDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityFloor(tx, projectId, buildingId, draft))
+  }
+
+  async function createRegionUnit(projectId: string, floorId: string, draft: QuantityRegionUnitDraft) {
+    return saveRegionNode(projectId, tx => persistQuantityUnit(tx, projectId, floorId, draft))
+  }
+
+  async function saveTemplate(draft: QuantityTemplateDraft) {
+    const savedDraft = snapshotQuantityTemplateDraft(draft)
+    templateSaving.value = true
+    templateError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityTemplate(tx, savedDraft))
+      try {
+        await loadTemplates(savedDraft.projectId)
+      }
+      catch (cause) {
+        templateError.value = `户型模板已保存，但刷新失败：${toErrorMessage(cause)}；请重新打开模板编辑器加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      templateError.value = `户型模板保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      templateSaving.value = false
+    }
+  }
+
+  async function deleteTemplate(templateId: string, options: { allowArchivedEdit?: boolean } = {}) {
+    const projectId = templateWorkspace.value?.projectId ?? ''
+    if (!projectId)
+      throw new Error('请先加载户型模板')
+    templateSaving.value = true
+    templateError.value = ''
+    try {
+      const logId = await withTransaction(tx => deleteQuantityTemplate(tx, projectId, templateId, options))
+      try {
+        await loadTemplates(projectId)
+      }
+      catch (cause) {
+        templateError.value = `户型模板已删除，但刷新失败：${toErrorMessage(cause)}；请重新打开模板编辑器加载最新数据。`
+      }
+      return logId
+    }
+    catch (cause) {
+      templateError.value = `户型模板删除失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      templateSaving.value = false
+    }
+  }
+
+  async function undoTemplateSave(projectId: string, logIds: readonly string[], reloadProject = true) {
+    templateSaving.value = true
+    templateError.value = ''
+    try {
+      await withTransaction(tx => undoQuantityTemplateOperations(tx, projectId, logIds))
+      if (reloadProject) {
+        try {
+          await loadTemplates(projectId)
+        }
+        catch (cause) {
+          templateError.value = `户型模板已撤回，但刷新失败：${toErrorMessage(cause)}；请重新打开模板编辑器加载最新数据。`
+        }
+      }
+    }
+    catch (cause) {
+      templateError.value = `户型模板撤回失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      templateSaving.value = false
+    }
+  }
+
+  async function loadAssignments(projectId: string, origin: DataOriginDTO = 'real') {
+    if (origin !== 'real')
+      throw new Error('桌面工程量仅提供当前本地正式资料')
+    const request = ++latestAssignmentRequest
+    pendingAssignmentRequests += 1
+    assignmentLoading.value = true
+    assignmentError.value = ''
+    if (assignmentWorkspace.value?.projectId !== projectId)
+      assignmentWorkspace.value = null
+    try {
+      const result = projectId
+        ? await loadQuantityAssignmentWorkspace(db, projectId)
+        : null
+      if (request === latestAssignmentRequest)
+        assignmentWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestAssignmentRequest) {
+        assignmentWorkspace.value = null
+        assignmentError.value = `责任配置加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      pendingAssignmentRequests = Math.max(0, pendingAssignmentRequests - 1)
+      assignmentLoading.value = pendingAssignmentRequests > 0
+    }
+  }
+
+  async function loadCompletion(projectId: string, unitId: string, origin: DataOriginDTO = 'real') {
+    if (origin !== 'real')
+      throw new Error('桌面工程量仅提供当前本地正式资料')
+    const request = ++latestCompletionRequest
+    pendingCompletionRequests += 1
+    completionLoading.value = true
+    completionError.value = ''
+    if (completionWorkspace.value?.projectId !== projectId || completionWorkspace.value?.unit.id !== unitId)
+      completionWorkspace.value = null
+    try {
+      const result = projectId && unitId
+        ? await loadQuantityCompletionWorkspace(db, projectId, unitId)
+        : null
+      if (request === latestCompletionRequest)
+        completionWorkspace.value = result
+    }
+    catch (cause) {
+      if (request === latestCompletionRequest) {
+        completionWorkspace.value = null
+        completionError.value = `完成登记加载失败：${toErrorMessage(cause)}`
+      }
+      throw cause
+    }
+    finally {
+      pendingCompletionRequests = Math.max(0, pendingCompletionRequests - 1)
+      completionLoading.value = pendingCompletionRequests > 0
+    }
+  }
+
+  async function saveCompletion(draft: QuantityCompletionDraft) {
+    completionSaving.value = true
+    completionError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityStageCompletion(tx, draft))
+      try {
+        await loadCompletion(draft.projectId, draft.unitId)
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        completionError.value = `完成登记已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      completionError.value = `完成登记保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      completionSaving.value = false
+    }
+  }
+
+  // 归档独立 action：matrix_archived_at 刻意不在 project store 的列登记表里，
+  // 普通项目全字段更新不触碰它；归档/解除都单独落 projects update 日志（蓝本§六）。
+  async function setMatrixArchived(projectId: string, archived: boolean) {
+    if (!projectId)
+      throw new Error('请选择项目')
+    beginRequest()
+    try {
+      const logId = await withTransaction(async (tx) => {
+        const [row] = await tx.select<{ matrix_archived_at: string | null }>(
+          'SELECT matrix_archived_at FROM projects WHERE id = ? AND deleted_at IS NULL',
+          [projectId],
+        )
+        if (!row)
+          throw new Error('工程量项目不存在或已删除')
+        if ((row.matrix_archived_at != null) === archived)
+          return null
+        return withUpdateLog(tx, 'projects', projectId, async () => {
+          await tx.execute(
+            'UPDATE projects SET matrix_archived_at = ? WHERE id = ?',
+            [archived ? new Date().toISOString() : null, projectId],
+          )
+        })
+      })
+      if (logId)
+        await loadProject(projectId)
+      return logId
+    }
+    catch (cause) {
+      error.value = `${archived ? '归档' : '解除归档'}失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      endRequest()
+    }
+  }
+
+  async function archiveMatrix(projectId: string) {
+    return setMatrixArchived(projectId, true)
+  }
+
+  async function unarchiveMatrix(projectId: string) {
+    return setMatrixArchived(projectId, false)
+  }
+
+  async function saveBatchCompletion(draft: QuantityBatchCompletionDraft) {
+    completionSaving.value = true
+    completionError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityBatchCompletion(tx, draft))
+      try {
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        completionError.value = `批量完成已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      completionError.value = `批量完成保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      completionSaving.value = false
+    }
+  }
+
+  async function saveAssignments(draft: QuantityAssignmentBatchDraft) {
+    assignmentSaving.value = true
+    assignmentError.value = ''
+    try {
+      const result = await withTransaction(tx => persistQuantityAssignments(tx, draft))
+      try {
+        await loadAssignments(draft.projectId)
+        await loadProject(draft.projectId)
+        if (snapshot.value?.projectId !== draft.projectId || error.value)
+          throw new Error(error.value || '工程量矩阵未能刷新')
+      }
+      catch (cause) {
+        assignmentError.value = `责任配置已保存，但刷新失败：${toErrorMessage(cause)}；请刷新工程量页面加载最新数据。`
+      }
+      return result
+    }
+    catch (cause) {
+      assignmentError.value = `责任配置保存失败：${toErrorMessage(cause)}`
+      throw cause
+    }
+    finally {
+      assignmentSaving.value = false
+    }
+  }
+
+  return {
+    catalog: computed(() => catalog.value.map(project => ({ ...project, dataOrigin: 'real' as const }))),
+    dataOrigin: computed(() => 'real' as const),
+    templateOrigin: computed(() => 'real' as const),
+    regionOrigin: computed(() => 'real' as const),
+    completionOrigin: computed(() => 'real' as const),
+    canWrite: computed(() => snapshot.value != null),
+    canImport: computed(() => true),
+    canLinkBoq: computed(() => false),
+    loadBoq: async (_projectId: string, _options?: { signal?: AbortSignal }): Promise<QuantityReadResult<QuantityBoqWorkspace>> => {
+      throw new Error('桌面模板保留现有本地清单关联，请通过本地清单导入维护')
+    },
+    templateCanWrite: computed(() => templateWorkspace.value != null),
+    regionCanWrite: computed(() => regionWorkspace.value != null),
+    assignmentCanWrite: computed(() => assignmentWorkspace.value != null),
+    completionCanWrite: computed(() => completionWorkspace.value != null),
+    assignmentOrigin: computed(() => 'real' as const),
+    batchCanWrite: computed(() => assignmentWorkspace.value != null),
+    snapshot: readonly(snapshot),
+    stageProgress: readonly(stageProgress),
+    loading: readonly(loading),
+    error: readonly(error),
+    templateWorkspace: readonly(templateWorkspace),
+    templateLoading: readonly(templateLoading),
+    templateSaving: readonly(templateSaving),
+    templateError: readonly(templateError),
+    assignmentWorkspace: readonly(assignmentWorkspace),
+    assignmentLoading: readonly(assignmentLoading),
+    assignmentSaving: readonly(assignmentSaving),
+    assignmentError: readonly(assignmentError),
+    completionWorkspace: readonly(completionWorkspace),
+    completionLoading: readonly(completionLoading),
+    completionSaving: readonly(completionSaving),
+    completionError: readonly(completionError),
+    regionWorkspace: readonly(regionWorkspace),
+    regionLoading: readonly(regionLoading),
+    regionSaving: readonly(regionSaving),
+    regionError: readonly(regionError),
+    loadCatalog,
+    loadProject,
+    loadTemplates,
+    saveTemplate,
+    deleteTemplate,
+    undoTemplateSave,
+    loadAssignments,
+    saveAssignments,
+    loadCompletion,
+    saveCompletion,
+    saveBatchCompletion,
+    loadRegion,
+    createRegionBuilding,
+    createRegionFloor,
+    createRegionUnit,
+    archiveMatrix,
+    unarchiveMatrix,
+    loadBatchPlan: (projectId: string, trade: string, unitIds: readonly string[], _origin: DataOriginDTO = 'real') => loadQuantityBatchCompletionPlan(db, projectId, { trade, unitIds: [...unitIds] }),
+    readExportWorkspace: (projectId: string, _origin: DataOriginDTO = 'real') => loadQuantityCentralWorkspace(db, projectId),
+    loadVariance: (projectId: string, _origin: DataOriginDTO = 'real') => loadQuantityVarianceFacts(db, projectId),
+    loadPhoto: async (identity: QuantityPhotoIdentity, _origin: DataOriginDTO, options: { signal?: AbortSignal } = {}) => {
+      options.signal?.throwIfAborted()
+      const result = await readQuantityCentralPhoto(db, identity)
+      options.signal?.throwIfAborted()
+      return result
+    },
+    revalidateTemplate: async () => true,
+    revalidateRegion: async () => true,
+    cancelProject: () => { latestProjectRequest++ },
+    cancelTemplate: () => { latestTemplateRequest++ },
+    cancelRegion: () => { latestRegionRequest++ },
+    cancelCompletion: () => { latestCompletionRequest++ },
+    cancelWorkspaces: () => {
+      latestProjectRequest++
+      latestTemplateRequest++
+      latestAssignmentRequest++
+      latestCompletionRequest++
+      latestRegionRequest++
+    },
+  }
+})

@@ -103,8 +103,10 @@ export interface OwnerDocumentBoqLine {
   id: string
   itemName: string
   unit: string
-  qty: number
-  unitPrice: number
+  qty: number | null
+  unitPrice: number | null
+  building?: string | null
+  updatedAt?: string | null
   autoQty: number
   /** 取数基准下缺量的模板明细条数；> 0 表示自动完成量不完整，需在界面显式标注。 */
   missingQtyCount: number

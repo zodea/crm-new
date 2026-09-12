@@ -6,7 +6,7 @@ import {
   loadQuantityBatchCompletionPlan,
   persistQuantityBatchCompletion,
 } from '~/lib/quantity/batch-completion'
-import { useQuantityStore } from '~/stores/quantity'
+import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb

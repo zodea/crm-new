@@ -237,8 +237,9 @@ export async function parseWorkbookForMapping(file: File | ArrayBuffer): Promise
   const hash = await crypto.subtle.digest('SHA-256', buffer)
   const sourceHash = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
   const withSource = (sheet: RawImportSheet) => ({ ...sheet, sourceFileName: file instanceof File ? file.name : '导入.xlsx', sourceHash })
+  // CSV 保留字面值，避免日期被自动改成本地短格式；raw 读取选项不改变 XLSX 单元格格式。
   // codepage 65001 = UTF-8：无 BOM CSV 默认按 UTF-8 解码，避免中文表头乱码。
-  const workbook = XLSX.read(buffer, { type: 'array', codepage: 65001 })
+  const workbook = XLSX.read(buffer, { type: 'array', codepage: 65001, raw: true })
   const sheets = workbook.SheetNames.map(name => withSource(sheetToRawImport(workbook, name)))
   const parsed = { sheets }
   if (!sheets.some(sheet => hasMojibake(sheet)))
@@ -246,7 +247,7 @@ export async function parseWorkbookForMapping(file: File | ArrayBuffer): Promise
 
   // 表头出现替换符 → 大概率是中文 Excel「另存为 CSV」的 GBK 编码，按 GB18030 重读。
   const text = new TextDecoder('gb18030').decode(buffer)
-  const fallbackWorkbook = XLSX.read(text, { type: 'string' })
+  const fallbackWorkbook = XLSX.read(text, { type: 'string', raw: true })
   const fallback = {
     sheets: fallbackWorkbook.SheetNames.map(name => withSource(sheetToRawImport(fallbackWorkbook, name))),
   }

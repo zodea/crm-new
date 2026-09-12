@@ -1,3 +1,6 @@
+import type { DataOriginDTO } from '../../types/read-model'
+import { isDataOriginDTO } from '../../types/read-model'
+
 export type QuantityRouteQueryValue = string | readonly (string | null)[] | null | undefined
 export type QuantityRouteQuery = Record<string, QuantityRouteQueryValue>
 
@@ -8,22 +11,28 @@ export interface QuantityFilterContext {
   view: 'trade' | 'crew'
   trade: string
   assignee: string
+  origin?: DataOriginDTO
 }
 
-const FILTER_KEYS = [
+export const QUANTITY_FILTER_KEYS = [
   'project',
   'building',
   'month',
   'view',
   'trade',
   'assignee',
+  'origin',
 ] as const
 
 function stringValue(value: QuantityRouteQueryValue): string {
   return typeof value === 'string' ? value : ''
 }
 
-export function buildQuantityFilterQuery(context: QuantityFilterContext): Record<keyof QuantityFilterContext, string> {
+export function readQuantityOrigin(query: QuantityRouteQuery): DataOriginDTO | null {
+  return query.origin === undefined ? 'real' : isDataOriginDTO(query.origin) ? query.origin : null
+}
+
+export function buildQuantityFilterQuery(context: QuantityFilterContext): Record<string, string> {
   return {
     project: context.project,
     building: context.building,
@@ -31,6 +40,7 @@ export function buildQuantityFilterQuery(context: QuantityFilterContext): Record
     view: context.view,
     trade: context.trade,
     assignee: context.assignee,
+    ...(context.origin ? { origin: context.origin } : {}),
   }
 }
 
@@ -43,16 +53,32 @@ export function readQuantityFilterQuery(query: QuantityRouteQuery): Partial<Quan
     ...(view === 'trade' || view === 'crew' ? { view } : {}),
     trade: stringValue(query.trade),
     assignee: stringValue(query.assignee),
+    ...(isDataOriginDTO(query.origin) ? { origin: query.origin } : {}),
   }
 }
 
 export function quantityMatrixReturnPath(query: QuantityRouteQuery): string {
   const params = new URLSearchParams()
-  for (const key of FILTER_KEYS) {
+  for (const key of QUANTITY_FILTER_KEYS) {
+    if (key === 'origin' && !isDataOriginDTO(query.origin))
+      continue
     const value = stringValue(query[key])
     if (value)
       params.set(key, value)
   }
   const search = params.toString()
   return search ? `/subcontract/quantity?${search}` : '/subcontract/quantity'
+}
+
+export function quantityUnitReturnPath(projectId: string, query: QuantityRouteQuery): string {
+  if (typeof query.returnTo === 'string' && query.returnTo.startsWith('/subcontract/quantity?')) {
+    const target = new URL(query.returnTo, 'https://ruihang.invalid')
+    const values = Object.fromEntries(target.searchParams)
+    if (target.pathname === '/subcontract/quantity' && values.project === projectId
+      && readQuantityOrigin(values) === readQuantityOrigin(query)
+      && QUANTITY_FILTER_KEYS.every(key => target.searchParams.getAll(key).length <= 1)) {
+      return quantityMatrixReturnPath(values)
+    }
+  }
+  return quantityMatrixReturnPath({ ...query, project: projectId })
 }

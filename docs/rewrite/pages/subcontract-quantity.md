@@ -1,6 +1,6 @@
 # 工程量管理 — 户型模板 + 指派矩阵 + 阶段完成
 
-> 路由：`/subcontract/quantity` · `/subcontract/quantity/region` · `/subcontract/quantity/:pid/:uid`（`uid` = 户 ID）
+> 路由：`/subcontract/quantity` · `/subcontract/quantity/template` · `/subcontract/quantity/region` · `/subcontract/quantity/stages` · `/subcontract/quantity/:pid/:uid`（`uid` = 户 ID）
 > 页面：`pages/subcontract/quantity/index.vue` · `pages/subcontract/quantity/region.vue` · `pages/subcontract/quantity/[pid]/[uid].vue`
 > 架构决策：[ADR 0010](../../adr/0010-quantity-matrix-and-construction-record-model.md)
 > 数据模型：[DATABASE.md §2.6 / §3.4 / §4.7](../DATABASE.md)
@@ -60,6 +60,14 @@
 ---
 
 ## 三、矩阵视角
+
+### 当前来源与整页入口（#442）
+
+浏览器正式项目通过中央目录、Repository 与命令读取和保存；同 ID 的正式与演示项目按来源区分。演示只读适配与桌面本地适配边界以 [ADR 0020](../../adr/0020-browser-authority-and-demo-workspace-boundary.md) 为准，正式失败不得回退到本地快照。切换来源、离页或权限变化时，旧请求不得覆盖当前事实或恢复旧写入动作。
+
+“户型模板”“项目区域”“阶段配置”打开独立整页。模板编辑加载时固定的版本用于保存，取消、失败或重新核验权限不得用新版本覆盖草稿基线。模板量的清单关联必须从当前项目合同的稳定 BOQ 候选明确选择；原识别量与用户输入量分开显示，解除关联后旧识别量标为“原识别值”。具体数据及保存规则链接 [DATABASE](../DATABASE.md) 与 [COMMANDS](../COMMANDS.md)，不按名称补稳定身份。
+
+新项目先保存模板分项，再进入阶段配置显式建立阶段及分项映射。普通阶段默认不成为报量阶段；逐分项明确选择唯一报量阶段，也可明确不指定。同一分项可参与多个阶段进度。逐行保存报量选择时，其他行尚未保存的选择必须保留。人工进度阶段与按户完成阶段的边界、稳定阶段身份及归档确认遵循 [ADR 0010](../../adr/0010-quantity-matrix-and-construction-record-model.md)。使用步骤见[工程量中央流程指南](../../guides/quantity-central-workflow.md)。
 
 页面顶部提供项目、楼栋、月份筛选，以及“工种矩阵 / 班组矩阵”切换。主体为楼层 × 房号的可点击网格。
 

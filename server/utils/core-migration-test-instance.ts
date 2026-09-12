@@ -16,6 +16,7 @@ import type {
   CoreMigrationSourceRefDTO,
 } from '../../app/lib/migration/core-contract'
 import type { BusinessSession } from './business-session'
+import type { PreparedCoreMigration } from './core-migration-preparation'
 import { createHash } from 'node:crypto'
 import {
   CORE_MIGRATION_CAPABILITY,
@@ -31,6 +32,7 @@ import {
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { auxiliaryContractInstance } from './auxiliary-contract-runtime'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
+import { prepareCoreMigrationCommandSources } from './core-migration-preparation'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { migratedOtherSettlement } from './other-settlement-migration'
@@ -38,6 +40,8 @@ import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
 import { ownerCommercialDocumentCommandTestInstance } from './owner-commercial-document-command-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
+import { planQuantityMigration } from './quantity-migration'
+import { quantityTestInstance } from './quantity-runtime'
 import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
@@ -84,7 +88,8 @@ export interface CoreMigrationTestInstanceOptions {
   afterApply?: (entities: CoreMigrationServerEntityDTO[], batchId: string) => void | Promise<void>
   afterConfirm?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
   afterRollback?: (snapshot: CoreMigrationSnapshotDTO, batchId: string) => void | Promise<void>
-  afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void
+  afterReset?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => void | Promise<void>
+  prepareTransition?: (snapshot: CoreMigrationSnapshotDTO, workspaceId?: string) => Promise<PreparedCoreMigration>
 }
 
 interface ReferenceRule {
@@ -95,6 +100,9 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  quantity_projects: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
   other_settlements: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
     { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
@@ -254,6 +262,34 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
   const now = options.now ?? (() => new Date().toISOString())
   const createServerId = options.createServerId ?? stableDefaultId
   const rollbackWindowMs = options.rollbackWindowMs ?? DEFAULT_ROLLBACK_WINDOW_MS
+  const queues = new Map<string, Promise<void>>()
+  let resetting: Promise<void> = Promise.resolve()
+
+  function enqueue<T>(workspaceId: string, work: () => Promise<T>): Promise<T> {
+    const pending = Promise.all([resetting, queues.get(workspaceId)]).then(work)
+    queues.set(workspaceId, pending.then(() => undefined, () => undefined))
+    return pending
+  }
+
+  function commandQueue<T, Request extends CoreMigrationSourceCommandDTO | CoreMigrationBatchCommandDTO>(request: Request, session: BusinessSession, operation: (command: Request, session: BusinessSession) => Promise<T>): Promise<T> {
+    const command = clone(request)
+    const actor = clone(session)
+    return enqueue(actor.workspaceId, () => operation(command, actor))
+  }
+
+  async function commitTransition(snapshot: CoreMigrationSnapshotDTO, workspaceId: string | undefined, beforeCommit: () => void | Promise<void>, commitAuthority: () => void) {
+    let prepared: PreparedCoreMigration | undefined
+    try {
+      prepared = await options.prepareTransition?.(snapshot, workspaceId)
+      await beforeCommit()
+      prepared?.commit()
+      commitAuthority()
+    }
+    catch (cause) {
+      await prepared?.abort()
+      throw cause
+    }
+  }
 
   function workspace(workspaceId: string): WorkspaceState {
     let state = workspaces.get(workspaceId)
@@ -603,6 +639,45 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       }
     }
 
+    for (const entity of plannedEntities.filter(row => row.entityType === 'quantity_projects')) {
+      try {
+        const plan = planQuantityMigration({ authority: 'central', activeBatchId: batchId, entities: plannedEntities.filter(row => row.entityType !== 'quantity_projects' || row.id === entity.id) }, new Map())
+        const graph = plan.incoming[0]!.graph
+        const payloads = new Set(graph.tables.file_payloads.map(row => row.file_ref_id))
+        const missing = graph.tables.file_refs.filter(row => !payloads.has(row.id)).length
+        if (missing) {
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType: 'quantity_projects',
+            legacyId: entity.legacyId,
+            serverId: entity.id,
+            field: 'graphJson',
+            metricKey: 'missing-original',
+            sourceValue: String(missing),
+            expectedValue: null,
+            actualValue: missing,
+            difference: null,
+            attribution: 'source',
+            reason: `${missing} 份历史工程量照片缺少正文，保留原元数据和明确缺失状态，不借其他照片补齐。`,
+          }))
+        }
+      }
+      catch (cause) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'quantity_projects',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '工程量完整来源图校验失败',
+        }))
+      }
+    }
+
     for (const [entityType, expected] of Object.entries(command.source.expectations?.counts ?? {})) {
       const actual = steps.find(step => step.entityType === entityType)?.importableCount ?? 0
       if (actual !== expected) {
@@ -920,8 +995,10 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
-    if (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))
+    if (batch.dto.issues.some(item => item.entityType === 'quantity_projects' && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+      || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
+    }
     if (state.activeBatchId && state.activeBatchId !== command.batchId)
       throw conflict('已有另一迁移批次等待确认或回滚')
 
@@ -1017,15 +1094,17 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
       confirmedAt,
       rollbackExpiresAt: new Date(Date.parse(confirmedAt) + rollbackWindowMs).toISOString(),
     }
-    await options.afterConfirm?.({
+    const nextSnapshot: CoreMigrationSnapshotDTO = {
       authority: 'central',
       activeBatchId: command.batchId,
       entities: clone(state.entities),
-    }, command.batchId)
-    state.authority = 'central'
-    state.activeBatchId = command.batchId
-    batch.dto = confirmedBatch
-    remember(state, command.commandId, 'confirm', batch.dto)
+    }
+    await commitTransition(nextSnapshot, session.workspaceId, () => options.afterConfirm?.(nextSnapshot, command.batchId), () => {
+      state.authority = 'central'
+      state.activeBatchId = command.batchId
+      batch.dto = confirmedBatch
+      remember(state, command.commandId, 'confirm', batch.dto)
+    })
     return clone(batch.dto)
   }
 
@@ -1050,22 +1129,18 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
         || Date.parse(rolledBackAt) > Date.parse(batch.dto.rollbackExpiresAt))) {
       throw conflict('迁移回滚窗口已关闭')
     }
-    await options.afterRollback?.({
+    const nextSnapshot: CoreMigrationSnapshotDTO = {
       authority: batch.backup.authority,
       activeBatchId: batch.backup.activeBatchId,
       entities: clone(batch.backup.entities),
-    }, command.batchId)
-    state.authority = batch.backup.authority
-    state.activeBatchId = batch.backup.activeBatchId
-    state.entities = clone(batch.backup.entities)
-    batch.dto = {
-      ...batch.dto,
-      status: 'rolled-back',
-      authority: state.authority,
-      updatedAt: rolledBackAt,
-      rolledBackAt,
     }
-    remember(state, command.commandId, 'rollback', batch.dto)
+    await commitTransition(nextSnapshot, session.workspaceId, () => options.afterRollback?.(nextSnapshot, command.batchId), () => {
+      state.authority = nextSnapshot.authority
+      state.activeBatchId = nextSnapshot.activeBatchId
+      state.entities = clone(nextSnapshot.entities)
+      batch.dto = { ...batch.dto, status: 'rolled-back', authority: state.authority, updatedAt: rolledBackAt, rolledBackAt }
+      remember(state, command.commandId, 'rollback', batch.dto)
+    })
     return clone(batch.dto)
   }
 
@@ -1080,22 +1155,30 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     })
   }
 
-  function reset(workspaceId?: string): void {
-    if (workspaceId)
-      workspaces.delete(workspaceId)
-    else
-      workspaces.clear()
-    options.afterReset?.({ authority: 'local', activeBatchId: null, entities: [] }, workspaceId)
+  async function reset(workspaceId?: string): Promise<void> {
+    const empty: CoreMigrationSnapshotDTO = { authority: 'local', activeBatchId: null, entities: [] }
+    await commitTransition(empty, workspaceId, () => options.afterReset?.(empty, workspaceId), () => {
+      if (workspaceId)
+        workspaces.delete(workspaceId)
+      else
+        workspaces.clear()
+    })
   }
 
   return {
-    preflight,
-    dryRun,
-    importBatch,
-    confirm,
-    rollback,
+    preflight: (command: CoreMigrationSourceCommandDTO, session: BusinessSession) => commandQueue(command, session, preflight),
+    dryRun: (command: CoreMigrationSourceCommandDTO, session: BusinessSession) => commandQueue(command, session, dryRun),
+    importBatch: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, importBatch),
+    confirm: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, confirm),
+    rollback: (command: CoreMigrationBatchCommandDTO, session: BusinessSession) => commandQueue(command, session, rollback),
     snapshot,
-    reset,
+    reset(workspaceId?: string): Promise<void> {
+      if (workspaceId)
+        return enqueue(workspaceId, () => reset(workspaceId))
+      const pending = Promise.all([resetting, ...queues.values()]).then(() => reset())
+      resetting = pending.then(() => undefined, () => undefined)
+      return pending
+    },
   }
 }
 
@@ -1126,7 +1209,5 @@ const commandSources = [
 ] as const
 
 export const coreMigrationTestInstance = createCoreMigrationTestInstance({
-  afterConfirm: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
-  afterRollback: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
-  afterReset: snapshot => synchronizeCoreMigrationCommandSources(snapshot, commandSources),
+  prepareTransition: snapshot => prepareCoreMigrationCommandSources(snapshot, commandSources, [quantityTestInstance]),
 })

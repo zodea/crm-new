@@ -1,6 +1,7 @@
 import type { RestorableTabPath, TabRestoreValidator } from './restoration-contract'
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
+import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { TAB_TARGET_VERSION } from './restoration-contract'
 import { readRestoredDetail } from './restore-detail'
@@ -120,7 +121,9 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     if (url.searchParams.getAll('origin').length > 1 || (originValue != null && originValue !== 'real' && originValue !== 'demo'))
       return null
     const origin = originValue as DataOriginDTO | null ?? (detail ? 'real' : null)
-    const allowed = detail ? DETAIL_QUERY : LIST_QUERY
+    const baseAllowed = detail ? DETAIL_QUERY : LIST_QUERY
+    const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
+    const allowed = quantity ? new Set([...baseAllowed, ...QUANTITY_FILTER_KEYS]) : baseAllowed
     for (const key of [...url.searchParams.keys()]) {
       if (!allowed.has(key) || url.searchParams.getAll(key).some(hasControlCharacters))
         url.searchParams.delete(key)

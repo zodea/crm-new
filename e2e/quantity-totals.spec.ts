@@ -2,36 +2,56 @@ import type { Page } from '@playwright/test'
 import { readFile, writeFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import * as XLSX from 'xlsx'
-import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
-import { installQuantityProductionFixture, QUANTITY_PRODUCTION_FIXTURE } from './helpers/quantity-production-fixture'
+
+import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 
 async function prepare(page: Page) {
   await page.addInitScript(() => {
     Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined })
   })
-  await installQuantityProductionFixture(page)
-  await updateProductionSnapshot(page, (database) => {
-    database.run(`
-      UPDATE house_type_template_items SET contract_qty = 0 WHERE id = 'qty-e2e-line-masonry';
-      INSERT INTO rooms (id, template_id, code, name, kind) VALUES ('qty-total-extra', 'qty-e2e-template', 'EXTRA', '次卧', 'room');
-      INSERT INTO house_type_template_items (id, room_id, item_id, contract_qty, provisional_qty, field_qty)
-        VALUES ('qty-total-partial', 'qty-total-extra', 'qty-e2e-item-masonry', 0, 18, NULL);
-      UPDATE construction_stage_items SET is_reporting_stage = 1 WHERE id = 'qty-e2e-stage-item-masonry';
-      INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage)
-        VALUES ('qty-total-length', 'qty-e2e-stage-masonry', 'qty-e2e-item-plumbing', 1);
-      INSERT INTO construction_stages (id, project_id, code, name, trade, completion_mode, sort_order)
-        VALUES ('qty-total-shared', 'project-e2e-quantity-production', 'SHARED', '共用分项复验', '泥水工', 'unit', 2);
-      INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage)
-        VALUES ('qty-total-shared-map', 'qty-total-shared', 'qty-e2e-item-masonry', 0);
-      INSERT INTO unit_stage_completions (id, unit_id, stage_id, assignment_id, status, completed_at)
-        VALUES ('qty-total-shared-done', 'qty-e2e-unit-201', 'qty-total-shared', 'qty-e2e-asg-201-masonry', 'completed', '2026-08-01');
-    `)
-  })
-  await page.goto(`/subcontract/quantity/${QUANTITY_PRODUCTION_FIXTURE.projectId}/qty-e2e-unit-201`)
+  const fixture = await installQuantityProductionFixture(page, { totals: true })
+  await page.goto(`/subcontract/quantity/${fixture.projectId}/${fixture.units['201']}?origin=real&returnTo=${encodeURIComponent(fixture.matrixUrl)}`)
   await expect(page.getByRole('heading', { name: /1栋 2层 201户/ })).toBeVisible({ timeout: 60_000 })
 }
 
 test.describe('Issue #440 工程量三量合计与真实导出', () => {
+  test('中央慢响应导出先选择目录，再读取和写入当前台账', async ({ page }) => {
+    test.setTimeout(120_000)
+    await prepare(page)
+    await page.getByRole('link', { name: '返回工程量矩阵' }).click()
+    const exportButton = page.getByRole('button', { name: '导出台账', exact: true })
+    await expect(exportButton).toBeEnabled()
+    await page.evaluate(() => {
+      const state = { picked: false, active: false, size: 0 }
+      Object.assign(window, { quantityExportTest: state })
+      Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: async () => {
+        state.picked = true
+        state.active = navigator.userActivation.isActive
+        return { name: '合成导出目录', getFileHandle: async (_name: string, options: { create: boolean }) => {
+          if (!options.create)
+            throw new DOMException('合成目录没有同名文件', 'NotFoundError')
+          return { createWritable: async () => ({
+            write: async (data: Uint8Array) => { state.size = data.byteLength },
+            close: async () => {},
+          }) }
+        } }
+      } })
+    })
+    await page.route('**/api/read/quantity/workspace?**', async (route) => {
+      await new Promise(resolve => setTimeout(resolve, 6_500))
+      await route.continue()
+    })
+    try {
+      await exportButton.click()
+      await expect.poll(() => page.evaluate(() => (window as unknown as { quantityExportTest: { picked: boolean } }).quantityExportTest.picked), { timeout: 2_000 }).toBe(true)
+      await expect.poll(() => page.evaluate(() => (window as unknown as { quantityExportTest: { size: number } }).quantityExportTest.size), { timeout: 15_000 }).toBeGreaterThan(100)
+      expect(await page.evaluate(() => (window as unknown as { quantityExportTest: { active: boolean } }).quantityExportTest.active)).toBe(true)
+    }
+    finally {
+      await page.unrouteAll({ behavior: 'wait' })
+    }
+  })
+
   test('五档视口分单位合计、共用分项去重与缺量说明键盘往返', async ({ page }, testInfo) => {
     test.setTimeout(120_000)
     const errors: string[] = []

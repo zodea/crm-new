@@ -1,11 +1,12 @@
 import type { QuantityVarianceFact } from '~/lib/quantity/variance'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import QuantityVarianceDialog from '~/components/quantity/QuantityVarianceDialog.vue'
 
 const loadQuantityVarianceFacts = vi.hoisted(() => vi.fn())
+beforeEach(() => vi.stubGlobal('useQuantityStore', () => ({ loadVariance: loadQuantityVarianceFacts })))
 
 vi.mock('~/lib/quantity/variance', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/quantity/variance')>()

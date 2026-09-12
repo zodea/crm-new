@@ -4,7 +4,7 @@ import type { OwnerDocumentKind } from '~/lib/owner-document/forms'
 import type { OwnerDocumentBoqLine } from '~/lib/owner-document/page'
 import { useFullscreen } from '@vueuse/core'
 import { computed, useTemplateRef } from 'vue'
-import { ownerDocumentLineAmount } from '~/lib/owner-document/page'
+import { ownerDocumentLineAmount, ownerDocumentTotalAmount } from '~/lib/owner-document/page'
 
 type GridKind = Extract<OwnerDocumentKind, 'owner_change' | 'owner_report'>
 type GridLine = Record<string, unknown>
@@ -55,17 +55,12 @@ const gridMinWidth = computed(() =>
 )
 
 const summary = computed(() => {
-  const amount = props.lines.reduce(
-    (sum, line) => sum + ownerDocumentLineAmount(props.kind, line),
-    0,
-  )
+  const amount = ownerDocumentTotalAmount(props.kind, props.lines)
+  const money = (value: number | null) => value == null ? '待核对' : `¥${value.toFixed(2)}`
   if (props.kind === 'owner_change')
-    return `${props.lines.length} 项变更 · 合计 ¥${amount.toFixed(2)}`
-  const audited = props.lines.reduce(
-    (sum, line) => sum + (Number(line.auditedQty) || 0) * (Number(line.unitPrice) || 0),
-    0,
-  )
-  return `${props.lines.length} 项报量 · 申报 ¥${amount.toFixed(2)}${props.auditMode ? ` · 审定 ¥${audited.toFixed(2)}` : ''}`
+    return `${props.lines.length} 项变更 · 合计 ${money(amount)}`
+  const audited = ownerDocumentTotalAmount('owner_report', props.lines.map(line => ({ ...line, reportedQty: line.auditedQty })))
+  return `${props.lines.length} 项报量 · 申报 ${money(amount)}${props.auditMode ? ` · 审定 ${money(audited)}` : ''}`
 })
 
 function inputValue(event: Event): string {
@@ -99,7 +94,7 @@ function selectBoqLine(index: number, id: string) {
     qty: boqLine.qty,
     unitPrice: boqLine.unitPrice,
     autoQty: boqLine.autoQty,
-    reportedQty: props.lines[index]?.reportedQty ?? boqLine.autoQty,
+    reportedQty: props.lines[index]?.reportedQty ?? (boqLine.missingQtyCount > 0 ? null : boqLine.autoQty),
   })
 }
 
@@ -137,7 +132,7 @@ function add() {
           autoQty: 0,
           reportedQty: null,
           auditedQty: null,
-          unitPrice: 0,
+          unitPrice: null,
           note: '',
         },
   ])
@@ -315,11 +310,11 @@ function remove(index: number) {
           >
         </template>
         <template #unitPrice="{ row }">
-          <span class="font-mono font-700">{{ Number(row.unitPrice || 0).toFixed(2) }}</span>
+          <span class="font-mono font-700">{{ row.unitPrice == null || row.unitPrice === '' ? '未记录' : Number(row.unitPrice).toFixed(2) }}</span>
         </template>
         <template #amount="{ row }">
-          <span class="font-mono font-700" :class="{ 'text-danger': ownerDocumentLineAmount(kind, row) < 0 }">
-            {{ ownerDocumentLineAmount(kind, row).toFixed(2) }}
+          <span class="font-mono font-700" :class="{ 'text-danger': (ownerDocumentLineAmount(kind, row) ?? 0) < 0 }">
+            {{ ownerDocumentLineAmount(kind, row)?.toFixed(2) ?? '待核对' }}
           </span>
         </template>
         <template #note="{ row, rowIndex }">

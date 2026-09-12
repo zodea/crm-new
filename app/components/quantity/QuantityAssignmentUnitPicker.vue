@@ -3,6 +3,7 @@ import type {
   QuantityAssignmentCurrent,
   QuantityAssignmentWorkspaceUnit,
 } from '~/lib/quantity/assignment'
+import KitButton from '~/components/ui/KitButton.vue'
 
 const props = withDefaults(defineProps<{
   units: readonly QuantityAssignmentWorkspaceUnit[]
@@ -71,22 +72,24 @@ function clearAll() {
       <span class="text-12px text-ink-soft">
         已选 <b class="font-mono text-ink">{{ selectedUnitIds.length }}</b> / {{ units.length }} 户
       </span>
-      <button
+      <KitButton
         type="button"
-        class="ml-auto rounded-[var(--radius-sm)] px-2 py-1 text-11px text-brand font-700 hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-45"
+        variant="ghost"
+        class="ml-auto px-2 text-11px"
         :disabled="disabled || !units.length"
         @click="selectAll"
       >
         全选当前楼栋
-      </button>
-      <button
+      </KitButton>
+      <KitButton
         type="button"
-        class="rounded-[var(--radius-sm)] px-2 py-1 text-11px text-brand font-700 hover:bg-brand-soft disabled:cursor-not-allowed disabled:opacity-45"
+        variant="ghost"
+        class="px-2 text-11px"
         :disabled="disabled || !selectedUnitIds.length"
         @click="clearAll"
       >
         清空
-      </button>
+      </KitButton>
     </div>
 
     <fieldset :disabled="disabled" class="m-0 min-w-0 grid gap-3 border-0 p-0">

@@ -9,7 +9,7 @@ export const ADAPTERS = {
   'central-http': {
     read: 'HTTP Repository；测试服务实例',
     write: '中央 command（仅已暴露动作；逐动作原子性/幂等/版本待核验）',
-    storage: '中央测试实例 Map；不具备进程重启持久化证据',
+    storage: '中央测试实例；不具备进程重启持久化证据',
     sources: [
       ['app/plugins/repositories.ts', 'createHttpProjectListRepository'],
       ['server/utils/project-command-test-instance.ts', 'new Map'],
@@ -96,8 +96,14 @@ export function resolveAdapter(surface, host) {
     return 'file-workflow'
   if (route === '/finance/invoice/factor')
     return 'tool-local-storage'
+  if (route === '/subcontract/quantity/stages')
+    return host === 'browser' ? 'central-http' : 'unsupported'
+  if (host === 'browser' && ['/subcontract/quantity', '/subcontract/quantity/:pid/:uid', '/subcontract/quantity/region', '/subcontract/quantity/template'].includes(route))
+    return 'central-http'
   if (route === '/import/mapping/:entity') {
     if (kind === 'supplier' || kind === 'project')
+      return 'central-http'
+    if (host === 'browser' && ['quantity-template', 'quantity-assignment', 'quantity-completion'].includes(kind))
       return 'central-http'
     if (kind === 'demo-supplier')
       return 'simulation'
@@ -251,6 +257,7 @@ export const SUBVIEWS = [
   group({ route: '/subcontract/quantity' }, 'app/components/quantity/QuantityCompletionDialog.vue', ['stage', 'record', 'completed', 'draft'].map(key => view(`dialog/completion/${key}`, `'${key}'`, 'form-section'))),
   group({ route: '/subcontract/quantity/:pid/:uid', variant: 'default' }, 'app/components/quantity/QuantityUnitDetailScreen.vue', [view('group/stage/quantities', 'stage.quantities', 'matrix', '按实际工种、stage.id、roomId:itemId 展开，不能用固定表数替代'), view('group/stage/photos', 'stage.photos', 'files')]),
   group({ route: '/subcontract/quantity/template' }, 'app/components/quantity/QuantityTemplateFormPage.vue', mounted('section', ['QuantityTemplateBasicSection', 'QuantityTemplateRoomsSection', 'QuantityTemplateLinesSection'])),
+  group({ route: '/subcontract/quantity/stages' }, 'app/components/quantity/QuantityStageFormPage.vue', mounted('section', ['QuantityStageFields', 'QuantityStageReporting'])),
   group({ route: '/subcontract/quantity/region' }, 'app/components/quantity/QuantityRegionFormPage.vue', ['createBuilding', 'createFloor', 'createUnit'].map(key => view(`form/${key}`, key, 'form-section'))),
   group({ route: '/subcontract/payroll' }, 'app/components/payroll/PayrollScreen.vue', mounted('workspace', ['PayrollStatementTable', 'PayrollStatementDetail'])),
   group({ route: '/subcontract/payroll' }, 'app/components/payroll/PayrollStatementDetail.vue', [view('embedded/lines', '<table', 'subtable'), ...mounted('dialog', ['PayrollReleaseAllocationDialog']), ...mounted('print', ['PayrollPrintSheet'])]),

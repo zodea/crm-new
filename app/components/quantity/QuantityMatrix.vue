@@ -8,6 +8,7 @@ import { moveQuantityFocus } from '~/lib/quantity/matrix'
 
 const props = defineProps<{
   matrix: QuantityMatrixView
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -50,7 +51,7 @@ async function openActions(cellId: string, focusFirst = false) {
   openCellId.value = cellId
   if (focusFirst) {
     await nextTick()
-    actionButton(cellId, 'configure')?.focus()
+    ;(actionButton(cellId, 'configure') ?? actionButton(cellId, 'detail'))?.focus()
   }
 }
 
@@ -206,6 +207,7 @@ function assigneeLabel(cell: QuantityMatrixCell): string {
                   :aria-label="`${cell.unitName}操作`"
                 >
                   <button
+                    v-if="!readonly"
                     type="button"
                     :aria-label="`配置 ${cell.unitName}`"
                     data-quantity-action="configure"
@@ -217,6 +219,7 @@ function assigneeLabel(cell: QuantityMatrixCell): string {
                     配置
                   </button>
                   <button
+                    v-if="!readonly"
                     type="button"
                     :aria-label="`登记 ${cell.unitName}`"
                     data-quantity-action="complete"

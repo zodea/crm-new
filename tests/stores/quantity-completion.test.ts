@@ -8,7 +8,7 @@ import {
   loadQuantityPhotoDataUrl,
   persistQuantityStageCompletion,
 } from '~/lib/quantity/completion'
-import { useQuantityStore } from '~/stores/quantity'
+import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
 import { createMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb

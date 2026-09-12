@@ -106,17 +106,25 @@ export interface QuantityLedgerExportInput {
   monthly: readonly QuantityMonthlyOutput[]
 }
 
+export interface QuantityLazyLedgerExportInput {
+  projectName: string
+  loadData: () => Promise<Omit<QuantityLedgerExportInput, 'projectName'>>
+}
+
 /** ADR 0004 路一：施工记录 + 阶段进度 + 月度完成量三 sheet 单文件直接保存。 */
+export function createQuantityLedgerExport(input: QuantityLedgerExportInput, now?: Date): ExportFileOptions & { data: ArrayBuffer }
+export function createQuantityLedgerExport(input: QuantityLazyLedgerExportInput, now?: Date): ExportFileOptions & { data: () => Promise<ArrayBuffer> }
 export function createQuantityLedgerExport(
-  input: QuantityLedgerExportInput,
+  input: QuantityLedgerExportInput | QuantityLazyLedgerExportInput,
   now = new Date(),
 ): ExportFileOptions {
+  const encode = (data: Omit<QuantityLedgerExportInput, 'projectName'>) => sheetsToXlsx([
+    { name: '施工记录', rows: quantityRecordRows(data.records) },
+    { name: '阶段进度', rows: quantityProgressRows(data.progress) },
+    { name: '月度完成量', rows: quantityMonthlyRows(data.monthly) },
+  ])
   return {
-    data: sheetsToXlsx([
-      { name: '施工记录', rows: quantityRecordRows(input.records) },
-      { name: '阶段进度', rows: quantityProgressRows(input.progress) },
-      { name: '月度完成量', rows: quantityMonthlyRows(input.monthly) },
-    ]),
+    data: 'loadData' in input ? async () => encode(await input.loadData()) : encode(input),
     defaultName: `${input.projectName || '工程量'}_工程量台账_${localDateStamp(now)}.xlsx`,
     mimeType: XLSX_MIME,
   }

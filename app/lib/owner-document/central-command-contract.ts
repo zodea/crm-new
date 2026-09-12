@@ -1,4 +1,5 @@
 import type { FileRefChanges, FileRefRecord } from '../forms/file-refs'
+import type { QuantityBasis } from '../quantity/basis'
 import type { OwnerCommercialDocumentKind } from './central-repository'
 import type {
   AcceptanceLifecycleTarget,
@@ -143,6 +144,6 @@ export interface OwnerCommercialDocumentFormReadDTO {
 export interface OwnerCommercialDocumentCommandRepository {
   context: (kind?: OwnerCommercialDocumentKind) => Promise<OwnerCommercialDocumentCommandContextDTO>
   loadForm: (kind: OwnerCommercialDocumentKind, id: string) => Promise<OwnerCommercialDocumentFormReadDTO>
-  boqLines: (projectId: string, contractId: string, periodNo?: string) => Promise<OwnerDocumentBoqLine[]>
+  boqLines: (projectId: string, contractId: string, periodNo?: string, quantityBasis?: QuantityBasis) => Promise<OwnerDocumentBoqLine[]>
   execute: (request: OwnerCommercialDocumentCommandRequestDTO) => Promise<OwnerCommercialDocumentCommandResultDTO>
 }

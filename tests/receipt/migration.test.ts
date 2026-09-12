@@ -35,8 +35,8 @@ function readSource(db: Awaited<ReturnType<typeof createMemoryDb>>) {
   }).readSource()
 }
 
-afterEach(() => {
-  coreMigrationTestInstance.reset(session.workspaceId)
+afterEach(async () => {
+  await coreMigrationTestInstance.reset(session.workspaceId)
   receiptCommandTestInstance.reset()
 })
 

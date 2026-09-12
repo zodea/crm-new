@@ -99,10 +99,10 @@
     ]
   },
   "counts": {
-    "productionRoutes": 137,
-    "rootVariants": 192,
-    "surfaces": 556,
-    "environmentCases": 1012,
+    "productionRoutes": 138,
+    "rootVariants": 194,
+    "surfaces": 562,
+    "environmentCases": 1018,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -116,7 +116,7 @@
     "central-http": {
       "read": "HTTP Repository；测试服务实例",
       "write": "中央 command（仅已暴露动作；逐动作原子性/幂等/版本待核验）",
-      "storage": "中央测试实例 Map；不具备进程重启持久化证据",
+      "storage": "中央测试实例；不具备进程重启持久化证据",
       "sources": [
         {
           "path": "app/plugins/repositories.ts",
@@ -1323,7 +1323,7 @@
       "issues": [
         412
       ],
-      "surfaces": 72
+      "surfaces": 78
     },
     {
       "code": "schedule-target-cost",
@@ -18580,6 +18580,190 @@
       "routeEvidenceId": "E-651951D87848"
     },
     {
+      "id": "S-B23C25976515",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "page",
+      "label": "整页表单",
+      "type": "page",
+      "condition": "新建阶段；报量选择为独立显式动作，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
+      "id": "S-E2F6CC997492",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "section/QuantityStageFields",
+      "label": "QuantityStageFields",
+      "type": "section",
+      "condition": "新建阶段；报量选择为独立显式动作，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/quantity/QuantityStageFormPage.vue",
+          "anchor": "QuantityStageFields"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
+      "id": "S-0DC23110AA5B",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "new",
+      "template": "整页表单",
+      "path": "section/QuantityStageReporting",
+      "label": "QuantityStageReporting",
+      "type": "section",
+      "condition": "新建阶段；报量选择为独立显式动作，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/quantity/QuantityStageFormPage.vue",
+          "anchor": "QuantityStageReporting"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
+      "id": "S-9A75436028EC",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "page",
+      "label": "整页表单",
+      "type": "page",
+      "condition": "选定当前阶段；逐项保存报量草稿，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
+      "id": "S-DB26068EE397",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "section/QuantityStageFields",
+      "label": "QuantityStageFields",
+      "type": "section",
+      "condition": "选定当前阶段；逐项保存报量草稿，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/quantity/QuantityStageFormPage.vue",
+          "anchor": "QuantityStageFields"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
+      "id": "S-25BA90B5417A",
+      "route": "/subcontract/quantity/stages",
+      "routePattern": "/subcontract/quantity/stages",
+      "domain": "quantity-payroll",
+      "kind": "quantity-stage",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "edit",
+      "template": "整页表单",
+      "path": "section/QuantityStageReporting",
+      "label": "QuantityStageReporting",
+      "type": "section",
+      "condition": "选定当前阶段；逐项保存报量草稿，尚待运行验收",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/subcontract/quantity/stages.vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/quantity/QuantityStageFormPage.vue",
+          "anchor": "QuantityStageReporting"
+        }
+      ],
+      "issueNumbers": [
+        412
+      ],
+      "routeEvidenceId": "E-B8F4C3A6444A"
+    },
+    {
       "id": "S-2BAE9F169093",
       "route": "/subcontract/quantity/template",
       "routePattern": "/subcontract/quantity/template",
@@ -30771,7 +30955,7 @@
       "id": "C-C6299E9BC180",
       "surfaceId": "S-1E8C0AA0A662",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -30819,7 +31003,7 @@
       "id": "C-750EE2E85EB6",
       "surfaceId": "S-1BA6A44A54F3",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -30867,7 +31051,7 @@
       "id": "C-D140F5BD3B8E",
       "surfaceId": "S-799DC94D35D6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -30915,7 +31099,7 @@
       "id": "C-9F6E82B3983B",
       "surfaceId": "S-3A2F07493FEA",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -30963,7 +31147,7 @@
       "id": "C-D5EE76983C11",
       "surfaceId": "S-9B461B7A8A1A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31011,7 +31195,7 @@
       "id": "C-CBC2F6760975",
       "surfaceId": "S-94D7B59CAEAC",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31059,7 +31243,7 @@
       "id": "C-F0CF24735E31",
       "surfaceId": "S-36357A6E7CF6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31107,7 +31291,7 @@
       "id": "C-B643219C8B60",
       "surfaceId": "S-B20D2B9EE112",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31155,7 +31339,7 @@
       "id": "C-D34688CB5CC2",
       "surfaceId": "S-1A560096D92F",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31203,7 +31387,7 @@
       "id": "C-4E0C0480996F",
       "surfaceId": "S-B211C1A50CE8",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31251,7 +31435,7 @@
       "id": "C-874D32C4D862",
       "surfaceId": "S-48AB8F6B9F4A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31299,7 +31483,7 @@
       "id": "C-11D976DE07C1",
       "surfaceId": "S-A30194354552",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31347,7 +31531,7 @@
       "id": "C-7B15FA64BD83",
       "surfaceId": "S-FCD9F9375535",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31395,7 +31579,7 @@
       "id": "C-D1C8B7D4DE85",
       "surfaceId": "S-73A7981A0FDB",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -31443,7 +31627,7 @@
       "id": "C-BDDC64487072",
       "surfaceId": "S-0E1E50BF93E5",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41887,7 +42071,7 @@
       "id": "C-5BF5E8DBAFCE",
       "surfaceId": "S-ED03E2A1D592",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41944,7 +42128,7 @@
       "id": "C-4E4CE9D067CF",
       "surfaceId": "S-FF0F3FE9959B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -41992,7 +42176,7 @@
       "id": "C-CB2506DE8B66",
       "surfaceId": "S-E03AED6B1DD7",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42136,7 +42320,7 @@
       "id": "C-D5B7E5570149",
       "surfaceId": "S-75F8FF542466",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42193,7 +42377,7 @@
       "id": "C-962CD2D75972",
       "surfaceId": "S-FC5C295302E1",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42241,7 +42425,7 @@
       "id": "C-6D01D9AD07BE",
       "surfaceId": "S-2CE6E505D130",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42289,7 +42473,7 @@
       "id": "C-C8E6FED9D067",
       "surfaceId": "S-4952256A85CC",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42337,7 +42521,7 @@
       "id": "C-D98286F43042",
       "surfaceId": "S-A3036DF0D460",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42385,7 +42569,7 @@
       "id": "C-07BA1E9B8210",
       "surfaceId": "S-B3174BA9998E",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42433,7 +42617,7 @@
       "id": "C-B766B6E8270E",
       "surfaceId": "S-50485466538E",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42481,7 +42665,7 @@
       "id": "C-8B34939288B0",
       "surfaceId": "S-9A9E0ECD5E3B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42529,7 +42713,7 @@
       "id": "C-0230D57F3CE2",
       "surfaceId": "S-57E60E618531",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42577,7 +42761,7 @@
       "id": "C-0A297F9B7ACD",
       "surfaceId": "S-A433DD333F97",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42625,7 +42809,7 @@
       "id": "C-09BA6636B713",
       "surfaceId": "S-4C2B43C99E9D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42673,7 +42857,7 @@
       "id": "C-105DEE0D267B",
       "surfaceId": "S-68B65FAC1E7F",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42721,7 +42905,7 @@
       "id": "C-FF54C913FA32",
       "surfaceId": "S-81B58BCCB859",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42769,7 +42953,7 @@
       "id": "C-D8A19ADA4DFC",
       "surfaceId": "S-774CE1FB2ABD",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42817,7 +43001,7 @@
       "id": "C-0C6C66C02716",
       "surfaceId": "S-7EE27B1D563D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42865,7 +43049,7 @@
       "id": "C-E8A5031BDCB1",
       "surfaceId": "S-9C70EE9D3895",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42913,7 +43097,7 @@
       "id": "C-CF479629F996",
       "surfaceId": "S-3BCAC84FEE3D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -42961,7 +43145,7 @@
       "id": "C-E40436ECF296",
       "surfaceId": "S-58C7953A403C",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43009,7 +43193,7 @@
       "id": "C-DF7B130B33EE",
       "surfaceId": "S-13A1BABC8400",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43066,7 +43250,7 @@
       "id": "C-5E1E0B9E4EEC",
       "surfaceId": "S-9AF06D7D6E7B",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43114,7 +43298,7 @@
       "id": "C-2F6FEDDD0C10",
       "surfaceId": "S-E4F78B900530",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43162,7 +43346,7 @@
       "id": "C-8F6C050D78F8",
       "surfaceId": "S-AC0C73BFD348",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43210,7 +43394,7 @@
       "id": "C-9B18F8E92FF3",
       "surfaceId": "S-AA4ACD7774F6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43258,7 +43442,7 @@
       "id": "C-08C4B2636E1B",
       "surfaceId": "S-CFD9B0C0F56A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43306,7 +43490,7 @@
       "id": "C-5267278F6D39",
       "surfaceId": "S-6FD19608BDF3",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43354,7 +43538,7 @@
       "id": "C-67AA19793B60",
       "surfaceId": "S-1978BC5199BF",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43402,7 +43586,7 @@
       "id": "C-BB398CBE4781",
       "surfaceId": "S-A977FFB89369",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43450,7 +43634,7 @@
       "id": "C-0937BE14A1A6",
       "surfaceId": "S-8226D946CACB",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43498,7 +43682,7 @@
       "id": "C-442FB4BD0D20",
       "surfaceId": "S-EE0CC63829F9",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43546,7 +43730,7 @@
       "id": "C-3B68995EA6EF",
       "surfaceId": "S-F2FF940502C6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43594,7 +43778,7 @@
       "id": "C-16B0BAB7D4E9",
       "surfaceId": "S-E8692F08A6B9",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43642,7 +43826,7 @@
       "id": "C-2AD276B98FD8",
       "surfaceId": "S-6DE984C71B02",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43690,7 +43874,7 @@
       "id": "C-411D5374ED3F",
       "surfaceId": "S-D2FCD923A10F",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43738,7 +43922,7 @@
       "id": "C-D62FEA1C1539",
       "surfaceId": "S-B2B4352A94E2",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43786,7 +43970,7 @@
       "id": "C-0D0AE20E7E5F",
       "surfaceId": "S-D28C0268B4AC",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43834,7 +44018,7 @@
       "id": "C-B093DDD65E1D",
       "surfaceId": "S-D542FF945015",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43882,7 +44066,7 @@
       "id": "C-773254DBB2C2",
       "surfaceId": "S-BE0BCFFF50C6",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43939,7 +44123,7 @@
       "id": "C-20EFC20A6268",
       "surfaceId": "S-E79DE6C13990",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -43987,7 +44171,7 @@
       "id": "C-E1A622A75DF3",
       "surfaceId": "S-60833933A443",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44035,7 +44219,7 @@
       "id": "C-EAC527B792BF",
       "surfaceId": "S-C1316198503C",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44080,10 +44264,154 @@
       "obligationIds": []
     },
     {
+      "id": "C-64E866E3E561",
+      "surfaceId": "S-B23C25976515",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-0F9AC890FFF4",
+      "surfaceId": "S-E2F6CC997492",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-5B5A49F03F3A",
+      "surfaceId": "S-0DC23110AA5B",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-1391BD5DAE62",
+      "surfaceId": "S-9A75436028EC",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-2693123C0E82",
+      "surfaceId": "S-DB26068EE397",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-51E49A9289E2",
+      "surfaceId": "S-25BA90B5417A",
+      "host": "browser",
+      "adapter": "central-http",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-B8F4C3A6444A",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
       "id": "C-65CCC6704277",
       "surfaceId": "S-2BAE9F169093",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44140,7 +44468,7 @@
       "id": "C-B5AA0CFFCBE6",
       "surfaceId": "S-7583D5A8CC9A",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44188,7 +44516,7 @@
       "id": "C-73CAD8188692",
       "surfaceId": "S-F2CA393829CA",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44236,7 +44564,7 @@
       "id": "C-C0AB3E9FF1F2",
       "surfaceId": "S-FBD1BF39F29C",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44284,7 +44612,7 @@
       "id": "C-B00376092557",
       "surfaceId": "S-DE9E64551CCE",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44341,7 +44669,7 @@
       "id": "C-8B143EAA0D55",
       "surfaceId": "S-AB437A0122B4",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44389,7 +44717,7 @@
       "id": "C-4EF1F6DDC85C",
       "surfaceId": "S-AF91A6D3F508",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {
@@ -44437,7 +44765,7 @@
       "id": "C-6ABE3435D22B",
       "surfaceId": "S-F49D2C5C079D",
       "host": "browser",
-      "adapter": "browser-local",
+      "adapter": "central-http",
       "applicability": "in-scope",
       "sourceState": "wired-needs-action-audit",
       "reference": {

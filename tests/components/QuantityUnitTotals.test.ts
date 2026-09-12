@@ -39,7 +39,7 @@ beforeEach(() => {
 })
 
 function openDetail(value = workspace()) {
-  const store = reactive({ completionWorkspace: value, completionLoading: false, completionError: '', loadCompletion: vi.fn().mockResolvedValue(undefined) })
+  const store = reactive({ completionWorkspace: value, completionOrigin: 'real', completionCanWrite: true, cancelCompletion: vi.fn(), completionLoading: false, completionError: '', loadCompletion: vi.fn().mockResolvedValue(undefined) })
   vi.stubGlobal('useQuantityStore', () => store)
   render(QuantityUnitDetailScreen, {
     props: { projectId: 'project-quantity', unitId: 'unit-quantity' },

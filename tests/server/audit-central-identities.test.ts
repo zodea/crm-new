@@ -15,8 +15,8 @@ import { supplierCommandTestInstance } from '../../server/utils/supplier-command
 import { supplierReadTestInstance } from '../../server/utils/supplier-read-test-instance'
 
 const session = resolveBusinessSession()
-beforeEach(() => {
-  coreMigrationTestInstance.reset()
+beforeEach(async () => {
+  await coreMigrationTestInstance.reset()
   projectCommandTestInstance.reset()
   customerCommandTestInstance.reset()
   supplierCommandTestInstance.reset()

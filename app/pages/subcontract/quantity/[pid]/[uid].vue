@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
-import { quantityMatrixReturnPath } from '~/lib/quantity/navigation'
+import { quantityUnitReturnPath, readQuantityOrigin } from '~/lib/quantity/navigation'
 import { isDataOriginDTO } from '~/types/read-model'
 
 // 薄路由（#103 切片 6A）：参数身份已冻结为 pid=项目 id、uid=户 id（见 ADR 0010 / handoff 决策门）。
@@ -17,7 +17,7 @@ const centralContext = computed(() => {
 })
 const returnTo = computed(() => centralContext.value
   ? validateCrewWorkerReturnTo(route.query.returnTo) ?? `/base/${centralContext.value.ownerKind}`
-  : quantityMatrixReturnPath(route.query))
+  : quantityUnitReturnPath(projectId.value, route.query))
 </script>
 
 <template>
@@ -32,5 +32,5 @@ const returnTo = computed(() => centralContext.value
     :include-demo="visibility.includeDemo"
     :return-to="returnTo"
   />
-  <QuantityUnitDetailScreen v-else :project-id="projectId" :unit-id="unitId" :return-to="returnTo" />
+  <QuantityUnitDetailScreen v-else :project-id="projectId" :unit-id="unitId" :origin="readQuantityOrigin(route.query)" :return-to="returnTo" />
 </template>

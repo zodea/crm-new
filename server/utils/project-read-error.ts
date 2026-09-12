@@ -7,6 +7,7 @@ import { MaterialContractRepositoryProblem } from '../../app/lib/material-contra
 import { OwnerCommercialDocumentRepositoryProblem } from '../../app/lib/owner-document/central-repository'
 import { ProjectSupplierRepositoryProblem } from '../../app/lib/project-supplier/repository'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { QuantityRepositoryProblem } from '../../app/lib/quantity/central-contract'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
 import { SubcontractContractRepositoryProblem } from '../../app/lib/subcontract-contract/repository'
 import { SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
@@ -29,6 +30,7 @@ export function throwProjectReadError(cause: unknown): never {
     && !(cause instanceof CustomerRepositoryProblem)
     && !(cause instanceof SupplierRepositoryProblem)
     && !(cause instanceof ReceiptRepositoryProblem)
+    && !(cause instanceof QuantityRepositoryProblem)
     && !(cause instanceof ProjectSupplierRepositoryProblem)
     && !(cause instanceof CrewWorkerRepositoryProblem)
     && !(cause instanceof MaterialContractRepositoryProblem)

@@ -15,6 +15,10 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
+    return []
+  if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs)(?: WHERE | ORDER BY )/.test(sql))
+    return []
   if (sql.includes('FROM payment_applications p WHERE p.id IN') || sql.includes('FROM payment_records p WHERE EXISTS'))
     return []
   if (sql.includes('FROM expenditure_settlements s WHERE s.biz_type'))
@@ -41,6 +45,7 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       secondary_customer_id: null,
       area: 12.5,
       contract_amount: 100,
+      matrix_archived_at: null,
       deleted_at: null,
     }]
   }
@@ -928,6 +933,7 @@ describe('core migration local source', () => {
       'owner_documents',
       'workers',
       'project_suppliers',
+      'quantity_projects',
     ])
   })
 })

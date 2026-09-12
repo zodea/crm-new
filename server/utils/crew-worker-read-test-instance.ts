@@ -256,6 +256,10 @@ export function createCrewWorkerReadTestInstance(
   }
 
   return {
+    facts(sessionId?: string | null) {
+      const data = context(sessionId)
+      return { crews: structuredClone(data.crews), workers: structuredClone(data.workers), capabilities: [...data.capabilities], sourceVersion: data.sourceVersion }
+    },
     reset(next: CrewWorkerReadTestScenario, sessionId?: string | null) {
       if (next === 'ready')
         scenarios.delete(keyFor(sessionId))
