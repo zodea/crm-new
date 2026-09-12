@@ -71,6 +71,7 @@ describe('核心身份迁移整页流程', () => {
     render(CoreIdentityMigrationScreen)
 
     expect(await screen.findByRole('heading', { name: '本地数据迁移' })).not.toBeNull()
+    expect(screen.getByText(/旧项目别名尚未迁移/)).toBeTruthy()
     await waitFor(() => expect(migrationStore.hydrate).toHaveBeenCalledOnce())
     expect(migrationStore.preflight).not.toHaveBeenCalled()
 

@@ -74,6 +74,7 @@ const ISSUE_METRICS = new Set([
   'orphan',
   'soft-delete',
   'missing-original',
+  'legacy-audit',
   'soft-delete-mismatch',
   'duplicate-source',
   'apply-failed',

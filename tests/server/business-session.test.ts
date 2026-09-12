@@ -9,6 +9,8 @@ describe('default business session boundary', () => {
       capabilities: [
         'quantity:read',
         'quantity:write',
+        'delivery:read',
+        'delivery:write',
         'receipt:read',
         'receipt:write',
         'other-settlement:read',

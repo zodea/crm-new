@@ -322,6 +322,11 @@ const TARGET_REGISTRY = {
   'subcontract-document:penalty': subcontractDocumentPath,
   'invoice:detail': (intent: EntityTargetIntent) => entityPath('/finance/invoice', intent),
   'receipt:detail': receiptPath,
+  'delivery-record:detail': (intent: EntityTargetIntent) => {
+    if (!isDataOriginDTO(intent.filters.dataOrigin))
+      throw new Error('invalid delivery origin')
+    return `${entityPath('/material/delivery/archive', intent)}?origin=${intent.filters.dataOrigin}`
+  },
   'payment-application:detail': (intent: EntityTargetIntent) => `${entityPath('/finance/payment', intent)}/detail`,
   'quantity-unit:detail': quantityUnitPath,
   'wage-statement:detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/subcontract/payroll', intent), intent),

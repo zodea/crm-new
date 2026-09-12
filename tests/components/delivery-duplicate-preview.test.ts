@@ -24,7 +24,7 @@ function setup() {
   const store = {
     duplicates,
     files: [],
-    loadPendingPrintQueue: vi.fn(),
+    loadPendingPrintQueue: vi.fn().mockResolvedValue(undefined),
     loadDuplicateFile: (id: string) => new Promise<File>(resolve => pending.set(id, resolve)),
     loadDuplicateRepresentativeFile: async (id: string) => new File([id], `${id}-source.pdf`),
   }
@@ -39,6 +39,7 @@ function setup() {
     onScopeDispose,
     useObjectUrl,
     useDeliveryStore: () => store,
+    useDeliveryRecordStore: () => ({ mode: 'native', origin: 'real' }),
     useProjectStore: () => masterStore,
     useProjectAliasStore: () => masterStore,
     useSupplierStore: () => masterStore,

@@ -10,6 +10,8 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
   capabilities: Object.freeze([
     'quantity:read',
     'quantity:write',
+    'delivery:read',
+    'delivery:write',
     'receipt:read',
     'receipt:write',
     'other-settlement:read',

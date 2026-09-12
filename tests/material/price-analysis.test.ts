@@ -50,6 +50,7 @@ function delivery(
     ocrStatus: 'reviewed',
     naturalKeyDuplicate: false,
     currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: lines.map(line => ({
       ...line,
       amount: line.amount === undefined
@@ -61,6 +62,11 @@ function delivery(
 }
 
 describe('材料单价分析', () => {
+  it('缺原件的已核对中央记录保持归档，但不借有效价格进入分析', () => {
+    const source = delivery('missing-original', 'supplier-a', '2026-09-11', [{ id: 'line', materialName: '水泥', spec: '', unit: '吨', unitPrice: 20, amount: 20 }])
+    expect(buildMaterialPriceCatalog([{ ...source, dataOrigin: 'real', hasSourceFile: false }], suppliers, projects)).toEqual([])
+    expect(buildMaterialPriceCatalog([{ ...source, dataOrigin: 'real', hasSourceFile: true }], suppliers, projects)[0]?.facts[0]?.price).toBe(20)
+  })
   it('把 BV 全称、简称及常见单芯截面写法解析为同一稳定身份', () => {
     expect([
       parseWireMaterialIdentity({

@@ -11,8 +11,14 @@ const paneLabels: Readonly<Record<WorkbenchPane, string>> = {
 
 const {
   store,
-  projectStore,
-  supplierStore,
+  projects,
+  suppliers,
+  referenceError,
+  referenceLoading,
+  reloadReferences,
+  aliasRetry,
+  aliasSaving,
+  retrySupplierAlias,
   selectedFileId,
   selectedFile,
   selectedDocument,
@@ -86,6 +92,19 @@ const {
       @confirm="reviewDuplicate"
     />
 
+    <div v-if="referenceError" role="alert" class="panel flex flex-wrap items-center gap-3 p-3 text-13px text-danger">
+      <span class="min-w-0 flex-1">{{ referenceError }}</span>
+      <KitButton :loading="referenceLoading" @click="reloadReferences">
+        重新读取项目与分供方
+      </KitButton>
+    </div>
+    <div v-if="aliasRetry" role="status" class="panel flex flex-wrap items-center gap-3 p-3 text-13px text-warn-ink">
+      <span class="min-w-0 flex-1">分供方别名“{{ aliasRetry.raw }}”尚未保存；送货归档与别名分别处理。</span>
+      <KitButton :loading="aliasSaving" @click="retrySupplierAlias">
+        重试保存别名
+      </KitButton>
+    </div>
+
     <AdaptiveWorkbench
       v-model="activePane"
       :labels="paneLabels"
@@ -115,8 +134,8 @@ const {
           :file="selectedFile"
           :document="selectedDocument"
           :documents="selectedFile?.docs ?? []"
-          :projects="projectStore.list"
-          :suppliers="supplierStore.list"
+          :projects="projects"
+          :suppliers="suppliers"
           :supplier-suggestion="supplierSuggestion"
           :amount-summary="amountSummary"
           :review-progress="reviewProgress"

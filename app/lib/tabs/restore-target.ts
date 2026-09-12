@@ -38,7 +38,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/material/use': ['材料领用'],
   '/material/settlement': ['材料采购结算'],
   '/material/stock-check': ['库存盘点'],
-  '/material/delivery/archive': ['送货单归档库'],
+  '/material/delivery/archive': ['送货单归档库', 'delivery:read'],
   '/material/price': ['单价对比'],
   '/owner-material/control': ['甲供材总控量'],
   '/owner-material/requisition': ['甲供材下料单'],
@@ -77,10 +77,11 @@ const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDeta
   [/^\/subcontract\/(change|settlement)\/([^/]+)$/, m => ({ family: 'subcontract-document', kind: m[1]!, id: m[2]! })],
   [/^\/project\/penalty\/([^/]+)$/, m => ({ family: 'subcontract-document', kind: 'penalty', id: m[1]! })],
   [/^\/finance\/receipt\/([^/]+)$/, m => ({ family: 'receipt', id: m[1]! })],
+  [/^\/material\/delivery\/archive\/([^/]+)$/, m => ({ family: 'delivery', id: m[1]! })],
   [/^\/finance\/payment\/([^/]+)\/detail$/, m => ({ family: 'unconnected', id: m[1]! })],
   [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'wage', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'assignment', id: m[2]!, secondId: m[1]! })],
-  [/^\/(?:material\/delivery\/archive|project\/target-cost|schedule|base\/supplier\/credential)\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
+  [/^\/(?:project\/target-cost|schedule|base\/supplier\/credential)\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
 ]
 
 const LIST_QUERY = new Set(['origin', 'search', 'page', 'pageSize', 'sort', 'status', 'category', 'type', 'projectId', 'supplierId', 'customerId', 'contractId', 'project', 'supplier', 'customer', 'contract', 'phase', 'manager', 'plannedEnd', 'trade', 'crewId', 'crew', 'projectStatus', 'month', 'tab', 'variant', 'nav', 'returnTo', 'returnContext', 'credentialStatus', 'columnFilters', 'subKind', 'documentType', 'from', 'group', 'task', 'stage', 'item', 'building', 'buildings', 'groupName', 'taskName', 'itemName', 'planStart', 'planFinish', 'focus'])

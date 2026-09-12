@@ -35,6 +35,7 @@ const entityLabels: Record<CoreMigrationEntityType, string> = {
   subcontract_contracts: '分包合同',
   contract_supplements: '补充协议',
   receipt_registrations: '收款登记',
+  delivery_records: '送货归档、原件与修订',
   quantity_projects: '工程量区域、模板与完成',
   owner_documents: '甲方变洽签、月度报量、验收保修与最终结算',
   workers: '工人',
@@ -49,6 +50,7 @@ const issueTypeByMetric: Record<CoreMigrationIssueMetric, MigrationReconciliatio
   'orphan': 'orphan',
   'soft-delete': 'soft-delete-info',
   'missing-original': 'source-info',
+  'legacy-audit': 'source-info',
   'soft-delete-mismatch': 'soft-delete-mismatch',
   'duplicate-source': 'duplicate-source',
   'apply-failed': 'apply-failed',
@@ -173,6 +175,10 @@ onMounted(() => run(store.hydrate))
     >
       {{ store.lastError.message }}
     </div>
+
+    <p class="m-0 rounded-[var(--radius-control)] border border-warn/35 bg-warn/8 px-4 py-3 text-12px leading-6 text-ink-soft" data-testid="delivery-migration-scope">
+      送货范围提示：旧项目别名尚未迁移，原库与不可变备份仍保留；当前项目建议仅取自已人工确认的送货归属。历史原件已有逻辑归属的按字节与摘要保全，无法核实历史祖先或修订关联的仍待人工核对，暂不开放正文。本次不迁移旧到货明细，也不生成库存或材料结算资格。
+    </p>
 
     <MigrationPreflightPanel
       :schema-version="store.source?.sourceVersion ?? '待检测'"

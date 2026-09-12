@@ -7,6 +7,7 @@ import { useDeliveryRecordStore } from '~/stores/delivery-record'
 import { columnNames, createMemoryDb, listTables } from '../helpers/memory-db'
 
 let mem: TestDb
+vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 let failTransactionSql: RegExp | null = null
 let transactionQueue: Promise<void> = Promise.resolve()
 

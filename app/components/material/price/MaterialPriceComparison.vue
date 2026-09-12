@@ -34,7 +34,7 @@ function money(value: number): string {
       </div>
       <div class="price-comparison__source">
         <span>{{ row.date }} · {{ row.projectName }}</span>
-        <NuxtLink :to="`/material/delivery/archive/${row.deliveryRecordId}`" class="text-brand hover:underline">
+        <NuxtLink :to="`/material/delivery/archive/${encodeURIComponent(row.deliveryRecordId)}${row.dataOrigin ? `?origin=${row.dataOrigin}` : ''}`" class="text-brand hover:underline">
           来源 {{ row.deliveryOrderNo }}
         </NuxtLink>
       </div>

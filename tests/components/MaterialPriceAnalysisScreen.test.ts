@@ -36,6 +36,7 @@ const records: DeliveryPriceRecordInput[] = [
     ocrStatus: 'reviewed',
     naturalKeyDuplicate: false,
     currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
       { id: 'line-1', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.5, amount: 25, currentValueConfirmed: true },
       { id: 'line-2', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 410, amount: 410, currentValueConfirmed: true },
@@ -52,6 +53,7 @@ const records: DeliveryPriceRecordInput[] = [
     ocrStatus: 'reviewed',
     naturalKeyDuplicate: false,
     currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
       { id: 'line-3', materialName: 'BV 电线', spec: '2.5 mm²', unit: 'm', unitPrice: 2.8, amount: 28, currentValueConfirmed: true },
     ],
@@ -67,6 +69,7 @@ const records: DeliveryPriceRecordInput[] = [
     ocrStatus: 'reviewed',
     naturalKeyDuplicate: false,
     currentValuesConfirmed: true,
+    hasSourceFile: true,
     lines: [
       { id: 'line-4', materialName: '水泥', spec: 'P.O 42.5', unit: '吨', unitPrice: 430, amount: 430, currentValueConfirmed: true },
     ],

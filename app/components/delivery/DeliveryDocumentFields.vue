@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import type { DeepReadonly } from 'vue'
-import type { SupplierMatch } from '~/lib/delivery/match'
+import type { ProjectMatchCandidate, SupplierMatch, SupplierMatchCandidate } from '~/lib/delivery/match'
 import type { DeliveryDoc, DeliveryFile, DeliveryReviewInput } from '~/stores/delivery'
-import type { Project } from '~/stores/project'
-import type { Supplier } from '~/stores/supplier'
 
 type DraftPatch = Partial<Omit<DeliveryReviewInput, 'items'>>
 
@@ -11,8 +9,8 @@ const props = defineProps<{
   draft: DeepReadonly<DeliveryReviewInput>
   file: DeliveryFile
   document: DeliveryDoc
-  projects: readonly DeepReadonly<Project>[]
-  suppliers: readonly DeepReadonly<Supplier>[]
+  projects: readonly ProjectMatchCandidate[]
+  suppliers: readonly SupplierMatchCandidate[]
   supplierSuggestion: SupplierMatch | null
 }>()
 
@@ -30,7 +28,7 @@ const selectedSupplierName = computed(() =>
 )
 const supplierMatches = computed(() => {
   const needle = supplierSearch.value.trim().toLocaleLowerCase('zh-CN')
-  return props.suppliers.filter(supplier => !needle || [supplier.name, ...supplier.aliases]
+  return props.suppliers.filter(supplier => !needle || [supplier.name, ...supplier.aliases ?? []]
     .some(value => value.toLocaleLowerCase('zh-CN').includes(needle)))
 })
 const canAddSupplier = computed(() => Boolean(
@@ -64,7 +62,7 @@ function patchSupplierSearch(event: Event) {
   emit('patch', { supplierId: exact?.id ?? null })
 }
 
-function chooseSupplier(supplier: DeepReadonly<Supplier>) {
+function chooseSupplier(supplier: SupplierMatchCandidate) {
   supplierSearch.value = supplier.name
   supplierOpen.value = false
   emit('patch', { supplierId: supplier.id })

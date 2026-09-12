@@ -19,6 +19,10 @@ function sourceRows(sql: string): Record<string, unknown>[] {
     return []
   if (/^SELECT .+ FROM (?:buildings|house_type_templates|items|construction_stages|floors|rooms|units|house_type_template_items|construction_stage_items|unit_assignments|unit_assignment_scopes|unit_stage_completions|file_refs|file_payloads|operation_logs)(?: WHERE | ORDER BY )/.test(sql))
     return []
+  if (sql.includes('AS orphan_lines'))
+    return [{ orphan_lines: 0, orphan_sources: 0, orphan_audit: 0 }]
+  if (sql.includes('FROM delivery_records d ORDER BY d.id'))
+    return []
   if (sql.includes('FROM payment_applications p WHERE p.id IN') || sql.includes('FROM payment_records p WHERE EXISTS'))
     return []
   if (sql.includes('FROM expenditure_settlements s WHERE s.biz_type'))
@@ -930,6 +934,7 @@ describe('core migration local source', () => {
       'other_settlement_sources',
       'contract_supplements',
       'receipt_registrations',
+      'delivery_records',
       'owner_documents',
       'workers',
       'project_suppliers',

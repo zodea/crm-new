@@ -1,4 +1,6 @@
 import type { SoftDb } from '~/lib/db/soft-delete'
+import type { DeliveryRecord } from '~/stores/delivery-record'
+import type { DataOriginDTO } from '~/types/read-model'
 import { hiddenCtesFor, visibleCond } from '~/lib/db/soft-delete'
 
 export interface ProjectDeliveryArchiveRow {
@@ -18,6 +20,11 @@ export interface ProjectDeliveryArchiveRow {
   reviewFlag: string
   printStatus: string
   sourcePath: string
+  dataOrigin?: DataOriginDTO
+}
+
+export interface ProjectDeliveryArchiveSource {
+  load: () => Promise<{ origin: DataOriginDTO, records: readonly DeliveryRecord[] }>
 }
 
 function number(value: unknown): number {
@@ -30,8 +37,32 @@ function text(value: unknown): string {
 }
 
 export async function loadProjectDeliveryArchive(
-  db: SoftDb,
+  db: SoftDb | ProjectDeliveryArchiveSource,
 ): Promise<ProjectDeliveryArchiveRow[]> {
+  if ('load' in db) {
+    const { records, origin } = await db.load()
+    if (records.some(record => record.dataOrigin !== origin))
+      throw new Error('项目送货读取来源不一致，请重新读取')
+    return records.filter(record => record.archived).map(record => ({
+      id: record.id,
+      dataOrigin: origin,
+      projectId: record.projectId,
+      orderNo: record.orderNo,
+      deliveryDate: record.deliveryDate,
+      supplier: record.supplierName ?? '',
+      lineCount: record.lines.length,
+      totalQty: record.lines.reduce((sum, line) => sum + (line.qty ?? 0), 0),
+      totalAmount: record.lines.reduce((sum, line) => sum + (line.amount ?? 0), 0),
+      fileName: record.fileName,
+      sourceFileId: record.assetId ?? '',
+      hasSourceFile: record.hasSourceFile,
+      sourceStatus: record.hasSourceFile ? '原件已关联' : record.fileName ? '仅文件名' : '无原件',
+      ocrStatus: record.ocrStatus,
+      reviewFlag: record.reviewFlag,
+      printStatus: record.printDisposition === 'printed' ? '已打印' : record.printDisposition === 'pending' ? '待打印' : '已排除',
+      sourcePath: `/material/delivery/archive/${encodeURIComponent(record.id)}?origin=${origin}`,
+    }))
+  }
   const [deliveryRows, sourceRows] = await Promise.all([
     db.select<Record<string, unknown>>(`
       ${hiddenCtesFor('delivery_records', 'delivery_lines', 'suppliers')}

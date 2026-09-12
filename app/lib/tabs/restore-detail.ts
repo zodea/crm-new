@@ -125,6 +125,16 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
     const dto = await repos.receipts.detail(detail.id, { origin, includeDemo: query.includeDemo })
     return { ...common, capabilities: dto.capabilities, sourceVersion: dto.sourceVersion, subject: reference('receipt', dto.record.id, dto.record.draft.no || '收款登记'), origin: dto.record.dataOrigin }
   }
+  if (family === 'delivery') {
+    const context = await repos.deliveries.context(origin, { signal: options.signal })
+    checkRestoreAbort(options.signal)
+    if (!context.capabilities.includes(capability))
+      return restoreProblem('forbidden')
+    const record = await repos.deliveries.detail(detail.id, origin, { signal: options.signal })
+    if (record.deletedAt)
+      return restoreProblem('not-found')
+    return { ...common, capabilities: context.capabilities, sourceVersion: record.version, subject: reference('delivery-record', record.id, record.orderNo || '未编号送货单'), origin: record.dataOrigin }
+  }
   if (family === 'owner-document' || family === 'subcontract-document') {
     const kind = DOCUMENT_KINDS[`${family}/${detail.kind}`]!
     const variant = url.searchParams.get('variant')

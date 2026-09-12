@@ -173,3 +173,9 @@
 项目罚扣已由 [#329](https://github.com/zodea/crm-new/issues/329) 闭合中央新建/提交、专属只读详情、整改历史与部分抵扣执行；来源合同、分供方、班组、项目及真实结算稳定 ID 往返，余额与审计同源。未实现的审批、签认金额和甲方结算转扣不以假动作/假数据补齐。详情与显式表单分路由；[页面权威](../rewrite/pages/owner-documents.md#issue-329-项目罚扣中央执行链)。
 
 辅助合同中的其他支出与公司支出合同由 [#330](https://github.com/zodea/crm-new/issues/330) 闭合中央只读详情、显式编辑、真实来源往返和专属金额/附件/审计；[页面蓝本](../rewrite/pages/contract-forms.md#ax04-当前浏览器实现330) 与 [运行证据](./evidence/issue-330/README.md) 为准。其他支出结算由 [#331](https://github.com/zodea/crm-new/issues/331) 接入专属中央详情与完整往返，见 [AX05 证据](./evidence/issue-331/README.md)。材料采购结算与父规格其余工作不据此标记完成；可重置中央测试实例和文件正文缺口仍保留。
+
+<!-- issue-441:begin -->
+## #441 送货归档切片验收状态
+
+送货原件、逻辑归档及修订中央链已达到本地 `slice-verified`：实际入口、异常保稿、完整原件、迁移、打印和五档界面证据见 [#441 验收记录](./evidence/issue-441/README.md)。最终整合测试、类型检查与构建通过；该行为结论不改变生成路由计数。有效到货、仓库与库存、旧项目别名迁移和材料结算继续由 #411 及相关后续实施承接。
+<!-- issue-441:end -->

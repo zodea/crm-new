@@ -23,6 +23,7 @@ import { createHttpCrewWorkerCommandRepository } from '~/lib/crew-worker/command
 import { createHttpCrewWorkerReadRepository } from '~/lib/crew-worker/http-repository'
 import { createHttpCustomerCommandRepository } from '~/lib/customer/command-http-repository'
 import { createHttpCustomerReadRepository } from '~/lib/customer/http-repository'
+import { createDeliveryRepository } from '~/lib/delivery-record/repository'
 import { createHttpMaterialContractCommandRepository } from '~/lib/material-contract/command-http-repository'
 import { createHttpMaterialContractReadRepository } from '~/lib/material-contract/http-repository'
 import { createHttpCoreMigrationRepository } from '~/lib/migration/core-http-repository'
@@ -44,6 +45,7 @@ import { createHttpSupplierReadRepository } from '~/lib/supplier/http-repository
 
 export interface DomainRepositories {
   quantity: ReturnType<typeof createQuantityRepository>
+  deliveries: ReturnType<typeof createDeliveryRepository>
   receipts: ReturnType<typeof createReceiptRepository>
   otherSettlements: ReturnType<typeof createOtherSettlementRepository>
   auxiliaryContracts: ReturnType<typeof createAuxiliaryContractRepository>
@@ -71,6 +73,7 @@ export interface DomainRepositories {
 export default defineNuxtPlugin({ name: 'domain-repositories', setup() {
   const repositories: DomainRepositories = {
     quantity: createQuantityRepository((url, options) => $fetch(url, options)),
+    deliveries: createDeliveryRepository((url, options) => $fetch(url, options)),
     receipts: createReceiptRepository((url, options) => $fetch(url, options)),
     otherSettlements: createOtherSettlementRepository((url, options) => $fetch(url, options)),
     auxiliaryContracts: createAuxiliaryContractRepository((url, options) => $fetch(url, options)),

@@ -35,6 +35,7 @@ import { constructionContractCommandTestInstance } from './construction-contract
 import { prepareCoreMigrationCommandSources } from './core-migration-preparation'
 import { crewWorkerCommandTestInstance } from './crew-worker-command-test-instance'
 import { customerCommandTestInstance } from './customer-command-test-instance'
+import { deliveryCommandTestInstance } from './delivery-runtime'
 import { migratedOtherSettlement } from './other-settlement-migration'
 import { otherSettlementInstance } from './other-settlement-runtime'
 import { migratedSettlementSource } from './other-settlement-sources'
@@ -102,6 +103,10 @@ interface ReferenceRule {
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
   quantity_projects: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
+  delivery_records: [
+    { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true },
   ],
   other_settlements: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true },
@@ -550,6 +555,22 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           }
         }
 
+        if (entityType === 'delivery_records' && row.attributes?.sourceProblem) {
+          skipped = true
+          issues.push(issue(batchId, command.commandId, issueSequence++, {
+            entityType,
+            legacyId: row.legacyId,
+            serverId: null,
+            field: 'original',
+            metricKey: 'apply-failed',
+            sourceValue: '',
+            expectedValue: null,
+            actualValue: null,
+            difference: null,
+            attribution: 'source',
+            reason: String(row.attributes.sourceProblem),
+          }))
+        }
         if (skipped) {
           sourceRefs.push({
             batchId,
@@ -589,6 +610,30 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
           batchId,
         })
         imported += 1
+
+        if (entityType === 'delivery_records') {
+          const legacyOriginals = JSON.parse(String(row.attributes?.legacyOriginalsJson || '[]')) as unknown[]
+          const notices = [
+            ...(row.attributes?.sourceState === 'missing' ? [{ metricKey: 'missing-original' as const, reason: '原件正文缺失，保留缺失状态；不代表到货、库存或结算资格' }] : []),
+            ...(row.attributes?.auditJson && row.attributes.auditJson !== '[]' ? [{ metricKey: 'legacy-audit' as const, reason: '旧审计原样留痕；无法重建的历史版本不得冒称完整修订历史' }] : []),
+            ...(legacyOriginals.length ? [{ metricKey: 'legacy-audit' as const, reason: `${legacyOriginals.length} 份历史原件已有逻辑 owner，按原字节与摘要保全；历史祖先及对应修订未核实，暂不开放正文。缺正文仍保留缺失，原库与不可变备份保留。` }] : []),
+          ]
+          for (const notice of notices) {
+            issues.push(issue(batchId, command.commandId, issueSequence++, {
+              entityType,
+              legacyId: row.legacyId,
+              serverId,
+              field: 'provenance',
+              metricKey: notice.metricKey,
+              sourceValue: '',
+              expectedValue: null,
+              actualValue: null,
+              difference: null,
+              attribution: 'source',
+              reason: notice.reason,
+            }))
+          }
+        }
 
         if (row.deletedAt) {
           issues.push(issue(batchId, command.commandId, issueSequence++, {
@@ -1205,6 +1250,7 @@ const commandSources = [
   constructionContractCommandTestInstance,
   subcontractContractCommandTestInstance,
   receiptCommandTestInstance,
+  deliveryCommandTestInstance,
   ownerCommercialDocumentCommandTestInstance,
 ] as const
 

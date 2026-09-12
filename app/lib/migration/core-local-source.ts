@@ -38,6 +38,8 @@ import {
   coreMigrationSourceHashInput,
   isCoreMigrationMoney,
 } from './core-contract'
+import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from './delivery-record-source'
+import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from './delivery-source-diagnostics'
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 
@@ -71,6 +73,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
 }
 
 const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects'>, string> = {
+  delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
     FROM customers
@@ -1213,6 +1216,10 @@ async function buildSource(
       ? 'SELECT id, name, deleted_at, labor_scope FROM suppliers ORDER BY id'
       : ENTITY_SQL[entityType]
     const rows = await selectSource<Record<string, unknown>>(sql)
+    if (entityType === 'delivery_records') {
+      assertDeliverySourceDiagnostics(await selectSource(DELIVERY_SOURCE_DIAGNOSTICS_SQL))
+      return [entityType, await deliveryRecordSourceEntities(rows)] as const
+    }
     if (entityType === 'other_settlement_sources') {
       const payments = await selectSource<Record<string, unknown>>(OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL)
       return [entityType, [...rows.map(row => otherSettlementDocumentSource(row, 'application')), ...payments.map(row => otherSettlementDocumentSource(row, 'payment'))].sort((a, b) => compareCanonicalText(a.legacyId, b.legacyId))] as const

@@ -28,7 +28,7 @@ describe('delivery queue panel', () => {
       },
     })
 
-    expect(screen.getByText('已入库 · 待打印')).not.toBeNull()
+    expect(screen.getByText('已归档 · 待打印')).not.toBeNull()
     expect(screen.getByText(/打印成功或明确排除前保留在此/)).not.toBeNull()
     expect(screen.queryByTitle('移出队列')).toBeNull()
 
