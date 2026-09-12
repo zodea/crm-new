@@ -28,6 +28,10 @@ const taxpayerType = computed({
   get: () => normalizeSupplierEnumSelection(columnFilters.value.taxpayerType),
   set: (value: string[]) => { columnFilters.value = { ...columnFilters.value, taxpayerType: value } },
 })
+const businessLicense = computed({
+  get: () => columnFilters.value.businessLicense ?? [],
+  set: (value: NonNullable<SupplierListColumnFilters['businessLicense']>) => { columnFilters.value = { ...columnFilters.value, businessLicense: value } },
+})
 const hiddenColumns = useStorage<string[]>('ruihang:supplier-list:columns:v1', [], undefined, {
   serializer: {
     read: (raw) => {
@@ -89,6 +93,7 @@ function enumOptions(values: readonly string[], selected: string[], facets: { va
 const categoryOptions = computed(() => enumOptions(SUPPLIER_CATEGORIES, category.value, readPage.value?.summary.categories))
 const credentialOptions = computed(() => enumOptions(CREDENTIAL_STATUSES, credentialStatus.value, readPage.value?.summary.credentialStatuses, CREDENTIAL_STATUS_LABEL))
 const taxpayerOptions = computed(() => enumOptions(SUPPLIER_TAXPAYER_TYPES, taxpayerType.value, readPage.value?.summary.taxpayerTypes))
+const businessLicenseOptions = [{ key: 'available', label: '有原件' }, { key: 'missing', label: '缺少原件' }, { key: 'unavailable', label: '不可用' }]
 const allColumns: KitTableColumn[] = [
   { title: '#', type: 'seq', width: 42 },
   { field: 'name', title: '分供方名称', width: 180, slot: 'name' },
@@ -115,16 +120,16 @@ const allColumns: KitTableColumn[] = [
   { title: '操作', type: 'action', width: 55 },
 ]
 const numericFields = new Set(['settlementAmount', 'cumulativeContractAmount', 'contractAmount', 'paymentAmount', 'projectCount'])
-const enumFields = new Set(['supplierCategory', 'credentialStatus', 'taxpayerType'])
+const enumFields = new Set(['supplierCategory', 'credentialStatus', 'taxpayerType', 'businessLicense'])
 const columns = computed(() => allColumns
   .filter(col => !col.field || col.field === 'name' || !hiddenColumns.value.includes(col.field))
   .map(col => ({
     ...col,
-    ...(col.field && col.field !== 'businessLicense' ? { customHeader: true } : {}),
+    ...(col.field ? { customHeader: true } : {}),
     ...(fixedName.value && (col.type === 'seq' || col.field === 'name') ? { fixed: 'left' as const } : {}),
   })))
 const hasFilters = computed(() => Boolean(search.value || category.value.length || credentialStatus.value.length
-  || Object.values(columnFilters.value.contains ?? {}).some(Boolean) || taxpayerType.value.length
+  || Object.values(columnFilters.value.contains ?? {}).some(Boolean) || taxpayerType.value.length || businessLicense.value.length
   || Object.values(columnFilters.value.ranges ?? {}).some(range => range?.min !== undefined || range?.max !== undefined)))
 
 function columnValue(field: string): ColumnFilterValue {
@@ -134,6 +139,8 @@ function columnValue(field: string): ColumnFilterValue {
     return credentialStatus.value
   if (field === 'taxpayerType')
     return taxpayerType.value
+  if (field === 'businessLicense')
+    return businessLicense.value
   if (numericFields.has(field))
     return columnFilters.value.ranges?.[field as SupplierListNumericField] ?? {}
   return columnFilters.value.contains?.[field as SupplierListTextField] ?? ''
@@ -144,6 +151,8 @@ function columnOptions(field: string) {
     return categoryOptions.value
   if (field === 'credentialStatus')
     return credentialOptions.value
+  if (field === 'businessLicense')
+    return businessLicenseOptions
   return taxpayerOptions.value
 }
 
@@ -164,6 +173,8 @@ function applyColumnFilter(field: string, value: ColumnFilterValue) {
     credentialStatus.value = normalizeSupplierEnumSelection(value)
   else if (field === 'taxpayerType')
     taxpayerType.value = normalizeSupplierEnumSelection(value)
+  else if (field === 'businessLicense')
+    businessLicense.value = normalizeSupplierEnumSelection(value).filter((item): item is 'available' | 'missing' | 'unavailable' => ['available', 'missing', 'unavailable'].includes(item))
   else if (numericFields.has(field) && typeof value === 'object' && !Array.isArray(value))
     columnFilters.value = { ...columnFilters.value, ranges: { ...columnFilters.value.ranges, [field]: value } }
   else if (typeof value === 'string')
@@ -343,9 +354,9 @@ onActivated(() => {
               <span :title="row.contractAmount === null ? '合同金额记录不完整' : undefined">{{ row.contractAmount === null ? '—' : yuan(row.contractAmount) }}</span>
             </template>
             <template #businessLicense="{ row }">
-              <span v-if="row.businessLicense?.state === 'unavailable'" title="营业执照来源尚未接通">—</span>
+              <span v-if="row.businessLicense?.state === 'unavailable'" title="当前无读取权限或原件来源未接通">不可用</span>
               <NuxtLink v-else :to="`/base/supplier/credential/${encodeURIComponent(row.id)}?origin=${row.dataOrigin}&returnTo=${encodeURIComponent(detailTo(row))}`" class="cell--link">
-                {{ row.businessLicense?.state === 'available' ? `${row.businessLicense.fileCount} 份` : '未上传' }}
+                {{ row.businessLicense?.state === 'available' ? `${row.businessLicense.fileCount} 份` : '缺少原件' }}
               </NuxtLink>
             </template>
             <template #action="{ row }">

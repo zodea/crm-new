@@ -142,7 +142,7 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 
 2026-09-08 已将 `labor_scope` 接入本地迁移 v48、中央源模型/读写 DTO/解码及表单映射。存量留空，读取旧载荷缺字段时按空值兼容。显式清空保存为空字符串，更新载荷未提供该字段则保留原值；不制造工种枚举或独立关联实体。状态、审计和写入权限沿现有分供方主档契约；审计只记字段名等既定元信息。当前存在旧编码标签混写时保留原始值，按来源核对后更正，不按长度自动将内部编码迁为税号。
 
-`credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''` 是供应商级人工核验凭证：人工通过记录时间和可选备注，人工退回时备注必填；操作人字段待账号体系落地后补充。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。迁移 v36 会把没有该级凭证的旧 `qualified` / `rejected` 按真实文件重新计算，不用单份证照的 `verified_at` 冒充整户审核。
+`credential_reviewed_at TEXT NULL` 与 `credential_review_note TEXT DEFAULT ''` 是旧 SQLite 的供应商级人工核验凭证：人工通过记录时间和可选备注，人工退回时备注必填；该历史物理 schema 没有操作人字段。#446 中央凭证另外使用当前服务端会话的 `actorId`，历史没有操作者时保持 `null`，不补成迁入人。系统只可按资料规则自动写入 `incomplete/reviewing`，不得自动写入 `qualified/rejected`。迁移 v36 会把没有该级凭证的旧 `qualified` / `rejected` 按真实文件重新计算，不用单份证照的 `verified_at` 冒充整户审核。
 
 广东省内分供方可从应用打开[广东省电子税务局一般纳税人资格查询](https://etax.guangdong.chinatax.gov.cn:8443/xxbg/view/zhsffw/#/query/ybnsrzgcx)辅助核验。应用只负责复制税号、打开官网及记录人工确认结果；验证码由用户在官网完成，不爬取页面、不绕过验证码，也不把该页面当作稳定 API。
 
@@ -153,6 +153,16 @@ projects ─1:N→ project_aliases（工地名归一：别名→项目，首绑�
 有效期的“已过期 / 30 天内临期”统一按 `Asia/Shanghai` 业务日期判断，避免 UTC 日界线造成提前或延后一天。证照新增、OCR 核对、独立有效期编辑、删除和撤回写入 `supplier_credential_audits`：该表只保存动作、分类变化、变更字段名、有效期前后值与置信度，不保存 OCR 原文或人工确认正文；删除/撤回按明确的证照 ID 与 `deleted_at` 在同一事务恢复。上述动作不得使用通用 `operation_logs` 对 `supplier_credentials` 或 `suppliers` 做整行前后快照，避免复制 OCR 原文、税号和银行账号。
 
 供应商新增、编辑、导入、删除/撤回、人工资料核验与纳税人核验统一写 `supplier_audits`。该表只保存 `action`、规范化 `outcome`、`source_category`、变更字段名、备注是否存在和时间，不保存税号、银行账号、核验备注正文或外部来源原文。供应商与证照即使误走通用日志，快照也必须先按安全字段白名单脱敏；迁移 v36 会逐行清洗历史 `operation_logs` 中 `suppliers` / `supplier_credentials` 的敏感快照，坏 JSON 安全置空而不阻断升级。
+
+### 分供方证照中央事实（#446）
+
+浏览器证照以中央 `(dataOrigin, supplierId)` 为唯一所有者，主档、列表与证照页共用当前资料状态和原件投影。证照专用领域保存稳定证照身份、文件关系与正文、类别要求、有效期、整体人工凭证、原始及已确认 OCR 事实和专用审计；普通主档附件集合仍为空。日常 OCR 识别与人工回填由 #447 接通，#446 只保全既有 OCR 历史，不自动重新识别。Tauri 历史 schema 与本地适配不被中央接管改写。
+
+资料状态从当前有效必需原件、类别要求及上海业务日期派生；人工结论只在整体凭证仍有效时保留。中央主档关键字段真实变化和影响必需资料的命令与凭证失效原子协调，字段范围及可见行为只见[分供方蓝本](./pages/base-supplier.md#credentialstatus-流转)。无关可选资料、无变化的要求值或普通非关键字段不误撤销结论；普通表单与导入不能伪造人工态。
+
+受控迁移读取 `suppliers`、`supplier_credentials`、`supplier_credential_requirements`、所属 `file_refs` 及 `file_payloads`、`supplier_credential_audits` 和 `supplier_audits` 的完整关联图，保留软删除、旧 ID 映射、原始与人工确认 OCR、整体核验凭证及审计原义。文件引用必须属于对应证照；缺关系或歧义阻断，不按名称合并。只有路径而无正文时保留线索，不能据路径读取文件或计入齐全度。历史没有整体人工凭证的合格/退回按当前资料重算，内部码与税号保持原义，敏感原文不进入动作审计。
+
+迁移候选在统一协调器中准备、核对后原子发布；二次确认不覆盖已接管后的日常更正。回滚仅撤回未发生日常更正的本批证照图，独立中央记录保留；若本批证照已有日常更正，或独立记录仍依赖待撤回的主档或图，先整体拒绝，任何参与领域都不提前撤回。操作入口与失败恢复见[迁移指南](../guides/local-data-migration.md#分供方证照迁移范围)，当前实例的部署边界仍按 ADR 0020。
 
 迁移 v36 创建严格限定关键列的 `AFTER UPDATE OF name, unique_code, tax_no, legal_rep, address, bank, bank_account` 触发器。只有这些字段的 `OLD/NEW` 实际不同且旧状态为人工 `qualified/rejected` 时，才清除人工凭证并按真实原件、逐类别要求和上海业务日回算 `incomplete/reviewing`；纳税人核验、备注和 `updated_at` 更新不得误触发。列表每次加载前还会按当前上海业务日批量检查人工结论，只让已经缺失/过期或无有效凭证的历史人工态失效，仍有效的人工结论保持不变。除 `reviewCredentials` 外，表单、store 和导入入口均不得写入 `qualified/rejected` 或伪造审核时间/备注。
 

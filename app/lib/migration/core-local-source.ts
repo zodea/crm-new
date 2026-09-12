@@ -43,6 +43,7 @@ import { assertDeliverySourceDiagnostics, DELIVERY_SOURCE_DIAGNOSTICS_SQL } from
 import { OTHER_SETTLEMENT_SOURCE_SQL, otherSettlementSourceEntity } from './other-settlement-source'
 import { OTHER_SETTLEMENT_APPLICATION_SOURCE_SQL, OTHER_SETTLEMENT_PAYMENT_SOURCE_SQL, otherSettlementDocumentSource } from './other-settlement-source-documents'
 import { readProcessLibraryMigrationGraphs } from './process-library-source'
+import { readSupplierCredentialMigrationGraphs, supplierCredentialMasterAttributes } from './supplier-credential-source'
 
 export interface CoreMigrationLocalSourceDependencies {
   isNative: () => boolean
@@ -73,7 +74,7 @@ export interface CoreMigrationLocalSourceProblem extends Error {
     | 'unidentifiable-source-row'
 }
 
-const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries'>, string> = {
+const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 'process_libraries' | 'supplier_credentials'>, string> = {
   delivery_records: DELIVERY_RECORD_SOURCE_SQL,
   customers: `
     SELECT id, name, deleted_at
@@ -1202,7 +1203,12 @@ async function buildSource(
   schemaVersion: number,
   selectSource: SourceSelect,
 ): Promise<CoreMigrationSourceDTO> {
+  const credentialGraphs = await readSupplierCredentialMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> }, schemaVersion)
   const entries = await Promise.all(CORE_MIGRATION_TOPOLOGY.map(async (entityType) => {
+    if (entityType === 'supplier_credentials')
+      return [entityType, credentialGraphs] as const
+    if (entityType === 'suppliers')
+      return [entityType, credentialGraphs.map(entity => ({ legacyId: entity.legacyId, name: entity.name, deletedAt: entity.deletedAt, attributes: supplierCredentialMasterAttributes(JSON.parse(String(entity.attributes?.graphJson)).supplier) }))] as const
     if (entityType === 'process_libraries')
       return [entityType, await readProcessLibraryMigrationGraphs({ select: <T>(sql: string) => selectSource(sql) as Promise<T[]> })] as const
     if (entityType === 'quantity_projects') {
@@ -1215,9 +1221,7 @@ async function buildSource(
         deletedAt: quantityMigrationTimestamp(project.deleted_at, '工程量项目删除'),
       }))] as const
     }
-    const sql = entityType === 'suppliers' && schemaVersion >= 48
-      ? 'SELECT id, name, deleted_at, labor_scope FROM suppliers ORDER BY id'
-      : ENTITY_SQL[entityType]
+    const sql = ENTITY_SQL[entityType]
     const rows = await selectSource<Record<string, unknown>>(sql)
     if (entityType === 'delivery_records') {
       assertDeliverySourceDiagnostics(await selectSource(DELIVERY_SOURCE_DIAGNOSTICS_SQL))

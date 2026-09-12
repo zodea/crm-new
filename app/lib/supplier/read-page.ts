@@ -120,10 +120,14 @@ function visibleSupplier(
   source: SupplierListSourceRow,
   capabilities: readonly string[],
 ): SupplierListSourceRow {
+  const businessLicense = capabilities.includes('supplier-credential:read')
+    ? source.businessLicense ?? { state: 'unavailable' as const, fileCount: null, fileIds: [] }
+    : { state: 'unavailable' as const, fileCount: null, fileIds: [] }
   if (capabilities.includes('supplier:sensitive:read'))
-    return { ...source, laborScope: source.laborScope ?? '', aliases: [...source.aliases] }
+    return { ...source, businessLicense, laborScope: source.laborScope ?? '', aliases: [...source.aliases] }
   return {
     ...source,
+    businessLicense,
     laborScope: source.laborScope ?? '',
     aliases: [...source.aliases],
     uniqueCode: maskIdentifier(source.uniqueCode),
@@ -261,6 +265,8 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
   const stats = (row: SupplierListSourceRow) => summaryById.get(`${row.dataOrigin}:${row.id}`)!
   const contains = (value: string, text: string) => value.toLocaleLowerCase('zh-CN').includes(text.toLocaleLowerCase('zh-CN'))
   function matches(row: SupplierListSourceRow, except?: 'supplierCategory' | 'credentialStatus' | 'taxpayerType') {
+    if (columnFilters?.businessLicense?.length && !columnFilters.businessLicense.includes(row.businessLicense?.state ?? 'unavailable'))
+      return false
     if (except !== 'supplierCategory' && categories.length && !categories.includes(row.supplierCategory))
       return false
     if (except !== 'credentialStatus' && credentialStatuses.length && !credentialStatuses.includes(row.credentialStatus))
@@ -332,7 +338,7 @@ export function buildSupplierListPage(input: BuildSupplierListPageInput): Suppli
       bank: source.bank,
       bankAccount: visible.bankAccount,
       businessType: source.businessType,
-      businessLicense: { state: 'unavailable' as const, fileCount: null, fileIds: [] },
+      businessLicense: source.businessLicense ?? { state: 'unavailable' as const, fileCount: null, fileIds: [] },
       projectCount: summary.projectCount,
       cumulativeContractAmount: money(summary.cumulativeContractAmount),
       settlementAmount: summary.settlementAmount === null ? null : money(summary.settlementAmount),

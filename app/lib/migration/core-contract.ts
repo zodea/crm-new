@@ -8,6 +8,7 @@ export const CORE_MIGRATION_SUPPORTED_SOURCE_VERSIONS = ['sqlite-v47', 'sqlite-v
 export const CORE_MIGRATION_TOPOLOGY = [
   'customers',
   'suppliers',
+  'supplier_credentials',
   'crews',
   'projects',
   'construction_contracts',
@@ -45,8 +46,8 @@ export interface CoreMigrationSourceEntityDTO {
 }
 
 export type CoreMigrationSourceEntitiesDTO = {
-  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources' | 'delivery_records' | 'quantity_projects' | 'process_libraries'>]: CoreMigrationSourceEntityDTO[]
-} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[], delivery_records?: CoreMigrationSourceEntityDTO[], quantity_projects?: CoreMigrationSourceEntityDTO[], process_libraries?: CoreMigrationSourceEntityDTO[] }
+  [K in Exclude<CoreMigrationEntityType, 'auxiliary_contracts' | 'other_settlements' | 'other_settlement_sources' | 'delivery_records' | 'quantity_projects' | 'process_libraries' | 'supplier_credentials'>]: CoreMigrationSourceEntityDTO[]
+} & { auxiliary_contracts?: CoreMigrationSourceEntityDTO[], other_settlements?: CoreMigrationSourceEntityDTO[], other_settlement_sources?: CoreMigrationSourceEntityDTO[], delivery_records?: CoreMigrationSourceEntityDTO[], quantity_projects?: CoreMigrationSourceEntityDTO[], process_libraries?: CoreMigrationSourceEntityDTO[], supplier_credentials?: CoreMigrationSourceEntityDTO[] }
 
 export type CoreMigrationTotalExpectationDTO
   = | { entityType: CoreMigrationEntityType, metric: 'quantity', expected: number }

@@ -101,8 +101,8 @@
   "counts": {
     "productionRoutes": 139,
     "rootVariants": 195,
-    "surfaces": 563,
-    "environmentCases": 1020,
+    "surfaces": 577,
+    "environmentCases": 1034,
     "referenceMenus": 59
   },
   "excludedDevPages": [
@@ -159,13 +159,21 @@
       ]
     },
     "credential-browser": {
-      "read": "中央核对分供方身份；仅 demo 可读本地证照快照",
-      "write": "正式浏览器证照专用存储未接入；demo 只读",
-      "storage": "正式证照正文未接入，不能用本地演示快照证明正式可用",
+      "read": "中央专用证照 Repository：当前主档、原件、要求、资料状态与人工凭证；demo 经授权只读",
+      "write": "正式来源专用 command：上传、类别/有效期、要求、人工核验、删除/撤回；日常 OCR 由 #447 接通",
+      "storage": "中央验证实例；原件正文与主档原子协调，生产持久化仍待 #416",
       "sources": [
         {
           "path": "app/components/supplier/SupplierCredentialScreen.vue",
-          "anchor": "isTauri"
+          "anchor": "SupplierCredentialCentralPanel"
+        },
+        {
+          "path": "app/lib/supplier/credential-repository.ts",
+          "anchor": "createSupplierCredentialRepository"
+        },
+        {
+          "path": "server/utils/supplier-credential-service.ts",
+          "anchor": "ports.transact"
         }
       ]
     },
@@ -1217,7 +1225,7 @@
       "issues": [
         407
       ],
-      "surfaces": 16
+      "surfaces": 30
     },
     {
       "code": "project-supplier",
@@ -2742,6 +2750,454 @@
         {
           "path": "app/pages/base/supplier/credential/[id].vue",
           "anchor": "<template"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-9567DC139396",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "section/SupplierCredentialReviewStatus",
+      "label": "SupplierCredentialReviewStatus",
+      "type": "section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialCentralPanel.vue",
+          "anchor": "SupplierCredentialReviewStatus"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-D43AE990DB86",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "section/SupplierCredentialRequirements",
+      "label": "SupplierCredentialRequirements",
+      "type": "section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialCentralPanel.vue",
+          "anchor": "SupplierCredentialRequirements"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-DE466CAF26FE",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "section/SupplierCredentialOriginalList",
+      "label": "SupplierCredentialOriginalList",
+      "type": "section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialCentralPanel.vue",
+          "anchor": "SupplierCredentialOriginalList"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-439AA7945D36",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "history/restorable-deletions",
+      "label": "restorable-deletions",
+      "type": "subtable",
+      "condition": "按现有路由和 capability；只显示当前仍可核对的删除边界；演示不提供撤回",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialCentralPanel.vue",
+          "anchor": "restorableAudits"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-98B60B0CFF31",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "files/preview",
+      "label": "preview",
+      "type": "files",
+      "condition": "按现有路由和 capability；按当前分供方及证照归属读取正文；关闭/切页不应用迟到文件",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialCentralPanel.vue",
+          "anchor": "证照 PDF 原件预览"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-B1184CF73CF3",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/upload",
+      "label": "upload",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'upload'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-A8F6E9A2A9A6",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/edit",
+      "label": "edit",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'edit'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-EAAD5C0FAEA5",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/requirement",
+      "label": "requirement",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'requirement'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-EBAE5574616E",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/review",
+      "label": "review",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'review'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-B916417FD9DB",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/delete",
+      "label": "delete",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'delete'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-B11ADAF76B4D",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "dialog/restore",
+      "label": "restore",
+      "type": "dialog",
+      "condition": "按现有路由和 capability；正式来源逐动作验证；不是 OCR 核对或主档实体整页表单",
+      "hosts": [
+        "browser"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialEditor.vue",
+          "anchor": "'restore'"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-F57A58798B3C",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "desktop/requirements",
+      "label": "requirements",
+      "type": "section",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialTab.vue",
+          "anchor": "changeRequirement"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-BC21DFFE4BD5",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "desktop/originals",
+      "label": "originals",
+      "type": "files",
+      "condition": "按现有路由和 capability",
+      "hosts": [
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialTab.vue",
+          "anchor": "previewCredential"
+        }
+      ],
+      "issueNumbers": [
+        407
+      ],
+      "routeEvidenceId": "E-41EF6B00AA02"
+    },
+    {
+      "id": "S-4DF38EACB203",
+      "route": "/base/supplier/credential/:id",
+      "routePattern": "/base/supplier/credential/:id",
+      "domain": "supplier",
+      "kind": "supplier",
+      "variant": "default",
+      "branchIdentity": "",
+      "mode": "view",
+      "template": "详情",
+      "path": "desktop/ocr-review",
+      "label": "ocr-review",
+      "type": "section",
+      "condition": "按现有路由和 capability；保留既有 Tauri 适配，不代表浏览器 OCR 已接入",
+      "hosts": [
+        "tauri"
+      ],
+      "sources": [
+        {
+          "path": "app/pages/base/supplier/credential/[id].vue",
+          "anchor": "<template"
+        },
+        {
+          "path": "app/components/supplier/SupplierCredentialTab.vue",
+          "anchor": "SupplierCredentialOcrReview"
         }
       ],
       "issueNumbers": [
@@ -22100,6 +22556,342 @@
     {
       "id": "C-D663DF96A283",
       "surfaceId": "S-5422D6FEEA5A",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-D32468D86960",
+      "surfaceId": "S-9567DC139396",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-CA220489AE04",
+      "surfaceId": "S-D43AE990DB86",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-7824F88C0599",
+      "surfaceId": "S-DE466CAF26FE",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-3631D843F127",
+      "surfaceId": "S-439AA7945D36",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-5921D8FB3517",
+      "surfaceId": "S-98B60B0CFF31",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-0EF38A92B66B",
+      "surfaceId": "S-B1184CF73CF3",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-6D5F65C2F789",
+      "surfaceId": "S-A8F6E9A2A9A6",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-7EEE6663016B",
+      "surfaceId": "S-EAAD5C0FAEA5",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-7193EF79A405",
+      "surfaceId": "S-EBAE5574616E",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-AC5271D3BEDF",
+      "surfaceId": "S-B916417FD9DB",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-9F9641F15445",
+      "surfaceId": "S-B11ADAF76B4D",
+      "host": "browser",
+      "adapter": "credential-browser",
+      "applicability": "in-scope",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "not-verified"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-5664B4B74C87",
+      "surfaceId": "S-F57A58798B3C",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-F3A34F9E6F0D",
+      "surfaceId": "S-BC21DFFE4BD5",
+      "host": "tauri",
+      "adapter": "desktop-sqlite",
+      "applicability": "existing-capabilities-only; formal-delivery-excluded",
+      "sourceState": "wired-needs-action-audit",
+      "reference": {
+        "status": "not-observed",
+        "routeEvidenceId": "E-41EF6B00AA02",
+        "note": "父路由证据只作入口索引，不继承为本 kind/子视图/宿主的直接证据"
+      },
+      "acceptance": {
+        "rules": "needs-review",
+        "frontend": "not-verified",
+        "crossModule": "not-verified",
+        "production": "out-of-scope"
+      },
+      "reviewEvidence": [],
+      "remaining": [
+        "逐动作及正常/边界/失败/重复/更正/跨域场景待核验"
+      ],
+      "obligationIds": []
+    },
+    {
+      "id": "C-06D6B94AAAC6",
+      "surfaceId": "S-4DF38EACB203",
       "host": "tauri",
       "adapter": "desktop-sqlite",
       "applicability": "existing-capabilities-only; formal-delivery-excluded",

@@ -115,7 +115,7 @@ describe('页签恢复重新读取当前权威目标', () => {
     expect(await validator('projectList', 'get', vi.fn())(descriptor('/contract/record-1'))).toMatchObject({ state: 'not-connected' })
   })
 
-  it.each(['/project/target-cost/record-1', '/schedule/record-1', '/base/supplier/credential/record-1'])('只读稳定详情 %s 没有目标读取入口时保留明确原因', async (path) => {
+  it.each(['/project/target-cost/record-1', '/schedule/record-1'])('只读稳定详情 %s 没有目标读取入口时保留明确原因', async (path) => {
     expect(inspectRestorableTabPath(path)).not.toBeNull()
     expect(await validator('projectList', 'get', vi.fn())(descriptor(path))).toMatchObject({ state: 'not-connected' })
   })

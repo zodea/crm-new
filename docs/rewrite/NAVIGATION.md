@@ -200,7 +200,7 @@ interface NavigationOrigin {
 | `N-SUPPLIER-CONTRACT` | `supplier` `/base/supplier/:id` | 累计合同/累计结算及行内合同、项目 | 明确聚合目标；允许目标 0 条 | `?tab=contracts` / `?tab=settlements`，行到 `/contract/:id`、`/project/:id`；无 canonical 结算详情时行保持不可导航 | 返回同一分供方事实页签 | 闭合；结算不再借合同页签或旧累计字段 |
 | `N-SUPPLIER-INVOICE` | `supplier` `/base/supplier/:id` | 累计收票/发票号 | 明确聚合目标 | `?tab=invoices`，行到 `/finance/invoice/:id` | 返回同一页签/分页 | 闭合 |
 | `N-SUPPLIER-PAYMENT` | `supplier` `/base/supplier/:id` | 累计付款/付款申请号 | 明确聚合目标 | `?tab=payments`，行到 `/finance/payment/:id/detail` | 返回同一页签/分页 | 闭合 |
-| `N-SUPPLIER-CREDENTIAL` | `supplier` `/base/supplier/:id` | 证照附件 | 分供方稳定 ID | `/base/supplier/credential/:id` 独立专用路由 | 返回同一中央详情及来源 | 闭合既有专用文件/审计边界；未接入专用存储时显示不可用，不创建平行正式主档 |
+| `N-SUPPLIER-CREDENTIAL` | `supplier` `/base/supplier/:id` | 证照附件 | 分供方稳定 ID | `/base/supplier/credential/:id` 独立专用路由 | 返回同一中央详情及来源，再恢复有效列表条件与行焦点 | #446 使用 `supplier:credentials` 专用目标和中央证照读取核验身份/权限；冷刷新保留已保存页及有效返回上下文；测试身份经后台授权只读，不创建平行正式主档 |
 | `N-SUPPLIER-NONACTION` | `supplier` 列表/详情 | 列表失效金额、应付金额 | 无可靠目标 | — | 不导航 | 非入口；不能复制“蓝色但无操作” |
 | `N-PROJECT-SUPPLIER-ENTRY` | `project` `/project/:id` | 右栏项目分供方 | `project.id + supplier.id + dataOrigin` resolved | `/project/:pid/supplier/:sid?origin=:dataOrigin` 与正式导入 `/project/:pid/supplier/import?origin=real` | 工作台可回同一项目；导入完成回 canonical 正式项目 | 闭合；关系由中央项目详情 DTO 返回，空、无权限与错误分态；不从本地 store 推导 |
 | `N-PROJECT-SUPPLIER-TABS` | `project-supplier` 工作台 | 项目/分供方名称与六页签 | 两个 ID resolved | `/project/:pid`、`/base/supplier/:sid`；`?tab=overview,contract,claim,ticket,payment,settlement` | 目标详情刷新后仍可显式返回工作台原页签 | 闭合；身份卡经唯一 Target Registry 携双父 ID、同一 `dataOrigin` 与白名单页签，目标 ID 或来源错配时不保留返回链 |

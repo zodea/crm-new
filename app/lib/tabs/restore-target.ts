@@ -68,6 +68,7 @@ export interface RestoredDetailPath {
 }
 
 const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDetailPath]> = [
+  [/^\/base\/supplier\/credential\/([^/]+)$/, m => ({ family: 'supplier-credential', id: m[1]! })],
   [/^\/schedule\/process-library\/([^/]+)$/, m => ({ family: 'process-library', id: m[1]! })],
   [/^\/project\/([^/]+)\/supplier\/([^/]+)$/, m => ({ family: 'project-supplier', id: m[1]!, secondId: m[2]! })],
   [/^\/project\/([^/]+)$/, m => ({ family: 'project', id: m[1]! })],
@@ -82,7 +83,7 @@ const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDeta
   [/^\/finance\/payment\/([^/]+)\/detail$/, m => ({ family: 'unconnected', id: m[1]! })],
   [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'wage', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'assignment', id: m[2]!, secondId: m[1]! })],
-  [/^\/(?:project\/target-cost|schedule|base\/supplier\/credential)\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
+  [/^\/(?:project\/target-cost|schedule)\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
 ]
 
 const LIST_QUERY = new Set(['origin', 'search', 'page', 'pageSize', 'sort', 'status', 'category', 'type', 'projectId', 'supplierId', 'customerId', 'contractId', 'project', 'supplier', 'customer', 'contract', 'phase', 'manager', 'plannedEnd', 'trade', 'crewId', 'crew', 'projectStatus', 'month', 'tab', 'variant', 'nav', 'returnTo', 'returnContext', 'credentialStatus', 'columnFilters', 'subKind', 'documentType', 'from', 'group', 'task', 'stage', 'item', 'building', 'buildings', 'groupName', 'taskName', 'itemName', 'planStart', 'planFinish', 'focus'])

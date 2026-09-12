@@ -23,6 +23,7 @@ export type SupplierEnumSelection = string | string[] | null
 export interface SupplierListColumnFilters {
   contains?: Partial<Record<SupplierListTextField, string>>
   taxpayerType?: SupplierEnumSelection
+  businessLicense?: Array<'available' | 'missing' | 'unavailable'>
   ranges?: Partial<Record<SupplierListNumericField, { min?: number, max?: number }>>
 }
 
@@ -81,6 +82,7 @@ export interface SupplierListSourceRow {
   contactPhone: string
   contactTitle: string
   credentialStatus: string
+  businessLicense?: SupplierBusinessLicenseDTO
   note: string
   updatedAt: ISODateTimeDTO
 }

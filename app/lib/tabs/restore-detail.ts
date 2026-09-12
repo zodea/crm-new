@@ -73,6 +73,10 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'supplier-credential') {
+    const dto = await repos.supplierCredentials.read(detail.id, origin, { signal: options.signal })
+    return { ...common, capabilities: dto.capabilities, sourceVersion: dto.credentialVersion, subject: reference('supplier', dto.supplierId, `${dto.supplierName} · 证照附件`), origin: dto.dataOrigin, variant: 'credentials' }
+  }
   if (family === 'process-library') {
     const catalog = await repos.processLibraries.list(origin, { signal: options.signal })
     checkRestoreAbort(options.signal)

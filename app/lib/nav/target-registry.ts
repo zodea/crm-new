@@ -26,6 +26,7 @@ import {
 import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/source-target-policy'
 import { validateReceiptReturnTo } from '~/lib/receipt/return-context'
 import { validateSubcontractContractReturnTo } from '~/lib/subcontract-contract/return-context'
+import { validateSupplierDetailReturnTo, validateSupplierReturnTo } from '~/lib/supplier/return-context'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 import { isDataOriginDTO } from '~/types/read-model'
 
@@ -302,6 +303,12 @@ const TARGET_REGISTRY = {
   'project:supplier-workbench': projectSupplierPath,
   'customer:detail': customerPath,
   'supplier:detail': supplierPath,
+  'supplier:credentials': (intent: EntityTargetIntent) => {
+    const origin = intent.filters.dataOrigin
+    if (!isDataOriginDTO(origin) || !isStableRouteIdentity(intent.subject.id))
+      throw new Error('invalid supplier credential identity or origin')
+    return `${entityPath('/base/supplier/credential', intent)}?origin=${origin}`
+  },
   'crew:detail': crewPath,
   'worker:detail': workerPath,
   'contract:detail': contractPath,
@@ -438,6 +445,19 @@ export function resolveNavigationTarget(
 
   try {
     let to = builder(intent as EntityTargetIntent)
+    if (['supplier:credentials', 'supplier:detail'].includes(key) && options.returnTo) {
+      const detailReturn = key === 'supplier:credentials' ? validateSupplierDetailReturnTo(options.returnTo, intent.filters.dataOrigin, intent.subject.id) : null
+      const listReturn = validateSupplierReturnTo(options.returnTo)
+      if (detailReturn) {
+        to = `${to}&returnTo=${encodeURIComponent(detailReturn)}`
+      }
+      else if (listReturn) {
+        const url = new URL(listReturn, 'https://ruihang.invalid')
+        const identity = decodeURIComponent(decodeURIComponent(url.hash.slice(1))).replace(/^supplier-row-/, '')
+        if (identity === `${intent.filters.dataOrigin}:${intent.subject.id}`)
+          to = `${to}${to.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(listReturn)}`
+      }
+    }
     if (options.returnTo && (key === 'crew:detail' || key === 'project:detail' || key === 'customer:detail' || key === 'supplier:detail'
       || key === 'contract:detail' || key === 'contract:owner-document-source' || key === 'contract:subcontract-document-source')) {
       const ownerReturnTo = validateOwnerDocumentDetailReturnTo(options.returnTo, intent.filters.dataOrigin)

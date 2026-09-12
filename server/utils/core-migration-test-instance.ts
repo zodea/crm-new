@@ -48,6 +48,7 @@ import { quantityTestInstance } from './quantity-runtime'
 import { receiptCommandTestInstance } from './receipt-command-service'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
+import { prepareSupplierCredentialMigration } from './supplier-credential-migration'
 
 const DEFAULT_ROLLBACK_WINDOW_MS = 24 * 60 * 60 * 1000
 
@@ -103,6 +104,9 @@ interface ReferenceRule {
 }
 
 const REFERENCE_RULES: Partial<Record<CoreMigrationEntityType, readonly ReferenceRule[]>> = {
+  supplier_credentials: [
+    { field: 'supplierId', target: 'suppliers', orphanWhenMissing: true, requiredSourceValue: true },
+  ],
   quantity_projects: [
     { field: 'projectId', target: 'projects', orphanWhenMissing: true, requiredSourceValue: true },
   ],
@@ -687,6 +691,27 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
 
     try {
+      prepareSupplierCredentialMigration([], { authority: 'central', activeBatchId: batchId, entities: plannedEntities })
+    }
+    catch (cause) {
+      const entity = plannedEntities.find(row => row.entityType === 'supplier_credentials')
+      if (entity) {
+        issues.push(issue(batchId, command.commandId, issueSequence++, {
+          entityType: 'supplier_credentials',
+          legacyId: entity.legacyId,
+          serverId: entity.id,
+          field: 'graphJson',
+          metricKey: 'apply-failed',
+          sourceValue: entity.legacyId,
+          expectedValue: null,
+          actualValue: null,
+          difference: null,
+          attribution: 'source',
+          reason: cause instanceof Error ? cause.message : '证照完整来源图校验失败',
+        }))
+      }
+    }
+    try {
       prepareProcessLibraryMigration([], { authority: 'central', activeBatchId: batchId, entities: plannedEntities })
     }
     catch (cause) {
@@ -1064,7 +1089,7 @@ export function createCoreMigrationTestInstance(options: CoreMigrationTestInstan
     }
     if (batch.dto.status !== 'dry-run' && batch.dto.status !== 'failed')
       throw conflict(`状态 ${batch.dto.status} 不允许导入`)
-    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
+    if (batch.dto.issues.some(item => ['quantity_projects', 'process_libraries', 'supplier_credentials'].includes(item.entityType) && item.field === 'graphJson' && item.metricKey === 'apply-failed')
       || (batch.dto.status === 'dry-run' && batch.dto.issues.some(isOwnerDocumentDryRunRelationshipBlock))) {
       throw conflict('dry-run 存在阻断问题，不能导入')
     }

@@ -203,7 +203,7 @@ describe('supplier credential tab', () => {
     })
     await fireEvent.change(input, { target: { files: [disguised] } })
     await waitFor(() => expect(messages.error).toHaveBeenCalledWith(
-      expect.stringContaining('文件内容与扩展名不匹配'),
+      expect.stringContaining('文件内容签名与扩展名不一致'),
     ))
 
     const oversized = pdfFile('超大证照.pdf')

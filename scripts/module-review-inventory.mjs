@@ -29,10 +29,14 @@ export const ADAPTERS = {
     sources: [['app/lib/db/connection.ts', 'sqlite:crm.db']],
   },
   'credential-browser': {
-    read: '中央核对分供方身份；仅 demo 可读本地证照快照',
-    write: '正式浏览器证照专用存储未接入；demo 只读',
-    storage: '正式证照正文未接入，不能用本地演示快照证明正式可用',
-    sources: [['app/components/supplier/SupplierCredentialScreen.vue', 'isTauri']],
+    read: '中央专用证照 Repository：当前主档、原件、要求、资料状态与人工凭证；demo 经授权只读',
+    write: '正式来源专用 command：上传、类别/有效期、要求、人工核验、删除/撤回；日常 OCR 由 #447 接通',
+    storage: '中央验证实例；原件正文与主档原子协调，生产持久化仍待 #416',
+    sources: [
+      ['app/components/supplier/SupplierCredentialScreen.vue', 'SupplierCredentialCentralPanel'],
+      ['app/lib/supplier/credential-repository.ts', 'createSupplierCredentialRepository'],
+      ['server/utils/supplier-credential-service.ts', 'ports.transact'],
+    ],
   },
   'simulation': {
     read: '合成导入演示',
@@ -201,6 +205,17 @@ export const SUBVIEWS = [
   group({ route: '/base/customer/:id' }, 'app/components/master-data/CustomerDetailRelations.vue', ['projects', 'contracts', 'receipts'].map(key => view(`tab/${key}/table`, 'KitTable', 'subtable'))),
   group({ route: '/base/supplier/:id' }, 'app/components/supplier/SupplierDetailScreen.vue', tabs(['overview', 'projects', 'contracts', 'settlements', 'invoices', 'payments'])),
   group({ route: '/base/supplier/:id' }, 'app/components/supplier/SupplierFactTable.vue', ['projects', 'contracts', 'settlements', 'invoices', 'payments'].map(key => view(`tab/${key}/table`, `'${key}'`, 'subtable'))),
+  group({ route: '/base/supplier/credential/:id' }, 'app/components/supplier/SupplierCredentialCentralPanel.vue', [
+    ...mounted('section', ['SupplierCredentialReviewStatus', 'SupplierCredentialRequirements', 'SupplierCredentialOriginalList']),
+    view('history/restorable-deletions', 'restorableAudits', 'subtable', '只显示当前仍可核对的删除边界；演示不提供撤回'),
+    view('files/preview', '证照 PDF 原件预览', 'files', '按当前分供方及证照归属读取正文；关闭/切页不应用迟到文件'),
+  ], ['browser']),
+  group({ route: '/base/supplier/credential/:id' }, 'app/components/supplier/SupplierCredentialEditor.vue', ['upload', 'edit', 'requirement', 'review', 'delete', 'restore'].map(action => view(`dialog/${action}`, `'${action}'`, 'dialog', '正式来源逐动作验证；不是 OCR 核对或主档实体整页表单')), ['browser']),
+  group({ route: '/base/supplier/credential/:id' }, 'app/components/supplier/SupplierCredentialTab.vue', [
+    view('desktop/requirements', 'changeRequirement', 'section'),
+    view('desktop/originals', 'previewCredential', 'files'),
+    view('desktop/ocr-review', 'SupplierCredentialOcrReview', 'section', '保留既有 Tauri 适配，不代表浏览器 OCR 已接入'),
+  ], ['tauri']),
   group({ route: '/base/crew/:id' }, 'app/components/crew-worker/CrewMemberSection.vue', [view('table/members', 'detail.members', 'subtable')], ['browser']),
   group({ route: '/base/crew/:id' }, 'app/components/crew-worker/CrewWorkerCentralDetailScreen.vue', ['projects', 'penalties'].map(key => view(`table/${key}`, `crewDetail.${key}`, 'subtable')), ['browser']),
   group({ route: '/base/worker/:id' }, 'app/components/crew-worker/CrewWorkerCentralDetailScreen.vue', ['relatedWorkers', 'assignments', 'wageStatements', 'penalties'].map(key => view(`facts/${key}`, `workerDetail.${key}`, 'facts')), ['browser']),

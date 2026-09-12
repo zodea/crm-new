@@ -26,6 +26,8 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
     'customer:write',
     'supplier:list:read',
     'supplier:write',
+    'supplier-credential:read',
+    'supplier-credential:write',
     'subcontract-contract:read',
     'subcontract-contract:write',
     'construction-contract:read',

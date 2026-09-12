@@ -15,6 +15,8 @@ import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/u
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  if (/FROM supplier_(?:credentials|credential_requirements|credential_audits|audits)(?: ORDER BY|$)/.test(sql))
+    return []
   if (/FROM schedule_process_librar(?:ies|y_tasks)/.test(sql))
     return []
   if (sql === 'SELECT id, project_id, contract_id, deleted_at FROM boq_lines ORDER BY id')
@@ -39,8 +41,47 @@ function sourceRows(sql: string): Record<string, unknown>[] {
       { id: 'customer_demo_001', name: '随包测试客户' },
     ]
   }
-  if (sql.includes('FROM suppliers'))
-    return [{ id: 'supplier-local-1', name: '本地分供方', labor_scope: '独立劳务范围', deleted_at: null }]
+  if (sql.includes('FROM suppliers')) {
+    return [{
+      id: 'supplier-local-1',
+      name: '本地分供方',
+      external_ref: '',
+      aliases: '[]',
+      unique_code: '',
+      tax_no: '',
+      business_type: '',
+      supplier_category: '',
+      rating: '',
+      legal_rep: '',
+      registered_capital: null,
+      registered_date: '',
+      address: '',
+      taxpayer_type: '',
+      main_business: '',
+      labor_scope: '独立劳务范围',
+      invoice_name: '',
+      invoice_address: '',
+      bank: '',
+      bank_account: '',
+      phone: '',
+      contact: '',
+      contact_phone: '',
+      contact_title: '',
+      credential_status: 'incomplete',
+      credential_reviewed_at: null,
+      credential_review_note: '',
+      approval_status: 'draft',
+      source: 'manual',
+      note: '',
+      taxpayer_verification_status: 'not_checked',
+      taxpayer_verification_source: '',
+      taxpayer_verified_at: null,
+      taxpayer_verification_note: '',
+      created_at: '2026-09-12T08:00:00.000Z',
+      updated_at: '2026-09-12T08:00:00.000Z',
+      deleted_at: null,
+    }]
+  }
   if (sql.includes('FROM crews'))
     return [{ id: 'crew-local-1', name: '本地班组', deleted_at: null }]
   if (sql.includes('FROM projects')) {
@@ -284,7 +325,7 @@ describe('core migration local source', () => {
     const second = await source.readSource()
 
     expect(first).toEqual(second)
-    expect(first.entities.suppliers).toContainEqual(expect.objectContaining({ legacyId: 'supplier-local-1', attributes: { laborScope: '独立劳务范围' } }))
+    expect(first.entities.suppliers).toContainEqual(expect.objectContaining({ legacyId: 'supplier-local-1', attributes: expect.objectContaining({ laborScope: '独立劳务范围' }) }))
     expect(first).toMatchObject({
       contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
       mode: CORE_MIGRATION_SOURCE_MODE,
@@ -927,6 +968,7 @@ describe('core migration local source', () => {
     expect(Object.keys(result.entities)).toEqual([
       'customers',
       'suppliers',
+      'supplier_credentials',
       'crews',
       'projects',
       'construction_contracts',

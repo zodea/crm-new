@@ -77,7 +77,8 @@ describe('分供方中央逐行导入', () => {
     await h.importRow({ name: '原始分供方', externalRef: 'HQ-REVIEWED', contact: '新联系人' })
     expect(h.commands.form('reviewed', session).draft).toMatchObject({ mainBusiness: '主营业务', laborScope: '安装范围', bank: '开户行', contact: '新联系人' })
     await h.importRow({ name: '原始分供方', externalRef: 'HQ-REVIEWED', laborScope: '' })
-    expect(h.commands.rows().find(row => row.id === 'reviewed')).toMatchObject({ laborScope: '', mainBusiness: '主营业务', credentialStatus: 'qualified' })
+    // 旧导入标签没有人工凭证与原件；有效人工结论的非关键编辑保留由 credential-central 完整旅程验证。
+    expect(h.commands.rows().find(row => row.id === 'reviewed')).toMatchObject({ laborScope: '', mainBusiness: '主营业务', credentialStatus: 'incomplete' })
     expect(h.commands.rows()).toHaveLength(2)
     await h.importRow({ name: '更改工商名称', externalRef: 'HQ-REVIEWED' })
     expect(h.commands.rows().find(row => row.id === 'reviewed')?.credentialStatus).toBe('incomplete')

@@ -4,7 +4,7 @@
 
 本索引负责防遗漏，不定义业务规格，也不是完成率。路由来源为 [运行证据账本](./runtime-evidence-ledger.json)；子视图和宿主接线来自实际源码。父路由的 direct/historical 等级不自动赋给子视图。逐场景规则、差异和验收继续写入 [模块复核规程](../agents/module-review.md) 指定的当前 Issue。
 
-现有 139 条生产路由展开为 195 个路由变体、563 个页面/子视图、1020 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
+现有 139 条生产路由展开为 195 个路由变体、577 个页面/子视图、1034 个宿主用例。另有 5 个 dev 路由；这些数量均不表示已验收。
 
 实际记录见 [可机读清单](./module-review-coverage.json)：surfaces 保存 route + kind + variant + mode + path，cases 再按 browser/tauri 展开，分别保存读写适配器、参考范围、验收结果和剩余缺口。规则已定、前台通过、跨域通过、生产可用独立记录。#422 只登记材料合同浏览器列表已覆盖切片，整页仍为 partial；中央 Map、IndexedDB 刷新读回都没有生产可用结论。
 
@@ -74,7 +74,7 @@
 | central-http | HTTP Repository；测试服务实例 | 中央 command（仅已暴露动作；逐动作原子性/幂等/版本待核验） | 中央测试实例；不具备进程重启持久化证据 |
 | browser-local | 本地 DB adapter：sql.js / IndexedDB 快照 | 本地 DB 事务；尚未接管的业务边界，不能冒充中央正式写入 | IndexedDB crm-new-browser / database_snapshots；文件正文须另验 |
 | desktop-sqlite | Tauri 本地 DB adapter | 现有桌面 SQLite 分支；本轮只核对既有能力 | sqlite:crm.db；桌面正式交付不在本轮扩展范围 |
-| credential-browser | 中央核对分供方身份；仅 demo 可读本地证照快照 | 正式浏览器证照专用存储未接入；demo 只读 | 正式证照正文未接入，不能用本地演示快照证明正式可用 |
+| credential-browser | 中央专用证照 Repository：当前主档、原件、要求、资料状态与人工凭证；demo 经授权只读 | 正式来源专用 command：上传、类别/有效期、要求、人工核验、删除/撤回；日常 OCR 由 #447 接通 | 中央验证实例；原件正文与主档原子协调，生产持久化仍待 #416 |
 | simulation | 合成导入演示 | 模拟成功/首次失败，无业务记录写入 | 无业务持久化 |
 | precheck-only | 本地来源预检 | 只预检，不写业务行 | 无导入写入 |
 | file-workflow | 导出任务上下文与选定数据集 | 生成真实文件；不是业务存储写入 | 瞬时文件工作流；完整数据集/正文/失败清理分别验收 |
@@ -245,6 +245,20 @@ Tauri 只核验已有功能，正式交付按 #402 排除。HTTP Repository 未�
 | `/base/supplier/:id` view | supplier / default | tab/invoices/table · table | central-http / central-http | [app/components/supplier/SupplierFactTable.vue](../../app/components/supplier/SupplierFactTable.vue) |
 | `/base/supplier/:id` view | supplier / default | tab/payments/table · table | central-http / central-http | [app/components/supplier/SupplierFactTable.vue](../../app/components/supplier/SupplierFactTable.vue) |
 | `/base/supplier/credential/:id` view | supplier / default | page · 详情 | credential-browser / desktop-sqlite | [app/pages/base/supplier/credential/[id].vue](../../app/pages/base/supplier/credential/[id].vue) |
+| `/base/supplier/credential/:id` view | supplier / default | section/SupplierCredentialReviewStatus · SupplierCredentialReviewStatus | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialCentralPanel.vue](../../app/components/supplier/SupplierCredentialCentralPanel.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | section/SupplierCredentialRequirements · SupplierCredentialRequirements | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialCentralPanel.vue](../../app/components/supplier/SupplierCredentialCentralPanel.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | section/SupplierCredentialOriginalList · SupplierCredentialOriginalList | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialCentralPanel.vue](../../app/components/supplier/SupplierCredentialCentralPanel.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | history/restorable-deletions · restorable-deletions | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialCentralPanel.vue](../../app/components/supplier/SupplierCredentialCentralPanel.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | files/preview · preview | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialCentralPanel.vue](../../app/components/supplier/SupplierCredentialCentralPanel.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/upload · upload | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/edit · edit | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/requirement · requirement | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/review · review | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/delete · delete | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | dialog/restore · restore | credential-browser / 不适用 | [app/components/supplier/SupplierCredentialEditor.vue](../../app/components/supplier/SupplierCredentialEditor.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | desktop/requirements · requirements | 不适用 / desktop-sqlite | [app/components/supplier/SupplierCredentialTab.vue](../../app/components/supplier/SupplierCredentialTab.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | desktop/originals · originals | 不适用 / desktop-sqlite | [app/components/supplier/SupplierCredentialTab.vue](../../app/components/supplier/SupplierCredentialTab.vue) |
+| `/base/supplier/credential/:id` view | supplier / default | desktop/ocr-review · ocr-review | 不适用 / desktop-sqlite | [app/components/supplier/SupplierCredentialTab.vue](../../app/components/supplier/SupplierCredentialTab.vue) |
 | `/base/supplier/form` new | supplier / default | page · 整页表单 | central-http / desktop-sqlite | [app/pages/base/supplier/form/[[id]].vue](../../app/pages/base/supplier/form/[[id]].vue) |
 | `/base/supplier/form/:id` edit | supplier / default | page · 整页表单 | central-http / desktop-sqlite | [app/pages/base/supplier/form/[[id]].vue](../../app/pages/base/supplier/form/[[id]].vue) |
 | `/base/supplier` view | supplier / default | page · 列表 | central-http / central-http | [app/pages/base/supplier/index.vue](../../app/pages/base/supplier/index.vue) |

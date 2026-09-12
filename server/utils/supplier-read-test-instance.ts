@@ -18,6 +18,7 @@ import paymentRecordsSeed from '../../app/lib/db/seed/payment_records.json'
 import projectSuppliersSeed from '../../app/lib/db/seed/project_suppliers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import suppliersSeed from '../../app/lib/db/seed/suppliers.json'
+import { currentCredentialStatus } from '../../app/lib/supplier/credential-domain'
 import {
   buildSupplierDetailRead,
   buildSupplierListPage,
@@ -30,6 +31,7 @@ import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierCommandTestInstance } from './project-supplier-command-test-instance'
 import { supplierCommandTestInstance } from './supplier-command-test-instance'
+import { supplierCredentialDemoScope } from './supplier-credential-demo'
 import { supplierFactSource } from './supplier-fact-source'
 
 export type SupplierReadTestScenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -214,7 +216,7 @@ export function createSupplierReadTestInstance(
     const settlementSource = resolveSettlementSource?.(sessionId)
     return {
       capabilities,
-      suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers] : [],
+      suppliers: ready ? [...resolveFormalRows(sessionId), ...demoSuppliers.map(row => ({ ...row, credentialStatus: currentCredentialStatus(supplierCredentialDemoScope(row.id).aggregate, new Date()), businessLicense: { state: 'missing' as const, fileCount: 0, fileIds: [] } }))] : [],
       projects: ready ? [...formalProjects.rows, ...imported.projects, ...demoProjects] : [],
       projectSuppliers: ready ? [...imported.relations, ...demoProjectSuppliers] : [],
       contracts: ready ? [...formalContracts.rows, ...demoContracts] : [],

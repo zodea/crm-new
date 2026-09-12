@@ -36,7 +36,8 @@ describe('分供方中央写入测试实例', () => {
     const imported = { ...commands.rows()[0]!, id: 'qualified-import', credentialStatus: 'qualified' }
     commands.prepareImportedSuppliers([imported]).commit()
     await commands.execute({ ...base, id: imported.id, commandId: 'labor-qualified', baseVersion: '1', draft: { ...base.draft, laborScope: '幕墙安装' } }, session)
-    expect(commands.rows().find(row => row.id === imported.id)).toMatchObject({ laborScope: '幕墙安装', credentialStatus: 'qualified' })
+    // 旧人工态没有供应商级凭证与真实原件时不能继续冒充合格；有效人工结论另由证照完整旅程验证。
+    expect(commands.rows().find(row => row.id === imported.id)).toMatchObject({ laborScope: '幕墙安装', credentialStatus: 'incomplete' })
   })
 
   it('在 HTTP 边界拒绝畸形 draft', () => {
@@ -81,6 +82,7 @@ describe('分供方中央写入测试实例', () => {
     const duplicate = await commands.execute(request, session, 'session-a')
 
     expect(duplicate).toEqual(first)
+    await expect(commands.execute({ ...request, draft: { ...request.draft, name: '同键错误覆盖' } }, session, 'session-a')).rejects.toMatchObject({ problem: { code: 'conflict' } })
     expect(commands.rows('session-a')).toEqual([
       expect.objectContaining({
         id: 'supplier-real-1',

@@ -6,12 +6,17 @@ import type {
   SupplierFormReadDTO,
   SupplierImportCommandRequestDTO,
 } from '../../app/lib/supplier/command-contract'
+import type { SupplierCredentialAggregate } from '../../app/lib/supplier/credential-domain'
 import type { SupplierListSourceRow } from '../../app/lib/supplier/repository'
 import type { BusinessSession } from './business-session'
+import type { SupplierCredentialScope } from './supplier-credential-service'
 import { randomUUID } from 'node:crypto'
+import { supplierCredentialMasterDraft } from '../../app/lib/migration/supplier-credential-source'
 import { SUPPLIER_WRITE_CAPABILITY } from '../../app/lib/supplier/command-contract'
+import { credentialMasterChanged, credentialRecords, currentCredentialStatus, emptySupplierCredentialAggregate, revalidateCredentialReview } from '../../app/lib/supplier/credential-domain'
 import { supplierProblem, SupplierRepositoryProblem } from '../../app/lib/supplier/repository'
 import { migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
+import { migratedSupplierCredentialMaster, prepareSupplierCredentialMigration } from './supplier-credential-migration'
 
 interface StoredSupplier {
   migrationBatchId?: string | null
@@ -24,9 +29,11 @@ interface StoredSupplier {
 
 interface SessionState {
   commands: Map<string, SupplierCommandResultDTO>
+  commandFingerprints: Map<string, string>
   importFingerprints: Map<string, string>
   importedIds: Set<string>
   suppliers: Map<string, StoredSupplier>
+  credentialScopes: Map<string, SupplierCredentialAggregate>
   sourceVersion: number
 }
 
@@ -161,12 +168,14 @@ function importedStoredSupplier(row: SupplierListSourceRow): StoredSupplier {
 function cloneState(state: SessionState): SessionState {
   return {
     commands: new Map(state.commands),
+    commandFingerprints: new Map(state.commandFingerprints),
     importFingerprints: new Map(state.importFingerprints),
     importedIds: new Set(state.importedIds),
     suppliers: new Map([...state.suppliers].map(([id, stored]) => [id, {
       ...stored,
       draft: { ...stored.draft, aliases: [...(stored.draft.aliases ?? [])] },
     }])),
+    credentialScopes: new Map([...state.credentialScopes].map(([id, aggregate]) => [id, structuredClone(aggregate)])),
     sourceVersion: state.sourceVersion,
   }
 }
@@ -180,7 +189,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
     const key = keyFor(sessionId)
     let state = states.get(key)
     if (!state) {
-      state = { commands: new Map(), importFingerprints: new Map(), importedIds: new Set(), suppliers: new Map(), sourceVersion: 0 }
+      state = { commands: new Map(), commandFingerprints: new Map(), importFingerprints: new Map(), importedIds: new Set(), suppliers: new Map(), credentialScopes: new Map(), sourceVersion: 0 }
       states.set(key, state)
     }
     return state
@@ -195,17 +204,53 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
       throw failure('validation-failed', 'commandId 必填', { commandId: ['commandId 必填'] })
   }
 
+  function credentialScope(supplierId: string, sessionId?: string | null): SupplierCredentialScope {
+    const state = stateFor(sessionId)
+    const supplier = state.suppliers.get(supplierId)
+    if (!supplier)
+      throw failure('not-found', '当前正式分供方不存在')
+    const aggregate = state.credentialScopes.get(supplierId) ?? emptySupplierCredentialAggregate(supplierId)
+    const previousReview = aggregate.review
+    revalidateCredentialReview(aggregate, new Date(now()))
+    if (previousReview && !aggregate.review) {
+      aggregate.version++
+      supplier.version++
+      state.sourceVersion++
+    }
+    state.credentialScopes.set(supplierId, aggregate)
+    supplier.credentialStatus = currentCredentialStatus(aggregate, new Date(now()))
+    return { draft: structuredClone(supplier.draft), version: supplier.version, aggregate: structuredClone(aggregate) }
+  }
+
   const instance = {
+    readCredentialScope: credentialScope,
+    transactCredentialScope<T>(supplierId: string, operation: (scope: SupplierCredentialScope) => { changed: boolean, value: T }, sessionId?: string | null): T {
+      const scope = credentialScope(supplierId, sessionId)
+      const result = operation(scope)
+      if (result.changed) {
+        const state = stateFor(sessionId)
+        const supplier = state.suppliers.get(supplierId)!
+        state.credentialScopes.set(supplierId, scope.aggregate)
+        state.suppliers.set(supplierId, { ...supplier, version: supplier.version + 1, credentialStatus: currentCredentialStatus(scope.aggregate, new Date(now())), updatedAt: now() })
+        state.sourceVersion++
+      }
+      return result.value
+    },
     prepareMigrationSnapshot(snapshot: CoreMigrationSnapshotDTO, sessionId?: string | null) {
       const current = stateFor(sessionId)
-      const records = migratedIdentityRecords(current.suppliers, snapshot, 'suppliers', entity => ({
-        id: entity.id,
-        draft: migratedIdentityDraft<SupplierFormDraft>('supplier', entity),
-        credentialStatus: 'incomplete',
-        version: 1,
-        updatedAt: migratedIdentityTimestamp(entity),
-      }))
-      const candidate = { ...current, suppliers: records, sourceVersion: current.sourceVersion + (records === current.suppliers ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
+      const credentialPlan = prepareSupplierCredentialMigration([...current.credentialScopes.values()], snapshot, new Date(now()))
+      const credentialScopes = new Map(credentialPlan.aggregates.map(row => [row.supplierId, row]))
+      const records = migratedIdentityRecords(current.suppliers, snapshot, 'suppliers', (entity) => {
+        const master = migratedSupplierCredentialMaster(snapshot, entity.id)
+        const draft = master ? supplierCredentialMasterDraft(master) : migratedIdentityDraft<SupplierFormDraft>('supplier', entity)
+        const aggregate = credentialScopes.get(entity.id)
+        return { id: entity.id, draft: { ...draft, id: entity.id }, credentialStatus: aggregate ? currentCredentialStatus(aggregate, new Date(now())) : 'incomplete', version: 1, updatedAt: migratedIdentityTimestamp(entity) }
+      })
+      for (const [id, aggregate] of credentialScopes) {
+        if (current.suppliers.has(id) && !records.has(id) && aggregate.migrationBatchId === null && (aggregate.credentials.length || aggregate.requirements.length || aggregate.review))
+          throw failure('conflict', '迁入分供方已有独立证照资料，恢复将使原件归属悬空')
+      }
+      const candidate = { ...current, suppliers: records, credentialScopes, sourceVersion: current.sourceVersion + (records === current.suppliers && !credentialPlan.changed ? 0 : 1), commands: new Map([...current.commands].filter(([, result]) => records.has(result.id))) }
       return () => states.set(keyFor(sessionId), candidate)
     },
     reset(sessionId?: string | null) {
@@ -257,7 +302,11 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         state.sourceVersion += 1
     },
     rows(sessionId?: string | null): SupplierListSourceRow[] {
-      return [...stateFor(sessionId).suppliers.values()].map(toRow)
+      return [...stateFor(sessionId).suppliers.values()].map((stored) => {
+        const scope = credentialScope(stored.id, sessionId)
+        const fileIds = credentialRecords(scope.aggregate).filter(row => row.category === '营业执照' && row.file?.state === 'available').map(row => row.file!.id)
+        return { ...toRow(stored), businessLicense: { state: fileIds.length ? 'available' as const : 'missing' as const, fileCount: fileIds.length, fileIds } }
+      })
     },
     sourceVersion(sessionId?: string | null): string {
       return `supplier-command-${stateFor(sessionId).sourceVersion}`
@@ -268,6 +317,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
       const stored = stateFor(sessionId).suppliers.get(id)
       if (!stored)
         throw failure('not-found', '正式分供方不存在')
+      credentialScope(id, sessionId)
       return {
         draft: { ...stored.draft, id, aliases: [...(stored.draft.aliases ?? [])] },
         attachments: [],
@@ -316,6 +366,10 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
     async execute(request: SupplierCommandRequestDTO, session: BusinessSession, sessionId?: string | null): Promise<SupplierCommandResultDTO> {
       assertEnvelope(request, session)
       const state = stateFor(sessionId)
+      const fingerprint = JSON.stringify(request)
+      const previousFingerprint = state.commandFingerprints.get(request.commandId)
+      if (previousFingerprint !== undefined && previousFingerprint !== fingerprint)
+        throw failure('conflict', '此保存标识已用于其他内容，请核对原提交')
       const duplicate = state.commands.get(request.commandId)
       if (duplicate)
         return { ...duplicate, attachmentIds: [] }
@@ -332,6 +386,8 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
           throw failure('validation-failed', '分供方表单校验失败', fieldErrors)
       }
       const existing = request.id ? state.suppliers.get(request.id) : null
+      if (existing)
+        credentialScope(existing.id, sessionId)
       if (existing && request.draft.laborScope === undefined)
         draft.laborScope = existing.draft.laborScope ?? ''
       if (request.id && !existing)
@@ -348,18 +404,22 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         throw failure('validation-failed', '分供方内部编码已存在', { uniqueCode: ['分供方内部编码已存在'] })
       const timestamp = now()
       const id = existing?.id ?? createId()
-      const invalidatesCredentialReview = existing && ['qualified', 'rejected'].includes(existing.credentialStatus)
-        && (['name', 'uniqueCode', 'taxNo', 'legalRep', 'address', 'bank', 'bankAccount'] as const)
-          .some(field => text(existing.draft[field]) !== text(draft[field]))
+      const aggregate = structuredClone(state.credentialScopes.get(id) ?? emptySupplierCredentialAggregate(id))
+      if (existing && credentialMasterChanged(existing.draft, draft))
+        aggregate.review = null
+      if (aggregate.migrationBatchId)
+        aggregate.changedAfterMigration = true
       const stored: StoredSupplier = {
         id,
         draft: { ...draft, id },
-        credentialStatus: invalidatesCredentialReview ? 'incomplete' : existing?.credentialStatus ?? 'incomplete',
+        credentialStatus: currentCredentialStatus(aggregate, new Date(timestamp)),
         version: (existing?.version ?? 0) + 1,
         updatedAt: timestamp,
         migrationBatchId: existing?.migrationBatchId ?? null,
       }
       state.suppliers.set(id, stored)
+      aggregate.supplierAudits.push({ id: randomUUID(), action: existing ? 'update' : 'create', outcome: request.action, sourceCategory: state.importFingerprints.has(request.commandId) ? 'import' : 'form', changedFields: Object.keys(draft).filter(key => JSON.stringify(existing?.draft[key as keyof SupplierFormDraft]) !== JSON.stringify(draft[key as keyof SupplierFormDraft])), notePresent: Boolean(draft.note), createdAt: timestamp, actorId: session.actorId })
+      state.credentialScopes.set(id, aggregate)
       state.sourceVersion += 1
       const result = {
         id,
@@ -369,6 +429,7 @@ export function createSupplierCommandTestInstance(options: Options = {}) {
         attachmentIds: [],
       }
       state.commands.set(request.commandId, result)
+      state.commandFingerprints.set(request.commandId, fingerprint)
       return { ...result, attachmentIds: [] }
     },
   }

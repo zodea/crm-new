@@ -38,9 +38,14 @@ export function parseSupplierColumnFilters(value: unknown): SupplierListColumnFi
       return invalid()
     }
   }
-  if (!object(input) || Object.keys(input).some(key => !['contains', 'taxpayerType', 'ranges'].includes(key)))
+  if (!object(input) || Object.keys(input).some(key => !['contains', 'taxpayerType', 'businessLicense', 'ranges'].includes(key)))
     return invalid()
   const result: SupplierListColumnFilters = {}
+  const businessLicense = normalizeSupplierEnumSelection(input.businessLicense)
+  if (businessLicense.some(value => !['available', 'missing', 'unavailable'].includes(value)))
+    return invalid()
+  if (businessLicense.length)
+    result.businessLicense = businessLicense as NonNullable<SupplierListColumnFilters['businessLicense']>
   if (input.contains !== undefined) {
     if (!object(input.contains))
       return invalid()
