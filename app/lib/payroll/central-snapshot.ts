@@ -57,7 +57,8 @@ export function readPayrollSnapshot(raw: string | null, released: boolean, origi
     if (payrollNumber(data[key]) === null)
       issues.push(`发放快照缺少${snapshotFieldLabels[key]}`)
   }
-  for (const key of ['memberWorkerIds', 'members', 'lines', 'allocations', 'dayworkRecords']) {
+  const requiredArrays = ['memberWorkerIds', 'members', 'lines', 'allocations', ...(data.formatFamily === 'C2' ? ['dayworkRecords'] : [])]
+  for (const key of requiredArrays) {
     if (!Array.isArray(data[key]))
       issues.push(`发放快照缺少${snapshotFieldLabels[key]}`)
   }

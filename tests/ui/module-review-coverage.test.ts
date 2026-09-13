@@ -42,7 +42,7 @@ describe('module review coverage', () => {
       if (desktop)
         expect(desktop.adapter).toBe(surface.variant === 'central-source' ? 'central-http' : 'desktop-sqlite')
     }
-    for (const [route, expectedAdapter] of [['/subcontract/payroll', 'payroll-browser-readonly'], ['/project/target-cost', 'target-cost-browser']]) {
+    for (const [route, expectedAdapter] of [['/subcontract/payroll', 'payroll-a-browser'], ['/project/target-cost', 'target-cost-browser']]) {
       const surface = surfaces.find(item => item.route === route && item.path === 'page')!
       expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe(expectedAdapter)
       expect(cases.find(item => item.surfaceId === surface.id && item.host === 'tauri')?.adapter).toBe('desktop-sqlite')
@@ -215,9 +215,15 @@ describe('module review coverage', () => {
     }
     const byId = (id: string) => inherited.find(item => item.id === id)!
     expect(byId('WAGE-01').status).toBe('current-passed')
-    expect(byId('WAGE-02').status).toBe('ready')
-    expect(byId('WAGE-06').status).toBe('ready')
+    expect(byId('WAGE-02').status).toBe('current-passed')
+    expect(byId('WAGE-02').evidence).toEqual([expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-history/README.md', commit: '1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3', recency: 'current-run' })])
+    expect(byId('WAGE-06').status).toBe('partial')
     expect(byId('WAGE-10').status).toBe('ready')
+    for (const id of ['WAGE-13', 'WAGE-14', 'WAGE-15', 'WAGE-16', 'WAGE-17', 'WAGE-18']) {
+      expect(byId(id).status).toBe('ready')
+      expect(byId(id).sources).toContain('https://github.com/zodea/crm-new/issues/117')
+      expect(byId(id).evidence).toEqual([])
+    }
     expect(byId('PRG-01').status).toBe('current-passed')
     expect(byId('PRG-07').status).toBe('current-passed')
     expect(byId('PRG-07').evidence).toEqual([expect.objectContaining({ reference: 'docs/design/evidence/issue-412-target-cost/README.md', commit: 'b64d52240cb4d229dc5458b4009d5a16a982bc3c', recency: 'current-run' })])

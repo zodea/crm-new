@@ -153,7 +153,7 @@ function quantityLabel(value: number | null): string {
         <span v-if="wagePreview.missing" class="text-10px text-warning-deep">
           缺量 {{ wagePreview.missing }} 行
         </span>
-        <span class="text-9px text-ink-faint">最终结算固定取现场复核量</span>
+        <span class="text-9px text-ink-faint">这里只比较工程量；A 工资须核对实际完成责任与现场量</span>
       </div>
       <KitButton type="button" variant="secondary" class=" ml-auto" @click="emit('addManualItem')">
         <span class="i-lucide-list-plus mr-1" aria-hidden="true" />新增手工分项
@@ -296,8 +296,8 @@ function quantityLabel(value: number | null): string {
             <td class="p-2">
               <div class="flex flex-wrap gap-x-3 gap-y-1 text-10px text-ink-soft">
                 <span>合同/对比 <b class="font-mono text-ink">{{ quantityLabel(line.contractQty) }}</b></span>
-                <span>工资预付 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
-                <span>工资结算 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
+                <span>暂估量 <b class="font-mono text-ink">{{ quantityLabel(line.provisionalQty) }}</b></span>
+                <span>现场量 <b class="font-mono text-brand-deep">{{ quantityLabel(formulaValue(line)) }}</b></span>
               </div>
               <div v-if="!canLinkBoq" class="mt-1 text-9px text-ink-faint">
                 原识别值：{{ line.recognizedContractQty == null ? '未记录' : line.recognizedContractQty }}

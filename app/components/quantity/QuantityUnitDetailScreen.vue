@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { QuantityCompletionQuantityLine, QuantityCompletionStageView } from '~/lib/quantity/completion'
 import type { DataOriginDTO } from '~/types/read-model'
-import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import { nextTick, onActivated, onDeactivated, onScopeDispose } from 'vue'
 import QuantityTotalValue from '~/components/quantity/QuantityTotalValue.vue'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import KitButton from '~/components/ui/KitButton.vue'
+import { payrollSourceContext, payrollSourceQuery } from '~/lib/payroll/a-navigation'
 import { formatQuantityValue } from '~/lib/quantity/format'
 import { sumQuantityLines } from '~/lib/quantity/totals'
 import { toErrorMessage } from '~/lib/util/error'
@@ -14,9 +15,13 @@ const props = defineProps<{
   unitId: string
   returnTo?: string
   origin?: DataOriginDTO | null
+  payrollQuery?: Record<string, unknown>
 }>()
 
 const store = useQuantityStore()
+const detailElement = shallowRef<HTMLElement | null>(null)
+const payrollContext = computed(() => props.origin ? payrollSourceContext(props.payrollQuery ?? {}, { kind: 'quantity-unit', id: props.unitId, origin: props.origin, projectId: props.projectId }) : null)
+const payrollMatrix = computed(() => payrollContext.value ? { path: '/subcontract/quantity', query: { ...payrollSourceQuery(props.payrollQuery ?? {}), payrollSourceKind: 'quantity-project', payrollSourceId: props.projectId, project: props.projectId, origin: props.origin ?? 'real' } } : null)
 const { error: toastError } = useKitUI()
 
 const completionDialogOpen = shallowRef(false)
@@ -63,6 +68,25 @@ const workspace = computed(() => (
     ? store.completionWorkspace
     : null
 ))
+let payrollFocusSequence = 0
+async function focusPayrollStage() {
+  const stageId = props.payrollQuery?.stageId
+  const completionId = props.payrollQuery?.completionId
+  const value = workspace.value
+  const request = ++payrollFocusSequence
+  if (!active || !payrollContext.value || !value || typeof stageId !== 'string')
+    return
+  const stage = value.stages.find(stage => stage.id === stageId && (!completionId || stage.completion?.id === completionId))
+  if (!stage)
+    return
+  await nextTick()
+  if (!active || request !== payrollFocusSequence || value !== workspace.value)
+    return
+  const element = [...detailElement.value?.querySelectorAll<HTMLElement>('[data-payroll-stage]') ?? []].find(element => element.dataset.payrollStage === stageId)
+  element?.scrollIntoView({ block: 'center' })
+  element?.focus({ preventScroll: true })
+}
+watch([workspace, () => props.payrollQuery], () => void focusPayrollStage(), { flush: 'post' })
 
 useTabTitle(() => workspace.value
   ? `${workspace.value.unit.name} 施工详情`
@@ -132,6 +156,7 @@ onActivated(() => {
 })
 onDeactivated(() => {
   active = false
+  payrollFocusSequence += 1
   closePhoto()
   store.cancelCompletion()
 })
@@ -139,7 +164,7 @@ onScopeDispose(closePhoto)
 </script>
 
 <template>
-  <div class="quantity-unit-detail flex min-w-0 flex-col gap-4">
+  <div ref="detailElement" class="quantity-unit-detail flex min-w-0 flex-col gap-4">
     <p v-if="origin === null" class="panel p-4 text-danger" role="alert">
       工程量来源无效，请从项目列表重新打开。
     </p>
@@ -193,6 +218,10 @@ onScopeDispose(closePhoto)
     </section>
 
     <template v-else-if="workspace && origin !== null">
+      <PayrollASourceReturn v-if="payrollQuery?.payrollReturnTo" kind="quantity-unit" :source-id="unitId" :project-id="projectId" :origin="origin || 'real'" />
+      <NuxtLink v-if="payrollMatrix" :to="payrollMatrix" class="btn-secondary self-start">
+        查看工程量管理
+      </NuxtLink>
       <section
         v-for="group in tradeGroups"
         :key="group.trade"
@@ -208,6 +237,8 @@ onScopeDispose(closePhoto)
         <article
           v-for="stage in group.stages"
           :key="stage.id"
+          :data-payroll-stage="stage.id"
+          tabindex="-1"
           class="border-b border-line px-4 py-3 last:border-b-0"
         >
           <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">

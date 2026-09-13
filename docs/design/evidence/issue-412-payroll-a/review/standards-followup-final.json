@@ -1,0 +1,161 @@
+{
+  "kind": "independent Standards bounded follow-up",
+  "baseline": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "reviewedAt": "2026-09-13T05:35:37.4078418+08:00",
+  "scope": "A/C Standards 3 corrections, diagnostic/source-focus and empty-form codec increments only; excludes B10 author files and E2E/PDF/full outcomes",
+  "standardsUnresolved": 0,
+  "hardViolations": 0,
+  "actionableSmells": 0,
+  "checked": [
+    "frozen verification uses shared amountInCents precision; original amount consistency remains",
+    "config read failure disables new writes and keeps original subject/price drafts and source versions",
+    "price reactivation refreshes authority while preserving original price draft baseline",
+    "first wage and new-draft return use authorized A form candidates; no payroll head created",
+    "diagnostic original labels remain; navigation requires same project/template and visible ancestors plus quantity read",
+    "source two chooses its own completion marker and receiving stage validates current completion; safe registry return retained",
+    "writes remain Pinia actions and shared workspace transaction; post-await identities and capability guard retained",
+    "empty strings allowed only for partial preview projectId/leaderWorkerId/month; command draft false and top-level identities remain strict",
+    "public HTTP roundtrip retains empty form and allowed projects but empty workers, blockers and canSaveDraft false; malformed nonempty IDs and invalid save rejected; no wage writes"
+  ],
+  "testsRun": false,
+  "servicesStarted": false,
+  "productFilesChanged": false,
+  "files": [
+    {
+      "path": "app/lib/payroll/central-a-codec.ts",
+      "sha256": "0261099866AE1AC0DE06782A688EFCE147590E59E748960A2A43D0214F59115B"
+    },
+    {
+      "path": "app/lib/payroll/central-a-contract.ts",
+      "sha256": "9130485E864155BABDFB7213DA5A48189D64F445FF9ADA698E5C27B26141603A"
+    },
+    {
+      "path": "app/lib/payroll/central-a-calculation.ts",
+      "sha256": "6370DE62D991DB406CC211EEAF509706ADCC5A7E754FBF626FBA2653CF729F8A"
+    },
+    {
+      "path": "app/lib/payroll/statements.ts",
+      "sha256": "5C6BBEA6303D3B5FA2BD5D2FC3C71729AA82738BCF4405356426D9A29FABEE50"
+    },
+    {
+      "path": "server/utils/payroll-a-options.ts",
+      "sha256": "A4629DCBB2EE0A8DE25ACBBCE4A0FE0DCC2D5C1E8EE00DB9E686D67E85F34190"
+    },
+    {
+      "path": "server/utils/payroll-a-service.ts",
+      "sha256": "C4061C2F731B7B3CFC7C1378637CD2890C8AF54EB292754D56CB90079F73A42C"
+    },
+    {
+      "path": "server/utils/payroll-service.ts",
+      "sha256": "0D38A746B6BE8D51F04073FA69BB82CE1503336E9864964032E390DE2712372D"
+    },
+    {
+      "path": "app/stores/payroll-a.ts",
+      "sha256": "B9585F936A43A3F2F6D638AF273A6533E92D2C7FF87161702E2ED6B605C705FF"
+    },
+    {
+      "path": "app/composables/usePayrollAConfig.ts",
+      "sha256": "47526CE4C762E1088FCC6FDE23723681324AED4E604C1E72825E702C0E095B62"
+    },
+    {
+      "path": "app/composables/usePayrollRead.ts",
+      "sha256": "4FD938F746E832B8199F66EFDAE58B94C6978301E616BA2CE1F3268859D52B3A"
+    },
+    {
+      "path": "app/components/payroll/PayrollAPriceDialog.vue",
+      "sha256": "E4696523A06AACBFFB3D78F87581F4F2917A41A19A44D5FE66BC761348178816"
+    },
+    {
+      "path": "app/components/payroll/PayrollACreateFromQuantity.vue",
+      "sha256": "EEC8CF4D7DE040BFECAA69D3979C15C50A5AAAB535C0C4E3F55CA218B4CE8A74"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReturn.vue",
+      "sha256": "2598C792B7BF4F68C62DA8B72BB1651BA2DB11602C63D221D55CD3795078739B"
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReview.vue",
+      "sha256": "21980C57B388E84D8C5417057C79A04C78F4BF8079800067AC46DB22A34B594E"
+    },
+    {
+      "path": "app/lib/payroll/a-navigation.ts",
+      "sha256": "1D725E20DEB7D0D5E67C2006B236CC932CFA3BF501B06CD8CE48CA212A29F257"
+    },
+    {
+      "path": "app/lib/nav/target-registry.ts",
+      "sha256": "D59D7814BB3F9037DBFD6611AF4944B9B455F367F329AA4F7F6A3D9B18AF35B2"
+    },
+    {
+      "path": "app/components/quantity/QuantityUnitDetailScreen.vue",
+      "sha256": "31E87D6B981E4FB878BC17F5BF90B4AFDE0A94B5F26B6642D149BCCCE87A3F6A"
+    },
+    {
+      "path": "app/lib/quantity/navigation.ts",
+      "sha256": "A4FC0982296248168B0A73855BDFE0AA2C021E060AF1AA35DDDFB8A385D936BC"
+    },
+    {
+      "path": "app/pages/subcontract/quantity/[pid]/[uid].vue",
+      "sha256": "06AB29800B4D725A253E63476C66D3151495006135B63A1E7BB6D47BA310F282"
+    },
+    {
+      "path": "tests/components/PayrollAConfigState.test.ts",
+      "sha256": "90EA3A765C831D9A3B6D17B1EDA9F9E4A4A4F7C4B643E9CA4047EE96052EC86B"
+    },
+    {
+      "path": "tests/components/PayrollAPriceDialog.test.ts",
+      "sha256": "ACCBC2F6C826D92B4F5E25A18F935CF053E0626C6FFB4B843FB95B23253DCD7F"
+    },
+    {
+      "path": "tests/components/PayrollACreateFromQuantity.test.ts",
+      "sha256": "3571EE49154C554E56B8D9CD87452768B55E46AA0CED68836B533197580695CE"
+    },
+    {
+      "path": "tests/components/PayrollASourceReturn.test.ts",
+      "sha256": "E090D1C2740836CB62975EC9C7A5F9B34E5BBE88F9D2F65B09048EA762818045"
+    },
+    {
+      "path": "tests/components/PayrollASourceReview.test.ts",
+      "sha256": "3C180EF2BA78A1241CDBAEC34643578F667CAA4427551427FEABC27D9B3503EA"
+    },
+    {
+      "path": "tests/payroll/central-a-diagnostic-location.test.ts",
+      "sha256": "9BF4561D19CF5996028799D756D903318D9B8BDDFBEDB3B95843A35BC450637A"
+    },
+    {
+      "path": "tests/payroll/central-a-amount-integrity.test.ts",
+      "sha256": "9C2A2C8CB1294A757210EE35CF2779E834E38859E977F340AC23572EA922FF9A"
+    },
+    {
+      "path": "tests/payroll/central-a-service.test.ts",
+      "sha256": "4432A90B28A9718397EE1C2840EF3966501635BBC9AA8664B8E94304F0C37021"
+    },
+    {
+      "path": "tests/helpers/payroll-a-service-fixture.ts",
+      "sha256": "DBC3EBDFEC68418F9E45248FB88FE35AE20087DCE6FC9968FB024677583BB194"
+    },
+    {
+      "path": "tests/helpers/payroll-a-ui-fixture.ts",
+      "sha256": "A3F8C6682A91A690B7B69409279E4A417B556F29B55BFFBFAAE5A1AAB74DAF97"
+    },
+    {
+      "path": "tests/payroll/central-a-http.test.ts",
+      "sha256": "B574C91DB1EA744D772182D3E813AE5236FB18902B73BC8898B1B15D500C4663"
+    },
+    {
+      "path": "tests/payroll/central-a-codec.test.ts",
+      "sha256": "EC22B22BE4DFFC243ACE1396DA389386E1C1ABADA99601B815A59AA8D144E6A7"
+    },
+    {
+      "path": "server/api/read/payroll/a-form.post.ts",
+      "sha256": "BC8749892EA3AA6FB50F94B6009AF7CBC4B12729BBBF56DF9E6AA27F0782DA7B"
+    },
+    {
+      "path": "server/api/commands/payroll-a.post.ts",
+      "sha256": "A4164E257D721A4762C39D7F2B04715D8D1BF2B0391447C47B69771A2D0A9081"
+    },
+    {
+      "path": "app/lib/payroll/central-repository.ts",
+      "sha256": "6A21E1E7C8BAD7583F67BCB9CD481C4C3C1F46C27E489DADDF93D82BBE103BE7"
+    }
+  ]
+}

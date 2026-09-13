@@ -90,7 +90,7 @@ const ENTITY_SQL: Record<Exclude<CoreMigrationEntityType, 'quantity_projects' | 
     ORDER BY id
   `,
   crews: `
-    SELECT id, name, deleted_at
+    SELECT id, name, default_pay_ratio, deleted_at
     FROM crews
     ORDER BY id
   `,
@@ -926,6 +926,8 @@ function sourceEntity(
   row: Record<string, unknown>,
 ): CoreMigrationSourceEntityDTO {
   const entity = baseEntity(row)
+  if (entityType === 'crews' && Object.hasOwn(row, 'default_pay_ratio'))
+    return { ...entity, attributes: { defaultPayRatio: nullableNumber(row.default_pay_ratio) } }
   if (entityType === 'suppliers')
     return { ...entity, attributes: { laborScope: text(row.labor_scope) } }
   if (entityType === 'projects') {

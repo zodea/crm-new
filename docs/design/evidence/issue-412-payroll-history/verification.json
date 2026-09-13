@@ -2,7 +2,7 @@
   "baseline": "b64d52240cb4d229dc5458b4009d5a16a982bc3c",
   "status": "slice-verified",
   "scope": "工资P0完整资料接管、中央历史与独立来源只读；P1–P7及生产不在此通过范围",
-  "commitState": "已完成验收，待本工作单元独立提交；本单元代码身份见 code-hashes.json",
+  "commitState": "已完成本地独立提交；89个验收代码Git内容身份全部匹配。未推送或部署。",
   "checks": [
     {
       "name": "npm test",
@@ -89,5 +89,22 @@
     "房补管理费、空鼓扣款和完整工作簿",
     "生产持久化与部署",
     "远端推送或云CI"
-  ]
+  ],
+  "commit": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "commitChecks": {
+    "files": 600,
+    "tests": 3697,
+    "seconds": 229.72,
+    "startedAt": "2026-09-13 04:00:16 +08:00",
+    "codeBlobsMatched": 89,
+    "normalHooks": true,
+    "firstAttempt": "旧页签startup-order用例5000ms超时；同一原断言独跑830ms通过，未改代码后正常全套通过"
+  },
+  "cleanup": {
+    "files": 341,
+    "bytes": 22474402,
+    "recovery": "Windows Recycle Bin",
+    "at": "2026-09-13T04:05:40+08:00",
+    "retained": "85张正式交互图、9页正式PDF图及两份指南PDF"
+  }
 }

@@ -44,7 +44,7 @@ export function payrollReturnTo(value: unknown, origin: DataOriginDTO | null): s
     return null
   try {
     const url = new URL(value, 'https://payroll.invalid')
-    if (url.origin !== 'https://payroll.invalid' || url.hash || (!paths.has(url.pathname) && !/^\/subcontract\/payroll\/[^/]+$/.test(url.pathname)) || /\/(?:new|form)$/.test(url.pathname))
+    if (url.origin !== 'https://payroll.invalid' || url.hash || (!paths.has(url.pathname) && !/^\/subcontract\/payroll\/[^/]+$/.test(url.pathname)) || /\/(?:new|form|config)$/.test(url.pathname))
       return null
     const query: Record<string, unknown> = {}
     for (const key of url.searchParams.keys()) {

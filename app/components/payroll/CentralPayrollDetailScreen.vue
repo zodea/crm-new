@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
-import { payrollReadLocation, payrollReadQuery, payrollReturnTo, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
+import { payrollAEntryReturn } from '~/lib/payroll/a-navigation'
+import { payrollReadLocation, payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { payrollAmount, payrollNumber, payrollStatusLabel } from '~/lib/payroll/read-presentation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 
@@ -22,7 +23,7 @@ const { current, loading, error, load } = usePayrollRead(() => JSON.stringify([i
   return read
 })
 const statement = computed(() => current.value?.statement)
-const back = computed(() => payrollReturnTo(route.query.returnTo, scope.value.origin) || payrollReadLocation('/subcontract/payroll', scope.value))
+const back = computed(() => payrollAEntryReturn(route.query.returnTo, scope.value.origin, statement.value?.projectId) || payrollReadLocation('/subcontract/payroll', scope.value))
 const sources = computed(() => {
   if (!statement.value)
     return null
@@ -113,6 +114,7 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
         </p>
       </section>
       <PayrollReadDiagnostics :issues="statement.diagnostics" />
+      <PayrollAStatementWorkspace v-if="statement.formatFamily === 'A' && statement.recordKind === 'central' && !statement.deletedAt && current" :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" @changed="load" />
       <PayrollSnapshotEvidence :snapshot="statement.snapshot" />
       <PayrollEvidenceTable title="工资明细" :rows="statement.lines" :columns="lineColumns" />
       <PayrollEvidenceTable title="请款成员" :rows="statement.members" :columns="memberColumns" />

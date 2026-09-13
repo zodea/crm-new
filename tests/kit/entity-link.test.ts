@@ -61,7 +61,7 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       variant: 'detail',
       view: null,
       filters: { projectId: 'p1', dataOrigin: 'real' },
-    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1', label: '201户' })
+    })).toEqual({ state: 'resolved', to: '/subcontract/quantity/p1/u1?origin=real', label: '201户' })
     expect(resolveNavigationTarget({
       kind: 'entity-detail',
       subject: { state: 'resolved', entity: 'wage-statement', id: 'ws1', label: '7月工资单', no: null },

@@ -25,6 +25,9 @@ const rows = computed(() => (current.value?.rows || []).filter((row) => {
 const crews = computed(() => [...new Map((current.value?.rows || []).flatMap(row => row.crewId ? [[row.crewId, { id: row.crewId, name: row.crewName || '班组名称未记录' }] as const] : [])).values()])
 const returnTo = computed(() => payrollReadLocation('/subcontract/payroll', scope.value))
 const sources = computed(() => payrollReadLocation('/subcontract/payroll/sources', scope.value))
+const canCreate = computed(() => scope.value.origin === 'real' && current.value?.context.capabilities.includes('payroll:write'))
+const createTo = computed(() => ({ path: '/subcontract/payroll/new', query: { ...payrollViewQuery(scope.value), origin: 'real', returnTo: returnTo.value } }))
+const configTo = computed(() => ({ path: '/subcontract/payroll/config', query: { origin: 'real', project: scope.value.projectId, month: scope.value.month, crew: scope.value.crewId, returnTo: returnTo.value } }))
 const columns: KitTableColumn[] = [
   { field: 'month', title: '月份 / 详情', minWidth: 142, fixed: 'left', slot: 'detail' },
   { field: 'projectName', title: '项目', minWidth: 210 },
@@ -57,6 +60,12 @@ useTabTitle('工资台账')
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <NuxtLink v-if="canCreate" :to="createTo" class="btn-primary">
+          新建 A 工资草稿
+        </NuxtLink>
+        <NuxtLink v-if="canCreate" :to="configTo" class="btn-secondary">
+          工资配置
+        </NuxtLink>
         <NuxtLink :to="sources" class="btn-secondary">
           查看工资来源
         </NuxtLink><KitButton :disabled="loading" @click="load">

@@ -3,7 +3,7 @@ import { onActivated, onBeforeUnmount, onDeactivated, shallowRef, watch } from '
 import { toErrorMessage } from '~/lib/util/error'
 
 /** 每个只读页面持有自己的读取结果，失效或迟到请求不覆盖另一来源。 */
-export function usePayrollRead<T extends { context: PayrollContext }>(target: () => string, reader: () => Promise<T>) {
+export function usePayrollRead<T extends { context: Pick<PayrollContext, 'workspaceId' | 'actorId' | 'origin'> }>(target: () => string, reader: () => Promise<T>) {
   const current = shallowRef<T | null>(null)
   const loading = shallowRef(false)
   const error = shallowRef('')

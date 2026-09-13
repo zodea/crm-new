@@ -1,0 +1,16 @@
+
+Running 9 tests using 1 worker
+
+(node:27968) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\payroll-a-central.spec.ts:122:1 › A工资真实迁入、配置保稿、实际核对发放、跨月重核与冻结输出完整旅程 (1.0m)
+  ok 2 [chromium] › e2e\payroll-attendance.spec.ts:4:3 › 工资与考勤浏览器接管边界 › 工资台账保三态多选，建单仅开放A且空范围不生成工资 (2.0s)
+  ok 3 [chromium] › e2e\payroll-attendance.spec.ts:20:3 › 工资与考勤浏览器接管边界 › 考勤与签工入口仅查询来源，旧逐日录入及确认表单不挂载 (2.6s)
+  ok 4 [chromium] › e2e\payroll-attendance.spec.ts:29:3 › 工资与考勤浏览器接管边界 › 五档入口和原生筛选不撑破页面，未选项目不会补首项 (1.1s)
+  ok 5 [chromium] › e2e\payroll-context-retirement.spec.ts:6:3 › 工资中央来源、筛选与退役写入口 › 多状态浮层可用键盘关闭，真实新query与非法状态不复活旧筛选 (2.9s)
+  ok 6 [chromium] › e2e\payroll-context-retirement.spec.ts:20:3 › 工资中央来源、筛选与退役写入口 › 未选项目的来源往返保月份与工资状态，签工确认状态分开 (1.2s)
+  ok 7 [chromium] › e2e\payroll-context-retirement.spec.ts:30:3 › 工资中央来源、筛选与退役写入口 › 未知中央项目在工资、考勤和签工都显示失效而不归一为首项 (3.4s)
+  ok 8 [chromium] › e2e\payroll-statement-detail.spec.ts:6:3 › 工资历史详情的失效边界 › 不存在的稳定工资ID明确报错，返回保原多状态且不切首项 (1.3s)
+  ok 9 [chromium] › e2e\payroll-statement-detail.spec.ts:18:3 › 工资历史详情的失效边界 › 关系来源参数不完整时不降级到无归属的工资详情 (1.0s)
+
+  9 passed (1.3m)

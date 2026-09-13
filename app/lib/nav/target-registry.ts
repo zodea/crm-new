@@ -18,6 +18,7 @@ import {
   validateOwnerDocumentDetailReturnTo,
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
+import { payrollAWorkspaceReturn } from '~/lib/payroll/a-navigation'
 import { payrollReadLocation, payrollReturnTo, payrollViewScope } from '~/lib/payroll/central-navigation'
 import {
   appendProjectSupplierReturnContext,
@@ -270,10 +271,19 @@ function quantityUnitPath(intent: EntityTargetIntent): string {
   const projectId = intent.filters.projectId
   if (typeof projectId !== 'string' || !projectId)
     throw new Error('invalid quantity unit project context')
-  return withCrewWorkerFactContext(
+  const target = withCrewWorkerFactContext(
     `/subcontract/quantity/${encodeURIComponent(projectId)}/${encodeURIComponent(intent.subject.id)}`,
     intent,
   )
+  if (!hasCrewWorkerFactContext(intent) && isDataOriginDTO(intent.filters.dataOrigin)) {
+    const query = new URLSearchParams({ origin: intent.filters.dataOrigin })
+    for (const key of ['stageId', 'itemId', 'completionId']) {
+      if (isStableRouteIdentity(intent.filters[key]))
+        query.set(key, String(intent.filters[key]))
+    }
+    return `${target}?${query}`
+  }
+  return target
 }
 
 function withCrewWorkerFactContext(path: string, intent: EntityTargetIntent): string {
@@ -624,6 +634,18 @@ export function resolveNavigationTarget(
       if (returnTo) {
         const separator = to.includes('?') ? '&' : '?'
         to = `${to}${separator}returnTo=${encodeURIComponent(returnTo)}`
+      }
+    }
+    if (options.returnTo && ['quantity-unit:detail', 'worker:detail', 'crew:detail'].includes(key) && isDataOriginDTO(intent.filters.dataOrigin) && isStableRouteIdentity(intent.filters.projectId)) {
+      const back = payrollAWorkspaceReturn(options.returnTo, intent.filters.dataOrigin)
+      if (back) {
+        const target = new URL(to, 'https://payroll.invalid')
+        target.searchParams.delete('returnTo')
+        target.searchParams.set('payrollReturnTo', back)
+        target.searchParams.set('payrollProject', String(intent.filters.projectId))
+        target.searchParams.set('payrollSourceKind', intent.subject.entity)
+        target.searchParams.set('payrollSourceId', intent.subject.id)
+        to = `${target.pathname}?${target.searchParams}`
       }
     }
     return {

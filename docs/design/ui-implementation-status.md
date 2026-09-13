@@ -81,12 +81,12 @@
 | 设计稿 PAGE 路由 | 69 |
 | 设计稿整页表单路由 | 40 |
 | 设计稿侧栏分组 / 叶子 | 9 / 50 |
-| 实现页面文件（含 dev） | 146 |
+| 实现页面文件（含 dev） | 148 |
 | 开发预览路由 | 5 |
-| 实现生产路由（排除 dev） | 141 |
+| 实现生产路由（排除 dev） | 143 |
 | 实现侧栏叶子 | 51 |
 | 已覆盖 | 135 |
-| 待补设计（实现有、设计稿没有） | 6 |
+| 待补设计（实现有、设计稿没有） | 8 |
 | 已退役（设计稿有、实现不做） | 0 |
 <!-- design-coverage:end -->
 
@@ -134,7 +134,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 11 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 13 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -223,5 +223,13 @@
 
 工资 P0 达到本地 `slice-verified`：完整旧工资图和独立配置、考勤、签工经受控迁入后，由中央台账、历史详情与来源页读取；冻结缺口、原表金额、零分配与月份锁分别呈现。实际浏览器整批 9 项通过，85 张五档交互图及两份指南共 9 页已逐张检查；完整测试 600 个文件、3697 项，类型、构建和独立双轴复核通过。证据统一见 [工资 P0 验收](./evidence/issue-412-payroll-history/README.md)。
 
-新增 `/subcontract/payroll/sources` 保留独立设计缺口，未继承旧空台账的运行观察。当前浏览器日常工资写入及新输出仍未开放；A/C1/C2 核算发放、独立更正、房补管理费、空鼓扣款、资金建议和完整工作簿继续由 #412 承接，生产由 #416 承接。覆盖账本的旧 WAGE 固定提交回执在后续单元续记，不将本只读切片提升为完整工资链完成。
+新增 `/subcontract/payroll/sources` 保留独立设计缺口，未继承旧空台账的运行观察。P0 已独立提交 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`，固定证据已续入 WAGE 账本。日常 A 工资的后续接通另见下方 P1 切片；C1/C2 核算发放、独立更正、房补管理费、空鼓扣款、资金建议和完整工作簿仍逐项承接，生产由 #416 承接。本只读切片不提升完整工资链的完成等级。
 <!-- issue-412-payroll-p0:end -->
+
+<!-- issue-412-payroll-p1:begin -->
+## #412 中央 A 工资核算与实际发放
+
+P1 达到本地 `slice-verified`：实际完成现场量进入独立 A 草稿，配置首月比例及工资价，保存核对、按全部成员确认实发并冻结输出；工程量、户、工人和班组往返保留原草稿与来源焦点。空值、真实 0、缺损来源和旧历史输出资格分别保留，原提交恢复与跨月需重核均已实际运行。最终新实例完整 4 套件 9 项通过，85 张五档原图逐张通过，实际 PDF 一页目检及 XLSX 文件解析、发放汇总和成员分配核对通过，两份指南 12 页逐页检查，见 [P1 验收记录](./evidence/issue-412-payroll-a/README.md)。
+
+最终完整测试 626 文件 3783 项、类型、构建、109 个源码文件规范检查及独立 Standards / Spec 均通过；独立提交及提交钩子待执行。工资专属编辑和配置整页保留既定独立设计来源等级。P2–P7 的 C1/C2、独立更正与补退、房补管理费、空鼓扣款、批量资金建议和完整工作簿继续承接，#412 母票与 #416 生产持久化、部署不因此完成。
+<!-- issue-412-payroll-p1:end -->

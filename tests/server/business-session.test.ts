@@ -8,6 +8,7 @@ describe('default business session boundary', () => {
       actorId: 'actor-default',
       capabilities: [
         'payroll:read',
+        'payroll:write',
         'target-cost:read',
         'target-cost:write',
         'schedule:read',

@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto'
 import { parsePayrollProjectGraph, PAYROLL_MIGRATION_COLUMNS, PAYROLL_MIGRATION_PARTS, PAYROLL_MIGRATION_TABLES, payrollLogProject, payrollLogSnapshot } from '../../app/lib/migration/payroll-source'
 import { advancePayrollRevision, initializePayrollSchema } from '../../app/lib/payroll/central-schema'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { payrollAMigrationReferences } from './payroll-a-migration-references'
 
 export interface ImportedPayrollProject {
   entityId: string
@@ -209,6 +210,8 @@ export async function assertPayrollMigrationRemoval(db: TransactionDb, plan: Ret
   const all = Object.fromEntries(await Promise.all(PAYROLL_MIGRATION_PARTS.map(async part => [part, await db.select<PayrollMigrationRow>(`SELECT ${PAYROLL_MIGRATION_COLUMNS[part].join(',')} FROM ${PAYROLL_MIGRATION_TABLES[part]}`)]))) as Record<PayrollMigrationPart, PayrollMigrationRow[]>
   const owned = new Set(plan.removed.flatMap(previous => PAYROLL_MIGRATION_PARTS.flatMap(part => previous.graph[part].map(row => key(PAYROLL_MIGRATION_TABLES[part], row.id)))))
   const removedKeys = new Set([...owned, ...['projects', 'crews', 'workers'].flatMap(table => [...removed[table as 'projects' | 'crews' | 'workers']].map(id => key(table, id))), ...removed.quantity.map(identity => key(identity.table, identity.id))])
+  if (removedKeys.size && [...await payrollAMigrationReferences(db)].some(reference => removedKeys.has(reference)))
+    invalid('独立 A 类配置、来源、回执或历史仍引用待撤身份，已在删除前整批拒绝')
   for (const previous of plan.removed) {
     const actual = { schemaVersion: 1, projectId: previous.projectId } as PayrollProjectGraph
     for (const part of PAYROLL_MIGRATION_PARTS)

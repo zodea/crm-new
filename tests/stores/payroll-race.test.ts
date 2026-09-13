@@ -27,7 +27,8 @@ vi.mock('~/lib/db/connection', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('~/lib/payroll/statements', () => ({
+vi.mock('~/lib/payroll/statements', async importOriginal => ({
+  ...await importOriginal<typeof import('~/lib/payroll/statements')>(),
   buildWageDraftSource: vi.fn(),
   checkWageStatement: vi.fn(),
   createWageStatementDraft: vi.fn(),

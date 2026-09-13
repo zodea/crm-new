@@ -1,6 +1,10 @@
 # #412：工资完整资料接管与历史只读
 
-> 本地切片验收通过，随本单元独立提交。固定开工基线 `b64d52240cb4d229dc5458b4009d5a16a982bc3c`。承接 [#412](https://github.com/zodea/crm-new/issues/412) 及[本地 P0 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/00-central-history-and-sources.md)，未创建新的 GitHub 子 Issue。以下逐项记录验证范围，不将只读接管等同完整工资或上线交付。
+> 本地切片已独立提交 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`。固定开工基线 `b64d52240cb4d229dc5458b4009d5a16a982bc3c`。承接 [#412](https://github.com/zodea/crm-new/issues/412) 及[本地 P0 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/00-central-history-and-sources.md)，未创建新的 GitHub 子 Issue。以下逐项记录验证范围，不将只读接管等同完整工资或上线交付。
+
+提交后续记：正常提交检查于 2026-09-13 04:00:16 开始，600 文件、3697 项全部通过（229.72 秒），89 个验收代码的 Git 内容身份全部匹配。首次提交检查仅原页签启动顺序用例触及 5 秒超时；原断言单独 830 毫秒通过，保持代码不变后正常重跑全套通过。未跳过检查。
+
+本阶段 341 个临时脚本、日志和重复渲染文件共 22,474,402 字节已送入 Windows 回收站，可恢复；85 张正式交互图、9 页正式 PDF 渲染证据及两份指南 PDF 保留。总览已实际刷新核对新增工资流程及图片。后续 A 工资实施见 [P1 本地实施票](../../../research/issue-review-2026-09-11/payroll-tickets/01-central-a-payroll.md)。
 
 ## 完整资料接管
 

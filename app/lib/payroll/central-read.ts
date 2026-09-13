@@ -1,6 +1,7 @@
 import type { PayrollAllocation, PayrollAttendance, PayrollConfig, PayrollDaywork, PayrollDayworkLink, PayrollDiagnostic, PayrollIdentityMapping, PayrollJsonObject, PayrollLine, PayrollMember, PayrollQuery, PayrollSourceLock, PayrollStatementDetail, PayrollStatementRow } from './central-contract'
 import type { PayrollDb } from './statements'
 import { selectVisibleSql } from '../db/soft-delete'
+import { loadPayrollAReleasedDocuments } from './central-a-provenance'
 import { payrollProblem } from './central-contract'
 import { payrollNumber as number, payrollObject as object, readPayrollSnapshot, payrollText as text } from './central-snapshot'
 
@@ -17,6 +18,7 @@ export interface PayrollReadGraph {
   statementDaywork: PayrollStoredRow[]
   evidence: PayrollEvidence[]
   visibleStatementIds: Set<string>
+  provenAReleaseIds: Set<string>
   workers: Map<string, string>
   projects: Map<string, string>
   crews: Map<string, string>
@@ -39,6 +41,7 @@ export async function loadPayrollGraph(db: PayrollDb): Promise<PayrollReadGraph>
     }
   }
   graph.visibleStatementIds = new Set((await db.select<{ id: string }>(selectVisibleSql('wage_statements'))).map(row => row.id))
+  graph.provenAReleaseIds = new Set((await loadPayrollAReleasedDocuments(db)).keys())
   for (const table of ['workers', 'projects', 'crews'] as const) {
     graph[table] = new Map((await db.select<{ id: string, name: string }>(selectVisibleSql(table))).map(row => [row.id, row.name]))
   }
@@ -76,12 +79,17 @@ export function payrollStatementRow(row: PayrollStoredRow, graph: PayrollReadGra
   const released = row.status === 'released'
   const snapshot = readPayrollSnapshot(text(row.snapshot_json), released, original.row ? text(original.row.snapshot_json) : text(row.snapshot_json))
   const frozen = snapshot.data
+  const provenARelease = graph.provenAReleaseIds.has(id)
+  if (released && row.format_family === 'A' && frozen && ('aSource' in frozen || 'aDocument' in frozen) && !provenARelease) {
+    snapshot.state = 'partial'
+    snapshot.issues.push('中央 A 发放的原来源、冻结内容或成功回执无法相互核实')
+  }
   const value = (key: string, column: string) => released ? frozen?.[key] : row[column]
   const diagnostics = [...(evidence?.diagnostics.filter(d => d.recordId === original.legacyId || d.recordId === id || d.recordId === null) ?? [])]
   diagnostics.push(...snapshot.issues.map(message => diagnostic(`snapshot-${snapshot.state}`, message, id, 'snapshot_json')))
   if (row.format_family === 'B')
     diagnostics.push(diagnostic('retired-b', 'B 类已退役，仅保留历史，不参与新工资及成本', id, 'format_family'))
-  if (row.format_family === 'A' || row.format_family === 'C1')
+  if ((row.format_family === 'A' && !provenARelease) || row.format_family === 'C1')
     diagnostics.push(diagnostic('source-unproven', '旧汇总未保存完整施工责任或考勤行身份，不能据当前资料补造历史计薪资格', id, 'source_version'))
   if (!graph.visibleStatementIds.has(id))
     diagnostics.push(diagnostic('historical-scope', '工资单或其档案关系已隐藏，仅用于历史核对', id))

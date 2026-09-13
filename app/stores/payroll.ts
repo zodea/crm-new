@@ -25,6 +25,7 @@ import {
   updateDraftLinePrice,
 } from '~/lib/payroll/statements'
 import { useDataVisibilityStore } from './data-visibility'
+import { usePayrollAStore } from './payroll-a'
 
 function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
@@ -50,6 +51,7 @@ export interface PayrollDraftCreateInput {
 }
 
 export const usePayrollStore = defineStore('payroll-workbench', () => {
+  const centralA = usePayrollAStore()
   const statements = shallowRef<WageStatement[]>([])
   const options = shallowRef<PayrollWorkbenchOptions>({
     projects: [],
@@ -274,6 +276,18 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
   }
 
   return {
+    loadAForm: centralA.loadAForm,
+    loadAConfig: centralA.loadAConfig,
+    loadAOutput: centralA.loadAOutput,
+    saveADraft: centralA.saveADraft,
+    checkA: centralA.checkA,
+    setAPayRatio: centralA.setAPayRatio,
+    releaseA: centralA.releaseA,
+    saveASubjectConfig: centralA.saveASubjectConfig,
+    saveAPrices: centralA.saveAPrices,
+    getAPending: centralA.getAPending,
+    recoverA: centralA.recoverA,
+    aSaving: computed(() => centralA.aSaving),
     loadRead: (query: PayrollQuery) => loadPayrollListRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     statements,
     options,

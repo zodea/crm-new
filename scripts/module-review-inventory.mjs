@@ -62,9 +62,15 @@ export const ADAPTERS = {
   },
   'payroll-browser-readonly': {
     read: '工资专用中央 Repository：台账、历史冻结资料、配置、考勤、签工与月份占用；正式和演示隔离读取',
-    write: '当前仅受控迁移接管完整旧资料；浏览器日常建单、改价、核对、发放与输出尚未开放',
+    write: '完整历史与独立考勤/签工来源只读；A 日常核算另走 payroll-a-browser，不由此适配开放来源修改',
     storage: '中央工作区验证实例；原图与映射图分别保留，生产持久化仍待 #416',
     sources: [['app/components/payroll/PayrollScreen.vue', 'CentralPayrollScreen'], ['server/utils/payroll-service.ts', 'createPayrollService']],
+  },
+  'payroll-a-browser': {
+    read: '中央工资台账/详情及 A 草稿、主体配置、工资价格和冻结输出；完整旧历史继续只读',
+    write: '正式 A 使用固定来源和目标的保存、改比例、核对、发放及配置命令；当前切片实施中，逐动作待验收',
+    storage: '与工程量共用中央工作区事务及完整恢复保护；生产持久化仍待 #416',
+    sources: [['app/components/payroll/CentralPayrollDraftFormPage.vue', 'usePayrollAForm'], ['server/utils/payroll-a-service.ts', 'createPayrollAService']],
   },
   'simulation': {
     read: '合成导入演示',
@@ -138,8 +144,10 @@ export function resolveAdapter(surface, host) {
     return 'schedule-binding-browser'
   if (route === '/project/target-cost' || route.startsWith('/project/target-cost/'))
     return host === 'browser' ? 'target-cost-browser' : 'desktop-sqlite'
-  if (route === '/subcontract/payroll/sources' && host === 'tauri')
+  if (['/subcontract/payroll/sources', '/subcontract/payroll/config', '/subcontract/payroll/form/:id'].includes(route) && host === 'tauri')
     return 'unsupported'
+  if (variant !== 'central-source' && ['/subcontract/payroll', '/subcontract/payroll/:id', '/subcontract/payroll/new', '/subcontract/payroll/form/:id', '/subcontract/payroll/config'].includes(route) && host === 'browser')
+    return 'payroll-a-browser'
   if (variant !== 'central-source' && (route === '/subcontract/payroll' || route.startsWith('/subcontract/payroll/') || ['/subcontract/attendance', '/subcontract/daywork'].includes(route)))
     return host === 'browser' ? 'payroll-browser-readonly' : 'desktop-sqlite'
   if (route === '/contract/boq/building-evidence')
@@ -335,6 +343,19 @@ export const SUBVIEWS = [
   group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/NativePayrollStatementDetailScreen.vue', mounted('table', ['PayrollStatementMembersTable', 'PayrollStatementLinesTable']), ['tauri']),
   group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/NativePayrollStatementDetailScreen.vue', [view('table/daywork', 'PayrollStatementDayworkTable', 'subtable', '仅 formatFamily=C2')], ['tauri']),
   group({ route: '/subcontract/payroll/new' }, 'app/components/payroll/NativePayrollDraftFormPage.vue', ['basic', 'source', 'members', 'audit'].map(key => view(`section/${key}`, `'${key}'`, 'form-section')), ['tauri']),
+  group({ route: ['/subcontract/payroll/new', '/subcontract/payroll/form/:id'] }, 'app/components/payroll/CentralPayrollDraftFormPage.vue', [
+    view('central/section/basic', 'PayrollAFormFields', 'form-section'),
+    view('central/section/source', 'PayrollASourceReview', 'review-panel'),
+    view('central/section/note', 'id="section-note"', 'form-section'),
+    view('central/configuration', '工资配置', 'source-return'),
+    view('central/pending', 'PayrollACommandState', 'recovery-panel'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/config' }, 'app/components/payroll/PayrollAConfigScreen.vue', [
+    ...['scope', 'subject', 'prices'].map(key => view(`central/section/${key}`, `id="section-${key}"`, 'form-section')),
+    view('central/price-editor', 'PayrollAPriceEditor', 'subtable'),
+    view('central/history', 'PayrollReadHistory', 'subtable'),
+    view('central/pending', 'PayrollACommandState', 'recovery-panel'),
+  ], ['browser']),
   group({ route: '/subcontract/payroll' }, 'app/components/payroll/CentralPayrollScreen.vue', [view('central/filters', 'PayrollReadFilters', 'form-section'), view('central/ledger', '工资只读台账', 'subtable'), view('central/sources', '查看工资来源', 'source-return')], ['browser']),
   group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/CentralPayrollDetailScreen.vue', [
     view('central/snapshot', 'PayrollSnapshotEvidence', 'detail', '冻结结果缺项保留未知，不由当前资料补齐'),
@@ -342,6 +363,14 @@ export const SUBVIEWS = [
     view('central/original', '原工资头业务记录', 'detail', '原表金额与冻结结果分别呈现'),
     view('central/history', 'PayrollReadHistory', 'subtable'),
     view('central/evidence', 'PayrollSourceEvidence', 'detail'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/PayrollAStatementWorkspace.vue', [
+    view('central/a-processing', 'aria-label="A工资处理"', 'form-section', '仅原中央 A；草稿/已核对/需重核/已发分别验收'),
+    view('central/a-source', 'PayrollASourceReview', 'review-panel', '未发 A 的原完成责任、现场量与工资价'),
+    view('central/a-release', 'PayrollAReleaseDialog', 'dialog', '完整成员含零，原命令待恢复时不新键提交'),
+    view('central/a-price', 'PayrollAPriceDialog', 'dialog', '行级基准/个人例外，主体配置仍使用整页'),
+    view('central/a-output', 'PayrollAFrozenPrint', 'print', '完整新 A 发放快照，真实打印与 XLSX 分别验收'),
+    view('central/a-pending', 'PayrollACommandState', 'recovery-panel'),
   ], ['browser']),
   group({ route: ['/subcontract/payroll/sources', '/subcontract/attendance', '/subcontract/daywork'] }, 'app/components/payroll/CentralPayrollSourcesScreen.vue', [
     view('central/filters', 'PayrollReadFilters', 'form-section'),

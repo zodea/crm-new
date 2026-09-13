@@ -206,11 +206,11 @@ function assertLines(lines: readonly WageStatementLineInput[]) {
   }
 }
 
-function rounded(value: number): number {
+export function rounded(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-function amountInCents(value: number): number {
+export function amountInCents(value: number): number {
   return Math.round((value + Number.EPSILON) * 100)
 }
 
@@ -454,8 +454,8 @@ async function replaceAllocations(
   }
 }
 
-function normalizeAllocations(
-  statement: WageStatement,
+export function normalizeAllocations(
+  statement: Pick<WageStatement, 'members'>,
   actualAmount: number,
   allocations: readonly WageAllocationInput[],
 ): WageStatementAllocation[] {

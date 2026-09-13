@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import tabSessionPlugin from '~/plugins/tab-session.client'
 
+// 导入真实插件属于测试准备；不要把整个恢复依赖图的加载计入导航顺序断言的时限。
+vi.hoisted(() => {
+  vi.stubGlobal('defineNuxtPlugin', (value: unknown) => value)
+})
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -29,7 +34,6 @@ describe('nuxt 初始导航与页签恢复顺序', () => {
       dispose: vi.fn(),
       unavailable: vi.fn(),
     }
-    vi.stubGlobal('defineNuxtPlugin', (value: unknown) => value)
     vi.stubGlobal('useRouter', () => router)
     vi.stubGlobal('useTabSessionStore', () => session)
     vi.stubGlobal('useDataVisibilityStore', () => ({ includeDemo: false }))
@@ -41,7 +45,7 @@ describe('nuxt 初始导航与页签恢复顺序', () => {
         hooks.push(callback)
       },
     }
-    const plugin = (await import('~/plugins/tab-session.client')).default as unknown as { setup: (app: unknown) => void | Promise<void> }
+    const plugin = tabSessionPlugin as unknown as { setup: (app: unknown) => void | Promise<void> }
     await plugin.setup(app)
     expect(session.initialize).not.toHaveBeenCalled()
     for (const hook of hooks)

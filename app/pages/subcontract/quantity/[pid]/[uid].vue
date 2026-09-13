@@ -32,5 +32,5 @@ const returnTo = computed(() => centralContext.value
     :include-demo="visibility.includeDemo"
     :return-to="returnTo"
   />
-  <QuantityUnitDetailScreen v-else :project-id="projectId" :unit-id="unitId" :origin="readQuantityOrigin(route.query)" :return-to="returnTo" />
+  <QuantityUnitDetailScreen v-else :project-id="projectId" :unit-id="unitId" :origin="readQuantityOrigin(route.query)" :return-to="returnTo" :payroll-query="route.query" />
 </template>

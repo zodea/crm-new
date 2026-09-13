@@ -1,0 +1,187 @@
+import type { PayrollAFormRead, PayrollAOutputRead, PayrollAReleaseDraft, PayrollAStatementCommandResult } from '~/lib/payroll/central-a-contract'
+import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
+import { payrollReleaseDefault } from '~/lib/payroll/a-presentation'
+import { toErrorMessage } from '~/lib/util/error'
+
+export function usePayrollAStatement(options: { id: () => string, origin: () => 'real' | 'demo', changed: () => void }) {
+  const store = usePayrollStore()
+  const kit = useKitUI()
+  const read = shallowRef<PayrollAFormRead | null>(null)
+  const latest = shallowRef<PayrollAFormRead | null>(null)
+  const output = shallowRef<PayrollAOutputRead | null>(null)
+  const active = shallowRef(true)
+  const loading = shallowRef(false)
+  const readFailed = shallowRef(false)
+  const working = shallowRef(false)
+  const error = shallowRef('')
+  const releaseOpen = shallowRef(false)
+  const releaseRead = shallowRef<PayrollAFormRead | null>(null)
+  const releaseDraft = shallowRef<PayrollAReleaseDraft | null>(null)
+  const ratio = shallowRef<number | null>(null)
+  const target = () => JSON.stringify([options.id(), options.origin()])
+  const matching = computed(() => read.value?.statementId === options.id() && read.value.context.origin === options.origin() ? read.value : null)
+  const pending = computed(() => matching.value ? store.getAPending(matching.value) : null)
+  const busy = computed(() => loading.value || working.value)
+  const writable = computed(() => {
+    const value = latest.value ?? matching.value
+    return !!matching.value && !!value && !value.context.readonly && value.status !== 'released' && value.context.capabilities.includes('payroll:write') && options.origin() === 'real' && !readFailed.value && !pending.value && !busy.value
+  })
+  let sequence = 0
+  let started = false
+  const same = (requested: string, request: number) => active.value && requested === target() && request === sequence
+  async function load(replace = false) {
+    const requested = target()
+    const request = ++sequence
+    started = true
+    loading.value = true
+    readFailed.value = false
+    output.value = null
+    error.value = ''
+    try {
+      const value = await store.loadAForm({ origin: options.origin() }, { statementId: options.id() })
+      if (!same(requested, request))
+        return
+      if (value.statementId !== options.id() || value.context.origin !== options.origin())
+        throw new Error('工资核对目标与当前来源不一致。')
+      if (matching.value && (pending.value || releaseOpen.value || ratio.value !== matching.value.draft.payRatio) && !replace) {
+        latest.value = value
+      }
+      else {
+        read.value = value
+        latest.value = null
+        ratio.value = value.draft.payRatio ?? null
+      }
+      const operation = store.getAPending(value)
+      if (operation?.command.action.kind === 'release-a' && !releaseOpen.value) {
+        releaseRead.value = matching.value ?? value
+        releaseDraft.value = operation.command.action.release
+        releaseOpen.value = true
+      }
+      if (value.status === 'released') {
+        const result = await store.loadAOutput({ origin: options.origin() }, options.id())
+        if (same(requested, request) && result.statementId === options.id() && result.context.origin === options.origin())
+          output.value = result
+      }
+      else {
+        output.value = null
+      }
+    }
+    catch (cause) {
+      if (same(requested, request)) {
+        readFailed.value = true
+        error.value = toErrorMessage(cause)
+      }
+    }
+    finally {
+      if (same(requested, request))
+        loading.value = false
+    }
+  }
+  async function completed(result: PayrollAStatementCommandResult, requested: string, request: number) {
+    if (!same(requested, request) || result.statementId !== options.id())
+      return
+    if (result.outcome === 'needs-recheck') {
+      releaseOpen.value = false
+      error.value = '来源或此前已付已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
+    }
+    else {
+      releaseOpen.value = false
+      releaseRead.value = null
+      if (result.outcome === 'released')
+        releaseDraft.value = null
+    }
+    options.changed()
+    const nextRequest = sequence + 1
+    await load(true)
+    if (!same(requested, nextRequest))
+      return
+    if (result.outcome === 'needs-recheck')
+      error.value = '来源或此前已付已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
+    else
+      kit.success(result.outcome === 'released' ? '实际发放已保存，工资资料已冻结。' : '工资核对结果已保存。')
+  }
+  async function execute(kind: 'check' | 'ratio' | 'release', release?: PayrollAReleaseDraft) {
+    const value = kind === 'release' ? releaseRead.value : matching.value
+    if (!value || !writable.value || (kind === 'check' && !value.eligibility.canCheck) || (kind === 'release' && !value.eligibility.canRelease))
+      return
+    const requested = target()
+    const request = sequence
+    working.value = true
+    error.value = ''
+    if (release)
+      releaseDraft.value = release
+    try {
+      const result = kind === 'check' ? await store.checkA(value) : kind === 'ratio' ? await store.setAPayRatio(value, ratio.value) : await store.releaseA(value, release!)
+      if (same(requested, request)) {
+        working.value = false
+        await completed(result, requested, request)
+      }
+    }
+    catch (cause) {
+      if (same(requested, request))
+        error.value = toErrorMessage(cause)
+    }
+    finally {
+      if (same(requested, request))
+        working.value = false
+    }
+  }
+  function openRelease() {
+    if (!matching.value?.eligibility.canRelease || !writable.value)
+      return
+    releaseRead.value = matching.value
+    releaseDraft.value ??= payrollReleaseDefault(matching.value)
+    releaseOpen.value = true
+  }
+  async function recover() {
+    const operation = pending.value
+    if (!operation || busy.value)
+      return
+    const requested = target()
+    const request = sequence
+    working.value = true
+    try {
+      const result = await store.recoverA(operation)
+      if (same(requested, request) && result.statementId === options.id() && result.projectId === operation.command.projectId && operation.command.origin === options.origin()) {
+        working.value = false
+        await completed({ ...result, statementId: result.statementId }, requested, request)
+      }
+    }
+    catch (cause) {
+      if (same(requested, request))
+        error.value = toErrorMessage(cause)
+    }
+    finally {
+      if (same(requested, request))
+        working.value = false
+    }
+  }
+  watch(target, () => {
+    if (active.value) {
+      read.value = null
+      latest.value = null
+      output.value = null
+      releaseRead.value = null
+      releaseDraft.value = null
+      releaseOpen.value = false
+      void load()
+    }
+  }, { immediate: true })
+  onDeactivated(() => {
+    active.value = false
+    sequence += 1
+    loading.value = false
+    working.value = false
+  })
+  onActivated(() => {
+    if (active.value && started)
+      return
+    active.value = true
+    void load()
+  })
+  onScopeDispose(() => {
+    active.value = false
+    sequence += 1
+  })
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, recover }
+}

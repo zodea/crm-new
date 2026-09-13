@@ -106,6 +106,7 @@ onActivated(() => void load())
       <span v-else-if="detail?.dataOrigin === 'demo'" class="text-11px text-ink-faint">测试档案只读</span>
     </template>
     <template #summary>
+      <PayrollASourceReturn v-if="detail && route.query.payrollReturnTo" :kind="kind" :source-id="id" :origin="origin" class="mb-4" />
       <MetricGrid v-if="crewDetail && kind === 'crew'" :cols="6" data-testid="crew-central-summary">
         <Metric label="成员" :value="`${crewDetail.summary.memberCount} 人`" /><Metric label="在场成员" :value="`${crewDetail.summary.activeMemberCount} 人`" /><Metric label="关联项目" :value="`${crewDetail.summary.projectCount} 个`" /><Metric label="责任单元" :value="`${crewDetail.summary.assignedUnitCount} 个`" /><Metric label="已发工资" :value="`¥${crewDetail.summary.releasedWageAmount}`" /><Metric label="扣罚" :value="`¥${crewDetail.summary.penaltyAmount}`" />
       </MetricGrid>

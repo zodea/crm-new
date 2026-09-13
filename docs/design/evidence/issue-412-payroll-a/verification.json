@@ -1,0 +1,56 @@
+{
+  "baseline": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "recordedAt": "2026-09-13T06:46:12.929167+08:00",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "verification/npm-test-release.log",
+      "sha256": "2e9e584782edc24de6da2c27d1d48c90d38e05205d83d35054296894d76d1272",
+      "files": 626,
+      "tests": 3783,
+      "durationSeconds": 242.54
+    },
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "verification/typecheck-release.log",
+      "sha256": "29aa230872b81c9be83929131e82e9487811170eb768324395f03ab1523ffa01"
+    },
+    {
+      "command": "pnpm exec eslint <109 explicitly owned TypeScript/Vue/mjs paths>",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "verification/lint-release.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "files": 109
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "result": "passed",
+      "log": "verification/build-release.log",
+      "sha256": "30a684a8f39e7ba1d7ac38ddeff6bd09b69f663514215c98d2d69e816f4ed59c"
+    }
+  ],
+  "browser": {
+    "manifest": "browser/manifest.json",
+    "sourceRunId": "8a1b9aed-bdf5-4eca-af94-67422e0ce565",
+    "specs": 4,
+    "tests": 9,
+    "images": 85,
+    "visuallyReviewed": 85,
+    "failed": 0
+  },
+  "documents": {
+    "guidePages": 12,
+    "actualPayrollPdfPages": 1,
+    "visuallyReviewed": true
+  },
+  "commitHook": {
+    "status": "pending-normal-hook"
+  },
+  "scope": "P1 A 日常写入及冻结输出的本地中央实例验收；不代表C1/C2、P4–P7或生产部署已完成。"
+}

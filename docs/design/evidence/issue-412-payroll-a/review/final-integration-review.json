@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "/root/wbs_backend_standards_final",
+  "completedAt": "2026-09-13T06:31:15.3042866+08:00",
+  "fixedBase": "1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3",
+  "previousReview": {
+    "changedFiles": [
+      {
+        "path": "e2e/payroll-a-central.spec.ts",
+        "priorSha256": "bc6b96161d27a5021fe723ab8e4d6e17f3b768769a9d44384e15f10da303488f",
+        "sha256": "2e15d71c713dda2f43c4c0355f723270ef2b1fe8e102512d88d370f44fbb38a3"
+      },
+      {
+        "path": "app/components/payroll/PayrollASourceReview.vue",
+        "priorSha256": "feeca72af54797963a0a13d55625bd3b6097f2c28561aab388dfff53c19f0855",
+        "sha256": "3f45df7b69fbb74d4218d252c42aca536947b1289414f022cfef9bed3a7955fe"
+      }
+    ],
+    "sha256": "42b12c9b207a69047536990315aaa1688b219e9faba15b77e1c92d6b2ab914b5",
+    "path": ".tmp/remaining-issues-20260910/payroll-a-central/root/receipt-closure-review.json",
+    "inputCount": 44
+  },
+  "comparison": "HEAD is still fixed base. Tracked five-test differences read with git diff base. Untracked source/E2E and two Root regression tests read directly; previous receipt report is a hash manifest, not retained earlier source text. Prior reviewed receipt/domain files all still match except the two listed UI/E2E files.",
+  "scope": {
+    "integrationFiles": 7,
+    "totalFiles": 11,
+    "rootFormattingTests": 2,
+    "statusDocuments": 2
+  },
+  "standards": {
+    "smellBaseline": "Full code-review-matt Fowler baseline read; repo rules take precedence, heuristics are not hard violations; no actionable material smell in this bounded increment.",
+    "findings": [],
+    "unresolvedCount": 0
+  },
+  "checks": [
+    {
+      "result": "仅将 statements mock 改为 importOriginal 后覆盖原有 mocked 方法，保留真实 rounded 等纯函数；四条工资竞态和两条签工竞态的调用、等待与最终状态断言未删除，Native 模式未改变。",
+      "files": [
+        "tests/stores/payroll-race.test.ts",
+        "tests/stores/signed-daywork-race.test.ts"
+      ]
+    },
+    {
+      "result": "vi.hoisted 只准备 defineNuxtPlugin，静态导入仍是实际 tab-session plugin；真实 router、app:created hook 顺序、尚未 initialize、最终 /project、finishStartup 与 unavailable 断言完整。没有更改 timeout、worker 或跳过测试。",
+      "files": [
+        "tests/tabs/startup-order.test.ts"
+      ]
+    },
+    {
+      "result": "单列 grid/min-w-0 及独立可换行说明、摘要 min-w-0 为领域布局修复；班组能力判断、NavigationIntent 种类与 quantity-unit 门禁、stage/completion 对应原焦点及迟到隔离仍在，表格仅自身横滚，没有删除来源入口或业务文案。",
+      "files": [
+        "app/components/payroll/PayrollASourceReview.vue"
+      ]
+    },
+    {
+      "result": "新增非表格标题/说明/摘要实际矩形、TextRange、scrollWidth 与 390 说明多行校验；页面/工作区边界及 VXE 实际横滚仍保留。当前真实迁入、空首单、8/null/0、第二来源身份与焦点、stale 保稿、提交后丢响应恢复、300/0 冻结 XLSX/PDF 及次月 75 重核断言均存在。",
+      "files": [
+        "e2e/payroll-a-central.spec.ts"
+      ]
+    },
+    {
+      "result": "中央 A 草稿 stub 与实际 PayrollDraftFormPage 中央分支一致；Native/中央互斥和 legacy 未调用断言完整。quantity-unit 精确预期新增 origin=real，与 Registry 来源策略一致，未改为模糊匹配。",
+      "files": [
+        "tests/components/PayrollCentralBoundary.test.ts",
+        "tests/kit/entity-link.test.ts"
+      ]
+    },
+    {
+      "result": "直接复核现有金额七例和日期两例的有效断言：旧实际未知不反推、1280-900=380 不二扣/不混格式、月度比例、29 分与零成员、两类半分冻结、真实保存回执恢复；两种坏未来日期仍断言原主体诊断并对照合法未来日期应过滤。无 skip/only、测试门禁放松或用空夹具消除失败。未把缺少早期原文的哈希记录当成逐字格式 diff。",
+      "files": [
+        "tests/payroll/central-a-amount-integrity.test.ts",
+        "tests/payroll/quantity-facts-date-integrity.test.ts"
+      ]
+    },
+    {
+      "result": "状态文稿明确 A 中央验证版本已开放与 C1/C2 来源修改/核算/发放待接续；生产保存/部署未完成、单张输出不是完整工作簿。A 只取当月及以前完成事实，签工正文仅用于适用 C2；新 A 入口、配置、重新核对、确认实发、核对原提交与冻结输出对应当前页面。未宣称全票或生产验收完成。",
+      "files": [
+        "docs/guides/payroll-attendance.md",
+        "docs/rewrite/pages/subcontract-payroll.md"
+      ]
+    }
+  ],
+  "standardsSources": [
+    "AGENTS.md",
+    "docs/agents/module-review.md",
+    "docs/adr/0020-browser-authority-and-demo-workspace-boundary.md",
+    "docs/design/kit-ui-component-specs.md",
+    "C:/Users/Administrator/.agents/skills/code-review-matt/SKILL.md",
+    "C:/Users/Administrator/.agents/skills/vue-best-practices/SKILL.md"
+  ],
+  "validation": {
+    "finalWholeSuiteAndBrowser": "Root/C ongoing, not claimed by this bounded review",
+    "authorC": {
+      "tests": 19,
+      "files": 3,
+      "durationSeconds": 4.67
+    },
+    "reviewerSourceEdits": false,
+    "reviewerImagesViewed": false,
+    "reviewerServicesStarted": false,
+    "reviewerTestsRun": false,
+    "authorReportedA": {
+      "files": 3,
+      "tests": 7
+    },
+    "authorCLogRead": "ui/source-layout-boundary-green.log"
+  },
+  "files": [
+    {
+      "path": "tests/stores/payroll-race.test.ts",
+      "sha256": "94f3e7bd0dc8cfd006f3ef708d7556d19d3ec73cb34938d9a32388a75e56bf4f",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "tests/stores/signed-daywork-race.test.ts",
+      "sha256": "278add6dfed258091dd6e93c9305d5e8c2740174dd054c877c717e7483e4d5a1",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "tests/tabs/startup-order.test.ts",
+      "sha256": "2dc5ddbb6a497690db0ff0fa985eb4244c86ad24a4826131df999362fb5a85b5",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "app/components/payroll/PayrollASourceReview.vue",
+      "sha256": "3f45df7b69fbb74d4218d252c42aca536947b1289414f022cfef9bed3a7955fe",
+      "priorReviewSha256": "feeca72af54797963a0a13d55625bd3b6097f2c28561aab388dfff53c19f0855"
+    },
+    {
+      "path": "e2e/payroll-a-central.spec.ts",
+      "sha256": "2e15d71c713dda2f43c4c0355f723270ef2b1fe8e102512d88d370f44fbb38a3",
+      "priorReviewSha256": "bc6b96161d27a5021fe723ab8e4d6e17f3b768769a9d44384e15f10da303488f"
+    },
+    {
+      "path": "tests/components/PayrollCentralBoundary.test.ts",
+      "sha256": "b52b0b6e790bbf0233695b802a7e252fe53cb6af825e939bfda1f185ac1847f6",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "tests/kit/entity-link.test.ts",
+      "sha256": "45b40b9fdf0f31fc3deb6e106029b2df5ab45a0c1475865a73f94248f913d819",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "tests/payroll/central-a-amount-integrity.test.ts",
+      "sha256": "5b3af090f40ee71bce8a7f49d26e9fb1d874fe1c175a51ce06437246fcfc654d",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "tests/payroll/quantity-facts-date-integrity.test.ts",
+      "sha256": "94204d43c76ba9b6005ce3f94850efd43a6169722953c13d24d4729cca9dde23",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "docs/guides/payroll-attendance.md",
+      "sha256": "1cd46e0c933f092c1aea14cae73942fdc131fa525141fd3c0056b019853782b1",
+      "priorReviewSha256": null
+    },
+    {
+      "path": "docs/rewrite/pages/subcontract-payroll.md",
+      "sha256": "7bc3805de216885abbb72d78afe7007d6fad35c2e06e69c709464d51674ca731",
+      "priorReviewSha256": null
+    }
+  ]
+}

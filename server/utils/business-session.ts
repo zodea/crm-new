@@ -9,6 +9,7 @@ const DEFAULT_BUSINESS_SESSION = Object.freeze<BusinessSession>({
   actorId: 'actor-default',
   capabilities: Object.freeze([
     'payroll:read',
+    'payroll:write',
     'target-cost:read',
     'target-cost:write',
     'schedule:read',

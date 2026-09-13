@@ -7,7 +7,10 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
 const mocks = vi.hoisted(() => ({ list: vi.fn(), options: vi.fn() }))
 vi.mock('~/lib/db/connection', () => ({ getDb: vi.fn().mockResolvedValue({}), withTransaction: vi.fn() }))
 vi.mock('~/lib/payroll/daywork', () => ({ listSignedDayworkRecords: mocks.list, saveSignedDayworkRecord: vi.fn() }))
-vi.mock('~/lib/payroll/statements', () => ({ loadPayrollWorkbenchOptions: mocks.options }))
+vi.mock('~/lib/payroll/statements', async importOriginal => ({
+  ...await importOriginal<typeof import('~/lib/payroll/statements')>(),
+  loadPayrollWorkbenchOptions: mocks.options,
+}))
 
 beforeEach(() => {
   setActivePinia(createPinia())

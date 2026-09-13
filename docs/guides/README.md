@@ -28,7 +28,7 @@
 - [项目分供方工作台与文件导入使用指南](./project-supplier-workbench.md)
 - [分供方证照与资料核验使用指南](./supplier-credential-review.md)（中央原件及人工核验见 [#446](../design/evidence/issue-446/README.md)，OCR 人工确认与税务核验见 [#447](../design/evidence/issue-447/README.md)）
 - [材料单价分析使用说明](./material-price-analysis.md)
-- [工资与考勤工作台使用说明](./payroll-attendance.md)（中央历史接管、独立来源及后续核算/发放分期分别说明）
+- [工资与考勤工作台使用说明](./payroll-attendance.md)（中央历史接管、A 工资配置、核对、实际发放及冻结输出；后续 C1/C2 分期分别说明）
 - [OCR 设置使用说明](./ocr-settings.md)
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 - [开票因子与税额计算使用说明](./invoice-factor.md)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { isDesktopRuntime } from '~/lib/platform/runtime'
-import CentralPayrollUnavailableScreen from './CentralPayrollUnavailableScreen.vue'
+import CentralPayrollDraftFormPage from './CentralPayrollDraftFormPage.vue'
 import NativePayrollDraftFormPage from './NativePayrollDraftFormPage.vue'
 
 const native = isDesktopRuntime()
@@ -8,5 +8,5 @@ const native = isDesktopRuntime()
 
 <template>
   <NativePayrollDraftFormPage v-if="native" />
-  <CentralPayrollUnavailableScreen v-else />
+  <CentralPayrollDraftFormPage v-else />
 </template>

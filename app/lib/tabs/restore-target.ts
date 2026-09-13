@@ -1,6 +1,8 @@
 import type { RestorableTabPath, TabRestoreValidator } from './restoration-contract'
+import type { PayrollSourceKind } from '~/lib/payroll/a-navigation'
 import type { DomainRepositories } from '~/plugins/repositories'
 import type { DataOriginDTO } from '~/types/read-model'
+import { PAYROLL_A_CONFIG_PATH, PAYROLL_SOURCE_KEYS, payrollSourceContext } from '~/lib/payroll/a-navigation'
 import { PAYROLL_READ_QUERY_KEYS, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { QUANTITY_FILTER_KEYS } from '~/lib/quantity/navigation'
 import { SCHEDULE_DRILL_QUERY_KEYS } from '~/lib/schedule/navigation'
@@ -108,7 +110,7 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     if (segments.some(segment => segment === '.' || segment === '..' || WRITE_SEGMENTS.has(segment) || segment.includes('\\') || hasControlCharacters(segment)))
       return null
     const url = new URL(fullPath, 'https://ruihang.invalid')
-    if (url.origin !== 'https://ruihang.invalid')
+    if (url.origin !== 'https://ruihang.invalid' || url.pathname === PAYROLL_A_CONFIG_PATH)
       return null
     let detail: RestoredDetailPath | null = null
     if (!Object.hasOwn(LISTS, url.pathname)) {
@@ -133,6 +135,26 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    if (PAYROLL_SOURCE_KEYS.some(key => url.searchParams.has(key))) {
+      const sourceQuery = Object.fromEntries(url.searchParams)
+      const source: { kind: PayrollSourceKind, id: string, projectId?: string } | null = detail?.family === 'crew-worker-fact' && detail.kind === 'assignment'
+        ? { kind: 'quantity-unit' as const, id: detail.id, projectId: detail.secondId }
+        : detail?.family === 'worker' || detail?.family === 'crew'
+          ? { kind: detail.family, id: detail.id }
+          : url.pathname === '/subcontract/quantity'
+            ? { kind: 'quantity-project' as const, id: url.searchParams.get('project') || '', projectId: url.searchParams.get('project') || '' }
+            : null
+      if (!origin || !source || PAYROLL_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollSourceContext(sourceQuery, { ...source, origin }))
+        return null
+      PAYROLL_SOURCE_KEYS.forEach(key => allowed.add(key))
+    }
+    if (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment') {
+      for (const key of ['stageId', 'itemId', 'completionId']) {
+        if (url.searchParams.has(key) && (url.searchParams.getAll(key).length !== 1 || !isStableRouteIdentity(url.searchParams.get(key))))
+          return null
+        allowed.add(key)
+      }
+    }
     if (detail?.family === 'payroll' || ['/subcontract/payroll', '/subcontract/payroll/sources', '/subcontract/attendance', '/subcontract/daywork'].includes(url.pathname)) {
       const scope = payrollViewScope(Object.fromEntries([...url.searchParams.keys()].map(key => [key, url.searchParams.getAll(key).length > 1 ? url.searchParams.getAll(key) : url.searchParams.get(key)])))
       if (scope.error)

@@ -5,6 +5,7 @@ import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
 import { onActivated, onDeactivated } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
+import { payrollSourceQuery } from '~/lib/payroll/a-navigation'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { createQuantityCategoryExport, createQuantityLedgerExport } from '~/lib/quantity/export'
 import {
@@ -14,11 +15,8 @@ import {
   quantityMonthOptions,
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
-import {
-  buildQuantityFilterQuery,
-  readQuantityFilterQuery,
-  readQuantityOrigin,
-} from '~/lib/quantity/navigation'
+import { buildQuantityFilterQuery, quantityMatrixReturnPath, readQuantityFilterQuery, readQuantityOrigin } from '~/lib/quantity/navigation'
+
 import { buildScheduleReturnLocation, parseScheduleDrillContext, scheduleSourceQuery, validateScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -254,7 +252,7 @@ function completeCell(cell: QuantityMatrixCell): void {
 }
 
 function quantityFilterQuery() {
-  return { ...scheduleSourceQuery(route.query), ...buildQuantityFilterQuery({
+  return { ...payrollSourceQuery(route.query), ...scheduleSourceQuery(route.query), ...buildQuantityFilterQuery({
     project: projectId.value,
     building: buildingId.value,
     month: month.value,
@@ -493,6 +491,8 @@ watch(() => [route.query.project, route.query.origin, route.query.from, route.qu
       @refresh="retry"
     />
 
+    <PayrollASourceReturn v-if="snapshot && route.query.payrollReturnTo" kind="quantity-project" :source-id="projectId" :project-id="projectId" :origin="origin" />
+    <PayrollACreateFromQuantity v-if="snapshot && !isDesktopRuntime() && !route.query.payrollReturnTo" :project-id="projectId" :origin="origin" :month="month" :return-to="quantityMatrixReturnPath(buildQuantityFilterQuery({ project: projectId, building: buildingId, month, view: viewMode, trade, assignee: assigneeKey, origin }))" />
     <p v-if="origin === 'demo'" class="panel px-4 py-3 text-12px text-ink-soft" role="status">
       演示工程量只读。切换正式项目后可按权限配置模板、阶段和施工记录。
     </p>

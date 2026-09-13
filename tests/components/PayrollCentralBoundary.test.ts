@@ -15,7 +15,7 @@ const legacy = vi.fn(() => {
 const cases = [
   { component: PayrollScreen, central: 'CentralPayrollScreen', native: 'NativePayrollScreen' },
   { component: PayrollStatementDetailScreen, central: 'CentralPayrollDetailScreen', native: 'NativePayrollStatementDetailScreen' },
-  { component: PayrollDraftFormPage, central: 'CentralPayrollUnavailableScreen', native: 'NativePayrollDraftFormPage' },
+  { component: PayrollDraftFormPage, central: 'CentralPayrollDraftFormPage', native: 'NativePayrollDraftFormPage' },
   { component: AttendanceScreen, central: 'CentralPayrollSourcesScreen', native: 'NativeAttendanceScreen' },
   { component: SignedDayworkScreen, central: 'CentralPayrollSourcesScreen', native: 'NativeSignedDayworkScreen' },
 ]
@@ -27,7 +27,7 @@ beforeEach(() => {
     vi.stubGlobal(name, legacy)
 })
 describe('工资浏览器与桌面入口边界', () => {
-  it.each(cases)('$central 通过中央只读入口，不启动旧本地读写或输出', ({ component, central, native }) => {
+  it.each(cases)('$central 通过对应中央入口，不启动旧本地读写或输出', ({ component, central, native }) => {
     const wrapper = mount(component, { global: { stubs: { [central]: { template: '<div data-central>工资资料已接管</div>' }, [native]: { template: '<div data-native />' } } } })
     expect(wrapper.find('[data-central]').exists()).toBe(true)
     expect(wrapper.find('[data-native]').exists()).toBe(false)
