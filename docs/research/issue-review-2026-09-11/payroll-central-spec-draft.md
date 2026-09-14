@@ -6,7 +6,7 @@
 
 ## Problem Statement
 
-2026-09-13 实施续记：P0 完整接管与中央历史只读已提交为 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`，范围见 [P0 实施票](payroll-tickets/00-central-history-and-sources.md)及[逐项证据](../../design/evidence/issue-412-payroll-history/README.md)。[P1 A 工资](payroll-tickets/01-central-a-payroll.md)正在本地实施；以下问题保留实施前基线，P1–P7 的日常核算、费用与完整工作簿不由 P0 的只读验收替代。
+2026-09-14 实施续记：P0 完整接管与中央历史只读已提交为 `1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3`，范围见 [P0 实施票](payroll-tickets/00-central-history-and-sources.md)及[逐项证据](../../design/evidence/issue-412-payroll-history/README.md)。[P1 A 工资](payroll-tickets/01-central-a-payroll.md)已独立提交 `c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d`，实际核对、发放、冻结输出及原来源往返已验收，详见[P1证据](../../design/evidence/issue-412-payroll-a/README.md)。以下调查问题保留实施前基线；P2–P7 的 C1/C2、费用、更正与完整工作簿继续实施，不由已完成切片代验。
 
 工资已有本地 A/C1/C2 草稿、核对、发放、分配、打印及考勤/签工入口，但正式浏览器仍直接使用本地数据库。工资全图没有受控中央迁移；来源变更、跨单据占用、恢复及实际发放也没有覆盖所有入口的中央原子边界。班组、工人和成本消费者尚不能据此回读同一中央工资事实。
 

@@ -50,7 +50,19 @@
     "visuallyReviewed": true
   },
   "commitHook": {
-    "status": "pending-normal-hook"
+    "status": "passed",
+    "files": 626,
+    "tests": 3783,
+    "durationSeconds": 219.34,
+    "checks": [
+      "lint-staged eslint --fix",
+      "pnpm typecheck",
+      "pnpm test"
+    ],
+    "log": "verification/commit-hook.log",
+    "sha256": "6ed93792f5d110efe65a389be89d0523846dc68e50027faebb0fc9eba8f09904"
   },
-  "scope": "P1 A 日常写入及冻结输出的本地中央实例验收；不代表C1/C2、P4–P7或生产部署已完成。"
+  "scope": "P1 A 日常写入及冻结输出的本地中央实例验收；不代表C1/C2、P4–P7或生产部署已完成。",
+  "commit": "c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d",
+  "codeBlobsMatched": 110
 }

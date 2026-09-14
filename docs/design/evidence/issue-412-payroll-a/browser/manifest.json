@@ -41,27 +41,33 @@
     },
     {
       "file": "frozen-document.json",
-      "sha256": "c34321f3362d7fec19823224f59ca8d90061373b6380b47575013d68564e78fe",
-      "byteLength": 5156,
+      "sha256": "415983a8910f2cc0b3fffe932b441c388e6003e1f824400db0c818e1894df994",
+      "byteLength": 5157,
       "sourceRunId": "8a1b9aed-bdf5-4eca-af94-67422e0ce565",
       "originalFileName": "frozen-document.json",
-      "validation": "同一真实已发单的只读冻结输出数据"
+      "validation": "同一真实已发单的只读冻结输出数据",
+      "originalSha256": "c34321f3362d7fec19823224f59ca8d90061373b6380b47575013d68564e78fe",
+      "normalization": "正常提交格式化仅补末尾换行；逐值核对JSON内容不变，原运行字节摘要另行保留。"
     },
     {
       "file": "print-validation.json",
-      "sha256": "662cc218bcf2704aa4b006ff47525415744d5c3c76354e5d61f299296f7b082d",
-      "byteLength": 836,
+      "sha256": "07602102b22f5dfea8c9d7f62edbf5c61e05434caf94ded6408852334aecac6b",
+      "byteLength": 837,
       "sourceRunId": "8a1b9aed-bdf5-4eca-af94-67422e0ce565",
       "originalFileName": "print-validation.json",
-      "validation": "实际PDF逐页文本提取记录"
+      "validation": "实际PDF逐页文本提取记录",
+      "originalSha256": "662cc218bcf2704aa4b006ff47525415744d5c3c76354e5d61f299296f7b082d",
+      "normalization": "正常提交格式化仅补末尾换行；逐值核对JSON内容不变，原运行字节摘要另行保留。"
     },
     {
       "file": "source-verification.json",
-      "sha256": "52a449e9f592504a69556419e888cd7e9f726be82bd187802df1f2817e42261f",
-      "byteLength": 1208,
+      "sha256": "5cf9ea59761b49ed7f52d4201e1d5eb848920e11828f0000e945c32da3a4d9b9",
+      "byteLength": 1209,
       "sourceRunId": "8a1b9aed-bdf5-4eca-af94-67422e0ce565",
       "originalFileName": "verification.json",
-      "validation": "真实SQLite字节哈希、公开迁入批次及新发放身份"
+      "validation": "真实SQLite字节哈希、公开迁入批次及新发放身份",
+      "originalSha256": "52a449e9f592504a69556419e888cd7e9f726be82bd187802df1f2817e42261f",
+      "normalization": "正常提交格式化仅补末尾换行；逐值核对JSON内容不变，原运行字节摘要另行保留。"
     },
     {
       "file": "browser-run.log",
@@ -1662,7 +1668,7 @@
       "inspectedImages": 30
     }
   ],
-  "acceptanceStatus": "browser-and-visual-passed-awaiting-commit-hook",
+  "acceptanceStatus": "local-slice-verified-and-committed",
   "visualReview": {
     "passed": 85,
     "total": 85,
@@ -1672,5 +1678,6 @@
       "root": 35,
       "payroll_a_receipt_closure": 30
     }
-  }
+  },
+  "commit": "c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d"
 }
