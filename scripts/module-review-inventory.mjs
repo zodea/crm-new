@@ -80,13 +80,13 @@ export const ADAPTERS = {
   },
   'payroll-c1-browser': {
     read: '逐日考勤、个人日薪与独立加班标准、C1 草稿和同次发放冻结的工资/考勤配对输出',
-    write: '固定范围与原提交的个人标准、C1 保存/核对/实际发放；P2 整合验收中',
+    write: '固定范围与原提交的个人标准、C1 保存/核对/实际发放；P2 已通过本地限定验收',
     storage: '与考勤及 A 工资共用中央工作区事务；原来源与恢复保护独立验收，生产持久化仍待 #416',
     sources: [['app/components/payroll/CentralC1DraftFormPage.vue', 'usePayrollC1Form'], ['server/utils/payroll-c1-service.ts', 'createPayrollC1Service']],
   },
   'attendance-central-browser': {
     read: '中央真实工人日期矩阵、原组历史、月份占用与来源诊断；空格与真实零分开',
-    write: '固定项目/工人/日期的考勤命令及原键恢复；同月 C1/C2 互斥，已发全成员锁月；P2 整合验收中',
+    write: '固定项目/工人/日期的考勤命令及原键恢复；同月 C1/C2 互斥，已发全成员锁月；P2 已通过本地限定验收',
     storage: '中央工作区验证实例；浏览器不回写本地正式库，生产持久化仍待 #416',
     sources: [['app/components/payroll/AttendanceScreen.vue', 'CentralAttendanceScreen'], ['server/utils/payroll-attendance-service.ts', 'createPayrollAttendanceService']],
   },

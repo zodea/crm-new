@@ -9,6 +9,7 @@ const quantityCases = ['C-D5B7E5570149', 'C-DF7B130B33EE', 'C-5BF5E8DBAFCE', 'C-
 const targetCostCases = ['C-050232A62894', 'C-F06D8D7FCF2C', 'C-CF708A06FEBF', 'C-73665550F1A0']
 const payrollCases = ['C-9C98D806E9B1', 'C-D8B07FE3B973', 'C-A7B5F1FDD485']
 const payrollACases = [...payrollCases, 'C-D3A1780D1250', 'C-D5D665364A7D']
+const payrollC1Cases = ['C-0E290F34471B', 'C-0691840A9820', 'C-47E400CBBB0A', 'C-E648A9E95DCF', 'C-35235DAEA64C', 'C-B1D7348A13D7', 'C-72AAED4C3E21', 'C-54E1EDEB0DBF', 'C-F0F7F41C11C4', 'C-95C49C34C8F0', 'C-10C2AA2AC212', 'C-8760F1D1B19E', 'C-99C11727D5D7', 'C-849CF779D9ED', 'C-CBC81AEE97F5', 'C-322F46461EF5']
 const attendanceCase = 'C-5751CF6E9985'
 const dayworkCase = 'C-7C09C38C854D'
 const progressCases = [...scheduleCases, ...quantityCases, ...targetCostCases]
@@ -61,6 +62,12 @@ const payrollAEvidence = {
   commit: 'c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d',
   recency: 'current-run',
   scope: 'A 原施工事实与工资配置、草稿、重核、实发及全成员分配、冻结打印和 XLSX、原来源返回与恢复保护；不含 C1/C2 日常写入、更正、完整成本、费用工作簿或生产保存',
+}
+const payrollC1Evidence = {
+  reference: 'docs/design/evidence/issue-412-payroll-c1/README.md',
+  commit: 'fd0a7b6b4ab58eb177eea1db86a069067be92a4a',
+  recency: 'current-run',
+  scope: '逐日原考勤与个人标准、C1独立工资核对/实发/全成员月锁、原键后读恢复及配对PDF/XLSX；不含C2日常写入、P4–P7或生产部署',
 }
 const homeScheduleEvidence = {
   reference: 'docs/design/evidence/issue-434/README.md',
@@ -497,10 +504,10 @@ export const REVIEW_OBLIGATIONS = [
     label: '#301 AC2/3 / #352 AC1 C1 真实考勤来源与空态',
     sources: [issue(301), issue(352), issue(433)],
     ownerIssue: 412,
-    caseIds: [...payrollCases, attendanceCase],
-    status: 'partial',
-    evidence: [payrollEvidence],
-    remaining: '#433 已验证 C1 来源呈现与相关本地回归；中央考勤生成、工资配置读取和真实空态仍需端到端验证，不从工程量或合同补记录。',
+    caseIds: [...payrollCases, attendanceCase, ...payrollC1Cases],
+    status: 'current-passed',
+    evidence: [payrollC1Evidence],
+    remaining: 'P2 已验证真实考勤原行、空记录与真实零、个人日薪及独立加班标准和月度核算；无工程量仍可用，费率60.125及工时7.51保真，未配置不补默认记录。',
   },
   {
     id: 'WAGE-05',
@@ -517,20 +524,20 @@ export const REVIEW_OBLIGATIONS = [
     label: '#301 AC6 / #351–353 AC2/4 工资来源、草稿与成员分配中央保存',
     sources: [issue(301), issue(351), issue(352), issue(353)],
     ownerIssue: 412,
-    caseIds: wageCases,
+    caseIds: [...wageCases, ...payrollC1Cases],
     status: 'partial',
-    evidence: [payrollHistoryEvidence, payrollAEvidence],
-    remaining: 'P0 完整图接管与原子恢复、P1 A 原责任/量价/版本/全成员分配中央保存及幂等发放已验证；C1/C2 日常保存与恢复保护仍按 P2/P3 逐类型验收。',
+    evidence: [payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence],
+    remaining: 'P0完整原图、P1 A及P2 C1中央保存、全成员分配与幂等发放已验证；P3 C2日常签工及工资保存、双方日常命令并发仍独立验收。',
   },
   {
     id: 'WAGE-07',
     label: '#352/353 AC3 工资、考勤、签工来源范围恢复',
     sources: [issue(352), issue(353), issue(433)],
     ownerIssue: 412,
-    caseIds: wageCases,
+    caseIds: [...wageCases, ...payrollC1Cases],
     status: 'current-passed',
-    evidence: [payrollEvidence, payrollHistoryEvidence],
-    remaining: '原本地往返和 P0 中央只读台账、详情、考勤及签工来源已验证项目、月份、班组、多工资状态和深链隔离；C1/C2 新增写态保稿随 P2/P3 独立验收，A 写态和工程量入口见 WAGE-08。',
+    evidence: [payrollEvidence, payrollHistoryEvidence, payrollC1Evidence],
+    remaining: '旧来源范围往返及P2 C1原草稿/逐日ID/个人配置返回、冷页原键恢复已验证；P3新签工写态继续独立验收，不把原query作为实体身份。',
   },
   {
     id: 'WAGE-08',
@@ -547,10 +554,10 @@ export const REVIEW_OBLIGATIONS = [
     label: '#301 AC4 / #354 AC1 发放工资与劳务结算成本防双计',
     sources: [issue(301), issue(354), 'docs/rewrite/DATABASE.md'],
     ownerIssue: 412,
-    caseIds: payrollCases,
+    caseIds: [...payrollCases, ...payrollC1Cases],
     status: 'partial',
-    evidence: [payrollAEvidence],
-    remaining: 'P1 已验证 A 唯一 released 实发、整数分分配不再叠加金额及同键重试；完整成本/资金消费者、合同劳务隔离和更正后的跨页汇总仍由 P4 联验，不能用单张工资支付事实代替完整成本。',
+    evidence: [payrollAEvidence, payrollC1Evidence],
+    remaining: 'P1 A与P2 C1只形成一次真实实发、完整分配不重复加金额、同键重试不重复发放；完整成本及资金消费者、合同劳务隔离与更正后跨页汇总仍由P4联验。',
   },
   {
     id: 'WAGE-10',
@@ -567,30 +574,30 @@ export const REVIEW_OBLIGATIONS = [
     label: '#301 AC5 / #354 AC2/3 发放冻结、详情和调整历史',
     sources: [issue(301), issue(354)],
     ownerIssue: 412,
-    caseIds: payrollCases,
+    caseIds: [...payrollCases, ...payrollC1Cases],
     status: 'partial',
-    evidence: [payrollHistoryEvidence, payrollAEvidence],
-    remaining: 'P0 原文/缺损历史与 P1 A 原子冻结、原回执和快照来源复算、真实 PDF/XLSX 已验证；C1/C2 冻结及独立调整历史、完整实际成本仍按 P2–P4 验收。',
+    evidence: [payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence],
+    remaining: 'P0缺损原文与P1 A、P2 C1原子冻结及回执/来源互证、实际PDF和XLSX已验证；P2包含工资与考勤配对两表。P3 C2及P4独立调整历史和完整成本继续验收。',
   },
   {
     id: 'WAGE-12',
     label: '#301 AC6 / #350–354 AC4–6 工资迁移、集成、指南和独立交付',
     sources: [issue(301), issue(350), issue(351), issue(352), issue(353), issue(354)],
     ownerIssue: 412,
-    caseIds: wageCases,
+    caseIds: [...wageCases, ...payrollC1Cases],
     status: 'partial',
-    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence],
-    remaining: 'P0 完整资料与历史只读、P1 A 中央链均有独立固定提交及复核；P1 为 626 文件3783项、9条浏览器流程、85张五档图、12页指南和真实单据输出。C1/C2、费用、完整工作簿与跨域更正仍按 P2–P7 实施，生产关口归 #416。',
+    evidence: [payrollEvidence, payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence],
+    remaining: 'P0/P1/P2均具固定提交及独立复核；P2完整654文件3866项、14条真实浏览器流程、125交互图、13页指南和实际配对输出已验证。P3–P7及#416仍分别承接。',
   },
   {
     id: 'WAGE-13',
     label: '#117 D4 工资配置、统一改价与个人例外',
     sources: [issue(117), `${issue(117)}#issuecomment-5015242817`, `${issue(117)}#issuecomment-5015356993`, issue(351)],
     ownerIssue: 412,
-    caseIds: payrollACases,
+    caseIds: [...payrollACases, ...payrollC1Cases],
     status: 'partial',
-    evidence: [payrollAEvidence],
-    remaining: 'P1 A 主体配置、分项范围、基准/个人价、修订生效月和月度/结算/尾款比例已验证；默认值不冒充建档、缩范围不复活旧价、转组不改挂旧价。C1/C2 专属费率仍随 P2/P3 验收。',
+    evidence: [payrollAEvidence, payrollC1Evidence],
+    remaining: 'P1 A主体分项与个人价、P2 C1档案日薪优先/缺档兜底/独立加班标准已验证；明确0与空值、原项目班组恢复及历史原标准分别保留。P3 C2主体价继续验收。',
   },
   {
     id: 'WAGE-14',

@@ -2,6 +2,8 @@
 
 > 2026-09-14，P2 本地限定验收通过。固定比较基线为 `579d9383357fffd2bd87e727dbc21b903a7cb69c`；最终输入与检查见 [verification.json](./verification.json)。本页不代表全部工资、线上部署或生产保存已完成。
 
+产品与正式证据提交为 `fd0a7b6b4ab58eb177eea1db86a069067be92a4a`，正常提交钩子再次通过 654 文件 / 3866 项，112 个代码内容身份与提交一致，见[提交回执](./commit-receipt.json)。693 个专用临时文件及此前 15 份重复证据已送入回收站，可恢复；正式产物保留，见[清理记录](./cleanup-record.json)。
+
 本期承接[本地 P2 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/02-central-c1-attendance.md)。业务口径以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[数据库](../../../rewrite/DATABASE.md)与[命令](../../../rewrite/COMMANDS.md)为准；P1 的通过结果不替代本期 C1 验收。
 
 ## 本期流程
