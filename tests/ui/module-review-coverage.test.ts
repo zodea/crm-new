@@ -33,7 +33,7 @@ describe('module review coverage', () => {
     expect(byId('WAGE-09').status).toBe('partial')
     expect(byId('WAGE-09').remaining).toContain('材料/报销')
     expect(byId('WAGE-12').status).toBe('partial')
-    expect(byId('WAGE-12').remaining).toContain('P5–P7')
+    expect(byId('WAGE-12').remaining).toContain('P6/P7')
   })
 
   it('registers stage creation, editing and reporting as unverified central browser work', () => {
@@ -268,7 +268,9 @@ describe('module review coverage', () => {
       expect(byId(id).evidence).toContainEqual(payrollC2Proof)
     for (const id of ['WAGE-06', 'WAGE-11', 'WAGE-13'])
       expect(byId(id).evidence).toContainEqual(payrollAProof)
-    for (const id of ['WAGE-14', 'WAGE-15', 'WAGE-16', 'WAGE-17']) {
+    expect(byId('WAGE-14').status).toBe('current-passed')
+    expect(byId('WAGE-14').sources).toContain('https://github.com/zodea/crm-new/issues/117')
+    for (const id of ['WAGE-15', 'WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('ready')
       expect(byId(id).sources).toContain('https://github.com/zodea/crm-new/issues/117')
       expect(byId(id).evidence).toEqual([])

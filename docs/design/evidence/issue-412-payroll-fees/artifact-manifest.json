@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "run": "browser-seventh",
-  "productCommit": null,
+  "productCommit": "61a6a10ddee611125d9d10b8dfd9dd81f99db467",
   "scope": "第七轮主旅程与打印；第八轮仅归档390金额列补图、其独立事实记录与通过日志；不代表生产保存",
   "sourceCopiesRetained": true,
   "pdfRetained": false,
@@ -1108,5 +1108,7 @@
     "scope": "390金额列完整单行入镜",
     "independentScenario": true,
     "originalSeventhArtifactsRetained": true
-  }
+  },
+  "sourceCopyRetentionScope": "仅第八轮运行日志临时副本仍被本次登记使用；主浏览器与渲染页图副本已回收，见cleanup.json",
+  "browserAndRenderCopiesRecycled": true
 }

@@ -1,0 +1,42 @@
+{
+  "baseline": "61a6a10ddee611125d9d10b8dfd9dd81f99db467",
+  "checkedAt": "2026-09-14T17:45:29.254Z",
+  "rows": 46,
+  "untouchedArticlesByteForByte": 45,
+  "unchangedBusinessRows": 6,
+  "stateCounts": {
+    "local-done": 31,
+    "partial": 14,
+    "decision": 1
+  },
+  "changedNodes": [
+    "a",
+    "frozen",
+    "output",
+    "end"
+  ],
+  "graphNodes": 18,
+  "graphEdges": 27,
+  "geometryAndEdgesUnchanged": true,
+  "allCaseIdentityAndAcceptanceUnchanged": true,
+  "counts": {
+    "productionRoutes": 152,
+    "rootVariants": 208,
+    "surfaces": 754,
+    "environmentCases": 1221,
+    "referenceMenus": 59
+  },
+  "preserved": [
+    "other45embeddedRows",
+    "other45readmeRows",
+    "overviewBytes",
+    "behaviorScriptBytes",
+    "notes",
+    "P4SolvedEntries",
+    "flow",
+    "exception",
+    "otherObligations"
+  ],
+  "htmlSha256": "eddacc21a1bc2b1dbc55174140494f297cc141af7a1fd81245dd13bde56fe46e",
+  "readmeSha256": "97214731ae15fa30b9d2d1ea9bdbcecc26ebf0d473ad583f5973e7f5e1c932e9"
+}

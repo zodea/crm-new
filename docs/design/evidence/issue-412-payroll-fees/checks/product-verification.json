@@ -1,0 +1,13 @@
+{
+  "commit": "61a6a10ddee611125d9d10b8dfd9dd81f99db467",
+  "exactFiles": 340,
+  "typecheck": "passed",
+  "testFiles": 740,
+  "tests": 4190,
+  "testSeconds": 295.02,
+  "codeWorkingTreeSha256Matches": 144,
+  "artifactWorkingTreeAndGitBlobSha256Matches": 149,
+  "rawCaptures": "9 JSON原文以.json.txt及Git binary属性保原字节",
+  "pushed": false,
+  "productionPersistence": false
+}
