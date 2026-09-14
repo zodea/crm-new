@@ -1,0 +1,96 @@
+{
+  "productCommit": "f39d8106579ea09cd1335119701ba6105cd22846",
+  "sourceCodeChanges": 0,
+  "note": "正常提交钩子仅整理12份证据JSON格式；原始清单摘要不改，逐字节原件另以txt保留，解析值逐项等同。原始映射的摘要对应这些原件，其余文件不变。",
+  "records": [
+    {
+      "path": "browser/config-recovery/c2-config-recovery.json",
+      "beforeSha256": "d48b3ee3ce29d18e9835f84ea8227371f944617944b5ead31e7a9fab1b0436ef",
+      "committedWorkingBytesSha256": "a78e09ae75fdf9a01d06ab455f4c9836a10673657f585b22bdf03796d225212b",
+      "originalBytes": "checks/original-bytes/browser/config-recovery/c2-config-recovery.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/later-change-recovery/daywork-later-change-result.json",
+      "beforeSha256": "d490a84d0132a888f9a0b71a4320354b6d788d7a0bcc900d184ed0230d3ac7af",
+      "committedWorkingBytesSha256": "b5ab18e5b3f6cc0d00554d3202b07b5a6e6c376913e73ad3f59e9c507d6438cc",
+      "originalBytes": "checks/original-bytes/browser/later-change-recovery/daywork-later-change-result.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/legacy-readonly/legacy-readonly.json",
+      "beforeSha256": "106fe04bea6f277087d255cfb707ac1ff79bc168d1147fac68ed50b8cef0f482",
+      "committedWorkingBytesSha256": "79c11ea31414117cc1f8317d589c0fddca638085714785bd19934fdc451c1f8a",
+      "originalBytes": "checks/original-bytes/browser/legacy-readonly/legacy-readonly.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/long-output/long-output-verification.json",
+      "beforeSha256": "0604abb7e2dace14f5ed989fff417079472ff7c4111d4255f65967a702becbf1",
+      "committedWorkingBytesSha256": "e89a0fb131fe25fc6ad3d98e2a70273863d6304bfbee692e34a667e8b6a122f9",
+      "originalBytes": "checks/original-bytes/browser/long-output/long-output-verification.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/main/identities.json",
+      "beforeSha256": "3667259f7d83b2cfacee1e5b0eceba8fbf6b8cc381fc9fb5831f88776a6b123e",
+      "committedWorkingBytesSha256": "3488b421597e7ab8550227dfdb340d698aff3d45027f27f6df1dcc7279cddd88",
+      "originalBytes": "checks/original-bytes/browser/main/identities.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/main/print-validation.json",
+      "beforeSha256": "148a39b13d94f846c403c7001125b0c8959ac10b99687b0966ffbce844eec5d1",
+      "committedWorkingBytesSha256": "2aec627eab4dab89903ada0622457c1ba43eebbdd89183ef856c006b23f8de86",
+      "originalBytes": "checks/original-bytes/browser/main/print-validation.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/main/verification.json",
+      "beforeSha256": "a8c36f039a74c9971bd0f67489280f7e87334f83becf1d8e1c78a43e3d8aef67",
+      "committedWorkingBytesSha256": "cd287bf9629a25ba892ed42a6b5994c333571586beb1af4f9eaef054a12586a4",
+      "originalBytes": "checks/original-bytes/browser/main/verification.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "browser/new-daywork-recovery/daywork-cold-recovery.json",
+      "beforeSha256": "766641e70065a55665e7679cd836abc18e4f58dc0885d4471c43e5814136f47c",
+      "committedWorkingBytesSha256": "ccf6c5345a2163bce1e0eb7754fa03f716bfc401f29ab76cdc71525324de58e0",
+      "originalBytes": "checks/original-bytes/browser/new-daywork-recovery/daywork-cold-recovery.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "checks/a/validation.json",
+      "beforeSha256": "9e2d23ba04b0145b5cc184800a3618adef14d7844c488e672235da078f3e1aad",
+      "committedWorkingBytesSha256": "845c7c72d32de45cc0e5ba98eaeba06aecc6cc5d251ae1fbfa87f711499abb95",
+      "originalBytes": "checks/original-bytes/checks/a/validation.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "checks/visual/archive-map.json",
+      "beforeSha256": "97880a69fa5006c610c0c3a10a06bb1504f420f89a0d020bee434a69ff89ed7d",
+      "committedWorkingBytesSha256": "5103aba90a3df2e6daac5483cff02cf2bcfcf9f41ec9dafc45e34a2bb839eda9",
+      "originalBytes": "checks/original-bytes/checks/visual/archive-map.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "interaction/supplement/notice-final-verification.json",
+      "beforeSha256": "aca9970b99999ff21bdbdefcabbe0d9db4e1452d2f59a3aaa268e49081722e01",
+      "committedWorkingBytesSha256": "5d2c3c305595fd1d68e623969fa887c299f56194dc3e6ec24e04b554b1b03c9b",
+      "originalBytes": "checks/original-bytes/interaction/supplement/notice-final-verification.json.txt",
+      "jsonMeaningUnchanged": true
+    },
+    {
+      "path": "interaction/supplement/right-columns-final-verification.json",
+      "beforeSha256": "d9bf03f478549d7271775d3af1571406b64b26697059c6665e30ea469ad4076a",
+      "committedWorkingBytesSha256": "574bfb57dc23c9869206d8005041612411b56a52035d011a9b2370cdf1cb13e9",
+      "originalBytes": "checks/original-bytes/interaction/supplement/right-columns-final-verification.json.txt",
+      "jsonMeaningUnchanged": true
+    }
+  ],
+  "originalArchive": {
+    "path": "pre-hook-originals.zip",
+    "sha256": "9f6a27d5e1e5c906890eb0326690dd022c88adcd3329c1d7e2554b04fec1a566",
+    "note": "ZIP保存精确原始字节，避免Git文本换行转换影响原始摘要；archiveEntry对应各originalBytes去掉checks/original-bytes前缀。"
+  }
+}

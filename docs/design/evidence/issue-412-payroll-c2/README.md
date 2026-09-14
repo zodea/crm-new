@@ -4,6 +4,8 @@
 
 本期承接 [P3 实施票](../../../research/issue-review-2026-09-11/payroll-tickets/03-central-c2-daywork.md)，业务以[工资页面](../../../rewrite/pages/subcontract-payroll.md)、[命令](../../../rewrite/COMMANDS.md)及[数据模型](../../../rewrite/DATABASE.md)为准。
 
+产品已独立提交为 `f39d8106579ea09cd1335119701ba6105cd22846`，正常提交钩子再次通过规范、类型及682文件/3964项测试。产品提交当时112项源码身份保持不变。钩子仅整理12份证据JSON格式，原始清单仍保留提交前摘要，精确原件与提交后对应见[格式记录](checks/commit-normalization.json)；两者解析内容相同。产品提交事实见[提交回执](commit-receipt.md)；后置覆盖断言与HTTP单例时限已另行改变，分轮结果和最终验证见[后置登记](checks/closeout/README.md)，不倒改原始清单。
+
 ## 操作与异常返回
 
 ```mermaid

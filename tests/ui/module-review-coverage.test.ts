@@ -217,17 +217,25 @@ describe('module review coverage', () => {
     expect(byId('WAGE-01').status).toBe('current-passed')
     expect(byId('WAGE-02').status).toBe('current-passed')
     expect(byId('WAGE-02').evidence).toEqual([expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-history/README.md', commit: '1de44da2fdeb8091fb0e2cc2f3bcfd9794e07fc3', recency: 'current-run' })])
-    expect(byId('WAGE-06').status).toBe('partial')
     expect(byId('WAGE-10').status).toBe('ready')
     const payrollAProof = expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-a/README.md', commit: 'c4c5b9f2e8398cc6e4dc6b51bd6f844dff9cb91d', recency: 'current-run' })
     for (const id of ['WAGE-03', 'WAGE-08']) {
       expect(byId(id).status).toBe('current-passed')
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     }
-    for (const id of ['WAGE-06', 'WAGE-09', 'WAGE-11', 'WAGE-12', 'WAGE-13', 'WAGE-18']) {
+    for (const id of ['WAGE-09', 'WAGE-11', 'WAGE-12', 'WAGE-18']) {
       expect(byId(id).status).toBe('partial')
       expect(byId(id).evidence).toContainEqual(payrollAProof)
     }
+    const payrollC2Proof = expect.objectContaining({ reference: 'docs/design/evidence/issue-412-payroll-c2/README.md', commit: 'f39d8106579ea09cd1335119701ba6105cd22846', recency: 'current-run' })
+    for (const id of ['WAGE-05', 'WAGE-06', 'WAGE-07', 'WAGE-13']) {
+      expect(byId(id).status).toBe('current-passed')
+      expect(byId(id).evidence).toContainEqual(payrollC2Proof)
+    }
+    for (const id of ['WAGE-09', 'WAGE-11', 'WAGE-12'])
+      expect(byId(id).evidence).toContainEqual(payrollC2Proof)
+    for (const id of ['WAGE-06', 'WAGE-13'])
+      expect(byId(id).evidence).toContainEqual(payrollAProof)
     for (const id of ['WAGE-14', 'WAGE-15', 'WAGE-16', 'WAGE-17']) {
       expect(byId(id).status).toBe('ready')
       expect(byId(id).sources).toContain('https://github.com/zodea/crm-new/issues/117')

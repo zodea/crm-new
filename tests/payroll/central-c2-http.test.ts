@@ -90,4 +90,4 @@ it('真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发�
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     await f.close()
   }
-})
+}, 30_000)

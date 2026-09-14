@@ -1,0 +1,34 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+Not implemented: navigation to another Document
+Not implemented: navigation to another Document
+ ❯ |unit| tests/ui/module-review-coverage.test.ts (16 tests | 1 failed) 8447ms
+     × retains each inherited progress and payroll ticket without promoting local evidence to central acceptance 346ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/ui/module-review-coverage.test.ts > module review coverage > retains each inherited progress and payroll ticket without promoting local evidence to central acceptance
+AssertionError: expected 'current-passed' to be 'partial' // Object.is equality
+
+Expected: "partial"
+Received: "current-passed"
+
+ ❯ tests/ui/module-review-coverage.test.ts:220:36
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 681 passed (682)
+      Tests  1 failed | 3963 passed (3964)
+   Start at  16:38:46
+   Duration  301.36s (transform 108.77s, setup 250.95s, import 492.78s, tests 1360.84s, environment 793.44s)
+

@@ -1,0 +1,39 @@
+{
+  "original": {
+    "commandId": "daywork-command_mu0x4nx4_1",
+    "workspaceId": "workspace-default",
+    "actorId": "actor-default",
+    "origin": "real",
+    "sourceVersion": "payroll:71+identities:36ae3dd4b0263bb4cd666e10d3108e34ef34e4ab1240f09b65b1b732cd8fbaf3+daywork-form:0eb65529769c64fdda91a61e699d1a2ed1285170022bf785e64c8fd0fd3e69c7",
+    "requiredCapability": "payroll:write",
+    "projectId": "core-projects-873cfe0b2e0c266305a44407",
+    "recordId": null,
+    "draftKey": "c2-daywork-cold-original",
+    "originalScope": null,
+    "action": {
+      "kind": "save-daywork",
+      "record": {
+        "projectId": "core-projects-873cfe0b2e0c266305a44407",
+        "crewId": "core-crews-7c5300e238cb36fd4716f0e9",
+        "workerId": "core-workers-c5b9644e8990dad27db7dd8b",
+        "workDate": "2026-10-03",
+        "workContent": "冷页后仍保存原半工和长施工内容，不重复登记",
+        "startTime": "08:00",
+        "endTime": "12:00",
+        "laborUnits": "0.5",
+        "witness": "",
+        "confirmedOn": null,
+        "status": "draft",
+        "note": ""
+      }
+    }
+  },
+  "records": [
+    {
+      "id": "daywork_mu0x4phg_e2",
+      "workDate": "2026-10-03",
+      "laborUnits": 0.5,
+      "status": "draft"
+    }
+  ]
+}
