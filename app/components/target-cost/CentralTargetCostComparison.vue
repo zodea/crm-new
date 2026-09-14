@@ -60,7 +60,7 @@ const columns: KitTableColumn[] = [
             查看已确认结算
           </NuxtLink>
           <NuxtLink v-if="source(row.sources.payment)" :to="source(row.sources.payment)!" class="text-brand underline">
-            查看支付事实
+            {{ row.category === '工人工资' ? '查看工资实际收付' : '查看支付事实' }}
           </NuxtLink>
           <NuxtLink v-if="source(row.sources.reimbursement)" :to="source(row.sources.reimbursement)!" class="text-brand underline">
             查看已确认报销

@@ -1,10 +1,14 @@
 <script setup lang="ts">
-defineProps<{ pending: boolean, busy: boolean, error: string, awaitingRead?: boolean }>()
+import { shallowRef } from 'vue'
+
+defineProps<{ pending: boolean, busy: boolean, error: string, awaitingRead?: boolean, focusable?: boolean }>()
 defineEmits<{ recover: [], refresh: [] }>()
+const panel = shallowRef<HTMLElement | null>(null)
+defineExpose({ focus: () => panel.value?.focus() })
 </script>
 
 <template>
-  <section v-if="pending || error" class="panel grid gap-2 p-3 text-12px leading-5" :role="error ? 'alert' : 'status'" aria-label="工资提交核对">
+  <section v-if="pending || error" ref="panel" :tabindex="focusable ? -1 : undefined" class="panel grid gap-2 p-3 text-12px leading-5" :role="error ? 'alert' : 'status'" aria-label="工资提交核对">
     <p v-if="error" class="break-words text-danger">
       {{ error }}
     </p>

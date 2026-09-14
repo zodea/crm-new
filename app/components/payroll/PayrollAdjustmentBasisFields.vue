@@ -1,0 +1,175 @@
+<script setup lang="ts">
+import type { PayrollAdjustmentBasisDraft, PayrollOriginalWageRef } from '~/lib/payroll/central-adjustment-contract'
+import { computed } from 'vue'
+import { c2InputNumber } from '~/lib/payroll/c2-presentation'
+
+const props = defineProps<{ basis: PayrollAdjustmentBasisDraft | null, original: PayrollOriginalWageRef, disabled: boolean, sectionId?: string }>()
+const emit = defineEmits<{ change: [value: PayrollAdjustmentBasisDraft] }>()
+const names = computed(() => new Map(props.original.members.map(member => [member.workerId, member.workerName || '姓名未记录'])))
+function update(group: 'records' | 'rates' | 'components', index: number, field: string, value: unknown) {
+  if (props.disabled || !props.basis)
+    return
+  const basis = JSON.parse(JSON.stringify(props.basis)) as PayrollAdjustmentBasisDraft
+  if (group === 'components' && basis.formatFamily === 'A')
+    Object.assign(basis.components[index]!, { [field]: value })
+  else if (group === 'rates' && basis.formatFamily === 'C1')
+    Object.assign(basis.rates[index]!, { [field]: value })
+  else if (group === 'records' && basis.formatFamily !== 'A')
+    Object.assign(basis.records[index]!, { [field]: value })
+  emit('change', basis)
+}
+function amount(event: Event) {
+  return c2InputNumber((event.target as HTMLInputElement).value)
+}
+</script>
+
+<template>
+  <section :id="sectionId" class="panel grid min-w-0 gap-3 p-4" :aria-label="disabled ? '只读更正依据' : '独立更正依据'">
+    <SectionHeader title="独立更正依据" />
+    <p v-if="!basis" class="text-12px text-warn">
+      原核算依据不完整，不能补造更正来源。
+    </p>
+    <template v-else-if="basis.formatFamily === 'A'">
+      <label class="grid max-w-md gap-1 text-12px">本次更正采用比例（0 至 1）<input :value="basis.payRatio ?? ''" type="number" min="0" max="1" step="any" class="field-input" :disabled="disabled || basis.periodKind === 'retention'" @input="emit('change', { ...basis, payRatio: amount($event) })"></label>
+      <div tabindex="0" aria-label="A 原责任量价更正表" class="min-w-0 overflow-x-auto">
+        <table class="w-full min-w-640px text-left text-12px">
+          <thead>
+            <tr class="border-b border-line">
+              <th class="p-2">
+                原责任范围
+              </th><th class="p-2">
+                更正现场量
+              </th><th class="p-2">
+                更正单价
+              </th><th class="p-2">
+                原价格依据
+              </th>
+            </tr>
+          </thead><tbody>
+            <tr v-for="(row, index) in basis.components" :key="row.ownershipKey" class="border-b border-line">
+              <td class="max-w-64 break-all p-2">
+                {{ row.ownershipKey }}
+              </td><td class="p-2">
+                <input :value="row.quantity ?? ''" :aria-label="`第${index + 1}项更正现场量`" type="number" min="0" step="any" class="field-input w-32" :disabled="disabled" @input="update('components', index, 'quantity', amount($event))">
+              </td><td class="p-2">
+                <input :value="row.unitPrice ?? ''" :aria-label="`第${index + 1}项更正单价`" type="number" step="0.01" class="field-input w-32" :disabled="disabled" @input="update('components', index, 'unitPrice', amount($event))">
+              </td><td class="max-w-48 break-all p-2">
+                {{ row.priceRevisionId }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+    <template v-else-if="basis.formatFamily === 'C1'">
+      <div tabindex="0" aria-label="原成员更正标准" class="min-w-0 overflow-x-auto">
+        <table class="w-full min-w-600px text-left text-12px">
+          <thead>
+            <tr class="border-b border-line">
+              <th class="p-2">
+                原成员
+              </th><th class="p-2">
+                日薪
+              </th><th class="p-2">
+                加班规则
+              </th><th class="p-2">
+                独立加班标准
+              </th>
+            </tr>
+          </thead><tbody>
+            <tr v-for="(row, index) in basis.rates" :key="row.workerId" class="border-b border-line">
+              <td class="p-2">
+                {{ names.get(row.workerId) }}
+              </td><td class="p-2">
+                <input :value="row.dailyWage ?? ''" :aria-label="`${names.get(row.workerId)}更正日薪`" type="number" min="0" step="any" class="field-input w-28" :disabled="disabled" @input="update('rates', index, 'dailyWage', amount($event))">
+              </td><td class="p-2">
+                {{ row.overtimeRule === 'explicit' ? '独立标准' : '日薪的八分之一' }}
+              </td><td class="p-2">
+                <input v-if="row.overtimeRule === 'explicit'" :value="row.overtimeRate ?? ''" :aria-label="`${names.get(row.workerId)}更正加班标准`" type="number" min="0" step="any" class="field-input w-28" :disabled="disabled" @input="update('rates', index, 'overtimeRate', amount($event))"><span v-else>按原规则计算</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div tabindex="0" aria-label="原逐日考勤更正" class="min-w-0 overflow-x-auto">
+        <table class="w-full min-w-640px text-left text-12px">
+          <thead>
+            <tr class="border-b border-line">
+              <th class="p-2">
+                原成员 / 日期
+              </th><th class="p-2">
+                正常工时
+              </th><th class="p-2">
+                加班工时
+              </th><th class="p-2">
+                工作内容
+              </th>
+            </tr>
+          </thead><tbody>
+            <tr v-for="(row, index) in basis.records" :key="row.recordId" class="border-b border-line">
+              <td class="p-2">
+                {{ names.get(row.workerId) }} · {{ row.workDate }}
+              </td><td class="p-2">
+                <input :value="row.hours ?? ''" :aria-label="`第${index + 1}条正常工时`" type="number" min="0" max="8" step="any" class="field-input w-24" :disabled="disabled" @input="update('records', index, 'hours', amount($event))">
+              </td><td class="p-2">
+                <input :value="row.overtimeHours ?? ''" :aria-label="`第${index + 1}条加班工时`" type="number" min="0" max="24" step="any" class="field-input w-24" :disabled="disabled" @input="update('records', index, 'overtimeHours', amount($event))">
+              </td><td class="p-2">
+                <input :value="row.workContent" :aria-label="`第${index + 1}条工作内容`" class="field-input w-48" :disabled="disabled" @input="update('records', index, 'workContent', ($event.target as HTMLInputElement).value)">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+    <template v-else>
+      <label class="grid max-w-md gap-1 text-12px">更正主体单价（元 / 工）<input :value="basis.unitRate ?? ''" type="number" min="0" step="any" class="field-input" :disabled="disabled" @input="emit('change', { ...basis, unitRate: amount($event) })"></label>
+      <div tabindex="0" aria-label="原逐条签工更正" class="min-w-0 overflow-x-auto">
+        <table class="w-full min-w-1080px text-left text-12px">
+          <thead>
+            <tr class="border-b border-line">
+              <th class="p-2">
+                原成员 / 日期
+              </th><th class="p-2">
+                工数
+              </th><th class="p-2">
+                开始
+              </th><th class="p-2">
+                结束
+              </th><th class="p-2">
+                工作内容
+              </th><th class="p-2">
+                证明人
+              </th><th class="p-2">
+                确认日期
+              </th>
+            </tr>
+          </thead><tbody>
+            <tr v-for="(row, index) in basis.records" :key="row.recordId" class="border-b border-line">
+              <td class="p-2">
+                {{ names.get(row.workerId) }} · {{ row.workDate }}
+              </td><td class="p-2">
+                <select :value="row.laborUnits ?? ''" :aria-label="`第${index + 1}条更正工数`" class="field-input w-24" :disabled="disabled" @change="update('records', index, 'laborUnits', amount($event))">
+                  <option value="">
+                    未填写
+                  </option><option value="0.5">
+                    半工
+                  </option><option value="1">
+                    整工
+                  </option>
+                </select>
+              </td><td v-for="field in ['startTime', 'endTime'] as const" :key="field" class="p-2">
+                <input :value="row[field]" :aria-label="`第${index + 1}条${field === 'startTime' ? '开始' : '结束'}时间`" type="time" class="field-input w-28" :disabled="disabled" @input="update('records', index, field, ($event.target as HTMLInputElement).value)">
+              </td><td class="p-2">
+                <input :value="row.workContent" :aria-label="`第${index + 1}条更正工作内容`" class="field-input w-48" :disabled="disabled" @input="update('records', index, 'workContent', ($event.target as HTMLInputElement).value)">
+              </td><td class="p-2">
+                <input :value="row.witness" :aria-label="`第${index + 1}条更正证明人`" class="field-input w-32" :disabled="disabled" @input="update('records', index, 'witness', ($event.target as HTMLInputElement).value)">
+              </td><td class="p-2">
+                <input :value="row.confirmedOn" :aria-label="`第${index + 1}条更正确认日期`" type="date" class="field-input w-40" :disabled="disabled" @input="update('records', index, 'confirmedOn', ($event.target as HTMLInputElement).value)">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </section>
+</template>

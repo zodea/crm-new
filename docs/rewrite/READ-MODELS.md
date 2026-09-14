@@ -547,3 +547,13 @@ C2 工资预览分开返回当前逐条事实与原单采用来源，另有服�
 签工来源意图使用 `source-record / daywork / ledger` 与真实记录 ID，经授权关系校验后只读定位台账原记录；编辑另走明确整页入口。返回保原工资 ID/新稿与项目、月份、班组、工资状态及独立签工状态；失效或不再符合原关系时说明原因，不能猜同名对象或自动改挂。
 
 完整已发 C2 输出仅从本单采用来源、专属冻结及原发放回执互证后生成：零星用工记录表与工资表使用同一原配置、逐条时段/工数/证明信息、当时姓名和实发分配。已发后当前档案或配置变化不重写输出；缺证据保持 unavailable 与原历史只读，不能用当前数据填成完整工资。本期配对表不包含考勤或完整月工作簿。
+
+## 工资更正历史与实际收付读取（#412，P4）
+
+工资 Repository 提供 `adjustmentForm / adjustmentDetail / adjustmentHistory / actualPaymentForm / actualPaymentDetail / actualReversalForm / actualLedger / releaseAdjustmentPreview`，分别对应 `/api/read/payroll/` 下 `adjustment-form / adjustment-detail / adjustment-history / actual-payment-form / actual-payment-detail / actual-reversal-form / actual-ledger / release-adjustments` 的 POST 只读接口。query 与固定 input 身份共同校验，preview 不写入业务事实。
+
+原单更正历史包含尚未发生现金处理的核算更正、同根余额和每次处理；关联对象分别指向真实补退/冲销事件或后续已发工资，不能仅从现金集合反推更正清单。原签名金额、核算差额、待处理额与实际净额分区呈现。确认记录输出取已验证的独立确认快照，原 A/C1/C2 签名输出继续使用原冻结。
+
+`PayrollActualFacts` 以稳定 identity 去重，保留原工资、更正、应用和冲销引用，实际发生日、有符号金额、当时成员及个人分配、资格和完整性版本。金额保持两位十进制字符串，数量/单价保有限小数精度；未知、已知零、部分已知、无权和读取不可用分别解码。封闭解析器拒绝串项目、原单或事件的响应。
+
+预算在已有事务传入当前身份给内部工资 loader；班组/工人/项目 detail 嵌入目的范围的工资实际分区，避免页面再发另一套并行工资请求。目的读取权限和 `payroll:read` 同时核对，最后异步等待后再核验；个人缺分配不从整单或当前名册推份额。付款管理的工资收付为独立只读区域，不计入申请待付、银行流水或往来款。所有来源入口校验稳定关系并保留原预算版本、人员/项目及工资筛选返回。

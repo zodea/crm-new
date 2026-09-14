@@ -34,11 +34,14 @@ beforeEach(() => {
   route.fullPath = `${route.path}?origin=real`
   route.query = { origin: 'real' }
   load.mockImplementation(async (_query, input: PayrollAFormInput) => read(input.statementId, 'v1', input.draftKey ?? null))
-  save.mockResolvedValue({ statementId: 'wage-a', projectId: 'project', commandId: 'cmd', outcome: 'saved' })
+  save.mockImplementation(async (value: PayrollAFormRead, draft: PayrollAFormRead['draft']) => {
+    pending.value = { state: 'awaiting-read', command: { ...value.context, requiredCapability: 'payroll:write', commandId: 'cmd', projectId: 'project', statementId: value.statementId, draftKey: value.draftKey, configScope: null, action: { kind: 'save-a-draft', draft } } }
+    return { statementId: 'wage-a', projectId: 'project', commandId: 'cmd', outcome: 'saved' }
+  })
   confirm.mockResolvedValue(false)
   vi.stubGlobal('useRoute', () => route)
   vi.stubGlobal('useRouter', () => ({ push, replace: vi.fn().mockResolvedValue(undefined) }))
-  vi.stubGlobal('usePayrollStore', () => ({ loadAForm: load, saveADraft: save, recoverA: recover, getAPending: (value: PayrollAFormRead) => pending.value && pending.value.command.statementId === value.statementId && pending.value.command.draftKey === value.draftKey ? pending.value : null }))
+  vi.stubGlobal('usePayrollStore', () => ({ loadAForm: load, saveADraft: save, recoverA: recover, acknowledgeA: vi.fn(() => pending.value = null), getAPending: (value: PayrollAFormRead) => pending.value && pending.value.command.statementId === value.statementId && pending.value.command.draftKey === value.draftKey ? pending.value : null }))
   vi.stubGlobal('useTabsStore', () => ({ close, registerCloseGuard: (key: string, guard: () => Promise<boolean>) => {
     guards.set(key, guard)
     return () => guards.delete(key)

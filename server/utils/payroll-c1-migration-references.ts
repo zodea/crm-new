@@ -120,9 +120,9 @@ export async function payrollC1MigrationReferences(tx: TransactionDb): Promise<S
   for (const table of PAYROLL_C1_REFERENCE_TABLES) {
     for (const value of await tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`)) row(table, value)
   }
-  for (const value of await tx.select<Record<string, unknown>>('SELECT snapshot_json FROM wage_statements WHERE format_family=\'C1\'')) row('wage_statements', value)
+  for (const value of await tx.select<Record<string, unknown>>('SELECT id,snapshot_json FROM wage_statements WHERE format_family=\'C1\'')) row('wage_statements', value)
   const logTables = [...PAYROLL_C1_REFERENCE_TABLES, 'wage_statements']
-  const logs = await tx.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${logTables.map(() => '?').join(',')})`, logTables)
+  const logs = await tx.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT id,table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${logTables.map(() => '?').join(',')})`, logTables)
   for (const log of logs) {
     if (log.table_name !== 'wage_statements')
       add(log.table_name, log.record_id)

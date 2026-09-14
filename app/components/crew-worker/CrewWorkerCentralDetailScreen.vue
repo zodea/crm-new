@@ -3,6 +3,7 @@ import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { yuan } from '~/lib/util/money'
 import { useCrewWorkerReadStore } from '~/stores/crew-worker-read'
 
 const props = defineProps<{ kind: 'crew' | 'worker', id: string, origin: DataOriginDTO, includeDemo: boolean, returnTo?: string }>()
@@ -32,6 +33,11 @@ const workerDetail = computed(() => {
   return null
 })
 const detail = computed(() => props.kind === 'crew' ? crewDetail.value : workerDetail.value)
+const actualAmount = computed(() => detail.value?.payrollActual?.netAmount.value)
+const actualAmountLabel = computed(() => actualAmount.value == null ? '尚不能确认' : yuan(actualAmount.value))
+const missingAllocationCount = computed(() => workerDetail.value?.payrollActual
+  ? workerDetail.value.payrollActual.rows.filter(row => row.scopedAmount.value === null).length
+  : workerDetail.value?.summary.missingAllocationCount ?? 0)
 const problem = computed(() => 'problem' in state.value ? state.value.problem : null)
 const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
   if (settledKey.value !== queryKey.value)
@@ -110,12 +116,14 @@ onActivated(() => void load())
       <PayrollC2SourceReturn v-else-if="detail && route.query.payrollReturnTo && route.query.payrollFormat === 'C2'" :kind="kind" :source-id="id" :origin="origin" class="mb-4" />
       <PayrollASourceReturn v-else-if="detail && route.query.payrollReturnTo" :kind="kind" :source-id="id" :origin="origin" class="mb-4" />
       <MetricGrid v-if="crewDetail && kind === 'crew'" :cols="6" data-testid="crew-central-summary">
-        <Metric label="成员" :value="`${crewDetail.summary.memberCount} 人`" /><Metric label="在场成员" :value="`${crewDetail.summary.activeMemberCount} 人`" /><Metric label="关联项目" :value="`${crewDetail.summary.projectCount} 个`" /><Metric label="责任单元" :value="`${crewDetail.summary.assignedUnitCount} 个`" /><Metric label="已发工资" :value="`¥${crewDetail.summary.releasedWageAmount}`" /><Metric label="扣罚" :value="`¥${crewDetail.summary.penaltyAmount}`" />
+        <Metric label="成员" :value="`${crewDetail.summary.memberCount} 人`" /><Metric label="在场成员" :value="`${crewDetail.summary.activeMemberCount} 人`" /><Metric label="关联项目" :value="`${crewDetail.summary.projectCount} 个`" /><Metric label="责任单元" :value="`${crewDetail.summary.assignedUnitCount} 个`" /><Metric :label="crewDetail.payrollActual ? '工资实际净额' : '已发工资'" :value="crewDetail.payrollActual ? actualAmountLabel : `¥${crewDetail.summary.releasedWageAmount}`" /><Metric label="扣罚" :value="`¥${crewDetail.summary.penaltyAmount}`" />
       </MetricGrid>
       <MetricGrid v-else-if="workerDetail" :cols="6" data-testid="worker-central-summary">
-        <Metric label="关联项目" :value="`${workerDetail.summary.projectCount} 个`" /><Metric label="责任单元" :value="`${workerDetail.summary.assignedUnitCount} 个`" /><Metric label="完成阶段" :value="`${workerDetail.summary.completedStageCount} 个`" /><Metric label="工资分配" :value="`¥${workerDetail.summary.knownAllocatedAmount}`" /><Metric label="分配待记录" :value="`${workerDetail.summary.missingAllocationCount} 条`" /><Metric label="扣罚" :value="`¥${workerDetail.summary.penaltyAmount}`" />
+        <Metric label="关联项目" :value="`${workerDetail.summary.projectCount} 个`" /><Metric label="责任单元" :value="`${workerDetail.summary.assignedUnitCount} 个`" /><Metric label="完成阶段" :value="`${workerDetail.summary.completedStageCount} 个`" /><Metric :label="workerDetail.payrollActual ? '个人实际净额' : '工资分配'" :value="workerDetail.payrollActual ? actualAmountLabel : `¥${workerDetail.summary.knownAllocatedAmount}`" /><Metric label="分配待记录" :value="`${missingAllocationCount} 条`" /><Metric label="扣罚" :value="`¥${workerDetail.summary.penaltyAmount}`" />
       </MetricGrid>
     </template>
+
+    <PayrollHostSection v-if="detail?.payrollActual" :section="detail.payrollActual" :return-to="route.fullPath" class="mb-4" @retry="load" />
 
     <div v-if="crewDetail && kind === 'crew'" class="grid min-w-0 gap-4" data-ui="crew-central-detail">
       <section class="panel p-4">
@@ -149,7 +157,7 @@ onActivated(() => void load())
       </section>
       <CrewMemberSection :detail="crewDetail" :can-manage="canManageMembers" :return-to="route.fullPath" @changed="load" />
       <section class="panel min-w-0 overflow-hidden">
-        <SectionHeader class="p-4 pb-2" title="项目与工资事实" subtitle="在场成员、工程量责任和工资单按项目稳定 ID 聚合" /><div class="max-w-full overflow-x-auto">
+        <SectionHeader class="p-4 pb-2" :title="crewDetail.payrollActual ? '当前成员与责任项目' : '项目与工资事实'" :subtitle="crewDetail.payrollActual ? '主档与工程量责任项目；历史工资收付见上方独立分区' : '在场成员、工程量责任和工资单按项目稳定 ID 聚合'" /><div class="max-w-full overflow-x-auto">
           <table class="w-full min-w-860px text-left text-12px">
             <thead class="bg-surface-2 text-ink-soft">
               <tr>
@@ -161,9 +169,9 @@ onActivated(() => void load())
                   在场
                 </th><th class="p-3">
                   责任单元
-                </th><th class="p-3">
+                </th><th v-if="!crewDetail.payrollActual" class="p-3">
                   工资单
-                </th><th class="p-3">
+                </th><th v-if="!crewDetail.payrollActual" class="p-3">
                   已发工资
                 </th>
               </tr>
@@ -177,14 +185,14 @@ onActivated(() => void load())
                   {{ row.activeMemberCount }}
                 </td><td class="p-3">
                   {{ row.assignedUnitCount }}
-                </td><td class="p-3">
+                </td><td v-if="!crewDetail.payrollActual" class="p-3">
                   {{ row.wageStatementCount }}
-                </td><td class="p-3">
+                </td><td v-if="!crewDetail.payrollActual" class="p-3">
                   ¥{{ row.releasedWageAmount }}
                 </td>
               </tr><tr v-if="!crewDetail.projects.length">
-                <td colspan="6" class="p-6 text-center text-ink-faint">
-                  暂无项目、责任或工资事实
+                <td :colspan="crewDetail.payrollActual ? 4 : 6" class="p-6 text-center text-ink-faint">
+                  {{ crewDetail.payrollActual ? '暂无当前成员或责任项目' : '暂无项目、责任或工资事实' }}
                 </td>
               </tr>
             </tbody>
@@ -338,7 +346,7 @@ onActivated(() => void load())
           </table>
         </div>
       </section>
-      <section class="panel min-w-0 overflow-hidden">
+      <section v-if="!workerDetail.payrollActual" class="panel min-w-0 overflow-hidden">
         <SectionHeader class="p-4 pb-2" title="工资事实" subtitle="未记录分配金额时保持未知，不以工价反推" /><div class="max-w-full overflow-x-auto">
           <table class="w-full min-w-820px text-left text-12px">
             <thead class="bg-surface-2 text-ink-soft">

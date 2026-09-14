@@ -63,20 +63,32 @@ async function load(options: RestoreDetailOptions): Promise<LoadedTarget | TabRe
   const contractKind = url.searchParams.get('contractKind')
   const capability = family === 'contract'
     ? `${contractKind}-contract:read`
-    : family === 'schedule-project'
-      ? 'project:list:read'
-      : family === 'auxiliary'
-        ? 'auxiliary-contract:read'
-        : family === 'receipt'
-          ? 'receipt:read'
-          : ['project', 'customer', 'supplier', 'crew', 'worker'].includes(family)
-              ? `${family}:list:read`
-              : `${family}:read`
+    : family === 'payroll-adjustment' || family === 'payroll-actual'
+      ? 'payroll:read'
+      : family === 'schedule-project'
+        ? 'project:list:read'
+        : family === 'auxiliary'
+          ? 'auxiliary-contract:read'
+          : family === 'receipt'
+            ? 'receipt:read'
+            : ['project', 'customer', 'supplier', 'crew', 'worker'].includes(family)
+                ? `${family}:list:read`
+                : `${family}:read`
   if (family === 'unconnected' || (family === 'contract' && (!['material', 'construction', 'subcontract'].includes(contractKind ?? '') || !url.searchParams.has('origin'))))
     return restoreProblem('not-connected')
   if (!capabilities.includes(capability))
     return restoreProblem('forbidden')
   const common = { capability, variant: 'detail' }
+  if (family === 'payroll-adjustment') {
+    const dto = await repos.payroll.adjustmentDetail({ origin }, detail.id)
+    return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('wage-adjustment', dto.adjustment.id, '工资更正详情'), origin: dto.context.origin }
+  }
+  if (family === 'payroll-actual') {
+    const dto = await repos.payroll.actualPaymentDetail({ origin }, detail.id)
+    if (dto.fact.ref.kind !== 'actual-event')
+      return restoreProblem('mismatch')
+    return { ...common, capabilities: dto.context.capabilities, sourceVersion: dto.context.sourceVersion, subject: reference('wage-actual', dto.fact.ref.eventId, '工资实际收付详情'), origin: dto.context.origin }
+  }
   if (family === 'payroll') {
     const scope = payrollViewScope(Object.fromEntries(url.searchParams))
     const sourceQuery = payrollReadQuery(scope, query.includeDemo)

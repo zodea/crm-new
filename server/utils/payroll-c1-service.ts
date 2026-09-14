@@ -18,6 +18,9 @@ import { generateId } from '../../app/lib/util/id'
 import { loadPayrollAttendanceFacts } from './payroll-attendance-facts'
 import { markPayrollC1Recheck } from './payroll-attendance-service'
 import { loadPayrollC1Options } from './payroll-c1-options'
+import { payrollMigratedC1Form } from './payroll-migrated-form'
+import { loadPayrollMigratedProof } from './payroll-migrated-proof'
+import { persistPayrollReleaseAdjustments, preparePayrollReleaseAdjustments } from './payroll-release-adjustments'
 
 type Row = Record<string, unknown>
 const hash = (v: unknown) => createHash('sha256').update(payrollCanonical(v)).digest('hex')
@@ -46,6 +49,11 @@ async function rates(db: TransactionDb, source: PayrollIdentitySource, projectId
 export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceOptions) {
   async function form(db: TransactionDb, base: PayrollC1Context, source: PayrollIdentitySource, input: PayrollC1FormInput): Promise<PayrollC1FormRead> {
     const row = input.statementId ? await head(db, input.statementId) : null
+    if (row?.status === 'released') {
+      const migrated = payrollMigratedC1Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
+      if (migrated)
+        return migrated
+    }
     let stored: Partial<PayrollC1Draft> = {}
     let central = false
     if (row) {
@@ -150,7 +158,7 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
       if (query.projectId && query.projectId !== row.project_id)
         throw payrollProblem('relationship-mismatch', 'C1 输出与原项目不一致')
       const context = { ...base, readonly: !base.capabilities.includes('payroll:write') }
-      const document = (await loadPayrollC1ReleasedDocuments(db, statementId)).get(statementId)
+      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c1Documents.get(statementId) ?? (await loadPayrollC1ReleasedDocuments(db, statementId)).get(statementId)
       return document ? { context, statementId, state: 'available', document, reasons: [] } : { context, statementId, state: 'unavailable', document: null, reasons: ['这份历史工资缺少可相互证明的逐日考勤、个人费率、冻结与原发放回执；继续保留原文阅读'] }
     }),
     async executeC1(input: PayrollC1Command, sessionId?: string | null): Promise<PayrollC1CommandResult> {
@@ -213,7 +221,10 @@ export function createPayrollC1Service(run: PayrollRun, options: PayrollServiceO
                 result.outcome = action.kind === 'check-c1' ? 'checked' : 'saved'
               }
               else {
+                const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications)
                 await releasePayrollC1(db, read, action.release, version, context.actorId)
+                if (applications !== undefined)
+                  result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)
                 result.outcome = 'released'
               }
             }

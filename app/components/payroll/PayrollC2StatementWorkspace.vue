@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, shallowRef } from 'vue'
 import { usePayrollC2Statement } from '~/composables/usePayrollC2Statement'
 import { createPayrollC2Workbook } from '~/lib/payroll/c2-export'
 import { toErrorMessage } from '~/lib/util/error'
@@ -13,6 +13,7 @@ const emit = defineEmits<{
   changed: [
   ]
 }>()
+const adjustmentsReady = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollC2Statement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
 const { matching, output, active, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft } = ui
@@ -65,7 +66,7 @@ async function print() {
             C2 主体配置
           </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck" @click="ui.execute('check')">
             {{ matching.status === 'draft' ? '核对签工' : '重新核对签工' }}
-          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease" @click="ui.openRelease">
+          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady" @click="ui.openRelease">
             确认实际发放
           </KitButton>
         </div><template v-if="matching.status !== 'released'">
@@ -75,6 +76,7 @@ async function print() {
         </template>
       </section><PayrollC2SourceReview v-if="matching.status !== 'released'" :read="matching" :return-to="returnTo" />
     </template>
+    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资与签工输出">
       <SectionHeader title="冻结工资与签工表" /><template v-if="output.state === 'available'">
         <p class="text-12px">
@@ -90,6 +92,6 @@ async function print() {
         {{ reason }}
       </p>
     </section>
-    <PayrollC2ReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable" :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
+    <PayrollC2ReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable || !adjustmentsReady" :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
   </section>
 </template>

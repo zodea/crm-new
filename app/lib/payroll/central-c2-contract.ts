@@ -1,6 +1,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollHistoryEntry, PayrollJsonObject, PayrollParticipantOption, PayrollParticipantOptions, PayrollQuery, PayrollSourceDiagnostic, PayrollSourceEvidence, PayrollWritableContext } from './central-contract'
 import type { PayrollDayworkFact, PayrollDayworkRecordRead } from './central-daywork-contract'
+import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export interface PayrollC2ConfigScope { projectId: string, leaderWorkerId: string }
 export interface PayrollC2ConfigFact {
@@ -118,6 +119,7 @@ export interface PayrollC2FormRead {
 export interface PayrollC2ReleaseDraft {
   actualAmount: number | null
   allocations: Array<{ workerId: string, amount: number | null }>
+  adjustmentApplications?: PayrollReleaseAdjustmentApplication[]
 }
 export interface PayrollC2FrozenDocument {
   id: string
@@ -141,8 +143,17 @@ export interface PayrollC2FrozenDocument {
   members: Array<{ workerId: string, workerName: string, isLeader: boolean }>
   allocations: Array<{ workerId: string, workerName: string, isLeader: boolean, amount: number, allocatedAmountFen: number }>
 }
+/** 仅用于迁入后的读取 DTO；原冻结正文与其中 original 字段仍使用原身份。 */
+export interface PayrollC2OutputIdentity {
+  tableName: 'wage_statements' | 'projects' | 'crews' | 'workers' | 'signed_daywork_records' | 'payroll_subject_configs'
+  legacyId: string
+  centralId: string
+}
+export interface PayrollC2OutputDocument extends PayrollC2FrozenDocument {
+  identityMapping?: PayrollC2OutputIdentity[]
+}
 export type PayrollC2OutputRead = { context: PayrollWritableContext, statementId: string } & (
-  { state: 'available', document: PayrollC2FrozenDocument, reasons: [] }
+  { state: 'available', document: PayrollC2OutputDocument, reasons: [] }
   | { state: 'unavailable', document: null, reasons: string[] }
 )
 
@@ -175,6 +186,7 @@ export interface PayrollC2CommandResult {
   sourceVersion: string
   outcome: 'saved' | 'checked' | 'released' | 'needs-recheck'
   logIds: string[]
+  adjustmentApplicationIds?: string[]
 }
 export interface PayrollC2Pending { command: PayrollC2Command, state: 'sending' | 'unknown' | 'awaiting-read' }
 export type PayrollC2CommandRead = PayrollC2FormRead | PayrollC2ConfigRead

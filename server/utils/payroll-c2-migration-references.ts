@@ -161,9 +161,9 @@ export async function payrollC2MigrationReferences(tx: TransactionDb): Promise<S
   for (const table of PAYROLL_C2_REFERENCE_TABLES) {
     for (const value of await tx.select<Record<string, unknown>>(`SELECT * FROM ${table}`)) sourceRow(value)
   }
-  for (const value of await tx.select<{ snapshot_json: string | null }>('SELECT snapshot_json FROM wage_statements')) snapshot(value.snapshot_json)
+  for (const value of await tx.select<{ id: string, snapshot_json: string | null }>('SELECT id,snapshot_json FROM wage_statements')) snapshot(value.snapshot_json)
   const tables = [...PAYROLL_C2_REFERENCE_TABLES, 'wage_statements']
-  const logs = await tx.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${tables.map(() => '?').join(',')})`, tables)
+  const logs = await tx.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT id,table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${tables.map(() => '?').join(',')})`, tables)
   for (const log of logs) {
     if (log.table_name === 'payroll_c2_statement_sources')
       add('wage_statements', log.record_id)

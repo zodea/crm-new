@@ -172,9 +172,13 @@ export function usePayrollAConfig() {
         await store.saveAPrices(value, clone(prices.value))
       if (!same(requested, request))
         return
+      const operation = store.getAPending(value)
       const fresh = await store.loadAConfig({ origin: 'real' }, { ...scope.value })
       if (!same(requested, request))
         return
+      if (!operation)
+        throw new Error('原配置提交未能核对，请保留输入。')
+      store.acknowledgeA(operation, fresh)
       adopt(fresh, preserveOther ? section : 'all')
       remember()
       kit.success(section === 'subject' ? '首月比例已保存。' : '工资单价已保存；未发工资需要重新核对。')
@@ -202,6 +206,7 @@ export function usePayrollAConfig() {
       const value = await store.loadAConfig({ origin: 'real' }, { ...scope.value })
       if (!same(requested, request))
         return
+      store.acknowledgeA(operation, value)
       adopt(value, operation.command.action.kind === 'save-a-subject-config' ? 'subject' : 'prices')
       remember()
       error.value = ''

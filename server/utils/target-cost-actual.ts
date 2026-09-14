@@ -1,7 +1,9 @@
+import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CostCategory } from '../../app/lib/project/cost-control'
 import type { TargetCostCategory, TargetCostMetric, TargetCostSummary } from '../../app/lib/target-cost/central-contract'
 import type { TargetCostDetailItem } from '../../app/lib/target-cost/detail'
 import type { NavigationIntentDTO } from '../../app/types/read-model'
+import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
 import { COST_CATEGORIES } from '../../app/lib/project/cost-control'
 import { round2 } from '../../app/lib/util/number'
@@ -23,6 +25,7 @@ export interface BudgetActualSource {
   rows: BudgetActualRow[]
 }
 export interface TargetCostActualFacts { projectId: string | null, sourceVersion: string, categories: Array<{ category: CostCategory } & Record<BudgetActualMetric, TargetCostMetric>> }
+export interface TargetCostActualReadContext { db: TransactionDb, context: BusinessSession }
 const METRICS: BudgetActualMetric[] = ['signedAmount', 'settledAmount', 'paidAmount']
 
 /** 来源不完整时，knownValue 仅为已知部分，value 不产生假的完整余额。 */
@@ -111,7 +114,9 @@ export function buildTargetCostComparison(id: string, items: TargetCostDetailIte
       contract: navigation(actual.signedAmount, 'contract', actual.category === '材料' ? 'material' : subcontract ? 'subcontract' : other ? 'other_expense' : null),
       settlement: navigation(actual.settledAmount, subcontract ? 'subcontract-document' : 'settlement', subcontract ? 'settlement' : other ? 'other_settlement' : null),
       // 已知支付沿已接管结算来源核对，不制造尚未接管的独立付款入口。
-      payment: navigation(actual.paidAmount, subcontract ? 'subcontract-document' : 'settlement', subcontract ? 'settlement' : other ? 'other_settlement' : null),
+      payment: actual.category === '工人工资' && actual.paidAmount.knownValue != null && facts.projectId
+        ? { kind: 'entity-list', entity: 'wage-statement', variant: 'actual-ledger', view: null, filters: { projectId: facts.projectId, dataOrigin: 'real', costCategory: '工人工资' } } as NavigationIntentDTO
+        : navigation(actual.paidAmount, subcontract ? 'subcontract-document' : 'settlement', subcontract ? 'settlement' : other ? 'other_settlement' : null),
       reimbursement: null,
     } }
   })

@@ -32,7 +32,7 @@ describe('付款管理快照刷新', () => {
   it.each([false, true])('成功快照（有数据=%s）刷新保留表格，失败可见且不伪装首次加载', async (hasRows) => {
     let resolveInitial!: (rows: unknown[]) => void
     select.mockImplementationOnce(() => new Promise(resolve => resolveInitial = resolve))
-    render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true } } })
+    render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true, PaymentPayrollSection: true } } })
     expect(await screen.findByText('表格加载遮罩')).toBeTruthy()
     const store = usePaymentManagementStore()
     expect(store.hasSnapshot).toBe(false)

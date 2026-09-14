@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 50,
     "designMountedScreens": 88,
-    "trackedPageFiles": 150,
+    "trackedPageFiles": 157,
     "devPageFiles": 5,
-    "appPageFiles": 145,
+    "appPageFiles": 152,
     "appNavLeaves": 51,
     "covered": 135,
-    "designPending": 10,
+    "designPending": 17,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -743,6 +743,27 @@
       "status": "covered"
     },
     {
+      "appRoute": "/subcontract/payroll/adjustments/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立更正详情与原链余额；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/adjustments/form/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "固定编号更正编辑与确认；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/adjustments/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "新建有依据的独立核算更正；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
       "appRoute": "/subcontract/payroll/config",
       "designRoute": null,
       "status": "design-pending",
@@ -760,6 +781,34 @@
       "appRoute": "/subcontract/payroll/new",
       "designRoute": "payroll",
       "status": "covered"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "工资实际收付独立台账；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/:id",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "实际补退及错记冲销只读详情；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "真实补退整页登记；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
+    },
+    {
+      "appRoute": "/subcontract/payroll/payments/reversal/new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "明确原引用的错记冲销与再纠错；DC无独立设计屏，按工资页面规格及通用整页/详情原语实施，本地验收独立登记，不继承外部运行证据。",
+      "issue": "#412"
     },
     {
       "appRoute": "/subcontract/payroll/sources",

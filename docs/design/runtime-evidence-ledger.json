@@ -2,21 +2,21 @@
   "$schema": "本文件由 node scripts/sync-runtime-evidence-ledger.mjs 生成；不得手改。",
   "auditedAt": "2026-08-25",
   "counts": {
-    "trackedPageFiles": 150,
+    "trackedPageFiles": 157,
     "devPageFiles": 5,
-    "productionRoutes": 145,
+    "productionRoutes": 152,
     "pageDomains": 20,
-    "evidenceEndpointRecords": 145,
-    "referenceEndpoints": 145,
-    "referenceProfiles": 45,
-    "usedReferenceProfiles": 39,
+    "evidenceEndpointRecords": 152,
+    "referenceEndpoints": 152,
+    "referenceProfiles": 46,
+    "usedReferenceProfiles": 40,
     "directEvidenceRoutes": 54,
     "adjacentEvidenceRoutes": 18,
-    "localAuthorityRoutes": 29,
+    "localAuthorityRoutes": 36,
     "historicalEvidenceRoutes": 34,
     "unverifiedTargetRoutes": 10,
     "designCoveredRoutes": 135,
-    "designPendingRoutes": 10
+    "designPendingRoutes": 17
   },
   "domains": [
     {
@@ -232,7 +232,7 @@
     {
       "code": "quantity-payroll",
       "domain": "工程量与工资",
-      "routeCount": 15,
+      "routeCount": 22,
       "implementationIssues": [
         412
       ],
@@ -4624,6 +4624,223 @@
         "routeKey": "/subcontract/payroll/sources"
       },
       "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-34F3A23AC6C4",
+      "page": "app/pages/subcontract/payroll/adjustments/new.vue",
+      "localRoute": "/subcontract/payroll/adjustments/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-34F3A23AC6C4",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-70A241B634AB",
+      "page": "app/pages/subcontract/payroll/adjustments/form/[id].vue",
+      "localRoute": "/subcontract/payroll/adjustments/form/:id",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-70A241B634AB",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/form/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/form/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/form/:id"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-D76D2351E280",
+      "page": "app/pages/subcontract/payroll/adjustments/[id].vue",
+      "localRoute": "/subcontract/payroll/adjustments/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-D76D2351E280",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/adjustments/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/adjustments/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-9199ABAD01C0",
+      "page": "app/pages/subcontract/payroll/payments/index.vue",
+      "localRoute": "/subcontract/payroll/payments",
+      "domainCode": "quantity-payroll",
+      "template": "工作台",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-9199ABAD01C0",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-2D144233027A",
+      "page": "app/pages/subcontract/payroll/payments/new.vue",
+      "localRoute": "/subcontract/payroll/payments/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-2D144233027A",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/new"
+      },
+      "constraints": "C-FORM"
+    },
+    {
+      "evidenceRecordId": "E-CF84668FF087",
+      "page": "app/pages/subcontract/payroll/payments/[id].vue",
+      "localRoute": "/subcontract/payroll/payments/:id",
+      "domainCode": "quantity-payroll",
+      "template": "详情",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-CF84668FF087",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/:id",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/:id"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/:id"
+      },
+      "constraints": "C-DENSE"
+    },
+    {
+      "evidenceRecordId": "E-410AA14B4D8D",
+      "page": "app/pages/subcontract/payroll/payments/reversal/new.vue",
+      "localRoute": "/subcontract/payroll/payments/reversal/new",
+      "domainCode": "quantity-payroll",
+      "template": "整页表单",
+      "implementationIssues": [
+        412
+      ],
+      "historicalImplementationIssues": [
+        300,
+        301,
+        289
+      ],
+      "referenceProfile": "R-PAYROLL-ADJUSTMENTS-LOCAL",
+      "referenceEndpointId": "local-410AA14B4D8D",
+      "referenceEndpointLabel": "本地权威端点：/subcontract/payroll/payments/reversal/new",
+      "evidenceGrade": "local-authority",
+      "observationDate": null,
+      "observationDateStatus": "not-applicable-local-authority",
+      "permissionStatus": "not-applicable",
+      "layoutConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/reversal/new"
+      },
+      "stateAndNavigationConclusion": {
+        "sourceDocument": "docs/design/runtime-reference-audit.md",
+        "routeKey": "/subcontract/payroll/payments/reversal/new"
+      },
+      "constraints": "C-FORM"
     },
     {
       "evidenceRecordId": "E-E86E0A7B7A61",

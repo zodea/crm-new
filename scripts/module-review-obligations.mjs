@@ -19,6 +19,9 @@ const payrollC2FormCases = ['C-58443F85F115', 'C-BFFE7CD45B24', 'C-7804D6A25527'
 const payrollC2ConfigCases = ['C-F71EB72F1BE7', 'C-857E3A744BD8', 'C-DA8C04A247DF']
 const payrollC2StatementCases = ['C-22E59D126DB1', 'C-7573A5075C24', 'C-4D4A46274664', 'C-743E95C94FAD', 'C-819292D2D041']
 const payrollC2Cases = [...payrollC2FormCases, ...payrollC2ConfigCases, ...payrollC2StatementCases]
+// P4 先登记实际宿主与入口；固定本期提交及验收后再提升义务状态。
+const payrollP4Cases = ['C-3CEAC41F56EE', 'C-94E41A26A3CD', 'C-70614BA99381', 'C-1A58A5E04259', 'C-CA15E2E11333', 'C-68C5D0C7AF86', 'C-551B6A68ECCE', 'C-E09119AB5B23', 'C-BD39437F70F6', 'C-6E96061CBD9B', 'C-47DB19B2E589', 'C-E8A2ED8A1BE0', 'C-8F5A9E3126B3', 'C-B0A3DEF4249C', 'C-3F5E6146BE36', 'C-46410C9CE97C', 'C-ED270164311E', 'C-7190764C000E', 'C-65AAA530D948', 'C-C87C1D80EAEB', 'C-EC73DDB08635', 'C-8D26948C2EFF', 'C-3CDEC6A17EDE', 'C-EFED1F86A584', 'C-CF490A18E883', 'C-7C47CBA71307', 'C-9CD9C66FECE2', 'C-F5A2FE6D3CF6', 'C-45DB0DDC7FF6', 'C-FCC5103C718F', 'C-F36CE397D7FB', 'C-D25B508EB174', 'C-3DB9E07F1876', 'C-AA4672C833CB', 'C-0D44B14FF6F4', 'C-58F8C291E313', 'C-60F79C79C1FD', 'C-374B51B5F091', 'C-6C1FAE8C5A88', 'C-23BF5D82EE43', 'C-C419610B5F84', 'C-BB67195FF9FF', 'C-F66BF98E6C93']
+const payrollP4CostCases = ['C-3CEAC41F56EE', 'C-94E41A26A3CD', 'C-70614BA99381', 'C-1A58A5E04259', 'C-CA15E2E11333', 'C-551B6A68ECCE', 'C-E09119AB5B23', 'C-BD39437F70F6', 'C-6E96061CBD9B', 'C-F5A2FE6D3CF6', 'C-45DB0DDC7FF6', 'C-FCC5103C718F']
 const progressCases = [...scheduleCases, ...quantityCases, ...targetCostCases]
 const wageCases = [...payrollCases, attendanceCase, dayworkCase]
 const ocrEvidence = {
@@ -567,27 +570,27 @@ export const REVIEW_OBLIGATIONS = [
     label: '#301 AC4 / #354 AC1 发放工资与劳务结算成本防双计',
     sources: [issue(301), issue(354), 'docs/rewrite/DATABASE.md'],
     ownerIssue: 412,
-    caseIds: [...payrollCases, ...payrollC1Cases, ...payrollC2StatementCases, 'C-BFFE7CD45B24', 'C-BF6534CCC71B'],
+    caseIds: [...payrollCases, ...payrollC1Cases, ...payrollC2StatementCases, 'C-BFFE7CD45B24', 'C-BF6534CCC71B', ...payrollP4CostCases],
     status: 'partial',
     evidence: [payrollAEvidence, payrollC1Evidence, payrollC2Evidence],
-    remaining: 'P1 A、P2 C1及P3 C2只形成一次真实实发，完整分配不重复加金额，同键重试不重复发放；C2逐条签工唯一领用与下月独立核算已验证。完整成本及资金消费者、合同劳务隔离与更正后跨页汇总仍由P4联验。',
+    remaining: 'P1 A、P2 C1及P3 C2只形成一次真实实发，完整分配不重复加金额，同键重试不重复发放；C2逐条签工唯一领用与下月独立核算已验证。P4 工资实际与五类宿主已接线，待本期提交后固定成本防双计、合同劳务隔离及跨页汇总证据；材料/报销未接齐不宣布项目总额完整。',
   },
   {
     id: 'WAGE-10',
     label: '#301 AC5 / #354 AC2 有符号工资调整与冲销',
     sources: [issue(301), issue(354)],
     ownerIssue: 412,
-    caseIds: payrollCases,
+    caseIds: [...payrollCases, ...payrollP4Cases],
     status: 'ready',
     evidence: [],
-    remaining: '补差、扣回或纠错新增独立可追溯有符号记录，不能覆盖已发原单；调整/冲销的中央写入、关联原单、幂等并发及成本回读待实施。已定规则不重新 grill。',
+    remaining: 'P4 已接线独立核算更正、真实补退、后续工资处理、错记冲销及再纠错，原单不被覆盖；本期尚未有固定提交的验收登记，状态不提前提升。提交后按原子并发、唯一更正链、迁入恢复、原键冷读及各宿主实际证据逐项关闭；已定规则不重新 grill。',
   },
   {
     id: 'WAGE-11',
     label: '#301 AC5 / #354 AC2/3 发放冻结、详情和调整历史',
     sources: [issue(301), issue(354)],
     ownerIssue: 412,
-    caseIds: [...payrollCases, ...payrollC1Cases, ...payrollC2StatementCases],
+    caseIds: [...payrollCases, ...payrollC1Cases, ...payrollC2StatementCases, 'C-68C5D0C7AF86', 'C-EC73DDB08635', 'C-3CDEC6A17EDE', 'C-CF490A18E883', 'C-7C47CBA71307', 'C-9CD9C66FECE2', 'C-0D44B14FF6F4', 'C-60F79C79C1FD', 'C-374B51B5F091', 'C-6C1FAE8C5A88'],
     status: 'partial',
     evidence: [payrollHistoryEvidence, payrollAEvidence, payrollC1Evidence, payrollC2Evidence],
     remaining: 'P0缺损原文与P1 A、P2 C1、P3 C2原子冻结及回执/来源互证、实际PDF和XLSX已验证；C1工资/考勤、C2工资/签工分别成对，C2长表、精确单价、明确空规则及零分配保真。P4独立调整历史、实际补退与完整成本继续验收，不改写已发原单。',

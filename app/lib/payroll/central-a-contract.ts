@@ -1,6 +1,8 @@
 // 仅 P1 A 核算；取消是离开未保存页面，不是数据库删除/撤销/解除发放。
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
+import type { PayrollAAdjustmentReconciliation } from './central-a-adjustment-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollHistoryEntry, PayrollProjectOption, PayrollQuery } from './central-contract'
+import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export const PAYROLL_WRITE_CAPABILITY = 'payroll:write' as const
 export type PayrollAPeriodKind = 'monthly' | 'settlement' | 'retention'
@@ -230,6 +232,7 @@ export interface PayrollAEligibility {
   reasons: string[]
 }
 export interface PayrollAFormRead {
+  adjustmentReconciliation?: PayrollAAdjustmentReconciliation
   context: PayrollAContext
   statementId: string | null
   draftKey: string | null
@@ -268,6 +271,7 @@ export interface PayrollAConfigRead {
 }
 
 export interface PayrollAReleaseDraft {
+  adjustmentApplications?: PayrollReleaseAdjustmentApplication[]
   actualAmount: number | null
   /** 服务端必须验证全部成员与整数分合计；页面默认零也要明确保留。 */
   allocations: Array<{ workerId: string, amount: number | null }>
@@ -300,6 +304,8 @@ export interface PayrollACommand {
   action: PayrollAAction
 }
 export interface PayrollACommandResult {
+  adjustmentApplicationIds?: string[]
+  adjustmentCoverageIds?: string[]
   commandId: string
   projectId: string
   statementId: string | null
@@ -309,11 +315,12 @@ export interface PayrollACommandResult {
   outcome: 'saved' | 'checked' | 'released' | 'needs-recheck'
   logIds: string[]
 }
-export interface PayrollAPending { command: PayrollACommand, state: 'sending' | 'unknown' }
+export interface PayrollAPending { command: PayrollACommand, state: 'sending' | 'unknown' | 'awaiting-read' }
 export type PayrollAStatementCommandResult = PayrollACommandResult & { statementId: string }
 
 /** B 恢复保护只解析这个封闭字段集合，不泛递归旧快照或未知扩展。 */
 export interface PayrollAStatementSourceSnapshot {
+  adjustmentReconciliation?: PayrollAAdjustmentReconciliation
   schemaVersion: 1
   subject: PayrollASubjectScope
   facts: PayrollAQuantityFact[]
@@ -322,6 +329,7 @@ export interface PayrollAStatementSourceSnapshot {
 
 /** 已发 A 输出仅从完整且可证明的新中央冻结事实构建；不使用当前量/价格/姓名补齐。 */
 export interface PayrollAFrozenDocument {
+  adjustmentReconciliation?: PayrollAAdjustmentReconciliation
   id: string
   projectId: string
   projectName: string

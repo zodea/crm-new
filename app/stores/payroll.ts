@@ -287,6 +287,7 @@ export const usePayrollStore = defineStore('payroll-workbench', () => {
     saveAPrices: centralA.saveAPrices,
     getAPending: centralA.getAPending,
     recoverA: centralA.recoverA,
+    acknowledgeA: centralA.acknowledgeA,
     aSaving: computed(() => centralA.aSaving),
     loadRead: (query: PayrollQuery) => loadPayrollListRead(useNuxtApp().$repositories.payroll, { ...query, includeDemo: useDataVisibilityStore().includeDemo }),
     statements,

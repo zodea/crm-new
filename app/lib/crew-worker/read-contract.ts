@@ -7,6 +7,7 @@ import type {
   PageDTO,
   ProblemDTO,
 } from '../../types/read-model'
+import type { PayrollHostSection } from './payroll-read'
 
 export const CREW_WORKER_PAGE_SIZES = [10, 20, 50, 100] as const
 export type CrewWorkerPageSize = typeof CREW_WORKER_PAGE_SIZES[number]
@@ -280,6 +281,7 @@ export interface CrewPenaltyDTO {
 }
 
 export interface CrewDetailReadDTO {
+  payrollActual?: PayrollHostSection
   dataOrigin: DataOriginDTO
   crew: CrewSourceRow
   members: CrewDetailMemberDTO[]
@@ -375,6 +377,7 @@ export interface WorkerPenaltyDTO {
 }
 
 export interface WorkerDetailReadDTO {
+  payrollActual?: PayrollHostSection
   dataOrigin: DataOriginDTO
   worker: WorkerSourceRow & {
     gender: string

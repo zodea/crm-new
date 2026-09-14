@@ -184,7 +184,15 @@ export function usePayrollAForm() {
     tabs.close(formKey)
     await router.push(returnTo.value)
   }
-  async function finish(result: PayrollAStatementCommandResult) {
+  async function finish(result: PayrollAStatementCommandResult, requested: string, request: number) {
+    const value = matchingRead.value
+    const operation = value ? store.getAPending(value) : null
+    const refreshed = await store.loadAForm({ origin: 'real' }, { statementId: result.statementId })
+    if (!isCurrent(requested, request))
+      return
+    if (!operation)
+      throw new Error('原工资提交未能核对，请保留草稿。')
+    store.acknowledgeA(operation, refreshed)
     if (read.value)
       cache.delete(key(read.value))
     allowLeave = true
@@ -208,7 +216,7 @@ export function usePayrollAForm() {
     try {
       const result = await store.saveADraft(value, clone(draft.value))
       if (isCurrent(requested, request))
-        await finish(result)
+        await finish(result, requested, request)
     }
     catch (cause) {
       if (isCurrent(requested, request)) {
@@ -237,7 +245,7 @@ export function usePayrollAForm() {
     try {
       const result = await store.recoverA(operation)
       if (isCurrent(requested, request) && result.statementId && result.projectId === operation.command.projectId && (value.statementId ? result.statementId === value.statementId : operation.command.draftKey === value.draftKey))
-        await finish({ ...result, statementId: result.statementId })
+        await finish({ ...result, statementId: result.statementId }, requested, request)
     }
     catch (cause) {
       if (isCurrent(requested, request))

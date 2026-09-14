@@ -43,3 +43,28 @@ it('行级调价先显示实际个人例外，切统一价使用基准记录且�
   await fireEvent.click(screen.getByRole('button', { name: '保存单价' }))
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ context: expect.objectContaining({ sourceVersion: 'v1' }) }), [expect.objectContaining({ priceId: 'base', mode: 'baseline', unitPrice: 0, itemId: 'item' })])
 })
+it('行级调价成功后读失败仍保留原提交，核对可信配置后才关闭', async () => {
+  const operation = { command: { commandId: 'price-original' }, state: 'awaiting-read' }
+  const pending = shallowRef<typeof operation | null>(null)
+  const recover = vi.fn().mockResolvedValue({ outcome: 'saved' })
+  const acknowledge = vi.fn(() => pending.value = null)
+  save.mockImplementation(async () => {
+    pending.value = operation
+    return { outcome: 'saved' }
+  })
+  vi.stubGlobal('usePayrollStore', () => ({ loadAConfig: load, getAPending: () => pending.value, saveAPrices: save, recoverA: recover, acknowledgeA: acknowledge }))
+  const view = render(PayrollAPriceDialog, { props: { open: true, line: payrollUiLine(), projectId: 'project', month: '2026-09', crewId: 'crew', leaderWorkerId: 'worker', returnTo: '/subcontract/payroll/wage-a?origin=real' }, global: { components: { PayrollAPriceEditor }, stubs: { NuxtLink: { template: '<a><slot /></a>' }, KitButton: { template: '<button><slot /></button>' } } } })
+  await fireEvent.update(await screen.findByRole('spinbutton', { name: '工资单价金额' }), '23')
+  load.mockRejectedValueOnce(new Error('确认后的配置暂不可读'))
+  await fireEvent.click(screen.getByRole('button', { name: '保存单价' }))
+  await flushPromises()
+  expect(view.emitted().saved).toBeUndefined()
+  expect(pending.value).toEqual(operation)
+  expect((screen.getByRole('spinbutton', { name: '工资单价金额' }) as HTMLInputElement).value).toBe('23')
+  await fireEvent.click(screen.getByRole('button', { name: '核对原提交' }))
+  await flushPromises()
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(recover).toHaveBeenCalledWith(operation)
+  expect(acknowledge).toHaveBeenCalledWith(operation, expect.objectContaining({ scope: payrollUiConfig().scope }))
+  expect(view.emitted().saved).toEqual([[]])
+})

@@ -1,4 +1,5 @@
 import type { PayrollC1FormRead, PayrollC1OutputRead, PayrollC1ReleaseDraft, PayrollC1StatementCommandResult } from '~/lib/payroll/central-c1-contract'
+import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { c1ReleaseDefault as payrollReleaseDefault } from '~/lib/payroll/c1-presentation'
 import { toErrorMessage } from '~/lib/util/error'
@@ -128,6 +129,12 @@ export function usePayrollC1Statement(options: { id: () => string, origin: () =>
         working.value = false
     }
   }
+  function setReleaseApplications(applications: PayrollReleaseAdjustmentApplication[]) {
+    if (!matching.value || !writable.value || releaseOpen.value)
+      return
+    const value = releaseDraft.value ?? payrollReleaseDefault(matching.value)
+    releaseDraft.value = { ...value, adjustmentApplications: applications }
+  }
   function openRelease() {
     if (!matching.value?.eligibility.canRelease || !writable.value)
       return
@@ -185,5 +192,5 @@ export function usePayrollC1Statement(options: { id: () => string, origin: () =>
     active.value = false
     sequence += 1
   })
-  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, recover }
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
 }

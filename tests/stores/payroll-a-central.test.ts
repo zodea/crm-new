@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   setActivePinia(createPinia())
   repo.aForm.mockImplementation(async (_q, target) => read(target.statementId))
-  repo.execute.mockImplementation(async (c: PayrollACommand) => ({ commandId: c.commandId, statementId: c.statementId ?? 'created', subjectConfigId: null, projectId: c.projectId, sourceVersion: 'new', priceRevisionIds: [], logIds: [], outcome: 'saved' }))
+  repo.execute.mockImplementation(async (c: PayrollACommand) => ({ commandId: c.commandId, statementId: c.statementId ?? 'created', subjectConfigId: null, projectId: c.projectId, sourceVersion: 'new', priceRevisionIds: [], logIds: [], outcome: c.action.kind === 'release-a' ? 'needs-recheck' : c.action.kind === 'check-a' ? 'checked' : 'saved' }))
   vi.stubGlobal('useNuxtApp', () => ({ $repositories: { payroll: repo } }))
 })
 afterEach(() => {
@@ -40,6 +40,9 @@ it('固定页面读不被另一读抬高基准，失响应保原身份/原金额
   expect(restored.getAPending(original)?.command).toEqual(pending.command)
   await restored.recoverA(restored.getAPending(original)!)
   expect(repo.execute.mock.calls.at(-1)![0]).toEqual(pending.command)
+  expect(restored.getAPending(original)?.state).toBe('awaiting-read')
+  const refreshed = await restored.loadAForm({ origin: 'real' }, { statementId: 'a' })
+  restored.acknowledgeA(pending, refreshed)
   expect(restored.getAPending(original)).toBeNull()
 })
 it('只有本命令明确未应用才释放，通用stale、撤权或损坏回读保原键', async () => {

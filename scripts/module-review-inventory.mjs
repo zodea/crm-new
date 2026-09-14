@@ -78,6 +78,12 @@ export const ADAPTERS = {
     storage: '中央工作区验证实例；生产持久化仍待 #416',
     sources: [['app/components/payroll/CentralPayrollScreen.vue', '新建 C1 工资草稿'], ['app/components/payroll/CentralPayrollDetailScreen.vue', 'PayrollC1StatementWorkspace']],
   },
+  'payroll-adjustment-central': {
+    read: '独立更正、原链余额、实际收付和处理历史统一经工资中央 Repository；原签名与后来事实分开',
+    write: '浏览器独立整页确认核算更正、真实补退或错记冲销；后续工资成功发放才处理余额；本期提交后登记限定验收',
+    storage: '同一中央工作区事务、固定原提交与可信后读；不回退本地正式库，生产持久化仍待 #416',
+    sources: [['app/stores/payroll-adjustments.ts', 'usePayrollAdjustmentsStore'], ['server/utils/payroll-adjustment-service.ts', 'createPayrollAdjustmentService'], ['app/composables/usePayrollEvidenceForm.ts', 'isDesktopRuntime()']],
+  },
   'payroll-c1-browser': {
     read: '逐日考勤、个人日薪与独立加班标准、C1 草稿和同次发放冻结的工资/考勤配对输出',
     write: '固定范围与原提交的个人标准、C1 保存/核对/实际发放；P2 已通过本地限定验收',
@@ -166,6 +172,10 @@ export function resolveAdapter(surface, host) {
     return 'tool-local-storage'
   if (route === '/subcontract/quantity/stages')
     return host === 'browser' ? 'central-http' : 'unsupported'
+  if (route.startsWith('/subcontract/payroll/adjustments/') || route === '/subcontract/payroll/payments' || route.startsWith('/subcontract/payroll/payments/'))
+    return host === 'tauri' && surface.template === '整页表单' ? 'unsupported' : 'payroll-adjustment-central'
+  if (surface.path.startsWith('central/p4/'))
+    return 'payroll-adjustment-central'
   if (route === '/schedule/process-library' || route.startsWith('/schedule/process-library/'))
     return host === 'browser' ? 'central-http' : 'desktop-sqlite'
   if (host === 'browser' && ['/', '/schedule', '/schedule/:pid', '/schedule/new'].includes(route))
@@ -475,6 +485,51 @@ export const SUBVIEWS = [
     view('central/history', 'PayrollReadHistory', 'subtable'),
     view('central/evidence', 'PayrollSourceEvidence', 'detail'),
   ], ['browser']),
+  group({ route: ['/subcontract/payroll/adjustments/new', '/subcontract/payroll/adjustments/form/:id'] }, 'app/components/payroll/PayrollAdjustmentFormPage.vue', [
+    view('central/p4/original', 'PayrollOriginalWageSummary', 'detail', '原签名金额与原单稳定身份只读'),
+    view('central/p4/basis', 'PayrollAdjustmentBasisFields', 'form-section', 'A/C1/C2 有依据的新旧核算；不接受自由差额'),
+    view('central/p4/reason', 'id="section-reason"', 'form-section', '原因、具名依据和本次差额；不表示已收付'),
+    view('central/p4/pending', 'PayrollACommandState', 'recovery-panel', '保原 draftKey/更正编号与原命令，失败聚焦反馈'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/adjustments/:id' }, 'app/components/payroll/PayrollAdjustmentDetailScreen.vue', [
+    view('central/p4/original', 'PayrollOriginalWageSummary', 'detail'),
+    view('central/p4/confirmation', 'aria-label="本次更正确认"', 'detail', '仅已确认：本次差额、确认人及前序新旧依据'),
+    view('central/p4/draft', 'aria-label="独立更正草稿"', 'detail', '未确认草稿不产生余额或实际事实'),
+    view('central/p4/balance', 'aria-label="原更正链当前余额"', 'detail', '整链累计与本次确认分区，未知不补零'),
+    view('central/p4/applications', 'PayrollAdjustmentApplications', 'subtable'),
+    view('central/p4/output', 'PayrollConfirmationOutput', 'print', '独立确认记录下载/打印，不改原签名表'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/payments/new' }, 'app/components/payroll/PayrollActualPaymentFormPage.vue', [
+    view('central/p4/original', 'PayrollOriginalWageSummary', 'detail'),
+    view('central/p4/payment', 'PayrollActualPaymentFields', 'form-section', '真实日期与有符号实额、成员分配及更正处理守恒'),
+    view('central/p4/pending', 'PayrollACommandState', 'recovery-panel', '结果未知保留原收付命令，可信后读才完成'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/payments/reversal/new' }, 'app/components/payroll/PayrollRecordingReversalFormPage.vue', [
+    view('central/p4/original', 'PayrollOriginalWageSummary', 'detail'),
+    view('central/p4/proof', 'id="section-proof"', 'form-section', '错记及冲销再纠错均保明确原引用；不代表实际退款'),
+    view('central/p4/pending', 'PayrollACommandState', 'recovery-panel'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/payments/:id' }, 'app/components/payroll/PayrollActualPaymentDetailScreen.vue', [
+    view('central/p4/original', 'PayrollOriginalWageSummary', 'detail'),
+    view('central/p4/fact', 'PayrollActualFactsTable', 'subtable', '补发/退款/错记冲销按原事实种类读取'),
+    view('central/p4/references', '查看关联更正', 'source-return', '原收付、更正及错记冲销按明确引用往返'),
+    view('central/p4/output', 'PayrollConfirmationOutput', 'print', '独立实际确认记录，不重算原已发工资'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/payments' }, 'app/components/payroll/PayrollActualLedgerScreen.vue', [
+    view('central/p4/ledger', 'PayrollActualLedgerSection', 'subtable', '只计实际工资事实；原更正与处理关系不另计现金'),
+    view('central/p4/budget-return', 'TargetCostSourceReturn', 'source-return', '复验原预算版本和项目，冷读返回原对比'),
+  ], ['browser']),
+  group({ route: '/subcontract/payroll/:id', variant: 'default' }, 'app/components/payroll/CentralPayrollDetailScreen.vue', [
+    view('central/p4/adjustment-history', 'PayrollAdjustmentHistorySection', 'subtable', '原单独立更正含未处理确认；不从现金倒推更正'),
+    view('central/p4/actual-ledger', 'PayrollActualLedgerSection', 'subtable', '已发原单与后来真实事实分区'),
+  ], ['browser']),
+  ...['A', 'C1', 'C2'].map(format => group({ route: '/subcontract/payroll/:id', variant: 'default' }, `app/components/payroll/Payroll${format}StatementWorkspace.vue`, [
+    view(`central/p4/${format.toLowerCase()}-release-selection`, 'PayrollReleaseAdjustmentSelection', 'form-section', '各格式原工资整页明确选择处理额，发放成功才结清；A 已含差额不重复扣'),
+  ], ['browser'])),
+  group({ route: ['/base/worker/:id', '/base/crew/:id'] }, 'app/components/crew-worker/CrewWorkerCentralDetailScreen.vue', [view('central/p4/host-actual', 'PayrollHostSection', 'subtable', '按原人员/班组事实及完整度读取；原签名与个人实额独立')], ['browser']),
+  group({ route: '/project/:id' }, 'app/components/project/ProjectDetailScreen.vue', [view('central/p4/host-actual', 'PayrollHostSection', 'subtable', '工资事实稳定 ID 去重；不并入项目其他财务来源')], ['browser']),
+  group({ route: '/finance/payment-management' }, 'app/components/finance/payment-management/PaymentManagementScreen.vue', [view('central/p4/host-actual', 'PaymentPayrollSection', 'subtable', '专用工资项目冷恢复；独立只读工资收付不并入申请/银行流水')], ['browser']),
+  group({ route: '/project/target-cost/:id' }, 'app/components/target-cost/CentralTargetCostComparison.vue', [view('central/p4/host-actual', '查看工资实际收付', 'source-return', '工资动态成本与支付同源；材料/报销缺口保持未知')], ['browser']),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', mounted('workspace', ['ScheduleBoard', 'ScheduleTaskDialog', 'ScheduleDependencyDialog'])),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleTimeline.vue', ['wbs', 'gantt'].map(key => view(`workspace/mobile/${key}`, `'${key}'`, 'matrix'))),
   group({ route: ['/schedule', '/schedule/:pid'] }, 'app/components/schedule/ScheduleScreen.vue', [view('recovery/pending', 'store.pendingCommand', 'recovery-panel', '未确认原提交结果；弹窗内另提供可达的原提交恢复入口')]),

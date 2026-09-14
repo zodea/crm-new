@@ -19,9 +19,10 @@ import {
   validateOwnerDocumentJourneyReturnTo,
 } from '~/lib/owner-document/return-context'
 import { payrollAWorkspaceReturn } from '~/lib/payroll/a-navigation'
+import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 import { payrollC1WorkspaceReturn } from '~/lib/payroll/c1-navigation'
 import { payrollC2WorkspaceReturn } from '~/lib/payroll/c2-navigation'
-import { payrollReadLocation, payrollReturnTo, payrollViewScope } from '~/lib/payroll/central-navigation'
+import { payrollReadLocation, payrollViewScope } from '~/lib/payroll/central-navigation'
 import {
   appendProjectSupplierReturnContext,
   validateProjectSupplierIdentityReturnTo,
@@ -382,10 +383,26 @@ const TARGET_REGISTRY = {
       throw new Error('invalid payroll read context')
     return payrollReadLocation(path, scope)
   },
+  'wage-adjustment:detail': (intent: EntityTargetIntent) => {
+    if (intent.filters.dataOrigin !== 'real')
+      throw new Error('invalid payroll adjustment origin')
+    return `${entityPath('/subcontract/payroll/adjustments', intent)}?origin=real`
+  },
+  'wage-actual:detail': (intent: EntityTargetIntent) => {
+    if (intent.filters.dataOrigin !== 'real')
+      throw new Error('invalid payroll actual origin')
+    return `${entityPath('/subcontract/payroll/payments', intent)}?origin=real`
+  },
   'subcontract-document:penalty-detail': (intent: EntityTargetIntent) => withCrewWorkerFactContext(entityPath('/project/penalty', intent), intent),
 } satisfies Record<string, TargetBuilder>
 
 const LIST_TARGET_REGISTRY = {
+  'wage-statement:actual-ledger': (intent: ListTargetIntent) => {
+    const { projectId, dataOrigin, costCategory } = intent.filters
+    if (!isStableRouteIdentity(projectId) || dataOrigin !== 'real' || costCategory !== '工人工资')
+      throw new Error('invalid payroll actual source identity')
+    return `/subcontract/payroll/payments?${new URLSearchParams({ project: projectId, origin: dataOrigin })}`
+  },
   'contract:subcontract': (intent: ListTargetIntent) => budgetSourceListPath('/contract/subcontract', intent),
   'contract:other_expense': (intent: ListTargetIntent) => budgetSourceListPath('/contract/other-expense', intent),
   'subcontract-document:settlement': (intent: ListTargetIntent) => budgetSourceListPath('/subcontract/settlement', intent),
@@ -643,9 +660,11 @@ export function resolveNavigationTarget(
       || key === 'project:detail'
       || key === 'quantity-unit:detail'
       || key === 'wage-statement:detail'
+      || key === 'wage-adjustment:detail'
+      || key === 'wage-actual:detail'
       || key === 'subcontract-document:penalty-detail')) {
-      const returnTo = key === 'wage-statement:detail'
-        ? payrollReturnTo(options.returnTo, isDataOriginDTO(intent.filters.dataOrigin) ? intent.filters.dataOrigin : null) || validateCrewWorkerReturnTo(options.returnTo)
+      const returnTo = ['wage-statement:detail', 'wage-adjustment:detail', 'wage-actual:detail'].includes(key)
+        ? isDataOriginDTO(intent.filters.dataOrigin) && payrollAdjustmentReturn(options.returnTo, intent.filters.dataOrigin)
         : validateCrewWorkerReturnTo(options.returnTo)
       if (returnTo) {
         const separator = to.includes('?') ? '&' : '?'

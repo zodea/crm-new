@@ -142,5 +142,6 @@ onActivated(() => {
       @open-application="openApplication"
       @create-payment="createPayment"
     />
+    <PaymentPayrollSection />
   </main>
 </template>

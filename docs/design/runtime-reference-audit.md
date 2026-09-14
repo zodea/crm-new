@@ -115,6 +115,7 @@
 | `R-STAGE-PENDING` | 新增整页待验 | `/subcontract/quantity/stages`；阶段目录、分项关联与显式报量选择 | 待验证 390、768、1024、1280、1440px | #442 按 ADR 0010 与实体整页表单原语实施，当前未取得完整运行验收；相邻工程量页面的历史观察不提升本页证据等级。 |
 | `R-PAYROLL-SOURCES-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/sources` | 独立运行证据见工资接管记录，不继承旧空台账观察 | 按工资页面规格及 DC 通用原语呈现配置、考勤、签工和月锁；当前浏览器中央只读，Tauri 显式说明边界。[当前接管证据](./evidence/issue-412-payroll-history/README.md)与后续日常核算分别验收。 |
 | `R-PAYROLL-A-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/config`、`/subcontract/payroll/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；当前实施中 | 依据 #412 承接的 #117/#287 规则、工资页面及 DC 工资构图和整页原语。主体配置、工资价格、来源核对与固定单据编辑分别呈现；不继承旧空工资台账的运行结果，不称外部目标页已观察。 |
+| `R-PAYROLL-ADJUSTMENTS-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/payroll/adjustments` 下更正整页与详情、`/subcontract/payroll/payments` 下实际台账、收付详情及补退/冲销整页 | 新增界面按 390、768、1024、1280、1440px 单独验收；本期提交后固定证据 | 依据 #412 P4、工资页面及 DC 通用整页/详情/表格原语；原签名、核算更正、实际补退与错记冲销分别呈现。不继承旧空工资台账或参考站工资之外页面的观察结果；本地验收不提升外部参考等级。 |
 | `R-PAYROLL-DAYWORK-LOCAL` | 本地权威；无独立对应参考页 | `/subcontract/daywork/new`、`/subcontract/daywork/form/:id` | 新增整页按 390、768、1024、1280、1440px 独立验收；P3 当前实施中 | 依据 #412 已定签工规则、工资页面、DC 原语和 ADR 0014；整页登记与编辑、轻量人工确认分别核对。未观察独立外部目标页，不继承旧签工台账的运行结果；待取得本轮真实交互证据。 |
 | `R-OCR-STUDIO-SOURCE` | 固定源码参考，非业务运行态 | [`andyhuo520/ppocrv6-studio@34bf6c3`](https://github.com/andyhuo520/ppocrv6-studio/tree/34bf6c3) 的单页设置工作台 | 源项目桌面布局；瑞航仍复核 390、768、1024、1280–1440px | 只复刻“单页纵向分组、紧凑控件密度、恢复默认/保存反馈”的信息架构，不复制其传统 PP-OCRv6 ONNX 引擎契约。`model_variant`、`det_thresh`、`box_thresh`、`unclip` 等传统检测参数不能伪装成 PaddleOCR-VL 1.6 云端参数；瑞航可编辑项必须确实进入现有 VL 调用链，Access Token 等私密运行参数继续仅由服务端持有。 |
 | `R-SHELL-LIVE` | 当前直接证据 | 已登录参考站全局外壳；活动业务页签保持在用户原先打开的页面 | 桌面窗口，`RootWebArea` 约 1568×1153，2026-07-27 | 仅通过 Windows 无障碍树读取和安全界面状态切换：侧栏主体约 215px、顶栏约 50px、路由页签约 28–32px、通知面板约 360px；参考站菜单搜索“分包”显示 5 个站内入口，其中“分包产值确认”“分包签证结算”是参考站独有能力，不构成给瑞航新增或改名路由的授权。瑞航只按自身叶子名称/提示过滤，因此本地同词结果保持“分包变洽签”“分包合同”“分包结算”3 项。分组收起后立即恢复，两个已打开页签切换后恢复原页，通知面板只打开读取并由同一入口关闭。未触发已读、删除、处理、提交、导入、导出或任何业务动作；未保存参考截图和业务值。 |
@@ -180,13 +181,13 @@
 <!-- runtime-evidence-summary:begin -->
 | 可重算口径 | 数量 |
 | --- | ---: |
-| 跟踪页面文件 / dev / 生产路由 | 150 / 5 / 145 |
+| 跟踪页面文件 / dev / 生产路由 | 157 / 5 / 152 |
 | 页面域 | 20 |
-| 证据行 / 唯一参考端点 | 145 / 145 |
-| 参考证据档案 / 被路由使用 | 45 / 39 |
-| 直接 / 邻近 / 本地权威 | 54 / 18 / 29 |
+| 证据行 / 唯一参考端点 | 152 / 152 |
+| 参考证据档案 / 被路由使用 | 46 / 40 |
+| 直接 / 邻近 / 本地权威 | 54 / 18 / 36 |
 | 历史证据 / 未验证目标 | 34 / 10 |
-| 设计已覆盖 / 待补设计 | 135 / 10 |
+| 设计已覆盖 / 待补设计 | 135 / 17 |
 
 | 页面域 | 路由数 | 当前复核承接 |
 | --- | ---: | --- |
@@ -206,7 +207,7 @@
 | 收入财务 | 10 | [#413](https://github.com/zodea/crm-new/issues/413) |
 | 支出财务 | 11 | [#404](https://github.com/zodea/crm-new/issues/404)、[#413](https://github.com/zodea/crm-new/issues/413) |
 | 发票台账 | 4 | [#413](https://github.com/zodea/crm-new/issues/413)、[#414](https://github.com/zodea/crm-new/issues/414) |
-| 工程量与工资 | 15 | [#412](https://github.com/zodea/crm-new/issues/412) |
+| 工程量与工资 | 22 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 项目进度成本 | 10 | [#412](https://github.com/zodea/crm-new/issues/412) |
 | 导入导出 | 3 | [#406](https://github.com/zodea/crm-new/issues/406)、[#414](https://github.com/zodea/crm-new/issues/414) |
 | 系统设置 | 1 | [#414](https://github.com/zodea/crm-new/issues/414) |
@@ -354,6 +355,13 @@
 | `app/pages/subcontract/payroll/config.vue` | `/subcontract/payroll/config` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 工资主体首月比例、按生效月的基准价和个人例外使用独立整页；无独立外部目标页，当前正在实施 | 主体身份与价格范围明确，空值不默认零；保存后回原草稿复验来源，Tauri 显式说明边界，实际运行另行验收 | C-FORM |
 | `app/pages/subcontract/payroll/form/[id].vue` | `/subcontract/payroll/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-A-LOCAL | 固定 A 单据的资料、现场完成来源与单价、备注分区，按 DC 工资蓝本及整页表单原语实施 | 编辑身份来自路径，来源 query 只恢复上下文；已发不可编辑，未保存离开及来源变化保留输入并明确重核，实际运行另行验收 | C-FORM |
 | `app/pages/subcontract/payroll/sources.vue` | `/subcontract/payroll/sources` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-SOURCES-LOCAL | 新增中央来源只读页；配置、考勤、签工和月锁四视图，逐屏验收见接管证据，不继承旧空台账观察 | 项目/月/班组与来源返回显式保留；无工资头仍可读取独立来源，Tauri 不挂中央来源组件 | C-DENSE |
+| `app/pages/subcontract/payroll/adjustments/new.vue` | `/subcontract/payroll/adjustments/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 原已发单、新旧核算依据、原因与具名核对依据使用独立整页；无对应外部参考页 | 固定原单与 draftKey，保存更正不产生现金；失败保稿，桌面不允许更正写入，原来源返回受控 | C-FORM |
+| `app/pages/subcontract/payroll/adjustments/form/[id].vue` | `/subcontract/payroll/adjustments/form/:id` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 固定更正编号的编辑与确认整页；原签名实发、当前核算差额分区 | 前序变化重核，未知结果恢复原提交；已确认只追加引用纠错，不覆盖旧确认，桌面不允许写入 | C-FORM |
+| `app/pages/subcontract/payroll/adjustments/[id].vue` | `/subcontract/payroll/adjustments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次确认差额、确认者、新旧依据、前序引用与原链当前余额分区；独立确认记录输出 | 原单、原更正、实际补退及以后工资处理按稳定身份下钻；原签名金额保持原文，缺证明不重算 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/index.vue` | `/subcontract/payroll/payments` | 工程量与工资 | 工作台 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 工资独立实际台账；初始发放、实际补退、有效错记冲销及分配完整度分别显示 | 净额只聚合有效实际事实；项目和原单范围、预算版本及人员/付款来源返回分别校验，无本地正式写入回退 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/new.vue` | `/subcontract/payroll/payments/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 真实发生日期、有符号实额、成员分配和本次处理关系使用独立整页 | 按剩余额度与稳定原单确认真实补退；未知提交保原键，桌面不允许写入，不生成付款申请或银行流水 | C-FORM |
+| `app/pages/subcontract/payroll/payments/[id].vue` | `/subcontract/payroll/payments/:id` | 工程量与工资 | 详情 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 本次实际事实、人员分配、核对依据、关联处理及原记录引用分别展示 | 原收付只读，错记冲销及冲销再纠错通过独立引用追加；确认记录输出不改原工资签名 | C-DENSE |
+| `app/pages/subcontract/payroll/payments/reversal/new.vue` | `/subcontract/payroll/payments/reversal/new` | 工程量与工资 | 整页表单 | #412 | R-PAYROLL-ADJUSTMENTS-LOCAL | 指定错记事实、核实日期和未真实发生的明确依据使用独立整页 | 冲销只抵销所指错记效果；再纠错保原引用，不假造真实退款，未知结果恢复原提交，桌面不允许写入 | C-FORM |
 | `app/pages/subcontract/quantity/[pid]/[uid].vue` | `/subcontract/quantity/:pid/:uid` | 工程量与工资 | 详情 | #198 | R-ENGINEERING-FLOW-LOCAL | 工种→阶段→三量的只读施工详情可达，六项筛选完整返回，错配 pid/uid 显式失败；当前明细 `null` 显示“—”，阶段/全户合计却按 0 相加 | 先修复可空合计，不能把缺现场量写成 0；责任、阶段完成和三量仍只读派生，不落第二表 | C-DENSE |
 | `app/pages/subcontract/quantity/index.vue` | `/subcontract/quantity` | 工程量与工资 | 工作台 | #198 | R-ENGINEERING-FLOW-LOCAL | 合和新城真实 8 户矩阵可显示责任、完成与草稿；车陂商业大楼无区域时显示真实配置空态。四档根无横滚，矩阵只在 390px 局部滚动 | 排程任务下钻与返回已闭合；量差和矩阵继续读三量/阶段事实。分包合同与工资责任无显式外键，不从项目名称猜合同 | C-DENSE |
 | `app/pages/subcontract/quantity/region.vue` | `/subcontract/quantity/region` | 工程量与工资 | 整页表单 | #198 | R-ENGINEERING-FLOW-LOCAL | 楼栋→楼层→户真实区域、户型挂靠和排程来源返回已在只读运行态确认；空项目仍提供明确区域配置入口 | 本轮未执行新增；合同可选，归档矩阵禁止写入，排程恢复标记继续按项目真实 ID 传递 | C-FORM |

@@ -1,10 +1,12 @@
 import type { PayrollC2Command, PayrollC2CommandResult, PayrollC2ConfigFact, PayrollC2ConfigRead, PayrollC2ConfigScope, PayrollC2FormInput, PayrollC2FormRead, PayrollC2FrozenDocument, PayrollC2OutputRead, PayrollC2StatementSourceSnapshot } from './central-c2-contract'
 import type { PayrollQuery } from './central-contract'
 import { payrollC2Lines } from './central-c2-calculation'
+import { payrollC2OriginalOutput } from './central-c2-output-identity'
 import { payrollCanonical } from './central-command-shared'
 import { payrollProblem } from './central-contract'
 import { isPayrollDayworkFact, isPayrollDayworkRecordRead, isPayrollParticipantOptions } from './central-daywork-codec'
 import { wireArray as array, wireExact as exact, wireFields as fields, wireId as id, wireNullableText as nullableText, wireNullableNumber as number, wireObject as object, wireText as text, transformPayrollC2Wire, wireCent, wireContext, wireDate, wireIntent, wireMonth, wireStrings } from './central-payroll-wire'
+import { isPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { amountInCents } from './statements'
 
 export const encodePayrollC2Wire = (value: unknown) => transformPayrollC2Wire(value, false)
@@ -63,7 +65,9 @@ export function parsePayrollC2Command(raw: unknown): PayrollC2Command {
     }
     else if (action.kind === 'release-c2') {
       exact(action, ['kind', 'release'])
-      exact(action.release, ['actualAmount', 'allocations'])
+      exact(action.release, ['actualAmount', 'allocations', 'adjustmentApplications'])
+      if (action.release.adjustmentApplications !== undefined && !isPayrollReleaseApplications(action.release.adjustmentApplications))
+        fail('C2 的独立更正处理引用无效')
       if (!number(action.release.actualAmount) || !array(action.release.allocations, (row) => {
         exact(row, ['workerId', 'amount'])
         return id(row.workerId) && number(row.amount)
@@ -76,7 +80,9 @@ export function parsePayrollC2Command(raw: unknown): PayrollC2Command {
   return value as unknown as PayrollC2Command
 }
 export function decodePayrollC2Result(value: unknown, command: PayrollC2Command): PayrollC2CommandResult {
-  exact(value, ['commandId', 'projectId', 'statementId', 'configId', 'dayworkRecordIds', 'dayworkLinkIds', 'sourceVersion', 'outcome', 'logIds'])
+  exact(value, ['commandId', 'projectId', 'statementId', 'configId', 'dayworkRecordIds', 'dayworkLinkIds', 'sourceVersion', 'outcome', 'logIds', 'adjustmentApplicationIds'])
+  if (value.adjustmentApplicationIds !== undefined && (!uniqueIds(value.adjustmentApplicationIds) || command.action.kind !== 'release-c2' || command.action.release.adjustmentApplications === undefined || value.outcome !== 'released' || value.adjustmentApplicationIds.length !== command.action.release.adjustmentApplications.length))
+    fail('C2 更正处理回执与原实际发放不一致')
   const config = command.action.kind === 'save-c2-config'
   const outcomes = { 'save-c2-config': ['saved'], 'save-c2-draft': ['saved'], 'check-c2': ['checked'], 'release-c2': ['released', 'needs-recheck'] }
   if (value.commandId !== command.commandId || value.projectId !== command.projectId || !id(value.configId) || (config && command.configId !== null && value.configId !== command.configId) || (config ? value.statementId !== null : !id(value.statementId) || (command.statementId !== null && value.statementId !== command.statementId)) || !uniqueIds(value.dayworkRecordIds) || !uniqueIds(value.dayworkLinkIds) || !uniqueIds(value.logIds) || !text(value.sourceVersion) || !value.sourceVersion || !outcomes[command.action.kind].includes(String(value.outcome)))
@@ -124,7 +130,8 @@ export function decodePayrollC2Read<T extends PayrollC2FormRead | PayrollC2Confi
   if (!object(value) || !wireContext(value.context, query.origin))
     fail()
   if (kind === 'output') {
-    if (value.statementId !== target || (value.state === 'available' ? !isPayrollC2FrozenDocument(value.document) || value.document.id !== target || !array(value.reasons, () => false) : value.state !== 'unavailable' || value.document !== null || !wireStrings(value.reasons)))
+    const document = object(value.document) && value.document.identityMapping !== undefined ? payrollC2OriginalOutput(value.document) : value.document
+    if (value.statementId !== target || (value.state === 'available' ? !isPayrollC2FrozenDocument(document) || !object(value.document) || value.document.id !== target || !array(value.reasons, () => false) : value.state !== 'unavailable' || value.document !== null || !wireStrings(value.reasons)))
       fail()
   }
   else {

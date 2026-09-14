@@ -1,6 +1,8 @@
+import type { PayrollHostScope, PayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import type { CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type { ProjectListSourceRow, ProjectSupplierReferenceSourceRow } from '../../app/lib/project/repository'
 import type { DataOriginDTO } from '../../app/types/read-model'
+import { unavailablePayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import customersSeed from '../../app/lib/db/seed/customers.json'
 import projectsSeed from '../../app/lib/db/seed/projects.json'
 import { MaterialContractRepositoryProblem } from '../../app/lib/material-contract/repository'
@@ -159,6 +161,8 @@ export function createProjectReadTestInstance(
     = async rows => rows,
   resolveReceiptIncome: (rows: readonly ProjectListSourceRow[], sessionId?: string | null) => Promise<{ rows: readonly ProjectListSourceRow[], sourceVersion?: string, asOf?: string }>
     = async rows => ({ rows }),
+  resolvePayrollActual: (scope: PayrollHostScope, sessionId?: string | null) => Promise<PayrollHostSection | undefined>
+    = async () => undefined,
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -236,10 +240,13 @@ export function createProjectReadTestInstance(
       input: Record<string, unknown> | undefined,
       sessionId?: string | null,
     ) {
+      const before = facts(sessionId)
       const context = await readContext(sessionId)
       const query = parseProjectDetailQuery(id, input)
       if (query.includeDemo && !context.capabilities.includes('demo:read'))
         throw repositoryProblem('forbidden', '无测试数据查看权限', false)
+      // 先验证原目标存在，不能借另一个项目地址读取工资来源。
+      buildProjectDetailRead({ rows: context.rows, query, asOf: context.asOf, sourceVersion: context.sourceVersion, capabilities: context.capabilities })
       let materialContractCount: number | null = null
       let materialContractAccess: 'allowed' | 'forbidden' | 'unknown' | 'error' = 'unknown'
       let projectSupplierRelations: readonly ProjectSupplierReferenceSourceRow[] = []
@@ -267,7 +274,7 @@ export function createProjectReadTestInstance(
           ? 'forbidden'
           : 'error'
       }
-      return buildProjectDetailRead({
+      const detail = buildProjectDetailRead({
         rows: context.rows,
         query,
         asOf: context.asOf,
@@ -278,6 +285,19 @@ export function createProjectReadTestInstance(
         projectSupplierRelations,
         projectSupplierAccess,
       })
+      if (query.origin === 'demo')
+        return detail
+      const payrollActual = context.capabilities.includes('payroll:read')
+        ? await resolvePayrollActual({ kind: 'project', id: query.id }, sessionId)
+        : unavailablePayrollHostSection({ kind: 'project', id: query.id }, 'forbidden', '无工资收付查看权限')
+      const latest = facts(sessionId)
+      if (before.sourceVersion !== latest.sourceVersion || JSON.stringify(context.capabilities) !== JSON.stringify(latest.capabilities))
+        throw repositoryProblem('unavailable', '读取期间项目档案或权限已变化，请重新读取', true)
+      if (!latest.rows.some(row => row.id === query.id && row.dataOrigin === query.origin))
+        throw repositoryProblem('unavailable', '原项目已变化，请重新读取', true)
+      if (!payrollActual)
+        return detail
+      return { ...detail, payrollActual, sourceVersion: `${detail.sourceVersion}+payroll:${payrollActual?.sourceVersion ?? 'unavailable'}` }
     },
   }
 }
@@ -298,4 +318,5 @@ export const projectReadTestInstance = createProjectReadTestInstance(
   undefined,
   async (rows, sessionId) => (await import('./project-import-customers')).resolveProjectCustomerReferences(rows, sessionId),
   async (rows, sessionId) => (await import('./project-receipt-income')).projectReceiptIncome(rows, sessionId),
+  async (scope, sessionId) => (await import('./crew-worker-payroll-read')).readPayrollHostSection(scope, sessionId),
 )

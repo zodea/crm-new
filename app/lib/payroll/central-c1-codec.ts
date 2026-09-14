@@ -4,6 +4,7 @@ import { isPayrollAttendanceFact, isPayrollAttendanceWorker, parsePayrollAttenda
 import { payrollC1Lines } from './central-c1-calculation'
 import { payrollCanonical } from './central-command-shared'
 import { wireArray as array, wireCent as cent, wireExact as exact, wireFail as fail, wireFields as fields, wireId as id, wireNullableNumber as nullableNumber, wireNullableText as nullableText, wireObject as object, wireNonnegative as positive, wireStrings as strings, wireText as text, transformPayrollC1Wire, wireContext, wireDate, wireIntent, wireMonth } from './central-payroll-wire'
+import { isPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { amountInCents } from './statements'
 
 export const encodePayrollC1Wire = (v: unknown) => transformPayrollC1Wire(v, false)
@@ -42,7 +43,9 @@ export function parsePayrollC1Command(raw: unknown): PayrollC1Command {
   }
   else if (a.kind === 'release-c1') {
     exact(a, ['kind', 'release'])
-    exact(a.release, ['actualAmount', 'allocations'])
+    exact(a.release, ['actualAmount', 'allocations', 'adjustmentApplications'])
+    if (a.release.adjustmentApplications !== undefined && !isPayrollReleaseApplications(a.release.adjustmentApplications))
+      fail('C1 更正处理关联无效')
     if (!nullableNumber(a.release.actualAmount) || !array(a.release.allocations, (row) => {
       exact(row, ['workerId', 'amount'])
       return id(row.workerId) && nullableNumber(row.amount)
@@ -102,7 +105,9 @@ export function isPayrollC1FrozenDocument(v: unknown): v is PayrollC1FrozenDocum
   return !!ids.length && new Set(ids).size === ids.length && d.members.filter(m => m.isLeader).length === 1 && d.members.find(m => m.isLeader)?.workerName === d.leaderName && d.rates.length === ids.length && new Set(d.rates.map(r => r.workerId)).size === ids.length && d.rates.every(r => d.members.some(m => m.workerId === r.workerId && m.workerName === r.workerName)) && d.lines.every(l => cent(l.amount) && positive(l.unitPrice)) && payrollCanonical(calculated) === payrollCanonical(d.lines) && calculated.reduce((sum, l) => sum + amountInCents(l.amount!), 0) === amountInCents(d.grossAmount) && d.allocations.length === ids.length && new Set(d.allocations.map(a => a.workerId)).size === ids.length && d.allocations.every(a => d.members.some(m => m.workerId === a.workerId && m.workerName === a.workerName && m.isLeader === a.isLeader)) && d.allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === amountInCents(d.actualAmount)
 }
 export function decodePayrollC1Result(v: unknown, command: PayrollC1Command): PayrollC1CommandResult {
-  exact(v, ['commandId', 'projectId', 'statementId', 'rateRevisionIds', 'sourceVersion', 'outcome', 'logIds'])
+  exact(v, ['commandId', 'projectId', 'statementId', 'rateRevisionIds', 'sourceVersion', 'outcome', 'logIds', 'adjustmentApplicationIds'])
+  if (v.adjustmentApplicationIds !== undefined && (!array(v.adjustmentApplicationIds, id) || new Set(v.adjustmentApplicationIds as string[]).size !== (v.adjustmentApplicationIds as string[]).length || command.action.kind !== 'release-c1' || command.action.release.adjustmentApplications === undefined || v.outcome !== 'released' || (v.adjustmentApplicationIds as string[]).length !== command.action.release.adjustmentApplications.length))
+    fail('C1 更正应用回执与原提交不一致')
   const outcomes = { 'save-c1-draft': ['saved'], 'check-c1': ['checked'], 'release-c1': ['released', 'needs-recheck'], 'save-c1-rates': ['saved'] }
   if (v.commandId !== command.commandId || v.projectId !== command.projectId || (command.statementId !== null && v.statementId !== command.statementId) || !nullableText(v.statementId) || !text(v.sourceVersion) || !strings(v.rateRevisionIds) || !strings(v.logIds) || !outcomes[command.action.kind].includes(String(v.outcome)) || (command.action.kind === 'save-c1-rates' ? v.statementId !== null : !id(v.statementId)))
     fail('C1 回执与原动作或单据不一致')

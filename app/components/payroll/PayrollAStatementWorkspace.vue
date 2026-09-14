@@ -8,6 +8,7 @@ import { toErrorMessage } from '~/lib/util/error'
 
 const props = defineProps<{ statementId: string, origin: 'real' | 'demo', returnTo: string }>()
 const emit = defineEmits<{ changed: [] }>()
+const adjustmentsReady = shallowRef(false)
 const kit = useKitUI()
 const ui = usePayrollAStatement({ id: () => props.statementId, origin: () => props.origin, changed: () => emit('changed') })
 const { matching, output, active, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft } = ui
@@ -55,7 +56,7 @@ async function print() {
             工资配置
           </NuxtLink><KitButton v-if="matching.status !== 'released'" :disabled="!writable || !matching.eligibility.canCheck" @click="ui.execute('check')">
             重新核对工资
-          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease" @click="ui.openRelease">
+          </KitButton><KitButton v-if="matching.status !== 'released'" variant="primary" :disabled="!writable || !matching.eligibility.canRelease || !adjustmentsReady" @click="ui.openRelease">
             确认实际发放
           </KitButton>
         </div>
@@ -72,6 +73,7 @@ async function print() {
       </section>
       <PayrollASourceReview v-if="matching.status !== 'released'" :read="matching" :return-to="returnTo" :editable="writable" @price="selectedLine = $event" />
     </template>
+    <PayrollReleaseAdjustmentSelection v-if="matching && matching.status !== 'released'" :statement-id="statementId" :origin="origin" :source-version="matching.context.sourceVersion" :return-to="returnTo" :applications="releaseDraft?.adjustmentApplications" :disabled="!writable || releaseOpen" @change="ui.setReleaseApplications" @valid="adjustmentsReady = $event" />
     <section v-if="output" class="panel grid gap-3 p-4" aria-label="冻结工资输出">
       <SectionHeader title="冻结工资表" /><template v-if="output.state === 'available'">
         <p class="text-12px leading-5 text-ink-soft">
@@ -87,7 +89,7 @@ async function print() {
         {{ reason }}
       </p>
     </section>
-    <PayrollAReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable" :pending="!!pending" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
+    <PayrollAReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable || !adjustmentsReady" :pending="!!pending" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
     <PayrollAPriceDialog v-if="selectedLine && matching" :open="!!selectedLine" :line="selectedLine" :project-id="matching.draft.projectId || ''" :month="matching.draft.month || ''" :crew-id="matching.draft.crewId || null" :leader-worker-id="matching.draft.leaderWorkerId || ''" :return-to="returnTo" @update:open="!$event && (selectedLine = null)" @saved="ui.load()" />
   </section>
 </template>

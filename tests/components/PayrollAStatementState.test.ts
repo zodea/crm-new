@@ -9,6 +9,7 @@ const release = vi.fn()
 const check = vi.fn()
 const changed = vi.fn()
 const target = reactive({ id: 'wage-a' })
+const pending = shallowRef<{ command: { commandId: string, action: { kind: string } }, state: 'awaiting-read' } | null>(null)
 let ui: ReturnType<typeof usePayrollAStatement>
 const Harness = defineComponent({ setup() {
   ui = usePayrollAStatement({ id: () => target.id, origin: () => 'real', changed })
@@ -17,8 +18,17 @@ const Harness = defineComponent({ setup() {
 beforeEach(() => {
   vi.clearAllMocks()
   target.id = 'wage-a'
+  pending.value = null
   load.mockResolvedValue(payrollUiForm())
-  vi.stubGlobal('usePayrollStore', () => ({ loadAForm: load, getAPending: () => null, releaseA: release, checkA: check }))
+  vi.stubGlobal('usePayrollStore', () => ({ loadAForm: load, getAPending: () => pending.value, acknowledgeA: vi.fn(() => pending.value = null), releaseA: async (...args: unknown[]) => {
+    const result = await release(...args)
+    pending.value = { command: { commandId: 'release', action: { kind: 'release-a' } }, state: 'awaiting-read' }
+    return result
+  }, checkA: async (...args: unknown[]) => {
+    const result = await check(...args)
+    pending.value = { command: { commandId: 'check', action: { kind: 'check-a' } }, state: 'awaiting-read' }
+    return result
+  } }))
   vi.stubGlobal('useKitUI', () => ({ success: vi.fn() }))
 })
 it('此前实付变化后持久需重核，重核成功仍保原实发输入且再确认使用新依据', async () => {

@@ -5,6 +5,7 @@ import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '~/components/ui/dialog'
 import { c2InputNumber as payrollInputNumber, c2ReleaseDefault as payrollReleaseDefault, c2ReleaseError as payrollReleaseError } from '~/lib/payroll/c2-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
+import PayrollReleaseAdjustmentSummary from './PayrollReleaseAdjustmentSummary.vue'
 
 const props = defineProps<{ open: boolean, read: PayrollC2FormRead, busy: boolean, pending: boolean, awaitingRead?: boolean, error: string, initial?: PayrollC2ReleaseDraft | null, readonly?: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean], 'submit': [value: PayrollC2ReleaseDraft], 'change': [value: PayrollC2ReleaseDraft], 'recover': [] }>()
@@ -50,6 +51,7 @@ function submit() {
         </DialogDescription>
       </div>
       <div class="grid max-h-[min(65dvh,560px)] gap-4 overflow-y-auto px-5 py-4">
+        <PayrollReleaseAdjustmentSummary :applications="draft.adjustmentApplications" />
         <label class="grid gap-1 text-12px font-700">实际发放总额<input :value="draft.actualAmount ?? ''" :disabled="locked" aria-label="实际发放总额" class="field-input min-w-0 font-mono" type="number" min="0" step="0.01" @input="actual(($event.target as HTMLInputElement).value)"></label>
         <p class="text-12px text-ink-soft">
           默认付给负责人，可按实际拆分。零金额成员也保留在本次记录中。

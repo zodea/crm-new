@@ -35,7 +35,7 @@ export async function createPayrollC1ServiceFixture(readOptions: Pick<PayrollSer
     const record = { workerId: 'w', crewId: 'crew', workDate: '2026-08-01', hours: 8, overtimeHours: 2, workContent: '真实施工', note: '', ...overrides }
     return service.executeAttendance(attendanceCommand(await matrix(), record))
   }
-  return { db, service, source, scope, draft, command, attendanceCommand, matrix, form, attendance, config: () => service.c1Config({ origin: 'real' }, scope), close: () => coordinator.close(), setSession: (next: BusinessSession) => {
+  return { db, service, source, scope, draft, command, attendanceCommand, matrix, form, attendance, withTransaction: coordinator.withTransaction, config: () => service.c1Config({ origin: 'real' }, scope), close: () => coordinator.close(), setSession: (next: BusinessSession) => {
     session = next
   }, setIdentityHook: (next: typeof hook) => {
     hook = next

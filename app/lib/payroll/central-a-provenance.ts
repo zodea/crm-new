@@ -42,7 +42,7 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
   if (tables.length !== 2 || !(await db.select<{ name: string }>('PRAGMA table_info(payroll_command_receipts)')).some(column => column.name === 'command_json'))
     return documents
   // 已发事实包含软删原头，隐藏或删除不能解除其冻结与来源归属。
-  const rows = await db.select<Record<string, unknown>>(`SELECT w.id,w.project_id,w.leader_worker_id,w.snapshot_json,
+  const rows = await db.select<Record<string, unknown>>(`SELECT w.id,w.project_id,w.crew_id,w.leader_worker_id,w.month,w.gross_amount,w.actual_amount,w.snapshot_json,
     s.project_id AS source_project_id,s.leader_worker_id AS source_leader_id,s.source_json,
     r.command_id,r.actor_id,r.project_id AS receipt_project_id,r.fingerprint,r.result_json,r.command_json
     FROM wage_statements w JOIN payroll_a_statement_sources s ON s.statement_id=w.id
@@ -56,7 +56,8 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
     const command = await originalCommand(row.command_json, row.fingerprint)
     if (!snapshot || !isPayrollAFrozenDocument(document) || !isPayrollAStatementSourceSnapshot(source) || !result
       || document.id !== row.id || document.projectId !== row.project_id || row.source_project_id !== row.project_id || row.source_leader_id !== row.leader_worker_id
-      || source.subject.projectId !== row.project_id || source.subject.leaderWorkerId !== row.leader_worker_id
+      || source.subject.projectId !== row.project_id || source.subject.leaderWorkerId !== row.leader_worker_id || source.subject.crewId !== row.crew_id
+      || document.month !== row.month || document.grossAmount !== row.gross_amount || document.actualAmount !== row.actual_amount
       || row.receipt_project_id !== row.project_id || result.commandId !== row.command_id || result.statementId !== row.id || result.projectId !== row.project_id || result.outcome !== 'released'
       || !command || command.action.kind !== 'release-a' || command.commandId !== row.command_id || command.actorId !== row.actor_id || command.origin !== 'real'
       || command.projectId !== row.project_id || command.statementId !== row.id || command.draftKey !== null || command.configScope !== null
@@ -65,7 +66,7 @@ export async function loadPayrollAReleasedDocuments(db: PayrollDb, statementId?:
     }
     const submittedAllocations = command.action.release.allocations.map(allocation => payrollACanonical([allocation.workerId, allocation.amount === null ? null : amountInCents(allocation.amount)])).sort()
     const frozenAllocations = document.allocations.map(allocation => payrollACanonical([allocation.workerId, allocation.allocatedAmountFen])).sort()
-    if (!same(snapshot.aSource, source) || !Object.entries(document).every(([key, value]) => same(snapshot[key], value))
+    if (!same(snapshot.aSource, source) || !same(source.adjustmentReconciliation, document.adjustmentReconciliation) || !Object.entries(document).every(([key, value]) => same(snapshot[key], value))
       || !same(ids(source.subject.memberWorkerIds), ids(document.members.map(member => member.workerId)))
       || !document.members.some(member => member.isLeader && member.workerId === source.subject.leaderWorkerId)
       || !same(source.facts.map(payrollACanonical).sort(), document.lines.flatMap(line => line.facts).map(payrollACanonical).sort())

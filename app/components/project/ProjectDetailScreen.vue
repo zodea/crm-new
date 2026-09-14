@@ -561,6 +561,8 @@ onActivated(() => {
 
     <AuxiliaryContractJourney v-if="item.dataOrigin === 'real'" :project-id="projectId" />
 
+    <PayrollHostSection v-if="detail.payrollActual" :section="detail.payrollActual" :return-to="journeyReturnTo" @retry="loadProject" />
+
     <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">
       <div class="min-w-0">
         <SectionHeader title="项目收款" /><p class="mb-0 mt-2 text-12px text-ink-soft">

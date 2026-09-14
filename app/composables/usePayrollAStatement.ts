@@ -1,4 +1,5 @@
 import type { PayrollAFormRead, PayrollAOutputRead, PayrollAReleaseDraft, PayrollAStatementCommandResult } from '~/lib/payroll/central-a-contract'
+import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import { payrollReleaseDefault } from '~/lib/payroll/a-presentation'
 import { toErrorMessage } from '~/lib/util/error'
@@ -80,21 +81,25 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
   async function completed(result: PayrollAStatementCommandResult, requested: string, request: number) {
     if (!same(requested, request) || result.statementId !== options.id())
       return
-    if (result.outcome === 'needs-recheck') {
-      releaseOpen.value = false
-      error.value = '来源或此前已付已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
-    }
-    else {
-      releaseOpen.value = false
-      releaseRead.value = null
-      if (result.outcome === 'released')
-        releaseDraft.value = null
-    }
-    options.changed()
+    const operation = pending.value
     const nextRequest = sequence + 1
     await load(true)
-    if (!same(requested, nextRequest))
+    if (!same(requested, nextRequest) || readFailed.value || !matching.value)
       return
+    try {
+      if (!operation)
+        throw new Error('原提交未能核对，请保留输入并重新读取。')
+      store.acknowledgeA(operation, matching.value, output.value ?? undefined)
+    }
+    catch (cause) {
+      error.value = toErrorMessage(cause)
+      return
+    }
+    releaseOpen.value = false
+    releaseRead.value = null
+    if (result.outcome === 'released')
+      releaseDraft.value = null
+    options.changed()
     if (result.outcome === 'needs-recheck')
       error.value = '来源或此前已付已经变化，已保存为需重核。原实发输入仍保留，请先重新核对。'
     else
@@ -125,6 +130,12 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
       if (same(requested, request))
         working.value = false
     }
+  }
+  function setReleaseApplications(applications: PayrollReleaseAdjustmentApplication[]) {
+    if (!matching.value || !writable.value || releaseOpen.value)
+      return
+    const value = releaseDraft.value ?? payrollReleaseDefault(matching.value)
+    releaseDraft.value = { ...value, adjustmentApplications: applications }
   }
   function openRelease() {
     if (!matching.value?.eligibility.canRelease || !writable.value)
@@ -183,5 +194,5 @@ export function usePayrollAStatement(options: { id: () => string, origin: () => 
     active.value = false
     sequence += 1
   })
-  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, recover }
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, ratio, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
 }

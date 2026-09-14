@@ -191,6 +191,8 @@ describe('entityLink 解析（specs §07：type→route 唯一映射 + 退化不
       'supplier:credentials',
       'supplier:detail',
       'target-cost:detail',
+      'wage-actual:detail',
+      'wage-adjustment:detail',
       'wage-statement:detail',
       'worker:detail',
     ])

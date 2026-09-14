@@ -1,0 +1,37 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm.
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+npm warn Unknown project config "virtual-store-dir-max-length". This will stop working in the next major version of npm.
+
+> test
+> vitest run tests/payroll/central-adjustment-imported-integrity.test.ts -t 签工与签收表
+
+
+ RUN  v4.1.10 D:/crm本地项目开发
+
+ ❯ |unit| tests/payroll/central-adjustment-imported-integrity.test.ts (8 tests | 1 failed | 7 skipped) 1248ms
+   × 迁入后原 C2 签工与签收表仍可按冻结证据输出 1247ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |unit| tests/payroll/central-adjustment-imported-integrity.test.ts > 迁入后原 C2 签工与签收表仍可按冻结证据输出
+AssertionError: expected 'unavailable' to be 'available' // Object.is equality
+
+Expected: "available"
+Received: "unavailable"
+
+ ❯ tests/payroll/central-adjustment-imported-integrity.test.ts:141:24
+    139|   const f = await createPayrollAdjustmentMigrationFixture()
+    140|   const output = await f.service.c2Output({ origin: 'real', projectId:…
+    141|   expect(output.state).toBe('available')
+       |                        ^
+    142|   expect(output.document?.actualAmount).toBe(1000)
+    143| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  20:42:22
+   Duration  3.91s (transform 2.03s, setup 0ms, import 2.44s, tests 1.25s, environment 0ms)
+

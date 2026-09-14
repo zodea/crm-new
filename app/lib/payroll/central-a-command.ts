@@ -30,6 +30,8 @@ export async function persistPayrollASource(db: TransactionDb, statementId: stri
   const subject = { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }
   const usedPrices = new Set(read.lines.flatMap(line => line.priceRevisionIds))
   const snapshot: PayrollAStatementSourceSnapshot = { schemaVersion: 1, subject, facts: read.facts, priceRevisions: read.prices.filter(price => usedPrices.has(price.id)) }
+  if (read.adjustmentReconciliation)
+    snapshot.adjustmentReconciliation = read.adjustmentReconciliation
   await db.execute('INSERT INTO payroll_a_statement_sources(statement_id,project_id,leader_worker_id,source_json) VALUES(?,?,?,?) ON CONFLICT(statement_id) DO UPDATE SET project_id=excluded.project_id,leader_worker_id=excluded.leader_worker_id,source_json=excluded.source_json', [statementId, subject.projectId, subject.leaderWorkerId, JSON.stringify(snapshot)])
 }
 
@@ -78,7 +80,11 @@ export async function releasePayrollA(db: TransactionDb, read: PayrollAFormRead,
   const now = new Date().toISOString()
   const payments = await db.select<{ id: string, month: string, actual_amount: number }>('SELECT id,month,actual_amount FROM wage_statements WHERE project_id=? AND leader_worker_id=? AND format_family=\'A\' AND status=\'released\' AND id<>? ORDER BY month,id', [read.draft.projectId, read.draft.leaderWorkerId, read.statementId])
   const source: PayrollAStatementSourceSnapshot = { schemaVersion: 1, subject: { projectId: read.draft.projectId!, crewId: read.draft.crewId ?? null, leaderWorkerId: read.draft.leaderWorkerId!, memberWorkerIds: read.draft.memberWorkerIds! }, facts: read.facts, priceRevisions: read.prices.filter(price => read.lines.some(line => line.priceRevisionIds.includes(price.id))) }
+  if (read.adjustmentReconciliation)
+    source.adjustmentReconciliation = read.adjustmentReconciliation
   const document: PayrollAFrozenDocument = { id: read.statementId, projectId: read.draft.projectId!, projectName: project?.name ?? '', crewName: crew?.name ?? null, leaderName: members.find(member => member.isLeader)?.workerName ?? '', month: read.draft.month!, periodKind: read.draft.periodKind!, formatFamily: 'A', payRatio: read.draft.payRatio!, workAmount: read.totals.workAmount.value!, cumulativeAmount: read.totals.cumulativeAmount.value!, previouslyPaid: read.totals.previouslyPaid.value!, grossAmount: read.totals.grossAmount.value!, actualAmount: release.actualAmount, releasedAt: now, operatorName: actor, note: read.draft.note ?? '', lines: read.lines.map(line => ({ ...line, workerName: members.find(member => member.workerId === line.workerId)?.workerName ?? null })), members, allocations, previousPayments: payments.map(payment => ({ statementId: payment.id, month: payment.month, amount: payment.actual_amount })) }
+  if (read.adjustmentReconciliation)
+    document.adjustmentReconciliation = read.adjustmentReconciliation
   if (!isPayrollAFrozenDocument(document))
     throw payrollProblem('validation-failed', '发放所需姓名、明细、金额或完整分配尚未提供')
   const snapshot = { ...document, quantitySource: 'field', sourceVersion: calculationVersion, sourceUpdatedAt: now, adjustmentReason: '', submittedAt: now, memberWorkerIds: members.map(member => member.workerId), allocationRecorded: true, actualAmountFen: amountInCents(release.actualAmount), allocationTotalFen: allocations.reduce((sum, row) => sum + row.allocatedAmountFen, 0), aSource: source, aDocument: document }

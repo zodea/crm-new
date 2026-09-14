@@ -62,6 +62,8 @@ function metrics(value: Record<string, unknown>) {
 function sources(value: unknown, projectId: unknown, origin: unknown, category: unknown) {
   return object(value) && ['contract', 'settlement', 'payment', 'reimbursement'].every((key) => {
     const source = value[key]
+    if (object(source) && source.entity === 'wage-statement')
+      return key === 'payment' && category === '工人工资' && origin === 'real' && source.kind === 'entity-list' && source.variant === 'actual-ledger' && source.view === null && object(source.filters) && source.filters.projectId === projectId && source.filters.dataOrigin === origin && source.filters.costCategory === category
     return source === null || (object(source) && source.kind === 'entity-list' && ['contract', 'settlement', 'subcontract-document'].includes(String(source.entity)) && ['material', 'subcontract', 'other_expense', 'settlement', 'other_settlement'].includes(String(source.variant)) && object(source.filters) && source.filters.projectId === projectId && source.filters.dataOrigin === origin && source.filters.costCategory === category)
   })
 }

@@ -8,6 +8,8 @@
 | 考勤、签工与主体配置来源 | `/subcontract/payroll/sources`、`/subcontract/attendance`、`/subcontract/daywork` | 同项目真实来源及月锁查看；包含尚无工资头的独立来源 |
 | 工资新建与草稿编辑 | `/subcontract/payroll/new`、`/subcontract/payroll/form/:id` | A/C1/C2 独立整页在浏览器验证版本可用，既有单据按实际格式读取 |
 | 工资配置 | `/subcontract/payroll/config` | A 的负责人首月比例、分项基准价及个人例外，C1 的个人兜底与加班标准，C2 的项目×负责人主体价与确认规则分别核对 |
+| 独立工资更正 | `/subcontract/payroll/adjustments/new`、`/subcontract/payroll/adjustments/form/:id`、`/subcontract/payroll/adjustments/:id` | 原已发工资的独立核算更正；P4 集成验证中，见[更正指南](./payroll-adjustments.md) |
+| 工资实际收付 | `/subcontract/payroll/payments`、`/subcontract/payroll/payments/new`、`/subcontract/payroll/payments/reversal/new`、`/subcontract/payroll/payments/:eventId` | 实际补退、错记冲销与只读台账；后月处理仍在原工资发放步骤 |
 | 签工新建与显式编辑 | `/subcontract/daywork/new`、`/subcontract/daywork/form/:id` | 浏览器独立整页可用，原用工事实与人工证明分开，操作见[工资指南 C2](./payroll-attendance.md#八c2-从人工签工到实际发放) |
 | 目标成本列表 | `/project/target-cost` | 当前浏览器验证实例可用；筛选、基线、删除与恢复见[预算指南](./target-cost.md) |
 | 目标成本版本详情 | `/project/target-cost/:id` | 固定版本科目、来源对比、附件与历史；来源未齐保持未知 |

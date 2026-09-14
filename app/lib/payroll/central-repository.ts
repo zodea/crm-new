@@ -1,11 +1,15 @@
 import type { ProjectHttpFetcher } from '../project/http-repository'
 import type { PayrollAConfigRead, PayrollAFormRead, PayrollAOutputRead } from './central-a-contract'
+import type { PayrollAdjustmentRead, PayrollAdjustmentReadKind } from './central-adjustment-read-codec'
 import type { PayrollC1ConfigRead, PayrollC1FormRead, PayrollC1OutputRead } from './central-c1-contract'
 import type { PayrollC2ConfigRead, PayrollC2FormRead, PayrollC2OutputRead } from './central-c2-contract'
-import type { PayrollDetailRead, PayrollListRead, PayrollRepository, PayrollSourcesRead } from './central-contract'
+import type { PayrollDetailRead, PayrollListRead, PayrollQuery, PayrollRepository, PayrollSourcesRead } from './central-contract'
 import type { PayrollDayworkFormRead, PayrollDayworkListRead } from './central-daywork-contract'
 import { readProjectHttp } from '../project/http-repository'
 import { decodePayrollARead, decodePayrollAResult, encodePayrollAWire } from './central-a-codec'
+import { decodePayrollAdjustmentResult } from './central-adjustment-codec'
+import { decodePayrollAdjustmentRead } from './central-adjustment-read-codec'
+import { encodePayrollAdjustmentWire } from './central-adjustment-wire'
 import { decodePayrollAttendanceRead, decodePayrollAttendanceResult, encodePayrollAttendanceWire } from './central-attendance-codec'
 import { decodePayrollC1Read, decodePayrollC1Result, encodePayrollC1Wire } from './central-c1-codec'
 import { decodePayrollC2Read, decodePayrollC2Result, encodePayrollC2Wire } from './central-c2-codec'
@@ -13,7 +17,17 @@ import { decodePayrollRead } from './central-codec'
 import { decodePayrollDayworkRead, decodePayrollDayworkResult, encodePayrollDayworkWire } from './central-daywork-codec'
 
 export function createPayrollRepository(fetcher: ProjectHttpFetcher): PayrollRepository {
+  const adjustmentRead = <T extends PayrollAdjustmentRead>(kind: PayrollAdjustmentReadKind, query: PayrollQuery, input: unknown, target = input): Promise<T> => readProjectHttp(() => fetcher(`/api/read/payroll/${kind}`, { method: 'POST', body: { query, input: encodePayrollAdjustmentWire(input) } }), value => decodePayrollAdjustmentRead<T>(value, kind, query, target))
   return {
+    adjustmentHistory: (q, id) => adjustmentRead('adjustment-history', q, { statementId: id }, id),
+    adjustmentForm: (q, input) => adjustmentRead('adjustment-form', q, input),
+    adjustmentDetail: (q, id) => adjustmentRead('adjustment-detail', q, { adjustmentId: id }, id),
+    actualPaymentForm: (q, input) => adjustmentRead('actual-payment-form', q, input),
+    actualPaymentDetail: (q, id) => adjustmentRead('actual-payment-detail', q, { eventId: id }, id),
+    actualReversalForm: (q, input) => adjustmentRead('actual-reversal-form', q, input),
+    actualLedger: (q, scope) => adjustmentRead('actual-ledger', q, scope),
+    releaseAdjustmentPreview: (q, input) => adjustmentRead('release-adjustments', q, input),
+    executeAdjustment: command => readProjectHttp(() => fetcher('/api/commands/payroll-adjustment', { method: 'POST', body: encodePayrollAdjustmentWire(command) as Record<string, unknown> }), value => decodePayrollAdjustmentResult(value, command)),
     dayworkList: (query, scope) => readProjectHttp(() => fetcher('/api/read/payroll/daywork', { query: { ...query, scope: JSON.stringify(scope) } }), value => decodePayrollDayworkRead<PayrollDayworkListRead>(value, 'list', query, scope)),
     dayworkForm: (query, input) => readProjectHttp(() => fetcher('/api/read/payroll/daywork-form', { method: 'POST', body: { query, input: encodePayrollDayworkWire(input) } }), value => decodePayrollDayworkRead<PayrollDayworkFormRead>(value, 'form', query, input)),
     executeDaywork: command => readProjectHttp(() => fetcher('/api/commands/payroll-daywork', { method: 'POST', body: encodePayrollDayworkWire(command) as Record<string, unknown> }), value => decodePayrollDayworkResult(value, command)),

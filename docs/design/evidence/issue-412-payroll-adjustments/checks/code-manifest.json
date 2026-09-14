@@ -1,0 +1,988 @@
+{
+  "recordedAt": "2026-09-14T21:52:13+08:00",
+  "baseline": "c5caede8d55f117ededcff7354ce2b1af1872d90",
+  "phase": "P4 final code before commit hooks",
+  "count": 196,
+  "files": [
+    {
+      "path": "app/components/crew-worker/PayrollHostSection.vue",
+      "bytes": 5845,
+      "sha256": "84f704b2e43bb15aca48619ab0862d5a3101d01f175cb26bb091fdb5b190de1d"
+    },
+    {
+      "path": "app/components/finance/payment-management/PaymentPayrollSection.vue",
+      "bytes": 1967,
+      "sha256": "ec3a249be84ba9e7bca3488c31ca3d46c35bf656cc36cbf2e01d96ce349c35b1"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualFactsTable.vue",
+      "bytes": 3187,
+      "sha256": "7be56494e4e80d395d2da7c1f6bcfcd3c723ce7aff66245e81de0e21fe3ecf22"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualLedgerScreen.vue",
+      "bytes": 2399,
+      "sha256": "d057517c7ddf1ada3864d49f3b50d465b9511c95d8d5e5ad09166322cbd758e1"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualLedgerSection.vue",
+      "bytes": 2787,
+      "sha256": "3c74a9e90047f996b4478c20850129bb38f312cbe139ca998cf638428aa623a8"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualPaymentDetailScreen.vue",
+      "bytes": 4043,
+      "sha256": "58fcba57a4a50d0402177ee674d46a20f8a29699af0de7bf61f13a392c61d3e4"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualPaymentFields.vue",
+      "bytes": 5411,
+      "sha256": "523448c31ee9482870f0482d603ded9845b6641265ddcbe55a7326c199184210"
+    },
+    {
+      "path": "app/components/payroll/PayrollActualPaymentFormPage.vue",
+      "bytes": 2683,
+      "sha256": "b6bc19252faf3ed7176c8bd4493eb9fd686d859a7c281223782235d6e0a80d30"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentApplications.vue",
+      "bytes": 2452,
+      "sha256": "e0f07e458bb4a0b4171877773f0826a23a3a36bf5f2760cf79fbabaca59f97a2"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentBasisFields.vue",
+      "bytes": 9932,
+      "sha256": "098be3a3dd68c78b8d0304c821adc5824055aca7b84349625bd3f870bf1b2383"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentDetailScreen.vue",
+      "bytes": 7782,
+      "sha256": "145e64f6efab9c3303d9239187793b2194f9774301ee87d5816c29678895e662"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentFormPage.vue",
+      "bytes": 4758,
+      "sha256": "0a60b1f5e13f60306307407123a965cb0584e66505f02427e8c9dcb3d965e324"
+    },
+    {
+      "path": "app/components/payroll/PayrollAdjustmentHistorySection.vue",
+      "bytes": 4005,
+      "sha256": "659545b696c1ca9c17e22e7a7aff4faa37bbaca2e3102d03555698c8362b25ca"
+    },
+    {
+      "path": "app/components/payroll/PayrollConfirmationOutput.vue",
+      "bytes": 4072,
+      "sha256": "9daa23cf1ef41c41346b9658e0629b198f175500fdfefeedbf71fe7fc6c2a78b"
+    },
+    {
+      "path": "app/components/payroll/PayrollOriginalWageSummary.vue",
+      "bytes": 1926,
+      "sha256": "e7f236643c0e83788728d153aaa06010c388950511679f208fb8ee6c09981cae"
+    },
+    {
+      "path": "app/components/payroll/PayrollRecordingReversalFormPage.vue",
+      "bytes": 4568,
+      "sha256": "8597bed40f6439c3a6be4aa9fe8013b6f65c71f7520d5690dfd535fa20782d2b"
+    },
+    {
+      "path": "app/components/payroll/PayrollReleaseAdjustmentSelection.vue",
+      "bytes": 6264,
+      "sha256": "3f65deedd5c142c7068de6a4a2afc654f83431796697b44a5eedee91b18bfaf4"
+    },
+    {
+      "path": "app/components/payroll/PayrollReleaseAdjustmentSummary.vue",
+      "bytes": 802,
+      "sha256": "e8e9b37f307ad56c79aefe3089c72090bd97f1b6d33906ac276361187bec2f54"
+    },
+    {
+      "path": "app/composables/usePayrollActualPaymentForm.ts",
+      "bytes": 5256,
+      "sha256": "0be2c48c3e6383c1aef37f49507aec0a4e44d2140f4dd27e27e1ac6a1ca02e60"
+    },
+    {
+      "path": "app/composables/usePayrollAdjustmentForm.ts",
+      "bytes": 2750,
+      "sha256": "ac0100f340c8ce413fe9ef7e7c6016eda50006dddbdc3cbbbcb0db3837a4514c"
+    },
+    {
+      "path": "app/composables/usePayrollEvidenceForm.ts",
+      "bytes": 12375,
+      "sha256": "7ce1924760cd82f3e25ec2b95a8ec8bf422a147f15158e3243c6f22fb491ba6e"
+    },
+    {
+      "path": "app/lib/crew-worker/payroll-read.ts",
+      "bytes": 6394,
+      "sha256": "d8f42cbb58109496e8efd116df681c70d91d2d400057e54f874c89191d0d3572"
+    },
+    {
+      "path": "app/lib/migration/payroll-central-source.ts",
+      "bytes": 6147,
+      "sha256": "cc01a8d81f2294115cb2e4fa4416d3b7c56cdb4e0468e79c6fc8068a0da0b537"
+    },
+    {
+      "path": "app/lib/payroll/adjustment-navigation.ts",
+      "bytes": 4921,
+      "sha256": "f59d61a5cba265f35a063393ba2fcf89d712f69379c9443de0a83579d5a74f02"
+    },
+    {
+      "path": "app/lib/payroll/adjustment-output.ts",
+      "bytes": 6218,
+      "sha256": "11fe32202da8a1bb0eb0da52c58c7385edc2d4cd0b6f992d01ef53da23922f19"
+    },
+    {
+      "path": "app/lib/payroll/central-a-adjustment-contract.ts",
+      "bytes": 1193,
+      "sha256": "bc66ccd128af4dbad62c1351f39351b9ba016385ba6bd701e43fd9f172742ced"
+    },
+    {
+      "path": "app/lib/payroll/central-a-adjustment-validation.ts",
+      "bytes": 5002,
+      "sha256": "20f0be3ceeba6622bc61d7f06374a6131645fdce703ec3593987609f0b957e75"
+    },
+    {
+      "path": "app/lib/payroll/central-actual-codec.ts",
+      "bytes": 7848,
+      "sha256": "f918ca5cf125d6fd9926ed76b41f56a83312b090f9f26a3de6f4074c4c440561"
+    },
+    {
+      "path": "app/lib/payroll/central-actual-contract.ts",
+      "bytes": 5085,
+      "sha256": "440193b35ac5843336da4c00c294965588a01a638a82f5c4a63e6fe804e011f8"
+    },
+    {
+      "path": "app/lib/payroll/central-actual-validation.ts",
+      "bytes": 2681,
+      "sha256": "153ec03e8295d8199c933976d5cd7c3e33c19906c5e2e00e710a2fddc96f6ac2"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-calculation.ts",
+      "bytes": 2600,
+      "sha256": "0668c9333f0e5ee63f60d136c3cc6e4b1305f6a5cd2729661ba06f2c7dc76fca"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-codec.ts",
+      "bytes": 5842,
+      "sha256": "b506d2af6141cabb7b6659a04d35ac6400a0592e61e11733bec730e224d355cf"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-contract.ts",
+      "bytes": 6838,
+      "sha256": "a1649688d6b413be8629a2a03f2a9b9c3c3b327d3f154cc6ec6b2795a4fc6d07"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-read-codec.ts",
+      "bytes": 14425,
+      "sha256": "8ad90112d9718810cb7b956fd6bd306b64de05634246639f26327fa0b4ddb1a7"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-schema.ts",
+      "bytes": 3124,
+      "sha256": "63f74c76c4b0588ad09a8d510f0cc7161d834230319ba9652f3efbdd13c26e7e"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-validation.ts",
+      "bytes": 10471,
+      "sha256": "e3771f2de79436d2a628a85640302260c4a0a76bf3b24cb185f8c1d7b3d479b3"
+    },
+    {
+      "path": "app/lib/payroll/central-adjustment-wire.ts",
+      "bytes": 4693,
+      "sha256": "98023e5e31b628b51c10458b308ec5390d14856448e9e9d5a25e542ca90103d9"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-output-identity.ts",
+      "bytes": 3285,
+      "sha256": "f0925ea7f257185fd5aa1bbf665c8a8cf2d554fc0a558fb095ef7db51e56b341"
+    },
+    {
+      "path": "app/lib/payroll/central-release-adjustment-contract.ts",
+      "bytes": 742,
+      "sha256": "9fe9f55223d782157157f48dceec294cac97b91d65d60140821035f610ec5a0b"
+    },
+    {
+      "path": "app/lib/payroll/central-release-adjustment-wire.ts",
+      "bytes": 2107,
+      "sha256": "86bddb8252c0853dea4701b5b00392b9cf3896f6a20d95d0e5009ae10cd07436"
+    },
+    {
+      "path": "app/lib/payroll/central-reversal-validation.ts",
+      "bytes": 1958,
+      "sha256": "609b4c55660a74b9f5f6243461a7143478e42314c48d4786d3f491318706d498"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/adjustments/[id].vue",
+      "bytes": 59,
+      "sha256": "f5f3b0d3c96872a5a5c31e5c39c87ddf6fdec6edaf8ade706b3397d01c5c172a"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/adjustments/form/[id].vue",
+      "bytes": 55,
+      "sha256": "769805af87451762a57898b52fc9d2f638aceb4954d9d2d4a22a6c6d42872555"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/adjustments/new.vue",
+      "bytes": 55,
+      "sha256": "769805af87451762a57898b52fc9d2f638aceb4954d9d2d4a22a6c6d42872555"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/payments/[id].vue",
+      "bytes": 62,
+      "sha256": "89a685418dd0b63b08eef17f83aa20913f755038a1a9be4fa6d115de3c200839"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/payments/index.vue",
+      "bytes": 55,
+      "sha256": "9a039207b3d4664d94d10f3bd106c46474ec2b7bf48f032a9add5569ab50b95a"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/payments/new.vue",
+      "bytes": 58,
+      "sha256": "fba22ac410c27e19ba16124da937d2cf258d8fa73f57a9a527c59b460b4d7e8c"
+    },
+    {
+      "path": "app/pages/subcontract/payroll/payments/reversal/new.vue",
+      "bytes": 62,
+      "sha256": "2719160c86be434e508ffbc0fd84b3babe2a84abacad9e74d7accbfe50d3f935"
+    },
+    {
+      "path": "app/stores/payroll-adjustments.ts",
+      "bytes": 6355,
+      "sha256": "027b05e0578df5b59dd3a853b8c9e46b2ae41f32ee41842985889530fb6907f4"
+    },
+    {
+      "path": "e2e/helpers/payroll-adjustment-workspace.ts",
+      "bytes": 6065,
+      "sha256": "4ec4768b4a3b2ec5f233c860711ecab17cbce8aa60a7f39ee6f0892159bc0841"
+    },
+    {
+      "path": "e2e/payroll-adjustments-central.spec.ts",
+      "bytes": 17354,
+      "sha256": "45ec32e5f8e50131a1b0e0fd00d2068d57e010848921964115f46c17a8b6a8e2"
+    },
+    {
+      "path": "server/api/commands/payroll-adjustment.post.ts",
+      "bytes": 485,
+      "sha256": "b50c8672f4e1b1698d347f295ef7453d591889a7c4e00e361288f136f0a8561e"
+    },
+    {
+      "path": "server/api/read/payroll/actual-ledger.post.ts",
+      "bytes": 148,
+      "sha256": "fffb9cb494bf31d7462d6570d2c8bbdd1a41ee5a9acfd8d1dd834879c15a61ea"
+    },
+    {
+      "path": "server/api/read/payroll/actual-payment-detail.post.ts",
+      "bytes": 156,
+      "sha256": "a16cc45aff9f88b13ab107bdee57d02cdba26125a872adc40c50ffba18bb756a"
+    },
+    {
+      "path": "server/api/read/payroll/actual-payment-form.post.ts",
+      "bytes": 154,
+      "sha256": "58563441cbb88912e5602252e4dfd265ea7ed1e33eac148376ab563ae8f3c37e"
+    },
+    {
+      "path": "server/api/read/payroll/actual-reversal-form.post.ts",
+      "bytes": 155,
+      "sha256": "aa4b3492b33614ffd76e90e911c8377d48eae6f3b0ef8c5de68311b2af3cb2be"
+    },
+    {
+      "path": "server/api/read/payroll/adjustment-detail.post.ts",
+      "bytes": 152,
+      "sha256": "f0c8ad5c5ad8fd78f1d01763bc75ded434f3fb3e8e193a17e86408ca09e53b23"
+    },
+    {
+      "path": "server/api/read/payroll/adjustment-form.post.ts",
+      "bytes": 150,
+      "sha256": "f16c9dad8e8c3d3f648a0d59f1e7837089255c74c5b81c9a881903c921df8407"
+    },
+    {
+      "path": "server/api/read/payroll/adjustment-history.post.ts",
+      "bytes": 153,
+      "sha256": "5e7d281f859c3613359eecf58b4df951be1a8719408d9cc484dacbfb3f5c725f"
+    },
+    {
+      "path": "server/api/read/payroll/release-adjustments.post.ts",
+      "bytes": 154,
+      "sha256": "abab8fb91ad76c78a6c57be5d849467adfa1b49d3d7dcc915fda7a2abe77b69e"
+    },
+    {
+      "path": "server/utils/crew-worker-payroll-read.ts",
+      "bytes": 3782,
+      "sha256": "0bc45923f68c33b8658031fc56ae9b999a66257fd946a57486da04d1a69df6bb"
+    },
+    {
+      "path": "server/utils/payroll-a-adjustment-reconciliation.ts",
+      "bytes": 7746,
+      "sha256": "c2c53c57818b79089d01b3a0dbe1cede94061abf09d493990d227b3fa910279b"
+    },
+    {
+      "path": "server/utils/payroll-actual-budget.ts",
+      "bytes": 1535,
+      "sha256": "c80062f829a2039b1a43fad318fe794e92244831a70fa36fc1cc8f093e114b31"
+    },
+    {
+      "path": "server/utils/payroll-actual-facts.ts",
+      "bytes": 4118,
+      "sha256": "662a2c74615a3392076abe17b80d6219c00360d377d5c858ca15fb3a091b82d3"
+    },
+    {
+      "path": "server/utils/payroll-actual-history.ts",
+      "bytes": 4608,
+      "sha256": "9bf24cfc4695f2053d04d4ff6da900ecd2abdd1d4891f98b10ec23131749ad9b"
+    },
+    {
+      "path": "server/utils/payroll-actual-provenance.ts",
+      "bytes": 10062,
+      "sha256": "06054d2600f05b8a3c453713c3eb6db916fed0c986c3dcbf2e362dd4935b78bd"
+    },
+    {
+      "path": "server/utils/payroll-actual-service.ts",
+      "bytes": 12466,
+      "sha256": "2b4afa46fcae7617eb97ea8d6190dd6ba96035925c62b8474558d682011f6b17"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-application-integrity.ts",
+      "bytes": 3156,
+      "sha256": "8a3073a2c5a3fdb90916f2ddd24bbd50943b4f38453a5165cce5f7a37655504a"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-chain.ts",
+      "bytes": 2072,
+      "sha256": "e49055f1963ecf65afda64356e239f3d8f8dd793bbdfc5d91aabc5efd9aaf319"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-facts.ts",
+      "bytes": 6670,
+      "sha256": "60022792b7feb1c886c261f30d388a065edcc1c62850b23258c5df80a771b365"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-history.ts",
+      "bytes": 3157,
+      "sha256": "8833ae12cd30b78d419aff3df9a98347422d1ddd5921a93c2a2ec326cf68ee3f"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-http.ts",
+      "bytes": 3273,
+      "sha256": "a5c42424e588cdcd6696cab145623072254998128ac0a20eb2b9a4c9799cdaa0"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-migration-references.ts",
+      "bytes": 12783,
+      "sha256": "735c7192e626eadf972127efda5b4fd3747d7d42542b73a8c2e9d7082e3cba15"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-records.ts",
+      "bytes": 9180,
+      "sha256": "ec23e25fbca57318e77061ab3bd2373c70d43d0c48aa03c18a23538497b2e2f0"
+    },
+    {
+      "path": "server/utils/payroll-adjustment-service.ts",
+      "bytes": 12826,
+      "sha256": "843869c5447a7515191f484988cc7eac017bd4f0b039bd9e6751d4ffb0926bbc"
+    },
+    {
+      "path": "server/utils/payroll-central-migration.ts",
+      "bytes": 6562,
+      "sha256": "b7d0a62fd0bb11f0e77ff949165d861b73807c19d08a1894c27551fbdb363af5"
+    },
+    {
+      "path": "server/utils/payroll-migrated-form.ts",
+      "bytes": 5612,
+      "sha256": "af63c1b51371c59e8235c70866b56836df823cad9b89c49af5ecf9c4a4bc4132"
+    },
+    {
+      "path": "server/utils/payroll-migrated-mapping.ts",
+      "bytes": 20123,
+      "sha256": "c992cad32e6f1b80cf8170f83d228fd0cf2b9894768e4051a16ba2d2cc43ec3c"
+    },
+    {
+      "path": "server/utils/payroll-migrated-proof.ts",
+      "bytes": 14941,
+      "sha256": "1cf85a32de007576008b2f8bd984a242234681cc341001567141507157876da2"
+    },
+    {
+      "path": "server/utils/payroll-release-adjustments.ts",
+      "bytes": 8859,
+      "sha256": "e013d073c5507409cdac5f72499634e5c3b07ffd0fcc7019f3a9c2f1588bb808"
+    },
+    {
+      "path": "server/utils/payroll-release-application-provenance.ts",
+      "bytes": 3818,
+      "sha256": "b8b729a86052a865d76161a1d34dc68e8d851ad58fedf75dce833a9bf695c644"
+    },
+    {
+      "path": "server/utils/payroll-reversal-provenance.ts",
+      "bytes": 10563,
+      "sha256": "c3caeec0f794208e7b121fb8cbc65674a0e44a454aaf8a2944ac6b0e6f6e1a69"
+    },
+    {
+      "path": "server/utils/payroll-reversal-service.ts",
+      "bytes": 11828,
+      "sha256": "831714391f35942289d1b119e936fe19878e849ae00fd3fa150d6be1f76db4a0"
+    },
+    {
+      "path": "tests/components/PaymentPayrollSection.test.ts",
+      "bytes": 2498,
+      "sha256": "56c07d48d8975b6623d8fa69df896ed0addd87aaeac789f0951d19c6e7343aeb"
+    },
+    {
+      "path": "tests/components/PayrollActualPaymentFormState.test.ts",
+      "bytes": 4216,
+      "sha256": "064924e2c3cc31ed61f5ebec26db4c23fc9ee3ecbb8f3c78cf0f560fa1f811fe"
+    },
+    {
+      "path": "tests/components/PayrollAdjustmentDetailScreen.test.ts",
+      "bytes": 4279,
+      "sha256": "f1c20431313ce78daedb3f4d1b6862ef127038236eb30190d214d36359c9b3bf"
+    },
+    {
+      "path": "tests/components/PayrollAdjustmentFormState.test.ts",
+      "bytes": 6606,
+      "sha256": "8af3310b38aa3f3b4b928087c0389f3b648327457827435ecc9a67962e1c1be2"
+    },
+    {
+      "path": "tests/components/PayrollHostSection.test.ts",
+      "bytes": 4253,
+      "sha256": "03c90970452f40c98a4889d781998088c3a430d7864942ff62db490f42855994"
+    },
+    {
+      "path": "tests/components/PayrollRecordingReversalEntry.test.ts",
+      "bytes": 3935,
+      "sha256": "b996f0c6b218df111c488c6f16c2a0c512e7ed529cf31460410cc9e259b12267"
+    },
+    {
+      "path": "tests/components/PayrollReleaseAdjustmentSelection.test.ts",
+      "bytes": 3568,
+      "sha256": "ccbaa783fd3160960c97c95e9ef7f56a5b53b60159c47f340b4f367a4ac225a1"
+    },
+    {
+      "path": "tests/helpers/payroll-a-adjustment-fixture.ts",
+      "bytes": 4146,
+      "sha256": "39b9e4bb13bb77b7ef59378cf8805b906f44fbeec5f2512be2becd5472c201b8"
+    },
+    {
+      "path": "tests/helpers/payroll-a-output-migration-fixture.ts",
+      "bytes": 3350,
+      "sha256": "b48f252240c1000b3f8eba55cd6b5cf107636a9d2f202c0b2ae3b8afaff2ca65"
+    },
+    {
+      "path": "tests/helpers/payroll-adjustment-migration-fixture.ts",
+      "bytes": 3858,
+      "sha256": "c6892827c3771ef8285fa97a73a3491b47fdb0dfef169e6561a8b766bdf739ad"
+    },
+    {
+      "path": "tests/helpers/payroll-adjustment-service-fixture.ts",
+      "bytes": 3916,
+      "sha256": "25efe3ab7e736abe79739d14ad37868cd11fda9e54be5529f279f9eb75244105"
+    },
+    {
+      "path": "tests/helpers/payroll-adjustment-ui-fixture.ts",
+      "bytes": 1853,
+      "sha256": "036a654312b7928d58b39b8e8417b57e087efbf49f1809159ae1f364fb8bb557"
+    },
+    {
+      "path": "tests/helpers/payroll-host-fixture.ts",
+      "bytes": 2437,
+      "sha256": "2da794b2f8c84e753b7db6da61ff54184220e9431f6e85ecf8cf330bc6b778d2"
+    },
+    {
+      "path": "tests/migration/payroll-central-source.test.ts",
+      "bytes": 1569,
+      "sha256": "376908f115f2cfc9cbdff76443f55e86b7aa552c338529e925752085cd2a3068"
+    },
+    {
+      "path": "tests/payroll/adjustment-navigation-output.test.ts",
+      "bytes": 6598,
+      "sha256": "42ebb0cc5f239dc3d4217ab0794cf6f8fba2d5c09672c21ef5db430cecaca4c5"
+    },
+    {
+      "path": "tests/payroll/central-a-adjustment-reconciliation.test.ts",
+      "bytes": 3593,
+      "sha256": "43aa0c5a65b457e782a6c11cc791da12b3e92f51dcb7337d4a42c528669bdf7c"
+    },
+    {
+      "path": "tests/payroll/central-a-adjustments.test.ts",
+      "bytes": 3580,
+      "sha256": "8d0ac8187b51003f5b03ae29145f3d44a9a7e57e13253efb8b67152ccfe9b14e"
+    },
+    {
+      "path": "tests/payroll/central-actual-history.test.ts",
+      "bytes": 2568,
+      "sha256": "8ef09f580ac4de9d020a477fe366f3fa3937f7e00d72690806f6af7f6adbfc07"
+    },
+    {
+      "path": "tests/payroll/central-actual-payments.test.ts",
+      "bytes": 2472,
+      "sha256": "d32db1df991d464b893ea92b3e59c1511041644a3794a57ab786f37cc46c5bc2"
+    },
+    {
+      "path": "tests/payroll/central-actual-reversal.test.ts",
+      "bytes": 5880,
+      "sha256": "0d53f2a64b8f94d9989c3c87736bc7d3adbb7f1b859a9c53172b395d1b70b68d"
+    },
+    {
+      "path": "tests/payroll/central-actual-supplement.test.ts",
+      "bytes": 1401,
+      "sha256": "8f82fa7c8aff1c9042e18e3cfa6b2f8258f59e6412133b9da706d726a02e33d3"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-chain.test.ts",
+      "bytes": 10731,
+      "sha256": "e2782e2f5196f81b2d08a33e8a95856e64141a19857bbe6aef4216328dba084d"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-imported-integrity.test.ts",
+      "bytes": 18926,
+      "sha256": "c5b919b2ac6b00f09500bd81b6b9fc2d98bace6744cb1c0bfbbe1575ae8ef778"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-imported-runtime.test.ts",
+      "bytes": 7232,
+      "sha256": "ec63ace636c37a46571d68cbcd2de8f54266b0df7f4a18cc369b3f57062ad9fb"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-migrated-mapping.test.ts",
+      "bytes": 14277,
+      "sha256": "42737f5340fb85c3313133c8587bd4a25a7c4295d270874fee5baf8411b2c72b"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-migration.test.ts",
+      "bytes": 7329,
+      "sha256": "a1e5084a7f04fb0917f61b25a86e9364c488006604eda06a6225fd540a7cdf1d"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-provenance.test.ts",
+      "bytes": 3447,
+      "sha256": "709bc0e98159f0a5bc5ac281674f0c47eff45774cfd5453011a491c998fefb56"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-scope.test.ts",
+      "bytes": 1248,
+      "sha256": "0ae7fc3edc9750b3e971fdc657b87f9636ea9b666456f9183bc09d95f655cfc2"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-transactions.test.ts",
+      "bytes": 5216,
+      "sha256": "4dfb306836c9548175c8d6c04effa405af54d00b39063c59dbc6298b4836454c"
+    },
+    {
+      "path": "tests/payroll/central-adjustment-transport.test.ts",
+      "bytes": 4481,
+      "sha256": "76cca391164f336a4d809edae7c420a36ff7471e9338d94d34681a58ab03beba"
+    },
+    {
+      "path": "tests/payroll/central-adjustments-http.test.ts",
+      "bytes": 7631,
+      "sha256": "32efc376107ad31e94ec82e42c874f377076eaad9517ff24810b1496e1a805fc"
+    },
+    {
+      "path": "tests/payroll/central-adjustments.test.ts",
+      "bytes": 3696,
+      "sha256": "1cdbb245338ed4a9bab0d9fdd6b2a9ba136157bed3a491526ffbe186c9c05c4f"
+    },
+    {
+      "path": "tests/payroll/central-c1-adjustments.test.ts",
+      "bytes": 6283,
+      "sha256": "f9be8f01f1ea49f98a83933731098423d2384a0552806a184295f1cdaf6a8b09"
+    },
+    {
+      "path": "tests/payroll/central-host-http.test.ts",
+      "bytes": 4982,
+      "sha256": "6916532e2ff6477df84bd7c583bfc01435ca7c0c85afcbec8c3d19849d7496bc"
+    },
+    {
+      "path": "tests/payroll/central-host-read.test.ts",
+      "bytes": 5575,
+      "sha256": "525a5f0f14eb0015cb31694a4151f1467ef7ae583b6c4045817493706d9c128f"
+    },
+    {
+      "path": "tests/payroll/central-release-adjustments.test.ts",
+      "bytes": 2703,
+      "sha256": "29c8d4061f46c633fab1c16a6a79d9b7300d84722f6f8adc9371c25ef45409b4"
+    },
+    {
+      "path": "tests/stores/payroll-a-pending-read.test.ts",
+      "bytes": 2412,
+      "sha256": "fbc85ec5aa6f89a57a3df5704262d323baaed1a0ae18ba55f0c24c594a61f2b0"
+    },
+    {
+      "path": "tests/stores/payroll-adjustments-central.test.ts",
+      "bytes": 6380,
+      "sha256": "f92fa95fe248a0fbe131ee583ebd8e1f3b3a56e170b31e64214aece8f7afa3d4"
+    },
+    {
+      "path": "tests/target-cost/payroll-actual.test.ts",
+      "bytes": 6418,
+      "sha256": "08d19a13c12ab6e0b32a801755b4521b870ecb6144c3ab686675c885bf1a8f73"
+    },
+    {
+      "path": "app/components/crew-worker/CrewWorkerCentralDetailScreen.vue",
+      "bytes": 23617,
+      "sha256": "b98d208cb7298da9ba7b37583f84842a07ee41360110c331836c3803261a6f54"
+    },
+    {
+      "path": "app/components/finance/payment-management/PaymentManagementScreen.vue",
+      "bytes": 4112,
+      "sha256": "946fee902295270b250c70ee008f1fac2cec132efa42db0ba81cdc0c469f2f0f"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollDetailScreen.vue",
+      "bytes": 11528,
+      "sha256": "d66a4ecb9d9fd4c74a1c427bce70730b85d06848fbbf1dafde60198b0e055ec4"
+    },
+    {
+      "path": "app/components/payroll/CentralPayrollScreen.vue",
+      "bytes": 8378,
+      "sha256": "4d778d65797631addcfe7223c1c996f49129eb24244e9d2c1407669f90fd2c1a"
+    },
+    {
+      "path": "app/components/payroll/PayrollACommandState.vue",
+      "bytes": 1295,
+      "sha256": "9a310ca39a57bcc5a09523a6964dd206fc9fd4b01e0287370b7590adbaf4902c"
+    },
+    {
+      "path": "app/components/payroll/PayrollAPriceDialog.vue",
+      "bytes": 7004,
+      "sha256": "df0513e9b1d0a1eb2a6c3f619c3dfbf2a847812056aac16060ea948f97585939"
+    },
+    {
+      "path": "app/components/payroll/PayrollAReleaseDialog.vue",
+      "bytes": 5417,
+      "sha256": "b6f3e817f57f3acb3be20d1894ad3d19223b6d03e627690b0058a85da2310403"
+    },
+    {
+      "path": "app/components/payroll/PayrollAStatementWorkspace.vue",
+      "bytes": 6862,
+      "sha256": "cf7906f1e16931000a964fd5cc546e2f81f6408ef0bacc7abdcc000e9d5160a2"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1ReleaseDialog.vue",
+      "bytes": 5605,
+      "sha256": "005e11a295d3969496163c88163f0ce7ee62ae7ac2d1f912a47c22b0ac66c871"
+    },
+    {
+      "path": "app/components/payroll/PayrollC1StatementWorkspace.vue",
+      "bytes": 5824,
+      "sha256": "e2e46c8dbca956f19d9b93f77457a9a0faaca914d1c9db04d2d25681d6ebf569"
+    },
+    {
+      "path": "app/components/payroll/PayrollC2ReleaseDialog.vue",
+      "bytes": 5605,
+      "sha256": "267563344c1a648221b912531184a0d55bb331ea7046861c22602ca2e434d077"
+    },
+    {
+      "path": "app/components/payroll/PayrollC2StatementWorkspace.vue",
+      "bytes": 5873,
+      "sha256": "60b04d981d1eb70cec32653558e1ecadcd968395856cb5ea09fe97ce6c447e42"
+    },
+    {
+      "path": "app/components/project/ProjectDetailScreen.vue",
+      "bytes": 29565,
+      "sha256": "06a79e440fd8817ce9719259a529e1ce737f5e2f2f47ed9ac2f005fb9b2d7162"
+    },
+    {
+      "path": "app/components/target-cost/CentralTargetCostComparison.vue",
+      "bytes": 4135,
+      "sha256": "1c2f58256d69c57b42e78ef9b22df0656bcb527f5b6689ce6ebeb47b58783cc6"
+    },
+    {
+      "path": "app/composables/usePayrollAConfig.ts",
+      "bytes": 12691,
+      "sha256": "1e24df1687e20823071887e6ee69b299d66ad57b694d4dab9a4ee951a3d9bf75"
+    },
+    {
+      "path": "app/composables/usePayrollAForm.ts",
+      "bytes": 12827,
+      "sha256": "aaedcd57c248ad218088b8750497c14eea326e7e6dfb08800a35733f7439f737"
+    },
+    {
+      "path": "app/composables/usePayrollAStatement.ts",
+      "bytes": 8067,
+      "sha256": "2f3bb59b39c93476db3cf7b29bad36cc0bf0c9c74493c996fce172911cf01d6a"
+    },
+    {
+      "path": "app/composables/usePayrollC1Statement.ts",
+      "bytes": 7922,
+      "sha256": "e6f15c2dc58b3aacd5b9b30b88d028cd9d5d7d4715e44a929f97ad145432fa02"
+    },
+    {
+      "path": "app/composables/usePayrollC2Statement.ts",
+      "bytes": 8387,
+      "sha256": "51c8177efbc29153e92b3ca9ab896adbed767b59d691d5f8570e3901d3807bcd"
+    },
+    {
+      "path": "app/lib/crew-worker/read-contract.ts",
+      "bytes": 11962,
+      "sha256": "573df2c14ff03a568ec9b03ae858d8cfe8f6befbb4b6c5fbb0133f988da7a9ff"
+    },
+    {
+      "path": "app/lib/crew-worker/read-decoder.ts",
+      "bytes": 11393,
+      "sha256": "368b19ee4496807d4c927fa8b46d91a94d6b3452ce83c3afeaf221258c052c90"
+    },
+    {
+      "path": "app/lib/migration/payroll-source.ts",
+      "bytes": 10965,
+      "sha256": "3920bf2958e4765dabad996031e095107e007a5d8cb5f49bee53e25a677faad2"
+    },
+    {
+      "path": "app/lib/nav/target-registry.ts",
+      "bytes": 36507,
+      "sha256": "54672eccb2cd4aa03630d48ecdb03ef9729b5088a87ecd8a546b19bd02d2cb1d"
+    },
+    {
+      "path": "app/lib/payroll/central-a-codec.ts",
+      "bytes": 22550,
+      "sha256": "4a468a82d67689bc39157a24c0cc74f06f8356f0e0d0ee8c382f36d127e557cf"
+    },
+    {
+      "path": "app/lib/payroll/central-a-command.ts",
+      "bytes": 10103,
+      "sha256": "f8921e2992724461aa7d73dc5a16e957f0d3dd1c2019be60d998072f9233ba28"
+    },
+    {
+      "path": "app/lib/payroll/central-a-contract.ts",
+      "bytes": 13331,
+      "sha256": "b318c9e4e6b3555f42694721c193262e9852df93c15a94cf74f74fbe28745f31"
+    },
+    {
+      "path": "app/lib/payroll/central-a-provenance.ts",
+      "bytes": 6214,
+      "sha256": "c6c4dd215544fd02ec3f7f64e4459bb2b5c3445022a1f469ce195f3d9afd16ca"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-codec.ts",
+      "bytes": 13717,
+      "sha256": "fdf44a437c4e380df73f079241c2b383efd998d4a18df84da9fc141ecf53f2f7"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-contract.ts",
+      "bytes": 5788,
+      "sha256": "f7d74287d9a7e41f457202ebbd1f14496daa5272ee8af7430f01950644c175b7"
+    },
+    {
+      "path": "app/lib/payroll/central-c1-provenance.ts",
+      "bytes": 4485,
+      "sha256": "ebe125d244b1edeaa3ee6bae2c39920de8ac3497b37df4ab594f12d8eb7d9255"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-codec.ts",
+      "bytes": 17118,
+      "sha256": "3f08a6d6f4a2e944731539198762fa87b35beed055d344a573cd9039c66771f7"
+    },
+    {
+      "path": "app/lib/payroll/central-c2-contract.ts",
+      "bytes": 6952,
+      "sha256": "032ad35d7a2982eed0342366e73372bff2b5864410af5895590eec5f4e013895"
+    },
+    {
+      "path": "app/lib/payroll/central-contract.ts",
+      "bytes": 7597,
+      "sha256": "0f1f59f603e697031043733584b81fdc99ef9124ff19935e9cdae185fff9f2c6"
+    },
+    {
+      "path": "app/lib/payroll/central-payroll-wire.ts",
+      "bytes": 6889,
+      "sha256": "73330e29af259b9a1d8a7ba4fc24f7f9ffb44400b36503aa90378b1d8cee6636"
+    },
+    {
+      "path": "app/lib/payroll/central-repository.ts",
+      "bytes": 7500,
+      "sha256": "f7c813653c6ff6b5293d199380f43ebdf973a0eae2383463ecd8c2a9a14576fd"
+    },
+    {
+      "path": "app/lib/project/read-contract.ts",
+      "bytes": 5019,
+      "sha256": "8db8600f2e866fd6f5122994f4f73757c91b52fd9651488507c638a4b2cdd8b0"
+    },
+    {
+      "path": "app/lib/project/read-decoder.ts",
+      "bytes": 12067,
+      "sha256": "cb8db13dc9ccdc36612e416781b2211f83631b4519eab2b579ab3aeab8f6369f"
+    },
+    {
+      "path": "app/lib/tabs/restore-detail.ts",
+      "bytes": 15884,
+      "sha256": "21d50979787bfd5dc0a3a2e3411a56d4aff6c73b4be676fe41a671ab8ba7d1f5"
+    },
+    {
+      "path": "app/lib/tabs/restore-target.ts",
+      "bytes": 18828,
+      "sha256": "8de40524336432fa241453bf32098bdfb00fdbd3a9cb0559e0b8c9f496162c9a"
+    },
+    {
+      "path": "app/lib/target-cost/central-codec.ts",
+      "bytes": 11107,
+      "sha256": "7afa08f62a5e51fe5665da53659a425b999dfcdb237bd9f7e35d709d63b2262c"
+    },
+    {
+      "path": "app/lib/target-cost/navigation.ts",
+      "bytes": 5743,
+      "sha256": "4ea6367b4d6ee62187c57d97314a79aa3340d626a959169fa6e31c1a7cdf1303"
+    },
+    {
+      "path": "app/stores/payroll-a.ts",
+      "bytes": 6040,
+      "sha256": "749124a8ba3b47095d8fb14e525d6f1e7f37f451599288fdb5a083a73ce2e427"
+    },
+    {
+      "path": "app/stores/payroll.ts",
+      "bytes": 10693,
+      "sha256": "8722d51915432037da03352c72d56edf11b6164f502117e9ca7065e12d04676f"
+    },
+    {
+      "path": "app/types/read-model.ts",
+      "bytes": 5850,
+      "sha256": "d6a7e7378ef53e6436d186328be4203b8d6b1c850ecae25122781f560d9d557e"
+    },
+    {
+      "path": "scripts/module-review-inventory.mjs",
+      "bytes": 57472,
+      "sha256": "2677e6731e0a62046fbd5c24da3b6fc0fa68843c7d84b2863b57b3e3dbfb13e9"
+    },
+    {
+      "path": "scripts/module-review-obligations.mjs",
+      "bytes": 37635,
+      "sha256": "d09227805956dac646f9dcea0b5f519348dc29ec4a0f5e78c3fe396d12196b95"
+    },
+    {
+      "path": "scripts/runtime-evidence-ledger.mjs",
+      "bytes": 26513,
+      "sha256": "d4374f5d2234420219ac42336213c730a5dd598dda10f760ab30000e41ba1382"
+    },
+    {
+      "path": "server/api/read/crews/[id].get.ts",
+      "bytes": 685,
+      "sha256": "c476ad0da9c5a6f325cecaaa31dba55226743be331b2e3b4beadb71e8dc9070c"
+    },
+    {
+      "path": "server/api/read/projects/[id].get.ts",
+      "bytes": 671,
+      "sha256": "143cb6be93e3ca1e14a9d8aede5cfcf661e593c4a6173330cc3c62d7a5b57ab6"
+    },
+    {
+      "path": "server/api/read/workers/[id].get.ts",
+      "bytes": 687,
+      "sha256": "fb7427723e2aa4fddea13804540952bd807e5bd872a0b5db440cce30926b5996"
+    },
+    {
+      "path": "server/utils/crew-worker-read-test-instance.ts",
+      "bytes": 14623,
+      "sha256": "fed997349328e4039e849e93c66784c23e6676affe8c9e2391d1c861e7b6f48d"
+    },
+    {
+      "path": "server/utils/payroll-a-migration-references.ts",
+      "bytes": 6990,
+      "sha256": "97fa7d11f448b9ca3f855777575bc19872fb73b7224dd0843f0dee354ca62024"
+    },
+    {
+      "path": "server/utils/payroll-a-service.ts",
+      "bytes": 30916,
+      "sha256": "9b5281052d056ddb18235caf1d148b1f89db72393ff1a9025032458e14714467"
+    },
+    {
+      "path": "server/utils/payroll-c1-migration-references.ts",
+      "bytes": 6854,
+      "sha256": "4695bb4331f37301b2a58d7879fc3a3c54b1cc7a71251ddac40ce068a3471405"
+    },
+    {
+      "path": "server/utils/payroll-c1-service.ts",
+      "bytes": 23166,
+      "sha256": "33228f26cad01cd493dc9d6c0f999ec68c114e8e57c5bb28c7b1327242dc61f7"
+    },
+    {
+      "path": "server/utils/payroll-c2-migration-references.ts",
+      "bytes": 8556,
+      "sha256": "dced6c00e6222a61ec5969b06de863f5d4334a5d5bb23cae8b935c4d8306287a"
+    },
+    {
+      "path": "server/utils/payroll-c2-service.ts",
+      "bytes": 26148,
+      "sha256": "50894da64973ebe476d0e08eac16618c39a278d205a1dfa136770a7c0d63aae8"
+    },
+    {
+      "path": "server/utils/payroll-migration.ts",
+      "bytes": 29052,
+      "sha256": "d825280323deed86455d92126eb63ccc3f70fd859ee668be01a064fd08753945"
+    },
+    {
+      "path": "server/utils/payroll-service.ts",
+      "bytes": 11988,
+      "sha256": "dd8fb950d6f0b1449fea2a13b1fb91cb6d783a754bdee977fd82bd0495ebdcf7"
+    },
+    {
+      "path": "server/utils/project-read-test-instance.ts",
+      "bytes": 14620,
+      "sha256": "70d8f5cdb5564c86dcfccaa9238124c4837cd4786b3af973d0c51b70196903a0"
+    },
+    {
+      "path": "server/utils/target-cost-actual-sources.ts",
+      "bytes": 10207,
+      "sha256": "08a2dc19b1798397ac8f37f154cf44c5a2f2bce8fc4c2faec808fcf30b3e2574"
+    },
+    {
+      "path": "server/utils/target-cost-actual.ts",
+      "bytes": 9004,
+      "sha256": "b2c0477031a60d5b48aefe6b25f9ee7e25f018f5199d47b2a296e4caae7c6cb5"
+    },
+    {
+      "path": "server/utils/target-cost-service.ts",
+      "bytes": 13526,
+      "sha256": "06ff70a8c548b8b1337c7322ee8cb408db0a540db906f744b3e4b220d5f3ca48"
+    },
+    {
+      "path": "tests/components/PaymentManagementRefresh.test.ts",
+      "bytes": 3149,
+      "sha256": "9d7ad5fc05e97742a3b6700218fc749b58da4dfbc465dcf177e29399dcb3ccf1"
+    },
+    {
+      "path": "tests/components/PayrollAFormState.test.ts",
+      "bytes": 9459,
+      "sha256": "2ea8b363920cb805211ad6fcbf2a017545ccbe9e4c1e3bf45fce83e2eb48e78a"
+    },
+    {
+      "path": "tests/components/PayrollAPriceDialog.test.ts",
+      "bytes": 5451,
+      "sha256": "6f33154d2095bd806935959aa4ec4904eae7974945cd25fdd5ed2601d372e45f"
+    },
+    {
+      "path": "tests/components/PayrollAStatementState.test.ts",
+      "bytes": 4225,
+      "sha256": "7c30b947b91a423c3732356ae4037fe4c0a9655581b55a03e135ae23d7f099f5"
+    },
+    {
+      "path": "tests/components/SupplementalListFilters.test.ts",
+      "bytes": 8183,
+      "sha256": "b2e7800c1b8fa66974b5c396cfc39500a392b7ed649644fc447138ee4d107bcc"
+    },
+    {
+      "path": "tests/helpers/payroll-c1-service-fixture.ts",
+      "bytes": 4534,
+      "sha256": "094f5468eda373f299438f7b69e81ff5b57fc555f6a772f269b68d1b10ed0a5a"
+    },
+    {
+      "path": "tests/kit/entity-link.test.ts",
+      "bytes": 9346,
+      "sha256": "3ea37abad01f0756ef00a937cfeaf44bb91197144431299e9bb5d646cb0642d2"
+    },
+    {
+      "path": "tests/migration/core-local-source.test.ts",
+      "bytes": 43844,
+      "sha256": "d4c53ef344ccdc7cf85f77d3eeac3f644816e29cde82634bbbd19cf6ee825a85"
+    },
+    {
+      "path": "tests/stores/payroll-a-central.test.ts",
+      "bytes": 4900,
+      "sha256": "46e4258299006bce69c2aded077af5943c3541a0d0d0944dd134549c6a028bcc"
+    },
+    {
+      "path": "tests/ui/module-review-coverage.test.ts",
+      "bytes": 20221,
+      "sha256": "e904ca8e805b2c653ac03e9cd9603ecc1ac1d9b38edf583d410be6195bb57044"
+    },
+    {
+      "path": "tests/ui/runtime-reference-audit.test.ts",
+      "bytes": 14985,
+      "sha256": "404269bae439c928d5cfd1640039bee029a0bc2e65460c45121754bfa34bfdad"
+    }
+  ]
+}

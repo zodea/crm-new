@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { payrollACanonical } from '../../app/lib/payroll/central-a-calculation'
 import { encodePayrollAWire, parsePayrollACommand } from '../../app/lib/payroll/central-a-codec'
 import { projectProblem, ProjectRepositoryProblem } from '../../app/lib/project/repository'
+import { payrollAdjustmentReceiptReferences } from './payroll-adjustment-migration-references'
 import { payrollC1ReceiptReferences } from './payroll-c1-migration-references'
 import { payrollC2ReceiptReferences } from './payroll-c2-migration-references'
 
@@ -72,7 +73,7 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
     }
   }
   function receiptCommand(value: Record<string, unknown>) {
-    const specific = payrollC1ReceiptReferences(value) ?? payrollC2ReceiptReferences(value)
+    const specific = payrollAdjustmentReceiptReferences(value) ?? payrollC1ReceiptReferences(value) ?? payrollC2ReceiptReferences(value)
     if (specific) {
       for (const reference of specific) result.add(reference)
       return
@@ -132,7 +133,7 @@ export async function payrollAMigrationReferences(db: TransactionDb): Promise<Se
   for (const table of PAYROLL_A_REFERENCE_TABLES) {
     for (const value of await db.select<Record<string, unknown>>(`SELECT * FROM ${table}`)) row(table, value)
   }
-  const logs = await db.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${PAYROLL_A_REFERENCE_TABLES.map(() => '?').join(',')})`, [...PAYROLL_A_REFERENCE_TABLES])
+  const logs = await db.select<{ table_name: string, record_id: string, before_data: string | null, after_data: string | null }>(`SELECT id,table_name,record_id,before_data,after_data FROM operation_logs WHERE table_name IN (${PAYROLL_A_REFERENCE_TABLES.map(() => '?').join(',')})`, [...PAYROLL_A_REFERENCE_TABLES])
   for (const log of logs) {
     add(log.table_name, log.record_id)
     for (const data of [log.before_data, log.after_data]) {

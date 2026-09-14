@@ -1,3 +1,4 @@
+import type { PayrollHostScope, PayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import type {
   CrewSourceRow,
   CrewWorkerAssignmentSourceRow,
@@ -6,6 +7,7 @@ import type {
   CrewWorkerWageSourceRow,
   WorkerSourceRow,
 } from '../../app/lib/crew-worker/repository'
+import { unavailablePayrollHostSection } from '../../app/lib/crew-worker/payroll-read'
 import {
   buildCrewDetailRead,
   buildCrewListPage,
@@ -157,6 +159,7 @@ export function createCrewWorkerReadTestInstance(
   resolveFormalCrews: (sessionId?: string | null) => readonly CrewSourceRow[] = id => crewWorkerCommandTestInstance.crewRows(id),
   resolveFormalWorkers: (sessionId?: string | null) => readonly WorkerSourceRow[] = id => crewWorkerCommandTestInstance.workerRows(id),
   resolveFormalSourceVersion: (sessionId?: string | null) => string = id => crewWorkerCommandTestInstance.sourceVersion(id),
+  resolvePayrollActual: (scope: PayrollHostScope, sessionId?: string | null) => Promise<PayrollHostSection | undefined> = async () => undefined,
 ) {
   const scenarios = new Map<string, CrewWorkerReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -276,7 +279,18 @@ export function createCrewWorkerReadTestInstance(
       const data = context(sessionId)
       const query = parseCrewDetailQuery(id, input)
       assertDemo(query.includeDemo, data.capabilities)
-      return buildCrewDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      const detail = buildCrewDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      if (query.origin === 'demo')
+        return detail
+      const payrollActual = data.capabilities.includes('payroll:read')
+        ? await resolvePayrollActual({ kind: 'crew', id: query.id }, sessionId)
+        : unavailablePayrollHostSection({ kind: 'crew', id: query.id }, 'forbidden', '无工资收付查看权限')
+      const latest = context(sessionId)
+      if (data.sourceVersion !== latest.sourceVersion || JSON.stringify(data.capabilities) !== JSON.stringify(latest.capabilities))
+        throw problem('unavailable', '读取期间班组档案或权限已变化，请重新读取', true)
+      if (!payrollActual)
+        return detail
+      return { ...detail, payrollActual, sourceVersion: `${detail.sourceVersion}+payroll:${payrollActual?.sourceVersion ?? 'unavailable'}` }
     },
     async listWorkers(input: Record<string, unknown> | undefined, sessionId?: string | null) {
       const data = context(sessionId)
@@ -288,10 +302,21 @@ export function createCrewWorkerReadTestInstance(
       const data = context(sessionId)
       const query = parseWorkerDetailQuery(id, input)
       assertDemo(query.includeDemo, data.capabilities)
-      return buildWorkerDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      const detail = buildWorkerDetailRead({ ...data, query, asOf: FIXED_AS_OF })
+      if (query.origin === 'demo')
+        return detail
+      const payrollActual = data.capabilities.includes('payroll:read')
+        ? await resolvePayrollActual({ kind: 'worker', id: query.id }, sessionId)
+        : unavailablePayrollHostSection({ kind: 'worker', id: query.id }, 'forbidden', '无工资收付查看权限')
+      const latest = context(sessionId)
+      if (data.sourceVersion !== latest.sourceVersion || JSON.stringify(data.capabilities) !== JSON.stringify(latest.capabilities))
+        throw problem('unavailable', '读取期间工人档案或权限已变化，请重新读取', true)
+      if (!payrollActual)
+        return detail
+      return { ...detail, payrollActual, sourceVersion: `${detail.sourceVersion}+payroll:${payrollActual?.sourceVersion ?? 'unavailable'}` }
     },
     relationFactIdentity,
   }
 }
 
-export const crewWorkerReadTestInstance = createCrewWorkerReadTestInstance()
+export const crewWorkerReadTestInstance = createCrewWorkerReadTestInstance(undefined, undefined, undefined, undefined, async (scope, sessionId) => (await import('./crew-worker-payroll-read')).readPayrollHostSection(scope, sessionId))

@@ -29,6 +29,7 @@
 - [分供方证照与资料核验使用指南](./supplier-credential-review.md)（中央原件及人工核验见 [#446](../design/evidence/issue-446/README.md)，OCR 人工确认与税务核验见 [#447](../design/evidence/issue-447/README.md)）
 - [材料单价分析使用说明](./material-price-analysis.md)
 - [工资与考勤工作台使用说明](./payroll-attendance.md)（中央历史接管、A/C1/C2 配置、核对、实际发放及冻结输出；C1 配对考勤，C2 配对人工签工；更正与费用分期另述）
+- [工资更正与实际收付](./payroll-adjustments.md)（P4 本地验收；核算差额、补退、后月处理与错记冲销分别留证）
 - [OCR 设置使用说明](./ocr-settings.md)
 - [发票台账与 Excel 导入导出使用说明](./finance-invoice.md)
 - [开票因子与税额计算使用说明](./invoice-factor.md)

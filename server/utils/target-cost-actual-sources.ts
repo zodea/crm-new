@@ -1,5 +1,5 @@
 import type { CostCategory } from '../../app/lib/project/cost-control'
-import type { BudgetActualMetric, BudgetActualSource } from './target-cost-actual'
+import type { BudgetActualMetric, BudgetActualSource, TargetCostActualReadContext } from './target-cost-actual'
 import { isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
 import { isEffectiveSettlementFact } from '../../app/lib/other-settlement/facts'
 import { sameSettlementRelations, subcontractSettlementAmounts } from '../../app/lib/owner-document/subcontract-settlement'
@@ -9,6 +9,7 @@ import { materialContractCommandTestInstance } from './material-contract-command
 import { materialContractReadTestInstance } from './material-contract-read-test-instance'
 import { otherSettlementInstance, otherSettlementSession } from './other-settlement-runtime'
 import { ownerCommercialDocumentReadTestInstance } from './owner-commercial-document-read-test-instance'
+import { loadPayrollBudgetActual } from './payroll-actual-budget'
 import { subcontractContractCommandTestInstance } from './subcontract-contract-command-test-instance'
 import { subcontractContractReadTestInstance } from './subcontract-contract-read-test-instance'
 import { aggregateTargetCostActual } from './target-cost-actual'
@@ -30,8 +31,8 @@ function source(id: string, metric: BudgetActualMetric, categories: CostCategory
 function money(value: string | null): number | null {
   return value == null ? null : Number(value)
 }
-/** 只读取已接管事实；旧适配器的空工资、报销、材采结算/付款集合不能证明零。 */
-export async function loadTargetCostActual(projectId: string | null, sessionId?: string | null) {
+/** 只读取已接管事实；工资沿同一事务读取，报销及材采缺源保留未接状态。 */
+export async function loadTargetCostActual(projectId: string | null, sessionId?: string | null, read?: TargetCostActualReadContext) {
   if (!projectId)
     return aggregateTargetCostActual(null, [])
   const sources: BudgetActualSource[] = []
@@ -157,7 +158,12 @@ export async function loadTargetCostActual(projectId: string | null, sessionId?:
     otherSettled.status = otherPaid.status = failureStatus(cause)
   }
   sources.push(otherSettled, otherPaid)
-  for (const metric of ['settledAmount', 'paidAmount'] as const)
-    sources.push({ ...source('材料结算/实付、已发工资、已确认报销尚未接管', metric, ['材料', '工人工资', '费用报销']), status: 'pending' })
+  if (read)
+    sources.push(...await loadPayrollBudgetActual(read.db, projectId, read.context))
+  for (const metric of ['settledAmount', 'paidAmount'] as const) {
+    if (!read)
+      sources.push({ ...source('工资实际来源事务不可用', metric, ['工人工资']), status: 'unavailable' })
+    sources.push({ ...source('材料结算/实付、已确认报销尚未接管', metric, ['材料', '费用报销']), status: 'pending' })
+  }
   return aggregateTargetCostActual(projectId, sources)
 }

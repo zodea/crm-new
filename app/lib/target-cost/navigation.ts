@@ -79,12 +79,14 @@ export function targetCostReturnTo(value: unknown, origin: DataOriginDTO, depth 
   }
 }
 
-export const TARGET_COST_SOURCE_PATHS = ['/contract/material', '/contract/subcontract', '/contract/other-expense', '/contract/other-settlement', '/subcontract/settlement'] as const
+export const TARGET_COST_SOURCE_PATHS = ['/contract/material', '/contract/subcontract', '/contract/other-expense', '/contract/other-settlement', '/subcontract/settlement', '/subcontract/payroll/payments'] as const
 export const TARGET_COST_SOURCE_QUERY_KEYS = ['budgetId', 'budgetProject', 'budgetReturnTo'] as const
 
 export function targetCostSourceContext(path: string, query: Record<string, unknown>) {
   const origin = targetCostOrigin(query.origin)
   if (!(TARGET_COST_SOURCE_PATHS as readonly string[]).includes(path) || !origin || !isStableRouteIdentity(query.budgetId) || !isStableRouteIdentity(query.budgetProject))
+    return null
+  if (path === '/subcontract/payroll/payments' && (origin !== 'real' || query.project !== query.budgetProject))
     return null
   const returnTo = targetCostReturnTo(query.budgetReturnTo, origin)
   if (!returnTo || decodeURIComponent(new URL(returnTo, 'https://ruihang.invalid').pathname) !== `${TARGET_COST_LIST_PATH}/${query.budgetId}`)
@@ -95,7 +97,7 @@ export function targetCostSourceContext(path: string, query: Record<string, unkn
 export function targetCostSourceLocation(path: string, input: { id: string, projectId: string | null, origin: DataOriginDTO, returnTo: string }) {
   if (!(TARGET_COST_SOURCE_PATHS as readonly string[]).includes(path) || !input.projectId)
     return null
-  const query = { origin: input.origin, projectId: input.projectId, budgetId: input.id, budgetProject: input.projectId, budgetReturnTo: input.returnTo }
+  const query = { origin: input.origin, projectId: input.projectId, ...(path === '/subcontract/payroll/payments' ? { project: input.projectId } : {}), budgetId: input.id, budgetProject: input.projectId, budgetReturnTo: input.returnTo }
   return targetCostSourceContext(path, query) ? { path, query } : null
 }
 

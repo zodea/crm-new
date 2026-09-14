@@ -63,6 +63,9 @@ useTabTitle('工资台账')
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
+        <NuxtLink :to="{ path: '/subcontract/payroll/payments', query: { origin: scope.origin || 'real', project: scope.projectId, returnTo } }" class="btn-secondary">
+          工资实际收付
+        </NuxtLink>
         <NuxtLink v-if="canCreate" :to="createTo" class="btn-primary">
           新建 A 工资草稿
         </NuxtLink>

@@ -1,7 +1,9 @@
 import type { PayrollACommand, PayrollACommandResult, PayrollAConfigRead, PayrollAConfigScope, PayrollAFormInput, PayrollAFormRead, PayrollAFrozenDocument, PayrollAOutputRead, PayrollAStatementSourceSnapshot } from './central-a-contract'
 import type { PayrollQuery } from './central-contract'
 import { isStableRouteIdentity } from '../util/stable-route-identity'
+import { isPayrollAAdjustmentReconciliation } from './central-a-adjustment-validation'
 import { payrollProblem } from './central-contract'
+import { isPayrollReleaseApplications, transformPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { payrollObject as object } from './central-snapshot'
 import { amountInCents } from './statements'
 
@@ -35,8 +37,10 @@ function transform(value: unknown, decode: boolean): unknown {
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
     if (['history', 'beforeData', 'afterData'].includes(key))
       return [key, child]
+    if (key === 'adjustmentApplications')
+      return [key, transformPayrollReleaseApplications(child, decode)]
     const monetary = moneyFields.has(key) || (metric && ['value', 'knownValue'].includes(key))
-    const numeric = monetary || decimalFields.has(key) || (ratio && key === 'value')
+    const numeric = monetary || decimalFields.has(key) || (ratio && key === 'value') || ('dimension' in value && ['before', 'after', 'current', 'effective'].includes(key))
     if (!numeric || object(child))
       return [key, transform(child, decode)]
     if (child === null)
@@ -85,6 +89,8 @@ function price(v: unknown) {
   return object(v) && fields(v, ['id', 'priceId', 'projectId', 'leaderWorkerId', 'itemId'], text) && fields(v, ['crewId', 'itemName', 'unit', 'workerId', 'workerName', 'operatorId', 'createdAt'], nullableText) && ['baseline', 'worker-exception'].includes(String(v.mode)) && month(v.effectiveMonth) && nullableNumber(v.unitPrice) && Number.isInteger(v.revision) && scope(v.scope) && typeof v.editable === 'boolean' && strings(v.readonlyReasons)
 }
 export function isPayrollAStatementSourceSnapshot(v: unknown): v is PayrollAStatementSourceSnapshot {
+  if (object(v) && v.adjustmentReconciliation !== undefined && !isPayrollAAdjustmentReconciliation(v.adjustmentReconciliation))
+    return false
   if (!object(v) || v.schemaVersion !== 1 || !object(v.subject) || !fields(v.subject, ['projectId', 'leaderWorkerId'], isStableRouteIdentity)
     || !nullableText(v.subject.crewId) || !strings(v.subject.memberWorkerIds) || !v.subject.memberWorkerIds.includes(String(v.subject.leaderWorkerId))
     || new Set(v.subject.memberWorkerIds).size !== v.subject.memberWorkerIds.length || !array(v.facts, fact) || !Array.isArray(v.facts) || !v.facts.length || !array(v.priceRevisions, price)) {
@@ -149,7 +155,9 @@ export function parsePayrollACommand(value: unknown): PayrollACommand {
   }
   else if (action.kind === 'release-a') {
     exact(action, ['kind', 'release'])
-    exact(action.release, ['actualAmount', 'allocations'])
+    exact(action.release, ['actualAmount', 'allocations', 'adjustmentApplications'])
+    if (action.release.adjustmentApplications !== undefined && !isPayrollReleaseApplications(action.release.adjustmentApplications))
+      fail('A 工资更正处理关联无效')
     if (!nullableNumber(action.release.actualAmount) || !array(action.release.allocations, (row) => {
       exact(row, ['workerId', 'amount'])
       return isStableRouteIdentity(row.workerId) && nullableNumber(row.amount)
@@ -192,7 +200,10 @@ export function isPayrollAFrozenDocument(v: unknown): v is PayrollAFrozenDocumen
   const ownership = lines.flatMap(l => l.facts.map(f => f.ownershipKey))
   if (new Set(ownership).size !== ownership.length || lines.some(l => !l.facts.length || !l.priceRevisionIds.length || l.facts.some(f => f.fieldQty === null || f.unit !== l.unit) || !members.some(m => m.workerId === l.workerId && m.workerName === l.workerName) || Math.abs(l.facts.reduce((sum, f) => sum + (f.fieldQty ?? 0), 0) - l.quantity!) > 1e-8 || cents(l.quantity! * l.unitPrice!) !== cents(l.amount!)))
     return false
-  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(v.grossAmount)))
+  const reconciliation = v.adjustmentReconciliation
+  if (reconciliation !== undefined && (!isPayrollAAdjustmentReconciliation(reconciliation) || reconciliation.rawCumulative.value !== v.cumulativeAmount || reconciliation.availableAmount.value !== v.grossAmount || reconciliation.rawBasis.payRatio !== v.payRatio || reconciliation.reasons.length))
+    return false
+  if (lines.reduce((sum, l) => sum + cents(l.amount!), 0) !== cents(Number(v.workAmount)) || cents(Number(v.workAmount) * Number(v.payRatio)) !== cents(Number(v.cumulativeAmount)) || payments.reduce((sum, p) => sum + cents(p.amount), 0) !== cents(Number(v.previouslyPaid)) || (reconciliation === undefined && Math.max(0, cents(Number(v.cumulativeAmount)) - cents(Number(v.previouslyPaid))) !== cents(Number(v.grossAmount))))
     return false
   return new Set(members.map(m => m.workerId)).size === members.length && members.filter(m => m.isLeader).length === 1 && allocations.length === members.length && new Set(allocations.map(a => a.workerId)).size === members.length && allocations.every(a => members.some(m => m.workerId === a.workerId)) && allocations.reduce((sum, a) => sum + a.allocatedAmountFen, 0) === cents(Number(v.actualAmount))
 }
@@ -200,6 +211,8 @@ export function decodePayrollARead<T extends PayrollAFormRead | PayrollAConfigRe
   const value = transform(raw, true)
   if (!object(value) || !object(value.context))
     fail()
+  if (value.adjustmentReconciliation !== undefined && !isPayrollAAdjustmentReconciliation(value.adjustmentReconciliation))
+    fail('A 更正包含组成或实际净额无法核实')
   const c = value.context
   if (!fields(c, ['workspaceId', 'actorId', 'sourceVersion'], text) || c.origin !== query.origin || !strings(c.capabilities) || !c.capabilities.includes('payroll:read') || typeof c.readonly !== 'boolean' || (c.origin === 'demo' && (!c.readonly || !c.capabilities.includes('demo:read'))))
     fail()
@@ -226,6 +239,14 @@ export function decodePayrollARead<T extends PayrollAFormRead | PayrollAConfigRe
   return value as unknown as T
 }
 export function decodePayrollAResult(v: unknown, command: PayrollACommand): PayrollACommandResult {
+  if (object(v)) {
+    for (const key of ['adjustmentApplicationIds', 'adjustmentCoverageIds']) {
+      if (v[key] !== undefined && (!array(v[key], isStableRouteIdentity) || new Set(v[key] as string[]).size !== (v[key] as string[]).length || command.action.kind !== 'release-a' || v.outcome !== 'released'))
+        fail('A 工资更正回执身份或动作不一致')
+    }
+    if (v.adjustmentApplicationIds !== undefined && (command.action.kind !== 'release-a' || command.action.release.adjustmentApplications === undefined || (v.adjustmentApplicationIds as string[]).length !== command.action.release.adjustmentApplications.length))
+      fail('A 工资更正应用回执与原提交不一致')
+  }
   if (!object(v) || v.commandId !== command.commandId || v.projectId !== command.projectId || (command.statementId !== null && v.statementId !== command.statementId) || !nullableText(v.statementId) || !nullableText(v.subjectConfigId) || !text(v.sourceVersion) || !strings(v.priceRevisionIds) || !strings(v.logIds) || !['saved', 'checked', 'released', 'needs-recheck'].includes(String(v.outcome)))
     fail('工资提交回执与原目标不一致')
   if (!command.action.kind.startsWith('save-a-prices') && command.action.kind !== 'save-a-subject-config' && !v.statementId)

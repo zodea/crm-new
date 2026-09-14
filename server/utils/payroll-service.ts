@@ -1,20 +1,29 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { PayrollAQuantityFacts, PayrollAQuantityQuery } from '../../app/lib/payroll/central-a-contract'
+import type { PayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-contract'
 import type { PayrollAttendanceFacts, PayrollWorkerFact } from '../../app/lib/payroll/central-attendance-contract'
 import type { PayrollC2ConfigFacts, PayrollC2ConfigScope } from '../../app/lib/payroll/central-c2-contract'
 import type { PayrollContext, PayrollDetailRead, PayrollListRead, PayrollProjectOption, PayrollQuery, PayrollSourcesRead } from '../../app/lib/payroll/central-contract'
 import type { PayrollDayworkFacts, PayrollDayworkRecordFacts } from '../../app/lib/payroll/central-daywork-contract'
+import type { PayrollReleaseAdjustmentPreview } from '../../app/lib/payroll/central-release-adjustment-contract'
 import type { BusinessSession } from './business-session'
 import { createHash } from 'node:crypto'
+import { assertPayrollActualCommand } from '../../app/lib/payroll/central-actual-validation'
+import { assertPayrollAdjustmentCommand } from '../../app/lib/payroll/central-adjustment-validation'
 import { payrollProblem } from '../../app/lib/payroll/central-contract'
 import { loadPayrollHistory } from '../../app/lib/payroll/central-history'
 import { loadPayrollGraph, payrollEvidence, payrollListRows, payrollSources, readPayrollStatement } from '../../app/lib/payroll/central-read'
+import { assertPayrollReversalCommand } from '../../app/lib/payroll/central-reversal-validation'
 import { initializePayrollSchema, payrollRevision } from '../../app/lib/payroll/central-schema'
 import { createPayrollAService } from './payroll-a-service'
+import { createPayrollActualService } from './payroll-actual-service'
+import { createPayrollAdjustmentService } from './payroll-adjustment-service'
 import { createPayrollAttendanceService } from './payroll-attendance-service'
 import { createPayrollC1Service } from './payroll-c1-service'
 import { createPayrollC2Service } from './payroll-c2-service'
 import { createPayrollDayworkService } from './payroll-daywork-service'
+import { readPayrollReleaseAdjustments } from './payroll-release-adjustments'
+import { createPayrollReversalService } from './payroll-reversal-service'
 
 export interface PayrollIdentitySource {
   version: string
@@ -89,8 +98,37 @@ export function createPayrollService(options: PayrollServiceOptions) {
       return result
     }, sessionId)
   }
+  const adjustments = createPayrollAdjustmentService(run)
+  const { aFormInTransaction, ...aService } = createPayrollAService(run, options)
+  const { executeActual, ...actualReads } = createPayrollActualService(run)
+  const { executeReversal, ...reversalReads } = createPayrollReversalService(run)
   return {
-    ...createPayrollAService(run, options),
+    ...aService,
+    ...adjustments,
+    ...actualReads,
+    ...reversalReads,
+    releaseAdjustmentPreview(query: PayrollQuery, input: { statementId: string }, sessionId?: string | null): Promise<PayrollReleaseAdjustmentPreview> {
+      return run(query, sessionId, async (db, context, source) => {
+        const [head] = await db.select<{ format_family: string }>('SELECT format_family FROM wage_statements WHERE id=?', [input.statementId])
+        const a = head?.format_family === 'A' ? await aFormInTransaction(db, context, source, { statementId: input.statementId }) : null
+        const preview = await readPayrollReleaseAdjustments(db, input.statementId, a?.adjustmentReconciliation)
+        if (query.projectId && query.projectId !== preview.statement.project_id)
+          throw payrollProblem('relationship-mismatch', '后续工资不属于指定项目')
+        return { context: { ...context, readonly: !context.capabilities.includes('payroll:write'), sourceVersion: `${context.sourceVersion}+release-adjustments:${hash(preview)}` }, statementId: input.statementId, candidates: preview.candidates, reasons: preview.reasons }
+      })
+    },
+    executeAdjustment(command: PayrollAdjustmentCommand, sessionId?: string | null) {
+      if (command.action?.kind === 'confirm-recording-reversal') {
+        assertPayrollReversalCommand(command)
+        return executeReversal(command, sessionId)
+      }
+      if (command.action?.kind === 'confirm-actual-payment') {
+        assertPayrollActualCommand(command)
+        return executeActual(command, sessionId)
+      }
+      assertPayrollAdjustmentCommand(command)
+      return adjustments.executeAdjustment(command, sessionId)
+    },
     ...createPayrollAttendanceService(run, options),
     ...createPayrollC1Service(run, options),
     ...createPayrollC2Service(run, options),

@@ -72,7 +72,15 @@ async function save(recover = false) {
       await store.recoverA(operation)
     else
       await store.saveAPrices(value, [{ ...draft.value }])
+    if (!same(key, request))
+      return
+    const submitted = operation ?? store.getAPending(value)
+    if (!submitted)
+      throw new Error('原调价提交回执不可读，请保留原稿并核对。')
+    const refreshed = await store.loadAConfig({ origin: 'real' }, value.scope)
     if (same(key, request)) {
+      latest.value = refreshed
+      store.acknowledgeA(submitted, refreshed)
       emit('saved')
       emit('update:open', false)
     }

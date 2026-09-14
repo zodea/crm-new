@@ -56,7 +56,7 @@ describe('补充列表的同字段多选', () => {
     vi.stubGlobal('usePaymentManagementStore', () => ({ rows, loading: ref(false), projectOptions: ref([]), load: vi.fn() }))
     const Table = defineComponent({ props: ['rows'], setup: props => () => h('section', props.rows.map((row: { name: string }) => h('article', row.name))) })
     const Toolbar = defineComponent({ props: ['search'], emits: ['update:search'], setup: (_, { emit }) => () => h('input', { type: 'search', onInput: (event: Event) => emit('update:search', (event.target as HTMLInputElement).value) }) })
-    render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true, SegTab: true } } })
+    render(PaymentManagementScreen, { global: { components: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar }, stubs: { PaymentManagementSummary: true, PaymentPayrollSection: true, SegTab: true } } })
     expect(screen.getAllByRole('article')).toHaveLength(1)
     await fireEvent.click(screen.getByRole('button', { name: '付款状态，已选 1 项' }))
     await fireEvent.click(screen.getByRole('checkbox', { name: '已付清' }))

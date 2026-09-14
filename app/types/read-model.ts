@@ -60,6 +60,8 @@ export const ENTITY_KINDS = [
   'delivery-record',
   'warehouse',
   'wage-statement',
+  'wage-adjustment',
+  'wage-actual',
   'attendance',
   'daywork',
   'schedule-group',

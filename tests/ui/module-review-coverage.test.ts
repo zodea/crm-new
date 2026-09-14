@@ -5,6 +5,25 @@ import { REVIEW_OBLIGATIONS, validateReviewObligations } from '../../scripts/mod
 import { buildRuntimeEvidenceLedger } from '../../scripts/runtime-evidence-ledger.mjs'
 
 describe('module review coverage', () => {
+  it('registers P4 independent pages and every cash host without promoting uncommitted acceptance', () => {
+    const { surfaces, cases, obligations } = buildModuleReviewCoverage()
+    const routes = ['/subcontract/payroll/adjustments/:id', '/subcontract/payroll/adjustments/form/:id', '/subcontract/payroll/adjustments/new', '/subcontract/payroll/payments', '/subcontract/payroll/payments/:id', '/subcontract/payroll/payments/new', '/subcontract/payroll/payments/reversal/new']
+    const roots = surfaces.filter(surface => routes.includes(surface.route) && surface.path === 'page')
+    expect(roots.map(surface => surface.route).sort()).toEqual(routes)
+    for (const surface of roots) {
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'browser')?.adapter).toBe('payroll-adjustment-central')
+      expect(cases.find(item => item.surfaceId === surface.id && item.host === 'tauri')?.adapter).toBe(surface.template === '整页表单' ? 'unsupported' : 'payroll-adjustment-central')
+    }
+    expect(surfaces.filter(surface => surface.path === 'central/p4/host-actual').map(surface => surface.route).sort()).toEqual(['/base/crew/:id', '/base/worker/:id', '/finance/payment-management', '/project/:id', '/project/target-cost/:id'])
+    expect(surfaces.filter(surface => surface.path.endsWith('-release-selection')).map(surface => surface.path).sort()).toEqual(['central/p4/a-release-selection', 'central/p4/c1-release-selection', 'central/p4/c2-release-selection'])
+    const selected = cases.filter(item => item.host === 'browser' && surfaces.some(surface => surface.id === item.surfaceId && (routes.includes(surface.route) || surface.path.startsWith('central/p4/'))))
+    expect(selected).toHaveLength(43)
+    expect(selected.every(item => item.adapter === 'payroll-adjustment-central' && item.acceptance.frontend === 'not-verified' && item.acceptance.production === 'not-verified')).toBe(true)
+    expect(selected.every(item => item.obligationIds.includes('WAGE-10'))).toBe(true)
+    expect(obligations.find(item => item.id === 'WAGE-09')?.status).toBe('partial')
+    expect(obligations.find(item => item.id === 'WAGE-10')).toMatchObject({ status: 'ready', evidence: [] })
+  })
+
   it('registers stage creation, editing and reporting as unverified central browser work', () => {
     const { surfaces, cases } = buildModuleReviewCoverage()
     const stages = surfaces.filter(surface => surface.route === '/subcontract/quantity/stages')

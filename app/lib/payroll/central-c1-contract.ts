@@ -1,6 +1,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '../../types/read-model'
 import type { PayrollAttendanceFact, PayrollAttendanceWorker, PayrollC1Options } from './central-attendance-contract'
 import type { PayrollHistoryEntry, PayrollQuery, PayrollWritableContext } from './central-contract'
+import type { PayrollReleaseAdjustmentApplication } from './central-release-adjustment-contract'
 
 export type PayrollC1Context = PayrollWritableContext
 export interface PayrollC1Draft {
@@ -77,7 +78,7 @@ export interface PayrollC1ConfigRead {
   readonlyReasons: string[]
   history: PayrollHistoryEntry[]
 }
-export interface PayrollC1ReleaseDraft { actualAmount: number | null, allocations: Array<{ workerId: string, amount: number | null }> }
+export interface PayrollC1ReleaseDraft { actualAmount: number | null, allocations: Array<{ workerId: string, amount: number | null }>, adjustmentApplications?: PayrollReleaseAdjustmentApplication[] }
 export type PayrollC1Action = { kind: 'save-c1-draft', draft: PayrollC1Draft }
   | { kind: 'check-c1' }
   | { kind: 'release-c1', release: PayrollC1ReleaseDraft }
@@ -96,6 +97,7 @@ export interface PayrollC1Command {
   action: PayrollC1Action
 }
 export interface PayrollC1CommandResult {
+  adjustmentApplicationIds?: string[]
   commandId: string
   projectId: string
   statementId: string | null

@@ -16,7 +16,10 @@ import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
 import { generateId } from '../../app/lib/util/id'
 import { loadPayrollC2ConfigFacts, loadPayrollDayworkFacts } from './payroll-daywork-facts'
 import { markPayrollC2Recheck, projectPayrollDayworkRecords } from './payroll-daywork-service'
+import { payrollMigratedC2Form } from './payroll-migrated-form'
+import { loadPayrollMigratedProof } from './payroll-migrated-proof'
 import { loadPayrollParticipantOptions } from './payroll-participant-options'
+import { persistPayrollReleaseAdjustments, preparePayrollReleaseAdjustments } from './payroll-release-adjustments'
 
 const hash = (value: unknown) => createHash('sha256').update(payrollCanonical(value)).digest('hex')
 type Row = Record<string, unknown>
@@ -37,6 +40,11 @@ function sourceVersion(read: PayrollC2FormRead, locks: unknown) {
 export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceOptions) {
   async function form(db: TransactionDb, base: PayrollWritableContext, source: PayrollIdentitySource, input: PayrollC2FormInput): Promise<PayrollC2FormRead> {
     const row = input.statementId ? await head(db, input.statementId) : null
+    if (row?.status === 'released') {
+      const migrated = payrollMigratedC2Form(await loadPayrollMigratedProof(db, String(row.project_id)), base, String(row.id))
+      if (migrated)
+        return migrated
+    }
     let storedSource: PayrollC2StatementSourceSnapshot | null = null
     let stored: Partial<PayrollC2Draft> = {}
     if (row) {
@@ -151,7 +159,7 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
       if (query.projectId && query.projectId !== row.project_id)
         throw payrollProblem('relationship-mismatch', 'C2 输出与原项目不一致')
       const context = { ...base, readonly: !base.capabilities.includes('payroll:write') }
-      const document = (await loadPayrollC2ReleasedDocuments(db, statementId)).get(statementId)
+      const document = (await loadPayrollMigratedProof(db, String(row.project_id))).c2Documents.get(statementId) ?? (await loadPayrollC2ReleasedDocuments(db, statementId)).get(statementId)
       return document ? { context, statementId, state: 'available', document, reasons: [] } : { context, statementId, state: 'unavailable', document: null, reasons: ['这份工资缺少可相互核实的原签工、主体配置、冻结与原成功回执；保留原历史阅读'] }
     }),
     async executeC2(input: PayrollC2Command, sessionId?: string | null): Promise<PayrollC2CommandResult> {
@@ -219,7 +227,10 @@ export function createPayrollC2Service(run: PayrollRun, options: PayrollServiceO
               }
               else {
                 const locks = await loadPayrollSourceExclusions(db, { projectId: command.projectId, month: read.draft.month!, workerIds: read.draft.memberWorkerIds!, formatFamily: 'C2', statementId: command.statementId })
+                const applications = await preparePayrollReleaseAdjustments(db, command.statementId!, action.release.actualAmount, action.release.adjustmentApplications)
                 await releasePayrollC2(db, read, action.release, sourceVersion(read, locks).version, context.actorId)
+                if (applications !== undefined)
+                  result.adjustmentApplicationIds = await persistPayrollReleaseAdjustments(db, command.statementId!, command.commandId, applications, context.actorId)
                 result.outcome = 'released'
               }
               result.configId = read.storedSource?.config.id ?? read.config?.id ?? ''

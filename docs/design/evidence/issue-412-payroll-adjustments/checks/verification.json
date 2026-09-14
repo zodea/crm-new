@@ -1,0 +1,19 @@
+{
+  "statementId": "wage_mu19o5dv_4",
+  "laterId": "wage_mu19owiv_17",
+  "adjustmentId": "payroll-adjustment_mu19ohld_w",
+  "originalCommand": "payroll-adjustment-command_mu19or55_1",
+  "projectId": "core-projects-ca3b275bb079afb531ed0be9",
+  "originalSignature": 1000,
+  "refund": -40,
+  "laterActual": 940,
+  "net": 1900,
+  "remaining": 0,
+  "widths": [
+    390,
+    768,
+    1024,
+    1280,
+    1440
+  ]
+}

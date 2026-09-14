@@ -2,7 +2,7 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { QuantityContext } from '../../app/lib/quantity/central-contract'
 import type { TargetCostCommand, TargetCostCommandResult, TargetCostContext, TargetCostDetailRead, TargetCostFormRead, TargetCostProjectOption, TargetCostQuery } from '../../app/lib/target-cost/central-contract'
 import type { BusinessSession } from './business-session'
-import type { TargetCostActualFacts } from './target-cost-actual'
+import type { TargetCostActualFacts, TargetCostActualReadContext } from './target-cost-actual'
 import { createHash } from 'node:crypto'
 import { fetchRowById, hiddenCtesFor, restoreRecord, selectVisibleSql, softDelete, visibleCond } from '../../app/lib/db/soft-delete'
 import { ProjectRepositoryProblem } from '../../app/lib/project/repository'
@@ -21,7 +21,7 @@ export interface TargetCostProjectSource { projects: TargetCostProjectOption[], 
 export interface TargetCostServiceOptions {
   session: (sessionId?: string | null) => BusinessSession
   projects: (sessionId?: string | null) => TargetCostProjectSource | Promise<TargetCostProjectSource>
-  actual: (projectId: string | null, sessionId?: string | null) => Promise<TargetCostActualFacts>
+  actual: (projectId: string | null, sessionId: string | null | undefined, read: TargetCostActualReadContext) => Promise<TargetCostActualFacts>
   transaction: <T>(work: (db: TransactionDb, context: QuantityContext) => Promise<T>, sessionId?: string | null) => Promise<T>
 }
 function digest(value: unknown) {
@@ -102,7 +102,7 @@ export function createTargetCostService(options: TargetCostServiceOptions) {
         const header = targetCostHeaderFromRow({ ...row, project_name: project?.name, project_code: project?.code })
         // 删除版本可读自身归档；此前单独删除的明细仍在历史，不重现为当前明细。
         const items = (await db.select<Record<string, unknown>>('SELECT * FROM target_cost_items WHERE target_cost_id = ? AND deleted_at IS NULL ORDER BY sort_order, created_at, id', [id])).map(targetCostItemFromRow)
-        const actual = await options.actual(header.projectId, sessionId)
+        const actual = await options.actual(header.projectId, sessionId, { db, context })
         const comparison = buildTargetCostComparison(id, items, actual)
         return { context, targetCostId: id, deletedAt: row.deleted_at == null ? null : String(row.deleted_at), view: { header, items, ...comparison }, files: await loadBudgetFiles(db, id), actualSourceVersion: actual.sourceVersion, history: await loadTargetCostHistory(db, id) }
       })

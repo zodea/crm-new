@@ -10,11 +10,15 @@ import {
   CORE_MIGRATION_TOPOLOGY,
 } from '~/lib/migration/core-contract'
 import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-source'
+import { PAYROLL_CENTRAL_MIGRATION_TABLES } from '~/lib/migration/payroll-central-source'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
+  // 本组旧库替身没有中央工资扩展表；其余未知查询仍应明确失败。
+  if (sql === 'SELECT name FROM sqlite_master WHERE type=\'table\'')
+    return []
   if (/FROM (?:payroll_subject_configs|wage_statements|wage_statement_lines|wage_statement_members|wage_statement_allocations|attendance_records|signed_daywork_records|wage_statement_daywork_records) ORDER BY id/.test(sql))
     return []
   if (/FROM supplier_(?:credentials|credential_requirements|credential_audits|audits)(?: ORDER BY|$)/.test(sql))
@@ -539,6 +543,27 @@ describe('core migration local source', () => {
     finally {
       db.close()
     }
+  })
+
+  it('旧 SQLite 未建中央工资表时省略扩展，仍完整导出原工资金额与原文', async () => {
+    const db = await createMemoryDb()
+    try {
+      await runMigrations(db)
+      const tables = await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
+      const centralTables = new Set<string>(PAYROLL_CENTRAL_MIGRATION_TABLES)
+      expect(tables.filter(table => centralTables.has(table.name))).toEqual([])
+      await db.execute('INSERT INTO projects(id,name) VALUES(\'legacy-payroll-project\',\'旧工资项目\')')
+      await db.execute('INSERT INTO workers(id,name,trade) VALUES(\'legacy-payroll-worker\',\'原工资负责人\',\'泥工\')')
+      const original = JSON.stringify({ note: '仅保留旧工资原文，不补造中央确认依据' })
+      await db.execute('INSERT INTO wage_statements(id,project_id,leader_worker_id,month,quantity_source,status,gross_amount,actual_amount,snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)', ['legacy-payroll-statement', 'legacy-payroll-project', 'legacy-payroll-worker', '2026-08', 'field', 'released', 1000, 1000, original])
+
+      const result = await createCoreMigrationLocalSource(dependencies({ select: sql => db.select(sql) })).readSource()
+      expect(result.entities.payroll_projects).toHaveLength(1)
+      const graph = JSON.parse(String(result.entities.payroll_projects[0]!.attributes!.payrollGraphJson))
+      expect(graph).toMatchObject({ schemaVersion: 1, projectId: 'legacy-payroll-project', statements: [expect.objectContaining({ id: 'legacy-payroll-statement', gross_amount: 1000, actual_amount: 1000, snapshot_json: original })] })
+      expect(graph).not.toHaveProperty('central')
+    }
+    finally { db.close() }
   })
 
   it('sqlite 本地写入时间经 ISO 规范化后可完成甲方单据受控迁移', async () => {

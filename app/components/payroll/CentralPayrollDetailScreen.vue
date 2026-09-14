@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
-import { payrollAEntryReturn } from '~/lib/payroll/a-navigation'
+import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 import { payrollReadLocation, payrollReadQuery, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { payrollAmount, payrollNumber, payrollStatusLabel } from '~/lib/payroll/read-presentation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
@@ -23,7 +23,7 @@ const { current, loading, error, load } = usePayrollRead(() => JSON.stringify([i
   return read
 })
 const statement = computed(() => current.value?.statement)
-const back = computed(() => payrollAEntryReturn(route.query.returnTo, scope.value.origin, statement.value?.projectId) || payrollReadLocation('/subcontract/payroll', scope.value))
+const back = computed(() => (scope.value.origin && payrollAdjustmentReturn(route.query.returnTo, scope.value.origin)) || payrollReadLocation('/subcontract/payroll', scope.value))
 const sources = computed(() => {
   if (!statement.value)
     return null
@@ -118,6 +118,10 @@ useTabTitle(computed(() => statement.value ? `${statement.value.month} · 工资
       <PayrollC1StatementWorkspace v-if="statement.formatFamily === 'C1' && statement.recordKind === 'central' && !statement.deletedAt && current" :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" @changed="load" />
       <PayrollC2StatementWorkspace v-if="statement.formatFamily === 'C2' && statement.recordKind === 'central' && !statement.deletedAt && current" :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" @changed="load" />
       <PayrollSnapshotEvidence :snapshot="statement.snapshot" />
+      <template v-if="statement.status === 'released' && statement.recordKind === 'central' && ['A', 'C1', 'C2'].includes(statement.formatFamily) && current">
+        <PayrollAdjustmentHistorySection :statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" />
+        <PayrollActualLedgerSection :project-id="statement.projectId" :original-statement-id="statement.id" :origin="current.context.origin" :return-to="route.fullPath" />
+      </template>
       <PayrollEvidenceTable title="工资明细" :rows="statement.lines" :columns="lineColumns" />
       <PayrollEvidenceTable title="请款成员" :rows="statement.members" :columns="memberColumns" />
       <PayrollEvidenceTable title="收款分配" :rows="statement.allocations" :columns="allocationColumns" empty="原发放资料未提供可读取的成员分配，不推定全部付给负责人。" />

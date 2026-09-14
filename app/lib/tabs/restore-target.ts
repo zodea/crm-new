@@ -39,6 +39,7 @@ const LISTS: Record<string, [string, string?]> = {
   '/subcontract/quantity': ['工程量管理'],
   '/subcontract/payroll': ['工资台账', 'payroll:read'],
   '/subcontract/payroll/sources': ['工资来源', 'payroll:read'],
+  '/subcontract/payroll/payments': ['工资实际收付', 'payroll:read'],
   '/subcontract/attendance': ['考勤管理', 'payroll:read'],
   '/subcontract/daywork': ['签工管理', 'payroll:read'],
   '/material/requisition': ['下料单'],
@@ -91,6 +92,8 @@ const DETAIL_PATTERNS: Array<[RegExp, (matches: RegExpExecArray) => RestoredDeta
   [/^\/material\/delivery\/archive\/([^/]+)$/, m => ({ family: 'delivery', id: m[1]! })],
   [/^\/finance\/payment\/([^/]+)\/detail$/, m => ({ family: 'unconnected', id: m[1]! })],
   [/^\/subcontract\/payroll\/([^/]+)$/, m => ({ family: 'payroll', kind: 'wage', id: m[1]! })],
+  [/^\/subcontract\/payroll\/adjustments\/([^/]+)$/, m => ({ family: 'payroll-adjustment', id: m[1]! })],
+  [/^\/subcontract\/payroll\/payments\/([^/]+)$/, m => ({ family: 'payroll-actual', id: m[1]! })],
   [/^\/subcontract\/quantity\/([^/]+)\/([^/]+)$/, m => ({ family: 'crew-worker-fact', kind: 'assignment', id: m[2]!, secondId: m[1]! })],
   [/^\/schedule\/([^/]+)$/, m => ({ family: 'unconnected', id: m[1]! })],
 ]
@@ -137,6 +140,12 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     const quantity = url.pathname === '/subcontract/quantity' || (detail?.family === 'crew-worker-fact' && detail.kind === 'assignment')
     const schedule = url.pathname === '/' || url.pathname === '/schedule'
     const allowed = new Set(quantity || schedule ? [...baseAllowed, ...QUANTITY_FILTER_KEYS, ...SCHEDULE_DRILL_QUERY_KEYS] : baseAllowed)
+    const paymentPayrollScope = url.pathname === '/finance/payment-management'
+    if (paymentPayrollScope && url.searchParams.has('payrollProject')) {
+      if (origin === 'demo' || url.searchParams.getAll('payrollProject').length !== 1 || !isStableRouteIdentity(url.searchParams.get('payrollProject')))
+        return null
+      allowed.add('payrollProject')
+    }
     if (url.searchParams.get('payrollFormat') === 'C2') {
       const source: { kind: 'worker' | 'crew' | 'daywork', id: string, projectId?: string } | null = detail?.family === 'worker' || detail?.family === 'crew' ? { kind: detail.family, id: detail.id } : url.pathname === '/subcontract/daywork' ? { kind: 'daywork', id: url.searchParams.get('record') || '', projectId: url.searchParams.get('project') || '' } : null
       if (!origin || !source || PAYROLL_C2_SOURCE_KEYS.some(key => url.searchParams.getAll(key).length !== 1) || !payrollC2SourceContext(Object.fromEntries(url.searchParams), { ...source, origin }))
@@ -149,7 +158,7 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
         return null
       PAYROLL_C1_SOURCE_KEYS.forEach(key => allowed.add(key))
     }
-    else if (PAYROLL_SOURCE_KEYS.some(key => url.searchParams.has(key))) {
+    else if (PAYROLL_SOURCE_KEYS.some(key => url.searchParams.has(key) && !(paymentPayrollScope && key === 'payrollProject'))) {
       const sourceQuery = Object.fromEntries(url.searchParams)
       const source: { kind: PayrollSourceKind, id: string, projectId?: string } | null = detail?.family === 'crew-worker-fact' && detail.kind === 'assignment'
         ? { kind: 'quantity-unit' as const, id: detail.id, projectId: detail.secondId }
@@ -199,6 +208,11 @@ function parsePath(fullPath: string, depth = 0): { inspected: RestorableTabPath,
     }
     if (url.pathname === TARGET_COST_LIST_PATH)
       TARGET_COST_FILTER_KEYS.forEach(key => allowed.add(key))
+    if (url.pathname === '/subcontract/payroll/payments') {
+      if (url.searchParams.has('statementId') && (url.searchParams.getAll('statementId').length !== 1 || !isStableRouteIdentity(url.searchParams.get('statementId'))))
+        return null
+      allowed.add('statementId')
+    }
     if ((TARGET_COST_SOURCE_PATHS as readonly string[]).includes(url.pathname)) {
       const sourceQuery: Record<string, unknown> = Object.fromEntries(url.searchParams)
       if (TARGET_COST_SOURCE_QUERY_KEYS.some(key => url.searchParams.has(key))) {

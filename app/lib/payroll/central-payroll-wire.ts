@@ -1,5 +1,6 @@
 import { isStableRouteIdentity } from '../util/stable-route-identity'
 import { payrollProblem } from './central-contract'
+import { transformPayrollReleaseApplications } from './central-release-adjustment-wire'
 import { payrollObject } from './central-snapshot'
 import { amountInCents } from './statements'
 
@@ -56,6 +57,8 @@ export function transformPayrollC1Wire(value: unknown, decode: boolean): unknown
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
     if (['history', 'beforeData', 'afterData', 'evidence'].includes(key))
       return [key, child]
+    if (key === 'adjustmentApplications')
+      return [key, transformPayrollReleaseApplications(child, decode)]
     const money = monetary.has(key) || (metric && ['value', 'knownValue'].includes(key))
     if ((!money && !decimal.has(key)) || payrollObject(child))
       return [key, transformPayrollC1Wire(child, decode)]
@@ -88,6 +91,8 @@ export function transformPayrollC2Wire(value: unknown, decode: boolean): unknown
   return Object.fromEntries(Object.entries(value).filter(([, child]) => child !== undefined).map(([key, child]) => {
     if (['original', 'history', 'beforeData', 'afterData', 'evidence'].includes(key))
       return [key, child]
+    if (key === 'adjustmentApplications')
+      return [key, transformPayrollReleaseApplications(child, decode)]
     const money = monetary.has(key) || (metric && ['value', 'knownValue'].includes(key))
     if ((!money && !['unitRate', 'unitPrice', 'laborUnits', 'quantity', 'payRatio'].includes(key)) || payrollObject(child))
       return [key, transformPayrollC2Wire(child, decode)]
